@@ -1,0 +1,74 @@
+import Link from "next/link";
+import { auth } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import MobileNav from "./MobileNav";
+import HeaderUserMenu from "./HeaderUserMenu";
+
+const NAV_LINKS = [
+  { href: "/kosular", label: "Koşular" },
+  { href: "/analizler", label: "Analizler" },
+  { href: "/istatistik", label: "İstatistik" },
+];
+
+export default async function Header() {
+  const session = await auth();
+  const user = session?.user;
+
+  return (
+    <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-2.5">
+          <span className="text-base font-bold tracking-tight leading-none">
+            <span className="text-white">ROTA</span>
+            <span
+              style={{
+                background:
+                  "linear-gradient(90deg,#5b9bd5 0%,#a8c8e8 30%,#e4ddc8 50%,#d4b45a 65%,#c8971e 85%,#b8820a 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              GANYAN
+            </span>
+          </span>
+        </Link>
+
+        {/* Desktop nav */}
+        <nav className="hidden items-center gap-1 md:flex">
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          {user ? (
+            <HeaderUserMenu name={user.name} email={user.email} role={user.role} />
+          ) : (
+            <>
+              <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+                <Link href="/giris">Giriş Yap</Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                className="hidden bg-brand hover:bg-brand/90 text-brand-foreground md:inline-flex"
+              >
+                <Link href="/kayit">Kayıt Ol</Link>
+              </Button>
+            </>
+          )}
+          <MobileNav isLoggedIn={!!user} />
+        </div>
+      </div>
+    </header>
+  );
+}

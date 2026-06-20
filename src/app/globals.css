@@ -1,26 +1,116 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background:          var(--background);
+  --color-foreground:          var(--foreground);
+  --color-card:                var(--card);
+  --color-card-foreground:     var(--card-foreground);
+  --color-popover:             var(--popover);
+  --color-popover-foreground:  var(--popover-foreground);
+  --color-primary:             var(--primary);
+  --color-primary-foreground:  var(--primary-foreground);
+  --color-secondary:           var(--secondary);
+  --color-secondary-foreground:var(--secondary-foreground);
+  --color-muted:               var(--muted);
+  --color-muted-foreground:    var(--muted-foreground);
+  --color-accent:              var(--accent);
+  --color-accent-foreground:   var(--accent-foreground);
+  --color-destructive:         var(--destructive);
+  --color-border:              var(--border);
+  --color-input:               var(--input);
+  --color-ring:                var(--ring);
+
+  --color-brand:               var(--brand);
+  --color-brand-foreground:    var(--brand-foreground);
+  --color-target:              var(--target);
+  --color-target-foreground:   var(--target-foreground);
+  --color-hit:                 var(--hit);
+  --color-miss:                var(--miss);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/*
+  Tek tema — daima koyu lacivert.
+  #0F1B29 → oklch(0.12 0.038 240)
+  html'de class="dark" var, bu yüzden shadcn bileşenleri .dark varyantı kullanır.
+  Hem :root hem .dark aynı değerleri taşıyor — temayı kilitliyoruz.
+*/
+
+:root,
+.dark {
+  --radius: 0.5rem;
+
+  /* Ana arka plan: #0F1B29 */
+  --background:  oklch(0.12 0.038 240);
+  --foreground:  oklch(0.96 0.005 240);
+
+  /* Kartlar — bir kademe açık */
+  --card:              oklch(0.16 0.038 240);
+  --card-foreground:   oklch(0.96 0.005 240);
+
+  --popover:           oklch(0.16 0.038 240);
+  --popover-foreground:oklch(0.96 0.005 240);
+
+  /* Primary: altın (marka düğmeler) */
+  --primary:           oklch(0.74 0.17 82);
+  --primary-foreground:oklch(0.12 0.038 240);
+
+  /* İkincil alanlar */
+  --secondary:         oklch(0.20 0.038 240);
+  --secondary-foreground: oklch(0.92 0.005 240);
+
+  --muted:             oklch(0.20 0.038 240);
+  --muted-foreground:  oklch(0.58 0.015 240);
+
+  --accent:            oklch(0.22 0.038 240);
+  --accent-foreground: oklch(0.96 0.005 240);
+
+  --destructive:       oklch(0.60 0.22 27);
+
+  --border:            #1B354F;
+  --input:             #1B354F;
+  --ring:              oklch(0.74 0.17 82);
+
+  /* ── ROTAGANYAN marka renkleri ─────────── */
+
+  /* Altın sarı — logo GANYAN */
+  --brand:             oklch(0.74 0.17 82);
+  --brand-foreground:  oklch(0.12 0.038 240);
+
+  /* Çelik mavi — logo grafik */
+  --target:            oklch(0.62 0.13 228);
+  --target-foreground: oklch(0.12 0.038 240);
+
+  --hit:               oklch(0.58 0.16 155);
+  --miss:              oklch(0.62 0.22 27);
+}
+
+/* ─── Base ─────────────────────────────────── */
+*, *::before, *::after {
+  border-color: #1B354F;
+}
+
+html {
+  background: oklch(0.12 0.038 240);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* Satır zebra rengi */
+.race-row-even { background: oklch(0.16 0.038 240); }

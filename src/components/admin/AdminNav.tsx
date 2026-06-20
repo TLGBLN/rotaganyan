@@ -1,0 +1,53 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import {
+  LayoutDashboard,
+  Flag,
+  Trophy,
+  BookOpen,
+  Settings,
+  Users,
+  PackageOpen,
+  Dna,
+} from "lucide-react";
+
+const NAV = [
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/admin/kosular", label: "Koşular", icon: Flag },
+  { href: "/admin/sonuclar", label: "Sonuçlar", icon: Trophy },
+  { href: "/admin/pedigri", label: "Pedigri", icon: Dna },
+  { href: "/admin/makaleler", label: "Makaleler", icon: BookOpen },
+  { href: "/admin/kullanicilar", label: "Kullanıcılar", icon: Users },
+  { href: "/admin/import", label: "JSON İmport", icon: PackageOpen },
+  { href: "/admin/metodoloji", label: "Metodoloji", icon: Settings },
+];
+
+export default function AdminNav() {
+  const pathname = usePathname();
+
+  return (
+    <nav className="flex flex-col gap-0.5 p-3">
+      {NAV.map(({ href, label, icon: Icon, exact }) => {
+        const active = exact ? pathname === href : pathname.startsWith(href);
+        return (
+          <Link
+            key={href}
+            href={href}
+            className={cn(
+              "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              active
+                ? "bg-brand/15 text-brand border-l-2 border-brand pl-[10px]"
+                : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+            )}
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}

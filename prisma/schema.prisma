@@ -1,0 +1,371 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── ENUMS ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  USER
+  EDITOR
+  ADMIN
+}
+
+enum Plan {
+  FREE
+  PREMIUM
+}
+
+enum Surface {
+  CIM
+  KUM
+  SENTETIK
+}
+
+enum Breed {
+  ARAP
+  INGILIZ
+}
+
+enum Confidence {
+  DUSUK
+  ORTA
+  YUKSEK
+}
+
+enum PedigreeRating {
+  ZAYIF
+  DUSUK
+  ORTA
+  GUCLU
+  YUKSEK
+  COK_YUKSEK
+  SORU
+  BILINMIYOR
+}
+
+enum ArticleType {
+  EDUCATIONAL
+  MAGAZINE
+}
+
+enum NotificationType {
+  NEW_PREDICTION
+  NEW_ARTICLE
+  SYSTEM
+}
+
+enum LessonCategory {
+  DERECE
+  SICIL_KILO
+  AGF
+  TEMPO
+  TUM_ATLAR
+  BANKO
+  JOKEY
+  GALOP
+  TAKI
+  GRUP
+  GENEL
+}
+
+// ─── AUTH & USERS ─────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String?
+  name          String?
+  role          Role      @default(USER)
+  plan          Plan      @default(FREE)
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  predictions   Prediction[]
+  articles      Article[]
+  notifications Notification[]
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── RACE DOMAIN ──────────────────────────────────────────────────────────────
+
+model Hippodrome {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  slug     String    @unique
+  raceDays RaceDay[]
+}
+
+model RaceDay {
+  id           String   @id @default(cuid())
+  date         DateTime
+  hippodromeId String
+  createdAt    DateTime @default(now())
+
+  hippodrome Hippodrome @relation(fields: [hippodromeId], references: [id])
+  races      Race[]
+
+  @@unique([date, hippodromeId])
+}
+
+model Race {
+  id          String   @id @default(cuid())
+  raceDayId   String
+  raceNo      Int
+  time        String?
+  classType   String
+  breed       Breed
+  surface     Surface
+  distance    Int
+  conditions  String?
+  ageWeight   String?
+  trackRecord String?
+  createdAt   DateTime @default(now())
+
+  raceDay    RaceDay     @relation(fields: [raceDayId], references: [id], onDelete: Cascade)
+  runners    Runner[]
+  prediction Prediction?
+  result     Result?
+
+  @@unique([raceDayId, raceNo])
+}
+
+model Runner {
+  id               String  @id @default(cuid())
+  raceId           String
+  no               Int
+  name             String
+  sire             String?
+  dam              String?
+  damSire          String?
+  pedigreeNote     String?
+  pedigreeUrl      String?
+  jockey           String?
+  trainer          String?
+  startNo          Int?
+  weight           Float?
+  weightChange     Float?
+  equipment        String?
+  equipmentAdded   String?
+  equipmentRemoved String?
+  sameJockey       Boolean @default(false)
+  agf              Float?
+  raceStyle        Json?
+
+  race    Race     @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  gallops Gallop[]
+  picks   Pick[]
+
+  @@unique([raceId, no])
+}
+
+model Gallop {
+  id       String   @id @default(cuid())
+  runnerId String
+  date     DateTime
+  track    String?
+  surface  Surface?
+  jockey   String?
+  form     String?
+  splits   Json
+
+  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+}
+
+// Admin-maintained sire reputation reference — powers automatic pedigree scoring.
+// Tiers are domain knowledge the analyst (not the system) owns; this table just
+// lets that knowledge be looked up instead of re-typed into every report.
+model SireTier {
+  id      String         @id @default(cuid())
+  name    String         @unique
+  tier    PedigreeRating
+  surface Surface?
+  breed   Breed?
+  note    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── PREDICTION ───────────────────────────────────────────────────────────────
+
+model Prediction {
+  id           String     @id @default(cuid())
+  raceId       String     @unique
+  authorId     String
+  confidence   Confidence @default(ORTA)
+  notes        String
+  tempo        String?
+  couponNarrow String?
+  couponNormal String?
+  couponWide   String?
+  isBanko      Boolean    @default(false)
+  bankoNote    String?
+  published    Boolean    @default(false)
+  publishedAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  race   Race   @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [authorId], references: [id])
+  picks  Pick[]
+}
+
+model Pick {
+  id             String         @id @default(cuid())
+  predictionId   String
+  rank           Int
+  runnerId       String?
+  runnerLabel    String
+  score          Int?
+  details        Json
+  pedigreeRating PedigreeRating @default(BILINMIYOR)
+  isTarget       Boolean        @default(false)
+
+  prediction Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  runner     Runner?    @relation(fields: [runnerId], references: [id])
+
+  @@unique([predictionId, rank])
+}
+
+// ─── RESULT ───────────────────────────────────────────────────────────────────
+
+model Result {
+  id          String   @id @default(cuid())
+  raceId      String   @unique
+  actualOrder Json
+  winnerNo    Int?
+  hitTop1     Boolean  @default(false)
+  hitInCoupon Boolean  @default(false)
+  hitRanks    Json?
+  errorTag    String?
+  errorNote   String?
+  cikan       String?
+  enteredAt   DateTime @default(now())
+
+  race    Race               @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  lessons PostMortemLesson[]
+}
+
+// ─── CONTENT ──────────────────────────────────────────────────────────────────
+
+model Article {
+  id              String      @id @default(cuid())
+  type            ArticleType
+  title           String
+  slug            String      @unique
+  excerpt         String?
+  body            String
+  coverImage      String?
+  category        String?
+  tags            String[]
+  authorId        String
+  published       Boolean     @default(false)
+  publishedAt     DateTime?
+  metaTitle       String?
+  metaDescription String?
+  ogImage         String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([type, published])
+}
+
+// ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String?
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+}
+
+// ─── METHODOLOGY ──────────────────────────────────────────────────────────────
+
+model MethodologyVersion {
+  id            String   @id @default(cuid())
+  version       String   @unique
+  effectiveDate DateTime
+  content       String
+  isCurrent     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+model PostMortemLesson {
+  id        String         @id @default(cuid())
+  title     String
+  date      DateTime
+  category  LessonCategory
+  rule      String
+  raceRef   String?
+  resultId  String?
+  tags      String[]
+  active    Boolean        @default(true)
+  createdAt DateTime       @default(now())
+
+  result Result? @relation(fields: [resultId], references: [id])
+
+  @@index([category, active])
+}
+
+// ─── ENGINE CONFIG ────────────────────────────────────────────────────────────
+
+model EngineConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
