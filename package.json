@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node -e \"try{require('fs').rmSync('.next',{recursive:true,force:true})}catch(e){}\" && next dev --turbopack",
+    "postinstall": "prisma generate",
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
