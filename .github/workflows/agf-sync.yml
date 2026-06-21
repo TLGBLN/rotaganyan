@@ -1,0 +1,16 @@
+name: AGF Sync
+
+on:
+  schedule:
+    # 06:00-19:00 Türkiye saati (UTC+3) arası her 15 dakikada bir = 03:00-16:00 UTC
+    - cron: "*/15 3-16 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call AGF sync endpoint
+        run: |
+          curl -sf -X GET "https://rotaganyan.com/api/cron/agf-sync" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
