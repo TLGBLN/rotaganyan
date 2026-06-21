@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { getRaceDetail } from "@/server/services/race.service";
+import { auth } from "@/lib/auth";
 import RaceCard from "@/components/race/RaceCard";
 
 type PageProps = {
@@ -16,7 +17,10 @@ export default async function RaceDetailPage({ params }: PageProps) {
 
   if (isNaN(raceNo)) notFound();
 
-  const race = await getRaceDetail(tarih, hipodrom, raceNo);
+  const [race, session] = await Promise.all([
+    getRaceDetail(tarih, hipodrom, raceNo),
+    auth(),
+  ]);
   if (!race) notFound();
 
   const dateLabel = format(race.raceDay.date, "d MMMM yyyy (EEEE)", { locale: tr });
@@ -46,7 +50,7 @@ export default async function RaceDetailPage({ params }: PageProps) {
       </div>
 
       {/* Race card */}
-      <RaceCard race={race} />
+      <RaceCard race={race} isLoggedIn={!!session?.user} />
     </main>
   );
 }

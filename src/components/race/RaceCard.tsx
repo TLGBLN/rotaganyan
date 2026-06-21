@@ -1,4 +1,7 @@
+import Link from "next/link";
+import { Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import TargetBadge from "@/components/prediction/TargetBadge";
 import { cn, surfaceLabel, breedLabel } from "@/lib/utils";
 import type { RaceDetail } from "@/server/services/race.service";
@@ -6,6 +9,7 @@ import type { PedigreeRating } from "@prisma/client";
 
 type Props = {
   race: RaceDetail;
+  isLoggedIn: boolean;
 };
 
 const PED_LABEL: Record<PedigreeRating, string> = {
@@ -34,9 +38,10 @@ function splitLayerDetails(details: unknown) {
   return { a, b, c, gerekce: rest.join(" · ") || "—" };
 }
 
-export default function RaceCard({ race }: Props) {
+export default function RaceCard({ race, isLoggedIn }: Props) {
   const { runners } = race;
   const picks = race.prediction?.published ? race.prediction.picks : [];
+  const hasAnalysis = picks.length > 0;
 
   return (
     <section>
@@ -51,7 +56,20 @@ export default function RaceCard({ race }: Props) {
         {race.trackRecord && <span className="text-xs">E.İ.D.: {race.trackRecord}</span>}
       </div>
 
-      {picks.length > 0 ? (
+      {hasAnalysis && !isLoggedIn ? (
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed py-16 text-center text-sm text-muted-foreground">
+          <Lock className="h-6 w-6" />
+          <p>Bu koşu için analiz mevcut. Görmek için giriş yapmalısınız.</p>
+          <div className="flex gap-2">
+            <Button asChild size="sm">
+              <Link href="/giris">Giriş Yap</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/kayit">Kayıt Ol</Link>
+            </Button>
+          </div>
+        </div>
+      ) : picks.length > 0 ? (
         <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-xs">
             <thead>
