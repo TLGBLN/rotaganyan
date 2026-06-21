@@ -1,4 +1,4 @@
-import { format, isToday, isTomorrow, parseISO, differenceInDays } from "date-fns";
+import { format, parseISO, differenceInDays } from "date-fns";
 import { tr } from "date-fns/locale";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import {
 import { fetchDailyProgram } from "@/lib/tjk-daily";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { syncResultsForDate } from "@/server/services/result-sync";
+import { turkeyDateString } from "@/lib/tz";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import RaceCountdown from "@/components/kosular/RaceCountdown";
 import { cn } from "@/lib/utils";
@@ -39,14 +40,13 @@ const BREED_LABEL: Record<string, string> = {
 export default async function KosularPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
-  const todayDate = new Date();
-  const today = format(todayDate, "yyyy-MM-dd");
+  const today = turkeyDateString();
   const currentDate = params.tarih ?? today;
   const parsedCurrentDate = parseISO(currentDate);
-  const isCurrentToday = isToday(parsedCurrentDate);
-  const isCurrentTomorrow = isTomorrow(parsedCurrentDate);
+  const isCurrentToday = currentDate === today;
+  const isCurrentTomorrow = currentDate === turkeyDateString(1);
   // Bugün dahil 7 gün ileriye kadar otomatik çek
-  const daysAhead = differenceInDays(parsedCurrentDate, new Date());
+  const daysAhead = differenceInDays(parsedCurrentDate, parseISO(today));
   const shouldAutoIngest = daysAhead >= 0 && daysAhead <= 7;
 
   // Önce DB'ye bak
@@ -75,7 +75,7 @@ export default async function KosularPage({ searchParams }: PageProps) {
 
   // Hâlâ boşsa ve bugünse TJK canlı fallback
   const tjkProgram = dbRaceDays.length === 0 && isCurrentToday
-    ? await fetchDailyProgram(todayDate)
+    ? await fetchDailyProgram(new Date(`${today}T00:00:00Z`))
     : [];
 
   // Admin bir günü tamamen silmiş olabilir (RaceDay kaydı kalır ama races boş) —

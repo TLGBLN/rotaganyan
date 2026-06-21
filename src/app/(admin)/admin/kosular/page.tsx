@@ -4,6 +4,7 @@ import { tr } from "date-fns/locale";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { turkeyDateString } from "@/lib/tz";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import DeleteRaceDayButton from "@/components/admin/DeleteRaceDayButton";
 import DeleteRaceButton from "@/components/admin/DeleteRaceButton";
@@ -16,7 +17,7 @@ type PageProps = {
 
 export default async function AdminKosularPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const currentDate = params.tarih ?? format(new Date(), "yyyy-MM-dd");
+  const currentDate = params.tarih ?? turkeyDateString();
   const raceDays = await getAdminRaceDays(currentDate);
 
   return (
