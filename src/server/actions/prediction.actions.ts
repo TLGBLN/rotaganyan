@@ -46,6 +46,11 @@ export async function upsertPrediction(input: PredictionInput) {
         couponWide: input.couponWide,
         isBanko: input.isBanko,
         bankoNote: input.bankoNote,
+        // Var olan bir analizin üzerine yeniden girilip kaydedilmesi, en güncel
+        // hâlinin otomatik yayında olmasını gerektirir — taslağa düşürüp admini
+        // tekrar checklist'e yönlendirmiyoruz.
+        published: true,
+        publishedAt: new Date(),
         picks: {
           create: input.picks.map((p) => ({
             rank: p.rank,
@@ -60,6 +65,10 @@ export async function upsertPrediction(input: PredictionInput) {
       },
     });
     revalidatePath("/admin/analizler");
+    revalidatePath("/analizler");
+    revalidatePath("/kosular");
+    revalidatePath("/tahmin-onerileri");
+    revalidatePath("/");
     return { id: existing.id };
   }
 

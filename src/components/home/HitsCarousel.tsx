@@ -13,7 +13,7 @@ type Item = {
     raceNo: number;
     classType: string;
     raceDay: { date: Date | string; hippodrome: { name: string; slug: string } };
-    result: { hitTop1: boolean; winnerNo: number | null } | null;
+    result: { hitTop1: boolean; winnerNo: number | null; ganyan: number | null } | null;
   };
   picks: { runner: { name: string; no: number } | null }[];
 };
@@ -22,7 +22,7 @@ function Card({ p }: { p: Item }) {
   const pick1 = p.picks[0];
   const rd = p.race.raceDay;
   const dateStr = format(new Date(rd.date), "d MMM yyyy", { locale: tr });
-  const href = `/kosular/${format(new Date(rd.date), "yyyy-MM-dd")}/${rd.hippodrome.slug}/${p.race.raceNo}`;
+  const href = "/analizler";
 
   return (
     <Link
@@ -37,19 +37,27 @@ function Card({ p }: { p: Item }) {
           ✓ İsabet
         </span>
       </div>
-      <p className="font-bold text-foreground truncate">
-        {pick1?.runner?.name ?? "—"}
-      </p>
+      <div className="flex items-end justify-between gap-2">
+        <p className="font-bold text-foreground truncate">{pick1?.runner?.name ?? "—"}</p>
+        {p.race.result?.ganyan != null && (
+          <span className="shrink-0 text-right leading-none">
+            <span className="block text-lg font-extrabold text-brand">
+              {p.race.result.ganyan.toFixed(2)}
+            </span>
+            <span className="block text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+              Ganyan
+            </span>
+          </span>
+        )}
+      </div>
       <div className="mt-1 text-xs text-muted-foreground">
         {p.race.raceNo}. Koşu · {p.race.classType}
       </div>
-      {p.isBanko && (
-        <div className="mt-2">
-          <span className="text-xs border border-brand/40 text-brand bg-brand/10 rounded-full px-2 py-0.5">
-            ★ Banko
-          </span>
-        </div>
-      )}
+      <div className="mt-2">
+        <span className="text-xs border border-brand/40 text-brand bg-brand/10 rounded-full px-2 py-0.5">
+          ★ Banko
+        </span>
+      </div>
     </Link>
   );
 }

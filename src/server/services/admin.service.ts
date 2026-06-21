@@ -98,30 +98,34 @@ export async function getAdminRaceDays(dateStr?: string, limit = 30): Promise<Ad
   });
 }
 
-export async function getRacesNeedingResult() {
-  return db.race.findMany({
-    where: {
-      prediction: { published: true },
-      result: null,
-    },
+export async function getAllResults(limit = 50) {
+  return db.result.findMany({
+    // Analiz edilmemiş (Prediction'sız) yarışların sonuçları bu listede
+    // gösterilmez — burası ROTAGANYAN analizlerinin sonuçlarını takip eder.
+    where: { race: { prediction: { published: true } } },
     include: {
-      raceDay: { include: { hippodrome: true } },
-      prediction: { select: { id: true, isBanko: true } },
+      race: { include: { raceDay: { include: { hippodrome: true } } } },
     },
-    orderBy: { raceDay: { date: "desc" } },
-    take: 50,
+    orderBy: { enteredAt: "desc" },
+    take: limit,
   });
 }
 
 export async function getDashboardStats() {
+  // Analiz yapılmamış (Prediction'sız) yarışların sonuçları başarı oranını
+  // çarpıtır — dashboard'daki sonuç sayıları ve listesi sadece analiz edilmiş
+  // (yayında Prediction'ı olan) yarışları kapsar.
+  const analyzedResultFilter = { race: { prediction: { published: true } } };
+
   const [totalPredictions, publishedPredictions, totalResults, pendingResults, totalUsers, recentResults] =
     await Promise.all([
       db.prediction.count(),
       db.prediction.count({ where: { published: true } }),
-      db.result.count(),
+      db.result.count({ where: analyzedResultFilter }),
       db.race.count({ where: { prediction: { published: true }, result: null } }),
       db.user.count(),
       db.result.findMany({
+        where: analyzedResultFilter,
         take: 5,
         orderBy: { enteredAt: "desc" },
         include: { race: { include: { raceDay: { include: { hippodrome: true } } } } },

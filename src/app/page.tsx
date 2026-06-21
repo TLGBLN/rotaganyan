@@ -5,17 +5,22 @@ import HitsCarousel from "@/components/home/HitsCarousel";
 import LiveTvPlayer from "@/components/home/LiveTvPlayer";
 import HeaderUserMenu from "@/components/layout/HeaderUserMenu";
 import NewsTicker from "@/components/home/NewsTicker";
-import { getHitPredictions } from "@/server/services/race.service";
+import AltiliGanyanResults from "@/components/home/AltiliGanyanResults";
+import KuponOnerileri from "@/components/home/KuponOnerileri";
+import { getHitPredictions, getCouponSuggestions } from "@/server/services/race.service";
 import { auth } from "@/lib/auth";
 import { fetchTjkTicker } from "@/lib/tjk-ticker";
+import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
 
 export const revalidate = 600; // 10 dakika
 
 export default async function HomePage() {
-  const [hitPredictions, session, tickerItems] = await Promise.all([
+  const [hitPredictions, couponSuggestions, session, tickerItems, altiliResults] = await Promise.all([
     getHitPredictions(16),
+    getCouponSuggestions(8),
     auth(),
     fetchTjkTicker(),
+    fetchTodaysAltiliResults(),
   ]);
 
   return (
@@ -35,7 +40,7 @@ export default async function HomePage() {
             <Link href="/kosular">Günün Koşuları</Link>
           </Button>
           <Button asChild variant="outline" size="lg">
-            <Link href="/istatistik">İsabet Oranları</Link>
+            <Link href="/tahmin-onerileri">Tahmin Önerileri</Link>
           </Button>
           <LiveTvPlayer />
         </div>
@@ -54,7 +59,7 @@ export default async function HomePage() {
           <div className="mb-5 flex items-center justify-between px-4">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-hit animate-pulse" />
-              <h2 className="text-lg font-semibold">İsabet Sağlayan Tahminler</h2>
+              <h2 className="text-lg font-semibold">İsabet Sağlayan Bankolar</h2>
             </div>
             <Link href="/analizler" className="text-sm text-brand hover:underline pr-4">
               Tümünü Gör →
@@ -63,6 +68,12 @@ export default async function HomePage() {
           <HitsCarousel items={hitPredictions} />
         </section>
       )}
+
+      {/* Kupon Önerileri */}
+      <KuponOnerileri items={couponSuggestions} />
+
+      {/* Altılı Ganyan sonuçları */}
+      <AltiliGanyanResults results={altiliResults} />
 
       {/* Değer önerisi */}
       <section className="border-t px-4 py-16">

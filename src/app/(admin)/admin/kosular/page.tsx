@@ -1,5 +1,4 @@
 import { getAdminRaceDays } from "@/server/services/admin.service";
-import AgfSyncButton from "./AgfSyncButton";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import Link from "next/link";
@@ -26,7 +25,6 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
         <h1 className="text-lg font-bold">Koşu Programı</h1>
         <div className="flex items-center gap-2">
           <DateNavigator currentDate={currentDate} basePath="/admin/kosular" />
-          <AgfSyncButton date={currentDate} />
         </div>
       </div>
 

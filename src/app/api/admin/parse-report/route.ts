@@ -145,20 +145,25 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  await db.pick.deleteMany({ where: { predictionId: prediction.id } });
-  for (const p of parsed.picks) {
-    await db.pick.create({
-      data: {
-        predictionId: prediction.id,
-        rank: p.rank,
-        runnerId: runnerIdByNo[p.no] ?? null,
-        runnerLabel: `${p.no} ${p.name}`,
-        score: p.score,
-        details: p.details,
-        pedigreeRating: p.pedigreeRating,
-      },
-    });
-  }
+  // Delete + recreate must be atomic — otherwise an overlapping submit (e.g. a
+  // double-click) can interleave with this loop and leave stale picks mixed in
+  // with the new ones.
+  await db.$transaction([
+    db.pick.deleteMany({ where: { predictionId: prediction.id } }),
+    ...parsed.picks.map((p) =>
+      db.pick.create({
+        data: {
+          predictionId: prediction.id,
+          rank: p.rank,
+          runnerId: runnerIdByNo[p.no] ?? null,
+          runnerLabel: `${p.no} ${p.name}`,
+          score: p.score,
+          details: p.details,
+          pedigreeRating: p.pedigreeRating,
+        },
+      })
+    ),
+  ]);
 
   return NextResponse.json({
     ok: true,

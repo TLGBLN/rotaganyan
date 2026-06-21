@@ -1,7 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, XCircle } from "lucide-react";
-import PickRow from "./PickRow";
 import CouponBox from "./CouponBox";
 import { formatDate } from "@/lib/utils";
 import type { RaceDetail } from "@/server/services/race.service";
@@ -48,22 +47,6 @@ export default function PredictionBoard({ prediction, result }: Props) {
           )}
         </div>
       )}
-
-      {/* Picks */}
-      <div className="space-y-2">
-        {prediction.picks.map((pick) => (
-          <PickRow
-            key={pick.id}
-            rank={pick.rank}
-            runnerLabel={pick.runnerLabel}
-            score={pick.score}
-            details={Array.isArray(pick.details) ? (pick.details as string[]) : []}
-            pedigreeRating={pick.pedigreeRating}
-            isTarget={pick.isTarget}
-            pedigreeUrl={pick.runner?.pedigreeUrl}
-          />
-        ))}
-      </div>
 
       {/* Notes */}
       {prediction.notes && (

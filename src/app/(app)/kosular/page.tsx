@@ -7,6 +7,7 @@ import {
 } from "@/server/services/race.service";
 import { fetchDailyProgram } from "@/lib/tjk-daily";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
+import { syncResultsForDate } from "@/server/services/result-sync";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import RaceCountdown from "@/components/kosular/RaceCountdown";
 import { cn } from "@/lib/utils";
@@ -25,9 +26,9 @@ const CONFIDENCE_COLOR: Record<Confidence, string> = {
 };
 
 const SURFACE_COLOR: Record<string, string> = {
-  Çim:      "text-hit",
-  Kum:      "text-brand",
-  Sentetik: "text-target",
+  Çim:      "text-[#009900]",
+  Kum:      "text-[#996633]",
+  Sentetik: "text-[#D39B1E]",
 };
 
 const BREED_LABEL: Record<string, string> = {
@@ -59,6 +60,16 @@ export default async function KosularPage({ searchParams }: PageProps) {
       dbRaceDays = await getRaceDaysByDate(currentDate, undefined);
     } catch {
       // ingest başarısız olursa TJK canlı fallback'e düş
+    }
+  }
+
+  // Geçmiş/bugünkü koşularda sonucu eksik olanlar varsa TJK'dan otomatik çek
+  if (daysAhead <= 0) {
+    try {
+      await syncResultsForDate(currentDate);
+      dbRaceDays = await getRaceDaysByDate(currentDate, undefined);
+    } catch {
+      // sonuç çekme başarısız olursa sessizce geç, sayfa "Bekleniyor" göstermeye devam eder
     }
   }
 
@@ -122,7 +133,7 @@ export default async function KosularPage({ searchParams }: PageProps) {
                       <th className="px-3 py-2">Sınıf</th>
                       <th className="px-3 py-2">Irk</th>
                       <th className="px-3 py-2">Pist</th>
-                      <th className="px-3 py-2 text-right">Mesafe</th>
+                      <th className="px-3 py-2 pr-10 text-right">Mesafe</th>
                       <th className="px-3 py-2">Analiz</th>
                       <th className="px-3 py-2">Sonuç</th>
                     </tr>
@@ -142,10 +153,8 @@ export default async function KosularPage({ searchParams }: PageProps) {
                             i % 2 === 1 && "race-row-even"
                           )}
                         >
-                          <td className="px-3 py-2">
-                            <Link href={href} className="font-semibold text-brand hover:underline">
-                              {race.raceNo}. Koşu
-                            </Link>
+                          <td className="px-3 py-2 font-semibold">
+                            {race.raceNo}. Koşu
                           </td>
                           <td className="px-3 py-2 text-muted-foreground">
                             {race.time ?? "—"}
@@ -158,27 +167,44 @@ export default async function KosularPage({ searchParams }: PageProps) {
                           <td className={cn("px-3 py-2 text-xs font-medium", SURFACE_COLOR[surfaceLabel] ?? "text-muted-foreground")}>
                             {surfaceLabel}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono text-xs">{race.distance}m</td>
+                          <td className="px-3 py-2 pr-10 text-right font-mono text-xs">{race.distance}m</td>
                           <td className="px-3 py-2">
                             {pred?.published ? (
-                              <div className="flex items-center gap-1.5">
-                                <span className="h-1.5 w-1.5 rounded-full bg-hit animate-pulse" />
+                              <Link href={href} className="flex items-center gap-1.5">
+                                <span className="relative flex h-1.5 w-1.5">
+                                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-hit opacity-75" />
+                                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-hit" />
+                                </span>
                                 <Badge
                                   variant="outline"
-                                  className={cn("text-xs", CONFIDENCE_COLOR[pred.confidence])}
+                                  className={cn(
+                                    "text-xs",
+                                    pred.isBanko ? CONFIDENCE_COLOR[pred.confidence] : "border-[#007123] text-[#007123]"
+                                  )}
                                 >
                                   {pred.isBanko ? "★ Banko" : "Analiz Var"}
                                 </Badge>
-                              </div>
+                              </Link>
                             ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
+                              <Badge variant="outline" className="text-xs border-miss text-miss">
+                                Henüz Analiz Yok
+                              </Badge>
                             )}
                           </td>
                           <td className="px-3 py-2">
                             {result ? (
-                              <span className={cn("text-xs font-medium", result.hitTop1 ? "text-hit" : "text-miss")}>
-                                {result.hitTop1 ? "Tuttu ✓" : "Tutmadı ✗"}
-                              </span>
+                              result.hitTop1 ? (
+                                <span className="text-xs font-medium text-hit">
+                                  Tuttu ✓
+                                  {result.ganyan != null && (
+                                    <span className="ml-1 text-muted-foreground font-normal">
+                                      (Gny {result.ganyan.toFixed(2)})
+                                    </span>
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )
                             ) : (
                               <span className="text-xs text-muted-foreground">Bekleniyor</span>
                             )}
@@ -214,7 +240,7 @@ export default async function KosularPage({ searchParams }: PageProps) {
                       <th className="px-3 py-2">Sınıf</th>
                       <th className="px-3 py-2">Irk</th>
                       <th className="px-3 py-2">Pist</th>
-                      <th className="px-3 py-2 text-right">Mesafe</th>
+                      <th className="px-3 py-2 pr-10 text-right">Mesafe</th>
                       <th className="px-3 py-2">Analiz</th>
                     </tr>
                   </thead>
@@ -244,22 +270,32 @@ export default async function KosularPage({ searchParams }: PageProps) {
                           <td className={cn("px-3 py-2 text-xs font-medium", SURFACE_COLOR[race.surface] ?? "text-muted-foreground")}>
                             {race.surface || "—"}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono text-xs">
+                          <td className="px-3 py-2 pr-10 text-right font-mono text-xs">
                             {race.distance > 0 ? `${race.distance}m` : "—"}
                           </td>
                           <td className="px-3 py-2">
                             {db?.published ? (
                               <div className="flex items-center gap-1.5">
-                                <span className="h-1.5 w-1.5 rounded-full bg-hit animate-pulse" />
+                                <span className="relative flex h-1.5 w-1.5">
+                                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-hit opacity-75" />
+                                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-hit" />
+                                </span>
                                 <Badge
                                   variant="outline"
-                                  className={cn("text-xs", db.confidence ? CONFIDENCE_COLOR[db.confidence] : "")}
+                                  className={cn(
+                                    "text-xs",
+                                    db.isBanko
+                                      ? db.confidence ? CONFIDENCE_COLOR[db.confidence] : ""
+                                      : "border-[#007123] text-[#007123]"
+                                  )}
                                 >
                                   {db.isBanko ? "★ Banko" : "Analiz Var"}
                                 </Badge>
                               </div>
                             ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
+                              <Badge variant="outline" className="text-xs border-miss text-miss">
+                                Henüz Analiz Yok
+                              </Badge>
                             )}
                           </td>
                         </tr>

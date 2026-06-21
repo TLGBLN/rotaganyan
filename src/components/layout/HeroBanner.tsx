@@ -1,6 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
+import BannerCountdown from "./BannerCountdown";
+
+const GAZI_KOSUSU_TARGET = "2026-06-28T17:15:00+03:00";
 
 export default async function HeroBanner() {
   const session = await auth();
@@ -11,13 +14,18 @@ export default async function HeroBanner() {
       <div className="relative w-full">
         {/* Banner görseli */}
         <Image
-          src="/banner.png"
+          src="/gazi%20banner.png"
           alt="ROTAGANYAN — Analiz · Tahmin · Strateji"
-          width={3616}
-          height={1184}
+          width={2170}
+          height={725}
           className="w-full h-auto"
           priority
         />
+
+        {/* 100. Gazi Koşusu geri sayım — ROTAGANYAN yazısının üzerinde */}
+        <div className="absolute left-[34%] top-[5%] -translate-x-1/2 sm:left-[33%] sm:top-[6%]">
+          <BannerCountdown target={GAZI_KOSUSU_TARGET} />
+        </div>
 
         {/* Butonlar — sadece giriş yapmamış ziyaretçilere */}
         {!isLoggedIn && (

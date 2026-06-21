@@ -53,9 +53,9 @@ export default async function AdminDashboard() {
                     <td className="px-3 py-2 text-right">
                       <Badge
                         variant="outline"
-                        className={r.hitTop1 ? "border-hit text-hit" : "border-miss text-miss"}
+                        className={r.hitTop1 || r.hitInCoupon ? "border-hit text-hit" : "border-miss text-miss"}
                       >
-                        {r.hitTop1 ? "Tuttu" : "Tutmadı"}
+                        {r.hitTop1 ? "Tuttu" : r.hitInCoupon ? "Tuttu (İlk 3)" : "Tutmadı"}
                       </Badge>
                     </td>
                   </tr>

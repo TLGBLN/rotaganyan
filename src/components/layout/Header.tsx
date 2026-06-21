@@ -4,12 +4,6 @@ import { Button } from "@/components/ui/button";
 import MobileNav from "./MobileNav";
 import HeaderUserMenu from "./HeaderUserMenu";
 
-const NAV_LINKS = [
-  { href: "/kosular", label: "Koşular" },
-  { href: "/analizler", label: "Analizler" },
-  { href: "/istatistik", label: "İstatistik" },
-];
-
 export default async function Header() {
   const session = await auth();
   const user = session?.user;
@@ -34,19 +28,6 @@ export default async function Header() {
             </span>
           </span>
         </Link>
-
-        {/* Desktop nav */}
-        <nav className="hidden items-center gap-1 md:flex">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
 
         {/* Actions */}
         <div className="flex items-center gap-2">

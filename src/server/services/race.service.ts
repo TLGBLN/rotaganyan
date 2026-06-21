@@ -10,7 +10,7 @@ export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
     races: {
       include: {
         prediction: { select: { published: true; confidence: true; isBanko: true } };
-        result: { select: { hitTop1: true; hitInCoupon: true } };
+        result: { select: { hitTop1: true; hitInCoupon: true; ganyan: true } };
       };
     };
   };
@@ -41,7 +41,7 @@ export type PredictionListItem = Prisma.PredictionGetPayload<{
     race: {
       include: {
         raceDay: { include: { hippodrome: true } };
-        result: { select: { hitTop1: true; hitInCoupon: true; winnerNo: true } };
+        result: { select: { hitTop1: true; hitInCoupon: true; winnerNo: true; ganyan: true } };
       };
     };
     picks: {
@@ -73,7 +73,7 @@ export async function getRaceDaysByDate(
       races: {
         include: {
           prediction: { select: { published: true, confidence: true, isBanko: true } },
-          result: { select: { hitTop1: true, hitInCoupon: true } },
+          result: { select: { hitTop1: true, hitInCoupon: true, ganyan: true } },
         },
         orderBy: { raceNo: "asc" },
       },
@@ -148,7 +148,7 @@ export async function getHitPredictions(limit = 12): Promise<PredictionListItem[
       race: {
         include: {
           raceDay: { include: { hippodrome: true } },
-          result: { select: { hitTop1: true, hitInCoupon: true, winnerNo: true } },
+          result: { select: { hitTop1: true, hitInCoupon: true, winnerNo: true, ganyan: true } },
         },
       },
       picks: {
@@ -169,6 +169,7 @@ export async function getPublishedPredictions(
 ): Promise<{ items: PredictionListItem[]; total: number }> {
   const where: Prisma.PredictionWhereInput = {
     published: true,
+    NOT: { race: { result: { hitTop1: false } } },
     ...(classType ? { race: { classType } } : {}),
   };
 
@@ -179,7 +180,7 @@ export async function getPublishedPredictions(
         race: {
           include: {
             raceDay: { include: { hippodrome: true } },
-            result: { select: { hitTop1: true, hitInCoupon: true, winnerNo: true } },
+            result: { select: { hitTop1: true, hitInCoupon: true, winnerNo: true, ganyan: true } },
           },
         },
         picks: {
@@ -196,4 +197,64 @@ export async function getPublishedPredictions(
   ]);
 
   return { items, total };
+}
+
+/** Henüz sonuçlanmamış (bugün veya ileri tarihli) yayımlanmış aktif öneriler. */
+export async function getActivePredictions(): Promise<PredictionListItem[]> {
+  return db.prediction.findMany({
+    where: {
+      published: true,
+      race: {
+        result: null,
+        raceDay: { date: { gte: startOfDay(new Date()) } },
+      },
+    },
+    include: {
+      race: {
+        include: {
+          raceDay: { include: { hippodrome: true } },
+          result: { select: { hitTop1: true, hitInCoupon: true, winnerNo: true, ganyan: true } },
+        },
+      },
+      picks: {
+        where: { rank: 1 },
+        include: { runner: { select: { name: true, no: true } } },
+      },
+      author: { select: { name: true } },
+    },
+    orderBy: [{ race: { raceDay: { date: "asc" } } }, { race: { raceNo: "asc" } }],
+  });
+}
+
+/** Anasayfada gösterilecek, kupon önerisi girilmiş aktif (sonuçlanmamış) analizler. */
+export async function getCouponSuggestions(limit = 8): Promise<PredictionListItem[]> {
+  return db.prediction.findMany({
+    where: {
+      published: true,
+      race: {
+        result: null,
+        raceDay: { date: { gte: startOfDay(new Date()) } },
+      },
+      OR: [
+        { couponNarrow: { not: null } },
+        { couponNormal: { not: null } },
+        { couponWide: { not: null } },
+      ],
+    },
+    include: {
+      race: {
+        include: {
+          raceDay: { include: { hippodrome: true } },
+          result: { select: { hitTop1: true, hitInCoupon: true, winnerNo: true, ganyan: true } },
+        },
+      },
+      picks: {
+        where: { rank: 1 },
+        include: { runner: { select: { name: true, no: true } } },
+      },
+      author: { select: { name: true } },
+    },
+    orderBy: [{ race: { raceDay: { date: "asc" } } }, { race: { raceNo: "asc" } }],
+    take: limit,
+  });
 }

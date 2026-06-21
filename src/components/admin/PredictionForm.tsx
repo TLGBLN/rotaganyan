@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { upsertPrediction } from "@/server/actions/prediction.actions";
-import { scoreRunners, detectTempo } from "@/lib/methodology/engine";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,9 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { Confidence, PedigreeRating, Prisma } from "@prisma/client";
-import { Loader2, Zap } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import PublishChecklist from "./PublishChecklist";
-import RaceStyleButtons from "./RaceStyleButtons";
 
 type Runner = Prisma.RunnerGetPayload<{ include: { gallops: true } }>;
 
@@ -120,42 +118,6 @@ export default function PredictionForm({ raceId, runners, existingPrediction }: 
   const { fields } = useFieldArray({ control, name: "picks" });
   const isBanko = watch("isBanko");
 
-  function autoScore() {
-    const scored = scoreRunners(
-      runners.map((r) => ({
-        id: r.id,
-        no: r.no,
-        name: r.name,
-        weight: r.weight,
-        weightChange: r.weightChange,
-        agf: r.agf,
-        sameJockey: r.sameJockey,
-        equipmentAdded: r.equipmentAdded,
-        pedigreeRating: null,
-        gallops: r.gallops.map((g) => ({ form: g.form, date: new Date(g.date) })),
-      }))
-    );
-
-    const top3 = scored.slice(0, Math.min(3, scored.length));
-    top3.forEach((r, i) => {
-      setValue(`picks.${i}.runnerId`, r.id);
-      setValue(`picks.${i}.runnerLabel`, `#${r.no} ${r.name}`);
-      setValue(`picks.${i}.score`, r.totalScore);
-      setValue(`picks.${i}.isTarget`, r.isTarget);
-    });
-
-    const tempo = detectTempo(runners.map((r) => ({
-      id: r.id, no: r.no, name: r.name,
-      weight: r.weight, weightChange: r.weightChange, agf: r.agf,
-      sameJockey: r.sameJockey, equipmentAdded: r.equipmentAdded,
-      pedigreeRating: null,
-      gallops: r.gallops.map((g) => ({ form: g.form, date: new Date(g.date) })),
-    })));
-    setValue("tempo", tempo);
-
-    toast.success("Motor skorları atandı");
-  }
-
   async function onSubmit(data: FormData) {
     setSubmitting(true);
     try {
@@ -192,36 +154,6 @@ export default function PredictionForm({ raceId, runners, existingPrediction }: 
 
   return (
     <div className="space-y-6">
-      {/* Auto-score button */}
-      <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-3">
-        <div>
-          <p className="text-sm font-medium">Motor v1.6</p>
-          <p className="text-xs text-muted-foreground">Galop, pedigri, AGF ve kilo bazlı otomatik sıralama</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={autoScore} type="button">
-          <Zap className="mr-1.5 h-3.5 w-3.5" />
-          Otomatik Sırala
-        </Button>
-      </div>
-
-      {/* Koşu stili — tempo hesaplamasında kullanılır, form dışında anında kaydedilir */}
-      <section className="rounded-lg border p-3 space-y-2">
-        <h3 className="text-sm font-semibold">Koşu Stili</h3>
-        <div className="space-y-1.5">
-          {runners.map((r) => {
-            const style = (r.raceStyle as { style?: string } | null)?.style ?? null;
-            return (
-              <div key={r.id} className="flex items-center justify-between gap-3">
-                <span className="text-xs">
-                  #{r.no} {r.name}
-                </span>
-                <RaceStyleButtons runnerId={r.id} current={style} />
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Picks */}
         <section>

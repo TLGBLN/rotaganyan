@@ -99,6 +99,29 @@ function mapConfidence(v: string): Confidence {
   return "ORTA";
 }
 
+/** "52/60" -> 52, "/60" (unfilled placeholder) -> null, "**84/100**" (pre-stripped) -> 84 */
+function parseFractionNumerator(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const m = raw.trim().match(/^(\d+(?:[.,]\d+)?)/);
+  if (!m) return null;
+  const n = parseFloat(m[1].replace(",", "."));
+  return isNaN(n) ? null : n;
+}
+
+function countStars(raw: string): number {
+  return (raw.match(/⭐/g) ?? []).length;
+}
+
+/** A Katmanı/B Katmanı/C Katmanı şablonundaki yıldız sayısını PedigreeRating'e çevirir. */
+function mapStarPedigree(stars: number): PedigreeRating {
+  if (stars >= 5) return "COK_YUKSEK";
+  if (stars === 4) return "YUKSEK";
+  if (stars === 3) return "GUCLU";
+  if (stars === 2) return "ORTA";
+  if (stars === 1) return "DUSUK";
+  return "BILINMIYOR";
+}
+
 function mapPedigree(v: string): PedigreeRating {
   const n = normTr(v);
   // v1.6 template shorthand: Tier-1 ÇOK GÜÇLÜ / Tier-2 GÜÇLÜ / Tier-3 ORTA / Zayıf
@@ -374,7 +397,13 @@ function parseRankingTable(block: string): ReportPick[] {
   if (!headers.length) return [];
 
   const iRank = colIndex(headers, (h) => h.includes("SIRA"));
+  const iNo = colIndex(headers, (h) => h === "NO");
   const iAt = colIndex(headers, (h) => h === "AT");
+  // v1.6.1: A/B/C Katmanı + Toplam (100 üzerinden, katman ağırlıklı) — eski tek "Puan" sütununa da uyumlu.
+  const iKatmanA = colIndex(headers, (h) => h.includes("A KATMANI"));
+  const iKatmanB = colIndex(headers, (h) => h.includes("B KATMANI"));
+  const iKatmanC = colIndex(headers, (h) => h.includes("C KATMANI"));
+  const iToplam = colIndex(headers, (h) => h.includes("TOPLAM"));
   const iScore = colIndex(headers, (h) => h.includes("PUAN"));
   const iPed = colIndex(headers, (h) => h.includes("PEDIGRI"));
   const iNote = colIndex(headers, (h) => h.includes("GEREK"));
@@ -383,18 +412,42 @@ function parseRankingTable(block: string): ReportPick[] {
 
   const picks: ReportPick[] = [];
   rows.forEach((row, idx) => {
-    const parsed = parseNoName(row[iAt] ?? "");
-    if (!parsed) return;
+    let no: number | null;
+    let name: string;
+    if (iNo !== -1) {
+      no = parseInt(row[iNo]?.replace(/\D/g, "") ?? "", 10);
+      name = (row[iAt] ?? "").trim();
+    } else {
+      const parsed = parseNoName(row[iAt] ?? "");
+      if (!parsed) return;
+      no = parsed.no;
+      name = parsed.name;
+    }
+    if (no == null || isNaN(no) || !name) return;
+
     const rank = iRank !== -1 ? parseInt(row[iRank]?.replace(/\D/g, "") ?? "", 10) || idx + 1 : idx + 1;
-    const score = iScore !== -1 ? parseInt(row[iScore]?.replace(/\D/g, "") ?? "", 10) : NaN;
+
+    const layerNotes: string[] = [];
+    if (iKatmanA !== -1 && parseFractionNumerator(row[iKatmanA]) != null) layerNotes.push(`A: ${row[iKatmanA].trim()}`);
+    if (iKatmanB !== -1 && parseFractionNumerator(row[iKatmanB]) != null) layerNotes.push(`B: ${row[iKatmanB].trim()}`);
+    if (iKatmanC !== -1 && parseFractionNumerator(row[iKatmanC]) != null) layerNotes.push(`C: ${row[iKatmanC].trim()}`);
+
+    const toplam = iToplam !== -1 ? parseFractionNumerator(row[iToplam]) : null;
+    const legacyScore = iScore !== -1 ? parseInt(row[iScore]?.replace(/\D/g, "") ?? "", 10) : NaN;
+    const score = toplam != null ? Math.round(toplam) : (isNaN(legacyScore) ? null : legacyScore);
+
+    const pedRaw = iPed !== -1 ? row[iPed] ?? "" : "";
+    const stars = countStars(pedRaw);
+    const pedigreeRating = stars > 0 ? mapStarPedigree(stars) : iPed !== -1 ? mapPedigree(pedRaw) : "BILINMIYOR";
+
     const note = iNote !== -1 ? row[iNote]?.trim() : "";
     picks.push({
       rank,
-      no: parsed.no,
-      name: parsed.name,
-      score: isNaN(score) ? null : score,
-      pedigreeRating: iPed !== -1 ? mapPedigree(row[iPed] ?? "") : "BILINMIYOR",
-      details: note ? [note] : [],
+      no,
+      name,
+      score,
+      pedigreeRating,
+      details: [...layerNotes, ...(note ? [note] : [])],
     });
   });
   return picks.sort((a, b) => a.rank - b.rank);
@@ -525,7 +578,9 @@ export function parseFullReport(markdown: string): ParsedReport {
   const gallops = parseGallopTable(extractSection(text, "IDMAN / GALOP") || extractSection(text, "GALOP"), nameIndex);
 
   // NİHAİ SIRALAMA / NİHAİ SIRALAMA ÖZET table (+ richer NİHAİ PUANLAMA detail enrichment)
-  const picks = parseRankingTable(extractSection(text, "NIHAI SIRALAMA"));
+  // Başlık satırı olmadan sadece tablonun kendisi yapıştırılmış olabilir — bu durumda
+  // extractSection boş döner, tüm metni tarayarak tabloyu yine de bulmaya çalış.
+  const picks = parseRankingTable(extractSection(text, "NIHAI SIRALAMA") || text);
   const puanlamaSection = extractSection(text, "NIHAI PUANLAMA");
   const detailsByNo = parseDetailedScoring(puanlamaSection);
   const decisionsByNo = parseNarrativeDecisions(puanlamaSection, nameIndex);
@@ -594,6 +649,9 @@ export function isFullReport(markdown: string): boolean {
     n.includes("NIHAI SIRALAMA") ||
     n.includes("ROTAGANYAN ANALIZ RAPORU") ||
     n.includes("KOSU KIMLIGI") ||
-    n.includes("METODOLOJI KONTROL LISTESI")
+    n.includes("METODOLOJI KONTROL LISTESI") ||
+    // Başlık/bölüm satırı olmadan sadece v1.8 sıralama tablosu yapıştırılmış olabilir —
+    // bu tablonun kendine özgü kolon başlıkları da tam rapor olarak tanınmalı.
+    (n.includes("A KATMANI") && n.includes("KILIT GEREKCE"))
   );
 }

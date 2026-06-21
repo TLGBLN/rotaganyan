@@ -5,21 +5,19 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
+  FileText,
   Flag,
   Trophy,
-  BookOpen,
   Settings,
   Users,
   PackageOpen,
-  Dna,
 } from "lucide-react";
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/admin/analizler", label: "Analizler", icon: FileText },
   { href: "/admin/kosular", label: "Koşular", icon: Flag },
   { href: "/admin/sonuclar", label: "Sonuçlar", icon: Trophy },
-  { href: "/admin/pedigri", label: "Pedigri", icon: Dna },
-  { href: "/admin/makaleler", label: "Makaleler", icon: BookOpen },
   { href: "/admin/kullanicilar", label: "Kullanıcılar", icon: Users },
   { href: "/admin/import", label: "JSON İmport", icon: PackageOpen },
   { href: "/admin/metodoloji", label: "Metodoloji", icon: Settings },

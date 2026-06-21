@@ -102,7 +102,7 @@ export default function MarkdownRaceInput({ raceId, raceLabel, defaultOpen = fal
             onClick={() => { setText(ANALYSIS_REPORT_TEMPLATE); setStatus("idle"); }}
             className="text-[11px] font-medium text-brand hover:underline"
           >
-            v1.6 Şablonunu Yükle →
+            v1.8 Nihai Şablon Özeti →
           </button>
 
           {/* Textarea */}

@@ -21,7 +21,7 @@ async function fetchHtml(url: string): Promise<string> {
   return body.text();
 }
 
-export type ResultRow = { rank: number; no: number; name: string };
+export type ResultRow = { rank: number; no: number; name: string; ganyan?: number };
 export type CityRaceResult = { raceNo: number; rows: ResultRow[] };
 
 export async function fetchCityResults(
@@ -75,7 +75,10 @@ export async function fetchCityResults(
       const no = parseInt(numMatch[1], 10);
       const name = raw.slice(0, numMatch.index).trim();
 
-      rows.push({ rank, no, name });
+      const gnyText = $(".gunluk-GunlukYarisSonuclari-Gny", row).first().text().trim();
+      const ganyan = gnyText ? parseFloat(gnyText.replace(",", ".")) : undefined;
+
+      rows.push({ rank, no, name, ganyan: isNaN(ganyan as number) ? undefined : ganyan });
     });
 
     if (rows.length > 0) {

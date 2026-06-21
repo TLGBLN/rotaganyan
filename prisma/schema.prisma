@@ -277,6 +277,7 @@ model Result {
   raceId      String   @unique
   actualOrder Json
   winnerNo    Int?
+  ganyan      Float?
   hitTop1     Boolean  @default(false)
   hitInCoupon Boolean  @default(false)
   hitRanks    Json?

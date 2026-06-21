@@ -4,6 +4,7 @@ import { tr } from "date-fns/locale";
 import { getAdminPredictionById } from "@/server/services/admin.service";
 import PredictionForm from "@/components/admin/PredictionForm";
 import PublishChecklist from "@/components/admin/PublishChecklist";
+import MarkdownRaceInput from "@/components/admin/MarkdownRaceInput";
 import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,11 @@ export default async function EditAnalizPage({ params }: PageProps) {
           {pred.published ? "Yayında" : "Taslak"}
         </Badge>
       </div>
+
+      <MarkdownRaceInput
+        raceId={race.id}
+        raceLabel={`Markdown İle Yeniden Gir — ${race.raceNo}. Koşu · ${race.runners.length} at`}
+      />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
         <PredictionForm

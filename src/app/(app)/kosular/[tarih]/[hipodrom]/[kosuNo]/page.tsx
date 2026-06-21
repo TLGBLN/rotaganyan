@@ -4,10 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { getRaceDetail } from "@/server/services/race.service";
-import PredictionBoard from "@/components/prediction/PredictionBoard";
 import RaceCard from "@/components/race/RaceCard";
-import { Separator } from "@/components/ui/separator";
-import { auth, hasRole } from "@/lib/auth";
 
 type PageProps = {
   params: Promise<{ tarih: string; hipodrom: string; kosuNo: string }>;
@@ -19,13 +16,8 @@ export default async function RaceDetailPage({ params }: PageProps) {
 
   if (isNaN(raceNo)) notFound();
 
-  const [race, session] = await Promise.all([
-    getRaceDetail(tarih, hipodrom, raceNo),
-    auth(),
-  ]);
+  const race = await getRaceDetail(tarih, hipodrom, raceNo);
   if (!race) notFound();
-
-  const canAnalyze = hasRole(session?.user?.role ?? "USER", "EDITOR");
 
   const dateLabel = format(race.raceDay.date, "d MMMM yyyy (EEEE)", { locale: tr });
 
@@ -53,19 +45,8 @@ export default async function RaceDetailPage({ params }: PageProps) {
         <p className="text-sm text-muted-foreground">{dateLabel}</p>
       </div>
 
-      {/* Prediction — only if published */}
-      {race.prediction?.published && (
-        <>
-          <PredictionBoard
-            prediction={race.prediction}
-            result={race.result ?? undefined}
-          />
-          <Separator />
-        </>
-      )}
-
       {/* Race card */}
-      <RaceCard race={race} showAnalysis={canAnalyze} />
+      <RaceCard race={race} />
     </main>
   );
 }
