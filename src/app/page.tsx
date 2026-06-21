@@ -34,8 +34,8 @@ export default async function HomePage() {
       </div>
 
       {/* CTA */}
-      <section className="flex items-center justify-between gap-4 px-4 py-10 max-w-7xl mx-auto w-full">
-        <div className="flex items-center gap-4">
+      <section className="flex flex-col items-stretch gap-4 px-4 py-10 max-w-7xl mx-auto w-full sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-4">
           <Button asChild size="lg" className="bg-brand hover:bg-brand/90 text-brand-foreground">
             <Link href="/kosular">Günün Koşuları</Link>
           </Button>

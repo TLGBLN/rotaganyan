@@ -29,16 +29,16 @@ export default async function HeroBanner() {
 
         {/* Butonlar — sadece giriş yapmamış ziyaretçilere */}
         {!isLoggedIn && (
-          <div className="absolute bottom-[12%] right-[5%] flex items-center gap-3">
+          <div className="absolute bottom-[6%] right-[3%] flex items-center gap-1.5 sm:bottom-[12%] sm:right-[5%] sm:gap-3">
             <Link
               href="/giris"
-              className="rounded-md border border-white/50 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20"
+              className="rounded-md border border-white/50 bg-white/10 px-2.5 py-1.5 text-[10px] font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 sm:px-5 sm:py-2.5 sm:text-sm"
             >
               Giriş Yap
             </Link>
             <Link
               href="/kayit"
-              className="rounded-md px-5 py-2.5 text-sm font-semibold text-white transition"
+              className="rounded-md px-2.5 py-1.5 text-[10px] font-semibold text-white transition sm:px-5 sm:py-2.5 sm:text-sm"
               style={{ background: "linear-gradient(135deg,#c8971e,#e0b84a)" }}
             >
               Kayıt Ol
