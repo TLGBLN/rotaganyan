@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/agf-sync",
       "schedule": "*/15 6-19 * * *"
+    },
+    {
+      "path": "/api/cron/ingest-program",
+      "schedule": "0 5 * * *"
     }
   ]
 }

@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import type { Confidence, PedigreeRating, Prisma } from "@prisma/client";
 import { Loader2, Zap } from "lucide-react";
 import PublishChecklist from "./PublishChecklist";
+import RaceStyleButtons from "./RaceStyleButtons";
 
 type Runner = Prisma.RunnerGetPayload<{ include: { gallops: true } }>;
 
@@ -202,6 +203,24 @@ export default function PredictionForm({ raceId, runners, existingPrediction }: 
           Otomatik Sırala
         </Button>
       </div>
+
+      {/* Koşu stili — tempo hesaplamasında kullanılır, form dışında anında kaydedilir */}
+      <section className="rounded-lg border p-3 space-y-2">
+        <h3 className="text-sm font-semibold">Koşu Stili</h3>
+        <div className="space-y-1.5">
+          {runners.map((r) => {
+            const style = (r.raceStyle as { style?: string } | null)?.style ?? null;
+            return (
+              <div key={r.id} className="flex items-center justify-between gap-3">
+                <span className="text-xs">
+                  #{r.no} {r.name}
+                </span>
+                <RaceStyleButtons runnerId={r.id} current={style} />
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Picks */}

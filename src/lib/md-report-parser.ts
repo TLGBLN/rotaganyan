@@ -299,9 +299,14 @@ function parseGallopTable(block: string, nameIndex: Map<string, number>): Report
   return gallops;
 }
 
-/** Pulls the "Karar: ..." closing line out of each "### 🥇 #1 — At · N PUAN" block in NİHAİ PUANLAMA. */
-function parseNarrativeDecisions(section: string, nameIndex: Map<string, number>): Map<number, string> {
-  const decisions = new Map<number, string>();
+/**
+ * Pulls the analyst's own per-horse reasoning out of each "### 🥇 #1 — At · N PUAN"
+ * block in NİHAİ PUANLAMA: both the "Gerekçe: ..." line (why) and "Karar: ..." line
+ * (final call) — these are free-text comments the analyst writes per race, since the
+ * deciding factors differ from one race to another and can't be reduced to fixed criteria.
+ */
+function parseNarrativeDecisions(section: string, nameIndex: Map<string, number>): Map<number, string[]> {
+  const decisions = new Map<number, string[]>();
   const chunks = section.split(/^###\s+/m).slice(1);
 
   for (const chunk of chunks) {
@@ -315,8 +320,12 @@ function parseNarrativeDecisions(section: string, nameIndex: Map<string, number>
       : resolveRunnerNo(lines[0].split("—")[1]?.split("·")[0] ?? "", nameIndex);
     if (no == null || isNaN(no)) continue;
 
+    const notes: string[] = [];
+    const gerekceLine = lines.find((l) => /^Gerek[çc]e\s*:/i.test(l));
+    if (gerekceLine) notes.push(gerekceLine.replace(/^Gerek[çc]e\s*:\s*/i, "").trim());
     const kararLine = lines.find((l) => /^Karar\s*:/i.test(l));
-    if (kararLine) decisions.set(no, kararLine.replace(/^Karar\s*:\s*/i, "").trim());
+    if (kararLine) notes.push(kararLine.replace(/^Karar\s*:\s*/i, "").trim());
+    if (notes.length) decisions.set(no, notes);
   }
   return decisions;
 }
@@ -524,7 +533,7 @@ export function parseFullReport(markdown: string): ParsedReport {
     const rich = detailsByNo.get(pick.no);
     if (rich?.length) pick.details = rich;
     const decision = decisionsByNo.get(pick.no);
-    if (decision) pick.details = [...pick.details, decision];
+    if (decision?.length) pick.details = [...pick.details, ...decision];
     // Summary table's "Pedigri" cell is often a bare "Tier-N" shorthand; fall
     // back to the fuller PEDİGRİ ANALİZİ row (e.g. "Tier-1 ÇOK GÜÇLÜ — ...") when unresolved.
     if (pick.pedigreeRating === "BILINMIYOR") {
