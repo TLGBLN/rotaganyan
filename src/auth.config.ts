@@ -3,6 +3,7 @@ import type { NextAuthConfig } from "next-auth";
 // Edge Runtime uyumlu — Prisma/pg import yok.
 // Yalnızca middleware tarafından kullanılır.
 export const authConfig: NextAuthConfig = {
+  trustHost: true,
   pages: {
     signIn: "/giris",
     error: "/giris",
