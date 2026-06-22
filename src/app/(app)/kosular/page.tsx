@@ -13,6 +13,7 @@ import { fetchDailyProgram } from "@/lib/tjk-daily";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { syncResultsForDate } from "@/server/services/result-sync";
 import { turkeyDateString } from "@/lib/tz";
+import { wonOnlyInWideCoupon } from "@/lib/result-utils";
 import { auth } from "@/lib/auth";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import RaceCountdown from "@/components/kosular/RaceCountdown";
@@ -219,6 +220,14 @@ export default async function KosularPage({ searchParams }: PageProps) {
                                     <span className="ml-1 text-muted-foreground font-normal">
                                       (Gny {result.ganyan.toFixed(2)})
                                     </span>
+                                  )}
+                                  {wonOnlyInWideCoupon(result.winnerNo, pred?.couponNormal, pred?.couponWide) && (
+                                    <Badge
+                                      variant="outline"
+                                      className="ml-1.5 border-amber-500 text-[10px] font-normal text-amber-600"
+                                    >
+                                      ⚠ Genişte yer aldı
+                                    </Badge>
                                   )}
                                 </span>
                               ) : (
