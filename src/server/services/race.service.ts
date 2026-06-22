@@ -185,8 +185,10 @@ export async function getPublishedPredictions(
 ): Promise<{ items: PredictionListItem[]; total: number }> {
   const where: Prisma.PredictionWhereInput = {
     published: true,
-    NOT: { race: { result: { hitTop1: false } } },
-    ...(classType ? { race: { classType } } : {}),
+    race: {
+      result: { hitTop1: true },
+      ...(classType ? { classType } : {}),
+    },
   };
 
   const [items, total] = await Promise.all([
