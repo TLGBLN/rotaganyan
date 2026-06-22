@@ -7,6 +7,7 @@ import type { Role, Plan } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import RoleSelector from "./RoleSelector";
 import UserActions from "./UserActions";
+import CreateUserDialog from "./CreateUserDialog";
 
 const ROLE_LABEL: Record<Role, string> = { USER: "Üye", EDITOR: "Editör", ADMIN: "Admin" };
 const PLAN_LABEL: Record<Plan, string> = { FREE: "Ücretsiz", PREMIUM: "Premium" };
@@ -49,7 +50,10 @@ export default async function KullanicilarPage({ searchParams }: PageProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-bold">Kullanıcılar</h1>
-        <span className="text-sm text-muted-foreground">{total} kayıtlı üye</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">{total} kayıtlı üye</span>
+          <CreateUserDialog />
+        </div>
       </div>
 
       {/* Arama */}
