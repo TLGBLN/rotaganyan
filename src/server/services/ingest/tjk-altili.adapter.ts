@@ -68,9 +68,9 @@ export async function fetchAltiliSonuc(sehirId: number, sehirAdi: string): Promi
   return groups.length > 0 ? { sehirId, sehirAdi, groups } : null;
 }
 
-async function fetchTodaysAltiliResultsUncached(): Promise<AltiliCityResult[]> {
-  const { discoverTurkishCities, toTjkDate } = await import("./tjk-info.adapter");
-  const cities = await discoverTurkishCities(toTjkDate(new Date()));
+async function fetchTodaysAltiliResultsUncached(tjkDate: string): Promise<AltiliCityResult[]> {
+  const { discoverTurkishCities } = await import("./tjk-info.adapter");
+  const cities = await discoverTurkishCities(tjkDate);
 
   const results: AltiliCityResult[] = [];
   for (const city of cities) {
@@ -81,9 +81,14 @@ async function fetchTodaysAltiliResultsUncached(): Promise<AltiliCityResult[]> {
   return results;
 }
 
-/** Fetches today's Altılı Ganyan results for every active Turkish hippodrome — günde bir kez TJK'dan çekilip 24 saat cache'lenir. */
-export const fetchTodaysAltiliResults = unstable_cache(
+const cachedFetchTodaysAltiliResults = unstable_cache(
   fetchTodaysAltiliResultsUncached,
   ["todays-altili-results"],
-  { revalidate: 86400 }
+  { revalidate: 3600 }
 );
+
+/** Fetches today's Altılı Ganyan results for every active Turkish hippodrome — TJK gününe göre cache'lenir, gün değişince otomatik yenilenir. */
+export async function fetchTodaysAltiliResults(): Promise<AltiliCityResult[]> {
+  const { toTjkDate } = await import("./tjk-info.adapter");
+  return cachedFetchTodaysAltiliResults(toTjkDate(new Date()));
+}
