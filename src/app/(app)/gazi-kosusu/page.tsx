@@ -62,12 +62,9 @@ export default async function GaziKosusuPage() {
         </p>
       </div>
 
-      <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+      <div className="flex justify-center">
         <Button asChild size="lg" className="bg-brand hover:bg-brand/90 text-brand-foreground">
           <Link href={`/kosular?tarih=${tarihParam}`}>Koşu Programını Gör</Link>
-        </Button>
-        <Button asChild size="lg" variant="outline">
-          <Link href="/kayit">Kayıt Ol</Link>
         </Button>
       </div>
 
