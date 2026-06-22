@@ -40,7 +40,7 @@ export default async function HomePage() {
             <Link href="/kosular">Günün Koşuları</Link>
           </Button>
           <Button asChild variant="outline" size="lg">
-            <Link href="/tahmin-onerileri">Tahmin Önerileri</Link>
+            <Link href="/tahmin-onerileri">Banko Önerileri</Link>
           </Button>
           <LiveTvPlayer />
         </div>
