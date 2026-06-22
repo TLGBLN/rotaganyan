@@ -17,7 +17,7 @@ export default async function TahminOnerileriPage() {
   return (
     <main className="mx-auto max-w-4xl space-y-6 px-4 py-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Tahmin Önerileri</h1>
+        <h1 className="text-xl font-bold">Banko Önerileri</h1>
         <span className="text-sm text-muted-foreground">{items.length} öneri</span>
       </div>
 
@@ -26,8 +26,8 @@ export default async function TahminOnerileriPage() {
           <Lock className="h-6 w-6" />
           <p>
             {items.length > 0
-              ? `Şu an ${items.length} aktif tahmin önerisi var.`
-              : "Aktif tahmin önerilerini görmek için giriş yapmalısınız."}
+              ? `Şu an ${items.length} aktif banko önerisi var.`
+              : "Aktif banko önerilerini görmek için giriş yapmalısınız."}
             <br />
             Görmek için giriş yapmalısınız.
           </p>
@@ -42,7 +42,7 @@ export default async function TahminOnerileriPage() {
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-lg border border-dashed py-12 text-center text-sm text-muted-foreground">
-          Şu an için sonuçlanmamış aktif öneri yok.
+          Şu an için sonuçlanmamış aktif banko önerisi yok.
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border">
