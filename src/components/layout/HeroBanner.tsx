@@ -34,17 +34,19 @@ export default async function HeroBanner() {
         )}
 
         {/* 100. Gazi Koşusu geri sayım — ROTAGANYAN yazısının üzerinde */}
-        <div className="absolute left-[34%] top-[5%] -translate-x-1/2 flex flex-col items-center gap-1 sm:left-[33%] sm:top-[6%]">
-          {isGaziUpcoming && (
-            <Link
-              href="/gazi-kosusu"
-              className="text-[9px] font-semibold uppercase tracking-wide text-brand hover:underline sm:text-xs"
-            >
-              Gaziye Doğru →
-            </Link>
-          )}
-          <BannerCountdown target={GAZI_KOSUSU_TARGET} />
+        <div className="absolute left-[34%] top-[5%] -translate-x-1/2 sm:left-[33%] sm:top-[6%]">
+          <BannerCountdown target={GAZI_KOSUSU_TARGET} size="sm" />
         </div>
+
+        {/* Gaziye Doğru linki — banner'ın sol alt köşesi */}
+        {isGaziUpcoming && (
+          <Link
+            href="/gazi-kosusu"
+            className="absolute bottom-[6%] left-[3%] text-[9px] font-semibold uppercase tracking-wide text-brand hover:underline sm:bottom-[12%] sm:left-[5%] sm:text-xs"
+          >
+            Gaziye Doğru →
+          </Link>
+        )}
 
         {/* Butonlar — sadece giriş yapmamış ziyaretçilere */}
         {!isLoggedIn && (
