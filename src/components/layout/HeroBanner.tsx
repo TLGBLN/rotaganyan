@@ -8,19 +8,30 @@ const GAZI_KOSUSU_TARGET = "2026-06-28T17:15:00+03:00";
 export default async function HeroBanner() {
   const session = await auth();
   const isLoggedIn = !!session?.user;
+  const isGaziUpcoming = Date.now() < new Date(GAZI_KOSUSU_TARGET).getTime();
+
+  const bannerImage = (
+    <Image
+      src="/gazi%20banner.png"
+      alt="ROTAGANYAN — Analiz · Tahmin · Strateji"
+      width={2170}
+      height={725}
+      className="w-full h-auto"
+      priority
+    />
+  );
 
   return (
     <div className="w-full">
       <div className="relative w-full">
-        {/* Banner görseli */}
-        <Image
-          src="/gazi%20banner.png"
-          alt="ROTAGANYAN — Analiz · Tahmin · Strateji"
-          width={2170}
-          height={725}
-          className="w-full h-auto"
-          priority
-        />
+        {/* Banner görseli — geri sayım bitene kadar Gazi Koşusu sayfasına bağlı */}
+        {isGaziUpcoming ? (
+          <Link href="/gazi-kosusu" className="block">
+            {bannerImage}
+          </Link>
+        ) : (
+          bannerImage
+        )}
 
         {/* 100. Gazi Koşusu geri sayım — ROTAGANYAN yazısının üzerinde */}
         <div className="absolute left-[34%] top-[5%] -translate-x-1/2 sm:left-[33%] sm:top-[6%]">
