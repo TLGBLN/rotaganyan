@@ -24,7 +24,7 @@ function Box({ value, label, size }: { value: number; label: string; size: "sm" 
         className={cn(
           "flex items-center justify-center rounded-lg border border-brand/40 bg-gradient-to-b from-[#2a1f0f] to-black font-serif font-bold text-brand shadow-[0_0_10px_rgba(200,151,30,0.25)]",
           size === "sm"
-            ? "h-5 w-5 text-[10px] sm:h-8 sm:w-8 sm:rounded-xl sm:text-sm"
+            ? "h-6 w-6 text-xs sm:h-9 sm:w-9 sm:rounded-xl sm:text-base"
             : "h-8 w-8 text-base sm:h-12 sm:w-12 sm:rounded-xl sm:text-xl"
         )}
       >
@@ -33,7 +33,7 @@ function Box({ value, label, size }: { value: number; label: string; size: "sm" 
       <span
         className={cn(
           "mt-0.5 font-medium uppercase tracking-[0.1em] text-white/50",
-          size === "sm" ? "text-[5px] sm:text-[7px]" : "text-[6px] sm:text-[10px]"
+          size === "sm" ? "text-[6px] sm:text-[8px]" : "text-[6px] sm:text-[10px]"
         )}
       >
         {label}
@@ -60,7 +60,7 @@ export default function BannerCountdown({ target, size = "md" }: Props) {
     <div
       className={cn(
         "inline-flex items-center rounded-lg border border-brand/25 bg-gradient-to-b from-black/75 to-[#1a1206]/85 backdrop-blur-md",
-        size === "sm" ? "gap-1 px-1.5 py-1 sm:gap-1.5 sm:rounded-xl sm:px-2.5 sm:py-2" : "gap-1.5 px-2 py-1.5 sm:gap-2.5 sm:rounded-xl sm:px-4 sm:py-3"
+        size === "sm" ? "gap-1.5 px-2 py-1.5 sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2.5" : "gap-1.5 px-2 py-1.5 sm:gap-2.5 sm:rounded-xl sm:px-4 sm:py-3"
       )}
     >
       <Box value={parts.days} label="Gün" size={size} />

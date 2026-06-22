@@ -42,7 +42,7 @@ export default async function HeroBanner() {
         {isGaziUpcoming && (
           <Link
             href="/gazi-kosusu"
-            className="absolute bottom-[6%] left-[3%] text-[9px] font-semibold uppercase tracking-wide text-brand hover:underline sm:bottom-[12%] sm:left-[5%] sm:text-xs"
+            className="absolute bottom-[3%] left-[3%] text-[11px] font-semibold uppercase tracking-wide text-brand hover:underline sm:bottom-[7%] sm:left-[5%] sm:text-sm"
           >
             Gaziye Doğru →
           </Link>
