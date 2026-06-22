@@ -61,7 +61,10 @@ export async function fetchCityResults(
     table.find("tbody tr").each((_, row) => {
       const rankText = $(".gunluk-GunlukYarisSonuclari-SONUCNO", row).first().text().trim();
       const rank = parseInt(rankText, 10);
-      if (isNaN(rank)) return;
+      // rank 0 = diskalifiye/hükmen mağlup at, TJK tabloda en sona ekliyor ama "0" yazıyor —
+      // gerçek bir bitiş sırası değil, dahil edilirse sort sırasında 1. sıranın önüne geçip
+      // yanlış atın ganyanı kazanan ganyanı olarak kaydedilir.
+      if (isNaN(rank) || rank <= 0) return;
 
       const cell = $(".gunluk-GunlukYarisSonuclari-AtAdi3", row).first();
       const link = cell.find("a").first();
