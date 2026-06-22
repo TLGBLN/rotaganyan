@@ -23,6 +23,12 @@ const PED_LABEL: Record<PedigreeRating, string> = {
   BILINMIYOR: "—",
 };
 
+function couponCategory(rank: number): { label: string; className: string } {
+  if (rank <= 4) return { label: "Ekonomik", className: "border-hit text-hit" };
+  if (rank <= 7) return { label: "Normal", className: "border-brand text-brand" };
+  return { label: "Geniş", className: "border-muted-foreground text-muted-foreground" };
+}
+
 function splitLayerDetails(details: unknown) {
   const list = Array.isArray(details) ? (details as string[]) : [];
   let a = "—";
@@ -75,6 +81,7 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
             <thead>
               <tr className="border-b bg-muted/40">
                 <th className="px-2 py-2 text-left font-medium text-muted-foreground">Sıra</th>
+                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Kupon</th>
                 <th className="px-2 py-2 text-left font-medium text-muted-foreground">No</th>
                 <th className="px-2 py-2 text-left font-medium text-muted-foreground">At</th>
                 <th className="px-2 py-2 text-right font-medium text-muted-foreground">A Katmanı</th>
@@ -89,6 +96,7 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
               {picks.map((pick, i) => {
                 const { a, b, c, gerekce } = splitLayerDetails(pick.details);
                 const isWinner = race.result?.winnerNo != null && pick.runner?.no === race.result.winnerNo;
+                const coupon = couponCategory(pick.rank);
                 return (
                   <tr
                     key={pick.id}
@@ -100,6 +108,11 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                     )}
                   >
                     <td className="px-2 py-2 font-semibold">{pick.rank}</td>
+                    <td className="px-2 py-2">
+                      <Badge variant="outline" className={cn("text-[10px]", coupon.className)}>
+                        {coupon.label}
+                      </Badge>
+                    </td>
                     <td className="px-2 py-2 font-mono">{pick.runner?.no ?? "—"}</td>
                     <td className="px-2 py-2 font-medium">
                       <span className={isWinner ? "font-bold text-yellow-600 dark:text-yellow-400" : ""}>
