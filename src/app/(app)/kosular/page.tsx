@@ -1,14 +1,19 @@
 import { format, parseISO, differenceInDays } from "date-fns";
 import { tr } from "date-fns/locale";
 import Link from "next/link";
+import { Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   getRaceDaysByDate,
+  getComboCoupon,
+  type ComboLeg,
 } from "@/server/services/race.service";
 import { fetchDailyProgram } from "@/lib/tjk-daily";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { syncResultsForDate } from "@/server/services/result-sync";
 import { turkeyDateString } from "@/lib/tz";
+import { auth } from "@/lib/auth";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import RaceCountdown from "@/components/kosular/RaceCountdown";
 import { cn } from "@/lib/utils";
@@ -82,6 +87,17 @@ export default async function KosularPage({ searchParams }: PageProps) {
   // bu tombstone'lar görünümden ayıklanır ama yukarıdaki TJK fallback kararını etkilemez.
   const visibleRaceDays = dbRaceDays.filter((rd) => rd.races.length > 0);
 
+  const session = await auth();
+  const isLoggedIn = !!session?.user;
+
+  const comboByRaceDay = new Map<string, ComboLeg[]>();
+  if (visibleRaceDays.length > 0) {
+    const combos = await Promise.all(
+      visibleRaceDays.map((rd) => getComboCoupon(rd.hippodrome.slug, currentDate))
+    );
+    visibleRaceDays.forEach((rd, i) => comboByRaceDay.set(rd.id, combos[i]));
+  }
+
   // DB'deki koşular için hızlı lookup: "slug-raceNo" → prediction/result
   const dbLookup = new Map<string, {
     published?: boolean;
@@ -121,7 +137,10 @@ export default async function KosularPage({ searchParams }: PageProps) {
       {/* ── DB'den gelen program (analiz/sonuç bilgili) ── */}
       {visibleRaceDays.length > 0 && (
         <div className="space-y-8">
-          {visibleRaceDays.map((raceDay) => (
+          {visibleRaceDays.map((raceDay) => {
+            const combo = comboByRaceDay.get(raceDay.id) ?? [];
+            const totalCombinations = combo.reduce((acc, leg) => acc * Math.max(leg.horses.length, 1), 1);
+            return (
             <section key={raceDay.id}>
               <h2 className="mb-3 text-base font-semibold">{raceDay.hippodrome.name}</h2>
               <div className="overflow-x-auto rounded-lg border">
@@ -215,8 +234,51 @@ export default async function KosularPage({ searchParams }: PageProps) {
                   </tbody>
                 </table>
               </div>
+
+              {combo.length > 0 && (
+                <div className="mt-3 rounded-lg border p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Kombine Kupon Önerisi</h3>
+                    {isLoggedIn && (
+                      <span className="text-xs text-muted-foreground">{totalCombinations} kombinasyon</span>
+                    )}
+                  </div>
+                  {!isLoggedIn ? (
+                    <div className="flex flex-col items-center gap-3 py-6 text-center text-sm text-muted-foreground">
+                      <Lock className="h-5 w-5" />
+                      <p>{combo.length} ayaklı kombine kupon önerisi mevcut. Görmek için giriş yapmalısınız.</p>
+                      <div className="flex gap-2">
+                        <Button asChild size="sm">
+                          <Link href="/giris">Giriş Yap</Link>
+                        </Button>
+                        <Button asChild size="sm" variant="outline">
+                          <Link href="/kayit">Kayıt Ol</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {combo.map((leg) => (
+                        <div key={leg.raceId} className="flex flex-wrap items-center gap-2 text-sm">
+                          <span className="w-20 shrink-0 font-medium">
+                            {leg.raceNo}. Koşu
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {leg.horses.map((h) => (
+                              <Badge key={h.no} variant="outline" className="text-xs">
+                                #{h.no} {h.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
-          ))}
+            );
+          })}
         </div>
       )}
 

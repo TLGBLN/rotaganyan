@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { startOfDay, endOfDay, subDays } from "date-fns";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, Confidence } from "@prisma/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -257,4 +257,68 @@ export async function getCouponSuggestions(limit = 8): Promise<PredictionListIte
     orderBy: [{ race: { raceDay: { date: "asc" } } }, { race: { raceNo: "asc" } }],
     take: limit,
   });
+}
+
+// ─── Kombine Kupon ──────────────────────────────────────────────────────────────
+
+export type ComboLeg = {
+  raceId: string;
+  raceNo: number;
+  time: string | null;
+  confidence: Confidence;
+  isBanko: boolean;
+  horses: { no: number; name: string }[];
+};
+
+const MAX_HORSES_PER_LEG = 7;
+
+/** Banko/yüksek güvende az at, düşük güvende daha fazla at — riskli ayaklara site otomatik daha geniş kapsama önerir. */
+function legHorseCount(confidence: Confidence, isBanko: boolean): number {
+  if (isBanko || confidence === "YUKSEK") return 1;
+  if (confidence === "ORTA") return 3;
+  return MAX_HORSES_PER_LEG;
+}
+
+/** Bir hipodrom/gün için, her koşunun güven seviyesine göre kaç at oynanacağını otomatik belirleyen kombine kupon önerisi. */
+export async function getComboCoupon(hippodromeSlug: string, dateStr: string): Promise<ComboLeg[]> {
+  const date = new Date(dateStr + "T00:00:00.000Z");
+  const raceDay = await db.raceDay.findFirst({
+    where: { date, hippodrome: { slug: hippodromeSlug } },
+    include: {
+      races: {
+        where: { prediction: { published: true } },
+        include: {
+          prediction: {
+            include: {
+              picks: {
+                orderBy: { rank: "asc" },
+                include: { runner: { select: { no: true, name: true } } },
+              },
+            },
+          },
+        },
+        orderBy: { raceNo: "asc" },
+      },
+    },
+  });
+  if (!raceDay) return [];
+
+  return raceDay.races
+    .filter((r) => r.prediction)
+    .map((r) => {
+      const pred = r.prediction!;
+      const count = Math.min(legHorseCount(pred.confidence, pred.isBanko), MAX_HORSES_PER_LEG);
+      const horses = pred.picks.slice(0, count).map((p) => ({
+        no: p.runner?.no ?? 0,
+        name: p.runner?.name ?? p.runnerLabel,
+      }));
+      return {
+        raceId: r.id,
+        raceNo: r.raceNo,
+        time: r.time,
+        confidence: pred.confidence,
+        isBanko: pred.isBanko,
+        horses,
+      };
+    });
 }
