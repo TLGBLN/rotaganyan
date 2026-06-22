@@ -88,19 +88,24 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
             <tbody>
               {picks.map((pick, i) => {
                 const { a, b, c, gerekce } = splitLayerDetails(pick.details);
+                const isWinner = race.result?.winnerNo != null && pick.runner?.no === race.result.winnerNo;
                 return (
                   <tr
                     key={pick.id}
                     className={cn(
                       "border-b last:border-0 transition-colors hover:bg-muted/30",
                       i % 2 === 1 && "race-row-even",
-                      pick.isTarget && "bg-target/10"
+                      pick.isTarget && "bg-target/10",
+                      isWinner && "bg-yellow-400/15"
                     )}
                   >
                     <td className="px-2 py-2 font-semibold">{pick.rank}</td>
                     <td className="px-2 py-2 font-mono">{pick.runner?.no ?? "—"}</td>
                     <td className="px-2 py-2 font-medium">
-                      {pick.runner?.name ?? pick.runnerLabel}
+                      <span className={isWinner ? "font-bold text-yellow-600 dark:text-yellow-400" : ""}>
+                        {pick.runner?.name ?? pick.runnerLabel}
+                      </span>
+                      {isWinner && <span className="ml-1">🏆</span>}
                       {pick.isTarget && <TargetBadge className="ml-1.5" />}
                     </td>
                     <td className="px-2 py-2 text-right font-mono">{a}</td>
