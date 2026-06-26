@@ -16,6 +16,12 @@ const HEADERS = {
 
 export type GaziHorse = {
   atAdi: string;
+  imgAt: string | null;
+  imgAtSahibi: string | null;
+  imgJokey: string | null;
+  imgForma: string | null;
+  imgPedigri: string | null;
+  anaBilgiler: string | null;
   atSahibi: string | null;
   yetistici: string | null;
   antrenor: string | null;

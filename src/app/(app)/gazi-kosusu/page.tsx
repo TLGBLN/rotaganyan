@@ -5,11 +5,11 @@ import { tr } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import BannerCountdown from "@/components/layout/BannerCountdown";
 import { fetchGaziKayitlar, type GaziHorse } from "@/server/services/ingest/tjk-gazi.adapter";
-import { cn } from "@/lib/utils";
+import GaziHorseSlider from "@/components/gazi/GaziHorseSlider";
 
 const GAZI_KOSUSU_TARGET = "2026-06-28T17:15:00+03:00";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 export const metadata = {
   title: "100. Gazi Koşusu — ROTAGANYAN",
@@ -70,40 +70,8 @@ export default async function GaziKosusuPage() {
 
       {horses.length > 0 && (
         <div>
-          <h2 className="mb-3 text-base font-semibold">
-            Kayıtlı Adaylar <span className="text-sm font-normal text-muted-foreground">({horses.length} at)</span>
-          </h2>
-          <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
-                  <th className="px-3 py-2">At</th>
-                  <th className="px-3 py-2">Sahibi</th>
-                  <th className="px-3 py-2">Antrenör</th>
-                  <th className="px-3 py-2">Yetiştirici</th>
-                  <th className="px-3 py-2 text-right">HP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {horses.map((h, i) => (
-                  <tr
-                    key={h.atAdi}
-                    className={cn(
-                      "border-b last:border-0",
-                      i % 2 === 1 && "race-row-even"
-                    )}
-                  >
-                    <td className="px-3 py-2 font-medium">{h.atAdi}</td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{h.atSahibi ?? "—"}</td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{h.antrenor ?? "—"}</td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{h.yetistici ?? "—"}</td>
-                    <td className="px-3 py-2 text-right font-mono text-xs">{h.hp ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
+          <GaziHorseSlider horses={horses} />
+          <p className="mt-3 text-[11px] text-muted-foreground">
             Jokey ataması yarış gününe yakın netleşir. Kaynak: gazi.tjk.org
           </p>
         </div>
