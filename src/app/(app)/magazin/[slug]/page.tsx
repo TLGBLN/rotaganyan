@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { getArticleBySlug } from "@/server/services/article.service";
+import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
@@ -56,11 +57,16 @@ export default async function MagazinArticlePage({ params }: PageProps) {
       </Link>
 
       {article.coverImage && (
-        <img
-          src={article.coverImage}
-          alt={article.title}
-          className="mb-6 h-56 w-full rounded-xl object-cover"
-        />
+        <div className="relative mb-6 h-56 w-full overflow-hidden rounded-xl">
+          <Image
+            src={article.coverImage}
+            alt={article.title}
+            fill
+            priority
+            sizes="(max-width: 768px) 100vw, 768px"
+            className="object-cover"
+          />
+        </div>
       )}
 
       <div className="flex items-start justify-between gap-4">

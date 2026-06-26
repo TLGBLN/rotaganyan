@@ -1,5 +1,6 @@
 import { request } from "undici";
 import * as cheerio from "cheerio";
+import { unstable_cache } from "next/cache";
 
 export type DailyRace = {
   raceNo: number;
@@ -31,9 +32,7 @@ const HIPO: Record<string, string> = {
   SAK: "Sakarya", BAL: "Balıkesir", SAN: "Şanlıurfa",
 };
 
-export async function fetchDailyProgram(date?: Date): Promise<DailyHippodrome[]> {
-  const d = date ?? new Date();
-  const dateStr = d.toISOString().slice(0, 10);
+async function fetchDailyProgramUncached(dateStr: string): Promise<DailyHippodrome[]> {
   const url = `${BASE}/TR/YarisSever/Query/Page/GunlukYarisProgrami?QueryParameter_Tarih=${dateStr}`;
 
   try {
@@ -109,4 +108,14 @@ export async function fetchDailyProgram(date?: Date): Promise<DailyHippodrome[]>
   } catch {
     return [];
   }
+}
+
+const fetchDailyProgramCached = unstable_cache(fetchDailyProgramUncached, ["tjk-daily-program"], {
+  revalidate: 300,
+});
+
+/** Belirli bir günün TJK koşu programı — DB'de henüz veri yokken canlı fallback olarak kullanılır, 5 dakika cache'lenir. */
+export async function fetchDailyProgram(date?: Date): Promise<DailyHippodrome[]> {
+  const dateStr = (date ?? new Date()).toISOString().slice(0, 10);
+  return fetchDailyProgramCached(dateStr);
 }

@@ -151,9 +151,9 @@ export default async function KosularPage({ searchParams }: PageProps) {
                       <th className="px-3 py-2">Koşu</th>
                       <th className="px-3 py-2">Saat</th>
                       <th className="px-3 py-2">Sınıf</th>
-                      <th className="px-3 py-2">Irk</th>
-                      <th className="px-3 py-2">Pist</th>
-                      <th className="px-3 py-2 pr-10 text-right">Mesafe</th>
+                      <th className="hidden px-3 py-2 sm:table-cell">Irk</th>
+                      <th className="hidden px-3 py-2 sm:table-cell">Pist</th>
+                      <th className="hidden px-3 py-2 pr-10 text-right sm:table-cell">Mesafe</th>
                       <th className="px-3 py-2">Analiz</th>
                     </tr>
                   </thead>
@@ -246,9 +246,9 @@ export default async function KosularPage({ searchParams }: PageProps) {
                       <th className="px-3 py-2">Koşu</th>
                       <th className="px-3 py-2">Saat</th>
                       <th className="px-3 py-2">Sınıf</th>
-                      <th className="px-3 py-2">Irk</th>
-                      <th className="px-3 py-2">Pist</th>
-                      <th className="px-3 py-2 pr-10 text-right">Mesafe</th>
+                      <th className="hidden px-3 py-2 sm:table-cell">Irk</th>
+                      <th className="hidden px-3 py-2 sm:table-cell">Pist</th>
+                      <th className="hidden px-3 py-2 pr-10 text-right sm:table-cell">Mesafe</th>
                       <th className="px-3 py-2">Analiz</th>
                     </tr>
                   </thead>
@@ -274,11 +274,11 @@ export default async function KosularPage({ searchParams }: PageProps) {
                           <td className="px-3 py-2">
                             <Badge variant="secondary" className="text-xs">{race.classType}</Badge>
                           </td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground">{race.breed || "—"}</td>
-                          <td className={cn("px-3 py-2 text-xs font-medium", SURFACE_COLOR[race.surface] ?? "text-muted-foreground")}>
+                          <td className="hidden px-3 py-2 text-xs text-muted-foreground sm:table-cell">{race.breed || "—"}</td>
+                          <td className={cn("hidden px-3 py-2 text-xs font-medium sm:table-cell", SURFACE_COLOR[race.surface] ?? "text-muted-foreground")}>
                             {race.surface || "—"}
                           </td>
-                          <td className="px-3 py-2 pr-10 text-right font-mono text-xs">
+                          <td className="hidden px-3 py-2 pr-10 text-right font-mono text-xs sm:table-cell">
                             {race.distance > 0 ? `${race.distance}m` : "—"}
                           </td>
                           <td className="px-3 py-2">

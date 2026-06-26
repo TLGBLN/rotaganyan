@@ -37,10 +37,10 @@ export default function AltiliGanyanResults({ results }: Props) {
                           {group.rows.map((row) => (
                             <tr key={row.rank} className="border-b last:border-0">
                               <td className="px-4 py-2.5 font-semibold">{row.rank}</td>
-                              <td className="px-4 py-2.5">{row.at}</td>
-                              <td className="px-4 py-2.5 text-right font-mono">{row.derece}</td>
-                              <td className="px-4 py-2.5 text-right font-mono text-brand">{row.ganyan}</td>
-                              <td className="px-4 py-2.5 text-right font-mono">{row.agf}</td>
+                              <td className="px-4 py-2.5">{row.at || "—"}</td>
+                              <td className="px-4 py-2.5 text-right font-mono">{row.derece || "—"}</td>
+                              <td className="px-4 py-2.5 text-right font-mono text-brand">{row.ganyan || "—"}</td>
+                              <td className="px-4 py-2.5 text-right font-mono">{row.agf || "—"}</td>
                             </tr>
                           ))}
                         </tbody>

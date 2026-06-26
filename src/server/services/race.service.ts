@@ -348,3 +348,50 @@ export async function getComboCoupon(hippodromeSlug: string, dateStr: string): P
       };
     });
 }
+
+// ─── Anasayfa: Tahmin Önerileri (Ekonomik/Normal/Geniş kupon) ─────────────────
+
+export type KuponLeg = { raceNo: number; nos: number[] };
+export type KuponVariant = { key: "ekonomik" | "normal" | "genis"; label: string; legs: KuponLeg[]; amount: number };
+export type KuponOnerisi = { hippodromeName: string; variants: KuponVariant[] } | null;
+export type HomeKuponLeg = { raceNo: number; narrow: number[]; normal: number[]; wide: number[] };
+
+/** Tüm yarışlar yurtiçi (yabancı hipodromlar ingest sırasında elenir) — birim bahis bedeli sabit. */
+const STAKE_PER_COMBINATION = 1.25;
+
+function kuponAmount(nosPerLeg: number[][]): number {
+  const combinations = nosPerLeg.reduce((acc, nos) => acc * Math.max(nos.length, 1), 1);
+  return Math.round(combinations * STAKE_PER_COMBINATION * 100) / 100;
+}
+
+/** Admin'in manuel kurup yayınladığı (isActive) kombine kuponu anasayfa için hazırlar. */
+export async function getKuponOnerileri(): Promise<KuponOnerisi> {
+  const active = await db.homeKupon.findFirst({
+    where: { isActive: true },
+    orderBy: { updatedAt: "desc" },
+  });
+  if (!active) return null;
+
+  const legs = active.legs as unknown as HomeKuponLeg[];
+  if (!Array.isArray(legs) || legs.length === 0) return null;
+
+  // Normal/Geniş için ayrıca seçim yapılmamışsa bir alt seviyeye düşer (Geniş→Normal→Ekonomik).
+  const narrowLegs: KuponLeg[] = legs.map((l) => ({ raceNo: l.raceNo, nos: l.narrow }));
+  const normalLegs: KuponLeg[] = legs.map((l) => ({
+    raceNo: l.raceNo,
+    nos: l.normal.length > 0 ? l.normal : l.narrow,
+  }));
+  const wideLegs: KuponLeg[] = legs.map((l) => ({
+    raceNo: l.raceNo,
+    nos: l.wide.length > 0 ? l.wide : l.normal.length > 0 ? l.normal : l.narrow,
+  }));
+
+  return {
+    hippodromeName: active.hippodromeName,
+    variants: [
+      { key: "ekonomik", label: "Ekonomik", legs: narrowLegs, amount: kuponAmount(narrowLegs.map((l) => l.nos)) },
+      { key: "normal", label: "Normal", legs: normalLegs, amount: kuponAmount(normalLegs.map((l) => l.nos)) },
+      { key: "genis", label: "Geniş", legs: wideLegs, amount: kuponAmount(wideLegs.map((l) => l.nos)) },
+    ],
+  };
+}

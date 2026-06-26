@@ -251,6 +251,8 @@ model Prediction {
   race   Race   @relation(fields: [raceId], references: [id], onDelete: Cascade)
   author User   @relation(fields: [authorId], references: [id])
   picks  Pick[]
+
+  @@index([published])
 }
 
 model Pick {
@@ -288,6 +290,8 @@ model Result {
 
   race    Race               @relation(fields: [raceId], references: [id], onDelete: Cascade)
   lessons PostMortemLesson[]
+
+  @@index([hitTop1])
 }
 
 // ─── CONTENT ──────────────────────────────────────────────────────────────────
@@ -359,6 +363,21 @@ model PostMortemLesson {
   result Result? @relation(fields: [resultId], references: [id])
 
   @@index([category, active])
+}
+
+// ─── ANASAYFA KUPON ───────────────────────────────────────────────────────────
+
+// Admin'in manuel kurduğu çok ayaklı kombine kupon (Ekonomik/Normal/Geniş) — anasayfada gösterilir.
+model HomeKupon {
+  id             String   @id @default(cuid())
+  hippodromeName String
+  date           DateTime
+  legs           Json     // [{ raceNo: number, narrow: number[], normal: number[], wide: number[] }]
+  isActive       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([isActive])
 }
 
 // ─── ENGINE CONFIG ────────────────────────────────────────────────────────────

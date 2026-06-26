@@ -5,22 +5,10 @@ import { Button } from "@/components/ui/button";
 import TargetBadge from "@/components/prediction/TargetBadge";
 import { cn, surfaceLabel, breedLabel } from "@/lib/utils";
 import type { RaceDetail } from "@/server/services/race.service";
-import type { PedigreeRating } from "@prisma/client";
 
 type Props = {
   race: RaceDetail;
   isLoggedIn: boolean;
-};
-
-const PED_LABEL: Record<PedigreeRating, string> = {
-  ZAYIF: "Zayıf",
-  DUSUK: "Düşük",
-  ORTA: "Orta",
-  GUCLU: "Güçlü",
-  YUKSEK: "Yüksek",
-  COK_YUKSEK: "Çok Yüksek",
-  SORU: "?",
-  BILINMIYOR: "—",
 };
 
 function couponCategory(rank: number): { label: string; className: string } {
@@ -81,15 +69,14 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
             <thead>
               <tr className="border-b bg-muted/40">
                 <th className="px-2 py-2 text-left font-medium text-muted-foreground">Sıra</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Kupon</th>
+                <th className="hidden px-2 py-2 text-left font-medium text-muted-foreground sm:table-cell">Kupon</th>
                 <th className="px-2 py-2 text-left font-medium text-muted-foreground">No</th>
                 <th className="px-2 py-2 text-left font-medium text-muted-foreground">At</th>
-                <th className="px-2 py-2 text-right font-medium text-muted-foreground">A Katmanı</th>
-                <th className="px-2 py-2 text-right font-medium text-muted-foreground">B Katmanı</th>
-                <th className="px-2 py-2 text-right font-medium text-muted-foreground">C Katmanı</th>
+                <th className="hidden px-2 py-2 text-right font-medium text-muted-foreground sm:table-cell">A Katmanı</th>
+                <th className="hidden px-2 py-2 text-right font-medium text-muted-foreground sm:table-cell">B Katmanı</th>
+                <th className="hidden px-2 py-2 text-right font-medium text-muted-foreground sm:table-cell">C Katmanı</th>
                 <th className="px-2 py-2 text-right font-medium text-muted-foreground">Toplam</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Pedigri</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Kilit Gerekçe</th>
+                <th className="hidden px-2 py-2 text-left font-medium text-muted-foreground md:table-cell">Kilit Gerekçe</th>
               </tr>
             </thead>
             <tbody>
@@ -108,7 +95,7 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                     )}
                   >
                     <td className="px-2 py-2 font-semibold">{pick.rank}</td>
-                    <td className="px-2 py-2">
+                    <td className="hidden px-2 py-2 sm:table-cell">
                       <Badge variant="outline" className={cn("text-[10px]", coupon.className)}>
                         {coupon.label}
                       </Badge>
@@ -121,14 +108,13 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                       {isWinner && <span className="ml-1">🏆</span>}
                       {pick.isTarget && <TargetBadge className="ml-1.5" />}
                     </td>
-                    <td className="px-2 py-2 text-right font-mono">{a}</td>
-                    <td className="px-2 py-2 text-right font-mono">{b}</td>
-                    <td className="px-2 py-2 text-right font-mono">{c}</td>
+                    <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">{a}</td>
+                    <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">{b}</td>
+                    <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">{c}</td>
                     <td className="px-2 py-2 text-right font-mono font-bold text-brand">
                       {pick.score ?? "—"}
                     </td>
-                    <td className="px-2 py-2">{PED_LABEL[pick.pedigreeRating]}</td>
-                    <td className="px-2 py-2 text-muted-foreground">{gerekce}</td>
+                    <td className="hidden px-2 py-2 text-muted-foreground md:table-cell">{gerekce}</td>
                   </tr>
                 );
               })}
@@ -143,10 +129,10 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                 <th className="px-2 py-2 text-left font-medium text-muted-foreground">No</th>
                 <th className="px-2 py-2 text-left font-medium text-muted-foreground">At</th>
                 <th className="px-2 py-2 text-left font-medium text-muted-foreground">Jokey</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Antrenör</th>
-                <th className="px-2 py-2 text-right font-medium text-muted-foreground">KG</th>
+                <th className="hidden px-2 py-2 text-left font-medium text-muted-foreground sm:table-cell">Antrenör</th>
+                <th className="hidden px-2 py-2 text-right font-medium text-muted-foreground sm:table-cell">KG</th>
                 <th className="px-2 py-2 text-right font-medium text-muted-foreground">AGF</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Takı</th>
+                <th className="hidden px-2 py-2 text-left font-medium text-muted-foreground md:table-cell">Takı</th>
               </tr>
             </thead>
             <tbody>
@@ -176,8 +162,8 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                     )}
                   </td>
                   <td className="px-2 py-2">{runner.jockey ?? "—"}</td>
-                  <td className="px-2 py-2 text-muted-foreground">{runner.trainer ?? "—"}</td>
-                  <td className="px-2 py-2 text-right font-mono">
+                  <td className="hidden px-2 py-2 text-muted-foreground sm:table-cell">{runner.trainer ?? "—"}</td>
+                  <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">
                     {runner.weight ?? "—"}
                     {runner.weightChange != null && (
                       <span
@@ -194,7 +180,7 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                   <td className="px-2 py-2 text-right font-mono">
                     {runner.agf != null ? `%${runner.agf.toFixed(1)}` : "—"}
                   </td>
-                  <td className="px-2 py-2 text-muted-foreground">
+                  <td className="hidden px-2 py-2 text-muted-foreground md:table-cell">
                     <div>
                       {runner.equipment ?? "—"}
                       {runner.equipmentAdded && (

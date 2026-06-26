@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -34,11 +35,13 @@ export default async function MagazinPage() {
               className="group flex gap-4 rounded-lg border bg-card p-4 transition-shadow hover:shadow-md"
             >
               {article.coverImage && (
-                <div className="h-20 w-28 shrink-0 overflow-hidden rounded-md">
-                  <img
+                <div className="relative h-20 w-28 shrink-0 overflow-hidden rounded-md">
+                  <Image
                     src={article.coverImage}
                     alt={article.title}
-                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                    fill
+                    sizes="112px"
+                    className="object-cover transition-transform group-hover:scale-105"
                   />
                 </div>
               )}

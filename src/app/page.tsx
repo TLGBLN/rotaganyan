@@ -7,7 +7,8 @@ import HeaderUserMenu from "@/components/layout/HeaderUserMenu";
 import NewsTicker from "@/components/home/NewsTicker";
 import AltiliGanyanResults from "@/components/home/AltiliGanyanResults";
 import KuponOnerileri from "@/components/home/KuponOnerileri";
-import { getHitPredictions, getCouponSuggestions } from "@/server/services/race.service";
+import TahminOnerileri from "@/components/home/TahminOnerileri";
+import { getHitPredictions, getCouponSuggestions, getKuponOnerileri } from "@/server/services/race.service";
 import { auth } from "@/lib/auth";
 import { fetchTjkTicker } from "@/lib/tjk-ticker";
 import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
@@ -15,9 +16,10 @@ import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.ad
 export const revalidate = 600; // 10 dakika
 
 export default async function HomePage() {
-  const [hitPredictions, couponSuggestions, session, tickerItems, altiliResults] = await Promise.all([
+  const [hitPredictions, couponSuggestions, kuponOnerisi, session, tickerItems, altiliResults] = await Promise.all([
     getHitPredictions(16),
     getCouponSuggestions(8),
+    getKuponOnerileri(),
     auth(),
     fetchTjkTicker(),
     fetchTodaysAltiliResults(),
@@ -68,6 +70,9 @@ export default async function HomePage() {
           <HitsCarousel items={hitPredictions} />
         </section>
       )}
+
+      {/* Tahmin Önerileri — Ekonomik/Normal/Geniş kupon şablonları */}
+      <TahminOnerileri data={kuponOnerisi} />
 
       {/* Kupon Önerileri */}
       <KuponOnerileri items={couponSuggestions} />

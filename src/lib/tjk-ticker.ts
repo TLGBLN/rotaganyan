@@ -1,5 +1,6 @@
 import { request } from "undici";
 import * as cheerio from "cheerio";
+import { unstable_cache } from "next/cache";
 
 const TJK_INDEX = "https://www.tjk.org/TR/YarisSever/YarisSever/Index";
 const HEADERS = {
@@ -8,7 +9,7 @@ const HEADERS = {
   Referer: "https://www.tjk.org/",
 };
 
-export async function fetchTjkTicker(): Promise<string[]> {
+async function fetchTjkTickerUncached(): Promise<string[]> {
   try {
     const { statusCode, body } = await request(TJK_INDEX, { headers: HEADERS });
     if (statusCode !== 200) return [];
@@ -34,3 +35,8 @@ export async function fetchTjkTicker(): Promise<string[]> {
     return [];
   }
 }
+
+/** TJK ana sayfa duyuru/haber bandı — her sayfa yüklemesinde canlı çekmemek için 10 dakika cache'lenir. */
+export const fetchTjkTicker = unstable_cache(fetchTjkTickerUncached, ["tjk-ticker"], {
+  revalidate: 600,
+});

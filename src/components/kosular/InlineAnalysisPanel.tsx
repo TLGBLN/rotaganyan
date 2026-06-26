@@ -67,12 +67,12 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, href 
               <th className="px-2 py-2 text-left font-medium text-muted-foreground">Sıra</th>
               <th className="px-2 py-2 text-left font-medium text-muted-foreground">No</th>
               <th className="px-2 py-2 text-left font-medium text-muted-foreground">At</th>
-              <th className="px-2 py-2 text-right font-medium text-muted-foreground">A Katmanı</th>
-              <th className="px-2 py-2 text-right font-medium text-muted-foreground">B Katmanı</th>
-              <th className="px-2 py-2 text-right font-medium text-muted-foreground">C Katmanı</th>
+              <th className="hidden px-2 py-2 text-right font-medium text-muted-foreground sm:table-cell">A Katmanı</th>
+              <th className="hidden px-2 py-2 text-right font-medium text-muted-foreground sm:table-cell">B Katmanı</th>
+              <th className="hidden px-2 py-2 text-right font-medium text-muted-foreground sm:table-cell">C Katmanı</th>
               <th className="px-2 py-2 text-right font-medium text-muted-foreground">Toplam</th>
-              <th className="px-2 py-2 text-left font-medium text-muted-foreground">Pedigri</th>
-              <th className="px-2 py-2 text-left font-medium text-muted-foreground">Kilit Gerekçe</th>
+              <th className="hidden px-2 py-2 text-left font-medium text-muted-foreground sm:table-cell">Pedigri</th>
+              <th className="hidden px-2 py-2 text-left font-medium text-muted-foreground md:table-cell">Kilit Gerekçe</th>
             </tr>
           </thead>
           <tbody>
@@ -96,12 +96,12 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, href 
                     </span>
                     {isWinner && <span className="ml-1">🏆</span>}
                   </td>
-                  <td className="px-2 py-2 text-right font-mono">{a}</td>
-                  <td className="px-2 py-2 text-right font-mono">{b}</td>
-                  <td className="px-2 py-2 text-right font-mono">{c}</td>
+                  <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">{a}</td>
+                  <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">{b}</td>
+                  <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">{c}</td>
                   <td className="px-2 py-2 text-right font-mono font-bold text-brand">{pick.score ?? "—"}</td>
-                  <td className="px-2 py-2">{PED_LABEL[pick.pedigreeRating]}</td>
-                  <td className="px-2 py-2 text-muted-foreground">{gerekce}</td>
+                  <td className="hidden px-2 py-2 sm:table-cell">{PED_LABEL[pick.pedigreeRating]}</td>
+                  <td className="hidden px-2 py-2 text-muted-foreground md:table-cell">{gerekce}</td>
                 </tr>
               );
             })}

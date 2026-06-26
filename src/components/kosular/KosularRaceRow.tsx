@@ -55,9 +55,9 @@ export default function KosularRaceRow({
         <td className="px-3 py-2">
           <Badge variant="secondary" className="text-xs">{race.classType}</Badge>
         </td>
-        <td className="px-3 py-2 text-xs text-muted-foreground">{breedLabel}</td>
-        <td className={cn("px-3 py-2 text-xs font-medium", surfaceClassName)}>{surfaceLabel}</td>
-        <td className="px-3 py-2 pr-10 text-right font-mono text-xs">{race.distance}m</td>
+        <td className="hidden px-3 py-2 text-xs text-muted-foreground sm:table-cell">{breedLabel}</td>
+        <td className={cn("hidden px-3 py-2 text-xs font-medium sm:table-cell", surfaceClassName)}>{surfaceLabel}</td>
+        <td className="hidden px-3 py-2 pr-10 text-right font-mono text-xs sm:table-cell">{race.distance}m</td>
         <td className="px-3 py-2">
           {hasAnalysis ? (
             <button

@@ -11,6 +11,7 @@ import {
   Settings,
   Users,
   PackageOpen,
+  Ticket,
 } from "lucide-react";
 
 const NAV = [
@@ -18,6 +19,7 @@ const NAV = [
   { href: "/admin/analizler", label: "Analizler", icon: FileText },
   { href: "/admin/kosular", label: "Koşular", icon: Flag },
   { href: "/admin/sonuclar", label: "Sonuçlar", icon: Trophy },
+  { href: "/admin/kupon", label: "Kupon Hazırla", icon: Ticket },
   { href: "/admin/kullanicilar", label: "Kullanıcılar", icon: Users },
   { href: "/admin/import", label: "JSON İmport", icon: PackageOpen },
   { href: "/admin/metodoloji", label: "Metodoloji", icon: Settings },

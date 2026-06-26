@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -35,11 +36,13 @@ export default async function RehberPage() {
               className="group rounded-lg border bg-card p-4 transition-shadow hover:shadow-md"
             >
               {article.coverImage && (
-                <div className="mb-3 overflow-hidden rounded-md">
-                  <img
+                <div className="relative mb-3 h-36 w-full overflow-hidden rounded-md">
+                  <Image
                     src={article.coverImage}
                     alt={article.title}
-                    className="h-36 w-full object-cover transition-transform group-hover:scale-105"
+                    fill
+                    sizes="(max-width: 640px) 100vw, 50vw"
+                    className="object-cover transition-transform group-hover:scale-105"
                   />
                 </div>
               )}
