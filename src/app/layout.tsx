@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Barlow_Condensed } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import SessionProvider from "@/components/providers/SessionProvider";
+import VersionWatcher from "@/components/layout/VersionWatcher";
 import { auth } from "@/lib/auth";
 import "./globals.css";
 
@@ -74,6 +75,7 @@ export default async function RootLayout({
           <TooltipProvider>
             {children}
             <Toaster richColors position="bottom-right" />
+            <VersionWatcher />
           </TooltipProvider>
         </SessionProvider>
       </body>
