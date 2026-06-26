@@ -16,6 +16,10 @@ export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
             isBanko: true;
             couponNormal: true;
             couponWide: true;
+            picks: {
+              orderBy: { rank: "asc" };
+              include: { runner: { select: { name: true; no: true } } };
+            };
           };
         };
         result: { select: { hitTop1: true; hitInCoupon: true; ganyan: true; winnerNo: true } };
@@ -87,6 +91,10 @@ export async function getRaceDaysByDate(
               isBanko: true,
               couponNormal: true,
               couponWide: true,
+              picks: {
+                orderBy: { rank: "asc" },
+                include: { runner: { select: { name: true, no: true } } },
+              },
             },
           },
           result: { select: { hitTop1: true, hitInCoupon: true, ganyan: true, winnerNo: true } },

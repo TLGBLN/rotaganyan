@@ -17,6 +17,7 @@ import { wonOnlyInWideCoupon } from "@/lib/result-utils";
 import { auth } from "@/lib/auth";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import RaceCountdown from "@/components/kosular/RaceCountdown";
+import KosularRaceRow from "@/components/kosular/KosularRaceRow";
 import { cn } from "@/lib/utils";
 import type { Confidence } from "@prisma/client";
 
@@ -166,78 +167,19 @@ export default async function KosularPage({ searchParams }: PageProps) {
                       const surfaceLabel = race.surface === "CIM" ? "Çim" : race.surface === "SENTETIK" ? "Sentetik" : "Kum";
                       const breedLabel = BREED_LABEL[race.breed] ?? race.breed;
                       return (
-                        <tr
+                        <KosularRaceRow
                           key={race.id}
-                          className={cn(
-                            "border-b last:border-0 transition-colors hover:bg-muted/30",
-                            i % 2 === 1 && "race-row-even"
-                          )}
-                        >
-                          <td className="px-3 py-2 font-semibold">
-                            {race.raceNo}. Koşu
-                          </td>
-                          <td className="px-3 py-2 text-muted-foreground">
-                            {race.time ?? "—"}
-                            {race.time && <RaceCountdown date={currentDate} time={race.time} />}
-                          </td>
-                          <td className="px-3 py-2">
-                            <Badge variant="secondary" className="text-xs">{race.classType}</Badge>
-                          </td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground">{breedLabel}</td>
-                          <td className={cn("px-3 py-2 text-xs font-medium", SURFACE_COLOR[surfaceLabel] ?? "text-muted-foreground")}>
-                            {surfaceLabel}
-                          </td>
-                          <td className="px-3 py-2 pr-10 text-right font-mono text-xs">{race.distance}m</td>
-                          <td className="px-3 py-2">
-                            {pred?.published ? (
-                              <Link href={href} className="flex items-center gap-1.5">
-                                <span className="relative flex h-1.5 w-1.5">
-                                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-hit opacity-75" />
-                                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-hit" />
-                                </span>
-                                <Badge
-                                  variant="outline"
-                                  className={cn(
-                                    "text-xs",
-                                    pred.isBanko ? CONFIDENCE_COLOR[pred.confidence] : "border-[#007123] text-[#007123]"
-                                  )}
-                                >
-                                  {pred.isBanko ? "★ Banko" : "Analiz Var"}
-                                </Badge>
-                              </Link>
-                            ) : (
-                              <Badge variant="outline" className="text-xs border-miss text-miss">
-                                Henüz Analiz Yok
-                              </Badge>
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            {result ? (
-                              result.hitTop1 ? (
-                                <span className="text-xs font-medium text-hit">
-                                  Tuttu ✓
-                                  {result.ganyan != null && (
-                                    <span className="ml-1 text-muted-foreground font-normal">
-                                      (Gny {result.ganyan.toFixed(2)})
-                                    </span>
-                                  )}
-                                  {wonOnlyInWideCoupon(result.winnerNo, pred?.couponNormal, pred?.couponWide) && (
-                                    <Badge
-                                      variant="outline"
-                                      className="ml-1.5 border-amber-500 text-[10px] font-normal text-amber-600"
-                                    >
-                                      ⚠ Genişte yer aldı
-                                    </Badge>
-                                  )}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )
-                            ) : (
-                              <span className="text-xs text-muted-foreground">Bekleniyor</span>
-                            )}
-                          </td>
-                        </tr>
+                          race={race}
+                          currentDate={currentDate}
+                          href={href}
+                          surfaceLabel={surfaceLabel}
+                          surfaceClassName={SURFACE_COLOR[surfaceLabel] ?? "text-muted-foreground"}
+                          breedLabel={breedLabel}
+                          confidenceColor={CONFIDENCE_COLOR}
+                          isEven={i % 2 === 1}
+                          isLoggedIn={isLoggedIn}
+                          wonOnlyInWide={wonOnlyInWideCoupon(result?.winnerNo, pred?.couponNormal, pred?.couponWide)}
+                        />
                       );
                     })}
                   </tbody>
