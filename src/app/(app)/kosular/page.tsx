@@ -159,7 +159,6 @@ export default async function KosularPage({ searchParams }: PageProps) {
                   </thead>
                   <tbody>
                     {raceDay.races.map((race, i) => {
-                      const href = `/kosular/${currentDate}/${raceDay.hippodrome.slug}/${race.raceNo}`;
                       const surfaceLabel = race.surface === "CIM" ? "Çim" : race.surface === "SENTETIK" ? "Sentetik" : "Kum";
                       const breedLabel = BREED_LABEL[race.breed] ?? race.breed;
                       return (
@@ -167,7 +166,6 @@ export default async function KosularPage({ searchParams }: PageProps) {
                           key={race.id}
                           race={race}
                           currentDate={currentDate}
-                          href={href}
                           surfaceLabel={surfaceLabel}
                           surfaceClassName={SURFACE_COLOR[surfaceLabel] ?? "text-muted-foreground"}
                           breedLabel={breedLabel}

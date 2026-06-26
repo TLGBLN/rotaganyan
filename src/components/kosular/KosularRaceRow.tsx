@@ -14,7 +14,6 @@ type Race = ProgramRaceDay["races"][number];
 type Props = {
   race: Race;
   currentDate: string;
-  href: string;
   surfaceLabel: string;
   surfaceClassName: string;
   breedLabel: string;
@@ -26,7 +25,6 @@ type Props = {
 export default function KosularRaceRow({
   race,
   currentDate,
-  href,
   surfaceLabel,
   surfaceClassName,
   breedLabel,
@@ -90,7 +88,7 @@ export default function KosularRaceRow({
       {expanded && hasAnalysis && (
         <tr className="border-b last:border-0">
           <td colSpan={7} className="bg-muted/20 p-3">
-            <InlineAnalysisPanel picks={pred!.picks} winnerNo={result?.winnerNo} isLoggedIn={isLoggedIn} href={href} />
+            <InlineAnalysisPanel picks={pred!.picks} winnerNo={result?.winnerNo} isLoggedIn={isLoggedIn} />
           </td>
         </tr>
       )}
