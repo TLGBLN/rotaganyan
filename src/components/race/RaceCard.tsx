@@ -12,9 +12,14 @@ type Props = {
 };
 
 function couponCategory(rank: number): { label: string; className: string } {
-  if (rank <= 4) return { label: "Ekonomik", className: "border-hit text-hit" };
+  if (rank <= 3) return { label: "Ekonomik", className: "border-hit text-hit" };
   if (rank <= 7) return { label: "Normal", className: "border-brand text-brand" };
   return { label: "Geniş", className: "border-muted-foreground text-muted-foreground" };
+}
+
+/** "51/60" gibi tavanlı bir skor metninden sadece pay (gerçek puan) kısmını döner. */
+function scoreOnly(value: string): string {
+  return value.split("/")[0]?.trim() || value;
 }
 
 function splitLayerDetails(details: unknown) {
@@ -24,9 +29,9 @@ function splitLayerDetails(details: unknown) {
   let c = "—";
   const rest: string[] = [];
   for (const d of list) {
-    if (/^A:\s*/.test(d)) a = d.replace(/^A:\s*/, "");
-    else if (/^B:\s*/.test(d)) b = d.replace(/^B:\s*/, "");
-    else if (/^C:\s*/.test(d)) c = d.replace(/^C:\s*/, "");
+    if (/^A:\s*/.test(d)) a = scoreOnly(d.replace(/^A:\s*/, ""));
+    else if (/^B:\s*/.test(d)) b = scoreOnly(d.replace(/^B:\s*/, ""));
+    else if (/^C:\s*/.test(d)) c = scoreOnly(d.replace(/^C:\s*/, ""));
     else rest.push(d);
   }
   return { a, b, c, gerekce: rest.join(" · ") || "—" };
