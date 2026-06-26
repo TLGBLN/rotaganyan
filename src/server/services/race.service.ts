@@ -351,7 +351,7 @@ export async function getComboCoupon(hippodromeSlug: string, dateStr: string): P
 
 // ─── Anasayfa: Tahmin Önerileri (Ekonomik/Normal/Geniş kupon) ─────────────────
 
-export type KuponLeg = { raceNo: number; nos: number[] };
+export type KuponLeg = { raceNo: number; nos: number[]; winnerNo?: number | null };
 export type KuponVariant = { key: "ekonomik" | "normal" | "genis"; label: string; legs: KuponLeg[]; amount: number };
 export type KuponOnerisi = { hippodromeName: string; variants: KuponVariant[] } | null;
 export type HomeKuponLeg = { raceNo: number; narrow: number[]; normal: number[]; wide: number[] };
@@ -375,15 +375,31 @@ export async function getKuponOnerileri(): Promise<KuponOnerisi> {
   const legs = active.legs as unknown as HomeKuponLeg[];
   if (!Array.isArray(legs) || legs.length === 0) return null;
 
+  // Her ayağın gerçek kazananını bul (sonuç girildiyse) — kupon numaralarıyla eşleşeni yeşil göstermek için.
+  const hippodrome = await db.hippodrome.findUnique({ where: { name: active.hippodromeName } });
+  const winnerByRaceNo = new Map<number, number | null>();
+  if (hippodrome) {
+    const races = await db.race.findMany({
+      where: {
+        raceNo: { in: legs.map((l) => l.raceNo) },
+        raceDay: { hippodromeId: hippodrome.id, date: { gte: startOfDay(active.date), lte: endOfDay(active.date) } },
+      },
+      include: { result: { select: { winnerNo: true } } },
+    });
+    for (const r of races) winnerByRaceNo.set(r.raceNo, r.result?.winnerNo ?? null);
+  }
+
   // Normal/Geniş için ayrıca seçim yapılmamışsa bir alt seviyeye düşer (Geniş→Normal→Ekonomik).
-  const narrowLegs: KuponLeg[] = legs.map((l) => ({ raceNo: l.raceNo, nos: l.narrow }));
+  const narrowLegs: KuponLeg[] = legs.map((l) => ({ raceNo: l.raceNo, nos: l.narrow, winnerNo: winnerByRaceNo.get(l.raceNo) }));
   const normalLegs: KuponLeg[] = legs.map((l) => ({
     raceNo: l.raceNo,
     nos: l.normal.length > 0 ? l.normal : l.narrow,
+    winnerNo: winnerByRaceNo.get(l.raceNo),
   }));
   const wideLegs: KuponLeg[] = legs.map((l) => ({
     raceNo: l.raceNo,
     nos: l.wide.length > 0 ? l.wide : l.normal.length > 0 ? l.normal : l.narrow,
+    winnerNo: winnerByRaceNo.get(l.raceNo),
   }));
 
   return {

@@ -31,7 +31,15 @@ export default function TahminOnerileri({ data }: { data: KuponOnerisi }) {
                       </div>
                       <div className="space-y-1.5 text-sm font-semibold">
                         {leg.nos.map((no) => (
-                          <div key={no}>{no}</div>
+                          <div key={no}>
+                            {no === leg.winnerNo ? (
+                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-hit text-hit">
+                                {no}
+                              </span>
+                            ) : (
+                              no
+                            )}
+                          </div>
                         ))}
                       </div>
                     </div>
