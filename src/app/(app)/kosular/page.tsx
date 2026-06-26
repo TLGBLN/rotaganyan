@@ -13,7 +13,6 @@ import { fetchDailyProgram } from "@/lib/tjk-daily";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { syncResultsForDate } from "@/server/services/result-sync";
 import { turkeyDateString } from "@/lib/tz";
-import { wonOnlyInWideCoupon } from "@/lib/result-utils";
 import { auth } from "@/lib/auth";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import RaceCountdown from "@/components/kosular/RaceCountdown";
@@ -156,13 +155,10 @@ export default async function KosularPage({ searchParams }: PageProps) {
                       <th className="px-3 py-2">Pist</th>
                       <th className="px-3 py-2 pr-10 text-right">Mesafe</th>
                       <th className="px-3 py-2">Analiz</th>
-                      <th className="px-3 py-2">Sonuç</th>
                     </tr>
                   </thead>
                   <tbody>
                     {raceDay.races.map((race, i) => {
-                      const pred = race.prediction;
-                      const result = race.result;
                       const href = `/kosular/${currentDate}/${raceDay.hippodrome.slug}/${race.raceNo}`;
                       const surfaceLabel = race.surface === "CIM" ? "Çim" : race.surface === "SENTETIK" ? "Sentetik" : "Kum";
                       const breedLabel = BREED_LABEL[race.breed] ?? race.breed;
@@ -178,7 +174,6 @@ export default async function KosularPage({ searchParams }: PageProps) {
                           confidenceColor={CONFIDENCE_COLOR}
                           isEven={i % 2 === 1}
                           isLoggedIn={isLoggedIn}
-                          wonOnlyInWide={wonOnlyInWideCoupon(result?.winnerNo, pred?.couponNormal, pred?.couponWide)}
                         />
                       );
                     })}

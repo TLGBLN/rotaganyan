@@ -21,7 +21,6 @@ type Props = {
   confidenceColor: Record<Confidence, string>;
   isEven: boolean;
   isLoggedIn: boolean;
-  wonOnlyInWide: boolean;
 };
 
 export default function KosularRaceRow({
@@ -34,7 +33,6 @@ export default function KosularRaceRow({
   confidenceColor,
   isEven,
   isLoggedIn,
-  wonOnlyInWide,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const pred = race.prediction;
@@ -88,33 +86,10 @@ export default function KosularRaceRow({
             </Badge>
           )}
         </td>
-        <td className="px-3 py-2">
-          {result ? (
-            result.hitTop1 ? (
-              <span className="text-xs font-medium text-hit">
-                Tuttu ✓
-                {result.ganyan != null && (
-                  <span className="ml-1 text-muted-foreground font-normal">
-                    (Gny {result.ganyan.toFixed(2)})
-                  </span>
-                )}
-                {wonOnlyInWide && (
-                  <Badge variant="outline" className="ml-1.5 border-amber-500 text-[10px] font-normal text-amber-600">
-                    ⚠ Genişte yer aldı
-                  </Badge>
-                )}
-              </span>
-            ) : (
-              <span className="text-xs text-muted-foreground">—</span>
-            )
-          ) : (
-            <span className="text-xs text-muted-foreground">Bekleniyor</span>
-          )}
-        </td>
       </tr>
       {expanded && hasAnalysis && (
         <tr className="border-b last:border-0">
-          <td colSpan={8} className="bg-muted/20 p-3">
+          <td colSpan={7} className="bg-muted/20 p-3">
             <InlineAnalysisPanel picks={pred!.picks} winnerNo={result?.winnerNo} isLoggedIn={isLoggedIn} href={href} />
           </td>
         </tr>
