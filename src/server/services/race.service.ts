@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { startOfDay, endOfDay, subDays } from "date-fns";
+import { turkeyDateString } from "@/lib/tz";
 import type { Prisma, Confidence } from "@prisma/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -371,6 +372,9 @@ export async function getKuponOnerileri(): Promise<KuponOnerisi> {
     orderBy: { updatedAt: "desc" },
   });
   if (!active) return null;
+
+  // Günün kuponu sadece o gün için geçerlidir — gün bitince admin elle kaldırmasa da otomatik kalkar.
+  if (active.date.toISOString().slice(0, 10) !== turkeyDateString()) return null;
 
   const legs = active.legs as unknown as HomeKuponLeg[];
   if (!Array.isArray(legs) || legs.length === 0) return null;
