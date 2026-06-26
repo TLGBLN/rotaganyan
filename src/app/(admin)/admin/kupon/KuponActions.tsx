@@ -30,9 +30,15 @@ type Props = {
 export default function KuponActions({ id, isActive, hippodromeName, date, legs }: Props) {
   const [pending, startTransition] = useTransition();
 
-  function shareOnX() {
+  async function shareOnX() {
     const text = buildShareText(hippodromeName, date, legs);
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, "_blank");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Kupon metni kopyalandı — X'te yapıştırıp paylaşabilirsin");
+    } catch {
+      toast.error("Metin kopyalanamadı");
+    }
+    window.open("https://x.com/home", "_blank");
   }
 
   async function shareOnInstagram() {
