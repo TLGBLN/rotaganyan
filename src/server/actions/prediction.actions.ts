@@ -135,5 +135,10 @@ export async function deletePrediction(id: string) {
   await requireRole("ADMIN");
 
   await db.prediction.delete({ where: { id } });
+
   revalidatePath("/admin/analizler");
+  revalidatePath("/analizler");
+  revalidatePath("/kosular");
+  revalidatePath("/tahmin-onerileri");
+  revalidatePath("/");
 }

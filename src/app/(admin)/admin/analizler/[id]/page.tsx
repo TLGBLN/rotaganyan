@@ -5,6 +5,7 @@ import { getAdminPredictionById } from "@/server/services/admin.service";
 import PredictionForm from "@/components/admin/PredictionForm";
 import PublishChecklist from "@/components/admin/PublishChecklist";
 import MarkdownRaceInput from "@/components/admin/MarkdownRaceInput";
+import DeletePredictionButton from "@/components/admin/DeletePredictionButton";
 import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
@@ -29,9 +30,12 @@ export default async function EditAnalizPage({ params }: PageProps) {
             {format(race.raceDay.date, "d MMMM yyyy", { locale: tr })}
           </p>
         </div>
-        <Badge variant={pred.published ? "default" : "secondary"}>
-          {pred.published ? "Yayında" : "Taslak"}
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant={pred.published ? "default" : "secondary"}>
+            {pred.published ? "Yayında" : "Taslak"}
+          </Badge>
+          <DeletePredictionButton predictionId={pred.id} />
+        </div>
       </div>
 
       <MarkdownRaceInput
