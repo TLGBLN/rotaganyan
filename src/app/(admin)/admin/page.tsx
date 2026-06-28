@@ -1,6 +1,7 @@
 import { getDashboardStats, getAnalystStats } from "@/server/services/admin.service";
 import StatTile from "@/components/stats/StatTile";
 import PerformanceBreakdown from "@/components/admin/PerformanceBreakdown";
+import CouponTierChart from "@/components/admin/CouponTierChart";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -75,6 +76,8 @@ export default async function AdminDashboard() {
               <PerformanceBreakdown title="Koşu Sınıfına Göre" rows={analyst.byClassType} limit={6} />
               <PerformanceBreakdown title="Hipodroma Göre" rows={analyst.byHippodrome} limit={6} />
             </div>
+
+            <CouponTierChart rows={analyst.couponTierByClassType} limit={8} />
           </div>
         )}
       </section>

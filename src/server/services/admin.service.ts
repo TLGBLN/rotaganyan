@@ -145,6 +145,8 @@ export async function getDashboardStats() {
 // ─── Performans Analizi ─────────────────────────────────────────────────────────
 
 export type AnalystBreakdown = { label: string; total: number; hits: number; rate: number };
+export type CouponTier = "ekonomik" | "normal" | "genis" | "kacti";
+export type CouponTierBreakdown = { label: string; total: number; ekonomik: number; normal: number; genis: number; kacti: number };
 export type AnalystStats = {
   overall: { total: number; hits: number; rate: number };
   byClassType: AnalystBreakdown[];
@@ -152,10 +154,19 @@ export type AnalystStats = {
   byConfidence: AnalystBreakdown[];
   byHippodrome: AnalystBreakdown[];
   recentTrend: boolean[];
+  couponTierByClassType: CouponTierBreakdown[];
 };
 
 const SURFACE_LABEL: Record<string, string> = { CIM: "Çim", KUM: "Kum", SENTETIK: "Sentetik" };
 const CONFIDENCE_LABEL: Record<string, string> = { DUSUK: "Düşük Güven", ORTA: "Orta Güven", YUKSEK: "Yüksek Güven" };
+
+/** Kazananın bulunduğu sıraya göre hangi kupon kademesinde (Ekonomik/Normal/Geniş) yakalandığını, hiç yakalanmadıysa "kacti" döner. */
+function couponTierForRank(rank: number | undefined): CouponTier {
+  if (rank == null) return "kacti";
+  if (rank <= 3) return "ekonomik";
+  if (rank <= 7) return "normal";
+  return "genis";
+}
 
 /** Yayında ve sonuçlanmış tahminleri sınıf/pist/güven/hipodroma göre kırarak isabet oranını çıkarır. */
 export async function getAnalystStats(): Promise<AnalystStats> {
@@ -164,12 +175,13 @@ export async function getAnalystStats(): Promise<AnalystStats> {
     select: {
       confidence: true,
       isBanko: true,
+      picks: { select: { rank: true, runner: { select: { no: true } } } },
       race: {
         select: {
           classType: true,
           surface: true,
           raceDay: { select: { hippodrome: { select: { name: true } } } },
-          result: { select: { hitTop1: true } },
+          result: { select: { hitTop1: true, winnerNo: true } },
         },
       },
     },
@@ -190,6 +202,20 @@ export async function getAnalystStats(): Promise<AnalystStats> {
       .sort((a, b) => b.total - a.total);
   }
 
+  function groupCouponTier(keyFn: (r: (typeof rows)[number]) => string): CouponTierBreakdown[] {
+    const map = new Map<string, CouponTierBreakdown>();
+    for (const r of rows) {
+      const key = keyFn(r);
+      const entry = map.get(key) ?? { label: key, total: 0, ekonomik: 0, normal: 0, genis: 0, kacti: 0 };
+      const winnerNo = r.race.result?.winnerNo;
+      const matchedPick = winnerNo != null ? r.picks.find((p) => p.runner?.no === winnerNo) : undefined;
+      entry.total++;
+      entry[couponTierForRank(matchedPick?.rank)]++;
+      map.set(key, entry);
+    }
+    return [...map.values()].sort((a, b) => b.total - a.total);
+  }
+
   const totalHits = rows.filter((r) => r.race.result?.hitTop1).length;
 
   return {
@@ -199,5 +225,6 @@ export async function getAnalystStats(): Promise<AnalystStats> {
     byConfidence: group((r) => (r.isBanko ? "★ Banko" : CONFIDENCE_LABEL[r.confidence] ?? r.confidence)),
     byHippodrome: group((r) => r.race.raceDay.hippodrome.name),
     recentTrend: rows.slice(-20).map((r) => r.race.result?.hitTop1 ?? false),
+    couponTierByClassType: groupCouponTier((r) => r.race.classType),
   };
 }
