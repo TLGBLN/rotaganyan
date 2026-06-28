@@ -29,17 +29,17 @@ function emptySelection(): Record<Width, Set<number>> {
 }
 
 /**
- * Son 6 koşu her zaman "2. Altılı"; öncesindeki tüm koşular "1. Altılı".
- * Örn. 9 koşuluk günde: 1-2-3 → 1. Altılı, 4-5-6-7-8-9 → 2. Altılı.
- * 6 veya daha az koşu varsa tek grup ("1. Altılı") olarak kalır.
+ * 1. Altılı her zaman ilk 6 koşu (1-6); 2. Altılı her zaman son 6 koşu.
+ * Günde 9 koşu varsa: 1. Altılı = 1-6, 2. Altılı = 4-9 (4-5-6 ortak/üst üste biner).
+ * 12 koşu varsa üst üste binme olmaz (1-6 / 7-12). 6 veya daha az koşu varsa tek grup.
  */
 function chunkIntoAltili<T>(races: T[]): T[][] {
   if (races.length <= 6) return races.length > 0 ? [races] : [];
-  return [races.slice(0, races.length - 6), races.slice(races.length - 6)];
+  return [races.slice(0, 6), races.slice(races.length - 6)];
 }
 
-function legCounts(raceDay: RaceDayData, selections: Selections, width: Width): number[] {
-  return raceDay.races.map((r) => Math.max((selections[r.raceNo] ?? emptySelection())[width].size, 1));
+function legCounts(races: { raceNo: number }[], selections: Selections, width: Width): number[] {
+  return races.map((r) => Math.max((selections[r.raceNo] ?? emptySelection())[width].size, 1));
 }
 
 function amountFor(counts: number[]): number {
@@ -57,13 +57,21 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
   const [raceDay, setRaceDay] = useState<RaceDayData | null>(null);
   const [selections, setSelections] = useState<Selections>({});
 
-  const amounts = useMemo(() => {
-    if (!raceDay) return null;
-    return WIDTHS.reduce((acc, width) => {
-      acc[width] = amountFor(legCounts(raceDay, selections, width));
-      return acc;
-    }, {} as Record<Width, number>);
-  }, [raceDay, selections]);
+  const altiliGroups = useMemo(
+    () => (raceDay ? chunkIntoAltili(raceDay.races) : []),
+    [raceDay]
+  );
+
+  const groupAmounts = useMemo(
+    () =>
+      altiliGroups.map((group) =>
+        WIDTHS.reduce((acc, width) => {
+          acc[width] = amountFor(legCounts(group, selections, width));
+          return acc;
+        }, {} as Record<Width, number>)
+      ),
+    [altiliGroups, selections]
+  );
 
   function fetchRaceDay() {
     if (!slug) return;
@@ -157,7 +165,7 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
       {raceDay && (
         <div className="space-y-4">
           {/* Bahis kuponu tarzı: her ayak için at numarası butonları, sütun=şablon */}
-          {chunkIntoAltili(raceDay.races).map((chunk, chunkIdx) => (
+          {altiliGroups.map((chunk, chunkIdx) => (
             <div key={chunkIdx} className="space-y-2">
               <h3 className="text-sm font-semibold">
                 {raceDay.hippodromeName} — {chunkIdx + 1}. Altılı
@@ -220,22 +228,24 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
                   </tbody>
                 </table>
               </div>
+
+              {/* Bu altılının canlı özeti — formül: ayaklardaki at sayıları çarpılır × 1.25 */}
+              <div className="grid grid-cols-3 gap-3">
+                {WIDTHS.map((width) => (
+                  <div key={width} className="rounded-lg border p-3 text-center">
+                    <div className="text-xs text-muted-foreground">{WIDTH_LABEL[width]}</div>
+                    <div className="mt-1 text-lg font-bold">
+                      {groupAmounts[chunkIdx][width].toLocaleString("tr-TR", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{" "}
+                      ₺
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
-
-          {/* Canlı özet — formül: ayaklardaki at sayıları çarpılır × 1.25 */}
-          {amounts && (
-            <div className="grid grid-cols-3 gap-3">
-              {WIDTHS.map((width) => (
-                <div key={width} className="rounded-lg border p-3 text-center">
-                  <div className="text-xs text-muted-foreground">{WIDTH_LABEL[width]}</div>
-                  <div className="mt-1 text-lg font-bold">
-                    {amounts[width].toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
 
           <button
             type="button"
