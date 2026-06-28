@@ -28,11 +28,14 @@ function emptySelection(): Record<Width, Set<number>> {
   return { narrow: new Set(), normal: new Set(), wide: new Set() };
 }
 
-/** İlk 6 koşu "1. Altılı", sonraki 6 koşu "2. Altılı" — hipodromlarda günde iki altılı koşulabiliyor. */
+/**
+ * Son 6 koşu her zaman "2. Altılı"; öncesindeki tüm koşular "1. Altılı".
+ * Örn. 9 koşuluk günde: 1-2-3 → 1. Altılı, 4-5-6-7-8-9 → 2. Altılı.
+ * 6 veya daha az koşu varsa tek grup ("1. Altılı") olarak kalır.
+ */
 function chunkIntoAltili<T>(races: T[]): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < races.length; i += 6) chunks.push(races.slice(i, i + 6));
-  return chunks;
+  if (races.length <= 6) return races.length > 0 ? [races] : [];
+  return [races.slice(0, races.length - 6), races.slice(races.length - 6)];
 }
 
 function legCounts(raceDay: RaceDayData, selections: Selections, width: Width): number[] {
