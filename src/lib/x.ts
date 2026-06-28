@@ -33,3 +33,17 @@ export async function tweetArticlePublished(title: string, path: string) {
     console.error("[x] Tweet gönderilemedi:", err);
   }
 }
+
+/** Verilen metni doğrudan bağlı X hesabından (ROTAGANYAN) paylaşır. */
+export async function postTweet(text: string): Promise<{ ok: boolean; error?: string }> {
+  if (!client) {
+    return { ok: false, error: "X hesabı bağlı değil (X_API_KEY/SECRET eksik)" };
+  }
+  try {
+    await client.v2.tweet(text.slice(0, 280));
+    return { ok: true };
+  } catch (err) {
+    console.error("[x] Tweet gönderilemedi:", err);
+    return { ok: false, error: err instanceof Error ? err.message : "Bilinmeyen hata" };
+  }
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -8,6 +9,7 @@ import {
   setActiveHomeKupon,
   deactivateHomeKupon,
   deleteHomeKupon,
+  shareHomeKuponOnX,
   type HomeKuponLegInput,
 } from "@/server/actions/home-kupon.actions";
 
@@ -39,17 +41,19 @@ type Props = {
 };
 
 export default function KuponActions({ id, isActive, hippodromeName, date, legs }: Props) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  async function shareOnX(width: Width) {
+  function shareOnX(width: Width) {
     const text = buildShareText(hippodromeName, date, legs, width);
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success(`${WIDTH_LABEL[width]} kupon metni kopyalandı — X'te yapıştırıp paylaşabilirsin`);
-    } catch {
-      toast.error("Metin kopyalanamadı");
-    }
-    window.open("https://x.com/home", "_blank");
+    startTransition(async () => {
+      const result = await shareHomeKuponOnX(text);
+      if (result.ok) {
+        toast.success(`${WIDTH_LABEL[width]} kupon X hesabından paylaşıldı`);
+      } else {
+        toast.error(result.error ?? "X'te paylaşılamadı");
+      }
+    });
   }
 
   async function shareOnInstagram(width: Width) {
@@ -72,6 +76,7 @@ export default function KuponActions({ id, isActive, hippodromeName, date, legs 
         await setActiveHomeKupon(id);
         toast.success("Anasayfada yayınlandı");
       }
+      router.refresh();
     });
   }
 
@@ -80,6 +85,7 @@ export default function KuponActions({ id, isActive, hippodromeName, date, legs 
     startTransition(async () => {
       await deleteHomeKupon(id);
       toast.success("Kupon silindi");
+      router.refresh();
     });
   }
 
@@ -90,8 +96,9 @@ export default function KuponActions({ id, isActive, hippodromeName, date, legs 
           <span className="w-16 text-right text-muted-foreground">{WIDTH_LABEL[width]}</span>
           <button
             onClick={() => shareOnX(width)}
-            className="rounded border px-1.5 py-0.5 text-muted-foreground hover:text-foreground"
-            title={`${WIDTH_LABEL[width]} — X'te paylaş`}
+            disabled={pending}
+            className="rounded border px-1.5 py-0.5 text-muted-foreground hover:text-foreground disabled:opacity-50"
+            title={`${WIDTH_LABEL[width]} — X hesabından paylaş`}
           >
             X
           </button>

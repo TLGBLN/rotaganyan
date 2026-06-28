@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { postTweet } from "@/lib/x";
 
 export type HomeKuponLegInput = {
   raceNo: number;
@@ -103,4 +104,9 @@ export async function deleteHomeKupon(id: string) {
   await db.homeKupon.delete({ where: { id } });
 
   revalidatePath("/admin/kupon");
+}
+
+export async function shareHomeKuponOnX(text: string) {
+  await requireRole("EDITOR");
+  return postTweet(text);
 }
