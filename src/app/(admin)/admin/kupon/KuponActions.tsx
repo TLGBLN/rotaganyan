@@ -11,12 +11,23 @@ import {
   type HomeKuponLegInput,
 } from "@/server/actions/home-kupon.actions";
 
-function buildShareText(hippodromeName: string, date: Date, legs: HomeKuponLegInput[]): string {
+type Width = "narrow" | "normal" | "wide";
+const WIDTH_LABEL: Record<Width, string> = { narrow: "Ekonomik", normal: "Normal", wide: "Geniş" };
+
+/** Genişlik için at numaralarını seçer — boşsa bir alt seviyeye düşer (Geniş→Normal→Ekonomik), anasayfa mantığıyla aynı. */
+function nosForWidth(leg: HomeKuponLegInput, width: Width): number[] {
+  if (width === "narrow") return leg.narrow;
+  if (width === "normal") return leg.normal.length > 0 ? leg.normal : leg.narrow;
+  return leg.wide.length > 0 ? leg.wide : leg.normal.length > 0 ? leg.normal : leg.narrow;
+}
+
+function buildShareText(hippodromeName: string, date: Date, legs: HomeKuponLegInput[], width: Width): string {
   const dateLabel = format(date, "d MMMM yyyy", { locale: tr });
   const lines = legs
-    .filter((l) => l.normal.length > 0 || l.narrow.length > 0 || l.wide.length > 0)
-    .map((l) => `${l.raceNo}. Ayak: ${(l.normal.length > 0 ? l.normal : l.narrow.length > 0 ? l.narrow : l.wide).join("-")}`);
-  return `${hippodromeName} ${dateLabel} Kombine Kupon Önerisi 🏇\n\n${lines.join("\n")}\n\nrotaganyan.com`;
+    .map((l) => ({ raceNo: l.raceNo, nos: nosForWidth(l, width) }))
+    .filter((l) => l.nos.length > 0)
+    .map((l) => `${l.raceNo}. Ayak: ${l.nos.join("-")}`);
+  return `${hippodromeName} ${dateLabel} ${WIDTH_LABEL[width]} Kupon Önerisi 🏇\n\n${lines.join("\n")}\n\nrotaganyan.com`;
 }
 
 type Props = {
@@ -30,22 +41,22 @@ type Props = {
 export default function KuponActions({ id, isActive, hippodromeName, date, legs }: Props) {
   const [pending, startTransition] = useTransition();
 
-  async function shareOnX() {
-    const text = buildShareText(hippodromeName, date, legs);
+  async function shareOnX(width: Width) {
+    const text = buildShareText(hippodromeName, date, legs, width);
     try {
       await navigator.clipboard.writeText(text);
-      toast.success("Kupon metni kopyalandı — X'te yapıştırıp paylaşabilirsin");
+      toast.success(`${WIDTH_LABEL[width]} kupon metni kopyalandı — X'te yapıştırıp paylaşabilirsin`);
     } catch {
       toast.error("Metin kopyalanamadı");
     }
     window.open("https://x.com/home", "_blank");
   }
 
-  async function shareOnInstagram() {
-    const text = buildShareText(hippodromeName, date, legs);
+  async function shareOnInstagram(width: Width) {
+    const text = buildShareText(hippodromeName, date, legs, width);
     try {
       await navigator.clipboard.writeText(text);
-      toast.success("Kupon metni kopyalandı — Instagram'da yapıştırıp paylaşabilirsin");
+      toast.success(`${WIDTH_LABEL[width]} kupon metni kopyalandı — Instagram'da yapıştırıp paylaşabilirsin`);
     } catch {
       toast.error("Metin kopyalanamadı");
     }
@@ -73,35 +84,43 @@ export default function KuponActions({ id, isActive, hippodromeName, date, legs 
   }
 
   return (
-    <div className="flex items-center justify-end gap-3">
-      <button
-        onClick={shareOnX}
-        className="text-xs text-muted-foreground hover:text-foreground"
-        title="X'te paylaş"
-      >
-        X
-      </button>
-      <button
-        onClick={shareOnInstagram}
-        className="text-xs text-muted-foreground hover:text-foreground"
-        title="Instagram'da paylaş"
-      >
-        Instagram
-      </button>
-      <button
-        onClick={toggleActive}
-        disabled={pending}
-        className="text-xs text-brand hover:underline disabled:opacity-50"
-      >
-        {pending ? "…" : isActive ? "Yayından Kaldır" : "Yayınla"}
-      </button>
-      <button
-        onClick={remove}
-        disabled={pending}
-        className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
-      >
-        Sil
-      </button>
+    <div className="flex flex-col items-end gap-1.5">
+      {(["narrow", "normal", "wide"] as Width[]).map((width) => (
+        <div key={width} className="flex items-center gap-1.5 text-[10px]">
+          <span className="w-16 text-right text-muted-foreground">{WIDTH_LABEL[width]}</span>
+          <button
+            onClick={() => shareOnX(width)}
+            className="rounded border px-1.5 py-0.5 text-muted-foreground hover:text-foreground"
+            title={`${WIDTH_LABEL[width]} — X'te paylaş`}
+          >
+            X
+          </button>
+          <button
+            onClick={() => shareOnInstagram(width)}
+            className="rounded border px-1.5 py-0.5 text-muted-foreground hover:text-foreground"
+            title={`${WIDTH_LABEL[width]} — Instagram'da paylaş`}
+          >
+            IG
+          </button>
+        </div>
+      ))}
+
+      <div className="mt-1 flex items-center gap-3">
+        <button
+          onClick={toggleActive}
+          disabled={pending}
+          className="text-xs text-brand hover:underline disabled:opacity-50"
+        >
+          {pending ? "…" : isActive ? "Yayından Kaldır" : "Yayınla"}
+        </button>
+        <button
+          onClick={remove}
+          disabled={pending}
+          className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+        >
+          Sil
+        </button>
+      </div>
     </div>
   );
 }
