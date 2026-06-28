@@ -28,6 +28,13 @@ function emptySelection(): Record<Width, Set<number>> {
   return { narrow: new Set(), normal: new Set(), wide: new Set() };
 }
 
+/** İlk 6 koşu "1. Altılı", sonraki 6 koşu "2. Altılı" — hipodromlarda günde iki altılı koşulabiliyor. */
+function chunkIntoAltili<T>(races: T[]): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < races.length; i += 6) chunks.push(races.slice(i, i + 6));
+  return chunks;
+}
+
 function legCounts(raceDay: RaceDayData, selections: Selections, width: Width): number[] {
   return raceDay.races.map((r) => Math.max((selections[r.raceNo] ?? emptySelection())[width].size, 1));
 }
@@ -147,62 +154,69 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
       {raceDay && (
         <div className="space-y-4">
           {/* Bahis kuponu tarzı: her ayak için at numarası butonları, sütun=şablon */}
-          <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="bg-muted/40">
-                  <th className="border-b px-3 py-2 text-left text-xs font-medium text-muted-foreground">
-                    Koşu
-                  </th>
-                  {WIDTHS.map((width) => (
-                    <th
-                      key={width}
-                      className="border-b px-3 py-2 text-left text-xs font-medium text-muted-foreground"
-                    >
-                      {WIDTH_LABEL[width]}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {raceDay.races.map((race, i) => {
-                  const sel = selections[race.raceNo] ?? emptySelection();
-                  return (
-                    <tr key={race.raceNo} className={cn("border-b last:border-0", i % 2 === 1 && "bg-muted/20")}>
-                      <td className="px-3 py-3 align-top text-sm font-semibold whitespace-nowrap">
-                        {race.raceNo}. Koşu
-                      </td>
+          {chunkIntoAltili(raceDay.races).map((chunk, chunkIdx) => (
+            <div key={chunkIdx} className="space-y-2">
+              <h3 className="text-sm font-semibold">
+                {raceDay.hippodromeName} — {chunkIdx + 1}. Altılı
+              </h3>
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-muted/40">
+                      <th className="border-b px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                        Koşu
+                      </th>
                       {WIDTHS.map((width) => (
-                        <td key={width} className="px-3 py-3 align-top">
-                          <div className="flex flex-wrap gap-1">
-                            {race.runners.map((runner) => {
-                              const checked = sel[width].has(runner.no);
-                              return (
-                                <button
-                                  key={runner.no}
-                                  type="button"
-                                  title={runner.name}
-                                  onClick={() => toggleHorse(race.raceNo, width, runner.no)}
-                                  className={cn(
-                                    "flex h-8 w-8 items-center justify-center rounded-md border text-xs font-bold transition-colors",
-                                    checked
-                                      ? "border-brand bg-brand text-brand-foreground"
-                                      : "border-muted-foreground/30 text-muted-foreground hover:border-brand/50 hover:text-foreground"
-                                  )}
-                                >
-                                  {runner.no}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </td>
+                        <th
+                          key={width}
+                          className="border-b px-3 py-2 text-left text-xs font-medium text-muted-foreground"
+                        >
+                          {WIDTH_LABEL[width]}
+                        </th>
                       ))}
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {chunk.map((race, i) => {
+                      const sel = selections[race.raceNo] ?? emptySelection();
+                      return (
+                        <tr key={race.raceNo} className={cn("border-b last:border-0", i % 2 === 1 && "bg-muted/20")}>
+                          <td className="px-3 py-3 align-top text-sm font-semibold whitespace-nowrap">
+                            {race.raceNo}. Koşu
+                          </td>
+                          {WIDTHS.map((width) => (
+                            <td key={width} className="px-3 py-3 align-top">
+                              <div className="flex flex-wrap gap-1">
+                                {race.runners.map((runner) => {
+                                  const checked = sel[width].has(runner.no);
+                                  return (
+                                    <button
+                                      key={runner.no}
+                                      type="button"
+                                      title={runner.name}
+                                      onClick={() => toggleHorse(race.raceNo, width, runner.no)}
+                                      className={cn(
+                                        "flex h-8 w-8 items-center justify-center rounded-md border text-xs font-bold transition-colors",
+                                        checked
+                                          ? "border-brand bg-brand text-brand-foreground"
+                                          : "border-muted-foreground/30 text-muted-foreground hover:border-brand/50 hover:text-foreground"
+                                      )}
+                                    >
+                                      {runner.no}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
 
           {/* Canlı özet — formül: ayaklardaki at sayıları çarpılır × 1.25 */}
           {amounts && (
