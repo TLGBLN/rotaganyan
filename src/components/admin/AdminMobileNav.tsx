@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, LogOut } from "lucide-react";
+import { Menu, LogOut, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import AdminNav from "./AdminNav";
@@ -10,9 +10,10 @@ import AdminNav from "./AdminNav";
 type Props = {
   userName: string | null | undefined;
   userEmail: string | null | undefined;
+  unreadCount: number;
 };
 
-export default function AdminMobileNav({ userName, userEmail }: Props) {
+export default function AdminMobileNav({ userName, userEmail, unreadCount }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -23,12 +24,32 @@ export default function AdminMobileNav({ userName, userEmail }: Props) {
       </Button>
       <SheetContent side="left" className="w-64 border-brand/20 bg-[#0d0d14] p-0">
         <SheetHeader className="border-b border-brand/20">
-          <SheetTitle className="text-left text-sm font-bold text-foreground">
-            <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded bg-brand text-[10px] font-black text-black">
-              A
+          <div className="flex items-center justify-between gap-2">
+            <SheetTitle className="text-left text-sm font-bold text-foreground">
+              <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded bg-brand text-[10px] font-black text-black">
+                A
+              </span>
+              ROTAGANYAN
+            </SheetTitle>
+            <Link
+              href="/panel/bildirimler"
+              onClick={() => setOpen(false)}
+              className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+            >
+              <Bell className="h-4 w-4" />
+              {unreadCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-hit px-1 text-[9px] font-bold text-black">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </Link>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="rounded-sm bg-brand/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-brand">
+              Admin
             </span>
-            ROTAGANYAN
-          </SheetTitle>
+            <span className="text-[10px] text-muted-foreground">Kontrol Paneli</span>
+          </div>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto">
           <AdminNav onNavigate={() => setOpen(false)} />

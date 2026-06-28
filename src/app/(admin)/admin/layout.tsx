@@ -78,7 +78,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <span className="rounded-sm bg-brand/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-brand">Admin</span>
             <Link href="/" className="text-sm font-bold text-foreground">ROTAGANYAN</Link>
           </div>
-          <AdminMobileNav userName={session.user.name} userEmail={session.user.email} />
+          <AdminMobileNav
+            userName={session.user.name}
+            userEmail={session.user.email}
+            unreadCount={unreadCount}
+          />
         </header>
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
       </div>
