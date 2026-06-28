@@ -253,39 +253,6 @@ export async function getActivePredictions(): Promise<PredictionListItem[]> {
   });
 }
 
-/** Anasayfada gösterilecek, kupon önerisi girilmiş aktif (sonuçlanmamış) analizler. */
-export async function getCouponSuggestions(limit = 8): Promise<PredictionListItem[]> {
-  return db.prediction.findMany({
-    where: {
-      published: true,
-      race: {
-        result: null,
-        raceDay: { date: { gte: startOfDay(new Date()) } },
-      },
-      OR: [
-        { couponNarrow: { not: null } },
-        { couponNormal: { not: null } },
-        { couponWide: { not: null } },
-      ],
-    },
-    include: {
-      race: {
-        include: {
-          raceDay: { include: { hippodrome: true } },
-          result: { select: { hitTop1: true, hitInCoupon: true, winnerNo: true, ganyan: true } },
-        },
-      },
-      picks: {
-        where: { rank: 1 },
-        include: { runner: { select: { name: true, no: true } } },
-      },
-      author: { select: { name: true } },
-    },
-    orderBy: [{ race: { raceDay: { date: "asc" } } }, { race: { raceNo: "asc" } }],
-    take: limit,
-  });
-}
-
 // ─── Kombine Kupon ──────────────────────────────────────────────────────────────
 
 export type ComboLeg = {

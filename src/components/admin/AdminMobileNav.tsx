@@ -24,7 +24,7 @@ export default function AdminMobileNav({ userName, userEmail, unreadCount }: Pro
       </Button>
       <SheetContent side="left" className="w-64 border-brand/20 bg-[#0d0d14] p-0">
         <SheetHeader className="border-b border-brand/20">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 pr-7">
             <SheetTitle className="text-left text-sm font-bold text-foreground">
               <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded bg-brand text-[10px] font-black text-black">
                 A
