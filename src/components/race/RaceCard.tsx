@@ -74,7 +74,7 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
             <thead>
               <tr className="border-b bg-muted/40">
                 <th className="px-2 py-2 text-left font-medium text-muted-foreground">Sıra</th>
-                <th className="hidden px-2 py-2 text-left font-medium text-muted-foreground sm:table-cell">Kupon</th>
+                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Kupon</th>
                 <th className="px-2 py-2 text-left font-medium text-muted-foreground">No</th>
                 <th className="px-2 py-2 text-left font-medium text-muted-foreground">At</th>
                 <th className="hidden px-2 py-2 text-right font-medium text-muted-foreground sm:table-cell">A Katmanı</th>
@@ -100,8 +100,8 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                     )}
                   >
                     <td className="px-2 py-2 font-semibold">{pick.rank}</td>
-                    <td className="hidden px-2 py-2 sm:table-cell">
-                      <Badge variant="outline" className={cn("text-[10px]", coupon.className)}>
+                    <td className="px-2 py-2">
+                      <Badge variant="outline" className={cn("text-[10px] whitespace-nowrap", coupon.className)}>
                         {coupon.label}
                       </Badge>
                     </td>
