@@ -16,7 +16,7 @@ type Props = {
 
 function couponCategory(rank: number): { label: string; className: string } {
   if (rank <= 3) return { label: "Ekonomik", className: "border-hit text-hit" };
-  if (rank <= 7) return { label: "Normal", className: "border-brand text-brand" };
+  if (rank <= 6) return { label: "Normal", className: "border-brand text-brand" };
   return { label: "Geniş", className: "border-muted-foreground text-muted-foreground" };
 }
 

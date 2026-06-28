@@ -2,20 +2,26 @@ import type { CouponTierBreakdown } from "@/server/services/admin.service";
 
 const SEGMENTS: { key: "ekonomik" | "normal" | "genis" | "kacti"; label: string; barClass: string; dotClass: string }[] = [
   { key: "ekonomik", label: "Ekonomik (1-3)", barClass: "bg-hit", dotClass: "bg-hit" },
-  { key: "normal", label: "Normal (4-7)", barClass: "bg-brand", dotClass: "bg-brand" },
-  { key: "genis", label: "Geniş (8+)", barClass: "bg-muted-foreground/50", dotClass: "bg-muted-foreground/50" },
+  { key: "normal", label: "Normal (4-6)", barClass: "bg-brand", dotClass: "bg-brand" },
+  { key: "genis", label: "Geniş (7+)", barClass: "bg-muted-foreground/50", dotClass: "bg-muted-foreground/50" },
   { key: "kacti", label: "Kaçtı", barClass: "bg-miss", dotClass: "bg-miss" },
 ];
 
-export default function CouponTierChart({ rows, limit }: { rows: CouponTierBreakdown[]; limit?: number }) {
+export default function CouponTierChart({
+  rows,
+  limit,
+  title = "Koşu Tipine Göre Kazanan Hangi Kupon Kademesinde Geldi",
+}: {
+  rows: CouponTierBreakdown[];
+  limit?: number;
+  title?: string;
+}) {
   const visible = limit ? rows.slice(0, limit) : rows;
 
   return (
     <div className="rounded-lg border p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Koşu Tipine Göre Kazanan Hangi Kupon Kademesinde Geldi
-        </h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
         <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
           {SEGMENTS.map((s) => (
             <span key={s.key} className="flex items-center gap-1">

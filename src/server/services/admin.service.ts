@@ -155,6 +155,7 @@ export type AnalystStats = {
   byHippodrome: AnalystBreakdown[];
   recentTrend: boolean[];
   couponTierByClassType: CouponTierBreakdown[];
+  overallCouponTier: CouponTierBreakdown;
 };
 
 const SURFACE_LABEL: Record<string, string> = { CIM: "Çim", KUM: "Kum", SENTETIK: "Sentetik" };
@@ -173,7 +174,7 @@ function normalizeClassType(classType: string): string {
 function couponTierForRank(rank: number | undefined): CouponTier {
   if (rank == null) return "kacti";
   if (rank <= 3) return "ekonomik";
-  if (rank <= 7) return "normal";
+  if (rank <= 6) return "normal";
   return "genis";
 }
 
@@ -235,6 +236,14 @@ export async function getAnalystStats(): Promise<AnalystStats> {
     byHippodrome: group((r) => r.race.raceDay.hippodrome.name),
     recentTrend: rows.slice(-20).map((r) => r.race.result?.hitTop1 ?? false),
     couponTierByClassType: groupCouponTier((r) => normalizeClassType(r.race.classType)),
+    overallCouponTier: groupCouponTier(() => "Tüm Tahminler")[0] ?? {
+      label: "Tüm Tahminler",
+      total: 0,
+      ekonomik: 0,
+      normal: 0,
+      genis: 0,
+      kacti: 0,
+    },
   };
 }
 

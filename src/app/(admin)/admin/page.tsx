@@ -70,6 +70,8 @@ export default async function AdminDashboard() {
               </div>
             </div>
 
+            <CouponTierChart rows={[analyst.overallCouponTier]} title="Genel: Kazanan Hangi Kupon Kademesinde Geldi" />
+
             <div className="grid gap-4 sm:grid-cols-2">
               <PerformanceBreakdown title="Güven Seviyesine Göre (Kalibrasyon)" rows={analyst.byConfidence} />
               <PerformanceBreakdown title="Pist Tipine Göre" rows={analyst.bySurface} />
