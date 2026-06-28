@@ -141,3 +141,63 @@ export async function getDashboardStats() {
     recentResults,
   };
 }
+
+// ─── Performans Analizi ─────────────────────────────────────────────────────────
+
+export type AnalystBreakdown = { label: string; total: number; hits: number; rate: number };
+export type AnalystStats = {
+  overall: { total: number; hits: number; rate: number };
+  byClassType: AnalystBreakdown[];
+  bySurface: AnalystBreakdown[];
+  byConfidence: AnalystBreakdown[];
+  byHippodrome: AnalystBreakdown[];
+  recentTrend: boolean[];
+};
+
+const SURFACE_LABEL: Record<string, string> = { CIM: "Çim", KUM: "Kum", SENTETIK: "Sentetik" };
+const CONFIDENCE_LABEL: Record<string, string> = { DUSUK: "Düşük Güven", ORTA: "Orta Güven", YUKSEK: "Yüksek Güven" };
+
+/** Yayında ve sonuçlanmış tahminleri sınıf/pist/güven/hipodroma göre kırarak isabet oranını çıkarır. */
+export async function getAnalystStats(): Promise<AnalystStats> {
+  const rows = await db.prediction.findMany({
+    where: { published: true, race: { result: { isNot: null } } },
+    select: {
+      confidence: true,
+      isBanko: true,
+      race: {
+        select: {
+          classType: true,
+          surface: true,
+          raceDay: { select: { hippodrome: { select: { name: true } } } },
+          result: { select: { hitTop1: true } },
+        },
+      },
+    },
+    orderBy: { publishedAt: "asc" },
+  });
+
+  function group(keyFn: (r: (typeof rows)[number]) => string): AnalystBreakdown[] {
+    const map = new Map<string, { total: number; hits: number }>();
+    for (const r of rows) {
+      const key = keyFn(r);
+      const entry = map.get(key) ?? { total: 0, hits: 0 };
+      entry.total++;
+      if (r.race.result?.hitTop1) entry.hits++;
+      map.set(key, entry);
+    }
+    return [...map.entries()]
+      .map(([label, v]) => ({ label, total: v.total, hits: v.hits, rate: v.total > 0 ? (v.hits / v.total) * 100 : 0 }))
+      .sort((a, b) => b.total - a.total);
+  }
+
+  const totalHits = rows.filter((r) => r.race.result?.hitTop1).length;
+
+  return {
+    overall: { total: rows.length, hits: totalHits, rate: rows.length > 0 ? (totalHits / rows.length) * 100 : 0 },
+    byClassType: group((r) => r.race.classType),
+    bySurface: group((r) => SURFACE_LABEL[r.race.surface] ?? r.race.surface),
+    byConfidence: group((r) => (r.isBanko ? "★ Banko" : CONFIDENCE_LABEL[r.confidence] ?? r.confidence)),
+    byHippodrome: group((r) => r.race.raceDay.hippodrome.name),
+    recentTrend: rows.slice(-20).map((r) => r.race.result?.hitTop1 ?? false),
+  };
+}
