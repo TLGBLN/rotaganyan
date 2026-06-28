@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { Role } from "@prisma/client";
 
@@ -14,6 +15,7 @@ async function updateRole(userId: string, role: Role) {
 }
 
 export default function RoleSelector({ userId, currentRole }: { userId: string; currentRole: Role }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
@@ -22,6 +24,7 @@ export default function RoleSelector({ userId, currentRole }: { userId: string; 
       try {
         await updateRole(userId, newRole);
         toast.success("Rol güncellendi");
+        router.refresh();
       } catch {
         toast.error("Rol güncellenemedi");
       }

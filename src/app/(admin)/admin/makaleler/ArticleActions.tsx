@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { unpublishArticle, publishArticle } from "@/server/actions/article.actions";
 import { useTransition } from "react";
 import { toast } from "sonner";
 
 export default function ArticleActions({ id, published }: { id: string; published: boolean }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   function togglePublish() {
@@ -17,6 +19,7 @@ export default function ArticleActions({ id, published }: { id: string; publishe
         await publishArticle(id);
         toast.success("Yayımlandı");
       }
+      router.refresh();
     });
   }
 
