@@ -3,13 +3,11 @@ import { Button } from "@/components/ui/button";
 import HeroBanner from "@/components/layout/HeroBanner";
 import HitsCarousel from "@/components/home/HitsCarousel";
 import LiveTvPlayer from "@/components/home/LiveTvPlayer";
-import HeaderUserMenu from "@/components/layout/HeaderUserMenu";
 import NewsTicker from "@/components/home/NewsTicker";
 import AltiliGanyanResults from "@/components/home/AltiliGanyanResults";
 import KuponOnerileri from "@/components/home/KuponOnerileri";
 import TahminOnerileri from "@/components/home/TahminOnerileri";
 import { getHitPredictions, getCouponSuggestions, getKuponOnerileri } from "@/server/services/race.service";
-import { auth } from "@/lib/auth";
 import { fetchTjkTicker } from "@/lib/tjk-ticker";
 import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
 
