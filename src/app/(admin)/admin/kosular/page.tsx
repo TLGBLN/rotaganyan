@@ -95,6 +95,18 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                             </span>
                           )}
                         </div>
+                        {advice && (
+                          <div
+                            className={cn(
+                              "mt-0.5 text-[10px] leading-tight",
+                              advice.level === "warn" && "text-miss",
+                              advice.level === "info" && "text-brand",
+                              advice.level === "good" && "text-hit"
+                            )}
+                          >
+                            {advice.text}
+                          </div>
+                        )}
                       </td>
                       <td className="px-3 py-1.5">{race.runners.length} at</td>
                       <td className="px-3 py-1.5">

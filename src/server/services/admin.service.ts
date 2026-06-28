@@ -160,6 +160,15 @@ export type AnalystStats = {
 const SURFACE_LABEL: Record<string, string> = { CIM: "Çim", KUM: "Kum", SENTETIK: "Sentetik" };
 const CONFIDENCE_LABEL: Record<string, string> = { DUSUK: "Düşük Güven", ORTA: "Orta Güven", YUKSEK: "Yüksek Güven" };
 
+/**
+ * Koşu sınıfı metinleri "/H2", "/DHÖW", "/Dişi" gibi eklerle aşırı parçalanır
+ * (her biri n=1 olan onlarca benzersiz etiket). "/" öncesindeki temel sınıfı
+ * alarak gruplama ve geçmiş-eşleştirme anlamlı kalabilsin diye sadeleştirir.
+ */
+function normalizeClassType(classType: string): string {
+  return classType.split("/")[0].trim();
+}
+
 /** Kazananın bulunduğu sıraya göre hangi kupon kademesinde (Ekonomik/Normal/Geniş) yakalandığını, hiç yakalanmadıysa "kacti" döner. */
 function couponTierForRank(rank: number | undefined): CouponTier {
   if (rank == null) return "kacti";
@@ -220,12 +229,12 @@ export async function getAnalystStats(): Promise<AnalystStats> {
 
   return {
     overall: { total: rows.length, hits: totalHits, rate: rows.length > 0 ? (totalHits / rows.length) * 100 : 0 },
-    byClassType: group((r) => r.race.classType),
+    byClassType: group((r) => normalizeClassType(r.race.classType)),
     bySurface: group((r) => SURFACE_LABEL[r.race.surface] ?? r.race.surface),
     byConfidence: group((r) => (r.isBanko ? "★ Banko" : CONFIDENCE_LABEL[r.confidence] ?? r.confidence)),
     byHippodrome: group((r) => r.race.raceDay.hippodrome.name),
     recentTrend: rows.slice(-20).map((r) => r.race.result?.hitTop1 ?? false),
-    couponTierByClassType: groupCouponTier((r) => r.race.classType),
+    couponTierByClassType: groupCouponTier((r) => normalizeClassType(r.race.classType)),
   };
 }
 
@@ -237,28 +246,32 @@ export type ClassTypeAdvice = { level: "warn" | "info" | "good"; text: string };
  * için uyarı üretmez.
  */
 export function getClassTypeAdvice(stats: AnalystStats, classType: string): ClassTypeAdvice | null {
-  const breakdown = stats.byClassType.find((b) => b.label === classType);
+  const normalized = normalizeClassType(classType);
+  const breakdown = stats.byClassType.find((b) => b.label === normalized);
   if (!breakdown || breakdown.total < 3) return null;
 
-  if (breakdown.rate < 20) {
-    return { level: "warn", text: `Bu sınıfta tarihsel isabet düşük (%${breakdown.rate.toFixed(0)}, ${breakdown.hits}/${breakdown.total}) — dikkatli ol` };
+  const rateText = `isabet %${breakdown.rate.toFixed(0)} (${breakdown.hits}/${breakdown.total})`;
+
+  const tier = stats.couponTierByClassType.find((t) => t.label === normalized);
+  if (!tier || tier.total < 3) {
+    if (breakdown.rate < 20) return { level: "warn", text: `Bu sınıfta tarihsel ${rateText} — dikkatli ol` };
+    if (breakdown.rate >= 50) return { level: "good", text: `Bu sınıfta tarihsel ${rateText}` };
+    return null;
   }
 
-  const tier = stats.couponTierByClassType.find((t) => t.label === classType);
-  if (tier && tier.total >= 3) {
-    const economicShare = tier.ekonomik / tier.total;
-    const genisShare = tier.genis / tier.total;
-    if (genisShare >= 0.4) {
-      return { level: "warn", text: `Bu sınıfta kazanan genelde Geniş kuponda çıkıyor — dar kupon riskli` };
-    }
-    if (economicShare < 0.4) {
-      return { level: "info", text: `Bu sınıfta kazanan sık sık Ekonomik kuponun dışında kalıyor — Normal/Geniş düşün` };
-    }
-  }
+  // Kazananın hangi kupon kademesinde geldiğini yüzdesel olarak ifade eder — admin "ekonomik mi normal mi geniş mi
+  // değerlendireyim" sorusuna doğrudan sayısal cevap alsın diye her zaman bu kırılım gösterilir.
+  const pct = (n: number) => Math.round((n / tier.total) * 100);
+  const tierText =
+    `Ekonomik %${pct(tier.ekonomik)} · Normal %${pct(tier.normal)} · Geniş %${pct(tier.genis)}` +
+    (tier.kacti > 0 ? ` · Kaçtı %${pct(tier.kacti)}` : "");
 
-  if (breakdown.rate >= 50) {
-    return { level: "good", text: `Bu sınıfta tarihsel isabet yüksek (%${breakdown.rate.toFixed(0)}, ${breakdown.hits}/${breakdown.total})` };
-  }
+  const economicShare = tier.ekonomik / tier.total;
+  const genisShare = tier.genis / tier.total;
 
-  return null;
+  let level: ClassTypeAdvice["level"] = "info";
+  if (breakdown.rate < 20 || genisShare >= 0.4) level = "warn";
+  else if (breakdown.rate >= 50 && economicShare >= 0.4) level = "good";
+
+  return { level, text: `${tierText} (${tier.total} koşu) — tarihsel ${rateText}` };
 }

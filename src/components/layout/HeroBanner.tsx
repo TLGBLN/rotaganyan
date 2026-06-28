@@ -1,13 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
-import { auth } from "@/lib/auth";
 import BannerCountdown from "./BannerCountdown";
 
 const GAZI_KOSUSU_TARGET = "2026-06-28T17:15:00+03:00";
 
-export default async function HeroBanner() {
-  const session = await auth();
-  const isLoggedIn = !!session?.user;
+export default function HeroBanner() {
   const isGaziUpcoming = Date.now() < new Date(GAZI_KOSUSU_TARGET).getTime();
 
   const bannerImage = (
@@ -46,25 +43,6 @@ export default async function HeroBanner() {
           >
             Gaziye Doğru →
           </Link>
-        )}
-
-        {/* Butonlar — sadece giriş yapmamış ziyaretçilere */}
-        {!isLoggedIn && (
-          <div className="absolute bottom-[6%] right-[3%] flex items-center gap-1.5 sm:bottom-[12%] sm:right-[5%] sm:gap-3">
-            <Link
-              href="/giris"
-              className="rounded-md border border-white/50 bg-white/10 px-2.5 py-1.5 text-[10px] font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 sm:px-5 sm:py-2.5 sm:text-sm"
-            >
-              Giriş Yap
-            </Link>
-            <Link
-              href="/kayit"
-              className="rounded-md px-2.5 py-1.5 text-[10px] font-semibold text-white transition sm:px-5 sm:py-2.5 sm:text-sm"
-              style={{ background: "linear-gradient(135deg,#c8971e,#e0b84a)" }}
-            >
-              Kayıt Ol
-            </Link>
-          </div>
         )}
       </div>
     </div>

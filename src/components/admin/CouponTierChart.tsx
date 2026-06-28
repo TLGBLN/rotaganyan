@@ -50,6 +50,18 @@ export default function CouponTierChart({ rows, limit }: { rows: CouponTierBreak
                   );
                 })}
               </div>
+              <div className="mt-1 flex items-center gap-3 text-[10px] text-muted-foreground">
+                {SEGMENTS.map((s) => {
+                  const count = row[s.key];
+                  if (count === 0) return null;
+                  return (
+                    <span key={s.key} className="flex items-center gap-1">
+                      <span className={`inline-block h-1.5 w-1.5 rounded-full ${s.dotClass}`} />
+                      %{Math.round((count / row.total) * 100)} ({count})
+                    </span>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>

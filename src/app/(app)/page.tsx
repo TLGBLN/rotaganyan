@@ -14,11 +14,10 @@ import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.ad
 export const revalidate = 600; // 10 dakika
 
 export default async function HomePage() {
-  const [hitPredictions, couponSuggestions, kuponOnerisi, session, tickerItems, altiliResults] = await Promise.all([
+  const [hitPredictions, couponSuggestions, kuponOnerisi, tickerItems, altiliResults] = await Promise.all([
     getHitPredictions(16),
     getCouponSuggestions(8),
     getKuponOnerileri(),
-    auth(),
     fetchTjkTicker(),
     fetchTodaysAltiliResults(),
   ]);
@@ -34,23 +33,14 @@ export default async function HomePage() {
       </div>
 
       {/* CTA */}
-      <section className="flex flex-col items-stretch gap-4 px-4 py-10 max-w-7xl mx-auto w-full sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-4">
-          <Button asChild size="lg" className="bg-brand hover:bg-brand/90 text-brand-foreground">
-            <Link href="/kosular">Günün Koşuları</Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link href="/tahmin-onerileri">Banko Önerileri</Link>
-          </Button>
-          <LiveTvPlayer />
-        </div>
-        {session?.user && (
-          <HeaderUserMenu
-            name={session.user.name}
-            email={session.user.email}
-            role={session.user.role}
-          />
-        )}
+      <section className="flex flex-wrap items-center gap-4 px-4 py-10 max-w-7xl mx-auto w-full">
+        <Button asChild size="lg" className="bg-brand hover:bg-brand/90 text-brand-foreground">
+          <Link href="/kosular">Günün Koşuları</Link>
+        </Button>
+        <Button asChild variant="outline" size="lg">
+          <Link href="/tahmin-onerileri">Banko Önerileri</Link>
+        </Button>
+        <LiveTvPlayer />
       </section>
 
       {/* İsabet sağlayan tahminler — otomatik kayan slider */}
