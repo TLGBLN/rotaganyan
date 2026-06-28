@@ -50,7 +50,7 @@ function amountFor(counts: number[]): number {
 export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }) {
   const router = useRouter();
   const [loading, startLoading] = useTransition();
-  const [publishing, startPublishing] = useTransition();
+  const [publishingIdx, setPublishingIdx] = useState<number | null>(null);
 
   const [slug, setSlug] = useState(hippodromes[0]?.slug ?? "");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -99,10 +99,10 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
     });
   }
 
-  function submit() {
+  async function submitGroup(group: RaceDayData["races"], chunkIdx: number) {
     if (!raceDay) return;
 
-    const legs: HomeKuponLegInput[] = raceDay.races
+    const legs: HomeKuponLegInput[] = group
       .map((r) => {
         const sel = selections[r.raceNo] ?? emptySelection();
         return {
@@ -119,13 +119,20 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
       return;
     }
 
-    startPublishing(async () => {
-      await publishHomeKupon({ hippodromeName: raceDay.hippodromeName, date, legs });
-      toast.success("Kupon oluşturuldu ve anasayfada yayınlandı");
-      setRaceDay(null);
-      setSelections({});
+    const altiliLabel = altiliGroups.length > 1 ? `${chunkIdx + 1}. Altılı` : "1. Altılı";
+    setPublishingIdx(chunkIdx);
+    try {
+      await publishHomeKupon({
+        hippodromeName: `${raceDay.hippodromeName} — ${altiliLabel}`,
+        date,
+        legs,
+        slot: chunkIdx + 1,
+      });
+      toast.success(`${altiliLabel} kuponu oluşturuldu ve anasayfada yayınlandı`);
       router.refresh();
-    });
+    } finally {
+      setPublishingIdx(null);
+    }
   }
 
   return (
@@ -244,17 +251,17 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
                   </div>
                 ))}
               </div>
+
+              <button
+                type="button"
+                onClick={() => submitGroup(chunk, chunkIdx)}
+                disabled={publishingIdx === chunkIdx}
+                className="w-full rounded-md bg-brand px-4 py-3 text-sm font-semibold text-brand-foreground hover:bg-brand/90 disabled:opacity-50"
+              >
+                {publishingIdx === chunkIdx ? "Oluşturuluyor…" : "Kupon Oluştur"}
+              </button>
             </div>
           ))}
-
-          <button
-            type="button"
-            onClick={submit}
-            disabled={publishing}
-            className="w-full rounded-md bg-brand px-4 py-3 text-sm font-semibold text-brand-foreground hover:bg-brand/90 disabled:opacity-50"
-          >
-            {publishing ? "Oluşturuluyor…" : "Kupon Oluştur"}
-          </button>
         </div>
       )}
     </div>

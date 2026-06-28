@@ -365,22 +365,19 @@ function kuponAmount(nosPerLeg: number[][]): number {
   return Math.round(combinations * STAKE_PER_COMBINATION * 100) / 100;
 }
 
-/** Admin'in manuel kurup yayınladığı (isActive) kombine kuponu anasayfa için hazırlar. */
-export async function getKuponOnerileri(): Promise<KuponOnerisi> {
-  const active = await db.homeKupon.findFirst({
-    where: { isActive: true },
-    orderBy: { updatedAt: "desc" },
-  });
-  if (!active) return null;
-
-  // Günün kuponu sadece o gün için geçerlidir — gün bitince admin elle kaldırmasa da otomatik kalkar.
-  if (active.date.toISOString().slice(0, 10) !== turkeyDateString()) return null;
-
+async function buildKuponOnerisi(active: {
+  hippodromeName: string;
+  date: Date;
+  legs: unknown;
+}): Promise<KuponOnerisi> {
   const legs = active.legs as unknown as HomeKuponLeg[];
   if (!Array.isArray(legs) || legs.length === 0) return null;
 
+  // Hipodrom adı artık "Ankara — 1. Altılı" gibi bir etiket içerebilir; gerçek isim kısmını ayıkla.
+  const baseName = active.hippodromeName.split(" — ")[0];
+
   // Her ayağın gerçek kazananını bul (sonuç girildiyse) — kupon numaralarıyla eşleşeni yeşil göstermek için.
-  const hippodrome = await db.hippodrome.findUnique({ where: { name: active.hippodromeName } });
+  const hippodrome = await db.hippodrome.findUnique({ where: { name: baseName } });
   const winnerByRaceNo = new Map<number, number | null>();
   if (hippodrome) {
     const races = await db.race.findMany({
@@ -414,4 +411,19 @@ export async function getKuponOnerileri(): Promise<KuponOnerisi> {
       { key: "genis", label: "Geniş", legs: wideLegs, amount: kuponAmount(wideLegs.map((l) => l.nos)) },
     ],
   };
+}
+
+/** Admin'in manuel kurup yayınladığı (isActive) kombine kuponları (her slot/altılı kendi başına) anasayfa için hazırlar. */
+export async function getKuponOnerileri(): Promise<KuponOnerisi[]> {
+  const actives = await db.homeKupon.findMany({
+    where: { isActive: true },
+    orderBy: [{ slot: "asc" }, { updatedAt: "desc" }],
+  });
+
+  // Günün kuponu sadece o gün için geçerlidir — gün bitince admin elle kaldırmasa da otomatik kalkar.
+  const today = turkeyDateString();
+  const validActives = actives.filter((a) => a.date.toISOString().slice(0, 10) === today);
+
+  const results = await Promise.all(validActives.map((a) => buildKuponOnerisi(a)));
+  return results.filter((r): r is NonNullable<typeof r> => r !== null);
 }

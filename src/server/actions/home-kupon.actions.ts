@@ -15,6 +15,7 @@ export type HomeKuponInput = {
   hippodromeName: string;
   date: string;
   legs: HomeKuponLegInput[];
+  slot: number;
 };
 
 /** Bir hipodrom/günün koşu+at listesini (Race/Runner) döner — Prediction/analizden tamamen bağımsız. */
@@ -56,12 +57,13 @@ export async function publishHomeKupon(input: HomeKuponInput) {
     }));
 
   await db.$transaction([
-    db.homeKupon.updateMany({ where: { isActive: true }, data: { isActive: false } }),
+    db.homeKupon.updateMany({ where: { isActive: true, slot: input.slot }, data: { isActive: false } }),
     db.homeKupon.create({
       data: {
         hippodromeName: input.hippodromeName,
         date: new Date(input.date + "T00:00:00.000Z"),
         legs,
+        slot: input.slot,
         isActive: true,
       },
     }),
@@ -74,8 +76,11 @@ export async function publishHomeKupon(input: HomeKuponInput) {
 export async function setActiveHomeKupon(id: string) {
   await requireRole("EDITOR");
 
+  const target = await db.homeKupon.findUnique({ where: { id }, select: { slot: true } });
+  if (!target) return;
+
   await db.$transaction([
-    db.homeKupon.updateMany({ where: { isActive: true }, data: { isActive: false } }),
+    db.homeKupon.updateMany({ where: { isActive: true, slot: target.slot }, data: { isActive: false } }),
     db.homeKupon.update({ where: { id }, data: { isActive: true } }),
   ]);
 

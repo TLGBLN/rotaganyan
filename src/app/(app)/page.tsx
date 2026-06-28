@@ -71,7 +71,7 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Tahmin Önerileri — Ekonomik/Normal/Geniş kupon şablonları */}
+      {/* Tahmin Önerileri — Ekonomik/Normal/Geniş kupon şablonları (her aktif slot için) */}
       <TahminOnerileri data={kuponOnerisi} />
 
       {/* Kupon Önerileri */}

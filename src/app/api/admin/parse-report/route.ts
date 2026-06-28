@@ -3,6 +3,7 @@ import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { parseFullReport } from "@/lib/md-report-parser";
+import { reconstructFlattenedMarkdown } from "@/lib/ai-paste-fix";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -26,7 +27,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Koşu bulunamadı" }, { status: 404 });
   }
 
-  const parsed = parseFullReport(markdown);
+  let parsed = parseFullReport(markdown);
+  let aiFixed = false;
+
+  // Sohbet arayüzünden render edilmiş tablo kopyalanınca | işaretleri ve satır
+  // araları kaybolur ("Sıra No At ... 1 19 UPAMECANO ..." tek bir bitişik metne
+  // dönüşür) — bu durumda Claude'a aynı veriyi gerçek markdown tabloya geri
+  // çevirtip tekrar deniyoruz.
+  if (!parsed.picks.length) {
+    const reconstructed = await reconstructFlattenedMarkdown(markdown);
+    if (reconstructed) {
+      const retry = parseFullReport(reconstructed);
+      if (retry.picks.length) {
+        parsed = retry;
+        aiFixed = true;
+      }
+    }
+  }
+
   if (!parsed.picks.length) {
     return NextResponse.json(
       { error: "Nihai sıralama bulunamadı. 'NİHAİ SIRALAMA' tablosunu içeren tam rapor formatını kullanın." },
@@ -148,28 +166,32 @@ export async function POST(req: NextRequest) {
   // Delete + recreate must be atomic — otherwise an overlapping submit (e.g. a
   // double-click) can interleave with this loop and leave stale picks mixed in
   // with the new ones.
-  await db.$transaction([
-    db.pick.deleteMany({ where: { predictionId: prediction.id } }),
-    ...parsed.picks.map((p) =>
-      db.pick.create({
-        data: {
-          predictionId: prediction.id,
-          rank: p.rank,
-          runnerId: runnerIdByNo[p.no] ?? null,
-          runnerLabel: `${p.no} ${p.name}`,
-          score: p.score,
-          details: p.details,
-          pedigreeRating: p.pedigreeRating,
-        },
-      })
-    ),
-  ]);
+  await db.$transaction(
+    [
+      db.pick.deleteMany({ where: { predictionId: prediction.id } }),
+      ...parsed.picks.map((p) =>
+        db.pick.create({
+          data: {
+            predictionId: prediction.id,
+            rank: p.rank,
+            runnerId: runnerIdByNo[p.no] ?? null,
+            runnerLabel: `${p.no} ${p.name}`,
+            score: p.score,
+            details: p.details,
+            pedigreeRating: p.pedigreeRating,
+          },
+        })
+      ),
+    ],
+    { timeout: 30000 }
+  );
 
   return NextResponse.json({
     ok: true,
     predictionId: prediction.id,
     picks: parsed.picks.length,
     runners: parsed.runners.length,
+    aiFixed,
     coupon: {
       narrow: parsed.couponNarrow,
       normal: parsed.couponNormal,

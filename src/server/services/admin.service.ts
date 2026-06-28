@@ -228,3 +228,37 @@ export async function getAnalystStats(): Promise<AnalystStats> {
     couponTierByClassType: groupCouponTier((r) => r.race.classType),
   };
 }
+
+export type ClassTypeAdvice = { level: "warn" | "info" | "good"; text: string };
+
+/**
+ * Bir koşu sınıfının geçmiş performansından, o sınıfta analiz girerken dikkat
+ * edilmesi gereken noktayı çıkarır. Az veri varsa (n<3) yanlış güven vermemek
+ * için uyarı üretmez.
+ */
+export function getClassTypeAdvice(stats: AnalystStats, classType: string): ClassTypeAdvice | null {
+  const breakdown = stats.byClassType.find((b) => b.label === classType);
+  if (!breakdown || breakdown.total < 3) return null;
+
+  if (breakdown.rate < 20) {
+    return { level: "warn", text: `Bu sınıfta tarihsel isabet düşük (%${breakdown.rate.toFixed(0)}, ${breakdown.hits}/${breakdown.total}) — dikkatli ol` };
+  }
+
+  const tier = stats.couponTierByClassType.find((t) => t.label === classType);
+  if (tier && tier.total >= 3) {
+    const economicShare = tier.ekonomik / tier.total;
+    const genisShare = tier.genis / tier.total;
+    if (genisShare >= 0.4) {
+      return { level: "warn", text: `Bu sınıfta kazanan genelde Geniş kuponda çıkıyor — dar kupon riskli` };
+    }
+    if (economicShare < 0.4) {
+      return { level: "info", text: `Bu sınıfta kazanan sık sık Ekonomik kuponun dışında kalıyor — Normal/Geniş düşün` };
+    }
+  }
+
+  if (breakdown.rate >= 50) {
+    return { level: "good", text: `Bu sınıfta tarihsel isabet yüksek (%${breakdown.rate.toFixed(0)}, ${breakdown.hits}/${breakdown.total})` };
+  }
+
+  return null;
+}

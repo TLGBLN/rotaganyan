@@ -258,22 +258,25 @@ async function importSingle(item: AnalysisItem, adminUserId: string): Promise<st
 
   // 8. Picks (delete + recreate to keep clean — atomic so an overlapping
   // import for the same race can't interleave and leave stale picks behind)
-  await db.$transaction([
-    db.pick.deleteMany({ where: { predictionId: prediction.id } }),
-    ...parsedPicks.map((pick) =>
-      db.pick.create({
-        data: {
-          predictionId: prediction.id,
-          rank: pick.rank,
-          runnerId: runnerIds[pick.no] ?? null,
-          runnerLabel: pick.runnerLabel,
-          score: pick.score,
-          details: pick.details,
-          pedigreeRating: pick.pedigreeRating,
-        },
-      })
-    ),
-  ]);
+  await db.$transaction(
+    [
+      db.pick.deleteMany({ where: { predictionId: prediction.id } }),
+      ...parsedPicks.map((pick) =>
+        db.pick.create({
+          data: {
+            predictionId: prediction.id,
+            rank: pick.rank,
+            runnerId: runnerIds[pick.no] ?? null,
+            runnerLabel: pick.runnerLabel,
+            score: pick.score,
+            details: pick.details,
+            pedigreeRating: pick.pedigreeRating,
+          },
+        })
+      ),
+    ],
+    { timeout: 30000 }
+  );
 
   // 9. Result (if outcome is known)
   if (item.sonuc && item.gercek) {

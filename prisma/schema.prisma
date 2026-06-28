@@ -373,11 +373,13 @@ model HomeKupon {
   hippodromeName String
   date           DateTime
   legs           Json     // [{ raceNo: number, narrow: number[], normal: number[], wide: number[] }]
+  slot           Int      @default(1) // 1 = 1. Altılı, 2 = 2. Altılı — her slot kendi başına aktif olabilir
   isActive       Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   @@index([isActive])
+  @@index([slot])
 }
 
 // ─── ENGINE CONFIG ────────────────────────────────────────────────────────────

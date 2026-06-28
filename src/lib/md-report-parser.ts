@@ -30,6 +30,8 @@ export interface ReportPick {
   score: number | null;
   pedigreeRating: PedigreeRating;
   details: string[];
+  /** Raporda ayrıca "TJK No" sütunu varsa — kupon metnindeki TJK numaralarını Aktif No'ya çevirmek için. */
+  tjkNo?: number;
 }
 
 export interface ParsedReport {
@@ -397,7 +399,14 @@ function parseRankingTable(block: string): ReportPick[] {
   if (!headers.length) return [];
 
   const iRank = colIndex(headers, (h) => h.includes("SIRA"));
-  const iNo = colIndex(headers, (h) => h === "NO");
+  // Bazı raporlarda "Aktif No" (bu koşudaki program/start no'su — bizim Runner.no
+  // alanımızla eşleşen değer) ile "TJK No" (TJK'nın kalıcı/genel at kimliği, bizim
+  // veritabanımızdaki no ile EŞLEŞMEZ) ayrı sütunlar olarak gelir. Eşleştirme için
+  // her zaman Aktif/program No kullanılır, TJK No sadece görüntüleme amaçlıdır.
+  const iAktifNo = colIndex(headers, (h) => h.includes("AKTIF") && h.includes("NO"));
+  const iPlainNo = colIndex(headers, (h) => h === "NO");
+  const iNo = iAktifNo !== -1 ? iAktifNo : iPlainNo;
+  const iTjkNo = colIndex(headers, (h) => h.includes("TJK") && h.includes("NO"));
   const iAt = colIndex(headers, (h) => h === "AT");
   // v1.6.1: A/B/C Katmanı + Toplam (100 üzerinden, katman ağırlıklı) — eski tek "Puan" sütununa da uyumlu.
   const iKatmanA = colIndex(headers, (h) => h.includes("A KATMANI"));
@@ -441,9 +450,11 @@ function parseRankingTable(block: string): ReportPick[] {
     const pedigreeRating = stars > 0 ? mapStarPedigree(stars) : iPed !== -1 ? mapPedigree(pedRaw) : "BILINMIYOR";
 
     const note = iNote !== -1 ? row[iNote]?.trim() : "";
+    const tjkNoRaw = iTjkNo !== -1 ? parseInt(row[iTjkNo]?.replace(/\D/g, "") ?? "", 10) : NaN;
     picks.push({
       rank,
       no,
+      ...(!isNaN(tjkNoRaw) ? { tjkNo: tjkNoRaw } : {}),
       name,
       score,
       pedigreeRating,
@@ -601,9 +612,24 @@ export function parseFullReport(markdown: string): ParsedReport {
   const tempoMatch = text.match(/\*\*Tempo:\*\*\s*([^\n]+)/i);
   const tempo = tempoMatch ? tempoMatch[1].trim() : null;
 
-  // Kupon table
+  // Kupon table — bazı raporlarda kupon numaraları "TJK No" ile yazılır ama bizim
+  // Runner.no alanımız "Aktif No"; NİHAİ SIRALAMA'dan çıkardığımız eşlemeyle çeviriyoruz.
+  const tjkToAktif = new Map<number, number>();
+  for (const p of picks) if (p.tjkNo != null) tjkToAktif.set(p.tjkNo, p.no);
+
+  function translateCouponNumbers(value: string | null): string | null {
+    if (!value || tjkToAktif.size === 0) return value;
+    return value.replace(/\d+/g, (m) => String(tjkToAktif.get(parseInt(m, 10)) ?? m));
+  }
+
   const couponSection = extractSection(text, "KUPON");
-  const coupon = parseCouponTable(couponSection);
+  const rawCoupon = parseCouponTable(couponSection);
+  const coupon = {
+    ...rawCoupon,
+    narrow: translateCouponNumbers(rawCoupon.narrow),
+    normal: translateCouponNumbers(rawCoupon.normal),
+    wide: translateCouponNumbers(rawCoupon.wide),
+  };
 
   // "Banko neden yok: ..." line, plus the v1.6 template's narrative sections —
   // none of these have a dedicated DB column, so they're folded into notes for

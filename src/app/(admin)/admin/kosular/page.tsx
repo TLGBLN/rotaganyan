@@ -1,4 +1,4 @@
-import { getAdminRaceDays } from "@/server/services/admin.service";
+import { getAdminRaceDays, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import Link from "next/link";
@@ -18,7 +18,10 @@ type PageProps = {
 export default async function AdminKosularPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const currentDate = params.tarih ?? turkeyDateString();
-  const raceDays = await getAdminRaceDays(currentDate);
+  const [raceDays, analystStats] = await Promise.all([
+    getAdminRaceDays(currentDate),
+    getAnalystStats(),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -67,13 +70,32 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {rd.races.map((race, i) => (
+                  {rd.races.map((race, i) => {
+                    const advice = getClassTypeAdvice(analystStats, race.classType);
+                    return (
                     <tr
                       key={race.id}
                       className={cn("border-b last:border-0", i % 2 === 1 && "race-row-even")}
                     >
                       <td className="px-3 py-1.5 font-semibold">{race.raceNo}</td>
-                      <td className="px-3 py-1.5 text-muted-foreground">{race.classType}</td>
+                      <td className="px-3 py-1.5 text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                          <span>{race.classType}</span>
+                          {advice && (
+                            <span
+                              title={advice.text}
+                              className={cn(
+                                "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold cursor-help",
+                                advice.level === "warn" && "bg-miss/20 text-miss",
+                                advice.level === "info" && "bg-brand/20 text-brand",
+                                advice.level === "good" && "bg-hit/20 text-hit"
+                              )}
+                            >
+                              {advice.level === "warn" ? "!" : advice.level === "good" ? "✓" : "i"}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-3 py-1.5">{race.runners.length} at</td>
                       <td className="px-3 py-1.5">
                         {race.prediction ? (
@@ -109,7 +131,8 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                         />
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
