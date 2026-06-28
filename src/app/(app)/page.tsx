@@ -38,6 +38,9 @@ export default async function HomePage() {
         <Button asChild variant="outline" size="lg">
           <Link href="/tahmin-onerileri">Banko Önerileri</Link>
         </Button>
+        <Button asChild variant="outline" size="lg">
+          <Link href="/kosular">Altılı Ne Verir</Link>
+        </Button>
         <LiveTvPlayer />
       </section>
 
