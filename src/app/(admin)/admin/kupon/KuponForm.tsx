@@ -186,23 +186,25 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
                           </td>
                           {WIDTHS.map((width) => (
                             <td key={width} className="px-3 py-3 align-top">
-                              <div className="flex flex-wrap gap-1">
+                              <div className="flex flex-col gap-1">
                                 {race.runners.map((runner) => {
                                   const checked = sel[width].has(runner.no);
                                   return (
                                     <button
                                       key={runner.no}
                                       type="button"
-                                      title={runner.name}
                                       onClick={() => toggleHorse(race.raceNo, width, runner.no)}
                                       className={cn(
-                                        "flex h-8 w-8 items-center justify-center rounded-md border text-xs font-bold transition-colors",
+                                        "flex items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-xs transition-colors",
                                         checked
                                           ? "border-brand bg-brand text-brand-foreground"
                                           : "border-muted-foreground/30 text-muted-foreground hover:border-brand/50 hover:text-foreground"
                                       )}
                                     >
-                                      {runner.no}
+                                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-black/10 font-bold">
+                                        {runner.no}
+                                      </span>
+                                      <span className="truncate font-medium">{runner.name}</span>
                                     </button>
                                   );
                                 })}
