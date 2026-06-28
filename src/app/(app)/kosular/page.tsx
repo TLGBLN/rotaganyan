@@ -7,8 +7,11 @@ import { Button } from "@/components/ui/button";
 import {
   getRaceDaysByDate,
   getComboCoupon,
+  getAltiliNeVerir,
   type ComboLeg,
+  type AltiliNeVerir,
 } from "@/server/services/race.service";
+import LiveTvPlayer from "@/components/home/LiveTvPlayer";
 import { fetchDailyProgram } from "@/lib/tjk-daily";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { syncResultsForDate } from "@/server/services/result-sync";
@@ -92,11 +95,16 @@ export default async function KosularPage({ searchParams }: PageProps) {
   const isLoggedIn = !!session?.user;
 
   const comboByRaceDay = new Map<string, ComboLeg[]>();
+  const altiliByRaceDay = new Map<string, AltiliNeVerir>();
   if (visibleRaceDays.length > 0) {
-    const combos = await Promise.all(
-      visibleRaceDays.map((rd) => getComboCoupon(rd.hippodrome.slug, currentDate))
-    );
-    visibleRaceDays.forEach((rd, i) => comboByRaceDay.set(rd.id, combos[i]));
+    const [combos, altilis] = await Promise.all([
+      Promise.all(visibleRaceDays.map((rd) => getComboCoupon(rd.hippodrome.slug, currentDate))),
+      Promise.all(visibleRaceDays.map((rd) => getAltiliNeVerir(rd.hippodrome.slug, currentDate))),
+    ]);
+    visibleRaceDays.forEach((rd, i) => {
+      comboByRaceDay.set(rd.id, combos[i]);
+      altiliByRaceDay.set(rd.id, altilis[i]);
+    });
   }
 
   // DB'deki koşular için hızlı lookup: "slug-raceNo" → prediction/result
@@ -132,7 +140,10 @@ export default async function KosularPage({ searchParams }: PageProps) {
           <h1 className="text-xl font-bold">Koşu Programı</h1>
           <p className="text-xs text-muted-foreground mt-0.5">{displayDateLabel}</p>
         </div>
-        <DateNavigator currentDate={currentDate} />
+        <div className="flex items-center gap-2">
+          <LiveTvPlayer />
+          <DateNavigator currentDate={currentDate} />
+        </div>
       </div>
 
       {/* ── DB'den gelen program (analiz/sonuç bilgili) ── */}
@@ -141,6 +152,7 @@ export default async function KosularPage({ searchParams }: PageProps) {
           {visibleRaceDays.map((raceDay) => {
             const combo = comboByRaceDay.get(raceDay.id) ?? [];
             const totalCombinations = combo.reduce((acc, leg) => acc * Math.max(leg.horses.length, 1), 1);
+            const altili = altiliByRaceDay.get(raceDay.id) ?? null;
             return (
             <section key={raceDay.id}>
               <h2 className="mb-3 text-base font-semibold">{raceDay.hippodrome.name}</h2>
@@ -178,6 +190,58 @@ export default async function KosularPage({ searchParams }: PageProps) {
                   </tbody>
                 </table>
               </div>
+
+              {altili && (
+                <div className="mt-3 rounded-lg border p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Altılı Ganyan Ne Verir?</h3>
+                    <span className="text-xs text-muted-foreground">AGF'ye göre</span>
+                  </div>
+
+                  <div className="mb-4 space-y-2">
+                    {altili.legs.map((leg) => (
+                      <div key={leg.raceId} className="flex flex-wrap items-center gap-2 text-sm">
+                        <span className="w-20 shrink-0 font-medium">{leg.raceNo}. Koşu</span>
+                        <div className="flex flex-wrap gap-1">
+                          {leg.favorites.map((f, i) => (
+                            <Badge key={f.no} variant="outline" className={cn("text-xs", i === 0 && "border-brand text-brand")}>
+                              #{f.no} {f.name} <span className="ml-1 text-muted-foreground">%{f.agf.toFixed(0)}</span>
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mb-3 grid gap-2 sm:grid-cols-3">
+                    {altili.tiers.map((t) => (
+                      <div key={t.label} className="rounded-md border p-2.5 text-center">
+                        <div className="text-xs text-muted-foreground">{t.label}</div>
+                        <div className="mt-0.5 text-sm font-bold">{t.combinations} kombinasyon</div>
+                        <div className="text-xs text-muted-foreground">{t.amount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ₺</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div
+                    className={cn(
+                      "rounded-md border px-3 py-2 text-xs",
+                      altili.outlook.level === "dusuk" && "border-miss/40 bg-miss/5 text-miss",
+                      altili.outlook.level === "orta" && "border-muted-foreground/30 text-muted-foreground",
+                      altili.outlook.level === "yuksek" && "border-hit/40 bg-hit/5 text-hit"
+                    )}
+                  >
+                    <span className="font-semibold">İkramiye Potansiyeli: </span>
+                    {altili.outlook.level === "dusuk" ? "Düşük" : altili.outlook.level === "orta" ? "Orta" : "Yüksek"}
+                    {" — "}
+                    {altili.outlook.text}
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Gösterilen tutar bu kombinasyonu oynamanın maliyetidir, ikramiye değildir — gerçek ikramiye o gün
+                    altılıyı tutturan bilet sayısına göre belirlenir ve ancak yarışlar bitince netleşir.
+                  </p>
+                </div>
+              )}
 
               {combo.length > 0 && (
                 <div className="mt-3 rounded-lg border p-4">

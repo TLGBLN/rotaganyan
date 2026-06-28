@@ -3,9 +3,31 @@ import Link from "next/link";
 import BannerCountdown from "./BannerCountdown";
 
 const GAZI_KOSUSU_TARGET = "2026-06-28T17:15:00+03:00";
+// Gazi Koşusu banner'ı 29.06.2026'dan itibaren eski standart banner'a döner.
+const GAZI_BANNER_END = "2026-06-29T00:00:00+03:00";
 
 export default function HeroBanner() {
-  const isGaziUpcoming = Date.now() < new Date(GAZI_KOSUSU_TARGET).getTime();
+  const now = Date.now();
+  const showGaziBanner = now < new Date(GAZI_BANNER_END).getTime();
+
+  if (!showGaziBanner) {
+    return (
+      <div className="w-full">
+        <div className="relative w-full">
+          <Image
+            src="/banner.png"
+            alt="ROTAGANYAN — Analiz · Tahmin · Strateji"
+            width={3616}
+            height={1184}
+            className="w-full h-auto"
+            priority
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const isGaziUpcoming = now < new Date(GAZI_KOSUSU_TARGET).getTime();
 
   const bannerImage = (
     <Image

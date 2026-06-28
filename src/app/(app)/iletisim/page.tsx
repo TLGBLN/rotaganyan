@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PAYMENTS_ENABLED } from "@/lib/payments";
 
 export const metadata: Metadata = { title: "İletişim" };
 

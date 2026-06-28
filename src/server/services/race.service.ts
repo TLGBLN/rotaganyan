@@ -394,3 +394,93 @@ export async function getKuponOnerileri(): Promise<KuponOnerisi[]> {
   const results = await Promise.all(validActives.map((a) => buildKuponOnerisi(a)));
   return results.filter((r): r is NonNullable<typeof r> => r !== null);
 }
+
+// ─── Altılı Ganyan Ne Verir ─────────────────────────────────────────────────────
+
+export type AltiliFavorite = { no: number; name: string; agf: number };
+export type AltiliLeg = { raceId: string; raceNo: number; time: string | null; favorites: AltiliFavorite[] };
+export type AltiliTier = { label: string; horseCount: number; combinations: number; amount: number };
+export type PayoutOutlook = { level: "dusuk" | "orta" | "yuksek"; avgTopAgf: number; text: string };
+export type AltiliNeVerir = { hippodromeName: string; legs: AltiliLeg[]; tiers: AltiliTier[]; outlook: PayoutOutlook } | null;
+
+/**
+ * Altılı ganyan ikramiyesi havuzun, tutturan bilet sayısına bölünmesiyle belirlenir —
+ * gerçek tutarı ancak yarış bitince hesaplanabilir (canlı bahis/havuz verisine erişimimiz yok).
+ * Bunun yerine AGF yoğunluğundan kalitatif bir sinyal çıkarırız: favoriler güçlü/tek
+ * yönlüyse (yüksek AGF) favoriler kazandığında bilen çok olur → ikramiye düşük gelir;
+ * favoriler zayıf/dağınıksa (düşük AGF) sürpriz ihtimali ve olası ikramiye yüksektir.
+ */
+function computePayoutOutlook(legs: AltiliLeg[]): PayoutOutlook {
+  const topAgfs = legs.map((l) => l.favorites[0]?.agf ?? 0);
+  const avgTopAgf = topAgfs.length > 0 ? topAgfs.reduce((a, b) => a + b, 0) / topAgfs.length : 0;
+
+  if (avgTopAgf >= 35) {
+    return {
+      level: "dusuk",
+      avgTopAgf,
+      text: `Favoriler güçlü ve belirgin (ortalama en favori AGF %${avgTopAgf.toFixed(0)}). Favoriler kazanırsa bilen kişi sayısı yüksek olur — ikramiye düşük gelme olasılığı yüksek.`,
+    };
+  }
+  if (avgTopAgf >= 20) {
+    return {
+      level: "orta",
+      avgTopAgf,
+      text: `Favoriler orta düzeyde belirgin (ortalama en favori AGF %${avgTopAgf.toFixed(0)}). İkramiye potansiyeli orta seviyede.`,
+    };
+  }
+  return {
+    level: "yuksek",
+    avgTopAgf,
+    text: `Favoriler zayıf/dağınık (ortalama en favori AGF %${avgTopAgf.toFixed(0)}). Sürpriz ihtimali yüksek — sürpriz gelirse ikramiye büyük gelebilir.`,
+  };
+}
+
+const ALTILI_TIERS: { label: string; horseCount: number }[] = [
+  { label: "1 At (En Favori)", horseCount: 1 },
+  { label: "2 At", horseCount: 2 },
+  { label: "3 At", horseCount: 3 },
+];
+
+/**
+ * Bir hipodrom/günün tüm koşularında, TJK'nın resmi AGF (Ağırlıklı Genel Favori)
+ * yüzdesine göre en favori atları sıralayıp "Altılı Ganyan ne verir" sorusuna
+ * basit bir kombinasyon/tutar tahmini ile cevap verir. Gerçek 1./2. Altılı
+ * koşu gruplaması ayrıca tutulmadığından, günün tüm koşuları baz alınır.
+ */
+export async function getAltiliNeVerir(hippodromeSlug: string, dateStr: string): Promise<AltiliNeVerir> {
+  const date = new Date(dateStr + "T00:00:00.000Z");
+  const raceDay = await db.raceDay.findFirst({
+    where: { date, hippodrome: { slug: hippodromeSlug } },
+    include: {
+      hippodrome: { select: { name: true } },
+      races: {
+        include: { runners: { select: { no: true, name: true, agf: true } } },
+        orderBy: { raceNo: "asc" },
+      },
+    },
+  });
+  if (!raceDay) return null;
+
+  const legs: AltiliLeg[] = raceDay.races
+    .filter((r) => r.runners.some((rn) => rn.agf != null))
+    .map((r) => ({
+      raceId: r.id,
+      raceNo: r.raceNo,
+      time: r.time,
+      favorites: r.runners
+        .filter((rn) => rn.agf != null)
+        .sort((a, b) => (b.agf ?? 0) - (a.agf ?? 0))
+        .slice(0, 5)
+        .map((rn) => ({ no: rn.no, name: rn.name, agf: rn.agf as number })),
+    }));
+
+  if (legs.length === 0) return null;
+
+  const tiers: AltiliTier[] = ALTILI_TIERS.map((t) => {
+    const nosPerLeg = legs.map((l) => l.favorites.slice(0, t.horseCount).map((f) => f.no));
+    const combinations = nosPerLeg.reduce((acc, nos) => acc * Math.max(nos.length, 1), 1);
+    return { label: t.label, horseCount: t.horseCount, combinations, amount: Math.round(combinations * STAKE_PER_COMBINATION * 100) / 100 };
+  });
+
+  return { hippodromeName: raceDay.hippodrome.name, legs, tiers, outlook: computePayoutOutlook(legs) };
+}

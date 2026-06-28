@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,8 @@ import { fetchGaziKayitlar, type GaziHorse } from "@/server/services/ingest/tjk-
 import GaziHorseSlider from "@/components/gazi/GaziHorseSlider";
 
 const GAZI_KOSUSU_TARGET = "2026-06-28T17:15:00+03:00";
+// Bu özel sayfa 29.06.2026'dan itibaren kaldırılır.
+const GAZI_PAGE_END = "2026-06-29T00:00:00+03:00";
 
 export const revalidate = 3600;
 
@@ -16,6 +19,10 @@ export const metadata = {
 };
 
 export default async function GaziKosusuPage() {
+  if (Date.now() >= new Date(GAZI_PAGE_END).getTime()) {
+    notFound();
+  }
+
   const targetDate = new Date(GAZI_KOSUSU_TARGET);
   const dateLabel = format(targetDate, "d MMMM yyyy, EEEE", { locale: tr });
   const tarihParam = format(targetDate, "yyyy-MM-dd");
