@@ -195,7 +195,7 @@ export default async function KosularPage({ searchParams }: PageProps) {
                 <div className="mt-3 rounded-lg border p-4">
                   <div className="mb-3 flex items-center justify-between">
                     <h3 className="text-sm font-semibold">Altılı Ganyan Ne Verir?</h3>
-                    <span className="text-xs text-muted-foreground">AGF'ye göre</span>
+                    <span className="text-xs text-muted-foreground">AGF&apos;ye göre</span>
                   </div>
 
                   <div className="mb-4 space-y-2">
