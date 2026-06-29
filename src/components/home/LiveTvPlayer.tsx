@@ -8,10 +8,8 @@ function openLiveTv() {
   const height = 280;
   const left = window.screen.availWidth - width - 16;
   const top = window.screen.availHeight - height - 16;
-  // TJK'nın resmi YouTube kanalının /live adresi — sabit bir video ID değil, o anki
-  // yayın hangisiyse otomatik ona yönlenir, böylece yayın bitince link bayatlamaz.
   window.open(
-    "https://www.youtube.com/@TJKTVCANLIYAYIN/live",
+    "https://www.youtube.com/watch?v=g89RQMJtK6E",
     "tjkCanliTv",
     `width=${width},height=${height},left=${left},top=${top},noopener,noreferrer`
   );
