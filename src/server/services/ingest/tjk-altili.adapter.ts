@@ -95,9 +95,11 @@ async function fetchTodaysAltiliResultsUncached(tjkDate: string): Promise<Altili
   return results;
 }
 
+// "-v2" eki: ikramiye alanı eklenince eski (ikramiyesiz) cache girdisini geçersiz kılmak için
+// kasıtlı olarak yeni bir anahtar kullanıldı — aksi halde 1 saatlik TTL dolana kadar eski veri sunulurdu.
 const cachedFetchTodaysAltiliResults = unstable_cache(
   fetchTodaysAltiliResultsUncached,
-  ["todays-altili-results"],
+  ["todays-altili-results-v2"],
   { revalidate: 3600 }
 );
 
