@@ -98,11 +98,21 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn }: Pro
                   </td>
                   <td className="px-2 py-2 font-mono">{pick.runner?.no ?? "—"}</td>
                   <td className="px-2 py-2 font-medium">
-                    <span className={isWinner ? "font-bold text-brand" : ""}>
-                      {pick.runner?.name ?? pick.runnerLabel}
-                    </span>
-                    {isWinner && <span className="ml-1">🏆</span>}
-                    {pick.isTarget && <TargetBadge className="ml-1.5" />}
+                    <div className="flex items-center gap-1.5">
+                      {pick.runner?.formaUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={pick.runner.formaUrl}
+                          alt=""
+                          className="h-5 w-5 shrink-0 rounded-sm object-contain"
+                        />
+                      )}
+                      <span className={isWinner ? "font-bold text-brand" : ""}>
+                        {pick.runner?.name ?? pick.runnerLabel}
+                      </span>
+                      {isWinner && <span className="ml-1">🏆</span>}
+                      {pick.isTarget && <TargetBadge className="ml-1.5" />}
+                    </div>
                   </td>
                   <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">{a}</td>
                   <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">{b}</td>

@@ -193,6 +193,7 @@ model Runner {
   sameJockey       Boolean @default(false)
   agf              Float?
   raceStyle        Json?
+  formaUrl         String?
 
   race         Race          @relation(fields: [raceId], references: [id], onDelete: Cascade)
   gallops      Gallop[]

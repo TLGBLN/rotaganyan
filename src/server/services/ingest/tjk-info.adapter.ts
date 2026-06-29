@@ -204,7 +204,11 @@ export async function fetchCityProgram(
       const agfMatch = agfRaw.match(/([\d]+[.,]?[\d]*)/);
       const agf = agfMatch ? parseFloat(agfMatch[1].replace(",", ".")) || undefined : undefined;
 
-      runners.push({ no, name, weight, jockey, trainer, sire, dam, damSire, agf });
+      // Forma (jokey forması) görseli — medya-cdn.tjk.org üzerinde barınan jpg
+      const formaHref = $(".gunluk-GunlukYarisProgrami-FormaKodu a", row).attr("href");
+      const formaUrl = formaHref ? formaHref.replace(/^\/\//, "https://") : undefined;
+
+      runners.push({ no, name, weight, jockey, trainer, sire, dam, damSire, agf, formaUrl });
     });
 
     if (runners.length > 0) {

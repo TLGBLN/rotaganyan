@@ -107,11 +107,21 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                     </td>
                     <td className="px-2 py-2 font-mono">{pick.runner?.no ?? "—"}</td>
                     <td className="px-2 py-2 font-medium">
-                      <span className={isWinner ? "font-bold text-brand" : ""}>
-                        {pick.runner?.name ?? pick.runnerLabel}
-                      </span>
-                      {isWinner && <span className="ml-1">🏆</span>}
-                      {pick.isTarget && <TargetBadge className="ml-1.5" />}
+                      <div className="flex items-center gap-1.5">
+                        {pick.runner?.formaUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={pick.runner.formaUrl}
+                            alt=""
+                            className="h-5 w-5 shrink-0 rounded-sm object-contain"
+                          />
+                        )}
+                        <span className={isWinner ? "font-bold text-brand" : ""}>
+                          {pick.runner?.name ?? pick.runnerLabel}
+                        </span>
+                        {isWinner && <span className="ml-1">🏆</span>}
+                        {pick.isTarget && <TargetBadge className="ml-1.5" />}
+                      </div>
                     </td>
                     <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">{a}</td>
                     <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">{b}</td>
@@ -152,6 +162,14 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                   <td className="px-2 py-2 font-mono font-semibold">{runner.no}</td>
                   <td className="px-2 py-2">
                     <div className="flex items-center gap-1">
+                      {runner.formaUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={runner.formaUrl}
+                          alt=""
+                          className="h-5 w-5 shrink-0 rounded-sm object-contain"
+                        />
+                      )}
                       <span className="font-medium">{runner.name}</span>
                       {runner.sameJockey && (
                         <span className="rounded bg-yellow-100 px-1 text-[10px] font-semibold text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
