@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import SessionProvider from "@/components/providers/SessionProvider";
 import VersionWatcher from "@/components/layout/VersionWatcher";
+import ScrollToTopButton from "@/components/layout/ScrollToTopButton";
 import { auth } from "@/lib/auth";
 import "./globals.css";
 
@@ -76,6 +77,7 @@ export default async function RootLayout({
             {children}
             <Toaster richColors position="bottom-right" />
             <VersionWatcher />
+            <ScrollToTopButton />
           </TooltipProvider>
         </SessionProvider>
       </body>
