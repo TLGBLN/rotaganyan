@@ -1,10 +1,12 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import NextAuth from "next-auth";
+import { authConfig } from "@/auth.config";
 
-export function middleware(_request: NextRequest) {
-  return NextResponse.next();
-}
+export default NextAuth(authConfig).auth;
 
+// API rotaları (/api/admin/*) kendi auth() + hasRole() kontrolünü yapıp temiz
+// JSON 401 döndürüyor — middleware'in burada devreye girip giriş sayfasına
+// yönlendirmesi istemci tarafındaki fetch().json() akışını bozar, o yüzden
+// matcher'a dahil edilmedi.
 export const config = {
-  matcher: [],
+  matcher: ["/admin/:path*", "/panel/:path*"],
 };

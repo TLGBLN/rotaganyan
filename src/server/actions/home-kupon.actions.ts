@@ -19,7 +19,11 @@ export type HomeKuponInput = {
   slot: number;
 };
 
-/** Bir hipodrom/günün koşu+at listesini (Race/Runner) döner — Prediction/analizden tamamen bağımsız. */
+/**
+ * Bir hipodrom/günün koşu+at listesini döner. Yayınlanmış analizi olan koşularda
+ * atlar /kosular sayfasındaki gibi analiz sıralamasına (Pick.rank) göre dizilir;
+ * analizde yer almayan atlar listenin sonuna at numarasına göre eklenir.
+ */
 export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
   await requireRole("EDITOR");
 
@@ -29,7 +33,18 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
     include: {
       hippodrome: true,
       races: {
-        include: { runners: { orderBy: { no: "asc" }, select: { no: true, name: true } } },
+        include: {
+          runners: { orderBy: { no: "asc" }, select: { id: true, no: true, name: true } },
+          prediction: {
+            select: {
+              published: true,
+              picks: {
+                orderBy: { rank: "asc" },
+                select: { rank: true, runnerId: true },
+              },
+            },
+          },
+        },
         orderBy: { raceNo: "asc" },
       },
     },
@@ -38,10 +53,20 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
 
   return {
     hippodromeName: raceDay.hippodrome.name,
-    races: raceDay.races.map((r) => ({
-      raceNo: r.raceNo,
-      runners: r.runners,
-    })),
+    races: raceDay.races.map((r) => {
+      const picks = r.prediction?.published ? r.prediction.picks : [];
+      const rankByRunnerId = new Map(picks.map((p) => [p.runnerId, p.rank]));
+      const runners = [...r.runners].sort((a, b) => {
+        const rankA = rankByRunnerId.get(a.id) ?? Infinity;
+        const rankB = rankByRunnerId.get(b.id) ?? Infinity;
+        if (rankA !== rankB) return rankA - rankB;
+        return a.no - b.no;
+      });
+      return {
+        raceNo: r.raceNo,
+        runners: runners.map((runner) => ({ no: runner.no, name: runner.name })),
+      };
+    }),
   };
 }
 
