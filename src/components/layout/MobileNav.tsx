@@ -41,13 +41,6 @@ export default function MobileNav({ isLoggedIn }: Props) {
           >
             Banko Önerileri
           </Link>
-          <Link
-            href="/kosular"
-            onClick={() => setOpen(false)}
-            className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-          >
-            Altılı Ne Verir
-          </Link>
 
           <div className="border-t pt-4">
             {isLoggedIn ? (
