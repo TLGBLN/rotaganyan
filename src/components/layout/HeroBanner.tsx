@@ -15,7 +15,7 @@ export default function HeroBanner() {
       <div className="w-full">
         <div className="relative w-full">
           <Image
-            src="/banner.png"
+            src="/banner-v2.png"
             alt="ROTAGANYAN — Analiz · Tahmin · Strateji"
             width={2172}
             height={724}
