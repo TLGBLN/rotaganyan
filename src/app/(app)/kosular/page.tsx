@@ -11,7 +11,6 @@ import {
   type ComboLeg,
   type AltiliNeVerir,
 } from "@/server/services/race.service";
-import LiveTvPlayer from "@/components/home/LiveTvPlayer";
 import { fetchDailyProgram } from "@/lib/tjk-daily";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { syncResultsForDate } from "@/server/services/result-sync";
@@ -141,7 +140,6 @@ export default async function KosularPage({ searchParams }: PageProps) {
           <p className="text-xs text-muted-foreground mt-0.5">{displayDateLabel}</p>
         </div>
         <div className="flex items-center gap-2">
-          <LiveTvPlayer />
           <DateNavigator currentDate={currentDate} />
         </div>
       </div>
