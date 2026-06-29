@@ -319,8 +319,15 @@ export async function getComboCoupon(hippodromeSlug: string, dateStr: string): P
 
 // ─── Anasayfa: Tahmin Önerileri (Ekonomik/Normal/Geniş kupon) ─────────────────
 
-export type KuponLeg = { raceNo: number; nos: number[]; winnerNo?: number | null };
-export type KuponVariant = { key: "ekonomik" | "normal" | "genis"; label: string; legs: KuponLeg[]; amount: number };
+export type KuponLeg = { raceNo: number; nos: number[]; winnerNo?: number | null; resulted: boolean };
+export type KuponStatus = "hit" | "miss" | "pending";
+export type KuponVariant = {
+  key: "ekonomik" | "normal" | "genis";
+  label: string;
+  legs: KuponLeg[];
+  amount: number;
+  status: KuponStatus;
+};
 export type KuponOnerisi = { hippodromeName: string; variants: KuponVariant[] } | null;
 export type HomeKuponLeg = { raceNo: number; narrow: number[]; normal: number[]; wide: number[] };
 
@@ -343,9 +350,10 @@ async function buildKuponOnerisi(active: {
   // Hipodrom adı artık "Ankara — 1. Altılı" gibi bir etiket içerebilir; gerçek isim kısmını ayıkla.
   const baseName = active.hippodromeName.split(" — ")[0];
 
-  // Her ayağın gerçek kazananını bul (sonuç girildiyse) — kupon numaralarıyla eşleşeni yeşil göstermek için.
+  // Her ayağın gerçek kazananını ve sonucun girilip girilmediğini bul — kupon numaralarıyla eşleşeni
+  // yeşil göstermek, eşleşmeyeni (sonuç girilmiş ama kazanan seçilmemiş) "kaçtı" olarak işaretlemek için.
   const hippodrome = await db.hippodrome.findUnique({ where: { name: baseName } });
-  const winnerByRaceNo = new Map<number, number | null>();
+  const resultByRaceNo = new Map<number, { winnerNo: number | null; resulted: boolean }>();
   if (hippodrome) {
     const races = await db.race.findMany({
       where: {
@@ -354,28 +362,33 @@ async function buildKuponOnerisi(active: {
       },
       include: { result: { select: { winnerNo: true } } },
     });
-    for (const r of races) winnerByRaceNo.set(r.raceNo, r.result?.winnerNo ?? null);
+    for (const r of races) resultByRaceNo.set(r.raceNo, { winnerNo: r.result?.winnerNo ?? null, resulted: r.result != null });
+  }
+
+  function toLegs(nosFn: (l: HomeKuponLeg) => number[]): KuponLeg[] {
+    return legs.map((l) => {
+      const entry = resultByRaceNo.get(l.raceNo);
+      return { raceNo: l.raceNo, nos: nosFn(l), winnerNo: entry?.winnerNo ?? null, resulted: entry?.resulted ?? false };
+    });
+  }
+
+  function statusFor(variantLegs: KuponLeg[]): KuponStatus {
+    if (variantLegs.some((l) => l.resulted && !l.nos.includes(l.winnerNo as number))) return "miss";
+    if (variantLegs.some((l) => !l.resulted)) return "pending";
+    return "hit";
   }
 
   // Normal/Geniş için ayrıca seçim yapılmamışsa bir alt seviyeye düşer (Geniş→Normal→Ekonomik).
-  const narrowLegs: KuponLeg[] = legs.map((l) => ({ raceNo: l.raceNo, nos: l.narrow, winnerNo: winnerByRaceNo.get(l.raceNo) }));
-  const normalLegs: KuponLeg[] = legs.map((l) => ({
-    raceNo: l.raceNo,
-    nos: l.normal.length > 0 ? l.normal : l.narrow,
-    winnerNo: winnerByRaceNo.get(l.raceNo),
-  }));
-  const wideLegs: KuponLeg[] = legs.map((l) => ({
-    raceNo: l.raceNo,
-    nos: l.wide.length > 0 ? l.wide : l.normal.length > 0 ? l.normal : l.narrow,
-    winnerNo: winnerByRaceNo.get(l.raceNo),
-  }));
+  const narrowLegs = toLegs((l) => l.narrow);
+  const normalLegs = toLegs((l) => (l.normal.length > 0 ? l.normal : l.narrow));
+  const wideLegs = toLegs((l) => (l.wide.length > 0 ? l.wide : l.normal.length > 0 ? l.normal : l.narrow));
 
   return {
     hippodromeName: active.hippodromeName,
     variants: [
-      { key: "ekonomik", label: "Ekonomik", legs: narrowLegs, amount: kuponAmount(narrowLegs.map((l) => l.nos)) },
-      { key: "normal", label: "Normal", legs: normalLegs, amount: kuponAmount(normalLegs.map((l) => l.nos)) },
-      { key: "genis", label: "Geniş", legs: wideLegs, amount: kuponAmount(wideLegs.map((l) => l.nos)) },
+      { key: "ekonomik", label: "Ekonomik", legs: narrowLegs, amount: kuponAmount(narrowLegs.map((l) => l.nos)), status: statusFor(narrowLegs) },
+      { key: "normal", label: "Normal", legs: normalLegs, amount: kuponAmount(normalLegs.map((l) => l.nos)), status: statusFor(normalLegs) },
+      { key: "genis", label: "Geniş", legs: wideLegs, amount: kuponAmount(wideLegs.map((l) => l.nos)), status: statusFor(wideLegs) },
     ],
   };
 }
