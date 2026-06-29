@@ -54,9 +54,42 @@ export default async function HomePage() {
       {/* Değer önerisi / Manifesto */}
       <section className="border-t px-4 py-16">
         <div className="mx-auto max-w-5xl">
-          <h2 className="text-center text-2xl font-bold sm:text-3xl">
+          <h2 className="text-center text-2xl font-bold sm:text-3xl">Neden ROTAGANYAN?</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-center text-sm leading-relaxed text-muted-foreground sm:text-base">
+            Günde yüzlerce safkan koşarken, bir yarışseverin karşısında iki büyük tehlike vardır:
+          </p>
+
+          <div className="mx-auto mt-6 max-w-3xl space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex gap-3 rounded-lg border border-miss/20 bg-miss/5 p-4">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-miss" />
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  <span className="font-semibold text-foreground">Bilgi Eksikliği:</span> Verilere manuel
+                  olarak yetişememek ve sadece içgüdülerle veya kulaktan dolma bilgilerle karar vermek.
+                </p>
+              </div>
+              <div className="flex gap-3 rounded-lg border border-miss/20 bg-miss/5 p-4">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-miss" />
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  <span className="font-semibold text-foreground">Bilgi Zehirlenmesi:</span> Yüzlerce sayı,
+                  puan ve &ldquo;yapay zeka sinyali&rdquo; arasında boğulup, atçılığın temel mantığından
+                  uzaklaşmak.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 rounded-lg border border-hit/20 bg-hit/5 p-4">
+              <Scale className="h-5 w-5 shrink-0 text-hit" />
+              <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
+                ROTAGANYAN, bu iki ucun dengesidir. Veri yığınlarını alır, filtreden geçirir ve kalıplara
+                sokmadan &ldquo;anlamlı bağlantılara&rdquo; dönüştürür. Yarış saatindeki zaman baskısını ve
+                veri karmaşasını ortadan kaldırır.
+              </p>
+            </div>
+          </div>
+
+          <h3 className="mt-16 text-center text-2xl font-bold sm:text-3xl">
             ROTAGANYAN: <span className="text-brand">Verinin Ötesindeki Hikâyeyi</span> Okuyan Platform
-          </h2>
+          </h3>
           <p className="mx-auto mt-4 max-w-3xl text-center text-sm leading-relaxed text-muted-foreground sm:text-base">
             ROTAGANYAN, veriyi soğuk bir &ldquo;otomatik puanlama&rdquo; sistemine hapsetmez; onu bağlamsal
             analiz ile işler. Amacımız makinelere tahmin yaptırmak değil; sizin en doğru kararı
@@ -103,39 +136,7 @@ export default async function HomePage() {
             ))}
           </div>
 
-          <div className="mt-14 rounded-xl border bg-card/50 p-6 sm:p-8">
-            <h3 className="text-lg font-semibold sm:text-xl">Neden ROTAGANYAN?</h3>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
-              Günde yüzlerce safkan koşarken, bir yarışseverin karşısında iki büyük tehlike vardır:
-            </p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div className="flex gap-3 rounded-lg border border-miss/20 bg-miss/5 p-4">
-                <AlertTriangle className="h-5 w-5 shrink-0 text-miss" />
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  <span className="font-semibold text-foreground">Bilgi Eksikliği:</span> Verilere manuel
-                  olarak yetişememek ve sadece içgüdülerle veya kulaktan dolma bilgilerle karar vermek.
-                </p>
-              </div>
-              <div className="flex gap-3 rounded-lg border border-miss/20 bg-miss/5 p-4">
-                <AlertTriangle className="h-5 w-5 shrink-0 text-miss" />
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  <span className="font-semibold text-foreground">Bilgi Zehirlenmesi:</span> Yüzlerce sayı,
-                  puan ve &ldquo;yapay zeka sinyali&rdquo; arasında boğulup, atçılığın temel mantığından
-                  uzaklaşmak.
-                </p>
-              </div>
-            </div>
-            <div className="mt-4 flex gap-3 rounded-lg border border-hit/20 bg-hit/5 p-4">
-              <Scale className="h-5 w-5 shrink-0 text-hit" />
-              <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
-                ROTAGANYAN, bu iki ucun dengesidir. Veri yığınlarını alır, filtreden geçirir ve kalıplara
-                sokmadan &ldquo;anlamlı bağlantılara&rdquo; dönüştürür. Yarış saatindeki zaman baskısını ve
-                veri karmaşasını ortadan kaldırır.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-8 rounded-xl border border-brand/30 bg-brand/5 p-6 text-center sm:p-8">
+          <div className="mt-14 rounded-xl border border-brand/30 bg-brand/5 p-6 text-center sm:p-8">
             <h3 className="text-lg font-semibold text-brand sm:text-xl">Misyonumuz</h3>
             <p className="mx-auto mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">
               Gerçekçi olmayan kazanma vaatleri, hayal satan otomatik kurgular veya &ldquo;kesin
