@@ -182,6 +182,25 @@ function normalizeClassType(classType: string): string {
   return classType.split("/")[0].trim();
 }
 
+/**
+ * Sadeleştirilmiş sınıf adı bile "Handikap 14/15/16/17/21", "ŞARTLI 1..19",
+ * "KV-6..9" gibi tek başına anlamlı bir örneklem oluşturamayan onlarca alt
+ * kategoriye bölünüyor. Performans analizinde istatistiksel anlamlılık için
+ * bunları TJK'nın genel yarış kategorilerine (Maiden/Şartlı/Handikap/Kısa
+ * Vade/Satış/Grup) toplar.
+ */
+function classTypeGroup(classType: string): string {
+  const normalized = normalizeClassType(classType);
+  if (!normalized || normalized === "—") return "Diğer";
+  if (normalized.startsWith("Maiden")) return "Maiden";
+  if (normalized.startsWith("ŞARTLI")) return "Şartlı";
+  if (normalized.includes("Handikap")) return "Handikap";
+  if (normalized.startsWith("KV-")) return "Kısa Vade";
+  if (normalized.startsWith("SATIŞ")) return "Satış";
+  if (/^G\s*\d/.test(normalized)) return "Grup";
+  return normalized;
+}
+
 /** Kazananın bulunduğu sıraya göre hangi kupon kademesinde (Ekonomik/Normal/Geniş) yakalandığını, hiç yakalanmadıysa "kacti" döner. */
 function couponTierForRank(rank: number | undefined): CouponTier {
   if (rank == null) return "kacti";
@@ -242,12 +261,12 @@ export async function getAnalystStats(): Promise<AnalystStats> {
 
   return {
     overall: { total: rows.length, hits: totalHits, rate: rows.length > 0 ? (totalHits / rows.length) * 100 : 0 },
-    byClassType: group((r) => normalizeClassType(r.race.classType)),
+    byClassType: group((r) => classTypeGroup(r.race.classType)),
     bySurface: group((r) => SURFACE_LABEL[r.race.surface] ?? r.race.surface),
     byConfidence: group((r) => (r.isBanko ? "★ Banko" : CONFIDENCE_LABEL[r.confidence] ?? r.confidence)),
     byHippodrome: group((r) => r.race.raceDay.hippodrome.name),
     recentTrend: rows.slice(-20).map((r) => r.race.result?.hitTop1 ?? false),
-    couponTierByClassType: groupCouponTier((r) => normalizeClassType(r.race.classType)),
+    couponTierByClassType: groupCouponTier((r) => classTypeGroup(r.race.classType)),
     overallCouponTier: groupCouponTier(() => "Tüm Tahminler")[0] ?? {
       label: "Tüm Tahminler",
       total: 0,
@@ -268,7 +287,7 @@ export type ClassTypeAdvice = { level: "warn" | "info" | "good" | "none"; text: 
  * rozetin hiç görünmemesi, özelliğin çalışmadığıyla karıştırılabiliyor.
  */
 export function getClassTypeAdvice(stats: AnalystStats, classType: string): ClassTypeAdvice {
-  const normalized = normalizeClassType(classType);
+  const normalized = classTypeGroup(classType);
   const breakdown = stats.byClassType.find((b) => b.label === normalized);
   if (!breakdown || breakdown.total < 3) {
     return breakdown
@@ -279,6 +298,7 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string): Clas
   const rateText = `isabet %${breakdown.rate.toFixed(0)} (${breakdown.hits}/${breakdown.total})`;
 
   const tier = stats.couponTierByClassType.find((t) => t.label === normalized);
+
   if (!tier || tier.total < 3) {
     if (breakdown.rate < 20) return { level: "warn", text: `Bu sınıfta tarihsel ${rateText} — dikkatli ol` };
     if (breakdown.rate >= 50) return { level: "good", text: `Bu sınıfta tarihsel ${rateText}` };
