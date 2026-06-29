@@ -36,7 +36,7 @@ async function fetchTjkTickerUncached(): Promise<string[]> {
   }
 }
 
-/** TJK ana sayfa duyuru/haber bandı — her sayfa yüklemesinde canlı çekmemek için 10 dakika cache'lenir. */
+/** TJK ana sayfa duyuru/haber bandı — her sayfa yüklemesinde canlı çekmemek için 2 dakika cache'lenir. */
 export const fetchTjkTicker = unstable_cache(fetchTjkTickerUncached, ["tjk-ticker"], {
-  revalidate: 600,
+  revalidate: 120,
 });

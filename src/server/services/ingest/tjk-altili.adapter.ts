@@ -102,7 +102,7 @@ async function fetchTodaysAltiliResultsUncached(tjkDate: string): Promise<Altili
 const cachedFetchTodaysAltiliResults = unstable_cache(
   fetchTodaysAltiliResultsUncached,
   ["todays-altili-results-v2"],
-  { revalidate: 3600 }
+  { revalidate: 120 }
 );
 
 /** Fetches today's Altılı Ganyan results for every active Turkish hippodrome — TJK gününe göre cache'lenir, gün değişince otomatik yenilenir. */

@@ -2,7 +2,7 @@ import StatTile from "@/components/stats/StatTile";
 import { getStats } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 
-export const revalidate = 3600; // refresh hourly
+export const revalidate = 300;
 
 export default async function IstatistikPage() {
   const stats = await getStats();

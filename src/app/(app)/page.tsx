@@ -12,7 +12,7 @@ import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.ad
 import { turkeyDateString } from "@/lib/tz";
 import SteamWidget from "@/components/kosular/SteamWidget";
 
-export const revalidate = 600; // 10 dakika
+export const revalidate = 60;
 
 export default async function HomePage() {
   const today = turkeyDateString();
