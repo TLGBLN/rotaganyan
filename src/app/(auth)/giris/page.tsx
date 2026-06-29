@@ -10,26 +10,38 @@ import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = { title: "Giriş Yap" };
 
+/** Açık yönlendirme (open redirect) riskine karşı sadece site içi göreli yolları kabul eder. */
+function safeCallbackUrl(callbackUrl: string | undefined): string {
+  if (!callbackUrl) return "/";
+  try {
+    const url = new URL(callbackUrl, "https://rotaganyan.com");
+    return url.origin === "https://rotaganyan.com" ? `${url.pathname}${url.search}` : "/";
+  } catch {
+    return "/";
+  }
+}
+
 async function login(formData: FormData) {
   "use server";
+  const callbackUrl = safeCallbackUrl(formData.get("callbackUrl") as string);
   try {
     await signIn("credentials", {
       email: formData.get("email"),
       password: formData.get("password"),
-      redirectTo: "/",
+      redirectTo: callbackUrl,
     });
   } catch (err) {
     if (err instanceof AuthError) {
-      redirect("/giris?hata=1");
+      redirect(`/giris?hata=1&callbackUrl=${encodeURIComponent(callbackUrl)}`);
     }
     throw err;
   }
 }
 
-type Props = { searchParams: Promise<{ hata?: string }> };
+type Props = { searchParams: Promise<{ hata?: string; callbackUrl?: string }> };
 
 export default async function GirisPage({ searchParams }: Props) {
-  const { hata } = await searchParams;
+  const { hata, callbackUrl } = await searchParams;
 
   return (
     <Card>
@@ -39,6 +51,7 @@ export default async function GirisPage({ searchParams }: Props) {
       </CardHeader>
       <CardContent className="space-y-4">
         <form action={login} className="space-y-4">
+          <input type="hidden" name="callbackUrl" value={callbackUrl ?? "/"} />
           <div className="space-y-1.5">
             <Label htmlFor="email">E-posta</Label>
             <Input id="email" name="email" type="email" autoComplete="email" required />
