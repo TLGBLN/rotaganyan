@@ -88,32 +88,30 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                       <td className="px-3 py-1.5 text-muted-foreground">
                         <div className="flex items-center gap-1.5">
                           <span>{race.classType}</span>
-                          {advice && (
-                            <span
-                              title={advice.text}
-                              className={cn(
-                                "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold cursor-help",
-                                advice.level === "warn" && "bg-miss/20 text-miss",
-                                advice.level === "info" && "bg-brand/20 text-brand",
-                                advice.level === "good" && "bg-hit/20 text-hit"
-                              )}
-                            >
-                              {advice.level === "warn" ? "!" : advice.level === "good" ? "✓" : "i"}
-                            </span>
-                          )}
-                        </div>
-                        {advice && (
-                          <div
+                          <span
+                            title={advice.text}
                             className={cn(
-                              "mt-0.5 text-[10px] leading-tight",
-                              advice.level === "warn" && "text-miss",
-                              advice.level === "info" && "text-brand",
-                              advice.level === "good" && "text-hit"
+                              "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold cursor-help",
+                              advice.level === "warn" && "bg-miss/20 text-miss",
+                              advice.level === "info" && "bg-brand/20 text-brand",
+                              advice.level === "good" && "bg-hit/20 text-hit",
+                              advice.level === "none" && "bg-muted text-muted-foreground"
                             )}
                           >
-                            {advice.text}
-                          </div>
-                        )}
+                            {advice.level === "warn" ? "!" : advice.level === "good" ? "✓" : advice.level === "none" ? "–" : "i"}
+                          </span>
+                        </div>
+                        <div
+                          className={cn(
+                            "mt-0.5 text-[10px] leading-tight",
+                            advice.level === "warn" && "text-miss",
+                            advice.level === "info" && "text-brand",
+                            advice.level === "good" && "text-hit",
+                            advice.level === "none" && "text-muted-foreground/70"
+                          )}
+                        >
+                          {advice.text}
+                        </div>
                       </td>
                       <td className="px-3 py-1.5">{race.runners.length} at</td>
                       <td className="px-3 py-1.5">

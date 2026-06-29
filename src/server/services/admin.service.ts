@@ -259,17 +259,22 @@ export async function getAnalystStats(): Promise<AnalystStats> {
   };
 }
 
-export type ClassTypeAdvice = { level: "warn" | "info" | "good"; text: string };
+export type ClassTypeAdvice = { level: "warn" | "info" | "good" | "none"; text: string };
 
 /**
  * Bir koşu sınıfının geçmiş performansından, o sınıfta analiz girerken dikkat
  * edilmesi gereken noktayı çıkarır. Az veri varsa (n<3) yanlış güven vermemek
- * için uyarı üretmez.
+ * için yorum yapmaz, ama "veri yok" olduğunu da ayrıca belirtir — aksi halde
+ * rozetin hiç görünmemesi, özelliğin çalışmadığıyla karıştırılabiliyor.
  */
-export function getClassTypeAdvice(stats: AnalystStats, classType: string): ClassTypeAdvice | null {
+export function getClassTypeAdvice(stats: AnalystStats, classType: string): ClassTypeAdvice {
   const normalized = normalizeClassType(classType);
   const breakdown = stats.byClassType.find((b) => b.label === normalized);
-  if (!breakdown || breakdown.total < 3) return null;
+  if (!breakdown || breakdown.total < 3) {
+    return breakdown
+      ? { level: "none", text: `Bu sınıfta henüz yeterli geçmiş veri yok (${breakdown.total} koşu)` }
+      : { level: "none", text: "Bu sınıfta henüz geçmiş veri yok" };
+  }
 
   const rateText = `isabet %${breakdown.rate.toFixed(0)} (${breakdown.hits}/${breakdown.total})`;
 
@@ -277,7 +282,7 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string): Clas
   if (!tier || tier.total < 3) {
     if (breakdown.rate < 20) return { level: "warn", text: `Bu sınıfta tarihsel ${rateText} — dikkatli ol` };
     if (breakdown.rate >= 50) return { level: "good", text: `Bu sınıfta tarihsel ${rateText}` };
-    return null;
+    return { level: "info", text: `Bu sınıfta tarihsel ${rateText}` };
   }
 
   // Kazananın hangi kupon kademesinde geldiğini yüzdesel olarak ifade eder — admin "ekonomik mi normal mi geniş mi
