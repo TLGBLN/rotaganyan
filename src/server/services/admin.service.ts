@@ -183,21 +183,27 @@ function normalizeClassType(classType: string): string {
 }
 
 /**
- * Sadeleştirilmiş sınıf adı bile "Handikap 14/15/16/17/21", "ŞARTLI 1..19",
- * "KV-6..9" gibi tek başına anlamlı bir örneklem oluşturamayan onlarca alt
+ * Sadeleştirilmiş sınıf adı bile "Handikap 13..24", "ŞARTLI 1..27",
+ * "KV-6..26" gibi tek başına anlamlı bir örneklem oluşturamayan onlarca alt
  * kategoriye bölünüyor. Performans analizinde istatistiksel anlamlılık için
- * bunları TJK'nın genel yarış kategorilerine (Maiden/Şartlı/Handikap/Kısa
- * Vade/Satış/Grup) toplar.
+ * bunları TJK'nın resmi yarış kategorilerine toplar:
+ * - Şartlı Koşular: ŞARTLI 1, 2, 3, 4, 5, 11, 12, 19, 27...
+ * - Handikap Koşular: Handikap 13-17, 21, 22, 24 ve Kısa Vade Handikap (22/24) dahil
+ * - Kısa Vadeli (KV) Koşular: KV-6, 7, 8, 9, 10, 11, 18, 21-26
+ * - Satış Koşular: SATIŞ 1, 2, 3, 4...
+ * - Açık (Grup) Koşular: G 1/2/3 (Grup 1/2/3) ve A 2/3 (Açık 2/3)
+ * "Kısa Vade Handikap" adında "Handikap" geçtiği için KV- önekinden önce
+ * kontrol edilir, böylece Handikap grubuna düşer (KV grubuna değil).
  */
 function classTypeGroup(classType: string): string {
   const normalized = normalizeClassType(classType);
   if (!normalized || normalized === "—") return "Diğer";
-  if (normalized.startsWith("Maiden")) return "Maiden";
-  if (normalized.startsWith("ŞARTLI")) return "Şartlı";
-  if (normalized.includes("Handikap")) return "Handikap";
-  if (normalized.startsWith("KV-")) return "Kısa Vade";
-  if (normalized.startsWith("SATIŞ")) return "Satış";
-  if (/^G\s*\d/.test(normalized)) return "Grup";
+  if (normalized.startsWith("Maiden")) return "Maiden Koşular";
+  if (normalized.startsWith("ŞARTLI")) return "Şartlı Koşular";
+  if (normalized.includes("Handikap")) return "Handikap Koşular";
+  if (normalized.startsWith("KV-")) return "Kısa Vadeli (KV) Koşular";
+  if (normalized.startsWith("SATIŞ")) return "Satış Koşular";
+  if (/^[GA]\s*\d/.test(normalized)) return "Açık (Grup) Koşular";
   return normalized;
 }
 
