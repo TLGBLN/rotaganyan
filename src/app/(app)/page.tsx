@@ -136,15 +136,6 @@ export default async function HomePage() {
             ))}
           </div>
 
-          <div className="mt-14 rounded-xl border border-brand/30 bg-brand/5 p-6 text-center sm:p-8">
-            <h3 className="text-lg font-semibold text-brand sm:text-xl">Misyonumuz</h3>
-            <p className="mx-auto mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-              Gerçekçi olmayan kazanma vaatleri, hayal satan otomatik kurgular veya &ldquo;kesin
-              formüller&rdquo; bizim dünyamızda yer almaz. Misyonumuz; at yarışı analizini bir şans oyunu
-              veya makinelerin dikte ettiği bir sonuç olmaktan çıkarıp, yarışseverin veri okuryazarlığını
-              artıran ve ona kendi hikâyesini yazdırma gücü veren saygın bir bilgi ekosistemi yaratmaktır.
-            </p>
-          </div>
         </div>
       </section>
       {/* Alt linkler */}

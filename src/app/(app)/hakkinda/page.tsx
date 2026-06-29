@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { db } from "@/lib/db";
 import StatTile from "@/components/stats/StatTile";
 
@@ -36,18 +35,14 @@ export default async function HakkindaPage() {
         <StatTile label="Genel İsabet" value={`%${hitRate}`} highlight={hitRate >= 50 ? "hit" : "miss"} />
       </div>
 
-      <section className="space-y-4">
-        <h2 className="text-xl font-semibold">Metodolojimiz</h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Her analiz, v1.6 metodoloji motoru tarafından desteklenmektedir. Motor şu faktörleri
-          değerlendirir: galop baremleri (K1/K2/A1…), pedigri uyumu, AGF sıralama pozisyonu,
-          kilo değişimi, jokey sürekliliği ve takı değişiklikleri. Birinci seçimimizin yanında
-          &quot;Target&quot; rozetiyle öne çıkardığımız atlar, motor skorunun en yüksek olduğu,
-          bülten fiyatının düşük kaldığı safkanlardır.
+      <section className="rounded-xl border border-brand/30 bg-brand/5 p-6 text-center sm:p-8">
+        <h2 className="text-lg font-semibold text-brand sm:text-xl">Misyonumuz</h2>
+        <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+          Gerçekçi olmayan kazanma vaatleri, hayal satan otomatik kurgular veya &ldquo;kesin
+          formüller&rdquo; bizim dünyamızda yer almaz. Misyonumuz; at yarışı analizini bir şans oyunu
+          veya makinelerin dikte ettiği bir sonuç olmaktan çıkarıp, yarışseverin veri okuryazarlığını
+          artıran ve ona kendi hikâyesini yazdırma gücü veren saygın bir bilgi ekosistemi yaratmaktır.
         </p>
-        <Link href="/rehber" className="inline-block text-sm text-brand hover:underline">
-          Detaylı metodoloji rehberi →
-        </Link>
       </section>
 
       <section className="space-y-4">
