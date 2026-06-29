@@ -92,8 +92,8 @@ export default async function HomePage() {
           </h3>
           <p className="mx-auto mt-4 max-w-3xl text-center text-sm leading-relaxed text-muted-foreground sm:text-base">
             ROTAGANYAN, veriyi soğuk bir &ldquo;otomatik puanlama&rdquo; sistemine hapsetmez; onu bağlamsal
-            analiz ile işler. Amacımız makinelere tahmin yaptırmak değil; sizin en doğru kararı
-            verebilmeniz için verinin ardındaki gerçek hikâyeyi görünür kılmaktır.
+            analiz ile işler. Amacımız makinelere tahmin yaptırmak değil; bu verileri okuyup sizin en
+            doğru kararı verebilmeniz için verinin ardındaki gerçek hikâyeyi görünür kılmaktır.
           </p>
 
           <h3 className="mt-14 text-center text-lg font-semibold sm:text-xl">
