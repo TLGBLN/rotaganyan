@@ -194,11 +194,24 @@ model Runner {
   agf              Float?
   raceStyle        Json?
 
-  race    Race     @relation(fields: [raceId], references: [id], onDelete: Cascade)
-  gallops Gallop[]
-  picks   Pick[]
+  race         Race          @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  gallops      Gallop[]
+  picks        Pick[]
+  agfSnapshots AgfSnapshot[]
 
   @@unique([raceId, no])
+}
+
+/** AGF senkronizasyonu her çalıştığında (günde 4 kez) atılan an'lık AGF kaydı — zaman içindeki para hareketini (steam) görmek için. */
+model AgfSnapshot {
+  id         String   @id @default(cuid())
+  runnerId   String
+  agf        Float
+  capturedAt DateTime @default(now())
+
+  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+
+  @@index([runnerId, capturedAt])
 }
 
 model Gallop {

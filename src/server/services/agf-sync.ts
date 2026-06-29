@@ -89,6 +89,11 @@ export async function syncAgfForDate(date: Date): Promise<AgfSyncResult> {
             where: { id: dbRunner.id },
             data: { agf: pr.agf },
           });
+          // Her senkronizasyonda bir an'lık kayıt da düşürülür — zaman içindeki AGF
+          // değişimini (para hareketi / "steam") gösterebilmek için.
+          await db.agfSnapshot.create({
+            data: { runnerId: dbRunner.id, agf: pr.agf as number },
+          });
           runnersUpdated++;
         }
       }
