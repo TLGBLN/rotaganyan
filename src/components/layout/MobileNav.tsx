@@ -27,6 +27,28 @@ export default function MobileNav({ isLoggedIn }: Props) {
           </SheetTitle>
         </SheetHeader>
         <nav className="mt-6 flex flex-col gap-1">
+          <Link
+            href="/kosular"
+            onClick={() => setOpen(false)}
+            className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          >
+            Günün Koşuları
+          </Link>
+          <Link
+            href="/tahmin-onerileri"
+            onClick={() => setOpen(false)}
+            className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          >
+            Banko Önerileri
+          </Link>
+          <Link
+            href="/kosular"
+            onClick={() => setOpen(false)}
+            className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          >
+            Altılı Ne Verir
+          </Link>
+
           <div className="border-t pt-4">
             {isLoggedIn ? (
               <>

@@ -1,8 +1,6 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import HeroBanner from "@/components/layout/HeroBanner";
 import HitsCarousel from "@/components/home/HitsCarousel";
-import LiveTvPlayer from "@/components/home/LiveTvPlayer";
 import NewsTicker from "@/components/home/NewsTicker";
 import AltiliGanyanResults from "@/components/home/AltiliGanyanResults";
 import TahminOnerileri from "@/components/home/TahminOnerileri";
@@ -29,20 +27,6 @@ export default async function HomePage() {
       <div className="mt-4">
         <NewsTicker items={tickerItems} />
       </div>
-
-      {/* CTA */}
-      <section className="flex flex-wrap items-center gap-4 px-4 py-10 max-w-7xl mx-auto w-full">
-        <Button asChild size="lg" className="bg-brand hover:bg-brand/90 text-brand-foreground">
-          <Link href="/kosular">Günün Koşuları</Link>
-        </Button>
-        <Button asChild variant="outline" size="lg">
-          <Link href="/tahmin-onerileri">Banko Önerileri</Link>
-        </Button>
-        <Button asChild variant="outline" size="lg">
-          <Link href="/kosular">Altılı Ne Verir</Link>
-        </Button>
-        <LiveTvPlayer />
-      </section>
 
       {/* İsabet sağlayan tahminler — otomatik kayan slider */}
       {hitPredictions.length > 0 && (
