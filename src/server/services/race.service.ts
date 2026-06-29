@@ -2,6 +2,8 @@ import { db } from "@/lib/db";
 import { startOfDay, endOfDay, subDays } from "date-fns";
 import { turkeyDateString } from "@/lib/tz";
 import type { Prisma, Confidence } from "@prisma/client";
+import { fetchTodaysAltiliResults } from "./ingest/tjk-altili.adapter";
+import { toSlug } from "./ingest/tjk-info.adapter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -414,14 +416,23 @@ export type AltiliFavorite = { no: number; name: string; agf: number };
 export type AltiliLeg = { raceId: string; raceNo: number; time: string | null; favorites: AltiliFavorite[] };
 export type AltiliTier = { label: string; horseCount: number; combinations: number; amount: number };
 export type PayoutOutlook = { level: "dusuk" | "orta" | "yuksek"; avgTopAgf: number; text: string };
-export type AltiliNeVerir = { hippodromeName: string; legs: AltiliLeg[]; tiers: AltiliTier[]; outlook: PayoutOutlook } | null;
+export type AltiliGroup = {
+  label: string;
+  raceRange: string;
+  legs: AltiliLeg[];
+  tiers: AltiliTier[];
+  /** TJK'nın "Altılı Ganyan Sonuçları" sayfasından alınan, o anki dağıtılacak tutar metni — yoksa null. */
+  payout: string | null;
+  outlook: PayoutOutlook;
+};
+export type AltiliNeVerir = { hippodromeName: string; groups: AltiliGroup[] } | null;
 
 /**
- * Altılı ganyan ikramiyesi havuzun, tutturan bilet sayısına bölünmesiyle belirlenir —
- * gerçek tutarı ancak yarış bitince hesaplanabilir (canlı bahis/havuz verisine erişimimiz yok).
- * Bunun yerine AGF yoğunluğundan kalitatif bir sinyal çıkarırız: favoriler güçlü/tek
+ * AGF yoğunluğundan kalitatif bir tamamlayıcı sinyal çıkarır: favoriler güçlü/tek
  * yönlüyse (yüksek AGF) favoriler kazandığında bilen çok olur → ikramiye düşük gelir;
  * favoriler zayıf/dağınıksa (düşük AGF) sürpriz ihtimali ve olası ikramiye yüksektir.
+ * Gerçek dağıtılacak tutar artık `payout` alanında TJK'nın resmi verisinden geliyor —
+ * bu sadece favori yoğunluğu üzerinden ek bir yorum sağlar.
  */
 function computePayoutOutlook(legs: AltiliLeg[]): PayoutOutlook {
   const topAgfs = legs.map((l) => l.favorites[0]?.agf ?? 0);
@@ -455,10 +466,34 @@ const ALTILI_TIERS: { label: string; horseCount: number }[] = [
 ];
 
 /**
- * Bir hipodrom/günün tüm koşularında, TJK'nın resmi AGF (Ağırlıklı Genel Favori)
- * yüzdesine göre en favori atları sıralayıp "Altılı Ganyan ne verir" sorusuna
- * basit bir kombinasyon/tutar tahmini ile cevap verir. Gerçek 1./2. Altılı
- * koşu gruplaması ayrıca tutulmadığından, günün tüm koşuları baz alınır.
+ * TJK'da bir hipodromda günde 6'dan fazla koşu varsa altılı iki ayrı havuz halinde
+ * oynatılır: 1. Altılı günün ilk 6 koşusu, 2. Altılı ise son 6 koşusudur (araları
+ * çakışabilir). 6 veya daha az koşu varsa tek havuz vardır. Bu kural TJK'nın resmi
+ * altılı sonuç sayfası ile gerçek koşu programımız karşılaştırılarak doğrulanmıştır.
+ */
+function buildAltiliRaceGroups<T extends { raceNo: number }>(
+  races: T[]
+): { label: string; raceRange: string; races: T[] }[] {
+  const sorted = [...races].sort((a, b) => a.raceNo - b.raceNo);
+  if (sorted.length < 6) return [];
+
+  const groups: { label: string; races: T[] }[] = [{ label: "1. Altılı", races: sorted.slice(0, 6) }];
+  if (sorted.length > 6) {
+    groups.push({ label: "2. Altılı", races: sorted.slice(-6) });
+  }
+
+  return groups.map((g) => ({
+    ...g,
+    raceRange: `${g.races[0].raceNo}-${g.races[g.races.length - 1].raceNo}. Koşular`,
+  }));
+}
+
+/**
+ * Bir hipodrom/günün gerçek 1./2. Altılı koşu gruplamasını (ilk 6 / son 6 koşu) kullanarak,
+ * TJK'nın resmi AGF yüzdesine göre en favori atları sıralayıp "Altılı Ganyan ne verir"
+ * sorusuna kombinasyon/tutar tahmini ile cevap verir. Anasayfadaki "Altılı Ganyan
+ * Sonuçları" widget'ının kullandığı aynı kaynaktan (`fetchTodaysAltiliResults`) o günün
+ * gerçek dağıtılacak tutarını da çekip ilgili gruba eşler.
  */
 export async function getAltiliNeVerir(hippodromeSlug: string, dateStr: string): Promise<AltiliNeVerir> {
   const date = new Date(dateStr + "T00:00:00.000Z");
@@ -474,9 +509,22 @@ export async function getAltiliNeVerir(hippodromeSlug: string, dateStr: string):
   });
   if (!raceDay) return null;
 
-  const legs: AltiliLeg[] = raceDay.races
-    .filter((r) => r.runners.some((rn) => rn.agf != null))
-    .map((r) => ({
+  const raceGroups = buildAltiliRaceGroups(raceDay.races);
+  if (raceGroups.length === 0) return null;
+
+  let sonucPayouts: (string | null)[] = [];
+  try {
+    const allResults = await fetchTodaysAltiliResults();
+    const match = allResults.find((c) => toSlug(c.sehirAdi) === hippodromeSlug);
+    if (match && match.groups.length === raceGroups.length) {
+      sonucPayouts = match.groups.map((g) => g.payout || null);
+    }
+  } catch {
+    // Sonuç verisi alınamazsa sessizce devam — sadece kendi AGF verimizle hesaplarız.
+  }
+
+  const groups: AltiliGroup[] = raceGroups.map((rg, i) => {
+    const legs: AltiliLeg[] = rg.races.map((r) => ({
       raceId: r.id,
       raceNo: r.raceNo,
       time: r.time,
@@ -487,13 +535,21 @@ export async function getAltiliNeVerir(hippodromeSlug: string, dateStr: string):
         .map((rn) => ({ no: rn.no, name: rn.name, agf: rn.agf as number })),
     }));
 
-  if (legs.length === 0) return null;
+    const tiers: AltiliTier[] = ALTILI_TIERS.map((t) => {
+      const nosPerLeg = legs.map((l) => l.favorites.slice(0, t.horseCount).map((f) => f.no));
+      const combinations = nosPerLeg.reduce((acc, nos) => acc * Math.max(nos.length, 1), 1);
+      return { label: t.label, horseCount: t.horseCount, combinations, amount: Math.round(combinations * STAKE_PER_COMBINATION * 100) / 100 };
+    });
 
-  const tiers: AltiliTier[] = ALTILI_TIERS.map((t) => {
-    const nosPerLeg = legs.map((l) => l.favorites.slice(0, t.horseCount).map((f) => f.no));
-    const combinations = nosPerLeg.reduce((acc, nos) => acc * Math.max(nos.length, 1), 1);
-    return { label: t.label, horseCount: t.horseCount, combinations, amount: Math.round(combinations * STAKE_PER_COMBINATION * 100) / 100 };
+    return {
+      label: rg.label,
+      raceRange: rg.raceRange,
+      legs,
+      tiers,
+      payout: sonucPayouts[i] ?? null,
+      outlook: computePayoutOutlook(legs),
+    };
   });
 
-  return { hippodromeName: raceDay.hippodrome.name, legs, tiers, outlook: computePayoutOutlook(legs) };
+  return { hippodromeName: raceDay.hippodrome.name, groups };
 }

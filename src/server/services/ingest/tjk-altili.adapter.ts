@@ -29,6 +29,12 @@ function cleanText(raw: string): string {
   return raw.replace(/\s+/g, " ").trim();
 }
 
+/** tfoot içinde "... dir." sonrası gelen "Yarış Sonuçları | Yarış Programı | ..." gibi menü metnini ayıklar. */
+function extractPayoutSentence(raw: string): string {
+  const match = raw.match(/.*?dir\./);
+  return match ? match[0].trim() : raw;
+}
+
 export async function fetchAltiliSonuc(sehirId: number, sehirAdi: string): Promise<AltiliCityResult | null> {
   const url = `${BASE}/TR/YarisSever/YarisSever/AltiliSonuc?SehirId=${sehirId}`;
 
@@ -51,7 +57,7 @@ export async function fetchAltiliSonuc(sehirId: number, sehirAdi: string): Promi
     const title = cleanText(table.find("thead th").first().text());
     if (!title.includes("6'l")) return;
 
-    const payout = cleanText(table.find("tfoot tr").first().text());
+    const payout = extractPayoutSentence(cleanText(table.find("tfoot tr").first().text()));
 
     const rows: AltiliRow[] = [];
     table.find("tbody.sixer tr").each((_, rowEl) => {

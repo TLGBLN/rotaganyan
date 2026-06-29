@@ -192,54 +192,71 @@ export default async function KosularPage({ searchParams }: PageProps) {
               </div>
 
               {altili && (
-                <div className="mt-3 rounded-lg border p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">Altılı Ganyan Ne Verir?</h3>
-                    <span className="text-xs text-muted-foreground">AGF&apos;ye göre</span>
-                  </div>
-
-                  <div className="mb-4 space-y-2">
-                    {altili.legs.map((leg) => (
-                      <div key={leg.raceId} className="flex flex-wrap items-center gap-2 text-sm">
-                        <span className="w-20 shrink-0 font-medium">{leg.raceNo}. Koşu</span>
-                        <div className="flex flex-wrap gap-1">
-                          {leg.favorites.map((f, i) => (
-                            <Badge key={f.no} variant="outline" className={cn("text-xs", i === 0 && "border-brand text-brand")}>
-                              #{f.no} {f.name} <span className="ml-1 text-muted-foreground">%{f.agf.toFixed(0)}</span>
-                            </Badge>
-                          ))}
-                        </div>
+                <div className="mt-3 space-y-3">
+                  {altili.groups.map((group) => (
+                    <div key={group.label} className="rounded-lg border p-4">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-1">
+                        <h3 className="text-sm font-semibold">
+                          {group.label} Ganyan Ne Verir? <span className="text-xs font-normal text-muted-foreground">({group.raceRange})</span>
+                        </h3>
+                        <span className="text-xs text-muted-foreground">AGF&apos;ye göre</span>
                       </div>
-                    ))}
-                  </div>
 
-                  <div className="mb-3 grid gap-2 sm:grid-cols-3">
-                    {altili.tiers.map((t) => (
-                      <div key={t.label} className="rounded-md border p-2.5 text-center">
-                        <div className="text-xs text-muted-foreground">{t.label}</div>
-                        <div className="mt-0.5 text-sm font-bold">{t.combinations} kombinasyon</div>
-                        <div className="text-xs text-muted-foreground">{t.amount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ₺</div>
+                      {group.payout && (
+                        <p className="mb-3 rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-brand">
+                          {group.payout}
+                        </p>
+                      )}
+
+                      <div className="mb-4 space-y-2">
+                        {group.legs.map((leg) => (
+                          <div key={leg.raceId} className="flex flex-wrap items-center gap-2 text-sm">
+                            <span className="w-20 shrink-0 font-medium">{leg.raceNo}. Koşu</span>
+                            <div className="flex flex-wrap gap-1">
+                              {leg.favorites.length === 0 && (
+                                <span className="text-xs text-muted-foreground">AGF verisi henüz yok</span>
+                              )}
+                              {leg.favorites.map((f, i) => (
+                                <Badge key={f.no} variant="outline" className={cn("text-xs", i === 0 && "border-brand text-brand")}>
+                                  #{f.no} {f.name} <span className="ml-1 text-muted-foreground">%{f.agf.toFixed(0)}</span>
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
 
-                  <div
-                    className={cn(
-                      "rounded-md border px-3 py-2 text-xs",
-                      altili.outlook.level === "dusuk" && "border-miss/40 bg-miss/5 text-miss",
-                      altili.outlook.level === "orta" && "border-muted-foreground/30 text-muted-foreground",
-                      altili.outlook.level === "yuksek" && "border-hit/40 bg-hit/5 text-hit"
-                    )}
-                  >
-                    <span className="font-semibold">İkramiye Potansiyeli: </span>
-                    {altili.outlook.level === "dusuk" ? "Düşük" : altili.outlook.level === "orta" ? "Orta" : "Yüksek"}
-                    {" — "}
-                    {altili.outlook.text}
-                  </div>
-                  <p className="mt-2 text-[11px] text-muted-foreground">
-                    Gösterilen tutar bu kombinasyonu oynamanın maliyetidir, ikramiye değildir — gerçek ikramiye o gün
-                    altılıyı tutturan bilet sayısına göre belirlenir ve ancak yarışlar bitince netleşir.
-                  </p>
+                      <div className="mb-3 grid gap-2 sm:grid-cols-3">
+                        {group.tiers.map((t) => (
+                          <div key={t.label} className="rounded-md border p-2.5 text-center">
+                            <div className="text-xs text-muted-foreground">{t.label}</div>
+                            <div className="mt-0.5 text-sm font-bold">{t.combinations} kombinasyon</div>
+                            <div className="text-xs text-muted-foreground">{t.amount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ₺</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-xs",
+                          group.outlook.level === "dusuk" && "border-miss/40 bg-miss/5 text-miss",
+                          group.outlook.level === "orta" && "border-muted-foreground/30 text-muted-foreground",
+                          group.outlook.level === "yuksek" && "border-hit/40 bg-hit/5 text-hit"
+                        )}
+                      >
+                        <span className="font-semibold">İkramiye Potansiyeli: </span>
+                        {group.outlook.level === "dusuk" ? "Düşük" : group.outlook.level === "orta" ? "Orta" : "Yüksek"}
+                        {" — "}
+                        {group.outlook.text}
+                      </div>
+                      <p className="mt-2 text-[11px] text-muted-foreground">
+                        Kombinasyon tutarı bu kombinasyonu oynamanın maliyetidir, ikramiye değildir.
+                        {group.payout
+                          ? " Yukarıdaki dağıtılacak tutar TJK'nın güncel/canlı havuz verisidir, yarışlar bitmeden kesinleşmez."
+                          : " Gerçek ikramiye o gün altılıyı tutturan bilet sayısına göre belirlenir ve ancak yarışlar bitince netleşir."}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               )}
 
