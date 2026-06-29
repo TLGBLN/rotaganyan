@@ -17,8 +17,8 @@ export default function HeroBanner() {
           <Image
             src="/banner.png"
             alt="ROTAGANYAN — Analiz · Tahmin · Strateji"
-            width={3616}
-            height={1184}
+            width={2172}
+            height={724}
             className="w-full h-auto"
             priority
           />
