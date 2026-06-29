@@ -93,7 +93,7 @@ export default async function HomePage() {
       )}
 
       {/* Tahmin Önerileri — Ekonomik/Normal/Geniş kupon şablonları (her aktif slot için) */}
-      <TahminOnerileri data={kuponOnerisi} />
+      <TahminOnerileri data={kuponOnerisi} altiliResults={altiliResults} />
 
       {/* Altılı Ganyan sonuçları */}
       <AltiliGanyanResults results={altiliResults} />

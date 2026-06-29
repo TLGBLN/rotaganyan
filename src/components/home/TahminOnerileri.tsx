@@ -1,4 +1,5 @@
 import type { KuponOnerisi, KuponStatus } from "@/server/services/race.service";
+import type { AltiliCityResult } from "@/server/services/ingest/tjk-altili.adapter";
 import { cn } from "@/lib/utils";
 
 type Kupon = NonNullable<KuponOnerisi>;
@@ -10,7 +11,20 @@ const STATUS_CLASS: Record<KuponStatus, string> = {
   pending: "bg-muted text-muted-foreground",
 };
 
-function KuponBlock({ data }: { data: Kupon }) {
+/** "Bursa — 2. Altılı" gibi bir hipodrom etiketinden gerçek TJK Altılı Ganyan ikramiye cümlesini bulur. */
+function findIkramiye(hippodromeName: string, altiliResults: AltiliCityResult[]): string | null {
+  const [cityName, altiliLabel] = hippodromeName.split(" — ");
+  if (!cityName || !altiliLabel) return null;
+  const slotMatch = altiliLabel.match(/^(\d+)\./);
+  if (!slotMatch) return null;
+  const slot = parseInt(slotMatch[1], 10);
+
+  const city = altiliResults.find((c) => c.sehirAdi.trim().toLowerCase() === cityName.trim().toLowerCase());
+  const group = city?.groups[slot - 1];
+  return group?.ikramiye ?? null;
+}
+
+function KuponBlock({ data, ikramiye }: { data: Kupon; ikramiye: string | null }) {
   return (
     <div>
       <div className="mb-3 text-sm font-medium text-muted-foreground">{data.hippodromeName}</div>
@@ -69,6 +83,7 @@ function KuponBlock({ data }: { data: Kupon }) {
                 })}{" "}
                 ₺
               </div>
+              {ikramiye && <div className="mt-1.5 text-xs font-medium text-hit">{ikramiye}</div>}
             </div>
           </div>
         ))}
@@ -77,7 +92,9 @@ function KuponBlock({ data }: { data: Kupon }) {
   );
 }
 
-export default function TahminOnerileri({ data }: { data: KuponOnerisi[] }) {
+type Props = { data: KuponOnerisi[]; altiliResults?: AltiliCityResult[] };
+
+export default function TahminOnerileri({ data, altiliResults = [] }: Props) {
   const items = data.filter((k): k is Kupon => k !== null);
   if (items.length === 0) return null;
 
@@ -86,7 +103,7 @@ export default function TahminOnerileri({ data }: { data: KuponOnerisi[] }) {
       <div className="mx-auto max-w-6xl space-y-8">
         <h2 className="text-lg font-semibold">Kupon Önerileri</h2>
         {items.map((kupon, i) => (
-          <KuponBlock key={i} data={kupon} />
+          <KuponBlock key={i} data={kupon} ikramiye={findIkramiye(kupon.hippodromeName, altiliResults)} />
         ))}
       </div>
     </section>
