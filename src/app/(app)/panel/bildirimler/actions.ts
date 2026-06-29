@@ -9,4 +9,5 @@ export async function markAllRead(userId: string) {
     data: { read: true },
   });
   revalidatePath("/panel/bildirimler");
+  revalidatePath("/admin/bildirimler");
 }
