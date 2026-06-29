@@ -84,7 +84,7 @@ export default function TahminOnerileri({ data }: { data: KuponOnerisi[] }) {
   return (
     <section className="border-t px-4 py-10">
       <div className="mx-auto max-w-6xl space-y-8">
-        <h2 className="text-lg font-semibold">Tahmin Önerileri</h2>
+        <h2 className="text-lg font-semibold">Kupon Önerileri</h2>
         {items.map((kupon, i) => (
           <KuponBlock key={i} data={kupon} />
         ))}
