@@ -6,6 +6,7 @@ import { tr } from "date-fns/locale";
 import { getRaceDetail } from "@/server/services/race.service";
 import { auth } from "@/lib/auth";
 import RaceCard from "@/components/race/RaceCard";
+import LiveOddsPanel from "@/components/kosular/LiveOddsPanel";
 
 type PageProps = {
   params: Promise<{ tarih: string; hipodrom: string; kosuNo: string }>;
@@ -48,6 +49,14 @@ export default async function RaceDetailPage({ params }: PageProps) {
         </h1>
         <p className="text-sm text-muted-foreground">{dateLabel}</p>
       </div>
+
+      {/* Canlı ganyan oranları */}
+      <LiveOddsPanel
+        hippodromeSlug={hipodrom}
+        dateStr={tarih}
+        raceNo={raceNo}
+        runners={race.runners.map((r) => ({ no: r.no, name: r.name }))}
+      />
 
       {/* Race card */}
       <RaceCard race={race} isLoggedIn={!!session?.user} />
