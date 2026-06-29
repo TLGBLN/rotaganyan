@@ -146,24 +146,6 @@ export default async function HomePage() {
 
         </div>
       </section>
-      {/* Alt linkler */}
-      <section className="border-t px-4 py-8">
-        <div className="mx-auto max-w-5xl flex items-center justify-end gap-8">
-          <Link
-            href="/hakkinda"
-            className="text-sm font-medium text-muted-foreground hover:text-brand transition-colors"
-          >
-            Hakkımızda
-          </Link>
-          <span className="text-muted-foreground/30">|</span>
-          <Link
-            href="/iletisim"
-            className="text-sm font-medium text-muted-foreground hover:text-brand transition-colors"
-          >
-            İletişim
-          </Link>
-        </div>
-      </section>
     </main>
   );
 }

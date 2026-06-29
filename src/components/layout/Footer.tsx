@@ -22,6 +22,7 @@ export default function Footer() {
           </p>
           <nav className="flex flex-wrap justify-center gap-x-4 gap-y-1">
             <Link href="/hakkinda" className="hover:text-foreground hover:underline underline-offset-4">Hakkında</Link>
+            <Link href="/iletisim" className="hover:text-foreground hover:underline underline-offset-4">İletişim</Link>
             <Link href="/gizlilik" className="hover:text-foreground hover:underline underline-offset-4">Gizlilik</Link>
             <Link href="/kullanim-kosullari" className="hover:text-foreground hover:underline underline-offset-4">Kullanım Koşulları</Link>
           </nav>
