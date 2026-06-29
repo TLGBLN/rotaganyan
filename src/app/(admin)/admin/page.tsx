@@ -75,11 +75,11 @@ export default async function AdminDashboard() {
             <div className="grid gap-4 sm:grid-cols-2">
               <PerformanceBreakdown title="Güven Seviyesine Göre (Kalibrasyon)" rows={analyst.byConfidence} />
               <PerformanceBreakdown title="Pist Tipine Göre" rows={analyst.bySurface} />
-              <PerformanceBreakdown title="Koşu Sınıfına Göre" rows={analyst.byClassType} limit={6} />
+              <PerformanceBreakdown title="Koşu Sınıfına Göre" rows={analyst.byClassType} />
               <PerformanceBreakdown title="Hipodroma Göre" rows={analyst.byHippodrome} limit={6} />
             </div>
 
-            <CouponTierChart rows={analyst.couponTierByClassType} limit={8} />
+            <CouponTierChart rows={analyst.couponTierByClassType} />
           </div>
         )}
       </section>

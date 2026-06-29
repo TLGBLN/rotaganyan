@@ -3,9 +3,10 @@ import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import { getRaceForAnalysis } from "@/server/services/admin.service";
+import { getRaceForAnalysis, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
 import MarkdownRaceInput from "@/components/admin/MarkdownRaceInput";
 import BultenUpload from "@/components/admin/BultenUpload";
+import ClassTypeAdviceCard from "@/components/admin/ClassTypeAdviceCard";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,8 @@ export default async function YeniAnalizPage({ searchParams }: PageProps) {
 
   const raceName = `${race.raceDay.hippodrome.name} — ${race.raceNo}. Koşu`;
   const mod = params.mod ?? "md"; // default: markdown
+  const analystStats = await getAnalystStats();
+  const advice = getClassTypeAdvice(analystStats, race.classType);
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">

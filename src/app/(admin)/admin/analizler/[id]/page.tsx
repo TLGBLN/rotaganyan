@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
-import { getAdminPredictionById } from "@/server/services/admin.service";
+import { getAdminPredictionById, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
 import PredictionForm from "@/components/admin/PredictionForm";
 import PublishChecklist from "@/components/admin/PublishChecklist";
 import MarkdownRaceInput from "@/components/admin/MarkdownRaceInput";
 import DeletePredictionButton from "@/components/admin/DeletePredictionButton";
+import ClassTypeAdviceCard from "@/components/admin/ClassTypeAdviceCard";
 import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,8 @@ export default async function EditAnalizPage({ params }: PageProps) {
   if (!pred) notFound();
 
   const race = pred.race;
+  const analystStats = await getAnalystStats();
+  const advice = getClassTypeAdvice(analystStats, race.classType);
 
   return (
     <div className="space-y-6">
@@ -51,6 +54,7 @@ export default async function EditAnalizPage({ params }: PageProps) {
         />
 
         <aside className="space-y-4">
+          <ClassTypeAdviceCard advice={advice} classType={race.classType} />
           {!pred.published && <PublishChecklist predictionId={pred.id} />}
           {pred.published && (
             <div className="rounded-lg border border-hit/30 bg-hit/10 p-3 text-sm text-hit">
