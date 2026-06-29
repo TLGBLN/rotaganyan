@@ -407,3 +407,51 @@ export async function getKuponOnerileri(): Promise<KuponOnerisi[]> {
   const results = await Promise.all(validActives.map((a) => buildKuponOnerisi(a)));
   return results.filter((r): r is NonNullable<typeof r> => r !== null);
 }
+
+// ─── Canlı Oranlar (anasayfa) ───────────────────────────────────────────────────
+
+export type CurrentRace = {
+  raceId: string;
+  raceNo: number;
+  time: string | null;
+  hippodromeName: string;
+  hippodromeSlug: string;
+  runners: { no: number; name: string }[];
+};
+
+/** Her hipodromun o gün henüz sonuçlanmamış (şu an açık/yaklaşan) koşusunu döner — canlı oran paneli için. */
+export async function getCurrentRaces(dateStr: string): Promise<CurrentRace[]> {
+  const date = new Date(dateStr + "T00:00:00.000Z");
+
+  const raceDays = await db.raceDay.findMany({
+    where: { date: { gte: startOfDay(date), lte: endOfDay(date) } },
+    include: {
+      hippodrome: { select: { name: true, slug: true } },
+      races: {
+        select: {
+          id: true,
+          raceNo: true,
+          time: true,
+          result: { select: { id: true } },
+          runners: { select: { no: true, name: true }, orderBy: { no: "asc" } },
+        },
+        orderBy: { raceNo: "asc" },
+      },
+    },
+  });
+
+  const current: CurrentRace[] = [];
+  for (const rd of raceDays) {
+    const next = rd.races.find((r) => r.result == null);
+    if (!next) continue;
+    current.push({
+      raceId: next.id,
+      raceNo: next.raceNo,
+      time: next.time,
+      hippodromeName: rd.hippodrome.name,
+      hippodromeSlug: rd.hippodrome.slug,
+      runners: next.runners,
+    });
+  }
+  return current;
+}
