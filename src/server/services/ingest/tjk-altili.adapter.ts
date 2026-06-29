@@ -22,7 +22,7 @@ async function fetchHtml(url: string): Promise<string> {
 }
 
 export type AltiliRow = { rank: number; at: string; derece: string; ganyan: string; agf: string };
-export type AltiliGroup = { title: string; payout: string; rows: AltiliRow[] };
+export type AltiliGroup = { title: string; payout: string; ikramiye: string | null; rows: AltiliRow[] };
 export type AltiliCityResult = { sehirId: number; sehirAdi: string; groups: AltiliGroup[] };
 
 function cleanText(raw: string): string {
@@ -33,6 +33,12 @@ function cleanText(raw: string): string {
 function extractPayoutSentence(raw: string): string {
   const match = raw.match(/.*?dir\./);
   return match ? match[0].trim() : raw;
+}
+
+/** İkramiye cümlesi ("6'lı Ganyan X TL vermiştir.") — sadece resmi ikramiye hesaplanmış (sonuçlanmış) yarışlarda gelir, aksi halde null. */
+function extractIkramiyeSentence(raw: string): string | null {
+  const match = raw.match(/6'lı Ganyan[^.]*vermiştir\./);
+  return match ? match[0].trim() : null;
 }
 
 export async function fetchAltiliSonuc(sehirId: number, sehirAdi: string): Promise<AltiliCityResult | null> {
@@ -57,7 +63,9 @@ export async function fetchAltiliSonuc(sehirId: number, sehirAdi: string): Promi
     const title = cleanText(table.find("thead th").first().text());
     if (!title.includes("6'l")) return;
 
-    const payout = extractPayoutSentence(cleanText(table.find("tfoot tr").first().text()));
+    const tfootText = cleanText(table.find("tfoot tr").first().text());
+    const payout = extractPayoutSentence(tfootText);
+    const ikramiye = extractIkramiyeSentence(tfootText);
 
     const rows: AltiliRow[] = [];
     table.find("tbody.sixer tr").each((_, rowEl) => {
@@ -68,7 +76,7 @@ export async function fetchAltiliSonuc(sehirId: number, sehirAdi: string): Promi
       rows.push({ rank, at: cells[1], derece: cells[2], ganyan: cells[3], agf: cells[4] });
     });
 
-    if (rows.length > 0) groups.push({ title, payout, rows });
+    if (rows.length > 0) groups.push({ title, payout, ikramiye, rows });
   });
 
   return groups.length > 0 ? { sehirId, sehirAdi, groups } : null;

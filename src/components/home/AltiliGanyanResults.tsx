@@ -46,10 +46,11 @@ export default function AltiliGanyanResults({ results }: Props) {
                         </tbody>
                       </table>
                     </div>
-                    {group.payout && (
-                      <p className="border-t bg-muted/20 px-4 py-2 text-xs text-muted-foreground">
-                        {group.payout}
-                      </p>
+                    {(group.payout || group.ikramiye) && (
+                      <div className="border-t bg-muted/20 px-4 py-2 text-xs">
+                        {group.payout && <p className="text-muted-foreground">{group.payout}</p>}
+                        {group.ikramiye && <p className="font-semibold text-hit">{group.ikramiye}</p>}
+                      </div>
                     )}
                   </div>
                 ))}
