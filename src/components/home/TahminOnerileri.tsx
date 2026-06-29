@@ -30,7 +30,7 @@ function KuponBlock({ data, ikramiye }: { data: Kupon; ikramiye: string | null }
       <div className="mb-3 text-sm font-medium text-muted-foreground">{data.hippodromeName}</div>
       <div className="grid gap-4 sm:grid-cols-3">
         {data.variants.map((variant) => (
-          <div key={variant.key} className="overflow-hidden rounded-lg border bg-card">
+          <div key={variant.key} className="flex flex-col overflow-hidden rounded-lg border bg-card">
             <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-2.5">
               <span className="text-sm font-semibold">{variant.label}</span>
               <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", STATUS_CLASS[variant.status])}>
@@ -39,7 +39,7 @@ function KuponBlock({ data, ikramiye }: { data: Kupon; ikramiye: string | null }
             </div>
 
             {/* Ayak ızgarası */}
-            <div className="overflow-x-auto">
+            <div className="flex-1 overflow-x-auto">
               <div
                 className="grid divide-x"
                 style={{ gridTemplateColumns: `repeat(${variant.legs.length}, minmax(48px, 1fr))` }}
