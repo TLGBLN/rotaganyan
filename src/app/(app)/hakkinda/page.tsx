@@ -1,21 +1,11 @@
 import type { Metadata } from "next";
-import { db } from "@/lib/db";
-import StatTile from "@/components/stats/StatTile";
 
 export const metadata: Metadata = {
   title: "Hakkında",
   description: "ROTAGANYAN nedir, nasıl çalışır, neden şeffaf bir platformdur.",
 };
 
-export default async function HakkindaPage() {
-  const [totalAnalyses, totalResults, hitResults] = await Promise.all([
-    db.prediction.count({ where: { published: true } }),
-    db.result.count(),
-    db.result.count({ where: { hitTop1: true } }),
-  ]);
-
-  const hitRate = totalResults > 0 ? Math.round((hitResults / totalResults) * 100) : 0;
-
+export default function HakkindaPage() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-12 space-y-10">
       <div>
@@ -26,13 +16,6 @@ export default async function HakkindaPage() {
           ROTAGANYAN, at yarışı analizini şeffaf, veri odaklı ve rasyonel bir zemine taşımak
           için kurulmuş bir platformdur.
         </p>
-      </div>
-
-      {/* Live stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <StatTile label="Yayımlanan Analiz" value={totalAnalyses} highlight="brand" />
-        <StatTile label="Sonuçlanan" value={totalResults} />
-        <StatTile label="Genel İsabet" value={`%${hitRate}`} highlight={hitRate >= 50 ? "hit" : "miss"} />
       </div>
 
       <section className="rounded-xl border border-brand/30 bg-brand/5 p-6 text-center sm:p-8">
