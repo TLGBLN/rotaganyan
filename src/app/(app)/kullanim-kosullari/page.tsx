@@ -62,7 +62,10 @@ export default function KullanimKosullariPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-base font-semibold">5. Premium Abonelik</h2>
+        <h2 className="text-base font-semibold">
+          5. Premium Abonelik{" "}
+          <span className="text-sm font-normal text-muted-foreground">(Henüz faaliyette değildir)</span>
+        </h2>
         <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
           <li>Premium abonelik aylık olarak faturalandırılır.</li>
           <li>İptal istekleri bir sonraki fatura döneminden önce yapılmalıdır.</li>
