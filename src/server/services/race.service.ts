@@ -352,23 +352,53 @@ async function buildKuponOnerisi(active: {
 
   // Her ayağın gerçek kazananını ve sonucun girilip girilmediğini bul — kupon numaralarıyla eşleşeni
   // yeşil göstermek, eşleşmeyeni (sonuç girilmiş ama kazanan seçilmemiş) "kaçtı" olarak işaretlemek için.
+  // Aynı sorguda o ayağın analiz sırasını (Pick.rank) da çekiyoruz — kupondaki atlar sayı sırasına göre
+  // değil, analizdeki tahmin sırasına göre dizilsin diye.
   const hippodrome = await db.hippodrome.findUnique({ where: { name: baseName } });
   const resultByRaceNo = new Map<number, { winnerNo: number | null; resulted: boolean }>();
+  const rankByRaceNo = new Map<number, Map<number, number>>();
   if (hippodrome) {
     const races = await db.race.findMany({
       where: {
         raceNo: { in: legs.map((l) => l.raceNo) },
         raceDay: { hippodromeId: hippodrome.id, date: { gte: startOfDay(active.date), lte: endOfDay(active.date) } },
       },
-      include: { result: { select: { winnerNo: true } } },
+      include: {
+        result: { select: { winnerNo: true } },
+        prediction: { select: { picks: { select: { rank: true, runner: { select: { no: true } } } } } },
+      },
     });
-    for (const r of races) resultByRaceNo.set(r.raceNo, { winnerNo: r.result?.winnerNo ?? null, resulted: r.result != null });
+    for (const r of races) {
+      resultByRaceNo.set(r.raceNo, { winnerNo: r.result?.winnerNo ?? null, resulted: r.result != null });
+      const rankByNo = new Map<number, number>();
+      for (const pick of r.prediction?.picks ?? []) {
+        if (pick.runner) rankByNo.set(pick.runner.no, pick.rank);
+      }
+      if (rankByNo.size > 0) rankByRaceNo.set(r.raceNo, rankByNo);
+    }
+  }
+
+  /** Atları sayı sırası yerine analizdeki tahmin sırasına (Pick.rank) göre dizer; analizde olmayanlar sona, kendi aralarında sayı sırasına göre eklenir. */
+  function sortByAnalysisRank(raceNo: number, nos: number[]): number[] {
+    const rankByNo = rankByRaceNo.get(raceNo);
+    if (!rankByNo) return nos;
+    return [...nos].sort((a, b) => {
+      const ra = rankByNo.get(a) ?? Infinity;
+      const rb = rankByNo.get(b) ?? Infinity;
+      if (ra !== rb) return ra - rb;
+      return a - b;
+    });
   }
 
   function toLegs(nosFn: (l: HomeKuponLeg) => number[]): KuponLeg[] {
     return legs.map((l) => {
       const entry = resultByRaceNo.get(l.raceNo);
-      return { raceNo: l.raceNo, nos: nosFn(l), winnerNo: entry?.winnerNo ?? null, resulted: entry?.resulted ?? false };
+      return {
+        raceNo: l.raceNo,
+        nos: sortByAnalysisRank(l.raceNo, nosFn(l)),
+        winnerNo: entry?.winnerNo ?? null,
+        resulted: entry?.resulted ?? false,
+      };
     });
   }
 
