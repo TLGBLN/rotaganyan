@@ -9,7 +9,6 @@ import {
   getComboCoupon,
   type ComboLeg,
 } from "@/server/services/race.service";
-import { getAgfMovers } from "@/server/services/agf-trend.service";
 import { fetchDailyProgram } from "@/lib/tjk-daily";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { syncResultsForDate } from "@/server/services/result-sync";
@@ -18,7 +17,6 @@ import { auth } from "@/lib/auth";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import RaceCountdown from "@/components/kosular/RaceCountdown";
 import KosularRaceRow from "@/components/kosular/KosularRaceRow";
-import SteamWidget from "@/components/kosular/SteamWidget";
 import { cn } from "@/lib/utils";
 import type { Confidence } from "@prisma/client";
 
@@ -101,8 +99,6 @@ export default async function KosularPage({ searchParams }: PageProps) {
     });
   }
 
-  const agfMovers = visibleRaceDays.length > 0 ? await getAgfMovers(currentDate) : { risers: [], fallers: [] };
-
   // DB'deki koşular için hızlı lookup: "slug-raceNo" → prediction/result
   const dbLookup = new Map<string, {
     published?: boolean;
@@ -140,8 +136,6 @@ export default async function KosularPage({ searchParams }: PageProps) {
           <DateNavigator currentDate={currentDate} />
         </div>
       </div>
-
-      <SteamWidget movers={agfMovers} dateStr={currentDate} />
 
       {/* ── DB'den gelen program (analiz/sonuç bilgili) ── */}
       {visibleRaceDays.length > 0 && (

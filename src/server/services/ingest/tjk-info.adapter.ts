@@ -21,7 +21,10 @@ const FOREIGN_KW = [
   "Japonya", "Avustralya", "Kanada", "BAE", "Bahreyn", "İrlanda",
   "Singapur", "Birleşik", "Belçika", "Hong", "Guney", "Güney",
   "Kuzey", "Ukrayna", "Rusya", "Çin", "Polonya", "İsveç", "Park ABD",
-  "Park UK", "Racecourse", "Downs",
+  "Park UK", "Racecourse", "Downs", "Şili", "Hollanda", "İspanya",
+  "Meksika", "Brezilya", "Uruguay", "Peru", "Katar", "Umman",
+  "Suudi", "Mısır", "Çekya", "Macaristan", "Norveç", "Danimarka",
+  "Avusturya", "Yunanistan", "İsviçre", "Hindistan",
 ];
 
 function isTurkish(sehirAdi: string): boolean {
