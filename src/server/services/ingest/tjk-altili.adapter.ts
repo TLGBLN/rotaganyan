@@ -37,7 +37,9 @@ function extractPayoutSentence(raw: string): string {
 
 /** İkramiye cümlesi ("6'lı Ganyan X TL vermiştir.") — sadece resmi ikramiye hesaplanmış (sonuçlanmış) yarışlarda gelir, aksi halde null. */
 function extractIkramiyeSentence(raw: string): string | null {
-  const match = raw.match(/6'lı Ganyan[^.]*vermiştir\./);
+  // "Ganyan \d" (boşluk + rakam) şart — yoksa "Ganyanda dağıtılacak..." cümlesiyle de eşleşir.
+  // .*? (DEĞİL [^.]*) kullanılıyor çünkü tutar "52.263,00" gibi nokta (binlik ayraç) içerebilir.
+  const match = raw.match(/6'lı Ganyan \d.*?vermiştir\./);
   return match ? match[0].trim() : null;
 }
 
