@@ -11,6 +11,13 @@ import DeleteRaceButton from "@/components/admin/DeleteRaceButton";
 
 export const dynamic = "force-dynamic";
 
+/** Kupon kademesi etiketi — RaceCard/InlineAnalysisPanel'deki sınıflandırmayla aynı eşikler. */
+function couponTierLabel(rank: number): string {
+  if (rank <= 3) return "Ekonomik";
+  if (rank <= 6) return "Normal";
+  return "Geniş";
+}
+
 type PageProps = {
   searchParams: Promise<{ tarih?: string }>;
 };
@@ -111,15 +118,28 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                       <td className="px-3 py-1.5">{race.runners.length} at</td>
                       <td className="px-3 py-1.5">
                         {race.prediction ? (
-                          <Link
-                            href={`/admin/analizler/${race.prediction.id}`}
-                            className={cn(
-                              "font-medium hover:underline",
-                              race.prediction.published ? "text-hit" : "text-brand"
-                            )}
-                          >
-                            {race.prediction.published ? "Yayında" : "Taslak"}
-                          </Link>
+                          <div className="flex items-center gap-1.5">
+                            <Link
+                              href={`/admin/analizler/${race.prediction.id}`}
+                              className={cn(
+                                "font-medium hover:underline",
+                                race.prediction.published ? "text-hit" : "text-brand"
+                              )}
+                            >
+                              {race.prediction.published ? "Yayında" : "Taslak"}
+                            </Link>
+                            {race.prediction.picks
+                              .filter((p) => p.isTarget)
+                              .map((p) => (
+                                <span
+                                  key={p.rank}
+                                  title="Hedef Safkan (şanslı/sürpriz potansiyelli at)"
+                                  className="inline-flex items-center gap-0.5 rounded-full border border-brand/40 bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand"
+                                >
+                                  🎯 {couponTierLabel(p.rank)}
+                                </span>
+                              ))}
+                          </div>
                         ) : (
                           <Link
                             href={`/admin/analizler/yeni?kosu=${race.id}`}

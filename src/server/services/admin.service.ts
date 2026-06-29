@@ -15,7 +15,13 @@ export type AdminRaceDay = Prisma.RaceDayGetPayload<{
     hippodrome: true;
     races: {
       include: {
-        prediction: { select: { id: true; published: true } };
+        prediction: {
+          select: {
+            id: true;
+            published: true;
+            picks: { select: { rank: true; isTarget: true } };
+          };
+        };
         result: { select: { id: true } };
         runners: { select: { id: true; no: true; name: true } };
       };
@@ -86,7 +92,13 @@ export async function getAdminRaceDays(dateStr?: string, limit = 30): Promise<Ad
       hippodrome: true,
       races: {
         include: {
-          prediction: { select: { id: true, published: true } },
+          prediction: {
+            select: {
+              id: true,
+              published: true,
+              picks: { select: { rank: true, isTarget: true } },
+            },
+          },
           result: { select: { id: true } },
           runners: { select: { id: true, no: true, name: true } },
         },
