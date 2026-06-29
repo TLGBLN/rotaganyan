@@ -10,7 +10,7 @@ import { getSteamers } from "@/server/services/agf-trend.service";
 import { fetchTjkTicker } from "@/lib/tjk-ticker";
 import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
 import { turkeyDateString } from "@/lib/tz";
-import SteamWidget from "@/components/kosular/SteamWidget";
+import SteamTicker from "@/components/home/SteamTicker";
 
 export const revalidate = 600; // 10 dakika
 
@@ -50,20 +50,14 @@ export default async function HomePage() {
         </section>
       )}
 
+      {/* AGF Steam — borsa şeridi tarzında, günün en çok değişen favorileri */}
+      <SteamTicker steamers={steamers} dateStr={today} />
+
       {/* Tahmin Önerileri — Ekonomik/Normal/Geniş kupon şablonları (her aktif slot için) */}
       <TahminOnerileri data={kuponOnerisi} />
 
       {/* Altılı Ganyan sonuçları */}
       <AltiliGanyanResults results={altiliResults} />
-
-      {/* AGF Steam — günün en çok değişen favorileri */}
-      {steamers.length > 0 && (
-        <section className="border-t px-4 py-10">
-          <div className="mx-auto max-w-5xl">
-            <SteamWidget steamers={steamers} dateStr={today} />
-          </div>
-        </section>
-      )}
 
       {/* Değer önerisi / Manifesto */}
       <section className="border-t px-4 py-16">
