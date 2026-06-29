@@ -6,22 +6,22 @@ import NewsTicker from "@/components/home/NewsTicker";
 import AltiliGanyanResults from "@/components/home/AltiliGanyanResults";
 import TahminOnerileri from "@/components/home/TahminOnerileri";
 import { getHitPredictions, getKuponOnerileri } from "@/server/services/race.service";
-import { getSteamers } from "@/server/services/agf-trend.service";
+import { getAgfMovers } from "@/server/services/agf-trend.service";
 import { fetchTjkTicker } from "@/lib/tjk-ticker";
 import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
 import { turkeyDateString } from "@/lib/tz";
-import SteamTicker from "@/components/home/SteamTicker";
+import SteamWidget from "@/components/kosular/SteamWidget";
 
 export const revalidate = 600; // 10 dakika
 
 export default async function HomePage() {
   const today = turkeyDateString();
-  const [hitPredictions, kuponOnerisi, tickerItems, altiliResults, steamers] = await Promise.all([
+  const [hitPredictions, kuponOnerisi, tickerItems, altiliResults, agfMovers] = await Promise.all([
     getHitPredictions(16),
     getKuponOnerileri(),
     fetchTjkTicker(),
     fetchTodaysAltiliResults(),
-    getSteamers(today),
+    getAgfMovers(today),
   ]);
 
   return (
@@ -50,8 +50,15 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* AGF Steam — borsa şeridi tarzında, günün en çok değişen favorileri */}
-      <SteamTicker steamers={steamers} dateStr={today} />
+      {/* AGF Steam — günün en çok yükselen/düşen favorileri */}
+      {(agfMovers.risers.length > 0 || agfMovers.fallers.length > 0) && (
+        <section className="border-t px-4 py-10">
+          <div className="mx-auto max-w-4xl">
+            <h2 className="mb-4 text-lg font-semibold">Para Hareketi (AGF)</h2>
+            <SteamWidget movers={agfMovers} dateStr={today} />
+          </div>
+        </section>
+      )}
 
       {/* Tahmin Önerileri — Ekonomik/Normal/Geniş kupon şablonları (her aktif slot için) */}
       <TahminOnerileri data={kuponOnerisi} />

@@ -1,7 +1,8 @@
 /**
  * AGF zaman serisi — runner.agf yalnızca "şu anki" değeri tutar, geçmiş senkronizasyonlardaki
  * değerler AgfSnapshot tablosunda birikir (bkz. agf-sync.ts). Bu servis o birikimden günün
- * "para hareketi" (steam) sinyalini çıkarır: AGF'si en çok yükselen/düşen atlar.
+ * "para hareketi" sinyalini çıkarır: AGF'si en çok yükselen/düşen atlar (atkolik.net'teki
+ * "Oran Yükselen/Düşen" listelerinin AGF karşılığı).
  */
 
 import { db } from "@/lib/db";
@@ -19,11 +20,13 @@ export type Steamer = {
   first: number;
   last: number;
   delta: number;
+  resulted: boolean;
   points: SteamPoint[];
 };
+export type AgfMovers = { risers: Steamer[]; fallers: Steamer[] };
 
-/** Bir gündeki tüm koşularda, ilk ve son AGF senkronizasyonu arasında en çok değişen atları döner. */
-export async function getSteamers(dateStr: string, limit = 12): Promise<Steamer[]> {
+/** Bir gündeki tüm koşularda, ilk ve son AGF senkronizasyonu arasındaki değişimi yükselen/düşen olarak ikiye ayırır. */
+export async function getAgfMovers(dateStr: string, limitPerDirection = 10): Promise<AgfMovers> {
   const date = new Date(dateStr + "T00:00:00.000Z");
 
   const raceDays = await db.raceDay.findMany({
@@ -34,6 +37,7 @@ export async function getSteamers(dateStr: string, limit = 12): Promise<Steamer[
         select: {
           id: true,
           raceNo: true,
+          result: { select: { id: true } },
           runners: {
             select: {
               id: true,
@@ -51,7 +55,7 @@ export async function getSteamers(dateStr: string, limit = 12): Promise<Steamer[
     },
   });
 
-  const steamers: Steamer[] = [];
+  const all: Steamer[] = [];
   for (const rd of raceDays) {
     for (const race of rd.races) {
       for (const runner of race.runners) {
@@ -60,7 +64,7 @@ export async function getSteamers(dateStr: string, limit = 12): Promise<Steamer[
         const last = runner.agfSnapshots[runner.agfSnapshots.length - 1].agf;
         const delta = Math.round((last - first) * 100) / 100;
         if (delta === 0) continue;
-        steamers.push({
+        all.push({
           runnerId: runner.id,
           no: runner.no,
           name: runner.name,
@@ -71,11 +75,15 @@ export async function getSteamers(dateStr: string, limit = 12): Promise<Steamer[
           first,
           last,
           delta,
+          resulted: race.result != null,
           points: runner.agfSnapshots,
         });
       }
     }
   }
 
-  return steamers.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, limit);
+  const risers = all.filter((s) => s.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, limitPerDirection);
+  const fallers = all.filter((s) => s.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, limitPerDirection);
+
+  return { risers, fallers };
 }

@@ -1,86 +1,102 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingUp, TrendingDown, Flag, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Steamer } from "@/server/services/agf-trend.service";
+import type { AgfMovers, Steamer } from "@/server/services/agf-trend.service";
 
-function Sparkline({ points, rising }: { points: { agf: number }[]; rising: boolean }) {
-  const values = points.map((p) => p.agf);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const w = 64;
-  const h = 24;
-  const coords = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * w;
-    const y = h - ((v - min) / range) * h;
-    return `${x},${y}`;
-  });
-
+function MoverRow({ s, rank, dateStr, rising }: { s: Steamer; rank: number; dateStr: string; rising: boolean }) {
   return (
-    <svg width={w} height={h} className="shrink-0 overflow-visible">
-      <polyline
-        points={coords.join(" ")}
-        fill="none"
-        strokeWidth={1.5}
-        className={rising ? "stroke-hit" : "stroke-miss"}
-      />
-    </svg>
+    <Link
+      href={`/kosular/${dateStr}/${s.hippodromeSlug}/${s.raceNo}`}
+      className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-muted/40"
+    >
+      <span
+        className={cn(
+          "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-xs font-bold",
+          rising ? "border-hit/40 text-hit" : "border-miss/40 text-miss"
+        )}
+      >
+        {rank}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          <Flag className="h-2.5 w-2.5" />
+          {s.hippodromeName} {s.raceNo}. Koşu #{s.no}
+        </div>
+        <div className="truncate font-semibold">{s.name}</div>
+      </div>
+      <div className="shrink-0 text-right font-mono text-xs">
+        <span className="text-muted-foreground line-through">%{s.first.toFixed(1)}</span>
+        <span className="mx-1 text-muted-foreground">→</span>
+        <span className="font-bold">%{s.last.toFixed(1)}</span>
+      </div>
+      <span
+        className={cn(
+          "flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold",
+          rising ? "bg-hit/15 text-hit" : "bg-miss/15 text-miss"
+        )}
+      >
+        {rising ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+        {Math.abs(s.delta).toFixed(1)} puan
+      </span>
+      <span className="hidden w-16 shrink-0 text-right text-[10px] italic text-muted-foreground sm:inline">
+        {s.resulted ? "Koşuldu" : "Bekliyor"}
+      </span>
+    </Link>
   );
 }
 
-export default function SteamWidget({ steamers, dateStr }: { steamers: Steamer[]; dateStr: string }) {
-  if (steamers.length === 0) return null;
-
-  const lastCapturedAt = steamers
-    .flatMap((s) => s.points.map((p) => new Date(p.capturedAt).getTime()))
-    .reduce((max, t) => Math.max(max, t), 0);
+function MoverCard({ title, items, dateStr, rising }: { title: string; items: Steamer[]; dateStr: string; rising: boolean }) {
+  const [open, setOpen] = useState(true);
+  if (items.length === 0) return null;
 
   return (
-    <section className="rounded-lg border p-4">
-      <div className="mb-3 flex items-center gap-2">
-        <span className="h-2 w-2 rounded-full bg-brand animate-pulse" />
-        <h2 className="text-sm font-semibold">Para Hareketi (AGF Steam)</h2>
-        <span className="text-xs text-muted-foreground">Bugünün en çok değişen favorileri</span>
-      </div>
+    <div className="overflow-hidden rounded-lg border">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left"
+      >
+        <span
+          className={cn(
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
+            rising ? "bg-hit/15 text-hit" : "bg-miss/15 text-miss"
+          )}
+        >
+          {rising ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+        </span>
+        <h3 className="flex-1 text-sm font-bold">
+          {title} — Top {items.length}
+        </h3>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+          {items.length}
+        </span>
+        {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+      </button>
+      {open && (
+        <div className="divide-y border-t">
+          {items.map((s, i) => (
+            <MoverRow key={s.runnerId} s={s} rank={i + 1} dateStr={dateStr} rising={rising} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
-      <div className="space-y-2">
-        {steamers.map((s) => {
-          const rising = s.delta > 0;
-          return (
-            <Link
-              key={s.runnerId}
-              href={`/kosular/${dateStr}/${s.hippodromeSlug}/${s.raceNo}`}
-              className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
-            >
-              <span className="w-24 shrink-0 truncate text-xs text-muted-foreground">
-                {s.hippodromeName} {s.raceNo}.K
-              </span>
-              <span className="w-8 shrink-0 font-mono font-semibold">{s.no}</span>
-              <span className="flex-1 truncate font-medium">{s.name}</span>
-              <Sparkline points={s.points} rising={rising} />
-              <span
-                className={cn(
-                  "flex w-20 shrink-0 items-center justify-end gap-1 text-right font-mono text-xs font-bold",
-                  rising ? "text-hit" : "text-miss"
-                )}
-              >
-                {rising ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                {rising ? "+" : ""}
-                {s.delta.toFixed(1)}
-              </span>
-              <span className="hidden w-32 shrink-0 text-right text-[10px] text-muted-foreground sm:inline">
-                %{s.first.toFixed(0)} → %{s.last.toFixed(0)}
-              </span>
-            </Link>
-          );
-        })}
-      </div>
-      <p className="mt-2 text-[11px] text-muted-foreground">
-        AGF, güne ilk senkronizasyondan {format(new Date(lastCapturedAt), "HH:mm", { locale: tr })} itibarıyla geçen
-        değişimi gösterir — yükseliş favoriye giren parayı, düşüş soğumayı işaret eder.
+export default function SteamWidget({ movers, dateStr }: { movers: AgfMovers; dateStr: string }) {
+  if (movers.risers.length === 0 && movers.fallers.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <MoverCard title="AGF Yükselen" items={movers.risers} dateStr={dateStr} rising />
+      <MoverCard title="AGF Düşen" items={movers.fallers} dateStr={dateStr} rising={false} />
+      <p className="px-1 text-[11px] text-muted-foreground">
+        Günün ilk ve son AGF senkronizasyonu arasındaki değişim — yükseliş favoriye giren parayı, düşüş soğumayı
+        işaret eder.
       </p>
-    </section>
+    </div>
   );
 }

@@ -9,7 +9,7 @@ import {
   getComboCoupon,
   type ComboLeg,
 } from "@/server/services/race.service";
-import { getSteamers } from "@/server/services/agf-trend.service";
+import { getAgfMovers } from "@/server/services/agf-trend.service";
 import { fetchDailyProgram } from "@/lib/tjk-daily";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { syncResultsForDate } from "@/server/services/result-sync";
@@ -101,7 +101,7 @@ export default async function KosularPage({ searchParams }: PageProps) {
     });
   }
 
-  const steamers = visibleRaceDays.length > 0 ? await getSteamers(currentDate) : [];
+  const agfMovers = visibleRaceDays.length > 0 ? await getAgfMovers(currentDate) : { risers: [], fallers: [] };
 
   // DB'deki koşular için hızlı lookup: "slug-raceNo" → prediction/result
   const dbLookup = new Map<string, {
@@ -141,7 +141,7 @@ export default async function KosularPage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      <SteamWidget steamers={steamers} dateStr={currentDate} />
+      <SteamWidget movers={agfMovers} dateStr={currentDate} />
 
       {/* ── DB'den gelen program (analiz/sonuç bilgili) ── */}
       {visibleRaceDays.length > 0 && (
