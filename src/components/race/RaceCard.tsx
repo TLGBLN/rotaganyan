@@ -109,12 +109,10 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                     <td className="px-2 py-2 font-medium">
                       <div className="flex items-center gap-1.5">
                         {pick.runner?.formaUrl && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={pick.runner.formaUrl}
-                            alt=""
-                            className="h-5 w-5 shrink-0 rounded-sm object-contain"
-                          />
+                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-white p-0.5 ring-1 ring-border">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={pick.runner.formaUrl} alt="" className="h-full w-full object-contain" />
+                          </span>
                         )}
                         <span className={isWinner ? "font-bold text-brand" : ""}>
                           {pick.runner?.name ?? pick.runnerLabel}
@@ -163,12 +161,10 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                   <td className="px-2 py-2">
                     <div className="flex items-center gap-1">
                       {runner.formaUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={runner.formaUrl}
-                          alt=""
-                          className="h-5 w-5 shrink-0 rounded-sm object-contain"
-                        />
+                        <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-white p-0.5 ring-1 ring-border">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={runner.formaUrl} alt="" className="h-full w-full object-contain" />
+                        </span>
                       )}
                       <span className="font-medium">{runner.name}</span>
                       {runner.sameJockey && (
