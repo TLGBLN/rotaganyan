@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
+import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { auth } from "@/lib/auth";
 import { getPublishedPredictions } from "@/server/services/race.service";
 
 type PageProps = {
@@ -12,7 +14,10 @@ type PageProps = {
 const PER_PAGE = 20;
 
 export default async function AnalizlerPage({ searchParams }: PageProps) {
-  const params = await searchParams;
+  const [session, params] = await Promise.all([auth(), searchParams]);
+  if (!session?.user) {
+    redirect("/giris?callbackUrl=%2Fanalizler");
+  }
   const page = Math.max(1, parseInt(params.sayfa ?? "1", 10));
 
   const { items, total } = await getPublishedPredictions(page, PER_PAGE, params.tur);

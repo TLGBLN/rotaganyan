@@ -41,8 +41,8 @@ export default async function HomePage() {
       {/* Günün Koşu Programı özet paneli */}
       <GunlukProgramWidget raceDays={raceDays} dateStr={today} isLoggedIn={isLoggedIn} />
 
-      {/* İsabet sağlayan tahminler — otomatik kayan slider */}
-      {hitPredictions.length > 0 && (
+      {/* İsabet sağlayan tahminler — sadece üyeler görür */}
+      {isLoggedIn && hitPredictions.length > 0 && (
         <section className="border-t py-10">
           <div className="mb-5 flex items-center justify-between px-4">
             <div className="flex items-center gap-2">
@@ -57,7 +57,7 @@ export default async function HomePage() {
         </section>
       )}
 
-{/* AGF Steam — günün en çok yükselen/düşen favorileri */}
+      {/* AGF Steam — günün en çok yükselen/düşen favorileri */}
       {(agfMovers.risers.length > 0 || agfMovers.fallers.length > 0) && (
         <section className="border-t px-4 py-10">
           <div className="mx-auto max-w-4xl">
@@ -67,8 +67,8 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Tahmin Önerileri — Ekonomik/Normal/Geniş kupon şablonları (her aktif slot için) */}
-      <TahminOnerileri data={kuponOnerisi} altiliResults={altiliResults} />
+      {/* Tahmin Önerileri — sadece üyeler görür */}
+      {isLoggedIn && <TahminOnerileri data={kuponOnerisi} altiliResults={altiliResults} />}
 
       {/* Altılı Ganyan sonuçları */}
       <AltiliGanyanResults results={altiliResults} />

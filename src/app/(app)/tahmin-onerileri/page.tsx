@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
-import { Lock } from "lucide-react";
+import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/auth";
 import { getActivePredictions } from "@/server/services/race.service";
@@ -12,7 +11,9 @@ export const dynamic = "force-dynamic";
 
 export default async function TahminOnerileriPage() {
   const [items, session] = await Promise.all([getActivePredictions(), auth()]);
-  const isLoggedIn = !!session?.user;
+  if (!session?.user) {
+    redirect("/giris?callbackUrl=%2Ftahmin-onerileri");
+  }
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 px-4 py-8">
@@ -21,26 +22,7 @@ export default async function TahminOnerileriPage() {
         <span className="text-sm text-muted-foreground">{items.length} öneri</span>
       </div>
 
-      {!isLoggedIn ? (
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed py-16 text-center text-sm text-muted-foreground">
-          <Lock className="h-6 w-6" />
-          <p>
-            {items.length > 0
-              ? `Şu an ${items.length} aktif banko önerisi var.`
-              : "Aktif banko önerilerini görmek için giriş yapmalısınız."}
-            <br />
-            Görmek için giriş yapmalısınız.
-          </p>
-          <div className="flex gap-2">
-            <Button asChild size="sm">
-              <Link href="/giris">Giriş Yap</Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link href="/kayit">Kayıt Ol</Link>
-            </Button>
-          </div>
-        </div>
-      ) : items.length === 0 ? (
+      {items.length === 0 ? (
         <div className="rounded-lg border border-dashed py-12 text-center text-sm text-muted-foreground">
           Şu an için sonuçlanmamış aktif banko önerisi yok.
         </div>
