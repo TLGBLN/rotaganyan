@@ -158,12 +158,7 @@ function MoverCard({ title, items, rising }: { title: string; items: Mover[]; ri
         >
           {rising ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
         </span>
-        <h3 className="flex-1 text-sm font-bold">
-          {title} — Top {items.length}
-        </h3>
-        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-          {items.length}
-        </span>
+        <h3 className="flex-1 text-sm font-bold">{title}</h3>
       </div>
 
       <div className="divide-y border-t">
