@@ -171,18 +171,6 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                             >
                               <div className="flex items-start gap-1.5">
                                 <span className="flex shrink-0 items-center gap-1">
-                                  {pick.runner?.formaUrl ? (
-                                    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-white p-0.5 ring-1 ring-border/50">
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img
-                                        src={pick.runner.formaUrl}
-                                        alt=""
-                                        className="h-full w-full object-contain"
-                                      />
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex h-5 w-5 shrink-0 rounded-sm bg-muted/40" />
-                                  )}
                                   <span className={cn("whitespace-nowrap font-mono tabular-nums", weight)}>
                                     {pick.runner?.no ?? "—"}
                                   </span>
