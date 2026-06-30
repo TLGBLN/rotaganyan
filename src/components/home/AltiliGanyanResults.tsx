@@ -24,23 +24,23 @@ export default function AltiliGanyanResults({ results }: Props) {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b bg-muted/40">
-                            <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">
+                            <th className="px-2 py-2 sm:px-4 sm:py-3 text-left font-medium text-muted-foreground whitespace-nowrap">
                               {group.title}
                             </th>
-                            <th className="px-4 py-3 text-left font-medium text-muted-foreground">At İsmi</th>
-                            <th className="px-4 py-3 text-right font-medium text-muted-foreground">Derece</th>
-                            <th className="px-4 py-3 text-right font-medium text-muted-foreground">Ganyan</th>
-                            <th className="px-4 py-3 text-right font-medium text-muted-foreground">AGF</th>
+                            <th className="px-2 py-2 sm:px-4 sm:py-3 text-left font-medium text-muted-foreground whitespace-nowrap">At İsmi</th>
+                            <th className="px-2 py-2 sm:px-4 sm:py-3 text-right font-medium text-muted-foreground whitespace-nowrap">Derece</th>
+                            <th className="px-2 py-2 sm:px-4 sm:py-3 text-right font-medium text-muted-foreground whitespace-nowrap">Ganyan</th>
+                            <th className="px-2 py-2 sm:px-4 sm:py-3 text-right font-medium text-muted-foreground whitespace-nowrap">AGF</th>
                           </tr>
                         </thead>
                         <tbody>
                           {group.rows.map((row) => (
                             <tr key={row.rank} className="border-b last:border-0">
-                              <td className="px-4 py-2.5 font-semibold">{row.rank}</td>
-                              <td className="px-4 py-2.5">{row.at || "—"}</td>
-                              <td className="px-4 py-2.5 text-right font-mono">{row.derece || "—"}</td>
-                              <td className="px-4 py-2.5 text-right font-mono text-brand">{row.ganyan || "—"}</td>
-                              <td className="px-4 py-2.5 text-right font-mono">{row.agf || "—"}</td>
+                              <td className="px-2 py-2 sm:px-4 sm:py-2.5 font-semibold whitespace-nowrap">{row.rank}</td>
+                              <td className="px-2 py-2 sm:px-4 sm:py-2.5 max-w-[100px] truncate">{row.at || "—"}</td>
+                              <td className="px-2 py-2 sm:px-4 sm:py-2.5 text-right font-mono whitespace-nowrap">{row.derece || "—"}</td>
+                              <td className="px-2 py-2 sm:px-4 sm:py-2.5 text-right font-mono text-brand whitespace-nowrap">{row.ganyan || "—"}</td>
+                              <td className="px-2 py-2 sm:px-4 sm:py-2.5 text-right font-mono whitespace-nowrap">{row.agf || "—"}</td>
                             </tr>
                           ))}
                         </tbody>
