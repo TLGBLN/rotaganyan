@@ -354,28 +354,28 @@ async function buildKuponOnerisi(active: {
   // yeşil göstermek, eşleşmeyeni (sonuç girilmiş ama kazanan seçilmemiş) "kaçtı" olarak işaretlemek için.
   // Aynı sorguda o ayağın analiz sırasını (Pick.rank) da çekiyoruz — kupondaki atlar sayı sırasına göre
   // değil, analizdeki tahmin sırasına göre dizilsin diye.
-  const hippodrome = await db.hippodrome.findUnique({ where: { name: baseName } });
   const resultByRaceNo = new Map<number, { winnerNo: number | null; resulted: boolean }>();
   const rankByRaceNo = new Map<number, Map<number, number>>();
-  if (hippodrome) {
-    const races = await db.race.findMany({
-      where: {
-        raceNo: { in: legs.map((l) => l.raceNo) },
-        raceDay: { hippodromeId: hippodrome.id, date: { gte: startOfDay(active.date), lte: endOfDay(active.date) } },
+  const races = await db.race.findMany({
+    where: {
+      raceNo: { in: legs.map((l) => l.raceNo) },
+      raceDay: {
+        date: { gte: startOfDay(active.date), lte: endOfDay(active.date) },
+        hippodrome: { name: baseName },
       },
-      include: {
-        result: { select: { winnerNo: true } },
-        prediction: { select: { picks: { select: { rank: true, runner: { select: { no: true } } } } } },
-      },
-    });
-    for (const r of races) {
-      resultByRaceNo.set(r.raceNo, { winnerNo: r.result?.winnerNo ?? null, resulted: r.result != null });
-      const rankByNo = new Map<number, number>();
-      for (const pick of r.prediction?.picks ?? []) {
-        if (pick.runner) rankByNo.set(pick.runner.no, pick.rank);
-      }
-      if (rankByNo.size > 0) rankByRaceNo.set(r.raceNo, rankByNo);
+    },
+    include: {
+      result: { select: { winnerNo: true } },
+      prediction: { select: { picks: { select: { rank: true, runner: { select: { no: true } } } } } },
+    },
+  });
+  for (const r of races) {
+    resultByRaceNo.set(r.raceNo, { winnerNo: r.result?.winnerNo ?? null, resulted: r.result != null });
+    const rankByNo = new Map<number, number>();
+    for (const pick of r.prediction?.picks ?? []) {
+      if (pick.runner) rankByNo.set(pick.runner.no, pick.rank);
     }
+    if (rankByNo.size > 0) rankByRaceNo.set(r.raceNo, rankByNo);
   }
 
   /** Atları sayı sırası yerine analizdeki tahmin sırasına (Pick.rank) göre dizer; analizde olmayanlar sona, kendi aralarında sayı sırasına göre eklenir. */
