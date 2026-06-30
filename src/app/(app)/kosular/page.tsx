@@ -150,13 +150,13 @@ export default async function KosularPage({ searchParams }: PageProps) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
-                      <th className="px-3 py-2">Koşu</th>
-                      <th className="px-3 py-2">Saat</th>
-                      <th className="px-3 py-2">Sınıf</th>
+                      <th className="px-2 sm:px-3 py-2">Koşu</th>
+                      <th className="px-2 sm:px-3 py-2">Saat</th>
+                      <th className="hidden sm:table-cell px-3 py-2">Sınıf</th>
                       <th className="hidden px-3 py-2 sm:table-cell">Irk</th>
                       <th className="hidden px-3 py-2 sm:table-cell">Pist</th>
                       <th className="hidden px-3 py-2 pr-10 text-right sm:table-cell">Mesafe</th>
-                      <th className="px-3 py-2">Analiz</th>
+                      <th className="px-2 sm:px-3 py-2">Analiz</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -244,13 +244,13 @@ export default async function KosularPage({ searchParams }: PageProps) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
-                      <th className="px-3 py-2">Koşu</th>
-                      <th className="px-3 py-2">Saat</th>
-                      <th className="px-3 py-2">Sınıf</th>
+                      <th className="px-2 sm:px-3 py-2">Koşu</th>
+                      <th className="px-2 sm:px-3 py-2">Saat</th>
+                      <th className="hidden sm:table-cell px-3 py-2">Sınıf</th>
                       <th className="hidden px-3 py-2 sm:table-cell">Irk</th>
                       <th className="hidden px-3 py-2 sm:table-cell">Pist</th>
                       <th className="hidden px-3 py-2 pr-10 text-right sm:table-cell">Mesafe</th>
-                      <th className="px-3 py-2">Analiz</th>
+                      <th className="px-2 sm:px-3 py-2">Analiz</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -265,14 +265,15 @@ export default async function KosularPage({ searchParams }: PageProps) {
                             i % 2 === 1 && "race-row-even"
                           )}
                         >
-                          <td className="px-3 py-2 font-semibold text-foreground">
-                            {race.raceNo}. Koşu
+                          <td className="px-2 sm:px-3 py-2 font-semibold text-foreground">
+                            <div>{race.raceNo}. Koşu</div>
+                            <div className="text-[10px] font-normal text-muted-foreground sm:hidden">{race.classType}</div>
                           </td>
-                          <td className="px-3 py-2 text-muted-foreground">
+                          <td className="px-2 sm:px-3 py-2 text-muted-foreground">
                             {race.time || "—"}
                             {race.time && <RaceCountdown date={currentDate} time={race.time} />}
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="hidden sm:table-cell px-3 py-2">
                             <Badge variant="secondary" className="text-xs">{race.classType}</Badge>
                           </td>
                           <td className="hidden px-3 py-2 text-xs text-muted-foreground sm:table-cell">{race.breed || "—"}</td>
@@ -282,7 +283,7 @@ export default async function KosularPage({ searchParams }: PageProps) {
                           <td className="hidden px-3 py-2 pr-10 text-right font-mono text-xs sm:table-cell">
                             {race.distance > 0 ? `${race.distance}m` : "—"}
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-2 sm:px-3 py-2">
                             {db?.published ? (
                               <div className="flex items-center gap-1.5">
                                 <span className="relative flex h-1.5 w-1.5">

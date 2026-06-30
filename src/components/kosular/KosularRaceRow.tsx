@@ -45,18 +45,21 @@ export default function KosularRaceRow({
           isEven && "race-row-even"
         )}
       >
-        <td className="px-3 py-2 font-semibold">{race.raceNo}. Koşu</td>
-        <td className="px-3 py-2 text-muted-foreground">
+        <td className="px-2 sm:px-3 py-2 font-semibold">
+          <div>{race.raceNo}. Koşu</div>
+          <div className="text-[10px] font-normal text-muted-foreground sm:hidden">{race.classType}</div>
+        </td>
+        <td className="px-2 sm:px-3 py-2 text-muted-foreground">
           {race.time ?? "—"}
           {race.time && <RaceCountdown date={currentDate} time={race.time} />}
         </td>
-        <td className="px-3 py-2">
+        <td className="hidden sm:table-cell px-3 py-2">
           <Badge variant="secondary" className="text-xs">{race.classType}</Badge>
         </td>
         <td className="hidden px-3 py-2 text-xs text-muted-foreground sm:table-cell">{breedLabel}</td>
         <td className={cn("hidden px-3 py-2 text-xs font-medium sm:table-cell", surfaceClassName)}>{surfaceLabel}</td>
         <td className="hidden px-3 py-2 pr-10 text-right font-mono text-xs sm:table-cell">{race.distance}m</td>
-        <td className="px-3 py-2">
+        <td className="px-2 sm:px-3 py-2">
           {hasAnalysis ? (
             <button
               type="button"
