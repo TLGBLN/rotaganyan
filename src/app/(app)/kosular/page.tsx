@@ -1,6 +1,7 @@
 import { format, parseISO, differenceInDays } from "date-fns";
 import { tr } from "date-fns/locale";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -90,7 +91,11 @@ export default async function KosularPage({ searchParams }: PageProps) {
   const visibleRaceDays = dbRaceDays.filter((rd) => rd.races.length > 0);
 
   const session = await auth();
-  const isLoggedIn = !!session?.user;
+  if (!session?.user) {
+    const callbackUrl = params.tarih ? `/kosular?tarih=${params.tarih}` : "/kosular";
+    redirect(`/giris?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+  }
+  const isLoggedIn = true;
 
   const comboByRaceDay = new Map<string, ComboLeg[]>();
   if (visibleRaceDays.length > 0) {
