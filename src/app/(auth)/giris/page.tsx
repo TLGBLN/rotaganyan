@@ -80,7 +80,10 @@ export default async function GirisPage({ searchParams }: Props) {
 
         <div className="text-center text-sm text-muted-foreground">
           Hesabınız yok mu?{" "}
-          <Link href="/kayit" className="text-brand hover:underline">
+          <Link
+            href={callbackUrl ? `/kayit?callbackUrl=${encodeURIComponent(callbackUrl)}` : "/kayit"}
+            className="text-brand hover:underline"
+          >
             Kayıt Ol
           </Link>
         </div>

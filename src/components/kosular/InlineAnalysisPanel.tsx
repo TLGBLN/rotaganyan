@@ -12,6 +12,7 @@ type Props = {
   picks: Picks;
   winnerNo: number | null | undefined;
   isLoggedIn: boolean;
+  racePath?: string;
 };
 
 function couponCategory(rank: number): { label: string; className: string } {
@@ -40,18 +41,24 @@ function splitLayerDetails(details: unknown) {
   return { a, b, c, gerekce: rest.join(" · ") || "—" };
 }
 
-export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn }: Props) {
+export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, racePath }: Props) {
   if (!isLoggedIn) {
+    const girisHref = racePath
+      ? `/giris?callbackUrl=${encodeURIComponent(racePath)}`
+      : "/giris";
+    const kayitHref = racePath
+      ? `/kayit?callbackUrl=${encodeURIComponent(racePath)}`
+      : "/kayit";
     return (
       <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
         <Lock className="h-5 w-5" />
         <p>Bu koşu için analiz mevcut. Görmek için giriş yapmalısınız.</p>
         <div className="flex gap-2">
           <Button asChild size="sm">
-            <Link href="/giris">Giriş Yap</Link>
+            <Link href={girisHref}>Giriş Yap</Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <Link href="/kayit">Kayıt Ol</Link>
+            <Link href={kayitHref}>Kayıt Ol</Link>
           </Button>
         </div>
       </div>

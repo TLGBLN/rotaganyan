@@ -5,7 +5,10 @@ import RegisterForm from "./RegisterForm";
 
 export const metadata: Metadata = { title: "Kayıt Ol" };
 
-export default function KayitPage() {
+type Props = { searchParams: Promise<{ callbackUrl?: string }> };
+
+export default async function KayitPage({ searchParams }: Props) {
+  const { callbackUrl } = await searchParams;
   return (
     <Card>
       <CardHeader>
@@ -13,10 +16,13 @@ export default function KayitPage() {
         <CardDescription>Ücretsiz hesabınızı oluşturun.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <RegisterForm />
+        <RegisterForm callbackUrl={callbackUrl} />
         <div className="text-center text-sm text-muted-foreground">
           Zaten hesabınız var mı?{" "}
-          <Link href="/giris" className="text-brand hover:underline">
+          <Link
+            href={callbackUrl ? `/giris?callbackUrl=${encodeURIComponent(callbackUrl)}` : "/giris"}
+            className="text-brand hover:underline"
+          >
             Giriş Yap
           </Link>
         </div>

@@ -174,6 +174,7 @@ export default async function KosularPage({ searchParams }: PageProps) {
                           confidenceColor={CONFIDENCE_COLOR}
                           isEven={i % 2 === 1}
                           isLoggedIn={isLoggedIn}
+                          racePath={`/kosular/${currentDate}/${raceDay.hippodrome.slug}/${race.raceNo}`}
                         />
                       );
                     })}

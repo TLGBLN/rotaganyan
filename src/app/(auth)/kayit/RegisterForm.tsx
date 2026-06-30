@@ -11,7 +11,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, CheckCircle2 } from "lucide-react";
 
-export default function RegisterForm() {
+export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const router = useRouter();
@@ -31,7 +31,10 @@ export default function RegisterForm() {
       setServerError(res.error);
     } else {
       setSuccess(true);
-      setTimeout(() => router.push("/giris"), 2000);
+      const dest = callbackUrl
+        ? `/giris?callbackUrl=${encodeURIComponent(callbackUrl)}`
+        : "/giris";
+      setTimeout(() => router.push(dest), 2000);
     }
   }
 

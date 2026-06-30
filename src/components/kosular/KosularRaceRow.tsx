@@ -20,6 +20,7 @@ type Props = {
   confidenceColor: Record<Confidence, string>;
   isEven: boolean;
   isLoggedIn: boolean;
+  racePath?: string;
 };
 
 export default function KosularRaceRow({
@@ -31,6 +32,7 @@ export default function KosularRaceRow({
   confidenceColor,
   isEven,
   isLoggedIn,
+  racePath,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const pred = race.prediction;
@@ -91,7 +93,7 @@ export default function KosularRaceRow({
       {expanded && hasAnalysis && (
         <tr className="border-b last:border-0">
           <td colSpan={7} className="bg-muted/20 p-3">
-            <InlineAnalysisPanel picks={pred!.picks} winnerNo={result?.winnerNo} isLoggedIn={isLoggedIn} />
+            <InlineAnalysisPanel picks={pred!.picks} winnerNo={result?.winnerNo} isLoggedIn={isLoggedIn} racePath={racePath} />
           </td>
         </tr>
       )}
