@@ -32,6 +32,9 @@ export default function GunlukProgramWidget({ raceDays, dateStr }: Props) {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold">Günün Koşu Programı</h2>
+            <p className="mt-1 text-sm text-muted-foreground/70 italic">
+              Analizleri görmek için bir koşu seçiniz.
+            </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {totalRaces} koşu · {analyzedRaces} analiz yayımlandı
             </p>
