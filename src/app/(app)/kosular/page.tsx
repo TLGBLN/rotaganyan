@@ -152,40 +152,25 @@ export default async function KosularPage({ searchParams }: PageProps) {
             return (
             <section key={raceDay.id}>
               <h2 className="mb-3 text-base font-semibold">{raceDay.hippodrome.name}</h2>
-              <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
-                      <th className="px-2 sm:px-3 py-2">Koşu</th>
-                      <th className="px-2 sm:px-3 py-2">Saat</th>
-                      <th className="hidden sm:table-cell px-3 py-2">Sınıf</th>
-                      <th className="hidden px-3 py-2 sm:table-cell">Irk</th>
-                      <th className="hidden px-3 py-2 sm:table-cell">Pist</th>
-                      <th className="hidden px-3 py-2 pr-10 text-right sm:table-cell">Mesafe</th>
-                      <th className="px-2 sm:px-3 py-2">Analiz</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {raceDay.races.map((race, i) => {
-                      const surfaceLabel = race.surface === "CIM" ? "Çim" : race.surface === "SENTETIK" ? "Sentetik" : "Kum";
-                      const breedLabel = BREED_LABEL[race.breed] ?? race.breed;
-                      return (
-                        <KosularRaceRow
-                          key={race.id}
-                          race={race}
-                          currentDate={currentDate}
-                          surfaceLabel={surfaceLabel}
-                          surfaceClassName={SURFACE_COLOR[surfaceLabel] ?? "text-muted-foreground"}
-                          breedLabel={breedLabel}
-                          confidenceColor={CONFIDENCE_COLOR}
-                          isEven={i % 2 === 1}
-                          isLoggedIn={isLoggedIn}
-                          racePath={`/kosular/${currentDate}/${raceDay.hippodrome.slug}/${race.raceNo}`}
-                        />
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="rounded-lg border">
+                {raceDay.races.map((race, i) => {
+                  const surfaceLabel = race.surface === "CIM" ? "Çim" : race.surface === "SENTETIK" ? "Sentetik" : "Kum";
+                  const breedLabel = BREED_LABEL[race.breed] ?? race.breed;
+                  return (
+                    <KosularRaceRow
+                      key={race.id}
+                      race={race}
+                      currentDate={currentDate}
+                      surfaceLabel={surfaceLabel}
+                      surfaceClassName={SURFACE_COLOR[surfaceLabel] ?? "text-muted-foreground"}
+                      breedLabel={breedLabel}
+                      confidenceColor={CONFIDENCE_COLOR}
+                      isEven={i % 2 === 1}
+                      isLoggedIn={isLoggedIn}
+                      racePath={`/kosular/${currentDate}/${raceDay.hippodrome.slug}/${race.raceNo}`}
+                    />
+                  );
+                })}
               </div>
 
 
@@ -252,79 +237,66 @@ export default async function KosularPage({ searchParams }: PageProps) {
           {tjkProgram.map((hipo) => (
             <section key={hipo.code}>
               <h2 className="mb-3 text-base font-semibold">{hipo.name}</h2>
-              <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
-                      <th className="px-2 sm:px-3 py-2">Koşu</th>
-                      <th className="px-2 sm:px-3 py-2">Saat</th>
-                      <th className="hidden sm:table-cell px-3 py-2">Sınıf</th>
-                      <th className="hidden px-3 py-2 sm:table-cell">Irk</th>
-                      <th className="hidden px-3 py-2 sm:table-cell">Pist</th>
-                      <th className="hidden px-3 py-2 pr-10 text-right sm:table-cell">Mesafe</th>
-                      <th className="px-2 sm:px-3 py-2">Analiz</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {hipo.races.map((race, i) => {
-                      const key = `${hipo.code.toLowerCase()}-${race.raceNo}`;
-                      const db = dbLookup.get(key);
-                      return (
-                        <tr
-                          key={race.raceNo}
-                          className={cn(
-                            "border-b last:border-0 transition-colors hover:bg-muted/30",
-                            i % 2 === 1 && "race-row-even"
-                          )}
-                        >
-                          <td className="px-2 sm:px-3 py-2 font-semibold text-foreground">
-                            <div>{race.raceNo}. Koşu</div>
-                            <div className="text-[10px] font-normal text-muted-foreground sm:hidden">{race.classType}</div>
-                          </td>
-                          <td className="px-2 sm:px-3 py-2 text-muted-foreground">
+              <div className="rounded-lg border">
+                {hipo.races.map((race, i) => {
+                  const key = `${hipo.code.toLowerCase()}-${race.raceNo}`;
+                  const db = dbLookup.get(key);
+                  const surfaceLabel = race.surface === "Çim" ? "Çim" : race.surface === "Sentetik" ? "Sentetik" : "Kum";
+                  return (
+                    <div
+                      key={race.raceNo}
+                      className={cn(
+                        "flex items-center justify-between gap-3 border-b px-3 py-3 last:border-0 transition-colors hover:bg-muted/30",
+                        i % 2 === 1 && "race-row-even"
+                      )}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="shrink-0 font-semibold text-sm">{race.raceNo}. Koşu</span>
+                          <span className="text-xs text-muted-foreground shrink-0">
                             {race.time || "—"}
                             {race.time && <RaceCountdown date={currentDate} time={race.time} />}
-                          </td>
-                          <td className="hidden sm:table-cell px-3 py-2">
-                            <Badge variant="secondary" className="text-xs">{race.classType}</Badge>
-                          </td>
-                          <td className="hidden px-3 py-2 text-xs text-muted-foreground sm:table-cell">{race.breed || "—"}</td>
-                          <td className={cn("hidden px-3 py-2 text-xs font-medium sm:table-cell", SURFACE_COLOR[race.surface] ?? "text-muted-foreground")}>
-                            {race.surface || "—"}
-                          </td>
-                          <td className="hidden px-3 py-2 pr-10 text-right font-mono text-xs sm:table-cell">
-                            {race.distance > 0 ? `${race.distance}m` : "—"}
-                          </td>
-                          <td className="px-2 sm:px-3 py-2">
-                            {db?.published ? (
-                              <div className="flex items-center gap-1.5">
-                                <span className="relative flex h-1.5 w-1.5">
-                                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-hit opacity-75" />
-                                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-hit" />
-                                </span>
-                                <Badge
-                                  variant="outline"
-                                  className={cn(
-                                    "text-xs",
-                                    db.isBanko
-                                      ? db.confidence ? CONFIDENCE_COLOR[db.confidence] : ""
-                                      : "border-[#007123] text-[#007123]"
-                                  )}
-                                >
-                                  {db.isBanko ? "★ Banko" : "Analiz Var"}
-                                </Badge>
-                              </div>
-                            ) : (
-                              <Badge variant="outline" className="text-xs border-miss text-miss">
-                                Henüz Analiz Yok
-                              </Badge>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                          </span>
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+                          <span>{race.classType}</span>
+                          <span className="hidden sm:inline">· {race.breed || "—"}</span>
+                          <span className={cn("hidden sm:inline font-medium", SURFACE_COLOR[surfaceLabel] ?? "")}>
+                            · {surfaceLabel}
+                          </span>
+                          <span className="hidden sm:inline">
+                            · {race.distance > 0 ? `${race.distance}m` : "—"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        {db?.published ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="relative flex h-1.5 w-1.5">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-hit opacity-75" />
+                              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-hit" />
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-xs",
+                                db.isBanko
+                                  ? db.confidence ? CONFIDENCE_COLOR[db.confidence] : ""
+                                  : "border-[#007123] text-[#007123]"
+                              )}
+                            >
+                              {db.isBanko ? "★ Banko" : "Analiz Var"}
+                            </Badge>
+                          </div>
+                        ) : (
+                          <Badge variant="outline" className="text-xs border-miss text-miss">
+                            Henüz Analiz Yok
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           ))}
