@@ -147,6 +147,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                       const pick = race.prediction!.picks[rowIdx];
                       const isBanko = race.prediction!.isBanko && pick?.rank === 1;
                       const isTarget = pick?.isTarget;
+                      const isWinner = race.result?.winnerNo != null && pick?.runner?.no === race.result.winnerNo;
                       const colBg = ri % 2 === 1 ? "bg-muted/5" : "";
 
                       if (!pick) {
@@ -204,6 +205,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                               <span className={cn("whitespace-nowrap", weight)}>
                                 {pick.runner?.name ?? pick.runnerLabel ?? "—"}
                               </span>
+                              {isWinner && <span className="ml-0.5">🏆</span>}
                             </div>
                           </td>
 
