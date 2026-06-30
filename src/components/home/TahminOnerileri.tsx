@@ -24,12 +24,21 @@ function findIkramiye(hippodromeName: string, altiliResults: AltiliCityResult[])
   return group?.ikramiye ?? null;
 }
 
+const GRID_COLS: Record<number, string> = {
+  1: "sm:grid-cols-1",
+  2: "sm:grid-cols-2",
+  3: "sm:grid-cols-3",
+};
+
 function KuponBlock({ data, ikramiye }: { data: Kupon; ikramiye: string | null }) {
+  const visibleVariants = data.variants.filter((v) => v.status !== "miss");
+  if (visibleVariants.length === 0) return null;
+
   return (
     <div>
       <div className="mb-3 text-sm font-medium text-muted-foreground">{data.hippodromeName}</div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        {data.variants.map((variant) => (
+      <div className={cn("grid gap-4", GRID_COLS[visibleVariants.length] ?? "sm:grid-cols-3")}>
+        {visibleVariants.map((variant) => (
           <div key={variant.key} className="flex flex-col overflow-hidden rounded-lg border bg-card">
             <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-2.5">
               <span className="text-sm font-semibold">{variant.label}</span>
@@ -96,7 +105,8 @@ type Props = { data: KuponOnerisi[]; altiliResults?: AltiliCityResult[] };
 
 export default function TahminOnerileri({ data, altiliResults = [] }: Props) {
   const items = data.filter((k): k is Kupon => k !== null);
-  if (items.length === 0) return null;
+  const hasVisible = items.some((k) => k.variants.some((v) => v.status !== "miss"));
+  if (items.length === 0 || !hasVisible) return null;
 
   return (
     <section className="border-t px-4 py-10">
