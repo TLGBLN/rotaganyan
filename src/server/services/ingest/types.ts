@@ -13,7 +13,6 @@ export type IngestRunner = {
   weightChange?: number;
   equipment?: string;
   agf?: number;
-  formaUrl?: string;
   recentForm?: string;
 };
 

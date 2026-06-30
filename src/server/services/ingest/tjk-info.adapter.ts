@@ -208,15 +208,11 @@ export async function fetchCityProgram(
       const agfMatch = agfRaw.match(/([\d]+[.,]?[\d]*)/);
       const agf = agfMatch ? parseFloat(agfMatch[1].replace(",", ".")) || undefined : undefined;
 
-      // Forma (jokey forması) görseli — medya-cdn.tjk.org üzerinde barınan jpg
-      const formaHref = $(".gunluk-GunlukYarisProgrami-FormaKodu a", row).attr("href");
-      const formaUrl = formaHref ? formaHref.replace(/^\/\//, "https://") : undefined;
-
       // Son 6 yarış derecesi — "64450" formatında, her hane bir koşu pozisyonu (0=koşmadı)
       const son6Raw = $(".gunluk-GunlukYarisProgrami-Son6Yaris", row).text().trim();
       const recentForm = son6Raw || undefined;
 
-      runners.push({ no, name, startNo, weight, jockey, trainer, sire, dam, damSire, agf, formaUrl, recentForm });
+      runners.push({ no, name, startNo, weight, jockey, trainer, sire, dam, damSire, agf, recentForm });
     });
 
     if (runners.length > 0) {
