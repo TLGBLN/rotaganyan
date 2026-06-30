@@ -73,8 +73,8 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
               </span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="text-xs">
+            <div>
+              <table className="w-full text-xs">
                 <thead>
                   {/* Koşu başlıkları */}
                   <tr className="border-b bg-muted/20">
@@ -111,7 +111,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                           key={`${race.id}-ni`}
                           colSpan={2}
                           className={cn(
-                            "whitespace-nowrap px-2 py-1.5 text-left text-[10px] font-medium text-muted-foreground",
+                            "px-2 py-1.5 text-left text-[10px] font-medium text-muted-foreground",
                             ri % 2 === 1 && "bg-muted/10"
                           )}
                         >
@@ -167,7 +167,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                             <td
                               key={`${race.id}-${rowIdx}-ni`}
                               colSpan={2}
-                              className={cn("whitespace-nowrap px-2 py-1.5", rowBg, textColor)}
+                              className={cn("px-2 py-1.5", rowBg, textColor)}
                             >
                               <div className="flex items-start gap-1.5">
                                 <span className="flex shrink-0 items-center gap-1">
@@ -183,11 +183,11 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                                   ) : (
                                     <span className="inline-flex h-5 w-5 shrink-0 rounded-sm bg-muted/40" />
                                   )}
-                                  <span className={cn("font-mono tabular-nums", weight)}>
+                                  <span className={cn("whitespace-nowrap font-mono tabular-nums", weight)}>
                                     {pick.runner?.no ?? "—"}
                                   </span>
                                 </span>
-                                <span className={cn("whitespace-nowrap leading-snug", weight)}>
+                                <span className={cn("leading-snug", weight)}>
                                   {pick.runner?.name ?? pick.runnerLabel ?? "—"}
                                   {isWinner && <span className="ml-0.5">🏆</span>}
                                 </span>
