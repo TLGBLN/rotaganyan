@@ -66,12 +66,26 @@ export async function persistRaceDays(raceDays: IngestRaceDay[]): Promise<Ingest
           ? (await db.race.update({ where: { id: existing.id }, data: raceData }), updated++, existing)
           : (inserted++, await db.race.create({ data: raceData }));
 
-        // Upsert runners
+        // Upsert runners — detect jockey changes between ingests
         for (const runner of r.runners) {
+          const existing = await db.runner.findUnique({
+            where: { raceId_no: { raceId: race.id, no: runner.no } },
+            select: { jockey: true },
+          });
+
+          const jockeyChanged =
+            existing?.jockey != null &&
+            runner.jockey != null &&
+            existing.jockey !== runner.jockey;
+
           await db.runner.upsert({
             where: { raceId_no: { raceId: race.id, no: runner.no } },
             create: { raceId: race.id, ...runner },
-            update: runner,
+            update: {
+              ...runner,
+              jockeyChanged,
+              previousJockey: jockeyChanged ? existing!.jockey : undefined,
+            },
           });
         }
 

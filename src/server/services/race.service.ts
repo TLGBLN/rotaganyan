@@ -20,7 +20,7 @@ export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
             couponWide: true;
             picks: {
               orderBy: { rank: "asc" };
-              include: { runner: { select: { name: true; no: true; formaUrl: true } } };
+              include: { runner: { select: { name: true; no: true; formaUrl: true; jockeyChanged: true; previousJockey: true } } };
             };
           };
         };
@@ -40,7 +40,7 @@ export type RaceDetail = Prisma.RaceGetPayload<{
     prediction: {
       include: {
         picks: {
-          include: { runner: { select: { name: true; no: true; pedigreeUrl: true; formaUrl: true } } };
+          include: { runner: { select: { name: true; no: true; pedigreeUrl: true; formaUrl: true; jockeyChanged: true; previousJockey: true } } };
           orderBy: { rank: "asc" };
         };
         author: { select: { name: true } };
@@ -95,7 +95,7 @@ export async function getRaceDaysByDate(
               couponWide: true,
               picks: {
                 orderBy: { rank: "asc" },
-                include: { runner: { select: { name: true, no: true, formaUrl: true } } },
+                include: { runner: { select: { name: true, no: true, formaUrl: true, jockeyChanged: true, previousJockey: true } } },
               },
             },
           },
@@ -153,7 +153,7 @@ export async function getRaceDetail(
       prediction: {
         include: {
           picks: {
-            include: { runner: { select: { name: true, no: true, pedigreeUrl: true, formaUrl: true } } },
+            include: { runner: { select: { name: true, no: true, pedigreeUrl: true, formaUrl: true, jockeyChanged: true, previousJockey: true } } },
             orderBy: { rank: "asc" },
           },
           author: { select: { name: true } },

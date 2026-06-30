@@ -110,6 +110,11 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn }: Pro
                       </span>
                       {isWinner && <span className="ml-1">🏆</span>}
                       {pick.isTarget && <TargetBadge className="ml-1.5" />}
+                      {pick.runner?.jockeyChanged && pick.runner.previousJockey && (
+                        <span title={`Jokey değişti → önceki: ${pick.runner.previousJockey}`} className="rounded bg-orange-100 px-1 text-[10px] font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                          ÖJ
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">{a}</td>

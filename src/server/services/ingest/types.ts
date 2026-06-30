@@ -14,6 +14,7 @@ export type IngestRunner = {
   equipment?: string;
   agf?: number;
   formaUrl?: string;
+  recentForm?: string;
 };
 
 export type IngestGallop = {

@@ -194,6 +194,9 @@ model Runner {
   agf              Float?
   raceStyle        Json?
   formaUrl         String?
+  recentForm       String?
+  jockeyChanged    Boolean @default(false)
+  previousJockey   String?
 
   race         Race          @relation(fields: [raceId], references: [id], onDelete: Cascade)
   gallops      Gallop[]

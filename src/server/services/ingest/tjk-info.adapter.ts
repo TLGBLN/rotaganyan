@@ -198,6 +198,10 @@ export async function fetchCityProgram(
       const dam = babaLinks[1] ? $(babaLinks[1]).text().trim() || undefined : undefined;
       const damSire = babaLinks[2] ? $(babaLinks[2]).text().trim() || undefined : undefined;
 
+      // Start stall number
+      const startNoRaw = $(".gunluk-GunlukYarisProgrami-StartId", row).text().trim();
+      const startNo = parseInt(startNoRaw, 10) || undefined;
+
       // AGF — title attr has the precise value, e.g. title="%17,09(2)"
       const agfEl = $(".gunluk-GunlukYarisProgrami-AGFORAN a", row).first();
       const agfRaw = (agfEl.attr("title") || agfEl.text()).trim();
@@ -208,7 +212,11 @@ export async function fetchCityProgram(
       const formaHref = $(".gunluk-GunlukYarisProgrami-FormaKodu a", row).attr("href");
       const formaUrl = formaHref ? formaHref.replace(/^\/\//, "https://") : undefined;
 
-      runners.push({ no, name, weight, jockey, trainer, sire, dam, damSire, agf, formaUrl });
+      // Son 6 yarış derecesi — "64450" formatında, her hane bir koşu pozisyonu (0=koşmadı)
+      const son6Raw = $(".gunluk-GunlukYarisProgrami-Son6Yaris", row).text().trim();
+      const recentForm = son6Raw || undefined;
+
+      runners.push({ no, name, startNo, weight, jockey, trainer, sire, dam, damSire, agf, formaUrl, recentForm });
     });
 
     if (runners.length > 0) {

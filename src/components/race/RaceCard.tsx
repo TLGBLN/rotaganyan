@@ -11,6 +11,29 @@ type Props = {
   isLoggedIn: boolean;
 };
 
+function RecentFormBadges({ form }: { form?: string | null }) {
+  if (!form) return <span className="text-muted-foreground">—</span>;
+  const digits = form.replace(/\D/g, "").split("");
+  return (
+    <div className="flex justify-center gap-0.5">
+      {digits.map((d, i) => {
+        const pos = parseInt(d, 10);
+        const color =
+          pos === 0 ? "bg-muted text-muted-foreground" :
+          pos === 1 ? "bg-hit text-white" :
+          pos === 2 ? "bg-hit/70 text-white" :
+          pos === 3 ? "bg-brand/60 text-white" :
+          "bg-muted-foreground/40 text-foreground";
+        return (
+          <span key={i} className={cn("inline-flex h-4 w-4 items-center justify-center rounded-sm text-[10px] font-bold", color)}>
+            {pos === 0 ? "—" : d}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 function couponCategory(rank: number): { label: string; className: string } {
   if (rank <= 3) return { label: "Ekonomik", className: "border-hit text-hit" };
   if (rank <= 6) return { label: "Normal", className: "border-brand text-brand" };
@@ -119,6 +142,11 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                         </span>
                         {isWinner && <span className="ml-1">🏆</span>}
                         {pick.isTarget && <TargetBadge className="ml-1.5" />}
+                        {pick.runner?.jockeyChanged && pick.runner.previousJockey && (
+                          <span title={`Jokey değişti → önceki: ${pick.runner.previousJockey}`} className="rounded bg-orange-100 px-1 text-[10px] font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                            ÖJ
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">{a}</td>
@@ -140,12 +168,14 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
             <thead>
               <tr className="border-b bg-muted/40">
                 <th className="px-2 py-2 text-left font-medium text-muted-foreground">No</th>
+                <th className="hidden px-2 py-2 text-left font-medium text-muted-foreground sm:table-cell">St</th>
                 <th className="px-2 py-2 text-left font-medium text-muted-foreground">At</th>
                 <th className="px-2 py-2 text-left font-medium text-muted-foreground">Jokey</th>
                 <th className="hidden px-2 py-2 text-left font-medium text-muted-foreground sm:table-cell">Antrenör</th>
                 <th className="hidden px-2 py-2 text-right font-medium text-muted-foreground sm:table-cell">KG</th>
+                <th className="hidden px-2 py-2 text-center font-medium text-muted-foreground md:table-cell">Son 6 Y.</th>
                 <th className="px-2 py-2 text-right font-medium text-muted-foreground">AGF</th>
-                <th className="hidden px-2 py-2 text-left font-medium text-muted-foreground md:table-cell">Takı</th>
+                <th className="hidden px-2 py-2 text-left font-medium text-muted-foreground lg:table-cell">Takı</th>
               </tr>
             </thead>
             <tbody>
@@ -158,6 +188,7 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                   )}
                 >
                   <td className="px-2 py-2 font-mono font-semibold">{runner.no}</td>
+                  <td className="hidden px-2 py-2 font-mono text-muted-foreground sm:table-cell">{runner.startNo ?? "—"}</td>
                   <td className="px-2 py-2">
                     <div className="flex items-center gap-1">
                       {runner.formaUrl && (
@@ -180,7 +211,16 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                       </div>
                     )}
                   </td>
-                  <td className="px-2 py-2">{runner.jockey ?? "—"}</td>
+                  <td className="px-2 py-2">
+                    <div className="flex items-center gap-1">
+                      <span>{runner.jockey ?? "—"}</span>
+                      {runner.jockeyChanged && runner.previousJockey && (
+                        <span title={`Önceki jokey: ${runner.previousJockey}`} className="rounded bg-orange-100 px-1 text-[10px] font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                          ÖJ
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="hidden px-2 py-2 text-muted-foreground sm:table-cell">{runner.trainer ?? "—"}</td>
                   <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">
                     {runner.weight ?? "—"}
@@ -196,10 +236,13 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                       </span>
                     )}
                   </td>
+                  <td className="hidden px-2 py-2 text-center md:table-cell">
+                    <RecentFormBadges form={runner.recentForm} />
+                  </td>
                   <td className="px-2 py-2 text-right font-mono">
                     {runner.agf != null ? `%${runner.agf.toFixed(1)}` : "—"}
                   </td>
-                  <td className="hidden px-2 py-2 text-muted-foreground md:table-cell">
+                  <td className="hidden px-2 py-2 text-muted-foreground lg:table-cell">
                     <div>
                       {runner.equipment ?? "—"}
                       {runner.equipmentAdded && (
