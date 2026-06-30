@@ -175,11 +175,11 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                           {/* At No + Forma */}
                           <td
                             key={`${race.id}-${rowIdx}-no`}
-                            className={cn("px-1 py-1 text-center", rowBg)}
+                            className={cn("whitespace-nowrap px-2 py-1.5", rowBg)}
                           >
-                            <div className="flex flex-col items-center gap-0.5">
-                              {pick.runner?.formaUrl && (
-                                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-white p-0.5 ring-1 ring-border">
+                            <div className="flex items-center gap-1.5">
+                              {pick.runner?.formaUrl ? (
+                                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-white p-0.5 ring-1 ring-border/50">
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img
                                     src={pick.runner.formaUrl}
@@ -187,6 +187,8 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                                     className="h-full w-full object-contain"
                                   />
                                 </span>
+                              ) : (
+                                <span className="inline-flex h-5 w-5 shrink-0 rounded-sm bg-muted/40" />
                               )}
                               <span className="font-mono font-bold">{pick.runner?.no ?? "—"}</span>
                             </div>
@@ -195,9 +197,11 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                           {/* İsim */}
                           <td
                             key={`${race.id}-${rowIdx}-isim`}
-                            className={cn("max-w-[90px] truncate px-1 py-1.5 font-medium", rowBg)}
+                            className={cn("px-1 py-1.5 font-medium", rowBg)}
                           >
-                            {pick.runner?.name ?? pick.runnerLabel ?? "—"}
+                            <span className="block max-w-[100px] truncate">
+                              {pick.runner?.name ?? pick.runnerLabel ?? "—"}
+                            </span>
                           </td>
 
                           {/* Puan */}
