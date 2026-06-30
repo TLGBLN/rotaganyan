@@ -10,13 +10,15 @@ import { getAgfMovers } from "@/server/services/agf-trend.service";
 import { fetchTjkTicker } from "@/lib/tjk-ticker";
 import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
 import { turkeyDateString } from "@/lib/tz";
+import { auth } from "@/lib/auth";
 import SteamWidget from "@/components/kosular/SteamWidget";
 import GunlukProgramWidget from "@/components/home/GunlukProgramWidget";
 export const revalidate = 60;
 
 export default async function HomePage() {
   const today = turkeyDateString();
-  const [hitPredictions, kuponOnerisi, tickerItems, altiliResults, agfMovers, raceDays] = await Promise.all([
+  const [session, hitPredictions, kuponOnerisi, tickerItems, altiliResults, agfMovers, raceDays] = await Promise.all([
+    auth(),
     getHitPredictions(16),
     getKuponOnerileri(),
     fetchTjkTicker(),
@@ -24,6 +26,7 @@ export default async function HomePage() {
     getAgfMovers(today),
     getRaceDaysByDate(today),
   ]);
+  const isLoggedIn = !!session?.user;
 
   return (
     <main className="flex min-h-screen flex-col">
@@ -36,7 +39,7 @@ export default async function HomePage() {
       </div>
 
       {/* Günün Koşu Programı özet paneli */}
-      <GunlukProgramWidget raceDays={raceDays} dateStr={today} />
+      <GunlukProgramWidget raceDays={raceDays} dateStr={today} isLoggedIn={isLoggedIn} />
 
       {/* İsabet sağlayan tahminler — otomatik kayan slider */}
       {hitPredictions.length > 0 && (

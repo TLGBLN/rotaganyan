@@ -6,6 +6,7 @@ import type { ProgramRaceDay } from "@/server/services/race.service";
 type Props = {
   raceDays: ProgramRaceDay[];
   dateStr: string;
+  isLoggedIn: boolean;
 };
 
 function SurfaceDot({ surface }: { surface: string }) {
@@ -16,7 +17,7 @@ function SurfaceDot({ surface }: { surface: string }) {
   return <span className={cn("inline-block h-2 w-2 rounded-full shrink-0", cls)} />;
 }
 
-export default function GunlukProgramWidget({ raceDays, dateStr }: Props) {
+export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: Props) {
   if (raceDays.length === 0) return null;
 
   const totalRaces = raceDays.reduce((s, rd) => s + rd.races.length, 0);
@@ -32,9 +33,19 @@ export default function GunlukProgramWidget({ raceDays, dateStr }: Props) {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold">Günün Koşu Programı</h2>
-            <p className="mt-1 text-sm text-muted-foreground/70 italic">
-              Analizleri görmek için bir koşu seçiniz.
-            </p>
+            {isLoggedIn ? (
+              <p className="mt-1 text-sm text-muted-foreground/70 italic">
+                Analizleri görmek için bir koşu seçiniz.
+              </p>
+            ) : (
+              <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground/70 italic">
+                Analizleri görmek için{" "}
+                <Link href="/kayit" className="not-italic font-medium text-brand hover:underline">
+                  üye olunuz
+                </Link>
+                .
+              </p>
+            )}
             <p className="mt-0.5 text-xs text-muted-foreground">
               {totalRaces} koşu · {analyzedRaces} analiz yayımlandı
             </p>
@@ -77,11 +88,16 @@ export default function GunlukProgramWidget({ raceDays, dateStr }: Props) {
                     const hasAnalysis = !!race.prediction?.published;
                     const isBanko = race.prediction?.isBanko;
                     const isResulted = !!race.result;
+                    const racePath = `/kosular/${dateStr}/${hipSlug}/${race.raceNo}`;
+                    const href =
+                      hasAnalysis && !isLoggedIn
+                        ? `/giris?callbackUrl=${encodeURIComponent(racePath)}`
+                        : racePath;
 
                     return (
                       <Link
                         key={race.id}
-                        href={`/kosular/${dateStr}/${hipSlug}/${race.raceNo}`}
+                        href={href}
                         className="flex items-center gap-3 px-4 py-2.5 text-xs transition-colors hover:bg-muted/40"
                       >
                         {/* Race no */}
