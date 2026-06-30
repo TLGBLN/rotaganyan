@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { startOfDay, endOfDay, subDays } from "date-fns";
 import { turkeyDateString } from "@/lib/tz";
 import type { Prisma, Confidence } from "@prisma/client";
+import { syncResultsForDate } from "./result-sync";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -433,6 +434,10 @@ export async function getKuponOnerileri(): Promise<KuponOnerisi[]> {
   // Günün kuponu sadece o gün için geçerlidir — gün bitince admin elle kaldırmasa da otomatik kalkar.
   const today = turkeyDateString();
   const validActives = actives.filter((a) => a.date.toISOString().slice(0, 10) === today);
+
+  if (validActives.length > 0) {
+    await syncResultsForDate(today);
+  }
 
   const results = await Promise.all(validActives.map((a) => buildKuponOnerisi(a)));
   return results.filter((r): r is NonNullable<typeof r> => r !== null);

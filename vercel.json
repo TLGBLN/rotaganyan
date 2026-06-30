@@ -30,7 +30,7 @@
     },
     {
       "path": "/api/cron/result-sync",
-      "schedule": "*/5 8-16 * * *"
+      "schedule": "0 16 * * *"
     }
   ]
 }
