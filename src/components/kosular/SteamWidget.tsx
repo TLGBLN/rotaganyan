@@ -91,8 +91,10 @@ export default function SteamWidget({ movers, dateStr }: { movers: AgfMovers; da
 
   return (
     <div className="space-y-3">
-      <MoverCard title="AGF Yükselen" items={movers.risers} dateStr={dateStr} rising />
-      <MoverCard title="AGF Düşen" items={movers.fallers} dateStr={dateStr} rising={false} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <MoverCard title="AGF Yükselen" items={movers.risers} dateStr={dateStr} rising />
+        <MoverCard title="AGF Düşen" items={movers.fallers} dateStr={dateStr} rising={false} />
+      </div>
       <p className="px-1 text-[11px] text-muted-foreground">
         Günün ilk ve son AGF senkronizasyonu arasındaki değişim — yükseliş favoriye giren parayı, düşüş soğumayı
         işaret eder.
