@@ -157,8 +157,8 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                           );
                         }
 
-                        const rowBg = isBanko ? "bg-brand" : isTarget ? "bg-hit/15" : colBg;
-                        const textColor = isBanko ? "text-white" : rankColor(pick.rank);
+                        const rowBg = isBanko ? "bg-brand" : isWinner ? "bg-amber-400/25" : isTarget ? "bg-hit/15" : colBg;
+                        const textColor = isBanko ? "text-white" : isWinner ? "text-amber-600 dark:text-amber-400" : rankColor(pick.rank);
                         const weight = rankWeight(pick.rank);
 
                         return (
@@ -177,7 +177,6 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                                 </span>
                                 <span className={cn("leading-snug", weight)}>
                                   {pick.runner?.name ?? pick.runnerLabel ?? "—"}
-                                  {isWinner && <span className="ml-0.5">🏆</span>}
                                 </span>
                               </div>
                             </td>
