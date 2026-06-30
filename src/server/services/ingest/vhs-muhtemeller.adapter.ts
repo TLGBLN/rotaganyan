@@ -69,6 +69,88 @@ export type RunnerSnapshot = {
   running: boolean;
 };
 
+function toSlug(name: string): string {
+  return name
+    .replace(/Ğ/g, "G").replace(/ğ/g, "g")
+    .replace(/Ü/g, "U").replace(/ü/g, "u")
+    .replace(/Ş/g, "S").replace(/ş/g, "s")
+    .replace(/İ/g, "I").replace(/ı/g, "i")
+    .replace(/Ö/g, "O").replace(/ö/g, "o")
+    .replace(/Ç/g, "C").replace(/ç/g, "c")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+type DayFile = {
+  success: boolean;
+  data?: {
+    yarislar?: {
+      KEY: string;
+      YER: string;
+      atlar: Record<string, Record<string, string>>;
+    }[];
+  };
+};
+
+/**
+ * Tamamen vhs.ebayi.org CDN'inden çeker — DB'ye gerek yok.
+ * checksum → day file (at isimleri) → paralel koşu dosyaları → flat RunnerSnapshot listesi.
+ */
+export async function fetchAllDayMuhtemellerFromCdn(dateStr: string): Promise<RunnerSnapshot[]> {
+  const path = toTjkPathDate(dateStr);
+  const checksum = await fetchJson<ChecksumResponse>(`${ORIGIN}/${path}/checksum.json`);
+  if (!checksum?.runs || !checksum.day) return [];
+
+  const dayFile = await fetchJson<DayFile>(`${CDN}/${path}/day-${checksum.day}.json`);
+  const yarislar = dayFile?.data?.yarislar ?? [];
+
+  // KEY → { name, slug, atlar } map
+  const hipMap = new Map(
+    yarislar.map((y) => [y.KEY, { name: y.YER, slug: toSlug(y.YER), atlar: y.atlar }])
+  );
+
+  type Job = { key: string; raceNo: number; pair: [string, string]; hippodromeName: string; hippodromeSlug: string; atlar: Record<string, Record<string, string>> };
+  const jobs: Job[] = [];
+
+  for (const [runKey, pair] of Object.entries(checksum.runs)) {
+    const dash = runKey.lastIndexOf("-");
+    const key = runKey.slice(0, dash);
+    const raceNo = parseInt(runKey.slice(dash + 1), 10);
+    if (isNaN(raceNo)) continue;
+    const hip = hipMap.get(key);
+    if (!hip) continue;
+    jobs.push({ key, raceNo, pair: pair as [string, string], hippodromeName: hip.name, hippodromeSlug: hip.slug, atlar: hip.atlar });
+  }
+
+  const results = await Promise.all(
+    jobs.map(async (job) => {
+      for (const hash of job.pair) {
+        const url = `${CDN}/${path}/${job.key}-${job.raceNo}-${hash}.json`;
+        const json = await fetchJson<{ success: boolean; data?: { muhtemeller?: { bahisler?: { B: string; isGanyan?: boolean; muhtemeller: { S1: string; G?: string; K?: boolean }[] }[] } } }>(url);
+        const m = json?.data?.muhtemeller;
+        if (!m) continue;
+        const ganyan = m.bahisler?.find((b) => b.isGanyan || b.B === "GANYAN");
+        if (!ganyan) continue;
+        return ganyan.muhtemeller
+          .map((o): RunnerSnapshot => ({
+            hippodromeName: job.hippodromeName,
+            hippodromeSlug: job.hippodromeSlug,
+            raceNo: job.raceNo,
+            no: Number(o.S1),
+            name: job.atlar[String(job.raceNo)]?.[o.S1] ?? `#${o.S1}`,
+            ganyan: o.K ? null : (o.G ?? null),
+            running: !o.K,
+          }))
+          .filter((s) => s.running && s.ganyan !== null);
+      }
+      return [] as RunnerSnapshot[];
+    })
+  );
+
+  return results.flat();
+}
+
 type HippodromeInput = { name: string; slug: string; races: { raceNo: number; runners: { no: number; name: string }[] }[] };
 
 /** Günün tüm koşularını tek checksum çekişiyle, paralel olarak alır. Hipodrom+koşu+at bazında flat liste döner. */

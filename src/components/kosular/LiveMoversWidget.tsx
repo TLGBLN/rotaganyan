@@ -14,55 +14,22 @@ type Runner = {
   running: boolean;
 };
 
-type Row = Runner & { delta: number | null; prev: string | null; history: number[] };
+type Row = Runner & { delta: number | null; prev: string | null };
 
 const POLL_MS = 30_000;
 const TOP = 20;
-const MAX_HISTORY = 10;
 
 function runnerKey(r: { hippodromeSlug: string; raceNo: number; no: number }) {
   return `${r.hippodromeSlug}-${r.raceNo}-${r.no}`;
-}
-
-function Sparkline({ values }: { values: number[] }) {
-  if (values.length < 2) return <div className="w-14 shrink-0" />;
-  const W = 56;
-  const H = 24;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 0.1;
-  const pts = values
-    .map((v, i) => {
-      const x = (i / (values.length - 1)) * W;
-      const y = H - ((v - min) / range) * (H - 2) - 1;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-  const falling = values[values.length - 1] < values[0];
-  const color = falling ? "#22c55e" : values[values.length - 1] > values[0] ? "#ef4444" : "#94a3b8";
-  return (
-    <svg width={W} height={H} className="shrink-0 overflow-visible">
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={(values.length - 1) / (values.length - 1) * W} cy={H - ((values[values.length - 1] - min) / range) * (H - 2) - 1} r="2" fill={color} />
-    </svg>
-  );
 }
 
 export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const baselineRef = useRef<Map<string, string> | null>(null);
-  const historyRef = useRef<Map<string, number[]>>(new Map());
 
   useEffect(() => {
     let stopped = false;
-
-    function pushHistory(key: string, value: number) {
-      const h = historyRef.current.get(key) ?? [];
-      h.push(value);
-      if (h.length > MAX_HISTORY) h.shift();
-      historyRef.current.set(key, h);
-    }
 
     async function poll() {
       try {
@@ -72,18 +39,13 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
 
         const current: Runner[] = json.data ?? [];
 
-        // Her poll'da geçmiş kaydını güncelle
-        for (const r of current) {
-          if (r.ganyan) pushHistory(runnerKey(r), parseFloat(r.ganyan));
-        }
-
         if (!baselineRef.current) {
           baselineRef.current = new Map(current.map((r) => [runnerKey(r), r.ganyan ?? ""]));
           const initial: Row[] = current
             .filter((r) => r.ganyan !== null)
             .sort((a, b) => parseFloat(a.ganyan!) - parseFloat(b.ganyan!))
             .slice(0, TOP)
-            .map((r) => ({ ...r, delta: null, prev: null, history: historyRef.current.get(runnerKey(r)) ?? [] }));
+            .map((r) => ({ ...r, delta: null, prev: null }));
           setRows(initial);
           setLoading(false);
           return;
@@ -93,16 +55,10 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
         const next: Row[] = current
           .filter((r) => r.ganyan !== null)
           .map((r) => {
-            const k = runnerKey(r);
-            const prevVal = base.get(k);
+            const prevVal = base.get(runnerKey(r));
             const rawDelta = prevVal ? Math.round((parseFloat(r.ganyan!) - parseFloat(prevVal)) * 100) / 100 : null;
             const delta = rawDelta !== null && Math.abs(rawDelta) >= 0.05 ? rawDelta : null;
-            return {
-              ...r,
-              delta,
-              prev: delta !== null ? (prevVal ?? null) : null,
-              history: historyRef.current.get(k) ?? [],
-            };
+            return { ...r, delta, prev: delta !== null ? (prevVal ?? null) : null };
           });
 
         next.sort((a, b) => {
@@ -183,9 +139,6 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
                 </div>
                 <div className="truncate font-semibold">{r.name}</div>
               </div>
-
-              {/* Sparkline — her pollda büyüyen geçmiş */}
-              <Sparkline values={r.history} />
 
               <div className="shrink-0 text-right transition-all duration-300">
                 {hasDelta && (
