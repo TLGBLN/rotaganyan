@@ -183,18 +183,20 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
                 <div className="font-mono text-sm font-bold">{r.ganyan}</div>
               </div>
 
-              <span
-                className={cn(
-                  "flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-bold",
-                  fell ? "bg-hit/15 text-hit" : "bg-miss/15 text-miss"
-                )}
-              >
-                {fell ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
-                {Math.abs(r.delta!).toFixed(2)}
-                <span className="opacity-70">
+              <div className="flex shrink-0 flex-col items-end gap-0.5">
+                <span
+                  className={cn(
+                    "flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-bold",
+                    fell ? "bg-hit/15 text-hit" : "bg-miss/15 text-miss"
+                  )}
+                >
+                  {fell ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+                  {Math.abs(r.delta!).toFixed(2)}
+                </span>
+                <span className={cn("text-[10px] font-semibold", fell ? "text-hit" : "text-miss")}>
                   %{Math.abs(Math.round((r.delta! / parseFloat(r.prev!)) * 1000) / 10).toFixed(1)}
                 </span>
-              </span>
+              </div>
             </div>
           );
         })}
