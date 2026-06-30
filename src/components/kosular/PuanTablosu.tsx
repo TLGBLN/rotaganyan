@@ -73,8 +73,8 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
               </span>
             </div>
 
-            <div>
-              <table className="w-full text-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[10px]">
                 <thead>
                   {/* Koşu başlıkları */}
                   <tr className="border-b bg-muted/20">
@@ -169,13 +169,11 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                               colSpan={2}
                               className={cn("px-2 py-1.5", rowBg, textColor)}
                             >
-                              <div className="flex items-start gap-1.5">
-                                <span className="flex shrink-0 items-center gap-1">
-                                  <span className={cn("whitespace-nowrap font-mono tabular-nums", weight)}>
-                                    {pick.runner?.no ?? "—"}
-                                  </span>
+                              <div className="flex items-center gap-1 whitespace-nowrap">
+                                <span className={cn("shrink-0 font-mono tabular-nums", weight)}>
+                                  {pick.runner?.no ?? "—"}
                                 </span>
-                                <span className={cn("leading-snug", weight)}>
+                                <span className={cn(weight)}>
                                   {pick.runner?.name ?? pick.runnerLabel ?? "—"}
                                 </span>
                               </div>
