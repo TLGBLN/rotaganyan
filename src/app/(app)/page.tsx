@@ -41,8 +41,8 @@ export default async function HomePage() {
       {/* Günün Koşu Programı özet paneli */}
       <GunlukProgramWidget raceDays={raceDays} dateStr={today} isLoggedIn={isLoggedIn} />
 
-      {/* İsabet sağlayan tahminler — sadece üyeler görür */}
-      {isLoggedIn && hitPredictions.length > 0 && (
+      {/* İsabet sağlayan tahminler — herkese açık */}
+      {hitPredictions.length > 0 && (
         <section className="border-t py-10">
           <div className="mb-5 flex items-center justify-between px-4">
             <div className="flex items-center gap-2">
