@@ -119,7 +119,7 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                       "border-b last:border-0 transition-colors hover:bg-muted/30",
                       i % 2 === 1 && "race-row-even",
                       pick.isTarget && "bg-target/10",
-                      isWinner && "bg-brand/20"
+                      isWinner && "bg-[#C98F02]/20"
                     )}
                   >
                     <td className="px-2 py-2 font-semibold">{pick.rank}</td>
@@ -131,7 +131,7 @@ export default function RaceCard({ race, isLoggedIn }: Props) {
                     <td className="px-2 py-2 font-mono">{pick.runner?.no ?? "—"}</td>
                     <td className="px-2 py-2 font-medium">
                       <div className="flex items-center gap-1.5">
-                        <span className={isWinner ? "font-bold text-brand" : ""}>
+                        <span className={isWinner ? "font-bold text-[#C98F02]" : ""}>
                           {pick.runner?.name ?? pick.runnerLabel}
                         </span>
                         {isWinner && <span className="ml-1">🏆</span>}

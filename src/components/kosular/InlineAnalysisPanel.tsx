@@ -94,7 +94,7 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, raceP
                     "border-b last:border-0",
                     i % 2 === 1 && "race-row-even",
                     pick.isTarget && "bg-target/10",
-                    isWinner && "bg-amber-400/25"
+                    isWinner && "bg-[#C98F02]/20"
                   )}
                 >
                   <td className="px-2 py-2 font-semibold">{pick.rank}</td>
@@ -106,7 +106,7 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, raceP
                   <td className="px-2 py-2 font-mono">{pick.runner?.no ?? "—"}</td>
                   <td className="px-2 py-2 font-medium">
                     <div className="flex items-center gap-1.5">
-                      <span className={isWinner ? "font-bold text-amber-600 dark:text-amber-400" : ""}>
+                      <span className={isWinner ? "font-bold text-[#C98F02]" : ""}>
                         {pick.runner?.name ?? pick.runnerLabel}
                       </span>
                       {pick.isTarget && <TargetBadge className="ml-1.5" />}
