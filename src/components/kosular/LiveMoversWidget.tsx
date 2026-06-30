@@ -17,7 +17,7 @@ type Runner = {
 type Row = Runner & { delta: number | null; prev: string | null };
 
 const POLL_MS = 30_000;
-const TOP = 20;
+const TOP = 10;
 const LS_TTL_MS = 5 * 60 * 1000; // 5 dakika
 
 function runnerKey(r: { hippodromeSlug: string; raceNo: number; no: number }) {
@@ -138,7 +138,7 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
     );
   }
 
-  if (rows.length === 0) return null;
+  const movers = rows.filter((r) => r.delta !== null);
 
   return (
     <div className="overflow-hidden rounded-lg border">
@@ -150,17 +150,21 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
         <span className="text-xs text-muted-foreground">30sn&apos;de bir güncellenir</span>
       </div>
 
+      {movers.length === 0 ? (
+        <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+          Oran değişimi takip ediliyor…
+        </div>
+      ) : (
       <div className="divide-y border-t">
-        {rows.map((r, i) => {
-          const hasDelta = r.delta !== null;
-          const fell = hasDelta && r.delta! < 0;
+        {movers.map((r, i) => {
+          const fell = r.delta! < 0;
 
           return (
             <div
               key={runnerKey(r)}
               className={cn(
                 "flex items-center gap-3 px-4 py-2 text-sm transition-colors duration-300",
-                hasDelta && (fell ? "bg-hit/5" : "bg-miss/5")
+                fell ? "bg-hit/5" : "bg-miss/5"
               )}
             >
               <span className="w-5 shrink-0 text-center text-xs font-semibold text-muted-foreground">
@@ -175,30 +179,27 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
               </div>
 
               <div className="shrink-0 text-right transition-all duration-300">
-                {hasDelta && (
-                  <div className="font-mono text-xs text-muted-foreground line-through">{r.prev}</div>
-                )}
+                <div className="font-mono text-xs text-muted-foreground line-through">{r.prev}</div>
                 <div className="font-mono text-sm font-bold">{r.ganyan}</div>
               </div>
 
-              {hasDelta && (
-                <span
-                  className={cn(
-                    "flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-bold",
-                    fell ? "bg-hit/15 text-hit" : "bg-miss/15 text-miss"
-                  )}
-                >
-                  {fell ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
-                  {Math.abs(r.delta!).toFixed(2)}
-                  <span className="opacity-70">
-                    %{Math.abs(Math.round((r.delta! / parseFloat(r.prev!)) * 1000) / 10).toFixed(1)}
-                  </span>
+              <span
+                className={cn(
+                  "flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-bold",
+                  fell ? "bg-hit/15 text-hit" : "bg-miss/15 text-miss"
+                )}
+              >
+                {fell ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+                {Math.abs(r.delta!).toFixed(2)}
+                <span className="opacity-70">
+                  %{Math.abs(Math.round((r.delta! / parseFloat(r.prev!)) * 1000) / 10).toFixed(1)}
                 </span>
-              )}
+              </span>
             </div>
           );
         })}
       </div>
+      )}
     </div>
   );
 }
