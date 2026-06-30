@@ -14,27 +14,17 @@ type Runner = {
   running: boolean;
 };
 
-type Mover = Runner & { delta: number; prev: string };
+type Row = Runner & { delta: number | null; prev: string | null };
 
 const POLL_MS = 30_000;
-const TOP = 10;
+const TOP = 20;
 
 function runnerKey(r: { hippodromeSlug: string; raceNo: number; no: number }) {
   return `${r.hippodromeSlug}-${r.raceNo}-${r.no}`;
 }
 
-function mergeMovers(prev: Mover[], incoming: Mover[], top: number): Mover[] {
-  const inMap = new Map(incoming.map((m) => [runnerKey(m), m]));
-  const kept = prev.map((m) => inMap.get(runnerKey(m)) ?? null).filter((m): m is Mover => m !== null);
-  const keptKeys = new Set(kept.map(runnerKey));
-  for (const m of incoming) if (!keptKeys.has(runnerKey(m))) kept.push(m);
-  return kept.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, top);
-}
-
 export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
-  const [snapshot, setSnapshot] = useState<Runner[]>([]);
-  const [risers, setRisers] = useState<Mover[]>([]);
-  const [fallers, setFallers] = useState<Mover[]>([]);
+  const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const baselineRef = useRef<Map<string, string> | null>(null);
 
@@ -49,29 +39,63 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
 
         const current: Runner[] = json.data ?? [];
 
-        // Her poll'da anlık snapshot'u güncelle (son halleri her zaman görünsün)
-        setSnapshot(current);
-        setLoading(false);
-
         if (!baselineRef.current) {
+          // İlk poll: baseline kur ve hemen göster — bekleme yok
           baselineRef.current = new Map(current.map((r) => [runnerKey(r), r.ganyan ?? ""]));
+          const initial: Row[] = current
+            .filter((r) => r.ganyan !== null)
+            .sort((a, b) => parseFloat(a.ganyan!) - parseFloat(b.ganyan!))
+            .slice(0, TOP)
+            .map((r) => ({ ...r, delta: null, prev: null }));
+          setRows(initial);
+          setLoading(false);
           return;
         }
 
         const base = baselineRef.current;
-        const allMovers: Mover[] = [];
-        for (const r of current) {
-          const prevVal = base.get(runnerKey(r));
-          if (!prevVal || !r.ganyan) continue;
-          const delta = Math.round((parseFloat(r.ganyan) - parseFloat(prevVal)) * 100) / 100;
-          if (Math.abs(delta) < 0.05) continue;
-          allMovers.push({ ...r, delta, prev: prevVal });
-        }
 
-        const newRisers = allMovers.filter((m) => m.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, TOP);
-        const newFallers = allMovers.filter((m) => m.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, TOP);
-        setRisers((prev) => mergeMovers(prev, newRisers, TOP));
-        setFallers((prev) => mergeMovers(prev, newFallers, TOP));
+        const next: Row[] = current
+          .filter((r) => r.ganyan !== null)
+          .map((r) => {
+            const prevVal = base.get(runnerKey(r));
+            const delta = prevVal
+              ? Math.round((parseFloat(r.ganyan!) - parseFloat(prevVal)) * 100) / 100
+              : null;
+            return {
+              ...r,
+              delta: delta !== null && Math.abs(delta) >= 0.05 ? delta : null,
+              prev: delta !== null && Math.abs(delta) >= 0.05 ? (prevVal ?? null) : null,
+            };
+          });
+
+        // Değişim varsa üste, yoksa ganyan'a göre sırala
+        next.sort((a, b) => {
+          const da = a.delta !== null ? Math.abs(a.delta) : 0;
+          const db = b.delta !== null ? Math.abs(b.delta) : 0;
+          if (da !== db) return db - da;
+          return parseFloat(a.ganyan!) - parseFloat(b.ganyan!);
+        });
+
+        const top = next.slice(0, TOP);
+
+        // Mevcut listeyle merge: aynı key'ler yerinde kalır
+        setRows((prev) => {
+          const topMap = new Map(top.map((r) => [runnerKey(r), r]));
+          const kept = prev
+            .map((r) => topMap.get(runnerKey(r)) ?? null)
+            .filter((r): r is Row => r !== null);
+          const keptKeys = new Set(kept.map(runnerKey));
+          for (const r of top) if (!keptKeys.has(runnerKey(r))) kept.push(r);
+          return kept
+            .sort((a, b) => {
+              const da = a.delta !== null ? Math.abs(a.delta) : 0;
+              const db = b.delta !== null ? Math.abs(b.delta) : 0;
+              if (da !== db) return db - da;
+              return parseFloat(a.ganyan!) - parseFloat(b.ganyan!);
+            })
+            .slice(0, TOP);
+        });
+        setLoading(false);
       } catch {
         if (!stopped) setLoading(false);
       }
@@ -91,88 +115,63 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
     );
   }
 
-  // Delta yokken: güncel en düşük oranlılar (en favori atlar) tek kart halinde
-  const hasMovers = risers.length > 0 || fallers.length > 0;
+  if (rows.length === 0) return null;
 
-  if (!hasMovers) {
-    const topFavorites = [...snapshot]
-      .filter((r) => r.ganyan !== null)
-      .sort((a, b) => parseFloat(a.ganyan!) - parseFloat(b.ganyan!))
-      .slice(0, TOP);
-
-    return (
-      <SnapshotCard title="Güncel Oranlar" items={topFavorites} />
-    );
-  }
-
-  return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <MoverCard title="Oran Düşen" items={fallers} rising={false} />
-      <MoverCard title="Oran Yükselen" items={risers} rising />
-    </div>
-  );
-}
-
-function SnapshotCard({ title, items }: { title: string; items: Runner[] }) {
-  if (items.length === 0) return null;
   return (
     <div className="overflow-hidden rounded-lg border">
       <div className="flex items-center gap-3 px-4 py-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
           <span className="h-2 w-2 rounded-full bg-brand animate-pulse" />
         </span>
-        <h3 className="flex-1 text-sm font-bold">{title}</h3>
+        <h3 className="flex-1 text-sm font-bold">Güncel Oranlar</h3>
+        <span className="text-xs text-muted-foreground">30sn&apos;de bir güncellenir</span>
       </div>
-      <div className="divide-y border-t">
-        {items.map((r, i) => (
-          <div key={runnerKey(r)} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-xs font-bold text-muted-foreground">
-              {i + 1}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] text-muted-foreground">
-                {r.hippodromeName} — {r.raceNo}. Koşu
-              </div>
-              <div className="truncate font-semibold">{r.name}</div>
-            </div>
-            <span className="font-mono text-sm font-bold">{r.ganyan}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
-function MoverCard({ title, items, rising }: { title: string; items: Mover[]; rising: boolean }) {
-  if (items.length === 0) return null;
-  return (
-    <div className="overflow-hidden rounded-lg border">
-      <div className="flex items-center gap-3 px-4 py-3">
-        <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", rising ? "bg-miss/15 text-miss" : "bg-hit/15 text-hit")}>
-          {rising ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-        </span>
-        <h3 className="flex-1 text-sm font-bold">{title}</h3>
-      </div>
       <div className="divide-y border-t">
-        {items.map((m, i) => (
-          <div key={runnerKey(m)} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-            <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-xs font-bold", rising ? "border-miss/40 text-miss" : "border-hit/40 text-hit")}>
-              {i + 1}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] text-muted-foreground">{m.hippodromeName} — {m.raceNo}. Koşu</div>
-              <div className="truncate font-semibold">{m.name}</div>
+        {rows.map((r, i) => {
+          const hasDelta = r.delta !== null;
+          const fell = hasDelta && r.delta! < 0;
+
+          return (
+            <div
+              key={runnerKey(r)}
+              className={cn(
+                "flex items-center gap-3 px-4 py-2.5 text-sm transition-colors duration-300",
+                hasDelta && (fell ? "bg-hit/5" : "bg-miss/5")
+              )}
+            >
+              <span className="w-6 shrink-0 text-center text-xs font-semibold text-muted-foreground">
+                {i + 1}
+              </span>
+
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] text-muted-foreground">
+                  {r.hippodromeName} — {r.raceNo}. Koşu
+                </div>
+                <div className="truncate font-semibold">{r.name}</div>
+              </div>
+
+              <div className="shrink-0 text-right transition-all duration-300">
+                {hasDelta && (
+                  <div className="font-mono text-xs text-muted-foreground line-through">{r.prev}</div>
+                )}
+                <div className="font-mono text-sm font-bold">{r.ganyan}</div>
+              </div>
+
+              {hasDelta && (
+                <span
+                  className={cn(
+                    "flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-bold transition-all duration-300",
+                    fell ? "bg-hit/15 text-hit" : "bg-miss/15 text-miss"
+                  )}
+                >
+                  {fell ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+                  {Math.abs(r.delta!).toFixed(2)}
+                </span>
+              )}
             </div>
-            <div className="shrink-0 text-right transition-all duration-300">
-              <div className="font-mono text-xs text-muted-foreground line-through">{m.prev}</div>
-              <div className="font-mono text-sm font-bold">{m.ganyan}</div>
-            </div>
-            <span className={cn("flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold transition-all duration-300", rising ? "bg-miss/15 text-miss" : "bg-hit/15 text-hit")}>
-              {rising ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              {Math.abs(m.delta).toFixed(2)}
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
