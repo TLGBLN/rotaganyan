@@ -17,6 +17,7 @@ import { auth } from "@/lib/auth";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import RaceCountdown from "@/components/kosular/RaceCountdown";
 import KosularRaceRow from "@/components/kosular/KosularRaceRow";
+import PuanTablosu from "@/components/kosular/PuanTablosu";
 import { cn } from "@/lib/utils";
 import type { Confidence } from "@prisma/client";
 
@@ -182,6 +183,11 @@ export default async function KosularPage({ searchParams }: PageProps) {
                 </table>
               </div>
 
+
+              {/* Puan Tablosu — tüm analizler yan yana */}
+              <div className="mt-4">
+                <PuanTablosu raceDay={raceDay} isLoggedIn={isLoggedIn} currentDate={currentDate} />
+              </div>
 
               {combo.length > 0 && (
                 <div className="mt-3 rounded-lg border p-4">
