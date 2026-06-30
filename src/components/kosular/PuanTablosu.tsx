@@ -157,8 +157,8 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                           );
                         }
 
-                        const rowBg = isBanko ? "bg-brand" : isWinner ? "bg-[#C98F02]/20" : isTarget ? "bg-hit/15" : colBg;
-                        const textColor = isBanko ? "text-white" : isWinner ? "text-[#C98F02]" : rankColor(pick.rank);
+                        const rowBg = isBanko ? "bg-brand" : isWinner ? "bg-[#C98F02]/8" : isTarget ? "bg-hit/15" : colBg;
+                        const textColor = isBanko ? "text-white" : isWinner ? "text-[#E8C46A]" : rankColor(pick.rank);
                         const weight = rankWeight(pick.rank);
 
                         return (
