@@ -48,8 +48,10 @@ function saveBaseline(dateStr: string, map: Map<string, string>) {
 
 export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
   const [rows, setRows] = useState<Row[]>([]);
+  const [flashing, setFlashing] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const baselineRef = useRef<Map<string, string> | null>(null);
+  const prevGanyanRef = useRef<Map<string, string>>(new Map());
 
   // Mobilde sayfa geçişlerinde baseline kaybolmasın — localStorage'dan geri yükle
   useEffect(() => {
@@ -104,6 +106,20 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
         baselineRef.current = newBaseline;
         saveBaseline(dateStr, newBaseline);
 
+        // Değişen satırları tespit et → flash set'e ekle → 700ms sonra temizle
+        const changed = new Set<string>();
+        for (const r of top) {
+          const k = runnerKey(r);
+          const old = prevGanyanRef.current.get(k);
+          if (old !== undefined && old !== r.ganyan) changed.add(k);
+        }
+        for (const r of current) prevGanyanRef.current.set(runnerKey(r), r.ganyan ?? "");
+
+        if (changed.size > 0) {
+          setFlashing(changed);
+          setTimeout(() => setFlashing(new Set()), 700);
+        }
+
         setRows((prev) => {
           const topMap = new Map(top.map((r) => [runnerKey(r), r]));
           const kept = prev.map((r) => topMap.get(runnerKey(r)) ?? null).filter((r): r is Row => r !== null);
@@ -142,6 +158,7 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
 
   return (
     <div className="overflow-hidden rounded-lg border">
+      <style>{`@keyframes lmw-flash{0%{opacity:1}40%{opacity:.35}70%{opacity:1}100%{opacity:1}}`}</style>
       <div className="flex items-center gap-3 px-4 py-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
           <span className="h-2 w-2 rounded-full bg-brand animate-pulse" />
@@ -166,6 +183,7 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
                 "flex items-center gap-3 px-4 py-2 text-sm transition-colors duration-300",
                 fell ? "bg-hit/5" : "bg-miss/5"
               )}
+              style={flashing.has(runnerKey(r)) ? { animation: "lmw-flash 0.7s ease-out" } : undefined}
             >
               <span className="w-5 shrink-0 text-center text-xs font-semibold text-muted-foreground">
                 {i + 1}
