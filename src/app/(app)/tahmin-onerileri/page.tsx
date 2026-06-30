@@ -50,10 +50,10 @@ export default async function TahminOnerileriPage() {
             <thead>
               <tr className="border-b bg-muted/40">
                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">Koşu</th>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground">Tarih</th>
+                <th className="hidden px-3 py-2 text-left font-medium text-muted-foreground sm:table-cell">Tarih</th>
                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">1. Seçim</th>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground">Kupon Önerisi</th>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground">Yazar</th>
+                <th className="hidden px-3 py-2 text-left font-medium text-muted-foreground sm:table-cell">Kupon Önerisi</th>
+                <th className="hidden px-3 py-2 text-left font-medium text-muted-foreground sm:table-cell">Yazar</th>
               </tr>
             </thead>
             <tbody>
@@ -86,7 +86,7 @@ export default async function TahminOnerileriPage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                    <td className="hidden px-3 py-2 text-xs text-muted-foreground sm:table-cell">
                       {format(raceDay.date, "d MMM yyyy", { locale: tr })}
                       {pred.publishedAt && (
                         <div className="text-[10px]">
@@ -103,7 +103,7 @@ export default async function TahminOnerileriPage() {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-xs font-mono">
+                    <td className="hidden px-3 py-2 text-xs font-mono sm:table-cell">
                       {pred.couponNarrow || pred.couponNormal || pred.couponWide ? (
                         <div className="space-y-0.5">
                           {pred.couponNarrow && <div>Dar: {pred.couponNarrow}</div>}
@@ -114,7 +114,7 @@ export default async function TahminOnerileriPage() {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                    <td className="hidden px-3 py-2 text-xs text-muted-foreground sm:table-cell">
                       ROTAGANYAN Admin
                     </td>
                   </tr>

@@ -35,10 +35,10 @@ export default async function AnalizlerPage({ searchParams }: PageProps) {
               <thead>
                 <tr className="border-b bg-muted/40">
                   <th className="px-3 py-2 text-left font-medium text-muted-foreground">Koşu</th>
-                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">Tarih</th>
+                  <th className="hidden px-3 py-2 text-left font-medium text-muted-foreground sm:table-cell">Tarih</th>
                   <th className="px-3 py-2 text-left font-medium text-muted-foreground">1. Seçim</th>
                   <th className="px-3 py-2 text-left font-medium text-muted-foreground">Sonuç</th>
-                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">Yazar</th>
+                  <th className="hidden px-3 py-2 text-left font-medium text-muted-foreground sm:table-cell">Yazar</th>
                 </tr>
               </thead>
               <tbody>
@@ -69,7 +69,7 @@ export default async function AnalizlerPage({ searchParams }: PageProps) {
                           </Badge>
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                      <td className="hidden px-3 py-2 text-xs text-muted-foreground sm:table-cell">
                         {format(raceDay.date, "d MMM yyyy", { locale: tr })}
                       </td>
                       <td className="px-3 py-2">
@@ -100,7 +100,7 @@ export default async function AnalizlerPage({ searchParams }: PageProps) {
                           <span className="text-xs text-muted-foreground">Bekleniyor</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                      <td className="hidden px-3 py-2 text-xs text-muted-foreground sm:table-cell">
                         ROTAGANYAN Admin
                       </td>
                     </tr>

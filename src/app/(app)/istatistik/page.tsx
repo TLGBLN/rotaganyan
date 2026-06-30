@@ -32,7 +32,7 @@ export default async function IstatistikPage() {
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Banko Performansı
         </h2>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <StatTile label="Banko Sayısı" value={stats.recentBanko.total} />
           <StatTile label="Tutulan Banko" value={stats.recentBanko.hit} highlight="hit" />
           <StatTile

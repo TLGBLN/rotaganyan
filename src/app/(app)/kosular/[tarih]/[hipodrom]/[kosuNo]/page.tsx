@@ -29,7 +29,7 @@ export default async function RaceDetailPage({ params }: PageProps) {
   return (
     <main className="mx-auto max-w-4xl space-y-6 px-4 py-8">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
+      <nav className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
         <Link href="/kosular" className="flex items-center gap-0.5 hover:text-foreground">
           <ChevronLeft className="h-3.5 w-3.5" />
           Koşu Programı

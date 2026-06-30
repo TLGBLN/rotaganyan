@@ -21,7 +21,7 @@ export default function AltiliGanyanResults({ results }: Props) {
                 {city.groups.map((group, i) => (
                   <div key={i} className="overflow-hidden rounded-xl border">
                     <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
+                      <table className="w-full text-xs sm:text-sm">
                         <thead>
                           <tr className="border-b bg-muted/40">
                             <th className="px-2 py-2 sm:px-4 sm:py-3 text-left font-medium text-muted-foreground whitespace-nowrap">
