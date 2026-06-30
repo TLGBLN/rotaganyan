@@ -38,12 +38,8 @@ export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: P
                 Analizleri görmek için bir koşu seçiniz.
               </p>
             ) : (
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground/70 italic">
-                Analizleri görmek için{" "}
-                <Link href="/kayit" className="not-italic font-medium text-brand hover:underline">
-                  üye olunuz
-                </Link>
-                .
+              <p className="mt-1 text-sm text-muted-foreground/70 italic">
+                Analizleri görmek için bir koşuya tıklayınız.
               </p>
             )}
             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -88,11 +84,7 @@ export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: P
                     const hasAnalysis = !!race.prediction?.published;
                     const isBanko = race.prediction?.isBanko;
                     const isResulted = !!race.result;
-                    const racePath = `/kosular/${dateStr}/${hipSlug}/${race.raceNo}`;
-                    const href =
-                      hasAnalysis && !isLoggedIn
-                        ? `/giris?callbackUrl=${encodeURIComponent(racePath)}`
-                        : racePath;
+                    const href = `/kosular?tarih=${dateStr}`;
 
                     return (
                       <Link
