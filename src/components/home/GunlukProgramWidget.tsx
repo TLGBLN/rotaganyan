@@ -13,7 +13,7 @@ function SurfaceDot({ surface }: { surface: string }) {
   const cls =
     surface === "CIM" ? "bg-hit" :
     surface === "SENTETIK" ? "bg-brand" :
-    "bg-yellow-500";
+    "bg-[#996633]";
   return <span className={cn("inline-block h-2 w-2 rounded-full shrink-0", cls)} />;
 }
 
@@ -151,7 +151,7 @@ export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: P
                     <span className="inline-block h-1.5 w-1.5 rounded-full bg-hit" /> Çim
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-yellow-500" /> Kum
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#996633]" /> Kum
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand" /> Sentetik
