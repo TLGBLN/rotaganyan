@@ -18,15 +18,43 @@ type Row = Runner & { delta: number | null; prev: string | null };
 
 const POLL_MS = 30_000;
 const TOP = 20;
+const LS_TTL_MS = 5 * 60 * 1000; // 5 dakika
 
 function runnerKey(r: { hippodromeSlug: string; raceNo: number; no: number }) {
   return `${r.hippodromeSlug}-${r.raceNo}-${r.no}`;
+}
+
+function lsKey(dateStr: string) {
+  return `lmw-baseline-${dateStr}`;
+}
+
+function loadBaseline(dateStr: string): Map<string, string> | null {
+  try {
+    const raw = localStorage.getItem(lsKey(dateStr));
+    if (!raw) return null;
+    const { ts, entries } = JSON.parse(raw) as { ts: number; entries: [string, string][] };
+    if (Date.now() - ts > LS_TTL_MS) return null;
+    return new Map(entries);
+  } catch {
+    return null;
+  }
+}
+
+function saveBaseline(dateStr: string, map: Map<string, string>) {
+  try {
+    localStorage.setItem(lsKey(dateStr), JSON.stringify({ ts: Date.now(), entries: [...map.entries()] }));
+  } catch {}
 }
 
 export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const baselineRef = useRef<Map<string, string> | null>(null);
+
+  // Mobilde sayfa geçişlerinde baseline kaybolmasın — localStorage'dan geri yükle
+  useEffect(() => {
+    baselineRef.current = loadBaseline(dateStr);
+  }, [dateStr]);
 
   useEffect(() => {
     let stopped = false;
@@ -41,6 +69,7 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
 
         if (!baselineRef.current) {
           baselineRef.current = new Map(current.map((r) => [runnerKey(r), r.ganyan ?? ""]));
+          saveBaseline(dateStr, baselineRef.current);
           const initial: Row[] = current
             .filter((r) => r.ganyan !== null)
             .sort((a, b) => parseFloat(a.ganyan!) - parseFloat(b.ganyan!))
@@ -69,6 +98,11 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
         });
 
         const top = next.slice(0, TOP);
+
+        // Her poll'da mevcut oranları yeni baseline olarak kaydet (mobil için)
+        const newBaseline = new Map(current.map((r) => [runnerKey(r), r.ganyan ?? ""]));
+        baselineRef.current = newBaseline;
+        saveBaseline(dateStr, newBaseline);
 
         setRows((prev) => {
           const topMap = new Map(top.map((r) => [runnerKey(r), r]));
@@ -156,6 +190,9 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
                 >
                   {fell ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
                   {Math.abs(r.delta!).toFixed(2)}
+                  <span className="opacity-70">
+                    %{Math.abs(Math.round((r.delta! / parseFloat(r.prev!)) * 1000) / 10).toFixed(1)}
+                  </span>
                 </span>
               )}
             </div>
