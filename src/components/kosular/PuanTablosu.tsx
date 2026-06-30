@@ -10,13 +10,16 @@ type Props = {
   currentDate: string;
 };
 
-const MAX_LEGS = 6;
+// Admin/kupon ile aynı mantık: ≤6 koşu → tek grup, >6 → ilk 6 ve son 6
+function chunkIntoAltili<T>(races: T[]): T[][] {
+  if (races.length <= 6) return races.length > 0 ? [races] : [];
+  return [races.slice(0, 6), races.slice(races.length - 6)];
+}
 
-// Kupon kategorisi renkleri — InlineAnalysisPanel ile aynı mantık
 function rankColor(rank: number): string {
-  if (rank <= 3) return "text-hit";          // Ekonomik (yeşil)
-  if (rank <= 6) return "text-brand";        // Normal (marka)
-  return "text-muted-foreground";            // Geniş (gri)
+  if (rank <= 3) return "text-hit";
+  if (rank <= 6) return "text-brand";
+  return "text-muted-foreground";
 }
 
 function rankWeight(rank: number): string {
@@ -53,11 +56,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
     );
   }
 
-  // 6'lı gruplara böl
-  const groups: typeof analyzedRaces[] = [];
-  for (let i = 0; i < analyzedRaces.length; i += MAX_LEGS) {
-    groups.push(analyzedRaces.slice(i, i + MAX_LEGS));
-  }
+  const groups = chunkIntoAltili(analyzedRaces);
 
   return (
     <div className="space-y-6">
@@ -66,168 +65,153 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
         const altiliLabel = groups.length > 1 ? `${gi + 1}. Altılı` : "Altılı";
 
         return (
-          <div key={gi} className="overflow-x-auto rounded-xl border">
+          <div key={gi} className="rounded-xl border">
             {/* Başlık */}
             <div className="border-b bg-muted/30 px-4 py-2.5">
               <span className="text-sm font-semibold">
-                {hipName} — {altiliLabel} Puan Tablosu
+                {hipName} — {altiliLabel} Rotaganyan Puan Tablosu
               </span>
             </div>
 
-            <table className="text-xs">
-              <thead>
-                {/* AYAK başlıkları */}
-                <tr className="border-b bg-muted/20">
-                  <th
-                    rowSpan={2}
-                    className="w-7 border-r px-2 text-center text-[10px] font-medium text-muted-foreground align-middle"
-                  >
-                    #
-                  </th>
-                  {group.map((race, ri) => (
+            <div className="w-full overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  {/* Koşu başlıkları */}
+                  <tr className="border-b bg-muted/20">
                     <th
-                      key={race.id}
-                      colSpan={3}
-                      className={cn(
-                        "border-r px-3 py-2 text-center last:border-r-0",
-                        ri % 2 === 1 && "bg-muted/10"
-                      )}
+                      rowSpan={2}
+                      className="w-8 border-r px-2 text-center text-[10px] font-medium text-muted-foreground align-middle"
                     >
-                      <div className="text-[11px] font-bold whitespace-nowrap">
-                        {ri + 1 + gi * MAX_LEGS}. AYAK
-                      </div>
-                      <div className="text-[10px] font-normal text-muted-foreground whitespace-nowrap">
-                        {race.raceNo}. Koşu · {race.time ?? "—"}
-                      </div>
+                      #
                     </th>
-                  ))}
-                </tr>
-
-                {/* Alt başlıklar: No · İsim · Puan */}
-                <tr className="border-b bg-muted/10">
-                  {group.map((race, ri) => (
-                    <>
+                    {group.map((race, ri) => (
                       <th
-                        key={`${race.id}-no`}
+                        key={race.id}
+                        colSpan={3}
                         className={cn(
-                          "whitespace-nowrap px-2 py-1.5 text-left text-[10px] font-medium text-muted-foreground",
+                          "border-r px-3 py-2 text-center last:border-r-0",
                           ri % 2 === 1 && "bg-muted/10"
                         )}
                       >
-                        No · İsim
+                        <div className="whitespace-nowrap text-[11px] font-bold">
+                          {race.raceNo}. Koşu
+                        </div>
+                        <div className="whitespace-nowrap text-[10px] font-normal text-muted-foreground">
+                          {race.time ?? "—"}
+                        </div>
                       </th>
-                      <th
-                        key={`${race.id}-isim`}
-                        className={cn(ri % 2 === 1 && "bg-muted/10")}
-                        style={{ display: "none" }}
-                      />
-                      <th
-                        key={`${race.id}-puan`}
-                        className={cn(
-                          "border-r px-2 py-1.5 text-center text-[10px] font-medium text-muted-foreground last:border-r-0",
-                          ri % 2 === 1 && "bg-muted/10"
-                        )}
-                      >
-                        Puan
-                      </th>
-                    </>
-                  ))}
-                </tr>
-              </thead>
+                    ))}
+                  </tr>
 
-              <tbody>
-                {Array.from({ length: maxRows }).map((_, rowIdx) => (
-                  <tr key={rowIdx} className="border-b last:border-0">
-                    {/* Sıra */}
-                    <td className="border-r px-2 py-1.5 text-center text-[10px] tabular-nums text-muted-foreground">
-                      {rowIdx + 1}
-                    </td>
+                  {/* Alt başlık: No · İsim, Puan */}
+                  <tr className="border-b bg-muted/10">
+                    {group.map((race, ri) => (
+                      <>
+                        <th
+                          key={`${race.id}-ni`}
+                          colSpan={2}
+                          className={cn(
+                            "whitespace-nowrap px-2 py-1.5 text-left text-[10px] font-medium text-muted-foreground",
+                            ri % 2 === 1 && "bg-muted/10"
+                          )}
+                        >
+                          No · İsim
+                        </th>
+                        <th
+                          key={`${race.id}-puan`}
+                          className={cn(
+                            "border-r px-2 py-1.5 text-center text-[10px] font-medium text-muted-foreground last:border-r-0",
+                            ri % 2 === 1 && "bg-muted/10"
+                          )}
+                        >
+                          Puan
+                        </th>
+                      </>
+                    ))}
+                  </tr>
+                </thead>
 
-                    {group.map((race, ri) => {
-                      const pick = race.prediction!.picks[rowIdx];
-                      const isBanko = race.prediction!.isBanko && pick?.rank === 1;
-                      const isTarget = pick?.isTarget;
-                      const isWinner = race.result?.winnerNo != null && pick?.runner?.no === race.result.winnerNo;
-                      const colBg = ri % 2 === 1 ? "bg-muted/5" : "";
+                <tbody>
+                  {Array.from({ length: maxRows }).map((_, rowIdx) => (
+                    <tr key={rowIdx} className="border-b last:border-0">
+                      {/* Sıra */}
+                      <td className="border-r px-2 py-1.5 text-center text-[10px] tabular-nums text-muted-foreground">
+                        {rowIdx + 1}
+                      </td>
 
-                      if (!pick) {
+                      {group.map((race, ri) => {
+                        const pick = race.prediction!.picks[rowIdx];
+                        const isBanko = race.prediction!.isBanko && pick?.rank === 1;
+                        const isTarget = pick?.isTarget;
+                        const isWinner =
+                          race.result?.winnerNo != null &&
+                          pick?.runner?.no === race.result.winnerNo;
+                        const colBg = ri % 2 === 1 ? "bg-muted/5" : "";
+
+                        if (!pick) {
+                          return (
+                            <>
+                              <td key={`${race.id}-${rowIdx}-a`} colSpan={2} className={cn("px-2 py-1.5", colBg)} />
+                              <td key={`${race.id}-${rowIdx}-b`} className={cn("border-r px-2 py-1.5 last:border-r-0", colBg)} />
+                            </>
+                          );
+                        }
+
+                        const rowBg = isBanko ? "bg-brand" : isTarget ? "bg-hit/15" : colBg;
+                        const textColor = isBanko ? "text-white" : rankColor(pick.rank);
+                        const weight = rankWeight(pick.rank);
+
                         return (
                           <>
-                            <td key={`${race.id}-${rowIdx}-a`} className={cn("px-2 py-1.5", colBg)} />
-                            <td key={`${race.id}-${rowIdx}-b`} className={cn("px-1 py-1.5", colBg)} />
-                            <td key={`${race.id}-${rowIdx}-c`} className={cn("border-r px-2 py-1.5 last:border-r-0", colBg)} />
+                            {/* Forma + No + İsim */}
+                            <td
+                              key={`${race.id}-${rowIdx}-ni`}
+                              colSpan={2}
+                              className={cn("whitespace-nowrap px-2 py-1.5", rowBg, textColor)}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                {pick.runner?.formaUrl ? (
+                                  <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-white p-0.5 ring-1 ring-border/50">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={pick.runner.formaUrl}
+                                      alt=""
+                                      className="h-full w-full object-contain"
+                                    />
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex h-5 w-5 shrink-0 rounded-sm bg-muted/40" />
+                                )}
+                                <span className={cn("font-mono tabular-nums", weight)}>
+                                  {pick.runner?.no ?? "—"}
+                                </span>
+                                <span className={cn(weight)}>
+                                  {pick.runner?.name ?? pick.runnerLabel ?? "—"}
+                                </span>
+                                {isWinner && <span className="ml-0.5">🏆</span>}
+                              </div>
+                            </td>
+
+                            {/* Puan */}
+                            <td
+                              key={`${race.id}-${rowIdx}-puan`}
+                              className={cn(
+                                "border-r px-2 py-1.5 text-center font-mono tabular-nums last:border-r-0",
+                                rowBg,
+                                textColor,
+                                weight
+                              )}
+                            >
+                              {pick.score ?? "—"}
+                            </td>
                           </>
                         );
-                      }
-
-                      // Renk — banko > isTarget > rank rengi
-                      const textColor = isBanko
-                        ? "text-white"
-                        : isTarget
-                        ? rankColor(pick.rank)
-                        : rankColor(pick.rank);
-
-                      const rowBg = isBanko
-                        ? "bg-brand"
-                        : isTarget
-                        ? "bg-hit/15"
-                        : colBg;
-
-                      const weight = rankWeight(pick.rank);
-
-                      return (
-                        <>
-                          {/* Forma + No + İsim (tek hücre, birleştirildik) */}
-                          <td
-                            key={`${race.id}-${rowIdx}-no`}
-                            colSpan={2}
-                            className={cn("whitespace-nowrap px-2 py-1.5", rowBg, textColor)}
-                          >
-                            <div className="flex items-center gap-1.5">
-                              {/* Forma */}
-                              {pick.runner?.formaUrl ? (
-                                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-white p-0.5 ring-1 ring-border/50">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src={pick.runner.formaUrl}
-                                    alt=""
-                                    className="h-full w-full object-contain"
-                                  />
-                                </span>
-                              ) : (
-                                <span className="inline-flex h-5 w-5 shrink-0 rounded-sm bg-muted/40" />
-                              )}
-                              {/* No */}
-                              <span className={cn("font-mono tabular-nums", weight)}>
-                                {pick.runner?.no ?? "—"}
-                              </span>
-                              {/* İsim */}
-                              <span className={cn("whitespace-nowrap", weight)}>
-                                {pick.runner?.name ?? pick.runnerLabel ?? "—"}
-                              </span>
-                              {isWinner && <span className="ml-0.5">🏆</span>}
-                            </div>
-                          </td>
-
-                          {/* Puan */}
-                          <td
-                            key={`${race.id}-${rowIdx}-puan`}
-                            className={cn(
-                              "border-r px-2 py-1.5 text-center font-mono tabular-nums last:border-r-0",
-                              rowBg,
-                              textColor,
-                              weight
-                            )}
-                          >
-                            {pick.score ?? "—"}
-                          </td>
-                        </>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         );
       })}
