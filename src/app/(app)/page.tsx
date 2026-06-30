@@ -11,8 +11,6 @@ import { fetchTjkTicker } from "@/lib/tjk-ticker";
 import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
 import { turkeyDateString } from "@/lib/tz";
 import SteamWidget from "@/components/kosular/SteamWidget";
-import LiveMoversWidget from "@/components/kosular/LiveMoversWidget";
-
 export const revalidate = 60;
 
 export default async function HomePage() {
@@ -51,18 +49,7 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Canlı Oran Hareketi — tüm hipodromlar genelinde top10 düşen/yükselen */}
-      <section className="border-t px-4 py-10">
-        <div className="mx-auto max-w-4xl">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-brand animate-pulse" />
-            <h2 className="text-lg font-semibold">Canlı Oran Hareketi</h2>
-          </div>
-          <LiveMoversWidget dateStr={today} />
-        </div>
-      </section>
-
-      {/* AGF Steam — günün en çok yükselen/düşen favorileri */}
+{/* AGF Steam — günün en çok yükselen/düşen favorileri */}
       {(agfMovers.risers.length > 0 || agfMovers.fallers.length > 0) && (
         <section className="border-t px-4 py-10">
           <div className="mx-auto max-w-4xl">
