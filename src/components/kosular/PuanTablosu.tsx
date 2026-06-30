@@ -73,10 +73,69 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
               </span>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* ── MOBİL: her koşu ayrı kart, alt alta ── */}
+            <div className="sm:hidden divide-y">
+              {group.map((race) => (
+                <div key={race.id}>
+                  <div className="bg-muted/20 px-3 py-2 text-xs font-bold">
+                    {race.raceNo}. Koşu{race.time ? ` · ${race.time}` : ""}
+                  </div>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b bg-muted/10">
+                        <th className="w-6 px-2 py-1 text-center text-[10px] font-medium text-muted-foreground">#</th>
+                        <th className="px-2 py-1 text-left text-[10px] font-medium text-muted-foreground">No · Ad</th>
+                        <th className="w-12 px-2 py-1 text-center text-[10px] font-medium text-muted-foreground">Puan</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {race.prediction!.picks.map((pick, rowIdx) => {
+                        const isBanko = race.prediction!.isBanko && pick?.rank === 1;
+                        const isTarget = pick?.isTarget;
+                        const isWinner =
+                          race.result?.winnerNo != null &&
+                          pick?.runner?.no === race.result.winnerNo;
+                        const rowBg = isBanko
+                          ? "bg-brand"
+                          : isWinner
+                          ? "bg-[#C98F02]/20"
+                          : isTarget
+                          ? "bg-hit/15"
+                          : "";
+                        const textColor = isBanko
+                          ? "text-white"
+                          : isWinner
+                          ? "text-[#F5C518]"
+                          : rankColor(pick.rank);
+                        const weight = rankWeight(pick.rank);
+
+                        return (
+                          <tr key={rowIdx} className={cn("border-b last:border-0", rowBg)}>
+                            <td className="px-2 py-1.5 text-center tabular-nums text-muted-foreground">
+                              {rowIdx + 1}
+                            </td>
+                            <td className={cn("px-2 py-1.5", textColor, weight)}>
+                              <span className="font-mono mr-1 tabular-nums">
+                                {pick.runner?.no ?? "—"}
+                              </span>
+                              {pick.runner?.name ?? pick.runnerLabel ?? "—"}
+                            </td>
+                            <td className={cn("px-2 py-1.5 text-center font-mono tabular-nums", textColor, weight)}>
+                              {pick.score ?? "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+
+            {/* ── MASAÜSTÜ: tüm koşular yan yana tablo ── */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-[10px]">
                 <thead>
-                  {/* Koşu başlıkları */}
                   <tr className="border-b bg-muted/20">
                     <th
                       rowSpan={2}
@@ -103,7 +162,6 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                     ))}
                   </tr>
 
-                  {/* Alt başlık: No · İsim, Puan */}
                   <tr className="border-b bg-muted/10">
                     {group.map((race, ri) => (
                       <>
@@ -134,7 +192,6 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                 <tbody>
                   {Array.from({ length: maxRows }).map((_, rowIdx) => (
                     <tr key={rowIdx} className="border-b last:border-0">
-                      {/* Sıra */}
                       <td className="border-r px-2 py-1.5 text-center text-[10px] tabular-nums text-muted-foreground">
                         {rowIdx + 1}
                       </td>
@@ -163,7 +220,6 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
 
                         return (
                           <>
-                            {/* Forma + No + İsim */}
                             <td
                               key={`${race.id}-${rowIdx}-ni`}
                               colSpan={2}
@@ -179,7 +235,6 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                               </div>
                             </td>
 
-                            {/* Puan */}
                             <td
                               key={`${race.id}-${rowIdx}-puan`}
                               className={cn(
