@@ -5,22 +5,24 @@ import HitsCarousel from "@/components/home/HitsCarousel";
 import NewsTicker from "@/components/home/NewsTicker";
 import AltiliGanyanResults from "@/components/home/AltiliGanyanResults";
 import TahminOnerileri from "@/components/home/TahminOnerileri";
-import { getHitPredictions, getKuponOnerileri } from "@/server/services/race.service";
+import { getHitPredictions, getKuponOnerileri, getRaceDaysByDate } from "@/server/services/race.service";
 import { getAgfMovers } from "@/server/services/agf-trend.service";
 import { fetchTjkTicker } from "@/lib/tjk-ticker";
 import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
 import { turkeyDateString } from "@/lib/tz";
 import SteamWidget from "@/components/kosular/SteamWidget";
+import GunlukProgramWidget from "@/components/home/GunlukProgramWidget";
 export const revalidate = 60;
 
 export default async function HomePage() {
   const today = turkeyDateString();
-  const [hitPredictions, kuponOnerisi, tickerItems, altiliResults, agfMovers] = await Promise.all([
+  const [hitPredictions, kuponOnerisi, tickerItems, altiliResults, agfMovers, raceDays] = await Promise.all([
     getHitPredictions(16),
     getKuponOnerileri(),
     fetchTjkTicker(),
     fetchTodaysAltiliResults(),
     getAgfMovers(today),
+    getRaceDaysByDate(today),
   ]);
 
   return (
@@ -32,6 +34,9 @@ export default async function HomePage() {
       <div className="mt-4">
         <NewsTicker items={tickerItems} />
       </div>
+
+      {/* Günün Koşu Programı özet paneli */}
+      <GunlukProgramWidget raceDays={raceDays} dateStr={today} />
 
       {/* İsabet sağlayan tahminler — otomatik kayan slider */}
       {hitPredictions.length > 0 && (
