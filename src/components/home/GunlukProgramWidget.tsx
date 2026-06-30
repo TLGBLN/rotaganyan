@@ -28,7 +28,7 @@ export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: P
 
   return (
     <section className="border-t px-4 py-10">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-7xl">
         {/* Header */}
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
