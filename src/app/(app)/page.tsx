@@ -5,25 +5,24 @@ import HitsCarousel from "@/components/home/HitsCarousel";
 import NewsTicker from "@/components/home/NewsTicker";
 import AltiliGanyanResults from "@/components/home/AltiliGanyanResults";
 import TahminOnerileri from "@/components/home/TahminOnerileri";
-import { getHitPredictions, getKuponOnerileri, getCurrentRaces } from "@/server/services/race.service";
+import { getHitPredictions, getKuponOnerileri } from "@/server/services/race.service";
 import { getAgfMovers } from "@/server/services/agf-trend.service";
 import { fetchTjkTicker } from "@/lib/tjk-ticker";
 import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
 import { turkeyDateString } from "@/lib/tz";
 import SteamWidget from "@/components/kosular/SteamWidget";
-import LiveOddsPanel from "@/components/kosular/LiveOddsPanel";
+import LiveMoversWidget from "@/components/kosular/LiveMoversWidget";
 
 export const revalidate = 60;
 
 export default async function HomePage() {
   const today = turkeyDateString();
-  const [hitPredictions, kuponOnerisi, tickerItems, altiliResults, agfMovers, currentRaces] = await Promise.all([
+  const [hitPredictions, kuponOnerisi, tickerItems, altiliResults, agfMovers] = await Promise.all([
     getHitPredictions(16),
     getKuponOnerileri(),
     fetchTjkTicker(),
     fetchTodaysAltiliResults(),
     getAgfMovers(today),
-    getCurrentRaces(today),
   ]);
 
   return (
@@ -52,35 +51,16 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Canlı Ganyan Oranları — her hipodromun şu an açık/yaklaşan koşusu */}
-      {currentRaces.length > 0 && (
-        <section className="border-t px-4 py-10">
-          <div className="mx-auto max-w-4xl">
-            <div className="mb-4 flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-brand animate-pulse" />
-              <h2 className="text-lg font-semibold">Canlı Ganyan Oranları</h2>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {currentRaces.map((race) => (
-                <div key={race.raceId} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm font-semibold">
-                    <span>
-                      {race.hippodromeName} — {race.raceNo}. Koşu
-                    </span>
-                    {race.time && <span className="text-xs font-normal text-muted-foreground">{race.time}</span>}
-                  </div>
-                  <LiveOddsPanel
-                    hippodromeSlug={race.hippodromeSlug}
-                    dateStr={today}
-                    raceNo={race.raceNo}
-                    runners={race.runners}
-                  />
-                </div>
-              ))}
-            </div>
+      {/* Canlı Oran Hareketi — tüm hipodromlar genelinde top10 düşen/yükselen */}
+      <section className="border-t px-4 py-10">
+        <div className="mx-auto max-w-4xl">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-brand animate-pulse" />
+            <h2 className="text-lg font-semibold">Canlı Oran Hareketi</h2>
           </div>
-        </section>
-      )}
+          <LiveMoversWidget dateStr={today} />
+        </div>
+      </section>
 
       {/* AGF Steam — günün en çok yükselen/düşen favorileri */}
       {(agfMovers.risers.length > 0 || agfMovers.fallers.length > 0) && (

@@ -59,6 +59,67 @@ function toTjkPathDate(dateStr: string): string {
   return `${y}/${m}/${d}`;
 }
 
+export type RunnerSnapshot = {
+  hippodromeName: string;
+  hippodromeSlug: string;
+  raceNo: number;
+  no: number;
+  name: string;
+  ganyan: string | null;
+  running: boolean;
+};
+
+type HippodromeInput = { name: string; slug: string; races: { raceNo: number; runners: { no: number; name: string }[] }[] };
+
+/** Günün tüm koşularını tek checksum çekişiyle, paralel olarak alır. Hipodrom+koşu+at bazında flat liste döner. */
+export async function fetchAllDayMuhtemeller(dateStr: string, hippodromes: HippodromeInput[]): Promise<RunnerSnapshot[]> {
+  const path = toTjkPathDate(dateStr);
+  const checksum = await fetchJson<ChecksumResponse>(`${ORIGIN}/${path}/checksum.json`);
+  if (!checksum?.runs) return [];
+
+  type RaceJob = { hippodromeName: string; hippodromeSlug: string; raceNo: number; key: string; pair: [string, string]; runners: { no: number; name: string }[] };
+  const jobs: RaceJob[] = [];
+
+  for (const h of hippodromes) {
+    const key = toMuhtemellerKey(h.name);
+    for (const race of h.races) {
+      const pair = checksum.runs[`${key}-${race.raceNo}`];
+      if (!pair) continue;
+      jobs.push({ hippodromeName: h.name, hippodromeSlug: h.slug, raceNo: race.raceNo, key, pair, runners: race.runners });
+    }
+  }
+
+  const results = await Promise.all(
+    jobs.map(async (job) => {
+      for (const hash of job.pair) {
+        const url = `${CDN}/${path}/${job.key}-${job.raceNo}-${hash}.json`;
+        const json = await fetchJson<{ success: boolean; data?: { muhtemeller?: { bahisler?: { B: string; isGanyan?: boolean; muhtemeller: { S1: string; G?: string; K?: boolean }[] }[] } } }>(url);
+        const m = json?.data?.muhtemeller;
+        if (!m) continue;
+        const ganyan = m.bahisler?.find((b) => b.isGanyan || b.B === "GANYAN");
+        if (!ganyan) continue;
+        return ganyan.muhtemeller
+          .map((o) => {
+            const runner = job.runners.find((r) => String(r.no) === o.S1);
+            return {
+              hippodromeName: job.hippodromeName,
+              hippodromeSlug: job.hippodromeSlug,
+              raceNo: job.raceNo,
+              no: Number(o.S1),
+              name: runner?.name ?? `#${o.S1}`,
+              ganyan: o.K ? null : (o.G ?? null),
+              running: !o.K,
+            } satisfies RunnerSnapshot;
+          })
+          .filter((s) => s.running && s.ganyan !== null);
+      }
+      return [] as RunnerSnapshot[];
+    })
+  );
+
+  return results.flat();
+}
+
 /** Bir hipodrom+koşu için TJK'nın canlı ganyan muhtemel oranlarını çeker — değişmediyse de aynı veriyi tazeler. */
 export async function fetchRaceMuhtemeller(
   dateStr: string,
