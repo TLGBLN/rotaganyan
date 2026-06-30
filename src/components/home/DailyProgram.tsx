@@ -3,7 +3,7 @@ import type { Confidence } from "@prisma/client";
 
 const SURFACE_COLOR: Record<string, string> = {
   Çim: "text-hit border-hit/30 bg-hit/5",
-  Kum: "text-brand border-brand/30 bg-brand/5",
+  Kum: "text-[#996633] border-[#996633]/30 bg-[#996633]/5",
   Sentetik: "text-target border-target/30 bg-target/5",
 };
 
