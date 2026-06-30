@@ -73,8 +73,8 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
               </span>
             </div>
 
-            <div className="w-full overflow-x-auto">
-              <table className="w-full text-xs">
+            <div className="w-full">
+              <table className="w-full table-fixed text-xs">
                 <thead>
                   {/* Koşu başlıkları */}
                   <tr className="border-b bg-muted/20">
@@ -93,10 +93,10 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                           ri % 2 === 1 && "bg-muted/10"
                         )}
                       >
-                        <div className="whitespace-nowrap text-[11px] font-bold">
+                        <div className="break-words text-[11px] font-bold">
                           {race.raceNo}. Koşu
                         </div>
-                        <div className="whitespace-nowrap text-[10px] font-normal text-muted-foreground">
+                        <div className="break-words text-[10px] font-normal text-muted-foreground">
                           {race.time ?? "—"}
                         </div>
                       </th>
@@ -111,7 +111,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                           key={`${race.id}-ni`}
                           colSpan={2}
                           className={cn(
-                            "whitespace-nowrap px-2 py-1.5 text-left text-[10px] font-medium text-muted-foreground",
+                            "break-words px-2 py-1.5 text-left text-[10px] font-medium text-muted-foreground",
                             ri % 2 === 1 && "bg-muted/10"
                           )}
                         >
@@ -120,7 +120,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                         <th
                           key={`${race.id}-puan`}
                           className={cn(
-                            "border-r px-2 py-1.5 text-center text-[10px] font-medium text-muted-foreground last:border-r-0",
+                            "w-10 border-r px-2 py-1.5 text-center text-[10px] font-medium text-muted-foreground last:border-r-0",
                             ri % 2 === 1 && "bg-muted/10"
                           )}
                         >
@@ -167,28 +167,30 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                             <td
                               key={`${race.id}-${rowIdx}-ni`}
                               colSpan={2}
-                              className={cn("whitespace-nowrap px-2 py-1.5", rowBg, textColor)}
+                              className={cn("break-words px-2 py-1.5", rowBg, textColor)}
                             >
-                              <div className="flex items-center gap-1.5">
-                                {pick.runner?.formaUrl ? (
-                                  <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-white p-0.5 ring-1 ring-border/50">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                      src={pick.runner.formaUrl}
-                                      alt=""
-                                      className="h-full w-full object-contain"
-                                    />
+                              <div className="flex items-start gap-1.5">
+                                <span className="flex shrink-0 items-center gap-1">
+                                  {pick.runner?.formaUrl ? (
+                                    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-white p-0.5 ring-1 ring-border/50">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img
+                                        src={pick.runner.formaUrl}
+                                        alt=""
+                                        className="h-full w-full object-contain"
+                                      />
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex h-5 w-5 shrink-0 rounded-sm bg-muted/40" />
+                                  )}
+                                  <span className={cn("font-mono tabular-nums", weight)}>
+                                    {pick.runner?.no ?? "—"}
                                   </span>
-                                ) : (
-                                  <span className="inline-flex h-5 w-5 shrink-0 rounded-sm bg-muted/40" />
-                                )}
-                                <span className={cn("font-mono tabular-nums", weight)}>
-                                  {pick.runner?.no ?? "—"}
                                 </span>
-                                <span className={cn(weight)}>
+                                <span className={cn("min-w-0 leading-snug", weight)}>
                                   {pick.runner?.name ?? pick.runnerLabel ?? "—"}
+                                  {isWinner && <span className="ml-0.5">🏆</span>}
                                 </span>
-                                {isWinner && <span className="ml-0.5">🏆</span>}
                               </div>
                             </td>
 
