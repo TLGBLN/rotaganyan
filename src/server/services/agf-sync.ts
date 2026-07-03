@@ -31,33 +31,8 @@ export async function syncAgfForDate(date: Date): Promise<AgfSyncResult> {
   for (const city of cities) {
     try {
       const slug = toSlug(city.sehirAdi);
-      const hippodrome = await db.hippodrome.findFirst({ where: { slug } });
-      if (!hippodrome) {
-        cityResults.push({
-          name: city.sehirAdi,
-          ok: false,
-          racesUpdated: 0,
-          runnersUpdated: 0,
-          error: `Hippodrome not in DB: ${slug}`,
-        });
-        continue;
-      }
 
-      const raceDay = await db.raceDay.findFirst({
-        where: { date: d, hippodromeId: hippodrome.id },
-        include: { races: { include: { runners: { select: { id: true, no: true } } } } },
-      });
-      if (!raceDay || raceDay.races.length === 0) {
-        cityResults.push({
-          name: city.sehirAdi,
-          ok: false,
-          racesUpdated: 0,
-          runnersUpdated: 0,
-          error: "No race day found in DB",
-        });
-        continue;
-      }
-
+      // TJK'dan programı önce çek (hippodrome/raceDay yoksa ingest için de kullanılır)
       const program = await fetchCityProgram(city, tjkDate);
       if (!program) {
         cityResults.push({
@@ -70,8 +45,52 @@ export async function syncAgfForDate(date: Date): Promise<AgfSyncResult> {
         continue;
       }
 
+      // Hippodrome veya raceDay DB'de yoksa ingest et (hippodrome upsert'i de yapar)
+      let hippodrome = await db.hippodrome.findFirst({ where: { slug } });
+      let raceDay = hippodrome
+        ? await db.raceDay.findFirst({
+            where: { date: d, hippodromeId: hippodrome.id },
+            include: { races: { include: { runners: { select: { id: true, no: true } } } } },
+          })
+        : null;
+
+      if (!hippodrome || !raceDay || raceDay.races.length === 0) {
+        try {
+          const { persistRaceDays } = await import("./ingest/base");
+          await persistRaceDays([program]);
+          hippodrome = await db.hippodrome.findFirst({ where: { slug } });
+          if (hippodrome) {
+            raceDay = await db.raceDay.findFirst({
+              where: { date: d, hippodromeId: hippodrome.id },
+              include: { races: { include: { runners: { select: { id: true, no: true } } } } },
+            });
+          }
+        } catch { /* ingest başarısız olursa AGF sync de atla */ }
+      }
+
+      if (!raceDay || raceDay.races.length === 0) {
+        cityResults.push({
+          name: city.sehirAdi,
+          ok: false,
+          racesUpdated: 0,
+          runnersUpdated: 0,
+          error: "No race day found in DB",
+        });
+        continue;
+      }
+
       let racesUpdated = 0;
       let runnersUpdated = 0;
+
+      // Fetch latest snapshot per runner in bulk to avoid N+1 queries
+      const allRunnerIds = raceDay.races.flatMap((rc) => rc.runners.map((r) => r.id));
+      const latestSnapshots = await db.agfSnapshot.findMany({
+        where: { runnerId: { in: allRunnerIds } },
+        orderBy: { capturedAt: "desc" },
+        select: { runnerId: true, agf: true },
+        distinct: ["runnerId"],
+      });
+      const lastSnapshotMap = new Map(latestSnapshots.map((s) => [s.runnerId, s.agf]));
 
       for (const race of raceDay.races) {
         const programRace = program.races.find((r) => r.raceNo === race.raceNo);
@@ -89,12 +108,16 @@ export async function syncAgfForDate(date: Date): Promise<AgfSyncResult> {
             where: { id: dbRunner.id },
             data: { agf: pr.agf },
           });
-          // Her senkronizasyonda bir an'lık kayıt da düşürülür — zaman içindeki AGF
-          // değişimini (para hareketi / "steam") gösterebilmek için.
-          await db.agfSnapshot.create({
-            data: { runnerId: dbRunner.id, agf: pr.agf as number },
-          });
-          runnersUpdated++;
+
+          // Yalnızca değer değiştiyse snapshot oluştur; böylece first≠last garantilenir.
+          const prevAgf = lastSnapshotMap.get(dbRunner.id);
+          const newAgf = pr.agf as number;
+          if (prevAgf === undefined || Math.abs(prevAgf - newAgf) >= 0.01) {
+            await db.agfSnapshot.create({
+              data: { runnerId: dbRunner.id, agf: newAgf },
+            });
+            runnersUpdated++;
+          }
         }
       }
 
