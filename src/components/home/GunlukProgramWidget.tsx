@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { cn, surfaceLabel, breedLabel } from "@/lib/utils";
+import RaceCountdown from "@/components/kosular/RaceCountdown";
 import type { ProgramRaceDay } from "@/server/services/race.service";
 
 type Props = {
@@ -97,10 +98,13 @@ export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: P
                           {race.raceNo}.
                         </span>
 
-                        {/* Time */}
-                        <span className="w-10 shrink-0 font-mono text-muted-foreground">
-                          {race.time ?? "—"}
-                        </span>
+                        {/* Time + countdown */}
+                        <div className="w-14 shrink-0 flex flex-col">
+                          <span className="font-mono text-muted-foreground">{race.time ?? "—"}</span>
+                          {race.time && !isResulted && (
+                            <RaceCountdown date={dateStr} time={race.time} />
+                          )}
+                        </div>
 
                         {/* Surface dot + class */}
                         <div className="flex min-w-0 flex-1 items-center gap-1.5">
