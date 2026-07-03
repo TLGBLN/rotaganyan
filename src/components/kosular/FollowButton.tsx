@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { Bookmark, BookmarkCheck, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toggleHorseFollow, updateFollowNote } from "@/server/actions/horse-follow";
@@ -16,6 +16,18 @@ export default function FollowButton({ horseName, initialFollowing, initialNote 
   const [note, setNote] = useState(initialNote ?? "");
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
 
   function handleToggle() {
     startTransition(async () => {
@@ -33,20 +45,14 @@ export default function FollowButton({ horseName, initialFollowing, initialNote 
   }
 
   return (
-    <div className="relative inline-block">
+    <div ref={ref} className="relative inline-block">
       <button
         type="button"
         disabled={isPending}
-        onClick={() => {
-          if (following) {
-            setOpen((v) => !v);
-          } else {
-            setOpen((v) => !v);
-          }
-        }}
+        onClick={() => setOpen((v) => !v)}
         title={following ? "Takiptesin · düzenle" : "Takip et"}
         className={cn(
-          "flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] transition-colors",
+          "flex items-center rounded px-1 py-0.5 transition-colors",
           following
             ? "text-brand hover:text-brand/80"
             : "text-muted-foreground hover:text-foreground"
@@ -61,9 +67,7 @@ export default function FollowButton({ horseName, initialFollowing, initialNote 
 
       {open && (
         <div className="absolute left-0 top-6 z-50 w-52 rounded-lg border bg-background p-3 shadow-lg">
-          <p className="mb-1.5 text-[11px] font-semibold">
-            {horseName}
-          </p>
+          <p className="mb-1.5 text-[11px] font-semibold truncate">{horseName}</p>
           <textarea
             className="w-full resize-none rounded border bg-muted/30 px-2 py-1.5 text-xs outline-none focus:border-brand"
             rows={2}
@@ -88,7 +92,7 @@ export default function FollowButton({ horseName, initialFollowing, initialNote 
                   disabled={isPending}
                   className="flex items-center justify-center gap-1 rounded border border-miss/50 px-2 py-1 text-[11px] text-miss hover:bg-miss/10 disabled:opacity-50"
                 >
-                  <X className="h-3 w-3" /> Takipten Çık
+                  <X className="h-3 w-3" /> Çık
                 </button>
               </>
             ) : (
