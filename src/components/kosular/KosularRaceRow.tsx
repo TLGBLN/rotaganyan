@@ -85,7 +85,7 @@ export default function KosularRaceRow({
                 "flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold transition-all md:gap-2 md:px-3 md:py-1.5 md:text-xs",
                 pred!.isBanko
                   ? cn("border", confidenceColor[pred!.confidence], "hover:opacity-80")
-                  : "bg-[#007123] text-white hover:bg-[#005a1c]"
+                  : "bg-[#009900] text-white hover:bg-[#007a00]"
               )}
             >
               <span className="relative flex h-1.5 w-1.5 shrink-0">
