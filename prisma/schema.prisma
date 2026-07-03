@@ -425,3 +425,11 @@ model EngineConfig {
   updatedBy String?
   updatedAt DateTime @updatedAt
 }
+
+// ─── SITE SETTINGS ───────────────────────────────────────────────────────────
+
+model SiteSetting {
+  key       String   @id  // örn. "banner_url"
+  value     String
+  updatedAt DateTime @updatedAt
+}
