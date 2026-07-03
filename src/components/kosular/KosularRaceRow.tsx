@@ -21,6 +21,7 @@ type Props = {
   isEven: boolean;
   isLoggedIn: boolean;
   racePath?: string;
+  followedHorseNames?: Set<string>;
 };
 
 export default function KosularRaceRow({
@@ -33,6 +34,7 @@ export default function KosularRaceRow({
   isEven,
   isLoggedIn,
   racePath,
+  followedHorseNames,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const pred = race.prediction;
@@ -111,6 +113,7 @@ export default function KosularRaceRow({
             winnerNo={result?.winnerNo}
             isLoggedIn={isLoggedIn}
             racePath={racePath}
+            followedHorseNames={followedHorseNames}
           />
         </div>
       )}

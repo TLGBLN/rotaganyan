@@ -15,6 +15,7 @@ import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter
 import { syncResultsForDate } from "@/server/services/result-sync";
 import { turkeyDateString } from "@/lib/tz";
 import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import RaceCountdown from "@/components/kosular/RaceCountdown";
 import KosularRaceRow from "@/components/kosular/KosularRaceRow";
@@ -97,6 +98,12 @@ export default async function KosularPage({ searchParams }: PageProps) {
   }
   const isLoggedIn = true;
 
+  const followRows = await db.horseFollow.findMany({
+    where: { userId: session!.user.id },
+    select: { horseName: true },
+  });
+  const followedHorseNames = new Set(followRows.map((r) => r.horseName));
+
   const comboByRaceDay = new Map<string, ComboLeg[]>();
   if (visibleRaceDays.length > 0) {
     const combos = await Promise.all(visibleRaceDays.map((rd) => getComboCoupon(rd.hippodrome.slug, currentDate)));
@@ -168,6 +175,7 @@ export default async function KosularPage({ searchParams }: PageProps) {
                       isEven={i % 2 === 1}
                       isLoggedIn={isLoggedIn}
                       racePath={`/kosular/${currentDate}/${raceDay.hippodrome.slug}/${race.raceNo}`}
+                      followedHorseNames={followedHorseNames}
                     />
                   );
                 })}

@@ -56,6 +56,7 @@ enum NotificationType {
   NEW_PREDICTION
   NEW_ARTICLE
   SYSTEM
+  HORSE_RACE
 }
 
 enum LessonCategory {
@@ -89,6 +90,7 @@ model User {
   predictions   Prediction[]
   articles      Article[]
   notifications Notification[]
+  horseFollows  HorseFollow[]
   accounts      Account[]
   sessions      Session[]
 }
@@ -352,6 +354,21 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, read])
+}
+
+// ─── HORSE FOLLOWS ────────────────────────────────────────────────────────────
+
+model HorseFollow {
+  id        String   @id @default(cuid())
+  userId    String
+  horseName String
+  note      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, horseName])
+  @@index([userId])
 }
 
 // ─── METHODOLOGY ──────────────────────────────────────────────────────────────

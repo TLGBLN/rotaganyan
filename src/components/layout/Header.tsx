@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import MobileNav from "./MobileNav";
 import HeaderUserMenu from "./HeaderUserMenu";
 import LiveTvPlayer from "@/components/home/LiveTvPlayer";
+import NotificationBell from "./NotificationBell";
 
 export default async function Header() {
   const session = await auth();
@@ -43,6 +44,7 @@ export default async function Header() {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          {user && <NotificationBell />}
           {user ? (
             <HeaderUserMenu name={user.name} email={user.email} role={user.role} />
           ) : (

@@ -31,6 +31,14 @@
     {
       "path": "/api/cron/result-sync",
       "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/cron/horse-notifications-morning",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/horse-notifications-hourly",
+      "schedule": "0 9-18 * * *"
     }
   ]
 }

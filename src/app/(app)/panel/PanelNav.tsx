@@ -5,10 +5,11 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { PAYMENTS_ENABLED } from "@/lib/payments";
-import { LayoutDashboard, Bell, Star } from "lucide-react";
+import { LayoutDashboard, Bell, Bookmark, Star } from "lucide-react";
 
 const BASE_NAV = [
   { href: "/panel", label: "Profil", icon: LayoutDashboard, exact: true },
+  { href: "/panel/takip-atlarim", label: "Takip Atlarım", icon: Bookmark },
   { href: "/panel/bildirimler", label: "Bildirimler", icon: Bell },
 ];
 

@@ -3,6 +3,7 @@ import { Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import TargetBadge from "@/components/prediction/TargetBadge";
+import FollowButton from "@/components/kosular/FollowButton";
 import { cn } from "@/lib/utils";
 import type { ProgramRaceDay } from "@/server/services/race.service";
 
@@ -13,6 +14,7 @@ type Props = {
   winnerNo: number | null | undefined;
   isLoggedIn: boolean;
   racePath?: string;
+  followedHorseNames?: Set<string>;
 };
 
 function couponCategory(rank: number): { label: string; className: string } {
@@ -41,7 +43,7 @@ function splitLayerDetails(details: unknown) {
   return { a, b, c, gerekce: rest.join(" · ") || "—" };
 }
 
-export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, racePath }: Props) {
+export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, racePath, followedHorseNames }: Props) {
   if (!isLoggedIn) {
     const girisHref = racePath
       ? `/giris?callbackUrl=${encodeURIComponent(racePath)}`
@@ -114,6 +116,12 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, raceP
                         <span title={`Jokey değişti → önceki: ${pick.runner.previousJockey}`} className="rounded bg-orange-100 px-1 text-[10px] font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
                           ÖJ
                         </span>
+                      )}
+                      {pick.runner?.name && followedHorseNames !== undefined && (
+                        <FollowButton
+                          horseName={pick.runner.name}
+                          initialFollowing={followedHorseNames.has(pick.runner.name)}
+                        />
                       )}
                     </div>
                   </td>
