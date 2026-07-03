@@ -17,7 +17,7 @@ function compute(target: number): State {
   const minutes = totalMinutes % 60;
 
   const label =
-    days > 0 ? `${days}g ${hours}s kaldı` : hours > 0 ? `${hours}s ${minutes}dk kaldı` : `${minutes}dk kaldı`;
+    days > 0 ? `${days}g ${hours}s` : hours > 0 ? `${hours}s ${minutes}dk` : `${minutes}dk`;
 
   return { label, started: false, soon: diff <= 30 * 60_000 };
 }

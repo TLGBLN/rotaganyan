@@ -91,15 +91,15 @@ export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: P
                       <Link
                         key={race.id}
                         href={href}
-                        className="flex items-center gap-3 px-4 py-2.5 text-xs transition-colors hover:bg-muted/40"
+                        className="flex items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-muted/40 sm:gap-3 sm:px-4 sm:py-2.5"
                       >
                         {/* Race no */}
-                        <span className="w-5 shrink-0 font-mono font-semibold text-muted-foreground">
+                        <span className="w-4 shrink-0 font-mono font-semibold text-muted-foreground sm:w-5">
                           {race.raceNo}.
                         </span>
 
                         {/* Time + countdown */}
-                        <div className="w-14 shrink-0 flex flex-col">
+                        <div className="w-12 shrink-0 flex flex-col sm:w-14">
                           <span className="font-mono text-muted-foreground">{race.time ?? "—"}</span>
                           {race.time && !isResulted && (
                             <RaceCountdown date={dateStr} time={race.time} />
@@ -112,8 +112,8 @@ export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: P
                           <span className="truncate font-medium">{race.classType}</span>
                         </div>
 
-                        {/* Distance */}
-                        <span className="shrink-0 font-mono text-muted-foreground">
+                        {/* Distance — mobilde gizli */}
+                        <span className="hidden shrink-0 font-mono text-muted-foreground sm:inline">
                           {race.distance}m
                         </span>
 
@@ -134,7 +134,7 @@ export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: P
                             {isBanko ? "★ Banko" : "Analiz"}
                           </span>
                         ) : (
-                          <span className="shrink-0 w-10" />
+                          <span className="shrink-0 w-8 sm:w-10" />
                         )}
                       </Link>
                     );
