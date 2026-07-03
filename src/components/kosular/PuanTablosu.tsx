@@ -62,7 +62,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
     <div className="space-y-6">
       {groups.map((group, gi) => {
         const maxRows = Math.max(...group.map((r) => r.prediction!.picks.length));
-        const altiliLabel = groups.length > 1 ? `${gi + 1}. Altılı` : "Altılı";
+        const altiliLabel = `${gi + 1}.Altılı`;
 
         return (
           <div key={gi} className="rounded-xl border">
