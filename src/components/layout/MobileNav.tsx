@@ -2,14 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu } from "lucide-react";
+import { Menu, Bookmark, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { signOut } from "next-auth/react";
+import { cn } from "@/lib/utils";
 
-type Props = { isLoggedIn?: boolean };
+type FollowedHorse = { horseName: string; note?: string | null };
+type Props = { isLoggedIn?: boolean; followedHorses?: FollowedHorse[] };
 
-export default function MobileNav({ isLoggedIn }: Props) {
+export default function MobileNav({ isLoggedIn, followedHorses = [] }: Props) {
+  const [horsesOpen, setHorsesOpen] = useState(false);
   const [open, setOpen] = useState(false);
 
   return (
@@ -41,6 +44,50 @@ export default function MobileNav({ isLoggedIn }: Props) {
           >
             Banko Önerileri
           </Link>
+
+          {isLoggedIn && followedHorses.length > 0 && (
+            <div className="border-t pt-3 pb-1">
+              <button
+                onClick={() => setHorsesOpen((v) => !v)}
+                className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              >
+                <span className="flex items-center gap-2">
+                  <Bookmark className="h-4 w-4 text-brand" />
+                  Takip Atlarım
+                  <span className="rounded-full bg-brand/15 px-1.5 py-0.5 text-[10px] font-semibold text-brand">
+                    {followedHorses.length}
+                  </span>
+                </span>
+                {horsesOpen ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </button>
+
+              {horsesOpen && (
+                <div className="ml-3 mt-1 border-l pl-3 space-y-0.5">
+                  {followedHorses.map((h) => (
+                    <div key={h.horseName} className="py-1.5">
+                      <p className="text-sm font-medium">{h.horseName}</p>
+                      {h.note && (
+                        <p className="text-[11px] text-muted-foreground">{h.note}</p>
+                      )}
+                    </div>
+                  ))}
+                  <Link
+                    href="/panel/takip-atlarim"
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "mt-1 block rounded-md px-2 py-1.5 text-xs font-medium text-brand hover:bg-brand/10"
+                    )}
+                  >
+                    Tümünü gör →
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="border-t pt-4">
             {isLoggedIn ? (

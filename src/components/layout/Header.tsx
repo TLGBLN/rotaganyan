@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import MobileNav from "./MobileNav";
 import HeaderUserMenu from "./HeaderUserMenu";
@@ -9,6 +10,14 @@ import NotificationBell from "./NotificationBell";
 export default async function Header() {
   const session = await auth();
   const user = session?.user;
+
+  const followedHorses = user?.id
+    ? await db.horseFollow.findMany({
+        where: { userId: user.id },
+        select: { horseName: true, note: true },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -61,7 +70,7 @@ export default async function Header() {
               </Button>
             </>
           )}
-          <MobileNav isLoggedIn={!!user} />
+          <MobileNav isLoggedIn={!!user} followedHorses={followedHorses} />
         </div>
       </div>
     </header>
