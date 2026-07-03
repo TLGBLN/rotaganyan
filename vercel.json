@@ -38,7 +38,19 @@
     },
     {
       "path": "/api/cron/horse-notifications-hourly",
-      "schedule": "0 9-18 * * *"
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/horse-notifications-hourly",
+      "schedule": "0 11 * * *"
+    },
+    {
+      "path": "/api/cron/horse-notifications-hourly",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/horse-notifications-hourly",
+      "schedule": "0 15 * * *"
     }
   ]
 }
