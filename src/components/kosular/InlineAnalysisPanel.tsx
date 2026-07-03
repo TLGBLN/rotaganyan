@@ -70,7 +70,7 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, raceP
   return (
     <div className="space-y-2">
       {/* ── MOBİL: her at ayrı satır ── */}
-      <div className="sm:hidden rounded-lg border divide-y">
+      <div className="md:hidden rounded-lg border divide-y">
         {picks.map((pick, i) => {
           const isWinner = winnerNo != null && pick.runner?.no === winnerNo;
           const coupon = couponCategory(pick.rank);
@@ -119,7 +119,7 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, raceP
       </div>
 
       {/* ── MASAÜSTÜ: tablo ── */}
-      <div className="hidden sm:block overflow-x-auto rounded-lg border">
+      <div className="hidden md:block overflow-x-auto rounded-lg border">
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b bg-muted/40">

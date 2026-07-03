@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,15 @@ export default function KosularRaceRow({
   followedHorseNames,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (expanded && panelRef.current) {
+      const el = panelRef.current;
+      setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "nearest" }), 80);
+    }
+  }, [expanded]);
+
   const pred = race.prediction;
   const result = race.result;
   const hasAnalysis = !!pred?.published;
@@ -107,7 +116,7 @@ export default function KosularRaceRow({
       </div>
 
       {expanded && hasAnalysis && (
-        <div className="border-b bg-muted/20 p-3 last:border-0">
+        <div ref={panelRef} className="border-b bg-muted/20 p-3 last:border-0">
           <InlineAnalysisPanel
             picks={pred!.picks}
             winnerNo={result?.winnerNo}
