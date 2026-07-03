@@ -8,7 +8,7 @@ export const maxDuration = 30;
 
 const BUCKET = "banners";
 const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_BYTES = 5 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -26,28 +26,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Dosya 5 MB'dan büyük olamaz" }, { status: 400 });
 
   const ext = file.name.split(".").pop() ?? "jpg";
-  const path = `banner.${ext}`;
+  const storagePath = `slide-${Date.now()}.${ext}`;
   const arrayBuffer = await file.arrayBuffer();
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from(BUCKET)
-    .upload(path, arrayBuffer, {
-      contentType: file.type,
-      upsert: true,
-    });
+    .upload(storagePath, arrayBuffer, { contentType: file.type, upsert: false });
 
   if (uploadError) {
     return NextResponse.json({ error: uploadError.message }, { status: 500 });
   }
 
-  const { data: urlData } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path);
-  const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+  const { data: urlData } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(storagePath);
 
-  await db.siteSetting.upsert({
-    where: { key: "banner_url" },
-    create: { key: "banner_url", value: publicUrl },
-    update: { value: publicUrl },
+  // En yüksek order'dan bir fazlası
+  const last = await db.bannerSlide.findFirst({ orderBy: { order: "desc" }, select: { order: true } });
+  const nextOrder = (last?.order ?? -1) + 1;
+
+  const slide = await db.bannerSlide.create({
+    data: { url: urlData.publicUrl, storagePath, order: nextOrder },
   });
 
-  return NextResponse.json({ url: publicUrl });
+  return NextResponse.json({ slide });
 }

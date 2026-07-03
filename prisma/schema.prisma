@@ -433,3 +433,16 @@ model SiteSetting {
   value     String
   updatedAt DateTime @updatedAt
 }
+
+// ─── BANNER SLIDES ───────────────────────────────────────────────────────────
+
+model BannerSlide {
+  id        String   @id @default(cuid())
+  url       String
+  storagePath String  // Supabase'deki dosya yolu (silme için)
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([active, order])
+}

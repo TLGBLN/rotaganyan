@@ -1,25 +1,46 @@
 import Image from "next/image";
 import { db } from "@/lib/db";
+import BannerSlider from "./BannerSlider";
+
+const FALLBACK = { id: "default", url: "/banner-v3.png" };
 
 export default async function HeroBanner() {
-  const setting = await db.siteSetting.findUnique({ where: { key: "banner_url" } });
-  const src = setting?.value ?? "/banner-v3.png";
+  const slides = await db.bannerSlide.findMany({
+    where: { active: true },
+    orderBy: { order: "asc" },
+    select: { id: true, url: true },
+  });
 
-  const isExternal = src.startsWith("http");
-
-  return (
-    <div className="w-full">
-      <div className="relative w-full">
+  if (slides.length === 0) {
+    return (
+      <div className="w-full">
         <Image
-          src={src}
+          src={FALLBACK.url}
           alt="ROTAGANYAN — Analiz · Tahmin · Strateji"
           width={2191}
           height={718}
           className="w-full h-auto"
           priority
-          unoptimized={isExternal}
         />
       </div>
-    </div>
-  );
+    );
+  }
+
+  if (slides.length === 1) {
+    return (
+      <div className="w-full">
+        <Image
+          src={slides[0].url}
+          alt="ROTAGANYAN — Analiz · Tahmin · Strateji"
+          width={2191}
+          height={718}
+          className="w-full h-auto"
+          priority
+          unoptimized
+        />
+      </div>
+    );
+  }
+
+  return <BannerSlider slides={slides} />;
 }
