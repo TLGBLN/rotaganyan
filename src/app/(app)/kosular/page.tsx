@@ -61,14 +61,17 @@ export default async function KosularPage({ searchParams }: PageProps) {
   // Önce DB'ye bak
   let dbRaceDays = await getRaceDaysByDate(currentDate, undefined);
 
-  // DB boşsa ve tarih bugün/yarınsa otomatik çek ve kaydet
-  if (dbRaceDays.length === 0 && shouldAutoIngest) {
+  // Bugün/yarınsa: boşsa veya kısmen geldiyse (hipodrom var ama az koşu) yeniden çek
+  if (shouldAutoIngest) {
     const tjkDate = toTjkDate(new Date(currentDate + "T00:00:00Z"));
-    try {
-      await ingestDate(tjkDate);
-      dbRaceDays = await getRaceDaysByDate(currentDate, undefined);
-    } catch {
-      // ingest başarısız olursa TJK canlı fallback'e düş
+    const totalRaces = dbRaceDays.reduce((s, rd) => s + rd.races.length, 0);
+    if (totalRaces === 0 || dbRaceDays.some(rd => rd.races.length < 3)) {
+      try {
+        await ingestDate(tjkDate);
+        dbRaceDays = await getRaceDaysByDate(currentDate, undefined);
+      } catch {
+        // ingest başarısız olursa mevcut veriyle devam et
+      }
     }
   }
 

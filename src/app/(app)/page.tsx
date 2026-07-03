@@ -19,14 +19,18 @@ export const revalidate = 60;
 export default async function HomePage() {
   const today = turkeyDateString();
 
-  // DB'de bugünkü koşu yoksa otomatik çek (cron çalışmamışsa kapsamı doldurur)
+  // Build zamanında TJK'ya bağlanma (timeout); runtime ISR'da her zaman taze çek
   let raceDays = await getRaceDaysByDate(today);
-  if (raceDays.length === 0) {
-    try {
-      await ingestDate(toTjkDate(new Date(today + "T00:00:00Z")));
-      raceDays = await getRaceDaysByDate(today);
-    } catch {
-      // ingest başarısız olursa widget boş kalır, sayfa yine render edilir
+  if (process.env.NEXT_PHASE !== "phase-production-build") {
+    const totalRaces = raceDays.reduce((s, rd) => s + rd.races.length, 0);
+    // Hiç veri yoksa veya kısmen geldiyse (hipodrom var ama az koşu) yeniden çek
+    if (totalRaces === 0 || raceDays.some(rd => rd.races.length < 3)) {
+      try {
+        await ingestDate(toTjkDate(new Date(today + "T00:00:00Z")));
+        raceDays = await getRaceDaysByDate(today);
+      } catch {
+        // sessizce geç
+      }
     }
   }
 
