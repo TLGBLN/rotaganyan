@@ -171,7 +171,7 @@ export async function fetchCityProgram(
     $("tbody tr", raceDiv).each((_, row) => {
       const noText = $(".gunluk-GunlukYarisProgrami-SiraId", row).text().trim();
       const no = parseInt(noText, 10);
-      if (isNaN(no) || no < 1 || no > 30) return;
+      if (isNaN(no) || no < 1) return;
 
       // Horse name — clone & remove span (finishing position) before reading text
       const atEl = $(".gunluk-GunlukYarisProgrami-AtAdi a", row).first();

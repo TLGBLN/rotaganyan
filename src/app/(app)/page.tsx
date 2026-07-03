@@ -9,6 +9,7 @@ import { getHitPredictions, getKuponOnerileri, getRaceDaysByDate } from "@/serve
 import { getAgfMovers } from "@/server/services/agf-trend.service";
 import { fetchTjkTicker } from "@/lib/tjk-ticker";
 import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
+import { ingestDate, toTjkDate } from "@/server/services/ingest/tjk-info.adapter";
 import { turkeyDateString } from "@/lib/tz";
 import { auth } from "@/lib/auth";
 import SteamWidget from "@/components/kosular/SteamWidget";
@@ -17,14 +18,25 @@ export const revalidate = 60;
 
 export default async function HomePage() {
   const today = turkeyDateString();
-  const [session, hitPredictions, kuponOnerisi, tickerItems, altiliResults, agfMovers, raceDays] = await Promise.all([
+
+  // DB'de bugünkü koşu yoksa otomatik çek (cron çalışmamışsa kapsamı doldurur)
+  let raceDays = await getRaceDaysByDate(today);
+  if (raceDays.length === 0) {
+    try {
+      await ingestDate(toTjkDate(new Date(today + "T00:00:00Z")));
+      raceDays = await getRaceDaysByDate(today);
+    } catch {
+      // ingest başarısız olursa widget boş kalır, sayfa yine render edilir
+    }
+  }
+
+  const [session, hitPredictions, kuponOnerisi, tickerItems, altiliResults, agfMovers] = await Promise.all([
     auth(),
     getHitPredictions(16),
     getKuponOnerileri(),
     fetchTjkTicker(),
     fetchTodaysAltiliResults(),
     getAgfMovers(today),
-    getRaceDaysByDate(today),
   ]);
   const isLoggedIn = !!session?.user;
 
