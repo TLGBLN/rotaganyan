@@ -43,8 +43,6 @@ export async function upsertArticle(id: string | null, input: ArticleInput) {
     : await db.article.create({ data });
 
   revalidatePath("/admin/makaleler");
-  revalidatePath(`/rehber/${input.slug}`);
-  revalidatePath(`/magazin/${input.slug}`);
   return { success: true, id: article.id };
 }
 
@@ -57,11 +55,7 @@ export async function publishArticle(id: string) {
   });
 
   revalidatePath("/admin/makaleler");
-  revalidatePath("/rehber");
-  revalidatePath("/magazin");
-
-  const path = article.type === "MAGAZINE" ? `/magazin/${article.slug}` : `/rehber/${article.slug}`;
-  await tweetArticlePublished(article.title, path);
+  await tweetArticlePublished(article.title, "/");
 }
 
 export async function unpublishArticle(id: string) {
