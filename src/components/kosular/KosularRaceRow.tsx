@@ -60,11 +60,9 @@ export default function KosularRaceRow({
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
             <span>{race.classType}</span>
+            <span className={cn("font-medium", surfaceClassName)}>· {surfaceLabel}</span>
+            <span>· {race.distance}m</span>
             <span className="hidden sm:inline">· {breedLabel}</span>
-            <span className={cn("hidden sm:inline font-medium", surfaceClassName)}>
-              · {surfaceLabel}
-            </span>
-            <span className="hidden sm:inline">· {race.distance}m</span>
           </div>
         </div>
 
@@ -86,7 +84,12 @@ export default function KosularRaceRow({
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
               </span>
               <span>
-                {pred!.isBanko ? "★ Banko" : "Analizleri görmek için tıklayınız"}
+                {pred!.isBanko ? "★ Banko" : (
+                  <>
+                    <span className="sm:hidden">Analizler</span>
+                    <span className="hidden sm:inline">Analizleri görmek için tıklayınız</span>
+                  </>
+                )}
               </span>
               <ChevronDown
                 className={cn(

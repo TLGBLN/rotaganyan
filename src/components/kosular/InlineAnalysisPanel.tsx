@@ -69,17 +69,67 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, raceP
 
   return (
     <div className="space-y-2">
-      <div className="overflow-x-auto rounded-lg border">
+      {/* ── MOBİL: her at ayrı satır ── */}
+      <div className="sm:hidden rounded-lg border divide-y">
+        {picks.map((pick, i) => {
+          const isWinner = winnerNo != null && pick.runner?.no === winnerNo;
+          const coupon = couponCategory(pick.rank);
+          return (
+            <div
+              key={pick.id}
+              className={cn(
+                "flex items-center gap-2 px-3 py-2.5",
+                i % 2 === 1 && "race-row-even",
+                pick.isTarget && "bg-target/10",
+                isWinner && "bg-[#C98F02]/20"
+              )}
+            >
+              <span className="w-4 shrink-0 text-center text-[11px] text-muted-foreground tabular-nums">
+                {pick.rank}
+              </span>
+              <span className="w-5 shrink-0 font-mono text-xs tabular-nums">
+                {pick.runner?.no ?? "—"}
+              </span>
+              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                <span className={cn("truncate text-xs font-medium", isWinner && "font-bold text-[#F5C518]")}>
+                  {pick.runner?.name ?? pick.runnerLabel}
+                </span>
+                {pick.isTarget && <TargetBadge />}
+                {pick.runner?.jockeyChanged && pick.runner.previousJockey && (
+                  <span title={`Jokey değişti → önceki: ${pick.runner.previousJockey}`} className="shrink-0 rounded bg-orange-100 px-1 text-[10px] font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                    ÖJ
+                  </span>
+                )}
+                {pick.runner?.name && followedHorseNames !== undefined && (
+                  <FollowButton
+                    horseName={pick.runner.name}
+                    initialFollowing={followedHorseNames.has(pick.runner.name)}
+                  />
+                )}
+              </div>
+              <span className="shrink-0 font-mono text-xs font-bold text-brand">
+                {pick.score ?? "—"}
+              </span>
+              <Badge variant="outline" className={cn("shrink-0 text-[10px]", coupon.className)}>
+                {coupon.label}
+              </Badge>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── MASAÜSTÜ: tablo ── */}
+      <div className="hidden sm:block overflow-x-auto rounded-lg border">
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b bg-muted/40">
               <th className="px-2 py-2 text-left font-medium text-muted-foreground">Sıra</th>
-              <th className="hidden px-2 py-2 text-left font-medium text-muted-foreground sm:table-cell">Kupon</th>
+              <th className="px-2 py-2 text-left font-medium text-muted-foreground">Kupon</th>
               <th className="px-2 py-2 text-left font-medium text-muted-foreground">No</th>
               <th className="px-2 py-2 text-left font-medium text-muted-foreground">At</th>
-              <th className="hidden px-2 py-2 text-right font-medium text-muted-foreground sm:table-cell">A Katmanı</th>
-              <th className="hidden px-2 py-2 text-right font-medium text-muted-foreground sm:table-cell">B Katmanı</th>
-              <th className="hidden px-2 py-2 text-right font-medium text-muted-foreground sm:table-cell">C Katmanı</th>
+              <th className="px-2 py-2 text-right font-medium text-muted-foreground">A Katmanı</th>
+              <th className="px-2 py-2 text-right font-medium text-muted-foreground">B Katmanı</th>
+              <th className="px-2 py-2 text-right font-medium text-muted-foreground">C Katmanı</th>
               <th className="px-2 py-2 text-right font-medium text-muted-foreground">Toplam</th>
               <th className="hidden px-2 py-2 text-left font-medium text-muted-foreground md:table-cell">Kilit Gerekçe</th>
             </tr>
@@ -100,7 +150,7 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, raceP
                   )}
                 >
                   <td className="px-2 py-2 font-semibold">{pick.rank}</td>
-                  <td className="hidden px-2 py-2 sm:table-cell">
+                  <td className="px-2 py-2">
                     <Badge variant="outline" className={cn("text-[10px]", coupon.className)}>
                       {coupon.label}
                     </Badge>
@@ -125,9 +175,9 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, raceP
                       )}
                     </div>
                   </td>
-                  <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">{a}</td>
-                  <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">{b}</td>
-                  <td className="hidden px-2 py-2 text-right font-mono sm:table-cell">{c}</td>
+                  <td className="px-2 py-2 text-right font-mono">{a}</td>
+                  <td className="px-2 py-2 text-right font-mono">{b}</td>
+                  <td className="px-2 py-2 text-right font-mono">{c}</td>
                   <td className="px-2 py-2 text-right font-mono font-bold text-brand">{pick.score ?? "—"}</td>
                   <td className="hidden px-2 py-2 text-muted-foreground md:table-cell">{gerekce}</td>
                 </tr>
