@@ -73,7 +73,7 @@ export default function KosularRaceRow({
               type="button"
               onClick={() => setExpanded((v) => !v)}
               className={cn(
-                "flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold transition-all",
+                "flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold transition-all md:gap-2 md:px-3 md:py-1.5 md:text-xs",
                 pred!.isBanko
                   ? cn("border", confidenceColor[pred!.confidence], "hover:opacity-80")
                   : "bg-[#007123] text-white hover:bg-[#005a1c]"
@@ -86,14 +86,14 @@ export default function KosularRaceRow({
               <span>
                 {pred!.isBanko ? "★ Banko" : (
                   <>
-                    <span className="sm:hidden">Analizler</span>
-                    <span className="hidden sm:inline">Analizleri görmek için tıklayınız</span>
+                    <span className="md:hidden">Analiz</span>
+                    <span className="hidden md:inline">Analizleri görmek için tıklayınız</span>
                   </>
                 )}
               </span>
               <ChevronDown
                 className={cn(
-                  "h-3.5 w-3.5 transition-transform",
+                  "h-3 w-3 transition-transform md:h-3.5 md:w-3.5",
                   expanded && "rotate-180"
                 )}
               />
