@@ -3,7 +3,6 @@ import StatTile from "@/components/stats/StatTile";
 import PerformanceBreakdown from "@/components/admin/PerformanceBreakdown";
 import CouponTierChart from "@/components/admin/CouponTierChart";
 import InsightsPanel from "@/components/admin/InsightsPanel";
-import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -79,25 +78,6 @@ export default async function AdminDashboard() {
           <p className="text-sm text-muted-foreground">Henüz sonuçlanmış tahmin yok.</p>
         ) : (
           <div className="space-y-4">
-            <div className="rounded-lg border bg-card p-4">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Son {analyst.recentTrend.length} Tahmin (kronolojik sıra)
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {analyst.recentTrend.map((hit, i) => (
-                  <span
-                    key={i}
-                    className={cn(
-                      "inline-flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold",
-                      hit ? "bg-hit/20 text-hit" : "bg-miss/20 text-miss"
-                    )}
-                  >
-                    {hit ? "✓" : "✗"}
-                  </span>
-                ))}
-              </div>
-            </div>
-
             <CouponTierChart rows={[analyst.overallCouponTier]} title="Genel: Kazanan Hangi Kupon Kademesinde Geldi" />
 
             <div className="grid gap-4 sm:grid-cols-2">
