@@ -92,7 +92,7 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, raceP
               </span>
               <div className="flex min-w-0 flex-1 items-center gap-1.5">
                 <span className={cn("truncate text-xs font-medium", isWinner && "font-bold text-[#F5C518]")}>
-                  {pick.runner?.name ?? pick.runnerLabel}
+                  {pick.runner?.name || pick.runnerLabel}
                 </span>
                 {pick.isTarget && <TargetBadge />}
                 {pick.runner?.jockeyChanged && pick.runner.previousJockey && (
@@ -159,7 +159,7 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, raceP
                   <td className="px-2 py-2 font-medium">
                     <div className="flex items-center gap-1.5">
                       <span className={isWinner ? "font-bold text-[#F5C518]" : ""}>
-                        {pick.runner?.name ?? pick.runnerLabel}
+                        {pick.runner?.name || pick.runnerLabel}
                       </span>
                       {pick.isTarget && <TargetBadge className="ml-1.5" />}
                       {pick.runner?.jockeyChanged && pick.runner.previousJockey && (

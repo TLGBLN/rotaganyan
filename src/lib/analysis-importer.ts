@@ -216,7 +216,7 @@ async function importSingle(item: AnalysisItem, adminUserId: string): Promise<st
     const runner = await db.runner.upsert({
       where: { raceId_no: { raceId: race.id, no: pick.no } },
       create: { raceId: race.id, no: pick.no, name: pick.name },
-      update: {},
+      update: { name: pick.name },
     });
     runnerIds[pick.no] = runner.id;
   }

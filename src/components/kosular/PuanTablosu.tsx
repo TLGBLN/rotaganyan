@@ -129,7 +129,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                               <span className="font-mono mr-1 tabular-nums">
                                 {pick.runner?.no ?? "—"}
                               </span>
-                              {pick.runner?.name ?? pick.runnerLabel ?? "—"}
+                              {pick.runner?.name || pick.runnerLabel || "—"}
                             </td>
                             <td className={cn("px-2 py-1.5 text-center font-mono tabular-nums", textColor, weight)}>
                               {pick.score ?? "—"}
@@ -241,7 +241,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                                   {pick.runner?.no ?? "—"}
                                 </span>
                                 <span className={cn(weight)}>
-                                  {pick.runner?.name ?? pick.runnerLabel ?? "—"}
+                                  {pick.runner?.name || pick.runnerLabel || "—"}
                                 </span>
                               </div>
                             </td>
