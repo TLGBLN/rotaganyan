@@ -416,7 +416,7 @@ export async function getRecentPredictions(n = 15): Promise<RecentPrediction[]> 
     isBanko: p.isBanko,
     topPickLabel: p.picks[0]?.runner?.name || p.picks[0]?.runnerLabel || "—",
     hitTop1: p.race.result?.hitTop1 ?? null,
-    actualFirst: (p.race.result?.actualOrder as string[] | null | undefined)?.[0] ?? null,
+    actualFirst: (Array.isArray(p.race.result?.actualOrder) ? String(p.race.result.actualOrder[0] ?? "") : null) || null,
   }));
 }
 

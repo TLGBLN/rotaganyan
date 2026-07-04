@@ -75,7 +75,7 @@ export default function RecentFeed({ predictions }: { predictions: RecentPredict
                 <ResultBadge hitTop1={p.hitTop1} />
                 {p.actualFirst && !p.hitTop1 && p.hitTop1 !== null && (
                   <span className="ml-1.5 text-[10px] text-muted-foreground">
-                    → {p.actualFirst.replace(/^\d+\s+/, "")}
+                    → {String(p.actualFirst).replace(/^\d+\s+/, "")}
                   </span>
                 )}
               </div>
