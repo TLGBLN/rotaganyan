@@ -325,10 +325,10 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string): Clas
   const normalized = normalizeClassType(classType);
   const breakdown = stats.byClassType.find((b) => b.label === normalized);
 
-  // Az veriyle yanıltıcı kırmızı uyarı çıkmasın — anlamlı yorum için en az 5 koşu gerekli.
+  // Az veriyle anlamlı yorum yapılamaz — yeterli veri yoksa uyarı ver.
   if (!breakdown || breakdown.total < 5) {
     const n = breakdown?.total ?? 0;
-    return { level: "none", text: n > 0 ? `${n} koşu — yorum için yeterli veri yok` : "Geçmiş veri yok" };
+    return { level: "warn", text: n > 0 ? `${n} koşu — yeterli geçmiş veri yok` : "Geçmiş veri yok" };
   }
 
   const tier = stats.couponTierByClassType.find((t) => t.label === normalized);
