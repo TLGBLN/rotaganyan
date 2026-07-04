@@ -3,6 +3,7 @@ import StatTile from "@/components/stats/StatTile";
 import PerformanceBreakdown from "@/components/admin/PerformanceBreakdown";
 import CouponTierChart from "@/components/admin/CouponTierChart";
 import InsightsPanel from "@/components/admin/InsightsPanel";
+import NarrativeSummary from "@/components/admin/NarrativeSummary";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,8 @@ export default async function AdminDashboard() {
   return (
     <div className="space-y-6">
       <h1 className="text-lg font-bold">Dashboard</h1>
+
+      <NarrativeSummary analyst={analyst} pendingResults={stats.pendingResults} />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <StatTile label="Toplam Analiz" value={stats.totalPredictions} highlight="brand" />
