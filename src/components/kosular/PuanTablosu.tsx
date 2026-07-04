@@ -11,9 +11,17 @@ type Props = {
 };
 
 type Race = { raceNo: number };
-function chunkIntoAltili<T extends Race>(races: T[]): { label: string; races: T[] }[] {
-  const g1 = races.filter((r) => r.raceNo <= 6);
-  const g2 = races.filter((r) => r.raceNo > 6);
+function chunkIntoAltili<T extends Race>(
+  allRaces: T[],
+  analyzedRaces: T[]
+): { label: string; races: T[] }[] {
+  if (allRaces.length <= 6) {
+    return analyzedRaces.length > 0 ? [{ label: "1.Altılı", races: analyzedRaces }] : [];
+  }
+  const g1Nos = new Set(allRaces.slice(0, 6).map((r) => r.raceNo));
+  const g2Nos = new Set(allRaces.slice(allRaces.length - 6).map((r) => r.raceNo));
+  const g1 = analyzedRaces.filter((r) => g1Nos.has(r.raceNo));
+  const g2 = analyzedRaces.filter((r) => g2Nos.has(r.raceNo));
   const result: { label: string; races: T[] }[] = [];
   if (g1.length > 0) result.push({ label: "1.Altılı", races: g1 });
   if (g2.length > 0) result.push({ label: "2.Altılı", races: g2 });
@@ -60,7 +68,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
     );
   }
 
-  const groups = chunkIntoAltili(analyzedRaces);
+  const groups = chunkIntoAltili(raceDay.races, analyzedRaces);
 
   return (
     <div className="space-y-6">
