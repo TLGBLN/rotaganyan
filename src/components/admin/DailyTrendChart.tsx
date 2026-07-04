@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { DailyPoint } from "@/server/services/admin.service";
+import type { RollingPoint } from "@/server/services/admin.service";
 
 // ── SVG sabit boyutlar ───────────────────────────────────────────────────────
 const W = 600, H = 140;
@@ -78,36 +78,45 @@ export type TrendChartStats = {
   pending: number;
 };
 
+const LINE_COLOR = "#3b82f6";   // sabit mavi — light/dark her ikisinde görünür
+const AREA_COLOR = "#3b82f6";
+const HIT_COLOR  = "#22c55e";   // yeşil
+const MISS_COLOR = "#ef4444";   // kırmızı
+
 export default function DailyTrendChart({
-  dailyTrend,
+  rollingTrend,
   overallRate,
   stats,
 }: {
-  dailyTrend: DailyPoint[];
+  rollingTrend: RollingPoint[];
   overallRate: number;
   stats?: TrendChartStats;
 }) {
-  const n = dailyTrend.length;
-  const allPts = dailyTrend.map((d, i) => ({
+  const completed = rollingTrend.filter((_, i) => i >= 0); // all points
+  const n = completed.length;
+  const hasChart = n >= 5;
+
+  const pts = completed.map((d, i) => ({
     x: px(i, n),
-    y: d.rate >= 0 ? py(d.rate) : null,
-    ...d,
+    y: py(d.rate),
+    hit: d.hit,
+    date: d.date,
+    rate: d.rate,
   }));
-  const valid = allPts.filter((p): p is typeof p & { y: number } => p.y !== null);
-  const hasChart = valid.length >= 3;
 
   const avgY = py(overallRate);
   const bottomY = MT + PH;
-  const linePath = hasChart ? curvePath(valid.map((p) => ({ x: p.x, y: p.y }))) : "";
+  const linePath = hasChart ? curvePath(pts.map((p) => ({ x: p.x, y: p.y }))) : "";
   const areaPath = hasChart
-    ? `${linePath} L ${valid[valid.length - 1].x.toFixed(1)},${bottomY} L ${valid[0].x.toFixed(1)},${bottomY} Z`
+    ? `${linePath} L ${pts[n - 1].x.toFixed(1)},${bottomY} L ${pts[0].x.toFixed(1)},${bottomY} Z`
     : "";
 
+  // X-axis labels: ~6 evenly spaced
   const labelIdxs: number[] = [];
-  for (let i = 0; i < n; i += 7) labelIdxs.push(i);
+  const step = Math.max(1, Math.floor(n / 6));
+  for (let i = 0; i < n; i += step) labelIdxs.push(i);
   if (n > 1 && labelIdxs[labelIdxs.length - 1] !== n - 1) labelIdxs.push(n - 1);
 
-  // KPI renk hesaplama
   const overallColor: Color =
     overallRate >= 40 ? "hit" : overallRate >= 20 ? "brand" : "miss";
   const bankoColor: Color =
@@ -130,7 +139,7 @@ export default function DailyTrendChart({
   return (
     <div className="rounded-lg border p-4">
       <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Performans Özeti · Son 30 Gün
+        Performans Özeti · Kümülatif Trend
       </h3>
 
       {/* Mini KPI'lar */}
@@ -167,8 +176,8 @@ export default function DailyTrendChart({
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" aria-hidden="true">
           <defs>
             <linearGradient id="trendAreaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="hsl(var(--brand))" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="hsl(var(--brand))" stopOpacity="0.02" />
+              <stop offset="0%" stopColor={AREA_COLOR} stopOpacity="0.20" />
+              <stop offset="100%" stopColor={AREA_COLOR} stopOpacity="0.02" />
             </linearGradient>
           </defs>
 
@@ -176,8 +185,8 @@ export default function DailyTrendChart({
             const y = py(pct);
             return (
               <g key={pct}>
-                <line x1={ML} y1={y} x2={W - MR} y2={y} stroke="currentColor" strokeOpacity="0.07" strokeWidth="1" />
-                <text x={ML - 4} y={y + 3.5} textAnchor="end" fontSize="9" fill="currentColor" fillOpacity="0.35">
+                <line x1={ML} y1={y} x2={W - MR} y2={y} stroke="currentColor" strokeOpacity="0.08" strokeWidth="1" />
+                <text x={ML - 4} y={y + 3.5} textAnchor="end" fontSize="9" fill="currentColor" fillOpacity="0.4">
                   {pct}%
                 </text>
               </g>
@@ -185,30 +194,33 @@ export default function DailyTrendChart({
           })}
 
           {overallRate > 0 && overallRate < 100 && (
-            <line x1={ML} y1={avgY} x2={W - MR} y2={avgY} stroke="currentColor" strokeOpacity="0.25" strokeWidth="1" strokeDasharray="4 3" />
+            <line x1={ML} y1={avgY} x2={W - MR} y2={avgY} stroke={LINE_COLOR} strokeOpacity="0.35" strokeWidth="1" strokeDasharray="4 3" />
           )}
 
           <path d={areaPath} fill="url(#trendAreaGrad)" />
-          <path d={linePath} fill="none" stroke="hsl(var(--brand))" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={linePath} fill="none" stroke={LINE_COLOR} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
 
-          {valid.map((p, i) => {
-            const isGood = p.rate >= overallRate + 15;
-            const isBad = p.rate < overallRate - 15 && overallRate > 0;
-            const fill = isGood ? "hsl(var(--hit))" : isBad ? "hsl(var(--miss))" : "hsl(var(--brand))";
-            return (
-              <circle key={i} cx={p.x.toFixed(1)} cy={p.y.toFixed(1)} r="2.8" style={{ fill, stroke: "hsl(var(--background))", strokeWidth: 1.5 }} />
-            );
-          })}
+          {pts.map((p, i) => (
+            <circle
+              key={i}
+              cx={p.x.toFixed(1)}
+              cy={p.y.toFixed(1)}
+              r="3.5"
+              fill={p.hit ? HIT_COLOR : MISS_COLOR}
+              stroke="white"
+              strokeWidth="1.5"
+            />
+          ))}
 
           {labelIdxs.map((idx) => (
-            <text key={idx} x={allPts[idx].x.toFixed(1)} y={H - 4} textAnchor="middle" fontSize="9" fill="currentColor" fillOpacity="0.35">
-              {fmtDate(dailyTrend[idx].date)}
+            <text key={idx} x={pts[idx].x.toFixed(1)} y={H - 4} textAnchor="middle" fontSize="9" fill="currentColor" fillOpacity="0.4">
+              {fmtDate(pts[idx].date)}
             </text>
           ))}
         </svg>
       ) : (
         <div className="flex h-20 items-center justify-center">
-          <p className="text-sm text-muted-foreground">Henüz yeterli günlük veri yok.</p>
+          <p className="text-sm text-muted-foreground">Henüz yeterli veri yok (en az 5 sonuç gerekli).</p>
         </div>
       )}
     </div>

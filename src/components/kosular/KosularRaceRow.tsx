@@ -73,6 +73,9 @@ export default function KosularRaceRow({
             <span>· {race.distance}m</span>
             <span className="hidden sm:inline">· {breedLabel}</span>
           </div>
+          {race.conditions && (
+            <div className="mt-0.5 text-[10px] text-brand/70 font-medium">↳ {race.conditions}</div>
+          )}
         </div>
 
         {/* Sağ: analiz butonu */}

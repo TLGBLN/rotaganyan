@@ -95,11 +95,17 @@ function normTr(s: string): string {
   return s.replace(/[İIığĞüÜşŞöÖçÇ]/g, (c) => TR_MAP[c] ?? c).toUpperCase();
 }
 
-/** "1. Koşu 17.45" -> { raceNo: 1, time: "17:45" } */
-function parseRaceNoTime(text: string): { raceNo: number; time?: string } | null {
-  const m = cleanCell(text).match(/(\d+)\.\s*Ko[şs]u\s*(\d{1,2})[.:](\d{2})/i);
+/** "1. Koşu 17.45 (İstanbul 8. Koşu)" -> { raceNo: 1, time: "17:45", sourceRace: "İstanbul 8. Koşu" } */
+function parseRaceNoTime(text: string): { raceNo: number; time?: string; sourceRace?: string } | null {
+  const clean = cleanCell(text);
+  const m = clean.match(/(\d+)\.\s*Ko[şs]u\s*(\d{1,2})[.:](\d{2})/i);
   if (!m) return null;
-  return { raceNo: parseInt(m[1], 10), time: `${m[2].padStart(2, "0")}:${m[3]}` };
+  const sourceMatch = clean.match(/\(([^)]+\d+\.\s*Ko[şs]u[^)]*)\)/i);
+  return {
+    raceNo: parseInt(m[1], 10),
+    time: `${m[2].padStart(2, "0")}:${m[3]}`,
+    sourceRace: sourceMatch ? sourceMatch[1].trim() : undefined,
+  };
 }
 
 /** "Handikap 15 /H1 , 3 ve Yukarı İngilizler, 2100 Sentetik" -> race config fields */
@@ -242,6 +248,7 @@ async function fetchCityProgram(
       breed: config.breed,
       surface: config.surface,
       distance: config.distance,
+      conditions: noTime.sourceRace,
       runners,
       gallops: [],
     });

@@ -84,7 +84,12 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                       key={race.id}
                       className={cn("border-b last:border-0", i % 2 === 1 && "race-row-even")}
                     >
-                      <td className="px-3 py-1.5 font-semibold">{race.raceNo}</td>
+                      <td className="px-3 py-1.5 font-semibold">
+                        {race.raceNo}
+                        {race.conditions && (
+                          <div className="text-[10px] font-normal text-muted-foreground">{race.conditions}</div>
+                        )}
+                      </td>
                       <td className="px-3 py-1.5 text-muted-foreground">
                         <div className="flex items-center gap-1.5">
                           <span>{race.classType}</span>
