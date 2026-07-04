@@ -10,10 +10,14 @@ type Props = {
   currentDate: string;
 };
 
-// Admin/kupon ile aynı mantık: ≤6 koşu → tek grup, >6 → ilk 6 ve son 6
-function chunkIntoAltili<T>(races: T[]): T[][] {
-  if (races.length <= 6) return races.length > 0 ? [races] : [];
-  return [races.slice(0, 6), races.slice(races.length - 6)];
+type Race = { raceNo: number };
+function chunkIntoAltili<T extends Race>(races: T[]): { label: string; races: T[] }[] {
+  const g1 = races.filter((r) => r.raceNo <= 6);
+  const g2 = races.filter((r) => r.raceNo > 6);
+  const result: { label: string; races: T[] }[] = [];
+  if (g1.length > 0) result.push({ label: "1.Altılı", races: g1 });
+  if (g2.length > 0) result.push({ label: "2.Altılı", races: g2 });
+  return result;
 }
 
 function rankColor(rank: number): string {
@@ -60,9 +64,8 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
 
   return (
     <div className="space-y-6">
-      {groups.map((group, gi) => {
+      {groups.map(({ label: altiliLabel, races: group }, gi) => {
         const maxRows = Math.max(...group.map((r) => r.prediction!.picks.length));
-        const altiliLabel = `${gi + 1}.Altılı`;
 
         return (
           <div key={gi} className="rounded-xl border">
