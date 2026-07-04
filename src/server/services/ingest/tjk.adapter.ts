@@ -257,7 +257,10 @@ export class TjkAdapter implements DataProvider {
     const dmy = toDmy(target);
 
     const tabs = await fetchCityTabs(dmy);
-    const turkishTabs = tabs.filter((t) => TURKISH_CITY_SLUGS[t.name.toUpperCase()]);
+    // normTr kullan: JS'in toUpperCase() "i"→"I" yapar ama "İ"→"İ" yapar,
+    // dolayısıyla "İzmir".toUpperCase() = "İZMIR" (noktalı+normal I karışık).
+    // normTr ise tüm Türkçe harfleri ASCII'ye normalize eder → "IZMIR" doğru eşleşir.
+    const turkishTabs = tabs.filter((t) => TURKISH_CITY_SLUGS[normTr(t.name)]);
     if (turkishTabs.length === 0) return [];
 
     const raceDays: IngestRaceDay[] = [];
@@ -267,7 +270,7 @@ export class TjkAdapter implements DataProvider {
         if (races.length === 0) continue;
         raceDays.push({
           date: target,
-          hippodromeSlug: TURKISH_CITY_SLUGS[tab.name.toUpperCase()],
+          hippodromeSlug: TURKISH_CITY_SLUGS[normTr(tab.name)],
           hippodromeName: tab.name,
           races,
         });
