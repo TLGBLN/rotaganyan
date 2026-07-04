@@ -4,7 +4,6 @@ import {
   getRecentPredictions,
   getPendingPredictions,
 } from "@/server/services/admin.service";
-import StatTile from "@/components/stats/StatTile";
 import PerformanceBreakdown from "@/components/admin/PerformanceBreakdown";
 import CouponTierChart from "@/components/admin/CouponTierChart";
 import InsightsPanel from "@/components/admin/InsightsPanel";
@@ -26,8 +25,15 @@ export default async function AdminDashboard() {
   const hasData = analyst.overall.total > 0;
   const banko = analyst.byConfidence.find((b) => b.label === "★ Banko");
   const last10 = analyst.recentTrend.slice(-10);
-  const last10Rate =
-    last10.length > 0 ? (last10.filter(Boolean).length / last10.length) * 100 : 0;
+  const last10Hits = last10.filter(Boolean).length;
+
+  const trendStats = {
+    overall: analyst.overall,
+    banko: banko && banko.total >= 1 ? { rate: banko.rate, hits: banko.hits, total: banko.total } : undefined,
+    last10: { rate: last10.length > 0 ? (last10Hits / last10.length) * 100 : 0, hits: last10Hits },
+    last10Count: last10.length,
+    pending: stats.pendingResults,
+  };
 
   return (
     <div className="space-y-5">
@@ -44,72 +50,13 @@ export default async function AdminDashboard() {
       {/* ── Yorumsal Özet ──────────────────────────────────────────── */}
       <NarrativeSummary analyst={analyst} pendingResults={stats.pendingResults} />
 
-      {/* ── KPI Kartları ───────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <StatTile
-          label="Toplam Analiz"
-          value={stats.totalPredictions}
-          highlight="brand"
-        />
-        <StatTile
-          label="Genel İsabet"
-          value={hasData ? `%${analyst.overall.rate.toFixed(0)}` : "—"}
-          sub={hasData ? `${analyst.overall.hits}/${analyst.overall.total} koşu` : undefined}
-          highlight={
-            analyst.overall.rate >= 40
-              ? "hit"
-              : analyst.overall.rate >= 20
-              ? "brand"
-              : "miss"
-          }
-        />
-        <StatTile
-          label="Banko İsabeti"
-          value={banko && banko.total >= 1 ? `%${banko.rate.toFixed(0)}` : "—"}
-          sub={banko && banko.total >= 1 ? `${banko.hits}/${banko.total} banko` : undefined}
-          highlight={
-            !banko || banko.total < 1
-              ? "neutral"
-              : banko.rate >= 50
-              ? "hit"
-              : banko.rate >= 30
-              ? "brand"
-              : "miss"
-          }
-        />
-        <StatTile
-          label={`Son ${last10.length} Form`}
-          value={last10.length >= 3 ? `%${last10Rate.toFixed(0)}` : "—"}
-          sub={last10.length >= 3 ? `${last10.filter(Boolean).length} isabet` : undefined}
-          highlight={
-            last10.length < 3
-              ? "neutral"
-              : last10Rate >= 40
-              ? "hit"
-              : last10Rate >= 20
-              ? "brand"
-              : "miss"
-          }
-        />
-        <StatTile
-          label="Bekleyen"
-          value={stats.pendingResults}
-          highlight={
-            stats.pendingResults > 5
-              ? "miss"
-              : stats.pendingResults > 0
-              ? "brand"
-              : "neutral"
-          }
-        />
-      </div>
-
       {/* ── Trend + Bekleyen ───────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <DailyTrendChart
             dailyTrend={analyst.dailyTrend}
             overallRate={analyst.overall.rate}
+            stats={trendStats}
           />
         </div>
         <PendingList pending={pendingPredictions} />
