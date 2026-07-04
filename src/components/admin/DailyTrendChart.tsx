@@ -78,10 +78,9 @@ export type TrendChartStats = {
   pending: number;
 };
 
-const LINE_COLOR = "#3b82f6";   // sabit mavi — light/dark her ikisinde görünür
-const AREA_COLOR = "#3b82f6";
-const HIT_COLOR  = "#22c55e";   // yeşil
-const MISS_COLOR = "#ef4444";   // kırmızı
+const LINE_COLOR = "#60a5fa";   // mavi-400 — dark/light her ikisinde parlak
+const HIT_COLOR  = "#4ade80";   // yeşil-400
+const MISS_COLOR = "#f87171";   // kırmızı-400
 
 export default function DailyTrendChart({
   rollingTrend,
@@ -105,11 +104,7 @@ export default function DailyTrendChart({
   }));
 
   const avgY = py(overallRate);
-  const bottomY = MT + PH;
   const linePath = hasChart ? curvePath(pts.map((p) => ({ x: p.x, y: p.y }))) : "";
-  const areaPath = hasChart
-    ? `${linePath} L ${pts[n - 1].x.toFixed(1)},${bottomY} L ${pts[0].x.toFixed(1)},${bottomY} Z`
-    : "";
 
   // X-axis labels: ~6 evenly spaced
   const labelIdxs: number[] = [];
@@ -174,19 +169,12 @@ export default function DailyTrendChart({
       {/* Grafik */}
       {hasChart ? (
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" aria-hidden="true">
-          <defs>
-            <linearGradient id="trendAreaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={AREA_COLOR} stopOpacity="0.20" />
-              <stop offset="100%" stopColor={AREA_COLOR} stopOpacity="0.02" />
-            </linearGradient>
-          </defs>
-
           {[0, 25, 50, 75, 100].map((pct) => {
             const y = py(pct);
             return (
               <g key={pct}>
                 <line x1={ML} y1={y} x2={W - MR} y2={y} stroke="currentColor" strokeOpacity="0.08" strokeWidth="1" />
-                <text x={ML - 4} y={y + 3.5} textAnchor="end" fontSize="9" fill="currentColor" fillOpacity="0.4">
+                <text x={ML - 4} y={y + 3.5} textAnchor="end" fontSize="9" fill="currentColor" fillOpacity="0.45">
                   {pct}%
                 </text>
               </g>
@@ -194,21 +182,18 @@ export default function DailyTrendChart({
           })}
 
           {overallRate > 0 && overallRate < 100 && (
-            <line x1={ML} y1={avgY} x2={W - MR} y2={avgY} stroke={LINE_COLOR} strokeOpacity="0.35" strokeWidth="1" strokeDasharray="4 3" />
+            <line x1={ML} y1={avgY} x2={W - MR} y2={avgY} stroke={LINE_COLOR} strokeOpacity="0.5" strokeWidth="1" strokeDasharray="5 3" />
           )}
 
-          <path d={areaPath} fill="url(#trendAreaGrad)" />
-          <path d={linePath} fill="none" stroke={LINE_COLOR} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={linePath} fill="none" style={{ stroke: LINE_COLOR, strokeWidth: 3, strokeLinecap: "round", strokeLinejoin: "round" }} />
 
           {pts.map((p, i) => (
             <circle
               key={i}
               cx={p.x.toFixed(1)}
               cy={p.y.toFixed(1)}
-              r="3.5"
-              fill={p.hit ? HIT_COLOR : MISS_COLOR}
-              stroke="white"
-              strokeWidth="1.5"
+              r="5"
+              style={{ fill: p.hit ? HIT_COLOR : MISS_COLOR }}
             />
           ))}
 
