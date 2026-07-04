@@ -64,6 +64,7 @@ export async function upsertPrediction(input: PredictionInput) {
         },
       },
     });
+    revalidatePath("/admin");
     revalidatePath("/admin/analizler");
     revalidatePath("/analizler");
     revalidatePath("/kosular");
@@ -98,6 +99,7 @@ export async function upsertPrediction(input: PredictionInput) {
     },
   });
 
+  revalidatePath("/admin");
   revalidatePath("/admin/analizler");
   return { id: created.id };
 }
@@ -110,6 +112,7 @@ export async function publishPrediction(id: string) {
     data: { published: true, publishedAt: new Date() },
   });
 
+  revalidatePath("/admin");
   revalidatePath("/admin/analizler");
   revalidatePath("/analizler");
   revalidatePath("/kosular");
@@ -127,6 +130,7 @@ export async function unpublishPrediction(id: string) {
     data: { published: false, publishedAt: null },
   });
 
+  revalidatePath("/admin");
   revalidatePath("/admin/analizler");
   revalidatePath("/analizler");
 }
@@ -136,6 +140,7 @@ export async function deletePrediction(id: string) {
 
   await db.prediction.delete({ where: { id } });
 
+  revalidatePath("/admin");
   revalidatePath("/admin/analizler");
   revalidatePath("/analizler");
   revalidatePath("/kosular");

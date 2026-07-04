@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
   const today = turkeyDateString();
   await syncResultsForDate(today);
 
+  revalidatePath("/admin");
   revalidatePath("/");
 
   return NextResponse.json({ ok: true, date: today });
