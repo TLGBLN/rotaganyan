@@ -76,9 +76,10 @@ export async function loginUser(
   const validPassword =
     user?.passwordHash ? await bcrypt.compare(password, user.passwordHash) : false;
 
-  // Her girişimi logla (başarılı veya başarısız)
-  db.loginLog
-    .create({
+  // Her girişimi logla — await zorunlu, signIn sonra NEXT_REDIRECT fırlatır
+  // ve serverless fonksiyon hemen biter; fire-and-forget DB yazma kayboluyor.
+  try {
+    await db.loginLog.create({
       data: {
         userId: validPassword ? user!.id : undefined,
         email,
@@ -88,8 +89,10 @@ export async function loginUser(
         city,
         success: validPassword,
       },
-    })
-    .catch(console.error);
+    });
+  } catch (e) {
+    console.error("[loginLog]", e);
+  }
 
   if (!validPassword) {
     return { error: "E-posta veya şifre hatalı." };
