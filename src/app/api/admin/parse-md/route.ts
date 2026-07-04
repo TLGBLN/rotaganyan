@@ -63,5 +63,29 @@ export async function POST(req: NextRequest) {
     })
   );
 
+  // Runner'lar oluştuktan sonra: bu koşuya ait prediction varsa,
+  // runnerId'si null olan pick'leri runner no'ya göre relink et.
+  const runnerByNo: Record<number, { id: string; name: string }> = {};
+  for (const r of updated) runnerByNo[r.no] = { id: r.id, name: r.name ?? "" };
+
+  const prediction = await db.prediction.findUnique({
+    where: { raceId },
+    select: { id: true, picks: { select: { id: true, runnerId: true, runnerLabel: true } } },
+  });
+
+  if (prediction) {
+    for (const pick of prediction.picks) {
+      if (pick.runnerId) continue; // zaten bağlı
+      const no = parseInt(pick.runnerLabel.trim().replace(/^#/, "").match(/^(\d+)/)?.[1] ?? "", 10);
+      const runner = runnerByNo[no];
+      if (runner) {
+        await db.pick.update({
+          where: { id: pick.id },
+          data: { runnerId: runner.id, runnerLabel: `${no} ${runner.name}` },
+        });
+      }
+    }
+  }
+
   return NextResponse.json({ ok: true, updated: updated.length, runners: parsed });
 }
