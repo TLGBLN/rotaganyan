@@ -159,13 +159,42 @@ export async function getDashboardStats() {
 export type AnalystBreakdown = { label: string; total: number; hits: number; rate: number; group?: string };
 export type CouponTier = "ekonomik" | "normal" | "genis" | "kacti";
 export type CouponTierBreakdown = { label: string; total: number; ekonomik: number; normal: number; genis: number; kacti: number; group?: string };
+export type DailyPoint = { date: string; total: number; hits: number; rate: number };
+
+export type RecentPrediction = {
+  id: string;
+  date: Date;
+  hippodrome: string;
+  raceNo: number;
+  classType: string;
+  distance: number;
+  surface: string;
+  isBanko: boolean;
+  topPickLabel: string;
+  hitTop1: boolean | null;
+  actualFirst: string | null;
+};
+
+export type PendingPrediction = {
+  predictionId: string;
+  raceId: string;
+  date: Date;
+  hippodrome: string;
+  raceNo: number;
+  classType: string;
+  distance: number;
+  topPickLabel: string;
+};
+
 export type AnalystStats = {
   overall: { total: number; hits: number; rate: number };
   byClassType: AnalystBreakdown[];
   bySurface: AnalystBreakdown[];
   byConfidence: AnalystBreakdown[];
   byHippodrome: AnalystBreakdown[];
+  byDistance: AnalystBreakdown[];
   recentTrend: boolean[];
+  dailyTrend: DailyPoint[];
   couponTierByClassType: CouponTierBreakdown[];
   overallCouponTier: CouponTierBreakdown;
 };
@@ -227,13 +256,23 @@ export async function getAnalystStats(): Promise<AnalystStats> {
         select: {
           classType: true,
           surface: true,
-          raceDay: { select: { hippodrome: { select: { name: true } } } },
+          distance: true,
+          raceDay: { select: { hippodrome: { select: { name: true } }, date: true } },
           result: { select: { hitTop1: true, winnerNo: true } },
         },
       },
     },
     orderBy: { publishedAt: "asc" },
   });
+
+  const DISTANCE_ORDER = ["≤1200m", "1201–1400m", "1401–1600m", "1601–1800m", "1800m+"];
+  function distanceBucket(d: number): string {
+    if (d <= 1200) return "≤1200m";
+    if (d <= 1400) return "1201–1400m";
+    if (d <= 1600) return "1401–1600m";
+    if (d <= 1800) return "1601–1800m";
+    return "1800m+";
+  }
 
   /** Aynı üst gruba (örn. "Handikap") ait satırları yan yana toplar; gruplar kendi içindeki toplam koşu
    *  sayısına göre, satırlar da grup içinde toplam koşu sayısına göre sıralanır. */
@@ -294,13 +333,40 @@ export async function getAnalystStats(): Promise<AnalystStats> {
 
   const totalHits = rows.filter((r) => r.race.result?.hitTop1).length;
 
+  // Daily trend: last 30 days
+  const now = new Date();
+  const dailyMap = new Map<string, { hits: number; total: number }>();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now);
+    d.setUTCDate(d.getUTCDate() - i);
+    dailyMap.set(d.toISOString().slice(0, 10), { hits: 0, total: 0 });
+  }
+  for (const r of rows) {
+    const key = new Date(r.race.raceDay.date).toISOString().slice(0, 10);
+    if (dailyMap.has(key)) {
+      const e = dailyMap.get(key)!;
+      e.total++;
+      if (r.race.result?.hitTop1) e.hits++;
+    }
+  }
+  const dailyTrend: DailyPoint[] = [...dailyMap.entries()].map(([date, v]) => ({
+    date,
+    total: v.total,
+    hits: v.hits,
+    rate: v.total > 0 ? (v.hits / v.total) * 100 : -1,
+  }));
+
   return {
     overall: { total: rows.length, hits: totalHits, rate: rows.length > 0 ? (totalHits / rows.length) * 100 : 0 },
     byClassType: group((r) => normalizeClassType(r.race.classType), classTypeGroup),
     bySurface: group((r) => SURFACE_LABEL[r.race.surface] ?? r.race.surface),
     byConfidence: group((r) => (r.isBanko ? "★ Banko" : CONFIDENCE_LABEL[r.confidence] ?? r.confidence)),
     byHippodrome: group((r) => r.race.raceDay.hippodrome.name),
+    byDistance: group((r) => distanceBucket(r.race.distance ?? 1400)).sort(
+      (a, b) => DISTANCE_ORDER.indexOf(a.label) - DISTANCE_ORDER.indexOf(b.label)
+    ),
     recentTrend: rows.slice(-20).map((r) => r.race.result?.hitTop1 ?? false),
+    dailyTrend,
     couponTierByClassType: groupCouponTier((r) => normalizeClassType(r.race.classType), classTypeGroup),
     overallCouponTier: groupCouponTier(() => "Tüm Tahminler")[0] ?? {
       label: "Tüm Tahminler",
@@ -311,6 +377,82 @@ export async function getAnalystStats(): Promise<AnalystStats> {
       kacti: 0,
     },
   };
+}
+
+export async function getRecentPredictions(n = 15): Promise<RecentPrediction[]> {
+  const preds = await db.prediction.findMany({
+    where: { published: true },
+    select: {
+      id: true,
+      isBanko: true,
+      picks: {
+        orderBy: { rank: "asc" },
+        take: 1,
+        select: { runnerLabel: true, runner: { select: { name: true } } },
+      },
+      race: {
+        select: {
+          raceNo: true,
+          classType: true,
+          distance: true,
+          surface: true,
+          raceDay: { select: { date: true, hippodrome: { select: { name: true } } } },
+          result: { select: { hitTop1: true, actualOrder: true } },
+        },
+      },
+    },
+    orderBy: { publishedAt: "desc" },
+    take: n,
+  });
+
+  return preds.map((p) => ({
+    id: p.id,
+    date: p.race.raceDay.date,
+    hippodrome: p.race.raceDay.hippodrome.name,
+    raceNo: p.race.raceNo,
+    classType: p.race.classType,
+    distance: p.race.distance,
+    surface: p.race.surface,
+    isBanko: p.isBanko,
+    topPickLabel: p.picks[0]?.runner?.name || p.picks[0]?.runnerLabel || "—",
+    hitTop1: p.race.result?.hitTop1 ?? null,
+    actualFirst: p.race.result?.actualOrder[0] ?? null,
+  }));
+}
+
+export async function getPendingPredictions(): Promise<PendingPrediction[]> {
+  const preds = await db.prediction.findMany({
+    where: { published: true, race: { result: null } },
+    select: {
+      id: true,
+      picks: {
+        orderBy: { rank: "asc" },
+        take: 1,
+        select: { runnerLabel: true, runner: { select: { name: true } } },
+      },
+      race: {
+        select: {
+          id: true,
+          raceNo: true,
+          classType: true,
+          distance: true,
+          raceDay: { select: { date: true, hippodrome: { select: { name: true } } } },
+        },
+      },
+    },
+    orderBy: { publishedAt: "asc" },
+  });
+
+  return preds.map((p) => ({
+    predictionId: p.id,
+    raceId: p.race.id,
+    date: p.race.raceDay.date,
+    hippodrome: p.race.raceDay.hippodrome.name,
+    raceNo: p.race.raceNo,
+    classType: p.race.classType,
+    distance: p.race.distance,
+    topPickLabel: p.picks[0]?.runner?.name || p.picks[0]?.runnerLabel || "—",
+  }));
 }
 
 export type ClassTypeAdvice = { level: "warn" | "info" | "good" | "none"; text: string };
