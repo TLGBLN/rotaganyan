@@ -2,8 +2,14 @@ import type { AltiliCityResult } from "@/server/services/ingest/tjk-altili.adapt
 
 type Props = { results: AltiliCityResult[] };
 
+function hasAnyResult(city: AltiliCityResult): boolean {
+  return city.groups.some((g) => g.rows.some((r) => r.derece.trim() !== ""));
+}
+
 export default function AltiliGanyanResults({ results }: Props) {
   if (results.length === 0) return null;
+  const cities = results.filter(hasAnyResult);
+  if (cities.length === 0) return null;
 
   return (
     <section className="border-t px-4 py-14">
@@ -14,7 +20,7 @@ export default function AltiliGanyanResults({ results }: Props) {
         </div>
 
         <div className="space-y-10">
-          {results.map((city) => (
+          {cities.map((city) => (
             <div key={city.sehirId}>
               <h3 className="mb-4 text-base font-semibold text-muted-foreground">{city.sehirAdi}</h3>
               <div className="grid gap-6 lg:grid-cols-2">
