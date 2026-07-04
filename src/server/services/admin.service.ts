@@ -199,10 +199,10 @@ function classTypeGroup(classType: string): string {
   const normalized = normalizeClassType(classType);
   if (!normalized || normalized === "—") return "Diğer";
   if (normalized.startsWith("Maiden")) return "Maiden Koşular";
-  if (normalized.startsWith("ŞARTLI")) return "Şartlı Koşular";
+  if (normalized.toUpperCase().startsWith("ŞARTLI")) return "Şartlı Koşular";
   if (normalized.includes("Handikap")) return "Handikap Koşular";
   if (normalized.startsWith("KV-")) return "Kısa Vadeli (KV) Koşular";
-  if (normalized.startsWith("SATIŞ")) return "Satış Koşular";
+  if (normalized.toUpperCase().startsWith("SATIŞ")) return "Satış Koşular";
   if (/^[GA]\s*\d/.test(normalized)) return "Açık (Grup) Koşular";
   return normalized;
 }
