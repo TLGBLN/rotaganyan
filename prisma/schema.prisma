@@ -93,6 +93,25 @@ model User {
   horseFollows  HorseFollow[]
   accounts      Account[]
   sessions      Session[]
+  loginLogs     LoginLog[]
+}
+
+model LoginLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  email     String
+  ip        String
+  userAgent String   @default("")
+  country   String?
+  city      String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId])
+  @@index([success])
 }
 
 model Account {

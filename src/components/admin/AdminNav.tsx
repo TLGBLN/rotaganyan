@@ -13,6 +13,7 @@ import {
   PackageOpen,
   Ticket,
   LayoutTemplate,
+  LogIn,
 } from "lucide-react";
 
 const NAV = [
@@ -25,6 +26,7 @@ const NAV = [
   { href: "/admin/import", label: "JSON İmport", icon: PackageOpen },
   { href: "/admin/metodoloji", label: "Metodoloji", icon: Settings },
   { href: "/admin/ayarlar", label: "Site Ayarları", icon: LayoutTemplate },
+  { href: "/admin/girisler", label: "Giriş Logları", icon: LogIn },
 ];
 
 export default function AdminNav({ onNavigate }: { onNavigate?: () => void }) {
