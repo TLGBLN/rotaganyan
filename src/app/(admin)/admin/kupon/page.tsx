@@ -38,7 +38,6 @@ export default async function AdminKuponPage() {
           </h2>
           {raceDays.map((rd) => {
             const analyzedRaces = rd.races.filter((r) => r.prediction?.published);
-            if (analyzedRaces.length === 0) return null;
             return (
               <div key={rd.id} className="rounded-lg border overflow-hidden">
                 <div className="flex items-center justify-between border-b bg-muted/30 px-3 py-2">
