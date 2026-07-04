@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { getHippodromes, getRaceDaysByDate } from "@/server/services/race.service";
 import { turkeyDateString } from "@/lib/tz";
+import PuanTablosu from "@/components/kosular/PuanTablosu";
 import KuponForm from "./KuponForm";
 import KuponActions from "./KuponActions";
 import type { HomeKuponLegInput } from "@/server/actions/home-kupon.actions";
@@ -112,6 +113,11 @@ export default async function AdminKuponPage() {
               </div>
             );
           })}
+
+          {/* Puan Tablosu */}
+          {raceDays.map((rd) => (
+            <PuanTablosu key={rd.id} raceDay={rd} isLoggedIn={true} currentDate={today} />
+          ))}
         </div>
       )}
 
