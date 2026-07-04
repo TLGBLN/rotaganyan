@@ -324,35 +324,32 @@ export type ClassTypeAdvice = { level: "warn" | "info" | "good" | "none"; text: 
 export function getClassTypeAdvice(stats: AnalystStats, classType: string): ClassTypeAdvice {
   const normalized = normalizeClassType(classType);
   const breakdown = stats.byClassType.find((b) => b.label === normalized);
-  if (!breakdown || breakdown.total < 3) {
-    return breakdown
-      ? { level: "none", text: `Bu sınıfta henüz yeterli geçmiş veri yok (${breakdown.total} koşu)` }
-      : { level: "none", text: "Bu sınıfta henüz geçmiş veri yok" };
-  }
 
-  const rateText = `isabet %${breakdown.rate.toFixed(0)} (${breakdown.hits}/${breakdown.total})`;
+  // Az veriyle yanıltıcı kırmızı uyarı çıkmasın — anlamlı yorum için en az 5 koşu gerekli.
+  if (!breakdown || breakdown.total < 5) {
+    const n = breakdown?.total ?? 0;
+    return { level: "none", text: n > 0 ? `${n} koşu — yorum için yeterli veri yok` : "Geçmiş veri yok" };
+  }
 
   const tier = stats.couponTierByClassType.find((t) => t.label === normalized);
+  const pct = (n: number) => Math.round((n / (tier?.total ?? breakdown.total)) * 100);
 
-  if (!tier || tier.total < 3) {
-    if (breakdown.rate < 20) return { level: "warn", text: `Bu sınıfta tarihsel ${rateText} — dikkatli ol` };
-    if (breakdown.rate >= 50) return { level: "good", text: `Bu sınıfta tarihsel ${rateText}` };
-    return { level: "info", text: `Bu sınıfta tarihsel ${rateText}` };
-  }
+  const tierText = tier && tier.total >= 5
+    ? `Eko %${pct(tier.ekonomik)} · Nor %${pct(tier.normal)} · Gen %${pct(tier.genis)}` +
+      (tier.kacti > 0 ? ` · Kaçtı %${pct(tier.kacti)}` : "")
+    : null;
 
-  // Kazananın hangi kupon kademesinde geldiğini yüzdesel olarak ifade eder — admin "ekonomik mi normal mi geniş mi
-  // değerlendireyim" sorusuna doğrudan sayısal cevap alsın diye her zaman bu kırılım gösterilir.
-  const pct = (n: number) => Math.round((n / tier.total) * 100);
-  const tierText =
-    `Ekonomik %${pct(tier.ekonomik)} · Normal %${pct(tier.normal)} · Geniş %${pct(tier.genis)}` +
-    (tier.kacti > 0 ? ` · Kaçtı %${pct(tier.kacti)}` : "");
+  const isabet = `%${breakdown.rate.toFixed(0)} (${breakdown.hits}/${breakdown.total})`;
+  const text = tierText
+    ? `${tierText} (${tier!.total} koşu) · isabet ${isabet}`
+    : `isabet ${isabet} (${breakdown.total} koşu)`;
 
-  const economicShare = tier.ekonomik / tier.total;
-  const genisShare = tier.genis / tier.total;
+  const economicShare = (tier?.ekonomik ?? 0) / (tier?.total ?? 1);
+  const genisShare = (tier?.genis ?? 0) / (tier?.total ?? 1);
 
   let level: ClassTypeAdvice["level"] = "info";
-  if (breakdown.rate < 20 || genisShare >= 0.4) level = "warn";
-  else if (breakdown.rate >= 50 && economicShare >= 0.4) level = "good";
+  if (breakdown.rate < 25 || (tier && tier.total >= 5 && genisShare >= 0.45)) level = "warn";
+  else if (breakdown.rate >= 50 && economicShare >= 0.35) level = "good";
 
-  return { level, text: `${tierText} (${tier.total} koşu) — tarihsel ${rateText}` };
+  return { level, text };
 }
