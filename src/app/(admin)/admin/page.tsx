@@ -148,10 +148,6 @@ export default async function AdminDashboard() {
                 rows={analyst.byDistance}
               />
               <PerformanceBreakdown
-                title="Koşu Sınıfına Göre"
-                rows={analyst.byClassType}
-              />
-              <PerformanceBreakdown
                 title="Hipodroma Göre"
                 rows={analyst.byHippodrome}
                 limit={8}
