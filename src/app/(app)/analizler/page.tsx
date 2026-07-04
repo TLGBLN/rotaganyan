@@ -72,6 +72,9 @@ export default async function AnalizlerPage({ searchParams }: PageProps) {
                           <Badge variant="outline" className="ml-1 mt-0.5 text-[10px] text-brand">
                             ★ Banko
                           </Badge>
+                          {race.conditions && (
+                            <div className="mt-0.5 text-[10px] text-brand/70 font-medium">↳ {race.conditions}</div>
+                          )}
                         </div>
                       </td>
                       <td className="hidden px-3 py-2 text-xs text-muted-foreground sm:table-cell">

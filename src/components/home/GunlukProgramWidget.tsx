@@ -107,9 +107,14 @@ export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: P
                         </div>
 
                         {/* Surface dot + class */}
-                        <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                          <SurfaceDot surface={race.surface} />
-                          <span className="truncate font-medium">{race.classType}</span>
+                        <div className="flex min-w-0 flex-1 flex-col">
+                          <div className="flex items-center gap-1.5">
+                            <SurfaceDot surface={race.surface} />
+                            <span className="truncate font-medium">{race.classType}</span>
+                          </div>
+                          {race.conditions && (
+                            <span className="text-[10px] text-brand/70 font-medium pl-3.5">↳ {race.conditions}</span>
+                          )}
                         </div>
 
                         {/* Distance — mobilde gizli */}
