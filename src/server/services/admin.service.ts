@@ -160,7 +160,7 @@ export type AnalystBreakdown = { label: string; total: number; hits: number; rat
 export type CouponTier = "ekonomik" | "normal" | "genis" | "kacti";
 export type CouponTierBreakdown = { label: string; total: number; ekonomik: number; normal: number; genis: number; kacti: number; group?: string };
 export type DailyPoint = { date: string; total: number; hits: number; rate: number };
-export type RollingPoint = { date: string; rate: number; hit: boolean };
+export type CumulativePoint = { date: string; rate: number; hits: number; total: number; improved: boolean };
 
 export type RecentPrediction = {
   id: string;
@@ -196,7 +196,7 @@ export type AnalystStats = {
   byDistance: AnalystBreakdown[];
   recentTrend: boolean[];
   dailyTrend: DailyPoint[];
-  rollingTrend: RollingPoint[];
+  cumulativeTrend: CumulativePoint[];
   couponTierByClassType: CouponTierBreakdown[];
   overallCouponTier: CouponTierBreakdown;
 };
@@ -369,15 +369,22 @@ export async function getAnalystStats(): Promise<AnalystStats> {
     ),
     recentTrend: rows.slice(-20).map((r) => r.race.result?.hitTop1 ?? false),
     dailyTrend,
-    rollingTrend: rows.map((r, i) => {
-      const slice = rows.slice(Math.max(0, i - 9), i + 1);
-      const hits = slice.filter((s) => s.race.result?.hitTop1).length;
-      return {
-        date: new Date(r.race.raceDay.date).toISOString().slice(0, 10),
-        rate: (hits / slice.length) * 100,
-        hit: !!r.race.result?.hitTop1,
-      };
-    }),
+    cumulativeTrend: (() => {
+      let cHits = 0;
+      const dateMap = new Map<string, { cumHits: number; cumTotal: number }>();
+      rows.forEach((r, i) => {
+        const date = new Date(r.race.raceDay.date).toISOString().slice(0, 10);
+        if (r.race.result?.hitTop1) cHits++;
+        dateMap.set(date, { cumHits: cHits, cumTotal: i + 1 });
+      });
+      let prevRate = -1;
+      return Array.from(dateMap.entries()).map(([date, { cumHits, cumTotal }]) => {
+        const rate = (cumHits / cumTotal) * 100;
+        const improved = prevRate < 0 ? rate > 0 : rate > prevRate;
+        prevRate = rate;
+        return { date, rate, hits: cumHits, total: cumTotal, improved };
+      });
+    })(),
     couponTierByClassType: groupCouponTier((r) => normalizeClassType(r.race.classType), classTypeGroup),
     overallCouponTier: groupCouponTier(() => "Tüm Tahminler")[0] ?? {
       label: "Tüm Tahminler",

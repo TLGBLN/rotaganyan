@@ -54,7 +54,7 @@ export default async function AdminDashboard() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <DailyTrendChart
-            rollingTrend={analyst.rollingTrend}
+            cumulativeTrend={analyst.cumulativeTrend}
             overallRate={analyst.overall.rate}
             stats={trendStats}
           />
