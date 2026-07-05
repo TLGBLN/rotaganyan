@@ -207,3 +207,20 @@ Banko neden yok / var: (Handikap = zorunlu kombinasyon · AGF ayrışma · eşit
 
 ROTAGANYAN · v1.6 · [tarih] analiz şablonu
 `;
+
+export const RANKING_TABLE_TEMPLATE = `# 🏁 NİHAİ SIRALAMA ŞABLONU
+
+| Sıra | No | At | A | B+C | Toplam | Veri Güven | Kilit Gerekçe |
+|---:|---:|---|---:|---:|---:|:--:|---|
+| 1 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
+| 2 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
+| 3 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
+| 4 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
+| 5 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
+| 6 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
+| 7 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
+| 8 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
+| 9 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
+
+> *Sıra önce A'ya göredir. B+C, yalnız A farkı ≤2 iken ve fark ≥8 olduğunda sırayı değiştirebilir. Toplam yalnız referanstır ve sıralama kararı vermez.*
+`;

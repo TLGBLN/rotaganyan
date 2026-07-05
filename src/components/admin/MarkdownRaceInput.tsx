@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle, AlertCircle, Loader2, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isFullReport } from "@/lib/md-report-parser";
-import { ANALYSIS_REPORT_TEMPLATE } from "@/lib/methodology/report-template";
+import { ANALYSIS_REPORT_TEMPLATE, RANKING_TABLE_TEMPLATE } from "@/lib/methodology/report-template";
 
 interface ParsedRunner {
   no: number;
@@ -96,14 +96,23 @@ export default function MarkdownRaceInput({ raceId, raceLabel, defaultOpen = fal
             <span className="text-brand">Tam ROTAGANYAN v1.6 analiz raporunu</span> (KOŞU KİMLİĞİ, GENEL PROGRAM, NİHAİ SIRALAMA ÖZET, KUPON dahil) doğrudan yapıştırabilirsiniz — otomatik algılanır.
           </p>
 
-          {/* Şablonu yükle */}
-          <button
-            type="button"
-            onClick={() => { setText(ANALYSIS_REPORT_TEMPLATE); setStatus("idle"); }}
-            className="text-[11px] font-medium text-brand hover:underline"
-          >
-            v1.8 Nihai Şablon Özeti →
-          </button>
+          {/* Şablon butonları */}
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => { setText(RANKING_TABLE_TEMPLATE); setStatus("idle"); }}
+              className="text-[11px] font-semibold text-brand hover:underline"
+            >
+              🏁 Nihai Sıralama Şablonu →
+            </button>
+            <button
+              type="button"
+              onClick={() => { setText(ANALYSIS_REPORT_TEMPLATE); setStatus("idle"); }}
+              className="text-[11px] font-medium text-muted-foreground hover:underline"
+            >
+              Tam v1.6 Rapor Şablonu →
+            </button>
+          </div>
 
           {/* Textarea */}
           <textarea
