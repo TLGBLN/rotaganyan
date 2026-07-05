@@ -487,7 +487,7 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string): Clas
   const breakdown = stats.byClassType.find((b) => b.label === normalized);
 
   // Az veriyle anlamlı yorum yapılamaz — yeterli veri yoksa uyarı ver.
-  if (!breakdown || breakdown.total < 5) {
+  if (!breakdown || breakdown.total < 3) {
     const n = breakdown?.total ?? 0;
     return { level: "warn", text: n > 0 ? `${n} koşu — yeterli geçmiş veri yok` : "Geçmiş veri yok" };
   }

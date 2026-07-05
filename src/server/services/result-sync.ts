@@ -18,7 +18,7 @@ export async function syncResultsForDate(dateStr: string): Promise<void> {
       raceDay: { include: { hippodrome: true } },
       runners: { select: { no: true } },
       prediction: {
-        include: { picks: { where: { rank: 1 }, include: { runner: { select: { no: true } } } } },
+        include: { picks: { where: { rank: { lte: 3 } }, include: { runner: { select: { no: true } } } } },
       },
     },
   });
@@ -49,11 +49,15 @@ export async function syncResultsForDate(dateStr: string): Promise<void> {
 
     const winnerNo = actualOrder[0];
     const ganyan = raceResult.rows[0]?.ganyan;
-    const topPick = race.prediction?.picks[0];
+    const picks = race.prediction?.picks ?? [];
+    const topPick = picks.find(p => p.rank === 1);
     const hitTop1 = computeHitTop1(actualOrder, winnerNo, topPick?.runner?.no);
+    // Kazanan, rank 1-3 pick'lerden biriyse "ekonomik kupon içinde" sayılır
+    const top3Nos = picks.map(p => p.runner?.no).filter((n): n is number => n != null);
+    const hitInCoupon = winnerNo != null && top3Nos.includes(winnerNo);
 
     await db.result.create({
-      data: { raceId: race.id, winnerNo, actualOrder, ganyan, hitTop1 },
+      data: { raceId: race.id, winnerNo, actualOrder, ganyan, hitTop1, hitInCoupon },
     });
   }
 }

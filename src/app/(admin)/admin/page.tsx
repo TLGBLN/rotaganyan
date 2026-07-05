@@ -26,9 +26,13 @@ export default async function AdminDashboard() {
   const banko = analyst.byConfidence.find((b) => b.label === "★ Banko");
   const last10 = analyst.recentTrend.slice(-10);
   const last10Hits = last10.filter(Boolean).length;
+  const couponTier = analyst.overallCouponTier;
 
   const trendStats = {
     overall: analyst.overall,
+    coupon: couponTier.total >= 1
+      ? { hits: couponTier.ekonomik, total: couponTier.total, rate: (couponTier.ekonomik / couponTier.total) * 100 }
+      : undefined,
     banko: banko && banko.total >= 1 ? { rate: banko.rate, hits: banko.hits, total: banko.total } : undefined,
     last10: { rate: last10.length > 0 ? (last10Hits / last10.length) * 100 : 0, hits: last10Hits },
     last10Count: last10.length,

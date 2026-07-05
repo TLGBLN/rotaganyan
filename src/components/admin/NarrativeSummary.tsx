@@ -3,16 +3,29 @@ import type { AnalystStats } from "@/server/services/admin.service";
 
 function buildNarrative(analyst: AnalystStats, pendingResults: number): { sentences: string[]; verdict: "good" | "warn" | "critical" | "neutral" } {
   const sentences: string[] = [];
-  const { overall, recentTrend, byConfidence, bySurface, byHippodrome, byClassType } = analyst;
+  const { overall, recentTrend, byConfidence, bySurface, byHippodrome, byClassType, overallCouponTier } = analyst;
 
   if (overall.total === 0) return { sentences: ["Henüz sonuçlanmış tahmin bulunmuyor."], verdict: "neutral" };
 
-  // --- Genel isabet ---
+  // --- 1. seçim isabeti ---
   const rate = overall.rate;
   const rateLabel = rate >= 45 ? "çok iyi" : rate >= 35 ? "iyi" : rate >= 25 ? "orta" : "düşük";
   sentences.push(
-    `Toplam ${overall.total} sonuçlanmış tahminde genel isabet oranı %${rate.toFixed(0)} (${overall.hits} isabet) — bu ${rateLabel} bir seviye.`
+    `Toplam ${overall.total} sonuçlanmış tahminde 1. seçim isabeti %${rate.toFixed(0)} (${overall.hits} isabet) — bu ${rateLabel} bir seviye.`
   );
+
+  // --- Kupon isabeti (kazanan top-3 içinde mi) ---
+  if (overallCouponTier.total >= 5) {
+    const cpnRate = (overallCouponTier.ekonomik / overallCouponTier.total) * 100;
+    const diff = cpnRate - rate;
+    if (diff >= 10) {
+      sentences.push(
+        `Kupon isabeti (kazanan top-3 seçim içinde) %${cpnRate.toFixed(0)} — 1. seçim isabetiyle aradaki ${diff.toFixed(0)} puanlık fark, atların sıralama farkıyla kaybedilen tahmini gösteriyor.`
+      );
+    } else if (cpnRate >= 40) {
+      sentences.push(`Kupon isabeti (kazanan top-3 içinde) %${cpnRate.toFixed(0)}.`);
+    }
+  }
 
   // --- Son form vs genel ---
   const last10 = recentTrend.slice(-10);

@@ -92,6 +92,8 @@ function TRow({ label, cells, colors, alt }: { label: string; cells: string[]; c
 // ── Ana bileşen ──────────────────────────────────────────────────────────────
 export type TrendChartStats = {
   overall: { rate: number; hits: number; total: number };
+  /** Kazanan atın rank 1-3 pick içinde olduğu koşu oranı ("ekonomik kupon isabeti") */
+  coupon?: { rate: number; hits: number; total: number };
   banko?: { rate: number; hits: number; total: number };
   last10: { rate: number; hits: number };
   last10Count: number;
@@ -124,7 +126,9 @@ export default function DailyTrendChart({
   const showPct = (i: number) => n <= 20 || i % 2 === 0;
 
   // KPI renkleri
-  const ovClr  = overallRate >= 40 ? HIT_CLR : overallRate >= 20 ? AVG_CLR : MISS_CLR;
+  const ovClr   = overallRate >= 40 ? HIT_CLR : overallRate >= 20 ? AVG_CLR : MISS_CLR;
+  const cpnRate = stats?.coupon?.rate ?? -1;
+  const cpnClr  = cpnRate < 0 ? DIM : cpnRate >= 55 ? HIT_CLR : cpnRate >= 35 ? AVG_CLR : MISS_CLR;
   const bnkRate = stats?.banko?.rate ?? -1;
   const bnkClr  = bnkRate < 0 ? DIM : bnkRate >= 50 ? HIT_CLR : bnkRate >= 30 ? AVG_CLR : MISS_CLR;
   const l10Pct  = stats && stats.last10Count >= 3 ? (stats.last10.hits / stats.last10Count) * 100 : -1;
@@ -146,11 +150,15 @@ export default function DailyTrendChart({
 
       {/* KPI kutuları */}
       {stats && (
-        <div className="grid grid-cols-2 gap-2.5 mb-5 sm:grid-cols-4">
-          <KpiTile icon="🎯" label="Genel İsabet"
+        <div className="grid grid-cols-2 gap-2.5 mb-5 sm:grid-cols-3 lg:grid-cols-5">
+          <KpiTile icon="🎯" label="1. Seçim İsabeti"
             value={stats.overall.total > 0 ? `%${Math.round(overallRate)}` : "—"}
-            sub={stats.overall.total > 0 ? `${stats.overall.hits} / ${stats.overall.total} koşu` : undefined}
+            sub={stats.overall.total > 0 ? `${stats.overall.hits} / ${stats.overall.total} · 1. at kesin birinci` : undefined}
             color={stats.overall.total > 0 ? ovClr : DIM} />
+          <KpiTile icon="🪙" label="Kupon İsabeti"
+            value={stats.coupon && stats.coupon.total >= 1 ? `%${Math.round(cpnRate)}` : "—"}
+            sub={stats.coupon && stats.coupon.total >= 1 ? `${stats.coupon.hits} / ${stats.coupon.total} · kazanan top-3 içinde` : undefined}
+            color={cpnClr} />
           <KpiTile icon="🛡️" label="Banko İsabeti"
             value={stats.banko && stats.banko.total >= 1 ? `%${Math.round(bnkRate)}` : "—"}
             sub={stats.banko && stats.banko.total >= 1 ? `${stats.banko.hits} / ${stats.banko.total} banko` : undefined}
