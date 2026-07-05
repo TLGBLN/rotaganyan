@@ -146,7 +146,7 @@ export default function DailyTrendChart({
 
       {/* KPI kutuları */}
       {stats && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 20 }}>
+        <div className="grid grid-cols-2 gap-2.5 mb-5 sm:grid-cols-4">
           <KpiTile icon="🎯" label="Genel İsabet"
             value={stats.overall.total > 0 ? `%${Math.round(overallRate)}` : "—"}
             sub={stats.overall.total > 0 ? `${stats.overall.hits} / ${stats.overall.total} koşu` : undefined}

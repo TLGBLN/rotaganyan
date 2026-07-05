@@ -67,9 +67,9 @@ export default function CouponTierChart({
 
   return (
     <div className="rounded-lg border p-4">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
-        <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
           {SEGMENTS.map((s) => (
             <span key={s.key} className="flex items-center gap-1">
               <span className={`inline-block h-2 w-2 rounded-full ${s.dotClass}`} />
