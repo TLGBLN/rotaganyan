@@ -30,17 +30,21 @@ function scoreOnly(value: string): string {
 
 function splitLayerDetails(details: unknown) {
   const list = Array.isArray(details) ? (details as string[]) : [];
-  let a = "—";
-  let b = "—";
-  let c = "—";
+  let a = "—", b = "—", c = "—", bcDirect = "";
   const rest: string[] = [];
   for (const d of list) {
-    if (/^A:\s*/.test(d)) a = scoreOnly(d.replace(/^A:\s*/, ""));
-    else if (/^B:\s*/.test(d)) b = scoreOnly(d.replace(/^B:\s*/, ""));
-    else if (/^C:\s*/.test(d)) c = scoreOnly(d.replace(/^C:\s*/, ""));
+    if (/^A:\s*/.test(d))      a        = scoreOnly(d.replace(/^A:\s*/, ""));
+    else if (/^B\+C:\s*/.test(d)) bcDirect = scoreOnly(d.replace(/^B\+C:\s*/, ""));
+    else if (/^B:\s*/.test(d)) b        = scoreOnly(d.replace(/^B:\s*/, ""));
+    else if (/^C:\s*/.test(d)) c        = scoreOnly(d.replace(/^C:\s*/, ""));
     else rest.push(d);
   }
-  return { a, b, c, gerekce: rest.join(" · ") || "—" };
+  // B+C: önce "B+C:" girişini kullan, yoksa ayrı B ve C değerlerini topla
+  const bcNum = bcDirect
+    ? parseInt(bcDirect, 10)
+    : (parseInt(b, 10) || 0) + (parseInt(c, 10) || 0);
+  const bc = bcDirect || (b !== "—" || c !== "—") ? (isNaN(bcNum) ? "—" : String(bcNum)) : "—";
+  return { a, bc, gerekce: rest.join(" · ") || "—" };
 }
 
 export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, racePath, followedHorseNames }: Props) {
@@ -127,16 +131,15 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, raceP
               <th className="px-2 py-2 text-left font-medium text-muted-foreground">Kupon</th>
               <th className="px-2 py-2 text-left font-medium text-muted-foreground">No</th>
               <th className="px-2 py-2 text-left font-medium text-muted-foreground">At</th>
-              <th className="px-2 py-2 text-right font-medium text-muted-foreground">A Katmanı</th>
-              <th className="px-2 py-2 text-right font-medium text-muted-foreground">B Katmanı</th>
-              <th className="px-2 py-2 text-right font-medium text-muted-foreground">C Katmanı</th>
+              <th className="px-2 py-2 text-right font-medium text-muted-foreground">A</th>
+              <th className="px-2 py-2 text-right font-medium text-muted-foreground">B+C</th>
               <th className="px-2 py-2 text-right font-medium text-muted-foreground">Toplam</th>
               <th className="hidden px-2 py-2 text-left font-medium text-muted-foreground md:table-cell">Kilit Gerekçe</th>
             </tr>
           </thead>
           <tbody>
             {picks.map((pick, i) => {
-              const { a, b, c, gerekce } = splitLayerDetails(pick.details);
+              const { a, bc, gerekce } = splitLayerDetails(pick.details);
               const isWinner = winnerNo != null && pick.runner?.no === winnerNo;
               const coupon = couponCategory(pick.rank);
               return (
@@ -176,8 +179,7 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, raceP
                     </div>
                   </td>
                   <td className="px-2 py-2 text-right font-mono">{a}</td>
-                  <td className="px-2 py-2 text-right font-mono">{b}</td>
-                  <td className="px-2 py-2 text-right font-mono">{c}</td>
+                  <td className="px-2 py-2 text-right font-mono">{bc}</td>
                   <td className="px-2 py-2 text-right font-mono font-bold text-brand">{pick.score ?? "—"}</td>
                   <td className="hidden px-2 py-2 text-muted-foreground md:table-cell">{gerekce}</td>
                 </tr>

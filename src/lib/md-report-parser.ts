@@ -412,6 +412,9 @@ function parseRankingTable(block: string): ReportPick[] {
   const iKatmanA = colIndex(headers, (h) => h.includes("A KATMANI"));
   const iKatmanB = colIndex(headers, (h) => h.includes("B KATMANI"));
   const iKatmanC = colIndex(headers, (h) => h.includes("C KATMANI"));
+  // Basitleştirilmiş şablon: tek "A" sütunu ve birleşik "B+C" sütunu
+  const iSimpleA  = iKatmanA === -1 ? colIndex(headers, (h) => h === "A") : -1;
+  const iBplusC   = colIndex(headers, (h) => h.replace(/\s+/g, "") === "B+C");
   const iToplam = colIndex(headers, (h) => h.includes("TOPLAM"));
   const iScore = colIndex(headers, (h) => h.includes("PUAN"));
   const iPed = colIndex(headers, (h) => h.includes("PEDIGRI"));
@@ -440,6 +443,9 @@ function parseRankingTable(block: string): ReportPick[] {
     if (iKatmanA !== -1 && parseFractionNumerator(row[iKatmanA]) != null) layerNotes.push(`A: ${row[iKatmanA].trim()}`);
     if (iKatmanB !== -1 && parseFractionNumerator(row[iKatmanB]) != null) layerNotes.push(`B: ${row[iKatmanB].trim()}`);
     if (iKatmanC !== -1 && parseFractionNumerator(row[iKatmanC]) != null) layerNotes.push(`C: ${row[iKatmanC].trim()}`);
+    // Basitleştirilmiş şablon sütunları
+    if (iSimpleA !== -1) { const v = (row[iSimpleA] ?? "").trim(); if (v && v !== "—" && !/^X+$/i.test(v)) layerNotes.push(`A: ${v}`); }
+    if (iBplusC  !== -1) { const v = (row[iBplusC]  ?? "").trim(); if (v && v !== "—" && !/^Y+$/i.test(v)) layerNotes.push(`B+C: ${v}`); }
 
     const toplaRaw = row[iToplam] ?? "";
     const toplam = iToplam !== -1

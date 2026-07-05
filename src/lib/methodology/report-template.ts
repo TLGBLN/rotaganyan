@@ -164,21 +164,19 @@ Karar: [özet]
 
 ## 📊 NİHAİ SIRALAMA ÖZETİ
 
-| Sıra | No | At | A Katmanı | B Katmanı | C Katmanı | Toplam | Pedigri | Kilit Gerekçe |
-|---:|---:|---|---:|---:|---:|---:|---|---|
-| 1 | [NO] | **[AT]** | /60 | /30 | /10 | **/100** | ⭐⭐⭐⭐⭐ | [Exact + sınıf + form] |
-| 2 | [NO] | **[AT]** | /60 | /30 | /10 | **/100** | ⭐⭐⭐⭐ | [Galop + pedigri + jokey] |
-| 3 | [NO] | **[AT]** | /60 | /30 | /10 | **/100** | ⭐⭐⭐⭐ | [Kilo + tempo + sicil] |
-| 4 | [NO] | **[AT]** | /60 | /30 | /10 | **/100** | ⭐⭐⭐ | [Sınıf düşüşü + derece] |
-| 5 | [NO] | **[AT]** | /60 | /30 | /10 | **/100** | ⭐⭐⭐ | [Takı + gelişim + start] |
-| 6 | [NO] | **[AT]** | /60 | /30 | /10 | **/100** | ⭐⭐⭐ | [Düşük AGF + çoklu sinyal] |
-| 7 | [NO] | [AT] | /60 | /30 | /10 | /100 | ⭐⭐ | [Kilit gerekçe] |
-| 8 | [NO] | [AT] | /60 | /30 | /10 | /100 | ⭐⭐ | [Kilit gerekçe] |
-| 9 | [NO] | [AT] | /60 | /30 | /10 | /100 | ⭐ | [Kilit gerekçe] |
-| 10 | [NO] | [AT] | /60 | /30 | /10 | /100 | ⭐ | [Kilit gerekçe] |
-| 11 | [NO] | [AT] | /60 | /30 | /10 | /100 | ⭐ | [Kilit gerekçe] |
+| Sıra | No | At | A | B+C | Toplam | Veri Güven | Kilit Gerekçe |
+|---:|---:|---|---:|---:|---:|:--:|---|
+| 1 | [NO] | **[AT]** | XX | YY | *ZZ* | A/B/C | [Exact + sınıf + form] |
+| 2 | [NO] | **[AT]** | XX | YY | *ZZ* | A/B/C | [Galop + pedigri + jokey] |
+| 3 | [NO] | **[AT]** | XX | YY | *ZZ* | A/B/C | [Kilo + tempo + sicil] |
+| 4 | [NO] | **[AT]** | XX | YY | *ZZ* | A/B/C | [Sınıf düşüşü + derece] |
+| 5 | [NO] | **[AT]** | XX | YY | *ZZ* | A/B/C | [Takı + gelişim + start] |
+| 6 | [NO] | **[AT]** | XX | YY | *ZZ* | A/B/C | [Düşük AGF + çoklu sinyal] |
+| 7 | [NO] | [AT] | XX | YY | *ZZ* | A/B/C | [Kilit gerekçe] |
+| 8 | [NO] | [AT] | XX | YY | *ZZ* | A/B/C | [Kilit gerekçe] |
+| 9 | [NO] | [AT] | XX | YY | *ZZ* | A/B/C | [Kilit gerekçe] |
 
-> **Sıralama kuralı:** A Katmanı farkı önceliklidir. Toplam puanı daha yüksek olsa bile A Katmanı zayıf olan at, yalnız matematiksel toplam nedeniyle güçlü A Katmanı bulunan atın önüne geçirilmez.
+> *Sıra önce A'ya göredir. B+C, yalnız A farkı ≤2 iken ve fark ≥8 olduğunda sırayı değiştirebilir. Toplam yalnız referanstır.*
 
 ## 🎫 KUPON
 
