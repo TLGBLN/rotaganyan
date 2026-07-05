@@ -441,7 +441,10 @@ function parseRankingTable(block: string): ReportPick[] {
     if (iKatmanB !== -1 && parseFractionNumerator(row[iKatmanB]) != null) layerNotes.push(`B: ${row[iKatmanB].trim()}`);
     if (iKatmanC !== -1 && parseFractionNumerator(row[iKatmanC]) != null) layerNotes.push(`C: ${row[iKatmanC].trim()}`);
 
-    const toplam = iToplam !== -1 ? parseFractionNumerator(row[iToplam]) : null;
+    const toplaRaw = row[iToplam] ?? "";
+    const toplam = iToplam !== -1
+      ? parseFractionNumerator(toplaRaw) ?? (parseInt(toplaRaw.replace(/[^\d]/g, ""), 10) || null)
+      : null;
     const legacyScore = iScore !== -1 ? parseInt(row[iScore]?.replace(/\D/g, "") ?? "", 10) : NaN;
     const score = toplam != null ? Math.round(toplam) : (isNaN(legacyScore) ? null : legacyScore);
 
@@ -678,6 +681,8 @@ export function isFullReport(markdown: string): boolean {
     n.includes("METODOLOJI KONTROL LISTESI") ||
     // Başlık/bölüm satırı olmadan sadece v1.8 sıralama tablosu yapıştırılmış olabilir —
     // bu tablonun kendine özgü kolon başlıkları da tam rapor olarak tanınmalı.
-    (n.includes("A KATMANI") && n.includes("KILIT GEREKCE"))
+    (n.includes("A KATMANI") && n.includes("KILIT GEREKCE")) ||
+    // Basitleştirilmiş "Nihai Sıralama Şablonu" (Sıra | No | At | A | B+C | Toplam | Veri Güven | Kilit Gerekçe)
+    (n.includes("VERI GUVEN") && n.includes("KILIT GEREKCE"))
   );
 }
