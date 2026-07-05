@@ -127,14 +127,15 @@ export async function getDashboardStats() {
   // Analiz yapılmamış (Prediction'sız) yarışların sonuçları başarı oranını
   // çarpıtır — dashboard'daki sonuç sayıları ve listesi sadece analiz edilmiş
   // (yayında Prediction'ı olan) yarışları kapsar.
-  const analyzedResultFilter = { race: { prediction: { published: true } } };
+  // Karma mirror'lar (conditions != null) istatistikleri şişirir, hariç tutulur.
+  const analyzedResultFilter = { race: { prediction: { published: true }, conditions: null } };
 
   const [totalPredictions, publishedPredictions, totalResults, pendingResults, totalUsers, recentResults] =
     await Promise.all([
-      db.prediction.count(),
-      db.prediction.count({ where: { published: true } }),
+      db.prediction.count({ where: { race: { conditions: null } } }),
+      db.prediction.count({ where: { published: true, race: { conditions: null } } }),
       db.result.count({ where: analyzedResultFilter }),
-      db.race.count({ where: { prediction: { published: true }, result: null } }),
+      db.race.count({ where: { conditions: null, prediction: { published: true }, result: null } }),
       db.user.count(),
       db.result.findMany({
         where: analyzedResultFilter,
@@ -249,7 +250,7 @@ function couponTierForRank(rank: number | undefined): CouponTier {
 /** Yayında ve sonuçlanmış tahminleri sınıf/pist/güven/hipodroma göre kırarak isabet oranını çıkarır. */
 export async function getAnalystStats(): Promise<AnalystStats> {
   const rows = await db.prediction.findMany({
-    where: { published: true, race: { result: { isNot: null } } },
+    where: { published: true, race: { result: { isNot: null }, conditions: null } },
     select: {
       confidence: true,
       isBanko: true,
@@ -399,7 +400,7 @@ export async function getAnalystStats(): Promise<AnalystStats> {
 
 export async function getRecentPredictions(n = 15): Promise<RecentPrediction[]> {
   const preds = await db.prediction.findMany({
-    where: { published: true },
+    where: { published: true, race: { conditions: null } },
     select: {
       id: true,
       isBanko: true,
@@ -440,7 +441,7 @@ export async function getRecentPredictions(n = 15): Promise<RecentPrediction[]> 
 
 export async function getPendingPredictions(): Promise<PendingPrediction[]> {
   const preds = await db.prediction.findMany({
-    where: { published: true, race: { result: null } },
+    where: { published: true, race: { result: null, conditions: null } },
     select: {
       id: true,
       picks: {
