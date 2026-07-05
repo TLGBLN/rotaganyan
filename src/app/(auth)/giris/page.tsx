@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { AuthError } from "next-auth";
+import bcrypt from "bcryptjs";
 import { signIn } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,13 +26,34 @@ function safeCallbackUrl(callbackUrl: string | undefined): string {
 
 async function login(formData: FormData) {
   "use server";
+  const hdrs = await headers();
+  const ip = hdrs.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
+  const ua = hdrs.get("user-agent") ?? "";
+  const country = hdrs.get("x-vercel-ip-country") ?? undefined;
+  const city = hdrs.get("x-vercel-ip-city") ?? undefined;
+  const email = (formData.get("email") as string | null) ?? "";
+  const password = (formData.get("password") as string | null) ?? "";
   const callbackUrl = safeCallbackUrl(formData.get("callbackUrl") as string);
+
+  // Şifreyi doğrula — log'a başarı/başarısızlık yazabilmek için signIn'den önce kontrol et
+  const user = await db.user.findUnique({ where: { email }, select: { id: true, passwordHash: true } });
+  const validPassword = user?.passwordHash ? await bcrypt.compare(password, user.passwordHash) : false;
+
+  // Her girişimi logla (await: signIn sonraki satırda NEXT_REDIRECT fırlatır, fire-and-forget kaybolur)
   try {
-    await signIn("credentials", {
-      email: formData.get("email"),
-      password: formData.get("password"),
-      redirectTo: callbackUrl,
+    await db.loginLog.create({
+      data: { userId: validPassword ? user!.id : undefined, email, ip, userAgent: ua, country, city, success: validPassword },
     });
+  } catch (e) {
+    console.error("[loginLog]", e);
+  }
+
+  if (!validPassword) {
+    redirect(`/giris?hata=1&callbackUrl=${encodeURIComponent(callbackUrl)}`);
+  }
+
+  try {
+    await signIn("credentials", { email, password, redirectTo: callbackUrl });
   } catch (err) {
     if (err instanceof AuthError) {
       redirect(`/giris?hata=1&callbackUrl=${encodeURIComponent(callbackUrl)}`);
