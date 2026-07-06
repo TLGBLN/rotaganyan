@@ -43,13 +43,10 @@ export default async function Header() {
         {/* Hızlı erişim */}
         <nav className="hidden flex-1 items-center gap-2 md:flex">
           <Button asChild size="sm" className="bg-brand hover:bg-brand/90 text-brand-foreground">
-            <Link href="/kosular">Günün Koşuları</Link>
+            <Link href="/program">Yarış Programı</Link>
           </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/tahmin-onerileri">Banko Önerileri</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/program">Yarış Programı</Link>
           </Button>
           <LiveTvPlayer compact />
         </nav>

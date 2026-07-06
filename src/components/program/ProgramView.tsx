@@ -7,7 +7,7 @@ import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/serv
 
 // ── Geri sayım (Turkey UTC+3) ────────────────────────────────────────────────
 
-function useRaceCountdown(time: string | null, hasResult: boolean) {
+function useRaceCountdown(time: string | null, hasResult: boolean, dateStr: string) {
   const [display, setDisplay] = useState("");
 
   useEffect(() => {
@@ -16,13 +16,10 @@ function useRaceCountdown(time: string | null, hasResult: boolean) {
 
     const tick = () => {
       const now = Date.now();
-      // Turkey = UTC+3
-      const turkeyNow = new Date(now + 3 * 60 * 60 * 1000);
-      const todayTR = turkeyNow.toISOString().split("T")[0];
       const [h, m] = time.replace(".", ":").split(":").map(Number);
       if (isNaN(h) || isNaN(m)) return;
-      // race target in UTC
-      const raceUtcMs = new Date(`${todayTR}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00Z`).getTime()
+      // race target in UTC: use explicit dateStr, not today's date
+      const raceUtcMs = new Date(`${dateStr}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00Z`).getTime()
         - 3 * 60 * 60 * 1000;
       const diffSec = Math.floor((raceUtcMs - now) / 1000);
       if (diffSec <= 0) { setDisplay("Başladı"); return; }
@@ -34,7 +31,7 @@ function useRaceCountdown(time: string | null, hasResult: boolean) {
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [time, hasResult]);
+  }, [time, hasResult, dateStr]);
 
   return display;
 }
@@ -356,8 +353,8 @@ function RunnerCard({
 
 // ── Koşu tablosu ─────────────────────────────────────────────────────────────
 
-function RaceTimer({ time, hasResult }: { time: string | null; hasResult: boolean }) {
-  const display = useRaceCountdown(time, hasResult);
+function RaceTimer({ time, hasResult, dateStr }: { time: string | null; hasResult: boolean; dateStr: string }) {
+  const display = useRaceCountdown(time, hasResult, dateStr);
   if (!display) return null;
   const isKostu = display === "Koştu";
   return (
@@ -494,7 +491,7 @@ function RaceTable({ race }: { race: ProgramRace }) {
 
 // ── Ana görünüm ───────────────────────────────────────────────────────────────
 
-export default function ProgramView({ days }: { days: ProgramDay[] }) {
+export default function ProgramView({ days, dateStr }: { days: ProgramDay[]; dateStr: string }) {
   const [activeHipo, setActiveHipo] = useState(days[0]?.hippodromeSlug ?? "");
   const [activeRace, setActiveRace] = useState<Record<string, number>>({});
 
@@ -572,7 +569,7 @@ export default function ProgramView({ days }: { days: ProgramDay[] }) {
               </span>
             </div>
             {currentRace && (
-              <RaceTimer time={currentRace.time} hasResult={currentRace.result != null} />
+              <RaceTimer time={currentRace.time} hasResult={currentRace.result != null} dateStr={dateStr} />
             )}
           </div>
 

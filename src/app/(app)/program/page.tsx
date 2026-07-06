@@ -49,7 +49,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
         <DateNavigator currentDate={currentDate} basePath="/program" />
       </div>
       <div className="rounded-lg border overflow-hidden">
-        <ProgramView days={days} />
+        <ProgramView days={days} dateStr={currentDate} />
       </div>
     </div>
   );

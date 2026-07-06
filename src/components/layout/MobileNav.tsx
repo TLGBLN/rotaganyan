@@ -31,11 +31,11 @@ export default function MobileNav({ isLoggedIn, followedHorses = [] }: Props) {
         </SheetHeader>
         <nav className="mt-6 flex flex-col gap-1">
           <Link
-            href="/kosular"
+            href="/program"
             onClick={() => setOpen(false)}
             className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           >
-            Günün Koşuları
+            Yarış Programı
           </Link>
           <Link
             href="/tahmin-onerileri"
@@ -43,13 +43,6 @@ export default function MobileNav({ isLoggedIn, followedHorses = [] }: Props) {
             className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           >
             Banko Önerileri
-          </Link>
-          <Link
-            href="/program"
-            onClick={() => setOpen(false)}
-            className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-          >
-            Yarış Programı
           </Link>
 
           {isLoggedIn && followedHorses.length > 0 && (
