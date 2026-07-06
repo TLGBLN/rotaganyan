@@ -255,6 +255,105 @@ function RunnerRow({
   );
 }
 
+// ── At kartı (mobil) ─────────────────────────────────────────────────────────
+
+function RunnerCard({
+  r, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime,
+}: {
+  r: ProgramRunner;
+  isWinner: boolean;
+  isTopAgf: boolean;
+  ekuriColor?: { border: string; badge: string };
+  agfRank?: number;
+  isBestTime: boolean;
+}) {
+  const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
+  const surfaces = (r.recentFormSurfaces ?? "").split("");
+
+  return (
+    <div className={cn(
+      "px-3 py-2.5 border-b text-xs",
+      isWinner && "bg-[#f5c518]/10",
+      r.scratched && "opacity-60"
+    )}>
+      {/* Satır 1: No | İsim | AGF + Form */}
+      <div className="flex items-start gap-2">
+        <div className={cn(
+          "flex items-center justify-center gap-1 font-bold tabular-nums w-8 shrink-0 pt-0.5",
+          ekuriColor?.border
+        )}>
+          {ekuriColor && <span className={cn("inline-block w-1.5 h-1.5 rounded-full shrink-0", ekuriColor.badge)} />}
+          <span>{r.no}</span>
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className={cn("font-semibold truncate", isWinner && "text-[#f5c518]", r.scratched && "line-through")}>
+            {r.name}
+            {r.scratched && <span className="ml-1 text-[10px] font-normal text-red-400 no-underline">(Koşmaz)</span>}
+          </div>
+          {(r.sire || r.dam) && (
+            <div className="text-[10px] text-muted-foreground truncate">
+              {[r.sire, r.dam].filter(Boolean).join(" — ")}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          {r.agf != null ? (
+            <div className={cn("font-semibold", isTopAgf && "text-[#27ae60]")}>
+              %{r.agf.toFixed(1)}
+              {agfRank != null && <span className="text-[9px] text-muted-foreground font-normal ml-1">{agfRank}.</span>}
+            </div>
+          ) : <span className="text-muted-foreground">—</span>}
+          <div className="flex gap-0.5">
+            {formChars.length === 0
+              ? <span className="text-muted-foreground">—</span>
+              : formChars.slice(-5).map((c, i) => {
+                  const surf = surfaces[i]?.trim() ?? "";
+                  const cls = formBoxClass(c, surf);
+                  return (
+                    <span key={i} className={cn("inline-flex items-center justify-center w-4 h-4 rounded text-[10px] font-bold", cls)}>
+                      {c}
+                    </span>
+                  );
+                })}
+          </div>
+        </div>
+      </div>
+
+      {/* Satır 2: Jokey, Kilo, Start, HP, En İyi Derece, Yaş */}
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 ml-10 text-[10px] text-muted-foreground">
+        {r.jockey && (
+          <span className={cn(r.jockeyChanged && "text-orange-500 font-medium")}>
+            {r.jockey}
+            {r.jockeyChanged && r.previousJockey && (
+              <span className="font-normal text-muted-foreground"> ← {r.previousJockey}</span>
+            )}
+          </span>
+        )}
+        {r.weight != null && (
+          <span>
+            {r.weight}kg
+            {r.weightChange != null && r.weightChange !== 0 && (
+              <span className={r.weightChange < 0 ? "text-red-500" : "text-green-500"}>
+                {r.weightChange > 0 ? "+" : ""}{r.weightChange}
+              </span>
+            )}
+          </span>
+        )}
+        {r.startNo != null && <span>S:{r.startNo}</span>}
+        {r.hp != null && <span>HP:{r.hp}</span>}
+        {r.bestTime && (
+          <span className={cn(isBestTime && "text-[#27ae60] font-medium font-mono")}>
+            {r.bestTime.split(" - ")[0]}
+          </span>
+        )}
+        {r.age != null && <span>{r.age}y</span>}
+      </div>
+    </div>
+  );
+}
+
 // ── Koşu tablosu ─────────────────────────────────────────────────────────────
 
 function RaceTimer({ time, hasResult }: { time: string | null; hasResult: boolean }) {
@@ -312,8 +411,8 @@ function RaceTable({ race }: { race: ProgramRace }) {
         {race.conditions && <span className="text-xs text-brand">· {race.conditions}</span>}
       </div>
 
-      {/* Tablo */}
-      <div className="overflow-x-auto">
+      {/* Tablo — masaüstü */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/60 text-xs text-muted-foreground">
@@ -353,6 +452,27 @@ function RaceTable({ race }: { race: ProgramRace }) {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Kartlar — mobil */}
+      <div className="sm:hidden">
+        {race.runners.length === 0 ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            Yarışçı verisi henüz yüklenmedi.
+          </div>
+        ) : (
+          race.runners.map((r) => (
+            <RunnerCard
+              key={r.id}
+              r={r}
+              isWinner={winnerNo != null && r.no === winnerNo}
+              isTopAgf={r.no === topAgfNo}
+              ekuriColor={ekuriColorMap.get(r.no)}
+              agfRank={agfRankMap.get(r.no)}
+              isBestTime={bestTimeNoSet.has(r.no)}
+            />
+          ))
+        )}
       </div>
 
       {/* Analiz butonu + panel */}
