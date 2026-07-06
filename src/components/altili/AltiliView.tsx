@@ -19,6 +19,14 @@ function breedShort(b: string) {
   return b === "ARAP" ? "Arap" : "İngiliz";
 }
 
+// AGF bazlı katsayı hesabı: Π(100/AGFi), tahmini ikramiye = katsayı × 2.25
+// (TJK altılı: 3 TL bilet × ~%75 dağıtım oranı)
+function formatTL(n: number): string {
+  if (n >= 1_000_000) return `~${(n / 1_000_000).toFixed(1)} Milyon TL`;
+  if (n >= 1_000) return `~${Math.round(n / 1000).toLocaleString("tr-TR")}.000 TL`;
+  return `~${Math.round(n).toLocaleString("tr-TR")} TL`;
+}
+
 export default function AltiliView({ days }: { days: ProgramDay[] }) {
   const [activeHipo, setActiveHipo] = useState(days[0]?.hippodromeSlug ?? "");
   const [altiliIdx, setAltiliIdx] = useState<Record<string, number>>({});
@@ -72,6 +80,12 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
 
   const groupSelections = currentGroup?.races.map((_, i) => getSelected(activeHipo, curAltili, i)) ?? [];
   const filledCount = groupSelections.filter(Boolean).length;
+
+  const katsayi =
+    filledCount === 6 && groupSelections.every((s) => s != null && s.agf != null && s.agf > 0)
+      ? groupSelections.reduce((prod, s) => prod * (100 / s!.agf!), 1)
+      : null;
+  const tahminiIkramiye = katsayi != null ? katsayi * 2.25 : null;
 
   return (
     <div className="flex flex-col">
@@ -284,6 +298,33 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                     );
                   })}
                 </div>
+
+                {/* Tahmini ikramiye */}
+                {tahminiIkramiye != null && (
+                  <div className="mt-3 rounded-lg border border-[#27ae60]/40 bg-[#27ae60]/10 px-3 py-2.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                          Kombinasyon Katsayısı
+                        </div>
+                        <div className="text-sm font-bold tabular-nums">
+                          {Math.round(katsayi!).toLocaleString("tr-TR")}×
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                          Tahmini İkramiye
+                        </div>
+                        <div className="text-lg font-bold text-[#27ae60]">
+                          {formatTL(tahminiIkramiye)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-1.5 text-[10px] text-muted-foreground">
+                      * AGF bazlı kaba tahmin. Gerçek ikramiye toplam havuz ve kazanan sayısına göre değişir.
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
