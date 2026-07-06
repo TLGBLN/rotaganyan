@@ -49,6 +49,9 @@ export default async function Header() {
             <Link href="/rotaganyanpuantablosu">Rotaganyan Puan Tablosu</Link>
           </Button>
           <Button asChild variant="outline" size="sm">
+            <Link href="/altili">Altılı Ne Verir?</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
             <Link href="/tahmin-onerileri">Banko Önerileri</Link>
           </Button>
           <LiveTvPlayer compact />

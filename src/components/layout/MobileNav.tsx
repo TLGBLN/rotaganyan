@@ -45,6 +45,13 @@ export default function MobileNav({ isLoggedIn, followedHorses = [] }: Props) {
             Rotaganyan Puan Tablosu
           </Link>
           <Link
+            href="/altili"
+            onClick={() => setOpen(false)}
+            className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          >
+            Altılı Ne Verir?
+          </Link>
+          <Link
             href="/tahmin-onerileri"
             onClick={() => setOpen(false)}
             className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
