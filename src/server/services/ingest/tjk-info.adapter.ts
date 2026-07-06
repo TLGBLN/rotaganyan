@@ -165,55 +165,159 @@ export async function fetchCityProgram(
     const surface = parseSurface(configText);
     const breed = parseBreed(configText);
 
-    // Parse runner rows
+    // ── Runner table and eküri are inside sibling div#kosubilgisi-{raceId} ──────
+    const kosuDiv = $(`#kosubilgisi-${raceId}`);
+
+    // Eküri gruplarını kosuDiv içinde ara
+    const ekuriGroups: number[][] = [];
+    kosuDiv.find("*").each((_, el) => {
+      if ($(el).find("table, tbody").length > 0) return;
+      const text = $(el).text();
+      if (!/ekür/i.test(text)) return;
+      const matches = [...text.matchAll(/\[([^\]]+)\]/g)];
+      for (const m of matches) {
+        const nos = [...m[1].matchAll(/\((\d+)\)/g)].map((x) => parseInt(x[1], 10));
+        if (nos.length > 0) ekuriGroups.push(nos);
+      }
+    });
+    const ekuriMap = new Map<number, number>();
+    ekuriGroups.forEach((group, idx) => group.forEach((no) => ekuriMap.set(no, idx + 1)));
+
+    const table = kosuDiv.find("table.tablesorter, table").first();
     const runners: IngestRunner[] = [];
 
-    $("tbody tr", raceDiv).each((_, row) => {
-      const noText = $(".gunluk-GunlukYarisProgrami-SiraId", row).text().trim();
-      const no = parseInt(noText, 10);
-      if (isNaN(no) || no < 1) return;
+    if (table.length) {
+      const headerEls = table.find("tr").first().find("th, td").toArray();
+      const headers = headerEls.map((el) => {
+        const t = $(el).text().trim().replace(/\s+/g, " ").toUpperCase();
+        // Turkish normalization
+        return t.replace(/İ/g, "I").replace(/Ğ/g, "G").replace(/Ü/g, "U")
+                .replace(/Ş/g, "S").replace(/Ö/g, "O").replace(/Ç/g, "C");
+      });
 
-      // Horse name — clone & remove span (finishing position) before reading text
-      const atEl = $(".gunluk-GunlukYarisProgrami-AtAdi a", row).first();
-      const atClone = atEl.clone();
-      atClone.find("span, sup").remove();
-      const name = atClone.text().trim().toUpperCase();
-      if (!name) return;
+      const col = (matcher: (h: string) => boolean) => headers.findIndex(matcher);
 
-      // Weight
-      const kiloRaw = $(".gunluk-GunlukYarisProgrami-Kilo", row).text().trim();
-      const weight = parseFloat(kiloRaw.replace(",", ".")) || undefined;
+      const iNo      = col((h) => h === "N");
+      const iName    = col((h) => h.includes("AT ISM") || h.includes("AT ADI"));
+      const iAge     = col((h) => h === "YAS" || h === "Y" || h.startsWith("YAS"));
+      const iOrigin  = col((h) => h.includes("ORIJIN") || h.includes("BABA"));
+      const iWeight  = col((h) => h.includes("SIKLET") || h === "KILO");
+      const iJockey  = col((h) => h === "JOKEY" || h === "JOCKEY");
+      const iOwner   = col((h) => h === "SAHIP" || h.startsWith("SAHIP"));
+      const iTrainer = col((h) => h.includes("ANTRENOR"));
+      const iStart   = col((h) => h === "ST" || h === "START");
+      const iHp      = col((h) => h === "HP");
+      const iSon6    = col((h) => (h.includes("SON") && h.includes("6")) || h === "SON 6 Y.");
+      const iBest    = col((h) => h.includes("EN IYI") || h.includes("E.I.D") || h.includes("ENIYI"));
+      const iAgf     = col((h) => h === "AGF");
 
-      // Jockey (prefer title attr which has full name)
-      const jokeyEl = $(".gunluk-GunlukYarisProgrami-JokeAdi a", row).first();
-      const jockey = (jokeyEl.attr("title") || jokeyEl.text()).trim() || undefined;
+      if (iNo !== -1 && iName !== -1) {
+        table.find("tbody tr").each((_, row) => {
+          const cellEls = $(row).find("td").toArray();
+          const cells   = cellEls.map((c) => $(c).text().trim().replace(/\s+/g, " "));
+          if (cells.length < 3) return;
 
-      // Trainer
-      const trainerEl = $(".gunluk-GunlukYarisProgrami-AntronorAdi a", row).first();
-      const trainer = trainerEl.text().trim() || undefined;
+          const no = parseInt(cells[iNo] ?? "", 10);
+          if (isNaN(no) || no < 1) return;
 
-      // Sire / Dam / DamSire from Baba td — three anchor tags
-      const babaLinks = $(".gunluk-GunlukYarisProgrami-Baba a", row).toArray();
-      const sire = babaLinks[0] ? $(babaLinks[0]).text().trim() || undefined : undefined;
-      const dam = babaLinks[1] ? $(babaLinks[1]).text().trim() || undefined : undefined;
-      const damSire = babaLinks[2] ? $(babaLinks[2]).text().trim() || undefined : undefined;
+          const nameCellText = cells[iName] ?? "";
+          const scratched = /ko[şs]maz/i.test(nameCellText);
 
-      // Start stall number
-      const startNoRaw = $(".gunluk-GunlukYarisProgrami-StartId", row).text().trim();
-      const startNo = parseInt(startNoRaw, 10) || undefined;
+          // At ismi: anchor'dan al, span/sup temizle
+          let name = "";
+          if (iName !== -1 && cellEls[iName]) {
+            const nameEl = $(cellEls[iName]).find("a").first();
+            if (nameEl.length) {
+              const clone = nameEl.clone();
+              clone.find("span, sup").remove();
+              name = clone.text().trim();
+            }
+          }
+          if (!name) name = nameCellText.split(/\s{2,}|\n/)[0] ?? "";
+          name = name.replace(/\s*\(ko[şs]maz\)\s*/gi, "").trim().toUpperCase();
+          if (!name) return;
 
-      // AGF — title attr has the precise value, e.g. title="%17,09(2)"
-      const agfEl = $(".gunluk-GunlukYarisProgrami-AGFORAN a", row).first();
-      const agfRaw = (agfEl.attr("title") || agfEl.text()).trim();
-      const agfMatch = agfRaw.match(/([\d]+[.,]?[\d]*)/);
-      const agf = agfMatch ? parseFloat(agfMatch[1].replace(",", ".")) || undefined : undefined;
+          const age = iAge !== -1 ? (cells[iAge] ?? "") || undefined : undefined;
 
-      // Son 6 yarış derecesi — "64450" formatında, her hane bir koşu pozisyonu (0=koşmadı)
-      const son6Raw = $(".gunluk-GunlukYarisProgrami-Son6Yaris", row).text().trim();
-      const recentForm = son6Raw || undefined;
+          // Pedigree
+          let sire: string | undefined, dam: string | undefined, damSire: string | undefined;
+          if (iOrigin !== -1 && cellEls[iOrigin]) {
+            const links = $(cellEls[iOrigin]).find("a").toArray().map((a) => $(a).text().trim());
+            sire = links[0] || undefined;
+            dam  = links[1] || undefined;
+            damSire = links[2] || undefined;
+            if (!sire) {
+              const raw = cells[iOrigin] ?? "";
+              const [sireDam, ds] = raw.split("/").map((s) => s.trim());
+              const dashIdx = (sireDam ?? "").indexOf("-");
+              if (dashIdx !== -1) {
+                sire = sireDam.slice(0, dashIdx).trim() || undefined;
+                dam  = sireDam.slice(dashIdx + 1).trim() || undefined;
+              }
+              damSire = ds || undefined;
+            }
+          }
 
-      runners.push({ no, name, startNo, weight, jockey, trainer, sire, dam, damSire, agf, recentForm });
-    });
+          const weightRaw = (cells[iWeight] ?? "").replace(",", ".");
+          const weight = parseFloat(weightRaw) || undefined;
+
+          const jockeyCell = iJockey !== -1 && cellEls[iJockey] ? $(cellEls[iJockey]).find("a").first() : null;
+          const jockey = jockeyCell
+            ? (jockeyCell.attr("title") || jockeyCell.text()).trim() || undefined
+            : undefined;
+
+          const ownerCell = iOwner !== -1 && cellEls[iOwner] ? $(cellEls[iOwner]).find("a").first() : null;
+          const owner = ownerCell
+            ? (ownerCell.attr("title") || ownerCell.text()).trim() || undefined
+            : (cells[iOwner] ?? "") || undefined;
+
+          const trainerCell = iTrainer !== -1 && cellEls[iTrainer] ? $(cellEls[iTrainer]).find("a").first() : null;
+          const trainer = trainerCell ? trainerCell.text().trim() || undefined : (cells[iTrainer] ?? "") || undefined;
+
+          const startNo = parseInt(cells[iStart] ?? "", 10) || undefined;
+
+          const hpRaw = (cells[iHp] ?? "").replace(/[^\d]/g, "");
+          const hp = hpRaw !== "" ? parseInt(hpRaw, 10) : undefined;
+
+          let recentForm: string | undefined;
+          let recentFormSurfaces: string | undefined;
+          if (iSon6 !== -1 && cellEls[iSon6]) {
+            const son6El = $(cellEls[iSon6]);
+            const items: { pos: string; surface: string }[] = [];
+            son6El.find("em, a, span, b, i").each((_, el) => {
+              const pos = $(el).text().trim();
+              if (!/^\d$/.test(pos)) return;
+              const cls = ($(el).attr("class") ?? "").toLowerCase();
+              const surface = cls.includes("cim") ? "C" : cls.includes("sentetik") ? "S" : cls.includes("kum") ? "K" : "";
+              items.push({ pos, surface });
+            });
+            if (items.length > 0) {
+              recentForm = items.map((x) => x.pos).join("");
+              if (items.some((x) => x.surface !== "")) {
+                recentFormSurfaces = items.map((x) => x.surface || " ").join("");
+              }
+            } else {
+              recentForm = (cells[iSon6] ?? "").replace(/[^\d]/g, "") || undefined;
+            }
+          }
+
+          const bestRaw = cells[iBest] ?? "";
+          const bestTime = bestRaw && !/^[0.:]+$/.test(bestRaw) ? bestRaw : undefined;
+
+          let agf: number | undefined;
+          if (iAgf !== -1 && cellEls[iAgf]) {
+            const agfEl = $(cellEls[iAgf]).find("a").first();
+            const agfRaw = (agfEl.attr("title") || agfEl.text() || (cells[iAgf] ?? "")).trim();
+            const agfMatch = agfRaw.match(/([\d]+[.,]?[\d]*)/);
+            agf = agfMatch ? parseFloat(agfMatch[1].replace(",", ".")) || undefined : undefined;
+          }
+
+          const ekuriGroup = ekuriMap.get(no) ?? undefined;
+
+          runners.push({ no, name, age, startNo, weight, jockey, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup });
+        });
+      }
+    }
 
     if (runners.length > 0) {
       races.push({

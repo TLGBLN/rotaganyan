@@ -141,61 +141,126 @@ function parsePedigree(raw: string): { sire?: string; dam?: string; damSire?: st
   };
 }
 
-function parseRunnersTable($: cheerio.CheerioAPI, table: cheerio.Cheerio<AnyNode>): IngestRunner[] {
-  const headers = table
-    .find("tr")
-    .first()
-    .find("th, td")
-    .toArray()
-    .map((el) => cleanCell($(el).text()));
+function parseEkuriGroups($: cheerio.CheerioAPI, context: cheerio.Cheerio<AnyNode>): Map<number, number> {
+  const groups: number[][] = [];
+  context.find("*").each((_, el) => {
+    if ($(el).find("table, tbody").length > 0) return;
+    const text = $(el).text();
+    if (!/ek[uü]ri/i.test(text)) return;
+    const matches = [...text.matchAll(/\[([^\]]+)\]/g)];
+    for (const m of matches) {
+      const nos = [...m[1].matchAll(/\((\d+)\)/g)].map((x) => parseInt(x[1], 10));
+      if (nos.length > 0) groups.push(nos);
+    }
+  });
+  const map = new Map<number, number>();
+  groups.forEach((g, idx) => g.forEach((no) => map.set(no, idx + 1)));
+  return map;
+}
+
+function parseRunnersTable(
+  $: cheerio.CheerioAPI,
+  table: cheerio.Cheerio<AnyNode>,
+  ekuriMap: Map<number, number> = new Map()
+): IngestRunner[] {
+  const headerEls = table.find("tr").first().find("th, td").toArray();
+  const headers = headerEls.map((el) => cleanCell($(el).text()));
 
   const col = (matcher: (h: string) => boolean) =>
     headers.findIndex((h) => matcher(normTr(h)));
 
-  const iNo = col((h) => h === "N");
-  const iName = col((h) => h.includes("AT ISMI"));
-  const iOrigin = col((h) => h.includes("ORIJIN"));
-  const iWeight = col((h) => h.includes("SIKLET"));
-  const iJockey = col((h) => h === "JOKEY");
+  const iNo      = col((h) => h === "N");
+  const iName    = col((h) => h.includes("AT ISMI") || h.includes("AT ISM"));
+  const iAge     = col((h) => h === "YAS" || h === "Y" || h.startsWith("YAS"));
+  const iOrigin  = col((h) => h.includes("ORIJIN") || h.includes("BABA"));
+  const iWeight  = col((h) => h.includes("SIKLET") || h === "KILO");
+  const iJockey  = col((h) => h === "JOKEY" || h === "JOCKEY");
+  const iOwner   = col((h) => h === "SAHIP" || h.startsWith("SAHIP"));
   const iTrainer = col((h) => h.includes("ANTRENOR"));
-  const iStart = col((h) => h === "ST");
-  const iAgf = col((h) => h === "AGF");
+  const iStart   = col((h) => h === "ST" || h === "START");
+  const iHp      = col((h) => h === "HP");
+  const iSon6    = col((h) => (h.includes("SON") && h.includes("6")) || h === "SON 6 Y.");
+  const iBest    = col((h) => h.includes("EN IYI") || h.includes("E.I.D") || h.includes("ENIYI"));
+  const iAgf     = col((h) => h === "AGF");
 
   if (iNo === -1 || iName === -1) return [];
 
   const runners: IngestRunner[] = [];
   table.find("tr").each((_, row) => {
-    const cells = $(row)
-      .find("td")
-      .toArray()
-      .map((c) => $(c).text());
+    const cellEls = $(row).find("td").toArray();
+    const cells   = cellEls.map((c) => $(c).text());
     if (cells.length < 3) return;
 
     const no = parseInt(cleanCell(cells[iNo] ?? ""), 10);
-    // Tooltip/equipment-note and apprentice-flag text bleed into these cells, separated
-    // from the real value by a run of whitespace/newlines — split on the *raw* text
-    // before collapsing whitespace, otherwise the separator itself disappears.
     const firstSegment = (raw: string) => cleanCell((raw ?? "").trim().split(/\s{2,}|\n/)[0] ?? "");
-    const name = firstSegment(cells[iName] ?? "").toUpperCase();
+
+    // Scratched detection
+    const nameCellText = cells[iName] ?? "";
+    const scratched = /ko[şs]maz/i.test(nameCellText);
+    const name = firstSegment(nameCellText)
+      .replace(/\s*\(ko[şs]maz\)\s*/gi, "")
+      .toUpperCase();
     if (isNaN(no) || !name) return;
 
+    const age = iAge !== -1 ? cleanCell(cells[iAge] ?? "") || undefined : undefined;
     const pedigree = iOrigin !== -1 ? parsePedigree(cells[iOrigin] ?? "") : {};
     const weight = iWeight !== -1 ? parseFloat(cleanCell(cells[iWeight] ?? "").replace(",", ".")) : undefined;
     const jockey = iJockey !== -1 ? firstSegment(cells[iJockey] ?? "") || undefined : undefined;
+    const owner  = iOwner !== -1 ? cleanCell(cells[iOwner] ?? "").split(/\s{2,}|\n/)[0]?.trim() || undefined : undefined;
     const trainer = iTrainer !== -1 ? cleanCell(cells[iTrainer] ?? "") || undefined : undefined;
     const startNo = iStart !== -1 ? parseInt(cleanCell(cells[iStart] ?? ""), 10) : undefined;
+
+    const hpRaw = iHp !== -1 ? cleanCell(cells[iHp] ?? "").replace(/[^\d]/g, "") : "";
+    const hp = hpRaw !== "" ? parseInt(hpRaw, 10) : undefined;
+
+    // Son 6 Yarış — try child element surface classes first, fall back to text digits
+    let recentForm: string | undefined;
+    let recentFormSurfaces: string | undefined;
+    if (iSon6 !== -1 && cellEls[iSon6]) {
+      const son6El = $(cellEls[iSon6]);
+      const items: { pos: string; surface: string }[] = [];
+      son6El.find("em, a, span, b, i").each((_, el) => {
+        const pos = $(el).text().trim();
+        if (!/^\d$/.test(pos)) return;
+        const cls = ($(el).attr("class") ?? "").toLowerCase();
+        const surface = cls.includes("cim") ? "C" : cls.includes("sentetik") ? "S" : cls.includes("kum") ? "K" : "";
+        items.push({ pos, surface });
+      });
+      if (items.length > 0) {
+        recentForm = items.map((x) => x.pos).join("");
+        if (items.some((x) => x.surface !== "")) {
+          recentFormSurfaces = items.map((x) => x.surface || " ").join("");
+        }
+      } else {
+        recentForm = son6El.text().replace(/\s+/g, "").replace(/[^\d]/g, "") || undefined;
+      }
+    }
+
+    const bestRaw = iBest !== -1 ? cleanCell(cells[iBest] ?? "") : "";
+    const bestTime = bestRaw && !/^[0.:]+$/.test(bestRaw) ? bestRaw : undefined;
+
     const agfRaw = iAgf !== -1 ? cleanCell(cells[iAgf] ?? "") : "";
     const agf = agfRaw ? parseFloat(agfRaw.replace("%", "").replace(",", ".")) : undefined;
+
+    const ekuriGroup = ekuriMap.get(no) ?? undefined;
 
     runners.push({
       no,
       name,
+      age,
       ...pedigree,
       weight: weight != null && !isNaN(weight) ? weight : undefined,
       jockey,
+      owner,
       trainer,
       startNo: startNo != null && !isNaN(startNo) ? startNo : undefined,
+      hp,
+      recentForm,
+      recentFormSurfaces,
+      bestTime,
       agf: agf != null && !isNaN(agf) ? agf : undefined,
+      scratched,
+      ekuriGroup,
     });
   });
   return runners;
@@ -237,9 +302,12 @@ async function fetchCityProgram(
 
     const config = parseRaceConfig(details.find("h3.race-config").first().text());
 
-    // The runner table lives in the sibling `div.test.kosubilgisi-*` that follows.
-    const table = details.nextAll("div").find("table.tablesorter").first();
-    const runners = table.length ? parseRunnersTable($, table) : [];
+    // The runner table lives in the sibling div#kosubilgisi-{raceId}.
+    const raceId = details.parent().attr("id") ?? "";
+    const kosuDiv = $(`#kosubilgisi-${raceId}`);
+    const table = kosuDiv.find("table.tablesorter").first();
+    const ekuriMap = table.length ? parseEkuriGroups($, kosuDiv) : new Map<number, number>();
+    const runners = table.length ? parseRunnersTable($, table, ekuriMap) : [];
 
     races.push({
       raceNo: noTime.raceNo,
