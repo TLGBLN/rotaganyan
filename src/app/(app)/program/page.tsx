@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { getProgramData } from "@/server/services/race.service";
 import { turkeyDateString } from "@/lib/tz";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
@@ -13,13 +14,27 @@ export default async function ProgramPage({ searchParams }: PageProps) {
   const today = turkeyDateString();
   const currentDate = tarih ?? today;
 
-  // Bugün ya da yakında olan yarışlar için her zaman TJK'dan taze veri çek
-  const daysAhead = Math.round((new Date(currentDate).getTime() - new Date(today).getTime()) / 86400000);
+  const daysAhead = Math.round(
+    (new Date(currentDate).getTime() - new Date(today).getTime()) / 86400000
+  );
+
   if (daysAhead >= 0 && daysAhead <= 7) {
-    try {
-      const tjkDate = toTjkDate(new Date(currentDate + "T00:00:00Z"));
-      await ingestDate(tjkDate);
-    } catch { /* ignore */ }
+    const tjkDate = toTjkDate(new Date(currentDate + "T00:00:00Z"));
+    const existing = await getProgramData(currentDate);
+    const totalRunners = existing.reduce(
+      (s, d) => s + d.races.reduce((s2, r) => s2 + r.runners.length, 0),
+      0
+    );
+
+    if (totalRunners === 0) {
+      // İlk kez: veri yoksa bekleyerek çek
+      try { await ingestDate(tjkDate); } catch { /* ignore */ }
+    } else {
+      // Veri var: hemen dön, arka planda yenile
+      after(async () => {
+        try { await ingestDate(tjkDate); } catch { /* ignore */ }
+      });
+    }
   }
 
   const days = await getProgramData(currentDate);
