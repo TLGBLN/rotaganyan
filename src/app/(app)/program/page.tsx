@@ -50,7 +50,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
     getAgfMovers(today),
     fetchTodaysAltiliResults(),
     fetchTjkTicker(),
-    getFollowedHorses(),
+    getFollowedHorses().catch(() => [] as { horseName: string }[]),
   ]);
   const followedNames = followedHorses.map((h) => h.horseName);
 

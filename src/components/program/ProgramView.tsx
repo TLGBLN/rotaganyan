@@ -276,7 +276,7 @@ function RunnerRow({
               "h-3.5 w-3.5",
               isFollowed
                 ? "fill-yellow-400 text-yellow-400"
-                : "text-muted-foreground/40 hover:text-yellow-400"
+                : "text-muted-foreground hover:text-yellow-400"
             )} />
           </button>
           <div className={cn("font-semibold", isWinner && "text-[#f5c518]")}>
@@ -427,7 +427,7 @@ function RunnerCard({
                 "h-3.5 w-3.5",
                 isFollowed
                   ? "fill-yellow-400 text-yellow-400"
-                  : "text-muted-foreground/40 hover:text-yellow-400"
+                  : "text-muted-foreground hover:text-yellow-400"
               )} />
             </button>
             <span className={cn("font-semibold truncate", isWinner && "text-[#f5c518]")}>
