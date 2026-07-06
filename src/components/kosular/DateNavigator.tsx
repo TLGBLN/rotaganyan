@@ -36,7 +36,7 @@ export default function DateNavigator({ currentDate, basePath = "/kosular" }: Pr
         onClick={() => inputRef.current?.showPicker()}
         className="relative flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium text-foreground transition-colors hover:border-foreground/30"
       >
-        <CalendarDays className="h-3.5 w-3.5" />
+        <CalendarDays className="h-3.5 w-3.5 text-[#EFF2F5]" />
         {toDisplay(currentDate)}
         <input
           ref={inputRef}
