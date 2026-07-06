@@ -506,3 +506,118 @@ export async function getCurrentRaces(dateStr: string): Promise<CurrentRace[]> {
   }
   return current;
 }
+
+// ─── Program Sayfası ──────────────────────────────────────────────────────────
+
+export type ProgramRunner = {
+  id: string;
+  no: number;
+  name: string;
+  age: string | null;
+  weight: number | null;
+  weightChange: number | null;
+  startNo: number | null;
+  jockey: string | null;
+  jockeyChanged: boolean;
+  previousJockey: string | null;
+  trainer: string | null;
+  owner: string | null;
+  sire: string | null;
+  dam: string | null;
+  hp: number | null;
+  bestTime: string | null;
+  recentForm: string | null;
+  recentFormSurfaces: string | null;
+  agf: number | null;
+  scratched: boolean;
+  ekuriGroup: number | null;
+};
+
+export type ProgramPick = {
+  rank: number;
+  runnerLabel: string | null;
+  runner: { no: number; name: string } | null;
+};
+
+export type ProgramRace = {
+  id: string;
+  raceNo: number;
+  time: string | null;
+  classType: string;
+  breed: string;
+  surface: string;
+  distance: number;
+  conditions: string | null;
+  runners: ProgramRunner[];
+  result: { winnerNo: number | null } | null;
+  hasAnalysis: boolean;
+  picks: ProgramPick[];
+};
+
+export type ProgramDay = {
+  id: string;
+  hippodromeName: string;
+  hippodromeSlug: string;
+  races: ProgramRace[];
+};
+
+export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
+  const date = new Date(dateStr + "T00:00:00.000Z");
+
+  const raceDays = await db.raceDay.findMany({
+    where: { date: { gte: startOfDay(date), lte: endOfDay(date) } },
+    include: {
+      hippodrome: { select: { name: true, slug: true } },
+      races: {
+        orderBy: { raceNo: "asc" },
+        include: {
+          result: { select: { winnerNo: true } },
+          prediction: {
+            select: {
+              picks: {
+                orderBy: { rank: "asc" },
+                select: {
+                  rank: true,
+                  runnerLabel: true,
+                  runner: { select: { no: true, name: true } },
+                },
+              },
+            },
+          },
+          runners: {
+            orderBy: { no: "asc" },
+            select: {
+              id: true, no: true, name: true, age: true, weight: true,
+              weightChange: true, startNo: true, jockey: true,
+              jockeyChanged: true, previousJockey: true, trainer: true,
+              owner: true, sire: true, dam: true, hp: true,
+              bestTime: true, recentForm: true, recentFormSurfaces: true, agf: true,
+              scratched: true, ekuriGroup: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: { hippodrome: { name: "asc" } },
+  });
+
+  return raceDays.map((rd) => ({
+    id: rd.id,
+    hippodromeName: rd.hippodrome.name,
+    hippodromeSlug: rd.hippodrome.slug,
+    races: rd.races.map((r) => ({
+      id: r.id,
+      raceNo: r.raceNo,
+      time: r.time,
+      classType: r.classType,
+      breed: r.breed,
+      surface: r.surface,
+      distance: r.distance,
+      conditions: r.conditions,
+      runners: r.runners,
+      result: r.result,
+      hasAnalysis: r.prediction != null && r.prediction.picks.length > 0,
+      picks: r.prediction?.picks ?? [],
+    })),
+  }));
+}

@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   const race = await db.race.findUnique({
     where: { id: raceId },
     include: {
-      runners: { select: { id: true, no: true } },
+      runners: { select: { id: true, no: true, name: true } },
       raceDay: { include: { hippodrome: true } },
     },
   });
@@ -85,7 +85,11 @@ export async function POST(req: NextRequest) {
   }
 
   const runnerIdByNo: Record<number, string> = {};
-  for (const r of race.runners) runnerIdByNo[r.no] = r.id;
+  const runnerNameByNo: Record<number, string> = {};
+  for (const r of race.runners) {
+    runnerIdByNo[r.no] = r.id;
+    runnerNameByNo[r.no] = r.name;
+  }
 
   for (const r of parsed.runners) {
     const data = {
@@ -126,10 +130,17 @@ export async function POST(req: NextRequest) {
   }
 
   // Picks may reference runners not present in the GENEL PROGRAM table; ensure they exist too.
+  // Also update name if the existing runner has an empty or placeholder name (e.g. TJK ingest without names).
   for (const p of parsed.picks) {
     if (!runnerIdByNo[p.no]) {
       const created = await db.runner.create({ data: { raceId, no: p.no, name: p.name } });
       runnerIdByNo[p.no] = created.id;
+    } else if (p.name) {
+      const existingName = runnerNameByNo[p.no] ?? "";
+      const isPlaceholder = !existingName.trim() || /^\d+$/.test(existingName.trim());
+      if (isPlaceholder) {
+        await db.runner.update({ where: { id: runnerIdByNo[p.no] }, data: { name: p.name } });
+      }
     }
   }
 

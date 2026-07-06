@@ -48,6 +48,9 @@ export default async function Header() {
           <Button asChild variant="outline" size="sm">
             <Link href="/tahmin-onerileri">Banko Önerileri</Link>
           </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/program">Yarış Programı</Link>
+          </Button>
           <LiveTvPlayer compact />
         </nav>
 

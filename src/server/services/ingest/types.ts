@@ -14,6 +14,13 @@ export type IngestRunner = {
   equipment?: string;
   agf?: number;
   recentForm?: string;
+  age?: string;
+  owner?: string;
+  hp?: number;
+  bestTime?: string;
+  recentFormSurfaces?: string;
+  scratched?: boolean;
+  ekuriGroup?: number;
 };
 
 export type IngestGallop = {

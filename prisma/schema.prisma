@@ -218,6 +218,13 @@ model Runner {
   recentForm       String?
   jockeyChanged    Boolean @default(false)
   previousJockey   String?
+  age              String?
+  owner            String?
+  hp               Int?
+  bestTime         String?
+  recentFormSurfaces String?
+  scratched        Boolean @default(false)
+  ekuriGroup       Int?
 
   race         Race          @relation(fields: [raceId], references: [id], onDelete: Cascade)
   gallops      Gallop[]
