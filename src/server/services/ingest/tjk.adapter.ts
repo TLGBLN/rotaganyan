@@ -143,16 +143,16 @@ function parsePedigree(raw: string): { sire?: string; dam?: string; damSire?: st
 
 function parseEkuriGroups($: cheerio.CheerioAPI, context: cheerio.Cheerio<AnyNode>): Map<number, number> {
   const groups: number[][] = [];
-  context.find("*").each((_, el) => {
-    if ($(el).find("table, tbody").length > 0) return;
-    const text = $(el).text();
-    if (!/ek[uü]ri/i.test(text)) return;
+  const clone = context.clone();
+  clone.find("table").remove();
+  const text = clone.text().replace(/\s+/g, " ");
+  if (/ek[uü]ri/i.test(text)) {
     const matches = [...text.matchAll(/\[([^\]]+)\]/g)];
     for (const m of matches) {
       const nos = [...m[1].matchAll(/\((\d+)\)/g)].map((x) => parseInt(x[1], 10));
-      if (nos.length > 0) groups.push(nos);
+      if (nos.length >= 2) groups.push(nos);
     }
-  });
+  }
   const map = new Map<number, number>();
   groups.forEach((g, idx) => g.forEach((no) => map.set(no, idx + 1)));
   return map;

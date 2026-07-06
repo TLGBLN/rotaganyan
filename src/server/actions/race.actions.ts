@@ -5,6 +5,18 @@ import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import type { Surface, Breed } from "@prisma/client";
 
+export async function forceIngestDate(date: string): Promise<{ runners: number }> {
+  await requireRole("ADMIN");
+  const { toTjkDate, ingestDate } = await import("@/server/services/ingest/tjk-info.adapter");
+  const tjkDate = toTjkDate(new Date(date + "T00:00:00Z"));
+  const result = await ingestDate(tjkDate);
+  const runners = result.cities.reduce((s, c) => s + c.runners, 0);
+  revalidatePath("/admin/kosular");
+  revalidatePath("/program");
+  revalidatePath("/altili");
+  return { runners };
+}
+
 export async function upsertRaceDay(hippodromeId: string, date: string) {
   await requireRole("EDITOR");
 

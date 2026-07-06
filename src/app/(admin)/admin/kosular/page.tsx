@@ -8,6 +8,8 @@ import { turkeyDateString } from "@/lib/tz";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import DeleteRaceDayButton from "@/components/admin/DeleteRaceDayButton";
 import DeleteRaceButton from "@/components/admin/DeleteRaceButton";
+import ForceIngestButton from "@/components/admin/ForceIngestButton";
+import { forceIngestDate } from "@/server/actions/race.actions";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,7 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-bold">Koşu Programı</h1>
         <div className="flex items-center gap-2">
+          <ForceIngestButton date={currentDate} action={forceIngestDate} />
           <DateNavigator currentDate={currentDate} basePath="/admin/kosular" />
         </div>
       </div>
