@@ -135,7 +135,13 @@ function AnalysisPanel({ picks, winnerNo }: { picks: ProgramPick[]; winnerNo?: n
   }, []);
 
   return (
-    <div ref={ref} className="border-t bg-muted/20">
+    <div ref={ref} className="border-t">
+      {/* Başlık */}
+      <div className="px-4 py-2.5 bg-[#1a2332] border-b flex items-center gap-2">
+        <span className="w-1 h-4 rounded-full bg-brand inline-block shrink-0" />
+        <span className="text-sm font-bold tracking-wide">Analiz Detayları</span>
+      </div>
+
       {/* Masaüstü tablo */}
       <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-xs">
