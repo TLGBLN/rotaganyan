@@ -3,27 +3,39 @@
 import { useState } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ProgramDay, ProgramRace } from "@/server/services/race.service";
+import type { ProgramDay, ProgramRace, ProgramRunner } from "@/server/services/race.service";
 
-type SelValue = { no: number; name: string; agf: number | null };
+// effectiveAgf: eküri grubundaki atlar için grup toplamı, tekil for tek at
+type SelValue = { no: number; name: string; agf: number | null; effectiveAgf: number };
 
 function chunkAltili(races: ProgramRace[]): { label: string; races: ProgramRace[] }[] {
   if (races.length === 0) return [];
   if (races.length <= 6) return [{ label: "1. Altılı", races }];
-  const g1 = races.slice(0, 6);
-  const g2 = races.slice(races.length - 6);
-  return [{ label: "1. Altılı", races: g1 }, { label: "2. Altılı", races: g2 }];
+  return [
+    { label: "1. Altılı", races: races.slice(0, 6) },
+    { label: "2. Altılı", races: races.slice(races.length - 6) },
+  ];
 }
 
 function breedShort(b: string) {
   return b === "ARAP" ? "Arap" : "İngiliz";
 }
 
-// AGF bazlı katsayı: Π(100/AGFi)
-// TJK altılı kolon = 1.25 TL, dağıtım %75–%87.5 → lower=katsayı×0.9375, upper=katsayı×1.09375
+// TJK altılı: kolon 1.25 TL, dağıtım %75–%87.5
+// lower = katsayı × 0.93, upper = katsayı × 0.99
 function formatTL(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2).replace(".", ",")} Milyon ₺`;
   return n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " ₺";
+}
+
+// Eküri grubundaki toplam AGF — tek at ise kendi AGF'i döner
+function effectiveAgf(runner: ProgramRunner, allRunners: ProgramRunner[]): number {
+  if (runner.agf == null) return 0;
+  if (runner.ekuriGroup == null || runner.ekuriGroup < 1) return runner.agf;
+  const total = allRunners
+    .filter((r) => r.ekuriGroup === runner.ekuriGroup && !r.scratched && r.agf != null)
+    .reduce((s, r) => s + r.agf!, 0);
+  return total > 0 ? total : runner.agf;
 }
 
 export default function AltiliView({ days }: { days: ProgramDay[] }) {
@@ -54,21 +66,6 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
   function getSelected(hipo: string, alt: number, ayak: number): SelValue | null {
     return selections[selKey(hipo, alt, ayak)] ?? null;
   }
-  function toggleSelection(
-    hipo: string, alt: number, ayak: number,
-    runner: { no: number; name: string; agf: number | null; scratched: boolean }
-  ) {
-    if (runner.scratched) return;
-    const key = selKey(hipo, alt, ayak);
-    setSelections((prev) => {
-      if (prev[key]?.no === runner.no) {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      }
-      return { ...prev, [key]: { no: runner.no, name: runner.name, agf: runner.agf } };
-    });
-  }
   function clearGroup(hipo: string, alt: number) {
     setSelections((prev) => {
       const next = { ...prev };
@@ -81,8 +78,8 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
   const filledCount = groupSelections.filter(Boolean).length;
 
   const katsayi =
-    filledCount === 6 && groupSelections.every((s) => s != null && s.agf != null && s.agf > 0)
-      ? groupSelections.reduce((prod, s) => prod * (100 / s!.agf!), 1)
+    filledCount === 6 && groupSelections.every((s) => s != null && s.effectiveAgf > 0)
+      ? groupSelections.reduce((prod, s) => prod * (100 / s!.effectiveAgf), 1)
       : null;
   const ikramiyeLower = katsayi != null ? katsayi * 0.93 : null;
   const ikramiyeUpper = katsayi != null ? katsayi * 0.99 : null;
@@ -180,7 +177,7 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                         <th className="w-10 px-2 py-2 text-center">No</th>
                         <th className="px-2 py-2 text-left">At</th>
                         <th className="px-2 py-2 text-left">Jokey</th>
-                        <th className="w-16 px-2 py-2 text-right">AGF%</th>
+                        <th className="w-20 px-2 py-2 text-right">AGF%</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -190,31 +187,46 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                           return (b.agf ?? -1) - (a.agf ?? -1);
                         })
                         .map((r, i) => {
-                          const isSelected =
-                            getSelected(activeHipo, curAltili, curAyak)?.no === r.no;
+                          const isSelected = getSelected(activeHipo, curAltili, curAyak)?.no === r.no;
                           const isTopAgf = !r.scratched && i === 0;
+                          const effAgf = effectiveAgf(r, currentRace.runners);
+                          const isEkuri = r.ekuriGroup != null && r.ekuriGroup >= 1 && effAgf > (r.agf ?? 0) + 0.01;
+
                           return (
                             <tr
                               key={r.id}
-                              onClick={() => toggleSelection(activeHipo, curAltili, curAyak, r)}
+                              onClick={() => {
+                                if (r.scratched) return;
+                                const key = selKey(activeHipo, curAltili, curAyak);
+                                const wasSelected = getSelected(activeHipo, curAltili, curAyak)?.no === r.no;
+                                setSelections((prev) => {
+                                  if (wasSelected) {
+                                    const next = { ...prev };
+                                    delete next[key];
+                                    return next;
+                                  }
+                                  return {
+                                    ...prev,
+                                    [key]: { no: r.no, name: r.name, agf: r.agf, effectiveAgf: effAgf },
+                                  };
+                                });
+                                // Otomatik sonraki ayağa geç (seçim yapılıyorsa, iptal değil)
+                                if (!wasSelected && curAyak < currentGroup.races.length - 1) {
+                                  setAyakIdx((prev) => ({ ...prev, [ayakKey]: curAyak + 1 }));
+                                }
+                              }}
                               className={cn(
                                 "border-b transition-colors",
-                                r.scratched
-                                  ? "opacity-40 cursor-not-allowed"
-                                  : "cursor-pointer",
+                                r.scratched ? "opacity-40 cursor-not-allowed" : "cursor-pointer",
                                 i % 2 === 0 ? "bg-background" : "bg-muted/20",
                                 isSelected && "bg-[#27ae60]/15 hover:bg-[#27ae60]/20",
                                 !isSelected && !r.scratched && "hover:bg-muted/40"
                               )}
                             >
                               <td className="px-2 py-2.5 text-center w-8">
-                                {isSelected && (
-                                  <Check className="h-4 w-4 text-[#27ae60] mx-auto" />
-                                )}
+                                {isSelected && <Check className="h-4 w-4 text-[#27ae60] mx-auto" />}
                               </td>
-                              <td className="px-2 py-2.5 text-center font-bold tabular-nums">
-                                {r.no}
-                              </td>
+                              <td className="px-2 py-2.5 text-center font-bold tabular-nums">{r.no}</td>
                               <td className="px-2 py-2.5">
                                 <span className={cn("font-medium", r.scratched && "line-through")}>
                                   {r.name}
@@ -226,13 +238,17 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                               <td className="px-2 py-2.5 text-xs text-muted-foreground">
                                 {r.jockey ?? "—"}
                               </td>
-                              <td
-                                className={cn(
-                                  "px-2 py-2.5 text-right font-semibold tabular-nums",
-                                  isTopAgf && "text-[#27ae60]"
-                                )}
-                              >
-                                {r.agf != null ? `%${r.agf.toFixed(1)}` : "—"}
+                              <td className={cn("px-2 py-2.5 text-right tabular-nums", isTopAgf && "text-[#27ae60]")}>
+                                {r.agf != null ? (
+                                  <div>
+                                    <div className="font-semibold">{`%${r.agf.toFixed(1)}`}</div>
+                                    {isEkuri && (
+                                      <div className="text-[10px] text-brand">
+                                        E:%{effAgf.toFixed(1)}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : "—"}
                               </td>
                             </tr>
                           );
@@ -264,9 +280,7 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                     return (
                       <button
                         key={i}
-                        onClick={() =>
-                          setAyakIdx((prev) => ({ ...prev, [ayakKey]: i }))
-                        }
+                        onClick={() => setAyakIdx((prev) => ({ ...prev, [ayakKey]: i }))}
                         className={cn(
                           "flex flex-col items-center rounded-lg border p-1.5 text-center transition-colors min-h-[58px] justify-center",
                           sel
@@ -285,11 +299,9 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                             <span className="text-[9px] truncate w-full leading-tight mt-0.5 px-0.5">
                               {sel.name.split(" ")[0]}
                             </span>
-                            {sel.agf != null && (
-                              <span className="text-[9px] text-[#27ae60] font-semibold">
-                                %{sel.agf.toFixed(0)}
-                              </span>
-                            )}
+                            <span className="text-[9px] text-[#27ae60] font-semibold">
+                              %{sel.effectiveAgf.toFixed(0)}
+                            </span>
                           </>
                         ) : (
                           <span className="text-xl text-muted-foreground/25 leading-none mt-0.5">+</span>
