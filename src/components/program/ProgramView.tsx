@@ -101,6 +101,12 @@ function parsePickDetails(details: string[]) {
   return { aScore, bcScore, veriGuven, kilItGerekce: notes.join(" ") || undefined };
 }
 
+function rankStyle(rank: number) {
+  if (rank <= 3) return { badge: "bg-[#27ae60] text-white", text: "text-[#27ae60]" };
+  if (rank <= 6) return { badge: "bg-brand text-brand-foreground", text: "text-brand" };
+  return { badge: "bg-muted text-muted-foreground", text: "text-muted-foreground" };
+}
+
 function veriGuvenColor(vg: string | undefined) {
   if (!vg) return "text-muted-foreground";
   const u = vg.toUpperCase();
@@ -164,16 +170,16 @@ function AnalysisPanel({ picks, winnerNo }: { picks: ProgramPick[]; winnerNo?: n
               const no = p.runner?.no ?? (parseInt(p.runnerLabel ?? "0", 10) || "?");
               const { aScore, bcScore, veriGuven, kilItGerekce } = parsePickDetails(p.details);
               const isWinner = winnerNo != null && p.runner?.no === winnerNo;
+              const rs = rankStyle(p.rank);
               return (
                 <tr key={p.rank} className={cn("border-b last:border-0", isWinner && "bg-[#f5c518]/10")}>
                   <td className="px-2 py-2 text-center">
-                    <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold",
-                      "bg-muted text-muted-foreground")}>
+                    <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold", rs.badge)}>
                       {p.rank}
                     </span>
                   </td>
-                  <td className={cn("px-2 py-2 text-center font-mono font-bold", isWinner && "text-[#f5c518]")}>{no}</td>
-                  <td className={cn("px-2 py-2 font-semibold", isWinner && "text-[#f5c518]")}>{name}</td>
+                  <td className={cn("px-2 py-2 text-center font-mono font-bold", isWinner ? "text-[#f5c518]" : rs.text)}>{no}</td>
+                  <td className={cn("px-2 py-2 font-semibold", isWinner ? "text-[#f5c518]" : rs.text)}>{name}</td>
                   <td className="px-2 py-2 text-center tabular-nums">{aScore ?? "—"}</td>
                   <td className="px-2 py-2 text-center tabular-nums">{bcScore ?? "—"}</td>
                   <td className="px-2 py-2 text-center tabular-nums font-bold">
@@ -200,14 +206,15 @@ function AnalysisPanel({ picks, winnerNo }: { picks: ProgramPick[]; winnerNo?: n
           const no = p.runner?.no ?? (parseInt(p.runnerLabel ?? "0", 10) || "?");
           const { aScore, bcScore, veriGuven, kilItGerekce } = parsePickDetails(p.details);
           const isWinner = winnerNo != null && p.runner?.no === winnerNo;
+          const rs = rankStyle(p.rank);
           return (
             <div key={p.rank} className={cn("px-3 py-2.5", isWinner && "bg-[#f5c518]/10")}>
               <div className="flex items-center gap-2 mb-1">
-                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0 bg-muted text-muted-foreground">
+                <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0", rs.badge)}>
                   {p.rank}
                 </span>
-                <span className={cn("font-bold text-xs", isWinner && "text-[#f5c518]")}>#{no}</span>
-                <span className={cn("font-semibold text-xs", isWinner && "text-[#f5c518]")}>{name}</span>
+                <span className={cn("font-bold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>#{no}</span>
+                <span className={cn("font-semibold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>{name}</span>
                 {veriGuven && <span className={cn("ml-auto text-xs", veriGuvenColor(veriGuven))}>{veriGuven}</span>}
               </div>
               <div className="flex gap-3 text-[11px] text-muted-foreground mb-1">
