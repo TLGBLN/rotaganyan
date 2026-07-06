@@ -144,8 +144,8 @@ function AnalysisPanel({ picks, winnerNo }: { picks: ProgramPick[]; winnerNo?: n
     <div ref={ref} className="border-t">
       {/* Başlık */}
       <div className="px-4 py-2.5 bg-[#1a2332] border-b flex items-center gap-2">
-        <span className="w-1 h-4 rounded-full bg-brand inline-block shrink-0" />
-        <span className="text-sm font-bold tracking-wide">Analiz Detayları</span>
+        <span className="w-1 h-4 rounded-full bg-[#c0392b] inline-block shrink-0" />
+        <span className="text-sm font-bold tracking-wide text-[#c0392b]">Analiz Detayları</span>
       </div>
 
       {/* Masaüstü tablo */}
@@ -159,7 +159,6 @@ function AnalysisPanel({ picks, winnerNo }: { picks: ProgramPick[]; winnerNo?: n
               <th className="px-2 py-2 text-center w-10">A</th>
               <th className="px-2 py-2 text-center w-12">B+C</th>
               <th className="px-2 py-2 text-center w-14 font-bold">Toplam</th>
-              <th className="px-2 py-2 text-center w-20">Veri Güven</th>
               <th className="px-2 py-2 text-left">Kilit Gerekçe</th>
             </tr>
           </thead>
@@ -184,9 +183,6 @@ function AnalysisPanel({ picks, winnerNo }: { picks: ProgramPick[]; winnerNo?: n
                   <td className="px-2 py-2 text-center tabular-nums">{bcScore ?? "—"}</td>
                   <td className="px-2 py-2 text-center tabular-nums font-bold">
                     {p.score != null ? <span>{p.score}</span> : "—"}
-                  </td>
-                  <td className={cn("px-2 py-2 text-center", veriGuvenColor(veriGuven))}>
-                    {veriGuven ?? "—"}
                   </td>
                   <td className="px-2 py-2 text-muted-foreground leading-snug max-w-xs">
                     {kilItGerekce ?? "—"}
@@ -215,7 +211,6 @@ function AnalysisPanel({ picks, winnerNo }: { picks: ProgramPick[]; winnerNo?: n
                 </span>
                 <span className={cn("font-bold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>#{no}</span>
                 <span className={cn("font-semibold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>{name}</span>
-                {veriGuven && <span className={cn("ml-auto text-xs", veriGuvenColor(veriGuven))}>{veriGuven}</span>}
               </div>
               <div className="flex gap-3 text-[11px] text-muted-foreground mb-1">
                 {aScore && <span>A: <span className="text-foreground">{aScore}</span></span>}
