@@ -7,24 +7,31 @@ import { getHippodromes, getRaceDaysByDate } from "@/server/services/race.servic
 
 import { turkeyDateString } from "@/lib/tz";
 import PuanTablosu from "@/components/kosular/PuanTablosu";
+import DateNavigator from "@/components/kosular/DateNavigator";
 import KuponForm from "./KuponForm";
 import KuponActions from "./KuponActions";
 import type { HomeKuponLegInput } from "@/server/actions/home-kupon.actions";
 
 export const dynamic = "force-dynamic";
 
+type PageProps = { searchParams: Promise<{ tarih?: string }> };
 
-export default async function AdminKuponPage() {
+export default async function AdminKuponPage({ searchParams }: PageProps) {
+  const { tarih } = await searchParams;
   const today = turkeyDateString();
+  const currentDate = tarih ?? today;
   const [kuponlar, hippodromes, raceDays] = await Promise.all([
     db.homeKupon.findMany({ orderBy: { createdAt: "desc" }, take: 20 }),
     getHippodromes(),
-    getRaceDaysByDate(today),
+    getRaceDaysByDate(currentDate),
   ]);
 
   return (
     <div className="space-y-6">
-      <h1 className="text-lg font-bold">Kupon Hazırla</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-bold">Kupon Hazırla</h1>
+        <DateNavigator currentDate={currentDate} basePath="/admin/kupon" />
+      </div>
 
       {/* ── Puan Tablosu ── */}
       {raceDays.map((rd) => (
