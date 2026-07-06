@@ -5,6 +5,7 @@ import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter
 import { getAgfMovers } from "@/server/services/agf-trend.service";
 import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
 import { fetchTjkTicker } from "@/lib/tjk-ticker";
+import { getFollowedHorses } from "@/server/actions/horse-follow";
 import ProgramView from "@/components/program/ProgramView";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import SteamWidget from "@/components/kosular/SteamWidget";
@@ -44,12 +45,14 @@ export default async function ProgramPage({ searchParams }: PageProps) {
     }
   }
 
-  const [days, agfMovers, altiliResults, tickerItems] = await Promise.all([
+  const [days, agfMovers, altiliResults, tickerItems, followedHorses] = await Promise.all([
     getProgramData(currentDate),
     getAgfMovers(today),
     fetchTodaysAltiliResults(),
     fetchTjkTicker(),
+    getFollowedHorses(),
   ]);
+  const followedNames = followedHorses.map((h) => h.horseName);
 
   return (
     <div className="mx-auto max-w-[1400px] px-3 py-4 space-y-6">
@@ -63,7 +66,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
           <DateNavigator currentDate={currentDate} basePath="/program" />
         </div>
         <div className="rounded-lg border overflow-hidden">
-          <ProgramView days={days} dateStr={currentDate} />
+          <ProgramView days={days} dateStr={currentDate} followedNames={followedNames} />
         </div>
       </div>
 

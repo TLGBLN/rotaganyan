@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useTransition } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Star } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
+import { toggleHorseFollow } from "@/server/actions/horse-follow";
 
 // ── Geri sayım (Turkey UTC+3) ────────────────────────────────────────────────
 
@@ -228,7 +229,7 @@ function AnalysisPanel({ picks, winnerNo }: { picks: ProgramPick[]; winnerNo?: n
 // ── At satırı ────────────────────────────────────────────────────────────────
 
 function RunnerRow({
-  r, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime,
+  r, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow,
 }: {
   r: ProgramRunner;
   isWinner: boolean;
@@ -237,6 +238,8 @@ function RunnerRow({
   ekuriColor?: { border: string; badge: string };
   agfRank?: number;
   isBestTime: boolean;
+  isFollowed: boolean;
+  onToggleFollow: () => void;
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
@@ -262,14 +265,29 @@ function RunnerRow({
 
       {/* At İsmi */}
       <td className="px-2 py-1.5 min-w-[140px]">
-        <div className={cn("font-semibold", isWinner && "text-[#f5c518]", false)}>
-          {r.name}
-          {r.scratched && (
-            <span className="ml-1.5 text-[10px] font-normal text-red-400 no-underline">(Koşmaz)</span>
-          )}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onToggleFollow}
+            title={isFollowed ? "Takipten çık" : "Takip et"}
+            className="shrink-0 transition-colors"
+          >
+            <Star className={cn(
+              "h-3.5 w-3.5",
+              isFollowed
+                ? "fill-yellow-400 text-yellow-400"
+                : "text-muted-foreground/40 hover:text-yellow-400"
+            )} />
+          </button>
+          <div className={cn("font-semibold", isWinner && "text-[#f5c518]")}>
+            {r.name}
+            {r.scratched && (
+              <span className="ml-1.5 text-[10px] font-normal text-red-400 no-underline">(Koşmaz)</span>
+            )}
+          </div>
         </div>
         {(r.sire || r.dam) && (
-          <div className="text-[10px] text-muted-foreground">
+          <div className="text-[10px] text-muted-foreground ml-5">
             {[r.sire, r.dam].filter(Boolean).join(" — ")}
           </div>
         )}
@@ -367,7 +385,7 @@ function RunnerRow({
 // ── At kartı (mobil) ─────────────────────────────────────────────────────────
 
 function RunnerCard({
-  r, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime,
+  r, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow,
 }: {
   r: ProgramRunner;
   isWinner: boolean;
@@ -375,6 +393,8 @@ function RunnerCard({
   ekuriColor?: { border: string; badge: string };
   agfRank?: number;
   isBestTime: boolean;
+  isFollowed: boolean;
+  onToggleFollow: () => void;
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
@@ -396,12 +416,27 @@ function RunnerCard({
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className={cn("font-semibold truncate", isWinner && "text-[#f5c518]", false)}>
-            {r.name}
-            {r.scratched && <span className="ml-1 text-[10px] font-normal text-red-400 no-underline">(Koşmaz)</span>}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onToggleFollow}
+              title={isFollowed ? "Takipten çık" : "Takip et"}
+              className="shrink-0 transition-colors"
+            >
+              <Star className={cn(
+                "h-3.5 w-3.5",
+                isFollowed
+                  ? "fill-yellow-400 text-yellow-400"
+                  : "text-muted-foreground/40 hover:text-yellow-400"
+              )} />
+            </button>
+            <span className={cn("font-semibold truncate", isWinner && "text-[#f5c518]")}>
+              {r.name}
+              {r.scratched && <span className="ml-1 text-[10px] font-normal text-red-400 no-underline">(Koşmaz)</span>}
+            </span>
           </div>
           {(r.sire || r.dam) && (
-            <div className="text-[10px] text-muted-foreground truncate">
+            <div className="text-[10px] text-muted-foreground truncate ml-5">
               {[r.sire, r.dam].filter(Boolean).join(" — ")}
             </div>
           )}
@@ -480,11 +515,13 @@ function RaceTimer({ time, hasResult, dateStr }: { time: string | null; hasResul
 }
 
 function RaceTable({
-  race, analysisOpen, onAnalysisToggle,
+  race, analysisOpen, onAnalysisToggle, followedSet, onToggleFollow,
 }: {
   race: ProgramRace;
   analysisOpen: boolean;
   onAnalysisToggle: () => void;
+  followedSet: Set<string>;
+  onToggleFollow: (horseName: string) => void;
 }) {
   const surf = surfaceLabel(race.surface);
   const winnerNo = race.result?.winnerNo;
@@ -561,6 +598,8 @@ function RaceTable({
                   ekuriColor={ekuriColorMap.get(r.no)}
                   agfRank={agfRankMap.get(r.no)}
                   isBestTime={bestTimeNoSet.has(r.no)}
+                  isFollowed={followedSet.has(r.name)}
+                  onToggleFollow={() => onToggleFollow(r.name)}
                 />
               ))
             )}
@@ -584,6 +623,8 @@ function RaceTable({
               ekuriColor={ekuriColorMap.get(r.no)}
               agfRank={agfRankMap.get(r.no)}
               isBestTime={bestTimeNoSet.has(r.no)}
+              isFollowed={followedSet.has(r.name)}
+              onToggleFollow={() => onToggleFollow(r.name)}
             />
           ))
         )}
@@ -597,10 +638,29 @@ function RaceTable({
 
 // ── Ana görünüm ───────────────────────────────────────────────────────────────
 
-export default function ProgramView({ days, dateStr }: { days: ProgramDay[]; dateStr: string }) {
+export default function ProgramView({
+  days, dateStr, followedNames = [],
+}: {
+  days: ProgramDay[];
+  dateStr: string;
+  followedNames?: string[];
+}) {
   const [activeHipo, setActiveHipo] = useState(days[0]?.hippodromeSlug ?? "");
   const [activeRace, setActiveRace] = useState<Record<string, number>>({});
   const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [followedSet, setFollowedSet] = useState(() => new Set(followedNames));
+  const [, startFollowTransition] = useTransition();
+
+  function handleToggleFollow(horseName: string) {
+    setFollowedSet((prev) => {
+      const next = new Set(prev);
+      if (next.has(horseName)) next.delete(horseName); else next.add(horseName);
+      return next;
+    });
+    startFollowTransition(async () => {
+      try { await toggleHorseFollow(horseName); } catch { /* sessizce hata yut */ }
+    });
+  }
 
   const currentDay = days.find((d) => d.hippodromeSlug === activeHipo) ?? days[0];
 
@@ -701,6 +761,8 @@ export default function ProgramView({ days, dateStr }: { days: ProgramDay[]; dat
               race={currentRace}
               analysisOpen={analysisOpen}
               onAnalysisToggle={() => setAnalysisOpen((v) => !v)}
+              followedSet={followedSet}
+              onToggleFollow={handleToggleFollow}
             />
           )}
         </>

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
+import { Star } from "lucide-react";
 import type { Role, Plan } from "@prisma/client";
 
 const PLAN_LABEL: Record<Plan, string> = { FREE: "Ücretsiz", PREMIUM: "Premium" };
@@ -13,11 +14,18 @@ export default async function PanelPage() {
   const session = await auth();
   if (!session?.user) return null;
 
-  const notifications = await db.notification.findMany({
-    where: { userId: session.user.id, read: false },
-    orderBy: { createdAt: "desc" },
-    take: 5,
-  });
+  const [notifications, followedHorses] = await Promise.all([
+    db.notification.findMany({
+      where: { userId: session.user.id, read: false },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
+    db.horseFollow.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
+  ]);
 
   const user = await db.user.findUnique({
     where: { id: session.user.id },
@@ -66,6 +74,36 @@ export default async function PanelPage() {
                     {format(new Date(n.createdAt), "d MMM HH:mm", { locale: tr })}
                   </p>
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Takip Listem */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-semibold flex items-center gap-1.5">
+            <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+            Takip Listem
+          </h2>
+          <Link href="/panel/takip-atlarim" className="text-xs text-brand hover:underline">
+            Tümünü gör →
+          </Link>
+        </div>
+        {followedHorses.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Henüz takip ettiğin at yok. Yarış programında atlara tıklayarak takibe alabilirsin.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {followedHorses.map((h) => (
+              <div
+                key={h.id}
+                className="flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm"
+              >
+                <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 shrink-0" />
+                <span className="font-medium">{h.horseName}</span>
               </div>
             ))}
           </div>
