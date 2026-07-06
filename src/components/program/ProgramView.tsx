@@ -570,18 +570,7 @@ function RaceTable({
       </div>
 
       {/* Analiz paneli */}
-      {race.hasAnalysis && (
-        <>
-          <button
-            onClick={onAnalysisToggle}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#27ae60] hover:bg-[#219a52] text-white text-sm font-semibold transition-colors"
-          >
-            <span>● Analizleri görmek için tıklayınız</span>
-            {analysisOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </button>
-          {analysisOpen && <AnalysisPanel picks={race.picks} />}
-        </>
-      )}
+      {race.hasAnalysis && analysisOpen && <AnalysisPanel picks={race.picks} />}
     </div>
   );
 }
