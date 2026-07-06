@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
@@ -555,7 +556,7 @@ export default function ProgramView({ days, dateStr }: { days: ProgramDay[]; dat
             ))}
           </div>
 
-          {/* Zemin legend + geri sayım */}
+          {/* Zemin legend + analiz + geri sayım */}
           <div className="flex items-center justify-between gap-4 px-3 py-1.5 bg-muted/20 border-b text-[11px]">
             <div className="flex items-center gap-4 text-muted-foreground">
               <span className="flex items-center gap-1">
@@ -568,9 +569,21 @@ export default function ProgramView({ days, dateStr }: { days: ProgramDay[]; dat
                 <span className="w-2.5 h-2.5 rounded-sm bg-[#d4ac0d] inline-block" /> Sentetik
               </span>
             </div>
-            {currentRace && (
-              <RaceTimer time={currentRace.time} hasResult={currentRace.result != null} dateStr={dateStr} />
-            )}
+            <div className="flex items-center gap-3">
+              {currentRace?.hasAnalysis ? (
+                <Link
+                  href={`/kosular/${dateStr}/${currentDay?.hippodromeSlug}/${currentRace.raceNo}`}
+                  className="text-xs font-semibold text-[#27ae60] hover:underline"
+                >
+                  Analizi Gör →
+                </Link>
+              ) : (
+                <span className="text-xs font-semibold text-[#e74c3c]">Analiz Hazırlanıyor</span>
+              )}
+              {currentRace && (
+                <RaceTimer time={currentRace.time} hasResult={currentRace.result != null} dateStr={dateStr} />
+              )}
+            </div>
           </div>
 
           {/* Seçili koşu */}
