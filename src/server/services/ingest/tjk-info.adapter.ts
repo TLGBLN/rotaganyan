@@ -168,18 +168,20 @@ export async function fetchCityProgram(
     // ── Runner table and eküri are inside sibling div#kosubilgisi-{raceId} ──────
     const kosuDiv = $(`#kosubilgisi-${raceId}`);
 
-    // Eküri gruplarını kosuDiv içinde ara
+    // Eküri gruplarını kosuDiv içinde ara — tabloyu çıkardıktan sonra kalan metni tara
     const ekuriGroups: number[][] = [];
-    kosuDiv.find("*").each((_, el) => {
-      if ($(el).find("table, tbody").length > 0) return;
-      const text = $(el).text();
-      if (!/ekür/i.test(text)) return;
-      const matches = [...text.matchAll(/\[([^\]]+)\]/g)];
-      for (const m of matches) {
-        const nos = [...m[1].matchAll(/\((\d+)\)/g)].map((x) => parseInt(x[1], 10));
-        if (nos.length > 0) ekuriGroups.push(nos);
+    {
+      const clone = kosuDiv.clone();
+      clone.find("table").remove();
+      const ekuriText = clone.text().replace(/\s+/g, " ");
+      if (/ekür/i.test(ekuriText)) {
+        const matches = [...ekuriText.matchAll(/\[([^\]]+)\]/g)];
+        for (const m of matches) {
+          const nos = [...m[1].matchAll(/\((\d+)\)/g)].map((x) => parseInt(x[1], 10));
+          if (nos.length >= 2) ekuriGroups.push(nos);
+        }
       }
-    });
+    }
     const ekuriMap = new Map<number, number>();
     ekuriGroups.forEach((group, idx) => group.forEach((no) => ekuriMap.set(no, idx + 1)));
 
