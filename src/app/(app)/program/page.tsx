@@ -4,10 +4,12 @@ import { turkeyDateString } from "@/lib/tz";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { getAgfMovers } from "@/server/services/agf-trend.service";
 import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
+import { fetchTjkTicker } from "@/lib/tjk-ticker";
 import ProgramView from "@/components/program/ProgramView";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import SteamWidget from "@/components/kosular/SteamWidget";
 import AltiliGanyanResults from "@/components/home/AltiliGanyanResults";
+import NewsTicker from "@/components/home/NewsTicker";
 
 export const revalidate = 0;
 
@@ -42,14 +44,18 @@ export default async function ProgramPage({ searchParams }: PageProps) {
     }
   }
 
-  const [days, agfMovers, altiliResults] = await Promise.all([
+  const [days, agfMovers, altiliResults, tickerItems] = await Promise.all([
     getProgramData(currentDate),
     getAgfMovers(today),
     fetchTodaysAltiliResults(),
+    fetchTjkTicker(),
   ]);
 
   return (
     <div className="mx-auto max-w-[1400px] px-3 py-4 space-y-6">
+      {/* Haber Akışı */}
+      {tickerItems.length > 0 && <NewsTicker items={tickerItems} />}
+
       {/* Program */}
       <div>
         <div className="flex items-center justify-between mb-3">
