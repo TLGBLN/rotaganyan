@@ -2,8 +2,12 @@ import { after } from "next/server";
 import { getProgramData } from "@/server/services/race.service";
 import { turkeyDateString } from "@/lib/tz";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
+import { getAgfMovers } from "@/server/services/agf-trend.service";
+import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
 import ProgramView from "@/components/program/ProgramView";
 import DateNavigator from "@/components/kosular/DateNavigator";
+import SteamWidget from "@/components/kosular/SteamWidget";
+import AltiliGanyanResults from "@/components/home/AltiliGanyanResults";
 
 export const revalidate = 0;
 
@@ -30,27 +34,43 @@ export default async function ProgramPage({ searchParams }: PageProps) {
     );
 
     if (totalRunners === 0 || !hasAge) {
-      // Veri yok ya da eski (eksik alan) — bekleyerek taze çek
       try { await ingestDate(tjkDate); } catch { /* ignore */ }
     } else {
-      // Veri tam — hemen dön, arka planda yenile (güncel veri için)
       after(async () => {
         try { await ingestDate(tjkDate); } catch { /* ignore */ }
       });
     }
   }
 
-  const days = await getProgramData(currentDate);
+  const [days, agfMovers, altiliResults] = await Promise.all([
+    getProgramData(currentDate),
+    getAgfMovers(today),
+    fetchTodaysAltiliResults(),
+  ]);
 
   return (
-    <div className="mx-auto max-w-[1400px] px-3 py-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold">Yarış Programı</h1>
-        <DateNavigator currentDate={currentDate} basePath="/program" />
+    <div className="mx-auto max-w-[1400px] px-3 py-4 space-y-6">
+      {/* Program */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-lg font-bold">Yarış Programı</h1>
+          <DateNavigator currentDate={currentDate} basePath="/program" />
+        </div>
+        <div className="rounded-lg border overflow-hidden">
+          <ProgramView days={days} dateStr={currentDate} />
+        </div>
       </div>
-      <div className="rounded-lg border overflow-hidden">
-        <ProgramView days={days} dateStr={currentDate} />
-      </div>
+
+      {/* Para Akışı (AGF) */}
+      {(agfMovers.risers.length > 0 || agfMovers.fallers.length > 0) && (
+        <div>
+          <h2 className="text-base font-semibold mb-3">Para Akışı (AGF)</h2>
+          <SteamWidget movers={agfMovers} dateStr={today} />
+        </div>
+      )}
+
+      {/* Yarış Sonuçları */}
+      <AltiliGanyanResults results={altiliResults} />
     </div>
   );
 }
