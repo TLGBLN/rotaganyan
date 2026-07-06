@@ -284,25 +284,38 @@ export async function fetchCityProgram(
           if (iSon6 !== -1 && cellEls[iSon6]) {
             const son6El = $(cellEls[iSon6]);
             const items: { pos: string; surface: string }[] = [];
-            son6El.find("em, a, span, b, i").each((_, el) => {
-              const pos = $(el).text().trim();
-              if (!/^\d$/.test(pos)) return;
-              const cls = ($(el).attr("class") ?? "").toLowerCase();
-              const surface = cls.includes("cim") ? "C" : cls.includes("sentetik") ? "S" : cls.includes("kum") ? "K" : "";
+            // TJK uses <font color=#996633> (Kum), #009900 (Çim), #d39b1e (Sentetik)
+            son6El.find("font").each((_, el) => {
+              const color = ($(el).attr("color") ?? "").replace(/^#/, "").toLowerCase();
+              const posEl = $(el).find("b").first();
+              const pos = (posEl.length ? posEl.text() : $(el).text()).trim().toUpperCase();
+              if (!pos || pos.length > 1) return;
+              const surface =
+                color === "996633" ? "K" :
+                color === "009900" ? "C" :
+                color === "d39b1e" ? "S" : "";
               items.push({ pos, surface });
             });
             if (items.length > 0) {
               recentForm = items.map((x) => x.pos).join("");
-              if (items.some((x) => x.surface !== "")) {
-                recentFormSurfaces = items.map((x) => x.surface || " ").join("");
-              }
+              recentFormSurfaces = items.map((x) => x.surface || " ").join("");
             } else {
-              recentForm = (cells[iSon6] ?? "").replace(/[^\d]/g, "") || undefined;
+              recentForm = [...son6El.text().replace(/\s/g, "")].filter((c) => /[\dK]/i.test(c)).join("") || undefined;
             }
           }
 
-          const bestRaw = cells[iBest] ?? "";
-          const bestTime = bestRaw && !/^[0.:]+$/.test(bestRaw) ? bestRaw : undefined;
+          let bestTime: string | undefined;
+          if (iBest !== -1 && cellEls[iBest]) {
+            const dereceEl = $(cellEls[iBest]);
+            const timeSpan = dereceEl.find("#aciklamaFancyDrc").first();
+            const timeText = (timeSpan.find("font").text().trim() || timeSpan.text().trim()).replace(/\s+/g, " ");
+            if (timeText && /\d/.test(timeText)) {
+              const href = dereceEl.find("a.tooltiptextt").attr("href") ?? "";
+              const dateM = href.match(/QueryParameter_Tarih=([^#&]+)/i);
+              const dateStr = dateM ? decodeURIComponent(dateM[1]) : "";
+              bestTime = dateStr ? `${timeText} - ${dateStr}` : timeText;
+            }
+          }
 
           let agf: number | undefined;
           if (iAgf !== -1 && cellEls[iAgf]) {

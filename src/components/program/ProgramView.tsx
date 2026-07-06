@@ -50,10 +50,11 @@ const EKURI_COLORS = [
 
 // ── Son Yarışlar renk ────────────────────────────────────────────────────────
 
-function formBoxClassBySurface(pos: string, surface: string): string {
-  if (surface === "C") return "bg-[#27ae60] text-white";
-  if (surface === "S") return "bg-[#d4ac0d] text-gray-900";
-  if (surface === "K") return "bg-[#e67e22] text-white";
+function formBoxClass(pos: string, surface: string): string {
+  if (pos === "K") return "bg-[#7f8c8d] text-white"; // Koşmadı — always gray
+  if (surface === "C") return "bg-[#27ae60] text-white"; // Çim
+  if (surface === "S") return "bg-[#d4ac0d] text-gray-900"; // Sentetik
+  if (surface === "K") return "bg-[#e67e22] text-white"; // Kum
   return formBoxClassByPos(pos); // zemin bilinmiyorsa pozisyona göre
 }
 
@@ -65,6 +66,16 @@ function formBoxClassByPos(pos: string): string {
   const n = parseInt(pos, 10);
   if (n >= 4 && n <= 6) return "bg-[#e74c3c] text-white";
   return "bg-[#922b21] text-white";
+}
+
+// En İyi Derece — "1.58.82 - 13/06/2026" → saniyeye çevir (karşılaştırma için)
+function bestTimeToSeconds(t: string): number {
+  const time = t.split(" - ")[0].trim();
+  const parts = time.split(".");
+  if (parts.length !== 3) return Infinity;
+  const [m, s, cs] = parts.map(Number);
+  if ([m, s, cs].some(isNaN)) return Infinity;
+  return m * 60 + s + cs / 100;
 }
 
 function surfaceLabel(s: string) {
@@ -108,15 +119,17 @@ function AnalysisPanel({ picks }: { picks: ProgramPick[] }) {
 // ── At satırı ────────────────────────────────────────────────────────────────
 
 function RunnerRow({
-  r, isWinner, idx, isTopAgf, ekuriColor,
+  r, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime,
 }: {
   r: ProgramRunner;
   isWinner: boolean;
   idx: number;
   isTopAgf: boolean;
   ekuriColor?: { border: string; badge: string };
+  agfRank?: number;
+  isBestTime: boolean;
 }) {
-  const formChars = (r.recentForm ?? "").split("").filter((c) => /\d/.test(c)).slice(-6);
+  const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
 
   return (
@@ -191,8 +204,18 @@ function RunnerRow({
       </td>
 
       {/* En İyi Derece */}
-      <td className="px-2 py-1.5 tabular-nums text-center font-mono text-[11px]">
-        {r.bestTime ?? "—"}
+      <td className="px-2 py-1.5 text-center">
+        {r.bestTime ? (() => {
+          const [time, date] = r.bestTime.split(" - ");
+          return (
+            <div>
+              <div className={cn("font-mono text-[11px] font-semibold tabular-nums", isBestTime && "text-[#27ae60]")}>
+                {time}
+              </div>
+              {date && <div className="text-[9px] text-muted-foreground tabular-nums">{date}</div>}
+            </div>
+          );
+        })() : <span className="text-muted-foreground text-[10px]">—</span>}
       </td>
 
       {/* Son Yarışlar */}
@@ -202,14 +225,14 @@ function RunnerRow({
             <span className="text-muted-foreground text-[10px]">—</span>
           ) : (
             formChars.map((c, i) => {
-              const surf = surfaces[i]?.trim();
-              const cls = surf ? formBoxClassBySurface(c, surf) : formBoxClassByPos(c);
+              const surf = surfaces[i]?.trim() ?? "";
+              const cls = formBoxClass(c, surf);
               return (
                 <span
                   key={i}
                   className={cn("inline-flex items-center justify-center w-5 h-5 rounded text-[11px] font-bold", cls)}
                 >
-                  {c === "0" ? "K" : c}
+                  {c}
                 </span>
               );
             })
@@ -219,7 +242,14 @@ function RunnerRow({
 
       {/* AGF */}
       <td className={cn("px-2 py-1.5 tabular-nums text-center font-semibold", isTopAgf && "text-[#27ae60]")}>
-        {r.agf != null ? `%${r.agf.toFixed(1)}` : "—"}
+        {r.agf != null ? (
+          <div>
+            <div>{`%${r.agf.toFixed(1)}`}</div>
+            {agfRank != null && (
+              <div className="text-[9px] text-muted-foreground font-normal">{agfRank}. sıra</div>
+            )}
+          </div>
+        ) : "—"}
       </td>
     </tr>
   );
@@ -246,10 +276,20 @@ function RaceTable({ race }: { race: ProgramRace }) {
   const winnerNo = race.result?.winnerNo;
   const [analysisOpen, setAnalysisOpen] = useState(false);
 
-  // AGF #1 = en yüksek AGF yüzdesi
-  const topAgfNo = race.runners
+  // AGF sıralama (en yüksek = 1. sıra)
+  const agfSorted = race.runners
     .filter((r) => r.agf != null && r.agf > 0 && !r.scratched)
-    .reduce<ProgramRunner | null>((best, r) => (!best || r.agf! > best.agf!) ? r : best, null)?.no;
+    .sort((a, b) => b.agf! - a.agf!);
+  const topAgfNo = agfSorted[0]?.no;
+  const agfRankMap = new Map(agfSorted.map((r, i) => [r.no, i + 1]));
+
+  // En İyi Derece — en düşük süre yeşil
+  const bestTimeSec = Math.min(
+    ...race.runners.filter((r) => r.bestTime).map((r) => bestTimeToSeconds(r.bestTime!))
+  );
+  const bestTimeNoSet = new Set(
+    race.runners.filter((r) => r.bestTime && bestTimeToSeconds(r.bestTime) === bestTimeSec).map((r) => r.no)
+  );
 
   // Eküri renk map
   const ekuriColorMap = new Map<number, typeof EKURI_COLORS[0]>();
@@ -306,6 +346,8 @@ function RaceTable({ race }: { race: ProgramRace }) {
                   isWinner={winnerNo != null && r.no === winnerNo}
                   isTopAgf={r.no === topAgfNo}
                   ekuriColor={ekuriColorMap.get(r.no)}
+                  agfRank={agfRankMap.get(r.no)}
+                  isBestTime={bestTimeNoSet.has(r.no)}
                 />
               ))
             )}

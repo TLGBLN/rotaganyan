@@ -213,31 +213,44 @@ function parseRunnersTable(
     const hpRaw = iHp !== -1 ? cleanCell(cells[iHp] ?? "").replace(/[^\d]/g, "") : "";
     const hp = hpRaw !== "" ? parseInt(hpRaw, 10) : undefined;
 
-    // Son 6 Yarış — try child element surface classes first, fall back to text digits
+    // Son 6 Yarış — TJK uses <font color> for surface: #996633=Kum, #009900=Çim, #d39b1e=Sentetik
     let recentForm: string | undefined;
     let recentFormSurfaces: string | undefined;
     if (iSon6 !== -1 && cellEls[iSon6]) {
       const son6El = $(cellEls[iSon6]);
       const items: { pos: string; surface: string }[] = [];
-      son6El.find("em, a, span, b, i").each((_, el) => {
-        const pos = $(el).text().trim();
-        if (!/^\d$/.test(pos)) return;
-        const cls = ($(el).attr("class") ?? "").toLowerCase();
-        const surface = cls.includes("cim") ? "C" : cls.includes("sentetik") ? "S" : cls.includes("kum") ? "K" : "";
+      son6El.find("font").each((_, el) => {
+        const color = ($(el).attr("color") ?? "").replace(/^#/, "").toLowerCase();
+        const posEl = $(el).find("b").first();
+        const pos = (posEl.length ? posEl.text() : $(el).text()).trim().toUpperCase();
+        if (!pos || pos.length > 1) return;
+        const surface =
+          color === "996633" ? "K" :
+          color === "009900" ? "C" :
+          color === "d39b1e" ? "S" : "";
         items.push({ pos, surface });
       });
       if (items.length > 0) {
         recentForm = items.map((x) => x.pos).join("");
-        if (items.some((x) => x.surface !== "")) {
-          recentFormSurfaces = items.map((x) => x.surface || " ").join("");
-        }
+        recentFormSurfaces = items.map((x) => x.surface || " ").join("");
       } else {
-        recentForm = son6El.text().replace(/\s+/g, "").replace(/[^\d]/g, "") || undefined;
+        recentForm = [...son6El.text().replace(/\s/g, "")].filter((c) => /[\dK]/i.test(c)).join("") || undefined;
       }
     }
 
-    const bestRaw = iBest !== -1 ? cleanCell(cells[iBest] ?? "") : "";
-    const bestTime = bestRaw && !/^[0.:]+$/.test(bestRaw) ? bestRaw : undefined;
+    // En İyi Derece — zaman #aciklamaFancyDrc span'dan, tarih href'ten
+    let bestTime: string | undefined;
+    if (iBest !== -1 && cellEls[iBest]) {
+      const dereceEl = $(cellEls[iBest]);
+      const timeSpan = dereceEl.find("#aciklamaFancyDrc").first();
+      const timeText = (timeSpan.find("font").text().trim() || timeSpan.text().trim()).replace(/\s+/g, " ");
+      if (timeText && /\d/.test(timeText)) {
+        const href = dereceEl.find("a.tooltiptextt").attr("href") ?? "";
+        const dateM = href.match(/QueryParameter_Tarih=([^#&]+)/i);
+        const dateStr = dateM ? decodeURIComponent(dateM[1]) : "";
+        bestTime = dateStr ? `${timeText} - ${dateStr}` : timeText;
+      }
+    }
 
     const agfRaw = iAgf !== -1 ? cleanCell(cells[iAgf] ?? "") : "";
     const agf = agfRaw ? parseFloat(agfRaw.replace("%", "").replace(",", ".")) : undefined;
