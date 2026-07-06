@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
@@ -85,26 +85,118 @@ function breedShort(b: string) {
   return b === "ARAP" ? "Arap" : "İngiliz";
 }
 
+// ── Analiz detay parser ───────────────────────────────────────────────────────
+
+function parsePickDetails(details: string[]) {
+  let aScore: string | undefined;
+  let bcScore: string | undefined;
+  let veriGuven: string | undefined;
+  const notes: string[] = [];
+  for (const d of details) {
+    const aM = d.match(/^A:\s*(.+)/);   if (aM)  { aScore = aM[1].trim(); continue; }
+    const bM = d.match(/^B\+C:\s*(.+)/); if (bM)  { bcScore = bM[1].trim(); continue; }
+    const vM = d.match(/^VG:\s*(.+)/);  if (vM)  { veriGuven = vM[1].trim(); continue; }
+    if (d.trim()) notes.push(d.trim());
+  }
+  return { aScore, bcScore, veriGuven, kilItGerekce: notes.join(" ") || undefined };
+}
+
+function veriGuvenColor(vg: string | undefined) {
+  if (!vg) return "text-muted-foreground";
+  const u = vg.toUpperCase();
+  if (u.startsWith("A")) return "text-[#27ae60] font-semibold";
+  if (u.startsWith("B+") || u === "B+") return "text-[#2980b9] font-semibold";
+  if (u.startsWith("B")) return "text-[#2980b9]";
+  if (u.startsWith("C+") || u === "C+") return "text-[#e67e22]";
+  return "text-[#e74c3c]";
+}
+
 // ── Analiz paneli ────────────────────────────────────────────────────────────
 
 function AnalysisPanel({ picks }: { picks: ProgramPick[] }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, []);
+
   return (
-    <div className="px-4 py-3 bg-muted/40 border-t">
-      <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+    <div ref={ref} className="border-t bg-muted/20">
+      {/* Masaüstü tablo */}
+      <div className="hidden sm:block overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b bg-muted/60 text-[11px] text-muted-foreground">
+              <th className="px-2 py-2 text-center w-8">Sıra</th>
+              <th className="px-2 py-2 text-center w-8">No</th>
+              <th className="px-2 py-2 text-left">At</th>
+              <th className="px-2 py-2 text-center w-10">A</th>
+              <th className="px-2 py-2 text-center w-12">B+C</th>
+              <th className="px-2 py-2 text-center w-14 font-bold">Toplam</th>
+              <th className="px-2 py-2 text-center w-20">Veri Güven</th>
+              <th className="px-2 py-2 text-left">Kilit Gerekçe</th>
+            </tr>
+          </thead>
+          <tbody>
+            {picks.map((p) => {
+              const name = (p.runner?.name && !/^\d+$/.test(p.runner.name) ? p.runner.name : null)
+                ?? p.runnerLabel?.replace(/^\d+\s+/, "") ?? "—";
+              const no = p.runner?.no ?? (parseInt(p.runnerLabel ?? "0", 10) || "?");
+              const { aScore, bcScore, veriGuven, kilItGerekce } = parsePickDetails(p.details);
+              const isTop = p.rank === 1;
+              return (
+                <tr key={p.rank} className={cn("border-b last:border-0", isTop && "bg-brand/10")}>
+                  <td className="px-2 py-2 text-center">
+                    <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold",
+                      isTop ? "bg-brand text-white" : "bg-muted text-muted-foreground")}>
+                      {p.rank}
+                    </span>
+                  </td>
+                  <td className="px-2 py-2 text-center font-mono font-bold">{no}</td>
+                  <td className="px-2 py-2 font-semibold">{name}</td>
+                  <td className="px-2 py-2 text-center tabular-nums">{aScore ?? "—"}</td>
+                  <td className="px-2 py-2 text-center tabular-nums">{bcScore ?? "—"}</td>
+                  <td className="px-2 py-2 text-center tabular-nums font-bold">
+                    {p.score != null ? <span className={isTop ? "text-brand" : ""}>{p.score}</span> : "—"}
+                  </td>
+                  <td className={cn("px-2 py-2 text-center", veriGuvenColor(veriGuven))}>
+                    {veriGuven ?? "—"}
+                  </td>
+                  <td className="px-2 py-2 text-muted-foreground leading-snug max-w-xs">
+                    {kilItGerekce ?? "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobil kart listesi */}
+      <div className="sm:hidden divide-y">
         {picks.map((p) => {
-          const name =
-            (p.runner?.name && !/^\d+$/.test(p.runner.name) ? p.runner.name : null) ??
-            p.runnerLabel?.replace(/^\d+\s+/, "") ?? "—";
+          const name = (p.runner?.name && !/^\d+$/.test(p.runner.name) ? p.runner.name : null)
+            ?? p.runnerLabel?.replace(/^\d+\s+/, "") ?? "—";
           const no = p.runner?.no ?? (parseInt(p.runnerLabel ?? "0", 10) || "?");
+          const { aScore, bcScore, veriGuven, kilItGerekce } = parsePickDetails(p.details);
+          const isTop = p.rank === 1;
           return (
-            <div key={p.rank} className="flex items-center gap-1.5 text-sm">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand text-white text-[10px] font-bold shrink-0">
-                {p.rank}
-              </span>
-              <span className="font-medium">
-                <span className="text-muted-foreground text-xs mr-1">({no})</span>
-                {name}
-              </span>
+            <div key={p.rank} className={cn("px-3 py-2.5", isTop && "bg-brand/10")}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0",
+                  isTop ? "bg-brand text-white" : "bg-muted text-muted-foreground")}>
+                  {p.rank}
+                </span>
+                <span className="font-bold text-xs">#{no}</span>
+                <span className="font-semibold text-xs">{name}</span>
+                {veriGuven && <span className={cn("ml-auto text-xs", veriGuvenColor(veriGuven))}>{veriGuven}</span>}
+              </div>
+              <div className="flex gap-3 text-[11px] text-muted-foreground mb-1">
+                {aScore && <span>A: <span className="text-foreground">{aScore}</span></span>}
+                {bcScore && <span>B+C: <span className="text-foreground">{bcScore}</span></span>}
+                {p.score != null && <span>Toplam: <span className={cn("font-bold", isTop ? "text-brand" : "text-foreground")}>{p.score}</span></span>}
+              </div>
+              {kilItGerekce && <p className="text-[11px] text-muted-foreground leading-snug">{kilItGerekce}</p>}
             </div>
           );
         })}

@@ -418,6 +418,7 @@ function parseRankingTable(block: string): ReportPick[] {
   const iToplam = colIndex(headers, (h) => h.includes("TOPLAM"));
   const iScore = colIndex(headers, (h) => h.includes("PUAN"));
   const iPed = colIndex(headers, (h) => h.includes("PEDIGRI"));
+  const iVeriGuven = colIndex(headers, (h) => h.includes("VERI") && h.includes("GUVEN"));
   const iNote = colIndex(headers, (h) => h.includes("GEREK"));
 
   if (iAt === -1) return [];
@@ -446,6 +447,7 @@ function parseRankingTable(block: string): ReportPick[] {
     // Basitleştirilmiş şablon sütunları
     if (iSimpleA !== -1) { const v = (row[iSimpleA] ?? "").trim(); if (v && v !== "—" && !/^X+$/i.test(v)) layerNotes.push(`A: ${v}`); }
     if (iBplusC  !== -1) { const v = (row[iBplusC]  ?? "").trim(); if (v && v !== "—" && !/^Y+$/i.test(v)) layerNotes.push(`B+C: ${v}`); }
+    if (iVeriGuven !== -1) { const v = (row[iVeriGuven] ?? "").trim(); if (v && v !== "—") layerNotes.push(`VG: ${v}`); }
 
     const toplaRaw = row[iToplam] ?? "";
     const toplam = iToplam !== -1

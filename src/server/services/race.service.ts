@@ -537,6 +537,8 @@ export type ProgramPick = {
   rank: number;
   runnerLabel: string | null;
   runner: { no: number; name: string } | null;
+  score: number | null;
+  details: string[];
 };
 
 export type ProgramRace = {
@@ -579,6 +581,8 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
                 select: {
                   rank: true,
                   runnerLabel: true,
+                  score: true,
+                  details: true,
                   runner: { select: { no: true, name: true } },
                 },
               },
@@ -617,7 +621,10 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
       runners: r.runners,
       result: r.result,
       hasAnalysis: r.prediction != null && r.prediction.picks.length > 0,
-      picks: r.prediction?.picks ?? [],
+      picks: (r.prediction?.picks ?? []).map((p) => ({
+        ...p,
+        details: Array.isArray(p.details) ? (p.details as string[]) : [],
+      })),
     })),
   }));
 }
