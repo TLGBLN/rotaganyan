@@ -25,12 +25,15 @@ export default async function ProgramPage({ searchParams }: PageProps) {
       (s, d) => s + d.races.reduce((s2, r) => s2 + r.runners.length, 0),
       0
     );
+    const hasAge = existing.some((d) =>
+      d.races.some((r) => r.runners.some((ru) => ru.age))
+    );
 
-    if (totalRunners === 0) {
-      // İlk kez: veri yoksa bekleyerek çek
+    if (totalRunners === 0 || !hasAge) {
+      // Veri yok ya da eski (eksik alan) — bekleyerek taze çek
       try { await ingestDate(tjkDate); } catch { /* ignore */ }
     } else {
-      // Veri var: hemen dön, arka planda yenile
+      // Veri tam — hemen dön, arka planda yenile (güncel veri için)
       after(async () => {
         try { await ingestDate(tjkDate); } catch { /* ignore */ }
       });
