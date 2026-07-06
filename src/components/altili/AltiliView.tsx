@@ -84,8 +84,8 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
     filledCount === 6 && groupSelections.every((s) => s != null && s.agf != null && s.agf > 0)
       ? groupSelections.reduce((prod, s) => prod * (100 / s!.agf!), 1)
       : null;
-  const ikramiyeLower = katsayi != null ? katsayi * 0.9375 : null;
-  const ikramiyeUpper = katsayi != null ? katsayi * 1.09375 : null;
+  const ikramiyeLower = katsayi != null ? katsayi * 0.93 : null;
+  const ikramiyeUpper = katsayi != null ? katsayi * 0.99 : null;
 
   return (
     <div className="flex flex-col">
