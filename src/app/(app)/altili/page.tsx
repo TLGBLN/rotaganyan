@@ -1,5 +1,7 @@
+import { after } from "next/server";
 import { getProgramData } from "@/server/services/race.service";
 import { turkeyDateString } from "@/lib/tz";
+import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import AltiliView from "@/components/altili/AltiliView";
 
@@ -9,7 +11,33 @@ type PageProps = { searchParams: Promise<{ tarih?: string }> };
 
 export default async function AltiliPage({ searchParams }: PageProps) {
   const { tarih } = await searchParams;
-  const currentDate = tarih ?? turkeyDateString();
+  const today = turkeyDateString();
+  const currentDate = tarih ?? today;
+
+  const daysAhead = Math.round(
+    (new Date(currentDate).getTime() - new Date(today).getTime()) / 86400000
+  );
+
+  if (daysAhead >= 0 && daysAhead <= 7) {
+    const tjkDate = toTjkDate(new Date(currentDate + "T00:00:00Z"));
+    const existing = await getProgramData(currentDate);
+    const totalRunners = existing.reduce(
+      (s, d) => s + d.races.reduce((s2, r) => s2 + r.runners.length, 0),
+      0
+    );
+    const hasAge = existing.some((d) =>
+      d.races.some((r) => r.runners.some((ru) => ru.age))
+    );
+
+    if (totalRunners === 0 || !hasAge) {
+      try { await ingestDate(tjkDate); } catch { /* ignore */ }
+    } else {
+      after(async () => {
+        try { await ingestDate(tjkDate); } catch { /* ignore */ }
+      });
+    }
+  }
+
   const days = await getProgramData(currentDate);
 
   return (
