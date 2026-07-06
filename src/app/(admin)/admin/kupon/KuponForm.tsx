@@ -156,7 +156,7 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="rounded-md border bg-background px-3 py-2 text-sm"
+            className="rounded-md border bg-background px-3 py-2 text-sm [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:brightness-200"
           />
         </div>
         <button
