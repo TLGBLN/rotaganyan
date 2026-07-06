@@ -7,6 +7,8 @@ import { tr } from "date-fns/locale";
 import { Star } from "lucide-react";
 import type { Role, Plan } from "@prisma/client";
 
+export const dynamic = "force-dynamic";
+
 const PLAN_LABEL: Record<Plan, string> = { FREE: "Ücretsiz", PREMIUM: "Premium" };
 const ROLE_LABEL: Record<Role, string> = { USER: "Üye", EDITOR: "Editör", ADMIN: "Admin" };
 
