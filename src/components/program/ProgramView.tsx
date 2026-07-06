@@ -117,7 +117,21 @@ function AnalysisPanel({ picks }: { picks: ProgramPick[] }) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (!ref.current) return;
+    const el = ref.current;
+    const start = window.scrollY;
+    const target = start + el.getBoundingClientRect().top - 80;
+    const distance = target - start;
+    const duration = 600;
+    let startTime: number | null = null;
+    function easeIn(t: number) { return t * t * t; }
+    function step(now: number) {
+      if (!startTime) startTime = now;
+      const elapsed = Math.min((now - startTime) / duration, 1);
+      window.scrollTo(0, start + distance * easeIn(elapsed));
+      if (elapsed < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
   }, []);
 
   return (
