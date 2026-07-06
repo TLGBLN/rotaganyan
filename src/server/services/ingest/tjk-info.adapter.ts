@@ -320,8 +320,11 @@ export async function fetchCityProgram(
           let agf: number | undefined;
           if (iAgf !== -1 && cellEls[iAgf]) {
             const agfEl = $(cellEls[iAgf]).find("a").first();
-            const agfRaw = (agfEl.attr("title") || agfEl.text() || (cells[iAgf] ?? "")).trim();
-            const agfMatch = agfRaw.match(/([\d]+[.,]?[\d]*)/);
+            const agfTitle = agfEl.attr("title") ?? "";
+            const agfText = agfEl.text().trim();
+            // Use % prefix to avoid matching "1" from "1. 6'LI GANYAN : %2,05(9)"
+            const agfSrc = agfTitle || agfText;
+            const agfMatch = agfSrc.match(/%\s*([\d]+[.,]?\d*)/);
             agf = agfMatch ? parseFloat(agfMatch[1].replace(",", ".")) || undefined : undefined;
           }
 

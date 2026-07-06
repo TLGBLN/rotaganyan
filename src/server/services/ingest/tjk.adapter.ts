@@ -252,8 +252,16 @@ function parseRunnersTable(
       }
     }
 
-    const agfRaw = iAgf !== -1 ? cleanCell(cells[iAgf] ?? "") : "";
-    const agf = agfRaw ? parseFloat(agfRaw.replace("%", "").replace(",", ".")) : undefined;
+    // Extract % value to avoid matching "1" from "1. 6'LI GANYAN" prefix in title
+    let agf: number | undefined;
+    if (iAgf !== -1 && cellEls[iAgf]) {
+      const agfEl = $(cellEls[iAgf]).find("a").first();
+      const agfTitle = agfEl.attr("title") ?? "";
+      const agfText = agfEl.text().trim();
+      const agfSrc = agfTitle || agfText;
+      const agfMatch = agfSrc.match(/%\s*([\d]+[.,]?\d*)/);
+      agf = agfMatch ? parseFloat(agfMatch[1].replace(",", ".")) || undefined : undefined;
+    }
 
     const ekuriGroup = ekuriMap.get(no) ?? undefined;
 
