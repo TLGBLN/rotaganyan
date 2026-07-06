@@ -77,24 +77,27 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
   const groupSelections = currentGroup?.races.map((_, i) => getSelected(activeHipo, curAltili, i)) ?? [];
   const filledCount = groupSelections.filter(Boolean).length;
 
-  const ikramiyeRef = useRef<HTMLDivElement>(null);
+  const summaryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (filledCount !== 6 || !ikramiyeRef.current) return;
-    const el = ikramiyeRef.current;
-    const start = window.scrollY;
-    const target = start + el.getBoundingClientRect().top - 80;
-    const distance = target - start;
-    const duration = 600;
-    let startTime: number | null = null;
-    function easeIn(t: number) { return t * t * t; }
-    function step(now: number) {
-      if (!startTime) startTime = now;
-      const elapsed = Math.min((now - startTime) / duration, 1);
-      window.scrollTo(0, start + distance * easeIn(elapsed));
-      if (elapsed < 1) requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
+    if (filledCount !== 6 || !summaryRef.current) return;
+    const el = summaryRef.current;
+    setTimeout(() => {
+      const start = window.scrollY;
+      const target = start + el.getBoundingClientRect().bottom - window.innerHeight + 24;
+      if (target <= start) return;
+      const distance = target - start;
+      const duration = 600;
+      let startTime: number | null = null;
+      function easeIn(t: number) { return t * t * t; }
+      function step(now: number) {
+        if (!startTime) startTime = now;
+        const elapsed = Math.min((now - startTime) / duration, 1);
+        window.scrollTo(0, start + distance * easeIn(elapsed));
+        if (elapsed < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }, 50);
   }, [filledCount]);
 
   const katsayi =
@@ -279,7 +282,7 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
               )}
 
               {/* Seçim özeti */}
-              <div className="border-t bg-muted/20 px-3 py-3 shrink-0">
+              <div ref={summaryRef} className="border-t bg-muted/20 px-3 py-3 shrink-0">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Seçimleriniz — {filledCount}/6
@@ -333,7 +336,7 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
 
                 {/* Tahmini ikramiye */}
                 {ikramiyeLower != null && ikramiyeUpper != null && (
-                  <div ref={ikramiyeRef} className="mt-3 rounded-lg border border-[#27ae60]/40 bg-[#27ae60]/10 px-3 py-3">
+                  <div className="mt-3 rounded-lg border border-[#27ae60]/40 bg-[#27ae60]/10 px-3 py-3">
                     <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">
                       6lı Ganyan Tahmini
                     </div>
