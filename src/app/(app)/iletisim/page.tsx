@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { PAYMENTS_ENABLED } from "@/lib/payments";
 
 export const metadata: Metadata = { title: "İletişim" };
 
@@ -34,17 +33,6 @@ export default function IletisimPage() {
           </p>
         </div>
 
-        {PAYMENTS_ENABLED && (
-          <div className="rounded-lg border p-6">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Premium Destek</p>
-            <p className="text-sm text-muted-foreground">
-              Premium üyelerimiz öncelikli destek hattından yararlanır.{" "}
-              <a href="/premium" className="text-brand hover:underline underline-offset-4">
-                Premium&apos;a geç →
-              </a>
-            </p>
-          </div>
-        )}
       </div>
     </main>
   );

@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
-import { PAYMENTS_ENABLED } from "@/lib/payments";
-import { LayoutDashboard, Bell, Bookmark, Star } from "lucide-react";
+import { LayoutDashboard, Bell, Bookmark } from "lucide-react";
 
 const BASE_NAV = [
   { href: "/panel", label: "Profil", icon: LayoutDashboard, exact: true },
@@ -15,8 +13,6 @@ const BASE_NAV = [
 
 export default function PanelNav() {
   const pathname = usePathname();
-  const { data: session, status } = useSession();
-  const isPremium = status === "authenticated" && session?.user?.plan === "PREMIUM";
 
   return (
     <nav className="flex gap-1 lg:flex-col">
@@ -39,20 +35,6 @@ export default function PanelNav() {
         );
       })}
 
-      {PAYMENTS_ENABLED && !isPremium && (
-        <Link
-          href="/panel/premium-upgrade"
-          className={cn(
-            "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors mt-2",
-            pathname.startsWith("/panel/premium-upgrade")
-              ? "bg-brand/10 text-brand"
-              : "border border-brand/40 text-brand hover:bg-brand/5"
-          )}
-        >
-          <Star className="h-4 w-4 shrink-0" />
-          Premium&apos;a Geç
-        </Link>
-      )}
     </nav>
   );
 }
