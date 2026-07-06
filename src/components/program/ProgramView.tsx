@@ -742,7 +742,7 @@ export default function ProgramView({
               {currentRace?.hasAnalysis ? (
                 <button
                   onClick={() => setAnalysisOpen((v) => !v)}
-                  className="text-xs font-semibold text-[#27ae60] hover:underline flex items-center gap-1"
+                  className="flex items-center gap-1 rounded-md bg-[#27AE60] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90"
                 >
                   Analizi Gör {analysisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
