@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ProgramDay, ProgramRace, ProgramRunner } from "@/server/services/race.service";
@@ -76,6 +76,26 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
 
   const groupSelections = currentGroup?.races.map((_, i) => getSelected(activeHipo, curAltili, i)) ?? [];
   const filledCount = groupSelections.filter(Boolean).length;
+
+  const ikramiyeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (filledCount !== 6 || !ikramiyeRef.current) return;
+    const el = ikramiyeRef.current;
+    const start = window.scrollY;
+    const target = start + el.getBoundingClientRect().top - 80;
+    const distance = target - start;
+    const duration = 600;
+    let startTime: number | null = null;
+    function easeIn(t: number) { return t * t * t; }
+    function step(now: number) {
+      if (!startTime) startTime = now;
+      const elapsed = Math.min((now - startTime) / duration, 1);
+      window.scrollTo(0, start + distance * easeIn(elapsed));
+      if (elapsed < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }, [filledCount]);
 
   const katsayi =
     filledCount === 6 && groupSelections.every((s) => s != null && s.effectiveAgf > 0)
@@ -313,7 +333,7 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
 
                 {/* Tahmini ikramiye */}
                 {ikramiyeLower != null && ikramiyeUpper != null && (
-                  <div className="mt-3 rounded-lg border border-[#27ae60]/40 bg-[#27ae60]/10 px-3 py-3">
+                  <div ref={ikramiyeRef} className="mt-3 rounded-lg border border-[#27ae60]/40 bg-[#27ae60]/10 px-3 py-3">
                     <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">
                       6lı Ganyan Tahmini
                     </div>
