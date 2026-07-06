@@ -113,7 +113,7 @@ function veriGuvenColor(vg: string | undefined) {
 
 // ── Analiz paneli ────────────────────────────────────────────────────────────
 
-function AnalysisPanel({ picks }: { picks: ProgramPick[] }) {
+function AnalysisPanel({ picks, winnerNo }: { picks: ProgramPick[]; winnerNo?: number | null }) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -157,21 +157,21 @@ function AnalysisPanel({ picks }: { picks: ProgramPick[] }) {
                 ?? p.runnerLabel?.replace(/^\d+\s+/, "") ?? "—";
               const no = p.runner?.no ?? (parseInt(p.runnerLabel ?? "0", 10) || "?");
               const { aScore, bcScore, veriGuven, kilItGerekce } = parsePickDetails(p.details);
-              const isTop = p.rank === 1;
+              const isWinner = winnerNo != null && p.runner?.no === winnerNo;
               return (
-                <tr key={p.rank} className={cn("border-b last:border-0", isTop && "bg-brand/10")}>
+                <tr key={p.rank} className={cn("border-b last:border-0", isWinner && "bg-[#f5c518]/10")}>
                   <td className="px-2 py-2 text-center">
                     <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold",
-                      isTop ? "bg-brand text-white" : "bg-muted text-muted-foreground")}>
+                      "bg-muted text-muted-foreground")}>
                       {p.rank}
                     </span>
                   </td>
-                  <td className="px-2 py-2 text-center font-mono font-bold">{no}</td>
-                  <td className="px-2 py-2 font-semibold">{name}</td>
+                  <td className={cn("px-2 py-2 text-center font-mono font-bold", isWinner && "text-[#f5c518]")}>{no}</td>
+                  <td className={cn("px-2 py-2 font-semibold", isWinner && "text-[#f5c518]")}>{name}</td>
                   <td className="px-2 py-2 text-center tabular-nums">{aScore ?? "—"}</td>
                   <td className="px-2 py-2 text-center tabular-nums">{bcScore ?? "—"}</td>
                   <td className="px-2 py-2 text-center tabular-nums font-bold">
-                    {p.score != null ? <span className={isTop ? "text-brand" : ""}>{p.score}</span> : "—"}
+                    {p.score != null ? <span>{p.score}</span> : "—"}
                   </td>
                   <td className={cn("px-2 py-2 text-center", veriGuvenColor(veriGuven))}>
                     {veriGuven ?? "—"}
@@ -193,22 +193,21 @@ function AnalysisPanel({ picks }: { picks: ProgramPick[] }) {
             ?? p.runnerLabel?.replace(/^\d+\s+/, "") ?? "—";
           const no = p.runner?.no ?? (parseInt(p.runnerLabel ?? "0", 10) || "?");
           const { aScore, bcScore, veriGuven, kilItGerekce } = parsePickDetails(p.details);
-          const isTop = p.rank === 1;
+          const isWinner = winnerNo != null && p.runner?.no === winnerNo;
           return (
-            <div key={p.rank} className={cn("px-3 py-2.5", isTop && "bg-brand/10")}>
+            <div key={p.rank} className={cn("px-3 py-2.5", isWinner && "bg-[#f5c518]/10")}>
               <div className="flex items-center gap-2 mb-1">
-                <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0",
-                  isTop ? "bg-brand text-white" : "bg-muted text-muted-foreground")}>
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0 bg-muted text-muted-foreground">
                   {p.rank}
                 </span>
-                <span className="font-bold text-xs">#{no}</span>
-                <span className="font-semibold text-xs">{name}</span>
+                <span className={cn("font-bold text-xs", isWinner && "text-[#f5c518]")}>#{no}</span>
+                <span className={cn("font-semibold text-xs", isWinner && "text-[#f5c518]")}>{name}</span>
                 {veriGuven && <span className={cn("ml-auto text-xs", veriGuvenColor(veriGuven))}>{veriGuven}</span>}
               </div>
               <div className="flex gap-3 text-[11px] text-muted-foreground mb-1">
                 {aScore && <span>A: <span className="text-foreground">{aScore}</span></span>}
                 {bcScore && <span>B+C: <span className="text-foreground">{bcScore}</span></span>}
-                {p.score != null && <span>Toplam: <span className={cn("font-bold", isTop ? "text-brand" : "text-foreground")}>{p.score}</span></span>}
+                {p.score != null && <span>Toplam: <span className="font-bold text-foreground">{p.score}</span></span>}
               </div>
               {kilItGerekce && <p className="text-[11px] text-muted-foreground leading-snug">{kilItGerekce}</p>}
             </div>
@@ -584,7 +583,7 @@ function RaceTable({
       </div>
 
       {/* Analiz paneli */}
-      {race.hasAnalysis && analysisOpen && <AnalysisPanel picks={race.picks} />}
+      {race.hasAnalysis && analysisOpen && <AnalysisPanel picks={race.picks} winnerNo={winnerNo} />}
     </div>
   );
 }
