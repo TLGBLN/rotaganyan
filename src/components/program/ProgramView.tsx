@@ -151,7 +151,7 @@ function RunnerRow({
 
       {/* At İsmi */}
       <td className="px-2 py-1.5 min-w-[140px]">
-        <div className={cn("font-semibold", isWinner && "text-[#f5c518]", r.scratched && "line-through")}>
+        <div className={cn("font-semibold", isWinner && "text-[#f5c518]", false)}>
           {r.name}
           {r.scratched && (
             <span className="ml-1.5 text-[10px] font-normal text-red-400 no-underline">(Koşmaz)</span>
@@ -285,7 +285,7 @@ function RunnerCard({
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className={cn("font-semibold truncate", isWinner && "text-[#f5c518]", r.scratched && "line-through")}>
+          <div className={cn("font-semibold truncate", isWinner && "text-[#f5c518]", false)}>
             {r.name}
             {r.scratched && <span className="ml-1 text-[10px] font-normal text-red-400 no-underline">(Koşmaz)</span>}
           </div>
