@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
@@ -368,10 +367,15 @@ function RaceTimer({ time, hasResult, dateStr }: { time: string | null; hasResul
   );
 }
 
-function RaceTable({ race }: { race: ProgramRace }) {
+function RaceTable({
+  race, analysisOpen, onAnalysisToggle,
+}: {
+  race: ProgramRace;
+  analysisOpen: boolean;
+  onAnalysisToggle: () => void;
+}) {
   const surf = surfaceLabel(race.surface);
   const winnerNo = race.result?.winnerNo;
-  const [analysisOpen, setAnalysisOpen] = useState(false);
 
   // AGF sıralama (en yüksek = 1. sıra)
   const agfSorted = race.runners
@@ -473,11 +477,11 @@ function RaceTable({ race }: { race: ProgramRace }) {
         )}
       </div>
 
-      {/* Analiz butonu + panel */}
+      {/* Analiz paneli */}
       {race.hasAnalysis && (
         <>
           <button
-            onClick={() => setAnalysisOpen((v) => !v)}
+            onClick={onAnalysisToggle}
             className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#27ae60] hover:bg-[#219a52] text-white text-sm font-semibold transition-colors"
           >
             <span>● Analizleri görmek için tıklayınız</span>
@@ -495,6 +499,7 @@ function RaceTable({ race }: { race: ProgramRace }) {
 export default function ProgramView({ days, dateStr }: { days: ProgramDay[]; dateStr: string }) {
   const [activeHipo, setActiveHipo] = useState(days[0]?.hippodromeSlug ?? "");
   const [activeRace, setActiveRace] = useState<Record<string, number>>({});
+  const [analysisOpen, setAnalysisOpen] = useState(false);
 
   const currentDay = days.find((d) => d.hippodromeSlug === activeHipo) ?? days[0];
 
@@ -504,6 +509,9 @@ export default function ProgramView({ days, dateStr }: { days: ProgramDay[]; dat
 
   const raceNo = selectedRaceNo(currentDay!);
   const currentRace = currentDay?.races.find((r) => r.raceNo === raceNo) ?? currentDay?.races[0];
+
+  // Yarış veya hipodrom değişince analiz panelini kapat
+  useEffect(() => { setAnalysisOpen(false); }, [activeHipo, raceNo]);
 
   if (days.length === 0) {
     return (
@@ -571,12 +579,12 @@ export default function ProgramView({ days, dateStr }: { days: ProgramDay[]; dat
             </div>
             <div className="flex items-center gap-3">
               {currentRace?.hasAnalysis ? (
-                <Link
-                  href={`/kosular/${dateStr}/${currentDay?.hippodromeSlug}/${currentRace.raceNo}`}
-                  className="text-xs font-semibold text-[#27ae60] hover:underline"
+                <button
+                  onClick={() => setAnalysisOpen((v) => !v)}
+                  className="text-xs font-semibold text-[#27ae60] hover:underline flex items-center gap-1"
                 >
-                  Analizi Gör →
-                </Link>
+                  Analizi Gör {analysisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
               ) : (
                 <span className="text-xs font-semibold text-[#e74c3c]">Analiz Hazırlanıyor</span>
               )}
@@ -587,7 +595,13 @@ export default function ProgramView({ days, dateStr }: { days: ProgramDay[]; dat
           </div>
 
           {/* Seçili koşu */}
-          {currentRace && <RaceTable race={currentRace} />}
+          {currentRace && (
+            <RaceTable
+              race={currentRace}
+              analysisOpen={analysisOpen}
+              onAnalysisToggle={() => setAnalysisOpen((v) => !v)}
+            />
+          )}
         </>
       )}
     </div>

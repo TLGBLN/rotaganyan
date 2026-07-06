@@ -46,7 +46,7 @@ export default async function Header() {
             <Link href="/program">Yarış Programı</Link>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href="/kosular">Rotaganyan Puan Tablosu</Link>
+            <Link href="/rotaganyanpuantablosu">Rotaganyan Puan Tablosu</Link>
           </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/tahmin-onerileri">Banko Önerileri</Link>
