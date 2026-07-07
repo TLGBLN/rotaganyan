@@ -28,6 +28,12 @@ function chunkIntoAltili<T extends Race>(
   return result;
 }
 
+function finishPos(actualOrder: unknown, runnerNo: number | null | undefined): number | null {
+  if (!Array.isArray(actualOrder) || runnerNo == null) return null;
+  const idx = (actualOrder as string[]).findIndex((s) => parseInt(s, 10) === runnerNo);
+  return idx >= 0 ? idx + 1 : null;
+}
+
 function rankColor(rank: number): string {
   if (rank <= 3) return "text-hit";
   if (rank <= 6) return "text-brand";
@@ -135,6 +141,14 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                               {pick.runner?.scratched && (
                                 <span className="ml-1 text-[10px] font-semibold text-red-400">Koşmaz</span>
                               )}
+                              {(() => {
+                                const pos = finishPos(race.result?.actualOrder, pick.runner?.no);
+                                return pos != null ? (
+                                  <span className={cn("ml-1 text-[10px] font-semibold", pos === 1 ? "text-[#F5C518]" : "text-muted-foreground")}>
+                                    ({pos}.)
+                                  </span>
+                                ) : null;
+                              })()}
                             </td>
                             <td className={cn("px-2 py-1.5 text-center font-mono tabular-nums", textColor, weight)}>
                               {pick.score ?? "—"}
@@ -251,6 +265,14 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                                 {pick.runner?.scratched && (
                                   <span className="text-[10px] font-semibold text-red-400">Koşmaz</span>
                                 )}
+                                {(() => {
+                                  const pos = finishPos(race.result?.actualOrder, pick.runner?.no);
+                                  return pos != null ? (
+                                    <span className={cn("text-[10px] font-semibold", pos === 1 ? "text-[#F5C518]" : "text-muted-foreground")}>
+                                      ({pos}.)
+                                    </span>
+                                  ) : null;
+                                })()}
                               </div>
                             </td>
 

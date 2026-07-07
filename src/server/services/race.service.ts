@@ -45,7 +45,7 @@ export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
             };
           };
         };
-        result: { select: { hitTop1: true; hitInCoupon: true; ganyan: true; winnerNo: true } };
+        result: { select: { hitTop1: true; hitInCoupon: true; ganyan: true; winnerNo: true; actualOrder: true } };
       };
     };
   };
@@ -129,7 +129,7 @@ export async function getRaceDaysByDate(
               },
             },
           },
-          result: { select: { hitTop1: true, hitInCoupon: true, ganyan: true, winnerNo: true } },
+          result: { select: { hitTop1: true, hitInCoupon: true, ganyan: true, winnerNo: true, actualOrder: true } },
         },
         orderBy: { raceNo: "asc" },
       },
