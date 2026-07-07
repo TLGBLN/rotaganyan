@@ -102,6 +102,7 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
         const runnerIdToNo = new Map(match.runners.map((ru) => [ru.id, ru.no]));
         const noToRank = new Map<number, number>();
         for (const pick of match.prediction.picks) {
+          if (!pick.runnerId) continue;
           const no = runnerIdToNo.get(pick.runnerId);
           if (no != null) noToRank.set(no, pick.rank);
         }
@@ -119,7 +120,10 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
 
       if (r.prediction) {
         const picks = r.prediction.picks;
-        rankByRunnerId = new Map(picks.map((p) => [p.runnerId, p.rank]));
+        rankByRunnerId = new Map(
+          picks.filter((p): p is typeof p & { runnerId: string } => p.runnerId != null)
+               .map((p) => [p.runnerId, p.rank])
+        );
       } else {
         rankByNo = rankByNoById.get(r.id) ?? null;
       }
