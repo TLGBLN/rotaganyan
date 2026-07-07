@@ -8,6 +8,7 @@ import { fetchTjkTicker } from "@/lib/tjk-ticker";
 import { auth } from "@/lib/auth";
 import { getFollowedHorses } from "@/server/actions/horse-follow";
 import ProgramView from "@/components/program/ProgramView";
+import AutoRefresh from "@/components/program/AutoRefresh";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import SteamWidget from "@/components/kosular/SteamWidget";
 import AltiliGanyanResults from "@/components/home/AltiliGanyanResults";
@@ -65,7 +66,10 @@ export default async function ProgramPage({ searchParams }: PageProps) {
       {/* Program */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-lg font-bold">Yarış Programı</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold">Yarış Programı</h1>
+            {daysAhead >= 0 && daysAhead <= 1 && <AutoRefresh />}
+          </div>
           <DateNavigator currentDate={currentDate} basePath="/program" />
         </div>
         <div className="rounded-lg border overflow-hidden">
