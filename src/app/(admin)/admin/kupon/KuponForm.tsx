@@ -24,6 +24,7 @@ const WIDTHS: Width[] = ["narrow", "normal", "wide"];
 const WIDTH_LABEL: Record<Width, string> = { narrow: "Ekonomik", normal: "Normal", wide: "Geniş" };
 const STAKE_PER_COMBINATION = 1.25;
 const LIMITS: Record<Width, number> = { narrow: 600, normal: 1500, wide: 3000 };
+const TOLERANCE = 1.10; // %10 esneme payı
 
 function emptySelection(): Record<Width, Set<number>> {
   return { narrow: new Set(), normal: new Set(), wide: new Set() };
@@ -242,10 +243,11 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
                 {WIDTHS.map((width) => {
                   const amount = groupAmounts[chunkIdx][width];
                   const limit = LIMITS[width];
-                  const maxCombos = Math.floor(limit / STAKE_PER_COMBINATION);
+                  const effectiveLimit = limit * TOLERANCE;
+                  const maxCombos = Math.floor(effectiveLimit / STAKE_PER_COMBINATION);
                   const currentCombos = Math.round(amount / STAKE_PER_COMBINATION);
                   const remaining = maxCombos - currentCombos;
-                  const over = amount > limit;
+                  const over = amount > effectiveLimit;
                   return (
                     <div key={width} className={cn("rounded-lg border p-3 text-center transition-colors", over ? "border-red-500/60 bg-red-500/5" : "")}>
                       <div className="text-xs font-medium text-muted-foreground">{WIDTH_LABEL[width]}</div>
@@ -261,14 +263,14 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
                           : `${remaining.toLocaleString("tr-TR")} kombo kaldı`}
                       </div>
                       <div className="text-[10px] text-muted-foreground mt-1 border-t pt-1">
-                        max {maxCombos.toLocaleString("tr-TR")} kombo · {limit.toLocaleString("tr-TR")} ₺
+                        max {maxCombos.toLocaleString("tr-TR")} kombo · {effectiveLimit.toLocaleString("tr-TR")} ₺ <span className="opacity-60">(+%10)</span>
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {WIDTHS.some((w) => groupAmounts[chunkIdx][w] > LIMITS[w]) && (
+              {WIDTHS.some((w) => groupAmounts[chunkIdx][w] > LIMITS[w] * TOLERANCE) && (
                 <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-500">
                   ⚠ Bir veya daha fazla kupon türü limit aşıyor. Kaydetmeden önce seçimleri azaltın.
                 </div>
