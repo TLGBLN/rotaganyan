@@ -68,7 +68,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-bold">Yarış Programı</h1>
-            {daysAhead >= 0 && daysAhead <= 1 && <AutoRefresh />}
+            {daysAhead >= 0 && <AutoRefresh />}
           </div>
           <DateNavigator currentDate={currentDate} basePath="/program" />
         </div>
