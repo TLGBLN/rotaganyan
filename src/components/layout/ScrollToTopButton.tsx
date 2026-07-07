@@ -22,11 +22,11 @@ export default function ScrollToTopButton() {
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       aria-label="Yukarı çık"
       className={cn(
-        "fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg transition-all hover:bg-brand/90",
+        "fixed bottom-6 right-6 z-50 flex h-8 w-8 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg transition-all hover:bg-brand/90",
         visible ? "opacity-100 translate-y-0" : "pointer-events-none opacity-0 translate-y-2"
       )}
     >
-      <ArrowUp className="h-5 w-5" />
+      <ArrowUp className="h-4 w-4" />
     </button>
   );
 }
