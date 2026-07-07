@@ -660,3 +660,39 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     }),
   }));
 }
+
+// ─── Jokey İstatistikleri ─────────────────────────────────────────────────────
+
+export type JockeyStat = { wins: number; rides: number };
+
+/** Bu yıla ait galibiyet/biniş sayılarını jokey adına göre döner. */
+export async function getJockeyStats(names: string[]): Promise<Record<string, JockeyStat>> {
+  if (names.length === 0) return {};
+
+  const since = new Date(`${new Date().getFullYear()}-01-01T00:00:00Z`);
+
+  const runners = await db.runner.findMany({
+    where: {
+      jockey: { in: names },
+      race: {
+        raceDay: { date: { gte: since } },
+        result: { isNot: null },
+      },
+    },
+    select: {
+      jockey: true,
+      no: true,
+      race: { select: { result: { select: { winnerNo: true } } } },
+    },
+  });
+
+  const out: Record<string, JockeyStat> = {};
+  for (const r of runners) {
+    if (!r.jockey) continue;
+    const s = out[r.jockey] ?? { wins: 0, rides: 0 };
+    s.rides++;
+    if (r.race.result?.winnerNo === r.no) s.wins++;
+    out[r.jockey] = s;
+  }
+  return out;
+}

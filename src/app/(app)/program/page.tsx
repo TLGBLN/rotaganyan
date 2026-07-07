@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { getProgramData, getKuponOnerileri, getHitPredictions } from "@/server/services/race.service";
+import { getProgramData, getKuponOnerileri, getHitPredictions, getJockeyStats, type JockeyStat } from "@/server/services/race.service";
 import { turkeyDateString } from "@/lib/tz";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { getAgfMovers } from "@/server/services/agf-trend.service";
@@ -64,6 +64,12 @@ export default async function ProgramPage({ searchParams }: PageProps) {
   const isAdmin = session?.user?.role ? hasRole(session.user.role as Role, "EDITOR") : false;
   const followedNames = followedHorses.map((h) => h.horseName);
 
+  // Jokey istatistikleri — bu yılın galibiyet/biniş verileri
+  const allJockeys = [...new Set(
+    days.flatMap((d) => d.races.flatMap((r) => r.runners.map((ru) => ru.jockey).filter((j): j is string => !!j)))
+  )];
+  const jockeyStats = await getJockeyStats(allJockeys).catch(() => ({} as Record<string, JockeyStat>));
+
   // Üye olmayanlar için picks verisi client'a gönderilmez
   const viewDays = isLoggedIn
     ? days
@@ -87,7 +93,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
           <DateNavigator currentDate={currentDate} basePath="/program" />
         </div>
         <div className="rounded-lg border overflow-hidden">
-          <ProgramView days={viewDays} dateStr={currentDate} followedNames={followedNames} isLoggedIn={isLoggedIn} />
+          <ProgramView days={viewDays} dateStr={currentDate} followedNames={followedNames} isLoggedIn={isLoggedIn} jockeyStats={jockeyStats} />
         </div>
       </div>
 
