@@ -5,8 +5,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { getHippodromes, getRaceDaysByDate } from "@/server/services/race.service";
-import { getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
-
+import { getAdminRaceDays, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
 import { turkeyDateString } from "@/lib/tz";
 import PuanTablosu from "@/components/kosular/PuanTablosu";
 import DateNavigator from "@/components/kosular/DateNavigator";
@@ -22,6 +21,17 @@ function couponTierLabel(rank: number): string {
   return "Geniş";
 }
 
+function parseConditionsRef(conditions: string): { slug: string; raceNo: number } | null {
+  const m = conditions.match(/^(.+?)\s+(\d+)\.\s*Ko[şs]u/i);
+  if (!m) return null;
+  const slug = m[1].trim()
+    .replace(/[İI]/g, "i").replace(/ı/g, "i")
+    .replace(/[ğĞ]/g, "g").replace(/[üÜ]/g, "u")
+    .replace(/[şŞ]/g, "s").replace(/[öÖ]/g, "o").replace(/[çÇ]/g, "c")
+    .toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  return { slug, raceNo: parseInt(m[2], 10) };
+}
+
 type PageProps = { searchParams: Promise<{ tarih?: string }> };
 
 export default async function AdminKuponPage({ searchParams }: PageProps) {
@@ -29,25 +39,40 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
   const today = turkeyDateString();
   const currentDate = tarih ?? today;
 
-  const [kuponlar, hippodromes, raceDays, analystStats] = await Promise.all([
+  const [kuponlar, hippodromes, raceDays, adminRaceDays, analystStats] = await Promise.all([
     db.homeKupon.findMany({ orderBy: { createdAt: "desc" }, take: 20 }),
     getHippodromes(),
-    getRaceDaysByDate(currentDate),
+    getRaceDaysByDate(currentDate),        // PuanTablosu için
+    getAdminRaceDays(currentDate),         // Koşu programı tablosu için (kosular ile aynı)
     getAnalystStats(),
   ]);
 
-  // Koşucu sayısı — programRunner'dan hızlı toplu sorgu
-  const raceIds = raceDays.flatMap((rd) => rd.races.map((r) => r.id));
-  const runnerCountRows = raceIds.length > 0
-    ? await db.runner.groupBy({
-        by: ["raceId"],
-        where: { raceId: { in: raceIds } },
-        _count: { id: true },
-      })
-    : [];
-  const runnerCountMap = new Map(
-    runnerCountRows.map((r: { raceId: string; _count: { id: number } }) => [r.raceId, r._count.id])
-  );
+  // Karma mirror lookup — kosular/page.tsx ile aynı mantık
+  type RaceRow = (typeof adminRaceDays)[0]["races"][0];
+  type OriginalMeta = {
+    raceId: string;
+    prediction: RaceRow["prediction"];
+    classType: string;
+    distance: number;
+    runners: RaceRow["runners"];
+  };
+  const originalByKey = new Map<string, OriginalMeta>();
+  const originalByTime = new Map<string, OriginalMeta>();
+  for (const rd of adminRaceDays) {
+    if (rd.hippodrome.slug === "karma") continue;
+    for (const race of rd.races) {
+      if (race.conditions != null) continue;
+      const meta: OriginalMeta = {
+        raceId: race.id,
+        prediction: race.prediction,
+        classType: race.classType,
+        distance: race.distance,
+        runners: race.runners,
+      };
+      originalByKey.set(`${rd.hippodrome.slug}:${race.raceNo}`, meta);
+      if (race.time) originalByTime.set(race.time, meta);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -56,14 +81,14 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
         <DateNavigator currentDate={currentDate} basePath="/admin/kupon" />
       </div>
 
-      {/* ── Koşu Programı Özeti ── */}
-      {raceDays.length > 0 && (
+      {/* ── Koşu Programı (kosular ile aynı veri) ── */}
+      {adminRaceDays.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Koşu Programı
           </h2>
-          {raceDays.map((rd) => (
-            <div key={rd.id} className="rounded-lg border text-xs">
+          {adminRaceDays.map((rd) => (
+            <div key={rd.id} className="rounded-lg border">
               <div className="border-b bg-muted/30 px-3 py-1.5 text-sm font-semibold">
                 {rd.hippodrome.name}
               </div>
@@ -81,8 +106,19 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                   </thead>
                   <tbody>
                     {rd.races.map((race, i) => {
-                      const advice = getClassTypeAdvice(analystStats, race.classType);
-                      const runnerCount = runnerCountMap.get(race.id) ?? 0;
+                      const karmaRef = race.conditions ? parseConditionsRef(race.conditions) : null;
+                      const original = karmaRef
+                        ? (originalByKey.get(`${karmaRef.slug}:${karmaRef.raceNo}`) ?? (race.time ? originalByTime.get(race.time) : null))
+                        : null;
+                      const effectivePred = race.prediction ?? original?.prediction ?? null;
+                      const effectiveClassType =
+                        race.classType && race.classType !== "—"
+                          ? race.classType
+                          : (original?.classType ?? race.classType);
+                      const effectiveRunners =
+                        race.runners.length > 0 ? race.runners : (original?.runners ?? []);
+                      const advice = getClassTypeAdvice(analystStats, effectiveClassType);
+
                       return (
                         <tr
                           key={race.id}
@@ -98,8 +134,8 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                           </td>
                           <td className="px-3 py-1.5 text-muted-foreground">{race.time ?? "—"}</td>
                           <td className="px-3 py-1.5">
-                            <div className="flex items-center gap-1">
-                              <span>{race.classType}</span>
+                            <div className="flex items-center gap-1.5">
+                              <span>{effectiveClassType}</span>
                               <span
                                 title={advice.text}
                                 className={cn(
@@ -110,13 +146,7 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                                   advice.level === "none" && "bg-muted text-muted-foreground"
                                 )}
                               >
-                                {advice.level === "warn"
-                                  ? "!"
-                                  : advice.level === "good"
-                                  ? "✓"
-                                  : advice.level === "none"
-                                  ? "–"
-                                  : "i"}
+                                {advice.level === "warn" ? "!" : advice.level === "good" ? "✓" : advice.level === "none" ? "–" : "i"}
                               </span>
                             </div>
                             <div
@@ -132,20 +162,20 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                             </div>
                           </td>
                           <td className="px-3 py-1.5 text-muted-foreground">{race.distance}m</td>
-                          <td className="px-3 py-1.5">{runnerCount}</td>
+                          <td className="px-3 py-1.5">{effectiveRunners.length}</td>
                           <td className="px-3 py-1.5">
-                            {race.prediction ? (
+                            {effectivePred ? (
                               <div className="flex flex-wrap items-center gap-1">
                                 <Link
-                                  href={`/admin/analizler/${race.prediction.id}`}
+                                  href={`/admin/analizler/${effectivePred.id}`}
                                   className={cn(
                                     "font-medium hover:underline",
-                                    race.prediction.published ? "text-hit" : "text-brand"
+                                    effectivePred.published ? "text-hit" : "text-brand"
                                   )}
                                 >
-                                  {race.prediction.published ? "Yayında" : "Taslak"}
+                                  {effectivePred.published ? "Yayında" : "Taslak"}
                                 </Link>
-                                {race.prediction.picks
+                                {effectivePred.picks
                                   .filter((p) => p.isTarget)
                                   .map((p) => (
                                     <span
