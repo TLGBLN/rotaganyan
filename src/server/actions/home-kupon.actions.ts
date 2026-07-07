@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
@@ -54,6 +55,15 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
     },
   });
   if (!raceDay) return null;
+
+  // Her "Koşuları Getir" isteğinde arka planda taze ingest tetikle —
+  // scratched/jockey değişikliklerini DB'ye yansıtır, bir sonraki getir'de görünür.
+  after(async () => {
+    try {
+      const { ingestDate, toTjkDate } = await import("@/server/services/ingest/tjk-info.adapter");
+      await ingestDate(toTjkDate(date));
+    } catch { /* ingest hatası kupon işlemini engellemesin */ }
+  });
 
   // Karma altılılarda her koşu başka bir hipodromun aynasıdır (conditions = "İstanbul 8. Koşu" gibi).
   // Bu yarışların kendi prediction'ı olmaz; at sıralaması için kaynak yarışın pick'leri bulunur.

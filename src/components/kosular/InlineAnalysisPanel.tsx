@@ -95,9 +95,12 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, raceP
                 {pick.runner?.no ?? "—"}
               </span>
               <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                <span className={cn("truncate text-xs font-medium", isWinner && "font-bold text-[#F5C518]")}>
-                  {pick.runner?.name || pick.runnerLabel}
+                <span className={cn("truncate text-xs font-medium", isWinner && "font-bold text-[#F5C518]", pick.runner?.scratched && "line-through opacity-50")}>
+                  {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
                 </span>
+                {pick.runner?.scratched && (
+                  <span className="shrink-0 text-[10px] font-semibold text-red-400">Koşmaz</span>
+                )}
                 {pick.isTarget && <TargetBadge />}
                 {pick.runner?.jockeyChanged && pick.runner.previousJockey && (
                   <span title={`Jokey değişti → önceki: ${pick.runner.previousJockey}`} className="shrink-0 rounded bg-orange-100 px-1 text-[10px] font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
@@ -161,9 +164,12 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, raceP
                   <td className="px-2 py-2 font-mono">{pick.runner?.no ?? "—"}</td>
                   <td className="px-2 py-2 font-medium">
                     <div className="flex items-center gap-1.5">
-                      <span className={isWinner ? "font-bold text-[#F5C518]" : ""}>
-                        {pick.runner?.name || pick.runnerLabel}
+                      <span className={cn(isWinner ? "font-bold text-[#F5C518]" : "", pick.runner?.scratched && "line-through opacity-50")}>
+                        {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
                       </span>
+                      {pick.runner?.scratched && (
+                        <span className="text-[10px] font-semibold text-red-400">Koşmaz</span>
+                      )}
                       {pick.isTarget && <TargetBadge className="ml-1.5" />}
                       {pick.runner?.jockeyChanged && pick.runner.previousJockey && (
                         <span title={`Jokey değişti → önceki: ${pick.runner.previousJockey}`} className="rounded bg-orange-100 px-1 text-[10px] font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">

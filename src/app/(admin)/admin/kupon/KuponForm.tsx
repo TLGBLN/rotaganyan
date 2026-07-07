@@ -218,7 +218,7 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
                                       className={cn(
                                         "flex items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-xs transition-colors",
                                         runner.scratched
-                                          ? "border-muted-foreground/15 opacity-50 cursor-not-allowed"
+                                          ? "border-muted-foreground/15 opacity-40 cursor-not-allowed"
                                           : checked
                                           ? "border-brand bg-brand text-brand-foreground"
                                           : "border-muted-foreground/30 text-muted-foreground hover:border-brand/50 hover:text-foreground"
@@ -230,9 +230,11 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
                                       <span className={cn("truncate font-medium", runner.scratched && "line-through")}>
                                         {runner.name}
                                       </span>
-                                      {runner.ekuriGroup != null && (
+                                      {runner.scratched ? (
+                                        <span className="ml-auto shrink-0 text-[10px] text-red-400 font-semibold">Koşmaz</span>
+                                      ) : runner.ekuriGroup != null ? (
                                         <span title={`Eküri grubu ${runner.ekuriGroup}`} className="ml-auto shrink-0 text-[10px]">🐴</span>
-                                      )}
+                                      ) : null}
                                     </button>
                                   );
                                 })}
