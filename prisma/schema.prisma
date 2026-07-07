@@ -94,6 +94,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   loginLogs     LoginLog[]
+  pageViews     PageView[]
 }
 
 model LoginLog {
@@ -471,4 +472,20 @@ model BannerSlide {
   createdAt DateTime @default(now())
 
   @@index([active, order])
+}
+
+// ─── PAGE VIEWS ───────────────────────────────────────────────────────────────
+
+model PageView {
+  id        String   @id @default(cuid())
+  userId    String?
+  path      String
+  duration  Int?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([path])
+  @@index([createdAt(sort: Desc)])
 }

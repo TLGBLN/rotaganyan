@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import SessionProvider from "@/components/providers/SessionProvider";
 import VersionWatcher from "@/components/layout/VersionWatcher";
 import ScrollToTopButton from "@/components/layout/ScrollToTopButton";
+import PageTracker from "@/components/layout/PageTracker";
 import { auth } from "@/lib/auth";
 import "./globals.css";
 
@@ -78,6 +79,7 @@ export default async function RootLayout({
             <Toaster richColors position="bottom-right" />
             <VersionWatcher />
             <ScrollToTopButton />
+            <PageTracker />
           </TooltipProvider>
         </SessionProvider>
       </body>
