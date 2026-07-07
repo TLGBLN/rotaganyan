@@ -41,7 +41,7 @@ const GRID_COLS: Record<number, string> = {
   3: "sm:grid-cols-3",
 };
 
-function KuponBlock({ data, ikramiye }: { data: Kupon; ikramiye: string | null }) {
+function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string | null; isAdmin: boolean }) {
   const visibleVariants = data.variants.filter((v) => v.status !== "miss");
   if (visibleVariants.length === 0) return null;
 
@@ -51,15 +51,17 @@ function KuponBlock({ data, ikramiye }: { data: Kupon; ikramiye: string | null }
     <div>
       <div className="mb-3 flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">{data.hippodromeName}</span>
-        <a
-          href={tweetUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-md border border-muted-foreground/25 px-2.5 py-1 text-xs font-semibold hover:bg-muted transition-colors"
-        >
-          <span>𝕏</span>
-          <span>Paylaş</span>
-        </a>
+        {isAdmin && (
+          <a
+            href={tweetUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md border border-muted-foreground/25 px-2.5 py-1 text-xs font-semibold hover:bg-muted transition-colors"
+          >
+            <span>𝕏</span>
+            <span>Paylaş</span>
+          </a>
+        )}
       </div>
       <div className={cn("grid gap-4", GRID_COLS[visibleVariants.length] ?? "sm:grid-cols-3")}>
         {visibleVariants.map((variant) => (
@@ -125,19 +127,41 @@ function KuponBlock({ data, ikramiye }: { data: Kupon; ikramiye: string | null }
   );
 }
 
-type Props = { data: KuponOnerisi[]; altiliResults?: AltiliCityResult[] };
+type Props = { data: KuponOnerisi[]; altiliResults?: AltiliCityResult[]; isLoggedIn?: boolean; isAdmin?: boolean };
 
-export default function TahminOnerileri({ data, altiliResults = [] }: Props) {
+export default function TahminOnerileri({ data, altiliResults = [], isLoggedIn = false, isAdmin = false }: Props) {
   const items = data.filter((k): k is Kupon => k !== null);
   const hasVisible = items.some((k) => k.variants.some((v) => v.status !== "miss"));
   if (items.length === 0 || !hasVisible) return null;
+
+  if (!isLoggedIn) {
+    return (
+      <section className="border-t px-4 py-8">
+        <div className="mx-auto max-w-6xl">
+          <h2 className="mb-4 text-lg font-semibold">Kupon Önerileri</h2>
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+            <span className="text-2xl">🔒</span>
+            <p className="font-medium">Kupon önerilerini görmek için üye olmalısınız.</p>
+            <div className="flex gap-2">
+              <a href="/giris" className="rounded-md bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground hover:bg-brand/90">
+                Giriş Yap
+              </a>
+              <a href="/kayit" className="rounded-md border px-4 py-2 text-xs font-semibold hover:bg-muted">
+                Kayıt Ol
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="border-t px-4 py-10">
       <div className="mx-auto max-w-6xl space-y-8">
         <h2 className="text-lg font-semibold">Kupon Önerileri</h2>
         {items.map((kupon, i) => (
-          <KuponBlock key={i} data={kupon} ikramiye={findIkramiye(kupon.hippodromeName, altiliResults)} />
+          <KuponBlock key={i} data={kupon} ikramiye={findIkramiye(kupon.hippodromeName, altiliResults)} isAdmin={isAdmin} />
         ))}
       </div>
     </section>

@@ -5,7 +5,8 @@ import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter
 import { getAgfMovers } from "@/server/services/agf-trend.service";
 import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
 import { fetchTjkTicker } from "@/lib/tjk-ticker";
-import { auth } from "@/lib/auth";
+import { auth, hasRole } from "@/lib/auth";
+import type { Role } from "@prisma/client";
 import { getFollowedHorses } from "@/server/actions/horse-follow";
 import ProgramView from "@/components/program/ProgramView";
 import AutoRefresh from "@/components/program/AutoRefresh";
@@ -58,6 +59,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
     getKuponOnerileri().catch(() => []),
   ]);
   const isLoggedIn = !!session?.user;
+  const isAdmin = session?.user?.role ? hasRole(session.user.role as Role, "EDITOR") : false;
   const followedNames = followedHorses.map((h) => h.horseName);
 
   return (
@@ -81,7 +83,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
 
       {/* Kupon Önerileri */}
       {coupons.length > 0 && (
-        <TahminOnerileri data={coupons} altiliResults={altiliResults} />
+        <TahminOnerileri data={coupons} altiliResults={altiliResults} isLoggedIn={isLoggedIn} isAdmin={isAdmin} />
       )}
 
       {/* Para Akışı (AGF) */}
