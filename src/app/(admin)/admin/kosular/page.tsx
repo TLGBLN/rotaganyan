@@ -171,7 +171,7 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                       <td className="px-3 py-1.5">{effectiveRunners.length} at</td>
                       <td className="px-3 py-1.5">
                         {effectivePred ? (
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <Link
                               href={`/admin/analizler/${effectivePred.id}`}
                               className={cn(
@@ -180,6 +180,13 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                               )}
                             >
                               {effectivePred.published ? "Yayında" : "Taslak"}
+                            </Link>
+                            <Link
+                              href={`/admin/analizler/yeni?kosu=${effectiveRaceId}`}
+                              className="text-muted-foreground hover:text-brand"
+                              title="Analizi revize et"
+                            >
+                              + Ekle
                             </Link>
                             {effectivePred.picks
                               .filter((p) => p.isTarget)
