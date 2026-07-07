@@ -259,10 +259,14 @@ function RunnerRow({
   isBestTime: boolean;
   isFollowed: boolean;
   onToggleFollow: () => void;
-  jockeyStat?: { wins: number; rides: number };
+  jockeyStat?: JockeyStatRow;
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
+
+  function pct(b: { wins: number; rides: number }) {
+    return Math.round(b.wins / b.rides * 100);
+  }
 
   return (
     <tr
@@ -339,9 +343,25 @@ function RunnerRow({
         {r.jockeyChanged && r.previousJockey && (
           <div className="text-[10px] text-muted-foreground">← {r.previousJockey}</div>
         )}
-        {jockeyStat && jockeyStat.rides >= 5 && (
-          <div className="text-[10px] text-muted-foreground tabular-nums">
-            {jockeyStat.wins}/{jockeyStat.rides}B %{Math.round(jockeyStat.wins / jockeyStat.rides * 100)}
+        {jockeyStat && (
+          <div className="mt-0.5 space-y-0 text-[10px] tabular-nums leading-tight">
+            {jockeyStat.contextFull && jockeyStat.contextFull.rides >= 3 ? (
+              <div className={cn(
+                pct(jockeyStat.contextFull) >= 25 ? "text-hit" :
+                pct(jockeyStat.contextFull) >= 15 ? "text-brand" : "text-muted-foreground"
+              )}>
+                Bu Pist: {jockeyStat.contextFull.wins}/{jockeyStat.contextFull.rides}B %{pct(jockeyStat.contextFull)}
+              </div>
+            ) : jockeyStat.contextHippo && jockeyStat.contextHippo.rides >= 5 ? (
+              <div className="text-muted-foreground">
+                Bu Hipo: {jockeyStat.contextHippo.wins}/{jockeyStat.contextHippo.rides}B %{pct(jockeyStat.contextHippo)}
+              </div>
+            ) : null}
+            {jockeyStat.overall.rides >= 5 && (
+              <div className="text-muted-foreground/70">
+                Genel: {jockeyStat.overall.wins}/{jockeyStat.overall.rides}B %{pct(jockeyStat.overall)}
+              </div>
+            )}
           </div>
         )}
       </td>
@@ -422,10 +442,14 @@ function RunnerCard({
   isBestTime: boolean;
   isFollowed: boolean;
   onToggleFollow: () => void;
-  jockeyStat?: { wins: number; rides: number };
+  jockeyStat?: JockeyStatRow;
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
+
+  function pct(b: { wins: number; rides: number }) {
+    return Math.round(b.wins / b.rides * 100);
+  }
 
   return (
     <div className={cn(
@@ -502,9 +526,19 @@ function RunnerCard({
         {r.jockey && (
           <span className={cn(r.jockeyChanged && "text-orange-500 font-medium")}>
             {r.jockey}
-            {jockeyStat && jockeyStat.rides >= 5 && (
-              <span className="font-normal text-muted-foreground/70">
-                {" "}%{Math.round(jockeyStat.wins / jockeyStat.rides * 100)}
+            {jockeyStat && (
+              <span className="font-normal text-muted-foreground/70 tabular-nums">
+                {jockeyStat.contextFull && jockeyStat.contextFull.rides >= 3
+                  ? <span className={cn(
+                      pct(jockeyStat.contextFull) >= 25 ? "text-hit" :
+                      pct(jockeyStat.contextFull) >= 15 ? "text-brand" : "text-muted-foreground/70"
+                    )}>{" "}%{pct(jockeyStat.contextFull)}P</span>
+                  : jockeyStat.contextHippo && jockeyStat.contextHippo.rides >= 5
+                  ? <>{" "}%{pct(jockeyStat.contextHippo)}H</>
+                  : null}
+                {jockeyStat.overall.rides >= 5
+                  ? <>{" "}%{pct(jockeyStat.overall)}G</>
+                  : null}
               </span>
             )}
             {r.jockeyChanged && r.previousJockey && (
@@ -551,8 +585,20 @@ function RaceTimer({ time, hasResult, dateStr }: { time: string | null; hasResul
   );
 }
 
+type JockeyStatRow = {
+  contextFull?: { wins: number; rides: number };
+  contextHippo?: { wins: number; rides: number };
+  overall: { wins: number; rides: number };
+};
+
+type JockeyStatsMap = Record<string, {
+  overall: { wins: number; rides: number };
+  byHippo: Record<string, { wins: number; rides: number }>;
+  byContext: Record<string, { wins: number; rides: number }>;
+}>;
+
 function RaceTable({
-  race, analysisOpen, onAnalysisToggle, followedSet, onToggleFollow, isLoggedIn, jockeyStats,
+  race, analysisOpen, onAnalysisToggle, followedSet, onToggleFollow, isLoggedIn, jockeyStats, hippodromeSlug,
 }: {
   race: ProgramRace;
   analysisOpen: boolean;
@@ -560,7 +606,8 @@ function RaceTable({
   followedSet: Set<string>;
   onToggleFollow: (horseName: string) => void;
   isLoggedIn: boolean;
-  jockeyStats?: Record<string, { wins: number; rides: number }>;
+  jockeyStats?: JockeyStatsMap;
+  hippodromeSlug?: string;
 }) {
   const surf = surfaceLabel(race.surface);
   const winnerNo = race.result?.winnerNo;
@@ -587,6 +634,19 @@ function RaceTable({
       ekuriColorMap.set(r.no, EKURI_COLORS[(r.ekuriGroup - 1) % EKURI_COLORS.length]);
     }
   });
+
+  // Jokey context stat hesaplayıcı
+  const contextKey = hippodromeSlug ? `${hippodromeSlug}:${race.surface}` : null;
+  function buildJockeyStat(jockey: string | null): JockeyStatRow | undefined {
+    if (!jockey || !jockeyStats) return undefined;
+    const raw = jockeyStats[jockey];
+    if (!raw) return undefined;
+    return {
+      contextFull: contextKey ? raw.byContext[contextKey] : undefined,
+      contextHippo: hippodromeSlug ? raw.byHippo[hippodromeSlug] : undefined,
+      overall: raw.overall,
+    };
+  }
 
   return (
     <div>
@@ -639,7 +699,7 @@ function RaceTable({
                   isBestTime={bestTimeNoSet.has(r.no)}
                   isFollowed={followedSet.has(r.name)}
                   onToggleFollow={() => onToggleFollow(r.name)}
-                  jockeyStat={r.jockey ? jockeyStats?.[r.jockey] : undefined}
+                  jockeyStat={buildJockeyStat(r.jockey)}
                 />
               ))
             )}
@@ -665,7 +725,7 @@ function RaceTable({
               isBestTime={bestTimeNoSet.has(r.no)}
               isFollowed={followedSet.has(r.name)}
               onToggleFollow={() => onToggleFollow(r.name)}
-              jockeyStat={r.jockey ? jockeyStats?.[r.jockey] : undefined}
+              jockeyStat={buildJockeyStat(r.jockey)}
             />
           ))
         )}
@@ -686,7 +746,7 @@ export default function ProgramView({
   dateStr: string;
   followedNames?: string[];
   isLoggedIn?: boolean;
-  jockeyStats?: Record<string, { wins: number; rides: number }>;
+  jockeyStats?: JockeyStatsMap;
 }) {
   const [activeHipo, setActiveHipo] = useState(days[0]?.hippodromeSlug ?? "");
   const [activeRace, setActiveRace] = useState<Record<string, number>>({});
@@ -810,6 +870,7 @@ export default function ProgramView({
               onToggleFollow={handleToggleFollow}
               isLoggedIn={isLoggedIn}
               jockeyStats={jockeyStats}
+              hippodromeSlug={currentDay.hippodromeSlug}
             />
           )}
         </>

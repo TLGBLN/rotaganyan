@@ -663,9 +663,15 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
 
 // ─── Jokey İstatistikleri ─────────────────────────────────────────────────────
 
-export type JockeyStat = { wins: number; rides: number };
+type StatBucket = { wins: number; rides: number };
 
-/** Bu yıla ait galibiyet/biniş sayılarını jokey adına göre döner. */
+export type JockeyStat = {
+  overall: StatBucket;
+  byHippo: Record<string, StatBucket>;          // "ankara"
+  byContext: Record<string, StatBucket>;         // "ankara:CIM"
+};
+
+/** Bu yıla ait galibiyet/biniş istatistiklerini hipodrom+pist kırılımıyla döner. */
 export async function getJockeyStats(names: string[]): Promise<Record<string, JockeyStat>> {
   if (names.length === 0) return {};
 
@@ -682,17 +688,38 @@ export async function getJockeyStats(names: string[]): Promise<Record<string, Jo
     select: {
       jockey: true,
       no: true,
-      race: { select: { result: { select: { winnerNo: true } } } },
+      race: {
+        select: {
+          surface: true,
+          raceDay: { select: { hippodrome: { select: { slug: true } } } },
+          result: { select: { winnerNo: true } },
+        },
+      },
     },
   });
 
   const out: Record<string, JockeyStat> = {};
+
   for (const r of runners) {
     if (!r.jockey) continue;
-    const s = out[r.jockey] ?? { wins: 0, rides: 0 };
-    s.rides++;
-    if (r.race.result?.winnerNo === r.no) s.wins++;
-    out[r.jockey] = s;
+    const isWin = r.race.result?.winnerNo === r.no;
+    const hippoSlug = r.race.raceDay.hippodrome.slug;
+    const contextKey = `${hippoSlug}:${r.race.surface}`;
+
+    if (!out[r.jockey]) out[r.jockey] = { overall: { wins: 0, rides: 0 }, byHippo: {}, byContext: {} };
+    const stat = out[r.jockey];
+
+    stat.overall.rides++;
+    if (isWin) stat.overall.wins++;
+
+    stat.byHippo[hippoSlug] ??= { wins: 0, rides: 0 };
+    stat.byHippo[hippoSlug].rides++;
+    if (isWin) stat.byHippo[hippoSlug].wins++;
+
+    stat.byContext[contextKey] ??= { wins: 0, rides: 0 };
+    stat.byContext[contextKey].rides++;
+    if (isWin) stat.byContext[contextKey].wins++;
   }
+
   return out;
 }
