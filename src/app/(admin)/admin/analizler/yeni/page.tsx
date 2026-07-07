@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
 import { tr } from "date-fns/locale";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
@@ -7,17 +7,25 @@ import { getRaceForAnalysis, getAnalystStats, getClassTypeAdvice } from "@/serve
 import MarkdownRaceInput from "@/components/admin/MarkdownRaceInput";
 import BultenUpload from "@/components/admin/BultenUpload";
 import ClassTypeAdviceCard from "@/components/admin/ClassTypeAdviceCard";
+import { turkeyDateString } from "@/lib/tz";
+import DatePickerNav from "./DatePickerNav";
 
 export const dynamic = "force-dynamic";
 
-type PageProps = { searchParams: Promise<{ kosu?: string; mod?: string }> };
+type PageProps = { searchParams: Promise<{ kosu?: string; mod?: string; tarih?: string }> };
 
 export default async function YeniAnalizPage({ searchParams }: PageProps) {
   const params = await searchParams;
+  const today = turkeyDateString();
+  const tomorrow = turkeyDateString(1);
 
   // Race picker — kosu seçilmemiş
   if (!params.kosu) {
+    const selectedDate = params.tarih ?? today;
+    const date = new Date(selectedDate + "T00:00:00.000Z");
+
     const raceDays = await db.raceDay.findMany({
+      where: { date: { gte: startOfDay(date), lte: endOfDay(date) } },
       include: {
         hippodrome: true,
         races: {
@@ -25,41 +33,53 @@ export default async function YeniAnalizPage({ searchParams }: PageProps) {
           orderBy: { raceNo: "asc" },
         },
       },
-      orderBy: { date: "desc" },
-      take: 10,
+      orderBy: { date: "asc" },
     });
 
     return (
       <div className="space-y-4">
-        <h1 className="text-lg font-bold">Veri Gir — Koşu Seç</h1>
-        <p className="text-xs text-muted-foreground">
-          Markdown veya ekran görüntüsü ile veri gireceğin koşuyu seç.
-        </p>
-        <div className="space-y-4">
-          {raceDays.map((rd) => (
-            <div key={rd.id}>
-              <p className="mb-2 text-sm font-semibold text-muted-foreground">
-                {rd.hippodrome.name} — {format(rd.date, "d MMMM yyyy (EEEE)", { locale: tr })}
-              </p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {rd.races.map((race) => (
-                  <Link
-                    key={race.id}
-                    href={`/admin/analizler/yeni?kosu=${race.id}`}
-                    className={`rounded-lg border px-3 py-2 text-center text-sm transition-colors hover:bg-muted ${
-                      race.prediction ? "border-brand/30 bg-brand/5" : ""
-                    }`}
-                  >
-                    <span className="font-semibold">{race.raceNo}. Koşu</span>
-                    {race.prediction && (
-                      <div className="mt-0.5 text-[10px] text-brand">✓ Analiz var</div>
-                    )}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ))}
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <h1 className="text-lg font-bold">Veri Gir — Koşu Seç</h1>
+          <DatePickerNav selectedDate={selectedDate} today={today} tomorrow={tomorrow} />
         </div>
+        <p className="text-xs text-muted-foreground">
+          Günü seçip analiz gireceğin koşuya tıkla.
+        </p>
+
+        {raceDays.length === 0 ? (
+          <div className="rounded-lg border border-dashed py-12 text-center text-sm text-muted-foreground">
+            Bu tarih için koşu programı bulunamadı.
+            {selectedDate >= today && (
+              <p className="mt-1 text-xs">Program henüz import edilmemiş olabilir.</p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {raceDays.map((rd) => (
+              <div key={rd.id}>
+                <p className="mb-2 text-sm font-semibold text-muted-foreground">
+                  {rd.hippodrome.name} — {format(rd.date, "d MMMM yyyy (EEEE)", { locale: tr })}
+                </p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {rd.races.map((race) => (
+                    <Link
+                      key={race.id}
+                      href={`/admin/analizler/yeni?kosu=${race.id}&tarih=${selectedDate}`}
+                      className={`rounded-lg border px-3 py-2 text-center text-sm transition-colors hover:bg-muted ${
+                        race.prediction ? "border-brand/30 bg-brand/5" : ""
+                      }`}
+                    >
+                      <span className="font-semibold">{race.raceNo}. Koşu</span>
+                      {race.prediction && (
+                        <div className="mt-0.5 text-[10px] text-brand">✓ Analiz var</div>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -71,6 +91,9 @@ export default async function YeniAnalizPage({ searchParams }: PageProps) {
   const mod = params.mod ?? "md"; // default: markdown
   const analystStats = await getAnalystStats();
   const advice = getClassTypeAdvice(analystStats, race.classType);
+  const backHref = params.tarih
+    ? `/admin/analizler/yeni?tarih=${params.tarih}`
+    : "/admin/analizler/yeni";
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
@@ -78,7 +101,7 @@ export default async function YeniAnalizPage({ searchParams }: PageProps) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <Link
-            href="/admin/analizler/yeni"
+            href={backHref}
             className="mb-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
             <ChevronLeft className="h-3.5 w-3.5" /> Koşu Seç
