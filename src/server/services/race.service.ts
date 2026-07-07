@@ -668,6 +668,7 @@ type StatBucket = { wins: number; rides: number };
 export type JockeyStat = {
   overall: StatBucket;
   byHippo: Record<string, StatBucket>;          // "ankara"
+  bySurface: Record<string, StatBucket>;         // "CIM" | "KUM" | "SENTETIK"
   byContext: Record<string, StatBucket>;         // "ankara:CIM"
 };
 
@@ -706,7 +707,7 @@ export async function getJockeyStats(names: string[]): Promise<Record<string, Jo
     const hippoSlug = r.race.raceDay.hippodrome.slug;
     const contextKey = `${hippoSlug}:${r.race.surface}`;
 
-    if (!out[r.jockey]) out[r.jockey] = { overall: { wins: 0, rides: 0 }, byHippo: {}, byContext: {} };
+    if (!out[r.jockey]) out[r.jockey] = { overall: { wins: 0, rides: 0 }, byHippo: {}, bySurface: {}, byContext: {} };
     const stat = out[r.jockey];
 
     stat.overall.rides++;
@@ -715,6 +716,10 @@ export async function getJockeyStats(names: string[]): Promise<Record<string, Jo
     stat.byHippo[hippoSlug] ??= { wins: 0, rides: 0 };
     stat.byHippo[hippoSlug].rides++;
     if (isWin) stat.byHippo[hippoSlug].wins++;
+
+    stat.bySurface[r.race.surface] ??= { wins: 0, rides: 0 };
+    stat.bySurface[r.race.surface].rides++;
+    if (isWin) stat.bySurface[r.race.surface].wins++;
 
     stat.byContext[contextKey] ??= { wins: 0, rides: 0 };
     stat.byContext[contextKey].rides++;
