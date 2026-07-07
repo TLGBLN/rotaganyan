@@ -129,7 +129,12 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                               <span className="font-mono mr-1 tabular-nums">
                                 {pick.runner?.no ?? "—"}
                               </span>
-                              {pick.runner?.name || pick.runnerLabel || "—"}
+                              <span className={cn(pick.runner?.scratched && "line-through opacity-50")}>
+                                {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
+                              </span>
+                              {pick.runner?.scratched && (
+                                <span className="ml-1 text-[10px] font-semibold text-red-400">Koşmaz</span>
+                              )}
                             </td>
                             <td className={cn("px-2 py-1.5 text-center font-mono tabular-nums", textColor, weight)}>
                               {pick.score ?? "—"}
@@ -240,9 +245,12 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                                 <span className={cn("shrink-0 font-mono tabular-nums", weight)}>
                                   {pick.runner?.no ?? "—"}
                                 </span>
-                                <span className={cn(weight)}>
-                                  {pick.runner?.name || pick.runnerLabel || "—"}
+                                <span className={cn(weight, pick.runner?.scratched && "line-through opacity-50")}>
+                                  {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
                                 </span>
+                                {pick.runner?.scratched && (
+                                  <span className="text-[10px] font-semibold text-red-400">Koşmaz</span>
+                                )}
                               </div>
                             </td>
 
