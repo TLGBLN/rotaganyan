@@ -23,6 +23,7 @@ type Selections = Record<number, Record<Width, Set<number>>>;
 const WIDTHS: Width[] = ["narrow", "normal", "wide"];
 const WIDTH_LABEL: Record<Width, string> = { narrow: "Ekonomik", normal: "Normal", wide: "Geniş" };
 const STAKE_PER_COMBINATION = 1.25;
+const LIMITS: Record<Width, number> = { narrow: 600, normal: 1500, wide: 3000 };
 
 function emptySelection(): Record<Width, Set<number>> {
   return { narrow: new Set(), normal: new Set(), wide: new Set() };
@@ -238,19 +239,29 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
 
               {/* Bu altılının canlı özeti — formül: ayaklardaki at sayıları çarpılır × 1.25 */}
               <div className="grid grid-cols-3 gap-3">
-                {WIDTHS.map((width) => (
-                  <div key={width} className="rounded-lg border p-3 text-center">
-                    <div className="text-xs text-muted-foreground">{WIDTH_LABEL[width]}</div>
-                    <div className="mt-1 text-lg font-bold">
-                      {groupAmounts[chunkIdx][width].toLocaleString("tr-TR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}{" "}
-                      ₺
+                {WIDTHS.map((width) => {
+                  const amount = groupAmounts[chunkIdx][width];
+                  const limit = LIMITS[width];
+                  const over = amount > limit;
+                  return (
+                    <div key={width} className={cn("rounded-lg border p-3 text-center transition-colors", over ? "border-red-500/60 bg-red-500/5" : "")}>
+                      <div className="text-xs text-muted-foreground">{WIDTH_LABEL[width]}</div>
+                      <div className={cn("mt-1 text-lg font-bold", over ? "text-red-500" : "")}>
+                        {amount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                      </div>
+                      <div className={cn("text-[10px] mt-0.5", over ? "text-red-500 font-semibold" : "text-muted-foreground")}>
+                        {over ? `⚠ Limit aşıldı! (max ${limit.toLocaleString("tr-TR")} ₺)` : `max ${limit.toLocaleString("tr-TR")} ₺`}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+
+              {WIDTHS.some((w) => groupAmounts[chunkIdx][w] > LIMITS[w]) && (
+                <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-500">
+                  ⚠ Bir veya daha fazla kupon türü limit aşıyor. Kaydetmeden önce seçimleri azaltın.
+                </div>
+              )}
 
               <button
                 type="button"
