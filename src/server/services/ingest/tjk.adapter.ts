@@ -327,7 +327,7 @@ async function fetchCityProgram(
     const raceId = details.parent().attr("id") ?? "";
     const kosuDiv = $(`#kosubilgisi-${raceId}`);
     const table = kosuDiv.find("table.tablesorter").first();
-    const ekuriMap = table.length ? parseEkuriGroups($, kosuDiv) : new Map<number, number>();
+    const ekuriMap = table.length ? parseEkuriGroups($, $(details.parent())) : new Map<number, number>();
     const runners = table.length ? parseRunnersTable($, table, ekuriMap) : [];
 
     races.push({

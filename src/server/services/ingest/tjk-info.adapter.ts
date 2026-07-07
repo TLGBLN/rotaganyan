@@ -168,10 +168,10 @@ export async function fetchCityProgram(
     // ── Runner table and eküri are inside sibling div#kosubilgisi-{raceId} ──────
     const kosuDiv = $(`#kosubilgisi-${raceId}`);
 
-    // Eküri gruplarını kosuDiv içinde ara — tabloyu çıkardıktan sonra kalan metni tara
+    // Eküri metni kosuDiv dışında da olabilir — tüm race pane'de ara
     const ekuriGroups: number[][] = [];
     {
-      const clone = kosuDiv.clone();
+      const clone = $(raceDiv).clone();
       clone.find("table").remove();
       const ekuriText = clone.text().replace(/\s+/g, " ");
       if (/ekür/i.test(ekuriText)) {
