@@ -128,15 +128,46 @@ export default async function GirislerPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold">Kullanıcı Aktivitesi</h1>
-        {activeUsers.length > 0 && (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="h-2 w-2 rounded-full bg-hit animate-pulse" />
-            <span>
-              <strong className="text-foreground">{activeUsers.length}</strong> kullanıcı aktif (son 30 dk)
-            </span>
+      <h1 className="text-lg font-bold">Kullanıcı Aktivitesi</h1>
+
+      {/* Aktif kullanıcılar — her zaman görünür */}
+      <div className="rounded-lg border bg-card p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-hit animate-pulse" />
+          <span className="text-sm font-semibold">
+            Şu An Aktif
+            <span className="ml-2 text-xs font-normal text-muted-foreground">(son 30 dakika)</span>
+          </span>
+          <span className="ml-auto rounded-full bg-hit/15 px-2 py-0.5 text-xs font-bold text-hit">
+            {activeUsers.length}
+          </span>
+        </div>
+        {activeUsers.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {activeUsers.map((v) => (
+              <div
+                key={v.userId}
+                className="flex items-center gap-2 rounded-lg border border-hit/20 bg-hit/5 px-3 py-2 text-xs"
+              >
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand/20 text-[10px] font-bold text-brand shrink-0">
+                  {v.user?.name?.[0]?.toUpperCase() ?? "?"}
+                </div>
+                <div>
+                  <div className="font-semibold text-foreground">
+                    {v.user?.name ?? v.user?.email?.split("@")[0]}
+                    {v.user?.role !== "USER" && (
+                      <span className="ml-1.5 rounded px-1 bg-brand/15 text-brand text-[9px] font-semibold">
+                        {v.user?.role}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">{pathLabel(v.path)}</div>
+                </div>
+              </div>
+            ))}
           </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Son 30 dakikada aktif kullanıcı yok.</p>
         )}
       </div>
 
