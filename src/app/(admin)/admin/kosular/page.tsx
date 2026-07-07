@@ -43,13 +43,25 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
     getAnalystStats(),
   ]);
 
-  // Build lookup: original races "slug:raceNo" → { prediction, raceId }
+  // Build lookup: original races "slug:raceNo" → metadata + prediction
   type RaceRow = (typeof raceDays)[0]["races"][0];
-  const originalByKey = new Map<string, { raceId: string; prediction: RaceRow["prediction"] }>();
+  const originalByKey = new Map<string, {
+    raceId: string;
+    prediction: RaceRow["prediction"];
+    classType: string;
+    distance: number;
+    runners: RaceRow["runners"];
+  }>();
   for (const rd of raceDays) {
     for (const race of rd.races) {
       if (race.conditions == null) {
-        originalByKey.set(`${rd.hippodrome.slug}:${race.raceNo}`, { raceId: race.id, prediction: race.prediction });
+        originalByKey.set(`${rd.hippodrome.slug}:${race.raceNo}`, {
+          raceId: race.id,
+          prediction: race.prediction,
+          classType: race.classType,
+          distance: race.distance,
+          runners: race.runners,
+        });
       }
     }
   }
@@ -103,12 +115,14 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                 </thead>
                 <tbody>
                   {rd.races.map((race, i) => {
-                    const advice = getClassTypeAdvice(analystStats, race.classType);
                     // Karma mirror: find original race's prediction + raceId
                     const karmaRef = race.conditions ? parseConditionsRef(race.conditions) : null;
                     const original = karmaRef ? originalByKey.get(`${karmaRef.slug}:${karmaRef.raceNo}`) : null;
                     const effectivePred = race.prediction ?? original?.prediction ?? null;
                     const effectiveRaceId = original?.raceId ?? race.id;
+                    const effectiveClassType = (race.classType && race.classType !== "—") ? race.classType : (original?.classType ?? race.classType);
+                    const effectiveRunners = race.runners.length > 0 ? race.runners : (original?.runners ?? []);
+                    const advice = getClassTypeAdvice(analystStats, effectiveClassType);
                     return (
                     <tr
                       key={race.id}
@@ -122,7 +136,7 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                       </td>
                       <td className="px-3 py-1.5 text-muted-foreground">
                         <div className="flex items-center gap-1.5">
-                          <span>{race.classType}</span>
+                          <span>{effectiveClassType}</span>
                           <span
                             title={advice.text}
                             className={cn(
@@ -148,7 +162,7 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                           {advice.text}
                         </div>
                       </td>
-                      <td className="px-3 py-1.5">{race.runners.length} at</td>
+                      <td className="px-3 py-1.5">{effectiveRunners.length} at</td>
                       <td className="px-3 py-1.5">
                         {effectivePred ? (
                           <div className="flex items-center gap-1.5">
