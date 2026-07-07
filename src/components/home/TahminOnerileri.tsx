@@ -11,6 +11,17 @@ const STATUS_CLASS: Record<KuponStatus, string> = {
   pending: "bg-muted text-muted-foreground",
 };
 
+function buildTweetText(data: Kupon): string {
+  const visibleVariants = data.variants.filter((v) => v.status !== "miss");
+  const lines: string[] = [`🏇 ${data.hippodromeName}`, ""];
+  for (const variant of visibleVariants) {
+    const legs = variant.legs.map((l) => l.nos.join(",")).join(" | ");
+    lines.push(`${variant.label}: ${legs}`);
+  }
+  lines.push("", "rotaganyan.com/program");
+  return lines.join("\n");
+}
+
 /** "Bursa — 2. Altılı" gibi bir hipodrom etiketinden gerçek TJK Altılı Ganyan ikramiye cümlesini bulur. */
 function findIkramiye(hippodromeName: string, altiliResults: AltiliCityResult[]): string | null {
   const [cityName, altiliLabel] = hippodromeName.split(" — ");
@@ -34,9 +45,22 @@ function KuponBlock({ data, ikramiye }: { data: Kupon; ikramiye: string | null }
   const visibleVariants = data.variants.filter((v) => v.status !== "miss");
   if (visibleVariants.length === 0) return null;
 
+  const tweetUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(buildTweetText(data))}`;
+
   return (
     <div>
-      <div className="mb-3 text-sm font-medium text-muted-foreground">{data.hippodromeName}</div>
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-sm font-medium text-muted-foreground">{data.hippodromeName}</span>
+        <a
+          href={tweetUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-md border border-muted-foreground/25 px-2.5 py-1 text-xs font-semibold hover:bg-muted transition-colors"
+        >
+          <span>𝕏</span>
+          <span>Paylaş</span>
+        </a>
+      </div>
       <div className={cn("grid gap-4", GRID_COLS[visibleVariants.length] ?? "sm:grid-cols-3")}>
         {visibleVariants.map((variant) => (
           <div key={variant.key} className="flex flex-col overflow-hidden rounded-lg border bg-card">
