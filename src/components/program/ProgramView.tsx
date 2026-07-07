@@ -624,13 +624,18 @@ function RaceTable({
   const pistLabel = { CIM: "Çim", SENTETIK: "Snt.", KUM: "Kum" }[race.surface as string] ?? race.surface;
   const hippoShort = hippodromeName?.split(" ")[0] ?? hippodromeSlug ?? "Hipo";
 
-  // Jokey stat — yalnızca bu hipodrom + bu pist kombosuna ait sicil
+  // Jokey stat — önce bu hipodrom+pist kombosuna, bulamazsa genel istatistiğe düşer
   function buildJockeyStat(jockey: string | null): JockeyStatRow | undefined {
     if (!jockey || !jockeyStats || !hippodromeSlug) return undefined;
     const raw = jockeyStats[jockey];
-    const label = `${hippoShort} ${pistLabel}`;
-    const combo = raw?.byContext[`${hippodromeSlug}:${race.surface}`];
-    return { wins: combo?.wins ?? 0, rides: combo?.rides ?? 0, label };
+    if (!raw) return undefined;
+    const combo = raw.byContext[`${hippodromeSlug}:${race.surface}`];
+    if (combo && combo.rides > 0) {
+      return { wins: combo.wins, rides: combo.rides, label: `${hippoShort} ${pistLabel}` };
+    }
+    const overall = raw.overall;
+    if (overall.rides === 0) return undefined;
+    return { wins: overall.wins, rides: overall.rides, label: "Genel" };
   }
 
   return (
