@@ -11,7 +11,7 @@ import {
 } from "@/server/actions/home-kupon.actions";
 
 type Hippodrome = { id: string; name: string; slug: string };
-type RaceRunner = { no: number; name: string };
+type RaceRunner = { no: number; name: string; scratched: boolean; ekuriGroup: number | null };
 type RaceDayData = {
   hippodromeName: string;
   races: { raceNo: number; runners: RaceRunner[] }[];
@@ -213,10 +213,13 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
                                     <button
                                       key={runner.no}
                                       type="button"
-                                      onClick={() => toggleHorse(race.raceNo, width, runner.no)}
+                                      onClick={() => !runner.scratched && toggleHorse(race.raceNo, width, runner.no)}
+                                      disabled={runner.scratched}
                                       className={cn(
                                         "flex items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-xs transition-colors",
-                                        checked
+                                        runner.scratched
+                                          ? "border-muted-foreground/15 opacity-50 cursor-not-allowed"
+                                          : checked
                                           ? "border-brand bg-brand text-brand-foreground"
                                           : "border-muted-foreground/30 text-muted-foreground hover:border-brand/50 hover:text-foreground"
                                       )}
@@ -224,7 +227,12 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
                                       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-black/10 font-bold">
                                         {runner.no}
                                       </span>
-                                      <span className="truncate font-medium">{runner.name}</span>
+                                      <span className={cn("truncate font-medium", runner.scratched && "line-through")}>
+                                        {runner.name}
+                                      </span>
+                                      {runner.ekuriGroup != null && (
+                                        <span title={`Eküri grubu ${runner.ekuriGroup}`} className="ml-auto shrink-0 text-[10px]">🐴</span>
+                                      )}
                                     </button>
                                   );
                                 })}

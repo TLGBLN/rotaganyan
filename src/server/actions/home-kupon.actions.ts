@@ -39,7 +39,7 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
       hippodrome: true,
       races: {
         include: {
-          runners: { orderBy: { no: "asc" }, select: { id: true, no: true, name: true } },
+          runners: { orderBy: { no: "asc" }, select: { id: true, no: true, name: true, scratched: true, ekuriGroup: true } },
           prediction: {
             select: {
               picks: {
@@ -58,10 +58,11 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
   // Karma altılılarda her koşu başka bir hipodromun aynasıdır (conditions = "İstanbul 8. Koşu" gibi).
   // Bu yarışların kendi prediction'ı olmaz; at sıralaması için kaynak yarışın pick'leri bulunur.
   const karmaRaces = raceDay.races.filter((r) => !r.prediction && r.conditions);
-  const sourcePicksById = new Map<string, { rank: number; runnerId: string }[]>();
 
-  // rankByNo: Karma yarışlar için at numarası → analiz sırası eşlemesi
+  // rankByNo: Karma yarışlar için at numarası → analiz sırası
   const rankByNoById = new Map<string, Map<number, number>>();
+  // metaByNo: Karma yarışlar için at numarası → { scratched, ekuriGroup }
+  const metaByNoById = new Map<string, Map<number, { scratched: boolean; ekuriGroup: number | null }>>();
 
   if (karmaRaces.length > 0) {
     // conditions → "HipodromAdı RaceNo. Koşu" formatından parse et
@@ -81,7 +82,7 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
         },
         include: {
           raceDay: { include: { hippodrome: { select: { name: true } } } },
-          runners: { select: { id: true, no: true } },
+          runners: { select: { id: true, no: true, scratched: true, ekuriGroup: true } },
           prediction: {
             select: {
               picks: { orderBy: { rank: "asc" }, select: { rank: true, runnerId: true } },
@@ -107,6 +108,13 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
           if (no != null) noToRank.set(no, pick.rank);
         }
         rankByNoById.set(src.raceId, noToRank);
+
+        // at no → meta
+        const noToMeta = new Map<number, { scratched: boolean; ekuriGroup: number | null }>();
+        for (const ru of match.runners) {
+          noToMeta.set(ru.no, { scratched: ru.scratched, ekuriGroup: ru.ekuriGroup });
+        }
+        metaByNoById.set(src.raceId, noToMeta);
       }
     }
   }
@@ -136,7 +144,15 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
       });
       return {
         raceNo: r.raceNo,
-        runners: runners.map((runner) => ({ no: runner.no, name: runner.name })),
+        runners: runners.map((runner) => {
+          const karmaMeta = metaByNoById.get(r.id)?.get(runner.no);
+          return {
+            no: runner.no,
+            name: runner.name,
+            scratched: karmaMeta?.scratched ?? runner.scratched,
+            ekuriGroup: karmaMeta?.ekuriGroup ?? runner.ekuriGroup,
+          };
+        }),
       };
     }),
   };
