@@ -25,6 +25,7 @@ export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
       include: {
         prediction: {
           select: {
+            id: true;
             published: true;
             confidence: true;
             isBanko: true;
@@ -39,7 +40,7 @@ export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
                 isTarget: true;
                 runnerLabel: true;
                 details: true;
-                runner: { select: { name: true; no: true; jockeyChanged: true; previousJockey: true } };
+                runner: { select: { name: true; no: true; jockeyChanged: true; previousJockey: true; scratched: true } };
               };
             };
           };
@@ -108,6 +109,7 @@ export async function getRaceDaysByDate(
         include: {
           prediction: {
             select: {
+              id: true,
               published: true,
               confidence: true,
               isBanko: true,
@@ -122,7 +124,7 @@ export async function getRaceDaysByDate(
                   isTarget: true,
                   runnerLabel: true,
                   details: true,
-                  runner: { select: { name: true, no: true, jockeyChanged: true, previousJockey: true } },
+                  runner: { select: { name: true, no: true, jockeyChanged: true, previousJockey: true, scratched: true } },
                 },
               },
             },

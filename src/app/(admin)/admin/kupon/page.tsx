@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { getHippodromes, getRaceDaysByDate } from "@/server/services/race.service";
-import { getAdminRaceDays, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
+import { getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
 
 import { turkeyDateString } from "@/lib/tz";
 import PuanTablosu from "@/components/kosular/PuanTablosu";
@@ -28,13 +28,26 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
   const { tarih } = await searchParams;
   const today = turkeyDateString();
   const currentDate = tarih ?? today;
-  const [kuponlar, hippodromes, raceDays, adminRaceDays, analystStats] = await Promise.all([
+
+  const [kuponlar, hippodromes, raceDays, analystStats] = await Promise.all([
     db.homeKupon.findMany({ orderBy: { createdAt: "desc" }, take: 20 }),
     getHippodromes(),
     getRaceDaysByDate(currentDate),
-    getAdminRaceDays(currentDate),
     getAnalystStats(),
   ]);
+
+  // Koşucu sayısı — programRunner'dan hızlı toplu sorgu
+  const raceIds = raceDays.flatMap((rd) => rd.races.map((r) => r.id));
+  const runnerCountRows = raceIds.length > 0
+    ? await db.runner.groupBy({
+        by: ["raceId"],
+        where: { raceId: { in: raceIds } },
+        _count: { id: true },
+      })
+    : [];
+  const runnerCountMap = new Map(
+    runnerCountRows.map((r: { raceId: string; _count: { id: number } }) => [r.raceId, r._count.id])
+  );
 
   return (
     <div className="space-y-6">
@@ -44,10 +57,12 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
       </div>
 
       {/* ── Koşu Programı Özeti ── */}
-      {adminRaceDays.length > 0 && (
+      {raceDays.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Koşu Programı</h2>
-          {adminRaceDays.map((rd) => (
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Koşu Programı
+          </h2>
+          {raceDays.map((rd) => (
             <div key={rd.id} className="rounded-lg border text-xs">
               <div className="border-b bg-muted/30 px-3 py-1.5 text-sm font-semibold">
                 {rd.hippodrome.name}
@@ -67,6 +82,7 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                   <tbody>
                     {rd.races.map((race, i) => {
                       const advice = getClassTypeAdvice(analystStats, race.classType);
+                      const runnerCount = runnerCountMap.get(race.id) ?? 0;
                       return (
                         <tr
                           key={race.id}
@@ -75,7 +91,9 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                           <td className="px-3 py-1.5 font-semibold">
                             {race.raceNo}
                             {race.conditions && (
-                              <div className="text-[10px] font-normal text-muted-foreground">{race.conditions}</div>
+                              <div className="text-[10px] font-normal text-muted-foreground">
+                                {race.conditions}
+                              </div>
                             )}
                           </td>
                           <td className="px-3 py-1.5 text-muted-foreground">{race.time ?? "—"}</td>
@@ -92,7 +110,13 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                                   advice.level === "none" && "bg-muted text-muted-foreground"
                                 )}
                               >
-                                {advice.level === "warn" ? "!" : advice.level === "good" ? "✓" : advice.level === "none" ? "–" : "i"}
+                                {advice.level === "warn"
+                                  ? "!"
+                                  : advice.level === "good"
+                                  ? "✓"
+                                  : advice.level === "none"
+                                  ? "–"
+                                  : "i"}
                               </span>
                             </div>
                             <div
@@ -108,7 +132,7 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                             </div>
                           </td>
                           <td className="px-3 py-1.5 text-muted-foreground">{race.distance}m</td>
-                          <td className="px-3 py-1.5">{race.runners.length}</td>
+                          <td className="px-3 py-1.5">{runnerCount}</td>
                           <td className="px-3 py-1.5">
                             {race.prediction ? (
                               <div className="flex flex-wrap items-center gap-1">
