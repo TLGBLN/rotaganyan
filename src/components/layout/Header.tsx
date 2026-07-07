@@ -23,7 +23,7 @@ export default async function Header() {
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4">
         {/* Logo */}
-        <Link href="/" className="flex shrink-0 items-center gap-2.5">
+        <Link href="/program" className="flex shrink-0 items-center gap-2.5">
           <span className="text-base font-bold tracking-tight leading-none">
             <span className="text-white">ROTA</span>
             <span
