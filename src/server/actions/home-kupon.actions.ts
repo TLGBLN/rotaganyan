@@ -28,9 +28,11 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
   await requireRole("EDITOR");
 
   const date = new Date(dateStr + "T00:00:00.000Z");
+  const dayEnd = new Date(date.getTime() + 86_400_000);
+
   const raceDay = await db.raceDay.findFirst({
     where: {
-      date: { gte: date, lt: new Date(date.getTime() + 86_400_000) },
+      date: { gte: date, lt: dayEnd },
       hippodrome: { slug: hippodromeSlug },
     },
     include: {
@@ -53,14 +55,78 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
   });
   if (!raceDay) return null;
 
+  // Karma altılılarda her koşu başka bir hipodromun aynasıdır (conditions = "İstanbul 8. Koşu" gibi).
+  // Bu yarışların kendi prediction'ı olmaz; at sıralaması için kaynak yarışın pick'leri bulunur.
+  const karmaRaces = raceDay.races.filter((r) => !r.prediction && r.conditions);
+  const sourcePicksById = new Map<string, { rank: number; runnerId: string }[]>();
+
+  // rankByNo: Karma yarışlar için at numarası → analiz sırası eşlemesi
+  const rankByNoById = new Map<string, Map<number, number>>();
+
+  if (karmaRaces.length > 0) {
+    // conditions → "HipodromAdı RaceNo. Koşu" formatından parse et
+    const parsedSources = karmaRaces.flatMap((r) => {
+      const m = r.conditions?.match(/^(.+?)\s+(\d+)\.\s*Ko[şs]u/i);
+      if (!m) return [];
+      return [{ raceId: r.id, hippodromeName: m[1].trim(), raceNo: parseInt(m[2], 10) }];
+    });
+
+    if (parsedSources.length > 0) {
+      // Kaynak yarışları + runner'larını + pick'lerini tek sorguda çek
+      const sourceRaces = await db.race.findMany({
+        where: {
+          raceDay: { date: { gte: date, lt: dayEnd } },
+          raceNo: { in: parsedSources.map((s) => s.raceNo) },
+          prediction: { isNot: null },
+        },
+        include: {
+          raceDay: { include: { hippodrome: { select: { name: true } } } },
+          runners: { select: { id: true, no: true } },
+          prediction: {
+            select: {
+              picks: { orderBy: { rank: "asc" }, select: { rank: true, runnerId: true } },
+            },
+          },
+        },
+      });
+
+      for (const src of parsedSources) {
+        const match = sourceRaces.find(
+          (sr) =>
+            sr.raceNo === src.raceNo &&
+            sr.raceDay.hippodrome.name.toLowerCase().includes(src.hippodromeName.toLowerCase())
+        );
+        if (!match?.prediction) continue;
+
+        // Kaynak runner ID'den at numarasına map oluştur, sonra no→rank yap
+        const runnerIdToNo = new Map(match.runners.map((ru) => [ru.id, ru.no]));
+        const noToRank = new Map<number, number>();
+        for (const pick of match.prediction.picks) {
+          const no = runnerIdToNo.get(pick.runnerId);
+          if (no != null) noToRank.set(no, pick.rank);
+        }
+        rankByNoById.set(src.raceId, noToRank);
+      }
+    }
+  }
+
   return {
     hippodromeName: raceDay.hippodrome.name,
     races: raceDay.races.map((r) => {
-      const picks = r.prediction?.picks ?? [];
-      const rankByRunnerId = new Map(picks.map((p) => [p.runnerId, p.rank]));
+      // Kendi prediction'ı varsa runnerId bazlı, Karma aynasıysa no bazlı sırala
+      let rankByRunnerId: Map<string, number> | null = null;
+      let rankByNo: Map<number, number> | null = null;
+
+      if (r.prediction) {
+        const picks = r.prediction.picks;
+        rankByRunnerId = new Map(picks.map((p) => [p.runnerId, p.rank]));
+      } else {
+        rankByNo = rankByNoById.get(r.id) ?? null;
+      }
+
       const runners = [...r.runners].sort((a, b) => {
-        const rankA = rankByRunnerId.get(a.id) ?? Infinity;
-        const rankB = rankByRunnerId.get(b.id) ?? Infinity;
+        const rankA = rankByRunnerId?.get(a.id) ?? rankByNo?.get(a.no) ?? Infinity;
+        const rankB = rankByRunnerId?.get(b.id) ?? rankByNo?.get(b.no) ?? Infinity;
         if (rankA !== rankB) return rankA - rankB;
         return a.no - b.no;
       });
