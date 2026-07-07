@@ -62,6 +62,14 @@ export default async function ProgramPage({ searchParams }: PageProps) {
   const isAdmin = session?.user?.role ? hasRole(session.user.role as Role, "EDITOR") : false;
   const followedNames = followedHorses.map((h) => h.horseName);
 
+  // Üye olmayanlar için picks verisi client'a gönderilmez
+  const viewDays = isLoggedIn
+    ? days
+    : days.map((d) => ({
+        ...d,
+        races: d.races.map((r) => ({ ...r, picks: [] as typeof r.picks })),
+      }));
+
   return (
     <div className="mx-auto max-w-[1400px] px-3 py-4 space-y-6">
       {/* Haber Akışı */}
@@ -77,7 +85,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
           <DateNavigator currentDate={currentDate} basePath="/program" />
         </div>
         <div className="rounded-lg border overflow-hidden">
-          <ProgramView days={days} dateStr={currentDate} followedNames={followedNames} isLoggedIn={isLoggedIn} />
+          <ProgramView days={viewDays} dateStr={currentDate} followedNames={followedNames} isLoggedIn={isLoggedIn} />
         </div>
       </div>
 

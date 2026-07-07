@@ -120,7 +120,7 @@ function veriGuvenColor(vg: string | undefined) {
 
 // ── Analiz paneli ────────────────────────────────────────────────────────────
 
-function AnalysisPanel({ picks, winnerNo }: { picks: ProgramPick[]; winnerNo?: number | null }) {
+function AnalysisPanel({ picks, winnerNo, isLoggedIn }: { picks: ProgramPick[]; winnerNo?: number | null; isLoggedIn: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -140,6 +140,25 @@ function AnalysisPanel({ picks, winnerNo }: { picks: ProgramPick[]; winnerNo?: n
     }
     requestAnimationFrame(step);
   }, []);
+
+  if (!isLoggedIn) {
+    return (
+      <div ref={ref} className="border-t px-4 py-10 text-center">
+        <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
+          <span className="text-2xl">🔒</span>
+          <p className="font-medium">Analizi görmek için üye olmalısınız.</p>
+          <div className="flex gap-2">
+            <a href="/giris?callbackUrl=%2Fprogram" className="rounded-md bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground hover:bg-brand/90">
+              Giriş Yap
+            </a>
+            <a href="/kayit" className="rounded-md border px-4 py-2 text-xs font-semibold hover:bg-muted">
+              Kayıt Ol
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} className="border-t">
@@ -521,13 +540,14 @@ function RaceTimer({ time, hasResult, dateStr }: { time: string | null; hasResul
 }
 
 function RaceTable({
-  race, analysisOpen, onAnalysisToggle, followedSet, onToggleFollow,
+  race, analysisOpen, onAnalysisToggle, followedSet, onToggleFollow, isLoggedIn,
 }: {
   race: ProgramRace;
   analysisOpen: boolean;
   onAnalysisToggle: () => void;
   followedSet: Set<string>;
   onToggleFollow: (horseName: string) => void;
+  isLoggedIn: boolean;
 }) {
   const surf = surfaceLabel(race.surface);
   const winnerNo = race.result?.winnerNo;
@@ -637,7 +657,7 @@ function RaceTable({
       </div>
 
       {/* Analiz paneli */}
-      {race.hasAnalysis && analysisOpen && <AnalysisPanel picks={race.picks} winnerNo={winnerNo} />}
+      {race.hasAnalysis && analysisOpen && <AnalysisPanel picks={race.picks} winnerNo={winnerNo} isLoggedIn={isLoggedIn} />}
     </div>
   );
 }
@@ -747,21 +767,14 @@ export default function ProgramView({
             </div>
             <div className="flex items-center gap-3">
               {currentRace?.hasAnalysis ? (
-                isLoggedIn ? (
-                  <button
-                    onClick={() => setAnalysisOpen((v) => !v)}
-                    className="flex items-center gap-1 rounded-md bg-[#00944D] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90"
-                  >
-                    Analizi Gör {analysisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                  </button>
-                ) : (
-                  <a
-                    href={`/giris?callbackUrl=${encodeURIComponent("/program")}`}
-                    className="flex items-center gap-1 rounded-md bg-[#00944D] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90"
-                  >
-                    Analizi Gör 🔒
-                  </a>
-                )
+                <button
+                  onClick={() => setAnalysisOpen((v) => !v)}
+                  className="flex items-center gap-1 rounded-md bg-[#00944D] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90"
+                >
+                  {isLoggedIn
+                    ? <>Analizi Gör {analysisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}</>
+                    : "Analizi Gör 🔒"}
+                </button>
               ) : (
                 <span className="text-xs font-semibold text-[#e74c3c]">Analiz Hazırlanıyor</span>
               )}
@@ -779,6 +792,7 @@ export default function ProgramView({
               onAnalysisToggle={() => setAnalysisOpen((v) => !v)}
               followedSet={followedSet}
               onToggleFollow={handleToggleFollow}
+              isLoggedIn={isLoggedIn}
             />
           )}
         </>
