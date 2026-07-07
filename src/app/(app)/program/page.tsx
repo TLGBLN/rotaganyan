@@ -100,7 +100,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
       {(agfMovers.risers.length > 0 || agfMovers.fallers.length > 0) && (
         <div>
           <h2 className="text-base font-semibold mb-3">Para Akışı (AGF)</h2>
-          <SteamWidget movers={agfMovers} dateStr={today} />
+          <SteamWidget movers={agfMovers} />
         </div>
       )}
 

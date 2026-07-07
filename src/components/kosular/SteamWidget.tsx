@@ -1,16 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { TrendingUp, TrendingDown, Flag, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AgfMovers, Steamer } from "@/server/services/agf-trend.service";
 
-function MoverRow({ s, rank, dateStr, rising }: { s: Steamer; rank: number; dateStr: string; rising: boolean }) {
+function MoverRow({ s, rank, rising }: { s: Steamer; rank: number; rising: boolean }) {
   return (
-    <Link
-      href={`/kosular/${dateStr}/${s.hippodromeSlug}/${s.raceNo}`}
-      className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-muted/40"
+    <div
+      className="flex items-center gap-3 px-4 py-2.5 text-sm"
     >
       <span
         className={cn(
@@ -44,11 +42,11 @@ function MoverRow({ s, rank, dateStr, rising }: { s: Steamer; rank: number; date
       <span className="hidden w-16 shrink-0 text-right text-[10px] italic text-muted-foreground sm:inline">
         {s.resulted ? "Koşuldu" : "Bekliyor"}
       </span>
-    </Link>
+    </div>
   );
 }
 
-function MoverCard({ title, items, dateStr, rising }: { title: string; items: Steamer[]; dateStr: string; rising: boolean }) {
+function MoverCard({ title, items, rising }: { title: string; items: Steamer[]; rising: boolean }) {
   const [open, setOpen] = useState(true);
   if (items.length === 0) return null;
 
@@ -78,7 +76,7 @@ function MoverCard({ title, items, dateStr, rising }: { title: string; items: St
       {open && (
         <div className="divide-y border-t">
           {items.map((s, i) => (
-            <MoverRow key={s.runnerId} s={s} rank={i + 1} dateStr={dateStr} rising={rising} />
+            <MoverRow key={s.runnerId} s={s} rank={i + 1} rising={rising} />
           ))}
         </div>
       )}
@@ -86,14 +84,14 @@ function MoverCard({ title, items, dateStr, rising }: { title: string; items: St
   );
 }
 
-export default function SteamWidget({ movers, dateStr }: { movers: AgfMovers; dateStr: string }) {
+export default function SteamWidget({ movers }: { movers: AgfMovers }) {
   if (movers.risers.length === 0 && movers.fallers.length === 0) return null;
 
   return (
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
-        <MoverCard title="AGF Yükselen" items={movers.risers} dateStr={dateStr} rising />
-        <MoverCard title="AGF Düşen" items={movers.fallers} dateStr={dateStr} rising={false} />
+        <MoverCard title="AGF Yükselen" items={movers.risers} rising />
+        <MoverCard title="AGF Düşen" items={movers.fallers} rising={false} />
       </div>
       <p className="px-1 text-[11px] text-muted-foreground">
         Günün ilk ve son AGF senkronizasyonu arasındaki değişim — yükseliş favoriye giren parayı, düşüş soğumayı
