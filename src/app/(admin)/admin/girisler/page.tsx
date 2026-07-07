@@ -32,10 +32,20 @@ const COUNTRY_FLAG: Record<string, string> = {
 };
 
 export default async function GirislerPage() {
-  const logs = await db.loginLog.findMany({
+  const rawLogs = await db.loginLog.findMany({
     orderBy: { createdAt: "desc" },
-    take: 200,
+    take: 500,
     include: { user: { select: { name: true, role: true } } },
+  });
+
+  // Deduplicate: same email + IP + minute window + result → keep first (most recent)
+  const seen = new Set<string>();
+  const logs = rawLogs.filter((log) => {
+    const minute = Math.floor(log.createdAt.getTime() / 60_000);
+    const key = `${log.email}|${log.ip ?? ""}|${minute}|${log.success}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
   });
 
   const totalToday = logs.filter(
@@ -50,7 +60,7 @@ export default async function GirislerPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-bold">Giriş Logları</h1>
-        <span className="text-xs text-muted-foreground">Son 200 kayıt</span>
+        <span className="text-xs text-muted-foreground">Son {logs.length} kayıt (tekrarlar gizlendi)</span>
       </div>
 
       {/* Özet */}
