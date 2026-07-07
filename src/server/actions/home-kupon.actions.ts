@@ -29,7 +29,10 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
 
   const date = new Date(dateStr + "T00:00:00.000Z");
   const raceDay = await db.raceDay.findFirst({
-    where: { date, hippodrome: { slug: hippodromeSlug } },
+    where: {
+      date: { gte: date, lt: new Date(date.getTime() + 86_400_000) },
+      hippodrome: { slug: hippodromeSlug },
+    },
     include: {
       hippodrome: true,
       races: {
@@ -37,7 +40,6 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
           runners: { orderBy: { no: "asc" }, select: { id: true, no: true, name: true } },
           prediction: {
             select: {
-              published: true,
               picks: {
                 orderBy: { rank: "asc" },
                 select: { rank: true, runnerId: true },
@@ -54,7 +56,7 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
   return {
     hippodromeName: raceDay.hippodrome.name,
     races: raceDay.races.map((r) => {
-      const picks = r.prediction?.published ? r.prediction.picks : [];
+      const picks = r.prediction?.picks ?? [];
       const rankByRunnerId = new Map(picks.map((p) => [p.runnerId, p.rank]));
       const runners = [...r.runners].sort((a, b) => {
         const rankA = rankByRunnerId.get(a.id) ?? Infinity;
