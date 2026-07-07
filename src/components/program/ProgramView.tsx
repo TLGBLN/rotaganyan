@@ -350,16 +350,16 @@ function RunnerRow({
                 pct(jockeyStat.contextFull) >= 25 ? "text-hit" :
                 pct(jockeyStat.contextFull) >= 15 ? "text-brand" : "text-muted-foreground"
               )}>
-                Bu Pist: {jockeyStat.contextFull.wins}/{jockeyStat.contextFull.rides}B %{pct(jockeyStat.contextFull)}
+                Bu Pist '26: {jockeyStat.contextFull.wins}/{jockeyStat.contextFull.rides}B %{pct(jockeyStat.contextFull)}
               </div>
             ) : jockeyStat.contextHippo && jockeyStat.contextHippo.rides >= 5 ? (
               <div className="text-muted-foreground">
-                Bu Hipo: {jockeyStat.contextHippo.wins}/{jockeyStat.contextHippo.rides}B %{pct(jockeyStat.contextHippo)}
+                Bu Hipo '26: {jockeyStat.contextHippo.wins}/{jockeyStat.contextHippo.rides}B %{pct(jockeyStat.contextHippo)}
               </div>
             ) : null}
             {jockeyStat.overall.rides >= 5 && (
               <div className="text-muted-foreground/70">
-                Genel: {jockeyStat.overall.wins}/{jockeyStat.overall.rides}B %{pct(jockeyStat.overall)}
+                Genel '26: {jockeyStat.overall.wins}/{jockeyStat.overall.rides}B %{pct(jockeyStat.overall)}
               </div>
             )}
           </div>
@@ -532,12 +532,12 @@ function RunnerCard({
                   ? <span className={cn(
                       pct(jockeyStat.contextFull) >= 25 ? "text-hit" :
                       pct(jockeyStat.contextFull) >= 15 ? "text-brand" : "text-muted-foreground/70"
-                    )}>{" "}%{pct(jockeyStat.contextFull)}P</span>
+                    )} title="Bu pist '26 galibiyeti">{" "}%{pct(jockeyStat.contextFull)}P</span>
                   : jockeyStat.contextHippo && jockeyStat.contextHippo.rides >= 5
-                  ? <>{" "}%{pct(jockeyStat.contextHippo)}H</>
+                  ? <span title="Bu hipodrom '26 galibiyeti">{" "}%{pct(jockeyStat.contextHippo)}H</span>
                   : null}
                 {jockeyStat.overall.rides >= 5
-                  ? <>{" "}%{pct(jockeyStat.overall)}G</>
+                  ? <span title="Genel '26 galibiyeti">{" "}%{pct(jockeyStat.overall)}G</span>
                   : null}
               </span>
             )}
