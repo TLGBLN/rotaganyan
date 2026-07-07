@@ -265,7 +265,7 @@ function RunnerRow({
   const surfaces = (r.recentFormSurfaces ?? "").split("");
 
   function pct(b: { wins: number; rides: number }) {
-    return Math.round(b.wins / b.rides * 100);
+    return b.rides === 0 ? 0 : Math.round(b.wins / b.rides * 100);
   }
 
   return (
@@ -436,7 +436,7 @@ function RunnerCard({
   const surfaces = (r.recentFormSurfaces ?? "").split("");
 
   function pct(b: { wins: number; rides: number }) {
-    return Math.round(b.wins / b.rides * 100);
+    return b.rides === 0 ? 0 : Math.round(b.wins / b.rides * 100);
   }
 
   return (
@@ -628,10 +628,9 @@ function RaceTable({
   function buildJockeyStat(jockey: string | null): JockeyStatRow | undefined {
     if (!jockey || !jockeyStats || !hippodromeSlug) return undefined;
     const raw = jockeyStats[jockey];
-    if (!raw) return undefined;
-    const combo = raw.byContext[`${hippodromeSlug}:${race.surface}`];
-    if (!combo || combo.rides === 0) return undefined;
-    return { ...combo, label: `${hippoShort} ${pistLabel}` };
+    const label = `${hippoShort} ${pistLabel}`;
+    const combo = raw?.byContext[`${hippodromeSlug}:${race.surface}`];
+    return { wins: combo?.wins ?? 0, rides: combo?.rides ?? 0, label };
   }
 
   return (
