@@ -1,7 +1,7 @@
 "use client";
 
 import { useForm, useFieldArray } from "react-hook-form";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { upsertPrediction } from "@/server/actions/prediction.actions";
@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { Confidence, PedigreeRating, Prisma } from "@prisma/client";
+import type { AIAnalysisResult } from "./AIAnalysisPanel";
 import { Loader2 } from "lucide-react";
 import PublishChecklist from "./PublishChecklist";
 
@@ -45,6 +46,8 @@ type FormData = {
 type Props = {
   raceId: string;
   runners: Runner[];
+  aiResult?: AIAnalysisResult | null;
+  aiRunners?: { id: string; no: number; name: string }[];
   existingPrediction?: {
     id: string;
     confidence: Confidence;
@@ -82,10 +85,11 @@ const PEDIGREE_LABEL: Record<PedigreeRating, string> = {
   BILINMIYOR: "Bilinmiyor",
 };
 
-export default function PredictionForm({ raceId, runners, existingPrediction }: Props) {
+export default function PredictionForm({ raceId, runners, existingPrediction, aiResult, aiRunners }: Props) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [savedId, setSavedId] = useState(existingPrediction?.id ?? null);
+  const prevAiResult = useRef<AIAnalysisResult | null | undefined>(null);
 
   const defaultPicks: PickFormData[] = existingPrediction?.picks.map((p) => ({
     rank: p.rank,
@@ -117,6 +121,34 @@ export default function PredictionForm({ raceId, runners, existingPrediction }: 
 
   const { fields } = useFieldArray({ control, name: "picks" });
   const isBanko = watch("isBanko");
+
+  // AI sonucu gelince formu doldur
+  useEffect(() => {
+    if (!aiResult || aiResult === prevAiResult.current) return;
+    prevAiResult.current = aiResult;
+    const runnersMap = new Map((aiRunners ?? []).map((r) => [r.no, r]));
+    const aiPicks: PickFormData[] = aiResult.picks.slice(0, 3).map((p) => {
+      const runner = runnersMap.get(p.no) ?? runners.find((r) => r.no === p.no);
+      return {
+        rank: p.rank,
+        runnerId: runner?.id ?? "",
+        runnerLabel: runner ? `#${runner.no} ${runner.name}` : `#${p.no} ${p.name}`,
+        score: p.score,
+        isTarget: p.isTarget,
+        pedigreeRating: p.pedigreeRating,
+        details: p.details.join(", "),
+      };
+    });
+    setValue("picks", aiPicks);
+    setValue("confidence", aiResult.confidence);
+    setValue("notes", aiResult.notes);
+    setValue("tempo", aiResult.tempo);
+    setValue("isBanko", aiResult.isBanko);
+    setValue("bankoNote", aiResult.bankoNote);
+    setValue("couponNarrow", aiResult.couponNarrow);
+    setValue("couponNormal", aiResult.couponNormal);
+    setValue("couponWide", aiResult.couponWide);
+  }, [aiResult, aiRunners, runners, setValue]);
 
   async function onSubmit(data: FormData) {
     setSubmitting(true);

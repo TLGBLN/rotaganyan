@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { getAdminPredictionById, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
-import PredictionForm from "@/components/admin/PredictionForm";
+import SmartAnalysisEditor from "@/components/admin/SmartAnalysisEditor";
 import PublishChecklist from "@/components/admin/PublishChecklist";
 import MarkdownRaceInput from "@/components/admin/MarkdownRaceInput";
 import DeletePredictionButton from "@/components/admin/DeletePredictionButton";
@@ -47,7 +47,7 @@ export default async function EditAnalizPage({ params }: PageProps) {
       />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-        <PredictionForm
+        <SmartAnalysisEditor
           raceId={race.id}
           runners={race.runners}
           existingPrediction={pred}
