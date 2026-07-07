@@ -630,7 +630,7 @@ function RaceTable({
     const raw = jockeyStats[jockey];
     if (!raw) return undefined;
     const combo = raw.byContext[`${hippodromeSlug}:${race.surface}`];
-    if (!combo || combo.rides < 3) return undefined;
+    if (!combo || combo.rides === 0) return undefined;
     return { ...combo, label: `${hippoShort} ${pistLabel}` };
   }
 

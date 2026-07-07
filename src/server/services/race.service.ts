@@ -728,3 +728,52 @@ export async function getJockeyStats(names: string[]): Promise<Record<string, Jo
 
   return out;
 }
+
+export type JockeyRow = {
+  jockey: string;
+  wins: number;
+  rides: number;
+  winPct: number;
+};
+
+/** Admin jokey veri sayfası için tüm jokeyler — hipodrom ve pist filtresiyle. */
+export async function getAllJockeyStats(params: {
+  hippoSlug?: string;
+  surface?: string;
+  year?: number;
+}): Promise<JockeyRow[]> {
+  const year = params.year ?? new Date().getFullYear();
+  const since = new Date(`${year}-01-01T00:00:00Z`);
+
+  const runners = await db.runner.findMany({
+    where: {
+      jockey: { not: null },
+      race: {
+        ...(params.surface ? { surface: params.surface as "CIM" | "KUM" | "SENTETIK" } : {}),
+        raceDay: {
+          date: { gte: since },
+          ...(params.hippoSlug ? { hippodrome: { slug: params.hippoSlug } } : {}),
+        },
+        result: { isNot: null },
+      },
+    },
+    select: {
+      jockey: true,
+      no: true,
+      race: { select: { result: { select: { winnerNo: true } } } },
+    },
+  });
+
+  const agg: Record<string, { wins: number; rides: number }> = {};
+  for (const r of runners) {
+    if (!r.jockey) continue;
+    const s = agg[r.jockey] ?? { wins: 0, rides: 0 };
+    s.rides++;
+    if (r.race.result?.winnerNo === r.no) s.wins++;
+    agg[r.jockey] = s;
+  }
+
+  return Object.entries(agg)
+    .map(([jockey, s]) => ({ jockey, ...s, winPct: s.rides > 0 ? Math.round(s.wins / s.rides * 100) : 0 }))
+    .sort((a, b) => b.winPct - a.winPct || b.rides - a.rides);
+}
