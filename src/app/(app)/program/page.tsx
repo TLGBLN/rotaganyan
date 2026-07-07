@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { getProgramData } from "@/server/services/race.service";
+import { getProgramData, getKuponOnerileri } from "@/server/services/race.service";
 import { turkeyDateString } from "@/lib/tz";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { getAgfMovers } from "@/server/services/agf-trend.service";
@@ -12,6 +12,7 @@ import AutoRefresh from "@/components/program/AutoRefresh";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import SteamWidget from "@/components/kosular/SteamWidget";
 import AltiliGanyanResults from "@/components/home/AltiliGanyanResults";
+import TahminOnerileri from "@/components/home/TahminOnerileri";
 import NewsTicker from "@/components/home/NewsTicker";
 
 export const revalidate = 0;
@@ -47,13 +48,14 @@ export default async function ProgramPage({ searchParams }: PageProps) {
     }
   }
 
-  const [session, days, agfMovers, altiliResults, tickerItems, followedHorses] = await Promise.all([
+  const [session, days, agfMovers, altiliResults, tickerItems, followedHorses, coupons] = await Promise.all([
     auth(),
     getProgramData(currentDate),
     getAgfMovers(today),
     fetchTodaysAltiliResults(),
     fetchTjkTicker(),
     getFollowedHorses().catch(() => [] as { horseName: string }[]),
+    getKuponOnerileri().catch(() => []),
   ]);
   const isLoggedIn = !!session?.user;
   const followedNames = followedHorses.map((h) => h.horseName);
@@ -76,6 +78,11 @@ export default async function ProgramPage({ searchParams }: PageProps) {
           <ProgramView days={days} dateStr={currentDate} followedNames={followedNames} isLoggedIn={isLoggedIn} />
         </div>
       </div>
+
+      {/* Kupon Önerileri */}
+      {coupons.length > 0 && (
+        <TahminOnerileri data={coupons} altiliResults={altiliResults} />
+      )}
 
       {/* Para Akışı (AGF) */}
       {(agfMovers.risers.length > 0 || agfMovers.fallers.length > 0) && (

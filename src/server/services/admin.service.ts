@@ -502,8 +502,8 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string): Clas
 
   const isabet = `%${breakdown.rate.toFixed(0)} (${breakdown.hits}/${breakdown.total})`;
   const text = tierText
-    ? `${tierText} (${tier!.total} koşu) · isabet ${isabet}`
-    : `isabet ${isabet} (${breakdown.total} koşu)`;
+    ? `${tierText} (${tier!.total} koşu) · 1. seçim 1. geldi: ${isabet}`
+    : `1. seçim 1. geldi: ${isabet} (${breakdown.total} koşu)`;
 
   const economicShare = (tier?.ekonomik ?? 0) / (tier?.total ?? 1);
   const genisShare = (tier?.genis ?? 0) / (tier?.total ?? 1);
