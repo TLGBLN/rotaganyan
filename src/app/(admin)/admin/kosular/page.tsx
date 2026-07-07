@@ -43,26 +43,30 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
     getAnalystStats(),
   ]);
 
-  // Build lookup: original races "slug:raceNo" → metadata + prediction
+  // Build lookup: original races — by "slug:raceNo" AND by time (fallback for slug mismatches)
   type RaceRow = (typeof raceDays)[0]["races"][0];
-  const originalByKey = new Map<string, {
+  type OriginalMeta = {
     raceId: string;
     prediction: RaceRow["prediction"];
     classType: string;
     distance: number;
     runners: RaceRow["runners"];
-  }>();
+  };
+  const originalByKey = new Map<string, OriginalMeta>();
+  const originalByTime = new Map<string, OriginalMeta>();
   for (const rd of raceDays) {
+    if (rd.hippodrome.slug === "karma") continue;
     for (const race of rd.races) {
-      if (race.conditions == null) {
-        originalByKey.set(`${rd.hippodrome.slug}:${race.raceNo}`, {
-          raceId: race.id,
-          prediction: race.prediction,
-          classType: race.classType,
-          distance: race.distance,
-          runners: race.runners,
-        });
-      }
+      if (race.conditions != null) continue;
+      const meta: OriginalMeta = {
+        raceId: race.id,
+        prediction: race.prediction,
+        classType: race.classType,
+        distance: race.distance,
+        runners: race.runners,
+      };
+      originalByKey.set(`${rd.hippodrome.slug}:${race.raceNo}`, meta);
+      if (race.time) originalByTime.set(race.time, meta);
     }
   }
 
@@ -117,7 +121,9 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                   {rd.races.map((race, i) => {
                     // Karma mirror: find original race's prediction + raceId
                     const karmaRef = race.conditions ? parseConditionsRef(race.conditions) : null;
-                    const original = karmaRef ? originalByKey.get(`${karmaRef.slug}:${karmaRef.raceNo}`) : null;
+                    const original = karmaRef
+                      ? (originalByKey.get(`${karmaRef.slug}:${karmaRef.raceNo}`) ?? (race.time ? originalByTime.get(race.time) : null))
+                      : null;
                     const effectivePred = race.prediction ?? original?.prediction ?? null;
                     const effectiveRaceId = original?.raceId ?? race.id;
                     const effectiveClassType = (race.classType && race.classType !== "—") ? race.classType : (original?.classType ?? race.classType);
