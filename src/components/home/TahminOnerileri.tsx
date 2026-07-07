@@ -90,7 +90,7 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
                         {leg.nos.map((no) => (
                           <div key={no}>
                             {no === leg.winnerNo ? (
-                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-hit text-hit">
+                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-hit text-white text-xs font-bold">
                                 {no}
                               </span>
                             ) : (

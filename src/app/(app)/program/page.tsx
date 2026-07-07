@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { getProgramData, getKuponOnerileri } from "@/server/services/race.service";
+import { getProgramData, getKuponOnerileri, getHitPredictions } from "@/server/services/race.service";
 import { turkeyDateString } from "@/lib/tz";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { getAgfMovers } from "@/server/services/agf-trend.service";
@@ -14,6 +14,7 @@ import DateNavigator from "@/components/kosular/DateNavigator";
 import SteamWidget from "@/components/kosular/SteamWidget";
 import AltiliGanyanResults from "@/components/home/AltiliGanyanResults";
 import TahminOnerileri from "@/components/home/TahminOnerileri";
+import HitsCarousel from "@/components/home/HitsCarousel";
 import NewsTicker from "@/components/home/NewsTicker";
 
 export const revalidate = 0;
@@ -49,7 +50,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
     }
   }
 
-  const [session, days, agfMovers, altiliResults, tickerItems, followedHorses, coupons] = await Promise.all([
+  const [session, days, agfMovers, altiliResults, tickerItems, followedHorses, coupons, hitPredictions] = await Promise.all([
     auth(),
     getProgramData(currentDate),
     getAgfMovers(today),
@@ -57,6 +58,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
     fetchTjkTicker(),
     getFollowedHorses().catch(() => [] as { horseName: string }[]),
     getKuponOnerileri().catch(() => []),
+    getHitPredictions(16).catch(() => []),
   ]);
   const isLoggedIn = !!session?.user;
   const isAdmin = session?.user?.role ? hasRole(session.user.role as Role, "EDITOR") : false;
@@ -104,6 +106,17 @@ export default async function ProgramPage({ searchParams }: PageProps) {
 
       {/* Yarış Sonuçları */}
       <AltiliGanyanResults results={altiliResults} />
+
+      {/* İsabet Sağlayan Bankolar */}
+      {hitPredictions.length > 0 && (
+        <section className="border-t pt-8">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-hit" />
+            <h2 className="text-base font-semibold">İsabet Sağlayan Bankolar</h2>
+          </div>
+          <HitsCarousel items={hitPredictions} />
+        </section>
+      )}
     </div>
   );
 }
