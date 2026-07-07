@@ -26,10 +26,12 @@ export default function AdminMobileNav({ userName, userEmail, unreadCount }: Pro
         <SheetHeader className="border-b border-brand/20">
           <div className="flex items-center justify-between gap-2 pr-7">
             <SheetTitle className="text-left text-sm font-bold text-foreground">
-              <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded bg-brand text-[10px] font-black text-black">
-                A
-              </span>
-              ROTAGANYAN
+              <Link href="/program" onClick={() => setOpen(false)} className="flex items-center gap-2">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded bg-brand text-[10px] font-black text-black">
+                  A
+                </span>
+                ROTAGANYAN
+              </Link>
             </SheetTitle>
             <Link
               href="/admin/bildirimler"

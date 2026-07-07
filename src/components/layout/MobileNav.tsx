@@ -26,7 +26,9 @@ export default function MobileNav({ isLoggedIn, followedHorses = [] }: Props) {
       <SheetContent side="left" className="w-64">
         <SheetHeader>
           <SheetTitle className="text-left text-lg font-bold">
-            ROTA<span className="text-brand">GANYAN</span>
+            <Link href="/program" onClick={() => setOpen(false)}>
+              ROTA<span className="text-brand">GANYAN</span>
+            </Link>
           </SheetTitle>
         </SheetHeader>
         <nav className="mt-6 flex flex-col gap-1">
