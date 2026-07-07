@@ -639,11 +639,12 @@ function RaceTable({
 // ── Ana görünüm ───────────────────────────────────────────────────────────────
 
 export default function ProgramView({
-  days, dateStr, followedNames = [],
+  days, dateStr, followedNames = [], isLoggedIn = false,
 }: {
   days: ProgramDay[];
   dateStr: string;
   followedNames?: string[];
+  isLoggedIn?: boolean;
 }) {
   const [activeHipo, setActiveHipo] = useState(days[0]?.hippodromeSlug ?? "");
   const [activeRace, setActiveRace] = useState<Record<string, number>>({});
@@ -740,12 +741,21 @@ export default function ProgramView({
             </div>
             <div className="flex items-center gap-3">
               {currentRace?.hasAnalysis ? (
-                <button
-                  onClick={() => setAnalysisOpen((v) => !v)}
-                  className="flex items-center gap-1 rounded-md bg-[#00944D] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90"
-                >
-                  Analizi Gör {analysisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                </button>
+                isLoggedIn ? (
+                  <button
+                    onClick={() => setAnalysisOpen((v) => !v)}
+                    className="flex items-center gap-1 rounded-md bg-[#00944D] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90"
+                  >
+                    Analizi Gör {analysisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  </button>
+                ) : (
+                  <a
+                    href={`/giris?callbackUrl=${encodeURIComponent("/program")}`}
+                    className="flex items-center gap-1 rounded-md bg-[#00944D] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90"
+                  >
+                    Analizi Gör 🔒
+                  </a>
+                )
               ) : (
                 <span className="text-xs font-semibold text-[#e74c3c]">Analiz Hazırlanıyor</span>
               )}

@@ -5,6 +5,7 @@ import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter
 import { getAgfMovers } from "@/server/services/agf-trend.service";
 import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
 import { fetchTjkTicker } from "@/lib/tjk-ticker";
+import { auth } from "@/lib/auth";
 import { getFollowedHorses } from "@/server/actions/horse-follow";
 import ProgramView from "@/components/program/ProgramView";
 import DateNavigator from "@/components/kosular/DateNavigator";
@@ -45,13 +46,15 @@ export default async function ProgramPage({ searchParams }: PageProps) {
     }
   }
 
-  const [days, agfMovers, altiliResults, tickerItems, followedHorses] = await Promise.all([
+  const [session, days, agfMovers, altiliResults, tickerItems, followedHorses] = await Promise.all([
+    auth(),
     getProgramData(currentDate),
     getAgfMovers(today),
     fetchTodaysAltiliResults(),
     fetchTjkTicker(),
     getFollowedHorses().catch(() => [] as { horseName: string }[]),
   ]);
+  const isLoggedIn = !!session?.user;
   const followedNames = followedHorses.map((h) => h.horseName);
 
   return (
@@ -66,7 +69,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
           <DateNavigator currentDate={currentDate} basePath="/program" />
         </div>
         <div className="rounded-lg border overflow-hidden">
-          <ProgramView days={days} dateStr={currentDate} followedNames={followedNames} />
+          <ProgramView days={days} dateStr={currentDate} followedNames={followedNames} isLoggedIn={isLoggedIn} />
         </div>
       </div>
 

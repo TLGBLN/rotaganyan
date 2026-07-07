@@ -102,92 +102,70 @@ export default async function SonuclarPage() {
         </span>
       </div>
 
-      {/* Sonuç tablosu */}
+      {/* Sonuç listesi */}
       {results.length === 0 ? (
         <div className="rounded-lg border border-dashed py-12 text-center text-sm text-muted-foreground">
           Henüz sonuç girilmemiş.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50 text-xs font-medium text-muted-foreground">
-                <th className="px-3 py-2 text-left">Tarih</th>
-                <th className="px-3 py-2 text-left">Koşu</th>
-                <th className="px-3 py-2 text-left">Kazanan</th>
-                <th className="px-3 py-2 text-left">Sıra</th>
-                <th className="px-3 py-2 text-left">Ganyan</th>
-                <th className="px-3 py-2 text-left">Değerlendirme</th>
-                <th className="px-3 py-2 text-left">Hata</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((r, i) => {
-                const tier = tiers[i];
-                const picks = r.race.prediction?.picks ?? [];
-                const winnerPick = picks.find((p) => p.runner?.no === r.winnerNo);
-                const topScoredPick = [...picks].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
-                const topScoredIsWinner = topScoredPick?.runner?.no === r.winnerNo;
+        <div className="rounded-lg border divide-y">
+          {results.map((r, i) => {
+            const tier = tiers[i];
+            const picks = r.race.prediction?.picks ?? [];
+            const winnerPick = picks.find((p) => p.runner?.no === r.winnerNo);
+            const topScoredPick = [...picks].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
+            const topScoredIsWinner = topScoredPick?.runner?.no === r.winnerNo;
 
-                return (
-                  <tr key={r.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+            return (
+              <div key={r.id} className="px-3 py-2.5 hover:bg-muted/20 transition-colors">
+                {/* Satır 1: Tarih + Koşu + Değerlendirme */}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
                       {format(r.race.raceDay.date, "d MMM yy", { locale: tr })}
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      <span className="font-medium">{r.race.raceDay.hippodrome.name}</span>
-                      <span className="text-muted-foreground"> · {r.race.raceNo}. Koşu</span>
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      {r.winnerNo != null ? (
-                        <span className="font-mono text-xs">
-                          #{r.winnerNo}
-                          {r.cikan ? <span className="ml-1 font-sans text-muted-foreground">{r.cikan}</span> : null}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {winnerPick != null ? (
-                        <span className="font-semibold">{winnerPick.rank}. sıra</span>
-                      ) : r.winnerNo != null ? (
-                        <span className="text-muted-foreground text-xs">listede yok</span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground">
-                      {r.ganyan != null ? (
-                        <span className={r.ganyan < 5 ? "text-foreground" : r.ganyan < 15 ? "text-brand" : "text-[#c0392b]"}>
-                          {r.ganyan.toFixed(2)}
-                        </span>
-                      ) : "—"}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${TIER[tier].className}`}>
-                          {TIER[tier].label}
-                        </span>
-                        {topScoredIsWinner && (
-                          <span className="inline-flex items-center rounded-full bg-yellow-500/15 px-2 py-0.5 text-xs font-semibold text-yellow-600 border border-yellow-500/30">
-                            En yüksek puan kazandı
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs">
-                      {r.errorTag ? (
-                        <span className="text-[#c0392b]">{r.errorTag}</span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </span>
+                    <span className="font-medium text-sm whitespace-nowrap">
+                      {r.race.raceDay.hippodrome.name}
+                      <span className="text-muted-foreground font-normal"> · {r.race.raceNo}. Koşu</span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${TIER[tier].className}`}>
+                      {TIER[tier].label}
+                    </span>
+                    {topScoredIsWinner && (
+                      <span className="hidden sm:inline-flex items-center rounded-full bg-yellow-500/15 px-2 py-0.5 text-xs font-semibold text-yellow-600 border border-yellow-500/30">
+                        En yüksek puan
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {/* Satır 2: Kazanan + Sıra + Ganyan */}
+                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                  {r.winnerNo != null && (
+                    <span>
+                      Kazanan: <span className="font-mono font-bold text-foreground">#{r.winnerNo}</span>
+                      {r.cikan && <span className="ml-1">{r.cikan}</span>}
+                    </span>
+                  )}
+                  {winnerPick != null ? (
+                    <span>Sıra: <span className="font-semibold text-foreground">{winnerPick.rank}.</span></span>
+                  ) : r.winnerNo != null ? (
+                    <span className="text-[#c0392b]">listede yok</span>
+                  ) : null}
+                  {r.ganyan != null && (
+                    <span>
+                      Ganyan:{" "}
+                      <span className={`font-semibold ${r.ganyan < 5 ? "text-foreground" : r.ganyan < 15 ? "text-brand" : "text-[#c0392b]"}`}>
+                        {r.ganyan.toFixed(2)}
+                      </span>
+                    </span>
+                  )}
+                  {r.errorTag && <span className="text-[#c0392b]">{r.errorTag}</span>}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
