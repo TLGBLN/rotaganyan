@@ -281,9 +281,11 @@ function RunnerRow({
           </button>
           <div className={cn("font-semibold", isWinner && "text-[#f5c518]")}>
             {r.name}
-            {r.scratched && (
+            {r.scratched ? (
               <span className="ml-1.5 text-[10px] font-normal text-red-400 no-underline">(Koşmaz)</span>
-            )}
+            ) : r.ekuriGroup != null ? (
+              <span title={`Eküri grubu ${r.ekuriGroup}`} className="ml-1 text-[11px]">🐴</span>
+            ) : null}
           </div>
         </div>
         {(r.sire || r.dam) && (
@@ -432,7 +434,11 @@ function RunnerCard({
             </button>
             <span className={cn("font-semibold truncate", isWinner && "text-[#f5c518]")}>
               {r.name}
-              {r.scratched && <span className="ml-1 text-[10px] font-normal text-red-400 no-underline">(Koşmaz)</span>}
+              {r.scratched ? (
+                <span className="ml-1 text-[10px] font-normal text-red-400 no-underline">(Koşmaz)</span>
+              ) : r.ekuriGroup != null ? (
+                <span title={`Eküri grubu ${r.ekuriGroup}`} className="ml-1 text-[11px]">🐴</span>
+              ) : null}
             </span>
           </div>
           {(r.sire || r.dam) && (
