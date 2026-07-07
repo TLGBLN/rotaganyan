@@ -24,6 +24,17 @@ type PageProps = {
   searchParams: Promise<{ tarih?: string }>;
 };
 
+function parseConditionsRef(conditions: string): { slug: string; raceNo: number } | null {
+  const m = conditions.match(/^(.+?)\s+(\d+)\.\s*Ko[şs]u/i);
+  if (!m) return null;
+  const slug = m[1].trim()
+    .replace(/[İI]/g, "i").replace(/ı/g, "i")
+    .replace(/[ğĞ]/g, "g").replace(/[üÜ]/g, "u")
+    .replace(/[şŞ]/g, "s").replace(/[öÖ]/g, "o").replace(/[çÇ]/g, "c")
+    .toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  return { slug, raceNo: parseInt(m[2], 10) };
+}
+
 export default async function AdminKosularPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const currentDate = params.tarih ?? turkeyDateString();
@@ -31,6 +42,17 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
     getAdminRaceDays(currentDate),
     getAnalystStats(),
   ]);
+
+  // Build lookup: original races "slug:raceNo" → { prediction, raceId }
+  type RaceRow = (typeof raceDays)[0]["races"][0];
+  const originalByKey = new Map<string, { raceId: string; prediction: RaceRow["prediction"] }>();
+  for (const rd of raceDays) {
+    for (const race of rd.races) {
+      if (race.conditions == null) {
+        originalByKey.set(`${rd.hippodrome.slug}:${race.raceNo}`, { raceId: race.id, prediction: race.prediction });
+      }
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -82,6 +104,11 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                 <tbody>
                   {rd.races.map((race, i) => {
                     const advice = getClassTypeAdvice(analystStats, race.classType);
+                    // Karma mirror: find original race's prediction + raceId
+                    const karmaRef = race.conditions ? parseConditionsRef(race.conditions) : null;
+                    const original = karmaRef ? originalByKey.get(`${karmaRef.slug}:${karmaRef.raceNo}`) : null;
+                    const effectivePred = race.prediction ?? original?.prediction ?? null;
+                    const effectiveRaceId = original?.raceId ?? race.id;
                     return (
                     <tr
                       key={race.id}
@@ -123,18 +150,18 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                       </td>
                       <td className="px-3 py-1.5">{race.runners.length} at</td>
                       <td className="px-3 py-1.5">
-                        {race.prediction ? (
+                        {effectivePred ? (
                           <div className="flex items-center gap-1.5">
                             <Link
-                              href={`/admin/analizler/${race.prediction.id}`}
+                              href={`/admin/analizler/${effectivePred.id}`}
                               className={cn(
                                 "font-medium hover:underline",
-                                race.prediction.published ? "text-hit" : "text-brand"
+                                effectivePred.published ? "text-hit" : "text-brand"
                               )}
                             >
-                              {race.prediction.published ? "Yayında" : "Taslak"}
+                              {effectivePred.published ? "Yayında" : "Taslak"}
                             </Link>
-                            {race.prediction.picks
+                            {effectivePred.picks
                               .filter((p) => p.isTarget)
                               .map((p) => (
                                 <span
@@ -148,7 +175,7 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                           </div>
                         ) : (
                           <Link
-                            href={`/admin/analizler/yeni?kosu=${race.id}`}
+                            href={`/admin/analizler/yeni?kosu=${effectiveRaceId}`}
                             className="text-muted-foreground hover:text-brand"
                           >
                             + Analiz Ekle

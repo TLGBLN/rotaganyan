@@ -4,6 +4,18 @@ import { turkeyDateString } from "@/lib/tz";
 import type { Prisma, Confidence } from "@prisma/client";
 import { syncResultsForDate } from "./result-sync";
 
+/** "Bursa 4. Koşu" → { slug: "bursa", raceNo: 4 } */
+function parseConditionsRef(conditions: string): { slug: string; raceNo: number } | null {
+  const m = conditions.match(/^(.+?)\s+(\d+)\.\s*Ko[şs]u/i);
+  if (!m) return null;
+  const slug = m[1].trim()
+    .replace(/[İI]/g, "i").replace(/ı/g, "i")
+    .replace(/[ğĞ]/g, "g").replace(/[üÜ]/g, "u")
+    .replace(/[şŞ]/g, "s").replace(/[öÖ]/g, "o").replace(/[çÇ]/g, "c")
+    .toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  return { slug, raceNo: parseInt(m[2], 10) };
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
@@ -605,26 +617,44 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     orderBy: { hippodrome: { name: "asc" } },
   });
 
+  // Build lookup for original races (conditions = null): "slug:raceNo" → prediction
+  const originalPred = new Map<string, typeof raceDays[0]["races"][0]["prediction"]>();
+  for (const rd of raceDays) {
+    for (const r of rd.races) {
+      if (r.conditions == null) {
+        originalPred.set(`${rd.hippodrome.slug}:${r.raceNo}`, r.prediction);
+      }
+    }
+  }
+
   return raceDays.map((rd) => ({
     id: rd.id,
     hippodromeName: rd.hippodrome.name,
     hippodromeSlug: rd.hippodrome.slug,
-    races: rd.races.map((r) => ({
-      id: r.id,
-      raceNo: r.raceNo,
-      time: r.time,
-      classType: r.classType,
-      breed: r.breed,
-      surface: r.surface,
-      distance: r.distance,
-      conditions: r.conditions,
-      runners: r.runners,
-      result: r.result,
-      hasAnalysis: r.prediction != null && r.prediction.picks.length > 0,
-      picks: (r.prediction?.picks ?? []).map((p) => ({
-        ...p,
-        details: Array.isArray(p.details) ? (p.details as string[]) : [],
-      })),
-    })),
+    races: rd.races.map((r) => {
+      // Karma mirror: inherit prediction from original race
+      let pred = r.prediction;
+      if (r.conditions != null && pred == null) {
+        const ref = parseConditionsRef(r.conditions);
+        if (ref) pred = originalPred.get(`${ref.slug}:${ref.raceNo}`) ?? null;
+      }
+      return {
+        id: r.id,
+        raceNo: r.raceNo,
+        time: r.time,
+        classType: r.classType,
+        breed: r.breed,
+        surface: r.surface,
+        distance: r.distance,
+        conditions: r.conditions,
+        runners: r.runners,
+        result: r.result,
+        hasAnalysis: pred != null && pred.picks.length > 0,
+        picks: (pred?.picks ?? []).map((p) => ({
+          ...p,
+          details: Array.isArray(p.details) ? (p.details as string[]) : [],
+        })),
+      };
+    }),
   }));
 }

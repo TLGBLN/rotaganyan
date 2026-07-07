@@ -55,7 +55,10 @@ export default async function YeniAnalizPage({ searchParams }: PageProps) {
           </div>
         ) : (
           <div className="space-y-4">
-            {raceDays.map((rd) => (
+            {raceDays
+              .map((rd) => ({ ...rd, races: rd.races.filter((r) => !r.conditions) }))
+              .filter((rd) => rd.races.length > 0)
+              .map((rd) => (
               <div key={rd.id}>
                 <p className="mb-2 text-sm font-semibold text-muted-foreground">
                   {rd.hippodrome.name} — {format(rd.date, "d MMMM yyyy (EEEE)", { locale: tr })}
