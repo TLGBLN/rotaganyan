@@ -242,15 +242,26 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
                 {WIDTHS.map((width) => {
                   const amount = groupAmounts[chunkIdx][width];
                   const limit = LIMITS[width];
+                  const maxCombos = Math.floor(limit / STAKE_PER_COMBINATION);
+                  const currentCombos = Math.round(amount / STAKE_PER_COMBINATION);
+                  const remaining = maxCombos - currentCombos;
                   const over = amount > limit;
                   return (
                     <div key={width} className={cn("rounded-lg border p-3 text-center transition-colors", over ? "border-red-500/60 bg-red-500/5" : "")}>
-                      <div className="text-xs text-muted-foreground">{WIDTH_LABEL[width]}</div>
+                      <div className="text-xs font-medium text-muted-foreground">{WIDTH_LABEL[width]}</div>
                       <div className={cn("mt-1 text-lg font-bold", over ? "text-red-500" : "")}>
                         {amount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
                       </div>
-                      <div className={cn("text-[10px] mt-0.5", over ? "text-red-500 font-semibold" : "text-muted-foreground")}>
-                        {over ? `⚠ Limit aşıldı! (max ${limit.toLocaleString("tr-TR")} ₺)` : `max ${limit.toLocaleString("tr-TR")} ₺`}
+                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                        {currentCombos.toLocaleString("tr-TR")} / {maxCombos.toLocaleString("tr-TR")} kombo
+                      </div>
+                      <div className={cn("text-[10px] mt-0.5 font-semibold", over ? "text-red-500" : "text-muted-foreground")}>
+                        {over
+                          ? `⚠ ${Math.abs(remaining).toLocaleString("tr-TR")} kombo aştı`
+                          : `${remaining.toLocaleString("tr-TR")} kombo kaldı`}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-1 border-t pt-1">
+                        max {maxCombos.toLocaleString("tr-TR")} kombo · {limit.toLocaleString("tr-TR")} ₺
                       </div>
                     </div>
                   );
