@@ -44,16 +44,9 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
   const [ayakIdx, setAyakIdx] = useState<Record<string, number>>({});
   const [selections, setSelections] = useState<Record<string, SelValue>>({});
 
-  if (days.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
-        Bu tarih için yarış programı bulunamadı.
-      </div>
-    );
-  }
-
-  const currentDay = days.find((d) => d.hippodromeSlug === activeHipo) ?? days[0]!;
-  const groups = chunkAltili(currentDay.races);
+  // Derived state — computed before any early return so hooks stay unconditional
+  const currentDay = days.find((d) => d.hippodromeSlug === activeHipo) ?? days[0];
+  const groups = currentDay ? chunkAltili(currentDay.races) : [];
   const curAltili = altiliIdx[activeHipo] ?? 0;
   const currentGroup = groups[curAltili];
   const ayakKey = `${activeHipo}/${curAltili}`;
@@ -106,6 +99,14 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
       : null;
   const ikramiyeLower = katsayi != null ? katsayi * 0.93 : null;
   const ikramiyeUpper = katsayi != null ? katsayi * 0.99 : null;
+
+  if (days.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
+        Bu tarih için yarış programı bulunamadı.
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col">
