@@ -248,7 +248,7 @@ function AnalysisPanel({ picks, winnerNo, isLoggedIn }: { picks: ProgramPick[]; 
 // ── At satırı ────────────────────────────────────────────────────────────────
 
 function RunnerRow({
-  r, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, jockeyStat, surfaceLabel, hippoShort,
+  r, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, jockeyStat,
 }: {
   r: ProgramRunner;
   isWinner: boolean;
@@ -260,8 +260,6 @@ function RunnerRow({
   isFollowed: boolean;
   onToggleFollow: () => void;
   jockeyStat?: JockeyStatRow;
-  surfaceLabel?: string;
-  hippoShort?: string;
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
@@ -346,25 +344,12 @@ function RunnerRow({
           <div className="text-[10px] text-muted-foreground">← {r.previousJockey}</div>
         )}
         {jockeyStat && (
-          <div className="mt-0.5 space-y-0 text-[10px] tabular-nums leading-tight">
-            {jockeyStat.surface && jockeyStat.surface.rides >= 5 && (
-              <div className={cn(
-                pct(jockeyStat.surface) >= 25 ? "text-hit" :
-                pct(jockeyStat.surface) >= 15 ? "text-brand" : "text-muted-foreground"
-              )}>
-                {surfaceLabel} '26: {jockeyStat.surface.wins}/{jockeyStat.surface.rides} %{pct(jockeyStat.surface)}
-              </div>
-            )}
-            {jockeyStat.hippo && jockeyStat.hippo.rides >= 5 && (
-              <div className="text-muted-foreground">
-                {hippoShort} '26: {jockeyStat.hippo.wins}/{jockeyStat.hippo.rides} %{pct(jockeyStat.hippo)}
-              </div>
-            )}
-            {jockeyStat.overall.rides >= 10 && (
-              <div className="text-muted-foreground/70">
-                Genel '26: {jockeyStat.overall.wins}/{jockeyStat.overall.rides} %{pct(jockeyStat.overall)}
-              </div>
-            )}
+          <div className={cn(
+            "mt-0.5 text-[10px] tabular-nums leading-tight",
+            pct(jockeyStat) >= 25 ? "text-hit" :
+            pct(jockeyStat) >= 15 ? "text-brand" : "text-muted-foreground"
+          )}>
+            {jockeyStat.label} &apos;26: {jockeyStat.wins}/{jockeyStat.rides} %{pct(jockeyStat)}
           </div>
         )}
       </td>
@@ -435,7 +420,7 @@ function RunnerRow({
 // ── At kartı (mobil) ─────────────────────────────────────────────────────────
 
 function RunnerCard({
-  r, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, jockeyStat, surfaceLabel, hippoShort,
+  r, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, jockeyStat,
 }: {
   r: ProgramRunner;
   isWinner: boolean;
@@ -446,8 +431,6 @@ function RunnerCard({
   isFollowed: boolean;
   onToggleFollow: () => void;
   jockeyStat?: JockeyStatRow;
-  surfaceLabel?: string;
-  hippoShort?: string;
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
@@ -532,23 +515,14 @@ function RunnerCard({
           <span className={cn(r.jockeyChanged && "text-orange-500 font-medium")}>
             {r.jockey}
             {jockeyStat && (
-              <span className="font-normal text-muted-foreground/70 tabular-nums">
-                {jockeyStat.surface && jockeyStat.surface.rides >= 5 && (
-                  <span
-                    title={`${surfaceLabel} '26`}
-                    className={cn(
-                      pct(jockeyStat.surface) >= 25 ? "text-hit" :
-                      pct(jockeyStat.surface) >= 15 ? "text-brand" : "text-muted-foreground/70"
-                    )}
-                  >{" "}%{pct(jockeyStat.surface)}{(surfaceLabel ?? "")[0]}</span>
+              <span
+                title={`${jockeyStat.label} '26: ${jockeyStat.wins}/${jockeyStat.rides}`}
+                className={cn(
+                  "font-normal tabular-nums",
+                  pct(jockeyStat) >= 25 ? "text-hit" :
+                  pct(jockeyStat) >= 15 ? "text-brand" : "text-muted-foreground/70"
                 )}
-                {jockeyStat.hippo && jockeyStat.hippo.rides >= 5 && (
-                  <span title={`${hippoShort} '26`}>{" "}%{pct(jockeyStat.hippo)}A</span>
-                )}
-                {jockeyStat.overall.rides >= 10 && (
-                  <span title="Genel '26">{" "}%{pct(jockeyStat.overall)}G</span>
-                )}
-              </span>
+              >{" "}%{pct(jockeyStat)}</span>
             )}
             {r.jockeyChanged && r.previousJockey && (
               <span className="font-normal text-muted-foreground"> ← {r.previousJockey}</span>
@@ -595,9 +569,9 @@ function RaceTimer({ time, hasResult, dateStr }: { time: string | null; hasResul
 }
 
 type JockeyStatRow = {
-  surface?: { wins: number; rides: number };    // tüm hipodromlarda bu pist tipi
-  hippo?: { wins: number; rides: number };      // bu hipodromda tüm pistler
-  overall: { wins: number; rides: number };
+  wins: number;
+  rides: number;
+  label: string;  // "Ankara Kum"
 };
 
 type JockeyStatsMap = Record<string, {
@@ -650,16 +624,14 @@ function RaceTable({
   const pistLabel = { CIM: "Çim", SENTETIK: "Snt.", KUM: "Kum" }[race.surface as string] ?? race.surface;
   const hippoShort = hippodromeName?.split(" ")[0] ?? hippodromeSlug ?? "Hipo";
 
-  // Jokey stat hesaplayıcı — surface-wide + hippo + overall
+  // Jokey stat — yalnızca bu hipodrom + bu pist kombosuna ait sicil
   function buildJockeyStat(jockey: string | null): JockeyStatRow | undefined {
-    if (!jockey || !jockeyStats) return undefined;
+    if (!jockey || !jockeyStats || !hippodromeSlug) return undefined;
     const raw = jockeyStats[jockey];
     if (!raw) return undefined;
-    return {
-      surface: raw.bySurface[race.surface],
-      hippo: hippodromeSlug ? raw.byHippo[hippodromeSlug] : undefined,
-      overall: raw.overall,
-    };
+    const combo = raw.byContext[`${hippodromeSlug}:${race.surface}`];
+    if (!combo || combo.rides < 3) return undefined;
+    return { ...combo, label: `${hippoShort} ${pistLabel}` };
   }
 
   return (
@@ -714,8 +686,6 @@ function RaceTable({
                   isFollowed={followedSet.has(r.name)}
                   onToggleFollow={() => onToggleFollow(r.name)}
                   jockeyStat={buildJockeyStat(r.jockey)}
-                  surfaceLabel={pistLabel}
-                  hippoShort={hippoShort}
                 />
               ))
             )}
@@ -742,8 +712,6 @@ function RaceTable({
               isFollowed={followedSet.has(r.name)}
               onToggleFollow={() => onToggleFollow(r.name)}
               jockeyStat={buildJockeyStat(r.jockey)}
-              surfaceLabel={pistLabel}
-              hippoShort={hippoShort}
             />
           ))
         )}
