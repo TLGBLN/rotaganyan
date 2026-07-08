@@ -17,7 +17,6 @@ export async function POST(req: NextRequest) {
   const yearStart = new Date(`${dateFrom ?? `${new Date().getFullYear()}-01-01`}T00:00:00.000Z`);
   const yearEnd   = new Date(`${dateTo   ?? new Date().toISOString().slice(0, 10)}T00:00:00.000Z`);
 
-  // Sonucu eksik yarış olan tüm günleri bul
   const raceDays = await db.raceDay.findMany({
     where: {
       date: { gte: yearStart, lte: yearEnd },
@@ -28,24 +27,47 @@ export async function POST(req: NextRequest) {
   });
 
   const dates = raceDays.map((d) => d.date.toISOString().slice(0, 10));
+  const total = dates.length;
 
-  let synced = 0;
-  let failed = 0;
-  const errors: string[] = [];
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      let synced = 0;
+      let failed = 0;
 
-  for (const dateStr of dates) {
-    try {
-      await syncResultsForDate(dateStr);
-      synced++;
-    } catch (e) {
-      failed++;
-      errors.push(`${dateStr}: ${e instanceof Error ? e.message : String(e)}`);
-    }
-    // TJK'ya nazik ol
-    await new Promise((r) => setTimeout(r, 500));
-  }
+      for (let i = 0; i < dates.length; i++) {
+        const dateStr = dates[i];
+        try {
+          await syncResultsForDate(dateStr);
+          synced++;
+        } catch {
+          failed++;
+        }
 
-  return NextResponse.json({ ok: true, total: dates.length, synced, failed, errors });
+        const chunk = JSON.stringify({
+          current: i + 1,
+          total,
+          date: dateStr,
+          synced,
+          failed,
+          done: i === dates.length - 1,
+        }) + "\n";
+        controller.enqueue(encoder.encode(chunk));
+
+        await new Promise((r) => setTimeout(r, 500));
+      }
+
+      if (dates.length === 0) {
+        controller.enqueue(encoder.encode(JSON.stringify({ current: 0, total: 0, synced: 0, failed: 0, done: true }) + "\n"));
+      }
+
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
 }
 
 // Kaç gün eksik var sadece say (çalıştırmadan önce önizleme)
