@@ -162,7 +162,7 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
         </div>
         {rows.length > 0 && (
           <div className="border-t px-3 py-2 text-[11px] text-muted-foreground">
-            {rows.length} jokey · Veri DB'den anlık hesaplanır, yeni sonuçlar girilince otomatik güncellenir.
+            {rows.length} jokey · Veri DB&apos;den anlık hesaplanır, yeni sonuçlar girilince otomatik güncellenir.
           </div>
         )}
       </div>
