@@ -64,7 +64,7 @@ export default function BackfillCard() {
         <div>
           <h3 className="text-sm font-semibold">Sonuç Backfill (2026)</h3>
           <p className="text-xs text-muted-foreground">
-            TJK'dan eksik yarış sonuçlarını tamamla
+            TJK&apos;dan eksik yarış sonuçlarını tamamla
           </p>
         </div>
         <Button variant="ghost" size="icon" onClick={fetchPreview} disabled={loading}>
