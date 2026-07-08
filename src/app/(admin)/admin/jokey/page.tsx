@@ -1,7 +1,7 @@
 import { getAllJockeyStats, getHippodromes } from "@/server/services/race.service";
 import { cn } from "@/lib/utils";
-import { RefreshCw } from "lucide-react";
 import Link from "next/link";
+import RefreshButton from "@/components/admin/RefreshButton";
 
 export const dynamic = "force-dynamic";
 
@@ -39,13 +39,6 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
     selectedBreed.value ? selectedBreed.label : "",
   ].filter(Boolean).join(" · ");
 
-  // Yenile URL — aynı filtrelerle sayfayı taze yükler
-  const refreshParams = new URLSearchParams();
-  if (hipo) refreshParams.set("hipo", hipo);
-  if (pist) refreshParams.set("pist", pist);
-  if (irk) refreshParams.set("irk", irk);
-  const refreshUrl = `/admin/jokey${refreshParams.size ? `?${refreshParams}` : ""}`;
-
   return (
     <div className="space-y-4">
       {/* Başlık */}
@@ -54,13 +47,7 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
           <h1 className="text-lg font-bold">Jokey İstatistikleri</h1>
           <p className="text-xs text-muted-foreground mt-0.5">{year} sezonu · {contextLabel}</p>
         </div>
-        <Link
-          href={refreshUrl}
-          className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          Yenile
-        </Link>
+        <RefreshButton className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" />
       </div>
 
       {/* Filtreler */}
