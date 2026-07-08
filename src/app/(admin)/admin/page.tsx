@@ -70,9 +70,11 @@ export default async function AdminDashboard() {
         </div>
         <div className="space-y-4">
           <PendingList pending={pendingPredictions} />
-          <BackfillCard />
         </div>
       </div>
+
+      {/* ── Backfill ───────────────────────────────────────────────── */}
+      <BackfillCard />
 
       {/* ── Son Tahminler Akışı ────────────────────────────────────── */}
       <RecentFeed predictions={recentPredictions} />
