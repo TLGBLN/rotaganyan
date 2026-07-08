@@ -1,10 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, hasRole } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { persistRaceDays, TjkAdapter } from "@/server/services/ingest";
 import { syncResultsForDate } from "@/server/services/result-sync";
 import type { Role } from "@prisma/client";
 
 export const maxDuration = 300;
+
+const BATCH = 14;
+
+function allDatesInRange(from: Date, to: Date): string[] {
+  const list: string[] = [];
+  const cur = new Date(from);
+  while (cur <= to) {
+    list.push(cur.toISOString().slice(0, 10));
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  return list;
+}
+
+function getDateRange() {
+  const year = new Date().getFullYear();
+  const start = new Date(`${year}-01-01T00:00:00Z`);
+  const yesterday = new Date();
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  yesterday.setUTCHours(0, 0, 0, 0);
+  return { start, yesterday };
+}
+
+async function getMissingDates(start: Date, yesterday: Date): Promise<string[]> {
+  const allDates = allDatesInRange(start, yesterday);
+  const existing = await db.raceDay.findMany({
+    where: { date: { gte: start, lte: yesterday } },
+    select: { date: true },
+    distinct: ["date"],
+  });
+  const existingSet = new Set(existing.map((d) => d.date.toISOString().slice(0, 10)));
+  return allDates.filter((d) => !existingSet.has(d));
+}
+
+/** Önizleme: kaç gün kaldı */
+export async function GET() {
+  const session = await auth();
+  if (!session?.user || !hasRole(session.user.role as Role, "EDITOR")) {
+    return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
+  }
+
+  const { start, yesterday } = getDateRange();
+  const missing = await getMissingDates(start, yesterday);
+
+  return NextResponse.json({
+    totalDays: allDatesInRange(start, yesterday).length,
+    missingDays: missing.length,
+    batchSize: BATCH,
+  });
+}
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -12,22 +62,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }
 
-  const { dateFrom, dateTo } = await req.json() as { dateFrom?: string; dateTo?: string };
-
-  const year = new Date().getFullYear();
-  const yesterday = new Date();
-  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-
-  const start = new Date(`${dateFrom ?? `${year}-01-01`}T00:00:00Z`);
-  const end   = new Date(`${dateTo ?? yesterday.toISOString().slice(0, 10)}T00:00:00Z`);
-
-  // Tarih listesini oluştur
-  const dates: string[] = [];
-  const cur = new Date(start);
-  while (cur <= end) {
-    dates.push(cur.toISOString().slice(0, 10));
-    cur.setUTCDate(cur.getUTCDate() + 1);
-  }
+  const { start, yesterday } = getDateRange();
+  const missing = await getMissingDates(start, yesterday);
+  const batch = missing.slice(0, BATCH);
 
   const adapter = new TjkAdapter();
   const encoder = new TextEncoder();
@@ -38,8 +75,8 @@ export async function POST(req: NextRequest) {
       let empty = 0;
       let failed = 0;
 
-      for (let i = 0; i < dates.length; i++) {
-        const dateStr = dates[i];
+      for (let i = 0; i < batch.length; i++) {
+        const dateStr = batch[i];
         const date = new Date(`${dateStr}T00:00:00Z`);
 
         try {
@@ -58,17 +95,15 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode(
           JSON.stringify({
             current: i + 1,
-            total: dates.length,
+            total: batch.length,
+            remaining: missing.length - i - 1,
             date: dateStr,
             withRaces,
             empty,
             failed,
-            done: i === dates.length - 1,
+            done: i === batch.length - 1,
           }) + "\n"
         ));
-
-        // Yarış olan günler zaten yavaş (çok fetch var), boş günlerde biraz bekle
-        if (empty > withRaces) await new Promise((r) => setTimeout(r, 200));
       }
 
       controller.close();
