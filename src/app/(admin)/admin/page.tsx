@@ -11,6 +11,7 @@ import NarrativeSummary from "@/components/admin/NarrativeSummary";
 import DailyTrendChart from "@/components/admin/DailyTrendChart";
 import RecentFeed from "@/components/admin/RecentFeed";
 import PendingList from "@/components/admin/PendingList";
+import BackfillCard from "@/components/admin/BackfillCard";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,10 @@ export default async function AdminDashboard() {
             stats={trendStats}
           />
         </div>
-        <PendingList pending={pendingPredictions} />
+        <div className="space-y-4">
+          <PendingList pending={pendingPredictions} />
+          <BackfillCard />
+        </div>
       </div>
 
       {/* ── Son Tahminler Akışı ────────────────────────────────────── */}
