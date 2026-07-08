@@ -5,6 +5,24 @@ import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import type { Surface, Breed } from "@prisma/client";
 
+export async function syncTodayResults(): Promise<{ synced: number; failed: number; errors: string[] }> {
+  await requireRole("EDITOR");
+  const { turkeyDateString } = await import("@/lib/tz");
+  const { syncResultsForDate } = await import("@/server/services/result-sync");
+  const today = turkeyDateString();
+  const synced = 0; let failed = 0; const errors: string[] = [];
+  try {
+    await syncResultsForDate(today);
+    revalidatePath("/admin");
+    revalidatePath("/admin/sonuclar");
+    return { synced: 1, failed: 0, errors: [] };
+  } catch (e) {
+    failed++;
+    errors.push(e instanceof Error ? e.message : String(e));
+    return { synced: 0, failed, errors };
+  }
+}
+
 export async function forceIngestDate(date: string): Promise<{ runners: number }> {
   await requireRole("ADMIN");
   const { toTjkDate, ingestDate } = await import("@/server/services/ingest/tjk-info.adapter");

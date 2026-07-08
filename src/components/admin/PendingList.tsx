@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { differenceInCalendarDays } from "date-fns";
 import type { PendingPrediction } from "@/server/services/admin.service";
+import SyncTodayButton from "./SyncTodayButton";
 
 function DayChip({ date }: { date: Date }) {
   const days = differenceInCalendarDays(new Date(), new Date(date));
@@ -63,6 +64,7 @@ export default function PendingList({ pending }: { pending: PendingPrediction[] 
           })}
         </div>
       )}
+      <SyncTodayButton />
     </div>
   );
 }
