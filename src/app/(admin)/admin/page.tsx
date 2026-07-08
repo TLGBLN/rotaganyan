@@ -12,7 +12,7 @@ import DailyTrendChart from "@/components/admin/DailyTrendChart";
 import RecentFeed from "@/components/admin/RecentFeed";
 import PendingList from "@/components/admin/PendingList";
 import BackfillCard from "@/components/admin/BackfillCard";
-import AutoRefresh from "@/components/program/AutoRefresh";
+import AdminRefresh from "@/components/admin/AdminRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +47,7 @@ export default async function AdminDashboard() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-bold">Dashboard</h1>
-          <AutoRefresh />
+          <AdminRefresh />
         </div>
         {hasData && (
           <span className="text-xs text-muted-foreground">
