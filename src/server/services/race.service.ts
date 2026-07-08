@@ -746,10 +746,11 @@ export type JockeyRow = {
   winPct: number;
 };
 
-/** Admin jokey veri sayfası için tüm jokeyler — hipodrom ve pist filtresiyle. */
+/** Admin jokey veri sayfası için tüm jokeyler — hipodrom, pist ve ırk filtresiyle. */
 export async function getAllJockeyStats(params: {
   hippoSlug?: string;
   surface?: string;
+  breed?: string;
   year?: number;
 }): Promise<JockeyRow[]> {
   const year = params.year ?? new Date().getFullYear();
@@ -760,6 +761,7 @@ export async function getAllJockeyStats(params: {
       jockey: { not: null },
       race: {
         ...(params.surface ? { surface: params.surface as "CIM" | "KUM" | "SENTETIK" } : {}),
+        ...(params.breed ? { breed: params.breed as "INGILIZ" | "ARAP" } : {}),
         raceDay: {
           date: { gte: since },
           ...(params.hippoSlug ? { hippodrome: { slug: params.hippoSlug } } : {}),

@@ -12,29 +12,38 @@ const SURFACES = [
   { value: "SENTETIK", label: "Sentetik" },
 ];
 
-type PageProps = { searchParams: Promise<{ hipo?: string; pist?: string }> };
+const BREEDS = [
+  { value: "", label: "Tüm Irklar" },
+  { value: "INGILIZ", label: "İngiliz" },
+  { value: "ARAP", label: "Arap" },
+];
+
+type PageProps = { searchParams: Promise<{ hipo?: string; pist?: string; irk?: string }> };
 
 export default async function AdminJokeyPage({ searchParams }: PageProps) {
-  const { hipo, pist } = await searchParams;
+  const { hipo, pist, irk } = await searchParams;
   const year = new Date().getFullYear();
 
   const [hippodromes, rows] = await Promise.all([
     getHippodromes(),
-    getAllJockeyStats({ hippoSlug: hipo || undefined, surface: pist || undefined, year }),
+    getAllJockeyStats({ hippoSlug: hipo || undefined, surface: pist || undefined, breed: irk || undefined, year }),
   ]);
 
   const selectedHippo = hippodromes.find((h) => h.slug === hipo);
   const selectedSurface = SURFACES.find((s) => s.value === (pist ?? "")) ?? SURFACES[0];
+  const selectedBreed = BREEDS.find((b) => b.value === (irk ?? "")) ?? BREEDS[0];
 
   const contextLabel = [
     selectedHippo?.name ?? "Tüm Hipodromlar",
     selectedSurface.value ? selectedSurface.label : "",
+    selectedBreed.value ? selectedBreed.label : "",
   ].filter(Boolean).join(" · ");
 
   // Yenile URL — aynı filtrelerle sayfayı taze yükler
   const refreshParams = new URLSearchParams();
   if (hipo) refreshParams.set("hipo", hipo);
   if (pist) refreshParams.set("pist", pist);
+  if (irk) refreshParams.set("irk", irk);
   const refreshUrl = `/admin/jokey${refreshParams.size ? `?${refreshParams}` : ""}`;
 
   return (
@@ -85,6 +94,19 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
           </select>
         </div>
 
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] font-medium text-muted-foreground">Irk</label>
+          <select
+            name="irk"
+            defaultValue={irk ?? ""}
+            className="rounded-md border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand"
+          >
+            {BREEDS.map((b) => (
+              <option key={b.value} value={b.value}>{b.label}</option>
+            ))}
+          </select>
+        </div>
+
         <button
           type="submit"
           className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground hover:bg-brand/90 transition-colors"
@@ -92,7 +114,7 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
           Filtrele
         </button>
 
-        {(hipo || pist) && (
+        {(hipo || pist || irk) && (
           <Link
             href="/admin/jokey"
             className="rounded-md border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
