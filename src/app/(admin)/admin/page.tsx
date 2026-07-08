@@ -12,6 +12,7 @@ import DailyTrendChart from "@/components/admin/DailyTrendChart";
 import RecentFeed from "@/components/admin/RecentFeed";
 import PendingList from "@/components/admin/PendingList";
 import BackfillCard from "@/components/admin/BackfillCard";
+import AutoRefresh from "@/components/program/AutoRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,10 @@ export default async function AdminDashboard() {
     <div className="space-y-5">
       {/* ── Başlık ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold">Dashboard</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-bold">Dashboard</h1>
+          <AutoRefresh />
+        </div>
         {hasData && (
           <span className="text-xs text-muted-foreground">
             {analyst.overall.total} sonuçlanmış · {stats.totalPredictions} toplam tahmin
