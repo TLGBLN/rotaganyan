@@ -8,7 +8,7 @@ export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!session?.user || !hasRole(session.user.role as Role, "ADMIN")) {
+  if (!session?.user || !hasRole(session.user.role as Role, "EDITOR")) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }
 
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 // Kaç gün eksik var sadece say (çalıştırmadan önce önizleme)
 export async function GET() {
   const session = await auth();
-  if (!session?.user || !hasRole(session.user.role as Role, "ADMIN")) {
+  if (!session?.user || !hasRole(session.user.role as Role, "EDITOR")) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }
 
