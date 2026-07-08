@@ -772,13 +772,17 @@ export async function getAllJockeyStats(params: {
     select: {
       jockey: true,
       no: true,
+      name: true,
       race: { select: { result: { select: { winnerNo: true } } } },
     },
   });
 
+  const horseNames = new Set(runners.map((r) => r.name).filter(Boolean));
+
   const agg: Record<string, { wins: number; rides: number }> = {};
   for (const r of runners) {
     if (!r.jockey) continue;
+    if (horseNames.has(r.jockey)) continue;
     const s = agg[r.jockey] ?? { wins: 0, rides: 0 };
     s.rides++;
     if (r.race.result?.winnerNo === r.no) s.wins++;
