@@ -672,7 +672,7 @@ export type JockeyStat = {
   byContext: Record<string, StatBucket>;         // "ankara:CIM"
 };
 
-/** Bu yıla ait galibiyet/biniş istatistiklerini hipodrom+pist kırılımıyla döner. */
+/** Bu yıla ait galibiyet/biniş istatistiklerini ırk+hipodrom+pist kırılımıyla döner. */
 export async function getJockeyStats(names: string[]): Promise<Record<string, JockeyStat>> {
   if (names.length === 0) return {};
 
@@ -692,6 +692,7 @@ export async function getJockeyStats(names: string[]): Promise<Record<string, Jo
       race: {
         select: {
           surface: true,
+          breed: true,
           raceDay: { select: { hippodrome: { select: { slug: true } } } },
           result: { select: { winnerNo: true } },
         },
@@ -705,7 +706,10 @@ export async function getJockeyStats(names: string[]): Promise<Record<string, Jo
     if (!r.jockey) continue;
     const isWin = r.race.result?.winnerNo === r.no;
     const hippoSlug = r.race.raceDay.hippodrome.slug;
-    const contextKey = `${hippoSlug}:${r.race.surface}`;
+    // context key: ırk + hipodrom + pist
+    const contextKey = `${hippoSlug}:${r.race.surface}:${r.race.breed}`;
+    // fallback key: sadece hipodrom + pist (ırksız)
+    const contextKeyNoBreed = `${hippoSlug}:${r.race.surface}`;
 
     if (!out[r.jockey]) out[r.jockey] = { overall: { wins: 0, rides: 0 }, byHippo: {}, bySurface: {}, byContext: {} };
     const stat = out[r.jockey];
@@ -721,9 +725,15 @@ export async function getJockeyStats(names: string[]): Promise<Record<string, Jo
     stat.bySurface[r.race.surface].rides++;
     if (isWin) stat.bySurface[r.race.surface].wins++;
 
+    // ırk+hipodrom+pist
     stat.byContext[contextKey] ??= { wins: 0, rides: 0 };
     stat.byContext[contextKey].rides++;
     if (isWin) stat.byContext[contextKey].wins++;
+
+    // hipodrom+pist (ırksız fallback)
+    stat.byContext[contextKeyNoBreed] ??= { wins: 0, rides: 0 };
+    stat.byContext[contextKeyNoBreed].rides++;
+    if (isWin) stat.byContext[contextKeyNoBreed].wins++;
   }
 
   return out;

@@ -624,15 +624,23 @@ function RaceTable({
   const pistLabel = { CIM: "Çim", SENTETIK: "Snt.", KUM: "Kum" }[race.surface as string] ?? race.surface;
   const hippoShort = hippodromeName?.split(" ")[0] ?? hippodromeSlug ?? "Hipo";
 
-  // Jokey stat — önce bu hipodrom+pist kombosuna, bulamazsa genel istatistiğe düşer
+  // Jokey stat — önce ırk+hipodrom+pist, sonra hipodrom+pist, sonra genel
   function buildJockeyStat(jockey: string | null): JockeyStatRow | undefined {
     if (!jockey || !jockeyStats || !hippodromeSlug) return undefined;
     const raw = jockeyStats[jockey];
     if (!raw) return undefined;
+    // 1. Bu ırk + hipodrom + pist
+    const breedCombo = raw.byContext[`${hippodromeSlug}:${race.surface}:${race.breed}`];
+    if (breedCombo && breedCombo.rides > 0) {
+      const irkLabel = race.breed === "INGILIZ" ? "İng" : "Arap";
+      return { wins: breedCombo.wins, rides: breedCombo.rides, label: `${hippoShort} ${pistLabel} ${irkLabel}` };
+    }
+    // 2. Aynı hipodrom + pist (ırk fark etmez)
     const combo = raw.byContext[`${hippodromeSlug}:${race.surface}`];
     if (combo && combo.rides > 0) {
       return { wins: combo.wins, rides: combo.rides, label: `${hippoShort} ${pistLabel}` };
     }
+    // 3. Genel
     const overall = raw.overall;
     if (overall.rides === 0) return undefined;
     return { wins: overall.wins, rides: overall.rides, label: "Genel" };
