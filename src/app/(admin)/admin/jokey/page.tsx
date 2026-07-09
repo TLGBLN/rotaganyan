@@ -4,19 +4,21 @@ import Link from "next/link";
 import RefreshButton from "@/components/admin/RefreshButton";
 import JokeyStatImport from "@/components/admin/JokeyStatImport";
 import JokeySyncButton from "@/components/admin/JokeySyncButton";
+import JokeyEntryForm from "@/components/admin/JokeyEntryForm";
 
 export const dynamic = "force-dynamic";
 
-type PageProps = { searchParams: Promise<{ hipo?: string; pist?: string; irk?: string; sort?: string }> };
+type PageProps = { searchParams: Promise<{ hipo?: string; pist?: string; irk?: string; sort?: string; q?: string }> };
 
 export default async function AdminJokeyPage({ searchParams }: PageProps) {
-  const { hipo, pist, irk, sort = "wins" } = await searchParams;
+  const { hipo, pist, irk, sort = "wins", q } = await searchParams;
 
   const where = {
     year: 2026,
     ...(hipo ? { hippoSlug: hipo } : {}),
     ...(pist ? { surface: pist } : {}),
     ...(irk ? { breed: irk } : {}),
+    ...(q ? { jockey: { contains: q, mode: "insensitive" as const } } : {}),
   };
 
   // Jokey başına toplu istatistik
@@ -66,7 +68,7 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
   if (irk) ctxParts.push(irk === "INGILIZ" ? "İngiliz" : irk === "ARAP" ? "Arap" : irk);
   const contextLabel = ctxParts.join(" · ") + " · 2026";
 
-  const isFiltered = !!(hipo || pist || irk);
+  const isFiltered = !!(hipo || pist || irk || q);
 
   return (
     <div className="space-y-4">
@@ -83,6 +85,16 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
 
       {/* Filtreler — tam genişlik */}
       <form method="GET" className="flex flex-wrap items-end gap-2 rounded-lg border p-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] font-medium text-muted-foreground">Jokey Ara</label>
+          <input
+            type="text"
+            name="q"
+            defaultValue={q ?? ""}
+            placeholder="İsim..."
+            className="rounded-md border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand min-w-[130px]"
+          />
+        </div>
         <div className="flex flex-col gap-1">
           <label className="text-[11px] font-medium text-muted-foreground">Hipodrom</label>
           <select name="hipo" defaultValue={hipo ?? ""} className="rounded-md border bg-background px-2 py-1.5 text-xs focus:outline-none min-w-[110px]">
@@ -127,6 +139,14 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
         <div className="space-y-4">
           <JokeyStatImport />
           <JokeySyncButton />
+          {hipo && pist && irk && (
+            <JokeyEntryForm
+              hippoSlug={hipo}
+              surface={pist}
+              breed={irk}
+              year={2026}
+            />
+          )}
 
           {datasets.length > 0 && (
             <div className="rounded-xl border p-3 space-y-1.5">
