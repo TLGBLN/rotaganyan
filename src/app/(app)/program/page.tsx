@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { db } from "@/lib/db";
 import { getProgramData, getKuponOnerileri, getHitPredictions, getJockeyStats, type JockeyStat } from "@/server/services/race.service";
 import { turkeyDateString } from "@/lib/tz";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
@@ -68,7 +69,38 @@ export default async function ProgramPage({ searchParams }: PageProps) {
   const allJockeys = [...new Set(
     days.flatMap((d) => d.races.flatMap((r) => r.runners.map((ru) => ru.jockey).filter((j): j is string => !!j)))
   )];
-  const jockeyStats = await getJockeyStats(allJockeys).catch(() => ({} as Record<string, JockeyStat>));
+
+  // Jockey-horse geçmiş biniş verileri
+  const allPairs = days.flatMap((d) =>
+    d.races.flatMap((r) =>
+      r.runners.filter((ru) => ru.jockey).map((ru) => ({ jockey: ru.jockey as string, name: ru.name }))
+    )
+  );
+
+  const [jockeyStats, horseHistoryRaw] = await Promise.all([
+    getJockeyStats(allJockeys).catch(() => ({} as Record<string, JockeyStat>)),
+    allPairs.length > 0
+      ? db.runner.findMany({
+          where: {
+            OR: allPairs.map((p) => ({ jockey: p.jockey, name: p.name })),
+            race: {
+              result: { isNot: null },
+              raceDay: { date: { lt: new Date(currentDate + "T00:00:00Z") } },
+            },
+          },
+          select: { jockey: true, name: true, no: true, race: { select: { result: { select: { winnerNo: true } } } } },
+        }).catch(() => [])
+      : Promise.resolve([]),
+  ]);
+
+  const horseHistory: Record<string, { rides: number; wins: number }> = {};
+  for (const r of horseHistoryRaw) {
+    const key = `${r.jockey}:${r.name}`;
+    const s = horseHistory[key] ?? { rides: 0, wins: 0 };
+    s.rides++;
+    if (r.race.result?.winnerNo === r.no) s.wins++;
+    horseHistory[key] = s;
+  }
 
   // Üye olmayanlar için picks verisi client'a gönderilmez
   const viewDays = isLoggedIn
@@ -93,7 +125,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
           <DateNavigator currentDate={currentDate} basePath="/program" />
         </div>
         <div className="rounded-lg border overflow-hidden">
-          <ProgramView days={viewDays} dateStr={currentDate} followedNames={followedNames} isLoggedIn={isLoggedIn} jockeyStats={jockeyStats} />
+          <ProgramView days={viewDays} dateStr={currentDate} followedNames={followedNames} isLoggedIn={isLoggedIn} jockeyStats={jockeyStats} horseHistory={horseHistory} />
         </div>
       </div>
 
