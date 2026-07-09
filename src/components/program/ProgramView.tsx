@@ -248,7 +248,7 @@ function AnalysisPanel({ picks, winnerNo, isLoggedIn }: { picks: ProgramPick[]; 
 // ── At satırı ────────────────────────────────────────────────────────────────
 
 function RunnerRow({
-  r, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, jockeyStat, horseStat,
+  r, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, jockeyStat,
 }: {
   r: ProgramRunner;
   isWinner: boolean;
@@ -260,7 +260,6 @@ function RunnerRow({
   isFollowed: boolean;
   onToggleFollow: () => void;
   jockeyStat?: JockeyStatRow;
-  horseStat?: { rides: number; wins: number };
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
@@ -357,18 +356,10 @@ function RunnerRow({
                 <span className={cn("font-semibold", wc)}>{jockeyStat.wins} gal · %{wp}</span>
                 {tp != null && <span className="text-muted-foreground"> · %{tp} tablo</span>}
                 {sc != null && <span className="text-brand font-medium"> · {sc.toFixed(1)} p</span>}
-                {horseStat && horseStat.rides > 0 && (
-                  <span className="text-muted-foreground/60"> · bu atla {horseStat.wins}/{horseStat.rides}</span>
-                )}
               </div>
             </div>
           );
         })()}
-        {!jockeyStat && horseStat && horseStat.rides > 0 && (
-          <div className="mt-0.5 text-[10px] text-muted-foreground/60 tabular-nums">
-            Bu atla: {horseStat.wins}/{horseStat.rides}
-          </div>
-        )}
       </td>
 
       {/* Sahip / Antrenör */}
@@ -437,7 +428,7 @@ function RunnerRow({
 // ── At kartı (mobil) ─────────────────────────────────────────────────────────
 
 function RunnerCard({
-  r, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, jockeyStat, horseStat,
+  r, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, jockeyStat,
 }: {
   r: ProgramRunner;
   isWinner: boolean;
@@ -448,7 +439,6 @@ function RunnerCard({
   isFollowed: boolean;
   onToggleFollow: () => void;
   jockeyStat?: JockeyStatRow;
-  horseStat?: { rides: number; wins: number };
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
@@ -549,11 +539,6 @@ function RunnerCard({
             )}
           </span>
         )}
-        {horseStat && horseStat.rides > 0 && (
-          <span className="tabular-nums text-muted-foreground/60">
-            ({horseStat.wins}/{horseStat.rides})
-          </span>
-        )}
         {r.weight != null && (
           <span>
             {r.weight}kg
@@ -610,7 +595,7 @@ type JockeyStatsMap = Record<string, {
 }>;
 
 function RaceTable({
-  race, analysisOpen, onAnalysisToggle, followedSet, onToggleFollow, isLoggedIn, jockeyStats, hippodromeSlug, hippodromeName, horseHistory,
+  race, analysisOpen, onAnalysisToggle, followedSet, onToggleFollow, isLoggedIn, jockeyStats, hippodromeSlug, hippodromeName,
 }: {
   race: ProgramRace;
   analysisOpen: boolean;
@@ -621,7 +606,6 @@ function RaceTable({
   jockeyStats?: JockeyStatsMap;
   hippodromeSlug?: string;
   hippodromeName?: string;
-  horseHistory?: Record<string, { rides: number; wins: number }>;
 }) {
   const surf = surfaceLabel(race.surface);
   const winnerNo = race.result?.winnerNo;
@@ -654,11 +638,6 @@ function RaceTable({
   const hippoShort = hippodromeName?.split(" ")[0] ?? hippodromeSlug ?? "Hipo";
 
   // Yarışın tam bağlamına (hipodrom + pist + ırk) uyan veriyi göster — fallback yok
-  function getHorseStat(jockey: string | null, name: string) {
-    if (!jockey || !horseHistory) return undefined;
-    return horseHistory[`${jockey}:${name}`];
-  }
-
   function buildJockeyStat(jockey: string | null): JockeyStatRow | undefined {
     if (!jockey || !jockeyStats || !hippodromeSlug) return undefined;
     const raw = jockeyStats[jockey];
@@ -723,7 +702,6 @@ function RaceTable({
                   isFollowed={followedSet.has(r.name)}
                   onToggleFollow={() => onToggleFollow(r.name)}
                   jockeyStat={buildJockeyStat(r.jockey)}
-                  horseStat={getHorseStat(r.jockey, r.name)}
                 />
               ))
             )}
@@ -750,7 +728,6 @@ function RaceTable({
               isFollowed={followedSet.has(r.name)}
               onToggleFollow={() => onToggleFollow(r.name)}
               jockeyStat={buildJockeyStat(r.jockey)}
-              horseStat={getHorseStat(r.jockey, r.name)}
             />
           ))
         )}
@@ -765,14 +742,13 @@ function RaceTable({
 // ── Ana görünüm ───────────────────────────────────────────────────────────────
 
 export default function ProgramView({
-  days, dateStr, followedNames = [], isLoggedIn = false, jockeyStats = {}, horseHistory = {},
+  days, dateStr, followedNames = [], isLoggedIn = false, jockeyStats = {},
 }: {
   days: ProgramDay[];
   dateStr: string;
   followedNames?: string[];
   isLoggedIn?: boolean;
   jockeyStats?: JockeyStatsMap;
-  horseHistory?: Record<string, { rides: number; wins: number }>;
 }) {
   const [activeHipo, setActiveHipo] = useState(days[0]?.hippodromeSlug ?? "");
   const [activeRace, setActiveRace] = useState<Record<string, number>>({});
@@ -898,7 +874,6 @@ export default function ProgramView({
               jockeyStats={jockeyStats}
               hippodromeSlug={currentDay.hippodromeSlug}
               hippodromeName={currentDay.hippodromeName}
-              horseHistory={horseHistory}
             />
           )}
         </>
