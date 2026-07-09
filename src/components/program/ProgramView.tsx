@@ -351,24 +351,20 @@ function RunnerRow({
           const wc = wp >= 25 ? "text-hit" : wp >= 15 ? "text-brand" : "text-muted-foreground";
           return (
             <div className="mt-0.5 text-[10px] leading-snug space-y-0.5">
-              <div className="text-muted-foreground/70">
-                {jockeyStat.label} · {jockeyStat.rides} biniş
-              </div>
+              <div className="text-muted-foreground/70">{jockeyStat.label}</div>
               <div className="tabular-nums">
-                <span className={cn("font-semibold", wc)}>
-                  {jockeyStat.wins} galibiyet · %{wp}
-                </span>
-                {tp != null && (
-                  <span className="text-muted-foreground"> · %{tp} tablo</span>
-                )}
-                {sc != null && (
-                  <span className="text-brand font-medium"> · {sc.toFixed(1)} p</span>
+                <span className="text-muted-foreground">{jockeyStat.rides} biniş · </span>
+                <span className={cn("font-semibold", wc)}>{jockeyStat.wins} gal · %{wp}</span>
+                {tp != null && <span className="text-muted-foreground"> · %{tp} tablo</span>}
+                {sc != null && <span className="text-brand font-medium"> · {sc.toFixed(1)} p</span>}
+                {horseStat && horseStat.rides > 0 && (
+                  <span className="text-muted-foreground/60"> · bu atla {horseStat.wins}/{horseStat.rides}</span>
                 )}
               </div>
             </div>
           );
         })()}
-        {horseStat && horseStat.rides > 0 && (
+        {!jockeyStat && horseStat && horseStat.rides > 0 && (
           <div className="mt-0.5 text-[10px] text-muted-foreground/60 tabular-nums">
             Bu atla: {horseStat.wins}/{horseStat.rides}
           </div>
