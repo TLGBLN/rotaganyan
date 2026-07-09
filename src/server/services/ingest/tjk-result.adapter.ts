@@ -21,7 +21,7 @@ async function fetchHtml(url: string): Promise<string> {
   return body.text();
 }
 
-export type ResultRow = { rank: number; no: number; name: string; ganyan?: number };
+export type ResultRow = { rank: number; no: number; name: string; ganyan?: number; jockey?: string };
 export type CityRaceResult = { raceNo: number; rows: ResultRow[] };
 
 export async function fetchCityResults(
@@ -81,7 +81,10 @@ export async function fetchCityResults(
       const gnyText = $(".gunluk-GunlukYarisSonuclari-Gny", row).first().text().trim();
       const ganyan = gnyText ? parseFloat(gnyText.replace(",", ".")) : undefined;
 
-      rows.push({ rank, no, name, ganyan: isNaN(ganyan as number) ? undefined : ganyan });
+      const jockeyRaw = $(".gunluk-GunlukYarisSonuclari-JokeAdi", row).first().text().trim();
+      const jockey = jockeyRaw || undefined;
+
+      rows.push({ rank, no, name, ganyan: isNaN(ganyan as number) ? undefined : ganyan, jockey });
     });
 
     if (rows.length > 0) {

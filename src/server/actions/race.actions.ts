@@ -75,6 +75,18 @@ export async function syncTodayResults(): Promise<{ synced: number; failed: numb
       await db.result.create({
         data: { raceId: race.id, winnerNo, actualOrder, ganyan, hitTop1, hitInCoupon },
       });
+
+      // Jokey-at çiftlerini runner kayıtlarına yaz (boşsa doldur)
+      const jockeyUpdates = raceResult.rows
+        .filter((row) => row.jockey && row.no != null)
+        .map((row) =>
+          db.runner.updateMany({
+            where: { raceId: race.id, no: row.no, jockey: null },
+            data: { jockey: row.jockey },
+          })
+        );
+      await Promise.all(jockeyUpdates);
+
       debug.push(`✓ ${slug} ${race.raceNo}. koşu kaydedildi (kazanan: ${winnerNo}, ganyan: ${ganyan})`);
       synced++;
     }
