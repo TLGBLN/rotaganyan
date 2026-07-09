@@ -343,15 +343,30 @@ function RunnerRow({
         {r.jockeyChanged && r.previousJockey && (
           <div className="text-[10px] text-muted-foreground">← {r.previousJockey}</div>
         )}
-        {jockeyStat && (
-          <div className={cn(
-            "mt-0.5 text-[10px] tabular-nums leading-tight",
-            pct(jockeyStat) >= 25 ? "text-hit" :
-            pct(jockeyStat) >= 15 ? "text-brand" : "text-muted-foreground"
-          )}>
-            {jockeyStat.label} &apos;26: {jockeyStat.wins}/{jockeyStat.rides} K%{pct(jockeyStat)}{jockeyStat.tableRate != null ? ` Tb%${Math.round(jockeyStat.tableRate * 100)}` : ""}{jockeyStat.performanceScore != null ? ` · ${jockeyStat.performanceScore.toFixed(1)}` : ""}
-          </div>
-        )}
+        {jockeyStat && (() => {
+          const wp = pct(jockeyStat);
+          const tp = jockeyStat.tableRate != null ? Math.round(jockeyStat.tableRate * 100) : null;
+          const sc = jockeyStat.performanceScore;
+          const wc = wp >= 25 ? "text-hit" : wp >= 15 ? "text-brand" : "text-muted-foreground";
+          return (
+            <div className="mt-0.5 text-[10px] leading-snug space-y-0.5">
+              <div className="text-muted-foreground/70">
+                {jockeyStat.label} · {jockeyStat.rides} biniş
+              </div>
+              <div className="tabular-nums">
+                <span className={cn("font-semibold", wc)}>
+                  {jockeyStat.wins} galibiyet · %{wp}
+                </span>
+                {tp != null && (
+                  <span className="text-muted-foreground"> · %{tp} tablo</span>
+                )}
+                {sc != null && (
+                  <span className="text-brand font-medium"> · {sc.toFixed(1)} p</span>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </td>
 
       {/* Sahip / Antrenör */}
@@ -514,16 +529,18 @@ function RunnerCard({
         {r.jockey && (
           <span className={cn(r.jockeyChanged && "text-orange-500 font-medium")}>
             {r.jockey}
-            {jockeyStat && (
-              <span
-                title={`${jockeyStat.label} '26: ${jockeyStat.wins}/${jockeyStat.rides}`}
-                className={cn(
-                  "font-normal tabular-nums",
-                  pct(jockeyStat) >= 25 ? "text-hit" :
-                  pct(jockeyStat) >= 15 ? "text-brand" : "text-muted-foreground/70"
-                )}
-              >{" "}%{pct(jockeyStat)}</span>
-            )}
+            {jockeyStat && (() => {
+              const wp = pct(jockeyStat);
+              const tp = jockeyStat.tableRate != null ? Math.round(jockeyStat.tableRate * 100) : null;
+              const sc = jockeyStat.performanceScore;
+              const wc = wp >= 25 ? "text-hit" : wp >= 15 ? "text-brand" : "text-muted-foreground/70";
+              const tip = `${jockeyStat.label} · ${jockeyStat.rides} biniş · ${jockeyStat.wins} galibiyet · %${wp}${tp != null ? ` · %${tp} tablo` : ""}${sc != null ? ` · ${sc.toFixed(1)} p` : ""}`;
+              return (
+                <span title={tip} className={cn("font-normal tabular-nums", wc)}>
+                  {" "}%{wp} gal{tp != null ? ` · %${tp} tablo` : ""}
+                </span>
+              );
+            })()}
             {r.jockeyChanged && r.previousJockey && (
               <span className="font-normal text-muted-foreground"> ← {r.previousJockey}</span>
             )}
