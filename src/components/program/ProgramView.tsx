@@ -370,7 +370,7 @@ function RunnerRow({
         })()}
         {horseStat && horseStat.rides > 0 && (
           <div className="mt-0.5 text-[10px] text-muted-foreground/60 tabular-nums">
-            Bu atla: {horseStat.rides} biniş{horseStat.wins > 0 ? ` · ${horseStat.wins} galibiyet` : ""}
+            Bu atla: {horseStat.wins}/{horseStat.rides}
           </div>
         )}
       </td>
@@ -555,7 +555,7 @@ function RunnerCard({
         )}
         {horseStat && horseStat.rides > 0 && (
           <span className="tabular-nums text-muted-foreground/60">
-            bu atla: {horseStat.rides}b{horseStat.wins > 0 ? `·${horseStat.wins}g` : ""}
+            ({horseStat.wins}/{horseStat.rides})
           </span>
         )}
         {r.weight != null && (
