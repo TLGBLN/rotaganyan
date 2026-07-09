@@ -1,43 +1,38 @@
-import { getAllJockeyStats, getHippodromes } from "@/server/services/race.service";
+import { db } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import RefreshButton from "@/components/admin/RefreshButton";
+import JokeyStatImport from "@/components/admin/JokeyStatImport";
 
 export const dynamic = "force-dynamic";
-
-const SURFACES = [
-  { value: "", label: "Tüm Pistler" },
-  { value: "KUM", label: "Kum" },
-  { value: "CIM", label: "Çim" },
-  { value: "SENTETIK", label: "Sentetik" },
-];
-
-const BREEDS = [
-  { value: "", label: "Tüm Irklar" },
-  { value: "INGILIZ", label: "İngiliz" },
-  { value: "ARAP", label: "Arap" },
-];
 
 type PageProps = { searchParams: Promise<{ hipo?: string; pist?: string; irk?: string }> };
 
 export default async function AdminJokeyPage({ searchParams }: PageProps) {
   const { hipo, pist, irk } = await searchParams;
-  const year = new Date().getFullYear();
 
-  const [hippodromes, rows] = await Promise.all([
-    getHippodromes(),
-    getAllJockeyStats({ hippoSlug: hipo || undefined, surface: pist || undefined, breed: irk || undefined, year }),
-  ]);
+  // Mevcut yüklü veri setleri
+  const datasets = await db.jockeyStatSync.groupBy({
+    by: ["hippoSlug", "breed", "surface", "year"],
+    _count: { jockey: true },
+    orderBy: [{ year: "desc" }, { hippoSlug: "asc" }],
+  });
 
-  const selectedHippo = hippodromes.find((h) => h.slug === hipo);
-  const selectedSurface = SURFACES.find((s) => s.value === (pist ?? "")) ?? SURFACES[0];
-  const selectedBreed = BREEDS.find((b) => b.value === (irk ?? "")) ?? BREEDS[0];
+  // Seçili filtreye göre jokey listesi
+  const rows = await db.jockeyStatSync.findMany({
+    where: {
+      year: 2026,
+      ...(hipo ? { hippoSlug: hipo } : {}),
+      ...(pist ? { surface: pist } : {}),
+      ...(irk ? { breed: irk } : {}),
+    },
+    orderBy: { performanceScore: "desc" },
+  });
 
-  const contextLabel = [
-    selectedHippo?.name ?? "Tüm Hipodromlar",
-    selectedSurface.value ? selectedSurface.label : "",
-    selectedBreed.value ? selectedBreed.label : "",
-  ].filter(Boolean).join(" · ");
+  // Benzersiz hipodrom/pist/ırk seçenekleri
+  const hippos = [...new Set(datasets.map((d) => d.hippoSlug))].sort();
+  const surfaces = [...new Set(datasets.map((d) => d.surface).filter(Boolean))].sort();
+  const breeds = [...new Set(datasets.map((d) => d.breed).filter(Boolean))].sort();
 
   return (
     <div className="space-y-4">
@@ -45,135 +40,124 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold">Jokey İstatistikleri</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">{year} sezonu · {contextLabel}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {datasets.length} veri seti · {rows.length} jokey gösteriliyor
+          </p>
         </div>
         <RefreshButton className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" />
       </div>
 
-      {/* Filtreler */}
-      <form method="GET" className="flex flex-wrap items-end gap-3 rounded-lg border p-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-medium text-muted-foreground">Hipodrom</label>
-          <select
-            name="hipo"
-            defaultValue={hipo ?? ""}
-            className="rounded-md border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand"
-          >
-            <option value="">Tüm Hipodromlar</option>
-            {hippodromes
-              .filter((h) => h.slug !== "karma")
-              .map((h) => (
-                <option key={h.slug} value={h.slug}>{h.name}</option>
-              ))}
-          </select>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Sol: Import + yüklü setler */}
+        <div className="space-y-4">
+          <JokeyStatImport />
+
+          {datasets.length > 0 && (
+            <div className="rounded-xl border p-4 space-y-2">
+              <h3 className="text-sm font-semibold">Yüklü Veri Setleri</h3>
+              <div className="space-y-1">
+                {datasets.map((d, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs py-1 border-b last:border-0">
+                    <span className="font-medium">
+                      {d.hippoSlug} · {d.surface ?? "—"} · {d.breed === "INGILIZ" ? "İng" : d.breed === "ARAP" ? "Arap" : "—"}
+                    </span>
+                    <span className="text-muted-foreground">{d._count.jockey} jokey</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-medium text-muted-foreground">Pist</label>
-          <select
-            name="pist"
-            defaultValue={pist ?? ""}
-            className="rounded-md border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand"
-          >
-            {SURFACES.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
-        </div>
+        {/* Sağ: Filtreli tablo */}
+        <div className="lg:col-span-2 space-y-3">
+          {/* Filtreler */}
+          <form method="GET" className="flex flex-wrap items-end gap-2 rounded-lg border p-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-medium text-muted-foreground">Hipodrom</label>
+              <select name="hipo" defaultValue={hipo ?? ""} className="rounded-md border bg-background px-2 py-1.5 text-xs focus:outline-none">
+                <option value="">Tümü</option>
+                {hippos.map((h) => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-medium text-muted-foreground">Pist</label>
+              <select name="pist" defaultValue={pist ?? ""} className="rounded-md border bg-background px-2 py-1.5 text-xs focus:outline-none">
+                <option value="">Tümü</option>
+                {surfaces.map((s) => <option key={s ?? ""} value={s ?? ""}>{s}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-medium text-muted-foreground">Irk</label>
+              <select name="irk" defaultValue={irk ?? ""} className="rounded-md border bg-background px-2 py-1.5 text-xs focus:outline-none">
+                <option value="">Tümü</option>
+                {breeds.map((b) => <option key={b ?? ""} value={b ?? ""}>{b === "INGILIZ" ? "İngiliz" : b === "ARAP" ? "Arap" : b}</option>)}
+              </select>
+            </div>
+            <button type="submit" className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground hover:bg-brand/90 transition-colors">
+              Filtrele
+            </button>
+            {(hipo || pist || irk) && (
+              <Link href="/admin/jokey" className="rounded-md border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                Temizle
+              </Link>
+            )}
+          </form>
 
-        <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-medium text-muted-foreground">Irk</label>
-          <select
-            name="irk"
-            defaultValue={irk ?? ""}
-            className="rounded-md border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand"
-          >
-            {BREEDS.map((b) => (
-              <option key={b.value} value={b.value}>{b.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <button
-          type="submit"
-          className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground hover:bg-brand/90 transition-colors"
-        >
-          Filtrele
-        </button>
-
-        {(hipo || pist || irk) && (
-          <Link
-            href="/admin/jokey"
-            className="rounded-md border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          >
-            Temizle
-          </Link>
-        )}
-      </form>
-
-      {/* Tablo */}
-      <div className="rounded-lg border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b bg-muted/50 text-muted-foreground">
-                <th className="px-3 py-2 text-left font-medium w-8">#</th>
-                <th className="px-3 py-2 text-left font-medium">Jokey</th>
-                <th className="px-3 py-2 text-center font-medium">Biniş</th>
-                <th className="px-3 py-2 text-center font-medium">Galibiyet</th>
-                <th className="px-3 py-2 text-center font-medium">Kazanma %</th>
-                <th className="px-3 py-2 text-left w-40 font-medium">Oran</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-10 text-center text-muted-foreground">
-                    Bu filtre için veri bulunamadı.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((r, i) => {
-                  const color =
-                    r.winPct >= 25 ? "text-hit" :
-                    r.winPct >= 15 ? "text-brand" : "text-muted-foreground";
-                  const barWidth = Math.min(r.winPct * 2, 100);
-
-                  return (
-                    <tr
-                      key={r.jockey}
-                      className={cn("border-b last:border-0", i % 2 === 1 && "bg-muted/20")}
-                    >
-                      <td className="px-3 py-2 text-muted-foreground tabular-nums">{i + 1}</td>
-                      <td className="px-3 py-2 font-semibold">{r.jockey}</td>
-                      <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{r.rides}</td>
-                      <td className="px-3 py-2 text-center tabular-nums font-medium">{r.wins}</td>
-                      <td className={cn("px-3 py-2 text-center tabular-nums font-bold", color)}>
-                        %{r.winPct}
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-1.5">
-                          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                            <div
-                              className={cn("h-full rounded-full", r.winPct >= 25 ? "bg-hit" : r.winPct >= 15 ? "bg-brand" : "bg-muted-foreground/40")}
-                              style={{ width: `${barWidth}%` }}
-                            />
-                          </div>
-                          <span className="text-[10px] text-muted-foreground w-6 text-right">{r.wins}/{r.rides}</span>
-                        </div>
+          {/* Tablo */}
+          <div className="rounded-lg border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b bg-muted/50 text-muted-foreground">
+                    <th className="px-3 py-2 text-left font-medium w-8">#</th>
+                    <th className="px-3 py-2 text-left font-medium">Jokey</th>
+                    <th className="px-3 py-2 text-center font-medium">Biniş</th>
+                    <th className="px-3 py-2 text-center font-medium">1.</th>
+                    <th className="px-3 py-2 text-center font-medium">K%</th>
+                    <th className="px-3 py-2 text-center font-medium">Tb%</th>
+                    <th className="px-3 py-2 text-center font-medium">Skor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-10 text-center text-muted-foreground">
+                        {datasets.length === 0
+                          ? "Henüz veri yüklenmedi. Sol taraftan JSON dosyası ekleyin."
+                          : "Bu filtre için veri bulunamadı."}
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        {rows.length > 0 && (
-          <div className="border-t px-3 py-2 text-[11px] text-muted-foreground">
-            {rows.length} jokey · Veri DB&apos;den anlık hesaplanır, yeni sonuçlar girilince otomatik güncellenir.
+                  ) : (
+                    rows.map((r, i) => {
+                      const winPct = Math.round(r.winRate * 100);
+                      const tabPct = Math.round(r.tableRate * 100);
+                      const color = winPct >= 25 ? "text-hit" : winPct >= 15 ? "text-brand" : "text-muted-foreground";
+                      return (
+                        <tr key={r.id} className={cn("border-b last:border-0", i % 2 === 1 && "bg-muted/20")}>
+                          <td className="px-3 py-2 text-muted-foreground tabular-nums">{i + 1}</td>
+                          <td className="px-3 py-2 font-semibold">{r.jockey}</td>
+                          <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{r.rides}</td>
+                          <td className="px-3 py-2 text-center tabular-nums font-medium">{r.wins}</td>
+                          <td className={cn("px-3 py-2 text-center tabular-nums font-bold", color)}>%{winPct}</td>
+                          <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">%{tabPct}</td>
+                          <td className="px-3 py-2 text-center tabular-nums font-medium text-brand">
+                            {r.performanceScore?.toFixed(1) ?? "—"}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {rows.length > 0 && (
+              <div className="border-t px-3 py-2 text-[11px] text-muted-foreground">
+                {rows.length} jokey · K% = kazanma, Tb% = ilk 5, Skor = performans puanı
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

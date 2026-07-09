@@ -474,6 +474,34 @@ model BannerSlide {
   @@index([active, order])
 }
 
+// ─── JOKEY STAT SYNC (TJK'dan çekilen) ───────────────────────────────────────
+
+model JockeyStatSync {
+  id               String   @id @default(cuid())
+  jockey           String
+  hippoSlug        String   // "overall" veya hippodrome slug (ankara, istanbul, ...)
+  year             Int
+  breed            String?  // "INGILIZ" | "ARAP" | null = hepsi
+  surface          String?  // "CIM" | "KUM" | "SENTETIK" | null = hepsi
+  rides            Int
+  wins             Int
+  place2           Int
+  place3           Int
+  place4           Int
+  place5           Int
+  tableCount       Int
+  winRate          Float
+  tableRate        Float
+  prizeTl          Int
+  performanceScore Float?
+  confidenceLabel  String?
+  updatedAt        DateTime @updatedAt
+
+  @@unique([jockey, hippoSlug, year, breed, surface])
+  @@index([hippoSlug, year, breed, surface])
+  @@index([jockey, year])
+}
+
 // ─── PAGE VIEWS ───────────────────────────────────────────────────────────────
 
 model PageView {
