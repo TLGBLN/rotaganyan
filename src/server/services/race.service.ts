@@ -678,11 +678,16 @@ export type JockeyStat = {
   byContext: Record<string, StatBucket>;        // "ankara:CIM:INGILIZ" | "ankara:CIM"
 };
 
-function _norm(s: string) {
+export function _norm(s: string) {
   return s.toUpperCase()
     .replace(/İ/g, "I").replace(/Ğ/g, "G").replace(/Ü/g, "U")
     .replace(/Ş/g, "S").replace(/Ö/g, "O").replace(/Ç/g, "C")
     .replace(/\s+/g, " ").trim();
+}
+
+// "V.ABİŞ" veya "VURAL ABİŞ" → "ABIS" (nokta/boşlukla bölüp son token)
+function _surname(normName: string): string {
+  return normName.split(/[\s.]+/).filter(Boolean).at(-1) ?? normName;
 }
 
 /** JockeyStatSync tablosundan (JSON import + race result sync) çeker; veri yoksa race result hesaplar. */
@@ -690,32 +695,42 @@ export async function getJockeyStats(names: string[]): Promise<Record<string, Jo
   if (names.length === 0) return {};
   const year = new Date().getFullYear();
 
-  // Tüm sync satırlarını çek (küçük tablo) — normalize eşleştirme için
+  // Tüm sync satırlarını çek (küçük tablo) — normalize + soyadı eşleştirme için
   const allSyncRows = await db.jockeyStatSync.findMany({ where: { year } });
   if (allSyncRows.length === 0) return _calcJockeyStatsFromResults(names);
 
-  // normalized → canonical DB ismi haritası
+  // normalize → sync ismi
   const normMap = new Map<string, string>();
-  for (const row of allSyncRows) normMap.set(_norm(row.jockey), row.jockey);
+  // soyad → sync ismi (fallback: TJK kısaltmalı "V.ABİŞ" ↔ "VURAL ABİŞ")
+  const surnameMap = new Map<string, string>();
+  for (const row of allSyncRows) {
+    const n = _norm(row.jockey);
+    normMap.set(n, row.jockey);
+    const sur = _surname(n);
+    if (!surnameMap.has(sur)) surnameMap.set(sur, row.jockey);
+  }
 
-  // Her giriş ismini canonical'a çevir
-  const canonicalNames = names.map((n) => normMap.get(_norm(n)) ?? n);
-  const canonicalSet = new Set(canonicalNames);
+  function resolve(name: string): string {
+    const n = _norm(name);
+    return normMap.get(n) ?? surnameMap.get(_surname(n)) ?? name;
+  }
+
+  // Program ismi → sync'teki canonical isim
+  const progToSync = new Map<string, string>(); // syncIsim → programIsmi (ters harita)
+  const canonicalSet = new Set<string>();
+  for (const name of names) {
+    const syncName = resolve(name);
+    canonicalSet.add(syncName);
+    if (!progToSync.has(syncName)) progToSync.set(syncName, name);
+  }
 
   const syncRows = allSyncRows.filter((r) => canonicalSet.has(r.jockey));
   if (syncRows.length === 0) return _calcJockeyStatsFromResults(names);
 
-  // Program ismi → canonical isim haritası (geri eşleme için)
-  const progToCanonical = new Map<string, string>();
-  for (let i = 0; i < names.length; i++) {
-    const c = normMap.get(_norm(names[i])) ?? names[i];
-    progToCanonical.set(c, names[i]);  // canonical → program ismi
-  }
-
   const out: Record<string, JockeyStat> = {};
   for (const row of syncRows) {
-    // Çıktı anahtarı: program sayfasındaki isim (eşleşme için)
-    const outKey = progToCanonical.get(row.jockey) ?? row.jockey;
+    // Çıktı anahtarı: program sayfasındaki isim
+    const outKey = progToSync.get(row.jockey) ?? row.jockey;
     if (!out[outKey]) {
       out[outKey] = { overall: { wins: 0, rides: 0 }, byHippo: {}, bySurface: {}, byContext: {} };
     }

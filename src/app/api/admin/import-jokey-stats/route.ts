@@ -71,14 +71,17 @@ function toSurface(track: string): string {
   return "KUM";
 }
 
-// Türkçe karakter normalize + büyük harf (isim eşleştirme için)
+// Türkçe karakter normalize + büyük harf
 function normName(s: string): string {
   return s.toUpperCase()
-    .replace(/İ/g, "I").replace(/I/g, "I")
-    .replace(/Ğ/g, "G").replace(/Ü/g, "U")
-    .replace(/Ş/g, "S").replace(/Ö/g, "O")
-    .replace(/Ç/g, "C").replace(/\s+/g, " ")
-    .trim();
+    .replace(/İ/g, "I").replace(/Ğ/g, "G").replace(/Ü/g, "U")
+    .replace(/Ş/g, "S").replace(/Ö/g, "O").replace(/Ç/g, "C")
+    .replace(/\s+/g, " ").trim();
+}
+
+// Son token (soyad): "V.ABİŞ" → "ABIS", "VEDAT ABİŞ" → "ABIS"
+function surname(normN: string): string {
+  return normN.split(/[\s.]+/).filter(Boolean).at(-1) ?? normN;
 }
 
 export async function POST(req: NextRequest) {
@@ -122,18 +125,27 @@ export async function POST(req: NextRequest) {
     distinct: ["jockey"],
   });
 
-  // normalized → canonical isim haritası
-  const canonicalMap = new Map<string, string>();
+  // normalize → canonical, soyad → canonical (iki seviyeli eşleştirme)
+  const canonicalMap = new Map<string, string>();   // tam norm → canonical
+  const surnameMap = new Map<string, string>();     // soyad → canonical
   for (const r of knownRunners) {
-    if (r.jockey) canonicalMap.set(normName(r.jockey), r.jockey);
+    if (!r.jockey) continue;
+    const n = normName(r.jockey);
+    canonicalMap.set(n, r.jockey);
+    const sur = surname(n);
+    if (!surnameMap.has(sur)) surnameMap.set(sur, r.jockey);
+  }
+
+  function resolveCanonical(jsonName: string): string | undefined {
+    const n = normName(jsonName);
+    return canonicalMap.get(n) ?? surnameMap.get(surname(n));
   }
 
   let upserted = 0;
   const unmatched: string[] = [];
 
   for (const j of jockeys) {
-    // Canonical isim: önce tam eşleşme, sonra normalize eşleşme, son olarak JSON ismi
-    const canonical = canonicalMap.get(normName(j.jockey));
+    const canonical = resolveCanonical(j.jockey);
     const jockeyName = canonical ?? j.jockey;
     if (!canonical) unmatched.push(j.jockey);
 
