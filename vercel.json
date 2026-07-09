@@ -91,6 +91,10 @@
     {
       "path": "/api/cron/horse-notifications-hourly",
       "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/sync-jokey-stats",
+      "schedule": "0 22 * * *"
     }
   ]
 }

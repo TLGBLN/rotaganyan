@@ -349,7 +349,7 @@ function RunnerRow({
             pct(jockeyStat) >= 25 ? "text-hit" :
             pct(jockeyStat) >= 15 ? "text-brand" : "text-muted-foreground"
           )}>
-            {jockeyStat.label} &apos;26: {jockeyStat.wins}/{jockeyStat.rides} %{pct(jockeyStat)}
+            {jockeyStat.label} &apos;26: {jockeyStat.wins}/{jockeyStat.rides} K%{pct(jockeyStat)}{jockeyStat.tableRate != null ? ` Tb%${Math.round(jockeyStat.tableRate * 100)}` : ""}{jockeyStat.performanceScore != null ? ` · ${jockeyStat.performanceScore.toFixed(1)}` : ""}
           </div>
         )}
       </td>
@@ -571,14 +571,17 @@ function RaceTimer({ time, hasResult, dateStr }: { time: string | null; hasResul
 type JockeyStatRow = {
   wins: number;
   rides: number;
-  label: string;  // "Ankara Kum"
+  label: string;
+  tableRate?: number;
+  performanceScore?: number;
 };
 
+type StatBucket = { wins: number; rides: number; winRate?: number; tableRate?: number; performanceScore?: number };
 type JockeyStatsMap = Record<string, {
-  overall: { wins: number; rides: number };
-  byHippo: Record<string, { wins: number; rides: number }>;
-  bySurface: Record<string, { wins: number; rides: number }>;
-  byContext: Record<string, { wins: number; rides: number }>;
+  overall: StatBucket;
+  byHippo: Record<string, StatBucket>;
+  bySurface: Record<string, StatBucket>;
+  byContext: Record<string, StatBucket>;
 }>;
 
 function RaceTable({
@@ -633,12 +636,12 @@ function RaceTable({
     const breedCombo = raw.byContext[`${hippodromeSlug}:${race.surface}:${race.breed}`];
     if (breedCombo && breedCombo.rides > 0) {
       const irkLabel = race.breed === "INGILIZ" ? "İng" : "Arap";
-      return { wins: breedCombo.wins, rides: breedCombo.rides, label: `${hippoShort} ${pistLabel} ${irkLabel}` };
+      return { wins: breedCombo.wins, rides: breedCombo.rides, label: `${hippoShort} ${pistLabel} ${irkLabel}`, tableRate: breedCombo.tableRate, performanceScore: breedCombo.performanceScore };
     }
     // 2. Aynı hipodrom + pist (ırk fark etmez)
     const combo = raw.byContext[`${hippodromeSlug}:${race.surface}`];
     if (combo && combo.rides > 0) {
-      return { wins: combo.wins, rides: combo.rides, label: `${hippoShort} ${pistLabel}` };
+      return { wins: combo.wins, rides: combo.rides, label: `${hippoShort} ${pistLabel}`, tableRate: combo.tableRate };
     }
     // 3. Genel
     const overall = raw.overall;

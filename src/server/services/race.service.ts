@@ -663,28 +663,67 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
 
 // ─── Jokey İstatistikleri ─────────────────────────────────────────────────────
 
-type StatBucket = { wins: number; rides: number };
+export type StatBucket = {
+  wins: number;
+  rides: number;
+  winRate?: number;
+  tableRate?: number;
+  performanceScore?: number;
+};
 
 export type JockeyStat = {
   overall: StatBucket;
-  byHippo: Record<string, StatBucket>;          // "ankara"
-  bySurface: Record<string, StatBucket>;         // "CIM" | "KUM" | "SENTETIK"
-  byContext: Record<string, StatBucket>;         // "ankara:CIM"
+  byHippo: Record<string, StatBucket>;
+  bySurface: Record<string, StatBucket>;
+  byContext: Record<string, StatBucket>;        // "ankara:CIM:INGILIZ" | "ankara:CIM"
 };
 
-/** Bu yıla ait galibiyet/biniş istatistiklerini ırk+hipodrom+pist kırılımıyla döner. */
+/** JockeyStatSync tablosundan (JSON import + race result sync) çeker; veri yoksa race result hesaplar. */
 export async function getJockeyStats(names: string[]): Promise<Record<string, JockeyStat>> {
   if (names.length === 0) return {};
+  const year = new Date().getFullYear();
 
+  const syncRows = await db.jockeyStatSync.findMany({
+    where: { jockey: { in: names }, year },
+  });
+
+  if (syncRows.length > 0) {
+    const out: Record<string, JockeyStat> = {};
+    for (const row of syncRows) {
+      if (!out[row.jockey]) {
+        out[row.jockey] = { overall: { wins: 0, rides: 0 }, byHippo: {}, bySurface: {}, byContext: {} };
+      }
+      const stat = out[row.jockey];
+      if (row.hippoSlug && row.surface && row.breed) {
+        const k1 = `${row.hippoSlug}:${row.surface}:${row.breed}`;
+        stat.byContext[k1] = {
+          wins: row.wins,
+          rides: row.rides,
+          winRate: row.winRate,
+          tableRate: row.tableRate,
+          performanceScore: row.performanceScore ?? undefined,
+        };
+        const k2 = `${row.hippoSlug}:${row.surface}`;
+        stat.byContext[k2] ??= { wins: 0, rides: 0 };
+        stat.byContext[k2].wins += row.wins;
+        stat.byContext[k2].rides += row.rides;
+      }
+      stat.overall.wins += row.wins;
+      stat.overall.rides += row.rides;
+    }
+    return out;
+  }
+
+  // Fallback: race result hesaplama
+  return _calcJockeyStatsFromResults(names);
+}
+
+async function _calcJockeyStatsFromResults(names: string[]): Promise<Record<string, JockeyStat>> {
   const since = new Date(`${new Date().getFullYear()}-01-01T00:00:00Z`);
-
   const runners = await db.runner.findMany({
     where: {
       jockey: { in: names },
-      race: {
-        raceDay: { date: { gte: since } },
-        result: { isNot: null },
-      },
+      race: { raceDay: { date: { gte: since } }, result: { isNot: null } },
     },
     select: {
       jockey: true,
@@ -701,42 +740,85 @@ export async function getJockeyStats(names: string[]): Promise<Record<string, Jo
   });
 
   const out: Record<string, JockeyStat> = {};
-
   for (const r of runners) {
     if (!r.jockey) continue;
     const isWin = r.race.result?.winnerNo === r.no;
     const hippoSlug = r.race.raceDay.hippodrome.slug;
-    // context key: ırk + hipodrom + pist
     const contextKey = `${hippoSlug}:${r.race.surface}:${r.race.breed}`;
-    // fallback key: sadece hipodrom + pist (ırksız)
     const contextKeyNoBreed = `${hippoSlug}:${r.race.surface}`;
-
     if (!out[r.jockey]) out[r.jockey] = { overall: { wins: 0, rides: 0 }, byHippo: {}, bySurface: {}, byContext: {} };
     const stat = out[r.jockey];
+    stat.overall.rides++; if (isWin) stat.overall.wins++;
+    stat.byHippo[hippoSlug] ??= { wins: 0, rides: 0 }; stat.byHippo[hippoSlug].rides++; if (isWin) stat.byHippo[hippoSlug].wins++;
+    stat.bySurface[r.race.surface] ??= { wins: 0, rides: 0 }; stat.bySurface[r.race.surface].rides++; if (isWin) stat.bySurface[r.race.surface].wins++;
+    stat.byContext[contextKey] ??= { wins: 0, rides: 0 }; stat.byContext[contextKey].rides++; if (isWin) stat.byContext[contextKey].wins++;
+    stat.byContext[contextKeyNoBreed] ??= { wins: 0, rides: 0 }; stat.byContext[contextKeyNoBreed].rides++; if (isWin) stat.byContext[contextKeyNoBreed].wins++;
+  }
+  return out;
+}
 
-    stat.overall.rides++;
-    if (isWin) stat.overall.wins++;
+/** Yarış sonuçlarından JockeyStatSync tablosunu günceller (cron tarafından çağrılır). */
+export async function syncJockeyStatsFromResults(): Promise<number> {
+  const year = new Date().getFullYear();
+  const since = new Date(`${year}-01-01T00:00:00Z`);
 
-    stat.byHippo[hippoSlug] ??= { wins: 0, rides: 0 };
-    stat.byHippo[hippoSlug].rides++;
-    if (isWin) stat.byHippo[hippoSlug].wins++;
+  const runners = await db.runner.findMany({
+    where: {
+      jockey: { not: null },
+      race: { raceDay: { date: { gte: since } }, result: { isNot: null } },
+    },
+    select: {
+      jockey: true,
+      no: true,
+      race: {
+        select: {
+          surface: true,
+          breed: true,
+          raceDay: { select: { hippodrome: { select: { slug: true } } } },
+          result: { select: { actualOrder: true, winnerNo: true } },
+        },
+      },
+    },
+  });
 
-    stat.bySurface[r.race.surface] ??= { wins: 0, rides: 0 };
-    stat.bySurface[r.race.surface].rides++;
-    if (isWin) stat.bySurface[r.race.surface].wins++;
+  type Agg = { wins: number; rides: number; p2: number; p3: number; p4: number; p5: number };
+  const agg = new Map<string, Agg>();
 
-    // ırk+hipodrom+pist
-    stat.byContext[contextKey] ??= { wins: 0, rides: 0 };
-    stat.byContext[contextKey].rides++;
-    if (isWin) stat.byContext[contextKey].wins++;
-
-    // hipodrom+pist (ırksız fallback)
-    stat.byContext[contextKeyNoBreed] ??= { wins: 0, rides: 0 };
-    stat.byContext[contextKeyNoBreed].rides++;
-    if (isWin) stat.byContext[contextKeyNoBreed].wins++;
+  for (const r of runners) {
+    if (!r.jockey) continue;
+    const hippo = r.race.raceDay.hippodrome.slug;
+    const surf = r.race.surface as string;
+    const breed = r.race.breed as string;
+    const key = `${r.jockey}|${hippo}|${surf}|${breed}`;
+    let a = agg.get(key);
+    if (!a) { a = { wins: 0, rides: 0, p2: 0, p3: 0, p4: 0, p5: 0 }; agg.set(key, a); }
+    a.rides++;
+    const order = r.race.result?.actualOrder as number[] | null;
+    if (Array.isArray(order)) {
+      const pos = order.indexOf(r.no);
+      if (pos === 0) a.wins++;
+      else if (pos === 1) a.p2++;
+      else if (pos === 2) a.p3++;
+      else if (pos === 3) a.p4++;
+      else if (pos === 4) a.p5++;
+    } else if (r.race.result?.winnerNo === r.no) {
+      a.wins++;
+    }
   }
 
-  return out;
+  for (const [key, a] of agg) {
+    const [jockey, hippoSlug, surface, breed] = key.split("|");
+    const tableCount = a.wins + a.p2 + a.p3 + a.p4 + a.p5;
+    const winRate = a.rides > 0 ? a.wins / a.rides : 0;
+    const tableRate = a.rides > 0 ? tableCount / a.rides : 0;
+    await db.jockeyStatSync.upsert({
+      where: { jockey_hippoSlug_year_breed_surface: { jockey, hippoSlug, year, breed, surface } },
+      update: { rides: a.rides, wins: a.wins, place2: a.p2, place3: a.p3, place4: a.p4, place5: a.p5, tableCount, winRate, tableRate },
+      create: { jockey, hippoSlug, year, breed, surface, rides: a.rides, wins: a.wins, place2: a.p2, place3: a.p3, place4: a.p4, place5: a.p5, tableCount, winRate, tableRate, prizeTl: 0 },
+    });
+  }
+
+  return agg.size;
 }
 
 export type JockeyRow = {

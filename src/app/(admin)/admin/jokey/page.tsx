@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import RefreshButton from "@/components/admin/RefreshButton";
 import JokeyStatImport from "@/components/admin/JokeyStatImport";
+import JokeySyncButton from "@/components/admin/JokeySyncButton";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,7 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
         {/* Sol: Import + yüklü setler */}
         <div className="space-y-4">
           <JokeyStatImport />
+          <JokeySyncButton />
 
           {datasets.length > 0 && (
             <div className="rounded-xl border p-4 space-y-2">
