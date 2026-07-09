@@ -129,20 +129,18 @@ export async function POST(req: NextRequest) {
     distinct: ["jockey"],
   });
 
-  // normalize → canonical, soyad → canonical (iki seviyeli eşleştirme)
-  const canonicalMap = new Map<string, string>();   // tam norm → canonical
-  const surnameMap = new Map<string, string>();     // soyad → canonical
+  // Exact normalize match only — surname fallback intentionally removed.
+  // JSON files contain full names; surname matching causes collisions when two
+  // jockeys share a surname (both map to the same TJK abbreviated canonical).
+  // getJockeyStats handles abbreviation resolution on the program side.
+  const canonicalMap = new Map<string, string>(); // norm full name → canonical TJK name
   for (const r of knownRunners) {
     if (!r.jockey) continue;
-    const n = normName(r.jockey);
-    canonicalMap.set(n, r.jockey);
-    const sur = surname(n);
-    if (!surnameMap.has(sur)) surnameMap.set(sur, r.jockey);
+    canonicalMap.set(normName(r.jockey), r.jockey);
   }
 
   function resolveCanonical(jsonName: string): string | undefined {
-    const n = normName(jsonName);
-    return canonicalMap.get(n) ?? surnameMap.get(surname(n));
+    return canonicalMap.get(normName(jsonName));
   }
 
   let upserted = 0;
