@@ -678,44 +678,66 @@ export type JockeyStat = {
   byContext: Record<string, StatBucket>;        // "ankara:CIM:INGILIZ" | "ankara:CIM"
 };
 
+function _norm(s: string) {
+  return s.toUpperCase()
+    .replace(/İ/g, "I").replace(/Ğ/g, "G").replace(/Ü/g, "U")
+    .replace(/Ş/g, "S").replace(/Ö/g, "O").replace(/Ç/g, "C")
+    .replace(/\s+/g, " ").trim();
+}
+
 /** JockeyStatSync tablosundan (JSON import + race result sync) çeker; veri yoksa race result hesaplar. */
 export async function getJockeyStats(names: string[]): Promise<Record<string, JockeyStat>> {
   if (names.length === 0) return {};
   const year = new Date().getFullYear();
 
-  const syncRows = await db.jockeyStatSync.findMany({
-    where: { jockey: { in: names }, year },
-  });
+  // Tüm sync satırlarını çek (küçük tablo) — normalize eşleştirme için
+  const allSyncRows = await db.jockeyStatSync.findMany({ where: { year } });
+  if (allSyncRows.length === 0) return _calcJockeyStatsFromResults(names);
 
-  if (syncRows.length > 0) {
-    const out: Record<string, JockeyStat> = {};
-    for (const row of syncRows) {
-      if (!out[row.jockey]) {
-        out[row.jockey] = { overall: { wins: 0, rides: 0 }, byHippo: {}, bySurface: {}, byContext: {} };
-      }
-      const stat = out[row.jockey];
-      if (row.hippoSlug && row.surface && row.breed) {
-        const k1 = `${row.hippoSlug}:${row.surface}:${row.breed}`;
-        stat.byContext[k1] = {
-          wins: row.wins,
-          rides: row.rides,
-          winRate: row.winRate,
-          tableRate: row.tableRate,
-          performanceScore: row.performanceScore ?? undefined,
-        };
-        const k2 = `${row.hippoSlug}:${row.surface}`;
-        stat.byContext[k2] ??= { wins: 0, rides: 0 };
-        stat.byContext[k2].wins += row.wins;
-        stat.byContext[k2].rides += row.rides;
-      }
-      stat.overall.wins += row.wins;
-      stat.overall.rides += row.rides;
-    }
-    return out;
+  // normalized → canonical DB ismi haritası
+  const normMap = new Map<string, string>();
+  for (const row of allSyncRows) normMap.set(_norm(row.jockey), row.jockey);
+
+  // Her giriş ismini canonical'a çevir
+  const canonicalNames = names.map((n) => normMap.get(_norm(n)) ?? n);
+  const canonicalSet = new Set(canonicalNames);
+
+  const syncRows = allSyncRows.filter((r) => canonicalSet.has(r.jockey));
+  if (syncRows.length === 0) return _calcJockeyStatsFromResults(names);
+
+  // Program ismi → canonical isim haritası (geri eşleme için)
+  const progToCanonical = new Map<string, string>();
+  for (let i = 0; i < names.length; i++) {
+    const c = normMap.get(_norm(names[i])) ?? names[i];
+    progToCanonical.set(c, names[i]);  // canonical → program ismi
   }
 
-  // Fallback: race result hesaplama
-  return _calcJockeyStatsFromResults(names);
+  const out: Record<string, JockeyStat> = {};
+  for (const row of syncRows) {
+    // Çıktı anahtarı: program sayfasındaki isim (eşleşme için)
+    const outKey = progToCanonical.get(row.jockey) ?? row.jockey;
+    if (!out[outKey]) {
+      out[outKey] = { overall: { wins: 0, rides: 0 }, byHippo: {}, bySurface: {}, byContext: {} };
+    }
+    const stat = out[outKey];
+    if (row.hippoSlug && row.surface && row.breed) {
+      const k1 = `${row.hippoSlug}:${row.surface}:${row.breed}`;
+      stat.byContext[k1] = {
+        wins: row.wins,
+        rides: row.rides,
+        winRate: row.winRate,
+        tableRate: row.tableRate,
+        performanceScore: row.performanceScore ?? undefined,
+      };
+      const k2 = `${row.hippoSlug}:${row.surface}`;
+      stat.byContext[k2] ??= { wins: 0, rides: 0 };
+      stat.byContext[k2].wins += row.wins;
+      stat.byContext[k2].rides += row.rides;
+    }
+    stat.overall.wins += row.wins;
+    stat.overall.rides += row.rides;
+  }
+  return out;
 }
 
 async function _calcJockeyStatsFromResults(names: string[]): Promise<Record<string, JockeyStat>> {

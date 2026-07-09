@@ -8,6 +8,9 @@ import { cn } from "@/lib/utils";
 type ImportResult = {
   ok: boolean;
   upserted: number;
+  matched: number;
+  unmatched: number;
+  unmatchedNames: string[];
   hippoSlug: string;
   breed: string | null;
   surface: string | null;
@@ -87,11 +90,20 @@ export default function JokeyStatImport({ onImported }: { onImported?: () => voi
       </div>
 
       {result && (
-        <div className="rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-2 text-xs space-y-0.5">
+        <div className="rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-2 text-xs space-y-1">
           <div className="flex items-center gap-1.5 font-semibold text-green-500">
             <CheckCircle className="h-3.5 w-3.5" /> {result.title}
           </div>
-          <p className="text-muted-foreground">{result.upserted} jokey içe aktarıldı</p>
+          <p className="text-muted-foreground">
+            {result.upserted} jokey içe aktarıldı
+            {result.matched > 0 && ` · ${result.matched} isim yarış programıyla eşleşti`}
+          </p>
+          {result.unmatched > 0 && (
+            <div className="text-orange-500">
+              <p className="font-medium">{result.unmatched} isim programda bulunamadı (JSON ismi kullanıldı):</p>
+              <p className="text-muted-foreground leading-relaxed">{result.unmatchedNames.join(", ")}{result.unmatched > 20 ? "…" : ""}</p>
+            </div>
+          )}
         </div>
       )}
 

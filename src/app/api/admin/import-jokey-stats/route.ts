@@ -3,7 +3,6 @@ import { auth, hasRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { Role } from "@prisma/client";
 
-// JSON formatı: { meta: { year, breed, city, track }, jockeys: [...] }
 type JokeyJson = {
   meta: {
     year: number;
@@ -72,6 +71,16 @@ function toSurface(track: string): string {
   return "KUM";
 }
 
+// Türkçe karakter normalize + büyük harf (isim eşleştirme için)
+function normName(s: string): string {
+  return s.toUpperCase()
+    .replace(/İ/g, "I").replace(/I/g, "I")
+    .replace(/Ğ/g, "G").replace(/Ü/g, "U")
+    .replace(/Ş/g, "S").replace(/Ö/g, "O")
+    .replace(/Ç/g, "C").replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user || !hasRole(session.user.role as Role, "EDITOR")) {
@@ -95,12 +104,43 @@ export async function POST(req: NextRequest) {
   const surface = meta.track ? toSurface(meta.track) : null;
   const year = meta.year ?? new Date().getFullYear();
 
+  // Yarış programlarından bu hipodrom/pist/ırk için bilinen jokey isimlerini çek
+  const since = new Date(`${year}-01-01T00:00:00Z`);
+  const knownRunners = await db.runner.findMany({
+    where: {
+      jockey: { not: null },
+      race: {
+        ...(surface ? { surface: surface as "CIM" | "KUM" | "SENTETIK" } : {}),
+        ...(breed ? { breed: breed as "INGILIZ" | "ARAP" } : {}),
+        raceDay: {
+          date: { gte: since },
+          hippodrome: { slug: hippoSlug },
+        },
+      },
+    },
+    select: { jockey: true },
+    distinct: ["jockey"],
+  });
+
+  // normalized → canonical isim haritası
+  const canonicalMap = new Map<string, string>();
+  for (const r of knownRunners) {
+    if (r.jockey) canonicalMap.set(normName(r.jockey), r.jockey);
+  }
+
   let upserted = 0;
+  const unmatched: string[] = [];
+
   for (const j of jockeys) {
+    // Canonical isim: önce tam eşleşme, sonra normalize eşleşme, son olarak JSON ismi
+    const canonical = canonicalMap.get(normName(j.jockey));
+    const jockeyName = canonical ?? j.jockey;
+    if (!canonical) unmatched.push(j.jockey);
+
     await db.jockeyStatSync.upsert({
       where: {
         jockey_hippoSlug_year_breed_surface: {
-          jockey: j.jockey,
+          jockey: jockeyName,
           hippoSlug,
           year,
           breed: breed ?? "",
@@ -122,7 +162,7 @@ export async function POST(req: NextRequest) {
         confidenceLabel: j.confidenceLabel ?? null,
       },
       create: {
-        jockey: j.jockey,
+        jockey: jockeyName,
         hippoSlug,
         year,
         breed: breed ?? "",
@@ -147,6 +187,9 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     upserted,
+    matched: upserted - unmatched.length,
+    unmatched: unmatched.length,
+    unmatchedNames: unmatched.slice(0, 20),
     hippoSlug,
     breed,
     surface,
