@@ -690,18 +690,16 @@ function _surname(normName: string): string {
   return normName.split(/[\s.]+/).filter(Boolean).at(-1) ?? normName;
 }
 
-/** JockeyStatSync tablosundan (JSON import + race result sync) çeker; veri yoksa race result hesaplar. */
+/** JockeyStatSync + yarış sonuçlarını birleştirir. Sync'te olmayan jokeyler race results'tan tamamlanır. */
 export async function getJockeyStats(names: string[]): Promise<Record<string, JockeyStat>> {
   if (names.length === 0) return {};
   const year = new Date().getFullYear();
 
-  // Tüm sync satırlarını çek (küçük tablo) — normalize + soyadı eşleştirme için
+  // 1. JockeyStatSync'ten çek (JSON import + result sync)
   const allSyncRows = await db.jockeyStatSync.findMany({ where: { year } });
-  if (allSyncRows.length === 0) return _calcJockeyStatsFromResults(names);
 
-  // normalize → sync ismi
+  // normalize → sync ismi + soyadı haritaları
   const normMap = new Map<string, string>();
-  // soyad → sync ismi (fallback: TJK kısaltmalı "V.ABİŞ" ↔ "VURAL ABİŞ")
   const surnameMap = new Map<string, string>();
   for (const row of allSyncRows) {
     const n = _norm(row.jockey);
@@ -710,48 +708,48 @@ export async function getJockeyStats(names: string[]): Promise<Record<string, Jo
     if (!surnameMap.has(sur)) surnameMap.set(sur, row.jockey);
   }
 
-  function resolve(name: string): string {
+  function resolve(name: string): string | undefined {
     const n = _norm(name);
-    return normMap.get(n) ?? surnameMap.get(_surname(n)) ?? name;
+    return normMap.get(n) ?? surnameMap.get(_surname(n));
   }
-
-  // Program ismi → sync'teki canonical isim
-  const progToSync = new Map<string, string>(); // syncIsim → programIsmi (ters harita)
-  const canonicalSet = new Set<string>();
-  for (const name of names) {
-    const syncName = resolve(name);
-    canonicalSet.add(syncName);
-    if (!progToSync.has(syncName)) progToSync.set(syncName, name);
-  }
-
-  const syncRows = allSyncRows.filter((r) => canonicalSet.has(r.jockey));
-  if (syncRows.length === 0) return _calcJockeyStatsFromResults(names);
 
   const out: Record<string, JockeyStat> = {};
-  for (const row of syncRows) {
-    // Çıktı anahtarı: program sayfasındaki isim
-    const outKey = progToSync.get(row.jockey) ?? row.jockey;
-    if (!out[outKey]) {
-      out[outKey] = { overall: { wins: 0, rides: 0 }, byHippo: {}, bySurface: {}, byContext: {} };
+  const missingNames: string[] = [];  // sync'te bulunamayan jokeyler
+
+  for (const name of names) {
+    const syncName = resolve(name);
+    if (!syncName) { missingNames.push(name); continue; }
+
+    const rows = allSyncRows.filter((r) => r.jockey === syncName);
+    if (rows.length === 0) { missingNames.push(name); continue; }
+
+    if (!out[name]) out[name] = { overall: { wins: 0, rides: 0 }, byHippo: {}, bySurface: {}, byContext: {} };
+    const stat = out[name];
+    for (const row of rows) {
+      if (row.hippoSlug && row.surface && row.breed) {
+        stat.byContext[`${row.hippoSlug}:${row.surface}:${row.breed}`] = {
+          wins: row.wins, rides: row.rides,
+          winRate: row.winRate, tableRate: row.tableRate,
+          performanceScore: row.performanceScore ?? undefined,
+        };
+        const k2 = `${row.hippoSlug}:${row.surface}`;
+        stat.byContext[k2] ??= { wins: 0, rides: 0 };
+        stat.byContext[k2].wins += row.wins;
+        stat.byContext[k2].rides += row.rides;
+      }
+      stat.overall.wins += row.wins;
+      stat.overall.rides += row.rides;
     }
-    const stat = out[outKey];
-    if (row.hippoSlug && row.surface && row.breed) {
-      const k1 = `${row.hippoSlug}:${row.surface}:${row.breed}`;
-      stat.byContext[k1] = {
-        wins: row.wins,
-        rides: row.rides,
-        winRate: row.winRate,
-        tableRate: row.tableRate,
-        performanceScore: row.performanceScore ?? undefined,
-      };
-      const k2 = `${row.hippoSlug}:${row.surface}`;
-      stat.byContext[k2] ??= { wins: 0, rides: 0 };
-      stat.byContext[k2].wins += row.wins;
-      stat.byContext[k2].rides += row.rides;
-    }
-    stat.overall.wins += row.wins;
-    stat.overall.rides += row.rides;
   }
+
+  // 2. Sync'te olmayan jokeyler için race results'tan hesapla ve ekle
+  if (missingNames.length > 0) {
+    const fromResults = await _calcJockeyStatsFromResults(missingNames);
+    for (const [name, stat] of Object.entries(fromResults)) {
+      out[name] = stat;
+    }
+  }
+
   return out;
 }
 
