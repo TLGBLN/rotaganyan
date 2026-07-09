@@ -4,7 +4,6 @@ import Link from "next/link";
 import RefreshButton from "@/components/admin/RefreshButton";
 import JokeyStatImport from "@/components/admin/JokeyStatImport";
 import JokeySyncButton from "@/components/admin/JokeySyncButton";
-import JokeyEntryForm from "@/components/admin/JokeyEntryForm";
 
 export const dynamic = "force-dynamic";
 
@@ -139,14 +138,7 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
         <div className="space-y-4">
           <JokeyStatImport />
           <JokeySyncButton />
-          {hipo && pist && irk && (
-            <JokeyEntryForm
-              hippoSlug={hipo}
-              surface={pist}
-              breed={irk}
-              year={2026}
-            />
-          )}
+
 
           {datasets.length > 0 && (
             <div className="rounded-xl border p-3 space-y-1.5">

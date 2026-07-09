@@ -795,12 +795,36 @@ async function _calcJockeyStatsFromResults(names: string[]): Promise<Record<stri
 /** Yarış sonuçlarından JockeyStatSync tablosunu günceller (cron tarafından çağrılır). */
 export async function syncJockeyStatsFromResults(): Promise<number> {
   const year = new Date().getFullYear();
-  const since = new Date(`${year}-01-01T00:00:00Z`);
+  const yearStart = new Date(`${year}-01-01T00:00:00Z`);
 
+  // Load existing JockeyStatSync rows (with jsonCutoffDate for additive logic).
+  const existingRows = await db.jockeyStatSync.findMany({
+    where: { year },
+    select: { jockey: true, hippoSlug: true, surface: true, breed: true, jsonCutoffDate: true,
+              rides: true, wins: true, place2: true, place3: true, place4: true, place5: true, tableCount: true },
+  });
+
+  // surname → canonical name (for TJK abbreviated names like "V.ABİŞ" → "VEDAT ABİŞ")
+  const canonicalBySurname = new Map<string, string>();
+  for (const row of existingRows) {
+    const sur = _surname(_norm(row.jockey));
+    if (!canonicalBySurname.has(sur)) canonicalBySurname.set(sur, row.jockey);
+  }
+
+  // canonical key → existing row (for additive update)
+  type SyncRow = typeof existingRows[number];
+  const existingByKey = new Map<string, SyncRow>();
+  for (const row of existingRows) {
+    existingByKey.set(`${row.jockey}|${row.hippoSlug}|${row.surface}|${row.breed}`, row);
+  }
+
+  // Fetch runners with results. For rows with jsonCutoffDate, only count races AFTER
+  // that cutoff so we add the delta on top of JSON baseline without double-counting.
+  // For rows without jsonCutoffDate (no JSON import), count from year start.
   const runners = await db.runner.findMany({
     where: {
       jockey: { not: null },
-      race: { raceDay: { date: { gte: since } }, result: { isNot: null } },
+      race: { raceDay: { date: { gte: yearStart } }, result: { isNot: null } },
     },
     select: {
       jockey: true,
@@ -809,7 +833,7 @@ export async function syncJockeyStatsFromResults(): Promise<number> {
         select: {
           surface: true,
           breed: true,
-          raceDay: { select: { hippodrome: { select: { slug: true } } } },
+          raceDay: { select: { date: true, hippodrome: { select: { slug: true } } } },
           result: { select: { actualOrder: true, winnerNo: true } },
         },
       },
@@ -824,9 +848,19 @@ export async function syncJockeyStatsFromResults(): Promise<number> {
     const hippo = r.race.raceDay.hippodrome.slug;
     const surf = r.race.surface as string;
     const breed = r.race.breed as string;
-    const key = `${r.jockey}|${hippo}|${surf}|${breed}`;
-    let a = agg.get(key);
-    if (!a) { a = { wins: 0, rides: 0, p2: 0, p3: 0, p4: 0, p5: 0 }; agg.set(key, a); }
+    const raceDate = r.race.raceDay.date;
+
+    // Resolve canonical name
+    const sur = _surname(_norm(r.jockey));
+    const jockey = canonicalBySurname.get(sur) ?? r.jockey;
+    const canonicalKey = `${jockey}|${hippo}|${surf}|${breed}`;
+
+    // If JSON import covers this combo, only count races after the cutoff
+    const existingRow = existingByKey.get(canonicalKey);
+    if (existingRow?.jsonCutoffDate && raceDate <= existingRow.jsonCutoffDate) continue;
+
+    let a = agg.get(canonicalKey);
+    if (!a) { a = { wins: 0, rides: 0, p2: 0, p3: 0, p4: 0, p5: 0 }; agg.set(canonicalKey, a); }
     a.rides++;
     const order = r.race.result?.actualOrder as number[] | null;
     if (Array.isArray(order)) {
@@ -841,19 +875,53 @@ export async function syncJockeyStatsFromResults(): Promise<number> {
     }
   }
 
-  for (const [key, a] of agg) {
-    const [jockey, hippoSlug, surface, breed] = key.split("|");
-    const tableCount = a.wins + a.p2 + a.p3 + a.p4 + a.p5;
-    const winRate = a.rides > 0 ? a.wins / a.rides : 0;
-    const tableRate = a.rides > 0 ? tableCount / a.rides : 0;
-    await db.jockeyStatSync.upsert({
-      where: { jockey_hippoSlug_year_breed_surface: { jockey, hippoSlug, year, breed, surface } },
-      update: { rides: a.rides, wins: a.wins, place2: a.p2, place3: a.p3, place4: a.p4, place5: a.p5, tableCount, winRate, tableRate },
-      create: { jockey, hippoSlug, year, breed, surface, rides: a.rides, wins: a.wins, place2: a.p2, place3: a.p3, place4: a.p4, place5: a.p5, tableCount, winRate, tableRate, prizeTl: 0 },
-    });
+  // Track raw TJK names that resolved to a different canonical (to delete orphan rows)
+  const orphanNames = new Set<string>();
+  for (const r of runners) {
+    if (!r.jockey) continue;
+    const sur = _surname(_norm(r.jockey));
+    const canonical = canonicalBySurname.get(sur);
+    if (canonical && canonical !== r.jockey) orphanNames.add(r.jockey);
   }
 
-  return agg.size;
+  let updated = 0;
+
+  for (const [canonicalKey, delta] of agg) {
+    const [jockey, hippoSlug, surface, breed] = canonicalKey.split("|");
+    const existing = existingByKey.get(canonicalKey);
+
+    // Additive: JSON baseline + delta from DB races after cutoff
+    const baseRides = existing?.rides ?? 0;
+    const baseWins = existing?.wins ?? 0;
+    const baseP2 = existing?.place2 ?? 0;
+    const baseP3 = existing?.place3 ?? 0;
+    const baseP4 = existing?.place4 ?? 0;
+    const baseP5 = existing?.place5 ?? 0;
+
+    const rides = baseRides + delta.rides;
+    const wins = baseWins + delta.wins;
+    const p2 = baseP2 + delta.p2;
+    const p3 = baseP3 + delta.p3;
+    const p4 = baseP4 + delta.p4;
+    const p5 = baseP5 + delta.p5;
+    const tableCount = wins + p2 + p3 + p4 + p5;
+    const winRate = rides > 0 ? wins / rides : 0;
+    const tableRate = rides > 0 ? tableCount / rides : 0;
+
+    await db.jockeyStatSync.upsert({
+      where: { jockey_hippoSlug_year_breed_surface: { jockey, hippoSlug, year, breed, surface } },
+      update: { rides, wins, place2: p2, place3: p3, place4: p4, place5: p5, tableCount, winRate, tableRate },
+      create: { jockey, hippoSlug, year, breed, surface, rides, wins, place2: p2, place3: p3, place4: p4, place5: p5, tableCount, winRate, tableRate, prizeTl: 0 },
+    });
+    updated++;
+  }
+
+  // Delete orphan rows (abbreviated TJK names superseded by canonical JSON-imported names).
+  if (orphanNames.size > 0) {
+    await db.jockeyStatSync.deleteMany({ where: { year, jockey: { in: [...orphanNames] } } });
+  }
+
+  return updated;
 }
 
 export type JockeyRow = {

@@ -42,6 +42,9 @@ const CITY_SLUG: Record<string, string> = {
   "kocaeli": "kocaeli",
   "sanliurfa": "sanliurfa",
   "Şanlıurfa": "sanliurfa",
+  "Ş.Urfa": "sanliurfa",
+  "ş.urfa": "sanliurfa",
+  "s.urfa": "sanliurfa",
   "konya": "konya",
   "diyarbakir": "diyarbakir",
   "Diyarbakır": "diyarbakir",
@@ -51,13 +54,14 @@ const CITY_SLUG: Record<string, string> = {
 };
 
 function toSlug(city: string): string {
+  if (CITY_SLUG[city]) return CITY_SLUG[city];
   const lower = city.toLowerCase()
     .replace(/i̇/g, "i").replace(/ı/g, "i")
     .replace(/ğ/g, "g").replace(/ü/g, "u")
     .replace(/ş/g, "s").replace(/ö/g, "o")
     .replace(/ç/g, "c").replace(/â/g, "a")
-    .replace(/\s+/g, "-");
-  return CITY_SLUG[city] ?? CITY_SLUG[lower] ?? lower;
+    .replace(/\./g, "").replace(/\s+/g, "-");
+  return CITY_SLUG[lower] ?? lower;
 }
 
 function toBreed(breed: string): string {
@@ -172,6 +176,7 @@ export async function POST(req: NextRequest) {
         prizeTl: Math.round(j.prizeTl),
         performanceScore: j.performanceScore ?? null,
         confidenceLabel: j.confidenceLabel ?? null,
+        jsonCutoffDate: new Date(),
       },
       create: {
         jockey: jockeyName,
@@ -191,6 +196,7 @@ export async function POST(req: NextRequest) {
         prizeTl: Math.round(j.prizeTl),
         performanceScore: j.performanceScore ?? null,
         confidenceLabel: j.confidenceLabel ?? null,
+        jsonCutoffDate: new Date(),
       },
     });
     upserted++;
