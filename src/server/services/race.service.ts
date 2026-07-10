@@ -690,12 +690,11 @@ function _surname(normName: string): string {
   return normName.split(/[\s.]+/).filter(Boolean).at(-1) ?? normName;
 }
 
-/** JockeyStatSync + yarış sonuçlarını birleştirir. Sync'te olmayan jokeyler race results'tan tamamlanır. */
+/** Sadece jockeyStatSync tablosundan çeker — race results fallback yok. */
 export async function getJockeyStats(names: string[]): Promise<Record<string, JockeyStat>> {
   if (names.length === 0) return {};
   const year = new Date().getFullYear();
 
-  // 1. JockeyStatSync'ten çek (JSON import + result sync)
   const allSyncRows = await db.jockeyStatSync.findMany({ where: { year } });
 
   // normalize → sync ismi + soyadı haritaları
@@ -714,14 +713,13 @@ export async function getJockeyStats(names: string[]): Promise<Record<string, Jo
   }
 
   const out: Record<string, JockeyStat> = {};
-  const missingNames: string[] = [];  // sync'te bulunamayan jokeyler
 
   for (const name of names) {
     const syncName = resolve(name);
-    if (!syncName) { missingNames.push(name); continue; }
+    if (!syncName) continue;
 
     const rows = allSyncRows.filter((r) => r.jockey === syncName);
-    if (rows.length === 0) { missingNames.push(name); continue; }
+    if (rows.length === 0) continue;
 
     if (!out[name]) out[name] = { overall: { wins: 0, rides: 0 }, byHippo: {}, bySurface: {}, byContext: {} };
     const stat = out[name];
@@ -739,14 +737,6 @@ export async function getJockeyStats(names: string[]): Promise<Record<string, Jo
       }
       stat.overall.wins += row.wins;
       stat.overall.rides += row.rides;
-    }
-  }
-
-  // 2. Sync'te olmayan jokeyler için race results'tan hesapla ve ekle
-  if (missingNames.length > 0) {
-    const fromResults = await _calcJockeyStatsFromResults(missingNames);
-    for (const [name, stat] of Object.entries(fromResults)) {
-      out[name] = stat;
     }
   }
 
