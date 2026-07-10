@@ -50,8 +50,8 @@ const EKURI_COLORS = [
 
 function formBoxClass(pos: string, surface: string): string {
   if (pos === "K") return "bg-[#7f8c8d] text-white"; // Koşmadı — always gray
-  if (surface === "C") return "bg-[#27ae60] text-white"; // Çim
-  if (surface === "S") return "bg-[#d4ac0d] text-gray-900"; // Sentetik
+  if (surface === "C") return "bg-[#009900] text-white"; // Çim
+  if (surface === "S") return "bg-[#D39B1E] text-white"; // Sentetik
   if (surface === "K") return "bg-[#996633] text-white"; // Kum
   return formBoxClassByPos(pos); // zemin bilinmiyorsa pozisyona göre
 }
@@ -77,8 +77,8 @@ function bestTimeToSeconds(t: string): number {
 }
 
 function surfaceLabel(s: string) {
-  if (s === "CIM") return { label: "Çim", cls: "text-green-500" };
-  if (s === "SENTETIK") return { label: "Sentetik", cls: "text-yellow-500" };
+  if (s === "CIM") return { label: "Çim", cls: "text-[#009900]" };
+  if (s === "SENTETIK") return { label: "Sentetik", cls: "text-[#D39B1E]" };
   return { label: "Kum", cls: "text-[#996633]" };
 }
 
@@ -829,13 +829,13 @@ export default function ProgramView({
           <div className="flex items-center justify-between gap-4 px-3 py-1.5 bg-muted/20 border-b text-[11px]">
             <div className="flex items-center gap-4 text-muted-foreground">
               <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-sm bg-[#27ae60] inline-block" /> Çim
+                <span className="w-2.5 h-2.5 rounded-sm bg-[#009900] inline-block" /> Çim
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-sm bg-[#996633] inline-block" /> Kum
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-sm bg-[#d4ac0d] inline-block" /> Sentetik
+                <span className="w-2.5 h-2.5 rounded-sm bg-[#D39B1E] inline-block" /> Sentetik
               </span>
             </div>
             <div className="flex items-center gap-3">

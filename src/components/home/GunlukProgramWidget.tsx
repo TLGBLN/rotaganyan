@@ -149,13 +149,13 @@ export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: P
                 {/* Card footer */}
                 <div className="border-t px-4 py-2 flex items-center gap-3 text-[10px] text-muted-foreground">
                   <span className="flex items-center gap-1">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-hit" /> Çim
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#009900]" /> Çim
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#996633]" /> Kum
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand" /> Sentetik
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#D39B1E]" /> Sentetik
                   </span>
                   {analyzed > 0 && (
                     <span className="ml-auto text-hit font-medium">{analyzed}/{races.length} analiz</span>

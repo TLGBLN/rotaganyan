@@ -2,9 +2,9 @@ import type { DailyHippodrome } from "@/lib/tjk-daily";
 import type { Confidence } from "@prisma/client";
 
 const SURFACE_COLOR: Record<string, string> = {
-  Çim: "text-hit border-hit/30 bg-hit/5",
+  Çim: "text-[#009900] border-[#009900]/30 bg-[#009900]/5",
   Kum: "text-[#996633] border-[#996633]/30 bg-[#996633]/5",
-  Sentetik: "text-target border-target/30 bg-target/5",
+  Sentetik: "text-[#D39B1E] border-[#D39B1E]/30 bg-[#D39B1E]/5",
 };
 
 const CONFIDENCE_COLOR: Record<Confidence, string> = {
