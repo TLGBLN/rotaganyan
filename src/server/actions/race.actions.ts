@@ -5,6 +5,13 @@ import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import type { Surface, Breed } from "@prisma/client";
 
+export async function clearJockeyStats(): Promise<{ deleted: number }> {
+  await requireRole("ADMIN");
+  const { count } = await db.jockeyStatSync.deleteMany({});
+  revalidatePath("/admin/jokey");
+  return { deleted: count };
+}
+
 export async function syncTodayResults(): Promise<{ synced: number; failed: number; errors: string[]; debug: string[] }> {
   await requireRole("EDITOR");
   const { turkeyDateString } = await import("@/lib/tz");

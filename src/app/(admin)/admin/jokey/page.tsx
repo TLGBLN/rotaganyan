@@ -4,6 +4,7 @@ import Link from "next/link";
 import RefreshButton from "@/components/admin/RefreshButton";
 import JokeyStatImport from "@/components/admin/JokeyStatImport";
 import JokeySyncButton from "@/components/admin/JokeySyncButton";
+import JokeyClearButton from "@/components/admin/JokeyClearButton";
 
 export const dynamic = "force-dynamic";
 
@@ -138,6 +139,7 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
         <div className="space-y-4">
           <JokeyStatImport />
           <JokeySyncButton />
+          <JokeyClearButton />
 
 
           {datasets.length > 0 && (
