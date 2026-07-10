@@ -707,9 +707,27 @@ export async function getJockeyStats(names: string[]): Promise<Record<string, Jo
     if (!surnameMap.has(sur)) surnameMap.set(sur, row.jockey);
   }
 
+  // Baş harf + soyad eşleşmesi: "M.S.CELİK" → initials=["M","S"], sur="CELIK"
+  // Soyada uyan adayları başharflere göre filtrele; tekse döndür, çoksa en fazla biniş yapanı al
+  function resolveByInitials(n: string): string | undefined {
+    const parts = n.split(/[\s.]+/).filter(Boolean);
+    if (parts.length < 2) return undefined;
+    const sur = parts[parts.length - 1];
+    const initials = parts.slice(0, -1);
+    const candidates = allSyncRows.filter((r) => {
+      const rn = _norm(r.jockey).split(/\s+/);
+      if (_surname(_norm(r.jockey)) !== sur) return false;
+      return initials.every((init, i) => (rn[i] ?? "").startsWith(init));
+    });
+    if (candidates.length === 0) return undefined;
+    if (candidates.length === 1) return candidates[0].jockey;
+    // Birden fazla aday varsa en fazla biniş yapanı döndür
+    return candidates.sort((a, b) => b.rides - a.rides)[0].jockey;
+  }
+
   function resolve(name: string): string | undefined {
     const n = _norm(name);
-    return normMap.get(n) ?? surnameMap.get(_surname(n));
+    return normMap.get(n) ?? resolveByInitials(n) ?? surnameMap.get(_surname(n));
   }
 
   const out: Record<string, JockeyStat> = {};
