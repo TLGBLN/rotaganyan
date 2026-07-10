@@ -52,7 +52,7 @@ function formBoxClass(pos: string, surface: string): string {
   if (pos === "K") return "bg-[#7f8c8d] text-white"; // Koşmadı — always gray
   if (surface === "C") return "bg-[#27ae60] text-white"; // Çim
   if (surface === "S") return "bg-[#d4ac0d] text-gray-900"; // Sentetik
-  if (surface === "K") return "bg-[#e67e22] text-white"; // Kum
+  if (surface === "K") return "bg-[#996633] text-white"; // Kum
   return formBoxClassByPos(pos); // zemin bilinmiyorsa pozisyona göre
 }
 
@@ -79,7 +79,7 @@ function bestTimeToSeconds(t: string): number {
 function surfaceLabel(s: string) {
   if (s === "CIM") return { label: "Çim", cls: "text-green-500" };
   if (s === "SENTETIK") return { label: "Sentetik", cls: "text-yellow-500" };
-  return { label: "Kum", cls: "text-amber-600" };
+  return { label: "Kum", cls: "text-[#996633]" };
 }
 
 function breedShort(b: string) {
@@ -832,7 +832,7 @@ export default function ProgramView({
                 <span className="w-2.5 h-2.5 rounded-sm bg-[#27ae60] inline-block" /> Çim
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-sm bg-[#e67e22] inline-block" /> Kum
+                <span className="w-2.5 h-2.5 rounded-sm bg-[#996633] inline-block" /> Kum
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-sm bg-[#d4ac0d] inline-block" /> Sentetik
