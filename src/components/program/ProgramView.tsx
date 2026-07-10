@@ -354,7 +354,7 @@ function RunnerRow({
               <div className="tabular-nums">
                 <span className="text-muted-foreground">{jockeyStat.rides} biniş · </span>
                 <span className={cn("font-semibold", wc)}>{jockeyStat.wins} gal · %{wp}</span>
-                {tp != null && <span className="text-muted-foreground"> · %{tp} tablo</span>}
+                {tp != null && <span className="text-muted-foreground"> · %{tp} tabela</span>}
                 {sc != null && <span className="text-brand font-medium"> · {sc.toFixed(1)} p</span>}
               </div>
             </div>
@@ -527,10 +527,10 @@ function RunnerCard({
               const tp = jockeyStat.tableRate != null ? Math.round(jockeyStat.tableRate * 100) : null;
               const sc = jockeyStat.performanceScore;
               const wc = wp >= 25 ? "text-hit" : wp >= 15 ? "text-brand" : "text-muted-foreground/70";
-              const tip = `${jockeyStat.label} · ${jockeyStat.rides} biniş · ${jockeyStat.wins} galibiyet · %${wp}${tp != null ? ` · %${tp} tablo` : ""}${sc != null ? ` · ${sc.toFixed(1)} p` : ""}`;
+              const tip = `${jockeyStat.label} · ${jockeyStat.rides} biniş · ${jockeyStat.wins} galibiyet · %${wp}${tp != null ? ` · %${tp} tabela` : ""}${sc != null ? ` · ${sc.toFixed(1)} p` : ""}`;
               return (
                 <span title={tip} className={cn("font-normal tabular-nums", wc)}>
-                  {" "}%{wp} gal{tp != null ? ` · %${tp} tablo` : ""}
+                  {" "}%{wp} gal{tp != null ? ` · %${tp} tabela` : ""}
                 </span>
               );
             })()}
