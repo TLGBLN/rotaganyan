@@ -21,6 +21,7 @@ export type IngestRunner = {
   recentFormSurfaces?: string;
   scratched?: boolean;
   ekuriGroup?: number;
+  apprentice?: boolean;
 };
 
 export type IngestGallop = {

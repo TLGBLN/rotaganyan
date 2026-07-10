@@ -264,8 +264,10 @@ export async function fetchCityProgram(
           const weight = parseFloat(weightRaw) || undefined;
 
           const jockeyCell = iJockey !== -1 && cellEls[iJockey] ? $(cellEls[iJockey]).find("a").first() : null;
+          const jockeyText = jockeyCell ? jockeyCell.text().trim() : "";
+          const apprentice = /\(A[p]?\)/i.test(jockeyText);
           const jockey = jockeyCell
-            ? (jockeyCell.attr("title") || jockeyCell.text()).trim() || undefined
+            ? (jockeyCell.attr("title") || jockeyText.replace(/\s*\(A[p]?\)/gi, "")).trim() || undefined
             : undefined;
 
           const ownerCell = iOwner !== -1 && cellEls[iOwner] ? $(cellEls[iOwner]).find("a").first() : null;
@@ -332,7 +334,7 @@ export async function fetchCityProgram(
 
           const ekuriGroup = ekuriMap.get(no) ?? undefined;
 
-          runners.push({ no, name, age, startNo, weight, jockey, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup });
+          runners.push({ no, name, age, startNo, weight, jockey, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup });
         });
       }
     }

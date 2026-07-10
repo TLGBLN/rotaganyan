@@ -226,6 +226,7 @@ model Runner {
   recentFormSurfaces String?
   scratched        Boolean @default(false)
   ekuriGroup       Int?
+  apprentice       Boolean @default(false)
 
   race         Race          @relation(fields: [raceId], references: [id], onDelete: Cascade)
   gallops      Gallop[]

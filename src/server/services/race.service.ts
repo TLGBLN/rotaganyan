@@ -545,6 +545,7 @@ export type ProgramRunner = {
   agf: number | null;
   scratched: boolean;
   ekuriGroup: number | null;
+  apprentice: boolean;
 };
 
 export type ProgramPick = {
@@ -610,7 +611,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
               jockeyChanged: true, previousJockey: true, trainer: true,
               owner: true, sire: true, dam: true, hp: true,
               bestTime: true, recentForm: true, recentFormSurfaces: true, agf: true,
-              scratched: true, ekuriGroup: true,
+              scratched: true, ekuriGroup: true, apprentice: true,
             },
           },
         },
