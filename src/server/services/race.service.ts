@@ -523,6 +523,14 @@ export async function getCurrentRaces(dateStr: string): Promise<CurrentRace[]> {
 
 // ─── Program Sayfası ──────────────────────────────────────────────────────────
 
+export type ProgramGallop = {
+  date: Date;
+  track: string | null;
+  form: string | null;
+  jockey: string | null;
+  splits: Record<string, string | null>;
+};
+
 export type ProgramRunner = {
   id: string;
   no: number;
@@ -544,6 +552,7 @@ export type ProgramRunner = {
   recentFormSurfaces: string | null;
   agf: number | null;
   scratched: boolean;
+  gallops: ProgramGallop[];
   ekuriGroup: number | null;
   apprentice: boolean;
 };
@@ -612,6 +621,11 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
               owner: true, sire: true, dam: true, hp: true,
               bestTime: true, recentForm: true, recentFormSurfaces: true, agf: true,
               scratched: true, ekuriGroup: true, apprentice: true,
+              gallops: {
+                orderBy: { date: "desc" },
+                take: 5,
+                select: { date: true, track: true, form: true, jockey: true, splits: true },
+              },
             },
           },
         },
@@ -650,7 +664,13 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
         surface: r.surface,
         distance: r.distance,
         conditions: r.conditions,
-        runners: r.runners,
+        runners: r.runners.map((ru) => ({
+            ...ru,
+            gallops: ru.gallops.map((g) => ({
+              ...g,
+              splits: (g.splits ?? {}) as Record<string, string | null>,
+            })),
+          })),
         result: r.result,
         hasAnalysis: pred != null && pred.picks.length > 0,
         picks: (pred?.picks ?? []).map((p) => ({

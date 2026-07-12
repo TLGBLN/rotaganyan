@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useTransition } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp, Star } from "lucide-react";
-import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
+import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick, ProgramGallop } from "@/server/services/race.service";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
 
 // ── Geri sayım (Turkey UTC+3) ────────────────────────────────────────────────
@@ -84,6 +84,66 @@ function surfaceLabel(s: string) {
 
 function breedShort(b: string) {
   return b === "ARAP" ? "Arap" : "İngiliz";
+}
+
+// Galop — en derin mesafe + 400m finişi
+const GALOP_PREP_DISTS = ["1600", "1400", "1200", "1000", "800", "600"] as const;
+function galopSplits(g: ProgramGallop): { prepDist: string | null; prepTime: string | null; finish: string | null } {
+  const prepDist = GALOP_PREP_DISTS.find((d) => g.splits[d]) ?? null;
+  return {
+    prepDist,
+    prepTime: prepDist ? (g.splits[prepDist] ?? null) : null,
+    finish: g.splits["400"] ?? null,
+  };
+}
+function galopDate(g: ProgramGallop): string {
+  const d = new Date(g.date);
+  return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+// Galop kalite renklendirmesi
+const GALOP_BENCHMARKS: Record<string, Record<string, { iyi: number; cokIyi: number }>> = {
+  INGILIZ: {
+    "400": { cokIyi: 23, iyi: 26 },
+    "600": { cokIyi: 35, iyi: 38 },
+    "800": { cokIyi: 46, iyi: 50 },
+    "1000": { cokIyi: 61, iyi: 63 },
+  },
+  ARAP: {
+    "400": { cokIyi: 25, iyi: 28 },
+    "600": { cokIyi: 39, iyi: 42 },
+    "800": { cokIyi: 52, iyi: 56 },
+    "1000": { cokIyi: 66, iyi: 70 },
+  },
+};
+
+function parseGalopSec(t: string | null): number | null {
+  if (!t) return null;
+  const p = t.split(".");
+  if (p.length === 2) return parseFloat(t) || null;
+  if (p.length === 3) {
+    const [m, s, d] = p;
+    return (parseInt(m!) || 0) * 60 + (parseInt(s!) || 0) + (parseInt(d!) || 0) / 10;
+  }
+  return null;
+}
+
+type GalopQuality = "iyi" | "cok_iyi";
+function galopQuality(dist: string, timeStr: string | null, breed: string, isInner: boolean): GalopQuality | null {
+  const secs = parseGalopSec(timeStr);
+  if (secs === null) return null;
+  const adjusted = isInner ? secs - 1.0 : secs;
+  const b = GALOP_BENCHMARKS[breed === "ARAP" ? "ARAP" : "INGILIZ"]?.[dist];
+  if (!b) return null;
+  if (adjusted <= b.cokIyi) return "cok_iyi";
+  if (adjusted <= b.iyi) return "iyi";
+  return null;
+}
+
+function galopTimeClass(q: GalopQuality | null): string {
+  if (q === "cok_iyi") return "text-green-400 font-bold";
+  if (q === "iyi") return "text-emerald-500 dark:text-emerald-400";
+  return "";
 }
 
 // ── Analiz detay parser ───────────────────────────────────────────────────────
@@ -248,7 +308,7 @@ function AnalysisPanel({ picks, winnerNo, isLoggedIn }: { picks: ProgramPick[]; 
 // ── At satırı ────────────────────────────────────────────────────────────────
 
 function RunnerRow({
-  r, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, jockeyStat,
+  r, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, jockeyStat, breed,
 }: {
   r: ProgramRunner;
   isWinner: boolean;
@@ -260,6 +320,7 @@ function RunnerRow({
   isFollowed: boolean;
   onToggleFollow: () => void;
   jockeyStat?: JockeyStatRow;
+  breed: string;
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
@@ -418,14 +479,71 @@ function RunnerRow({
           </div>
         ) : "—"}
       </td>
+
+      {/* Galop */}
+      <td className="px-2 py-1.5 min-w-[130px]">
+        {r.gallops.length > 0 ? (
+          <div className="space-y-1">
+            {r.gallops.slice(0, 3).map((g, i) => {
+              const { prepDist, prepTime, finish } = galopSplits(g);
+              if (!prepDist && !finish) return null;
+              const isInner = (g.splits["ic_dis"] ?? "").includes("İÇ") || (g.splits["ic_dis"] ?? "").toUpperCase().includes("IC");
+              const prepQ = galopQuality(prepDist ?? "", prepTime, breed, isInner);
+              const finQ = galopQuality("400", finish, breed, isInner);
+              return (
+                <div key={i} className="text-[10px] leading-snug">
+                  <div className="font-mono">
+                    {prepDist && prepTime && (
+                      <span className={galopTimeClass(prepQ)}>{prepDist}·{prepTime}</span>
+                    )}
+                    {prepDist && finish && <span className="text-muted-foreground mx-1">/</span>}
+                    {finish && (
+                      <span className={cn("text-amber-500 dark:text-amber-400", galopTimeClass(finQ))}>{`400·${finish}`}</span>
+                    )}
+                  </div>
+                  <div className="text-[9px] text-muted-foreground">
+                    {galopDate(g)}
+                    {g.track && <span className="ml-1 opacity-70">{g.track}</span>}
+                    {isInner && <span className="ml-1 text-blue-400 opacity-80">İÇ</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <span className="text-muted-foreground text-[10px]">—</span>
+        )}
+      </td>
     </tr>
+  );
+}
+
+// ── Mobil kart — hizalı stat hücresi ────────────────────────────────────────
+
+function StatCell({
+  label, value, sub, subClass, valueClass,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  subClass?: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="flex flex-col items-center">
+      <span className="text-[8px] uppercase tracking-wide text-muted-foreground/60">{label}</span>
+      <span className={cn("text-[11px] font-mono font-medium tabular-nums", valueClass)}>
+        {value}
+        {sub && <span className={cn("ml-0.5 text-[9px] font-sans", subClass)}>{sub}</span>}
+      </span>
+    </div>
   );
 }
 
 // ── At kartı (mobil) ─────────────────────────────────────────────────────────
 
 function RunnerCard({
-  r, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, jockeyStat,
+  r, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, jockeyStat, breed,
 }: {
   r: ProgramRunner;
   isWinner: boolean;
@@ -436,6 +554,7 @@ function RunnerCard({
   isFollowed: boolean;
   onToggleFollow: () => void;
   jockeyStat?: JockeyStatRow;
+  breed: string;
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
@@ -514,45 +633,80 @@ function RunnerCard({
         </div>
       </div>
 
-      {/* Satır 2: Jokey, Kilo, Start, HP, En İyi Derece, Yaş */}
-      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 ml-10 text-[10px] text-muted-foreground">
-        {r.jockey && (
-          <span className={cn(r.jockeyChanged && "text-orange-500 font-medium")}>
-            {r.jockey}{r.apprentice && <span className="ml-1 font-semibold text-brand">Ap.</span>}
-            {jockeyStat && (() => {
-              const wp = pct(jockeyStat);
-              const wc = wp >= 25 ? "text-hit" : wp >= 15 ? "text-brand" : "text-muted-foreground/70";
-              const tip = `${jockeyStat.label} · ${jockeyStat.rides} biniş · ${jockeyStat.wins} galibiyet · %${wp}`;
-              return (
-                <span title={tip} className={cn("font-normal tabular-nums", wc)}>
-                  {" "}%{wp} gal
-                </span>
-              );
-            })()}
-            {r.jockeyChanged && r.previousJockey && (
-              <span className="font-normal text-muted-foreground"> ← {r.previousJockey}</span>
-            )}
+      {/* Jokey satırı */}
+      {r.jockey && (
+        <div className="mt-1.5 ml-10 text-[11px] leading-snug">
+          <span className={cn("font-medium", r.jockeyChanged && "text-orange-500")}>
+            {r.jockey}
           </span>
-        )}
-        {r.weight != null && (
-          <span>
-            {r.weight}kg
-            {r.weightChange != null && r.weightChange !== 0 && (
-              <span className={r.weightChange < 0 ? "text-red-500" : "text-green-500"}>
-                {r.weightChange > 0 ? "+" : ""}{r.weightChange}
+          {r.apprentice && <span className="ml-1 text-[10px] font-semibold text-brand">Ap.</span>}
+          {jockeyStat && (() => {
+            const wp = pct(jockeyStat);
+            const wc = wp >= 25 ? "text-hit" : wp >= 15 ? "text-brand" : "text-muted-foreground";
+            const tip = `${jockeyStat.label} · ${jockeyStat.rides} biniş · ${jockeyStat.wins} galibiyet · %${wp}`;
+            return (
+              <span title={tip} className={cn("ml-1.5 tabular-nums", wc)}>
+                %{wp} gal
               </span>
-            )}
-          </span>
-        )}
-        {r.startNo != null && <span>S:{r.startNo}</span>}
-        {r.hp != null && <span>HP:{r.hp}</span>}
-        {r.bestTime && (
-          <span className={cn(isBestTime && "text-[#27ae60] font-medium font-mono")}>
-            {r.bestTime.split(" - ")[0]}
-          </span>
-        )}
-        {r.age != null && <span>{r.age}y</span>}
+            );
+          })()}
+          {r.jockeyChanged && r.previousJockey && (
+            <span className="ml-1.5 text-muted-foreground">← {r.previousJockey}</span>
+          )}
+        </div>
+      )}
+
+      {/* Kilo · Start · HP · Derece · Yaş — hizalı grid */}
+      <div className="grid grid-cols-5 gap-1 mt-1.5 ml-10">
+        <StatCell
+          label="Kilo"
+          value={r.weight ?? "—"}
+          sub={r.weightChange != null && r.weightChange !== 0 ? `${r.weightChange > 0 ? "+" : ""}${r.weightChange}` : undefined}
+          subClass={r.weightChange != null && r.weightChange < 0 ? "text-red-500" : "text-green-500"}
+        />
+        <StatCell label="Start" value={r.startNo ?? "—"} />
+        <StatCell label="HP" value={r.hp ?? "—"} />
+        <StatCell
+          label="Derece"
+          value={r.bestTime ? r.bestTime.split(" - ")[0] : "—"}
+          valueClass={isBestTime ? "text-[#27ae60] font-semibold" : undefined}
+        />
+        <StatCell label="Yaş" value={r.age ?? "—"} />
       </div>
+
+      {/* Galop satırı — mobile */}
+      {r.gallops.length > 0 && (() => {
+        const items = r.gallops.slice(0, 3).map((g) => {
+          const { prepDist, prepTime, finish } = galopSplits(g);
+          const isInner = (g.splits["ic_dis"] ?? "").includes("İÇ") || (g.splits["ic_dis"] ?? "").toUpperCase().includes("IC");
+          return { prepDist, prepTime, finish, date: galopDate(g), track: g.track, isInner,
+            prepQ: galopQuality(prepDist ?? "", prepTime, breed, isInner),
+            finQ: galopQuality("400", finish, breed, isInner) };
+        }).filter((x) => x.prepDist || x.finish);
+        if (items.length === 0) return null;
+        return (
+          <div className="mt-1.5 ml-10 border-t border-border/30 pt-1">
+            <div className="text-[9px] text-muted-foreground font-medium mb-0.5 uppercase tracking-wide">Galop</div>
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+              {items.map((x, i) => (
+                <div key={i} className="text-[10px]">
+                  <span className="font-mono">
+                    {x.prepDist && x.prepTime && (
+                      <span className={galopTimeClass(x.prepQ)}>{x.prepDist}·{x.prepTime}</span>
+                    )}
+                    {x.prepDist && x.finish && <span className="text-muted-foreground mx-0.5">/</span>}
+                    {x.finish && (
+                      <span className={cn("text-amber-500 dark:text-amber-400", galopTimeClass(x.finQ))}>{`400·${x.finish}`}</span>
+                    )}
+                  </span>
+                  <span className="text-muted-foreground ml-1 text-[9px]">{x.date}</span>
+                  {x.isInner && <span className="ml-0.5 text-[9px] text-blue-400">İÇ</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -674,12 +828,13 @@ function RaceTable({
               <th className="px-2 py-1.5 text-center">En İyi D.</th>
               <th className="px-2 py-1.5 text-left">Son Yarışlar</th>
               <th className="px-2 py-1.5 text-center">AGF</th>
+              <th className="px-2 py-1.5 text-left">Galop</th>
             </tr>
           </thead>
           <tbody>
             {race.runners.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-8 text-center text-sm text-muted-foreground">
+                <td colSpan={12} className="py-8 text-center text-sm text-muted-foreground">
                   Yarışçı verisi henüz yüklenmedi.
                 </td>
               </tr>
@@ -689,6 +844,7 @@ function RaceTable({
                   key={r.id}
                   r={r}
                   idx={i}
+                  breed={race.breed}
                   isWinner={winnerNo != null && r.no === winnerNo}
                   isTopAgf={r.no === topAgfNo}
                   ekuriColor={ekuriColorMap.get(r.no)}
@@ -715,6 +871,7 @@ function RaceTable({
             <RunnerCard
               key={r.id}
               r={r}
+              breed={race.breed}
               isWinner={winnerNo != null && r.no === winnerNo}
               isTopAgf={r.no === topAgfNo}
               ekuriColor={ekuriColorMap.get(r.no)}
