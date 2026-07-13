@@ -136,44 +136,71 @@ function parseGalopPage(html: string): HorseGalop[] {
 }
 
 /** Fetch all Turkish race galop pages for a given YYYY-MM-DD date string. */
-export async function fetchGalopForDate(dateStr: string): Promise<RaceGalopPage[]> {
-  const datePageHtml = await fetchHtml(`${BASE}/program/galop/${dateStr}`);
-  if (!datePageHtml) return [];
-
-  const $ = cheerio.load(datePageHtml);
-
-  // Collect unique city+raceNo combos for Turkish cities
+function extractRaceLinks(html: string, filterDate?: string): Array<{ citySlug: string; raceNo: number; url: string }> {
+  const $ = cheerio.load(html);
   const raceSet = new Set<string>();
-  const raceList: Array<{ citySlug: string; raceNo: number }> = [];
+  const raceList: Array<{ citySlug: string; raceNo: number; url: string }> = [];
 
   $('a[href*="/program/galop/"]').each((_, el) => {
     const href = $(el).attr("href") ?? "";
-    const m = href.match(/\/program\/galop\/[^/]+\/([^/]+)\/(\d+)$/);
+    const m = href.match(/\/program\/galop\/(\d{4}-\d{2}-\d{2})\/([^/]+)\/(\d+)$/);
     if (!m) return;
-    const citySlug = m[1];
-    const raceNo = parseInt(m[2], 10);
+    const linkDate = m[1];
+    const citySlug = m[2];
+    const raceNo = parseInt(m[3], 10);
+    if (filterDate && linkDate !== filterDate) return;
     if (FOREIGN_SLUGS.has(citySlug)) return;
-    const key = `${citySlug}/${raceNo}`;
+    const key = `${linkDate}/${citySlug}/${raceNo}`;
     if (raceSet.has(key)) return;
     raceSet.add(key);
-    raceList.push({ citySlug, raceNo });
+    raceList.push({ citySlug, raceNo, url: `${BASE}${href}` });
   });
 
+  return raceList;
+}
+
+export async function fetchGalopForDate(dateStr: string): Promise<RaceGalopPage[]> {
+  // Try main galop page first — shows current race day with all tabs visible.
+  // Fall back to date-specific URL if main page has no links for this date.
+  const mainHtml = await fetchHtml(`${BASE}/program/galop`);
+  let raceList = mainHtml ? extractRaceLinks(mainHtml, dateStr) : [];
+
+  if (raceList.length === 0) {
+    const dateHtml = await fetchHtml(`${BASE}/program/galop/${dateStr}`);
+    raceList = dateHtml ? extractRaceLinks(dateHtml, dateStr) : [];
+  }
+
   const results: RaceGalopPage[] = [];
-  for (const { citySlug, raceNo } of raceList) {
-    const url = `${BASE}/program/galop/${dateStr}/${citySlug}/${raceNo}`;
+  for (const { citySlug, raceNo, url } of raceList) {
     const html = await fetchHtml(url);
     if (!html) continue;
     const horses = parseGalopPage(html);
     if (horses.length > 0) {
       results.push({ citySlug, raceNo, horses });
     }
+    await new Promise((r) => setTimeout(r, 800));
   }
 
   return results;
 }
 
-/** Upsert galop rows into the database, matching horse names to today's runners. */
+// Liderform city slug → DB hippodrome slug (for precise runner lookup per race)
+const CITY_TO_HIPPO: Record<string, string> = {
+  istanbul: "istanbul",
+  izmir: "izmir",
+  ankara: "ankara",
+  bursa: "bursa",
+  adana: "adana",
+  elazig: "elazig",
+  kocaeli: "kocaeli",
+  antalya: "antalya",
+  dbakir: "diyarbakir",
+  sanliurfa: "sanliurfa",
+};
+
+/** Upsert galop rows into the database, matching horse names to today's runners.
+ *  Looks up runners per-page (city + raceNo) to avoid name collisions when the
+ *  same horse appears in multiple races on the same day. */
 export async function syncGalopForDate(dateStr: string): Promise<{
   pages: number;
   horses: number;
@@ -183,29 +210,10 @@ export async function syncGalopForDate(dateStr: string): Promise<{
 }> {
   const { db } = await import("@/lib/db");
 
-  // Liderform URL date = workout date, not race date.
-  // Horses trained on dateStr may race 1–2 days later (or same day).
-  // Load runners from [dateStr - 1 day, dateStr + 3 days] to cover all cases.
   const windowStart = new Date(`${dateStr}T00:00:00Z`);
   windowStart.setUTCDate(windowStart.getUTCDate() - 1);
   const windowEnd = new Date(`${dateStr}T00:00:00Z`);
   windowEnd.setUTCDate(windowEnd.getUTCDate() + 3);
-
-  const todayRunners = await db.runner.findMany({
-    where: {
-      race: {
-        raceDay: {
-          date: { gte: windowStart, lte: windowEnd },
-        },
-      },
-    },
-    select: { id: true, name: true },
-  });
-
-  const nameToRunnerId = new Map<string, string>();
-  for (const r of todayRunners) {
-    nameToRunnerId.set(normHorseName(r.name), r.id);
-  }
 
   const pages = await fetchGalopForDate(dateStr);
 
@@ -215,6 +223,32 @@ export async function syncGalopForDate(dateStr: string): Promise<{
   const errors: string[] = [];
 
   for (const page of pages) {
+    const hippoSlug = CITY_TO_HIPPO[page.citySlug];
+
+    // Query runners scoped to this specific hippodrome + race number to prevent
+    // name collisions when a horse appears in multiple races on the same date.
+    const runners = await db.runner.findMany({
+      where: hippoSlug
+        ? {
+            race: {
+              raceNo: page.raceNo,
+              raceDay: {
+                hippodrome: { slug: hippoSlug },
+                date: { gte: windowStart, lte: windowEnd },
+              },
+            },
+          }
+        : {
+            race: { raceDay: { date: { gte: windowStart, lte: windowEnd } } },
+          },
+      select: { id: true, name: true },
+    });
+
+    const nameToRunnerId = new Map<string, string>();
+    for (const r of runners) {
+      nameToRunnerId.set(normHorseName(r.name), r.id);
+    }
+
     for (const horse of page.horses) {
       const runnerId = nameToRunnerId.get(normHorseName(horse.horseName));
       if (!runnerId) {
@@ -230,13 +264,6 @@ export async function syncGalopForDate(dateStr: string): Promise<{
           });
           if (exists) continue;
 
-          const splitsWithMeta = {
-            ...row.splits,
-            kg: row.kg,
-            sehir: row.sehir,
-            ic_dis: row.icDis,
-          };
-
           await db.gallop.create({
             data: {
               runnerId,
@@ -244,7 +271,12 @@ export async function syncGalopForDate(dateStr: string): Promise<{
               track: row.pist || undefined,
               form: row.caba || undefined,
               jockey: row.jockey || undefined,
-              splits: splitsWithMeta,
+              splits: {
+                ...row.splits,
+                kg: row.kg,
+                sehir: row.sehir,
+                ic_dis: row.icDis,
+              },
             },
           });
           totalRows++;
