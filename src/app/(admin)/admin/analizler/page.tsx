@@ -33,9 +33,8 @@ export default async function AdminAnalizlerPage({ searchParams }: PageProps) {
           <thead>
             <tr className="border-b bg-muted/40">
               <th className="px-3 py-2 text-left font-medium text-muted-foreground">Koşu</th>
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground">Tarih</th>
               <th className="px-3 py-2 text-left font-medium text-muted-foreground">Durum</th>
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground">Sonuç</th>
+              <th className="hidden px-3 py-2 text-left font-medium text-muted-foreground sm:table-cell">Sonuç</th>
               <th className="px-3 py-2 text-right font-medium text-muted-foreground">İşlem</th>
             </tr>
           </thead>
@@ -60,9 +59,9 @@ export default async function AdminAnalizlerPage({ searchParams }: PageProps) {
                         ★ Banko
                       </Badge>
                     )}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">
-                    {format(raceDay.date, "d MMM yyyy", { locale: tr })}
+                    <div className="text-xs text-muted-foreground">
+                      {format(raceDay.date, "d MMM yyyy", { locale: tr })}
+                    </div>
                   </td>
                   <td className="px-3 py-2">
                     <Badge
@@ -72,7 +71,7 @@ export default async function AdminAnalizlerPage({ searchParams }: PageProps) {
                       {pred.published ? "Yayında" : "Taslak"}
                     </Badge>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="hidden px-3 py-2 sm:table-cell">
                     {race.result ? (
                       <Badge
                         variant="outline"

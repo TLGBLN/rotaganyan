@@ -15,20 +15,18 @@ const HEADERS = {
   Referer: "https://www.tjk.org/",
 };
 
-// Keywords that indicate a foreign venue
-const FOREIGN_KW = [
-  "ABD", "Arjantin", "Krallık", "Afrika", "Fransa", "Almanya", "İtalya",
-  "Japonya", "Avustralya", "Kanada", "BAE", "Bahreyn", "İrlanda",
-  "Singapur", "Birleşik", "Belçika", "Hong", "Guney", "Güney",
-  "Kuzey", "Ukrayna", "Rusya", "Çin", "Polonya", "İsveç", "Park ABD",
-  "Park UK", "Racecourse", "Downs", "Şili", "Hollanda", "İspanya",
-  "Meksika", "Brezilya", "Uruguay", "Peru", "Katar", "Umman",
-  "Suudi", "Mısır", "Çekya", "Macaristan", "Norveç", "Danimarka",
-  "Avusturya", "Yunanistan", "İsviçre", "Hindistan",
+// TJK'nın yerli (Türkiye) hipodromları — sabit ve küçük bir küme.
+// Kara liste yaklaşımı (ülke adı eşleşmesi) yeni bir ülke eklendiğinde
+// sessizce delik bırakıyordu (örn. "Selangor Malezya" kaçmıştı çünkü
+// "Malezya" listede yoktu). Beyaz liste bu sınıfın tamamını kapatır.
+const TR_HIPPODROMES = [
+  "Adana", "Ankara", "Antalya", "Bursa", "Diyarbakır", "Elazığ",
+  "İstanbul", "İzmir", "Karma", "Kocaeli", "Şanlıurfa",
 ];
 
 function isTurkish(sehirAdi: string): boolean {
-  return !FOREIGN_KW.some((kw) => sehirAdi.includes(kw));
+  const name = sehirAdi.trim();
+  return TR_HIPPODROMES.some((tr) => name === tr || name.startsWith(`${tr} `));
 }
 
 export function toSlug(name: string): string {
