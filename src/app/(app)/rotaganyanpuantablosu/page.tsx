@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getRaceDaysByDate } from "@/server/services/race.service";
+import { syncResultsForDate } from "@/server/services/result-sync";
 import { turkeyDateString } from "@/lib/tz";
 import PuanTablosu from "@/components/kosular/PuanTablosu";
 import DateNavigator from "@/components/kosular/DateNavigator";
@@ -19,6 +20,14 @@ export default async function PuanTablosuPage({ searchParams }: PageProps) {
     redirect(
       `/giris?callbackUrl=${encodeURIComponent(`/rotaganyanpuantablosu${params.tarih ? `?tarih=${params.tarih}` : ""}`)}`
     );
+  }
+
+  // Kazanan atı hemen yansıtmak için (saatlik cron'u beklemeden) sayfa açılışında senkronla
+  const daysAhead = Math.round(
+    (new Date(currentDate).getTime() - new Date(today).getTime()) / 86400000
+  );
+  if (daysAhead <= 0 && daysAhead >= -7) {
+    try { await syncResultsForDate(currentDate); } catch { /* ignore */ }
   }
 
   const raceDays = await getRaceDaysByDate(currentDate, undefined);

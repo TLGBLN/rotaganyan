@@ -3,6 +3,7 @@ import { getProgramData, getKuponOnerileri, getHitPredictions, getJockeyStats, t
 import { turkeyDateString } from "@/lib/tz";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { getAgfMovers } from "@/server/services/agf-trend.service";
+import { syncResultsForDate } from "@/server/services/result-sync";
 import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
 import { fetchTjkTicker } from "@/lib/tjk-ticker";
 import { auth, hasRole } from "@/lib/auth";
@@ -48,6 +49,12 @@ export default async function ProgramPage({ searchParams }: PageProps) {
         try { await ingestDate(tjkDate); } catch { /* ignore */ }
       });
     }
+  }
+
+  // Sonucu çıkmış ama henüz senkronlanmamış koşuların kazananını yakala
+  // (hourly cron her koşu bitiminde hemen tetiklenmiyor, bu yüzden sayfa açılışında da deneriz)
+  if (daysAhead <= 0 && daysAhead >= -7) {
+    try { await syncResultsForDate(currentDate); } catch { /* ignore */ }
   }
 
   const [session, days, agfMovers, altiliResults, tickerItems, followedHorses, coupons, hitPredictions] = await Promise.all([
