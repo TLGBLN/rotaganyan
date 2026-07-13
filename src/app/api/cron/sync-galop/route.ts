@@ -11,13 +11,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Allow overriding date via ?date=YYYY-MM-DD
-  const dateParam = req.nextUrl.searchParams.get("date");
-  const now = new Date();
-  const dateStr =
-    dateParam ?? `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-${String(now.getUTCDate()).padStart(2, "0")}`;
+  // Optional ?date=YYYY-MM-DD override; otherwise auto-detects from liderform main page
+  const dateParam = req.nextUrl.searchParams.get("date") ?? undefined;
 
-  const result = await syncGalopForDate(dateStr);
+  const result = await syncGalopForDate(dateParam);
 
-  return NextResponse.json({ date: dateStr, ...result });
+  return NextResponse.json({ date: dateParam ?? "auto", ...result });
 }

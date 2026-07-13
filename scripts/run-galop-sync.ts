@@ -1,15 +1,10 @@
 import { syncGalopForDate } from "../src/server/services/ingest/liderform-galop.adapter";
 
 async function main() {
-  const arg = process.argv[2];
-  let dateStr: string;
-  if (arg) {
-    dateStr = arg;
-  } else {
-    const now = new Date();
-    dateStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-${String(now.getUTCDate()).padStart(2, "0")}`;
-  }
-  console.log("Galop sync başlıyor:", dateStr);
+  // Optional date override: npx tsx scripts/run-galop-sync.ts 2026-07-13
+  // Without a date, auto-detects from liderform.com.tr/program/galop
+  const dateStr = process.argv[2] as string | undefined;
+  console.log("Galop sync başlıyor:", dateStr ?? "auto");
   const result = await syncGalopForDate(dateStr);
   console.log("Sonuç:", JSON.stringify(result, null, 2));
 }

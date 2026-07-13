@@ -136,52 +136,60 @@ function parseGalopPage(html: string): HorseGalop[] {
 }
 
 /** Fetch all Turkish race galop pages for a given YYYY-MM-DD date string. */
-function extractRaceLinks(html: string, filterDate?: string): Array<{ citySlug: string; raceNo: number; url: string }> {
+type RaceLink = { citySlug: string; raceNo: number; url: string; dateStr: string };
+
+function extractRaceLinks(html: string, filterDate?: string): RaceLink[] {
   const $ = cheerio.load(html);
   const raceSet = new Set<string>();
-  const raceList: Array<{ citySlug: string; raceNo: number; url: string }> = [];
+  const raceList: RaceLink[] = [];
 
   $('a[href*="/program/galop/"]').each((_, el) => {
     const href = $(el).attr("href") ?? "";
     const m = href.match(/\/program\/galop\/(\d{4}-\d{2}-\d{2})\/([^/]+)\/(\d+)$/);
     if (!m) return;
-    const linkDate = m[1];
-    const citySlug = m[2];
-    const raceNo = parseInt(m[3], 10);
-    if (filterDate && linkDate !== filterDate) return;
+    const dateStr = m[1]!;
+    const citySlug = m[2]!;
+    const raceNo = parseInt(m[3]!, 10);
+    if (filterDate && dateStr !== filterDate) return;
     if (FOREIGN_SLUGS.has(citySlug)) return;
-    const key = `${linkDate}/${citySlug}/${raceNo}`;
+    const key = `${dateStr}/${citySlug}/${raceNo}`;
     if (raceSet.has(key)) return;
     raceSet.add(key);
-    raceList.push({ citySlug, raceNo, url: `${BASE}${href}` });
+    raceList.push({ citySlug, raceNo, url: `${BASE}${href}`, dateStr });
   });
 
   return raceList;
 }
 
-export async function fetchGalopForDate(dateStr: string): Promise<RaceGalopPage[]> {
-  // Try main galop page first — shows current race day with all tabs visible.
-  // Fall back to date-specific URL if main page has no links for this date.
+/** Fetch all Turkish galop pages.
+ *  Always starts from the main galop page (auto-detects current race day).
+ *  Falls back to date-specific URL when a particular date is requested. */
+export async function fetchGalopPages(filterDate?: string): Promise<(RaceGalopPage & { dateStr: string })[]> {
   const mainHtml = await fetchHtml(`${BASE}/program/galop`);
-  let raceList = mainHtml ? extractRaceLinks(mainHtml, dateStr) : [];
+  let raceList = mainHtml ? extractRaceLinks(mainHtml, filterDate) : [];
 
-  if (raceList.length === 0) {
-    const dateHtml = await fetchHtml(`${BASE}/program/galop/${dateStr}`);
-    raceList = dateHtml ? extractRaceLinks(dateHtml, dateStr) : [];
+  if (raceList.length === 0 && filterDate) {
+    const dateHtml = await fetchHtml(`${BASE}/program/galop/${filterDate}`);
+    raceList = dateHtml ? extractRaceLinks(dateHtml, filterDate) : [];
   }
 
-  const results: RaceGalopPage[] = [];
-  for (const { citySlug, raceNo, url } of raceList) {
+  const results: (RaceGalopPage & { dateStr: string })[] = [];
+  for (const { citySlug, raceNo, url, dateStr } of raceList) {
     const html = await fetchHtml(url);
     if (!html) continue;
     const horses = parseGalopPage(html);
     if (horses.length > 0) {
-      results.push({ citySlug, raceNo, horses });
+      results.push({ citySlug, raceNo, horses, dateStr });
     }
     await new Promise((r) => setTimeout(r, 800));
   }
 
   return results;
+}
+
+/** @deprecated Use syncGalopForDate without arguments for automatic date detection */
+export async function fetchGalopForDate(dateStr: string) {
+  return fetchGalopPages(dateStr);
 }
 
 // Liderform city slug → DB hippodrome slug (for precise runner lookup per race)
@@ -201,7 +209,7 @@ const CITY_TO_HIPPO: Record<string, string> = {
 /** Upsert galop rows into the database, matching horse names to today's runners.
  *  Looks up runners per-page (city + raceNo) to avoid name collisions when the
  *  same horse appears in multiple races on the same day. */
-export async function syncGalopForDate(dateStr: string): Promise<{
+export async function syncGalopForDate(dateStr?: string): Promise<{
   pages: number;
   horses: number;
   rows: number;
@@ -210,12 +218,8 @@ export async function syncGalopForDate(dateStr: string): Promise<{
 }> {
   const { db } = await import("@/lib/db");
 
-  const windowStart = new Date(`${dateStr}T00:00:00Z`);
-  windowStart.setUTCDate(windowStart.getUTCDate() - 1);
-  const windowEnd = new Date(`${dateStr}T00:00:00Z`);
-  windowEnd.setUTCDate(windowEnd.getUTCDate() + 3);
-
-  const pages = await fetchGalopForDate(dateStr);
+  // Fetch pages — date is auto-detected from main galop page when not provided
+  const pages = await fetchGalopPages(dateStr);
 
   let totalHorses = 0;
   let totalRows = 0;
@@ -224,6 +228,11 @@ export async function syncGalopForDate(dateStr: string): Promise<{
 
   for (const page of pages) {
     const hippoSlug = CITY_TO_HIPPO[page.citySlug];
+
+    // Build date window from this page's own date (extracted from liderform URL)
+    const pageDate = new Date(`${page.dateStr}T00:00:00Z`);
+    const windowStart = new Date(pageDate); windowStart.setUTCDate(pageDate.getUTCDate() - 1);
+    const windowEnd = new Date(pageDate); windowEnd.setUTCDate(pageDate.getUTCDate() + 3);
 
     // Query runners scoped to this specific hippodrome + race number to prevent
     // name collisions when a horse appears in multiple races on the same date.
