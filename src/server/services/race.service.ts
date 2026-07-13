@@ -829,9 +829,25 @@ export async function syncJockeyStatsFromResults(): Promise<number> {
   // Load existing JockeyStatSync rows (with jsonCutoffDate for additive logic).
   const existingRows = await db.jockeyStatSync.findMany({
     where: { year },
-    select: { jockey: true, hippoSlug: true, surface: true, breed: true, jsonCutoffDate: true,
-              rides: true, wins: true, place2: true, place3: true, place4: true, place5: true, tableCount: true },
+    select: { jockey: true, hippoSlug: true, surface: true, breed: true, jsonCutoffDate: true, jsonBaseline: true },
   });
+
+  // jsonBaseline is the immutable snapshot captured at JSON-import time — never
+  // touched again by this function. Reading `rides`/`wins` (which THIS function
+  // overwrites every run) as the "base" would double-count the same delta on
+  // every subsequent sync — that was the bug that made ride counts balloon on
+  // every "sonuçları güncelle" click.
+  function readBaseline(row: (typeof existingRows)[number] | undefined) {
+    const b = (row?.jsonBaseline ?? null) as { rides?: number; wins?: number; place2?: number; place3?: number; place4?: number; place5?: number } | null;
+    return {
+      rides: b?.rides ?? 0,
+      wins: b?.wins ?? 0,
+      p2: b?.place2 ?? 0,
+      p3: b?.place3 ?? 0,
+      p4: b?.place4 ?? 0,
+      p5: b?.place5 ?? 0,
+    };
+  }
 
   // surname → canonical name (for TJK abbreviated names like "V.ABİŞ" → "VEDAT ABİŞ")
   const canonicalBySurname = new Map<string, string>();
@@ -919,20 +935,17 @@ export async function syncJockeyStatsFromResults(): Promise<number> {
     const [jockey, hippoSlug, surface, breed] = canonicalKey.split("|");
     const existing = existingByKey.get(canonicalKey);
 
-    // Additive: JSON baseline + delta from DB races after cutoff
-    const baseRides = existing?.rides ?? 0;
-    const baseWins = existing?.wins ?? 0;
-    const baseP2 = existing?.place2 ?? 0;
-    const baseP3 = existing?.place3 ?? 0;
-    const baseP4 = existing?.place4 ?? 0;
-    const baseP5 = existing?.place5 ?? 0;
+    // Fixed JSON baseline (never mutated by this function) + delta, which is
+    // always the COMPLETE aggregate of DB races after the (also fixed) cutoff —
+    // so re-running this is idempotent no matter how many times it's called.
+    const base = readBaseline(existing);
 
-    const rides = baseRides + delta.rides;
-    const wins = baseWins + delta.wins;
-    const p2 = baseP2 + delta.p2;
-    const p3 = baseP3 + delta.p3;
-    const p4 = baseP4 + delta.p4;
-    const p5 = baseP5 + delta.p5;
+    const rides = base.rides + delta.rides;
+    const wins = base.wins + delta.wins;
+    const p2 = base.p2 + delta.p2;
+    const p3 = base.p3 + delta.p3;
+    const p4 = base.p4 + delta.p4;
+    const p5 = base.p5 + delta.p5;
     const tableCount = wins + p2 + p3 + p4 + p5;
     const winRate = rides > 0 ? wins / rides : 0;
     const tableRate = rides > 0 ? tableCount / rides : 0;

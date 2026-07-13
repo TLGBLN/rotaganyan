@@ -175,6 +175,7 @@ export async function POST(req: NextRequest) {
         performanceScore: j.performanceScore ?? null,
         confidenceLabel: j.confidenceLabel ?? null,
         jsonCutoffDate: new Date(),
+        jsonBaseline: { rides: j.starts, wins: j.first, place2: j.second, place3: j.third, place4: j.fourth, place5: j.fifth },
       },
       create: {
         jockey: jockeyName,
@@ -195,6 +196,7 @@ export async function POST(req: NextRequest) {
         performanceScore: j.performanceScore ?? null,
         confidenceLabel: j.confidenceLabel ?? null,
         jsonCutoffDate: new Date(),
+        jsonBaseline: { rides: j.starts, wins: j.first, place2: j.second, place3: j.third, place4: j.fourth, place5: j.fifth },
       },
     });
     upserted++;

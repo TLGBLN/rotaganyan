@@ -497,6 +497,7 @@ model JockeyStatSync {
   performanceScore Float?
   confidenceLabel  String?
   jsonCutoffDate   DateTime? // JSON import tarihi — auto-sync bu tarihten sonraki yarışları ekler
+  jsonBaseline     Json?     // JSON import anındaki sabit taban (rides/wins/place2-5) — auto-sync asla üzerine yazmaz
   updatedAt        DateTime @updatedAt
 
   @@unique([jockey, hippoSlug, year, breed, surface])
