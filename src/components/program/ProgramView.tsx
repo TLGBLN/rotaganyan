@@ -491,21 +491,21 @@ function RunnerRow({
               const prepQ = galopQuality(prepDist ?? "", prepTime, breed, isInner);
               const finQ = galopQuality("400", finish, breed, isInner);
               return (
-                <div key={i} className="text-[10px] leading-snug">
-                  <div className="font-mono">
+                <div key={i} className="flex items-baseline gap-1.5 text-[10px] leading-snug whitespace-nowrap">
+                  <span className="font-mono">
                     {prepDist && prepTime && (
                       <span className={galopTimeClass(prepQ)}>{prepDist}·{prepTime}</span>
                     )}
-                    {prepDist && finish && <span className="text-muted-foreground mx-1">/</span>}
+                    {prepDist && finish && <span className="text-muted-foreground mx-0.5">/</span>}
                     {finish && (
                       <span className={cn("text-amber-500 dark:text-amber-400", galopTimeClass(finQ))}>{`400·${finish}`}</span>
                     )}
-                  </div>
-                  <div className="text-[9px] text-muted-foreground">
+                  </span>
+                  <span className="text-[9px] text-muted-foreground">
                     {galopDate(g)}
                     {g.track && <span className="ml-1 opacity-70">{g.track}</span>}
                     {isInner && <span className="ml-1 text-blue-400 opacity-80">İÇ</span>}
-                  </div>
+                  </span>
                 </div>
               );
             })}
