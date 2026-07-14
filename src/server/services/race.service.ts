@@ -826,6 +826,80 @@ export async function syncJockeyStatsFromTjk(year = new Date().getFullYear()): P
   return updated;
 }
 
+// ─── Antrenör İstatistikleri (TJK'dan çekilen) ───────────────────────────────
+
+export type TrainerStat = { wins: number; rides: number };
+
+/** Sadece trainerStatSync tablosundan çeker — TJK'nın resmi 2026 kazanma oranı. */
+export async function getTrainerStats(names: string[]): Promise<Record<string, TrainerStat>> {
+  if (names.length === 0) return {};
+  const year = new Date().getFullYear();
+
+  const allSyncRows = await db.trainerStatSync.findMany({ where: { year } });
+
+  const normMap = new Map<string, string>();
+  const surnameMap = new Map<string, string>();
+  for (const row of allSyncRows) {
+    const n = _norm(row.trainer);
+    normMap.set(n, row.trainer);
+    const sur = _surname(n);
+    if (!surnameMap.has(sur)) surnameMap.set(sur, row.trainer);
+  }
+
+  function resolveByInitials(n: string): string | undefined {
+    const parts = n.split(/[\s.]+/).filter(Boolean);
+    if (parts.length < 2) return undefined;
+    const sur = parts[parts.length - 1];
+    const initials = parts.slice(0, -1);
+    const candidates = allSyncRows.filter((r) => {
+      const rn = _norm(r.trainer).split(/\s+/);
+      if (_surname(_norm(r.trainer)) !== sur) return false;
+      return initials.every((init, i) => (rn[i] ?? "").startsWith(init));
+    });
+    if (candidates.length === 0) return undefined;
+    if (candidates.length === 1) return candidates[0].trainer;
+    return candidates.sort((a, b) => b.rides - a.rides)[0].trainer;
+  }
+
+  function resolve(name: string): string | undefined {
+    const n = _norm(name);
+    return normMap.get(n) ?? resolveByInitials(n) ?? surnameMap.get(_surname(n));
+  }
+
+  const out: Record<string, TrainerStat> = {};
+  for (const name of names) {
+    const syncName = resolve(name);
+    if (!syncName) continue;
+    const row = allSyncRows.find((r) => r.trainer === syncName);
+    if (!row) continue;
+    out[name] = { wins: row.wins, rides: row.rides };
+  }
+
+  return out;
+}
+
+/**
+ * TJK'nın resmi Antrenör İstatistikleri sayfasından TrainerStatSync tablosunu günceller
+ * (cron tarafından çağrılır) — yıl geneli biniş/galibiyet sayılarını doğrudan TJK'dan yazar.
+ */
+export async function syncTrainerStatsFromTjk(year = new Date().getFullYear()): Promise<number> {
+  const { fetchTjkTrainerStats } = await import("./ingest/tjk-trainer-stats.adapter");
+  const rows = await fetchTjkTrainerStats(year);
+
+  let updated = 0;
+  for (const r of rows) {
+    const winRate = r.races > 0 ? r.wins / r.races : 0;
+    await db.trainerStatSync.upsert({
+      where: { trainer_year: { trainer: r.trainer, year } },
+      update: { rides: r.races, wins: r.wins, winRate },
+      create: { trainer: r.trainer, year, rides: r.races, wins: r.wins, winRate },
+    });
+    updated++;
+  }
+
+  return updated;
+}
+
 export type JockeyRow = {
   jockey: string;
   wins: number;

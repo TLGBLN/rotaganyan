@@ -308,7 +308,7 @@ function AnalysisPanel({ picks, winnerNo, isLoggedIn }: { picks: ProgramPick[]; 
 // ── At satırı ────────────────────────────────────────────────────────────────
 
 function RunnerRow({
-  r, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, jockeyStat, breed,
+  r, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, jockeyStat, trainerStat, breed,
 }: {
   r: ProgramRunner;
   isWinner: boolean;
@@ -320,6 +320,7 @@ function RunnerRow({
   isFollowed: boolean;
   onToggleFollow: () => void;
   jockeyStat?: JockeyStatRow;
+  trainerStat?: TrainerStatRow;
   breed: string;
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
@@ -424,6 +425,15 @@ function RunnerRow({
       <td className="px-2 py-1.5 min-w-[130px]">
         {r.owner && <div className="font-medium">{r.owner}</div>}
         {r.trainer && <div className="text-[10px] text-muted-foreground">{r.trainer}</div>}
+        {trainerStat && (() => {
+          const wp = pct(trainerStat);
+          const wc = wp >= 25 ? "text-hit" : wp >= 15 ? "text-brand" : "text-muted-foreground";
+          return (
+            <div className={cn("text-[10px] tabular-nums font-semibold", wc)}>
+              %{wp} · {trainerStat.rides} yarış
+            </div>
+          );
+        })()}
       </td>
 
       {/* H.P */}
@@ -735,6 +745,8 @@ type JockeyStatRow = {
   performanceScore?: number;
 };
 
+type TrainerStatRow = { wins: number; rides: number };
+
 type StatBucket = { wins: number; rides: number; winRate?: number; tableRate?: number; performanceScore?: number };
 type JockeyStatsMap = Record<string, {
   overall: StatBucket;
@@ -742,9 +754,10 @@ type JockeyStatsMap = Record<string, {
   bySurface: Record<string, StatBucket>;
   byContext: Record<string, StatBucket>;
 }>;
+type TrainerStatsMap = Record<string, TrainerStatRow>;
 
 function RaceTable({
-  race, analysisOpen, onAnalysisToggle, followedSet, onToggleFollow, isLoggedIn, jockeyStats, hippodromeSlug, hippodromeName,
+  race, analysisOpen, onAnalysisToggle, followedSet, onToggleFollow, isLoggedIn, jockeyStats, trainerStats,
 }: {
   race: ProgramRace;
   analysisOpen: boolean;
@@ -753,8 +766,7 @@ function RaceTable({
   onToggleFollow: (horseName: string) => void;
   isLoggedIn: boolean;
   jockeyStats?: JockeyStatsMap;
-  hippodromeSlug?: string;
-  hippodromeName?: string;
+  trainerStats?: TrainerStatsMap;
 }) {
   const surf = surfaceLabel(race.surface);
   const winnerNo = race.result?.winnerNo;
@@ -788,6 +800,13 @@ function RaceTable({
     const raw = jockeyStats[jockey];
     if (!raw || raw.overall.rides === 0) return undefined;
     return { wins: raw.overall.wins, rides: raw.overall.rides, label: "2026" };
+  }
+
+  function buildTrainerStat(trainer: string | null): TrainerStatRow | undefined {
+    if (!trainer || !trainerStats) return undefined;
+    const raw = trainerStats[trainer];
+    if (!raw || raw.rides === 0) return undefined;
+    return raw;
   }
 
   return (
@@ -844,6 +863,7 @@ function RaceTable({
                   isFollowed={followedSet.has(r.name)}
                   onToggleFollow={() => onToggleFollow(r.name)}
                   jockeyStat={buildJockeyStat(r.jockey)}
+                  trainerStat={buildTrainerStat(r.trainer)}
                 />
               ))
             )}
@@ -885,13 +905,14 @@ function RaceTable({
 // ── Ana görünüm ───────────────────────────────────────────────────────────────
 
 export default function ProgramView({
-  days, dateStr, followedNames = [], isLoggedIn = false, jockeyStats = {},
+  days, dateStr, followedNames = [], isLoggedIn = false, jockeyStats = {}, trainerStats = {},
 }: {
   days: ProgramDay[];
   dateStr: string;
   followedNames?: string[];
   isLoggedIn?: boolean;
   jockeyStats?: JockeyStatsMap;
+  trainerStats?: TrainerStatsMap;
 }) {
   const [activeHipo, setActiveHipo] = useState(days[0]?.hippodromeSlug ?? "");
   const [activeRace, setActiveRace] = useState<Record<string, number>>({});
@@ -1015,8 +1036,7 @@ export default function ProgramView({
               onToggleFollow={handleToggleFollow}
               isLoggedIn={isLoggedIn}
               jockeyStats={jockeyStats}
-              hippodromeSlug={currentDay.hippodromeSlug}
-              hippodromeName={currentDay.hippodromeName}
+              trainerStats={trainerStats}
             />
           )}
         </>

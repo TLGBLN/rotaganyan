@@ -505,6 +505,21 @@ model JockeyStatSync {
   @@index([jockey, year])
 }
 
+// ─── ANTRENÖR STAT SYNC (TJK'dan çekilen) ────────────────────────────────────
+
+model TrainerStatSync {
+  id        String   @id @default(cuid())
+  trainer   String
+  year      Int
+  rides     Int
+  wins      Int
+  winRate   Float
+  updatedAt DateTime @updatedAt
+
+  @@unique([trainer, year])
+  @@index([trainer, year])
+}
+
 // ─── PAGE VIEWS ───────────────────────────────────────────────────────────────
 
 model PageView {

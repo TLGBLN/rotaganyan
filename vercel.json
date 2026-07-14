@@ -97,6 +97,10 @@
       "schedule": "0 22 * * *"
     },
     {
+      "path": "/api/cron/sync-trainer-stats",
+      "schedule": "0 22 * * *"
+    },
+    {
       "path": "/api/cron/sync-galop",
       "schedule": "0 6 * * *"
     },

@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { getProgramData, getKuponOnerileri, getHitPredictions, getJockeyStats, type JockeyStat } from "@/server/services/race.service";
+import { getProgramData, getKuponOnerileri, getHitPredictions, getJockeyStats, getTrainerStats, type JockeyStat, type TrainerStat } from "@/server/services/race.service";
 import { turkeyDateString } from "@/lib/tz";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { getAgfMovers } from "@/server/services/agf-trend.service";
@@ -71,11 +71,17 @@ export default async function ProgramPage({ searchParams }: PageProps) {
   const isAdmin = session?.user?.role ? hasRole(session.user.role as Role, "EDITOR") : false;
   const followedNames = followedHorses.map((h) => h.horseName);
 
-  // Jokey istatistikleri — bu yılın galibiyet/biniş verileri
+  // Jokey ve antrenör istatistikleri — TJK'nın resmi bu yıl galibiyet/biniş verileri
   const allJockeys = [...new Set(
     days.flatMap((d) => d.races.flatMap((r) => r.runners.map((ru) => ru.jockey).filter((j): j is string => !!j)))
   )];
-  const jockeyStats = await getJockeyStats(allJockeys).catch(() => ({} as Record<string, JockeyStat>));
+  const allTrainers = [...new Set(
+    days.flatMap((d) => d.races.flatMap((r) => r.runners.map((ru) => ru.trainer).filter((t): t is string => !!t)))
+  )];
+  const [jockeyStats, trainerStats] = await Promise.all([
+    getJockeyStats(allJockeys).catch(() => ({} as Record<string, JockeyStat>)),
+    getTrainerStats(allTrainers).catch(() => ({} as Record<string, TrainerStat>)),
+  ]);
 
   // Üye olmayanlar için picks verisi client'a gönderilmez
   const viewDays = isLoggedIn
@@ -100,7 +106,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
           <DateNavigator currentDate={currentDate} basePath="/program" />
         </div>
         <div className="rounded-lg border overflow-hidden">
-          <ProgramView days={viewDays} dateStr={currentDate} followedNames={followedNames} isLoggedIn={isLoggedIn} jockeyStats={jockeyStats} />
+          <ProgramView days={viewDays} dateStr={currentDate} followedNames={followedNames} isLoggedIn={isLoggedIn} jockeyStats={jockeyStats} trainerStats={trainerStats} />
         </div>
       </div>
 
