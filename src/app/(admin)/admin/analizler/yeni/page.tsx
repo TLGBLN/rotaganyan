@@ -92,7 +92,7 @@ export default async function YeniAnalizPage({ searchParams }: PageProps) {
 
   const raceName = `${race.raceDay.hippodrome.name} — ${race.raceNo}. Koşu`;
   const mod = params.mod ?? "md"; // default: markdown
-  const analystStats = await getAnalystStats();
+  const analystStats = await getAnalystStats(race.raceDay.date.toISOString().slice(0, 10));
   const advice = getClassTypeAdvice(analystStats, race.classType);
   const backHref = params.tarih
     ? `/admin/analizler/yeni?tarih=${params.tarih}`

@@ -40,7 +40,7 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
   const currentDate = params.tarih ?? turkeyDateString();
   const [raceDays, analystStats] = await Promise.all([
     getAdminRaceDays(currentDate),
-    getAnalystStats(),
+    getAnalystStats(currentDate),
   ]);
 
   // Build lookup: original races — by "slug:raceNo" AND by time (fallback for slug mismatches)

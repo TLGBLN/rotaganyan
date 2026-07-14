@@ -247,10 +247,21 @@ function couponTierForRank(rank: number | undefined): CouponTier {
   return "genis";
 }
 
-/** Yayında ve sonuçlanmış tahminleri sınıf/pist/güven/hipodroma göre kırarak isabet oranını çıkarır. */
-export async function getAnalystStats(): Promise<AnalystStats> {
+/**
+ * Yayında ve sonuçlanmış tahminleri sınıf/pist/güven/hipodroma göre kırarak isabet oranını çıkarır.
+ * `beforeDateStr` verilirse o tarih ve sonrası hariç tutulur — bir koşuya "tavsiye" gösterirken
+ * o koşunun (veya aynı günün diğer koşularının) kendi sonucu, kendi tavsiyesini beslememeli.
+ */
+export async function getAnalystStats(beforeDateStr?: string): Promise<AnalystStats> {
   const rows = await db.prediction.findMany({
-    where: { published: true, race: { result: { isNot: null }, conditions: null } },
+    where: {
+      published: true,
+      race: {
+        result: { isNot: null },
+        conditions: null,
+        ...(beforeDateStr ? { raceDay: { date: { lt: startOfDay(new Date(beforeDateStr)) } } } : {}),
+      },
+    },
     select: {
       confidence: true,
       isBanko: true,

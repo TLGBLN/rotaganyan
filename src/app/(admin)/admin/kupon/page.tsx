@@ -44,7 +44,7 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
     getHippodromes(),
     getRaceDaysByDate(currentDate),        // PuanTablosu için
     getAdminRaceDays(currentDate),         // Koşu programı tablosu için (kosular ile aynı)
-    getAnalystStats(),
+    getAnalystStats(currentDate),
   ]);
 
   // Karma mirror lookup — kosular/page.tsx ile aynı mantık
