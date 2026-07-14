@@ -782,21 +782,12 @@ function RaceTable({
     }
   });
 
-  // Pist ve hipodrom etiketleri
-  const pistLabel = { CIM: "Çim", SENTETIK: "Snt.", KUM: "Kum" }[race.surface as string] ?? race.surface;
-  const hippoShort = hippodromeName?.split(" ")[0] ?? hippodromeSlug ?? "Hipo";
-
-  // Yarışın tam bağlamına (hipodrom + pist + ırk) uyan veriyi göster — fallback yok
+  // TJK'nın resmi istatistiklerinden 2026 geneli kazanma oranı — hipodrom/pist/ırk kırılımı yok
   function buildJockeyStat(jockey: string | null): JockeyStatRow | undefined {
-    if (!jockey || !jockeyStats || !hippodromeSlug) return undefined;
+    if (!jockey || !jockeyStats) return undefined;
     const raw = jockeyStats[jockey];
-    if (!raw) return undefined;
-    const irkLabel = race.breed === "INGILIZ" ? "İng" : "Arap";
-    const exact = raw.byContext[`${hippodromeSlug}:${race.surface}:${race.breed}`];
-    if (exact && exact.rides > 0) {
-      return { wins: exact.wins, rides: exact.rides, label: `${hippoShort} ${pistLabel} ${irkLabel}`, tableRate: exact.tableRate, performanceScore: exact.performanceScore };
-    }
-    return undefined;
+    if (!raw || raw.overall.rides === 0) return undefined;
+    return { wins: raw.overall.wins, rides: raw.overall.rides, label: "2026" };
   }
 
   return (

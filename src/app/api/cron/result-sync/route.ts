@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { syncResultsForDate } from "@/server/services/result-sync";
-import { syncJockeyStatsFromResults } from "@/server/services/race.service";
+import { syncJockeyStatsFromTjk } from "@/server/services/race.service";
 import { turkeyDateString } from "@/lib/tz";
 
 export const maxDuration = 60;
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   // Jokey istatistiklerini response sonrasında arka planda güncelle
   after(async () => {
-    await syncJockeyStatsFromResults();
+    await syncJockeyStatsFromTjk();
     revalidatePath("/admin/jokey");
   });
 

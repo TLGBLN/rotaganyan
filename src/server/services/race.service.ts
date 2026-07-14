@@ -783,185 +783,44 @@ export async function getJockeyStats(names: string[]): Promise<Record<string, Jo
   return out;
 }
 
-async function _calcJockeyStatsFromResults(names: string[]): Promise<Record<string, JockeyStat>> {
-  const since = new Date(`${new Date().getFullYear()}-01-01T00:00:00Z`);
-  const runners = await db.runner.findMany({
-    where: {
-      jockey: { in: names },
-      race: { raceDay: { date: { gte: since } }, result: { isNot: null } },
-    },
-    select: {
-      jockey: true,
-      no: true,
-      race: {
-        select: {
-          surface: true,
-          breed: true,
-          raceDay: { select: { hippodrome: { select: { slug: true } } } },
-          result: { select: { winnerNo: true } },
-        },
-      },
-    },
+/**
+ * TJK'nın resmi Jokey İstatistikleri sayfasından JockeyStatSync tablosunu günceller
+ * (cron tarafından çağrılır). Kendi program/sonuç verimizdeki eksiklerden etkilenmeyen
+ * tek doğru kaynak — hippoSlug="overall", breed/surface=null olarak, yıl geneli
+ * biniş/galibiyet sayılarını doğrudan TJK'dan yazar.
+ */
+export async function syncJockeyStatsFromTjk(year = new Date().getFullYear()): Promise<number> {
+  const { fetchTjkJockeyStats } = await import("./ingest/tjk-jockey-stats.adapter");
+  const rows = await fetchTjkJockeyStats(year);
+
+  // Prisma'nın compound-unique kısayolu (jockey_hippoSlug_year_breed_surface) null
+  // değer kabul etmiyor (Postgres'te NULL != NULL, unique lookup için belirsiz) —
+  // bu yüzden "overall" satırlarını find + create/update ile yönetiyoruz.
+  const existing = await db.jockeyStatSync.findMany({
+    where: { year, hippoSlug: "overall", breed: null, surface: null },
+    select: { id: true, jockey: true },
   });
-
-  const out: Record<string, JockeyStat> = {};
-  for (const r of runners) {
-    if (!r.jockey) continue;
-    const isWin = r.race.result?.winnerNo === r.no;
-    const hippoSlug = r.race.raceDay.hippodrome.slug;
-    const contextKey = `${hippoSlug}:${r.race.surface}:${r.race.breed}`;
-    const contextKeyNoBreed = `${hippoSlug}:${r.race.surface}`;
-    if (!out[r.jockey]) out[r.jockey] = { overall: { wins: 0, rides: 0 }, byHippo: {}, bySurface: {}, byContext: {} };
-    const stat = out[r.jockey];
-    stat.overall.rides++; if (isWin) stat.overall.wins++;
-    stat.byHippo[hippoSlug] ??= { wins: 0, rides: 0 }; stat.byHippo[hippoSlug].rides++; if (isWin) stat.byHippo[hippoSlug].wins++;
-    stat.bySurface[r.race.surface] ??= { wins: 0, rides: 0 }; stat.bySurface[r.race.surface].rides++; if (isWin) stat.bySurface[r.race.surface].wins++;
-    stat.byContext[contextKey] ??= { wins: 0, rides: 0 }; stat.byContext[contextKey].rides++; if (isWin) stat.byContext[contextKey].wins++;
-    stat.byContext[contextKeyNoBreed] ??= { wins: 0, rides: 0 }; stat.byContext[contextKeyNoBreed].rides++; if (isWin) stat.byContext[contextKeyNoBreed].wins++;
-  }
-  return out;
-}
-
-/** Yarış sonuçlarından JockeyStatSync tablosunu günceller (cron tarafından çağrılır). */
-export async function syncJockeyStatsFromResults(): Promise<number> {
-  const year = new Date().getFullYear();
-  const yearStart = new Date(`${year}-01-01T00:00:00Z`);
-
-  // Load existing JockeyStatSync rows (with jsonCutoffDate for additive logic).
-  const existingRows = await db.jockeyStatSync.findMany({
-    where: { year },
-    select: { jockey: true, hippoSlug: true, surface: true, breed: true, jsonCutoffDate: true, jsonBaseline: true },
-  });
-
-  // jsonBaseline is the immutable snapshot captured at JSON-import time — never
-  // touched again by this function. Reading `rides`/`wins` (which THIS function
-  // overwrites every run) as the "base" would double-count the same delta on
-  // every subsequent sync — that was the bug that made ride counts balloon on
-  // every "sonuçları güncelle" click.
-  function readBaseline(row: (typeof existingRows)[number] | undefined) {
-    const b = (row?.jsonBaseline ?? null) as { rides?: number; wins?: number; place2?: number; place3?: number; place4?: number; place5?: number } | null;
-    return {
-      rides: b?.rides ?? 0,
-      wins: b?.wins ?? 0,
-      p2: b?.place2 ?? 0,
-      p3: b?.place3 ?? 0,
-      p4: b?.place4 ?? 0,
-      p5: b?.place5 ?? 0,
-    };
-  }
-
-  // surname → canonical name (for TJK abbreviated names like "V.ABİŞ" → "VEDAT ABİŞ")
-  const canonicalBySurname = new Map<string, string>();
-  for (const row of existingRows) {
-    const sur = _surname(_norm(row.jockey));
-    if (!canonicalBySurname.has(sur)) canonicalBySurname.set(sur, row.jockey);
-  }
-
-  // canonical key → existing row (for additive update)
-  type SyncRow = typeof existingRows[number];
-  const existingByKey = new Map<string, SyncRow>();
-  for (const row of existingRows) {
-    existingByKey.set(`${row.jockey}|${row.hippoSlug}|${row.surface}|${row.breed}`, row);
-  }
-
-  // Fetch runners with results. For rows with jsonCutoffDate, only count races AFTER
-  // that cutoff so we add the delta on top of JSON baseline without double-counting.
-  // For rows without jsonCutoffDate (no JSON import), count from year start.
-  const runners = await db.runner.findMany({
-    where: {
-      jockey: { not: null },
-      race: { raceDay: { date: { gte: yearStart } }, result: { isNot: null } },
-    },
-    select: {
-      jockey: true,
-      no: true,
-      race: {
-        select: {
-          surface: true,
-          breed: true,
-          raceDay: { select: { date: true, hippodrome: { select: { slug: true } } } },
-          result: { select: { actualOrder: true, winnerNo: true } },
-        },
-      },
-    },
-  });
-
-  type Agg = { wins: number; rides: number; p2: number; p3: number; p4: number; p5: number };
-  const agg = new Map<string, Agg>();
-
-  for (const r of runners) {
-    if (!r.jockey) continue;
-    const hippo = r.race.raceDay.hippodrome.slug;
-    const surf = r.race.surface as string;
-    const breed = r.race.breed as string;
-    const raceDate = r.race.raceDay.date;
-
-    // Resolve canonical name
-    const sur = _surname(_norm(r.jockey));
-    const jockey = canonicalBySurname.get(sur) ?? r.jockey;
-    const canonicalKey = `${jockey}|${hippo}|${surf}|${breed}`;
-
-    // If JSON import covers this combo, only count races after the cutoff
-    const existingRow = existingByKey.get(canonicalKey);
-    if (existingRow?.jsonCutoffDate && raceDate <= existingRow.jsonCutoffDate) continue;
-
-    let a = agg.get(canonicalKey);
-    if (!a) { a = { wins: 0, rides: 0, p2: 0, p3: 0, p4: 0, p5: 0 }; agg.set(canonicalKey, a); }
-    a.rides++;
-    const order = r.race.result?.actualOrder as number[] | null;
-    if (Array.isArray(order)) {
-      const pos = order.indexOf(r.no);
-      if (pos === 0) a.wins++;
-      else if (pos === 1) a.p2++;
-      else if (pos === 2) a.p3++;
-      else if (pos === 3) a.p4++;
-      else if (pos === 4) a.p5++;
-    } else if (r.race.result?.winnerNo === r.no) {
-      a.wins++;
-    }
-  }
-
-  // Track raw TJK names that resolved to a different canonical (to delete orphan rows)
-  const orphanNames = new Set<string>();
-  for (const r of runners) {
-    if (!r.jockey) continue;
-    const sur = _surname(_norm(r.jockey));
-    const canonical = canonicalBySurname.get(sur);
-    if (canonical && canonical !== r.jockey) orphanNames.add(r.jockey);
-  }
+  const existingByJockey = new Map(existing.map((r) => [r.jockey, r.id]));
 
   let updated = 0;
+  for (const r of rows) {
+    const tableCount = r.wins + r.place2 + r.place3 + r.place4 + r.place5;
+    const winRate = r.races > 0 ? r.wins / r.races : 0;
+    const tableRate = r.races > 0 ? tableCount / r.races : 0;
+    const data = {
+      rides: r.races, wins: r.wins, place2: r.place2, place3: r.place3, place4: r.place4, place5: r.place5,
+      tableCount, winRate, tableRate,
+    };
 
-  for (const [canonicalKey, delta] of agg) {
-    const [jockey, hippoSlug, surface, breed] = canonicalKey.split("|");
-    const existing = existingByKey.get(canonicalKey);
-
-    // Fixed JSON baseline (never mutated by this function) + delta, which is
-    // always the COMPLETE aggregate of DB races after the (also fixed) cutoff —
-    // so re-running this is idempotent no matter how many times it's called.
-    const base = readBaseline(existing);
-
-    const rides = base.rides + delta.rides;
-    const wins = base.wins + delta.wins;
-    const p2 = base.p2 + delta.p2;
-    const p3 = base.p3 + delta.p3;
-    const p4 = base.p4 + delta.p4;
-    const p5 = base.p5 + delta.p5;
-    const tableCount = wins + p2 + p3 + p4 + p5;
-    const winRate = rides > 0 ? wins / rides : 0;
-    const tableRate = rides > 0 ? tableCount / rides : 0;
-
-    await db.jockeyStatSync.upsert({
-      where: { jockey_hippoSlug_year_breed_surface: { jockey, hippoSlug, year, breed, surface } },
-      update: { rides, wins, place2: p2, place3: p3, place4: p4, place5: p5, tableCount, winRate, tableRate },
-      create: { jockey, hippoSlug, year, breed, surface, rides, wins, place2: p2, place3: p3, place4: p4, place5: p5, tableCount, winRate, tableRate, prizeTl: 0 },
-    });
+    const existingId = existingByJockey.get(r.jockey);
+    if (existingId) {
+      await db.jockeyStatSync.update({ where: { id: existingId }, data });
+    } else {
+      await db.jockeyStatSync.create({
+        data: { jockey: r.jockey, hippoSlug: "overall", year, breed: null, surface: null, ...data, prizeTl: 0 },
+      });
+    }
     updated++;
-  }
-
-  // Delete orphan rows (abbreviated TJK names superseded by canonical JSON-imported names).
-  if (orphanNames.size > 0) {
-    await db.jockeyStatSync.deleteMany({ where: { year, jockey: { in: [...orphanNames] } } });
   }
 
   return updated;
