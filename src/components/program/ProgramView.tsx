@@ -101,6 +101,22 @@ function galopDate(g: ProgramGallop): string {
   return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+// İdman (galop) jokeyi, koşuda binecek jokeyle aynı kişi mi? — soyada göre karşılaştırma
+// (galop kaydı "D.SAV" gibi kısaltılmış, koşu kaydı "DENİZ SAV" gibi tam olabilir)
+function normTr(s: string): string {
+  return s.toUpperCase()
+    .replace(/İ/g, "I").replace(/Ğ/g, "G").replace(/Ü/g, "U")
+    .replace(/Ş/g, "S").replace(/Ö/g, "O").replace(/Ç/g, "C")
+    .replace(/\s+/g, " ").trim();
+}
+function jockeySurname(name: string): string {
+  return normTr(name).split(/[\s.]+/).filter(Boolean).at(-1) ?? normTr(name);
+}
+function isSameJockey(galopJockey: string | null, raceJockey: string | null): boolean {
+  if (!galopJockey || !raceJockey) return false;
+  return jockeySurname(galopJockey) === jockeySurname(raceJockey);
+}
+
 // Galop kalite renklendirmesi
 const GALOP_BENCHMARKS: Record<string, Record<string, { iyi: number; cokIyi: number }>> = {
   INGILIZ: {
@@ -500,8 +516,12 @@ function RunnerRow({
               const isInner = (g.splits["ic_dis"] ?? "").includes("İÇ") || (g.splits["ic_dis"] ?? "").toUpperCase().includes("IC");
               const prepQ = galopQuality(prepDist ?? "", prepTime, breed, isInner);
               const finQ = galopQuality("400", finish, breed, isInner);
+              const sameJockey = isSameJockey(g.jockey, r.jockey);
               return (
                 <div key={i} className="flex items-baseline gap-1.5 text-[10px] leading-snug whitespace-nowrap">
+                  {sameJockey && (
+                    <span title={`İdman jokeyi (${g.jockey}) koşuda da binecek`} className="font-bold text-hit">!</span>
+                  )}
                   <span className="font-mono">
                     {prepDist && prepTime && (
                       <span className={galopTimeClass(prepQ)}>{prepDist}·{prepTime}</span>
@@ -690,6 +710,7 @@ function RunnerCard({
           const { prepDist, prepTime, finish } = galopSplits(g);
           const isInner = (g.splits["ic_dis"] ?? "").includes("İÇ") || (g.splits["ic_dis"] ?? "").toUpperCase().includes("IC");
           return { prepDist, prepTime, finish, date: galopDate(g), track: g.track, isInner,
+            sameJockey: isSameJockey(g.jockey, r.jockey),
             prepQ: galopQuality(prepDist ?? "", prepTime, breed, isInner),
             finQ: galopQuality("400", finish, breed, isInner) };
         }).filter((x) => x.prepDist || x.finish);
@@ -700,6 +721,7 @@ function RunnerCard({
             <div className="flex flex-wrap gap-x-3 gap-y-0.5">
               {items.map((x, i) => (
                 <div key={i} className="text-[10px]">
+                  {x.sameJockey && <span className="font-bold text-hit mr-0.5">!</span>}
                   <span className="font-mono">
                     {x.prepDist && x.prepTime && (
                       <span className={galopTimeClass(x.prepQ)}>{x.prepDist}·{x.prepTime}</span>
