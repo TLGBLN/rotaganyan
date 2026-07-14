@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
-import { syncGalopForDate } from "@/server/services/ingest/liderform-galop.adapter";
+import { syncIdmanForDate } from "@/server/services/ingest/tjk-idman-stats.adapter";
 
 export const maxDuration = 300;
 
@@ -26,10 +26,10 @@ export async function GET(req: NextRequest) {
     ingestDate(toTjkDate(tomorrow)),
   ]);
 
-  // 2. Galop sync: program yüklendikten sonra bugün + yarın
+  // 2. İdman (galop) sync: program yüklendikten sonra bugün + yarın
   const [todayGalop, tomorrowGalop] = await Promise.all([
-    syncGalopForDate(toIsoDate(now)).catch((e: unknown) => ({ pages: 0, horses: 0, rows: 0, skipped: 0, errors: [String(e)] })),
-    syncGalopForDate(toIsoDate(tomorrow)).catch((e: unknown) => ({ pages: 0, horses: 0, rows: 0, skipped: 0, errors: [String(e)] })),
+    syncIdmanForDate(toIsoDate(now)).catch((e: unknown) => ({ hippodromes: 0, rows: 0, skipped: 0, errors: [String(e)] })),
+    syncIdmanForDate(toIsoDate(tomorrow)).catch((e: unknown) => ({ hippodromes: 0, rows: 0, skipped: 0, errors: [String(e)] })),
   ]);
 
   const summary = (r: typeof todayResult) =>
@@ -39,12 +39,12 @@ export async function GET(req: NextRequest) {
     today: {
       date: toTjkDate(now),
       cities: summary(todayResult),
-      galop: { pages: todayGalop.pages, horses: todayGalop.horses, rows: todayGalop.rows, skipped: todayGalop.skipped },
+      galop: { hippodromes: todayGalop.hippodromes, rows: todayGalop.rows, skipped: todayGalop.skipped },
     },
     tomorrow: {
       date: toTjkDate(tomorrow),
       cities: summary(tomorrowResult),
-      galop: { pages: tomorrowGalop.pages, horses: tomorrowGalop.horses, rows: tomorrowGalop.rows, skipped: tomorrowGalop.skipped },
+      galop: { hippodromes: tomorrowGalop.hippodromes, rows: tomorrowGalop.rows, skipped: tomorrowGalop.skipped },
     },
   });
 }

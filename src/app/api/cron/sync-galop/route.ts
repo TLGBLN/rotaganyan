@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { syncGalopForDate } from "@/server/services/ingest/liderform-galop.adapter";
+import { syncIdmanForDate } from "@/server/services/ingest/tjk-idman-stats.adapter";
+import { turkeyDateString } from "@/lib/tz";
 
 export const maxDuration = 120;
 
@@ -11,10 +12,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Optional ?date=YYYY-MM-DD override; otherwise auto-detects from liderform main page
-  const dateParam = req.nextUrl.searchParams.get("date") ?? undefined;
+  // Optional ?date=YYYY-MM-DD override; otherwise bugün + yarın senkronlanır
+  const dateParam = req.nextUrl.searchParams.get("date");
+  const dates = dateParam ? [dateParam] : [turkeyDateString(), turkeyDateString(1)];
 
-  const result = await syncGalopForDate(dateParam);
+  const results = [];
+  for (const d of dates) {
+    results.push({ date: d, ...(await syncIdmanForDate(d)) });
+  }
 
-  return NextResponse.json({ date: dateParam ?? "auto", ...result });
+  return NextResponse.json({ results });
 }
