@@ -712,6 +712,13 @@ function _surname(normName: string): string {
   return normName.split(/[\s.]+/).filter(Boolean).at(-1) ?? normName;
 }
 
+// TJK'nın arama motoru Türkçe karakter (Ş/Ç/Ğ/Ü/Ö/İ) - ASCII eşdeğeri eşleştirmesi
+// yapmıyor ("COSKUN" ile "COŞKUN" bulunamıyor) — bu yüzden TJK sorgusu için
+// orijinal (ASCII'ye çevrilmemiş) soyadı gerekir; sadece boşluk/nokta ile böler.
+function _surnameOriginal(name: string): string {
+  return name.trim().split(/[\s.]+/).filter(Boolean).at(-1) ?? name;
+}
+
 /** Sadece jockeyStatSync tablosundan çeker — race results fallback yok. */
 export async function getJockeyStats(names: string[]): Promise<Record<string, JockeyStat>> {
   if (names.length === 0) return {};
@@ -789,9 +796,46 @@ export async function getJockeyStats(names: string[]): Promise<Record<string, Jo
  * tek doğru kaynak — hippoSlug="overall", breed/surface=null olarak, yıl geneli
  * biniş/galibiyet sayılarını doğrudan TJK'dan yazar.
  */
-export async function syncJockeyStatsFromTjk(year = new Date().getFullYear()): Promise<number> {
-  const { fetchTjkJockeyStats } = await import("./ingest/tjk-jockey-stats.adapter");
+export async function syncJockeyStatsFromTjk(
+  year = new Date().getFullYear(),
+  opts: { includeMissing?: boolean } = {}
+): Promise<number> {
+  const { fetchTjkJockeyStats, fetchTjkJockeyStatsByName } = await import("./ingest/tjk-jockey-stats.adapter");
   const rows = await fetchTjkJockeyStats(year);
+
+  // TJK'nın toplu sayfalaması güvenilir değil ("Toplam X sonuçtan" dediği sayı,
+  // DataRows ile gerçekte erişilebilenden fazla) — düşük binişli jokeyler/aprantiler
+  // (örn. Enes Atlamaz, Mehmet Taha Coşkun) toplu listede hiç görünmüyor. Kendi
+  // Runner verimizdeki isimlerle karşılaştırıp eksik kalanları soyadına göre
+  // tek tek TJK'dan sorgulayarak tamamlıyoruz.
+  if (opts.includeMissing) {
+    const bulkSurnames = new Set(rows.map((r) => _surname(_norm(r.jockey))));
+    const ourRunners = await db.runner.findMany({
+      where: { jockey: { not: null }, race: { raceDay: { date: { gte: new Date(`${year}-01-01T00:00:00Z`) } } } },
+      select: { jockey: true },
+      distinct: ["jockey"],
+    });
+    const missingSurnames = new Map<string, string>(); // normalized → orijinal (TJK araması için)
+    for (const r of ourRunners) {
+      if (!r.jockey || r.jockey.includes("*")) continue;
+      const sur = _surname(_norm(r.jockey));
+      if (sur.length >= 2 && !bulkSurnames.has(sur)) missingSurnames.set(sur, _surnameOriginal(r.jockey));
+    }
+
+    const foundJockeys = new Set(rows.map((r) => r.jockey));
+    for (const sur of missingSurnames.values()) {
+      try {
+        const found = await fetchTjkJockeyStatsByName(sur, year);
+        for (const f of found) {
+          if (!foundJockeys.has(f.jockey)) {
+            rows.push(f);
+            foundJockeys.add(f.jockey);
+          }
+        }
+      } catch { /* TJK'da bu soyad için sonuç yok — atla */ }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
 
   // Prisma'nın compound-unique kısayolu (jockey_hippoSlug_year_breed_surface) null
   // değer kabul etmiyor (Postgres'te NULL != NULL, unique lookup için belirsiz) —
@@ -882,9 +926,43 @@ export async function getTrainerStats(names: string[]): Promise<Record<string, T
  * TJK'nın resmi Antrenör İstatistikleri sayfasından TrainerStatSync tablosunu günceller
  * (cron tarafından çağrılır) — yıl geneli biniş/galibiyet sayılarını doğrudan TJK'dan yazar.
  */
-export async function syncTrainerStatsFromTjk(year = new Date().getFullYear()): Promise<number> {
-  const { fetchTjkTrainerStats } = await import("./ingest/tjk-trainer-stats.adapter");
+export async function syncTrainerStatsFromTjk(
+  year = new Date().getFullYear(),
+  opts: { includeMissing?: boolean } = {}
+): Promise<number> {
+  const { fetchTjkTrainerStats, fetchTjkTrainerStatsByName } = await import("./ingest/tjk-trainer-stats.adapter");
   const rows = await fetchTjkTrainerStats(year);
+
+  // Jokey sync'teki aynı boşluk: TJK'nın toplu sayfalaması düşük binişli
+  // antrenörleri kesebiliyor — eksik kalanları soyadına göre tamamlıyoruz.
+  if (opts.includeMissing) {
+    const bulkSurnames = new Set(rows.map((r) => _surname(_norm(r.trainer))));
+    const ourRunners = await db.runner.findMany({
+      where: { trainer: { not: null }, race: { raceDay: { date: { gte: new Date(`${year}-01-01T00:00:00Z`) } } } },
+      select: { trainer: true },
+      distinct: ["trainer"],
+    });
+    const missingSurnames = new Map<string, string>(); // normalized → orijinal (TJK araması için)
+    for (const r of ourRunners) {
+      if (!r.trainer || r.trainer.includes("*")) continue;
+      const sur = _surname(_norm(r.trainer));
+      if (sur.length >= 2 && !bulkSurnames.has(sur)) missingSurnames.set(sur, _surnameOriginal(r.trainer));
+    }
+
+    const foundTrainers = new Set(rows.map((r) => r.trainer));
+    for (const sur of missingSurnames.values()) {
+      try {
+        const found = await fetchTjkTrainerStatsByName(sur, year);
+        for (const f of found) {
+          if (!foundTrainers.has(f.trainer)) {
+            rows.push(f);
+            foundTrainers.add(f.trainer);
+          }
+        }
+      } catch { /* TJK'da bu soyad için sonuç yok — atla */ }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
 
   let updated = 0;
   for (const r of rows) {

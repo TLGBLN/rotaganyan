@@ -12,6 +12,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }
 
-  const count = await syncJockeyStatsFromTjk();
+  const count = await syncJockeyStatsFromTjk(undefined, { includeMissing: true });
   return NextResponse.json({ ok: true, count, ts: new Date().toISOString() });
 }

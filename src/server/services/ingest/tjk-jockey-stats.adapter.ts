@@ -83,3 +83,15 @@ export async function fetchTjkJockeyStats(year: number): Promise<TjkJockeyRow[]>
 
   return all;
 }
+
+/**
+ * TJK'nın toplu sayfalaması güvenilir değil — "Toplam X sonuçtan" dediği sayı ile
+ * gerçekte DataRows üzerinden erişilebilen satır sayısı tutmuyor (düşük binişli
+ * jokeyler kesiliyor). QueryParameter_JokeyAdi ile soyada göre tekil arama bu
+ * eksikleri kesin olarak yakalar (aynı sorgu, sayfalama olmadan).
+ */
+export async function fetchTjkJockeyStatsByName(query: string, year: number): Promise<TjkJockeyRow[]> {
+  const qs = `QueryParameter_YIL=${year}&QueryParameter_SehirId=-1&QueryParameter_APRANTIADI=-1&QueryParameter_JokeyAdi=${encodeURIComponent(query)}`;
+  const html = await fetchHtml(`${BASE}/TR/YarisSever/Query/Data/JokeyIstatistikleri?${qs}`);
+  return parseRows(html);
+}

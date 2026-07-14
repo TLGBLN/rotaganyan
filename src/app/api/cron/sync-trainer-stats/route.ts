@@ -9,6 +9,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }
 
-  const count = await syncTrainerStatsFromTjk();
+  const count = await syncTrainerStatsFromTjk(undefined, { includeMissing: true });
   return NextResponse.json({ ok: true, count, ts: new Date().toISOString() });
 }

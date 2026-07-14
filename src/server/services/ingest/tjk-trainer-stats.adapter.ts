@@ -75,3 +75,13 @@ export async function fetchTjkTrainerStats(year: number): Promise<TjkTrainerRow[
 
   return all;
 }
+
+/**
+ * TJK'nın toplu sayfalaması güvenilir değil — düşük binişli antrenörler toplu
+ * listede kesilebiliyor. Soyada göre tekil arama bu eksikleri kesin yakalar.
+ */
+export async function fetchTjkTrainerStatsByName(query: string, year: number): Promise<TjkTrainerRow[]> {
+  const qs = `QueryParameter_YIL=${year}&QueryParameter_SehirId=-1&QueryParameter_AntrenorAdi=${encodeURIComponent(query)}`;
+  const html = await fetchHtml(`${BASE}/TR/YarisSever/Query/Data/AntrenorIstatistikleri?${qs}`);
+  return parseRows(html);
+}
