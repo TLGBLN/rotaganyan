@@ -6,10 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/auth";
 import { getActivePredictions } from "@/server/services/race.service";
+import { syncResultsForDate } from "@/server/services/result-sync";
+import { turkeyDateString } from "@/lib/tz";
 
 export const dynamic = "force-dynamic";
 
 export default async function TahminOnerileriPage() {
+  // Sonuçlanmış bir koşu "aktif" listede takılı kalmasın diye bugünü senkronla
+  try { await syncResultsForDate(turkeyDateString()); } catch { /* ignore */ }
+
   const [items, session] = await Promise.all([getActivePredictions(), auth()]);
   if (!session?.user) {
     redirect("/giris?callbackUrl=%2Ftahmin-onerileri");

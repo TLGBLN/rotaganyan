@@ -259,12 +259,13 @@ export async function getPublishedPredictions(
 
 /** Henüz sonuçlanmamış (bugün veya ileri tarihli) yayımlanmış aktif öneriler. */
 export async function getActivePredictions(): Promise<PredictionListItem[]> {
+  const today = new Date(turkeyDateString() + "T00:00:00.000Z");
   return db.prediction.findMany({
     where: {
       published: true,
       race: {
         result: null,
-        raceDay: { date: { gte: startOfDay(new Date()) } },
+        raceDay: { date: { gte: today } },
       },
     },
     include: {

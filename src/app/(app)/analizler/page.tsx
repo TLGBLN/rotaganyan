@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/auth";
 import { getPublishedPredictions } from "@/server/services/race.service";
+import { syncResultsForDate } from "@/server/services/result-sync";
+import { turkeyDateString } from "@/lib/tz";
 
 type PageProps = {
   searchParams: Promise<{ sayfa?: string; tur?: string }>;
@@ -18,6 +20,10 @@ export default async function AnalizlerPage({ searchParams }: PageProps) {
   if (!session?.user) {
     redirect("/giris?callbackUrl=%2Fanalizler");
   }
+
+  // Bugün biten bir bankonun isabeti hemen bu listeye yansısın diye senkronla
+  try { await syncResultsForDate(turkeyDateString()); } catch { /* ignore */ }
+
   const page = Math.max(1, parseInt(params.sayfa ?? "1", 10));
 
   const { items, total } = await getPublishedPredictions(page, PER_PAGE, params.tur);
