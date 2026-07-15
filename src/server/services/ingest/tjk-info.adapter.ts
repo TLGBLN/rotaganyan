@@ -144,6 +144,22 @@ export async function fetchCityProgram(
 
   if (raceMeta.size === 0) return null;
 
+  // Pist durumu + hava — sayfanın ".conditions-race" bölümünde, ayrı bir istek gerekmez
+  const $cond = $(".conditions-race").first();
+  const surfaceConditions: { label: string; detail: string }[] = [];
+  $cond.find('span[class*="raceWeather"]').each((_, el) => {
+    const text = $(el).text().trim().replace(/\s+/g, " ");
+    const m = text.match(/^([^:]+):\s*(.*)$/);
+    if (m) surfaceConditions.push({ label: m[1].trim(), detail: m[2].trim() });
+  });
+  let weather: string | undefined;
+  $cond.contents().each((_, node) => {
+    if (node.type === "text") {
+      const t = $(node).text().trim();
+      if (t) weather = (weather ? weather + " " : "") + t;
+    }
+  });
+
   // Parse each race pane
   const races: IngestRace[] = [];
 
@@ -361,6 +377,8 @@ export async function fetchCityProgram(
     hippodromeSlug: slug,
     hippodromeName: city.sehirAdi,
     races,
+    surfaceConditions: surfaceConditions.length > 0 ? surfaceConditions : undefined,
+    weather,
   };
 }
 

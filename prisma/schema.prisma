@@ -161,10 +161,12 @@ model Hippodrome {
 }
 
 model RaceDay {
-  id           String   @id @default(cuid())
-  date         DateTime
-  hippodromeId String
-  createdAt    DateTime @default(now())
+  id                String   @id @default(cuid())
+  date              DateTime
+  hippodromeId      String
+  createdAt         DateTime @default(now())
+  surfaceConditions Json? // TJK "conditions-race" bloğu — [{label:"Çim", detail:"Normal 3,3"}, ...]
+  weather           String? // örn. "Hava: 26C,Az Bulutlu,Nem%64"
 
   hippodrome Hippodrome @relation(fields: [hippodromeId], references: [id])
   races      Race[]

@@ -586,6 +586,8 @@ export type ProgramDay = {
   hippodromeName: string;
   hippodromeSlug: string;
   races: ProgramRace[];
+  surfaceConditions: { label: string; detail: string }[] | null;
+  weather: string | null;
 };
 
 export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
@@ -649,6 +651,8 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     id: rd.id,
     hippodromeName: rd.hippodrome.name,
     hippodromeSlug: rd.hippodrome.slug,
+    surfaceConditions: (rd.surfaceConditions as { label: string; detail: string }[] | null) ?? null,
+    weather: rd.weather,
     races: rd.races.map((r) => {
       // Karma mirror: inherit prediction from original race
       let pred = r.prediction;

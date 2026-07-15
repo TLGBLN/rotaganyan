@@ -38,10 +38,14 @@ export async function persistRaceDays(raceDays: IngestRaceDay[]): Promise<Ingest
       date.setUTCHours(0, 0, 0, 0);
 
       // Upsert race day
+      const conditionData = {
+        surfaceConditions: rd.surfaceConditions ?? undefined,
+        weather: rd.weather ?? undefined,
+      };
       const raceDay = await db.raceDay.upsert({
         where: { date_hippodromeId: { date, hippodromeId: hippodrome.id } },
-        create: { date, hippodromeId: hippodrome.id },
-        update: {},
+        create: { date, hippodromeId: hippodrome.id, ...conditionData },
+        update: conditionData,
       });
 
       for (const r of rd.races) {

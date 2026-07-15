@@ -46,11 +46,15 @@ export type IngestRace = {
   gallops: IngestGallop[];
 };
 
+export type IngestSurfaceCondition = { label: string; detail: string };
+
 export type IngestRaceDay = {
   date: Date;
   hippodromeSlug: string;
   hippodromeName: string;
   races: IngestRace[];
+  surfaceConditions?: IngestSurfaceCondition[];
+  weather?: string;
 };
 
 export type IngestResult = {

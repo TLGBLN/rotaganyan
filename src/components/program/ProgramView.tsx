@@ -1134,6 +1134,26 @@ export default function ProgramView({
             ))}
           </div>
 
+          {/* Pist durumu + hava (TJK) */}
+          {((currentDay.surfaceConditions?.length ?? 0) > 0 || currentDay.weather) && (
+            <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 bg-muted/10 border-b text-[11px]">
+              {currentDay.surfaceConditions?.map((c, i) => (
+                <span
+                  key={i}
+                  className={cn(
+                    "rounded border px-1.5 py-0.5 font-medium",
+                    /çim/i.test(c.label) ? "border-[#009900] text-[#009900]"
+                      : /kum/i.test(c.label) ? "border-[#996633] text-[#996633]"
+                      : "border-[#D39B1E] text-[#D39B1E]"
+                  )}
+                >
+                  {c.label}: {c.detail}
+                </span>
+              ))}
+              {currentDay.weather && <span className="text-muted-foreground">{currentDay.weather}</span>}
+            </div>
+          )}
+
           {/* Zemin legend + analiz + geri sayım */}
           <div className="flex items-center justify-between gap-4 px-3 py-1.5 bg-muted/20 border-b text-[11px]">
             <div className="flex items-center gap-4 text-muted-foreground">
