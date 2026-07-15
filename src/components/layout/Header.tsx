@@ -6,18 +6,23 @@ import MobileNav from "./MobileNav";
 import HeaderUserMenu from "./HeaderUserMenu";
 import LiveTvPlayer from "@/components/home/LiveTvPlayer";
 import NotificationBell from "./NotificationBell";
+import IntroTour from "./IntroTour";
 
 export default async function Header() {
   const session = await auth();
   const user = session?.user;
 
-  const followedHorses = user?.id
-    ? await db.horseFollow.findMany({
-        where: { userId: user.id },
-        select: { horseName: true, note: true },
-        orderBy: { createdAt: "desc" },
-      })
-    : [];
+  const [followedHorses, dbUser] = await Promise.all([
+    user?.id
+      ? db.horseFollow.findMany({
+          where: { userId: user.id },
+          select: { horseName: true, note: true },
+          orderBy: { createdAt: "desc" },
+        })
+      : Promise.resolve([]),
+    user?.id ? db.user.findUnique({ where: { id: user.id }, select: { hasSeenIntro: true } }) : Promise.resolve(null),
+  ]);
+  const showIntroTour = !!user && dbUser?.hasSeenIntro === false;
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -43,25 +48,25 @@ export default async function Header() {
         {/* Hızlı erişim */}
         <nav className="hidden flex-1 items-center gap-2 md:flex">
           <Button asChild size="sm" className="bg-brand hover:bg-brand/90 text-brand-foreground">
-            <Link href="/program">Yarış Programı</Link>
+            <Link href="/program" data-tour="program">Yarış Programı</Link>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href="/rotaganyanpuantablosu">Rotaganyan Puan Tablosu</Link>
+            <Link href="/rotaganyanpuantablosu" data-tour="puantablosu">Rotaganyan Puan Tablosu</Link>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href="/altili">Altılı Ne Verir?</Link>
+            <Link href="/altili" data-tour="altili">Altılı Ne Verir?</Link>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href="/tahmin-onerileri">Banko Önerileri</Link>
+            <Link href="/tahmin-onerileri" data-tour="banko">Banko Önerileri</Link>
           </Button>
           <LiveTvPlayer compact />
         </nav>
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          {user && <NotificationBell />}
+          {user && <span data-tour="bildirim"><NotificationBell /></span>}
           {user ? (
-            <HeaderUserMenu name={user.name} email={user.email} role={user.role} />
+            <span data-tour="hesap"><HeaderUserMenu name={user.name} email={user.email} role={user.role} /></span>
           ) : (
             <>
               <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
@@ -79,6 +84,7 @@ export default async function Header() {
           <MobileNav isLoggedIn={!!user} followedHorses={followedHorses} />
         </div>
       </div>
+      {showIntroTour && <IntroTour />}
     </header>
   );
 }
