@@ -1,23 +1,13 @@
 import Link from "next/link";
+import Wordmark from "./Wordmark";
 
 export default function Footer() {
   return (
     <footer className="border-t bg-background px-4 py-8 text-sm text-muted-foreground">
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
-          <p className="font-medium">
-            <span className="text-white">ROTA</span>
-            <span
-              style={{
-                background:
-                  "linear-gradient(90deg,#5b9bd5 0%,#a8c8e8 30%,#e4ddc8 50%,#d4b45a 65%,#c8971e 85%,#b8820a 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              GANYAN
-            </span>
+          <p className="flex items-center font-medium">
+            <Wordmark />
             <span className="ml-2 font-normal">© 2026 At Yarışı Analiz Platformu</span>
           </p>
           <nav className="flex flex-wrap justify-center gap-x-4 gap-y-1">
