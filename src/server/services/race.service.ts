@@ -645,7 +645,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
               scratched: true, ekuriGroup: true, apprentice: true, raceStyle: true,
               gallops: {
                 orderBy: { date: "desc" },
-                take: 5,
+                take: 3,
                 select: { date: true, track: true, form: true, jockey: true, splits: true },
               },
             },

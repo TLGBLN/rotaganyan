@@ -6,6 +6,7 @@ import SessionProvider from "@/components/providers/SessionProvider";
 import VersionWatcher from "@/components/layout/VersionWatcher";
 import ScrollToTopButton from "@/components/layout/ScrollToTopButton";
 import PageTracker from "@/components/layout/PageTracker";
+import SplashScreen from "@/components/layout/SplashScreen";
 import { auth } from "@/lib/auth";
 import "./globals.css";
 
@@ -75,6 +76,7 @@ export default async function RootLayout({
       >
         <SessionProvider session={session}>
           <TooltipProvider>
+            <SplashScreen />
             {children}
             <Toaster richColors position="bottom-right" />
             <VersionWatcher />

@@ -114,3 +114,9 @@ body {
 
 /* Satır zebra rengi */
 .race-row-even { background: oklch(0.16 0.038 240); }
+
+/* Açılış ekranı — logo etrafında dönen nokta */
+@keyframes rg-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
