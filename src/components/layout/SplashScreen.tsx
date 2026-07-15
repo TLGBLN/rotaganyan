@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 
 const HOLD_MS = 2400;
-const FADE_MS = 450;
+const FADE_MS = 550;
 
 export default function SplashScreen() {
   const [stage, setStage] = useState<"visible" | "fading" | "hidden">("visible");
@@ -31,8 +31,17 @@ export default function SplashScreen() {
         <div className="absolute inset-0" style={{ animation: "rg-orbit 2.6s linear infinite" }}>
           <span className="absolute -top-[3px] left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-[#d4b45a] shadow-[0_0_10px_3px_rgba(212,180,90,0.65)]" />
         </div>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Image src="/logo.png" alt="ROTAGANYAN" width={72} height={72} className="rounded-xl" priority />
+        <div className="absolute inset-0 flex items-center justify-center overflow-visible">
+          <div
+            style={{
+              animation:
+                stage === "visible"
+                  ? "rg-gallop 0.55s ease-in-out infinite"
+                  : "rg-run-off 550ms cubic-bezier(0.4,0,0.8,0.6) forwards",
+            }}
+          >
+            <Image src="/logo.png" alt="ROTAGANYAN" width={72} height={72} className="rounded-xl" priority />
+          </div>
         </div>
       </div>
 
