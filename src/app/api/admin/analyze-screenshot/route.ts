@@ -108,8 +108,11 @@ export async function POST(req: NextRequest) {
     extracted = JSON.parse(clean);
     // Gerçekçi kilo değişimi ±10kg'ı aşmaz — modelin yanlış kolonu okuduğu
     // durumlarda (örn. start no) gerçek dışı değerlerin veritabanına yazılmasını engeller.
+    // Aynı şekilde "jockey" alanına bu yarıştaki bir at ismi düşmüşse geçersiz sayılır.
+    const horseNamesInRace = new Set(extracted.map((r) => (r.name ?? "").toUpperCase().trim()));
     for (const r of extracted) {
       if (r.weightChange != null && Math.abs(r.weightChange) > 10) r.weightChange = undefined;
+      if (r.jockey && horseNamesInRace.has(r.jockey.toUpperCase().trim())) r.jockey = undefined;
     }
   } catch (err) {
     console.error("Claude Vision error:", err);

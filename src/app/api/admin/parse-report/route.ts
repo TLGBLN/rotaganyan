@@ -91,7 +91,17 @@ export async function POST(req: NextRequest) {
     runnerNameByNo[r.no] = r.name;
   }
 
+  // Sütunlar kayarsa "Jokey" alanına bu yarıştaki bir at ismi düşebiliyor —
+  // bunu tespit edip geçersiz sayıyoruz, sessizce yazmıyoruz.
+  const horseNamesInRace = new Set([
+    ...race.runners.map((r) => r.name.toUpperCase().trim()),
+    ...parsed.runners.map((r) => r.name.toUpperCase().trim()),
+  ]);
+
   for (const r of parsed.runners) {
+    if (r.jockey && horseNamesInRace.has(r.jockey.toUpperCase().trim())) {
+      r.jockey = undefined;
+    }
     const data = {
       name: r.name,
       weight: r.weight ?? undefined,

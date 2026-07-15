@@ -28,6 +28,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Hiç at verisi bulunamadı. Format: No | At | Jokey | Kilo | ΔKilo | AGF% | Notlar" }, { status: 422 });
   }
 
+  // Sütunlar kayarsa (ör. eksik bir sütun) "Jokey" alanına bu yarıştaki bir at
+  // ismi düşebiliyor — bunu tespit edip geçersiz sayıyoruz, sessizce yazmıyoruz.
+  const horseNamesInRace = new Set(parsed.map((r) => r.name.toUpperCase().trim()));
+  for (const r of parsed) {
+    if (r.jockey && horseNamesInRace.has(r.jockey.toUpperCase().trim())) {
+      r.jockey = undefined;
+    }
+  }
+
   const updated = await Promise.all(
     parsed.map(async (r) => {
       const existing = race.runners.find((x) => x.no === r.no);
