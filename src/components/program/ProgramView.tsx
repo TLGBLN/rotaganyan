@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useTransition } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, Star } from "lucide-react";
+import { ChevronDown, ChevronUp, Star, TriangleAlert } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick, ProgramGallop } from "@/server/services/race.service";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
 import { getSon800ForRace, type Son800RunnerData } from "@/server/actions/son800.actions";
@@ -527,7 +527,12 @@ function GalopPanel({ runners, breed }: { runners: ProgramRunner[]; breed: strin
                     <div key={i} className="text-[10px] leading-snug">
                       <div className="flex items-baseline gap-1 flex-wrap">
                         {sameJockey && (
-                          <span title={`İdman jokeyi (${g.jockey}) koşuda da binecek`} className="font-bold text-hit">!</span>
+                          <span
+                            title={`İdman jokeyi (${g.jockey}) koşuda da binecek`}
+                            className="inline-flex items-center justify-center rounded-full bg-amber-400 p-0.5"
+                          >
+                            <TriangleAlert className="h-3 w-3 fill-amber-400 stroke-black" strokeWidth={2.5} />
+                          </span>
                         )}
                         <span className="font-mono">
                           {prepDist && prepTime && (

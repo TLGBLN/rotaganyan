@@ -21,7 +21,8 @@ export async function getSon800ForRace(raceId: string): Promise<Son800RunnerData
     runners.map(async (r): Promise<Son800RunnerData> => {
       try {
         const rows = await fetchTjkSon800ByHorseName(r.name);
-        return { runnerNo: r.no, horseName: r.name, records: rows.slice(-3).reverse() };
+        const rows2026 = rows.filter((row) => row.year === "2026");
+        return { runnerNo: r.no, horseName: r.name, records: rows2026.slice(-3).reverse() };
       } catch {
         return { runnerNo: r.no, horseName: r.name, records: [] };
       }

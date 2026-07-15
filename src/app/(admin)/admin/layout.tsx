@@ -7,6 +7,7 @@ import { hasRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { Role } from "@prisma/client";
 import { LogOut, Bell } from "lucide-react";
+import Wordmark from "@/components/layout/Wordmark";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -24,12 +25,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="border-b border-brand/20 px-4 py-4">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
+              <Link href="/program">
+                <Wordmark className="text-xs" />
+              </Link>
               <div className="flex h-6 w-6 items-center justify-center rounded bg-brand text-[10px] font-black text-black">
                 A
               </div>
-              <Link href="/program" className="text-sm font-bold tracking-wide text-foreground">
-                ROTAGANYAN
-              </Link>
             </div>
             <Link
               href="/admin/bildirimler"
@@ -75,8 +76,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         {/* Mobile header */}
         <header className="flex items-center justify-between border-b border-brand/20 bg-[#0d0d14] px-4 py-3 lg:hidden">
           <div className="flex items-center gap-2">
+            <Link href="/program">
+              <Wordmark className="text-xs" />
+            </Link>
             <span className="rounded-sm bg-brand/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-brand">Admin</span>
-            <Link href="/program" className="text-sm font-bold text-foreground">ROTAGANYAN</Link>
           </div>
           <AdminMobileNav
             userName={session.user.name}

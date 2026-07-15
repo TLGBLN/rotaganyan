@@ -8,6 +8,7 @@ import LiveTvPlayer from "@/components/home/LiveTvPlayer";
 import NotificationBell from "./NotificationBell";
 import IntroTour from "./IntroTour";
 import OnlineCounter from "./OnlineCounter";
+import Wordmark from "./Wordmark";
 
 export default async function Header() {
   const session = await auth();
@@ -30,20 +31,7 @@ export default async function Header() {
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4">
         {/* Logo */}
         <Link href="/program" className="flex shrink-0 items-center gap-2.5">
-          <span className="text-base font-bold tracking-tight leading-none">
-            <span className="text-white">ROTA</span>
-            <span
-              style={{
-                background:
-                  "linear-gradient(90deg,#5b9bd5 0%,#a8c8e8 30%,#e4ddc8 50%,#d4b45a 65%,#c8971e 85%,#b8820a 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              GANYAN
-            </span>
-          </span>
+          <Wordmark />
         </Link>
 
         {/* Hızlı erişim */}

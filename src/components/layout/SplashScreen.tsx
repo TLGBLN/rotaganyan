@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import Wordmark from "./Wordmark";
 
 const HOLD_MS = 2600;
 const FADE_MS = 500;
@@ -27,10 +28,7 @@ export default function SplashScreen() {
       aria-hidden="true"
     >
       <Image src="/logo.png" alt="ROTAGANYAN" width={80} height={80} className="rounded-full" priority />
-      <span className="text-xl font-bold tracking-tight">
-        <span className="text-white">ROTA</span>
-        <span className="text-brand">GANYAN</span>
-      </span>
+      <Wordmark className="text-xl px-3 py-1.5" />
     </div>
   );
 }

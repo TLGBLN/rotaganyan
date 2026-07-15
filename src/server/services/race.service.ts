@@ -645,12 +645,25 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     orderBy: { hippodrome: { name: "asc" } },
   });
 
-  // Build lookup for original races (conditions = null): "slug:raceNo" → prediction
+  // "Karma" hipodromu, gerçek koşuların kombine bahis için aynadaki (mirror) kopyasıdır —
+  // idman/yarış stili senkronu "karma" için hiç çalışmaz (gerçek tekil hipodrom değil), bu
+  // yüzden galop ve yarış stili de tıpkı tahmin gibi orijinal koşudan miras alınmalı.
+  function normHorseNameForMirror(name: string): string {
+    return name.replace(/\([A-Z]{2,3}\)/g, "").replace(/\s+/g, " ").trim().toUpperCase();
+  }
+
+  // Build lookup for original races (conditions = null): "slug:raceNo" → prediction + runner verisi
   const originalPred = new Map<string, typeof raceDays[0]["races"][0]["prediction"]>();
+  const originalRunnerData = new Map<string, Map<string, { gallops: typeof raceDays[0]["races"][0]["runners"][0]["gallops"]; raceStyle: unknown }>>();
   for (const rd of raceDays) {
     for (const r of rd.races) {
       if (r.conditions == null) {
-        originalPred.set(`${rd.hippodrome.slug}:${r.raceNo}`, r.prediction);
+        const key = `${rd.hippodrome.slug}:${r.raceNo}`;
+        originalPred.set(key, r.prediction);
+        originalRunnerData.set(
+          key,
+          new Map(r.runners.map((ru) => [normHorseNameForMirror(ru.name), { gallops: ru.gallops, raceStyle: ru.raceStyle }]))
+        );
       }
     }
   }
@@ -662,11 +675,16 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     surfaceConditions: (rd.surfaceConditions as { label: string; detail: string }[] | null) ?? null,
     weather: rd.weather,
     races: rd.races.map((r) => {
-      // Karma mirror: inherit prediction from original race
+      // Karma mirror: inherit prediction + galop/yarış stili from original race
       let pred = r.prediction;
-      if (r.conditions != null && pred == null) {
+      let originalRunners: Map<string, { gallops: typeof raceDays[0]["races"][0]["runners"][0]["gallops"]; raceStyle: unknown }> | undefined;
+      if (r.conditions != null) {
         const ref = parseConditionsRef(r.conditions);
-        if (ref) pred = originalPred.get(`${ref.slug}:${ref.raceNo}`) ?? null;
+        if (ref) {
+          const key = `${ref.slug}:${ref.raceNo}`;
+          if (pred == null) pred = originalPred.get(key) ?? null;
+          originalRunners = originalRunnerData.get(key);
+        }
       }
       return {
         id: r.id,
@@ -677,14 +695,19 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
         surface: r.surface,
         distance: r.distance,
         conditions: r.conditions,
-        runners: r.runners.map((ru) => ({
+        runners: r.runners.map((ru) => {
+          const inherited = originalRunners?.get(normHorseNameForMirror(ru.name));
+          const gallops = ru.gallops.length > 0 ? ru.gallops : inherited?.gallops ?? ru.gallops;
+          const raceStyle = ru.raceStyle ?? inherited?.raceStyle ?? null;
+          return {
             ...ru,
-            raceStyle: parseRaceStyle(ru.raceStyle),
-            gallops: ru.gallops.map((g) => ({
+            raceStyle: parseRaceStyle(raceStyle),
+            gallops: gallops.map((g) => ({
               ...g,
               splits: (g.splits ?? {}) as Record<string, string | null>,
             })),
-          })),
+          };
+        }),
         result: r.result,
         hasAnalysis: pred != null && pred.picks.length > 0,
         picks: (pred?.picks ?? []).map((p) => ({
