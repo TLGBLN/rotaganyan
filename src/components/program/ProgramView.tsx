@@ -256,11 +256,12 @@ function XLogo({ className }: { className?: string }) {
 // ── Analiz paneli ────────────────────────────────────────────────────────────
 
 function AnalysisPanel({
-  picks, winnerNo, isLoggedIn, raceNo, hippodromeName, raceId,
+  picks, winnerNo, isLoggedIn, isAdmin, raceNo, hippodromeName, raceId,
 }: {
   picks: ProgramPick[];
   winnerNo?: number | null;
   isLoggedIn: boolean;
+  isAdmin: boolean;
   raceNo: number;
   hippodromeName?: string;
   raceId: string;
@@ -351,7 +352,7 @@ function AnalysisPanel({
                   <td className={cn("px-2 py-2 font-semibold", isWinner ? "text-[#f5c518]" : rs.text)}>
                     <span className="inline-flex items-center gap-1.5">
                       {name}
-                      {isWinner && (
+                      {isWinner && isAdmin && (
                         <button
                           type="button"
                           onClick={handleShare}
@@ -393,7 +394,7 @@ function AnalysisPanel({
                 </span>
                 <span className={cn("font-bold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>#{no}</span>
                 <span className={cn("font-semibold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>{name}</span>
-                {isWinner && (
+                {isWinner && isAdmin && (
                   <button
                     type="button"
                     onClick={handleShare}
@@ -980,7 +981,7 @@ type JockeyStatsMap = Record<string, {
 type TrainerStatsMap = Record<string, TrainerStatRow>;
 
 function RaceTable({
-  race, analysisOpen, onAnalysisToggle, son800Open, galopOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, jockeyStats, trainerStats, hippodromeName,
+  race, analysisOpen, onAnalysisToggle, son800Open, galopOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, jockeyStats, trainerStats, hippodromeName,
 }: {
   race: ProgramRace;
   analysisOpen: boolean;
@@ -991,6 +992,7 @@ function RaceTable({
   onToggleFollow: (horseName: string) => void;
   onSelectHorse: (name: string) => void;
   isLoggedIn: boolean;
+  isAdmin: boolean;
   jockeyStats?: JockeyStatsMap;
   hippodromeName?: string;
   trainerStats?: TrainerStatsMap;
@@ -1129,6 +1131,7 @@ function RaceTable({
           picks={race.picks}
           winnerNo={winnerNo}
           isLoggedIn={isLoggedIn}
+          isAdmin={isAdmin}
           raceNo={race.raceNo}
           hippodromeName={hippodromeName}
           raceId={race.id}
@@ -1143,12 +1146,13 @@ function RaceTable({
 // ── Ana görünüm ───────────────────────────────────────────────────────────────
 
 export default function ProgramView({
-  days, dateStr, followedNames = [], isLoggedIn = false, jockeyStats = {}, trainerStats = {},
+  days, dateStr, followedNames = [], isLoggedIn = false, isAdmin = false, jockeyStats = {}, trainerStats = {},
 }: {
   days: ProgramDay[];
   dateStr: string;
   followedNames?: string[];
   isLoggedIn?: boolean;
+  isAdmin?: boolean;
   jockeyStats?: JockeyStatsMap;
   trainerStats?: TrainerStatsMap;
 }) {
@@ -1318,6 +1322,7 @@ export default function ProgramView({
               onToggleFollow={handleToggleFollow}
               onSelectHorse={setSelectedHorse}
               isLoggedIn={isLoggedIn}
+              isAdmin={isAdmin}
               jockeyStats={jockeyStats}
               trainerStats={trainerStats}
               hippodromeName={currentDay?.hippodromeName}

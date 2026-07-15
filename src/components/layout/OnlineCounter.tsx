@@ -22,7 +22,7 @@ export default function OnlineCounter() {
   if (count == null) return null;
 
   return (
-    <span className="hidden items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium text-muted-foreground sm:flex">
+    <span className="flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium text-muted-foreground">
       <span className="relative flex h-2 w-2 shrink-0">
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#27ae60] opacity-75" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-[#27ae60]" />

@@ -27,17 +27,32 @@ const AI_BOTS = [
   "FacebookBot",
 ];
 
+// Link paylaşımında önizleme kartı (Open Graph image) çekmek için siteyi ziyaret eden
+// botlar — bunlar toplu tarama yapmaz, bir insan link paylaştığında tek seferlik istek
+// atar. Genel "/api/" yasağının altında ezilmemeleri için ayrı, tam açık bir kural
+// veriyoruz — "en spesifik yol kazanır" mantığına güvenmek yerine kesin çözüm.
+const LINK_PREVIEW_BOTS = [
+  "Twitterbot",
+  "facebookexternalhit",
+  "LinkedInBot",
+  "Slackbot",
+  "TelegramBot",
+  "WhatsApp",
+  "Discordbot",
+];
+
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       {
-        // "/api/og/" özellikle izinli: X/Twitter, Facebook gibi platformların link
-        // paylaşımında kart görselini (Open Graph image) çekebilmesi için gerekli —
-        // yoksa robots.txt'teki genel "/api/" yasağı crawler'ı engelliyor.
         userAgent: "*",
-        allow: ["/", "/api/og/"],
+        allow: "/",
         disallow: ["/admin/", "/panel/", "/api/"],
       },
+      ...LINK_PREVIEW_BOTS.map((userAgent) => ({
+        userAgent,
+        allow: "/",
+      })),
       ...AI_BOTS.map((userAgent) => ({
         userAgent,
         disallow: ANALYSIS_PATHS,

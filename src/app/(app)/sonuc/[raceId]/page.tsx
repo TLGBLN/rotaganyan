@@ -41,7 +41,7 @@ export async function generateMetadata({
     openGraph: {
       title,
       description,
-      images: [{ url: imageUrl, width: 1200, height: 630 }],
+      images: [{ url: imageUrl, width: 1080, height: 1350 }],
     },
     twitter: {
       card: "summary_large_image",
@@ -62,12 +62,12 @@ export default async function SonucSharePage({
   if (!summary) notFound();
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
+    <main className="mx-auto max-w-md px-4 py-10">
       <Image
         src={`/api/og/sonuc/${raceId}`}
         alt={`${summary.winnerName ?? "Kazanan"} — ${summary.race.raceDay.hippodrome.name} ${summary.race.raceNo}. Koşu`}
-        width={1200}
-        height={630}
+        width={1080}
+        height={1350}
         className="w-full rounded-lg border"
         unoptimized
         priority

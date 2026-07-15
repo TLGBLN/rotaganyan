@@ -106,7 +106,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
           <DateNavigator currentDate={currentDate} basePath="/program" />
         </div>
         <div className="rounded-lg border overflow-hidden">
-          <ProgramView days={viewDays} dateStr={currentDate} followedNames={followedNames} isLoggedIn={isLoggedIn} jockeyStats={jockeyStats} trainerStats={trainerStats} />
+          <ProgramView days={viewDays} dateStr={currentDate} followedNames={followedNames} isLoggedIn={isLoggedIn} isAdmin={isAdmin} jockeyStats={jockeyStats} trainerStats={trainerStats} />
         </div>
       </div>
 
