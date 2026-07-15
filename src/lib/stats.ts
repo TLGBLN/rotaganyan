@@ -18,6 +18,96 @@ export type StatsOverview = {
   recentBanko: { total: number; hit: number; rate: number };
 };
 
+const RACE_STYLE_LABELS: Record<string, string> = {
+  KACAK: "Kaçak",
+  ON_GRUP: "Ön Grup",
+  BEKLEME: "Bekleme",
+  EN_GERI: "En Geri",
+};
+const RACE_STYLE_ORDER = ["KACAK", "ON_GRUP", "BEKLEME", "EN_GERI"];
+
+export type RaceStyleWinBreakdown = {
+  bucket: string;
+  label: string;
+  total: number;
+  byStyle: { style: string; label: string; wins: number; rate: number }[];
+};
+
+function distanceBucket(distance: number): { key: string; label: string } {
+  if (distance <= 1200) return { key: "1", label: "≤1200m" };
+  if (distance <= 1600) return { key: "2", label: "1201–1600m" };
+  if (distance <= 2000) return { key: "3", label: "1601–2000m" };
+  return { key: "4", label: "2001m+" };
+}
+
+function fieldSizeBucket(count: number): { key: string; label: string } {
+  if (count <= 6) return { key: "1", label: "≤6 atlı" };
+  if (count <= 10) return { key: "2", label: "7–10 atlı" };
+  return { key: "3", label: "11+ atlı" };
+}
+
+function buildBreakdown(
+  rows: { bucketKey: string; bucketLabel: string; style: string }[]
+): RaceStyleWinBreakdown[] {
+  const byBucket = new Map<string, { label: string; styles: Map<string, number>; total: number }>();
+  for (const row of rows) {
+    const entry = byBucket.get(row.bucketKey) ?? { label: row.bucketLabel, styles: new Map<string, number>(), total: 0 };
+    entry.styles.set(row.style, (entry.styles.get(row.style) ?? 0) + 1);
+    entry.total += 1;
+    byBucket.set(row.bucketKey, entry);
+  }
+  return Array.from(byBucket.entries())
+    .map(([key, entry]) => ({
+      bucket: key,
+      label: entry.label,
+      total: entry.total,
+      byStyle: RACE_STYLE_ORDER.map((style) => {
+        const wins = entry.styles.get(style) ?? 0;
+        return { style, label: RACE_STYLE_LABELS[style], wins, rate: entry.total > 0 ? Math.round((wins / entry.total) * 100) : 0 };
+      }),
+    }))
+    .sort((a, b) => a.bucket.localeCompare(b.bucket));
+}
+
+/** Yüzülen yarışlarda kazanan atın yarış stiline (Kaçak/Ön Grup/Bekleme/En Geri) göre, mesafe ve at sayısı kırılımında kazanma dağılımı. */
+export async function getRaceStyleWinStats(): Promise<{
+  byDistance: RaceStyleWinBreakdown[];
+  byFieldSize: RaceStyleWinBreakdown[];
+}> {
+  const results = await db.result.findMany({
+    where: { winnerNo: { not: null } },
+    select: {
+      winnerNo: true,
+      race: {
+        select: {
+          distance: true,
+          runners: { select: { no: true, raceStyle: true } },
+        },
+      },
+    },
+  });
+
+  const distanceRows: { bucketKey: string; bucketLabel: string; style: string }[] = [];
+  const fieldSizeRows: { bucketKey: string; bucketLabel: string; style: string }[] = [];
+
+  for (const r of results) {
+    const winner = r.race.runners.find((x) => x.no === r.winnerNo);
+    const style = (winner?.raceStyle as { style?: string } | null)?.style;
+    if (!style || !RACE_STYLE_LABELS[style]) continue;
+
+    const db_ = distanceBucket(r.race.distance);
+    distanceRows.push({ bucketKey: db_.key, bucketLabel: db_.label, style });
+
+    const fb = fieldSizeBucket(r.race.runners.length);
+    fieldSizeRows.push({ bucketKey: fb.key, bucketLabel: fb.label, style });
+  }
+
+  return {
+    byDistance: buildBreakdown(distanceRows),
+    byFieldSize: buildBreakdown(fieldSizeRows),
+  };
+}
+
 export async function getStats(): Promise<StatsOverview> {
   const results = await db.result.findMany({
     include: {

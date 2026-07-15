@@ -35,19 +35,34 @@ export type GdRaceRef = {
   raceId: string;
 };
 
-/** "İstanbul Veliefendi Hipodromu" → "istanbul" gibi bizim hipodrom slug'larımıza çevirir. Karma için null döner (atlanır). */
-function toOurHippoSlug(gdName: string): string | null {
-  const name = gdName.replace(/\s*Hipodromu\s*$/i, "").trim();
-  if (/^karma$/i.test(name)) return null;
-  if (/veliefendi/i.test(name) || /^istanbul/i.test(name)) return "istanbul";
-  return name
+// Bizim DB'deki Hippodrome.slug değerleri şehir adının kendisidir (ör. "ankara", "kocaeli").
+// ganyandefteri ise "Ankara 75. Yıl Hipodromu", "Kocaeli Kartepe Hipodromu" gibi tam tesis
+// adları kullanır — bu yüzden basit transliterasyon yeterli değil, bilinen şehir isimlerinden
+// biriyle başlayıp başlamadığına bakılır.
+const KNOWN_CITY_SLUGS = [
+  "istanbul", "ankara", "izmir", "bursa", "adana", "sanliurfa", "kocaeli", "elazig", "diyarbakir", "antalya",
+];
+
+function trToAscii(s: string): string {
+  return s
     .replace(/Ğ/g, "G").replace(/ğ/g, "g")
     .replace(/Ü/g, "U").replace(/ü/g, "u")
     .replace(/Ş/g, "S").replace(/ş/g, "s")
     .replace(/İ/g, "I").replace(/ı/g, "i")
     .replace(/Ö/g, "O").replace(/ö/g, "o")
     .replace(/Ç/g, "C").replace(/ç/g, "c")
-    .toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    .toLowerCase();
+}
+
+/** "Ankara 75. Yıl Hipodromu" → "ankara" gibi bizim hipodrom slug'larımıza çevirir. Karma için null döner (atlanır). */
+function toOurHippoSlug(gdName: string): string | null {
+  const name = gdName.replace(/\s*Hipodromu\s*$/i, "").trim();
+  if (/^karma$/i.test(name)) return null;
+  if (/veliefendi/i.test(name) || /^istanbul/i.test(name)) return "istanbul";
+
+  const ascii = trToAscii(name).replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  const known = KNOWN_CITY_SLUGS.find((slug) => ascii === slug || ascii.startsWith(`${slug}-`));
+  return known ?? ascii;
 }
 
 /** Verilen tarih için ganyandefteri'nin günlük programındaki tüm koşuları (hipodrom+koşu no → race_id) çözer. */

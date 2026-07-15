@@ -313,16 +313,8 @@ function AnalysisPanel({
   return (
     <div ref={ref} className="border-t">
       {/* Başlık */}
-      <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center justify-between gap-2">
+      <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
         <span className="text-sm font-bold tracking-wide text-white">Analiz Detayları</span>
-        <button
-          type="button"
-          onClick={handleShare}
-          title="X'te paylaş"
-          className="flex items-center justify-center w-6 h-6 rounded hover:bg-white/15 transition-colors shrink-0"
-        >
-          <XLogo className="h-3.5 w-3.5 text-white" />
-        </button>
       </div>
 
       {/* Masaüstü tablo */}
@@ -353,7 +345,21 @@ function AnalysisPanel({
                     </span>
                   </td>
                   <td className={cn("px-2 py-2 text-center font-mono font-bold", isWinner ? "text-[#f5c518]" : rs.text)}>{no}</td>
-                  <td className={cn("px-2 py-2 font-semibold", isWinner ? "text-[#f5c518]" : rs.text)}>{name}</td>
+                  <td className={cn("px-2 py-2 font-semibold", isWinner ? "text-[#f5c518]" : rs.text)}>
+                    <span className="inline-flex items-center gap-1.5">
+                      {name}
+                      {isWinner && (
+                        <button
+                          type="button"
+                          onClick={handleShare}
+                          title="X'te paylaş"
+                          className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0"
+                        >
+                          <XLogo className="h-3 w-3" />
+                        </button>
+                      )}
+                    </span>
+                  </td>
                   <td className="px-2 py-2 text-center tabular-nums">{aScore ?? "—"}</td>
                   <td className="px-2 py-2 text-center tabular-nums">{bcScore ?? "—"}</td>
                   <td className="px-2 py-2 text-center tabular-nums font-bold">
@@ -384,6 +390,16 @@ function AnalysisPanel({
                 </span>
                 <span className={cn("font-bold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>#{no}</span>
                 <span className={cn("font-semibold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>{name}</span>
+                {isWinner && (
+                  <button
+                    type="button"
+                    onClick={handleShare}
+                    title="X'te paylaş"
+                    className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0"
+                  >
+                    <XLogo className="h-3 w-3" />
+                  </button>
+                )}
               </div>
               <div className="flex gap-3 text-[11px] text-muted-foreground mb-1">
                 {aScore && <span>A: <span className="text-foreground">{aScore}</span></span>}
