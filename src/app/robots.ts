@@ -31,8 +31,11 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       {
+        // "/api/og/" özellikle izinli: X/Twitter, Facebook gibi platformların link
+        // paylaşımında kart görselini (Open Graph image) çekebilmesi için gerekli —
+        // yoksa robots.txt'teki genel "/api/" yasağı crawler'ı engelliyor.
         userAgent: "*",
-        allow: "/",
+        allow: ["/", "/api/og/"],
         disallow: ["/admin/", "/panel/", "/api/"],
       },
       ...AI_BOTS.map((userAgent) => ({
