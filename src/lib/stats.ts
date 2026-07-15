@@ -108,6 +108,21 @@ export async function getRaceStyleWinStats(): Promise<{
   };
 }
 
+/** Admin dashboard'ındaki PerformanceBreakdown kartlarıyla aynı formata (group + hits/total/rate) çevirir. */
+export function raceStyleBreakdownToRows(
+  breakdown: RaceStyleWinBreakdown[]
+): { label: string; total: number; hits: number; rate: number; group?: string }[] {
+  return breakdown.flatMap((bucket) =>
+    bucket.byStyle.map((s) => ({
+      group: `${bucket.label} (${bucket.total} koşu)`,
+      label: s.label,
+      hits: s.wins,
+      total: bucket.total,
+      rate: s.rate,
+    }))
+  );
+}
+
 export async function getStats(): Promise<StatsOverview> {
   const results = await db.result.findMany({
     include: {

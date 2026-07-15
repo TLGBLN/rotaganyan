@@ -4,6 +4,7 @@ import {
   getRecentPredictions,
   getPendingPredictions,
 } from "@/server/services/admin.service";
+import { getRaceStyleWinStats, raceStyleBreakdownToRows } from "@/lib/stats";
 import PerformanceBreakdown from "@/components/admin/PerformanceBreakdown";
 import CouponTierChart from "@/components/admin/CouponTierChart";
 import InsightsPanel from "@/components/admin/InsightsPanel";
@@ -16,11 +17,12 @@ import AdminRefresh from "@/components/admin/AdminRefresh";
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
-  const [stats, analyst, recentPredictions, pendingPredictions] = await Promise.all([
+  const [stats, analyst, recentPredictions, pendingPredictions, raceStyleStats] = await Promise.all([
     getDashboardStats(),
     getAnalystStats(),
     getRecentPredictions(16),
     getPendingPredictions(),
+    getRaceStyleWinStats(),
   ]);
 
   const hasData = analyst.overall.total > 0;
@@ -112,6 +114,17 @@ export default async function AdminDashboard() {
             </div>
 
             <CouponTierChart rows={analyst.couponTierByClassType} />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <PerformanceBreakdown
+                title="Kazanan Yarış Stili — Mesafeye Göre"
+                rows={raceStyleBreakdownToRows(raceStyleStats.byDistance)}
+              />
+              <PerformanceBreakdown
+                title="Kazanan Yarış Stili — At Sayısına Göre"
+                rows={raceStyleBreakdownToRows(raceStyleStats.byFieldSize)}
+              />
+            </div>
           </div>
         </section>
       )}
