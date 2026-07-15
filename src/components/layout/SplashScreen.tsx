@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 
-const HOLD_MS = 1100;
+const HOLD_MS = 2400;
 const FADE_MS = 450;
 
 export default function SplashScreen() {
