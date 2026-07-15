@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp, Star } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick, ProgramGallop } from "@/server/services/race.service";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
 import { getSon800ForRace, type Son800RunnerData } from "@/server/actions/son800.actions";
+import HorseDetailModal from "./HorseDetailModal";
 
 // ── Geri sayım (Turkey UTC+3) ────────────────────────────────────────────────
 
@@ -85,6 +86,17 @@ function surfaceLabel(s: string) {
 
 function breedShort(b: string) {
   return b === "ARAP" ? "Arap" : "İngiliz";
+}
+
+// Yarış stili — ganyandefteri.com'dan senkronlanan RaceStyleTag
+function raceStyleBadge(raceStyle: { style: string; percent: number } | null): { text: string; cls: string } | null {
+  if (!raceStyle) return null;
+  const { style, percent } = raceStyle;
+  if (style === "KACAK") return { text: `%${percent} Kaçak`, cls: "bg-[#e74c3c]/15 text-[#e74c3c]" };
+  if (style === "ON_GRUP") return { text: `%${percent} Ön Grup`, cls: "bg-[#e67e22]/15 text-[#e67e22]" };
+  if (style === "BEKLEME") return { text: `%${percent} Bekleme`, cls: "bg-[#2980b9]/15 text-[#2980b9]" };
+  if (style === "EN_GERI") return { text: `%${percent} En Geri`, cls: "bg-[#8e44ad]/15 text-[#8e44ad]" };
+  return null;
 }
 
 // Galop — en derin mesafe + 400m ve 200m finiş
@@ -222,10 +234,44 @@ function veriGuvenColor(vg: string | undefined) {
   return "text-[#e74c3c]";
 }
 
+function pickDisplay(p: ProgramPick): { no: number | string; name: string } {
+  if (p.runner) return { no: p.runner.no, name: p.runner.name };
+  return { no: "—", name: p.runnerLabel ?? "—" };
+}
+
+function buildShareText(picks: ProgramPick[], raceNo: number, hippodromeName?: string): string {
+  const nos = picks.slice(0, 6).map((p) => pickDisplay(p).no).join("-");
+  const yer = hippodromeName ? `${hippodromeName} ` : "";
+  return `${yer}${raceNo}. Koşu Rotaganyan analizi: ${nos} 🐎`;
+}
+
+function XLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
 // ── Analiz paneli ────────────────────────────────────────────────────────────
 
-function AnalysisPanel({ picks, winnerNo, isLoggedIn }: { picks: ProgramPick[]; winnerNo?: number | null; isLoggedIn: boolean }) {
+function AnalysisPanel({
+  picks, winnerNo, isLoggedIn, raceNo, hippodromeName,
+}: {
+  picks: ProgramPick[];
+  winnerNo?: number | null;
+  isLoggedIn: boolean;
+  raceNo: number;
+  hippodromeName?: string;
+}) {
   const ref = useRef<HTMLDivElement>(null);
+
+  function handleShare() {
+    const url = new URL("https://twitter.com/intent/tweet");
+    url.searchParams.set("text", buildShareText(picks, raceNo, hippodromeName));
+    if (typeof window !== "undefined") url.searchParams.set("url", window.location.href);
+    window.open(url.toString(), "_blank", "noopener,noreferrer");
+  }
 
   useEffect(() => {
     if (!ref.current) return;
@@ -267,8 +313,16 @@ function AnalysisPanel({ picks, winnerNo, isLoggedIn }: { picks: ProgramPick[]; 
   return (
     <div ref={ref} className="border-t">
       {/* Başlık */}
-      <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
+      <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center justify-between gap-2">
         <span className="text-sm font-bold tracking-wide text-white">Analiz Detayları</span>
+        <button
+          type="button"
+          onClick={handleShare}
+          title="X'te paylaş"
+          className="flex items-center justify-center w-6 h-6 rounded hover:bg-white/15 transition-colors shrink-0"
+        >
+          <XLogo className="h-3.5 w-3.5 text-white" />
+        </button>
       </div>
 
       {/* Masaüstü tablo */}
@@ -287,9 +341,7 @@ function AnalysisPanel({ picks, winnerNo, isLoggedIn }: { picks: ProgramPick[]; 
           </thead>
           <tbody>
             {picks.map((p) => {
-              const name = (p.runner?.name && !/^\d+$/.test(p.runner.name) ? p.runner.name : null)
-                ?? p.runnerLabel?.replace(/^\d+\s+/, "") ?? "—";
-              const no = p.runner?.no ?? (parseInt(p.runnerLabel ?? "0", 10) || "?");
+              const { no, name } = pickDisplay(p);
               const { aScore, bcScore, veriGuven, kilItGerekce } = parsePickDetails(p.details);
               const isWinner = winnerNo != null && p.runner?.no === winnerNo;
               const rs = rankStyle(p.rank);
@@ -320,9 +372,7 @@ function AnalysisPanel({ picks, winnerNo, isLoggedIn }: { picks: ProgramPick[]; 
       {/* Mobil kart listesi */}
       <div className="sm:hidden divide-y">
         {picks.map((p) => {
-          const name = (p.runner?.name && !/^\d+$/.test(p.runner.name) ? p.runner.name : null)
-            ?? p.runnerLabel?.replace(/^\d+\s+/, "") ?? "—";
-          const no = p.runner?.no ?? (parseInt(p.runnerLabel ?? "0", 10) || "?");
+          const { no, name } = pickDisplay(p);
           const { aScore, bcScore, veriGuven, kilItGerekce } = parsePickDetails(p.details);
           const isWinner = winnerNo != null && p.runner?.no === winnerNo;
           const rs = rankStyle(p.rank);
@@ -427,10 +477,73 @@ function Son800Panel({ raceId }: { raceId: string }) {
   );
 }
 
+// ── Galop paneli ─────────────────────────────────────────────────────────────
+
+function GalopPanel({ runners, breed }: { runners: ProgramRunner[]; breed: string }) {
+  const withGallops = runners.filter((r) => r.gallops.length > 0);
+  return (
+    <div className="border-t">
+      <div className="px-4 py-2.5 bg-[#5d4037] border-b flex items-center">
+        <span className="text-sm font-bold tracking-wide text-white">Galop</span>
+      </div>
+      {withGallops.length === 0 ? (
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">Galop verisi yok.</div>
+      ) : (
+        <div className="divide-y">
+          {withGallops.map((r) => (
+            <div key={r.id} className="px-3 py-2">
+              <div className="text-xs font-semibold mb-1">
+                <span className="font-mono mr-1.5">{r.no}</span>
+                {r.name}
+              </div>
+              <div className="space-y-1 ml-5">
+                {r.gallops.slice(0, 3).map((g, i) => {
+                  const { prepDist, prepTime, finish, final200 } = galopSplits(g);
+                  if (!prepDist && !finish && !final200) return null;
+                  const isInner = (g.splits["ic_dis"] ?? "").includes("İÇ") || (g.splits["ic_dis"] ?? "").toUpperCase().includes("IC");
+                  const prepQ = galopQuality(prepDist ?? "", prepTime, breed, isInner);
+                  const finQ = galopQuality("400", finish, breed, isInner);
+                  const sameJockey = isSameJockey(g.jockey, r.jockey);
+                  return (
+                    <div key={i} className="flex items-baseline gap-1.5 text-[11px] leading-snug flex-wrap">
+                      {sameJockey && (
+                        <span title={`İdman jokeyi (${g.jockey}) koşuda da binecek`} className="font-bold text-hit">!</span>
+                      )}
+                      <span className="font-mono">
+                        {prepDist && prepTime && (
+                          <span className={galopTimeClass(prepQ)}>{prepDist}·{prepTime}</span>
+                        )}
+                        {prepDist && finish && <span className="text-muted-foreground mx-0.5">/</span>}
+                        {finish && (
+                          <span className={cn("text-amber-500 dark:text-amber-400", galopTimeClass(finQ))}>{`400·${finish}`}</span>
+                        )}
+                        {(prepDist || finish) && final200 && <span className="text-muted-foreground mx-0.5">/</span>}
+                        {final200 && (
+                          <span className="text-sky-500 dark:text-sky-400">{`200·${final200}`}</span>
+                        )}
+                      </span>
+                      <span className="text-[9px] text-muted-foreground">
+                        {galopDate(g)}
+                        {g.track && <span className="ml-1 opacity-70">{g.track}</span>}
+                        {g.form && <span className="ml-1 opacity-70">· {g.form}</span>}
+                        {isInner && <span className="ml-1 text-blue-400 opacity-80">İÇ</span>}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── At satırı ────────────────────────────────────────────────────────────────
 
 function RunnerRow({
-  r, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, jockeyStat, trainerStat, breed,
+  r, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, onSelectHorse, jockeyStat, trainerStat,
 }: {
   r: ProgramRunner;
   isWinner: boolean;
@@ -441,9 +554,9 @@ function RunnerRow({
   isBestTime: boolean;
   isFollowed: boolean;
   onToggleFollow: () => void;
+  onSelectHorse: (name: string) => void;
   jockeyStat?: JockeyStatRow;
   trainerStat?: TrainerStatRow;
-  breed: string;
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
@@ -487,14 +600,19 @@ function RunnerRow({
                 : "text-muted-foreground hover:text-yellow-400"
             )} />
           </button>
-          <div className={cn("font-semibold", isWinner && "text-[#f5c518]")}>
+          <button
+            type="button"
+            onClick={() => onSelectHorse(r.name)}
+            data-tour="at-detay"
+            className={cn("font-semibold text-left hover:underline", isWinner && "text-[#f5c518]")}
+          >
             {r.name}
             {r.scratched ? (
               <span className="ml-1.5 text-[10px] font-normal text-red-400 no-underline">(Koşmaz)</span>
             ) : r.ekuriGroup != null ? (
               <span title={`Eküri grubu ${r.ekuriGroup}`} className="ml-1 text-[11px]">🐴</span>
             ) : null}
-          </div>
+          </button>
         </div>
         {(r.sire || r.dam) && (
           <div className="text-[10px] text-muted-foreground ml-5">
@@ -612,45 +730,12 @@ function RunnerRow({
         ) : "—"}
       </td>
 
-      {/* Galop */}
-      <td className="px-2 py-1.5 min-w-[130px]">
-        {r.gallops.length > 0 ? (
-          <div className="space-y-1">
-            {r.gallops.slice(0, 3).map((g, i) => {
-              const { prepDist, prepTime, finish, final200 } = galopSplits(g);
-              if (!prepDist && !finish && !final200) return null;
-              const isInner = (g.splits["ic_dis"] ?? "").includes("İÇ") || (g.splits["ic_dis"] ?? "").toUpperCase().includes("IC");
-              const prepQ = galopQuality(prepDist ?? "", prepTime, breed, isInner);
-              const finQ = galopQuality("400", finish, breed, isInner);
-              const sameJockey = isSameJockey(g.jockey, r.jockey);
-              return (
-                <div key={i} className="flex items-baseline gap-1.5 text-[10px] leading-snug whitespace-nowrap">
-                  {sameJockey && (
-                    <span title={`İdman jokeyi (${g.jockey}) koşuda da binecek`} className="font-bold text-hit">!</span>
-                  )}
-                  <span className="font-mono">
-                    {prepDist && prepTime && (
-                      <span className={galopTimeClass(prepQ)}>{prepDist}·{prepTime}</span>
-                    )}
-                    {prepDist && finish && <span className="text-muted-foreground mx-0.5">/</span>}
-                    {finish && (
-                      <span className={cn("text-amber-500 dark:text-amber-400", galopTimeClass(finQ))}>{`400·${finish}`}</span>
-                    )}
-                    {(prepDist || finish) && final200 && <span className="text-muted-foreground mx-0.5">/</span>}
-                    {final200 && (
-                      <span className="text-sky-500 dark:text-sky-400">{`200·${final200}`}</span>
-                    )}
-                  </span>
-                  <span className="text-[9px] text-muted-foreground">
-                    {galopDate(g)}
-                    {g.track && <span className="ml-1 opacity-70">{g.track}</span>}
-                    {g.form && <span className="ml-1 opacity-70">· {g.form}</span>}
-                    {isInner && <span className="ml-1 text-blue-400 opacity-80">İÇ</span>}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+      {/* Yarış Stili */}
+      <td className="px-2 py-1.5">
+        {raceStyleBadge(r.raceStyle) ? (
+          <span className={cn("inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap", raceStyleBadge(r.raceStyle)!.cls)}>
+            {raceStyleBadge(r.raceStyle)!.text}
+          </span>
         ) : (
           <span className="text-muted-foreground text-[10px]">—</span>
         )}
@@ -684,7 +769,7 @@ function StatCell({
 // ── At kartı (mobil) ─────────────────────────────────────────────────────────
 
 function RunnerCard({
-  r, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, jockeyStat, breed,
+  r, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, onSelectHorse, jockeyStat,
 }: {
   r: ProgramRunner;
   isWinner: boolean;
@@ -694,8 +779,8 @@ function RunnerCard({
   isBestTime: boolean;
   isFollowed: boolean;
   onToggleFollow: () => void;
+  onSelectHorse: (name: string) => void;
   jockeyStat?: JockeyStatRow;
-  breed: string;
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
@@ -735,14 +820,18 @@ function RunnerCard({
                   : "text-muted-foreground hover:text-yellow-400"
               )} />
             </button>
-            <span className={cn("font-semibold truncate", isWinner && "text-[#f5c518]")}>
+            <button
+              type="button"
+              onClick={() => onSelectHorse(r.name)}
+              className={cn("font-semibold truncate text-left hover:underline", isWinner && "text-[#f5c518]")}
+            >
               {r.name}
               {r.scratched ? (
                 <span className="ml-1 text-[10px] font-normal text-red-400 no-underline">(Koşmaz)</span>
               ) : r.ekuriGroup != null ? (
                 <span title={`Eküri grubu ${r.ekuriGroup}`} className="ml-1 text-[11px]">🐴</span>
               ) : null}
-            </span>
+            </button>
           </div>
           {(r.sire || r.dam) && (
             <div className="text-[10px] text-muted-foreground truncate ml-5">
@@ -815,45 +904,13 @@ function RunnerCard({
         <StatCell label="Yaş" value={r.age ?? "—"} />
       </div>
 
-      {/* Galop satırı — mobile */}
-      {r.gallops.length > 0 && (() => {
-        const items = r.gallops.slice(0, 3).map((g) => {
-          const { prepDist, prepTime, finish, final200 } = galopSplits(g);
-          const isInner = (g.splits["ic_dis"] ?? "").includes("İÇ") || (g.splits["ic_dis"] ?? "").toUpperCase().includes("IC");
-          return { prepDist, prepTime, finish, final200, date: galopDate(g), track: g.track, form: g.form, isInner,
-            sameJockey: isSameJockey(g.jockey, r.jockey),
-            prepQ: galopQuality(prepDist ?? "", prepTime, breed, isInner),
-            finQ: galopQuality("400", finish, breed, isInner) };
-        }).filter((x) => x.prepDist || x.finish || x.final200);
-        if (items.length === 0) return null;
-        return (
-          <div className="mt-1.5 ml-10 border-t border-border/30 pt-1">
-            <div className="text-[9px] text-muted-foreground font-medium mb-0.5 uppercase tracking-wide">Galop</div>
-            <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-              {items.map((x, i) => (
-                <div key={i} className="text-[10px]">
-                  {x.sameJockey && <span className="font-bold text-hit mr-0.5">!</span>}
-                  <span className="font-mono">
-                    {x.prepDist && x.prepTime && (
-                      <span className={galopTimeClass(x.prepQ)}>{x.prepDist}·{x.prepTime}</span>
-                    )}
-                    {x.prepDist && x.finish && <span className="text-muted-foreground mx-0.5">/</span>}
-                    {x.finish && (
-                      <span className={cn("text-amber-500 dark:text-amber-400", galopTimeClass(x.finQ))}>{`400·${x.finish}`}</span>
-                    )}
-                    {(x.prepDist || x.finish) && x.final200 && <span className="text-muted-foreground mx-0.5">/</span>}
-                    {x.final200 && <span className="text-sky-500 dark:text-sky-400">{`200·${x.final200}`}</span>}
-                  </span>
-                  <span className="text-muted-foreground ml-1 text-[9px]">{x.date}</span>
-                  {x.track && <span className="ml-1 text-[9px] text-muted-foreground opacity-70">{x.track}</span>}
-                  {x.form && <span className="ml-1 text-[9px] text-muted-foreground opacity-70">· {x.form}</span>}
-                  {x.isInner && <span className="ml-0.5 text-[9px] text-blue-400">İÇ</span>}
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
+      {raceStyleBadge(r.raceStyle) && (
+        <div className="mt-1.5 ml-10">
+          <span className={cn("inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold", raceStyleBadge(r.raceStyle)!.cls)}>
+            {raceStyleBadge(r.raceStyle)!.text}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -894,16 +951,19 @@ type JockeyStatsMap = Record<string, {
 type TrainerStatsMap = Record<string, TrainerStatRow>;
 
 function RaceTable({
-  race, analysisOpen, onAnalysisToggle, son800Open, followedSet, onToggleFollow, isLoggedIn, jockeyStats, trainerStats,
+  race, analysisOpen, onAnalysisToggle, son800Open, galopOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, jockeyStats, trainerStats, hippodromeName,
 }: {
   race: ProgramRace;
   analysisOpen: boolean;
   onAnalysisToggle: () => void;
   son800Open: boolean;
+  galopOpen: boolean;
   followedSet: Set<string>;
   onToggleFollow: (horseName: string) => void;
+  onSelectHorse: (name: string) => void;
   isLoggedIn: boolean;
   jockeyStats?: JockeyStatsMap;
+  hippodromeName?: string;
   trainerStats?: TrainerStatsMap;
 }) {
   const surf = surfaceLabel(race.surface);
@@ -970,13 +1030,13 @@ function RaceTable({
               <th className="px-2 py-1.5 text-left">Yaş</th>
               <th className="px-2 py-1.5 text-center">Kilo</th>
               <th className="px-2 py-1.5 text-center">Start</th>
-              <th className="px-2 py-1.5 text-left">Jokey</th>
-              <th className="px-2 py-1.5 text-left">Sahip / Antrenör</th>
+              <th className="px-2 py-1.5 text-left" data-tour="jokey">Jokey</th>
+              <th className="px-2 py-1.5 text-left" data-tour="antrenor">Sahip / Antrenör</th>
               <th className="px-2 py-1.5 text-center">H.P</th>
               <th className="px-2 py-1.5 text-center">En İyi D.</th>
               <th className="px-2 py-1.5 text-left">Son Yarışlar</th>
               <th className="px-2 py-1.5 text-center">AGF</th>
-              <th className="px-2 py-1.5 text-left">Galop</th>
+              <th className="px-2 py-1.5 text-left" data-tour="yaris-stili">Yarış Stili</th>
             </tr>
           </thead>
           <tbody>
@@ -992,7 +1052,6 @@ function RaceTable({
                   key={r.id}
                   r={r}
                   idx={i}
-                  breed={race.breed}
                   isWinner={winnerNo != null && r.no === winnerNo}
                   isTopAgf={r.no === topAgfNo}
                   ekuriColor={ekuriColorMap.get(r.no)}
@@ -1000,6 +1059,7 @@ function RaceTable({
                   isBestTime={bestTimeNoSet.has(r.no)}
                   isFollowed={followedSet.has(r.name)}
                   onToggleFollow={() => onToggleFollow(r.name)}
+                  onSelectHorse={onSelectHorse}
                   jockeyStat={buildJockeyStat(r.jockey)}
                   trainerStat={buildTrainerStat(r.trainer)}
                 />
@@ -1020,7 +1080,6 @@ function RaceTable({
             <RunnerCard
               key={r.id}
               r={r}
-              breed={race.breed}
               isWinner={winnerNo != null && r.no === winnerNo}
               isTopAgf={r.no === topAgfNo}
               ekuriColor={ekuriColorMap.get(r.no)}
@@ -1028,6 +1087,7 @@ function RaceTable({
               isBestTime={bestTimeNoSet.has(r.no)}
               isFollowed={followedSet.has(r.name)}
               onToggleFollow={() => onToggleFollow(r.name)}
+              onSelectHorse={onSelectHorse}
               jockeyStat={buildJockeyStat(r.jockey)}
             />
           ))
@@ -1035,8 +1095,17 @@ function RaceTable({
       </div>
 
       {/* Analiz paneli */}
-      {race.hasAnalysis && analysisOpen && <AnalysisPanel picks={race.picks} winnerNo={winnerNo} isLoggedIn={isLoggedIn} />}
+      {race.hasAnalysis && analysisOpen && (
+        <AnalysisPanel
+          picks={race.picks}
+          winnerNo={winnerNo}
+          isLoggedIn={isLoggedIn}
+          raceNo={race.raceNo}
+          hippodromeName={hippodromeName}
+        />
+      )}
       {son800Open && <Son800Panel raceId={race.id} />}
+      {galopOpen && <GalopPanel runners={race.runners} breed={race.breed} />}
     </div>
   );
 }
@@ -1057,6 +1126,8 @@ export default function ProgramView({
   const [activeRace, setActiveRace] = useState<Record<string, number>>({});
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [son800Open, setSon800Open] = useState(false);
+  const [galopOpen, setGalopOpen] = useState(false);
+  const [selectedHorse, setSelectedHorse] = useState<string | null>(null);
   const [followedSet, setFollowedSet] = useState(() => new Set(followedNames));
   const [, startFollowTransition] = useTransition();
 
@@ -1080,8 +1151,8 @@ export default function ProgramView({
   const raceNo = selectedRaceNo(currentDay!);
   const currentRace = currentDay?.races.find((r) => r.raceNo === raceNo) ?? currentDay?.races[0];
 
-  // Yarış veya hipodrom değişince analiz/son800 panelini kapat
-  useEffect(() => { setAnalysisOpen(false); setSon800Open(false); }, [activeHipo, raceNo]);
+  // Yarış veya hipodrom değişince analiz/son800/galop panelini kapat
+  useEffect(() => { setAnalysisOpen(false); setSon800Open(false); setGalopOpen(false); }, [activeHipo, raceNo]);
 
   if (days.length === 0) {
     return (
@@ -1171,6 +1242,7 @@ export default function ProgramView({
               {currentRace?.hasAnalysis ? (
                 <button
                   onClick={() => setAnalysisOpen((v) => !v)}
+                  data-tour="analiz-buton"
                   className="flex items-center gap-1 rounded-md bg-[#00944D] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90"
                 >
                   {isLoggedIn
@@ -1183,9 +1255,19 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => setSon800Open((v) => !v)}
+                  data-tour="son800-buton"
                   className="flex items-center gap-1 rounded-md bg-[#1a3a5c] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90"
                 >
                   Son 800 {son800Open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
+              )}
+              {currentRace && (
+                <button
+                  onClick={() => setGalopOpen((v) => !v)}
+                  data-tour="galop"
+                  className="flex items-center gap-1 rounded-md bg-[#5d4037] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90"
+                >
+                  Galop {galopOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
               )}
               {currentRace && (
@@ -1201,15 +1283,19 @@ export default function ProgramView({
               analysisOpen={analysisOpen}
               onAnalysisToggle={() => setAnalysisOpen((v) => !v)}
               son800Open={son800Open}
+              galopOpen={galopOpen}
               followedSet={followedSet}
               onToggleFollow={handleToggleFollow}
+              onSelectHorse={setSelectedHorse}
               isLoggedIn={isLoggedIn}
               jockeyStats={jockeyStats}
               trainerStats={trainerStats}
+              hippodromeName={currentDay?.hippodromeName}
             />
           )}
         </>
       )}
+      {selectedHorse && <HorseDetailModal name={selectedHorse} onClose={() => setSelectedHorse(null)} />}
     </div>
   );
 }

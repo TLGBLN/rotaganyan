@@ -16,6 +16,24 @@ function parseConditionsRef(conditions: string): { slug: string; raceNo: number 
   return { slug, raceNo: parseInt(m[2], 10) };
 }
 
+// "Kaçak" → "KACAK", "Ön Grup" → "ON_GRUP" — ganyandefteri'nin Türkçe etiketlerini bizim enum'a çevirir
+function normalizeStyleLabel(s: string): string {
+  return s.trim().toUpperCase()
+    .replace(/Ç/g, "C").replace(/Ş/g, "S").replace(/Ö/g, "O")
+    .replace(/Ü/g, "U").replace(/İ/g, "I").replace(/Ğ/g, "G")
+    .replace(/\s+/g, "_");
+}
+
+/** Runner.raceStyle JSON alanından ("style" + "sonUcYarisKategorileri") ekranda gösterilecek yüzdeyi çıkarır. */
+function parseRaceStyle(raw: unknown): { style: string; percent: number } | null {
+  const r = raw as { style?: string; sonUcYarisKategorileri?: string[] } | null;
+  if (!r?.style || !r.sonUcYarisKategorileri?.length) return null;
+  const list = r.sonUcYarisKategorileri;
+  const matches = list.filter((c) => normalizeStyleLabel(c) === r.style).length;
+  const percent = Math.round((matches / list.length) * 100);
+  return { style: r.style, percent };
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
@@ -556,6 +574,7 @@ export type ProgramRunner = {
   gallops: ProgramGallop[];
   ekuriGroup: number | null;
   apprentice: boolean;
+  raceStyle: { style: string; percent: number } | null; // style: "KACAK" | "ON_GRUP" | "BEKLEME" | "EN_GERI"
 };
 
 export type ProgramPick = {
@@ -623,7 +642,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
               jockeyChanged: true, previousJockey: true, trainer: true,
               owner: true, sire: true, dam: true, hp: true,
               bestTime: true, recentForm: true, recentFormSurfaces: true, agf: true,
-              scratched: true, ekuriGroup: true, apprentice: true,
+              scratched: true, ekuriGroup: true, apprentice: true, raceStyle: true,
               gallops: {
                 orderBy: { date: "desc" },
                 take: 5,
@@ -671,6 +690,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
         conditions: r.conditions,
         runners: r.runners.map((ru) => ({
             ...ru,
+            raceStyle: parseRaceStyle(ru.raceStyle),
             gallops: ru.gallops.map((g) => ({
               ...g,
               splits: (g.splits ?? {}) as Record<string, string | null>,

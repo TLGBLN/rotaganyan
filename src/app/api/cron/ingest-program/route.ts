@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { syncIdmanForDate } from "@/server/services/ingest/tjk-idman-stats.adapter";
+import { syncRaceStylesForDate } from "@/server/services/ingest/ganyandefteri-style.adapter";
 
 export const maxDuration = 300;
 
@@ -32,6 +33,12 @@ export async function GET(req: NextRequest) {
     syncIdmanForDate(toIsoDate(tomorrow)).catch((e: unknown) => ({ hippodromes: 0, rows: 0, skipped: 0, errors: [String(e)] })),
   ]);
 
+  // 3. Yarış stili (ganyandefteri.com) — bugün + yarın
+  const [todayStyle, tomorrowStyle] = await Promise.all([
+    syncRaceStylesForDate(toIsoDate(now)).catch((e: unknown) => ({ races: 0, updated: 0, errors: [String(e)] })),
+    syncRaceStylesForDate(toIsoDate(tomorrow)).catch((e: unknown) => ({ races: 0, updated: 0, errors: [String(e)] })),
+  ]);
+
   const summary = (r: typeof todayResult) =>
     r.cities.map((c) => `${c.sehirAdi}: ${c.ok ? `${c.runners} koşucu` : `HATA: ${c.error}`}`);
 
@@ -40,11 +47,13 @@ export async function GET(req: NextRequest) {
       date: toTjkDate(now),
       cities: summary(todayResult),
       galop: { hippodromes: todayGalop.hippodromes, rows: todayGalop.rows, skipped: todayGalop.skipped },
+      raceStyle: { races: todayStyle.races, updated: todayStyle.updated },
     },
     tomorrow: {
       date: toTjkDate(tomorrow),
       cities: summary(tomorrowResult),
       galop: { hippodromes: tomorrowGalop.hippodromes, rows: tomorrowGalop.rows, skipped: tomorrowGalop.skipped },
+      raceStyle: { races: tomorrowStyle.races, updated: tomorrowStyle.updated },
     },
   });
 }
