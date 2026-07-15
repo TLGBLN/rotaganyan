@@ -22,18 +22,15 @@ export default function SplashScreen() {
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-[#040810] transition-opacity ease-out"
+      className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-3 bg-[#0B1423] transition-opacity ease-out"
       style={{ opacity: stage === "fading" ? 0 : 1, transitionDuration: `${FADE_MS}ms` }}
       aria-hidden="true"
     >
-      <Image
-        src="/splash-banner.webp"
-        alt="ROTAGANYAN"
-        width={2191}
-        height={718}
-        className="w-full max-w-2xl px-6 sm:max-w-3xl"
-        priority
-      />
+      <Image src="/logo.png" alt="ROTAGANYAN" width={80} height={80} className="rounded-full" priority />
+      <span className="text-xl font-bold tracking-tight">
+        <span className="text-white">ROTA</span>
+        <span className="text-brand">GANYAN</span>
+      </span>
     </div>
   );
 }
