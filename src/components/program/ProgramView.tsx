@@ -167,15 +167,22 @@ function galopTimeClass(q: GalopQuality | null): string {
 
 function parsePickDetails(details: string[]) {
   let aScore: string | undefined;
-  let bcScore: string | undefined;
+  let bScore: string | undefined;
+  let cScore: string | undefined;
+  let bcScoreCombined: string | undefined;
   let veriGuven: string | undefined;
   const notes: string[] = [];
   for (const d of details) {
-    const aM = d.match(/^A:\s*(.+)/);   if (aM)  { aScore = aM[1].trim(); continue; }
-    const bM = d.match(/^B\+C:\s*(.+)/); if (bM)  { bcScore = bM[1].trim(); continue; }
-    const vM = d.match(/^VG:\s*(.+)/);  if (vM)  { veriGuven = vM[1].trim(); continue; }
+    const aM = d.match(/^A:\s*(.+)/);    if (aM)  { aScore = aM[1].trim(); continue; }
+    // v4.0 şablonu B ve C'yi ayrı satırlarda verir ("B: 14/30", "C: 3/10");
+    // eski "B+C: YY" formatı da geriye dönük desteklenir.
+    const bcM = d.match(/^B\+C:\s*(.+)/); if (bcM) { bcScoreCombined = bcM[1].trim(); continue; }
+    const bM = d.match(/^B:\s*(.+)/);    if (bM)  { bScore = bM[1].trim(); continue; }
+    const cM = d.match(/^C:\s*(.+)/);    if (cM)  { cScore = cM[1].trim(); continue; }
+    const vM = d.match(/^VG:\s*(.+)/);   if (vM)  { veriGuven = vM[1].trim(); continue; }
     if (d.trim()) notes.push(d.trim());
   }
+  const bcScore = bcScoreCombined ?? (bScore && cScore ? `${bScore} · ${cScore}` : bScore ?? cScore);
   return { aScore, bcScore, veriGuven, kilItGerekce: notes.join(" ") || undefined };
 }
 
