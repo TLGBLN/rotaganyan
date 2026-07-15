@@ -115,23 +115,3 @@ body {
 /* Satır zebra rengi */
 .race-row-even { background: oklch(0.16 0.038 240); }
 
-/* Açılış ekranı — logo etrafında dönen nokta */
-@keyframes rg-orbit {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* Açılış ekranı — at logosu koşar gibi hafifçe zıplasın */
-@keyframes rg-gallop {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  25%      { transform: translateY(-5px) rotate(-3deg); }
-  50%      { transform: translateY(0) rotate(0deg); }
-  75%      { transform: translateY(-3px) rotate(3deg); }
-}
-
-/* Açılış ekranı — at koşarak ekrandan çıksın */
-@keyframes rg-run-off {
-  0%   { transform: translateY(0) translateX(0) scale(1) rotate(0deg); opacity: 1; }
-  30%  { transform: translateY(-6px) translateX(20px) scale(1.05) rotate(-4deg); opacity: 1; }
-  100% { transform: translateY(4px) translateX(260px) scale(0.6) rotate(6deg); opacity: 0; }
-}

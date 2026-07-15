@@ -2,12 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { Dancing_Script } from "next/font/google";
 
-const dancingScript = Dancing_Script({ subsets: ["latin"], weight: ["600"] });
-
-const HOLD_MS = 3200;
-const FADE_MS = 550;
+const HOLD_MS = 2600;
+const FADE_MS = 500;
 
 export default function SplashScreen() {
   const [stage, setStage] = useState<"visible" | "fading" | "hidden">("visible");
@@ -25,50 +22,18 @@ export default function SplashScreen() {
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-5 bg-[#000712] transition-opacity ease-out"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-[#040810] transition-opacity ease-out"
       style={{ opacity: stage === "fading" ? 0 : 1, transitionDuration: `${FADE_MS}ms` }}
       aria-hidden="true"
     >
-      <div className="relative h-28 w-28">
-        <div className="absolute inset-0 rounded-full border border-white/15" />
-        <div className="absolute inset-0" style={{ animation: "rg-orbit 2.6s linear infinite" }}>
-          <span className="absolute -top-[3px] left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-[#d4b45a] shadow-[0_0_10px_3px_rgba(212,180,90,0.65)]" />
-        </div>
-        <div className="absolute inset-0 flex items-center justify-center overflow-visible">
-          <div
-            style={{
-              animation:
-                stage === "visible"
-                  ? "rg-gallop 0.55s ease-in-out infinite"
-                  : "rg-run-off 550ms cubic-bezier(0.4,0,0.8,0.6) forwards",
-            }}
-          >
-            <Image src="/logo.png" alt="ROTAGANYAN" width={72} height={72} className="rounded-xl" priority />
-          </div>
-        </div>
-      </div>
-
-      <span className="text-sm font-bold tracking-[0.25em]">
-        <span className="text-white">ROTA</span>
-        <span
-          style={{
-            background:
-              "linear-gradient(90deg,#5b9bd5 0%,#a8c8e8 30%,#e4ddc8 50%,#d4b45a 65%,#c8971e 85%,#b8820a 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}
-        >
-          GANYAN
-        </span>
-      </span>
-
-      <div className={`${dancingScript.className} mt-1 max-w-xs px-8 text-center leading-snug`}>
-        <p className="text-lg text-[#c9a86a]">
-          “At yarışları modern toplumlar için sosyal bir ihtiyaçtır.”
-        </p>
-        <p className="mt-1 text-base text-[#c9a86a]/80">K. Atatürk</p>
-      </div>
+      <Image
+        src="/splash-banner.webp"
+        alt="ROTAGANYAN"
+        width={2191}
+        height={718}
+        className="w-full max-w-2xl px-6 sm:max-w-3xl"
+        priority
+      />
     </div>
   );
 }
