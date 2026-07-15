@@ -202,12 +202,14 @@ export async function syncIdmanForDate(dateStr: string): Promise<{
         )
       : new Set<string>();
 
-    const MAX_BACKFILL = 30;
+    // Gerçek zamanlamada (production'a yakın ağ koşullarında) 200 at ~12
+    // eşzamanlılıkla ~2.5 dakikada tamamlanıyor — üst sınırı buna göre gevşek tutuyoruz.
+    const MAX_BACKFILL = 80;
     const zeroCoverage = stillMissing.filter(([, id]) => !coveredRunnerIds.has(id)).map(([n]) => n);
     const staleCoverage = stillMissing.filter(([, id]) => coveredRunnerIds.has(id)).map(([n]) => n);
     const missingNames = [...zeroCoverage, ...staleCoverage].slice(0, MAX_BACKFILL);
 
-    const CONCURRENCY = 15;
+    const CONCURRENCY = 12;
     for (let i = 0; i < missingNames.length; i += CONCURRENCY) {
       const batch = missingNames.slice(i, i + CONCURRENCY);
       const results = await Promise.all(
