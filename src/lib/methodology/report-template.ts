@@ -206,19 +206,66 @@ Banko neden yok / var: (Handikap = zorunlu kombinasyon · AGF ayrışma · eşit
 ROTAGANYAN · v1.6 · [tarih] analiz şablonu
 `;
 
-export const RANKING_TABLE_TEMPLATE = `# 🏁 NİHAİ SIRALAMA ŞABLONU
+export const RANKING_TABLE_TEMPLATE = `# 🏁 NİHAİ SIRALAMA ŞABLONU v4.0
+
+## [Hipodrom] [Tarih] — [Koşu #] · [Tip] · [Mesafe] [Pist] · [At Sayısı] at
+*Motor: gecit_core.py v3.2.8 · DURUM: [TEMİZ/KONTROL] · TAMAMLANABİLİR: [True/False]*
+*Pist durumu: [Normal/Islak/Ağır] · Zemin katsayısı: [×1.0/×1.15/×1.30]*
 
 | Sıra | No | At | A | B+C | Toplam | Veri Güven | Kilit Gerekçe |
 |---:|---:|---|---:|---:|---:|:--:|---|
-| 1 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
-| 2 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
-| 3 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
-| 4 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
-| 5 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
-| 6 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
-| 7 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
-| 8 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
-| 9 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | ... |
+| 1 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | Ana dayanak · sıra nedeni · [🚨 DİKKAT varsa ata özgü uyarı] |
+| 2 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | … |
+| 3 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | … |
+| 4 | # | **AT ADI** | XX | YY | *ZZ* | A/B/C | … |
+| 5 | # | AT ADI | XX | YY | *ZZ* | A/B/C | … |
+| 6 | # | AT ADI | XX | YY | *ZZ* | A/B/C | … |
 
-> *Sıra önce A'ya göredir. B+C, yalnız A farkı ≤2 iken ve fark ≥8 olduğunda sırayı değiştirebilir. Toplam yalnız referanstır ve sıralama kararı vermez.*
+> *Sıra önce A'ya göredir. B+C, yalnız A farkı ≤2 iken ve fark ≥8 olduğunda sırayı
+> değiştirebilir. Toplam yalnız referanstır; sıralama kararı vermez.*
+
+---
+
+## 🎯 KUPON
+
+🎯 **DAR ([N] at):** [At 1] · [At 2] · [At 3]
+📌 **NORMAL ([N] at):** + [At 4] · [At 5]
+📋 **GENİŞ ([N] at):** + [At 6] · [At 7]
+
+**BANKO:** [AT ADI] *(A:[XX], fark:[+X], Veri Güveni:A, risk yok)* VEYA **BANKO YOK**
+
+---
+
+## ⭐ ÖNE ÇIKAN ATLAR
+
+*(Geçit tetikleyen, piyasa ayrışması olan veya özellikle dikkat edilmesi gereken atlar
+için sade yarış yorumcusu diliyle kısa paragraf. Teknik terim kullanılmaz.)*
+
+---
+
+## ⚠️ KOŞU GENELİ UYARILAR
+
+*(Yalnız tek bir ata bağlı olmayan, koşunun tamamını etkileyen uyarılar buraya:
+tempo parçalanması, kalabalık saha, eksik veri oranı, sürüm uyarısı vb.)*
+
+---
+
+## Geçit Skoru Sıralaması (Ekonomik Kupon için)
+
+| At | Geçit Skoru | Geçitler |
+|---|---:|---|
+| [At adı] | XX.X | [ATOMIC_FORCE, HP_PATLAMA, …] |
+| [At adı] | XX.X | [AGF_AYRISMA] |
+| … | … | … |
+
+*Ayak içi slot geçit skoruyla dolar, A sırasıyla değil.*
+
+---
+
+### KİLİT GEREKÇE STANDARDI
+Her satır üç parçadan oluşur:
+1. **Ana dayanak** — en güçlü somut olumlu kanıt (sade dil, terim yok)
+2. **Sıra nedeni** — yakın rakibe göre neden önde/geride
+3. **Risk / Uyarı** — somut olumsuz kanıt VEYA önemli veri eksikliği
+   (🚨 DİKKAT formatında, ata özel, o atın satırında)
 `;
