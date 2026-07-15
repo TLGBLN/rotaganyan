@@ -38,12 +38,17 @@ export type TjkIdmanRow = {
   trainingDate: Date;
   surface: string; // Kum/Çim/Sentetik
   position: string; // İç/Dış
-  trainingType: string; // Kenter/Tırıs/...
+  trainingType: string; // Kenter/Tırıs/Sprint/Galop...
+  durum: string | null; // GALOPKISA — çaba/durum kodu (R, ÇR, ...)
   splits: Record<string, string | null>; // "1400","1200","1000","800","600","400","200"
 };
 
 async function fetchHtml(url: string): Promise<string> {
-  const { statusCode, body } = await request(url, { headers: HEADERS });
+  const { statusCode, body } = await request(url, {
+    headers: HEADERS,
+    headersTimeout: 10_000,
+    bodyTimeout: 10_000,
+  });
   if (statusCode !== 200) throw new Error(`HTTP ${statusCode}: ${url}`);
   return body.text();
 }
@@ -81,6 +86,7 @@ function parseRows(html: string): TjkIdmanRow[] {
       surface: cell("PISTTUR"),
       position: cell("ATINKONUMU"),
       trainingType: cell("IDMANTUR"),
+      durum: cell("GALOPKISA") || null,
       splits,
     });
   });
@@ -114,6 +120,19 @@ export async function fetchTjkIdmanStats(raceDateStr: string, hippoSlug: string)
   }
 
   return all;
+}
+
+/**
+ * TJK'nın toplu (tarih+hipodrom) sorgusu güvenilir değil — "Toplam X" dediği sayı
+ * ile DataRows üzerinden gerçekte erişilebilenden fazla olabiliyor (2. sayfa
+ * doğrudan 404 dönebiliyor), bazı atların idman kaydı toplu listede hiç
+ * görünmüyor. At ismiyle doğrudan arama bu atın TÜM idman geçmişini güvenilir
+ * şekilde döner — eksik kalanları tamamlamak için kullanılır.
+ */
+export async function fetchTjkIdmanByHorseName(horseName: string): Promise<TjkIdmanRow[]> {
+  const qs = `QueryParameter_ATADI=${encodeURIComponent(horseName)}`;
+  const html = await fetchHtml(`${BASE}/TR/YarisSever/Query/Data/IdmanIstatistikleri?${qs}`);
+  return parseRows(html);
 }
 
 function normHorseName(name: string): string {
@@ -162,26 +181,77 @@ export async function syncIdmanForDate(dateStr: string): Promise<{
       continue;
     }
 
+    // Toplu sorgu güvenilmez şekilde eksik kalabiliyor — eşleşmeyen her at için
+    // isimle tek tek arayıp tamamlıyoruz (at isimleriyle eşleştirme). Bir at
+    // başına bir istek olduğundan tam listeyi tek seferde bitirmek (60-90 at)
+    // cron süresini aşabiliyor — hiç galopu olmayan atlara öncelik verip, kalan
+    // bütçeyi eski/kısmi verisi olanlara ayırarak makul bir üst sınırla sınırlıyoruz;
+    // sınıra takılan isimler sık çalışan cron sayesinde bir sonraki turda denenir.
+    const foundNames = new Set(idmanRows.map((r) => normHorseName(r.horseName)));
+    const stillMissing = [...nameToRunnerId.entries()].filter(([n]) => !foundNames.has(n));
+    const runnerIdsToCheck = stillMissing.map(([, id]) => id);
+    const coveredRunnerIds = runnerIdsToCheck.length
+      ? new Set(
+          (
+            await db.gallop.findMany({
+              where: { runnerId: { in: runnerIdsToCheck } },
+              select: { runnerId: true },
+              distinct: ["runnerId"],
+            })
+          ).map((g) => g.runnerId)
+        )
+      : new Set<string>();
+
+    const MAX_BACKFILL = 30;
+    const zeroCoverage = stillMissing.filter(([, id]) => !coveredRunnerIds.has(id)).map(([n]) => n);
+    const staleCoverage = stillMissing.filter(([, id]) => coveredRunnerIds.has(id)).map(([n]) => n);
+    const missingNames = [...zeroCoverage, ...staleCoverage].slice(0, MAX_BACKFILL);
+
+    const CONCURRENCY = 15;
+    for (let i = 0; i < missingNames.length; i += CONCURRENCY) {
+      const batch = missingNames.slice(i, i + CONCURRENCY);
+      const results = await Promise.all(
+        batch.map(async (normName) => {
+          try {
+            const byName = await fetchTjkIdmanByHorseName(normName);
+            // At isim araması atın TÜM idman geçmişini (50'ye kadar satır) döner;
+            // zaten sadece son 3'ü tutacağız — sadece en güncel birkaçını alıp
+            // gereksiz onlarca eski satırı yazıp hemen budamaktan kaçınıyoruz.
+            return byName
+              .filter((r) => normHorseName(r.horseName) === normName)
+              .sort((a, b) => b.trainingDate.getTime() - a.trainingDate.getTime())
+              .slice(0, 5);
+          } catch {
+            return [] as TjkIdmanRow[]; // TJK'da bu at için idman kaydı yok — atla
+          }
+        })
+      );
+      for (const exact of results) idmanRows.push(...exact);
+      await new Promise((r) => setTimeout(r, 150));
+    }
+
     const touchedRunnerIds = new Set<string>();
     for (const row of idmanRows) {
       const runnerId = nameToRunnerId.get(normHorseName(row.horseName));
       if (!runnerId) { skipped++; continue; }
 
       try {
-        const exists = await db.gallop.findFirst({ where: { runnerId, date: row.trainingDate } });
-        if (!exists) {
-          await db.gallop.create({
-            data: {
-              runnerId,
-              date: row.trainingDate,
-              track: row.trainingType || undefined,
-              form: row.trainingType || undefined,
-              jockey: row.jockey || undefined,
-              splits: { ...row.splits, ic_dis: row.position, pist: row.surface },
-            },
-          });
-          totalRows++;
+        const data = {
+          track: row.trainingType || undefined,
+          form: row.durum || undefined,
+          jockey: row.jockey || undefined,
+          splits: { ...row.splits, ic_dis: row.position, pist: row.surface },
+        };
+        const existing = await db.gallop.findFirst({ where: { runnerId, date: row.trainingDate } });
+        if (existing) {
+          // Eski (liderform kaynaklı) kayıt aynı tarihte zaten varsa, 200m/Durum gibi
+          // ek alanları taşıyan TJK verisiyle üzerine yaz — sessizce atlamak eski,
+          // eksik veriyi kalıcı olarak koruyup TJK'nın daha zengin verisini gizliyordu.
+          await db.gallop.update({ where: { id: existing.id }, data });
+        } else {
+          await db.gallop.create({ data: { runnerId, date: row.trainingDate, ...data } });
         }
+        totalRows++;
         touchedRunnerIds.add(runnerId);
       } catch (err) {
         errors.push(`${row.horseName} ${row.trainingDate.toISOString()}: ${String(err)}`);

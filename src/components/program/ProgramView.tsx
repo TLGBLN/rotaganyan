@@ -86,14 +86,15 @@ function breedShort(b: string) {
   return b === "ARAP" ? "Arap" : "İngiliz";
 }
 
-// Galop — en derin mesafe + 400m finişi
+// Galop — en derin mesafe + 400m ve 200m finiş
 const GALOP_PREP_DISTS = ["1600", "1400", "1200", "1000", "800", "600"] as const;
-function galopSplits(g: ProgramGallop): { prepDist: string | null; prepTime: string | null; finish: string | null } {
+function galopSplits(g: ProgramGallop): { prepDist: string | null; prepTime: string | null; finish: string | null; final200: string | null } {
   const prepDist = GALOP_PREP_DISTS.find((d) => g.splits[d]) ?? null;
   return {
     prepDist,
     prepTime: prepDist ? (g.splits[prepDist] ?? null) : null,
     finish: g.splits["400"] ?? null,
+    final200: g.splits["200"] ?? null,
   };
 }
 function galopDate(g: ProgramGallop): string {
@@ -511,8 +512,8 @@ function RunnerRow({
         {r.gallops.length > 0 ? (
           <div className="space-y-1">
             {r.gallops.slice(0, 3).map((g, i) => {
-              const { prepDist, prepTime, finish } = galopSplits(g);
-              if (!prepDist && !finish) return null;
+              const { prepDist, prepTime, finish, final200 } = galopSplits(g);
+              if (!prepDist && !finish && !final200) return null;
               const isInner = (g.splits["ic_dis"] ?? "").includes("İÇ") || (g.splits["ic_dis"] ?? "").toUpperCase().includes("IC");
               const prepQ = galopQuality(prepDist ?? "", prepTime, breed, isInner);
               const finQ = galopQuality("400", finish, breed, isInner);
@@ -530,10 +531,15 @@ function RunnerRow({
                     {finish && (
                       <span className={cn("text-amber-500 dark:text-amber-400", galopTimeClass(finQ))}>{`400·${finish}`}</span>
                     )}
+                    {(prepDist || finish) && final200 && <span className="text-muted-foreground mx-0.5">/</span>}
+                    {final200 && (
+                      <span className="text-sky-500 dark:text-sky-400">{`200·${final200}`}</span>
+                    )}
                   </span>
                   <span className="text-[9px] text-muted-foreground">
                     {galopDate(g)}
                     {g.track && <span className="ml-1 opacity-70">{g.track}</span>}
+                    {g.form && <span className="ml-1 opacity-70">· {g.form}</span>}
                     {isInner && <span className="ml-1 text-blue-400 opacity-80">İÇ</span>}
                   </span>
                 </div>
@@ -707,13 +713,13 @@ function RunnerCard({
       {/* Galop satırı — mobile */}
       {r.gallops.length > 0 && (() => {
         const items = r.gallops.slice(0, 3).map((g) => {
-          const { prepDist, prepTime, finish } = galopSplits(g);
+          const { prepDist, prepTime, finish, final200 } = galopSplits(g);
           const isInner = (g.splits["ic_dis"] ?? "").includes("İÇ") || (g.splits["ic_dis"] ?? "").toUpperCase().includes("IC");
-          return { prepDist, prepTime, finish, date: galopDate(g), track: g.track, isInner,
+          return { prepDist, prepTime, finish, final200, date: galopDate(g), track: g.track, form: g.form, isInner,
             sameJockey: isSameJockey(g.jockey, r.jockey),
             prepQ: galopQuality(prepDist ?? "", prepTime, breed, isInner),
             finQ: galopQuality("400", finish, breed, isInner) };
-        }).filter((x) => x.prepDist || x.finish);
+        }).filter((x) => x.prepDist || x.finish || x.final200);
         if (items.length === 0) return null;
         return (
           <div className="mt-1.5 ml-10 border-t border-border/30 pt-1">
@@ -730,8 +736,12 @@ function RunnerCard({
                     {x.finish && (
                       <span className={cn("text-amber-500 dark:text-amber-400", galopTimeClass(x.finQ))}>{`400·${x.finish}`}</span>
                     )}
+                    {(x.prepDist || x.finish) && x.final200 && <span className="text-muted-foreground mx-0.5">/</span>}
+                    {x.final200 && <span className="text-sky-500 dark:text-sky-400">{`200·${x.final200}`}</span>}
                   </span>
                   <span className="text-muted-foreground ml-1 text-[9px]">{x.date}</span>
+                  {x.track && <span className="ml-1 text-[9px] text-muted-foreground opacity-70">{x.track}</span>}
+                  {x.form && <span className="ml-1 text-[9px] text-muted-foreground opacity-70">· {x.form}</span>}
                   {x.isInner && <span className="ml-0.5 text-[9px] text-blue-400">İÇ</span>}
                 </div>
               ))}

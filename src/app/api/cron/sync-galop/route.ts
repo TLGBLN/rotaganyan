@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { syncIdmanForDate } from "@/server/services/ingest/tjk-idman-stats.adapter";
 import { turkeyDateString } from "@/lib/tz";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -16,10 +16,7 @@ export async function GET(req: NextRequest) {
   const dateParam = req.nextUrl.searchParams.get("date");
   const dates = dateParam ? [dateParam] : [turkeyDateString(), turkeyDateString(1)];
 
-  const results = [];
-  for (const d of dates) {
-    results.push({ date: d, ...(await syncIdmanForDate(d)) });
-  }
+  const results = await Promise.all(dates.map(async (d) => ({ date: d, ...(await syncIdmanForDate(d)) })));
 
   return NextResponse.json({ results });
 }
