@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { Dancing_Script } from "next/font/google";
 
-const HOLD_MS = 2400;
+const dancingScript = Dancing_Script({ subsets: ["latin"], weight: ["600"] });
+
+const HOLD_MS = 3200;
 const FADE_MS = 550;
 
 export default function SplashScreen() {
@@ -59,6 +62,13 @@ export default function SplashScreen() {
           GANYAN
         </span>
       </span>
+
+      <div className={`${dancingScript.className} mt-1 max-w-xs px-8 text-center leading-snug`}>
+        <p className="text-lg text-[#c9a86a]">
+          “At yarışları modern toplumlar için sosyal bir ihtiyaçtır.”
+        </p>
+        <p className="mt-1 text-base text-[#c9a86a]/80">K. Atatürk</p>
+      </div>
     </div>
   );
 }
