@@ -28,7 +28,7 @@ export default function SplashScreen() {
       aria-hidden="true"
     >
       <Image src="/logo.png" alt="ROTAGANYAN" width={80} height={80} className="rounded-full" priority />
-      <Wordmark className="text-xl px-3 py-1.5" />
+      <Wordmark className="text-xl" />
     </div>
   );
 }
