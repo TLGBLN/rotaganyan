@@ -280,7 +280,8 @@ function parseEquipmentTable(block: string, nameIndex: Map<string, number>): Map
     result.set(no, {
       equipmentAdded: equipmentAdded || undefined,
       equipmentRemoved: equipmentRemoved || undefined,
-      weightChange: weightChange != null && !isNaN(weightChange) ? weightChange : undefined,
+      // Gerçekçi kilo değişimi ±10kg'ı aşmaz — bunu aşan değerler sütun kaymasına işaret eder.
+      weightChange: weightChange != null && !isNaN(weightChange) && Math.abs(weightChange) <= 10 ? weightChange : undefined,
       sameJockey,
     });
   }

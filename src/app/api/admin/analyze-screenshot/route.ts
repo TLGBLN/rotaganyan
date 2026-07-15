@@ -106,6 +106,11 @@ export async function POST(req: NextRequest) {
     // Strip possible markdown code fences
     const clean = text.replace(/```(?:json)?/gi, "").trim();
     extracted = JSON.parse(clean);
+    // Gerçekçi kilo değişimi ±10kg'ı aşmaz — modelin yanlış kolonu okuduğu
+    // durumlarda (örn. start no) gerçek dışı değerlerin veritabanına yazılmasını engeller.
+    for (const r of extracted) {
+      if (r.weightChange != null && Math.abs(r.weightChange) > 10) r.weightChange = undefined;
+    }
   } catch (err) {
     console.error("Claude Vision error:", err);
     return NextResponse.json(

@@ -66,7 +66,9 @@ export function parseMdRunners(raw: string): ParsedRunner[] {
 
     if (cols[4] !== undefined) {
       const d = parseFloat(cols[4].replace(",", "."));
-      if (!isNaN(d)) runner.weightChange = d;
+      // Gerçekçi kilo değişimi ±10kg'ı aşmaz — bunun dışındaki değerler genelde
+      // yapıştırılan tablonun sütun sırası kaymasından (örn. Start No) kaynaklanır.
+      if (!isNaN(d) && Math.abs(d) <= 10) runner.weightChange = d;
     }
 
     if (cols[5] !== undefined) {
