@@ -165,24 +165,43 @@ function galopTimeClass(q: GalopQuality | null): string {
 
 // ── Analiz detay parser ───────────────────────────────────────────────────────
 
+// "14/30" → 14 (payda sadece puanın hangi ölçekte olduğunu gösterir, ekranda gösterilmez)
+function numerator(s: string): number | undefined {
+  const m = s.match(/^(\d+(?:[.,]\d+)?)\s*\/\s*\d+/);
+  if (m) return parseFloat(m[1].replace(",", "."));
+  const n = parseFloat(s.replace(",", "."));
+  return isNaN(n) ? undefined : n;
+}
+
 function parsePickDetails(details: string[]) {
-  let aScore: string | undefined;
-  let bScore: string | undefined;
-  let cScore: string | undefined;
-  let bcScoreCombined: string | undefined;
+  let aRaw: string | undefined;
+  let bRaw: string | undefined;
+  let cRaw: string | undefined;
+  let bcRaw: string | undefined;
   let veriGuven: string | undefined;
   const notes: string[] = [];
   for (const d of details) {
-    const aM = d.match(/^A:\s*(.+)/);    if (aM)  { aScore = aM[1].trim(); continue; }
+    const aM = d.match(/^A:\s*(.+)/);    if (aM)  { aRaw = aM[1].trim(); continue; }
     // v4.0 şablonu B ve C'yi ayrı satırlarda verir ("B: 14/30", "C: 3/10");
     // eski "B+C: YY" formatı da geriye dönük desteklenir.
-    const bcM = d.match(/^B\+C:\s*(.+)/); if (bcM) { bcScoreCombined = bcM[1].trim(); continue; }
-    const bM = d.match(/^B:\s*(.+)/);    if (bM)  { bScore = bM[1].trim(); continue; }
-    const cM = d.match(/^C:\s*(.+)/);    if (cM)  { cScore = cM[1].trim(); continue; }
+    const bcM = d.match(/^B\+C:\s*(.+)/); if (bcM) { bcRaw = bcM[1].trim(); continue; }
+    const bM = d.match(/^B:\s*(.+)/);    if (bM)  { bRaw = bM[1].trim(); continue; }
+    const cM = d.match(/^C:\s*(.+)/);    if (cM)  { cRaw = cM[1].trim(); continue; }
     const vM = d.match(/^VG:\s*(.+)/);   if (vM)  { veriGuven = vM[1].trim(); continue; }
     if (d.trim()) notes.push(d.trim());
   }
-  const bcScore = bcScoreCombined ?? (bScore && cScore ? `${bScore} · ${cScore}` : bScore ?? cScore);
+
+  const aScore = aRaw != null ? String(numerator(aRaw) ?? aRaw) : undefined;
+  // B+C her zaman bir toplamdır: ayrı B/C satırları varsa payları toplanır, eski "B+C: YY" ise olduğu gibi kullanılır.
+  let bcScore: string | undefined;
+  if (bcRaw != null) {
+    bcScore = String(numerator(bcRaw) ?? bcRaw);
+  } else if (bRaw != null || cRaw != null) {
+    const b = bRaw != null ? numerator(bRaw) : undefined;
+    const c = cRaw != null ? numerator(cRaw) : undefined;
+    bcScore = b != null && c != null ? String(b + c) : String(b ?? c ?? "");
+  }
+
   return { aScore, bcScore, veriGuven, kilItGerekce: notes.join(" ") || undefined };
 }
 
