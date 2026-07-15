@@ -16,22 +16,11 @@ function parseConditionsRef(conditions: string): { slug: string; raceNo: number 
   return { slug, raceNo: parseInt(m[2], 10) };
 }
 
-// "Kaçak" → "KACAK", "Ön Grup" → "ON_GRUP" — ganyandefteri'nin Türkçe etiketlerini bizim enum'a çevirir
-function normalizeStyleLabel(s: string): string {
-  return s.trim().toUpperCase()
-    .replace(/Ç/g, "C").replace(/Ş/g, "S").replace(/Ö/g, "O")
-    .replace(/Ü/g, "U").replace(/İ/g, "I").replace(/Ğ/g, "G")
-    .replace(/\s+/g, "_");
-}
-
-/** Runner.raceStyle JSON alanından ("style" + "sonUcYarisKategorileri") ekranda gösterilecek yüzdeyi çıkarır. */
+/** Runner.raceStyle JSON alanından ("style" + "percent") ekranda gösterilecek değeri çıkarır. */
 function parseRaceStyle(raw: unknown): { style: string; percent: number } | null {
-  const r = raw as { style?: string; sonUcYarisKategorileri?: string[] } | null;
-  if (!r?.style || !r.sonUcYarisKategorileri?.length) return null;
-  const list = r.sonUcYarisKategorileri;
-  const matches = list.filter((c) => normalizeStyleLabel(c) === r.style).length;
-  const percent = Math.round((matches / list.length) * 100);
-  return { style: r.style, percent };
+  const r = raw as { style?: string; percent?: number } | null;
+  if (!r?.style || r.percent == null) return null;
+  return { style: r.style, percent: r.percent };
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────

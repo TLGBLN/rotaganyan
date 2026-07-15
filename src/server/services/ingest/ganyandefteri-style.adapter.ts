@@ -2,8 +2,14 @@
  * ganyandefteri.com — atların "yarış stili" (kaçak/öncü/bekleme/en geri) verisi.
  * TJK'da bu veriyi yayınlayan bir sayfa yok; ganyandefteri kendi geçmiş yarış
  * sonuçlarından bu sınıflandırmayı hesaplayıp public (girişsiz) bir endpoint'te
- * sunuyor. Günlük program: /daily/programy/{YYYY-MM-DD} · Stil hesaplama:
- * /daily/hesapla-yaris-stili-performans?race_id={id}
+ * sunuyor. Günlük program: /daily/programy/{YYYY-MM-DD} · Stil dağılımı (dört
+ * kategorinin tam yüzdeleri, sitenin "Yarış Stili" modalıyla birebir aynı):
+ * /daily/getRaceStyleStats?race_id={id}&filter=all
+ *
+ * NOT: Daha önce kullanılan /daily/hesapla-yaris-stili-performans endpoint'i
+ * yalnızca son 3 yarışa dayalı kaba bir "kategori" döndürüyordu ve sitenin
+ * kendi gösterdiği (tüm geçmişe dayalı) yüzdelerle uyuşmuyordu — bu yüzden
+ * gerçek modal endpoint'ine geçildi.
  */
 
 import { request } from "undici";
@@ -108,52 +114,53 @@ export async function fetchGanyandefteriProgramy(dateStr: string): Promise<GdRac
   return races;
 }
 
-// API'nin ham (snake_case) yanıt şekli
+// API'nin ham yanıt şekli — sitenin "Yarış Stili" modalıyla aynı dört kategori
 type GdStyleRowRaw = {
-  horse_id: string;
+  at_id: string;
+  at_name: string;
   horse_number: string;
-  horse_name: string;
-  toplam_puan: number;
-  kategori: string | null;
-  kacak_at_sayisi: number;
-  son_uc_yaris_kategorileri: string[];
+  veri: number;
+  kacak: number;
+  kacak_yuzde: number;
+  bekleme: number;
+  bekleme_yuzde: number;
+  on_grup_bekleme: number;
+  on_grup_bekleme_yuzde: number;
+  en_arka_bekleme: number;
+  en_arka_bekleme_yuzde: number;
 };
 
 export type GdStyleRow = {
   horseName: string;
   horseNumber: string;
-  kategori: string | null; // "kacak" | "bekleme" | "onGrup" | "enGeri" | null (yeterli veri yoksa)
-  kacakAtSayisi: number;
-  sonUcYarisKategorileri: string[];
+  veri: number;
+  style: string | null; // "KACAK" | "BEKLEME" | "ON_GRUP" | "EN_GERI" | null (veri yoksa)
+  percent: number;
 };
 
-type GdStyleResponse = { success: boolean; sonuc?: GdStyleRowRaw[]; message?: string };
+type GdStyleResponse = { success: boolean; atlar?: GdStyleRowRaw[]; message?: string };
 
-/** Bir koşudaki tüm atların yarış stili kategorisini (ganyandefteri'nin kendi hesaplaması) döner. */
+/** Bir koşudaki tüm atların yarış stili dağılımını (tüm geçmişe dayalı dört kategori yüzdesi) döner. */
 export async function fetchGanyandefteriRaceStyle(raceId: string): Promise<GdStyleRow[]> {
-  const data = await fetchJson<GdStyleResponse>(`${BASE}/daily/hesapla-yaris-stili-performans?race_id=${raceId}`);
-  if (!data.success || !data.sonuc) return [];
-  return data.sonuc.map((r) => ({
-    horseName: r.horse_name,
-    horseNumber: r.horse_number,
-    kategori: r.kategori,
-    kacakAtSayisi: r.kacak_at_sayisi,
-    sonUcYarisKategorileri: r.son_uc_yaris_kategorileri,
-  }));
+  const data = await fetchJson<GdStyleResponse>(`${BASE}/daily/getRaceStyleStats?race_id=${raceId}&filter=all`);
+  if (!data.success || !data.atlar) return [];
+  return data.atlar.map((r) => {
+    if (!r.veri || r.veri <= 0) {
+      return { horseName: r.at_name, horseNumber: r.horse_number, veri: 0, style: null, percent: 0 };
+    }
+    const candidates: [string, number][] = [
+      ["KACAK", r.kacak_yuzde],
+      ["BEKLEME", r.bekleme_yuzde],
+      ["ON_GRUP", r.on_grup_bekleme_yuzde],
+      ["EN_GERI", r.en_arka_bekleme_yuzde],
+    ];
+    const [style, percent] = candidates.reduce((best, cur) => (cur[1] > best[1] ? cur : best));
+    return { horseName: r.at_name, horseNumber: r.horse_number, veri: r.veri, style, percent };
+  });
 }
 
 function normHorseName(name: string): string {
   return name.replace(/\([A-Z]{2,3}\)/g, "").replace(/\s+/g, " ").trim().toUpperCase();
-}
-
-// ganyandefteri "kacak"/"bekleme"/"onGrup"/"enGeri" → bizim RaceStyleTag ("KACAK"|"BEKLEME"|"ON_GRUP"|"EN_GERI")
-function mapKategori(kategori: string): string | null {
-  const k = kategori.toLowerCase();
-  if (k === "kacak") return "KACAK";
-  if (k === "bekleme") return "BEKLEME";
-  if (k === "ongrup" || k === "on_grup") return "ON_GRUP";
-  if (k === "engeri" || k === "en_geri") return "EN_GERI";
-  return null;
 }
 
 /**
@@ -200,9 +207,7 @@ export async function syncRaceStylesForDate(dateStr: string): Promise<{
 
     const nameToRunnerId = new Map(race.runners.map((r) => [normHorseName(r.name), r.id]));
     for (const row of styleRows) {
-      if (!row.kategori) continue; // yeterli geçmiş veri yok
-      const style = mapKategori(row.kategori);
-      if (!style) continue;
+      if (!row.style || row.veri <= 0) continue; // yeterli geçmiş veri yok
 
       const runnerId = nameToRunnerId.get(normHorseName(row.horseName));
       if (!runnerId) continue;
@@ -212,9 +217,9 @@ export async function syncRaceStylesForDate(dateStr: string): Promise<{
           where: { id: runnerId },
           data: {
             raceStyle: {
-              style,
-              kacakAtSayisi: row.kacakAtSayisi,
-              sonUcYarisKategorileri: row.sonUcYarisKategorileri,
+              style: row.style,
+              percent: row.percent,
+              veri: row.veri,
               source: "ganyandefteri",
               updatedAt: new Date().toISOString(),
             },
