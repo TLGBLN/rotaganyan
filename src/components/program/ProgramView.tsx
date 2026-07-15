@@ -256,20 +256,23 @@ function XLogo({ className }: { className?: string }) {
 // ── Analiz paneli ────────────────────────────────────────────────────────────
 
 function AnalysisPanel({
-  picks, winnerNo, isLoggedIn, raceNo, hippodromeName,
+  picks, winnerNo, isLoggedIn, raceNo, hippodromeName, raceId,
 }: {
   picks: ProgramPick[];
   winnerNo?: number | null;
   isLoggedIn: boolean;
   raceNo: number;
   hippodromeName?: string;
+  raceId: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
   function handleShare() {
     const url = new URL("https://twitter.com/intent/tweet");
     url.searchParams.set("text", buildShareText(picks, raceNo, hippodromeName));
-    if (typeof window !== "undefined") url.searchParams.set("url", window.location.href);
+    if (typeof window !== "undefined") {
+      url.searchParams.set("url", `${window.location.origin}/sonuc/${raceId}`);
+    }
     window.open(url.toString(), "_blank", "noopener,noreferrer");
   }
 
@@ -1128,6 +1131,7 @@ function RaceTable({
           isLoggedIn={isLoggedIn}
           raceNo={race.raceNo}
           hippodromeName={hippodromeName}
+          raceId={race.id}
         />
       )}
       {son800Open && <Son800Panel raceId={race.id} />}
