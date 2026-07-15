@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp, Star } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick, ProgramGallop } from "@/server/services/race.service";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
+import { getSon800ForRace, type Son800RunnerData } from "@/server/actions/son800.actions";
 
 // ── Geri sayım (Turkey UTC+3) ────────────────────────────────────────────────
 
@@ -344,6 +345,84 @@ function AnalysisPanel({ picks, winnerNo, isLoggedIn }: { picks: ProgramPick[]; 
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ── Son 800 paneli ───────────────────────────────────────────────────────────
+
+function Son800Panel({ raceId }: { raceId: string }) {
+  const [data, setData] = useState<Son800RunnerData[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(false);
+    getSon800ForRace(raceId)
+      .then((res) => { if (!cancelled) setData(res); })
+      .catch(() => { if (!cancelled) setError(true); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [raceId]);
+
+  return (
+    <div className="border-t">
+      <div className="px-4 py-2.5 bg-[#1a3a5c] border-b flex items-center">
+        <span className="text-sm font-bold tracking-wide text-white">Son 800 (TJK)</span>
+      </div>
+
+      {loading ? (
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">TJK'dan çekiliyor…</div>
+      ) : error ? (
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">Son 800 verisi alınamadı.</div>
+      ) : (
+        <div className="divide-y">
+          {(data ?? []).map((d) => (
+            <div key={d.runnerNo} className="px-3 py-2">
+              <div className="text-xs font-semibold mb-1">
+                <span className="font-mono mr-1.5">{d.runnerNo}</span>
+                {d.horseName}
+              </div>
+              {d.records.length === 0 ? (
+                <div className="text-[11px] text-muted-foreground ml-5">TJK'da kayıt yok</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[11px]">
+                    <thead>
+                      <tr className="text-muted-foreground">
+                        <th className="px-1.5 py-0.5 text-left font-medium">Yıl</th>
+                        <th className="px-1.5 py-0.5 text-left font-medium">Hipodrom</th>
+                        <th className="px-1.5 py-0.5 text-left font-medium">Pist</th>
+                        <th className="px-1.5 py-0.5 text-left font-medium">Mesafe</th>
+                        <th className="px-1.5 py-0.5 text-left font-medium">Kilo</th>
+                        <th className="px-1.5 py-0.5 text-left font-medium">Koşu Cinsi</th>
+                        <th className="px-1.5 py-0.5 text-center font-medium text-sky-500">Son 800</th>
+                        <th className="px-1.5 py-0.5 text-center font-medium">İlk Giren</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {d.records.map((rec, i) => (
+                        <tr key={i} className="border-t border-border/30">
+                          <td className="px-1.5 py-1 tabular-nums">{rec.year}</td>
+                          <td className="px-1.5 py-1">{rec.city}</td>
+                          <td className="px-1.5 py-1">{rec.surface}{rec.surfaceCondition && rec.surfaceCondition !== "Normal" ? ` (${rec.surfaceCondition})` : ""}</td>
+                          <td className="px-1.5 py-1 tabular-nums">{rec.distance}</td>
+                          <td className="px-1.5 py-1 tabular-nums">{rec.weight}</td>
+                          <td className="px-1.5 py-1">{rec.raceClass}</td>
+                          <td className="px-1.5 py-1 text-center font-mono font-semibold text-sky-500 tabular-nums">{rec.son800 || "—"}</td>
+                          <td className="px-1.5 py-1 text-center font-mono tabular-nums text-muted-foreground">{rec.ilk800 || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -815,11 +894,12 @@ type JockeyStatsMap = Record<string, {
 type TrainerStatsMap = Record<string, TrainerStatRow>;
 
 function RaceTable({
-  race, analysisOpen, onAnalysisToggle, followedSet, onToggleFollow, isLoggedIn, jockeyStats, trainerStats,
+  race, analysisOpen, onAnalysisToggle, son800Open, followedSet, onToggleFollow, isLoggedIn, jockeyStats, trainerStats,
 }: {
   race: ProgramRace;
   analysisOpen: boolean;
   onAnalysisToggle: () => void;
+  son800Open: boolean;
   followedSet: Set<string>;
   onToggleFollow: (horseName: string) => void;
   isLoggedIn: boolean;
@@ -956,6 +1036,7 @@ function RaceTable({
 
       {/* Analiz paneli */}
       {race.hasAnalysis && analysisOpen && <AnalysisPanel picks={race.picks} winnerNo={winnerNo} isLoggedIn={isLoggedIn} />}
+      {son800Open && <Son800Panel raceId={race.id} />}
     </div>
   );
 }
@@ -975,6 +1056,7 @@ export default function ProgramView({
   const [activeHipo, setActiveHipo] = useState(days[0]?.hippodromeSlug ?? "");
   const [activeRace, setActiveRace] = useState<Record<string, number>>({});
   const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [son800Open, setSon800Open] = useState(false);
   const [followedSet, setFollowedSet] = useState(() => new Set(followedNames));
   const [, startFollowTransition] = useTransition();
 
@@ -998,8 +1080,8 @@ export default function ProgramView({
   const raceNo = selectedRaceNo(currentDay!);
   const currentRace = currentDay?.races.find((r) => r.raceNo === raceNo) ?? currentDay?.races[0];
 
-  // Yarış veya hipodrom değişince analiz panelini kapat
-  useEffect(() => { setAnalysisOpen(false); }, [activeHipo, raceNo]);
+  // Yarış veya hipodrom değişince analiz/son800 panelini kapat
+  useEffect(() => { setAnalysisOpen(false); setSon800Open(false); }, [activeHipo, raceNo]);
 
   if (days.length === 0) {
     return (
@@ -1079,6 +1161,14 @@ export default function ProgramView({
                 <span className="text-xs font-semibold text-[#e74c3c]">Analiz Hazırlanıyor</span>
               )}
               {currentRace && (
+                <button
+                  onClick={() => setSon800Open((v) => !v)}
+                  className="flex items-center gap-1 rounded-md bg-[#1a3a5c] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90"
+                >
+                  Son 800 {son800Open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
+              )}
+              {currentRace && (
                 <RaceTimer time={currentRace.time} hasResult={currentRace.result != null} dateStr={dateStr} />
               )}
             </div>
@@ -1090,6 +1180,7 @@ export default function ProgramView({
               race={currentRace}
               analysisOpen={analysisOpen}
               onAnalysisToggle={() => setAnalysisOpen((v) => !v)}
+              son800Open={son800Open}
               followedSet={followedSet}
               onToggleFollow={handleToggleFollow}
               isLoggedIn={isLoggedIn}
