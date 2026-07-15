@@ -22,7 +22,7 @@ export default function SplashScreen() {
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-5 bg-[#0a1420] transition-opacity ease-out"
+      className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-5 bg-[#000712] transition-opacity ease-out"
       style={{ opacity: stage === "fading" ? 0 : 1, transitionDuration: `${FADE_MS}ms` }}
       aria-hidden="true"
     >
