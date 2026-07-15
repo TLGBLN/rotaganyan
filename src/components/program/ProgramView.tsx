@@ -374,7 +374,7 @@ function Son800Panel({ raceId }: { raceId: string }) {
       </div>
 
       {loading ? (
-        <div className="px-4 py-8 text-center text-sm text-muted-foreground">TJK'dan çekiliyor…</div>
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">{"TJK'dan çekiliyor…"}</div>
       ) : error ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">Son 800 verisi alınamadı.</div>
       ) : (
@@ -386,7 +386,7 @@ function Son800Panel({ raceId }: { raceId: string }) {
                 {d.horseName}
               </div>
               {d.records.length === 0 ? (
-                <div className="text-[11px] text-muted-foreground ml-5">TJK'da kayıt yok</div>
+                <div className="text-[11px] text-muted-foreground ml-5">{"TJK'da kayıt yok"}</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-[11px]">
