@@ -520,13 +520,6 @@ function GalopPanel({ runners, breed }: { runners: ProgramRunner[]; breed: strin
                 <span className="font-mono mr-1">{r.no}</span>
                 {r.name}
               </div>
-              {(r.equipment || r.equipmentAdded || r.equipmentRemoved) && (
-                <div className="text-[10px] text-muted-foreground mb-1">
-                  Takı: {r.equipment && <span className="text-foreground">{r.equipment}</span>}
-                  {r.equipmentAdded && <span className="ml-1 text-hit">+{r.equipmentAdded}</span>}
-                  {r.equipmentRemoved && <span className="ml-1 text-miss">-{r.equipmentRemoved}</span>}
-                </div>
-              )}
               <div className="space-y-1">
                 {r.gallops.slice(0, 3).map((g, i) => {
                   const { prepDist, prepTime, finish, final200 } = galopSplits(g);
@@ -611,6 +604,38 @@ function PedigreePanel({ runners }: { runners: ProgramRunner[] }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ── Takılar paneli ───────────────────────────────────────────────────────────
+
+function EquipmentPanel({ runners }: { runners: ProgramRunner[] }) {
+  const withEquipment = runners.filter((r) => r.equipment || r.equipmentAdded || r.equipmentRemoved);
+  return (
+    <div className="border-t">
+      <div className="px-4 py-2.5 bg-[#5d5233] border-b flex items-center">
+        <span className="text-sm font-bold tracking-wide text-white">Takılar</span>
+      </div>
+      {withEquipment.length === 0 ? (
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">Takı bilgisi yok.</div>
+      ) : (
+        <div className="max-h-[480px] overflow-y-auto grid grid-cols-1 sm:grid-cols-2">
+          {withEquipment.map((r, idx) => (
+            <div key={r.id} className={cn("px-3 py-2.5 border-b", idx % 2 === 0 && "sm:border-r")}>
+              <div className="text-xs font-semibold mb-1">
+                <span className="font-mono mr-1.5">{r.no}</span>
+                {r.name}
+              </div>
+              <div className="text-[11px] text-muted-foreground leading-snug">
+                {r.equipment && <span className="text-foreground">{r.equipment}</span>}
+                {r.equipmentAdded && <span className="ml-1.5 text-hit">+{r.equipmentAdded}</span>}
+                {r.equipmentRemoved && <span className="ml-1.5 text-miss">-{r.equipmentRemoved}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1132,7 +1157,7 @@ type JockeyStatsMap = Record<string, {
 type TrainerStatsMap = Record<string, TrainerStatRow>;
 
 function RaceTable({
-  race, dateStr, analysisOpen, onAnalysisToggle, son800Open, galopOpen, pedigreeOpen, comparisonOpen, h2hOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, jockeyStats, trainerStats, hippodromeName,
+  race, dateStr, analysisOpen, onAnalysisToggle, son800Open, galopOpen, pedigreeOpen, equipmentOpen, comparisonOpen, h2hOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, jockeyStats, trainerStats, hippodromeName,
 }: {
   race: ProgramRace;
   dateStr: string;
@@ -1141,6 +1166,7 @@ function RaceTable({
   son800Open: boolean;
   galopOpen: boolean;
   pedigreeOpen: boolean;
+  equipmentOpen: boolean;
   comparisonOpen: boolean;
   h2hOpen: boolean;
   followedSet: Set<string>;
@@ -1298,6 +1324,7 @@ function RaceTable({
       {son800Open && <Son800Panel raceId={race.id} />}
       {galopOpen && <GalopPanel runners={race.runners} breed={race.breed} />}
       {pedigreeOpen && <PedigreePanel runners={race.runners} />}
+      {equipmentOpen && <EquipmentPanel runners={race.runners} />}
       {comparisonOpen && <ComparisonPanel runners={race.runners} />}
       {h2hOpen && <H2HPanel raceId={race.id} />}
     </div>
@@ -1323,6 +1350,7 @@ export default function ProgramView({
   const [son800Open, setSon800Open] = useState(false);
   const [galopOpen, setGalopOpen] = useState(false);
   const [pedigreeOpen, setPedigreeOpen] = useState(false);
+  const [equipmentOpen, setEquipmentOpen] = useState(false);
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [h2hOpen, setH2hOpen] = useState(false);
   const [selectedHorse, setSelectedHorse] = useState<string | null>(null);
@@ -1355,6 +1383,7 @@ export default function ProgramView({
     setSon800Open(false);
     setGalopOpen(false);
     setPedigreeOpen(false);
+    setEquipmentOpen(false);
     setComparisonOpen(false);
     setH2hOpen(false);
   }, [activeHipo, raceNo]);
@@ -1485,6 +1514,14 @@ export default function ProgramView({
               )}
               {currentRace && (
                 <button
+                  onClick={() => setEquipmentOpen((v) => !v)}
+                  className="flex items-center gap-1 rounded-md bg-[#5d5233] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
+                >
+                  Takılar {equipmentOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
+              )}
+              {currentRace && (
+                <button
                   onClick={() => setH2hOpen((v) => !v)}
                   className="flex items-center gap-1 rounded-md bg-[#6b3b3b] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
                 >
@@ -1517,6 +1554,7 @@ export default function ProgramView({
               son800Open={son800Open}
               galopOpen={galopOpen}
               pedigreeOpen={pedigreeOpen}
+              equipmentOpen={equipmentOpen}
               comparisonOpen={comparisonOpen}
               h2hOpen={h2hOpen}
               followedSet={followedSet}
