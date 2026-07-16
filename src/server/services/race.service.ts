@@ -569,6 +569,7 @@ export type ProgramRunner = {
   ekuriGroup: number | null;
   apprentice: boolean;
   raceStyle: { style: string; percent: number } | null; // style: "KACAK" | "ON_GRUP" | "BEKLEME" | "EN_GERI"
+  tjkAtId: number | null;
 };
 
 export type ProgramPick = {
@@ -637,7 +638,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
               owner: true, sire: true, dam: true, damSire: true, pedigreeNote: true, hp: true,
               equipment: true, equipmentAdded: true, equipmentRemoved: true,
               bestTime: true, recentForm: true, recentFormSurfaces: true, agf: true,
-              scratched: true, ekuriGroup: true, apprentice: true, raceStyle: true,
+              scratched: true, ekuriGroup: true, apprentice: true, raceStyle: true, tjkAtId: true,
               gallops: {
                 orderBy: { date: "desc" },
                 take: 3,

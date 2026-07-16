@@ -230,6 +230,7 @@ model Runner {
   scratched        Boolean @default(false)
   ekuriGroup       Int?
   apprentice       Boolean @default(false)
+  tjkAtId          Int?
 
   race         Race          @relation(fields: [raceId], references: [id], onDelete: Cascade)
   gallops      Gallop[]

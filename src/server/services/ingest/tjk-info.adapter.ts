@@ -239,14 +239,20 @@ export async function fetchCityProgram(
           const nameCellText = cells[iName] ?? "";
           const scratched = /ko[şs]maz/i.test(nameCellText);
 
-          // At ismi: anchor'dan al, span/sup temizle
+          // At ismi: anchor'dan al, span/sup temizle. Aynı anchor'ın href'i TJK'nın
+          // atın kendi profil sayfasına giden kalıcı kimliğini (AtId) taşıyor —
+          // at bazlı derinlemesine sorgular (ör. AtKosuBilgileri) için gerekli.
           let name = "";
+          let tjkAtId: number | undefined;
           if (iName !== -1 && cellEls[iName]) {
             const nameEl = $(cellEls[iName]).find("a").first();
             if (nameEl.length) {
               const clone = nameEl.clone();
               clone.find("span, sup").remove();
               name = clone.text().trim();
+              const href = nameEl.attr("href") ?? "";
+              const atIdMatch = href.match(/QueryParameter_AtId=(\d+)/i);
+              if (atIdMatch) tjkAtId = parseInt(atIdMatch[1], 10);
             }
           }
           if (!name) name = nameCellText.split(/\s{2,}|\n/)[0] ?? "";
@@ -348,7 +354,7 @@ export async function fetchCityProgram(
 
           const ekuriGroup = ekuriMap.get(no) ?? undefined;
 
-          runners.push({ no, name, age, startNo, weight, jockey, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup });
+          runners.push({ no, name, age, startNo, weight, jockey, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup, tjkAtId });
         });
       }
     }

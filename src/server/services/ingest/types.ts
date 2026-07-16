@@ -22,6 +22,7 @@ export type IngestRunner = {
   scratched?: boolean;
   ekuriGroup?: number;
   apprentice?: boolean;
+  tjkAtId?: number;
 };
 
 export type IngestGallop = {
