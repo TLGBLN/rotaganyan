@@ -164,7 +164,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ raceId:
         <div
           style={{
             display: "flex",
-            alignItems: "flex-start",
+            flexDirection: "column",
             marginTop: "auto",
             background: "#0f1c2f",
             border: "1px solid rgba(216,171,78,0.22)",
@@ -172,43 +172,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ raceId:
             padding: "40px 45px",
           }}
         >
-          <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-            <div style={{ display: "flex", fontSize: 27, letterSpacing: 4, color: GOLD, fontWeight: 700, textTransform: "uppercase" }}>
-              Rotaganyan Ne Dedi
-            </div>
-            <div style={{ display: "flex", fontSize: 36, color: INK, fontWeight: 700, marginTop: "14px" }}>
-              {winningPick ? `${winningPick.rank}. sırada önerildi` : "Analiz listesinde vardı"}
-            </div>
-            {reason && (
-              <div style={{ display: "flex", fontSize: 31, color: INK_DIM, marginTop: "14px", lineHeight: 1.5 }}>
-                {reason}
-              </div>
-            )}
+          <div style={{ display: "flex", fontSize: 27, letterSpacing: 4, color: GOLD, fontWeight: 700, textTransform: "uppercase" }}>
+            Rotaganyan Ne Dedi
           </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "165px",
-              height: "165px",
-              borderRadius: "50%",
-              border: `6px solid ${HIT}`,
-              flexShrink: 0,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                width: "50px",
-                height: "27px",
-                borderLeft: `9px solid ${HIT}`,
-                borderBottom: `9px solid ${HIT}`,
-                transform: "rotate(-45deg)",
-                marginTop: "-10px",
-              }}
-            />
+          <div style={{ display: "flex", fontSize: 36, color: INK, fontWeight: 700, marginTop: "14px" }}>
+            {winningPick ? `${winningPick.rank}. sırada önerildi` : "Analiz listesinde vardı"}
           </div>
+          {reason && (
+            <div style={{ display: "flex", fontSize: 31, color: INK_DIM, marginTop: "14px", lineHeight: 1.5 }}>
+              {reason}
+            </div>
+          )}
         </div>
 
         {/* alt logo + isabet etiketi */}
@@ -218,7 +192,33 @@ export async function GET(_req: Request, { params }: { params: Promise<{ raceId:
             <span style={{ color: GOLD }}>GANYAN</span>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-            <div style={{ display: "flex", fontSize: 35, color: HIT, fontWeight: 800, letterSpacing: 2 }}>İSABET</div>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "44px",
+                  height: "44px",
+                  borderRadius: "50%",
+                  border: `4px solid ${HIT}`,
+                  marginRight: "12px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    width: "14px",
+                    height: "8px",
+                    borderLeft: `3px solid ${HIT}`,
+                    borderBottom: `3px solid ${HIT}`,
+                    transform: "rotate(-45deg)",
+                    marginTop: "-3px",
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", fontSize: 35, color: HIT, fontWeight: 800, letterSpacing: 2 }}>İSABET</div>
+            </div>
             <div style={{ display: "flex", fontSize: 27, color: INK_DIM, marginTop: "4px" }}>rotaganyan.com</div>
           </div>
         </div>
