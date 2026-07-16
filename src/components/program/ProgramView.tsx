@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp, Star, TriangleAlert } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick, ProgramGallop } from "@/server/services/race.service";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
 import { getSon800ForRace, type Son800RunnerData } from "@/server/actions/son800.actions";
+import { getH2HForRace, type H2HEncounter } from "@/server/actions/h2h.actions";
 import HorseDetailModal from "./HorseDetailModal";
 
 // ── Geri sayım (Turkey UTC+3) ────────────────────────────────────────────────
@@ -570,6 +571,149 @@ function GalopPanel({ runners, breed }: { runners: ProgramRunner[]; breed: strin
   );
 }
 
+// ── Pedigri paneli ───────────────────────────────────────────────────────────
+
+function PedigreePanel({ runners }: { runners: ProgramRunner[] }) {
+  return (
+    <div className="border-t">
+      <div className="px-4 py-2.5 bg-[#4a3b6b] border-b flex items-center">
+        <span className="text-sm font-bold tracking-wide text-white">Pedigriler</span>
+      </div>
+      <div className="max-h-[480px] overflow-y-auto grid grid-cols-1 sm:grid-cols-2">
+        {runners.map((r, idx) => (
+          <div key={r.id} className={cn("px-3 py-2.5 border-b", idx % 2 === 0 && "sm:border-r")}>
+            <div className="text-xs font-semibold mb-1">
+              <span className="font-mono mr-1.5">{r.no}</span>
+              {r.name}
+            </div>
+            <div className="text-[11px] text-muted-foreground leading-snug">
+              {r.sire || r.dam ? (
+                <>
+                  <span className="text-foreground">{r.sire ?? "—"}</span>
+                  {" — "}
+                  <span className="text-foreground">{r.dam ?? "—"}</span>
+                  {r.damSire && <span> ({r.damSire})</span>}
+                </>
+              ) : (
+                <span>Pedigri bilgisi yok</span>
+              )}
+            </div>
+            {r.pedigreeNote && (
+              <div className="text-[11px] text-muted-foreground mt-1 leading-snug">{r.pedigreeNote}</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── At karşılaştırma paneli ──────────────────────────────────────────────────
+
+function ComparisonPanel({ runners }: { runners: ProgramRunner[] }) {
+  return (
+    <div className="border-t">
+      <div className="px-4 py-2.5 bg-[#2c5f5f] border-b flex items-center">
+        <span className="text-sm font-bold tracking-wide text-white">Detaylı At Karşılaştırma</span>
+      </div>
+      <div className="max-h-[480px] overflow-y-auto overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-[#0f1c2f]">
+            <tr className="border-b text-[10px] text-muted-foreground">
+              <th className="px-2 py-2 text-left">At</th>
+              <th className="px-2 py-2 text-center">Yaş</th>
+              <th className="px-2 py-2 text-center">Kilo</th>
+              <th className="px-2 py-2 text-center">Start</th>
+              <th className="px-2 py-2 text-center">H.P</th>
+              <th className="px-2 py-2 text-center">En İyi D.</th>
+              <th className="px-2 py-2 text-center">AGF</th>
+              <th className="px-2 py-2 text-left">Jokey</th>
+            </tr>
+          </thead>
+          <tbody>
+            {runners.map((r) => (
+              <tr key={r.id} className={cn("border-b", r.scratched && "opacity-50")}>
+                <td className="px-2 py-2 font-semibold whitespace-nowrap">
+                  <span className="font-mono mr-1.5 text-muted-foreground">{r.no}</span>
+                  {r.name}
+                </td>
+                <td className="px-2 py-2 text-center text-muted-foreground">{r.age ?? "—"}</td>
+                <td className="px-2 py-2 text-center tabular-nums">{r.weight ?? "—"}</td>
+                <td className="px-2 py-2 text-center tabular-nums">{r.startNo ?? "—"}</td>
+                <td className="px-2 py-2 text-center tabular-nums font-mono">{r.hp ?? "—"}</td>
+                <td className="px-2 py-2 text-center font-mono tabular-nums">{r.bestTime?.split(" - ")[0] ?? "—"}</td>
+                <td className="px-2 py-2 text-center tabular-nums">{r.agf != null ? `%${r.agf.toFixed(1)}` : "—"}</td>
+                <td className="px-2 py-2 whitespace-nowrap">{r.jockey ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── H2H (Head-to-Head) paneli ────────────────────────────────────────────────
+
+function H2HPanel({ raceId }: { raceId: string }) {
+  const [data, setData] = useState<H2HEncounter[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(false);
+    getH2HForRace(raceId)
+      .then((res) => { if (!cancelled) setData(res); })
+      .catch(() => { if (!cancelled) setError(true); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [raceId]);
+
+  return (
+    <div className="border-t">
+      <div className="px-4 py-2.5 bg-[#6b3b3b] border-b flex items-center">
+        <span className="text-sm font-bold tracking-wide text-white">H2H — Geçmiş Karşılaşmalar</span>
+      </div>
+      {loading ? (
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">Geçmiş karşılaşmalar aranıyor…</div>
+      ) : error ? (
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">Veri alınamadı.</div>
+      ) : !data || data.length === 0 ? (
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+          Bu koşudaki atların birbirleriyle daha önce karşılaştığı bir yarış bulunamadı.
+        </div>
+      ) : (
+        <div className="max-h-[480px] overflow-y-auto divide-y">
+          {data.map((enc) => (
+            <div key={enc.raceId} className="px-3 py-2.5">
+              <div className="text-[11px] text-muted-foreground mb-1.5">
+                {enc.hippodrome} · {enc.raceNo}. Koşu · {new Date(enc.date).toLocaleDateString("tr-TR")} · {enc.distance}m
+              </div>
+              <div className="space-y-0.5">
+                {enc.results.map((r, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs">
+                    <span
+                      className={cn(
+                        "inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0",
+                        r.finishPos === 1 ? "bg-[#27ae60] text-white" : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {r.finishPos ?? "—"}
+                    </span>
+                    <span className="font-medium">{r.horseName}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── At satırı ────────────────────────────────────────────────────────────────
 
 function RunnerRow({
@@ -981,13 +1125,16 @@ type JockeyStatsMap = Record<string, {
 type TrainerStatsMap = Record<string, TrainerStatRow>;
 
 function RaceTable({
-  race, analysisOpen, onAnalysisToggle, son800Open, galopOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, jockeyStats, trainerStats, hippodromeName,
+  race, analysisOpen, onAnalysisToggle, son800Open, galopOpen, pedigreeOpen, comparisonOpen, h2hOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, jockeyStats, trainerStats, hippodromeName,
 }: {
   race: ProgramRace;
   analysisOpen: boolean;
   onAnalysisToggle: () => void;
   son800Open: boolean;
   galopOpen: boolean;
+  pedigreeOpen: boolean;
+  comparisonOpen: boolean;
+  h2hOpen: boolean;
   followedSet: Set<string>;
   onToggleFollow: (horseName: string) => void;
   onSelectHorse: (name: string) => void;
@@ -1139,6 +1286,9 @@ function RaceTable({
       )}
       {son800Open && <Son800Panel raceId={race.id} />}
       {galopOpen && <GalopPanel runners={race.runners} breed={race.breed} />}
+      {pedigreeOpen && <PedigreePanel runners={race.runners} />}
+      {comparisonOpen && <ComparisonPanel runners={race.runners} />}
+      {h2hOpen && <H2HPanel raceId={race.id} />}
     </div>
   );
 }
@@ -1161,6 +1311,9 @@ export default function ProgramView({
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [son800Open, setSon800Open] = useState(false);
   const [galopOpen, setGalopOpen] = useState(false);
+  const [pedigreeOpen, setPedigreeOpen] = useState(false);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
+  const [h2hOpen, setH2hOpen] = useState(false);
   const [selectedHorse, setSelectedHorse] = useState<string | null>(null);
   const [followedSet, setFollowedSet] = useState(() => new Set(followedNames));
   const [, startFollowTransition] = useTransition();
@@ -1186,7 +1339,14 @@ export default function ProgramView({
   const currentRace = currentDay?.races.find((r) => r.raceNo === raceNo) ?? currentDay?.races[0];
 
   // Yarış veya hipodrom değişince analiz/son800/galop panelini kapat
-  useEffect(() => { setAnalysisOpen(false); setSon800Open(false); setGalopOpen(false); }, [activeHipo, raceNo]);
+  useEffect(() => {
+    setAnalysisOpen(false);
+    setSon800Open(false);
+    setGalopOpen(false);
+    setPedigreeOpen(false);
+    setComparisonOpen(false);
+    setH2hOpen(false);
+  }, [activeHipo, raceNo]);
 
   if (days.length === 0) {
     return (
@@ -1272,25 +1432,25 @@ export default function ProgramView({
                 <span className="w-2.5 h-2.5 rounded-sm bg-[#D39B1E] inline-block" /> Sentetik
               </span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 overflow-x-auto min-w-0">
               {currentRace?.hasAnalysis ? (
                 <button
                   onClick={() => setAnalysisOpen((v) => !v)}
                   data-tour="analiz-buton"
-                  className="flex items-center gap-1 rounded-md bg-[#00944D] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90"
+                  className="flex items-center gap-1 rounded-md bg-[#00944D] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
                 >
                   {isLoggedIn
                     ? <>Analizi Gör {analysisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}</>
                     : "Analizi Gör 🔒"}
                 </button>
               ) : (
-                <span className="text-xs font-semibold text-[#e74c3c]">Analiz Hazırlanıyor</span>
+                <span className="text-xs font-semibold text-[#e74c3c] shrink-0 whitespace-nowrap">Analiz Hazırlanıyor</span>
               )}
               {currentRace && (
                 <button
                   onClick={() => setSon800Open((v) => !v)}
                   data-tour="son800-buton"
-                  className="flex items-center gap-1 rounded-md bg-[#1a3a5c] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90"
+                  className="flex items-center gap-1 rounded-md bg-[#1a3a5c] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
                 >
                   Son 800 {son800Open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
@@ -1299,13 +1459,39 @@ export default function ProgramView({
                 <button
                   onClick={() => setGalopOpen((v) => !v)}
                   data-tour="galop"
-                  className="flex items-center gap-1 rounded-md bg-[#5d4037] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90"
+                  className="flex items-center gap-1 rounded-md bg-[#5d4037] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
                 >
                   Galop {galopOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
               )}
               {currentRace && (
-                <RaceTimer time={currentRace.time} hasResult={currentRace.result != null} dateStr={dateStr} />
+                <button
+                  onClick={() => setPedigreeOpen((v) => !v)}
+                  className="flex items-center gap-1 rounded-md bg-[#4a3b6b] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
+                >
+                  Pedigriler {pedigreeOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
+              )}
+              {currentRace && (
+                <button
+                  onClick={() => setH2hOpen((v) => !v)}
+                  className="flex items-center gap-1 rounded-md bg-[#6b3b3b] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
+                >
+                  H2H {h2hOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
+              )}
+              {currentRace && (
+                <button
+                  onClick={() => setComparisonOpen((v) => !v)}
+                  className="flex items-center gap-1 rounded-md bg-[#2c5f5f] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
+                >
+                  Karşılaştır {comparisonOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
+              )}
+              {currentRace && (
+                <div className="shrink-0">
+                  <RaceTimer time={currentRace.time} hasResult={currentRace.result != null} dateStr={dateStr} />
+                </div>
               )}
             </div>
           </div>
@@ -1318,6 +1504,9 @@ export default function ProgramView({
               onAnalysisToggle={() => setAnalysisOpen((v) => !v)}
               son800Open={son800Open}
               galopOpen={galopOpen}
+              pedigreeOpen={pedigreeOpen}
+              comparisonOpen={comparisonOpen}
+              h2hOpen={h2hOpen}
               followedSet={followedSet}
               onToggleFollow={handleToggleFollow}
               onSelectHorse={setSelectedHorse}

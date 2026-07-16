@@ -554,6 +554,8 @@ export type ProgramRunner = {
   owner: string | null;
   sire: string | null;
   dam: string | null;
+  damSire: string | null;
+  pedigreeNote: string | null;
   hp: number | null;
   bestTime: string | null;
   recentForm: string | null;
@@ -629,7 +631,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
               id: true, no: true, name: true, age: true, weight: true,
               weightChange: true, startNo: true, jockey: true,
               jockeyChanged: true, previousJockey: true, trainer: true,
-              owner: true, sire: true, dam: true, hp: true,
+              owner: true, sire: true, dam: true, damSire: true, pedigreeNote: true, hp: true,
               bestTime: true, recentForm: true, recentFormSurfaces: true, agf: true,
               scratched: true, ekuriGroup: true, apprentice: true, raceStyle: true,
               gallops: {
