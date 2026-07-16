@@ -520,6 +520,13 @@ function GalopPanel({ runners, breed }: { runners: ProgramRunner[]; breed: strin
                 <span className="font-mono mr-1">{r.no}</span>
                 {r.name}
               </div>
+              {(r.equipment || r.equipmentAdded || r.equipmentRemoved) && (
+                <div className="text-[10px] text-muted-foreground mb-1">
+                  Takı: {r.equipment && <span className="text-foreground">{r.equipment}</span>}
+                  {r.equipmentAdded && <span className="ml-1 text-hit">+{r.equipmentAdded}</span>}
+                  {r.equipmentRemoved && <span className="ml-1 text-miss">-{r.equipmentRemoved}</span>}
+                </div>
+              )}
               <div className="space-y-1">
                 {r.gallops.slice(0, 3).map((g, i) => {
                   const { prepDist, prepTime, finish, final200 } = galopSplits(g);
@@ -1125,9 +1132,10 @@ type JockeyStatsMap = Record<string, {
 type TrainerStatsMap = Record<string, TrainerStatRow>;
 
 function RaceTable({
-  race, analysisOpen, onAnalysisToggle, son800Open, galopOpen, pedigreeOpen, comparisonOpen, h2hOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, jockeyStats, trainerStats, hippodromeName,
+  race, dateStr, analysisOpen, onAnalysisToggle, son800Open, galopOpen, pedigreeOpen, comparisonOpen, h2hOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, jockeyStats, trainerStats, hippodromeName,
 }: {
   race: ProgramRace;
+  dateStr: string;
   analysisOpen: boolean;
   onAnalysisToggle: () => void;
   son800Open: boolean;
@@ -1196,6 +1204,9 @@ function RaceTable({
         <span className="text-muted-foreground">{breedShort(race.breed)}</span>
         {race.classType && <span className="text-muted-foreground">· {race.classType}</span>}
         {race.conditions && <span className="text-xs text-brand">· {race.conditions}</span>}
+        <span className="sm:hidden ml-auto">
+          <RaceTimer time={race.time} hasResult={race.result != null} dateStr={dateStr} />
+        </span>
       </div>
 
       {/* Tablo — masaüstü */}
@@ -1489,7 +1500,7 @@ export default function ProgramView({
                 </button>
               )}
               {currentRace && (
-                <div className="shrink-0">
+                <div className="hidden sm:block shrink-0">
                   <RaceTimer time={currentRace.time} hasResult={currentRace.result != null} dateStr={dateStr} />
                 </div>
               )}
@@ -1500,6 +1511,7 @@ export default function ProgramView({
           {currentRace && (
             <RaceTable
               race={currentRace}
+              dateStr={dateStr}
               analysisOpen={analysisOpen}
               onAnalysisToggle={() => setAnalysisOpen((v) => !v)}
               son800Open={son800Open}
