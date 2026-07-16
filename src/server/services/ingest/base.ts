@@ -71,16 +71,25 @@ export async function persistRaceDays(raceDays: IngestRaceDay[]): Promise<Ingest
           : (inserted++, await db.race.create({ data: raceData }));
 
         // Upsert runners — detect jockey changes between ingests
+        // "existing.jockey" bazı koşularda geçmiş bir manuel yükleme yüzünden aslında bir
+        // at ismi olabiliyor (sütun kayması) — bu değeri gerçek bir jokey değişikliği gibi
+        // previousJockey'e taşırsak bozuk veri kalıcılaşıyor. Aynı koşudaki at isimleriyle
+        // eşleşen değerleri geçersiz sayıp temizliyoruz (kendi kendini düzelten senkron).
+        const raceHorseNames = new Set(r.runners.map((x) => x.name.trim().toUpperCase()));
         for (const runner of r.runners) {
           const existing = await db.runner.findUnique({
             where: { raceId_no: { raceId: race.id, no: runner.no } },
             select: { jockey: true },
           });
 
+          const existingJockeyClean = existing?.jockey?.replace(/\*\*/g, "").trim() || null;
+          const existingJockeyValid =
+            existingJockeyClean != null && !raceHorseNames.has(existingJockeyClean.toUpperCase());
+
           const jockeyChanged =
-            existing?.jockey != null &&
+            existingJockeyValid &&
             runner.jockey != null &&
-            existing.jockey !== runner.jockey;
+            existingJockeyClean !== runner.jockey;
 
           await db.runner.upsert({
             where: { raceId_no: { raceId: race.id, no: runner.no } },
@@ -88,7 +97,7 @@ export async function persistRaceDays(raceDays: IngestRaceDay[]): Promise<Ingest
             update: {
               ...runner,
               jockeyChanged,
-              previousJockey: jockeyChanged ? existing!.jockey : undefined,
+              previousJockey: jockeyChanged ? existingJockeyClean : null,
             },
           });
         }
