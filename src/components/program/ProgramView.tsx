@@ -264,16 +264,14 @@ function AnalysisPanel({
               <th className="px-2 py-2 text-center w-8">Sıra</th>
               <th className="px-2 py-2 text-center w-8">No</th>
               <th className="px-2 py-2 text-left">At</th>
-              <th className="px-2 py-2 text-center w-10">A</th>
-              <th className="px-2 py-2 text-center w-12">B+C</th>
-              <th className="px-2 py-2 text-center w-14 font-bold">Toplam</th>
+              <th className="px-2 py-2 text-center w-14 font-bold">Puan</th>
               <th className="px-2 py-2 text-left">Kilit Gerekçe</th>
             </tr>
           </thead>
           <tbody>
             {picks.map((p) => {
               const { no, name } = pickDisplay(p);
-              const { aScore, bcScore, veriGuven, kilItGerekce } = parsePickDetails(p.details);
+              const { kilItGerekce } = parsePickDetails(p.details);
               const isWinner = winnerNo != null && p.runner?.no === winnerNo;
               const rs = rankStyle(p.rank);
               return (
@@ -299,8 +297,6 @@ function AnalysisPanel({
                       )}
                     </span>
                   </td>
-                  <td className="px-2 py-2 text-center tabular-nums">{aScore ?? "—"}</td>
-                  <td className="px-2 py-2 text-center tabular-nums">{bcScore ?? "—"}</td>
                   <td className="px-2 py-2 text-center tabular-nums font-bold">
                     {p.score != null ? <span>{p.score}</span> : "—"}
                   </td>
@@ -318,7 +314,7 @@ function AnalysisPanel({
       <div className="sm:hidden divide-y">
         {picks.map((p) => {
           const { no, name } = pickDisplay(p);
-          const { aScore, bcScore, veriGuven, kilItGerekce } = parsePickDetails(p.details);
+          const { kilItGerekce } = parsePickDetails(p.details);
           const isWinner = winnerNo != null && p.runner?.no === winnerNo;
           const rs = rankStyle(p.rank);
           return (
@@ -341,9 +337,7 @@ function AnalysisPanel({
                 )}
               </div>
               <div className="flex gap-3 text-[11px] text-muted-foreground mb-1">
-                {aScore && <span>A: <span className="text-foreground">{aScore}</span></span>}
-                {bcScore && <span>B+C: <span className="text-foreground">{bcScore}</span></span>}
-                {p.score != null && <span>Toplam: <span className="font-bold text-foreground">{p.score}</span></span>}
+                {p.score != null && <span>Puan: <span className="font-bold text-foreground">{p.score}</span></span>}
               </div>
               {kilItGerekce && <p className="text-[11px] text-muted-foreground leading-snug">{kilItGerekce}</p>}
             </div>
