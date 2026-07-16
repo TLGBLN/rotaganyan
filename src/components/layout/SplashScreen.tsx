@@ -58,7 +58,9 @@ export default function SplashScreen() {
       <div className="relative flex items-center justify-center h-[152px] w-[152px]">
         <div className="absolute inset-0 rounded-full bg-brand/10 blur-xl" />
         <div className="absolute inset-0 rounded-full border-2 border-brand/15" />
-        <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-brand border-r-brand animate-spin" />
+        <div className="absolute inset-0 animate-spin" style={{ animationDuration: "2.2s" }}>
+          <span className="absolute -top-[3px] left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-[#f0d9a6] shadow-[0_0_14px_4px_rgba(240,217,166,0.85)]" />
+        </div>
         <Image src="/logo.png" alt="ROTAGANYAN" width={128} height={128} className="relative rounded-full" priority />
       </div>
       <Wordmark className="text-3xl" />
