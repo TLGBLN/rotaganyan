@@ -23,12 +23,12 @@ export default function SplashScreen() {
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-3 bg-[#0B1423] transition-opacity ease-out"
+      className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-5 bg-[#0B1423] transition-opacity ease-out"
       style={{ opacity: stage === "fading" ? 0 : 1, transitionDuration: `${FADE_MS}ms` }}
       aria-hidden="true"
     >
-      <Image src="/logo.png" alt="ROTAGANYAN" width={80} height={80} className="rounded-full" priority />
-      <Wordmark className="text-xl" />
+      <Image src="/logo.png" alt="ROTAGANYAN" width={128} height={128} className="rounded-full" priority />
+      <Wordmark className="text-3xl" />
     </div>
   );
 }
