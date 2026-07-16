@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { db } from "@/lib/db";
 import { getProgramData, getKuponOnerileri, getHitPredictions, getJockeyStats, getTrainerStats, type JockeyStat, type TrainerStat } from "@/server/services/race.service";
 import { turkeyDateString } from "@/lib/tz";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
@@ -31,18 +32,32 @@ export default async function ProgramPage({ searchParams }: PageProps) {
     (new Date(currentDate).getTime() - new Date(today).getTime()) / 86400000
   );
 
+  // Bu istekten tamamen bağımsız veriler — ingest/senkron kontrolüyle aynı anda başlar,
+  // sırayla beklenmez (getProgramData'nın kendisi ayrıca ve sadece bir kez, aşağıda,
+  // ingest/senkron kesinleştikten SONRA çekilir — sonuçları etkilememeleri için).
+  const independentDataPromise = Promise.all([
+    auth(),
+    getAgfMovers(today),
+    fetchTodaysAltiliResults(),
+    fetchTjkTicker(),
+    getFollowedHorses().catch(() => [] as { horseName: string }[]),
+    getKuponOnerileri().catch(() => []),
+    getHitPredictions(16).catch(() => []),
+  ]);
+
   if (daysAhead >= 0 && daysAhead <= 7) {
     const tjkDate = toTjkDate(new Date(currentDate + "T00:00:00Z"));
-    const existing = await getProgramData(currentDate);
-    const totalRunners = existing.reduce(
-      (s, d) => s + d.races.reduce((s2, r) => s2 + r.runners.length, 0),
-      0
-    );
-    const hasAge = existing.some((d) =>
-      d.races.some((r) => r.runners.some((ru) => ru.age))
-    );
+    // getProgramData()'nın tamamını (tüm koşular+atlar+galoplar+picks) sadece "veri var mı,
+    // yaş bilgisi dolu mu" kontrolü için çekip sonucu atmak yerine, hafif bir varlık
+    // sorgusu kullanılıyor — asıl veri aşağıda, ingest/senkron bittikten sonra tek sefer
+    // çekiliyor.
+    const date = new Date(currentDate + "T00:00:00.000Z");
+    const runnerWithAge = await db.runner.findFirst({
+      where: { race: { raceDay: { date } }, age: { not: null } },
+      select: { id: true },
+    });
 
-    if (totalRunners === 0 || !hasAge) {
+    if (!runnerWithAge) {
       try { await ingestDate(tjkDate); } catch { /* ignore */ }
     } else {
       after(async () => {
@@ -57,16 +72,9 @@ export default async function ProgramPage({ searchParams }: PageProps) {
     try { await syncResultsForDate(currentDate); } catch { /* ignore */ }
   }
 
-  const [session, days, agfMovers, altiliResults, tickerItems, followedHorses, coupons, hitPredictions] = await Promise.all([
-    auth(),
-    getProgramData(currentDate),
-    getAgfMovers(today),
-    fetchTodaysAltiliResults(),
-    fetchTjkTicker(),
-    getFollowedHorses().catch(() => [] as { horseName: string }[]),
-    getKuponOnerileri().catch(() => []),
-    getHitPredictions(16).catch(() => []),
-  ]);
+  const days = await getProgramData(currentDate);
+  const [session, agfMovers, altiliResults, tickerItems, followedHorses, coupons, hitPredictions] =
+    await independentDataPromise;
   const isLoggedIn = !!session?.user;
   const isAdmin = session?.user?.role ? hasRole(session.user.role as Role, "EDITOR") : false;
   const followedNames = followedHorses.map((h) => h.horseName);
