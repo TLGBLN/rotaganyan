@@ -691,7 +691,10 @@ export function isFullReport(markdown: string): boolean {
     // Başlık/bölüm satırı olmadan sadece v1.8 sıralama tablosu yapıştırılmış olabilir —
     // bu tablonun kendine özgü kolon başlıkları da tam rapor olarak tanınmalı.
     (n.includes("A KATMANI") && n.includes("KILIT GEREKCE")) ||
-    // Basitleştirilmiş "Nihai Sıralama Şablonu" (Sıra | No | At | A | B+C | Toplam | Veri Güven | Kilit Gerekçe)
-    (n.includes("VERI GUVEN") && n.includes("KILIT GEREKCE"))
+    // Basitleştirilmiş "Nihai Sıralama Şablonu" (Sıra | No | At | A | B+C | Toplam | [Veri Güven] | Kilit Gerekçe).
+    // "Veri Güven" sütunu isteğe bağlıdır — parseRankingTable zaten eksikse sessizce
+    // atlıyor, o yüzden burada zorunlu tutmak (eskiden öyleydi) tabloyu yanlışlıkla
+    // basit at tablosu ayrıştırıcısına yönlendirip sessiz başarısızlığa yol açıyordu.
+    (n.includes("KILIT GEREKCE") && (n.includes("TOPLAM") || n.includes("SIRA")))
   );
 }
