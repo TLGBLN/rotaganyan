@@ -4,20 +4,48 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Wordmark from "./Wordmark";
 
-const HOLD_MS = 2600;
+// Sabit süre yerine sayfa gerçekten yüklenene (window "load") kadar bekler —
+// MIN taban, sayfa çok hızlı yüklense bile splash'ın bir anlık çakıp
+// kaybolmamasını sağlar; MAX ise "load" olayı hiç/geç tetiklenirse (yavaş
+// ağ, önbelleksiz font/görsel yükleri) splash'ın sonsuza dek takılı
+// kalmasını engelleyen bir güvenlik sınırı.
+const MIN_HOLD_MS = 1500;
+const MAX_HOLD_MS = 6000;
 const FADE_MS = 500;
 
 export default function SplashScreen() {
   const [stage, setStage] = useState<"visible" | "fading" | "hidden">("visible");
 
   useEffect(() => {
-    const t1 = setTimeout(() => setStage("fading"), HOLD_MS);
-    const t2 = setTimeout(() => setStage("hidden"), HOLD_MS + FADE_MS);
+    const start = Date.now();
+    let finished = false;
+
+    function finish() {
+      if (finished) return;
+      finished = true;
+      const elapsed = Date.now() - start;
+      const remaining = Math.max(0, MIN_HOLD_MS - elapsed);
+      setTimeout(() => setStage("fading"), remaining);
+    }
+
+    if (document.readyState === "complete") {
+      finish();
+    } else {
+      window.addEventListener("load", finish);
+    }
+    const maxTimer = setTimeout(finish, MAX_HOLD_MS);
+
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
+      window.removeEventListener("load", finish);
+      clearTimeout(maxTimer);
     };
   }, []);
+
+  useEffect(() => {
+    if (stage !== "fading") return;
+    const t = setTimeout(() => setStage("hidden"), FADE_MS);
+    return () => clearTimeout(t);
+  }, [stage]);
 
   if (stage === "hidden") return null;
 
@@ -27,7 +55,12 @@ export default function SplashScreen() {
       style={{ opacity: stage === "fading" ? 0 : 1, transitionDuration: `${FADE_MS}ms` }}
       aria-hidden="true"
     >
-      <Image src="/logo.png" alt="ROTAGANYAN" width={128} height={128} className="rounded-full" priority />
+      <div className="relative flex items-center justify-center h-[152px] w-[152px]">
+        <div className="absolute inset-0 rounded-full bg-brand/10 blur-xl" />
+        <div className="absolute inset-0 rounded-full border-2 border-brand/15" />
+        <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-brand border-r-brand animate-spin" />
+        <Image src="/logo.png" alt="ROTAGANYAN" width={128} height={128} className="relative rounded-full" priority />
+      </div>
       <Wordmark className="text-3xl" />
     </div>
   );
