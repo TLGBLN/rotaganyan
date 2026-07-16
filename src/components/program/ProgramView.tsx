@@ -264,7 +264,7 @@ function AnalysisPanel({
               <th className="px-2 py-2 text-center w-8">Sıra</th>
               <th className="px-2 py-2 text-center w-8">No</th>
               <th className="px-2 py-2 text-left">At</th>
-              <th className="px-2 py-2 text-center w-14 font-bold">Puan</th>
+              <th className="px-2 py-2 text-center w-14 font-bold">Toplam</th>
               <th className="px-2 py-2 text-left">Kilit Gerekçe</th>
             </tr>
           </thead>
@@ -337,7 +337,7 @@ function AnalysisPanel({
                 )}
               </div>
               <div className="flex gap-3 text-[11px] text-muted-foreground mb-1">
-                {p.score != null && <span>Puan: <span className="font-bold text-foreground">{p.score}</span></span>}
+                {p.score != null && <span>Toplam: <span className="font-bold text-foreground">{p.score}</span></span>}
               </div>
               {kilItGerekce && <p className="text-[11px] text-muted-foreground leading-snug">{kilItGerekce}</p>}
             </div>
