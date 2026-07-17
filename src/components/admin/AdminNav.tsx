@@ -15,12 +15,14 @@ import {
   LayoutTemplate,
   LogIn,
   TrendingUp,
+  Dna,
 } from "lucide-react";
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/analizler", label: "Analizler", icon: FileText },
   { href: "/admin/kosular", label: "Koşular", icon: Flag },
+  { href: "/admin/pedigri", label: "Pedigriler", icon: Dna },
   { href: "/admin/sonuclar", label: "Sonuçlar", icon: Trophy },
   { href: "/admin/kupon", label: "Kupon Hazırla", icon: Ticket },
   { href: "/admin/jokey", label: "Jokey İstatistikleri", icon: TrendingUp },

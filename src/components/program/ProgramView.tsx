@@ -971,14 +971,21 @@ export default function ProgramView({
   const [followedSet, setFollowedSet] = useState(() => new Set(followedNames));
   const [, startFollowTransition] = useTransition();
 
-  /** Panel butonuna basınca paneli aç/kapat; açılıyorsa render sonrası panele scroll et. */
+  // Site üstündeki sticky Header (h-14 = 56px) — panele scroll ederken başlığın
+  // bu barın altında kalmaması için bu kadar pay bırakılır.
+  const STICKY_HEADER_OFFSET = 64;
+
+  /** Panel butonuna basınca paneli aç/kapat; açılıyorsa render sonrası panelin başlığına scroll et. */
   function toggleAndScroll(setter: (v: (prev: boolean) => boolean) => void, current: boolean, panelId: string) {
     const willOpen = !current;
     setter((v) => !v);
     if (willOpen) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          document.getElementById(panelId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+          const el = document.getElementById(panelId);
+          if (!el) return;
+          const top = el.getBoundingClientRect().top + window.scrollY - STICKY_HEADER_OFFSET;
+          window.scrollTo({ top, behavior: "smooth" });
         });
       });
     }

@@ -48,13 +48,27 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
   const curAltili = altiliIdx[activeHipo] ?? 0;
   const currentGroup = groups[curAltili];
   const ayakKey = `${activeHipo}/${curAltili}`;
-  const curAyak = ayakIdx[ayakKey] ?? 0;
+  // Varsayılan olarak henüz sonuçlanmamış ilk ayağı göster — sonuçlanmış ayaklar zaten
+  // otomatik işaretlendiği için kullanıcının onlarla uğraşmasına gerek yok.
+  const firstUnresultedIdx = currentGroup?.races.findIndex((r) => r.result?.winnerNo == null) ?? -1;
+  const curAyak = ayakIdx[ayakKey] ?? (firstUnresultedIdx >= 0 ? firstUnresultedIdx : 0);
   const currentRace = currentGroup?.races[curAyak];
+  const currentResulted = currentRace?.result?.winnerNo != null;
 
   function selKey(hipo: string, alt: number, ayak: number) {
     return `${hipo}/${alt}/${ayak}`;
   }
+  // Sonuçlanmış bir yarış varsa seçim otomatik olarak gerçek kazanana kilitlenir —
+  // kullanıcının artık bilmediği bir sonucu tahmin etmesine gerek kalmaz.
   function getSelected(hipo: string, alt: number, ayak: number): SelValue | null {
+    const race = currentGroup?.races[ayak];
+    const winnerNo = race?.result?.winnerNo;
+    if (race && winnerNo != null) {
+      const winner = race.runners.find((r) => r.no === winnerNo);
+      if (winner) {
+        return { no: winner.no, name: winner.name, agf: winner.agf, effectiveAgf: effectiveAgf(winner, race.runners) };
+      }
+    }
     return selections[selKey(hipo, alt, ayak)] ?? null;
   }
   function clearGroup(hipo: string, alt: number) {
@@ -183,6 +197,7 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
               <div className="flex overflow-x-auto border-b bg-background shrink-0">
                 {currentGroup.races.map((r, i) => {
                   const sel = getSelected(activeHipo, curAltili, i);
+                  const resulted = r.result?.winnerNo != null;
                   return (
                     <button
                       key={r.id}
@@ -196,7 +211,12 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                     >
                       {i + 1}. Ayak
                       {sel && (
-                        <span className="absolute top-1 right-0.5 w-1.5 h-1.5 rounded-full bg-[#27ae60]" />
+                        <span
+                          className={cn(
+                            "absolute top-1 right-0.5 w-1.5 h-1.5 rounded-full",
+                            resulted ? "bg-[#f0d9a6]" : "bg-[#27ae60]"
+                          )}
+                        />
                       )}
                     </button>
                   );
@@ -205,12 +225,17 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
 
               {/* Seçili koşu başlığı */}
               {currentRace && (
-                <div className="flex flex-wrap gap-x-3 gap-y-0.5 px-3 py-2 bg-muted/30 border-b text-xs text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-2 bg-muted/30 border-b text-xs text-muted-foreground">
                   <span className="font-semibold text-foreground">{currentRace.raceNo}. Koşu</span>
                   {currentRace.time && <span>{currentRace.time}</span>}
                   <span>{currentRace.distance}m</span>
                   <span>{breedShort(currentRace.breed)}</span>
                   {currentRace.classType && <span>· {currentRace.classType}</span>}
+                  {currentResulted && (
+                    <span className="ml-auto rounded-full bg-[#f0d9a6]/15 px-2 py-0.5 text-[10px] font-semibold text-[#c9a54e]">
+                      Sonuçlandı — otomatik işaretlendi
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -243,7 +268,7 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                             <tr
                               key={r.id}
                               onClick={() => {
-                                if (r.scratched) return;
+                                if (r.scratched || currentResulted) return;
                                 const key = selKey(activeHipo, curAltili, curAyak);
                                 const wasSelected = getSelected(activeHipo, curAltili, curAyak)?.no === r.no;
                                 setSelections((prev) => {
@@ -264,14 +289,17 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                               }}
                               className={cn(
                                 "border-b transition-colors",
-                                r.scratched ? "opacity-40 cursor-not-allowed" : "cursor-pointer",
+                                r.scratched ? "opacity-40 cursor-not-allowed" : currentResulted ? "cursor-default" : "cursor-pointer",
                                 i % 2 === 0 ? "bg-background" : "bg-muted/20",
-                                isSelected && "bg-[#27ae60]/15 hover:bg-[#27ae60]/20",
-                                !isSelected && !r.scratched && "hover:bg-muted/40"
+                                isSelected && currentResulted && "bg-[#f0d9a6]/15",
+                                isSelected && !currentResulted && "bg-[#27ae60]/15 hover:bg-[#27ae60]/20",
+                                !isSelected && !r.scratched && !currentResulted && "hover:bg-muted/40"
                               )}
                             >
                               <td className="px-2 py-2.5 text-center w-8">
-                                {isSelected && <Check className="h-4 w-4 text-[#27ae60] mx-auto" />}
+                                {isSelected && (
+                                  <Check className={cn("h-4 w-4 mx-auto", currentResulted ? "text-[#c9a54e]" : "text-[#27ae60]")} />
+                                )}
                               </td>
                               <td className="px-2 py-2.5 text-center font-bold tabular-nums">{r.no}</td>
                               <td className="px-2 py-2.5">
@@ -321,16 +349,19 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                   )}
                 </div>
                 <div className="grid grid-cols-6 gap-1.5">
-                  {currentGroup.races.map((_, i) => {
+                  {currentGroup.races.map((race, i) => {
                     const sel = getSelected(activeHipo, curAltili, i);
                     const isActive = curAyak === i;
+                    const resulted = race.result?.winnerNo != null;
                     return (
                       <button
                         key={i}
                         onClick={() => setAyakIdx((prev) => ({ ...prev, [ayakKey]: i }))}
                         className={cn(
                           "flex flex-col items-center rounded-lg border p-1.5 text-center transition-colors min-h-[58px] justify-center",
-                          sel
+                          resulted
+                            ? "border-[#c9a54e] bg-[#f0d9a6]/10"
+                            : sel
                             ? "border-[#27ae60] bg-[#27ae60]/10"
                             : isActive
                             ? "border-[#c0392b] bg-[#c0392b]/5"
@@ -346,7 +377,7 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                             <span className="text-[9px] truncate w-full leading-tight mt-0.5 px-0.5">
                               {sel.name.split(" ")[0]}
                             </span>
-                            <span className="text-[9px] text-[#27ae60] font-semibold">
+                            <span className={cn("text-[9px] font-semibold", resulted ? "text-[#c9a54e]" : "text-[#27ae60]")}>
                               %{sel.effectiveAgf.toFixed(0)}
                             </span>
                           </>
