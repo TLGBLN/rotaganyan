@@ -2,6 +2,10 @@ import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import SireTierForm from "@/components/admin/SireTierForm";
 import SireTierDeleteButton from "@/components/admin/SireTierDeleteButton";
+import PedigreeEntryRow from "@/components/admin/PedigreeEntryRow";
+import DateNavigator from "@/components/kosular/DateNavigator";
+import { getRaceDaysForPedigreeEntry } from "@/server/services/admin.service";
+import { turkeyDateString } from "@/lib/tz";
 
 export const dynamic = "force-dynamic";
 
@@ -27,13 +31,94 @@ const TIER_COLOR: Record<string, string> = {
   BILINMIYOR: "text-muted-foreground border-border",
 };
 
-export default async function PedigriPage() {
-  const sireTiers = await db.sireTier.findMany({ orderBy: [{ tier: "asc" }, { name: "asc" }] });
+type PageProps = { searchParams: Promise<{ tarih?: string }> };
+
+export default async function PedigriPage({ searchParams }: PageProps) {
+  const { tarih } = await searchParams;
+  const currentDate = tarih ?? turkeyDateString();
+
+  const [sireTiers, raceDays] = await Promise.all([
+    db.sireTier.findMany({ orderBy: [{ tier: "asc" }, { name: "asc" }] }),
+    getRaceDaysForPedigreeEntry(currentDate),
+  ]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-lg font-bold">Pedigri / Sire Tier</h1>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-bold">At Pedigrileri</h1>
+            <p className="text-xs text-muted-foreground">
+              O günün koşan atlarına baba (sire), anne (dam), anne babası (damsire) ve serbest not
+              girin. TJK programında zaten varsa otomatik dolu gelir, siz üzerine yazabilirsiniz.
+              Kaydettiğiniz bilgi kullanıcılara &quot;Pedigriler&quot; panelinde gösterilir.
+            </p>
+          </div>
+          <DateNavigator currentDate={currentDate} basePath="/admin/pedigri" />
+        </div>
+
+        {raceDays.length === 0 && (
+          <div className="mt-4 rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
+            Bu tarih için koşu programı bulunamadı.
+          </div>
+        )}
+
+        <div className="mt-4 space-y-4">
+          {raceDays.map((rd) => (
+            <section key={rd.id} className="rounded-lg border">
+              <div className="border-b bg-muted/30 px-4 py-2">
+                <h2 className="text-sm font-semibold">{rd.hippodrome.name}</h2>
+              </div>
+              <div className="divide-y">
+                {rd.races.map((race) => (
+                  <div key={race.id} className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="px-3 py-1.5 text-left font-medium text-muted-foreground">
+                            {race.raceNo}. Koşu
+                          </th>
+                          <th className="px-3 py-1.5 text-left font-medium text-muted-foreground">At</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Baba</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Anne</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Anne Babası</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Not</th>
+                          <th className="px-2 py-1.5"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {race.runners.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="px-3 py-3 text-center text-muted-foreground">
+                              At kaydı yok.
+                            </td>
+                          </tr>
+                        ) : (
+                          race.runners.map((r) => (
+                            <PedigreeEntryRow
+                              key={r.id}
+                              runnerId={r.id}
+                              no={r.no}
+                              name={r.name}
+                              sire={r.sire}
+                              dam={r.dam}
+                              damSire={r.damSire}
+                              pedigreeNote={r.pedigreeNote}
+                            />
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-lg font-bold">Aygır İtibarı (Sire Tier)</h2>
         <p className="text-xs text-muted-foreground">
           Otomatik analiz motoru, koşan atların sire/damSire bilgisini buradaki listeyle eşleştirip
           Pedigri puanı üretir. Bu liste sizin bildiğiniz aygır itibarını içerir — sistem hiçbir

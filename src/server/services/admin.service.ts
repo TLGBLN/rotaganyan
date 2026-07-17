@@ -110,6 +110,47 @@ export async function getAdminRaceDays(dateStr?: string, limit = 30): Promise<Ad
   });
 }
 
+export type PedigreeEntryRaceDay = Prisma.RaceDayGetPayload<{
+  include: {
+    hippodrome: true;
+    races: {
+      include: {
+        runners: {
+          select: {
+            id: true;
+            no: true;
+            name: true;
+            sire: true;
+            dam: true;
+            damSire: true;
+            pedigreeNote: true;
+          };
+        };
+      };
+    };
+  };
+}>;
+
+export async function getRaceDaysForPedigreeEntry(dateStr: string): Promise<PedigreeEntryRaceDay[]> {
+  const date = new Date(dateStr);
+  return db.raceDay.findMany({
+    where: { date: { gte: startOfDay(date), lte: endOfDay(date) } },
+    include: {
+      hippodrome: true,
+      races: {
+        include: {
+          runners: {
+            select: { id: true, no: true, name: true, sire: true, dam: true, damSire: true, pedigreeNote: true },
+            orderBy: { no: "asc" },
+          },
+        },
+        orderBy: { raceNo: "asc" },
+      },
+    },
+    orderBy: { date: "desc" },
+  });
+}
+
 export async function getAllResults(limit = 50) {
   return db.result.findMany({
     // Analiz edilmemiş (Prediction'sız) yarışların sonuçları bu listede

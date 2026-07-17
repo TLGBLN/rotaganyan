@@ -190,3 +190,28 @@ export async function upsertRunner(input: RunnerInput) {
   revalidatePath("/admin/kosular");
   return runner;
 }
+
+type PedigreeInput = {
+  sire?: string;
+  dam?: string;
+  damSire?: string;
+  pedigreeNote?: string;
+};
+
+export async function updateRunnerPedigree(runnerId: string, input: PedigreeInput) {
+  await requireRole("EDITOR");
+
+  const runner = await db.runner.update({
+    where: { id: runnerId },
+    data: {
+      sire: input.sire?.trim() || null,
+      dam: input.dam?.trim() || null,
+      damSire: input.damSire?.trim() || null,
+      pedigreeNote: input.pedigreeNote?.trim() || null,
+    },
+  });
+
+  revalidatePath("/admin/pedigri");
+  revalidatePath("/program");
+  return runner;
+}
