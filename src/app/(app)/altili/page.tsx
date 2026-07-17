@@ -46,7 +46,7 @@ export default async function AltiliPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-lg font-bold">Altılı Ne Verir?</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Her ayak için bir at seçin, kombinasyonunuzu oluşturun
+            Her ayak için bir at seçin — Altılı, Beşli, Dörtlü ve Üçlü Ganyan tahminleri aynı anda hesaplanır
           </p>
         </div>
         <DateNavigator currentDate={currentDate} basePath="/altili" />

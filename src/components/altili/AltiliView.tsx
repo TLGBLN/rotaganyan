@@ -69,11 +69,12 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
 
   const groupSelections = currentGroup?.races.map((_, i) => getSelected(activeHipo, curAltili, i)) ?? [];
   const filledCount = groupSelections.filter(Boolean).length;
+  const totalLegs = currentGroup?.races.length ?? 0;
 
   const summaryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (filledCount !== 6 || !summaryRef.current) return;
+    if (filledCount === 0 || filledCount !== totalLegs || !summaryRef.current) return;
     const el = summaryRef.current;
     setTimeout(() => {
       const start = window.scrollY;
@@ -91,14 +92,33 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
       }
       requestAnimationFrame(step);
     }, 50);
-  }, [filledCount]);
+  }, [filledCount, totalLegs]);
 
-  const katsayi =
-    filledCount === 6 && groupSelections.every((s) => s != null && s.effectiveAgf > 0)
-      ? groupSelections.reduce((prod, s) => prod * (100 / s!.effectiveAgf), 1)
-      : null;
-  const ikramiyeLower = katsayi != null ? katsayi * 0.93 : null;
-  const ikramiyeUpper = katsayi != null ? katsayi * 0.99 : null;
+  // Beşli/Dörtlü/Üçlü Ganyan havuzları, TJK'da o günün Altılı grubunun SON N ayağını kapsar
+  // (ör. Altılı 4-9. koşularsa, Beşli 5-9, Dörtlü 6-9, Üçlü 7-9) — aynı seçimler tüm havuzlarda
+  // ortak kullanılır, kullanıcı ayrıca seçim yapmaz.
+  const POOL_DEFS = [
+    { key: "altili", label: "Altılı (6'lı)" },
+    { key: "besli", label: "Beşli (5'li)" },
+    { key: "dortlu", label: "Dörtlü (4'lü)" },
+    { key: "uclu", label: "Üçlü (3'lü)" },
+  ] as const;
+
+  const poolResults = POOL_DEFS.map(({ key, label }, i) => {
+    const n = 6 - i;
+    if (totalLegs < n) return { key, label, n, katsayi: null, lower: null, upper: null };
+    const subset = groupSelections.slice(totalLegs - n);
+    const ready = subset.length === n && subset.every((s) => s != null && s.effectiveAgf > 0);
+    const katsayi = ready ? subset.reduce((prod, s) => prod * (100 / s!.effectiveAgf), 1) : null;
+    return {
+      key,
+      label,
+      n,
+      katsayi,
+      lower: katsayi != null ? katsayi * 0.93 : null,
+      upper: katsayi != null ? katsayi * 0.99 : null,
+    };
+  }).filter((p) => p.n <= totalLegs);
 
   if (days.length === 0) {
     return (
@@ -286,7 +306,7 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
               <div ref={summaryRef} className="border-t bg-muted/20 px-3 py-3 shrink-0">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Seçimleriniz — {filledCount}/6
+                    Seçimleriniz — {filledCount}/{totalLegs}
                   </span>
                   {filledCount > 0 && (
                     <button
@@ -335,18 +355,43 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                   })}
                 </div>
 
-                {/* Tahmini ikramiye */}
-                {ikramiyeLower != null && ikramiyeUpper != null && (
-                  <div className="mt-3 rounded-lg border border-[#27ae60]/40 bg-[#27ae60]/10 px-3 py-3">
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">
-                      6lı Ganyan Tahmini
-                    </div>
-                    <div className="text-xl font-bold text-[#27ae60] tabular-nums">
-                      {formatTL(ikramiyeLower)} – {formatTL(ikramiyeUpper)}
-                    </div>
-                    <div className="mt-1.5 text-[10px] text-muted-foreground">
-                      AGF bazlı tahmin (katsayı: {Math.round(katsayi!).toLocaleString("tr-TR")}×). Gerçek ikramiye havuz ve kazanan sayısına göre değişir.
-                    </div>
+                {/* Tahmini ikramiye — Altılı/Beşli/Dörtlü/Üçlü, aynı seçimlerden ortak hesaplanır */}
+                {poolResults.length > 0 && (
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {poolResults.map((p) => (
+                      <div
+                        key={p.key}
+                        className={cn(
+                          "rounded-lg border px-2.5 py-2.5",
+                          p.lower != null
+                            ? "border-[#27ae60]/40 bg-[#27ae60]/10"
+                            : "border-dashed border-muted-foreground/25"
+                        )}
+                      >
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">
+                          {p.label}
+                        </div>
+                        {p.lower != null && p.upper != null ? (
+                          <>
+                            <div className="text-sm font-bold text-[#27ae60] tabular-nums leading-tight">
+                              {formatTL(p.lower)}
+                            </div>
+                            <div className="text-sm font-bold text-[#27ae60] tabular-nums leading-tight">
+                              – {formatTL(p.upper)}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-xs text-muted-foreground">
+                            Son {p.n} ayağı doldurun
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {poolResults.some((p) => p.lower != null) && (
+                  <div className="mt-2 text-[10px] text-muted-foreground">
+                    AGF bazlı tahmin — her havuz kendi son N ayağının seçimlerinden hesaplanır. Gerçek ikramiye havuz büyüklüğü ve kazanan sayısına göre değişir.
                   </div>
                 )}
               </div>
