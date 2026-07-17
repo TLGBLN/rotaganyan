@@ -25,6 +25,7 @@ export type TjkAtKosuRow = {
   finishPos: string;
   time: string;
   weight: string;
+  equipment: string;
   jockey: string;
   raceNo: string;
   classType: string;
@@ -59,6 +60,7 @@ export async function fetchTjkAtKosuBilgileri(atId: number): Promise<TjkAtKosuRo
       finishPos: cells[4] ?? "",
       time: cells[5] ?? "",
       weight: cells[6] ?? "",
+      equipment: cells[7] ?? "",
       jockey: cells[8] ?? "",
       raceNo: cells[12] ?? "",
       classType: cells[13] ?? "",
