@@ -21,8 +21,6 @@ function breedShort(b: string) {
   return b === "ARAP" ? "Arap" : "İngiliz";
 }
 
-// TJK altılı: kolon 1.25 TL, dağıtım %75–%87.5
-// lower = katsayı × 0.93, upper = katsayı × 0.99
 function formatTL(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2).replace(".", ",")} Milyon ₺`;
   return n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " ₺";
@@ -115,8 +113,11 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
       label,
       n,
       katsayi,
-      lower: katsayi != null ? katsayi * 0.93 : null,
-      upper: katsayi != null ? katsayi * 0.99 : null,
+      // TJK ganyan havuzlarında vergi/devlet payı kesintisi sonrası gerçek dağıtım oranı
+      // ~%75–%87.5 arasıdır — daha önce burada yanlışlıkla %93–%99 kullanılıyordu, bu da
+      // tahmini gerçek ikramiyenin belirgin şekilde üzerinde gösteriyordu.
+      lower: katsayi != null ? katsayi * 0.75 : null,
+      upper: katsayi != null ? katsayi * 0.875 : null,
     };
   }).filter((p) => p.n <= totalLegs);
 
