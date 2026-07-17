@@ -943,7 +943,7 @@ function RaceTable({
       <div id="panel-son800">{son800Open && <Son800Panel raceId={race.id} />}</div>
       <div id="panel-galop">{galopOpen && <GalopPanel runners={race.runners} breed={race.breed} />}</div>
       <div id="panel-pedigriler">{pedigreeOpen && <PedigreePanel runners={race.runners} />}</div>
-      <div id="panel-takilar">{equipmentOpen && <EquipmentPanel runners={race.runners} />}</div>
+      <div id="panel-takilar">{equipmentOpen && <EquipmentPanel raceId={race.id} />}</div>
       <div id="panel-karsilastir">{comparisonOpen && <ComparisonPanel raceId={race.id} />}</div>
       <div id="panel-h2h">{h2hOpen && <H2HPanel raceId={race.id} />}</div>
     </div>

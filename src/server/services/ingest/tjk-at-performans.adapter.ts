@@ -47,9 +47,17 @@ export async function fetchTjkAtKosuBilgileri(atId: number): Promise<TjkAtKosuRo
   const rows: TjkAtKosuRow[] = [];
 
   $("#queryTable tbody tr").each((_, tr) => {
-    const cells = $(tr).find("td").toArray().map((td) => $(td).text().replace(/\s+/g, " ").trim());
+    const $row = $(tr);
+    const cellEls = $row.find("td").toArray();
+    const cells = cellEls.map((td) => $(td).text().replace(/\s+/g, " ").trim());
     const date = cells[0] ?? "";
     if (!/^\d{2}\.\d{2}\.\d{4}$/.test(date)) return; // toplam/özet satırlarını atla
+
+    // Takı — hücredeki her <a> bir kod (K, KG, DB, SK, GKR...) taşır; virgülle birleştirilir
+    // (daily program ingest'indeki formatla tutarlı olsun diye).
+    const equipmentCodes = cellEls[7]
+      ? $(cellEls[7]).find("a").toArray().map((a) => $(a).text().trim()).filter(Boolean)
+      : [];
 
     rows.push({
       date,
@@ -60,7 +68,7 @@ export async function fetchTjkAtKosuBilgileri(atId: number): Promise<TjkAtKosuRo
       finishPos: cells[4] ?? "",
       time: cells[5] ?? "",
       weight: cells[6] ?? "",
-      equipment: cells[7] ?? "",
+      equipment: equipmentCodes.join(","),
       jockey: cells[8] ?? "",
       raceNo: cells[12] ?? "",
       classType: cells[13] ?? "",

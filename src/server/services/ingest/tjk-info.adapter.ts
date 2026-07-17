@@ -255,6 +255,18 @@ export async function fetchCityProgram(
               if (atIdMatch) tjkAtId = parseInt(atIdMatch[1], 10);
             }
           }
+
+          // Takı (KG/K/DB/SK/GKR gibi kısa kodlar) — at ismi hücresindeki
+          // <sup class="tooltipp"><span class="aciklamaFancy">KOD</span>...</sup> içinden okunur.
+          let equipment: string | undefined;
+          if (iName !== -1 && cellEls[iName]) {
+            const codes = $(cellEls[iName])
+              .find("sup.tooltipp .aciklamaFancy")
+              .toArray()
+              .map((el) => $(el).text().trim())
+              .filter(Boolean);
+            if (codes.length > 0) equipment = codes.join(",");
+          }
           if (!name) name = nameCellText.split(/\s{2,}|\n/)[0] ?? "";
           name = name.replace(/\s*\(ko[şs]maz\)\s*/gi, "").trim().toUpperCase();
           if (!name) return;
@@ -354,7 +366,7 @@ export async function fetchCityProgram(
 
           const ekuriGroup = ekuriMap.get(no) ?? undefined;
 
-          runners.push({ no, name, age, startNo, weight, jockey, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup, tjkAtId });
+          runners.push({ no, name, age, startNo, weight, jockey, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup, tjkAtId, equipment });
         });
       }
     }

@@ -1,30 +1,73 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import type { ProgramRunner } from "@/server/services/race.service";
+import { useState, useEffect } from "react";
+import { getEquipmentChangesForRace, type EquipmentChangeData } from "@/server/actions/equipment.actions";
 
-export default function EquipmentPanel({ runners }: { runners: ProgramRunner[] }) {
-  const withEquipment = runners.filter((r) => r.equipment || r.equipmentAdded || r.equipmentRemoved);
+export default function EquipmentPanel({ raceId }: { raceId: string }) {
+  const [data, setData] = useState<EquipmentChangeData[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(false);
+    getEquipmentChangesForRace(raceId)
+      .then((res) => { if (!cancelled) setData(res); })
+      .catch(() => { if (!cancelled) setError(true); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [raceId]);
+
   return (
     <div className="border-t">
       <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
         <span className="text-sm font-bold tracking-wide text-white">Takılar</span>
       </div>
-      {withEquipment.length === 0 ? (
+      {loading ? (
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">TJK geçmişiyle karşılaştırılıyor…</div>
+      ) : error ? (
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">Veri alınamadı.</div>
+      ) : !data || data.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">Takı bilgisi yok.</div>
       ) : (
         <div className="max-h-[480px] overflow-y-auto grid grid-cols-1 sm:grid-cols-2">
-          {withEquipment.map((r, idx) => (
-            <div key={r.id} className={cn("px-3 py-2.5 border-b", idx % 2 === 0 && "sm:border-r")}>
+          {data.map((r, idx) => (
+            <div key={r.runnerNo} className={`px-3 py-2.5 border-b ${idx % 2 === 0 ? "sm:border-r" : ""}`}>
               <div className="text-xs font-semibold mb-1">
-                <span className="font-mono mr-1.5">{r.no}</span>
-                {r.name}
+                <span className="font-mono mr-1.5">{r.runnerNo}</span>
+                {r.horseName}
               </div>
-              <div className="text-[11px] text-muted-foreground leading-snug">
-                {r.equipment && <span className="text-foreground">{r.equipment}</span>}
-                {r.equipmentAdded && <span className="ml-1.5 text-hit">+{r.equipmentAdded}</span>}
-                {r.equipmentRemoved && <span className="ml-1.5 text-miss">-{r.equipmentRemoved}</span>}
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] leading-snug">
+                {r.current.length === 0 && r.added.length === 0 && r.removed.length === 0 ? (
+                  <span className="text-muted-foreground">Takı yok</span>
+                ) : (
+                  <>
+                    {r.current
+                      .filter((c) => !r.added.some((a) => a.code === c.code))
+                      .map((c) => (
+                        <span key={c.code} className="rounded-full border px-1.5 py-0.5 text-foreground">
+                          {c.label}
+                        </span>
+                      ))}
+                    {r.added.map((c) => (
+                      <span key={`+${c.code}`} className="rounded-full bg-hit/15 px-1.5 py-0.5 font-semibold text-hit">
+                        +{c.label}
+                      </span>
+                    ))}
+                    {r.removed.map((c) => (
+                      <span key={`-${c.code}`} className="rounded-full bg-[#c0392b]/15 px-1.5 py-0.5 font-semibold text-[#c0392b]">
+                        -{c.label}
+                      </span>
+                    ))}
+                  </>
+                )}
               </div>
+              {r.lastRaceDate && (r.added.length > 0 || r.removed.length > 0) && (
+                <div className="mt-1 text-[10px] text-muted-foreground">
+                  Önceki koşuya ({r.lastRaceDate}) göre değişiklik
+                </div>
+              )}
             </div>
           ))}
         </div>
