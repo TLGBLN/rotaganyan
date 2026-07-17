@@ -918,25 +918,27 @@ function RaceTable({
       </div>
 
       {/* Analiz paneli */}
-      {race.hasAnalysis && analysisOpen && (
-        <AnalysisPanel
-          picks={race.picks}
-          winnerNo={winnerNo}
-          isLoggedIn={isLoggedIn}
-          isAdmin={isAdmin}
-          isVerified={isVerified}
-          userEmail={userEmail}
-          raceNo={race.raceNo}
-          hippodromeName={hippodromeName}
-          raceId={race.id}
-        />
-      )}
-      {son800Open && <Son800Panel raceId={race.id} />}
-      {galopOpen && <GalopPanel runners={race.runners} breed={race.breed} />}
-      {pedigreeOpen && <PedigreePanel runners={race.runners} />}
-      {equipmentOpen && <EquipmentPanel runners={race.runners} />}
-      {comparisonOpen && <ComparisonPanel raceId={race.id} />}
-      {h2hOpen && <H2HPanel raceId={race.id} />}
+      <div id="panel-analiz">
+        {race.hasAnalysis && analysisOpen && (
+          <AnalysisPanel
+            picks={race.picks}
+            winnerNo={winnerNo}
+            isLoggedIn={isLoggedIn}
+            isAdmin={isAdmin}
+            isVerified={isVerified}
+            userEmail={userEmail}
+            raceNo={race.raceNo}
+            hippodromeName={hippodromeName}
+            raceId={race.id}
+          />
+        )}
+      </div>
+      <div id="panel-son800">{son800Open && <Son800Panel raceId={race.id} />}</div>
+      <div id="panel-galop">{galopOpen && <GalopPanel runners={race.runners} breed={race.breed} />}</div>
+      <div id="panel-pedigriler">{pedigreeOpen && <PedigreePanel runners={race.runners} />}</div>
+      <div id="panel-takilar">{equipmentOpen && <EquipmentPanel runners={race.runners} />}</div>
+      <div id="panel-karsilastir">{comparisonOpen && <ComparisonPanel raceId={race.id} />}</div>
+      <div id="panel-h2h">{h2hOpen && <H2HPanel raceId={race.id} />}</div>
     </div>
   );
 }
@@ -968,6 +970,19 @@ export default function ProgramView({
   const [selectedHorse, setSelectedHorse] = useState<string | null>(null);
   const [followedSet, setFollowedSet] = useState(() => new Set(followedNames));
   const [, startFollowTransition] = useTransition();
+
+  /** Panel butonuna basınca paneli aç/kapat; açılıyorsa render sonrası panele scroll et. */
+  function toggleAndScroll(setter: (v: (prev: boolean) => boolean) => void, current: boolean, panelId: string) {
+    const willOpen = !current;
+    setter((v) => !v);
+    if (willOpen) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document.getElementById(panelId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
+    }
+  }
 
   function handleToggleFollow(horseName: string) {
     setFollowedSet((prev) => {
@@ -1087,7 +1102,7 @@ export default function ProgramView({
             <div className="flex items-center gap-2 overflow-x-auto min-w-0">
               {currentRace?.hasAnalysis ? (
                 <button
-                  onClick={() => setAnalysisOpen((v) => !v)}
+                  onClick={() => toggleAndScroll(setAnalysisOpen, analysisOpen, "panel-analiz")}
                   data-tour="analiz-buton"
                   className="flex items-center gap-1 rounded-md bg-[#00944D] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
                 >
@@ -1100,7 +1115,7 @@ export default function ProgramView({
               )}
               {currentRace && (
                 <button
-                  onClick={() => setSon800Open((v) => !v)}
+                  onClick={() => toggleAndScroll(setSon800Open, son800Open, "panel-son800")}
                   data-tour="son800-buton"
                   className="flex items-center gap-1 rounded-md bg-[#1a3a5c] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
                 >
@@ -1109,7 +1124,7 @@ export default function ProgramView({
               )}
               {currentRace && (
                 <button
-                  onClick={() => setGalopOpen((v) => !v)}
+                  onClick={() => toggleAndScroll(setGalopOpen, galopOpen, "panel-galop")}
                   data-tour="galop"
                   className="flex items-center gap-1 rounded-md bg-[#5d4037] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
                 >
@@ -1118,7 +1133,7 @@ export default function ProgramView({
               )}
               {currentRace && (
                 <button
-                  onClick={() => setPedigreeOpen((v) => !v)}
+                  onClick={() => toggleAndScroll(setPedigreeOpen, pedigreeOpen, "panel-pedigriler")}
                   className="flex items-center gap-1 rounded-md bg-[#4a3b6b] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
                 >
                   Pedigriler {pedigreeOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -1126,7 +1141,7 @@ export default function ProgramView({
               )}
               {currentRace && (
                 <button
-                  onClick={() => setEquipmentOpen((v) => !v)}
+                  onClick={() => toggleAndScroll(setEquipmentOpen, equipmentOpen, "panel-takilar")}
                   className="flex items-center gap-1 rounded-md bg-[#5d5233] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
                 >
                   Takılar {equipmentOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -1134,7 +1149,7 @@ export default function ProgramView({
               )}
               {currentRace && (
                 <button
-                  onClick={() => setH2hOpen((v) => !v)}
+                  onClick={() => toggleAndScroll(setH2hOpen, h2hOpen, "panel-h2h")}
                   className="flex items-center gap-1 rounded-md bg-[#6b3b3b] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
                 >
                   H2H {h2hOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -1142,7 +1157,7 @@ export default function ProgramView({
               )}
               {currentRace && (
                 <button
-                  onClick={() => setComparisonOpen((v) => !v)}
+                  onClick={() => toggleAndScroll(setComparisonOpen, comparisonOpen, "panel-karsilastir")}
                   className="flex items-center gap-1 rounded-md bg-[#2c5f5f] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
                 >
                   Karşılaştır {comparisonOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
