@@ -113,11 +113,13 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
       label,
       n,
       katsayi,
-      // TJK ganyan havuzlarında vergi/devlet payı kesintisi sonrası gerçek dağıtım oranı
-      // ~%75–%87.5 arasıdır — daha önce burada yanlışlıkla %93–%99 kullanılıyordu, bu da
-      // tahmini gerçek ikramiyenin belirgin şekilde üzerinde gösteriyordu.
-      lower: katsayi != null ? katsayi * 0.75 : null,
-      upper: katsayi != null ? katsayi * 0.875 : null,
+      // AGF'lerin tersini çarpan bu formül yapısal olarak iyimser: favoriler kazandığında
+      // gerçekte çok daha fazla bilet doğru tahmin ettiği için havuz daha fazla kişiye
+      // bölünüyor ve gerçek ikramiye teorik çarpımdan belirgin biçimde düşük kalıyor.
+      // %75-87.5 aralığı bile gözlemlenen gerçek sonuçların üzerinde çıktığı için
+      // aralık %65-80'e çekildi.
+      lower: katsayi != null ? katsayi * 0.65 : null,
+      upper: katsayi != null ? katsayi * 0.8 : null,
     };
   }).filter((p) => p.n <= totalLegs);
 
