@@ -460,7 +460,11 @@ function RunnerRow({
       <td className="px-2 py-1.5 min-w-[110px]">
         <div className={cn(r.jockeyChanged && "text-orange-500 font-medium")}>
           {r.jockey ?? "—"}
-          {r.apprentice && <span className="ml-1 text-[10px] font-semibold text-brand">Ap.</span>}
+          {r.apprentice && (
+            <span className="ml-1 text-[10px] font-semibold text-brand">
+              Ap.{r.apprenticeRemaining != null && ` (${r.apprenticeRemaining} kaldı)`}
+            </span>
+          )}
         </div>
         {r.jockeyChanged && r.previousJockey && (
           <div className="text-[10px] text-muted-foreground">← {r.previousJockey}</div>
@@ -688,7 +692,11 @@ function RunnerCard({
           <span className={cn("font-medium", r.jockeyChanged && "text-orange-500")}>
             {r.jockey}
           </span>
-          {r.apprentice && <span className="ml-1 text-[10px] font-semibold text-brand">Ap.</span>}
+          {r.apprentice && (
+            <span className="ml-1 text-[10px] font-semibold text-brand">
+              Ap.{r.apprenticeRemaining != null && ` (${r.apprenticeRemaining} kaldı)`}
+            </span>
+          )}
           {jockeyStat && (() => {
             const wp = pct(jockeyStat);
             const wc = wp >= 25 ? "text-hit" : wp >= 15 ? "text-brand" : "text-muted-foreground";

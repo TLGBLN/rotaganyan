@@ -3,6 +3,7 @@ import { startOfDay, endOfDay, subDays } from "date-fns";
 import { turkeyDateString } from "@/lib/tz";
 import type { Prisma, Confidence } from "@prisma/client";
 import { syncResultsForDate } from "./result-sync";
+import { fetchApprenticeRemainingRaces, normalizeJockeyName } from "./ingest/tjk-apprentice.adapter";
 
 /** "Bursa 4. Koşu" → { slug: "bursa", raceNo: 4 } */
 function parseConditionsRef(conditions: string): { slug: string; raceNo: number } | null {
@@ -568,6 +569,7 @@ export type ProgramRunner = {
   gallops: ProgramGallop[];
   ekuriGroup: number | null;
   apprentice: boolean;
+  apprenticeRemaining: number | null;
   raceStyle: { style: string; percent: number } | null; // style: "KACAK" | "ON_GRUP" | "BEKLEME" | "EN_GERI"
   tjkAtId: number | null;
 };
@@ -607,7 +609,8 @@ export type ProgramDay = {
 export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
   const date = new Date(dateStr + "T00:00:00.000Z");
 
-  const raceDays = await db.raceDay.findMany({
+  const [raceDays, apprenticeRemainingMap] = await Promise.all([
+    db.raceDay.findMany({
     where: { date: { gte: startOfDay(date), lte: endOfDay(date) } },
     include: {
       hippodrome: { select: { name: true, slug: true } },
@@ -650,7 +653,9 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
       },
     },
     orderBy: { hippodrome: { name: "asc" } },
-  });
+    }),
+    fetchApprenticeRemainingRaces().catch(() => ({}) as Record<string, number>),
+  ]);
 
   // "Karma" hipodromu, gerçek koşuların kombine bahis için aynadaki (mirror) kopyasıdır —
   // idman/yarış stili senkronu "karma" için hiç çalışmaz (gerçek tekil hipodrom değil), bu
@@ -706,8 +711,13 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
           const inherited = originalRunners?.get(normHorseNameForMirror(ru.name));
           const gallops = ru.gallops.length > 0 ? ru.gallops : inherited?.gallops ?? ru.gallops;
           const raceStyle = ru.raceStyle ?? inherited?.raceStyle ?? null;
+          const apprenticeRemaining =
+            ru.apprentice && ru.jockey
+              ? apprenticeRemainingMap[normalizeJockeyName(ru.jockey)] ?? null
+              : null;
           return {
             ...ru,
+            apprenticeRemaining,
             raceStyle: parseRaceStyle(raceStyle),
             gallops: gallops.map((g) => ({
               ...g,
