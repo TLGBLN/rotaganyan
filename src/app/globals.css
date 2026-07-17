@@ -115,3 +115,27 @@ body {
 /* Satır zebra rengi */
 .race-row-even { background: oklch(0.16 0.038 240); }
 
+/* ─── Splash ekranı ───────────────────────────
+   Dönen halka yerine: logo "foto-finiş flaşı" ile beliriyor,
+   ardından start kapısı ışıkları sırayla yanıp sönüyor. */
+@keyframes splash-logo-in {
+  0% { opacity: 0; transform: scale(0.85); filter: blur(6px); }
+  55% { opacity: 1; }
+  100% { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+@keyframes splash-flash-sweep {
+  0% { transform: translateX(-140%) skewX(-12deg); opacity: 0; }
+  12% { opacity: 1; }
+  55% { transform: translateX(140%) skewX(-12deg); opacity: 1; }
+  100% { transform: translateX(140%) skewX(-12deg); opacity: 0; }
+}
+@keyframes splash-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes splash-gate-bar {
+  0%, 100% { background: rgba(240, 217, 166, 0.16); height: 12px; box-shadow: none; }
+  35% { background: #f0d9a6; height: 22px; box-shadow: 0 0 10px 1px rgba(240, 217, 166, 0.65); }
+  60% { background: rgba(240, 217, 166, 0.16); height: 12px; box-shadow: none; }
+}
+
