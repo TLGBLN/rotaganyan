@@ -21,6 +21,13 @@ const EquipmentPanel = dynamic(() => import("./panels/EquipmentPanel"), { loadin
 const ComparisonPanel = dynamic(() => import("./panels/ComparisonPanel"), { loading: () => PANEL_LOADING, ssr: false });
 const H2HPanel = dynamic(() => import("./panels/H2HPanel"), { loading: () => PANEL_LOADING, ssr: false });
 
+// Detay paneli açma/kapama butonları (Son 800/Galop/Pedigriler/Takılar/H2H/Karşılaştır) —
+// her biri farklı renkteyken karmaşık görünüyordu; artık hepsi tek tip, sadece açık/kapalı
+// durumuna göre (marka rengi / nötr) ayrışıyor.
+const PANEL_BTN_CLASS = "flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors shrink-0";
+const PANEL_BTN_OPEN = "bg-brand text-brand-foreground";
+const PANEL_BTN_CLOSED = "bg-white/5 text-[#c7d0dc] border border-white/10 hover:bg-white/10";
+
 // ── Geri sayım (Turkey UTC+3) ────────────────────────────────────────────────
 
 function useRaceCountdown(time: string | null, hasResult: boolean, dateStr: string) {
@@ -1124,7 +1131,7 @@ export default function ProgramView({
                 <button
                   onClick={() => toggleAndScroll(setSon800Open, son800Open, "panel-son800")}
                   data-tour="son800-buton"
-                  className="flex items-center gap-1 rounded-md bg-[#1a3a5c] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
+                  className={cn(PANEL_BTN_CLASS, son800Open ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
                   Son 800 {son800Open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
@@ -1133,7 +1140,7 @@ export default function ProgramView({
                 <button
                   onClick={() => toggleAndScroll(setGalopOpen, galopOpen, "panel-galop")}
                   data-tour="galop"
-                  className="flex items-center gap-1 rounded-md bg-[#5d4037] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
+                  className={cn(PANEL_BTN_CLASS, galopOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
                   Galop {galopOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
@@ -1141,7 +1148,7 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setPedigreeOpen, pedigreeOpen, "panel-pedigriler")}
-                  className="flex items-center gap-1 rounded-md bg-[#4a3b6b] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
+                  className={cn(PANEL_BTN_CLASS, pedigreeOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
                   Pedigriler {pedigreeOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
@@ -1149,7 +1156,7 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setEquipmentOpen, equipmentOpen, "panel-takilar")}
-                  className="flex items-center gap-1 rounded-md bg-[#5d5233] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
+                  className={cn(PANEL_BTN_CLASS, equipmentOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
                   Takılar {equipmentOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
@@ -1157,7 +1164,7 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setH2hOpen, h2hOpen, "panel-h2h")}
-                  className="flex items-center gap-1 rounded-md bg-[#6b3b3b] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
+                  className={cn(PANEL_BTN_CLASS, h2hOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
                   H2H {h2hOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
@@ -1165,7 +1172,7 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setComparisonOpen, comparisonOpen, "panel-karsilastir")}
-                  className="flex items-center gap-1 rounded-md bg-[#2c5f5f] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
+                  className={cn(PANEL_BTN_CLASS, comparisonOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
                   Karşılaştır {comparisonOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
