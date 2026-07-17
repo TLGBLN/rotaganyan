@@ -21,7 +21,7 @@ export default function ComparisonPanel({ raceId }: { raceId: string }) {
 
   return (
     <div className="border-t">
-      <div className="px-4 py-2.5 bg-[#2c5f5f] border-b flex items-center">
+      <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
         <span className="text-sm font-bold tracking-wide text-white">
           Detaylı At Karşılaştırma — Aynı Pist / Mesafe / Hipodrom (2026)
         </span>

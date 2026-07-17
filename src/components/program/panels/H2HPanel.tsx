@@ -22,7 +22,7 @@ export default function H2HPanel({ raceId }: { raceId: string }) {
 
   return (
     <div className="border-t">
-      <div className="px-4 py-2.5 bg-[#6b3b3b] border-b flex items-center">
+      <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
         <span className="text-sm font-bold tracking-wide text-white">H2H — Geçmiş Karşılaşmalar</span>
       </div>
       {loading ? (

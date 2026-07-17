@@ -7,7 +7,7 @@ export default function EquipmentPanel({ runners }: { runners: ProgramRunner[] }
   const withEquipment = runners.filter((r) => r.equipment || r.equipmentAdded || r.equipmentRemoved);
   return (
     <div className="border-t">
-      <div className="px-4 py-2.5 bg-[#5d5233] border-b flex items-center">
+      <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
         <span className="text-sm font-bold tracking-wide text-white">Takılar</span>
       </div>
       {withEquipment.length === 0 ? (

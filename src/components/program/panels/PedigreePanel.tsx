@@ -6,7 +6,7 @@ import type { ProgramRunner } from "@/server/services/race.service";
 export default function PedigreePanel({ runners }: { runners: ProgramRunner[] }) {
   return (
     <div className="border-t">
-      <div className="px-4 py-2.5 bg-[#4a3b6b] border-b flex items-center">
+      <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
         <span className="text-sm font-bold tracking-wide text-white">Pedigriler</span>
       </div>
       <div className="max-h-[480px] overflow-y-auto grid grid-cols-1 sm:grid-cols-2">
