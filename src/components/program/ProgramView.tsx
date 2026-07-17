@@ -7,6 +7,7 @@ import { ChevronDown, ChevronUp, Star } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
 import HorseDetailModal from "./HorseDetailModal";
+import EmailVerificationGate from "./EmailVerificationGate";
 
 // Sadece ilgili buton tıklanınca açılan paneller — ilk sayfa yüklemesinin JS
 // paketine dahil edilmesinler diye lazy-load (next/dynamic) ile yükleniyor.
@@ -159,16 +160,6 @@ function rankStyle(rank: number) {
   return { badge: "bg-muted text-muted-foreground", text: "text-muted-foreground" };
 }
 
-function veriGuvenColor(vg: string | undefined) {
-  if (!vg) return "text-muted-foreground";
-  const u = vg.toUpperCase();
-  if (u.startsWith("A")) return "text-[#27ae60] font-semibold";
-  if (u.startsWith("B+") || u === "B+") return "text-[#2980b9] font-semibold";
-  if (u.startsWith("B")) return "text-[#2980b9]";
-  if (u.startsWith("C+") || u === "C+") return "text-[#e67e22]";
-  return "text-[#e74c3c]";
-}
-
 function pickDisplay(p: ProgramPick): { no: number | string; name: string } {
   if (p.runner) return { no: p.runner.no, name: p.runner.name };
   return { no: "—", name: p.runnerLabel ?? "—" };
@@ -191,12 +182,14 @@ function XLogo({ className }: { className?: string }) {
 // ── Analiz paneli ────────────────────────────────────────────────────────────
 
 function AnalysisPanel({
-  picks, winnerNo, isLoggedIn, isAdmin, raceNo, hippodromeName, raceId,
+  picks, winnerNo, isLoggedIn, isAdmin, isVerified, userEmail, raceNo, hippodromeName, raceId,
 }: {
   picks: ProgramPick[];
   winnerNo?: number | null;
   isLoggedIn: boolean;
   isAdmin: boolean;
+  isVerified: boolean;
+  userEmail: string;
   raceNo: number;
   hippodromeName?: string;
   raceId: string;
@@ -245,6 +238,17 @@ function AnalysisPanel({
             </a>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (!isVerified) {
+    return (
+      <div ref={ref} className="border-t">
+        <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
+          <span className="text-sm font-bold tracking-wide text-white">Analiz Detayları</span>
+        </div>
+        <EmailVerificationGate email={userEmail} />
       </div>
     );
   }
@@ -759,7 +763,7 @@ type JockeyStatsMap = Record<string, {
 type TrainerStatsMap = Record<string, TrainerStatRow>;
 
 function RaceTable({
-  race, dateStr, analysisOpen, onAnalysisToggle, son800Open, galopOpen, pedigreeOpen, equipmentOpen, comparisonOpen, h2hOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, jockeyStats, trainerStats, hippodromeName,
+  race, dateStr, analysisOpen, onAnalysisToggle, son800Open, galopOpen, pedigreeOpen, equipmentOpen, comparisonOpen, h2hOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, isVerified, userEmail, jockeyStats, trainerStats, hippodromeName,
 }: {
   race: ProgramRace;
   dateStr: string;
@@ -776,6 +780,8 @@ function RaceTable({
   onSelectHorse: (name: string) => void;
   isLoggedIn: boolean;
   isAdmin: boolean;
+  isVerified: boolean;
+  userEmail: string;
   jockeyStats?: JockeyStatsMap;
   hippodromeName?: string;
   trainerStats?: TrainerStatsMap;
@@ -918,6 +924,8 @@ function RaceTable({
           winnerNo={winnerNo}
           isLoggedIn={isLoggedIn}
           isAdmin={isAdmin}
+          isVerified={isVerified}
+          userEmail={userEmail}
           raceNo={race.raceNo}
           hippodromeName={hippodromeName}
           raceId={race.id}
@@ -936,13 +944,15 @@ function RaceTable({
 // ── Ana görünüm ───────────────────────────────────────────────────────────────
 
 export default function ProgramView({
-  days, dateStr, followedNames = [], isLoggedIn = false, isAdmin = false, jockeyStats = {}, trainerStats = {},
+  days, dateStr, followedNames = [], isLoggedIn = false, isAdmin = false, isVerified = false, userEmail = "", jockeyStats = {}, trainerStats = {},
 }: {
   days: ProgramDay[];
   dateStr: string;
   followedNames?: string[];
   isLoggedIn?: boolean;
   isAdmin?: boolean;
+  isVerified?: boolean;
+  userEmail?: string;
   jockeyStats?: JockeyStatsMap;
   trainerStats?: TrainerStatsMap;
 }) {
@@ -1164,6 +1174,8 @@ export default function ProgramView({
               onSelectHorse={setSelectedHorse}
               isLoggedIn={isLoggedIn}
               isAdmin={isAdmin}
+              isVerified={isVerified}
+              userEmail={userEmail}
               jockeyStats={jockeyStats}
               trainerStats={trainerStats}
               hippodromeName={currentDay?.hippodromeName}

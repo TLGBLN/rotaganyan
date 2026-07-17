@@ -9,6 +9,7 @@ import { AuthError } from "next-auth";
 import { checkRateLimit, loginLimiter, registerLimiter } from "@/lib/ratelimit";
 import { sendWelcomeEmail } from "@/lib/email";
 import { notifyAdminsNewUser } from "./notification.actions";
+import { sendInitialVerificationEmail } from "./email-verification.actions";
 
 export async function registerUser(formData: FormData) {
   const hdrs = await headers();
@@ -24,6 +25,7 @@ export async function registerUser(formData: FormData) {
     email: formData.get("email"),
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
+    acceptTerms: formData.get("acceptTerms") === "true",
   };
 
   const parsed = registerSchema.safeParse(raw);
@@ -46,6 +48,7 @@ export async function registerUser(formData: FormData) {
 
   // Fire and forget — don't block registration on email/notification failure
   sendWelcomeEmail(email, name).catch(console.error);
+  sendInitialVerificationEmail(email, name).catch(console.error);
   notifyAdminsNewUser(user.id).catch(console.error);
 
   return { success: true };

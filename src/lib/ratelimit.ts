@@ -26,6 +26,9 @@ export const registerLimiter = createRateLimiter(3, "1 h");
 // 3 password reset requests per hour per IP
 export const passwordResetLimiter = createRateLimiter(3, "1 h");
 
+// 3 e-posta doğrulama (tekrar gönder) isteği saatte, IP başına
+export const emailVerificationLimiter = createRateLimiter(3, "1 h");
+
 export async function checkRateLimit(
   limiter: ReturnType<typeof createRateLimiter>,
   identifier: string

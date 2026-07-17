@@ -15,10 +15,15 @@ export const registerSchema = z
       .regex(/[A-Z]/, "En az bir büyük harf içermeli")
       .regex(/[0-9]/, "En az bir rakam içermeli"),
     confirmPassword: z.string(),
+    acceptTerms: z.boolean(),
   })
   .refine((d) => d.password === d.confirmPassword, {
     message: "Şifreler eşleşmiyor",
     path: ["confirmPassword"],
+  })
+  .refine((d) => d.acceptTerms === true, {
+    message: "18 yaşından büyük olmalı ve Kullanım Koşulları'nı kabul etmelisiniz",
+    path: ["acceptTerms"],
   });
 
 export const forgotPasswordSchema = z.object({

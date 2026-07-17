@@ -77,6 +77,9 @@ export default async function ProgramPage({ searchParams }: PageProps) {
     await independentDataPromise;
   const isLoggedIn = !!session?.user;
   const isAdmin = session?.user?.role ? hasRole(session.user.role as Role, "EDITOR") : false;
+  // Adminler/editörler doğrulama zorunluluğundan muaf — kendi hesaplarını her zaman test edebilmeliler.
+  const isVerified = isAdmin || !!session?.user?.isEmailVerified;
+  const userEmail = session?.user?.email ?? "";
   const followedNames = followedHorses.map((h) => h.horseName);
 
   // Jokey ve antrenör istatistikleri — TJK'nın resmi bu yıl galibiyet/biniş verileri
@@ -114,7 +117,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
           <DateNavigator currentDate={currentDate} basePath="/program" />
         </div>
         <div className="rounded-lg border overflow-hidden">
-          <ProgramView days={viewDays} dateStr={currentDate} followedNames={followedNames} isLoggedIn={isLoggedIn} isAdmin={isAdmin} jockeyStats={jockeyStats} trainerStats={trainerStats} />
+          <ProgramView days={viewDays} dateStr={currentDate} followedNames={followedNames} isLoggedIn={isLoggedIn} isAdmin={isAdmin} isVerified={isVerified} userEmail={userEmail} jockeyStats={jockeyStats} trainerStats={trainerStats} />
         </div>
       </div>
 

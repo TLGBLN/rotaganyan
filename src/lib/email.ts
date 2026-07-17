@@ -63,6 +63,37 @@ export async function sendPremiumConfirmationEmail(email: string, name: string) 
   });
 }
 
+export async function sendVerificationEmail(email: string, name: string, token: string) {
+  if (!resend) {
+    console.warn("[email] RESEND_API_KEY not set — skipping email send");
+    return;
+  }
+
+  const verifyUrl = `${BASE_URL}/eposta-dogrula/${token}`;
+
+  await resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: "E-postanızı doğrulayın — ROTAGANYAN",
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#15803d">Merhaba ${name}!</h2>
+        <p>ROTAGANYAN'a kayıt olduğunuz için teşekkürler. Hesabınızı tam olarak kullanabilmek
+        (analizler dahil) için e-posta adresinizi doğrulamanız gerekiyor.</p>
+        <a
+          href="${verifyUrl}"
+          style="display:inline-block;padding:12px 24px;background:#15803d;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;margin:16px 0"
+        >
+          E-postamı Doğrula
+        </a>
+        <p style="color:#6b7280;font-size:12px">
+          Bu bağlantı <strong>24 saat</strong> geçerlidir. Bağlantı: ${verifyUrl}
+        </p>
+      </div>
+    `,
+  });
+}
+
 export async function sendWelcomeEmail(email: string, name: string) {
   if (!resend) return;
 

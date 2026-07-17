@@ -1,14 +1,16 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, type RegisterInput } from "@/lib/validations/auth";
 import { registerUser } from "@/server/actions/auth.actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Loader2, CheckCircle2 } from "lucide-react";
 
 export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) {
@@ -19,13 +21,17 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isSubmitting },
-  } = useForm<RegisterInput>({ resolver: zodResolver(registerSchema) });
+  } = useForm<RegisterInput>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: { acceptTerms: false },
+  });
 
   async function onSubmit(data: RegisterInput) {
     setServerError(null);
     const fd = new FormData();
-    Object.entries(data).forEach(([k, v]) => fd.set(k, v));
+    Object.entries(data).forEach(([k, v]) => fd.set(k, String(v)));
     const res = await registerUser(fd);
     if (res?.error) {
       setServerError(res.error);
@@ -74,6 +80,35 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
         {errors.confirmPassword && (
           <p className="text-xs text-miss">{errors.confirmPassword.message}</p>
         )}
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="flex items-start gap-2">
+          <Controller
+            name="acceptTerms"
+            control={control}
+            render={({ field }) => (
+              <Checkbox
+                id="acceptTerms"
+                checked={field.value}
+                onCheckedChange={field.onChange}
+                className="mt-0.5"
+              />
+            )}
+          />
+          <Label htmlFor="acceptTerms" className="text-xs font-normal leading-relaxed text-muted-foreground">
+            18 yaşından büyüğüm ve{" "}
+            <Link href="/kullanim-kosullari" target="_blank" className="text-brand underline">
+              Kullanım Koşulları
+            </Link>
+            {" "}ile{" "}
+            <Link href="/gizlilik" target="_blank" className="text-brand underline">
+              Gizlilik Politikası
+            </Link>
+            &apos;nı okudum, kabul ediyorum.
+          </Label>
+        </div>
+        {errors.acceptTerms && <p className="text-xs text-miss">{errors.acceptTerms.message}</p>}
       </div>
 
       {serverError && (

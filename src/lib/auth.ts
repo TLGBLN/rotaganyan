@@ -30,6 +30,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             role: true,
             plan: true,
             image: true,
+            emailVerified: true,
           },
         });
 
@@ -48,15 +49,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           role: user.role,
           plan: user.plan,
           image: user.image ?? undefined,
+          isEmailVerified: !!user.emailVerified,
         };
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.role = user.role;
         token.plan = user.plan;
+        token.isEmailVerified = user.isEmailVerified;
+      }
+      // E-posta doğrulandıktan sonra client'ta useSession().update() çağrılınca
+      // JWT'deki eski (doğrulanmamış) durumu DB'den taze okuyarak günceller —
+      // aksi halde kullanıcı çıkış/giriş yapana kadar hâlâ "doğrulanmamış" görünür.
+      if (trigger === "update" && token.sub) {
+        const fresh = await db.user.findUnique({
+          where: { id: token.sub },
+          select: { emailVerified: true },
+        });
+        if (fresh) token.isEmailVerified = !!fresh.emailVerified;
       }
       return token;
     },
@@ -65,6 +78,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.id = token.sub!;
         session.user.role = token.role as Role;
         session.user.plan = token.plan as import("@prisma/client").Plan;
+        session.user.isEmailVerified = token.isEmailVerified as boolean;
       }
       return session;
     },
