@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import SireTierForm from "@/components/admin/SireTierForm";
 import SireTierDeleteButton from "@/components/admin/SireTierDeleteButton";
-import PedigreeEntryRow from "@/components/admin/PedigreeEntryRow";
+import RacePedigreeTable from "@/components/admin/RacePedigreeTable";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import { getRaceDaysForPedigreeEntry } from "@/server/services/admin.service";
 import { turkeyDateString } from "@/lib/tz";
@@ -71,45 +71,7 @@ export default async function PedigriPage({ searchParams }: PageProps) {
               </div>
               <div className="divide-y">
                 {rd.races.map((race) => (
-                  <div key={race.id} className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="px-3 py-1.5 text-left font-medium text-muted-foreground">
-                            {race.raceNo}. Koşu
-                          </th>
-                          <th className="px-3 py-1.5 text-left font-medium text-muted-foreground">At</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Baba</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Anne</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Anne Babası</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Not</th>
-                          <th className="px-2 py-1.5"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {race.runners.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} className="px-3 py-3 text-center text-muted-foreground">
-                              At kaydı yok.
-                            </td>
-                          </tr>
-                        ) : (
-                          race.runners.map((r) => (
-                            <PedigreeEntryRow
-                              key={r.id}
-                              runnerId={r.id}
-                              no={r.no}
-                              name={r.name}
-                              sire={r.sire}
-                              dam={r.dam}
-                              damSire={r.damSire}
-                              pedigreeNote={r.pedigreeNote}
-                            />
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                  <RacePedigreeTable key={race.id} raceNo={race.raceNo} runners={race.runners} />
                 ))}
               </div>
             </section>
