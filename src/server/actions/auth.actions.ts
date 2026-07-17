@@ -27,7 +27,6 @@ export async function registerUser(formData: FormData) {
     confirmPassword: formData.get("confirmPassword"),
     ageConfirmed: formData.get("ageConfirmed") === "true",
     acceptTerms: formData.get("acceptTerms") === "true",
-    marketingConsent: formData.get("marketingConsent") === "true",
   };
 
   const parsed = registerSchema.safeParse(raw);
@@ -35,7 +34,7 @@ export async function registerUser(formData: FormData) {
     return { error: parsed.error.issues[0]?.message ?? "Geçersiz veri" };
   }
 
-  const { name, email, password, marketingConsent } = parsed.data;
+  const { name, email, password } = parsed.data;
 
   const existing = await db.user.findUnique({ where: { email } });
   if (existing) {
@@ -45,7 +44,7 @@ export async function registerUser(formData: FormData) {
   const passwordHash = await bcrypt.hash(password, 12);
 
   const user = await db.user.create({
-    data: { name, email, passwordHash, marketingConsent: !!marketingConsent },
+    data: { name, email, passwordHash },
   });
 
   // Fire and forget — don't block registration on email/notification failure

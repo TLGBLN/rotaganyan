@@ -28,7 +28,7 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
     formState: { errors, isSubmitting },
   } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { ageConfirmed: false, acceptTerms: false, marketingConsent: false },
+    defaultValues: { ageConfirmed: false, acceptTerms: false },
   });
 
   async function onSubmit(data: RegisterInput) {
@@ -123,35 +123,12 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
             />
             <Label htmlFor="acceptTerms" className="text-xs font-semibold uppercase tracking-wide leading-relaxed text-foreground">
               <Link href="/kullanim-kosullari" target="_blank" className="text-brand underline">
-                Kullanım Koşulları
+                Kullanım Koşullarını
               </Link>
-              {" "}ile{" "}
-              <Link href="/gizlilik" target="_blank" className="text-brand underline">
-                Gizlilik Politikası
-              </Link>
-              &apos;nı kabul ediyorum
+              {" "}kabul ediyorum
             </Label>
           </div>
           {errors.acceptTerms && <p className="text-xs text-miss">{errors.acceptTerms.message}</p>}
-        </div>
-
-        <div className="flex items-start gap-2">
-          <Controller
-            name="marketingConsent"
-            control={control}
-            render={({ field }) => (
-              <Checkbox
-                id="marketingConsent"
-                checked={field.value}
-                onCheckedChange={field.onChange}
-                className="mt-0.5"
-              />
-            )}
-          />
-          <Label htmlFor="marketingConsent" className="text-xs font-semibold uppercase tracking-wide leading-relaxed text-muted-foreground">
-            Kampanya, fırsat ve içerik e-postaları almak istiyorum{" "}
-            <span className="font-normal normal-case">(isteğe bağlı, sonradan kapatabilirsiniz)</span>
-          </Label>
         </div>
       </div>
 

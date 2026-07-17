@@ -17,7 +17,6 @@ export const registerSchema = z
     confirmPassword: z.string(),
     ageConfirmed: z.boolean(),
     acceptTerms: z.boolean(),
-    marketingConsent: z.boolean().optional(),
   })
   .refine((d) => d.password === d.confirmPassword, {
     message: "Şifreler eşleşmiyor",
