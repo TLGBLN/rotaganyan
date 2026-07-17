@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import AuthTabs from "../AuthTabs";
 import RegisterForm from "./RegisterForm";
 
 export const metadata: Metadata = { title: "Kayıt Ol" };
@@ -20,10 +20,11 @@ export default async function KayitPage({ searchParams }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Kayıt Ol</CardTitle>
+        <CardTitle className="text-xl">Üye Ol</CardTitle>
         <CardDescription>Ücretsiz hesabınızı oluşturun.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
+        <AuthTabs active="kayit" callbackUrl={callbackUrl} />
         <div className="rounded-lg border bg-muted/30 px-4 py-3 space-y-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Üye olunca erişebilecekleriniz</p>
           <ul className="space-y-1.5">
@@ -36,15 +37,6 @@ export default async function KayitPage({ searchParams }: Props) {
           </ul>
         </div>
         <RegisterForm callbackUrl={callbackUrl} />
-        <div className="text-center text-sm text-muted-foreground">
-          Zaten hesabınız var mı?{" "}
-          <Link
-            href={callbackUrl ? `/giris?callbackUrl=${encodeURIComponent(callbackUrl)}` : "/giris"}
-            className="text-brand hover:underline"
-          >
-            Giriş Yap
-          </Link>
-        </div>
       </CardContent>
     </Card>
   );

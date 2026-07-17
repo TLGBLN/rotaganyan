@@ -3,6 +3,7 @@ import Image from "next/image";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { hasRole } from "@/lib/auth";
+import Wordmark from "@/components/layout/Wordmark";
 
 export default async function AuthLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -26,10 +27,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
           className="rounded-full"
           priority
         />
-        <span className="text-xl font-bold tracking-tight">
-          <span className="text-foreground">ROTA</span>
-          <span className="text-brand">GANYAN</span>
-        </span>
+        <Wordmark className="text-xl" />
       </Link>
       <div className="w-full max-w-md">{children}</div>
     </div>

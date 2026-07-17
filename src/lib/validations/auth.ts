@@ -15,14 +15,20 @@ export const registerSchema = z
       .regex(/[A-Z]/, "En az bir büyük harf içermeli")
       .regex(/[0-9]/, "En az bir rakam içermeli"),
     confirmPassword: z.string(),
+    ageConfirmed: z.boolean(),
     acceptTerms: z.boolean(),
+    marketingConsent: z.boolean().optional(),
   })
   .refine((d) => d.password === d.confirmPassword, {
     message: "Şifreler eşleşmiyor",
     path: ["confirmPassword"],
   })
+  .refine((d) => d.ageConfirmed === true, {
+    message: "18 yaşından büyük olduğunuzu onaylamalısınız",
+    path: ["ageConfirmed"],
+  })
   .refine((d) => d.acceptTerms === true, {
-    message: "18 yaşından büyük olmalı ve Kullanım Koşulları'nı kabul etmelisiniz",
+    message: "Kullanım Koşulları'nı kabul etmelisiniz",
     path: ["acceptTerms"],
   });
 

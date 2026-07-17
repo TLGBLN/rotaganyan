@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { PasswordInput } from "@/components/ui/password-input";
+import AuthTabs from "../AuthTabs";
 
 export const metadata: Metadata = { title: "Giriş Yap" };
 
@@ -70,25 +72,20 @@ export default async function GirisPage({ searchParams }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Giriş Yap</CardTitle>
+        <CardTitle className="text-xl">Giriş Yap</CardTitle>
         <CardDescription>Hesabınıza erişmek için bilgilerinizi girin.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
+        <AuthTabs active="giris" callbackUrl={callbackUrl} />
         <form action={login} className="space-y-4">
           <input type="hidden" name="callbackUrl" value={callbackUrl ?? "/"} />
           <div className="space-y-1.5">
-            <Label htmlFor="email">E-posta</Label>
+            <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">E-posta</Label>
             <Input id="email" name="email" type="email" autoComplete="email" required />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="password">Şifre</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-            />
+            <Label htmlFor="password" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Şifre</Label>
+            <PasswordInput id="password" name="password" autoComplete="current-password" required />
           </div>
 
           {hata && (
@@ -102,15 +99,6 @@ export default async function GirisPage({ searchParams }: Props) {
           </Button>
         </form>
 
-        <div className="text-center text-sm text-muted-foreground">
-          Hesabınız yok mu?{" "}
-          <Link
-            href={callbackUrl ? `/kayit?callbackUrl=${encodeURIComponent(callbackUrl)}` : "/kayit"}
-            className="text-brand hover:underline"
-          >
-            Kayıt Ol
-          </Link>
-        </div>
         <div className="text-center text-sm">
           <Link href="/sifre-sifirla" className="text-muted-foreground hover:text-foreground">
             Şifremi Unuttum

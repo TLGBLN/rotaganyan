@@ -87,6 +87,7 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   hasSeenIntro  Boolean   @default(false)
+  marketingConsent Boolean @default(false)
 
   predictions   Prediction[]
   articles      Article[]

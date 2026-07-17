@@ -8,10 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, CheckCircle2 } from "lucide-react";
+
+const FIELD_LABEL = "text-xs font-semibold uppercase tracking-wide text-muted-foreground";
 
 export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) {
   const [serverError, setServerError] = useState<string | null>(null);
@@ -25,7 +28,7 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
     formState: { errors, isSubmitting },
   } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { acceptTerms: false },
+    defaultValues: { ageConfirmed: false, acceptTerms: false, marketingConsent: false },
   });
 
   async function onSubmit(data: RegisterInput) {
@@ -57,58 +60,99 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div className="space-y-1.5">
-        <Label htmlFor="name">Ad Soyad</Label>
+        <Label htmlFor="name" className={FIELD_LABEL}>Ad Soyad</Label>
         <Input id="name" autoComplete="name" {...register("name")} />
         {errors.name && <p className="text-xs text-miss">{errors.name.message}</p>}
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="email">E-posta</Label>
+        <Label htmlFor="email" className={FIELD_LABEL}>E-posta</Label>
         <Input id="email" type="email" autoComplete="email" {...register("email")} />
         {errors.email && <p className="text-xs text-miss">{errors.email.message}</p>}
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="password">Şifre</Label>
-        <Input id="password" type="password" autoComplete="new-password" {...register("password")} />
+        <Label htmlFor="password" className={FIELD_LABEL}>Şifre</Label>
+        <PasswordInput id="password" autoComplete="new-password" {...register("password")} />
         {errors.password && <p className="text-xs text-miss">{errors.password.message}</p>}
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="confirmPassword">Şifre Tekrar</Label>
-        <Input id="confirmPassword" type="password" autoComplete="new-password" {...register("confirmPassword")} />
+        <Label htmlFor="confirmPassword" className={FIELD_LABEL}>Şifre Tekrar</Label>
+        <PasswordInput id="confirmPassword" autoComplete="new-password" {...register("confirmPassword")} />
         {errors.confirmPassword && (
           <p className="text-xs text-miss">{errors.confirmPassword.message}</p>
         )}
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-3 pt-1">
+        <div className="space-y-1">
+          <div className="flex items-start gap-2">
+            <Controller
+              name="ageConfirmed"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="ageConfirmed"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                  className="mt-0.5"
+                />
+              )}
+            />
+            <Label htmlFor="ageConfirmed" className="text-xs font-semibold uppercase tracking-wide leading-relaxed text-foreground">
+              18 yaşından büyüğüm
+            </Label>
+          </div>
+          {errors.ageConfirmed && <p className="text-xs text-miss">{errors.ageConfirmed.message}</p>}
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex items-start gap-2">
+            <Controller
+              name="acceptTerms"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="acceptTerms"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                  className="mt-0.5"
+                />
+              )}
+            />
+            <Label htmlFor="acceptTerms" className="text-xs font-semibold uppercase tracking-wide leading-relaxed text-foreground">
+              <Link href="/kullanim-kosullari" target="_blank" className="text-brand underline">
+                Kullanım Koşulları
+              </Link>
+              {" "}ile{" "}
+              <Link href="/gizlilik" target="_blank" className="text-brand underline">
+                Gizlilik Politikası
+              </Link>
+              &apos;nı kabul ediyorum
+            </Label>
+          </div>
+          {errors.acceptTerms && <p className="text-xs text-miss">{errors.acceptTerms.message}</p>}
+        </div>
+
         <div className="flex items-start gap-2">
           <Controller
-            name="acceptTerms"
+            name="marketingConsent"
             control={control}
             render={({ field }) => (
               <Checkbox
-                id="acceptTerms"
+                id="marketingConsent"
                 checked={field.value}
                 onCheckedChange={field.onChange}
                 className="mt-0.5"
               />
             )}
           />
-          <Label htmlFor="acceptTerms" className="text-xs font-normal leading-relaxed text-muted-foreground">
-            18 yaşından büyüğüm ve{" "}
-            <Link href="/kullanim-kosullari" target="_blank" className="text-brand underline">
-              Kullanım Koşulları
-            </Link>
-            {" "}ile{" "}
-            <Link href="/gizlilik" target="_blank" className="text-brand underline">
-              Gizlilik Politikası
-            </Link>
-            &apos;nı okudum, kabul ediyorum.
+          <Label htmlFor="marketingConsent" className="text-xs font-semibold uppercase tracking-wide leading-relaxed text-muted-foreground">
+            Kampanya, fırsat ve içerik e-postaları almak istiyorum{" "}
+            <span className="font-normal normal-case">(isteğe bağlı, sonradan kapatabilirsiniz)</span>
           </Label>
         </div>
-        {errors.acceptTerms && <p className="text-xs text-miss">{errors.acceptTerms.message}</p>}
       </div>
 
       {serverError && (
