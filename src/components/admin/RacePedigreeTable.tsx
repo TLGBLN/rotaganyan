@@ -42,7 +42,8 @@ function parseBulkPedigree(text: string): ParsedEntry[] {
   for (const block of blocks) {
     const headerMatch = block.match(/^\d+\.\s*(.+)/);
     if (!headerMatch) continue;
-    const name = headerMatch[1].trim();
+    // "1. BERATIM (8y)" gibi isme eklenmiş yaş bilgisini ("(8y)", "(4 y)"...) at ismine dahil etmeden ayıkla.
+    const name = headerMatch[1].replace(/\s*\(\s*\d+\s*y\s*\)\s*$/i, "").trim();
     const rest = block.slice(headerMatch[0].length);
 
     const sireMatch = rest.match(/Babas[ıİi]\s*\(([^)]+)\)\s*:\s*([\s\S]*?)(?=\s*Anne\s*Hatt[ıİi]\s*\(|$)/i);
