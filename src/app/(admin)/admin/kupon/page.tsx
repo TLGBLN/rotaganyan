@@ -4,7 +4,7 @@ import { tr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { getHippodromes, getRaceDaysByDate } from "@/server/services/race.service";
+import { getHippodromes, getRaceDaysByDate, buildKuponOnerisi, type KuponStatus } from "@/server/services/race.service";
 import { getAdminRaceDays, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
 import { turkeyDateString } from "@/lib/tz";
 import PuanTablosu from "@/components/kosular/PuanTablosu";
@@ -46,6 +46,16 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
     getAdminRaceDays(currentDate),         // Koşu programı tablosu için (kosular ile aynı)
     getAnalystStats(currentDate),
   ]);
+
+  // Her kuponun güncel isabet durumu (Ekonomik/Normal/Geniş) — koşular bittikçe burada da görülsün diye.
+  const kuponSonuclari = await Promise.all(
+    kuponlar.map((k) => buildKuponOnerisi({ hippodromeName: k.hippodromeName, date: k.date, legs: k.legs }))
+  );
+  const statusBadge: Record<KuponStatus, { label: string; cls: string }> = {
+    hit: { label: "Tuttu", cls: "bg-hit/15 text-hit" },
+    miss: { label: "Yattı", cls: "bg-miss/15 text-miss" },
+    pending: { label: "Bekliyor", cls: "bg-muted text-muted-foreground" },
+  };
 
   // Karma mirror lookup — kosular/page.tsx ile aynı mantık
   type RaceRow = (typeof adminRaceDays)[0]["races"][0];
@@ -221,19 +231,21 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">Tarih</th>
                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">Ayak</th>
                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">Durum</th>
+                <th className="px-3 py-2 text-left font-medium text-muted-foreground">Sonuç</th>
                 <th className="px-3 py-2 text-right font-medium text-muted-foreground">İşlem</th>
               </tr>
             </thead>
             <tbody>
               {kuponlar.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
                     Henüz kupon oluşturulmadı.
                   </td>
                 </tr>
               )}
               {kuponlar.map((k, i) => {
                 const legCount = Array.isArray(k.legs) ? k.legs.length : 0;
+                const sonuc = kuponSonuclari[i];
                 return (
                   <tr key={k.id} className={cn("border-b last:border-0", i % 2 === 1 && "race-row-even")}>
                     <td className="px-3 py-2 font-medium">{k.hippodromeName}</td>
@@ -245,6 +257,26 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                       <Badge variant={k.isActive ? "default" : "secondary"} className="text-xs">
                         {k.isActive ? "Yayında" : "Pasif"}
                       </Badge>
+                    </td>
+                    <td className="px-3 py-2">
+                      {sonuc ? (
+                        <div className="flex flex-wrap gap-1">
+                          {sonuc.variants.map((v) => (
+                            <span
+                              key={v.key}
+                              title={v.label}
+                              className={cn(
+                                "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                                statusBadge[v.status].cls
+                              )}
+                            >
+                              {v.label[0]}: {statusBadge[v.status].label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right">
                       <KuponActions

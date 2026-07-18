@@ -367,7 +367,7 @@ function kuponAmount(nosPerLeg: number[][]): number {
   return Math.round(combinations * STAKE_PER_COMBINATION * 100) / 100;
 }
 
-async function buildKuponOnerisi(active: {
+export async function buildKuponOnerisi(active: {
   hippodromeName: string;
   date: Date;
   legs: unknown;
