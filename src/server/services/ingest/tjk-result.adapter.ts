@@ -21,7 +21,7 @@ async function fetchHtml(url: string): Promise<string> {
   return body.text();
 }
 
-export type ResultRow = { rank: number; no: number; name: string; ganyan?: number; jockey?: string };
+export type ResultRow = { rank: number; no: number; name: string; ganyan?: number; jockey?: string; time?: string; fark?: string };
 export type CityRaceResult = { raceNo: number; rows: ResultRow[] };
 
 export async function fetchCityResults(
@@ -84,7 +84,10 @@ export async function fetchCityResults(
       const jockeyRaw = $(".gunluk-GunlukYarisSonuclari-JokeAdi", row).first().text().trim();
       const jockey = jockeyRaw || undefined;
 
-      rows.push({ rank, no, name, ganyan: isNaN(ganyan as number) ? undefined : ganyan, jockey });
+      const time = $(".gunluk-GunlukYarisSonuclari-Derece", row).first().text().trim() || undefined;
+      const fark = $(".gunluk-GunlukYarisSonuclari-Fark", row).first().text().trim() || undefined;
+
+      rows.push({ rank, no, name, ganyan: isNaN(ganyan as number) ? undefined : ganyan, jockey, time, fark });
     });
 
     if (rows.length > 0) {

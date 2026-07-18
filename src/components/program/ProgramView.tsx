@@ -957,6 +957,25 @@ function RaceTable({
         )}
       </div>
 
+      {/* Sonuç kartı — koşu sonuçlandığında TJK formatında otomatik doldurulur */}
+      {race.result && (
+        <div className="border-t bg-muted/10 px-3 py-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] font-mono">
+          <span className="font-semibold text-foreground">SONUÇ:</span>
+          <span>
+            {(Array.isArray(race.result.actualOrder) ? (race.result.actualOrder as number[]).slice(0, 5) : []).join(" · ") || "—"}
+          </span>
+          <span className="mx-1 text-muted-foreground">/</span>
+          <span className="font-semibold text-foreground">MÜDDET:</span>
+          <span>{race.result.time || "—"}</span>
+          <span className="mx-1 text-muted-foreground">/</span>
+          <span className="font-semibold text-foreground">FARKLAR:</span>
+          <span>{race.result.farklar || "—"}</span>
+          <span className="mx-1 text-muted-foreground">/</span>
+          <span className="font-semibold text-foreground">GANYAN:</span>
+          <span>{race.result.ganyan != null ? String(race.result.ganyan).replace(".", ",") : "—"}</span>
+        </div>
+      )}
+
       {/* Analiz paneli */}
       <div id="panel-analiz">
         {race.hasAnalysis && analysisOpen && (
@@ -1141,20 +1160,8 @@ export default function ProgramView({
             </div>
           )}
 
-          {/* Zemin legend + analiz + geri sayım */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-4 px-3 py-1.5 bg-muted/20 border-b text-[11px]">
-            {/* "Son Yarışlar" kutucukları bu renkleri kullandığı için mobilde de gösterilir */}
-            <div className="flex items-center gap-3 sm:gap-4 text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-sm bg-[#009900] inline-block" /> Çim
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-sm bg-[#996633] inline-block" /> Kum
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-sm bg-[#D39B1E] inline-block" /> Sentetik
-              </span>
-            </div>
+          {/* Analiz + geri sayım */}
+          <div className="flex items-center px-3 py-1.5 bg-muted/20 border-b text-[11px]">
             <div className="flex items-center gap-2 overflow-x-auto min-w-0 print:hidden">
               {currentRace?.hasAnalysis ? (
                 <button

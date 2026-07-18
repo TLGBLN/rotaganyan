@@ -589,7 +589,7 @@ export type ProgramRace = {
   distance: number;
   conditions: string | null;
   runners: ProgramRunner[];
-  result: { winnerNo: number | null } | null;
+  result: { winnerNo: number | null; actualOrder: unknown; ganyan: number | null; time: string | null; farklar: string | null } | null;
   hasAnalysis: boolean;
   picks: ProgramPick[];
 };
@@ -614,7 +614,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
       races: {
         orderBy: { raceNo: "asc" },
         include: {
-          result: { select: { winnerNo: true } },
+          result: { select: { winnerNo: true, actualOrder: true, ganyan: true, time: true, farklar: true } },
           prediction: {
             select: {
               picks: {

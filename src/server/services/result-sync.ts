@@ -62,8 +62,13 @@ export async function syncResultsForDate(dateStr: string): Promise<void> {
     const top3Nos = picks.map(p => p.runner?.no).filter((n): n is number => n != null);
     const hitInCoupon = winnerNo != null && top3Nos.includes(winnerNo);
 
+    // Müddet = kazananın resmi koşu süresi; Farklar = ilk 5 sıra arasındaki TJK mesafe farkları.
+    const sortedRows = [...raceResult.rows].sort((a, b) => a.rank - b.rank);
+    const time = sortedRows[0]?.time ?? null;
+    const farklar = sortedRows.slice(0, 5).map((r) => r.fark).filter((f): f is string => !!f).join(", ") || null;
+
     await db.result.create({
-      data: { raceId: race.id, winnerNo, actualOrder, ganyan, hitTop1, hitInCoupon },
+      data: { raceId: race.id, winnerNo, actualOrder, ganyan, time, farklar, hitTop1, hitInCoupon },
     });
   }
 }

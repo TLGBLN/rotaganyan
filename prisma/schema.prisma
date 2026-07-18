@@ -330,6 +330,8 @@ model Result {
   actualOrder Json
   winnerNo    Int?
   ganyan      Float?
+  time        String? // Müddet — kazananın resmi koşu süresi (örn. "1.20.11")
+  farklar     String? // Farklar — ilk sıralar arasındaki mesafe farkları, TJK sırasıyla (örn. "Baş, 1, 2, Boyun")
   hitTop1     Boolean  @default(false)
   hitInCoupon Boolean  @default(false)
   hitRanks    Json?
