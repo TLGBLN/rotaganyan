@@ -467,7 +467,16 @@ export async function getKuponOnerileri(): Promise<KuponOnerisi[]> {
   }
 
   const results = await Promise.all(validActives.map((a) => buildKuponOnerisi(a)));
-  return results.filter((r): r is NonNullable<typeof r> => r !== null);
+  // Yatan (miss) varyantlar gün bitmeden anasayfadan kalksın — tutan (hit) ve henüz
+  // sonuçlanmamış (pending) varyantlar gün boyu yayında kalmaya devam eder. Bir
+  // hipodromun Ekonomik/Normal/Geniş varyantları birbirinden bağımsız yatabilir
+  // (ör. Ekonomik yatar ama Geniş hâlâ tutuyor olabilir). Geçmiş (yatan dahil)
+  // admin panelindeki "Geçmiş Kuponlar" listesinde zaten saklanıyor — bu sadece
+  // anasayfa görünümünü filtreler, veriyi silmez.
+  return results
+    .filter((r): r is NonNullable<typeof r> => r !== null)
+    .map((r) => ({ ...r, variants: r.variants.filter((v) => v.status !== "miss") }))
+    .filter((r) => r.variants.length > 0);
 }
 
 // ─── Canlı Oranlar (anasayfa) ───────────────────────────────────────────────────
