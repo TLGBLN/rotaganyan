@@ -181,7 +181,12 @@ export async function publishHomeKupon(input: HomeKuponInput) {
     }));
 
   await db.$transaction([
-    db.homeKupon.updateMany({ where: { isActive: true, slot: input.slot }, data: { isActive: false } }),
+    // Sadece AYNI hipodromun aynı slotu (ör. "İzmir 1. Altılı") devre dışı kalır — farklı
+    // hipodromların kuponları (Karma, Ankara vb.) etkilenmez, hepsi aynı anda yayında kalabilir.
+    db.homeKupon.updateMany({
+      where: { isActive: true, slot: input.slot, hippodromeName: input.hippodromeName },
+      data: { isActive: false },
+    }),
     db.homeKupon.create({
       data: {
         hippodromeName: input.hippodromeName,
@@ -200,11 +205,15 @@ export async function publishHomeKupon(input: HomeKuponInput) {
 export async function setActiveHomeKupon(id: string) {
   await requireRole("EDITOR");
 
-  const target = await db.homeKupon.findUnique({ where: { id }, select: { slot: true } });
+  const target = await db.homeKupon.findUnique({ where: { id }, select: { slot: true, hippodromeName: true } });
   if (!target) return;
 
   await db.$transaction([
-    db.homeKupon.updateMany({ where: { isActive: true, slot: target.slot }, data: { isActive: false } }),
+    // Sadece AYNI hipodromun aynı slotu devre dışı kalır — bkz. publishHomeKupon.
+    db.homeKupon.updateMany({
+      where: { isActive: true, slot: target.slot, hippodromeName: target.hippodromeName },
+      data: { isActive: false },
+    }),
     db.homeKupon.update({ where: { id }, data: { isActive: true } }),
   ]);
 
