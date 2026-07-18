@@ -65,9 +65,18 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
     } catch { /* ingest hatası kupon işlemini engellemesin */ }
   });
 
-  // Karma altılılarda her koşu başka bir hipodromun aynasıdır (conditions = "İstanbul 8. Koşu" gibi).
-  // Bu yarışların kendi prediction'ı olmaz; at sıralaması için kaynak yarışın pick'leri bulunur.
-  const karmaRaces = raceDay.races.filter((r) => !r.prediction && r.conditions);
+  // Karma altılılarda her koşu başka bir hipodromun aynasıdır. Bu yarışların kendi prediction'ı
+  // olmaz; at sıralaması için kaynak yarışın pick'leri bulunur. Eşleştirme Race.conditions metin
+  // alanına (mevcut ingest hiç doldurmuyor) değil, atların isim kümesi imzasına bakılarak yapılır —
+  // karma bir koşu, kaynak koşuyla birebir aynı atlara sahiptir (bkz. race.service.ts).
+  function normHorseNameForMirror(name: string): string {
+    return name.replace(/\([A-Z]{2,3}\)/g, "").replace(/\s+/g, " ").trim().toUpperCase();
+  }
+  function runnerSetSignature(runners: { name: string }[]): string {
+    return runners.map((r) => normHorseNameForMirror(r.name)).sort().join("|");
+  }
+
+  const karmaRaces = raceDay.races.filter((r) => !r.prediction && r.runners.length > 0);
 
   // rankByNo: Karma yarışlar için at numarası → analiz sırası
   const rankByNoById = new Map<string, Map<number, number>>();
@@ -75,57 +84,46 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
   const metaByNoById = new Map<string, Map<number, { scratched: boolean; ekuriGroup: number | null }>>();
 
   if (karmaRaces.length > 0) {
-    // conditions → "HipodromAdı RaceNo. Koşu" formatından parse et
-    const parsedSources = karmaRaces.flatMap((r) => {
-      const m = r.conditions?.match(/^(.+?)\s+(\d+)\.\s*Ko[şs]u/i);
-      if (!m) return [];
-      return [{ raceId: r.id, hippodromeName: m[1].trim(), raceNo: parseInt(m[2], 10) }];
-    });
-
-    if (parsedSources.length > 0) {
-      // Kaynak yarışları + runner'larını + pick'lerini tek sorguda çek
-      const sourceRaces = await db.race.findMany({
-        where: {
-          raceDay: { date: { gte: date, lt: dayEnd } },
-          raceNo: { in: parsedSources.map((s) => s.raceNo) },
-          prediction: { isNot: null },
-        },
-        include: {
-          raceDay: { include: { hippodrome: { select: { name: true } } } },
-          runners: { select: { id: true, no: true, scratched: true, ekuriGroup: true } },
-          prediction: {
-            select: {
-              picks: { orderBy: { rank: "asc" }, select: { rank: true, runnerId: true } },
-            },
+    // O günün TÜM (karma hariç) prediction'lı yarışlarını imza → yarış olacak şekilde indeksle
+    const sourceRaces = await db.race.findMany({
+      where: {
+        raceDay: { date: { gte: date, lt: dayEnd }, hippodrome: { slug: { not: "karma" } } },
+        prediction: { isNot: null },
+      },
+      include: {
+        runners: { select: { id: true, no: true, name: true, scratched: true, ekuriGroup: true } },
+        prediction: {
+          select: {
+            picks: { orderBy: { rank: "asc" }, select: { rank: true, runnerId: true } },
           },
         },
-      });
+      },
+    });
+    const sourceBySignature = new Map<string, (typeof sourceRaces)[number]>();
+    for (const sr of sourceRaces) {
+      if (sr.runners.length > 0) sourceBySignature.set(runnerSetSignature(sr.runners), sr);
+    }
 
-      for (const src of parsedSources) {
-        const match = sourceRaces.find(
-          (sr) =>
-            sr.raceNo === src.raceNo &&
-            sr.raceDay.hippodrome.name.toLowerCase().includes(src.hippodromeName.toLowerCase())
-        );
-        if (!match?.prediction) continue;
+    for (const r of karmaRaces) {
+      const match = sourceBySignature.get(runnerSetSignature(r.runners));
+      if (!match?.prediction) continue;
 
-        // Kaynak runner ID'den at numarasına map oluştur, sonra no→rank yap
-        const runnerIdToNo = new Map(match.runners.map((ru) => [ru.id, ru.no]));
-        const noToRank = new Map<number, number>();
-        for (const pick of match.prediction.picks) {
-          if (!pick.runnerId) continue;
-          const no = runnerIdToNo.get(pick.runnerId);
-          if (no != null) noToRank.set(no, pick.rank);
-        }
-        rankByNoById.set(src.raceId, noToRank);
-
-        // at no → meta
-        const noToMeta = new Map<number, { scratched: boolean; ekuriGroup: number | null }>();
-        for (const ru of match.runners) {
-          noToMeta.set(ru.no, { scratched: ru.scratched, ekuriGroup: ru.ekuriGroup });
-        }
-        metaByNoById.set(src.raceId, noToMeta);
+      // Kaynak runner ID'den at numarasına map oluştur, sonra no→rank yap
+      const runnerIdToNo = new Map(match.runners.map((ru) => [ru.id, ru.no]));
+      const noToRank = new Map<number, number>();
+      for (const pick of match.prediction.picks) {
+        if (!pick.runnerId) continue;
+        const no = runnerIdToNo.get(pick.runnerId);
+        if (no != null) noToRank.set(no, pick.rank);
       }
+      rankByNoById.set(r.id, noToRank);
+
+      // at no → meta
+      const noToMeta = new Map<number, { scratched: boolean; ekuriGroup: number | null }>();
+      for (const ru of match.runners) {
+        noToMeta.set(ru.no, { scratched: ru.scratched, ekuriGroup: ru.ekuriGroup });
+      }
+      metaByNoById.set(r.id, noToMeta);
     }
   }
 
