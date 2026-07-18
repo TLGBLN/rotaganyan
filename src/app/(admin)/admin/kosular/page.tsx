@@ -24,15 +24,13 @@ type PageProps = {
   searchParams: Promise<{ tarih?: string }>;
 };
 
-function parseConditionsRef(conditions: string): { slug: string; raceNo: number } | null {
-  const m = conditions.match(/^(.+?)\s+(\d+)\.\s*Ko[şs]u/i);
-  if (!m) return null;
-  const slug = m[1].trim()
-    .replace(/[İI]/g, "i").replace(/ı/g, "i")
-    .replace(/[ğĞ]/g, "g").replace(/[üÜ]/g, "u")
-    .replace(/[şŞ]/g, "s").replace(/[öÖ]/g, "o").replace(/[çÇ]/g, "c")
-    .toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-  return { slug, raceNo: parseInt(m[2], 10) };
+// Karma bir koşu, orijinal koşuyla birebir aynı atlara sahiptir — eşleştirme Race.conditions
+// metin alanına (mevcut ingest hiç doldurmuyor) değil, atların isim kümesi imzasına bakılarak yapılır.
+function normHorseNameForMirror(name: string): string {
+  return name.replace(/\([A-Z]{2,3}\)/g, "").replace(/\s+/g, " ").trim().toUpperCase();
+}
+function runnerSetSignature(runners: { name: string }[]): string {
+  return runners.map((r) => normHorseNameForMirror(r.name)).sort().join("|");
 }
 
 export default async function AdminKosularPage({ searchParams }: PageProps) {
@@ -43,7 +41,10 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
     getAnalystStats(currentDate),
   ]);
 
-  // Build lookup: original races — by "slug:raceNo" AND by time (fallback for slug mismatches)
+  // Build lookup for original (non-karma) races: at isim kümesi imzası → prediction + runner verisi.
+  // Race.conditions metin alanı mevcut ingest tarafından hiç doldurulmadığı için (eski, artık
+  // kullanılmayan bir alan) eşleştirme doğrudan atların isim kümesine bakılarak yapılır — karma
+  // bir koşu, orijinal koşuyla birebir aynı atlara sahiptir.
   type RaceRow = (typeof raceDays)[0]["races"][0];
   type OriginalMeta = {
     raceId: string;
@@ -52,21 +53,18 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
     distance: number;
     runners: RaceRow["runners"];
   };
-  const originalByKey = new Map<string, OriginalMeta>();
-  const originalByTime = new Map<string, OriginalMeta>();
+  const originalBySignature = new Map<string, OriginalMeta>();
   for (const rd of raceDays) {
     if (rd.hippodrome.slug === "karma") continue;
     for (const race of rd.races) {
-      if (race.conditions != null) continue;
-      const meta: OriginalMeta = {
+      if (race.runners.length === 0) continue;
+      originalBySignature.set(runnerSetSignature(race.runners), {
         raceId: race.id,
         prediction: race.prediction,
         classType: race.classType,
         distance: race.distance,
         runners: race.runners,
-      };
-      originalByKey.set(`${rd.hippodrome.slug}:${race.raceNo}`, meta);
-      if (race.time) originalByTime.set(race.time, meta);
+      });
     }
   }
 
@@ -119,11 +117,11 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                 </thead>
                 <tbody>
                   {rd.races.map((race, i) => {
-                    // Karma mirror: find original race's prediction + raceId
-                    const karmaRef = race.conditions ? parseConditionsRef(race.conditions) : null;
-                    const original = karmaRef
-                      ? (originalByKey.get(`${karmaRef.slug}:${karmaRef.raceNo}`) ?? (race.time ? originalByTime.get(race.time) : null))
-                      : null;
+                    // Karma mirror: find original race's prediction + raceId (at isim kümesi imzasıyla)
+                    const original =
+                      rd.hippodrome.slug === "karma" && race.runners.length > 0
+                        ? originalBySignature.get(runnerSetSignature(race.runners)) ?? null
+                        : null;
                     const effectivePred = race.prediction ?? original?.prediction ?? null;
                     const effectiveRaceId = original?.raceId ?? race.id;
                     const effectiveClassType = (race.classType && race.classType !== "—") ? race.classType : (original?.classType ?? race.classType);

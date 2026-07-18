@@ -5,18 +5,6 @@ import type { Prisma, Confidence } from "@prisma/client";
 import { syncResultsForDate } from "./result-sync";
 import { fetchApprenticeRemainingRaces, normalizeJockeyName } from "./ingest/tjk-apprentice.adapter";
 
-/** "Bursa 4. Koşu" → { slug: "bursa", raceNo: 4 } */
-function parseConditionsRef(conditions: string): { slug: string; raceNo: number } | null {
-  const m = conditions.match(/^(.+?)\s+(\d+)\.\s*Ko[şs]u/i);
-  if (!m) return null;
-  const slug = m[1].trim()
-    .replace(/[İI]/g, "i").replace(/ı/g, "i")
-    .replace(/[ğĞ]/g, "g").replace(/[üÜ]/g, "u")
-    .replace(/[şŞ]/g, "s").replace(/[öÖ]/g, "o").replace(/[çÇ]/g, "c")
-    .toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-  return { slug, raceNo: parseInt(m[2], 10) };
-}
-
 /** Runner.raceStyle JSON alanından ("style" + "percent") ekranda gösterilecek değeri çıkarır. */
 function parseRaceStyle(raw: unknown): { style: string; percent: number } | null {
   const r = raw as { style?: string; percent?: number } | null;
@@ -659,24 +647,30 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
 
   // "Karma" hipodromu, gerçek koşuların kombine bahis için aynadaki (mirror) kopyasıdır —
   // idman/yarış stili senkronu "karma" için hiç çalışmaz (gerçek tekil hipodrom değil), bu
-  // yüzden galop ve yarış stili de tıpkı tahmin gibi orijinal koşudan miras alınmalı.
+  // yüzden galop, yarış stili ve tahmin de orijinal koşudan miras alınmalı. Eşleştirme
+  // Race.conditions metin alanına (mevcut ingest hiç doldurmuyor) değil, doğrudan atların
+  // isim kümesine bakılarak yapılır — karma bir koşu, orijinal koşuyla birebir aynı atlara
+  // sahiptir, bu yüzden isim kümesi imzası güvenilir bir eşleştirme anahtarıdır.
   function normHorseNameForMirror(name: string): string {
     return name.replace(/\([A-Z]{2,3}\)/g, "").replace(/\s+/g, " ").trim().toUpperCase();
   }
+  function runnerSetSignature(runners: { name: string }[]): string {
+    return runners.map((r) => normHorseNameForMirror(r.name)).sort().join("|");
+  }
 
-  // Build lookup for original races (conditions = null): "slug:raceNo" → prediction + runner verisi
+  // Build lookup for original (non-karma) races: at isim kümesi imzası → prediction + runner verisi
   const originalPred = new Map<string, typeof raceDays[0]["races"][0]["prediction"]>();
   const originalRunnerData = new Map<string, Map<string, { gallops: typeof raceDays[0]["races"][0]["runners"][0]["gallops"]; raceStyle: unknown }>>();
   for (const rd of raceDays) {
+    if (rd.hippodrome.slug === "karma") continue;
     for (const r of rd.races) {
-      if (r.conditions == null) {
-        const key = `${rd.hippodrome.slug}:${r.raceNo}`;
-        originalPred.set(key, r.prediction);
-        originalRunnerData.set(
-          key,
-          new Map(r.runners.map((ru) => [normHorseNameForMirror(ru.name), { gallops: ru.gallops, raceStyle: ru.raceStyle }]))
-        );
-      }
+      if (r.runners.length === 0) continue;
+      const key = runnerSetSignature(r.runners);
+      originalPred.set(key, r.prediction);
+      originalRunnerData.set(
+        key,
+        new Map(r.runners.map((ru) => [normHorseNameForMirror(ru.name), { gallops: ru.gallops, raceStyle: ru.raceStyle }]))
+      );
     }
   }
 
@@ -690,13 +684,10 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
       // Karma mirror: inherit prediction + galop/yarış stili from original race
       let pred = r.prediction;
       let originalRunners: Map<string, { gallops: typeof raceDays[0]["races"][0]["runners"][0]["gallops"]; raceStyle: unknown }> | undefined;
-      if (r.conditions != null) {
-        const ref = parseConditionsRef(r.conditions);
-        if (ref) {
-          const key = `${ref.slug}:${ref.raceNo}`;
-          if (pred == null) pred = originalPred.get(key) ?? null;
-          originalRunners = originalRunnerData.get(key);
-        }
+      if (rd.hippodrome.slug === "karma" && r.runners.length > 0) {
+        const key = runnerSetSignature(r.runners);
+        if (pred == null) pred = originalPred.get(key) ?? null;
+        originalRunners = originalRunnerData.get(key);
       }
       return {
         id: r.id,
