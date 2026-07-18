@@ -4,9 +4,7 @@ import bcrypt from "bcryptjs";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { registerSchema } from "@/lib/validations/auth";
-import { signIn } from "@/lib/auth";
-import { AuthError } from "next-auth";
-import { checkRateLimit, loginLimiter, registerLimiter } from "@/lib/ratelimit";
+import { checkRateLimit, registerLimiter } from "@/lib/ratelimit";
 import { sendWelcomeEmail } from "@/lib/email";
 import { notifyAdminsNewUser } from "./notification.actions";
 import { sendInitialVerificationEmail } from "./email-verification.actions";
@@ -53,63 +51,4 @@ export async function registerUser(formData: FormData) {
   notifyAdminsNewUser(user.id).catch(console.error);
 
   return { success: true };
-}
-
-export async function loginUser(
-  _prevState: { error: string | null },
-  formData: FormData
-): Promise<{ error: string | null }> {
-  const hdrs = await headers();
-  const ip = hdrs.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
-  const ua = hdrs.get("user-agent") ?? "";
-  const country = hdrs.get("x-vercel-ip-country") ?? undefined;
-  const city = hdrs.get("x-vercel-ip-city") ?? undefined;
-  const email = (formData.get("email") as string | null) ?? "";
-  const password = (formData.get("password") as string | null) ?? "";
-
-  const { success: rateLimitOk } = await checkRateLimit(loginLimiter, ip);
-  if (!rateLimitOk) {
-    return { error: "Çok fazla giriş denemesi. Lütfen 1 dakika bekleyin." };
-  }
-
-  // Kimlik bilgilerini doğrula — log atmadan önce geçerliliği bilmemiz lazım.
-  const user = await db.user.findUnique({
-    where: { email },
-    select: { id: true, passwordHash: true },
-  });
-  const validPassword =
-    user?.passwordHash ? await bcrypt.compare(password, user.passwordHash) : false;
-
-  // Her girişimi logla — await zorunlu, signIn sonra NEXT_REDIRECT fırlatır
-  // ve serverless fonksiyon hemen biter; fire-and-forget DB yazma kayboluyor.
-  try {
-    await db.loginLog.create({
-      data: {
-        userId: validPassword ? user!.id : undefined,
-        email,
-        ip,
-        userAgent: ua,
-        country,
-        city,
-        success: validPassword,
-      },
-    });
-  } catch (e) {
-    console.error("[loginLog]", e);
-  }
-
-  if (!validPassword) {
-    return { error: "E-posta veya şifre hatalı." };
-  }
-
-  try {
-    await signIn("credentials", { email, password, redirectTo: "/panel" });
-  } catch (err) {
-    if (err instanceof AuthError) {
-      return { error: "E-posta veya şifre hatalı." };
-    }
-    throw err; // NEXT_REDIRECT
-  }
-
-  return { error: null };
 }

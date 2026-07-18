@@ -988,7 +988,7 @@ export default function ProgramView({
 
   // Site üstündeki sticky Header (h-14 = 56px) — panele scroll ederken başlığın
   // bu barın altında kalmaması için bu kadar pay bırakılır.
-  const STICKY_HEADER_OFFSET = 64;
+  const STICKY_HEADER_OFFSET = 56;
 
   /** Panel butonuna basınca paneli aç/kapat; açılıyorsa render sonrası panelin başlığına scroll et. */
   function toggleAndScroll(setter: (v: (prev: boolean) => boolean) => void, current: boolean, panelId: string) {

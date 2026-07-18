@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function DeleteRaceButton({
   raceId,
@@ -19,12 +20,19 @@ export default function DeleteRaceButton({
       return;
     }
     setPending(true);
-    await fetch("/api/admin/race", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ raceId }),
-    });
-    router.refresh();
+    try {
+      const res = await fetch("/api/admin/race", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ raceId }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      router.refresh();
+    } catch {
+      toast.error("Koşu silinemedi, tekrar deneyin.");
+    } finally {
+      setPending(false);
+    }
   }
 
   return (

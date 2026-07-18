@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
+import { toast } from "sonner";
 import { unfollowHorse } from "@/server/actions/horse-follow";
 
 export default function UnfollowButton({ horseName }: { horseName: string }) {
@@ -15,8 +16,12 @@ export default function UnfollowButton({ horseName }: { horseName: string }) {
       disabled={isPending}
       onClick={() =>
         startTransition(async () => {
-          await unfollowHorse(horseName);
-          router.refresh();
+          try {
+            await unfollowHorse(horseName);
+            router.refresh();
+          } catch {
+            toast.error("Takipten çıkarılamadı, tekrar deneyin.");
+          }
         })
       }
       title="Takipten çık"

@@ -69,23 +69,31 @@ export default function KuponActions({ id, isActive, hippodromeName, date, legs 
 
   function toggleActive() {
     startTransition(async () => {
-      if (isActive) {
-        await deactivateHomeKupon(id);
-        toast.success("Yayından kaldırıldı");
-      } else {
-        await setActiveHomeKupon(id);
-        toast.success("Anasayfada yayınlandı");
+      try {
+        if (isActive) {
+          await deactivateHomeKupon(id);
+          toast.success("Yayından kaldırıldı");
+        } else {
+          await setActiveHomeKupon(id);
+          toast.success("Anasayfada yayınlandı");
+        }
+        router.refresh();
+      } catch {
+        toast.error("İşlem başarısız oldu, tekrar deneyin.");
       }
-      router.refresh();
     });
   }
 
   function remove() {
     if (!confirm("Bu kuponu silmek istediğine emin misin?")) return;
     startTransition(async () => {
-      await deleteHomeKupon(id);
-      toast.success("Kupon silindi");
-      router.refresh();
+      try {
+        await deleteHomeKupon(id);
+        toast.success("Kupon silindi");
+        router.refresh();
+      } catch {
+        toast.error("Silinemedi, tekrar deneyin.");
+      }
     });
   }
 

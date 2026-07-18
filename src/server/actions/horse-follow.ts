@@ -56,32 +56,3 @@ export async function getFollowedHorses() {
   });
 }
 
-export async function isFollowingHorse(horseName: string): Promise<boolean> {
-  const session = await auth();
-  if (!session?.user?.id) return false;
-
-  const row = await db.horseFollow.findUnique({
-    where: { userId_horseName: { userId: session.user.id, horseName } },
-  });
-  return !!row;
-}
-
-export async function getUnreadNotificationCount(): Promise<number> {
-  const session = await auth();
-  if (!session?.user?.id) return 0;
-
-  return db.notification.count({
-    where: { userId: session.user.id, read: false },
-  });
-}
-
-export async function markAllNotificationsRead() {
-  const session = await auth();
-  if (!session?.user?.id) return;
-
-  await db.notification.updateMany({
-    where: { userId: session.user.id, read: false },
-    data: { read: true },
-  });
-  revalidatePath("/panel/bildirimler");
-}

@@ -93,7 +93,6 @@ async function main() {
       weight: 56.0,
       agf: 28.5,
       pedigreeNote: "Frankel × Galileo — klasik mesafe pedigri, 1400m ideal mesafe",
-      pedigreeUrl: "https://www.pedigreequery.com/star+queen",
       raceStyle: { kacak: 10, onGrupArkasi: 45, bekleme: 40, enGeri: 5 },
     },
   });
@@ -114,7 +113,6 @@ async function main() {
       weight: 56.0,
       agf: 35.2,
       pedigreeNote: "Sea The Stars × Dansili — güçlü pedigri, form soru işareti",
-      pedigreeUrl: "https://www.pedigreequery.com/golden+dream",
       raceStyle: { kacak: 5, onGrupArkasi: 60, bekleme: 30, enGeri: 5 },
     },
   });
@@ -136,7 +134,6 @@ async function main() {
       weightChange: -1.0,
       agf: 18.9,
       pedigreeNote: "Dubawi × Montjeu — kilo düşüşü ve galop serisi dikkat çekici",
-      pedigreeUrl: "https://www.pedigreequery.com/rose+garden",
       raceStyle: { kacak: 0, onGrupArkasi: 25, bekleme: 60, enGeri: 15 },
     },
   });

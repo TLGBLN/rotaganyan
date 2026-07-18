@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { clearJockeyStats } from "@/server/actions/race.actions";
 
 export default function JokeyClearButton() {
@@ -11,8 +12,12 @@ export default function JokeyClearButton() {
   function handleClick() {
     if (!confirm("Tüm jokey istatistikleri silinecek. Emin misin?")) return;
     start(async () => {
-      await clearJockeyStats();
-      setDone(true);
+      try {
+        await clearJockeyStats();
+        setDone(true);
+      } catch {
+        toast.error("Silinemedi, tekrar deneyin.");
+      }
     });
   }
 

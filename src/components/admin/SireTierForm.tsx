@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 const TIERS = ["COK_YUKSEK", "YUKSEK", "GUCLU", "ORTA", "DUSUK", "ZAYIF"] as const;
 const TIER_LABEL: Record<string, string> = {
@@ -25,17 +26,23 @@ export default function SireTierForm() {
   async function submit() {
     if (!name.trim()) return;
     setSaving(true);
-    await fetch("/api/admin/sire-tier", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, tier, surface, breed, note }),
-    });
-    setName("");
-    setNote("");
-    setSurface("");
-    setBreed("");
-    setSaving(false);
-    router.refresh();
+    try {
+      const res = await fetch("/api/admin/sire-tier", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, tier, surface, breed, note }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setName("");
+      setNote("");
+      setSurface("");
+      setBreed("");
+      router.refresh();
+    } catch {
+      toast.error("Kaydedilemedi, tekrar deneyin.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (

@@ -50,6 +50,7 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [flashing, setFlashing] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [errorStreak, setErrorStreak] = useState(0);
   const baselineRef = useRef<Map<string, string> | null>(null);
   const prevGanyanRef = useRef<Map<string, string>>(new Map());
 
@@ -64,9 +65,11 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
     async function poll() {
       try {
         const res = await fetch(`/api/muhtemeller/movers?tarih=${dateStr}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         if (stopped) return;
 
+        setErrorStreak(0);
         const current: Runner[] = json.data ?? [];
 
         if (!baselineRef.current) {
@@ -136,7 +139,10 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
         });
         setLoading(false);
       } catch {
-        if (!stopped) setLoading(false);
+        if (!stopped) {
+          setLoading(false);
+          setErrorStreak((n) => n + 1);
+        }
       }
     }
 
@@ -150,6 +156,16 @@ export default function LiveMoversWidget({ dateStr }: { dateStr: string }) {
       <div className="flex items-center gap-2 rounded-lg border p-4 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
         Canlı oranlar yükleniyor…
+      </div>
+    );
+  }
+
+  // Art arda birkaç poll başarısız olduysa (tek seferlik bir hata değil) kullanıcıya
+  // gerçek bir hata göster — "takip ediliyor" mesajıyla sonsuza dek asılı kalmasın.
+  if (errorStreak >= 2 && rows.length === 0) {
+    return (
+      <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+        Canlı oranlar şu anda alınamıyor. Otomatik olarak tekrar denenecek.
       </div>
     );
   }

@@ -2,24 +2,42 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { unpublishArticle, publishArticle } from "@/server/actions/article.actions";
+import { unpublishArticle, publishArticle, deleteArticle } from "@/server/actions/article.actions";
 import { useTransition } from "react";
 import { toast } from "sonner";
 
 export default function ArticleActions({ id, published }: { id: string; published: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [deleting, startDeleteTransition] = useTransition();
 
   function togglePublish() {
     startTransition(async () => {
-      if (published) {
-        await unpublishArticle(id);
-        toast.success("Yayından kaldırıldı");
-      } else {
-        await publishArticle(id);
-        toast.success("Yayımlandı");
+      try {
+        if (published) {
+          await unpublishArticle(id);
+          toast.success("Yayından kaldırıldı");
+        } else {
+          await publishArticle(id);
+          toast.success("Yayımlandı");
+        }
+        router.refresh();
+      } catch {
+        toast.error("İşlem başarısız oldu, tekrar deneyin.");
       }
-      router.refresh();
+    });
+  }
+
+  function handleDelete() {
+    if (!confirm("Bu makaleyi kalıcı olarak silmek istediğinize emin misiniz?")) return;
+    startDeleteTransition(async () => {
+      try {
+        await deleteArticle(id);
+        toast.success("Makale silindi");
+        router.refresh();
+      } catch {
+        toast.error("Silinemedi, tekrar deneyin.");
+      }
     });
   }
 
@@ -30,10 +48,17 @@ export default function ArticleActions({ id, published }: { id: string; publishe
       </Link>
       <button
         onClick={togglePublish}
-        disabled={pending}
+        disabled={pending || deleting}
         className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
       >
         {pending ? "…" : published ? "Geri Al" : "Yayımla"}
+      </button>
+      <button
+        onClick={handleDelete}
+        disabled={pending || deleting}
+        className="text-xs text-miss hover:underline disabled:opacity-50"
+      >
+        {deleting ? "…" : "Sil"}
       </button>
     </div>
   );

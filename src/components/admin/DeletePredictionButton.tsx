@@ -13,9 +13,13 @@ export default function DeletePredictionButton({ predictionId }: { predictionId:
     if (!confirm("Bu analizi tamamen silmek istediğine emin misin? Yayından da kalkacak ve geri alınamaz.")) return;
 
     startTransition(async () => {
-      await deletePrediction(predictionId);
-      toast.success("Analiz silindi ve yayından kaldırıldı");
-      router.push("/admin/analizler");
+      try {
+        await deletePrediction(predictionId);
+        toast.success("Analiz silindi ve yayından kaldırıldı");
+        router.push("/admin/analizler");
+      } catch {
+        toast.error("Silinemedi, tekrar deneyin.");
+      }
     });
   }
 

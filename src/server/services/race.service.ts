@@ -69,7 +69,7 @@ export type RaceDetail = Prisma.RaceGetPayload<{
     prediction: {
       include: {
         picks: {
-          include: { runner: { select: { name: true; no: true; pedigreeUrl: true; jockeyChanged: true; previousJockey: true } } };
+          include: { runner: { select: { name: true; no: true; jockeyChanged: true; previousJockey: true } } };
           orderBy: { rank: "asc" };
         };
         author: { select: { name: true } };
@@ -191,7 +191,7 @@ export async function getRaceDetail(
       prediction: {
         include: {
           picks: {
-            include: { runner: { select: { name: true, no: true, pedigreeUrl: true, jockeyChanged: true, previousJockey: true } } },
+            include: { runner: { select: { name: true, no: true, jockeyChanged: true, previousJockey: true } } },
             orderBy: { rank: "asc" },
           },
           author: { select: { name: true } },

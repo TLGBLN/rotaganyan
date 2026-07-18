@@ -207,7 +207,6 @@ model Runner {
   dam              String?
   damSire          String?
   pedigreeNote     String?
-  pedigreeUrl      String?
   jockey           String?
   trainer          String?
   startNo          Int?
@@ -219,7 +218,6 @@ model Runner {
   sameJockey       Boolean @default(false)
   agf              Float?
   raceStyle        Json?
-  formaUrl         String?
   recentForm       String?
   jockeyChanged    Boolean @default(false)
   previousJockey   String?
