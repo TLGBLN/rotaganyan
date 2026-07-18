@@ -11,6 +11,8 @@ export type H2HResult = {
   equipment: string;
   time: string;
   hp: string;
+  ganyan: string;
+  classType: string;
 };
 
 export type H2HEncounter = {
@@ -86,6 +88,8 @@ export async function getH2HForRace(raceId: string): Promise<H2HEncounter[]> {
           equipment: e.row.equipment,
           time: e.row.time,
           hp: e.row.hp,
+          ganyan: e.row.ganyan,
+          classType: e.row.classType,
         }))
         .sort((a, b) => {
           const an = parseInt(a.finishPos, 10);

@@ -40,7 +40,7 @@ export default function EquipmentPanel({ raceId }: { raceId: string }) {
       ) : !data || data.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">Takı bilgisi yok.</div>
       ) : (
-        <div className="max-h-[480px] overflow-y-auto grid grid-cols-1 sm:grid-cols-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2">
           {data.map((r, idx) => (
             <div key={r.runnerNo} className={`px-3 py-2.5 border-b ${idx % 2 === 0 ? "sm:border-r" : ""}`}>
               <div className="text-xs font-semibold mb-1">

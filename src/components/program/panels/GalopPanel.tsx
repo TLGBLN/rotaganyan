@@ -10,12 +10,12 @@ export default function GalopPanel({ runners, breed }: { runners: ProgramRunner[
   return (
     <div className="border-t">
       <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
-        <span className="text-sm font-bold tracking-wide text-white">Galop</span>
+        <span className="text-sm font-bold tracking-wide text-white">Son Hazırlıklar</span>
       </div>
       {withGallops.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">Galop verisi yok.</div>
       ) : (
-        <div className="max-h-[480px] overflow-y-auto grid grid-cols-2">
+        <div className="grid grid-cols-2">
           {withGallops.map((r, idx) => (
             <div
               key={r.id}

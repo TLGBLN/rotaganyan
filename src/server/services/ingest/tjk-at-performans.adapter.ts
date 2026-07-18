@@ -33,6 +33,8 @@ export type TjkAtKosuRow = {
   trainer: string;
   owner: string;
   hp: string;
+  ganyan: string;
+  group: string; // Grup — örn. "4A"
 };
 
 async function fetchHtml(url: string): Promise<string> {
@@ -75,6 +77,8 @@ async function fetchTjkAtKosuBilgileriUncached(atId: number): Promise<TjkAtKosuR
       trainer: cells[14] ?? "",
       owner: cells[15] ?? "",
       hp: cells[16] ?? "",
+      ganyan: cells[10] ?? "",
+      group: cells[11] ?? "",
     });
   });
 

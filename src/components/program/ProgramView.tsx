@@ -1184,7 +1184,7 @@ export default function ProgramView({
                   data-tour="galop"
                   className={cn(PANEL_BTN_CLASS, galopOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
-                  Galop {galopOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  Son Hazırlıklar {galopOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
               )}
               {currentRace && (

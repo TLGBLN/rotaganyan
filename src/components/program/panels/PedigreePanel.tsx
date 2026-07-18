@@ -9,7 +9,7 @@ export default function PedigreePanel({ runners }: { runners: ProgramRunner[] })
       <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
         <span className="text-sm font-bold tracking-wide text-white">Pedigriler</span>
       </div>
-      <div className="max-h-[480px] overflow-y-auto grid grid-cols-1 sm:grid-cols-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2">
         {runners.map((r, idx) => (
           <div key={r.id} className={cn("px-3 py-2.5 border-b", idx % 2 === 0 && "sm:border-r")}>
             <div className="text-xs font-semibold mb-1">
