@@ -91,7 +91,7 @@ export default function SplashScreen() {
           18+
         </span>
         <p className="max-w-md text-center text-[10px] leading-tight text-white/40 sm:text-sm">
-          ROTAGANYAN 18 yaşından büyükler içindir. Bahis oynatmaz, yorum ve analiz sunar.
+          ROTAGANYAN 18 yaşından büyükler içindir. Bahis oynatmaz, yorum, analiz ve kupon önerilerinde bulunur.
         </p>
       </div>
     </div>
