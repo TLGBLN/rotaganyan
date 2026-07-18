@@ -7,6 +7,7 @@ export default function EquipmentPanel({ raceId }: { raceId: string }) {
   const [data, setData] = useState<EquipmentChangeData[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -17,7 +18,7 @@ export default function EquipmentPanel({ raceId }: { raceId: string }) {
       .catch(() => { if (!cancelled) setError(true); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [raceId]);
+  }, [raceId, retryKey]);
 
   return (
     <div className="border-t">
@@ -27,7 +28,15 @@ export default function EquipmentPanel({ raceId }: { raceId: string }) {
       {loading ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">TJK geçmişiyle karşılaştırılıyor…</div>
       ) : error ? (
-        <div className="px-4 py-8 text-center text-sm text-muted-foreground">Veri alınamadı.</div>
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+          <p className="mb-2">Veri alınamadı.</p>
+          <button
+            onClick={() => setRetryKey((k) => k + 1)}
+            className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+          >
+            Tekrar Dene
+          </button>
+        </div>
       ) : !data || data.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">Takı bilgisi yok.</div>
       ) : (

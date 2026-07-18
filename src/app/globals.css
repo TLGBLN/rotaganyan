@@ -115,6 +115,33 @@ body {
 /* Satır zebra rengi */
 .race-row-even { background: oklch(0.16 0.038 240); }
 
+/* ─── Yazdırma ─────────────────────────────────
+   Site koyu tema — olduğu gibi yazdırılırsa mürekkep/toner israfı ve
+   okunamaz kontrast olur. Yazdırırken açık zemin + koyu metne geçilir;
+   header/footer ve navigasyon amaçlı elemanlar print:hidden ile gizlenir. */
+@media print {
+  :root, .dark {
+    --background: #ffffff;
+    --foreground: #111111;
+    --card: #ffffff;
+    --card-foreground: #111111;
+    --muted: #f2f2f2;
+    --muted-foreground: #555555;
+    --accent: #f2f2f2;
+    --accent-foreground: #111111;
+    --border: #cccccc;
+  }
+  * , *::before, *::after {
+    border-color: #cccccc !important;
+  }
+  html, body {
+    background: #ffffff !important;
+  }
+  .race-row-even {
+    background: #f7f7f7 !important;
+  }
+}
+
 /* ─── Splash ekranı ───────────────────────────
    Dönen halka yerine: logo "foto-finiş flaşı" ile beliriyor,
    ardından start kapısı ışıkları sırayla yanıp sönüyor. */

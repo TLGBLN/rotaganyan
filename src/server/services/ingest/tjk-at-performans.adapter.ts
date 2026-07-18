@@ -8,6 +8,7 @@
 
 import { request } from "undici";
 import * as cheerio from "cheerio";
+import { unstable_cache } from "next/cache";
 
 const BASE = "https://www.tjk.org";
 const HEADERS = {
@@ -40,8 +41,7 @@ async function fetchHtml(url: string): Promise<string> {
   return body.text();
 }
 
-/** Bir atın (TJK AtId'siyle) tüm resmi yarış geçmişini döner. */
-export async function fetchTjkAtKosuBilgileri(atId: number): Promise<TjkAtKosuRow[]> {
+async function fetchTjkAtKosuBilgileriUncached(atId: number): Promise<TjkAtKosuRow[]> {
   const html = await fetchHtml(`${BASE}/TR/YarisSever/Query/ConnectedPage/AtKosuBilgileri?1=1&QueryParameter_AtId=${atId}&Era=yesterday`);
   const $ = cheerio.load(html);
   const rows: TjkAtKosuRow[] = [];
@@ -79,4 +79,17 @@ export async function fetchTjkAtKosuBilgileri(atId: number): Promise<TjkAtKosuRo
   });
 
   return rows;
+}
+
+// Bir atın geçmişi günde en fazla birkaç kez değişir (yeni koşu sonrası) — 3 saatlik
+// cache Son800/Takılar/Karşılaştır/H2H panellerinin hepsinde gereksiz TJK isteğini önler.
+const cachedFetch = unstable_cache(
+  fetchTjkAtKosuBilgileriUncached,
+  ["tjk-at-kosu-bilgileri"],
+  { revalidate: 10_800 }
+);
+
+/** Bir atın (TJK AtId'siyle) tüm resmi yarış geçmişini döner. */
+export async function fetchTjkAtKosuBilgileri(atId: number): Promise<TjkAtKosuRow[]> {
+  return cachedFetch(atId);
 }

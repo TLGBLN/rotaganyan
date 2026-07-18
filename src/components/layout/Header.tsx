@@ -27,7 +27,7 @@ export default async function Header() {
   const showIntroTour = !!user && dbUser?.hasSeenIntro === false;
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 print:hidden">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4">
         {/* Logo */}
         <Link href="/program" className="flex shrink-0 items-center gap-2.5">

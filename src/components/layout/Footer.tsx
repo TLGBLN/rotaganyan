@@ -3,7 +3,7 @@ import Wordmark from "./Wordmark";
 
 export default function Footer() {
   return (
-    <footer className="border-t bg-background px-4 py-8 text-sm text-muted-foreground">
+    <footer className="border-t bg-background px-4 py-8 text-sm text-muted-foreground print:hidden">
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
           <p className="flex items-center font-medium">

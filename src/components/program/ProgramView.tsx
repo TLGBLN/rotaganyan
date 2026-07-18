@@ -24,6 +24,7 @@ const H2HPanel = dynamic(() => import("./panels/H2HPanel"), { loading: () => PAN
 // Detay paneli açma/kapama butonları (Son 800/Galop/Pedigriler/Takılar/H2H/Karşılaştır) —
 // her biri farklı renkteyken karmaşık görünüyordu; artık hepsi tek tip, sadece açık/kapalı
 // durumuna göre (marka rengi / nötr) ayrışıyor.
+const LAST_HIPO_STORAGE_KEY = "rg-last-hipo";
 const PANEL_BTN_CLASS = "flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors shrink-0";
 const PANEL_BTN_OPEN = "bg-brand text-brand-foreground";
 const PANEL_BTN_CLOSED = "bg-white/5 text-[#c7d0dc] border border-white/10 hover:bg-white/10";
@@ -301,7 +302,8 @@ function AnalysisPanel({
                           type="button"
                           onClick={handleShare}
                           title="X'te paylaş"
-                          className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0"
+                          aria-label="X'te paylaş"
+                          className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0 print:hidden"
                         >
                           <XLogo className="h-3 w-3" />
                         </button>
@@ -341,6 +343,7 @@ function AnalysisPanel({
                     type="button"
                     onClick={handleShare}
                     title="X'te paylaş"
+                    aria-label="X'te paylaş"
                     className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0"
                   >
                     <XLogo className="h-3 w-3" />
@@ -410,7 +413,8 @@ function RunnerRow({
             type="button"
             onClick={onToggleFollow}
             title={isFollowed ? "Takipten çık" : "Takip et"}
-            className="shrink-0 transition-colors"
+            aria-label={isFollowed ? "Takipten çık" : "Takip et"}
+            className="shrink-0 transition-colors print:hidden"
           >
             <Star className={cn(
               "h-3.5 w-3.5",
@@ -511,7 +515,7 @@ function RunnerRow({
           return (
             <div>
               <div className={cn("font-mono text-[11px] font-semibold tabular-nums", isBestTime && "text-[#27ae60]")}>
-                {time}
+                {isBestTime && "★ "}{time}
               </div>
               {date && <div className="text-[9px] text-muted-foreground tabular-nums">{date}</div>}
             </div>
@@ -545,7 +549,7 @@ function RunnerRow({
       <td className={cn("px-2 py-1.5 tabular-nums text-center font-semibold", isTopAgf && "text-[#27ae60]")}>
         {r.agf != null ? (
           <div>
-            <div>{`%${r.agf.toFixed(1)}`}</div>
+            <div>{isTopAgf && "★ "}{`%${r.agf.toFixed(1)}`}</div>
             {agfRank != null && (
               <div className="text-[9px] text-muted-foreground font-normal">{agfRank}. sıra</div>
             )}
@@ -592,7 +596,7 @@ function StatCell({
 // ── At kartı (mobil) ─────────────────────────────────────────────────────────
 
 function RunnerCard({
-  r, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, onSelectHorse, jockeyStat,
+  r, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, onSelectHorse, jockeyStat, trainerStat,
 }: {
   r: ProgramRunner;
   isWinner: boolean;
@@ -604,6 +608,7 @@ function RunnerCard({
   onToggleFollow: () => void;
   onSelectHorse: (name: string) => void;
   jockeyStat?: JockeyStatRow;
+  trainerStat?: TrainerStatRow;
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
@@ -634,7 +639,8 @@ function RunnerCard({
               type="button"
               onClick={onToggleFollow}
               title={isFollowed ? "Takipten çık" : "Takip et"}
-              className="shrink-0 transition-colors"
+              aria-label={isFollowed ? "Takipten çık" : "Takip et"}
+              className="shrink-0 transition-colors print:hidden"
             >
               <Star className={cn(
                 "h-3.5 w-3.5",
@@ -666,7 +672,7 @@ function RunnerCard({
         <div className="flex flex-col items-end gap-1 shrink-0">
           {r.agf != null ? (
             <div className={cn("font-semibold", isTopAgf && "text-[#27ae60]")}>
-              %{r.agf.toFixed(1)}
+              {isTopAgf && "★ "}%{r.agf.toFixed(1)}
               {agfRank != null && <span className="text-[9px] text-muted-foreground font-normal ml-1">{agfRank}.</span>}
             </div>
           ) : <span className="text-muted-foreground">—</span>}
@@ -713,6 +719,24 @@ function RunnerCard({
         </div>
       )}
 
+      {/* Sahip / Antrenör — masaüstüyle aynı bilgi, mobilde de gösterilsin */}
+      {(r.owner || r.trainer) && (
+        <div className="mt-1 ml-10 text-[10px] leading-snug text-muted-foreground">
+          {r.owner && <span className="font-medium text-foreground">{r.owner}</span>}
+          {r.owner && r.trainer && " · "}
+          {r.trainer && <span>{r.trainer}</span>}
+          {trainerStat && (() => {
+            const wp = pct(trainerStat);
+            const wc = wp >= 25 ? "text-hit" : wp >= 15 ? "text-brand" : "text-muted-foreground";
+            return (
+              <span className={cn("ml-1.5 tabular-nums font-semibold", wc)}>
+                %{wp} · {trainerStat.rides} yarış
+              </span>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Kilo · Start · HP · Derece · Yaş — hizalı grid */}
       <div className="grid grid-cols-5 gap-1 mt-1.5 ml-10">
         <StatCell
@@ -725,7 +749,7 @@ function RunnerCard({
         <StatCell label="HP" value={r.hp ?? "—"} />
         <StatCell
           label="Derece"
-          value={r.bestTime ? r.bestTime.split(" - ")[0] : "—"}
+          value={r.bestTime ? `${isBestTime ? "★ " : ""}${r.bestTime.split(" - ")[0]}` : "—"}
           valueClass={isBestTime ? "text-[#27ae60] font-semibold" : undefined}
         />
         <StatCell label="Yaş" value={r.age ?? "—"} />
@@ -927,6 +951,7 @@ function RaceTable({
               onToggleFollow={() => onToggleFollow(r.name)}
               onSelectHorse={onSelectHorse}
               jockeyStat={buildJockeyStat(r.jockey)}
+              trainerStat={buildTrainerStat(r.trainer)}
             />
           ))
         )}
@@ -975,6 +1000,14 @@ export default function ProgramView({
 }) {
   const [activeHipo, setActiveHipo] = useState(days[0]?.hippodromeSlug ?? "");
   const [activeRace, setActiveRace] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const saved = localStorage.getItem(LAST_HIPO_STORAGE_KEY);
+    if (saved && days.some((d) => d.hippodromeSlug === saved)) setActiveHipo(saved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (activeHipo) localStorage.setItem(LAST_HIPO_STORAGE_KEY, activeHipo);
+  }, [activeHipo]);
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [son800Open, setSon800Open] = useState(false);
   const [galopOpen, setGalopOpen] = useState(false);
@@ -1048,7 +1081,7 @@ export default function ProgramView({
   return (
     <div className="flex flex-col">
       {/* Hipodrom tab'ları */}
-      <div className="flex overflow-x-auto border-b bg-muted/30 shrink-0">
+      <div className="flex overflow-x-auto border-b bg-muted/30 shrink-0 print:hidden">
         {days.map((d) => (
           <button
             key={d.hippodromeSlug}
@@ -1068,7 +1101,7 @@ export default function ProgramView({
       {currentDay && (
         <>
           {/* Koşu tab'ları */}
-          <div className="flex overflow-x-auto border-b bg-background shrink-0">
+          <div className="flex overflow-x-auto border-b bg-background shrink-0 print:hidden">
             {currentDay.races.map((r) => (
               <button
                 key={r.raceNo}
@@ -1109,8 +1142,9 @@ export default function ProgramView({
           )}
 
           {/* Zemin legend + analiz + geri sayım */}
-          <div className="flex items-center justify-between gap-4 px-3 py-1.5 bg-muted/20 border-b text-[11px]">
-            <div className="hidden sm:flex items-center gap-4 text-muted-foreground">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-4 px-3 py-1.5 bg-muted/20 border-b text-[11px]">
+            {/* "Son Yarışlar" kutucukları bu renkleri kullandığı için mobilde de gösterilir */}
+            <div className="flex items-center gap-3 sm:gap-4 text-muted-foreground">
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-sm bg-[#009900] inline-block" /> Çim
               </span>
@@ -1121,7 +1155,7 @@ export default function ProgramView({
                 <span className="w-2.5 h-2.5 rounded-sm bg-[#D39B1E] inline-block" /> Sentetik
               </span>
             </div>
-            <div className="flex items-center gap-2 overflow-x-auto min-w-0">
+            <div className="flex items-center gap-2 overflow-x-auto min-w-0 print:hidden">
               {currentRace?.hasAnalysis ? (
                 <button
                   onClick={() => toggleAndScroll(setAnalysisOpen, analysisOpen, "panel-analiz")}

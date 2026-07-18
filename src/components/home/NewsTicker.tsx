@@ -8,7 +8,7 @@ export default function NewsTicker({ items }: Props) {
   const text = items.join("  ·  ");
 
   return (
-    <div className="flex items-center overflow-hidden border-y border-y-white/5 bg-[#0d0d14] text-white/80 text-xs">
+    <div className="flex items-center overflow-hidden border-y border-y-white/5 bg-[#0d0d14] text-white/80 text-xs print:hidden">
       <span className="shrink-0 border-r border-r-brand/40 bg-brand/10 px-3 py-1.5 font-bold uppercase tracking-widest text-[10px] text-brand">
         Güncel Haberler
       </span>
