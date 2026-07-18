@@ -49,6 +49,12 @@ export async function syncResultsForDate(dateStr: string): Promise<void> {
 
     const winnerNo = actualOrder[0];
     const ganyan = raceResult.rows[0]?.ganyan;
+    // TJK, bir koşunun ganyanını (kazanan oranı) ancak sonuç kesinleştikten (itiraz/foto-finiş
+    // incelemesi bittikten) sonra yayınlar. Ganyan henüz yoksa sıralama geçici/olası yanlış
+    // olabilir (bir kez yaşandı: 14 atlık geçici bir sıralama kaydedildi, sonradan TJK sıralamayı
+    // tamamen değiştirdi) — böyle bir koşuyu KAYDETMEYİP bir sonraki senkronizasyona bırakıyoruz,
+    // ki yanlış/geçici bir sonuç kalıcı olarak Result tablosuna yazılıp kupon isabet hesaplarını bozmasın.
+    if (ganyan == null) continue;
     const picks = race.prediction?.picks ?? [];
     const topPick = picks.find(p => p.rank === 1);
     const hitTop1 = computeHitTop1(actualOrder, winnerNo, topPick?.runner?.no);

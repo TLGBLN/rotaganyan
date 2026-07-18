@@ -72,6 +72,9 @@ export async function syncTodayResults(): Promise<{ synced: number; failed: numb
 
       const winnerNo = actualOrder[0];
       const ganyan = raceResult.rows[0]?.ganyan;
+      // TJK ganyanı ancak sonuç kesinleştikten (itiraz/foto-finiş incelemesi bitince) sonra
+      // yayınlar — ganyan yoksa sıralama geçici/olası yanlış olabilir, bir sonraki senkronizasyona bırakılır.
+      if (ganyan == null) { debug.push(`⚠ ${slug} ${race.raceNo}. koşu: ganyan henüz yayınlanmamış, sonuç kesinleşmemiş sayılıp atlandı`); continue; }
       const picks = race.prediction?.picks ?? [];
       const topPick = picks.find(p => p.rank === 1);
       const hitTop1 = computeHitTop1(actualOrder, winnerNo, topPick?.runner?.no);
