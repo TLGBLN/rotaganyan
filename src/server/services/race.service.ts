@@ -243,7 +243,7 @@ export async function getPublishedPredictions(
         },
         author: { select: { name: true } },
       },
-      orderBy: { publishedAt: "desc" },
+      orderBy: [{ race: { raceDay: { date: "desc" } } }, { race: { raceNo: "asc" } }],
       skip: (page - 1) * perPage,
       take: perPage,
     }),

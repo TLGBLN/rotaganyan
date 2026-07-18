@@ -41,15 +41,16 @@ export default async function AnalizlerPage({ searchParams }: PageProps) {
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-lg border">
+          {/* Masaüstü: tablo */}
+          <div className="hidden sm:block overflow-x-auto rounded-lg border">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/40">
                   <th className="px-3 py-2 text-left font-medium text-muted-foreground">Koşu</th>
-                  <th className="hidden px-3 py-2 text-left font-medium text-muted-foreground sm:table-cell">Tarih</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">Tarih</th>
                   <th className="px-3 py-2 text-left font-medium text-muted-foreground">1. Seçim</th>
                   <th className="px-3 py-2 text-left font-medium text-muted-foreground">Sonuç</th>
-                  <th className="hidden px-3 py-2 text-left font-medium text-muted-foreground sm:table-cell">Yazar</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">Yazar</th>
                 </tr>
               </thead>
               <tbody>
@@ -83,7 +84,7 @@ export default async function AnalizlerPage({ searchParams }: PageProps) {
                           )}
                         </div>
                       </td>
-                      <td className="hidden px-3 py-2 text-xs text-muted-foreground sm:table-cell">
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
                         {format(raceDay.date, "d MMM yyyy", { locale: tr })}
                       </td>
                       <td className="px-3 py-2">
@@ -114,7 +115,7 @@ export default async function AnalizlerPage({ searchParams }: PageProps) {
                           <span className="text-xs text-muted-foreground">Bekleniyor</span>
                         )}
                       </td>
-                      <td className="hidden px-3 py-2 text-xs text-muted-foreground sm:table-cell">
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
                         ROTAGANYAN Admin
                       </td>
                     </tr>
@@ -122,6 +123,64 @@ export default async function AnalizlerPage({ searchParams }: PageProps) {
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobil: yatay kaymayı önlemek için dikey kart listesi */}
+          <div className="sm:hidden space-y-2">
+            {items.map((pred) => {
+              const race = pred.race;
+              const raceDay = race.raceDay;
+              const pick1 = pred.picks[0];
+              const result = race.result;
+
+              return (
+                <div key={pred.id} className="rounded-lg border p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm truncate">
+                        {raceDay.hippodrome.name} {race.raceNo}. Koşu
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(raceDay.date, "d MMM yyyy", { locale: tr })}
+                      </p>
+                    </div>
+                    {result ? (
+                      <span
+                        className={cn(
+                          "shrink-0 text-xs font-semibold",
+                          result.hitTop1 ? "text-hit" : "text-miss"
+                        )}
+                      >
+                        {result.hitTop1 ? "Tuttu ✓" : "Tutmadı ✗"}
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-xs text-muted-foreground">Bekleniyor</span>
+                    )}
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                    <Badge variant="secondary" className="text-[10px]">{race.classType}</Badge>
+                    <Badge variant="outline" className="text-[10px] text-brand">★ Banko</Badge>
+                  </div>
+                  {race.conditions && (
+                    <div className="mt-1 text-[10px] text-brand/70 font-medium">↳ {race.conditions}</div>
+                  )}
+                  <div className="mt-1.5 text-sm">
+                    {pick1?.runner ? (
+                      <span className="font-medium">
+                        #{pick1.runner.no} {pick1.runner.name}
+                        {result?.hitTop1 && result.ganyan != null && (
+                          <span className="ml-1 text-xs font-normal text-muted-foreground">
+                            (Gny {result.ganyan.toFixed(2)})
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Pagination */}
