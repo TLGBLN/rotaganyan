@@ -87,10 +87,10 @@ export default function SplashScreen() {
         className="absolute bottom-6 left-4 right-4 flex items-center justify-center gap-2 opacity-0"
         style={{ animation: "splash-fade-up 500ms ease-out 1000ms both" }}
       >
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#c0392b] text-[9px] font-black text-[#c0392b]">
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#c0392b] text-[9px] font-black text-[#c0392b] sm:h-7 sm:w-7 sm:text-xs">
           18+
         </span>
-        <p className="text-center text-[10px] leading-tight text-white/40">
+        <p className="max-w-md text-center text-[10px] leading-tight text-white/40 sm:text-sm">
           ROTAGANYAN 18 yaşından büyükler içindir. Bahis aracılığı yapmaz, yorum ve analiz sunar.
         </p>
       </div>
