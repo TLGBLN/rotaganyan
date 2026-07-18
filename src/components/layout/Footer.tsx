@@ -18,10 +18,7 @@ export default function Footer() {
           </nav>
         </div>
         <p className="mt-4 text-center text-xs">
-          Analizler yatırım tavsiyesi değildir. Her zaman en doğru tercih sizin tercihlerinizdir. ·{" "}
-          <a href="mailto:destek@rotaganyan.com" className="hover:text-foreground hover:underline underline-offset-4">
-            destek@rotaganyan.com
-          </a>
+          Analizler yatırım tavsiyesi değildir. Her zaman en doğru tercih sizin tercihlerinizdir.
         </p>
       </div>
     </footer>

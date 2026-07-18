@@ -19,7 +19,7 @@ export default async function EditAnalizPage({ params }: PageProps) {
   if (!pred) notFound();
 
   const race = pred.race;
-  const analystStats = await getAnalystStats(race.raceDay.date.toISOString().slice(0, 10));
+  const analystStats = await getAnalystStats(race.id);
   const advice = getClassTypeAdvice(analystStats, race.classType);
 
   return (

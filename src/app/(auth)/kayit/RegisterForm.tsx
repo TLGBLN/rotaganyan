@@ -4,6 +4,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, type RegisterInput } from "@/lib/validations/auth";
 import { registerUser } from "@/server/actions/auth.actions";
+import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,13 +39,23 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
     const res = await registerUser(fd);
     if (res?.error) {
       setServerError(res.error);
-    } else {
-      setSuccess(true);
-      const dest = callbackUrl
-        ? `/giris?callbackUrl=${encodeURIComponent(callbackUrl)}`
-        : "/giris";
-      setTimeout(() => router.push(dest), 2000);
+      return;
     }
+    setSuccess(true);
+    // Kayıt sonrası tekrar e-posta/şifre girmek zorunda kalmasın — direkt oturum açılır.
+    const signInResult = await signIn("credentials", {
+      email: data.email,
+      password: data.password,
+      redirect: false,
+    });
+    if (signInResult?.error) {
+      // Otomatik giriş başarısız olursa (beklenmedik durum) giriş ekranına yönlendir.
+      const dest = callbackUrl ? `/giris?callbackUrl=${encodeURIComponent(callbackUrl)}` : "/giris";
+      router.push(dest);
+      return;
+    }
+    router.push(callbackUrl || "/program");
+    router.refresh();
   }
 
   if (success) {
@@ -52,7 +63,7 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
       <div className="flex flex-col items-center gap-3 py-6 text-center">
         <CheckCircle2 className="h-10 w-10 text-hit" />
         <p className="font-medium">Hesabınız oluşturuldu!</p>
-        <p className="text-sm text-muted-foreground">Giriş sayfasına yönlendiriliyorsunuz…</p>
+        <p className="text-sm text-muted-foreground">Siteye yönlendiriliyorsunuz…</p>
       </div>
     );
   }

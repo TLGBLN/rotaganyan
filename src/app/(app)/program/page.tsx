@@ -77,8 +77,10 @@ export default async function ProgramPage({ searchParams }: PageProps) {
     await independentDataPromise;
   const isLoggedIn = !!session?.user;
   const isAdmin = session?.user?.role ? hasRole(session.user.role as Role, "EDITOR") : false;
-  // Adminler/editörler doğrulama zorunluluğundan muaf — kendi hesaplarını her zaman test edebilmeliler.
-  const isVerified = isAdmin || !!session?.user?.isEmailVerified;
+  // ŞİMDİLİK devre dışı: doğrulama maili gönderimi (Resend) henüz kurulmadığı için yeni üyeler
+  // mail hiç gelmediğinden asla doğrulayamıyor ve analizlere sonsuza dek erişemiyordu. Resend
+  // kurulunca `isAdmin || !!session?.user?.isEmailVerified` haline geri alınmalı.
+  const isVerified = true;
   const userEmail = session?.user?.email ?? "";
   const followedNames = followedHorses.map((h) => h.horseName);
 

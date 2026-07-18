@@ -290,17 +290,18 @@ function couponTierForRank(rank: number | undefined): CouponTier {
 
 /**
  * Yayında ve sonuçlanmış tahminleri sınıf/pist/güven/hipodroma göre kırarak isabet oranını çıkarır.
- * `beforeDateStr` verilirse o tarih ve sonrası hariç tutulur — bir koşuya "tavsiye" gösterirken
- * o koşunun (veya aynı günün diğer koşularının) kendi sonucu, kendi tavsiyesini beslememeli.
+ * `excludeRaceId` verilirse o koşu hariç tutulur — bir koşuya "tavsiye" gösterirken o koşunun kendi
+ * sonucu kendi tavsiyesini beslemesin diye. Bugün daha erken biten diğer koşuların sonuçları dahildir
+ * (onlar zaten kesinleşmiş, tavsiye edilen koşuyu beslemesinde bir sakınca yok — sayaç gün içinde de büyür).
  */
-export async function getAnalystStats(beforeDateStr?: string): Promise<AnalystStats> {
+export async function getAnalystStats(excludeRaceId?: string): Promise<AnalystStats> {
   const rows = await db.prediction.findMany({
     where: {
       published: true,
       race: {
         result: { isNot: null },
         conditions: null,
-        ...(beforeDateStr ? { raceDay: { date: { lt: startOfDay(new Date(beforeDateStr)) } } } : {}),
+        ...(excludeRaceId ? { id: { not: excludeRaceId } } : {}),
       },
     },
     select: {

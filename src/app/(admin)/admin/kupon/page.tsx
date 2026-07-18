@@ -12,6 +12,7 @@ import DateNavigator from "@/components/kosular/DateNavigator";
 import KuponForm from "./KuponForm";
 import KuponActions from "./KuponActions";
 import type { HomeKuponLegInput } from "@/server/actions/home-kupon.actions";
+import { syncResultsForDate } from "@/server/services/result-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -39,12 +40,18 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
   const today = turkeyDateString();
   const currentDate = tarih ?? today;
 
-  const [kuponlar, hippodromes, raceDays, adminRaceDays, analystStats] = await Promise.all([
+  // Sayfa her açıldığında o günün bitmiş koşularının sonucu otomatik senkronize edilir —
+  // admin artık manuel "Yenile"ye gerek kalmadan, sayfayı ziyaret ettiğinde biten koşuların
+  // sonucunu (ve kupon isabet durumunu/tavsiyeleri) taze görür.
+  if (currentDate <= today) {
+    try { await syncResultsForDate(currentDate); } catch { /* TJK geçici olarak erişilemezse sessizce geç, mevcut veriyle devam et */ }
+  }
+
+  const [kuponlar, hippodromes, raceDays, adminRaceDays] = await Promise.all([
     db.homeKupon.findMany({ orderBy: { createdAt: "desc" }, take: 20 }),
     getHippodromes(),
     getRaceDaysByDate(currentDate),        // PuanTablosu için
     getAdminRaceDays(currentDate),         // Koşu programı tablosu için (kosular ile aynı)
-    getAnalystStats(currentDate),
   ]);
 
   // Her kuponun güncel isabet durumu (Ekonomik/Normal/Geniş) — koşular bittikçe burada da görülsün diye.
@@ -83,6 +90,21 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
       if (race.time) originalByTime.set(race.time, meta);
     }
   }
+
+  // Her koşunun tavsiyesi kendi (ya da karma ise eşleştiği asıl koşunun) sonucunu saymasın diye
+  // koşu başına ayrı hesaplanır — bugün daha erken biten diğer koşuların sonuçları yine sayılır.
+  function effectiveRaceIdFor(race: RaceRow): string {
+    const karmaRef = race.conditions ? parseConditionsRef(race.conditions) : null;
+    const original = karmaRef
+      ? (originalByKey.get(`${karmaRef.slug}:${karmaRef.raceNo}`) ?? (race.time ? originalByTime.get(race.time) : null))
+      : null;
+    return original?.raceId ?? race.id;
+  }
+  const allEffectiveRaceIds = [...new Set(adminRaceDays.flatMap((rd) => rd.races.map((race) => effectiveRaceIdFor(race))))];
+  const analystStatsEntries = await Promise.all(
+    allEffectiveRaceIds.map(async (id) => [id, await getAnalystStats(id)] as const)
+  );
+  const analystStatsByRaceId = new Map(analystStatsEntries);
 
   return (
     <div className="space-y-6">
@@ -127,7 +149,7 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                           : (original?.classType ?? race.classType);
                       const effectiveRunners =
                         race.runners.length > 0 ? race.runners : (original?.runners ?? []);
-                      const advice = getClassTypeAdvice(analystStats, effectiveClassType);
+                      const advice = getClassTypeAdvice(analystStatsByRaceId.get(effectiveRaceIdFor(race))!, effectiveClassType);
 
                       return (
                         <tr

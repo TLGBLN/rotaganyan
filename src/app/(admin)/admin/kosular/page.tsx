@@ -10,6 +10,7 @@ import DeleteRaceDayButton from "@/components/admin/DeleteRaceDayButton";
 import DeleteRaceButton from "@/components/admin/DeleteRaceButton";
 import ForceIngestButton from "@/components/admin/ForceIngestButton";
 import { forceIngestDate } from "@/server/actions/race.actions";
+import { syncResultsForDate } from "@/server/services/result-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -36,10 +37,13 @@ function runnerSetSignature(runners: { name: string }[]): string {
 export default async function AdminKosularPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const currentDate = params.tarih ?? turkeyDateString();
-  const [raceDays, analystStats] = await Promise.all([
-    getAdminRaceDays(currentDate),
-    getAnalystStats(currentDate),
-  ]);
+  // Sayfa her açıldığında o günün bitmiş koşularının sonucu otomatik senkronize edilir —
+  // "bülten bitişinde güncellenmiyor" şikayeti için: admin artık manuel "Yenile"ye gerek kalmadan,
+  // sayfayı her ziyaret ettiğinde biten koşuların sonucunu (ve buna bağlı tavsiyeleri) taze görür.
+  if (currentDate <= turkeyDateString()) {
+    try { await syncResultsForDate(currentDate); } catch { /* TJK geçici olarak erişilemezse sessizce geç, mevcut veriyle devam et */ }
+  }
+  const raceDays = await getAdminRaceDays(currentDate);
 
   // Build lookup for original (non-karma) races: at isim kümesi imzası → prediction + runner verisi.
   // Race.conditions metin alanı mevcut ingest tarafından hiç doldurulmadığı için (eski, artık
@@ -67,6 +71,21 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
       });
     }
   }
+
+  // Her koşunun tavsiyesi kendi (ya da karma ise eşleştiği asıl koşunun) sonucunu saymasın diye
+  // koşu başına ayrı hesaplanır — bugün daha erken biten diğer koşuların sonuçları yine sayılır.
+  function effectiveRaceIdFor(rd: (typeof raceDays)[0], race: RaceRow): string {
+    const original =
+      rd.hippodrome.slug === "karma" && race.runners.length > 0
+        ? originalBySignature.get(runnerSetSignature(race.runners)) ?? null
+        : null;
+    return original?.raceId ?? race.id;
+  }
+  const allEffectiveRaceIds = [...new Set(raceDays.flatMap((rd) => rd.races.map((race) => effectiveRaceIdFor(rd, race))))];
+  const analystStatsEntries = await Promise.all(
+    allEffectiveRaceIds.map(async (id) => [id, await getAnalystStats(id)] as const)
+  );
+  const analystStatsByRaceId = new Map(analystStatsEntries);
 
   return (
     <div className="space-y-4">
@@ -126,7 +145,7 @@ export default async function AdminKosularPage({ searchParams }: PageProps) {
                     const effectiveRaceId = original?.raceId ?? race.id;
                     const effectiveClassType = (race.classType && race.classType !== "—") ? race.classType : (original?.classType ?? race.classType);
                     const effectiveRunners = race.runners.length > 0 ? race.runners : (original?.runners ?? []);
-                    const advice = getClassTypeAdvice(analystStats, effectiveClassType);
+                    const advice = getClassTypeAdvice(analystStatsByRaceId.get(effectiveRaceId)!, effectiveClassType);
                     return (
                     <tr
                       key={race.id}

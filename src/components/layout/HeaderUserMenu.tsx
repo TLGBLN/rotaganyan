@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { User, LayoutDashboard, LogOut, ShieldCheck } from "lucide-react";
+import { User, LayoutDashboard, LogOut, ShieldCheck, Bookmark } from "lucide-react";
 
 type Props = {
   name?: string | null;
@@ -39,6 +39,12 @@ export default function HeaderUserMenu({ name, email, role }: Props) {
           <Link href="/panel">
             <LayoutDashboard className="mr-2 h-3.5 w-3.5" />
             Panelim
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/panel/takip-atlarim">
+            <Bookmark className="mr-2 h-3.5 w-3.5" />
+            Takip Atlarım
           </Link>
         </DropdownMenuItem>
         {isEditor && (
