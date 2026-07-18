@@ -6,6 +6,15 @@ import { parseFullReport } from "@/lib/md-report-parser";
 import { reconstructFlattenedMarkdown } from "@/lib/ai-paste-fix";
 
 export async function POST(req: NextRequest) {
+  try {
+    return await handlePost(req);
+  } catch (e) {
+    console.error("[parse-report]", e);
+    return NextResponse.json({ error: "Beklenmedik bir sunucu hatası oluştu. Tekrar deneyin." }, { status: 500 });
+  }
+}
+
+async function handlePost(req: NextRequest) {
   const session = await auth();
   if (!session?.user || !hasRole(session.user.role as Role, "ADMIN")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

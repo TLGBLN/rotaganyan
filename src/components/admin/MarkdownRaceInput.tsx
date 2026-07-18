@@ -44,28 +44,33 @@ export default function MarkdownRaceInput({ raceId, raceLabel, defaultOpen = fal
     const fullReport = isFullReport(text);
     const endpoint = fullReport ? "/api/admin/parse-report" : "/api/admin/parse-md";
 
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ raceId, markdown: text }),
-    });
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ raceId, markdown: text }),
+      });
 
-    const data = await res.json();
-    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) {
+        setStatus("error");
+        setMessage(data?.error ?? `Sunucu hatası (${res.status}). Tekrar deneyin.`);
+        return;
+      }
+
+      setStatus("ok");
+      if (fullReport) {
+        setMessage(`Tam rapor kaydedildi: ${data.picks} seçim, ${data.runners} at`);
+        setRunners([]);
+      } else {
+        setMessage(`${data.updated} at kaydedildi`);
+        setRunners(data.runners ?? []);
+      }
+      router.refresh();
+    } catch {
       setStatus("error");
-      setMessage(data.error ?? "Hata oluştu");
-      return;
+      setMessage("Ağ hatası. Tekrar deneyin.");
     }
-
-    setStatus("ok");
-    if (fullReport) {
-      setMessage(`Tam rapor kaydedildi: ${data.picks} seçim, ${data.runners} at`);
-      setRunners([]);
-    } else {
-      setMessage(`${data.updated} at kaydedildi`);
-      setRunners(data.runners ?? []);
-    }
-    router.refresh();
   }
 
   return (
