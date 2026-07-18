@@ -115,6 +115,14 @@
     {
       "path": "/api/cron/sync-galop",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/sync-race-styles",
+      "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/cron/sync-race-styles",
+      "schedule": "30 11 * * *"
     }
   ]
 }
