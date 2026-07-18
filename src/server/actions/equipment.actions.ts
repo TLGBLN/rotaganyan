@@ -9,12 +9,20 @@ const EQUIPMENT_LABELS: Record<string, string> = {
   K: "Kulaklık",
   KG: "Kapalı Gözlük",
   DB: "Dil Bağı",
-  SK: "Starta Kulaklıkla",
+  SK: "Starta Kadar Kulaklık",
   GKR: "Göz Koruyucu",
 };
 
 function labelFor(code: string): string {
   return EQUIPMENT_LABELS[code] ?? code;
+}
+
+// K (koşu boyunca kulaklık) ve SK (sadece starta kadar kulaklık), aynı ekipmanın iki farklı kullanım
+// şekli — biri diğerinin yerine geçtiğinde bu "eklendi + çıkarıldı" gibi iki ayrı değişiklik değil,
+// kulaklık kullanım TÜRÜNÜN değişmesidir; ayrı ayrı eklenen/çıkarılan olarak işaretlenmemeli.
+const EQUIPMENT_FAMILY: Record<string, string> = { K: "KULAKLIK", SK: "KULAKLIK" };
+function familyOf(code: string): string {
+  return EQUIPMENT_FAMILY[code] ?? code;
 }
 
 function toCodes(raw: string | null): string[] {
@@ -70,8 +78,10 @@ export async function getEquipmentChangesForRace(raceId: string): Promise<Equipm
           return { runnerNo: r.no, horseName: r.name, current, added: [], removed: [], lastRaceDate: null, hasTjkId: true };
         }
         const pastCodes = toCodes(last.equipment);
-        const added = currentCodes.filter((c) => !pastCodes.includes(c)).map((code) => ({ code, label: labelFor(code) }));
-        const removed = pastCodes.filter((c) => !currentCodes.includes(c)).map((code) => ({ code, label: labelFor(code) }));
+        const currentFamilies = new Set(currentCodes.map(familyOf));
+        const pastFamilies = new Set(pastCodes.map(familyOf));
+        const added = currentCodes.filter((c) => !pastFamilies.has(familyOf(c))).map((code) => ({ code, label: labelFor(code) }));
+        const removed = pastCodes.filter((c) => !currentFamilies.has(familyOf(c))).map((code) => ({ code, label: labelFor(code) }));
         return { runnerNo: r.no, horseName: r.name, current, added, removed, lastRaceDate: last.date, hasTjkId: true };
       } catch {
         return { runnerNo: r.no, horseName: r.name, current, added: [], removed: [], lastRaceDate: null, hasTjkId: true };
