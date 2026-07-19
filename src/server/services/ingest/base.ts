@@ -2,7 +2,7 @@ import type { IngestRaceDay, IngestResult } from "./types";
 
 /**
  * Abstract data provider. Implement this interface for each source
- * (TJK, ganyandefteri.com, etc.) and register in ingest/index.ts.
+ * (e.g. TJK) and register in ingest/index.ts.
  */
 export interface DataProvider {
   /** Human-readable name for logging */

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { syncRaceStylesForDate } from "@/server/services/ingest/ganyandefteri-style.adapter";
+import { syncYarisStiliForDate } from "@/server/services/yaris-stili.service";
 
 // Kendi cron'u — daha önce ingest-program içindeydi ama program ingest + galop senkronuyla
 // aynı istekte olduğu için toplam süre Vercel'in maxDuration sınırını (300s) aşıp
@@ -22,8 +22,8 @@ export async function GET(req: NextRequest) {
   const tomorrow = new Date(now);
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
-  const today = await syncRaceStylesForDate(toIsoDate(now)).catch((e: unknown) => ({ races: 0, updated: 0, errors: [String(e)] }));
-  const tomorrowResult = await syncRaceStylesForDate(toIsoDate(tomorrow)).catch((e: unknown) => ({ races: 0, updated: 0, errors: [String(e)] }));
+  const today = await syncYarisStiliForDate(toIsoDate(now)).catch((e: unknown) => ({ atlar: 0, guncellenen: 0, errors: [String(e)] }));
+  const tomorrowResult = await syncYarisStiliForDate(toIsoDate(tomorrow)).catch((e: unknown) => ({ atlar: 0, guncellenen: 0, errors: [String(e)] }));
 
   return NextResponse.json({
     today: { date: toIsoDate(now), ...today },

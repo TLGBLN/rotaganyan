@@ -1,10 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { persistRaceDays, TjkAdapter, GanyanDefteriAdapter } from "@/server/services/ingest";
+import { persistRaceDays, TjkAdapter } from "@/server/services/ingest";
 
 const INGEST_SECRET = process.env.INGEST_SECRET;
 
-// Priority: TJK first, fallback to ganyandefteri if TJK returns empty
-const PROVIDERS = [new TjkAdapter(), new GanyanDefteriAdapter()];
+const PROVIDERS = [new TjkAdapter()];
 
 export async function POST(req: NextRequest) {
   // Protect with a shared secret (set INGEST_SECRET in env)

@@ -109,7 +109,7 @@ function breedShort(b: string) {
   return b === "ARAP" ? "Arap" : "İngiliz";
 }
 
-// Yarış stili — ganyandefteri.com'dan senkronlanan RaceStyleTag
+// Yarış stili — TJK Son 800 verisinden kendi hesabımızla senkronlanan RaceStyleTag
 function raceStyleBadge(raceStyle: { style: string; percent: number } | null): { text: string; cls: string } | null {
   if (!raceStyle) return null;
   const { style, percent } = raceStyle;

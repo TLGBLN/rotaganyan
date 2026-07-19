@@ -284,7 +284,7 @@ export type VeriDenetimSonucu = { yeterli: boolean; eksikler: string[]; rapor: V
 
 export function veriDenetimi(atlar: AtGirdisi[], _esik: Esikler = ESIK): VeriDenetimSonucu {
   const n = atlar.length || 1;
-  // tempoVeriN kasıtlı olarak "bloklayan" listede DEĞİL: TJK/ganyandefteri bazı atları
+  // tempoVeriN kasıtlı olarak "bloklayan" listede DEĞİL: kendi yarış stili hesabımız bazı atları
   // (özellikle az yarışlı/ilk startlı) yarış stiline göre hiç sınıflandırmıyor — bu bir
   // veri toplama eksikliği değil, yapısal bir sınır. Bu yüzden düşük doluluğu analiz
   // üretimini BLOKE etmez, yalnız rapora ve şeffaflık notlarına yansır (kullanıcı onayı).

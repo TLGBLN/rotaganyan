@@ -165,7 +165,7 @@ export default async function IstatistikPage() {
         </h2>
         <RaceStyleTable rowLabel="Kadro" rows={raceStyleStats.byFieldSize} />
         <p className="mt-2 text-[11px] text-muted-foreground">
-          * Yarış stili verisi ganyandefteri.com kaynaklıdır; yalnızca stil verisi bulunan galibiyetler sayılır.
+          * Yarış stili verisi TJK&apos;nın resmi Son 800 istatistiklerinden kendi hesabımızla üretilir; yalnızca stil verisi bulunan galibiyetler sayılır.
         </p>
       </section>
 
