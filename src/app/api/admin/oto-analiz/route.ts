@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { auth, hasRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { gatherFaz1 } from "@/lib/methodology/veri-toplama";
-import { degerlendir, metin, type AtGirdisi } from "@/lib/methodology/gecit-motoru";
+import { degerlendir, metin, veriDenetimi, type AtGirdisi } from "@/lib/methodology/gecit-motoru";
 import type { Role } from "@prisma/client";
 
 const client = new Anthropic();
@@ -30,6 +30,22 @@ async function handlePost(req: NextRequest) {
   const faz1 = await gatherFaz1(raceId);
   if (!faz1) return NextResponse.json({ error: "Koşu verisi bulunamadı" }, { status: 404 });
 
+  // Faz 2'yi (ücretli Claude çağrısı) çağırmadan ÖNCE veri yeterliliğini kontrol et — AGF/HP
+  // henüz yayınlanmadıysa (örn. AGF sabah 9'da açıklanıyor) burada ücretsiz olarak durur,
+  // Claude'a hiç istek atılmaz.
+  const onKontrol: AtGirdisi[] = faz1.runners.map((r) => ({
+    ad: r.ad, bc: 0, agfSirasi: r.agfSirasi, hpBugun: r.hpBugun, hpOnceki: r.hpOnceki, tempoVeriN: r.tempoVeriN,
+  }));
+  const onVeriDenetimi = veriDenetimi(onKontrol);
+  if (!onVeriDenetimi.yeterli) {
+    return NextResponse.json({
+      error:
+        "Bu koşu için veri yetersiz, otomatik analiz üretilemedi (Claude'a hiç istek atılmadı, ücret harcanmadı):\n" +
+        onVeriDenetimi.eksikler.join("\n") +
+        "\n\nBu genelde AGF/HP verisinin henüz yayınlanmadığı durumlarda olur (AGF genelde koşu günü sabahı yayınlanır). Veri yayınlandıktan sonra tekrar deneyin.",
+    }, { status: 422 });
+  }
+
   const methodology = await db.methodologyVersion.findFirst({ where: { isCurrent: true } });
   const methodologyText = methodology?.content ?? "";
 
@@ -41,6 +57,7 @@ async function handlePost(req: NextRequest) {
         `  Kilo:${r.weight ?? "—"}(${kiloStr}) Jokey:${r.jockey ?? "—"}(%${r.jockeyWinPct ?? "?"}) Antrenör:${r.trainer ?? "—"}(%${r.trainerWinPct ?? "?"})`,
         `  Pedigri: ${r.sire ?? "—"} — ${r.dam ?? "—"} (${r.damSire ?? "—"}) ${r.pedigreeNote ?? ""}`.trim(),
         `  Aygır İtibarı: baba=${r.sireTier ? `${r.sireTier.tier}${r.sireTier.note ? ` (${r.sireTier.note})` : ""}` : "kayıt yok"} · anne babası=${r.damSireTier ? `${r.damSireTier.tier}${r.damSireTier.note ? ` (${r.damSireTier.note})` : ""}` : "kayıt yok"}`,
+        ...(r.adminNote ? [`  Admin Notu (elle girildi, güvenilir kanıt kabul et): ${r.adminNote}`] : []),
         `  HP bugün:${r.hpBugun ?? "?"} önceki:${r.ilkStart ? "İLK START" : (r.hpOnceki ?? "?")} ivme:${r.hpIvmesi ?? "?"}`,
         `  AGF:%${r.agf ?? "?"} sıra:${r.agfSirasi ?? "?"} | Form dizisi:${r.recentForm ?? "—"} (geriliyor=${r.bitirisGeriliyor} iyileşiyor=${r.bitirisIyilesiyor} son sonuç zayıf=${r.sonSonucZayif})`,
         `  Tempo örneklem n:${r.tempoVeriN ?? "?"} stil:${r.raceStyleEtiket ?? "?"} kaçak:${r.kacak}`,

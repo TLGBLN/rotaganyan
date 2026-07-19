@@ -47,11 +47,14 @@ export default async function PedigriPage({ searchParams }: PageProps) {
       <div>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold">At Pedigrileri</h1>
+            <h1 className="text-lg font-bold">At Pedigrileri &amp; Eksik Veri</h1>
             <p className="text-xs text-muted-foreground">
-              O günün koşan atlarına baba (sire), anne (dam), anne babası (damsire) ve serbest not
+              O günün koşan atlarına baba (sire), anne (dam), anne babası (damsire) ve pedigri notu
               girin. TJK programında zaten varsa otomatik dolu gelir, siz üzerine yazabilirsiniz.
-              Kaydettiğiniz bilgi kullanıcılara &quot;Pedigriler&quot; panelinde gösterilir.
+              Kaydettiğiniz bilgi kullanıcılara &quot;Pedigriler&quot; panelinde gösterilir. Ayrıca her
+              atın yanındaki &quot;Genel Not&quot; alanına pedigri dışında herhangi bir eksik veriyi
+              (sakatlık haberi, antrenman gözlemi, pist notu vb.) girebilirsiniz — otomatik analiz
+              motoru bu notu okur ve değerlendirmesine dahil eder.
             </p>
           </div>
           <DateNavigator currentDate={currentDate} basePath="/admin/pedigri" />

@@ -124,6 +124,7 @@ export type PedigreeEntryRaceDay = Prisma.RaceDayGetPayload<{
             dam: true;
             damSire: true;
             pedigreeNote: true;
+            adminNote: true;
           };
         };
       };
@@ -140,7 +141,7 @@ export async function getRaceDaysForPedigreeEntry(dateStr: string): Promise<Pedi
       races: {
         include: {
           runners: {
-            select: { id: true, no: true, name: true, sire: true, dam: true, damSire: true, pedigreeNote: true },
+            select: { id: true, no: true, name: true, sire: true, dam: true, damSire: true, pedigreeNote: true, adminNote: true },
             orderBy: { no: "asc" },
           },
         },

@@ -12,10 +12,30 @@ type Runner = {
   dam: string | null;
   damSire: string | null;
   pedigreeNote: string | null;
+  adminNote: string | null;
 };
 
-type FormState = { sire: string; dam: string; damSire: string; pedigreeNote: string };
+type FormState = { sire: string; dam: string; damSire: string; pedigreeNote: string; adminNote: string };
 type ParsedEntry = { name: string; sire: string; dam: string; damSire: string; note: string };
+type ParsedNote = { name: string; note: string };
+
+/**
+ * "1. AT ADI: serbest metin" biçiminde, herhangi bir eksik veriyi (sakatlık haberi,
+ * antrenman gözlemi, pist/hava notu, TJK'da olmayan her şey) at başına ayrıştırır.
+ * Pedigri formatından farklı olarak tek satır — herhangi bir veri türü için kullanılabilir.
+ */
+function parseBulkNotes(text: string): ParsedNote[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const m = line.match(/^\d+\.\s*([^:]+):\s*(.+)$/);
+      if (!m) return null;
+      return { name: m[1].trim(), note: m[2].trim() };
+    })
+    .filter((e): e is ParsedNote => e != null && e.name.length > 0);
+}
 
 const COMBINING_MARKS_RE = new RegExp("[̀-ͯ]", "g");
 const TURKISH_UPPER_I_RE = new RegExp("İ", "g"); // İ
@@ -73,7 +93,13 @@ export default function RacePedigreeTable({ raceNo, runners }: { raceNo: number;
     Object.fromEntries(
       runners.map((r) => [
         r.id,
-        { sire: r.sire ?? "", dam: r.dam ?? "", damSire: r.damSire ?? "", pedigreeNote: r.pedigreeNote ?? "" },
+        {
+          sire: r.sire ?? "",
+          dam: r.dam ?? "",
+          damSire: r.damSire ?? "",
+          pedigreeNote: r.pedigreeNote ?? "",
+          adminNote: r.adminNote ?? "",
+        },
       ])
     )
   );
@@ -84,6 +110,12 @@ export default function RacePedigreeTable({ raceNo, runners }: { raceNo: number;
   const [unmatched, setUnmatched] = useState<string[]>([]);
   const [matchedCount, setMatchedCount] = useState<number | null>(null);
   const [bulkSaving, setBulkSaving] = useState(false);
+
+  const [noteBulkOpen, setNoteBulkOpen] = useState(false);
+  const [noteBulkText, setNoteBulkText] = useState("");
+  const [noteUnmatched, setNoteUnmatched] = useState<string[]>([]);
+  const [noteMatchedCount, setNoteMatchedCount] = useState<number | null>(null);
+  const [noteBulkSaving, setNoteBulkSaving] = useState(false);
 
   function setField(id: string, key: keyof FormState, value: string) {
     setForms((prev) => ({ ...prev, [id]: { ...prev[id], [key]: value } }));
@@ -114,7 +146,7 @@ export default function RacePedigreeTable({ raceNo, runners }: { raceNo: number;
           continue;
         }
         hits++;
-        next[target.id] = { sire: entry.sire, dam: entry.dam, damSire: entry.damSire, pedigreeNote: entry.note };
+        next[target.id] = { ...next[target.id], sire: entry.sire, dam: entry.dam, damSire: entry.damSire, pedigreeNote: entry.note };
       }
       return next;
     });
@@ -126,6 +158,34 @@ export default function RacePedigreeTable({ raceNo, runners }: { raceNo: number;
     setBulkSaving(true);
     await Promise.all(runners.map((r) => updateRunnerPedigree(r.id, forms[r.id])));
     setBulkSaving(false);
+    setSavedIds(new Set(runners.map((r) => r.id)));
+  }
+
+  function applyNoteBulk() {
+    const entries = parseBulkNotes(noteBulkText);
+    const misses: string[] = [];
+    let hits = 0;
+    setForms((prev) => {
+      const next = { ...prev };
+      for (const entry of entries) {
+        const target = runners.find((r) => normalizeName(r.name) === normalizeName(entry.name));
+        if (!target) {
+          misses.push(entry.name);
+          continue;
+        }
+        hits++;
+        next[target.id] = { ...next[target.id], adminNote: entry.note };
+      }
+      return next;
+    });
+    setNoteUnmatched(misses);
+    setNoteMatchedCount(hits);
+  }
+
+  async function saveNoteBulk() {
+    setNoteBulkSaving(true);
+    await Promise.all(runners.map((r) => updateRunnerPedigree(r.id, forms[r.id])));
+    setNoteBulkSaving(false);
     setSavedIds(new Set(runners.map((r) => r.id)));
   }
 
@@ -182,6 +242,58 @@ export default function RacePedigreeTable({ raceNo, runners }: { raceNo: number;
         </div>
       )}
 
+      <div className="flex items-center justify-between border-b px-3 py-1.5 bg-muted/10">
+        <span className="text-[11px] text-muted-foreground">Genel Eksik Veri Notu</span>
+        <button
+          onClick={() => setNoteBulkOpen((v) => !v)}
+          className="flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline"
+        >
+          Toplu Yapıştır {noteBulkOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        </button>
+      </div>
+
+      {noteBulkOpen && (
+        <div className="border-b bg-muted/10 px-3 py-3 space-y-2">
+          <p className="text-[11px] text-muted-foreground">
+            Pedigri dışında herhangi bir eksik veriyi buradan girebilirsiniz (sakatlık haberi, antrenman
+            gözlemi, pist/hava notu vb.) — otomatik analiz motoru bu notu okur ve dikkate alır. Biçim:
+            &quot;1. At Adı: not metni&quot;, her satıra bir at.
+          </p>
+          <textarea
+            value={noteBulkText}
+            onChange={(e) => setNoteBulkText(e.target.value)}
+            placeholder={"1. AT ADI: son antrenmanda hafif topallama gözlendi\n2. DİĞER AT: pist bugün ağır, kapanışı güçlü atlar avantajlı"}
+            rows={4}
+            className="w-full rounded-md border bg-transparent px-2 py-1.5 text-xs font-mono"
+          />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={applyNoteBulk}
+              disabled={!noteBulkText.trim()}
+              className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground hover:bg-brand/90 disabled:opacity-50"
+            >
+              Ayrıştır ve Doldur
+            </button>
+            <button
+              onClick={saveNoteBulk}
+              disabled={noteBulkSaving}
+              className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-muted disabled:opacity-50"
+            >
+              {noteBulkSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              Tümünü Kaydet
+            </button>
+          </div>
+          {noteMatchedCount != null && (
+            <p className="text-[11px] text-hit">{noteMatchedCount} at eşleşti ve dolduruldu.</p>
+          )}
+          {noteUnmatched.length > 0 && (
+            <p className="text-[11px] text-miss">
+              Eşleşmeyen at(lar) — isim bu koşudaki isimle birebir uyuşmuyor: {noteUnmatched.join(", ")}
+            </p>
+          )}
+        </div>
+      )}
+
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b">
@@ -190,14 +302,15 @@ export default function RacePedigreeTable({ raceNo, runners }: { raceNo: number;
             <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Baba</th>
             <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Anne</th>
             <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Anne Babası</th>
-            <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Not</th>
+            <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Pedigri Notu</th>
+            <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Genel Not</th>
             <th className="px-2 py-1.5"></th>
           </tr>
         </thead>
         <tbody>
           {runners.length === 0 ? (
             <tr>
-              <td colSpan={7} className="px-3 py-3 text-center text-muted-foreground">
+              <td colSpan={8} className="px-3 py-3 text-center text-muted-foreground">
                 At kaydı yok.
               </td>
             </tr>
@@ -236,8 +349,16 @@ export default function RacePedigreeTable({ raceNo, runners }: { raceNo: number;
                     <input
                       value={form.pedigreeNote}
                       onChange={(e) => setField(r.id, "pedigreeNote", e.target.value)}
-                      placeholder="Not (opsiyonel)"
+                      placeholder="Pedigri notu (opsiyonel)"
                       className="w-full min-w-[140px] rounded-md border bg-transparent px-2 py-1 text-xs"
+                    />
+                  </td>
+                  <td className="px-2 py-2">
+                    <input
+                      value={form.adminNote}
+                      onChange={(e) => setField(r.id, "adminNote", e.target.value)}
+                      placeholder="Eksik veri / genel not (opsiyonel)"
+                      className="w-full min-w-[160px] rounded-md border bg-transparent px-2 py-1 text-xs"
                     />
                   </td>
                   <td className="px-2 py-2 text-right">

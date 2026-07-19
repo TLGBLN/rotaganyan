@@ -110,6 +110,10 @@ export type Faz1Runner = {
   // varsa Faz 2 skorlamasında Ansiklopedi'nin Pedigri bölümü için doğrudan kullanılır.
   sireTier: { tier: string; note: string | null } | null;
   damSireTier: { tier: string; note: string | null } | null;
+  // Admin'in /admin/pedigri sayfasındaki "Genel Not"a elle girdiği, pedigri dışı herhangi
+  // bir eksik veri (sakatlık, antrenman gözlemi, pist notu vb.) — otomatik toplanamayan
+  // her şey için genel amaçlı manuel giriş alanı.
+  adminNote: string | null;
   hpBugun: number | null;
   agf: number | null;
   agfSirasi: number | null;
@@ -314,6 +318,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         sire: r.sire, dam: r.dam, damSire: r.damSire, pedigreeNote: r.pedigreeNote,
         sireTier: r.sire ? sireTierMap.get(r.sire) ?? null : null,
         damSireTier: r.damSire ? sireTierMap.get(r.damSire) ?? null : null,
+        adminNote: r.adminNote,
         hpBugun: r.hp, agf: r.agf, agfSirasi: agfSiraMap.get(r.id) ?? null,
         equipment: r.equipment, equipmentAdded: r.equipmentAdded, equipmentRemoved: r.equipmentRemoved,
         recentForm: r.recentForm, apprentice: r.apprentice,

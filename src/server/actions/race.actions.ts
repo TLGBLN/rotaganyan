@@ -130,6 +130,7 @@ type PedigreeInput = {
   dam?: string;
   damSire?: string;
   pedigreeNote?: string;
+  adminNote?: string;
 };
 
 export async function updateRunnerPedigree(runnerId: string, input: PedigreeInput) {
@@ -142,6 +143,7 @@ export async function updateRunnerPedigree(runnerId: string, input: PedigreeInpu
       dam: input.dam?.trim() || null,
       damSire: input.damSire?.trim() || null,
       pedigreeNote: input.pedigreeNote?.trim() || null,
+      adminNote: input.adminNote?.trim() || null,
     },
   });
 
