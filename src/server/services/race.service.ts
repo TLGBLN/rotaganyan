@@ -5,11 +5,11 @@ import type { Prisma, Confidence } from "@prisma/client";
 import { syncResultsForDate } from "./result-sync";
 import { fetchApprenticeRemainingRaces, normalizeJockeyName } from "./ingest/tjk-apprentice.adapter";
 
-/** Runner.raceStyle JSON alanından ("style" + "percent") ekranda gösterilecek değeri çıkarır. */
-function parseRaceStyle(raw: unknown): { style: string; percent: number } | null {
-  const r = raw as { style?: string; percent?: number } | null;
+/** Runner.raceStyle JSON alanından ("style" + "percent" + "veri") ekranda gösterilecek değeri çıkarır. */
+function parseRaceStyle(raw: unknown): { style: string; percent: number; veri: number | null } | null {
+  const r = raw as { style?: string; percent?: number; veri?: number } | null;
   if (!r?.style || r.percent == null) return null;
-  return { style: r.style, percent: r.percent };
+  return { style: r.style, percent: r.percent, veri: r.veri ?? null };
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -576,7 +576,7 @@ export type ProgramRunner = {
   ekuriGroup: number | null;
   apprentice: boolean;
   apprenticeRemaining: number | null;
-  raceStyle: { style: string; percent: number } | null; // style: "KACAK" | "ON_GRUP" | "BEKLEME" | "EN_GERI"
+  raceStyle: { style: string; percent: number; veri: number | null } | null; // style: "KACAK" | "ON_GRUP" | "BEKLEME" | "EN_GERI"; veri = örneklem sayısı (n)
   tjkAtId: number | null;
 };
 

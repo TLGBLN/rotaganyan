@@ -1,0 +1,200 @@
+import { NextRequest, NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
+import { auth, hasRole } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { gatherFaz1 } from "@/lib/methodology/veri-toplama";
+import { degerlendir, metin, type AtGirdisi } from "@/lib/methodology/gecit-motoru";
+import type { Role } from "@prisma/client";
+
+const client = new Anthropic();
+
+function extractJson(raw: string): string {
+  const jsonMatch = raw.match(/```json\s*([\s\S]*?)```/) ?? raw.match(/(\{[\s\S]*\})/);
+  return jsonMatch ? jsonMatch[1].trim() : raw;
+}
+
+type Faz2Atlar = {
+  atlar: { no: number; ad: string; aPuani: number; bcPuani: number; teknikSira: number | null; notlar?: string }[];
+};
+
+async function handlePost(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user || !hasRole(session.user.role as Role, "EDITOR")) {
+    return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
+  }
+
+  const { raceId } = (await req.json()) as { raceId: string };
+  if (!raceId) return NextResponse.json({ error: "raceId gerekli" }, { status: 400 });
+
+  // ── FAZ 1 — TAMAMEN OTOMATİK VERİ TOPLAMA (admin girdisi yok) ──
+  const faz1 = await gatherFaz1(raceId);
+  if (!faz1) return NextResponse.json({ error: "Koşu verisi bulunamadı" }, { status: 404 });
+
+  const methodology = await db.methodologyVersion.findFirst({ where: { isCurrent: true } });
+  const methodologyText = methodology?.content ?? "";
+
+  const faz1Tablo = faz1.runners
+    .map((r) => {
+      const kiloStr = r.weightChange != null ? `${r.weightChange >= 0 ? "+" : ""}${r.weightChange}kg` : "—";
+      return [
+        `#${r.no} ${r.ad}`,
+        `  Kilo:${r.weight ?? "—"}(${kiloStr}) Jokey:${r.jockey ?? "—"}(%${r.jockeyWinPct ?? "?"}) Antrenör:${r.trainer ?? "—"}(%${r.trainerWinPct ?? "?"})`,
+        `  Pedigri: ${r.sire ?? "—"} — ${r.dam ?? "—"} (${r.damSire ?? "—"}) ${r.pedigreeNote ?? ""}`.trim(),
+        `  HP bugün:${r.hpBugun ?? "?"} önceki:${r.ilkStart ? "İLK START" : (r.hpOnceki ?? "?")} ivme:${r.hpIvmesi ?? "?"}`,
+        `  AGF:%${r.agf ?? "?"} sıra:${r.agfSirasi ?? "?"} | Form dizisi:${r.recentForm ?? "—"} (geriliyor=${r.bitirisGeriliyor} iyileşiyor=${r.bitirisIyilesiyor} son sonuç zayıf=${r.sonSonucZayif})`,
+        `  Tempo örneklem n:${r.tempoVeriN ?? "?"} stil:${r.raceStyleEtiket ?? "?"} kaçak:${r.kacak}`,
+        `  Sınıf: ${r.sinifOnceki ?? "?"} (SKK ${r.sinifSkkOnceki ?? "?"}) -> bugün ${faz1.race.classType} (SKK ${r.sinifSkkBugun ?? "?"}) düşüş=${r.sinifDususu}`,
+        `  Takı: ${r.equipment ?? "—"} (eklenen:${r.equipmentAdded ?? "—"} çıkarılan:${r.equipmentRemoved ?? "—"})`,
+        `  Galop: ${r.galopOzet} | kondisyon zinciri var=${r.kondisyonZinciriVar} keskin=${r.keskinGalopZinciri}`,
+        `  Son800 benzer koşu n=${r.son800BenzerKosuN} medyan fark=${r.son800Medyan ?? "—"}`,
+      ].join("\n");
+    })
+    .join("\n\n");
+
+  // ── FAZ 2 — CLAUDE: koşu tipine göre A/B+C skorlama + ön teknik sıra ──
+  const faz2Prompt = `Sen ROTAGANYAN v4.1 at yarışı analistisin. FAZ 2 — SKORLAMA aşamasındasın (henüz final sıralama/kupon yazma, sadece puanla).
+
+## KOŞU
+${faz1.race.hippodromeName} — ${faz1.race.raceNo}. Koşu | ${faz1.race.classType} | ${faz1.race.breed} | ${faz1.race.distance}m ${faz1.race.surface} | ${faz1.runners.length} at
+
+## ATLAR (FAZ 1 — otomatik toplanmış ham veri, sitenin kendi TJK kaynağından)
+${faz1Tablo}
+
+## METODOLOJİ
+${methodologyText}
+
+## GÖREVİN
+1. Koşu tipini belirle (Ansiklopedi Bölüm IV) ve o tipin A/B+C ağırlık matrisini uygula.
+2. Her at için A (0-60) ve B+C (0-40, Son800 bonusu HARİÇ — o ayrıca koddan eklenecek) puanı ver.
+3. Toplam puana göre ön teknik sıra belirle (1 = en iyi). Bu sıra FAZ 3'te geçit motoruna girdi olacak.
+4. "Kanıt yokluğu olumsuz kanıt değildir" ilkesine uy — eksik veriyi ceza sebebi yapma.
+
+Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
+{
+  "atlar": [
+    { "no": 0, "ad": "...", "aPuani": 0, "bcPuani": 0, "teknikSira": 1, "notlar": "kısa iç not" }
+  ]
+}`;
+
+  const faz2Msg = await client.messages.create({
+    model: "claude-sonnet-5",
+    max_tokens: 4096,
+    messages: [{ role: "user", content: faz2Prompt }],
+  });
+  const faz2Raw = faz2Msg.content[0].type === "text" ? faz2Msg.content[0].text.trim() : "";
+  let faz2: Faz2Atlar;
+  try {
+    faz2 = JSON.parse(extractJson(faz2Raw));
+  } catch {
+    return NextResponse.json({ error: "Faz 2 (skorlama) yanıtı parse edilemedi", raw: faz2Raw }, { status: 500 });
+  }
+
+  // ── FAZ 3 — GEÇİT MOTORU: KOD İLE ÇALIŞIR, LLM DEĞİL ──
+  const teknikSiraByNo = new Map(faz2.atlar.map((a) => [a.no, a.teknikSira]));
+  const bcPuaniByNo = new Map(faz2.atlar.map((a) => [a.no, a.bcPuani]));
+
+  const kacakSayisi = faz1.runners.filter((r) => r.kacak).length;
+  const atGirdileri: AtGirdisi[] = faz1.runners.map((r) => ({
+    ad: r.ad,
+    teknikSira: teknikSiraByNo.get(r.no) ?? null,
+    agfSirasi: r.agfSirasi,
+    bc: bcPuaniByNo.get(r.no) ?? 0,
+    hpBugun: r.hpBugun,
+    hpOnceki: r.hpOnceki,
+    ilkStart: r.ilkStart,
+    bitirisGeriliyor: r.bitirisGeriliyor,
+    bitirisIyilesiyor: r.bitirisIyilesiyor,
+    tempoVeriN: r.tempoVeriN,
+    kacak: r.kacak,
+    atomicForce: {
+      kiloAvantaji: r.kiloAvantaji,
+      takiUygun: r.takiDegisikligiVar,
+      startTempoUygun: r.tempoVeriN != null && r.tempoVeriN >= 5 && !!r.raceStyleEtiket,
+      exactVeyaPedigri: r.exactVeyaPedigri,
+      kondisyonZinciri: r.kondisyonZinciriVar,
+      sinifJokeyAntrenor: r.sinifJokeyAntrenor,
+    },
+    sinifDususu: r.sinifDususu,
+    hpAlanIciUst: r.hpAlanIciUst,
+    sonSonucZayif: r.sonSonucZayif,
+    keskinGalopZinciri: r.keskinGalopZinciri,
+    son800Farki: r.son800Medyan,
+    son800BenzerKosuN: r.son800BenzerKosuN,
+    son800Medyan: r.son800Medyan,
+  }));
+
+  const gecitSonuc = degerlendir({
+    kosu: { ad: `${faz1.race.hippodromeName} ${faz1.race.raceNo}.Koşu`, kuponDerinligi: 6, sahadakiKacakSayisi: kacakSayisi },
+    atlar: atGirdileri,
+  });
+  const gecitMetin = metin(gecitSonuc, `${faz1.race.hippodromeName} ${faz1.race.raceNo}.Koşu`);
+
+  // ── FAZ 4 — CLAUDE: geçit çıktısını işleyip final sıralama + kupon + yazım ──
+  const faz4Prompt = `Sen ROTAGANYAN v4.1 at yarışı analistisin. FAZ 4 — SIRALAMA ve KUPON aşamasındasın.
+
+## FAZ 2 SKORLARIN
+${faz2.atlar.map((a) => `#${a.no} ${a.ad}: A=${a.aPuani} B+C=${a.bcPuani} (ön teknik sıra ${a.teknikSira})`).join("\n")}
+
+## FAZ 3 — GEÇİT MOTORU ÇIKTISI (koddan gerçekten üretildi, sinyaller DEĞİŞTİRİLEMEZ)
+\`\`\`
+${gecitMetin}
+\`\`\`
+
+## METODOLOJİ (çözüm rejimi ve çıktı formatı için — dosyanın "Çözüm Rejimi" ve "Çıktı JSON Şeması" bölümlerine bak)
+${methodologyText}
+
+## GÖREVİN
+1. Geçit motoru çıktısındaki her tetiklenen atı işle: "Çözüm Rejimi" tablosuna göre TAŞI (varsayılan zorunlu eylem) ya da — yalnız gerçekten güçlü, somut exact-dışı bir olumsuz kanıt FAZ 1 verisinde açıkça varsa — yerinde bırak ve nedenini yaz.
+2. AGF_AYRIŞMA yalnız gerçek taşımayla çözülür, gerekçeyle ASLA.
+3. Bu otomatik pipeline'da admin'in elle çözüm girmesi mümkün değildir — bu yüzden varsayılan davranış her zaman "taşı"dır.
+4. FAZ 2 puanlarına ve geçit sonuçlarına göre FİNAL sıralamayı belirle (en iyi 3-5 at, rank 1'den başlayarak).
+5. Banko şartlarını kontrol et (dördü birden: puan≥75, rakibe fark≥5, Veri Güveni A, somut risk yok — Handikap/Grup'ta ekstra dikkatli ol, aşırı piyasa konsensüsü varsa banko yapma).
+6. Ekonomik/Normal/Geniş kupon önerisi üret (at numaralarıyla, örn "X-Y-Z").
+7. Her pick için kullanıcıya SADE dilde (A/B+C/Atomic Force/geçit skoru gibi teknik terimler YOK) kısa gerekçe yaz.
+
+Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
+{
+  "picks": [
+    { "rank": 1, "no": 0, "name": "...", "score": 0, "pedigreeRating": "BILINMIYOR", "isTarget": false, "details": [], "note": "Neden bu sırada (max 2-3 cümle, sade dil)" }
+  ],
+  "confidence": "ORTA",
+  "isBanko": false,
+  "bankoNote": "",
+  "notes": "Genel koşu değerlendirmesi + geçit motorunun uyarılarının sade özeti",
+  "tempo": "Tempo beklentisi (sade dil)",
+  "couponNarrow": "X",
+  "couponNormal": "X-Y",
+  "couponWide": "X-Y-Z"
+}
+pedigreeRating değerleri: COK_YUKSEK, YUKSEK, GUCLU, ORTA, DUSUK, ZAYIF, SORU, BILINMIYOR
+details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, Jokey devam, HP İvmesi +12, Son800 güçlü kapanış`;
+
+  const faz4Msg = await client.messages.create({
+    model: "claude-sonnet-5",
+    max_tokens: 2048,
+    messages: [{ role: "user", content: faz4Prompt }],
+  });
+  const faz4Raw = faz4Msg.content[0].type === "text" ? faz4Msg.content[0].text.trim() : "";
+  let result: unknown;
+  try {
+    result = JSON.parse(extractJson(faz4Raw));
+  } catch {
+    return NextResponse.json({ error: "Faz 4 (sıralama) yanıtı parse edilemedi", raw: faz4Raw }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    result,
+    runners: faz1.runners.map((r) => ({ id: r.id, no: r.no, name: r.ad })),
+    debug: { faz1VeriDoluluk: faz1.veriDoluluk, gecitDurum: gecitSonuc.durum, gecitUyari: gecitSonuc.uyari },
+  });
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    return await handlePost(req);
+  } catch (e) {
+    console.error("[oto-analiz]", e);
+    return NextResponse.json({ error: "Beklenmeyen hata: " + String(e) }, { status: 500 });
+  }
+}

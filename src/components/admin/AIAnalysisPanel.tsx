@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Loader2, Sparkles, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { PedigreeRating } from "@prisma/client";
 
@@ -44,7 +43,6 @@ const PEDIGREE_LABEL: Record<PedigreeRating, string> = {
 };
 
 export default function AIAnalysisPanel({ raceId, onApply }: Props) {
-  const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AIAnalysisResult | null>(null);
   const [runners, setRunners] = useState<Runner[]>([]);
@@ -52,16 +50,15 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
   const [applied, setApplied] = useState(false);
 
   async function handleEvaluate() {
-    if (!text.trim()) return;
     setLoading(true);
     setError(null);
     setResult(null);
     setApplied(false);
     try {
-      const res = await fetch("/api/admin/ai-analiz", {
+      const res = await fetch("/api/admin/oto-analiz", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ raceId, chatgptAnalysis: text }),
+        body: JSON.stringify({ raceId }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error ?? "Hata");
@@ -84,28 +81,19 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
     <div className="space-y-4 rounded-xl border border-brand/20 bg-brand/5 p-4">
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-brand" />
-        <h3 className="text-sm font-semibold">AI Değerlendirme</h3>
-        <span className="ml-auto text-[10px] text-muted-foreground">ChatGPT sıralamasını yapıştır → site final kararı verir</span>
+        <h3 className="text-sm font-semibold">Otomatik Analiz</h3>
+        <span className="ml-auto text-[10px] text-muted-foreground">Metodoloji (v4.1) + geçit motoru + sitenin kendi verisiyle tamamen otomatik çalışır</span>
       </div>
-
-      <Textarea
-        rows={8}
-        placeholder={"ChatGPT'nin ürettiği sıralamayı buraya yapıştır…\n\nÖrn:\n1. #5 GOLDMAN — AGF1, Galop K1, Sicil var\n2. #3 NEJDET — Kilo düştü\n3. #7 ÇAKIRASLAN — Pedigri güçlü"}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        className="font-mono text-xs resize-none bg-background"
-        disabled={loading}
-      />
 
       <div className="flex gap-2">
         <Button
           onClick={handleEvaluate}
-          disabled={loading || !text.trim()}
+          disabled={loading}
           size="sm"
           className="gap-1.5"
         >
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-          {loading ? "Değerlendiriliyor…" : "Değerlendir"}
+          {loading ? "Analiz oluşturuluyor…" : "Otomatik Analiz Oluştur"}
         </Button>
         {result && (
           <Button
