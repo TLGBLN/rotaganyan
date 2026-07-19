@@ -6,6 +6,7 @@ import { ChevronLeft } from "lucide-react";
 import { getRaceForAnalysis, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
 import MarkdownRaceInput from "@/components/admin/MarkdownRaceInput";
 import BultenUpload from "@/components/admin/BultenUpload";
+import SmartAnalysisEditor from "@/components/admin/SmartAnalysisEditor";
 import ClassTypeAdviceCard from "@/components/admin/ClassTypeAdviceCard";
 import { turkeyDateString } from "@/lib/tz";
 import DatePickerNav from "./DatePickerNav";
@@ -91,7 +92,7 @@ export default async function YeniAnalizPage({ searchParams }: PageProps) {
   if (!race) return <p className="text-sm text-muted-foreground">Koşu bulunamadı.</p>;
 
   const raceName = `${race.raceDay.hippodrome.name} — ${race.raceNo}. Koşu`;
-  const mod = params.mod ?? "md"; // default: markdown
+  const mod = params.mod ?? "oto"; // varsayılan: tam otomatik analiz
   const analystStats = await getAnalystStats(race.id);
   const advice = getClassTypeAdvice(analystStats, race.classType);
   const backHref = params.tarih
@@ -128,6 +129,16 @@ export default async function YeniAnalizPage({ searchParams }: PageProps) {
       {/* Mode toggle */}
       <div className="flex gap-2">
         <Link
+          href={`?kosu=${race.id}&mod=oto`}
+          className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${
+            mod === "oto"
+              ? "bg-brand text-black"
+              : "border border-white/10 text-muted-foreground hover:bg-white/5"
+          }`}
+        >
+          Otomatik Analiz
+        </Link>
+        <Link
           href={`?kosu=${race.id}&mod=md`}
           className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${
             mod === "md"
@@ -148,6 +159,11 @@ export default async function YeniAnalizPage({ searchParams }: PageProps) {
           Ekran Görüntüsü
         </Link>
       </div>
+
+      {/* Otomatik analiz — admin hiçbir şey elle girmez, site kendi verisiyle + metodolojiyle üretir */}
+      {mod === "oto" && (
+        <SmartAnalysisEditor raceId={race.id} runners={race.runners} />
+      )}
 
       {/* Markdown input — serbest format: basit at tablosu veya tam ROTAGANYAN raporu, otomatik algılanır */}
       {mod === "md" && (
