@@ -3,11 +3,14 @@
  * veri-toplama.ts
  *
  * Metodolojinin FAZ 1'i (ham veri çıkarma) burada TAMAMEN OTOMATİK yapılır —
- * admin hiçbir alanı elle girmez. Girdiler sitenin kendi TJK verisinden
- * (Runner tablosu + AtKosuBilgileri geçmişi + Son800 istatistikleri + jokey/
- * antrenör senkronizasyonu) türetilir. Bazı alanlar (takı "uygunluğu", galop
- * zincirinin "keskinliği" gibi tamamen öznel değerlendirmeler) yerine, ölçülebilir
- * bir yaklaşıklık kullanılır — bu yaklaşıklıklar aşağıda açıkça belirtilmiştir.
+ * admin hiçbir alanı elle girmek ZORUNDA değildir. Girdiler sitenin kendi TJK
+ * verisinden (Runner tablosu + AtKosuBilgileri geçmişi + Son800 istatistikleri +
+ * jokey/antrenör senkronizasyonu) türetilir. Bazı alanlar (takı "uygunluğu",
+ * galop zincirinin "keskinliği" gibi tamamen öznel değerlendirmeler) yerine,
+ * ölçülebilir bir yaklaşıklık kullanılır — bu yaklaşıklıklar aşağıda açıkça
+ * belirtilmiştir. Admin isterse /admin/pedigri üzerinden (tek tek ya da toplu
+ * yapıştırarak) pedigri metni ve aygır itibar tablosu (SireTier) girebilir —
+ * bu veri girildiyse Faz 1 otomatik olarak okur ve Faz 2 skorlamasına dahil eder.
  */
 
 import { db } from "@/lib/db";
@@ -103,6 +106,10 @@ export type Faz1Runner = {
   dam: string | null;
   damSire: string | null;
   pedigreeNote: string | null;
+  // Admin'in /admin/pedigri > "Aygır İtibar Tablosu"nda elle girdiği referans bilgisi —
+  // varsa Faz 2 skorlamasında Ansiklopedi'nin Pedigri bölümü için doğrudan kullanılır.
+  sireTier: { tier: string; note: string | null } | null;
+  damSireTier: { tier: string; note: string | null } | null;
   hpBugun: number | null;
   agf: number | null;
   agfSirasi: number | null;
@@ -185,6 +192,14 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
     getJockeyStats(jockeyNames).catch(() => ({} as Awaited<ReturnType<typeof getJockeyStats>>)),
     getTrainerStats(trainerNames).catch(() => ({} as Awaited<ReturnType<typeof getTrainerStats>>)),
   ]);
+
+  // Admin'in /admin/pedigri > "Aygır İtibar Tablosu"nda elle girdiği referans veriler —
+  // bu koşudaki atların baba/anne babası isimleriyle eşleşenler toplu çekilir.
+  const sireNames = [...new Set(race.runners.flatMap((r) => [r.sire, r.damSire]).filter((n): n is string => !!n))];
+  const sireTierRows = sireNames.length > 0
+    ? await db.sireTier.findMany({ where: { name: { in: sireNames } }, select: { name: true, tier: true, note: true } }).catch(() => [])
+    : [];
+  const sireTierMap = new Map(sireTierRows.map((s) => [s.name, { tier: s.tier as string, note: s.note }]));
 
   // AGF sırası — bugünkü sahada AGF yüzdesine göre (yüksekten düşüğe)
   const agfSirali = [...race.runners]
@@ -297,6 +312,8 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         weight: r.weight, weightChange: r.weightChange,
         jockey: r.jockey, trainer: r.trainer, owner: r.owner,
         sire: r.sire, dam: r.dam, damSire: r.damSire, pedigreeNote: r.pedigreeNote,
+        sireTier: r.sire ? sireTierMap.get(r.sire) ?? null : null,
+        damSireTier: r.damSire ? sireTierMap.get(r.damSire) ?? null : null,
         hpBugun: r.hp, agf: r.agf, agfSirasi: agfSiraMap.get(r.id) ?? null,
         equipment: r.equipment, equipmentAdded: r.equipmentAdded, equipmentRemoved: r.equipmentRemoved,
         recentForm: r.recentForm, apprentice: r.apprentice,

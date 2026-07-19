@@ -336,16 +336,16 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
           <h3 className="mb-3 text-sm font-semibold">Kupon Önerisi</h3>
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
-              <Label className="text-xs">Dar</Label>
-              <Input className="h-8 text-sm font-mono" placeholder="1-3" {...register("couponNarrow")} />
+              <Label className="text-xs">Ekonomik (3 at)</Label>
+              <Input className="h-8 text-sm font-mono" placeholder="1-3-7" {...register("couponNarrow")} />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Normal</Label>
-              <Input className="h-8 text-sm font-mono" placeholder="1-3-7" {...register("couponNormal")} />
+              <Label className="text-xs">Normal (3 at)</Label>
+              <Input className="h-8 text-sm font-mono" placeholder="9-11-14" {...register("couponNormal")} />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Geniş</Label>
-              <Input className="h-8 text-sm font-mono" placeholder="1-3-7-9" {...register("couponWide")} />
+              <Label className="text-xs">Geniş (kalanlar)</Label>
+              <Input className="h-8 text-sm font-mono" placeholder="2-4-5-6-8-10" {...register("couponWide")} />
             </div>
           </div>
         </section>

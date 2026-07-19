@@ -112,7 +112,7 @@ function parsePedRating(v: string = ""): PedigreeRating {
 }
 
 function extractCoupons(notlar: string = "") {
-  const narrow = notlar.match(/(?:^|\n)Dar:\s*([^\n]+)/im)?.[1]?.trim() ?? null;
+  const narrow = notlar.match(/(?:^|\n)(?:Dar|Ekonomik):\s*([^\n]+)/im)?.[1]?.trim() ?? null;
   const normal = notlar.match(/(?:^|\n)Normal:\s*([^\n]+)/im)?.[1]?.trim() ?? null;
   const wide = notlar.match(/(?:^|\n)Geni[şs]:\s*([^\n]+)/im)?.[1]?.trim() ?? null;
   return { narrow, normal, wide };

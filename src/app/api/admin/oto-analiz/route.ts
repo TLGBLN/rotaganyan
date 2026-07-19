@@ -40,6 +40,7 @@ async function handlePost(req: NextRequest) {
         `#${r.no} ${r.ad}`,
         `  Kilo:${r.weight ?? "—"}(${kiloStr}) Jokey:${r.jockey ?? "—"}(%${r.jockeyWinPct ?? "?"}) Antrenör:${r.trainer ?? "—"}(%${r.trainerWinPct ?? "?"})`,
         `  Pedigri: ${r.sire ?? "—"} — ${r.dam ?? "—"} (${r.damSire ?? "—"}) ${r.pedigreeNote ?? ""}`.trim(),
+        `  Aygır İtibarı: baba=${r.sireTier ? `${r.sireTier.tier}${r.sireTier.note ? ` (${r.sireTier.note})` : ""}` : "kayıt yok"} · anne babası=${r.damSireTier ? `${r.damSireTier.tier}${r.damSireTier.note ? ` (${r.damSireTier.note})` : ""}` : "kayıt yok"}`,
         `  HP bugün:${r.hpBugun ?? "?"} önceki:${r.ilkStart ? "İLK START" : (r.hpOnceki ?? "?")} ivme:${r.hpIvmesi ?? "?"}`,
         `  AGF:%${r.agf ?? "?"} sıra:${r.agfSirasi ?? "?"} | Form dizisi:${r.recentForm ?? "—"} (geriliyor=${r.bitirisGeriliyor} iyileşiyor=${r.bitirisIyilesiyor} son sonuç zayıf=${r.sonSonucZayif})`,
         `  Tempo örneklem n:${r.tempoVeriN ?? "?"} stil:${r.raceStyleEtiket ?? "?"} kaçak:${r.kacak}`,
@@ -161,7 +162,11 @@ ${methodologyText}
 3. Bu otomatik pipeline'da admin'in elle çözüm girmesi mümkün değildir — bu yüzden varsayılan davranış her zaman "taşı"dır.
 4. FAZ 2 puanlarına ve geçit sonuçlarına göre FİNAL sıralamayı belirle (en iyi 3-5 at, rank 1'den başlayarak).
 5. Banko şartlarını kontrol et (dördü birden: puan≥75, rakibe fark≥5, Veri Güveni A, somut risk yok — Handikap/Grup'ta ekstra dikkatli ol, aşırı piyasa konsensüsü varsa banko yapma).
-6. Ekonomik/Normal/Geniş kupon önerisi üret (at numaralarıyla, örn "X-Y-Z").
+6. Ekonomik/Normal/Geniş kupon önerisi üret — sahadaki atları üç gruba böl (kupon numaraları at numarasıdır):
+   - Ekonomik: final sıralamandaki en iyi 3 at.
+   - Normal: sıralamada onları izleyen 3 at (Ekonomik'te olmayan farklı 3 at).
+   - Geniş: sahada kalan TÜM diğer atlar (Ekonomik ve Normal'de olmayanların hepsi — koşulmayan/çekilen atlar hariç).
+   Alanları "X-Y-Z" formatında, at numaralarıyla doldur. Saha 6 attan azsa Normal'i mevcut atlarla doldur, Geniş boş kalabilir.
 7. Her pick için "note" alanına, yarışseverin okuyacağı bir YAZI yaz — teknik rapor değil, MAKALE tadında:
    - Yayına hazır, akıcı bir dille anlat: atın adını (BÜYÜK HARF, örn. GÜLALP KIZI) doğal biçimde cümle içinde geçir.
    - Kendi kanaatini yansıt: "çok beğeniyorum", "inanıyorum", "ihtimali yüksek" gibi kişisel/yorumlayıcı bir ton kullan — kuru istatistik listesi DEĞİL.
@@ -182,9 +187,9 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
   "bankoNote": "",
   "notes": "Genel koşu değerlendirmesi + geçit motorunun uyarılarının sade özeti",
   "tempo": "Tempo beklentisi (sade dil)",
-  "couponNarrow": "X",
-  "couponNormal": "X-Y",
-  "couponWide": "X-Y-Z"
+  "couponNarrow": "1-3-7",
+  "couponNormal": "9-11-14",
+  "couponWide": "2-4-5-6-8-10"
 }
 pedigreeRating değerleri: COK_YUKSEK, YUKSEK, GUCLU, ORTA, DUSUK, ZAYIF, SORU, BILINMIYOR
 details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, Jokey devam, HP İvmesi +12, Son800 güçlü kapanış`;
