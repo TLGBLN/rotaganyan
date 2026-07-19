@@ -136,7 +136,10 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
         score: p.score,
         isTarget: p.isTarget,
         pedigreeRating: p.pedigreeRating,
-        details: p.details.join(", "),
+        // Kilit Gerekçe metni ("Analizi Gör" ekranında gösterilen asıl gerekçe cümlesi) kısa
+        // etiketlerin ("AGF1" gibi) yanına eklenir — details virgülle ayrılıp saklandığından
+        // gerekçe cümlesindeki virgüller "·" ile değiştirilir, aksi halde cümle parçalanır.
+        details: [...p.details, p.note?.replace(/,/g, " ·")].filter(Boolean).join(", "),
       };
     });
     setValue("picks", aiPicks);
