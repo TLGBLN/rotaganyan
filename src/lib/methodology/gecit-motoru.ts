@@ -284,19 +284,31 @@ export type VeriDenetimSonucu = { yeterli: boolean; eksikler: string[]; rapor: V
 
 export function veriDenetimi(atlar: AtGirdisi[], _esik: Esikler = ESIK): VeriDenetimSonucu {
   const n = atlar.length || 1;
-  const kritik: [keyof AtGirdisi, string, number][] = [
+  // tempoVeriN kasıtlı olarak "bloklayan" listede DEĞİL: TJK/ganyandefteri bazı atları
+  // (özellikle az yarışlı/ilk startlı) yarış stiline göre hiç sınıflandırmıyor — bu bir
+  // veri toplama eksikliği değil, yapısal bir sınır. Bu yüzden düşük doluluğu analiz
+  // üretimini BLOKE etmez, yalnız rapora ve şeffaflık notlarına yansır (kullanıcı onayı).
+  const kritikBloklayan: [keyof AtGirdisi, string, number][] = [
     ["hpBugun", "Bugünkü HP", 0.90],
     ["hpOnceki", "Geçmiş P-HP (HP ivmesi için)", 0.90],
-    ["tempoVeriN", "Tempo örneklem sayısı (VERİ sütunu)", 0.90],
     ["agfSirasi", "AGF sırası", 0.90],
+  ];
+  const kritikBilgi: [keyof AtGirdisi, string, number][] = [
+    ["tempoVeriN", "Tempo örneklem sayısı (VERİ sütunu)", 0.90],
   ];
   const rapor: VeriDenetimSatiri[] = [];
   const eksikler: string[] = [];
-  for (const [alan, ad, gerek] of kritik) {
+  for (const [alan, ad, gerek] of kritikBloklayan) {
     const dolu = atlar.filter((a) => (a as Record<string, unknown>)[alan as string] != null).length;
     const oran = dolu / n;
     rapor.push({ alan: alan as string, ad, dolu, toplam: n, oran: Math.round(oran * 100) / 100, yeterli: oran >= gerek });
     if (oran < gerek) eksikler.push(`${ad}: ${dolu}/${n} (%${Math.round(oran * 100)}) — en az %${Math.round(gerek * 100)} gerekli`);
+  }
+  for (const [alan, ad, gerek] of kritikBilgi) {
+    const dolu = atlar.filter((a) => (a as Record<string, unknown>)[alan as string] != null).length;
+    const oran = dolu / n;
+    rapor.push({ alan: alan as string, ad, dolu, toplam: n, oran: Math.round(oran * 100) / 100, yeterli: oran >= gerek });
+    // Bilerek eksikler'e eklenmiyor — bkz. yukarıdaki not.
   }
 
   const formDolu = atlar.filter((a) => a.bitirisGeriliyor != null || a.bitirisIyilesiyor != null).length;

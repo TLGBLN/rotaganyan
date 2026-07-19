@@ -108,7 +108,7 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-miss/30 bg-miss/10 px-3 py-2 text-xs text-miss">
+        <div className="whitespace-pre-wrap rounded-lg border border-miss/30 bg-miss/10 px-3 py-2 text-xs text-miss">
           {error}
         </div>
       )}

@@ -129,6 +129,18 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
   });
   const gecitMetin = metin(gecitSonuc, `${faz1.race.hippodromeName} ${faz1.race.raceNo}.Koşu`);
 
+  // Veri yetersizse sessizce devam ETME — admin'e açıkça bildir (metodolojinin
+  // "motor aç karnına çalışmaz" ilkesi). Not: tempoVeriN bu kontrolden hariç tutulur
+  // (bkz. gecit-motoru.ts veriDenetimi yorumu) — yapısal bir sınır, HP/AGF gibi değil.
+  if (gecitSonuc.durum === "VERI_YETERSIZ") {
+    return NextResponse.json({
+      error:
+        "Bu koşu için veri yetersiz, otomatik analiz üretilemedi:\n" +
+        gecitSonuc.veriDenetimi.eksikler.join("\n") +
+        "\n\nBu genelde atların TJK geçmişine erişilemediği ya da AGF/HP verisinin henüz yayınlanmadığı durumlarda olur. Biraz sonra tekrar deneyin ya da Markdown Giriş / Ekran Görüntüsü ile devam edin.",
+    }, { status: 422 });
+  }
+
   // ── FAZ 4 — CLAUDE: geçit çıktısını işleyip final sıralama + kupon + yazım ──
   const faz4Prompt = `Sen ROTAGANYAN v4.1 at yarışı analistisin. FAZ 4 — SIRALAMA ve KUPON aşamasındasın.
 
@@ -150,12 +162,20 @@ ${methodologyText}
 4. FAZ 2 puanlarına ve geçit sonuçlarına göre FİNAL sıralamayı belirle (en iyi 3-5 at, rank 1'den başlayarak).
 5. Banko şartlarını kontrol et (dördü birden: puan≥75, rakibe fark≥5, Veri Güveni A, somut risk yok — Handikap/Grup'ta ekstra dikkatli ol, aşırı piyasa konsensüsü varsa banko yapma).
 6. Ekonomik/Normal/Geniş kupon önerisi üret (at numaralarıyla, örn "X-Y-Z").
-7. Her pick için kullanıcıya SADE dilde (A/B+C/Atomic Force/geçit skoru gibi teknik terimler YOK) kısa gerekçe yaz.
+7. Her pick için "note" alanına, yarışseverin okuyacağı bir YAZI yaz — teknik rapor değil, MAKALE tadında:
+   - Yayına hazır, akıcı bir dille anlat: atın adını (BÜYÜK HARF, örn. GÜLALP KIZI) doğal biçimde cümle içinde geçir.
+   - Kendi kanaatini yansıt: "çok beğeniyorum", "inanıyorum", "ihtimali yüksek" gibi kişisel/yorumlayıcı bir ton kullan — kuru istatistik listesi DEĞİL.
+   - Yarışın nasıl geçebileceğini SENARYOLAŞTIR: rakip atların (varsa) bilinen eğilimlerinden bahset (örn. "son metrelerde durma ihtimali", "ekürisinin varlığından rehavete kapılıp sprint'e geç girme ihtimali", "temposunu bir anda yükseltip mücadeleye girme" gibi), bu diğer atların FAZ 1 verisinden (form yönü, HP ivmesi, tempo/kaçak durumu, sınıf geçişi vb.) çıkarılmalı — uydurma değil.
+   - "A puanı", "B+C", "Atomic Force", "geçit skoru", "SKK", "HP ivmesi" gibi TEKNİK TERİMLER asla geçmesin — bunların ardındaki GERÇEK ANLAMI günlük dille anlat (örn. "HP ivmesi +12" yerine "resmi puanı son formunun gerisinde kalmış, aslında koştuğundan daha güçlü").
+   - En az 3-4 cümle, gerekirse daha uzun — kısa/telegrafik değil, bir spor yazarının yazacağı gibi.
+   - Uygunsa net bir tavsiyeyle bitir: "ekonomik kuponlarda banko olarak öneriyorum", "geniş kupona yazılabilir" gibi.
+   - Örnek ton (uzunluk ve üslup referansı, kelimesi kelimesine kopyalama):
+     "İkinci koşuda mücadele edecek olan GÜLALP KIZI'nın İstanbul çim pist performansını çok beğeniyorum. Son koşusunda da temposunu bir anda yükselterek birincilik mücadelesinin içerisine girmiş ve son anda mağlup kalarak ikinci olmuştu. Bugün YEŞİLKAYA'nın son metrelerde durma ihtimali yüksek olduğu gibi, SEMRAKAYA'nın da ekürisinin varlığından rehavete kapılarak sprintine geçikme ihtimali yüksek. Bu durumdan da en fazla istifade edebilecek isim GÜLALP KIZI olduğu için kazanmaya çok yakın olduğuna inanıyorum ve ekonomik kuponlar için banko olarak öneriyorum."
 
 Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
 {
   "picks": [
-    { "rank": 1, "no": 0, "name": "...", "score": 0, "pedigreeRating": "BILINMIYOR", "isTarget": false, "details": [], "note": "Neden bu sırada (max 2-3 cümle, sade dil)" }
+    { "rank": 1, "no": 0, "name": "...", "score": 0, "pedigreeRating": "BILINMIYOR", "isTarget": false, "details": [], "note": "Yukarıdaki örnek uzunlukta/üslupta, makale tadında gerekçe yazısı" }
   ],
   "confidence": "ORTA",
   "isBanko": false,

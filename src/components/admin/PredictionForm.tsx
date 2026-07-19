@@ -98,7 +98,7 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
     score: p.score ?? 0,
     isTarget: p.isTarget,
     pedigreeRating: p.pedigreeRating,
-    details: Array.isArray(p.details) ? (p.details as string[]).join(", ") : "",
+    details: Array.isArray(p.details) ? (p.details as string[]).join("; ") : "",
   })) ?? [
     { rank: 1, runnerId: "", runnerLabel: "", score: 0, isTarget: false, pedigreeRating: "BILINMIYOR", details: "" },
     { rank: 2, runnerId: "", runnerLabel: "", score: 0, isTarget: false, pedigreeRating: "BILINMIYOR", details: "" },
@@ -136,10 +136,10 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
         score: p.score,
         isTarget: p.isTarget,
         pedigreeRating: p.pedigreeRating,
-        // Kilit Gerekçe metni ("Analizi Gör" ekranında gösterilen asıl gerekçe cümlesi) kısa
-        // etiketlerin ("AGF1" gibi) yanına eklenir — details virgülle ayrılıp saklandığından
-        // gerekçe cümlesindeki virgüller "·" ile değiştirilir, aksi halde cümle parçalanır.
-        details: [...p.details, p.note?.replace(/,/g, " ·")].filter(Boolean).join(", "),
+        // Kilit Gerekçe metni ("Analizi Gör" ekranında gösterilen asıl gerekçe yazısı) kısa
+        // etiketlerin ("AGF1" gibi) yanına eklenir — ayraç noktalı virgüldür (","  değil), çünkü
+        // gerekçe artık tam cümlelerden oluşan bir yazı ve virgül içeriyor.
+        details: [...p.details, p.note].filter(Boolean).join("; "),
       };
     });
     setValue("picks", aiPicks);
@@ -173,7 +173,7 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
             runnerId: p.runnerId || undefined,
             runnerLabel: p.runnerLabel,
             score: p.score || undefined,
-            details: p.details ? p.details.split(",").map((s) => s.trim()).filter(Boolean) : [],
+            details: p.details ? p.details.split(";").map((s) => s.trim()).filter(Boolean) : [],
             pedigreeRating: p.pedigreeRating,
             isTarget: p.isTarget,
           })),
@@ -249,10 +249,11 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
                 </div>
 
                 <div>
-                  <Label className="text-xs mb-1 block">Detay Bayrakları (virgülle ayır)</Label>
-                  <Input
-                    className="h-8 text-sm"
-                    placeholder="örn: AGF1, Kilo düştü, Galop K1"
+                  <Label className="text-xs mb-1 block">Kilit Gerekçe / Detay Bayrakları (noktalı virgülle ayır)</Label>
+                  <Textarea
+                    rows={3}
+                    className="text-sm resize-y"
+                    placeholder="örn: AGF1; Kilo düştü; Bu at şu sebeple öne çıkıyor çünkü..."
                     {...register(`picks.${i}.details`)}
                   />
                 </div>
