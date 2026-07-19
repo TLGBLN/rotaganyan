@@ -13,16 +13,19 @@ import DailyTrendChart from "@/components/admin/DailyTrendChart";
 import RecentFeed from "@/components/admin/RecentFeed";
 import PendingList from "@/components/admin/PendingList";
 import AdminRefresh from "@/components/admin/AdminRefresh";
+import ClaudeBudgetWidget from "@/components/admin/ClaudeBudgetWidget";
+import { getClaudeBudget } from "@/server/actions/claude-budget.actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
-  const [stats, analyst, recentPredictions, pendingPredictions, raceStyleStats] = await Promise.all([
+  const [stats, analyst, recentPredictions, pendingPredictions, raceStyleStats, claudeBudget] = await Promise.all([
     getDashboardStats(),
     getAnalystStats(),
     getRecentPredictions(16),
     getPendingPredictions(),
     getRaceStyleWinStats(),
+    getClaudeBudget(),
   ]);
 
   const hasData = analyst.overall.total > 0;
@@ -71,6 +74,7 @@ export default async function AdminDashboard() {
         </div>
         <div className="space-y-4">
           <PendingList pending={pendingPredictions} />
+          <ClaudeBudgetWidget status={claudeBudget} />
         </div>
       </div>
 

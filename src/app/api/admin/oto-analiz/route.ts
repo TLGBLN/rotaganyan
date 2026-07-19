@@ -4,6 +4,7 @@ import { auth, hasRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { gatherFaz1 } from "@/lib/methodology/veri-toplama";
 import { degerlendir, metin, veriDenetimi, type AtGirdisi } from "@/lib/methodology/gecit-motoru";
+import { logClaudeUsage } from "@/lib/claude-cost";
 import type { Role } from "@prisma/client";
 
 const client = new Anthropic();
@@ -99,6 +100,10 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
     model: "claude-sonnet-5",
     max_tokens: 4096,
     messages: [{ role: "user", content: faz2Prompt }],
+  });
+  await logClaudeUsage({
+    raceId, phase: "faz2", model: "claude-sonnet-5",
+    inputTokens: faz2Msg.usage.input_tokens, outputTokens: faz2Msg.usage.output_tokens,
   });
   const faz2Raw = faz2Msg.content[0].type === "text" ? faz2Msg.content[0].text.trim() : "";
   let faz2: Faz2Atlar;
@@ -216,6 +221,10 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
     model: "claude-sonnet-5",
     max_tokens: 2048,
     messages: [{ role: "user", content: faz4Prompt }],
+  });
+  await logClaudeUsage({
+    raceId, phase: "faz4", model: "claude-sonnet-5",
+    inputTokens: faz4Msg.usage.input_tokens, outputTokens: faz4Msg.usage.output_tokens,
   });
   const faz4Raw = faz4Msg.content[0].type === "text" ? faz4Msg.content[0].text.trim() : "";
   let result: unknown;

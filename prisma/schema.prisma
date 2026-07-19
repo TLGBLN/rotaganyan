@@ -405,6 +405,32 @@ model HorseFollow {
   @@index([userId])
 }
 
+// ─── CLAUDE API BÜTÇE TAKİBİ ───────────────────────────────────────────────────
+// Anthropic'in kendisi kalan kredi bakiyesini API üzerinden vermiyor (yalnızca
+// Console'da gösteriliyor) — bu yüzden her çağrının token kullanımını burada
+// kendimiz kaydedip, admin'in girdiği başlangıç bakiyeden düşerek TAHMİNİ bir
+// kalan bakiye hesaplıyoruz. Gerçek Anthropic bakiyesiyle birebir aynı olacağının
+// garantisi yoktur.
+
+model ClaudeUsageLog {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+  raceId       String?
+  phase        String // "faz2" | "faz4"
+  model        String
+  inputTokens  Int
+  outputTokens Int
+
+  @@index([createdAt])
+}
+
+model ClaudeBudget {
+  id          String   @id @default(cuid())
+  startingUsd Float
+  resetAt     DateTime @default(now())
+  note        String?
+}
+
 // ─── METHODOLOGY ──────────────────────────────────────────────────────────────
 
 model MethodologyVersion {
