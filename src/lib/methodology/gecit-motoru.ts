@@ -290,7 +290,6 @@ export function veriDenetimi(atlar: AtGirdisi[], _esik: Esikler = ESIK): VeriDen
   // üretimini BLOKE etmez, yalnız rapora ve şeffaflık notlarına yansır (kullanıcı onayı).
   const kritikBloklayan: [keyof AtGirdisi, string, number][] = [
     ["hpBugun", "Bugünkü HP", 0.90],
-    ["hpOnceki", "Geçmiş P-HP (HP ivmesi için)", 0.90],
     ["agfSirasi", "AGF sırası", 0.90],
   ];
   const kritikBilgi: [keyof AtGirdisi, string, number][] = [
@@ -304,6 +303,18 @@ export function veriDenetimi(atlar: AtGirdisi[], _esik: Esikler = ESIK): VeriDen
     rapor.push({ alan: alan as string, ad, dolu, toplam: n, oran: Math.round(oran * 100) / 100, yeterli: oran >= gerek });
     if (oran < gerek) eksikler.push(`${ad}: ${dolu}/${n} (%${Math.round(oran * 100)}) — en az %${Math.round(gerek * 100)} gerekli`);
   }
+
+  // hpOnceki'yi ayrı ele al: gerçek ilk start atlarda (ilkStart) hpOnceki hiç oluşmaz —
+  // bu bir eksiklik değil, "GERCEK KOR NOKTA" olarak zaten ayrıca işaretlenir. Debut atları
+  // yeterlilik oranından hariç tutmazsak, tamamı ilk startlı bir Maiden koşusu her zaman
+  // yanlışlıkla VERİ_YETERSİZ'e düşer.
+  {
+    const alan = "hpOnceki"; const ad = "Geçmiş P-HP (HP ivmesi için)"; const gerek = 0.90;
+    const dolu = atlar.filter((a) => a.hpOnceki != null || a.ilkStart).length;
+    const oran = dolu / n;
+    rapor.push({ alan, ad, dolu, toplam: n, oran: Math.round(oran * 100) / 100, yeterli: oran >= gerek });
+    if (oran < gerek) eksikler.push(`${ad}: ${dolu}/${n} (%${Math.round(oran * 100)}) — en az %${Math.round(gerek * 100)} gerekli`);
+  }
   for (const [alan, ad, gerek] of kritikBilgi) {
     const dolu = atlar.filter((a) => (a as Record<string, unknown>)[alan as string] != null).length;
     const oran = dolu / n;
@@ -311,12 +322,14 @@ export function veriDenetimi(atlar: AtGirdisi[], _esik: Esikler = ESIK): VeriDen
     // Bilerek eksikler'e eklenmiyor — bkz. yukarıdaki not.
   }
 
+  // Form yönü de (tempoVeriN gibi) "bloklayan" değil "bilgi" niteliğinde: TJK, az yarışlı
+  // atlar için (özellikle Şartlı 1 sahaları — çoğunlukla yeni/az deneyimli atlar) "son 4
+  // yarış" formu hiç yayınlamıyor. Gözlemlenen veride bu %100 sınıfa bağlı (Şartlı 1
+  // sahalarında 0 dolu, diğer tüm sınıflarda 100 dolu) — veri toplama hatası değil,
+  // yapısal bir eksiklik. Düşük doluluğu analiz üretimini BLOKE etmez, rapora yansır.
   const formDolu = atlar.filter((a) => a.bitirisGeriliyor != null || a.bitirisIyilesiyor != null).length;
   const formOran = formDolu / n;
   rapor.push({ alan: "form_catali", ad: "Form yönü (bitiriş geriliyor/iyileşiyor)", dolu: formDolu, toplam: n, oran: Math.round(formOran * 100) / 100, yeterli: formOran >= 0.90 });
-  if (formOran < 0.90) {
-    eksikler.push(`Form yönü: ${formDolu}/${n} (%${Math.round(formOran * 100)}) — FORM ÇATALI ÇALIŞMIYOR.`);
-  }
 
   return { yeterli: eksikler.length === 0, eksikler, rapor };
 }

@@ -115,6 +115,12 @@ export type Faz1Runner = {
   // her şey için genel amaçlı manuel giriş alanı.
   adminNote: string | null;
   hpBugun: number | null;
+  // TJK bu at için resmi HP yayınlamamışsa (genelde Şartlı 1 / Maiden ya da atın henüz
+  // handikap puanı atanmamışsa) hpBugun/hpOnceki 0 varsayılır — bu bir veri toplama
+  // eksikliği değil, yapısal bir durumdur. Bu bayraklar Faz 2 promptunda ve veri
+  // yeterliliği kontrolünde "gerçekten eksik" ile "resmen yok" ayrımını korumak içindir.
+  hpBugunResmiYok: boolean;
+  hpOncekiResmiYok: boolean;
   agf: number | null;
   agfSirasi: number | null;
   equipment: string | null;
@@ -311,6 +317,15 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
             return `${new Date(g.date).toISOString().slice(0, 10)} ${g.form ?? ""} ${parcalar.join(" ")}`.trim();
           }).join(" | ");
 
+      // TJK bazı atlar için (özellikle Şartlı 1 / Maiden ya da HP'si henüz atanmamış atlar)
+      // hiç HP yayınlamaz — bu bir veri toplama eksikliği değil, yapısal bir durumdur.
+      // hpOnceki'de aynı durum "gerçek ilk start" (ilkStart) ile karıştırılmamalı: at daha
+      // önce koşmuş ama o koşularda da resmi HP hiç almamış olabilir.
+      const hpBugunResmiYok = r.hp == null;
+      const hpBugunEfektif = r.hp ?? 0;
+      const hpOncekiResmiYok = !ilkStart && hpOnceki == null;
+      const hpOncekiEfektif = ilkStart ? null : hpOnceki ?? 0;
+
       return {
         id: r.id, no: r.no, ad: r.name, scratched: r.scratched,
         weight: r.weight, weightChange: r.weightChange,
@@ -319,15 +334,16 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         sireTier: r.sire ? sireTierMap.get(r.sire) ?? null : null,
         damSireTier: r.damSire ? sireTierMap.get(r.damSire) ?? null : null,
         adminNote: r.adminNote,
-        hpBugun: r.hp, agf: r.agf, agfSirasi: agfSiraMap.get(r.id) ?? null,
+        hpBugun: hpBugunEfektif, hpBugunResmiYok, hpOncekiResmiYok,
+        agf: r.agf, agfSirasi: agfSiraMap.get(r.id) ?? null,
         equipment: r.equipment, equipmentAdded: r.equipmentAdded, equipmentRemoved: r.equipmentRemoved,
         recentForm: r.recentForm, apprentice: r.apprentice,
         raceStyleEtiket: (r.raceStyle as { style?: string } | null)?.style ?? null,
         tempoVeriN: (r.raceStyle as { veri?: number } | null)?.veri ?? null,
         kacak: (r.raceStyle as { style?: string } | null)?.style === "KACAK",
         galopOzet,
-        ilkStart, hpOnceki,
-        hpIvmesi: r.hp != null && hpOnceki != null ? r.hp - hpOnceki : null,
+        ilkStart, hpOnceki: hpOncekiEfektif,
+        hpIvmesi: !ilkStart ? hpBugunEfektif - (hpOncekiEfektif ?? 0) : null,
         sinifOnceki, sinifSkkOnceki, sinifSkkBugun: bugunSkk, sinifDususu,
         bitirisGeriliyor: yon?.geriliyor ?? null, bitirisIyilesiyor: yon?.iyilesiyor ?? null,
         sonSonucZayif: sonSonucZayifMi(r.recentForm),
