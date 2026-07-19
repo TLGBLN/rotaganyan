@@ -355,6 +355,9 @@ export type KuponVariant = {
   legs: KuponLeg[];
   amount: number;
   status: KuponStatus;
+  /** Admin bu kademeye gerçekten at girdi mi — girmediyse (sadece bir alt kademeden miras aldıysa
+   *  veya tamamen boşsa) kupon önerilerinde/paylaşımda ayrı bir kademe olarak gösterilmemeli. */
+  filled: boolean;
 };
 export type KuponOnerisi = { hippodromeName: string; variants: KuponVariant[] } | null;
 export type HomeKuponLeg = { raceNo: number; narrow: number[]; normal: number[]; wide: number[] };
@@ -441,12 +444,18 @@ export async function buildKuponOnerisi(active: {
   const normalLegs = toLegs((l) => (l.normal.length > 0 ? l.normal : l.narrow));
   const wideLegs = toLegs((l) => (l.wide.length > 0 ? l.wide : l.normal.length > 0 ? l.normal : l.narrow));
 
+  // Admin bu kademeye en az bir ayakta gerçekten at girdi mi — girmediyse alt kademeden miras
+  // alınmış (veya tamamen boş) demektir, ayrı bir kademe olarak gösterilmemeli.
+  const hasNarrow = legs.some((l) => l.narrow.length > 0);
+  const hasNormal = legs.some((l) => l.normal.length > 0);
+  const hasWide = legs.some((l) => l.wide.length > 0);
+
   return {
     hippodromeName: active.hippodromeName,
     variants: [
-      { key: "ekonomik", label: "Ekonomik", legs: narrowLegs, amount: kuponAmount(narrowLegs.map((l) => l.nos)), status: statusFor(narrowLegs) },
-      { key: "normal", label: "Normal", legs: normalLegs, amount: kuponAmount(normalLegs.map((l) => l.nos)), status: statusFor(normalLegs) },
-      { key: "genis", label: "Geniş", legs: wideLegs, amount: kuponAmount(wideLegs.map((l) => l.nos)), status: statusFor(wideLegs) },
+      { key: "ekonomik", label: "Ekonomik", legs: narrowLegs, amount: kuponAmount(narrowLegs.map((l) => l.nos)), status: statusFor(narrowLegs), filled: hasNarrow },
+      { key: "normal", label: "Normal", legs: normalLegs, amount: kuponAmount(normalLegs.map((l) => l.nos)), status: statusFor(normalLegs), filled: hasNormal },
+      { key: "genis", label: "Geniş", legs: wideLegs, amount: kuponAmount(wideLegs.map((l) => l.nos)), status: statusFor(wideLegs), filled: hasWide },
     ],
   };
 }
@@ -475,7 +484,7 @@ export async function getKuponOnerileri(): Promise<KuponOnerisi[]> {
   // anasayfa görünümünü filtreler, veriyi silmez.
   return results
     .filter((r): r is NonNullable<typeof r> => r !== null)
-    .map((r) => ({ ...r, variants: r.variants.filter((v) => v.status !== "miss") }))
+    .map((r) => ({ ...r, variants: r.variants.filter((v) => v.status !== "miss" && v.filled) }))
     .filter((r) => r.variants.length > 0);
 }
 

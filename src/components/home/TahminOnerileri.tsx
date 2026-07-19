@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { KuponOnerisi, KuponStatus } from "@/server/services/race.service";
 import type { AltiliCityResult } from "@/server/services/ingest/tjk-altili.adapter";
 import { cn } from "@/lib/utils";
@@ -11,8 +14,12 @@ const STATUS_CLASS: Record<KuponStatus, string> = {
   pending: "bg-muted text-muted-foreground",
 };
 
+const TAB_CLASS = "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors shrink-0";
+const TAB_ACTIVE = "bg-brand text-brand-foreground";
+const TAB_INACTIVE = "bg-white/5 text-muted-foreground border hover:bg-muted";
+
 function buildTweetText(data: Kupon): string {
-  const visibleVariants = data.variants.filter((v) => v.status !== "miss");
+  const visibleVariants = data.variants.filter((v) => v.status !== "miss" && v.filled);
   const lines: string[] = [`🏇 ${data.hippodromeName}`, ""];
   for (const variant of visibleVariants) {
     const legs = variant.legs.map((l) => l.nos.join(",")).join(" | ");
@@ -35,16 +42,12 @@ function findIkramiye(hippodromeName: string, altiliResults: AltiliCityResult[])
   return group?.ikramiye ?? null;
 }
 
-const GRID_COLS: Record<number, string> = {
-  1: "sm:grid-cols-1",
-  2: "sm:grid-cols-2",
-  3: "sm:grid-cols-3",
-};
-
 function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string | null; isAdmin: boolean }) {
-  const visibleVariants = data.variants.filter((v) => v.status !== "miss");
+  const visibleVariants = data.variants.filter((v) => v.status !== "miss" && v.filled);
+  const [activeKey, setActiveKey] = useState(visibleVariants[0]?.key);
   if (visibleVariants.length === 0) return null;
 
+  const active = visibleVariants.find((v) => v.key === activeKey) ?? visibleVariants[0];
   const tweetUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(buildTweetText(data))}`;
 
   return (
@@ -63,65 +66,74 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
           </a>
         )}
       </div>
-      <div className={cn("grid gap-4", GRID_COLS[visibleVariants.length] ?? "sm:grid-cols-3")}>
-        {visibleVariants.map((variant) => (
-          <div key={variant.key} className="flex flex-col overflow-hidden rounded-lg border bg-card">
-            <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-2.5">
-              <span className="text-sm font-semibold">{variant.label}</span>
-              <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", STATUS_CLASS[variant.status])}>
-                {STATUS_LABEL[variant.status]}
-              </span>
-            </div>
 
-            {/* Ayak ızgarası */}
-            <div className="flex-1 overflow-x-auto">
-              <div
-                className="grid divide-x"
-                style={{ gridTemplateColumns: `repeat(${variant.legs.length}, minmax(48px, 1fr))` }}
+      {/* Tek kupon şablonu — Ekonomik/Normal/Geniş, /program'daki panel butonları gibi tıklanınca değişir */}
+      <div className="flex flex-col overflow-hidden rounded-lg border bg-card">
+        <div className="flex items-center justify-between gap-2 border-b bg-muted/30 px-4 py-2.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto">
+            {visibleVariants.map((variant) => (
+              <button
+                key={variant.key}
+                type="button"
+                onClick={() => setActiveKey(variant.key)}
+                className={cn(TAB_CLASS, variant.key === active.key ? TAB_ACTIVE : TAB_INACTIVE)}
               >
-                {variant.legs.map((leg) => {
-                  const missed = leg.resulted && !leg.nos.includes(leg.winnerNo as number);
-                  return (
-                    <div key={leg.raceNo} className="px-1.5 py-3 text-center">
-                      <div className="mb-2 text-[10px] font-medium text-muted-foreground">
-                        {leg.raceNo}. Koşu
-                      </div>
-                      <div className="space-y-1.5 text-sm font-semibold">
-                        {leg.nos.map((no) => (
-                          <div key={no}>
-                            {no === leg.winnerNo ? (
-                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-hit text-white text-xs font-bold">
-                                {no}
-                              </span>
-                            ) : (
-                              <span className={missed ? "text-muted-foreground line-through" : undefined}>{no}</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                      {missed && (
-                        <div className="mt-1.5 text-[10px] font-medium text-miss">Kazanan: {leg.winnerNo}</div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Kupon tutarı */}
-            <div className="border-t px-4 py-3">
-              <div className="text-xs text-muted-foreground">Kupon Tutarı</div>
-              <div className="text-lg font-bold">
-                {variant.amount.toLocaleString("tr-TR", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{" "}
-                ₺
-              </div>
-              {ikramiye && <div className="mt-1.5 text-xs font-medium text-hit">{ikramiye}</div>}
-            </div>
+                {variant.label}
+              </button>
+            ))}
           </div>
-        ))}
+          <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold", STATUS_CLASS[active.status])}>
+            {STATUS_LABEL[active.status]}
+          </span>
+        </div>
+
+        {/* Ayak ızgarası */}
+        <div className="flex-1 overflow-x-auto">
+          <div
+            className="grid divide-x"
+            style={{ gridTemplateColumns: `repeat(${active.legs.length}, minmax(48px, 1fr))` }}
+          >
+            {active.legs.map((leg) => {
+              const missed = leg.resulted && !leg.nos.includes(leg.winnerNo as number);
+              return (
+                <div key={leg.raceNo} className="px-1.5 py-3 text-center">
+                  <div className="mb-2 text-[10px] font-medium text-muted-foreground">
+                    {leg.raceNo}. Koşu
+                  </div>
+                  <div className="space-y-1.5 text-sm font-semibold">
+                    {leg.nos.map((no) => (
+                      <div key={no}>
+                        {no === leg.winnerNo ? (
+                          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-hit text-white text-xs font-bold">
+                            {no}
+                          </span>
+                        ) : (
+                          <span className={missed ? "text-muted-foreground line-through" : undefined}>{no}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {missed && (
+                    <div className="mt-1.5 text-[10px] font-medium text-miss">Kazanan: {leg.winnerNo}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Kupon tutarı */}
+        <div className="border-t px-4 py-3">
+          <div className="text-xs text-muted-foreground">Kupon Tutarı</div>
+          <div className="text-lg font-bold">
+            {active.amount.toLocaleString("tr-TR", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}{" "}
+            ₺
+          </div>
+          {ikramiye && <div className="mt-1.5 text-xs font-medium text-hit">{ikramiye}</div>}
+        </div>
       </div>
     </div>
   );

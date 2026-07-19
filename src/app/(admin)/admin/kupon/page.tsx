@@ -283,7 +283,7 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                     <td className="px-3 py-2">
                       {sonuc ? (
                         <div className="flex flex-wrap gap-1">
-                          {sonuc.variants.map((v) => (
+                          {sonuc.variants.filter((v) => v.filled).map((v) => (
                             <span
                               key={v.key}
                               title={v.label}
