@@ -11,18 +11,18 @@ export type Son800RunnerData = {
 
 /** Bir koşudaki tüm atların TJK Son 800 geçmişini (en fazla son 3 kayıt) döner. */
 export async function getSon800ForRace(raceId: string): Promise<Son800RunnerData[]> {
-  const runners = await db.runner.findMany({
-    where: { raceId },
-    orderBy: { no: "asc" },
-    select: { no: true, name: true },
-  });
+  const [race, runners] = await Promise.all([
+    db.race.findUnique({ where: { id: raceId }, select: { raceDay: { select: { date: true } } } }),
+    db.runner.findMany({ where: { raceId }, orderBy: { no: "asc" }, select: { no: true, name: true } }),
+  ]);
+  const raceYear = (race?.raceDay.date ?? new Date()).getUTCFullYear().toString();
 
   const results = await Promise.all(
     runners.map(async (r): Promise<Son800RunnerData> => {
       try {
         const rows = await fetchTjkSon800ByHorseName(r.name);
-        const rows2026 = rows.filter((row) => row.year === "2026");
-        return { runnerNo: r.no, horseName: r.name, records: rows2026.slice(-3).reverse() };
+        const rowsBuYil = rows.filter((row) => row.year === raceYear);
+        return { runnerNo: r.no, horseName: r.name, records: rowsBuYil.slice(-3).reverse() };
       } catch {
         return { runnerNo: r.no, horseName: r.name, records: [] };
       }

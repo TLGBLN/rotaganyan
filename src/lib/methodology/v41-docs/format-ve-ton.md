@@ -60,11 +60,13 @@ Her at için 3-5 kısa cümle:
   "bankoNote": "",
   "notes": "Genel koşu değerlendirmesi + geçit motorunun ürettiği uyarıların sade özeti",
   "tempo": "Tempo beklentisi (sade dil)",
-  "couponNarrow": "X",
-  "couponNormal": "X-Y",
-  "couponWide": "X-Y-Z"
+  "couponNarrow": "1-3-7",
+  "couponNormal": "9-11-14",
+  "couponWide": "2-4-5-6-8-10"
 }
 ```
+
+Kupon alanları sahadaki atları üç gruba böler: **Ekonomik** = final sıralamadaki en iyi 3 at, **Normal** = onları izleyen farklı 3 at, **Geniş** = sahada kalan tüm diğer atlar (koşulmayan/çekilenler hariç). Saha 6 attan azsa Normal mevcut atlarla doldurulur, Geniş boş kalabilir.
 
 `pedigreeRating` değerleri: COK_YUKSEK, YUKSEK, GUCLU, ORTA, DUSUK, ZAYIF, SORU, BILINMIYOR.
 `details` örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, Jokey devam, HP İvmesi +12, Son800 güçlü kapanış.

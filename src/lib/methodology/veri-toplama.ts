@@ -226,6 +226,10 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   const ortKilo = agirlıklar.length > 0 ? agirlıklar.reduce((a, b) => a + b, 0) / agirlıklar.length : null;
 
   const bugunSkk = classToSkk(race.classType);
+  // Son800 "benzer koşu" filtresi koşunun kendi yılına göre çalışır — sabit bir yıl
+  // yazılırsa (örn. "2026") her yılbaşında sessizce kırılır, Son 800 Gölge Mod'u
+  // kalıcı olarak devre dışı bırakır.
+  const raceYear = race.raceDay.date.getUTCFullYear().toString();
 
   const runners: Faz1Runner[] = await Promise.all(
     race.runners.map(async (r): Promise<Faz1Runner> => {
@@ -258,7 +262,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
           const surfacePrefix = race.surface === "CIM" ? "Ç" : race.surface === "SENTETIK" ? "S" : "K";
           const benzer = son800Rows.filter(
             (row) =>
-              row.year === "2026" &&
+              row.year === raceYear &&
               row.city.includes(hippodromeName) &&
               row.surface.startsWith(surfacePrefix) &&
               Math.abs((parseInt(row.distance, 10) || 0) - race.distance) <= 200

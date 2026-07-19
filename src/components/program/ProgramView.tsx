@@ -851,12 +851,12 @@ function RaceTable({
     }
   });
 
-  // TJK'nın resmi istatistiklerinden 2026 geneli kazanma oranı — hipodrom/pist/ırk kırılımı yok
+  // TJK'nın resmi istatistiklerinden içinde bulunulan yılın geneli kazanma oranı — hipodrom/pist/ırk kırılımı yok
   function buildJockeyStat(jockey: string | null): JockeyStatRow | undefined {
     if (!jockey || !jockeyStats) return undefined;
     const raw = jockeyStats[jockey];
     if (!raw || raw.overall.rides === 0) return undefined;
-    return { wins: raw.overall.wins, rides: raw.overall.rides, label: "2026" };
+    return { wins: raw.overall.wins, rides: raw.overall.rides, label: String(new Date().getFullYear()) };
   }
 
   function buildTrainerStat(trainer: string | null): TrainerStatRow | undefined {

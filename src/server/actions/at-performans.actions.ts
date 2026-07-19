@@ -14,7 +14,7 @@ const SURFACE_PREFIX: Record<string, string> = { CIM: "Ç", KUM: "K", SENTETIK: 
 
 /**
  * Bu koşudaki her at için, TJK'nın resmi at profilinden aynı hipodrom + aynı mesafe +
- * aynı pist tipinde, sadece 2026 yılına ait geçmiş performansını döner.
+ * aynı pist tipinde, koşunun kendi yılına ait geçmiş performansını döner.
  */
 export async function getAtPerformansForRace(raceId: string): Promise<AtPerformansRunnerData[]> {
   const race = await db.race.findUnique({
@@ -22,7 +22,7 @@ export async function getAtPerformansForRace(raceId: string): Promise<AtPerforma
     select: {
       distance: true,
       surface: true,
-      raceDay: { select: { hippodrome: { select: { name: true } } } },
+      raceDay: { select: { date: true, hippodrome: { select: { name: true } } } },
       runners: { select: { no: true, name: true, tjkAtId: true } },
     },
   });
@@ -30,6 +30,7 @@ export async function getAtPerformansForRace(raceId: string): Promise<AtPerforma
 
   const hippodromeName = race.raceDay.hippodrome.name.trim();
   const surfacePrefix = SURFACE_PREFIX[race.surface] ?? "";
+  const raceYear = race.raceDay.date.getUTCFullYear().toString();
 
   return Promise.all(
     race.runners.map(async (r): Promise<AtPerformansRunnerData> => {
@@ -40,7 +41,7 @@ export async function getAtPerformansForRace(raceId: string): Promise<AtPerforma
         const all = await fetchTjkAtKosuBilgileri(r.tjkAtId);
         const filtered = all.filter(
           (row) =>
-            row.year === "2026" &&
+            row.year === raceYear &&
             row.distance === race.distance &&
             row.city.includes(hippodromeName) &&
             (surfacePrefix === "" || row.surface.startsWith(surfacePrefix))
