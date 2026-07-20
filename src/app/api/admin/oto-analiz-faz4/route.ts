@@ -153,6 +153,26 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
     return NextResponse.json({ error: `Faz 4 (sıralama) yanıtı parse edilemedi${sebep}`, raw: faz4Raw }, { status: 500 });
   }
 
+  // ── gecitSonuc.uyari, Faz 4 çalışmadan ÖNCEKİ ham durumu anlatıyordu (örn. "GEÇİT ALARMI
+  // ... ANALİZ TAMAMLANMADI") — Faz 4 bu atları gerçekten öne taşıyıp sorunu çözmüş olsa
+  // bile ekranda hep aynı (yanıltıcı) uyarı gösteriliyordu. Burada Faz 4'ün KENDİ ürettiği
+  // pick listesini (aşağıdaki tam-saha tamamlamasından ÖNCE, yani gerçekten Claude'un
+  // seçtiği atlar) kontrol edip, alarmlı atlar gerçekten çözülmüşse net bir mesaja çeviriyoruz.
+  const faz4OnlyNos = new Set(result.picks.map((p) => p.no));
+  const cozulmemisAlarmlar = gecitSonuc.alarmlar
+    .map((a) => faz1.runners.find((r) => r.ad === a.at))
+    .filter((r): r is (typeof faz1.runners)[number] => !!r && !faz4OnlyNos.has(r.no));
+
+  let gecitUyariGuncel = gecitSonuc.uyari;
+  if (gecitSonuc.durum === "ALARM") {
+    // Çözüldüyse (Faz 4 gerçekten öne taşıdıysa) admin'e sarı "dikkat" kutusunda korkutucu
+    // bir mesaj göstermeye gerek yok — sessizce null, sanki hiç alarm olmamış gibi (ki artık
+    // çözülmüş durumda). Yalnız GERÇEKTEN hâlâ çözülmemişse net isimlerle uyarı gösterilir.
+    gecitUyariGuncel = cozulmemisAlarmlar.length === 0
+      ? null
+      : `GEÇİT ALARMI ÇÖZÜLEMEDİ: ${cozulmemisAlarmlar.map((r) => r.ad).join(", ")} geçit tetikliyor ama Faz 4 hâlâ kupon dışında bıraktı — kontrol edilmeli.`;
+  }
+
   // Faz 4 yalnız en iyi 3-6 atı sıralıyor. Kalan atlar için YENİ bir AI çağrısı yapmadan —
   // Faz 2'nin (ücreti zaten ödenmiş) her at için hesapladığı A+B+C puanını kullanarak devamı
   // tamamla, böylece admin ve public sayfa TÜM sahayı sıralı/puanlı görür, ek maliyet sıfır.
@@ -180,7 +200,7 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
     ok: true,
     result,
     runners: faz1.runners.map((r) => ({ id: r.id, no: r.no, name: r.ad })),
-    debug: { faz1VeriDoluluk: faz1.veriDoluluk, gecitDurum: gecitSonuc.durum, gecitUyari: gecitSonuc.uyari },
+    debug: { faz1VeriDoluluk: faz1.veriDoluluk, gecitDurum: gecitSonuc.durum, gecitUyari: gecitUyariGuncel },
   });
 }
 
