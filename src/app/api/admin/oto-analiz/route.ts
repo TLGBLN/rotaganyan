@@ -74,6 +74,65 @@ function extractText(msg: Anthropic.Message): string {
   return textBlock ? textBlock.text.trim() : "";
 }
 
+/**
+ * Metodolojinin "IV. KOŞU TİPİ ÖZET MATRİSLERİ" bölümü ~12 kart içeriyor (Şartlı 1'den
+ * Grup'a kadar) ama bir yarışta yalnız BİRİ (+ mesafe/pist/saha büyüklüğü değiştiricileri)
+ * geçerli. Tümünü göndermek hem gereksiz token hem de Claude'un "hangisi bu yarışa uyuyor"
+ * diye ekstra düşünmesine yol açıyor. Bu fonksiyon §IV'ü yalnız ilgili kart(lar)la
+ * değiştirir — geri kalan bölümler (I-III, V-XX, banko/tiebreaker/yasak gerekçe gibi
+ * her koşu tipinde geçerli kurallar) AYNEN kalır, yalnız §IV daralıyor.
+ * Eşleştirme başarısız olursa (metodoloji formatı değişmiş, beklenmeyen classType vb.)
+ * GÜVENLİ TARAF seçilir: tüm §IV olduğu gibi bırakılır — asla sessizce veri kaybedilmez.
+ */
+function daraltilmisMetodoloji(
+  methodologyText: string,
+  classType: string,
+  skk: number | null,
+  distance: number,
+  surface: string,
+  atSayisi: number
+): string {
+  const startMarker = "## IV. KOŞU TİPİ ÖZET MATRİSLERİ";
+  const endMarker = "## V. HP İVMESİ";
+  const startIdx = methodologyText.indexOf(startMarker);
+  const endIdx = methodologyText.indexOf(endMarker);
+  if (startIdx === -1 || endIdx === -1) return methodologyText; // güvenli taraf: dokunma
+
+  const bolumBasi = methodologyText.slice(0, startIdx);
+  const ivIcerik = methodologyText.slice(startIdx + startMarker.length, endIdx).trim();
+  const bolumSonu = methodologyText.slice(endIdx);
+
+  const kartlar = ivIcerik.split(/\n\n(?=\*\*)/).map((k) => k.trim()).filter(Boolean);
+  if (kartlar.length < 5) return methodologyText; // beklenenden az kart — format değişmiş olabilir, güvenli taraf
+
+  const t = classType.toUpperCase();
+  let tipAnahtari: string;
+  if (/SATIŞ|SATIS|CLAIMING/.test(t)) tipAnahtari = "SATIŞ/CLAIMING";
+  else if (skk === 1) tipAnahtari = "ŞARTLI 1";
+  else if (skk === 2) tipAnahtari = "MAİDEN";
+  else if (skk === 3) tipAnahtari = "ŞARTLI 2/3/4";
+  else if (skk === 4) tipAnahtari = /HAND[İI]KAP/.test(t) ? "HANDİKAP H13" : "ŞARTLI 5";
+  else if (skk === 5) tipAnahtari = "HANDİKAP H17";
+  else if (skk === 6) tipAnahtari = "KV-6";
+  else if (skk === 7) tipAnahtari = "KV-8";
+  else if (skk != null && skk >= 8) tipAnahtari = "GRUP";
+  else tipAnahtari = "";
+
+  const tipKarti = tipAnahtari ? kartlar.find((k) => k.toUpperCase().includes(tipAnahtari)) : undefined;
+  if (!tipKarti) return methodologyText; // sınıf eşleşmedi — güvenli taraf: tüm kartları gönder
+
+  const secilenler = [tipKarti];
+  if (distance <= 1300) secilenler.push(kartlar.find((k) => k.includes("KISA MESAFE")) ?? "");
+  if (distance >= 1900) secilenler.push(kartlar.find((k) => k.includes("UZUN MESAFE")) ?? "");
+  if (surface === "KUM") secilenler.push(kartlar.find((k) => k.includes("KUM PİST")) ?? "");
+  if (surface === "CIM") secilenler.push(kartlar.find((k) => k.includes("ÇİM PİST")) ?? "");
+  if (surface === "SENTETIK") secilenler.push(kartlar.find((k) => k.includes("SENTETİK PİST")) ?? "");
+  if (atSayisi >= 15) secilenler.push(kartlar.find((k) => k.includes("KALABALIK SAHA")) ?? "");
+
+  const daraltilmisIv = secilenler.filter(Boolean).join("\n\n");
+  return `${bolumBasi}${startMarker} (yalnız bu yarışa uyan kart — geri kalan ~${kartlar.length - secilenler.filter(Boolean).length} kart alakasız olduğu için çıkarıldı)\n\n${daraltilmisIv}\n\n${bolumSonu}`;
+}
+
 // Claude'un cevabını YALNIZCA prompt talimatıyla JSON'a zorlamak yerine, API'nin kendi
 // şema doğrulamasını (output_config.format) kullanıyoruz — "geçerli JSON döndür" gibi
 // bir talimata güvenmek yerine sunucu tarafında zorunlu kılınıyor. Bu, önceki halde
@@ -177,7 +236,14 @@ async function handlePost(req: NextRequest) {
   }
 
   const methodology = await db.methodologyVersion.findFirst({ where: { isCurrent: true } });
-  const methodologyText = methodology?.content ?? "";
+  const methodologyText = daraltilmisMetodoloji(
+    methodology?.content ?? "",
+    faz1.race.classType,
+    faz1.runners[0]?.sinifSkkBugun ?? null,
+    faz1.race.distance,
+    faz1.race.surface,
+    faz1.runners.length
+  );
 
   const faz1Tablo = faz1.runners
     .map((r) => {
