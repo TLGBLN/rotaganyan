@@ -143,6 +143,11 @@ export type Faz1Runner = {
   // yeterliliği kontrolünde "gerçekten eksik" ile "resmen yok" ayrımını korumak içindir.
   hpBugunResmiYok: boolean;
   hpOncekiResmiYok: boolean;
+  // hpOncekiResmiYok'tan AYRI: TJK "At Koşu Bilgileri" isteği gerçekten başarısız oldu
+  // (network/parse hatası) — at daha önce koşmuş olabilir ama önceki HP'si bu seferlik
+  // ELDE EDİLEMEDİ. Bununla "resmi yok" (TJK gerçekten hiç HP atamamış, yapısal) KARIŞTIRILMAMALI —
+  // biri gerçek bir hata (araştır/tekrar dene), diğeri normal bir durum.
+  hpOncekiFetchBasarisiz: boolean;
   agf: number | null;
   agfSirasi: number | null;
   equipment: string | null;
@@ -311,6 +316,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       let ilkStart = true;
       let hpOnceki: number | null = null;
       let sinifOnceki: string | null = null;
+      let hpOncekiFetchBasarisiz = false;
       let son800BenzerKosuN = 0;
       let son800Medyan: number | null = null;
 
@@ -329,7 +335,15 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
           // (yanlışsa) hpOnceki eksikliğini "gerçek kör nokta" gibi gösterip veri toplama
           // hatasını gizler; bu yüzden false bırakılır — gecit-motoru bunu doğru şekilde
           // "veri toplama hatası" (araştırılması gereken eksik) olarak işaretler.
+          //
+          // ÖNEMLİ: hpOnceki burada BİLEREK null bırakılıyor (0'a düşürülmüyor) — aşağıda
+          // hpOncekiEfektif hesabı bu durumu "resmi yok" (yapısal, 0 varsayılan) ile
+          // KARIŞTIRMAMASI için hpOncekiFetchBasarisiz ayrı tutuluyor. Daha önce ikisi
+          // aynı koddan geçtiği için gerçek bir TJK erişim hatası, atın ham bugünkü HP'sini
+          // "HP ivmesi" sanan sahte bir sayıya dönüşüyordu — bu da HP_PATLAMA gibi gerçek
+          // paralı bir geçidi (≥+10 ivme → zorunlu ekonomik kupon) yanlışlıkla tetikleyebiliyordu.
           ilkStart = false;
+          hpOncekiFetchBasarisiz = true;
         }
 
         try {
@@ -410,8 +424,11 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       // önce koşmuş ama o koşularda da resmi HP hiç almamış olabilir.
       const hpBugunResmiYok = r.hp == null;
       const hpBugunEfektif = r.hp ?? 0;
-      const hpOncekiResmiYok = !ilkStart && hpOnceki == null;
-      const hpOncekiEfektif = ilkStart ? null : hpOnceki ?? 0;
+      // "Resmi yok" (yapısal, 0 varsayılan) YALNIZ fetch gerçekten başarılıyken ve TJK'nın
+      // kendisi HP boş bırakmışsa geçerli — fetch başarısız olduysa bu bir "resmi yok" değil,
+      // "bilinmiyor" (hpOncekiFetchBasarisiz aşağıda ayrıca taşınıyor).
+      const hpOncekiResmiYok = !ilkStart && hpOnceki == null && !hpOncekiFetchBasarisiz;
+      const hpOncekiEfektif = ilkStart || hpOncekiFetchBasarisiz ? null : hpOnceki ?? 0;
 
       const aynıPistMesafeKayitlari = atPerformansMap.get(r.name) ?? [];
       const aynıPistMesafeOzet = aynıPistMesafeKayitlari.length > 0
@@ -426,7 +443,10 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         : null;
 
       // ── Mekanik ön-hesaplama ──
-      const hpIvmesiHesap = !ilkStart ? hpBugunEfektif - (hpOncekiEfektif ?? 0) : null;
+      // hpOncekiEfektif fetch başarısız olduğunda null olur (yukarıda) — bu durumda "ivme"
+      // hesaplamak (ham HP'yi ivme sanmak) yerine ivme de null kalmalı, gecit-motoru.ts'nin
+      // veriToplamaHatasi kontrolü (`iv==null && !ilkStart`) bunu doğru yakalasın.
+      const hpIvmesiHesap = !ilkStart && hpOncekiEfektif != null ? hpBugunEfektif - hpOncekiEfektif : null;
       const hpAlanIciUstHesap = hpUstSet.has(r.id);
       const yonHesap = { geriliyor: yon?.geriliyor ?? null, iyilesiyor: yon?.iyilesiyor ?? null };
       const hpKalitesi = hpKalitesiYildizi({
@@ -449,7 +469,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         ekuriMateleri: ekuriMateMap.get(r.id) ?? [],
         sire: r.sire, dam: r.dam, damSire: r.damSire, pedigreeNote: r.pedigreeNote,
         adminNote: r.adminNote,
-        hpBugun: hpBugunEfektif, hpBugunResmiYok, hpOncekiResmiYok,
+        hpBugun: hpBugunEfektif, hpBugunResmiYok, hpOncekiResmiYok, hpOncekiFetchBasarisiz,
         agf: r.agf, agfSirasi: agfSiraMap.get(r.id) ?? null,
         equipment: r.equipment, equipmentAdded: r.equipmentAdded, equipmentRemoved: r.equipmentRemoved,
         recentForm: r.recentForm, bestTime: r.bestTime,
