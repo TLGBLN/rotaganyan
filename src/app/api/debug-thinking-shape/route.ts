@@ -19,7 +19,14 @@ export async function GET() {
         },
       },
     },
-    messages: [{ role: "user", content: "2+2 kaç eder? Kısaca düşün, sonra JSON döndür." }],
+    messages: [{
+      role: "user",
+      content:
+        "12 atlık bir yarışta her at için (kilo, jokey kazanma yüzdesi, son 4 yarış formu, HP ivmesi, " +
+        "pedigri, galop verisi gibi 10'dan fazla değişken var) A puanı (0-60) ve B+C puanı (0-40) ver ve " +
+        "hangisinin en güçlü aday olduğunu, neden olduğunu adım adım muhakeme ederek gerekçelendir. " +
+        "Varsayımsal veriler üret, gerçekçi olsun. Sonunda JSON formatında 'hello' alanına en güçlü atın adını yaz.",
+    }],
   });
   return NextResponse.json({
     stop_reason: msg.stop_reason,
