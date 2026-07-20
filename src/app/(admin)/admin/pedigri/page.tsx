@@ -1,4 +1,5 @@
-import { ChevronRight } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import RacePedigreeTable from "@/components/admin/RacePedigreeTable";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import { getRaceDaysForPedigreeEntry } from "@/server/services/admin.service";
@@ -46,15 +47,32 @@ export default async function PedigriPage({ searchParams }: PageProps) {
                 <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
               </summary>
               <div className="divide-y">
-                {rd.races.map((race) => (
-                  <details key={race.id} className="group/race">
-                    <summary className="flex cursor-pointer list-none items-center justify-between bg-muted/10 px-4 py-1.5 text-xs font-medium [&::-webkit-details-marker]:hidden">
-                      <span>{race.raceNo}. Koşu <span className="font-normal text-muted-foreground">({race.runners.length} at)</span></span>
-                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-open/race:rotate-90" />
-                    </summary>
-                    <RacePedigreeTable runners={race.runners} />
-                  </details>
-                ))}
+                {rd.races.map((race) => {
+                  const pedigriDolu = race.runners.filter(
+                    (r) => r.sire || r.dam || r.damSire || r.pedigreeNote
+                  ).length;
+                  const tamamlandi = race.runners.length > 0 && pedigriDolu === race.runners.length;
+                  return (
+                    <details key={race.id} className="group/race">
+                      <summary className="flex cursor-pointer list-none items-center justify-between bg-muted/10 px-4 py-1.5 text-xs font-medium [&::-webkit-details-marker]:hidden">
+                        <span className="flex items-center gap-2">
+                          {race.raceNo}. Koşu <span className="font-normal text-muted-foreground">({race.runners.length} at)</span>
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                              tamamlandi ? "bg-hit/15 text-hit" : pedigriDolu > 0 ? "bg-muted text-muted-foreground" : "bg-miss/10 text-miss"
+                            )}
+                          >
+                            {tamamlandi && <Check className="h-3 w-3" />}
+                            {pedigriDolu}/{race.runners.length} pedigri
+                          </span>
+                        </span>
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-open/race:rotate-90" />
+                      </summary>
+                      <RacePedigreeTable runners={race.runners} />
+                    </details>
+                  );
+                })}
               </div>
             </details>
           ))}
