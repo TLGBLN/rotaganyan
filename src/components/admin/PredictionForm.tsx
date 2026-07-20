@@ -136,10 +136,13 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
         score: p.score,
         isTarget: p.isTarget,
         pedigreeRating: p.pedigreeRating,
-        // Kilit Gerekçe metni ("Analizi Gör" ekranında gösterilen asıl gerekçe yazısı) kısa
-        // etiketlerin ("AGF1" gibi) yanına eklenir — ayraç noktalı virgüldür (","  değil), çünkü
-        // gerekçe artık tam cümlelerden oluşan bir yazı ve virgül içeriyor.
-        details: [...p.details, p.note].filter(Boolean).join("; "),
+        // p.details ("AGF1", "AF 2/6" gibi kısa iç etiketler) kasıtlı olarak DAHİL EDİLMİYOR —
+        // bunlar Claude'un kendi muhakemesi için, admin önizlemesinde ayrı rozet olarak zaten
+        // gösteriliyor (AIAnalysisPanel). Buraya eklenirse "Analizi Gör" ekranındaki public
+        // Kilit Gerekçe metnine (parsePickDetails, A:/B:/VG: gibi özel önekleri tanımayan her
+        // satırı olduğu gibi yazıya ekliyor) ham jargon olarak sızıyordu. Yalnızca gerçek
+        // makale metni (p.note) public gerekçe olarak kaydedilir.
+        details: p.note ?? "",
       };
     });
     replace(aiPicks);

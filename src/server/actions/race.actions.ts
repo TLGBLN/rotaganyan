@@ -151,3 +151,22 @@ export async function updateRunnerPedigree(runnerId: string, input: PedigreeInpu
   revalidatePath("/program");
   return runner;
 }
+
+/**
+ * Yalnızca adminNote'u günceller — updateRunnerPedigree'nin aksine sire/dam/damSire/
+ * pedigreeNote alanlarına dokunmaz. Koşu ekranındaki tek kutulu hızlı veri girişi
+ * (Faz1VeriDurumu) bunu kullanır; updateRunnerPedigree'yi partial input ile çağırmak
+ * o alanları sessizce null'a çevirirdi.
+ */
+export async function updateRunnerAdminNote(runnerId: string, adminNote: string) {
+  await requireRole("EDITOR");
+
+  const runner = await db.runner.update({
+    where: { id: runnerId },
+    data: { adminNote: adminNote.trim() || null },
+  });
+
+  revalidatePath("/admin/pedigri");
+  revalidatePath("/program");
+  return runner;
+}

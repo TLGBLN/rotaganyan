@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import AIAnalysisPanel, { type AIAnalysisResult } from "./AIAnalysisPanel";
+import Faz1VeriDurumu from "./Faz1VeriDurumu";
 import PredictionForm from "./PredictionForm";
 import type { PedigreeRating, Prisma } from "@prisma/client";
 
@@ -44,6 +45,7 @@ export default function SmartAnalysisEditor({ raceId, runners, existingPredictio
 
   return (
     <div className="space-y-6">
+      <Faz1VeriDurumu raceId={raceId} />
       <AIAnalysisPanel raceId={raceId} onApply={handleAIApply} />
       <PredictionForm
         raceId={raceId}

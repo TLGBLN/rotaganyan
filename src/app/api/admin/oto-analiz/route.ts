@@ -243,6 +243,9 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
   // ── FAZ 4 — CLAUDE: geçit çıktısını işleyip final sıralama + kupon + yazım ──
   const faz4Prompt = `Sen ROTAGANYAN v4.1 at yarışı analistisin. FAZ 4 — SIRALAMA ve KUPON aşamasındasın.
 
+## ATLAR (FAZ 1 — ham veri: galop, pedigri, aygır itibarı, Son800, form dizisi, sınıf geçmişi)
+${faz1Tablo}
+
 ## FAZ 2 SKORLARIN
 ${faz2.atlar.map((a) => `#${a.no} ${a.ad}: A=${a.aPuani} B+C=${a.bcPuani} (ön teknik sıra ${a.teknikSira})`).join("\n")}
 
@@ -269,6 +272,8 @@ ${methodologyText}
    - Yayına hazır, akıcı bir dille anlat: atın adını (BÜYÜK HARF, örn. GÜLALP KIZI) doğal biçimde cümle içinde geçir.
    - Kendi kanaatini yansıt: "çok beğeniyorum", "inanıyorum", "ihtimali yüksek" gibi kişisel/yorumlayıcı bir ton kullan — kuru istatistik listesi DEĞİL.
    - Yarışın nasıl geçebileceğini SENARYOLAŞTIR: rakip atların (varsa) bilinen eğilimlerinden bahset (örn. "son metrelerde durma ihtimali", "ekürisinin varlığından rehavete kapılıp sprint'e geç girme ihtimali", "temposunu bir anda yükseltip mücadeleye girme" gibi), bu diğer atların FAZ 1 verisinden (form yönü, HP ivmesi, tempo/kaçak durumu, sınıf geçişi vb.) çıkarılmalı — uydurma değil.
+   - SOMUT VERİYE DAYAN, boş yorum YASAK: yukarıdaki FAZ 1 tablosundaki galop özetinden (tarih, form harfi, kilometre parçaları), pedigriden (baba/anne/aygır itibarı varsa), Son800 benzer koşu medyanından ve geçmiş form dizisinden en az birini somut şekilde ismen anarak yaz (örn. "18 Temmuz idmanında 400m'de gösterdiği hız dikkat çekici", "SIRAF DANCER kanından gelen bu at çim pistte iyi sonuçlar veren bir soydan geliyor"). "Piyasanın neden ilgi gösterdiğini çözemedik" gibi veriye dayanmayan, sebepsiz belirsizlik cümleleri YASAK — eğer gerçekten veri yoksa (ör. FAZ 1 tablosunda galop/pedigri kaydı yoksa) bunu açıkça ve sade dille söyle ("bu at hakkında idman/pedigri kaydımız yok"), muğlak bırakma.
+   - Özellikle Maiden/Şartlı 1 gibi az yarışlı atların olduğu koşularda (HP/geçmiş performans verisi zayıf/yok) galop ve pedigri verisi ANA dayanak olmalı — bu atlar için FAZ 1'deki galop özeti ve pedigri/aygır itibarı satırlarını mutlaka değerlendirmeye kat.
    - "A puanı", "B+C", "Atomic Force", "geçit skoru", "SKK", "HP ivmesi" gibi TEKNİK TERİMLER asla geçmesin — bunların ardındaki GERÇEK ANLAMI günlük dille anlat (örn. "HP ivmesi +12" yerine "resmi puanı son formunun gerisinde kalmış, aslında koştuğundan daha güçlü").
    - En az 3-4 cümle, gerekirse daha uzun — kısa/telegrafik değil, bir spor yazarının yazacağı gibi.
    - Uygunsa net bir tavsiyeyle bitir: "ekonomik kuponlarda banko olarak öneriyorum", "geniş kupona yazılabilir" gibi.
