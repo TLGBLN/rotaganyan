@@ -9,6 +9,35 @@ import type { Role } from "@prisma/client";
 
 const client = new Anthropic();
 
+/**
+ * Adaptive thinking, Sonnet 5'te max_tokens'ten görünmeyen bir pay aldığı için
+ * (budget_tokens ile sınırlandırılamıyor — Sonnet 5'te 400 hatası verir) kalabalık
+ * sahalarda yanıt bazen ilk denemede yarıda kesilebilir. Admin'e "tekrar dene"
+ * dedirtip Faz 2/4'ü baştan bir kez daha ÜCRETLENDİRMEK yerine, aynı istek içinde
+ * otomatik olarak daha yüksek bir limitle BİR kez tekrar dene — kullanıcı ekstra
+ * tıklama ve ekstra bekleme olmadan sonuç alır.
+ */
+async function createWithTruncationRetry(
+  params: Anthropic.MessageCreateParamsNonStreaming,
+  raceId: string,
+  phase: "faz2" | "faz4",
+  retryMaxTokens: number
+) {
+  let msg = await client.messages.create(params);
+  await logClaudeUsage({
+    raceId, phase, model: "claude-sonnet-5",
+    inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens,
+  });
+  if (msg.stop_reason === "max_tokens") {
+    msg = await client.messages.create({ ...params, max_tokens: retryMaxTokens });
+    await logClaudeUsage({
+      raceId, phase, model: "claude-sonnet-5",
+      inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens,
+    });
+  }
+  return msg;
+}
+
 // Claude'un cevabını YALNIZCA prompt talimatıyla JSON'a zorlamak yerine, API'nin kendi
 // şema doğrulamasını (output_config.format) kullanıyoruz — "geçerli JSON döndür" gibi
 // bir talimata güvenmek yerine sunucu tarafında zorunlu kılınıyor. Bu, önceki halde
@@ -164,28 +193,25 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
   ]
 }`;
 
-  const faz2Msg = await client.messages.create({
-    model: "claude-sonnet-5",
-    // Adaptive thinking AÇIK — kullanıcı isteği: mekanik/yüzeysel skorlama yerine
-    // gerçek muhakeme istiyor. Thinking görünmeyen bir bölüm olarak max_tokens'ten
-    // pay aldığı için (Sonnet 5'in kendi belgelenen davranışı) limiti yeterince
-    // yüksek tutuyoruz — aksi halde kalabalık sahalarda yanıt yine yarıda kesilir.
-    thinking: { type: "adaptive" },
-    max_tokens: 12000,
-    output_config: { format: { type: "json_schema", schema: FAZ2_SCHEMA } },
-    messages: [{ role: "user", content: faz2Prompt }],
-  });
-  await logClaudeUsage({
-    raceId, phase: "faz2", model: "claude-sonnet-5",
-    inputTokens: faz2Msg.usage.input_tokens, outputTokens: faz2Msg.usage.output_tokens,
-  });
+  const faz2Msg = await createWithTruncationRetry(
+    {
+      model: "claude-sonnet-5",
+      // Adaptive thinking AÇIK — kullanıcı isteği: mekanik/yüzeysel skorlama yerine
+      // gerçek muhakeme istiyor.
+      thinking: { type: "adaptive" },
+      max_tokens: 20000,
+      output_config: { format: { type: "json_schema", schema: FAZ2_SCHEMA } },
+      messages: [{ role: "user", content: faz2Prompt }],
+    },
+    raceId, "faz2", 28000
+  );
   const faz2Raw = faz2Msg.content[0].type === "text" ? faz2Msg.content[0].text.trim() : "";
   let faz2: Faz2Atlar;
   try {
     faz2 = JSON.parse(faz2Raw);
   } catch {
     const sebep = faz2Msg.stop_reason === "max_tokens"
-      ? " (yanıt token sınırına takılıp yarıda kesildi — bu genelde çok kalabalık sahalarda olur, tekrar deneyin)"
+      ? " (yanıt otomatik yüksek limitli tekrar denemede de token sınırına takıldı — bu koşu olağanüstü kalabalık, tekrar deneyin)"
       : "";
     return NextResponse.json({ error: `Faz 2 (skorlama) yanıtı parse edilemedi${sebep}`, raw: faz2Raw }, { status: 500 });
   }
@@ -299,27 +325,26 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
 pedigreeRating değerleri: COK_YUKSEK, YUKSEK, GUCLU, ORTA, DUSUK, ZAYIF, SORU, BILINMIYOR
 details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, Jokey devam, HP İvmesi +12, Son800 güçlü kapanış`;
 
-  const faz4Msg = await client.messages.create({
-    model: "claude-sonnet-5",
-    // Adaptive thinking AÇIK (bkz. Faz 2'deki not) — Faz 4 hem daha uzun makale
-    // tadında metin üretiyor hem de gerçek yorumlama gerektiriyor, bu yüzden
-    // limiti Faz 2'den de yüksek tutuyoruz.
-    thinking: { type: "adaptive" },
-    max_tokens: 16000,
-    output_config: { format: { type: "json_schema", schema: FAZ4_SCHEMA } },
-    messages: [{ role: "user", content: faz4Prompt }],
-  });
-  await logClaudeUsage({
-    raceId, phase: "faz4", model: "claude-sonnet-5",
-    inputTokens: faz4Msg.usage.input_tokens, outputTokens: faz4Msg.usage.output_tokens,
-  });
+  const faz4Msg = await createWithTruncationRetry(
+    {
+      model: "claude-sonnet-5",
+      // Adaptive thinking AÇIK (bkz. Faz 2'deki not) — Faz 4 hem daha uzun makale
+      // tadında metin üretiyor hem de gerçek yorumlama gerektiriyor, bu yüzden
+      // limiti Faz 2'den de yüksek tutuyoruz.
+      thinking: { type: "adaptive" },
+      max_tokens: 24000,
+      output_config: { format: { type: "json_schema", schema: FAZ4_SCHEMA } },
+      messages: [{ role: "user", content: faz4Prompt }],
+    },
+    raceId, "faz4", 32000
+  );
   const faz4Raw = faz4Msg.content[0].type === "text" ? faz4Msg.content[0].text.trim() : "";
   let result: unknown;
   try {
     result = JSON.parse(faz4Raw);
   } catch {
     const sebep = faz4Msg.stop_reason === "max_tokens"
-      ? " (yanıt token sınırına takılıp yarıda kesildi — makale tadındaki gerekçe yazıları uzun sürebilir, tekrar deneyin)"
+      ? " (yanıt otomatik yüksek limitli tekrar denemede de token sınırına takıldı — makale tadındaki gerekçe yazıları uzun sürebilir, tekrar deneyin)"
       : "";
     return NextResponse.json({ error: `Faz 4 (sıralama) yanıtı parse edilemedi${sebep}`, raw: faz4Raw }, { status: 500 });
   }
