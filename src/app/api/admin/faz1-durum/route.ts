@@ -33,17 +33,8 @@ export async function POST(req: NextRequest) {
     const eksikler: string[] = [];
     const bilgiler: string[] = [];
 
-    if (!r.sire && !r.dam && !r.sireTier && !r.damSireTier && !r.pedigreeNote) {
+    if (!r.sire && !r.dam && !r.pedigreeNote) {
       eksikler.push("Pedigri");
-    } else if (r.sire && !r.sireTier && !r.pedigreeNote) {
-      // Sire/dam adları TJK'dan zaten geliyor olabilir ama aygır itibarı (reputasyon
-      // değerlendirmesi) yalnızca admin girer — bu, TJK'nın hiç vermediği ve en çok
-      // katkı sağlayan pedigri bilgisidir, özellikle az yarışlı/Maiden atlarda.
-      // NOT: admin bunu SireTier (global, at-bağımsız aygır tablosu) yerine bu atın
-      // kendi pedigreeNote'una (yarışa özel, /admin/pedigri toplu yapıştırma) yazmış
-      // olabilir — pedigreeNote zaten Faz 1 tablosuna gidiyor, o zaman gerçekten eksik
-      // değildir, uyarı YANLIŞ ALARM olur.
-      eksikler.push("Aygır İtibarı");
     }
     if (r.galopOzet === "İdman kaydı yok") eksikler.push("Galop");
     if (!r.recentForm) eksikler.push("Form dizisi");

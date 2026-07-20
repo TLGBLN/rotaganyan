@@ -9,8 +9,8 @@
  * galop zincirinin "keskinliği" gibi tamamen öznel değerlendirmeler) yerine,
  * ölçülebilir bir yaklaşıklık kullanılır — bu yaklaşıklıklar aşağıda açıkça
  * belirtilmiştir. Admin isterse /admin/pedigri üzerinden (tek tek ya da toplu
- * yapıştırarak) pedigri metni ve aygır itibar tablosu (SireTier) girebilir —
- * bu veri girildiyse Faz 1 otomatik olarak okur ve Faz 2 skorlamasına dahil eder.
+ * yapıştırarak) pedigri metni girebilir — bu veri girildiyse Faz 1 otomatik
+ * olarak okur ve Faz 2 skorlamasına dahil eder.
  */
 
 import { db } from "@/lib/db";
@@ -119,10 +119,6 @@ export type Faz1Runner = {
   dam: string | null;
   damSire: string | null;
   pedigreeNote: string | null;
-  // Admin'in /admin/pedigri > "Aygır İtibar Tablosu"nda elle girdiği referans bilgisi —
-  // varsa Faz 2 skorlamasında Ansiklopedi'nin Pedigri bölümü için doğrudan kullanılır.
-  sireTier: { tier: string; note: string | null } | null;
-  damSireTier: { tier: string; note: string | null } | null;
   // Admin'in /admin/pedigri sayfasındaki "Genel Not"a elle girdiği, pedigri dışı herhangi
   // bir eksik veri (sakatlık, antrenman gözlemi, pist notu vb.) — otomatik toplanamayan
   // her şey için genel amaçlı manuel giriş alanı.
@@ -253,14 +249,6 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
     }
     return kayitlar.length > 0 ? kayitlar.slice(0, 3).join(" | ") : null;
   }
-
-  // Admin'in /admin/pedigri > "Aygır İtibar Tablosu"nda elle girdiği referans veriler —
-  // bu koşudaki atların baba/anne babası isimleriyle eşleşenler toplu çekilir.
-  const sireNames = [...new Set(race.runners.flatMap((r) => [r.sire, r.damSire]).filter((n): n is string => !!n))];
-  const sireTierRows = sireNames.length > 0
-    ? await db.sireTier.findMany({ where: { name: { in: sireNames } }, select: { name: true, tier: true, note: true } }).catch(() => [])
-    : [];
-  const sireTierMap = new Map(sireTierRows.map((s) => [s.name, { tier: s.tier as string, note: s.note }]));
 
   // AGF sırası — bugünkü sahada AGF yüzdesine göre (yüksekten düşüğe)
   const agfSirali = [...race.runners]
@@ -408,8 +396,6 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         trainer: r.trainer, owner: r.owner,
         ekuriMateleri: ekuriMateMap.get(r.id) ?? [],
         sire: r.sire, dam: r.dam, damSire: r.damSire, pedigreeNote: r.pedigreeNote,
-        sireTier: r.sire ? sireTierMap.get(r.sire) ?? null : null,
-        damSireTier: r.damSire ? sireTierMap.get(r.damSire) ?? null : null,
         adminNote: r.adminNote,
         hpBugun: hpBugunEfektif, hpBugunResmiYok, hpOncekiResmiYok,
         agf: r.agf, agfSirasi: agfSiraMap.get(r.id) ?? null,
