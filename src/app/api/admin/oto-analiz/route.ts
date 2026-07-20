@@ -7,7 +7,27 @@ import { degerlendir, metin, veriDenetimi, type AtGirdisi } from "@/lib/methodol
 import { logClaudeUsage } from "@/lib/claude-cost";
 import type { Role } from "@prisma/client";
 
+// Bu route art arda İKİ ağır Claude çağrısı yapıyor (Faz 2 + Faz 4), ikisi de adaptive
+// thinking ile uzun sürebilir — varsayılan Vercel süre sınırı bunun için yetersiz kalıp
+// fonksiyonu ortadan kesebilir (parayı harcadıktan SONRA, admin'e hata bile dönmeden).
+// Diğer uzun işlemlerle (ingest cron'ları vb.) aynı desen.
+export const maxDuration = 300;
+
 const client = new Anthropic();
+
+/**
+ * Anthropic SDK, max_tokens yüksekken (yaklaşık ~21.000'i geçince, thinking'in
+ * max_tokens'ten görünmeyen pay alması nedeniyle) senkron (non-streaming) isteği
+ * İSTEK GÖNDERİLMEDEN reddediyor: "Streaming is required for operations that may
+ * take longer than 10 minutes." Bu ücretsiz bir client-side hata (API'ye hiç
+ * gitmiyor) ama admin'e sürekli hata gösterip analiz üretilmesini engelliyor.
+ * Çözüm: her zaman stream() + finalMessage() kullanmak — bu limiti tamamen
+ * ortadan kaldırıyor (SDK'nın kendi dokümante ettiği önerisi budur).
+ */
+async function createStreamed(params: Anthropic.MessageCreateParamsNonStreaming): Promise<Anthropic.Message> {
+  const stream = client.messages.stream(params);
+  return stream.finalMessage();
+}
 
 /**
  * Adaptive thinking, Sonnet 5'te max_tokens'ten görünmeyen bir pay aldığı için
@@ -23,13 +43,13 @@ async function createWithTruncationRetry(
   phase: "faz2" | "faz4",
   retryMaxTokens: number
 ) {
-  let msg = await client.messages.create(params);
+  let msg = await createStreamed(params);
   await logClaudeUsage({
     raceId, phase, model: "claude-sonnet-5",
     inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens,
   });
   if (msg.stop_reason === "max_tokens") {
-    msg = await client.messages.create({ ...params, max_tokens: retryMaxTokens });
+    msg = await createStreamed({ ...params, max_tokens: retryMaxTokens });
     await logClaudeUsage({
       raceId, phase, model: "claude-sonnet-5",
       inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens,
