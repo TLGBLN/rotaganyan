@@ -190,9 +190,10 @@ function XLogo({ className }: { className?: string }) {
 // ── Analiz paneli ────────────────────────────────────────────────────────────
 
 function AnalysisPanel({
-  picks, winnerNo, isLoggedIn, isAdmin, isVerified, userEmail, raceNo, hippodromeName, raceId,
+  picks, runners, winnerNo, isLoggedIn, isAdmin, isVerified, userEmail, raceNo, hippodromeName, raceId,
 }: {
   picks: ProgramPick[];
+  runners: ProgramRunner[];
   winnerNo?: number | null;
   isLoggedIn: boolean;
   isAdmin: boolean;
@@ -203,6 +204,15 @@ function AnalysisPanel({
   raceId: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+
+  // Faz 4 yalnız en iyi 3-6 atı sıralayıp "pick" olarak kaydediyor — geri kalanı
+  // (Geniş kupon) yalnız couponWide metninde numara olarak geçiyor, ayrı satır
+  // olarak hiç gösterilmiyordu. Kullanıcı isteği: tam saha görünsün — seçilmeyen
+  // atlar da (sıra/gerekçe olmadan, sade) listenin altına eklenir.
+  const pickedNos = new Set(picks.map((p) => p.runner?.no).filter((n): n is number => n != null));
+  const unpickedRunners = runners
+    .filter((r) => !r.scratched && !pickedNos.has(r.no))
+    .sort((a, b) => a.no - b.no);
 
   function handleShare() {
     const url = new URL("https://twitter.com/intent/tweet");
@@ -319,6 +329,15 @@ function AnalysisPanel({
                 </tr>
               );
             })}
+            {unpickedRunners.map((r) => (
+              <tr key={`geniş-${r.no}`} className="border-b last:border-0 opacity-60">
+                <td className="px-2 py-2 text-center text-muted-foreground">—</td>
+                <td className="px-2 py-2 text-center font-mono text-muted-foreground">{r.no}</td>
+                <td className="px-2 py-2 text-muted-foreground">{r.name}</td>
+                <td className="px-2 py-2 text-center text-muted-foreground">—</td>
+                <td className="px-2 py-2 text-muted-foreground">—</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -357,6 +376,15 @@ function AnalysisPanel({
             </div>
           );
         })}
+        {unpickedRunners.map((r) => (
+          <div key={`geniş-${r.no}`} className="px-3 py-2.5 opacity-60">
+            <div className="flex items-center gap-2">
+              <span className="w-5 shrink-0 text-center text-[10px] font-bold text-muted-foreground">—</span>
+              <span className="font-bold text-xs text-muted-foreground">#{r.no}</span>
+              <span className="font-semibold text-xs text-muted-foreground">{r.name}</span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -991,6 +1019,7 @@ function RaceTable({
         {race.hasAnalysis && analysisOpen && (
           <AnalysisPanel
             picks={race.picks}
+            runners={race.runners}
             winnerNo={winnerNo}
             isLoggedIn={isLoggedIn}
             isAdmin={isAdmin}
