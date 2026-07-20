@@ -232,7 +232,8 @@ export const FAZ4_SCHEMA = {
           rank: { type: "integer" },
           no: { type: "integer" },
           name: { type: "string" },
-          score: { type: "number" },
+          // Tam sayı zorunlu — "64.6" gibi küsuratlı skorlar kullanıcıya çirkin görünüyordu.
+          score: { type: "integer" },
           pedigreeRating: {
             type: "string",
             enum: ["COK_YUKSEK", "YUKSEK", "GUCLU", "ORTA", "DUSUK", "ZAYIF", "SORU", "BILINMIYOR"],
