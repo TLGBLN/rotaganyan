@@ -62,11 +62,43 @@ function normalizeName(s: string): string {
     .trim();
 }
 
+/** İlk "(" ile ona denk gelen (iç içe parantezleri — "(IRE)", "(USA)" gibi ülke kodlarını —
+ *  doğru sayarak bulunan) kapanış ")"sını ayırır. Basit `[^)]+` regex'i iç içe parantezde
+ *  ("AUTHORIZED (IRE)" gibi) yanlış yerde durur; bu yüzden derinlik sayarak elle taranır. */
+function matchBalancedParen(s: string): { pre: string; inner: string; afterIdx: number } | null {
+  const openIdx = s.indexOf("(");
+  if (openIdx < 0) return null;
+  let depth = 0;
+  for (let i = openIdx; i < s.length; i++) {
+    if (s[i] === "(") depth++;
+    else if (s[i] === ")") {
+      depth--;
+      if (depth === 0) {
+        return { pre: s.slice(0, openIdx).trim(), inner: s.slice(openIdx + 1, i).trim(), afterIdx: i + 1 };
+      }
+    }
+  }
+  return null;
+}
+
+function splitPedigreeParen(inner: string): { sire: string; dam: string; damSire: string } {
+  const slashParts = inner.split("/").map((s) => s.trim());
+  const sirePart = slashParts[0] ?? "";
+  const damSire = slashParts[1] ?? "";
+  const dashIdx = sirePart.indexOf("-");
+  const sire = dashIdx >= 0 ? sirePart.slice(0, dashIdx).trim() : sirePart.trim();
+  const dam = dashIdx >= 0 ? sirePart.slice(dashIdx + 1).trim() : "";
+  return { sire, dam, damSire };
+}
+
 /**
- * İki format da kabul edilir, satır/blok bazında otomatik seçilir:
- *  (A) "1. AT ADI / Babası (Sire): açıklama... / Anne Hattı (Dam / DamSire): açıklama..."
- *  (B) Kompakt tek satır: "11 - AT ADI (Baba - Anne / Anne Babası): açıklama" — kullanıcının
- *      doğal yazım şekli, "(" içindeki "Baba - Anne / Anne Babası" otomatik ayrıştırılır.
+ * Üç format da kabul edilir, blok bazında otomatik seçilir:
+ *  (A) Eski yapılandırılmış format — sade isim satırı, ardından "Babası (...): / Anne Hattı (...):" etiketleri.
+ *  (B) Kompakt tek satır: "11 - AT ADI (Baba - Anne / Anne Babası): açıklama".
+ *  (C) Başlık + serbest metin: "1 - AT ADI (Baba - Anne / Anne Babası)" satırından sonra kolon YOK,
+ *      devamındaki paragraflar ("Baba (...): ...", "Kısrak Babası (...): ...", "Değerlendirme: ..." gibi
+ *      herhangi bir başlıkla) olduğu gibi not olarak saklanır — kullanıcının kendi serbest yazım tarzı.
+ * (B) ve (C) baba/anne isimlerinde "AUTHORIZED (IRE)" gibi iç içe parantez olsa da doğru ayrıştırır.
  */
 function parseBulkPedigree(text: string): ParsedEntry[] {
   const blocks = text.split(/\n(?=\s*\d+\s*[-.]\s)/).map((b) => b.trim()).filter(Boolean);
@@ -77,28 +109,28 @@ function parseBulkPedigree(text: string): ParsedEntry[] {
     if (!numMatch) continue;
     const afterNum = block.slice(numMatch[0].length); // numara önekinden sonraki HER ŞEY (çok satırlı dahil)
 
-    // (B) Kompakt format: isim satır atlamadan "(" ile başlıyor ve hemen ardından ":" geliyorsa.
-    const compactMatch = afterNum.match(/^([^(:\n]+?)\s*\(([^)]+)\)\s*:\s*([\s\S]*)$/);
-    if (compactMatch) {
-      const name = compactMatch[1].trim();
-      const parenContent = compactMatch[2].trim();
-      const note = compactMatch[3].trim();
-      const slashParts = parenContent.split("/").map((s) => s.trim());
-      const sirePart = slashParts[0] ?? "";
-      const damSire = slashParts[1] ?? "";
-      const dashIdx = sirePart.indexOf("-");
-      const sire = dashIdx >= 0 ? sirePart.slice(0, dashIdx).trim() : sirePart.trim();
-      const dam = dashIdx >= 0 ? sirePart.slice(dashIdx + 1).trim() : "";
+    const firstLineEnd = afterNum.indexOf("\n");
+    const firstLine = firstLineEnd >= 0 ? afterNum.slice(0, firstLineEnd) : afterNum;
+    const restOfBlock = firstLineEnd >= 0 ? afterNum.slice(firstLineEnd + 1) : "";
+
+    // (B)/(C) Başlık satırında "AD (Baba - Anne / Anne Babası)" var mı?
+    const headerParen = matchBalancedParen(firstLine);
+    if (headerParen && headerParen.pre.length > 0) {
+      const name = headerParen.pre;
+      const { sire, dam, damSire } = splitPedigreeParen(headerParen.inner);
+      const afterParenOnFirstLine = firstLine.slice(headerParen.afterIdx);
+      const colonMatch = afterParenOnFirstLine.match(/^\s*:\s*([\s\S]*)$/);
+      const note = colonMatch
+        ? [colonMatch[1].trim(), restOfBlock.trim()].filter(Boolean).join("\n")
+        : [afterParenOnFirstLine.trim(), restOfBlock.trim()].filter(Boolean).join("\n");
       if (name) entries.push({ name, sire, dam, damSire, note });
       continue;
     }
 
-    // (A) Yapılandırılmış çok satırlı format — ilk satır at adı, kalanı Babası/Anne Hattı bölümleri.
-    const firstLineEnd = afterNum.indexOf("\n");
-    const firstLine = firstLineEnd >= 0 ? afterNum.slice(0, firstLineEnd) : afterNum;
+    // (A) Başlık satırında parantez yok — sade isim, devamı yapılandırılmış etiketlerle geliyor.
     // "1. BERATIM (8y)" gibi isme eklenmiş yaş bilgisini ("(8y)", "(4 y)"...) at ismine dahil etmeden ayıkla.
     const name = firstLine.replace(/\s*\(\s*\d+\s*y\s*\)\s*$/i, "").trim();
-    const rest = firstLineEnd >= 0 ? afterNum.slice(firstLineEnd + 1) : "";
+    const rest = restOfBlock;
 
     const sireMatch = rest.match(/Babas[ıİi]\s*\(([^)]+)\)\s*:\s*([\s\S]*?)(?=\s*Anne\s*Hatt[ıİi]\s*\(|$)/i);
     const damMatch = rest.match(/Anne\s*Hatt[ıİi]\s*\(([^)]+)\)\s*:\s*([\s\S]*)$/i);
@@ -115,7 +147,9 @@ function parseBulkPedigree(text: string): ParsedEntry[] {
     }
     const damNote = damMatch ? damMatch[2].trim() : "";
 
-    const note = [sireNote, damNote].filter(Boolean).join(" ");
+    // Ne "Babası"/"Anne Hattı" etiketi ne de başlıkta parantez varsa, veriyi sessizce
+    // kaybetmemek için tüm devam metnini olduğu gibi nota düş.
+    const note = [sireNote, damNote].filter(Boolean).join(" ") || rest.trim();
     if (name) entries.push({ name, sire, dam, damSire, note });
   }
 
