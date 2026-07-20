@@ -9,10 +9,75 @@ import type { Role } from "@prisma/client";
 
 const client = new Anthropic();
 
-function extractJson(raw: string): string {
-  const jsonMatch = raw.match(/```json\s*([\s\S]*?)```/) ?? raw.match(/(\{[\s\S]*\})/);
-  return jsonMatch ? jsonMatch[1].trim() : raw;
-}
+// Claude'un cevabını YALNIZCA prompt talimatıyla JSON'a zorlamak yerine, API'nin kendi
+// şema doğrulamasını (output_config.format) kullanıyoruz — "geçerli JSON döndür" gibi
+// bir talimata güvenmek yerine sunucu tarafında zorunlu kılınıyor. Bu, önceki halde
+// görülen "yanıtı parse edilemedi" hatalarının (Claude'un JSON dışına metin eklemesi,
+// virgül/tırnak hatası vb.) tamamını ortadan kaldırır — model="claude-sonnet-5" bu
+// özelliği destekliyor.
+const FAZ2_SCHEMA = {
+  type: "object",
+  properties: {
+    atlar: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          no: { type: "integer" },
+          ad: { type: "string" },
+          aPuani: { type: "number" },
+          bcPuani: { type: "number" },
+          teknikSira: { type: "integer" },
+          notlar: { type: "string" },
+        },
+        required: ["no", "ad", "aPuani", "bcPuani", "teknikSira", "notlar"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["atlar"],
+  additionalProperties: false,
+} as const;
+
+const FAZ4_SCHEMA = {
+  type: "object",
+  properties: {
+    picks: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          rank: { type: "integer" },
+          no: { type: "integer" },
+          name: { type: "string" },
+          score: { type: "number" },
+          pedigreeRating: {
+            type: "string",
+            enum: ["COK_YUKSEK", "YUKSEK", "GUCLU", "ORTA", "DUSUK", "ZAYIF", "SORU", "BILINMIYOR"],
+          },
+          isTarget: { type: "boolean" },
+          details: { type: "array", items: { type: "string" } },
+          note: { type: "string" },
+        },
+        required: ["rank", "no", "name", "score", "pedigreeRating", "isTarget", "details", "note"],
+        additionalProperties: false,
+      },
+    },
+    confidence: { type: "string", enum: ["DUSUK", "ORTA", "YUKSEK"] },
+    isBanko: { type: "boolean" },
+    bankoNote: { type: "string" },
+    notes: { type: "string" },
+    tempo: { type: "string" },
+    couponNarrow: { type: "string" },
+    couponNormal: { type: "string" },
+    couponWide: { type: "string" },
+  },
+  required: [
+    "picks", "confidence", "isBanko", "bankoNote", "notes", "tempo",
+    "couponNarrow", "couponNormal", "couponWide",
+  ],
+  additionalProperties: false,
+} as const;
 
 type Faz2Atlar = {
   atlar: { no: number; ad: string; aPuani: number; bcPuani: number; teknikSira: number | null; notlar?: string }[];
@@ -98,7 +163,8 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
 
   const faz2Msg = await client.messages.create({
     model: "claude-sonnet-5",
-    max_tokens: 4096,
+    max_tokens: 6000,
+    output_config: { format: { type: "json_schema", schema: FAZ2_SCHEMA } },
     messages: [{ role: "user", content: faz2Prompt }],
   });
   await logClaudeUsage({
@@ -108,9 +174,12 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
   const faz2Raw = faz2Msg.content[0].type === "text" ? faz2Msg.content[0].text.trim() : "";
   let faz2: Faz2Atlar;
   try {
-    faz2 = JSON.parse(extractJson(faz2Raw));
+    faz2 = JSON.parse(faz2Raw);
   } catch {
-    return NextResponse.json({ error: "Faz 2 (skorlama) yanıtı parse edilemedi", raw: faz2Raw }, { status: 500 });
+    const sebep = faz2Msg.stop_reason === "max_tokens"
+      ? " (yanıt token sınırına takılıp yarıda kesildi — bu genelde çok kalabalık sahalarda olur, tekrar deneyin)"
+      : "";
+    return NextResponse.json({ error: `Faz 2 (skorlama) yanıtı parse edilemedi${sebep}`, raw: faz2Raw }, { status: 500 });
   }
 
   // ── FAZ 3 — GEÇİT MOTORU: KOD İLE ÇALIŞIR, LLM DEĞİL ──
@@ -219,7 +288,8 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
 
   const faz4Msg = await client.messages.create({
     model: "claude-sonnet-5",
-    max_tokens: 2048,
+    max_tokens: 6000,
+    output_config: { format: { type: "json_schema", schema: FAZ4_SCHEMA } },
     messages: [{ role: "user", content: faz4Prompt }],
   });
   await logClaudeUsage({
@@ -229,9 +299,12 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
   const faz4Raw = faz4Msg.content[0].type === "text" ? faz4Msg.content[0].text.trim() : "";
   let result: unknown;
   try {
-    result = JSON.parse(extractJson(faz4Raw));
+    result = JSON.parse(faz4Raw);
   } catch {
-    return NextResponse.json({ error: "Faz 4 (sıralama) yanıtı parse edilemedi", raw: faz4Raw }, { status: 500 });
+    const sebep = faz4Msg.stop_reason === "max_tokens"
+      ? " (yanıt token sınırına takılıp yarıda kesildi — makale tadındaki gerekçe yazıları uzun sürebilir, tekrar deneyin)"
+      : "";
+    return NextResponse.json({ error: `Faz 4 (sıralama) yanıtı parse edilemedi${sebep}`, raw: faz4Raw }, { status: 500 });
   }
 
   return NextResponse.json({
