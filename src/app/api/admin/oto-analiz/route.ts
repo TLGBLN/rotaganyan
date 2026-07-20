@@ -89,9 +89,8 @@ const FAZ2_SCHEMA = {
           aPuani: { type: "number" },
           bcPuani: { type: "number" },
           teknikSira: { type: "integer" },
-          notlar: { type: "string" },
         },
-        required: ["no", "ad", "aPuani", "bcPuani", "teknikSira", "notlar"],
+        required: ["no", "ad", "aPuani", "bcPuani", "teknikSira"],
         additionalProperties: false,
       },
     },
@@ -141,7 +140,7 @@ const FAZ4_SCHEMA = {
 } as const;
 
 type Faz2Atlar = {
-  atlar: { no: number; ad: string; aPuani: number; bcPuani: number; teknikSira: number | null; notlar?: string }[];
+  atlar: { no: number; ad: string; aPuani: number; bcPuani: number; teknikSira: number | null }[];
 };
 
 async function handlePost(req: NextRequest) {
@@ -200,17 +199,30 @@ async function handlePost(req: NextRequest) {
     })
     .join("\n\n");
 
-  // ── FAZ 2 — CLAUDE: koşu tipine göre A/B+C skorlama + ön teknik sıra ──
-  const faz2Prompt = `Sen ROTAGANYAN v4.1 at yarışı analistisin. FAZ 2 — SKORLAMA aşamasındasın (henüz final sıralama/kupon yazma, sadece puanla).
-
-## KOŞU
+  // ── PAYLAŞILAN BAĞLAM (Faz 2 ve Faz 4'te BİREBİR AYNI metin) ──
+  // Faz 1 verisi (faz1Tablo) ve metodoloji metni ~19-20K token'a varabiliyor ve şu ana
+  // kadar HER İKİ çağrıda da (Faz 2 + Faz 4) tam fiyattan tekrar gönderiliyordu. Bu bloğu
+  // her iki isteğin de content dizisinde birebir aynı ilk eleman yapıp cache_control ile
+  // işaretleyerek, Faz 4 (Faz 2'den saniyeler/dakikalar sonra, 5dk'lık cache penceresi
+  // içinde çalışıyor) bu kısmı ~%90 indirimli "cache read" fiyatından okuyor — analiz
+  // kalitesinde hiçbir değişiklik yapmadan gerçek bir maliyet düşüşü.
+  const sharedContext = `## KOŞU
 ${faz1.race.hippodromeName} — ${faz1.race.raceNo}. Koşu | ${faz1.race.classType} | ${faz1.race.breed} | ${faz1.race.distance}m ${faz1.race.surface} | ${faz1.runners.length} at
 
 ## ATLAR (FAZ 1 — otomatik toplanmış ham veri, sitenin kendi TJK kaynağından)
 ${faz1Tablo}
 
 ## METODOLOJİ
-${methodologyText}
+${methodologyText}`;
+
+  const sharedContextBlock: Anthropic.TextBlockParam = {
+    type: "text",
+    text: sharedContext,
+    cache_control: { type: "ephemeral" },
+  };
+
+  // ── FAZ 2 — CLAUDE: koşu tipine göre A/B+C skorlama + ön teknik sıra ──
+  const faz2Tail = `Sen ROTAGANYAN v4.1 at yarışı analistisin. FAZ 2 — SKORLAMA aşamasındasın (henüz final sıralama/kupon yazma, sadece puanla). Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan.
 
 ## GÖREVİN
 1. Koşu tipini belirle (Ansiklopedi Bölüm IV) ve o tipin A/B+C ağırlık matrisini uygula.
@@ -221,7 +233,7 @@ ${methodologyText}
 Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
 {
   "atlar": [
-    { "no": 0, "ad": "...", "aPuani": 0, "bcPuani": 0, "teknikSira": 1, "notlar": "kısa iç not" }
+    { "no": 0, "ad": "...", "aPuani": 0, "bcPuani": 0, "teknikSira": 1 }
   ]
 }`;
 
@@ -233,7 +245,7 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
       thinking: { type: "adaptive" },
       max_tokens: 20000,
       output_config: { format: { type: "json_schema", schema: FAZ2_SCHEMA } },
-      messages: [{ role: "user", content: faz2Prompt }],
+      messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz2Tail }] }],
     },
     raceId, "faz2", 28000
   );
@@ -301,10 +313,7 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
   }
 
   // ── FAZ 4 — CLAUDE: geçit çıktısını işleyip final sıralama + kupon + yazım ──
-  const faz4Prompt = `Sen ROTAGANYAN v4.1 at yarışı analistisin. FAZ 4 — SIRALAMA ve KUPON aşamasındasın.
-
-## ATLAR (FAZ 1 — ham veri: galop, pedigri, aygır itibarı, Son800, form dizisi, sınıf geçmişi)
-${faz1Tablo}
+  const faz4Tail = `Sen ROTAGANYAN v4.1 at yarışı analistisin. FAZ 4 — SIRALAMA ve KUPON aşamasındasın. Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan (metodolojinin "Çözüm Rejimi" ve "Çıktı JSON Şeması" bölümlerine özellikle bak).
 
 ## FAZ 2 SKORLARIN
 ${faz2.atlar.map((a) => `#${a.no} ${a.ad}: A=${a.aPuani} B+C=${a.bcPuani} (ön teknik sıra ${a.teknikSira})`).join("\n")}
@@ -313,9 +322,6 @@ ${faz2.atlar.map((a) => `#${a.no} ${a.ad}: A=${a.aPuani} B+C=${a.bcPuani} (ön t
 \`\`\`
 ${gecitMetin}
 \`\`\`
-
-## METODOLOJİ (çözüm rejimi ve çıktı formatı için — dosyanın "Çözüm Rejimi" ve "Çıktı JSON Şeması" bölümlerine bak)
-${methodologyText}
 
 ## GÖREVİN
 1. Geçit motoru çıktısındaki her tetiklenen atı işle: "Çözüm Rejimi" tablosuna göre TAŞI (varsayılan zorunlu eylem) ya da — yalnız gerçekten güçlü, somut exact-dışı bir olumsuz kanıt FAZ 1 verisinde açıkça varsa — yerinde bırak ve nedenini yaz.
@@ -366,7 +372,7 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
       thinking: { type: "adaptive" },
       max_tokens: 24000,
       output_config: { format: { type: "json_schema", schema: FAZ4_SCHEMA } },
-      messages: [{ role: "user", content: faz4Prompt }],
+      messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz4Tail }] }],
     },
     raceId, "faz4", 32000
   );
