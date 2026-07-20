@@ -208,7 +208,11 @@ function parseRunnersTable(
     const jockey = iJockey !== -1 ? firstSegment(cells[iJockey] ?? "") || undefined : undefined;
     const owner  = iOwner !== -1 ? cleanCell(cells[iOwner] ?? "").split(/\s{2,}|\n/)[0]?.trim() || undefined : undefined;
     const trainer = iTrainer !== -1 ? cleanCell(cells[iTrainer] ?? "") || undefined : undefined;
-    const startNo = iStart !== -1 ? parseInt(cleanCell(cells[iStart] ?? ""), 10) : undefined;
+    const startCellText = iStart !== -1 ? cleanCell(cells[iStart] ?? "") : "";
+    const startNo = iStart !== -1 ? parseInt(startCellText, 10) : undefined;
+    // "St" sütununun yanındaki turuncu "DS" işareti — at kendi tercihiyle dıştan
+    // başlayacak anlamına gelir (bkz. tjk-info.adapter.ts'teki aynı mantık).
+    const disaridanStart = /DS/i.test(startCellText.replace(/^\d+/, ""));
 
     const hpRaw = iHp !== -1 ? cleanCell(cells[iHp] ?? "").replace(/[^\d]/g, "") : "";
     const hp = hpRaw !== "" ? parseInt(hpRaw, 10) : undefined;
@@ -275,6 +279,7 @@ function parseRunnersTable(
       owner,
       trainer,
       startNo: startNo != null && !isNaN(startNo) ? startNo : undefined,
+      disaridanStart,
       hp,
       recentForm,
       recentFormSurfaces,

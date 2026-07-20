@@ -310,7 +310,13 @@ export async function fetchCityProgram(
           const trainerCell = iTrainer !== -1 && cellEls[iTrainer] ? $(cellEls[iTrainer]).find("a").first() : null;
           const trainer = trainerCell ? trainerCell.text().trim() || undefined : (cells[iTrainer] ?? "") || undefined;
 
-          const startNo = parseInt(cells[iStart] ?? "", 10) || undefined;
+          const startCellText = cells[iStart] ?? "";
+          const startNo = parseInt(startCellText, 10) || undefined;
+          // "St" sütununun yanında turuncu "DS" işareti — at kendi tercihiyle dıştan
+          // başlayacak anlamına gelir. Hücrenin ham metninden (ör. "15DS") baştaki
+          // sayı çıkarılıp kalan kısımda "DS" aranır — belirli bir <sup> yapısına
+          // bağımlı olmadığı için TJK küçük bir DOM değişikliği yapsa da kırılmaz.
+          const disaridanStart = /DS/i.test(startCellText.replace(/^\d+/, ""));
 
           const hpRaw = (cells[iHp] ?? "").replace(/[^\d]/g, "");
           const hp = hpRaw !== "" ? parseInt(hpRaw, 10) : undefined;
@@ -366,7 +372,7 @@ export async function fetchCityProgram(
 
           const ekuriGroup = ekuriMap.get(no) ?? undefined;
 
-          runners.push({ no, name, age, startNo, weight, jockey, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup, tjkAtId, equipment });
+          runners.push({ no, name, age, startNo, disaridanStart, weight, jockey, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup, tjkAtId, equipment });
         });
       }
     }

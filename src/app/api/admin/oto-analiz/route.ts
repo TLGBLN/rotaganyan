@@ -120,7 +120,7 @@ async function handlePost(req: NextRequest) {
     .map((r) => {
       const kiloStr = r.weightChange != null ? `${r.weightChange >= 0 ? "+" : ""}${r.weightChange}kg` : "—";
       return [
-        `#${r.no} ${r.ad}`,
+        `#${r.no} ${r.ad}${r.disaridanStart ? "  [⚠ DS — KENDİ TERCİHİYLE DIŞTAN START, olumlu bir etken olabilir, dikkate al]" : ""}`,
         `  Kilo:${r.weight ?? "—"}(${kiloStr}) Jokey:${r.jockey ?? "—"}(%${r.jockeyWinPct ?? "?"}) Antrenör:${r.trainer ?? "—"}(%${r.trainerWinPct ?? "?"})`,
         `  Pedigri: ${r.sire ?? "—"} — ${r.dam ?? "—"} (${r.damSire ?? "—"}) ${r.pedigreeNote ?? ""}`.trim(),
         `  Aygır İtibarı: baba=${r.sireTier ? `${r.sireTier.tier}${r.sireTier.note ? ` (${r.sireTier.note})` : ""}` : "kayıt yok"} · anne babası=${r.damSireTier ? `${r.damSireTier.tier}${r.damSireTier.note ? ` (${r.damSireTier.note})` : ""}` : "kayıt yok"}`,

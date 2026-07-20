@@ -211,6 +211,7 @@ model Runner {
   jockey           String?
   trainer          String?
   startNo          Int?
+  disaridanStart   Boolean @default(false)
   weight           Float?
   weightChange     Float?
   equipment        String?

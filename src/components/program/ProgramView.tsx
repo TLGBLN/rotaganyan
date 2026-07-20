@@ -458,7 +458,12 @@ function RunnerRow({
       </td>
 
       {/* Start */}
-      <td className="px-2 py-1.5 tabular-nums text-center">{r.startNo ?? "—"}</td>
+      <td className="px-2 py-1.5 tabular-nums text-center">
+        {r.startNo ?? "—"}
+        {r.disaridanStart && (
+          <sup className="ml-0.5 font-sans font-bold text-red-500" title="Kendi tercihiyle dıştan start yapacak">DS</sup>
+        )}
+      </td>
 
       {/* Jokey */}
       <td className="px-2 py-1.5 min-w-[110px]">
@@ -745,7 +750,12 @@ function RunnerCard({
           sub={r.weightChange != null && r.weightChange !== 0 ? `${r.weightChange > 0 ? "+" : ""}${r.weightChange}` : undefined}
           subClass={r.weightChange != null && r.weightChange < 0 ? "text-red-500" : "text-green-500"}
         />
-        <StatCell label="Start" value={r.startNo ?? "—"} />
+        <StatCell
+          label="Start"
+          value={r.startNo ?? "—"}
+          sub={r.disaridanStart ? "DS" : undefined}
+          subClass="text-red-500 font-bold"
+        />
         <StatCell label="HP" value={r.hp ?? "—"} />
         <StatCell
           label="Derece"

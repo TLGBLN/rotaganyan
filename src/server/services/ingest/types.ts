@@ -9,6 +9,9 @@ export type IngestRunner = {
   jockey?: string;
   trainer?: string;
   startNo?: number;
+  // TJK program sayfasında "St" (start sayısı) sütununun yanında turuncu "DS" işareti —
+  // at kendi tercihiyle dıştan başlayacak anlamına gelir, olumlu bir etken olabilir.
+  disaridanStart?: boolean;
   weight?: number;
   weightChange?: number;
   equipment?: string;

@@ -101,6 +101,9 @@ export type Faz1Runner = {
   // Ham veri (Runner tablosundan doğrudan)
   weight: number | null;
   weightChange: number | null;
+  // TJK'nın "St" sütununun yanında turuncu "DS" işareti — at kendi tercihiyle dıştan
+  // başlayacak anlamına gelir. Olumlu bir etken olabilir, göz ardı edilmemeli.
+  disaridanStart: boolean;
   jockey: string | null;
   trainer: string | null;
   owner: string | null;
@@ -369,7 +372,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
 
       return {
         id: r.id, no: r.no, ad: r.name, scratched: r.scratched,
-        weight: r.weight, weightChange: r.weightChange,
+        weight: r.weight, weightChange: r.weightChange, disaridanStart: r.disaridanStart,
         jockey: r.jockey, trainer: r.trainer, owner: r.owner,
         sire: r.sire, dam: r.dam, damSire: r.damSire, pedigreeNote: r.pedigreeNote,
         sireTier: r.sire ? sireTierMap.get(r.sire) ?? null : null,
