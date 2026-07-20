@@ -17,6 +17,8 @@ import { db } from "@/lib/db";
 import { fetchTjkAtKosuBilgileri } from "@/server/services/ingest/tjk-at-performans.adapter";
 import { fetchTjkSon800ByHorseName } from "@/server/services/ingest/tjk-son800-stats.adapter";
 import { galopQuality, isSameJockey } from "@/components/program/panels/galop-helpers";
+import { getAtPerformansForRace } from "@/server/actions/at-performans.actions";
+import { getH2HForRace } from "@/server/actions/h2h.actions";
 
 // ── SKK Sınıf Piramidi (Ansiklopedi Bölüm III) — metin tabanlı en iyi eşleştirme ──
 function classToSkk(classType: string | null | undefined): number | null {
@@ -161,6 +163,11 @@ export type Faz1Runner = {
   // Son 800 — Gölge Mod girdileri
   son800BenzerKosuN: number;
   son800Medyan: number | null;
+
+  // Sitenin kendi "Aynı Pist/Mesafe/Hipodrom" ve "H2H" panellerinden (methodolojide
+  // XI. Bölüm — ZAYIF KANIT, tek başına sırayı belirlemez ama göz ardı edilmemeli).
+  aynıPistMesafeOzet: string | null;
+  h2hOzet: string | null;
 };
 
 export type Faz1Sonuc = {
@@ -198,10 +205,28 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   const trainerNames = [...new Set(race.runners.map((r) => r.trainer).filter((t): t is string => !!t))];
 
   const { getJockeyStats, getTrainerStats } = await import("@/server/services/race.service");
-  const [jockeyStats, trainerStats] = await Promise.all([
+  const [jockeyStats, trainerStats, atPerformansRows, h2hEncounters] = await Promise.all([
     getJockeyStats(jockeyNames).catch(() => ({} as Awaited<ReturnType<typeof getJockeyStats>>)),
     getTrainerStats(trainerNames).catch(() => ({} as Awaited<ReturnType<typeof getTrainerStats>>)),
+    getAtPerformansForRace(raceId).catch(() => []),
+    getH2HForRace(raceId).catch(() => []),
   ]);
+  const atPerformansMap = new Map(atPerformansRows.map((r) => [r.horseName, r.records]));
+
+  // Her at için: bu koşudaki DİĞER atlarla geçmişte birlikte koştuğu yarışlardan
+  // (H2H) kısa bir özet. Methodolojide "zayıf kanıt" — tek başına sırayı belirlemez.
+  function h2hOzetFor(horseName: string): string | null {
+    const kayitlar: string[] = [];
+    for (const enc of h2hEncounters) {
+      const kendisi = enc.results.find((r) => r.horseName === horseName);
+      if (!kendisi) continue;
+      const rakipler = enc.results.filter((r) => r.horseName !== horseName);
+      if (rakipler.length === 0) continue;
+      const rakipOzet = rakipler.map((r) => `${r.horseName}(${r.finishPos || "?"}.)`).join(", ");
+      kayitlar.push(`${enc.date} ${enc.hippodrome}: kendisi ${kendisi.finishPos || "?"}. — ${rakipOzet}`);
+    }
+    return kayitlar.length > 0 ? kayitlar.slice(0, 3).join(" | ") : null;
+  }
 
   // Admin'in /admin/pedigri > "Aygır İtibar Tablosu"nda elle girdiği referans veriler —
   // bu koşudaki atların baba/anne babası isimleriyle eşleşenler toplu çekilir.
@@ -334,6 +359,14 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       const hpOncekiResmiYok = !ilkStart && hpOnceki == null;
       const hpOncekiEfektif = ilkStart ? null : hpOnceki ?? 0;
 
+      const aynıPistMesafeKayitlari = atPerformansMap.get(r.name) ?? [];
+      const aynıPistMesafeOzet = aynıPistMesafeKayitlari.length > 0
+        ? aynıPistMesafeKayitlari
+            .slice(0, 3)
+            .map((row) => `${row.date} ${row.finishPos || "?"}. (HP ${row.hp || "?"})`)
+            .join(" | ")
+        : null;
+
       return {
         id: r.id, no: r.no, ad: r.name, scratched: r.scratched,
         weight: r.weight, weightChange: r.weightChange,
@@ -360,6 +393,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         jockeyWinPct, trainerWinPct, sinifJokeyAntrenor,
         takiDegisikligiVar, exactVeyaPedigri,
         son800BenzerKosuN, son800Medyan,
+        aynıPistMesafeOzet, h2hOzet: h2hOzetFor(r.name),
       };
     })
   );
