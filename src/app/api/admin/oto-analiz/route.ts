@@ -164,6 +164,12 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
   const faz2Msg = await client.messages.create({
     model: "claude-sonnet-5",
     max_tokens: 6000,
+    // Sonnet 5'te "thinking" alanı hiç verilmezse model varsayılan olarak sessizce
+    // "adaptive thinking" (görünmeyen iç muhakeme) çalıştırıyor ve bu da max_tokens'ten
+    // pay alıyor — kalabalık sahalarda görünür JSON çıktısına yer kalmayıp yanıt yarıda
+    // kesiliyordu. Bu iş (skorlama matrisini uygulamak) derin serbest muhakeme
+    // gerektirmiyor; kapatmak hem kesilmeyi önlüyor hem de ücreti düşürüyor.
+    thinking: { type: "disabled" },
     output_config: { format: { type: "json_schema", schema: FAZ2_SCHEMA } },
     messages: [{ role: "user", content: faz2Prompt }],
   });
@@ -288,7 +294,8 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
 
   const faz4Msg = await client.messages.create({
     model: "claude-sonnet-5",
-    max_tokens: 6000,
+    max_tokens: 8000,
+    thinking: { type: "disabled" },
     output_config: { format: { type: "json_schema", schema: FAZ4_SCHEMA } },
     messages: [{ role: "user", content: faz4Prompt }],
   });
