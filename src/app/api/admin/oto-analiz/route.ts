@@ -163,13 +163,12 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
 
   const faz2Msg = await client.messages.create({
     model: "claude-sonnet-5",
-    max_tokens: 6000,
-    // Sonnet 5'te "thinking" alanı hiç verilmezse model varsayılan olarak sessizce
-    // "adaptive thinking" (görünmeyen iç muhakeme) çalıştırıyor ve bu da max_tokens'ten
-    // pay alıyor — kalabalık sahalarda görünür JSON çıktısına yer kalmayıp yanıt yarıda
-    // kesiliyordu. Bu iş (skorlama matrisini uygulamak) derin serbest muhakeme
-    // gerektirmiyor; kapatmak hem kesilmeyi önlüyor hem de ücreti düşürüyor.
-    thinking: { type: "disabled" },
+    // Adaptive thinking AÇIK — kullanıcı isteği: mekanik/yüzeysel skorlama yerine
+    // gerçek muhakeme istiyor. Thinking görünmeyen bir bölüm olarak max_tokens'ten
+    // pay aldığı için (Sonnet 5'in kendi belgelenen davranışı) limiti yeterince
+    // yüksek tutuyoruz — aksi halde kalabalık sahalarda yanıt yine yarıda kesilir.
+    thinking: { type: "adaptive" },
+    max_tokens: 12000,
     output_config: { format: { type: "json_schema", schema: FAZ2_SCHEMA } },
     messages: [{ role: "user", content: faz2Prompt }],
   });
@@ -299,8 +298,11 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
 
   const faz4Msg = await client.messages.create({
     model: "claude-sonnet-5",
-    max_tokens: 8000,
-    thinking: { type: "disabled" },
+    // Adaptive thinking AÇIK (bkz. Faz 2'deki not) — Faz 4 hem daha uzun makale
+    // tadında metin üretiyor hem de gerçek yorumlama gerektiriyor, bu yüzden
+    // limiti Faz 2'den de yüksek tutuyoruz.
+    thinking: { type: "adaptive" },
+    max_tokens: 16000,
     output_config: { format: { type: "json_schema", schema: FAZ4_SCHEMA } },
     messages: [{ role: "user", content: faz4Prompt }],
   });
