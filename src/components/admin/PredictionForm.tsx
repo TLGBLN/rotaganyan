@@ -136,13 +136,11 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
         score: p.score,
         isTarget: p.isTarget,
         pedigreeRating: p.pedigreeRating,
-        // p.details ("AGF1", "AF 2/6" gibi kısa iç etiketler) kasıtlı olarak DAHİL EDİLMİYOR —
-        // bunlar Claude'un kendi muhakemesi için, admin önizlemesinde ayrı rozet olarak zaten
-        // gösteriliyor (AIAnalysisPanel). Buraya eklenirse "Analizi Gör" ekranındaki public
-        // Kilit Gerekçe metnine (parsePickDetails, A:/B:/VG: gibi özel önekleri tanımayan her
-        // satırı olduğu gibi yazıya ekliyor) ham jargon olarak sızıyordu. Yalnızca gerçek
-        // makale metni (p.note) public gerekçe olarak kaydedilir.
-        details: p.note ?? "",
+        // Kilit Gerekçe (uzun makale tadında gerekçe metni) maliyet nedeniyle kaldırıldı —
+        // Faz 4 artık bu metni üretmiyor. p.details ("AGF1" gibi kısa iç etiketler) admin
+        // önizlemesinde ayrı rozet olarak zaten gösteriliyor (AIAnalysisPanel), buraya
+        // (public "Kilit Gerekçe" alanına) yazılmıyor.
+        details: "",
       };
     });
     replace(aiPicks);

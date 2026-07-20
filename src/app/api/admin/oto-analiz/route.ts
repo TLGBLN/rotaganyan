@@ -117,9 +117,8 @@ const FAZ4_SCHEMA = {
           },
           isTarget: { type: "boolean" },
           details: { type: "array", items: { type: "string" } },
-          note: { type: "string" },
         },
-        required: ["rank", "no", "name", "score", "pedigreeRating", "isTarget", "details", "note"],
+        required: ["rank", "no", "name", "score", "pedigreeRating", "isTarget", "details"],
         additionalProperties: false,
       },
     },
@@ -334,22 +333,12 @@ ${gecitMetin}
    - Normal: sıralamada onları izleyen 3 at (Ekonomik'te olmayan farklı 3 at).
    - Geniş: sahada kalan TÜM diğer atlar (Ekonomik ve Normal'de olmayanların hepsi — koşulmayan/çekilen atlar hariç).
    Alanları "X-Y-Z" formatında, at numaralarıyla doldur. Saha 6 attan azsa Normal'i mevcut atlarla doldur, Geniş boş kalabilir.
-7. Her pick için "note" alanına, yarışseverin okuyacağı bir YAZI yaz — teknik rapor değil, MAKALE tadında:
-   - Yayına hazır, akıcı bir dille anlat: atın adını (BÜYÜK HARF, örn. GÜLALP KIZI) doğal biçimde cümle içinde geçir.
-   - Kendi kanaatini yansıt: "çok beğeniyorum", "inanıyorum", "ihtimali yüksek" gibi kişisel/yorumlayıcı bir ton kullan — kuru istatistik listesi DEĞİL.
-   - Yarışın nasıl geçebileceğini SENARYOLAŞTIR: rakip atların (varsa) bilinen eğilimlerinden bahset (örn. "son metrelerde durma ihtimali", "temposunu bir anda yükseltip mücadeleye girme" gibi), bu diğer atların FAZ 1 verisinden (form yönü, HP ivmesi, tempo/kaçak durumu, sınıf geçişi vb.) çıkarılmalı — uydurma değil. Eküri (rehavet/pacemaker) senaryosunu YALNIZCA o atın FAZ 1 satırında gerçekten "Eküri:" bilgisi varsa kullan — eküri verisi yoksa bu senaryoyu hiç uydurma.
-   - SOMUT VERİYE DAYAN, boş yorum YASAK: yukarıdaki FAZ 1 tablosundaki galop özetinden (tarih, form harfi, kilometre parçaları), pedigriden (baba/anne/aygır itibarı varsa), Son800 benzer koşu medyanından ve geçmiş form dizisinden en az birini somut şekilde ismen anarak yaz (örn. "18 Temmuz idmanında 400m'de gösterdiği hız dikkat çekici", "SIRAF DANCER kanından gelen bu at çim pistte iyi sonuçlar veren bir soydan geliyor"). "Piyasanın neden ilgi gösterdiğini çözemedik" gibi veriye dayanmayan, sebepsiz belirsizlik cümleleri YASAK — eğer gerçekten veri yoksa (ör. FAZ 1 tablosunda galop/pedigri kaydı yoksa) bunu açıkça ve sade dille söyle ("bu at hakkında idman/pedigri kaydımız yok"), muğlak bırakma.
-   - Özellikle Maiden/Şartlı 1 gibi az yarışlı atların olduğu koşularda (HP/geçmiş performans verisi zayıf/yok) galop ve pedigri verisi ANA dayanak olmalı — bu atlar için FAZ 1'deki galop özeti ve pedigri/aygır itibarı satırlarını mutlaka değerlendirmeye kat.
-   - "A puanı", "B+C", "Atomic Force", "geçit skoru", "SKK", "HP ivmesi" gibi TEKNİK TERİMLER asla geçmesin — bunların ardındaki GERÇEK ANLAMI günlük dille anlat (örn. "HP ivmesi +12" yerine "resmi puanı son formunun gerisinde kalmış, aslında koştuğundan daha güçlü").
-   - En az 3-4 cümle, gerekirse daha uzun — kısa/telegrafik değil, bir spor yazarının yazacağı gibi.
-   - Uygunsa net bir tavsiyeyle bitir: "ekonomik kuponlarda banko olarak öneriyorum", "geniş kupona yazılabilir" gibi.
-   - Örnek ton (uzunluk ve üslup referansı, kelimesi kelimesine kopyalama):
-     "İkinci koşuda mücadele edecek olan GÜLALP KIZI'nın İstanbul çim pist performansını çok beğeniyorum. Son koşusunda da temposunu bir anda yükselterek birincilik mücadelesinin içerisine girmiş ve son anda mağlup kalarak ikinci olmuştu. Bugün YEŞİLKAYA'nın son metrelerde durma ihtimali yüksek olduğu gibi, SEMRAKAYA'nın da ekürisinin varlığından rehavete kapılarak sprintine geçikme ihtimali yüksek. Bu durumdan da en fazla istifade edebilecek isim GÜLALP KIZI olduğu için kazanmaya çok yakın olduğuna inanıyorum ve ekonomik kuponlar için banko olarak öneriyorum."
+7. "details" alanına yalnızca kısa iç etiketler yaz (örn. "AGF1", "Galop K1", "Sınıf düşüşü") — uzun yazı YAZMA, makale/gerekçe metni İSTENMİYOR.
 
 Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
 {
   "picks": [
-    { "rank": 1, "no": 0, "name": "...", "score": 0, "pedigreeRating": "BILINMIYOR", "isTarget": false, "details": [], "note": "Yukarıdaki örnek uzunlukta/üslupta, makale tadında gerekçe yazısı" }
+    { "rank": 1, "no": 0, "name": "...", "score": 0, "pedigreeRating": "BILINMIYOR", "isTarget": false, "details": [] }
   ],
   "confidence": "ORTA",
   "isBanko": false,
@@ -366,9 +355,10 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
   const faz4Msg = await createWithTruncationRetry(
     {
       model: "claude-sonnet-5",
-      // Adaptive thinking AÇIK (bkz. Faz 2'deki not) — Faz 4 hem daha uzun makale
-      // tadında metin üretiyor hem de gerçek yorumlama gerektiriyor, bu yüzden
-      // limiti Faz 2'den de yüksek tutuyoruz.
+      // Adaptive thinking AÇIK (bkz. Faz 2'deki not). Kilit Gerekçe (uzun makale
+      // metni) maliyet nedeniyle kaldırıldığından çıktı artık küçük, ama Faz 4
+      // hâlâ en karmaşık muhakemeyi (geçit çözümü, banko, kupon) yaptığı için
+      // limiti güvenlik payı olarak yüksek bırakıyoruz.
       thinking: { type: "adaptive" },
       max_tokens: 24000,
       output_config: { format: { type: "json_schema", schema: FAZ4_SCHEMA } },
