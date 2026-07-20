@@ -38,6 +38,18 @@ async function createWithTruncationRetry(
   return msg;
 }
 
+/**
+ * Thinking açıkken content[] dizisinin İLK elemanı "thinking" bloğu oluyor, asıl JSON
+ * metni sonraki bir elemanda geliyor — content[0]'ı sabit varsayıp okumak (eski kod)
+ * thinking her tetiklendiğinde boş string döndürüp "yanıtı parse edilemedi" hatasına
+ * yol açıyordu (token sınırından bağımsız, canlı API'ye atılan bir tanı isteğiyle
+ * doğrulandı). Doğrusu, tipine göre "text" bloğunu aramak.
+ */
+function extractText(msg: Anthropic.Message): string {
+  const textBlock = msg.content.find((c): c is Anthropic.TextBlock => c.type === "text");
+  return textBlock ? textBlock.text.trim() : "";
+}
+
 // Claude'un cevabını YALNIZCA prompt talimatıyla JSON'a zorlamak yerine, API'nin kendi
 // şema doğrulamasını (output_config.format) kullanıyoruz — "geçerli JSON döndür" gibi
 // bir talimata güvenmek yerine sunucu tarafında zorunlu kılınıyor. Bu, önceki halde
@@ -205,7 +217,7 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
     },
     raceId, "faz2", 28000
   );
-  const faz2Raw = faz2Msg.content[0].type === "text" ? faz2Msg.content[0].text.trim() : "";
+  const faz2Raw = extractText(faz2Msg);
   let faz2: Faz2Atlar;
   try {
     faz2 = JSON.parse(faz2Raw);
@@ -338,7 +350,7 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
     },
     raceId, "faz4", 32000
   );
-  const faz4Raw = faz4Msg.content[0].type === "text" ? faz4Msg.content[0].text.trim() : "";
+  const faz4Raw = extractText(faz4Msg);
   let result: unknown;
   try {
     result = JSON.parse(faz4Raw);
