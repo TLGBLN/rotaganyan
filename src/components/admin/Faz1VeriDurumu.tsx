@@ -106,7 +106,7 @@ export default function Faz1VeriDurumu({ raceId }: { raceId: string }) {
     }
   }
 
-  const eksigiOlanlar = runners?.filter((r) => r.eksikler.length > 0) ?? [];
+  const eksigiOlanlar = runners?.filter((r) => r.eksikler.length > 0 || r.bilgiler.length > 0) ?? [];
 
   return (
     <div className="rounded-xl border p-4 space-y-3">

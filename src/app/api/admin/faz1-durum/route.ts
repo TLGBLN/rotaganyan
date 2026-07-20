@@ -46,9 +46,14 @@ export async function POST(req: NextRequest) {
       eksikler.push("Aygır İtibarı");
     }
     if (r.galopOzet === "İdman kaydı yok") eksikler.push("Galop");
-    if (r.son800BenzerKosuN === 0) eksikler.push("Son800 (benzer koşu)");
     if (!r.recentForm) eksikler.push("Form dizisi");
     if (r.agfSirasi == null) eksikler.push("AGF (henüz yayınlanmamış)");
+
+    // Son800 admin tarafından elle girilemeyen, tamamen otomatik bir alan — at bu
+    // hipodrom/pist/mesafe kombinasyonunda hiç koşmamışsa 0 çıkması YAPISAL bir durumdur,
+    // "eksik veri" değil (Faz 2/4 zaten bunu ceza sebebi yapmıyor). Kırmızı "eksik" olarak
+    // göstermek admin'e düzeltemeyeceği bir şeyi işaret ediyordu — bilgi notuna taşındı.
+    if (r.son800BenzerKosuN === 0) bilgiler.push("Son800: bu hipodrom/pist/mesafede benzer koşu yok (yapısal, 0 kabul edilir)");
 
     if (r.hpBugunResmiYok) bilgiler.push("Bugünkü HP resmi yok (yapısal — Şartlı1/Maiden'de normal)");
     if (r.ilkStart) bilgiler.push("İlk start (geçmiş yarış yok)");
