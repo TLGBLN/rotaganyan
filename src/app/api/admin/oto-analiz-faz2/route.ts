@@ -116,11 +116,10 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
   const faz2Msg = await createWithTruncationRetry(
     {
       model: "claude-sonnet-5",
-      // GEÇİCİ DENEY (kullanıcı onayıyla): thinking kapatıldı — maliyet vs kalite
-      // karşılaştırması için. Daha önce "açık kalsın" denmişti (özensiz/mekanik olur diye),
-      // şimdi gerçek bir sonuçla karşılaştırmak için tekrar deneniyor. Kalıcı değil —
-      // kullanıcı sonucu görüp karar verecek.
-      thinking: { type: "disabled" },
+      // Adaptive thinking AÇIK — kullanıcı deneyi yaptı (thinking kapalıyken hem puanlar
+      // sıkışık/mekanik çıktı hem somut bir puan-sıra tutarsızlığı görüldü) ve kaliteyi
+      // maliyete tercih ederek açık kalmasına karar verdi (10 koşu/gün ~$4 kabul edildi).
+      thinking: { type: "adaptive" },
       max_tokens: 20000,
       output_config: { format: { type: "json_schema", schema: FAZ2_SCHEMA } },
       messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz2Tail }] }],

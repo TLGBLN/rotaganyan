@@ -131,8 +131,9 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
   const faz4Msg = await createWithTruncationRetry(
     {
       model: "claude-sonnet-5",
-      // GEÇİCİ DENEY (bkz. Faz 2'deki not) — thinking kapatıldı, maliyet/kalite karşılaştırması.
-      thinking: { type: "disabled" },
+      // Adaptive thinking AÇIK (bkz. Faz 2'deki not) — kullanıcı deneyip kaliteyi
+      // maliyete tercih etti.
+      thinking: { type: "adaptive" },
       max_tokens: 24000,
       output_config: { format: { type: "json_schema", schema: FAZ4_SCHEMA } },
       messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz4Tail }] }],
