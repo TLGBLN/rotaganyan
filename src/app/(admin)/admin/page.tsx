@@ -3,6 +3,7 @@ import {
   getAnalystStats,
   getRecentPredictions,
   getPendingPredictions,
+  getArchiveStats,
 } from "@/server/services/admin.service";
 import { getRaceStyleWinStats, raceStyleBreakdownToRows } from "@/lib/stats";
 import PerformanceBreakdown from "@/components/admin/PerformanceBreakdown";
@@ -14,18 +15,20 @@ import RecentFeed from "@/components/admin/RecentFeed";
 import PendingList from "@/components/admin/PendingList";
 import AdminRefresh from "@/components/admin/AdminRefresh";
 import ClaudeBudgetWidget from "@/components/admin/ClaudeBudgetWidget";
+import ArchiveStatsWidget from "@/components/admin/ArchiveStatsWidget";
 import { getClaudeBudget } from "@/server/actions/claude-budget.actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
-  const [stats, analyst, recentPredictions, pendingPredictions, raceStyleStats, claudeBudget] = await Promise.all([
+  const [stats, analyst, recentPredictions, pendingPredictions, raceStyleStats, claudeBudget, archiveStats] = await Promise.all([
     getDashboardStats(),
     getAnalystStats(),
     getRecentPredictions(16),
     getPendingPredictions(),
     getRaceStyleWinStats(),
     getClaudeBudget(),
+    getArchiveStats(),
   ]);
 
   const hasData = analyst.overall.total > 0;
@@ -59,6 +62,9 @@ export default async function AdminDashboard() {
           </span>
         )}
       </div>
+
+      {/* ── Arşiv Kapsamı ──────────────────────────────────────────── */}
+      <ArchiveStatsWidget {...archiveStats} />
 
       {/* ── Yorumsal Özet ──────────────────────────────────────────── */}
       <NarrativeSummary analyst={analyst} pendingResults={stats.pendingResults} />

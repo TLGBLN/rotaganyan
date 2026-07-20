@@ -197,6 +197,22 @@ export async function getDashboardStats() {
   };
 }
 
+/** Dashboard'daki "Arşiv Kapsamı" kutusu için — hepsi gerçek DB sayımı, uydurma/yuvarlanmış değil. */
+export async function getArchiveStats() {
+  const [gecmisYarisKaydi, koşuArsivi, arsivGunu, hipodrom, pedigriArsivi, galopKaydi, enEskiGun] =
+    await Promise.all([
+      db.runner.count({ where: { race: { result: { isNot: null } } } }),
+      db.race.count(),
+      db.raceDay.count(),
+      db.hippodrome.count(),
+      db.runner.count({ where: { OR: [{ sire: { not: null } }, { pedigreeNote: { not: null } }] } }),
+      db.gallop.count(),
+      db.raceDay.findFirst({ orderBy: { date: "asc" }, select: { date: true } }),
+    ]);
+
+  return { gecmisYarisKaydi, koşuArsivi, arsivGunu, hipodrom, pedigriArsivi, galopKaydi, baslangicTarihi: enEskiGun?.date ?? null };
+}
+
 // ─── Performans Analizi ─────────────────────────────────────────────────────────
 
 export type AnalystBreakdown = { label: string; total: number; hits: number; rate: number; group?: string };
