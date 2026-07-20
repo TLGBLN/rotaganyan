@@ -8,11 +8,11 @@ import { logClaudeUsage } from "@/lib/claude-cost";
 import type { Role } from "@prisma/client";
 
 // Bu route art arda İKİ ağır Claude çağrısı yapıyor (Faz 2 + Faz 4), ikisi de adaptive
-// thinking ile uzun sürebilir. 300s (diğer uzun işlemlerle aynı) YETERSİZ ÇIKTI —
-// canlıda Faz 2 tamamlanıp Faz 4'e hiç geçilemeden fonksiyon kesildi (parayı harcadıktan
-// SONRA, admin'e "Unexpected token" gibi anlamsız bir Vercel platform hatası döndü,
-// bizim kendi try/catch'imize hiç uğramadan). Limit yükseltildi.
-export const maxDuration = 800;
+// thinking ile uzun sürebilir. 300s bazen yetersiz kalıyor (Faz 2 tamamlanıp Faz 4'e hiç
+// geçilemeden kesiliyor) AMA 800 denendi ve bu hesabın plan limitini aşıp DEPLOY'UN
+// KENDİSİNİ başarısız kıldı ("Deploying outputs" aşamasında hata) — yani 300, bu hesapta
+// gerçek üst tavan (Fluid Compute açık değil). Daha yüksek bir sayı YAZMA, deploy'u kırar.
+export const maxDuration = 300;
 
 const client = new Anthropic();
 
