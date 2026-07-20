@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2, Sparkles, CheckCircle, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -62,6 +62,23 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState(false);
   const [debug, setDebug] = useState<Debug | null>(null);
+  const [progress, setProgress] = useState(0);
+
+  // Faz 2 + Faz 4 tek bir HTTP isteği içinde çalışıyor (SSE/streaming yok), bu yüzden
+  // sunucudan GERÇEK bir ilerleme yüzdesi alamıyoruz. Bunun yerine, geçen süreye göre
+  // yavaşlayarak %95'e yaklaşan (asla tam 100 olmayan) bir tahmini şerit gösteriyoruz —
+  // yanıt gelince anında %100'e tamamlanıp kayboluyor. Amaç kullanıcıya "hâlâ çalışıyor,
+  // takılmadı" hissi vermek, gerçek ilerlemeyi ölçmek değil.
+  useEffect(() => {
+    if (!loading) { setProgress(0); return; }
+    const start = Date.now();
+    const TIME_CONSTANT_MS = 45_000;
+    const id = setInterval(() => {
+      const elapsed = Date.now() - start;
+      setProgress(95 * (1 - Math.exp(-elapsed / TIME_CONSTANT_MS)));
+    }, 250);
+    return () => clearInterval(id);
+  }, [loading]);
 
   async function handleEvaluate() {
     setLoading(true);
@@ -122,6 +139,15 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
           </Button>
         )}
       </div>
+
+      {loading && (
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-brand/15">
+          <div
+            className="h-full rounded-full bg-brand transition-[width] duration-300 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      )}
 
       {error && (
         <div className="whitespace-pre-wrap rounded-lg border border-miss/30 bg-miss/10 px-3 py-2 text-xs text-miss">
