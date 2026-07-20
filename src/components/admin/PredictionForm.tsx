@@ -119,7 +119,7 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
     },
   });
 
-  const { fields } = useFieldArray({ control, name: "picks" });
+  const { fields, replace } = useFieldArray({ control, name: "picks" });
   const isBanko = watch("isBanko");
 
   // AI sonucu gelince formu doldur
@@ -127,7 +127,7 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
     if (!aiResult || aiResult === prevAiResult.current) return;
     prevAiResult.current = aiResult;
     const runnersMap = new Map((aiRunners ?? []).map((r) => [r.no, r]));
-    const aiPicks: PickFormData[] = aiResult.picks.slice(0, 3).map((p) => {
+    const aiPicks: PickFormData[] = aiResult.picks.map((p) => {
       const runner = runnersMap.get(p.no) ?? runners.find((r) => r.no === p.no);
       return {
         rank: p.rank,
@@ -142,7 +142,7 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
         details: [...p.details, p.note].filter(Boolean).join("; "),
       };
     });
-    setValue("picks", aiPicks);
+    replace(aiPicks);
     setValue("confidence", aiResult.confidence);
     setValue("notes", aiResult.notes);
     setValue("tempo", aiResult.tempo);
@@ -151,7 +151,7 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
     setValue("couponNarrow", aiResult.couponNarrow);
     setValue("couponNormal", aiResult.couponNormal);
     setValue("couponWide", aiResult.couponWide);
-  }, [aiResult, aiRunners, runners, setValue]);
+  }, [aiResult, aiRunners, runners, setValue, replace]);
 
   async function onSubmit(data: FormData) {
     setSubmitting(true);
@@ -201,7 +201,7 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
                     {i + 1}
                   </Badge>
                   <span className="text-xs text-muted-foreground font-medium">
-                    {i === 0 ? "Birinci Seçim" : i === 1 ? "İkinci Seçim" : "Üçüncü Seçim"}
+                    {(["Birinci", "İkinci", "Üçüncü", "Dördüncü", "Beşinci"][i] ?? `${i + 1}.`)} Seçim
                   </span>
                 </div>
 

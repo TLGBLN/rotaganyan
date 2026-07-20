@@ -1,10 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Sparkles, CheckCircle } from "lucide-react";
+import { Loader2, Sparkles, CheckCircle, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { PedigreeRating } from "@prisma/client";
+
+const ALAN_LABEL: Record<string, string> = {
+  hpBugun: "Bugünkü HP",
+  hpOnceki: "Geçmiş HP (HP ivmesi)",
+  tempoVeriN: "Tempo Örneklemi",
+  agfSirasi: "AGF Sırası",
+  formYonu: "Form Yönü",
+};
+
+type Debug = {
+  faz1VeriDoluluk: { alan: string; oran: number }[];
+  gecitDurum: string;
+  gecitUyari: string | null;
+};
 
 export type AIPickResult = {
   rank: number;
@@ -48,12 +62,14 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
   const [runners, setRunners] = useState<Runner[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState(false);
+  const [debug, setDebug] = useState<Debug | null>(null);
 
   async function handleEvaluate() {
     setLoading(true);
     setError(null);
     setResult(null);
     setApplied(false);
+    setDebug(null);
     try {
       const res = await fetch("/api/admin/oto-analiz", {
         method: "POST",
@@ -64,6 +80,7 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
       if (!res.ok || !data.ok) throw new Error(data.error ?? "Hata");
       setResult(data.result);
       setRunners(data.runners ?? []);
+      setDebug(data.debug ?? null);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Beklenmeyen hata");
     } finally {
@@ -110,6 +127,26 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
       {error && (
         <div className="whitespace-pre-wrap rounded-lg border border-miss/30 bg-miss/10 px-3 py-2 text-xs text-miss">
           {error}
+        </div>
+      )}
+
+      {debug && (debug.gecitUyari || debug.faz1VeriDoluluk.some((v) => v.oran < 0.9)) && (
+        <div className="space-y-1.5 rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-3 py-2.5 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-yellow-600 dark:text-yellow-400">
+            <AlertTriangle className="h-3.5 w-3.5" /> Veri Durumu — dikkat
+          </div>
+          {debug.gecitUyari && (
+            <p className="whitespace-pre-wrap text-muted-foreground">{debug.gecitUyari}</p>
+          )}
+          {debug.faz1VeriDoluluk.filter((v) => v.oran < 0.9).length > 0 && (
+            <p className="text-muted-foreground">
+              Eksik/zayıf veri:{" "}
+              {debug.faz1VeriDoluluk
+                .filter((v) => v.oran < 0.9)
+                .map((v) => `${ALAN_LABEL[v.alan] ?? v.alan} (%${Math.round(v.oran * 100)})`)
+                .join(", ")}
+            </p>
+          )}
         </div>
       )}
 
