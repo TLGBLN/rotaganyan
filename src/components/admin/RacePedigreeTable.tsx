@@ -387,7 +387,14 @@ export default function RacePedigreeTable({ runners }: { runners: Runner[] }) {
               return (
                 <tr key={r.id} className="border-b last:border-0 align-top">
                   <td className="px-3 py-2 text-muted-foreground">{r.no}</td>
-                  <td className="px-3 py-2 font-semibold whitespace-nowrap">{r.name}</td>
+                  <td className="px-3 py-2 font-semibold whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5">
+                      {r.name}
+                      {(form.sire.trim() || form.dam.trim() || form.damSire.trim() || form.pedigreeNote.trim()) && (
+                        <Check className="h-3.5 w-3.5 text-hit" aria-label="Pedigri girildi" />
+                      )}
+                    </span>
+                  </td>
                   <td className="px-2 py-2">
                     <input
                       value={form.sire}
