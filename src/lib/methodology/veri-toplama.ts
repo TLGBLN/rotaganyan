@@ -316,7 +316,10 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
               row.year === raceYear &&
               row.city.includes(hippodromeName) &&
               row.surface.startsWith(surfacePrefix) &&
-              Math.abs((parseInt(row.distance, 10) || 0) - race.distance) <= 200
+              // TJK mesafeyi Türkçe binlik ayracıyla "1.800" biçiminde döner — parseInt bunu
+              // noktada durup "1" olarak okuyordu, bu yüzden mesafe farkı hep devasa çıkıp
+              // ±200m toleransı ASLA sağlanamıyordu (her at için sessizce 0 benzer koşu).
+              Math.abs((parseInt(row.distance.replace(/\./g, ""), 10) || 0) - race.distance) <= 200
           );
           const farklar = benzer
             .slice(0, 3)
