@@ -16,7 +16,7 @@
 import { db } from "@/lib/db";
 import { fetchTjkAtKosuBilgileri } from "@/server/services/ingest/tjk-at-performans.adapter";
 import { fetchTjkSon800ByHorseName } from "@/server/services/ingest/tjk-son800-stats.adapter";
-import { galopQuality } from "@/components/program/panels/galop-helpers";
+import { galopQuality, isSameJockey } from "@/components/program/panels/galop-helpers";
 
 // ── SKK Sınıf Piramidi (Ansiklopedi Bölüm III) — metin tabanlı en iyi eşleştirme ──
 function classToSkk(classType: string | null | undefined): number | null {
@@ -318,7 +318,11 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
             const parcalar = ["1200", "1000", "800", "600", "400", "200"]
               .filter((d) => s[d])
               .map((d) => `${d}m:${s[d]}`);
-            return `${new Date(g.date).toISOString().slice(0, 10)} ${g.form ?? ""} ${parcalar.join(" ")}`.trim();
+            // Sitenin galop panelindeki "!" işaretiyle aynı sinyal: idmanı yapan jokey
+            // bugünkü yarışta da binecek jokeyle aynıysa, bu olumlu bir işaret ve
+            // Faz 2/4'e mutlaka yansımalı — göz ardı edilmemesi gerekiyor.
+            const jokeyAyni = isSameJockey(g.jockey, r.jockey) ? " [AYNI JOKEY İLE İDMAN YAPTI]" : "";
+            return `${new Date(g.date).toISOString().slice(0, 10)} ${g.form ?? ""} ${parcalar.join(" ")}${jokeyAyni}`.trim();
           }).join(" | ");
 
       // TJK bazı atlar için (özellikle Şartlı 1 / Maiden ya da HP'si henüz atanmamış atlar)

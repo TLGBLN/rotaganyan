@@ -19,16 +19,33 @@ function normalizeName(s: string): string {
     .trim();
 }
 
-/** "1. At Adı: eksik veri metni" — satır başına bir at. */
+/**
+ * Satır başına bir at, iki yaygın format da kabul edilir:
+ *   "1. At Adı: metin"                      (nokta ile)
+ *   "1 - At Adı (Baba - Anne / Anne Babası): metin"   (tire ile, pedigri parantezli)
+ * At adından sonraki ilk "(" veya ":" işaretine kadar olan kısım isim sayılır; ondan
+ * sonraki her şey (parantez içeriği dahil) not olarak olduğu gibi saklanır — pedigri
+ * satırındaki soy bilgisi kaybolmasın diye.
+ */
 function parseBulkNotes(text: string): { name: string; note: string }[] {
   return text
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const m = line.match(/^\d+\.\s*([^:]+):\s*(.+)$/);
+      const m = line.match(/^\d+\s*[-.]\s*(.+)$/);
       if (!m) return null;
-      return { name: m[1].trim(), note: m[2].trim() };
+      const rest = m[1];
+      const parenIdx = rest.indexOf("(");
+      const colonIdx = rest.indexOf(":");
+      const candidates = [parenIdx, colonIdx].filter((i) => i >= 0);
+      if (candidates.length === 0) return null;
+      const splitIdx = Math.min(...candidates);
+      const name = rest.slice(0, splitIdx).trim();
+      let note = rest.slice(splitIdx).trim();
+      if (note.startsWith(":")) note = note.slice(1).trim();
+      if (!name || !note) return null;
+      return { name, note };
     })
     .filter((e): e is { name: string; note: string } => e != null && e.name.length > 0);
 }
@@ -142,14 +159,17 @@ export default function Faz1VeriDurumu({ raceId }: { raceId: string }) {
             {open && (
               <div className="mt-2 space-y-2">
                 <p className="text-[11px] text-muted-foreground">
-                  Yukarıda eksik görünen (ya da başka herhangi bir) at için satır satır yaz — format:{" "}
-                  <code className="rounded bg-muted px-1">1. At Adı: eksik bilgi (pedigri, galop, ne varsa)</code>.
-                  Kaydettiğinde Faz 1&apos;e eklenir, &quot;Otomatik Analiz Oluştur&quot;a bastığında Faz 2 bu bilgiyle birlikte çalışır.
+                  Yukarıda eksik görünen (ya da başka herhangi bir) at için satır satır yaz — hem{" "}
+                  <code className="rounded bg-muted px-1">1. At Adı: eksik bilgi</code> hem{" "}
+                  <code className="rounded bg-muted px-1">1 - At Adı (Baba - Anne / Anne Babası): pedigri yorumu</code>{" "}
+                  formatı kabul edilir, parantez içeriği de olduğu gibi saklanır. Kaydettiğinde Faz 1&apos;e eklenir,
+                  &quot;Otomatik Analiz Oluştur&quot;a bastığında Faz 2 bu bilgiyle birlikte çalışır — Faz 1&apos;i tekrar
+                  çalıştırıp veri girdikten SONRA analiz oluşturursan tek ödeme yeterli olur.
                 </p>
                 <textarea
                   value={bulkText}
                   onChange={(e) => setBulkText(e.target.value)}
-                  placeholder={"1. AT ADI: babası X aygırı, çim pistte iyi sonuç veren bir soy\n2. DİĞER AT: son idmanında hafif topallama gözlendi"}
+                  placeholder={"1. AT ADI: babası X aygırı, çim pistte iyi sonuç veren bir soy\n2 - DİĞER AT (Baba - Anne / Anne Babası): pedigri yorumu da olduğu gibi kabul edilir"}
                   rows={4}
                   className="w-full rounded-md border bg-transparent px-2 py-1.5 text-xs font-mono"
                 />

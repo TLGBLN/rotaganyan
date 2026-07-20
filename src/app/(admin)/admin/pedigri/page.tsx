@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import SireTierForm from "@/components/admin/SireTierForm";
 import SireTierDeleteButton from "@/components/admin/SireTierDeleteButton";
@@ -68,16 +69,23 @@ export default async function PedigriPage({ searchParams }: PageProps) {
 
         <div className="mt-4 space-y-4">
           {raceDays.map((rd) => (
-            <section key={rd.id} className="rounded-lg border">
-              <div className="border-b bg-muted/30 px-4 py-2">
+            <details key={rd.id} className="group rounded-lg border">
+              <summary className="flex cursor-pointer list-none items-center justify-between border-b bg-muted/30 px-4 py-2 [&::-webkit-details-marker]:hidden">
                 <h2 className="text-sm font-semibold">{rd.hippodrome.name}</h2>
-              </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
+              </summary>
               <div className="divide-y">
                 {rd.races.map((race) => (
-                  <RacePedigreeTable key={race.id} raceNo={race.raceNo} runners={race.runners} />
+                  <details key={race.id} className="group/race">
+                    <summary className="flex cursor-pointer list-none items-center justify-between bg-muted/10 px-4 py-1.5 text-xs font-medium [&::-webkit-details-marker]:hidden">
+                      <span>{race.raceNo}. Koşu <span className="font-normal text-muted-foreground">({race.runners.length} at)</span></span>
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-open/race:rotate-90" />
+                    </summary>
+                    <RacePedigreeTable runners={race.runners} />
+                  </details>
                 ))}
               </div>
-            </section>
+            </details>
           ))}
         </div>
       </div>
@@ -93,9 +101,9 @@ export default async function PedigriPage({ searchParams }: PageProps) {
 
       <SireTierForm />
 
-      <div className="overflow-x-auto rounded-lg border">
+      <div className="max-h-[500px] overflow-y-auto overflow-x-auto rounded-lg border">
         <table className="w-full text-xs">
-          <thead>
+          <thead className="sticky top-0 bg-background">
             <tr className="border-b bg-muted/30">
               <th className="px-3 py-2 text-left font-medium text-muted-foreground">Aygır</th>
               <th className="px-3 py-2 text-left font-medium text-muted-foreground">Tier</th>

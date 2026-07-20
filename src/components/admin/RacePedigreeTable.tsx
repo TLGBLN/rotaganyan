@@ -20,9 +20,10 @@ type ParsedEntry = { name: string; sire: string; dam: string; damSire: string; n
 type ParsedNote = { name: string; note: string };
 
 /**
- * "1. AT ADI: serbest metin" biçiminde, herhangi bir eksik veriyi (sakatlık haberi,
- * antrenman gözlemi, pist/hava notu, TJK'da olmayan her şey) at başına ayrıştırır.
- * Pedigri formatından farklı olarak tek satır — herhangi bir veri türü için kullanılabilir.
+ * Herhangi bir eksik veriyi (sakatlık haberi, antrenman gözlemi, pist/hava notu,
+ * pedigri yorumu, TJK'da olmayan her şey) at başına ayrıştırır. İki format da kabul
+ * edilir: "1. AT ADI: metin" ve "1 - AT ADI (Baba - Anne / Anne Babası): metin" —
+ * ikincide parantez içeriği de not olarak olduğu gibi saklanır.
  */
 function parseBulkNotes(text: string): ParsedNote[] {
   return text
@@ -30,9 +31,19 @@ function parseBulkNotes(text: string): ParsedNote[] {
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const m = line.match(/^\d+\.\s*([^:]+):\s*(.+)$/);
+      const m = line.match(/^\d+\s*[-.]\s*(.+)$/);
       if (!m) return null;
-      return { name: m[1].trim(), note: m[2].trim() };
+      const rest = m[1];
+      const parenIdx = rest.indexOf("(");
+      const colonIdx = rest.indexOf(":");
+      const candidates = [parenIdx, colonIdx].filter((i) => i >= 0);
+      if (candidates.length === 0) return null;
+      const splitIdx = Math.min(...candidates);
+      const name = rest.slice(0, splitIdx).trim();
+      let note = rest.slice(splitIdx).trim();
+      if (note.startsWith(":")) note = note.slice(1).trim();
+      if (!name || !note) return null;
+      return { name, note };
     })
     .filter((e): e is ParsedNote => e != null && e.name.length > 0);
 }
@@ -52,19 +63,42 @@ function normalizeName(s: string): string {
 }
 
 /**
- * "1. AT ADI / Babası (Sire): açıklama... / Anne Hattı (Dam / DamSire): açıklama..."
- * biçimindeki toplu pedigri metnini at başına ayrıştırır.
+ * İki format da kabul edilir, satır/blok bazında otomatik seçilir:
+ *  (A) "1. AT ADI / Babası (Sire): açıklama... / Anne Hattı (Dam / DamSire): açıklama..."
+ *  (B) Kompakt tek satır: "11 - AT ADI (Baba - Anne / Anne Babası): açıklama" — kullanıcının
+ *      doğal yazım şekli, "(" içindeki "Baba - Anne / Anne Babası" otomatik ayrıştırılır.
  */
 function parseBulkPedigree(text: string): ParsedEntry[] {
-  const blocks = text.split(/\n(?=\s*\d+\.\s)/).map((b) => b.trim()).filter(Boolean);
+  const blocks = text.split(/\n(?=\s*\d+\s*[-.]\s)/).map((b) => b.trim()).filter(Boolean);
   const entries: ParsedEntry[] = [];
 
   for (const block of blocks) {
-    const headerMatch = block.match(/^\d+\.\s*(.+)/);
-    if (!headerMatch) continue;
+    const numMatch = block.match(/^\d+\s*[-.]\s*/);
+    if (!numMatch) continue;
+    const afterNum = block.slice(numMatch[0].length); // numara önekinden sonraki HER ŞEY (çok satırlı dahil)
+
+    // (B) Kompakt format: isim satır atlamadan "(" ile başlıyor ve hemen ardından ":" geliyorsa.
+    const compactMatch = afterNum.match(/^([^(:\n]+?)\s*\(([^)]+)\)\s*:\s*([\s\S]*)$/);
+    if (compactMatch) {
+      const name = compactMatch[1].trim();
+      const parenContent = compactMatch[2].trim();
+      const note = compactMatch[3].trim();
+      const slashParts = parenContent.split("/").map((s) => s.trim());
+      const sirePart = slashParts[0] ?? "";
+      const damSire = slashParts[1] ?? "";
+      const dashIdx = sirePart.indexOf("-");
+      const sire = dashIdx >= 0 ? sirePart.slice(0, dashIdx).trim() : sirePart.trim();
+      const dam = dashIdx >= 0 ? sirePart.slice(dashIdx + 1).trim() : "";
+      if (name) entries.push({ name, sire, dam, damSire, note });
+      continue;
+    }
+
+    // (A) Yapılandırılmış çok satırlı format — ilk satır at adı, kalanı Babası/Anne Hattı bölümleri.
+    const firstLineEnd = afterNum.indexOf("\n");
+    const firstLine = firstLineEnd >= 0 ? afterNum.slice(0, firstLineEnd) : afterNum;
     // "1. BERATIM (8y)" gibi isme eklenmiş yaş bilgisini ("(8y)", "(4 y)"...) at ismine dahil etmeden ayıkla.
-    const name = headerMatch[1].replace(/\s*\(\s*\d+\s*y\s*\)\s*$/i, "").trim();
-    const rest = block.slice(headerMatch[0].length);
+    const name = firstLine.replace(/\s*\(\s*\d+\s*y\s*\)\s*$/i, "").trim();
+    const rest = firstLineEnd >= 0 ? afterNum.slice(firstLineEnd + 1) : "";
 
     const sireMatch = rest.match(/Babas[ıİi]\s*\(([^)]+)\)\s*:\s*([\s\S]*?)(?=\s*Anne\s*Hatt[ıİi]\s*\(|$)/i);
     const damMatch = rest.match(/Anne\s*Hatt[ıİi]\s*\(([^)]+)\)\s*:\s*([\s\S]*)$/i);
@@ -88,7 +122,7 @@ function parseBulkPedigree(text: string): ParsedEntry[] {
   return entries;
 }
 
-export default function RacePedigreeTable({ raceNo, runners }: { raceNo: number; runners: Runner[] }) {
+export default function RacePedigreeTable({ runners }: { runners: Runner[] }) {
   const [forms, setForms] = useState<Record<string, FormState>>(() =>
     Object.fromEntries(
       runners.map((r) => [
@@ -191,8 +225,7 @@ export default function RacePedigreeTable({ raceNo, runners }: { raceNo: number;
 
   return (
     <div className="overflow-x-auto">
-      <div className="flex items-center justify-between px-3 py-1.5 border-b bg-muted/10">
-        <span className="text-[11px] font-medium text-muted-foreground">{raceNo}. Koşu</span>
+      <div className="flex items-center justify-end px-3 py-1.5 border-b bg-muted/10">
         <button
           onClick={() => setBulkOpen((v) => !v)}
           className="flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline"
