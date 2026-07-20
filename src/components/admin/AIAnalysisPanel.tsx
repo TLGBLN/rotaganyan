@@ -14,6 +14,11 @@ const ALAN_LABEL: Record<string, string> = {
   formYonu: "Form Yönü",
 };
 
+const FAZ_LABEL: Record<"faz2" | "faz4", string> = {
+  faz2: "Faz 1 + Faz 2 çalışıyor — veri toplama + skorlama…",
+  faz4: "Faz 3 + Faz 4 çalışıyor — geçit motoru + sıralama/kupon…",
+};
+
 type Debug = {
   faz1VeriDoluluk: { alan: string; oran: number }[];
   gecitDurum: string;
@@ -55,22 +60,46 @@ const PEDIGREE_LABEL: Record<PedigreeRating, string> = {
   DUSUK: "Düşük", ZAYIF: "Zayıf", SORU: "Soru", BILINMIYOR: "?",
 };
 
+/** Sunucudan gelen yanıtı önce metin olarak okuyup öyle parse eder — sunucu JSON
+ *  döndürmediyse (ör. Vercel'in platform zaman aşımı sayfası) ham "Unexpected token"
+ *  parse hatası yerine anlaşılır bir mesaj fırlatır. */
+async function fetchJson<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const raw = await res.text();
+  let data: T & { ok?: boolean; error?: string };
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      "Sunucudan geçerli bir yanıt gelmedi — muhtemelen istek çok uzun sürdü ve zaman aşımına uğradı. Az önce ödenen çağrı(lar) boşa gitmiş olabilir, lütfen tekrar deneyin."
+    );
+  }
+  if (!res.ok || !data.ok) throw new Error(data.error ?? "Hata");
+  return data;
+}
+
 export default function AIAnalysisPanel({ raceId, onApply }: Props) {
-  const [loading, setLoading] = useState(false);
+  const [phase, setPhase] = useState<"faz2" | "faz4" | null>(null);
   const [result, setResult] = useState<AIAnalysisResult | null>(null);
   const [runners, setRunners] = useState<Runner[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState(false);
   const [debug, setDebug] = useState<Debug | null>(null);
   const [progress, setProgress] = useState(0);
+  const loading = phase !== null;
 
-  // Faz 2 + Faz 4 tek bir HTTP isteği içinde çalışıyor (SSE/streaming yok), bu yüzden
-  // sunucudan GERÇEK bir ilerleme yüzdesi alamıyoruz. Bunun yerine, geçen süreye göre
-  // yavaşlayarak %95'e yaklaşan (asla tam 100 olmayan) bir tahmini şerit gösteriyoruz —
-  // yanıt gelince anında %100'e tamamlanıp kayboluyor. Amaç kullanıcıya "hâlâ çalışıyor,
-  // takılmadı" hissi vermek, gerçek ilerlemeyi ölçmek değil.
+  // Faz 2 ve Faz 4 artık ayrı isteklerde çalışıyor (bkz. /api/admin/oto-analiz-faz2 ve
+  // -faz4 route'larındaki not: eskiden tek istekte çalışıyorlardı, toplamları bazı
+  // koşularda 300s'lik Vercel sınırını aşıp fonksiyonu ortadan kesiyordu). Her fazın
+  // kendi Claude çağrısı hâlâ ne kadar süreceği önceden bilinmediği için (SSE yok)
+  // gerçek yüzde veremiyoruz, ama HANGİ fazda olduğumuzu artık gerçekten biliyoruz —
+  // faz değişince şerit sıfırlanıp o fazın kendi süresi için yeniden %95'e yaklaşır.
   useEffect(() => {
-    if (!loading) { setProgress(0); return; }
+    if (!phase) { setProgress(0); return; }
     const start = Date.now();
     const TIME_CONSTANT_MS = 45_000;
     const id = setInterval(() => {
@@ -78,40 +107,33 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
       setProgress(95 * (1 - Math.exp(-elapsed / TIME_CONSTANT_MS)));
     }, 250);
     return () => clearInterval(id);
-  }, [loading]);
+  }, [phase]);
 
   async function handleEvaluate() {
-    setLoading(true);
     setError(null);
     setResult(null);
     setApplied(false);
     setDebug(null);
     try {
-      const res = await fetch("/api/admin/oto-analiz", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ raceId }),
-      });
-      const raw = await res.text();
-      let data: { ok?: boolean; error?: string; result?: AIAnalysisResult; runners?: Runner[]; debug?: Debug };
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        // Sunucu JSON döndürmediyse (ör. Vercel'in kendi zaman aşımı/platform hata sayfası,
-        // uygulamamızın kendi try/catch'ine hiç uğramadan) — ham "Unexpected token" parse
-        // hatasını göstermek yerine anlaşılır bir mesaj ver.
-        throw new Error(
-          "Sunucudan geçerli bir yanıt gelmedi — muhtemelen istek çok uzun sürdü ve zaman aşımına uğradı. Az önce ödenen çağrı(lar) boşa gitmiş olabilir, lütfen tekrar deneyin."
-        );
-      }
-      if (!res.ok || !data.ok || !data.result) throw new Error(data.error ?? "Hata");
-      setResult(data.result);
-      setRunners(data.runners ?? []);
-      setDebug(data.debug ?? null);
+      setPhase("faz2");
+      const step1 = await fetchJson<{ faz1: unknown; faz2: unknown; sharedContext: string }>(
+        "/api/admin/oto-analiz-faz2",
+        { raceId }
+      );
+
+      setPhase("faz4");
+      const step2 = await fetchJson<{ result: AIAnalysisResult; runners: Runner[]; debug: Debug }>(
+        "/api/admin/oto-analiz-faz4",
+        { raceId, faz1: step1.faz1, faz2: step1.faz2, sharedContext: step1.sharedContext }
+      );
+
+      setResult(step2.result);
+      setRunners(step2.runners ?? []);
+      setDebug(step2.debug ?? null);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Beklenmeyen hata");
     } finally {
-      setLoading(false);
+      setPhase(null);
     }
   }
 
@@ -126,7 +148,7 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-brand" />
         <h3 className="text-sm font-semibold">Otomatik Analiz</h3>
-        <span className="ml-auto text-[10px] text-muted-foreground">Metodoloji (v4.1) + geçit motoru + sitenin kendi verisiyle tamamen otomatik çalışır</span>
+        <span className="ml-auto text-[10px] text-muted-foreground">Metodoloji (v4.2) + geçit motoru + sitenin kendi verisiyle tamamen otomatik çalışır</span>
       </div>
 
       <div className="flex gap-2">
@@ -151,12 +173,15 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
         )}
       </div>
 
-      {loading && (
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-brand/15">
-          <div
-            className="h-full rounded-full bg-brand transition-[width] duration-300 ease-out"
-            style={{ width: `${progress}%` }}
-          />
+      {phase && (
+        <div className="space-y-1">
+          <p className="text-[11px] font-medium text-muted-foreground">{FAZ_LABEL[phase]}</p>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-brand/15">
+            <div
+              className="h-full rounded-full bg-brand transition-[width] duration-300 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
       )}
 
