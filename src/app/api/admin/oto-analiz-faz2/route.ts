@@ -76,6 +76,7 @@ async function handlePost(req: NextRequest) {
         `  Son800 benzer koşu n=${r.son800BenzerKosuN} medyan fark=${r.son800Medyan ?? "—"}`,
         `  Aynı Pist/Mesafe/Hipodrom geçmişi: ${r.aynıPistMesafeOzet ?? "kayıt yok"}`,
         ...(r.h2hOzet ? [`  H2H (zayıf kanıt, sahadaki diğer atlarla geçmiş karşılaşma): ${r.h2hOzet}`] : []),
+        `  Ön-hesaplanmış (kod, YENİDEN HESAPLAMA): HP Kalitesi ${r.hpKalitesiYildizi != null ? `⭐${r.hpKalitesiYildizi}/5` : "tabloda tanımsız (serbest değerlendir)"} · Sınıf Geçiş ${r.sinifGecisBonusuPuan != null ? (r.sinifGecisBonusuPuan >= 0 ? `+${r.sinifGecisBonusuPuan}` : `${r.sinifGecisBonusuPuan}`) : "?"} · Galop zinciri ${r.galopSiniflandirma.ozet} · Tempo Güven: ${r.tempoGuven ?? "?"}`,
       ].join("\n");
     })
     .join("\n\n");
@@ -84,6 +85,8 @@ async function handlePost(req: NextRequest) {
   // taşınacak, cache_control eşleşmesi bu byte-birebir eşitliğe bağlı) ──
   const sharedContext = `## KOŞU
 ${faz1.race.hippodromeName} — ${faz1.race.raceNo}. Koşu | ${faz1.race.classType} | ${faz1.race.breed} | ${faz1.race.distance}m ${faz1.race.surface} | ${faz1.runners.length} at
+Zemin: ${faz1.race.zeminEtiketi}${faz1.race.zeminDetayi ? ` (${faz1.race.zeminDetayi})` : ""} — kilo katsayısı ×${faz1.race.zeminKatsayisi} (Göreli kilo/zemin puanına dahil et)
+Saha kaçak haritası: ${faz1.race.sahadakiKacakSayisi} kaçak → tempo "${faz1.race.kacakTempoEtiketi}" — avantajlı: ${faz1.race.kacakAvantajliStil}
 
 ## ATLAR (FAZ 1 — otomatik toplanmış ham veri, sitenin kendi TJK kaynağından)
 ${faz1Tablo}
@@ -102,9 +105,10 @@ ${methodologyText}`;
 
 ## GÖREVİN
 1. Koşu tipini belirle (Ansiklopedi Bölüm IV) ve o tipin A/B+C ağırlık matrisini uygula.
-2. Her at için A (0-60) ve B+C (0-40, Son800 bonusu HARİÇ — o ayrıca koddan eklenecek) puanı ver.
-3. Toplam puana göre ön teknik sıra belirle (1 = en iyi). Bu sıra FAZ 3'te geçit motoruna girdi olacak.
-4. "Kanıt yokluğu olumsuz kanıt değildir" ilkesine uy — eksik veriyi ceza sebebi yapma.
+2. Her atın satırındaki "Ön-hesaplanmış (kod, YENİDEN HESAPLAMA)" değerleri (HP Kalitesi yıldızı, Sınıf Geçiş puanı, Galop zinciri sınıflandırması, Tempo Güven seviyesi) ve KOŞU başlığındaki Zemin/Kaçak haritası zaten doğru hesaplandı — bunları TEKRAR HESAPLAMA, olduğu gibi kabul edip ilgili A/B+C bileşenine göm. Senin işin bu mekanik parçaları + pedigri notu/admin notu gibi serbest metin kanıtlarını, koşu tipinin ağırlık matrisine göre TOPLAM A(0-60)/B+C(0-40) puanına SENTEZLEMEK.
+3. Her at için A (0-60) ve B+C (0-40, Son800 bonusu HARİÇ — o ayrıca koddan eklenecek) puanı ver.
+4. Toplam puana göre ön teknik sıra belirle (1 = en iyi). Bu sıra FAZ 3'te geçit motoruna girdi olacak.
+5. "Kanıt yokluğu olumsuz kanıt değildir" ilkesine uy — eksik veriyi ceza sebebi yapma. "Tabloda tanımsız" olarak işaretlenmiş Ön-hesaplanmış alanlar (örn. HP Kalitesi) da bu ilkeye tabidir — boş/tanımsız olması ceza değildir, serbestçe değerlendir.
 
 Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
 {

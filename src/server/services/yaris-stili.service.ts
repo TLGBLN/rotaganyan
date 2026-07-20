@@ -29,13 +29,18 @@ type Stil = "KACAK" | "ON_GRUP" | "BEKLEME" | "EN_GERI";
 
 export type YarisStiliSonuc = { style: Stil; percent: number; veri: number };
 
+// TJK zaman formatı "dk.sn.yüzdeSn" (örn. "0.25.40" = 0dk 25.40sn) — 3. segment
+// yüzde saniye (centisecond), decisecond DEĞİL; bkz. veri-toplama.ts parseSaniye
+// yorumu (481 gerçek galop kaydıyla doğrulandı — eski d/10 yorumu son800 farkına
+// atlar arası bağımsız, telafi olmayan ±birkaç saniyelik gürültü karıştırıyordu,
+// bu da doğrudan bu dosyanın ürettiği kaçak/tempo sınıflandırmasını etkiliyordu).
 function parseSaniye(t: string | null | undefined): number | null {
   if (!t) return null;
   const parts = t.split(".");
   if (parts.length === 2) return parseFloat(t) || null;
   if (parts.length === 3) {
     const [m, s, d] = parts;
-    return (parseInt(m, 10) || 0) * 60 + (parseInt(s, 10) || 0) + (parseInt(d, 10) || 0) / 10;
+    return (parseInt(m, 10) || 0) * 60 + parseFloat(`${s}.${d}`);
   }
   return null;
 }

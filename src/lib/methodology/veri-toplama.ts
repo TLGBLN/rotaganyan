@@ -20,6 +20,10 @@ import { galopQuality, isSameJockey } from "@/components/program/panels/galop-he
 import { getAtPerformansForRace } from "@/server/actions/at-performans.actions";
 import { getH2HForRace } from "@/server/actions/h2h.actions";
 import { fetchApprenticeRemainingRaces, normalizeJockeyName } from "@/server/services/ingest/tjk-apprentice.adapter";
+import {
+  hpKalitesiYildizi, sinifGecisBonusu, galopSiniflandirmasi, tempoGuvenSeviyesi,
+  kacakHaritasi, zeminKatsayisi, zeminDetayiBul, type GalopZinciriSonuc, type TempoGuven,
+} from "@/lib/methodology/mekanik-puanlama";
 
 // ── SKK Sınıf Piramidi (Ansiklopedi Bölüm III) — metin tabanlı en iyi eşleştirme ──
 function classToSkk(classType: string | null | undefined): number | null {
@@ -76,13 +80,22 @@ function sonSonucZayifMi(recentForm: string | null): boolean {
   return parseInt(last, 10) >= 5;
 }
 
+// TJK zaman formatı "dk.sn.yüzdeSn" — örn. "0.25.40" = 0dk 25.40sn. Üçüncü segment
+// HER ZAMAN 2 haneli (yüzde saniye/centisecond), decisecond (tek hane / 10) DEĞİL —
+// 481 gerçek galop kaydı üzerinde doğrulandı: eski (d/10) yorum 400m split'lerini
+// 23-38sn (medyan 30sn) gibi gerçekçi olmayan bir aralığa yayıyordu; doğru (d
+// ondalık string birleştirme) yorum 23-31.6sn (medyan 26.2sn) veriyor — bu da
+// Ansiklopedi §VI barem tablosunun kendi belirttiği aralıkla (Normal 26-28sn)
+// birebir örtüşüyor. String birleştirme hem 1 hem 2 haneli ondalık kısımda doğru
+// sonuç verir (pozisyonel ondalık gösterim), sabit /10 böleni ise yalnız 1 haneli
+// durumda doğruydu.
 function parseSaniye(t: string | null | undefined): number | null {
   if (!t) return null;
   const parts = t.split(".");
   if (parts.length === 2) return parseFloat(t) || null;
   if (parts.length === 3) {
     const [m, s, d] = parts;
-    return (parseInt(m, 10) || 0) * 60 + (parseInt(s, 10) || 0) + (parseInt(d, 10) || 0) / 10;
+    return (parseInt(m, 10) || 0) * 60 + parseFloat(`${s}.${d}`);
   }
   return null;
 }
@@ -179,6 +192,14 @@ export type Faz1Runner = {
   // XI. Bölüm — ZAYIF KANIT, tek başına sırayı belirlemez ama göz ardı edilmemeli).
   aynıPistMesafeOzet: string | null;
   h2hOzet: string | null;
+
+  // ── Mekanik ön-hesaplama (mekanik-puanlama.ts) — Ansiklopedi §III/§V/§VI/§VIII'in
+  // tamamen tablo/aritmetik-tabanlı kısımları, Claude'a HAZIR sonuç olarak verilir,
+  // Faz 2'nin bunları yeniden hesaplaması istenmez.
+  hpKalitesiYildizi: 2 | 3 | 4 | 5 | null;
+  sinifGecisBonusuPuan: number | null;
+  galopSiniflandirma: GalopZinciriSonuc;
+  tempoGuven: TempoGuven | null;
 };
 
 export type Faz1Sonuc = {
@@ -191,6 +212,13 @@ export type Faz1Sonuc = {
     breed: string;
     surface: string;
     distance: number;
+    // ── Mekanik ön-hesaplama (race seviyesi) ──
+    zeminDetayi: string | null;
+    zeminKatsayisi: number;
+    zeminEtiketi: string;
+    sahadakiKacakSayisi: number;
+    kacakTempoEtiketi: string;
+    kacakAvantajliStil: string;
   };
   runners: Faz1Runner[];
   veriDoluluk: { alan: string; oran: number }[];
@@ -269,6 +297,14 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   // olmalı — eski yıllara ait veriler "eskide kalır", benzer koşu sayılmaz. Sabit bir
   // yıl yazılırsa (örn. "2026") her yılbaşında sessizce kırılır, bu yüzden dinamik.
   const raceYear = race.raceDay.date.getUTCFullYear().toString();
+
+  // Zemin durumu — bu veri (RaceDay.surfaceConditions) ingest'te zaten toplanıyordu
+  // ama Faz 1'e hiç aktarılmıyordu, yalnız public program sayfasında gösteriliyordu.
+  // §VII "Zemin Katsayıları" bugünkü pistin durumuna göre göreli kilo etkisini ±%15/±%30
+  // artırır — matristeki "Göreli kilo/zemin" bileşeninin ikinci yarısı budur.
+  const surfaceConditions = (race.raceDay.surfaceConditions as { label: string; detail: string }[] | null) ?? null;
+  const zeminDetayi = zeminDetayiBul(surfaceConditions, race.surface);
+  const zemin = zeminKatsayisi(zeminDetayi);
 
   const runners: Faz1Runner[] = await Promise.all(
     race.runners.map(async (r): Promise<Faz1Runner> => {
@@ -389,6 +425,22 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         ? apprenticeRemainingMap[normalizeJockeyName(r.jockey)] ?? null
         : null;
 
+      // ── Mekanik ön-hesaplama ──
+      const hpIvmesiHesap = !ilkStart ? hpBugunEfektif - (hpOncekiEfektif ?? 0) : null;
+      const hpAlanIciUstHesap = hpUstSet.has(r.id);
+      const yonHesap = { geriliyor: yon?.geriliyor ?? null, iyilesiyor: yon?.iyilesiyor ?? null };
+      const hpKalitesi = hpKalitesiYildizi({
+        hpIvmesi: hpIvmesiHesap, hpAlanIciUst: hpAlanIciUstHesap,
+        bitirisIyilesiyor: yonHesap.iyilesiyor, bitirisGeriliyor: yonHesap.geriliyor,
+      });
+      const sinifBonusu = sinifGecisBonusu(sinifSkkOnceki, bugunSkk);
+      const galopSinif = galopSiniflandirmasi(
+        r.gallops.map((g) => ({ splits: g.splits as Record<string, string | null> | null })),
+        race.breed
+      );
+      const tempoVeriNHesap = (r.raceStyle as { veri?: number } | null)?.veri ?? null;
+      const tempoGuvenHesap = tempoGuvenSeviyesi(tempoVeriNHesap);
+
       return {
         id: r.id, no: r.no, ad: r.name, scratched: r.scratched,
         weight: r.weight, weightChange: r.weightChange, disaridanStart: r.disaridanStart,
@@ -403,23 +455,32 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         recentForm: r.recentForm, bestTime: r.bestTime,
         apprentice: r.apprentice, apprenticeRemaining,
         raceStyleEtiket: (r.raceStyle as { style?: string } | null)?.style ?? null,
-        tempoVeriN: (r.raceStyle as { veri?: number } | null)?.veri ?? null,
+        tempoVeriN: tempoVeriNHesap,
         kacak: (r.raceStyle as { style?: string } | null)?.style === "KACAK",
         galopOzet,
         ilkStart, hpOnceki: hpOncekiEfektif,
-        hpIvmesi: !ilkStart ? hpBugunEfektif - (hpOncekiEfektif ?? 0) : null,
+        hpIvmesi: hpIvmesiHesap,
         sinifOnceki, sinifSkkOnceki, sinifSkkBugun: bugunSkk, sinifDususu,
-        bitirisGeriliyor: yon?.geriliyor ?? null, bitirisIyilesiyor: yon?.iyilesiyor ?? null,
+        bitirisGeriliyor: yonHesap.geriliyor, bitirisIyilesiyor: yonHesap.iyilesiyor,
         sonSonucZayif: sonSonucZayifMi(r.recentForm),
         kondisyonZinciriVar, keskinGalopZinciri,
-        kiloAvantaji, hpAlanIciUst: hpUstSet.has(r.id),
+        kiloAvantaji, hpAlanIciUst: hpAlanIciUstHesap,
         jockeyWinPct, trainerWinPct, sinifJokeyAntrenor,
         takiDegisikligiVar, exactVeyaPedigri,
         son800BenzerKosuN, son800Medyan,
         aynıPistMesafeOzet, h2hOzet: h2hOzetFor(r.name),
+        hpKalitesiYildizi: hpKalitesi, sinifGecisBonusuPuan: sinifBonusu,
+        galopSiniflandirma: galopSinif, tempoGuven: tempoGuvenHesap,
       };
     })
   );
+
+  // Sahadaki toplam kaçak sayısı (§VIII Kaçak Sayısı Haritası) — bu sayı zaten
+  // faz4/gecit-motoru.ts'te ayrıca hesaplanıyordu ama Faz 2'ye hiç ulaşmıyordu;
+  // Faz 2 tempo puanlarken her satırdaki "kaçak" bayrağını kendi kendine sayıp
+  // tahmin etmek zorunda kalıyordu.
+  const sahadakiKacakSayisi = runners.filter((r) => r.kacak).length;
+  const kacakHarita = kacakHaritasi(sahadakiKacakSayisi);
 
   const n = runners.length || 1;
   const veriDoluluk = [
@@ -440,6 +501,8 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       breed: race.breed,
       surface: race.surface,
       distance: race.distance,
+      zeminDetayi, zeminKatsayisi: zemin.katsayi, zeminEtiketi: zemin.etiket,
+      sahadakiKacakSayisi, kacakTempoEtiketi: kacakHarita.etiket, kacakAvantajliStil: kacakHarita.avantajli,
     },
     runners,
     veriDoluluk,
