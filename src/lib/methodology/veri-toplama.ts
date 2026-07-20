@@ -19,6 +19,7 @@ import { fetchTjkSon800ByHorseName } from "@/server/services/ingest/tjk-son800-s
 import { galopQuality, isSameJockey } from "@/components/program/panels/galop-helpers";
 import { getAtPerformansForRace } from "@/server/actions/at-performans.actions";
 import { getH2HForRace } from "@/server/actions/h2h.actions";
+import { fetchApprenticeRemainingRaces, normalizeJockeyName } from "@/server/services/ingest/tjk-apprentice.adapter";
 
 // ── SKK Sınıf Piramidi (Ansiklopedi Bölüm III) — metin tabanlı en iyi eşleştirme ──
 function classToSkk(classType: string | null | undefined): number | null {
@@ -105,8 +106,15 @@ export type Faz1Runner = {
   // başlayacak anlamına gelir. Olumlu bir etken olabilir, göz ardı edilmemeli.
   disaridanStart: boolean;
   jockey: string | null;
+  jockeyChanged: boolean;
+  previousJockey: string | null;
   trainer: string | null;
   owner: string | null;
+  // Sitenin program sayfasında 🐴 ile gösterdiği "aynı eküri" grubu — aynı sahiplik
+  // altında bu koşuda birden fazla at varsa, aralarında "temposunu bozan/yardımcı at"
+  // etkisi olabilir (methodolojide örnek verilen "ekürisinin varlığından rehavete
+  // kapılma" senaryosunun somut kanıtı budur).
+  ekuriMateleri: string[];
   sire: string | null;
   dam: string | null;
   damSire: string | null;
@@ -132,7 +140,11 @@ export type Faz1Runner = {
   equipmentAdded: string | null;
   equipmentRemoved: string | null;
   recentForm: string | null;
+  bestTime: string | null;
   apprentice: boolean;
+  // Çırak jokey ise TJK'nın "kalan kilo indirimi hakkı" sayısı — sitenin program
+  // sayfasında "Ap. (N kaldı)" olarak gösteriliyor, HP/kilo değerlendirmesinde bağlam sağlar.
+  apprenticeRemaining: number | null;
   raceStyleEtiket: string | null;
   tempoVeriN: number | null;
   kacak: boolean;
@@ -208,13 +220,24 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   const trainerNames = [...new Set(race.runners.map((r) => r.trainer).filter((t): t is string => !!t))];
 
   const { getJockeyStats, getTrainerStats } = await import("@/server/services/race.service");
-  const [jockeyStats, trainerStats, atPerformansRows, h2hEncounters] = await Promise.all([
+  const [jockeyStats, trainerStats, atPerformansRows, h2hEncounters, apprenticeRemainingMap] = await Promise.all([
     getJockeyStats(jockeyNames).catch(() => ({} as Awaited<ReturnType<typeof getJockeyStats>>)),
     getTrainerStats(trainerNames).catch(() => ({} as Awaited<ReturnType<typeof getTrainerStats>>)),
     getAtPerformansForRace(raceId).catch(() => []),
     getH2HForRace(raceId).catch(() => []),
+    fetchApprenticeRemainingRaces().catch(() => ({}) as Record<string, number>),
   ]);
   const atPerformansMap = new Map(atPerformansRows.map((r) => [r.horseName, r.records]));
+
+  // Aynı eküriden (sahiplik) bu koşuda koşan diğer atların isim listesi, her at için.
+  const ekuriMateMap = new Map<string, string[]>();
+  for (const r of race.runners) {
+    if (r.ekuriGroup == null) continue;
+    const mates = race.runners
+      .filter((o) => o.id !== r.id && o.ekuriGroup === r.ekuriGroup)
+      .map((o) => o.name);
+    if (mates.length > 0) ekuriMateMap.set(r.id, mates);
+  }
 
   // Her at için: bu koşudaki DİĞER atlarla geçmişte birlikte koştuğu yarışlardan
   // (H2H) kısa bir özet. Methodolojide "zayıf kanıt" — tek başına sırayı belirlemez.
@@ -370,10 +393,16 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
             .join(" | ")
         : null;
 
+      const apprenticeRemaining = r.apprentice && r.jockey
+        ? apprenticeRemainingMap[normalizeJockeyName(r.jockey)] ?? null
+        : null;
+
       return {
         id: r.id, no: r.no, ad: r.name, scratched: r.scratched,
         weight: r.weight, weightChange: r.weightChange, disaridanStart: r.disaridanStart,
-        jockey: r.jockey, trainer: r.trainer, owner: r.owner,
+        jockey: r.jockey, jockeyChanged: r.jockeyChanged, previousJockey: r.previousJockey,
+        trainer: r.trainer, owner: r.owner,
+        ekuriMateleri: ekuriMateMap.get(r.id) ?? [],
         sire: r.sire, dam: r.dam, damSire: r.damSire, pedigreeNote: r.pedigreeNote,
         sireTier: r.sire ? sireTierMap.get(r.sire) ?? null : null,
         damSireTier: r.damSire ? sireTierMap.get(r.damSire) ?? null : null,
@@ -381,7 +410,8 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         hpBugun: hpBugunEfektif, hpBugunResmiYok, hpOncekiResmiYok,
         agf: r.agf, agfSirasi: agfSiraMap.get(r.id) ?? null,
         equipment: r.equipment, equipmentAdded: r.equipmentAdded, equipmentRemoved: r.equipmentRemoved,
-        recentForm: r.recentForm, apprentice: r.apprentice,
+        recentForm: r.recentForm, bestTime: r.bestTime,
+        apprentice: r.apprentice, apprenticeRemaining,
         raceStyleEtiket: (r.raceStyle as { style?: string } | null)?.style ?? null,
         tempoVeriN: (r.raceStyle as { veri?: number } | null)?.veri ?? null,
         kacak: (r.raceStyle as { style?: string } | null)?.style === "KACAK",
