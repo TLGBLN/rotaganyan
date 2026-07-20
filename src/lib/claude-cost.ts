@@ -25,9 +25,27 @@ function fiyatFor(date: Date): FiyatDonemi {
   return secili;
 }
 
-export function tahminiMaliyet(inputTokens: number, outputTokens: number, date: Date = new Date()): number {
+// Prompt cache yazma/okuma fiyatı, temel input fiyatının katı olarak sabit (Anthropic'in
+// belgelenen oranı) — 5 dakikalık ephemeral cache (bizim kullandığımız, varsayılan TTL)
+// için yazma 1.25x, okuma 0.1x. Bunlar inputPerM'e göre TÜRETİLİR, ayrı sabitlenmez —
+// böylece fiyat dönemi değişince (bkz. FIYATLANDIRMA) otomatik doğru hesaplanır.
+const CACHE_WRITE_CARPAN = 1.25;
+const CACHE_READ_CARPAN = 0.1;
+
+export function tahminiMaliyet(
+  inputTokens: number,
+  outputTokens: number,
+  date: Date = new Date(),
+  cacheCreationInputTokens = 0,
+  cacheReadInputTokens = 0
+): number {
   const f = fiyatFor(date);
-  return (inputTokens / 1_000_000) * f.inputPerM + (outputTokens / 1_000_000) * f.outputPerM;
+  return (
+    (inputTokens / 1_000_000) * f.inputPerM +
+    (outputTokens / 1_000_000) * f.outputPerM +
+    (cacheCreationInputTokens / 1_000_000) * f.inputPerM * CACHE_WRITE_CARPAN +
+    (cacheReadInputTokens / 1_000_000) * f.inputPerM * CACHE_READ_CARPAN
+  );
 }
 
 /** Faz 2/Faz 4 çağrısından sonra token kullanımını kaydeder — hataya karşı sessizce yutulur, ana akışı bloklamaz. */
@@ -37,6 +55,8 @@ export async function logClaudeUsage(input: {
   model: string;
   inputTokens: number;
   outputTokens: number;
+  cacheCreationInputTokens?: number;
+  cacheReadInputTokens?: number;
 }): Promise<void> {
   try {
     const { db } = await import("@/lib/db");
@@ -47,6 +67,8 @@ export async function logClaudeUsage(input: {
         model: input.model,
         inputTokens: input.inputTokens,
         outputTokens: input.outputTokens,
+        cacheCreationInputTokens: input.cacheCreationInputTokens ?? 0,
+        cacheReadInputTokens: input.cacheReadInputTokens ?? 0,
       },
     });
   } catch (err) {
@@ -70,10 +92,16 @@ export async function getClaudeBudgetStatus(): Promise<BudgetStatus | null> {
 
   const logs = await db.claudeUsageLog.findMany({
     where: { createdAt: { gte: budget.resetAt } },
-    select: { inputTokens: true, outputTokens: true, createdAt: true },
+    select: {
+      inputTokens: true, outputTokens: true, createdAt: true,
+      cacheCreationInputTokens: true, cacheReadInputTokens: true,
+    },
   });
 
-  const spentUsd = logs.reduce((s, l) => s + tahminiMaliyet(l.inputTokens, l.outputTokens, l.createdAt), 0);
+  const spentUsd = logs.reduce(
+    (s, l) => s + tahminiMaliyet(l.inputTokens, l.outputTokens, l.createdAt, l.cacheCreationInputTokens, l.cacheReadInputTokens),
+    0
+  );
 
   return {
     startingUsd: budget.startingUsd,

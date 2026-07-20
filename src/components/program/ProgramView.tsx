@@ -120,48 +120,6 @@ function raceStyleBadge(raceStyle: { style: string; percent: number } | null): {
   return null;
 }
 
-// ── Analiz detay parser ───────────────────────────────────────────────────────
-
-// "14/30" → 14 (payda sadece puanın hangi ölçekte olduğunu gösterir, ekranda gösterilmez)
-function numerator(s: string): number | undefined {
-  const m = s.match(/^(\d+(?:[.,]\d+)?)\s*\/\s*\d+/);
-  if (m) return parseFloat(m[1].replace(",", "."));
-  const n = parseFloat(s.replace(",", "."));
-  return isNaN(n) ? undefined : n;
-}
-
-function parsePickDetails(details: string[]) {
-  let aRaw: string | undefined;
-  let bRaw: string | undefined;
-  let cRaw: string | undefined;
-  let bcRaw: string | undefined;
-  let veriGuven: string | undefined;
-  const notes: string[] = [];
-  for (const d of details) {
-    const aM = d.match(/^A:\s*(.+)/);    if (aM)  { aRaw = aM[1].trim(); continue; }
-    // v4.0 şablonu B ve C'yi ayrı satırlarda verir ("B: 14/30", "C: 3/10");
-    // eski "B+C: YY" formatı da geriye dönük desteklenir.
-    const bcM = d.match(/^B\+C:\s*(.+)/); if (bcM) { bcRaw = bcM[1].trim(); continue; }
-    const bM = d.match(/^B:\s*(.+)/);    if (bM)  { bRaw = bM[1].trim(); continue; }
-    const cM = d.match(/^C:\s*(.+)/);    if (cM)  { cRaw = cM[1].trim(); continue; }
-    const vM = d.match(/^VG:\s*(.+)/);   if (vM)  { veriGuven = vM[1].trim(); continue; }
-    if (d.trim()) notes.push(d.trim());
-  }
-
-  const aScore = aRaw != null ? String(numerator(aRaw) ?? aRaw) : undefined;
-  // B+C her zaman bir toplamdır: ayrı B/C satırları varsa payları toplanır, eski "B+C: YY" ise olduğu gibi kullanılır.
-  let bcScore: string | undefined;
-  if (bcRaw != null) {
-    bcScore = String(numerator(bcRaw) ?? bcRaw);
-  } else if (bRaw != null || cRaw != null) {
-    const b = bRaw != null ? numerator(bRaw) : undefined;
-    const c = cRaw != null ? numerator(cRaw) : undefined;
-    bcScore = b != null && c != null ? String(b + c) : String(b ?? c ?? "");
-  }
-
-  return { aScore, bcScore, veriGuven, kilItGerekce: notes.join(" ") || undefined };
-}
-
 function rankStyle(rank: number) {
   if (rank <= 3) return { badge: "bg-[#27ae60] text-white", text: "text-[#27ae60]" };
   if (rank <= 6) return { badge: "bg-brand text-brand-foreground", text: "text-brand" };
@@ -287,13 +245,11 @@ function AnalysisPanel({
               <th className="px-2 py-2 text-center w-8">No</th>
               <th className="px-2 py-2 text-left">At</th>
               <th className="px-2 py-2 text-center w-14 font-bold">Toplam</th>
-              <th className="px-2 py-2 text-left">Kilit Gerekçe</th>
             </tr>
           </thead>
           <tbody>
             {picks.map((p) => {
               const { no, name } = pickDisplay(p);
-              const { kilItGerekce } = parsePickDetails(p.details);
               const isWinner = winnerNo != null && p.runner?.no === winnerNo;
               const rs = rankStyle(p.rank);
               return (
@@ -323,9 +279,6 @@ function AnalysisPanel({
                   <td className="px-2 py-2 text-center tabular-nums font-bold">
                     {p.score != null ? <span>{p.score}</span> : "—"}
                   </td>
-                  <td className="px-2 py-2 text-muted-foreground leading-snug max-w-xs">
-                    {kilItGerekce ?? "—"}
-                  </td>
                 </tr>
               );
             })}
@@ -335,7 +288,6 @@ function AnalysisPanel({
                 <td className="px-2 py-2 text-center font-mono text-muted-foreground">{r.no}</td>
                 <td className="px-2 py-2 text-muted-foreground">{r.name}</td>
                 <td className="px-2 py-2 text-center text-muted-foreground">—</td>
-                <td className="px-2 py-2 text-muted-foreground">—</td>
               </tr>
             ))}
           </tbody>
@@ -346,7 +298,6 @@ function AnalysisPanel({
       <div className="sm:hidden divide-y">
         {picks.map((p) => {
           const { no, name } = pickDisplay(p);
-          const { kilItGerekce } = parsePickDetails(p.details);
           const isWinner = winnerNo != null && p.runner?.no === winnerNo;
           const rs = rankStyle(p.rank);
           return (
@@ -372,7 +323,6 @@ function AnalysisPanel({
               <div className="flex gap-3 text-[11px] text-muted-foreground mb-1">
                 {p.score != null && <span>Toplam: <span className="font-bold text-foreground">{p.score}</span></span>}
               </div>
-              {kilItGerekce && <p className="text-[11px] text-muted-foreground leading-snug">{kilItGerekce}</p>}
             </div>
           );
         })}

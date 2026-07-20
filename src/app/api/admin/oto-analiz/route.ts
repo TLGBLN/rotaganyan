@@ -47,12 +47,16 @@ async function createWithTruncationRetry(
   await logClaudeUsage({
     raceId, phase, model: "claude-sonnet-5",
     inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens,
+    cacheCreationInputTokens: msg.usage.cache_creation_input_tokens ?? 0,
+    cacheReadInputTokens: msg.usage.cache_read_input_tokens ?? 0,
   });
   if (msg.stop_reason === "max_tokens") {
     msg = await createStreamed({ ...params, max_tokens: retryMaxTokens });
     await logClaudeUsage({
       raceId, phase, model: "claude-sonnet-5",
       inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens,
+      cacheCreationInputTokens: msg.usage.cache_creation_input_tokens ?? 0,
+      cacheReadInputTokens: msg.usage.cache_read_input_tokens ?? 0,
     });
   }
   return msg;
@@ -367,7 +371,15 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
     raceId, "faz4", 32000
   );
   const faz4Raw = extractText(faz4Msg);
-  let result: unknown;
+  type Faz4Pick = {
+    rank: number; no: number; name: string; score: number;
+    pedigreeRating: string; isTarget: boolean; details: string[];
+  };
+  type Faz4Result = {
+    picks: Faz4Pick[]; confidence: string; isBanko: boolean; bankoNote: string;
+    notes: string; tempo: string; couponNarrow: string; couponNormal: string; couponWide: string;
+  };
+  let result: Faz4Result;
   try {
     result = JSON.parse(faz4Raw);
   } catch {
@@ -376,6 +388,29 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
       : "";
     return NextResponse.json({ error: `Faz 4 (sıralama) yanıtı parse edilemedi${sebep}`, raw: faz4Raw }, { status: 500 });
   }
+
+  // Faz 4 yalnız en iyi 3-6 atı sıralıyor. Kalan atlar için YENİ bir AI çağrısı yapmadan —
+  // Faz 2'nin (ücreti zaten ödenmiş) her at için hesapladığı A+B+C puanını kullanarak devamı
+  // tamamla, böylece admin ve public sayfa TÜM sahayı sıralı/puanlı görür, ek maliyet sıfır.
+  const pickedNos = new Set(result.picks.map((p) => p.no));
+  const enDusukPuan = result.picks.length > 0 ? Math.min(...result.picks.map((p) => p.score)) : 100;
+  const kalanlar = faz1.runners
+    .filter((r) => !pickedNos.has(r.no))
+    .map((r) => {
+      const a = faz2.atlar.find((x) => x.no === r.no);
+      const hamPuan = a ? Math.round(a.aPuani + a.bcPuani) : 0;
+      // ZORUNLU TUTARLILIK: Faz 4'ün taşıdığı atların skoru rank sırasını hiç bozmamalı —
+      // kalan atların ham Faz 2 puanı en düşük "pick"i geçemez.
+      return { no: r.no, name: r.ad, score: Math.min(hamPuan, enDusukPuan) };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  let sonrakiRank = result.picks.length > 0 ? Math.max(...result.picks.map((p) => p.rank)) + 1 : 1;
+  const ekPicks: Faz4Pick[] = kalanlar.map((r) => ({
+    rank: sonrakiRank++, no: r.no, name: r.name, score: r.score,
+    pedigreeRating: "BILINMIYOR", isTarget: false, details: [],
+  }));
+  result.picks = [...result.picks, ...ekPicks];
 
   return NextResponse.json({
     ok: true,

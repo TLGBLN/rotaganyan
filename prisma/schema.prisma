@@ -414,13 +414,18 @@ model HorseFollow {
 // garantisi yoktur.
 
 model ClaudeUsageLog {
-  id           String   @id @default(cuid())
-  createdAt    DateTime @default(now())
-  raceId       String?
-  phase        String // "faz2" | "faz4"
-  model        String
-  inputTokens  Int
-  outputTokens Int
+  id                     String   @id @default(cuid())
+  createdAt              DateTime @default(now())
+  raceId                 String?
+  phase                  String // "faz2" | "faz4"
+  model                  String
+  inputTokens            Int
+  outputTokens           Int
+  // Prompt cache (Faz2/Faz4 arasında paylaşılan bağlam) devreye girdikten sonra eklendi —
+  // bunlar olmadan gerçek maliyet olduğundan DÜŞÜK görünüyordu, çünkü cache yazma/okuma
+  // token'ları inputTokens'a hiç dahil değil (Anthropic bunları ayrı sayaçlarda döner).
+  cacheCreationInputTokens Int @default(0)
+  cacheReadInputTokens     Int @default(0)
 
   @@index([createdAt])
 }
