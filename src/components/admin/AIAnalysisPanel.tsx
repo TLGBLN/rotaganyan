@@ -92,8 +92,19 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ raceId }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error ?? "Hata");
+      const raw = await res.text();
+      let data: { ok?: boolean; error?: string; result?: AIAnalysisResult; runners?: Runner[]; debug?: Debug };
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        // Sunucu JSON döndürmediyse (ör. Vercel'in kendi zaman aşımı/platform hata sayfası,
+        // uygulamamızın kendi try/catch'ine hiç uğramadan) — ham "Unexpected token" parse
+        // hatasını göstermek yerine anlaşılır bir mesaj ver.
+        throw new Error(
+          "Sunucudan geçerli bir yanıt gelmedi — muhtemelen istek çok uzun sürdü ve zaman aşımına uğradı. Az önce ödenen çağrı(lar) boşa gitmiş olabilir, lütfen tekrar deneyin."
+        );
+      }
+      if (!res.ok || !data.ok || !data.result) throw new Error(data.error ?? "Hata");
       setResult(data.result);
       setRunners(data.runners ?? []);
       setDebug(data.debug ?? null);

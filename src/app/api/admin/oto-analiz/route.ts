@@ -8,10 +8,11 @@ import { logClaudeUsage } from "@/lib/claude-cost";
 import type { Role } from "@prisma/client";
 
 // Bu route art arda İKİ ağır Claude çağrısı yapıyor (Faz 2 + Faz 4), ikisi de adaptive
-// thinking ile uzun sürebilir — varsayılan Vercel süre sınırı bunun için yetersiz kalıp
-// fonksiyonu ortadan kesebilir (parayı harcadıktan SONRA, admin'e hata bile dönmeden).
-// Diğer uzun işlemlerle (ingest cron'ları vb.) aynı desen.
-export const maxDuration = 300;
+// thinking ile uzun sürebilir. 300s (diğer uzun işlemlerle aynı) YETERSİZ ÇIKTI —
+// canlıda Faz 2 tamamlanıp Faz 4'e hiç geçilemeden fonksiyon kesildi (parayı harcadıktan
+// SONRA, admin'e "Unexpected token" gibi anlamsız bir Vercel platform hatası döndü,
+// bizim kendi try/catch'imize hiç uğramadan). Limit yükseltildi.
+export const maxDuration = 800;
 
 const client = new Anthropic();
 
