@@ -277,6 +277,10 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   const ortKilo = agirlıklar.length > 0 ? agirlıklar.reduce((a, b) => a + b, 0) / agirlıklar.length : null;
 
   const bugunSkk = classToSkk(race.classType);
+  // Kullanıcı talimatı: Son800 karşılaştırması yalnız BUGÜNKÜ koşunun yılıyla sınırlı
+  // olmalı — eski yıllara ait veriler "eskide kalır", benzer koşu sayılmaz. Sabit bir
+  // yıl yazılırsa (örn. "2026") her yılbaşında sessizce kırılır, bu yüzden dinamik.
+  const raceYear = race.raceDay.date.getUTCFullYear().toString();
 
   const runners: Faz1Runner[] = await Promise.all(
     race.runners.map(async (r): Promise<Faz1Runner> => {
@@ -307,24 +311,19 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         try {
           const son800Rows = await fetchTjkSon800ByHorseName(r.name);
           const surfacePrefix = race.surface === "CIM" ? "Ç" : race.surface === "SENTETIK" ? "S" : "K";
-          // Metodoloji (VIII-B) karşılaştırma şartı olarak hipodrom/pist/mesafe/sınıf istiyor,
-          // YIL istemiyor — kod daha önce fazladan "aynı takvim yılı" şartı arıyordu, bu da
-          // geçen yıla ait gerçekten benzer (aynı hipodrom+pist+mesafe) koşuları sessizce
-          // eliyordu. Artık yıl aranmıyor, bunun yerine en YENİ 3 benzer koşu seçiliyor
-          // (eski→yeni gelen TJK sırasını yıla göre azalan sıraya çeviriyoruz).
-          const benzer = son800Rows
-            .filter(
-              (row) =>
-                row.city.includes(hippodromeName) &&
-                row.surface.startsWith(surfacePrefix) &&
-                // TJK mesafeyi Türkçe binlik ayracıyla "1.800" biçiminde döner — parseInt bunu
-                // noktada durup "1" olarak okuyordu, bu yüzden mesafe farkı hep devasa çıkıp
-                // ±200m toleransı ASLA sağlanamıyordu (her at için sessizce 0 benzer koşu).
-                Math.abs((parseInt(row.distance.replace(/\./g, ""), 10) || 0) - race.distance) <= 200
-            )
-            .sort((a, b) => (parseInt(b.year, 10) || 0) - (parseInt(a.year, 10) || 0));
+          const benzer = son800Rows.filter(
+            (row) =>
+              row.year === raceYear &&
+              row.city.includes(hippodromeName) &&
+              row.surface.startsWith(surfacePrefix) &&
+              // TJK mesafeyi Türkçe binlik ayracıyla "1.800" biçiminde döner — parseInt bunu
+              // noktada durup "1" olarak okuyordu, bu yüzden mesafe farkı hep devasa çıkıp
+              // ±200m toleransı ASLA sağlanamıyordu (her at için sessizce 0 benzer koşu).
+              Math.abs((parseInt(row.distance.replace(/\./g, ""), 10) || 0) - race.distance) <= 200
+          );
+          // Kullanıcı talimatı: sayı sınırı yok — 1 benzer koşu bile varsa dikkate alınır
+          // (eskiden yalnız ilk 3 kullanılıyordu, geri kalanı atılıyordu).
           const farklar = benzer
-            .slice(0, 3)
             .map((row) => {
               const son800 = parseSaniye(row.son800);
               const ilk800 = parseSaniye(row.ilk800);
