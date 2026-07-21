@@ -146,8 +146,11 @@ export async function upsertPrediction(input: PredictionInput) {
         couponWide: input.couponWide,
         isBanko: input.isBanko,
         bankoNote: input.bankoNote,
-        published: true,
-        publishedAt: new Date(),
+        // published/publishedAt BİLEREK burada yok — "Kaydet" (bu fonksiyon) bir taslağı
+        // düzenlerken sessizce yayına almamalı. Yayına alma YALNIZ publishPrediction()
+        // (PublishChecklist'teki "Yayınla" butonu) üzerinden olmalı. Daha önce burada
+        // published:true zorlanıyordu — bu da taslak düzenleyip "Kaydet"e basmayı,
+        // checklist'i hiç görmeden yayınlamaya eşitliyordu.
         picks: {
           create: input.picks.map((p) => ({
             rank: p.rank,
