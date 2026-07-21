@@ -39,38 +39,52 @@ function stripLeadingNumber(line: string): string {
   return line.replace(/^\d+\s*[-.]?\s*/, "");
 }
 
-/** Bir satırın (numara soyulduktan sonra) bu koşudaki bilinen at isimlerinden biriyle
- *  başlayıp başlamadığını kontrol eder — "(" ya da ":" öncesi kısmı (yoksa satırın
- *  tamamını) isimle karşılaştırır. Eşleşirse atın ORİJİNAL adını döner. Bu sayede
- *  "6 ŞAFAK BEY", "6. ŞAFAK BEY", "6 - ŞAFAK BEY" ve numarasız "ŞAFAK BEY" satırlarının
- *  hepsi aynı şekilde tanınır — kullanıcı numara yazmak ZORUNDA değildir. */
-function matchRunnerNameAtLineStart(line: string, runnerNames: { raw: string; norm: string }[]): string | null {
-  const stripped = stripLeadingNumber(line).trim();
-  if (!stripped) return null;
-  const parenIdx = stripped.indexOf("(");
-  const colonIdx = stripped.indexOf(":");
-  const candidates = [parenIdx, colonIdx].filter((i) => i >= 0);
-  const cutIdx = candidates.length > 0 ? Math.min(...candidates) : stripped.length;
-  const nameCandidate = stripped.slice(0, cutIdx).trim();
-  if (!nameCandidate) return null;
-  const norm = normalizeName(nameCandidate);
-  const found = runnerNames.find((r) => r.norm === norm);
-  return found ? found.raw : null;
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Serbest metni, bu koşudaki at isimlerini bulup her ismi bir "blok başlangıcı"
- *  sayarak parçalara ayırır — numara ZORUNLU değildir (varsa yok sayılır). Bir sonraki
- *  bilinen isme kadar olan her şey o atın bloğu sayılır. */
+/**
+ * Serbest metni, bu koşudaki at isimlerini bulup her ismi bir "blok başlangıcı" sayarak
+ * parçalara ayırır — TÜM metin taranır, yalnız satır başı değil. Kullanıcı birden fazla
+ * atın notunu aynı paragrafa/satıra yapıştırabiliyor (ör. "...koşacak yapıda. YENERSULTAN:
+ * Kalitesi tartışılmaz..." — iki at aynı satırda) — bu yüzden iki durum da yeni blok sayılır:
+ *  (1) satır başında bir isim (numara opsiyonel önekiyle),
+ *  (2) metnin ORTASINDA olsa bile isim hemen ardından ":" ile geliyorsa.
+ * Bir atın ismi başka bir atın notu İÇİNDE (":" ile devam etmeden) geçiyorsa yeni blok
+ * SAYILMAZ — yanlış bölünmeyi önler.
+ */
 function splitByRunnerName(text: string, runnerNames: { raw: string; norm: string }[]): { name: string; block: string }[] {
-  const lines = text.split("\n");
-  const starts: { idx: number; name: string }[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const name = matchRunnerNameAtLineStart(lines[i], runnerNames);
-    if (name) starts.push({ idx: i, name });
+  if (runnerNames.length === 0 || !text.trim()) return [];
+  // Uzun isimler önce denenir (kısa bir isim uzun bir ismin parçası olmasın diye).
+  const sorted = [...runnerNames].sort((a, b) => b.raw.length - a.raw.length);
+  const alternation = sorted.map((r) => escapeRegExp(r.raw)).join("|");
+  const lineStartRe = new RegExp(`(?:^|\\n)[ \\t]*(?:\\d+\\s*[-.]?\\s*)?(${alternation})\\b`, "gi");
+  const colonRe = new RegExp(`(${alternation})[ \\t]*:`, "gi");
+
+  const hits = new Map<number, string>(); // metin içindeki başlangıç indeksi -> atın ORİJİNAL adı
+  // lineStartRe: blok sınırı satırın başından (numara varsa dahil) itibaren sayılır —
+  // aksi halde bir sonraki atın numarası, önceki atın notunun sonuna sızardı.
+  for (const m of text.matchAll(lineStartRe)) {
+    const matchedRaw = m[1];
+    const found = sorted.find((r) => r.raw.toLocaleUpperCase("tr-TR") === matchedRaw.toLocaleUpperCase("tr-TR"));
+    if (!found) continue;
+    const idx = (m.index ?? 0) + (m[0].startsWith("\n") ? 1 : 0);
+    if (!hits.has(idx)) hits.set(idx, found.raw);
   }
+  // colonRe: metnin ORTASINDA (satır başı olmadan) yakalanan "AD:" durumu — sınır
+  // doğrudan ismin kendisinden başlar.
+  for (const m of text.matchAll(colonRe)) {
+    const matchedRaw = m[1];
+    const found = sorted.find((r) => r.raw.toLocaleUpperCase("tr-TR") === matchedRaw.toLocaleUpperCase("tr-TR"));
+    if (!found) continue;
+    const idx = (m.index ?? 0) + m[0].indexOf(matchedRaw);
+    if (!hits.has(idx)) hits.set(idx, found.raw);
+  }
+
+  const starts = [...hits.entries()].map(([idx, name]) => ({ idx, name })).sort((a, b) => a.idx - b.idx);
   return starts.map((s, i) => {
-    const end = i + 1 < starts.length ? starts[i + 1].idx : lines.length;
-    return { name: s.name, block: lines.slice(s.idx, end).join("\n").trim() };
+    const end = i + 1 < starts.length ? starts[i + 1].idx : text.length;
+    return { name: s.name, block: text.slice(s.idx, end).trim() };
   });
 }
 
@@ -84,15 +98,11 @@ function parseBulkNotes(text: string, runnerNames: string[]): ParsedNote[] {
   const normNames = runnerNames.map((n) => ({ raw: n, norm: normalizeName(n) }));
   const entries: ParsedNote[] = [];
   for (const { name, block } of splitByRunnerName(text, normNames)) {
-    const stripped = stripLeadingNumber(block);
-    const firstLineEnd = stripped.indexOf("\n");
-    const firstLine = firstLineEnd >= 0 ? stripped.slice(0, firstLineEnd) : stripped;
-    const restOfBlock = firstLineEnd >= 0 ? stripped.slice(firstLineEnd + 1) : "";
-    // İlk satırda ":" varsa (ör. "AT ADI: not") sonrasını al; yoksa isim kendi satırında
-    // tek başınadır ve devamındaki TÜM paragraf(lar) not sayılır (SÜKANBEY örneğindeki gibi).
-    const colonIdx = firstLine.indexOf(":");
-    const afterColon = colonIdx >= 0 ? firstLine.slice(colonIdx + 1).trim() : "";
-    const note = [afterColon, restOfBlock.trim()].filter(Boolean).join("\n").trim();
+    // block TAM OLARAK atın adıyla başlar (numara varsa önce o) — numara, isim, varsa ":"
+    // soyulur; geri kalan (aynı satırda veya sonraki satırlarda ne varsa) nottur.
+    const afterNum = stripLeadingNumber(block);
+    const nameRe = new RegExp(`^${escapeRegExp(name)}\\s*:?\\s*`, "i");
+    const note = afterNum.replace(nameRe, "").trim();
     if (note) entries.push({ name, note });
   }
   return entries;
@@ -144,14 +154,21 @@ function parseBulkPedigree(text: string, runnerNames: string[]): ParsedEntry[] {
   const entries: ParsedEntry[] = [];
 
   for (const { name, block } of splitByRunnerName(text, normNames)) {
-    const afterName = stripLeadingNumber(block);
-    const firstLineEnd = afterName.indexOf("\n");
-    const firstLine = firstLineEnd >= 0 ? afterName.slice(0, firstLineEnd) : afterName;
-    const restOfBlock = firstLineEnd >= 0 ? afterName.slice(firstLineEnd + 1) : "";
+    // block TAM OLARAK atın kendi adıyla başlar (numara varsa önce o) — sırayla numara,
+    // sonra ismin kendisi, sonra varsa ":" soyulur; geri kalan gerçek içeriktir. Bu, hem
+    // "AT ADI: metin" (aynı satırda) hem "AT ADI\nmetin" (ayrı satırda) hem de
+    // "AT ADI (Baba - Anne): metin" biçimlerini TEK bir yerden doğru ele alır.
+    const afterNum = stripLeadingNumber(block);
+    const nameRe = new RegExp(`^${escapeRegExp(name)}\\s*:?\\s*`, "i");
+    const content = afterNum.replace(nameRe, "");
 
-    // (B)/(C) Başlık satırında "AD (Baba - Anne / Anne Babası)" var mı?
+    const firstLineEnd = content.indexOf("\n");
+    const firstLine = firstLineEnd >= 0 ? content.slice(0, firstLineEnd) : content;
+    const restOfBlock = firstLineEnd >= 0 ? content.slice(firstLineEnd + 1) : "";
+
+    // (B)/(C) İsimden hemen sonra "(Baba - Anne / Anne Babası)" var mı?
     const headerParen = matchBalancedParen(firstLine);
-    if (headerParen && headerParen.pre.length > 0) {
+    if (headerParen && headerParen.pre.length === 0) {
       const { sire, dam, damSire } = splitPedigreeParen(headerParen.inner);
       const afterParenOnFirstLine = firstLine.slice(headerParen.afterIdx);
       const colonMatch = afterParenOnFirstLine.match(/^\s*:\s*([\s\S]*)$/);
@@ -162,10 +179,9 @@ function parseBulkPedigree(text: string, runnerNames: string[]): ParsedEntry[] {
       continue;
     }
 
-    // (A) Başlık satırında parantez yok — devamı yapılandırılmış "Babası/Anne Hattı" etiketleriyle mi geliyor?
-    const rest = restOfBlock;
-    const sireMatch = rest.match(/Babas[ıİi]\s*\(([^)]+)\)\s*:\s*([\s\S]*?)(?=\s*Anne\s*Hatt[ıİi]\s*\(|$)/i);
-    const damMatch = rest.match(/Anne\s*Hatt[ıİi]\s*\(([^)]+)\)\s*:\s*([\s\S]*)$/i);
+    // (A) Parantez yok — devamı yapılandırılmış "Babası/Anne Hattı" etiketleriyle mi geliyor?
+    const sireMatch = content.match(/Babas[ıİi]\s*\(([^)]+)\)\s*:\s*([\s\S]*?)(?=\s*Anne\s*Hatt[ıİi]\s*\(|$)/i);
+    const damMatch = content.match(/Anne\s*Hatt[ıİi]\s*\(([^)]+)\)\s*:\s*([\s\S]*)$/i);
 
     const sire = sireMatch ? sireMatch[1].trim() : "";
     const sireNote = sireMatch ? sireMatch[2].trim() : "";
@@ -179,9 +195,9 @@ function parseBulkPedigree(text: string, runnerNames: string[]): ParsedEntry[] {
     }
     const damNote = damMatch ? damMatch[2].trim() : "";
 
-    // (D) Ne "Babası"/"Anne Hattı" etiketi ne de başlıkta parantez varsa, veriyi sessizce
-    // kaybetmemek için tüm devam metnini olduğu gibi nota düş (sire/dam boş kalır).
-    const note = [sireNote, damNote].filter(Boolean).join(" ") || rest.trim();
+    // (D) Ne "Babası"/"Anne Hattı" etiketi ne de isimden sonra parantez varsa, veriyi
+    // sessizce kaybetmemek için TÜM içeriği olduğu gibi nota düş (sire/dam boş kalır).
+    const note = [sireNote, damNote].filter(Boolean).join(" ") || content.trim();
     entries.push({ name, sire, dam, damSire, note });
   }
 
