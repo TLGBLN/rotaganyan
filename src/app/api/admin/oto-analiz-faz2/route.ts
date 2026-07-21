@@ -31,22 +31,19 @@ async function handlePost(req: NextRequest) {
   const faz1 = await gatherFaz1(raceId);
   if (!faz1) return NextResponse.json({ error: "Koşu verisi bulunamadı" }, { status: 404 });
 
-  // Faz 2'yi (ücretli Claude çağrısı) çağırmadan ÖNCE veri yeterliliğini kontrol et — AGF/HP
-  // henüz yayınlanmadıysa (örn. AGF sabah 9'da açıklanıyor) burada ücretsiz olarak durur,
-  // Claude'a hiç istek atılmaz.
+  // Veri yeterliliğini kontrol et — AMA artık BLOKE ETMEZ (v4.10 düzeltmesi: "eksik veri
+  // varsa açıkça yaz, düşük güvenle devam et" ilkesiyle çelişen katı blokaj kaldırıldı).
+  // Admin zaten Faz1VeriDurumu panelinde eksikleri görüp kendi kararını verebiliyor; burada
+  // eksik varsa yalnız Claude'a açık bir uyarı enjekte edilir (Veri Güveni C'ye çeksin,
+  // eksikliği ceza sebebi yapmasın) — "analiz yok" çıktısı hiçbir zaman verilmez.
   const onKontrol: AtGirdisi[] = faz1.runners.map((r) => ({
     ad: r.ad, bc: 0, agfSirasi: r.agfSirasi, hpBugun: r.hpBugun, hpOnceki: r.hpOnceki, tempoVeriN: r.tempoVeriN,
     ilkStart: r.ilkStart, bitirisGeriliyor: r.bitirisGeriliyor, bitirisIyilesiyor: r.bitirisIyilesiyor,
   }));
   const onVeriDenetimi = veriDenetimi(onKontrol);
-  if (!onVeriDenetimi.yeterli) {
-    return NextResponse.json({
-      error:
-        "Bu koşu için veri yetersiz, otomatik analiz üretilemedi (Claude'a hiç istek atılmadı, ücret harcanmadı):\n" +
-        onVeriDenetimi.eksikler.join("\n") +
-        "\n\nBu genelde AGF/HP verisinin henüz yayınlanmadığı durumlarda olur (AGF genelde koşu günü sabahı yayınlanır). Veri yayınlandıktan sonra tekrar deneyin.",
-    }, { status: 422 });
-  }
+  const veriYeterliligiUyarisi = onVeriDenetimi.yeterli
+    ? ""
+    : `\nVERİ YETERLİLİĞİ UYARISI (blokaj değil, güven ayarı): ${onVeriDenetimi.eksikler.join(" · ")} — bu genelde AGF/HP'nin henüz yayınlanmadığı durumlarda olur. Eksik alanları OLUMSUZ KANIT SAYMA; etkilenen atlarda Veri Güveni'ni C'ye çek ve gerekçede eksikliği açıkça belirt.\n`;
 
   const methodology = await db.methodologyVersion.findFirst({ where: { isCurrent: true } });
   const methodologyText = daraltilmisMetodoloji(
@@ -74,6 +71,7 @@ async function handlePost(req: NextRequest) {
         } ivme:${r.hpIvmesi ?? "?"}`,
         `  AGF:%${r.agf ?? "?"} sıra:${r.agfSirasi ?? "?"} | Form dizisi:${r.recentForm ?? "—"} (geriliyor=${r.bitirisGeriliyor} iyileşiyor=${r.bitirisIyilesiyor} son sonuç zayıf=${r.sonSonucZayif}) | En iyi derece:${r.bestTime ?? "—"}`,
         `  Tempo örneklem n:${r.tempoVeriN ?? "?"} stil:${r.raceStyleEtiket ?? "?"} kaçak:${r.kacak}`,
+        `  Accurace tempo/pozisyon eğilimi (GPS/sektörel, geçmiş yarışlardan, Veri Çifti Doktrini §I.4): ${r.accuraceEgilim ? `${r.accuraceEgilim.stil} %${r.accuraceEgilim.percent} (${r.accuraceEgilim.n} yarış)` : "veri yok (henüz Accurace kaydı birikmedi veya n<3, ceza değil)"}`,
         `  Sınıf: ${r.sinifOnceki ?? "?"} (SKK ${r.sinifSkkOnceki ?? "?"}) -> bugün ${faz1.race.classType} (SKK ${r.sinifSkkBugun ?? "?"}) düşüş=${r.sinifDususu}`,
         `  Takı: ${r.equipment ?? "—"} (eklenen:${r.equipmentAdded ?? "—"} çıkarılan:${r.equipmentRemoved ?? "—"})`,
         `  Galop: ${r.galopOzet} | kondisyon zinciri var=${r.kondisyonZinciriVar} keskin=${r.keskinGalopZinciri}`,
@@ -91,7 +89,7 @@ async function handlePost(req: NextRequest) {
 ${faz1.race.hippodromeName} — ${faz1.race.raceNo}. Koşu | ${faz1.race.classType} | ${faz1.race.breed} | ${faz1.race.distance}m ${faz1.race.surface} | ${faz1.runners.length} at
 Zemin: ${faz1.race.zeminEtiketi}${faz1.race.zeminDetayi ? ` (${faz1.race.zeminDetayi})` : ""} — kilo katsayısı ×${faz1.race.zeminKatsayisi} (Göreli kilo/zemin puanına dahil et)
 Saha kaçak haritası: ${faz1.race.sahadakiKacakSayisi} kaçak → tempo "${faz1.race.kacakTempoEtiketi}" — avantajlı: ${faz1.race.kacakAvantajliStil}
-
+${veriYeterliligiUyarisi}
 ## ATLAR (FAZ 1 — otomatik toplanmış ham veri, sitenin kendi TJK kaynağından)
 ${faz1Tablo}
 
@@ -113,6 +111,7 @@ ${methodologyText}`;
 3. Her at için A (0-60) ve B+C (0-40, Son800 bonusu HARİÇ — o ayrıca koddan eklenecek) puanı ver.
 4. Toplam puana göre ön teknik sıra belirle (1 = en iyi). Bu sıra FAZ 3'te geçit motoruna girdi olacak.
 5. "Kanıt yokluğu olumsuz kanıt değildir" ilkesine uy — eksik veriyi ceza sebebi yapma. "Tabloda tanımsız" olarak işaretlenmiş Ön-hesaplanmış alanlar (örn. HP Kalitesi) da bu ilkeye tabidir — boş/tanımsız olması ceza değildir, serbestçe değerlendir.
+6. Veri Çifti Doktrini'ni (§I.4) uygula: puanlama kalem kalem yapılır ama her kalemin YORUMU izole değil, eşleştiği veriyle BİRLİKTE okunarak yazılır (ör. "kaçak" etiketi tempo+son800 birlikte okunmadan konmaz; "form yükseliyor" HP ivmesiyle birlikte doğrulanmadan yazılmaz). Çiftlendiği veri yoksa (ör. ilk start) o veri tek başına sınırlı kanıt sayılır — ceza değil, yalnız ek güven kaybı.
 
 Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
 {
@@ -146,7 +145,7 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
     return NextResponse.json({ error: `Faz 2 (skorlama) yanıtı parse edilemedi${sebep}`, raw: faz2Raw }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, faz1, faz2, sharedContext });
+  return NextResponse.json({ ok: true, faz1, faz2, sharedContext, veriDenetimi: onVeriDenetimi });
 }
 
 export async function POST(req: NextRequest) {

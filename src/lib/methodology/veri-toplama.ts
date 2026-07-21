@@ -24,6 +24,12 @@ import {
   hpKalitesiYildizi, sinifGecisBonusu, galopSiniflandirmasi, tempoGuvenSeviyesi,
   kacakHaritasi, zeminKatsayisi, zeminDetayiBul, type GalopZinciriSonuc, type TempoGuven,
 } from "@/lib/methodology/mekanik-puanlama";
+import { analizEtTekYaris, hesaplaCokYarisEgilimi, type PaceCheckpoint, type CokYarisEgilim } from "@/lib/methodology/pace-analizi";
+
+const COMBINING_MARKS_RE = /[̀-ͯ]/g;
+function normalizeHorseName(s: string): string {
+  return s.toLocaleUpperCase("tr-TR").normalize("NFD").replace(COMBINING_MARKS_RE, "").replace(/[^A-ZİĞÜŞÖÇ0-9 ]/g, "").replace(/\s+/g, " ").trim();
+}
 
 // ── SKK Sınıf Piramidi (Ansiklopedi Bölüm III) — metin tabanlı en iyi eşleştirme ──
 function classToSkk(classType: string | null | undefined): number | null {
@@ -213,6 +219,12 @@ export type Faz1Runner = {
   sinifGecisBonusuPuan: number | null;
   galopSiniflandirma: GalopZinciriSonuc;
   tempoGuven: TempoGuven | null;
+
+  // Accurace (GPS/sektörel zamanlama) geçmişinden türetilmiş, birden fazla yarışın
+  // birleştirilmesiyle üretilen KALICI tempo/pozisyon eğilimi — n<3 ise null (tek
+  // yarıştan kalıcı stil çıkarılmaz, bkz. §I.4 Veri Çifti Doktrini). Bu alan bugünkü
+  // yarışın verisi DEĞİL, atın GEÇMİŞ yarışlarındaki tekrarlanan davranışıdır.
+  accuraceEgilim: CokYarisEgilim | null;
 };
 
 export type Faz1Sonuc = {
@@ -257,14 +269,30 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   const trainerNames = [...new Set(race.runners.map((r) => r.trainer).filter((t): t is string => !!t))];
 
   const { getJockeyStats, getTrainerStats } = await import("@/server/services/race.service");
-  const [jockeyStats, trainerStats, atPerformansRows, h2hEncounters, apprenticeRemainingMap] = await Promise.all([
+  const [jockeyStats, trainerStats, atPerformansRows, h2hEncounters, apprenticeRemainingMap, accuraceKayitlari] = await Promise.all([
     getJockeyStats(jockeyNames).catch(() => ({} as Awaited<ReturnType<typeof getJockeyStats>>)),
     getTrainerStats(trainerNames).catch(() => ({} as Awaited<ReturnType<typeof getTrainerStats>>)),
     getAtPerformansForRace(raceId).catch(() => []),
     getH2HForRace(raceId).catch(() => []),
     fetchApprenticeRemainingRaces().catch(() => ({}) as Record<string, number>),
+    db.accuraceHorseSplit.findMany({
+      where: { horseName: { in: race.runners.map((r) => r.name) } },
+      select: { horseName: true, checkpoints: true, accuraceRace: { select: { length: true } } },
+    }).catch(() => []),
   ]);
   const atPerformansMap = new Map(atPerformansRows.map((r) => [r.horseName, r.records]));
+
+  // Accurace GPS/sektörel geçmişinden atın KALICI tempo/pozisyon eğilimini üret —
+  // yalnız n≥3 yarış varsa (bkz. pace-analizi.ts, tek yarıştan kalıcı stil çıkarılmaz).
+  const accuraceEgilimMap = new Map<string, CokYarisEgilim | null>();
+  for (const r of race.runners) {
+    const norm = normalizeHorseName(r.name);
+    const kayitlar = accuraceKayitlari.filter((k) => normalizeHorseName(k.horseName) === norm);
+    const sonuclar = kayitlar
+      .map((k) => analizEtTekYaris(k.checkpoints as unknown as PaceCheckpoint[], k.accuraceRace.length ?? 0))
+      .filter((s): s is NonNullable<typeof s> => s != null);
+    accuraceEgilimMap.set(r.id, hesaplaCokYarisEgilimi(sonuclar));
+  }
 
   // Aynı eküriden (sahiplik) bu koşuda koşan diğer atların isim listesi, her at için.
   const ekuriMateMap = new Map<string, string[]>();
@@ -500,6 +528,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         aynıPistMesafeOzet, h2hOzet: h2hOzetFor(r.name),
         hpKalitesiYildizi: hpKalitesi, sinifGecisBonusuPuan: sinifBonusu,
         galopSiniflandirma: galopSinif, tempoGuven: tempoGuvenHesap,
+        accuraceEgilim: accuraceEgilimMap.get(r.id) ?? null,
       };
     })
   );

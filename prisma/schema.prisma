@@ -76,18 +76,18 @@ enum LessonCategory {
 // ─── AUTH & USERS ─────────────────────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  passwordHash  String?
-  name          String?
-  role          Role      @default(USER)
-  plan          Plan      @default(FREE)
-  emailVerified DateTime?
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  hasSeenIntro  Boolean   @default(false)
-  marketingConsent Boolean @default(false)
+  id               String    @id @default(cuid())
+  email            String    @unique
+  passwordHash     String?
+  name             String?
+  role             Role      @default(USER)
+  plan             Plan      @default(FREE)
+  emailVerified    DateTime?
+  image            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  hasSeenIntro     Boolean   @default(false)
+  marketingConsent Boolean   @default(false)
 
   predictions   Prediction[]
   articles      Article[]
@@ -190,58 +190,62 @@ model Race {
   trackRecord String?
   createdAt   DateTime @default(now())
 
-  raceDay    RaceDay     @relation(fields: [raceDayId], references: [id], onDelete: Cascade)
-  runners    Runner[]
-  prediction Prediction?
-  result     Result?
+  raceDay      RaceDay       @relation(fields: [raceDayId], references: [id], onDelete: Cascade)
+  runners      Runner[]
+  prediction   Prediction?
+  result       Result?
+  accuraceRace AccuraceRace?
 
   @@unique([raceDayId, raceNo])
 }
 
 model Runner {
-  id               String  @id @default(cuid())
-  raceId           String
-  no               Int
-  name             String
-  sire             String?
-  dam              String?
-  damSire          String?
-  pedigreeNote     String?
-  adminNote        String?
-  jockey           String?
-  trainer          String?
-  startNo          Int?
-  disaridanStart   Boolean @default(false)
-  weight           Float?
-  weightChange     Float?
-  equipment        String?
-  equipmentAdded   String?
-  equipmentRemoved String?
-  sameJockey       Boolean @default(false)
-  agf              Float?
-  raceStyle        Json?
-  recentForm       String?
-  jockeyChanged    Boolean @default(false)
-  previousJockey   String?
-  age              String?
-  owner            String?
-  hp               Int?
-  bestTime         String?
+  id                 String  @id @default(cuid())
+  raceId             String
+  no                 Int
+  name               String
+  sire               String?
+  dam                String?
+  damSire            String?
+  pedigreeNote       String?
+  adminNote          String?
+  jockey             String?
+  trainer            String?
+  startNo            Int?
+  disaridanStart     Boolean @default(false)
+  weight             Float?
+  weightChange       Float?
+  equipment          String?
+  equipmentAdded     String?
+  equipmentRemoved   String?
+  sameJockey         Boolean @default(false)
+  agf                Float?
+  raceStyle          Json?
+  recentForm         String?
+  jockeyChanged      Boolean @default(false)
+  previousJockey     String?
+  age                String?
+  owner              String?
+  hp                 Int?
+  bestTime           String?
   recentFormSurfaces String?
-  scratched        Boolean @default(false)
-  ekuriGroup       Int?
-  apprentice       Boolean @default(false)
-  tjkAtId          Int?
+  scratched          Boolean @default(false)
+  ekuriGroup         Int?
+  apprentice         Boolean @default(false)
+  tjkAtId            Int?
 
-  race         Race          @relation(fields: [raceId], references: [id], onDelete: Cascade)
-  gallops      Gallop[]
-  picks        Pick[]
-  agfSnapshots AgfSnapshot[]
+  race           Race                 @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  gallops        Gallop[]
+  picks          Pick[]
+  agfSnapshots   AgfSnapshot[]
+  accuraceSplits AccuraceHorseSplit[]
 
   @@unique([raceId, no])
 }
 
-/** AGF senkronizasyonu her çalıştığında (günde 4 kez) atılan an'lık AGF kaydı — zaman içindeki para hareketini (steam) görmek için. */
+/**
+ * AGF senkronizasyonu her çalıştığında (günde 4 kez) atılan an'lık AGF kaydı — zaman içindeki para hareketini (steam) görmek için.
+ */
 model AgfSnapshot {
   id         String   @id @default(cuid())
   runnerId   String
@@ -264,6 +268,50 @@ model Gallop {
   splits   Json
 
   runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+}
+
+// Accurace.net (GPS/sektörel zamanlama sağlayıcısı) bir yarışın 100m'lik her
+// bölümündeki sıra+geçiş süresini veriyor — TJK'nın resmi sitesi bunu hiç yayınlamıyor,
+// yalnız bitiş derecesi/ganyan var. "raw" tam çözümlenmiş kaynak veriyi tutar (ileride
+// yeniden işlemek — örn. yeni bir tempo metriği eklemek — için yeniden çekmeye gerek
+// kalmasın diye); officialTimes TJK'nın resmi (Accurace'in KENDİ ölçümü değil) bitiş
+// dereceleridir, sırayla (1.den sonuncuya) verilir.
+model AccuraceRace {
+  id            String   @id @default(cuid())
+  raceId        String?  @unique
+  date          DateTime
+  citySlug      String
+  hippodrome    String?
+  raceNo        Int
+  length        Int?
+  ground        String?
+  officialTimes Json?
+  fetchedAt     DateTime @default(now())
+  raw           Json
+
+  race   Race?                @relation(fields: [raceId], references: [id], onDelete: SetNull)
+  splits AccuraceHorseSplit[]
+
+  @@unique([date, citySlug, raceNo])
+}
+
+// Bir atın bir yarıştaki her 100m'lik checkpoint'teki (kümülatif) geçiş süresi + o
+// andaki sırası. checkpoints: [{checkpoint:100, timeReal:8443, place:1}, ...] (timeReal ms).
+model AccuraceHorseSplit {
+  id             String  @id @default(cuid())
+  accuraceRaceId String
+  runnerId       String?
+  horseName      String
+  horseNumber    Int
+  place          Int
+  finishTimeReal Int
+  checkpoints    Json
+
+  accuraceRace AccuraceRace @relation(fields: [accuraceRaceId], references: [id], onDelete: Cascade)
+  runner       Runner?      @relation(fields: [runnerId], references: [id], onDelete: SetNull)
+
+  @@unique([accuraceRaceId, horseNumber])
+  @@index([horseName])
 }
 
 // Admin-maintained sire reputation reference — powers automatic pedigree scoring.
@@ -414,18 +462,18 @@ model HorseFollow {
 // garantisi yoktur.
 
 model ClaudeUsageLog {
-  id                     String   @id @default(cuid())
-  createdAt              DateTime @default(now())
-  raceId                 String?
-  phase                  String // "faz2" | "faz4"
-  model                  String
-  inputTokens            Int
-  outputTokens           Int
+  id                       String   @id @default(cuid())
+  createdAt                DateTime @default(now())
+  raceId                   String?
+  phase                    String // "faz2" | "faz4"
+  model                    String
+  inputTokens              Int
+  outputTokens             Int
   // Prompt cache (Faz2/Faz4 arasında paylaşılan bağlam) devreye girdikten sonra eklendi —
   // bunlar olmadan gerçek maliyet olduğundan DÜŞÜK görünüyordu, çünkü cache yazma/okuma
   // token'ları inputTokens'a hiç dahil değil (Anthropic bunları ayrı sayaçlarda döner).
-  cacheCreationInputTokens Int @default(0)
-  cacheReadInputTokens     Int @default(0)
+  cacheCreationInputTokens Int      @default(0)
+  cacheReadInputTokens     Int      @default(0)
 
   @@index([createdAt])
 }
@@ -472,7 +520,7 @@ model HomeKupon {
   id             String   @id @default(cuid())
   hippodromeName String
   date           DateTime
-  legs           Json     // [{ raceNo: number, narrow: number[], normal: number[], wide: number[] }]
+  legs           Json // [{ raceNo: number, narrow: number[], normal: number[], wide: number[] }]
   slot           Int      @default(1) // 1 = 1. Altılı, 2 = 2. Altılı — her slot kendi başına aktif olabilir
   isActive       Boolean  @default(false)
   createdAt      DateTime @default(now())
@@ -495,7 +543,7 @@ model EngineConfig {
 // ─── SITE SETTINGS ───────────────────────────────────────────────────────────
 
 model SiteSetting {
-  key       String   @id  // örn. "banner_url"
+  key       String   @id // örn. "banner_url"
   value     String
   updatedAt DateTime @updatedAt
 }
@@ -503,12 +551,12 @@ model SiteSetting {
 // ─── BANNER SLIDES ───────────────────────────────────────────────────────────
 
 model BannerSlide {
-  id        String   @id @default(cuid())
-  url       String
-  storagePath String  // Supabase'deki dosya yolu (silme için)
-  order     Int      @default(0)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  url         String
+  storagePath String // Supabase'deki dosya yolu (silme için)
+  order       Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
 
   @@index([active, order])
 }
@@ -516,12 +564,12 @@ model BannerSlide {
 // ─── JOKEY STAT SYNC (TJK'dan çekilen) ───────────────────────────────────────
 
 model JockeyStatSync {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   jockey           String
-  hippoSlug        String   // "overall" veya hippodrome slug (ankara, istanbul, ...)
+  hippoSlug        String // "overall" veya hippodrome slug (ankara, istanbul, ...)
   year             Int
-  breed            String?  // "INGILIZ" | "ARAP" | null = hepsi
-  surface          String?  // "CIM" | "KUM" | "SENTETIK" | null = hepsi
+  breed            String? // "INGILIZ" | "ARAP" | null = hepsi
+  surface          String? // "CIM" | "KUM" | "SENTETIK" | null = hepsi
   rides            Int
   wins             Int
   place2           Int
@@ -535,8 +583,8 @@ model JockeyStatSync {
   performanceScore Float?
   confidenceLabel  String?
   jsonCutoffDate   DateTime? // JSON import tarihi — auto-sync bu tarihten sonraki yarışları ekler
-  jsonBaseline     Json?     // JSON import anındaki sabit taban (rides/wins/place2-5) — auto-sync asla üzerine yazmaz
-  updatedAt        DateTime @updatedAt
+  jsonBaseline     Json? // JSON import anındaki sabit taban (rides/wins/place2-5) — auto-sync asla üzerine yazmaz
+  updatedAt        DateTime  @updatedAt
 
   @@unique([jockey, hippoSlug, year, breed, surface])
   @@index([hippoSlug, year, breed, surface])

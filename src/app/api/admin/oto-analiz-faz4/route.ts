@@ -103,7 +103,7 @@ ${gecitMetin}
 2. AGF_AYRIŞMA yalnız gerçek taşımayla çözülür, gerekçeyle ASLA.
 3. Bu otomatik pipeline'da admin'in elle çözüm girmesi mümkün değildir — bu yüzden varsayılan davranış her zaman "taşı"dır.
 4. FAZ 2 puanlarına ve geçit sonuçlarına göre FİNAL sıralamayı belirle — **en iyi 8 at için** (saha 8'den küçükse sahadaki TÜM atlar için) tek tek "picks" girdisi üret, rank 1'den başlayarak. ZORUNLU TUTARLILIK: "score" alanı rank sırasıyla ÇELİŞMEMELİ — rank 1'in score'u rank 2'ninkinden düşük OLAMAZ. Bir at geçit tetiklemesiyle öne taşındıysa (ham FAZ 2 puanı daha düşük olsa bile), score alanını bu yeni konumu yansıtacak şekilde YUKARI güncelle (örn. gecitSkoru bonusunu ekle) — gösterilen puan ile sıralama asla çelişmemeli, yarışseverin "neden düşük puanlı at daha üstte" diye sorması YASAK.
-5. Banko şartlarını kontrol et (dördü birden: puan≥75, rakibe fark≥5, Veri Güveni A, somut risk yok — Handikap/Grup'ta ekstra dikkatli ol, aşırı piyasa konsensüsü varsa banko yapma).
+5. Banko şartlarını kontrol et (dördü birden — TOPLAM puana göre DEĞİL, A puanına göre: A≥50, A farkı≥3 [A'dan hesaplanır, toplamdan değil], Veri Güveni A, somut risk yok — Handikap/Grup'ta ekstra dikkatli ol, aşırı piyasa konsensüsü [AGF>%50 + ganyan<1.50] varsa banko yapma, dar kuponda tut).
 6. Ekonomik/Normal/Geniş kupon önerisi üret — sahadaki atları üç gruba böl (kupon numaraları at numarasıdır):
    - Ekonomik: final sıralamandaki en iyi 3 at.
    - Normal: sıralamada onları izleyen 3 at (Ekonomik'te olmayan farklı 3 at).
