@@ -233,25 +233,41 @@ export default function RacePedigreeTable({ runners }: { runners: Runner[] }) {
     setSavedIds((prev) => new Set(prev).add(id));
   }
 
-  function applyBulk() {
+  // Ayrıştırma + kaydetme TEK adımda — önceden "Ayrıştır ve Doldur" yalnız formu
+  // dolduruyordu, ayrıca "Tümünü Kaydet"e basılması gerekiyordu; bu ikinci adım
+  // gözden kaçtığı için (kullanıcı verisini girip kaydetmeden çıktığı) defalarca
+  // "girdim ama yansımadı" sorununa yol açtı — artık ayrı bir adım yok.
+  async function applyBulk() {
     const entries = parseBulkPedigree(bulkText, runners.map((r) => r.name));
     const misses: string[] = [];
-    let hits = 0;
+    const matched: { id: string; form: FormState }[] = [];
+    for (const entry of entries) {
+      const target = runners.find((r) => normalizeName(r.name) === normalizeName(entry.name));
+      if (!target) {
+        misses.push(entry.name);
+        continue;
+      }
+      matched.push({
+        id: target.id,
+        form: { ...forms[target.id], sire: entry.sire, dam: entry.dam, damSire: entry.damSire, pedigreeNote: entry.note },
+      });
+    }
     setForms((prev) => {
       const next = { ...prev };
-      for (const entry of entries) {
-        const target = runners.find((r) => normalizeName(r.name) === normalizeName(entry.name));
-        if (!target) {
-          misses.push(entry.name);
-          continue;
-        }
-        hits++;
-        next[target.id] = { ...next[target.id], sire: entry.sire, dam: entry.dam, damSire: entry.damSire, pedigreeNote: entry.note };
-      }
+      for (const m of matched) next[m.id] = m.form;
       return next;
     });
     setUnmatched(misses);
-    setMatchedCount(hits);
+    setMatchedCount(matched.length);
+    if (matched.length === 0) return;
+    setBulkSaving(true);
+    await Promise.all(matched.map((m) => updateRunnerPedigree(m.id, m.form)));
+    setBulkSaving(false);
+    setSavedIds((prev) => {
+      const next = new Set(prev);
+      for (const m of matched) next.add(m.id);
+      return next;
+    });
   }
 
   async function saveAll() {
@@ -261,25 +277,34 @@ export default function RacePedigreeTable({ runners }: { runners: Runner[] }) {
     setSavedIds(new Set(runners.map((r) => r.id)));
   }
 
-  function applyNoteBulk() {
+  async function applyNoteBulk() {
     const entries = parseBulkNotes(noteBulkText, runners.map((r) => r.name));
     const misses: string[] = [];
-    let hits = 0;
+    const matched: { id: string; form: FormState }[] = [];
+    for (const entry of entries) {
+      const target = runners.find((r) => normalizeName(r.name) === normalizeName(entry.name));
+      if (!target) {
+        misses.push(entry.name);
+        continue;
+      }
+      matched.push({ id: target.id, form: { ...forms[target.id], adminNote: entry.note } });
+    }
     setForms((prev) => {
       const next = { ...prev };
-      for (const entry of entries) {
-        const target = runners.find((r) => normalizeName(r.name) === normalizeName(entry.name));
-        if (!target) {
-          misses.push(entry.name);
-          continue;
-        }
-        hits++;
-        next[target.id] = { ...next[target.id], adminNote: entry.note };
-      }
+      for (const m of matched) next[m.id] = m.form;
       return next;
     });
     setNoteUnmatched(misses);
-    setNoteMatchedCount(hits);
+    setNoteMatchedCount(matched.length);
+    if (matched.length === 0) return;
+    setNoteBulkSaving(true);
+    await Promise.all(matched.map((m) => updateRunnerPedigree(m.id, m.form)));
+    setNoteBulkSaving(false);
+    setSavedIds((prev) => {
+      const next = new Set(prev);
+      for (const m of matched) next.add(m.id);
+      return next;
+    });
   }
 
   async function saveNoteBulk() {
@@ -303,8 +328,9 @@ export default function RacePedigreeTable({ runners }: { runners: Runner[] }) {
       {bulkOpen && (
         <div className="border-b bg-muted/10 px-3 py-3 space-y-2">
           <p className="text-[11px] text-muted-foreground">
-            &quot;1. At Adı / Babası (Aygır): açıklama / Anne Hattı (Anne / Anne Babası): açıklama&quot; biçimindeki
-            metni buraya yapıştırın — atlar isme göre bu koşudaki atlarla otomatik eşleştirilir.
+            &quot;1. At Adı (Baba - Anne / Anne Babası): açıklama&quot; ya da tamamen serbest paragraf
+            (&quot;AT ADI&quot; satırından sonra istediğin kadar metin) — numara şart değil, atlar
+            isme göre bu koşudaki atlarla otomatik eşleştirilir ve doğrudan kaydedilir.
           </p>
           <textarea
             value={bulkText}
@@ -316,10 +342,11 @@ export default function RacePedigreeTable({ runners }: { runners: Runner[] }) {
           <div className="flex items-center gap-2">
             <button
               onClick={applyBulk}
-              disabled={!bulkText.trim()}
-              className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground hover:bg-brand/90 disabled:opacity-50"
+              disabled={!bulkText.trim() || bulkSaving}
+              className="flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground hover:bg-brand/90 disabled:opacity-50"
             >
-              Ayrıştır ve Doldur
+              {bulkSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              Ayrıştır ve Kaydet
             </button>
             <button
               onClick={saveAll}
@@ -331,7 +358,7 @@ export default function RacePedigreeTable({ runners }: { runners: Runner[] }) {
             </button>
           </div>
           {matchedCount != null && (
-            <p className="text-[11px] text-hit">{matchedCount} at eşleşti ve dolduruldu.</p>
+            <p className="text-[11px] text-hit">{matchedCount} at eşleşti ve kaydedildi.</p>
           )}
           {unmatched.length > 0 && (
             <p className="text-[11px] text-miss">
@@ -355,8 +382,8 @@ export default function RacePedigreeTable({ runners }: { runners: Runner[] }) {
         <div className="border-b bg-muted/10 px-3 py-3 space-y-2">
           <p className="text-[11px] text-muted-foreground">
             Pedigri dışında herhangi bir eksik veriyi buradan girebilirsiniz (sakatlık haberi, antrenman
-            gözlemi, pist/hava notu vb.) — otomatik analiz motoru bu notu okur ve dikkate alır. Biçim:
-            &quot;1. At Adı: not metni&quot;, her satıra bir at.
+            gözlemi, pist/hava notu vb.) — otomatik analiz motoru bu notu okur ve dikkate alır. &quot;At Adı: not&quot;
+            ya da &quot;AT ADI&quot; satırından sonra serbest paragraf — numara şart değil, isme göre eşleşir ve kaydedilir.
           </p>
           <textarea
             value={noteBulkText}
@@ -368,10 +395,11 @@ export default function RacePedigreeTable({ runners }: { runners: Runner[] }) {
           <div className="flex items-center gap-2">
             <button
               onClick={applyNoteBulk}
-              disabled={!noteBulkText.trim()}
-              className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground hover:bg-brand/90 disabled:opacity-50"
+              disabled={!noteBulkText.trim() || noteBulkSaving}
+              className="flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground hover:bg-brand/90 disabled:opacity-50"
             >
-              Ayrıştır ve Doldur
+              {noteBulkSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              Ayrıştır ve Kaydet
             </button>
             <button
               onClick={saveNoteBulk}
@@ -383,7 +411,7 @@ export default function RacePedigreeTable({ runners }: { runners: Runner[] }) {
             </button>
           </div>
           {noteMatchedCount != null && (
-            <p className="text-[11px] text-hit">{noteMatchedCount} at eşleşti ve dolduruldu.</p>
+            <p className="text-[11px] text-hit">{noteMatchedCount} at eşleşti ve kaydedildi.</p>
           )}
           {noteUnmatched.length > 0 && (
             <p className="text-[11px] text-miss">
