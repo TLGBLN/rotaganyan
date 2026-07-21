@@ -124,10 +124,12 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
   const faz2Msg = await createWithTruncationRetry(
     {
       model: "claude-sonnet-5",
-      // Adaptive thinking AÇIK — kullanıcı deneyi yaptı (thinking kapalıyken hem puanlar
-      // sıkışık/mekanik çıktı hem somut bir puan-sıra tutarsızlığı görüldü) ve kaliteyi
-      // maliyete tercih ederek açık kalmasına karar verdi (10 koşu/gün ~$4 kabul edildi).
-      thinking: { type: "adaptive" },
+      // GEÇİCİ DENEY 2 (2026-07-21): mekanik ön-hesaplama (HP yıldızı/sınıf bonusu/galop
+      // sınıflandırma/tempo güven/zemin/kaçak haritası) ve zenginleştirilmiş metodoloji
+      // eklendikten SONRA thinking kapalıyken kalite nasıl davranıyor, kullanıcı bugünkü
+      // gerçek koşularla yeniden test ediyor — bkz. [[thinking-acik-kalmali]]. Deney
+      // bitince (thinking:"adaptive"e) geri alınacak.
+      thinking: { type: "disabled" },
       max_tokens: 20000,
       output_config: { format: { type: "json_schema", schema: FAZ2_SCHEMA } },
       messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz2Tail }] }],
