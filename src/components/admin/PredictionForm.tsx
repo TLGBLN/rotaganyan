@@ -136,11 +136,11 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
         score: p.score,
         isTarget: p.isTarget,
         pedigreeRating: p.pedigreeRating,
-        // Kilit Gerekçe (uzun makale tadında gerekçe metni) maliyet nedeniyle kaldırıldı —
-        // Faz 4 artık bu metni üretmiyor. p.details ("AGF1" gibi kısa iç etiketler) admin
-        // önizlemesinde ayrı rozet olarak zaten gösteriliyor (AIAnalysisPanel), buraya
-        // (public "Kilit Gerekçe" alanına) yazılmıyor.
-        details: "",
+        // Kilit Gerekçe — Faz 4'ün ürettiği 3-5 cümlelik makale tadında gerekçe metni,
+        // public "Kilit Gerekçe" sütununa gidiyor. p.details ("AGF1" gibi kısa iç
+        // etiketler) ayrıca admin önizlemesinde rozet olarak gösteriliyor (AIAnalysisPanel),
+        // buraya karıştırılmıyor — yalnız okunabilir gerekçe metni kullanıcıya gidiyor.
+        details: p.note ?? "",
       };
     });
     replace(aiPicks);

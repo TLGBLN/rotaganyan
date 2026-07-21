@@ -109,12 +109,13 @@ ${gecitMetin}
    - Normal: sıralamada onları izleyen 3 at (Ekonomik'te olmayan farklı 3 at).
    - Geniş: sahada kalan TÜM diğer atlar (Ekonomik ve Normal'de olmayanların hepsi — koşulmayan/çekilen atlar hariç).
    Alanları "X-Y-Z" formatında, at numaralarıyla doldur. Saha 6 attan azsa Normal'i mevcut atlarla doldur, Geniş boş kalabilir.
-7. "details" alanına yalnızca kısa iç etiketler yaz (örn. "AGF1", "Galop K1", "Sınıf düşüşü") — uzun yazı YAZMA, makale/gerekçe metni İSTENMİYOR.
+7. "details" alanına yalnızca kısa iç etiketler yaz (örn. "AGF1", "Galop K1", "Sınıf düşüşü") — admin önizlemesinde ayrı rozet olarak gösterilir, kullanıcıya gitmez.
+8. "note" alanına o at için 3-5 cümlelik, makale tadında, okunabilir bir gerekçe yaz — bu metin doğrudan kullanıcıya (public "Kilit Gerekçe" sütununa) gidiyor. A/B+C/Atomic Force/HP ivmesi/geçit skoru gibi iç terimler burada GEÇMEZ (bkz. Sunum Kuralı) — sade, yarışseverin anlayacağı dille, o atı neden bu sırada değerlendirdiğini anlat (galop, pedigri, form, sınıf, kilo, tempo gibi somut kanıtlara dayanarak).
 
 Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
 {
   "picks": [
-    { "rank": 1, "no": 0, "name": "...", "score": 0, "pedigreeRating": "BILINMIYOR", "isTarget": false, "details": [] }
+    { "rank": 1, "no": 0, "name": "...", "score": 0, "pedigreeRating": "BILINMIYOR", "isTarget": false, "details": [], "note": "3-5 cümlelik gerekçe" }
   ],
   "confidence": "ORTA",
   "isBanko": false,
@@ -190,7 +191,7 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
   let sonrakiRank = result.picks.length > 0 ? Math.max(...result.picks.map((p) => p.rank)) + 1 : 1;
   const ekPicks: Faz4Pick[] = kalanlar.map((r) => ({
     rank: sonrakiRank++, no: r.no, name: r.name, score: r.score,
-    pedigreeRating: "BILINMIYOR", isTarget: false, details: [],
+    pedigreeRating: "BILINMIYOR", isTarget: false, details: [], note: "",
   }));
   result.picks = [...result.picks, ...ekPicks];
 

@@ -240,8 +240,12 @@ export const FAZ4_SCHEMA = {
           },
           isTarget: { type: "boolean" },
           details: { type: "array", items: { type: "string" } },
+          // Kilit Gerekçe — public "Kilit Gerekçe" sütununa giden, 3-5 cümlelik makale
+          // tadında gerekçe metni. Maliyet nedeniyle bir ara kaldırılmıştı (bkz. proje
+          // notu), kullanıcı bilinçli olarak (küçük ek maliyeti kabul ederek) geri istedi.
+          note: { type: "string" },
         },
-        required: ["rank", "no", "name", "score", "pedigreeRating", "isTarget", "details"],
+        required: ["rank", "no", "name", "score", "pedigreeRating", "isTarget", "details", "note"],
         additionalProperties: false,
       },
     },
@@ -267,7 +271,7 @@ export type Faz2Atlar = {
 
 export type Faz4Pick = {
   rank: number; no: number; name: string; score: number;
-  pedigreeRating: string; isTarget: boolean; details: string[];
+  pedigreeRating: string; isTarget: boolean; details: string[]; note: string;
 };
 export type Faz4Result = {
   picks: Faz4Pick[]; confidence: string; isBanko: boolean; bankoNote: string;
