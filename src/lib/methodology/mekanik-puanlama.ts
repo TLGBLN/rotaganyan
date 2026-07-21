@@ -60,10 +60,15 @@ export function galopSiniflandirmasi(
   let toplam = 0;
   for (const g of gallops) {
     const splits = g.splits ?? {};
+    // TJK idman verisi iç/dış pist bilgisini splits içinde "ic_dis" alanında taşır
+    // ("İç" / "Dış" ya da boş). Ansiklopedi §VI: "İç pist: ~1sn daha yavaş değerlendir" —
+    // galopQuality() bunu zaten destekliyordu ama buradan hiç iletilmiyordu, tüm iç pist
+    // galopları haksız yere daha yavaş görünüp barem tablosunda daha düşük sınıflanıyordu.
+    const isInner = splits["ic_dis"] === "İç";
     for (const dist of GALOP_BAREM_DISTS) {
       const t = splits[dist];
       if (!t) continue;
-      const q = galopQuality(dist, t, breed, false);
+      const q = galopQuality(dist, t, breed, isInner);
       if (q == null) continue;
       toplam += 1;
       if (q === "cok_iyi") cokIyi += 1;

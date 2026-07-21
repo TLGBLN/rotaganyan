@@ -395,7 +395,8 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       if (enSonGalop) {
         const s = (enSonGalop.splits as Record<string, string | null> | null) ?? {};
         const finish = s["400"] ?? null;
-        const q = galopQuality("400", finish, race.breed, false);
+        // §VI "İç pist: ~1sn daha yavaş değerlendir" — bkz. mekanik-puanlama.ts galopSiniflandirmasi yorumu.
+        const q = galopQuality("400", finish, race.breed, s["ic_dis"] === "İç");
         keskinGalopZinciri = q === "cok_iyi" || q === "iyi";
       }
 
