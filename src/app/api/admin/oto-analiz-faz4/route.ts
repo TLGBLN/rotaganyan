@@ -110,7 +110,7 @@ ${gecitMetin}
    - Geniş: sahada kalan TÜM diğer atlar (Ekonomik ve Normal'de olmayanların hepsi — koşulmayan/çekilen atlar hariç).
    Alanları "X-Y-Z" formatında, at numaralarıyla doldur. Saha 6 attan azsa Normal'i mevcut atlarla doldur, Geniş boş kalabilir.
 7. "details" alanına yalnızca kısa iç etiketler yaz (örn. "AGF1", "Galop K1", "Sınıf düşüşü") — admin önizlemesinde ayrı rozet olarak gösterilir, kullanıcıya gitmez.
-8. "note" alanına o at için 3-5 cümlelik, makale tadında, okunabilir bir gerekçe yaz — bu metin doğrudan kullanıcıya (public "Kilit Gerekçe" sütununa) gidiyor. A/B+C/Atomic Force/HP ivmesi/geçit skoru gibi iç terimler burada GEÇMEZ (bkz. Sunum Kuralı) — sade, yarışseverin anlayacağı dille, o atı neden bu sırada değerlendirdiğini anlat (galop, pedigri, form, sınıf, kilo, tempo gibi somut kanıtlara dayanarak).
+8. "note" alanına o at için 3-5 cümlelik, makale tadında, okunabilir bir gerekçe yaz — bu metin doğrudan kullanıcıya (public "Kilit Gerekçe" sütununa) gidiyor. A/B+C/Atomic Force/HP ivmesi/geçit skoru gibi iç terimler burada GEÇMEZ (bkz. Sunum Kuralı) — sade, yarışseverin anlayacağı dille, o atı neden bu sırada değerlendirdiğini anlat (galop, pedigri, form, sınıf, kilo, tempo gibi somut kanıtlara dayanarak). Pedigri hakkında konuşurken §IX'daki "Aygır/hat hakkında uydurma bilgi yasak" kuralına UY — yukarıda verilmeyen bir aygır/hat hakkında (referans tablosunda/pedigreeNote'ta/adminNote'ta yoksa) spesifik mesafe/pist/karakter iddiası YAZMA, yalnız verilen ham veriyle (isim var/yok, F% gibi) sınırlı kal.
 
 Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
 {
