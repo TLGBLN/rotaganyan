@@ -50,6 +50,14 @@ function classToSkk(classType: string | null | undefined): number | null {
     if (n === 1 || n === 27) return 1;
   }
   if (/MAIDEN/.test(t)) return 2;
+  // Satış 1-4, Ansiklopedi'nin SKK piramidinde resmen yok (TJK bunu ayrı bir kategori
+  // olarak tanımlıyor) — ama Sınıf Geçiş Bonusu hiç hesaplanamamasındansa, kullanıcının
+  // onayladığı yaklaşık eşleştirme kullanılıyor: Satış N ≈ Şartlı N (1-4) kademesi.
+  const satisMatch = t.match(/SAT(?:IŞ|IS)\s*(\d)/);
+  if (satisMatch) {
+    const n = parseInt(satisMatch[1], 10);
+    if (n >= 1 && n <= 4) return n;
+  }
   return null;
 }
 
