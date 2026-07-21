@@ -137,6 +137,13 @@ function buildShareText(picks: ProgramPick[], raceNo: number, hippodromeName?: s
   return `${yer}${raceNo}. Koşu Rotaganyan analizi: ${nos} 🐎`;
 }
 
+/** Pick.details dizisinden (A:/B:/C: gibi eski-format iç etiketleri hariç tutarak) okunabilir gerekçe metnini çıkarır. */
+function gerekceFrom(details: string[] | undefined | null): string | null {
+  if (!details || details.length === 0) return null;
+  const gerekce = details.filter((d) => !/^[ABC](\+C)?:\s*/.test(d)).join(" ");
+  return gerekce || null;
+}
+
 function XLogo({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
@@ -245,6 +252,7 @@ function AnalysisPanel({
               <th className="px-2 py-2 text-center w-8">No</th>
               <th className="px-2 py-2 text-left">At</th>
               <th className="px-2 py-2 text-center w-14 font-bold">Toplam</th>
+              <th className="hidden px-2 py-2 text-left md:table-cell">Kilit Gerekçe</th>
             </tr>
           </thead>
           <tbody>
@@ -252,6 +260,7 @@ function AnalysisPanel({
               const { no, name } = pickDisplay(p);
               const isWinner = winnerNo != null && p.runner?.no === winnerNo;
               const rs = rankStyle(p.rank);
+              const gerekce = gerekceFrom(p.details);
               return (
                 <tr key={p.rank} className={cn("border-b last:border-0", isWinner && "bg-[#f5c518]/10")}>
                   <td className="px-2 py-2 text-center">
@@ -279,6 +288,7 @@ function AnalysisPanel({
                   <td className="px-2 py-2 text-center tabular-nums font-bold">
                     {p.score != null ? <span>{p.score}</span> : "—"}
                   </td>
+                  <td className="hidden px-2 py-2 text-muted-foreground md:table-cell">{gerekce ?? "—"}</td>
                 </tr>
               );
             })}
@@ -288,6 +298,7 @@ function AnalysisPanel({
                 <td className="px-2 py-2 text-center font-mono text-muted-foreground">{r.no}</td>
                 <td className="px-2 py-2 text-muted-foreground">{r.name}</td>
                 <td className="px-2 py-2 text-center text-muted-foreground">—</td>
+                <td className="hidden px-2 py-2 text-muted-foreground md:table-cell">—</td>
               </tr>
             ))}
           </tbody>
@@ -323,6 +334,9 @@ function AnalysisPanel({
               <div className="flex gap-3 text-[11px] text-muted-foreground mb-1">
                 {p.score != null && <span>Toplam: <span className="font-bold text-foreground">{p.score}</span></span>}
               </div>
+              {gerekceFrom(p.details) && (
+                <p className="text-[11px] text-muted-foreground leading-snug">{gerekceFrom(p.details)}</p>
+              )}
             </div>
           );
         })}

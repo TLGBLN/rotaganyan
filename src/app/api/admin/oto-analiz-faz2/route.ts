@@ -124,12 +124,11 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
   const faz2Msg = await createWithTruncationRetry(
     {
       model: "claude-sonnet-5",
-      // GEÇİCİ DENEY 2 (2026-07-21): mekanik ön-hesaplama (HP yıldızı/sınıf bonusu/galop
-      // sınıflandırma/tempo güven/zemin/kaçak haritası) ve zenginleştirilmiş metodoloji
-      // eklendikten SONRA thinking kapalıyken kalite nasıl davranıyor, kullanıcı bugünkü
-      // gerçek koşularla yeniden test ediyor — bkz. [[thinking-acik-kalmali]]. Deney
-      // bitince (thinking:"adaptive"e) geri alınacak.
-      thinking: { type: "disabled" },
+      // GEÇİCİ DENEY 2 sonucu: thinking kapalıyken bir kez daha (mekanik ön-hesaplama
+      // sonrası) benzer bir kalite şüphesi görüldü (pedigri-mesafe uyumsuzluğu metinde
+      // doğru tespit edilmiş ama puana orantılı yansıyıp yansımadığı belirsiz). Karşılaştırma
+      // için thinking geri açıldı — bkz. [[thinking-acik-kalmali]].
+      thinking: { type: "adaptive" },
       max_tokens: 20000,
       output_config: { format: { type: "json_schema", schema: FAZ2_SCHEMA } },
       messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz2Tail }] }],
