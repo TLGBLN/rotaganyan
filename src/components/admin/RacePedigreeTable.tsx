@@ -180,7 +180,7 @@ function parseBulkPedigree(text: string, runnerNames: string[]): ParsedEntry[] {
     }
 
     // (A) Parantez yok — devamı yapılandırılmış "Babası/Anne Hattı" etiketleriyle mi geliyor?
-    const sireMatch = content.match(/Babas[ıİi]\s*\(([^)]+)\)\s*:\s*([\s\S]*?)(?=\s*Anne\s*Hatt[ıİi]\s*\(|$)/i);
+    const sireMatch = content.match(/Baba(?:s[ıİi]|\s*Hatt[ıİi])\s*\(([^)]+)\)\s*:\s*([\s\S]*?)(?=\s*Anne\s*Hatt[ıİi]\s*\(|$)/i);
     const damMatch = content.match(/Anne\s*Hatt[ıİi]\s*\(([^)]+)\)\s*:\s*([\s\S]*)$/i);
 
     const sire = sireMatch ? sireMatch[1].trim() : "";

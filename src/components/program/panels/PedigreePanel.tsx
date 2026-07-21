@@ -31,6 +31,9 @@ export default function PedigreePanel({ runners }: { runners: ProgramRunner[] })
             {r.pedigreeNote && (
               <div className="text-[11px] text-muted-foreground mt-1 leading-snug">{r.pedigreeNote}</div>
             )}
+            {r.adminNote && (
+              <div className="text-[11px] text-muted-foreground mt-1 leading-snug">{r.adminNote}</div>
+            )}
           </div>
         ))}
       </div>
