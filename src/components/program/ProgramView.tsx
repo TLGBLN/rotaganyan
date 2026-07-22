@@ -177,6 +177,15 @@ function PistMesafeInfoButton({
 }) {
   const [data, setData] = useState<PistMesafeStilSonuc | "loading" | "error" | "idle">("idle");
 
+  // ÖNEMLİ: bu bileşen koşu değiştiğinde YENİDEN MOUNT OLMUYOR — üst bileşen
+  // (RaceTable) tek bir "seçili koşu" state'iyle sürüyor, aynı React instance'ı
+  // korunuyor. Bu yüzden koşu-kimliği (hipodrom/pist/mesafe/ırk/tip) her
+  // değiştiğinde state'i elle "idle"a döndürmezsek, bir önceki koşunun
+  // sonucu ekranda YAPIŞIK kalır — az önce yaşanan gerçek bug buydu.
+  useEffect(() => {
+    setData("idle");
+  }, [hippodromeName, surface, distance, breed, classType]);
+
   function handleOpenChange(open: boolean) {
     if (open && data === "idle" && hippodromeName) {
       setData("loading");
