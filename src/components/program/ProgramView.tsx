@@ -219,10 +219,10 @@ function PistMesafeInfoButton({
         {data === null && <p className="text-muted-foreground">Bu koşu tipi için henüz yeterli veri yok (en az 3 yarış gerekli).</p>}
         {data && typeof data === "object" && (
           <>
-            <p className="mb-2 text-muted-foreground">
-              Aynı hipodrom+pist+mesafe(±200m)+ırk+koşu tipinde, Accurace geçmişindeki <strong>{data.n}</strong> yarışın kazananlarının stil dağılımı:
+            <p className="mb-1 text-muted-foreground">
+              <strong className="text-foreground">Bugünkü atlarla ilgili değil</strong> — aynı hipodrom+pist+mesafe(±200m)+ırk+koşu tipindeki <strong>{data.n}</strong> GEÇMİŞ yarışın kazananları o yarışı nasıl koştu:
             </p>
-            <ul className="space-y-1">
+            <ul className="space-y-1 my-2">
               {data.breakdown.map((b) => (
                 <li key={b.style} className="flex items-center justify-between">
                   <span className={cn("font-semibold", styleLabelCls(b.style).cls)}>{styleLabelCls(b.style).label}</span>
@@ -230,6 +230,9 @@ function PistMesafeInfoButton({
                 </li>
               ))}
             </ul>
+            <p className="text-muted-foreground">
+              Taktik ipucu: bu tip yarışlarda tarihsel olarak {styleLabelCls(data.topStyle).label.toLocaleLowerCase("tr-TR")} tarz kazanmış — sahadaki hiçbir at bu etiketi taşımasa bile, yarışın nasıl gelişebileceğine dair bir ipucudur.
+            </p>
             <p className="mt-2 text-[10px] text-muted-foreground">
               Tek yarıştan kalıcı kural çıkarılmaz — bu yalnız geçmiş eğilimi gösterir, garanti değildir.
             </p>
