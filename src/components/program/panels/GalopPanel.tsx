@@ -15,9 +15,9 @@ export default function GalopPanel({ runners, breed }: { runners: ProgramRunner[
       {withGallops.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">Galop verisi yok.</div>
       ) : (
-        <div className="divide-y">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4">
           {withGallops.map((r) => (
-            <div key={r.id} className="px-3 py-2">
+            <div key={r.id} className="px-3 py-2 border-b">
               <div className="text-[11px] font-semibold mb-1 truncate">
                 <span className="font-mono mr-1">{r.no}</span>
                 {r.name}
