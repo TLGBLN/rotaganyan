@@ -18,13 +18,17 @@ export type StatsOverview = {
   recentBanko: { total: number; hit: number; rate: number };
 };
 
+// v4.12: Runner.raceStyle artık Accurace (GPS/sektörel zamanlama) tabanlı 5'li
+// sistemi kullanıyor (bkz. pace-analizi.ts) — eski TJK Son800 tabanlı 4'lü sistem
+// (ON_GRUP/BEKLEME/EN_GERI) tamamen kaldırıldı, bu eşleme de ona göre güncellendi.
 const RACE_STYLE_LABELS: Record<string, string> = {
   KACAK: "Kaçak",
-  ON_GRUP: "Ön Grup",
-  BEKLEME: "Bekleme",
-  EN_GERI: "En Geri",
+  ONCU: "Öncü",
+  PRESCI: "Presçi",
+  TAKIPCI: "Takipçi",
+  BEKLEYEN: "Bekleyen",
 };
-const RACE_STYLE_ORDER = ["KACAK", "ON_GRUP", "BEKLEME", "EN_GERI"];
+const RACE_STYLE_ORDER = ["KACAK", "ONCU", "PRESCI", "TAKIPCI", "BEKLEYEN"];
 
 export type RaceStyleWinBreakdown = {
   bucket: string;
@@ -69,7 +73,7 @@ function buildBreakdown(
     .sort((a, b) => a.bucket.localeCompare(b.bucket));
 }
 
-/** Yüzülen yarışlarda kazanan atın yarış stiline (Kaçak/Ön Grup/Bekleme/En Geri) göre, mesafe ve at sayısı kırılımında kazanma dağılımı. */
+/** Yüzülen yarışlarda kazanan atın yarış stiline (Kaçak/Öncü/Presçi/Takipçi/Bekleyen) göre, mesafe ve at sayısı kırılımında kazanma dağılımı. */
 export async function getRaceStyleWinStats(): Promise<{
   byDistance: RaceStyleWinBreakdown[];
   byFieldSize: RaceStyleWinBreakdown[];

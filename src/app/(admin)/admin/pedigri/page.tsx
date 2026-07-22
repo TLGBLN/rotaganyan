@@ -48,9 +48,9 @@ export default async function PedigriPage({ searchParams }: PageProps) {
               </summary>
               <div className="divide-y">
                 {rd.races.map((race) => {
-                  const pedigriDolu = race.runners.filter(
-                    (r) => r.sire || r.dam || r.damSire || r.pedigreeNote
-                  ).length;
+                  // sire/dam/damSire TJK'dan otomatik gelir (neredeyse her atta zaten dolu) —
+                  // burada admin'in GERÇEKTEN girdiği iş, yalnız pedigreeNote (pedigri yorumu).
+                  const pedigriDolu = race.runners.filter((r) => r.pedigreeNote).length;
                   const tamamlandi = race.runners.length > 0 && pedigriDolu === race.runners.length;
                   return (
                     <details key={race.id} className="group/race">

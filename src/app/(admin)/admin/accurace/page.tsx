@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { turkeyDateString } from "@/lib/tz";
 import AccuraceSyncButton from "@/components/admin/AccuraceSyncButton";
+import AccuraceDatePicker from "@/components/admin/AccuraceDatePicker";
 import { analizEtTekYaris, hesaplaCokYarisEgilimi, type PaceCheckpoint, type TekYarisStil } from "@/lib/methodology/pace-analizi";
 
 export const dynamic = "force-dynamic";
@@ -74,17 +75,7 @@ export default async function AccuraceDashboardPage({ searchParams }: PageProps)
             GPS/sektörel zamanlama verisi — 100m&apos;lik her checkpoint&apos;te sıra + geçiş süresi. TJK&apos;nın resmi sitesinde bu veri yok, yalnız Accurace&apos;te var.
           </p>
         </div>
-        <form method="GET" className="flex items-center gap-2">
-          <input
-            type="date"
-            name="tarih"
-            defaultValue={date}
-            className="rounded-md border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand"
-          />
-          <button type="submit" className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground hover:bg-brand/90 transition-colors">
-            Git
-          </button>
-        </form>
+        <AccuraceDatePicker date={date} />
       </div>
 
       <div className="rounded-lg border p-3">

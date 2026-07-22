@@ -6,7 +6,13 @@ type Props = { className?: string; style?: CSSProperties; showIcon?: boolean; ic
 
 export default function Wordmark({ className, style, showIcon = true, iconClassName }: Props) {
   return (
-    <span className="inline-flex items-center gap-1.5" style={style}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 text-sm font-black leading-none tracking-tight",
+        className
+      )}
+      style={style}
+    >
       {showIcon && (
         <Image
           src="/horse-icon-gold.png"
@@ -17,12 +23,7 @@ export default function Wordmark({ className, style, showIcon = true, iconClassN
           priority
         />
       )}
-      <span
-        className={cn(
-          "inline-flex items-center text-sm font-black leading-none tracking-tight",
-          className
-        )}
-      >
+      <span className="inline-flex items-center">
         <span className="text-white">ROTA</span>
         <span className="text-brand">GANYAN</span>
       </span>

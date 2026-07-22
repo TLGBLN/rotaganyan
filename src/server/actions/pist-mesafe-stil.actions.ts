@@ -6,6 +6,15 @@ import type { Surface, Breed } from "@prisma/client";
 
 const MIN_ORNEK = 3;
 
+// TJK classType'ı "Handikap 15/DHÖ /H1", "ŞARTLI 3/DHÖ", "G 3/Dişi" gibi temel tipin
+// ardına "/" ile modifiye ekleri (çırak bandı, dişi, HP bandı vb.) ekliyor — tam string
+// eşleşmesi bu yüzden neredeyse hiç eşleşmiyordu (her koşunun kendine özgü ekleri farklı),
+// bu da "yeterli veri yok" mesajının neredeyse her koşuda görünmesine (kullanıcıya "hep
+// aynı" gibi gelen bir örüntüye) yol açıyordu. Temel tipi (ilk "/" öncesi) karşılaştırıyoruz.
+function temelKosuTipi(classType: string): string {
+  return classType.split("/")[0].trim().toLocaleUpperCase("tr-TR");
+}
+
 export type PistMesafeStilSonuc = {
   n: number;
   breakdown: { style: TekYarisStil; count: number; percent: number }[];
@@ -34,11 +43,11 @@ export async function getPistMesafeStilIstatistigi(
       raceDay: { hippodrome: { name: hippodromeName } },
       surface,
       breed,
-      classType,
       distance: { gte: distance - 200, lte: distance + 200 },
       accuraceRace: { isNot: null },
     },
     select: {
+      classType: true,
       accuraceRace: {
         select: {
           length: true,
@@ -48,9 +57,12 @@ export async function getPistMesafeStilIstatistigi(
     },
   });
 
+  const hedefTip = temelKosuTipi(classType);
+  const filtreli = races.filter((r) => temelKosuTipi(r.classType) === hedefTip);
+
   const sayac = { KACAK: 0, ONCU: 0, PRESCI: 0, TAKIPCI: 0, BEKLEYEN: 0 } as Record<TekYarisStil, number>;
   let toplam = 0;
-  for (const r of races) {
+  for (const r of filtreli) {
     const ar = r.accuraceRace;
     const kazanan = ar?.splits[0];
     if (!ar || !kazanan || !ar.length) continue;
