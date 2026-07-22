@@ -56,7 +56,7 @@ export default function SplashScreen() {
       aria-hidden="true"
     >
       <div className="relative h-[128px] w-[128px]" style={{ animation: "splash-logo-in 900ms cubic-bezier(.2,.8,.2,1) both" }}>
-        <Image src="/logo.png" alt="ROTAGANYAN" width={128} height={128} className="h-full w-full rounded-full" priority />
+        <Image src="/horse-icon-gold.png" alt="ROTAGANYAN" width={128} height={128} className="h-full w-full object-contain" priority />
         <div
           className="pointer-events-none absolute -inset-2.5 rounded-full mix-blend-screen"
           style={{
@@ -67,7 +67,7 @@ export default function SplashScreen() {
         />
       </div>
 
-      <Wordmark className="text-3xl opacity-0" style={{ animation: "splash-fade-up 500ms ease-out 520ms both" }} />
+      <Wordmark className="text-3xl opacity-0" showIcon={false} style={{ animation: "splash-fade-up 500ms ease-out 520ms both" }} />
 
       <div
         className="flex items-end gap-2.5 h-[22px] opacity-0"

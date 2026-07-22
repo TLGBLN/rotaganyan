@@ -3,11 +3,14 @@
 import { useState, useEffect, useRef, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, Star } from "lucide-react";
+import { ChevronDown, ChevronUp, Star, Info } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
 import HorseDetailModal from "./HorseDetailModal";
 import EmailVerificationGate from "./EmailVerificationGate";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { getPistMesafeStilIstatistigi, type PistMesafeStilSonuc } from "@/server/actions/pist-mesafe-stil.actions";
+import type { Surface, Breed } from "@prisma/client";
 
 // Sadece ilgili buton tıklanınca açılan paneller — ilk sayfa yüklemesinin JS
 // paketine dahil edilmesinler diye lazy-load (next/dynamic) ile yükleniyor.
@@ -109,15 +112,123 @@ function breedShort(b: string) {
   return b === "ARAP" ? "Arap" : "İngiliz";
 }
 
-// Yarış stili — TJK Son 800 verisinden kendi hesabımızla senkronlanan RaceStyleTag
+// Yarış stili — Accurace (GPS/sektörel zamanlama) geçmişinden n>=3 yarışla hesaplanan
+// kalıcı eğilim (bkz. pace-analizi.ts). Eski TJK Son800 tabanlı 4'lü sistemin yerini aldı.
 function raceStyleBadge(raceStyle: { style: string; percent: number } | null): { text: string; cls: string } | null {
   if (!raceStyle) return null;
   const { style, percent } = raceStyle;
   if (style === "KACAK") return { text: `%${percent} Kaçak`, cls: "bg-[#e74c3c]/15 text-[#e74c3c]" };
-  if (style === "ON_GRUP") return { text: `%${percent} Ön Grup`, cls: "bg-[#e67e22]/15 text-[#e67e22]" };
-  if (style === "BEKLEME") return { text: `%${percent} Bekleme`, cls: "bg-[#2980b9]/15 text-[#2980b9]" };
-  if (style === "EN_GERI") return { text: `%${percent} En Geri`, cls: "bg-[#8e44ad]/15 text-[#8e44ad]" };
+  if (style === "ONCU") return { text: `%${percent} Öncü`, cls: "bg-[#e67e22]/15 text-[#e67e22]" };
+  if (style === "PRESCI") return { text: `%${percent} Presçi`, cls: "bg-[#d4a017]/15 text-[#d4a017]" };
+  if (style === "TAKIPCI") return { text: `%${percent} Takipçi`, cls: "bg-[#2980b9]/15 text-[#2980b9]" };
+  if (style === "BEKLEYEN") return { text: `%${percent} Bekleyen`, cls: "bg-[#8e44ad]/15 text-[#8e44ad]" };
   return null;
+}
+
+const RACE_STYLE_INFO: { style: string; label: string; desc: string; cls: string }[] = [
+  { style: "KACAK", label: "Kaçak", desc: "Erken öne geçer, liderliği koruyarak bitirir.", cls: "text-[#e74c3c]" },
+  { style: "ONCU", label: "Öncü", desc: "Erken öndeydi ama sonlarda geriledi — tempoyu erken kullandı.", cls: "text-[#e67e22]" },
+  { style: "PRESCI", label: "Presçi", desc: "Liderin hemen arkasında/ön grupta gider, güçlü bitirir.", cls: "text-[#d4a017]" },
+  { style: "TAKIPCI", label: "Takipçi", desc: "Orta grupta gider, belirgin bir öne çıkış göstermez.", cls: "text-[#2980b9]" },
+  { style: "BEKLEYEN", label: "Bekleyen", desc: "Geriden gelip son bölümde öne fırlar.", cls: "text-[#8e44ad]" },
+];
+
+function RaceStyleInfoButton() {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground align-middle transition-opacity hover:opacity-80"
+          aria-label="Yarış stili açıklaması"
+        >
+          <Info className="h-2.5 w-2.5" strokeWidth={2.5} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 text-xs" onClick={(e) => e.stopPropagation()}>
+        <p className="mb-2 font-semibold text-foreground">Yarış Stili nedir?</p>
+        <p className="mb-2 text-muted-foreground">
+          Atın Accurace (GPS/sektörel zamanlama) geçmişindeki en az 3 yarıştan hesaplanan, tekrar eden davranış eğilimi. Yüzde, o davranışın kaç yarışta görüldüğünü gösterir.
+        </p>
+        <ul className="space-y-1.5">
+          {RACE_STYLE_INFO.map((s) => (
+            <li key={s.style}>
+              <span className={cn("font-semibold", s.cls)}>{s.label}:</span>{" "}
+              <span className="text-muted-foreground">{s.desc}</span>
+            </li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function styleLabelCls(style: string) {
+  return RACE_STYLE_INFO.find((s) => s.style === style) ?? { label: style, cls: "text-foreground" };
+}
+
+/** Bu pist+mesafe kombinasyonunda geçmişte hangi yarış stilinin kazandığını gösteren
+ *  bilgi kartı — yalnız tıklanınca (lazy) yükler, sonucu bir kere önbelleğe alır. */
+function PistMesafeInfoButton({
+  hippodromeName, surface, distance, breed, classType,
+}: {
+  hippodromeName?: string; surface: string; distance: number; breed: string; classType: string;
+}) {
+  const [data, setData] = useState<PistMesafeStilSonuc | "loading" | "error" | "idle">("idle");
+
+  function handleOpenChange(open: boolean) {
+    if (open && data === "idle" && hippodromeName) {
+      setData("loading");
+      getPistMesafeStilIstatistigi(hippodromeName, surface as Surface, distance, breed as Breed, classType)
+        .then(setData)
+        .catch(() => setData("error"));
+    }
+  }
+
+  return (
+    <Popover onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          data-tour="pist-mesafe-ipucu"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-semibold text-brand transition-colors hover:bg-brand/25"
+          aria-label="Bu koşu tipinde hangi yarış stili öne çıkıyor"
+        >
+          <Info className="h-3 w-3" strokeWidth={2.5} />
+          Bu Koşu Tipinde Kazananlar
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 text-xs" onClick={(e) => e.stopPropagation()}>
+        <p className="mb-2 font-semibold text-foreground">
+          {hippodromeName} · {distance}m · {surfaceLabel(surface).label} · {breedShort(breed)} · {classType}
+        </p>
+        {data === "idle" && <p className="text-muted-foreground">Açmak için tıklayın.</p>}
+        {data === "loading" && <p className="text-muted-foreground">Hesaplanıyor…</p>}
+        {data === "error" && <p className="text-muted-foreground">Veri alınamadı.</p>}
+        {data === null && <p className="text-muted-foreground">Bu koşu tipi için henüz yeterli veri yok (en az 3 yarış gerekli).</p>}
+        {data && typeof data === "object" && (
+          <>
+            <p className="mb-2 text-muted-foreground">
+              Aynı hipodrom+pist+mesafe(±200m)+ırk+koşu tipinde, Accurace geçmişindeki <strong>{data.n}</strong> yarışın kazananlarının stil dağılımı:
+            </p>
+            <ul className="space-y-1">
+              {data.breakdown.map((b) => (
+                <li key={b.style} className="flex items-center justify-between">
+                  <span className={cn("font-semibold", styleLabelCls(b.style).cls)}>{styleLabelCls(b.style).label}</span>
+                  <span className="tabular-nums text-muted-foreground">%{b.percent} ({b.count})</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[10px] text-muted-foreground">
+              Tek yarıştan kalıcı kural çıkarılmaz — bu yalnız geçmiş eğilimi gösterir, garanti değildir.
+            </p>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 function rankStyle(rank: number) {
@@ -758,10 +869,11 @@ function RunnerCard({
       </div>
 
       {raceStyleBadge(r.raceStyle) && (
-        <div className="mt-1.5 ml-10">
+        <div className="mt-1.5 ml-10 flex items-center gap-1">
           <span className={cn("inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold", raceStyleBadge(r.raceStyle)!.cls)}>
             {raceStyleBadge(r.raceStyle)!.text}
           </span>
+          <RaceStyleInfoButton />
         </div>
       )}
     </div>
@@ -883,6 +995,10 @@ function RaceTable({
           <RaceTimer time={race.time} hasResult={race.result != null} dateStr={dateStr} />
         </span>
       </div>
+      {/* Pist/Mesafe İpucu — geçmiş kazananların stil eğilimi, ayrı satırda (mobilde kaybolmasın diye) */}
+      <div className="px-3 py-1.5 bg-muted/30 border-b">
+        <PistMesafeInfoButton hippodromeName={hippodromeName} surface={race.surface} distance={race.distance} breed={race.breed} classType={race.classType} />
+      </div>
 
       {/* Tablo — masaüstü */}
       <div className="hidden sm:block overflow-x-auto">
@@ -900,7 +1016,12 @@ function RaceTable({
               <th className="px-2 py-1.5 text-center">En İyi D.</th>
               <th className="px-2 py-1.5 text-left">Son Yarışlar</th>
               <th className="px-2 py-1.5 text-center">AGF</th>
-              <th className="px-2 py-1.5 text-left" data-tour="yaris-stili">Yarış Stili</th>
+              <th className="px-2 py-1.5 text-left" data-tour="yaris-stili">
+                <span className="inline-flex items-center gap-1">
+                  Yarış Stili
+                  <RaceStyleInfoButton />
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody>

@@ -29,6 +29,13 @@ export const passwordResetLimiter = createRateLimiter(3, "1 h");
 // 3 e-posta doğrulama (tekrar gönder) isteği saatte, IP başına
 export const emailVerificationLimiter = createRateLimiter(3, "1 h");
 
+// Halka açık analiz/tahmin sayfaları (program, kosular, analizler, tahmin-onerileri,
+// istatistik) ve /api/muhtemeller için — yazılım/bot ile toplu veri çekmeyi (scraping)
+// caydırmak amacıyla. 40 istek/10sn normal bir kullanıcının hızlı gezinmesine (birden
+// fazla panel açması dahil) yeterince geniş, ama döngüyle onlarca koşuyu art arda
+// tarayan bir scraper'ı hızla 429'a düşürür. bkz. middleware.ts.
+export const publicContentLimiter = createRateLimiter(40, "10 s");
+
 export async function checkRateLimit(
   limiter: ReturnType<typeof createRateLimiter>,
   identifier: string

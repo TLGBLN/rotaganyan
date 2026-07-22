@@ -7,12 +7,20 @@
 
 import { db } from "@/lib/db";
 import { fetchAccuraceRace, toAccuraceCitySlug, parseAccuraceTimeToMs } from "./ingest/accurace.adapter";
+import { analizEtTekYaris, hesaplaCokYarisEgilimi, type PaceCheckpoint } from "@/lib/methodology/pace-analizi";
 
 const TURKISH_UPPER_I_RE = /I/g;
 const COMBINING_MARKS_RE = /[̀-ͯ]/g;
 
+// Yabancı doğumlu atlar bizim Runner.name'de "AD (USA)"/"(IRE)"/"(GB)" gibi ülke
+// koduyla kayıtlı — Accurace bu soneki hiç yazmıyor ("AD" olarak veriyor). Eşleştirmeden
+// önce bu soneği atmak gerekiyor, yoksa (gerçek bir eşleşme mümkünken) sistematik olarak
+// eşleşme kaçırılıyor (141 eşleşmeyenin büyük kısmı bu yüzdendi).
+const TRAILING_COUNTRY_CODE_RE = /\s*\([A-ZİĞÜŞÖÇ]{2,4}\)\s*$/i;
+
 function normalizeName(s: string): string {
   return s
+    .replace(TRAILING_COUNTRY_CODE_RE, "")
     .toLocaleUpperCase("tr-TR")
     .replace(TURKISH_UPPER_I_RE, "I")
     .normalize("NFD")
@@ -23,6 +31,52 @@ function normalizeName(s: string): string {
 }
 
 export type AccuraceSyncSonuc = { kosular: number; kaydedilen: number; atlanan: number; errors: string[] };
+
+/**
+ * Verilen at isimleri için Accurace geçmişinden KALICI eğilimi (n>=3) yeniden hesaplar
+ * ve o isme sahip TÜM Runner satırlarına yazar (Runner.raceStyle) — /program sayfasındaki
+ * rozet bu alandan besleniyor. syncAccuraceForDate her gün çağırdığı için rozet güncel
+ * kalır; scripts/_migrate_race_style.ts'nin yaptığı tek seferlik toplu işin küçük,
+ * artımlı (yalnız o gün etkilenen atlar için) eşdeğeridir.
+ */
+async function updateRaceStyleForHorseNames(horseNames: string[]): Promise<void> {
+  const uniq = [...new Set(horseNames)];
+  if (uniq.length === 0) return;
+
+  const splits = await db.accuraceHorseSplit.findMany({
+    where: { horseName: { in: uniq } },
+    select: { horseName: true, checkpoints: true, accuraceRace: { select: { length: true } } },
+  });
+
+  const byName = new Map<string, { checkpoints: PaceCheckpoint[]; length: number }[]>();
+  for (const s of splits) {
+    const norm = normalizeName(s.horseName);
+    const list = byName.get(norm) ?? [];
+    list.push({ checkpoints: s.checkpoints as unknown as PaceCheckpoint[], length: s.accuraceRace.length ?? 0 });
+    byName.set(norm, list);
+  }
+
+  const runners = await db.runner.findMany({ where: { name: { in: uniq } }, select: { id: true, name: true } });
+  const runnerIdsByNorm = new Map<string, string[]>();
+  for (const r of runners) {
+    const norm = normalizeName(r.name);
+    const list = runnerIdsByNorm.get(norm) ?? [];
+    list.push(r.id);
+    runnerIdsByNorm.set(norm, list);
+  }
+
+  for (const [norm, kayitlar] of byName) {
+    const ids = runnerIdsByNorm.get(norm);
+    if (!ids || ids.length === 0) continue;
+    const sonuclar = kayitlar
+      .map((k) => analizEtTekYaris(k.checkpoints, k.length))
+      .filter((s): s is NonNullable<typeof s> => s != null);
+    const egilim = hesaplaCokYarisEgilimi(sonuclar);
+    if (!egilim) continue;
+    const value = { style: egilim.stil, percent: egilim.percent, veri: egilim.n, source: "accurace", updatedAt: new Date().toISOString() };
+    await db.runner.updateMany({ where: { id: { in: ids } }, data: { raceStyle: value } });
+  }
+}
 
 /**
  * matchRunners=false: at ismi eşleştirmesi (runnerId) YAPILMAZ, yalnız ham veri toplanır.
@@ -44,6 +98,7 @@ export async function syncAccuraceForDate(dateStr: string, matchRunners = true):
   let kaydedilen = 0;
   let atlanan = 0;
   const errors: string[] = [];
+  const islenenAtlar: string[] = [];
 
   for (const race of races) {
     const hippodromeName = race.raceDay.hippodrome.name;
@@ -111,6 +166,7 @@ export async function syncAccuraceForDate(dateStr: string, matchRunners = true):
             checkpoints,
           },
         });
+        islenenAtlar.push(h.horse_name);
       }
 
       kaydedilen++;
@@ -120,6 +176,10 @@ export async function syncAccuraceForDate(dateStr: string, matchRunners = true):
 
     // Accurace'e nazik davran — art arda çok hızlı istek atmayalım.
     await new Promise((r) => setTimeout(r, 400));
+  }
+
+  if (matchRunners && islenenAtlar.length > 0) {
+    await updateRaceStyleForHorseNames(islenenAtlar).catch((e) => errors.push(`raceStyle güncelleme: ${String(e)}`));
   }
 
   return { kosular: races.length, kaydedilen, atlanan, errors };

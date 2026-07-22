@@ -15,7 +15,6 @@
 
 import { db } from "@/lib/db";
 import { fetchTjkAtKosuBilgileri } from "@/server/services/ingest/tjk-at-performans.adapter";
-import { fetchTjkSon800ByHorseName } from "@/server/services/ingest/tjk-son800-stats.adapter";
 import { galopQuality, isSameJockey } from "@/components/program/panels/galop-helpers";
 import { getAtPerformansForRace } from "@/server/actions/at-performans.actions";
 import { getH2HForRace } from "@/server/actions/h2h.actions";
@@ -25,10 +24,13 @@ import {
   kacakHaritasi, zeminKatsayisi, zeminDetayiBul, type GalopZinciriSonuc, type TempoGuven,
 } from "@/lib/methodology/mekanik-puanlama";
 import { analizEtTekYaris, hesaplaCokYarisEgilimi, type PaceCheckpoint, type CokYarisEgilim } from "@/lib/methodology/pace-analizi";
+import { toAccuraceCitySlug } from "@/server/services/ingest/accurace.adapter";
 
 const COMBINING_MARKS_RE = /[̀-ͯ]/g;
+// Yabancı doğumlu atlarda Runner.name "(USA)"/"(IRE)" gibi ülke koduyla biter, Accurace bunu yazmıyor.
+const TRAILING_COUNTRY_CODE_RE = /\s*\([A-ZİĞÜŞÖÇ]{2,4}\)\s*$/i;
 function normalizeHorseName(s: string): string {
-  return s.toLocaleUpperCase("tr-TR").normalize("NFD").replace(COMBINING_MARKS_RE, "").replace(/[^A-ZİĞÜŞÖÇ0-9 ]/g, "").replace(/\s+/g, " ").trim();
+  return s.replace(TRAILING_COUNTRY_CODE_RE, "").toLocaleUpperCase("tr-TR").normalize("NFD").replace(COMBINING_MARKS_RE, "").replace(/[^A-ZİĞÜŞÖÇ0-9 ]/g, "").replace(/\s+/g, " ").trim();
 }
 
 // ── SKK Sınıf Piramidi (Ansiklopedi Bölüm III) — metin tabanlı en iyi eşleştirme ──
@@ -92,26 +94,6 @@ function sonSonucZayifMi(recentForm: string | null): boolean {
   if (!last) return false;
   if (last.toUpperCase() === "K") return true;
   return parseInt(last, 10) >= 5;
-}
-
-// TJK zaman formatı "dk.sn.yüzdeSn" — örn. "0.25.40" = 0dk 25.40sn. Üçüncü segment
-// HER ZAMAN 2 haneli (yüzde saniye/centisecond), decisecond (tek hane / 10) DEĞİL —
-// 481 gerçek galop kaydı üzerinde doğrulandı: eski (d/10) yorum 400m split'lerini
-// 23-38sn (medyan 30sn) gibi gerçekçi olmayan bir aralığa yayıyordu; doğru (d
-// ondalık string birleştirme) yorum 23-31.6sn (medyan 26.2sn) veriyor — bu da
-// Ansiklopedi §VI barem tablosunun kendi belirttiği aralıkla (Normal 26-28sn)
-// birebir örtüşüyor. String birleştirme hem 1 hem 2 haneli ondalık kısımda doğru
-// sonuç verir (pozisyonel ondalık gösterim), sabit /10 böleni ise yalnız 1 haneli
-// durumda doğruydu.
-function parseSaniye(t: string | null | undefined): number | null {
-  if (!t) return null;
-  const parts = t.split(".");
-  if (parts.length === 2) return parseFloat(t) || null;
-  if (parts.length === 3) {
-    const [m, s, d] = parts;
-    return (parseInt(m, 10) || 0) * 60 + parseFloat(`${s}.${d}`);
-  }
-  return null;
 }
 
 function medyan(xs: number[]): number | null {
@@ -334,10 +316,6 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   const ortKilo = agirlıklar.length > 0 ? agirlıklar.reduce((a, b) => a + b, 0) / agirlıklar.length : null;
 
   const bugunSkk = classToSkk(race.classType);
-  // Kullanıcı talimatı: Son800 karşılaştırması yalnız BUGÜNKÜ koşunun yılıyla sınırlı
-  // olmalı — eski yıllara ait veriler "eskide kalır", benzer koşu sayılmaz. Sabit bir
-  // yıl yazılırsa (örn. "2026") her yılbaşında sessizce kırılır, bu yüzden dinamik.
-  const raceYear = race.raceDay.date.getUTCFullYear().toString();
 
   // Zemin durumu — bu veri (RaceDay.surfaceConditions) ingest'te zaten toplanıyordu
   // ama Faz 1'e hiç aktarılmıyordu, yalnız public program sayfasında gösteriliyordu.
@@ -346,6 +324,70 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   const surfaceConditions = (race.raceDay.surfaceConditions as { label: string; detail: string }[] | null) ?? null;
   const zeminDetayi = zeminDetayiBul(surfaceConditions, race.surface);
   const zemin = zeminKatsayisi(zeminDetayi);
+
+  // ── Son 800 Gölge Mod — artık Accurace'ten (TJK'nın tekil son800/ilk800 sayısı yerine).
+  // Atın kendi geçmişindeki (yıl/şehir/pist/mesafe±200m benzer) yarışlarda son 800m sektör
+  // süresini, O YARIŞTAKİ EN İYİ (field'in en hızlı) son 800m'siyle kıyaslıyoruz. Fark
+  // (saniye): 0=o yarışın en iyi kapanışını yakaladı, pozitif=daha yavaş kapandı — eski TJK
+  // formülüyle yön/birim uyumlu, gecit-motoru.ts'teki -0.5/+0.7 eşikleri değişmeden geçerli.
+  const son800AccuraceKayitlari = race.runners.length
+    ? await db.accuraceHorseSplit.findMany({
+        where: { horseName: { in: race.runners.map((r) => r.name) } },
+        select: {
+          horseName: true,
+          accuraceRaceId: true,
+          checkpoints: true,
+          accuraceRace: { select: { date: true, citySlug: true, ground: true, length: true } },
+        },
+      })
+    : [];
+  const son800RaceIds = [...new Set(son800AccuraceKayitlari.map((k) => k.accuraceRaceId))];
+  const son800Siblings = son800RaceIds.length
+    ? await db.accuraceHorseSplit.findMany({
+        where: { accuraceRaceId: { in: son800RaceIds } },
+        select: { accuraceRaceId: true, checkpoints: true, accuraceRace: { select: { length: true } } },
+      })
+    : [];
+
+  function last800SureSaniye(checkpoints: PaceCheckpoint[], length: number): number | null {
+    if (length < 800) return null;
+    const sorted = [...checkpoints].sort((a, b) => a.checkpoint - b.checkpoint);
+    const finish = sorted[sorted.length - 1];
+    if (!finish) return null;
+    const nokta = [...sorted].reverse().find((c) => c.checkpoint <= length - 800);
+    if (!nokta) return null;
+    return (finish.timeReal - nokta.timeReal) / 1000;
+  }
+
+  const fieldBestSon800ByRaceId = new Map<string, number>();
+  for (const s of son800Siblings) {
+    const sure = last800SureSaniye(s.checkpoints as unknown as PaceCheckpoint[], s.accuraceRace.length ?? 0);
+    if (sure == null) continue;
+    const mevcut = fieldBestSon800ByRaceId.get(s.accuraceRaceId);
+    if (mevcut == null || sure < mevcut) fieldBestSon800ByRaceId.set(s.accuraceRaceId, sure);
+  }
+
+  const surfacePrefixToday = race.surface === "CIM" ? "C" : race.surface === "SENTETIK" ? "S" : "K";
+  const todayCitySlug = toAccuraceCitySlug(hippodromeName);
+  const son800ByRunnerName = new Map<string, { n: number; medyan: number | null }>();
+  for (const r of race.runners) {
+    const kayitlar = son800AccuraceKayitlari.filter(
+      (k) =>
+        k.horseName === r.name &&
+        k.accuraceRace.date.getUTCFullYear().toString() === race.raceDay.date.getUTCFullYear().toString() &&
+        k.accuraceRace.citySlug === todayCitySlug &&
+        k.accuraceRace.ground === surfacePrefixToday &&
+        Math.abs((k.accuraceRace.length ?? 0) - race.distance) <= 200
+    );
+    const farklar = kayitlar
+      .map((k) => {
+        const kendiSuresi = last800SureSaniye(k.checkpoints as unknown as PaceCheckpoint[], k.accuraceRace.length ?? 0);
+        const fieldEnIyi = fieldBestSon800ByRaceId.get(k.accuraceRaceId);
+        return kendiSuresi != null && fieldEnIyi != null ? kendiSuresi - fieldEnIyi : null;
+      })
+      .filter((f): f is number => f != null);
+    son800ByRunnerName.set(r.name, { n: farklar.length, medyan: medyan(farklar) });
+  }
 
   const runners: Faz1Runner[] = await Promise.all(
     race.runners.map(async (r): Promise<Faz1Runner> => {
@@ -381,34 +423,12 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
           ilkStart = false;
           hpOncekiFetchBasarisiz = true;
         }
+      }
 
-        try {
-          const son800Rows = await fetchTjkSon800ByHorseName(r.name);
-          const surfacePrefix = race.surface === "CIM" ? "Ç" : race.surface === "SENTETIK" ? "S" : "K";
-          const benzer = son800Rows.filter(
-            (row) =>
-              row.year === raceYear &&
-              row.city.includes(hippodromeName) &&
-              row.surface.startsWith(surfacePrefix) &&
-              // TJK mesafeyi Türkçe binlik ayracıyla "1.800" biçiminde döner — parseInt bunu
-              // noktada durup "1" olarak okuyordu, bu yüzden mesafe farkı hep devasa çıkıp
-              // ±200m toleransı ASLA sağlanamıyordu (her at için sessizce 0 benzer koşu).
-              Math.abs((parseInt(row.distance.replace(/\./g, ""), 10) || 0) - race.distance) <= 200
-          );
-          // Kullanıcı talimatı: sayı sınırı yok — 1 benzer koşu bile varsa dikkate alınır
-          // (eskiden yalnız ilk 3 kullanılıyordu, geri kalanı atılıyordu).
-          const farklar = benzer
-            .map((row) => {
-              const son800 = parseSaniye(row.son800);
-              const ilk800 = parseSaniye(row.ilk800);
-              return son800 != null && ilk800 != null ? son800 - ilk800 : null;
-            })
-            .filter((f): f is number => f != null);
-          son800BenzerKosuN = farklar.length;
-          son800Medyan = medyan(farklar);
-        } catch {
-          // Son800 çekilemezse sinyal_yetersiz olarak kalır — motor zaten n<3'ü yoksayar.
-        }
+      const son800Sonuc = son800ByRunnerName.get(r.name);
+      if (son800Sonuc) {
+        son800BenzerKosuN = son800Sonuc.n;
+        son800Medyan = son800Sonuc.medyan;
       }
 
       const yon = formYonu(r.recentForm);

@@ -13,12 +13,13 @@ const STEPS: Step[] = [
   { selector: '[data-tour="bildirim"]', title: "Bildirimler", text: "Takip ettiğiniz atlarla ilgili bildirimler buradan gelir." },
   { selector: '[data-tour="hesap"]', title: "Hesabım", text: "Panelinize, takip ettiğiniz atlara ve ayarlara buradan ulaşırsınız." },
   { selector: '[data-tour="at-detay"]', title: "At Detayı", text: "Bir atın ismine tıklayarak geçmiş yarışlarını, aldığı dereceleri ve sonuçlarını görebilirsiniz." },
-  { selector: '[data-tour="yaris-stili"]', title: "Yarış Stili", text: "At isminin altında Kaçak, Ön Grup, Bekleme veya En Geri rozeti varsa, o atın yarışı nasıl koşma eğiliminde olduğunu gösterir." },
+  { selector: '[data-tour="yaris-stili"]', title: "Yarış Stili", text: "At isminin altında Kaçak, Öncü, Presçi, Takipçi veya Bekleyen rozeti varsa, o atın GPS verisiyle ölçülmüş gerçek yarış davranışını gösterir. Rozetin yanındaki (i) simgesine tıklayarak tüm stillerin açıklamasını görebilirsiniz." },
+  { selector: '[data-tour="pist-mesafe-ipucu"]', title: "Pist/Mesafe İpucu", text: "Bu düğmeye tıklayarak, aynı hipodrom+pist+mesafede geçmişte hangi yarış stilinin (kaçak, geriden gelen vb.) daha çok kazandığını görebilirsiniz — yalnız Rotaganyan'da var." },
   { selector: '[data-tour="jokey"]', title: "Jokey", text: "Jokey adının altında o sezonki biniş sayısı ve kazanma yüzdesi görünür." },
   { selector: '[data-tour="antrenor"]', title: "Sahip / Antrenör", text: "Antrenörün güncel kazanma oranını burada görebilirsiniz." },
   { selector: '[data-tour="galop"]', title: "Galop", text: "Son idman derecelerini gösterir. Kırmızı ünlem (!) işareti, idmanı yapan jokeyin yarışta da bineceği anlamına gelir." },
   { selector: '[data-tour="analiz-buton"]', title: "Analizi Gör", text: "Rotaganyan'ın ekonomik, normal ve geniş kupon önerilerini buradan açabilirsiniz." },
-  { selector: '[data-tour="son800-buton"]', title: "Son 800", text: "Atların son 800 metre sprint derecelerini TJK verisiyle karşılaştırın." },
+  { selector: '[data-tour="son800-buton"]', title: "Son 800", text: "Atların son 800 metre kapanış derecelerini, Accurace'in GPS/sektörel zamanlama verisiyle karşılaştırın." },
 ];
 
 function isVisible(el: Element | null): el is HTMLElement {

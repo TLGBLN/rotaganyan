@@ -23,11 +23,11 @@ export default function Son800Panel({ raceId }: { raceId: string }) {
   return (
     <div className="border-t">
       <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
-        <span className="text-sm font-bold tracking-wide text-white">Son 800 (TJK)</span>
+        <span className="text-sm font-bold tracking-wide text-white">Son 800 (Accurace)</span>
       </div>
 
       {loading ? (
-        <div className="px-4 py-8 text-center text-sm text-muted-foreground">{"TJK'dan çekiliyor…"}</div>
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">Yükleniyor…</div>
       ) : error ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
           <p className="mb-2">Son 800 verisi alınamadı.</p>
@@ -47,33 +47,29 @@ export default function Son800Panel({ raceId }: { raceId: string }) {
                 {d.horseName}
               </div>
               {d.records.length === 0 ? (
-                <div className="text-[11px] text-muted-foreground ml-5">{"TJK'da kayıt yok"}</div>
+                <div className="text-[11px] text-muted-foreground ml-5">Accurace kaydı yok</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-[11px]">
                     <thead>
                       <tr className="text-muted-foreground">
-                        <th className="px-1.5 py-0.5 text-left font-medium">Yıl</th>
+                        <th className="px-1.5 py-0.5 text-left font-medium">Tarih</th>
                         <th className="px-1.5 py-0.5 text-left font-medium">Hipodrom</th>
                         <th className="px-1.5 py-0.5 text-left font-medium">Pist</th>
                         <th className="px-1.5 py-0.5 text-left font-medium">Mesafe</th>
-                        <th className="px-1.5 py-0.5 text-left font-medium">Kilo</th>
-                        <th className="px-1.5 py-0.5 text-left font-medium">Koşu Cinsi</th>
+                        <th className="px-1.5 py-0.5 text-center font-medium">Bitiş</th>
                         <th className="px-1.5 py-0.5 text-center font-medium text-sky-500">Son 800</th>
-                        <th className="px-1.5 py-0.5 text-center font-medium">İlk Giren</th>
                       </tr>
                     </thead>
                     <tbody>
                       {d.records.map((rec, i) => (
                         <tr key={i} className="border-t border-border/30">
-                          <td className="px-1.5 py-1 tabular-nums">{rec.year}</td>
-                          <td className="px-1.5 py-1">{rec.city}</td>
-                          <td className="px-1.5 py-1">{rec.surface}{rec.surfaceCondition && rec.surfaceCondition !== "Normal" ? ` (${rec.surfaceCondition})` : ""}</td>
-                          <td className="px-1.5 py-1 tabular-nums">{rec.distance}</td>
-                          <td className="px-1.5 py-1 tabular-nums">{rec.weight}</td>
-                          <td className="px-1.5 py-1">{rec.raceClass}</td>
-                          <td className="px-1.5 py-1 text-center font-mono font-semibold text-sky-500 tabular-nums">{rec.son800 || "—"}</td>
-                          <td className="px-1.5 py-1 text-center font-mono tabular-nums text-muted-foreground">{rec.ilk800 || "—"}</td>
+                          <td className="px-1.5 py-1 tabular-nums">{rec.date}</td>
+                          <td className="px-1.5 py-1">{rec.hippodrome}</td>
+                          <td className="px-1.5 py-1">{rec.ground}</td>
+                          <td className="px-1.5 py-1 tabular-nums">{rec.length}</td>
+                          <td className="px-1.5 py-1 text-center tabular-nums text-muted-foreground">{rec.place}.</td>
+                          <td className="px-1.5 py-1 text-center font-mono font-semibold text-sky-500 tabular-nums">{rec.son800Sure}</td>
                         </tr>
                       ))}
                     </tbody>
