@@ -43,6 +43,30 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// JS regex'in "i" bayrağı Türkçe nokta(sız) I harflerini eş saymıyor (İ/I/ı/i dördü de
+// birbirinden farklı case-fold kümesinde) — /İ/i.test("I") === false. Kaynak metin TJK'dan
+// farklı bir klavye/kaynaktan kopyalanınca (örn. "GAZNELİ" yerine "GAZNELI") isim hiç
+// tanınmıyor, o atın bölümü sessizce önceki atın notuna karışıyordu. Ayrıca Ş/Ğ/Ü/Ö/Ç de
+// noktalama işaretsiz ASCII haliyle (S/G/U/O/C) yapıştırılabiliyor — case-fold bunu da
+// yakalamaz. Her harfi olası varyantlarını kapsayan bir karakter sınıfına çeviriyoruz.
+const TURKISH_FOLD_CLASSES: Record<string, string> = {
+  i: "İIıi", I: "İIıi", İ: "İIıi", ı: "İIıi",
+  ş: "ŞşSs", Ş: "ŞşSs",
+  ğ: "ĞğGg", Ğ: "ĞğGg",
+  ü: "ÜüUu", Ü: "ÜüUu",
+  ö: "ÖöOo", Ö: "ÖöOo",
+  ç: "ÇçCc", Ç: "ÇçCc",
+};
+function buildFuzzyNamePattern(name: string): string {
+  return escapeRegExp(name)
+    .split("")
+    .map((ch) => {
+      const cls = TURKISH_FOLD_CLASSES[ch];
+      return cls ? `[${cls}]` : ch;
+    })
+    .join("");
+}
+
 /**
  * Serbest metni, bu koşudaki at isimlerini bulup her ismi bir "blok başlangıcı" sayarak
  * parçalara ayırır — TÜM metin taranır, yalnız satır başı değil. Kullanıcı birden fazla
@@ -57,7 +81,7 @@ function splitByRunnerName(text: string, runnerNames: { raw: string; norm: strin
   if (runnerNames.length === 0 || !text.trim()) return [];
   // Uzun isimler önce denenir (kısa bir isim uzun bir ismin parçası olmasın diye).
   const sorted = [...runnerNames].sort((a, b) => b.raw.length - a.raw.length);
-  const alternation = sorted.map((r) => escapeRegExp(r.raw)).join("|");
+  const alternation = sorted.map((r) => buildFuzzyNamePattern(r.raw)).join("|");
   const lineStartRe = new RegExp(`(?:^|\\n)[ \\t]*(?:\\d+\\s*[-.]?\\s*)?(${alternation})\\b`, "gi");
   const colonRe = new RegExp(`(${alternation})[ \\t]*:`, "gi");
 
@@ -66,7 +90,9 @@ function splitByRunnerName(text: string, runnerNames: { raw: string; norm: strin
   // aksi halde bir sonraki atın numarası, önceki atın notunun sonuna sızardı.
   for (const m of text.matchAll(lineStartRe)) {
     const matchedRaw = m[1];
-    const found = sorted.find((r) => r.raw.toLocaleUpperCase("tr-TR") === matchedRaw.toLocaleUpperCase("tr-TR"));
+    // Regex fuzzy sınıflarla eşleşti (İ/I/ı/i, Ş/S vb. karışabilir) — kesin atı bulmak için
+    // normalizeName ile karşılaştırıyoruz (basit toUpperCase eşitliği bunu YAKALAMAZ).
+    const found = sorted.find((r) => normalizeName(r.raw) === normalizeName(matchedRaw));
     if (!found) continue;
     const idx = (m.index ?? 0) + (m[0].startsWith("\n") ? 1 : 0);
     if (!hits.has(idx)) hits.set(idx, found.raw);
@@ -75,7 +101,7 @@ function splitByRunnerName(text: string, runnerNames: { raw: string; norm: strin
   // doğrudan ismin kendisinden başlar.
   for (const m of text.matchAll(colonRe)) {
     const matchedRaw = m[1];
-    const found = sorted.find((r) => r.raw.toLocaleUpperCase("tr-TR") === matchedRaw.toLocaleUpperCase("tr-TR"));
+    const found = sorted.find((r) => normalizeName(r.raw) === normalizeName(matchedRaw));
     if (!found) continue;
     const idx = (m.index ?? 0) + m[0].indexOf(matchedRaw);
     if (!hits.has(idx)) hits.set(idx, found.raw);
@@ -101,7 +127,7 @@ function parseBulkNotes(text: string, runnerNames: string[]): ParsedNote[] {
     // block TAM OLARAK atın adıyla başlar (numara varsa önce o) — numara, isim, varsa ":"
     // soyulur; geri kalan (aynı satırda veya sonraki satırlarda ne varsa) nottur.
     const afterNum = stripLeadingNumber(block);
-    const nameRe = new RegExp(`^${escapeRegExp(name)}\\s*:?\\s*`, "i");
+    const nameRe = new RegExp(`^${buildFuzzyNamePattern(name)}\\s*:?\\s*`, "i");
     const note = afterNum.replace(nameRe, "").trim();
     if (note) entries.push({ name, note });
   }
@@ -159,7 +185,7 @@ function parseBulkPedigree(text: string, runnerNames: string[]): ParsedEntry[] {
     // "AT ADI: metin" (aynı satırda) hem "AT ADI\nmetin" (ayrı satırda) hem de
     // "AT ADI (Baba - Anne): metin" biçimlerini TEK bir yerden doğru ele alır.
     const afterNum = stripLeadingNumber(block);
-    const nameRe = new RegExp(`^${escapeRegExp(name)}\\s*:?\\s*`, "i");
+    const nameRe = new RegExp(`^${buildFuzzyNamePattern(name)}\\s*:?\\s*`, "i");
     const content = afterNum.replace(nameRe, "");
 
     const firstLineEnd = content.indexOf("\n");
