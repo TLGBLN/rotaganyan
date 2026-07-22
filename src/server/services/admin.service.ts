@@ -468,6 +468,96 @@ export async function getAnalystStats(excludeRaceId?: string): Promise<AnalystSt
   };
 }
 
+export type AgfEdgeStats = {
+  total: number;
+  systemHits: number;
+  systemRate: number;
+  agfFavoriteHits: number;
+  agfFavoriteRate: number;
+  edge: number;
+  agreeTotal: number;
+  agreeHits: number;
+  agreeRate: number;
+  disagreeTotal: number;
+  disagreeHits: number;
+  disagreeRate: number;
+};
+
+/**
+ * Sistemin 1. seçimini AGF favorisiyle (o koşudaki en yüksek AGF oranına sahip at) karşılaştırır.
+ * Rakip analiz sitelerinin (örn. yarisanaliz.com) "ganyan bazlı tahminlere göre +N puan" iddiasına
+ * karşılık, kendi verimizden ölçülebilir bir fark üretir. Ayrıca metodoloji ③ AGF adımının
+ * ("AGF 1. = sistem 1.? Değilse BANKO YOK") gerçek isabet karşılığını doğrular: sistem AGF
+ * favorisinden farklı bir at seçtiğinde isabet oranı düşüyor mu, yükseliyor mu?
+ * AGF verisi olmayan koşular (agf tüm atlarda null) karşılaştırmaya girmez.
+ */
+export async function getAgfEdgeStats(): Promise<AgfEdgeStats> {
+  const rows = await db.prediction.findMany({
+    where: {
+      published: true,
+      race: { result: { isNot: null }, conditions: null },
+    },
+    select: {
+      picks: { where: { rank: 1 }, select: { runner: { select: { no: true } } } },
+      race: {
+        select: {
+          runners: { select: { no: true, agf: true } },
+          result: { select: { hitTop1: true, winnerNo: true } },
+        },
+      },
+    },
+  });
+
+  let total = 0;
+  let systemHits = 0;
+  let agfFavoriteHits = 0;
+  let agreeTotal = 0;
+  let agreeHits = 0;
+  let disagreeTotal = 0;
+  let disagreeHits = 0;
+
+  for (const r of rows) {
+    const runnersWithAgf = r.race.runners.filter((x): x is { no: number; agf: number } => x.agf != null);
+    const winnerNo = r.race.result?.winnerNo;
+    const systemPickNo = r.picks[0]?.runner?.no;
+    if (runnersWithAgf.length === 0 || winnerNo == null || systemPickNo == null) continue;
+
+    const agfFavorite = runnersWithAgf.reduce((a, b) => (b.agf > a.agf ? b : a));
+    const systemWon = r.race.result?.hitTop1 ?? false;
+
+    total++;
+    if (systemWon) systemHits++;
+    if (agfFavorite.no === winnerNo) agfFavoriteHits++;
+
+    if (systemPickNo === agfFavorite.no) {
+      agreeTotal++;
+      if (systemWon) agreeHits++;
+    } else {
+      disagreeTotal++;
+      if (systemWon) disagreeHits++;
+    }
+  }
+
+  const rate = (hits: number, t: number) => (t > 0 ? (hits / t) * 100 : 0);
+  const systemRate = rate(systemHits, total);
+  const agfFavoriteRate = rate(agfFavoriteHits, total);
+
+  return {
+    total,
+    systemHits,
+    systemRate,
+    agfFavoriteHits,
+    agfFavoriteRate,
+    edge: systemRate - agfFavoriteRate,
+    agreeTotal,
+    agreeHits,
+    agreeRate: rate(agreeHits, agreeTotal),
+    disagreeTotal,
+    disagreeHits,
+    disagreeRate: rate(disagreeHits, disagreeTotal),
+  };
+}
+
 export async function getRecentPredictions(n = 15): Promise<RecentPrediction[]> {
   const preds = await db.prediction.findMany({
     where: { published: true, race: { conditions: null } },

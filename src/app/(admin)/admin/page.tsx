@@ -4,12 +4,14 @@ import {
   getRecentPredictions,
   getPendingPredictions,
   getArchiveStats,
+  getAgfEdgeStats,
 } from "@/server/services/admin.service";
 import { getRaceStyleWinStats, raceStyleBreakdownToRows } from "@/lib/stats";
 import PerformanceBreakdown from "@/components/admin/PerformanceBreakdown";
 import CouponTierChart from "@/components/admin/CouponTierChart";
 import InsightsPanel from "@/components/admin/InsightsPanel";
 import NarrativeSummary from "@/components/admin/NarrativeSummary";
+import AgfEdgeCard from "@/components/admin/AgfEdgeCard";
 import DailyTrendChart from "@/components/admin/DailyTrendChart";
 import RecentFeed from "@/components/admin/RecentFeed";
 import PendingList from "@/components/admin/PendingList";
@@ -21,7 +23,7 @@ import { getClaudeBudget } from "@/server/actions/claude-budget.actions";
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
-  const [stats, analyst, recentPredictions, pendingPredictions, raceStyleStats, claudeBudget, archiveStats] = await Promise.all([
+  const [stats, analyst, recentPredictions, pendingPredictions, raceStyleStats, claudeBudget, archiveStats, agfEdge] = await Promise.all([
     getDashboardStats(),
     getAnalystStats(),
     getRecentPredictions(16),
@@ -29,6 +31,7 @@ export default async function AdminDashboard() {
     getRaceStyleWinStats(),
     getClaudeBudget(),
     getArchiveStats(),
+    getAgfEdgeStats(),
   ]);
 
   const hasData = analyst.overall.total > 0;
@@ -68,6 +71,9 @@ export default async function AdminDashboard() {
 
       {/* ── Yorumsal Özet ──────────────────────────────────────────── */}
       <NarrativeSummary analyst={analyst} pendingResults={stats.pendingResults} />
+
+      {/* ── Sistem vs AGF Favorisi ─────────────────────────────────── */}
+      <AgfEdgeCard stats={agfEdge} />
 
       {/* ── Trend + Bekleyen ───────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
