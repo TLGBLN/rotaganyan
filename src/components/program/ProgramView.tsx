@@ -114,14 +114,19 @@ function breedShort(b: string) {
 
 // Yarış stili — Accurace (GPS/sektörel zamanlama) geçmişinden n>=3 yarışla hesaplanan
 // kalıcı eğilim (bkz. pace-analizi.ts). Eski TJK Son800 tabanlı 4'lü sistemin yerini aldı.
-function raceStyleBadge(raceStyle: { style: string; percent: number } | null): { text: string; cls: string } | null {
+function raceStyleBadge(raceStyle: { style: string; percent: number; veri?: number | null } | null): { text: string; cls: string; dusukGuven: boolean } | null {
   if (!raceStyle) return null;
-  const { style, percent } = raceStyle;
-  if (style === "KACAK") return { text: `%${percent} Kaçak`, cls: "bg-[#e74c3c]/15 text-[#e74c3c]" };
-  if (style === "ONCU") return { text: `%${percent} Öncü`, cls: "bg-[#e67e22]/15 text-[#e67e22]" };
-  if (style === "PRESCI") return { text: `%${percent} Presçi`, cls: "bg-[#d4a017]/15 text-[#d4a017]" };
-  if (style === "TAKIPCI") return { text: `%${percent} Takipçi`, cls: "bg-[#2980b9]/15 text-[#2980b9]" };
-  if (style === "BEKLEYEN") return { text: `%${percent} Bekleyen`, cls: "bg-[#8e44ad]/15 text-[#8e44ad]" };
+  const { style, percent, veri } = raceStyle;
+  // n=3-4 ile çıkan bir yüzde (örn. %33, 3 yarışta 3 farklı stil demek) gerçek bir
+  // eğilim değil, neredeyse rastgele — rozette n'i göstermezsek kullanıcı bunu
+  // yüksek-güvenilirlikli bir örüntüyle (örn. n=20+ %80) karıştırabilir.
+  const dusukGuven = veri != null && veri <= 4;
+  const n = veri != null ? ` (${veri})` : "";
+  if (style === "KACAK") return { text: `%${percent} Kaçak${n}`, cls: "bg-[#e74c3c]/15 text-[#e74c3c]", dusukGuven };
+  if (style === "ONCU") return { text: `%${percent} Öncü${n}`, cls: "bg-[#e67e22]/15 text-[#e67e22]", dusukGuven };
+  if (style === "PRESCI") return { text: `%${percent} Presçi${n}`, cls: "bg-[#d4a017]/15 text-[#d4a017]", dusukGuven };
+  if (style === "TAKIPCI") return { text: `%${percent} Takipçi${n}`, cls: "bg-[#2980b9]/15 text-[#2980b9]", dusukGuven };
+  if (style === "BEKLEYEN") return { text: `%${percent} Bekleyen${n}`, cls: "bg-[#8e44ad]/15 text-[#8e44ad]", dusukGuven };
   return null;
 }
 
@@ -149,7 +154,10 @@ function RaceStyleInfoButton() {
       <PopoverContent className="w-72 text-xs" onClick={(e) => e.stopPropagation()}>
         <p className="mb-2 font-semibold text-foreground">Yarış Stili nedir?</p>
         <p className="mb-2 text-muted-foreground">
-          Atın Accurace (GPS/sektörel zamanlama) geçmişindeki en az 3 yarıştan hesaplanan, tekrar eden davranış eğilimi. Yüzde, o davranışın kaç yarışta görüldüğünü gösterir.
+          Atın Accurace (GPS/sektörel zamanlama) geçmişindeki en az 3 yarıştan hesaplanan, tekrar eden davranış eğilimi. Yüzde, o davranışın kaç yarışta görüldüğünü gösterir; parantezdeki sayı toplam örneklem sayısı (n)&apos;dir.
+        </p>
+        <p className="mb-2 text-muted-foreground">
+          <span className="opacity-60 font-semibold">Soluk rozetler</span> (n≤4) az veriye dayanır — örn. %33, 3 yarışın 3 farklı stilde geçtiği (yani belirgin bir eğilim OLMADIĞI) anlamına da gelebilir. Ne kadar çok yarış (n), o kadar güvenilir.
         </p>
         <ul className="space-y-1.5">
           {RACE_STYLE_INFO.map((s) => (
@@ -680,7 +688,14 @@ function RunnerRow({
       {/* Yarış Stili */}
       <td className="px-2 py-1.5">
         {raceStyleBadge(r.raceStyle) ? (
-          <span className={cn("inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap", raceStyleBadge(r.raceStyle)!.cls)}>
+          <span
+            className={cn(
+              "inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap",
+              raceStyleBadge(r.raceStyle)!.cls,
+              raceStyleBadge(r.raceStyle)!.dusukGuven && "opacity-60"
+            )}
+            title={raceStyleBadge(r.raceStyle)!.dusukGuven ? "Az sayıda yarışa dayanıyor, düşük güven" : undefined}
+          >
             {raceStyleBadge(r.raceStyle)!.text}
           </span>
         ) : (
@@ -882,7 +897,14 @@ function RunnerCard({
 
       {raceStyleBadge(r.raceStyle) && (
         <div className="mt-1.5 ml-10 flex items-center gap-1">
-          <span className={cn("inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold", raceStyleBadge(r.raceStyle)!.cls)}>
+          <span
+            className={cn(
+              "inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold",
+              raceStyleBadge(r.raceStyle)!.cls,
+              raceStyleBadge(r.raceStyle)!.dusukGuven && "opacity-60"
+            )}
+            title={raceStyleBadge(r.raceStyle)!.dusukGuven ? "Az sayıda yarışa dayanıyor, düşük güven" : undefined}
+          >
             {raceStyleBadge(r.raceStyle)!.text}
           </span>
           <RaceStyleInfoButton />

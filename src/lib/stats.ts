@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { analizEtTekYaris, type PaceCheckpoint } from "@/lib/methodology/pace-analizi";
 
 export type HitRateByClass = {
   classType: string;
@@ -73,7 +74,20 @@ function buildBreakdown(
     .sort((a, b) => a.bucket.localeCompare(b.bucket));
 }
 
-/** Yüzülen yarışlarda kazanan atın yarış stiline (Kaçak/Öncü/Presçi/Takipçi/Bekleyen) göre, mesafe ve at sayısı kırılımında kazanma dağılımı. */
+/**
+ * Yüzülen yarışlarda kazanan atın O YARIŞTA fiilen nasıl koştuğuna (Kaçak/Öncü/
+ * Presçi/Takipçi/Bekleyen) göre, mesafe ve at sayısı kırılımında kazanma dağılımı.
+ *
+ * ÖNEMLİ (v4.13 düzeltmesi): eskiden burada kazanan atın Runner.raceStyle alanı
+ * (atın KENDİ KARİYERİ boyunca n>=3 yarıştan hesaplanan KİŞİSEL eğilimi)
+ * kullanılıyordu. Bu iki nedenle yanıltıcıydı: (1) bir at "Bekleyen" etiketli
+ * olsa bile O GÜN öne çıkarak kazanmış olabilir — kişisel eğilim ile o yarıştaki
+ * fiili koşu tarzı FARKLI ŞEYLER; (2) henüz 3 yarışı olmayan (genç/Maiden) atların
+ * kazandığı yarışlar tamamen dışlanıyordu, bu da istatistiği "tecrübeli at"
+ * kazançlarına doğru saptırıyordu (survivorship bias). Artık PistMesafeInfoButton
+ * ile aynı yöntemle, kazanan atın O YARIŞA ait Accurace checkpoint verisinden
+ * doğrudan hesaplıyoruz — atın geçmişinden bağımsız, yalnız o yarışın kendisi.
+ */
 export async function getRaceStyleWinStats(): Promise<{
   byDistance: RaceStyleWinBreakdown[];
   byFieldSize: RaceStyleWinBreakdown[];
@@ -81,11 +95,16 @@ export async function getRaceStyleWinStats(): Promise<{
   const results = await db.result.findMany({
     where: { winnerNo: { not: null } },
     select: {
-      winnerNo: true,
       race: {
         select: {
           distance: true,
-          runners: { select: { no: true, raceStyle: true } },
+          runners: { select: { no: true } },
+          accuraceRace: {
+            select: {
+              length: true,
+              splits: { where: { place: 1 }, select: { checkpoints: true }, take: 1 },
+            },
+          },
         },
       },
     },
@@ -95,8 +114,12 @@ export async function getRaceStyleWinStats(): Promise<{
   const fieldSizeRows: { bucketKey: string; bucketLabel: string; style: string }[] = [];
 
   for (const r of results) {
-    const winner = r.race.runners.find((x) => x.no === r.winnerNo);
-    const style = (winner?.raceStyle as { style?: string } | null)?.style;
+    const ar = r.race.accuraceRace;
+    const kazanan = ar?.splits[0];
+    if (!ar || !kazanan || !ar.length) continue;
+
+    const sonuc = analizEtTekYaris(kazanan.checkpoints as unknown as PaceCheckpoint[], ar.length);
+    const style = sonuc?.stil;
     if (!style || !RACE_STYLE_LABELS[style]) continue;
 
     const db_ = distanceBucket(r.race.distance);
