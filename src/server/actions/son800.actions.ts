@@ -53,10 +53,29 @@ export async function getSon800ForRace(raceId: string): Promise<Son800RunnerData
       horseName: true,
       place: true,
       checkpoints: true,
-      accuraceRace: { select: { date: true, hippodrome: true, citySlug: true, ground: true, length: true } },
+      accuraceRace: {
+        select: {
+          date: true,
+          hippodrome: true,
+          citySlug: true,
+          ground: true,
+          length: true,
+          race: { select: { raceDay: { select: { hippodrome: { select: { name: true } } } } } },
+        },
+      },
     },
     orderBy: { accuraceRace: { date: "desc" } },
   });
+
+  // Accurace bazı hipodromlar için (Antalya, Elazığ, Şanlıurfa) tam isim yerine yalnız
+  // "Hipodromu" kelimesini veriyor (kaynak veri eksikliği) — bu durumda kendi Race
+  // kaydımızdaki DOĞRU hipodrom adını kullanıyoruz.
+  function hippodromeAdi(k: (typeof splits)[number]): string {
+    const ham = k.accuraceRace.hippodrome;
+    const bizim = k.accuraceRace.race?.raceDay.hippodrome.name;
+    if (ham && ham.trim().toLocaleUpperCase("tr-TR") !== "HİPODROMU") return ham;
+    return bizim ? `${bizim} Hipodromu` : (ham ?? k.accuraceRace.citySlug);
+  }
 
   return runners.map((r): Son800RunnerData => {
     const norm = normalizeHorseName(r.name);
@@ -68,7 +87,7 @@ export async function getSon800ForRace(raceId: string): Promise<Son800RunnerData
         if (sure == null) return null;
         return {
           date: k.accuraceRace.date.toISOString().slice(0, 10).split("-").reverse().join("."),
-          hippodrome: k.accuraceRace.hippodrome ?? k.accuraceRace.citySlug,
+          hippodrome: hippodromeAdi(k),
           ground: GROUND_LABEL[k.accuraceRace.ground ?? ""] ?? (k.accuraceRace.ground ?? "—"),
           length,
           place: k.place,
