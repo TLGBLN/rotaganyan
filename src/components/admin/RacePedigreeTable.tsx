@@ -12,6 +12,7 @@ type Runner = {
   dam: string | null;
   damSire: string | null;
   sireStatOzet?: string | null;
+  damStatOzet?: string | null;
   adminNote: string | null;
 };
 
@@ -327,6 +328,9 @@ export default function RacePedigreeTable({ runners }: { runners: Runner[] }) {
                       placeholder="Anne babası (damsire)"
                       className="w-full min-w-[110px] rounded-md border bg-transparent px-2 py-1 text-xs"
                     />
+                    {r.damStatOzet ? (
+                      <p className="mt-1 text-[10px] leading-snug text-hit">🐎 Otomatik: {r.damStatOzet}</p>
+                    ) : null}
                   </td>
                   <td className="px-2 py-2">
                     <input

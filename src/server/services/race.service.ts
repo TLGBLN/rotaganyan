@@ -5,6 +5,7 @@ import type { Prisma, Confidence } from "@prisma/client";
 import { syncResultsForDate } from "./result-sync";
 import { fetchApprenticeRemainingRaces, normalizeJockeyName } from "./ingest/tjk-apprentice.adapter";
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
+import { getDamStatOzetleriForRace } from "@/server/actions/dam-stat.actions";
 
 /** Runner.raceStyle JSON alanından ("style" + "percent" + "veri") ekranda gösterilecek değeri çıkarır. */
 function parseRaceStyle(raw: unknown): { style: string; percent: number; veri: number | null } | null {
@@ -566,6 +567,7 @@ export type ProgramRunner = {
   damSire: string | null;
   pedigreeNote: string | null;
   sireStatOzet: string | null;
+  damStatOzet: string | null;
   adminNote: string | null;
   hp: number | null;
   equipment: string | null;
@@ -700,16 +702,25 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
   // koşu başına tek bir havuz sorgusu yeterli (bkz. getSireStatOzetleriForRace).
   const allRaces = raceDays.flatMap((rd) => rd.races);
   const sireStatByRunnerId = new Map<string, string | null>();
+  const damStatByRunnerId = new Map<string, string | null>();
   await Promise.all(
     allRaces.map(async (r) => {
       if (r.runners.length === 0) return;
-      const ozetler = await getSireStatOzetleriForRace(
-        r.runners.map((ru) => ru.sire),
-        r.breed,
-        r.surface,
-        r.distance
-      ).catch(() => r.runners.map(() => null));
-      r.runners.forEach((ru, i) => sireStatByRunnerId.set(ru.id, ozetler[i] ?? null));
+      const [sireOzetler, damOzetler] = await Promise.all([
+        getSireStatOzetleriForRace(r.runners.map((ru) => ru.sire), r.breed, r.surface, r.distance).catch(
+          () => r.runners.map(() => null)
+        ),
+        getDamStatOzetleriForRace(
+          r.runners.map((ru) => ({ dam: ru.dam, damSire: ru.damSire })),
+          r.breed,
+          r.surface,
+          r.distance
+        ).catch(() => r.runners.map(() => null)),
+      ]);
+      r.runners.forEach((ru, i) => {
+        sireStatByRunnerId.set(ru.id, sireOzetler[i] ?? null);
+        damStatByRunnerId.set(ru.id, damOzetler[i] ?? null);
+      });
     })
   );
 
@@ -749,6 +760,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
             ...ru,
             apprenticeRemaining,
             sireStatOzet: sireStatByRunnerId.get(ru.id) ?? null,
+            damStatOzet: damStatByRunnerId.get(ru.id) ?? null,
             raceStyle: parseRaceStyle(raceStyle),
             gallops: gallops.map((g) => ({
               ...g,

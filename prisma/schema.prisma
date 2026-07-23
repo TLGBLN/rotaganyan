@@ -526,6 +526,43 @@ model SireStat {
   @@index([filtreMesafe, filtrePist])
 }
 
+// hipodromx.com "Kısraklar" tablosu — SireStat'in anne (dam) + anne babası (damsire)
+// tarafındaki eşi. Site bu ikisini TEK satırda birlikte veriyor (kısrak tek başına değil,
+// kısrak+kısrak babası kombinasyonu bazında), o yüzden eşleştirme anahtarı ikisi birlikte.
+model DamStat {
+  id String @id @default(cuid())
+
+  damName     String // Kısrak (anne)
+  damSireName String // Kısrak Baba (anne babası)
+  irk         String @default("İNGİLİZ")
+
+  filtreYil        String
+  filtreCins       String
+  filtreSehir      String
+  filtreMesafe     String
+  filtrePist       String
+  filtreGrupListed String
+  filtreYasGrubu   String
+
+  atSayisi  Int // "At" — bu kısrak+kısrak babası kombinasyonundan bu filtrede koşan farklı yavru sayısı
+  start     Int
+  birinci   Int
+  kYuzde    Float
+  ikinci    Int
+  ucuncu    Int
+  dorduncu  Int
+  besinci   Int
+  ikramiye  BigInt
+
+  source    String   @default("hipodromx")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([damName, damSireName, irk, filtreYil, filtreCins, filtreSehir, filtreMesafe, filtrePist, filtreGrupListed, filtreYasGrubu], name: "damStatFiltre")
+  @@index([damName])
+  @@index([filtreMesafe, filtrePist])
+}
+
 // ─── METHODOLOGY ──────────────────────────────────────────────────────────────
 
 model MethodologyVersion {

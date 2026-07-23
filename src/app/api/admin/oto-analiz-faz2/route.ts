@@ -66,6 +66,9 @@ async function handlePost(req: NextRequest) {
         ...(r.sireStatOzet
           ? [`  Aygır İstatistiği (otomatik, hipodromx.com — babanın BU pist/mesafe kombinasyonundaki yavru performansı, K/K%=galibiyet oranı, AEI=1.0 ortalama): ${r.sireStatOzet}`]
           : []),
+        ...(r.damStatOzet
+          ? [`  Kısrak İstatistiği (otomatik, hipodromx.com — anne+anne babası kombinasyonunun BU pist/mesafedeki yavru performansı): ${r.damStatOzet}`]
+          : []),
         ...(r.adminNote ? [`  Admin Notu (elle girildi, güvenilir kanıt kabul et): ${r.adminNote}`] : []),
         `  HP bugün:${r.hpBugun}${r.hpBugunResmiYok ? " (resmi HP yok — Şartlı1/Maiden/henüz atanmamış; 0 KABUL EDİLİR, HP karşılaştırmasında/sıralamasında bu at 0 puanlı sayılır — bkz. metodoloji istisna kuralı)" : ""} önceki:${
           r.ilkStart ? "İLK START"

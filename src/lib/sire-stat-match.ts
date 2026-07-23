@@ -67,3 +67,35 @@ export function findSireStat<T extends SireStatLite>(sireName: string | null | u
 export function formatSireStatOzet(s: SireStatLite, mesafe: string, pist: string): string {
   return `${s.sireName} (${pist} ${mesafe}): yavruları ${s.kkKazanan}/${s.kkKosulan} koşuda kazandı (K/K %${s.kkYuzde}) · Start ${s.start} 1.${s.birinci}(K% ${s.kYuzde}) 2.${s.ikinci} 3.${s.ucuncu} · İkr ${s.ikramiye.toLocaleString("tr-TR")}₺ · AEI ${s.aei}${s.aei > 1 ? " (ortalama üstü)" : s.start > 0 ? " (ortalama altı)" : ""}`;
 }
+
+export type DamStatLite = {
+  damName: string;
+  damSireName: string;
+  atSayisi: number;
+  start: number;
+  birinci: number;
+  kYuzde: number;
+  ikinci: number;
+  ucuncu: number;
+  ikramiye: bigint;
+};
+
+/** Kısrak eşleştirmesi ANNE + ANNE BABASI birlikte — hipodromx bu ikisini tek satırda birlikte veriyor. */
+export function findDamStat<T extends DamStatLite>(
+  damName: string | null | undefined,
+  damSireName: string | null | undefined,
+  pool: T[]
+): T | null {
+  if (!damName) return null;
+  const normDam = normalizeSireName(damName);
+  const normDamSire = damSireName ? normalizeSireName(damSireName) : null;
+  const candidates = pool.filter((s) => normalizeSireName(s.damName) === normDam);
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+  // Aynı isimli birden fazla kısrak varsa (nadir), anne babasıyla ayrıştır.
+  return (normDamSire && candidates.find((s) => normalizeSireName(s.damSireName) === normDamSire)) || candidates[0];
+}
+
+export function formatDamStatOzet(s: DamStatLite, mesafe: string, pist: string): string {
+  return `${s.damName} / ${s.damSireName} (${pist} ${mesafe}): ${s.atSayisi} yavru · Start ${s.start} 1.${s.birinci}(K% ${s.kYuzde}) 2.${s.ikinci} 3.${s.ucuncu} · İkr ${s.ikramiye.toLocaleString("tr-TR")}₺`;
+}

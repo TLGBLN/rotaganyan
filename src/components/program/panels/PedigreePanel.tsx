@@ -31,6 +31,9 @@ export default function PedigreePanel({ runners }: { runners: ProgramRunner[] })
             {r.sireStatOzet && (
               <div className="text-[11px] text-muted-foreground mt-1 leading-snug">🏆 {r.sireStatOzet}</div>
             )}
+            {r.damStatOzet && (
+              <div className="text-[11px] text-muted-foreground mt-1 leading-snug">🐎 {r.damStatOzet}</div>
+            )}
             {r.adminNote && (
               <div className="text-[11px] text-muted-foreground mt-1 leading-snug">{r.adminNote}</div>
             )}

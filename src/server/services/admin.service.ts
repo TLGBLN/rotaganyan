@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { startOfDay, endOfDay } from "date-fns";
 import type { Prisma } from "@prisma/client";
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
+import { getDamStatOzetleriForRace } from "@/server/actions/dam-stat.actions";
 
 export type AdminPrediction = Prisma.PredictionGetPayload<{
   include: {
@@ -136,16 +137,25 @@ export async function getRaceDaysForPedigreeEntry(dateStr: string) {
   // ırk/pist/mesafe SABİT olduğu için tek havuz sorgusu, at başına ayrı sorgu gerekmiyor.
   const allRaces = raceDays.flatMap((rd) => rd.races);
   const sireStatByRunnerId = new Map<string, string | null>();
+  const damStatByRunnerId = new Map<string, string | null>();
   await Promise.all(
     allRaces.map(async (r) => {
       if (r.runners.length === 0) return;
-      const ozetler = await getSireStatOzetleriForRace(
-        r.runners.map((ru) => ru.sire),
-        r.breed,
-        r.surface,
-        r.distance
-      ).catch(() => r.runners.map(() => null));
-      r.runners.forEach((ru, i) => sireStatByRunnerId.set(ru.id, ozetler[i] ?? null));
+      const [sireOzetler, damOzetler] = await Promise.all([
+        getSireStatOzetleriForRace(r.runners.map((ru) => ru.sire), r.breed, r.surface, r.distance).catch(
+          () => r.runners.map(() => null)
+        ),
+        getDamStatOzetleriForRace(
+          r.runners.map((ru) => ({ dam: ru.dam, damSire: ru.damSire })),
+          r.breed,
+          r.surface,
+          r.distance
+        ).catch(() => r.runners.map(() => null)),
+      ]);
+      r.runners.forEach((ru, i) => {
+        sireStatByRunnerId.set(ru.id, sireOzetler[i] ?? null);
+        damStatByRunnerId.set(ru.id, damOzetler[i] ?? null);
+      });
     })
   );
 
@@ -153,7 +163,11 @@ export async function getRaceDaysForPedigreeEntry(dateStr: string) {
     ...rd,
     races: rd.races.map((r) => ({
       ...r,
-      runners: r.runners.map((ru) => ({ ...ru, sireStatOzet: sireStatByRunnerId.get(ru.id) ?? null })),
+      runners: r.runners.map((ru) => ({
+        ...ru,
+        sireStatOzet: sireStatByRunnerId.get(ru.id) ?? null,
+        damStatOzet: damStatByRunnerId.get(ru.id) ?? null,
+      })),
     })),
   }));
 }
