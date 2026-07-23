@@ -41,10 +41,11 @@ export async function POST(req: NextRequest) {
     if (r.agfSirasi == null) eksikler.push("AGF (henüz yayınlanmamış)");
 
     // Son800 admin tarafından elle girilemeyen, tamamen otomatik bir alan — at bu
-    // hipodrom/pist/mesafe kombinasyonunda hiç koşmamışsa 0 çıkması YAPISAL bir durumdur,
-    // "eksik veri" değil (Faz 2/4 zaten bunu ceza sebebi yapmıyor). Kırmızı "eksik" olarak
-    // göstermek admin'e düzeltemeyeceği bir şeyi işaret ediyordu — bilgi notuna taşındı.
-    if (r.son800BenzerKosuN === 0) bilgiler.push("Son800: bu hipodrom/pist/mesafede benzer koşu yok (yapısal, 0 kabul edilir)");
+    // pist/mesafe kombinasyonunda (herhangi bir hipodromda) hiç koşmamışsa 0 çıkması
+    // YAPISAL bir durumdur, "eksik veri" değil (Faz 2/4 zaten bunu ceza sebebi yapmıyor).
+    // Kırmızı "eksik" olarak göstermek admin'e düzeltemeyeceği bir şeyi işaret ediyordu —
+    // bilgi notuna taşındı. v4.13: artık hipodrom şartı yok, yalnız pist+mesafe aranıyor.
+    if (r.son800BenzerKosuN === 0) bilgiler.push("Son800: bu pist/mesafede (hiçbir hipodromda) benzer koşu yok — veri gerçekten yok, çekilememe değil.");
 
     if (r.hpBugunResmiYok) bilgiler.push("Bugünkü HP resmi yok (yapısal — Şartlı1/Maiden'de normal)");
     if (r.ilkStart) bilgiler.push("İlk start (geçmiş yarış yok)");

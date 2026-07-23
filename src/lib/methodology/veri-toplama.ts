@@ -24,7 +24,6 @@ import {
   kacakHaritasi, zeminKatsayisi, zeminDetayiBul, type GalopZinciriSonuc, type TempoGuven,
 } from "@/lib/methodology/mekanik-puanlama";
 import { analizEtTekYaris, hesaplaCokYarisEgilimi, type PaceCheckpoint, type CokYarisEgilim } from "@/lib/methodology/pace-analizi";
-import { toAccuraceCitySlug } from "@/server/services/ingest/accurace.adapter";
 
 const COMBINING_MARKS_RE = /[̀-ͯ]/g;
 // Yabancı doğumlu atlarda Runner.name "(USA)"/"(IRE)" gibi ülke koduyla biter, Accurace bunu yazmıyor.
@@ -368,14 +367,17 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   }
 
   const surfacePrefixToday = race.surface === "CIM" ? "C" : race.surface === "SENTETIK" ? "S" : "K";
-  const todayCitySlug = toAccuraceCitySlug(hippodromeName);
   const son800ByRunnerName = new Map<string, { n: number; medyan: number | null }>();
   for (const r of race.runners) {
+    // v4.13: eskiden hipodrom da BİREBİR aynı olmak zorundaydı (bu hipodromda hiç
+    // koşmamış atlar için n hep 0 çıkıyor, sinyal boşa gidiyordu). Kullanıcı talebiyle
+    // hipodrom şartı kaldırıldı — yalnız pist türü (ground) ve mesafe (±200m) aranıyor.
+    // Farklı hipodromların pist yapısı/banket farkı olsa da, aynı pist türü+mesafedeki
+    // kapanış hızı kıyaslaması tek hipodroma sıkışmaktan daha değerli bir sinyal veriyor.
     const kayitlar = son800AccuraceKayitlari.filter(
       (k) =>
         k.horseName === r.name &&
         k.accuraceRace.date.getUTCFullYear().toString() === race.raceDay.date.getUTCFullYear().toString() &&
-        k.accuraceRace.citySlug === todayCitySlug &&
         k.accuraceRace.ground === surfacePrefixToday &&
         Math.abs((k.accuraceRace.length ?? 0) - race.distance) <= 200
     );
