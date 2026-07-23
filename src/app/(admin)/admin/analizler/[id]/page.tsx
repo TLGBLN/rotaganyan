@@ -55,7 +55,7 @@ export default async function EditAnalizPage({ params }: PageProps) {
 
         <aside className="space-y-4">
           <ClassTypeAdviceCard advice={advice} classType={race.classType} />
-          {!pred.published && <PublishChecklist predictionId={pred.id} />}
+          {!pred.published && <PublishChecklist predictionId={pred.id} pickCount={pred.picks.length} />}
           {pred.published && (
             <div className="rounded-lg border border-hit/30 bg-hit/10 p-3 text-sm text-hit">
               ✓ Bu analiz yayında

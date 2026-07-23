@@ -1,68 +1,98 @@
 "use client";
 
-import { useState } from "react";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { publishPrediction } from "@/server/actions/prediction.actions";
+import { publishPrediction, getPublishChecklistAuto, type ChecklistCheck } from "@/server/actions/prediction.actions";
 import { useTransition } from "react";
-import { CheckCircle2, Lock } from "lucide-react";
+import { CheckCircle2, XCircle, Info, Lock, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CHECKLIST_6 } from "@/lib/methodology/topics";
+import { cn } from "@/lib/utils";
 
-const CHECKLIST = CHECKLIST_6;
+const STATUS_ICON = {
+  PASS: <CheckCircle2 className="h-4 w-4 shrink-0 text-hit" />,
+  FAIL: <XCircle className="h-4 w-4 shrink-0 text-miss" />,
+  INFO: <Info className="h-4 w-4 shrink-0 text-muted-foreground" />,
+};
 
-export default function PublishChecklist({ predictionId }: { predictionId: string }) {
-  const [checked, setChecked] = useState<boolean[]>(CHECKLIST.map(() => false));
+export default function PublishChecklist({
+  predictionId, pickCount, saveVersion = 0,
+}: { predictionId: string; pickCount: number; saveVersion?: number }) {
+  const [checks, setChecks] = useState<ChecklistCheck[] | "loading">("loading");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
-  const allChecked = checked.every(Boolean);
+  // saveVersion: mevcut bir tahmin (aynı predictionId) tekrar tekrar kaydedildiğinde
+  // (Kaydet'e her basışta id DEĞİŞMEZ, upsert aynı satırı günceller) — bu sayaç
+  // olmadan kontroller bir daha ASLA yeniden çekilmezdi, ilk yüklemedeki (belki
+  // kaydetmeden önceki) bayat durumda kalırdı.
+  useEffect(() => {
+    setChecks("loading");
+    getPublishChecklistAuto(predictionId).then(setChecks);
+  }, [predictionId, saveVersion]);
 
-  function toggle(i: number) {
-    setChecked((prev) => prev.map((v, idx) => (idx === i ? !v : v)));
-  }
+  const hasPicks = pickCount > 0;
+  const hasFail = checks !== "loading" && checks.some((c) => c.status === "FAIL");
+  const canPublish = hasPicks && checks !== "loading" && !hasFail;
 
   function handlePublish() {
     startTransition(async () => {
-      await publishPrediction(predictionId);
-      toast.success("Analiz yayımlandı!");
-      router.push("/admin/analizler");
+      try {
+        await publishPrediction(predictionId);
+        toast.success("Analiz yayımlandı!");
+        router.push("/admin/analizler");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Yayınlama başarısız.");
+      }
     });
   }
 
   return (
     <div className="rounded-lg border p-4 space-y-3">
       <h3 className="text-sm font-semibold">Yayın Öncesi Kontrol</h3>
-      <div className="space-y-2">
-        {CHECKLIST.map((item, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <Checkbox
-              id={`check-${i}`}
-              checked={checked[i]}
-              onCheckedChange={() => toggle(i)}
-            />
-            <Label
-              htmlFor={`check-${i}`}
-              className="text-sm cursor-pointer"
-            >
-              {item}
-            </Label>
-          </div>
-        ))}
-      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Kayıtlı veriden otomatik hesaplanır — elle işaretlemeniz gerekmez, tek işiniz aşağıdaki kontroller geçtiğinde Yayımla&apos;ya basmak.
+      </p>
+
+      {!hasPicks && (
+        <div className="rounded-md border border-miss/30 bg-miss/10 px-3 py-2 text-xs font-medium text-miss">
+          Bu analizde hiç at seçimi (pick) yok — önce soldaki formu doldurup <strong>Kaydet</strong>&apos;e basmadan yayınlanamaz.
+        </div>
+      )}
+
+      {checks === "loading" ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Kontroller hesaplanıyor…
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {checks.map((c) => (
+            <div key={c.label} className="flex items-start gap-2">
+              {STATUS_ICON[c.status]}
+              <div className="min-w-0">
+                <p className={cn("text-sm font-medium", c.status === "FAIL" && "text-miss")}>{c.label}</p>
+                <p className="text-[11px] text-muted-foreground">{c.detail}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <Button
         onClick={handlePublish}
-        disabled={!allChecked || pending}
+        disabled={!canPublish || pending}
         className="w-full"
         size="sm"
       >
-        {!allChecked ? (
+        {!hasPicks ? (
           <>
             <Lock className="mr-2 h-3.5 w-3.5" />
-            {checked.filter(Boolean).length} / {CHECKLIST.length} tamamlandı
+            At seçimi yok
+          </>
+        ) : hasFail ? (
+          <>
+            <Lock className="mr-2 h-3.5 w-3.5" />
+            Kontrolleri geç
           </>
         ) : (
           <>

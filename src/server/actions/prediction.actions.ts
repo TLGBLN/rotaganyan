@@ -206,8 +206,102 @@ export async function upsertPrediction(input: PredictionInput) {
   return { id: predictionId };
 }
 
+export type ChecklistCheck = { label: string; status: "PASS" | "FAIL" | "INFO"; detail: string };
+
+/**
+ * §XX'in 6 maddelik yayın öncesi kontrolünü elle işaretlemek yerine gerçek kayıtlı
+ * veriden otomatik hesaplar. Üç madde (③⑤⑥) tamamen yapısal veriden kesin
+ * doğrulanabilir — bunlar FAIL ise yayın engellenir. ④ yarı-yapısal (tempo alanı
+ * dolu mu) bir vekil kontrol. ①② ise AI'ın gerekçe metni artık ayrı saklanmadığı
+ * için (maliyet nedeniyle kapatıldı, bkz. proje notu) gerçek anlamda doğrulanamaz —
+ * bunlar INFO olarak referans veri gösterir, yayını engellemez.
+ */
+export async function getPublishChecklistAuto(predictionId: string): Promise<ChecklistCheck[]> {
+  const pred = await db.prediction.findUnique({
+    where: { id: predictionId },
+    select: {
+      isBanko: true, tempo: true, couponNarrow: true, couponNormal: true, couponWide: true,
+      picks: { orderBy: { rank: "asc" }, select: { rank: true, runnerId: true } },
+      race: {
+        select: {
+          classType: true, distance: true,
+          runners: {
+            select: { id: true, no: true, name: true, scratched: true, agf: true, bestTime: true, raceStyle: true },
+          },
+        },
+      },
+    },
+  });
+  if (!pred) return [];
+
+  const aktifAtlar = pred.race.runners.filter((r) => !r.scratched);
+  const checks: ChecklistCheck[] = [];
+
+  // ① Derece — bilgi amaçlı: bu koşuda en iyi dereceye sahip at kim (metni doğrulayamıyoruz, referans veriyoruz).
+  const enIyiDereceli = [...aktifAtlar].filter((r) => r.bestTime).sort((a, b) => (a.bestTime! < b.bestTime! ? -1 : 1))[0];
+  checks.push({
+    label: "① Derece",
+    status: "INFO",
+    detail: enIyiDereceli ? `En iyi derece: #${enIyiDereceli.no} ${enIyiDereceli.name} (${enIyiDereceli.bestTime})` : "Hiçbir atta derece kaydı yok",
+  });
+
+  // ② Sicil > Kilo — bilgi amaçlı, gerekçe metni saklanmadığı için doğrulanamıyor.
+  checks.push({ label: "② Sicil > Kilo", status: "INFO", detail: "Formdaki gerekçeyi elle kontrol edin — otomatik doğrulanamaz." });
+
+  // ③ AGF — AGF 1. ile sistem 1. farklıysa banko VERİLEMEZ.
+  const agfAtlari = aktifAtlar.filter((r) => r.agf != null);
+  const agfFavori = agfAtlari.length ? agfAtlari.reduce((a, b) => (b.agf! > a.agf! ? b : a)) : null;
+  const sistemBirinci = pred.picks.find((p) => p.rank === 1);
+  if (!agfFavori || !sistemBirinci) {
+    checks.push({ label: "③ AGF", status: "INFO", detail: "AGF verisi henüz yok — kontrol edilemedi." });
+  } else if (pred.isBanko && agfFavori.id !== sistemBirinci.runnerId) {
+    checks.push({ label: "③ AGF", status: "FAIL", detail: `AGF favorisi #${agfFavori.no} ${agfFavori.name}, sistem 1.si farklı — BANKO verilemez.` });
+  } else {
+    checks.push({ label: "③ AGF", status: "PASS", detail: agfFavori.id === sistemBirinci.runnerId ? "AGF favorisi = sistem 1." : "AGF farklı ama banko verilmemiş, kural ihlali yok." });
+  }
+
+  // ④ Tempo — 2+ kaçak varsa tempo alanı dolu olmalı (vekil kontrol).
+  const kacakSayisi = aktifAtlar.filter((r) => (r.raceStyle as { style?: string } | null)?.style === "KACAK").length;
+  if (kacakSayisi >= 2 && !pred.tempo?.trim()) {
+    checks.push({ label: "④ Tempo", status: "FAIL", detail: `${kacakSayisi} kaçak stilli at var ama tempo alanı boş.` });
+  } else {
+    checks.push({ label: "④ Tempo", status: "PASS", detail: kacakSayisi >= 2 ? `${kacakSayisi} kaçak var, tempo değerlendirilmiş.` : "2'den az kaçak, tempo riski düşük." });
+  }
+
+  // ⑤ Tüm Atlar — koşan (çekilmemiş) her at bir pick'e sahip olmalı.
+  const pickliRunnerIds = new Set(pred.picks.map((p) => p.runnerId).filter(Boolean));
+  const eksikAtlar = aktifAtlar.filter((r) => !pickliRunnerIds.has(r.id));
+  if (pred.picks.length === 0) {
+    checks.push({ label: "⑤ Tüm Atlar", status: "FAIL", detail: "Hiç at seçimi (pick) yok — form kaydedilmemiş." });
+  } else if (eksikAtlar.length > 0) {
+    checks.push({ label: "⑤ Tüm Atlar", status: "FAIL", detail: `${eksikAtlar.length} at analiz edilmemiş: ${eksikAtlar.map((r) => r.name).join(", ")}` });
+  } else {
+    checks.push({ label: "⑤ Tüm Atlar", status: "PASS", detail: `Sahadaki ${aktifAtlar.length} atın tamamı analiz edildi.` });
+  }
+
+  // ⑥ Banko — Handikap/Grup'ta banko veriliyorsa kombinasyon (3 kupon alanı) zorunlu.
+  const handikapVeyaGrup = /^(Handikap|G\s*\d|Grup)/i.test(pred.race.classType);
+  if (pred.isBanko && handikapVeyaGrup && !(pred.couponNarrow && pred.couponNormal && pred.couponWide)) {
+    checks.push({ label: "⑥ Banko Kombinasyon", status: "FAIL", detail: "Handikap/Grup + banko → 3 kupon alanı (Ekonomik/Normal/Geniş) doldurulmalı." });
+  } else {
+    checks.push({ label: "⑥ Banko Kombinasyon", status: "PASS", detail: handikapVeyaGrup ? "Kombinasyon şartı sağlanıyor." : "Handikap/Grup değil, zorunlu değil." });
+  }
+
+  return checks;
+}
+
 export async function publishPrediction(id: string) {
   await requireRole("EDITOR");
+
+  // PublishChecklist formdan bağımsız bir bileşen — "Kaydet" hiç tıklanmamış veya
+  // başarısız olmuş olsa bile 6 kutu işaretlenip Yayımla'ya basılabiliyordu. Bu,
+  // gerçek üretimde picks'i boş ("published:true" ama 0 at) bir analizin yayınlanmasına
+  // yol açtı (Ankara 1-2. Koşu, 2026-07-23). Son çare olarak burada engelliyoruz —
+  // hangi UI yolundan gelirse gelsin, picks'i boş bir tahmin ASLA yayınlanamaz.
+  const pickCount = await db.pick.count({ where: { predictionId: id } });
+  if (pickCount === 0) {
+    throw new Error("Bu analizde hiç at seçimi (pick) yok — yayınlanamaz. Önce formu doldurup Kaydet'e basın.");
+  }
 
   await db.prediction.update({
     where: { id },

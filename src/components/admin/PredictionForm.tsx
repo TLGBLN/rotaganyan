@@ -89,6 +89,7 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [savedId, setSavedId] = useState(existingPrediction?.id ?? null);
+  const [saveVersion, setSaveVersion] = useState(0);
   const prevAiResult = useRef<AIAnalysisResult | null | undefined>(null);
 
   const defaultPicks: PickFormData[] = existingPrediction?.picks.map((p) => ({
@@ -180,6 +181,7 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
           })),
       });
       setSavedId(result.id);
+      setSaveVersion((v) => v + 1);
       toast.success("Analiz kaydedildi");
     } catch {
       toast.error("Kayıt hatası");
@@ -368,14 +370,16 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
 
       {savedId && (
         <div className="mt-4">
-          <PublishChecklistSection predictionId={savedId} />
+          <PublishChecklistSection predictionId={savedId} pickCount={fields.length} saveVersion={saveVersion} />
         </div>
       )}
     </div>
   );
 }
 
-function PublishChecklistSection({ predictionId }: { predictionId: string }) {
+function PublishChecklistSection({
+  predictionId, pickCount, saveVersion,
+}: { predictionId: string; pickCount: number; saveVersion: number }) {
   const [show, setShow] = useState(false);
 
   if (!show) {
@@ -389,5 +393,5 @@ function PublishChecklistSection({ predictionId }: { predictionId: string }) {
     );
   }
 
-  return <PublishChecklist predictionId={predictionId} />;
+  return <PublishChecklist predictionId={predictionId} pickCount={pickCount} saveVersion={saveVersion} />;
 }
