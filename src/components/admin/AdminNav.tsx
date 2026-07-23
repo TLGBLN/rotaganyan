@@ -17,6 +17,7 @@ import {
   TrendingUp,
   Dna,
   Gauge,
+  Award,
 } from "lucide-react";
 
 const NAV = [
@@ -24,6 +25,7 @@ const NAV = [
   { href: "/admin/analizler", label: "Analizler", icon: FileText },
   { href: "/admin/kosular", label: "Koşular", icon: Flag },
   { href: "/admin/pedigri", label: "Pedigriler", icon: Dna },
+  { href: "/admin/aygir-istatistik", label: "Aygır İstatistik", icon: Award },
   { href: "/admin/accurace", label: "Accurace Database", icon: Gauge },
   { href: "/admin/sonuclar", label: "Sonuçlar", icon: Trophy },
   { href: "/admin/kupon", label: "Kupon Hazırla", icon: Ticket },

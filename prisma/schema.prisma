@@ -485,6 +485,46 @@ model ClaudeBudget {
   note        String?
 }
 
+// ─── AYGIR İSTATİSTİK ───────────────────────────────────────────────────────────
+// Kullanıcının hipodromx.com'dan (robots.txt tüm botları engelliyor — bu yüzden
+// OTOMATİK scrape edilmiyor) elle kopyalayıp yapıştırdığı aygır istatistikleri.
+// Her satır belirli bir filtre kombinasyonuna (yıl/cins/şehir/mesafe/pist/
+// grup-listed/yaş grubu) ait — aynı aygır farklı filtrelerde farklı satırlarda olabilir.
+model SireStat {
+  id String @id @default(cuid())
+
+  sireName String
+
+  filtreYil        String // "2026", "Hepsi" vb. — site dropdown'ındaki metin aynen
+  filtreCins       String // Erkek/Dişi/İğdiş/Hepsi (yavru cinsiyeti)
+  filtreSehir      String // şehir adı ya da "Hepsi"
+  filtreMesafe     String // "800-1400" gibi
+  filtrePist       String // Çim/Kum/Sentetik/Hepsi
+  filtreGrupListed String // Grup 1/Grup/Listed/Hepsi
+  filtreYasGrubu   String // (2y)/(3y)/(3+)/(4+)/Hepsi
+
+  kkKazanan Int // "7-22" -> 7
+  kkKosulan Int // "7-22" -> 22
+  kkYuzde   Float // K/K% (örn. 31 = %31)
+  start     Int
+  birinci   Int
+  kYuzde    Float // K% (örn. 20 = %20)
+  ikinci    Int
+  ucuncu    Int
+  dorduncu  Int
+  besinci   Int
+  ikramiye  BigInt // İkr.(TL)
+  aei       Float
+
+  source    String   @default("hipodromx")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sireName, filtreYil, filtreCins, filtreSehir, filtreMesafe, filtrePist, filtreGrupListed, filtreYasGrubu], name: "sireStatFiltre")
+  @@index([sireName])
+  @@index([filtreMesafe, filtrePist])
+}
+
 // ─── METHODOLOGY ──────────────────────────────────────────────────────────────
 
 model MethodologyVersion {
