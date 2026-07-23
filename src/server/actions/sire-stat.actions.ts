@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { parseSireStatBulk } from "@/lib/sire-stat-parser";
+import { breedToIrk, surfaceToPist, mesafeBucket, findSireStat, formatSireStatOzet } from "@/lib/sire-stat-match";
 
 export type SireStatFiltre = {
   irk: string;
@@ -63,10 +64,24 @@ export async function listSireStats(limit = 100) {
   return db.sireStat.findMany({ orderBy: { updatedAt: "desc" }, take: limit });
 }
 
-/** Bir atın babasının, verilen pist+mesafe kombinasyonunda kayıtlı istatistiği var mı — ileride Faz 1 verisine eklemek için. */
-export async function getSireStatForSire(sireName: string, mesafe: string, pist: string) {
-  return db.sireStat.findFirst({
-    where: { sireName: sireName.toLocaleUpperCase("tr-TR"), filtreMesafe: mesafe, filtrePist: pist },
-    orderBy: { updatedAt: "desc" },
+/**
+ * Bir koşudaki tüm atların babası için, o koşunun ırk/pist/mesafe kombinasyonuna karşılık
+ * gelen aygır istatistiği özetini (varsa) döner — sireNames ile AYNI SIRADA, eşleşmeyenler null.
+ * Race.breed/surface/distance içinde ırk/pist/mesafe kombinasyonu SABİT olduğu için tek bir
+ * havuz sorgusu yeterli, at başına ayrı sorgu gerekmiyor.
+ */
+export async function getSireStatOzetleriForRace(
+  sireNames: (string | null)[],
+  breed: string,
+  surface: string,
+  distance: number
+): Promise<(string | null)[]> {
+  const irk = breedToIrk(breed);
+  const pist = surfaceToPist(surface);
+  const mesafe = mesafeBucket(distance);
+  const pool = await db.sireStat.findMany({ where: { irk, filtrePist: pist, filtreMesafe: mesafe } });
+  return sireNames.map((name) => {
+    const match = findSireStat(name, pool);
+    return match ? formatSireStatOzet(match, mesafe, pist) : null;
   });
 }

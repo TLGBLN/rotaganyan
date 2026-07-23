@@ -28,8 +28,8 @@ export default function PedigreePanel({ runners }: { runners: ProgramRunner[] })
                 <span>Pedigri bilgisi yok</span>
               )}
             </div>
-            {r.pedigreeNote && (
-              <div className="text-[11px] text-muted-foreground mt-1 leading-snug">{r.pedigreeNote}</div>
+            {r.sireStatOzet && (
+              <div className="text-[11px] text-muted-foreground mt-1 leading-snug">🏆 {r.sireStatOzet}</div>
             )}
             {r.adminNote && (
               <div className="text-[11px] text-muted-foreground mt-1 leading-snug">{r.adminNote}</div>

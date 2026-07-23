@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     const eksikler: string[] = [];
     const bilgiler: string[] = [];
 
-    if (!r.sire && !r.dam && !r.pedigreeNote) {
+    if (!r.sire && !r.dam) {
       eksikler.push("Pedigri");
     }
     if (r.galopOzet === "İdman kaydı yok") eksikler.push("Galop");

@@ -22,12 +22,14 @@ export default async function PedigriPage({ searchParams }: PageProps) {
           <div>
             <h1 className="text-lg font-bold">At Pedigrileri &amp; Eksik Veri</h1>
             <p className="text-xs text-muted-foreground">
-              O günün koşan atlarına baba (sire), anne (dam), anne babası (damsire) ve pedigri notu
-              girin. TJK programında zaten varsa otomatik dolu gelir, siz üzerine yazabilirsiniz.
-              Kaydettiğiniz bilgi kullanıcılara &quot;Pedigriler&quot; panelinde gösterilir. Ayrıca her
-              atın yanındaki &quot;Genel Not&quot; alanına pedigri dışında herhangi bir eksik veriyi
-              (sakatlık haberi, antrenman gözlemi, pist notu vb.) girebilirsiniz — otomatik analiz
-              motoru bu notu okur ve değerlendirmesine dahil eder.
+              O günün koşan atlarına baba (sire), anne (dam) ve anne babası (damsire) girin. TJK
+              programında zaten varsa otomatik dolu gelir, siz üzerine yazabilirsiniz. Aygır
+              İstatistik veritabanında (İngiliz/Arap × pist × mesafe) eşleşme varsa, babanın o
+              kombinasyondaki yavru performansı &quot;Baba&quot; alanının altında OTOMATİK gösterilir
+              ve analiz motoru bunu doğrudan kullanır — elle pedigri notu girmenize gerek yok.
+              Ayrıca her atın yanındaki &quot;Genel Not&quot; alanına pedigri dışında herhangi bir eksik
+              veriyi (sakatlık haberi, antrenman gözlemi, pist notu vb.) girebilirsiniz — otomatik
+              analiz motoru bu notu okur ve değerlendirmesine dahil eder.
             </p>
           </div>
           <DateNavigator currentDate={currentDate} basePath="/admin/pedigri" />
@@ -49,8 +51,9 @@ export default async function PedigriPage({ searchParams }: PageProps) {
               <div className="divide-y">
                 {rd.races.map((race) => {
                   // sire/dam/damSire TJK'dan otomatik gelir (neredeyse her atta zaten dolu) —
-                  // burada admin'in GERÇEKTEN girdiği iş, yalnız pedigreeNote (pedigri yorumu).
-                  const pedigriDolu = race.runners.filter((r) => r.pedigreeNote).length;
+                  // eksikse admin buradan elle tamamlayabilir. Aygır istatistiği (varsa) sire
+                  // doluysa OTOMATİK eşleşir, ayrıca giriş gerekmez.
+                  const pedigriDolu = race.runners.filter((r) => r.sire).length;
                   const tamamlandi = race.runners.length > 0 && pedigriDolu === race.runners.length;
                   return (
                     <details key={race.id} className="group/race">

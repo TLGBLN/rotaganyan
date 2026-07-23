@@ -19,6 +19,7 @@ import { galopQuality, isSameJockey } from "@/components/program/panels/galop-he
 import { getAtPerformansForRace } from "@/server/actions/at-performans.actions";
 import { getH2HForRace } from "@/server/actions/h2h.actions";
 import { fetchApprenticeRemainingRaces, normalizeJockeyName } from "@/server/services/ingest/tjk-apprentice.adapter";
+import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import {
   hpKalitesiYildizi, sinifGecisBonusu, galopSiniflandirmasi, tempoGuvenSeviyesi,
   kacakHaritasi, zeminKatsayisi, zeminDetayiBul, type GalopZinciriSonuc, type TempoGuven,
@@ -126,7 +127,10 @@ export type Faz1Runner = {
   sire: string | null;
   dam: string | null;
   damSire: string | null;
-  pedigreeNote: string | null;
+  // hipodromx.com "Aygırlar" tablosundan (bkz. SireStat modeli) bu koşunun ırk/pist/mesafe
+  // kombinasyonuna göre OTOMATİK eşleştirilen aygır istatistiği — admin artık bunu elle
+  // araştırıp pedigreeNote'a yazmak zorunda değil, eşleşme varsa doğrudan buradan gelir.
+  sireStatOzet: string | null;
   // Admin'in /admin/pedigri sayfasındaki "Genel Not"a elle girdiği, pedigri dışı herhangi
   // bir eksik veri (sakatlık, antrenman gözlemi, pist notu vb.) — otomatik toplanamayan
   // her şey için genel amaçlı manuel giriş alanı.
@@ -250,7 +254,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   const trainerNames = [...new Set(race.runners.map((r) => r.trainer).filter((t): t is string => !!t))];
 
   const { getJockeyStats, getTrainerStats } = await import("@/server/services/race.service");
-  const [jockeyStats, trainerStats, atPerformansRows, h2hEncounters, apprenticeRemainingMap, accuraceKayitlari] = await Promise.all([
+  const [jockeyStats, trainerStats, atPerformansRows, h2hEncounters, apprenticeRemainingMap, accuraceKayitlari, sireStatOzetleri] = await Promise.all([
     getJockeyStats(jockeyNames).catch(() => ({} as Awaited<ReturnType<typeof getJockeyStats>>)),
     getTrainerStats(trainerNames).catch(() => ({} as Awaited<ReturnType<typeof getTrainerStats>>)),
     getAtPerformansForRace(raceId).catch(() => []),
@@ -260,8 +264,12 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       where: { horseName: { in: race.runners.map((r) => r.name) } },
       select: { horseName: true, checkpoints: true, accuraceRace: { select: { length: true } } },
     }).catch(() => []),
+    getSireStatOzetleriForRace(race.runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(
+      () => race.runners.map(() => null)
+    ),
   ]);
   const atPerformansMap = new Map(atPerformansRows.map((r) => [r.horseName, r.records]));
+  const sireStatMap = new Map(race.runners.map((r, i) => [r.id, sireStatOzetleri[i] ?? null]));
 
   // Accurace GPS/sektörel geçmişinden atın KALICI tempo/pozisyon eğilimini üret —
   // yalnız n≥3 yarış varsa (bkz. pace-analizi.ts, tek yarıştan kalıcı stil çıkarılmaz).
@@ -526,7 +534,8 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         jockey: r.jockey, jockeyChanged: r.jockeyChanged, previousJockey: r.previousJockey,
         trainer: r.trainer, owner: r.owner,
         ekuriMateleri: ekuriMateMap.get(r.id) ?? [],
-        sire: r.sire, dam: r.dam, damSire: r.damSire, pedigreeNote: r.pedigreeNote,
+        sire: r.sire, dam: r.dam, damSire: r.damSire,
+        sireStatOzet: sireStatMap.get(r.id) ?? null,
         adminNote: r.adminNote,
         hpBugun: hpBugunEfektif, hpBugunResmiYok, hpOncekiResmiYok, hpOncekiFetchBasarisiz,
         agf: r.agf, agfSirasi: agfSiraMap.get(r.id) ?? null,
