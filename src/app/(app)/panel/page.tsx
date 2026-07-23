@@ -2,9 +2,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
 import type { Role, Plan } from "@prisma/client";
+import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +41,7 @@ export default async function PanelPage() {
           </div>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Üyelik tarihi: {format(new Date(user.createdAt), "d MMMM yyyy", { locale: tr })}
+          Üyelik tarihi: {formatDate(user.createdAt, "d MMMM yyyy")}
         </p>
       </div>
 
@@ -65,7 +64,7 @@ export default async function PanelPage() {
                   <p className="text-sm font-medium">{n.title}</p>
                   {n.body && <p className="text-xs text-muted-foreground">{n.body}</p>}
                   <p className="mt-0.5 text-[10px] text-muted-foreground">
-                    {format(new Date(n.createdAt), "d MMM HH:mm", { locale: tr })}
+                    {formatDate(n.createdAt, "d MMM HH:mm")}
                   </p>
                 </div>
               </div>

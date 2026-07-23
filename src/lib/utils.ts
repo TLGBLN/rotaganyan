@@ -3,6 +3,7 @@ import { twMerge } from "tailwind-merge";
 import slugifyLib from "slugify";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
+import { toTurkeyWallClock } from "./tz";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -12,16 +13,19 @@ export function slugify(text: string): string {
   return slugifyLib(text, { lower: true, strict: true, locale: "tr" });
 }
 
+// ÖNEMLİ: her üçü de toTurkeyWallClock ile sarmalı — sunucu (Vercel) UTC'de çalışıyor,
+// date-fns'in format() fonksiyonu doğrudan bir Date verilirse UTC saatini gösterir.
+// Kullanıcıya giden HER saat/tarih Türkiye saati olmalı (bkz. tz.ts).
 export function formatDate(date: Date | string, pattern = "d MMMM yyyy"): string {
-  return format(new Date(date), pattern, { locale: tr });
+  return format(toTurkeyWallClock(date), pattern, { locale: tr });
 }
 
 export function formatDateTime(date: Date | string): string {
-  return format(new Date(date), "d MMMM yyyy HH:mm", { locale: tr });
+  return format(toTurkeyWallClock(date), "d MMMM yyyy HH:mm", { locale: tr });
 }
 
 export function formatRaceDate(date: Date | string): string {
-  return format(new Date(date), "dd.MM.yyyy", { locale: tr });
+  return format(toTurkeyWallClock(date), "dd.MM.yyyy", { locale: tr });
 }
 
 export function pedigreeUrl(atName: string, breed: "ARAP" | "INGILIZ"): string {

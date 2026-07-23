@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { auth } from "@/lib/auth";
 import { getActivePredictions } from "@/server/services/race.service";
 import { syncResultsForDate } from "@/server/services/result-sync";
@@ -80,7 +80,7 @@ export default async function TahminOnerileriPage() {
                       {format(raceDay.date, "d MMM yyyy", { locale: tr })}
                       {pred.publishedAt && (
                         <div className="text-[10px]">
-                          Yayım: {format(new Date(pred.publishedAt), "d MMM HH:mm", { locale: tr })}
+                          Yayım: {formatDate(pred.publishedAt, "d MMM HH:mm")}
                         </div>
                       )}
                     </td>

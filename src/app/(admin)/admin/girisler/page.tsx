@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 
@@ -232,8 +232,8 @@ export default async function GirislerPage({ searchParams }: PageProps) {
                       )}
                     >
                       <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
-                        <div>{format(log.createdAt, "d MMM HH:mm", { locale: tr })}</div>
-                        <div className="text-[10px] opacity-60">{format(log.createdAt, "yyyy")}</div>
+                        <div>{formatDate(log.createdAt, "d MMM HH:mm")}</div>
+                        <div className="text-[10px] opacity-60">{formatDate(log.createdAt, "yyyy")}</div>
                       </td>
                       <td className="px-3 py-2">
                         <div className="font-medium">{log.user?.name ?? log.email.split("@")[0]}</div>

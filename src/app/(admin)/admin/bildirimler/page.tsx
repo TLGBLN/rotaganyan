@@ -1,9 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
 import { Bell, CheckCircle2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import MarkAllReadButton from "@/app/(app)/panel/bildirimler/MarkAllReadButton";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +49,7 @@ export default async function AdminBildirimlerPage() {
                 <p className="text-sm font-medium">{n.title}</p>
                 {n.body && <p className="mt-0.5 text-xs text-muted-foreground">{n.body}</p>}
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  {format(new Date(n.createdAt), "d MMM yyyy, HH:mm", { locale: tr })}
+                  {formatDate(n.createdAt, "d MMM yyyy, HH:mm")}
                 </p>
               </div>
             </div>
