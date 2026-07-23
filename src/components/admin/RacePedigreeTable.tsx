@@ -358,7 +358,8 @@ export default function RacePedigreeTable({ runners }: { runners: Runner[] }) {
 
   return (
     <div className="overflow-x-auto">
-      <div className="flex items-center justify-end px-3 py-1.5 border-b bg-muted/10">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b bg-brand/10">
+        <span className="text-[11px] font-semibold text-brand">📋 Pedigri Notu (soy ağacı / genetik yorum)</span>
         <button
           onClick={() => setBulkOpen((v) => !v)}
           className="flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline"
@@ -368,7 +369,10 @@ export default function RacePedigreeTable({ runners }: { runners: Runner[] }) {
       </div>
 
       {bulkOpen && (
-        <div className="border-b bg-muted/10 px-3 py-3 space-y-2">
+        <div className="border-b bg-brand/5 px-3 py-3 space-y-2">
+          <p className="text-[11px] font-semibold text-brand">
+            Buraya yapıştırılan metin PEDİGRİ NOTU olarak kaydedilir — genel/eksik veri notu için aşağıdaki ayrı kutuyu kullanın.
+          </p>
           <p className="text-[11px] text-muted-foreground">
             &quot;1. At Adı (Baba - Anne / Anne Babası): açıklama&quot; ya da tamamen serbest paragraf
             (&quot;AT ADI&quot; satırından sonra istediğin kadar metin) — numara şart değil, atlar
@@ -410,8 +414,8 @@ export default function RacePedigreeTable({ runners }: { runners: Runner[] }) {
         </div>
       )}
 
-      <div className="flex items-center justify-between border-b px-3 py-1.5 bg-muted/10">
-        <span className="text-[11px] text-muted-foreground">Genel Eksik Veri Notu</span>
+      <div className="flex items-center justify-between border-b px-3 py-1.5 bg-muted/20">
+        <span className="text-[11px] font-semibold text-muted-foreground">📝 Genel Eksik Veri Notu (pedigri DEĞİL)</span>
         <button
           onClick={() => setNoteBulkOpen((v) => !v)}
           className="flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline"
@@ -422,6 +426,9 @@ export default function RacePedigreeTable({ runners }: { runners: Runner[] }) {
 
       {noteBulkOpen && (
         <div className="border-b bg-muted/10 px-3 py-3 space-y-2">
+          <p className="text-[11px] font-semibold text-foreground">
+            Bu kutu pedigri notu İÇİN DEĞİL — pedigri notu için yukarıdaki gold kutuyu kullanın.
+          </p>
           <p className="text-[11px] text-muted-foreground">
             Pedigri dışında herhangi bir eksik veriyi buradan girebilirsiniz (sakatlık haberi, antrenman
             gözlemi, pist/hava notu vb.) — otomatik analiz motoru bu notu okur ve dikkate alır. &quot;At Adı: not&quot;
