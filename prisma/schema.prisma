@@ -494,6 +494,7 @@ model SireStat {
   id String @id @default(cuid())
 
   sireName String
+  irk      String @default("İNGİLİZ") // İNGİLİZ/ARAP — hipodromx'te ayrı sayfalar/listeler, sitenin kendi filtresinde yok, kullanıcı elle belirtiyor
 
   filtreYil        String // "2026", "Hepsi" vb. — site dropdown'ındaki metin aynen
   filtreCins       String // Erkek/Dişi/İğdiş/Hepsi (yavru cinsiyeti)
@@ -520,7 +521,7 @@ model SireStat {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([sireName, filtreYil, filtreCins, filtreSehir, filtreMesafe, filtrePist, filtreGrupListed, filtreYasGrubu], name: "sireStatFiltre")
+  @@unique([sireName, irk, filtreYil, filtreCins, filtreSehir, filtreMesafe, filtrePist, filtreGrupListed, filtreYasGrubu], name: "sireStatFiltre")
   @@index([sireName])
   @@index([filtreMesafe, filtrePist])
 }

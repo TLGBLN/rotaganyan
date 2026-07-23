@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { parseSireStatBulk } from "@/lib/sire-stat-parser";
 
 export type SireStatFiltre = {
+  irk: string;
   filtreYil: string;
   filtreCins: string;
   filtreSehir: string;
@@ -32,6 +33,7 @@ export async function saveSireStatBulk(text: string, filtre: SireStatFiltre): Pr
           where: {
             sireStatFiltre: {
               sireName: p.sireName,
+              irk: filtre.irk,
               filtreYil: filtre.filtreYil,
               filtreCins: filtre.filtreCins,
               filtreSehir: filtre.filtreSehir,

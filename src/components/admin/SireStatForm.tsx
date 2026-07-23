@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { saveSireStatBulk } from "@/server/actions/sire-stat.actions";
 
+const IRK_OPTIONS = ["İNGİLİZ", "ARAP"];
 const CINS_OPTIONS = ["Hepsi", "Erkek", "Dişi", "İğdiş"];
 const PIST_OPTIONS = ["Hepsi", "Çim", "Kum", "Sentetik"];
 const GRUP_OPTIONS = ["Hepsi", "Grup 1", "Grup", "Listed"];
@@ -41,6 +42,7 @@ function FieldText({ label, value, onChange, placeholder }: { label: string; val
 }
 
 export default function SireStatForm() {
+  const [irk, setIrk] = useState("İNGİLİZ");
   const [yil, setYil] = useState("2026");
   const [cins, setCins] = useState("Hepsi");
   const [sehir, setSehir] = useState("Hepsi");
@@ -57,7 +59,7 @@ export default function SireStatForm() {
     setResult(null);
     try {
       const r = await saveSireStatBulk(text, {
-        filtreYil: yil, filtreCins: cins, filtreSehir: sehir,
+        irk, filtreYil: yil, filtreCins: cins, filtreSehir: sehir,
         filtreMesafe: mesafe, filtrePist: pist, filtreGrupListed: grup, filtreYasGrubu: yas,
       });
       setResult(r);
@@ -79,6 +81,7 @@ export default function SireStatForm() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <FieldSelect label="Irk" value={irk} onChange={setIrk} options={IRK_OPTIONS} />
         <FieldText label="Yıl" value={yil} onChange={setYil} placeholder="2026" />
         <FieldSelect label="Cins (yavru)" value={cins} onChange={setCins} options={CINS_OPTIONS} />
         <FieldText label="Şehir" value={sehir} onChange={setSehir} placeholder="Hepsi" />

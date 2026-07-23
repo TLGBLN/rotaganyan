@@ -41,7 +41,7 @@ export default async function AygirIstatistikPage() {
                   <tr key={r.id} className="border-b last:border-0">
                     <td className="px-2 py-1.5 font-semibold whitespace-nowrap">{r.sireName}</td>
                     <td className="px-2 py-1.5 text-muted-foreground whitespace-nowrap">
-                      {r.filtreYil} · {r.filtreCins} · {r.filtreSehir} · {r.filtreMesafe} · {r.filtrePist} · {r.filtreGrupListed} · {r.filtreYasGrubu}
+                      {r.irk} · {r.filtreYil} · {r.filtreCins} · {r.filtreSehir} · {r.filtreMesafe} · {r.filtrePist} · {r.filtreGrupListed} · {r.filtreYasGrubu}
                     </td>
                     <td className="px-2 py-1.5 text-right tabular-nums">{r.start}</td>
                     <td className="px-2 py-1.5 text-right tabular-nums">{r.birinci}</td>
