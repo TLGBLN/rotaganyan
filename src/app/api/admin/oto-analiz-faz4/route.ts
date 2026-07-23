@@ -134,11 +134,16 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
       model: "claude-sonnet-5",
       // Adaptive thinking AÇIK (bkz. Faz 2'deki not) — GEÇİCİ DENEY 2 sonrası tekrar açıldı.
       thinking: { type: "adaptive" },
-      max_tokens: 24000,
+      // 2026-07-23: 8 atlı Handikap koşularında (her at için 3-5 cümlelik gerekçe
+      // toplamda) 24000 tavanına tıkanıp bozuk JSON dönüyordu (ClaudeUsageLog'da
+      // kanıtlandı — output tam 24000'de kesiliyordu). Ücret gerçek üretilen token'a
+      // göre alınır, tavanı yükseltmenin normal koşularda maliyet etkisi yok; yalnız
+      // tıkanan koşularda gereksiz (ve ücretli) tekrar denemeyi önlüyor.
+      max_tokens: 32000,
       output_config: { format: { type: "json_schema", schema: FAZ4_SCHEMA } },
       messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz4Tail }] }],
     },
-    raceId, "faz4", 32000
+    raceId, "faz4", 40000
   );
   const faz4Raw = extractText(faz4Msg);
   let result: Faz4Result;
