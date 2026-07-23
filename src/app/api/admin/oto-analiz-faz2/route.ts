@@ -64,10 +64,10 @@ async function handlePost(req: NextRequest) {
         ...(r.ekuriMateleri.length > 0 ? [`  Eküri: aynı sahiplikten bu koşuda da koşan diğer at(lar): ${r.ekuriMateleri.join(", ")} — pacemaker/rehavet etkisi olası, göz ardı etme`] : []),
         `  Pedigri: ${r.sire ?? "—"} — ${r.dam ?? "—"} (${r.damSire ?? "—"}) ${r.pedigreeNote ?? ""}`.trim(),
         ...(r.adminNote ? [`  Admin Notu (elle girildi, güvenilir kanıt kabul et): ${r.adminNote}`] : []),
-        `  HP bugün:${r.hpBugun}${r.hpBugunResmiYok ? " (resmi HP yok — Şartlı1/Maiden/henüz atanmamış, 0 varsayıldı, olumsuz kanıt DEĞİL)" : ""} önceki:${
+        `  HP bugün:${r.hpBugun}${r.hpBugunResmiYok ? " (resmi HP yok — Şartlı1/Maiden/henüz atanmamış; 0 KABUL EDİLİR, HP karşılaştırmasında/sıralamasında bu at 0 puanlı sayılır — bkz. metodoloji istisna kuralı)" : ""} önceki:${
           r.ilkStart ? "İLK START"
           : r.hpOncekiFetchBasarisiz ? "BİLİNMİYOR (TJK verisine bu seferlik ulaşılamadı — veri toplama hatası, olumsuz kanıt DEĞİL, ivme hesaplanamaz)"
-          : `${r.hpOnceki}${r.hpOncekiResmiYok ? " (resmi yok, 0 varsayıldı)" : ""}`
+          : `${r.hpOnceki}${r.hpOncekiResmiYok ? " (resmi yok, 0 KABUL EDİLİR — HP karşılaştırmasında bu at 0 puanlı sayılır)" : ""}`
         } ivme:${r.hpIvmesi ?? "?"}`,
         `  AGF:%${r.agf ?? "?"} sıra:${r.agfSirasi ?? "?"} | Form dizisi:${r.recentForm ?? "—"} (geriliyor=${r.bitirisGeriliyor} iyileşiyor=${r.bitirisIyilesiyor} son sonuç zayıf=${r.sonSonucZayif}) | En iyi derece:${r.bestTime ?? "—"}`,
         `  Tempo örneklem n:${r.tempoVeriN ?? "?"} stil:${r.raceStyleEtiket ?? "?"} kaçak:${r.kacak}`,
