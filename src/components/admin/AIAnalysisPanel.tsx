@@ -115,6 +115,19 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
     setResult(null);
     setApplied(false);
     setDebug(null);
+
+    // Analiz 1-2 dakika sürebiliyor — mobilde ekran zaman aşımıyla kilitlenirse
+    // bazı tarayıcılar arka plan sekmesindeki isteği kesiyor/geciktiriyor, analiz
+    // yarıda kalıyordu. Wake Lock API ekranın kilitlenmesini engeller (yalnız
+    // HTTPS + destekleyen tarayıcılarda çalışır — desteklenmiyorsa sessizce atlanır,
+    // uygulama akışını bozmaz).
+    let wakeLock: WakeLockSentinel | null = null;
+    try {
+      wakeLock = await navigator.wakeLock?.request("screen");
+    } catch {
+      // Desteklenmiyor veya izin yok — analiz normal şekilde devam eder.
+    }
+
     try {
       setPhase("faz2");
       const step1 = await fetchJson<{ faz1: unknown; faz2: unknown; sharedContext: string }>(
@@ -135,6 +148,7 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
       setError(e instanceof Error ? e.message : "Beklenmeyen hata");
     } finally {
       setPhase(null);
+      wakeLock?.release().catch(() => {});
     }
   }
 
