@@ -14,7 +14,7 @@ import type { Role } from "@prisma/client";
 // 6 at için) "Kilit Gerekçe" metinlerini üretir — Faz4'ün kendisinden daha dar/hızlı
 // bir görev. 2026-07-24: Fluid Compute açıldıktan sonra 300s'lik eski platform tavanı
 // da kalktı — bkz. oto-analiz-faz2/route.ts'teki not.
-export const maxDuration = 800;
+export const maxDuration = 300;
 
 type Body = {
   raceId: string;

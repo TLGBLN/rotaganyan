@@ -21,7 +21,7 @@ import type { Role } from "@prisma/client";
 // gerçekten geçerli. Bu, max_tokens artırma yamalarının (bkz. aşağıdaki not) asla tam
 // çözemediği kök sorunu (Claude'un thinking süresi saha büyüdükçe öngörülemez biçimde
 // uzuyor) kalıcı olarak ortadan kaldırıyor.
-export const maxDuration = 800;
+export const maxDuration = 300;
 
 async function handlePost(req: NextRequest) {
   const session = await auth();

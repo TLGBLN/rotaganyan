@@ -24,7 +24,7 @@ import type { Role } from "@prisma/client";
 // açıldıktan sonra 300s'lik eski platform tavanı da kalktı — bkz. oto-analiz-faz2/
 // route.ts'teki not. Bölme (split) yine de korunuyor çünkü thinking süresini gerçekten
 // azaltıyor (daha hızlı sonuç, daha az kesinti riski) — 800s bir güvenlik ağı, ilk tercih değil.
-export const maxDuration = 800;
+export const maxDuration = 300;
 
 type Body = { raceId: string; faz1: Faz1Sonuc; faz2: Faz2Atlar; sharedContext: string };
 
