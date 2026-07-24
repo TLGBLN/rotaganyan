@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, hasRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { gatherFaz1 } from "@/lib/methodology/veri-toplama";
+import { gatherFaz1, type Faz1Sonuc } from "@/lib/methodology/veri-toplama";
 import { veriDenetimi, type AtGirdisi } from "@/lib/methodology/gecit-motoru";
 import {
   createWithTruncationRetry, extractText, daraltilmisMetodoloji,
@@ -14,9 +14,10 @@ import type { Role } from "@prisma/client";
 // Faz 2 ve Faz 4, tek bir istekte art arda çalıştığında (eski hal) ikisinin toplam
 // süresi bazı koşularda 300s'i (bu hesabın gerçek Vercel üst tavanı — 800 denendi,
 // deploy'un kendisini kırdı, Fluid Compute açık değil) aşıp fonksiyonu ortadan
-// kesiyordu (Faz 2 tamamlanıp Faz 4'e hiç geçilemeden). Çözüm: iki AYRI istek —
-// admin paneli önce bunu çağırır, sonucu /oto-analiz-faz4'e taşır. Her istek artık
-// tek bir Claude çağrısı bekliyor, rahatça 300s altında kalıyor.
+// kesiyordu (Faz 2 tamamlanıp Faz 4'e hiç geçilemeden). Çözüm: AYRI istekler —
+// admin paneli önce /oto-analiz-faz1'i (ücretsiz veri toplama) çağırır, sonra bu
+// isteği (yalnız Claude çağrısı), sonucu /oto-analiz-faz4'e taşır. Bu istek artık
+// gatherFaz1'in ağ süresini hiç taşımıyor — 300sn'lik pencerenin tamamı Claude'a kalıyor.
 export const maxDuration = 300;
 
 async function handlePost(req: NextRequest) {
@@ -25,11 +26,15 @@ async function handlePost(req: NextRequest) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }
 
-  const { raceId } = (await req.json()) as { raceId: string };
+  const body = (await req.json()) as { raceId: string; faz1?: Faz1Sonuc };
+  const { raceId } = body;
   if (!raceId) return NextResponse.json({ error: "raceId gerekli" }, { status: 400 });
 
   // ── FAZ 1 — TAMAMEN OTOMATİK VERİ TOPLAMA (admin girdisi yok) ──
-  const faz1 = await gatherFaz1(raceId);
+  // İstemci bunu önceden ayrı (ücretsiz, Claude'a gitmeyen) /oto-analiz-faz1 isteğiyle
+  // topladıysa onu kullan — bu isteğin süresinden veri toplamayı çıkarır, 300sn'lik
+  // pencerenin tamamı Claude çağrısına kalır. Sağlanmadıysa (geriye uyumluluk) burada topla.
+  const faz1 = body.faz1 ?? await gatherFaz1(raceId);
   if (!faz1) return NextResponse.json({ error: "Koşu verisi bulunamadı" }, { status: 404 });
 
   // Veri yeterliliğini kontrol et — AMA artık BLOKE ETMEZ (v4.10 düzeltmesi: "eksik veri

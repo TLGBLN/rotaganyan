@@ -14,8 +14,9 @@ const ALAN_LABEL: Record<string, string> = {
   formYonu: "Form Yönü",
 };
 
-const FAZ_LABEL: Record<"faz2" | "faz4", string> = {
-  faz2: "Faz 1 + Faz 2 çalışıyor — veri toplama + skorlama…",
+const FAZ_LABEL: Record<"faz1" | "faz2" | "faz4", string> = {
+  faz1: "Faz 1 çalışıyor — veri toplanıyor (ücretsiz)…",
+  faz2: "Faz 2 çalışıyor — skorlama…",
   faz4: "Faz 3 + Faz 4 çalışıyor — geçit motoru + sıralama/kupon…",
 };
 
@@ -84,7 +85,7 @@ async function fetchJson<T>(url: string, body: unknown): Promise<T> {
 }
 
 export default function AIAnalysisPanel({ raceId, onApply }: Props) {
-  const [phase, setPhase] = useState<"faz2" | "faz4" | null>(null);
+  const [phase, setPhase] = useState<"faz1" | "faz2" | "faz4" | null>(null);
   const [result, setResult] = useState<AIAnalysisResult | null>(null);
   const [runners, setRunners] = useState<Runner[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -129,10 +130,16 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
     }
 
     try {
+      setPhase("faz1");
+      const faz1Step = await fetchJson<{ faz1: unknown }>(
+        "/api/admin/oto-analiz-faz1",
+        { raceId }
+      );
+
       setPhase("faz2");
       const step1 = await fetchJson<{ faz1: unknown; faz2: unknown; sharedContext: string }>(
         "/api/admin/oto-analiz-faz2",
-        { raceId }
+        { raceId, faz1: faz1Step.faz1 }
       );
 
       setPhase("faz4");
