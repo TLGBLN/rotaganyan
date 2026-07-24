@@ -158,11 +158,21 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
         // doğru tespit edilmiş ama puana orantılı yansıyıp yansımadığı belirsiz). Karşılaştırma
         // için thinking geri açıldı — bkz. [[thinking-acik-kalmali]].
         thinking: { type: "adaptive" },
-        max_tokens: 20000,
+        // 2026-07-24: İstanbul 10.Koşu'nda (16 at, Handikap) bu tavan İLK KEZ tamamen
+        // görünmeyen thinking'le tüketildi (out=20000, resultText=0kar — Faz4'ün daha önce
+        // 16000'de yaşadığıyla BİREBİR AYNI belirti). Kritik olan: createWithTruncationRetry
+        // aynı 300sn'lik Vercel penceresini paylaşıyor — ilk deneme tavanı tüketip onlarca
+        // saniye harcadıktan SONRA tekrar denemek, ikinci denemenin bitmesi için yeterli süre
+        // bırakmayabiliyor (nitekim burada 2. deneme hiç loglanmadı, fonksiyon muhtemelen
+        // süre dolmadan öldü). Çözüm Faz 4'te de aynıydı: tavanı İLK denemede yetecek kadar
+        // yükselt ki tekrar denemeye hiç gerek kalmasın. Faz 2'nin görevi (yalnız skorlama,
+        // Faz 4'teki geçit triyajı/sıralama/banko gibi ek karar yükü yok) daha hafif olduğu
+        // için Faz 4'ün nihai tavanıyla (32000/40000) aynı değere çıkarmak güvenli marj bırakıyor.
+        max_tokens: 32000,
         output_config: { format: { type: "json_schema", schema: FAZ2_SCHEMA } },
         messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz2Tail }] }],
       },
-      raceId, "faz2", 28000
+      raceId, "faz2", 40000
     );
     faz2Raw = extractText(faz2Msg);
     faz2StopReasonMaxTokens = faz2Msg.stop_reason === "max_tokens";
