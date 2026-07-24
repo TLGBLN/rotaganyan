@@ -149,12 +149,19 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
         // Adaptive thinking AÇIK (bkz. Faz 2'deki not) — GEÇİCİ DENEY 2 sonrası tekrar açıldı.
         thinking: { type: "adaptive" },
         // v4.1: "note" (Kilit Gerekçe düzyazısı) artık bu çağrıda üretilmiyor (bkz.
-        // FAZ4_DECISION_SCHEMA yorumu) — çıktı yalnız karar/kupon, tavan buna göre küçüldü.
-        max_tokens: 16000,
+        // FAZ4_DECISION_SCHEMA yorumu) — çıktı metni küçüldü. AMA 2026-07-24'te canlıda
+        // kanıtlandı: tavan 16000'e düşürülünce (İstanbul 5.Koşu, 9 at) adaptive thinking
+        // GÖRÜNMEYEN düşünme ile tavanın TAMAMINI tüketip hiç JSON yazamadan kesiliyordu
+        // (ClaudeUsageLog: out=16000 tam tavanda, resultText boş) — thinking süresi çıktı
+        // şemasının küçülmesiyle ORANTILI küçülmüyor, karmaşıklığa göre değişiyor. Sonra
+        // otomatik tekrar deneme BAŞLIYOR ama toplam süre 300sn Vercel sınırını aşıp
+        // fonksiyon öldürülüyor — admin'e "sunucudan yanıt gelmedi" hatası + boşa ödeme.
+        // Tavan Faz 2'nin kendi payına (20000) yakın güvenli bir değere çıkarıldı.
+        max_tokens: 24000,
         output_config: { format: { type: "json_schema", schema: FAZ4_DECISION_SCHEMA } },
         messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz4Tail }] }],
       },
-      raceId, "faz4", 24000
+      raceId, "faz4", 32000
     );
     faz4Raw = extractText(faz4Msg);
     faz4StopReasonMaxTokens = faz4Msg.stop_reason === "max_tokens";

@@ -398,7 +398,13 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
     if (mevcut == null || sure < mevcut) fieldBestSon800ByRaceId.set(s.accuraceRaceId, sure);
   }
 
-  const surfacePrefixToday = race.surface === "CIM" ? "C" : race.surface === "SENTETIK" ? "S" : "K";
+  // Accurace'in kendi ham "ground" alanı Çim için Türkçe "Ç" (cedilla) harfini kullanıyor,
+  // düz Latin "C" DEĞİL (canlı veriyle doğrulandı: AccuraceRace.ground="Ç") — bu satır
+  // eskiden "C" bekliyordu, bu yüzden ÇİM koşularında (ki bunlar sahadaki çoğunluk) bu
+  // filtre asla eşleşmiyordu: her at için "benzer koşu yok" çıkıyordu, veri gerçekten
+  // var olsa bile (bkz. son800.actions.ts'teki public panel — o normalizeHorseName ile
+  // ayrı bir eşleşme yaptığı için bu sorunu hiç yaşamıyordu, sorun yalnız buradaydı).
+  const surfacePrefixToday = race.surface === "CIM" ? "Ç" : race.surface === "SENTETIK" ? "S" : "K";
   const son800ByRunnerName = new Map<string, { n: number; medyan: number | null }>();
   for (const r of race.runners) {
     // v4.13: eskiden hipodrom da BİREBİR aynı olmak zorundaydı (bu hipodromda hiç
