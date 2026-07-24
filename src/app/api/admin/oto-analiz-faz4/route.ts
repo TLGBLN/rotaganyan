@@ -11,7 +11,7 @@ import type { Role } from "@prisma/client";
 
 // bkz. /api/admin/oto-analiz-faz2 route'undaki not — bu ikisi eskiden tek bir istekte
 // çalışıyordu, toplam süreleri bazı koşularda 300s'i aşıp fonksiyonu ortadan kesiyordu.
-export const maxDuration = 800;
+export const maxDuration = 300;
 
 type Body = { raceId: string; faz1: Faz1Sonuc; faz2: Faz2Atlar; sharedContext: string };
 

@@ -16,7 +16,7 @@ import type { Role } from "@prisma/client";
 // kesiyordu (Faz 2 tamamlanıp Faz 4'e hiç geçilemeden). Çözüm: iki AYRI istek —
 // admin paneli önce bunu çağırır, sonucu /oto-analiz-faz4'e taşır. Her istek artık
 // tek bir Claude çağrısı bekliyor, rahatça 300s altında kalıyor.
-export const maxDuration = 800;
+export const maxDuration = 300;
 
 async function handlePost(req: NextRequest) {
   const session = await auth();
