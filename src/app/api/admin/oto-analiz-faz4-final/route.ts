@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, hasRole } from "@/lib/auth";
 import {
-  createWithTruncationRetry, extractText,
+  createWithTruncationRetry, extractText, trimMetodolojiFaz4Icin,
   FAZ4_FINAL_SCHEMA, type Faz2Atlar, type Faz4DecisionPick, type Faz4FinalResult,
 } from "@/lib/methodology/claude-analiz-helpers";
 import { getRecentCachedResult } from "@/lib/claude-cost";
@@ -36,9 +36,12 @@ async function handlePost(req: NextRequest) {
   }
 
   // 1 saatlik TTL — Faz2/Faz4 ile eşleşmeli (bkz. oto-analiz-faz2/route.ts'teki not).
+  // 2026-07-25 DENEYSEL: bkz. oto-analiz-faz4/route.ts'teki METODOLOJI_V2 notu — A/B
+  // karşılaştırması bitene kadar varsayılan davranış (flag kapalı) değişmiyor.
+  const effectiveSharedContext = process.env.METODOLOJI_V2 === "1" ? trimMetodolojiFaz4Icin(sharedContext) : sharedContext;
   const sharedContextBlock: Anthropic.TextBlockParam = {
     type: "text",
-    text: sharedContext,
+    text: effectiveSharedContext,
     cache_control: { type: "ephemeral", ttl: "1h" },
   };
 

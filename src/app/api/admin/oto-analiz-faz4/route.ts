@@ -3,7 +3,7 @@ import { auth, hasRole } from "@/lib/auth";
 import { degerlendir, metin, type AtGirdisi } from "@/lib/methodology/gecit-motoru";
 import type { Faz1Sonuc } from "@/lib/methodology/veri-toplama";
 import {
-  createWithTruncationRetry, extractText,
+  createWithTruncationRetry, extractText, trimMetodolojiFaz4Icin,
   FAZ4_RANK_SCHEMA, type Faz2Atlar, type Faz4DecisionPick, type Faz4RankResult,
 } from "@/lib/methodology/claude-analiz-helpers";
 import { getRecentCachedResult } from "@/lib/claude-cost";
@@ -43,10 +43,18 @@ async function handlePost(req: NextRequest) {
   // BİREBİR AYNI metni tekrar göndermek Anthropic'in ~%90 indirimli "cache read"
   // fiyatından okumasını sağlıyor, analiz kalitesini etkilemiyor. 1 saatlik TTL
   // (Faz2'deki ile eşleşmeli) — bkz. o dosyadaki not: 5dk'lık varsayılan pencere
-  // gerçek ölçümde çoğunlukla dolmuş çıkıyordu.
+  // gerçek ölçümde çoğunlukla dolmuş çıkıyordu. NOT: Faz2/Faz4/Faz4-final zaten farklı
+  // output_config.format şeması kullandığı için üçü arasında (Anthropic'in kendi
+  // dokümantasyonuna göre) cache HİÇBİR ZAMAN gerçek isabet almıyor — bu blok yine de
+  // Faz2 ile birebir aynı kalmalı (METODOLOJI_V2 kapalıyken), aksi halde tutarlılık bozulur.
+  //
+  // 2026-07-25 DENEYSEL: METODOLOJI_V2=1 açıkken, Faz4'ün girdisinde karşılığı olmayan
+  // salt-Faz2 bölümleri (bkz. trimMetodolojiFaz4Icin yorumu) çıkarılıyor — yalnız input
+  // token maliyetini düşürmek için, A/B karşılaştırmasından geçmeden varsayılan yapılmadı.
+  const effectiveSharedContext = process.env.METODOLOJI_V2 === "1" ? trimMetodolojiFaz4Icin(sharedContext) : sharedContext;
   const sharedContextBlock: Anthropic.TextBlockParam = {
     type: "text",
-    text: sharedContext,
+    text: effectiveSharedContext,
     cache_control: { type: "ephemeral", ttl: "1h" },
   };
 

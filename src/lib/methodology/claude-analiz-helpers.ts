@@ -199,6 +199,40 @@ export function daraltilmisMetodoloji(
   return `${bolumBasi}${startMarker} (yalnız bu yarışa uyan kart(lar) — geri kalan kartlar alakasız olduğu için çıkarıldı)\n\n${daraltilmisIv}\n\n${bolumSonu}`;
 }
 
+/**
+ * DENEYSEL (yalnız METODOLOJI_V2=1 ortam değişkeni açıkken devreye girer, A/B
+ * karşılaştırması için) — Faz4/Faz4-final'e giden sharedContext'teki METODOLOJİ kısmından,
+ * Faz4'ün girdisinde (ATLAR tablosu, Faz2'yle birebir aynı) hiç karşılığı olmayan
+ * salt-Faz2 bölümlerini çıkarır: §IV (koşu tipi ağırlık tabloları — Faz4 yeniden
+ * puanlamıyor), §X (RPR/TS — kendi metni bile bu verinin hiç toplanmadığını söylüyor),
+ * §XV (veri yeterliliği — kod zaten Faz4 çalışmadan ÖNCE bunu kontrol ediyor), §XVIII-XX
+ * (post-mortem/hata kodları/tarihsel dersler/veri kaynakları — geçmişe dönük referans,
+ * canlı karara girmiyor).
+ *
+ * BİLEREK DOKUNULMAYANLAR: §V/VI/VII/VIII/XI/XII/XIII. Sebep — §XIV'ün ("kalmalı" listesi)
+ * "Geçerli olumsuz kanıtlar" satırı doğrudan bunların tanımına dayanıyor: "tempo aleyhine
+ * (§VIII) · somut kilo dezavantajı (§VII) · galop düşüşü (§VI) · ... ". Faz4'ün "somut
+ * kanıt var mı" triyajı (bir atı geçit tetiklemesine rağmen yerinde bırakma kararı) bu
+ * tanımları kaybederse ham sayıları (HP ivme, kilo değişimi, tempo n, jokey/antrenör %)
+ * yanlış yorumlayabilir — dış incelemede bulunan gerçek bir risk, bkz. proje notu.
+ */
+export function trimMetodolojiFaz4Icin(sharedContext: string): string {
+  const spans: [string, string][] = [
+    ["## IV. KOŞU TİPİ ÖZET MATRİSLERİ", "## V. HP İVMESİ"],
+    ["## X. RPR / TS ULUSLARARASI DERECE", "## XI. H2H (ZAYIF KANIT)"],
+    ["## XV. VERİ YETERLİLİĞİ", "## XVI. GEÇİT ÖZETİ"],
+    ["## XVIII. POST-MORTEM VE KALİBRASYON", "# ROTAGANYAN — ÇÖZÜM REJİMİ"],
+  ];
+  let out = sharedContext;
+  for (const [start, end] of spans) {
+    const s = out.indexOf(start);
+    const e = out.indexOf(end, s + 1);
+    if (s === -1 || e === -1) continue; // güvenli taraf: bulunamazsa dokunma, sessizce atlanır
+    out = out.slice(0, s) + out.slice(e);
+  }
+  return out;
+}
+
 // Claude'un cevabını YALNIZCA prompt talimatıyla JSON'a zorlamak yerine, API'nin kendi
 // şema doğrulamasını (output_config.format) kullanıyoruz — "geçerli JSON döndür" gibi
 // bir talimata güvenmek yerine sunucu tarafında zorunlu kılınıyor.
