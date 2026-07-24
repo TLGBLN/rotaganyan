@@ -232,46 +232,68 @@ export async function syncIdmanForDate(dateStr: string): Promise<{
       await new Promise((r) => setTimeout(r, 150));
     }
 
+    // DB yazma satır-satır SIRALI (await içinde await) yapılınca — İstanbul gibi büyük
+    // hipodromlarda yüzlerce satır × 2 round-trip (findFirst+create/update) — cron'un
+    // kendi 300sn Vercel sınırını aşıp fonksiyonun ortadan kesilmesine yol açıyordu
+    // (canlıda ölçüldü: tek bir hipodromun yazma+budama adımı 5dk'yı geçebiliyor). Faz4
+    // ve pedigri-own-stat'ta bugün karşılaşılan aynı desen — çözüm de aynı: eşzamanlı
+    // (concurrency-limited) yazma.
+    const WRITE_CONCURRENCY = 15;
     const touchedRunnerIds = new Set<string>();
-    for (const row of idmanRows) {
-      const runnerId = nameToRunnerId.get(normHorseName(row.horseName));
-      if (!runnerId) { skipped++; continue; }
+    const validRows = idmanRows
+      .map((row) => ({ row, runnerId: nameToRunnerId.get(normHorseName(row.horseName)) }))
+      .filter((x): x is { row: TjkIdmanRow; runnerId: string } => {
+        if (!x.runnerId) { skipped++; return false; }
+        return true;
+      });
 
-      try {
-        const data = {
-          track: row.trainingType || undefined,
-          form: row.durum || undefined,
-          jockey: row.jockey || undefined,
-          splits: { ...row.splits, ic_dis: row.position, pist: row.surface },
-        };
-        const existing = await db.gallop.findFirst({ where: { runnerId, date: row.trainingDate } });
-        if (existing) {
-          // Eski (liderform kaynaklı) kayıt aynı tarihte zaten varsa, 200m/Durum gibi
-          // ek alanları taşıyan TJK verisiyle üzerine yaz — sessizce atlamak eski,
-          // eksik veriyi kalıcı olarak koruyup TJK'nın daha zengin verisini gizliyordu.
-          await db.gallop.update({ where: { id: existing.id }, data });
-        } else {
-          await db.gallop.create({ data: { runnerId, date: row.trainingDate, ...data } });
-        }
-        totalRows++;
-        touchedRunnerIds.add(runnerId);
-      } catch (err) {
-        errors.push(`${row.horseName} ${row.trainingDate.toISOString()}: ${String(err)}`);
-      }
+    for (let i = 0; i < validRows.length; i += WRITE_CONCURRENCY) {
+      const batch = validRows.slice(i, i + WRITE_CONCURRENCY);
+      await Promise.all(
+        batch.map(async ({ row, runnerId }) => {
+          try {
+            const data = {
+              track: row.trainingType || undefined,
+              form: row.durum || undefined,
+              jockey: row.jockey || undefined,
+              splits: { ...row.splits, ic_dis: row.position, pist: row.surface },
+            };
+            const existing = await db.gallop.findFirst({ where: { runnerId, date: row.trainingDate } });
+            if (existing) {
+              // Eski (liderform kaynaklı) kayıt aynı tarihte zaten varsa, 200m/Durum gibi
+              // ek alanları taşıyan TJK verisiyle üzerine yaz — sessizce atlamak eski,
+              // eksik veriyi kalıcı olarak koruyup TJK'nın daha zengin verisini gizliyordu.
+              await db.gallop.update({ where: { id: existing.id }, data });
+            } else {
+              await db.gallop.create({ data: { runnerId, date: row.trainingDate, ...data } });
+            }
+            totalRows++;
+            touchedRunnerIds.add(runnerId);
+          } catch (err) {
+            errors.push(`${row.horseName} ${row.trainingDate.toISOString()}: ${String(err)}`);
+          }
+        })
+      );
     }
 
     // Sadece son 3 galopu tut — eski idman kayıtları bir at için giderek anlamsızlaşıyor
     // ve tabloyu şişiriyor; sync her çalıştığında en güncel 3'ün dışında kalanı budar.
-    for (const runnerId of touchedRunnerIds) {
-      const keep = await db.gallop.findMany({
-        where: { runnerId },
-        orderBy: { date: "desc" },
-        take: 3,
-        select: { id: true },
-      });
-      await db.gallop.deleteMany({
-        where: { runnerId, id: { notIn: keep.map((g) => g.id) } },
-      });
+    const touchedList = [...touchedRunnerIds];
+    for (let i = 0; i < touchedList.length; i += WRITE_CONCURRENCY) {
+      const batch = touchedList.slice(i, i + WRITE_CONCURRENCY);
+      await Promise.all(
+        batch.map(async (runnerId) => {
+          const keep = await db.gallop.findMany({
+            where: { runnerId },
+            orderBy: { date: "desc" },
+            take: 3,
+            select: { id: true },
+          });
+          await db.gallop.deleteMany({
+            where: { runnerId, id: { notIn: keep.map((g) => g.id) } },
+          });
+        })
+      );
     }
 
     await new Promise((r) => setTimeout(r, 300));
