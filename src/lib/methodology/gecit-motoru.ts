@@ -34,7 +34,11 @@ export const ESIK = {
   hpYukselisMin: 4,
   hpDususMin: -4,
   tempoMinN: 5,
-  kalabalikSahaEsik: 15,
+  // 2026-07-24: kullanıcının ayrı (manuel, otomatik hattan geçmemiş) 10 yarışlık test
+  // serisinde, 13 atlı iki koşuda (Takipçi stilindeki BIG RUGGED/KÜÇÜKDEMİRCİK, ikisi de
+  // modelin öngördüğünden belirgin iyi bitirdi) kalabalık-saha tempo bonusu eski eşik
+  // (15) yüzünden hiç tetiklenmemiş olurdu — kullanıcı eşiğin 10'a çekilmesini istedi.
+  kalabalikSahaEsik: 10,
   kalabalikZayifOran: 0.4,
   // ── Son 800 — Gölge Mod (v4.0) ──
   son800MinN: 3,

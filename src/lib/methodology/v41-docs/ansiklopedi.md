@@ -100,7 +100,7 @@ Her tip için: Ham veri önceliği · A ağırlıkları · B+C ağırlıkları �
 
 **ŞARTLI 5:** A = Exact+SKK 22, Derece 13, HP kalitesi 10, Form yönü+HP ivmesi 7, Ant+Jokey 8. B+C = Göreli kilo/zemin 12, Tempo 9, Start/kulvar 5, Takı 4, geri kalan 10. Veri Güveni **A–B**.
 
-**HANDİKAP H13–H16 (en sık tip):** A = Exact+SKK 24, Derece+taşınan kilo 13, HP kalitesi (sınıf bazlı) 12, Form yönü+HP ivmesi 6, Sınıf düşüş avantajı 5. B+C = Göreli kilo/zemin 11, Tempo 8, Ant+Jokey 7, Start/pist 4, geri kalan 10. 15+ atlık sahada: Tempo +3, Kulvar +2 (motor otomatik uygular). Veri Güveni **A–B** tipik.
+**HANDİKAP H13–H16 (en sık tip):** A = Exact+SKK 24, Derece+taşınan kilo 13, HP kalitesi (sınıf bazlı) 12, Form yönü+HP ivmesi 6, Sınıf düşüş avantajı 5. B+C = Göreli kilo/zemin 11, Tempo 8, Ant+Jokey 7, Start/pist 4, geri kalan 10. 10+ atlık sahada: Tempo +3, Kulvar +2 (motor otomatik uygular). Veri Güveni **A–B** tipik.
 
 HP Kalitesi Okuma: HP↑ + üst sınıf + form↑ = 5 yıldız · HP↑ + üst sınıf + form sabit = 4 yıldız · HP↑ + alt sınıf + form↑ = 3 yıldız (sınıf filtresi) · HP↑ + üst sınıf + form↓ = 2 yıldız (HP ivmesini kontrol et) · HP↑ + üst sınıf rakiplere karşı = 4 yıldız (gözden kaçırma).
 
@@ -126,7 +126,7 @@ HP Kalitesi Okuma: HP↑ + üst sınıf + form↑ = 5 yıldız · HP↑ + üst s
 
 **AĞIR/ISLAK PİST:** Kilo katsayısı ×1.30 — göreli kilo farkı normalden %30 daha etkili. Hafif kilolu kaçak dezavantajlı olabilir.
 
-**KALABALIK SAHA (15+ at):** Yarış stili ve kulvar çok daha belirleyici. Motor otomatik uygular: startTempoUygun=true olan ata B+C +5. Tempo adayları n≥10 değilse kaçak ilan etme. A eşiği ≥55 önerilir (standart 50 yerine).
+**KALABALIK SAHA (10+ at):** Yarış stili ve kulvar çok daha belirleyici. Motor otomatik uygular: startTempoUygun=true olan ata B+C +5. Tempo adayları n≥10 değilse kaçak ilan etme. A eşiği ≥55 önerilir (standart 50 yerine).
 
 ---
 

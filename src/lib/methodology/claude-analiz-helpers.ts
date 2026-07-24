@@ -191,7 +191,9 @@ export function daraltilmisMetodoloji(
   if (surface === "KUM") secilenler.push(kartlar.find((k) => k.includes("KUM PİST")) ?? "");
   if (surface === "CIM") secilenler.push(kartlar.find((k) => k.includes("ÇİM PİST")) ?? "");
   if (surface === "SENTETIK") secilenler.push(kartlar.find((k) => k.includes("SENTETİK PİST")) ?? "");
-  if (atSayisi >= 15) secilenler.push(kartlar.find((k) => k.includes("KALABALIK SAHA")) ?? "");
+  // gecit-motoru.ts'teki ESIK.kalabalikSahaEsik ile AYNI değer olmalı — biri değişip
+  // diğeri unutulursa, motor bonusu uygularken Claude'a kartın kendisi hiç gitmemiş olur.
+  if (atSayisi >= 10) secilenler.push(kartlar.find((k) => k.includes("KALABALIK SAHA")) ?? "");
 
   const daraltilmisIv = [...new Set(secilenler.filter(Boolean))].join("\n\n");
   return `${bolumBasi}${startMarker} (yalnız bu yarışa uyan kart(lar) — geri kalan kartlar alakasız olduğu için çıkarıldı)\n\n${daraltilmisIv}\n\n${bolumSonu}`;
