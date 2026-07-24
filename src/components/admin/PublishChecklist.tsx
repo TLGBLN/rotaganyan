@@ -53,6 +53,9 @@ export default function PublishChecklist({
       <p className="text-[11px] text-muted-foreground">
         Kayıtlı veriden otomatik hesaplanır — elle işaretlemeniz gerekmez, tek işiniz aşağıdaki kontroller geçtiğinde Yayımla&apos;ya basmak.
       </p>
+      <p className="text-[11px] text-muted-foreground/70 italic">
+        Not: bazı kontroller yalnızca ilgili alanın (kayıt/tempo/kupon) dolu olduğunu doğrular — içeriğin gerçekten analiz edilmiş olduğunu değil. Elle veya kısmi girişlerde bunu göz önünde bulundurun.
+      </p>
 
       {!hasPicks && (
         <div className="rounded-md border border-miss/30 bg-miss/10 px-3 py-2 text-xs font-medium text-miss">

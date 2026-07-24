@@ -132,8 +132,15 @@ async function syncKarmaMirrors(predictionId: string): Promise<void> {
  * vardı, ama manuel girişlerde kaynak metin yalnız öne çıkan birkaç atı içerebiliyordu —
  * bu da Rotaganyan Puan Tablosu'nda sahanın geri kalanının hiç görünmemesine yol açıyordu
  * (kullanıcı tarafından tespit edildi: 2026-07-20 Bursa 1-2. Koşu, 5-6 pick / 11-12 at).
- * Eksik atlar, verilen en düşük puanın altında (mevcut sıralamayı bozmadan) mekanik bir
- * puanla tamamlanır.
+ *
+ * 2026-07-24: eksik atlara UYDURULMUŞ, gerçek gibi görünen bir puan (en düşük puandan
+ * 1'er azalan) veriliyordu — kullanıcı bunu canlı Puan Tablosu'nda "analizsiz puan
+ * üretilmiş" olarak yakaladı (İstanbul 10.Koşu, rank 4-16 hepsi details:[] ama düzgün
+ * azalan sahte puanlarla, sanki gerçekten sıralanmış gibi). Puan artık BİLEREK boş
+ * (null) bırakılıyor — tüm gösterim yerleri (PuanTablosu/InlineAnalysisPanel/
+ * ProgramView) zaten null puanı "—" olarak gösteriyor, hiç ek UI değişikliği gerekmedi.
+ * Sıra da (rank) artık DB'nin rastgele dönüş sırası yerine at numarasına göre — analiz
+ * edilmemiş atlar arasında da yanlışlıkla "sıralanmış" izlenimi verilmesin diye.
  */
 async function completeFullField(raceId: string, picks: PickInput[]): Promise<PickInput[]> {
   const runners = await db.runner.findMany({
@@ -141,17 +148,14 @@ async function completeFullField(raceId: string, picks: PickInput[]): Promise<Pi
     select: { id: true, no: true, name: true },
   });
   const pickedIds = new Set(picks.map((p) => p.runnerId).filter(Boolean));
-  const missing = runners.filter((r) => !pickedIds.has(r.id));
+  const missing = runners.filter((r) => !pickedIds.has(r.id)).sort((a, b) => a.no - b.no);
   if (missing.length === 0) return picks;
 
-  const existingScores = picks.map((p) => p.score).filter((s): s is number => s != null);
-  const taban = existingScores.length > 0 ? Math.min(...existingScores) : 50;
   let sonrakiRank = picks.length > 0 ? Math.max(...picks.map((p) => p.rank)) + 1 : 1;
-  const ekPicks: PickInput[] = missing.map((r, i) => ({
+  const ekPicks: PickInput[] = missing.map((r) => ({
     rank: sonrakiRank++,
     runnerId: r.id,
     runnerLabel: `${r.no} ${r.name}`,
-    score: Math.max(0, taban - 1 - i),
     details: [],
     pedigreeRating: "BILINMIYOR" as PedigreeRating,
     isTarget: false,
@@ -318,18 +322,22 @@ export async function getPublishChecklistAuto(predictionId: string): Promise<Che
   if (kacakSayisi >= 2 && !pred.tempo?.trim()) {
     checks.push({ label: "④ Tempo", status: "FAIL", detail: `${kacakSayisi} kaçak stilli at var ama tempo alanı boş.` });
   } else {
-    checks.push({ label: "④ Tempo", status: "PASS", detail: kacakSayisi >= 2 ? `${kacakSayisi} kaçak var, tempo değerlendirilmiş.` : "2'den az kaçak, tempo riski düşük." });
+    checks.push({ label: "④ Tempo", status: "PASS", detail: kacakSayisi >= 2 ? `${kacakSayisi} kaçak var, tempo alanı dolu (yalnız alanın dolu olduğu doğrulanıyor, içeriği değil).` : "2'den az kaçak, tempo riski düşük." });
   }
 
-  // ⑤ Tüm Atlar — koşan (çekilmemiş) her at bir pick'e sahip olmalı.
+  // ⑤ Tüm Atlar — koşan (çekilmemiş) her at bir pick'e sahip olmalı. DİKKAT: bu yalnız
+  // her at için bir Pick KAYDI olduğunu doğrular — o kaydın gerçekten analiz edilmiş
+  // (AI'ın gerekçelendirdiği) mi yoksa elle/mekanik olarak boş "details" ile mi
+  // eklendiğini AYIRT ETMEZ. Kullanıcı tespiti: elle analiz girildiğinde bile bu
+  // kontrol "tamamı analiz edildi" diyordu — yanıltıcıydı, metin buna göre düzeltildi.
   const pickliRunnerIds = new Set(pred.picks.map((p) => p.runnerId).filter(Boolean));
   const eksikAtlar = aktifAtlar.filter((r) => !pickliRunnerIds.has(r.id));
   if (pred.picks.length === 0) {
     checks.push({ label: "⑤ Tüm Atlar", status: "FAIL", detail: "Hiç at seçimi (pick) yok — form kaydedilmemiş." });
   } else if (eksikAtlar.length > 0) {
-    checks.push({ label: "⑤ Tüm Atlar", status: "FAIL", detail: `${eksikAtlar.length} at analiz edilmemiş: ${eksikAtlar.map((r) => r.name).join(", ")}` });
+    checks.push({ label: "⑤ Tüm Atlar", status: "FAIL", detail: `${eksikAtlar.length} at listede yok: ${eksikAtlar.map((r) => r.name).join(", ")}` });
   } else {
-    checks.push({ label: "⑤ Tüm Atlar", status: "PASS", detail: `Sahadaki ${aktifAtlar.length} atın tamamı analiz edildi.` });
+    checks.push({ label: "⑤ Tüm Atlar", status: "PASS", detail: `Sahadaki ${aktifAtlar.length} at için kayıt var — bu yalnız hiçbirinin atlanmadığını doğrular, her birinin gerçekten (AI ya da elle) analiz edildiğini değil.` });
   }
 
   // ⑥ Banko — Handikap/Grup'ta banko veriliyorsa kombinasyon (3 kupon alanı) zorunlu.
