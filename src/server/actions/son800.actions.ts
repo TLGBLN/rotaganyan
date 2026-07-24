@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import type { PaceCheckpoint } from "@/lib/methodology/pace-analizi";
+import { analizEtTekYaris, type PaceCheckpoint, type TekYarisStil } from "@/lib/methodology/pace-analizi";
 
 const COMBINING_MARKS_RE = /[̀-ͯ]/g;
 const TRAILING_COUNTRY_CODE_RE = /\s*\([A-ZİĞÜŞÖÇ]{2,4}\)\s*$/i;
@@ -35,6 +35,10 @@ export type AccuraceSon800Record = {
   length: number;
   place: number;
   son800Sure: string;
+  // 2026-07-24: kullanıcı isteği — admin/accurace panosundaki gibi TÜM sektörel
+  // (200/400/600...) kırılımı public panelde de görünsün, yalnız son 800 özeti değil.
+  checkpoints: PaceCheckpoint[];
+  stil: TekYarisStil | null;
 };
 export type Son800RunnerData = { runnerNo: number; horseName: string; records: AccuraceSon800Record[] };
 
@@ -85,8 +89,10 @@ export async function getSon800ForRace(raceId: string): Promise<Son800RunnerData
     const records: AccuraceSon800Record[] = kayitlar
       .map((k) => {
         const length = k.accuraceRace.length ?? 0;
-        const sure = last800SureSaniye(k.checkpoints as unknown as PaceCheckpoint[], length);
+        const checkpoints = k.checkpoints as unknown as PaceCheckpoint[];
+        const sure = last800SureSaniye(checkpoints, length);
         if (sure == null) return null;
+        const sonuc = analizEtTekYaris(checkpoints, length);
         return {
           date: k.accuraceRace.date.toISOString().slice(0, 10).split("-").reverse().join("."),
           hippodrome: hippodromeAdi(k),
@@ -94,6 +100,8 @@ export async function getSon800ForRace(raceId: string): Promise<Son800RunnerData
           length,
           place: k.place,
           son800Sure: `${sure.toFixed(2)}''`,
+          checkpoints,
+          stil: sonuc?.stil ?? null,
         };
       })
       .filter((r): r is AccuraceSon800Record => r != null);

@@ -4,33 +4,12 @@ import Link from "next/link";
 import { turkeyDateString } from "@/lib/tz";
 import AccuraceSyncButton from "@/components/admin/AccuraceSyncButton";
 import AccuraceDatePicker from "@/components/admin/AccuraceDatePicker";
-import { analizEtTekYaris, hesaplaCokYarisEgilimi, type PaceCheckpoint, type TekYarisStil } from "@/lib/methodology/pace-analizi";
+import { analizEtTekYaris, hesaplaCokYarisEgilimi, type PaceCheckpoint } from "@/lib/methodology/pace-analizi";
+import { fmtSaniye, checkpointCols, STIL_LABEL, STIL_RENK } from "@/lib/methodology/pace-format";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = { searchParams: Promise<{ tarih?: string }> };
-
-const STIL_LABEL: Record<TekYarisStil, string> = {
-  KACAK: "Kaçak",
-  ONCU: "Öncü (erken düştü)",
-  PRESCI: "Presçi",
-  TAKIPCI: "Takipçi",
-  BEKLEYEN: "Bekleyen/Sprintçi",
-};
-const STIL_RENK: Record<TekYarisStil, string> = {
-  KACAK: "bg-hit-bg text-hit",
-  ONCU: "bg-risk-bg text-risk",
-  PRESCI: "bg-brand/15 text-brand",
-  TAKIPCI: "bg-muted text-muted-foreground",
-  BEKLEYEN: "bg-hit-bg text-hit",
-};
-
-function fmtSaniye(ms: number): string {
-  const totalSec = ms / 1000;
-  const dk = Math.floor(totalSec / 60);
-  const sn = totalSec - dk * 60;
-  return dk > 0 ? `${dk}'${sn.toFixed(2)}''` : `${sn.toFixed(2)}''`;
-}
 
 export default async function AccuraceDashboardPage({ searchParams }: PageProps) {
   const { tarih } = await searchParams;
@@ -93,10 +72,7 @@ export default async function AccuraceDashboardPage({ searchParams }: PageProps)
         <div className="space-y-6">
           {races.map((ar) => {
             const length = ar.length ?? ar.race?.distance ?? 0;
-            // 200m aralıklarla + bitiş — okunabilir bir özet tablosu için.
-            const checkpointCols: number[] = [];
-            for (let c = 400; c < length; c += 200) checkpointCols.push(c);
-            checkpointCols.push(length);
+            const cols = checkpointCols(length);
 
             return (
               <div key={ar.id} className="rounded-lg border overflow-hidden">
@@ -120,7 +96,7 @@ export default async function AccuraceDashboardPage({ searchParams }: PageProps)
                       <tr className="border-b bg-muted/20 text-muted-foreground">
                         <th className="px-2 py-1.5 text-left font-medium">No</th>
                         <th className="px-2 py-1.5 text-left font-medium">At</th>
-                        {checkpointCols.map((c) => (
+                        {cols.map((c) => (
                           <th key={c} className="px-2 py-1.5 text-center font-medium tabular-nums">
                             {c}m
                           </th>
@@ -141,7 +117,7 @@ export default async function AccuraceDashboardPage({ searchParams }: PageProps)
                               {s.horseName}
                               {!s.runner && <span className="ml-1 text-[10px] text-risk" title="İsimle eşleşmedi">⚠</span>}
                             </td>
-                            {checkpointCols.map((c) => {
+                            {cols.map((c) => {
                               const cp = checkpoints.find((x) => x.checkpoint === c);
                               return (
                                 <td key={c} className="px-2 py-1.5 text-center tabular-nums">
