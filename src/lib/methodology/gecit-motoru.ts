@@ -54,7 +54,10 @@ export type AtGirdisi = {
   ad: string;
   teknikSira?: number | null;
   agfSirasi?: number | null;
-  bc: number;
+  // v5.0: A/B+C katman ayrımı kaldırıldı (kullanıcının "Harmanlama / Tek Puanlama
+  // Deneyi" bulguları) — Faz2 artık tek bir 0-100 puan üretiyor, ayrı A/B+C alt
+  // toplamı yok. Alan adı `puan` (eski `bc` adı artık yanlış/yanıltıcı olurdu).
+  puan: number;
   hpBugun?: number | null;
   hpOnceki?: number | null;
   ilkStart?: boolean;
@@ -91,8 +94,8 @@ export type AtSonucu = {
   teknikSira: number | null | undefined;
   atomicForceSayi: number;
   hpIvmesi: number | null;
-  bc: number;
-  bcHam: number;
+  puan: number;
+  puanHam: number;
   kalabalikEklenti: number;
   son800Bonus: number;
   son800Ozet: string;
@@ -154,22 +157,22 @@ export function atiDegerlendir(at: AtGirdisi, kosu: KosuGirdisi, esik: Esikler =
   const tek = at.teknikSira;
   const tetikler: GecitTetik[] = [];
 
-  const bcHam = at.bc ?? 0;
+  const puanHam = at.puan ?? 0;
   const kalabalik = kosu.kalabalik || kosu.kalabalikSaha || false;
 
-  // v4.1: Son800 artık B+C'ye mekanik eklenmiyor — Faz2 promptu Claude'dan bunu
-  // doğrudan A puanına (yetenek/tempo gücü göstergesi olarak) dahil etmesini istiyor.
-  // son800Bonus burada YALNIZ referans/rapor amaçlı hesaplanmaya devam ediyor (aşağıdaki
-  // SON800 notları), gerçek puana ikinci kez eklenmiyor — çifte sayım olmasın diye.
+  // v5.0: Son800 artık nihai puana mekanik eklenmiyor — Faz2 promptu Claude'dan bunu
+  // puanlama sırasında (Çapraz Doğrulama Katsayısı'nın parçası olarak) dahil etmesini
+  // istiyor. son800Bonus burada YALNIZ referans/rapor amaçlı hesaplanmaya devam ediyor
+  // (aşağıdaki SON800 notları), gerçek puana ikinci kez eklenmiyor — çifte sayım olmasın diye.
   const s800 = son800Ozet(at, esik);
   const son800Bonus = s800 === "guclu_kapanis" ? 2 : s800 === "dusuk_tempo" ? -1 : 0;
 
-  let bcEfektif: number;
+  let puanEfektif: number;
   if (kalabalik) {
     const tempoUygun = !!at.atomicForce?.startTempoUygun;
-    bcEfektif = bcHam + (tempoUygun ? 5 : 0);
+    puanEfektif = puanHam + (tempoUygun ? 5 : 0);
   } else {
-    bcEfektif = bcHam;
+    puanEfektif = puanHam;
   }
 
   const af = say(at.atomicForce);
@@ -275,8 +278,8 @@ export function atiDegerlendir(at: AtGirdisi, kosu: KosuGirdisi, esik: Esikler =
 
   return {
     at: at.ad || "(isimsiz)", teknikSira: tek,
-    atomicForceSayi: af, hpIvmesi: iv, bc: bcEfektif, bcHam,
-    kalabalikEklenti: bcEfektif - bcHam,
+    atomicForceSayi: af, hpIvmesi: iv, puan: puanEfektif, puanHam,
+    kalabalikEklenti: puanEfektif - puanHam,
     son800Bonus, son800Ozet: s800,
     son800Farki: at.son800Farki, son800Medyan: at.son800Medyan, son800N: at.son800BenzerKosuN ?? 0,
     tetikler, tetikliyor: tetikler.length > 0, uyarilar,
@@ -343,7 +346,10 @@ export function veriDenetimi(atlar: AtGirdisi[], _esik: Esikler = ESIK): VeriDen
 }
 
 export function gecitSkoru(r: AtSonucu): number {
-  let s = r.atomicForceSayi * 2 + r.tetikler.length * 3 + r.bc / 5;
+  // v5.0: eski formül yalnız B+C (max 40) kullanıyordu, /5 ile max katkı 8 idi.
+  // Tek puan modelinde r.puan max 100 — aynı max-8 katkı oranını korumak için
+  // bölen 12.5'e çıkarıldı (40/5 = 100/12.5 = 8), formülün amacı değişmedi.
+  let s = r.atomicForceSayi * 2 + r.tetikler.length * 3 + r.puan / 12.5;
   if (r.hpIvmesi != null && r.hpIvmesi >= ESIK.hpPatlamaMin) s += 6;
   return Math.round(s * 10) / 10;
 }

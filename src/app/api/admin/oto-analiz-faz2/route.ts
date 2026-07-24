@@ -46,7 +46,7 @@ async function handlePost(req: NextRequest) {
   // eksik varsa yalnız Claude'a açık bir uyarı enjekte edilir (Veri Güveni C'ye çeksin,
   // eksikliği ceza sebebi yapmasın) — "analiz yok" çıktısı hiçbir zaman verilmez.
   const onKontrol: AtGirdisi[] = faz1.runners.map((r) => ({
-    ad: r.ad, bc: 0, agfSirasi: r.agfSirasi, hpBugun: r.hpBugun, hpOnceki: r.hpOnceki, tempoVeriN: r.tempoVeriN,
+    ad: r.ad, puan: 0, agfSirasi: r.agfSirasi, hpBugun: r.hpBugun, hpOnceki: r.hpOnceki, tempoVeriN: r.tempoVeriN,
     ilkStart: r.ilkStart, bitirisGeriliyor: r.bitirisGeriliyor, bitirisIyilesiyor: r.bitirisIyilesiyor,
   }));
   const onVeriDenetimi = veriDenetimi(onKontrol);
@@ -125,22 +125,28 @@ ${methodologyText}`;
     cache_control: { type: "ephemeral", ttl: "1h" },
   };
 
-  // ── FAZ 2 — CLAUDE: koşu tipine göre A/B+C skorlama + ön teknik sıra ──
-  const faz2Tail = `Sen ROTAGANYAN v4.1 at yarışı analistisin. FAZ 2 — SKORLAMA aşamasındasın (henüz final sıralama/kupon yazma, sadece puanla). Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan.
+  // ── FAZ 2 — CLAUDE: koşu tipine göre TEK HAVUZ skorlama + ön teknik sıra ──
+  // v5.0: kullanıcının "Harmanlama / Tek Puanlama Deneyi" bulgularına göre A(0-60)/B+C(0-40)
+  // katman ayrımı kaldırıldı — harmanlama artık yalnız metin/gerekçe seviyesinde değil,
+  // PUANIN KENDİSİNDE (Çapraz Doğrulama Katsayısı ile) gerçekleşiyor. Bkz. metodoloji §II.
+  const faz2Tail = `Sen ROTAGANYAN v5.0 at yarışı analistisin. FAZ 2 — SKORLAMA aşamasındasın (henüz final sıralama/kupon yazma, sadece puanla). Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan (özellikle §II Tek Puan Sistemi ve §I.4 Veri Çifti Doktrini).
 
 ## GÖREVİN
-1. Koşu tipini belirle (Ansiklopedi Bölüm IV) ve o tipin A/B+C ağırlık matrisini uygula.
-2. Her atın satırındaki "Ön-hesaplanmış (kod, YENİDEN HESAPLAMA)" değerleri (HP Kalitesi yıldızı, Sınıf Geçiş puanı, Galop zinciri sınıflandırması, Tempo Güven seviyesi) ve KOŞU başlığındaki Zemin/Kaçak haritası zaten doğru hesaplandı — bunları TEKRAR HESAPLAMA, olduğu gibi kabul edip ilgili A/B+C bileşenine göm. Senin işin bu mekanik parçaları + pedigri notu/admin notu gibi serbest metin kanıtlarını, koşu tipinin ağırlık matrisine göre TOPLAM A(0-60)/B+C(0-40) puanına SENTEZLEMEK.
-3. Her at için A (0-60) ve B+C (0-40) puanı ver. Bir yarışın kalbi tempodur: "Son800 benzer koşu (KESİN)" satırındaki n/medyan A puanına ANA dayanak — n≥3 ve medyan ≤ -0.5s ise güçlü kapanış (yetenek göstergesi, A'yı yükselt), n≥3 ve medyan ≥ +0.7s ise düşük tempo (A'yı düşür), n<3 ise bu KESİN sayı tek başına güvenilir değil. Bu durumda (veya ek doğrulama için her zaman) "Son800 TÜM kayıtlar" satırına bak: [TAM UYGUN] etiketli satırlar KESİN sayıyla aynı anlamda güvenilir; [PİST FARKLI]/[MESAFE UZAK] etiketli satırlar birebir kıyaslanamaz (farklı pist/mesafede kapanış süresi doğrudan karşılaştırılmaz) ama atın GENEL kapanış karakteri (tutarlı hızlı/yavaş bitiriş, sıra iyileşmesi) hakkında zayıf ama sıfır olmayan bir ipucu verir — tamamen yok saymak yerine düşük ağırlıkla, KESİN sayının YERİNE değil YANINA bir gözlem olarak kullan.
-4. Toplam puana göre ön teknik sıra belirle (1 = en iyi). Bu sıra FAZ 3'te geçit motoruna girdi olacak.
-5. "Kanıt yokluğu olumsuz kanıt değildir" ilkesine uy — eksik veriyi ceza sebebi yapma. "Tabloda tanımsız" olarak işaretlenmiş Ön-hesaplanmış alanlar (örn. HP Kalitesi) da bu ilkeye tabidir — boş/tanımsız olması ceza değildir, serbestçe değerlendir.
-6. Veri Çifti Doktrini'ni (§I.4) uygula: puanlama kalem kalem yapılır ama her kalemin YORUMU izole değil, eşleştiği veriyle BİRLİKTE okunarak yazılır (ör. "kaçak" etiketi tempo+son800 birlikte okunmadan konmaz; "form yükseliyor" HP ivmesiyle birlikte doğrulanmadan yazılmaz). Çiftlendiği veri yoksa (ör. ilk start) o veri tek başına sınırlı kanıt sayılır — ceza değil, yalnız ek güven kaybı.
-7. Aygır İstatistiği / Kısrak İstatistiği satırlarını değerlendirirken ÖRNEKLEM BÜYÜKLÜĞÜNE dikkat et: bir yüzdenin yanında "[DÜŞÜK ÖRNEKLEM]" etiketi varsa (birkaç yarışa dayanıyor) bunu güçlü bir pozitif/negatif sinyal olarak KULLANMA, yalnız hafif bir ipucu say; "[geniş örneklem]" etiketli sayılar daha istikrarlı bir eğilimdir, puanlamada daha güvenle kullanılabilir. 5 yarışta %100 ile 200 yarışta %25 ASLA eşit güvenilirlikte değildir — etiketsiz olduğunda bile, satırdaki ham sayılara (Start/K/K) bakıp örneklemi kendin değerlendir.
+1. Koşu tipini belirle (Ansiklopedi Bölüm IV) ve o tipin ağırlık matrisini uygula — kartlar hâlâ "A = ..." / "B+C = ..." etiketiyle yazılı ama bu ayrım artık yalnız kavramsal bir kalıntı, TÜM kalemler TEK bir 100 puanlık havuzda toplanır (öncelik zinciri yok).
+2. Her atın satırındaki "Ön-hesaplanmış (kod, YENİDEN HESAPLAMA)" değerleri (HP Kalitesi yıldızı, Sınıf Geçiş puanı, Galop zinciri sınıflandırması, Tempo Güven seviyesi) ve KOŞU başlığındaki Zemin/Kaçak haritası zaten doğru hesaplandı — bunları TEKRAR HESAPLAMA, olduğu gibi kabul edip ilgili kaleme göm.
+3. Her at için TEK bir "puan" (0-100) ver — formül: HAM TOPLAM (§IV ağırlıklarının toplamı) × ÇAPRAZ DOĞRULAMA KATSAYISI (§II.3). Bir yarışın kalbi tempodur: "Son800 benzer koşu (KESİN)" satırındaki n/medyan ANA dayanaktır — n≥3 ve medyan ≤ -0.5s ise güçlü kapanış (yetenek göstergesi, puanı yükselt), n≥3 ve medyan ≥ +0.7s ise düşük tempo (puanı düşür), n<3 ise bu KESİN sayı tek başına güvenilir değil. Bu durumda (veya ek doğrulama için her zaman) "Son800 TÜM kayıtlar" satırına bak: [TAM UYGUN] etiketli satırlar KESİN sayıyla aynı anlamda güvenilir; [PİST FARKLI]/[MESAFE UZAK] etiketli satırlar birebir kıyaslanamaz ama atın GENEL kapanış karakteri hakkında zayıf ama sıfır olmayan bir ipucu verir — düşük ağırlıkla, KESİN sayının YERİNE değil YANINA bir gözlem olarak kullan.
+4. ÇAPRAZ DOĞRULAMA KATSAYISI (§II.3) — puanı yazmadan önce §I.4'teki veri çiftlerini kontrol et: iki veri birbirini güçlü destekliyorsa ×1.05-1.10, nötr/bağımsızsa ×1.00, hafif çelişiyorsa ×0.90-0.95, doğrudan çelişiyor/biri diğerini geçersiz kılıyorsa ×0.70-0.80. Birden fazla çift varsa çarpma, EN GÜÇLÜ çelişki/destek esas alınır. Bu katsayı yalnız GERÇEK/SOMUT çelişkiler içindir — küçük örneklem, veri eksikliği, farklı bağlam bu kapsama GİRMEZ (bkz. madde 7).
+5. KİLO-GEÇMİŞ ÇAPRAZ KONTROLÜ (§VII.3, zorunlu): "Aynı Pist/Mesafe/Hipodrom geçmişi" satırındaki geçmiş kilo bugünküyle karşılaştırılır — geçmişte iyi sonuç aldığı kilodan bugün daha hafifse +3/+5, geçmişte zaten yetersiz kaldığı kilodan bugün daha ağırsa −4/−6 (bu aynı zamanda madde 4'teki en güçlü çelişki örneğidir — örn. yüksek HP + bu olumsuz kilo-geçmiş sinyali).
+6. YAŞ-KİLO AYRIŞTIRMASI (karma yaş grubu koşularında, §IV): genç atın (alt yaş) yaş-skala kaynaklı düşük kilosu, düşük HP'siyle AYNI kalemde eritilip cezalandırılmaz — ayrı ve pozitif bir alt-kalem olarak işlenir.
+7. "Kanıt yokluğu olumsuz kanıt değildir" ilkesine uy. Örneklem küçüklüğü (jokey/antrenör dahil), veri eksikliği, farklı bağlamdan gelen kanıt yalnız Veri Güveni notunda ("küçük örneklem ama X" gibi) yansır — puanı veya çapraz doğrulama katsayısını İKİNCİ KEZ ASLA düşürme/yükseltme (bkz. WHIZBANG/KARAKTERLİ dersleri, §XII/§XI). Aygır/Kısrak istatistiklerinde "[DÜŞÜK ÖRNEKLEM]" etiketli bir yüzde tesadüfi olabilir, "[geniş örneklem]" daha güvenilirdir — 5 yarışta %100 ile 200 yarışta %25 ASLA eşit güvenilirlikte değildir.
+8. TAKI DEĞİŞİKLİĞİ BAYRAĞI (§XIII): bir atta takı eklendi/çıkarıldıysa bunu "details" etiketine ekle (örn. "Takı değişti") — otomatik puan vermez, ama gerekçede değerlendirildiği belli olmalı.
+9. Veri Çifti Doktrini'ni (§I.4) uygula: her kalemin YORUMU izole değil, eşleştiği veriyle BİRLİKTE okunarak yazılır. Çiftlendiği veri yoksa (ör. ilk start) o veri tek başına sınırlı kanıt sayılır — ceza değil, yalnız ek güven kaybı.
+10. KURAL DENETİM PROTOKOLÜ (§II.4, ZORUNLU SON ADIM): puanları yazdıktan sonra, ayrı bir turda her düşük puanı geri kontrol et — bu puanı düşüren şey somut bir çelişki mi (madde 4'e göre katsayı hakkı var), yoksa örneklem küçüklüğü/bağlam farkı/kanıt yokluğu mu (madde 7'ye göre puanı DEĞİL, yalnız notu etkilemeli)? §III'teki "Güçlü Jokey + İyi Pedigri Tabanı" gibi zorunlu taban kuralları bu atı ilgilendiriyor mu? Bu adım atlanmaz.
 
 Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
 {
   "atlar": [
-    { "no": 0, "ad": "...", "aPuani": 0, "bcPuani": 0, "teknikSira": 1 }
+    { "no": 0, "ad": "...", "puan": 0, "teknikSira": 1 }
   ]
 }`;
 

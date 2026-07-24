@@ -52,14 +52,14 @@ async function handlePost(req: NextRequest) {
 
   // ── FAZ 3 — GEÇİT MOTORU: KOD İLE ÇALIŞIR, LLM DEĞİL ──
   const teknikSiraByNo = new Map(faz2.atlar.map((a) => [a.no, a.teknikSira]));
-  const bcPuaniByNo = new Map(faz2.atlar.map((a) => [a.no, a.bcPuani]));
+  const puanByNo = new Map(faz2.atlar.map((a) => [a.no, a.puan]));
 
   const kacakSayisi = faz1.runners.filter((r) => r.kacak).length;
   const atGirdileri: AtGirdisi[] = faz1.runners.map((r) => ({
     ad: r.ad,
     teknikSira: teknikSiraByNo.get(r.no) ?? null,
     agfSirasi: r.agfSirasi,
-    bc: bcPuaniByNo.get(r.no) ?? 0,
+    puan: puanByNo.get(r.no) ?? 0,
     hpBugun: r.hpBugun,
     hpOnceki: r.hpOnceki,
     ilkStart: r.ilkStart,
@@ -103,10 +103,10 @@ async function handlePost(req: NextRequest) {
   }
 
   // ── FAZ 4 — CLAUDE: geçit çıktısını işleyip final sıralama + kupon + yazım ──
-  const faz4Tail = `Sen ROTAGANYAN v4.1 at yarışı analistisin. FAZ 4 — SIRALAMA ve KUPON aşamasındasın. Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan (metodolojinin "Çözüm Rejimi" ve "Çıktı JSON Şeması" bölümlerine özellikle bak).
+  const faz4Tail = `Sen ROTAGANYAN v5.0 at yarışı analistisin. FAZ 4 — SIRALAMA ve KUPON aşamasındasın. Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan (metodolojinin "Çözüm Rejimi" ve "Çıktı JSON Şeması" bölümlerine özellikle bak).
 
-## FAZ 2 SKORLARIN
-${faz2.atlar.map((a) => `#${a.no} ${a.ad}: A=${a.aPuani} B+C=${a.bcPuani} (ön teknik sıra ${a.teknikSira})`).join("\n")}
+## FAZ 2 SKORLARIN (v5.0 — tek puan, A/B+C ayrımı yok)
+${faz2.atlar.map((a) => `#${a.no} ${a.ad}: Puan=${a.puan} (ön teknik sıra ${a.teknikSira})`).join("\n")}
 
 ## FAZ 3 — GEÇİT MOTORU ÇIKTISI (koddan gerçekten üretildi, sinyaller DEĞİŞTİRİLEMEZ)
 \`\`\`
@@ -194,7 +194,7 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
   }
 
   // Faz 4 yalnız en iyi 3-6 atı sıralıyor. Kalan atlar için YENİ bir AI çağrısı yapmadan —
-  // Faz 2'nin (ücreti zaten ödenmiş) her at için hesapladığı A+B+C puanını kullanarak devamı
+  // Faz 2'nin (ücreti zaten ödenmiş) her at için hesapladığı puanı kullanarak devamı
   // tamamla, böylece admin ve public sayfa TÜM sahayı sıralı/puanlı görür, ek maliyet sıfır.
   const pickedNos = new Set(result.picks.map((p) => p.no));
   const enDusukPuan = result.picks.length > 0 ? Math.min(...result.picks.map((p) => p.score)) : 100;
@@ -202,7 +202,7 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
     .filter((r) => !pickedNos.has(r.no))
     .map((r) => {
       const a = faz2.atlar.find((x) => x.no === r.no);
-      const hamPuan = a ? Math.round(a.aPuani + a.bcPuani) : 0;
+      const hamPuan = a ? Math.round(a.puan) : 0;
       // ZORUNLU TUTARLILIK: Faz 4'ün taşıdığı atların skoru rank sırasını hiç bozmamalı —
       // kalan atların ham Faz 2 puanı en düşük "pick"i geçemez.
       return { no: r.no, name: r.ad, score: Math.min(hamPuan, enDusukPuan) };

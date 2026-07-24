@@ -202,6 +202,13 @@ export function daraltilmisMetodoloji(
 // Claude'un cevabını YALNIZCA prompt talimatıyla JSON'a zorlamak yerine, API'nin kendi
 // şema doğrulamasını (output_config.format) kullanıyoruz — "geçerli JSON döndür" gibi
 // bir talimata güvenmek yerine sunucu tarafında zorunlu kılınıyor.
+//
+// v4.16: Kullanıcının "Harmanlama / Tek Puanlama Deneyi" bulgularına göre A(0-60)/B+C(0-40)
+// katmanlı model kaldırıldı — kullanıcının kendi tespiti: harmanlama yalnız METİN/gerekçe
+// seviyesinde oluyordu, PUAN hesaplamasına hiç yansımıyordu (iki veri çelişse bile toplam
+// puan bunu sayısal olarak cezalandırmıyordu). Artık TEK bir "puan" (0-100) alanı var —
+// tüm veriler aynı havuzda değerlendirilir, çelişki-tutarlılık çarpanı (bkz. Faz2 prompt'u)
+// puana zaten işlenmiş halde gelir; ayrı A/B+C alt toplamı yok.
 export const FAZ2_SCHEMA = {
   type: "object",
   properties: {
@@ -212,11 +219,10 @@ export const FAZ2_SCHEMA = {
         properties: {
           no: { type: "integer" },
           ad: { type: "string" },
-          aPuani: { type: "number" },
-          bcPuani: { type: "number" },
+          puan: { type: "number" },
           teknikSira: { type: "integer" },
         },
-        required: ["no", "ad", "aPuani", "bcPuani", "teknikSira"],
+        required: ["no", "ad", "puan", "teknikSira"],
         additionalProperties: false,
       },
     },
@@ -302,7 +308,7 @@ export const FAZ4_FINAL_SCHEMA = {
 } as const;
 
 export type Faz2Atlar = {
-  atlar: { no: number; ad: string; aPuani: number; bcPuani: number; teknikSira: number | null }[];
+  atlar: { no: number; ad: string; puan: number; teknikSira: number | null }[];
 };
 
 export type Faz4DecisionPick = {

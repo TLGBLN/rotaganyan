@@ -42,23 +42,23 @@ async function handlePost(req: NextRequest) {
     cache_control: { type: "ephemeral", ttl: "1h" },
   };
 
-  const faz4FinalTail = `Sen ROTAGANYAN v4.1 at yarışı analistisin. Bu, FAZ 4'ün devamı — final sıralama KARARI zaten verildi (aşağıdaki SIRALAMA), senin işin: (1) banko/kupon/tempo/genel-yorum kararlarını üretmek, (2) belirtilen atlar için kısa "Kilit Gerekçe" metni yazmak. Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını (özellikle her atın galop/pedigri/form/sınıf/kilo/tempo verisini) kullan.
+  const faz4FinalTail = `Sen ROTAGANYAN v5.0 at yarışı analistisin. Bu, FAZ 4'ün devamı — final sıralama KARARI zaten verildi (aşağıdaki SIRALAMA), senin işin: (1) banko/kupon/tempo/genel-yorum kararlarını üretmek, (2) belirtilen atlar için kısa "Kilit Gerekçe" metni yazmak. Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını (özellikle her atın galop/pedigri/form/sınıf/kilo/tempo verisini) kullan.
 
-## FAZ 2 SKORLARIN (A puanı banko şartı için gerekli)
-${faz2.atlar.map((a) => `#${a.no} ${a.ad}: A=${a.aPuani} B+C=${a.bcPuani}`).join("\n")}
+## FAZ 2 SKORLARIN (v5.0 — tek puan, banko şartı için gerekli)
+${faz2.atlar.map((a) => `#${a.no} ${a.ad}: Puan=${a.puan}`).join("\n")}
 
 ## VERİLEN SIRALAMA KARARI (değiştirme — tüm saha, rank sırasıyla)
 ${allPicks.map((p) => `rank ${p.rank}: #${p.no} ${p.name} score=${p.score} pedigreeRating=${p.pedigreeRating} iç etiketler: ${p.details.join(", ") || "—"}`).join("\n")}
 
 ## GÖREVİN
-1. Banko şartlarını kontrol et (dördü birden — TOPLAM puana göre DEĞİL, A puanına göre: A≥50, A farkı≥3 [A'dan hesaplanır, toplamdan değil], Veri Güveni A, somut risk yok — Handikap/Grup'ta ekstra dikkatli ol, aşırı piyasa konsensüsü [AGF>%50 + ganyan<1.50] varsa banko yapma, dar kuponda tut).
+1. Banko şartlarını kontrol et (dördü birden — metodoloji §XVII v5.0: Nihai puan≥75, rakibe fark≥5 puan, gerekçede güveni zayıflatan not [küçük örneklem/eksik veri/bağlam farkı] yok, somut risk yok + Çapraz Doğrulama Katsayısı≥1.0 [çelişkili sinyal taşıyan at bankoya alınamaz] — Handikap/Grup'ta ekstra dikkatli ol, aşırı piyasa konsensüsü [AGF>%50 + ganyan<1.50] varsa banko yapma, dar kuponda tut).
 2. Ekonomik/Normal/Geniş kupon önerisi üret — yukarıdaki SIRALAMA'daki TÜM atları üç gruba böl (kupon numaraları at numarasıdır):
    - Ekonomik: sıralamandaki en iyi 3 at.
    - Normal: sıralamada onları izleyen 3 at (Ekonomik'te olmayan farklı 3 at).
    - Geniş: sahada kalan TÜM diğer atlar (Ekonomik ve Normal'de olmayanların hepsi).
    Alanları "X-Y-Z" formatında, at numaralarıyla doldur. Saha 6 attan azsa Normal'i mevcut atlarla doldur, Geniş boş kalabilir.
 3. "notes" alanına genel koşu değerlendirmesi + geçit motorunun uyarılarının sade özetini yaz, "tempo" alanına tempo beklentisini sade dille yaz.
-4. Aşağıdaki GEREKÇE YAZILACAK ATLAR listesindeki HER at için "gerekceler" dizisine bir "note" yaz: 2 cümlelik, öz ve okunabilir bir gerekçe — bu metin doğrudan kullanıcıya (public "Kilit Gerekçe" sütununa) gidiyor. A/B+C/Atomic Force/HP ivmesi/geçit skoru gibi iç terimler burada GEÇMEZ (bkz. Sunum Kuralı) — sade, yarışseverin anlayacağı dille, o atı neden bu sırada değerlendirdiğini anlat (galop, pedigri, form, sınıf, kilo, tempo gibi somut kanıtlara dayanarak, yukarıdaki ATLAR verisinden). Pedigri hakkında konuşurken §IX'daki "Aygır/hat hakkında uydurma bilgi yasak" kuralına UY — yukarıda verilmeyen bir aygır/hat hakkında (Aygır İstatistiği'nde/adminNote'ta yoksa) spesifik mesafe/pist/karakter iddiası YAZMA, yalnız verilen ham veriyle (isim var/yok, F% gibi) sınırlı kal.
+4. Aşağıdaki GEREKÇE YAZILACAK ATLAR listesindeki HER at için "gerekceler" dizisine bir "note" yaz: 2 cümlelik, öz ve okunabilir bir gerekçe — bu metin doğrudan kullanıcıya (public "Kilit Gerekçe" sütununa) gidiyor. Atomic Force/HP ivmesi/geçit skoru/Çapraz Doğrulama Katsayısı gibi iç terimler burada GEÇMEZ (bkz. Sunum Kuralı) — sade, yarışseverin anlayacağı dille, o atı neden bu sırada değerlendirdiğini anlat (galop, pedigri, form, sınıf, kilo, tempo gibi somut kanıtlara dayanarak, yukarıdaki ATLAR verisinden). Pedigri hakkında konuşurken §IX'daki "Aygır/hat hakkında uydurma bilgi yasak" kuralına UY — yukarıda verilmeyen bir aygır/hat hakkında (Aygır İstatistiği'nde/adminNote'ta yoksa) spesifik mesafe/pist/karakter iddiası YAZMA, yalnız verilen ham veriyle (isim var/yok, F% gibi) sınırlı kal.
 
 ## GEREKÇE YAZILACAK ATLAR (yalnız bunlar için "gerekceler" üret, diğerleri için üretme)
 ${notePicks.map((p) => `#${p.no} ${p.name}`).join(", ") || "(yok)"}
