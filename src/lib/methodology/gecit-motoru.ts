@@ -153,15 +153,19 @@ export function atiDegerlendir(at: AtGirdisi, kosu: KosuGirdisi, esik: Esikler =
   const bcHam = at.bc ?? 0;
   const kalabalik = kosu.kalabalik || kosu.kalabalikSaha || false;
 
+  // v4.1: Son800 artık B+C'ye mekanik eklenmiyor — Faz2 promptu Claude'dan bunu
+  // doğrudan A puanına (yetenek/tempo gücü göstergesi olarak) dahil etmesini istiyor.
+  // son800Bonus burada YALNIZ referans/rapor amaçlı hesaplanmaya devam ediyor (aşağıdaki
+  // SON800 notları), gerçek puana ikinci kez eklenmiyor — çifte sayım olmasın diye.
   const s800 = son800Ozet(at, esik);
   const son800Bonus = s800 === "guclu_kapanis" ? 2 : s800 === "dusuk_tempo" ? -1 : 0;
 
   let bcEfektif: number;
   if (kalabalik) {
     const tempoUygun = !!at.atomicForce?.startTempoUygun;
-    bcEfektif = bcHam + (tempoUygun ? 5 : 0) + son800Bonus;
+    bcEfektif = bcHam + (tempoUygun ? 5 : 0);
   } else {
-    bcEfektif = bcHam + son800Bonus;
+    bcEfektif = bcHam;
   }
 
   const af = say(at.atomicForce);
@@ -268,7 +272,7 @@ export function atiDegerlendir(at: AtGirdisi, kosu: KosuGirdisi, esik: Esikler =
   return {
     at: at.ad || "(isimsiz)", teknikSira: tek,
     atomicForceSayi: af, hpIvmesi: iv, bc: bcEfektif, bcHam,
-    kalabalikEklenti: bcEfektif - bcHam - son800Bonus,
+    kalabalikEklenti: bcEfektif - bcHam,
     son800Bonus, son800Ozet: s800,
     son800Farki: at.son800Farki, son800Medyan: at.son800Medyan, son800N: at.son800BenzerKosuN ?? 0,
     tetikler, tetikliyor: tetikler.length > 0, uyarilar,
@@ -547,13 +551,13 @@ export function metin(s: DegerlendirSonucu, ad = ""): string {
     const med = r.son800Medyan;
     const bon = r.son800Bonus;
     if (ozet === "guclu_kapanis") {
-      son800Notlar.push(`  [SON800 +${bon}] ${r.at}: Güçlü kapanış örüntüsü (n=${n}, medyan ${(med ?? 0) >= 0 ? "+" : ""}${(med ?? 0).toFixed(2)}s) — B+C'ye +${bon} eklendi.`);
+      son800Notlar.push(`  [SON800 referans +${bon}] ${r.at}: Güçlü kapanış örüntüsü (n=${n}, medyan ${(med ?? 0) >= 0 ? "+" : ""}${(med ?? 0).toFixed(2)}s) — A puanına (tempo/yetenek göstergesi) yansıtılmış olmalı.`);
     } else if (ozet === "dusuk_tempo") {
-      son800Notlar.push(`  [SON800 ${bon}] ${r.at}: Son 800 referanstan yavaş (n=${n}, medyan ${(med ?? 0) >= 0 ? "+" : ""}${(med ?? 0).toFixed(2)}s) — B+C'ye ${bon} eklendi.`);
+      son800Notlar.push(`  [SON800 referans ${bon}] ${r.at}: Son 800 referanstan yavaş (n=${n}, medyan ${(med ?? 0) >= 0 ? "+" : ""}${(med ?? 0).toFixed(2)}s) — A puanına (tempo/yetenek göstergesi) yansıtılmış olmalı.`);
     }
   }
   if (son800Notlar.length > 0) {
-    L.push("\nSON 800 (B+C bileşeni — tempo satırına ek):");
+    L.push("\nSON 800 (A bileşeni — tempo, yeteneğin parçası):");
     L.push(...son800Notlar);
   }
 
