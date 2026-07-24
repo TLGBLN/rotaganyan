@@ -34,6 +34,23 @@ function normalizeHorseName(s: string): string {
   return s.replace(TRAILING_COUNTRY_CODE_RE, "").toLocaleUpperCase("tr-TR").normalize("NFD").replace(COMBINING_MARKS_RE, "").replace(/[^A-ZİĞÜŞÖÇ0-9 ]/g, "").replace(/\s+/g, " ").trim();
 }
 
+// AccuraceHorseSplit.horseName, Accurace'in KENDİ ham formatı — yabancı doğumlu atlarda
+// "(IRE)"/"(USA)" gibi ülke kodu soneki hiç YAZMIYOR (bkz. accurace-sync.service.ts'teki
+// aynı tespit), Runner.name ise TJK formatıyla bu soneki İÇERİYOR. Prisma'nın `where.in`
+// eşleşmesi TAM METİN karşılaştırması yaptığı için, sorguya yalnız Runner.name'i vermek bu
+// atların Accurace kayıtlarını SQL seviyesinde sessizce dışarıda bırakıyordu — aşağıdaki
+// normalizeHorseName filtresi hiç çalışma fırsatı bile bulamıyordu (satır zaten gelmemişti).
+// Çözüm: sorguya hem ham hem ülke-kodu-çıkarılmış halini birlikte vermek.
+function accuraceQueryNames(names: string[]): string[] {
+  const out = new Set<string>();
+  for (const n of names) {
+    out.add(n);
+    const stripped = n.replace(TRAILING_COUNTRY_CODE_RE, "").trim();
+    if (stripped) out.add(stripped);
+  }
+  return [...out];
+}
+
 // ── SKK Sınıf Piramidi (Ansiklopedi Bölüm III) — metin tabanlı en iyi eşleştirme ──
 function classToSkk(classType: string | null | undefined): number | null {
   if (!classType) return null;
@@ -264,7 +281,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
     getH2HForRace(raceId).catch(() => []),
     fetchApprenticeRemainingRaces().catch(() => ({}) as Record<string, number>),
     db.accuraceHorseSplit.findMany({
-      where: { horseName: { in: race.runners.map((r) => r.name) } },
+      where: { horseName: { in: accuraceQueryNames(race.runners.map((r) => r.name)) } },
       select: { horseName: true, checkpoints: true, accuraceRace: { select: { length: true } } },
     }).catch(() => []),
     getSireStatOzetleriForRace(race.runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(
@@ -346,7 +363,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   // formülüyle yön/birim uyumlu, gecit-motoru.ts'teki -0.5/+0.7 eşikleri değişmeden geçerli.
   const son800AccuraceKayitlari = race.runners.length
     ? await db.accuraceHorseSplit.findMany({
-        where: { horseName: { in: race.runners.map((r) => r.name) } },
+        where: { horseName: { in: accuraceQueryNames(race.runners.map((r) => r.name)) } },
         select: {
           horseName: true,
           accuraceRaceId: true,
@@ -391,7 +408,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
     // kapanış hızı kıyaslaması tek hipodroma sıkışmaktan daha değerli bir sinyal veriyor.
     const kayitlar = son800AccuraceKayitlari.filter(
       (k) =>
-        k.horseName === r.name &&
+        normalizeHorseName(k.horseName) === normalizeHorseName(r.name) &&
         k.accuraceRace.date.getUTCFullYear().toString() === race.raceDay.date.getUTCFullYear().toString() &&
         k.accuraceRace.ground === surfacePrefixToday &&
         Math.abs((k.accuraceRace.length ?? 0) - race.distance) <= 200
@@ -532,7 +549,14 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         r.gallops.map((g) => ({ splits: g.splits as Record<string, string | null> | null })),
         race.breed
       );
-      const tempoVeriNHesap = (r.raceStyle as { veri?: number } | null)?.veri ?? null;
+      // Runner.raceStyle DB alanı yalnız o at KENDİ Accurace verisi geldiğinde yazılıyor —
+      // yeni girilen (henüz koşulmamış) bir at için bu alan neredeyse hep null'du (bkz.
+      // ingest/base.ts'teki kalıcı düzeltme notu). accuraceEgilimMap yukarıda ZATEN aynı
+      // atın geçmiş Accurace kayıtlarından TAZE hesaplanmıştı (n≥3) — o yüzden DB'deki
+      // (potansiyel olarak eski/boş) alan yerine bunu kullanmak hem daha güvenilir hem
+      // ekstra sorgu gerektirmiyor.
+      const accuraceEgilimHesap = accuraceEgilimMap.get(r.id) ?? null;
+      const tempoVeriNHesap = accuraceEgilimHesap?.n ?? null;
       const tempoGuvenHesap = tempoGuvenSeviyesi(tempoVeriNHesap);
 
       return {
@@ -550,9 +574,9 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         equipment: r.equipment, equipmentAdded: r.equipmentAdded, equipmentRemoved: r.equipmentRemoved,
         recentForm: r.recentForm, bestTime: r.bestTime,
         apprentice: r.apprentice, apprenticeRemaining,
-        raceStyleEtiket: (r.raceStyle as { style?: string } | null)?.style ?? null,
+        raceStyleEtiket: accuraceEgilimHesap?.stil ?? null,
         tempoVeriN: tempoVeriNHesap,
-        kacak: (r.raceStyle as { style?: string } | null)?.style === "KACAK",
+        kacak: accuraceEgilimHesap?.stil === "KACAK",
         galopOzet,
         ilkStart, hpOnceki: hpOncekiEfektif,
         hpIvmesi: hpIvmesiHesap,

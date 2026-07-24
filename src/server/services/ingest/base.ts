@@ -1,4 +1,5 @@
 import type { IngestRaceDay, IngestResult } from "./types";
+import { Prisma } from "@prisma/client";
 
 /**
  * Abstract data provider. Implement this interface for each source
@@ -24,6 +25,26 @@ export async function persistRaceDays(raceDays: IngestRaceDay[]): Promise<Ingest
   let inserted = 0;
   let updated = 0;
   const errors: string[] = [];
+
+  // Yeni (henüz koşulmamış) bir Runner satırı raceStyle=null ile başlıyordu — bu alan
+  // yalnız o at KENDİ Accurace verisi geldiğinde (yani KENDİ koşusunu koştuktan SONRA)
+  // yazılıyor (bkz. accurace-sync.service.ts). Sonuç: at daha önce onlarca yarış koşup
+  // stili bilinse bile, yeni girdiği her koşuda program/analiz sayfası "yarış stili yok"
+  // gösteriyordu. Burada, at isminin EN GÜNCEL bilinen (null olmayan) raceStyle'ını
+  // önceden bulup yeni satıra miras bırakıyoruz — kalıcı çözüm, geriye dönük backfill
+  // scripts/_backfill_race_style_upcoming.ts ile ayrıca yapıldı.
+  const allHorseNames = [...new Set(raceDays.flatMap((rd) => rd.races.flatMap((r) => r.runners.map((x) => x.name))))];
+  const latestStyleByName = new Map<string, Prisma.InputJsonValue>();
+  if (allHorseNames.length > 0) {
+    const knownStyleRows = await db.runner.findMany({
+      where: { name: { in: allHorseNames }, raceStyle: { not: Prisma.DbNull } },
+      select: { name: true, raceStyle: true, race: { select: { raceDay: { select: { date: true } } } } },
+      orderBy: { race: { raceDay: { date: "desc" } } },
+    });
+    for (const row of knownStyleRows) {
+      if (!latestStyleByName.has(row.name)) latestStyleByName.set(row.name, row.raceStyle as Prisma.InputJsonValue);
+    }
+  }
 
   for (const rd of raceDays) {
     try {
@@ -79,7 +100,7 @@ export async function persistRaceDays(raceDays: IngestRaceDay[]): Promise<Ingest
         for (const runner of r.runners) {
           const existing = await db.runner.findUnique({
             where: { raceId_no: { raceId: race.id, no: runner.no } },
-            select: { jockey: true },
+            select: { jockey: true, raceStyle: true },
           });
 
           const existingJockeyClean = existing?.jockey?.replace(/\*\*/g, "").trim() || null;
@@ -91,13 +112,16 @@ export async function persistRaceDays(raceDays: IngestRaceDay[]): Promise<Ingest
             runner.jockey != null &&
             existingJockeyClean !== runner.jockey;
 
+          const inheritedStyle = latestStyleByName.get(runner.name);
+
           await db.runner.upsert({
             where: { raceId_no: { raceId: race.id, no: runner.no } },
-            create: { raceId: race.id, ...runner },
+            create: { raceId: race.id, ...runner, ...(inheritedStyle != null ? { raceStyle: inheritedStyle } : {}) },
             update: {
               ...runner,
               jockeyChanged,
               previousJockey: jockeyChanged ? existingJockeyClean : null,
+              ...(existing?.raceStyle == null && inheritedStyle != null ? { raceStyle: inheritedStyle } : {}),
             },
           });
         }
