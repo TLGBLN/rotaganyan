@@ -6,6 +6,7 @@ import {
   createWithTruncationRetry, extractText,
   FAZ4_SCHEMA, type Faz2Atlar, type Faz4Pick, type Faz4Result,
 } from "@/lib/methodology/claude-analiz-helpers";
+import { getRecentCachedResult } from "@/lib/claude-cost";
 import type { Anthropic } from "@anthropic-ai/sdk";
 import type { Role } from "@prisma/client";
 
@@ -129,28 +130,37 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
 pedigreeRating değerleri: COK_YUKSEK, YUKSEK, GUCLU, ORTA, DUSUK, ZAYIF, SORU, BILINMIYOR
 details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, Jokey devam, HP İvmesi +12, Son800 güçlü kapanış`;
 
-  const faz4Msg = await createWithTruncationRetry(
-    {
-      model: "claude-sonnet-5",
-      // Adaptive thinking AÇIK (bkz. Faz 2'deki not) — GEÇİCİ DENEY 2 sonrası tekrar açıldı.
-      thinking: { type: "adaptive" },
-      // 2026-07-23: 8 atlı Handikap koşularında (her at için 3-5 cümlelik gerekçe
-      // toplamda) 24000 tavanına tıkanıp bozuk JSON dönüyordu (ClaudeUsageLog'da
-      // kanıtlandı — output tam 24000'de kesiliyordu). Ücret gerçek üretilen token'a
-      // göre alınır, tavanı yükseltmenin normal koşularda maliyet etkisi yok; yalnız
-      // tıkanan koşularda gereksiz (ve ücretli) tekrar denemeyi önlüyor.
-      max_tokens: 32000,
-      output_config: { format: { type: "json_schema", schema: FAZ4_SCHEMA } },
-      messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz4Tail }] }],
-    },
-    raceId, "faz4", 40000
-  );
-  const faz4Raw = extractText(faz4Msg);
+  // "Boşa ödeme" koruması — bkz. oto-analiz-faz2/route.ts'teki aynı desen.
+  const cachedFaz4 = await getRecentCachedResult(raceId, "faz4");
+  let faz4Raw: string;
+  let faz4StopReasonMaxTokens = false;
+  if (cachedFaz4) {
+    faz4Raw = cachedFaz4;
+  } else {
+    const faz4Msg = await createWithTruncationRetry(
+      {
+        model: "claude-sonnet-5",
+        // Adaptive thinking AÇIK (bkz. Faz 2'deki not) — GEÇİCİ DENEY 2 sonrası tekrar açıldı.
+        thinking: { type: "adaptive" },
+        // 2026-07-23: 8 atlı Handikap koşularında (her at için 3-5 cümlelik gerekçe
+        // toplamda) 24000 tavanına tıkanıp bozuk JSON dönüyordu (ClaudeUsageLog'da
+        // kanıtlandı — output tam 24000'de kesiliyordu). Ücret gerçek üretilen token'a
+        // göre alınır, tavanı yükseltmenin normal koşularda maliyet etkisi yok; yalnız
+        // tıkanan koşularda gereksiz (ve ücretli) tekrar denemeyi önlüyor.
+        max_tokens: 32000,
+        output_config: { format: { type: "json_schema", schema: FAZ4_SCHEMA } },
+        messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz4Tail }] }],
+      },
+      raceId, "faz4", 40000
+    );
+    faz4Raw = extractText(faz4Msg);
+    faz4StopReasonMaxTokens = faz4Msg.stop_reason === "max_tokens";
+  }
   let result: Faz4Result;
   try {
     result = JSON.parse(faz4Raw);
   } catch {
-    const sebep = faz4Msg.stop_reason === "max_tokens"
+    const sebep = faz4StopReasonMaxTokens
       ? " (yanıt otomatik yüksek limitli tekrar denemede de token sınırına takıldı — makale tadındaki gerekçe yazıları uzun sürebilir, tekrar deneyin)"
       : "";
     return NextResponse.json({ error: `Faz 4 (sıralama) yanıtı parse edilemedi${sebep}`, raw: faz4Raw }, { status: 500 });

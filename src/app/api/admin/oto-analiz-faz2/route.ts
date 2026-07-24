@@ -7,6 +7,7 @@ import {
   createWithTruncationRetry, extractText, daraltilmisMetodoloji,
   FAZ2_SCHEMA, type Faz2Atlar,
 } from "@/lib/methodology/claude-analiz-helpers";
+import { getRecentCachedResult } from "@/lib/claude-cost";
 import type { Anthropic } from "@anthropic-ai/sdk";
 import type { Role } from "@prisma/client";
 
@@ -126,26 +127,38 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
   ]
 }`;
 
-  const faz2Msg = await createWithTruncationRetry(
-    {
-      model: "claude-sonnet-5",
-      // GEÇİCİ DENEY 2 sonucu: thinking kapalıyken bir kez daha (mekanik ön-hesaplama
-      // sonrası) benzer bir kalite şüphesi görüldü (pedigri-mesafe uyumsuzluğu metinde
-      // doğru tespit edilmiş ama puana orantılı yansıyıp yansımadığı belirsiz). Karşılaştırma
-      // için thinking geri açıldı — bkz. [[thinking-acik-kalmali]].
-      thinking: { type: "adaptive" },
-      max_tokens: 20000,
-      output_config: { format: { type: "json_schema", schema: FAZ2_SCHEMA } },
-      messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz2Tail }] }],
-    },
-    raceId, "faz2", 28000
-  );
-  const faz2Raw = extractText(faz2Msg);
+  // "Boşa ödeme" koruması: Vercel platform zaman aşımı Claude'u ücretlendirdikten SONRA
+  // ama yanıt istemciye ulaşmadan ÖNCE fonksiyonu kesebiliyor — admin "tekrar dene" dediğinde
+  // aynı raceId için 20dk içinde zaten üretilmiş bir sonuç varsa, Claude'u YENİDEN ÇAĞIRMADAN
+  // onu kullan (bkz. claude-cost.ts getRecentCachedResult).
+  const cachedFaz2 = await getRecentCachedResult(raceId, "faz2");
+  let faz2Raw: string;
+  let faz2StopReasonMaxTokens = false;
+  if (cachedFaz2) {
+    faz2Raw = cachedFaz2;
+  } else {
+    const faz2Msg = await createWithTruncationRetry(
+      {
+        model: "claude-sonnet-5",
+        // GEÇİCİ DENEY 2 sonucu: thinking kapalıyken bir kez daha (mekanik ön-hesaplama
+        // sonrası) benzer bir kalite şüphesi görüldü (pedigri-mesafe uyumsuzluğu metinde
+        // doğru tespit edilmiş ama puana orantılı yansıyıp yansımadığı belirsiz). Karşılaştırma
+        // için thinking geri açıldı — bkz. [[thinking-acik-kalmali]].
+        thinking: { type: "adaptive" },
+        max_tokens: 20000,
+        output_config: { format: { type: "json_schema", schema: FAZ2_SCHEMA } },
+        messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz2Tail }] }],
+      },
+      raceId, "faz2", 28000
+    );
+    faz2Raw = extractText(faz2Msg);
+    faz2StopReasonMaxTokens = faz2Msg.stop_reason === "max_tokens";
+  }
   let faz2: Faz2Atlar;
   try {
     faz2 = JSON.parse(faz2Raw);
   } catch {
-    const sebep = faz2Msg.stop_reason === "max_tokens"
+    const sebep = faz2StopReasonMaxTokens
       ? " (yanıt otomatik yüksek limitli tekrar denemede de token sınırına takıldı — bu koşu olağanüstü kalabalık, tekrar deneyin)"
       : "";
     return NextResponse.json({ error: `Faz 2 (skorlama) yanıtı parse edilemedi${sebep}`, raw: faz2Raw }, { status: 500 });

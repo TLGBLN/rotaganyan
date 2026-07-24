@@ -37,6 +37,7 @@ export async function createWithTruncationRetry(
     inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens,
     cacheCreationInputTokens: msg.usage.cache_creation_input_tokens ?? 0,
     cacheReadInputTokens: msg.usage.cache_read_input_tokens ?? 0,
+    resultText: extractText(msg),
   });
   if (msg.stop_reason === "max_tokens") {
     msg = await createStreamed({ ...params, max_tokens: retryMaxTokens });
@@ -45,6 +46,7 @@ export async function createWithTruncationRetry(
       inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens,
       cacheCreationInputTokens: msg.usage.cache_creation_input_tokens ?? 0,
       cacheReadInputTokens: msg.usage.cache_read_input_tokens ?? 0,
+      resultText: extractText(msg),
     });
   }
   return msg;

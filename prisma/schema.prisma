@@ -474,8 +474,14 @@ model ClaudeUsageLog {
   // token'ları inputTokens'a hiç dahil değil (Anthropic bunları ayrı sayaçlarda döner).
   cacheCreationInputTokens Int      @default(0)
   cacheReadInputTokens     Int      @default(0)
+  // Claude'un ham yanıt metni (extractText sonrası) — Vercel platform zaman aşımı
+  // Claude başarıyla yanıtladıktan SONRA ama istemciye ulaşmadan ÖNCE fonksiyonu
+  // kesebiliyor ("boşa ödeme"). Bu alan sayesinde hemen ardından gelen "tekrar dene"
+  // Claude'u yeniden çağırıp ikinci kez ücretlendirmek yerine bu kaydı kullanabilir.
+  resultText               String?  @db.Text
 
   @@index([createdAt])
+  @@index([raceId, phase, createdAt])
 }
 
 model ClaudeBudget {

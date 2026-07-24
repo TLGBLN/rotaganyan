@@ -48,7 +48,8 @@ export function tahminiMaliyet(
   );
 }
 
-/** Faz 2/Faz 4 çağrısından sonra token kullanımını kaydeder — hataya karşı sessizce yutulur, ana akışı bloklamaz. */
+/** Faz 2/Faz 4 çağrısından sonra token kullanımını (ve ham yanıt metnini) kaydeder —
+ *  hataya karşı sessizce yutulur, ana akışı bloklamaz. */
 export async function logClaudeUsage(input: {
   raceId?: string;
   phase: "faz2" | "faz4";
@@ -57,6 +58,7 @@ export async function logClaudeUsage(input: {
   outputTokens: number;
   cacheCreationInputTokens?: number;
   cacheReadInputTokens?: number;
+  resultText?: string;
 }): Promise<void> {
   try {
     const { db } = await import("@/lib/db");
@@ -69,10 +71,43 @@ export async function logClaudeUsage(input: {
         outputTokens: input.outputTokens,
         cacheCreationInputTokens: input.cacheCreationInputTokens ?? 0,
         cacheReadInputTokens: input.cacheReadInputTokens ?? 0,
+        resultText: input.resultText,
       },
     });
   } catch (err) {
     console.error("[claude-cost] usage log kaydedilemedi", err);
+  }
+}
+
+/**
+ * "Boşa ödeme" koruması: Vercel platform zaman aşımı Claude'u başarıyla ücretlendirdikten
+ * SONRA ama yanıt istemciye ulaşmadan ÖNCE fonksiyonu kesebiliyor — admin "tekrar dene"
+ * dediğinde bu, aynı işi ikinci kez (ikinci kez ücretli) Claude'a yaptırıyordu. Bu fonksiyon,
+ * kısa bir pencere içinde (varsayılan 20dk) bu raceId+phase için zaten başarıyla üretilmiş
+ * bir yanıt var mı diye bakar — varsa onu döner, route Claude'u YENİDEN ÇAĞIRMAZ.
+ * 20dk'lık pencere kasıtlı kısa tutuldu: admin gerçekten yeni bir analiz istiyorsa (ör. Faz 1
+ * verisi değişti) bu süre kolayca geçer, o zaman normal şekilde yeniden üretilir.
+ */
+export async function getRecentCachedResult(
+  raceId: string,
+  phase: "faz2" | "faz4",
+  windowMinutes = 20
+): Promise<string | null> {
+  try {
+    const { db } = await import("@/lib/db");
+    const log = await db.claudeUsageLog.findFirst({
+      where: {
+        raceId, phase,
+        resultText: { not: null },
+        createdAt: { gte: new Date(Date.now() - windowMinutes * 60_000) },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { resultText: true },
+    });
+    return log?.resultText ?? null;
+  } catch (err) {
+    console.error("[claude-cost] önbellek okunamadı", err);
+    return null;
   }
 }
 
