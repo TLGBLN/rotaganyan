@@ -41,7 +41,9 @@ export type Son800RunnerData = { runnerNo: number; horseName: string; records: A
 /**
  * Bir koşudaki tüm atların Accurace (GPS/sektörel zamanlama) geçmişinden son 800m
  * performansını döner — eskiden TJK Son800 sayfasından tek bir sayı çekiliyordu, artık
- * atın kendi checkpoint verisinden gerçek son 800m süresi hesaplanıyor (en fazla son 3 yarış).
+ * atın kendi checkpoint verisinden gerçek son 800m süresi hesaplanıyor. 2026-07-24:
+ * kullanıcı isteğiyle "en fazla son 3 yarış" sınırı kaldırıldı — atın Accurace'te kayıtlı
+ * TÜM geçmiş yarışları gösteriliyor (buton da "Son 800" yerine "Accurace" oldu).
  */
 export async function getSon800ForRace(raceId: string): Promise<Son800RunnerData[]> {
   const runners = await db.runner.findMany({ where: { raceId }, orderBy: { no: "asc" }, select: { no: true, name: true } });
@@ -79,7 +81,7 @@ export async function getSon800ForRace(raceId: string): Promise<Son800RunnerData
 
   return runners.map((r): Son800RunnerData => {
     const norm = normalizeHorseName(r.name);
-    const kayitlar = splits.filter((s) => normalizeHorseName(s.horseName) === norm).slice(0, 3);
+    const kayitlar = splits.filter((s) => normalizeHorseName(s.horseName) === norm);
     const records: AccuraceSon800Record[] = kayitlar
       .map((k) => {
         const length = k.accuraceRace.length ?? 0;

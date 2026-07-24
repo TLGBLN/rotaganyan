@@ -1340,7 +1340,7 @@ export default function ProgramView({
                   data-tour="son800-buton"
                   className={cn(PANEL_BTN_CLASS, son800Open ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
-                  Son 800 {son800Open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  Accurace {son800Open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
               )}
               {currentRace && (

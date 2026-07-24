@@ -23,14 +23,14 @@ export default function Son800Panel({ raceId }: { raceId: string }) {
   return (
     <div className="border-t">
       <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
-        <span className="text-sm font-bold tracking-wide text-white">Son 800 (Accurace)</span>
+        <span className="text-sm font-bold tracking-wide text-white">Accurace — Tüm Kayıtlar</span>
       </div>
 
       {loading ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">Yükleniyor…</div>
       ) : error ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-          <p className="mb-2">Son 800 verisi alınamadı.</p>
+          <p className="mb-2">Accurace verisi alınamadı.</p>
           <button
             onClick={() => setRetryKey((k) => k + 1)}
             className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-muted"

@@ -19,7 +19,7 @@ const STEPS: Step[] = [
   { selector: '[data-tour="antrenor"]', title: "Sahip / Antrenör", text: "Antrenörün güncel kazanma oranını burada görebilirsiniz." },
   { selector: '[data-tour="galop"]', title: "Galop", text: "Son idman derecelerini gösterir. Kırmızı ünlem (!) işareti, idmanı yapan jokeyin yarışta da bineceği anlamına gelir." },
   { selector: '[data-tour="analiz-buton"]', title: "Analizi Gör", text: "Rotaganyan'ın ekonomik, normal ve geniş kupon önerilerini buradan açabilirsiniz." },
-  { selector: '[data-tour="son800-buton"]', title: "Son 800", text: "Atların son 800 metre kapanış derecelerini, Accurace'in GPS/sektörel zamanlama verisiyle karşılaştırın." },
+  { selector: '[data-tour="son800-buton"]', title: "Accurace", text: "Atların geçmiş yarışlardaki tüm Accurace (GPS/sektörel zamanlama) kayıtlarını — son 800 metre kapanış dereceleri dahil — burada görebilirsiniz." },
 ];
 
 function isVisible(el: Element | null): el is HTMLElement {
