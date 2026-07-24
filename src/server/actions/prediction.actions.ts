@@ -410,6 +410,32 @@ export async function publishPrediction(id: string) {
     throw new Error("Bu analizde hiç at seçimi (pick) yok — yayınlanamaz. Önce formu doldurup Kaydet'e basın.");
   }
 
+  // AGF favorisi gerekçesiz kalmışsa yayınlanamaz — kullanıcı tespiti (İstanbul 6.Koşu,
+  // ORMELLO %54 AGF, hiç değerlendirilmeden mekanik puanla 8. sıraya düşmüştü). ③b
+  // checklist kontrolü (getPublishChecklistAuto) bunu yalnız GÖSTERİYORDU — admin gözden
+  // kaçırabiliyordu. Aynı sınır burada da SERT olarak uygulanıyor, pickCount===0 kuralıyla
+  // aynı disiplinde: hangi UI yolundan gelirse gelsin, bu durumda yayın engellenir.
+  const agfCheckPred = await db.prediction.findUnique({
+    where: { id },
+    select: {
+      picks: { select: { runnerId: true, details: true } },
+      race: { select: { runners: { where: { scratched: false }, select: { id: true, no: true, name: true, agf: true } } } },
+    },
+  });
+  if (agfCheckPred) {
+    const agfAtlari = agfCheckPred.race.runners.filter((r) => r.agf != null);
+    const agfFavori = agfAtlari.length ? agfAtlari.reduce((a, b) => (b.agf! > a.agf! ? b : a)) : null;
+    if (agfFavori && agfFavori.agf! >= 25) {
+      const pick = agfCheckPred.picks.find((p) => p.runnerId === agfFavori.id);
+      const gerekcesiz = !pick || !Array.isArray(pick.details) || pick.details.length === 0;
+      if (gerekcesiz) {
+        throw new Error(
+          `AGF favorisi #${agfFavori.no} ${agfFavori.name} (%${agfFavori.agf}) hiç gerekçelendirilmemiş — yayınlanamaz. Bu atı formda elle gerekçelendirin ya da analizi yeniden çalıştırın.`
+        );
+      }
+    }
+  }
+
   await db.prediction.update({
     where: { id },
     data: { published: true, publishedAt: new Date() },
