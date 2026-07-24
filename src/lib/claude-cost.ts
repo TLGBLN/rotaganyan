@@ -52,7 +52,7 @@ export function tahminiMaliyet(
  *  hataya karşı sessizce yutulur, ana akışı bloklamaz. */
 export async function logClaudeUsage(input: {
   raceId?: string;
-  phase: "faz2" | "faz4";
+  phase: "faz2" | "faz4" | "faz4notes";
   model: string;
   inputTokens: number;
   outputTokens: number;
@@ -90,7 +90,7 @@ export async function logClaudeUsage(input: {
  */
 export async function getRecentCachedResult(
   raceId: string,
-  phase: "faz2" | "faz4",
+  phase: "faz2" | "faz4" | "faz4notes",
   windowMinutes = 20
 ): Promise<string | null> {
   try {

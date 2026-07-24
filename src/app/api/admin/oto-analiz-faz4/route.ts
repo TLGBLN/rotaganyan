@@ -4,7 +4,7 @@ import { degerlendir, metin, type AtGirdisi } from "@/lib/methodology/gecit-moto
 import type { Faz1Sonuc } from "@/lib/methodology/veri-toplama";
 import {
   createWithTruncationRetry, extractText,
-  FAZ4_SCHEMA, type Faz2Atlar, type Faz4Pick, type Faz4Result,
+  FAZ4_DECISION_SCHEMA, type Faz2Atlar, type Faz4DecisionPick, type Faz4DecisionResult,
 } from "@/lib/methodology/claude-analiz-helpers";
 import { getRecentCachedResult } from "@/lib/claude-cost";
 import type { Anthropic } from "@anthropic-ai/sdk";
@@ -12,6 +12,11 @@ import type { Role } from "@prisma/client";
 
 // bkz. /api/admin/oto-analiz-faz2 route'undaki not — bu ikisi eskiden tek bir istekte
 // çalışıyordu, toplam süreleri bazı koşularda 300s'i aşıp fonksiyonu ortadan kesiyordu.
+// v4.1: Faz 4'ün KENDİSİ de (sıralama/kupon KARARI + her pick için 3-5 cümlelik gerekçe
+// birlikte) bazı kalabalık/karmaşık koşularda tek başına 300s'i aşmaya başladı — bu
+// yüzden bu route artık YALNIZ KARARI üretir, gerekçe metinleri ayrı bir çağrıda
+// (/api/admin/oto-analiz-faz4-notes) üretilir (bkz. claude-analiz-helpers.ts'teki
+// FAZ4_DECISION_SCHEMA/FAZ4_NOTES_SCHEMA yorumu).
 export const maxDuration = 300;
 
 type Body = { raceId: string; faz1: Faz1Sonuc; faz2: Faz2Atlar; sharedContext: string };
@@ -111,12 +116,13 @@ ${gecitMetin}
    - Geniş: sahada kalan TÜM diğer atlar (Ekonomik ve Normal'de olmayanların hepsi — koşulmayan/çekilen atlar hariç).
    Alanları "X-Y-Z" formatında, at numaralarıyla doldur. Saha 6 attan azsa Normal'i mevcut atlarla doldur, Geniş boş kalabilir.
 7. "details" alanına yalnızca kısa iç etiketler yaz (örn. "AGF1", "Galop K1", "Sınıf düşüşü") — admin önizlemesinde ayrı rozet olarak gösterilir, kullanıcıya gitmez.
-8. "note" alanına o at için 3-5 cümlelik, makale tadında, okunabilir bir gerekçe yaz — bu metin doğrudan kullanıcıya (public "Kilit Gerekçe" sütununa) gidiyor. A/B+C/Atomic Force/HP ivmesi/geçit skoru gibi iç terimler burada GEÇMEZ (bkz. Sunum Kuralı) — sade, yarışseverin anlayacağı dille, o atı neden bu sırada değerlendirdiğini anlat (galop, pedigri, form, sınıf, kilo, tempo gibi somut kanıtlara dayanarak). Pedigri hakkında konuşurken §IX'daki "Aygır/hat hakkında uydurma bilgi yasak" kuralına UY — yukarıda verilmeyen bir aygır/hat hakkında (Aygır İstatistiği'nde/adminNote'ta yoksa) spesifik mesafe/pist/karakter iddiası YAZMA, yalnız verilen ham veriyle (isim var/yok, F% gibi) sınırlı kal.
+
+Not: Bu adımda kullanıcıya giden "Kilit Gerekçe" gerekçe metnini YAZMA — bu, sıralama/kupon KARARIN belli olduktan sonra ayrı bir çağrıda üretiliyor (bkz. /oto-analiz-faz4-notes). Burada yalnız KARARI ver.
 
 Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
 {
   "picks": [
-    { "rank": 1, "no": 0, "name": "...", "score": 0, "pedigreeRating": "BILINMIYOR", "isTarget": false, "details": [], "note": "3-5 cümlelik gerekçe" }
+    { "rank": 1, "no": 0, "name": "...", "score": 0, "pedigreeRating": "BILINMIYOR", "isTarget": false, "details": [] }
   ],
   "confidence": "ORTA",
   "isBanko": false,
@@ -142,26 +148,23 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
         model: "claude-sonnet-5",
         // Adaptive thinking AÇIK (bkz. Faz 2'deki not) — GEÇİCİ DENEY 2 sonrası tekrar açıldı.
         thinking: { type: "adaptive" },
-        // 2026-07-23: 8 atlı Handikap koşularında (her at için 3-5 cümlelik gerekçe
-        // toplamda) 24000 tavanına tıkanıp bozuk JSON dönüyordu (ClaudeUsageLog'da
-        // kanıtlandı — output tam 24000'de kesiliyordu). Ücret gerçek üretilen token'a
-        // göre alınır, tavanı yükseltmenin normal koşularda maliyet etkisi yok; yalnız
-        // tıkanan koşularda gereksiz (ve ücretli) tekrar denemeyi önlüyor.
-        max_tokens: 32000,
-        output_config: { format: { type: "json_schema", schema: FAZ4_SCHEMA } },
+        // v4.1: "note" (Kilit Gerekçe düzyazısı) artık bu çağrıda üretilmiyor (bkz.
+        // FAZ4_DECISION_SCHEMA yorumu) — çıktı yalnız karar/kupon, tavan buna göre küçüldü.
+        max_tokens: 16000,
+        output_config: { format: { type: "json_schema", schema: FAZ4_DECISION_SCHEMA } },
         messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz4Tail }] }],
       },
-      raceId, "faz4", 40000
+      raceId, "faz4", 24000
     );
     faz4Raw = extractText(faz4Msg);
     faz4StopReasonMaxTokens = faz4Msg.stop_reason === "max_tokens";
   }
-  let result: Faz4Result;
+  let result: Faz4DecisionResult;
   try {
     result = JSON.parse(faz4Raw);
   } catch {
     const sebep = faz4StopReasonMaxTokens
-      ? " (yanıt otomatik yüksek limitli tekrar denemede de token sınırına takıldı — makale tadındaki gerekçe yazıları uzun sürebilir, tekrar deneyin)"
+      ? " (yanıt otomatik yüksek limitli tekrar denemede de token sınırına takıldı, tekrar deneyin)"
       : "";
     return NextResponse.json({ error: `Faz 4 (sıralama) yanıtı parse edilemedi${sebep}`, raw: faz4Raw }, { status: 500 });
   }
@@ -202,16 +205,24 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
     })
     .sort((a, b) => b.score - a.score);
 
+  // İstemci, gerekçe metnini yalnız Claude'un GERÇEKTEN sıraladığı bu kadar pick için
+  // isteyecek (bkz. AIAnalysisPanel.tsx) — mekanik olarak eklenen kalanlar için değil.
+  const claudePickCount = result.picks.length;
+
   let sonrakiRank = result.picks.length > 0 ? Math.max(...result.picks.map((p) => p.rank)) + 1 : 1;
-  const ekPicks: Faz4Pick[] = kalanlar.map((r) => ({
+  const ekPicks: Faz4DecisionPick[] = kalanlar.map((r) => ({
     rank: sonrakiRank++, no: r.no, name: r.name, score: r.score,
-    pedigreeRating: "BILINMIYOR", isTarget: false, details: [], note: "",
+    pedigreeRating: "BILINMIYOR", isTarget: false, details: [],
   }));
   result.picks = [...result.picks, ...ekPicks];
 
+  // "note" alanı bu fazda üretilmiyor artık (bkz. yukarıdaki not) — istemci, kararı
+  // gösterdikten sonra /oto-analiz-faz4-notes'u ayrıca çağırıp gerekçe metinlerini
+  // picks'e "no" ile eşleştirerek ekliyor.
   return NextResponse.json({
     ok: true,
     result,
+    claudePickCount,
     runners: faz1.runners.map((r) => ({ id: r.id, no: r.no, name: r.ad })),
     debug: { faz1VeriDoluluk: faz1.veriDoluluk, gecitDurum: gecitSonuc.durum, gecitUyari: gecitUyariGuncel },
   });

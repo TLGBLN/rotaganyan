@@ -28,7 +28,7 @@ export async function createStreamed(params: Anthropic.MessageCreateParamsNonStr
 export async function createWithTruncationRetry(
   params: Anthropic.MessageCreateParamsNonStreaming,
   raceId: string,
-  phase: "faz2" | "faz4",
+  phase: "faz2" | "faz4" | "faz4notes",
   retryMaxTokens: number
 ) {
   let msg = await createStreamed(params);
@@ -267,6 +267,72 @@ export const FAZ4_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+// v4.1: Faz 4 tek istekte hem sıralama/kupon/banko KARARINI hem de her pick için
+// 3-5 cümlelik "Kilit Gerekçe" düzyazısını ÜRETİYORDU — bu, adaptive thinking'le
+// birlikte bazı (özellikle kalabalık/karmaşık) koşularda 300sn'lik Vercel penceresini
+// aşıp fonksiyonu ortadan kesiyordu (bkz. oto-analiz-faz4/route.ts notu). Karar ile
+// düzyazı yazımı artık İKİ AYRI Claude çağrısına bölündü — DECISION şeması "note"
+// içermiyor (küçük/hızlı), NOTES şeması yalnız gerekçe metinlerini üretiyor (kararın
+// zaten belli olduğu ikinci, daha dar bir görev — daha az "keşif" gerektirir).
+export const FAZ4_DECISION_SCHEMA = {
+  type: "object",
+  properties: {
+    picks: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          rank: { type: "integer" },
+          no: { type: "integer" },
+          name: { type: "string" },
+          score: { type: "integer" },
+          pedigreeRating: {
+            type: "string",
+            enum: ["COK_YUKSEK", "YUKSEK", "GUCLU", "ORTA", "DUSUK", "ZAYIF", "SORU", "BILINMIYOR"],
+          },
+          isTarget: { type: "boolean" },
+          details: { type: "array", items: { type: "string" } },
+        },
+        required: ["rank", "no", "name", "score", "pedigreeRating", "isTarget", "details"],
+        additionalProperties: false,
+      },
+    },
+    confidence: { type: "string", enum: ["DUSUK", "ORTA", "YUKSEK"] },
+    isBanko: { type: "boolean" },
+    bankoNote: { type: "string" },
+    notes: { type: "string" },
+    tempo: { type: "string" },
+    couponNarrow: { type: "string" },
+    couponNormal: { type: "string" },
+    couponWide: { type: "string" },
+  },
+  required: [
+    "picks", "confidence", "isBanko", "bankoNote", "notes", "tempo",
+    "couponNarrow", "couponNormal", "couponWide",
+  ],
+  additionalProperties: false,
+} as const;
+
+export const FAZ4_NOTES_SCHEMA = {
+  type: "object",
+  properties: {
+    notes: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          no: { type: "integer" },
+          note: { type: "string" },
+        },
+        required: ["no", "note"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["notes"],
+  additionalProperties: false,
+} as const;
+
 export type Faz2Atlar = {
   atlar: { no: number; ad: string; aPuani: number; bcPuani: number; teknikSira: number | null }[];
 };
@@ -275,7 +341,10 @@ export type Faz4Pick = {
   rank: number; no: number; name: string; score: number;
   pedigreeRating: string; isTarget: boolean; details: string[]; note: string;
 };
+export type Faz4DecisionPick = Omit<Faz4Pick, "note">;
 export type Faz4Result = {
   picks: Faz4Pick[]; confidence: string; isBanko: boolean; bankoNote: string;
   notes: string; tempo: string; couponNarrow: string; couponNormal: string; couponWide: string;
 };
+export type Faz4DecisionResult = Omit<Faz4Result, "picks"> & { picks: Faz4DecisionPick[] };
+export type Faz4NotesResult = { notes: { no: number; note: string }[] };

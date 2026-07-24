@@ -14,10 +14,11 @@ const ALAN_LABEL: Record<string, string> = {
   formYonu: "Form Yönü",
 };
 
-const FAZ_LABEL: Record<"faz1" | "faz2" | "faz4", string> = {
+const FAZ_LABEL: Record<"faz1" | "faz2" | "faz4" | "faz4notes", string> = {
   faz1: "Faz 1 çalışıyor — veri toplanıyor (ücretsiz)…",
   faz2: "Faz 2 çalışıyor — skorlama…",
   faz4: "Faz 3 + Faz 4 çalışıyor — geçit motoru + sıralama/kupon…",
+  faz4notes: "Faz 4 devam ediyor — Kilit Gerekçe metinleri yazılıyor…",
 };
 
 type Debug = {
@@ -85,7 +86,7 @@ async function fetchJson<T>(url: string, body: unknown): Promise<T> {
 }
 
 export default function AIAnalysisPanel({ raceId, onApply }: Props) {
-  const [phase, setPhase] = useState<"faz1" | "faz2" | "faz4" | null>(null);
+  const [phase, setPhase] = useState<"faz1" | "faz2" | "faz4" | "faz4notes" | null>(null);
   const [result, setResult] = useState<AIAnalysisResult | null>(null);
   const [runners, setRunners] = useState<Runner[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -143,12 +144,37 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
       );
 
       setPhase("faz4");
-      const step2 = await fetchJson<{ result: AIAnalysisResult; runners: Runner[]; debug: Debug }>(
+      const step2 = await fetchJson<{
+        result: Omit<AIAnalysisResult, "picks"> & { picks: Omit<AIPickResult, "note">[] };
+        claudePickCount: number;
+        runners: Runner[];
+        debug: Debug;
+      }>(
         "/api/admin/oto-analiz-faz4",
         { raceId, faz1: step1.faz1, faz2: step1.faz2, sharedContext: step1.sharedContext }
       );
 
-      setResult(step2.result);
+      // "Kilit Gerekçe" düzyazısı ayrı bir çağrıda üretiliyor (bkz. /oto-analiz-faz4-notes
+      // route'undaki not) — karar zaten belli, yalnız Claude'un GERÇEKTEN sıraladığı ilk
+      // claudePickCount kadar at için gerekçe istenir (mekanik olarak eklenen kalan atlar
+      // zaten boş gerekçeyle kalır, eskiden de öyleydi).
+      const gerekceliPicks = step2.result.picks.slice(0, step2.claudePickCount);
+      let notesByNo = new Map<number, string>();
+      if (gerekceliPicks.length > 0) {
+        setPhase("faz4notes");
+        const step3 = await fetchJson<{ notes: { no: number; note: string }[] }>(
+          "/api/admin/oto-analiz-faz4-notes",
+          { raceId, sharedContext: step1.sharedContext, picks: gerekceliPicks }
+        );
+        notesByNo = new Map(step3.notes.map((n) => [n.no, n.note]));
+      }
+
+      const finalResult: AIAnalysisResult = {
+        ...step2.result,
+        picks: step2.result.picks.map((p) => ({ ...p, note: notesByNo.get(p.no) ?? "" })),
+      };
+
+      setResult(finalResult);
       setRunners(step2.runners ?? []);
       setDebug(step2.debug ?? null);
     } catch (e: unknown) {
