@@ -45,7 +45,18 @@ export async function POST(req: NextRequest) {
     // YAPISAL bir durumdur, "eksik veri" değil (Faz 2/4 zaten bunu ceza sebebi yapmıyor).
     // Kırmızı "eksik" olarak göstermek admin'e düzeltemeyeceği bir şeyi işaret ediyordu —
     // bilgi notuna taşındı. v4.13: artık hipodrom şartı yok, yalnız pist+mesafe aranıyor.
-    if (r.son800BenzerKosuN === 0) bilgiler.push("Son800: bu pist/mesafede (hiçbir hipodromda) benzer koşu yok — veri gerçekten yok, çekilememe değil.");
+    // v4.1: eskiden bu mesaj "veri gerçekten yok" diyordu — YANLIŞ izlenim veriyordu,
+    // çünkü at başka pist/mesafede koşmuş olabilir. Artık son800TumOzet (tüm kayıtlar,
+    // uygunluk etiketli) Faz 2'ye HER ZAMAN gidiyor ve düşük ağırlıkla değerlendiriliyor —
+    // mesaj buna göre ayrıştırılıyor: gerçekten hiç Accurace kaydı yoksa "veri yok" denir,
+    // varsa (yalnız KESİN eşleşme yoksa) bunun analize dahil edildiği belirtilir.
+    if (r.son800BenzerKosuN === 0) {
+      bilgiler.push(
+        r.son800TumOzet
+          ? "Son800: bu pist/mesafede KESİN eşleşme yok, ama atın diğer pist/mesafelerdeki kayıtları analizde (Faz 2) düşük ağırlıkla değerlendiriliyor — göz ardı edilmiyor."
+          : "Son800: bu atın hiç Accurace kaydı yok — veri gerçekten yok, çekilememe değil."
+      );
+    }
 
     if (r.hpBugunResmiYok) bilgiler.push("Bugünkü HP resmi yok (yapısal — Şartlı1/Maiden'de normal)");
     if (r.ilkStart) bilgiler.push("İlk start (geçmiş yarış yok)");
