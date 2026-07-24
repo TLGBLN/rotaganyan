@@ -258,7 +258,7 @@ export async function getPublishChecklistAuto(predictionId: string): Promise<Che
     where: { id: predictionId },
     select: {
       isBanko: true, tempo: true, couponNarrow: true, couponNormal: true, couponWide: true,
-      picks: { orderBy: { rank: "asc" }, select: { rank: true, runnerId: true } },
+      picks: { orderBy: { rank: "asc" }, select: { rank: true, runnerId: true, details: true } },
       race: {
         select: {
           classType: true, distance: true, breed: true, surface: true,
@@ -295,6 +295,22 @@ export async function getPublishChecklistAuto(predictionId: string): Promise<Che
     checks.push({ label: "③ AGF", status: "FAIL", detail: `AGF favorisi #${agfFavori.no} ${agfFavori.name}, sistem 1.si farklı — BANKO verilemez.` });
   } else {
     checks.push({ label: "③ AGF", status: "PASS", detail: agfFavori.id === sistemBirinci.runnerId ? "AGF favorisi = sistem 1." : "AGF farklı ama banko verilmemiş, kural ihlali yok." });
+  }
+
+  // ③b AGF Favorisi Değerlendirildi mi — kullanıcı tespiti (İstanbul 6.Koşu, Ormello %54
+  // AGF): Faz4 yalnız en iyi birkaç atı gerçekten gerekçelendiriyor, kalan saha mekanik
+  // olarak (boş "details", ham Faz2 puanıyla) tamamlanıyor. Piyasanın güçlü desteklediği
+  // bir at bu mekanik kuyruğa hiç değerlendirilmeden düşebiliyordu — burada yakalanır.
+  if (agfFavori && agfFavori.agf != null && agfFavori.agf >= 25) {
+    const agfFavoriPick = pred.picks.find((p) => p.runnerId === agfFavori.id);
+    const detailsBos = !agfFavoriPick || !Array.isArray(agfFavoriPick.details) || agfFavoriPick.details.length === 0;
+    checks.push({
+      label: "③b AGF Favorisi Değerlendirildi mi",
+      status: detailsBos ? "FAIL" : "PASS",
+      detail: detailsBos
+        ? `AGF favorisi #${agfFavori.no} ${agfFavori.name} (%${agfFavori.agf}) hiç gerekçelendirilmemiş — muhtemelen mekanik olarak eklendi, gerçekte değerlendirilmedi. Yayınlamadan önce elle kontrol edin veya analizi yeniden çalıştırın.`
+        : `AGF favorisi #${agfFavori.no} ${agfFavori.name} (%${agfFavori.agf}) gerekçelendirilmiş.`,
+    });
   }
 
   // ④ Tempo — 2+ kaçak varsa tempo alanı dolu olmalı (vekil kontrol).
