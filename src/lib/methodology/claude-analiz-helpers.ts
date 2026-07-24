@@ -223,58 +223,22 @@ export const FAZ2_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-export const FAZ4_SCHEMA = {
-  type: "object",
-  properties: {
-    picks: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          rank: { type: "integer" },
-          no: { type: "integer" },
-          name: { type: "string" },
-          // Tam sayı zorunlu — "64.6" gibi küsuratlı skorlar kullanıcıya çirkin görünüyordu.
-          score: { type: "integer" },
-          pedigreeRating: {
-            type: "string",
-            enum: ["COK_YUKSEK", "YUKSEK", "GUCLU", "ORTA", "DUSUK", "ZAYIF", "SORU", "BILINMIYOR"],
-          },
-          isTarget: { type: "boolean" },
-          details: { type: "array", items: { type: "string" } },
-          // Kilit Gerekçe — public "Kilit Gerekçe" sütununa giden, 3-5 cümlelik makale
-          // tadında gerekçe metni. Maliyet nedeniyle bir ara kaldırılmıştı (bkz. proje
-          // notu), kullanıcı bilinçli olarak (küçük ek maliyeti kabul ederek) geri istedi.
-          note: { type: "string" },
-        },
-        required: ["rank", "no", "name", "score", "pedigreeRating", "isTarget", "details", "note"],
-        additionalProperties: false,
-      },
-    },
-    confidence: { type: "string", enum: ["DUSUK", "ORTA", "YUKSEK"] },
-    isBanko: { type: "boolean" },
-    bankoNote: { type: "string" },
-    notes: { type: "string" },
-    tempo: { type: "string" },
-    couponNarrow: { type: "string" },
-    couponNormal: { type: "string" },
-    couponWide: { type: "string" },
-  },
-  required: [
-    "picks", "confidence", "isBanko", "bankoNote", "notes", "tempo",
-    "couponNarrow", "couponNormal", "couponWide",
-  ],
-  additionalProperties: false,
-} as const;
-
 // v4.1: Faz 4 tek istekte hem sıralama/kupon/banko KARARINI hem de her pick için
-// 3-5 cümlelik "Kilit Gerekçe" düzyazısını ÜRETİYORDU — bu, adaptive thinking'le
-// birlikte bazı (özellikle kalabalık/karmaşık) koşularda 300sn'lik Vercel penceresini
-// aşıp fonksiyonu ortadan kesiyordu (bkz. oto-analiz-faz4/route.ts notu). Karar ile
-// düzyazı yazımı artık İKİ AYRI Claude çağrısına bölündü — DECISION şeması "note"
-// içermiyor (küçük/hızlı), NOTES şeması yalnız gerekçe metinlerini üretiyor (kararın
-// zaten belli olduğu ikinci, daha dar bir görev — daha az "keşif" gerektirir).
-export const FAZ4_DECISION_SCHEMA = {
+// gerekçe düzyazısını ÜRETİYORDU — bu, adaptive thinking'le birlikte bazı (özellikle
+// kalabalık/karmaşık) koşularda 300sn'lik Vercel penceresini aşıp fonksiyonu ortadan
+// kesiyordu. Karar ile gerekçe/banko/kupon yazımı iki ayrı çağrıya bölünmüştü ama
+// 2026-07-24'te İstanbul 7.Koşu (13 atlı Handikap) gösterdi ki KARAR çağrısının
+// KENDİSİ (geçit motoru triyajı + tüm sahayı sıralama + AGF-favori zorunluluğu)
+// tek başına 300sn'yi aşabiliyor — ClaudeUsageLog'da 20+ dakika sonra HİÇ kayıt yoktu
+// (ne başarılı ne "max_tokens" ile kesilmiş), yani Vercel işlemi Claude bitirmeden
+// duvarda öldürüyordu. Token tavanının artık ilgisi yok — sorun süre. Çözüm: KARAR
+// çağrısını da ikiye böl — RANK şeması yalnız sıralama/skor/pedigree/detay üretir
+// (en ağır iş: geçit triyajı + tüm sahayı sıralama), FINAL şeması bu KARAR zaten
+// belliyken banko/kupon/tempo/genel-yorum + gerekçe metinlerini üretir (daha dar,
+// daha az "keşif" gerektiren bir görev). Böylece HİÇBİR çağrıda thinking kısılmadan
+// (kullanıcının kalite önceliği korunarak) her çağrının kendi süresi 300sn duvarından
+// uzaklaşıyor — split, effort düşürmenin (kalite ödünü) alternatifi olarak seçildi.
+export const FAZ4_RANK_SCHEMA = {
   type: "object",
   properties: {
     picks: {
@@ -297,6 +261,28 @@ export const FAZ4_DECISION_SCHEMA = {
         additionalProperties: false,
       },
     },
+  },
+  required: ["picks"],
+  additionalProperties: false,
+} as const;
+
+// Bu şema, RANK çağrısının kararı zaten belliyken çalışır — banko/kupon/tempo/genel
+// yorum + her pick için (bütçe nedeniyle yalnız ilk 6 — bkz. AIAnalysisPanel.tsx
+// NOT_BUTCE_LIMITI) "Kilit Gerekçe" gerekçe metnini tek çağrıda üretir. Gerekçe
+// metinleri "gerekceler" adıyla ayrı bir dizi — üst seviye "notes" (genel koşu
+// yorumu) alanıyla isim çakışmasını önlemek için.
+export const FAZ4_FINAL_SCHEMA = {
+  type: "object",
+  properties: {
+    gerekceler: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { no: { type: "integer" }, note: { type: "string" } },
+        required: ["no", "note"],
+        additionalProperties: false,
+      },
+    },
     confidence: { type: "string", enum: ["DUSUK", "ORTA", "YUKSEK"] },
     isBanko: { type: "boolean" },
     bankoNote: { type: "string" },
@@ -307,29 +293,9 @@ export const FAZ4_DECISION_SCHEMA = {
     couponWide: { type: "string" },
   },
   required: [
-    "picks", "confidence", "isBanko", "bankoNote", "notes", "tempo",
+    "gerekceler", "confidence", "isBanko", "bankoNote", "notes", "tempo",
     "couponNarrow", "couponNormal", "couponWide",
   ],
-  additionalProperties: false,
-} as const;
-
-export const FAZ4_NOTES_SCHEMA = {
-  type: "object",
-  properties: {
-    notes: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          no: { type: "integer" },
-          note: { type: "string" },
-        },
-        required: ["no", "note"],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ["notes"],
   additionalProperties: false,
 } as const;
 
@@ -337,14 +303,13 @@ export type Faz2Atlar = {
   atlar: { no: number; ad: string; aPuani: number; bcPuani: number; teknikSira: number | null }[];
 };
 
-export type Faz4Pick = {
+export type Faz4DecisionPick = {
   rank: number; no: number; name: string; score: number;
-  pedigreeRating: string; isTarget: boolean; details: string[]; note: string;
+  pedigreeRating: string; isTarget: boolean; details: string[];
 };
-export type Faz4DecisionPick = Omit<Faz4Pick, "note">;
-export type Faz4Result = {
-  picks: Faz4Pick[]; confidence: string; isBanko: boolean; bankoNote: string;
+export type Faz4RankResult = { picks: Faz4DecisionPick[] };
+export type Faz4FinalResult = {
+  gerekceler: { no: number; note: string }[];
+  confidence: string; isBanko: boolean; bankoNote: string;
   notes: string; tempo: string; couponNarrow: string; couponNormal: string; couponWide: string;
 };
-export type Faz4DecisionResult = Omit<Faz4Result, "picks"> & { picks: Faz4DecisionPick[] };
-export type Faz4NotesResult = { notes: { no: number; note: string }[] };

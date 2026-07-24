@@ -4,7 +4,7 @@ import { degerlendir, metin, type AtGirdisi } from "@/lib/methodology/gecit-moto
 import type { Faz1Sonuc } from "@/lib/methodology/veri-toplama";
 import {
   createWithTruncationRetry, extractText,
-  FAZ4_DECISION_SCHEMA, type Faz2Atlar, type Faz4DecisionPick, type Faz4DecisionResult,
+  FAZ4_RANK_SCHEMA, type Faz2Atlar, type Faz4DecisionPick, type Faz4RankResult,
 } from "@/lib/methodology/claude-analiz-helpers";
 import { getRecentCachedResult } from "@/lib/claude-cost";
 import type { Anthropic } from "@anthropic-ai/sdk";
@@ -12,11 +12,15 @@ import type { Role } from "@prisma/client";
 
 // bkz. /api/admin/oto-analiz-faz2 route'undaki not — bu ikisi eskiden tek bir istekte
 // çalışıyordu, toplam süreleri bazı koşularda 300s'i aşıp fonksiyonu ortadan kesiyordu.
-// v4.1: Faz 4'ün KENDİSİ de (sıralama/kupon KARARI + her pick için 3-5 cümlelik gerekçe
-// birlikte) bazı kalabalık/karmaşık koşularda tek başına 300s'i aşmaya başladı — bu
-// yüzden bu route artık YALNIZ KARARI üretir, gerekçe metinleri ayrı bir çağrıda
-// (/api/admin/oto-analiz-faz4-notes) üretilir (bkz. claude-analiz-helpers.ts'teki
-// FAZ4_DECISION_SCHEMA/FAZ4_NOTES_SCHEMA yorumu).
+// v4.1: Faz 4'ün KENDİSİ de (sıralama/kupon KARARI + her pick için gerekçe birlikte)
+// bazı kalabalık/karmaşık koşularda tek başına 300s'i aşmaya başladı — gerekçe metinleri
+// ayrı bir çağrıya taşındı. 2026-07-24: İstanbul 7.Koşu (13 atlı Handikap) gösterdi ki
+// KARAR çağrısının KENDİSİ de (geçit triyajı + tüm sahayı sıralama + banko/kupon/tempo
+// prose birlikte) tek başına 300s'i aşabiliyor — bu yüzden bu route artık YALNIZ
+// SIRALAMA KARARINI üretir (FAZ4_RANK_SCHEMA: rank/skor/pedigree/detay). Banko/kupon/
+// tempo/genel-yorum + gerekçe metinleri, karar zaten belliyken çalışan ayrı ve daha dar
+// bir çağrıda üretiliyor (/api/admin/oto-analiz-faz4-final — bkz. claude-analiz-
+// helpers.ts'teki FAZ4_RANK_SCHEMA/FAZ4_FINAL_SCHEMA yorumu).
 export const maxDuration = 300;
 
 type Body = { raceId: string; faz1: Faz1Sonuc; faz2: Faz2Atlar; sharedContext: string };
@@ -112,29 +116,15 @@ ${gecitMetin}
 3. Bu otomatik pipeline'da admin'in elle çözüm girmesi mümkün değildir — bu yüzden varsayılan davranış her zaman "taşı"dır.
 4. FAZ 2 puanlarına ve geçit sonuçlarına göre FİNAL sıralamayı belirle — **en iyi 8 at için** (saha 8'den küçükse sahadaki TÜM atlar için) tek tek "picks" girdisi üret, rank 1'den başlayarak. ZORUNLU TUTARLILIK: "score" alanı rank sırasıyla ÇELİŞMEMELİ — rank 1'in score'u rank 2'ninkinden düşük OLAMAZ. Bir at geçit tetiklemesiyle öne taşındıysa (ham FAZ 2 puanı daha düşük olsa bile), score alanını bu yeni konumu yansıtacak şekilde YUKARI güncelle (örn. gecitSkoru bonusunu ekle) — gösterilen puan ile sıralama asla çelişmemeli, yarışseverin "neden düşük puanlı at daha üstte" diye sorması YASAK.
 4b. ZORUNLU: Sahadaki EN YÜKSEK AGF'ye sahip at (piyasa favorisi) "picks" listesine HER ZAMAN dahil edilmeli — sıralaması ne olursa olsun (en iyi 8'e girmese bile açıkça ekle, gerekirse 9. pick olarak). Bu atı gerçekten düşük sıraya koyuyorsan bunu bilerek yap ve "details" alanında somut nedenini kısaca belirt (örn. "AGF yüksek ama HP yok/form zayıf/veri yetersiz") — piyasanın güçlü desteklediği bir atın hiç değerlendirilmeden (details boş, mekanik puanla) listeye düşmesi YASAK.
-5. Banko şartlarını kontrol et (dördü birden — TOPLAM puana göre DEĞİL, A puanına göre: A≥50, A farkı≥3 [A'dan hesaplanır, toplamdan değil], Veri Güveni A, somut risk yok — Handikap/Grup'ta ekstra dikkatli ol, aşırı piyasa konsensüsü [AGF>%50 + ganyan<1.50] varsa banko yapma, dar kuponda tut).
-6. Ekonomik/Normal/Geniş kupon önerisi üret — sahadaki atları üç gruba böl (kupon numaraları at numarasıdır):
-   - Ekonomik: final sıralamandaki en iyi 3 at.
-   - Normal: sıralamada onları izleyen 3 at (Ekonomik'te olmayan farklı 3 at).
-   - Geniş: sahada kalan TÜM diğer atlar (Ekonomik ve Normal'de olmayanların hepsi — koşulmayan/çekilen atlar hariç).
-   Alanları "X-Y-Z" formatında, at numaralarıyla doldur. Saha 6 attan azsa Normal'i mevcut atlarla doldur, Geniş boş kalabilir.
-7. "details" alanına yalnızca kısa iç etiketler yaz (örn. "AGF1", "Galop K1", "Sınıf düşüşü") — admin önizlemesinde ayrı rozet olarak gösterilir, kullanıcıya gitmez.
+5. "details" alanına yalnızca kısa iç etiketler yaz (örn. "AGF1", "Galop K1", "Sınıf düşüşü") — admin önizlemesinde ayrı rozet olarak gösterilir, kullanıcıya gitmez.
 
-Not: Bu adımda kullanıcıya giden "Kilit Gerekçe" gerekçe metnini YAZMA — bu, sıralama/kupon KARARIN belli olduktan sonra ayrı bir çağrıda üretiliyor (bkz. /oto-analiz-faz4-notes). Burada yalnız KARARI ver.
+Not: Bu adımda ne kullanıcıya giden "Kilit Gerekçe" gerekçe metnini, ne de banko/kupon/tempo/genel-yorum kararını YAZMA — bunlar, sıralama KARARIN belli olduktan sonra ayrı ve daha dar bir çağrıda üretiliyor (bkz. /oto-analiz-faz4-final). Burada yalnız SIRALAMA KARARINI ver.
 
 Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
 {
   "picks": [
     { "rank": 1, "no": 0, "name": "...", "score": 0, "pedigreeRating": "BILINMIYOR", "isTarget": false, "details": [] }
-  ],
-  "confidence": "ORTA",
-  "isBanko": false,
-  "bankoNote": "",
-  "notes": "Genel koşu değerlendirmesi + geçit motorunun uyarılarının sade özeti",
-  "tempo": "Tempo beklentisi (sade dil)",
-  "couponNarrow": "1-3-7",
-  "couponNormal": "9-11-14",
-  "couponWide": "2-4-5-6-8-10"
+  ]
 }
 pedigreeRating değerleri: COK_YUKSEK, YUKSEK, GUCLU, ORTA, DUSUK, ZAYIF, SORU, BILINMIYOR
 details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, Jokey devam, HP İvmesi +12, Son800 güçlü kapanış`;
@@ -162,7 +152,7 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
         // 26000+ token'a çıkmış. Tavan, geçmişteki gerçek maksimumun üstüne, split-
         // öncesi (32000/40000) orijinal güvenli değere geri çıkarıldı.
         max_tokens: 32000,
-        output_config: { format: { type: "json_schema", schema: FAZ4_DECISION_SCHEMA } },
+        output_config: { format: { type: "json_schema", schema: FAZ4_RANK_SCHEMA } },
         messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz4Tail }] }],
       },
       raceId, "faz4", 40000
@@ -170,7 +160,7 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
     faz4Raw = extractText(faz4Msg);
     faz4StopReasonMaxTokens = faz4Msg.stop_reason === "max_tokens";
   }
-  let result: Faz4DecisionResult;
+  let result: Faz4RankResult;
   try {
     result = JSON.parse(faz4Raw);
   } catch {
@@ -227,9 +217,10 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
   }));
   result.picks = [...result.picks, ...ekPicks];
 
-  // "note" alanı bu fazda üretilmiyor artık (bkz. yukarıdaki not) — istemci, kararı
-  // gösterdikten sonra /oto-analiz-faz4-notes'u ayrıca çağırıp gerekçe metinlerini
-  // picks'e "no" ile eşleştirerek ekliyor.
+  // Gerekçe metni, banko/kupon/tempo/genel-yorum bu fazda üretilmiyor artık (bkz.
+  // yukarıdaki not) — istemci, kararı gösterdikten sonra /oto-analiz-faz4-final'i
+  // ayrıca çağırıp bunları TÜM (Claude-kararlı + mekanik tamamlanan) "picks" listesiyle
+  // birlikte üretiyor.
   return NextResponse.json({
     ok: true,
     result,

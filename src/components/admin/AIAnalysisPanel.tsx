@@ -14,11 +14,11 @@ const ALAN_LABEL: Record<string, string> = {
   formYonu: "Form Yönü",
 };
 
-const FAZ_LABEL: Record<"faz1" | "faz2" | "faz4" | "faz4notes", string> = {
+const FAZ_LABEL: Record<"faz1" | "faz2" | "faz4" | "faz4final", string> = {
   faz1: "Faz 1 çalışıyor — veri toplanıyor (ücretsiz)…",
   faz2: "Faz 2 çalışıyor — skorlama…",
-  faz4: "Faz 3 + Faz 4 çalışıyor — geçit motoru + sıralama/kupon…",
-  faz4notes: "Faz 4 devam ediyor — Kilit Gerekçe metinleri yazılıyor…",
+  faz4: "Faz 3 + Faz 4 çalışıyor — geçit motoru + sıralama…",
+  faz4final: "Faz 4 devam ediyor — banko/kupon + Kilit Gerekçe metinleri yazılıyor…",
 };
 
 type Debug = {
@@ -88,7 +88,7 @@ async function fetchJson<T>(url: string, body: unknown): Promise<T> {
 }
 
 export default function AIAnalysisPanel({ raceId, onApply }: Props) {
-  const [phase, setPhase] = useState<"faz1" | "faz2" | "faz4" | "faz4notes" | null>(null);
+  const [phase, setPhase] = useState<"faz1" | "faz2" | "faz4" | "faz4final" | null>(null);
   const [result, setResult] = useState<AIAnalysisResult | null>(null);
   const [runners, setRunners] = useState<Runner[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +147,7 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
 
       setPhase("faz4");
       const step2 = await fetchJson<{
-        result: Omit<AIAnalysisResult, "picks"> & { picks: Omit<AIPickResult, "note">[] };
+        result: { picks: Omit<AIPickResult, "note">[] };
         claudePickCount: number;
         runners: Runner[];
         debug: Debug;
@@ -156,30 +156,45 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
         { raceId, faz1: step1.faz1, faz2: step1.faz2, sharedContext: step1.sharedContext }
       );
 
-      // "Kilit Gerekçe" düzyazısı ayrı bir çağrıda üretiliyor (bkz. /oto-analiz-faz4-notes
-      // route'undaki not) — karar zaten belli, maliyet için yalnız Claude'un GERÇEKTEN
-      // sıraladığı (rank'e göre) İLK 6 at için gerekçe istenir. Gerisi (7-8. sıradaki
-      // decision pick'ler + mekanik olarak eklenen kalanlar) boş "note" ile kalır — UI
-      // bunun yerine bütçe uyarısı gösterir (aşağıdaki NOTE_PLACEHOLDER).
+      // Banko/kupon/tempo/genel-yorum + "Kilit Gerekçe" düzyazısı ayrı bir çağrıda üretiliyor
+      // (bkz. /oto-analiz-faz4-final route'undaki not) — sıralama KARARI zaten belli, maliyet
+      // için gerekçe yalnız Claude'un GERÇEKTEN sıraladığı (rank'e göre) İLK 6 at için istenir.
+      // Gerisi (7-8. sıradaki decision pick'ler + mekanik olarak eklenen kalanlar) boş "note"
+      // ile kalır — UI bunun yerine bütçe uyarısı gösterir (aşağıdaki NOTE_PLACEHOLDER).
       const NOT_BUTCE_LIMITI = 6;
-      const gerekceliPicks = step2.result.picks
+      const notePicks = step2.result.picks
         .slice(0, step2.claudePickCount)
         .slice()
         .sort((a, b) => a.rank - b.rank)
         .slice(0, NOT_BUTCE_LIMITI);
-      let notesByNo = new Map<number, string>();
-      if (gerekceliPicks.length > 0) {
-        setPhase("faz4notes");
-        const step3 = await fetchJson<{ notes: { no: number; note: string }[] }>(
-          "/api/admin/oto-analiz-faz4-notes",
-          { raceId, sharedContext: step1.sharedContext, picks: gerekceliPicks }
-        );
-        notesByNo = new Map(step3.notes.map((n) => [n.no, n.note]));
-      }
+
+      setPhase("faz4final");
+      const step3 = await fetchJson<{
+        gerekceler: { no: number; note: string }[];
+        confidence: AIAnalysisResult["confidence"];
+        isBanko: boolean;
+        bankoNote: string;
+        notes: string;
+        tempo: string;
+        couponNarrow: string;
+        couponNormal: string;
+        couponWide: string;
+      }>(
+        "/api/admin/oto-analiz-faz4-final",
+        { raceId, sharedContext: step1.sharedContext, faz2: step1.faz2, allPicks: step2.result.picks, notePicks }
+      );
+      const notesByNo = new Map(step3.gerekceler.map((n) => [n.no, n.note]));
 
       const finalResult: AIAnalysisResult = {
-        ...step2.result,
         picks: step2.result.picks.map((p) => ({ ...p, note: notesByNo.get(p.no) ?? "" })),
+        confidence: step3.confidence,
+        isBanko: step3.isBanko,
+        bankoNote: step3.bankoNote,
+        notes: step3.notes,
+        tempo: step3.tempo,
+        couponNarrow: step3.couponNarrow,
+        couponNormal: step3.couponNormal,
+        couponWide: step3.couponWide,
       };
 
       setResult(finalResult);
