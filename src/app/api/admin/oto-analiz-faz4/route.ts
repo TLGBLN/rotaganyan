@@ -33,12 +33,14 @@ async function handlePost(req: NextRequest) {
   }
 
   // sharedContext, /oto-analiz-faz2'de üretilip cache_control ile işaretlenmişti — burada
-  // BİREBİR AYNI metni tekrar göndermek (5dk'lık ephemeral pencere içindeyse) Anthropic'in
-  // ~%90 indirimli "cache read" fiyatından okumasını sağlıyor, analiz kalitesini etkilemiyor.
+  // BİREBİR AYNI metni tekrar göndermek Anthropic'in ~%90 indirimli "cache read"
+  // fiyatından okumasını sağlıyor, analiz kalitesini etkilemiyor. 1 saatlik TTL
+  // (Faz2'deki ile eşleşmeli) — bkz. o dosyadaki not: 5dk'lık varsayılan pencere
+  // gerçek ölçümde çoğunlukla dolmuş çıkıyordu.
   const sharedContextBlock: Anthropic.TextBlockParam = {
     type: "text",
     text: sharedContext,
-    cache_control: { type: "ephemeral" },
+    cache_control: { type: "ephemeral", ttl: "1h" },
   };
 
   // ── FAZ 3 — GEÇİT MOTORU: KOD İLE ÇALIŞIR, LLM DEĞİL ──

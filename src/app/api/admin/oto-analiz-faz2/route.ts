@@ -108,10 +108,17 @@ ${faz1Tablo}
 ## METODOLOJİ
 ${methodologyText}`;
 
+  // 2026-07-24: gerçek 7 günlük ölçümde cache hit oranı yalnız %6 çıktı — Faz2 burada
+  // yazıyor ama Faz4/Faz4notes'a ulaşana kadar (Faz1 ağ toplama + Faz2'nin kendi
+  // thinking süresi + olası tekrar denemeler) 5dk'lık varsayılan pencere çoğunlukla
+  // dolmuş oluyordu, bu yüzden Faz4/Faz4notes kendi (tam fiyatlı) cache yazımını
+  // yapıyordu. 1 saatlik TTL'e çıkarmak yazma maliyetini artırıyor (1.25x→2x) ama
+  // 3 çağrının aynı pencerede kalma ihtimalini pratikte kesinliğe yaklaştırıyor —
+  // net etki düşüş yönünde (bkz. shared/prompt-caching.md ekonomi tablosu).
   const sharedContextBlock: Anthropic.TextBlockParam = {
     type: "text",
     text: sharedContext,
-    cache_control: { type: "ephemeral" },
+    cache_control: { type: "ephemeral", ttl: "1h" },
   };
 
   // ── FAZ 2 — CLAUDE: koşu tipine göre A/B+C skorlama + ön teknik sıra ──

@@ -27,10 +27,11 @@ async function handlePost(req: NextRequest) {
     return NextResponse.json({ error: "raceId/sharedContext/picks gerekli" }, { status: 400 });
   }
 
+  // 1 saatlik TTL — Faz2/Faz4 ile eşleşmeli (bkz. oto-analiz-faz2/route.ts'teki not).
   const sharedContextBlock: Anthropic.TextBlockParam = {
     type: "text",
     text: sharedContext,
-    cache_control: { type: "ephemeral" },
+    cache_control: { type: "ephemeral", ttl: "1h" },
   };
 
   const faz4NotesTail = `Sen ROTAGANYAN v4.1 at yarışı analistisin. Bu, FAZ 4'ün devamı — final sıralama/kupon KARARI zaten verildi, senin işin SADECE her at için kısa gerekçe metni yazmak. Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını (özellikle her atın galop/pedigri/form/sınıf/kilo/tempo verisini) kullan.
