@@ -94,8 +94,9 @@ export async function getDamStatOzetleriForRace(
           : (damSire && ownCandidates.find((o) => normalizeSireName(o.damSireName) === normalizeSireName(damSire))) || ownCandidates[0];
     if (match) return formatDamStatOzet(match, mesafe, pist, ownMatch);
     // hipodromx eşleşmesi yok ama kendi verimizde varsa, yalnız kendi veriyle özet göster.
-    return ownMatch && ownMatch.start >= 3
-      ? `${dam} / ${ownMatch.damSireName} (${pist} ${mesafe}): Kendi verimiz: ${ownMatch.start} start, K% ${ownMatch.kYuzde} (${ownMatch.birinci}/${ownMatch.start})`
-      : null;
+    if (!ownMatch || ownMatch.start < 3) return null;
+    const tayOrani = ownMatch.yavruSayisi > 0 ? Math.round((ownMatch.kazananYavruSayisi / ownMatch.yavruSayisi) * 100) : null;
+    const tayStr = tayOrani != null ? ` · Kazanan tay oranı %${tayOrani} (${ownMatch.kazananYavruSayisi}/${ownMatch.yavruSayisi} yavru)` : "";
+    return `${dam} / ${ownMatch.damSireName} (${pist} ${mesafe}): Kendi verimiz: ${ownMatch.start} start, K% ${ownMatch.kYuzde} (${ownMatch.birinci}/${ownMatch.start})${tayStr}`;
   });
 }

@@ -135,6 +135,7 @@ ${methodologyText}`;
 4. Toplam puana göre ön teknik sıra belirle (1 = en iyi). Bu sıra FAZ 3'te geçit motoruna girdi olacak.
 5. "Kanıt yokluğu olumsuz kanıt değildir" ilkesine uy — eksik veriyi ceza sebebi yapma. "Tabloda tanımsız" olarak işaretlenmiş Ön-hesaplanmış alanlar (örn. HP Kalitesi) da bu ilkeye tabidir — boş/tanımsız olması ceza değildir, serbestçe değerlendir.
 6. Veri Çifti Doktrini'ni (§I.4) uygula: puanlama kalem kalem yapılır ama her kalemin YORUMU izole değil, eşleştiği veriyle BİRLİKTE okunarak yazılır (ör. "kaçak" etiketi tempo+son800 birlikte okunmadan konmaz; "form yükseliyor" HP ivmesiyle birlikte doğrulanmadan yazılmaz). Çiftlendiği veri yoksa (ör. ilk start) o veri tek başına sınırlı kanıt sayılır — ceza değil, yalnız ek güven kaybı.
+7. Aygır İstatistiği / Kısrak İstatistiği satırlarını değerlendirirken ÖRNEKLEM BÜYÜKLÜĞÜNE dikkat et: bir yüzdenin yanında "[DÜŞÜK ÖRNEKLEM]" etiketi varsa (birkaç yarışa dayanıyor) bunu güçlü bir pozitif/negatif sinyal olarak KULLANMA, yalnız hafif bir ipucu say; "[geniş örneklem]" etiketli sayılar daha istikrarlı bir eğilimdir, puanlamada daha güvenle kullanılabilir. 5 yarışta %100 ile 200 yarışta %25 ASLA eşit güvenilirlikte değildir — etiketsiz olduğunda bile, satırdaki ham sayılara (Start/K/K) bakıp örneklemi kendin değerlendir.
 
 Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
 {

@@ -93,6 +93,7 @@ export async function syncOwnPedigreeStats(): Promise<{ sireRows: number; damRow
       dam: true,
       damSire: true,
       no: true,
+      name: true,
       race: {
         select: {
           breed: true,
@@ -104,7 +105,13 @@ export async function syncOwnPedigreeStats(): Promise<{ sireRows: number; damRow
     },
   });
 
-  const damGroups = new Map<string, { damName: string; damSireName: string; irk: string; pist: string; mesafe: string; sayac: Sayac }>();
+  // yavrular: at adı -> bu at en az bir kez birinci olmuş mu (yarış-bazlı start/birinci
+  // sayaçlarından AYRI — aynı at birden çok start/galibiyet üretebilir, bu ise DİSTİNCT
+  // at say›sı ve o atlardan kaçının en az 1 galibiyeti olduğunu ölçer, "kazanan tay oranı").
+  const damGroups = new Map<string, {
+    damName: string; damSireName: string; irk: string; pist: string; mesafe: string;
+    sayac: Sayac; yavrular: Map<string, boolean>;
+  }>();
   for (const r of damRunners) {
     if (!r.dam || !r.damSire || !r.race.result) continue;
     const irk = breedToIrk(r.race.breed);
@@ -113,29 +120,32 @@ export async function syncOwnPedigreeStats(): Promise<{ sireRows: number; damRow
     const key = `${r.dam}||${r.damSire}||${irk}||${pist}||${mesafe}`;
     let g = damGroups.get(key);
     if (!g) {
-      g = { damName: r.dam, damSireName: r.damSire, irk, pist, mesafe, sayac: bosSayac() };
+      g = { damName: r.dam, damSireName: r.damSire, irk, pist, mesafe, sayac: bosSayac(), yavrular: new Map() };
       damGroups.set(key, g);
     }
     const pos = finishPos(r.race.result.actualOrder, r.no);
     pozisyonaGoreArttir(g.sayac, pos);
+    g.yavrular.set(r.name, (g.yavrular.get(r.name) ?? false) || pos === 1);
   }
 
   const damEntries = [...damGroups.values()];
   for (let i = 0; i < damEntries.length; i += BATCH_SIZE) {
     const batch = damEntries.slice(i, i + BATCH_SIZE);
     const values = Prisma.join(
-      batch.map(
-        (g) =>
-          Prisma.sql`(${randomUUID()}, ${g.damName}, ${g.damSireName}, ${g.irk}, ${g.pist}, ${g.mesafe}, ${g.sayac.start}, ${g.sayac.birinci}, ${g.sayac.ikinci}, ${g.sayac.ucuncu}, ${g.sayac.dorduncu}, ${g.sayac.besinci}, ${Math.round((g.sayac.birinci / g.sayac.start) * 100)}, now())`
-      )
+      batch.map((g) => {
+        const yavruSayisi = g.yavrular.size;
+        const kazananYavruSayisi = [...g.yavrular.values()].filter(Boolean).length;
+        return Prisma.sql`(${randomUUID()}, ${g.damName}, ${g.damSireName}, ${g.irk}, ${g.pist}, ${g.mesafe}, ${g.sayac.start}, ${g.sayac.birinci}, ${g.sayac.ikinci}, ${g.sayac.ucuncu}, ${g.sayac.dorduncu}, ${g.sayac.besinci}, ${Math.round((g.sayac.birinci / g.sayac.start) * 100)}, ${yavruSayisi}, ${kazananYavruSayisi}, now())`;
+      })
     );
     await db.$executeRaw`
-      INSERT INTO "DamStatOwn" ("id", "damName", "damSireName", "irk", "pist", "mesafe", "start", "birinci", "ikinci", "ucuncu", "dorduncu", "besinci", "kYuzde", "updatedAt")
+      INSERT INTO "DamStatOwn" ("id", "damName", "damSireName", "irk", "pist", "mesafe", "start", "birinci", "ikinci", "ucuncu", "dorduncu", "besinci", "kYuzde", "yavruSayisi", "kazananYavruSayisi", "updatedAt")
       VALUES ${values}
       ON CONFLICT ("damName", "damSireName", "irk", "pist", "mesafe") DO UPDATE SET
         "start" = EXCLUDED."start", "birinci" = EXCLUDED."birinci", "ikinci" = EXCLUDED."ikinci",
         "ucuncu" = EXCLUDED."ucuncu", "dorduncu" = EXCLUDED."dorduncu", "besinci" = EXCLUDED."besinci",
-        "kYuzde" = EXCLUDED."kYuzde", "updatedAt" = now()
+        "kYuzde" = EXCLUDED."kYuzde", "yavruSayisi" = EXCLUDED."yavruSayisi",
+        "kazananYavruSayisi" = EXCLUDED."kazananYavruSayisi", "updatedAt" = now()
     `;
   }
 

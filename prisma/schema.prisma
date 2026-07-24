@@ -609,6 +609,12 @@ model DamStatOwn {
   dorduncu    Int
   besinci     Int
   kYuzde      Float
+  // 2026-07-24: kullanıcı isteği — "kazanan tay oranı" (kaç FARKLI yavrunun en az 1
+  // galibiyeti var / toplam farklı yavru). start/birinci YARIŞ bazlı (aynı at birden
+  // fazla start/galibiyet üretebilir) — bu ikisi ise AT (yavru) bazlı, distinct Runner.name
+  // gruplamasıyla hesaplanır. hipodromx bunu vermiyor (yalnız kendi verimizde mümkün).
+  yavruSayisi        Int @default(0)
+  kazananYavruSayisi Int @default(0)
   updatedAt   DateTime @updatedAt
 
   @@unique([damName, damSireName, irk, pist, mesafe])
