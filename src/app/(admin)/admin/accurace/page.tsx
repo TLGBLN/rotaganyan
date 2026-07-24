@@ -4,15 +4,95 @@ import Link from "next/link";
 import { turkeyDateString } from "@/lib/tz";
 import AccuraceSyncButton from "@/components/admin/AccuraceSyncButton";
 import AccuraceDatePicker from "@/components/admin/AccuraceDatePicker";
+import AccuraceHorseSearch from "@/components/admin/AccuraceHorseSearch";
+import AccuraceSectionalTable from "@/components/program/panels/AccuraceSectionalTable";
 import { analizEtTekYaris, hesaplaCokYarisEgilimi, type PaceCheckpoint } from "@/lib/methodology/pace-analizi";
 import { fmtSaniye, checkpointCols, STIL_LABEL, STIL_RENK } from "@/lib/methodology/pace-format";
 
 export const dynamic = "force-dynamic";
 
-type PageProps = { searchParams: Promise<{ tarih?: string }> };
+type PageProps = { searchParams: Promise<{ tarih?: string; at?: string }> };
+
+const GROUND_LABEL_TR: Record<string, string> = { K: "Kum", C: "Çim", S: "Sentetik" };
 
 export default async function AccuraceDashboardPage({ searchParams }: PageProps) {
-  const { tarih } = await searchParams;
+  const { tarih, at } = await searchParams;
+  const atQuery = at?.trim();
+
+  // At adıyla arama modu — tarihe bağlı değil, o atın Accurace'te kayıtlı TÜM geçmiş
+  // yarışlarını (herhangi bir tarihten) gösterir. Kullanıcı isteği: günlük listede
+  // yalnız o gün koşan atlar görünüyordu, geçmişte koşmuş herhangi bir atı aramak
+  // mümkün değildi.
+  if (atQuery) {
+    const matches = await db.accuraceHorseSplit.findMany({
+      where: { horseName: { contains: atQuery, mode: "insensitive" } },
+      include: {
+        accuraceRace: {
+          select: {
+            date: true, length: true, ground: true, raceNo: true, hippodrome: true, citySlug: true,
+            race: { select: { raceDay: { select: { hippodrome: { select: { name: true } } } } } },
+          },
+        },
+      },
+      orderBy: { accuraceRace: { date: "desc" } },
+    });
+
+    const grouped = new Map<string, typeof matches>();
+    for (const m of matches) {
+      const list = grouped.get(m.horseName) ?? [];
+      list.push(m);
+      grouped.set(m.horseName, list);
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-lg font-bold">Accurace Database</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">&quot;{atQuery}&quot; için arama sonuçları — tüm tarihler.</p>
+          </div>
+          <AccuraceHorseSearch initialQuery={atQuery} />
+        </div>
+
+        {grouped.size === 0 ? (
+          <div className="rounded-lg border py-16 text-center text-sm text-muted-foreground">
+            &quot;{atQuery}&quot; için Accurace kaydı bulunamadı.
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {[...grouped.entries()].map(([horseName, records]) => (
+              <div key={horseName} className="rounded-lg border overflow-hidden">
+                <div className="border-b bg-muted/30 px-3 py-2 text-sm font-semibold">
+                  {horseName} <span className="ml-2 text-xs font-normal text-muted-foreground">{records.length} kayıt</span>
+                </div>
+                <div className="space-y-2 p-3">
+                  {records.map((r) => {
+                    const length = r.accuraceRace.length ?? 0;
+                    const checkpoints = r.checkpoints as unknown as PaceCheckpoint[];
+                    const sonuc = analizEtTekYaris(checkpoints, length);
+                    const hipoAdi = r.accuraceRace.race?.raceDay.hippodrome.name ?? r.accuraceRace.hippodrome ?? r.accuraceRace.citySlug;
+                    return (
+                      <div key={r.id}>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-0.5 pb-0.5 text-[11px] text-muted-foreground">
+                          <span className="tabular-nums">{r.accuraceRace.date.toISOString().slice(0, 10).split("-").reverse().join(".")}</span>
+                          <span>{hipoAdi} · {r.accuraceRace.raceNo}. Koşu</span>
+                          <span>{GROUND_LABEL_TR[r.accuraceRace.ground ?? ""] ?? r.accuraceRace.ground ?? "—"}</span>
+                          <span className="tabular-nums">{length}m</span>
+                          <span className="tabular-nums">{r.place}. sıra</span>
+                        </div>
+                        <AccuraceSectionalTable length={length} checkpoints={checkpoints} stil={sonuc?.stil ?? null} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const date = tarih ?? turkeyDateString();
   const dateObj = new Date(`${date}T00:00:00.000Z`);
 
@@ -54,7 +134,10 @@ export default async function AccuraceDashboardPage({ searchParams }: PageProps)
             GPS/sektörel zamanlama verisi — 100m&apos;lik her checkpoint&apos;te sıra + geçiş süresi. TJK&apos;nın resmi sitesinde bu veri yok, yalnız Accurace&apos;te var.
           </p>
         </div>
-        <AccuraceDatePicker date={date} />
+        <div className="flex items-center gap-2">
+          <AccuraceHorseSearch initialQuery="" />
+          <AccuraceDatePicker date={date} />
+        </div>
       </div>
 
       <div className="rounded-lg border p-3">
