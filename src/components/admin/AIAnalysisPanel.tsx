@@ -57,6 +57,8 @@ type Props = {
   onApply: (result: AIAnalysisResult, runners: Runner[]) => void;
 };
 
+const NOTE_PLACEHOLDER = "Kilit Gerekçe üretilmedi — bütçeniz doğrultusunda dilerseniz elle ekleyebilirsiniz.";
+
 const CONFIDENCE_LABEL = { DUSUK: "Düşük", ORTA: "Orta", YUKSEK: "Yüksek" };
 const PEDIGREE_LABEL: Record<PedigreeRating, string> = {
   COK_YUKSEK: "Çok Yüksek", YUKSEK: "Yüksek", GUCLU: "Güçlü", ORTA: "Orta",
@@ -155,10 +157,16 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
       );
 
       // "Kilit Gerekçe" düzyazısı ayrı bir çağrıda üretiliyor (bkz. /oto-analiz-faz4-notes
-      // route'undaki not) — karar zaten belli, yalnız Claude'un GERÇEKTEN sıraladığı ilk
-      // claudePickCount kadar at için gerekçe istenir (mekanik olarak eklenen kalan atlar
-      // zaten boş gerekçeyle kalır, eskiden de öyleydi).
-      const gerekceliPicks = step2.result.picks.slice(0, step2.claudePickCount);
+      // route'undaki not) — karar zaten belli, maliyet için yalnız Claude'un GERÇEKTEN
+      // sıraladığı (rank'e göre) İLK 6 at için gerekçe istenir. Gerisi (7-8. sıradaki
+      // decision pick'ler + mekanik olarak eklenen kalanlar) boş "note" ile kalır — UI
+      // bunun yerine bütçe uyarısı gösterir (aşağıdaki NOTE_PLACEHOLDER).
+      const NOT_BUTCE_LIMITI = 6;
+      const gerekceliPicks = step2.result.picks
+        .slice(0, step2.claudePickCount)
+        .slice()
+        .sort((a, b) => a.rank - b.rank)
+        .slice(0, NOT_BUTCE_LIMITI);
       let notesByNo = new Map<number, string>();
       if (gerekceliPicks.length > 0) {
         setPhase("faz4notes");
@@ -287,8 +295,10 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
                         ))}
                       </div>
                     )}
-                    {pick.note && (
+                    {pick.note ? (
                       <p className="mt-1 text-xs text-muted-foreground">{pick.note}</p>
+                    ) : (
+                      <p className="mt-1 text-xs italic text-muted-foreground/70">{NOTE_PLACEHOLDER}</p>
                     )}
                   </div>
                 </div>
