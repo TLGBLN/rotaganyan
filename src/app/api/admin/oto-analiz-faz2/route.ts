@@ -12,13 +12,16 @@ import type { Anthropic } from "@anthropic-ai/sdk";
 import type { Role } from "@prisma/client";
 
 // Faz 2 ve Faz 4, tek bir istekte art arda çalıştığında (eski hal) ikisinin toplam
-// süresi bazı koşularda 300s'i (bu hesabın gerçek Vercel üst tavanı — 800 denendi,
-// deploy'un kendisini kırdı, Fluid Compute açık değil) aşıp fonksiyonu ortadan
-// kesiyordu (Faz 2 tamamlanıp Faz 4'e hiç geçilemeden). Çözüm: AYRI istekler —
-// admin paneli önce /oto-analiz-faz1'i (ücretsiz veri toplama) çağırır, sonra bu
-// isteği (yalnız Claude çağrısı), sonucu /oto-analiz-faz4'e taşır. Bu istek artık
-// gatherFaz1'in ağ süresini hiç taşımıyor — 300sn'lik pencerenin tamamı Claude'a kalıyor.
-export const maxDuration = 300;
+// süresi bazı koşularda 300s'i aşıp fonksiyonu ortadan kesiyordu (Faz 2 tamamlanıp
+// Faz 4'e hiç geçilemeden). Çözüm: AYRI istekler — admin paneli önce /oto-analiz-faz1'i
+// (ücretsiz veri toplama) çağırır, sonra bu isteği (yalnız Claude çağrısı), sonucu
+// /oto-analiz-faz4'e taşır. 2026-07-24: Fluid Compute Vercel proje ayarından açıldı
+// (daha önce 800 denenmişti, Fluid Compute kapalıyken deploy'un kendisini kırıyordu) —
+// artık 300s'lik eski platform tavanı da kalkmış durumda, aşağıdaki maxDuration=800
+// gerçekten geçerli. Bu, max_tokens artırma yamalarının (bkz. aşağıdaki not) asla tam
+// çözemediği kök sorunu (Claude'un thinking süresi saha büyüdükçe öngörülemez biçimde
+// uzuyor) kalıcı olarak ortadan kaldırıyor.
+export const maxDuration = 800;
 
 async function handlePost(req: NextRequest) {
   const session = await auth();

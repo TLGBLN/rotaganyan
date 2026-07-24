@@ -20,8 +20,11 @@ import type { Role } from "@prisma/client";
 // SIRALAMA KARARINI üretir (FAZ4_RANK_SCHEMA: rank/skor/pedigree/detay). Banko/kupon/
 // tempo/genel-yorum + gerekçe metinleri, karar zaten belliyken çalışan ayrı ve daha dar
 // bir çağrıda üretiliyor (/api/admin/oto-analiz-faz4-final — bkz. claude-analiz-
-// helpers.ts'teki FAZ4_RANK_SCHEMA/FAZ4_FINAL_SCHEMA yorumu).
-export const maxDuration = 300;
+// helpers.ts'teki FAZ4_RANK_SCHEMA/FAZ4_FINAL_SCHEMA yorumu). 2026-07-24: Fluid Compute
+// açıldıktan sonra 300s'lik eski platform tavanı da kalktı — bkz. oto-analiz-faz2/
+// route.ts'teki not. Bölme (split) yine de korunuyor çünkü thinking süresini gerçekten
+// azaltıyor (daha hızlı sonuç, daha az kesinti riski) — 800s bir güvenlik ağı, ilk tercih değil.
+export const maxDuration = 800;
 
 type Body = { raceId: string; faz1: Faz1Sonuc; faz2: Faz2Atlar; sharedContext: string };
 

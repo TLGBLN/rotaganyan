@@ -12,8 +12,9 @@ import type { Role } from "@prisma/client";
 // tüm sahayı sıralama) artık AYRI ve daha ağır bir çağrıda üretiliyor, bu istek yalnız
 // o karar zaten belliyken banko/kupon/tempo/genel-yorumu ve (bütçe nedeniyle yalnız ilk
 // 6 at için) "Kilit Gerekçe" metinlerini üretir — Faz4'ün kendisinden daha dar/hızlı
-// bir görev, aynı 300sn duvarına çok daha az riskle yaklaşır.
-export const maxDuration = 300;
+// bir görev. 2026-07-24: Fluid Compute açıldıktan sonra 300s'lik eski platform tavanı
+// da kalktı — bkz. oto-analiz-faz2/route.ts'teki not.
+export const maxDuration = 800;
 
 type Body = {
   raceId: string;
