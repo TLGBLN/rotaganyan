@@ -208,9 +208,15 @@ export type Faz1Runner = {
   takiDegisikligiVar: boolean;
   exactVeyaPedigri: boolean;
 
-  // Son 800 — Gölge Mod girdileri
+  // Son 800 — Gölge Mod girdileri (yalnız TAM UYGUN — pist zorunlu + mesafe ±200m —
+  // kayıtlardan hesaplanır, gecit-motoru.ts'nin kalibre eşiklerini besler, değişmedi).
   son800BenzerKosuN: number;
   son800Medyan: number | null;
+  // v4.1: kullanıcı talebiyle eklendi — atın AYNI YIL içindeki TÜM Son800 kayıtları
+  // (pist/mesafe uygunluğuna bakılmaksızın), her satırda uygunluk etiketiyle. Faz 2
+  // Claude'a gidiyor — yukarıdaki kesin sayıyı DEĞİŞTİRMEZ, ek bağlam/serbest
+  // değerlendirme için. null = bu atın hiç Accurace kaydı yok.
+  son800TumOzet: string | null;
 
   // Sitenin kendi "Aynı Pist/Mesafe/Hipodrom" ve "H2H" panellerinden (methodolojide
   // XI. Bölüm — ZAYIF KANIT, tek başına sırayı belirlemez ama göz ardı edilmemeli).
@@ -368,6 +374,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
           horseName: true,
           accuraceRaceId: true,
           checkpoints: true,
+          place: true,
           accuraceRace: { select: { date: true, citySlug: true, ground: true, length: true } },
         },
       })
@@ -427,6 +434,45 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       })
       .filter((f): f is number => f != null);
     son800ByRunnerName.set(r.name, { n: farklar.length, medyan: medyan(farklar) });
+  }
+
+  // v4.1: kullanıcı talebiyle — yukarıdaki KESİN sayı (pist zorunlu + mesafe ±200m)
+  // değişmiyor, ama Claude'a atın AYNI YIL içindeki TÜM Son800 kayıtlarını (pist/mesafe
+  // uygunluğu ne olursa olsun) uygunluk etiketiyle birlikte gösteriyoruz — sadece "yok"
+  // denip atlanan (ama gerçekte var olan, sadece bugünkü koşula tam uymayan) kayıtlar da
+  // serbest değerlendirmeye (Faz 2 A-katmanı) girebilsin.
+  const GROUND_LABEL: Record<string, string> = { K: "Kum", Ç: "Çim", S: "Sentetik" };
+  const son800TumOzetByRunnerName = new Map<string, string | null>();
+  for (const r of race.runners) {
+    const kayitlarTumu = son800AccuraceKayitlari
+      .filter(
+        (k) =>
+          normalizeHorseName(k.horseName) === normalizeHorseName(r.name) &&
+          k.accuraceRace.date.getUTCFullYear().toString() === race.raceDay.date.getUTCFullYear().toString()
+      )
+      .sort((a, b) => b.accuraceRace.date.getTime() - a.accuraceRace.date.getTime())
+      .slice(0, 8); // aşırı uzun listeyi önlemek için en güncel 8 kayıtla sınırlı
+
+    if (kayitlarTumu.length === 0) { son800TumOzetByRunnerName.set(r.name, null); continue; }
+
+    const satirlar = kayitlarTumu.map((k) => {
+      const sure = last800SureSaniye(k.checkpoints as unknown as PaceCheckpoint[], k.accuraceRace.length ?? 0);
+      const pistUygun = k.accuraceRace.ground === surfacePrefixToday;
+      const mesafeFarki = Math.abs((k.accuraceRace.length ?? 0) - race.distance);
+      const mesafeUygun = mesafeFarki <= 200;
+      const etiket =
+        pistUygun && mesafeUygun
+          ? "TAM UYGUN"
+          : pistUygun
+            ? `MESAFE UZAK (${mesafeFarki}m fark)`
+            : mesafeUygun
+              ? "PİST FARKLI"
+              : `PİST+MESAFE FARKLI (${mesafeFarki}m)`;
+      const tarih = k.accuraceRace.date.toISOString().slice(0, 10).split("-").reverse().join(".");
+      const pistAdi = GROUND_LABEL[k.accuraceRace.ground ?? ""] ?? (k.accuraceRace.ground ?? "?");
+      return `${tarih} ${pistAdi} ${k.accuraceRace.length ?? "?"}m ${k.place}. son800=${sure != null ? sure.toFixed(2) + "s" : "?"} [${etiket}]`;
+    });
+    son800TumOzetByRunnerName.set(r.name, satirlar.join(" | "));
   }
 
   const runners: Faz1Runner[] = await Promise.all(
@@ -594,6 +640,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         jockeyWinPct, trainerWinPct, sinifJokeyAntrenor,
         takiDegisikligiVar, exactVeyaPedigri,
         son800BenzerKosuN, son800Medyan,
+        son800TumOzet: son800TumOzetByRunnerName.get(r.name) ?? null,
         aynıPistMesafeOzet, h2hOzet: h2hOzetFor(r.name),
         hpKalitesiYildizi: hpKalitesi, sinifGecisBonusuPuan: sinifBonusu,
         galopSiniflandirma: galopSinif, tempoGuven: tempoGuvenHesap,
