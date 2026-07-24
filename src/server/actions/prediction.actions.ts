@@ -125,10 +125,46 @@ async function syncKarmaMirrors(predictionId: string): Promise<void> {
   }
 }
 
+/**
+ * Yayınlanan her tahminin sahadaki AKTİF (çekilmemiş) her atı içermesini garanti eder —
+ * giriş yöntemi ne olursa olsun (otomatik analiz formu, elle giriş, markdown/ekran
+ * görüntüsü yapıştırma). Otomatik analizde (oto-analiz-faz4/route.ts) bu tamamlama zaten
+ * vardı, ama manuel girişlerde kaynak metin yalnız öne çıkan birkaç atı içerebiliyordu —
+ * bu da Rotaganyan Puan Tablosu'nda sahanın geri kalanının hiç görünmemesine yol açıyordu
+ * (kullanıcı tarafından tespit edildi: 2026-07-20 Bursa 1-2. Koşu, 5-6 pick / 11-12 at).
+ * Eksik atlar, verilen en düşük puanın altında (mevcut sıralamayı bozmadan) mekanik bir
+ * puanla tamamlanır.
+ */
+async function completeFullField(raceId: string, picks: PickInput[]): Promise<PickInput[]> {
+  const runners = await db.runner.findMany({
+    where: { raceId, scratched: false },
+    select: { id: true, no: true, name: true },
+  });
+  const pickedIds = new Set(picks.map((p) => p.runnerId).filter(Boolean));
+  const missing = runners.filter((r) => !pickedIds.has(r.id));
+  if (missing.length === 0) return picks;
+
+  const existingScores = picks.map((p) => p.score).filter((s): s is number => s != null);
+  const taban = existingScores.length > 0 ? Math.min(...existingScores) : 50;
+  let sonrakiRank = picks.length > 0 ? Math.max(...picks.map((p) => p.rank)) + 1 : 1;
+  const ekPicks: PickInput[] = missing.map((r, i) => ({
+    rank: sonrakiRank++,
+    runnerId: r.id,
+    runnerLabel: `${r.no} ${r.name}`,
+    score: Math.max(0, taban - 1 - i),
+    details: [],
+    pedigreeRating: "BILINMIYOR" as PedigreeRating,
+    isTarget: false,
+  }));
+  return [...picks, ...ekPicks];
+}
+
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
 export async function upsertPrediction(input: PredictionInput) {
   const session = await requireRole("EDITOR");
+
+  const completedPicks = await completeFullField(input.raceId, input.picks);
 
   const existing = await db.prediction.findUnique({ where: { raceId: input.raceId } });
 
@@ -153,7 +189,7 @@ export async function upsertPrediction(input: PredictionInput) {
         // published:true zorlanıyordu — bu da taslak düzenleyip "Kaydet"e basmayı,
         // checklist'i hiç görmeden yayınlamaya eşitliyordu.
         picks: {
-          create: input.picks.map((p) => ({
+          create: completedPicks.map((p) => ({
             rank: p.rank,
             runnerId: p.runnerId,
             runnerLabel: p.runnerLabel,
@@ -180,7 +216,7 @@ export async function upsertPrediction(input: PredictionInput) {
         isBanko: input.isBanko,
         bankoNote: input.bankoNote,
         picks: {
-          create: input.picks.map((p) => ({
+          create: completedPicks.map((p) => ({
             rank: p.rank,
             runnerId: p.runnerId,
             runnerLabel: p.runnerLabel,
