@@ -55,6 +55,7 @@ type Runner = { id: string; no: number; name: string };
 type Props = {
   raceId: string;
   onApply: (result: AIAnalysisResult, runners: Runner[]) => void;
+  methodologyVersion?: string | null;
 };
 
 const NOTE_PLACEHOLDER = "Kilit Gerekçe üretilmedi — bütçeniz doğrultusunda dilerseniz elle ekleyebilirsiniz.";
@@ -87,7 +88,7 @@ async function fetchJson<T>(url: string, body: unknown): Promise<T> {
   return data;
 }
 
-export default function AIAnalysisPanel({ raceId, onApply }: Props) {
+export default function AIAnalysisPanel({ raceId, onApply, methodologyVersion }: Props) {
   const [phase, setPhase] = useState<"faz1" | "faz2" | "faz4" | "faz4final" | null>(null);
   const [result, setResult] = useState<AIAnalysisResult | null>(null);
   const [runners, setRunners] = useState<Runner[]>([]);
@@ -219,7 +220,7 @@ export default function AIAnalysisPanel({ raceId, onApply }: Props) {
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-brand" />
         <h3 className="text-sm font-semibold">Otomatik Analiz</h3>
-        <span className="ml-auto text-[10px] text-muted-foreground">Metodoloji (v4.2) + geçit motoru + sitenin kendi verisiyle tamamen otomatik çalışır</span>
+        <span className="ml-auto text-[10px] text-muted-foreground">Metodoloji ({methodologyVersion ?? "?"}) + geçit motoru + sitenin kendi verisiyle tamamen otomatik çalışır</span>
       </div>
 
       <div className="flex gap-2">

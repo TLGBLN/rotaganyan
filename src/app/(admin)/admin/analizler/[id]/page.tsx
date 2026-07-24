@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
+import { db } from "@/lib/db";
 import { getAdminPredictionById, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
 import SmartAnalysisEditor from "@/components/admin/SmartAnalysisEditor";
 import PublishChecklist from "@/components/admin/PublishChecklist";
@@ -21,6 +22,10 @@ export default async function EditAnalizPage({ params }: PageProps) {
   const race = pred.race;
   const analystStats = await getAnalystStats(race.id);
   const advice = getClassTypeAdvice(analystStats, race.classType);
+  // AIAnalysisPanel'in "Metodoloji (vX.X)" etiketi eskiden hardcoded "v4.2" idi — metodoloji
+  // bu oturumda tek başına v4.13'ten v5.0'a kadar birçok kez güncellendi, etiket hep geride
+  // kaldı. Artık gerçek güncel versiyonu DB'den okuyup gösteriyor, bir daha yanlış çıkamaz.
+  const methodologyVersion = (await db.methodologyVersion.findFirst({ where: { isCurrent: true }, select: { version: true } }))?.version ?? null;
 
   return (
     <div className="space-y-6">
@@ -51,6 +56,7 @@ export default async function EditAnalizPage({ params }: PageProps) {
           raceId={race.id}
           runners={race.runners}
           existingPrediction={pred}
+          methodologyVersion={methodologyVersion}
         />
 
         <aside className="space-y-4">

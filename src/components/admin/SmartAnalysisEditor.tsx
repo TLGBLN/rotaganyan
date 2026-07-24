@@ -12,6 +12,7 @@ type AIRunner = { id: string; no: number; name: string };
 type Props = {
   raceId: string;
   runners: Runner[];
+  methodologyVersion?: string | null;
   existingPrediction?: {
     id: string;
     confidence: "DUSUK" | "ORTA" | "YUKSEK";
@@ -34,7 +35,7 @@ type Props = {
   };
 };
 
-export default function SmartAnalysisEditor({ raceId, runners, existingPrediction }: Props) {
+export default function SmartAnalysisEditor({ raceId, runners, methodologyVersion, existingPrediction }: Props) {
   const [aiResult, setAiResult] = useState<AIAnalysisResult | null>(null);
   const [aiRunners, setAiRunners] = useState<AIRunner[]>([]);
 
@@ -46,7 +47,7 @@ export default function SmartAnalysisEditor({ raceId, runners, existingPredictio
   return (
     <div className="space-y-6">
       <Faz1VeriDurumu raceId={raceId} />
-      <AIAnalysisPanel raceId={raceId} onApply={handleAIApply} />
+      <AIAnalysisPanel raceId={raceId} onApply={handleAIApply} methodologyVersion={methodologyVersion} />
       <PredictionForm
         raceId={raceId}
         runners={runners}
