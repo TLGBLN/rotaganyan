@@ -7,7 +7,7 @@ import { startOfDay, endOfDay } from "date-fns";
 import type { Confidence, PedigreeRating } from "@prisma/client";
 import { findSireStat, findDamStat, mesafeBucket, surfaceToPist, breedToIrk, normalizeSireName } from "@/lib/sire-stat-match";
 
-type PickInput = {
+export type PickInput = {
   rank: number;
   runnerId?: string;
   runnerLabel: string;
@@ -141,8 +141,13 @@ async function syncKarmaMirrors(predictionId: string): Promise<void> {
  * ProgramView) zaten null puanı "—" olarak gösteriyor, hiç ek UI değişikliği gerekmedi.
  * Sıra da (rank) artık DB'nin rastgele dönüş sırası yerine at numarasına göre — analiz
  * edilmemiş atlar arasında da yanlışlıkla "sıralanmış" izlenimi verilmesin diye.
+ *
+ * export: yalnız upsertPrediction() (elle form) değil, parse-report/route.ts (markdown
+ * yapıştırma) ve analysis-importer.ts (toplu içe aktarma) de bunu çağırır — kod
+ * denetiminde bulundu ki bu iki yol tamamlamayı hiç görmüyordu, aynı 2026-07-20 hatasını
+ * (sahadan eksik atlarla sessiz yayın) farklı bir kapıdan tekrar üretebiliyorlardı.
  */
-async function completeFullField(raceId: string, picks: PickInput[]): Promise<PickInput[]> {
+export async function completeFullField(raceId: string, picks: PickInput[]): Promise<PickInput[]> {
   const runners = await db.runner.findMany({
     where: { raceId, scratched: false },
     select: { id: true, no: true, name: true },
@@ -405,9 +410,18 @@ export async function getPublishChecklistAuto(predictionId: string): Promise<Che
   return checks;
 }
 
-export async function publishPrediction(id: string) {
-  await requireRole("EDITOR");
-
+/**
+ * İki sert kural — hangi giriş yolundan gelirse gelsin (elle form, markdown/ekran
+ * görüntüsü yapıştırma, toplu içe aktarma) uygulanır: (1) hiç pick yoksa yayın yok,
+ * (2) AGF favorisi (≥%25) gerekçesiz kaldıysa yayın yok. Önceden bu yalnız
+ * publishPrediction()'ın İÇİNDEYDİ — kod denetiminde bulundu ki parse-report/route.ts
+ * (markdown yapıştırma) ve analysis-importer.ts (toplu içe aktarma) hiçbir kontrolden
+ * geçmeden doğrudan "published:true" yazıyordu; bu da 2026-07-20 (eksik saha) ve
+ * 2026-07-24 (Ormello/AGF) hatalarının AYNISININ bu iki farklı kapıdan sessizce tekrar
+ * yaşanabileceği anlamına geliyordu. Artık üçü de (publishPrediction + iki dış giriş
+ * yolu) bu TEK fonksiyonu çağırıyor — kural tek yerde, atlanması imkansız.
+ */
+export async function assertPublishSafe(id: string): Promise<void> {
   // PublishChecklist formdan bağımsız bir bileşen — "Kaydet" hiç tıklanmamış veya
   // başarısız olmuş olsa bile 6 kutu işaretlenip Yayımla'ya basılabiliyordu. Bu,
   // gerçek üretimde picks'i boş ("published:true" ama 0 at) bir analizin yayınlanmasına
@@ -443,6 +457,12 @@ export async function publishPrediction(id: string) {
       }
     }
   }
+}
+
+export async function publishPrediction(id: string) {
+  await requireRole("EDITOR");
+
+  await assertPublishSafe(id);
 
   await db.prediction.update({
     where: { id },

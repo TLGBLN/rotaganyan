@@ -58,9 +58,17 @@ export default function MarkdownRaceInput({ raceId, raceLabel, defaultOpen = fal
         return;
       }
 
+      if (fullReport && data.publishWarning) {
+        setStatus("error");
+        setMessage(`Taslak olarak kaydedildi, YAYINLANMADI: ${data.publishWarning}`);
+        setRunners([]);
+        router.refresh();
+        return;
+      }
+
       setStatus("ok");
       if (fullReport) {
-        setMessage(`Tam rapor kaydedildi: ${data.picks} seçim, ${data.runners} at`);
+        setMessage(`Tam rapor kaydedildi ve yayınlandı: ${data.picks} seçim, ${data.runners} at`);
         setRunners([]);
       } else {
         setMessage(`${data.updated} at kaydedildi`);

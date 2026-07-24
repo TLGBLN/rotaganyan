@@ -4,6 +4,7 @@ import type { Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { parseFullReport } from "@/lib/md-report-parser";
 import { reconstructFlattenedMarkdown } from "@/lib/ai-paste-fix";
+import { completeFullField, assertPublishSafe, type PickInput } from "@/server/actions/prediction.actions";
 
 export async function POST(req: NextRequest) {
   try {
@@ -163,6 +164,23 @@ async function handlePost(req: NextRequest) {
     }
   }
 
+  // 2026-07-24 kod denetimi: bu route eskiden picks'i doğrudan yazıp published:true
+  // veriyordu — ne sahayı tamamlama (completeFullField) ne de yayın öncesi sert
+  // kurallar (assertPublishSafe: boş pick / gerekçesiz AGF favorisi) hiç çalışmıyordu.
+  // "NİHAİ SIRALAMA" şablonu yalnız ilk 6 atı içerdiği için, 7+ atlı her yapıştırmada
+  // saha eksik yayınlanabiliyordu — tam olarak 2026-07-20'de elle giriş için bulunup
+  // düzeltilen hatanın aynısı, farklı bir kapıdan. Artık iki fonksiyon da burada da çalışıyor.
+  const pickInputs: PickInput[] = parsed.picks.map((p) => ({
+    rank: p.rank,
+    runnerId: runnerIdByNo[p.no],
+    runnerLabel: `${p.no} ${p.name}`,
+    score: p.score ?? undefined,
+    details: p.details,
+    pedigreeRating: p.pedigreeRating,
+    isTarget: false,
+  }));
+  const completedPicks = await completeFullField(raceId, pickInputs);
+
   const prediction = await db.prediction.upsert({
     where: { raceId },
     create: {
@@ -176,8 +194,7 @@ async function handlePost(req: NextRequest) {
       couponWide: parsed.couponWide,
       isBanko: parsed.isBanko,
       bankoNote: parsed.bankoNote,
-      published: true,
-      publishedAt: new Date(),
+      published: false,
     },
     update: {
       confidence: parsed.confidence,
@@ -188,8 +205,6 @@ async function handlePost(req: NextRequest) {
       couponWide: parsed.couponWide,
       isBanko: parsed.isBanko,
       bankoNote: parsed.bankoNote,
-      published: true,
-      publishedAt: new Date(),
     },
   });
 
@@ -199,14 +214,14 @@ async function handlePost(req: NextRequest) {
   await db.$transaction(
     [
       db.pick.deleteMany({ where: { predictionId: prediction.id } }),
-      ...parsed.picks.map((p) =>
+      ...completedPicks.map((p) =>
         db.pick.create({
           data: {
             predictionId: prediction.id,
             rank: p.rank,
-            runnerId: runnerIdByNo[p.no] ?? null,
-            runnerLabel: `${p.no} ${p.name}`,
-            score: p.score,
+            runnerId: p.runnerId ?? null,
+            runnerLabel: p.runnerLabel,
+            score: p.score ?? null,
             details: p.details,
             pedigreeRating: p.pedigreeRating,
           },
@@ -216,12 +231,25 @@ async function handlePost(req: NextRequest) {
     { timeout: 30000 }
   );
 
+  // Yalnız sert kurallar geçerse otomatik yayınla — geçmezse taslak (published:false)
+  // olarak bırak ve admin'e nedenini bildir (mevcut bir yayının üstüne yapıştırıldıysa
+  // da, yeni veri kuralı geçmiyorsa yayından İNDİRİLİR — eski published:true'ya güvenilmez).
+  let publishWarning: string | null = null;
+  try {
+    await assertPublishSafe(prediction.id);
+    await db.prediction.update({ where: { id: prediction.id }, data: { published: true, publishedAt: new Date() } });
+  } catch (e) {
+    publishWarning = e instanceof Error ? e.message : "Yayınlanamadı, taslak olarak kaydedildi.";
+    await db.prediction.update({ where: { id: prediction.id }, data: { published: false } });
+  }
+
   return NextResponse.json({
     ok: true,
     predictionId: prediction.id,
-    picks: parsed.picks.length,
+    picks: completedPicks.length,
     runners: parsed.runners.length,
     aiFixed,
+    publishWarning,
     coupon: {
       narrow: parsed.couponNarrow,
       normal: parsed.couponNormal,
