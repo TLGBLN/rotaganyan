@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { startOfDay, endOfDay } from "date-fns";
 import type { Confidence, PedigreeRating } from "@prisma/client";
+import { findSireStat, findDamStat, mesafeBucket, surfaceToPist, breedToIrk } from "@/lib/sire-stat-match";
 
 type PickInput = {
   rank: number;
@@ -224,9 +225,9 @@ export async function getPublishChecklistAuto(predictionId: string): Promise<Che
       picks: { orderBy: { rank: "asc" }, select: { rank: true, runnerId: true } },
       race: {
         select: {
-          classType: true, distance: true,
+          classType: true, distance: true, breed: true, surface: true,
           runners: {
-            select: { id: true, no: true, name: true, scratched: true, agf: true, bestTime: true, raceStyle: true },
+            select: { id: true, no: true, name: true, scratched: true, agf: true, bestTime: true, raceStyle: true, sire: true, dam: true, damSire: true },
           },
         },
       },
@@ -286,6 +287,38 @@ export async function getPublishChecklistAuto(predictionId: string): Promise<Che
   } else {
     checks.push({ label: "⑥ Banko Kombinasyon", status: "PASS", detail: handikapVeyaGrup ? "Kombinasyon şartı sağlanıyor." : "Handikap/Grup değil, zorunlu değil." });
   }
+
+  // Kan Hattı — bu ırk/pist/mesafe kombinasyonunda aygır/kısrak istatistiği olumlu
+  // olan atları referans olarak gösterir (bilgi amaçlı, yayını engellemez). Metodolojinin
+  // sabit 6 maddesine dahil değil — Aygır/Kısrak İstatistiği verisi Faz2'ye zaten otomatik
+  // aktarılıyor, bu sadece yayın öncesi son bakışta aynı bilgiyi burada da özetler.
+  const irk = breedToIrk(pred.race.breed);
+  const pist = surfaceToPist(pred.race.surface);
+  const mesafe = mesafeBucket(pred.race.distance);
+  const [sirePool, damPool] = await Promise.all([
+    db.sireStat.findMany({ where: { irk, filtrePist: pist, filtreMesafe: mesafe } }),
+    db.damStat.findMany({ where: { irk, filtrePist: pist, filtreMesafe: mesafe } }),
+  ]);
+  const olumluAtlar = aktifAtlar
+    .map((r) => {
+      const sireMatch = findSireStat(r.sire, sirePool);
+      const damMatch = findDamStat(r.dam, r.damSire, damPool);
+      const sireOlumlu = sireMatch && sireMatch.kkKosulan >= 5 && (sireMatch.kkYuzde >= 15 || sireMatch.aei > 1);
+      const damOlumlu = damMatch && damMatch.start >= 3 && damMatch.kYuzde >= 20;
+      if (!sireOlumlu && !damOlumlu) return null;
+      const parts: string[] = [];
+      if (sireOlumlu) parts.push(`aygır K/K %${sireMatch!.kkYuzde}, AEI ${sireMatch!.aei}`);
+      if (damOlumlu) parts.push(`kısrak K% ${damMatch!.kYuzde}`);
+      return `#${r.no} ${r.name} (${parts.join(" · ")})`;
+    })
+    .filter((v): v is string => v !== null);
+  checks.push({
+    label: "Kan Hattı (Pist/Mesafe)",
+    status: "INFO",
+    detail: olumluAtlar.length
+      ? `${pist} ${mesafe} için olumlu kan hattı: ${olumluAtlar.join(", ")}`
+      : `${pist} ${mesafe} için olumlu (eşik üstü) kan hattı eşleşmesi yok.`,
+  });
 
   return checks;
 }
