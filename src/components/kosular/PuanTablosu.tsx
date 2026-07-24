@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { ProgramRaceDay } from "@/server/services/race.service";
+import { finishPos } from "@/lib/race-result";
 
 type Props = {
   raceDay: ProgramRaceDay;
@@ -26,12 +27,6 @@ function chunkIntoAltili<T extends Race>(
   if (g1.length > 0) result.push({ label: "1.Altılı", races: g1 });
   if (g2.length > 0) result.push({ label: "2.Altılı", races: g2 });
   return result;
-}
-
-function finishPos(actualOrder: unknown, runnerNo: number | null | undefined): number | null {
-  if (!Array.isArray(actualOrder) || runnerNo == null) return null;
-  const idx = (actualOrder as string[]).findIndex((s) => parseInt(s, 10) === runnerNo);
-  return idx >= 0 ? idx + 1 : null;
 }
 
 function rankColor(rank: number): string {

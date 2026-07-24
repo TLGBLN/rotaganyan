@@ -569,6 +569,52 @@ model DamStat {
   @@index([filtreMesafe, filtrePist])
 }
 
+// rotaganyan'ın KENDİ Runner/Result verisinden hesaplanan aygır istatistiği — yukarıdaki
+// SireStat (hipodromx.com'dan elle yapıştırılan, geniş tarihsel taban + AEI) ile PARALEL
+// çalışır, onun yerine geçmez. Yalnız irk×pist×mesafe kırılımı var (hipodromx'in
+// filtreYıl/filtreCins/filtreŞehir/filtreGrupListed/filtreYaşGrubu kırılımları yok —
+// kendi örneklemimiz küçük, daha ince kırılım örneklemi anlamsızlaştırır). AEI/ikramiye
+// hesaplanamıyor çünkü şemada hiçbir yerde ödül/purse verisi yok.
+model SireStatOwn {
+  id        String   @id @default(cuid())
+  sireName  String
+  irk       String
+  pist      String // surfaceToPist() değeri
+  mesafe    String // mesafeBucket() değeri
+  start     Int
+  birinci   Int
+  ikinci    Int
+  ucuncu    Int
+  dorduncu  Int
+  besinci   Int
+  kYuzde    Float
+  updatedAt DateTime @updatedAt
+
+  @@unique([sireName, irk, pist, mesafe])
+  @@index([sireName])
+}
+
+// DamStatOwn — bkz. SireStatOwn yorumu, aynı mantık kısrak+kısrak babası için.
+model DamStatOwn {
+  id          String   @id @default(cuid())
+  damName     String
+  damSireName String
+  irk         String
+  pist        String
+  mesafe      String
+  start       Int
+  birinci     Int
+  ikinci      Int
+  ucuncu      Int
+  dorduncu    Int
+  besinci     Int
+  kYuzde      Float
+  updatedAt   DateTime @updatedAt
+
+  @@unique([damName, damSireName, irk, pist, mesafe])
+  @@index([damName])
+}
+
 // ─── METHODOLOGY ──────────────────────────────────────────────────────────────
 
 model MethodologyVersion {

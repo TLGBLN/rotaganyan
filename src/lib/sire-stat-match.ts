@@ -63,9 +63,23 @@ export function findSireStat<T extends SireStatLite>(sireName: string | null | u
   return pool.find((s) => normalizeSireName(s.sireName) === norm) ?? null;
 }
 
+// rotaganyan'ın KENDİ Runner/Result verisinden hesaplanan tamamlayıcı sinyal (bkz.
+// SireStatOwn/DamStatOwn şema yorumu ve pedigri-own-stat.service.ts) — hipodromx
+// kaynaklı SireStatLite/DamStatLite'ın YERİNE değil YANINA ekleniyor, AEI/ikramiye
+// içermiyor (o veri şemada hiç yok). n<3 ise (tek-yarış-kalıcı-kural-olmaz ilkesiyle
+// tutarlı) formatlama fonksiyonları bunu sessizce atlar.
+const OWN_MIN_ORNEK = 3;
+
+export type SireStatOwnLite = { start: number; birinci: number; ikinci: number; ucuncu: number; kYuzde: number };
+export type DamStatOwnLite = { start: number; birinci: number; ikinci: number; ucuncu: number; kYuzde: number };
+
 /** Claude'a ve UI'a gösterilecek okunabilir tek satır özet. */
-export function formatSireStatOzet(s: SireStatLite, mesafe: string, pist: string): string {
-  return `${s.sireName} (${pist} ${mesafe}): yavruları ${s.kkKazanan}/${s.kkKosulan} koşuda kazandı (K/K %${s.kkYuzde}) · Start ${s.start} 1.${s.birinci}(K% ${s.kYuzde}) 2.${s.ikinci} 3.${s.ucuncu} · İkr ${s.ikramiye.toLocaleString("tr-TR")}₺ · AEI ${s.aei}${s.aei > 1 ? " (ortalama üstü)" : s.start > 0 ? " (ortalama altı)" : ""}`;
+export function formatSireStatOzet(s: SireStatLite, mesafe: string, pist: string, own?: SireStatOwnLite | null): string {
+  const base = `${s.sireName} (${pist} ${mesafe}): yavruları ${s.kkKazanan}/${s.kkKosulan} koşuda kazandı (K/K %${s.kkYuzde}) · Start ${s.start} 1.${s.birinci}(K% ${s.kYuzde}) 2.${s.ikinci} 3.${s.ucuncu} · İkr ${s.ikramiye.toLocaleString("tr-TR")}₺ · AEI ${s.aei}${s.aei > 1 ? " (ortalama üstü)" : s.start > 0 ? " (ortalama altı)" : ""}`;
+  if (own && own.start >= OWN_MIN_ORNEK) {
+    return `${base} · Kendi verimiz: ${own.start} start, K% ${own.kYuzde} (${own.birinci}/${own.start})`;
+  }
+  return base;
 }
 
 export type DamStatLite = {
@@ -96,6 +110,10 @@ export function findDamStat<T extends DamStatLite>(
   return (normDamSire && candidates.find((s) => normalizeSireName(s.damSireName) === normDamSire)) || candidates[0];
 }
 
-export function formatDamStatOzet(s: DamStatLite, mesafe: string, pist: string): string {
-  return `${s.damName} / ${s.damSireName} (${pist} ${mesafe}): ${s.atSayisi} yavru · Start ${s.start} 1.${s.birinci}(K% ${s.kYuzde}) 2.${s.ikinci} 3.${s.ucuncu} · İkr ${s.ikramiye.toLocaleString("tr-TR")}₺`;
+export function formatDamStatOzet(s: DamStatLite, mesafe: string, pist: string, own?: DamStatOwnLite | null): string {
+  const base = `${s.damName} / ${s.damSireName} (${pist} ${mesafe}): ${s.atSayisi} yavru · Start ${s.start} 1.${s.birinci}(K% ${s.kYuzde}) 2.${s.ikinci} 3.${s.ucuncu} · İkr ${s.ikramiye.toLocaleString("tr-TR")}₺`;
+  if (own && own.start >= OWN_MIN_ORNEK) {
+    return `${base} · Kendi verimiz: ${own.start} start, K% ${own.kYuzde} (${own.birinci}/${own.start})`;
+  }
+  return base;
 }

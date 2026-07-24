@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { startOfDay, endOfDay } from "date-fns";
 import type { Confidence, PedigreeRating } from "@prisma/client";
-import { findSireStat, findDamStat, mesafeBucket, surfaceToPist, breedToIrk } from "@/lib/sire-stat-match";
+import { findSireStat, findDamStat, mesafeBucket, surfaceToPist, breedToIrk, normalizeSireName } from "@/lib/sire-stat-match";
 
 type PickInput = {
   rank: number;
@@ -331,9 +331,11 @@ export async function getPublishChecklistAuto(predictionId: string): Promise<Che
   const irk = breedToIrk(pred.race.breed);
   const pist = surfaceToPist(pred.race.surface);
   const mesafe = mesafeBucket(pred.race.distance);
-  const [sirePool, damPool] = await Promise.all([
+  const [sirePool, damPool, sireOwnPool, damOwnPool] = await Promise.all([
     db.sireStat.findMany({ where: { irk, filtrePist: pist, filtreMesafe: mesafe } }),
     db.damStat.findMany({ where: { irk, filtrePist: pist, filtreMesafe: mesafe } }),
+    db.sireStatOwn.findMany({ where: { irk, pist, mesafe } }),
+    db.damStatOwn.findMany({ where: { irk, pist, mesafe } }),
   ]);
   const olumluAtlar = aktifAtlar
     .map((r) => {
@@ -341,10 +343,30 @@ export async function getPublishChecklistAuto(predictionId: string): Promise<Che
       const damMatch = findDamStat(r.dam, r.damSire, damPool);
       const sireOlumlu = sireMatch && sireMatch.kkKosulan >= 5 && (sireMatch.kkYuzde >= 15 || sireMatch.aei > 1);
       const damOlumlu = damMatch && damMatch.start >= 3 && damMatch.kYuzde >= 20;
-      if (!sireOlumlu && !damOlumlu) return null;
+
+      // Kendi verimiz — bkz. pedigri-own-stat.service.ts. hipodromx eşleşmesi olsa da
+      // olmasa da ayrıca kontrol edilir (iki kaynak birbirinden bağımsız "olumlu" verebilir).
+      const sireOwnMatch = r.sire
+        ? sireOwnPool.find((o) => normalizeSireName(o.sireName) === normalizeSireName(r.sire!))
+        : undefined;
+      const damOwnCandidates = r.dam
+        ? damOwnPool.filter((o) => normalizeSireName(o.damName) === normalizeSireName(r.dam!))
+        : [];
+      const damOwnMatch =
+        damOwnCandidates.length === 0
+          ? undefined
+          : damOwnCandidates.length === 1
+            ? damOwnCandidates[0]
+            : (r.damSire && damOwnCandidates.find((o) => normalizeSireName(o.damSireName) === normalizeSireName(r.damSire!))) || damOwnCandidates[0];
+      const sireOwnOlumlu = sireOwnMatch && sireOwnMatch.start >= 3 && sireOwnMatch.kYuzde >= 20;
+      const damOwnOlumlu = damOwnMatch && damOwnMatch.start >= 3 && damOwnMatch.kYuzde >= 20;
+
+      if (!sireOlumlu && !damOlumlu && !sireOwnOlumlu && !damOwnOlumlu) return null;
       const parts: string[] = [];
       if (sireOlumlu) parts.push(`aygır K/K %${sireMatch!.kkYuzde}, AEI ${sireMatch!.aei}`);
       if (damOlumlu) parts.push(`kısrak K% ${damMatch!.kYuzde}`);
+      if (sireOwnOlumlu) parts.push(`aygır K% ${sireOwnMatch!.kYuzde} (kendi veri, ${sireOwnMatch!.start} start)`);
+      if (damOwnOlumlu) parts.push(`kısrak K% ${damOwnMatch!.kYuzde} (kendi veri, ${damOwnMatch!.start} start)`);
       return `#${r.no} ${r.name} (${parts.join(" · ")})`;
     })
     .filter((v): v is string => v !== null);

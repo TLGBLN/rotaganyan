@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { parseSireStatBulk } from "@/lib/sire-stat-parser";
-import { breedToIrk, surfaceToPist, mesafeBucket, findSireStat, formatSireStatOzet } from "@/lib/sire-stat-match";
+import { breedToIrk, surfaceToPist, mesafeBucket, findSireStat, formatSireStatOzet, normalizeSireName } from "@/lib/sire-stat-match";
 
 export type SireStatFiltre = {
   irk: string;
@@ -79,9 +79,17 @@ export async function getSireStatOzetleriForRace(
   const irk = breedToIrk(breed);
   const pist = surfaceToPist(surface);
   const mesafe = mesafeBucket(distance);
-  const pool = await db.sireStat.findMany({ where: { irk, filtrePist: pist, filtreMesafe: mesafe } });
+  const [pool, ownPool] = await Promise.all([
+    db.sireStat.findMany({ where: { irk, filtrePist: pist, filtreMesafe: mesafe } }),
+    db.sireStatOwn.findMany({ where: { irk, pist, mesafe } }),
+  ]);
   return sireNames.map((name) => {
     const match = findSireStat(name, pool);
-    return match ? formatSireStatOzet(match, mesafe, pist) : null;
+    const ownMatch = name ? ownPool.find((o) => normalizeSireName(o.sireName) === normalizeSireName(name)) ?? null : null;
+    if (match) return formatSireStatOzet(match, mesafe, pist, ownMatch);
+    // hipodromx eşleşmesi yok ama kendi verimizde varsa, yalnız kendi veriyle özet göster.
+    return ownMatch && ownMatch.start >= 3
+      ? `${name} (${pist} ${mesafe}): Kendi verimiz: ${ownMatch.start} start, K% ${ownMatch.kYuzde} (${ownMatch.birinci}/${ownMatch.start})`
+      : null;
   });
 }

@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { parseDamStatBulk } from "@/lib/dam-stat-parser";
-import { breedToIrk, surfaceToPist, mesafeBucket, findDamStat, formatDamStatOzet } from "@/lib/sire-stat-match";
+import { breedToIrk, surfaceToPist, mesafeBucket, findDamStat, formatDamStatOzet, normalizeSireName } from "@/lib/sire-stat-match";
 
 export type DamStatFiltre = {
   irk: string;
@@ -77,9 +77,25 @@ export async function getDamStatOzetleriForRace(
   const irk = breedToIrk(breed);
   const pist = surfaceToPist(surface);
   const mesafe = mesafeBucket(distance);
-  const pool = await db.damStat.findMany({ where: { irk, filtrePist: pist, filtreMesafe: mesafe } });
+  const [pool, ownPool] = await Promise.all([
+    db.damStat.findMany({ where: { irk, filtrePist: pist, filtreMesafe: mesafe } }),
+    db.damStatOwn.findMany({ where: { irk, pist, mesafe } }),
+  ]);
   return dams.map(({ dam, damSire }) => {
     const match = findDamStat(dam, damSire, pool);
-    return match ? formatDamStatOzet(match, mesafe, pist) : null;
+    const ownCandidates = dam
+      ? ownPool.filter((o) => normalizeSireName(o.damName) === normalizeSireName(dam))
+      : [];
+    const ownMatch =
+      ownCandidates.length === 0
+        ? null
+        : ownCandidates.length === 1
+          ? ownCandidates[0]
+          : (damSire && ownCandidates.find((o) => normalizeSireName(o.damSireName) === normalizeSireName(damSire))) || ownCandidates[0];
+    if (match) return formatDamStatOzet(match, mesafe, pist, ownMatch);
+    // hipodromx eşleşmesi yok ama kendi verimizde varsa, yalnız kendi veriyle özet göster.
+    return ownMatch && ownMatch.start >= 3
+      ? `${dam} / ${ownMatch.damSireName} (${pist} ${mesafe}): Kendi verimiz: ${ownMatch.start} start, K% ${ownMatch.kYuzde} (${ownMatch.birinci}/${ownMatch.start})`
+      : null;
   });
 }
