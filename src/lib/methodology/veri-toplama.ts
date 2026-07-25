@@ -23,7 +23,7 @@ import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getDamStatOzetleriForRace } from "@/server/actions/dam-stat.actions";
 import {
   hpKalitesiYildizi, sinifGecisBonusu, galopSiniflandirmasi, tempoGuvenSeviyesi,
-  kacakHaritasi, zeminKatsayisi, zeminDetayiBul, type GalopZinciriSonuc, type TempoGuven,
+  kacakHaritasi, zeminKatsayisi, zeminDetayiBul, zeminDetayiSatirdanCikar, type GalopZinciriSonuc, type TempoGuven,
 } from "@/lib/methodology/mekanik-puanlama";
 import { analizEtTekYaris, hesaplaCokYarisEgilimi, type PaceCheckpoint, type CokYarisEgilim } from "@/lib/methodology/pace-analizi";
 
@@ -577,7 +577,14 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       const aynıPistMesafeOzet = aynıPistMesafeKayitlari.length > 0
         ? aynıPistMesafeKayitlari
             .slice(0, 3)
-            .map((row) => `${row.date} ${row.finishPos || "?"}. (HP ${row.hp || "?"})`)
+            .map((row) => {
+              // TJK'nın ham "surface" metni ("Ç:Normal 3.3" gibi) zaten zemin DURUMUNU
+              // (yalnız pist türünü değil) taşıyor — daha önce hiç kullanılmıyordu. Ayıklanamazsa
+              // (nadiren, format farklıysa) sessizce etiket eklenmez — "Normal" UYDURULMAZ.
+              const zeminDetay = zeminDetayiSatirdanCikar(row.surface);
+              const zeminEk = zeminDetay ? ` [Zemin: ${zeminKatsayisi(zeminDetay).etiket}]` : "";
+              return `${row.date} ${row.finishPos || "?"}. (HP ${row.hp || "?"})${zeminEk}`;
+            })
             .join(" | ")
         : null;
 

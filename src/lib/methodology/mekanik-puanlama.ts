@@ -127,3 +127,18 @@ export function zeminDetayiBul(
   const found = surfaceConditions.find((c) => pattern.test(c.label));
   return found?.detail ?? null;
 }
+
+// 2026-07-25: kullanıcı tespiti — TJK'nın "At Koşu Bilgileri" sayfasından (atPerformans.
+// actions.ts) her geçmiş kayıt için zaten "Ç:Normal 3.3" / "K:Islak" gibi ham bir "surface"
+// metni çekiliyordu, içinde zemin DURUMU (yalnız pist TÜRÜ değil) de vardı — ama bu bilgi
+// hiç kullanılmadan atılıyordu. Yağışlı havalarda pist ıslanıyor/ağırlaşıyor, hatta bazen
+// Çim→Kum'a alınıyor (TJK bunu KENDİ resmi kaydında doğru yansıtıyor, biz ekstra bir şey
+// yapmamıza gerek yok) — bir atın geçmiş performansını bugünkü zeminle kıyaslarken hangi
+// zeminde koştuğunu bilmek gerekir. "Ç:Normal 3.3" gibi bir metinden ":"den sonrasını
+// (zeminKatsayisi'nin zaten anladığı format) ayıklayıp aynı sınıflandırmayı uygular.
+export function zeminDetayiSatirdanCikar(rawSurface: string | null | undefined): string | null {
+  if (!rawSurface) return null;
+  const idx = rawSurface.indexOf(":");
+  if (idx === -1) return null;
+  return rawSurface.slice(idx + 1).trim() || null;
+}
