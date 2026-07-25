@@ -3,7 +3,7 @@ import { auth, hasRole } from "@/lib/auth";
 import { degerlendir, metin, type AtGirdisi } from "@/lib/methodology/gecit-motoru";
 import type { Faz1Sonuc } from "@/lib/methodology/veri-toplama";
 import {
-  createWithTruncationRetry, extractText,
+  createWithTruncationRetry, extractText, trimMetodolojiFaz4Icin,
   FAZ4_RANK_SCHEMA, FAZ_SHARED_SCHEMA, type Faz2Atlar, type Faz4DecisionPick, type Faz4RankResult,
 } from "@/lib/methodology/claude-analiz-helpers";
 
@@ -48,11 +48,16 @@ async function handlePost(req: NextRequest) {
   // gerçek ölçümde çoğunlukla dolmuş çıkıyordu. NOT: Anthropic'in cache'i hiyerarşik
   // hash'leniyor (tools/output_config.format → system → messages) — output_config.format
   // farklıysa ondan SONRAKİ her şey (metodoloji+veri birebir aynı olsa bile) geçersiz
-  // sayılıyor. 2026-07-25: METODOLOJI_V2=1 iken Faz2/Faz4/Faz4-final ÜÇÜ DE aynı
-  // (FAZ_SHARED_SCHEMA, tek paylaşılan sabit) şemayı kullanıyor VE metin hiç
-  // kısaltılmıyor — yani üçü de birebir aynı prefix'i paylaşıyor. Faz2 cache'i yazar,
-  // Faz4/Faz4-final ucuza okur (gerçek loglarda doğrulandı — bkz. proje notu).
-  const effectiveSharedContext = sharedContext;
+  // sayılıyor. Faz2 hep farklı şema (FAZ2_SCHEMA) kullandığı için Faz4/Faz4-final'le
+  // ASLA cache paylaşamaz (Faz2'yi de katma denemesi "Grammar compilation timed out"
+  // hatası verdi, geri alındı — bkz. claude-analiz-helpers.ts'teki FAZ_SHARED_SCHEMA
+  // yorumu). Faz4 ile Faz4-final ARASINDA ise (METODOLOJI_V2=1 iken) AYNI şemayı
+  // (FAZ_SHARED_SCHEMA) kullanıyorlar — gerçek loglarda cacheRead>0 ile doğrulandı.
+  //
+  // DENEYSEL: METODOLOJI_V2=1 açıkken, Faz4'ün girdisinde karşılığı olmayan salt-Faz2
+  // bölümleri (bkz. trimMetodolojiFaz4Icin yorumu) çıkarılıyor — yalnız input token
+  // maliyetini düşürmek için.
+  const effectiveSharedContext = METODOLOJI_V2 ? trimMetodolojiFaz4Icin(sharedContext) : sharedContext;
   const sharedContextBlock: Anthropic.TextBlockParam = {
     type: "text",
     text: effectiveSharedContext,
