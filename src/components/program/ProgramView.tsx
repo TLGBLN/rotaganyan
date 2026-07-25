@@ -33,13 +33,15 @@ const PANEL_BTN_OPEN = "bg-brand text-brand-foreground";
 const PANEL_BTN_CLOSED = "bg-white/5 text-[#c7d0dc] border border-white/10 hover:bg-white/10";
 
 // Koşu tab'ları — kullanıcı isteği: TJK'nın kendi sitesindeki gibi pist türüne göre
-// renklendirilsin. r.surface, Race.surface'ten geliyor ve program senkronu her
-// çalıştığında güncelleniyor — pist değişikliği (yağışta çim→kum gibi) olursa bir
+// renklendirilsin, TJK'nın KENDİ renk kodlarıyla birebir (bkz. tjk.adapter.ts'teki
+// "Son 6 Yarış" font-color notu: #009900=Çim, #996633=Kum, #d39b1e=Sentetik — aynı
+// kaynak, tek yerde tutarlı). r.surface, Race.surface'ten geliyor ve program senkronu
+// her çalıştığında güncelleniyor — pist değişikliği (yağışta çim→kum gibi) olursa bir
 // sonraki senkronda burası da otomatik güncellenir, sabit/statik değil.
 const SURFACE_TAB_BG: Record<string, string> = {
-  CIM: "bg-emerald-700/25 hover:bg-emerald-700/40",
-  KUM: "bg-amber-800/25 hover:bg-amber-800/40",
-  SENTETIK: "bg-sky-700/25 hover:bg-sky-700/40",
+  CIM: "bg-[#009900] hover:bg-[#00b300] text-white",
+  KUM: "bg-[#996633] hover:bg-[#a8754a] text-white",
+  SENTETIK: "bg-[#D39B1E] hover:bg-[#e0ab3a] text-white",
 };
 
 // ── Geri sayım (Turkey UTC+3) ────────────────────────────────────────────────
@@ -1294,16 +1296,16 @@ export default function ProgramView({
                 key={r.raceNo}
                 onClick={() => setActiveRace((prev) => ({ ...prev, [currentDay.hippodromeSlug]: r.raceNo }))}
                 className={cn(
-                  "relative shrink-0 px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap",
+                  "relative shrink-0 px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap",
                   SURFACE_TAB_BG[r.surface],
                   selectedRaceNo(currentDay) === r.raceNo
-                    ? "border-b-2 border-[#c0392b] text-[#c0392b]"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "ring-2 ring-inset ring-white shadow-inner"
+                    : "opacity-70 hover:opacity-100"
                 )}
               >
                 {r.raceNo}. Koşu
                 {r.hasAnalysis && (
-                  <span className="absolute top-1 right-0.5 w-1.5 h-1.5 rounded-full bg-[#27ae60]" />
+                  <span className="absolute top-1 right-0.5 w-1.5 h-1.5 rounded-full bg-[#27ae60] ring-1 ring-white" />
                 )}
               </button>
             ))}
