@@ -1314,7 +1314,7 @@ export default function ProgramView({
           </div>
 
           {/* Pist durumu + hava (TJK) */}
-          {((currentDay.surfaceConditions?.length ?? 0) > 0 || currentDay.weather) && (
+          {((currentDay.surfaceConditions?.length ?? 0) > 0 || currentDay.weather || currentRace) && (
             <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 bg-muted/10 border-b text-[11px]">
               {currentDay.surfaceConditions?.map((c, i) => (
                 <span
@@ -1330,6 +1330,14 @@ export default function ProgramView({
                 </span>
               ))}
               {currentDay.weather && <span className="text-muted-foreground">{currentDay.weather}</span>}
+              {currentRace && (
+                <button
+                  onClick={() => setHipodromOzellikleriOpen(true)}
+                  className="sm:hidden ml-auto shrink-0 rounded border px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground whitespace-nowrap"
+                >
+                  Hipodrom Özellikleri
+                </button>
+              )}
             </div>
           )}
 
@@ -1402,7 +1410,7 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => setHipodromOzellikleriOpen(true)}
-                  className={cn(PANEL_BTN_CLASS, PANEL_BTN_CLOSED)}
+                  className={cn(PANEL_BTN_CLASS, PANEL_BTN_CLOSED, "hidden sm:flex")}
                 >
                   Hipodrom Özellikleri
                 </button>
