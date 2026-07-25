@@ -3,12 +3,35 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { getAtPerformansForRace, type AtPerformansRunnerData } from "@/server/actions/at-performans.actions";
+import { zeminDetayiSatirdanCikar, zeminKatsayisi } from "@/lib/methodology/mekanik-puanlama";
 
 function surfaceShort(raw: string): string {
   if (raw.startsWith("Ç")) return "Çim";
   if (raw.startsWith("S")) return "Sentetik";
   if (raw.startsWith("K")) return "Kum";
   return raw || "—";
+}
+
+function zeminEtiketi(raw: string): string | null {
+  const detay = zeminDetayiSatirdanCikar(raw);
+  if (!detay) return null;
+  const z = zeminKatsayisi(detay);
+  return z.katsayi === 1.0 ? null : z.etiket;
+}
+
+/** "1.24.13" (dk.sn.yüzde) veya "58.13" (sn.yüzde) formatındaki dereceyi karşılaştırılabilir
+ * bir sayıya (yüzde-saniye) çevirir — küçük değer daha iyi derece demektir. Ayrıştırılamazsa null. */
+function parseTime(raw: string): number | null {
+  const nums = raw.trim().split(".").map(Number);
+  if (nums.length === 3 && nums.every((n) => Number.isFinite(n))) {
+    const [min, sec, hs] = nums;
+    return min * 6000 + sec * 100 + hs;
+  }
+  if (nums.length === 2 && nums.every((n) => Number.isFinite(n))) {
+    const [sec, hs] = nums;
+    return sec * 100 + hs;
+  }
+  return null;
 }
 
 export default function ComparisonPanel({ raceId }: { raceId: string }) {
@@ -28,7 +51,13 @@ export default function ComparisonPanel({ raceId }: { raceId: string }) {
     return () => { cancelled = true; };
   }, [raceId, retryKey]);
 
-  const withRecords = (data ?? []).filter((d) => d.records.length > 0);
+  const withRecords = (data ?? [])
+    .filter((d) => d.records.length > 0)
+    .sort((a, b) => {
+      const bestA = Math.min(...a.records.map((r) => parseTime(r.time) ?? Infinity));
+      const bestB = Math.min(...b.records.map((r) => parseTime(r.time) ?? Infinity));
+      return bestA - bestB;
+    });
 
   return (
     <div className="border-t">
@@ -102,7 +131,12 @@ export default function ComparisonPanel({ raceId }: { raceId: string }) {
                         <td className="px-2 py-1.5 whitespace-nowrap">{rec.city || "—"}</td>
                         <td className="px-2 py-1.5 text-center tabular-nums">{rec.raceNo || "—"}</td>
                         <td className="px-2 py-1.5 text-center tabular-nums">{rec.distance || "—"}</td>
-                        <td className="px-2 py-1.5 whitespace-nowrap">{surfaceShort(rec.surface)}</td>
+                        <td className="px-2 py-1.5 whitespace-nowrap">
+                          {surfaceShort(rec.surface)}
+                          {zeminEtiketi(rec.surface) && (
+                            <div className="text-[10px] text-muted-foreground">{zeminEtiketi(rec.surface)}</div>
+                          )}
+                        </td>
                         <td className={cn("px-2 py-1.5 text-center font-semibold tabular-nums", rec.finishPos === "1" && "text-hit")}>
                           {rec.finishPos || "—"}
                         </td>
@@ -141,7 +175,10 @@ export default function ComparisonPanel({ raceId }: { raceId: string }) {
                       </div>
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 font-mono tabular-nums text-muted-foreground">
                         <span>{rec.time || "—"}</span>
-                        <span>{rec.distance}m · {surfaceShort(rec.surface)}</span>
+                        <span>
+                          {rec.distance}m · {surfaceShort(rec.surface)}
+                          {zeminEtiketi(rec.surface) && <> ({zeminEtiketi(rec.surface)})</>}
+                        </span>
                         <span>{rec.weight ? `${rec.weight}kg` : "—"}</span>
                         {rec.ganyan && <span>Gny {rec.ganyan}</span>}
                       </div>

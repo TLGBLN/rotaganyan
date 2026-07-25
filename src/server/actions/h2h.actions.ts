@@ -20,6 +20,8 @@ export type H2HEncounter = {
   date: string; // TJK formatı: "15.07.2026"
   hippodrome: string;
   raceNo: string;
+  distance: number;
+  surface: string; // TJK ham metni ("Ç:Normal 3.3" gibi) — pist tipi + zemin durumu
   results: H2HResult[];
 };
 
@@ -79,6 +81,8 @@ export async function getH2HForRace(raceId: string): Promise<H2HEncounter[]> {
       date: v.date,
       hippodrome: v.city,
       raceNo: v.raceNo,
+      distance: v.entries[0].row.distance,
+      surface: v.entries[0].row.surface,
       results: v.entries
         .map((e) => ({
           horseName: e.horseName,

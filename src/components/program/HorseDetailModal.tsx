@@ -125,7 +125,12 @@ export default function HorseDetailModal({ name, onClose }: { name: string; onCl
                         </td>
                         <td className="px-2 py-1.5">{h.hippodrome} · {h.raceNo}.K</td>
                         <td className="px-2 py-1.5 text-center tabular-nums">{h.distance}m</td>
-                        <td className={cn("px-2 py-1.5 text-center font-medium", surf.cls)}>{surf.label}</td>
+                        <td className={cn("px-2 py-1.5 text-center font-medium", surf.cls)}>
+                          {surf.label}
+                          {h.zeminEtiketi && (
+                            <div className="text-[10px] font-normal text-muted-foreground">{h.zeminEtiketi}</div>
+                          )}
+                        </td>
                         <td className="px-2 py-1.5">{h.jockey ?? "—"}</td>
                         <td className="px-2 py-1.5 text-center tabular-nums">{h.weight ?? "—"}</td>
                         <td className="px-2 py-1.5 text-center tabular-nums font-mono">{h.hp ?? "—"}</td>

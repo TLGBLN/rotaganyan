@@ -3,6 +3,21 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { getH2HForRace, type H2HEncounter } from "@/server/actions/h2h.actions";
+import { zeminDetayiSatirdanCikar, zeminKatsayisi } from "@/lib/methodology/mekanik-puanlama";
+
+function surfaceShort(raw: string): string {
+  if (raw.startsWith("Ç")) return "Çim";
+  if (raw.startsWith("S")) return "Sentetik";
+  if (raw.startsWith("K")) return "Kum";
+  return raw || "—";
+}
+
+function zeminEtiketi(raw: string): string | null {
+  const detay = zeminDetayiSatirdanCikar(raw);
+  if (!detay) return null;
+  const z = zeminKatsayisi(detay);
+  return z.katsayi === 1.0 ? null : z.etiket;
+}
 
 export default function H2HPanel({ raceId }: { raceId: string }) {
   const [data, setData] = useState<H2HEncounter[] | null>(null);
@@ -52,6 +67,7 @@ export default function H2HPanel({ raceId }: { raceId: string }) {
                   <th className="px-2 py-1.5 text-left font-medium">Tarih</th>
                   <th className="px-2 py-1.5 text-left font-medium">Hipodrom</th>
                   <th className="px-2 py-1.5 text-center font-medium">K.No</th>
+                  <th className="px-2 py-1.5 text-left font-medium">Mesafe/Pist</th>
                   <th className="px-2 py-1.5 text-left font-medium">At</th>
                   <th className="px-2 py-1.5 text-center font-medium">S</th>
                   <th className="px-2 py-1.5 text-center font-medium">Derece</th>
@@ -84,6 +100,12 @@ export default function H2HPanel({ raceId }: { raceId: string }) {
                             <td rowSpan={enc.results.length} className="px-2 py-1.5 align-top text-center tabular-nums">
                               {enc.raceNo}
                             </td>
+                            <td rowSpan={enc.results.length} className="px-2 py-1.5 align-top whitespace-nowrap">
+                              {enc.distance}m · {surfaceShort(enc.surface)}
+                              {zeminEtiketi(enc.surface) && (
+                                <div className="text-[10px] text-muted-foreground">{zeminEtiketi(enc.surface)}</div>
+                              )}
+                            </td>
                           </>
                         )}
                         <td className="px-2 py-1.5 font-semibold whitespace-nowrap">{r.horseName}</td>
@@ -108,7 +130,8 @@ export default function H2HPanel({ raceId }: { raceId: string }) {
             {data.map((enc) => (
               <div key={enc.key} className="px-3 py-2.5">
                 <div className="text-[11px] text-muted-foreground mb-1.5">
-                  {enc.hippodrome} · {enc.raceNo}. Koşu · {enc.date}
+                  {enc.hippodrome} · {enc.raceNo}. Koşu · {enc.date} · {enc.distance}m {surfaceShort(enc.surface)}
+                  {zeminEtiketi(enc.surface) && <> ({zeminEtiketi(enc.surface)})</>}
                 </div>
                 <div className="space-y-1">
                   {enc.results.map((r, i) => (
