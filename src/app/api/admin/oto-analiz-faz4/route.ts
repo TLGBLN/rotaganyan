@@ -4,8 +4,10 @@ import { degerlendir, metin, type AtGirdisi } from "@/lib/methodology/gecit-moto
 import type { Faz1Sonuc } from "@/lib/methodology/veri-toplama";
 import {
   createWithTruncationRetry, extractText, trimMetodolojiFaz4Icin,
-  FAZ4_RANK_SCHEMA, type Faz2Atlar, type Faz4DecisionPick, type Faz4RankResult,
+  FAZ4_RANK_SCHEMA, FAZ4_UNIFIED_SCHEMA, type Faz2Atlar, type Faz4DecisionPick, type Faz4RankResult,
 } from "@/lib/methodology/claude-analiz-helpers";
+
+const METODOLOJI_V2 = process.env.METODOLOJI_V2 === "1";
 import { getRecentCachedResult } from "@/lib/claude-cost";
 import type { Anthropic } from "@anthropic-ai/sdk";
 import type { Role } from "@prisma/client";
@@ -43,15 +45,19 @@ async function handlePost(req: NextRequest) {
   // BİREBİR AYNI metni tekrar göndermek Anthropic'in ~%90 indirimli "cache read"
   // fiyatından okumasını sağlıyor, analiz kalitesini etkilemiyor. 1 saatlik TTL
   // (Faz2'deki ile eşleşmeli) — bkz. o dosyadaki not: 5dk'lık varsayılan pencere
-  // gerçek ölçümde çoğunlukla dolmuş çıkıyordu. NOT: Faz2/Faz4/Faz4-final zaten farklı
-  // output_config.format şeması kullandığı için üçü arasında (Anthropic'in kendi
-  // dokümantasyonuna göre) cache HİÇBİR ZAMAN gerçek isabet almıyor — bu blok yine de
-  // Faz2 ile birebir aynı kalmalı (METODOLOJI_V2 kapalıyken), aksi halde tutarlılık bozulur.
+  // gerçek ölçümde çoğunlukla dolmuş çıkıyordu. NOT: Anthropic'in cache'i hiyerarşik
+  // hash'leniyor (tools/output_config.format → system → messages) — output_config.format
+  // farklıysa ondan SONRAKİ her şey (metodoloji+veri birebir aynı olsa bile) geçersiz
+  // sayılıyor. Faz2 hep farklı şema (FAZ2_SCHEMA) kullandığı için Faz4/Faz4-final'le
+  // ASLA cache paylaşamaz — üstelik Faz2'nin girdisi hiç kısaltılmıyor da, içerik zaten
+  // farklı. Faz4 ile Faz4-final ARASINDA ise (METODOLOJI_V2=1 iken) artık AYNI şemayı
+  // (FAZ4_UNIFIED_SCHEMA, tek paylaşılan sabit) kullanıyorlar — bu ikisi arasında cache
+  // isabeti teorik olarak mümkün olmalı, gerçek loglarda cacheRead ile doğrulanacak.
   //
   // 2026-07-25 DENEYSEL: METODOLOJI_V2=1 açıkken, Faz4'ün girdisinde karşılığı olmayan
   // salt-Faz2 bölümleri (bkz. trimMetodolojiFaz4Icin yorumu) çıkarılıyor — yalnız input
   // token maliyetini düşürmek için, A/B karşılaştırmasından geçmeden varsayılan yapılmadı.
-  const effectiveSharedContext = process.env.METODOLOJI_V2 === "1" ? trimMetodolojiFaz4Icin(sharedContext) : sharedContext;
+  const effectiveSharedContext = METODOLOJI_V2 ? trimMetodolojiFaz4Icin(sharedContext) : sharedContext;
   const sharedContextBlock: Anthropic.TextBlockParam = {
     type: "text",
     text: effectiveSharedContext,
@@ -163,7 +169,7 @@ details örnekleri: AGF1, Galop K1, Kilo düştü, Sicil, Sınıf düşüşü, J
         // 26000+ token'a çıkmış. Tavan, geçmişteki gerçek maksimumun üstüne, split-
         // öncesi (32000/40000) orijinal güvenli değere geri çıkarıldı.
         max_tokens: 32000,
-        output_config: { format: { type: "json_schema", schema: FAZ4_RANK_SCHEMA } },
+        output_config: { format: { type: "json_schema", schema: METODOLOJI_V2 ? FAZ4_UNIFIED_SCHEMA : FAZ4_RANK_SCHEMA } },
         messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz4Tail }] }],
       },
       raceId, "faz4", 40000

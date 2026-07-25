@@ -341,6 +341,66 @@ export const FAZ4_FINAL_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+// DENEYSEL (yalnız METODOLOJI_V2=1 açıkken, Faz4 + Faz4-final için kullanılır — Faz2
+// hariç, çünkü Faz2'nin girdisi zaten hiç kısaltılmıyor, o yüzden Faz4/Faz4-final'le
+// asla aynı prefix'i paylaşamaz). Anthropic'in prompt cache'i hiyerarşik hash'leniyor:
+// tools/output_config.format → system → messages sırasıyla. Şema farklıysa, ondan
+// SONRAKİ her şey (metodoloji+veri birebir aynı olsa bile) otomatik geçersiz sayılıyor
+// — dış incelemede doğrulandı, gerçek loglarda da 3 çağrının 3'ünde de cacheRead=0
+// görüldü. Çözüm: Faz4 ve Faz4-final'in TEK VE AYNI şemayı (aynı JS objesi, aynı
+// referans — anahtar sırası da dahil bayt-bayt eşleşsin diye) kullanması. Hiçbir alan
+// `required` değil (JSON Schema kuralı: required'da olmayan alan tamamen atlanabilir) —
+// Faz4 yalnız "picks" doldurur, Faz4-final yalnız "gerekceler"+banko/kupon alanlarını;
+// öbür fazın alanları şemada TANIMLI ama zorunlu olmadığı için model onları doldurmaya
+// mecbur kalmaz. Prompt METNİ zaten hangi alanların isteneceğini açıkça söylüyor.
+// Güvenlik: her route yalnız kendi ilgili alanını (result.picks / result.gerekceler vb.)
+// okuyor — modelin şemada izinli ama alakasız bir alanı doldurması durumunda bile o veri
+// hiçbir zaman kullanılmıyor, sessizce göz ardı ediliyor.
+export const FAZ4_UNIFIED_SCHEMA = {
+  type: "object",
+  properties: {
+    picks: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          rank: { type: "integer" },
+          no: { type: "integer" },
+          name: { type: "string" },
+          score: { type: "integer" },
+          pedigreeRating: {
+            type: "string",
+            enum: ["COK_YUKSEK", "YUKSEK", "GUCLU", "ORTA", "DUSUK", "ZAYIF", "SORU", "BILINMIYOR"],
+          },
+          isTarget: { type: "boolean" },
+          details: { type: "array", items: { type: "string" } },
+        },
+        required: ["rank", "no", "name", "score", "pedigreeRating", "isTarget", "details"],
+        additionalProperties: false,
+      },
+    },
+    gerekceler: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { no: { type: "integer" }, note: { type: "string" } },
+        required: ["no", "note"],
+        additionalProperties: false,
+      },
+    },
+    confidence: { type: "string", enum: ["DUSUK", "ORTA", "YUKSEK"] },
+    isBanko: { type: "boolean" },
+    bankoNote: { type: "string" },
+    notes: { type: "string" },
+    tempo: { type: "string" },
+    couponNarrow: { type: "string" },
+    couponNormal: { type: "string" },
+    couponWide: { type: "string" },
+  },
+  required: [],
+  additionalProperties: false,
+} as const;
+
 export type Faz2Atlar = {
   atlar: { no: number; ad: string; puan: number; teknikSira: number | null }[];
 };
