@@ -112,8 +112,11 @@ export function zeminKatsayisi(detail: string | null | undefined): ZeminKatsayis
   const islak = /ıslak|islak/.test(d);
   const agir = /ağır|agir/.test(d);
   const hafif = /hafif/.test(d);
+  // "Nemli" — kullanıcının orijinal örneğinde ("Kum: Nemli") gördüğümüz ama regex'in
+  // hiç yakalamadığı bir TJK ifadesi; ıslak kadar ağır değil, kuru/normal de sayılmaz.
+  const nemli = /nemli/.test(d);
   if (agir || (islak && !hafif)) return { katsayi: 1.3, etiket: "Islak/Ağır" };
-  if (islak && hafif) return { katsayi: 1.15, etiket: "Hafif Islak" };
+  if ((islak && hafif) || nemli) return { katsayi: 1.15, etiket: "Hafif Islak/Nemli" };
   return { katsayi: 1.0, etiket: "Sert/Normal" };
 }
 

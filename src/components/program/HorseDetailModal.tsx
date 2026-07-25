@@ -107,6 +107,7 @@ export default function HorseDetailModal({ name, onClose }: { name: string; onCl
                     <th className="px-2 py-1.5 text-left">Hipodrom</th>
                     <th className="px-2 py-1.5 text-center">Mesafe</th>
                     <th className="px-2 py-1.5 text-center">Pist</th>
+                    <th className="px-2 py-1.5 text-left">Cins</th>
                     <th className="px-2 py-1.5 text-left">Jokey</th>
                     <th className="px-2 py-1.5 text-center">Kilo</th>
                     <th className="px-2 py-1.5 text-center">H.P</th>
@@ -131,6 +132,7 @@ export default function HorseDetailModal({ name, onClose }: { name: string; onCl
                             <div className="text-[10px] font-normal text-muted-foreground">{h.zeminEtiketi}</div>
                           )}
                         </td>
+                        <td className="px-2 py-1.5 whitespace-nowrap">{h.classType || "—"}</td>
                         <td className="px-2 py-1.5">{h.jockey ?? "—"}</td>
                         <td className="px-2 py-1.5 text-center tabular-nums">{h.weight ?? "—"}</td>
                         <td className="px-2 py-1.5 text-center tabular-nums font-mono">{h.hp ?? "—"}</td>
