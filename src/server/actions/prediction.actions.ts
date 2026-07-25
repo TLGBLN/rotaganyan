@@ -128,8 +128,9 @@ async function syncKarmaMirrors(predictionId: string): Promise<void> {
 /**
  * Yayınlanan her tahminin sahadaki AKTİF (çekilmemiş) her atı içermesini garanti eder —
  * giriş yöntemi ne olursa olsun (otomatik analiz formu, elle giriş, markdown/ekran
- * görüntüsü yapıştırma). Otomatik analizde (oto-analiz-faz4/route.ts) bu tamamlama zaten
- * vardı, ama manuel girişlerde kaynak metin yalnız öne çıkan birkaç atı içerebiliyordu —
+ * görüntüsü yapıştırma). Otomatik analizde (oto-analiz-faz3/route.ts) sıralama zaten
+ * TÜM sahayı kapsıyor (kod tabanlı, Faz2 puanına göre), ama manuel girişlerde kaynak
+ * metin yalnız öne çıkan birkaç atı içerebiliyordu —
  * bu da Rotaganyan Puan Tablosu'nda sahanın geri kalanının hiç görünmemesine yol açıyordu
  * (kullanıcı tarafından tespit edildi: 2026-07-20 Bursa 1-2. Koşu, 5-6 pick / 11-12 at).
  *

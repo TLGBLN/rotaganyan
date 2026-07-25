@@ -14,17 +14,14 @@ const ALAN_LABEL: Record<string, string> = {
   formYonu: "Form Yönü",
 };
 
-const FAZ_LABEL: Record<"faz1" | "faz2" | "faz4" | "faz4final", string> = {
+const FAZ_LABEL: Record<"faz1" | "faz2" | "faz3", string> = {
   faz1: "Faz 1 çalışıyor — veri toplanıyor (ücretsiz)…",
-  faz2: "Faz 2 çalışıyor — skorlama…",
-  faz4: "Faz 3 + Faz 4 çalışıyor — geçit motoru + sıralama…",
-  faz4final: "Faz 4 devam ediyor — banko/kupon + Kilit Gerekçe metinleri yazılıyor…",
+  faz2: "Faz 2 çalışıyor — puanlama…",
+  faz3: "Faz 3 çalışıyor — muhakeme + banko/kupon + Kilit Gerekçe metinleri…",
 };
 
 type Debug = {
   faz1VeriDoluluk: { alan: string; oran: number }[];
-  gecitDurum: string;
-  gecitUyari: string | null;
 };
 
 export type AIPickResult = {
@@ -89,7 +86,7 @@ async function fetchJson<T>(url: string, body: unknown): Promise<T> {
 }
 
 export default function AIAnalysisPanel({ raceId, onApply, methodologyVersion }: Props) {
-  const [phase, setPhase] = useState<"faz1" | "faz2" | "faz4" | "faz4final" | null>(null);
+  const [phase, setPhase] = useState<"faz1" | "faz2" | "faz3" | null>(null);
   const [result, setResult] = useState<AIAnalysisResult | null>(null);
   const [runners, setRunners] = useState<Runner[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -98,9 +95,9 @@ export default function AIAnalysisPanel({ raceId, onApply, methodologyVersion }:
   const [progress, setProgress] = useState(0);
   const loading = phase !== null;
 
-  // Faz 2 ve Faz 4 artık ayrı isteklerde çalışıyor (bkz. /api/admin/oto-analiz-faz2 ve
-  // -faz4 route'larındaki not: eskiden tek istekte çalışıyorlardı, toplamları bazı
-  // koşularda 300s'lik Vercel sınırını aşıp fonksiyonu ortadan kesiyordu). Her fazın
+  // Faz 2 ve Faz 3 ayrı isteklerde çalışıyor (bkz. /api/admin/oto-analiz-faz2 ve -faz3
+  // route'larındaki not — büyük/karmaşık koşularda toplam süreleri 300s'lik Vercel
+  // sınırını aşabiliyordu). Her fazın
   // kendi Claude çağrısı hâlâ ne kadar süreceği önceden bilinmediği için (SSE yok)
   // gerçek yüzde veremiyoruz, ama HANGİ fazda olduğumuzu artık gerçekten biliyoruz —
   // faz değişince şerit sıfırlanıp o fazın kendi süresi için yeniden %95'e yaklaşır.
@@ -146,32 +143,13 @@ export default function AIAnalysisPanel({ raceId, onApply, methodologyVersion }:
         { raceId, faz1: faz1Step.faz1 }
       );
 
-      setPhase("faz4");
+      // Sıralama/kupon/banko artık kod tarafında Faz2 puanına göre mekanik hesaplanıyor
+      // (bkz. /oto-analiz-faz3 route'undaki not) — Claude'un tek işi pedigri değerlendirmesi/
+      // iç rozetler + banko notu/genel-yorum/tempo + yalnız kod tarafından belirlenen ilk 6
+      // at için Kilit Gerekçe.
+      setPhase("faz3");
       const step2 = await fetchJson<{
-        result: { picks: Omit<AIPickResult, "note">[] };
-        claudePickCount: number;
-        runners: Runner[];
-        debug: Debug;
-      }>(
-        "/api/admin/oto-analiz-faz4",
-        { raceId, faz1: step1.faz1, faz2: step1.faz2, sharedContext: step1.sharedContext }
-      );
-
-      // Banko/kupon/tempo/genel-yorum + "Kilit Gerekçe" düzyazısı ayrı bir çağrıda üretiliyor
-      // (bkz. /oto-analiz-faz4-final route'undaki not) — sıralama KARARI zaten belli, maliyet
-      // için gerekçe yalnız Claude'un GERÇEKTEN sıraladığı (rank'e göre) İLK 6 at için istenir.
-      // Gerisi (7-8. sıradaki decision pick'ler + mekanik olarak eklenen kalanlar) boş "note"
-      // ile kalır — UI bunun yerine bütçe uyarısı gösterir (aşağıdaki NOTE_PLACEHOLDER).
-      const NOT_BUTCE_LIMITI = 6;
-      const notePicks = step2.result.picks
-        .slice(0, step2.claudePickCount)
-        .slice()
-        .sort((a, b) => a.rank - b.rank)
-        .slice(0, NOT_BUTCE_LIMITI);
-
-      setPhase("faz4final");
-      const step3 = await fetchJson<{
-        gerekceler: { no: number; note: string }[];
+        picks: AIPickResult[];
         confidence: AIAnalysisResult["confidence"];
         isBanko: boolean;
         bankoNote: string;
@@ -180,22 +158,23 @@ export default function AIAnalysisPanel({ raceId, onApply, methodologyVersion }:
         couponNarrow: string;
         couponNormal: string;
         couponWide: string;
+        runners: Runner[];
+        debug: Debug;
       }>(
-        "/api/admin/oto-analiz-faz4-final",
-        { raceId, sharedContext: step1.sharedContext, faz2: step1.faz2, allPicks: step2.result.picks, notePicks }
+        "/api/admin/oto-analiz-faz3",
+        { raceId, faz1: step1.faz1, faz2: step1.faz2, sharedContext: step1.sharedContext }
       );
-      const notesByNo = new Map(step3.gerekceler.map((n) => [n.no, n.note]));
 
       const finalResult: AIAnalysisResult = {
-        picks: step2.result.picks.map((p) => ({ ...p, note: notesByNo.get(p.no) ?? "" })),
-        confidence: step3.confidence,
-        isBanko: step3.isBanko,
-        bankoNote: step3.bankoNote,
-        notes: step3.notes,
-        tempo: step3.tempo,
-        couponNarrow: step3.couponNarrow,
-        couponNormal: step3.couponNormal,
-        couponWide: step3.couponWide,
+        picks: step2.picks,
+        confidence: step2.confidence,
+        isBanko: step2.isBanko,
+        bankoNote: step2.bankoNote,
+        notes: step2.notes,
+        tempo: step2.tempo,
+        couponNarrow: step2.couponNarrow,
+        couponNormal: step2.couponNormal,
+        couponWide: step2.couponWide,
       };
 
       setResult(finalResult);
@@ -220,7 +199,7 @@ export default function AIAnalysisPanel({ raceId, onApply, methodologyVersion }:
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-brand" />
         <h3 className="text-sm font-semibold">Otomatik Analiz</h3>
-        <span className="ml-auto text-[10px] text-muted-foreground">Metodoloji ({methodologyVersion ?? "?"}) + geçit motoru + sitenin kendi verisiyle tamamen otomatik çalışır</span>
+        <span className="ml-auto text-[10px] text-muted-foreground">Metodoloji ({methodologyVersion ?? "?"}) + sitenin kendi verisiyle tamamen otomatik çalışır</span>
       </div>
 
       <div className="flex gap-2">
@@ -263,14 +242,11 @@ export default function AIAnalysisPanel({ raceId, onApply, methodologyVersion }:
         </div>
       )}
 
-      {debug && (debug.gecitUyari || debug.faz1VeriDoluluk.some((v) => v.oran < 0.9)) && (
+      {debug && debug.faz1VeriDoluluk.some((v) => v.oran < 0.9) && (
         <div className="space-y-1.5 rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-3 py-2.5 text-xs">
           <div className="flex items-center gap-1.5 font-semibold text-yellow-600 dark:text-yellow-400">
             <AlertTriangle className="h-3.5 w-3.5" /> Veri Durumu — dikkat
           </div>
-          {debug.gecitUyari && (
-            <p className="whitespace-pre-wrap text-muted-foreground">{debug.gecitUyari}</p>
-          )}
           {debug.faz1VeriDoluluk.filter((v) => v.oran < 0.9).length > 0 && (
             <p className="text-muted-foreground">
               Eksik/zayıf veri:{" "}
