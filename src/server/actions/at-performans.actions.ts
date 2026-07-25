@@ -14,7 +14,10 @@ const SURFACE_PREFIX: Record<string, string> = { CIM: "Ç", KUM: "K", SENTETIK: 
 
 /**
  * Bu koşudaki her at için, TJK'nın resmi at profilinden aynı hipodrom + aynı mesafe +
- * aynı pist tipinde, koşunun kendi yılına ait geçmiş performansını döner.
+ * aynı pist tipinde, koşunun kendi yılına ait geçmiş performansını döner. Kasıtlı olarak
+ * KESİN eşleşme — panelin amacı gerçekten "aynı" koşulları göstermek (kullanıcı onayı:
+ * tolerans/etiket yaklaşımı burada İSTENMEDİ, Son800'den farklı olarak). Ankara'da az/hiç
+ * sonuç çıkması güncel bir pist değişikliğinin (çim→kum) dürüst bir yansımasıdır, hata değil.
  */
 export async function getAtPerformansForRace(raceId: string): Promise<AtPerformansRunnerData[]> {
   const race = await db.race.findUnique({

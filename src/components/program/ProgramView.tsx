@@ -20,11 +20,11 @@ const PANEL_LOADING = (
 const Son800Panel = dynamic(() => import("./panels/Son800Panel"), { loading: () => PANEL_LOADING, ssr: false });
 const GalopPanel = dynamic(() => import("./panels/GalopPanel"), { loading: () => PANEL_LOADING, ssr: false });
 const PedigreePanel = dynamic(() => import("./panels/PedigreePanel"), { loading: () => PANEL_LOADING, ssr: false });
-const EquipmentPanel = dynamic(() => import("./panels/EquipmentPanel"), { loading: () => PANEL_LOADING, ssr: false });
 const ComparisonPanel = dynamic(() => import("./panels/ComparisonPanel"), { loading: () => PANEL_LOADING, ssr: false });
 const H2HPanel = dynamic(() => import("./panels/H2HPanel"), { loading: () => PANEL_LOADING, ssr: false });
+const SonYarisDetayPanel = dynamic(() => import("./panels/SonYarisDetayPanel"), { loading: () => PANEL_LOADING, ssr: false });
 
-// Detay paneli açma/kapama butonları (Son 800/Galop/Pedigriler/Takılar/H2H/Karşılaştır) —
+// Detay paneli açma/kapama butonları (Son 800/Galop/Pedigriler/H2H/Karşılaştır/Son Yarış Detayları) —
 // her biri farklı renkteyken karmaşık görünüyordu; artık hepsi tek tip, sadece açık/kapalı
 // durumuna göre (marka rengi / nötr) ayrışıyor.
 const LAST_HIPO_STORAGE_KEY = "rg-last-hipo";
@@ -962,7 +962,7 @@ type JockeyStatsMap = Record<string, {
 type TrainerStatsMap = Record<string, TrainerStatRow>;
 
 function RaceTable({
-  race, dateStr, analysisOpen, onAnalysisToggle, son800Open, galopOpen, pedigreeOpen, equipmentOpen, comparisonOpen, h2hOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, isVerified, userEmail, jockeyStats, trainerStats, hippodromeName,
+  race, dateStr, analysisOpen, onAnalysisToggle, son800Open, galopOpen, pedigreeOpen, comparisonOpen, h2hOpen, sonYarisOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, isVerified, userEmail, jockeyStats, trainerStats, hippodromeName,
 }: {
   race: ProgramRace;
   dateStr: string;
@@ -971,9 +971,9 @@ function RaceTable({
   son800Open: boolean;
   galopOpen: boolean;
   pedigreeOpen: boolean;
-  equipmentOpen: boolean;
   comparisonOpen: boolean;
   h2hOpen: boolean;
+  sonYarisOpen: boolean;
   followedSet: Set<string>;
   onToggleFollow: (horseName: string) => void;
   onSelectHorse: (name: string) => void;
@@ -1165,9 +1165,9 @@ function RaceTable({
       <div id="panel-son800">{son800Open && <Son800Panel raceId={race.id} />}</div>
       <div id="panel-galop">{galopOpen && <GalopPanel runners={race.runners} breed={race.breed} />}</div>
       <div id="panel-pedigriler">{pedigreeOpen && <PedigreePanel runners={race.runners} />}</div>
-      <div id="panel-takilar">{equipmentOpen && <EquipmentPanel raceId={race.id} />}</div>
       <div id="panel-karsilastir">{comparisonOpen && <ComparisonPanel raceId={race.id} />}</div>
       <div id="panel-h2h">{h2hOpen && <H2HPanel raceId={race.id} />}</div>
+      <div id="panel-son-yaris-detay">{sonYarisOpen && <SonYarisDetayPanel raceId={race.id} />}</div>
     </div>
   );
 }
@@ -1201,9 +1201,9 @@ export default function ProgramView({
   const [son800Open, setSon800Open] = useState(false);
   const [galopOpen, setGalopOpen] = useState(false);
   const [pedigreeOpen, setPedigreeOpen] = useState(false);
-  const [equipmentOpen, setEquipmentOpen] = useState(false);
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [h2hOpen, setH2hOpen] = useState(false);
+  const [sonYarisOpen, setSonYarisOpen] = useState(false);
   const [selectedHorse, setSelectedHorse] = useState<string | null>(null);
   const [followedSet, setFollowedSet] = useState(() => new Set(followedNames));
   const [, startFollowTransition] = useTransition();
@@ -1254,9 +1254,9 @@ export default function ProgramView({
     setSon800Open(false);
     setGalopOpen(false);
     setPedigreeOpen(false);
-    setEquipmentOpen(false);
     setComparisonOpen(false);
     setH2hOpen(false);
+    setSonYarisOpen(false);
   }, [activeHipo, raceNo]);
 
   if (days.length === 0) {
@@ -1375,14 +1375,6 @@ export default function ProgramView({
               )}
               {currentRace && (
                 <button
-                  onClick={() => toggleAndScroll(setEquipmentOpen, equipmentOpen, "panel-takilar")}
-                  className={cn(PANEL_BTN_CLASS, equipmentOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
-                >
-                  Takılar {equipmentOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                </button>
-              )}
-              {currentRace && (
-                <button
                   onClick={() => toggleAndScroll(setH2hOpen, h2hOpen, "panel-h2h")}
                   className={cn(PANEL_BTN_CLASS, h2hOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
@@ -1395,6 +1387,14 @@ export default function ProgramView({
                   className={cn(PANEL_BTN_CLASS, comparisonOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
                   Karşılaştır {comparisonOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
+              )}
+              {currentRace && (
+                <button
+                  onClick={() => toggleAndScroll(setSonYarisOpen, sonYarisOpen, "panel-son-yaris-detay")}
+                  className={cn(PANEL_BTN_CLASS, sonYarisOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                >
+                  Son Yarış Detayları {sonYarisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
               )}
               {currentRace && (
@@ -1415,9 +1415,9 @@ export default function ProgramView({
               son800Open={son800Open}
               galopOpen={galopOpen}
               pedigreeOpen={pedigreeOpen}
-              equipmentOpen={equipmentOpen}
               comparisonOpen={comparisonOpen}
               h2hOpen={h2hOpen}
+              sonYarisOpen={sonYarisOpen}
               followedSet={followedSet}
               onToggleFollow={handleToggleFollow}
               onSelectHorse={setSelectedHorse}
