@@ -324,7 +324,7 @@ export async function getPublishChecklistAuto(predictionId: string): Promise<Che
   }
 
   // ④ Tempo — 2+ kaçak varsa tempo alanı dolu olmalı (vekil kontrol).
-  const kacakSayisi = aktifAtlar.filter((r) => (r.raceStyle as { style?: string } | null)?.style === "KACAK").length;
+  const kacakSayisi = aktifAtlar.filter((r) => (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT").length;
   if (kacakSayisi >= 2 && !pred.tempo?.trim()) {
     checks.push({ label: "④ Tempo", status: "FAIL", detail: `${kacakSayisi} kaçak stilli at var ama tempo alanı boş.` });
   } else {

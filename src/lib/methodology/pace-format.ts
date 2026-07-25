@@ -22,17 +22,15 @@ export function checkpointCols(length: number): number[] {
 }
 
 export const STIL_LABEL: Record<TekYarisStil, string> = {
-  KACAK: "Kaçak",
-  ONCU: "Öncü (erken düştü)",
-  PRESCI: "Presçi",
-  TAKIPCI: "Takipçi",
-  BEKLEYEN: "Bekleyen/Sprintçi",
+  KACAK_AT: "Kaçak At",
+  ON_GRUP_ARKASI: "Ön Grup Arkası",
+  BEKLEME_GRUBU: "Bekleme Grubu",
+  EN_GERI_TAKIP: "En Geri Takip",
 };
 
 export const STIL_RENK: Record<TekYarisStil, string> = {
-  KACAK: "bg-hit-bg text-hit",
-  ONCU: "bg-risk-bg text-risk",
-  PRESCI: "bg-brand/15 text-brand",
-  TAKIPCI: "bg-muted text-muted-foreground",
-  BEKLEYEN: "bg-hit-bg text-hit",
+  KACAK_AT: "bg-hit-bg text-hit",
+  ON_GRUP_ARKASI: "bg-brand/15 text-brand",
+  BEKLEME_GRUBU: "bg-muted text-muted-foreground",
+  EN_GERI_TAKIP: "bg-risk-bg text-risk",
 };

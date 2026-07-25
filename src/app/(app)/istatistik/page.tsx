@@ -5,11 +5,10 @@ import { cn } from "@/lib/utils";
 export const revalidate = 300;
 
 const STYLE_COLOR: Record<string, string> = {
-  KACAK: "text-[#e74c3c]",
-  ONCU: "text-[#e67e22]",
-  PRESCI: "text-[#d4a017]",
-  TAKIPCI: "text-[#2980b9]",
-  BEKLEYEN: "text-[#8e44ad]",
+  KACAK_AT: "text-[#e74c3c]",
+  ON_GRUP_ARKASI: "text-[#d4a017]",
+  BEKLEME_GRUBU: "text-[#2980b9]",
+  EN_GERI_TAKIP: "text-[#8e44ad]",
 };
 
 function RaceStyleTable({ rowLabel, rows }: { rowLabel: string; rows: RaceStyleWinBreakdown[] }) {

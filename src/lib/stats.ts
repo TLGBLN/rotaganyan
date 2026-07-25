@@ -19,17 +19,17 @@ export type StatsOverview = {
   recentBanko: { total: number; hit: number; rate: number };
 };
 
-// v4.12: Runner.raceStyle artık Accurace (GPS/sektörel zamanlama) tabanlı 5'li
-// sistemi kullanıyor (bkz. pace-analizi.ts) — eski TJK Son800 tabanlı 4'lü sistem
-// (ON_GRUP/BEKLEME/EN_GERI) tamamen kaldırıldı, bu eşleme de ona göre güncellendi.
+// v6.3: Runner.raceStyle artık saha büyüklüğüne göre YÜZDELİK dilimlenen, yalnız erken
+// pozisyona bakan 4'lü sistemi kullanıyor (bkz. pace-analizi.ts'teki v6.3 notu — eski
+// 5'li KACAK/ONCU/PRESCI/TAKIPCI/BEKLEYEN şeması bitiş sırasını da karıştırdığı için
+// atların %62'si "TAKIPCI" çöp kategorisine düşüyordu).
 const RACE_STYLE_LABELS: Record<string, string> = {
-  KACAK: "Kaçak",
-  ONCU: "Öncü",
-  PRESCI: "Presçi",
-  TAKIPCI: "Takipçi",
-  BEKLEYEN: "Bekleyen",
+  KACAK_AT: "Kaçak At",
+  ON_GRUP_ARKASI: "Ön Grup Arkası",
+  BEKLEME_GRUBU: "Bekleme Grubu",
+  EN_GERI_TAKIP: "En Geri Takip",
 };
-const RACE_STYLE_ORDER = ["KACAK", "ONCU", "PRESCI", "TAKIPCI", "BEKLEYEN"];
+const RACE_STYLE_ORDER = ["KACAK_AT", "ON_GRUP_ARKASI", "BEKLEME_GRUBU", "EN_GERI_TAKIP"];
 
 export type RaceStyleWinBreakdown = {
   bucket: string;
@@ -103,6 +103,7 @@ export async function getRaceStyleWinStats(): Promise<{
             select: {
               length: true,
               splits: { where: { place: 1 }, select: { checkpoints: true }, take: 1 },
+              _count: { select: { splits: true } },
             },
           },
         },
@@ -118,7 +119,7 @@ export async function getRaceStyleWinStats(): Promise<{
     const kazanan = ar?.splits[0];
     if (!ar || !kazanan || !ar.length) continue;
 
-    const sonuc = analizEtTekYaris(kazanan.checkpoints as unknown as PaceCheckpoint[], ar.length);
+    const sonuc = analizEtTekYaris(kazanan.checkpoints as unknown as PaceCheckpoint[], ar.length, ar._count.splits);
     const style = sonuc?.stil;
     if (!style || !RACE_STYLE_LABELS[style]) continue;
 

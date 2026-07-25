@@ -12,7 +12,15 @@
 
 export type PaceCheckpoint = { checkpoint: number; timeReal: number; place: number };
 
-export type TekYarisStil = "KACAK" | "ONCU" | "PRESCI" | "TAKIPCI" | "BEKLEYEN";
+// v6.3 (2026-07-25) — kullanıcı talimatıyla yeniden tasarlandı. Eski 5'li şema (KACAK/
+// ONCU/PRESCI/TAKIPCI/BEKLEYEN) "bitiş sırası"nı da işin içine kattığı için (örn. KAÇAK
+// hem erken önde OLMALI hem 1-2. bitirmeliydi) çoğu at hiçbir kategoriye net girmiyor,
+// sessizce TAKIPCI'ye düşüyordu — gerçek dağılımda %62'si TAKIPCI çıktı (34.764 kayıt
+// üzerinde ölçüldü). Yeni şema SADECE erken pozisyona (saha büyüklüğüne göre YÜZDELİK
+// dilim) bakar — bitiş sırasıyla karıştırılmaz, "yarış stili" gerçekten SAHADAKİ KONUMU
+// anlatır, sonucu değil. Saha büyüklüğü normalize edilir (18 atlı sahada 3. sıra ile
+// 5 atlı sahada 3. sıra aynı "erken pozisyon" anlamına gelmez).
+export type TekYarisStil = "KACAK_AT" | "ON_GRUP_ARKASI" | "BEKLEME_GRUBU" | "EN_GERI_TAKIP";
 export type EnerjiProfili = "ERKEN_YUKLU" | "DENGELI" | "GEC_YUKLU";
 
 export type TekYarisPaceSonucu = {
@@ -43,8 +51,21 @@ function hizKmSaat(mesafeM: number, sureMs: number): number {
   return (mesafeM / 1000) / (sureMs / 3_600_000);
 }
 
-/** checkpoints: checkpoint mesafesine göre ARTAN sırada (100, 200, ..., raceLength). */
-export function analizEtTekYaris(checkpoints: PaceCheckpoint[], raceLength: number): TekYarisPaceSonucu | null {
+/** Erken pozisyonu (25% mesafe) saha büyüklüğüne göre yüzdelik dilime çevirip
+ *  4 kategoriden birine atar — bitiş sırasına HİÇ bakmaz (bkz. dosya başındaki v6.3 notu). */
+function stilFor(erkenSira: number, fieldSize: number): TekYarisStil {
+  if (erkenSira <= 1) return "KACAK_AT";
+  if (fieldSize <= 1) return "ON_GRUP_ARKASI";
+  const pct = (erkenSira - 1) / (fieldSize - 1); // 0 = lider, 1 = son
+  if (pct <= 0.35) return "ON_GRUP_ARKASI";
+  if (pct <= 0.70) return "BEKLEME_GRUBU";
+  return "EN_GERI_TAKIP";
+}
+
+/** checkpoints: checkpoint mesafesine göre ARTAN sırada (100, 200, ..., raceLength).
+ *  fieldSize: o yarıştaki TOPLAM at sayısı (yalnız bu atın kendi checkpoint'lerinden
+ *  çıkarılamaz — örn. hep önde giden bir at hiç arka sıraları görmemiş olabilir). */
+export function analizEtTekYaris(checkpoints: PaceCheckpoint[], raceLength: number, fieldSize: number): TekYarisPaceSonucu | null {
   if (checkpoints.length < 4) return null;
   const sorted = [...checkpoints].sort((a, b) => a.checkpoint - b.checkpoint);
   const finish = sorted[sorted.length - 1];
@@ -75,12 +96,7 @@ export function analizEtTekYaris(checkpoints: PaceCheckpoint[], raceLength: numb
   else if (hizFarkOrani < -0.02) enerjiProfili = "GEC_YUKLU";
   else enerjiProfili = "DENGELI";
 
-  let stil: TekYarisStil;
-  if (erkenSira === 1 && bitisSira <= 2) stil = "KACAK";
-  else if (erkenSira <= 2 && bitisSira - erkenSira >= 3) stil = "ONCU";
-  else if (erkenSira <= 3 && bitisSira <= erkenSira + 1) stil = "PRESCI";
-  else if (erkenSira - bitisSira >= 3) stil = "BEKLEYEN";
-  else stil = "TAKIPCI";
+  const stil = stilFor(erkenSira, fieldSize);
 
   return { erkenSira, ortaSira, gecSira, bitisSira, stil, enerjiProfili, son400Dusus, ilkYariOrtHiz, sonYariOrtHiz, ortalamaHiz };
 }
@@ -95,7 +111,7 @@ const MIN_ORNEK = 3;
  */
 export function hesaplaCokYarisEgilimi(sonuclar: TekYarisPaceSonucu[]): CokYarisEgilim | null {
   if (sonuclar.length < MIN_ORNEK) return null;
-  const sayac: Record<TekYarisStil, number> = { KACAK: 0, ONCU: 0, PRESCI: 0, TAKIPCI: 0, BEKLEYEN: 0 };
+  const sayac: Record<TekYarisStil, number> = { KACAK_AT: 0, ON_GRUP_ARKASI: 0, BEKLEME_GRUBU: 0, EN_GERI_TAKIP: 0 };
   for (const s of sonuclar) sayac[s.stil]++;
   const [stil, sayi] = (Object.entries(sayac) as [TekYarisStil, number][]).reduce((best, cur) => (cur[1] > best[1] ? cur : best));
   return { stil, percent: Math.round((sayi / sonuclar.length) * 100), n: sonuclar.length };

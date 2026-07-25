@@ -258,6 +258,11 @@ export type Faz1Sonuc = {
     sahadakiKacakSayisi: number;
     kacakTempoEtiketi: string;
     kacakAvantajliStil: string;
+    // TJK ham metni — koşu şartları/yaş-kilo skalası/pist rekoru. Doğrudan at bazlı bir
+    // sinyal değil, yalnız bağlam; boşsa gösterilmez.
+    conditions: string | null;
+    ageWeight: string | null;
+    trackRecord: string | null;
   };
   runners: Faz1Runner[];
   veriDoluluk: { alan: string; oran: number }[];
@@ -291,7 +296,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
     fetchApprenticeRemainingRaces().catch(() => ({}) as Record<string, number>),
     db.accuraceHorseSplit.findMany({
       where: { horseName: { in: accuraceQueryNames(race.runners.map((r) => r.name)) } },
-      select: { horseName: true, checkpoints: true, accuraceRace: { select: { length: true } } },
+      select: { horseName: true, checkpoints: true, accuraceRace: { select: { length: true, _count: { select: { splits: true } } } } },
     }).catch(() => []),
     getSireStatOzetleriForRace(race.runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(
       () => race.runners.map(() => null)
@@ -311,7 +316,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
     const norm = normalizeHorseName(r.name);
     const kayitlar = accuraceKayitlari.filter((k) => normalizeHorseName(k.horseName) === norm);
     const sonuclar = kayitlar
-      .map((k) => analizEtTekYaris(k.checkpoints as unknown as PaceCheckpoint[], k.accuraceRace.length ?? 0))
+      .map((k) => analizEtTekYaris(k.checkpoints as unknown as PaceCheckpoint[], k.accuraceRace.length ?? 0, k.accuraceRace._count.splits))
       .filter((s): s is NonNullable<typeof s> => s != null);
     accuraceEgilimMap.set(r.id, hesaplaCokYarisEgilimi(sonuclar));
   }
@@ -647,7 +652,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         apprentice: r.apprentice, apprenticeRemaining,
         raceStyleEtiket: accuraceEgilimHesap?.stil ?? null,
         tempoVeriN: tempoVeriNHesap,
-        kacak: accuraceEgilimHesap?.stil === "KACAK",
+        kacak: accuraceEgilimHesap?.stil === "KACAK_AT",
         galopOzet,
         ilkStart, hpOnceki: hpOncekiEfektif,
         hpIvmesi: hpIvmesiHesap,
@@ -696,6 +701,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       distance: race.distance,
       zeminDetayi, zeminKatsayisi: zemin.katsayi, zeminEtiketi: zemin.etiket,
       sahadakiKacakSayisi, kacakTempoEtiketi: kacakHarita.etiket, kacakAvantajliStil: kacakHarita.avantajli,
+      conditions: race.conditions, ageWeight: race.ageWeight, trackRecord: race.trackRecord,
     },
     runners,
     veriDoluluk,

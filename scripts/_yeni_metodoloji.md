@@ -1,7 +1,8 @@
-# ROTAGANYAN BÜTÜNLEŞİK ANALİZ MOTORU — v6.2
+# ROTAGANYAN BÜTÜNLEŞİK ANALİZ MOTORU — v6.3
 
 *(v6.1 revizyonu — canlı yarış geri bildirimiyle: düşük AGF artık teknik açıdan güçlü bir atı geriye çekme gerekçesi değil; Son800+galop zinciri kombinasyonu gerçek bir destekleyici unsur; yüksek ham HP tek başına üstünlük garantilemez. Bkz. §XVI, §X, §XI, §XX.26-28.)*
 *(v6.2 revizyonu — ★ Hedef/isTarget artık pasif bir rozet değil: işaretlenen at sıralamada ilk 3'ün hemen altına getirilir, puanı 3. sıraya yakın/eşit verilir. Bkz. §XIX.0a.)*
+*(v6.3 revizyonu — Yarış Stili 5'li şemadan (KAÇAK/ÖNCÜ/PRESÇİ/TAKİPÇİ/BEKLEYEN — çoğu at gerçek dışı şekilde "Takipçi"ye düşüyordu, %62) saha-büyüklüğü-yüzdelik 4'lü şemaya geçti: Kaçak At/Ön Grup Arkası/Bekleme Grubu/En Geri Takip — bitiş sırasıyla karışmaz, yalnız erken pozisyonu anlatır. Bkz. §IX.0.)*
 
 ## I. SİSTEMİN AMACI
 
@@ -151,7 +152,7 @@ Ham Toplam ≈ 100 (normalize et)
 
 Her kart yalnız hangi paketin hangi katmana girdiğini belirtir; aralıklar sabittir. Bir katmana birden fazla paket düşerse aralık kanıt gücüne göre paylaştırılır, katman toplamı aşılmaz.
 
-**Kalabalık Saha Katman Yükseltmesi (10+ at):** Kartın kendi ataması ne olursa olsun, Tempo + Yarış Stili + Accurace verisi otomatik Katman 1-2'ye yükseltilir — kartın ana dayanağıyla EŞİT ağırlıkta değerlendirilir, katman aralığı ikisi arasında paylaştırılır (BIG RUGGED/KÜÇÜKDEMİRCİK dersi: kalabalık sahada Takipçi stilindeki atlar modelin öngördüğünden belirgin iyi bitirdi).
+**Kalabalık Saha Katman Yükseltmesi (10+ at):** Kartın kendi ataması ne olursa olsun, Tempo + Yarış Stili + Accurace verisi otomatik Katman 1-2'ye yükseltilir — kartın ana dayanağıyla EŞİT ağırlıkta değerlendirilir, katman aralığı ikisi arasında paylaştırılır (BIG RUGGED/KÜÇÜKDEMİRCİK dersi: kalabalık sahada Bekleme Grubu/Ön Grup Arkası stilindeki atlar modelin öngördüğünden belirgin iyi bitirdi).
 
 **Evrensel asgari:** Tempo + Yarış Stili + Accurace, veri varsa HER koşu tipinde en az bir katmanda (asgari Katman 4-5) yer alır. Veri yoksa nötr sayılır, kart dışı bırakılmaz.
 
@@ -250,14 +251,27 @@ Otomatik ilk 3 garantisi değildir; Kural Denetim Protokolü'nün (§II.4) 4-5. 
 
 ## IX. TEMPO ANALİZİ
 
+### IX.0 Yarış Stili — 4 Kategori (v6.3)
+
+Accurace GPS/sektörel verisinden, saha büyüklüğüne göre YÜZDELİK dilimlenmiş, yalnız erken pozisyona (mesafenin ~%25'i) bakan 4 kategori — bitiş sırasıyla karışmaz, "o at o yarışta sahanın neresinde gitti" sorusuna cevaptır, sonucu değil:
+
+| Kategori | Tanım |
+|---|---|
+| Kaçak At | Erken bölümde sahanın en önünde. |
+| Ön Grup Arkası | Erken bölümde sahanın ön yüzdelik diliminde (lider hariç). |
+| Bekleme Grubu | Erken bölümde sahanın orta yüzdelik diliminde. |
+| En Geri Takip | Erken bölümde sahanın en gerisinde. |
+
+n≥3 yarış birleştirilerek KALICI eğilim üretilir (tek yarıştan kalıcı stil çıkarılmaz, §XVIII).
+
 ### IX.1 Kaçak sayısı haritası
 
 | Kaçak | Tempo | Avantaj |
 |---:|---|---|
 | 0 | Avare | Önde giden/lideri takip |
-| 1 | Düşük | Kaçak veya ön grup arkası |
-| 2–3 | Sert | Bekleyen, sprinter, hafif kilolu |
-| 4+ | Çok sert | Güçlü finiş yapan geride bekleyenler |
+| 1 | Düşük | Kaçak At veya Ön Grup Arkası |
+| 2–3 | Sert | En Geri Takip, sprinter, hafif kilolu |
+| 4+ | Çok sert | Güçlü finiş yapan En Geri Takip grubu |
 
 ### IX.2 Örneklem kuralı
 
@@ -278,9 +292,9 @@ Bkz. §VII.0 "Kalabalık Saha Katman Yükseltmesi" — buradaki etkiler bağıms
 
 | Sinyal | Puan etkisi |
 |---|---:|
-| Takipçi/Presçi, n≥5 tutarlı üst-orta sıra | +3 ila +5 |
-| Öncü + "erken düştü" tekrarı | −3 ila −5 |
-| İç kulvar (1-4) + kaçak/öncü eğilimi | +2 |
+| Ön Grup Arkası/Bekleme Grubu, n≥5 tutarlı üst-orta sıra | +3 ila +5 |
+| Kaçak At eğilimi + tekrarlı zayıf bitiriş geçmişi (form dizisinden) | −3 ila −5 |
+| İç kulvar (1-4) + Kaçak At eğilimi | +2 |
 | Dış kulvar (10+) + tempo bilgisi yetersiz | −2 |
 
 ---

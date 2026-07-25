@@ -90,7 +90,9 @@ export async function getSon800ForRace(raceId: string): Promise<Son800RunnerData
       })
     : [];
   const fieldBestByRaceId = new Map<string, number>();
+  const fieldSizeByRaceId = new Map<string, number>();
   for (const s of siblings) {
+    fieldSizeByRaceId.set(s.accuraceRaceId, (fieldSizeByRaceId.get(s.accuraceRaceId) ?? 0) + 1);
     const sure = last800SureSaniye(s.checkpoints as unknown as PaceCheckpoint[], s.accuraceRace.length ?? 0);
     if (sure == null) continue;
     const mevcut = fieldBestByRaceId.get(s.accuraceRaceId);
@@ -116,7 +118,7 @@ export async function getSon800ForRace(raceId: string): Promise<Son800RunnerData
         const checkpoints = k.checkpoints as unknown as PaceCheckpoint[];
         const sure = last800SureSaniye(checkpoints, length);
         if (sure == null) return null;
-        const sonuc = analizEtTekYaris(checkpoints, length);
+        const sonuc = analizEtTekYaris(checkpoints, length, fieldSizeByRaceId.get(k.accuraceRaceId) ?? 1);
         const fieldBest = fieldBestByRaceId.get(k.accuraceRaceId);
         const fark = fieldBest != null ? Math.round((sure - fieldBest) * 100) / 100 : null;
         return {

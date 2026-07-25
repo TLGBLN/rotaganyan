@@ -58,7 +58,9 @@ export default async function AccuraceDashboardPage({ searchParams }: PageProps)
         })
       : [];
     const searchFieldBest = new Map<string, number>();
+    const searchFieldSize = new Map<string, number>();
     for (const s of searchSiblings) {
+      searchFieldSize.set(s.accuraceRaceId, (searchFieldSize.get(s.accuraceRaceId) ?? 0) + 1);
       const sure = last800SureSaniye(s.checkpoints as unknown as PaceCheckpoint[], s.accuraceRace.length ?? 0);
       if (sure == null) continue;
       const mevcut = searchFieldBest.get(s.accuraceRaceId);
@@ -97,7 +99,7 @@ export default async function AccuraceDashboardPage({ searchParams }: PageProps)
                   {records.map((r) => {
                     const length = r.accuraceRace.length ?? 0;
                     const checkpoints = r.checkpoints as unknown as PaceCheckpoint[];
-                    const sonuc = analizEtTekYaris(checkpoints, length);
+                    const sonuc = analizEtTekYaris(checkpoints, length, searchFieldSize.get(r.accuraceRaceId) ?? 1);
                     const hipoAdi = r.accuraceRace.race?.raceDay.hippodrome.name ?? r.accuraceRace.hippodrome ?? r.accuraceRace.citySlug;
                     const sure = last800SureSaniye(checkpoints, length);
                     const fieldBest = searchFieldBest.get(r.accuraceRaceId);
@@ -148,14 +150,14 @@ export default async function AccuraceDashboardPage({ searchParams }: PageProps)
   const gecmisKayitlar = horseNames.length
     ? await db.accuraceHorseSplit.findMany({
         where: { horseName: { in: horseNames } },
-        include: { accuraceRace: { select: { length: true, date: true } } },
+        include: { accuraceRace: { select: { length: true, date: true, _count: { select: { splits: true } } } } },
       })
     : [];
   const egilimByHorse = new Map<string, ReturnType<typeof hesaplaCokYarisEgilimi>>();
   for (const name of horseNames) {
     const kayitlar = gecmisKayitlar.filter((k) => k.horseName === name);
     const sonuclar = kayitlar
-      .map((k) => analizEtTekYaris(k.checkpoints as unknown as PaceCheckpoint[], k.accuraceRace.length ?? 0))
+      .map((k) => analizEtTekYaris(k.checkpoints as unknown as PaceCheckpoint[], k.accuraceRace.length ?? 0, k.accuraceRace._count.splits))
       .filter((s): s is NonNullable<typeof s> => s != null);
     egilimByHorse.set(name, hesaplaCokYarisEgilimi(sonuclar));
   }
@@ -228,7 +230,7 @@ export default async function AccuraceDashboardPage({ searchParams }: PageProps)
                     <tbody>
                       {ar.splits.map((s, i) => {
                         const checkpoints = s.checkpoints as unknown as PaceCheckpoint[];
-                        const sonuc = analizEtTekYaris(checkpoints, length);
+                        const sonuc = analizEtTekYaris(checkpoints, length, ar.splits.length);
                         const egilim = egilimByHorse.get(s.horseName);
                         return (
                           <tr key={s.id} className={cn("border-b last:border-0", i % 2 === 1 && "bg-muted/10")}>

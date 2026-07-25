@@ -584,7 +584,7 @@ export type ProgramRunner = {
   ekuriGroup: number | null;
   apprentice: boolean;
   apprenticeRemaining: number | null;
-  raceStyle: { style: string; percent: number; veri: number | null } | null; // style: "KACAK" | "ONCU" | "PRESCI" | "TAKIPCI" | "BEKLEYEN" (Accurace tabanlı); veri = örneklem sayısı (n)
+  raceStyle: { style: string; percent: number; veri: number | null } | null; // style: "KACAK_AT" | "ON_GRUP_ARKASI" | "BEKLEME_GRUBU" | "EN_GERI_TAKIP" (Accurace tabanlı, saha-yüzdelik); veri = örneklem sayısı (n)
   tjkAtId: number | null;
 };
 

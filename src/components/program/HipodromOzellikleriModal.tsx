@@ -153,11 +153,6 @@ export default function HipodromOzellikleriModal({
                   tek başına belirleyici değildir.
                 </p>
               </div>
-
-              <p className="text-[10px] text-muted-foreground border-t pt-2">
-                Kaynak: TJK resmi &quot;Hipodromlar&quot; sayfası. Bu veri statiktir, nadiren değişir
-                (pist yeniden inşa edilmedikçe) — otomatik senkronize edilmez.
-              </p>
             </div>
           )}
         </div>

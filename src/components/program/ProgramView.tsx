@@ -135,20 +135,18 @@ function raceStyleBadge(raceStyle: { style: string; percent: number; veri?: numb
   // yüksek-güvenilirlikli bir örüntüyle (örn. n=20+ %80) karıştırabilir.
   const dusukGuven = veri != null && veri <= 4;
   const n = veri != null ? ` (${veri})` : "";
-  if (style === "KACAK") return { text: `%${percent} Kaçak${n}`, cls: "bg-[#e74c3c]/15 text-[#e74c3c]", dusukGuven };
-  if (style === "ONCU") return { text: `%${percent} Öncü${n}`, cls: "bg-[#e67e22]/15 text-[#e67e22]", dusukGuven };
-  if (style === "PRESCI") return { text: `%${percent} Presçi${n}`, cls: "bg-[#d4a017]/15 text-[#d4a017]", dusukGuven };
-  if (style === "TAKIPCI") return { text: `%${percent} Takipçi${n}`, cls: "bg-[#2980b9]/15 text-[#2980b9]", dusukGuven };
-  if (style === "BEKLEYEN") return { text: `%${percent} Bekleyen${n}`, cls: "bg-[#8e44ad]/15 text-[#8e44ad]", dusukGuven };
+  if (style === "KACAK_AT") return { text: `%${percent} Kaçak At${n}`, cls: "bg-[#e74c3c]/15 text-[#e74c3c]", dusukGuven };
+  if (style === "ON_GRUP_ARKASI") return { text: `%${percent} Ön Grup Arkası${n}`, cls: "bg-[#d4a017]/15 text-[#d4a017]", dusukGuven };
+  if (style === "BEKLEME_GRUBU") return { text: `%${percent} Bekleme Grubu${n}`, cls: "bg-[#2980b9]/15 text-[#2980b9]", dusukGuven };
+  if (style === "EN_GERI_TAKIP") return { text: `%${percent} En Geri Takip${n}`, cls: "bg-[#8e44ad]/15 text-[#8e44ad]", dusukGuven };
   return null;
 }
 
 const RACE_STYLE_INFO: { style: string; label: string; desc: string; cls: string }[] = [
-  { style: "KACAK", label: "Kaçak", desc: "Erken öne geçer, liderliği koruyarak bitirir.", cls: "text-[#e74c3c]" },
-  { style: "ONCU", label: "Öncü", desc: "Erken öndeydi ama sonlarda geriledi — tempoyu erken kullandı.", cls: "text-[#e67e22]" },
-  { style: "PRESCI", label: "Presçi", desc: "Liderin hemen arkasında/ön grupta gider, güçlü bitirir.", cls: "text-[#d4a017]" },
-  { style: "TAKIPCI", label: "Takipçi", desc: "Orta grupta gider, belirgin bir öne çıkış göstermez.", cls: "text-[#2980b9]" },
-  { style: "BEKLEYEN", label: "Bekleyen", desc: "Geriden gelip son bölümde öne fırlar.", cls: "text-[#8e44ad]" },
+  { style: "KACAK_AT", label: "Kaçak At", desc: "Yarışın erken bölümünde sahanın en önünde gider.", cls: "text-[#e74c3c]" },
+  { style: "ON_GRUP_ARKASI", label: "Ön Grup Arkası", desc: "Erken bölümde öndeki grubun hemen arkasında, sahanın ön yüzdelik diliminde gider.", cls: "text-[#d4a017]" },
+  { style: "BEKLEME_GRUBU", label: "Bekleme Grubu", desc: "Erken bölümde sahanın orta yüzdelik diliminde, beklemede gider.", cls: "text-[#2980b9]" },
+  { style: "EN_GERI_TAKIP", label: "En Geri Takip", desc: "Erken bölümde sahanın en gerisinde, uzaktan takip eder.", cls: "text-[#8e44ad]" },
 ];
 
 function RaceStyleInfoButton() {

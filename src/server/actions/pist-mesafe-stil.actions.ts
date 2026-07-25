@@ -38,18 +38,19 @@ export async function getPistMesafeStilIstatistigi(
         select: {
           length: true,
           splits: { where: { place: 1 }, select: { checkpoints: true }, take: 1 },
+          _count: { select: { splits: true } },
         },
       },
     },
   });
 
-  const sayac = { KACAK: 0, ONCU: 0, PRESCI: 0, TAKIPCI: 0, BEKLEYEN: 0 } as Record<TekYarisStil, number>;
+  const sayac = { KACAK_AT: 0, ON_GRUP_ARKASI: 0, BEKLEME_GRUBU: 0, EN_GERI_TAKIP: 0 } as Record<TekYarisStil, number>;
   let toplam = 0;
   for (const r of races) {
     const ar = r.accuraceRace;
     const kazanan = ar?.splits[0];
     if (!ar || !kazanan || !ar.length) continue;
-    const sonuc = analizEtTekYaris(kazanan.checkpoints as unknown as PaceCheckpoint[], ar.length);
+    const sonuc = analizEtTekYaris(kazanan.checkpoints as unknown as PaceCheckpoint[], ar.length, ar._count.splits);
     if (!sonuc) continue;
     sayac[sonuc.stil]++;
     toplam++;

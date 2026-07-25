@@ -39,20 +39,35 @@ export type AccuraceSyncSonuc = { kosular: number; kaydedilen: number; atlanan: 
  * kalır; scripts/_migrate_race_style.ts'nin yaptığı tek seferlik toplu işin küçük,
  * artımlı (yalnız o gün etkilenen atlar için) eşdeğeridir.
  */
-async function updateRaceStyleForHorseNames(horseNames: string[]): Promise<void> {
+export async function updateRaceStyleForHorseNames(horseNames: string[]): Promise<void> {
   const uniq = [...new Set(horseNames)];
   if (uniq.length === 0) return;
 
   const splits = await db.accuraceHorseSplit.findMany({
     where: { horseName: { in: uniq } },
-    select: { horseName: true, checkpoints: true, accuraceRace: { select: { length: true } } },
+    select: { horseName: true, checkpoints: true, accuraceRaceId: true, accuraceRace: { select: { length: true } } },
   });
 
-  const byName = new Map<string, { checkpoints: PaceCheckpoint[]; length: number }[]>();
+  // Saha büyüklüğü (fieldSize) — bu atın KENDİ checkpoint'lerinden çıkarılamaz (hep önde
+  // gitmiş bir at hiç arka sıraları görmemiş olabilir), o yüzden her accuraceRaceId için
+  // ayrıca kaç at start ettiğini sayıyoruz.
+  const raceIds = [...new Set(splits.map((s) => s.accuraceRaceId))];
+  const counts = await db.accuraceHorseSplit.groupBy({
+    by: ["accuraceRaceId"],
+    where: { accuraceRaceId: { in: raceIds } },
+    _count: { _all: true },
+  });
+  const fieldSizeByRaceId = new Map(counts.map((c) => [c.accuraceRaceId, c._count._all]));
+
+  const byName = new Map<string, { checkpoints: PaceCheckpoint[]; length: number; fieldSize: number }[]>();
   for (const s of splits) {
     const norm = normalizeName(s.horseName);
     const list = byName.get(norm) ?? [];
-    list.push({ checkpoints: s.checkpoints as unknown as PaceCheckpoint[], length: s.accuraceRace.length ?? 0 });
+    list.push({
+      checkpoints: s.checkpoints as unknown as PaceCheckpoint[],
+      length: s.accuraceRace.length ?? 0,
+      fieldSize: fieldSizeByRaceId.get(s.accuraceRaceId) ?? 1,
+    });
     byName.set(norm, list);
   }
 
@@ -69,7 +84,7 @@ async function updateRaceStyleForHorseNames(horseNames: string[]): Promise<void>
     const ids = runnerIdsByNorm.get(norm);
     if (!ids || ids.length === 0) continue;
     const sonuclar = kayitlar
-      .map((k) => analizEtTekYaris(k.checkpoints, k.length))
+      .map((k) => analizEtTekYaris(k.checkpoints, k.length, k.fieldSize))
       .filter((s): s is NonNullable<typeof s> => s != null);
     const egilim = hesaplaCokYarisEgilimi(sonuclar);
     if (!egilim) continue;
