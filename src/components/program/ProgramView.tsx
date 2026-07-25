@@ -7,6 +7,7 @@ import { ChevronDown, ChevronUp, Star, Info } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
 import HorseDetailModal from "./HorseDetailModal";
+import HipodromOzellikleriModal from "./HipodromOzellikleriModal";
 import EmailVerificationGate from "./EmailVerificationGate";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getPistMesafeStilIstatistigi, type PistMesafeStilSonuc } from "@/server/actions/pist-mesafe-stil.actions";
@@ -1205,6 +1206,7 @@ export default function ProgramView({
   const [h2hOpen, setH2hOpen] = useState(false);
   const [sonYarisOpen, setSonYarisOpen] = useState(false);
   const [selectedHorse, setSelectedHorse] = useState<string | null>(null);
+  const [hipodromOzellikleriOpen, setHipodromOzellikleriOpen] = useState(false);
   const [followedSet, setFollowedSet] = useState(() => new Set(followedNames));
   const [, startFollowTransition] = useTransition();
 
@@ -1270,7 +1272,7 @@ export default function ProgramView({
   return (
     <div className="flex flex-col">
       {/* Hipodrom tab'ları */}
-      <div className="flex overflow-x-auto border-b bg-muted/30 shrink-0 print:hidden">
+      <div className="flex items-center overflow-x-auto border-b bg-muted/30 shrink-0 print:hidden">
         {days.map((d) => (
           <button
             key={d.hippodromeSlug}
@@ -1285,6 +1287,14 @@ export default function ProgramView({
             {d.hippodromeName}
           </button>
         ))}
+        {currentDay && (
+          <button
+            onClick={() => setHipodromOzellikleriOpen(true)}
+            className="ml-auto mr-2 shrink-0 rounded-md border px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground whitespace-nowrap"
+          >
+            Hipodrom Özellikleri
+          </button>
+        )}
       </div>
 
       {currentDay && (
@@ -1433,6 +1443,13 @@ export default function ProgramView({
         </>
       )}
       {selectedHorse && <HorseDetailModal name={selectedHorse} onClose={() => setSelectedHorse(null)} />}
+      {hipodromOzellikleriOpen && currentDay && (
+        <HipodromOzellikleriModal
+          hippodromeSlug={currentDay.hippodromeSlug}
+          hippodromeName={currentDay.hippodromeName}
+          onClose={() => setHipodromOzellikleriOpen(false)}
+        />
+      )}
     </div>
   );
 }
