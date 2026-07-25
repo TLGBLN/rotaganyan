@@ -1272,25 +1272,27 @@ export default function ProgramView({
   return (
     <div className="flex flex-col">
       {/* Hipodrom tab'ları */}
-      <div className="flex items-center overflow-x-auto border-b bg-muted/30 shrink-0 print:hidden">
-        {days.map((d) => (
-          <button
-            key={d.hippodromeSlug}
-            onClick={() => setActiveHipo(d.hippodromeSlug)}
-            className={cn(
-              "shrink-0 px-4 py-2.5 text-sm font-semibold transition-colors whitespace-nowrap",
-              activeHipo === d.hippodromeSlug
-                ? "bg-[#c0392b] text-white"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            )}
-          >
-            {d.hippodromeName}
-          </button>
-        ))}
+      <div className="flex items-stretch border-b bg-muted/30 shrink-0 print:hidden">
+        <div className="flex overflow-x-auto min-w-0">
+          {days.map((d) => (
+            <button
+              key={d.hippodromeSlug}
+              onClick={() => setActiveHipo(d.hippodromeSlug)}
+              className={cn(
+                "shrink-0 px-4 py-2.5 text-sm font-semibold transition-colors whitespace-nowrap",
+                activeHipo === d.hippodromeSlug
+                  ? "bg-[#c0392b] text-white"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              )}
+            >
+              {d.hippodromeName}
+            </button>
+          ))}
+        </div>
         {currentDay && (
           <button
             onClick={() => setHipodromOzellikleriOpen(true)}
-            className="ml-auto mr-2 shrink-0 rounded-md border px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground whitespace-nowrap"
+            className="shrink-0 flex items-center gap-1 self-center mr-2 rounded-md border px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground whitespace-nowrap"
           >
             Hipodrom Özellikleri
           </button>
