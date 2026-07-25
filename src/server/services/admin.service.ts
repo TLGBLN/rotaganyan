@@ -217,6 +217,12 @@ export async function getDashboardStats() {
   };
 }
 
+// "Karma" TJK'nin birleşik-şehir veri grubudur, gerçek bir hipodrom değil (bkz. tjk-at-
+// performans.adapter.ts'teki Karma filtre notu); "Perak Malezya" ise yanlışlıkla/nadiren
+// ingest edilmiş yabancı bir hipodrom (1 raceDay) — ikisi de "kaç hipodrom kapsıyoruz"
+// istatistiğine dahil edilmemeli.
+const GERCEK_OLMAYAN_HIPODROM_SLUGLARI = ["karma", "perak-malezya"];
+
 /** Dashboard'daki "Arşiv Kapsamı" kutusu için — hepsi gerçek DB sayımı, uydurma/yuvarlanmış değil. */
 export async function getArchiveStats() {
   const [gecmisYarisKaydi, koşuArsivi, arsivGunu, hipodrom, pedigriArsivi, galopKaydi, enEskiGun] =
@@ -224,7 +230,7 @@ export async function getArchiveStats() {
       db.runner.count({ where: { race: { result: { isNot: null } } } }),
       db.race.count(),
       db.raceDay.count(),
-      db.hippodrome.count(),
+      db.hippodrome.count({ where: { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI } } }),
       db.runner.count({ where: { OR: [{ sire: { not: null } }, { pedigreeNote: { not: null } }] } }),
       db.gallop.count(),
       db.raceDay.findFirst({ orderBy: { date: "asc" }, select: { date: true } }),
