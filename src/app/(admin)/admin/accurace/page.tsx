@@ -15,6 +15,19 @@ type PageProps = { searchParams: Promise<{ tarih?: string; at?: string }> };
 
 const GROUND_LABEL_TR: Record<string, string> = { K: "Kum", C: "Çim", S: "Sentetik" };
 
+// bkz. son800.actions.ts'teki aynı fonksiyon — o yarıştaki EN İYİ (sahanın en hızlı)
+// son 800'ü hesaplamak için tekrar kullanılıyor (admin arama sonuçları tek atlı, izole
+// görünüm olduğu için sahanın geri kalanıyla karşılaştırma olmadan ham derece yanıltıcı).
+function last800SureSaniye(checkpoints: PaceCheckpoint[], length: number): number | null {
+  if (length < 800) return null;
+  const sorted = [...checkpoints].sort((a, b) => a.checkpoint - b.checkpoint);
+  const finish = sorted[sorted.length - 1];
+  if (!finish) return null;
+  const nokta = [...sorted].reverse().find((c) => c.checkpoint <= length - 800);
+  if (!nokta) return null;
+  return (finish.timeReal - nokta.timeReal) / 1000;
+}
+
 export default async function AccuraceDashboardPage({ searchParams }: PageProps) {
   const { tarih, at } = await searchParams;
   const atQuery = at?.trim();
@@ -36,6 +49,21 @@ export default async function AccuraceDashboardPage({ searchParams }: PageProps)
       },
       orderBy: { accuraceRace: { date: "desc" } },
     });
+
+    const searchRaceIds = [...new Set(matches.map((m) => m.accuraceRaceId))];
+    const searchSiblings = searchRaceIds.length
+      ? await db.accuraceHorseSplit.findMany({
+          where: { accuraceRaceId: { in: searchRaceIds } },
+          select: { accuraceRaceId: true, checkpoints: true, accuraceRace: { select: { length: true } } },
+        })
+      : [];
+    const searchFieldBest = new Map<string, number>();
+    for (const s of searchSiblings) {
+      const sure = last800SureSaniye(s.checkpoints as unknown as PaceCheckpoint[], s.accuraceRace.length ?? 0);
+      if (sure == null) continue;
+      const mevcut = searchFieldBest.get(s.accuraceRaceId);
+      if (mevcut == null || sure < mevcut) searchFieldBest.set(s.accuraceRaceId, sure);
+    }
 
     const grouped = new Map<string, typeof matches>();
     for (const m of matches) {
@@ -71,6 +99,9 @@ export default async function AccuraceDashboardPage({ searchParams }: PageProps)
                     const checkpoints = r.checkpoints as unknown as PaceCheckpoint[];
                     const sonuc = analizEtTekYaris(checkpoints, length);
                     const hipoAdi = r.accuraceRace.race?.raceDay.hippodrome.name ?? r.accuraceRace.hippodrome ?? r.accuraceRace.citySlug;
+                    const sure = last800SureSaniye(checkpoints, length);
+                    const fieldBest = searchFieldBest.get(r.accuraceRaceId);
+                    const fark = sure != null && fieldBest != null ? Math.round((sure - fieldBest) * 100) / 100 : null;
                     return (
                       <div key={r.id}>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-0.5 pb-0.5 text-[11px] text-muted-foreground">
@@ -80,7 +111,13 @@ export default async function AccuraceDashboardPage({ searchParams }: PageProps)
                           <span className="tabular-nums">{length}m</span>
                           <span className="tabular-nums">{r.place}. sıra</span>
                         </div>
-                        <AccuraceSectionalTable length={length} checkpoints={checkpoints} stil={sonuc?.stil ?? null} />
+                        <AccuraceSectionalTable
+                          length={length}
+                          checkpoints={checkpoints}
+                          stil={sonuc?.stil ?? null}
+                          son800Sure={sure != null ? `${sure.toFixed(2)}''` : undefined}
+                          fark={fark}
+                        />
                       </div>
                     );
                   })}

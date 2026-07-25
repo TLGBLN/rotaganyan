@@ -35,6 +35,11 @@ export type AccuraceSon800Record = {
   length: number;
   place: number;
   son800Sure: string;
+  // 2026-07-25: kullanıcı isteği — ham dereceyle değil, O YARIŞTAKİ EN İYİ (sahanın en
+  // hızlı) son 800m'siyle farkla okunmalı (analiz motorunun zaten yaptığı gibi, bkz.
+  // veri-toplama.ts fieldBestSon800ByRaceId) — public panelde bu karşılaştırma hiç
+  // yoktu, yalnız mutlak süre gösteriliyordu.
+  fark: number | null; // saniye — 0=o yarışın en iyisi, pozitif=daha yavaş
   // 2026-07-24: kullanıcı isteği — admin/accurace panosundaki gibi TÜM sektörel
   // (200/400/600...) kırılımı public panelde de görünsün, yalnız son 800 özeti değil.
   checkpoints: PaceCheckpoint[];
@@ -59,6 +64,7 @@ export async function getSon800ForRace(raceId: string): Promise<Son800RunnerData
       horseName: true,
       place: true,
       checkpoints: true,
+      accuraceRaceId: true,
       accuraceRace: {
         select: {
           date: true,
@@ -72,6 +78,24 @@ export async function getSon800ForRace(raceId: string): Promise<Son800RunnerData
     },
     orderBy: { accuraceRace: { date: "desc" } },
   });
+
+  // O yarıştaki EN İYİ (sahanın en hızlı) son 800'ü bulmak için, bu koşudaki atların
+  // koştuğu her Accurace yarışının TÜM alanını (sibling'lerini) ayrıca çekiyoruz —
+  // analiz motorunun (veri-toplama.ts) fieldBestSon800ByRaceId ile birebir aynı mantık.
+  const raceIds = [...new Set(splits.map((s) => s.accuraceRaceId))];
+  const siblings = raceIds.length
+    ? await db.accuraceHorseSplit.findMany({
+        where: { accuraceRaceId: { in: raceIds } },
+        select: { accuraceRaceId: true, checkpoints: true, accuraceRace: { select: { length: true } } },
+      })
+    : [];
+  const fieldBestByRaceId = new Map<string, number>();
+  for (const s of siblings) {
+    const sure = last800SureSaniye(s.checkpoints as unknown as PaceCheckpoint[], s.accuraceRace.length ?? 0);
+    if (sure == null) continue;
+    const mevcut = fieldBestByRaceId.get(s.accuraceRaceId);
+    if (mevcut == null || sure < mevcut) fieldBestByRaceId.set(s.accuraceRaceId, sure);
+  }
 
   // Accurace bazı hipodromlar için (Antalya, Elazığ, Şanlıurfa) tam isim yerine yalnız
   // "Hipodromu" kelimesini veriyor (kaynak veri eksikliği) — bu durumda kendi Race
@@ -93,6 +117,8 @@ export async function getSon800ForRace(raceId: string): Promise<Son800RunnerData
         const sure = last800SureSaniye(checkpoints, length);
         if (sure == null) return null;
         const sonuc = analizEtTekYaris(checkpoints, length);
+        const fieldBest = fieldBestByRaceId.get(k.accuraceRaceId);
+        const fark = fieldBest != null ? Math.round((sure - fieldBest) * 100) / 100 : null;
         return {
           date: k.accuraceRace.date.toISOString().slice(0, 10).split("-").reverse().join("."),
           hippodrome: hippodromeAdi(k),
@@ -100,6 +126,7 @@ export async function getSon800ForRace(raceId: string): Promise<Son800RunnerData
           length,
           place: k.place,
           son800Sure: `${sure.toFixed(2)}''`,
+          fark,
           checkpoints,
           stil: sonuc?.stil ?? null,
         };

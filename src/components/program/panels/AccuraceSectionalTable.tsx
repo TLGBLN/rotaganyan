@@ -9,19 +9,32 @@ import { fmtSaniye, checkpointCols, STIL_LABEL, STIL_RENK } from "@/lib/methodol
  * (admin/accurace/page.tsx, hem günlük listede hem at arama sonuçlarında) kullanılır.
  */
 export default function AccuraceSectionalTable({
-  length, checkpoints, stil, son800Sure,
+  length, checkpoints, stil, son800Sure, fark,
 }: {
   length: number;
   checkpoints: PaceCheckpoint[];
   stil: TekYarisStil | null;
   son800Sure?: string;
+  // 2026-07-25: kullanıcı isteği — ham dereceyle değil, o yarıştaki EN İYİ (sahanın en
+  // hızlı) son 800'üyle farkla okunmalı. 0=o yarışın en iyi kapanışını yakaladı,
+  // pozitif=daha yavaş kapandı. Veri yoksa (sibling koşucu bulunamadıysa) undefined.
+  fark?: number | null;
 }) {
   const cols = checkpointCols(length);
   return (
     <div className="rounded-md border border-border/40 overflow-hidden">
       {(son800Sure || stil) && (
         <div className="flex flex-wrap items-center gap-2 bg-muted/20 px-1.5 py-1 text-[11px]">
-          {son800Sure && <span className="ml-auto font-mono font-semibold text-sky-500 tabular-nums">Son 800: {son800Sure}</span>}
+          {son800Sure && (
+            <span className="ml-auto font-mono font-semibold text-sky-500 tabular-nums">
+              Son 800: {son800Sure}
+              {fark != null && (
+                <span className={cn("ml-1.5 font-semibold", fark <= 0 ? "text-hit" : fark <= 0.5 ? "text-muted-foreground" : "text-[#c0392b]")}>
+                  ({fark <= 0 ? "yarışın en iyisi" : `+${fark.toFixed(2)}s farkla`})
+                </span>
+              )}
+            </span>
+          )}
           {stil && (
             <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-semibold", STIL_RENK[stil])}>
               {STIL_LABEL[stil]}

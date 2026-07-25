@@ -65,6 +65,7 @@ export default function Son800Panel({ raceId }: { raceId: string }) {
                         checkpoints={rec.checkpoints}
                         stil={rec.stil}
                         son800Sure={rec.son800Sure}
+                        fark={rec.fark}
                       />
                     </div>
                   ))}
