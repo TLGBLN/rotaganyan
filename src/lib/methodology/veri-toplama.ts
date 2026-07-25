@@ -132,6 +132,9 @@ export type Faz1Runner = {
   // TJK'nın "St" sütununun yanında turuncu "DS" işareti — at kendi tercihiyle dıştan
   // başlayacak anlamına gelir. Olumlu bir etken olabilir, göz ardı edilmemeli.
   disaridanStart: boolean;
+  // Kulvar/start no — hipodrom geometrisiyle birlikte (§III.2/§IV.1) YALNIZ destekleyici
+  // bir unsur olarak okunmalı, ana veriyi (HP/sınıf/tempo/form) asla gölgeleyemez (§XX.25).
+  startNo: number | null;
   jockey: string | null;
   jockeyChanged: boolean;
   previousJockey: string | null;
@@ -629,7 +632,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
 
       return {
         id: r.id, no: r.no, ad: r.name, scratched: r.scratched,
-        weight: r.weight, weightChange: r.weightChange, disaridanStart: r.disaridanStart,
+        weight: r.weight, weightChange: r.weightChange, disaridanStart: r.disaridanStart, startNo: r.startNo,
         jockey: r.jockey, jockeyChanged: r.jockeyChanged, previousJockey: r.previousJockey,
         trainer: r.trainer, owner: r.owner,
         ekuriMateleri: ekuriMateMap.get(r.id) ?? [],

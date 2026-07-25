@@ -74,7 +74,7 @@ Pist türü: Kum, çim, sentetik. Zemin durumu: Normal, hızlı, ıslak, ağır,
 
 Düşük benzerlik geçmiş yarışı silmez; güvenini azaltır.
 
-*(Hipodrom geometrisi: pist uzunluğu/genişliği ve mesafe/start noktası diyagramı sitede "Hipodrom Özellikleri" panelinde görüntülenebilir. Kulvar çıkışlarının virajdan/düz yoldan başlaması bu diyagramdan okunur — YALNIZ DESTEKLEYİCİ bir unsurdur, en fazla Katman 4-5 seviyesinde yer alır, HİÇBİR VERİYİ GÖLGELEYEMEZ/GEÇERSİZ KILAMAZ. HP, sınıf, tempo, form gibi ana kalemlerin önüne asla geçmez.)*
+*(Hipodrom geometrisi: pist uzunluğu/genişliği ve mesafe/start noktası diyagramı sitede "Hipodrom Özellikleri" panelinde görüntülenebilir. Kulvar çıkışlarının virajdan/düz yoldan başlaması bu diyagramdan okunur — YALNIZ DESTEKLEYİCİ bir unsurdur, en fazla Katman 4-5 seviyesinde yer alır, HİÇBİR VERİYİ GÖLGELEYEMEZ/GEÇERSİZ KILAMAZ. HP, sınıf, tempo, form gibi ana kalemlerin önüne asla geçmez. Her atın kulvar/start numarası (v6.2'den itibaren) ATLAR tablosunda "Kulvar:N" olarak veriliyor — düşük numara/iç kulvar dar virajlarda avantaj, dış kulvar mesafe kaybı olabilir, ama bu KESİN bir kural değil, koşunun kendi bağlamına göre değerlendir.)*
 
 ### III.3 Zemin Kilo Katsayısı
 
