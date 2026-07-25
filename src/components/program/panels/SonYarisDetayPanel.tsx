@@ -99,7 +99,7 @@ export default function SonYarisDetayPanel({ raceId }: { raceId: string }) {
                       "px-2 py-1.5 text-center tabular-nums font-semibold",
                       d.kiloDegisimi == null ? "text-muted-foreground" : d.kiloDegisimi < 0 ? "text-red-500" : d.kiloDegisimi > 0 ? "text-green-500" : "text-muted-foreground"
                     )}>
-                      {d.kiloDegisimi == null ? "∅" : d.kiloDegisimi === 0 ? "0" : `${d.kiloDegisimi > 0 ? "+" : ""}${d.kiloDegisimi}`}
+                      {d.kiloDegisimi == null ? "∅" : d.kiloDegisimi === 0 ? "0 kg" : `${d.kiloDegisimi > 0 ? "+" : ""}${d.kiloDegisimi} kg`}
                     </td>
                     <td className="px-2 py-1.5 text-center">
                       {d.ayniJokey == null ? (
@@ -138,7 +138,7 @@ export default function SonYarisDetayPanel({ raceId }: { raceId: string }) {
                     "tabular-nums font-semibold",
                     d.kiloDegisimi == null ? "text-muted-foreground" : d.kiloDegisimi < 0 ? "text-red-500" : d.kiloDegisimi > 0 ? "text-green-500" : "text-muted-foreground"
                   )}>
-                    {d.kiloDegisimi == null ? "∅" : d.kiloDegisimi === 0 ? "0" : `${d.kiloDegisimi > 0 ? "+" : ""}${d.kiloDegisimi}`}
+                    {d.kiloDegisimi == null ? "∅" : d.kiloDegisimi === 0 ? "0 kg" : `${d.kiloDegisimi > 0 ? "+" : ""}${d.kiloDegisimi} kg`}
                   </div>
                   <div className="text-muted-foreground">Aynı Jokey</div>
                   <div>
