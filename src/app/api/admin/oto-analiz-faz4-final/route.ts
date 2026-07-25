@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, hasRole } from "@/lib/auth";
 import {
-  createWithTruncationRetry, extractText, trimMetodolojiFaz4Icin,
-  FAZ4_FINAL_SCHEMA, FAZ4_UNIFIED_SCHEMA, type Faz2Atlar, type Faz4DecisionPick, type Faz4FinalResult,
+  createWithTruncationRetry, extractText,
+  FAZ4_FINAL_SCHEMA, FAZ_SHARED_SCHEMA, type Faz2Atlar, type Faz4DecisionPick, type Faz4FinalResult,
 } from "@/lib/methodology/claude-analiz-helpers";
 
 const METODOLOJI_V2 = process.env.METODOLOJI_V2 === "1";
@@ -38,9 +38,10 @@ async function handlePost(req: NextRequest) {
   }
 
   // 1 saatlik TTL — Faz2/Faz4 ile eşleşmeli (bkz. oto-analiz-faz2/route.ts'teki not).
-  // 2026-07-25 DENEYSEL: bkz. oto-analiz-faz4/route.ts'teki METODOLOJI_V2 notu — A/B
-  // karşılaştırması bitene kadar varsayılan davranış (flag kapalı) değişmiyor.
-  const effectiveSharedContext = METODOLOJI_V2 ? trimMetodolojiFaz4Icin(sharedContext) : sharedContext;
+  // 2026-07-25: metin artık kısaltılmıyor — bkz. oto-analiz-faz4/route.ts'teki
+  // FAZ_SHARED_SCHEMA notu (üç faz da birebir aynı prefix'i paylaşıyor, Faz2 cache
+  // yazıyor, Faz4/Faz4-final ucuza okuyor).
+  const effectiveSharedContext = sharedContext;
   const sharedContextBlock: Anthropic.TextBlockParam = {
     type: "text",
     text: effectiveSharedContext,
@@ -92,7 +93,7 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
         model: "claude-sonnet-5",
         thinking: { type: "adaptive" },
         max_tokens: 20000,
-        output_config: { format: { type: "json_schema", schema: METODOLOJI_V2 ? FAZ4_UNIFIED_SCHEMA : FAZ4_FINAL_SCHEMA } },
+        output_config: { format: { type: "json_schema", schema: METODOLOJI_V2 ? FAZ_SHARED_SCHEMA : FAZ4_FINAL_SCHEMA } },
         messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz4FinalTail }] }],
       },
       raceId, "faz4notes", 28000

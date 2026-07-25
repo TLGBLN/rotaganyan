@@ -5,8 +5,10 @@ import { gatherFaz1, type Faz1Sonuc } from "@/lib/methodology/veri-toplama";
 import { veriDenetimi, type AtGirdisi } from "@/lib/methodology/gecit-motoru";
 import {
   createWithTruncationRetry, extractText, daraltilmisMetodoloji,
-  FAZ2_SCHEMA, type Faz2Atlar,
+  FAZ2_SCHEMA, FAZ_SHARED_SCHEMA, type Faz2Atlar,
 } from "@/lib/methodology/claude-analiz-helpers";
+
+const METODOLOJI_V2 = process.env.METODOLOJI_V2 === "1";
 import { getRecentCachedResult } from "@/lib/claude-cost";
 import type { Anthropic } from "@anthropic-ai/sdk";
 import type { Role } from "@prisma/client";
@@ -119,6 +121,12 @@ ${methodologyText}`;
   // yapıyordu. 1 saatlik TTL'e çıkarmak yazma maliyetini artırıyor (1.25x→2x) ama
   // 3 çağrının aynı pencerede kalma ihtimalini pratikte kesinliğe yaklaştırıyor —
   // net etki düşüş yönünde (bkz. shared/prompt-caching.md ekonomi tablosu).
+  //
+  // 2026-07-25: %6'lık oranın ASIL sebebi TTL değil, her fazın farklı output_config.
+  // format şeması kullanması imiş (Anthropic cache'i hiyerarşik hash'liyor — şema
+  // farklıysa sonrası geçersiz). METODOLOJI_V2=1 iken Faz2 de FAZ_SHARED_SCHEMA
+  // kullanıyor (aynı obje, Faz4/Faz4-final ile) — bu Faz2'nin cache YAZDIĞI bu bloğu
+  // Faz4/Faz4-final'in ucuza OKUYABİLMESİ için şart. Gerçek loglarda doğrulandı.
   const sharedContextBlock: Anthropic.TextBlockParam = {
     type: "text",
     text: sharedContext,
@@ -179,7 +187,7 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
         // Faz 4'teki geçit triyajı/sıralama/banko gibi ek karar yükü yok) daha hafif olduğu
         // için Faz 4'ün nihai tavanıyla (32000/40000) aynı değere çıkarmak güvenli marj bırakıyor.
         max_tokens: 32000,
-        output_config: { format: { type: "json_schema", schema: FAZ2_SCHEMA } },
+        output_config: { format: { type: "json_schema", schema: METODOLOJI_V2 ? FAZ_SHARED_SCHEMA : FAZ2_SCHEMA } },
         messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz2Tail }] }],
       },
       raceId, "faz2", 40000

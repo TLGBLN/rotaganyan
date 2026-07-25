@@ -199,40 +199,6 @@ export function daraltilmisMetodoloji(
   return `${bolumBasi}${startMarker} (yalnız bu yarışa uyan kart(lar) — geri kalan kartlar alakasız olduğu için çıkarıldı)\n\n${daraltilmisIv}\n\n${bolumSonu}`;
 }
 
-/**
- * DENEYSEL (yalnız METODOLOJI_V2=1 ortam değişkeni açıkken devreye girer, A/B
- * karşılaştırması için) — Faz4/Faz4-final'e giden sharedContext'teki METODOLOJİ kısmından,
- * Faz4'ün girdisinde (ATLAR tablosu, Faz2'yle birebir aynı) hiç karşılığı olmayan
- * salt-Faz2 bölümlerini çıkarır: §IV (koşu tipi ağırlık tabloları — Faz4 yeniden
- * puanlamıyor), §X (RPR/TS — kendi metni bile bu verinin hiç toplanmadığını söylüyor),
- * §XV (veri yeterliliği — kod zaten Faz4 çalışmadan ÖNCE bunu kontrol ediyor), §XVIII-XX
- * (post-mortem/hata kodları/tarihsel dersler/veri kaynakları — geçmişe dönük referans,
- * canlı karara girmiyor).
- *
- * BİLEREK DOKUNULMAYANLAR: §V/VI/VII/VIII/XI/XII/XIII. Sebep — §XIV'ün ("kalmalı" listesi)
- * "Geçerli olumsuz kanıtlar" satırı doğrudan bunların tanımına dayanıyor: "tempo aleyhine
- * (§VIII) · somut kilo dezavantajı (§VII) · galop düşüşü (§VI) · ... ". Faz4'ün "somut
- * kanıt var mı" triyajı (bir atı geçit tetiklemesine rağmen yerinde bırakma kararı) bu
- * tanımları kaybederse ham sayıları (HP ivme, kilo değişimi, tempo n, jokey/antrenör %)
- * yanlış yorumlayabilir — dış incelemede bulunan gerçek bir risk, bkz. proje notu.
- */
-export function trimMetodolojiFaz4Icin(sharedContext: string): string {
-  const spans: [string, string][] = [
-    ["## IV. KOŞU TİPİ ÖZET MATRİSLERİ", "## V. HP İVMESİ"],
-    ["## X. RPR / TS ULUSLARARASI DERECE", "## XI. H2H (ZAYIF KANIT)"],
-    ["## XV. VERİ YETERLİLİĞİ", "## XVI. GEÇİT ÖZETİ"],
-    ["## XVIII. POST-MORTEM VE KALİBRASYON", "# ROTAGANYAN — ÇÖZÜM REJİMİ"],
-  ];
-  let out = sharedContext;
-  for (const [start, end] of spans) {
-    const s = out.indexOf(start);
-    const e = out.indexOf(end, s + 1);
-    if (s === -1 || e === -1) continue; // güvenli taraf: bulunamazsa dokunma, sessizce atlanır
-    out = out.slice(0, s) + out.slice(e);
-  }
-  return out;
-}
-
 // Claude'un cevabını YALNIZCA prompt talimatıyla JSON'a zorlamak yerine, API'nin kendi
 // şema doğrulamasını (output_config.format) kullanıyoruz — "geçerli JSON döndür" gibi
 // bir talimata güvenmek yerine sunucu tarafında zorunlu kılınıyor.
@@ -341,24 +307,45 @@ export const FAZ4_FINAL_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-// DENEYSEL (yalnız METODOLOJI_V2=1 açıkken, Faz4 + Faz4-final için kullanılır — Faz2
-// hariç, çünkü Faz2'nin girdisi zaten hiç kısaltılmıyor, o yüzden Faz4/Faz4-final'le
-// asla aynı prefix'i paylaşamaz). Anthropic'in prompt cache'i hiyerarşik hash'leniyor:
-// tools/output_config.format → system → messages sırasıyla. Şema farklıysa, ondan
-// SONRAKİ her şey (metodoloji+veri birebir aynı olsa bile) otomatik geçersiz sayılıyor
-// — dış incelemede doğrulandı, gerçek loglarda da 3 çağrının 3'ünde de cacheRead=0
-// görüldü. Çözüm: Faz4 ve Faz4-final'in TEK VE AYNI şemayı (aynı JS objesi, aynı
-// referans — anahtar sırası da dahil bayt-bayt eşleşsin diye) kullanması. Hiçbir alan
-// `required` değil (JSON Schema kuralı: required'da olmayan alan tamamen atlanabilir) —
-// Faz4 yalnız "picks" doldurur, Faz4-final yalnız "gerekceler"+banko/kupon alanlarını;
-// öbür fazın alanları şemada TANIMLI ama zorunlu olmadığı için model onları doldurmaya
-// mecbur kalmaz. Prompt METNİ zaten hangi alanların isteneceğini açıkça söylüyor.
-// Güvenlik: her route yalnız kendi ilgili alanını (result.picks / result.gerekceler vb.)
-// okuyor — modelin şemada izinli ama alakasız bir alanı doldurması durumunda bile o veri
-// hiçbir zaman kullanılmıyor, sessizce göz ardı ediliyor.
-export const FAZ4_UNIFIED_SCHEMA = {
+// DENEYSEL (yalnız METODOLOJI_V2=1 açıkken, ÜÇ fazda da — Faz2 + Faz4 + Faz4-final —
+// kullanılır). Anthropic'in prompt cache'i hiyerarşik hash'leniyor: tools/
+// output_config.format → system → messages sırasıyla. Şema farklıysa, ondan SONRAKİ
+// her şey (metodoloji+veri birebir aynı olsa bile) otomatik geçersiz sayılıyor — dış
+// incelemede doğrulandı, gerçek loglarda da (kısaltma+kısmi birleşik şema denemesinde)
+// doğrulandı: Faz4↔Faz4-final arasında cacheRead>0 gerçekten görüldü.
+//
+// 2026-07-25: bir adım ileri götürüldü — Faz4/Faz4-final'e giden metin ARTIK
+// KISALTILMIYOR (denenen trimMetodolojiFaz4Icin fonksiyonu tamamen kaldırıldı, ilk
+// denemede %18 tasarruf sağlamıştı ama bu yaklaşım daha fazlasını sağladı) ve Faz2
+// de AYNI birleşik şemayı kullanıyor. Sonuç: üçü de
+// birebir aynı (tam, kısaltılmamış) içeriği + aynı şemayı paylaşıyor — Faz2 cache'i BİR
+// KEZ yazar, Faz4 VE Faz4-final ikisi de ucuza okur (önceki halde yalnız Faz4-final,
+// Faz4'ün yazdığını okuyabiliyordu). Bu hem daha ucuz (Faz4 artık yazma değil okuma
+// fiyatı öder) HEM DE daha güvenli (Faz4/Faz4-final artık kısaltılmamış tam metodolojiyi
+// görüyor, önceki "hangi bölüm gerçekten gerekli" tartışmasının riski tamamen kalkıyor).
+//
+// Hiçbir alan `required` değil (JSON Schema kuralı: required'da olmayan alan tamamen
+// atlanabilir) — Faz2 yalnız "atlar", Faz4 yalnız "picks", Faz4-final yalnız
+// "gerekceler"+banko/kupon alanlarını doldurur; öbür fazların alanları şemada TANIMLI
+// ama zorunlu olmadığı için model onları doldurmaya mecbur kalmaz. Prompt METNİ zaten
+// hangi alanların isteneceğini açıkça söylüyor. Güvenlik: her route yalnız kendi ilgili
+// alanını okuyor — modelin şemada izinli ama alakasız bir alanı doldurması durumunda
+// bile o veri hiçbir zaman kullanılmıyor, sessizce göz ardı ediliyor.
+export const FAZ_SHARED_SCHEMA = {
   type: "object",
   properties: {
+    atlar: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          no: { type: "integer" }, ad: { type: "string" },
+          puan: { type: "number" }, teknikSira: { type: "integer" },
+        },
+        required: ["no", "ad", "puan", "teknikSira"],
+        additionalProperties: false,
+      },
+    },
     picks: {
       type: "array",
       items: {
