@@ -29,8 +29,16 @@ export default function AccuraceSectionalTable({
             <span className="ml-auto font-mono font-semibold text-sky-500 tabular-nums">
               Son 800: {son800Sure}
               {fark != null && (
+                // 2026-07-25: kullanıcı tespiti — "+1.42s farkla" gibi nötr bir ifade,
+                // bunun aslında OLUMSUZ bir sinyal olduğunu (yarışın en iyisinden yavaş
+                // kapandığı) okuyucuya açıkça anlatmıyordu. Kelime seçimi artık kendi
+                // kendini açıklıyor: "yavaş" ibaresi + kırmızı renk birlikte.
                 <span className={cn("ml-1.5 font-semibold", fark <= 0 ? "text-hit" : fark <= 0.5 ? "text-muted-foreground" : "text-[#c0392b]")}>
-                  ({fark <= 0 ? "yarışın en iyisi" : `+${fark.toFixed(2)}s farkla`})
+                  {fark <= 0
+                    ? "(yarışın en iyisi ✓)"
+                    : fark <= 0.5
+                      ? `(+${fark.toFixed(2)}s, en iyiye yakın)`
+                      : `(+${fark.toFixed(2)}s yavaş — yarışın en iyisinden geride)`}
                 </span>
               )}
             </span>
