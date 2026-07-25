@@ -55,6 +55,13 @@ async function fetchTjkAtKosuBilgileriUncached(atId: number): Promise<TjkAtKosuR
     const date = cells[0] ?? "";
     if (!/^\d{2}\.\d{2}\.\d{4}$/.test(date)) return; // toplam/özet satırlarını atla
 
+    // TJK, küçük hipodromların koşularını AYRICA "Karma" adlı ortak bir yayın altında da
+    // listeliyor — fiziksel olarak aynı yarış, kullanıcı ekran görüntüsüyle tespit etti
+    // (aynı tarih/mesafe/pist/jokey, yalnız AGF havuzu farklı). Burada eleyince tek bir
+    // chokepoint'ten Karşılaştır/H2H panelleri VE Faz2 analiz girdisi (veri-toplama.ts)
+    // birden düzeliyor, hepsi bu fonksiyonu kullanıyor.
+    if ((cells[1] ?? "").trim().toLocaleUpperCase("tr-TR") === "KARMA") return;
+
     // Takı — hücredeki her <a> bir kod (K, KG, DB, SK, GKR...) taşır; virgülle birleştirilir
     // (daily program ingest'indeki formatla tutarlı olsun diye).
     const equipmentCodes = cellEls[7]

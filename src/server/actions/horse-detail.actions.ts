@@ -29,7 +29,10 @@ function finishPosition(actualOrder: unknown, runnerNo: number): number | null {
 /** Bir atın (isme göre) geçmiş yarışlarını, en yeniden eskiye, en fazla 15 kayıt döner. */
 export async function getHorseHistory(name: string): Promise<HorseHistoryEntry[]> {
   const runners = await db.runner.findMany({
-    where: { name },
+    // "Karma" hipodromu, küçük şehirlerin koşularını TJK'nın ayrıca yayınladığı ortak bir
+    // yayın — fiziksel olarak gerçek şehirdeki koşuyla aynı yarış (bkz. prediction.actions.ts
+    // karma-mirror mantığı). Geçmişte mükerrer satır olarak görünmesin diye elenir.
+    where: { name, race: { raceDay: { hippodrome: { slug: { not: "karma" } } } } },
     orderBy: { race: { raceDay: { date: "desc" } } },
     take: 15,
     select: {
