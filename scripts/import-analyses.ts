@@ -81,11 +81,12 @@ async function importOne(db: PrismaClient, item: AnalysisItem, adminId: string) 
   }
 
   if (item.sonuc && item.gercek) {
-    const w = item.gercek.match(/^(\d+)/)?.[1];
+    const ws = item.gercek.split(",").map((s) => s.trim().match(/^(\d+)/)?.[1]).filter((s): s is string => !!s).map((s) => +s);
+    const w = ws[0] ?? null;
     await db.result.upsert({
       where:{raceId:race.id},
-      create:{raceId:race.id,actualOrder:[item.gercek,item.g2,item.g3,item.g4,item.g5].filter((x): x is string => Boolean(x)),winnerNo:w?+w:null,hitTop1:item.sonuc==="Kazandi",hitInCoupon:item.sonuc==="Kazandi"||item.sonuc==="Kismen",errorTag:item.hata==="Evet"?"HATA":null,errorNote:item.hatanot||null,cikan:item.cikan||null},
-      update:{actualOrder:[item.gercek,item.g2,item.g3,item.g4,item.g5].filter((x): x is string => Boolean(x)),winnerNo:w?+w:null,hitTop1:item.sonuc==="Kazandi",hitInCoupon:item.sonuc==="Kazandi"||item.sonuc==="Kismen",errorTag:item.hata==="Evet"?"HATA":null,errorNote:item.hatanot||null,cikan:item.cikan||null},
+      create:{raceId:race.id,actualOrder:[item.gercek,item.g2,item.g3,item.g4,item.g5].filter((x): x is string => Boolean(x)),winnerNo:w,winnerNos:ws,hitTop1:item.sonuc==="Kazandi",hitInCoupon:item.sonuc==="Kazandi"||item.sonuc==="Kismen",errorTag:item.hata==="Evet"?"HATA":null,errorNote:item.hatanot||null,cikan:item.cikan||null},
+      update:{actualOrder:[item.gercek,item.g2,item.g3,item.g4,item.g5].filter((x): x is string => Boolean(x)),winnerNo:w,winnerNos:ws,hitTop1:item.sonuc==="Kazandi",hitInCoupon:item.sonuc==="Kazandi"||item.sonuc==="Kismen",errorTag:item.hata==="Evet"?"HATA":null,errorNote:item.hatanot||null,cikan:item.cikan||null},
     });
   }
 

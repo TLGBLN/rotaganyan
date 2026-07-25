@@ -93,7 +93,7 @@ export async function getRaceStyleWinStats(): Promise<{
   byFieldSize: RaceStyleWinBreakdown[];
 }> {
   const results = await db.result.findMany({
-    where: { winnerNo: { not: null } },
+    where: { winnerNos: { isEmpty: false } },
     select: {
       race: {
         select: {

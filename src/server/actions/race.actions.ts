@@ -70,23 +70,27 @@ export async function syncTodayResults(): Promise<{ synced: number; failed: numb
       const matchCount = actualOrder.filter((no) => race.runners.some((r) => r.no === no)).length;
       if (matchCount === 0) { debug.push(`⚠ ${slug} ${race.raceNo}. koşu: at numaraları eşleşmedi (TJK: ${actualOrder.slice(0,3).join(",")})`); continue; }
 
-      const winnerNo = actualOrder[0];
+      // At başı/beraberlik (dead heat): TJK aynı SONUCNO=1'i birden fazla ata verebiliyor —
+      // rows rank'e göre sıralı geliyor, en düşük rank'e sahip TÜM satırlar resmi kazanandır.
+      const minRank = raceResult.rows[0]?.rank;
+      const winnerNos = raceResult.rows.filter((r) => r.rank === minRank).map((r) => r.no);
+      const winnerNo = winnerNos[0] ?? null;
       const ganyan = raceResult.rows[0]?.ganyan;
       // TJK ganyanı ancak sonuç kesinleştikten (itiraz/foto-finiş incelemesi bitince) sonra
       // yayınlar — ganyan yoksa sıralama geçici/olası yanlış olabilir, bir sonraki senkronizasyona bırakılır.
       if (ganyan == null) { debug.push(`⚠ ${slug} ${race.raceNo}. koşu: ganyan henüz yayınlanmamış, sonuç kesinleşmemiş sayılıp atlandı`); continue; }
       const picks = race.prediction?.picks ?? [];
       const topPick = picks.find(p => p.rank === 1);
-      const hitTop1 = computeHitTop1(actualOrder, winnerNo, topPick?.runner?.no);
+      const hitTop1 = computeHitTop1(actualOrder, winnerNos, topPick?.runner?.no);
       const top3Nos = picks.map(p => p.runner?.no).filter((n): n is number => n != null);
-      const hitInCoupon = winnerNo != null && top3Nos.includes(winnerNo);
+      const hitInCoupon = winnerNos.some((no) => top3Nos.includes(no));
 
       const sortedRows = [...raceResult.rows].sort((a, b) => a.rank - b.rank);
       const time = sortedRows[0]?.time ?? null;
       const farklar = sortedRows.slice(0, 5).map((r) => r.fark).filter((f): f is string => !!f).join(", ") || null;
 
       await db.result.create({
-        data: { raceId: race.id, winnerNo, actualOrder, ganyan, time, farklar, hitTop1, hitInCoupon },
+        data: { raceId: race.id, winnerNo, winnerNos, actualOrder, ganyan, time, farklar, hitTop1, hitInCoupon },
       });
 
       // Jokey-at çiftlerini runner kayıtlarına yaz (boşsa doldur)
@@ -100,7 +104,7 @@ export async function syncTodayResults(): Promise<{ synced: number; failed: numb
         );
       await Promise.all(jockeyUpdates);
 
-      debug.push(`✓ ${slug} ${race.raceNo}. koşu kaydedildi (kazanan: ${winnerNo}, ganyan: ${ganyan})`);
+      debug.push(`✓ ${slug} ${race.raceNo}. koşu kaydedildi (kazanan: ${winnerNos.join(",")}, ganyan: ${ganyan})`);
       synced++;
     }
 

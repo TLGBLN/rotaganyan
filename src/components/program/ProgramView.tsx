@@ -299,11 +299,11 @@ function XLogo({ className }: { className?: string }) {
 // ── Analiz paneli ────────────────────────────────────────────────────────────
 
 function AnalysisPanel({
-  picks, runners, winnerNo, isLoggedIn, isAdmin, isVerified, userEmail, raceNo, hippodromeName, raceId,
+  picks, runners, winnerNos, isLoggedIn, isAdmin, isVerified, userEmail, raceNo, hippodromeName, raceId,
 }: {
   picks: ProgramPick[];
   runners: ProgramRunner[];
-  winnerNo?: number | null;
+  winnerNos?: number[] | null;
   isLoggedIn: boolean;
   isAdmin: boolean;
   isVerified: boolean;
@@ -402,7 +402,7 @@ function AnalysisPanel({
           <tbody>
             {picks.map((p) => {
               const { no, name } = pickDisplay(p);
-              const isWinner = winnerNo != null && p.runner?.no === winnerNo;
+              const isWinner = p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no);
               const rs = rankStyle(p.rank);
               const gerekce = gerekceFrom(p.details);
               return (
@@ -453,7 +453,7 @@ function AnalysisPanel({
       <div className="sm:hidden divide-y">
         {picks.map((p) => {
           const { no, name } = pickDisplay(p);
-          const isWinner = winnerNo != null && p.runner?.no === winnerNo;
+          const isWinner = p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no);
           const rs = rankStyle(p.rank);
           return (
             <div key={p.rank} className={cn("px-3 py-2.5", isWinner && "bg-[#f5c518]/10")}>
@@ -987,7 +987,7 @@ function RaceTable({
   trainerStats?: TrainerStatsMap;
 }) {
   const surf = surfaceLabel(race.surface);
-  const winnerNo = race.result?.winnerNo;
+  const winnerNos = race.result?.winnerNos ?? [];
 
   // AGF sıralama (en yüksek = 1. sıra)
   const agfSorted = race.runners
@@ -1084,7 +1084,7 @@ function RaceTable({
                   key={r.id}
                   r={r}
                   idx={i}
-                  isWinner={winnerNo != null && r.no === winnerNo}
+                  isWinner={winnerNos.includes(r.no)}
                   isTopAgf={r.no === topAgfNo}
                   ekuriColor={ekuriColorMap.get(r.no)}
                   agfRank={agfRankMap.get(r.no)}
@@ -1112,7 +1112,7 @@ function RaceTable({
             <RunnerCard
               key={r.id}
               r={r}
-              isWinner={winnerNo != null && r.no === winnerNo}
+              isWinner={winnerNos.includes(r.no)}
               isTopAgf={r.no === topAgfNo}
               ekuriColor={ekuriColorMap.get(r.no)}
               agfRank={agfRankMap.get(r.no)}
@@ -1152,7 +1152,7 @@ function RaceTable({
           <AnalysisPanel
             picks={race.picks}
             runners={race.runners}
-            winnerNo={winnerNo}
+            winnerNos={winnerNos}
             isLoggedIn={isLoggedIn}
             isAdmin={isAdmin}
             isVerified={isVerified}

@@ -351,7 +351,7 @@ export async function getAnalystStats(excludeRaceId?: string): Promise<AnalystSt
           surface: true,
           distance: true,
           raceDay: { select: { hippodrome: { select: { name: true } }, date: true } },
-          result: { select: { hitTop1: true, winnerNo: true } },
+          result: { select: { hitTop1: true, winnerNos: true } },
         },
       },
     },
@@ -414,8 +414,12 @@ export async function getAnalystStats(excludeRaceId?: string): Promise<AnalystSt
       const key = keyFn(r);
       const entry =
         map.get(key) ?? { label: key, total: 0, ekonomik: 0, normal: 0, genis: 0, kacti: 0, group: groupFn?.(key) };
-      const winnerNo = r.race.result?.winnerNo;
-      const matchedPick = winnerNo != null ? r.picks.find((p) => p.runner?.no === winnerNo) : undefined;
+      const winnerNos = r.race.result?.winnerNos ?? [];
+      // At başı/beraberlikte, tahminin EN İYİ sıralı (en düşük rank) eşleşen kazananı esas alınır —
+      // birden fazla kazanandan biri bile üst sıradaysa o tier'e sayılır.
+      const matchedPick = winnerNos.length > 0
+        ? r.picks.filter((p) => p.runner?.no != null && winnerNos.includes(p.runner.no)).sort((a, b) => a.rank - b.rank)[0]
+        : undefined;
       entry.total++;
       entry[couponTierForRank(matchedPick?.rank)]++;
       map.set(key, entry);
@@ -522,7 +526,7 @@ export async function getAgfEdgeStats(): Promise<AgfEdgeStats> {
       race: {
         select: {
           runners: { select: { no: true, agf: true } },
-          result: { select: { hitTop1: true, winnerNo: true } },
+          result: { select: { hitTop1: true, winnerNos: true } },
         },
       },
     },
@@ -538,16 +542,16 @@ export async function getAgfEdgeStats(): Promise<AgfEdgeStats> {
 
   for (const r of rows) {
     const runnersWithAgf = r.race.runners.filter((x): x is { no: number; agf: number } => x.agf != null);
-    const winnerNo = r.race.result?.winnerNo;
+    const winnerNos = r.race.result?.winnerNos ?? [];
     const systemPickNo = r.picks[0]?.runner?.no;
-    if (runnersWithAgf.length === 0 || winnerNo == null || systemPickNo == null) continue;
+    if (runnersWithAgf.length === 0 || winnerNos.length === 0 || systemPickNo == null) continue;
 
     const agfFavorite = runnersWithAgf.reduce((a, b) => (b.agf > a.agf ? b : a));
     const systemWon = r.race.result?.hitTop1 ?? false;
 
     total++;
     if (systemWon) systemHits++;
-    if (agfFavorite.no === winnerNo) agfFavoriteHits++;
+    if (winnerNos.includes(agfFavorite.no)) agfFavoriteHits++;
 
     if (systemPickNo === agfFavorite.no) {
       agreeTotal++;

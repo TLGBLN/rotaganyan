@@ -43,7 +43,7 @@ export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
             };
           };
         };
-        result: { select: { hitTop1: true; hitInCoupon: true; ganyan: true; winnerNo: true; actualOrder: true } };
+        result: { select: { hitTop1: true; hitInCoupon: true; ganyan: true; winnerNo: true; winnerNos: true; actualOrder: true } };
       };
     };
   };
@@ -74,7 +74,7 @@ export type PredictionListItem = Prisma.PredictionGetPayload<{
     race: {
       include: {
         raceDay: { include: { hippodrome: true } };
-        result: { select: { hitTop1: true; hitInCoupon: true; winnerNo: true; ganyan: true } };
+        result: { select: { hitTop1: true; hitInCoupon: true; winnerNo: true; winnerNos: true; ganyan: true } };
       };
     };
     picks: {
@@ -127,7 +127,7 @@ export async function getRaceDaysByDate(
               },
             },
           },
-          result: { select: { hitTop1: true, hitInCoupon: true, ganyan: true, winnerNo: true, actualOrder: true } },
+          result: { select: { hitTop1: true, hitInCoupon: true, ganyan: true, winnerNo: true, winnerNos: true, actualOrder: true } },
         },
         orderBy: { raceNo: "asc" },
       },
@@ -202,7 +202,7 @@ export async function getHitPredictions(limit = 12): Promise<PredictionListItem[
       race: {
         include: {
           raceDay: { include: { hippodrome: true } },
-          result: { select: { hitTop1: true, hitInCoupon: true, winnerNo: true, ganyan: true } },
+          result: { select: { hitTop1: true, hitInCoupon: true, winnerNo: true, winnerNos: true, ganyan: true } },
         },
       },
       picks: {
@@ -236,7 +236,7 @@ export async function getPublishedPredictions(
         race: {
           include: {
             raceDay: { include: { hippodrome: true } },
-            result: { select: { hitTop1: true, hitInCoupon: true, winnerNo: true, ganyan: true } },
+            result: { select: { hitTop1: true, hitInCoupon: true, winnerNo: true, winnerNos: true, ganyan: true } },
           },
         },
         picks: {
@@ -270,7 +270,7 @@ export async function getActivePredictions(): Promise<PredictionListItem[]> {
       race: {
         include: {
           raceDay: { include: { hippodrome: true } },
-          result: { select: { hitTop1: true, hitInCoupon: true, winnerNo: true, ganyan: true } },
+          result: { select: { hitTop1: true, hitInCoupon: true, winnerNo: true, winnerNos: true, ganyan: true } },
         },
       },
       picks: {
@@ -349,7 +349,7 @@ export async function getComboCoupon(hippodromeSlug: string, dateStr: string): P
 
 // ─── Anasayfa: Tahmin Önerileri (Ekonomik/Normal/Geniş kupon) ─────────────────
 
-export type KuponLeg = { raceNo: number; nos: number[]; winnerNo?: number | null; resulted: boolean };
+export type KuponLeg = { raceNo: number; nos: number[]; winnerNo?: number | null; winnerNos: number[]; resulted: boolean };
 export type KuponStatus = "hit" | "miss" | "pending";
 export type KuponVariant = {
   key: "ekonomik" | "normal" | "genis";
@@ -387,7 +387,7 @@ export async function buildKuponOnerisi(active: {
   // yeşil göstermek, eşleşmeyeni (sonuç girilmiş ama kazanan seçilmemiş) "kaçtı" olarak işaretlemek için.
   // Aynı sorguda o ayağın analiz sırasını (Pick.rank) da çekiyoruz — kupondaki atlar sayı sırasına göre
   // değil, analizdeki tahmin sırasına göre dizilsin diye.
-  const resultByRaceNo = new Map<number, { winnerNo: number | null; resulted: boolean }>();
+  const resultByRaceNo = new Map<number, { winnerNo: number | null; winnerNos: number[]; resulted: boolean }>();
   const rankByRaceNo = new Map<number, Map<number, number>>();
   const races = await db.race.findMany({
     where: {
@@ -398,12 +398,12 @@ export async function buildKuponOnerisi(active: {
       },
     },
     include: {
-      result: { select: { winnerNo: true } },
+      result: { select: { winnerNo: true, winnerNos: true } },
       prediction: { select: { picks: { select: { rank: true, runner: { select: { no: true } } } } } },
     },
   });
   for (const r of races) {
-    resultByRaceNo.set(r.raceNo, { winnerNo: r.result?.winnerNo ?? null, resulted: r.result != null });
+    resultByRaceNo.set(r.raceNo, { winnerNo: r.result?.winnerNo ?? null, winnerNos: r.result?.winnerNos ?? [], resulted: r.result != null });
     const rankByNo = new Map<number, number>();
     for (const pick of r.prediction?.picks ?? []) {
       if (pick.runner) rankByNo.set(pick.runner.no, pick.rank);
@@ -430,13 +430,15 @@ export async function buildKuponOnerisi(active: {
         raceNo: l.raceNo,
         nos: sortByAnalysisRank(l.raceNo, nosFn(l)),
         winnerNo: entry?.winnerNo ?? null,
+        winnerNos: entry?.winnerNos ?? [],
         resulted: entry?.resulted ?? false,
       };
     });
   }
 
   function statusFor(variantLegs: KuponLeg[]): KuponStatus {
-    if (variantLegs.some((l) => l.resulted && !l.nos.includes(l.winnerNo as number))) return "miss";
+    // At başı/beraberlikte kupon o ayakta HERHANGİ bir kazananı içeriyorsa isabet sayılır.
+    if (variantLegs.some((l) => l.resulted && !l.winnerNos.some((no) => l.nos.includes(no)))) return "miss";
     if (variantLegs.some((l) => !l.resulted)) return "pending";
     return "hit";
   }
@@ -604,7 +606,7 @@ export type ProgramRace = {
   distance: number;
   conditions: string | null;
   runners: ProgramRunner[];
-  result: { winnerNo: number | null; actualOrder: unknown; ganyan: number | null; time: string | null; farklar: string | null } | null;
+  result: { winnerNo: number | null; winnerNos: number[]; actualOrder: unknown; ganyan: number | null; time: string | null; farklar: string | null } | null;
   hasAnalysis: boolean;
   picks: ProgramPick[];
 };
@@ -629,7 +631,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
       races: {
         orderBy: { raceNo: "asc" },
         include: {
-          result: { select: { winnerNo: true, actualOrder: true, ganyan: true, time: true, farklar: true } },
+          result: { select: { winnerNo: true, winnerNos: true, actualOrder: true, ganyan: true, time: true, farklar: true } },
           prediction: {
             select: {
               picks: {
@@ -1108,7 +1110,7 @@ export async function getAllJockeyStats(params: {
       jockey: true,
       no: true,
       name: true,
-      race: { select: { result: { select: { winnerNo: true } } } },
+      race: { select: { result: { select: { winnerNos: true } } } },
     },
   });
 
@@ -1120,7 +1122,7 @@ export async function getAllJockeyStats(params: {
     if (horseNames.has(r.jockey)) continue;
     const s = agg[r.jockey] ?? { wins: 0, rides: 0 };
     s.rides++;
-    if (r.race.result?.winnerNo === r.no) s.wins++;
+    if (r.race.result?.winnerNos.includes(r.no)) s.wins++;
     agg[r.jockey] = s;
   }
 

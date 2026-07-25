@@ -11,7 +11,7 @@ type Picks = NonNullable<ProgramRaceDay["races"][number]["prediction"]>["picks"]
 
 type Props = {
   picks: Picks;
-  winnerNo: number | null | undefined;
+  winnerNos: number[] | null | undefined;
   isLoggedIn: boolean;
   racePath?: string;
   followedHorseNames?: Set<string>;
@@ -47,7 +47,7 @@ function splitLayerDetails(details: unknown) {
   return { a, bc, gerekce: rest.join(" · ") || "—" };
 }
 
-export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, racePath, followedHorseNames }: Props) {
+export default function InlineAnalysisPanel({ picks, winnerNos, isLoggedIn, racePath, followedHorseNames }: Props) {
   if (!isLoggedIn) {
     const girisHref = racePath
       ? `/giris?callbackUrl=${encodeURIComponent(racePath)}`
@@ -76,7 +76,7 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, raceP
       {/* ── MOBİL: her at ayrı satır ── */}
       <div className="md:hidden rounded-lg border divide-y">
         {picks.map((pick, i) => {
-          const isWinner = winnerNo != null && pick.runner?.no === winnerNo;
+          const isWinner = pick.runner?.no != null && (winnerNos ?? []).includes(pick.runner.no);
           const coupon = couponCategory(pick.rank);
           return (
             <div
@@ -143,7 +143,7 @@ export default function InlineAnalysisPanel({ picks, winnerNo, isLoggedIn, raceP
           <tbody>
             {picks.map((pick, i) => {
               const { a, bc, gerekce } = splitLayerDetails(pick.details);
-              const isWinner = winnerNo != null && pick.runner?.no === winnerNo;
+              const isWinner = pick.runner?.no != null && (winnerNos ?? []).includes(pick.runner.no);
               const coupon = couponCategory(pick.rank);
               return (
                 <tr

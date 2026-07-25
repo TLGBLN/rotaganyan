@@ -225,6 +225,7 @@ async function main() {
       raceId: race1.id,
       actualOrder: ["3", "1", "2"],
       winnerNo: 3,
+      winnerNos: [3],
       hitTop1: true,
       hitInCoupon: true,
       hitRanks: { g2: true, g3: true },

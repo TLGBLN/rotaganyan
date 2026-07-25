@@ -30,7 +30,7 @@ const DISTANCE_TOLERANCE = 100; // metre — "exact mesafe" sayılma payı
 
 /**
  * Aynı at adıyla, aynı pist+ırkta geçmiş koşuları arar (mevcut koşu hariç).
- * Sadece kazanılmış (Result.winnerNo eşleşmesi) exact pist+mesafe sicilini
+ * Sadece kazanılmış (Result.winnerNos eşleşmesi — at başı/beraberlikte hepsi geçerli) exact pist+mesafe sicilini
  * "doğrulanmış derece" sayar — metodolojinin "kör derece revizyonu yapılmaz"
  * kuralına uymak için zayıf eşleşmeler skor üretmez, sadece bilgi notu döner.
  */
@@ -56,7 +56,7 @@ export async function lookupDereceForRunners(
           id: true,
           distance: true,
           raceDay: { select: { date: true, hippodrome: { select: { name: true } } } },
-          result: { select: { winnerNo: true, hitTop1: true } },
+          result: { select: { winnerNos: true, hitTop1: true } },
         },
       },
     },
@@ -83,7 +83,7 @@ export async function lookupDereceForRunners(
       (h) => Math.abs(h.race.distance - ctx.distance) <= DISTANCE_TOLERANCE
     );
 
-    const win = exactDistance.find((h) => h.race.result?.winnerNo === h.no);
+    const win = exactDistance.find((h) => h.race.result?.winnerNos.includes(h.no));
     if (win) {
       const date = win.race.raceDay.date.toLocaleDateString("tr-TR");
       out.set(r.no, {

@@ -378,7 +378,8 @@ model Result {
   id          String   @id @default(cuid())
   raceId      String   @unique
   actualOrder Json
-  winnerNo    Int?
+  winnerNo    Int? // birincil kazanan (geriye uyumluluk — beraberlikte winnerNos[0])
+  winnerNos   Int[] @default([]) // TÜM kazananlar — at başı/beraberlik (dead heat) TJK'da birden fazla at aynı SONUCNO=1 alabilir
   ganyan      Float?
   time        String? // Müddet — kazananın resmi koşu süresi (örn. "1.20.11")
   farklar     String? // Farklar — ilk sıralar arasındaki mesafe farkları, TJK sırasıyla (örn. "Baş, 1, 2, Boyun")

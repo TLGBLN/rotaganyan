@@ -36,7 +36,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ raceId:
       surface: true,
       classType: true,
       raceDay: { select: { date: true, hippodrome: { select: { name: true } } } },
-      result: { select: { winnerNo: true, ganyan: true } },
+      result: { select: { winnerNos: true, ganyan: true } },
       runners: { select: { no: true, name: true, jockey: true } },
       prediction: {
         select: {
@@ -48,14 +48,21 @@ export async function GET(_req: Request, { params }: { params: Promise<{ raceId:
     },
   });
 
-  if (!race || race.result?.winnerNo == null) {
+  if (!race || !race.result || race.result.winnerNos.length === 0) {
     return new Response("Sonuç bulunamadı", { status: 404 });
   }
 
-  const winnerNo = race.result.winnerNo;
-  const winner = race.runners.find((r) => r.no === winnerNo);
-  const winningPick = race.prediction?.picks.find((p) => p.runner?.no === winnerNo);
+  const winnerNos = race.result.winnerNos;
+  const winners = race.runners.filter((r) => winnerNos.includes(r.no));
+  // At başı/beraberlikte, EN İYİ sıralanmış (en düşük rank) pick'i "önerilen sıra" olarak göster.
+  const winningPick = race.prediction?.picks
+    .filter((p) => p.runner?.no != null && winnerNos.includes(p.runner.no))
+    .sort((a, b) => a.rank - b.rank)[0];
   const reason = winningPick ? extractReason(winningPick.details) : null;
+  const winnerNumberLabel = winners.map((w) => w.no).join(" / ") || "—";
+  const winnerNameLabel = winners.map((w) => w.name).join(" & ") || "—";
+  const winnerJockeyLabel = winners.map((w) => w.jockey).filter(Boolean).join(" & ") || "—";
+  const multiWinner = winners.length > 1;
 
   const surfaceLabel = race.surface === "CIM" ? "Çim" : race.surface === "SENTETIK" ? "Sentetik" : "Kum";
   const dateStr = race.raceDay.date.toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" });
@@ -121,26 +128,32 @@ export async function GET(_req: Request, { params }: { params: Promise<{ raceId:
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              width: "131px",
+              minWidth: "131px",
               height: "131px",
+              padding: "0 20px",
               borderRadius: "28px",
               background: "linear-gradient(160deg, #f0d9a6, #d8ab4e 55%, #a97f2e)",
               color: "#1a1305",
-              fontSize: 62,
+              fontSize: multiWinner ? 44 : 62,
               fontWeight: 800,
             }}
           >
-            {winner?.no ?? "—"}
+            {winnerNumberLabel}
           </div>
         </div>
 
         {/* at ismi */}
         <div style={{ display: "flex", flexDirection: "column", marginTop: "62px" }}>
-          <div style={{ display: "flex", fontSize: 131, fontWeight: 800, color: INK, lineHeight: 0.96, letterSpacing: -2 }}>
-            {winner?.name ?? "—"}
+          {multiWinner && (
+            <div style={{ display: "flex", fontSize: 30, letterSpacing: 3, color: GOLD, fontWeight: 700, textTransform: "uppercase", marginBottom: "10px" }}>
+              At Başı — Ortak Kazanan
+            </div>
+          )}
+          <div style={{ display: "flex", fontSize: multiWinner ? 78 : 131, fontWeight: 800, color: INK, lineHeight: 1.02, letterSpacing: -2 }}>
+            {winnerNameLabel}
           </div>
           <div style={{ display: "flex", fontSize: 36, color: INK_DIM, marginTop: "23px" }}>
-            Jokey <span style={{ color: GOLD_SOFT, fontWeight: 700, marginLeft: 10 }}>{winner?.jockey ?? "—"}</span>
+            Jokey <span style={{ color: GOLD_SOFT, fontWeight: 700, marginLeft: 10 }}>{winnerJockeyLabel}</span>
           </div>
         </div>
 

@@ -94,7 +94,7 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
             style={{ gridTemplateColumns: `repeat(${active.legs.length}, minmax(48px, 1fr))` }}
           >
             {active.legs.map((leg) => {
-              const missed = leg.resulted && !leg.nos.includes(leg.winnerNo as number);
+              const missed = leg.resulted && !leg.winnerNos.some((n) => leg.nos.includes(n));
               return (
                 <div key={leg.raceNo} className="px-1.5 py-3 text-center">
                   <div className="mb-2 text-[10px] font-medium text-muted-foreground">
@@ -103,7 +103,7 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
                   <div className="space-y-1.5 text-sm font-semibold">
                     {leg.nos.map((no) => (
                       <div key={no}>
-                        {no === leg.winnerNo ? (
+                        {leg.winnerNos.includes(no) ? (
                           <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-hit text-white text-xs font-bold">
                             {no}
                           </span>
@@ -114,7 +114,7 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
                     ))}
                   </div>
                   {missed && (
-                    <div className="mt-1.5 text-[10px] font-medium text-miss">Kazanan: {leg.winnerNo}</div>
+                    <div className="mt-1.5 text-[10px] font-medium text-miss">Kazanan: {leg.winnerNos.join(", ")}</div>
                   )}
                 </div>
               );

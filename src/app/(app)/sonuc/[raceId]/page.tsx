@@ -12,13 +12,14 @@ async function getRaceSummary(raceId: string) {
     select: {
       raceNo: true,
       raceDay: { select: { date: true, hippodrome: { select: { name: true } } } },
-      result: { select: { winnerNo: true } },
+      result: { select: { winnerNos: true } },
       runners: { select: { no: true, name: true } },
     },
   });
-  if (!race || race.result?.winnerNo == null) return null;
-  const winner = race.runners.find((r) => r.no === race.result!.winnerNo);
-  return { race, winnerName: winner?.name ?? null };
+  if (!race || !race.result || race.result.winnerNos.length === 0) return null;
+  const winners = race.runners.filter((r) => race.result!.winnerNos.includes(r.no));
+  const winnerName = winners.map((w) => w.name).join(" & ") || null;
+  return { race, winnerName };
 }
 
 export async function generateMetadata({

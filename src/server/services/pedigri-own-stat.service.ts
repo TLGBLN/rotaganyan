@@ -45,7 +45,7 @@ export async function syncOwnPedigreeStats(): Promise<{ sireRows: number; damRow
           breed: true,
           surface: true,
           distance: true,
-          result: { select: { actualOrder: true } },
+          result: { select: { actualOrder: true, winnerNos: true } },
         },
       },
     },
@@ -63,7 +63,7 @@ export async function syncOwnPedigreeStats(): Promise<{ sireRows: number; damRow
       g = { sireName: r.sire, irk, pist, mesafe, sayac: bosSayac() };
       sireGroups.set(key, g);
     }
-    const pos = finishPos(r.race.result.actualOrder, r.no);
+    const pos = finishPos(r.race.result.actualOrder, r.no, r.race.result.winnerNos);
     pozisyonaGoreArttir(g.sayac, pos);
   }
 
@@ -99,7 +99,7 @@ export async function syncOwnPedigreeStats(): Promise<{ sireRows: number; damRow
           breed: true,
           surface: true,
           distance: true,
-          result: { select: { actualOrder: true } },
+          result: { select: { actualOrder: true, winnerNos: true } },
         },
       },
     },
@@ -123,7 +123,7 @@ export async function syncOwnPedigreeStats(): Promise<{ sireRows: number; damRow
       g = { damName: r.dam, damSireName: r.damSire, irk, pist, mesafe, sayac: bosSayac(), yavrular: new Map() };
       damGroups.set(key, g);
     }
-    const pos = finishPos(r.race.result.actualOrder, r.no);
+    const pos = finishPos(r.race.result.actualOrder, r.no, r.race.result.winnerNos);
     pozisyonaGoreArttir(g.sayac, pos);
     g.yavrular.set(r.name, (g.yavrular.get(r.name) ?? false) || pos === 1);
   }

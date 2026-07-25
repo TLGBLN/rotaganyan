@@ -33,10 +33,10 @@ type Result = Awaited<ReturnType<typeof getResultsWithPicks>>[number];
 function getTier(r: Result): Tier {
   if (r.hitTop1) return "rank1";
   if (r.hitInCoupon) return "rank2_3";
-  const winnerNo = r.winnerNo;
-  if (winnerNo != null) {
+  const winnerNos = r.winnerNos;
+  if (winnerNos.length > 0) {
     const picks = r.race.prediction?.picks ?? [];
-    const pick = picks.find((p) => p.runner?.no === winnerNo);
+    const pick = picks.find((p) => p.runner?.no != null && winnerNos.includes(p.runner.no));
     if (pick && pick.rank >= 4 && pick.rank <= 6) return "rank4_6";
   }
   return "miss";
@@ -112,9 +112,12 @@ export default async function SonuclarPage() {
           {results.map((r, i) => {
             const tier = tiers[i];
             const picks = r.race.prediction?.picks ?? [];
-            const winnerPick = picks.find((p) => p.runner?.no === r.winnerNo);
+            // At başı/beraberlikte, kazananlardan EN İYİ sıralanmış pick esas alınır.
+            const winnerPick = picks
+              .filter((p) => p.runner?.no != null && r.winnerNos.includes(p.runner.no))
+              .sort((a, b) => a.rank - b.rank)[0];
             const topScoredPick = [...picks].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
-            const topScoredIsWinner = topScoredPick?.runner?.no === r.winnerNo;
+            const topScoredIsWinner = topScoredPick?.runner?.no != null && r.winnerNos.includes(topScoredPick.runner.no);
 
             return (
               <div key={r.id} className="px-3 py-2.5 hover:bg-muted/20 transition-colors">
@@ -142,15 +145,15 @@ export default async function SonuclarPage() {
                 </div>
                 {/* Satır 2: Kazanan + Sıra + Ganyan */}
                 <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
-                  {r.winnerNo != null && (
+                  {r.winnerNos.length > 0 && (
                     <span>
-                      Kazanan: <span className="font-mono font-bold text-foreground">#{r.winnerNo}</span>
+                      Kazanan: <span className="font-mono font-bold text-foreground">{r.winnerNos.map((n) => `#${n}`).join(", ")}</span>
                       {r.cikan && <span className="ml-1">{r.cikan}</span>}
                     </span>
                   )}
                   {winnerPick != null ? (
                     <span>Sıra: <span className="font-semibold text-foreground">{winnerPick.rank}.</span></span>
-                  ) : r.winnerNo != null ? (
+                  ) : r.winnerNos.length > 0 ? (
                     <span className="text-[#c0392b]">listede yok</span>
                   ) : null}
                   {r.ganyan != null && (

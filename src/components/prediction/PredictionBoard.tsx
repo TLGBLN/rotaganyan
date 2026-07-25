@@ -40,9 +40,9 @@ export default function PredictionBoard({ prediction, result }: Props) {
             {result.hitTop1 ? "Birinci at tuttu" : "Birinci at tutmadı"}
             {result.hitInCoupon && " · Kazanan kuponda vardı"}
           </span>
-          {result.winnerNo && (
+          {result.winnerNos.length > 0 && (
             <Badge variant="outline" className="ml-auto text-xs">
-              Kazanan: #{result.winnerNo}
+              Kazanan: {result.winnerNos.map((n) => `#${n}`).join(", ")}
             </Badge>
           )}
         </div>

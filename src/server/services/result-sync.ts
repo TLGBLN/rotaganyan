@@ -47,7 +47,12 @@ export async function syncResultsForDate(dateStr: string): Promise<void> {
     const matchCount = actualOrder.filter((no) => race.runners.some((r) => r.no === no)).length;
     if (matchCount === 0) continue;
 
-    const winnerNo = actualOrder[0];
+    // At başı/beraberlik (dead heat): TJK aynı SONUCNO=1'i birden fazla ata verebiliyor —
+    // rows zaten rank'e göre sıralı geliyor (bkz. tjk-result.adapter.ts), en düşük rank'e
+    // (genelde 1) sahip TÜM satırlar resmi kazanandır.
+    const minRank = raceResult.rows[0]?.rank;
+    const winnerNos = raceResult.rows.filter((r) => r.rank === minRank).map((r) => r.no);
+    const winnerNo = winnerNos[0] ?? null;
     const ganyan = raceResult.rows[0]?.ganyan;
     // TJK, bir koşunun ganyanını (kazanan oranı) ancak sonuç kesinleştikten (itiraz/foto-finiş
     // incelemesi bittikten) sonra yayınlar. Ganyan henüz yoksa sıralama geçici/olası yanlış
@@ -57,10 +62,10 @@ export async function syncResultsForDate(dateStr: string): Promise<void> {
     if (ganyan == null) continue;
     const picks = race.prediction?.picks ?? [];
     const topPick = picks.find(p => p.rank === 1);
-    const hitTop1 = computeHitTop1(actualOrder, winnerNo, topPick?.runner?.no);
-    // Kazanan, rank 1-3 pick'lerden biriyse "ekonomik kupon içinde" sayılır
+    const hitTop1 = computeHitTop1(actualOrder, winnerNos, topPick?.runner?.no);
+    // Kazananlardan biri rank 1-3 pick'lerden biriyse "ekonomik kupon içinde" sayılır
     const top3Nos = picks.map(p => p.runner?.no).filter((n): n is number => n != null);
-    const hitInCoupon = winnerNo != null && top3Nos.includes(winnerNo);
+    const hitInCoupon = winnerNos.some((no) => top3Nos.includes(no));
 
     // Müddet = kazananın resmi koşu süresi; Farklar = ilk 5 sıra arasındaki TJK mesafe farkları.
     const sortedRows = [...raceResult.rows].sort((a, b) => a.rank - b.rank);
@@ -68,7 +73,7 @@ export async function syncResultsForDate(dateStr: string): Promise<void> {
     const farklar = sortedRows.slice(0, 5).map((r) => r.fark).filter((f): f is string => !!f).join(", ") || null;
 
     await db.result.create({
-      data: { raceId: race.id, winnerNo, actualOrder, ganyan, time, farklar, hitTop1, hitInCoupon },
+      data: { raceId: race.id, winnerNo, winnerNos, actualOrder, ganyan, time, farklar, hitTop1, hitInCoupon },
     });
   }
 }

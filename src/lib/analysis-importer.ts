@@ -280,8 +280,14 @@ async function importSingle(item: AnalysisItem, adminUserId: string): Promise<st
 
   // 9. Result (if outcome is known)
   if (item.sonuc && item.gercek) {
-    const winnerNoMatch = item.gercek.match(/^(\d+)/);
-    const winnerNo = winnerNoMatch ? parseInt(winnerNoMatch[1]) : null;
+    // At başı/beraberlik (dead heat): birden fazla kazanan varsa "gercek" alanına
+    // virgülle ayrılmış girilir, örn. "8 MARİSCAL, 3 TORNADO".
+    const winnerNos = item.gercek
+      .split(",")
+      .map((s) => s.trim().match(/^(\d+)/)?.[1])
+      .filter((s): s is string => !!s)
+      .map((s) => parseInt(s, 10));
+    const winnerNo = winnerNos[0] ?? null;
     const hitTop1 = item.sonuc === "Kazandi";
     const hitInCoupon = item.sonuc === "Kazandi" || item.sonuc === "Kismen";
     const actualOrder = [item.gercek, item.g2, item.g3, item.g4, item.g5]
@@ -293,6 +299,7 @@ async function importSingle(item: AnalysisItem, adminUserId: string): Promise<st
         raceId: race.id,
         actualOrder,
         winnerNo,
+        winnerNos,
         hitTop1,
         hitInCoupon,
         errorTag: item.hata === "Evet" ? "HATA" : null,
@@ -302,6 +309,7 @@ async function importSingle(item: AnalysisItem, adminUserId: string): Promise<st
       update: {
         actualOrder,
         winnerNo,
+        winnerNos,
         hitTop1,
         hitInCoupon,
         errorTag: item.hata === "Evet" ? "HATA" : null,

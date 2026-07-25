@@ -105,8 +105,8 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                         const isBanko = race.prediction!.isBanko && pick?.rank === 1;
                         const isTarget = pick?.isTarget;
                         const isWinner =
-                          race.result?.winnerNo != null &&
-                          pick?.runner?.no === race.result.winnerNo;
+                          pick?.runner?.no != null &&
+                          (race.result?.winnerNos ?? []).includes(pick.runner.no);
                         const rowBg = isBanko
                           ? "bg-brand"
                           : isWinner
@@ -137,7 +137,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                                 <span className="ml-1 text-[10px] font-semibold text-red-400">Koşmaz</span>
                               )}
                               {(() => {
-                                const pos = finishPos(race.result?.actualOrder, pick.runner?.no);
+                                const pos = finishPos(race.result?.actualOrder, pick.runner?.no, race.result?.winnerNos);
                                 return pos != null ? (
                                   <span className={cn("ml-1 text-[10px] font-semibold", pos === 1 ? "text-[#F5C518]" : "text-muted-foreground")}>
                                     ({pos}.)
@@ -226,8 +226,8 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                         const isBanko = race.prediction!.isBanko && pick?.rank === 1;
                         const isTarget = pick?.isTarget;
                         const isWinner =
-                          race.result?.winnerNo != null &&
-                          pick?.runner?.no === race.result.winnerNo;
+                          pick?.runner?.no != null &&
+                          (race.result?.winnerNos ?? []).includes(pick.runner.no);
                         const colBg = ri % 2 === 1 ? "bg-muted/5" : "";
 
                         if (!pick) {
@@ -261,7 +261,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                                   <span className="text-[10px] font-semibold text-red-400">Koşmaz</span>
                                 )}
                                 {(() => {
-                                  const pos = finishPos(race.result?.actualOrder, pick.runner?.no);
+                                  const pos = finishPos(race.result?.actualOrder, pick.runner?.no, race.result?.winnerNos);
                                   return pos != null ? (
                                     <span className={cn("text-[10px] font-semibold", pos === 1 ? "text-[#F5C518]" : "text-muted-foreground")}>
                                       ({pos}.)

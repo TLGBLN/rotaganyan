@@ -122,7 +122,7 @@ export default function KosularRaceRow({
         <div ref={panelRef} className="border-b bg-muted/20 p-3 last:border-0">
           <InlineAnalysisPanel
             picks={pred!.picks}
-            winnerNo={result?.winnerNo}
+            winnerNos={result?.winnerNos}
             isLoggedIn={isLoggedIn}
             racePath={racePath}
             followedHorseNames={followedHorseNames}
