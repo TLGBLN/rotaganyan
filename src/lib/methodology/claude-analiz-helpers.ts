@@ -97,23 +97,25 @@ export const FAZ2_SCHEMA = {
 } as const;
 
 // v6.0: Fazlar 5'ten (veri+puanlama+geçit+sıralama+gerekçe) 3'e indirildi (kullanıcı
-// kararı) — geçit motoru tamamen kaldırıldı, sıralama/kupon/banko artık KOD tarafında
-// Faz2'nin puanına göre MEKANİK hesaplanıyor (yeni metodolojinin §XVIII.2 "puan sırası
-// ile nihai sıralama çelişemez" kuralı zaten bunu zorunlu kılıyor — LLM'e bırakmak
-// gereksiz risk). Faz 3'ün TEK işi: Kural Denetim Protokolü (§II.4) gözden geçirmesi +
-// pedigri değerlendirmesi/iç etiketler (admin rozetleri) + banko notu/genel yorum/tempo
-// + yalnız kod tarafından belirlenen ilk 6 at için Kilit Gerekçe (§XIX.1). Bu, eski
-// Faz4'ün en ağır kısmını (geçit triyajı + tüm sahayı sıralama) tamamen ortadan
-// kaldırıyor — hem daha hızlı hem daha tutarlı (LLM'in sıra/kupon hatası yapma imkanı yok).
+// kararı) — geçit motoru tamamen kaldırıldı. Faz 2 ham puanları YALNIZ bir BAŞLANGIÇ
+// NOKTASI: asıl işi — muhakeme ile NİHAİ SIRALAMAYI belirlemek, Kural Denetim
+// Protokolü'nü (§II.4) uygulamak, gerekirse puanı düzeltmek — Claude'un kendisi yapar
+// (Faz 3, "son kontrol" — kullanıcı talimatı: Claude'un işi en önemli iş olmalı).
+// Kupon/banko EŞİĞİ (Ekonomik/Normal/Geniş dilimleme, puan≥80+fark≥5+risk-yok testi)
+// kod tarafında Claude'un ÜRETTİĞİ nihai sıraya göre mekanik uygulanır — ama SIRANIN
+// KENDİSİ tamamen Claude'un muhakemesinin ürünüdür, kod bunu ASLA yeniden sıralamaz.
 export const FAZ3_SCHEMA = {
   type: "object",
   properties: {
-    atDegerlendirmeleri: {
+    picks: {
       type: "array",
       items: {
         type: "object",
         properties: {
+          rank: { type: "integer" },
           no: { type: "integer" },
+          name: { type: "string" },
+          score: { type: "number" },
           pedigreeRating: {
             type: "string",
             enum: ["COK_YUKSEK", "YUKSEK", "GUCLU", "ORTA", "DUSUK", "ZAYIF", "SORU", "BILINMIYOR"],
@@ -121,7 +123,7 @@ export const FAZ3_SCHEMA = {
           isTarget: { type: "boolean" },
           details: { type: "array", items: { type: "string" } },
         },
-        required: ["no", "pedigreeRating", "isTarget", "details"],
+        required: ["rank", "no", "name", "score", "pedigreeRating", "isTarget", "details"],
         additionalProperties: false,
       },
     },
@@ -139,7 +141,7 @@ export const FAZ3_SCHEMA = {
     notes: { type: "string" },
     tempo: { type: "string" },
   },
-  required: ["atDegerlendirmeleri", "gerekceler", "confidence", "bankoNote", "notes", "tempo"],
+  required: ["picks", "gerekceler", "confidence", "bankoNote", "notes", "tempo"],
   additionalProperties: false,
 } as const;
 
@@ -147,11 +149,12 @@ export type Faz2Atlar = {
   atlar: { no: number; ad: string; puan: number; teknikSira: number | null }[];
 };
 
-export type Faz3AtDegerlendirme = {
-  no: number; pedigreeRating: string; isTarget: boolean; details: string[];
+export type Faz3Pick = {
+  rank: number; no: number; name: string; score: number;
+  pedigreeRating: string; isTarget: boolean; details: string[];
 };
 export type Faz3Result = {
-  atDegerlendirmeleri: Faz3AtDegerlendirme[];
+  picks: Faz3Pick[];
   gerekceler: { no: number; note: string }[];
   confidence: string; bankoNote: string; notes: string; tempo: string;
 };

@@ -3,24 +3,25 @@ import { auth, hasRole } from "@/lib/auth";
 import type { Faz1Sonuc } from "@/lib/methodology/veri-toplama";
 import {
   createWithTruncationRetry, extractText,
-  FAZ3_SCHEMA, type Faz2Atlar, type Faz3Result,
+  FAZ3_SCHEMA, type Faz2Atlar, type Faz3Pick, type Faz3Result,
 } from "@/lib/methodology/claude-analiz-helpers";
 import { getRecentCachedResult } from "@/lib/claude-cost";
 import type { Anthropic } from "@anthropic-ai/sdk";
 import type { PedigreeRating, Role } from "@prisma/client";
 
 // v6.0: eski Faz4 (sıralama kararı, geçit motoru triyajı dahil) + Faz4-final (banko/
-// kupon/tempo/gerekçe) TEK bu çağrıda birleşti. Sıra/kupon/banko artık KOD tarafında
-// Faz2'nin puanına göre MEKANİK hesaplanıyor (yeni metodolojinin §XVIII.2 "puan sırası
-// ile nihai sıralama çelişemez" kuralı zaten bunu zorunlu kılıyor) — Claude'a bırakmak
-// eski Faz4'ün en ağır/en riskli kısmıydı (geçit triyajı + tüm sahayı sıralama, timeout'a
-// sebep olmuştu). Claude'un TEK işi: pedigri değerlendirmesi/iç rozetler + yalnız kod
-// tarafından belirlenen ilk 6 at için Kilit Gerekçe (§XIX.1) + banko notu/genel-yorum/tempo.
+// kupon/tempo/gerekçe) TEK bu çağrıda birleşti, geçit motoru tamamen kaldırıldı.
+// KRİTİK: NİHAİ SIRALAMA Claude'un muhakemesinin ürünüdür — Faz 2'nin puanı yalnız bir
+// BAŞLANGIÇ NOKTASI, kod bunu asla mekanik olarak yeniden sıralamaz (kullanıcı talimatı:
+// "Faz2 puanlama, Faz3 muhakeme'nin işi son nihai sıralamayı belirlemek" — Claude'un işi
+// en önemli iş, bu çağrı motorun "son kontrol"ü). Kod yalnız (a) Claude'un ürettiği
+// sıraya göre kupon dilimlemesini (Ekonomik/Normal/Geniş) ve (b) mekanik banko eşiğini
+// (puan≥80+fark≥5+risk-yok) uygular — sıranın kendisine dokunmaz.
 export const maxDuration = 300;
 
 type Body = { raceId: string; faz1: Faz1Sonuc; faz2: Faz2Atlar; sharedContext: string };
 
-export type Faz3Pick = {
+export type FinalPick = {
   rank: number; no: number; name: string; score: number;
   pedigreeRating: PedigreeRating; isTarget: boolean; details: string[]; note: string;
 };
@@ -51,58 +52,30 @@ async function handlePost(req: NextRequest) {
     cache_control: { type: "ephemeral", ttl: "1h" },
   };
 
-  // ── SIRALAMA/KUPON/BANKO — KOD, LLM değil ──
-  const puanByNo = new Map(faz2.atlar.map((a) => [a.no, a.puan]));
-  const teknikSiraByNo = new Map(faz2.atlar.map((a) => [a.no, a.teknikSira ?? 999]));
-  const sirali = [...faz1.runners].sort((a, b) => {
-    const pa = puanByNo.get(a.no) ?? 0, pb = puanByNo.get(b.no) ?? 0;
-    if (pb !== pa) return pb - pa;
-    const ta = teknikSiraByNo.get(a.no) ?? 999, tb = teknikSiraByNo.get(b.no) ?? 999;
-    if (ta !== tb) return ta - tb;
-    return a.no - b.no;
-  });
+  const sahaBuyuklugu = faz1.runners.length;
+  const enIyiN = Math.min(8, sahaBuyuklugu);
 
-  // §XIX.1: Kilit Gerekçe yalnız ilk 6 at için — bütçe kararı, kalanlar sabit placeholder
-  // (bkz. AIAnalysisPanel.tsx NOTE_PLACEHOLDER).
-  const NOT_BUTCE_LIMITI = 6;
-  const notePicks = sirali.slice(0, NOT_BUTCE_LIMITI);
+  const faz3Tail = `Sen ROTAGANYAN v6.0 at yarışı analistisin. FAZ 3 — MUHAKEME ve NİHAİ SIRALAMA aşamasındasın (motorun "son kontrol"ü — bu senin işin, en önemli iş). Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan (özellikle §II.4 Kural Denetim Protokolü, §XVIII Tek Puan Sistemi, §XIX Kilit Gerekçe standardı, §VII.0 Kalabalık Saha kuralı).
 
-  // Banko (§XVIII.4 — mekanik eşik: puan≥80 + fark≥5 + risk yok). Risk = piyasanın (AGF)
-  // sıralamamızdaki 1. DIŞINDA bir atı %50'nin üzerinde desteklemesi (yani piyasa bizim
-  // favorimizle açıkça ayrışıyor). Canlı veride "ganyan" alanı yalnız yarış SONRASI Result
-  // modelinde var, bugünkü/gelecek Runner'da yok — bu yüzden risk kontrolü yalnız AGF'ye
-  // dayanıyor (eski "AGF>%50 + ganyan<1.50" ikili şartının ganyan ayağı düşürüldü).
-  const top1 = sirali[0];
-  const top2 = sirali[1];
-  const top1Puan = top1 ? Math.round(puanByNo.get(top1.no) ?? 0) : 0;
-  const top2Puan = top2 ? Math.round(puanByNo.get(top2.no) ?? 0) : 0;
-  const piyasaRiski = sirali.slice(1).some((r) => (r.agf ?? 0) > 50);
-  const isBanko = !!top1 && top1Puan >= 80 && (top1Puan - top2Puan) >= 5 && !piyasaRiski;
-
-  const faz3Tail = `Sen ROTAGANYAN v6.0 at yarışı analistisin. FAZ 3 — MUHAKEME aşamasındasın. Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan. Sıralama/kupon/banko kararı KOD tarafında Faz 2 puanlarından mekanik olarak zaten hesaplandı — SEN bunu değiştiremezsin, yalnız aşağıdaki görevleri yap.
-
-## KOD TARAFINDAN HESAPLANMIŞ NİHAİ SIRA (değiştirme, veri olarak kullan)
-${sirali.map((r, i) => `${i + 1}. #${r.no} ${r.ad} — puan ${Math.round(puanByNo.get(r.no) ?? 0)}`).join("\n")}
-
-## MEKANİK BANKO KARARI (kod hesapladı, değiştiremezsin — yalnız "bankoNote" ile yorumla)
-${isBanko
-    ? `BANKO: #${top1.no} ${top1.ad} (puan ${top1Puan}, 2.'ye fark ${top1Puan - top2Puan}, piyasa riski yok)`
-    : `BANKO DEĞİL — nedeni: ${!top1 ? "saha boş" : top1Puan < 80 ? `en yüksek puan (${top1Puan}) 80 eşiğinin altında` : (top1Puan - top2Puan) < 5 ? `1.-2. arası fark (${top1Puan - top2Puan}) yetersiz` : "piyasa (AGF) sıralamamızdaki 1. dışında bir atı güçlü destekliyor — risk var"}`}
+## FAZ 2 PUANLARIN (yalnız BAŞLANGIÇ NOKTASI — nihai sıralamayı SEN belirleyeceksin)
+${faz2.atlar.map((a) => `#${a.no} ${a.ad}: Puan=${a.puan} (ön teknik sıra ${a.teknikSira})`).join("\n")}
 
 ## GÖREVİN
-1. Her at için "atDegerlendirmeleri" üret: pedigreeRating (aygır/kısrak istatistiğine ve KOŞU/ATLAR bölümündeki pedigri verisine dayanarak — §IX "uydurma bilgi yasak" kuralına uy, verilmeyen bir aygır/hat hakkında spesifik mesafe/pist/karakter iddiası YAZMA, yalnız verilen ham veriyle sınırlı kal), isTarget (sürpriz/değer potansiyeli taşıyan bir at mı — sırasından bağımsız, serbestçe değerlendir), details (kısa iç etiketler, örn. "AGF1", "Galop K1", "Sınıf düşüşü" — admin rozeti olarak gösterilir, kullanıcıya gitmez).
-2. Yalnız aşağıdaki GEREKÇE YAZILACAK ATLAR listesindeki atlar için "gerekceler" dizisine bir "note" yaz — §XIX.2: EN FAZLA 2 CÜMLE, öz ve okunabilir, doğrudan kullanıcıya (public "Kilit Gerekçe" sütununa) gidiyor. İç terimler (puan/katsayı/katman gibi) burada GEÇMEZ — sade dille, o atın galop/pedigri/form/sınıf/kilo/tempo verisinden somut 1-2 gerekçe ver.
-3. "confidence" (DUSUK/ORTA/YUKSEK): sahanın genel veri kalitesine ve sıralamanın netliğine (1.-2. arası fark, çelişkili sinyal sayısı) göre.
-4. "bankoNote": yukarıdaki mekanik banko kararını 1-2 cümleyle sade dilde yorumla (banko ise neden güçlü, değilse neden temkinli olunmalı).
-5. "notes": genel koşu değerlendirmesi, sade özet.
-6. "tempo": tempo beklentisi — 10+ atlı sahada (§VII.0 Kalabalık Saha kuralı) yarış stili/pozisyon beklentisini öne çıkar.
-
-## GEREKÇE YAZILACAK ATLAR (yalnız bunlar için "gerekceler" üret, diğerleri için üretme)
-${notePicks.map((r) => `#${r.no} ${r.ad}`).join(", ") || "(yok)"}
+1. KURAL DENETİM PROTOKOLÜ (§II.4): Faz 2'nin her puanını geri kontrol et — bir atı düşüren şey somut/gerçek bir çelişki mi (Çapraz Doğrulama Katsayısı §XVIII.3'e göre haklı), yoksa yalnız örneklem küçüklüğü/veri eksikliği/farklı bağlam mı (§II.1 — bu yalnız notu etkilemeli, puanı İKİNCİ KEZ düşürmemeli)? Gerekirse puanı düzelt.
+2. Bu düzeltilmiş puanları ve tüm ATLAR verisini (galop, form, tempo/stil, sınıf, kilo, AGF, pedigri) birlikte değerlendirerek NİHAİ SIRALAMAYI SEN belirle — mekanik puan sırasını kopyalamak ZORUNDA değilsin, ama §XVIII.2 "puan sırası ile nihai sıralama çelişemez" ilkesine uy: bir atı puanından farklı konuma taşıyorsan "score" alanını bu yeni konumu yansıtacak şekilde güncelle (rank1'in score'u rank2'ninkinden düşük OLAMAZ) ve nedenini "details"e kısaca yaz.
+3. Kalabalık sahada (10+ at, §VII.0) tempo/stil/pozisyon önceliğini sıralamana açıkça yansıt.
+4. En iyi ${enIyiN} at için${sahaBuyuklugu > enIyiN ? "" : " (saha küçük, TÜM saha için)"} "picks" dizisine rank 1'den başlayarak gir.
+5. Her pick için "pedigreeRating"/"isTarget"/"details" üret (§IX: uydurma bilgi yasak — yalnız KOŞU/ATLAR verisinde verilen ham pedigri/aygır-kısrak istatistiğiyle sınırlı kal). details: kısa iç etiketler (örn. "AGF1", "Galop K1", "Sınıf düşüşü") — admin rozeti, kullanıcıya gitmez.
+6. Kendi sıraladığın picks listesinin İLK 6'sı için "gerekceler" dizisine bir "note" yaz — §XIX.2: EN FAZLA 2 CÜMLE, sade dil, iç terim (puan/katsayı/katman) GEÇMEZ, doğrudan kullanıcıya (public "Kilit Gerekçe") gidiyor.
+7. "confidence" (DUSUK/ORTA/YUKSEK): sıralamanın netliğine (1.-2. arası fark, çelişkili sinyal sayısı) göre.
+8. "bankoNote": banko kararının KENDİSİNİ kod ayrıca mekanik olarak hesaplayacak (puan≥80+fark≥5+piyasa riski yok) — sen yalnız 1.-2. arası farkı ve genel netliği 1-2 cümleyle sade dilde yorumla.
+9. "notes": genel koşu değerlendirmesi, sade özet. "tempo": tempo beklentisi (sade dil).
 
 Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
 {
-  "atDegerlendirmeleri": [ { "no": 0, "pedigreeRating": "BILINMIYOR", "isTarget": false, "details": [] } ],
+  "picks": [
+    { "rank": 1, "no": 0, "name": "...", "score": 0, "pedigreeRating": "BILINMIYOR", "isTarget": false, "details": [] }
+  ],
   "gerekceler": [ { "no": 0, "note": "en fazla 2 cümlelik gerekçe" } ],
   "confidence": "ORTA",
   "bankoNote": "",
@@ -123,8 +96,9 @@ pedigreeRating değerleri: COK_YUKSEK, YUKSEK, GUCLU, ORTA, DUSUK, ZAYIF, SORU, 
         model: "claude-sonnet-5",
         thinking: { type: "adaptive" },
         // Eski Faz4'ün kanıtlanmış güvenli tavanı (bkz. o dosyadaki not: canlıda iki kez
-        // 16000/24000 yetersiz çıkmıştı) — burada iş daha dar olsa da (sıralama kararı
-        // yok) aynı tavan korunuyor, düşürmek yeni bir kesinti riski doğurabilir.
+        // 16000/24000 yetersiz çıkmıştı, 32000/40000'e çıkarılınca sorun kalmadı). Bu
+        // çağrı artık gerekçe/banko-yorumu/notes/tempo'yu da içeriyor (eskiden ayrı
+        // Faz4-final'de üretiliyordu) — tavanı düşürmek yeni bir kesinti riski doğurur.
         max_tokens: 32000,
         output_config: { format: { type: "json_schema", schema: FAZ3_SCHEMA } },
         messages: [{ role: "user", content: [sharedContextBlock, { type: "text", text: faz3Tail }] }],
@@ -144,26 +118,51 @@ pedigreeRating değerleri: COK_YUKSEK, YUKSEK, GUCLU, ORTA, DUSUK, ZAYIF, SORU, 
     return NextResponse.json({ error: `Faz 3 (muhakeme) yanıtı parse edilemedi${sebep}`, raw: faz3Raw }, { status: 500 });
   }
 
-  const detByNo = new Map(result.atDegerlendirmeleri.map((d) => [d.no, d]));
+  // Claude yalnız en iyi ~8 atı sıralıyor. Kalan atlar için YENİ bir AI çağrısı yapmadan —
+  // Faz 2'nin (ücreti zaten ödenmiş) her at için hesapladığı ham puanı kullanarak devamı
+  // tamamla, böylece admin ve public sayfa TÜM sahayı sıralı/puanlı görür, ek maliyet sıfır.
+  const puanByNo = new Map(faz2.atlar.map((a) => [a.no, a.puan]));
+  const pickedNos = new Set(result.picks.map((p) => p.no));
+  const enDusukPuan = result.picks.length > 0 ? Math.min(...result.picks.map((p) => p.score)) : 100;
+  const kalanlar = faz1.runners
+    .filter((r) => !pickedNos.has(r.no))
+    .map((r) => {
+      const hamPuan = Math.round(puanByNo.get(r.no) ?? 0);
+      // ZORUNLU TUTARLILIK: Claude'un sıraladığı atların skoru rank sırasını hiç bozmamalı —
+      // kalan atların ham Faz 2 puanı en düşük "pick"i geçemez.
+      return { no: r.no, name: r.ad, score: Math.min(hamPuan, enDusukPuan) };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  let sonrakiRank = result.picks.length > 0 ? Math.max(...result.picks.map((p) => p.rank)) + 1 : 1;
+  const ekPicks: Faz3Pick[] = kalanlar.map((r) => ({
+    rank: sonrakiRank++, no: r.no, name: r.name, score: r.score,
+    pedigreeRating: "BILINMIYOR", isTarget: false, details: [],
+  }));
+  const tumSira = [...result.picks, ...ekPicks].sort((a, b) => a.rank - b.rank);
+
   const noteByNo = new Map(result.gerekceler.map((g) => [g.no, g.note]));
+  const picks: FinalPick[] = tumSira.map((p) => ({
+    rank: p.rank, no: p.no, name: p.name, score: p.score,
+    pedigreeRating: p.pedigreeRating as PedigreeRating, isTarget: p.isTarget, details: p.details,
+    note: noteByNo.get(p.no) ?? "",
+  }));
 
-  const picks: Faz3Pick[] = sirali.map((r, i) => {
-    const det = detByNo.get(r.no);
-    return {
-      rank: i + 1,
-      no: r.no,
-      name: r.ad,
-      score: Math.round(puanByNo.get(r.no) ?? 0),
-      pedigreeRating: (det?.pedigreeRating as PedigreeRating) ?? "BILINMIYOR",
-      isTarget: det?.isTarget ?? false,
-      details: det?.details ?? [],
-      note: noteByNo.get(r.no) ?? "",
-    };
-  });
+  // Kupon dilimlemesi — Claude'un ÜRETTİĞİ sıraya göre KOD mekanik uyguluyor (§XVIII.4/
+  // önceki tur kararı: Ekonomik=ilk3, Normal=4-6, Geniş=7+). Sıranın kendisi değişmiyor.
+  const couponNarrow = tumSira.slice(0, 3).map((p) => p.no).join("-");
+  const couponNormal = tumSira.slice(3, 6).map((p) => p.no).join("-");
+  const couponWide = tumSira.slice(6).map((p) => p.no).join("-");
 
-  const couponNarrow = sirali.slice(0, 3).map((r) => r.no).join("-");
-  const couponNormal = sirali.slice(3, 6).map((r) => r.no).join("-");
-  const couponWide = sirali.slice(6).map((r) => r.no).join("-");
+  // Banko — mekanik eşik (puan≥80 + fark≥5 + risk yok), Claude'un ÜRETTİĞİ nihai sıradaki
+  // 1.-2.ye göre. Risk = piyasanın (AGF) 1. DIŞINDA bir atı %50'nin üzerinde desteklemesi.
+  // Canlı veride "ganyan" alanı yalnız yarış SONRASI Result modelinde var, Runner'da yok —
+  // bu yüzden risk kontrolü yalnız AGF'ye dayanıyor.
+  const agfByNo = new Map(faz1.runners.map((r) => [r.no, r.agf]));
+  const top1 = tumSira[0];
+  const top2 = tumSira[1];
+  const piyasaRiski = tumSira.slice(1).some((p) => (agfByNo.get(p.no) ?? 0) > 50);
+  const isBanko = !!top1 && top1.score >= 80 && (top1.score - (top2?.score ?? 0)) >= 5 && !piyasaRiski;
 
   return NextResponse.json({
     ok: true,
