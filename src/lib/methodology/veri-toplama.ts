@@ -444,14 +444,23 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   const GROUND_LABEL: Record<string, string> = { K: "Kum", Ç: "Çim", S: "Sentetik" };
   const son800TumOzetByRunnerName = new Map<string, string | null>();
   for (const r of race.runners) {
-    const kayitlarTumu = son800AccuraceKayitlari
-      .filter(
-        (k) =>
-          normalizeHorseName(k.horseName) === normalizeHorseName(r.name) &&
-          k.accuraceRace.date.getUTCFullYear().toString() === race.raceDay.date.getUTCFullYear().toString()
-      )
-      .sort((a, b) => b.accuraceRace.date.getTime() - a.accuraceRace.date.getTime())
-      .slice(0, 8); // aşırı uzun listeyi önlemek için en güncel 8 kayıtla sınırlı
+    // 2026-07-25: maliyet azaltma — kullanıcı talebiyle 8'den 4'e düşürüldü. Bu bölüm
+    // metodolojinin kendisince zaten İKİNCİL/zayıf kanıt sayılıyor (yukarıdaki KESİN
+    // n/medyan özetinin YANINA, YERİNE değil) — TAM UYGUN kayıtlar (KESİN özetle aynı
+    // güvenilirlikte) en-güncelden ÖNCE öncelenir, geri kalan slot en güncel PİST/MESAFE
+    // FARKLI kayıtlarla doldurulur; böylece kısaltma en değerli satırları kaybettirmez.
+    const tumYilKayitlari = son800AccuraceKayitlari.filter(
+      (k) =>
+        normalizeHorseName(k.horseName) === normalizeHorseName(r.name) &&
+        k.accuraceRace.date.getUTCFullYear().toString() === race.raceDay.date.getUTCFullYear().toString()
+    );
+    const tamUygun = tumYilKayitlari
+      .filter((k) => k.accuraceRace.ground === surfacePrefixToday && Math.abs((k.accuraceRace.length ?? 0) - race.distance) <= 200)
+      .sort((a, b) => b.accuraceRace.date.getTime() - a.accuraceRace.date.getTime());
+    const digerleri = tumYilKayitlari
+      .filter((k) => !(k.accuraceRace.ground === surfacePrefixToday && Math.abs((k.accuraceRace.length ?? 0) - race.distance) <= 200))
+      .sort((a, b) => b.accuraceRace.date.getTime() - a.accuraceRace.date.getTime());
+    const kayitlarTumu = [...tamUygun, ...digerleri].slice(0, 4);
 
     if (kayitlarTumu.length === 0) { son800TumOzetByRunnerName.set(r.name, null); continue; }
 
