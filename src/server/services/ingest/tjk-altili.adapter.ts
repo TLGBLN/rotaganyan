@@ -6,7 +6,6 @@
 
 import { request } from "undici";
 import * as cheerio from "cheerio";
-import { unstable_cache } from "next/cache";
 
 const BASE = "https://www.tjk.org";
 const HEADERS = {
@@ -97,16 +96,18 @@ async function fetchTodaysAltiliResultsUncached(tjkDate: string): Promise<Altili
   return results;
 }
 
-// "-v2" eki: ikramiye alanı eklenince eski (ikramiyesiz) cache girdisini geçersiz kılmak için
-// kasıtlı olarak yeni bir anahtar kullanıldı — aksi halde 1 saatlik TTL dolana kadar eski veri sunulurdu.
-const cachedFetchTodaysAltiliResults = unstable_cache(
-  fetchTodaysAltiliResultsUncached,
-  ["todays-altili-results-v2"],
-  { revalidate: 120 }
-);
+// next/cache'in unstable_cache()'i yerine process-içi TTL cache — bkz. tjk-at-performans.
+// adapter.ts'teki aynı düzeltmenin notu ("use server" zincirinde sessizce yutulan hata).
+const memCache = new Map<string, { data: AltiliCityResult[]; expiresAt: number }>();
+const CACHE_TTL_MS = 120_000;
 
 /** Fetches today's Altılı Ganyan results for every active Turkish hippodrome — TJK gününe göre cache'lenir, gün değişince otomatik yenilenir. */
 export async function fetchTodaysAltiliResults(): Promise<AltiliCityResult[]> {
   const { toTjkDate } = await import("./tjk-info.adapter");
-  return cachedFetchTodaysAltiliResults(toTjkDate(new Date()));
+  const tjkDate = toTjkDate(new Date());
+  const cached = memCache.get(tjkDate);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  const data = await fetchTodaysAltiliResultsUncached(tjkDate);
+  memCache.set(tjkDate, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+  return data;
 }

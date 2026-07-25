@@ -6,7 +6,6 @@
 
 import { request } from "undici";
 import * as cheerio from "cheerio";
-import { unstable_cache } from "next/cache";
 
 const BASE = "https://www.tjk.org";
 const HEADERS = {
@@ -51,15 +50,17 @@ async function fetchApprenticeRemainingRacesUncached(): Promise<Record<string, n
 }
 
 // Liste günde birkaç kez değişir (yarış sonrası) — 3 saatlik cache yeterli, gereksiz TJK isteği yapmaz.
-const cachedFetch = unstable_cache(
-  fetchApprenticeRemainingRacesUncached,
-  ["apprentice-remaining-races"],
-  { revalidate: 10_800 }
-);
+// next/cache'in unstable_cache()'i yerine process-içi TTL cache — bkz. tjk-at-performans.
+// adapter.ts'teki aynı düzeltmenin notu ("use server" zincirinde sessizce yutulan hata).
+let cached: { data: Record<string, number>; expiresAt: number } | null = null;
+const CACHE_TTL_MS = 10_800_000;
 
 /** Jokey adı (tam ad veya kısa ad, büyük/küçük harf ve Türkçe karakter farketmez) -> kalan yarış sayısı. */
 export async function fetchApprenticeRemainingRaces(): Promise<Record<string, number>> {
-  return cachedFetch();
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  const data = await fetchApprenticeRemainingRacesUncached();
+  cached = { data, expiresAt: Date.now() + CACHE_TTL_MS };
+  return data;
 }
 
 export { normalizeJockeyName };

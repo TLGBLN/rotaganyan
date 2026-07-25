@@ -1,6 +1,5 @@
 import { request } from "undici";
 import * as cheerio from "cheerio";
-import { unstable_cache } from "next/cache";
 
 const TJK_INDEX = "https://www.tjk.org/TR/YarisSever/YarisSever/Index";
 const HEADERS = {
@@ -36,7 +35,15 @@ async function fetchTjkTickerUncached(): Promise<string[]> {
   }
 }
 
+// next/cache'in unstable_cache()'i yerine process-içi TTL cache — bkz. tjk-at-performans.
+// adapter.ts'teki aynı düzeltmenin notu ("use server" zincirinde sessizce yutulan hata).
+let cached: { data: string[]; expiresAt: number } | null = null;
+const CACHE_TTL_MS = 120_000;
+
 /** TJK ana sayfa duyuru/haber bandı — her sayfa yüklemesinde canlı çekmemek için 2 dakika cache'lenir. */
-export const fetchTjkTicker = unstable_cache(fetchTjkTickerUncached, ["tjk-ticker"], {
-  revalidate: 120,
-});
+export async function fetchTjkTicker(): Promise<string[]> {
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  const data = await fetchTjkTickerUncached();
+  cached = { data, expiresAt: Date.now() + CACHE_TTL_MS };
+  return data;
+}

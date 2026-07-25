@@ -1,6 +1,5 @@
 import { request } from "undici";
 import * as cheerio from "cheerio";
-import { unstable_cache } from "next/cache";
 
 export type DailyRace = {
   raceNo: number;
@@ -110,12 +109,17 @@ async function fetchDailyProgramUncached(dateStr: string): Promise<DailyHippodro
   }
 }
 
-const fetchDailyProgramCached = unstable_cache(fetchDailyProgramUncached, ["tjk-daily-program"], {
-  revalidate: 300,
-});
+// next/cache'in unstable_cache()'i yerine process-içi TTL cache — bkz. tjk-at-performans.
+// adapter.ts'teki aynı düzeltmenin notu ("use server" zincirinde sessizce yutulan hata).
+const memCache = new Map<string, { data: DailyHippodrome[]; expiresAt: number }>();
+const CACHE_TTL_MS = 300_000;
 
 /** Belirli bir günün TJK koşu programı — DB'de henüz veri yokken canlı fallback olarak kullanılır, 5 dakika cache'lenir. */
 export async function fetchDailyProgram(date?: Date): Promise<DailyHippodrome[]> {
   const dateStr = (date ?? new Date()).toISOString().slice(0, 10);
-  return fetchDailyProgramCached(dateStr);
+  const cached = memCache.get(dateStr);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  const data = await fetchDailyProgramUncached(dateStr);
+  memCache.set(dateStr, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+  return data;
 }

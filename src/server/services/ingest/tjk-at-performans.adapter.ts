@@ -8,7 +8,6 @@
 
 import { request } from "undici";
 import * as cheerio from "cheerio";
-import { unstable_cache } from "next/cache";
 
 const BASE = "https://www.tjk.org";
 const HEADERS = {
@@ -94,13 +93,21 @@ async function fetchTjkAtKosuBilgileriUncached(atId: number): Promise<TjkAtKosuR
 
 // Bir atın geçmişi günde en fazla birkaç kez değişir (yeni koşu sonrası) — 3 saatlik
 // cache Son800/Takılar/Karşılaştır/H2H panellerinin hepsinde gereksiz TJK isteğini önler.
-const cachedFetch = unstable_cache(
-  fetchTjkAtKosuBilgileriUncached,
-  ["tjk-at-kosu-bilgileri"],
-  { revalidate: 10_800 }
-);
+//
+// ÖNEMLİ: burada eskiden next/cache'in unstable_cache()'i kullanılıyordu — ama bu, "use
+// server" Server Action zincirinden (Karşılaştır/H2H panelleri client component'ten böyle
+// çağırıyor) tetiklendiğinde "Invariant: incrementalCache missing in unstable_cache" hatası
+// fırlatıyordu (canlıda doğrulandı: tüm koşularda 0 kayıt dönüyordu, tjkAtId kapsamı %100
+// olmasına rağmen). Çağıran kod (at-performans.actions.ts/h2h.actions.ts) bu hatayı
+// try/catch ile sessizce yutup boş dizi döndürdüğü için sorun fark edilmeden kalıyordu.
+// Next'in incrementalCache'ine bağımlı olmayan basit bir process-içi TTL cache'e geçildi.
+const memCache = new Map<number, { data: TjkAtKosuRow[]; expiresAt: number }>();
+const CACHE_TTL_MS = 10_800_000;
 
-/** Bir atın (TJK AtId'siyle) tüm resmi yarış geçmişini döner. */
 export async function fetchTjkAtKosuBilgileri(atId: number): Promise<TjkAtKosuRow[]> {
-  return cachedFetch(atId);
+  const cached = memCache.get(atId);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  const data = await fetchTjkAtKosuBilgileriUncached(atId);
+  memCache.set(atId, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+  return data;
 }

@@ -7,7 +7,6 @@
 
 import { request } from "undici";
 import * as cheerio from "cheerio";
-import { unstable_cache } from "next/cache";
 
 const BASE = "https://www.tjk.org";
 const HEADERS = {
@@ -75,14 +74,17 @@ async function fetchTjkSon800ByHorseNameUncached(horseName: string): Promise<Tjk
 }
 
 // At geçmişi günde en fazla birkaç kez değişir — 3 saatlik cache Son800 panelinin
-// gereksiz TJK isteği yapmasını önler (tjk-at-performans.adapter'daki desenle tutarlı).
-const cachedFetch = unstable_cache(
-  fetchTjkSon800ByHorseNameUncached,
-  ["tjk-son800-by-horse-name"],
-  { revalidate: 10_800 }
-);
+// gereksiz TJK isteği yapmasını önler. next/cache'in unstable_cache()'i yerine process-içi
+// TTL cache kullanılıyor — bkz. tjk-at-performans.adapter.ts'teki aynı düzeltmenin notu
+// ("Invariant: incrementalCache missing" hatası "use server" zincirinde sessizce yutuluyordu).
+const memCache = new Map<string, { data: TjkSon800Row[]; expiresAt: number }>();
+const CACHE_TTL_MS = 10_800_000;
 
 /** Bir atın TJK'daki tüm Son 800 kayıtlarını çeker (en fazla ~50, sayfalama yapılmaz — tek at için yeterli). */
 export async function fetchTjkSon800ByHorseName(horseName: string): Promise<TjkSon800Row[]> {
-  return cachedFetch(horseName);
+  const cached = memCache.get(horseName);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  const data = await fetchTjkSon800ByHorseNameUncached(horseName);
+  memCache.set(horseName, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+  return data;
 }
