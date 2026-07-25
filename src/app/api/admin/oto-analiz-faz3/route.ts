@@ -55,13 +55,17 @@ async function handlePost(req: NextRequest) {
   const sahaBuyuklugu = faz1.runners.length;
   const enIyiN = Math.min(8, sahaBuyuklugu);
 
-  const faz3Tail = `Sen ROTAGANYAN v6.0 at yarışı analistisin. FAZ 3 — MUHAKEME ve NİHAİ SIRALAMA aşamasındasın (motorun "son kontrol"ü — bu senin işin, en önemli iş). Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan (özellikle §II.4 Kural Denetim Protokolü, §XVIII Tek Puan Sistemi, §XIX Kilit Gerekçe standardı, §VII.0 Kalabalık Saha kuralı).
+  const faz3Tail = `Sen ROTAGANYAN v6.1 at yarışı analistisin. FAZ 3 — MUHAKEME ve NİHAİ SIRALAMA aşamasındasın (motorun "son kontrol"ü — bu senin işin, en önemli iş). Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan (özellikle §II.4 Kural Denetim Protokolü, §XVIII Tek Puan Sistemi, §XIX Kilit Gerekçe standardı, §VII.0 Kalabalık Saha kuralı).
 
 ## FAZ 2 PUANLARIN (yalnız BAŞLANGIÇ NOKTASI — nihai sıralamayı SEN belirleyeceksin)
 ${faz2.atlar.map((a) => `#${a.no} ${a.ad}: Puan=${a.puan} (ön teknik sıra ${a.teknikSira})`).join("\n")}
 
 ## GÖREVİN
-1. KURAL DENETİM PROTOKOLÜ (§II.4): Faz 2'nin her puanını geri kontrol et — bir atı düşüren şey somut/gerçek bir çelişki mi (Çapraz Doğrulama Katsayısı §XVIII.3'e göre haklı), yoksa yalnız örneklem küçüklüğü/veri eksikliği/farklı bağlam mı (§II.1 — bu yalnız notu etkilemeli, puanı İKİNCİ KEZ düşürmemeli)? Gerekirse puanı düzelt.
+1. KURAL DENETİM PROTOKOLÜ (§II.4, SON KONTROL — motorun en önemli adımı burası): Faz 2'nin her puanını geri kontrol et — bir atı düşüren şey somut/gerçek bir çelişki mi (Çapraz Doğrulama Katsayısı §XVIII.3'e göre haklı), yoksa yalnız örneklem küçüklüğü/veri eksikliği/farklı bağlam mı (§II.1 — bu yalnız notu etkilemeli, puanı İKİNCİ KEZ düşürmemeli)? Özellikle şu iki noktayı özenle kontrol et (v6.1 canlı yarış geri bildirimiyle eklendi):
+   a) AGF ASİMETRİSİ (§XVI/§XX.26): bir at yalnızca DÜŞÜK AGF'si yüzünden geride mi bırakılmış? Düşük AGF asla tek başına bir atı geriye çekme gerekçesi değildir (yalnız piyasa ilgisizliği) — teknik açıdan güçlü bir at düşük AGF'ye rağmen üst sıraya çıkarılmalı.
+   b) SON800+GALOP KOMBİNASYONU (§X/§XI/§XX.28): yeterli örneklemli güçlü Son800 (n≥3, medyan≤-0.5s) İLE keskin/iyi galop zinciri birlikte olan bir at, bu güçlü destekleyici çift göz ardı edilerek geride mi bırakılmış? Varsa yukarı taşı.
+   c) HP TEK BAŞINA ÜSTÜNLÜK DEĞİLDİR (§XX.27): yalnız yüksek ham HP'ye dayanarak, formu zayıf/gerilemiş ya da tempo-stili bugüne uymayan bir at otomatik olarak en üste mi konmuş? Değilse düzelt.
+   Gerekirse puanı/sırayı düzelt.
 2. Bu düzeltilmiş puanları ve tüm ATLAR verisini (galop, form, tempo/stil, sınıf, kilo, AGF, pedigri) birlikte değerlendirerek NİHAİ SIRALAMAYI SEN belirle — mekanik puan sırasını kopyalamak ZORUNDA değilsin, ama §XVIII.2 "puan sırası ile nihai sıralama çelişemez" ilkesine uy: bir atı puanından farklı konuma taşıyorsan "score" alanını bu yeni konumu yansıtacak şekilde güncelle (rank1'in score'u rank2'ninkinden düşük OLAMAZ) ve nedenini "details"e kısaca yaz.
 3. Kalabalık sahada (10+ at, §VII.0) tempo/stil/pozisyon önceliğini sıralamana açıkça yansıt.
 4. En iyi ${enIyiN} at için${sahaBuyuklugu > enIyiN ? "" : " (saha küçük, TÜM saha için)"} "picks" dizisine rank 1'den başlayarak gir.

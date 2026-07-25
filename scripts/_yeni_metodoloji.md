@@ -1,4 +1,6 @@
-# ROTAGANYAN BÜTÜNLEŞİK ANALİZ MOTORU — v6.0
+# ROTAGANYAN BÜTÜNLEŞİK ANALİZ MOTORU — v6.1
+
+*(v6.1 revizyonu — canlı yarış geri bildirimiyle: düşük AGF artık teknik açıdan güçlü bir atı geriye çekme gerekçesi değil; Son800+galop zinciri kombinasyonu gerçek bir destekleyici unsur; yüksek ham HP tek başına üstünlük garantilemez. Bkz. §XVI, §X, §XI, §XX.26-28.)*
 
 ## I. SİSTEMİN AMACI
 
@@ -40,7 +42,9 @@ Nihai değerlendirme öncesinde zorunlu kontroller:
 8. Aynı ham veri iki kez puanlandı mı?
 9. Bilinmeyen veri cezaya dönüştürüldü mü?
 10. Metin, puan ve sıra birbiriyle tutarlı mı?
-11. AGF, teknik sıralamayla birlikte (destekleyici veya çelişen unsur olarak) değerlendirildi mi?
+11. AGF, §XVI'daki ASİMETRİK kuralla değerlendirildi mi (yüksek AGF hem destek hem çelişki yönünde işleyebilir; düşük AGF ASLA bir atı geriye çekme gerekçesi olarak kullanılmadı mı)?
+11b. Yüksek ham HP, zayıf form/tempo uyumsuzluğuna rağmen otomatik üstünlük gerekçesi yapılmadı mı?
+11c. Yeterli örneklemli güçlü Son800 + keskin galop zinciri birlikte görüldüğünde gerçek bir destekleyici çift olarak (§X, §XI) tanındı mı?
 12. Çapraz Doğrulama Katsayısı (§XVIII.3) her at için doğru gerekçeyle uygulandı mı?
 
 ---
@@ -93,7 +97,7 @@ Bu bir kod-çarpanı DEĞİLDİR (mekanik hesap yok) — kilo etkisini ne kadar 
 | Tempo + ara geçişler + Son 800 + zemin | Enerji nerede kullanıldı, sona güç kaldı mı? | Maiden, Ş2-5, Handikap, KV, Grup, Satış | Son 800 tek başına stil değildir |
 | Son 800 + yarış içi en iyi Son 800 farkı | Aynı yarış içindeki kapanış gücü | Tüm tecrübeli yarışlar | Ham saniye yerine yarış içi fark tercih edilir |
 | Son 800 + pist/mesafe/zemin geçmişi | Kapanış tekrarlanabilir mi? | Ş4-5, Handikap, KV, Grup | Benzer şart örneklemi gerekir |
-| HP ivmesi + form dizisi + zemin | Sonuç yanıltıcı mı, gizli gelişim var mı? | Maiden, Ş2-5, Handikap, KV | Form, HP ivmesinden bağımsız yorumlanmaz |
+| HP ivmesi + form dizisi + zemin | Sonuç yanıltıcı mı, gizli gelişim var mı? | Maiden, Ş2-5, Handikap, KV | Form, HP ivmesinden bağımsız yorumlanmaz. Yüksek HAM HP tek başına (form zayıfsa) üstünlük gerekçesi DEĞİLDİR (§XX.27) |
 | HP + kilo + sınıf + zemin | Kalitesine göre taşıdığı yük uygun mu? | Handikap merkezli | Kilo etkisi doğrusal kabul edilmez |
 | Sınıf geçişi + rakip kalitesi + kilo | Gerçek düşüş/yükseliş var mı? | Ş3-5, H17+, KV, Grup | SKK tek başına puan değildir |
 | Galop + son yarış + geçen gün + çalışma zemini | Form devamı, toparlanma/eksiklik | Ş1/27, Maiden, Ş2-3, Satış, uzun ara | Tek galop yerine zincir okunur |
@@ -290,7 +294,9 @@ Bkz. §VII.0 "Kalabalık Saha Katman Yükseltmesi" — buradaki etkiler bağıms
 
 **Eşikler:** n≥3 ve medyan ≤−0.5sn: güçlü kapanış · n≥3 ve medyan ≥+0.7sn: düşük kapanış · diğer: nötr.
 
-**Yapmadıkları:** HP'nin, P-HP'nin, exact sicilin yerine geçmez; tek başına ilk 4'e taşımaz, banko gerekçesi olmaz.
+**Yapmadıkları:** HP'nin, P-HP'nin, exact sicilin yerine geçmez; TEK BAŞINA (başka hiçbir destek olmadan) bir banko gerekçesi olmaz.
+
+**v6.1 — Son800 + Galop kombinasyonu gerçek bir destekleyici çifttir:** Yeterli örneklemli güçlü Son800 (n≥3, medyan≤−0.5sn) ile §XI'deki keskin/iyi bir galop zinciri AYNI ANDA görüldüğünde, bu ikili yalnız "ek bir not" değil, GERÇEK ve GÜÇLÜ bir destekleyici pakettir — Çapraz Doğrulama Katsayısı'nda artı yönde (×1.05-1.10) sayılabilir ve atı sıralamada belirgin biçimde yukarı taşıyabilir, ilk 4'e/üst sıralara girmesini haklı çıkarabilir. Bu kombinasyonu görüp de düşük AGF veya sınıf/HP gibi başka bir kaleme dayanarak geri planda bırakmak, kanıtı görmezden gelmek olur.
 
 ---
 
@@ -303,6 +309,8 @@ Galop tek dereceyle değil, zincir olarak okunur.
 **Arap safkan:** 400m: 28-31/25-28/≤25 · 600m: 42-46/39-42/≤39 · 800m: 56-61/52-56/≤52 · 1000m: 1:10-1:15/1:06-1:10/≤1:06
 
 İç pist ~1sn yavaş değerlendirilebilir (sabit değil). Farklı zeminde galop hazırlık gösterir, pist uyumu kanıtlamaz. Tek hızlı iş form garantisi değildir.
+
+**v6.1:** Keskin/iyi bir galop zinciri, güçlü bir Son800 kaydıyla (§X) BİRLİKTE görüldüğünde gerçek bir destekleyici kombinasyondur — bkz. §X "Son800 + Galop kombinasyonu".
 
 ---
 
@@ -346,10 +354,14 @@ Zayıf kanıt. Tek başına atı geriye itemez, tek karşılaşma kesin üstünl
 
 AGF, teknik verinin YERİNE geçmez ama İSTİSNASIZ önemli bir DESTEKLEYİCİ unsurdur — her atın değerlendirmesinde her zaman göz önünde bulundurulur.
 
-- Teknik sıralamayla uyumluysa: Çapraz Doğrulama Katsayısı'nda (§XVIII.3) destekleyici kanıt sayılır (×1.05-1.10 yönünde).
-- Belirgin şekilde çelişiyorsa: aynı katsayı sistemine (×0.90-0.95 / ×0.70-0.80) girer — ayrı bir "AGF ayrışması" geçidi veya sabit sayısal eşik YOKTUR; ne kadar güçlü bir çelişki olduğuna kendi muhakemenle karar ver.
-- Yüksek/düşük AGF tek başına otomatik artı/eksi değildir.
-- Aşırı piyasa konsensüsü (AGF>%50) yalnız banko şartında risk sayılır (§XIX).
+**ASİMETRİK KURAL (v6.1) — yön bağımsız değildir:**
+
+- **AGF YÜKSEK + teknik görüş güçlü:** destekleyici kanıt, Çapraz Doğrulama Katsayısı'nda (§XVIII.3) artı yönde (×1.05-1.10) sayılır.
+- **AGF YÜKSEK + teknik görüş zayıf:** GERÇEK bir çelişki — piyasa teknik veride görünmeyen bir şey görüyor olabilir, göz ardı edilmez, katsayı sistemine (×0.90-0.95 / ×0.70-0.80) girer, ne kadar güçlü olduğuna kendi muhakemenle karar ver.
+- **AGF DÜŞÜK + teknik görüş güçlü:** BU BİR ÇELİŞKİ DEĞİLDİR. Düşük AGF yalnızca piyasa ilgisizliği/az oynanma anlamına gelir, teknik gücü ÇÜRÜTMEZ — Çapraz Doğrulama Katsayısını düşürmek için gerekçe OLAMAZ, atı sıralamada geriye çekmek için KULLANILMAZ. Teknik olarak güçlü bir at, düşük AGF'ye rağmen üst sıralarda yer alabilir/almalıdır.
+- **AGF DÜŞÜK + teknik görüş de zayıf:** nötr, ayrıca ceza gerekmez (ikisi zaten uyumlu-zayıf).
+
+Aşırı piyasa konsensüsü (bir BAŞKA atın AGF'si >%50) yalnız banko şartında risk sayılır (§XIX) — bu, yukarıdaki asimetrik kuralın istisnası değildir, ayrı bir banko-güvenlik testidir.
 
 ---
 
@@ -435,6 +447,9 @@ Kupon, Nihai Puana göre: **Ekonomik = ilk 3 · Normal = 4-6 · Geniş = 7 ve so
 23. Banko = puan≥80 + fark≥5 + risk yok. Yalnız puan≥80 = Banko Adayı.
 24. Geçit motoru YOKTUR — analiz doğrudan puanlama ve muhakemeyle yapılır.
 25. Kulvar/pist geometrisi bilgisi hiçbir zaman diğer verileri gölgeleyemez veya geçersiz kılamaz — yalnız düşük ağırlıklı (Katman 4-5) bir destekleyici unsurdur.
+26. Düşük AGF, teknik açıdan güçlü bir atı geriye çekmek için gerekçe SAYILMAZ (§XVI asimetrik kural) — yalnız piyasa ilgisizliğidir, Çapraz Doğrulama Katsayısını düşürmez.
+27. Yüksek ham HP tek başına üstünlük garantilemez; form zayıfsa/gerilemişse veya tempo-stil uyumsuzsa, güçlü Son800+galop zinciri kombinasyonu (§X) gibi diğer paketler HP'nin önüne geçebilir.
+28. Yeterli örneklemli güçlü Son800 (n≥3, medyan≤−0.5sn) ile keskin bir galop zinciri BİRLİKTE görüldüğünde, bu ikili gerçek ve güçlü bir destekleyici kombinasyon sayılır ve sıralamayı/puanı belirgin biçimde yukarı taşıyabilir.
 
 ---
 
