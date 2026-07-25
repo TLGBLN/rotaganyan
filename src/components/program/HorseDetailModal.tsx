@@ -74,7 +74,7 @@ export default function HorseDetailModal({ name, onClose }: { name: string; onCl
         role="dialog"
         aria-modal="true"
         aria-label={name}
-        className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border bg-background shadow-xl"
+        className="flex max-h-[80vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border bg-background shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b px-4 py-3">
