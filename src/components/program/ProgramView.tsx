@@ -1455,6 +1455,8 @@ export default function ProgramView({
         <HipodromOzellikleriModal
           hippodromeSlug={currentDay.hippodromeSlug}
           hippodromeName={currentDay.hippodromeName}
+          distance={currentRace?.distance}
+          surface={currentRace?.surface}
           onClose={() => setHipodromOzellikleriOpen(false)}
         />
       )}

@@ -55,7 +55,7 @@ async function handlePost(req: NextRequest) {
   const sahaBuyuklugu = faz1.runners.length;
   const enIyiN = Math.min(8, sahaBuyuklugu);
 
-  const faz3Tail = `Sen ROTAGANYAN v6.1 at yarışı analistisin. FAZ 3 — MUHAKEME ve NİHAİ SIRALAMA aşamasındasın (motorun "son kontrol"ü — bu senin işin, en önemli iş). Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan (özellikle §II.4 Kural Denetim Protokolü, §XVIII Tek Puan Sistemi, §XIX Kilit Gerekçe standardı, §VII.0 Kalabalık Saha kuralı).
+  const faz3Tail = `Sen ROTAGANYAN v6.2 at yarışı analistisin. FAZ 3 — MUHAKEME ve NİHAİ SIRALAMA aşamasındasın (motorun "son kontrol"ü — bu senin işin, en önemli iş). Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan (özellikle §II.4 Kural Denetim Protokolü, §XVIII Tek Puan Sistemi, §XIX Kilit Gerekçe standardı, §VII.0 Kalabalık Saha kuralı).
 
 ## FAZ 2 PUANLARIN (yalnız BAŞLANGIÇ NOKTASI — nihai sıralamayı SEN belirleyeceksin)
 ${faz2.atlar.map((a) => `#${a.no} ${a.ad}: Puan=${a.puan} (ön teknik sıra ${a.teknikSira})`).join("\n")}
@@ -70,6 +70,7 @@ ${faz2.atlar.map((a) => `#${a.no} ${a.ad}: Puan=${a.puan} (ön teknik sıra ${a.
 3. Kalabalık sahada (10+ at, §VII.0) tempo/stil/pozisyon önceliğini sıralamana açıkça yansıt.
 4. En iyi ${enIyiN} at için${sahaBuyuklugu > enIyiN ? "" : " (saha küçük, TÜM saha için)"} "picks" dizisine rank 1'den başlayarak gir.
 5. Her pick için "pedigreeRating"/"isTarget"/"details" üret (§IX: uydurma bilgi yasak — yalnız KOŞU/ATLAR verisinde verilen ham pedigri/aygır-kısrak istatistiğiyle sınırlı kal). details: kısa iç etiketler (örn. "AGF1", "Galop K1", "Sınıf düşüşü") — admin rozeti, kullanıcıya gitmez.
+5b. ★ HEDEF (isTarget) KURALI (v6.2, kullanıcı talimatı): isTarget=true işaretlediğin bir at yalnız pasif bir rozet almaz — sıralamada İLK 3'ÜN HEMEN ALTINA (4. sıra civarına) getirilir ve "score"u 3. sıradaki atınkine YAKIN/EŞİT verilir (rank1-3'ün score'undan düşük olmalı, madde 2'deki tutarlılık kuralına uy). Yani Hedef ataması sıralamayı GERÇEKTEN etkiler — yalnız "ilginç ama etkisiz" bir not değildir. Bunu yalnız gerçekten güçlü bir sürpriz/değer sinyali olduğuna inandığın at(lar) için kullan, gelişigüzel dağıtma (en fazla 1-2 at).
 6. Kendi sıraladığın picks listesinin İLK 6'sı için "gerekceler" dizisine bir "note" yaz — §XIX.2: EN FAZLA 2 CÜMLE, sade dil, iç terim (puan/katsayı/katman) GEÇMEZ, doğrudan kullanıcıya (public "Kilit Gerekçe") gidiyor.
 7. "confidence" (DUSUK/ORTA/YUKSEK): sıralamanın netliğine (1.-2. arası fark, çelişkili sinyal sayısı) göre.
 8. "bankoNote": banko kararının KENDİSİNİ kod ayrıca mekanik olarak hesaplayacak (puan≥80+fark≥5+piyasa riski yok) — sen yalnız 1.-2. arası farkı ve genel netliği 1-2 cümleyle sade dilde yorumla.

@@ -1,6 +1,7 @@
-# ROTAGANYAN BÜTÜNLEŞİK ANALİZ MOTORU — v6.1
+# ROTAGANYAN BÜTÜNLEŞİK ANALİZ MOTORU — v6.2
 
 *(v6.1 revizyonu — canlı yarış geri bildirimiyle: düşük AGF artık teknik açıdan güçlü bir atı geriye çekme gerekçesi değil; Son800+galop zinciri kombinasyonu gerçek bir destekleyici unsur; yüksek ham HP tek başına üstünlük garantilemez. Bkz. §XVI, §X, §XI, §XX.26-28.)*
+*(v6.2 revizyonu — ★ Hedef/isTarget artık pasif bir rozet değil: işaretlenen at sıralamada ilk 3'ün hemen altına getirilir, puanı 3. sıraya yakın/eşit verilir. Bkz. §XIX.0a.)*
 
 ## I. SİSTEMİN AMACI
 
@@ -413,6 +414,10 @@ Birden fazla çift varsa çarpılmaz, EN GÜÇLÜ olan esas alınır. Küçük �
 **BANKO** — üçü birlikte: (1) Puan ≥ 80, (2) en yakın rakibe puan farkı ≥ 5, (3) belirgin risk yok (AGF>%50 aşırı konsensüs ise risk). Yalnız (1) sağlanıp (2)/(3) eksikse: **BANKO ADAYI**.
 
 Kupon, Nihai Puana göre: **Ekonomik = ilk 3 · Normal = 4-6 · Geniş = 7 ve sonrası.**
+
+### XIX.0a ★ Hedef (isTarget) Kuralı (v6.2)
+
+★ Hedef, pasif bir rozet değildir — gerçek bir sürpriz/değer sinyali gördüğün bir atı böyle işaretlersen, o at sıralamada **İLK 3'ÜN HEMEN ALTINA** (4. sıra civarına) getirilir ve puanı 3. sıradaki ata **yakın/eşit** verilir (yine de rank1-3'ün puanını geçemez, §XVIII.2). Yani Hedef ataması nihai sıralamayı gerçekten etkiler. Gelişigüzel dağıtılmaz — koşu başına en fazla 1-2 at, yalnız gerçekten güçlü bir sinyal varsa.
 
 ### XIX.1 Kilit Gerekçe Standardı
 

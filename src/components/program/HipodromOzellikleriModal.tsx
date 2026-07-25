@@ -3,17 +3,27 @@
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { HIPODROM_OZELLIKLERI } from "@/lib/hipodrom-ozellikleri";
+import { HIPODROM_MESAFE_KOORDINATLARI } from "@/lib/hipodrom-mesafe-koordinat";
+
+const YUZEY_LABEL: Record<string, string> = { CIM: "Çim", KUM: "Kum", SENTETIK: "Sentetik" };
+const YUZEY_RENK: Record<string, string> = { CIM: "#009900", KUM: "#996633", SENTETIK: "#D39B1E" };
 
 export default function HipodromOzellikleriModal({
-  hippodromeSlug, hippodromeName, onClose,
+  hippodromeSlug, hippodromeName, distance, surface, onClose,
 }: {
   hippodromeSlug: string;
   hippodromeName: string;
+  /** Bugünkü koşunun mesafesi/pisti — verilirse diyagram üzerinde işaretlenir. */
+  distance?: number;
+  surface?: string;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const ozellik = HIPODROM_OZELLIKLERI[hippodromeSlug];
+  const koordinat = surface && distance != null
+    ? HIPODROM_MESAFE_KOORDINATLARI[hippodromeSlug]?.[surface as "CIM" | "KUM" | "SENTETIK"]?.[distance]
+    : undefined;
 
   // Odağı diyalog içine al ve önceki elemana geri döndür — ekran okuyucu/klavye kullanıcıları arkadaki sayfaya kaçmasın
   useEffect(() => {
@@ -97,10 +107,18 @@ export default function HipodromOzellikleriModal({
               )}
 
               <div>
-                <div className="mb-1.5 text-xs font-semibold text-muted-foreground">
-                  Mesafe / Start Noktası Diyagramı (TJK resmi)
+                <div className="mb-1.5 flex items-center justify-between gap-2 text-xs font-semibold text-muted-foreground">
+                  <span>Mesafe / Start Noktası Diyagramı (TJK resmi)</span>
+                  {distance != null && surface && (
+                    <span
+                      className="rounded-full border px-2 py-0.5 text-[10px] font-bold"
+                      style={{ color: YUZEY_RENK[surface] ?? undefined, borderColor: YUZEY_RENK[surface] ?? undefined }}
+                    >
+                      Bugünkü koşu: {distance}m {YUZEY_LABEL[surface] ?? surface}
+                    </span>
+                  )}
                 </div>
-                <div className="rounded-md border bg-white p-2">
+                <div className="relative rounded-md border bg-white p-2">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={ozellik.diyagramUrl}
@@ -108,7 +126,27 @@ export default function HipodromOzellikleriModal({
                     className="w-full h-auto"
                     loading="lazy"
                   />
+                  {koordinat && surface && (
+                    <div
+                      className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+                      style={{ left: `${koordinat.x}%`, top: `${koordinat.y}%` }}
+                    >
+                      <span
+                        className="absolute inset-0 -m-2 block animate-ping rounded-full opacity-60"
+                        style={{ backgroundColor: YUZEY_RENK[surface] ?? "#e11d48" }}
+                      />
+                      <span
+                        className="relative block h-3.5 w-3.5 rounded-full border-2 border-white shadow-[0_0_0_1.5px_rgba(0,0,0,0.5)]"
+                        style={{ backgroundColor: YUZEY_RENK[surface] ?? "#e11d48" }}
+                      />
+                    </div>
+                  )}
                 </div>
+                {distance != null && surface && !koordinat && (
+                  <p className="mt-1.5 text-[10px] text-muted-foreground">
+                    Bugünkü koşunun ({distance}m {YUZEY_LABEL[surface] ?? surface}) tam start noktası bu diyagramda ayrıca işaretli değil.
+                  </p>
+                )}
                 <p className="mt-1.5 text-[10px] text-muted-foreground">
                   Her mesafenin start kapısının pistin neresinden (viraj veya düz yol) başladığını
                   gösterir — kulvar avantajı ve erken tempo yorumunda destekleyici bir unsurdur,
