@@ -32,6 +32,16 @@ const PANEL_BTN_CLASS = "flex items-center gap-1 rounded-md px-2.5 py-1 text-xs 
 const PANEL_BTN_OPEN = "bg-brand text-brand-foreground";
 const PANEL_BTN_CLOSED = "bg-white/5 text-[#c7d0dc] border border-white/10 hover:bg-white/10";
 
+// Koşu tab'ları — kullanıcı isteği: TJK'nın kendi sitesindeki gibi pist türüne göre
+// renklendirilsin. r.surface, Race.surface'ten geliyor ve program senkronu her
+// çalıştığında güncelleniyor — pist değişikliği (yağışta çim→kum gibi) olursa bir
+// sonraki senkronda burası da otomatik güncellenir, sabit/statik değil.
+const SURFACE_TAB_BG: Record<string, string> = {
+  CIM: "bg-emerald-700/25 hover:bg-emerald-700/40",
+  KUM: "bg-amber-800/25 hover:bg-amber-800/40",
+  SENTETIK: "bg-sky-700/25 hover:bg-sky-700/40",
+};
+
 // ── Geri sayım (Turkey UTC+3) ────────────────────────────────────────────────
 
 function useRaceCountdown(time: string | null, hasResult: boolean, dateStr: string) {
@@ -1285,6 +1295,7 @@ export default function ProgramView({
                 onClick={() => setActiveRace((prev) => ({ ...prev, [currentDay.hippodromeSlug]: r.raceNo }))}
                 className={cn(
                   "relative shrink-0 px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap",
+                  SURFACE_TAB_BG[r.surface],
                   selectedRaceNo(currentDay) === r.raceNo
                     ? "border-b-2 border-[#c0392b] text-[#c0392b]"
                     : "text-muted-foreground hover:text-foreground"
