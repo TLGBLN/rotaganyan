@@ -13,6 +13,7 @@ export type HorseHistoryEntry = {
   surface: string;
   zeminEtiketi: string | null;
   classType: string | null;
+  equipment: string | null;
   jockey: string | null;
   weight: number | null;
   hp: number | null;
@@ -52,6 +53,7 @@ export async function getHorseHistory(name: string): Promise<HorseHistoryEntry[]
       bestTime: true,
       scratched: true,
       tjkAtId: true,
+      equipment: true,
       race: {
         select: {
           id: true,
@@ -112,6 +114,7 @@ export async function getHorseHistory(name: string): Promise<HorseHistoryEntry[]
       surface: r.race.surface,
       zeminEtiketi,
       classType: tjkRow?.classType || r.race.classType || null,
+      equipment: tjkRow?.equipment || r.equipment || null,
       jockey: r.jockey,
       weight: r.weight,
       hp: r.hp,

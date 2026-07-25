@@ -108,6 +108,7 @@ export default function HorseDetailModal({ name, onClose }: { name: string; onCl
                     <th className="px-2 py-1.5 text-center">Mesafe</th>
                     <th className="px-2 py-1.5 text-center">Pist</th>
                     <th className="px-2 py-1.5 text-left">Cins</th>
+                    <th className="px-2 py-1.5 text-center">Takı</th>
                     <th className="px-2 py-1.5 text-left">Jokey</th>
                     <th className="px-2 py-1.5 text-center">Kilo</th>
                     <th className="px-2 py-1.5 text-center">H.P</th>
@@ -133,6 +134,9 @@ export default function HorseDetailModal({ name, onClose }: { name: string; onCl
                           )}
                         </td>
                         <td className="px-2 py-1.5 whitespace-nowrap">{h.classType || "—"}</td>
+                        <td className="px-2 py-1.5 text-center whitespace-nowrap text-[11px]">
+                          {h.equipment ? h.equipment.split(",").join(" ") : "—"}
+                        </td>
                         <td className="px-2 py-1.5">{h.jockey ?? "—"}</td>
                         <td className="px-2 py-1.5 text-center tabular-nums">{h.weight ?? "—"}</td>
                         <td className="px-2 py-1.5 text-center tabular-nums font-mono">{h.hp ?? "—"}</td>
