@@ -10,7 +10,7 @@ import HorseDetailModal from "./HorseDetailModal";
 import EmailVerificationGate from "./EmailVerificationGate";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getPistMesafeStilIstatistigi, type PistMesafeStilSonuc } from "@/server/actions/pist-mesafe-stil.actions";
-import type { Surface, Breed } from "@prisma/client";
+import type { Surface } from "@prisma/client";
 
 // Sadece ilgili buton tıklanınca açılan paneller — ilk sayfa yüklemesinin JS
 // paketine dahil edilmesinler diye lazy-load (next/dynamic) ile yükleniyor.
@@ -204,12 +204,12 @@ function PistMesafeInfoButton({
   // sonucu ekranda YAPIŞIK kalır — az önce yaşanan gerçek bug buydu.
   useEffect(() => {
     setData("idle");
-  }, [hippodromeName, surface, distance, breed, classType]);
+  }, [hippodromeName, surface, distance]);
 
   function handleOpenChange(open: boolean) {
     if (open && data === "idle" && hippodromeName) {
       setData("loading");
-      getPistMesafeStilIstatistigi(hippodromeName, surface as Surface, distance, breed as Breed, classType)
+      getPistMesafeStilIstatistigi(hippodromeName, surface as Surface, distance)
         .then(setData)
         .catch(() => setData("error"));
     }
@@ -240,7 +240,7 @@ function PistMesafeInfoButton({
         {data && typeof data === "object" && (
           <>
             <p className="mb-1 text-muted-foreground">
-              <strong className="text-foreground">Bugünkü atlarla ilgili değil</strong> — aynı hipodrom+pist+mesafe(±200m)+ırk+koşu tipindeki <strong>{data.n}</strong> GEÇMİŞ yarışın kazananları o yarışı nasıl koştu:
+              <strong className="text-foreground">Bugünkü atlarla ilgili değil</strong> — aynı hipodrom+pist+mesafe(±200m)&apos;deki <strong>{data.n}</strong> GEÇMİŞ yarışın kazananları o yarışı nasıl koştu:
             </p>
             <ul className="space-y-1 my-2">
               {data.breakdown.map((b) => (
@@ -251,7 +251,7 @@ function PistMesafeInfoButton({
               ))}
             </ul>
             <p className="text-muted-foreground">
-              Taktik ipucu: bu tip yarışlarda tarihsel olarak {styleLabelCls(data.topStyle).label.toLocaleLowerCase("tr-TR")} tarz kazanmış — sahadaki hiçbir at bu etiketi taşımasa bile, yarışın nasıl gelişebileceğine dair bir ipucudur.
+              Taktik ipucu: bu pist+mesafede tarihsel olarak {styleLabelCls(data.topStyle).label.toLocaleLowerCase("tr-TR")} tarz kazanmış — sahadaki hiçbir at bu etiketi taşımasa bile, yarışın nasıl gelişebileceğine dair bir ipucudur.
             </p>
             <p className="mt-2 text-[10px] text-muted-foreground">
               Tek yarıştan kalıcı kural çıkarılmaz — bu yalnız geçmiş eğilimi gösterir, garanti değildir.
