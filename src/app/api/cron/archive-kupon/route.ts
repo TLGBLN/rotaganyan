@@ -1,13 +1,30 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { turkeyDateString } from "@/lib/tz";
+import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
 
 // Gün sonunda (Türkiye saatiyle) o güne ait tüm HomeKupon kayıtlarını arşivler
 // (isActive: false) — anasayfada yalnızca "bugünün" aktif kuponları gösterildiği
 // için bu adım olmadan da pratikte kaybolurlar, ama isActive bayrağını temiz
 // tutmak ve admin panelindeki "Geçmiş Kuponlar" listesinde net bir "arşivlendi"
 // anı olması için elle de kapatılıyor. Kayıtlar silinmiyor, sadece pasife alınıyor.
+//
+// 2026-07-26, kullanıcı talebiyle eklendi: arşivlemeden HEMEN ÖNCE TJK'nın resmi
+// ikramiye cümlesini de yakalayıp kaydediyoruz — TJK'nın AltiliSonuc sayfası yalnız
+// "bugünü" gösteriyor (geçmişe dönük sorgu yok), bu yüzden bu an kaçırılırsa o günün
+// gerçek ikramiye tutarı BİR DAHA hiç elde edilemez.
 const CRON_SECRET = process.env.CRON_SECRET;
+
+/** "İstanbul — 1. Altılı" gibi bir etiketten şehir adı + slot numarasını ayıklayıp TJK sonucundan ikramiye cümlesini bulur. */
+function findIkramiye(hippodromeName: string, altiliResults: Awaited<ReturnType<typeof fetchTodaysAltiliResults>>): string | null {
+  const [cityName, altiliLabel] = hippodromeName.split(" — ");
+  if (!cityName || !altiliLabel) return null;
+  const slotMatch = altiliLabel.match(/^(\d+)\./);
+  if (!slotMatch) return null;
+  const slot = parseInt(slotMatch[1], 10);
+  const city = altiliResults.find((c) => c.sehirAdi.trim().toLowerCase() === cityName.trim().toLowerCase());
+  return city?.groups[slot - 1]?.ikramiye ?? null;
+}
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get("authorization");
@@ -18,10 +35,15 @@ export async function GET(req: NextRequest) {
   const today = turkeyDateString();
   const date = new Date(today + "T00:00:00.000Z");
 
-  const { count } = await db.homeKupon.updateMany({
-    where: { isActive: true, date },
-    data: { isActive: false },
-  });
+  const activeKuponlar = await db.homeKupon.findMany({ where: { isActive: true, date } });
+  const altiliResults = await fetchTodaysAltiliResults().catch(() => []);
 
-  return NextResponse.json({ date: today, archived: count });
+  let archived = 0;
+  for (const k of activeKuponlar) {
+    const ikramiye = findIkramiye(k.hippodromeName, altiliResults);
+    await db.homeKupon.update({ where: { id: k.id }, data: { isActive: false, ikramiye } });
+    archived++;
+  }
+
+  return NextResponse.json({ date: today, archived });
 }

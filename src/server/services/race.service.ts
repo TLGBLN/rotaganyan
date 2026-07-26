@@ -492,6 +492,49 @@ export async function getKuponOnerileri(): Promise<KuponOnerisi[]> {
     .filter((r) => r.variants.length > 0);
 }
 
+export type KazananKupon = {
+  id: string;
+  hippodromeName: string;
+  date: Date;
+  variantLabel: string;
+  amount: number;
+  ikramiye: string | null;
+};
+
+/**
+ * Geçmişte İSABET SAĞLAYAN (en az bir kademesi "hit") arşivlenmiş kuponları tarih
+ * sırasına göre döner — anasayfadaki "İsabet Sağlayan Kuponlar" şeridi için. Tuttu/
+ * tutmadı durumu her zaman güvenilir (bizim kendi Result verimizden hesaplanıyor,
+ * buildKuponOnerisi() geçmişe dönük de doğru çalışır) — ama "ikramiye" yalnız
+ * archive-kupon cron'unun 2026-07-26'dan itibaren yakaladığı kayıtlarda dolu olur,
+ * TJK'nın kaynağı geçmişe dönük sorgulanamadığı için daha eskiler için null kalır.
+ */
+export async function getGecmisKazananKuponlar(limit = 20): Promise<KazananKupon[]> {
+  const archived = await db.homeKupon.findMany({
+    where: { isActive: false },
+    orderBy: { date: "desc" },
+    take: limit * 4, // her arşivlenen kaydın hit çıkacağı garanti değil, bolluk payı
+  });
+
+  const results: KazananKupon[] = [];
+  for (const k of archived) {
+    if (results.length >= limit) break;
+    const built = await buildKuponOnerisi(k);
+    if (!built) continue;
+    const hitVariant = built.variants.find((v) => v.filled && v.status === "hit");
+    if (!hitVariant) continue;
+    results.push({
+      id: k.id,
+      hippodromeName: built.hippodromeName,
+      date: k.date,
+      variantLabel: hitVariant.label,
+      amount: hitVariant.amount,
+      ikramiye: k.ikramiye,
+    });
+  }
+  return results;
+}
+
 // ─── Canlı Oranlar (anasayfa) ───────────────────────────────────────────────────
 
 export type CurrentRace = {

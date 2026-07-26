@@ -647,6 +647,11 @@ model HomeKupon {
   legs           Json // [{ raceNo: number, narrow: number[], normal: number[], wide: number[] }]
   slot           Int      @default(1) // 1 = 1. Altılı, 2 = 2. Altılı — her slot kendi başına aktif olabilir
   isActive       Boolean  @default(false)
+  // TJK'nın resmi "6'lı Ganyan X TL vermiştir." cümlesi — yalnız gün sonu arşivlenirken
+  // (archive-kupon cron) yakalanabilir, TJK'nın ilgili sayfası geçmişe dönük sorgu
+  // desteklemiyor (her zaman "bugün"). Bu yüzden yalnız BUNDAN SONRAKİ arşivlenen
+  // kayıtlarda dolu olur, geçmişe dönük doldurulamaz. null = yakalanamadı/henüz arşivlenmedi.
+  ikramiye       String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

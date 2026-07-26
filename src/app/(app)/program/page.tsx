@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { db } from "@/lib/db";
-import { getProgramData, getKuponOnerileri, getHitPredictions, getJockeyStats, getTrainerStats, type JockeyStat, type TrainerStat } from "@/server/services/race.service";
+import { getProgramData, getKuponOnerileri, getHitPredictions, getGecmisKazananKuponlar, getJockeyStats, getTrainerStats, type JockeyStat, type TrainerStat } from "@/server/services/race.service";
 import { turkeyDateString } from "@/lib/tz";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { getAgfMovers } from "@/server/services/agf-trend.service";
@@ -17,6 +17,7 @@ import SteamWidget from "@/components/kosular/SteamWidget";
 import AltiliGanyanResults from "@/components/home/AltiliGanyanResults";
 import TahminOnerileri from "@/components/home/TahminOnerileri";
 import HitsCarousel from "@/components/home/HitsCarousel";
+import KazananKuponlarCarousel from "@/components/home/KazananKuponlarCarousel";
 import NewsTicker from "@/components/home/NewsTicker";
 
 export const revalidate = 0;
@@ -43,6 +44,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
     getFollowedHorses().catch(() => [] as { horseName: string }[]),
     getKuponOnerileri().catch(() => []),
     getHitPredictions(16).catch(() => []),
+    getGecmisKazananKuponlar(16).catch(() => []),
   ]);
 
   if (daysAhead >= 0 && daysAhead <= 7) {
@@ -73,7 +75,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
   }
 
   const days = await getProgramData(currentDate);
-  const [session, agfMovers, altiliResults, tickerItems, followedHorses, coupons, hitPredictions] =
+  const [session, agfMovers, altiliResults, tickerItems, followedHorses, coupons, hitPredictions, kazananKuponlar] =
     await independentDataPromise;
   const isLoggedIn = !!session?.user;
   const isAdmin = session?.user?.role ? hasRole(session.user.role as Role, "EDITOR") : false;
@@ -147,6 +149,17 @@ export default async function ProgramPage({ searchParams }: PageProps) {
             <h2 className="text-base font-semibold">İsabet Sağlayan Bankolar</h2>
           </div>
           <HitsCarousel items={hitPredictions} />
+        </section>
+      )}
+
+      {/* İsabet Sağlayan Kuponlar */}
+      {kazananKuponlar.length > 0 && (
+        <section className="border-t pt-8">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-hit" />
+            <h2 className="text-base font-semibold">İsabet Sağlayan Kuponlar</h2>
+          </div>
+          <KazananKuponlarCarousel items={kazananKuponlar} />
         </section>
       )}
     </div>
