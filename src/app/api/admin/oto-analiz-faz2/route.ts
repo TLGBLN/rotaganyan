@@ -77,7 +77,7 @@ async function handlePost(req: NextRequest) {
         `  Takı: ${r.equipment ?? "—"} (eklenen:${takiEklenenEfektif} çıkarılan:${takiCikarilanEfektif})${r.sonYarisVeriKaynagiGuvenilir ? " [TJK doğrulanmış]" : ""}${r.sonYarisVeriKaynagiGuvenilir && r.sonYarisAyniJokey != null ? ` | Aynı jokey mi (TJK doğrulanmış): ${r.sonYarisAyniJokey ? "EVET" : "HAYIR"}` : ""}`,
         `  Galop: ${r.galopOzet} | kondisyon zinciri var=${r.kondisyonZinciriVar} keskin=${r.keskinGalopZinciri}${r.galopOzet.includes("AYNI JOKEY İLE İDMAN YAPTI") ? " | NOT: '[AYNI JOKEY İLE İDMAN YAPTI]' etiketi — idman jokeyi bugün de binecek, süreklilik/uyum açısından OLUMLU bir etken, destekleyici unsur olarak değerlendir" : ""}`,
         `  Son800 benzer koşu (KESİN — pist zorunlu+mesafe≤200m) n=${r.son800BenzerKosuN} medyan fark=${r.son800Medyan ?? "—"}`,
-        `  Son800 TÜM kayıtlar (bu yıl, en fazla 4, TAM UYGUN öncelikli): ${r.son800TumOzet ?? "Accurace kaydı yok"}`,
+        `  Son800 TÜM kayıtlar (tüm yıllar, en fazla 4, TAM UYGUN öncelikli): ${r.son800TumOzet ?? "Accurace kaydı yok"}`,
         `  Aynı Pist/Mesafe/Hipodrom geçmişi: ${r.aynıPistMesafeOzet ?? "kayıt yok"}`,
         `  Bu Hipodrom+Mesafe+Pist'te TÜM YILLAR (TJK resmi profilinden doğrulanmış): ${r.hipodromMesafedeKazandi === "EVET" ? "EN AZ 1 KEZ KAZANDI" : r.hipodromMesafedeKazandi === "HAYIR" ? "koştu, hiç kazanmadı" : "hiç koşmadı"}${r.hipodromMesafedeEnIyiDerece ? ` — en iyi derecesi: ${r.hipodromMesafedeEnIyiDerece}` : ""}`,
         ...(r.h2hOzet ? [`  H2H (zayıf kanıt, sahadaki diğer atlarla geçmiş karşılaşma): ${r.h2hOzet}`] : []),

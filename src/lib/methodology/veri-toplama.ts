@@ -250,10 +250,12 @@ export type Faz1Runner = {
   // kayıtlardan hesaplanır, gecit-motoru.ts'nin kalibre eşiklerini besler, değişmedi).
   son800BenzerKosuN: number;
   son800Medyan: number | null;
-  // v4.1: kullanıcı talebiyle eklendi — atın AYNI YIL içindeki TÜM Son800 kayıtları
+  // v4.1: kullanıcı talebiyle eklendi — atın TÜM YILLARDAKİ TÜM Son800 kayıtları
   // (pist/mesafe uygunluğuna bakılmaksızın), her satırda uygunluk etiketiyle. Faz 2
   // Claude'a gidiyor — yukarıdaki kesin sayıyı DEĞİŞTİRMEZ, ek bağlam/serbest
-  // değerlendirme için. null = bu atın hiç Accurace kaydı yok.
+  // değerlendirme için. null = bu atın hiç Accurace kaydı yok. 2026-07-26: yıl kısıtı
+  // kaldırıldı, "Accurace — Tüm Kayıtlar" panelinin (son800.actions.ts) davranışıyla
+  // tutarlı hale getirildi (bkz. aşağıdaki hesaplama).
   son800TumOzet: string | null;
 
   // Sitenin kendi "Aynı Pist/Mesafe/Hipodrom" ve "H2H" panellerinden (methodolojide
@@ -469,10 +471,14 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
     // hipodrom şartı kaldırıldı — yalnız pist türü (ground) ve mesafe (±200m) aranıyor.
     // Farklı hipodromların pist yapısı/banket farkı olsa da, aynı pist türü+mesafedeki
     // kapanış hızı kıyaslaması tek hipodroma sıkışmaktan daha değerli bir sinyal veriyor.
+    // 2026-07-26: yıl şartı kaldırıldı (kullanıcı talebi) — "Accurace — Tüm Kayıtlar"
+    // panelinin (son800.actions.ts) kendisi hiçbir zaman yıl filtresi uygulamıyordu, bu
+    // yalnız Faz1'in KESİN eşleşme aramasında vardı ve panelde görünen, gerçekte uygun
+    // bir geçmiş-yıl kaydını "eşleşme yok" gibi göstererek zayıf ikincil değerlendirmeye
+    // düşürüyordu — artık ikisi tutarlı, atın TÜM yıllardaki pist+mesafe uygun kayıtları aranıyor.
     const kayitlar = son800AccuraceKayitlari.filter(
       (k) =>
         normalizeHorseName(k.horseName) === normalizeHorseName(r.name) &&
-        k.accuraceRace.date.getUTCFullYear().toString() === race.raceDay.date.getUTCFullYear().toString() &&
         k.accuraceRace.ground === surfacePrefixToday &&
         Math.abs((k.accuraceRace.length ?? 0) - race.distance) <= 200
     );
@@ -487,10 +493,13 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   }
 
   // v4.1: kullanıcı talebiyle — yukarıdaki KESİN sayı (pist zorunlu + mesafe ±200m)
-  // değişmiyor, ama Claude'a atın AYNI YIL içindeki TÜM Son800 kayıtlarını (pist/mesafe
-  // uygunluğu ne olursa olsun) uygunluk etiketiyle birlikte gösteriyoruz — sadece "yok"
-  // denip atlanan (ama gerçekte var olan, sadece bugünkü koşula tam uymayan) kayıtlar da
+  // değişmiyor, ama Claude'a atın TÜM Son800 kayıtlarını (pist/mesafe uygunluğu ne
+  // olursa olsun) uygunluk etiketiyle birlikte gösteriyoruz — sadece "yok" denip
+  // atlanan (ama gerçekte var olan, sadece bugünkü koşula tam uymayan) kayıtlar da
   // serbest değerlendirmeye (Faz 2 A-katmanı) girebilsin.
+  // 2026-07-26: "AYNI YIL" şartı kaldırıldı (kullanıcı talebi, yukarıdaki KESİN eşleşme
+  // filtresiyle aynı gerekçe) — "Accurace — Tüm Kayıtlar" panelinin adı zaten bunu
+  // vaat ediyordu, yıl kısıtı olmadan TÜM geçmiş kayıtlar aranıyor.
   const GROUND_LABEL: Record<string, string> = { K: "Kum", Ç: "Çim", S: "Sentetik" };
   const son800TumOzetByRunnerName = new Map<string, string | null>();
   for (const r of race.runners) {
@@ -499,15 +508,13 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
     // n/medyan özetinin YANINA, YERİNE değil) — TAM UYGUN kayıtlar (KESİN özetle aynı
     // güvenilirlikte) en-güncelden ÖNCE öncelenir, geri kalan slot en güncel PİST/MESAFE
     // FARKLI kayıtlarla doldurulur; böylece kısaltma en değerli satırları kaybettirmez.
-    const tumYilKayitlari = son800AccuraceKayitlari.filter(
-      (k) =>
-        normalizeHorseName(k.horseName) === normalizeHorseName(r.name) &&
-        k.accuraceRace.date.getUTCFullYear().toString() === race.raceDay.date.getUTCFullYear().toString()
+    const tumKayitlari = son800AccuraceKayitlari.filter(
+      (k) => normalizeHorseName(k.horseName) === normalizeHorseName(r.name)
     );
-    const tamUygun = tumYilKayitlari
+    const tamUygun = tumKayitlari
       .filter((k) => k.accuraceRace.ground === surfacePrefixToday && Math.abs((k.accuraceRace.length ?? 0) - race.distance) <= 200)
       .sort((a, b) => b.accuraceRace.date.getTime() - a.accuraceRace.date.getTime());
-    const digerleri = tumYilKayitlari
+    const digerleri = tumKayitlari
       .filter((k) => !(k.accuraceRace.ground === surfacePrefixToday && Math.abs((k.accuraceRace.length ?? 0) - race.distance) <= 200))
       .sort((a, b) => b.accuraceRace.date.getTime() - a.accuraceRace.date.getTime());
     const kayitlarTumu = [...tamUygun, ...digerleri].slice(0, 4);
