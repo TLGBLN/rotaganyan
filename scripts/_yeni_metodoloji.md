@@ -1,9 +1,10 @@
-# ROTAGANYAN BÜTÜNLEŞİK ANALİZ MOTORU — v6.4
+# ROTAGANYAN BÜTÜNLEŞİK ANALİZ MOTORU — v6.5
 
 *(v6.1 revizyonu — canlı yarış geri bildirimiyle: düşük AGF artık teknik açıdan güçlü bir atı geriye çekme gerekçesi değil; Son800+galop zinciri kombinasyonu gerçek bir destekleyici unsur; yüksek ham HP tek başına üstünlük garantilemez. Bkz. §XVI, §X, §XI, §XX.26-28.)*
 *(v6.2 revizyonu — ★ Hedef/isTarget artık pasif bir rozet değil: işaretlenen at sıralamada ilk 3'ün hemen altına getirilir, puanı 3. sıraya yakın/eşit verilir. Bkz. §XIX.0a.)*
 *(v6.3 revizyonu — Yarış Stili 5'li şemadan (KAÇAK/ÖNCÜ/PRESÇİ/TAKİPÇİ/BEKLEYEN — çoğu at gerçek dışı şekilde "Takipçi"ye düşüyordu, %62) saha-büyüklüğü-yüzdelik 4'lü şemaya geçti: Kaçak At/Ön Grup Arkası/Bekleme Grubu/En Geri Takip — bitiş sırasıyla karışmaz, yalnız erken pozisyonu anlatır. Bkz. §IX.0.)*
 *(v6.4 revizyonu — kullanıcının canlı gözlemine dayanan 4 yeni OLUMLU kombinasyon kuralı eklendi: yağışlı hava + Kaçak At stili (§IX.6), kalabalık sahada kaçak dezavantajı/az atlı sahada sprinter avantajı (§IX.5), Şartlı 1/27 gibi giriş seviyeli koşularda takısız taylar (§XIII.1), 30+ gün aradan dönüp güçlü jokeyle koşan atlar (§XX.29). Dördü de yalnız olumlu yönde işler, hiçbiri tek başına bir atı cezalandırma gerekçesi değildir.)*
+*(v6.5 revizyonu — canlı yarış geri bildirimi (İstanbul 2.Koşu, GIRALAMO): Aygır ve Kısrak İstatistiği artık kesinlikle AYRI değerlendirilir — biri zayıf diye diğerinin kendi eşiğini geçen olumlu sinyali "pedigri zayıf" gibi toptan bir hükümle gölgelenmez. Bkz. §XII.1.)*
 
 ## I. SİSTEMİN AMACI
 
@@ -350,6 +351,12 @@ Galop tek dereceyle değil, zincir olarak okunur.
 **Yasak:** Doğrulanmamış nitelik ("erken gelişir" vb.) veri olmadan yazılmaz.
 
 **Ağırlık düşüşü:** İlk start=yüksek · 1-4 start=koşullu yüksek · 5-9=destekleyici · 10+=genellikle teyit.
+
+### XII.1 Aygır/Kısrak Ayrı Değerlendirilir (v6.5)
+
+Aygır İstatistiği (baba) ve Kısrak İstatistiği (anne+anne baba) İKİ BAĞIMSIZ sinyaldir — tek bir "pedigri zayıf/güçlü" hükmünde harmanlanıp toplanmaz. Biri (özellikle örneklem küçük veya "Kendi verimiz" düşükse) zayıf çıksa bile, DİĞERİNİN kendi eşiğini geçen olumlu sinyalini (K/K≥%15 veya AEI>1 gibi) gölgeleme/görmezden gelme. Gerekçe metninde iki taraf ayrı ayrı belirtilir: örn. "aygır tarafı güçlü (K/K %X, AEI Y), kısrak tarafı zayıf" — "pedigri zayıf" gibi tek bir toptan hükümle geçilmez.
+
+*(Kullanıcı canlı geri bildirimi: İstanbul 2. Koşu, GIRALAMO — baba TOUCH THE WOLF'un K/K %18/AEI 1.37 olumlu sinyali, anne tarafının ve kendi-veri örnekleminin zayıflığıyla "baba-anne performans verileri zayıf" diye toptan etiketlenmişti; at kazandı.)*
 
 ---
 
