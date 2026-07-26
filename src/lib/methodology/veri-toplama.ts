@@ -36,6 +36,16 @@ function normalizeHorseName(s: string): string {
   return s.replace(TRAILING_COUNTRY_CODE_RE, "").toLocaleUpperCase("tr-TR").normalize("NFD").replace(COMBINING_MARKS_RE, "").replace(/[^A-ZİĞÜŞÖÇ0-9 ]/g, "").replace(/\s+/g, " ").trim();
 }
 
+// TJK tarih formatı "DD.MM.YYYY" — bugünkü koşu tarihine göre gün farkını hesaplamak için.
+function gunFarkiHesapla(tjkTarih: string | null, bugununTarihi: Date): number | null {
+  if (!tjkTarih) return null;
+  const [gg, aa, yyyy] = tjkTarih.split(".").map(Number);
+  if (!gg || !aa || !yyyy) return null;
+  const sonYaris = new Date(Date.UTC(yyyy, aa - 1, gg));
+  const fark = Math.round((bugununTarihi.getTime() - sonYaris.getTime()) / 86_400_000);
+  return fark >= 0 ? fark : null;
+}
+
 // AccuraceHorseSplit.horseName, Accurace'in KENDİ ham formatı — yabancı doğumlu atlarda
 // "(IRE)"/"(USA)" gibi ülke kodu soneki hiç YAZMIYOR (bkz. accurace-sync.service.ts'teki
 // aynı tespit), Runner.name ise TJK formatıyla bu soneki İÇERİYOR. Prisma'nın `where.in`
@@ -196,6 +206,10 @@ export type Faz1Runner = {
   sonYarisTakiCikarilan: string[];
   sonYarisKiloDegisimi: number | null;
   sonYarisAyniJokey: boolean | null;
+  // Son startından bugüne geçen gün — uzun aradan (30+ gün) dönen bir atta galop vb.
+  // unsurlar vasat olsa bile üstündeki jokey iyiyse kazanabilir (kullanıcı talimatı,
+  // olumlu değerlendirilir). null = bilinmiyor (ilk start veya TJK verisi yok).
+  gunAralik: number | null;
   recentForm: string | null;
   bestTime: string | null;
   apprentice: boolean;
@@ -284,6 +298,10 @@ export type Faz1Sonuc = {
     conditions: string | null;
     ageWeight: string | null;
     trackRecord: string | null;
+    // Yağışlı/ıslak hava, kaçak stilli atlara olumlu bir kombinasyon oluşturabilir
+    // (kullanıcı talimatı) — Claude kendi muhakemesiyle ham metinden değerlendirir,
+    // sabit bir "yağmurlu" anahtar kelime listesi TUTULMAZ (§XXI sabit sayı yok ilkesi).
+    weather: string | null;
   };
   runners: Faz1Runner[];
   veriDoluluk: { alan: string; oran: number }[];
@@ -677,6 +695,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         sonYarisTakiCikarilan: sonYarisDetayByNo.get(r.no)?.cikarilanTaki.map((t) => t.label) ?? [],
         sonYarisKiloDegisimi: sonYarisDetayByNo.get(r.no)?.kiloDegisimi ?? null,
         sonYarisAyniJokey: sonYarisDetayByNo.get(r.no)?.ayniJokey ?? null,
+        gunAralik: gunFarkiHesapla(sonYarisDetayByNo.get(r.no)?.sonYarisTarihi ?? null, race.raceDay.date),
         hpBugun: hpBugunEfektif, hpBugunResmiYok, hpOncekiResmiYok, hpOncekiFetchBasarisiz,
         agf: r.agf, agfSirasi: agfSiraMap.get(r.id) ?? null,
         equipment: r.equipment, equipmentAdded: r.equipmentAdded, equipmentRemoved: r.equipmentRemoved,
@@ -734,6 +753,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       zeminDetayi, zeminKatsayisi: zemin.katsayi, zeminEtiketi: zemin.etiket,
       sahadakiKacakSayisi, kacakTempoEtiketi: kacakHarita.etiket, kacakAvantajliStil: kacakHarita.avantajli,
       conditions: race.conditions, ageWeight: race.ageWeight, trackRecord: race.trackRecord,
+      weather: race.raceDay.weather,
     },
     runners,
     veriDoluluk,

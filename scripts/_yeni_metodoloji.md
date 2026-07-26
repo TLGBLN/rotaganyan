@@ -1,8 +1,9 @@
-# ROTAGANYAN BÜTÜNLEŞİK ANALİZ MOTORU — v6.3
+# ROTAGANYAN BÜTÜNLEŞİK ANALİZ MOTORU — v6.4
 
 *(v6.1 revizyonu — canlı yarış geri bildirimiyle: düşük AGF artık teknik açıdan güçlü bir atı geriye çekme gerekçesi değil; Son800+galop zinciri kombinasyonu gerçek bir destekleyici unsur; yüksek ham HP tek başına üstünlük garantilemez. Bkz. §XVI, §X, §XI, §XX.26-28.)*
 *(v6.2 revizyonu — ★ Hedef/isTarget artık pasif bir rozet değil: işaretlenen at sıralamada ilk 3'ün hemen altına getirilir, puanı 3. sıraya yakın/eşit verilir. Bkz. §XIX.0a.)*
 *(v6.3 revizyonu — Yarış Stili 5'li şemadan (KAÇAK/ÖNCÜ/PRESÇİ/TAKİPÇİ/BEKLEYEN — çoğu at gerçek dışı şekilde "Takipçi"ye düşüyordu, %62) saha-büyüklüğü-yüzdelik 4'lü şemaya geçti: Kaçak At/Ön Grup Arkası/Bekleme Grubu/En Geri Takip — bitiş sırasıyla karışmaz, yalnız erken pozisyonu anlatır. Bkz. §IX.0.)*
+*(v6.4 revizyonu — kullanıcının canlı gözlemine dayanan 4 yeni OLUMLU kombinasyon kuralı eklendi: yağışlı hava + Kaçak At stili (§IX.6), kalabalık sahada kaçak dezavantajı/az atlı sahada sprinter avantajı (§IX.5), Şartlı 1/27 gibi giriş seviyeli koşularda takısız taylar (§XIII.1), 30+ gün aradan dönüp güçlü jokeyle koşan atlar (§XX.29). Dördü de yalnız olumlu yönde işler, hiçbiri tek başına bir atı cezalandırma gerekçesi değildir.)*
 
 ## I. SİSTEMİN AMACI
 
@@ -297,6 +298,17 @@ Bkz. §VII.0 "Kalabalık Saha Katman Yükseltmesi" — buradaki etkiler bağıms
 | İç kulvar (1-4) + Kaçak At eğilimi | +2 |
 | Dış kulvar (10+) + tempo bilgisi yetersiz | −2 |
 
+### IX.5 Saha büyüklüğü × Yarış stili (v6.4)
+
+Kullanıcı gözlemi: kalabalık sahada trafik/blokaj riski, az atlı sahada boş alan bolluğu stil tercihinin gerçek performansa etkisini değiştirir. Yalnız OLUMLU/nötr yönde işler — bir stili doğrudan cezalandırmaz, yalnız rakip stilleri öne çıkarır:
+
+- **Kalabalık saha (10+ at):** Kaçak At stili trafik/blokaj riski taşır (§IX.4 ile tutarlı) — bu bir ceza değil, dikkatli/nötr bir not.
+- **Az atlı saha (≤6 at):** Sprinter/En Geri Takip tipi (final kapanışa güvenen) atlar boş alan bulma sorunu yaşamaz, kapanış gücünü tam kullanabilir — olumlu değerlendir.
+
+### IX.6 Hava durumu × Kaçak At (v6.4)
+
+Yağışlı/ıslak hava (RaceDay.weather, TJK kaynaklı, sabit anahtar kelime listesi değil — kendi muhakemenle değerlendir) ile Kaçak At stili birlikte olumlu bir kombinasyondur: önden giden at diğer atların üzerine su/çamur sıçratmaktan kaçınır, bozulan izden önce geçer. Yalnız olumlu yönde işler, kuru havada bu bonus uygulanmaz (ceza da değil, nötr).
+
 ---
 
 ## X. SON 800 ANALİZİ — GÖLGE MOD
@@ -348,6 +360,10 @@ Otomatik artı/eksi değil. Ayrı durumlar: ilk kez, yeniden, çıkarıldı, kom
 Zorunlu karşılaştırma: bugünkü takı + önceki takı + önceki sonuç + start davranışı + yarış içi davranış + pist/zemin.
 
 Son yarışa göre değişiklik varsa: `TAKI_DEGISIKLIGI_ALARMI`
+
+### XIII.1 Şartlı 1/27 — takısız tay (v6.4)
+
+Şartlı 1/Şartlı 27 gibi en giriş seviyeli/genç-ağırlıklı koşularda, TAKISI OLMAYAN (equipment boş) taylar takılı olanlara göre KESİNLİKLE olumlu değerlendirilir — bu seviyede takı genelde bir eksikliği telafi etmek için takılır, takısız olmak temiz/doğal bir yeteneğe işaret eder. Yalnız olumlu yönde işler; takılı olmak otomatik ceza DEĞİLDİR.
 
 ---
 
@@ -469,6 +485,7 @@ Kupon, Nihai Puana göre: **Ekonomik = ilk 3 · Normal = 4-6 · Geniş = 7 ve so
 26. Düşük AGF, teknik açıdan güçlü bir atı geriye çekmek için gerekçe SAYILMAZ (§XVI asimetrik kural) — yalnız piyasa ilgisizliğidir, Çapraz Doğrulama Katsayısını düşürmez.
 27. Yüksek ham HP tek başına üstünlük garantilemez; form zayıfsa/gerilemişse veya tempo-stil uyumsuzsa, güçlü Son800+galop zinciri kombinasyonu (§X) gibi diğer paketler HP'nin önüne geçebilir.
 28. Yeterli örneklemli güçlü Son800 (n≥3, medyan≤−0.5sn) ile keskin bir galop zinciri BİRLİKTE görüldüğünde, bu ikili gerçek ve güçlü bir destekleyici kombinasyon sayılır ve sıralamayı/puanı belirgin biçimde yukarı taşıyabilir.
+29. 30+ gün (uzun ara) sonra dönen bir atta galop/kondisyon verisi vasat olsa bile, üstündeki jokeyin kazanma yüzdesi yüksekse bu olumlu bir kombinasyon sayılır — yalnız galop verisine bakarak ceza uygulanmaz (§XX.10 "değişiklik tek başına olumlu/olumsuz değildir" ilkesiyle tutarlı).
 
 ---
 

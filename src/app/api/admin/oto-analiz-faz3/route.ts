@@ -121,7 +121,7 @@ async function handlePost(req: NextRequest) {
   const sahaBuyuklugu = faz1.runners.length;
   const enIyiN = Math.min(8, sahaBuyuklugu);
 
-  const faz3Tail = `Sen ROTAGANYAN v6.3 at yarışı analistisin. FAZ 3 — MUHAKEME ve NİHAİ SIRALAMA aşamasındasın (motorun "son kontrol"ü — bu senin işin, en önemli iş). Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan (özellikle §II.4 Kural Denetim Protokolü, §XVIII Tek Puan Sistemi, §XIX Kilit Gerekçe standardı, §VII.0 Kalabalık Saha kuralı).
+  const faz3Tail = `Sen ROTAGANYAN v6.4 at yarışı analistisin. FAZ 3 — MUHAKEME ve NİHAİ SIRALAMA aşamasındasın (motorun "son kontrol"ü — bu senin işin, en önemli iş). Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan (özellikle §II.4 Kural Denetim Protokolü, §XVIII Tek Puan Sistemi, §XIX Kilit Gerekçe standardı, §VII.0 Kalabalık Saha kuralı).
 
 ## FAZ 2 PUANLARIN (yalnız BAŞLANGIÇ NOKTASI — nihai sıralamayı SEN belirleyeceksin)
 ${faz2.atlar.map((a) => `#${a.no} ${a.ad}: Puan=${a.puan} (ön teknik sıra ${a.teknikSira})`).join("\n")}
@@ -131,6 +131,7 @@ ${faz2.atlar.map((a) => `#${a.no} ${a.ad}: Puan=${a.puan} (ön teknik sıra ${a.
    a) AGF ASİMETRİSİ (§XVI/§XX.26): bir at yalnızca DÜŞÜK AGF'si yüzünden geride mi bırakılmış? Düşük AGF asla tek başına bir atı geriye çekme gerekçesi değildir (yalnız piyasa ilgisizliği) — teknik açıdan güçlü bir at düşük AGF'ye rağmen üst sıraya çıkarılmalı.
    b) SON800+GALOP KOMBİNASYONU (§X/§XI/§XX.28): yeterli örneklemli güçlü Son800 (n≥3, medyan≤-0.5s) İLE keskin/iyi galop zinciri birlikte olan bir at, bu güçlü destekleyici çift göz ardı edilerek geride mi bırakılmış? Varsa yukarı taşı.
    c) HP TEK BAŞINA ÜSTÜNLÜK DEĞİLDİR (§XX.27): yalnız yüksek ham HP'ye dayanarak, formu zayıf/gerilemiş ya da tempo-stili bugüne uymayan bir at otomatik olarak en üste mi konmuş? Değilse düzelt.
+   d) YENİ OLUMLU KOMBİNASYONLAR (v6.4, kullanıcı talimatı — dördü de yalnız OLUMLU yönde işler, hiçbiri tek başına bir atı cezalandırma gerekçesi değildir): (i) yağışlı/ıslak hava + KAÇAK AT stili → olumlu (§IX.6); (ii) kalabalık sahada (10+ at) kaçak stiller dezavantajlı, az atlı sahada (≤6 at) sprinter/kapanışa güvenen atlar avantajlı → olumlu (§IX.5); (iii) Şartlı 1/27 gibi giriş seviyeli koşularda TAKISIZ taylar takılı olanlara göre → KESİNLİKLE olumlu (§XIII.1); (iv) 30+ gün ([UZUN ARA] etiketli) aradan dönen atta galop/kondisyon vasat olsa bile jokeyin kazanma yüzdesi yüksekse → olumlu (§XX.29). Bu dört durumdan biri sahada varken göz ardı edilmiş bir at olup olmadığını kontrol et, varsa yukarı taşı.
    Gerekirse puanı/sırayı düzelt.
 2. Bu düzeltilmiş puanları ve tüm ATLAR verisini (galop, form, tempo/stil, sınıf, kilo, AGF, pedigri) birlikte değerlendirerek NİHAİ SIRALAMAYI SEN belirle — mekanik puan sırasını kopyalamak ZORUNDA değilsin, ama §XVIII.2 "puan sırası ile nihai sıralama çelişemez" ilkesine uy: bir atı puanından farklı konuma taşıyorsan "score" alanını bu yeni konumu yansıtacak şekilde güncelle (rank1'in score'u rank2'ninkinden düşük OLAMAZ) ve nedenini "details"e kısaca yaz.
 3. Kalabalık sahada (10+ at, §VII.0) tempo/stil/pozisyon önceliğini sıralamana açıkça yansıt.

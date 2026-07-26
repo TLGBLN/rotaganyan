@@ -67,6 +67,8 @@ export type SonYarisDetay = {
   hipodromMesafeEtiket: string;
   kazandi: "EVET" | "HAYIR" | "KOSMADI";
   enIyiDerecesi: string | null;
+  /** En son startının tarihi ("15.07.2026") — uzun ara tespiti için (§ galop/jokey kuralı). */
+  sonYarisTarihi: string | null;
 };
 
 /**
@@ -106,7 +108,7 @@ export async function getSonYarisDetaylariForRace(raceId: string): Promise<SonYa
         return {
           runnerNo: r.no, horseName: r.name, hasTjkId: false,
           eklenenTaki: [], cikarilanTaki: [], kiloDegisimi: null, ayniJokey: null,
-          hipodromMesafeEtiket, kazandi: "KOSMADI", enIyiDerecesi: null,
+          hipodromMesafeEtiket, kazandi: "KOSMADI", enIyiDerecesi: null, sonYarisTarihi: null,
         };
       }
 
@@ -154,13 +156,13 @@ export async function getSonYarisDetaylariForRace(raceId: string): Promise<SonYa
         return {
           runnerNo: r.no, horseName: r.name, hasTjkId: true,
           eklenenTaki, cikarilanTaki, kiloDegisimi, ayniJokey,
-          hipodromMesafeEtiket, kazandi, enIyiDerecesi,
+          hipodromMesafeEtiket, kazandi, enIyiDerecesi, sonYarisTarihi: last?.date ?? null,
         };
       } catch {
         return {
           runnerNo: r.no, horseName: r.name, hasTjkId: true,
           eklenenTaki: [], cikarilanTaki: [], kiloDegisimi: null, ayniJokey: null,
-          hipodromMesafeEtiket, kazandi: "KOSMADI", enIyiDerecesi: null,
+          hipodromMesafeEtiket, kazandi: "KOSMADI", enIyiDerecesi: null, sonYarisTarihi: null,
         };
       }
     })

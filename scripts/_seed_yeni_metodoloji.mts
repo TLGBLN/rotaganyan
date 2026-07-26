@@ -6,7 +6,7 @@ const content = readFileSync("scripts/_yeni_metodoloji.md", "utf8");
 await db.methodologyVersion.updateMany({ where: { isCurrent: true }, data: { isCurrent: false } });
 const created = await db.methodologyVersion.create({
   data: {
-    version: "v6.3",
+    version: "v6.4",
     effectiveDate: new Date(),
     content,
     isCurrent: true,
