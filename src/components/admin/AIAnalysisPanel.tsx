@@ -24,6 +24,10 @@ type Debug = {
   faz1VeriDoluluk: { alan: string; oran: number }[];
 };
 
+// v6.3: analizi durdurmayan/engellemeyen ama veriye dayalı GERÇEK kontrol notları —
+// Faz3'ün kendi kurallarını (AGF asimetri, Son800+galop, HP-tek-başına, Hedef) gerçekten
+// uygulayıp uygulamadığını gösterir. Bkz. oto-analiz-faz3/route.ts kontrolNotlariUret.
+
 export type AIPickResult = {
   rank: number;
   no: number;
@@ -92,6 +96,7 @@ export default function AIAnalysisPanel({ raceId, onApply, methodologyVersion }:
   const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState(false);
   const [debug, setDebug] = useState<Debug | null>(null);
+  const [kontrolNotlari, setKontrolNotlari] = useState<string[]>([]);
   const [progress, setProgress] = useState(0);
   const loading = phase !== null;
 
@@ -117,6 +122,7 @@ export default function AIAnalysisPanel({ raceId, onApply, methodologyVersion }:
     setResult(null);
     setApplied(false);
     setDebug(null);
+    setKontrolNotlari([]);
 
     // Analiz 1-2 dakika sürebiliyor — mobilde ekran zaman aşımıyla kilitlenirse
     // bazı tarayıcılar arka plan sekmesindeki isteği kesiyor/geciktiriyor, analiz
@@ -143,10 +149,10 @@ export default function AIAnalysisPanel({ raceId, onApply, methodologyVersion }:
         { raceId, faz1: faz1Step.faz1 }
       );
 
-      // Sıralama/kupon/banko artık kod tarafında Faz2 puanına göre mekanik hesaplanıyor
-      // (bkz. /oto-analiz-faz3 route'undaki not) — Claude'un tek işi pedigri değerlendirmesi/
-      // iç rozetler + banko notu/genel-yorum/tempo + yalnız kod tarafından belirlenen ilk 6
-      // at için Kilit Gerekçe.
+      // Nihai sıralamayı Faz3 (Claude) kendi muhakemesiyle belirliyor (bkz. /oto-analiz-faz3
+      // route'undaki not) — kod yalnız o sıraya göre kupon dilimlemesini ve mekanik banko
+      // eşiğini uyguluyor. kontrolNotlari: analizi durdurmayan, veriye dayalı gerçek kontrol
+      // notları (AGF asimetri/Son800+galop/HP-tek-başına/Hedef kuralları gerçekten uygulandı mı).
       setPhase("faz3");
       const step2 = await fetchJson<{
         picks: AIPickResult[];
@@ -160,6 +166,7 @@ export default function AIAnalysisPanel({ raceId, onApply, methodologyVersion }:
         couponWide: string;
         runners: Runner[];
         debug: Debug;
+        kontrolNotlari: string[];
       }>(
         "/api/admin/oto-analiz-faz3",
         { raceId, faz1: step1.faz1, faz2: step1.faz2, sharedContext: step1.sharedContext }
@@ -180,6 +187,7 @@ export default function AIAnalysisPanel({ raceId, onApply, methodologyVersion }:
       setResult(finalResult);
       setRunners(step2.runners ?? []);
       setDebug(step2.debug ?? null);
+      setKontrolNotlari(step2.kontrolNotlari ?? []);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Beklenmeyen hata");
     } finally {
@@ -256,6 +264,19 @@ export default function AIAnalysisPanel({ raceId, onApply, methodologyVersion }:
                 .join(", ")}
             </p>
           )}
+        </div>
+      )}
+
+      {kontrolNotlari.length > 0 && (
+        <div className="space-y-1.5 rounded-lg border border-orange-500/30 bg-orange-500/5 px-3 py-2.5 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-orange-600 dark:text-orange-400">
+            <AlertTriangle className="h-3.5 w-3.5" /> Kontrol Notları — sıralama tamam, bunlar gözden geçirilsin
+          </div>
+          <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
+            {kontrolNotlari.map((not, i) => (
+              <li key={i}>{not}</li>
+            ))}
+          </ul>
         </div>
       )}
 
