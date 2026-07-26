@@ -106,10 +106,41 @@ export default async function ProgramPage({ searchParams }: PageProps) {
         races: d.races.map((r) => ({ ...r, picks: [] as typeof r.picks })),
       }));
 
+  // İsabet Sağlayan Bankolar/Kuponlar — pazarlama amaçlı: giriş yapmamış (reklamdan
+  // gelen, henüz ikna olmamış) ziyaretçilere sayfanın EN ÜSTÜNDE (kayıt duvarından
+  // önce) gösterilir; giriş yapmış düzenli üyelere ise günlük programın ALTINDA kalır
+  // (onlar zaten ikna olmuş, önce bugünün programını görmek ister). Kullanıcı kararı.
+  const proofSection = (
+    <>
+      {hitPredictions.length > 0 && (
+        <section className="border-t pt-8">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-hit" />
+            <h2 className="text-base font-semibold">İsabet Sağlayan Bankolar</h2>
+          </div>
+          <HitsCarousel items={hitPredictions} />
+        </section>
+      )}
+
+      {kazananKuponlar.length > 0 && (
+        <section className="border-t pt-8">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-hit" />
+            <h2 className="text-base font-semibold">İsabet Sağlayan Kuponlar</h2>
+          </div>
+          <KazananKuponlarCarousel items={kazananKuponlar} />
+        </section>
+      )}
+    </>
+  );
+
   return (
     <div className="mx-auto max-w-[1400px] px-3 py-4 space-y-6">
       {/* Haber Akışı */}
       {tickerItems.length > 0 && <NewsTicker items={tickerItems} />}
+
+      {/* İsabet Sağlayan Bankolar/Kuponlar — yalnız giriş yapmamış ziyaretçiler için üstte */}
+      {!isLoggedIn && proofSection}
 
       {/* Program */}
       <div>
@@ -141,27 +172,8 @@ export default async function ProgramPage({ searchParams }: PageProps) {
       {/* Yarış Sonuçları */}
       <AltiliGanyanResults results={altiliResults} />
 
-      {/* İsabet Sağlayan Bankolar */}
-      {hitPredictions.length > 0 && (
-        <section className="border-t pt-8">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-hit" />
-            <h2 className="text-base font-semibold">İsabet Sağlayan Bankolar</h2>
-          </div>
-          <HitsCarousel items={hitPredictions} />
-        </section>
-      )}
-
-      {/* İsabet Sağlayan Kuponlar */}
-      {kazananKuponlar.length > 0 && (
-        <section className="border-t pt-8">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-hit" />
-            <h2 className="text-base font-semibold">İsabet Sağlayan Kuponlar</h2>
-          </div>
-          <KazananKuponlarCarousel items={kazananKuponlar} />
-        </section>
-      )}
+      {/* İsabet Sağlayan Bankolar/Kuponlar — giriş yapmış kullanıcılar için altta (mevcut yer) */}
+      {isLoggedIn && proofSection}
     </div>
   );
 }
