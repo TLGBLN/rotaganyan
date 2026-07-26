@@ -286,40 +286,77 @@ export async function upsertPrediction(input: PredictionInput) {
 }
 
 /**
- * İki sert kural — hangi giriş yolundan gelirse gelsin (elle form/upsertPrediction,
- * markdown/ekran görüntüsü yapıştırma, toplu içe aktarma) uygulanır: (1) hiç pick
- * yoksa yayın yok, (2) AGF favorisi (≥%25) gerekçesiz kaldıysa yayın yok — 2026-07-20
- * (eksik saha) ve 2026-07-24 (Ormello/AGF) canlı hatalarından kalma, ATLANAMAZ.
- * 2026-07-26: eskiden yalnız ayrı bir "Yayımla" adımında (PublishChecklist UI, artık
- * kaldırıldı) çalışıyordu — artık upsertPrediction ("Kaydet") her kayıtta bunu dener.
+ * Yayın öncesi kontroller — hangi giriş yolundan gelirse gelsin (elle form/
+ * upsertPrediction, markdown/ekran görüntüsü yapıştırma, toplu içe aktarma) uygulanır,
+ * ATLANAMAZ. 2026-07-26, kullanıcı talimatı: ayrı "Yayımla" butonu/checklist UI'ı
+ * kaldırıldı ("Kaydet" artık doğrudan yayınlamayı dener) AMA kontrollerin kendisi HER
+ * ZAMAN çalışmalı — önceden PublishChecklist.tsx'in yalnız UI'da gösterdiği (sunucu
+ * tarafında hiç zorunlu olmayan) ③④⑥ maddeleri de buraya taşınıp sert kural yapıldı.
  */
 export async function assertPublishSafe(id: string): Promise<void> {
-  const pickCount = await db.pick.count({ where: { predictionId: id } });
-  if (pickCount === 0) {
+  const pred = await db.prediction.findUnique({
+    where: { id },
+    select: {
+      isBanko: true, tempo: true, couponNarrow: true, couponNormal: true, couponWide: true,
+      picks: { select: { rank: true, runnerId: true, details: true } },
+      race: {
+        select: {
+          classType: true,
+          runners: { where: { scratched: false }, select: { id: true, no: true, name: true, agf: true, raceStyle: true } },
+        },
+      },
+    },
+  });
+  if (!pred) return;
+
+  // (1) Hiç pick yoksa yayın yok — 2026-07-23 Ankara 1-2. Koşu (boş saha) hatasından kalma.
+  if (pred.picks.length === 0) {
     throw new Error("Bu analizde hiç at seçimi (pick) yok — yayınlanamaz. Önce formu doldurup Kaydet'e basın.");
   }
 
-  // AGF favorisi gerekçesiz kalmışsa yayınlanamaz — kullanıcı tespiti (İstanbul 6.Koşu,
-  // ORMELLO %54 AGF, hiç değerlendirilmeden mekanik puanla 8. sıraya düşmüştü).
-  const agfCheckPred = await db.prediction.findUnique({
-    where: { id },
-    select: {
-      picks: { select: { runnerId: true, details: true } },
-      race: { select: { runners: { where: { scratched: false }, select: { id: true, no: true, name: true, agf: true } } } },
-    },
-  });
-  if (agfCheckPred) {
-    const agfAtlari = agfCheckPred.race.runners.filter((r) => r.agf != null);
-    const agfFavori = agfAtlari.length ? agfAtlari.reduce((a, b) => (b.agf! > a.agf! ? b : a)) : null;
-    if (agfFavori && agfFavori.agf! >= 25) {
-      const pick = agfCheckPred.picks.find((p) => p.runnerId === agfFavori.id);
-      const gerekcesiz = !pick || !Array.isArray(pick.details) || pick.details.length === 0;
-      if (gerekcesiz) {
-        throw new Error(
-          `AGF favorisi #${agfFavori.no} ${agfFavori.name} (%${agfFavori.agf}) hiç gerekçelendirilmemiş — yayınlanamaz. Bu atı formda elle gerekçelendirin ya da analizi yeniden çalıştırın.`
-        );
-      }
+  const aktifAtlar = pred.race.runners;
+
+  // (2) AGF favorisi (≥%25) gerekçesiz kalmışsa yayınlanamaz — 2026-07-24 İstanbul
+  // 6.Koşu (ORMELLO %54 AGF, hiç değerlendirilmeden mekanik puanla 8. sıraya düşmüştü).
+  const agfAtlari = aktifAtlar.filter((r) => r.agf != null);
+  const agfFavori = agfAtlari.length ? agfAtlari.reduce((a, b) => (b.agf! > a.agf! ? b : a)) : null;
+  if (agfFavori && agfFavori.agf! >= 25) {
+    const pick = pred.picks.find((p) => p.runnerId === agfFavori.id);
+    const gerekcesiz = !pick || !Array.isArray(pick.details) || pick.details.length === 0;
+    if (gerekcesiz) {
+      throw new Error(
+        `AGF favorisi #${agfFavori.no} ${agfFavori.name} (%${agfFavori.agf}) hiç gerekçelendirilmemiş — yayınlanamaz. Bu atı formda elle gerekçelendirin ya da analizi yeniden çalıştırın.`
+      );
     }
+  }
+
+  // (3) Banko verilmişse AGF favorisi ile sistem 1.si farklı olamaz.
+  const sistemBirinci = pred.picks.find((p) => p.rank === 1);
+  if (pred.isBanko && agfFavori && sistemBirinci && agfFavori.id !== sistemBirinci.runnerId) {
+    throw new Error(
+      `AGF favorisi #${agfFavori.no} ${agfFavori.name}, sistem 1.sinden farklı — BANKO verilemez. Bankoyu kaldırın veya sıralamayı gözden geçirin.`
+    );
+  }
+
+  // (4) 2+ kaçak stilli at varsa tempo alanı boş bırakılamaz.
+  const kacakSayisi = aktifAtlar.filter((r) => (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT").length;
+  if (kacakSayisi >= 2 && !pred.tempo?.trim()) {
+    throw new Error(`${kacakSayisi} kaçak stilli at var ama tempo alanı boş — yayınlanamaz. Tempo değerlendirmesini doldurun.`);
+  }
+
+  // (5) Koşan (çekilmemiş) her at bir pick'e sahip olmalı — completeFullField() zaten
+  // bunu garanti ediyor (upsertPrediction/parse-report/analysis-importer'da), burada
+  // ikinci bir savunma katmanı olarak da doğrulanıyor.
+  const pickliRunnerIds = new Set(pred.picks.map((p) => p.runnerId).filter(Boolean));
+  const eksikAtlar = aktifAtlar.filter((r) => !pickliRunnerIds.has(r.id));
+  if (eksikAtlar.length > 0) {
+    throw new Error(`${eksikAtlar.length} at listede yok: ${eksikAtlar.map((r) => r.name).join(", ")} — yayınlanamaz.`);
+  }
+
+  // (6) Handikap/Grup koşusunda banko veriliyorsa 3 kupon alanı (Ekonomik/Normal/Geniş) zorunlu.
+  const handikapVeyaGrup = /^(Handikap|G\s*\d|Grup)/i.test(pred.race.classType);
+  if (pred.isBanko && handikapVeyaGrup && !(pred.couponNarrow && pred.couponNormal && pred.couponWide)) {
+    throw new Error("Handikap/Grup + banko → 3 kupon alanı (Ekonomik/Normal/Geniş) doldurulmadan yayınlanamaz.");
   }
 }
 
