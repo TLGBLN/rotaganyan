@@ -6,6 +6,8 @@ import { syncResultsForDate } from "./result-sync";
 import { fetchApprenticeRemainingRaces, normalizeJockeyName } from "./ingest/tjk-apprentice.adapter";
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getDamStatOzetleriForRace } from "@/server/actions/dam-stat.actions";
+import { fetchTodaysAltiliResults } from "./ingest/tjk-altili.adapter";
+import { findIkramiyeForHippodrome } from "@/lib/altili-match";
 
 /** Runner.raceStyle JSON alanından ("style" + "percent" + "veri") ekranda gösterilecek değeri çıkarır. */
 function parseRaceStyle(raw: unknown): { style: string; percent: number; veri: number | null } | null {
@@ -532,7 +534,7 @@ export async function getGecmisKazananKuponlar(limit = 20): Promise<KazananKupon
     return true;
   });
 
-  const results: KazananKupon[] = [];
+  const results: (KazananKupon & { _needsIkramiye: boolean })[] = [];
   for (const k of dedup) {
     if (results.length >= limit) break;
     const built = await buildKuponOnerisi(k);
@@ -547,9 +549,27 @@ export async function getGecmisKazananKuponlar(limit = 20): Promise<KazananKupon
       amount: hitVariant.amount,
       ikramiye: k.ikramiye,
       legs: hitVariant.legs,
+      _needsIkramiye: k.ikramiye == null,
     });
   }
-  return results;
+
+  // TJK'nın ikramiye kaynağı yalnız "bugünü" gösteriyor (bkz. archive-kupon cron notu) —
+  // gün içinde admin bir kuponu güncelleyip henüz gece yarısı arşivlenmediyse (ikramiye
+  // hiç yakalanmamış olabilir) burada CANLI tamamlanır, DB'ye de yazılır ki bir daha
+  // her sayfa yüklemesinde tekrar TJK'ya gidilmesin.
+  const bugunNeedsIkramiye = results.filter((r) => r._needsIkramiye && r.date.toISOString().slice(0, 10) === turkeyDateString());
+  if (bugunNeedsIkramiye.length > 0) {
+    const altiliResults = await fetchTodaysAltiliResults().catch(() => []);
+    for (const r of bugunNeedsIkramiye) {
+      const ikramiye = findIkramiyeForHippodrome(r.hippodromeName, altiliResults);
+      if (ikramiye) {
+        r.ikramiye = ikramiye;
+        await db.homeKupon.update({ where: { id: r.id }, data: { ikramiye } }).catch(() => {});
+      }
+    }
+  }
+
+  return results.map(({ _needsIkramiye, ...r }) => r);
 }
 
 // ─── Canlı Oranlar (anasayfa) ───────────────────────────────────────────────────

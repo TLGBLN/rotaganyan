@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { KuponOnerisi, KuponStatus } from "@/server/services/race.service";
 import type { AltiliCityResult } from "@/server/services/ingest/tjk-altili.adapter";
+import { findIkramiyeForHippodrome } from "@/lib/altili-match";
 import { cn } from "@/lib/utils";
 
 type Kupon = NonNullable<KuponOnerisi>;
@@ -27,19 +28,6 @@ function buildTweetText(data: Kupon): string {
   }
   lines.push("", "rotaganyan.com/program");
   return lines.join("\n");
-}
-
-/** "Bursa — 2. Altılı" gibi bir hipodrom etiketinden gerçek TJK Altılı Ganyan ikramiye cümlesini bulur. */
-function findIkramiye(hippodromeName: string, altiliResults: AltiliCityResult[]): string | null {
-  const [cityName, altiliLabel] = hippodromeName.split(" — ");
-  if (!cityName || !altiliLabel) return null;
-  const slotMatch = altiliLabel.match(/^(\d+)\./);
-  if (!slotMatch) return null;
-  const slot = parseInt(slotMatch[1], 10);
-
-  const city = altiliResults.find((c) => c.sehirAdi.trim().toLowerCase() === cityName.trim().toLowerCase());
-  const group = city?.groups[slot - 1];
-  return group?.ikramiye ?? null;
 }
 
 function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string | null; isAdmin: boolean }) {
@@ -173,7 +161,7 @@ export default function TahminOnerileri({ data, altiliResults = [], isLoggedIn =
       <div className="mx-auto max-w-6xl space-y-8">
         <h2 className="text-lg font-semibold">Kupon Önerileri</h2>
         {items.map((kupon, i) => (
-          <KuponBlock key={i} data={kupon} ikramiye={findIkramiye(kupon.hippodromeName, altiliResults)} isAdmin={isAdmin} />
+          <KuponBlock key={i} data={kupon} ikramiye={findIkramiyeForHippodrome(kupon.hippodromeName, altiliResults)} isAdmin={isAdmin} />
         ))}
       </div>
     </section>
