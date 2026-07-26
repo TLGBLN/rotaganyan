@@ -1,4 +1,4 @@
-import { Lock } from "lucide-react";
+import { Lock, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -107,16 +107,12 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                         const isWinner =
                           pick?.runner?.no != null &&
                           (race.result?.winnerNos ?? []).includes(pick.runner.no);
-                        const rowBg = isBanko
-                          ? "bg-brand"
-                          : isWinner
+                        const rowBg = isWinner
                           ? "bg-[#C98F02]/20"
                           : isTarget
                           ? "bg-hit/15"
                           : "";
-                        const textColor = isBanko
-                          ? "text-white"
-                          : isWinner
+                        const textColor = isWinner
                           ? "text-[#F5C518]"
                           : rankColor(pick.rank);
                         const weight = rankWeight(pick.rank);
@@ -127,6 +123,9 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                               {rowIdx + 1}
                             </td>
                             <td className={cn("px-2 py-1.5", textColor, weight)}>
+                              {isBanko && (
+                                <Star className="inline-block h-3 w-3 mr-0.5 -mt-0.5 fill-brand text-brand" />
+                              )}
                               <span className="font-mono mr-1 tabular-nums">
                                 {pick.runner?.no ?? "—"}
                               </span>
@@ -239,8 +238,8 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                           );
                         }
 
-                        const rowBg = isBanko ? "bg-brand" : isWinner ? "bg-[#C98F02]/20" : isTarget ? "bg-hit/15" : colBg;
-                        const textColor = isBanko ? "text-white" : isWinner ? "text-[#F5C518]" : rankColor(pick.rank);
+                        const rowBg = isWinner ? "bg-[#C98F02]/20" : isTarget ? "bg-hit/15" : colBg;
+                        const textColor = isWinner ? "text-[#F5C518]" : rankColor(pick.rank);
                         const weight = rankWeight(pick.rank);
 
                         return (
@@ -251,6 +250,9 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                               className={cn("px-2 py-1.5", rowBg, textColor)}
                             >
                               <div className="flex items-center gap-1 whitespace-nowrap">
+                                {isBanko && (
+                                  <Star className="h-3 w-3 shrink-0 fill-brand text-brand" />
+                                )}
                                 <span className={cn("shrink-0 font-mono tabular-nums", weight)}>
                                   {pick.runner?.no ?? "—"}
                                 </span>
