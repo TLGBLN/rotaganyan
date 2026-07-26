@@ -465,6 +465,9 @@ model ClaudeUsageLog {
   // kesebiliyor ("boşa ödeme"). Bu alan sayesinde hemen ardından gelen "tekrar dene"
   // Claude'u yeniden çağırıp ikinci kez ücretlendirmek yerine bu kaydı kullanabilir.
   resultText               String?  @db.Text
+  // İsteğin gönderilmesinden yanıtın alınmasına kadar geçen süre (ms) — admin panelde
+  // "hangi analiz kaç dakika sürdü" tablosu için (kullanıcı talebi). Eski kayıtlarda yok.
+  durationMs               Int?
 
   @@index([createdAt])
   @@index([raceId, phase, createdAt])

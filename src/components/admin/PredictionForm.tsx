@@ -17,7 +17,6 @@ import { cn } from "@/lib/utils";
 import type { Confidence, PedigreeRating, Prisma } from "@prisma/client";
 import type { AIAnalysisResult } from "./AIAnalysisPanel";
 import { Loader2 } from "lucide-react";
-import PublishChecklist from "./PublishChecklist";
 
 type Runner = Prisma.RunnerGetPayload<{ include: { gallops: true } }>;
 
@@ -88,8 +87,6 @@ const PEDIGREE_LABEL: Record<PedigreeRating, string> = {
 export default function PredictionForm({ raceId, runners, existingPrediction, aiResult, aiRunners }: Props) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
-  const [savedId, setSavedId] = useState(existingPrediction?.id ?? null);
-  const [saveVersion, setSaveVersion] = useState(0);
   const prevAiResult = useRef<AIAnalysisResult | null | undefined>(null);
 
   const defaultPicks: PickFormData[] = existingPrediction?.picks.map((p) => ({
@@ -180,9 +177,11 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
             isTarget: p.isTarget,
           })),
       });
-      setSavedId(result.id);
-      setSaveVersion((v) => v + 1);
-      toast.success("Analiz kaydedildi");
+      if (result.publishError) {
+        toast.warning(`Kaydedildi ama yayınlanamadı: ${result.publishError}`);
+      } else {
+        toast.success("Analiz kaydedildi ve yayınlandı");
+      }
     } catch {
       toast.error("Kayıt hatası");
     } finally {
@@ -367,31 +366,6 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
           </Button>
         </div>
       </form>
-
-      {savedId && (
-        <div className="mt-4">
-          <PublishChecklistSection predictionId={savedId} pickCount={fields.length} saveVersion={saveVersion} />
-        </div>
-      )}
     </div>
   );
-}
-
-function PublishChecklistSection({
-  predictionId, pickCount, saveVersion,
-}: { predictionId: string; pickCount: number; saveVersion: number }) {
-  const [show, setShow] = useState(false);
-
-  if (!show) {
-    return (
-      <button
-        onClick={() => setShow(true)}
-        className="text-sm text-brand hover:underline"
-      >
-        Yayımla →
-      </button>
-    );
-  }
-
-  return <PublishChecklist predictionId={predictionId} pickCount={pickCount} saveVersion={saveVersion} />;
 }

@@ -18,12 +18,13 @@ import PendingList from "@/components/admin/PendingList";
 import AdminRefresh from "@/components/admin/AdminRefresh";
 import ClaudeBudgetWidget from "@/components/admin/ClaudeBudgetWidget";
 import ArchiveStatsWidget from "@/components/admin/ArchiveStatsWidget";
-import { getClaudeBudget } from "@/server/actions/claude-budget.actions";
+import AnalizSureMaliyetTablosu from "@/components/admin/AnalizSureMaliyetTablosu";
+import { getClaudeBudget, getAnalysisRuns } from "@/server/actions/claude-budget.actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
-  const [stats, analyst, recentPredictions, pendingPredictions, raceStyleStats, claudeBudget, archiveStats, agfEdge] = await Promise.all([
+  const [stats, analyst, recentPredictions, pendingPredictions, raceStyleStats, claudeBudget, archiveStats, agfEdge, analysisRuns] = await Promise.all([
     getDashboardStats(),
     getAnalystStats(),
     getRecentPredictions(16),
@@ -32,6 +33,7 @@ export default async function AdminDashboard() {
     getClaudeBudget(),
     getArchiveStats(),
     getAgfEdgeStats(),
+    getAnalysisRuns(20),
   ]);
 
   const hasData = analyst.overall.total > 0;
@@ -89,6 +91,9 @@ export default async function AdminDashboard() {
           <ClaudeBudgetWidget status={claudeBudget} />
         </div>
       </div>
+
+      {/* ── Analiz Süre & Maliyet ──────────────────────────────────── */}
+      <AnalizSureMaliyetTablosu runs={analysisRuns} />
 
       {/* ── Son Tahminler Akışı ────────────────────────────────────── */}
       <RecentFeed predictions={recentPredictions} />

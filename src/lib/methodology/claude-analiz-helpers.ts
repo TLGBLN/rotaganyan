@@ -31,6 +31,7 @@ export async function createWithTruncationRetry(
   phase: "faz2" | "faz3",
   retryMaxTokens: number
 ) {
+  let start = Date.now();
   let msg = await createStreamed(params);
   await logClaudeUsage({
     raceId, phase, model: "claude-sonnet-5",
@@ -38,8 +39,10 @@ export async function createWithTruncationRetry(
     cacheCreationInputTokens: msg.usage.cache_creation_input_tokens ?? 0,
     cacheReadInputTokens: msg.usage.cache_read_input_tokens ?? 0,
     resultText: extractText(msg),
+    durationMs: Date.now() - start,
   });
   if (msg.stop_reason === "max_tokens") {
+    start = Date.now();
     msg = await createStreamed({ ...params, max_tokens: retryMaxTokens });
     await logClaudeUsage({
       raceId, phase, model: "claude-sonnet-5",
@@ -47,6 +50,7 @@ export async function createWithTruncationRetry(
       cacheCreationInputTokens: msg.usage.cache_creation_input_tokens ?? 0,
       cacheReadInputTokens: msg.usage.cache_read_input_tokens ?? 0,
       resultText: extractText(msg),
+      durationMs: Date.now() - start,
     });
   }
   return msg;

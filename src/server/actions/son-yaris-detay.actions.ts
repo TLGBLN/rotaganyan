@@ -32,6 +32,17 @@ function mostRecent(rows: TjkAtKosuRow[]): TjkAtKosuRow | undefined {
   return [...rows].sort((a, b) => parseTjkDate(b.date) - parseTjkDate(a.date))[0];
 }
 
+// "KGS" (Kaç Gün Sonra) — atın TJK'daki en son startından bugünkü koşuya kadar geçen gün
+// sayısı, program tablosunda ve Faz1'de (uzun ara + jokey kuralı, §XX.29) kullanılıyor.
+function gunFarkiHesapla(tjkTarih: string | null, bugununTarihi: Date): number | null {
+  if (!tjkTarih) return null;
+  const [gg, aa, yyyy] = tjkTarih.split(".").map(Number);
+  if (!gg || !aa || !yyyy) return null;
+  const sonYaris = new Date(Date.UTC(yyyy, aa - 1, gg));
+  const fark = Math.round((bugununTarihi.getTime() - sonYaris.getTime()) / 86_400_000);
+  return fark >= 0 ? fark : null;
+}
+
 // TJK kilo alanı virgüllü ondalık kullanır ("56,5").
 function parseWeight(raw: string): number | null {
   const n = parseFloat(raw.replace(",", "."));
@@ -69,6 +80,8 @@ export type SonYarisDetay = {
   enIyiDerecesi: string | null;
   /** En son startının tarihi ("15.07.2026") — uzun ara tespiti için (§ galop/jokey kuralı). */
   sonYarisTarihi: string | null;
+  /** "KGS" — son startından bugünkü koşuya kadar geçen gün sayısı. null = bilinmiyor (ilk start/TJK verisi yok). */
+  gunFarki: number | null;
 };
 
 /**
@@ -90,7 +103,7 @@ export async function getSonYarisDetaylariForRace(raceId: string): Promise<SonYa
     select: {
       distance: true,
       surface: true,
-      raceDay: { select: { hippodrome: { select: { name: true } } } },
+      raceDay: { select: { date: true, hippodrome: { select: { name: true } } } },
       runners: { select: { no: true, name: true, weight: true, jockey: true, equipment: true, tjkAtId: true } },
     },
   });
@@ -108,7 +121,7 @@ export async function getSonYarisDetaylariForRace(raceId: string): Promise<SonYa
         return {
           runnerNo: r.no, horseName: r.name, hasTjkId: false,
           eklenenTaki: [], cikarilanTaki: [], kiloDegisimi: null, ayniJokey: null,
-          hipodromMesafeEtiket, kazandi: "KOSMADI", enIyiDerecesi: null, sonYarisTarihi: null,
+          hipodromMesafeEtiket, kazandi: "KOSMADI", enIyiDerecesi: null, sonYarisTarihi: null, gunFarki: null,
         };
       }
 
@@ -153,16 +166,18 @@ export async function getSonYarisDetaylariForRace(raceId: string): Promise<SonYa
           }
         }
 
+        const sonYarisTarihi = last?.date ?? null;
         return {
           runnerNo: r.no, horseName: r.name, hasTjkId: true,
           eklenenTaki, cikarilanTaki, kiloDegisimi, ayniJokey,
-          hipodromMesafeEtiket, kazandi, enIyiDerecesi, sonYarisTarihi: last?.date ?? null,
+          hipodromMesafeEtiket, kazandi, enIyiDerecesi, sonYarisTarihi,
+          gunFarki: gunFarkiHesapla(sonYarisTarihi, race.raceDay.date),
         };
       } catch {
         return {
           runnerNo: r.no, horseName: r.name, hasTjkId: true,
           eklenenTaki: [], cikarilanTaki: [], kiloDegisimi: null, ayniJokey: null,
-          hipodromMesafeEtiket, kazandi: "KOSMADI", enIyiDerecesi: null, sonYarisTarihi: null,
+          hipodromMesafeEtiket, kazandi: "KOSMADI", enIyiDerecesi: null, sonYarisTarihi: null, gunFarki: null,
         };
       }
     })

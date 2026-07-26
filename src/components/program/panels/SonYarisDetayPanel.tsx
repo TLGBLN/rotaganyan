@@ -50,8 +50,9 @@ export default function SonYarisDetayPanel({ raceId }: { raceId: string }) {
       <div className="px-4 py-2.5 bg-[#c0392b] border-b">
         <div className="text-sm font-bold tracking-wide text-white">Son Yarış Detayları</div>
         <div className="mt-0.5 text-[11px] text-white/70">
-          Takı/kilo/jokey değişimi atın TJK&apos;daki en son koşusuyla, Kazandı/En İyi Derecesi ise bu
-          hipodrom + mesafe + pist tipindeki (tüm yıllar) geçmişiyle kıyaslanır.
+          KGS: son startından bu koşuya kadar geçen gün sayısı. Takı/kilo/jokey değişimi atın TJK&apos;daki
+          en son koşusuyla, Kazandı/En İyi Derecesi ise bu hipodrom + mesafe + pist tipindeki (tüm yıllar)
+          geçmişiyle kıyaslanır.
         </div>
       </div>
 
@@ -76,6 +77,7 @@ export default function SonYarisDetayPanel({ raceId }: { raceId: string }) {
                 <tr className="border-b bg-muted/40 text-muted-foreground">
                   <th className="px-2 py-1.5 text-left font-medium" rowSpan={2}>No</th>
                   <th className="px-2 py-1.5 text-left font-medium" rowSpan={2}>At</th>
+                  <th className="px-2 py-1.5 text-center font-medium" rowSpan={2}>KGS</th>
                   <th className="px-2 py-1.5 text-center font-medium" colSpan={3}>Son Yarışına Göre</th>
                   <th className="px-2 py-1.5 text-center font-medium" colSpan={2}>{hipodromMesafeEtiket || "Hipodrom · Mesafe"}</th>
                 </tr>
@@ -92,6 +94,12 @@ export default function SonYarisDetayPanel({ raceId }: { raceId: string }) {
                   <tr key={d.runnerNo} className={cn("border-b border-border/30", i % 2 === 1 && "race-row-even")}>
                     <td className="px-2 py-1.5 font-mono text-muted-foreground">{d.runnerNo}</td>
                     <td className="px-2 py-1.5 font-semibold whitespace-nowrap">{d.horseName}</td>
+                    <td className={cn(
+                      "px-2 py-1.5 text-center tabular-nums font-semibold",
+                      d.gunFarki == null ? "text-muted-foreground" : d.gunFarki >= 30 ? "text-amber-500" : "text-foreground"
+                    )}>
+                      {d.gunFarki ?? <span className="text-muted-foreground">—</span>}
+                    </td>
                     <td className="px-2 py-1.5 text-center">
                       <TakiHucre eklenen={d.eklenenTaki} cikarilan={d.cikarilanTaki} />
                     </td>
@@ -131,6 +139,13 @@ export default function SonYarisDetayPanel({ raceId }: { raceId: string }) {
                   {d.horseName}
                 </div>
                 <div className="grid grid-cols-2 gap-y-1 gap-x-3">
+                  <div className="text-muted-foreground">KGS</div>
+                  <div className={cn(
+                    "tabular-nums font-semibold",
+                    d.gunFarki == null ? "text-muted-foreground" : d.gunFarki >= 30 ? "text-amber-500" : "text-foreground"
+                  )}>
+                    {d.gunFarki ?? "—"}
+                  </div>
                   <div className="text-muted-foreground">Takı Değişikliği</div>
                   <div><TakiHucre eklenen={d.eklenenTaki} cikarilan={d.cikarilanTaki} /></div>
                   <div className="text-muted-foreground">Kilo Değişimi</div>

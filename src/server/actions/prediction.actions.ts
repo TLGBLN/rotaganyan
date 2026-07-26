@@ -5,7 +5,6 @@ import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { startOfDay, endOfDay } from "date-fns";
 import type { Confidence, PedigreeRating } from "@prisma/client";
-import { findSireStat, findDamStat, mesafeBucket, surfaceToPist, breedToIrk, normalizeSireName } from "@/lib/sire-stat-match";
 
 export type PickInput = {
   rank: number;
@@ -177,6 +176,7 @@ export async function upsertPrediction(input: PredictionInput) {
   const completedPicks = await completeFullField(input.raceId, input.picks);
 
   const existing = await db.prediction.findUnique({ where: { raceId: input.raceId } });
+  const wasPublished = existing?.published ?? false;
 
   let predictionId: string;
 
@@ -193,11 +193,9 @@ export async function upsertPrediction(input: PredictionInput) {
         couponWide: input.couponWide,
         isBanko: input.isBanko,
         bankoNote: input.bankoNote,
-        // published/publishedAt BİLEREK burada yok — "Kaydet" (bu fonksiyon) bir taslağı
-        // düzenlerken sessizce yayına almamalı. Yayına alma YALNIZ publishPrediction()
-        // (PublishChecklist'teki "Yayınla" butonu) üzerinden olmalı. Daha önce burada
-        // published:true zorlanıyordu — bu da taslak düzenleyip "Kaydet"e basmayı,
-        // checklist'i hiç görmeden yayınlamaya eşitliyordu.
+        // published/publishedAt burada YOK — aşağıda assertPublishSafe geçince ayrıca
+        // set ediliyor (bkz. fonksiyonun sonu, 2026-07-26 kullanıcı talimatı: "Kaydet"
+        // artık ayrı bir "Yayımla" adımı olmadan doğrudan yayınlamayı dener).
         picks: {
           create: completedPicks.map((p) => ({
             rank: p.rank,
@@ -241,203 +239,68 @@ export async function upsertPrediction(input: PredictionInput) {
     predictionId = created.id;
   }
 
-  // Karma yarışlarına mirror'la (arka planda, hata login'i engellemesin)
+  // 2026-07-26, kullanıcı talimatı: "Kaydet" artık ayrı bir "Yayımla" adımı olmadan
+  // doğrudan yayınlamayı dener — iki sert güvenlik kuralı (hiç pick yok / AGF favorisi
+  // gerekçesiz, bkz. assertPublishSafe) hâlâ geçerli ve ATLANAMAZ: geçmezse kayıt yine
+  // BAŞARILI olur ama published=false'a (yeniden) çekilir, sebep admin'e döndürülür —
+  // önceden yayınlanmış bir kayıt bu düzenlemeyle güvensiz hale geldiyse otomatik olarak
+  // yayından iner, sessizce yayında kalmaz.
+  let publishError: string | null = null;
+  let nowPublished = false;
+  try {
+    await assertPublishSafe(predictionId);
+    await db.prediction.update({
+      where: { id: predictionId },
+      data: { published: true, publishedAt: new Date() },
+    });
+    nowPublished = true;
+  } catch (e) {
+    publishError = e instanceof Error ? e.message : "Yayınlanamadı";
+    await db.prediction.update({
+      where: { id: predictionId },
+      data: { published: false, publishedAt: null },
+    });
+  }
+
+  // Karma yarışlarına mirror'la (arka planda, hata login'i engellemesin) — nihai
+  // published durumunu yansıtması için publish denemesinden SONRA çağrılıyor.
   syncKarmaMirrors(predictionId).catch(console.error);
+
+  // Bildirim YALNIZ taslak→yayında GEÇİŞİNDE gönderilir (publishPrediction()'ın eski
+  // davranışıyla aynı) — yoksa zaten yayında olan bir analizi her "Kaydet"te (küçük bir
+  // düzeltme için bile) yeniden bildirmek kullanıcılara spam gönderirdi.
+  if (nowPublished && !wasPublished) {
+    const { notifyNewPrediction } = await import("./notification.actions");
+    notifyNewPrediction(predictionId).catch(console.error);
+  }
 
   revalidatePath("/admin");
   revalidatePath("/admin/analizler");
   revalidatePath("/analizler");
   revalidatePath("/kosular");
   revalidatePath("/tahmin-onerileri");
+  revalidatePath("/rotaganyanpuantablosu");
+  revalidatePath("/program");
   revalidatePath("/");
-  return { id: predictionId };
-}
-
-export type ChecklistCheck = { label: string; status: "PASS" | "FAIL" | "INFO"; detail: string };
-
-/**
- * §XX'in 6 maddelik yayın öncesi kontrolünü elle işaretlemek yerine gerçek kayıtlı
- * veriden otomatik hesaplar. Üç madde (③⑤⑥) tamamen yapısal veriden kesin
- * doğrulanabilir — bunlar FAIL ise yayın engellenir. ④ yarı-yapısal (tempo alanı
- * dolu mu) bir vekil kontrol. ①② ise AI'ın gerekçe metni artık ayrı saklanmadığı
- * için (maliyet nedeniyle kapatıldı, bkz. proje notu) gerçek anlamda doğrulanamaz —
- * bunlar INFO olarak referans veri gösterir, yayını engellemez.
- */
-export async function getPublishChecklistAuto(predictionId: string): Promise<ChecklistCheck[]> {
-  const pred = await db.prediction.findUnique({
-    where: { id: predictionId },
-    select: {
-      isBanko: true, tempo: true, couponNarrow: true, couponNormal: true, couponWide: true,
-      picks: { orderBy: { rank: "asc" }, select: { rank: true, runnerId: true, details: true } },
-      race: {
-        select: {
-          classType: true, distance: true, breed: true, surface: true,
-          runners: {
-            select: { id: true, no: true, name: true, scratched: true, agf: true, bestTime: true, raceStyle: true, sire: true, dam: true, damSire: true },
-          },
-        },
-      },
-    },
-  });
-  if (!pred) return [];
-
-  const aktifAtlar = pred.race.runners.filter((r) => !r.scratched);
-  const checks: ChecklistCheck[] = [];
-
-  // ① Derece — bilgi amaçlı: bu koşuda en iyi dereceye sahip at kim (metni doğrulayamıyoruz, referans veriyoruz).
-  const enIyiDereceli = [...aktifAtlar].filter((r) => r.bestTime).sort((a, b) => (a.bestTime! < b.bestTime! ? -1 : 1))[0];
-  checks.push({
-    label: "① Derece",
-    status: "INFO",
-    detail: enIyiDereceli ? `En iyi derece: #${enIyiDereceli.no} ${enIyiDereceli.name} (${enIyiDereceli.bestTime})` : "Hiçbir atta derece kaydı yok",
-  });
-
-  // ② Sicil > Kilo — bilgi amaçlı, gerekçe metni saklanmadığı için doğrulanamıyor.
-  checks.push({ label: "② Sicil > Kilo", status: "INFO", detail: "Formdaki gerekçeyi elle kontrol edin — otomatik doğrulanamaz." });
-
-  // ③ AGF — AGF 1. ile sistem 1. farklıysa banko VERİLEMEZ.
-  const agfAtlari = aktifAtlar.filter((r) => r.agf != null);
-  const agfFavori = agfAtlari.length ? agfAtlari.reduce((a, b) => (b.agf! > a.agf! ? b : a)) : null;
-  const sistemBirinci = pred.picks.find((p) => p.rank === 1);
-  if (!agfFavori || !sistemBirinci) {
-    checks.push({ label: "③ AGF", status: "INFO", detail: "AGF verisi henüz yok — kontrol edilemedi." });
-  } else if (pred.isBanko && agfFavori.id !== sistemBirinci.runnerId) {
-    checks.push({ label: "③ AGF", status: "FAIL", detail: `AGF favorisi #${agfFavori.no} ${agfFavori.name}, sistem 1.si farklı — BANKO verilemez.` });
-  } else {
-    checks.push({ label: "③ AGF", status: "PASS", detail: agfFavori.id === sistemBirinci.runnerId ? "AGF favorisi = sistem 1." : "AGF farklı ama banko verilmemiş, kural ihlali yok." });
-  }
-
-  // ③b AGF Favorisi Değerlendirildi mi — kullanıcı tespiti (İstanbul 6.Koşu, Ormello %54
-  // AGF): Faz4 yalnız en iyi birkaç atı gerçekten gerekçelendiriyor, kalan saha mekanik
-  // olarak (boş "details", ham Faz2 puanıyla) tamamlanıyor. Piyasanın güçlü desteklediği
-  // bir at bu mekanik kuyruğa hiç değerlendirilmeden düşebiliyordu — burada yakalanır.
-  if (agfFavori && agfFavori.agf != null && agfFavori.agf >= 25) {
-    const agfFavoriPick = pred.picks.find((p) => p.runnerId === agfFavori.id);
-    const detailsBos = !agfFavoriPick || !Array.isArray(agfFavoriPick.details) || agfFavoriPick.details.length === 0;
-    checks.push({
-      label: "③b AGF Favorisi Değerlendirildi mi",
-      status: detailsBos ? "FAIL" : "PASS",
-      detail: detailsBos
-        ? `AGF favorisi #${agfFavori.no} ${agfFavori.name} (%${agfFavori.agf}) hiç gerekçelendirilmemiş — muhtemelen mekanik olarak eklendi, gerçekte değerlendirilmedi. Yayınlamadan önce elle kontrol edin veya analizi yeniden çalıştırın.`
-        : `AGF favorisi #${agfFavori.no} ${agfFavori.name} (%${agfFavori.agf}) gerekçelendirilmiş.`,
-    });
-  }
-
-  // ④ Tempo — 2+ kaçak varsa tempo alanı dolu olmalı (vekil kontrol).
-  const kacakSayisi = aktifAtlar.filter((r) => (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT").length;
-  if (kacakSayisi >= 2 && !pred.tempo?.trim()) {
-    checks.push({ label: "④ Tempo", status: "FAIL", detail: `${kacakSayisi} kaçak stilli at var ama tempo alanı boş.` });
-  } else {
-    checks.push({ label: "④ Tempo", status: "PASS", detail: kacakSayisi >= 2 ? `${kacakSayisi} kaçak var, tempo alanı dolu (yalnız alanın dolu olduğu doğrulanıyor, içeriği değil).` : "2'den az kaçak, tempo riski düşük." });
-  }
-
-  // ⑤ Tüm Atlar — koşan (çekilmemiş) her at bir pick'e sahip olmalı. DİKKAT: bu yalnız
-  // her at için bir Pick KAYDI olduğunu doğrular — o kaydın gerçekten analiz edilmiş
-  // (AI'ın gerekçelendirdiği) mi yoksa elle/mekanik olarak boş "details" ile mi
-  // eklendiğini AYIRT ETMEZ. Kullanıcı tespiti: elle analiz girildiğinde bile bu
-  // kontrol "tamamı analiz edildi" diyordu — yanıltıcıydı, metin buna göre düzeltildi.
-  const pickliRunnerIds = new Set(pred.picks.map((p) => p.runnerId).filter(Boolean));
-  const eksikAtlar = aktifAtlar.filter((r) => !pickliRunnerIds.has(r.id));
-  if (pred.picks.length === 0) {
-    checks.push({ label: "⑤ Tüm Atlar", status: "FAIL", detail: "Hiç at seçimi (pick) yok — form kaydedilmemiş." });
-  } else if (eksikAtlar.length > 0) {
-    checks.push({ label: "⑤ Tüm Atlar", status: "FAIL", detail: `${eksikAtlar.length} at listede yok: ${eksikAtlar.map((r) => r.name).join(", ")}` });
-  } else {
-    checks.push({ label: "⑤ Tüm Atlar", status: "PASS", detail: `Sahadaki ${aktifAtlar.length} at için kayıt var — bu yalnız hiçbirinin atlanmadığını doğrular, her birinin gerçekten (AI ya da elle) analiz edildiğini değil.` });
-  }
-
-  // ⑥ Banko — Handikap/Grup'ta banko veriliyorsa kombinasyon (3 kupon alanı) zorunlu.
-  const handikapVeyaGrup = /^(Handikap|G\s*\d|Grup)/i.test(pred.race.classType);
-  if (pred.isBanko && handikapVeyaGrup && !(pred.couponNarrow && pred.couponNormal && pred.couponWide)) {
-    checks.push({ label: "⑥ Banko Kombinasyon", status: "FAIL", detail: "Handikap/Grup + banko → 3 kupon alanı (Ekonomik/Normal/Geniş) doldurulmalı." });
-  } else {
-    checks.push({ label: "⑥ Banko Kombinasyon", status: "PASS", detail: handikapVeyaGrup ? "Kombinasyon şartı sağlanıyor." : "Handikap/Grup değil, zorunlu değil." });
-  }
-
-  // Kan Hattı — bu ırk/pist/mesafe kombinasyonunda aygır/kısrak istatistiği olumlu
-  // olan atları referans olarak gösterir (bilgi amaçlı, yayını engellemez). Metodolojinin
-  // sabit 6 maddesine dahil değil — Aygır/Kısrak İstatistiği verisi Faz2'ye zaten otomatik
-  // aktarılıyor, bu sadece yayın öncesi son bakışta aynı bilgiyi burada da özetler.
-  const irk = breedToIrk(pred.race.breed);
-  const pist = surfaceToPist(pred.race.surface);
-  const mesafe = mesafeBucket(pred.race.distance);
-  const [sirePool, damPool, sireOwnPool, damOwnPool] = await Promise.all([
-    db.sireStat.findMany({ where: { irk, filtrePist: pist, filtreMesafe: mesafe } }),
-    db.damStat.findMany({ where: { irk, filtrePist: pist, filtreMesafe: mesafe } }),
-    db.sireStatOwn.findMany({ where: { irk, pist, mesafe } }),
-    db.damStatOwn.findMany({ where: { irk, pist, mesafe } }),
-  ]);
-  const olumluAtlar = aktifAtlar
-    .map((r) => {
-      const sireMatch = findSireStat(r.sire, sirePool);
-      const damMatch = findDamStat(r.dam, r.damSire, damPool);
-      const sireOlumlu = sireMatch && sireMatch.kkKosulan >= 5 && (sireMatch.kkYuzde >= 15 || sireMatch.aei > 1);
-      const damOlumlu = damMatch && damMatch.start >= 3 && damMatch.kYuzde >= 20;
-
-      // Kendi verimiz — bkz. pedigri-own-stat.service.ts. hipodromx eşleşmesi olsa da
-      // olmasa da ayrıca kontrol edilir (iki kaynak birbirinden bağımsız "olumlu" verebilir).
-      const sireOwnMatch = r.sire
-        ? sireOwnPool.find((o) => normalizeSireName(o.sireName) === normalizeSireName(r.sire!))
-        : undefined;
-      const damOwnCandidates = r.dam
-        ? damOwnPool.filter((o) => normalizeSireName(o.damName) === normalizeSireName(r.dam!))
-        : [];
-      const damOwnMatch =
-        damOwnCandidates.length === 0
-          ? undefined
-          : damOwnCandidates.length === 1
-            ? damOwnCandidates[0]
-            : (r.damSire && damOwnCandidates.find((o) => normalizeSireName(o.damSireName) === normalizeSireName(r.damSire!))) || damOwnCandidates[0];
-      const sireOwnOlumlu = sireOwnMatch && sireOwnMatch.start >= 3 && sireOwnMatch.kYuzde >= 20;
-      const damOwnOlumlu = damOwnMatch && damOwnMatch.start >= 3 && damOwnMatch.kYuzde >= 20;
-
-      if (!sireOlumlu && !damOlumlu && !sireOwnOlumlu && !damOwnOlumlu) return null;
-      const parts: string[] = [];
-      if (sireOlumlu) parts.push(`aygır K/K %${sireMatch!.kkYuzde}, AEI ${sireMatch!.aei}`);
-      if (damOlumlu) parts.push(`kısrak K% ${damMatch!.kYuzde}`);
-      if (sireOwnOlumlu) parts.push(`aygır K% ${sireOwnMatch!.kYuzde} (kendi veri, ${sireOwnMatch!.start} start)`);
-      if (damOwnOlumlu) parts.push(`kısrak K% ${damOwnMatch!.kYuzde} (kendi veri, ${damOwnMatch!.start} start)`);
-      return `#${r.no} ${r.name} (${parts.join(" · ")})`;
-    })
-    .filter((v): v is string => v !== null);
-  checks.push({
-    label: "Kan Hattı (Pist/Mesafe)",
-    status: "INFO",
-    detail: olumluAtlar.length
-      ? `${pist} ${mesafe} için olumlu kan hattı: ${olumluAtlar.join(", ")}`
-      : `${pist} ${mesafe} için olumlu (eşik üstü) kan hattı eşleşmesi yok.`,
-  });
-
-  return checks;
+  return { id: predictionId, publishError };
 }
 
 /**
- * İki sert kural — hangi giriş yolundan gelirse gelsin (elle form, markdown/ekran
- * görüntüsü yapıştırma, toplu içe aktarma) uygulanır: (1) hiç pick yoksa yayın yok,
- * (2) AGF favorisi (≥%25) gerekçesiz kaldıysa yayın yok. Önceden bu yalnız
- * publishPrediction()'ın İÇİNDEYDİ — kod denetiminde bulundu ki parse-report/route.ts
- * (markdown yapıştırma) ve analysis-importer.ts (toplu içe aktarma) hiçbir kontrolden
- * geçmeden doğrudan "published:true" yazıyordu; bu da 2026-07-20 (eksik saha) ve
- * 2026-07-24 (Ormello/AGF) hatalarının AYNISININ bu iki farklı kapıdan sessizce tekrar
- * yaşanabileceği anlamına geliyordu. Artık üçü de (publishPrediction + iki dış giriş
- * yolu) bu TEK fonksiyonu çağırıyor — kural tek yerde, atlanması imkansız.
+ * İki sert kural — hangi giriş yolundan gelirse gelsin (elle form/upsertPrediction,
+ * markdown/ekran görüntüsü yapıştırma, toplu içe aktarma) uygulanır: (1) hiç pick
+ * yoksa yayın yok, (2) AGF favorisi (≥%25) gerekçesiz kaldıysa yayın yok — 2026-07-20
+ * (eksik saha) ve 2026-07-24 (Ormello/AGF) canlı hatalarından kalma, ATLANAMAZ.
+ * 2026-07-26: eskiden yalnız ayrı bir "Yayımla" adımında (PublishChecklist UI, artık
+ * kaldırıldı) çalışıyordu — artık upsertPrediction ("Kaydet") her kayıtta bunu dener.
  */
 export async function assertPublishSafe(id: string): Promise<void> {
-  // PublishChecklist formdan bağımsız bir bileşen — "Kaydet" hiç tıklanmamış veya
-  // başarısız olmuş olsa bile 6 kutu işaretlenip Yayımla'ya basılabiliyordu. Bu,
-  // gerçek üretimde picks'i boş ("published:true" ama 0 at) bir analizin yayınlanmasına
-  // yol açtı (Ankara 1-2. Koşu, 2026-07-23). Son çare olarak burada engelliyoruz —
-  // hangi UI yolundan gelirse gelsin, picks'i boş bir tahmin ASLA yayınlanamaz.
   const pickCount = await db.pick.count({ where: { predictionId: id } });
   if (pickCount === 0) {
     throw new Error("Bu analizde hiç at seçimi (pick) yok — yayınlanamaz. Önce formu doldurup Kaydet'e basın.");
   }
 
   // AGF favorisi gerekçesiz kalmışsa yayınlanamaz — kullanıcı tespiti (İstanbul 6.Koşu,
-  // ORMELLO %54 AGF, hiç değerlendirilmeden mekanik puanla 8. sıraya düşmüştü). ③b
-  // checklist kontrolü (getPublishChecklistAuto) bunu yalnız GÖSTERİYORDU — admin gözden
-  // kaçırabiliyordu. Aynı sınır burada da SERT olarak uygulanıyor, pickCount===0 kuralıyla
-  // aynı disiplinde: hangi UI yolundan gelirse gelsin, bu durumda yayın engellenir.
+  // ORMELLO %54 AGF, hiç değerlendirilmeden mekanik puanla 8. sıraya düşmüştü).
   const agfCheckPred = await db.prediction.findUnique({
     where: { id },
     select: {
@@ -458,28 +321,6 @@ export async function assertPublishSafe(id: string): Promise<void> {
       }
     }
   }
-}
-
-export async function publishPrediction(id: string) {
-  await requireRole("EDITOR");
-
-  await assertPublishSafe(id);
-
-  await db.prediction.update({
-    where: { id },
-    data: { published: true, publishedAt: new Date() },
-  });
-
-  // Karma mirror'larını da yayınla
-  syncKarmaMirrors(id).catch(console.error);
-
-  revalidatePath("/admin");
-  revalidatePath("/admin/analizler");
-  revalidatePath("/analizler");
-  revalidatePath("/kosular");
-
-  const { notifyNewPrediction } = await import("./notification.actions");
-  notifyNewPrediction(id).catch(console.error);
 }
 
 export async function unpublishPrediction(id: string) {

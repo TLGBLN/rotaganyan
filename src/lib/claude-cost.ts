@@ -59,6 +59,7 @@ export async function logClaudeUsage(input: {
   cacheCreationInputTokens?: number;
   cacheReadInputTokens?: number;
   resultText?: string;
+  durationMs?: number;
 }): Promise<void> {
   try {
     const { db } = await import("@/lib/db");
@@ -72,6 +73,7 @@ export async function logClaudeUsage(input: {
         cacheCreationInputTokens: input.cacheCreationInputTokens ?? 0,
         cacheReadInputTokens: input.cacheReadInputTokens ?? 0,
         resultText: input.resultText,
+        durationMs: input.durationMs,
       },
     });
   } catch (err) {
@@ -109,6 +111,76 @@ export async function getRecentCachedResult(
     console.error("[claude-cost] önbellek okunamadı", err);
     return null;
   }
+}
+
+export type AnalysisRunSummary = {
+  raceId: string;
+  raceLabel: string;
+  faz2DurationMs: number | null;
+  faz3DurationMs: number | null;
+  totalDurationMs: number | null;
+  costUsd: number;
+  callCount: number;
+  createdAt: string;
+};
+
+/** Admin panelde "hangi analiz kaç dakika sürdü, ne kadar harcandı" tablosu için —
+ *  ClaudeUsageLog satırlarını raceId'ye göre gruplar (Faz2+Faz3, olası retry dahil). */
+export async function getRecentAnalysisRuns(limit = 20): Promise<AnalysisRunSummary[]> {
+  const { db } = await import("@/lib/db");
+  const logs = await db.claudeUsageLog.findMany({
+    where: { raceId: { not: null } },
+    orderBy: { createdAt: "desc" },
+    // faz2+faz3 (+ olası retry) satırlarını aynı koşu için toplayabilmek için bolluk payı.
+    take: limit * 6,
+    select: {
+      raceId: true, phase: true, inputTokens: true, outputTokens: true,
+      cacheCreationInputTokens: true, cacheReadInputTokens: true,
+      durationMs: true, createdAt: true,
+    },
+  });
+
+  type LogRow = (typeof logs)[number];
+  const byRace = new Map<string, LogRow[]>();
+  for (const l of logs) {
+    if (!l.raceId) continue;
+    const arr = byRace.get(l.raceId) ?? [];
+    arr.push(l);
+    byRace.set(l.raceId, arr);
+  }
+  // logs zaten createdAt DESC sıralı ve her raceId Map'e İLK GÖRÜLDÜĞÜNDE ekleniyor —
+  // yani anahtar sırası otomatik olarak "en son işlem gören koşu önce" oluyor.
+  const raceIds = [...byRace.keys()].slice(0, limit);
+
+  const races = await db.race.findMany({
+    where: { id: { in: raceIds } },
+    select: { id: true, raceNo: true, raceDay: { select: { date: true, hippodrome: { select: { name: true } } } } },
+  });
+  const raceById = new Map(races.map((r) => [r.id, r]));
+
+  function sumDuration(rows: LogRow[], phase: "faz2" | "faz3"): number | null {
+    const durations = rows.filter((r) => r.phase === phase).map((r) => r.durationMs).filter((d): d is number => d != null);
+    return durations.length > 0 ? durations.reduce((a, b) => a + b, 0) : null;
+  }
+
+  return raceIds.map((raceId) => {
+    const rows = byRace.get(raceId)!;
+    const race = raceById.get(raceId);
+    const faz2DurationMs = sumDuration(rows, "faz2");
+    const faz3DurationMs = sumDuration(rows, "faz3");
+    const totalDurationMs = faz2DurationMs != null || faz3DurationMs != null ? (faz2DurationMs ?? 0) + (faz3DurationMs ?? 0) : null;
+    const costUsd = rows.reduce(
+      (s, r) => s + tahminiMaliyet(r.inputTokens, r.outputTokens, r.createdAt, r.cacheCreationInputTokens, r.cacheReadInputTokens),
+      0
+    );
+    const raceLabel = race
+      ? `${race.raceDay.hippodrome.name} — ${race.raceNo}. Koşu (${race.raceDay.date.toISOString().slice(0, 10).split("-").reverse().join(".")})`
+      : "Bilinmeyen koşu";
+    return {
+      raceId, raceLabel, faz2DurationMs, faz3DurationMs, totalDurationMs,
+      costUsd, callCount: rows.length, createdAt: rows[0].createdAt.toISOString(),
+    };
+  });
 }
 
 export type BudgetStatus = {

@@ -4,7 +4,6 @@ import { tr } from "date-fns/locale";
 import { db } from "@/lib/db";
 import { getAdminPredictionById, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
 import SmartAnalysisEditor from "@/components/admin/SmartAnalysisEditor";
-import PublishChecklist from "@/components/admin/PublishChecklist";
 import MarkdownRaceInput from "@/components/admin/MarkdownRaceInput";
 import DeletePredictionButton from "@/components/admin/DeletePredictionButton";
 import ClassTypeAdviceCard from "@/components/admin/ClassTypeAdviceCard";
@@ -61,10 +60,15 @@ export default async function EditAnalizPage({ params }: PageProps) {
 
         <aside className="space-y-4">
           <ClassTypeAdviceCard advice={advice} classType={race.classType} />
-          {!pred.published && <PublishChecklist predictionId={pred.id} pickCount={pred.picks.length} />}
-          {pred.published && (
+          {pred.published ? (
             <div className="rounded-lg border border-hit/30 bg-hit/10 p-3 text-sm text-hit">
               ✓ Bu analiz yayında
+            </div>
+          ) : (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400">
+              Taslak — bir güvenlik kuralını geçemedi (pick yok ya da AGF favorisi
+              gerekçesiz kaldı). Formu düzenleyip tekrar Kaydet&apos;e basın, otomatik
+              olarak yeniden yayınlamayı dener.
             </div>
           )}
         </aside>

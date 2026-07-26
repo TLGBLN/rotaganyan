@@ -2,11 +2,15 @@
 
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { getClaudeBudgetStatus, type BudgetStatus } from "@/lib/claude-cost";
+import { getClaudeBudgetStatus, getRecentAnalysisRuns, type BudgetStatus, type AnalysisRunSummary } from "@/lib/claude-cost";
 import { revalidatePath } from "next/cache";
 
 export async function getClaudeBudget(): Promise<BudgetStatus | null> {
   return getClaudeBudgetStatus();
+}
+
+export async function getAnalysisRuns(limit = 20): Promise<AnalysisRunSummary[]> {
+  return getRecentAnalysisRuns(limit);
 }
 
 /** Admin yeni kredi yüklediğinde çağırır — geçmiş harcamayı sıfırlar, yeni başlangıç bakiyesi girer. */
