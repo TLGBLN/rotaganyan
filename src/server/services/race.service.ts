@@ -503,22 +503,37 @@ export type KazananKupon = {
 };
 
 /**
- * Geçmişte İSABET SAĞLAYAN (en az bir kademesi "hit") arşivlenmiş kuponları tarih
- * sırasına göre döner — anasayfadaki "İsabet Sağlayan Kuponlar" şeridi için. Tuttu/
- * tutmadı durumu her zaman güvenilir (bizim kendi Result verimizden hesaplanıyor,
- * buildKuponOnerisi() geçmişe dönük de doğru çalışır) — ama "ikramiye" yalnız
- * archive-kupon cron'unun 2026-07-26'dan itibaren yakaladığı kayıtlarda dolu olur,
- * TJK'nın kaynağı geçmişe dönük sorgulanamadığı için daha eskiler için null kalır.
+ * Geçmişte İSABET SAĞLAYAN (en az bir kademesi "hit") kuponları tarih sırasına göre
+ * döner — anasayfadaki "İsabet Sağlayan Kuponlar" şeridi için. Tuttu/tutmadı durumu
+ * her zaman güvenilir (bizim kendi Result verimizden hesaplanıyor, buildKuponOnerisi()
+ * geçmişe dönük de doğru çalışır) — ama "ikramiye" yalnız archive-kupon cron'unun
+ * 2026-07-26'dan itibaren yakaladığı kayıtlarda dolu olur, TJK'nın kaynağı geçmişe
+ * dönük sorgulanamadığı için daha eskiler için null kalır.
+ *
+ * 2026-07-26, kullanıcı tespiti: isActive:false şartı, gün içinde admin tarafından
+ * güncellenip henüz gece yarısı arşivlenmemiş (isActive hâlâ true) taze bir isabeti
+ * dışarıda bırakıyordu (İstanbul 1. Altılı örneği) — kaldırıldı. Aynı hipodrom+tarih+
+ * slot için birden fazla kayıt olabildiğinden (admin güncelledikçe eski kayıt kalıyor,
+ * silinmiyor) en güncel (updatedAt) olan tercih edilerek tekilleştiriliyor.
  */
 export async function getGecmisKazananKuponlar(limit = 20): Promise<KazananKupon[]> {
-  const archived = await db.homeKupon.findMany({
-    where: { isActive: false },
-    orderBy: { date: "desc" },
-    take: limit * 4, // her arşivlenen kaydın hit çıkacağı garanti değil, bolluk payı
+  const all = await db.homeKupon.findMany({
+    orderBy: [{ date: "desc" }, { updatedAt: "desc" }],
+    take: limit * 6, // her kaydın hit çıkacağı/tekil olacağı garanti değil, bolluk payı
+  });
+
+  // Aynı hipodrom+tarih+slot için birden fazla kayıt varsa (admin güncelledikçe eskisi
+  // silinmiyor) yalnız en güncelini (zaten updatedAt desc sıralı, ilk görülen) kullan.
+  const seen = new Set<string>();
+  const dedup = all.filter((k) => {
+    const key = `${k.hippodromeName}|${k.date.toISOString()}|${k.slot}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
   });
 
   const results: KazananKupon[] = [];
-  for (const k of archived) {
+  for (const k of dedup) {
     if (results.length >= limit) break;
     const built = await buildKuponOnerisi(k);
     if (!built) continue;
