@@ -163,8 +163,16 @@ export type Faz1Runner = {
   // kombinasyonuna göre OTOMATİK eşleştirilen aygır istatistiği — admin artık bunu elle
   // araştırıp pedigreeNote'a yazmak zorunda değil, eşleşme varsa doğrudan buradan gelir.
   sireStatOzet: string | null;
+  // Aygır/kısrak istatistiğinin dayandığı ham örneklem sayısı — eskiden yalnız sireStatOzet/
+  // damStatOzet metnine gömülüydü ("Start 27" gibi), ayrı sayısal alan yoktu (kullanıcı
+  // talebiyle eklendi, §XII.1 minOrneklem kararlarının güvenilir uygulanabilmesi için).
+  // null = eşleşme yok (o kaynaktan hiç veri yok, "0 örneklem" ile karıştırılmasın).
+  sireOrneklemHipodromx: number | null;
+  sireOrneklemKendiVeri: number | null;
   // Aynısı anne + anne babası (kısrak) tarafı için — hipodromx.com "Kısraklar" tablosu.
   damStatOzet: string | null;
+  damOrneklemHipodromx: number | null;
+  damOrneklemKendiVeri: number | null;
   // Admin'in /admin/pedigri sayfasındaki "Genel Not"a elle girdiği, pedigri dışı herhangi
   // bir eksik veri (sakatlık, antrenman gözlemi, pist notu vb.) — otomatik toplanamayan
   // her şey için genel amaçlı manuel giriş alanı.
@@ -247,10 +255,17 @@ export type Faz1Runner = {
   // kaldırıldı, "Accurace — Tüm Kayıtlar" panelinin (son800.actions.ts) davranışıyla
   // tutarlı hale getirildi (bkz. aşağıdaki hesaplama).
   son800TumOzet: string | null;
+  // son800TumOzet metne en fazla 4 kayıt yazar (maliyet nedeniyle) — bu, gerçek toplam
+  // kayıt sayısı (kullanıcı talebiyle eklendi, minOrneklem kararı için gerekli).
+  son800TumToplamKayit: number;
 
   // Sitenin kendi "Aynı Pist/Mesafe/Hipodrom" ve "H2H" panellerinden (methodolojide
   // XI. Bölüm — ZAYIF KANIT, tek başına sırayı belirlemez ama göz ardı edilmemeli).
   aynıPistMesafeOzet: string | null;
+  // aynıPistMesafeOzet metne en fazla 3 kayıt yazar — bu, gerçek toplam kayıt sayısı
+  // (kullanıcı talebiyle eklendi — önceden bu sayı kod içinde hesaplanıp hiç
+  // gönderilmeden atılıyordu, Claude "3 kayıt mı yoksa 8'den seçilmiş 3 mü" ayırt edemiyordu).
+  aynıPistMesafeToplamKayit: number;
   h2hOzet: string | null;
 
   // ── Mekanik ön-hesaplama (mekanik-puanlama.ts) — Ansiklopedi §III/§V/§VI/§VIII'in
@@ -330,16 +345,16 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       select: { horseName: true, checkpoints: true, accuraceRace: { select: { length: true, _count: { select: { splits: true } } } } },
     }).catch(() => []),
     getSireStatOzetleriForRace(race.runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(
-      () => race.runners.map(() => null)
+      () => race.runners.map(() => ({ ozet: null, ornekHipodromx: null, ornekKendiVeri: null }))
     ),
     getDamStatOzetleriForRace(race.runners.map((r) => ({ dam: r.dam, damSire: r.damSire })), race.breed, race.surface, race.distance).catch(
-      () => race.runners.map(() => null)
+      () => race.runners.map(() => ({ ozet: null, ornekHipodromx: null, ornekKendiVeri: null }))
     ),
     getSonYarisDetaylariForRace(raceId).catch(() => []),
   ]);
   const atPerformansMap = new Map(atPerformansRows.map((r) => [r.horseName, r.records]));
-  const sireStatMap = new Map(race.runners.map((r, i) => [r.id, sireStatOzetleri[i] ?? null]));
-  const damStatMap = new Map(race.runners.map((r, i) => [r.id, damStatOzetleri[i] ?? null]));
+  const sireStatMap = new Map(race.runners.map((r, i) => [r.id, sireStatOzetleri[i] ?? { ozet: null, ornekHipodromx: null, ornekKendiVeri: null }]));
+  const damStatMap = new Map(race.runners.map((r, i) => [r.id, damStatOzetleri[i] ?? { ozet: null, ornekHipodromx: null, ornekKendiVeri: null }]));
   const sonYarisDetayByNo = new Map(sonYarisDetaylari.map((d) => [d.runnerNo, d]));
   const kulvarBolgeBugun = kulvarBolgesi(race.raceDay.hippodrome.slug, race.surface, race.distance);
 
@@ -492,6 +507,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   // vaat ediyordu, yıl kısıtı olmadan TÜM geçmiş kayıtlar aranıyor.
   const GROUND_LABEL: Record<string, string> = { K: "Kum", Ç: "Çim", S: "Sentetik" };
   const son800TumOzetByRunnerName = new Map<string, string | null>();
+  const son800TumToplamByRunnerName = new Map<string, number>();
   for (const r of race.runners) {
     // 2026-07-25: maliyet azaltma — kullanıcı talebiyle 8'den 4'e düşürüldü. Bu bölüm
     // metodolojinin kendisince zaten İKİNCİL/zayıf kanıt sayılıyor (yukarıdaki KESİN
@@ -508,6 +524,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       .filter((k) => !(k.accuraceRace.ground === surfacePrefixToday && Math.abs((k.accuraceRace.length ?? 0) - race.distance) <= 200))
       .sort((a, b) => b.accuraceRace.date.getTime() - a.accuraceRace.date.getTime());
     const kayitlarTumu = [...tamUygun, ...digerleri].slice(0, 4);
+    son800TumToplamByRunnerName.set(r.name, tumKayitlari.length);
 
     if (kayitlarTumu.length === 0) { son800TumOzetByRunnerName.set(r.name, null); continue; }
 
@@ -684,8 +701,12 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         trainer: r.trainer, owner: r.owner,
         ekuriMateleri: ekuriMateMap.get(r.id) ?? [],
         sire: r.sire, dam: r.dam, damSire: r.damSire,
-        sireStatOzet: sireStatMap.get(r.id) ?? null,
-        damStatOzet: damStatMap.get(r.id) ?? null,
+        sireStatOzet: sireStatMap.get(r.id)?.ozet ?? null,
+        sireOrneklemHipodromx: sireStatMap.get(r.id)?.ornekHipodromx ?? null,
+        sireOrneklemKendiVeri: sireStatMap.get(r.id)?.ornekKendiVeri ?? null,
+        damStatOzet: damStatMap.get(r.id)?.ozet ?? null,
+        damOrneklemHipodromx: damStatMap.get(r.id)?.ornekHipodromx ?? null,
+        damOrneklemKendiVeri: damStatMap.get(r.id)?.ornekKendiVeri ?? null,
         adminNote: r.adminNote,
         sonYarisVeriKaynagiGuvenilir: sonYarisDetayByNo.get(r.no)?.hasTjkId ?? false,
         sonYarisTakiEklenen: sonYarisDetayByNo.get(r.no)?.eklenenTaki.map((t) => t.label) ?? [],
@@ -713,7 +734,8 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         takiDegisikligiVar, exactVeyaPedigri,
         son800BenzerKosuN, son800Medyan,
         son800TumOzet: son800TumOzetByRunnerName.get(r.name) ?? null,
-        aynıPistMesafeOzet, h2hOzet: h2hOzetFor(r.name),
+        son800TumToplamKayit: son800TumToplamByRunnerName.get(r.name) ?? 0,
+        aynıPistMesafeOzet, aynıPistMesafeToplamKayit: aynıPistMesafeKayitlari.length, h2hOzet: h2hOzetFor(r.name),
         hpKalitesiYildizi: hpKalitesi, sinifGecisBonusuPuan: sinifBonusu,
         galopSiniflandirma: galopSinif, tempoGuven: tempoGuvenHesap,
         accuraceEgilim: accuraceEgilimMap.get(r.id) ?? null,

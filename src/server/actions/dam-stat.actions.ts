@@ -64,6 +64,13 @@ export async function listDamStats(limit = 100) {
   return db.damStat.findMany({ orderBy: { updatedAt: "desc" }, take: limit });
 }
 
+export type DamStatOzetSonuc = {
+  ozet: string | null;
+  // minOrneklem kararları için ham örneklem büyüklüğü (bkz. sire-stat.actions.ts SireStatOzetSonuc).
+  ornekHipodromx: number | null; // s.start — hipodromx başlık istatistiğinin dayandığı start sayısı
+  ornekKendiVeri: number | null; // own.start — rotaganyan'ın kendi verisindeki start sayısı
+};
+
 /**
  * Bir koşudaki tüm atların anne+anne babası için, o koşunun ırk/pist/mesafe kombinasyonuna
  * karşılık gelen kısrak istatistiği özetini (varsa) döner — girdilerle AYNI SIRADA.
@@ -73,7 +80,7 @@ export async function getDamStatOzetleriForRace(
   breed: string,
   surface: string,
   distance: number
-): Promise<(string | null)[]> {
+): Promise<DamStatOzetSonuc[]> {
   const irk = breedToIrk(breed);
   const pist = surfaceToPist(surface);
   const mesafe = mesafeBucket(distance);
@@ -92,11 +99,14 @@ export async function getDamStatOzetleriForRace(
         : ownCandidates.length === 1
           ? ownCandidates[0]
           : (damSire && ownCandidates.find((o) => normalizeSireName(o.damSireName) === normalizeSireName(damSire))) || ownCandidates[0];
-    if (match) return formatDamStatOzet(match, mesafe, pist, ownMatch);
+    const ornekHipodromx = match?.start ?? null;
+    const ornekKendiVeri = ownMatch?.start ?? null;
+    if (match) return { ozet: formatDamStatOzet(match, mesafe, pist, ownMatch), ornekHipodromx, ornekKendiVeri };
     // hipodromx eşleşmesi yok ama kendi verimizde varsa, yalnız kendi veriyle özet göster.
-    if (!ownMatch || ownMatch.start < 3) return null;
+    if (!ownMatch || ownMatch.start < 3) return { ozet: null, ornekHipodromx, ornekKendiVeri };
     const tayOrani = ownMatch.yavruSayisi > 0 ? Math.round((ownMatch.kazananYavruSayisi / ownMatch.yavruSayisi) * 100) : null;
     const tayStr = tayOrani != null ? ` · Kazanan tay oranı %${tayOrani} (${ownMatch.kazananYavruSayisi}/${ownMatch.yavruSayisi} yavru)` : "";
-    return `${dam} / ${ownMatch.damSireName} (${pist} ${mesafe}): Kendi verimiz: ${ownMatch.start} start, K% ${ownMatch.kYuzde} (${ownMatch.birinci}/${ownMatch.start})${tayStr}`;
+    const ozet = `${dam} / ${ownMatch.damSireName} (${pist} ${mesafe}): Kendi verimiz: ${ownMatch.start} start, K% ${ownMatch.kYuzde} (${ownMatch.birinci}/${ownMatch.start})${tayStr}`;
+    return { ozet, ornekHipodromx, ornekKendiVeri };
   });
 }

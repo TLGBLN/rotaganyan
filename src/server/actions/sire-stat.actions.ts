@@ -64,6 +64,15 @@ export async function listSireStats(limit = 100) {
   return db.sireStat.findMany({ orderBy: { updatedAt: "desc" }, take: limit });
 }
 
+export type SireStatOzetSonuc = {
+  ozet: string | null;
+  // minOrneklem kararları için ham örneklem büyüklüğü — eskiden yalnız formatSireStatOzet()'in
+  // ürettiği metne gömülüydü ("Start 27" gibi), Claude'un/kodun güvenilir şekilde okuyabileceği
+  // ayrı bir sayısal alan yoktu (kullanıcı talebiyle eklendi).
+  ornekHipodromx: number | null; // s.kkKosulan — K/K% başlık istatistiğinin dayandığı koşu sayısı
+  ornekKendiVeri: number | null; // own.start — rotaganyan'ın kendi verisindeki start sayısı
+};
+
 /**
  * Bir koşudaki tüm atların babası için, o koşunun ırk/pist/mesafe kombinasyonuna karşılık
  * gelen aygır istatistiği özetini (varsa) döner — sireNames ile AYNI SIRADA, eşleşmeyenler null.
@@ -75,7 +84,7 @@ export async function getSireStatOzetleriForRace(
   breed: string,
   surface: string,
   distance: number
-): Promise<(string | null)[]> {
+): Promise<SireStatOzetSonuc[]> {
   const irk = breedToIrk(breed);
   const pist = surfaceToPist(surface);
   const mesafe = mesafeBucket(distance);
@@ -86,10 +95,13 @@ export async function getSireStatOzetleriForRace(
   return sireNames.map((name) => {
     const match = findSireStat(name, pool);
     const ownMatch = name ? ownPool.find((o) => normalizeSireName(o.sireName) === normalizeSireName(name)) ?? null : null;
-    if (match) return formatSireStatOzet(match, mesafe, pist, ownMatch);
+    const ornekHipodromx = match?.kkKosulan ?? null;
+    const ornekKendiVeri = ownMatch?.start ?? null;
+    if (match) return { ozet: formatSireStatOzet(match, mesafe, pist, ownMatch), ornekHipodromx, ornekKendiVeri };
     // hipodromx eşleşmesi yok ama kendi verimizde varsa, yalnız kendi veriyle özet göster.
-    return ownMatch && ownMatch.start >= 3
+    const ozet = ownMatch && ownMatch.start >= 3
       ? `${name} (${pist} ${mesafe}): Kendi verimiz: ${ownMatch.start} start, K% ${ownMatch.kYuzde} (${ownMatch.birinci}/${ownMatch.start})`
       : null;
+    return { ozet, ornekHipodromx, ornekKendiVeri };
   });
 }

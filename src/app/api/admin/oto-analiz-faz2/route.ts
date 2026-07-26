@@ -58,10 +58,10 @@ async function handlePost(req: NextRequest) {
         ...(r.ekuriMateleri.length > 0 ? [`  Eküri: aynı sahiplikten bu koşuda da koşan diğer at(lar): ${r.ekuriMateleri.join(", ")} — pacemaker/rehavet etkisi olası, göz ardı etme`] : []),
         `  Pedigri: ${r.sire ?? "—"} — ${r.dam ?? "—"} (${r.damSire ?? "—"})`,
         ...(r.sireStatOzet
-          ? [`  Aygır İstatistiği (otomatik, hipodromx.com — babanın BU pist/mesafe kombinasyonundaki yavru performansı, K/K%=galibiyet oranı, AEI=1.0 ortalama): ${r.sireStatOzet}`]
+          ? [`  Aygır İstatistiği (otomatik, hipodromx.com — babanın BU pist/mesafe kombinasyonundaki yavru performansı, K/K%=galibiyet oranı, AEI=1.0 ortalama, örneklem: hipodromx ${r.sireOrneklemHipodromx ?? "?"} koşu / kendi veri ${r.sireOrneklemKendiVeri ?? "yok"} start — §XII.1 kısrak tarafından AYRI değerlendir): ${r.sireStatOzet}`]
           : []),
         ...(r.damStatOzet
-          ? [`  Kısrak İstatistiği (otomatik, hipodromx.com — anne+anne babası kombinasyonunun BU pist/mesafedeki yavru performansı): ${r.damStatOzet}`]
+          ? [`  Kısrak İstatistiği (otomatik, hipodromx.com — anne+anne babası kombinasyonunun BU pist/mesafedeki yavru performansı, örneklem: hipodromx ${r.damOrneklemHipodromx ?? "?"} start / kendi veri ${r.damOrneklemKendiVeri ?? "yok"} start — §XII.1 aygır tarafından AYRI değerlendir): ${r.damStatOzet}`]
           : []),
         ...(r.adminNote ? [`  Admin Notu (elle girildi, güvenilir kanıt kabul et): ${r.adminNote}`] : []),
         `  HP bugün:${r.hpBugun}${r.hpBugunResmiYok ? " (resmi HP yok — Şartlı1/Maiden/henüz atanmamış; 0 KABUL EDİLİR, HP karşılaştırmasında/sıralamasında bu at 0 puanlı sayılır — bkz. metodoloji istisna kuralı)" : ""} önceki:${
@@ -77,8 +77,8 @@ async function handlePost(req: NextRequest) {
         `  Takı: ${r.equipment ?? "—"} (eklenen:${takiEklenenEfektif} çıkarılan:${takiCikarilanEfektif})${r.sonYarisVeriKaynagiGuvenilir ? " [TJK doğrulanmış]" : ""}${r.sonYarisVeriKaynagiGuvenilir && r.sonYarisAyniJokey != null ? ` | Aynı jokey mi (TJK doğrulanmış): ${r.sonYarisAyniJokey ? "EVET" : "HAYIR"}` : ""}`,
         `  Galop: ${r.galopOzet} | kondisyon zinciri var=${r.kondisyonZinciriVar} keskin=${r.keskinGalopZinciri}${r.galopOzet.includes("AYNI JOKEY İLE İDMAN YAPTI") ? " | NOT: '[AYNI JOKEY İLE İDMAN YAPTI]' etiketi — idman jokeyi bugün de binecek, süreklilik/uyum açısından OLUMLU bir etken, destekleyici unsur olarak değerlendir" : ""}`,
         `  Son800 benzer koşu (KESİN — pist zorunlu+mesafe≤200m) n=${r.son800BenzerKosuN} medyan fark=${r.son800Medyan ?? "—"}`,
-        `  Son800 TÜM kayıtlar (tüm yıllar, en fazla 4, TAM UYGUN öncelikli): ${r.son800TumOzet ?? "Accurace kaydı yok"}`,
-        `  Aynı Pist/Mesafe/Hipodrom geçmişi: ${r.aynıPistMesafeOzet ?? "kayıt yok"}`,
+        `  Son800 TÜM kayıtlar (tüm yıllar, gerçek toplam ${r.son800TumToplamKayit} kayıttan en fazla 4'ü — TAM UYGUN öncelikli — gösteriliyor): ${r.son800TumOzet ?? "Accurace kaydı yok"}`,
+        `  Aynı Pist/Mesafe/Hipodrom geçmişi (gerçek toplam ${r.aynıPistMesafeToplamKayit} kayıttan en fazla 3'ü gösteriliyor): ${r.aynıPistMesafeOzet ?? "kayıt yok"}`,
         `  Bu Hipodrom+Mesafe+Pist'te TÜM YILLAR (TJK resmi profilinden doğrulanmış): ${r.hipodromMesafedeKazandi === "EVET" ? "EN AZ 1 KEZ KAZANDI" : r.hipodromMesafedeKazandi === "HAYIR" ? "koştu, hiç kazanmadı" : "hiç koşmadı"}${r.hipodromMesafedeEnIyiDerece ? ` — en iyi derecesi: ${r.hipodromMesafedeEnIyiDerece}` : ""}`,
         ...(r.h2hOzet ? [`  H2H (zayıf kanıt, sahadaki diğer atlarla geçmiş karşılaşma): ${r.h2hOzet}`] : []),
         `  Ön-hesaplanmış (kod, YENİDEN HESAPLAMA): HP Kalitesi ${r.hpKalitesiYildizi != null ? `⭐${r.hpKalitesiYildizi}/5` : "tabloda tanımsız (serbest değerlendir)"} · Sınıf Geçiş ${r.sinifGecisBonusuPuan != null ? (r.sinifGecisBonusuPuan >= 0 ? `+${r.sinifGecisBonusuPuan}` : `${r.sinifGecisBonusuPuan}`) : "?"} · Galop zinciri ${r.galopSiniflandirma.ozet} · Tempo Güven: ${r.tempoGuven ?? "?"}`,

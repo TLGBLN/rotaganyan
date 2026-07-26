@@ -710,18 +710,18 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
       if (r.runners.length === 0) return;
       const [sireOzetler, damOzetler] = await Promise.all([
         getSireStatOzetleriForRace(r.runners.map((ru) => ru.sire), r.breed, r.surface, r.distance).catch(
-          () => r.runners.map(() => null)
+          () => r.runners.map(() => ({ ozet: null, ornekHipodromx: null, ornekKendiVeri: null }))
         ),
         getDamStatOzetleriForRace(
           r.runners.map((ru) => ({ dam: ru.dam, damSire: ru.damSire })),
           r.breed,
           r.surface,
           r.distance
-        ).catch(() => r.runners.map(() => null)),
+        ).catch(() => r.runners.map(() => ({ ozet: null, ornekHipodromx: null, ornekKendiVeri: null }))),
       ]);
       r.runners.forEach((ru, i) => {
-        sireStatByRunnerId.set(ru.id, sireOzetler[i] ?? null);
-        damStatByRunnerId.set(ru.id, damOzetler[i] ?? null);
+        sireStatByRunnerId.set(ru.id, sireOzetler[i]?.ozet ?? null);
+        damStatByRunnerId.set(ru.id, damOzetler[i]?.ozet ?? null);
       });
     })
   );
