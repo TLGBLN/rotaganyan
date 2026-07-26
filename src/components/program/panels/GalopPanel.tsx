@@ -1,6 +1,6 @@
 "use client";
 
-import { TriangleAlert } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ProgramRunner } from "@/server/services/race.service";
 import { galopSplits, galopDate, isSameJockey, galopQuality, galopTimeClass } from "./galop-helpers";
@@ -35,10 +35,10 @@ export default function GalopPanel({ runners, breed }: { runners: ProgramRunner[
                       <div className="flex items-baseline gap-1 flex-wrap">
                         {sameJockey && (
                           <span
-                            title={`İdman jokeyi (${g.jockey}) koşuda da binecek`}
-                            className="inline-flex items-center justify-center rounded-full bg-amber-400 p-0.5"
+                            title={`İdman jokeyi (${g.jockey}) koşuda da binecek — olumlu bir etken`}
+                            className="inline-flex items-center justify-center rounded-full bg-hit/15 p-0.5"
                           >
-                            <TriangleAlert className="h-3 w-3 fill-amber-400 stroke-black" strokeWidth={2.5} />
+                            <CheckCircle2 className="h-3 w-3 text-hit" strokeWidth={2.5} />
                           </span>
                         )}
                         <span className="font-mono">

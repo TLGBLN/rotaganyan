@@ -45,7 +45,13 @@ async function handlePost(req: NextRequest) {
 
   const faz1Tablo = faz1.runners
     .map((r) => {
-      const kiloStr = r.weightChange != null ? `${r.weightChange >= 0 ? "+" : ""}${r.weightChange}kg` : "—";
+      // TJK'nın resmi at profilinden (AtKosuBilgileri) doğrulanmış kilo/takı değişimi,
+      // mevcutsa site DB alanlarından ÖNCELİKLİDİR (kullanıcı talimatı — "Son Yarış
+      // Detayları" panelinin kullandığı aynı güvenilir kaynak). Yoksa eskiye geri düşülür.
+      const kiloDegisimEfektif = r.sonYarisVeriKaynagiGuvenilir ? r.sonYarisKiloDegisimi : r.weightChange;
+      const kiloStr = kiloDegisimEfektif != null ? `${kiloDegisimEfektif >= 0 ? "+" : ""}${kiloDegisimEfektif}kg${r.sonYarisVeriKaynagiGuvenilir ? " [TJK doğrulanmış]" : ""}` : "—";
+      const takiEklenenEfektif = r.sonYarisVeriKaynagiGuvenilir ? r.sonYarisTakiEklenen.join(", ") || "—" : r.equipmentAdded ?? "—";
+      const takiCikarilanEfektif = r.sonYarisVeriKaynagiGuvenilir ? r.sonYarisTakiCikarilan.join(", ") || "—" : r.equipmentRemoved ?? "—";
       return [
         `#${r.no} ${r.ad}${r.startNo != null ? `  Kulvar:${r.startNo}${r.kulvarBolge ? ` (${r.kulvarBolge})` : ""}` : ""}${r.disaridanStart ? "  [DS — at sahibinin KENDİ TERCİHİYLE dıştan start seçimi, ASLA olumsuz sayılmaz — olumlu bir etken olma ihtimali daha yüksek, destekleyici unsur olarak değerlendir]" : ""}`,
         `  Kilo:${r.weight ?? "—"}(${kiloStr}) Jokey:${r.jockey ?? "—"}(%${r.jockeyWinPct ?? "?"})${r.apprentice ? ` [ÇIRAK jokey, kalan kilo indirim hakkı:${r.apprenticeRemaining ?? "?"}]` : ""}${r.jockeyChanged ? ` [JOKEY DEĞİŞTİ, önceki jokey:${r.previousJockey ?? "?"}]` : ""} Antrenör:${r.trainer ?? "—"}(%${r.trainerWinPct ?? "?"})`,
@@ -67,8 +73,8 @@ async function handlePost(req: NextRequest) {
         `  Tempo örneklem n:${r.tempoVeriN ?? "?"} stil:${r.raceStyleEtiket ?? "?"} kaçak:${r.kacak}`,
         `  Accurace tempo/pozisyon eğilimi (GPS/sektörel, geçmiş yarışlardan): ${r.accuraceEgilim ? `${r.accuraceEgilim.stil} %${r.accuraceEgilim.percent} (${r.accuraceEgilim.n} yarış)` : "veri yok (henüz Accurace kaydı birikmedi veya n<3, ceza değil)"}`,
         `  Sınıf: ${r.sinifOnceki ?? "?"} (SKK ${r.sinifSkkOnceki ?? "?"}) -> bugün ${faz1.race.classType} (SKK ${r.sinifSkkBugun ?? "?"}) düşüş=${r.sinifDususu}`,
-        `  Takı: ${r.equipment ?? "—"} (eklenen:${r.equipmentAdded ?? "—"} çıkarılan:${r.equipmentRemoved ?? "—"})`,
-        `  Galop: ${r.galopOzet} | kondisyon zinciri var=${r.kondisyonZinciriVar} keskin=${r.keskinGalopZinciri}`,
+        `  Takı: ${r.equipment ?? "—"} (eklenen:${takiEklenenEfektif} çıkarılan:${takiCikarilanEfektif})${r.sonYarisVeriKaynagiGuvenilir ? " [TJK doğrulanmış]" : ""}${r.sonYarisVeriKaynagiGuvenilir && r.sonYarisAyniJokey != null ? ` | Aynı jokey mi (TJK doğrulanmış): ${r.sonYarisAyniJokey ? "EVET" : "HAYIR"}` : ""}`,
+        `  Galop: ${r.galopOzet} | kondisyon zinciri var=${r.kondisyonZinciriVar} keskin=${r.keskinGalopZinciri}${r.galopOzet.includes("AYNI JOKEY İLE İDMAN YAPTI") ? " | NOT: '[AYNI JOKEY İLE İDMAN YAPTI]' etiketi — idman jokeyi bugün de binecek, süreklilik/uyum açısından OLUMLU bir etken, destekleyici unsur olarak değerlendir" : ""}`,
         `  Son800 benzer koşu (KESİN — pist zorunlu+mesafe≤200m) n=${r.son800BenzerKosuN} medyan fark=${r.son800Medyan ?? "—"}`,
         `  Son800 TÜM kayıtlar (bu yıl, en fazla 4, TAM UYGUN öncelikli): ${r.son800TumOzet ?? "Accurace kaydı yok"}`,
         `  Aynı Pist/Mesafe/Hipodrom geçmişi: ${r.aynıPistMesafeOzet ?? "kayıt yok"}`,

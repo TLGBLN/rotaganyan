@@ -186,6 +186,16 @@ export type Faz1Runner = {
   equipment: string | null;
   equipmentAdded: string | null;
   equipmentRemoved: string | null;
+  // TJK'nın resmi at profilinden (AtKosuBilgileri) doğrulanmış Takı/Kilo/Jokey değişimi —
+  // "Son Yarış Detayları" panelinin KULLANDIĞI aynı kaynak, site DB alanlarından (yukarıdaki
+  // weightChange/equipmentAdded/equipmentRemoved) daha güvenilir kabul edilir (kullanıcı
+  // talimatı). sonYarisVeriKaynagiGuvenilir=false ise (tjkAtId yok/TJK fetch başarısız)
+  // yukarıdaki alanlara geri düşülür — kanıt yokluğu olumsuz kanıt değildir (§II.1).
+  sonYarisVeriKaynagiGuvenilir: boolean;
+  sonYarisTakiEklenen: string[];
+  sonYarisTakiCikarilan: string[];
+  sonYarisKiloDegisimi: number | null;
+  sonYarisAyniJokey: boolean | null;
   recentForm: string | null;
   bestTime: string | null;
   apprentice: boolean;
@@ -662,6 +672,11 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         sireStatOzet: sireStatMap.get(r.id) ?? null,
         damStatOzet: damStatMap.get(r.id) ?? null,
         adminNote: r.adminNote,
+        sonYarisVeriKaynagiGuvenilir: sonYarisDetayByNo.get(r.no)?.hasTjkId ?? false,
+        sonYarisTakiEklenen: sonYarisDetayByNo.get(r.no)?.eklenenTaki.map((t) => t.label) ?? [],
+        sonYarisTakiCikarilan: sonYarisDetayByNo.get(r.no)?.cikarilanTaki.map((t) => t.label) ?? [],
+        sonYarisKiloDegisimi: sonYarisDetayByNo.get(r.no)?.kiloDegisimi ?? null,
+        sonYarisAyniJokey: sonYarisDetayByNo.get(r.no)?.ayniJokey ?? null,
         hpBugun: hpBugunEfektif, hpBugunResmiYok, hpOncekiResmiYok, hpOncekiFetchBasarisiz,
         agf: r.agf, agfSirasi: agfSiraMap.get(r.id) ?? null,
         equipment: r.equipment, equipmentAdded: r.equipmentAdded, equipmentRemoved: r.equipmentRemoved,
