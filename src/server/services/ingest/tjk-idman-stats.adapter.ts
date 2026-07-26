@@ -168,10 +168,35 @@ export async function syncIdmanForDate(dateStr: string): Promise<{
     if (hippoSlug === "karma" || !(hippoSlug in IDMAN_SEHIR_ID)) continue;
 
     const nameToRunnerId = new Map<string, string>();
+    const runnerIdToNormName = new Map<string, string>();
+    const rawNames = new Set<string>();
     for (const race of rd.races) {
-      for (const r of race.runners) nameToRunnerId.set(normHorseName(r.name), r.id);
+      for (const r of race.runners) {
+        const norm = normHorseName(r.name);
+        nameToRunnerId.set(norm, r.id);
+        runnerIdToNormName.set(r.id, norm);
+        rawNames.add(r.name);
+      }
     }
     if (nameToRunnerId.size === 0) continue;
+
+    // Her at için SON KOŞU tarihi (bugünkü koşudan önceki en son ırk) — galopları bu
+    // tarihten SONRAKİ kayıtlarla sınırlamak için (kullanıcı talebi, 2026-07-26): önceki
+    // hazırlık döneminden kalma eski idmanlar bugünkü hazırlığı yansıtmaz ve "aynı jokey"
+    // eşleşmesini yanlış yorumlatabilir. Kendi geçmiş verimizden — ekstra TJK isteği
+    // gerektirmez; at ilk kez giriyorsa (geçmiş kaydımız yoksa) null kalır, o durumda
+    // aşağıda eskisi gibi "en güncel birkaçı" davranışına düşülür.
+    const pastRaces = await db.runner.findMany({
+      where: { name: { in: [...rawNames] }, race: { raceDay: { date: { lt: rd.date } } } },
+      select: { name: true, race: { select: { raceDay: { select: { date: true } } } } },
+    });
+    const lastRaceDateByName = new Map<string, Date>();
+    for (const pr of pastRaces) {
+      const norm = normHorseName(pr.name);
+      const d = pr.race.raceDay.date;
+      const cur = lastRaceDateByName.get(norm);
+      if (!cur || d > cur) lastRaceDateByName.set(norm, d);
+    }
 
     let idmanRows: TjkIdmanRow[];
     try {
@@ -181,14 +206,20 @@ export async function syncIdmanForDate(dateStr: string): Promise<{
       continue;
     }
 
-    // Toplu sorgu güvenilmez şekilde eksik kalabiliyor — eşleşmeyen her at için
-    // isimle tek tek arayıp tamamlıyoruz (at isimleriyle eşleştirme). Bir at
-    // başına bir istek olduğundan tam listeyi tek seferde bitirmek (60-90 at)
-    // cron süresini aşabiliyor — hiç galopu olmayan atlara öncelik verip, kalan
-    // bütçeyi eski/kısmi verisi olanlara ayırarak makul bir üst sınırla sınırlıyoruz;
-    // sınıra takılan isimler sık çalışan cron sayesinde bir sonraki turda denenir.
-    const foundNames = new Set(idmanRows.map((r) => normHorseName(r.horseName)));
-    const stillMissing = [...nameToRunnerId.entries()].filter(([n]) => !foundNames.has(n));
+    // Toplu sorgu güvenilmez şekilde eksik kalabiliyor — eşleşmeyen (ya da yalnız TEK
+    // satırla, muhtemelen eksik biçimde eşleşen — NEW ARTİST örneği: tek satır bulundu,
+    // güncel jokeyle yapılmış daha önceki bir idman hiç çekilmedi) her at için isimle tek
+    // tek arayıp tamamlıyoruz. Bir at başına bir istek olduğundan tam listeyi tek seferde
+    // bitirmek (60-90 at) cron süresini aşabiliyor — hiç galopu olmayan atlara öncelik
+    // verip, kalan bütçeyi eski/kısmi verisi olanlara ayırarak makul bir üst sınırla
+    // sınırlıyoruz; sınıra takılan isimler sık çalışan cron sayesinde bir sonraki turda denenir.
+    const MIN_BULK_ROWS = 2;
+    const bulkCountByName = new Map<string, number>();
+    for (const r of idmanRows) {
+      const n = normHorseName(r.horseName);
+      bulkCountByName.set(n, (bulkCountByName.get(n) ?? 0) + 1);
+    }
+    const stillMissing = [...nameToRunnerId.entries()].filter(([n]) => (bulkCountByName.get(n) ?? 0) < MIN_BULK_ROWS);
     const runnerIdsToCheck = stillMissing.map(([, id]) => id);
     const coveredRunnerIds = runnerIdsToCheck.length
       ? new Set(
@@ -216,13 +247,16 @@ export async function syncIdmanForDate(dateStr: string): Promise<{
         batch.map(async (normName) => {
           try {
             const byName = await fetchTjkIdmanByHorseName(normName);
-            // At isim araması atın TÜM idman geçmişini (50'ye kadar satır) döner;
-            // zaten sadece son 3'ü tutacağız — sadece en güncel birkaçını alıp
-            // gereksiz onlarca eski satırı yazıp hemen budamaktan kaçınıyoruz.
-            return byName
-              .filter((r) => normHorseName(r.horseName) === normName)
-              .sort((a, b) => b.trainingDate.getTime() - a.trainingDate.getTime())
-              .slice(0, 5);
+            const lastRaceDate = lastRaceDateByName.get(normName);
+            const exact = byName.filter((r) => normHorseName(r.horseName) === normName);
+            // Son koşu tarihi biliniyorsa YALNIZ o tarihten SONRAKİ idmanlar tutulur
+            // (bugünkü hazırlık dönemi) — bilinmiyorsa (ilk start vb.) eskisi gibi en
+            // güncel birkaçını alıp gereksiz onlarca eski satırı yazıp hemen budamaktan
+            // kaçınılır.
+            const relevant = exact
+              .filter((r) => !lastRaceDate || r.trainingDate > lastRaceDate)
+              .sort((a, b) => b.trainingDate.getTime() - a.trainingDate.getTime());
+            return lastRaceDate ? relevant.slice(0, 10) : relevant.slice(0, 5);
           } catch {
             return [] as TjkIdmanRow[]; // TJK'da bu at için idman kaydı yok — atla
           }
@@ -276,17 +310,21 @@ export async function syncIdmanForDate(dateStr: string): Promise<{
       );
     }
 
-    // Sadece son 3 galopu tut — eski idman kayıtları bir at için giderek anlamsızlaşıyor
-    // ve tabloyu şişiriyor; sync her çalıştığında en güncel 3'ün dışında kalanı budar.
+    // Son koşu tarihi biliniyorsa YALNIZ o tarihten SONRAKİ galoplar tutulur (bugünkü
+    // hazırlık dönemi, en fazla 10) — eski hazırlık dönemine ait idmanlar bugünü
+    // yansıtmaz ve "aynı jokey" eşleşmesini yanlış yorumlatabilir (kullanıcı talebi,
+    // 2026-07-26). Bilinmiyorsa (ilk start vb.) eskisi gibi en güncel 3'ü tutmaya devam eder.
     const touchedList = [...touchedRunnerIds];
     for (let i = 0; i < touchedList.length; i += WRITE_CONCURRENCY) {
       const batch = touchedList.slice(i, i + WRITE_CONCURRENCY);
       await Promise.all(
         batch.map(async (runnerId) => {
+          const normName = runnerIdToNormName.get(runnerId);
+          const lastRaceDate = normName ? lastRaceDateByName.get(normName) : undefined;
           const keep = await db.gallop.findMany({
-            where: { runnerId },
+            where: { runnerId, ...(lastRaceDate ? { date: { gt: lastRaceDate } } : {}) },
             orderBy: { date: "desc" },
-            take: 3,
+            take: lastRaceDate ? 10 : 3,
             select: { id: true },
           });
           await db.gallop.deleteMany({
