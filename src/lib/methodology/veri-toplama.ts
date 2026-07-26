@@ -389,8 +389,13 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       if (!kendisi) continue;
       const rakipler = enc.results.filter((r) => r.horseName !== horseName);
       if (rakipler.length === 0) continue;
-      const rakipOzet = rakipler.map((r) => `${r.horseName}(${r.finishPos || "?"}.)`).join(", ");
-      kayitlar.push(`${enc.date} ${enc.hippodrome}: kendisi ${kendisi.finishPos || "?"}. — ${rakipOzet}`);
+      // 2026-07-26, kullanıcı talebiyle: Aynı Pist/Mesafe satırıyla aynı gerekçeyle
+      // kilo/derece/takı/sınıf eklendi (ganyan BİLEREK dışarıda bırakıldı, bkz.
+      // aynıPistMesafeOzet'teki aynı karar). Rakip listesi kompakt tutuluyor (yalnız kilo),
+      // aksi halde çok karşılaşmalı atlarda metin çok şişerdi.
+      const rakipOzet = rakipler.map((r) => `${r.horseName}(${r.finishPos || "?"}. kilo:${r.weight || "?"})`).join(", ");
+      const sinifEk = kendisi.classType || kendisi.group ? ` (sınıf:${kendisi.classType || "—"}${kendisi.group ? ` grup:${kendisi.group}` : ""})` : "";
+      kayitlar.push(`${enc.date} ${enc.hippodrome}: kendisi ${kendisi.finishPos || "?"}. derece:${kendisi.time || "?"} kilo:${kendisi.weight || "?"} takı:${kendisi.equipment || "—"}${sinifEk} — ${rakipOzet}`);
     }
     return kayitlar.length > 0 ? kayitlar.slice(0, 3).join(" | ") : null;
   }
