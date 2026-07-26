@@ -207,7 +207,6 @@ model Runner {
   sire               String?
   dam                String?
   damSire            String?
-  pedigreeNote       String?
   adminNote          String?
   jockey             String?
   trainer            String?

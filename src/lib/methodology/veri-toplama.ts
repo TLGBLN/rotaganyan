@@ -656,7 +656,12 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
               // (nadiren, format farklıysa) sessizce etiket eklenmez — "Normal" UYDURULMAZ.
               const zeminDetay = zeminDetayiSatirdanCikar(row.surface);
               const zeminEk = zeminDetay ? ` [Zemin: ${zeminKatsayisi(zeminDetay).etiket}]` : "";
-              return `${row.date} ${row.finishPos || "?"}. (HP ${row.hp || "?"})${zeminEk}`;
+              // 2026-07-26, kullanıcı talebiyle eklendi: bu kayıtlar TJK'dan zaten 17 alanla
+              // çekiliyordu (bkz. TjkAtKosuRow) ama yalnız tarih/sıra/HP metne yazılıyordu —
+              // Faz2 promptunun kendi 6. maddesi ("KİLO-GEÇMİŞ ÇAPRAZ KONTROLÜ") burada kilo
+              // olduğunu varsayıyordu, aslında hiç yoktu. Ganyan BİLEREK dışarıda bırakıldı
+              // (kullanıcının Result.ganyan için verdiği "hiçbiri bağlanmasın" kararıyla tutarlı).
+              return `${row.date} ${row.finishPos || "?"}. derece:${row.time || "?"} kilo:${row.weight || "?"} takı:${row.equipment || "—"} jokey:${row.jockey || "?"} grup:${row.group || "—"} (HP ${row.hp || "?"})${zeminEk}`;
             })
             .join(" | ")
         : null;

@@ -231,7 +231,7 @@ export async function getArchiveStats() {
       db.race.count(),
       db.raceDay.count(),
       db.hippodrome.count({ where: { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI } } }),
-      db.runner.count({ where: { OR: [{ sire: { not: null } }, { pedigreeNote: { not: null } }] } }),
+      db.runner.count({ where: { sire: { not: null } } }),
       db.gallop.count(),
       db.raceDay.findFirst({ orderBy: { date: "asc" }, select: { date: true } }),
     ]);

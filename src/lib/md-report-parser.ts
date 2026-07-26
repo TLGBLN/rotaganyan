@@ -8,7 +8,6 @@ export interface ReportRunner {
   agf?: number;
   sire?: string;
   damSire?: string;
-  pedigreeNote?: string;
   equipmentAdded?: string;
   equipmentRemoved?: string;
   weightChange?: number;
@@ -228,6 +227,10 @@ function parseIdentityTable(block: string): Record<string, string> {
   return map;
 }
 
+// "pedigreeNote" burada yalnız YEREL bir ara değer — Runner.pedigreeNote DB alanı
+// 2026-07-26'da kaldırıldı (hiç okunmuyordu, tamamen yazma-yönlü ölü alandı). Bu
+// fonksiyonun döndürdüğü not, aşağıda YALNIZ pick.pedigreeRating'i türetmek için
+// (satır ~618) kullanılıyor, DB'ye hiç yazılmıyor.
 function parsePedigreeTable(block: string, nameIndex: Map<string, number>): Map<number, { sire?: string; damSire?: string; pedigreeNote?: string }> {
   const { headers, rows } = parseTable(block);
   const result = new Map<number, { sire?: string; damSire?: string; pedigreeNote?: string }>();

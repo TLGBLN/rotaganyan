@@ -133,7 +133,6 @@ type PedigreeInput = {
   sire?: string;
   dam?: string;
   damSire?: string;
-  pedigreeNote?: string;
   adminNote?: string;
 };
 
@@ -146,7 +145,6 @@ export async function updateRunnerPedigree(runnerId: string, input: PedigreeInpu
       sire: input.sire?.trim() || null,
       dam: input.dam?.trim() || null,
       damSire: input.damSire?.trim() || null,
-      pedigreeNote: input.pedigreeNote?.trim() || null,
       adminNote: input.adminNote?.trim() || null,
     },
   });
@@ -157,8 +155,8 @@ export async function updateRunnerPedigree(runnerId: string, input: PedigreeInpu
 }
 
 /**
- * Yalnızca adminNote'u günceller — updateRunnerPedigree'nin aksine sire/dam/damSire/
- * pedigreeNote alanlarına dokunmaz. Koşu ekranındaki tek kutulu hızlı veri girişi
+ * Yalnızca adminNote'u günceller — updateRunnerPedigree'nin aksine sire/dam/damSire
+ * alanlarına dokunmaz. Koşu ekranındaki tek kutulu hızlı veri girişi
  * (Faz1VeriDurumu) bunu kullanır; updateRunnerPedigree'yi partial input ile çağırmak
  * o alanları sessizce null'a çevirirdi.
  */

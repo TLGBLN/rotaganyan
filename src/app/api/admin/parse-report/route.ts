@@ -119,7 +119,6 @@ async function handlePost(req: NextRequest) {
       agf: r.agf ?? undefined,
       sire: r.sire ?? undefined,
       damSire: r.damSire ?? undefined,
-      pedigreeNote: r.pedigreeNote ?? undefined,
       equipmentAdded: r.equipmentAdded ?? undefined,
       equipmentRemoved: r.equipmentRemoved ?? undefined,
       weightChange: r.weightChange ?? undefined,

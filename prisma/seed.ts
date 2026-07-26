@@ -92,7 +92,6 @@ async function main() {
       startNo: 3,
       weight: 56.0,
       agf: 28.5,
-      pedigreeNote: "Frankel × Galileo — klasik mesafe pedigri, 1400m ideal mesafe",
       raceStyle: { kacak: 10, onGrupArkasi: 45, bekleme: 40, enGeri: 5 },
     },
   });
@@ -112,7 +111,6 @@ async function main() {
       startNo: 1,
       weight: 56.0,
       agf: 35.2,
-      pedigreeNote: "Sea The Stars × Dansili — güçlü pedigri, form soru işareti",
       raceStyle: { kacak: 5, onGrupArkasi: 60, bekleme: 30, enGeri: 5 },
     },
   });
@@ -133,7 +131,6 @@ async function main() {
       weight: 55.0,
       weightChange: -1.0,
       agf: 18.9,
-      pedigreeNote: "Dubawi × Montjeu — kilo düşüşü ve galop serisi dikkat çekici",
       raceStyle: { kacak: 0, onGrupArkasi: 25, bekleme: 60, enGeri: 15 },
     },
   });
@@ -278,7 +275,6 @@ async function main() {
       weight: 54.0,
       weightChange: -3.0,
       agf: 22.1,
-      pedigreeNote: "Kahyasi × Pennekamp — kum pistinde güçlü soy, −3kg kilo düşüşü kritik avantaj",
     },
   });
 
