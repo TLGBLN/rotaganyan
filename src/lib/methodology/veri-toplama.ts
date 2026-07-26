@@ -235,14 +235,17 @@ export type Faz1Runner = {
   kondisyonZinciriVar: boolean;
   keskinGalopZinciri: boolean;
 
-  // Kilo, jokey/antrenör, takı — otomatik
+  // Kilo, jokey/antrenör, takı — otomatik. kiloAvantaji: bu atın kilosu sahadaki
+  // ortalamadan en az 1kg hafif mi — önceden hesaplanıyordu ama Faz2/Faz3 promptuna
+  // hiç gönderilmiyordu (kullanıcı denetiminde bulundu, 2026-07-26).
   kiloAvantaji: boolean;
   hpAlanIciUst: boolean;
   jockeyWinPct: number | null;
   trainerWinPct: number | null;
+  // §VIII.5 "Sınıf Koruma Adayı" kuralının "en az bir ek destek" şartını doğrulamak için —
+  // sınıf düşüşü VEYA jokey/antrenör %15+ ise true. Önceden hesaplanıyordu ama Faz2/Faz3
+  // promptuna hiç gönderilmiyordu (kullanıcı denetiminde bulundu, 2026-07-26).
   sinifJokeyAntrenor: boolean;
-  takiDegisikligiVar: boolean;
-  exactVeyaPedigri: boolean;
 
   // Son 800 — Gölge Mod girdileri (yalnız TAM UYGUN — pist zorunlu + mesafe ±200m —
   // kayıtlardan hesaplanır, gecit-motoru.ts'nin kalibre eşiklerini besler, değişmedi).
@@ -621,8 +624,6 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       }
 
       const kiloAvantaji = r.weight != null && ortKilo != null ? r.weight <= ortKilo - 1 : false;
-      const takiDegisikligiVar = !!(r.equipmentAdded || r.equipmentRemoved);
-      const exactVeyaPedigri = !!(r.sire || r.dam) || son800BenzerKosuN > 0;
       const sinifJokeyAntrenor = sinifDususu || (jockeyWinPct ?? 0) >= 15 || (trainerWinPct ?? 0) >= 15;
 
       const galopOzet = r.gallops.length === 0
@@ -741,7 +742,6 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         kondisyonZinciriVar, keskinGalopZinciri,
         kiloAvantaji, hpAlanIciUst: hpAlanIciUstHesap,
         jockeyWinPct, trainerWinPct, sinifJokeyAntrenor,
-        takiDegisikligiVar, exactVeyaPedigri,
         son800BenzerKosuN, son800Medyan,
         son800TumOzet: son800TumOzetByRunnerName.get(r.name) ?? null,
         son800TumToplamKayit: son800TumToplamByRunnerName.get(r.name) ?? 0,
