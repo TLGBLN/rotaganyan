@@ -25,8 +25,9 @@ type Debug = {
 };
 
 // v6.3: analizi durdurmayan/engellemeyen ama veriye dayalı GERÇEK kontrol notları —
-// Faz3'ün kendi kurallarını (AGF asimetri, Son800+galop, HP-tek-başına, Hedef) gerçekten
-// uygulayıp uygulamadığını gösterir. Bkz. oto-analiz-faz3/route.ts kontrolNotlariUret.
+// Faz3'ün kendi kurallarını (AGF asimetri, Son800+galop, HP-tek-başına, Hedef, v6.6
+// banko/confidence tutarlılığı) gerçekten uygulayıp uygulamadığını gösterir. Bkz.
+// oto-analiz-faz3/route.ts kontrolNotlariUret.
 
 export type AIPickResult = {
   rank: number;
@@ -151,8 +152,9 @@ export default function AIAnalysisPanel({ raceId, onApply, methodologyVersion }:
 
       // Nihai sıralamayı Faz3 (Claude) kendi muhakemesiyle belirliyor (bkz. /oto-analiz-faz3
       // route'undaki not) — kod yalnız o sıraya göre kupon dilimlemesini ve mekanik banko
-      // eşiğini uyguluyor. kontrolNotlari: analizi durdurmayan, veriye dayalı gerçek kontrol
-      // notları (AGF asimetri/Son800+galop/HP-tek-başına/Hedef kuralları gerçekten uygulandı mı).
+      // eşiğini uyguluyor (v6.6'dan itibaren confidence=YUKSEK de şart). kontrolNotlari:
+      // analizi durdurmayan, veriye dayalı gerçek kontrol notları (AGF asimetri/Son800+
+      // galop/HP-tek-başına/Hedef/banko-confidence tutarlılığı kuralları gerçekten uygulandı mı).
       setPhase("faz3");
       const step2 = await fetchJson<{
         picks: AIPickResult[];

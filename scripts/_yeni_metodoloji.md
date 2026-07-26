@@ -453,13 +453,13 @@ Birden fazla çift varsa çarpılmaz, EN GÜÇLÜ olan esas alınır. Küçük �
 
 Kupon, Nihai Puana göre: **Ekonomik = ilk 3 · Normal = 4-6 · Geniş = 7 ve sonrası.**
 
-### XIX.0b Banko İçin confidence=YUKSEK Zorunlu (v6.6)
-
-Kullanıcı canlı geri bildirimi (İstanbul 2. ve 10. Koşu, aynı gün iki banko birden kaybetti): eskiden banko kararı YALNIZ sayısal eşiğe (puan/fark/AGF riski) bakıyordu, "confidence" alanı (ve bankoNote'ta yazılan çekinceler) hiç hesaba katılmıyordu. Her iki kayıp bankoda da confidence "ORTA" idi ve bankoNote'ta zaten açık bir çekince yazılıydı ("sürprize açık zemin bırakıyor", "netliği azaltıyor") — buna rağmen sayısal eşik geçtiği için banko basılmıştı. Artık **confidence=YUKSEK olmadıkça banko verilmez**, puan/fark eşiği ne kadar güçlü olursa olsun. confidence'ı YUKSEK seçmek, bankoNote'ta bir çekince yazmakla ÇELİŞEMEZ — gerçek bir çekincen varsa confidence ORTA'da kalmalı, bu otomatik olarak bankoyu engeller.
-
 ### XIX.0a ★ Hedef (isTarget) Kuralı (v6.2)
 
 ★ Hedef, pasif bir rozet değildir — gerçek bir sürpriz/değer sinyali gördüğün bir atı böyle işaretlersen, o at sıralamada **İLK 3'ÜN HEMEN ALTINA** (4. sıra civarına) getirilir ve puanı 3. sıradaki ata **yakın/eşit** verilir (yine de rank1-3'ün puanını geçemez, §XVIII.2). Yani Hedef ataması nihai sıralamayı gerçekten etkiler. Gelişigüzel dağıtılmaz — koşu başına en fazla 1-2 at, yalnız gerçekten güçlü bir sinyal varsa.
+
+### XIX.0b Banko İçin confidence=YUKSEK Zorunlu (v6.6)
+
+Kullanıcı canlı geri bildirimi (İstanbul 2. ve 10. Koşu, aynı gün iki banko birden kaybetti): eskiden banko kararı YALNIZ sayısal eşiğe (puan/fark/AGF riski) bakıyordu, "confidence" alanı (ve bankoNote'ta yazılan çekinceler) hiç hesaba katılmıyordu. Her iki kayıp bankoda da confidence "ORTA" idi ve bankoNote'ta zaten açık bir çekince yazılıydı ("sürprize açık zemin bırakıyor", "netliği azaltıyor") — buna rağmen sayısal eşik geçtiği için banko basılmıştı. Artık **confidence=YUKSEK olmadıkça banko verilmez**, puan/fark eşiği ne kadar güçlü olursa olsun. confidence'ı YUKSEK seçmek, bankoNote'ta bir çekince yazmakla ÇELİŞEMEZ — gerçek bir çekincen varsa confidence ORTA'da kalmalı, bu otomatik olarak bankoyu engeller.
 
 ### XIX.1 Kilit Gerekçe Standardı
 
@@ -491,13 +491,17 @@ Kullanıcı canlı geri bildirimi (İstanbul 2. ve 10. Koşu, aynı gün iki ban
 20. Görülmeyen sayı yazılmaz.
 21. Veri/örneklem yetersizliği analiz sürecini ASLA durdurmaz — yalnız ilgili kalemi nötr sayar.
 22. Nihai Puan = Ham Toplam (§VII.0) × Çapraz Doğrulama Katsayısı (§XVIII.3).
-23. Banko = puan≥80 + fark≥5 + risk yok. Yalnız puan≥80 = Banko Adayı.
+23. Banko = puan≥80 + fark≥5 + risk yok + confidence=YUKSEK (v6.6, bkz. §XIX.0b). Yalnız puan≥80 = Banko Adayı.
 24. Geçit motoru YOKTUR — analiz doğrudan puanlama ve muhakemeyle yapılır.
 25. Kulvar/pist geometrisi bilgisi hiçbir zaman diğer verileri gölgeleyemez veya geçersiz kılamaz — yalnız düşük ağırlıklı (Katman 4-5) bir destekleyici unsurdur.
 26. Düşük AGF, teknik açıdan güçlü bir atı geriye çekmek için gerekçe SAYILMAZ (§XVI asimetrik kural) — yalnız piyasa ilgisizliğidir, Çapraz Doğrulama Katsayısını düşürmez.
 27. Yüksek ham HP tek başına üstünlük garantilemez; form zayıfsa/gerilemişse veya tempo-stil uyumsuzsa, güçlü Son800+galop zinciri kombinasyonu (§X) gibi diğer paketler HP'nin önüne geçebilir.
 28. Yeterli örneklemli güçlü Son800 (n≥3, medyan≤−0.5sn) ile keskin bir galop zinciri BİRLİKTE görüldüğünde, bu ikili gerçek ve güçlü bir destekleyici kombinasyon sayılır ve sıralamayı/puanı belirgin biçimde yukarı taşıyabilir.
 29. 30+ gün (uzun ara) sonra dönen bir atta galop/kondisyon verisi vasat olsa bile, üstündeki jokeyin kazanma yüzdesi yüksekse bu olumlu bir kombinasyon sayılır — yalnız galop verisine bakarak ceza uygulanmaz (§XX.10 "değişiklik tek başına olumlu/olumsuz değildir" ilkesiyle tutarlı).
+30. Yağışlı/ıslak hava ile Kaçak At stili birlikte olumlu bir kombinasyon sayılır — önden giden çamur/iz dezavantajından kaçınır (§IX.6).
+31. Kalabalık sahada (10+ at) Kaçak At stili trafik/blokaj riski taşır (ceza değil, dikkatli not); az atlı sahada (≤6 at) sprinter/kapanışa güvenen atlar avantajlıdır (§IX.5).
+32. Şartlı 1/27 gibi giriş seviyeli koşularda takısız taylar takılı olanlara göre KESİNLİKLE olumlu değerlendirilir (§XIII.1).
+33. Aygır ve Kısrak İstatistiği iki bağımsız sinyaldir; biri zayıf diye diğerinin kendi eşiğini geçen olumlu sinyali "pedigri zayıf" gibi toptan bir hükümle gölgelenmez (§XII.1).
 
 ---
 

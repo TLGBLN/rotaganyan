@@ -16,7 +16,7 @@ import type { PedigreeRating, Role } from "@prisma/client";
 // "Faz2 puanlama, Faz3 muhakeme'nin işi son nihai sıralamayı belirlemek" — Claude'un işi
 // en önemli iş, bu çağrı motorun "son kontrol"ü). Kod yalnız (a) Claude'un ürettiği
 // sıraya göre kupon dilimlemesini (Ekonomik/Normal/Geniş) ve (b) mekanik banko eşiğini
-// (puan≥80+fark≥5+risk-yok) uygular — sıranın kendisine dokunmaz.
+// (puan≥80+fark≥5+risk-yok+confidence=YUKSEK, v6.6) uygular — sıranın kendisine dokunmaz.
 export const maxDuration = 300;
 
 type Body = { raceId: string; faz1: Faz1Sonuc; faz2: Faz2Atlar; sharedContext: string };
@@ -32,11 +32,14 @@ export type FinalPick = {
  * düzeltilmek üzere bana not olarak ver sadece. analiz gerçekleşsin. ama gerçek bir
  * kontrol olsun, gerçek bir eksikliği göstersin." Yani: analizi ASLA durdurmaz/
  * engellemez, yalnız Faz3'ün KENDİ kurallarını (§XVI AGF asimetri, §X/§XI Son800+
- * galop, §XX.27 HP-tek-başına, §XIX.0a Hedef) gerçekten uygulayıp uygulamadığını
- * HAM VERİYE bakarak (metin taraması değil) kontrol eder — sahte pozitif üretmemesi
- * için yalnız somut, ölçülebilir eşiklerle çalışır.
+ * galop, §XX.27 HP-tek-başına, §XIX.0a Hedef, §XIX.0b banko/confidence tutarlılığı)
+ * gerçekten uygulayıp uygulamadığını HAM VERİYE bakarak (F hariç, o metin taramasıdır)
+ * kontrol eder — sahte pozitif üretmemesi için yalnız somut, ölçülebilir eşiklerle çalışır.
  */
-function kontrolNotlariUret(faz1: Faz1Sonuc, faz2: Faz2Atlar, tumSira: Faz3Pick[]): string[] {
+function kontrolNotlariUret(
+  faz1: Faz1Sonuc, faz2: Faz2Atlar, tumSira: Faz3Pick[],
+  bankoInfo: { isBanko: boolean; bankoNote: string }
+): string[] {
   const notlar: string[] = [];
   const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
   const rankByNo = new Map(tumSira.map((p) => [p.no, p.rank]));
@@ -86,6 +89,17 @@ function kontrolNotlariUret(faz1: Faz1Sonuc, faz2: Faz2Atlar, tumSira: Faz3Pick[
     const rank1 = tumSira.find((p) => p.rank === 1);
     if (rank1 && rank1.no === enYuksekHp.no && rank1.details.length <= 1) {
       notlar.push(`#${rank1.no} ${rank1.name} en yüksek ham HP'ye (${enYuksekHp.hpBugun}) sahip olduğu için 1. sıraya konmuş görünüyor (yalnız ${rank1.details.length} detay var) — form/tempo uyumunun da gerçekten değerlendirildiğinden emin olun (§XX.27).`);
+    }
+  }
+
+  // F) Banko verildi ama bankoNote kendi kendiyle çelişen bir çekince yazıyor mu (§XIX.0b).
+  // confidence=YUKSEK şartı bunu artık kaynağında engelliyor, ama Claude yine de YUKSEK
+  // seçip metinde çekince yazabilir — bu son bir savunma katmanı, metin taraması olduğu
+  // için diğer kontroller kadar kesin değil, admin gözden geçirsin diye not düşülür.
+  if (bankoInfo.isBanko) {
+    const cekinceKaliplari = /ancak|fakat|ama\b|risk|sürpriz|belirsiz|netliği azalt|şüphe/i;
+    if (cekinceKaliplari.test(bankoInfo.bankoNote)) {
+      notlar.push(`Banko verildi ama bankoNote kendi içinde bir çekince barındırıyor gibi görünüyor: "${bankoInfo.bankoNote}" — gerçekten YÜKSEK güvenli mi, elle kontrol edin.`);
     }
   }
 
@@ -244,7 +258,7 @@ pedigreeRating değerleri: COK_YUKSEK, YUKSEK, GUCLU, ORTA, DUSUK, ZAYIF, SORU, 
 
   // Analizi ASLA durdurmaz/engellemez — yalnız admin'e sonradan düzeltilmek üzere
   // gösterilecek, veriye dayalı gerçek kontrol notları (bkz. kontrolNotlariUret yorumu).
-  const kontrolNotlari = kontrolNotlariUret(faz1, faz2, tumSira);
+  const kontrolNotlari = kontrolNotlariUret(faz1, faz2, tumSira, { isBanko, bankoNote: result.bankoNote });
 
   return NextResponse.json({
     ok: true,
