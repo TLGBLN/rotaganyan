@@ -1,10 +1,11 @@
-# ROTAGANYAN BÜTÜNLEŞİK ANALİZ MOTORU — v6.5
+# ROTAGANYAN BÜTÜNLEŞİK ANALİZ MOTORU — v6.6
 
 *(v6.1 revizyonu — canlı yarış geri bildirimiyle: düşük AGF artık teknik açıdan güçlü bir atı geriye çekme gerekçesi değil; Son800+galop zinciri kombinasyonu gerçek bir destekleyici unsur; yüksek ham HP tek başına üstünlük garantilemez. Bkz. §XVI, §X, §XI, §XX.26-28.)*
 *(v6.2 revizyonu — ★ Hedef/isTarget artık pasif bir rozet değil: işaretlenen at sıralamada ilk 3'ün hemen altına getirilir, puanı 3. sıraya yakın/eşit verilir. Bkz. §XIX.0a.)*
 *(v6.3 revizyonu — Yarış Stili 5'li şemadan (KAÇAK/ÖNCÜ/PRESÇİ/TAKİPÇİ/BEKLEYEN — çoğu at gerçek dışı şekilde "Takipçi"ye düşüyordu, %62) saha-büyüklüğü-yüzdelik 4'lü şemaya geçti: Kaçak At/Ön Grup Arkası/Bekleme Grubu/En Geri Takip — bitiş sırasıyla karışmaz, yalnız erken pozisyonu anlatır. Bkz. §IX.0.)*
 *(v6.4 revizyonu — kullanıcının canlı gözlemine dayanan 4 yeni OLUMLU kombinasyon kuralı eklendi: yağışlı hava + Kaçak At stili (§IX.6), kalabalık sahada kaçak dezavantajı/az atlı sahada sprinter avantajı (§IX.5), Şartlı 1/27 gibi giriş seviyeli koşularda takısız taylar (§XIII.1), 30+ gün aradan dönüp güçlü jokeyle koşan atlar (§XX.29). Dördü de yalnız olumlu yönde işler, hiçbiri tek başına bir atı cezalandırma gerekçesi değildir.)*
 *(v6.5 revizyonu — canlı yarış geri bildirimi (İstanbul 2.Koşu, GIRALAMO): Aygır ve Kısrak İstatistiği artık kesinlikle AYRI değerlendirilir — biri zayıf diye diğerinin kendi eşiğini geçen olumlu sinyali "pedigri zayıf" gibi toptan bir hükümle gölgelenmez. Bkz. §XII.1.)*
+*(v6.6 revizyonu — canlı yarış geri bildirimi (İstanbul 2. ve 10.Koşu, aynı gün iki banko birden kaybetti): Banko kararı artık confidence=YUKSEK şartını da zorunlu tutuyor — eskiden yalnız sayısal eşiğe (puan/fark/AGF riski) bakılıyordu, Claude'un kendi "confidence" değerlendirmesi ve bankoNote'taki çekinceler hesaba katılmıyordu. Bkz. §XIX.0b.)*
 
 ## I. SİSTEMİN AMACI
 
@@ -448,9 +449,13 @@ Birden fazla çift varsa çarpılmaz, EN GÜÇLÜ olan esas alınır. Küçük �
 
 ## XIX. BANKO VE KUPON
 
-**BANKO** — üçü birlikte: (1) Puan ≥ 80, (2) en yakın rakibe puan farkı ≥ 5, (3) belirgin risk yok (AGF>%50 aşırı konsensüs ise risk). Yalnız (1) sağlanıp (2)/(3) eksikse: **BANKO ADAYI**.
+**BANKO** — dördü birlikte: (1) Puan ≥ 80, (2) en yakın rakibe puan farkı ≥ 5, (3) belirgin risk yok (AGF>%50 aşırı konsensüs ise risk), (4) **confidence = YUKSEK** (v6.6). Yalnız (1) sağlanıp (2)/(3)/(4)'ten biri eksikse: **BANKO ADAYI**.
 
 Kupon, Nihai Puana göre: **Ekonomik = ilk 3 · Normal = 4-6 · Geniş = 7 ve sonrası.**
+
+### XIX.0b Banko İçin confidence=YUKSEK Zorunlu (v6.6)
+
+Kullanıcı canlı geri bildirimi (İstanbul 2. ve 10. Koşu, aynı gün iki banko birden kaybetti): eskiden banko kararı YALNIZ sayısal eşiğe (puan/fark/AGF riski) bakıyordu, "confidence" alanı (ve bankoNote'ta yazılan çekinceler) hiç hesaba katılmıyordu. Her iki kayıp bankoda da confidence "ORTA" idi ve bankoNote'ta zaten açık bir çekince yazılıydı ("sürprize açık zemin bırakıyor", "netliği azaltıyor") — buna rağmen sayısal eşik geçtiği için banko basılmıştı. Artık **confidence=YUKSEK olmadıkça banko verilmez**, puan/fark eşiği ne kadar güçlü olursa olsun. confidence'ı YUKSEK seçmek, bankoNote'ta bir çekince yazmakla ÇELİŞEMEZ — gerçek bir çekincen varsa confidence ORTA'da kalmalı, bu otomatik olarak bankoyu engeller.
 
 ### XIX.0a ★ Hedef (isTarget) Kuralı (v6.2)
 

@@ -109,7 +109,7 @@ ${methodologyText}`;
   };
 
   // ── FAZ 2 — CLAUDE: TEK HAVUZ (0-100) puanlama + ön teknik sıra ──
-  const faz2Tail = `Sen ROTAGANYAN v6.5 at yarışı analistisin. FAZ 2 — PUANLAMA aşamasındasın. Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan (özellikle §VII.0 Sabit 5 Katmanlı Puan Havuzu, ilgili §VII.1-10 kartı, ve §XVIII Tek Puan Sistemi).
+  const faz2Tail = `Sen ROTAGANYAN v6.6 at yarışı analistisin. FAZ 2 — PUANLAMA aşamasındasın. Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan (özellikle §VII.0 Sabit 5 Katmanlı Puan Havuzu, ilgili §VII.1-10 kartı, ve §XVIII Tek Puan Sistemi).
 
 ## GÖREVİN
 1. Koşu tipini belirle, ilgili §VII kartını (§VII.1-10) uygula — o kartın 5 katmanına (Katman 1: 22-30, Katman 2: 16-22, Katman 3: 12-16, Katman 4: 8-12, Katman 5: 5-8 puan) hangi veri paketinin girdiğini kartın kendisi söylüyor.

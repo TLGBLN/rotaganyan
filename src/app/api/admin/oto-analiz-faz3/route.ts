@@ -121,7 +121,7 @@ async function handlePost(req: NextRequest) {
   const sahaBuyuklugu = faz1.runners.length;
   const enIyiN = Math.min(8, sahaBuyuklugu);
 
-  const faz3Tail = `Sen ROTAGANYAN v6.5 at yarışı analistisin. FAZ 3 — MUHAKEME ve NİHAİ SIRALAMA aşamasındasın (motorun "son kontrol"ü — bu senin işin, en önemli iş). Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan (özellikle §II.4 Kural Denetim Protokolü, §XVIII Tek Puan Sistemi, §XIX Kilit Gerekçe standardı, §VII.0 Kalabalık Saha kuralı).
+  const faz3Tail = `Sen ROTAGANYAN v6.6 at yarışı analistisin. FAZ 3 — MUHAKEME ve NİHAİ SIRALAMA aşamasındasın (motorun "son kontrol"ü — bu senin işin, en önemli iş). Yukarıdaki KOŞU/ATLAR/METODOLOJİ bağlamını kullan (özellikle §II.4 Kural Denetim Protokolü, §XVIII Tek Puan Sistemi, §XIX Kilit Gerekçe standardı, §VII.0 Kalabalık Saha kuralı).
 
 ## FAZ 2 PUANLARIN (yalnız BAŞLANGIÇ NOKTASI — nihai sıralamayı SEN belirleyeceksin)
 ${faz2.atlar.map((a) => `#${a.no} ${a.ad}: Puan=${a.puan} (ön teknik sıra ${a.teknikSira})`).join("\n")}
@@ -140,8 +140,8 @@ ${faz2.atlar.map((a) => `#${a.no} ${a.ad}: Puan=${a.puan} (ön teknik sıra ${a.
 5. Her pick için "pedigreeRating"/"isTarget"/"details" üret (§IX: uydurma bilgi yasak — yalnız KOŞU/ATLAR verisinde verilen ham pedigri/aygır-kısrak istatistiğiyle sınırlı kal). details: kısa iç etiketler (örn. "AGF1", "Galop K1", "Sınıf düşüşü") — admin rozeti, kullanıcıya gitmez.
 5b. ★ HEDEF (isTarget) KURALI (v6.2, kullanıcı talimatı): isTarget=true işaretlediğin bir at yalnız pasif bir rozet almaz — sıralamada İLK 3'ÜN HEMEN ALTINA (4. sıra civarına) getirilir ve "score"u 3. sıradaki atınkine YAKIN/EŞİT verilir (rank1-3'ün score'undan düşük olmalı, madde 2'deki tutarlılık kuralına uy). Yani Hedef ataması sıralamayı GERÇEKTEN etkiler — yalnız "ilginç ama etkisiz" bir not değildir. Bunu yalnız gerçekten güçlü bir sürpriz/değer sinyali olduğuna inandığın at(lar) için kullan, gelişigüzel dağıtma (en fazla 1-2 at).
 6. Kendi sıraladığın picks listesinin İLK 6'sı için "gerekceler" dizisine bir "note" yaz — §XIX.2: EN FAZLA 2 CÜMLE, sade dil, iç terim (puan/katsayı/katman) GEÇMEZ, doğrudan kullanıcıya (public "Kilit Gerekçe") gidiyor.
-7. "confidence" (DUSUK/ORTA/YUKSEK): sıralamanın netliğine (1.-2. arası fark, çelişkili sinyal sayısı) göre.
-8. "bankoNote": banko kararının KENDİSİNİ kod ayrıca mekanik olarak hesaplayacak (puan≥80+fark≥5+piyasa riski yok) — sen yalnız 1.-2. arası farkı ve genel netliği 1-2 cümleyle sade dilde yorumla.
+7. "confidence" (DUSUK/ORTA/YUKSEK, v6.6 — ÖNEMLİ, gerçekten dikkatli seç): sıralamanın netliğine (1.-2. arası fark, çelişkili sinyal sayısı) göre. Bu alan artık YALNIZ bilgi amaçlı değil — kod, YUKSEK olmadıkça banko VERMEZ, puan/fark eşiği ne kadar güçlü olursa olsun. Yani bankoNote'unda ("ancak", "riski var" gibi) bir çekince yazacaksan confidence'ı YUKSEK seçme, ORTA'da bırak — gerçek bir çekincen varsa banko otomatik engellenmeli, kendi kendinle çelişme (iki gerçek örnek: puan farkı yeterliydi ama bankoNote'ta zaten "sürprize açık", "netliği azaltıyor" gibi çekinceler vardı — confidence eskiden hiç kontrol edilmiyordu, ikisi de banko verilip kaybetti).
+8. "bankoNote": banko kararının KENDİSİNİ kod ayrıca mekanik olarak hesaplayacak (puan≥80+fark≥5+piyasa riski yok+confidence=YUKSEK) — sen yalnız 1.-2. arası farkı ve genel netliği 1-2 cümleyle sade dilde yorumla.
 9. "notes": genel koşu değerlendirmesi, sade özet. "tempo": tempo beklentisi (sade dil).
 
 Yanıtı YALNIZCA geçerli JSON olarak ver, başka metin ekleme:
@@ -227,15 +227,20 @@ pedigreeRating değerleri: COK_YUKSEK, YUKSEK, GUCLU, ORTA, DUSUK, ZAYIF, SORU, 
   const couponNormal = tumSira.slice(3, 6).map((p) => p.no).join("-");
   const couponWide = tumSira.slice(6).map((p) => p.no).join("-");
 
-  // Banko — mekanik eşik (puan≥80 + fark≥5 + risk yok), Claude'un ÜRETTİĞİ nihai sıradaki
-  // 1.-2.ye göre. Risk = piyasanın (AGF) 1. DIŞINDA bir atı %50'nin üzerinde desteklemesi.
-  // Canlı veride "ganyan" alanı yalnız yarış SONRASI Result modelinde var, Runner'da yok —
-  // bu yüzden risk kontrolü yalnız AGF'ye dayanıyor.
+  // Banko — mekanik eşik (puan≥80 + fark≥5 + risk yok + confidence=YUKSEK), Claude'un
+  // ÜRETTİĞİ nihai sıradaki 1.-2.ye göre. Risk = piyasanın (AGF) 1. DIŞINDA bir atı
+  // %50'nin üzerinde desteklemesi. Canlı veride "ganyan" alanı yalnız yarış SONRASI
+  // Result modelinde var, Runner'da yok — bu yüzden risk kontrolü yalnız AGF'ye dayanıyor.
+  // 2026-07-26, kullanıcı tespiti (İstanbul 2. ve 10. Koşu — iki banko da kaybetti):
+  // eskiden yalnız sayısal eşiğe bakılıyordu, Claude'un KENDİ "confidence" değerlendirmesi
+  // (ve bankoNote'ta yazdığı çekinceler) hiç hesaba katılmıyordu — iki kayıp bankonun
+  // ikisinde de confidence "ORTA" idi, "YUKSEK" değil, ve bankoNote'ta risk zaten yazılıydı.
+  // Artık confidence=YUKSEK de zorunlu — Claude'un kendi çekincesi artık gerçekten dinleniyor.
   const agfByNo = new Map(faz1.runners.map((r) => [r.no, r.agf]));
   const top1 = tumSira[0];
   const top2 = tumSira[1];
   const piyasaRiski = tumSira.slice(1).some((p) => (agfByNo.get(p.no) ?? 0) > 50);
-  const isBanko = !!top1 && top1.score >= 80 && (top1.score - (top2?.score ?? 0)) >= 5 && !piyasaRiski;
+  const isBanko = !!top1 && top1.score >= 80 && (top1.score - (top2?.score ?? 0)) >= 5 && !piyasaRiski && result.confidence === "YUKSEK";
 
   // Analizi ASLA durdurmaz/engellemez — yalnız admin'e sonradan düzeltilmek üzere
   // gösterilecek, veriye dayalı gerçek kontrol notları (bkz. kontrolNotlariUret yorumu).
