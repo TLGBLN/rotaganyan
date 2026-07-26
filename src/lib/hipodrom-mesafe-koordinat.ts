@@ -108,3 +108,18 @@ export const HIPODROM_MESAFE_KOORDINATLARI: Record<string, YuzeyKoordinatlari> =
     },
   },
 };
+
+/**
+ * Bu mesafenin start noktası pistin virajında mı düz yolunda mı — tüm hipodromların
+ * ortak "stadyum ovali" biçiminden çıkarılan bir yaklaşıklık (sol/sağ uçtaki yuvarlak
+ * bölge = viraj, üst/alt yatay bant ve yan şeritler/chute'lar = düz yol). §III.2/§XX.25
+ * kuralı gereği bu YALNIZ destekleyici bir bağlam notudur, kesin bir ölçüm değildir.
+ */
+export function kulvarBolgesi(hippodromeSlug: string, surface: "CIM" | "KUM" | "SENTETIK", distance: number): "viraj" | "düz yol" | null {
+  const koordinat = HIPODROM_MESAFE_KOORDINATLARI[hippodromeSlug]?.[surface]?.[distance];
+  if (!koordinat) return null;
+  const { x, y } = koordinat;
+  const solVeyaSagUc = x <= 18 || x >= 82;
+  const ortaDikeyBant = y >= 15 && y <= 80;
+  return solVeyaSagUc && ortaDikeyBant ? "viraj" : "düz yol";
+}

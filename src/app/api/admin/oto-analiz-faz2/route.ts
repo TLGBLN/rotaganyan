@@ -47,7 +47,7 @@ async function handlePost(req: NextRequest) {
     .map((r) => {
       const kiloStr = r.weightChange != null ? `${r.weightChange >= 0 ? "+" : ""}${r.weightChange}kg` : "—";
       return [
-        `#${r.no} ${r.ad}${r.startNo != null ? `  Kulvar:${r.startNo}` : ""}${r.disaridanStart ? "  [⚠ DS — KENDİ TERCİHİYLE DIŞTAN START, olumlu bir etken olabilir, dikkate al]" : ""}`,
+        `#${r.no} ${r.ad}${r.startNo != null ? `  Kulvar:${r.startNo}${r.kulvarBolge ? ` (${r.kulvarBolge})` : ""}` : ""}${r.disaridanStart ? "  [DS — at sahibinin KENDİ TERCİHİYLE dıştan start seçimi, ASLA olumsuz sayılmaz — olumlu bir etken olma ihtimali daha yüksek, destekleyici unsur olarak değerlendir]" : ""}`,
         `  Kilo:${r.weight ?? "—"}(${kiloStr}) Jokey:${r.jockey ?? "—"}(%${r.jockeyWinPct ?? "?"})${r.apprentice ? ` [ÇIRAK jokey, kalan kilo indirim hakkı:${r.apprenticeRemaining ?? "?"}]` : ""}${r.jockeyChanged ? ` [JOKEY DEĞİŞTİ, önceki jokey:${r.previousJockey ?? "?"}]` : ""} Antrenör:${r.trainer ?? "—"}(%${r.trainerWinPct ?? "?"})`,
         ...(r.ekuriMateleri.length > 0 ? [`  Eküri: aynı sahiplikten bu koşuda da koşan diğer at(lar): ${r.ekuriMateleri.join(", ")} — pacemaker/rehavet etkisi olası, göz ardı etme`] : []),
         `  Pedigri: ${r.sire ?? "—"} — ${r.dam ?? "—"} (${r.damSire ?? "—"})`,
@@ -72,6 +72,7 @@ async function handlePost(req: NextRequest) {
         `  Son800 benzer koşu (KESİN — pist zorunlu+mesafe≤200m) n=${r.son800BenzerKosuN} medyan fark=${r.son800Medyan ?? "—"}`,
         `  Son800 TÜM kayıtlar (bu yıl, en fazla 4, TAM UYGUN öncelikli): ${r.son800TumOzet ?? "Accurace kaydı yok"}`,
         `  Aynı Pist/Mesafe/Hipodrom geçmişi: ${r.aynıPistMesafeOzet ?? "kayıt yok"}`,
+        `  Bu Hipodrom+Mesafe+Pist'te TÜM YILLAR (TJK resmi profilinden doğrulanmış): ${r.hipodromMesafedeKazandi === "EVET" ? "EN AZ 1 KEZ KAZANDI" : r.hipodromMesafedeKazandi === "HAYIR" ? "koştu, hiç kazanmadı" : "hiç koşmadı"}${r.hipodromMesafedeEnIyiDerece ? ` — en iyi derecesi: ${r.hipodromMesafedeEnIyiDerece}` : ""}`,
         ...(r.h2hOzet ? [`  H2H (zayıf kanıt, sahadaki diğer atlarla geçmiş karşılaşma): ${r.h2hOzet}`] : []),
         `  Ön-hesaplanmış (kod, YENİDEN HESAPLAMA): HP Kalitesi ${r.hpKalitesiYildizi != null ? `⭐${r.hpKalitesiYildizi}/5` : "tabloda tanımsız (serbest değerlendir)"} · Sınıf Geçiş ${r.sinifGecisBonusuPuan != null ? (r.sinifGecisBonusuPuan >= 0 ? `+${r.sinifGecisBonusuPuan}` : `${r.sinifGecisBonusuPuan}`) : "?"} · Galop zinciri ${r.galopSiniflandirma.ozet} · Tempo Güven: ${r.tempoGuven ?? "?"}`,
       ].join("\n");

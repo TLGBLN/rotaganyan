@@ -26,6 +26,8 @@ import {
   kacakHaritasi, zeminKatsayisi, zeminDetayiBul, zeminDetayiSatirdanCikar, type GalopZinciriSonuc, type TempoGuven,
 } from "@/lib/methodology/mekanik-puanlama";
 import { analizEtTekYaris, hesaplaCokYarisEgilimi, type PaceCheckpoint, type CokYarisEgilim } from "@/lib/methodology/pace-analizi";
+import { kulvarBolgesi } from "@/lib/hipodrom-mesafe-koordinat";
+import { getSonYarisDetaylariForRace } from "@/server/actions/son-yaris-detay.actions";
 
 const COMBINING_MARKS_RE = /[̀-ͯ]/g;
 // Yabancı doğumlu atlarda Runner.name "(USA)"/"(IRE)" gibi ülke koduyla biter, Accurace bunu yazmıyor.
@@ -135,6 +137,15 @@ export type Faz1Runner = {
   // Kulvar/start no — hipodrom geometrisiyle birlikte (§III.2/§IV.1) YALNIZ destekleyici
   // bir unsur olarak okunmalı, ana veriyi (HP/sınıf/tempo/form) asla gölgeleyemez (§XX.25).
   startNo: number | null;
+  // Bugünkü mesafe/pist kombinasyonunun start noktası pistin virajında mı düz yolunda mı
+  // (bkz. hipodrom-mesafe-koordinat.ts kulvarBolgesi) — tüm atlar için AYNI (koşu seviyesi
+  // bir bağlam), kulvar numarasıyla birlikte okunur.
+  kulvarBolge: "viraj" | "düz yol" | null;
+  // TJK'nın resmi at profilinden (AtKosuBilgileri) doğrulanmış: bu hipodrom+mesafe+pist
+  // kombinasyonunda (TÜM yıllar) daha önce kazandı mı, en iyi derecesi ne — "Son Yarış
+  // Detayları" panelindeki kaynakla AYNI, site DB alanlarına güvenmiyor.
+  hipodromMesafedeKazandi: "EVET" | "HAYIR" | "KOSMADI";
+  hipodromMesafedeEnIyiDerece: string | null;
   jockey: string | null;
   jockeyChanged: boolean;
   previousJockey: string | null;
@@ -288,7 +299,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   const trainerNames = [...new Set(race.runners.map((r) => r.trainer).filter((t): t is string => !!t))];
 
   const { getJockeyStats, getTrainerStats } = await import("@/server/services/race.service");
-  const [jockeyStats, trainerStats, atPerformansRows, h2hEncounters, apprenticeRemainingMap, accuraceKayitlari, sireStatOzetleri, damStatOzetleri] = await Promise.all([
+  const [jockeyStats, trainerStats, atPerformansRows, h2hEncounters, apprenticeRemainingMap, accuraceKayitlari, sireStatOzetleri, damStatOzetleri, sonYarisDetaylari] = await Promise.all([
     getJockeyStats(jockeyNames).catch(() => ({} as Awaited<ReturnType<typeof getJockeyStats>>)),
     getTrainerStats(trainerNames).catch(() => ({} as Awaited<ReturnType<typeof getTrainerStats>>)),
     getAtPerformansForRace(raceId).catch(() => []),
@@ -304,10 +315,13 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
     getDamStatOzetleriForRace(race.runners.map((r) => ({ dam: r.dam, damSire: r.damSire })), race.breed, race.surface, race.distance).catch(
       () => race.runners.map(() => null)
     ),
+    getSonYarisDetaylariForRace(raceId).catch(() => []),
   ]);
   const atPerformansMap = new Map(atPerformansRows.map((r) => [r.horseName, r.records]));
   const sireStatMap = new Map(race.runners.map((r, i) => [r.id, sireStatOzetleri[i] ?? null]));
   const damStatMap = new Map(race.runners.map((r, i) => [r.id, damStatOzetleri[i] ?? null]));
+  const sonYarisDetayByNo = new Map(sonYarisDetaylari.map((d) => [d.runnerNo, d]));
+  const kulvarBolgeBugun = kulvarBolgesi(race.raceDay.hippodrome.slug, race.surface, race.distance);
 
   // Accurace GPS/sektörel geçmişinden atın KALICI tempo/pozisyon eğilimini üret —
   // yalnız n≥3 yarış varsa (bkz. pace-analizi.ts, tek yarıştan kalıcı stil çıkarılmaz).
@@ -638,6 +652,9 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       return {
         id: r.id, no: r.no, ad: r.name, scratched: r.scratched,
         weight: r.weight, weightChange: r.weightChange, disaridanStart: r.disaridanStart, startNo: r.startNo,
+        kulvarBolge: kulvarBolgeBugun,
+        hipodromMesafedeKazandi: sonYarisDetayByNo.get(r.no)?.kazandi ?? "KOSMADI",
+        hipodromMesafedeEnIyiDerece: sonYarisDetayByNo.get(r.no)?.enIyiDerecesi ?? null,
         jockey: r.jockey, jockeyChanged: r.jockeyChanged, previousJockey: r.previousJockey,
         trainer: r.trainer, owner: r.owner,
         ekuriMateleri: ekuriMateMap.get(r.id) ?? [],
