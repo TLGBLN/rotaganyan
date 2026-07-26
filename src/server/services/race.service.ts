@@ -499,6 +499,7 @@ export type KazananKupon = {
   variantLabel: string;
   amount: number;
   ikramiye: string | null;
+  legs: KuponLeg[];
 };
 
 /**
@@ -530,6 +531,7 @@ export async function getGecmisKazananKuponlar(limit = 20): Promise<KazananKupon
       variantLabel: hitVariant.label,
       amount: hitVariant.amount,
       ikramiye: k.ikramiye,
+      legs: hitVariant.legs,
     });
   }
   return results;
