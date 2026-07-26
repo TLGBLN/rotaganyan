@@ -314,21 +314,6 @@ model AccuraceHorseSplit {
   @@index([horseName])
 }
 
-// Admin-maintained sire reputation reference — powers automatic pedigree scoring.
-// Tiers are domain knowledge the analyst (not the system) owns; this table just
-// lets that knowledge be looked up instead of re-typed into every report.
-model SireTier {
-  id      String         @id @default(cuid())
-  name    String         @unique
-  tier    PedigreeRating
-  surface Surface?
-  breed   Breed?
-  note    String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 // ─── PREDICTION ───────────────────────────────────────────────────────────────
 
 model Prediction {

@@ -528,30 +528,6 @@ async function main() {
   }
   console.log(`✅ ${engineConfigs.length} engine config oluşturuldu`);
 
-  // ─── Sire tier referansı (otomatik pedigri puanlaması) ────────────────────
-  const sireTiers: { name: string; tier: PedigreeRating; surface?: Surface; breed?: Breed; note?: string }[] = [
-    { name: "Kuruşağa", tier: PedigreeRating.COK_YUKSEK, surface: Surface.KUM, breed: Breed.ARAP, note: "Kanıtlı kum/1400m aygırı" },
-    { name: "Fatih Ağa", tier: PedigreeRating.COK_YUKSEK, surface: Surface.KUM, breed: Breed.ARAP, note: "Grubun en elit kum aygırı" },
-    { name: "Araslı", tier: PedigreeRating.COK_YUKSEK, surface: Surface.KUM, breed: Breed.ARAP, note: "En değerli 1400m kum dayanıklılık hattı (damsire rolünde)" },
-    { name: "Ayabakan", tier: PedigreeRating.COK_YUKSEK, surface: Surface.KUM, breed: Breed.ARAP, note: "Kum sprint hattı" },
-    { name: "Turbo", tier: PedigreeRating.COK_YUKSEK, surface: Surface.KUM, breed: Breed.ARAP, note: "Dayanıklılık hattı" },
-    { name: "Mengübert", tier: PedigreeRating.ORTA, breed: Breed.ARAP, note: "1400m kum için spesifik kanıt yok" },
-    { name: "Beyefendi", tier: PedigreeRating.ORTA, breed: Breed.ARAP, note: "1400m kum için spesifik kanıt yok" },
-    { name: "Diliran", tier: PedigreeRating.ORTA, breed: Breed.ARAP, note: "Zayıf kum hattı" },
-    { name: "Bilgin", tier: PedigreeRating.ORTA, breed: Breed.ARAP },
-    { name: "Berksoy", tier: PedigreeRating.ZAYIF, breed: Breed.ARAP },
-    { name: "Tamerinoğlu", tier: PedigreeRating.ZAYIF, breed: Breed.ARAP },
-  ];
-
-  for (const st of sireTiers) {
-    await db.sireTier.upsert({
-      where: { name: st.name },
-      update: {},
-      create: st,
-    });
-  }
-  console.log(`✅ ${sireTiers.length} sire tier oluşturuldu`);
-
   console.log("\n🎉 Seed tamamlandı!");
 }
 

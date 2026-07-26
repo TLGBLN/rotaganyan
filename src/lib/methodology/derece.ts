@@ -9,7 +9,7 @@ function normTr(s: string): string {
 }
 
 export type DereceResult = {
-  /** -1..3 aralığında, scorer.ts'teki diğer topic'lerle aynı ölçek */
+  /** -1..3 aralığında bir ölçek */
   score: number;
   label: string;
 };
