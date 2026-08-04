@@ -4,7 +4,7 @@ import { gatherFaz1 } from "@/lib/methodology/veri-toplama";
 import type { Anthropic } from "@anthropic-ai/sdk";
 import { createWithTruncationRetry, extractText } from "@/lib/methodology/claude-analiz-helpers";
 import type { Role } from "@prisma/client";
-import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle } from "@/lib/methodology/v2-engine";
+import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit } from "@/lib/methodology/v2-engine";
 
 // v6.44 — YENİ MOTOR, TÜM KATEGORİLER (kullanıcı: "inşa et"). Bu rota TAMAMEN İZOLE —
 // mevcut oto-analiz-faz2/faz3 rotalarına HİÇ dokunmuyor, hiçbir DB yazma/publish işlemi
@@ -74,7 +74,7 @@ async function handlePost(req: NextRequest) {
 
   const reminder = `Şimdi yukarıdaki V-kodu tanımlarını, muhakeme matrisini ve KOŞU/AT verisini kullanarak HER at için "muhakeme" üret. Bu koşu ${KATEGORI_ADI[kategori]} kategorisinde — yalnız KOŞU/AT verisinde GÖRÜNEN V-kodlarını kullan, görünmeyen bir kod hakkında veri uydurma.
 
-**FORMAT — KOMPAKT ETİKET NOTASYONU (maliyet verimliliği — bu metin yalnız Faz 3'e girdi, kullanıcıya GİTMEZ, doğal dil/cümle gerekmez):** "muhakeme" alanında TAM CÜMLE DEĞİL, kısa "Etiket:değer(bağlam)" parçaları yaz, "|" ile ayır. Fiil/bağlaç/özne YASAK ("...olduğu görülüyor" gibi ifadeler yazma) — yalnız kanıtın kendisi. Muhakeme Matrisi'nde çapraz sorguladığın HER çift için mutlaka "[Vx+Vy]:destek" (doğrulanan/uyumlu) veya "[Vx+Vy]:risk" (çelişen/riskli) etiketi ekle (bağlamı parantez içinde 1-3 kelimeyle ver). Örnek gerçek bir at için: 'V10:KaçakAt | V18:3(iç) | [V10+V18]:destek(iç kulvar+kaçak avantajlı) | V9:n=4,med-0.6(güçlü) | V2:3idman,keskin | [V2+V9]:destek(idman+kapanış örtüşüyor) | V13:56(-2kg) | [V13+V10]:risk(ağır kilo erken enerji riski) | V20:68→72(ivme+4) | V21:%12,sıra2(trend+3)'. Bu notasyon eksiksizliği AZALTMAZ (hangi V-kodları bu atta veri taşıyorsa hepsi değerlendirilir) — yalnız YAZIM BİÇİMİNİ sıkıştırır, kısalık için veri asla atlanmaz.
+**FORMAT — KOMPAKT ETİKET NOTASYONU (maliyet verimliliği, doğal dil/cümle gerekmez):** "muhakeme" alanında TAM CÜMLE DEĞİL, kısa "Etiket:değer(bağlam)" parçaları yaz, "|" ile ayır. Fiil/bağlaç/özne YASAK ("...olduğu görülüyor" gibi ifadeler yazma) — yalnız kanıtın kendisi. Muhakeme Matrisi'nde çapraz sorguladığın HER çift için mutlaka "[Vx+Vy]:destek" (doğrulanan/uyumlu) veya "[Vx+Vy]:risk" (çelişen/riskli) etiketi ekle (bağlamı parantez içinde 1-3 kelimeyle ver). Örnek gerçek bir at için: 'V10:KaçakAt | V18:3(iç) | [V10+V18]:destek(iç kulvar+kaçak avantajlı) | V9:n=4,med-0.6(güçlü) | V2:3idman,keskin | [V2+V9]:destek(idman+kapanış örtüşüyor) | V13:56(-2kg) | [V13+V10]:risk(ağır kilo erken enerji riski) | V20:68→72(ivme+4) | V21:%12,sıra2(trend+3)'. Bu notasyon eksiksizliği AZALTMAZ (hangi V-kodları bu atta veri taşıyorsa hepsi değerlendirilir) — yalnız YAZIM BİÇİMİNİ sıkıştırır, kısalık için veri asla atlanmaz.
 
 Yanıtı YALNIZCA geçerli JSON olarak ver:
 {
@@ -116,6 +116,32 @@ Yanıtı YALNIZCA geçerli JSON olarak ver:
   // göstermemeli." İkisi de ek Claude çağrısı yapmaz, tamamen mekanik/koddur.
   const faz1VeriDenetimi = faz1VeriKapsami(faz1, izinliKodlar);
   const faz2Denetim = parsed ? faz2MuhakemeDenetle(faz1, izinliKodlar, parsed.atlar) : null;
+  // v6.50 — kullanıcı kararı: Faz3 kullanılmayacak (ek maliyet), bu yüzden Elazığ 8
+  // dersini (güçlü/geniş örneklemli sinyal tek risk yüzünden son sıraya düşmesin) Faz2
+  // promptuna EKLEMEK yerine (bu da maliyet demek) tamamen ücretsiz mekanik bir
+  // son-kontrol olarak burada uyguluyoruz.
+  const faz2KaliteUyarilari = parsed ? faz2KaliteDenetimi(parsed.atlar) : null;
+  const faz2BankoAdayi = parsed ? faz2BankoAdayiTespit(parsed.atlar) : null;
+
+  // v6.51 — kullanıcı kararı 2026-08-03 ("hepsini hayata sok"): bu rota artık yalnız
+  // izole test değil, GERÇEK admin akışının (V2AnalysisPanel → upsertPrediction) veri
+  // kaynağı da. runners: no→runnerId eşlemesi için (AIAnalysisPanel'deki aynı desen).
+  // tempoOzeti/kupon dilimleri: Faz3 yokken bile assertPublishSafe'in "2+ kaçak → tempo
+  // zorunlu" kuralını mekanik olarak karşılamak ve kupon dilimlemesini merkezi tutmak için.
+  const runners = faz1.runners.map((r) => ({ id: r.id, no: r.no, name: r.ad }));
+  const kacakSayisi = faz1.runners.filter((r) => r.raceStyleEtiket === "Kaçak At").length;
+  const tempoOzeti = kacakSayisi >= 2
+    ? `Sahada ${kacakSayisi} kaçak stilli at var — erken tempo baskısı olası, kapanış gücü güçlü atlar avantajlı olabilir.`
+    : kacakSayisi === 1
+    ? "Sahada 1 kaçak stilli at var — belirgin bir erken tempo baskısı beklenmiyor."
+    : "Sahada net kaçak stilli at yok — tempo dağınık olabilir.";
+  let couponNarrow: string | undefined, couponNormal: string | undefined, couponWide: string | undefined;
+  if (parsed) {
+    const sirali = [...parsed.atlar].sort((a, b) => a.teknikSira - b.teknikSira).map((a) => a.no);
+    couponNarrow = sirali.slice(0, 3).join("-");
+    couponNormal = sirali.slice(3, 6).join("-");
+    couponWide = sirali.slice(6).join("-");
+  }
 
   return NextResponse.json({
     ok: true,
@@ -126,6 +152,11 @@ Yanıtı YALNIZCA geçerli JSON olarak ver:
     raw: parsed ? undefined : raw,
     faz1VeriDenetimi,
     faz2Denetim,
+    faz2KaliteUyarilari,
+    faz2BankoAdayi,
+    runners,
+    tempoOzeti,
+    couponNarrow, couponNormal, couponWide,
   });
 }
 

@@ -78,7 +78,7 @@ Hiçbir V-koduna sabit yüzde/tavan uygulanmaz. Bir veri kalemi o koşunun kader
 ## MUHAKEME MATRİSİ — ÇAPRAZ SORGULANACAK ÇİFTLER (olasılıksal dil, KESİNLİK YOK)
 [V2+V9] İdman keskinliği yarışın kapanış gücüyle örtüşüyor mu — ikisi de güçlüyse gerçek destekleyici çift.
 [V10+V11] Atın stili hipodromun düzlük uzunluğuna uyuyor mu.
-[V10+V12] Atın stili bu pist/mesafede tarihsel kazanan stille örtüşüyor mu.
+[V10+V12] Atın stili bu pist/mesafede tarihsel kazanan stille örtüşüyor mu. ÖNEMLİ (gerçek bulgu, Elazığ 8.Koşu 2026-08-03 — OLGUNADAM 2. geldi ama V12 uyumsuzluğu yüzünden 9. sıraya çekilmişti, FISILTIKAYA 3. geldi ama aynı sebeple son sıraya çekilmişti): V12, SAHANIN GENEL/tarihsel eğilimidir — atın KENDİ geniş örneklemli (n≥5) V9 (Son800) veya V10 (Accurace tempo) sinyali güçlüyse, yalnız V12 uyumsuzluğu YÜZÜNDEN bu atı aşağı çekme. Popülasyon istatistiği (V12), güçlü bireysel kanıtı (V9/V10, n≥5) BASTIRAMAZ — yalnız iki at birbirine yakın/eşit güçteyse aralarında ayırt edici bir ek unsur olarak kullanılabilir.
 [V10+V18] İç kulvar+kaçak stili kolay öne çıkar; dış kulvar+kaçak stili ilk 400m'de enerji maliyeti yaratabilir (KESİN değil, ihtimal).
 [V13+V10] Ağır kilo Kaçak atta erken enerji tükenmesine, Bekleme/Sprinter atta son düzlük ivmelenmesinin gecikmesine yol açabilir.
 [V13+V22] Islak/çamur zeminde taşınan kilo normalden daha fazla yıpranma yaratabilir.
@@ -94,7 +94,8 @@ Hiçbir V-koduna sabit yüzde/tavan uygulanmaz. Bir veri kalemi o koşunun kader
 
 ## AĞIRLIKLI RİSK SİNYALLERİ (zorunlu belirtme, zorunlu SONUÇ değil)
 Koşuda 3+ at V10=Kaçak At ise, bu durumu HER kaçak atın analizinde belirt (atlanamaz) — Bekleme/Sprinter atlar lehine GÜÇLÜ BİR EĞİLİM oluşur, ama KESİN değildir: jokey taktiği veya bir kaçak atın istisnai V2+V9 kombinasyonu bu eğilimi geçersiz kılabilir. "Matematiksel olarak imkansız" gibi kesinlik ifadeleri YASAK — yalnız "yüksek risk/orta risk/düşük risk" gibi dereceli dil kullan.
-Eküri Yasası (V16): İki atın da bireysel V10 stilleri somut bir taktik kurguyu desteklemiyorsa, spekülatif senaryo YAZMA — etkiyi NÖTR (0) kabul et.`;
+Eküri Yasası (V16): İki atın da bireysel V10 stilleri somut bir taktik kurguyu desteklemiyorsa, spekülatif senaryo YAZMA — etkiyi NÖTR (0) kabul et.
+TEK RİSK GÜÇLÜ SİNYALİ SİLMEZ (gerçek bulgu, Elazığ 8.Koşu 2026-08-03): geniş örneklemli (n≥5) güçlü bir V9 (Son800) veya V10 (Accurace tempo) sinyali, TEK bir risk etiketi (ör. tekrarlayan geç çıkış, V12 stil uyumsuzluğu, kilo artışı) yüzünden "teknikSira"da son sıralara çekilmemeli — o gün OLGUNADAM (%71 Accurace, n=7) ve FISILTIKAYA (Son800 n=10, iyi) tam bu hatayla son sıralara düşürülmüştü, ikisi de gerçekte üst 3'te bitirdi. Güçlü/geniş-örneklemli pozitif kanıt ile tekil bir risk DENGELENMELİ, risk kanıtı otomatik ELEMEMELİ.`;
 
 function takiEfektif(r: Faz1Runner): { eklenen: string; cikarilan: string } {
   return {
@@ -184,7 +185,7 @@ export function buildFaz3InstructionsV2(): string {
 1. KANIT AĞIRLIKLI KATMAN PUANLAMASI (dinamik atama, sabit tavan yok): Sabit 5 katman ARALIĞI var — Katman 1: 23-30, Katman 2: 17-22, Katman 3: 13-16, Katman 4: 9-12, Katman 5: 5-8 puan (ardışık, çakışmaz, her puan tam olarak bir katmana aittir). AMA hangi kanıtın/doğrulanan çiftin hangi katmana gireceği SABİT DEĞİL — bu SENİN bu koşudaki gerçek kanıt gücüne göre kararın: bir atın Faz 2 muhakemesinde en güçlü doğrulanan çift/kanıt neyse (tempo uyumu, sınıf/form, pedigri, galop, AGF trend, ne olursa) o Katman 1'e girer; ikinci en güçlü Katman 2'ye, vb. Aynı koşudaki farklı atlarda, hatta farklı koşularda, farklı kanıt türleri Katman 1'i doldurabilir — bu normaldir, hatta beklenir; bir kanıt türünün "genelde önemli" olması onu otomatik olarak Katman 1'e yazdırmaz. 10+ atlı sahada tempo/stil/pozisyon paketini otomatik Katman 1-2'ye yükselt. Her at için TEK bir "puan" (0-100) hesapla: HAM TOPLAM (katman 1-5 toplamı) × ÇAPRAZ DOĞRULAMA KATSAYISI (muhakemende belirttiğin doğrulanan/riskli çiftler birbirini güçlü destekliyorsa ×1.05-1.10, nötr/bağımsızsa ×1.00, hafif çelişiyorsa ×0.90-0.95, doğrudan çelişiyorsa ×0.70-0.80; birden fazla çift varsa çarpma, EN GÜÇLÜ çelişki/destek esas alınır; küçük örneklem/veri eksikliği/farklı bağlam bu kapsama GİRMEZ — yalnız notu etkiler, puanı İKİNCİ KEZ düşürme/yükseltme). Çarpım 100'ü aşarsa "score"u 100'de sabitle (min(100, ...)) — 100'ün üstü bir değer üretme.
 2. KURAL DENETİM PROTOKOLÜ (SON KONTROL — motorun en önemli adımı burası): az önce yazdığın puanları geri kontrol et — bir atı düşüren şey somut/gerçek bir çelişki mi (madde 1'e göre katsayı hakkı var), yoksa yalnız örneklem küçüklüğü/veri eksikliği/farklı bağlam mı (bu yalnız notu etkilemeli, puanı İKİNCİ KEZ düşürmemeli)? Özellikle şu noktaları özenle kontrol et:
    a) AGF ASİMETRİSİ + TREND: bir at yalnızca DÜŞÜK AGF'si yüzünden geride mi bırakılmış? Düşük AGF asla tek başına bir atı geriye çekme gerekçesi değildir. ÖZELLİKLE ARA: düşük AGF + YÜKSELEN AGF Trend + teknik görüş güçlü olan bir at var mı? Bu, ROTAGANYAN'ın piyasanın henüz göremediğini görme mottosuna tam uyan bir senaryodur — böyle bir at varsa yalnız "cezalandırma" değil, ÖNCELİKLİ olarak yukarı taşı.
-   b) SON800+GALOP KOMBİNASYONU: yeterli örneklemli güçlü Son800 (n≥3, medyan≤-0.5s) İLE keskin/iyi galop zinciri birlikte olan bir at, bu güçlü destekleyici çift göz ardı edilerek geride mi bırakılmış? Varsa yukarı taşı.
+   b) SON800+GALOP KOMBİNASYONU: yeterli örneklemli güçlü Son800 (n≥3, medyan≤-0.5s) İLE keskin/iyi galop zinciri birlikte olan bir at, bu güçlü destekleyici çift göz ardı edilerek geride mi bırakılmış? Varsa yukarı taşı. AYRICA (gerçek bulgu, Elazığ 8.Koşu 2026-08-03): geniş örneklemli (n≥5) güçlü bir Son800/Accurace tempo sinyali, YALNIZ bu pist/mesafenin genel tarihsel stil istatistiği (V12) uyuşmuyor diye ya da TEK bir risk etiketi (ör. tekrarlayan geç çıkış) var diye son sıralara çekilmiş mi kontrol et — o gün OLGUNADAM (%71 Accurace, n=7) V12 uyumsuzluğu yüzünden 9.'ya, FISILTIKAYA (Son800 n=10, iyi) tekrarlayan geç çıkış yüzünden son sıraya çekilmişti, ikisi de gerçekte üst 3'te bitirdi. Güçlü, geniş örneklemli bireysel bir sinyal TEK bir karşıt faktörle tamamen SİLİNMEMELİ — ikisi dengelenmeli.
    c) HP TEK BAŞINA ÜSTÜNLÜK DEĞİLDİR: yalnız yüksek ham HP'ye dayanarak, formu zayıf/gerilemiş ya da tempo-stili bugüne uymayan bir at otomatik olarak en üste mi konmuş? Değilse düzelt.
    d) OLUMLU KOMBİNASYONLAR (dördü de yalnız OLUMLU yönde işler, hiçbiri tek başına bir atı cezalandırma gerekçesi değildir): (i) yağışlı/ıslak hava + Kaçak At stili → olumlu; (ii) kalabalık sahada (10+ at) kaçak stiller dezavantajlı, az atlı sahada (≤6 at) sprinter/kapanışa güvenen atlar avantajlı → olumlu; (iii) tecrübesiz/giriş seviyeli koşularda (Kategori 1a/1b) TAKISIZ taylar takılı olanlara göre → KESİNLİKLE olumlu; (iv) 30+ gün ([UZUN ARA] etiketli) aradan dönen atta galop/kondisyon vasat olsa bile jokeyi güçlüyse → olumlu. Bu dört durumdan biri sahada varken göz ardı edilmiş bir at olup olmadığını kontrol et, varsa yukarı taşı.
    e) AYGIR/KISRAK/DAMSIRE AYRI DEĞERLENDİRME: "pedigri zayıf" diye tek bir hükme indirgenip, aslında Aygır veya Damsire istatistiğinin kendi eşiğini geçen olumlu bir sinyali Kısrak tarafının zayıflığı yüzünden gölgelenmiş bir at var mı? Varsa "details"/gerekçede ayrı ayrı belirt, puanı buna göre düzelt.
@@ -208,7 +209,7 @@ export function buildFaz3InstructionsV2(): string {
 4. Kalabalık sahada (10+ at) tempo/stil/pozisyon önceliğini sıralamana açıkça yansıt.
 5. TÜM saha (sahadaki at sayısı ne olursa olsun) için "picks" dizisine rank 1'den başlayarak gir — HİÇBİR at dışarıda bırakılamaz, hiçbiri ham puanla geçiştirilemez, HER birine gerçek score/details ver.
 6. Her pick için "pedigreeRating"/"isTarget"/"details" üret (uydurma bilgi yasak — yalnız KOŞU/ATLAR verisinde verilen ham veriyle sınırlı kal). details: kısa iç etiketler (örn. "AGF1", "Galop K1", "Sınıf düşüşü") — admin rozeti, kullanıcıya gitmez.
-6b. ★ HEDEF (isTarget) KURALI: isTarget=true işaretlediğin bir at yalnız pasif bir rozet almaz — sıralamada İLK 3'ÜN HEMEN ALTINA (4. sıra civarına) getirilir ve "score"u 3. sıradaki atınkine YAKIN/EŞİT verilir (rank1-3'ün score'undan düşük olmalı, madde 3'teki tutarlılık kuralına uy). Bunu yalnız gerçekten güçlü bir sürpriz/değer sinyali olduğuna inandığın at(lar) için kullan, gelişigüzel dağıtma (en fazla 1-2 at).
+6b. ★ HEDEF (isTarget) KURALI: isTarget=true işaretlediğin bir at yalnız pasif bir rozet almaz — sıralamada İLK 3'ÜN HEMEN ALTINA (4. sıra civarına) getirilir ve "score"u 3. sıradaki atınkine YAKIN/EŞİT verilir (rank1-3'ün score'undan düşük olmalı, madde 3'teki tutarlılık kuralına uy). Bunu yalnız gerçekten güçlü bir sürpriz/değer sinyali olduğuna inandığın at(lar) için kullan, gelişigüzel dağıtma (en fazla 1-2 at). SADECE YUKARI TAŞI (gerçek bulgu, 2026-08-03): bu kural bir atı yalnız kendi ön teknik sırasından DAHA YUKARI çekmek içindir — eğer at zaten teknikSira'da 4'ten üst sıradaysa (ör. 2.), isTarget rozeti onu 4.'e DÜŞÜRMEMELİ, mevcut yüksek konumunu KORUMALI. isTarget, bir tavan/sınırlama değil yalnız bir taban garantisidir.
 7. Kendi sıraladığın picks listesinin İLK 6'sı için "gerekceler" dizisine bir "note" yaz — EN FAZLA 2 CÜMLE, sade dil, iç terim (puan/katsayı/katman) GEÇMEZ, doğrudan kullanıcıya (public "Kilit Gerekçe") gidiyor. AYRICA: AGF LİDERİ (ATLAR verisinde "sıra:1" olan at) kendi top-6'nın dışına düşüyorsa, onun için de MUTLAKA bir not üret — neden piyasanın en çok para yatırdığı at bu kadar geride kaldığını 1-2 cümleyle açıkça belirt. Bu istisnasız zorunlu. AYNI zorunluluk "sıra:2" olan at için de geçerlidir.
 8. "confidence" (DUSUK/ORTA/YUKSEK — ÖNEMLİ, gerçekten dikkatli seç): sıralamanın netliğine (1.-2. arası fark, çelişkili sinyal sayısı) göre. Bu alan YALNIZ bilgi amaçlı değil — kod, YUKSEK olmadıkça banko VERMEZ. bankoNote'unda ("ancak", "riski var" gibi) bir çekince yazacaksan confidence'ı YUKSEK seçme, ORTA'da bırak.
 9. "bankoNote": banko kararının KENDİSİNİ kod ayrıca mekanik olarak hesaplayacak (puan≥80+fark≥5+piyasa riski yok+confidence=YUKSEK) — sen yalnız 1.-2. arası farkı ve genel netliği 1-2 cümleyle sade dilde yorumla.
@@ -317,6 +318,99 @@ export function faz2MuhakemeDenetle(
     }
     return { no: a.no, ad: a.ad, supheliCiftler };
   });
+}
+
+export type KaliteUyariSonuc = { no: number; ad: string; uyarilar: string[] };
+
+/**
+ * v6.50 — kullanıcı kararı 2026-08-03: "faz3 hayatımızda olmayacak, ek maliyet bu
+ * sebeple" — Faz2'nin promptunu (ek maliyet demek) BÜYÜTMEDEN, Elazığ 8.Koşu dersini
+ * (OLGUNADAM/FISILTIKAYA: geniş örneklemli güçlü V9/V10 sinyali tek bir risk/V12
+ * uyumsuzluğu yüzünden son sıralara çekildi) TAMAMEN ÜCRETSİZ, mekanik bir son-kontrol
+ * olarak uyguluyor. Ek Claude çağrısı YOK — yalnız Faz2'nin zaten ürettiği "muhakeme"
+ * metnini tarar, şüpheli durumları KULLANICIYA işaretler (kod hiçbir şeyi otomatik
+ * değiştirmez, karar kullanıcıda kalır).
+ */
+export function faz2KaliteDenetimi(
+  faz2Atlar: { no: number; ad: string; teknikSira: number; muhakeme: string }[]
+): KaliteUyariSonuc[] {
+  const saha = faz2Atlar.length;
+  const altYariEsigi = Math.ceil(saha / 2);
+  // v6.50 canlı bulgu: Claude, kompakt "Etiket:değer" talimatına rağmen çoğu zaman
+  // serbest metne dönüyor ("Tempo senaryosu: EN_GERİ_TAKİP stili (Accurace %71,n=7)
+  // ... zayıf stil eşleşmesi" gibi) — katı "V9:" önek arayan ilk sürüm bunu yakalayamadı.
+  // Artık TÜM metinde "n=SAYI" arıyor, çevresindeki pencerede güç kelimesi var mı bakıyor
+  // — biçimden bağımsız, gerçek çıktıya dayanıklı.
+  const gucKelimeleri = /güçlü|iyi\b|sağlam|yüksek|geniş\s*örneklem/i;
+  const nRegex = /n\s*[=~]\s*(\d+)/gi;
+  return faz2Atlar.map((a) => {
+    const uyarilar = new Set<string>();
+    if (a.teknikSira > altYariEsigi) {
+      let m: RegExpExecArray | null;
+      while ((m = nRegex.exec(a.muhakeme))) {
+        const n = parseInt(m[1], 10);
+        if (n < 5) continue;
+        const start = Math.max(0, m.index - 70);
+        const end = Math.min(a.muhakeme.length, m.index + 40);
+        const pencere = a.muhakeme.slice(start, end).replace(/\s+/g, " ").trim();
+        if (gucKelimeleri.test(pencere)) {
+          uyarilar.add(
+            `Geniş örneklemli (n=${n}) güçlü bir sinyal var ama teknikSira alt yarıda (${a.teknikSira}/${saha}) — Elazığ 8.Koşu dersi (OLGUNADAM/FISILTIKAYA): bu tür sinyaller tek bir risk/popülasyon istatistiği (V12) yüzünden aşırı düşürülmüş olabilir. İlgili bölüm: "…${pencere}…" — tekrar oku, gerekirse elle yukarı al.`
+          );
+        }
+      }
+    }
+    return { no: a.no, ad: a.ad, uyarilar: [...uyarilar] };
+  });
+}
+
+export type BankoAdayiSonuc = {
+  bankoAdayi: boolean;
+  sebep: string;
+  birinci?: { no: number; ad: string; karar: string };
+  ikinci?: { no: number; ad: string; karar: string };
+};
+
+/**
+ * v6.50 — kullanıcı talebi: "banko olabilecek atları bana bir şekilde göster" — Faz3
+ * (gerçek 0-100 puanlama) artık kullanılmayacağı için, YALNIZ Faz2'nin kendi
+ * teknikSira+karar alanlarına dayanan mekanik bir banko-ADAYI tespiti (kesin banko
+ * kararı DEĞİL, yalnız bir işaret — nihai karar kullanıcıda kalır). Ek Claude çağrısı yok.
+ */
+export function faz2BankoAdayiTespit(
+  faz2Atlar: { no: number; ad: string; teknikSira: number; karar: string }[]
+): BankoAdayiSonuc {
+  const siraya = [...faz2Atlar].sort((a, b) => a.teknikSira - b.teknikSira);
+  const birinci = siraya[0];
+  const ikinci = siraya[1];
+  if (!birinci) return { bankoAdayi: false, sebep: "Veri yok." };
+  const guclu = /güçlü aday/i;
+  const b = { no: birinci.no, ad: birinci.ad, karar: birinci.karar };
+  const i = ikinci ? { no: ikinci.no, ad: ikinci.ad, karar: ikinci.karar } : undefined;
+  if (guclu.test(birinci.karar) && (!ikinci || !guclu.test(ikinci.karar))) {
+    return {
+      bankoAdayi: true,
+      sebep: `#${b.no} ${b.ad} "Güçlü Aday" — 2. sıradaki ${i ? `#${i.no} ${i.ad} ("${i.karar}")` : "at"} aynı düzeyde değil, net bir ayrışma var. Yalnız bir işaret — muhakeme metnindeki riskleri kendiniz teyit edin.`,
+      birinci: b, ikinci: i,
+    };
+  }
+  return {
+    bankoAdayi: false,
+    sebep: i ? `1. ve 2. sıra ("${b.karar}" vs "${i.karar}") yeterince ayrışmıyor — net bir banko işareti yok.` : "Yeterli veri yok.",
+    birinci: b, ikinci: i,
+  };
+}
+
+/**
+ * v6.51 — kullanıcı kararı: V2 motoru artık gerçek Prediction/Pick kaydına gidiyor.
+ * Pick.details (Json, admin rozeti — "kısa iç etiketler") için Faz2'nin kompakt
+ * "muhakeme" metninden en anlamlı parçaları (karar + doğrulanan/riskli çiftler) çıkarır.
+ * assertPublishSafe'in "AGF favorisi gerekçesiz kalamaz" kuralı için de bu alanın DOLU
+ * olması gerekiyor — karar her zaman en az bir etiket garanti eder.
+ */
+export function faz2PickDetaylari(karar: string, muhakeme: string): string[] {
+  const etiketler = [...muhakeme.matchAll(/\[V\d+\+V\d+\][^|]*/g)].map((m) => m[0].trim());
+  return [`Karar: ${karar}`, ...etiketler.slice(0, 5)];
 }
 
 export function kosuBaslikUret(faz1: Faz1Sonuc, izinliKodlar: string[]): string {
