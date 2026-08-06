@@ -49,7 +49,7 @@ export const KATEGORI_ADI: Record<Exclude<Kategori, "bilinmiyor">, string> = {
 // doğru muhakeme nasıl olacaksa öyle").
 export const V_LEGEND = `## V-KODU REFERANS LİSTESİ (V1-V22 — TAM LİSTE, bu koşuda yalnız veri taşıyan kodlar aşağıda AT verisinde görünecek)
 
-V1 — Pedigri: Aygır, Kısrak ve Damsire istatistikleri (pist/mesafe bazlı yavru performansı) — ÜÇÜ BAĞIMSIZ değerlendirilir, biri zayıf çıksa bile diğerinin kendi eşiğini geçen olumlu sinyali gölgelenmez.
+V1 — Pedigri: Aygır, Kısrak ve Damsire istatistikleri (pist/mesafe bazlı yavru performansı) — ÜÇÜ BAĞIMSIZ değerlendirilir, biri zayıf çıksa bile diğerinin kendi eşiğini geçen olumlu sinyali gölgelenmez. Ayrıca "V1 Dozaj" satırı görürsen (aygırın DP/DI/CD'si) bu DÖRDÜNCÜ, tamamen bağımsız bir sinyal — aygırın soyağacındaki chef-de-race atalarından hesaplanan GENETİK hız/mesafe eğilimi, kazanma yüzdesine dayanmaz. DI yüksek (≥2.5) hız ağırlıklı, düşük (≤1.0) dayanıklılık ağırlıklı demektir — ama bu TEORİKTİR, doğrudan pist/zemin tercihinin kanıtı değildir, yalnız bugünkü mesafeyle genetik eğilim arasındaki uyum/uyumsuzluğu bir ipucu olarak değerlendir, tek başına karar gerekçesi yapma.
 V2 — Galop/Kondisyon: Split derecesi, ırka göre ayrı baraj — İngiliz 400m 26-28/24-26/≤23 · 600m 38-41/36-38/≤35 · 800m 50-54/46-50/≤46 · 1000m 1:03-1:07/1:01-1:03/≤1:01; Arap 400m 28-31/25-28/≤25 · 600m 42-46/39-42/≤39 · 800m 56-61/52-56/≤52 · 1000m 1:10-1:15/1:06-1:10/≤1:06. İç pist: normal dereceden ~1sn HIZLI değerlendirilir. İdman Jokeyi Uyumu: yarıştıracak jokey, atın idmanlarından HERHANGİ BİRİNİ yaptırmışsa (yalnız son idman değil) KESİNLİKLE olumlu — bu eşleşmenin YOKLUĞU asla negatif sayılmaz (elit jokeyler Anadolu hipodromlarındaki galoplara nadiren katılır, bu normaldir).
 V3 — Takı: Mevcut/eklenen/çıkarılan. Referans: Gözlük(KG/KGR/G-odaklanma), Kapalı Gözlük(KGP/SKG-aşırı huysuzluk), Yanaklık/Siperlik(Y/SY/SKG-hafif alternatif), Kulaklık(K/KUL-ses izolasyonu), Kulak Tıkacı(KT/KTI-güçlü ses izolasyonu), Dil Bağlanması(DB-KRİTİK, nefes borusu açıklığı), Burunluk/Dil Basarı(B/BB-baş açısı/nefes), Çapraz Bağlama(ÇB/ÇK-ağız/çene kontrolü), Gem(G/HG-yönetim kolaylığı). Yön fark etmez (ekleme=çıkarma=olumlu). İlk kez takılan=sürpriz potansiyeli, çıkarılan=rahatlama sinyali. KG+DB kombinasyonu özellikle güçlü.
 V4 — Jokey/Antrenör/Şartlar: genel yıllık kazanma yüzdesi, yarış şartları.
@@ -130,6 +130,9 @@ export function atSatirlariUret(r: Faz1Runner, izinliKodlar: string[]): string {
 
   if (izin.has("V1") && (r.sireStatOzet || r.damStatOzet || r.damSireStatOzet)) {
     satirlar.push(`V1 Pedigri: Aygır:${r.sireStatOzet ?? "veri yok"} | Kısrak:${r.damStatOzet ?? "veri yok"} | Damsire:${r.damSireStatOzet ?? "veri yok"}`);
+  }
+  if (izin.has("V1") && r.sireDosageOzet) {
+    satirlar.push(`V1 Dozaj (aygırın genetik hız/mesafe yapısı, TEORİK — kazanma yüzdesinden bağımsız): ${r.sireDosageOzet}`);
   }
   if (izin.has("V2")) {
     satirlar.push(`V2 Galop: ${r.galopOzet} | Kondisyon zinciri:${r.kondisyonZinciriVar ? "VAR" : "yok"} | Keskin:${r.keskinGalopZinciri ? "EVET" : "hayır"}`);
@@ -264,7 +267,7 @@ pedigreeRating değerleri: COK_YUKSEK, YUKSEK, GUCLU, ORTA, DUSUK, ZAYIF, SORU, 
  */
 export function veriVarMi(r: Faz1Runner, kod: string, faz1: Faz1Sonuc): boolean {
   switch (kod) {
-    case "V1": return !!(r.sireStatOzet || r.damStatOzet || r.damSireStatOzet);
+    case "V1": return !!(r.sireStatOzet || r.damStatOzet || r.damSireStatOzet || r.sireDosageOzet);
     case "V2": return r.galopOzet !== "İdman kaydı yok";
     case "V3": { const { eklenen, cikarilan } = takiEfektif(r); return !!(r.equipment || eklenen || cikarilan); }
     case "V4": return r.jockeyWinPct != null || r.trainerWinPct != null;

@@ -20,6 +20,7 @@ import { getAtPerformansForRace } from "@/server/actions/at-performans.actions";
 import { getH2HForRace } from "@/server/actions/h2h.actions";
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getDamStatOzetleriForRace, getDamSireOwnStatForRace } from "@/server/actions/dam-stat.actions";
+import { getSireDosageForRace } from "@/server/actions/sire-dosage.actions";
 import {
   hpKalitesiYildizi, sinifGecisBonusu, galopSiniflandirmasi, tempoGuvenSeviyesi,
   kacakHaritasi, zeminKatsayisi, zeminDetayiBul, zeminDetayiSatirdanCikar, type GalopZinciriSonuc, type TempoGuven,
@@ -203,6 +204,11 @@ export type Faz1Runner = {
   // için tamamen own-data (DamSireStatOwn) kaynaklıdır, "base" satırı yok.
   damSireStatOzet: string | null;
   damSireOrneklemKendiVeri: number | null;
+  // Dozaj (DP/DI/CD) — bkz. sire-dosage.actions.ts, aygırın genetik hız/mesafe yapısına
+  // dayanan, kazanma yüzdesinden bağımsız dördüncü pedigri sinyali. di>=2.5 hız ağırlıklı,
+  // di<=1.0 dayanıklılık ağırlıklı.
+  sireDosageOzet: string | null;
+  sireDosageDi: number | null;
   // Admin'in /admin/pedigri sayfasındaki "Genel Not"a elle girdiği, pedigri dışı herhangi
   // bir eksik veri (sakatlık, antrenman gözlemi, pist notu vb.) — otomatik toplanamayan
   // her şey için genel amaçlı manuel giriş alanı.
@@ -445,7 +451,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   // döngüsel bağımlılığı önlemek için (orijinal v6.24-öncesi koddaki aynı desen).
   const { getJockeyStats, getTrainerStats } = await import("@/server/services/race.service");
 
-  const [atPerformansRows, h2hEncounters, accuraceKayitlari, sireStatOzetleri, damStatOzetleri, sonYarisDetaylari, damSireStatOzetleri, agfTrendSonuc, horseStatsCacheRows, gecmisBaglamSonuc, jockeyStats, trainerStats, gecCikisMap] = await Promise.all([
+  const [atPerformansRows, h2hEncounters, accuraceKayitlari, sireStatOzetleri, damStatOzetleri, sonYarisDetaylari, damSireStatOzetleri, agfTrendSonuc, horseStatsCacheRows, gecmisBaglamSonuc, jockeyStats, trainerStats, gecCikisMap, sireDosageOzetleri] = await Promise.all([
     getAtPerformansForRace(raceId).catch(() => []),
     getH2HForRace(raceId).catch(() => []),
     db.accuraceHorseSplit.findMany({
@@ -479,6 +485,11 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
     // talebi 2026-08-01: "Start Sorunu olan atları tespit edebilir miyiz"). bkz.
     // gec-cikis.actions.ts, Result.gecCikanlar (tjk-result.adapter.ts + result-sync.ts).
     getGecCikisOzetleriForRace(race.runners.map((r) => r.name), race.raceDay.date).catch(() => new Map()),
+    // Dozaj (DP/DI/CD) — bkz. sire-dosage.actions.ts yorumu, aygır/kısrak/damsire kazanma
+    // yüzdesinden BAĞIMSIZ, aygırın genetik hız/mesafe yapısına dayanan dördüncü pedigri sinyali.
+    getSireDosageForRace(race.runners.map((r) => r.sire)).catch(
+      () => race.runners.map(() => ({ ozet: null, di: null, cd: null }))
+    ),
   ]);
   const horseStatsCacheMap = new Map(horseStatsCacheRows.map((h) => [h.tjkAtId, h.detailedStatsJson as unknown as HorseDetailStatSection[]]));
   const zeminGecmisiMap = new Map(gecmisBaglamSonuc.zemin.map((z) => [z.no, z]));
@@ -486,6 +497,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   const agfTrendMap = new Map(agfTrendSonuc.atlar.map((a) => [a.runnerNo, a]));
   const atPerformansMap = new Map(atPerformansRows.map((r) => [r.horseName, r.records]));
   const sireStatMap = new Map(race.runners.map((r, i) => [r.id, sireStatOzetleri[i] ?? { ozet: null, ornekKendiVeri: null, kYuzde: null }]));
+  const sireDosageMap = new Map(race.runners.map((r, i) => [r.id, sireDosageOzetleri[i] ?? { ozet: null, di: null, cd: null }]));
   const damStatMap = new Map(race.runners.map((r, i) => [r.id, damStatOzetleri[i] ?? { ozet: null, ornekKendiVeri: null }]));
   const damSireStatMap = new Map(race.runners.map((r, i) => [r.id, damSireStatOzetleri[i] ?? { ozet: null, ornekKendiVeri: null }]));
   const sonYarisDetayByNo = new Map(sonYarisDetaylari.map((d) => [d.runnerNo, d]));
@@ -883,6 +895,8 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         damOrneklemKendiVeri: damStatMap.get(r.id)?.ornekKendiVeri ?? null,
         damSireStatOzet: damSireStatMap.get(r.id)?.ozet ?? null,
         damSireOrneklemKendiVeri: damSireStatMap.get(r.id)?.ornekKendiVeri ?? null,
+        sireDosageOzet: sireDosageMap.get(r.id)?.ozet ?? null,
+        sireDosageDi: sireDosageMap.get(r.id)?.di ?? null,
         adminNote: r.adminNote,
         sonYarisVeriKaynagiGuvenilir: sonYarisDetayByNo.get(r.no)?.hasTjkId ?? false,
         sonYarisTakiEklenen: sonYarisDetayByNo.get(r.no)?.eklenenTaki.map((t) => t.label) ?? [],

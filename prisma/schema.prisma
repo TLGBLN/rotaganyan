@@ -702,6 +702,38 @@ model DamSireStatOwn {
   @@index([damSireName])
 }
 
+// Aygırın kendi 4 kuşaklık soy ağacındaki "chef-de-race" (Roman dozaj teorisi) sınıflı
+// atalarından hesaplanan Dosage Profile (B-I-C-S-P puanları), Dosage Index (DI, hız/
+// dayanıklılık oranı) ve Center of Distribution (CD). SireStatOwn/DamStatOwn'dan FARKLI:
+// o ikisi bizim kendi yarış sonucu verimizden (kazanma yüzdesi), bu ise aygırın soyağacı
+// yapısından (genetik hız/mesafe eğilimi) geliyor — birbirini tamamlayan, bağımsız iki
+// pedigri sinyali. Kaynak: kullanıcı tarafından sağlanan, önceden hesaplanmış bir tablo
+// (2026-08-06) — Werk Thoroughbred Consultants'ın chef-de-race listesi + standart Roman
+// dozaj formülüyle üretildiği iddia ediliyor, ancak GÜNCEL TAM chef-de-race listesine
+// (209+ isim) erişimimiz olmadığından bağımsız olarak birebir doğrulanamadı (bkz. proje
+// notu: önceki ChatGPT/Google AI kaynaklı dozaj listesi fabrikasyon içerdiği için iptal
+// edilmişti — bu tablo kullanıcının doğrudan talimatıyla, bu riski bilerek baz alınıyor).
+model SireDosageStat {
+  id         String @id @default(cuid())
+  sireName   String @unique
+  ulke       String? // "USA", "IRE", "TUR" vb.
+  dogumYili  Int?
+  dpB        Int
+  dpI        Int
+  dpC        Int
+  dpS        Int
+  dpP        Int
+  dpToplam   Int
+  di         Float
+  cd         Float
+  genetikKarakter String? // "Süratli miler", "Solid/Professional stamina" vb.
+  mesafeProfili   String? // "1400-1800 m" vb.
+  pistTempo       String? // "Normal-hızlı zemin; çok yönlü tempo" vb.
+  updatedAt  DateTime @updatedAt
+
+  @@index([sireName])
+}
+
 // Antrenörün EKİPMAN/TAKI DEĞİŞİKLİĞİ yaptığı start'lardaki kazanma oranı — genel
 // trainerWinPct'ten (TrainerStatSync, TJK kaynaklı yıllık toplam) FARKLI, tamamen
 // rotaganyan'ın kendi Runner geçmişinden hesaplanır (kullanıcı doktrini 2026-07-26:
