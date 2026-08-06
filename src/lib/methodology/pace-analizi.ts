@@ -101,7 +101,21 @@ export function analizEtTekYaris(checkpoints: PaceCheckpoint[], raceLength: numb
   return { erkenSira, ortaSira, gecSira, bitisSira, stil, enerjiProfili, son400Dusus, ilkYariOrtHiz, sonYariOrtHiz, ortalamaHiz };
 }
 
-export type CokYarisEgilim = { stil: TekYarisStil; percent: number; n: number };
+// v6.10 (kullanıcı talebi 2026-07-27): "Ara Geçişler" (erken/orta/geç sıra + yarı hız)
+// ham olarak checkpoint'lerden hesaplanıyordu ama tek bir stil etiketine sıkıştırılırken
+// bu detay atılıyordu, Claude'a hiç ulaşmıyordu. Artık ortalama/frekans olarak korunuyor —
+// tek bir mekanik yorum ÜRETİLMİYOR, ham eğilim Claude'a veriliyor, yorumu Claude yapar
+// (§XXI "sabit sayı yok" ilkesiyle tutarlı — burada da kod bir "iyi/kötü" hükmü vermiyor).
+export type CokYarisEgilim = {
+  stil: TekYarisStil;
+  percent: number;
+  n: number;
+  ortalamaErkenSira: number;
+  ortalamaOrtaSira: number;
+  ortalamaGecSira: number;
+  son400DususOrani: number; // % — kaç yarışta son 400m'de belirgin düşüş var
+  ortalamaHizFarki: number; // km/s — ilkYariOrtHiz - sonYariOrtHiz (pozitif = erken yüklü/yavaşlıyor)
+};
 const MIN_ORNEK = 3;
 
 /**
@@ -114,5 +128,16 @@ export function hesaplaCokYarisEgilimi(sonuclar: TekYarisPaceSonucu[]): CokYaris
   const sayac: Record<TekYarisStil, number> = { KACAK_AT: 0, ON_GRUP_ARKASI: 0, BEKLEME_GRUBU: 0, EN_GERI_TAKIP: 0 };
   for (const s of sonuclar) sayac[s.stil]++;
   const [stil, sayi] = (Object.entries(sayac) as [TekYarisStil, number][]).reduce((best, cur) => (cur[1] > best[1] ? cur : best));
-  return { stil, percent: Math.round((sayi / sonuclar.length) * 100), n: sonuclar.length };
+  const n = sonuclar.length;
+  const ort = (f: (s: TekYarisPaceSonucu) => number) => Math.round((sonuclar.reduce((s, x) => s + f(x), 0) / n) * 10) / 10;
+  return {
+    stil,
+    percent: Math.round((sayi / n) * 100),
+    n,
+    ortalamaErkenSira: ort((s) => s.erkenSira),
+    ortalamaOrtaSira: ort((s) => s.ortaSira),
+    ortalamaGecSira: ort((s) => s.gecSira),
+    son400DususOrani: Math.round((sonuclar.filter((s) => s.son400Dusus).length / n) * 100),
+    ortalamaHizFarki: Math.round((sonuclar.reduce((s, x) => s + (x.ilkYariOrtHiz - x.sonYariOrtHiz), 0) / n) * 100) / 100,
+  };
 }

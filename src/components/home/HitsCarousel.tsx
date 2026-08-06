@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
+import { useTranslations } from "next-intl";
 
 type Item = {
   id: string;
@@ -19,6 +20,7 @@ type Item = {
 };
 
 function Card({ p }: { p: Item }) {
+  const t = useTranslations("home.hits");
   const pick1 = p.picks[0];
   const rd = p.race.raceDay;
   const dateStr = format(new Date(rd.date), "d MMM yyyy", { locale: tr });
@@ -34,7 +36,7 @@ function Card({ p }: { p: Item }) {
           {dateStr} · {rd.hippodrome.name}
         </span>
         <span className="text-xs font-semibold text-hit bg-hit/10 border border-hit/30 rounded-full px-2 py-0.5 shrink-0">
-          ✓ İsabet
+          {t("isabet")}
         </span>
       </div>
       <div className="flex items-end justify-between gap-2">
@@ -45,17 +47,17 @@ function Card({ p }: { p: Item }) {
               {p.race.result.ganyan.toFixed(2)}
             </span>
             <span className="block text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-              Ganyan
+              {t("ganyan")}
             </span>
           </span>
         )}
       </div>
       <div className="mt-1 text-xs text-muted-foreground">
-        {p.race.raceNo}. Koşu · {p.race.classType}
+        {p.race.raceNo}. {t("kosuSuffix")} · {p.race.classType}
       </div>
       <div className="mt-2">
         <span className="text-xs border border-brand/40 text-brand bg-brand/10 rounded-full px-2 py-0.5">
-          ★ Banko
+          {t("banko")}
         </span>
       </div>
     </Link>

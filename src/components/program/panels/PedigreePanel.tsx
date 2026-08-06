@@ -1,13 +1,15 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { ProgramRunner } from "@/server/services/race.service";
 
 export default function PedigreePanel({ runners }: { runners: ProgramRunner[] }) {
+  const t = useTranslations("programToolbar");
   return (
     <div className="border-t">
       <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
-        <span className="text-sm font-bold tracking-wide text-white">Pedigriler</span>
+        <span className="text-sm font-bold tracking-wide text-white">{t("pedigriler")}</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2">
         {runners.map((r, idx) => (
@@ -25,7 +27,7 @@ export default function PedigreePanel({ runners }: { runners: ProgramRunner[] })
                   {r.damSire && <span> ({r.damSire})</span>}
                 </>
               ) : (
-                <span>Pedigri bilgisi yok</span>
+                <span>{t("pedigriBilgisiYok")}</span>
               )}
             </div>
             {r.sireStatOzet && (

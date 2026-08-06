@@ -1,18 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import AIAnalysisPanel, { type AIAnalysisResult } from "./AIAnalysisPanel";
+import V2AnalysisPanel from "./V2AnalysisPanel";
 import Faz1VeriDurumu from "./Faz1VeriDurumu";
 import PredictionForm from "./PredictionForm";
 import type { PedigreeRating, Prisma } from "@prisma/client";
 
 type Runner = Prisma.RunnerGetPayload<{ include: { gallops: true } }>;
-type AIRunner = { id: string; no: number; name: string };
 
 type Props = {
   raceId: string;
   runners: Runner[];
-  methodologyVersion?: string | null;
   existingPrediction?: {
     id: string;
     confidence: "DUSUK" | "ORTA" | "YUKSEK";
@@ -35,25 +32,15 @@ type Props = {
   };
 };
 
-export default function SmartAnalysisEditor({ raceId, runners, methodologyVersion, existingPrediction }: Props) {
-  const [aiResult, setAiResult] = useState<AIAnalysisResult | null>(null);
-  const [aiRunners, setAiRunners] = useState<AIRunner[]>([]);
-
-  function handleAIApply(result: AIAnalysisResult, runnersFromAI: AIRunner[]) {
-    setAiResult(result);
-    setAiRunners(runnersFromAI);
-  }
-
+export default function SmartAnalysisEditor({ raceId, runners, existingPrediction }: Props) {
   return (
     <div className="space-y-6">
       <Faz1VeriDurumu raceId={raceId} />
-      <AIAnalysisPanel raceId={raceId} onApply={handleAIApply} methodologyVersion={methodologyVersion} />
+      <V2AnalysisPanel raceId={raceId} />
       <PredictionForm
         raceId={raceId}
         runners={runners}
         existingPrediction={existingPrediction}
-        aiResult={aiResult}
-        aiRunners={aiRunners}
       />
     </div>
   );

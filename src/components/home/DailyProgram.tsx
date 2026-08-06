@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import type { DailyHippodrome } from "@/lib/tjk-daily";
 import type { Confidence } from "@prisma/client";
 
@@ -33,16 +34,17 @@ export default function DailyProgram({
   dateStr: string;
   analysisLookup?: Map<string, DailyAnalysisInfo>;
 }) {
+  const t = useTranslations("home.dailyProgram");
   if (hippodromes.length === 0) {
     return (
       <section className="border-t px-4 py-10">
         <div className="mx-auto max-w-7xl">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold">Günlük Program</h2>
+            <h2 className="text-lg font-semibold">{t("title")}</h2>
             <span className="text-xs text-muted-foreground">{dateStr}</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            Bugün için program bulunamadı veya TJK verisi alınamadı.
+            {t("notFound")}
           </p>
         </div>
       </section>
@@ -55,7 +57,7 @@ export default function DailyProgram({
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-brand animate-pulse" />
-            <h2 className="text-lg font-semibold">Günlük Yarış Programı</h2>
+            <h2 className="text-lg font-semibold">{t("titleLive")}</h2>
           </div>
           <span className="text-xs text-muted-foreground">{dateStr}</span>
         </div>
@@ -67,7 +69,7 @@ export default function DailyProgram({
               <div className="flex items-center justify-between border-b px-4 py-3">
                 <span className="font-semibold">{hipo.name}</span>
                 <span className="text-xs text-muted-foreground">
-                  {hipo.races.length} koşu
+                  {hipo.races.length} {t("kosuSuffix")}
                 </span>
               </div>
 
@@ -104,7 +106,7 @@ export default function DailyProgram({
                           className={`flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs ${CONFIDENCE_COLOR[analysis.confidence]}`}
                         >
                           <span className="h-1.5 w-1.5 rounded-full bg-hit animate-pulse" />
-                          {analysis.isBanko ? "★ Banko" : "Analiz Var"}
+                          {analysis.isBanko ? t("banko") : t("analizVar")}
                         </span>
                       ) : null}
                     </div>
@@ -116,7 +118,7 @@ export default function DailyProgram({
         </div>
 
         <p className="mt-4 text-xs text-muted-foreground text-right">
-          Kaynak: TJK · Her saat güncellenir
+          {t("source")}
         </p>
       </div>
     </section>

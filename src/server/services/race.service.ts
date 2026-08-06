@@ -3,9 +3,9 @@ import { startOfDay, endOfDay, subDays } from "date-fns";
 import { turkeyDateString } from "@/lib/tz";
 import type { Prisma, Confidence } from "@prisma/client";
 import { syncResultsForDate } from "./result-sync";
-import { fetchApprenticeRemainingRaces, normalizeJockeyName } from "./ingest/tjk-apprentice.adapter";
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getDamStatOzetleriForRace } from "@/server/actions/dam-stat.actions";
+import { getGecCikisOzetleriForRace } from "@/server/actions/gec-cikis.actions";
 import { fetchTodaysAltiliResults } from "./ingest/tjk-altili.adapter";
 import { findIkramiyeForHippodrome } from "@/lib/altili-match";
 
@@ -351,7 +351,15 @@ export async function getComboCoupon(hippodromeSlug: string, dateStr: string): P
 
 // ─── Anasayfa: Tahmin Önerileri (Ekonomik/Normal/Geniş kupon) ─────────────────
 
-export type KuponLeg = { raceNo: number; nos: number[]; winnerNo?: number | null; winnerNos: number[]; resulted: boolean };
+export type KuponLeg = {
+  raceNo: number; nos: number[]; winnerNo?: number | null; winnerNos: number[]; resulted: boolean;
+  // v6.35 — kullanıcı bulgusu: eküri (aynı sahiplikten "coupled" iki at) durumunda, seçilen
+  // at kazanmasa bile eküri ORTAĞI kazandıysa TJK kuralına göre bahis kazanmış sayılır. Bu
+  // map, doğrudan winnerNos'ta OLMAYAN bir seçili no'yu, onu "kazandıran" eküri ortağının
+  // no'suna eşler (yalnız dolaylı/eküri yoluyla kazananlar için — gerçek kazananlar zaten
+  // winnerNos'ta, burada tekrar yer almaz).
+  ekuriWinnerByNo: Record<number, number>;
+};
 export type KuponStatus = "hit" | "miss" | "pending";
 export type KuponVariant = {
   key: "ekonomik" | "normal" | "genis";
@@ -368,6 +376,33 @@ export type HomeKuponLeg = { raceNo: number; narrow: number[]; normal: number[];
 
 /** Tüm yarışlar yurtiçi (yabancı hipodromlar ingest sırasında elenir) — birim bahis bedeli sabit. */
 const STAKE_PER_COMBINATION = 1.25;
+
+/**
+ * Eküri (coupled entry) haritası — v6.35, kullanıcı bulgusu: "#7 ve #10 eküri, #10 kazandı,
+ * kupon tutmadı sayılamaz". Kazanan(lar)ın eküri grubunu bulur, o gruptaki (kazanan HARİÇ)
+ * diğer atları "dolaylı kazanan" no'suna eşler. ekuriGroup==null/0 olan atlar (tek başına
+ * koşan, eküri grubu yok) asla eşleşmez — yanlış pozitif riski taşımaz.
+ */
+function buildEkuriWinnerMap(
+  runners: { no: number; ekuriGroup: number | null }[],
+  winnerNos: number[]
+): Record<number, number> {
+  const map: Record<number, number> = {};
+  if (winnerNos.length === 0) return map;
+  const ekuriGroupOfWinner = new Map<number, number>();
+  for (const w of winnerNos) {
+    const grp = runners.find((r) => r.no === w)?.ekuriGroup;
+    if (grp != null && grp >= 1) ekuriGroupOfWinner.set(w, grp);
+  }
+  if (ekuriGroupOfWinner.size === 0) return map;
+  for (const r of runners) {
+    if (winnerNos.includes(r.no) || r.ekuriGroup == null || r.ekuriGroup < 1) continue;
+    for (const [winNo, grp] of ekuriGroupOfWinner) {
+      if (r.ekuriGroup === grp) { map[r.no] = winNo; break; }
+    }
+  }
+  return map;
+}
 
 function kuponAmount(nosPerLeg: number[][]): number {
   const combinations = nosPerLeg.reduce((acc, nos) => acc * Math.max(nos.length, 1), 1);
@@ -389,7 +424,7 @@ export async function buildKuponOnerisi(active: {
   // yeşil göstermek, eşleşmeyeni (sonuç girilmiş ama kazanan seçilmemiş) "kaçtı" olarak işaretlemek için.
   // Aynı sorguda o ayağın analiz sırasını (Pick.rank) da çekiyoruz — kupondaki atlar sayı sırasına göre
   // değil, analizdeki tahmin sırasına göre dizilsin diye.
-  const resultByRaceNo = new Map<number, { winnerNo: number | null; winnerNos: number[]; resulted: boolean }>();
+  const resultByRaceNo = new Map<number, { winnerNo: number | null; winnerNos: number[]; resulted: boolean; ekuriWinnerByNo: Record<number, number> }>();
   const rankByRaceNo = new Map<number, Map<number, number>>();
   const races = await db.race.findMany({
     where: {
@@ -402,10 +437,17 @@ export async function buildKuponOnerisi(active: {
     include: {
       result: { select: { winnerNo: true, winnerNos: true } },
       prediction: { select: { picks: { select: { rank: true, runner: { select: { no: true } } } } } },
+      runners: { select: { no: true, ekuriGroup: true } },
     },
   });
   for (const r of races) {
-    resultByRaceNo.set(r.raceNo, { winnerNo: r.result?.winnerNo ?? null, winnerNos: r.result?.winnerNos ?? [], resulted: r.result != null });
+    const winnerNos = r.result?.winnerNos ?? [];
+    resultByRaceNo.set(r.raceNo, {
+      winnerNo: r.result?.winnerNo ?? null,
+      winnerNos,
+      resulted: r.result != null,
+      ekuriWinnerByNo: buildEkuriWinnerMap(r.runners, winnerNos),
+    });
     const rankByNo = new Map<number, number>();
     for (const pick of r.prediction?.picks ?? []) {
       if (pick.runner) rankByNo.set(pick.runner.no, pick.rank);
@@ -434,13 +476,20 @@ export async function buildKuponOnerisi(active: {
         winnerNo: entry?.winnerNo ?? null,
         winnerNos: entry?.winnerNos ?? [],
         resulted: entry?.resulted ?? false,
+        ekuriWinnerByNo: entry?.ekuriWinnerByNo ?? {},
       };
     });
   }
 
+  // Bir seçili no, o ayağı KAZANMIŞ sayılır ne zaman: (a) doğrudan winnerNos'taysa, YA DA
+  // (b) aynı eküri grubundaki ortağı kazandıysa (ekuriWinnerByNo'da varsa) — TJK kuralı,
+  // eküri iki at TEK bahis birimidir.
+  function legWon(l: KuponLeg): boolean {
+    return l.nos.some((no) => l.winnerNos.includes(no) || no in l.ekuriWinnerByNo);
+  }
+
   function statusFor(variantLegs: KuponLeg[]): KuponStatus {
-    // At başı/beraberlikte kupon o ayakta HERHANGİ bir kazananı içeriyorsa isabet sayılır.
-    if (variantLegs.some((l) => l.resulted && !l.winnerNos.some((no) => l.nos.includes(no)))) return "miss";
+    if (variantLegs.some((l) => l.resulted && !legWon(l))) return "miss";
     if (variantLegs.some((l) => !l.resulted)) return "pending";
     return "hit";
   }
@@ -662,9 +711,13 @@ export type ProgramRunner = {
   gallops: ProgramGallop[];
   ekuriGroup: number | null;
   apprentice: boolean;
-  apprenticeRemaining: number | null;
   raceStyle: { style: string; percent: number; veri: number | null } | null; // style: "KACAK_AT" | "ON_GRUP_ARKASI" | "BEKLEME_GRUBU" | "EN_GERI_TAKIP" (Accurace tabanlı, saha-yüzdelik); veri = örneklem sayısı (n)
   tjkAtId: number | null;
+  idmanVideoUrl: string | null;
+  // Start Sorunu (v6.30, kullanıcı talebi 2026-08-01) — TJK'nın kendi resmi "Geç Çıkış"
+  // tespitine göre: true=tekrarlayan (2+) geç çıkış geçmişi var, false=veri var ama sorun
+  // yok, null=yeterli örneklem (3+ sonuçlu start) yok, "—" gösterilir (bkz. gec-cikis.actions.ts).
+  startSorunu: boolean | null;
 };
 
 export type ProgramPick = {
@@ -702,7 +755,7 @@ export type ProgramDay = {
 export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
   const date = new Date(dateStr + "T00:00:00.000Z");
 
-  const [raceDays, apprenticeRemainingMap] = await Promise.all([
+  const [raceDays] = await Promise.all([
     db.raceDay.findMany({
     where: { date: { gte: startOfDay(date), lte: endOfDay(date) } },
     include: {
@@ -734,7 +787,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
               owner: true, sire: true, dam: true, damSire: true, adminNote: true, hp: true,
               equipment: true, equipmentAdded: true, equipmentRemoved: true,
               bestTime: true, recentForm: true, recentFormSurfaces: true, agf: true,
-              scratched: true, ekuriGroup: true, apprentice: true, raceStyle: true, tjkAtId: true,
+              scratched: true, ekuriGroup: true, apprentice: true, raceStyle: true, tjkAtId: true, idmanVideoUrl: true,
               gallops: {
                 orderBy: { date: "desc" },
                 take: 3,
@@ -747,7 +800,6 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     },
     orderBy: { hippodrome: { name: "asc" } },
     }),
-    fetchApprenticeRemainingRaces().catch(() => ({}) as Record<string, number>),
   ]);
 
   // "Karma" hipodromu, gerçek koşuların kombine bahis için aynadaki (mirror) kopyasıdır —
@@ -765,7 +817,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
 
   // Build lookup for original (non-karma) races: at isim kümesi imzası → prediction + runner verisi
   const originalPred = new Map<string, typeof raceDays[0]["races"][0]["prediction"]>();
-  const originalRunnerData = new Map<string, Map<string, { gallops: typeof raceDays[0]["races"][0]["runners"][0]["gallops"]; raceStyle: unknown }>>();
+  const originalRunnerData = new Map<string, Map<string, { gallops: typeof raceDays[0]["races"][0]["runners"][0]["gallops"]; raceStyle: unknown; idmanVideoUrl: string | null }>>();
   for (const rd of raceDays) {
     if (rd.hippodrome.slug === "karma") continue;
     for (const r of rd.races) {
@@ -774,7 +826,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
       originalPred.set(key, r.prediction);
       originalRunnerData.set(
         key,
-        new Map(r.runners.map((ru) => [normHorseNameForMirror(ru.name), { gallops: ru.gallops, raceStyle: ru.raceStyle }]))
+        new Map(r.runners.map((ru) => [normHorseNameForMirror(ru.name), { gallops: ru.gallops, raceStyle: ru.raceStyle, idmanVideoUrl: ru.idmanVideoUrl }]))
       );
     }
   }
@@ -784,23 +836,29 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
   const allRaces = raceDays.flatMap((rd) => rd.races);
   const sireStatByRunnerId = new Map<string, string | null>();
   const damStatByRunnerId = new Map<string, string | null>();
+  // Start Sorunu (v6.30) — TJK'nın "Geç Çıkış" tespiti, at adına göre (bkz. gec-cikis.actions.ts).
+  const startSorunuByRunnerId = new Map<string, boolean | null>();
+  const STARTSORUNU_ESIK = 2; // §XX.39 ile tutarlı: tekrarlayan (2+) geç çıkış "Evet" sayılır.
   await Promise.all(
     allRaces.map(async (r) => {
       if (r.runners.length === 0) return;
-      const [sireOzetler, damOzetler] = await Promise.all([
+      const [sireOzetler, damOzetler, gecCikisMap] = await Promise.all([
         getSireStatOzetleriForRace(r.runners.map((ru) => ru.sire), r.breed, r.surface, r.distance).catch(
-          () => r.runners.map(() => ({ ozet: null, ornekHipodromx: null, ornekKendiVeri: null }))
+          () => r.runners.map(() => ({ ozet: null, ornekKendiVeri: null }))
         ),
         getDamStatOzetleriForRace(
           r.runners.map((ru) => ({ dam: ru.dam, damSire: ru.damSire })),
           r.breed,
           r.surface,
           r.distance
-        ).catch(() => r.runners.map(() => ({ ozet: null, ornekHipodromx: null, ornekKendiVeri: null }))),
+        ).catch(() => r.runners.map(() => ({ ozet: null, ornekKendiVeri: null }))),
+        getGecCikisOzetleriForRace(r.runners.map((ru) => ru.name), date).catch(() => new Map()),
       ]);
       r.runners.forEach((ru, i) => {
         sireStatByRunnerId.set(ru.id, sireOzetler[i]?.ozet ?? null);
         damStatByRunnerId.set(ru.id, damOzetler[i]?.ozet ?? null);
+        const gc = gecCikisMap.get(ru.name);
+        startSorunuByRunnerId.set(ru.id, gc ? gc.gecCikisSayisi >= STARTSORUNU_ESIK : null);
       });
     })
   );
@@ -814,7 +872,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     races: rd.races.map((r) => {
       // Karma mirror: inherit prediction + galop/yarış stili from original race
       let pred = r.prediction;
-      let originalRunners: Map<string, { gallops: typeof raceDays[0]["races"][0]["runners"][0]["gallops"]; raceStyle: unknown }> | undefined;
+      let originalRunners: Map<string, { gallops: typeof raceDays[0]["races"][0]["runners"][0]["gallops"]; raceStyle: unknown; idmanVideoUrl: string | null }> | undefined;
       if (rd.hippodrome.slug === "karma" && r.runners.length > 0) {
         const key = runnerSetSignature(r.runners);
         if (pred == null) pred = originalPred.get(key) ?? null;
@@ -833,16 +891,14 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
           const inherited = originalRunners?.get(normHorseNameForMirror(ru.name));
           const gallops = ru.gallops.length > 0 ? ru.gallops : inherited?.gallops ?? ru.gallops;
           const raceStyle = ru.raceStyle ?? inherited?.raceStyle ?? null;
-          const apprenticeRemaining =
-            ru.apprentice && ru.jockey
-              ? apprenticeRemainingMap[normalizeJockeyName(ru.jockey)] ?? null
-              : null;
+          const idmanVideoUrl = ru.idmanVideoUrl ?? inherited?.idmanVideoUrl ?? null;
           return {
             ...ru,
-            apprenticeRemaining,
             sireStatOzet: sireStatByRunnerId.get(ru.id) ?? null,
             damStatOzet: damStatByRunnerId.get(ru.id) ?? null,
+            startSorunu: startSorunuByRunnerId.get(ru.id) ?? null,
             raceStyle: parseRaceStyle(raceStyle),
+            idmanVideoUrl,
             gallops: gallops.map((g) => ({
               ...g,
               splits: (g.splits ?? {}) as Record<string, string | null>,

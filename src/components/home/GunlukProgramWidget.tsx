@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { cn, surfaceLabel, breedLabel } from "@/lib/utils";
 import RaceCountdown from "@/components/kosular/RaceCountdown";
@@ -19,6 +20,7 @@ function SurfaceDot({ surface }: { surface: string }) {
 }
 
 export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: Props) {
+  const t = useTranslations("home.gunlukProgram");
   if (raceDays.length === 0) return null;
 
   const totalRaces = raceDays.reduce((s, rd) => s + rd.races.length, 0);
@@ -33,25 +35,25 @@ export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: P
         {/* Header */}
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold">Günün Koşu Programı</h2>
+            <h2 className="text-lg font-semibold">{t("title")}</h2>
             {isLoggedIn ? (
               <p className="mt-1 text-sm text-muted-foreground/70 italic">
-                Analizleri görmek için bir koşu seçiniz.
+                {t("hintLoggedIn")}
               </p>
             ) : (
               <p className="mt-1 text-sm text-muted-foreground/70 italic">
-                Analizleri görmek için bir koşuya tıklayınız.
+                {t("hintLoggedOut")}
               </p>
             )}
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {totalRaces} koşu · {analyzedRaces} analiz yayımlandı
+              {t("summary", { total: totalRaces, analyzed: analyzedRaces })}
             </p>
           </div>
           <Link
             href={`/kosular?tarih=${dateStr}`}
             className="text-sm text-brand hover:underline"
           >
-            Tüm Program →
+            {t("tumProgram")}
           </Link>
         </div>
 
@@ -72,11 +74,11 @@ export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: P
                     <span className="font-semibold">{hipName}</span>
                     {banko > 0 && (
                       <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-bold text-brand">
-                        {banko} BANKO
+                        {banko} {t("bankoBadge")}
                       </span>
                     )}
                   </div>
-                  <span className="text-xs text-muted-foreground">{races.length} koşu</span>
+                  <span className="text-xs text-muted-foreground">{races.length} {t("kosuSuffix")}</span>
                 </div>
 
                 {/* Race rows */}
@@ -125,7 +127,7 @@ export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: P
                         {/* Analysis badge */}
                         {isResulted ? (
                           <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                            Bitti
+                            {t("bitti")}
                           </span>
                         ) : hasAnalysis ? (
                           <span
@@ -136,7 +138,7 @@ export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: P
                                 : "bg-hit/15 text-hit"
                             )}
                           >
-                            {isBanko ? "★ Banko" : "Analiz"}
+                            {isBanko ? t("banko") : t("analiz")}
                           </span>
                         ) : (
                           <span className="shrink-0 w-8 sm:w-10" />
@@ -149,16 +151,16 @@ export default function GunlukProgramWidget({ raceDays, dateStr, isLoggedIn }: P
                 {/* Card footer */}
                 <div className="border-t px-4 py-2 flex items-center gap-3 text-[10px] text-muted-foreground">
                   <span className="flex items-center gap-1">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#009900]" /> Çim
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#009900]" /> {t("cim")}
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#996633]" /> Kum
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#996633]" /> {t("kum")}
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#D39B1E]" /> Sentetik
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#D39B1E]" /> {t("sentetik")}
                   </span>
                   {analyzed > 0 && (
-                    <span className="ml-auto text-hit font-medium">{analyzed}/{races.length} analiz</span>
+                    <span className="ml-auto text-hit font-medium">{t("analizSummary", { analyzed, total: races.length })}</span>
                   )}
                 </div>
               </div>

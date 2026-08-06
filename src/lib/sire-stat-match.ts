@@ -1,5 +1,5 @@
 /**
- * Race.breed/surface/distance ↔ SireStat.irk/filtrePist/filtreMesafe eşlemesi ve
+ * Race.breed/surface/distance ↔ SireStatOwn/DamStatOwn.irk/pist/mesafe eşlemesi ve
  * at-babası (sire) isim eşleştirmesi — hem analiz motoru (veri-toplama.ts) hem de
  * herkese açık/admin pedigri görünümleri (race.service.ts, admin.service.ts)
  * TARAFINDAN paylaşılır, tek yerden bakım için.
@@ -13,8 +13,7 @@ const TR_FOLD: Record<string, string> = {
 };
 
 /** Case/aksan farklarını (İ/I/ı/i, Ş/Ğ/Ü/Ö/Ç) yok sayarak karşılaştırılabilir hale getirir —
- *  hipodromx'ten yapıştırılan aygır adı ile admin'in TJK'dan gelen "sire" alanı birebir
- *  aynı yazılmayabilir (klavye/kaynak farkı). */
+ *  TJK'dan gelen "sire"/"dam" alanı farklı kaynaklarda birebir aynı yazılmayabilir. */
 export function normalizeSireName(s: string): string {
   return s
     .split("")
@@ -25,7 +24,7 @@ export function normalizeSireName(s: string): string {
     .trim();
 }
 
-/** Race.distance (metre) → hipodromx'in kullandığı 3 mesafe aralığından biri. */
+/** Race.distance (metre) → SireStatOwn/DamStatOwn'ın kullandığı 3 mesafe aralığından biri. */
 export function mesafeBucket(distance: number): string {
   if (distance <= 1400) return "800-1400";
   if (distance <= 2000) return "1500-2000";
@@ -42,97 +41,61 @@ export function breedToIrk(breed: string): string {
   return breed === "ARAP" ? "ARAP" : "İNGİLİZ";
 }
 
-export type SireStatLite = {
-  sireName: string;
-  kkKazanan: number;
-  kkKosulan: number;
-  kkYuzde: number;
-  start: number;
-  birinci: number;
-  kYuzde: number;
-  ikinci: number;
-  ucuncu: number;
-  ikramiye: bigint;
-  aei: number;
-};
+// rotaganyan'ın KENDİ Runner/Result verisinden hesaplanan aygır/kısrak istatistiği (bkz.
+// SireStatOwn/DamStatOwn şema yorumu ve pedigri-own-stat.service.ts). v6.32'den önce
+// hipodromx.com'dan elle yapıştırılan SireStat/DamStat (AEI + geniş tarihsel taban)
+// "base" satırı, own-data ise ona eklenen tamamlayıcı sinyaldi. Kullanıcı kararı
+// (2026-08-01): kendi verimizin pist×mesafe kırılımı AEI'den daha değerli görüldü,
+// hipodromx analiz motorundan tamamen çıkarıldı — own-data artık TEK kaynak. hipodromx
+// admin sayfaları (SireStat/DamStat, Aygır/Kısrak İstatistik) kod tabanında duruyor ama
+// analiz akışına artık girmiyor.
 
-/** Verilen aygır adını (varsa) havuzdaki (aynı ırk/pist/mesafe filtresiyle çekilmiş) kayıtlarla eşleştirir. */
-export function findSireStat<T extends SireStatLite>(sireName: string | null | undefined, pool: T[]): T | null {
-  if (!sireName) return null;
-  const norm = normalizeSireName(sireName);
-  return pool.find((s) => normalizeSireName(s.sireName) === norm) ?? null;
-}
-
-// rotaganyan'ın KENDİ Runner/Result verisinden hesaplanan tamamlayıcı sinyal (bkz.
-// SireStatOwn/DamStatOwn şema yorumu ve pedigri-own-stat.service.ts) — hipodromx
-// kaynaklı SireStatLite/DamStatLite'ın YERİNE değil YANINA ekleniyor, AEI/ikramiye
-// içermiyor (o veri şemada hiç yok). n<3 ise (tek-yarış-kalıcı-kural-olmaz ilkesiyle
-// tutarlı) formatlama fonksiyonları bunu sessizce atlar.
-const OWN_MIN_ORNEK = 3;
+// 2026-08-02: kullanıcı kararı — sabit "n<3 ise gösterme" eşiği KALDIRILDI (§II.1/
+// [[feedback_sert_kosul_yasak]] ile tutarlı: hiçbir kural sabit eşikle Claude'un elindeki
+// veriyi analiz dışı bırakamaz — 1-2 startlık bir eşleşme bile NÖTR bir veri noktasıdır,
+// yokluk değil). Artık her eşleşme (start≥1) formatlanıp Claude'a gidiyor, yalnız
+// örneklem küçükse etiketle açıkça işaretleniyor — "veriyi gizleme, güvenilirliğini söyle."
 
 // 2026-07-24: kullanıcı isteği — "5 yarışta %100 ile 200 yarışta %25 aynı değerlendirilmez."
-// hipodromx kaynaklı yüzdeler (kkYuzde/kYuzde) önceden HİÇBİR örneklem eşiğinden geçmeden
-// Claude'a gidiyordu; artık her yüzdenin yanına örneklem büyüklüğüne göre bir güven etiketi
-// ekleniyor. Eşikler pedigri istatistiği için kaba ama makul bir ayrım: <10 yarış gerçekten
-// birkaç sonuca dayanır (tesadüf payı yüksek), ≥50 yarış artık istikrarlı bir eğilim sayılır.
+// Her yüzdenin yanına örneklem büyüklüğüne göre bir güven etiketi ekleniyor. Eşikler
+// pedigri istatistiği için kaba ama makul bir ayrım: <3 yarış tek-iki sonuca dayanır
+// (tesadüf payı çok yüksek), <10 yine düşük güvenilir, ≥50 istikrarlı bir eğilim sayılır.
 function ornekGuveniEtiketi(n: number): string {
+  if (n < 3) return " [ÇOK DÜŞÜK ÖRNEKLEM]";
   if (n < 10) return " [DÜŞÜK ÖRNEKLEM]";
   if (n >= 50) return " [geniş örneklem]";
   return "";
 }
 
-export type SireStatOwnLite = { start: number; birinci: number; ikinci: number; ucuncu: number; kYuzde: number };
+export type SireStatOwnLite = { sireName: string; start: number; birinci: number; ikinci: number; ucuncu: number; kYuzde: number };
 export type DamStatOwnLite = {
+  damName: string; damSireName: string;
   start: number; birinci: number; ikinci: number; ucuncu: number; kYuzde: number;
   yavruSayisi: number; kazananYavruSayisi: number;
 };
 
-/** Claude'a ve UI'a gösterilecek okunabilir tek satır özet. */
-export function formatSireStatOzet(s: SireStatLite, mesafe: string, pist: string, own?: SireStatOwnLite | null): string {
-  const base = `${s.sireName} (${pist} ${mesafe}): yavruları ${s.kkKazanan}/${s.kkKosulan} koşuda kazandı (K/K %${s.kkYuzde}${ornekGuveniEtiketi(s.kkKosulan)}) · Start ${s.start} 1.${s.birinci}(K% ${s.kYuzde}) 2.${s.ikinci} 3.${s.ucuncu} · İkr ${s.ikramiye.toLocaleString("tr-TR")}₺ · AEI ${s.aei}${s.aei > 1 ? " (ortalama üstü)" : s.start > 0 ? " (ortalama altı)" : ""}`;
-  if (own && own.start >= OWN_MIN_ORNEK) {
-    return `${base} · Kendi verimiz: ${own.start} start, K% ${own.kYuzde}${ornekGuveniEtiketi(own.start)} (${own.birinci}/${own.start})`;
-  }
-  return base;
+/** Claude'a ve UI'a gösterilecek okunabilir tek satır özet — örneklem küçük olsa bile (§II.1) gösterilir, yalnız etiketlenir. */
+export function formatSireStatOzet(s: SireStatOwnLite, mesafe: string, pist: string): string {
+  return `${s.sireName} (${pist} ${mesafe}) — kendi verimiz: ${s.start} start 1.${s.birinci}(K% ${s.kYuzde}${ornekGuveniEtiketi(s.start)}) 2.${s.ikinci} 3.${s.ucuncu}`;
 }
 
-export type DamStatLite = {
-  damName: string;
-  damSireName: string;
-  atSayisi: number;
-  start: number;
-  birinci: number;
-  kYuzde: number;
-  ikinci: number;
-  ucuncu: number;
-  ikramiye: bigint;
+/** Kısrak eşleştirmesi ANNE + ANNE BABASI birlikte — örneklem küçük olsa bile (§II.1) gösterilir, yalnız etiketlenir. */
+export function formatDamStatOzet(s: DamStatOwnLite, mesafe: string, pist: string): string {
+  const tayOrani = s.yavruSayisi > 0 ? Math.round((s.kazananYavruSayisi / s.yavruSayisi) * 100) : null;
+  const tayStr = tayOrani != null ? ` · Kazanan tay oranı %${tayOrani} (${s.kazananYavruSayisi}/${s.yavruSayisi} yavru)` : "";
+  return `${s.damName} / ${s.damSireName} (${pist} ${mesafe}) — kendi verimiz: ${s.start} start 1.${s.birinci}(K% ${s.kYuzde}${ornekGuveniEtiketi(s.start)}) 2.${s.ikinci} 3.${s.ucuncu}${tayStr}`;
+}
+
+export type DamSireStatOwnLite = {
+  damSireName: string; start: number; birinci: number; ikinci: number; ucuncu: number; kYuzde: number;
+  torunSayisi: number; kazananTorunSayisi: number;
 };
 
-/** Kısrak eşleştirmesi ANNE + ANNE BABASI birlikte — hipodromx bu ikisini tek satırda birlikte veriyor. */
-export function findDamStat<T extends DamStatLite>(
-  damName: string | null | undefined,
-  damSireName: string | null | undefined,
-  pool: T[]
-): T | null {
-  if (!damName) return null;
-  const normDam = normalizeSireName(damName);
-  const normDamSire = damSireName ? normalizeSireName(damSireName) : null;
-  const candidates = pool.filter((s) => normalizeSireName(s.damName) === normDam);
-  if (candidates.length === 0) return null;
-  if (candidates.length === 1) return candidates[0];
-  // Aynı isimli birden fazla kısrak varsa (nadir), anne babasıyla ayrıştır.
-  return (normDamSire && candidates.find((s) => normalizeSireName(s.damSireName) === normDamSire)) || candidates[0];
-}
-
-export function formatDamStatOzet(s: DamStatLite, mesafe: string, pist: string, own?: DamStatOwnLite | null): string {
-  const base = `${s.damName} / ${s.damSireName} (${pist} ${mesafe}): ${s.atSayisi} yavru · Start ${s.start} 1.${s.birinci}(K% ${s.kYuzde}${ornekGuveniEtiketi(s.start)}) 2.${s.ikinci} 3.${s.ucuncu} · İkr ${s.ikramiye.toLocaleString("tr-TR")}₺`;
-  if (own && own.start >= OWN_MIN_ORNEK) {
-    // kazanan tay oranı — kaç FARKLI yavrunun en az 1 galibiyeti var / toplam farklı yavru
-    // (yarış-bazlı K% ile karıştırılmasın — hipodromx bu at-bazlı oranı hiç vermiyor, yalnız
-    // kendi verimizden mümkün, bkz. pedigri-own-stat.service.ts).
-    const tayOrani = own.yavruSayisi > 0 ? Math.round((own.kazananYavruSayisi / own.yavruSayisi) * 100) : null;
-    const tayStr = tayOrani != null ? ` · Kazanan tay oranı %${tayOrani} (${own.kazananYavruSayisi}/${own.yavruSayisi} yavru)` : "";
-    return `${base} · Kendi verimiz: ${own.start} start, K% ${own.kYuzde}${ornekGuveniEtiketi(own.start)} (${own.birinci}/${own.start})${tayStr}`;
-  }
-  return base;
+// Damsire'nin (kısrağın babası) TEK BAŞINA etkisi — hipodromx bunu hiç vermiyor (dam+damsire
+// hep birlikte), o yüzden yalnızca kendi verimiz varsa gösterilir, hiçbir "base" satırı yok
+// (bkz. DamSireStatOwn şema yorumu, kullanıcı doktrini 2026-07-26).
+export function formatDamSireStatOzet(s: DamSireStatOwnLite, mesafe: string, pist: string): string {
+  const torunOrani = s.torunSayisi > 0 ? Math.round((s.kazananTorunSayisi / s.torunSayisi) * 100) : null;
+  const torunStr = torunOrani != null ? ` · Kazanan torun oranı %${torunOrani} (${s.kazananTorunSayisi}/${s.torunSayisi} farklı torun)` : "";
+  return `${s.damSireName} — kısrak babası olarak TÜM yavrularından (${pist} ${mesafe}), kendi verimiz: ${s.start} start, K% ${s.kYuzde}${ornekGuveniEtiketi(s.start)} (${s.birinci}/${s.start})${torunStr}`;
 }

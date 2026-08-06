@@ -2,12 +2,15 @@
 
 import { useState, useEffect, useRef, useTransition } from "react";
 import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, Star, Info } from "lucide-react";
+import { ChevronDown, ChevronUp, Star, Info, PlayCircle } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
 import HorseDetailModal from "./HorseDetailModal";
 import HipodromOzellikleriModal from "./HipodromOzellikleriModal";
+import IdmanVideoModal from "./panels/IdmanVideoModal";
+import { galopSplits, galopDate } from "./panels/galop-helpers";
 import EmailVerificationGate from "./EmailVerificationGate";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getPistMesafeStilIstatistigi, type PistMesafeStilSonuc } from "@/server/actions/pist-mesafe-stil.actions";
@@ -19,6 +22,7 @@ const PANEL_LOADING = (
   <div className="border-t px-4 py-8 text-center text-sm text-muted-foreground">Yükleniyor…</div>
 );
 const Son800Panel = dynamic(() => import("./panels/Son800Panel"), { loading: () => PANEL_LOADING, ssr: false });
+const AgfTrendPanel = dynamic(() => import("./panels/AgfTrendPanel"), { loading: () => PANEL_LOADING, ssr: false });
 const GalopPanel = dynamic(() => import("./panels/GalopPanel"), { loading: () => PANEL_LOADING, ssr: false });
 const PedigreePanel = dynamic(() => import("./panels/PedigreePanel"), { loading: () => PANEL_LOADING, ssr: false });
 const ComparisonPanel = dynamic(() => import("./panels/ComparisonPanel"), { loading: () => PANEL_LOADING, ssr: false });
@@ -48,10 +52,11 @@ const SURFACE_TAB_BG: Record<string, string> = {
 // ── Geri sayım (Turkey UTC+3) ────────────────────────────────────────────────
 
 function useRaceCountdown(time: string | null, hasResult: boolean, dateStr: string) {
+  const t = useTranslations("programToolbar");
   const [display, setDisplay] = useState("");
 
   useEffect(() => {
-    if (hasResult) { setDisplay("Koştu"); return; }
+    if (hasResult) { setDisplay(t("kostu")); return; }
     if (!time) return;
 
     const tick = () => {
@@ -62,16 +67,16 @@ function useRaceCountdown(time: string | null, hasResult: boolean, dateStr: stri
       const raceUtcMs = new Date(`${dateStr}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00Z`).getTime()
         - 3 * 60 * 60 * 1000;
       const diffSec = Math.floor((raceUtcMs - now) / 1000);
-      if (diffSec <= 0) { setDisplay("Başladı"); return; }
+      if (diffSec <= 0) { setDisplay(t("basladi")); return; }
       const hrs = Math.floor(diffSec / 3600);
       const mins = Math.floor((diffSec % 3600) / 60);
       const secs = diffSec % 60;
-      setDisplay(hrs > 0 ? `${hrs}s ${mins}dk` : mins > 0 ? `${mins}dk ${secs}sn` : `${secs}sn`);
+      setDisplay(hrs > 0 ? t("sureSaatDk", { hrs, mins }) : mins > 0 ? t("sureDkSn", { mins, secs }) : t("sureSn", { secs }));
     };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [time, hasResult, dateStr]);
+  }, [time, hasResult, dateStr, t]);
 
   return display;
 }
@@ -115,19 +120,21 @@ function bestTimeToSeconds(t: string): number {
   return m * 60 + s + cs / 100;
 }
 
-function surfaceLabel(s: string) {
-  if (s === "CIM") return { label: "Çim", cls: "text-[#009900]" };
-  if (s === "SENTETIK") return { label: "Sentetik", cls: "text-[#D39B1E]" };
-  return { label: "Kum", cls: "text-[#996633]" };
+type ProgramT = ReturnType<typeof useTranslations<"programToolbar">>;
+
+function surfaceLabel(s: string, t: ProgramT) {
+  if (s === "CIM") return { label: t("surfaceCim"), cls: "text-[#009900]" };
+  if (s === "SENTETIK") return { label: t("surfaceSentetik"), cls: "text-[#D39B1E]" };
+  return { label: t("surfaceKum"), cls: "text-[#996633]" };
 }
 
-function breedShort(b: string) {
-  return b === "ARAP" ? "Arap" : "İngiliz";
+function breedShort(b: string, t: ProgramT) {
+  return b === "ARAP" ? t("breedArap") : t("breedIngiliz");
 }
 
 // Yarış stili — Accurace (GPS/sektörel zamanlama) geçmişinden n>=3 yarışla hesaplanan
 // kalıcı eğilim (bkz. pace-analizi.ts). Eski TJK Son800 tabanlı 4'lü sistemin yerini aldı.
-function raceStyleBadge(raceStyle: { style: string; percent: number; veri?: number | null } | null): { text: string; cls: string; dusukGuven: boolean } | null {
+function raceStyleBadge(raceStyle: { style: string; percent: number; veri?: number | null } | null, t: ProgramT): { text: string; cls: string; dusukGuven: boolean } | null {
   if (!raceStyle) return null;
   const { style, percent, veri } = raceStyle;
   // n=3-4 ile çıkan bir yüzde (örn. %33, 3 yarışta 3 farklı stil demek) gerçek bir
@@ -135,21 +142,24 @@ function raceStyleBadge(raceStyle: { style: string; percent: number; veri?: numb
   // yüksek-güvenilirlikli bir örüntüyle (örn. n=20+ %80) karıştırabilir.
   const dusukGuven = veri != null && veri <= 4;
   const n = veri != null ? ` (${veri})` : "";
-  if (style === "KACAK_AT") return { text: `%${percent} Kaçak At${n}`, cls: "bg-[#e74c3c]/15 text-[#e74c3c]", dusukGuven };
-  if (style === "ON_GRUP_ARKASI") return { text: `%${percent} Ön Grup Arkası${n}`, cls: "bg-[#d4a017]/15 text-[#d4a017]", dusukGuven };
-  if (style === "BEKLEME_GRUBU") return { text: `%${percent} Bekleme Grubu${n}`, cls: "bg-[#2980b9]/15 text-[#2980b9]", dusukGuven };
-  if (style === "EN_GERI_TAKIP") return { text: `%${percent} En Geri Takip${n}`, cls: "bg-[#8e44ad]/15 text-[#8e44ad]", dusukGuven };
+  if (style === "KACAK_AT") return { text: t("styleBadgeText", { percent, style: t("kacakAt"), n }), cls: "bg-[#e74c3c]/15 text-[#e74c3c]", dusukGuven };
+  if (style === "ON_GRUP_ARKASI") return { text: t("styleBadgeText", { percent, style: t("onGrupArkasi"), n }), cls: "bg-[#d4a017]/15 text-[#d4a017]", dusukGuven };
+  if (style === "BEKLEME_GRUBU") return { text: t("styleBadgeText", { percent, style: t("beklemeGrubu"), n }), cls: "bg-[#2980b9]/15 text-[#2980b9]", dusukGuven };
+  if (style === "EN_GERI_TAKIP") return { text: t("styleBadgeText", { percent, style: t("enGeriTakip"), n }), cls: "bg-[#8e44ad]/15 text-[#8e44ad]", dusukGuven };
   return null;
 }
 
-const RACE_STYLE_INFO: { style: string; label: string; desc: string; cls: string }[] = [
-  { style: "KACAK_AT", label: "Kaçak At", desc: "Yarışın erken bölümünde sahanın en önünde gider.", cls: "text-[#e74c3c]" },
-  { style: "ON_GRUP_ARKASI", label: "Ön Grup Arkası", desc: "Erken bölümde öndeki grubun hemen arkasında, sahanın ön yüzdelik diliminde gider.", cls: "text-[#d4a017]" },
-  { style: "BEKLEME_GRUBU", label: "Bekleme Grubu", desc: "Erken bölümde sahanın orta yüzdelik diliminde, beklemede gider.", cls: "text-[#2980b9]" },
-  { style: "EN_GERI_TAKIP", label: "En Geri Takip", desc: "Erken bölümde sahanın en gerisinde, uzaktan takip eder.", cls: "text-[#8e44ad]" },
-];
+function getRaceStyleInfo(t: ProgramT): { style: string; label: string; desc: string; cls: string }[] {
+  return [
+    { style: "KACAK_AT", label: t("kacakAt"), desc: t("kacakAtDesc"), cls: "text-[#e74c3c]" },
+    { style: "ON_GRUP_ARKASI", label: t("onGrupArkasi"), desc: t("onGrupArkasiDesc"), cls: "text-[#d4a017]" },
+    { style: "BEKLEME_GRUBU", label: t("beklemeGrubu"), desc: t("beklemeGrubuDesc"), cls: "text-[#2980b9]" },
+    { style: "EN_GERI_TAKIP", label: t("enGeriTakip"), desc: t("enGeriTakipDesc"), cls: "text-[#8e44ad]" },
+  ];
+}
 
 function RaceStyleInfoButton() {
+  const t = useTranslations("programToolbar");
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -157,21 +167,21 @@ function RaceStyleInfoButton() {
           type="button"
           onClick={(e) => e.stopPropagation()}
           className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground align-middle transition-opacity hover:opacity-80"
-          aria-label="Yarış stili açıklaması"
+          aria-label={t("yarisStiliAriaLabel")}
         >
           <Info className="h-2.5 w-2.5" strokeWidth={2.5} />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-72 text-xs" onClick={(e) => e.stopPropagation()}>
-        <p className="mb-2 font-semibold text-foreground">Yarış Stili nedir?</p>
+        <p className="mb-2 font-semibold text-foreground">{t("yarisStiliNedir")}</p>
         <p className="mb-2 text-muted-foreground">
-          Atın Accurace (GPS/sektörel zamanlama) geçmişindeki en az 3 yarıştan hesaplanan, tekrar eden davranış eğilimi. Yüzde, o davranışın kaç yarışta görüldüğünü gösterir; parantezdeki sayı toplam örneklem sayısı (n)&apos;dir.
+          {t("yarisStiliAciklama1")}
         </p>
         <p className="mb-2 text-muted-foreground">
-          <span className="opacity-60 font-semibold">Soluk rozetler</span> (n≤4) az veriye dayanır — örn. %33, 3 yarışın 3 farklı stilde geçtiği (yani belirgin bir eğilim OLMADIĞI) anlamına da gelebilir. Ne kadar çok yarış (n), o kadar güvenilir.
+          <span className="opacity-60 font-semibold">{t("yarisStiliAciklama2Prefix")}</span> {t("yarisStiliAciklama2")}
         </p>
         <ul className="space-y-1.5">
-          {RACE_STYLE_INFO.map((s) => (
+          {getRaceStyleInfo(t).map((s) => (
             <li key={s.style}>
               <span className={cn("font-semibold", s.cls)}>{s.label}:</span>{" "}
               <span className="text-muted-foreground">{s.desc}</span>
@@ -183,8 +193,8 @@ function RaceStyleInfoButton() {
   );
 }
 
-function styleLabelCls(style: string) {
-  return RACE_STYLE_INFO.find((s) => s.style === style) ?? { label: style, cls: "text-foreground" };
+function styleLabelCls(style: string, t: ProgramT) {
+  return getRaceStyleInfo(t).find((s) => s.style === style) ?? { label: style, cls: "text-foreground" };
 }
 
 /** Bu pist+mesafe kombinasyonunda geçmişte hangi yarış stilinin kazandığını gösteren
@@ -194,6 +204,7 @@ function PistMesafeInfoButton({
 }: {
   hippodromeName?: string; surface: string; distance: number; breed: string; classType: string;
 }) {
+  const t = useTranslations("programToolbar");
   const [data, setData] = useState<PistMesafeStilSonuc | "loading" | "error" | "idle">("idle");
 
   // ÖNEMLİ: bu bileşen koşu değiştiğinde YENİDEN MOUNT OLMUYOR — üst bileşen
@@ -222,38 +233,42 @@ function PistMesafeInfoButton({
           data-tour="pist-mesafe-ipucu"
           onClick={(e) => e.stopPropagation()}
           className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-semibold text-brand transition-colors hover:bg-brand/25"
-          aria-label="Bu koşu tipinde hangi yarış stili öne çıkıyor"
+          aria-label={t("kazananlarAriaLabel")}
         >
           <Info className="h-3 w-3" strokeWidth={2.5} />
-          Bu Koşu Tipinde Kazananlar
+          {t("kazananlarButton")}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-80 text-xs" onClick={(e) => e.stopPropagation()}>
         <p className="mb-2 font-semibold text-foreground">
-          {hippodromeName} · {distance}m · {surfaceLabel(surface).label} · {breedShort(breed)} · {classType}
+          {hippodromeName} · {distance}m · {surfaceLabel(surface, t).label} · {breedShort(breed, t)} · {classType}
         </p>
-        {data === "idle" && <p className="text-muted-foreground">Açmak için tıklayın.</p>}
-        {data === "loading" && <p className="text-muted-foreground">Hesaplanıyor…</p>}
-        {data === "error" && <p className="text-muted-foreground">Veri alınamadı.</p>}
-        {data === null && <p className="text-muted-foreground">Bu koşu tipi için henüz yeterli veri yok (en az 3 yarış gerekli).</p>}
+        {data === "idle" && <p className="text-muted-foreground">{t("kazananlarAcTiklayin")}</p>}
+        {data === "loading" && <p className="text-muted-foreground">{t("kazananlarHesaplaniyor")}</p>}
+        {data === "error" && <p className="text-muted-foreground">{t("kazananlarVeriAlinamadi")}</p>}
+        {data === null && <p className="text-muted-foreground">{t("kazananlarYetersizVeri")}</p>}
         {data && typeof data === "object" && (
           <>
             <p className="mb-1 text-muted-foreground">
-              <strong className="text-foreground">Bugünkü atlarla ilgili değil</strong> — aynı hipodrom+pist+mesafe(±200m)&apos;deki <strong>{data.n}</strong> GEÇMİŞ yarışın kazananları o yarışı nasıl koştu:
+              <strong className="text-foreground">{t("kazananlarBugunkuAtlarlaIlgiliDegil")}</strong>{" "}
+              {t.rich("kazananlarGecmisYarisAciklama", { n: data.n, b: (chunks) => <strong className="text-foreground">{chunks}</strong> })}
             </p>
             <ul className="space-y-1 my-2">
               {data.breakdown.map((b) => (
                 <li key={b.style} className="flex items-center justify-between">
-                  <span className={cn("font-semibold", styleLabelCls(b.style).cls)}>{styleLabelCls(b.style).label}</span>
+                  <span className={cn("font-semibold", styleLabelCls(b.style, t).cls)}>{styleLabelCls(b.style, t).label}</span>
                   <span className="tabular-nums text-muted-foreground">%{b.percent} ({b.count})</span>
                 </li>
               ))}
             </ul>
             <p className="text-muted-foreground">
-              Taktik ipucu: bu pist+mesafede tarihsel olarak {styleLabelCls(data.topStyle).label.toLocaleLowerCase("tr-TR")} tarz kazanmış — sahadaki hiçbir at bu etiketi taşımasa bile, yarışın nasıl gelişebileceğine dair bir ipucudur.
+              {t("kazananlarTaktikIpucu", { style: styleLabelCls(data.topStyle, t).label.toLocaleLowerCase() })}
             </p>
             <p className="mt-2 text-[10px] text-muted-foreground">
-              Tek yarıştan kalıcı kural çıkarılmaz — bu yalnız geçmiş eğilimi gösterir, garanti değildir.
+              {t("kazananlarTekYaris")}
+            </p>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              {t("kazananlarSonGuncelleme", { tarih: data.enYeniTarih.split("-").reverse().join(".") })}
             </p>
           </>
         )}
@@ -273,17 +288,19 @@ function pickDisplay(p: ProgramPick): { no: number | string; name: string } {
   return { no: "—", name: p.runnerLabel ?? "—" };
 }
 
+// v6.55 — V2 motorunun (sayısal puanlama yok) picks'lerinde score her zaman null —
+// bunun yerine details[0]'daki "Karar: Güçlü Aday/Orta Risk/..." etiketini göster,
+// PuanTablosu.tsx/InlineAnalysisPanel.tsx'teki aynı desen (bkz. puanHucresi orada).
+function puanHucresi(score: number | null, details: string[]): string {
+  if (score != null) return String(score);
+  const karar = details.find((d) => d.startsWith("Karar: "));
+  return karar ? karar.replace("Karar: ", "") : "—";
+}
+
 function buildShareText(picks: ProgramPick[], raceNo: number, hippodromeName?: string): string {
   const nos = picks.slice(0, 6).map((p) => pickDisplay(p).no).join("-");
   const yer = hippodromeName ? `${hippodromeName} ` : "";
   return `${yer}${raceNo}. Koşu Rotaganyan analizi: ${nos} 🐎`;
-}
-
-/** Pick.details dizisinden (A:/B:/C: gibi eski-format iç etiketleri hariç tutarak) okunabilir gerekçe metnini çıkarır. */
-function gerekceFrom(details: string[] | undefined | null): string | null {
-  if (!details || details.length === 0) return null;
-  const gerekce = details.filter((d) => !/^[ABC](\+C)?:\s*/.test(d)).join(" ");
-  return gerekce || null;
 }
 
 function XLogo({ className }: { className?: string }) {
@@ -310,6 +327,7 @@ function AnalysisPanel({
   hippodromeName?: string;
   raceId: string;
 }) {
+  const t = useTranslations("programToolbar");
   const ref = useRef<HTMLDivElement>(null);
 
   // Faz 4 yalnız en iyi 3-6 atı sıralayıp "pick" olarak kaydediyor — geri kalanı
@@ -353,13 +371,13 @@ function AnalysisPanel({
       <div ref={ref} className="border-t px-4 py-10 text-center">
         <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
           <span className="text-2xl">🔒</span>
-          <p className="font-medium">Analizi görmek için üye olmalısınız.</p>
+          <p className="font-medium">{t("analiziGormekIcinUye")}</p>
           <div className="flex gap-2">
             <a href="/giris?callbackUrl=%2Fprogram" className="rounded-md bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground hover:bg-brand/90">
-              Giriş Yap
+              {t("girisYap")}
             </a>
             <a href="/kayit" className="rounded-md border px-4 py-2 text-xs font-semibold hover:bg-muted">
-              Kayıt Ol
+              {t("kayitOl")}
             </a>
           </div>
         </div>
@@ -371,7 +389,7 @@ function AnalysisPanel({
     return (
       <div ref={ref} className="border-t">
         <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
-          <span className="text-sm font-bold tracking-wide text-white">Analiz Detayları</span>
+          <span className="text-sm font-bold tracking-wide text-white">{t("analizDetaylari")}</span>
         </div>
         <EmailVerificationGate email={userEmail} />
       </div>
@@ -385,16 +403,20 @@ function AnalysisPanel({
         <span className="text-sm font-bold tracking-wide text-white">Analiz Detayları</span>
       </div>
 
-      {/* Masaüstü tablo */}
+      {/* Masaüstü tablo — Kilit Gerekçe sütunu kaldırıldıktan sonra "At" tek esnek sütun kaldı;
+          w-full bırakılırsa geniş ekranlarda tüm sayfa genişliğine gerip Toplam'ı sağ kenara
+          fırlatıyordu (kullanıcı ekran görüntüsü) — max-w ile tablo doğal genişliğine sabitlendi.
+          v6.59 — V2 motorunun "Düşük Risk/Yüksek Risk" gibi uzun karar etiketleri eski dar
+          sayısal Toplam sütununda (w-14) satır içi kırılıyordu; max-w de büyütülerek boşluk
+          azaltıldı (kullanıcı ekran görüntüsü, 2026-08-04). */}
       <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full max-w-xl text-xs">
           <thead>
             <tr className="border-b bg-muted/60 text-[11px] text-muted-foreground">
-              <th className="px-2 py-2 text-center w-8">Sıra</th>
-              <th className="px-2 py-2 text-center w-8">No</th>
-              <th className="px-2 py-2 text-left">At</th>
-              <th className="px-2 py-2 text-center w-14 font-bold">Toplam</th>
-              <th className="hidden px-2 py-2 text-left md:table-cell">Kilit Gerekçe</th>
+              <th className="px-2 py-2 text-center w-8">{t("sira")}</th>
+              <th className="px-2 py-2 text-center w-8">{t("no")}</th>
+              <th className="px-2 py-2 text-left">{t("at")}</th>
+              <th className="px-2 py-2 text-center w-24 font-bold whitespace-nowrap">{t("toplam")}</th>
             </tr>
           </thead>
           <tbody>
@@ -402,7 +424,6 @@ function AnalysisPanel({
               const { no, name } = pickDisplay(p);
               const isWinner = p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no);
               const rs = rankStyle(p.rank);
-              const gerekce = gerekceFrom(p.details);
               return (
                 <tr key={p.rank} className={cn("border-b last:border-0", isWinner && "bg-[#f5c518]/10")}>
                   <td className="px-2 py-2 text-center">
@@ -418,8 +439,8 @@ function AnalysisPanel({
                         <button
                           type="button"
                           onClick={handleShare}
-                          title="X'te paylaş"
-                          aria-label="X'te paylaş"
+                          title={t("xtePaylas")}
+                          aria-label={t("xtePaylas")}
                           className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0 print:hidden"
                         >
                           <XLogo className="h-3 w-3" />
@@ -427,10 +448,9 @@ function AnalysisPanel({
                       )}
                     </span>
                   </td>
-                  <td className="px-2 py-2 text-center tabular-nums font-bold">
-                    {p.score != null ? <span>{p.score}</span> : "—"}
+                  <td className="px-2 py-2 text-center tabular-nums font-bold whitespace-nowrap">
+                    <span>{puanHucresi(p.score, p.details)}</span>
                   </td>
-                  <td className="hidden px-2 py-2 text-muted-foreground md:table-cell">{gerekce ?? "—"}</td>
                 </tr>
               );
             })}
@@ -440,7 +460,6 @@ function AnalysisPanel({
                 <td className="px-2 py-2 text-center font-mono text-muted-foreground">{r.no}</td>
                 <td className="px-2 py-2 text-muted-foreground">{r.name}</td>
                 <td className="px-2 py-2 text-center text-muted-foreground">—</td>
-                <td className="hidden px-2 py-2 text-muted-foreground md:table-cell">—</td>
               </tr>
             ))}
           </tbody>
@@ -465,8 +484,8 @@ function AnalysisPanel({
                   <button
                     type="button"
                     onClick={handleShare}
-                    title="X'te paylaş"
-                    aria-label="X'te paylaş"
+                    title={t("xtePaylas")}
+                    aria-label={t("xtePaylas")}
                     className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0"
                   >
                     <XLogo className="h-3 w-3" />
@@ -474,11 +493,8 @@ function AnalysisPanel({
                 )}
               </div>
               <div className="flex gap-3 text-[11px] text-muted-foreground mb-1">
-                {p.score != null && <span>Toplam: <span className="font-bold text-foreground">{p.score}</span></span>}
+                <span>{t("toplamPrefix")} <span className="font-bold text-foreground">{puanHucresi(p.score, p.details)}</span></span>
               </div>
-              {gerekceFrom(p.details) && (
-                <p className="text-[11px] text-muted-foreground leading-snug">{gerekceFrom(p.details)}</p>
-              )}
             </div>
           );
         })}
@@ -499,9 +515,10 @@ function AnalysisPanel({
 // ── At satırı ────────────────────────────────────────────────────────────────
 
 function RunnerRow({
-  r, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, onSelectHorse, jockeyStat, trainerStat,
+  r, t, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, onSelectHorse, jockeyStat, trainerStat, onOpenVideo,
 }: {
   r: ProgramRunner;
+  t: ProgramT;
   isWinner: boolean;
   idx: number;
   isTopAgf: boolean;
@@ -513,6 +530,7 @@ function RunnerRow({
   onSelectHorse: (name: string) => void;
   jockeyStat?: JockeyStatRow;
   trainerStat?: TrainerStatRow;
+  onOpenVideo: () => void;
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
@@ -546,8 +564,8 @@ function RunnerRow({
           <button
             type="button"
             onClick={onToggleFollow}
-            title={isFollowed ? "Takipten çık" : "Takip et"}
-            aria-label={isFollowed ? "Takipten çık" : "Takip et"}
+            title={isFollowed ? t("takiptenCik") : t("takipEt")}
+            aria-label={isFollowed ? t("takiptenCik") : t("takipEt")}
             className="shrink-0 transition-colors print:hidden"
           >
             <Star className={cn(
@@ -565,7 +583,7 @@ function RunnerRow({
           >
             {r.name}
             {r.scratched ? (
-              <span className="ml-1.5 text-[10px] font-normal text-red-400 no-underline">(Koşmaz)</span>
+              <span className="ml-1.5 text-[10px] font-normal text-red-400 no-underline">{t("kosmaz")}</span>
             ) : r.ekuriGroup != null ? (
               <span title={`Eküri grubu ${r.ekuriGroup}`} className="ml-1 text-[11px]">🐴</span>
             ) : null}
@@ -595,7 +613,7 @@ function RunnerRow({
       <td className="px-2 py-1.5 tabular-nums text-center">
         {r.startNo ?? "—"}
         {r.disaridanStart && (
-          <sup className="ml-0.5 font-sans font-bold text-red-500" title="Kendi tercihiyle dıştan start yapacak">DS</sup>
+          <sup className="ml-0.5 font-sans font-bold text-red-500" title={t("dsTitle")}>DS</sup>
         )}
       </td>
 
@@ -605,7 +623,7 @@ function RunnerRow({
           {r.jockey ?? "—"}
           {r.apprentice && (
             <span className="ml-1 text-[10px] font-semibold text-brand">
-              Ap.{r.apprenticeRemaining != null && ` (${r.apprenticeRemaining} kaldı)`}
+              {t("ap")}
             </span>
           )}
         </div>
@@ -619,8 +637,8 @@ function RunnerRow({
             <div className="mt-0.5 text-[10px] leading-snug space-y-0.5">
               <div className="text-muted-foreground/70">{jockeyStat.label}</div>
               <div className="tabular-nums">
-                <span className="text-muted-foreground">{jockeyStat.rides} biniş · </span>
-                <span className={cn("font-semibold", wc)}>{jockeyStat.wins} gal · %{wp}</span>
+                <span className="text-muted-foreground">{jockeyStat.rides} {t("binis")} · </span>
+                <span className={cn("font-semibold", wc)}>{jockeyStat.wins} {t("gal")} · %{wp}</span>
               </div>
             </div>
           );
@@ -636,7 +654,7 @@ function RunnerRow({
           const wc = wp >= 25 ? "text-hit" : wp >= 15 ? "text-brand" : "text-muted-foreground";
           return (
             <div className={cn("text-[10px] tabular-nums font-semibold", wc)}>
-              %{wp} · {trainerStat.rides} yarış
+              %{wp} · {trainerStat.rides} {t("yarisSuffix")}
             </div>
           );
         })()}
@@ -698,19 +716,47 @@ function RunnerRow({
 
       {/* Yarış Stili */}
       <td className="px-2 py-1.5">
-        {raceStyleBadge(r.raceStyle) ? (
+        {raceStyleBadge(r.raceStyle, t) ? (
           <span
             className={cn(
               "inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap",
-              raceStyleBadge(r.raceStyle)!.cls,
-              raceStyleBadge(r.raceStyle)!.dusukGuven && "opacity-60"
+              raceStyleBadge(r.raceStyle, t)!.cls,
+              raceStyleBadge(r.raceStyle, t)!.dusukGuven && "opacity-60"
             )}
-            title={raceStyleBadge(r.raceStyle)!.dusukGuven ? "Az sayıda yarışa dayanıyor, düşük güven" : undefined}
+            title={raceStyleBadge(r.raceStyle, t)!.dusukGuven ? t("azSayidaYarisaDayaniyor") : undefined}
           >
-            {raceStyleBadge(r.raceStyle)!.text}
+            {raceStyleBadge(r.raceStyle, t)!.text}
           </span>
         ) : (
           <span className="text-muted-foreground text-[10px]">—</span>
+        )}
+      </td>
+
+      {/* İdman Görüntüsü */}
+      <td className="px-2 py-1.5 text-center">
+        {r.idmanVideoUrl ? (
+          <button
+            type="button"
+            onClick={onOpenVideo}
+            title={t("idmanIzle")}
+            aria-label={t("idmanIzleAria")}
+            className="inline-flex items-center justify-center text-[#c0392b] hover:opacity-70"
+          >
+            <PlayCircle className="h-5 w-5 fill-[#c0392b] text-white" />
+          </button>
+        ) : (
+          <span className="text-muted-foreground text-[10px]">—</span>
+        )}
+      </td>
+
+      {/* Start Sorunu — TJK'nın resmi "Geç Çıkış" tespitine göre, tekrarlayan (2+) kayıt.
+          Yetersiz veri de "Hayır" sayılır (kullanıcı talimatı 2026-08-01) — yalnız EVET
+          kanıtlanmış bir sorunu işaret eder, diğer her durum "Hayır" gösterir. */}
+      <td className="px-2 py-1.5 text-center">
+        {r.startSorunu ? (
+          <span className="text-[11px] font-semibold text-miss">{t("evet")}</span>
+        ) : (
+          <span className="text-[11px] text-muted-foreground">{t("hayir")}</span>
         )}
       </td>
     </tr>
@@ -742,9 +788,10 @@ function StatCell({
 // ── At kartı (mobil) ─────────────────────────────────────────────────────────
 
 function RunnerCard({
-  r, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, onSelectHorse, jockeyStat, trainerStat,
+  r, t, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, onSelectHorse, jockeyStat, trainerStat, onOpenVideo,
 }: {
   r: ProgramRunner;
+  t: ProgramT;
   isWinner: boolean;
   isTopAgf: boolean;
   ekuriColor?: { border: string; badge: string };
@@ -755,6 +802,7 @@ function RunnerCard({
   onSelectHorse: (name: string) => void;
   jockeyStat?: JockeyStatRow;
   trainerStat?: TrainerStatRow;
+  onOpenVideo: () => void;
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
@@ -784,8 +832,8 @@ function RunnerCard({
             <button
               type="button"
               onClick={onToggleFollow}
-              title={isFollowed ? "Takipten çık" : "Takip et"}
-              aria-label={isFollowed ? "Takipten çık" : "Takip et"}
+              title={isFollowed ? t("takiptenCik") : t("takipEt")}
+              aria-label={isFollowed ? t("takiptenCik") : t("takipEt")}
               className="shrink-0 transition-colors print:hidden"
             >
               <Star className={cn(
@@ -802,11 +850,22 @@ function RunnerCard({
             >
               {r.name}
               {r.scratched ? (
-                <span className="ml-1 text-[10px] font-normal text-red-400 no-underline">(Koşmaz)</span>
+                <span className="ml-1 text-[10px] font-normal text-red-400 no-underline">{t("kosmaz")}</span>
               ) : r.ekuriGroup != null ? (
                 <span title={`Eküri grubu ${r.ekuriGroup}`} className="ml-1 text-[11px]">🐴</span>
               ) : null}
             </button>
+            {r.idmanVideoUrl && (
+              <button
+                type="button"
+                onClick={onOpenVideo}
+                title={t("idmanIzle")}
+                aria-label={t("idmanIzleAria")}
+                className="shrink-0 inline-flex items-center justify-center text-[#c0392b]"
+              >
+                <PlayCircle className="h-4 w-4 fill-[#c0392b] text-white" />
+              </button>
+            )}
           </div>
           {(r.sire || r.dam) && (
             <div className="text-[10px] text-muted-foreground truncate ml-5">
@@ -846,16 +905,16 @@ function RunnerCard({
           </span>
           {r.apprentice && (
             <span className="ml-1 text-[10px] font-semibold text-brand">
-              Ap.{r.apprenticeRemaining != null && ` (${r.apprenticeRemaining} kaldı)`}
+              {t("ap")}
             </span>
           )}
           {jockeyStat && (() => {
             const wp = pct(jockeyStat);
             const wc = wp >= 25 ? "text-hit" : wp >= 15 ? "text-brand" : "text-muted-foreground";
-            const tip = `${jockeyStat.label} · ${jockeyStat.rides} biniş · ${jockeyStat.wins} galibiyet · %${wp}`;
+            const tip = `${jockeyStat.label} · ${jockeyStat.rides} ${t("binis")} · ${jockeyStat.wins} ${t("galibiyet")} · %${wp}`;
             return (
               <span title={tip} className={cn("ml-1.5 tabular-nums", wc)}>
-                %{wp} gal
+                %{wp} {t("gal")}
               </span>
             );
           })()}
@@ -876,7 +935,7 @@ function RunnerCard({
             const wc = wp >= 25 ? "text-hit" : wp >= 15 ? "text-brand" : "text-muted-foreground";
             return (
               <span className={cn("ml-1.5 tabular-nums font-semibold", wc)}>
-                %{wp} · {trainerStat.rides} yarış
+                %{wp} · {trainerStat.rides} {t("yarisSuffix")}
               </span>
             );
           })()}
@@ -886,37 +945,37 @@ function RunnerCard({
       {/* Kilo · Start · HP · Derece · Yaş — hizalı grid */}
       <div className="grid grid-cols-5 gap-1 mt-1.5 ml-10">
         <StatCell
-          label="Kilo"
+          label={t("statKilo")}
           value={r.weight ?? "—"}
           sub={r.weightChange != null && r.weightChange !== 0 ? `${r.weightChange > 0 ? "+" : ""}${r.weightChange}` : undefined}
           subClass={r.weightChange != null && r.weightChange < 0 ? "text-red-500" : "text-green-500"}
         />
         <StatCell
-          label="Start"
+          label={t("statStart")}
           value={r.startNo ?? "—"}
           sub={r.disaridanStart ? "DS" : undefined}
           subClass="text-red-500 font-bold"
         />
-        <StatCell label="HP" value={r.hp ?? "—"} />
+        <StatCell label={t("statHp")} value={r.hp ?? "—"} />
         <StatCell
-          label="Derece"
+          label={t("statDerece")}
           value={r.bestTime ? `${isBestTime ? "★ " : ""}${r.bestTime.split(" - ")[0]}` : "—"}
           valueClass={isBestTime ? "text-[#27ae60] font-semibold" : undefined}
         />
-        <StatCell label="Yaş" value={r.age ?? "—"} />
+        <StatCell label={t("statYas")} value={r.age ?? "—"} />
       </div>
 
-      {raceStyleBadge(r.raceStyle) && (
+      {raceStyleBadge(r.raceStyle, t) && (
         <div className="mt-1.5 ml-10 flex items-center gap-1">
           <span
             className={cn(
               "inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold",
-              raceStyleBadge(r.raceStyle)!.cls,
-              raceStyleBadge(r.raceStyle)!.dusukGuven && "opacity-60"
+              raceStyleBadge(r.raceStyle, t)!.cls,
+              raceStyleBadge(r.raceStyle, t)!.dusukGuven && "opacity-60"
             )}
-            title={raceStyleBadge(r.raceStyle)!.dusukGuven ? "Az sayıda yarışa dayanıyor, düşük güven" : undefined}
+            title={raceStyleBadge(r.raceStyle, t)!.dusukGuven ? t("azSayidaYarisaDayaniyor") : undefined}
           >
-            {raceStyleBadge(r.raceStyle)!.text}
+            {raceStyleBadge(r.raceStyle, t)!.text}
           </span>
           <RaceStyleInfoButton />
         </div>
@@ -930,13 +989,12 @@ function RunnerCard({
 function RaceTimer({ time, hasResult, dateStr }: { time: string | null; hasResult: boolean; dateStr: string }) {
   const display = useRaceCountdown(time, hasResult, dateStr);
   if (!display) return null;
-  const isKostu = display === "Koştu";
   return (
     <span className={cn(
       "text-xs font-semibold px-2 py-0.5 rounded",
-      isKostu ? "bg-muted text-muted-foreground" : "bg-brand/10 text-brand"
+      hasResult ? "bg-muted text-muted-foreground" : "bg-brand/10 text-brand"
     )}>
-      {isKostu ? "Koştu" : `⏱ ${display}`}
+      {hasResult ? display : `⏱ ${display}`}
     </span>
   );
 }
@@ -961,13 +1019,14 @@ type JockeyStatsMap = Record<string, {
 type TrainerStatsMap = Record<string, TrainerStatRow>;
 
 function RaceTable({
-  race, dateStr, analysisOpen, onAnalysisToggle, son800Open, galopOpen, pedigreeOpen, comparisonOpen, h2hOpen, sonYarisOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, isVerified, userEmail, jockeyStats, trainerStats, hippodromeName,
+  race, dateStr, analysisOpen, onAnalysisToggle, son800Open, agfTrendOpen, galopOpen, pedigreeOpen, comparisonOpen, h2hOpen, sonYarisOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, isVerified, userEmail, jockeyStats, trainerStats, hippodromeName,
 }: {
   race: ProgramRace;
   dateStr: string;
   analysisOpen: boolean;
   onAnalysisToggle: () => void;
   son800Open: boolean;
+  agfTrendOpen: boolean;
   galopOpen: boolean;
   pedigreeOpen: boolean;
   comparisonOpen: boolean;
@@ -984,8 +1043,16 @@ function RaceTable({
   hippodromeName?: string;
   trainerStats?: TrainerStatsMap;
 }) {
-  const surf = surfaceLabel(race.surface);
+  const t = useTranslations("programToolbar");
+  const surf = surfaceLabel(race.surface, t);
   const winnerNos = race.result?.winnerNos ?? [];
+
+  // İdman görüntüsü — TJK'nın kendi "Koşu Bilgisi" tablosundaki gibi ("İdm" sütunu, kırmızı
+  // ▶ ikon), Son Hazırlıklar alt paneline gömülü DEĞİL, doğrudan ana at tablosunda —
+  // kullanıcı talebi 2026-07-29: "direk ana sayfada yarış programının üzerinde olacak
+  // tjkdaki gibi". Aynı sayfada modal açılır (yeni sekme YOK, kullanıcı talebi).
+  const [openVideoRunnerId, setOpenVideoRunnerId] = useState<string | null>(null);
+  const openVideoRunner = race.runners.find((r) => r.id === openVideoRunnerId) ?? null;
 
   // AGF sıralama (en yüksek = 1. sıra)
   const agfSorted = race.runners
@@ -1029,11 +1096,11 @@ function RaceTable({
     <div>
       {/* Koşu başlığı */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 bg-muted/50 border-b text-sm">
-        <span className="font-bold">{race.raceNo}. Koşu</span>
+        <span className="font-bold">{t("raceNoLabel", { no: race.raceNo })}</span>
         {race.time && <span className="text-muted-foreground">{race.time}</span>}
         <span className="font-medium">{race.distance}m</span>
         <span className={cn("font-semibold", surf.cls)}>● {surf.label}</span>
-        <span className="text-muted-foreground">{breedShort(race.breed)}</span>
+        <span className="text-muted-foreground">{breedShort(race.breed, t)}</span>
         {race.classType && <span className="text-muted-foreground">· {race.classType}</span>}
         {race.conditions && <span className="text-xs text-brand">· {race.conditions}</span>}
         <span className="sm:hidden ml-auto">
@@ -1050,30 +1117,32 @@ function RaceTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/60 text-xs text-muted-foreground">
-              <th className="px-2 py-1.5 text-center">No</th>
-              <th className="px-2 py-1.5 text-left">At İsmi</th>
-              <th className="px-2 py-1.5 text-left">Yaş</th>
-              <th className="px-2 py-1.5 text-center">Kilo</th>
-              <th className="px-2 py-1.5 text-center">Start</th>
-              <th className="px-2 py-1.5 text-left" data-tour="jokey">Jokey</th>
-              <th className="px-2 py-1.5 text-left" data-tour="antrenor">Sahip / Antrenör</th>
-              <th className="px-2 py-1.5 text-center">H.P</th>
-              <th className="px-2 py-1.5 text-center">En İyi D.</th>
-              <th className="px-2 py-1.5 text-left">Son Yarışlar</th>
-              <th className="px-2 py-1.5 text-center">AGF</th>
+              <th className="px-2 py-1.5 text-center">{t("no")}</th>
+              <th className="px-2 py-1.5 text-left">{t("atIsmi")}</th>
+              <th className="px-2 py-1.5 text-left">{t("yas")}</th>
+              <th className="px-2 py-1.5 text-center">{t("kilo")}</th>
+              <th className="px-2 py-1.5 text-center">{t("start")}</th>
+              <th className="px-2 py-1.5 text-left" data-tour="jokey">{t("jokey")}</th>
+              <th className="px-2 py-1.5 text-left" data-tour="antrenor">{t("sahipAntrenor")}</th>
+              <th className="px-2 py-1.5 text-center">{t("hp")}</th>
+              <th className="px-2 py-1.5 text-center">{t("enIyiDerece")}</th>
+              <th className="px-2 py-1.5 text-left">{t("sonYarislar")}</th>
+              <th className="px-2 py-1.5 text-center">{t("agf")}</th>
               <th className="px-2 py-1.5 text-left" data-tour="yaris-stili">
                 <span className="inline-flex items-center gap-1">
-                  Yarış Stili
+                  {t("yarisStili")}
                   <RaceStyleInfoButton />
                 </span>
               </th>
+              <th className="px-2 py-1.5 text-center" title={t("idmTitle")} data-tour="idman-video">{t("idm")}</th>
+              <th className="px-2 py-1.5 text-center" title={t("startSorunuTitle")} data-tour="start-sorunu">{t("startSorunu")}</th>
             </tr>
           </thead>
           <tbody>
             {race.runners.length === 0 ? (
               <tr>
-                <td colSpan={12} className="py-8 text-center text-sm text-muted-foreground">
-                  Yarışçı verisi henüz yüklenmedi.
+                <td colSpan={13} className="py-8 text-center text-sm text-muted-foreground">
+                  {t("yarisciVerisiYok")}
                 </td>
               </tr>
             ) : (
@@ -1081,6 +1150,7 @@ function RaceTable({
                 <RunnerRow
                   key={r.id}
                   r={r}
+                  t={t}
                   idx={i}
                   isWinner={winnerNos.includes(r.no)}
                   isTopAgf={r.no === topAgfNo}
@@ -1092,6 +1162,7 @@ function RaceTable({
                   onSelectHorse={onSelectHorse}
                   jockeyStat={buildJockeyStat(r.jockey)}
                   trainerStat={buildTrainerStat(r.trainer)}
+                  onOpenVideo={() => setOpenVideoRunnerId(r.id)}
                 />
               ))
             )}
@@ -1103,13 +1174,14 @@ function RaceTable({
       <div className="sm:hidden">
         {race.runners.length === 0 ? (
           <div className="py-8 text-center text-sm text-muted-foreground">
-            Yarışçı verisi henüz yüklenmedi.
+            {t("yarisciVerisiYok")}
           </div>
         ) : (
           race.runners.map((r) => (
             <RunnerCard
               key={r.id}
               r={r}
+              t={t}
               isWinner={winnerNos.includes(r.no)}
               isTopAgf={r.no === topAgfNo}
               ekuriColor={ekuriColorMap.get(r.no)}
@@ -1120,6 +1192,7 @@ function RaceTable({
               onSelectHorse={onSelectHorse}
               jockeyStat={buildJockeyStat(r.jockey)}
               trainerStat={buildTrainerStat(r.trainer)}
+              onOpenVideo={() => setOpenVideoRunnerId(r.id)}
             />
           ))
         )}
@@ -1128,18 +1201,18 @@ function RaceTable({
       {/* Sonuç kartı — koşu sonuçlandığında TJK formatında otomatik doldurulur */}
       {race.result && (
         <div className="border-t bg-muted/10 px-3 py-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] font-mono">
-          <span className="font-semibold text-foreground">SONUÇ:</span>
+          <span className="font-semibold text-foreground">{t("sonucLabel")}</span>
           <span>
             {(Array.isArray(race.result.actualOrder) ? (race.result.actualOrder as number[]).slice(0, 5) : []).join(" · ") || "—"}
           </span>
           <span className="mx-1 text-muted-foreground">/</span>
-          <span className="font-semibold text-foreground">MÜDDET:</span>
+          <span className="font-semibold text-foreground">{t("muddetLabel")}</span>
           <span>{race.result.time || "—"}</span>
           <span className="mx-1 text-muted-foreground">/</span>
-          <span className="font-semibold text-foreground">FARKLAR:</span>
+          <span className="font-semibold text-foreground">{t("farklarLabel")}</span>
           <span>{race.result.farklar || "—"}</span>
           <span className="mx-1 text-muted-foreground">/</span>
-          <span className="font-semibold text-foreground">GANYAN:</span>
+          <span className="font-semibold text-foreground">{t("ganyanLabel")}</span>
           <span>{race.result.ganyan != null ? String(race.result.ganyan).replace(".", ",") : "—"}</span>
         </div>
       )}
@@ -1162,11 +1235,34 @@ function RaceTable({
         )}
       </div>
       <div id="panel-son800">{son800Open && <Son800Panel raceId={race.id} />}</div>
+      <div id="panel-agf-trend">{agfTrendOpen && <AgfTrendPanel raceId={race.id} />}</div>
       <div id="panel-galop">{galopOpen && <GalopPanel runners={race.runners} breed={race.breed} />}</div>
       <div id="panel-pedigriler">{pedigreeOpen && <PedigreePanel runners={race.runners} />}</div>
       <div id="panel-karsilastir">{comparisonOpen && <ComparisonPanel raceId={race.id} />}</div>
       <div id="panel-h2h">{h2hOpen && <H2HPanel raceId={race.id} />}</div>
       <div id="panel-son-yaris-detay">{sonYarisOpen && <SonYarisDetayPanel raceId={race.id} />}</div>
+
+      {openVideoRunner && openVideoRunner.idmanVideoUrl && (() => {
+        const g0 = openVideoRunner.gallops[0] ?? null;
+        const s = g0 ? galopSplits(g0) : null;
+        const splitsLabel = s
+          ? [s.prepDist && s.prepTime ? `${s.prepDist}·${s.prepTime}` : null, s.finish ? `400·${s.finish}` : null, s.final200 ? `200·${s.final200}` : null]
+              .filter(Boolean)
+              .join(" / ") || null
+          : null;
+        return (
+          <IdmanVideoModal
+            runnerName={openVideoRunner.name}
+            runnerNo={openVideoRunner.no}
+            videoUrl={openVideoRunner.idmanVideoUrl}
+            latestGallop={g0}
+            galopDateLabel={g0 ? galopDate(g0) : null}
+            splitsLabel={splitsLabel}
+            raceJockey={openVideoRunner.jockey}
+            onClose={() => setOpenVideoRunnerId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
@@ -1186,6 +1282,7 @@ export default function ProgramView({
   jockeyStats?: JockeyStatsMap;
   trainerStats?: TrainerStatsMap;
 }) {
+  const t = useTranslations("programToolbar");
   const [activeHipo, setActiveHipo] = useState(days[0]?.hippodromeSlug ?? "");
   const [activeRace, setActiveRace] = useState<Record<string, number>>({});
   useEffect(() => {
@@ -1198,6 +1295,7 @@ export default function ProgramView({
   }, [activeHipo]);
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [son800Open, setSon800Open] = useState(false);
+  const [agfTrendOpen, setAgfTrendOpen] = useState(false);
   const [galopOpen, setGalopOpen] = useState(false);
   const [pedigreeOpen, setPedigreeOpen] = useState(false);
   const [comparisonOpen, setComparisonOpen] = useState(false);
@@ -1262,7 +1360,7 @@ export default function ProgramView({
   if (days.length === 0) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground text-sm">
-        Bu tarih için koşu programı bulunamadı.
+        {t("kosuProgramiBulunamadi")}
       </div>
     );
   }
@@ -1303,7 +1401,7 @@ export default function ProgramView({
                     : "opacity-70 hover:opacity-100"
                 )}
               >
-                {r.raceNo}. Koşu
+                {t("raceNoLabel", { no: r.raceNo })}
                 {r.hasAnalysis && (
                   <span className="absolute top-1 right-0.5 w-1.5 h-1.5 rounded-full bg-[#27ae60] ring-1 ring-white" />
                 )}
@@ -1331,9 +1429,10 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => setHipodromOzellikleriOpen(true)}
+                  data-tour="hipodrom-ozellikleri"
                   className="sm:hidden ml-auto shrink-0 rounded border px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground whitespace-nowrap"
                 >
-                  Hipodrom Özellikleri
+                  {t("hipodromOzellikleri")}
                 </button>
               )}
             </div>
@@ -1349,11 +1448,11 @@ export default function ProgramView({
                   className="flex items-center gap-1 rounded-md bg-[#00944D] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
                 >
                   {isLoggedIn
-                    ? <>Analizi Gör {analysisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}</>
-                    : "Analizi Gör 🔒"}
+                    ? <>{t("analiziGor")} {analysisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}</>
+                    : `${t("analiziGor")} 🔒`}
                 </button>
               ) : (
-                <span className="text-xs font-semibold text-[#e74c3c] shrink-0 whitespace-nowrap">Analiz Hazırlanıyor</span>
+                <span className="text-xs font-semibold text-[#e74c3c] shrink-0 whitespace-nowrap">{t("analizHazirlaniyor")}</span>
               )}
               {currentRace && (
                 <button
@@ -1366,24 +1465,35 @@ export default function ProgramView({
               )}
               {currentRace && (
                 <button
+                  onClick={() => toggleAndScroll(setAgfTrendOpen, agfTrendOpen, "panel-agf-trend")}
+                  data-tour="agf-trend"
+                  className={cn(PANEL_BTN_CLASS, agfTrendOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                >
+                  {t("agfTrend")} {agfTrendOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
+              )}
+              {currentRace && (
+                <button
                   onClick={() => toggleAndScroll(setGalopOpen, galopOpen, "panel-galop")}
                   data-tour="galop"
                   className={cn(PANEL_BTN_CLASS, galopOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
-                  Son Hazırlıklar {galopOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  {t("sonHazirliklar")} {galopOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
               )}
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setPedigreeOpen, pedigreeOpen, "panel-pedigriler")}
+                  data-tour="pedigriler-panel"
                   className={cn(PANEL_BTN_CLASS, pedigreeOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
-                  Pedigriler {pedigreeOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  {t("pedigriler")} {pedigreeOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
               )}
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setH2hOpen, h2hOpen, "panel-h2h")}
+                  data-tour="h2h-panel"
                   className={cn(PANEL_BTN_CLASS, h2hOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
                   H2H {h2hOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -1392,25 +1502,28 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setComparisonOpen, comparisonOpen, "panel-karsilastir")}
+                  data-tour="karsilastir"
                   className={cn(PANEL_BTN_CLASS, comparisonOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
-                  Karşılaştır {comparisonOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  {t("karsilastir")} {comparisonOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
               )}
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setSonYarisOpen, sonYarisOpen, "panel-son-yaris-detay")}
+                  data-tour="son-yaris-panel"
                   className={cn(PANEL_BTN_CLASS, sonYarisOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
-                  Son Yarış Detayları {sonYarisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  {t("sonYarisDetaylari")} {sonYarisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
               )}
               {currentRace && (
                 <button
                   onClick={() => setHipodromOzellikleriOpen(true)}
+                  data-tour="hipodrom-ozellikleri"
                   className={cn(PANEL_BTN_CLASS, PANEL_BTN_CLOSED, "hidden sm:flex")}
                 >
-                  Hipodrom Özellikleri
+                  {t("hipodromOzellikleri")}
                 </button>
               )}
               {currentRace && (
@@ -1429,6 +1542,7 @@ export default function ProgramView({
               analysisOpen={analysisOpen}
               onAnalysisToggle={() => setAnalysisOpen((v) => !v)}
               son800Open={son800Open}
+              agfTrendOpen={agfTrendOpen}
               galopOpen={galopOpen}
               pedigreeOpen={pedigreeOpen}
               comparisonOpen={comparisonOpen}

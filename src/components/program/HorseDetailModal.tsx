@@ -4,6 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getHorseHistory, type HorseHistoryEntry } from "@/server/actions/horse-detail.actions";
+import { getHorsePedigreeTree } from "@/server/actions/horse-pedigree.actions";
+import type { PedigreeTree } from "@/lib/pedigree-tree-types";
+import SoyAgaciTree from "./SoyAgaciTree";
+import { getHorseProfileByName, getHorseDetailedStatsByName } from "@/server/actions/horse-profile.actions";
+import type { HorseProfile, HorseDetailStatSection } from "@/server/services/ingest/tjk-at-profil.adapter";
+import HorseProfileSummary from "./HorseProfileSummary";
+import HorseDetailedStatsView from "./HorseDetailedStatsView";
 
 function surfaceShort(s: string) {
   if (s === "CIM") return { label: "Çim", cls: "text-[#009900]" };
@@ -21,6 +28,12 @@ export default function HorseDetailModal({ name, onClose }: { name: string; onCl
   const [data, setData] = useState<HorseHistoryEntry[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [pedigreeTree, setPedigreeTree] = useState<PedigreeTree | null>(null);
+  const [pedigreeLoading, setPedigreeLoading] = useState(true);
+  const [profile, setProfile] = useState<HorseProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [detailedStats, setDetailedStats] = useState<HorseDetailStatSection[]>([]);
+  const [detailedStatsLoading, setDetailedStatsLoading] = useState(true);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -33,6 +46,39 @@ export default function HorseDetailModal({ name, onClose }: { name: string; onCl
       .then((res) => { if (!cancelled) setData(res); })
       .catch(() => { if (!cancelled) setError(true); })
       .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [name]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPedigreeLoading(true);
+    setPedigreeTree(null);
+    getHorsePedigreeTree(name)
+      .then((res) => { if (!cancelled) setPedigreeTree(res); })
+      .catch(() => { if (!cancelled) setPedigreeTree(null); })
+      .finally(() => { if (!cancelled) setPedigreeLoading(false); });
+    return () => { cancelled = true; };
+  }, [name]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setProfileLoading(true);
+    setProfile(null);
+    getHorseProfileByName(name)
+      .then((res) => { if (!cancelled) setProfile(res); })
+      .catch(() => { if (!cancelled) setProfile(null); })
+      .finally(() => { if (!cancelled) setProfileLoading(false); });
+    return () => { cancelled = true; };
+  }, [name]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDetailedStatsLoading(true);
+    setDetailedStats([]);
+    getHorseDetailedStatsByName(name)
+      .then((res) => { if (!cancelled) setDetailedStats(res); })
+      .catch(() => { if (!cancelled) setDetailedStats([]); })
+      .finally(() => { if (!cancelled) setDetailedStatsLoading(false); });
     return () => { cancelled = true; };
   }, [name]);
 
@@ -92,6 +138,43 @@ export default function HorseDetailModal({ name, onClose }: { name: string; onCl
         </div>
 
         <div className="overflow-y-auto">
+          <div className="border-b px-4 py-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Soy Ağacı (3 kuşak, TJK)
+            </div>
+            {pedigreeLoading ? (
+              <div className="py-4 text-center text-xs text-muted-foreground">Soy ağacı yükleniyor…</div>
+            ) : pedigreeTree ? (
+              <SoyAgaciTree tree={pedigreeTree} />
+            ) : (
+              <div className="py-2 text-xs text-muted-foreground">Bu at için soy ağacı bulunamadı.</div>
+            )}
+          </div>
+
+          <div className="border-b px-4 py-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Sahiplik & Kazanç (TJK)
+            </div>
+            {profileLoading ? (
+              <div className="py-4 text-center text-xs text-muted-foreground">Yükleniyor…</div>
+            ) : profile ? (
+              <HorseProfileSummary profile={profile} />
+            ) : (
+              <div className="py-2 text-xs text-muted-foreground">Bu at için detaylı bilgi bulunamadı.</div>
+            )}
+          </div>
+
+          <div className="border-b px-4 py-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Detaylı İstatistikler (Zaman / Hipodrom / Jokey / Pist / Mesafe)
+            </div>
+            {detailedStatsLoading ? (
+              <div className="py-4 text-center text-xs text-muted-foreground">Yükleniyor…</div>
+            ) : (
+              <HorseDetailedStatsView sections={detailedStats} />
+            )}
+          </div>
+
           {loading ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">Geçmiş yükleniyor…</div>
           ) : error ? (

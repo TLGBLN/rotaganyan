@@ -1,6 +1,7 @@
 "use client";
 
 import { Tv } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 function openLiveTv() {
@@ -16,6 +17,7 @@ function openLiveTv() {
 }
 
 export default function LiveTvPlayer({ compact = false }: { compact?: boolean }) {
+  const t = useTranslations("home.liveTv");
   return (
     <button
       onClick={openLiveTv}
@@ -25,7 +27,7 @@ export default function LiveTvPlayer({ compact = false }: { compact?: boolean })
       )}
     >
       <Tv className="h-4 w-4" />
-      Canlı TV
+      {t("canliTv")}
     </button>
   );
 }

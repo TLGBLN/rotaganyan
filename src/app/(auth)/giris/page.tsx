@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { getTranslations } from "next-intl/server";
 import { AuthError } from "next-auth";
 import bcrypt from "bcryptjs";
 import { signIn } from "@/lib/auth";
@@ -13,7 +14,10 @@ import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import AuthTabs from "../AuthTabs";
 
-export const metadata: Metadata = { title: "Giriş Yap" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("auth.giris");
+  return { title: t("metaTitle") };
+}
 
 /** Açık yönlendirme (open redirect) riskine karşı sadece site içi göreli yolları kabul eder. */
 function safeCallbackUrl(callbackUrl: string | undefined): string {
@@ -38,7 +42,7 @@ async function login(formData: FormData) {
   const callbackUrl = safeCallbackUrl(formData.get("callbackUrl") as string);
 
   // Şifreyi doğrula — log'a başarı/başarısızlık yazabilmek için signIn'den önce kontrol et
-  const user = await db.user.findUnique({ where: { email }, select: { id: true, passwordHash: true } });
+  const user = await db.user.findUnique({ where: { email }, select: { id: true, passwordHash: true, emailVerified: true } });
   const validPassword = user?.passwordHash ? await bcrypt.compare(password, user.passwordHash) : false;
 
   // Her girişimi logla (await: signIn sonraki satırda NEXT_REDIRECT fırlatır, fire-and-forget kaybolur)
@@ -54,6 +58,13 @@ async function login(formData: FormData) {
     redirect(`/giris?hata=1&callbackUrl=${encodeURIComponent(callbackUrl)}`);
   }
 
+  // v2026-07-31 — sahte hesapları engellemek için: e-postası doğrulanmamış hesap giriş
+  // YAPAMAZ (bkz. auth.ts authorize()'daki aynı kontrol, savunma katmanı). Şifre doğruysa
+  // ama hesap doğrulanmamışsa kullanıcıyı kod girme ekranına yönlendir.
+  if (!user!.emailVerified) {
+    redirect(`/kayit/dogrula?email=${encodeURIComponent(email)}&callbackUrl=${encodeURIComponent(callbackUrl)}`);
+  }
+
   try {
     await signIn("credentials", { email, password, redirectTo: callbackUrl });
   } catch (err) {
@@ -64,44 +75,52 @@ async function login(formData: FormData) {
   }
 }
 
-type Props = { searchParams: Promise<{ hata?: string; callbackUrl?: string }> };
+type Props = { searchParams: Promise<{ hata?: string; callbackUrl?: string; dogrulandi?: string; email?: string }> };
 
 export default async function GirisPage({ searchParams }: Props) {
-  const { hata, callbackUrl } = await searchParams;
+  const { hata, callbackUrl, dogrulandi, email } = await searchParams;
+  const t = await getTranslations("auth.giris");
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Giriş Yap</CardTitle>
-        <CardDescription>Hesabınıza erişmek için bilgilerinizi girin.</CardDescription>
+        <CardTitle className="text-xl">{t("title")}</CardTitle>
+        <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         <AuthTabs active="giris" callbackUrl={callbackUrl} />
+
+        {dogrulandi && (
+          <p className="rounded-md bg-hit/10 px-3 py-2 text-sm text-hit">
+            {t("dogrulandi")}
+          </p>
+        )}
+
         <form action={login} className="space-y-4">
           <input type="hidden" name="callbackUrl" value={callbackUrl ?? "/"} />
           <div className="space-y-1.5">
-            <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">E-posta</Label>
-            <Input id="email" name="email" type="email" autoComplete="email" required />
+            <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("eposta")}</Label>
+            <Input id="email" name="email" type="email" autoComplete="email" defaultValue={email ?? undefined} required />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="password" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Şifre</Label>
+            <Label htmlFor="password" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("sifre")}</Label>
             <PasswordInput id="password" name="password" autoComplete="current-password" required />
           </div>
 
           {hata && (
             <p className="rounded-md bg-miss/10 px-3 py-2 text-sm text-miss">
-              E-posta veya şifre hatalı.
+              {t("hataliGiris")}
             </p>
           )}
 
           <Button type="submit" className="w-full">
-            Giriş Yap
+            {t("girisYap")}
           </Button>
         </form>
 
         <div className="text-center text-sm">
           <Link href="/sifre-sifirla" className="text-muted-foreground hover:text-foreground">
-            Şifremi Unuttum
+            {t("sifremiUnuttum")}
           </Link>
         </div>
       </CardContent>

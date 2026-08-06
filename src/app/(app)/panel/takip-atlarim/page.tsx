@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { Bookmark } from "lucide-react";
 import UnfollowButton from "./UnfollowButton";
+import FollowNoteEditor from "./FollowNoteEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -39,9 +40,7 @@ export default async function TakipAtlarimPage() {
             >
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-sm">{follow.horseName}</p>
-                {follow.note && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">{follow.note}</p>
-                )}
+                <FollowNoteEditor horseName={follow.horseName} note={follow.note} />
                 <p className="mt-1 text-[10px] text-muted-foreground">
                   Takip tarihi: {format(new Date(follow.createdAt), "d MMM yyyy", { locale: tr })}
                 </p>

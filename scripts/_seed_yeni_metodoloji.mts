@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { readFileSync } from "fs";
 
-const VERSION = "v6.6";
+const VERSION = "v6.34";
 const content = readFileSync("scripts/_yeni_metodoloji.md", "utf8");
 
 await db.methodologyVersion.updateMany({ where: { isCurrent: true, version: { not: VERSION } }, data: { isCurrent: false } });

@@ -88,6 +88,10 @@ model User {
   updatedAt        DateTime  @updatedAt
   hasSeenIntro     Boolean   @default(false)
   marketingConsent Boolean   @default(false)
+  // Takip edilen atlar bugün koşuyorsa girişte açılan popup — günde en fazla 1 kez
+  // gösterilir (bkz. followed-horses-popup.actions.ts). hasSeenIntro'nun aksine KALICI
+  // değil, her gün yeniden gösterilebilir olması gerektiği için tarih karşılaştırılıyor.
+  followPopupShownAt DateTime?
 
   predictions   Prediction[]
   articles      Article[]
@@ -232,6 +236,7 @@ model Runner {
   ekuriGroup         Int?
   apprentice         Boolean @default(false)
   tjkAtId            Int?
+  idmanVideoUrl      String?
 
   race           Race                 @relation(fields: [raceId], references: [id], onDelete: Cascade)
   gallops        Gallop[]
@@ -240,6 +245,59 @@ model Runner {
   accuraceSplits AccuraceHorseSplit[]
 
   @@unique([raceId, no])
+}
+
+/**
+ * TJK'nın kendi Pedigri uç noktasından (Query/Pedigri/Pedigri?Atkodu=X) çekilen 3 kuşaklık
+ * (14 atalı) tam soy ağacı — tjkAtId'ye göre KALICI olarak önbelleklenir (pedigri değişmez,
+ * bir at kaç yarışa girerse girsin tek seferlik çekim yeterli). treeJson yapısı 14 alan:
+ * sire/dam, sireSire/sireDam/damSire/damDam, ve 8 üçüncü kuşak — her biri
+ * {name, year, note} veya null (bkz. src/server/services/ingest/tjk-pedigri.adapter.ts).
+ */
+model HorsePedigree {
+  tjkAtId   Int      @id
+  treeJson  Json
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+/**
+ * TJK "At Koşu Bilgileri" sayfasının kimlik/kazanç ve Zaman/Hipodrom/Jokey/Pist/Mesafe
+ * kırılımlı istatistiklerinin KALICI önbelleği — pedigriden farklı olarak bu veri her yeni
+ * koşudan sonra DEĞİŞİR, bu yüzden updatedAt'e göre periyodik olarak yeniden çekilir (bkz.
+ * src/server/services/ingest/tjk-at-profil.adapter.ts, sync-horse-stats-cache cron'u).
+ * Kullanıcı talebi 2026-07-30: "tüm atların tüm detayları çekilsin" — TJK'ya kullanıcı
+ * tıkladıkça değil, arka planda toplu olarak gidilsin.
+ */
+model HorseStatsCache {
+  tjkAtId           Int      @id
+  profileJson       Json
+  detailedStatsJson Json
+  updatedAt         DateTime @default(now()) @updatedAt
+}
+
+/**
+ * Bir atın istatistik/geçmiş çekimi ISRARLA (üst üste birkaç kez) başarısız olursa buraya
+ * kaydedilir — kullanıcı talimatı 2026-07-30: "ısrarla başarısız olanları atla" — aksi halde
+ * gerçekten hatalı/eksik bir TJK kaydı olan tek bir at, toplu dolum döngüsünü SONSUZA kadar
+ * durdurmadan tekrar tekrar dener. attempts eşiği aşılınca o at gelecek taramalarda
+ * `needsSync`'ten çıkarılır (syncHorseStatsCache) — sessizce değil, bu tabloda görünür kalır.
+ */
+model HorseSyncFailure {
+  tjkAtId     Int      @id
+  attempts    Int      @default(1)
+  lastAttempt DateTime @default(now()) @updatedAt
+}
+
+/**
+ * TJK'nın "At Koşu Bilgileri" tam yarış geçmişi tablosunun (tjk-at-performans.adapter.ts)
+ * KALICI önbelleği — kullanıcı talebi 2026-07-30: analiz (Faz1/veri-toplama.ts) ve public
+ * panellerin (H2H/Karşılaştır/Son Yarış Detayları) hepsi TJK'ya canlı gitmek yerine buradan
+ * okusun, TJK'dan besleme yalnız arka plan cron'uyla (sync-horse-stats-cache) devam etsin.
+ */
+model HorseRaceHistoryCache {
+  tjkAtId   Int      @id
+  rowsJson  Json
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 /**
@@ -367,6 +425,10 @@ model Result {
   ganyan      Float?
   time        String? // Müddet — kazananın resmi koşu süresi (örn. "1.20.11")
   farklar     String? // Farklar — ilk sıralar arasındaki mesafe farkları, TJK sırasıyla (örn. "Baş, 1, 2, Boyun")
+  // "Geç Çıkış" — TJK'nın kendi resmi start-kalitesi tespiti (bkz. tjk-result.adapter.ts).
+  // Bu koşuda geç kalkan at(lar), her biri {no, name, fark} — ör. [{"no":5,"name":"...","fark":"3 Boy"}].
+  // Boş dizi/null = kimse geç kalkmadı (TJK'nın kendi işaretlemesine göre).
+  gecCikanlar Json?
   hitTop1     Boolean  @default(false)
   hitInCoupon Boolean  @default(false)
   hitRanks    Json?
@@ -459,6 +521,11 @@ model ClaudeUsageLog {
   // token'ları inputTokens'a hiç dahil değil (Anthropic bunları ayrı sayaçlarda döner).
   cacheCreationInputTokens Int      @default(0)
   cacheReadInputTokens     Int      @default(0)
+  // cacheCreationInputTokens'ın 1 saatlik TTL'li kısmı (2x fiyat) — kalanı (toplam eksi bu)
+  // 5 dakikalık TTL'li kısımdır (1.25x fiyat). Anthropic bu ikisini usage.cache_creation
+  // altında ayrı ayrı döner (ephemeral_1h_input_tokens/ephemeral_5m_input_tokens) — doğru
+  // maliyet hesaplamak için ayrı saklanır (v6.31, metodoloji bloğu artık 1sa cache'leniyor).
+  cacheCreation1hInputTokens Int    @default(0)
   // Claude'un ham yanıt metni (extractText sonrası) — Vercel platform zaman aşımı
   // Claude başarıyla yanıtladıktan SONRA ama istemciye ulaşmadan ÖNCE fonksiyonu
   // kesebiliyor ("boşa ödeme"). Bu alan sayesinde hemen ardından gelen "tekrar dene"
@@ -607,6 +674,86 @@ model DamStatOwn {
 
   @@unique([damName, damSireName, irk, pist, mesafe])
   @@index([damName])
+}
+
+// Damsire'nin (kısrağın babası) KENDİ BAŞINA etkisi — DamStatOwn'dan farklı olarak dam
+// ADI hiç sayılmıyor, damSireName'e göre TÜM farklı kısraklardan gelen yavrular birlikte
+// gruplanıyor (kullanıcı doktrini 2026-07-26: "damsire atın fiziksel/mizaç profili üzerinde
+// önemli etki taşır, aygır+kısrak yanında üçüncü ayrı bir istatistik olarak izlenmeli").
+// torunSayisi/kazananTorunSayisi = DamStatOwn'daki yavru kavramının bir kuşak ötesi hali.
+model DamSireStatOwn {
+  id            String   @id @default(cuid())
+  damSireName   String
+  irk           String
+  pist          String
+  mesafe        String
+  start         Int
+  birinci       Int
+  ikinci        Int
+  ucuncu        Int
+  dorduncu      Int
+  besinci       Int
+  kYuzde        Float
+  torunSayisi        Int @default(0)
+  kazananTorunSayisi Int @default(0)
+  updatedAt     DateTime @updatedAt
+
+  @@unique([damSireName, irk, pist, mesafe])
+  @@index([damSireName])
+}
+
+// Antrenörün EKİPMAN/TAKI DEĞİŞİKLİĞİ yaptığı start'lardaki kazanma oranı — genel
+// trainerWinPct'ten (TrainerStatSync, TJK kaynaklı yıllık toplam) FARKLI, tamamen
+// rotaganyan'ın kendi Runner geçmişinden hesaplanır (kullanıcı doktrini 2026-07-26:
+// "ekipman değişikliği antrenörün bu tür değişikliklerdeki genel başarı oranıyla
+// eşleştirilmeli"). Bir at için "değişiklik" = önceki starta göre takı ailesi (bkz.
+// equipment-family.ts) farklı — o starttaki antrenöre atfedilir. Tüm zamanlar/pist-mesafe
+// kırılımsız (örneklem küçük, ince kırılım anlamsızlaşır — SireStatOwn'daki gerekçeyle aynı).
+model TrainerEquipmentStatOwn {
+  id             String   @id @default(cuid())
+  trainer        String   @unique
+  degisimStart   Int
+  degisimBirinci Int
+  degisimKYuzde  Float
+  updatedAt      DateTime @updatedAt
+
+  @@index([trainer])
+}
+
+// Jokeyin BU pist+mesafe+SKK sınıf kademesindeki kazanma oranı — genel jockeyWinPct'ten
+// (JockeyStatSync, TJK kaynaklı yıllık toplam, kırılımsız) FARKLI, kullanıcı doktrini
+// 2026-07-27: "jokey önceliği — (1) bu pist+mesafe+tip oranı" — "tip" SKK sınıf kademesi
+// (§VIII.1) olarak yorumlandı, ince kırılımda (tam classType) örneklem çok küçük kalırdı.
+model JockeyPistMesafeSkkStatOwn {
+  id       String @id @default(cuid())
+  jockey   String
+  pist     String
+  mesafe   String
+  skk      Int
+  start    Int
+  birinci  Int
+  kYuzde   Float
+  updatedAt DateTime @updatedAt
+
+  @@unique([jockey, pist, mesafe, skk])
+  @@index([jockey])
+}
+
+// Jokey-Antrenör İKİLİSİNİN son 60 gündeki kombinasyon kazanma oranı ("hot streak" —
+// kullanıcı doktrini 2026-07-27: "(2) bu antrenörle son 60 gün kombinasyonu"). Rolling
+// pencere olduğu için her gün cron'la yeniden hesaplanır (o günkü "son 60 gün"e göre) —
+// TrainerStatSync'in yıllık deseniyle aynı mantık, yalnız pencere kayan.
+model JokeyAntrenorKombinasyonStatOwn {
+  id       String @id @default(cuid())
+  jockey   String
+  trainer  String
+  start    Int
+  birinci  Int
+  kYuzde   Float
+  updatedAt DateTime @updatedAt
+
+  @@unique([jockey, trainer])
+  @@index([jockey])
 }
 
 // ─── METHODOLOGY ──────────────────────────────────────────────────────────────

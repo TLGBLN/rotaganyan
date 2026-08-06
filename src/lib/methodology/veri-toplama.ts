@@ -18,16 +18,32 @@ import { fetchTjkAtKosuBilgileri } from "@/server/services/ingest/tjk-at-perform
 import { galopQuality, isSameJockey } from "@/components/program/panels/galop-helpers";
 import { getAtPerformansForRace } from "@/server/actions/at-performans.actions";
 import { getH2HForRace } from "@/server/actions/h2h.actions";
-import { fetchApprenticeRemainingRaces, normalizeJockeyName } from "@/server/services/ingest/tjk-apprentice.adapter";
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
-import { getDamStatOzetleriForRace } from "@/server/actions/dam-stat.actions";
+import { getDamStatOzetleriForRace, getDamSireOwnStatForRace } from "@/server/actions/dam-stat.actions";
 import {
   hpKalitesiYildizi, sinifGecisBonusu, galopSiniflandirmasi, tempoGuvenSeviyesi,
   kacakHaritasi, zeminKatsayisi, zeminDetayiBul, zeminDetayiSatirdanCikar, type GalopZinciriSonuc, type TempoGuven,
 } from "@/lib/methodology/mekanik-puanlama";
 import { analizEtTekYaris, hesaplaCokYarisEgilimi, type PaceCheckpoint, type CokYarisEgilim } from "@/lib/methodology/pace-analizi";
 import { kulvarBolgesi } from "@/lib/hipodrom-mesafe-koordinat";
+import { HIPODROM_OZELLIKLERI } from "@/lib/hipodrom-ozellikleri";
+import { formatHorseDetailStatOzet, type HorseDetailStatSection } from "@/lib/methodology/horse-detail-stat-match";
 import { getSonYarisDetaylariForRace } from "@/server/actions/son-yaris-detay.actions";
+import { getAgfTrendForRace } from "@/server/actions/agf-trend.actions";
+import { getGecmisBaglamForRace } from "@/server/actions/gecmis-baglam.actions";
+import { getGecCikisOzetleriForRace, type GecCikisOzet } from "@/server/actions/gec-cikis.actions";
+import { getPistMesafeStilIstatistigi } from "@/server/actions/pist-mesafe-stil.actions";
+import { tjkTarihOncesiMi } from "@/lib/tjk-date";
+
+/** Faz1 promptu için tek satırlık özet metin — gecCikisSayisi=0 olan atlar için de üretir (temiz sicil bir sinyaldir). */
+function formatGecCikisOzet(ozet: GecCikisOzet | undefined): string | null {
+  if (!ozet) return null;
+  if (ozet.gecCikisSayisi === 0) {
+    return `Start Geçmişi: son ${ozet.toplamStart} sonuçlu startında hiç geç çıkış kaydı yok (TJK resmi tespiti).`;
+  }
+  const oran = Math.round((ozet.gecCikisSayisi / ozet.toplamStart) * 100);
+  return `Start Geçmişi: son ${ozet.toplamStart} sonuçlu startından ${ozet.gecCikisSayisi}'inde TJK tarafından "Geç Çıkış" olarak işaretlenmiş (%${oran})${ozet.sonFark ? `, en son ${ozet.sonFark} geriden` : ""}.`;
+}
 
 const COMBINING_MARKS_RE = /[̀-ͯ]/g;
 // Yabancı doğumlu atlarda Runner.name "(USA)"/"(IRE)" gibi ülke koduyla biter, Accurace bunu yazmıyor.
@@ -54,7 +70,9 @@ function accuraceQueryNames(names: string[]): string[] {
 }
 
 // ── SKK Sınıf Piramidi (Ansiklopedi Bölüm III) — metin tabanlı en iyi eşleştirme ──
-function classToSkk(classType: string | null | undefined): number | null {
+// export: jokey-own-stat.service.ts da AYNI sınıflandırmayı kullanıyor (jokeyin
+// pist+mesafe+SKK kademesi bazında kazanma oranı için) — tek kaynak, kopya mantık yok.
+export function classToSkk(classType: string | null | undefined): number | null {
   if (!classType) return null;
   const t = classType.toUpperCase();
   if (/\bG\s*1\b/.test(t)) return 10;
@@ -142,8 +160,9 @@ export type Faz1Runner = {
   // bir bağlam), kulvar numarasıyla birlikte okunur.
   kulvarBolge: "viraj" | "düz yol" | null;
   // TJK'nın resmi at profilinden (AtKosuBilgileri) doğrulanmış: bu hipodrom+mesafe+pist
-  // kombinasyonunda (TÜM yıllar) daha önce kazandı mı, en iyi derecesi ne — "Son Yarış
-  // Detayları" panelindeki kaynakla AYNI, site DB alanlarına güvenmiyor.
+  // kombinasyonunda KOŞUNUN KENDİ YILI içinde daha önce kazandı mı, en iyi derecesi ne
+  // (kullanıcı talebi 2026-07-26: tüm yıllar değil, bu yıl) — "Son Yarış Detayları"
+  // panelindeki kaynakla AYNI, site DB alanlarına güvenmiyor.
   hipodromMesafedeKazandi: "EVET" | "HAYIR" | "KOSMADI";
   hipodromMesafedeEnIyiDerece: string | null;
   jockey: string | null;
@@ -159,20 +178,31 @@ export type Faz1Runner = {
   sire: string | null;
   dam: string | null;
   damSire: string | null;
-  // hipodromx.com "Aygırlar" tablosundan (bkz. SireStat modeli) bu koşunun ırk/pist/mesafe
-  // kombinasyonuna göre OTOMATİK eşleştirilen aygır istatistiği — admin artık bunu elle
-  // araştırıp pedigreeNote'a yazmak zorunda değil, eşleşme varsa doğrudan buradan gelir.
+  // Kendi Runner/Result verimizden (SireStatOwn) bu koşunun ırk/pist/mesafe kombinasyonuna
+  // göre OTOMATİK eşleştirilen aygır istatistiği — v6.32: hipodromx.com kaynaklı SireStat
+  // analiz akışından çıkarıldı (kullanıcı kararı 2026-08-01, own-data pist×mesafe kırılımı
+  // AEI'den daha değerli görüldü), yalnızca own-data kaldı.
   sireStatOzet: string | null;
   // Aygır/kısrak istatistiğinin dayandığı ham örneklem sayısı — eskiden yalnız sireStatOzet/
   // damStatOzet metnine gömülüydü ("Start 27" gibi), ayrı sayısal alan yoktu (kullanıcı
   // talebiyle eklendi, §XII.1 minOrneklem kararlarının güvenilir uygulanabilmesi için).
   // null = eşleşme yok (o kaynaktan hiç veri yok, "0 örneklem" ile karıştırılmasın).
-  sireOrneklemHipodromx: number | null;
   sireOrneklemKendiVeri: number | null;
-  // Aynısı anne + anne babası (kısrak) tarafı için — hipodromx.com "Kısraklar" tablosu.
+  // v6.63 — kullanıcı bulgusu 2026-08-05 (ANSHBA SKY, İstanbul 5.Koşu Maiden): aygırın
+  // kazanma yüzdesi (kYuzde) zaten hesaplanıyordu ama yalnız sireStatOzet METNİNE
+  // gömülüydü, ayrı sayısal alan yoktu — sahadaki EN İYİ pedigriyi koda gömebilmek için
+  // (Maiden koşularda atların kendi geçmişi yok, pedigri neredeyse TEK objektif sinyal).
+  sireKazanmaOrani: number | null;
+  // Aynısı anne + anne babası (kısrak) tarafı için (DamStatOwn).
   damStatOzet: string | null;
-  damOrneklemHipodromx: number | null;
   damOrneklemKendiVeri: number | null;
+  // Damsire'nin (kısrağın babası) TEK BAŞINA — hangi kısraktan gelirse gelsin TÜM
+  // yavrularından — kendi verimizdeki toplu performansı (kullanıcı doktrini 2026-07-26:
+  // aygır+kısrak yanında ÜÇÜNCÜ ayrı bir istatistik, damsire'nin fiziksel/mizaç etkisi
+  // dam kaydına gömülmeden ayrıca görünür olmalı). hipodromx bu kırılımı hiç vermediği
+  // için tamamen own-data (DamSireStatOwn) kaynaklıdır, "base" satırı yok.
+  damSireStatOzet: string | null;
+  damSireOrneklemKendiVeri: number | null;
   // Admin'in /admin/pedigri sayfasındaki "Genel Not"a elle girdiği, pedigri dışı herhangi
   // bir eksik veri (sakatlık, antrenman gözlemi, pist notu vb.) — otomatik toplanamayan
   // her şey için genel amaçlı manuel giriş alanı.
@@ -191,6 +221,14 @@ export type Faz1Runner = {
   hpOncekiFetchBasarisiz: boolean;
   agf: number | null;
   agfSirasi: number | null;
+  // AGF'nin gün içindeki hareketi (agf-sync'in günde birkaç kez aldığı ölçümlerden) —
+  // "para akışı" trendi, kullanıcı talebi 2026-07-27. En az 2 ölçüm gerekir, aksi halde null.
+  agfTrendOzet: string | null;
+  // agfTrendOzet'in altındaki HAM puan farkı (örn. +9.2) — Faz3'ün kural kontrolü
+  // (kuralKontrolleriUret) "motto senaryosu"nu (düşük AGF + yükselen trend + güçlü teknik)
+  // KOD tarafında da doğrulayabilsin diye ayrı bir sayısal alan (v6.16, kullanıcı talebi:
+  // "kontrolde bakılanlar arasında yerini aldı mı, görmezden gelinmesin").
+  agfTrendFark: number | null;
   equipment: string | null;
   equipmentAdded: string | null;
   equipmentRemoved: string | null;
@@ -211,9 +249,6 @@ export type Faz1Runner = {
   recentForm: string | null;
   bestTime: string | null;
   apprentice: boolean;
-  // Çırak jokey ise TJK'nın "kalan kilo indirimi hakkı" sayısı — sitenin program
-  // sayfasında "Ap. (N kaldı)" olarak gösteriliyor, HP/kilo değerlendirmesinde bağlam sağlar.
-  apprenticeRemaining: number | null;
   raceStyleEtiket: string | null;
   tempoVeriN: number | null;
   kacak: boolean;
@@ -240,12 +275,35 @@ export type Faz1Runner = {
   // hiç gönderilmiyordu (kullanıcı denetiminde bulundu, 2026-07-26).
   kiloAvantaji: boolean;
   hpAlanIciUst: boolean;
+  // TJK Detaylı İstatistikler (HorseStatsCache: Zaman/Hipodrom/Jokey/Pist/Mesafe kırılımı) —
+  // bugünkü hipodrom/pist/mesafe/jokey bağlamına uyan satırların özeti (kullanıcı talebi
+  // 2026-07-30: "analiz motorunu yeniden oluşturuyoruz" sadeleştirmesinin bir parçası —
+  // jokey pist/mesafe/SKK, jokey+antrenör kombinasyonu, at-jokey geçmişi kaldırılıp yerine
+  // bu tek, TJK'nın kendi tam kariyer verisinden gelen özet kondu). Jokey/Antrenör genel
+  // win%, Zemin Geçmişi ve Sınıf-bağlamlı Form aynı gün içinde kullanıcı talebiyle geri
+  // eklendi (v6.26 — bkz. jockeyWinPct/trainerWinPct/zeminGecmisiOzet/sinifBaglamliForm).
+  detayliIstatistikOzet: string | null;
+  // Jokey/Antrenör GENEL yıllık kazanma yüzdesi (JockeyStatSync/TrainerStatSync tabanlı,
+  // sync-jokey-stats/sync-trainer-stats cron'larından, 22:00) — v6.26, kullanıcı talebi
+  // 2026-07-30: "bunlar da çekilecek Faz1'e" (ekran görüntüsündeki Jokey/Sahip-Antrenör
+  // tablosu). Kırılımsız, en zayıf jokey sinyali olduğu için v6.25'te kaldırılmıştı, bugün
+  // aynı oturumda geri istendi.
   jockeyWinPct: number | null;
   trainerWinPct: number | null;
-  // §VIII.5 "Sınıf Koruma Adayı" kuralının "en az bir ek destek" şartını doğrulamak için —
-  // sınıf düşüşü VEYA jokey/antrenör %15+ ise true. Önceden hesaplanıyordu ama Faz2/Faz3
-  // promptuna hiç gönderilmiyordu (kullanıcı denetiminde bulundu, 2026-07-26).
-  sinifJokeyAntrenor: boolean;
+  // Zemin Geçmişi (v6.26, kullanıcı talebi 2026-07-30: "anlık zemin ile koştukları zeminler
+  // arasındaki bağ") — bugünküyle AYNI zemin sınıfında (ıslak/ağır/normal vb.) atın TÜM
+  // geçmiş start'ları, hipodrom/mesafe/yıl sınırı olmadan (bkz. gecmis-baglam.actions.ts).
+  zeminGecmisiOzet: string | null;
+  zeminGecmisiToplamKayit: number;
+  // Sınıf-bağlamlı Form (v6.26, kullanıcı talebi 2026-07-30: "hangi yarıştan hangi yarışa
+  // çıktığını, daha zor rakiplerle/sınıfla koşunca kaçıncı olmuş") — son 5 start'ın bitiriş
+  // sırası, HER birinin sınıfıyla (classType) birlikte, çıplak "618..." dizisinden farklı
+  // olarak zorluk bağlamını taşır.
+  sinifBaglamliForm: string | null;
+  // Start Geçmişi / "Geç Çıkış" (v6.30, kullanıcı talebi 2026-08-01: "Start Sorunu olan
+  // atları tespit edebilir miyiz") — TJK'nın kendi resmi tespiti, geçmiş sonuçlu starlarda
+  // kaç kez "Geç Çıkış" olarak işaretlendiği (bkz. gec-cikis.actions.ts). Örneklem <3 ise null.
+  startGecmisiOzet: string | null;
 
   // Son 800 — Gölge Mod girdileri (yalnız TAM UYGUN — pist zorunlu + mesafe ±200m —
   // kayıtlardan hesaplanır, gecit-motoru.ts'nin kalibre eşiklerini besler, değişmedi).
@@ -262,8 +320,9 @@ export type Faz1Runner = {
   // kayıt sayısı (kullanıcı talebiyle eklendi, minOrneklem kararı için gerekli).
   son800TumToplamKayit: number;
 
-  // Sitenin kendi "Aynı Pist/Mesafe/Hipodrom" ve "H2H" panellerinden (methodolojide
-  // XI. Bölüm — ZAYIF KANIT, tek başına sırayı belirlemez ama göz ardı edilmemeli).
+  // Sitenin kendi "Aynı Pist/Mesafe" (v6.10'dan itibaren hipodrom şartı YOK, bkz.
+  // at-performans.actions.ts) ve "H2H" panellerinden (methodolojide XI. Bölüm — ZAYIF
+  // KANIT, tek başına sırayı belirlemez ama göz ardı edilmemeli).
   aynıPistMesafeOzet: string | null;
   // aynıPistMesafeOzet metne en fazla 3 kayıt yazar — bu, gerçek toplam kayıt sayısı
   // (kullanıcı talebiyle eklendi — önceden bu sayı kod içinde hesaplanıp hiç
@@ -303,6 +362,29 @@ export type Faz1Sonuc = {
     sahadakiKacakSayisi: number;
     kacakTempoEtiketi: string;
     kacakAvantajliStil: string;
+    // Aynı hipodrom+pist+mesafe(±200m)'deki geçmiş yarışların kazananlarının tarihsel
+    // stil dağılımı (n<3 ise null) — bugünkü atlarla ilgili değil, yalnız bu pist/mesafe
+    // kombinasyonunun tarihsel eğilimi.
+    pistMesafeStilOzeti: string | null;
+    // En çok kazanan tek stil + yüzdesi — kacakAvantajliStil ile AYNI desende, Faz2
+    // prompt'unda "bu stildeki atlar sıralamada gereksiz yere çok aşağıda kalmamalı"
+    // yönlendirmesi için ayrıca (metinden parse etmeye gerek kalmadan) tutuluyor.
+    pistMesafeStilEnCokKazanan: string | null;
+    pistMesafeStilEnCokKazananYuzde: number | null;
+    // v6.61 — kullanıcı bulgusu 2026-08-05 (İSPANOZ, İstanbul 3.Koşu): yalnız EN ÇOK
+    // kazanan stili (yukarıdaki iki alan) değil, TÜM sıralamayı (rank) koda gömebilmek
+    // için — bir atın stili popülasyonda 2. sırada olsa bile n≥10 bireysel örneklemle
+    // TAM "destek" sayılmalı, bunun için 2. sıradaki stili de bilmek gerekiyor.
+    pistMesafeStilBreakdown: { style: string; percent: number }[] | null;
+    // Sıklet Dağılımı / makas genişliği (v6.38, kullanıcı denetimi): sahadaki en hafif ve
+    // en ağır kilo arasındaki fark — bir atın mutlak kilosu tek başına yeterli bağlam
+    // değildir (60kg, taban 50kg'sa ezici bir yük, taban 58kg'sa önemsiz bir fark).
+    kiloEnHafif: number | null;
+    kiloEnAgir: number | null;
+    kiloMakasi: number | null;
+    // Son düzlük uzunluğu (v6.39) — kullanıcı tarafından sağlandı, TJK resmi ölçümü DEĞİL,
+    // yaklaşık bir aralık (bkz. hipodrom-ozellikleri.ts). null = henüz sağlanmadı/teyit bekliyor.
+    sonDuzlukUzunlugu: string | null;
     // TJK ham metni — koşu şartları/yaş-kilo skalası/pist rekoru. Doğrudan at bazlı bir
     // sinyal değil, yalnız bağlam; boşsa gösterilmez.
     conditions: string | null;
@@ -315,7 +397,14 @@ export type Faz1Sonuc = {
   };
   runners: Faz1Runner[];
   veriDoluluk: { alan: string; oran: number }[];
+  // Kullanıcının tek tek sorup doğruladığı 8 veri kategorisi için, HER analizde otomatik
+  // görünen checklist — "bakıldı mı" + bakılmadıysa GERÇEK sebebi (admin panelinde Faz1
+  // sonrası gösterilir, kullanıcı talebi 2026-07-26: "bunları listele... bakılmayanlara
+  // ise neden bakılmadığını sebebi ile açıklanacak").
+  veriKapsamKontrolu: VeriKapsamKontrol[];
 };
+
+export type VeriKapsamKontrol = { kategori: string; bakildi: boolean; detay: string };
 
 /** Bir koşunun tüm Faz 1 verisini TAMAMEN OTOMATİK toplar — admin girdisi gerektirmez. */
 export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
@@ -332,41 +421,87 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   });
   if (!race || race.runners.length === 0) return null;
 
+  // 2026-07-27 canlı bulgu (Bursa 9./Karma 2.Koşu — aynı fiziksel yarış iki program altında
+  // mirror'lanmış): AccuraceHorseSplit sorguları yalnız horseName'e göre filtreleniyordu,
+  // koşu kendi post saatinden SONRA (sonucu Accurace'e işlendikten sonra) analiz edilirse
+  // atın KENDİ AZ ÖNCE KOŞTUĞU yarışın verisi "geçmiş eğilim" gibi geri besleniyordu — Claude
+  // bunu gerçek bir geçmiş galibiyet sanıp gerekçeye yazdı, halbuki tahmin edilen yarışın
+  // kendi sonucuydu. v6.59 (kullanıcı bulgusu 2026-08-04 — "koşulmuş bir koşu üzerinde test
+  // yaparsak sonuçtan etkilenmeden sıralama yapabilir mi"): eski kod yalnız AYNI günü
+  // dışlıyordu, hedef yarıştan SONRAKİ günlerdeki kayıtlar (backtest sırasında at o tarihten
+  // sonra tekrar koşmuşsa) hâlâ sızabiliyordu — artık her karşılaştırma doğrudan Date
+  // nesneleriyle KESİN "öncesi mi" (race.raceDay.date < ...) yapılıyor, yalnız eşitlik değil.
+
   const hippodromeName = race.raceDay.hippodrome.name.trim();
+
+  // v6.24 sadeleştirme (kullanıcı talimatı 2026-07-30: "analiz motorunu yeniden
+  // oluşturuyoruz, sade ve hızlı ve en doğru muhakeme yapılacak şekilde") — Faz1 önce
+  // sabit 9 kategoriye daraltıldı; AYNI GÜN İÇİNDE kullanıcı 2 kategoriyi (Jokey/Antrenör
+  // genel win%, Zemin Geçmişi+Sınıf-bağlamlı Form) geri istedi (v6.26) — jokey pist/
+  // mesafe/SKK, jokey+antrenör kombinasyonu ve at-jokey geçmişi KALDIRILMIŞ olarak kalıyor.
   const jockeyNames = [...new Set(race.runners.map((r) => r.jockey).filter((j): j is string => !!j))];
   const trainerNames = [...new Set(race.runners.map((r) => r.trainer).filter((t): t is string => !!t))];
-
+  // Dinamik import: race.service.ts başka methodology dosyalarını da import ediyor,
+  // döngüsel bağımlılığı önlemek için (orijinal v6.24-öncesi koddaki aynı desen).
   const { getJockeyStats, getTrainerStats } = await import("@/server/services/race.service");
-  const [jockeyStats, trainerStats, atPerformansRows, h2hEncounters, apprenticeRemainingMap, accuraceKayitlari, sireStatOzetleri, damStatOzetleri, sonYarisDetaylari] = await Promise.all([
-    getJockeyStats(jockeyNames).catch(() => ({} as Awaited<ReturnType<typeof getJockeyStats>>)),
-    getTrainerStats(trainerNames).catch(() => ({} as Awaited<ReturnType<typeof getTrainerStats>>)),
+
+  const [atPerformansRows, h2hEncounters, accuraceKayitlari, sireStatOzetleri, damStatOzetleri, sonYarisDetaylari, damSireStatOzetleri, agfTrendSonuc, horseStatsCacheRows, gecmisBaglamSonuc, jockeyStats, trainerStats, gecCikisMap] = await Promise.all([
     getAtPerformansForRace(raceId).catch(() => []),
     getH2HForRace(raceId).catch(() => []),
-    fetchApprenticeRemainingRaces().catch(() => ({}) as Record<string, number>),
     db.accuraceHorseSplit.findMany({
       where: { horseName: { in: accuraceQueryNames(race.runners.map((r) => r.name)) } },
-      select: { horseName: true, checkpoints: true, accuraceRace: { select: { length: true, _count: { select: { splits: true } } } } },
+      select: { horseName: true, checkpoints: true, accuraceRace: { select: { date: true, length: true, _count: { select: { splits: true } } } } },
     }).catch(() => []),
     getSireStatOzetleriForRace(race.runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(
-      () => race.runners.map(() => ({ ozet: null, ornekHipodromx: null, ornekKendiVeri: null }))
+      () => race.runners.map(() => ({ ozet: null, ornekKendiVeri: null, kYuzde: null }))
     ),
     getDamStatOzetleriForRace(race.runners.map((r) => ({ dam: r.dam, damSire: r.damSire })), race.breed, race.surface, race.distance).catch(
-      () => race.runners.map(() => ({ ozet: null, ornekHipodromx: null, ornekKendiVeri: null }))
+      () => race.runners.map(() => ({ ozet: null, ornekKendiVeri: null }))
     ),
     getSonYarisDetaylariForRace(raceId).catch(() => []),
+    getDamSireOwnStatForRace(race.runners.map((r) => r.damSire), race.breed, race.surface, race.distance).catch(
+      () => race.runners.map(() => ({ ozet: null, ornekKendiVeri: null }))
+    ),
+    getAgfTrendForRace(raceId).catch(() => ({ atlar: [], enCokDusenler: [], enCokYukselenler: [] })),
+    // TJK Detaylı İstatistikler (Zaman/Hipodrom/Jokey/Pist/Mesafe kırılımı) — kalıcı
+    // HorseStatsCache'ten, TJK'ya canlı gitmez (kullanıcı talebi 2026-07-30: bugüne kadar
+    // yalnız at profili modalinde kullanılan bu veri artık Faz1'e de aktarılıyor).
+    db.horseStatsCache.findMany({
+      where: { tjkAtId: { in: race.runners.map((r) => r.tjkAtId).filter((id): id is number => id != null) } },
+      select: { tjkAtId: true, detailedStatsJson: true },
+    }).catch(() => []),
+    // Zemin Geçmişi + Sınıf-bağlamlı Form (v6.26, kullanıcı talebi 2026-07-30) — ikisi de
+    // aynı TJK geçmiş çağrısından (fetchTjkAtKosuBilgileri, kendi TTL cache'i) türer.
+    getGecmisBaglamForRace(raceId).catch(() => ({ zemin: [], sinifBaglamliForm: [] })),
+    getJockeyStats(jockeyNames).catch(() => ({} as Awaited<ReturnType<typeof getJockeyStats>>)),
+    getTrainerStats(trainerNames).catch(() => ({} as Awaited<ReturnType<typeof getTrainerStats>>)),
+    // Start Geçmişi / "Geç Çıkış" — TJK'nın kendi resmi start-kalitesi tespiti (kullanıcı
+    // talebi 2026-08-01: "Start Sorunu olan atları tespit edebilir miyiz"). bkz.
+    // gec-cikis.actions.ts, Result.gecCikanlar (tjk-result.adapter.ts + result-sync.ts).
+    getGecCikisOzetleriForRace(race.runners.map((r) => r.name), race.raceDay.date).catch(() => new Map()),
   ]);
+  const horseStatsCacheMap = new Map(horseStatsCacheRows.map((h) => [h.tjkAtId, h.detailedStatsJson as unknown as HorseDetailStatSection[]]));
+  const zeminGecmisiMap = new Map(gecmisBaglamSonuc.zemin.map((z) => [z.no, z]));
+  const sinifBaglamliFormMap = new Map(gecmisBaglamSonuc.sinifBaglamliForm.map((s) => [s.no, s]));
+  const agfTrendMap = new Map(agfTrendSonuc.atlar.map((a) => [a.runnerNo, a]));
   const atPerformansMap = new Map(atPerformansRows.map((r) => [r.horseName, r.records]));
-  const sireStatMap = new Map(race.runners.map((r, i) => [r.id, sireStatOzetleri[i] ?? { ozet: null, ornekHipodromx: null, ornekKendiVeri: null }]));
-  const damStatMap = new Map(race.runners.map((r, i) => [r.id, damStatOzetleri[i] ?? { ozet: null, ornekHipodromx: null, ornekKendiVeri: null }]));
+  const sireStatMap = new Map(race.runners.map((r, i) => [r.id, sireStatOzetleri[i] ?? { ozet: null, ornekKendiVeri: null, kYuzde: null }]));
+  const damStatMap = new Map(race.runners.map((r, i) => [r.id, damStatOzetleri[i] ?? { ozet: null, ornekKendiVeri: null }]));
+  const damSireStatMap = new Map(race.runners.map((r, i) => [r.id, damSireStatOzetleri[i] ?? { ozet: null, ornekKendiVeri: null }]));
   const sonYarisDetayByNo = new Map(sonYarisDetaylari.map((d) => [d.runnerNo, d]));
   const kulvarBolgeBugun = kulvarBolgesi(race.raceDay.hippodrome.slug, race.surface, race.distance);
+  // Son düzlük uzunluğu (v6.39, kullanıcı denetimi) — kullanıcı tarafından sağlandı,
+  // TJK resmi bir ölçüm DEĞİL (bkz. hipodrom-ozellikleri.ts'teki uyarı notu).
+  const sonDuzlukUzunlugu = HIPODROM_OZELLIKLERI[race.raceDay.hippodrome.slug]?.sonDuzlukUzunlugu ?? null;
 
   // Accurace GPS/sektörel geçmişinden atın KALICI tempo/pozisyon eğilimini üret —
   // yalnız n≥3 yarış varsa (bkz. pace-analizi.ts, tek yarıştan kalıcı stil çıkarılmaz).
   const accuraceEgilimMap = new Map<string, CokYarisEgilim | null>();
   for (const r of race.runners) {
     const norm = normalizeHorseName(r.name);
-    const kayitlar = accuraceKayitlari.filter((k) => normalizeHorseName(k.horseName) === norm);
+    const kayitlar = accuraceKayitlari.filter(
+      (k) => normalizeHorseName(k.horseName) === norm && k.accuraceRace.date < race.raceDay.date
+    );
     const sonuclar = kayitlar
       .map((k) => analizEtTekYaris(k.checkpoints as unknown as PaceCheckpoint[], k.accuraceRace.length ?? 0, k.accuraceRace._count.splits))
       .filter((s): s is NonNullable<typeof s> => s != null);
@@ -416,6 +551,11 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
 
   const agirlıklar = race.runners.map((r) => r.weight).filter((w): w is number => w != null);
   const ortKilo = agirlıklar.length > 0 ? agirlıklar.reduce((a, b) => a + b, 0) / agirlıklar.length : null;
+  // Sıklet Dağılımı / makas genişliği (v6.38) — agirlıklar zaten tüm sahanın kilolarını
+  // topladığı için min/max/fark hesabı ek bir sorgu gerektirmiyor.
+  const kiloEnHafif = agirlıklar.length > 0 ? Math.min(...agirlıklar) : null;
+  const kiloEnAgir = agirlıklar.length > 0 ? Math.max(...agirlıklar) : null;
+  const kiloMakasi = kiloEnHafif != null && kiloEnAgir != null ? kiloEnAgir - kiloEnHafif : null;
 
   const bugunSkk = classToSkk(race.classType);
 
@@ -432,7 +572,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   // süresini, O YARIŞTAKİ EN İYİ (field'in en hızlı) son 800m'siyle kıyaslıyoruz. Fark
   // (saniye): 0=o yarışın en iyi kapanışını yakaladı, pozitif=daha yavaş kapandı — eski TJK
   // formülüyle yön/birim uyumlu, gecit-motoru.ts'teki -0.5/+0.7 eşikleri değişmeden geçerli.
-  const son800AccuraceKayitlari = race.runners.length
+  const son800AccuraceKayitlariHam = race.runners.length
     ? await db.accuraceHorseSplit.findMany({
         where: { horseName: { in: accuraceQueryNames(race.runners.map((r) => r.name)) } },
         select: {
@@ -444,6 +584,12 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         },
       })
     : [];
+  // Hedef yarışın tarihi VE sonrası hariç tutuluyor (bkz. gatherFaz1 başındaki v6.59 notu) —
+  // aksi halde bir at bu yarışı (veya sonraki bir yarışını) kendi kendine "geçmiş kanıt"
+  // olarak gösterebiliyordu.
+  const son800AccuraceKayitlari = son800AccuraceKayitlariHam.filter(
+    (k) => k.accuraceRace.date < race.raceDay.date
+  );
   const son800RaceIds = [...new Set(son800AccuraceKayitlari.map((k) => k.accuraceRaceId))];
   const son800Siblings = son800RaceIds.length
     ? await db.accuraceHorseSplit.findMany({
@@ -567,7 +713,14 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
 
       if (r.tjkAtId) {
         try {
-          const gecmis = await fetchTjkAtKosuBilgileri(r.tjkAtId);
+          // v6.59 — kullanıcı bulgusu 2026-08-04: bu çekim ÖNCEDEN hiç tarih filtresi
+          // uygulamıyordu — bir yarış GEÇMİŞTE test/backtest edilirken (at hedef yarıştan
+          // SONRA da koşmuşsa) "en son yarış" olarak yanlışlıkla hedef yarışın KENDİSİ veya
+          // ondan SONRAKİ bir yarış seçilebiliyordu; sinifOnceki/hpOnceki (V14/V20'nin
+          // kaynağı) bu sızıntıdan doğrudan etkilenirdi. Artık yalnız hedef tarihten KESİN
+          // önceki kayıtlar "geçmiş" sayılıyor.
+          const gecmisTumu = await fetchTjkAtKosuBilgileri(r.tjkAtId);
+          const gecmis = gecmisTumu.filter((row) => tjkTarihOncesiMi(row.date, race.raceDay.date));
           if (gecmis.length > 0) {
             ilkStart = false;
             // TJK tablosu en yakın tarihli satırı en üstte döner
@@ -602,13 +755,6 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       const sinifSkkOnceki = classToSkk(sinifOnceki);
       const sinifDususu = bugunSkk != null && sinifSkkOnceki != null ? bugunSkk < sinifSkkOnceki : false;
 
-      const jockeyStat = r.jockey ? jockeyStats[r.jockey] : undefined;
-      const trainerStat = r.trainer ? trainerStats[r.trainer] : undefined;
-      const jockeyWinPct = jockeyStat && jockeyStat.overall.rides > 0
-        ? Math.round((jockeyStat.overall.wins / jockeyStat.overall.rides) * 100) : null;
-      const trainerWinPct = trainerStat && trainerStat.rides > 0
-        ? Math.round((trainerStat.wins / trainerStat.rides) * 100) : null;
-
       const kondisyonZinciriVar = r.gallops.some((g) => {
         const s = (g.splits as Record<string, string | null> | null) ?? {};
         return !!(s["800"] || s["1000"] || s["1200"]);
@@ -624,7 +770,14 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       }
 
       const kiloAvantaji = r.weight != null && ortKilo != null ? r.weight <= ortKilo - 1 : false;
-      const sinifJokeyAntrenor = sinifDususu || (jockeyWinPct ?? 0) >= 15 || (trainerWinPct ?? 0) >= 15;
+
+      // Jokey/Antrenör GENEL yıllık win% (v6.26, kullanıcı talebi 2026-07-30).
+      const jockeyStat = r.jockey ? jockeyStats[r.jockey] : undefined;
+      const trainerStat = r.trainer ? trainerStats[r.trainer] : undefined;
+      const jockeyWinPct = jockeyStat && jockeyStat.overall.rides > 0
+        ? Math.round((jockeyStat.overall.wins / jockeyStat.overall.rides) * 100) : null;
+      const trainerWinPct = trainerStat && trainerStat.rides > 0
+        ? Math.round((trainerStat.wins / trainerStat.rides) * 100) : null;
 
       const galopOzet = r.gallops.length === 0
         ? "İdman kaydı yok"
@@ -667,13 +820,12 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
               // Faz2 promptunun kendi 6. maddesi ("KİLO-GEÇMİŞ ÇAPRAZ KONTROLÜ") burada kilo
               // olduğunu varsayıyordu, aslında hiç yoktu. Ganyan BİLEREK dışarıda bırakıldı
               // (kullanıcının Result.ganyan için verdiği "hiçbiri bağlanmasın" kararıyla tutarlı).
-              return `${row.date} ${row.finishPos || "?"}. derece:${row.time || "?"} kilo:${row.weight || "?"} takı:${row.equipment || "—"} jokey:${row.jockey || "?"} grup:${row.group || "—"} (HP ${row.hp || "?"})${zeminEk}`;
+              // v6.10: hipodrom artık KESİN eşleşme şartı değil (yalnız pist+mesafe) — bu
+              // yüzden hangi hipodromda koşulduğu artık metne yazılıyor, aksi halde farklı
+              // bir hipodromdaki sonucu bugünküyle aynı sanma riski olurdu.
+              return `${row.date} ${row.city} ${row.finishPos || "?"}. derece:${row.time || "?"} kilo:${row.weight || "?"} takı:${row.equipment || "—"} jokey:${row.jockey || "?"} grup:${row.group || "—"} (HP ${row.hp || "?"})${zeminEk}`;
             })
             .join(" | ")
-        : null;
-
-      const apprenticeRemaining = r.apprentice && r.jockey
-        ? apprenticeRemainingMap[normalizeJockeyName(r.jockey)] ?? null
         : null;
 
       // ── Mekanik ön-hesaplama ──
@@ -702,6 +854,18 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       const tempoVeriNHesap = accuraceEgilimHesap?.n ?? null;
       const tempoGuvenHesap = tempoGuvenSeviyesi(tempoVeriNHesap);
 
+      // AGF Trend — kullanıcı talebi 2026-07-27, "para akışı" sinyali. En az 2 ölçüm
+      // (agf-sync günde birkaç kez çalışır) birikmemişse anlamlı bir trend sayılmaz, null.
+      // v6.17, kullanıcı talimatı 2026-07-27: ASIL sinyal MUTLAK puan farkı — küçük bir
+      // başlangıç yüzdesinden (%1-2 gibi) gelen ufak bir hareket bile devasa GÖRELİ yüzde
+      // sıçraması yaratır ama gerçek para akışını göstermez. Metin puanı ÖNE koyar, yüzdeyi
+      // yalnız bağlam olarak sona ekler, gürültü şüphesi varsa açıkça uyarır.
+      const agfTrendHesap = agfTrendMap.get(r.no);
+      const agfTrendOzetHesap =
+        agfTrendHesap && agfTrendHesap.kayitSayisi >= 2 && agfTrendHesap.ilkAgf != null && agfTrendHesap.sonAgf != null
+          ? `${agfTrendHesap.fark! >= 0 ? "+" : ""}${agfTrendHesap.fark} puan (%${agfTrendHesap.ilkAgf} → %${agfTrendHesap.sonAgf}, göreli ${agfTrendHesap.yuzdeDegisim! >= 0 ? "+" : ""}%${agfTrendHesap.yuzdeDegisim})${agfTrendHesap.gurultuSuphesi ? " [KÜÇÜK PAYDADAN GÜRÜLTÜ ŞÜPHESİ — göreli yüzde çarpıcı görünse de mutlak hareket küçük; kesin hüküm değil, diğer verilerle birlikte sen değerlendir]" : ""}`
+          : null;
+
       return {
         id: r.id, no: r.no, ad: r.name, scratched: r.scratched,
         weight: r.weight, weightChange: r.weightChange, disaridanStart: r.disaridanStart, startNo: r.startNo,
@@ -713,11 +877,12 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         ekuriMateleri: ekuriMateMap.get(r.id) ?? [],
         sire: r.sire, dam: r.dam, damSire: r.damSire,
         sireStatOzet: sireStatMap.get(r.id)?.ozet ?? null,
-        sireOrneklemHipodromx: sireStatMap.get(r.id)?.ornekHipodromx ?? null,
         sireOrneklemKendiVeri: sireStatMap.get(r.id)?.ornekKendiVeri ?? null,
+        sireKazanmaOrani: sireStatMap.get(r.id)?.kYuzde ?? null,
         damStatOzet: damStatMap.get(r.id)?.ozet ?? null,
-        damOrneklemHipodromx: damStatMap.get(r.id)?.ornekHipodromx ?? null,
         damOrneklemKendiVeri: damStatMap.get(r.id)?.ornekKendiVeri ?? null,
+        damSireStatOzet: damSireStatMap.get(r.id)?.ozet ?? null,
+        damSireOrneklemKendiVeri: damSireStatMap.get(r.id)?.ornekKendiVeri ?? null,
         adminNote: r.adminNote,
         sonYarisVeriKaynagiGuvenilir: sonYarisDetayByNo.get(r.no)?.hasTjkId ?? false,
         sonYarisTakiEklenen: sonYarisDetayByNo.get(r.no)?.eklenenTaki.map((t) => t.label) ?? [],
@@ -726,10 +891,11 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         sonYarisAyniJokey: sonYarisDetayByNo.get(r.no)?.ayniJokey ?? null,
         gunAralik: sonYarisDetayByNo.get(r.no)?.gunFarki ?? null,
         hpBugun: hpBugunEfektif, hpBugunResmiYok, hpOncekiResmiYok, hpOncekiFetchBasarisiz,
-        agf: r.agf, agfSirasi: agfSiraMap.get(r.id) ?? null,
+        agf: r.agf, agfSirasi: agfSiraMap.get(r.id) ?? null, agfTrendOzet: agfTrendOzetHesap,
+        agfTrendFark: agfTrendOzetHesap != null ? agfTrendHesap!.fark : null,
         equipment: r.equipment, equipmentAdded: r.equipmentAdded, equipmentRemoved: r.equipmentRemoved,
         recentForm: r.recentForm, bestTime: r.bestTime,
-        apprentice: r.apprentice, apprenticeRemaining,
+        apprentice: r.apprentice,
         raceStyleEtiket: accuraceEgilimHesap?.stil ?? null,
         tempoVeriN: tempoVeriNHesap,
         kacak: accuraceEgilimHesap?.stil === "KACAK_AT",
@@ -741,7 +907,6 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         sonSonucZayif: sonSonucZayifMi(r.recentForm),
         kondisyonZinciriVar, keskinGalopZinciri,
         kiloAvantaji, hpAlanIciUst: hpAlanIciUstHesap,
-        jockeyWinPct, trainerWinPct, sinifJokeyAntrenor,
         son800BenzerKosuN, son800Medyan,
         son800TumOzet: son800TumOzetByRunnerName.get(r.name) ?? null,
         son800TumToplamKayit: son800TumToplamByRunnerName.get(r.name) ?? 0,
@@ -749,6 +914,16 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         hpKalitesiYildizi: hpKalitesi, sinifGecisBonusuPuan: sinifBonusu,
         galopSiniflandirma: galopSinif, tempoGuven: tempoGuvenHesap,
         accuraceEgilim: accuraceEgilimMap.get(r.id) ?? null,
+        detayliIstatistikOzet: r.tjkAtId != null
+          ? formatHorseDetailStatOzet(horseStatsCacheMap.get(r.tjkAtId) ?? [], {
+              hippodromeName, surface: race.surface, distance: race.distance, jockeyName: r.jockey,
+            })
+          : null,
+        jockeyWinPct, trainerWinPct,
+        zeminGecmisiOzet: zeminGecmisiMap.get(r.no)?.ozet ?? null,
+        zeminGecmisiToplamKayit: zeminGecmisiMap.get(r.no)?.toplamKayit ?? 0,
+        sinifBaglamliForm: sinifBaglamliFormMap.get(r.no)?.ozet ?? null,
+        startGecmisiOzet: formatGecCikisOzet(gecCikisMap.get(r.name)),
       };
     })
   );
@@ -760,6 +935,26 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   const sahadakiKacakSayisi = runners.filter((r) => r.kacak).length;
   const kacakHarita = kacakHaritasi(sahadakiKacakSayisi);
 
+  // v6.34 — kullanıcı talebi (2026-08-02): "PistMesafeInfoButton" (program sayfasındaki
+  // "Bu Koşu Tipinde Kazananlar" kartı) yalnız insan editörün tıklayınca gördüğü bir
+  // bilgiydi, Faz1'e/Claude'a hiç ulaşmıyordu — sahadakiKacakSayisi'nde daha önce
+  // yaşanan AYNI sınıf eksiklik (yukarıdaki yorum). Aynı hipodrom+pist+mesafe(±200m)'deki
+  // geçmiş yarışların kazananlarının tarihsel stil dağılımı artık Faz2/Faz3'e de gidiyor.
+  // v6.34 düzeltme (kullanıcı geri bildirimi): yalnız ham veriyi yan yana koymak
+  // yetersizdi — Claude'un bunu gerçekten kullanması için kacakAvantajliStil'deki AYNI
+  // desende açık bir yönlendirme cümlesi (en çok kazanan stil ayrıca tutulup Faz2
+  // prompt'unda "bu atlar sıralamada gereksiz yere çok aşağıda kalmamalı" şeklinde
+  // belirtiliyor — GARANTİ/otomatik puan DEĞİL, yalnız yönlendirici bir eğilim).
+  const pistMesafeStil = await getPistMesafeStilIstatistigi(hippodromeName, race.surface, race.distance).catch(() => null);
+  const PIST_MESAFE_STIL_LABEL: Record<string, string> = {
+    KACAK_AT: "Kaçak At", ON_GRUP_ARKASI: "Ön Grup Arkası", BEKLEME_GRUBU: "Bekleme Grubu", EN_GERI_TAKIP: "En Geri Takip",
+  };
+  const pistMesafeStilOzeti = pistMesafeStil
+    ? `${pistMesafeStil.breakdown.map((b) => `${PIST_MESAFE_STIL_LABEL[b.style]} %${b.percent} (${b.count})`).join(", ")} — n=${pistMesafeStil.n} geçmiş yarış`
+    : null;
+  const pistMesafeStilEnCokKazanan = pistMesafeStil ? PIST_MESAFE_STIL_LABEL[pistMesafeStil.topStyle] : null;
+  const pistMesafeStilEnCokKazananYuzde = pistMesafeStil ? pistMesafeStil.topPercent : null;
+
   const n = runners.length || 1;
   const veriDoluluk = [
     { alan: "hpBugun", oran: runners.filter((r) => r.hpBugun != null).length / n },
@@ -767,6 +962,158 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
     { alan: "tempoVeriN", oran: runners.filter((r) => r.tempoVeriN != null).length / n },
     { alan: "agfSirasi", oran: runners.filter((r) => r.agfSirasi != null).length / n },
     { alan: "formYonu", oran: runners.filter((r) => r.bitirisGeriliyor != null || r.bitirisIyilesiyor != null).length / n },
+  ];
+
+  const accuraceSayisi = runners.filter((r) => r.accuraceEgilim != null || r.tempoVeriN != null).length;
+  const galopSayisi = runners.filter((r) => r.galopOzet !== "İdman kaydı yok").length;
+  const pedigriSayisi = runners.filter((r) => r.sireStatOzet != null || r.damStatOzet != null || r.damSireStatOzet != null).length;
+  const h2hSayisi = runners.filter((r) => r.h2hOzet != null).length;
+  const aynıPistMesafeSayisi = runners.filter((r) => r.aynıPistMesafeOzet != null).length;
+  const sonYarisSayisi = runners.filter((r) => r.sonYarisVeriKaynagiGuvenilir).length;
+  // v6.14 — kullanıcı bulgusu 2026-07-27: "Aynı Jokey" bilgisi (Son Yarış Detayları
+  // panelinin bir sütunu) Faz2 prompt'unda sonYarisVeriKaynagiGuvenilir=false olan atlarda
+  // sessizce satırdan düşüyordu (Çilli Cafer örneği) — düzeltildi (artık "bilinmiyor" olarak
+  // gösteriliyor, hiç düşmüyor), checklist bu kapsamı da ayrı görünür kılıyor.
+  const ayniJokeyBilinenSayisi = runners.filter((r) => r.sonYarisAyniJokey != null).length;
+  // v6.15 — kullanıcı talebi 2026-07-27: "Para Akışı (AGF) trendi analize nasıl eklenir".
+  const agfTrendSayisi = runners.filter((r) => r.agfTrendOzet != null).length;
+  // v6.10-v6.13'te eklenen sinyaller — checklist'e bugüne kadar hiç eklenmemişti (kullanıcı
+  // tespiti 2026-07-28: "veri kapsamı bu kadar mıydı, bir sürü şey yazdık").
+  const araGecislerSayisi = runners.filter((r) => r.accuraceEgilim != null).length;
+  const detayliIstatistikSayisi = runners.filter((r) => r.detayliIstatistikOzet != null).length;
+  // v6.26 — kullanıcı talebi 2026-07-30: bugün geri eklenen 2 kategori.
+  const jokeyAntrenorWinPctSayisi = runners.filter((r) => r.jockeyWinPct != null || r.trainerWinPct != null).length;
+  const zeminGecmisiSayisi = runners.filter((r) => r.zeminGecmisiOzet != null).length;
+  const sinifBaglamliFormSayisi = runners.filter((r) => r.sinifBaglamliForm != null).length;
+  const startGecmisiSayisi = runners.filter((r) => r.startGecmisiOzet != null).length;
+
+  const veriKapsamKontrolu: VeriKapsamKontrol[] = [
+    {
+      kategori: "Accurace — Tüm Kayıtlar (tempo ve yarış stilleri)",
+      bakildi: accuraceSayisi > 0,
+      detay: accuraceSayisi > 0
+        ? `${accuraceSayisi}/${n} atta Accurace GPS/sektörel tempo eğilimi (n≥3 yarış) veya bugünkü yarış verisi bulundu.`
+        : "Sahadaki hiçbir at için Accurace GPS/sektörel kaydı bulunamadı — ya bu koşuların GPS verisi hiç toplanmamış ya da hiçbir at 3+ yarışlık kalıcı eğilim eşiğini karşılamıyor.",
+    },
+    {
+      kategori: "Ara Geçişler (EP-MP-LP erken/orta/geç sıra, son 400m düşüş, hız farkı)",
+      bakildi: araGecislerSayisi > 0,
+      detay: araGecislerSayisi > 0
+        ? `${araGecislerSayisi}/${n} atın çok yarışlık Accurace geçmişinden ortalama erken/orta/geç sıra, son 400m düşüş oranı ve ilk-son yarı hız farkı hesaplandı, ham eğilim olarak Claude'a aktarıldı.`
+        : "Sahadaki hiçbir at için 3+ yarışlık kalıcı Accurace eğilimi oluşmadığından ara geçiş detayı hesaplanamadı.",
+    },
+    {
+      kategori: "Son Hazırlıklar (Galoplar ve aynı jokey ile mi çalışmış)",
+      bakildi: galopSayisi > 0,
+      detay: galopSayisi > 0
+        ? `${galopSayisi}/${n} atın son yarışından sonraki idman/galop kaydı çekildi.`
+        : "Sahadaki hiçbir at için son yarışından sonra TJK idman/galop kaydı bulunamadı.",
+    },
+    {
+      kategori: "Pedigriler (anne, baba ve anne babası — üçü ayrı ayrı)",
+      bakildi: pedigriSayisi > 0,
+      detay: pedigriSayisi > 0
+        ? `${pedigriSayisi}/${n} atın aygır, kısrak ve/veya damsire (kısrak babası) istatistiği (hipodromx veya kendi verimiz) eşleşti.`
+        : "Sahadaki hiçbir at için aygır/kısrak/damsire istatistiği eşleşmedi — bu ırk+pist+mesafe kombinasyonunda hipodromx'te de kendi verimizde de kayıt yok.",
+    },
+    {
+      kategori: "H2H — Geçmiş Karşılaşmalar",
+      bakildi: h2hSayisi > 0,
+      detay: h2hSayisi > 0
+        ? `${h2hSayisi}/${n} at, sahadaki diğer atlarla en az bir ortak geçmiş yarışta karşılaşmış.`
+        : "Sahadaki atlar arasında hiç ortak geçmiş yarış (aynı koşuda birlikte start) bulunamadı.",
+    },
+    {
+      kategori: "Detaylı At Karşılaştırma — Aynı Pist/Mesafe (bu yıl, hipodrom farklı olabilir)",
+      bakildi: aynıPistMesafeSayisi > 0,
+      detay: aynıPistMesafeSayisi > 0
+        ? `${aynıPistMesafeSayisi}/${n} atın bu mesafe+pist kombinasyonunda (herhangi bir hipodromda) bu yıl geçmiş kaydı var.`
+        : "Sahadaki hiçbir at bu mesafe+pist kombinasyonunda bu yıl koşmamış (TJK resmi profilinden doğrulandı).",
+    },
+    {
+      kategori: "Hipodrom Özellikleri (kulvar ve viraj konumu)",
+      bakildi: kulvarBolgeBugun != null,
+      detay: kulvarBolgeBugun != null
+        ? `Start noktası "${kulvarBolgeBugun}" olarak haritalandı, kulvar numaralarıyla birlikte değerlendirildi.`
+        : "Bu hipodrom+pist+mesafe kombinasyonu için start/viraj koordinat haritası tanımlı değil.",
+    },
+    {
+      kategori: "Son Yarış Detayları (KGS, kilo, takı, aynı jokey, kazandı mı/derece)",
+      bakildi: sonYarisSayisi > 0,
+      detay: sonYarisSayisi > 0
+        ? `${sonYarisSayisi}/${n} at için TJK resmi at profilinden (tjkAtId) güvenilir son yarış detayı çekildi — bunların ${ayniJokeyBilinenSayisi}/${sonYarisSayisi}'inde "aynı jokey mi" bilgisi de bilinen (geri kalanı "bilinmiyor" olarak Claude'a aktarıldı, hiçbiri satırdan düşürülmedi).`
+        : "Sahadaki hiçbir at TJK at profil ID'siyle (tjkAtId) eşleşmediği veya TJK sorgusu başarısız olduğu için son yarış detayı çekilemedi.",
+    },
+    {
+      kategori: "Detaylı İstatistikler (TJK — Zaman/Hipodrom/Jokey/Pist/Mesafe kırılımı)",
+      bakildi: detayliIstatistikSayisi > 0,
+      detay: detayliIstatistikSayisi > 0
+        ? `${detayliIstatistikSayisi}/${n} at için bugünkü hipodrom/pist/mesafe/jokey bağlamına uyan TJK kariyer istatistiği (HorseStatsCache) bulundu.`
+        : "Sahadaki hiçbir at için bugünkü bağlama uyan bir detaylı istatistik satırı bulunamadı.",
+    },
+    {
+      kategori: "AGF Trend (gün içi para akışı — yükselen/düşen)",
+      bakildi: agfTrendSayisi > 0,
+      detay: agfTrendSayisi > 0
+        ? `${agfTrendSayisi}/${n} atın AGF'sinde gün içinde en az 2 ölçüm birikti, ilk-son ölçüm arasındaki hareket Claude'a aktarıldı.`
+        : "Sahadaki hiçbir atta henüz 2. bir AGF ölçümü birikmedi (agf-sync ilk ölçümünü aldıktan sonra en az bir kez daha çalışması gerekiyor) — trend hesaplanamadı.",
+    },
+    {
+      kategori: "Jokey/Antrenör Genel Kazanma Yüzdesi (yıllık)",
+      bakildi: jokeyAntrenorWinPctSayisi > 0,
+      detay: jokeyAntrenorWinPctSayisi > 0
+        ? `${jokeyAntrenorWinPctSayisi}/${n} atın jokeyi ve/veya antrenörü için TJK'nın yıllık senkronize win%'i (sync-jokey-stats/sync-trainer-stats) bulundu.`
+        : "Sahadaki hiçbir at için jokey/antrenör senkronize istatistiği eşleşmedi.",
+    },
+    {
+      kategori: "Zemin Geçmişi (bugünküyle aynı zemin sınıfında geçmiş start'lar)",
+      bakildi: zeminGecmisiSayisi > 0,
+      detay: zeminGecmisiSayisi > 0
+        ? `${zeminGecmisiSayisi}/${n} atın bugünküyle (${zemin.etiket}) aynı zemin sınıfında en az 1 geçmiş start'ı bulundu.`
+        : `Sahadaki hiçbir atın bugünküyle (${zemin.etiket}) aynı zemin sınıfında geçmiş kaydı yok — bu zemin durumu nadir görüldüğü için beklenen bir durum olabilir.`,
+    },
+    {
+      kategori: "Sınıf-bağlamlı Form (son starlar, sıra+sınıf birlikte)",
+      bakildi: sinifBaglamliFormSayisi > 0,
+      detay: sinifBaglamliFormSayisi > 0
+        ? `${sinifBaglamliFormSayisi}/${n} at için son 5 start'ın bitiriş sırası, o günkü sınıfla birlikte çıkarıldı.`
+        : "Sahadaki hiçbir at için sınıf-bağlamlı form geçmişi çıkarılamadı.",
+    },
+    {
+      kategori: "Start Geçmişi (TJK resmi \"Geç Çıkış\" tespiti)",
+      bakildi: startGecmisiSayisi > 0,
+      detay: startGecmisiSayisi > 0
+        ? `${startGecmisiSayisi}/${n} atın en az 3 sonuçlu starttan oluşan geçmişinde, TJK'nın "Geç Çıkış" olarak işaretlediği start sayısı bulundu.`
+        : "Sahadaki hiçbir at için yeterli örneklemli (3+) sonuçlu start geçmişi bulunamadı.",
+    },
+    {
+      kategori: "Saha Büyüklüğü (kaçak/sprinter yorumu)",
+      bakildi: true,
+      detay: `${runners.length} at start alıyor, sahadaki kaçak sayısı ${sahadakiKacakSayisi} — ${kacakHarita.etiket}.`,
+    },
+    {
+      // v6.34 eklendi ama bu checklist'e unutulmuştu (kullanıcı ekran görüntüsüyle buldu,
+      // 2026-08-02) — diğer tüm Faz1 kategorileri gibi burada da görünür olmalı.
+      kategori: "Bu Koşu Tipinde Kazananlar (aynı pist+mesafe ±200m'deki tarihsel stil dağılımı)",
+      bakildi: pistMesafeStil != null,
+      detay: pistMesafeStil != null
+        ? `Aynı hipodrom+pist+mesafe(±200m)'deki ${pistMesafeStil.n} geçmiş yarışın kazananları tarandı — en çok kazanan stil: ${pistMesafeStilEnCokKazanan} (%${pistMesafeStilEnCokKazananYuzde}).`
+        : "Bu pist+mesafe kombinasyonunda (±200m) yeterli örneklemli (3+) geçmiş yarış bulunamadı.",
+    },
+    {
+      kategori: "Sıklet Dağılımı (sahadaki en hafif-en ağır kilo makası)",
+      bakildi: kiloMakasi != null,
+      detay: kiloMakasi != null
+        ? `Saha kilo aralığı ${kiloEnHafif}-${kiloEnAgir}kg (makas ${kiloMakasi}kg).`
+        : "Sahadaki hiçbir atın kilosu bulunamadığı için makas hesaplanamadı.",
+    },
+    {
+      kategori: "Son Düzlük Uzunluğu (hipodroma özgü, yaklaşık — TJK resmi ölçümü değil)",
+      bakildi: sonDuzlukUzunlugu != null,
+      detay: sonDuzlukUzunlugu != null
+        ? `${hippodromeName}: ${sonDuzlukUzunlugu}.`
+        : `${hippodromeName} için son düzlük uzunluğu verisi henüz sağlanmadı/teyit edilmedi.`,
+    },
   ];
 
   return {
@@ -781,10 +1128,14 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       distance: race.distance,
       zeminDetayi, zeminKatsayisi: zemin.katsayi, zeminEtiketi: zemin.etiket,
       sahadakiKacakSayisi, kacakTempoEtiketi: kacakHarita.etiket, kacakAvantajliStil: kacakHarita.avantajli,
+      pistMesafeStilOzeti, pistMesafeStilEnCokKazanan, pistMesafeStilEnCokKazananYuzde,
+      pistMesafeStilBreakdown: pistMesafeStil ? pistMesafeStil.breakdown.map((b) => ({ style: b.style, percent: b.percent })) : null,
+      kiloEnHafif, kiloEnAgir, kiloMakasi, sonDuzlukUzunlugu,
       conditions: race.conditions, ageWeight: race.ageWeight, trackRecord: race.trackRecord,
       weather: race.raceDay.weather,
     },
     runners,
     veriDoluluk,
+    veriKapsamKontrolu,
   };
 }

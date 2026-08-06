@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { getH2HForRace, type H2HEncounter } from "@/server/actions/h2h.actions";
 import { zeminDetayiSatirdanCikar, zeminKatsayisi } from "@/lib/methodology/mekanik-puanlama";
 
-function surfaceShort(raw: string): string {
-  if (raw.startsWith("Ç")) return "Çim";
-  if (raw.startsWith("S")) return "Sentetik";
-  if (raw.startsWith("K")) return "Kum";
+function surfaceShort(raw: string, t: ReturnType<typeof useTranslations<"programToolbar">>): string {
+  if (raw.startsWith("Ç")) return t("surfaceCim");
+  if (raw.startsWith("S")) return t("surfaceSentetik");
+  if (raw.startsWith("K")) return t("surfaceKum");
   return raw || "—";
 }
 
@@ -20,6 +21,7 @@ function zeminEtiketi(raw: string): string | null {
 }
 
 export default function H2HPanel({ raceId }: { raceId: string }) {
+  const t = useTranslations("programToolbar");
   const [data, setData] = useState<H2HEncounter[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -39,23 +41,23 @@ export default function H2HPanel({ raceId }: { raceId: string }) {
   return (
     <div className="border-t">
       <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
-        <span className="text-sm font-bold tracking-wide text-white">H2H — Geçmiş Karşılaşmalar</span>
+        <span className="text-sm font-bold tracking-wide text-white">{t("h2hPanelTitle")}</span>
       </div>
       {loading ? (
-        <div className="px-4 py-8 text-center text-sm text-muted-foreground">TJK geçmişinden ortak yarışlar aranıyor…</div>
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">{t("h2hLoading")}</div>
       ) : error ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-          <p className="mb-2">Veri alınamadı.</p>
+          <p className="mb-2">{t("veriAlinamadi")}</p>
           <button
             onClick={() => setRetryKey((k) => k + 1)}
             className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
           >
-            Tekrar Dene
+            {t("tekrarDene")}
           </button>
         </div>
       ) : !data || data.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-          Bu koşudaki atların TJK geçmişinde birlikte koştuğu bir yarış bulunamadı.
+          {t("h2hEmpty")}
         </div>
       ) : (
         <>
@@ -64,17 +66,17 @@ export default function H2HPanel({ raceId }: { raceId: string }) {
             <table className="w-full text-[11px]">
               <thead>
                 <tr className="border-b bg-muted/40 text-muted-foreground">
-                  <th className="px-2 py-1.5 text-left font-medium">Tarih</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Hipodrom</th>
-                  <th className="px-2 py-1.5 text-center font-medium">K.No</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Mesafe/Pist</th>
-                  <th className="px-2 py-1.5 text-left font-medium">At</th>
-                  <th className="px-2 py-1.5 text-center font-medium">S</th>
-                  <th className="px-2 py-1.5 text-center font-medium">Derece</th>
-                  <th className="px-2 py-1.5 text-center font-medium">Kilo</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Jokey</th>
-                  <th className="px-2 py-1.5 text-center font-medium">Gny</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Cins</th>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("h2hColTarih")}</th>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("h2hColHipodrom")}</th>
+                  <th className="px-2 py-1.5 text-center font-medium">{t("h2hColKNo")}</th>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("h2hColMesafePist")}</th>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("at")}</th>
+                  <th className="px-2 py-1.5 text-center font-medium">{t("colS")}</th>
+                  <th className="px-2 py-1.5 text-center font-medium">{t("colDerece")}</th>
+                  <th className="px-2 py-1.5 text-center font-medium">{t("kilo")}</th>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("jokey")}</th>
+                  <th className="px-2 py-1.5 text-center font-medium">{t("colGny")}</th>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("colCins")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -101,7 +103,7 @@ export default function H2HPanel({ raceId }: { raceId: string }) {
                               {enc.raceNo}
                             </td>
                             <td rowSpan={enc.results.length} className="px-2 py-1.5 align-top whitespace-nowrap">
-                              {enc.distance}m · {surfaceShort(enc.surface)}
+                              {enc.distance}m · {surfaceShort(enc.surface, t)}
                               {zeminEtiketi(enc.surface) && (
                                 <div className="text-[10px] text-muted-foreground">{zeminEtiketi(enc.surface)}</div>
                               )}
@@ -130,7 +132,7 @@ export default function H2HPanel({ raceId }: { raceId: string }) {
             {data.map((enc) => (
               <div key={enc.key} className="px-3 py-2.5">
                 <div className="text-[11px] text-muted-foreground mb-1.5">
-                  {enc.hippodrome} · {enc.raceNo}. Koşu · {enc.date} · {enc.distance}m {surfaceShort(enc.surface)}
+                  {enc.hippodrome} · {t("raceNoLabel", { no: enc.raceNo })} · {enc.date} · {enc.distance}m {surfaceShort(enc.surface, t)}
                   {zeminEtiketi(enc.surface) && <> ({zeminEtiketi(enc.surface)})</>}
                 </div>
                 <div className="space-y-1">

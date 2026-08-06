@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
-import { db } from "@/lib/db";
 import { getAdminPredictionById, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
 import { assertPublishSafe } from "@/server/actions/prediction.actions";
 import SmartAnalysisEditor from "@/components/admin/SmartAnalysisEditor";
@@ -9,6 +9,7 @@ import MarkdownRaceInput from "@/components/admin/MarkdownRaceInput";
 import DeletePredictionButton from "@/components/admin/DeletePredictionButton";
 import ClassTypeAdviceCard from "@/components/admin/ClassTypeAdviceCard";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +23,6 @@ export default async function EditAnalizPage({ params }: PageProps) {
   const race = pred.race;
   const analystStats = await getAnalystStats(race.id);
   const advice = getClassTypeAdvice(analystStats, race.classType);
-  // AIAnalysisPanel'in "Metodoloji (vX.X)" etiketi eskiden hardcoded "v4.2" idi — metodoloji
-  // bu oturumda tek başına v4.13'ten v5.0'a kadar birçok kez güncellendi, etiket hep geride
-  // kaldı. Artık gerçek güncel versiyonu DB'den okuyup gösteriyor, bir daha yanlış çıkamaz.
-  const methodologyVersion = (await db.methodologyVersion.findFirst({ where: { isCurrent: true }, select: { version: true } }))?.version ?? null;
 
   // Taslak kalma sebebini canlı hesapla — statik/eski bir metin değil, o an geçerli
   // yayın öncesi kontrollerin (assertPublishSafe) gerçek sonucu (kullanıcı talimatı:
@@ -54,6 +51,9 @@ export default async function EditAnalizPage({ params }: PageProps) {
           <Badge variant={pred.published ? "default" : "secondary"}>
             {pred.published ? "Yayında" : "Taslak"}
           </Badge>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/admin/analizler">İptal</Link>
+          </Button>
           <DeletePredictionButton predictionId={pred.id} />
         </div>
       </div>
@@ -68,7 +68,6 @@ export default async function EditAnalizPage({ params }: PageProps) {
           raceId={race.id}
           runners={race.runners}
           existingPrediction={pred}
-          methodologyVersion={methodologyVersion}
         />
 
         <aside className="space-y-4">

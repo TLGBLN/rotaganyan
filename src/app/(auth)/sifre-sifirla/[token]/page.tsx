@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { resetPassword } from "@/server/actions/password.actions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { Loader2, CheckCircle2 } from "lucide-react";
 type PageProps = { params: Promise<{ token: string }> };
 
 export default function ResetPasswordPage({ params }: PageProps) {
+  const t = useTranslations("auth.sifreSifirlaToken");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,11 +27,11 @@ export default function ResetPasswordPage({ params }: PageProps) {
     setError(null);
 
     if (password !== confirm) {
-      setError("Şifreler eşleşmiyor.");
+      setError(t("eslesmiyor"));
       return;
     }
     if (password.length < 8) {
-      setError("Şifre en az 8 karakter olmalı.");
+      setError(t("cokKisa"));
       return;
     }
 
@@ -49,20 +51,20 @@ export default function ResetPasswordPage({ params }: PageProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Yeni Şifre Belirle</CardTitle>
-        <CardDescription>Hesabınız için yeni bir şifre girin.</CardDescription>
+        <CardTitle>{t("title")}</CardTitle>
+        <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {success ? (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
             <CheckCircle2 className="h-10 w-10 text-hit" />
-            <p className="font-medium">Şifreniz güncellendi!</p>
-            <p className="text-sm text-muted-foreground">Giriş sayfasına yönlendiriliyorsunuz…</p>
+            <p className="font-medium">{t("guncellendi")}</p>
+            <p className="text-sm text-muted-foreground">{t("yonlendiriliyor")}</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="password">Yeni Şifre</Label>
+              <Label htmlFor="password">{t("yeniSifre")}</Label>
               <Input
                 id="password"
                 type="password"
@@ -72,7 +74,7 @@ export default function ResetPasswordPage({ params }: PageProps) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="confirm">Şifre Tekrar</Label>
+              <Label htmlFor="confirm">{t("sifreTekrar")}</Label>
               <Input
                 id="confirm"
                 type="password"
@@ -88,14 +90,14 @@ export default function ResetPasswordPage({ params }: PageProps) {
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Şifremi Güncelle
+              {t("sifreGuncelle")}
             </Button>
           </form>
         )}
 
         <div className="text-center text-sm">
           <Link href="/giris" className="text-muted-foreground hover:text-foreground">
-            ← Giriş sayfasına dön
+            {t("girisDon")}
           </Link>
         </div>
       </CardContent>

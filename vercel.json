@@ -30,47 +30,7 @@
     },
     {
       "path": "/api/cron/result-sync",
-      "schedule": "0 11 * * *"
-    },
-    {
-      "path": "/api/cron/result-sync",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/result-sync",
-      "schedule": "0 13 * * *"
-    },
-    {
-      "path": "/api/cron/result-sync",
-      "schedule": "0 14 * * *"
-    },
-    {
-      "path": "/api/cron/result-sync",
-      "schedule": "0 15 * * *"
-    },
-    {
-      "path": "/api/cron/result-sync",
-      "schedule": "0 16 * * *"
-    },
-    {
-      "path": "/api/cron/result-sync",
-      "schedule": "0 17 * * *"
-    },
-    {
-      "path": "/api/cron/result-sync",
-      "schedule": "0 18 * * *"
-    },
-    {
-      "path": "/api/cron/result-sync",
-      "schedule": "0 19 * * *"
-    },
-    {
-      "path": "/api/cron/result-sync",
-      "schedule": "0 20 * * *"
-    },
-    {
-      "path": "/api/cron/result-sync",
-      "schedule": "0 21 * * *"
+      "schedule": "*/15 11-21 * * *"
     },
     {
       "path": "/api/cron/horse-notifications-morning",
@@ -127,6 +87,30 @@
     {
       "path": "/api/cron/sync-pedigri-own-stats",
       "schedule": "30 21 * * *"
+    },
+    {
+      "path": "/api/cron/sync-trainer-equipment-stats",
+      "schedule": "35 21 * * *"
+    },
+    {
+      "path": "/api/cron/sync-jokey-own-stats",
+      "schedule": "40 21 * * *"
+    },
+    {
+      "path": "/api/cron/sync-pedigree-tree",
+      "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/cron/sync-pedigree-tree",
+      "schedule": "30 9 * * *"
+    },
+    {
+      "path": "/api/cron/sync-pedigree-tree",
+      "schedule": "30 12 * * *"
+    },
+    {
+      "path": "/api/cron/sync-horse-stats-cache",
+      "schedule": "0 3 * * *"
     }
   ]
 }

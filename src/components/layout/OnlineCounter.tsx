@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 // index = Date.getDay(): 0=Pazar, 1=Pazartesi, ... 6=Cumartesi
 const BASE_BY_DAY = [218, 102, 131, 104, 145, 129, 183];
 
 export default function OnlineCounter() {
+  const t = useTranslations("header");
   const [count, setCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -27,7 +29,7 @@ export default function OnlineCounter() {
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#27ae60] opacity-75" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-[#27ae60]" />
       </span>
-      {count} çevrimiçi
+      {count} {t("cevrimici")}
     </span>
   );
 }

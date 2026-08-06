@@ -35,3 +35,10 @@ export function toTurkeyWallClock(date: Date | string): Date {
   const hour = get("hour") % 24; // bazı motorlar gece yarısını "24" olarak verir
   return new Date(get("year"), get("month") - 1, get("day"), hour, get("minute"), get("second"));
 }
+
+/** İki zamanın Türkiye saatine göre AYNI takvim gününde olup olmadığını kontrol eder — "bugün gösterildi mi" gibi günlük tekrar kontrolleri için. */
+export function isSameTurkeyDay(a: Date, b: Date): boolean {
+  const wa = toTurkeyWallClock(a);
+  const wb = toTurkeyWallClock(b);
+  return wa.getFullYear() === wb.getFullYear() && wa.getMonth() === wb.getMonth() && wa.getDate() === wb.getDate();
+}

@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { getProgramData } from "@/server/services/race.service";
 import { turkeyDateString } from "@/lib/tz";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
+import { tryAcquireIngestLock } from "@/lib/ingest-lock";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import AltiliView from "@/components/altili/AltiliView";
 
@@ -30,10 +31,17 @@ export default async function AltiliPage({ searchParams }: PageProps) {
     );
 
     if (totalRunners === 0 || !hasAge) {
-      try { await ingestDate(tjkDate); } catch { /* ignore */ }
+      if (await tryAcquireIngestLock(`ingest:${tjkDate}`, 1)) {
+        try { await ingestDate(tjkDate); } catch { /* ignore */ }
+      }
     } else {
       after(async () => {
-        try { await ingestDate(tjkDate); } catch { /* ignore */ }
+        // program/page.tsx ile AYNI kilit anahtarı — ikisi de aynı TJK verisini çekiyor,
+        // biri az önce yenilediyse diğeri gereksiz yere tekrar gitmesin. Kilit süresi
+        // minimumda (1dk) — bahis kararlarını etkileyen veri gecikmesi riskine girilmiyor.
+        if (await tryAcquireIngestLock(`ingest:${tjkDate}`, 1)) {
+          try { await ingestDate(tjkDate); } catch { /* ignore */ }
+        }
       });
     }
   }

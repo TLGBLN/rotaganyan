@@ -125,7 +125,7 @@ export async function fetchCityProgram(
 
   const $ = cheerio.load(html);
 
-  // Build raceId → {raceNo, time} from race tabs
+  // Build raceId → {raceNo, time} from race tabs.
   const raceMeta = new Map<string, { raceNo: number; time: string }>();
   $("ul.races-tabs li h3.race-no a[id^='anc']").each((_, el) => {
     const ancId = $(el).attr("id") ?? "";
@@ -167,6 +167,19 @@ export async function fetchCityProgram(
     const raceId = $(raceDiv).attr("id") ?? "";
     const meta = raceMeta.get(raceId);
     if (!meta) return;
+
+    // "Karma" hipodromu, küçük şehirlerin koşularını TJK'nın ayrıca yayınladığı ortak bir
+    // yayın — bu durumda koşunun KENDİ h3.race-no başlığı (tab listesindeki KISALTILMIŞ
+    // metinden FARKLI olarak) "1. Koşu 17.00 (İstanbul 8. Koşu)" gibi parantez içinde kaynak
+    // koşuyu da taşıyor. v6.35 canlı bulgu (2026-08-02, kullanıcı: "puanlamaları
+    // yansıtılmalı"): bu alan hiç çıkarılmıyordu, Race.conditions hep null kalıyordu — bu
+    // yüzden syncKarmaMirrors (prediction.actions.ts) Karma koşularını HİÇBİR ZAMAN
+    // eşleştiremedi, analiz Karma tarafında hiç görünmedi (Puan Tablosu dahil). Kaynak
+    // referansı yalnız BURADA (pane başlığında) var — tab listesinde YOK, ilk deneme
+    // (raceMeta üzerinden) bu yüzden hiç eşleşmemişti.
+    const paneHeaderText = $(".race-details h3.race-no", raceDiv).first().text().trim().replace(/\s+/g, " ");
+    const sourceMatch = paneHeaderText.match(/\(([^)]+\d+\.\s*Ko[şs]u[^)]*)\)/i);
+    const sourceRace = sourceMatch ? sourceMatch[1].trim() : undefined;
 
     // Class type from aciklamaFancy link text (abbreviated race code)
     const classEl = $(".race-config .aciklamaFancy", raceDiv).first();
@@ -372,7 +385,25 @@ export async function fetchCityProgram(
 
           const ekuriGroup = ekuriMap.get(no) ?? undefined;
 
-          runners.push({ no, name, age, startNo, disaridanStart, weight, jockey, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup, tjkAtId, equipment });
+          // İdman (galop) videosu — "İdm" sütunundaki video-play ikonu, tıklandığında
+          // ../idmanpisti/Kosu?KosuKodu=X&Atkodu=Y açan bir link. TJK bu sayfada gerçek
+          // videoyu Radiant Media Player ile video-cdn.tjk.org'dan MP4 olarak sunuyor —
+          // dosya adı doğrudan {yıl}/{ay}/{KosuKodu}-{Atkodu}.mp4 kalıbında, aya sıfır
+          // eklenmiyor (ör. "2026/7/226457-117588.mp4"). İkon yoksa o at için TJK henüz
+          // idman videosu çekmemiş demektir — kullanıcı talebi 2026-07-29.
+          let idmanVideoUrl: string | undefined;
+          const idmanLink = $(row).find('a[href*="idmanpisti/Kosu"]').first();
+          if (idmanLink.length) {
+            const idmanHref = idmanLink.attr("href") ?? "";
+            const kosuM = idmanHref.match(/KosuKodu=(\d+)/i);
+            const atM = idmanHref.match(/Atkodu=(\d+)/i);
+            if (kosuM && atM) {
+              const [, mm, yyyy] = tjkDate.split("/");
+              idmanVideoUrl = `https://video-cdn.tjk.org/videoftp/idmanpisti/${yyyy}/${parseInt(mm, 10)}/${kosuM[1]}-${atM[1]}.mp4`;
+            }
+          }
+
+          runners.push({ no, name, age, startNo, disaridanStart, weight, jockey, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup, tjkAtId, equipment, idmanVideoUrl });
         });
       }
     }
@@ -385,6 +416,7 @@ export async function fetchCityProgram(
         breed,
         surface,
         distance,
+        conditions: sourceRace,
         runners,
         gallops: [],
       });

@@ -95,9 +95,6 @@ export default async function YeniAnalizPage({ searchParams }: PageProps) {
   const mod = params.mod ?? "oto"; // varsayılan: tam otomatik analiz
   const analystStats = await getAnalystStats(race.id);
   const advice = getClassTypeAdvice(analystStats, race.classType);
-  // bkz. [id]/page.tsx'teki aynı not — "Metodoloji (vX.X)" etiketi artık DB'den gerçek
-  // güncel versiyonu okuyor, hardcoded "v4.2" gibi geride kalmıyor.
-  const methodologyVersion = (await db.methodologyVersion.findFirst({ where: { isCurrent: true }, select: { version: true } }))?.version ?? null;
   const backHref = params.tarih
     ? `/admin/analizler/yeni?tarih=${params.tarih}`
     : "/admin/analizler/yeni";
@@ -165,7 +162,7 @@ export default async function YeniAnalizPage({ searchParams }: PageProps) {
 
       {/* Otomatik analiz — admin hiçbir şey elle girmez, site kendi verisiyle + metodolojiyle üretir */}
       {mod === "oto" && (
-        <SmartAnalysisEditor raceId={race.id} runners={race.runners} methodologyVersion={methodologyVersion} />
+        <SmartAnalysisEditor raceId={race.id} runners={race.runners} />
       )}
 
       {/* Markdown input — serbest format: basit at tablosu veya tam ROTAGANYAN raporu, otomatik algılanır */}

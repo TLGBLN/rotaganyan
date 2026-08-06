@@ -2,6 +2,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatDate } from "@/lib/utils";
 import { auth } from "@/lib/auth";
@@ -12,8 +13,14 @@ import { turkeyDateString } from "@/lib/tz";
 export const dynamic = "force-dynamic";
 
 export default async function TahminOnerileriPage() {
-  // Sonuçlanmış bir koşu "aktif" listede takılı kalmasın diye bugünü senkronla
-  try { await syncResultsForDate(turkeyDateString()); } catch { /* ignore */ }
+  // Sonuçlanmış bir koşu "aktif" listede takılı kalmasın diye bugünü senkronla.
+  // v2026-08-02: eskiden senkron (await) yapılıyordu — TJK yavaş yanıt verirse HER
+  // sayfa açılışı bekliyordu, hiç kilit de yoktu (her istek TJK'ya gidiyordu). Arka
+  // plana alındı (program/page.tsx ile aynı desen) — bu istek mevcut veriyle hemen
+  // döner, az önce biten bir koşu varsa bir sonraki açılışta listeden düşer.
+  after(async () => {
+    try { await syncResultsForDate(turkeyDateString()); } catch { /* ignore */ }
+  });
 
   const [items, session] = await Promise.all([getActivePredictions(), auth()]);
   if (!session?.user) {

@@ -1,20 +1,25 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { isSameTurkeyDay } from "@/lib/tz";
+import { getTodaysFollowedRaces } from "@/server/actions/horse-follow";
 import { Button } from "@/components/ui/button";
 import MobileNav from "./MobileNav";
 import HeaderUserMenu from "./HeaderUserMenu";
 import LiveTvPlayer from "@/components/home/LiveTvPlayer";
 import NotificationBell from "./NotificationBell";
 import IntroTour from "./IntroTour";
+import FollowedHorsesPopup from "./FollowedHorsesPopup";
 import OnlineCounter from "./OnlineCounter";
 import Wordmark from "./Wordmark";
+import LocaleToggle from "./LocaleToggle";
+import HeaderLabel from "./HeaderLabel";
 
 export default async function Header() {
   const session = await auth();
   const user = session?.user;
 
-  const [followedHorses, dbUser] = await Promise.all([
+  const [followedHorses, dbUser, todaysFollowedRaces] = await Promise.all([
     user?.id
       ? db.horseFollow.findMany({
           where: { userId: user.id },
@@ -22,9 +27,16 @@ export default async function Header() {
           orderBy: { createdAt: "desc" },
         })
       : Promise.resolve([]),
-    user?.id ? db.user.findUnique({ where: { id: user.id }, select: { hasSeenIntro: true } }) : Promise.resolve(null),
+    user?.id ? db.user.findUnique({ where: { id: user.id }, select: { hasSeenIntro: true, followPopupShownAt: true } }) : Promise.resolve(null),
+    user?.id ? getTodaysFollowedRaces() : Promise.resolve([]),
   ]);
   const showIntroTour = !!user && dbUser?.hasSeenIntro === false;
+  // Takip edilen atlar bugün koşuyorsa girişte bir kez popup — aynı gün içinde tekrar
+  // gösterilmez (followPopupShownAt), ertesi gün yeniden koşulan bir at varsa tekrar açılır.
+  const showFollowPopup =
+    !!user &&
+    todaysFollowedRaces.length > 0 &&
+    (!dbUser?.followPopupShownAt || !isSameTurkeyDay(dbUser.followPopupShownAt, new Date()));
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 print:hidden">
@@ -37,16 +49,16 @@ export default async function Header() {
         {/* Hızlı erişim */}
         <nav className="hidden flex-1 items-center gap-2 md:flex">
           <Button asChild size="sm" className="bg-brand hover:bg-brand/90 text-brand-foreground">
-            <Link href="/program" data-tour="program">Yarış Programı</Link>
+            <Link href="/program" data-tour="program"><HeaderLabel k="program" /></Link>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href="/rotaganyanpuantablosu" data-tour="puantablosu">Rotaganyan Puan Tablosu</Link>
+            <Link href="/rotaganyansiralamasi" data-tour="puantablosu"><HeaderLabel k="puanTablosu" /></Link>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href="/altili" data-tour="altili">Altılı Ne Verir?</Link>
+            <Link href="/altili" data-tour="altili"><HeaderLabel k="altiliNeVerir" /></Link>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href="/tahmin-onerileri" data-tour="banko">Banko Önerileri</Link>
+            <Link href="/tahmin-onerileri" data-tour="banko"><HeaderLabel k="bankoOnerileri" /></Link>
           </Button>
           <LiveTvPlayer compact />
         </nav>
@@ -60,21 +72,27 @@ export default async function Header() {
           ) : (
             <>
               <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
-                <Link href="/giris">Giriş Yap</Link>
+                <Link href="/giris"><HeaderLabel k="girisYap" /></Link>
               </Button>
               <Button
                 asChild
                 size="sm"
                 className="hidden bg-brand hover:bg-brand/90 text-brand-foreground md:inline-flex"
               >
-                <Link href="/kayit">Kayıt Ol</Link>
+                <Link href="/kayit"><HeaderLabel k="kayitOl" /></Link>
               </Button>
             </>
           )}
+          {/* Dar mobil ekranlarda bildirim/hesap/hamburger ile birlikte sıkışıyordu —
+              mobilde dil seçimi artık MobileNav sheet'i içinde bir kart olarak yer alıyor. */}
+          <div className="hidden md:block">
+            <LocaleToggle />
+          </div>
           <MobileNav isLoggedIn={!!user} followedHorses={followedHorses} />
         </div>
       </div>
       {showIntroTour && <IntroTour />}
+      {showFollowPopup && <FollowedHorsesPopup races={todaysFollowedRaces} />}
     </header>
   );
 }

@@ -42,7 +42,41 @@ async function fetchHtml(url: string): Promise<string> {
   return body.text();
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Her zaman TJK'dan CANLI çeker ve kalıcı DB önbelleğine yazar — yalnız arka plan cron'u (sync-horse-stats-cache) kullanır, uygulama içi normal okumalar fetchTjkAtKosuBilgileri'i kullanmalı. */
+export async function refreshTjkAtKosuBilgileri(atId: number): Promise<TjkAtKosuRow[]> {
+  const data = await fetchTjkAtKosuBilgileriUncached(atId);
+  const { db } = await import("@/lib/db");
+  await db.horseRaceHistoryCache
+    .upsert({ where: { tjkAtId: atId }, create: { tjkAtId: atId, rowsJson: data }, update: { rowsJson: data } })
+    .catch(() => {});
+  return data;
+}
+
+// v6.31 canlı bulgu (2026-08-01, NAZİKO #99331): TJK bazen tek seferlik geçici bir hata
+// veriyor (HTTP 404 veya boş tablo) — canlı doğrulandı: ilk deneme 404 döndü, HEMEN
+// SONRAKİ deneme aynı at için 31 satırın tamamını sorunsuz döndürdü. Bu tek seferlik
+// hıçkırık, DB'ye "atın hiç geçmişi yok" (ilkStart=true) olarak KALICI biçimde (okuma
+// tarafı fetchTjkAtKosuBilgileri, 3 günlük stale eşiğine bakmadan DB'de ne varsa direkt
+// döner) yazılıyordu — gerçek geçmişi olan bir at "İlk start" etiketiyle Faz2'ye gidiyordu.
+// Tek bir hızlı tekrar deneme (HTTP hatası VEYA boş tablo) bu hata sınıfını kapatır; ısrarlı
+// gerçek başarısızlıklar zaten HorseSyncFailure sayaç mekanizmasıyla (tjk-at-profil.adapter.ts)
+// ayrıca izleniyor, burada ek karmaşıklık gerekmiyor.
 async function fetchTjkAtKosuBilgileriUncached(atId: number): Promise<TjkAtKosuRow[]> {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const rows = await fetchAndParseTjkAtKosuBilgileri(atId);
+      if (rows.length > 0 || attempt === 2) return rows;
+    } catch (err) {
+      if (attempt === 2) throw err;
+    }
+    await sleep(800);
+  }
+  return [];
+}
+
+async function fetchAndParseTjkAtKosuBilgileri(atId: number): Promise<TjkAtKosuRow[]> {
   const html = await fetchHtml(`${BASE}/TR/YarisSever/Query/ConnectedPage/AtKosuBilgileri?1=1&QueryParameter_AtId=${atId}&Era=yesterday`);
   const $ = cheerio.load(html);
   const rows: TjkAtKosuRow[] = [];
@@ -104,10 +138,26 @@ async function fetchTjkAtKosuBilgileriUncached(atId: number): Promise<TjkAtKosuR
 const memCache = new Map<number, { data: TjkAtKosuRow[]; expiresAt: number }>();
 const CACHE_TTL_MS = 10_800_000;
 
+// Kalıcı DB önbelleği (HorseRaceHistoryCache) — analiz (Faz1) ve tüm public panellerin
+// (H2H/Karşılaştır/Son Yarış Detayları) TJK'ya CANLI gitmemesi için (kullanıcı talebi
+// 2026-07-30: "analiz yaparken API'miz bizim sitemizden ... verileri analiz etmeli, tekrar
+// tjk ya gitmemeli — bu maliyetlerimizi arttırıyor"). Arka plandaki sync-horse-stats-cache
+// cron'u bu tabloyu periyodik tazeler (refreshTjkAtKosuBilgileri). Yalnız DB'de HİÇ kaydı
+// olmayan (cron'un sırası henüz gelmemiş yeni) bir at için burada anlık çekim yapılır —
+// site beslenmesi TJK'dan devam eder, yalnız analiz isteği TJK'yı BEKLEMEZ.
 export async function fetchTjkAtKosuBilgileri(atId: number): Promise<TjkAtKosuRow[]> {
   const cached = memCache.get(atId);
   if (cached && cached.expiresAt > Date.now()) return cached.data;
-  const data = await fetchTjkAtKosuBilgileriUncached(atId);
+
+  const { db } = await import("@/lib/db");
+  const dbCached = await db.horseRaceHistoryCache.findUnique({ where: { tjkAtId: atId } }).catch(() => null);
+  if (dbCached) {
+    const data = dbCached.rowsJson as unknown as TjkAtKosuRow[];
+    memCache.set(atId, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+    return data;
+  }
+
+  const data = await refreshTjkAtKosuBilgileri(atId);
   memCache.set(atId, { data, expiresAt: Date.now() + CACHE_TTL_MS });
   return data;
 }

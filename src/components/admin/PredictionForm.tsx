@@ -1,8 +1,7 @@
 "use client";
 
 import { useForm, useFieldArray } from "react-hook-form";
-import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { toast } from "sonner";
 import { upsertPrediction } from "@/server/actions/prediction.actions";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { Confidence, PedigreeRating, Prisma } from "@prisma/client";
-import type { AIAnalysisResult } from "./AIAnalysisPanel";
 import { Loader2 } from "lucide-react";
 
 type Runner = Prisma.RunnerGetPayload<{ include: { gallops: true } }>;
@@ -45,8 +43,6 @@ type FormData = {
 type Props = {
   raceId: string;
   runners: Runner[];
-  aiResult?: AIAnalysisResult | null;
-  aiRunners?: { id: string; no: number; name: string }[];
   existingPrediction?: {
     id: string;
     confidence: Confidence;
@@ -84,10 +80,19 @@ const PEDIGREE_LABEL: Record<PedigreeRating, string> = {
   BILINMIYOR: "Bilinmiyor",
 };
 
-export default function PredictionForm({ raceId, runners, existingPrediction, aiResult, aiRunners }: Props) {
-  const router = useRouter();
+export default function PredictionForm({ raceId, runners, existingPrediction }: Props) {
   const [submitting, setSubmitting] = useState(false);
-  const prevAiResult = useRef<AIAnalysisResult | null | undefined>(null);
+  // v6.66 — kullanıcı bulgusu (HÜRRİYET, Kocaeli 7.Koşu): bu form V2AnalysisPanel'in
+  // HEMEN ALTINDA duruyor ve kendi "Kaydet"iyle AYNI Prediction kaydını sıfırdan
+  // yazabiliyor — sayfa ilk açıldığındaki (muhtemelen boş) donmuş state'iyle V2'nin az
+  // önce ürettiği gerçek muhakeme/details'i sessizce silebiliyor. Bu form yalnız V2'nin
+  // henüz desteklemediği kategoriler (ör. Amatör) için hâlâ gerekli, o yüzden komple
+  // kaldırılamıyor — ama zaten İÇERİKLİ (details dolu) bir analiz varsa üzerine yazmadan
+  // önce bilinçli onay ZORUNLU.
+  const varOlanIcerikliMi = (existingPrediction?.picks ?? []).some(
+    (p) => Array.isArray(p.details) && p.details.length > 0
+  );
+  const [uzerineYazOnay, setUzerineYazOnay] = useState(false);
 
   const defaultPicks: PickFormData[] = existingPrediction?.picks.map((p) => ({
     rank: p.rank,
@@ -117,40 +122,8 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
     },
   });
 
-  const { fields, replace } = useFieldArray({ control, name: "picks" });
+  const { fields } = useFieldArray({ control, name: "picks" });
   const isBanko = watch("isBanko");
-
-  // AI sonucu gelince formu doldur
-  useEffect(() => {
-    if (!aiResult || aiResult === prevAiResult.current) return;
-    prevAiResult.current = aiResult;
-    const runnersMap = new Map((aiRunners ?? []).map((r) => [r.no, r]));
-    const aiPicks: PickFormData[] = aiResult.picks.map((p) => {
-      const runner = runnersMap.get(p.no) ?? runners.find((r) => r.no === p.no);
-      return {
-        rank: p.rank,
-        runnerId: runner?.id ?? "",
-        runnerLabel: runner ? `#${runner.no} ${runner.name}` : `#${p.no} ${p.name}`,
-        score: p.score,
-        isTarget: p.isTarget,
-        pedigreeRating: p.pedigreeRating,
-        // Kilit Gerekçe — Faz 4'ün ürettiği 2 cümlelik öz gerekçe metni,
-        // public "Kilit Gerekçe" sütununa gidiyor. p.details ("AGF1" gibi kısa iç
-        // etiketler) ayrıca admin önizlemesinde rozet olarak gösteriliyor (AIAnalysisPanel),
-        // buraya karıştırılmıyor — yalnız okunabilir gerekçe metni kullanıcıya gidiyor.
-        details: p.note ?? "",
-      };
-    });
-    replace(aiPicks);
-    setValue("confidence", aiResult.confidence);
-    setValue("notes", aiResult.notes);
-    setValue("tempo", aiResult.tempo);
-    setValue("isBanko", aiResult.isBanko);
-    setValue("bankoNote", aiResult.bankoNote);
-    setValue("couponNarrow", aiResult.couponNarrow);
-    setValue("couponNormal", aiResult.couponNormal);
-    setValue("couponWide", aiResult.couponWide);
-  }, [aiResult, aiRunners, runners, setValue, replace]);
 
   async function onSubmit(data: FormData) {
     setSubmitting(true);
@@ -352,17 +325,25 @@ export default function PredictionForm({ raceId, runners, existingPrediction, ai
           </div>
         </section>
 
+        {varOlanIcerikliMi && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-xs">
+            <input
+              type="checkbox"
+              id="uzerineYazOnay"
+              checked={uzerineYazOnay}
+              onChange={(e) => setUzerineYazOnay(e.target.checked)}
+              className="mt-0.5"
+            />
+            <label htmlFor="uzerineYazOnay" className="text-amber-600 dark:text-amber-400">
+              Bu koşu için zaten içerikli bir analiz kayıtlı (muhtemelen V2 motorundan) — bu formu kaydedersem
+              üzerine yazılıp o analizin gerekçe/detayları silineceğini biliyorum ve onaylıyorum.
+            </label>
+          </div>
+        )}
         <div className="flex gap-3 pt-2">
-          <Button type="submit" disabled={submitting}>
+          <Button type="submit" disabled={submitting || (varOlanIcerikliMi && !uzerineYazOnay)}>
             {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             {existingPrediction ? "Güncelle" : "Kaydet"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.push("/admin/analizler")}
-          >
-            İptal
           </Button>
         </div>
       </form>

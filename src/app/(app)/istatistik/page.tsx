@@ -2,7 +2,11 @@ import StatTile from "@/components/stats/StatTile";
 import { getStats, getRaceStyleWinStats, type RaceStyleWinBreakdown } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 
-export const revalidate = 300;
+// v6.52 — geçici: build sırasında statik üretim denemesi 60sn zaman aşımına takılmaya
+// başladı (muhtemelen büyüyen veri hacmiyle getStats()/getRaceStyleWinStats() yavaşladı,
+// tonight'ki değişikliklerle ilgisi yok). Deploy'u bloke etmesin diye şimdilik istek
+// anında render'a çevrildi — asıl sorguyu profillemek ayrı, sakin kafayla yapılacak bir iş.
+export const dynamic = "force-dynamic";
 
 const STYLE_COLOR: Record<string, string> = {
   KACAK_AT: "text-[#e74c3c]",

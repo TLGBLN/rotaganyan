@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
+import { useTranslations } from "next-intl";
 import type { KazananKupon } from "@/server/services/race.service";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 function Card({ k, onOpen }: { k: KazananKupon; onOpen: () => void }) {
+  const t = useTranslations("home.kupon");
   const dateStr = format(new Date(k.date), "d MMM yyyy", { locale: tr });
 
   return (
@@ -19,7 +21,7 @@ function Card({ k, onOpen }: { k: KazananKupon; onOpen: () => void }) {
       <div className="flex items-start justify-between gap-2 mb-2">
         <span className="text-xs text-muted-foreground">{dateStr}</span>
         <span className="text-xs font-semibold text-hit bg-hit/10 border border-hit/30 rounded-full px-2 py-0.5 shrink-0">
-          ✓ Tuttu
+          {t("tuttu")}
         </span>
       </div>
       <p className="font-bold text-foreground truncate">{k.hippodromeName}</p>
@@ -39,6 +41,7 @@ function Card({ k, onOpen }: { k: KazananKupon; onOpen: () => void }) {
 }
 
 function KuponDetailDialog({ k, onClose }: { k: KazananKupon | null; onClose: () => void }) {
+  const t = useTranslations("home.kupon");
   return (
     <Dialog open={k != null} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-3xl">
@@ -48,7 +51,7 @@ function KuponDetailDialog({ k, onClose }: { k: KazananKupon | null; onClose: ()
               <div className="flex items-center justify-between gap-2 pr-6">
                 <DialogTitle>{k.hippodromeName}</DialogTitle>
                 <span className="shrink-0 rounded-full bg-hit/15 px-2 py-0.5 text-[10px] font-semibold text-hit">
-                  Tuttu
+                  {t("tuttuPlain")}
                 </span>
               </div>
             </DialogHeader>
@@ -70,20 +73,30 @@ function KuponDetailDialog({ k, onClose }: { k: KazananKupon | null; onClose: ()
                 {k.legs.map((leg) => (
                   <div key={leg.raceNo} className="px-1.5 py-3 text-center">
                     <div className="mb-2 text-[10px] font-medium text-muted-foreground">
-                      {leg.raceNo}. Koşu
+                      {leg.raceNo}. {t("kosuSuffix")}
                     </div>
                     <div className="space-y-1.5 text-sm font-semibold">
-                      {leg.nos.map((no) => (
-                        <div key={no}>
-                          {leg.winnerNos.includes(no) ? (
-                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-hit text-white text-xs font-bold">
-                              {no}
-                            </span>
-                          ) : (
-                            <span>{no}</span>
-                          )}
-                        </div>
-                      ))}
+                      {leg.nos.map((no) => {
+                        const ekuriWinnerNo = leg.ekuriWinnerByNo[no];
+                        return (
+                          <div key={no}>
+                            {leg.winnerNos.includes(no) ? (
+                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-hit text-white text-xs font-bold">
+                                {no}
+                              </span>
+                            ) : ekuriWinnerNo != null ? (
+                              <span className="inline-flex items-center gap-1">
+                                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-hit text-white text-xs font-bold">
+                                  {no}
+                                </span>
+                                <span className="text-[9px] text-hit">({ekuriWinnerNo} eküri)</span>
+                              </span>
+                            ) : (
+                              <span>{no}</span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
@@ -91,7 +104,7 @@ function KuponDetailDialog({ k, onClose }: { k: KazananKupon | null; onClose: ()
             </div>
 
             <div className="border-t pt-3">
-              <div className="text-xs text-muted-foreground">Kupon Tutarı</div>
+              <div className="text-xs text-muted-foreground">{t("kuponTutari")}</div>
               <div className="text-lg font-bold">
                 {k.amount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
               </div>

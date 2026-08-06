@@ -5,9 +5,8 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { registerSchema } from "@/lib/validations/auth";
 import { checkRateLimit, registerLimiter } from "@/lib/ratelimit";
-import { sendWelcomeEmail } from "@/lib/email";
 import { notifyAdminsNewUser } from "./notification.actions";
-import { sendInitialVerificationEmail } from "./email-verification.actions";
+import { sendInitialRegistrationCode } from "./registration-code.actions";
 
 export async function registerUser(formData: FormData) {
   const hdrs = await headers();
@@ -45,9 +44,12 @@ export async function registerUser(formData: FormData) {
     data: { name, email, passwordHash },
   });
 
-  // Fire and forget — don't block registration on email/notification failure
-  sendWelcomeEmail(email, name).catch(console.error);
-  sendInitialVerificationEmail(email, name).catch(console.error);
+  // v2026-07-31 — kullanıcı talebi: sahte hesapları engellemek için hesap, 6 haneli kod
+  // doğrulanana kadar KULLANILAMAZ (bkz. auth.ts authorize() ve giris/page.tsx). Artık
+  // burada otomatik oturum açılmıyor — RegisterForm kullanıcıyı /kayit/dogrula'ya
+  // yönlendiriyor. Hoş geldin e-postası da kayıt anında değil, doğrulama BAŞARILI
+  // olduğunda gönderiliyor (bkz. registration-code.actions.ts).
+  await sendInitialRegistrationCode(email, name);
   notifyAdminsNewUser(user.id).catch(console.error);
 
   return { success: true };

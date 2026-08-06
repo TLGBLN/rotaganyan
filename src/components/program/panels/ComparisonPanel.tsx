@@ -1,14 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { getAtPerformansForRace, type AtPerformansRunnerData } from "@/server/actions/at-performans.actions";
 import { zeminDetayiSatirdanCikar, zeminKatsayisi } from "@/lib/methodology/mekanik-puanlama";
 
-function surfaceShort(raw: string): string {
-  if (raw.startsWith("Ç")) return "Çim";
-  if (raw.startsWith("S")) return "Sentetik";
-  if (raw.startsWith("K")) return "Kum";
+type ComparisonT = ReturnType<typeof useTranslations<"programToolbar">>;
+
+function surfaceShort(raw: string, t: ComparisonT): string {
+  if (raw.startsWith("Ç")) return t("surfaceCim");
+  if (raw.startsWith("S")) return t("surfaceSentetik");
+  if (raw.startsWith("K")) return t("surfaceKum");
   return raw || "—";
 }
 
@@ -35,6 +38,7 @@ function parseTime(raw: string): number | null {
 }
 
 export default function ComparisonPanel({ raceId }: { raceId: string }) {
+  const t = useTranslations("programToolbar");
   const [data, setData] = useState<AtPerformansRunnerData[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -63,29 +67,28 @@ export default function ComparisonPanel({ raceId }: { raceId: string }) {
     <div className="border-t">
       <div className="px-4 py-2.5 bg-[#c0392b] border-b">
         <div className="text-sm font-bold tracking-wide text-white">
-          Detaylı At Karşılaştırma — Aynı Pist / Mesafe / Hipodrom (2026)
+          {t("comparisonTitle")}
         </div>
         <div className="mt-0.5 text-[11px] text-white/70">
-          Atlar birbiriyle değil, her biri kendi geçmiş performansıyla listelenir — bu koşuya benzer
-          pist/mesafe/hipodromda daha önce nasıl derece yaptıklarını karşılaştırmak içindir.
+          {t("comparisonDescription")}
         </div>
       </div>
 
       {loading ? (
-        <div className="px-4 py-8 text-center text-sm text-muted-foreground">{"TJK'dan çekiliyor…"}</div>
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">{t("tjkdanCekiliyor")}</div>
       ) : error ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-          <p className="mb-2">Veri alınamadı.</p>
+          <p className="mb-2">{t("veriAlinamadi")}</p>
           <button
             onClick={() => setRetryKey((k) => k + 1)}
             className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
           >
-            Tekrar Dene
+            {t("tekrarDene")}
           </button>
         </div>
       ) : withRecords.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-          Bu koşudaki atların hiçbiri aynı pist/mesafe/hipodromda 2026&apos;da koşmadı.
+          {t("comparisonEmpty")}
         </div>
       ) : (
         <>
@@ -94,19 +97,19 @@ export default function ComparisonPanel({ raceId }: { raceId: string }) {
             <table className="w-full text-[11px]">
               <thead>
                 <tr className="border-b bg-muted/40 text-muted-foreground">
-                  <th className="px-2 py-1.5 text-left font-medium">At</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Tarih</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Hipodrom</th>
-                  <th className="px-2 py-1.5 text-center font-medium">K.No</th>
-                  <th className="px-2 py-1.5 text-center font-medium">Mesafe</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Pist</th>
-                  <th className="px-2 py-1.5 text-center font-medium">S</th>
-                  <th className="px-2 py-1.5 text-center font-medium">Derece</th>
-                  <th className="px-2 py-1.5 text-center font-medium">Kilo</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Jokey</th>
-                  <th className="px-2 py-1.5 text-center font-medium">Gny</th>
-                  <th className="px-2 py-1.5 text-center font-medium">Grup</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Cins</th>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("at")}</th>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("colTarih")}</th>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("colHipodrom")}</th>
+                  <th className="px-2 py-1.5 text-center font-medium">{t("colKNo")}</th>
+                  <th className="px-2 py-1.5 text-center font-medium">{t("colMesafe")}</th>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("colPist")}</th>
+                  <th className="px-2 py-1.5 text-center font-medium">{t("colS")}</th>
+                  <th className="px-2 py-1.5 text-center font-medium">{t("colDerece")}</th>
+                  <th className="px-2 py-1.5 text-center font-medium">{t("statKilo")}</th>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("jokey")}</th>
+                  <th className="px-2 py-1.5 text-center font-medium">{t("colGny")}</th>
+                  <th className="px-2 py-1.5 text-center font-medium">{t("colGrup")}</th>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("colCins")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -132,7 +135,7 @@ export default function ComparisonPanel({ raceId }: { raceId: string }) {
                         <td className="px-2 py-1.5 text-center tabular-nums">{rec.raceNo || "—"}</td>
                         <td className="px-2 py-1.5 text-center tabular-nums">{rec.distance || "—"}</td>
                         <td className="px-2 py-1.5 whitespace-nowrap">
-                          {surfaceShort(rec.surface)}
+                          {surfaceShort(rec.surface, t)}
                           {zeminEtiketi(rec.surface) && (
                             <div className="text-[10px] text-muted-foreground">{zeminEtiketi(rec.surface)}</div>
                           )}
@@ -167,7 +170,7 @@ export default function ComparisonPanel({ raceId }: { raceId: string }) {
                     <div key={i} className="rounded border border-border/50 px-2 py-1.5 text-[11px]">
                       <div className="flex items-center justify-between">
                         <span className="tabular-nums text-muted-foreground">
-                          {rec.date} · {rec.city} · {rec.raceNo}.Koşu
+                          {rec.date} · {rec.city} · {t("raceNoLabel", { no: rec.raceNo })}
                         </span>
                         <span className={cn("font-semibold tabular-nums", rec.finishPos === "1" && "text-hit")}>
                           {rec.finishPos ? `${rec.finishPos}.` : "—"}
@@ -176,11 +179,11 @@ export default function ComparisonPanel({ raceId }: { raceId: string }) {
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 font-mono tabular-nums text-muted-foreground">
                         <span>{rec.time || "—"}</span>
                         <span>
-                          {rec.distance}m · {surfaceShort(rec.surface)}
+                          {rec.distance}m · {surfaceShort(rec.surface, t)}
                           {zeminEtiketi(rec.surface) && <> ({zeminEtiketi(rec.surface)})</>}
                         </span>
                         <span>{rec.weight ? `${rec.weight}kg` : "—"}</span>
-                        {rec.ganyan && <span>Gny {rec.ganyan}</span>}
+                        {rec.ganyan && <span>{t("colGny")} {rec.ganyan}</span>}
                       </div>
                       <div className="mt-0.5 truncate">{rec.jockey || "—"}</div>
                       <div className="truncate text-muted-foreground">

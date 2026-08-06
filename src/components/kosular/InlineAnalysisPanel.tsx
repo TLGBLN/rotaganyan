@@ -28,6 +28,16 @@ function scoreOnly(value: string): string {
   return value.split("/")[0]?.trim() || value;
 }
 
+// v6.51 — V2 motoru (Faz3/sayısal puanlama yok) kaydettiği pick'lerde score HER ZAMAN
+// null — bu durumda "—" yerine Faz2'nin "karar" etiketini (details[0]) gösteriyoruz.
+// Eski (Faz3'lü) tahminlerde davranış AYNEN korunuyor (bkz. PuanTablosu.tsx'teki aynı desen).
+function puanHucresi(score: number | null | undefined, details: unknown): string {
+  if (score != null) return String(score);
+  const list = Array.isArray(details) ? (details as string[]) : [];
+  const karar = list.find((d) => d.startsWith("Karar: "));
+  return karar ? karar.replace("Karar: ", "") : "—";
+}
+
 function splitLayerDetails(details: unknown) {
   const list = Array.isArray(details) ? (details as string[]) : [];
   let a = "—", b = "—", c = "—", bcDirect = "";
@@ -115,7 +125,7 @@ export default function InlineAnalysisPanel({ picks, winnerNos, isLoggedIn, race
                 )}
               </div>
               <span className="shrink-0 font-mono text-xs font-bold text-brand">
-                {pick.score ?? "—"}
+                {puanHucresi(pick.score, pick.details)}
               </span>
               <Badge variant="outline" className={cn("shrink-0 text-[10px]", coupon.className)}>
                 {coupon.label}
@@ -137,12 +147,11 @@ export default function InlineAnalysisPanel({ picks, winnerNos, isLoggedIn, race
               <th className="px-2 py-2 text-right font-medium text-muted-foreground">A</th>
               <th className="px-2 py-2 text-right font-medium text-muted-foreground">B+C</th>
               <th className="px-2 py-2 text-right font-medium text-muted-foreground">Toplam</th>
-              <th className="hidden px-2 py-2 text-left font-medium text-muted-foreground md:table-cell">Kilit Gerekçe</th>
             </tr>
           </thead>
           <tbody>
             {picks.map((pick, i) => {
-              const { a, bc, gerekce } = splitLayerDetails(pick.details);
+              const { a, bc } = splitLayerDetails(pick.details);
               const isWinner = pick.runner?.no != null && (winnerNos ?? []).includes(pick.runner.no);
               const coupon = couponCategory(pick.rank);
               return (
@@ -186,8 +195,7 @@ export default function InlineAnalysisPanel({ picks, winnerNos, isLoggedIn, race
                   </td>
                   <td className="px-2 py-2 text-right font-mono">{a}</td>
                   <td className="px-2 py-2 text-right font-mono">{bc}</td>
-                  <td className="px-2 py-2 text-right font-mono font-bold text-brand">{pick.score ?? "—"}</td>
-                  <td className="hidden px-2 py-2 text-muted-foreground md:table-cell">{gerekce}</td>
+                  <td className="px-2 py-2 text-right font-mono font-bold text-brand">{puanHucresi(pick.score, pick.details)}</td>
                 </tr>
               );
             })}

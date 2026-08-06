@@ -5,7 +5,7 @@ import type { Anthropic } from "@anthropic-ai/sdk";
 import { createWithTruncationRetry, extractText, FAZ3_SCHEMA, type Faz2Atlar, type Faz3Pick, type Faz3Result } from "@/lib/methodology/claude-analiz-helpers";
 import type { PedigreeRating, Role } from "@prisma/client";
 import { kategoriTespit, KATEGORI_KODLARI, V_LEGEND, atSatirlariUret, kosuBaslikUret, buildFaz3InstructionsV2, buildFaz3ReminderV2 } from "@/lib/methodology/v2-engine";
-import { kuralKontrolleriUret, type FinalPick } from "@/app/api/admin/oto-analiz-faz3/route";
+import { kontrolNotlariUret, type FinalPick } from "@/lib/methodology/kural-kontrolleri";
 import type { TestV2Pick } from "@/app/api/admin/test-v2-engine/route";
 
 // v6.44 — YENİ MOTOR, FAZ3 (Kanıt Ağırlıklı Katman puanlama+banko+kupon). Test-v2-engine'in
@@ -109,13 +109,14 @@ async function handlePost(req: NextRequest) {
   const piyasaRiski = tumSira.slice(1).some((p) => (agfByNo.get(p.no) ?? 0) > 50);
   const isBanko = !!top1 && top1.score >= 80 && (top1.score - (top2?.score ?? 0)) >= 5 && !piyasaRiski && result.confidence === "YUKSEK";
 
-  // kuralKontrolleriUret, {no,ad,teknikSira,muhakeme} bekliyor (eski Faz2 şekli) — v6.47
-  // kompakt tek-alan formatına geçtikten sonra TestV2Pick zaten bu şekle birebir uyuyor,
-  // ayrıca serileştirme gerekmiyor.
+  // v6.66 — dosya kazayla silinmişti, git HEAD'den kurtarıldı: gerçek "Kural Denetim
+  // Protokolü (a-t)" (kontrolNotlariUret, oto-analiz-faz3/route.ts) artık burada da
+  // kullanılıyor — önceki oturumdaki basitleştirilmiş yeniden-yazım (kural-kontrolleri.ts)
+  // kaldırıldı, ihtiyaç kalmadı.
   const faz2Legacy: Faz2Atlar = {
     atlar: faz2Atlar.map((a) => ({ no: a.no, ad: a.ad, teknikSira: a.teknikSira, muhakeme: a.muhakeme })),
   };
-  const kuralKontrolleri = kuralKontrolleriUret(faz1, faz2Legacy, picks, { isBanko, bankoNote: result.bankoNote }, sahaBuyuklugu);
+  const kuralKontrolleri = kontrolNotlariUret(faz1, faz2Legacy, tumSira, { isBanko, bankoNote: result.bankoNote ?? "" });
 
   return NextResponse.json({
     ok: true,

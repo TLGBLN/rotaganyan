@@ -42,6 +42,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         );
         if (!valid) return null;
 
+        // Sahte hesapları engellemek için: e-postası doğrulanmamış hesap giriş yapamaz —
+        // birincil kontrol giris/page.tsx'in kendi login() action'ında (kullanıcıyı
+        // /kayit/dogrula'ya yönlendirir), bu ikinci bir savunma katmanı (ör. NextAuth
+        // signIn'in başka bir yoldan doğrudan çağrılması ihtimaline karşı).
+        if (!user.emailVerified) return null;
+
         return {
           id: user.id,
           email: user.email,

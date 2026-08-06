@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { parseDamStatBulk } from "@/lib/dam-stat-parser";
-import { breedToIrk, surfaceToPist, mesafeBucket, findDamStat, formatDamStatOzet, normalizeSireName } from "@/lib/sire-stat-match";
+import { breedToIrk, surfaceToPist, mesafeBucket, formatDamStatOzet, formatDamSireStatOzet, normalizeSireName } from "@/lib/sire-stat-match";
 
 export type DamStatFiltre = {
   irk: string;
@@ -67,13 +67,14 @@ export async function listDamStats(limit = 100) {
 export type DamStatOzetSonuc = {
   ozet: string | null;
   // minOrneklem kararları için ham örneklem büyüklüğü (bkz. sire-stat.actions.ts SireStatOzetSonuc).
-  ornekHipodromx: number | null; // s.start — hipodromx başlık istatistiğinin dayandığı start sayısı
   ornekKendiVeri: number | null; // own.start — rotaganyan'ın kendi verisindeki start sayısı
 };
 
 /**
  * Bir koşudaki tüm atların anne+anne babası için, o koşunun ırk/pist/mesafe kombinasyonuna
  * karşılık gelen kısrak istatistiği özetini (varsa) döner — girdilerle AYNI SIRADA.
+ * v6.32: yalnızca DamStatOwn (kendi verimiz) — hipodromx.com kaynaklı DamStat analiz
+ * akışından çıkarıldı (kullanıcı kararı 2026-08-01, bkz. sire-stat-match.ts başlık notu).
  */
 export async function getDamStatOzetleriForRace(
   dams: { dam: string | null; damSire: string | null }[],
@@ -84,12 +85,8 @@ export async function getDamStatOzetleriForRace(
   const irk = breedToIrk(breed);
   const pist = surfaceToPist(surface);
   const mesafe = mesafeBucket(distance);
-  const [pool, ownPool] = await Promise.all([
-    db.damStat.findMany({ where: { irk, filtrePist: pist, filtreMesafe: mesafe } }),
-    db.damStatOwn.findMany({ where: { irk, pist, mesafe } }),
-  ]);
+  const ownPool = await db.damStatOwn.findMany({ where: { irk, pist, mesafe } });
   return dams.map(({ dam, damSire }) => {
-    const match = findDamStat(dam, damSire, pool);
     const ownCandidates = dam
       ? ownPool.filter((o) => normalizeSireName(o.damName) === normalizeSireName(dam))
       : [];
@@ -99,14 +96,33 @@ export async function getDamStatOzetleriForRace(
         : ownCandidates.length === 1
           ? ownCandidates[0]
           : (damSire && ownCandidates.find((o) => normalizeSireName(o.damSireName) === normalizeSireName(damSire))) || ownCandidates[0];
-    const ornekHipodromx = match?.start ?? null;
     const ornekKendiVeri = ownMatch?.start ?? null;
-    if (match) return { ozet: formatDamStatOzet(match, mesafe, pist, ownMatch), ornekHipodromx, ornekKendiVeri };
-    // hipodromx eşleşmesi yok ama kendi verimizde varsa, yalnız kendi veriyle özet göster.
-    if (!ownMatch || ownMatch.start < 3) return { ozet: null, ornekHipodromx, ornekKendiVeri };
-    const tayOrani = ownMatch.yavruSayisi > 0 ? Math.round((ownMatch.kazananYavruSayisi / ownMatch.yavruSayisi) * 100) : null;
-    const tayStr = tayOrani != null ? ` · Kazanan tay oranı %${tayOrani} (${ownMatch.kazananYavruSayisi}/${ownMatch.yavruSayisi} yavru)` : "";
-    const ozet = `${dam} / ${ownMatch.damSireName} (${pist} ${mesafe}): Kendi verimiz: ${ownMatch.start} start, K% ${ownMatch.kYuzde} (${ownMatch.birinci}/${ownMatch.start})${tayStr}`;
-    return { ozet, ornekHipodromx, ornekKendiVeri };
+    const ozet = ownMatch ? formatDamStatOzet(ownMatch, mesafe, pist) : null;
+    return { ozet, ornekKendiVeri };
+  });
+}
+
+export type DamSireStatOzetSonuc = { ozet: string | null; ornekKendiVeri: number | null };
+
+/**
+ * Damsire'nin (kısrağın babası) TEK BAŞINA — hangi kısraktan gelirse gelsin TÜM
+ * yavrularından — kendi verimizdeki toplu performansı (bkz. formatDamSireStatOzet).
+ * hipodromx bu kırılımı hiç vermediği için tamamen DamSireStatOwn'a (own-data motoru,
+ * pedigri-own-stat.service.ts) dayanır.
+ */
+export async function getDamSireOwnStatForRace(
+  damSireNames: (string | null)[],
+  breed: string,
+  surface: string,
+  distance: number
+): Promise<DamSireStatOzetSonuc[]> {
+  const irk = breedToIrk(breed);
+  const pist = surfaceToPist(surface);
+  const mesafe = mesafeBucket(distance);
+  const pool = await db.damSireStatOwn.findMany({ where: { irk, pist, mesafe } });
+  return damSireNames.map((name) => {
+    const match = name ? pool.find((o) => normalizeSireName(o.damSireName) === normalizeSireName(name)) ?? null : null;
+    if (!match) return { ozet: null, ornekKendiVeri: null };
+    return { ozet: formatDamSireStatOzet(match, mesafe, pist), ornekKendiVeri: match.start };
   });
 }

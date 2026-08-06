@@ -78,13 +78,13 @@ Hiçbir V-koduna sabit yüzde/tavan uygulanmaz. Bir veri kalemi o koşunun kader
 ## MUHAKEME MATRİSİ — ÇAPRAZ SORGULANACAK ÇİFTLER (olasılıksal dil, KESİNLİK YOK)
 [V2+V9] İdman keskinliği yarışın kapanış gücüyle örtüşüyor mu — ikisi de güçlüyse gerçek destekleyici çift.
 [V10+V11] Atın stili hipodromun düzlük uzunluğuna uyuyor mu.
-[V10+V12] Atın stili bu pist/mesafede tarihsel kazanan stille örtüşüyor mu. ÖNEMLİ (gerçek bulgu, Elazığ 8.Koşu 2026-08-03 — OLGUNADAM 2. geldi ama V12 uyumsuzluğu yüzünden 9. sıraya çekilmişti, FISILTIKAYA 3. geldi ama aynı sebeple son sıraya çekilmişti): V12, SAHANIN GENEL/tarihsel eğilimidir — atın KENDİ geniş örneklemli (n≥5) V9 (Son800) veya V10 (Accurace tempo) sinyali güçlüyse, yalnız V12 uyumsuzluğu YÜZÜNDEN bu atı aşağı çekme. Popülasyon istatistiği (V12), güçlü bireysel kanıtı (V9/V10, n≥5) BASTIRAMAZ — yalnız iki at birbirine yakın/eşit güçteyse aralarında ayırt edici bir ek unsur olarak kullanılabilir.
+[V10+V12] Atın stili bu pist/mesafede tarihsel kazanan stille örtüşüyor mu. ÖNEMLİ (gerçek bulgu, Elazığ 8.Koşu 2026-08-03 — OLGUNADAM 2. geldi ama V12 uyumsuzluğu yüzünden 9. sıraya çekilmişti, FISILTIKAYA 3. geldi ama aynı sebeple son sıraya çekilmişti): V12, SAHANIN GENEL/tarihsel eğilimidir — atın KENDİ geniş örneklemli (n≥5) V9 (Son800) veya V10 (Accurace tempo) sinyali güçlüyse, yalnız V12 uyumsuzluğu YÜZÜNDEN bu atı aşağı çekme. Popülasyon istatistiği (V12), güçlü bireysel kanıtı (V9/V10, n≥5) BASTIRAMAZ — yalnız iki at birbirine yakın/eşit güçteyse aralarında ayırt edici bir ek unsur olarak kullanılabilir. AĞIRLIK NETLİĞİ (gerçek bulgu, İSPANOZ, İstanbul 3.Koşu 2026-08-05 — bireysel n=15 GÜÇLÜ sinyal + popülasyonda 2. sırada (%28) olmasına rağmen "nötr-hafif destek" gibi yumuşatılmış etiketle değerlendirilip 6. sıraya düşmüştü, oysa kazandı): bireysel örneklem n≥10 VE popülasyonda ilk 2 sırada ise bu TAM "destek" sayılır — "hafif/nötr/kısmi destek" gibi yumuşatılmış bir etiket KULLANILMAZ. Yumuşatma yalnız bireysel örneklem n<5 İSE veya popülasyonda alt sıralardaysa haklıdır.
 [V10+V18] İç kulvar+kaçak stili kolay öne çıkar; dış kulvar+kaçak stili ilk 400m'de enerji maliyeti yaratabilir (KESİN değil, ihtimal).
 [V13+V10] Ağır kilo Kaçak atta erken enerji tükenmesine, Bekleme/Sprinter atta son düzlük ivmelenmesinin gecikmesine yol açabilir.
 [V13+V22] Islak/çamur zeminde taşınan kilo normalden daha fazla yıpranma yaratabilir.
 [V10+V22] Islak/çamur zemin + Kaçak/Önde Giden stil → belirgin bir avantaj taşıyabilir (sabit % yok).
 [V1+V22] Tecrübe azken (ilk startlarda tipik), pedigrinin o zemin tipindeki tarihsel başarısı daha baskın bir referans olabilir.
-[V14+V20] Sınıf düşüşü gerçek avantaj mı yoksa HP zaten düşüyorken mi geldi — HP ivmesi sert düşüyorsa taktiksel değil fiziksel bir gerilemeye işaret edebilir (kesin değil).
+[V14+V20] Sınıf düşüşü gerçek avantaj mı yoksa HP zaten düşüyorken mi geldi — HP ivmesi SERT DÜŞÜYORSA (negatif ivme) taktiksel değil fiziksel bir gerilemeye işaret edebilir (kesin değil). "HP DÜŞMÜYOR" İLE "HP SABİT (ivme=0)" AYNI ŞEY DEĞİL — sabit/nötr HP asla şüphe gerekçesi sayılmaz, yalnız GERÇEKTEN NEGATİF ivme şüphe sebebidir (PRENSES MEHLİKA vakası: KV-6→SKK3, 3 kademelik düşüş, HP 58→58 ivme=0 iken "HP yükselmiyor" diye risk sayılmıştı — YANLIŞ, sabit HP + büyük düşüş OLUMLU bir kombinasyondur, 5. bitirdi).
 [V19+V20+V6] Görünen bitiriş gerilemesi/iyileşmesi, HP ivmesi ve rakip kalitesiyle çapraz kontrol edilir — kötü görünen bir derece çok daha yüksek bir sınıfta alınmışsa "gizli form" olabilir.
 [V15+V2] Uzun aradan dönüşte idman zincirinin (galop) yeterliliği kontrol edilir.
 [V15+V3] Uzun ara+takı+jokey+kilo aynı anda değişiyorsa BÜTÜN olarak (tek tek değil) yüksek belirsizlik olarak okunur.
@@ -107,6 +107,23 @@ function takiEfektif(r: Faz1Runner): { eklenen: string; cikarilan: string } {
 /** Bir atın V-kodu satırlarını, YALNIZ o kategoride izinli kodlar arasından ve veri
  * gerçekten varsa üretir. Veri yoksa satır hiç yazılmaz (madde 17 "açıkta veri
  * kalmasın" ilkesinin tersi değil — burada "veri yok" zaten yapısal, uydurulmaz). */
+/**
+ * v6.66 — kullanıcı bulgusu 2026-08-06: sıralama çağrısına WOLF SEYFO dersi için TAM
+ * `atSatirlariUret` çıktısı (V1-V22'nin tamamı, kategoriye göre) ekleniyordu — büyük
+ * sahalarda (15 at) bu, sıralama çağrısını 37K+ giriş/10K+ çıkış tokenına şişirip
+ * gerçek bir zaman aşımına yol açtı ("para kaybettirdi"). Sıralama çağrısının GERÇEKTEN
+ * ihtiyacı olan tek şey "kelimeyle sayı çelişiyor mu" diye bakabileceği birkaç objektif
+ * sayı (kilo, HP, sınıf, AGF) — tüm V1-V22 dökümü değil. Bu kompakt özet, o dosyayı
+ * V13/V14/V20 garantili enjeksiyonlarıyla AYNI kaynak alanları kullanır.
+ */
+export function hamVeriOzetiUret(r: Faz1Runner): string {
+  const parcalar: string[] = [`kilo:${r.weight ?? "?"}kg`];
+  if (!r.ilkStart && r.hpOnceki != null) parcalar.push(`HP:${r.hpOnceki}→${r.hpBugun}(ivme:${r.hpIvmesi ?? "?"})`);
+  if (r.sinifOnceki != null) parcalar.push(`sınıf:${r.sinifOnceki}(SKK${r.sinifSkkOnceki})→bugünSKK${r.sinifSkkBugun}`);
+  if (r.agf != null) parcalar.push(`AGF:%${r.agf}`);
+  return parcalar.join(", ");
+}
+
 export function atSatirlariUret(r: Faz1Runner, izinliKodlar: string[]): string {
   const izin = new Set(izinliKodlar);
   const satirlar = [`#${r.no} ${r.ad}`];
@@ -300,7 +317,7 @@ export function faz2MuhakemeDenetle(
 ): MuhakemeDenetimSonuc[] {
   const izin = new Set(izinliKodlar);
   const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
-  const ciftRegex = /\[V\d+\+V\d+\][^|]*/g;
+  const ciftRegex = /\[V\d+(?:\+V\d+)?\][^|]*/g;
   return faz2Atlar.map((a) => {
     const r = runnerByNo.get(a.no);
     const supheliCiftler: { cift: string; kod: string; sebep: string }[] = [];
@@ -364,6 +381,139 @@ export function faz2KaliteDenetimi(
   });
 }
 
+export type KullanilmayanVeriSonuc = { no: number; ad: string; kullanilmayanKodlar: string[] };
+
+/**
+ * v6.58 — kullanıcı kararı 2026-08-04: aynı oturumda 3 ayrı at üzerinde (STARŞAH/
+ * PRENSES MEHLİKA/WOLF SEYFO) "veri var ama muhakemede hiç geçmedi/yanlış yorumlandı"
+ * bulundu — üçü de yalnız KÖTÜ SONUÇ SONRASI manuel kazıyla bulundu. Kullanıcı: "biz
+ * verileri doğru kullanamıyoruz" — V13/V14/V20 zaten koda gömüldü (garanti), ama geri
+ * kalan (V2/V6/V8/V9/V15/V16/V17/V19 vb.) sentez gerektirdiği için koda gömülemez —
+ * bunun yerine TÜM V1-V22 için GENEL bir "veri var ama hiç kullanılmadı" dedektörü.
+ * Yalnız en yüksek riskli (rank 1-2, banko/kupon kararını doğrudan etkileyen) atlara
+ * uygulanır — gürültüyü azaltmak için. Bu fonksiyon yalnız TESPİT eder; asıl önemli
+ * olan (kullanıcının sorusu: "bu uyarıdan sonra ne olacak") bunun bir admin panelinde
+ * gözden kaçırılabilecek kutu OLARAK KALMAMASI — V2AnalysisPanel.tsx'te bu liste boş
+ * değilse "Kaydet ve Yayımla" butonu admin bilinçli onay vermeden ÇALIŞMIYOR.
+ */
+export function faz2KullanilmayanVeriTespiti(
+  faz1: Faz1Sonuc, izinliKodlar: string[],
+  faz2Atlar: { no: number; ad: string; teknikSira: number; muhakeme: string }[]
+): KullanilmayanVeriSonuc[] {
+  const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
+  return faz2Atlar
+    .filter((a) => a.teknikSira <= 2)
+    .map((a) => {
+      const r = runnerByNo.get(a.no);
+      const kullanilmayanKodlar: string[] = [];
+      if (r) {
+        for (const kod of izinliKodlar) {
+          if (!veriVarMi(r, kod, faz1)) continue;
+          const num = kod.slice(1);
+          const regex = new RegExp(`(?<!\\d)V${num}(?!\\d)`);
+          if (!regex.test(a.muhakeme)) kullanilmayanKodlar.push(kod);
+        }
+      }
+      return { no: a.no, ad: a.ad, kullanilmayanKodlar };
+    });
+}
+
+export type SiralamaCiftUyarisi = { no: number; ad: string; uyarilar: string[] };
+
+/**
+ * v6.55 — kullanıcı bulgusu 2026-08-04 (Kocaeli 7.Koşu, WOLF SEYFO): sıralama çağrısı,
+ * AYNI V-kodu çifti için bir atı "destek" başka bir atı "risk/risk-nötr" olarak
+ * etiketlese bile, destek etiketli atı daha KÖTÜ sıraya koyabiliyor —
+ * [V10+V12] WOLF SEYFO'da "en yüksek kazanan stille tam örtüşüyor" (destek) yazarken,
+ * TANER ABİ'de aynı çift "nominal eşleşme, güven sınırlı" (risk-nötr) olduğu halde
+ * TANER ABİ 4, WOLF SEYFO 5. sırada kaldı — WOLF SEYFO yarışı kazandı. Elazığ 8 dersinden
+ * (faz2KaliteDenetimi) FARKLI bir hata sınıfı: burada mutlak güç değil, AYNI çift için
+ * atlar ARASI göreceli kıyaslama tutarsızlığı yakalanıyor. Ek Claude çağrısı yapmaz,
+ * tamamen mekanik: her V-kodu çifti için atların etiketlerini karşılaştırır; "destek"
+ * etiketli bir at, AYNI çift için "destek" OLMAYAN etiketli bir attan daha kötü teknik
+ * sıradaysa uyarır. Kod hiçbir şeyi otomatik değiştirmez, karar kullanıcıda kalır.
+ */
+export function faz2SiralamaTutarlilikDenetimi(
+  faz2Atlar: { no: number; ad: string; teknikSira: number; muhakeme: string }[]
+): SiralamaCiftUyarisi[] {
+  type Girdi = { no: number; ad: string; teknikSira: number; destek: boolean; baglam: string };
+  const ciftMap = new Map<string, Girdi[]>();
+  const etiketRegex = /\[V(\d+)\+V(\d+)\]:([a-zçğıöşü-]+)(?:\(([^)]*)\))?/gi;
+
+  for (const a of faz2Atlar) {
+    let m: RegExpExecArray | null;
+    etiketRegex.lastIndex = 0;
+    while ((m = etiketRegex.exec(a.muhakeme))) {
+      const kodA = parseInt(m[1], 10), kodB = parseInt(m[2], 10);
+      const cift = kodA <= kodB ? `V${kodA}+V${kodB}` : `V${kodB}+V${kodA}`;
+      const destek = m[3].toLowerCase().includes("destek");
+      const baglam = m[4] ?? "";
+      if (!ciftMap.has(cift)) ciftMap.set(cift, []);
+      ciftMap.get(cift)!.push({ no: a.no, ad: a.ad, teknikSira: a.teknikSira, destek, baglam });
+    }
+  }
+
+  const uyarilarByNo = new Map<number, Set<string>>();
+  for (const [cift, girdiler] of ciftMap) {
+    const destekliler = girdiler.filter((g) => g.destek);
+    const digerleri = girdiler.filter((g) => !g.destek);
+    for (const d of destekliler) {
+      for (const r of digerleri) {
+        if (d.teknikSira > r.teknikSira) {
+          const set = uyarilarByNo.get(d.no) ?? new Set<string>();
+          set.add(
+            `[${cift}] bu at için "destek" (${d.baglam || "bağlam yok"}) işaretlenmiş ama #${r.no} ${r.ad} için AYNI çift "destek değil" (${r.baglam || "bağlam yok"}) olmasına rağmen sıralamada üstte (${r.teknikSira}. sıra) — sıralama tutarsız olabilir, elle kontrol edin.`
+          );
+          uyarilarByNo.set(d.no, set);
+        }
+      }
+    }
+  }
+
+  return faz2Atlar.map((a) => ({ no: a.no, ad: a.ad, uyarilar: [...(uyarilarByNo.get(a.no) ?? [])] }));
+}
+
+const KARAR_AGIRLIK: Record<string, number> = {
+  "Güçlü Aday": 4,
+  "Düşük Risk": 3,
+  "Orta Risk": 2,
+  "Yüksek Risk": 1,
+};
+
+/**
+ * v6.66 — kullanıcı bulgusu (15 atlı saha, "Neden bozdun analiz motorumuzu"): sıralama
+ * çağrısı, V-kodu çiftlerini ikili ikili karşılaştırırken atın GENEL "karar" kategorisini
+ * (Güçlü Aday/Düşük Risk/Orta Risk/Yüksek Risk) gözden kaçırıp tutarsız bir genel sıra
+ * üretebiliyor (ör. "Güçlü Aday" bir at, açık bir gerekçe olmadan çok sayıda daha zayıf
+ * kategorili atın gerisine düşüyor). Prompt talimatı (bkz. siralamaReminder "GENEL
+ * TUTARLILIK") tek başına yeterli olmayabileceğinden (kullanıcı: "yetersiz kalma
+ * ihtimali ön görüyorsan garantici olmanı istiyorum") bu, PROMPTTAN BAĞIMSIZ, tamamen
+ * mekanik bir son-kontrol — büyük sahalarda (24 at dahil) otomatik ölçeklenir, ek Claude
+ * çağrısı yapmaz, yalnız bilgilendirme amaçlıdır (bloklamaz).
+ */
+export function faz2KararSiraTutarsizlikDenetimi(
+  faz2Atlar: { no: number; ad: string; karar: string; teknikSira: number }[]
+): SiralamaCiftUyarisi[] {
+  const uyarilarByNo = new Map<number, Set<string>>();
+  for (const a of faz2Atlar) {
+    const kendiAgirlik = KARAR_AGIRLIK[a.karar] ?? 2;
+    const gerideBirakan = faz2Atlar.filter(
+      (b) => b.no !== a.no && (KARAR_AGIRLIK[b.karar] ?? 2) < kendiAgirlik && b.teknikSira < a.teknikSira
+    );
+    if (gerideBirakan.length >= 3) {
+      const set = uyarilarByNo.get(a.no) ?? new Set<string>();
+      set.add(
+        `"${a.karar}" kararı verilmiş ama ${gerideBirakan.length} tane daha zayıf kategorili at (${gerideBirakan
+          .slice(0, 3)
+          .map((b) => `#${b.no} ${b.ad} (${b.karar})`)
+          .join(", ")}${gerideBirakan.length > 3 ? "..." : ""}) sıralamada önünde — karar/sıra tutarsız olabilir, elle kontrol edin.`
+      );
+      uyarilarByNo.set(a.no, set);
+    }
+  }
+  return faz2Atlar.map((a) => ({ no: a.no, ad: a.ad, uyarilar: [...(uyarilarByNo.get(a.no) ?? [])] }));
+}
+
 export type BankoAdayiSonuc = {
   bankoAdayi: boolean;
   sebep: string;
@@ -409,12 +559,264 @@ export function faz2BankoAdayiTespit(
  * olması gerekiyor — karar her zaman en az bir etiket garanti eder.
  */
 export function faz2PickDetaylari(karar: string, muhakeme: string): string[] {
-  const etiketler = [...muhakeme.matchAll(/\[V\d+\+V\d+\][^|]*/g)].map((m) => m[0].trim());
-  return [`Karar: ${karar}`, ...etiketler.slice(0, 5)];
+  const etiketler = [...muhakeme.matchAll(/\[V\d+(?:\+V\d+)?\][^|]*/g)].map((m) => m[0].trim());
+  // v6.66 — kullanıcı bulgusu (MELONCITTO, Kocaeli 6.Koşu): sabit slice(0,5) kesmesi,
+  // Claude kendi 5 etiketini yazdıktan SONRA eklenen kod-garantili etiketleri (V1/V4/V12/
+  // V19 vb., hepsi sona eklenir) sessizce görünürden düşürüyordu — V19 (son yarışı
+  // kazandı) bu yüzden admin ekranında hiç görünmedi. Kod-garantili etiketler ASLA
+  // kesilmez, geri kalan yer Claude'un kendi etiketleriyle doldurulur.
+  const garantili = etiketler.filter((e) => e.includes("KOD-GARANTİSİ"));
+  const digerleri = etiketler.filter((e) => !e.includes("KOD-GARANTİSİ"));
+  const secili = [...garantili, ...digerleri.slice(0, Math.max(5, 8 - garantili.length))];
+  return [`Karar: ${karar}`, ...secili];
+}
+
+/**
+ * v6.56 — kullanıcı bulgusu 2026-08-04 (STARŞAH, Kocaeli 8.Koşu): sınıf geçişi (SKK
+ * farkı) Faz1'de HER ZAMAN hesaplanıyor (classToSkk) ama Claude muhakemede bunu
+ * atlayabiliyordu — STARŞAH KV-6(SKK 6)'dan Şartlı 5(SKK 4)'e 2 kademe düşmüştü, hiç
+ * değerlendirilmedi, sonuçta yarışı kazandı. Kullanıcı kararı net: "muhakemede hiç
+ * geçmemesini kabul etmiyorum, geçmesini sağlaman gerek" — ihtimale/Claude'un seçimine
+ * bırakmak yerine KODUN KENDİSİ bu bilgiyi muhakeme metnine GARANTİLİ olarak ekliyor (ek
+ * Claude çağrısı yok, ücretsiz). Kullanıcı eşik istemedi — SKK farkı 1 bile olsa eklenir.
+ */
+export function faz2SinifGecisEtiketiEkle(
+  muhakeme: string,
+  r: { sinifOnceki: string | null; sinifSkkOnceki: number | null; sinifSkkBugun: number | null }
+): string {
+  if (r.sinifOnceki == null || r.sinifSkkOnceki == null || r.sinifSkkBugun == null) return muhakeme;
+  if (r.sinifSkkBugun < r.sinifSkkOnceki) {
+    return `${muhakeme} | [V14]:destek(sınıf düşüşü: ${r.sinifOnceki}(SKK ${r.sinifSkkOnceki}) → bugün SKK ${r.sinifSkkBugun})`;
+  }
+  if (r.sinifSkkBugun > r.sinifSkkOnceki) {
+    return `${muhakeme} | [V14]:nötr(sınıf yükselişi: ${r.sinifOnceki}(SKK ${r.sinifSkkOnceki}) → bugün SKK ${r.sinifSkkBugun}, dezavantaj sayılmaz)`;
+  }
+  return muhakeme;
+}
+
+/**
+ * v6.57 — kullanıcı kararı 2026-08-04: "her V'yi koda göm" dedi, ama yalnız SAYISAL/
+ * objektif V-kodları (V13 kilo, V14 sınıf, V20 HP ivmesi) için kabul edildi — çok
+ * sinyalli sentez gerektirenler (V2/V9/V16/V19 vb.) [[Sert Koşul Yasak]] ilkesi
+ * gereği Claude'un muhakemesinde kalıyor. WOLF SEYFO vakasında "ağır kilo" sahanın
+ * gerçek ortalamasına göre kalibre edilmeden kullanılmıştı — kiloAvantaji ile AYNI
+ * ≥1kg eşiği (kullanıcı onaylı, veri-toplama.ts'te zaten var) kullanılarak simetrik
+ * hale getirildi: ≥1kg hafif=destek, ≥1kg ağır=risk, arası=nötr. Kod garantili, ek
+ * Claude çağrısı yok.
+ */
+export function faz2KiloKarsilastirmaEtiketiEkle(
+  muhakeme: string,
+  r: { weight: number | null },
+  ortKilo: number | null
+): string {
+  if (r.weight == null || ortKilo == null) return muhakeme;
+  const fark = Math.round((r.weight - ortKilo) * 10) / 10;
+  if (fark <= -1) {
+    return `${muhakeme} | [V13]:destek(sahadaki ortalamadan ${Math.abs(fark)}kg hafif — ${r.weight}kg vs ort ${ortKilo.toFixed(1)}kg)`;
+  }
+  if (fark >= 1) {
+    return `${muhakeme} | [V13]:risk(sahadaki ortalamadan ${fark}kg ağır — ${r.weight}kg vs ort ${ortKilo.toFixed(1)}kg)`;
+  }
+  return `${muhakeme} | [V13]:nötr(sahadaki ortalamaya yakın — ${r.weight}kg vs ort ${ortKilo.toFixed(1)}kg)`;
+}
+
+/**
+ * v6.57 — kullanıcı kararı 2026-08-04: PRENSES MEHLİKA vakasında "HP sabit" (ivme=0)
+ * ile "HP düşüyor" (negatif ivme) birbirine karıştırılmıştı; bunu prompt seviyesinde
+ * netleştirmenin (V_LEGEND) yanı sıra, HP ivmesinin yönü zaten objektif bir sayı
+ * olduğu için doğrudan koda gömülüyor — Claude'un yorumuna bağlı kalmıyor.
+ */
+export function faz2HpIvmeEtiketiEkle(
+  muhakeme: string,
+  r: { hpIvmesi: number | null }
+): string {
+  if (r.hpIvmesi == null) return muhakeme;
+  if (r.hpIvmesi > 0) {
+    return `${muhakeme} | [V20]:destek(HP yükseliyor, ivme +${r.hpIvmesi})`;
+  }
+  if (r.hpIvmesi < 0) {
+    return `${muhakeme} | [V20]:risk(HP geriliyor, ivme ${r.hpIvmesi} — fiziksel gerileme olabilir)`;
+  }
+  return `${muhakeme} | [V20]:nötr(HP sabit, ivme 0 — ne gerileme ne belirgin iyileşme)`;
+}
+
+/**
+ * v6.61 — kullanıcı bulgusu 2026-08-05 (İSPANOZ, İstanbul 3.Koşu): bireysel n=15 GÜÇLÜ
+ * sinyal + popülasyonda 2. sırada (%28) olmasına rağmen muhakeme "nötr-hafif destek"
+ * gibi yumuşatılmış bir etiketle değerlendirip 6. sıraya çekmişti — İSPANOZ kazandı.
+ * Kullanıcı talebi ("yetersiz kalma ihtimali varsa garantici ol"): yalnız V_LEGEND'e
+ * netleştirme yazmak (Claude'un yorumuna bağlı kalır) yetmeyebilir — popülasyon sırası
+ * (pistMesafeStilBreakdown, zaten hesaplanıyor) ve atın kendi örneklemi (tempoVeriN)
+ * İKİSİ de objektif/sayısal olduğu için V13/V14/V20 gibi KODA gömülüyor: at kendi
+ * stiliyle popülasyonun ilk 2 sırasından birinde eşleşiyorsa VE tempoVeriN≥10 ise,
+ * [V10+V12]:destek GARANTİLİ eklenir — Claude'un "hafif/nötr" diye yumuşatması bu
+ * garantili etiketi SİLEMEZ, yalnız yanına eklenir.
+ */
+export function faz2StilPopulasyonEtiketiEkle(
+  muhakeme: string,
+  r: { raceStyleEtiket: string | null; tempoVeriN: number | null },
+  breakdown: { style: string; percent: number }[] | null
+): string {
+  if (!r.raceStyleEtiket || r.tempoVeriN == null || r.tempoVeriN < 10 || !breakdown) return muhakeme;
+  const ilkIki = breakdown.slice(0, 2);
+  const eslesen = ilkIki.find((b) => b.style === r.raceStyleEtiket);
+  if (!eslesen) return muhakeme;
+  // v6.62 — kullanıcı bulgusu 2026-08-05 (TAM TIME, 10 atlı koşu): V_LEGEND'e eklenen
+  // netlik bazen Claude'un KENDİSİ tarafından zaten doğru uygulanıyor ("n=13≥10,
+  // popülasyonda ilk sıralarda-TAM destek" gibi temiz bir "destek" etiketiyle) — bu
+  // durumda kod GARANTİSİNİ yine de eklemek aynı çifti İKİ KEZ yazdırıp tutarlılık
+  // kontrolünde yanıltıcı/tekrarlı uyarılara yol açıyordu. Artık yalnız Claude'un
+  // kendi etiketi YUMUŞATILMIŞ (temiz "destek" değil) veya HİÇ yoksa ekleniyor —
+  // zaten doğru yazılmışsa dokunulmuyor.
+  const mevcutEtiket = muhakeme.match(/\[V(?:10\+V12|12\+V10)\]:([^|(]*)/i)?.[1]?.trim().toLowerCase();
+  if (mevcutEtiket === "destek") return muhakeme;
+  const sira = breakdown.findIndex((b) => b.style === r.raceStyleEtiket) + 1;
+  return `${muhakeme} | [V10+V12]:destek(KOD-GARANTİSİ: bireysel örneklem n=${r.tempoVeriN}(≥10) + popülasyonda ${sira}. sırada %${eslesen.percent} — bu TAM destek sayılır, yumuşatılmamalı)`;
+}
+
+/** Bir muhakeme metninde, verilen V-kodu çifti (tek veya çift kod, örn. "V4" ya da
+ * "V10+V12") için Claude'un ZATEN temiz bir "destek" yazıp yazmadığını kontrol eder —
+ * yazmışsa kod tekrar eklemez (v6.62 TAM TIME dersi: aynı çifti iki kez yazdırıp
+ * tutarlılık kontrolünü yanıltmamak için). */
+function halihazirdaTemizDestekVarMi(muhakeme: string, kodDeseni: string): boolean {
+  const re = new RegExp(`\\[${kodDeseni}\\]:([^|(]*)`, "i");
+  const etiket = muhakeme.match(re)?.[1]?.trim().toLowerCase();
+  return etiket === "destek";
+}
+
+/**
+ * v6.63 — kullanıcı bulgusu 2026-08-05 (ANSHBA SKY, İstanbul 5.Koşu Maiden): atın son
+ * yarışını AYNI jokeyle koştuğu (jockeyChanged=false) olumlu bir sinyaldir ama Claude
+ * muhakemede hiç değinmeyebiliyordu — ANSHBA SKY'de tam olarak bu oldu (muhakeme
+ * tamamen boştu), at yine de kazandı. jockeyChanged zaten temiz bir boolean olduğu
+ * için (V13/V14/V20 gibi) doğrudan koda gömülüyor.
+ */
+export type Top3TerfiSonuc = { no: number; ad: string; eskiSira: number; yeniSira: number };
+
+// route.ts'teki TestV2Pick ile aynı şekil — döngüsel import'tan kaçınmak için burada
+// yerel bir tip takma adı olarak tekrarlanıyor.
+type TeknikSiraliAt = { no: number; ad: string; karar: string; muhakeme: string; teknikSira: number };
+
+/**
+ * v6.64 — kullanıcı kararı 2026-08-05 (DAELLA, kazandı ama 5. sıradaydı): "bunları
+ * sistem ilk 3'e almalı diyorum ben değil" — DAELLA'nın [V10+V12] etiketi Claude
+ * tarafından ZATEN doğru "destek" yazılmıştı (sahanın #1 tarihsel kazanan stili,
+ * ÖnGrupArkası%37) ama sıralama çağrısı yine de onu 5. sıraya koydu. Yalnız EN SIKI
+ * koşulda çalışır (sahanın #1 stili + n≥10 gerçek örneklem + atın kendi kararı
+ * "Yüksek Risk" DEĞİL) — yanlış pozitif riskini en aza indirmek için, kullanıcı onayı
+ * (2026-08-05, iki seçenekten "en sıkı" olanı seçildi). Bu bir etiket EKLEMEK değil,
+ * doğrudan teknikSira'yı DEĞİŞTİRMEK — bugüne kadarki en güçlü müdahale, bu yüzden
+ * her terfi hem muhakeme metnine görünür şekilde eklenir hem admin panelinde ayrıca
+ * listelenir (şeffaflık, kör bir kural gibi sessizce çalışmaz).
+ */
+export function faz2Top3Garantisi(
+  atlar: TeknikSiraliAt[],
+  faz1: Faz1Sonuc
+): { atlar: TeknikSiraliAt[]; terfiler: Top3TerfiSonuc[] } {
+  const breakdown = faz1.race.pistMesafeStilBreakdown;
+  if (!breakdown || breakdown.length === 0 || atlar.length <= 3) return { atlar, terfiler: [] };
+  const topStyle = breakdown[0].style;
+  const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
+
+  function nitelikliMi(a: TeknikSiraliAt): boolean {
+    const r = runnerByNo.get(a.no);
+    if (!r || r.raceStyleEtiket !== topStyle) return false;
+    if (r.tempoVeriN == null || r.tempoVeriN < 10) return false;
+    if (a.karar === "Yüksek Risk") return false;
+    return true;
+  }
+
+  const sirali = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
+  const terfiEdecekler = sirali.slice(3).filter(nitelikliMi);
+  if (terfiEdecekler.length === 0) return { atlar, terfiler: [] };
+
+  const orijinalTop3 = sirali.slice(0, 3);
+  // v6.64 düzeltme: terfi eden at "ilk 3'e girsin" demekti, "1. sıraya fırlasın" değil —
+  // korunan orijinal top-3 üyeleri ÖNCE (kendi göreceli sırasıyla), terfi edenler
+  // SONRA (yalnız boşalan alt sıra(lar)ı doldurarak) ekleniyor.
+  const yeniTop3 = terfiEdecekler.length >= 3
+    ? terfiEdecekler.slice(0, 3)
+    : [...orijinalTop3.slice(0, 3 - terfiEdecekler.length), ...terfiEdecekler];
+  const yeniTop3Nos = new Set(yeniTop3.map((a) => a.no));
+  const kalan = sirali.filter((a) => !yeniTop3Nos.has(a.no));
+  const yeniSiraliListe = [...yeniTop3, ...kalan];
+
+  const terfiler: Top3TerfiSonuc[] = terfiEdecekler
+    .filter((a) => yeniTop3Nos.has(a.no))
+    .map((a) => ({ no: a.no, ad: a.ad, eskiSira: a.teknikSira, yeniSira: yeniSiraliListe.findIndex((x) => x.no === a.no) + 1 }));
+
+  const yeniAtlar = yeniSiraliListe.map((a, i) => {
+    const terfi = terfiler.find((t) => t.no === a.no);
+    const teknikSira = i + 1;
+    if (!terfi) return { ...a, teknikSira };
+    return {
+      ...a,
+      teknikSira,
+      muhakeme: `${a.muhakeme} | [SİSTEM]:KOD-GARANTİSİ ilk 3'e terfi (eski sıra ${terfi.eskiSira} → ${teknikSira}) — sahanın #1 tarihsel kazanan stiliyle n≥10 gerçek örneklemle eşleşiyor, kendi kararı Yüksek Risk değil (DAELLA dersi, 2026-08-05).`,
+    };
+  });
+
+  return { atlar: yeniAtlar, terfiler };
+}
+
+export function faz2AyniJokeyEtiketiEkle(
+  muhakeme: string,
+  r: { jockeyChanged: boolean; ilkStart: boolean }
+): string {
+  if (r.ilkStart || r.jockeyChanged) return muhakeme;
+  if (halihazirdaTemizDestekVarMi(muhakeme, "V4")) return muhakeme;
+  return `${muhakeme} | [V4]:destek(KOD-GARANTİSİ: son yarışını aynı jokeyle koştu, süreklilik olumlu)`;
+}
+
+/**
+ * v6.63 — kullanıcı bulgusu 2026-08-05 (ANSHBA SKY): Maiden koşularda atların kendi
+ * yarış geçmişi yok, pedigri (V1) neredeyse TEK objektif sinyal — ANSHBA SKY'nin
+ * babası (NATIVE KHAN, 50 start %28, sahadaki EN İYİ pedigri istatistiği) muhakemede
+ * hiç geçmemişti, at 4. sıraya düşürüldü ve kazandı. Aygırın kazanma yüzdesi
+ * (sireKazanmaOrani) zaten hesaplanıyor — sahadaki EN İYİ (ve gerçek örneklemli, n≥20)
+ * pedigriye sahip atlar için garantili ekleniyor.
+ */
+export function faz2PedigriKarsilastirmaEtiketiEkle(
+  muhakeme: string,
+  r: { sireKazanmaOrani: number | null; sireOrneklemKendiVeri: number | null },
+  sahaEnIyiKYuzde: number | null
+): string {
+  if (r.sireKazanmaOrani == null || r.sireOrneklemKendiVeri == null) return muhakeme;
+  if (r.sireOrneklemKendiVeri < 20) return muhakeme;
+  if (sahaEnIyiKYuzde == null || r.sireKazanmaOrani < sahaEnIyiKYuzde) return muhakeme;
+  if (halihazirdaTemizDestekVarMi(muhakeme, "V1")) return muhakeme;
+  return `${muhakeme} | [V1]:destek(KOD-GARANTİSİ: aygırın sahadaki EN İYİ kazanma yüzdesi — %${r.sireKazanmaOrani}(n=${r.sireOrneklemKendiVeri}, gerçek örneklem))`;
+}
+
+/**
+ * v6.65 — kullanıcı bulgusu 2026-08-05 (ARASİNKO): form dizisinin TAMAMI (V19'un
+ * "hangi kiloda alındı" senteziyle) sentez gerektirir, kod tarafından hesaplanamaz —
+ * ama "en son yarışını kazandı mı" tek başına objektif/basit bir gerçek (form
+ * dizisinin en SAĞ karakteri — soldan sağa eskiden yeniye, bkz. formYonu yorumu).
+ * ARASİNKO'nun formu "11" (son 2 yarışını da kazanmış) hiç muhakemede geçmemişti —
+ * kullanıcı talebi: "kaçırmaması için güvenlik önlemi al hemen kalıcı olarak".
+ * Yalnız EN SON yarışın kazanılıp kazanılmadığını garanti eder — daha geniş form
+ * yorumu (kaç yarış, hangi kiloda) hâlâ Claude'un muhakemesinde kalır.
+ */
+export function faz2SonYarisKazandiEtiketiEkle(
+  muhakeme: string,
+  r: { recentForm: string | null }
+): string {
+  if (!r.recentForm) return muhakeme;
+  const chars = r.recentForm.split("").filter((c) => /[\dK]/i.test(c));
+  const son = chars.at(-1);
+  if (son !== "1") return muhakeme;
+  if (halihazirdaTemizDestekVarMi(muhakeme, "V19")) return muhakeme;
+  return `${muhakeme} | [V19]:destek(KOD-GARANTİSİ: son yarışını kazandı — form dizisi ${r.recentForm})`;
 }
 
 export function kosuBaslikUret(faz1: Faz1Sonuc, izinliKodlar: string[]): string {
-  const kacakSayisi = faz1.runners.filter((r) => r.raceStyleEtiket === "Kaçak At").length;
+  // v6.61 — kullanıcı bulgusu 2026-08-05: raceStyleEtiket gerçek değeri "Kaçak At"
+  // (Türkçe görünen etiket) DEĞİL, ham enum "KACAK_AT" — bu karşılaştırma HER ZAMAN
+  // false dönüyordu, yani Claude'a gönderilen "Kaçak sayısı" başlık satırı gerçek
+  // sahadan bağımsız olarak her koşuda 0 gösteriliyordu. Aynı hata test-v2-engine/
+  // route.ts'te de vardı, orada da düzeltildi.
+  const kacakSayisi = faz1.runners.filter((r) => r.raceStyleEtiket === "KACAK_AT").length;
   const izin = new Set(izinliKodlar);
   const satirlar = [
     `## KOŞU`,

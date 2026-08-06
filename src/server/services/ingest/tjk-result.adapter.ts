@@ -21,7 +21,7 @@ async function fetchHtml(url: string): Promise<string> {
   return body.text();
 }
 
-export type ResultRow = { rank: number; no: number; name: string; ganyan?: number; jockey?: string; time?: string; fark?: string };
+export type ResultRow = { rank: number; no: number; name: string; ganyan?: number; jockey?: string; time?: string; fark?: string; gecCikis?: string };
 export type CityRaceResult = { raceNo: number; rows: ResultRow[] };
 
 export async function fetchCityResults(
@@ -86,8 +86,13 @@ export async function fetchCityResults(
 
       const time = $(".gunluk-GunlukYarisSonuclari-Derece", row).first().text().trim() || undefined;
       const fark = $(".gunluk-GunlukYarisSonuclari-Fark", row).first().text().trim() || undefined;
+      // "Geç Çıkış" (G. Çık.) — TJK'nın kendi resmi tespiti: at start'ta geç kalktıysa kaç
+      // boy geriden kalktığı burada yazıyor (örn. "3 Boy"), geç kalkmadıysa hücre boş.
+      // Kullanıcı talebi 2026-08-01: "start sorunu olan atları tespit edebilir miyiz" —
+      // bu alan TJK'da zaten vardı, biz şimdiye kadar hiç kaydetmiyorduk.
+      const gecCikis = $(".gunluk-GunlukYarisSonuclari-GecCikis", row).first().text().trim() || undefined;
 
-      rows.push({ rank, no, name, ganyan: isNaN(ganyan as number) ? undefined : ganyan, jockey, time, fark });
+      rows.push({ rank, no, name, ganyan: isNaN(ganyan as number) ? undefined : ganyan, jockey, time, fark, gecCikis });
     });
 
     if (rows.length > 0) {

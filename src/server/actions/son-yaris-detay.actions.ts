@@ -3,26 +3,8 @@
 import { db } from "@/lib/db";
 import { fetchTjkAtKosuBilgileri, type TjkAtKosuRow } from "@/server/services/ingest/tjk-at-performans.adapter";
 import { isSameJockey } from "@/components/program/panels/galop-helpers";
-
-// bkz. equipment.actions.ts — aynı kod tablosu ve K/SK aile mantığı (kulaklığın koşu boyunca
-// vs. yalnız starta kadar kullanımı, ayrı ayrı eklenen/çıkarılan sayılmamalı).
-const EQUIPMENT_LABELS: Record<string, string> = {
-  K: "Kulaklık",
-  KG: "Kapalı Gözlük",
-  DB: "Dil Bağı",
-  SK: "Starta Kadar Kulaklık",
-  GKR: "Göz Koruyucu",
-};
-const EQUIPMENT_FAMILY: Record<string, string> = { K: "KULAKLIK", SK: "KULAKLIK" };
-function familyOf(code: string): string {
-  return EQUIPMENT_FAMILY[code] ?? code;
-}
-function labelFor(code: string): string {
-  return EQUIPMENT_LABELS[code] ?? code;
-}
-function toCodes(raw: string | null): string[] {
-  return (raw ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-}
+import { familyOf, labelFor, toCodes } from "@/lib/equipment-family";
+import { tjkTarihOncesiMi } from "@/lib/tjk-date";
 
 function parseTjkDate(d: string): number {
   const [dd, mm, yyyy] = d.split(".").map(Number);
@@ -93,9 +75,10 @@ export type SonYarisDetay = {
  * - Takı: bugünkü program (Runner.equipment) vs atın TJK'daki EN SON koşusundaki takı.
  * - Kilo Değişimi: bugünkü kilo − TJK'daki en son koşudaki kilo.
  * - Aynı Jokey: bugünkü jokey === TJK'daki en son koşudaki jokey (soyadı bazlı, bkz. isSameJockey).
- * - Kazandı / En İyi Derecesi: atın bu hipodrom + bu mesafe + bu pist tipinde (TÜM yıllar,
- *   kullanıcı onayı) TJK'daki tüm geçmişinden — Karşılaştır panelinden farklı olarak yıl
- *   sınırı YOK (kullanıcı: "bu hipodrom+mesafe+pist bugünküyle birebir aynı" — yıl belirtmedi).
+ * - Kazandı / En İyi Derecesi: atın bu hipodrom + bu mesafe + bu pist tipinde, KOŞUNUN
+ *   KENDİ YILI içinde (Aynı Pist/Mesafe paneliyle aynı yıl kısıtı, kullanıcı talebi
+ *   2026-07-26: "tüm yıllar değil 2026 olacak") — eski yılların derecesi bugünün pist/at
+ *   kondisyonunu yansıtmadığından karşılaştırmaya dahil edilmez.
  */
 export async function getSonYarisDetaylariForRace(raceId: string): Promise<SonYarisDetay[]> {
   const race = await db.race.findUnique({
@@ -112,6 +95,7 @@ export async function getSonYarisDetaylariForRace(raceId: string): Promise<SonYa
   const hippodromeName = race.raceDay.hippodrome.name.trim();
   const surfacePrefix = SURFACE_PREFIX[race.surface] ?? "";
   const hipodromMesafeEtiket = `${hippodromeName} ${race.distance}m`;
+  const raceYear = race.raceDay.date.getUTCFullYear().toString();
 
   return Promise.all(
     race.runners.map(async (r): Promise<SonYarisDetay> => {
@@ -126,7 +110,9 @@ export async function getSonYarisDetaylariForRace(raceId: string): Promise<SonYa
       }
 
       try {
-        const history = await fetchTjkAtKosuBilgileri(r.tjkAtId);
+        // bkz. tjk-date.ts — bu koşu bittiyse (analiz sonradan tekrar çalıştırıldıysa) TJK'nın
+        // az önce güncellediği profildeki BUGÜNKÜ VE SONRAKİ satırlar "geçmiş" sayılıp dışlanır.
+        const history = (await fetchTjkAtKosuBilgileri(r.tjkAtId)).filter((row) => tjkTarihOncesiMi(row.date, race.raceDay.date));
         const last = mostRecent(history);
 
         let eklenenTaki: EquipmentItem[] = [];
@@ -150,6 +136,7 @@ export async function getSonYarisDetaylariForRace(raceId: string): Promise<SonYa
 
         const exact = history.filter(
           (row) =>
+            row.year === raceYear &&
             row.city.includes(hippodromeName) &&
             row.distance === race.distance &&
             (surfacePrefix === "" || row.surface.startsWith(surfacePrefix))

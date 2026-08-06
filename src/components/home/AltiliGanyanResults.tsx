@@ -1,18 +1,20 @@
+import { useTranslations } from "next-intl";
 import type { AltiliCityResult } from "@/server/services/ingest/tjk-altili.adapter";
 
 type Props = { results: AltiliCityResult[] };
 
 export default function AltiliGanyanResults({ results }: Props) {
+  const t = useTranslations("home.altili");
   if (results.length === 0) return null;
   const cities = results.filter((c) => c.groups.some((g) => g.rows.length > 0));
   if (cities.length === 0) return null;
 
   return (
-    <section className="border-t px-4 py-10">
+    <section className="border-t px-4 py-10" data-tour="altili-sonuclari">
       <div className="mx-auto max-w-7xl">
         <div className="mb-5 flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-brand animate-pulse" />
-          <h2 className="text-lg font-semibold">Altılı Ganyan Sonuçları</h2>
+          <h2 className="text-lg font-semibold">{t("title")}</h2>
         </div>
 
         <div className="space-y-10">
@@ -31,11 +33,11 @@ export default function AltiliGanyanResults({ results }: Props) {
                             </th>
                           </tr>
                           <tr className="border-b bg-muted/30">
-                            <th className="px-2 py-1.5 sm:px-3 text-center font-medium text-muted-foreground whitespace-nowrap w-10">Koşu</th>
-                            <th className="px-2 py-1.5 sm:px-3 text-left font-medium text-muted-foreground whitespace-nowrap">At İsmi</th>
-                            <th className="px-2 py-1.5 sm:px-3 text-right font-medium text-muted-foreground whitespace-nowrap">Derece</th>
-                            <th className="px-2 py-1.5 sm:px-3 text-right font-medium text-muted-foreground whitespace-nowrap">Ganyan</th>
-                            <th className="px-2 py-1.5 sm:px-3 text-right font-medium text-muted-foreground whitespace-nowrap">AGF(GR)</th>
+                            <th className="px-2 py-1.5 sm:px-3 text-center font-medium text-muted-foreground whitespace-nowrap w-10">{t("kosu")}</th>
+                            <th className="px-2 py-1.5 sm:px-3 text-left font-medium text-muted-foreground whitespace-nowrap">{t("atIsmi")}</th>
+                            <th className="px-2 py-1.5 sm:px-3 text-right font-medium text-muted-foreground whitespace-nowrap">{t("derece")}</th>
+                            <th className="px-2 py-1.5 sm:px-3 text-right font-medium text-muted-foreground whitespace-nowrap">{t("ganyan")}</th>
+                            <th className="px-2 py-1.5 sm:px-3 text-right font-medium text-muted-foreground whitespace-nowrap">{t("agf")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -54,7 +56,7 @@ export default function AltiliGanyanResults({ results }: Props) {
                     <div className="border-t bg-muted/20 px-3 py-2 text-xs">
                       {group.payout
                         ? <p className="text-muted-foreground leading-snug">{group.payout}</p>
-                        : <p className="text-muted-foreground">Dağıtım bilgisi bekleniyor…</p>
+                        : <p className="text-muted-foreground">{t("dagitimBekleniyor")}</p>
                       }
                       {group.ikramiye && (
                         <p className="mt-1 font-semibold text-hit">{group.ikramiye}</p>

@@ -29,6 +29,13 @@ export const passwordResetLimiter = createRateLimiter(3, "1 h");
 // 3 e-posta doğrulama (tekrar gönder) isteği saatte, IP başına
 export const emailVerificationLimiter = createRateLimiter(3, "1 h");
 
+// Kayıt doğrulama KODU gönderimi (ilk gönderim + "tekrar gönder") — saatte 5, IP başına.
+export const registrationCodeSendLimiter = createRateLimiter(5, "1 h");
+
+// Kayıt doğrulama kodu DENEME limiti — 6 haneli kodu kaba kuvvetle denemeyi zorlaştırmak
+// için 10 dakikada 10 deneme, IP başına.
+export const registrationCodeVerifyLimiter = createRateLimiter(10, "10 m");
+
 // Halka açık analiz/tahmin sayfaları (program, kosular, analizler, tahmin-onerileri,
 // istatistik) ve /api/muhtemeller için — yazılım/bot ile toplu veri çekmeyi (scraping)
 // caydırmak amacıyla. 40 istek/10sn normal bir kullanıcının hızlı gezinmesine (birden

@@ -2,16 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Menu, Bookmark, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
+import LocaleToggle from "./LocaleToggle";
 
 type FollowedHorse = { horseName: string; note?: string | null };
 type Props = { isLoggedIn?: boolean; followedHorses?: FollowedHorse[] };
 
 export default function MobileNav({ isLoggedIn, followedHorses = [] }: Props) {
+  const t = useTranslations("mobileNav");
   const [horsesOpen, setHorsesOpen] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -20,7 +23,7 @@ export default function MobileNav({ isLoggedIn, followedHorses = [] }: Props) {
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="md:hidden">
           <Menu className="h-5 w-5" />
-          <span className="sr-only">Menü</span>
+          <span className="sr-only">{t("menu")}</span>
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-64">
@@ -37,28 +40,28 @@ export default function MobileNav({ isLoggedIn, followedHorses = [] }: Props) {
             onClick={() => setOpen(false)}
             className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           >
-            Yarış Programı
+            {t("program")}
           </Link>
           <Link
-            href="/rotaganyanpuantablosu"
+            href="/rotaganyansiralamasi"
             onClick={() => setOpen(false)}
             className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           >
-            Rotaganyan Puan Tablosu
+            {t("puanTablosu")}
           </Link>
           <Link
             href="/altili"
             onClick={() => setOpen(false)}
             className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           >
-            Altılı Ne Verir?
+            {t("altiliNeVerir")}
           </Link>
           <Link
             href="/tahmin-onerileri"
             onClick={() => setOpen(false)}
             className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           >
-            Banko Önerileri
+            {t("bankoOnerileri")}
           </Link>
 
           {isLoggedIn && followedHorses.length > 0 && (
@@ -69,7 +72,7 @@ export default function MobileNav({ isLoggedIn, followedHorses = [] }: Props) {
               >
                 <span className="flex items-center gap-2">
                   <Bookmark className="h-4 w-4 text-brand" />
-                  Takip Atlarım
+                  {t("takipAtlarim")}
                   <span className="rounded-full bg-brand/15 px-1.5 py-0.5 text-[10px] font-semibold text-brand">
                     {followedHorses.length}
                   </span>
@@ -98,12 +101,19 @@ export default function MobileNav({ isLoggedIn, followedHorses = [] }: Props) {
                       "mt-1 block rounded-md px-2 py-1.5 text-xs font-medium text-brand hover:bg-brand/10"
                     )}
                   >
-                    Tümünü gör →
+                    {t("tumunuGor")}
                   </Link>
                 </div>
               )}
             </div>
           )}
+
+          <div className="border-t pt-4 pb-3">
+            <div className="flex items-center justify-between gap-2 rounded-md border px-3 py-2.5">
+              <span className="text-sm font-medium text-muted-foreground">{t("dil")}</span>
+              <LocaleToggle />
+            </div>
+          </div>
 
           <div className="border-t pt-4">
             {isLoggedIn ? (
@@ -113,13 +123,13 @@ export default function MobileNav({ isLoggedIn, followedHorses = [] }: Props) {
                   onClick={() => setOpen(false)}
                   className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 >
-                  Panelim
+                  {t("panelim")}
                 </Link>
                 <button
                   onClick={() => { setOpen(false); signOut({ callbackUrl: "/" }); }}
                   className="w-full rounded-md px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 >
-                  Çıkış Yap
+                  {t("cikisYap")}
                 </button>
               </>
             ) : (
@@ -129,14 +139,14 @@ export default function MobileNav({ isLoggedIn, followedHorses = [] }: Props) {
                   onClick={() => setOpen(false)}
                   className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 >
-                  Giriş Yap
+                  {t("girisYap")}
                 </Link>
                 <Link
                   href="/kayit"
                   onClick={() => setOpen(false)}
                   className="mt-1 block rounded-md bg-brand px-3 py-2.5 text-sm font-semibold text-white hover:bg-brand/90"
                 >
-                  Kayıt Ol
+                  {t("kayitOl")}
                 </Link>
               </>
             )}

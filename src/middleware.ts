@@ -20,6 +20,7 @@ const RATE_LIMITED_PREFIXES = [
   "/tahmin-onerileri",
   "/istatistik",
   "/rotaganyanpuantablosu",
+  "/rotaganyansiralamasi",
   "/api/muhtemeller",
 ];
 
@@ -57,6 +58,7 @@ export const config = {
     "/tahmin-onerileri/:path*",
     "/istatistik/:path*",
     "/rotaganyanpuantablosu/:path*",
+    "/rotaganyansiralamasi/:path*",
     "/api/muhtemeller/:path*",
   ],
 };

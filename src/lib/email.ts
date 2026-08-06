@@ -94,6 +94,34 @@ export async function sendVerificationEmail(email: string, name: string, token: 
   });
 }
 
+export async function sendVerificationCodeEmail(email: string, name: string, code: string) {
+  if (!resend) {
+    console.warn("[email] RESEND_API_KEY not set — skipping email send");
+    return;
+  }
+
+  await resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: `${code} — ROTAGANYAN doğrulama kodunuz`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#15803d">Merhaba ${name}!</h2>
+        <p>ROTAGANYAN'a kayıt olduğunuz için teşekkürler. Hesabınızı aktive etmek için
+        aşağıdaki kodu kayıt ekranına girin.</p>
+        <div style="text-align:center;margin:24px 0">
+          <span style="display:inline-block;padding:16px 32px;background:#f0fdf4;border:2px solid #15803d;border-radius:8px;font-size:32px;font-weight:700;letter-spacing:8px;color:#15803d">
+            ${code}
+          </span>
+        </div>
+        <p style="color:#6b7280;font-size:12px">
+          Bu kod <strong>30 dakika</strong> geçerlidir. Bu kaydı siz oluşturmadıysanız bu e-postayı görmezden gelin.
+        </p>
+      </div>
+    `,
+  });
+}
+
 export async function sendWelcomeEmail(email: string, name: string) {
   if (!resend) return;
 

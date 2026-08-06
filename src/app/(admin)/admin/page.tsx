@@ -18,13 +18,12 @@ import PendingList from "@/components/admin/PendingList";
 import AdminRefresh from "@/components/admin/AdminRefresh";
 import ClaudeBudgetWidget from "@/components/admin/ClaudeBudgetWidget";
 import ArchiveStatsWidget from "@/components/admin/ArchiveStatsWidget";
-import AnalizSureMaliyetTablosu from "@/components/admin/AnalizSureMaliyetTablosu";
-import { getClaudeBudget, getAnalysisRuns } from "@/server/actions/claude-budget.actions";
+import { getClaudeBudget } from "@/server/actions/claude-budget.actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
-  const [stats, analyst, recentPredictions, pendingPredictions, raceStyleStats, claudeBudget, archiveStats, agfEdge, analysisRuns] = await Promise.all([
+  const [stats, analyst, recentPredictions, pendingPredictions, raceStyleStats, claudeBudget, archiveStats, agfEdge] = await Promise.all([
     getDashboardStats(),
     getAnalystStats(),
     getRecentPredictions(16),
@@ -33,7 +32,6 @@ export default async function AdminDashboard() {
     getClaudeBudget(),
     getArchiveStats(),
     getAgfEdgeStats(),
-    getAnalysisRuns(20),
   ]);
 
   const hasData = analyst.overall.total > 0;
@@ -92,9 +90,6 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
-      {/* ── Analiz Süre & Maliyet ──────────────────────────────────── */}
-      <AnalizSureMaliyetTablosu runs={analysisRuns} />
-
       {/* ── Son Tahminler Akışı ────────────────────────────────────── */}
       <RecentFeed predictions={recentPredictions} />
 
@@ -133,6 +128,17 @@ export default async function AdminDashboard() {
                 limit={8}
               />
             </div>
+
+            {/* v6.60 — "Bu Koşu Tipinde Kazananlar" panelinin aynı hipodrom+pist+mesafe
+                kovasına göre kendi isabet oranımız (n≥3) — hangi TAM kombinasyonda
+                güçlü/zayıf olduğumuzu ayrı ayrı kırılımlardan daha net gösterir. */}
+            {analyst.byRaceTypeBucket.length > 0 && (
+              <PerformanceBreakdown
+                title="Hipodrom+Pist+Mesafe Kombinasyonuna Göre (n≥3)"
+                rows={analyst.byRaceTypeBucket}
+                limit={10}
+              />
+            )}
 
             <CouponTierChart rows={analyst.couponTierByClassType} />
 

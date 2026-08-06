@@ -2,6 +2,7 @@
 
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslations } from "next-intl";
 import { registerSchema, type RegisterInput } from "@/lib/validations/auth";
 import { registerUser } from "@/server/actions/auth.actions";
 import { signIn } from "next-auth/react";
@@ -13,13 +14,22 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import VerifyCodeForm from "./dogrula/VerifyCodeForm";
 
 const FIELD_LABEL = "text-xs font-semibold uppercase tracking-wide text-muted-foreground";
 
 export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) {
+  const t = useTranslations("auth.kayit");
   const [serverError, setServerError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  // v2026-07-31 — kullanıcı talebi: "aktivasyon kodu girildiğinde tekrar şifre girmesin,
+  // kullanıcı direk siteye bağlansın". Kayıt formu artık 2 adımlı TEK bileşen (sayfa
+  // değişmez) — şifre yalnız bu bileşenin hafızasında kalır (hiçbir yere gönderilmez/
+  // saklanmaz), kod doğrulanır doğrulanmaz aynı şifreyle sessizce signIn çağrılır.
+  // /kayit/dogrula bağımsız sayfası (ör. daha sonra doğrulanmamış hesapla giriş denemesi)
+  // hâlâ ayrıca var — orada şifre elde olmadığı için kullanıcı bir kez daha girer.
+  const [registeredData, setRegisteredData] = useState<{ email: string; password: string } | null>(null);
+  const [connecting, setConnecting] = useState(false);
   const router = useRouter();
 
   const {
@@ -41,55 +51,61 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
       setServerError(res.error);
       return;
     }
-    setSuccess(true);
-    // Kayıt sonrası tekrar e-posta/şifre girmek zorunda kalmasın — direkt oturum açılır.
+    setRegisteredData({ email: data.email, password: data.password });
+  }
+
+  async function handleVerified() {
+    if (!registeredData) return;
+    setConnecting(true);
     const signInResult = await signIn("credentials", {
-      email: data.email,
-      password: data.password,
+      email: registeredData.email,
+      password: registeredData.password,
       redirect: false,
     });
+    setConnecting(false);
     if (signInResult?.error) {
-      // Otomatik giriş başarısız olursa (beklenmedik durum) giriş ekranına yönlendir.
-      const dest = callbackUrl ? `/giris?callbackUrl=${encodeURIComponent(callbackUrl)}` : "/giris";
-      router.push(dest);
+      // Beklenmedik durum — otomatik giriş başarısız olursa güvenli şekilde giriş ekranına yönlendir.
+      router.push(`/giris?dogrulandi=1&email=${encodeURIComponent(registeredData.email)}`);
       return;
     }
     router.push(callbackUrl || "/program");
     router.refresh();
   }
 
-  if (success) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-6 text-center">
-        <CheckCircle2 className="h-10 w-10 text-hit" />
-        <p className="font-medium">Hesabınız oluşturuldu!</p>
-        <p className="text-sm text-muted-foreground">Siteye yönlendiriliyorsunuz…</p>
-      </div>
-    );
+  if (registeredData) {
+    if (connecting) {
+      return (
+        <div className="flex flex-col items-center gap-3 py-6 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-brand" />
+          <p className="text-sm text-muted-foreground">{t("baglaniyor")}</p>
+        </div>
+      );
+    }
+    return <VerifyCodeForm email={registeredData.email} onVerified={handleVerified} />;
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div className="space-y-1.5">
-        <Label htmlFor="name" className={FIELD_LABEL}>Ad Soyad</Label>
+        <Label htmlFor="name" className={FIELD_LABEL}>{t("adSoyad")}</Label>
         <Input id="name" autoComplete="name" {...register("name")} />
         {errors.name && <p className="text-xs text-miss">{errors.name.message}</p>}
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="email" className={FIELD_LABEL}>E-posta</Label>
+        <Label htmlFor="email" className={FIELD_LABEL}>{t("eposta")}</Label>
         <Input id="email" type="email" autoComplete="email" {...register("email")} />
         {errors.email && <p className="text-xs text-miss">{errors.email.message}</p>}
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="password" className={FIELD_LABEL}>Şifre</Label>
+        <Label htmlFor="password" className={FIELD_LABEL}>{t("sifre")}</Label>
         <PasswordInput id="password" autoComplete="new-password" {...register("password")} />
         {errors.password && <p className="text-xs text-miss">{errors.password.message}</p>}
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="confirmPassword" className={FIELD_LABEL}>Şifre Tekrar</Label>
+        <Label htmlFor="confirmPassword" className={FIELD_LABEL}>{t("sifreTekrar")}</Label>
         <PasswordInput id="confirmPassword" autoComplete="new-password" {...register("confirmPassword")} />
         {errors.confirmPassword && (
           <p className="text-xs text-miss">{errors.confirmPassword.message}</p>
@@ -112,7 +128,7 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
               )}
             />
             <Label htmlFor="ageConfirmed" className="text-xs font-semibold uppercase tracking-wide leading-relaxed text-foreground">
-              18 yaşından büyüğüm
+              {t("yasConfirm")}
             </Label>
           </div>
           {errors.ageConfirmed && <p className="text-xs text-miss">{errors.ageConfirmed.message}</p>}
@@ -133,10 +149,13 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
               )}
             />
             <Label htmlFor="acceptTerms" className="text-xs font-semibold uppercase tracking-wide leading-relaxed text-foreground">
-              <Link href="/kullanim-kosullari" target="_blank" className="text-brand underline">
-                Kullanım Koşullarını
-              </Link>
-              {" "}kabul ediyorum
+              {t.rich("acceptTerms", {
+                link: (chunks) => (
+                  <Link href="/kullanim-kosullari" target="_blank" className="text-brand underline">
+                    {chunks}
+                  </Link>
+                ),
+              })}
             </Label>
           </div>
           {errors.acceptTerms && <p className="text-xs text-miss">{errors.acceptTerms.message}</p>}
@@ -149,7 +168,7 @@ export default function RegisterForm({ callbackUrl }: { callbackUrl?: string }) 
 
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-        Kayıt Ol
+        {t("kayitOl")}
       </Button>
     </form>
   );

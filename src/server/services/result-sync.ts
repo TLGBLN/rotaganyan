@@ -71,9 +71,13 @@ export async function syncResultsForDate(dateStr: string): Promise<void> {
     const sortedRows = [...raceResult.rows].sort((a, b) => a.rank - b.rank);
     const time = sortedRows[0]?.time ?? null;
     const farklar = sortedRows.slice(0, 5).map((r) => r.fark).filter((f): f is string => !!f).join(", ") || null;
+    // "Geç Çıkış" — TJK'nın kendi start-kalitesi tespiti (kullanıcı talebi 2026-08-01).
+    const gecCikanlar = raceResult.rows
+      .filter((r) => r.gecCikis)
+      .map((r) => ({ no: r.no, name: r.name, fark: r.gecCikis }));
 
     await db.result.create({
-      data: { raceId: race.id, winnerNo, winnerNos, actualOrder, ganyan, time, farklar, hitTop1, hitInCoupon },
+      data: { raceId: race.id, winnerNo, winnerNos, actualOrder, ganyan, time, farklar, hitTop1, hitInCoupon, gecCikanlar: gecCikanlar.length > 0 ? gecCikanlar : undefined },
     });
   }
 }

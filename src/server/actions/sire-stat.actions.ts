@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { parseSireStatBulk } from "@/lib/sire-stat-parser";
-import { breedToIrk, surfaceToPist, mesafeBucket, findSireStat, formatSireStatOzet, normalizeSireName } from "@/lib/sire-stat-match";
+import { breedToIrk, surfaceToPist, mesafeBucket, formatSireStatOzet, normalizeSireName } from "@/lib/sire-stat-match";
 
 export type SireStatFiltre = {
   irk: string;
@@ -69,13 +69,18 @@ export type SireStatOzetSonuc = {
   // minOrneklem kararları için ham örneklem büyüklüğü — eskiden yalnız formatSireStatOzet()'in
   // ürettiği metne gömülüydü ("Start 27" gibi), Claude'un/kodun güvenilir şekilde okuyabileceği
   // ayrı bir sayısal alan yoktu (kullanıcı talebiyle eklendi).
-  ornekHipodromx: number | null; // s.kkKosulan — K/K% başlık istatistiğinin dayandığı koşu sayısı
   ornekKendiVeri: number | null; // own.start — rotaganyan'ın kendi verisindeki start sayısı
+  // v6.63 — kullanıcı bulgusu (ANSHBA SKY): aygırın kazanma yüzdesi zaten hesaplanıyordu
+  // ama yalnız formatSireStatOzet()'in ürettiği metne gömülüydü — sahadaki EN İYİ
+  // pedigriyi koda gömebilmek için ayrı sayısal alan.
+  kYuzde: number | null;
 };
 
 /**
  * Bir koşudaki tüm atların babası için, o koşunun ırk/pist/mesafe kombinasyonuna karşılık
  * gelen aygır istatistiği özetini (varsa) döner — sireNames ile AYNI SIRADA, eşleşmeyenler null.
+ * v6.32: yalnızca SireStatOwn (kendi verimiz) — hipodromx.com kaynaklı SireStat analiz
+ * akışından çıkarıldı (kullanıcı kararı 2026-08-01, bkz. sire-stat-match.ts başlık notu).
  * Race.breed/surface/distance içinde ırk/pist/mesafe kombinasyonu SABİT olduğu için tek bir
  * havuz sorgusu yeterli, at başına ayrı sorgu gerekmiyor.
  */
@@ -88,20 +93,11 @@ export async function getSireStatOzetleriForRace(
   const irk = breedToIrk(breed);
   const pist = surfaceToPist(surface);
   const mesafe = mesafeBucket(distance);
-  const [pool, ownPool] = await Promise.all([
-    db.sireStat.findMany({ where: { irk, filtrePist: pist, filtreMesafe: mesafe } }),
-    db.sireStatOwn.findMany({ where: { irk, pist, mesafe } }),
-  ]);
+  const ownPool = await db.sireStatOwn.findMany({ where: { irk, pist, mesafe } });
   return sireNames.map((name) => {
-    const match = findSireStat(name, pool);
     const ownMatch = name ? ownPool.find((o) => normalizeSireName(o.sireName) === normalizeSireName(name)) ?? null : null;
-    const ornekHipodromx = match?.kkKosulan ?? null;
     const ornekKendiVeri = ownMatch?.start ?? null;
-    if (match) return { ozet: formatSireStatOzet(match, mesafe, pist, ownMatch), ornekHipodromx, ornekKendiVeri };
-    // hipodromx eşleşmesi yok ama kendi verimizde varsa, yalnız kendi veriyle özet göster.
-    const ozet = ownMatch && ownMatch.start >= 3
-      ? `${name} (${pist} ${mesafe}): Kendi verimiz: ${ownMatch.start} start, K% ${ownMatch.kYuzde} (${ownMatch.birinci}/${ownMatch.start})`
-      : null;
-    return { ozet, ornekHipodromx, ornekKendiVeri };
+    const ozet = ownMatch ? formatSireStatOzet(ownMatch, mesafe, pist) : null;
+    return { ozet, ornekKendiVeri, kYuzde: ownMatch?.kYuzde ?? null };
   });
 }

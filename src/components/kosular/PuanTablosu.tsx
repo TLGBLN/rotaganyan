@@ -1,4 +1,5 @@
 import { Lock, Star } from "lucide-react";
+import TargetBadge from "@/components/prediction/TargetBadge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,18 @@ function rankWeight(rank: number): string {
   if (rank <= 3) return "font-semibold";
   if (rank <= 6) return "font-medium";
   return "";
+}
+
+// v6.51 — kullanıcı kararı: V2 motoru (Faz3/sayısal puanlama yok) kaydettiği pick'lerde
+// score HER ZAMAN null — bu durumda ham "—" göstermek yerine Faz2'nin ürettiği "karar"
+// etiketini (details[0] = "Karar: Güçlü Aday" gibi) gösteriyoruz, kullanıcı boş bir
+// hücreyle karşılaşmasın. Eski (Faz3'lü) tahminlerde score dolu olduğu için davranış
+// AYNEN korunuyor, hiçbir şey değişmiyor.
+function puanHucresi(score: number | null, details: unknown): string {
+  if (score != null) return String(score);
+  const list = Array.isArray(details) ? (details as string[]) : [];
+  const karar = list.find((d) => d.startsWith("Karar: "));
+  return karar ? karar.replace("Karar: ", "") : "—";
 }
 
 export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props) {
@@ -132,6 +145,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                               <span className={cn(pick.runner?.scratched && "line-through opacity-50")}>
                                 {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
                               </span>
+                              {isTarget && <TargetBadge className="ml-1 align-middle" />}
                               {pick.runner?.scratched && (
                                 <span className="ml-1 text-[10px] font-semibold text-red-400">Koşmaz</span>
                               )}
@@ -145,7 +159,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                               })()}
                             </td>
                             <td className={cn("px-2 py-1.5 text-center font-mono tabular-nums", textColor, weight)}>
-                              {pick.score ?? "—"}
+                              {puanHucresi(pick.score, pick.details)}
                             </td>
                           </tr>
                         );
@@ -259,6 +273,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                                 <span className={cn(weight, pick.runner?.scratched && "line-through opacity-50")}>
                                   {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
                                 </span>
+                                {isTarget && <TargetBadge className="shrink-0" />}
                                 {pick.runner?.scratched && (
                                   <span className="text-[10px] font-semibold text-red-400">Koşmaz</span>
                                 )}
@@ -282,7 +297,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                                 weight
                               )}
                             >
-                              {pick.score ?? "—"}
+                              {puanHucresi(pick.score, pick.details)}
                             </td>
                           </>
                         );

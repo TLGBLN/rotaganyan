@@ -115,6 +115,14 @@ body {
 /* Satır zebra rengi */
 .race-row-even { background: oklch(0.16 0.038 240); }
 
+/* Tıklama geri bildirimi — her butona (TR/EN dahil) basılınca hissedilir bir
+   "basıldı" tepkisi versin diye tek noktadan tanımlı. transform kullanılan
+   butonlarla (örn. hover:scale) çakışmasın diye yalnız :active anında devrede. */
+button:not(:disabled):active {
+  transform: scale(0.96);
+  transition: transform 0.05s ease-out;
+}
+
 /* ─── Yazdırma ─────────────────────────────────
    Site koyu tema — olduğu gibi yazdırılırsa mürekkep/toner israfı ve
    okunamaz kontrast olur. Yazdırırken açık zemin + koyu metne geçilir;

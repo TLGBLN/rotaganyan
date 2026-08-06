@@ -1,11 +1,13 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 export default function AuthTabs({ active, callbackUrl }: { active: "giris" | "kayit"; callbackUrl?: string }) {
+  const t = useTranslations("auth.tabs");
   const suffix = callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : "";
   const tabs = [
-    { key: "giris" as const, href: `/giris${suffix}`, label: "Giriş Yap" },
-    { key: "kayit" as const, href: `/kayit${suffix}`, label: "Üye Ol" },
+    { key: "giris" as const, href: `/giris${suffix}`, label: t("girisYap") },
+    { key: "kayit" as const, href: `/kayit${suffix}`, label: t("uyeOl") },
   ];
   return (
     <div className="mb-6 flex rounded-lg bg-muted p-1">

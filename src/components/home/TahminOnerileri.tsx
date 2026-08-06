@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import type { KuponOnerisi, KuponStatus } from "@/server/services/race.service";
 import type { AltiliCityResult } from "@/server/services/ingest/tjk-altili.adapter";
 import { findIkramiyeForHippodrome } from "@/lib/altili-match";
@@ -8,7 +9,6 @@ import { cn } from "@/lib/utils";
 
 type Kupon = NonNullable<KuponOnerisi>;
 
-const STATUS_LABEL: Record<KuponStatus, string> = { hit: "Tuttu", miss: "Tutmadı", pending: "Bekliyor" };
 const STATUS_CLASS: Record<KuponStatus, string> = {
   hit: "bg-hit/15 text-hit",
   miss: "bg-miss/15 text-miss",
@@ -31,6 +31,8 @@ function buildTweetText(data: Kupon): string {
 }
 
 function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string | null; isAdmin: boolean }) {
+  const t = useTranslations("home.tahminOnerileri");
+  const STATUS_LABEL: Record<KuponStatus, string> = { hit: t("hit"), miss: t("miss"), pending: t("pending") };
   const visibleVariants = data.variants.filter((v) => v.status !== "miss" && v.filled);
   const [activeKey, setActiveKey] = useState(visibleVariants[0]?.key);
   if (visibleVariants.length === 0) return null;
@@ -50,7 +52,7 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
             className="inline-flex items-center gap-1.5 rounded-md border border-muted-foreground/25 px-2.5 py-1 text-xs font-semibold hover:bg-muted transition-colors"
           >
             <span>𝕏</span>
-            <span>Paylaş</span>
+            <span>{t("paylas")}</span>
           </a>
         )}
       </div>
@@ -82,27 +84,40 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
             style={{ gridTemplateColumns: `repeat(${active.legs.length}, minmax(48px, 1fr))` }}
           >
             {active.legs.map((leg) => {
-              const missed = leg.resulted && !leg.winnerNos.some((n) => leg.nos.includes(n));
+              // v6.35: eküri (coupled entry) yoluyla dolaylı kazanan bir no varsa bu ayak
+              // "kaçtı" sayılmaz — legWon (race.service.ts) ile AYNI mantık burada da uygulanır.
+              const wonDirectlyOrByEkuri = leg.nos.some((n) => leg.winnerNos.includes(n) || n in leg.ekuriWinnerByNo);
+              const missed = leg.resulted && !wonDirectlyOrByEkuri;
               return (
                 <div key={leg.raceNo} className="px-1.5 py-3 text-center">
                   <div className="mb-2 text-[10px] font-medium text-muted-foreground">
-                    {leg.raceNo}. Koşu
+                    {leg.raceNo}. {t("kosuSuffix")}
                   </div>
                   <div className="space-y-1.5 text-sm font-semibold">
-                    {leg.nos.map((no) => (
-                      <div key={no}>
-                        {leg.winnerNos.includes(no) ? (
-                          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-hit text-white text-xs font-bold">
-                            {no}
-                          </span>
-                        ) : (
-                          <span className={missed ? "text-muted-foreground line-through" : undefined}>{no}</span>
-                        )}
-                      </div>
-                    ))}
+                    {leg.nos.map((no) => {
+                      const ekuriWinnerNo = leg.ekuriWinnerByNo[no];
+                      return (
+                        <div key={no}>
+                          {leg.winnerNos.includes(no) ? (
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-hit text-white text-xs font-bold">
+                              {no}
+                            </span>
+                          ) : ekuriWinnerNo != null ? (
+                            <span className="inline-flex items-center gap-1">
+                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-hit text-white text-xs font-bold">
+                                {no}
+                              </span>
+                              <span className="text-[9px] text-hit">({ekuriWinnerNo} eküri)</span>
+                            </span>
+                          ) : (
+                            <span className={missed ? "text-muted-foreground line-through" : undefined}>{no}</span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                   {missed && (
-                    <div className="mt-1.5 text-[10px] font-medium text-miss">Kazanan: {leg.winnerNos.join(", ")}</div>
+                    <div className="mt-1.5 text-[10px] font-medium text-miss">{t("kazanan")}: {leg.winnerNos.join(", ")}</div>
                   )}
                 </div>
               );
@@ -112,7 +127,7 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
 
         {/* Kupon tutarı */}
         <div className="border-t px-4 py-3">
-          <div className="text-xs text-muted-foreground">Kupon Tutarı</div>
+          <div className="text-xs text-muted-foreground">{t("kuponTutari")}</div>
           <div className="text-lg font-bold">
             {active.amount.toLocaleString("tr-TR", {
               minimumFractionDigits: 2,
@@ -130,6 +145,7 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
 type Props = { data: KuponOnerisi[]; altiliResults?: AltiliCityResult[]; isLoggedIn?: boolean; isAdmin?: boolean };
 
 export default function TahminOnerileri({ data, altiliResults = [], isLoggedIn = false, isAdmin = false }: Props) {
+  const t = useTranslations("home.tahminOnerileri");
   const items = data.filter((k): k is Kupon => k !== null);
   const hasVisible = items.some((k) => k.variants.some((v) => v.status !== "miss"));
   if (items.length === 0 || !hasVisible) return null;
@@ -138,16 +154,16 @@ export default function TahminOnerileri({ data, altiliResults = [], isLoggedIn =
     return (
       <section className="border-t px-4 py-8">
         <div className="mx-auto max-w-6xl">
-          <h2 className="mb-4 text-lg font-semibold">Kupon Önerileri</h2>
+          <h2 className="mb-4 text-lg font-semibold">{t("title")}</h2>
           <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
             <span className="text-2xl">🔒</span>
-            <p className="font-medium">Kupon önerilerini görmek için üye olmalısınız.</p>
+            <p className="font-medium">{t("girisGerekli")}</p>
             <div className="flex gap-2">
               <a href="/giris" className="rounded-md bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground hover:bg-brand/90">
-                Giriş Yap
+                {t("girisYap")}
               </a>
               <a href="/kayit" className="rounded-md border px-4 py-2 text-xs font-semibold hover:bg-muted">
-                Kayıt Ol
+                {t("kayitOl")}
               </a>
             </div>
           </div>
@@ -158,11 +174,13 @@ export default function TahminOnerileri({ data, altiliResults = [], isLoggedIn =
 
   return (
     <section className="border-t px-4 py-10">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <h2 className="text-lg font-semibold">Kupon Önerileri</h2>
-        {items.map((kupon, i) => (
-          <KuponBlock key={i} data={kupon} ikramiye={findIkramiyeForHippodrome(kupon.hippodromeName, altiliResults)} isAdmin={isAdmin} />
-        ))}
+      <div className="mx-auto max-w-6xl space-y-4">
+        <h2 className="text-lg font-semibold">{t("title")}</h2>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {items.map((kupon, i) => (
+            <KuponBlock key={i} data={kupon} ikramiye={findIkramiyeForHippodrome(kupon.hippodromeName, altiliResults)} isAdmin={isAdmin} />
+          ))}
+        </div>
       </div>
     </section>
   );

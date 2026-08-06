@@ -11,15 +11,20 @@ export type PistMesafeStilSonuc = {
   breakdown: { style: TekYarisStil; count: number; percent: number }[];
   topStyle: TekYarisStil;
   topPercent: number;
+  // v6.50 — kullanıcı talebi 2026-08-03: panelde "son güncelleme tarihi" gösterilsin —
+  // bu istatistik canlı hesaplanıyor (cache'lenmiyor), o yüzden en anlamlı tarih hesaba
+  // dahil edilen 27 geçmiş yarıştan EN YENİSİNİN tarihi (verinin ne kadar güncel olduğu).
+  enYeniTarih: string;
 } | null;
 
 /**
- * Aynı hipodrom+pist+mesafe(±200m)'de (ırk/koşu tipi şartı YOK — kullanıcı talebiyle
- * kaldırıldı, örneklem çok dar kalıp "yeterli veri yok" mesajını neredeyse her koşuda
- * gösteriyordu), Accurace geçmişindeki koşuların KAZANANLARININ (place=1) hangi yarış
- * stiline sahip olduğunu tarar — "bu pist+mesafede genelde kaçak atlar mı, geriden
- * gelenler mi kazanıyor" sorusuna cevap. n<3 ise (tek yarıştan kalıcı kural çıkarılmaz
- * ilkesiyle) null döner.
+ * Aynı hipodrom+pist+TAM mesafede (v6.51 — kullanıcı talebi 2026-08-04: ±200m yakınlık
+ * kaldırıldı, birebir aynı mesafe şartı getirildi; ırk/koşu tipi şartı hâlâ YOK —
+ * kullanıcı talebiyle kaldırılmıştı, örneklem çok dar kalıp "yeterli veri yok" mesajını
+ * neredeyse her koşuda gösteriyordu), Accurace geçmişindeki koşuların KAZANANLARININ
+ * (place=1) hangi yarış stiline sahip olduğunu tarar — "bu pist+mesafede genelde kaçak
+ * atlar mı, geriden gelenler mi kazanıyor" sorusuna cevap. n<3 ise (tek yarıştan kalıcı
+ * kural çıkarılmaz ilkesiyle) null döner.
  */
 export async function getPistMesafeStilIstatistigi(
   hippodromeName: string,
@@ -30,10 +35,11 @@ export async function getPistMesafeStilIstatistigi(
     where: {
       raceDay: { hippodrome: { name: hippodromeName } },
       surface,
-      distance: { gte: distance - 200, lte: distance + 200 },
+      distance,
       accuraceRace: { isNot: null },
     },
     select: {
+      raceDay: { select: { date: true } },
       accuraceRace: {
         select: {
           length: true,
@@ -46,6 +52,7 @@ export async function getPistMesafeStilIstatistigi(
 
   const sayac = { KACAK_AT: 0, ON_GRUP_ARKASI: 0, BEKLEME_GRUBU: 0, EN_GERI_TAKIP: 0 } as Record<TekYarisStil, number>;
   let toplam = 0;
+  let enYeniTarih: Date | null = null;
   for (const r of races) {
     const ar = r.accuraceRace;
     const kazanan = ar?.splits[0];
@@ -54,14 +61,18 @@ export async function getPistMesafeStilIstatistigi(
     if (!sonuc) continue;
     sayac[sonuc.stil]++;
     toplam++;
+    if (!enYeniTarih || r.raceDay.date > enYeniTarih) enYeniTarih = r.raceDay.date;
   }
 
-  if (toplam < MIN_ORNEK) return null;
+  if (toplam < MIN_ORNEK || !enYeniTarih) return null;
 
   const breakdown = (Object.entries(sayac) as [TekYarisStil, number][])
     .filter(([, count]) => count > 0)
     .map(([style, count]) => ({ style, count, percent: Math.round((count / toplam) * 100) }))
     .sort((a, b) => b.count - a.count);
 
-  return { n: toplam, breakdown, topStyle: breakdown[0].style, topPercent: breakdown[0].percent };
+  return {
+    n: toplam, breakdown, topStyle: breakdown[0].style, topPercent: breakdown[0].percent,
+    enYeniTarih: enYeniTarih.toISOString().slice(0, 10),
+  };
 }

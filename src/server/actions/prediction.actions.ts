@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { startOfDay, endOfDay } from "date-fns";
+import { recomputeHitStatsForRace } from "@/lib/result-utils";
 import type { Confidence, PedigreeRating } from "@prisma/client";
 
 export type PickInput = {
@@ -37,7 +38,10 @@ type PredictionInput = {
  * Örnek: İstanbul 8. Koşu için analiz girilince, conditions="İstanbul 8. Koşu"
  * olan tüm Karma koşularına da aynı analiz kopyalanır.
  */
-async function syncKarmaMirrors(predictionId: string): Promise<void> {
+// v6.35 — geriye dönük backfill script'lerinin (Karma conditions alanı yeni doldurulmaya
+// başladığı için önceden hiç eşleşmemiş, zaten yayınlanmış analizler var) bu fonksiyonu
+// tekrar çağırabilmesi için dışa açık — buildFaz2Prompt/kuralKontrolleriUret ile aynı desen.
+export async function syncKarmaMirrors(predictionId: string): Promise<void> {
   const pred = await db.prediction.findUnique({
     where: { id: predictionId },
     include: {
@@ -128,7 +132,8 @@ async function syncKarmaMirrors(predictionId: string): Promise<void> {
  * Yayınlanan her tahminin sahadaki AKTİF (çekilmemiş) her atı içermesini garanti eder —
  * giriş yöntemi ne olursa olsun (otomatik analiz formu, elle giriş, markdown/ekran
  * görüntüsü yapıştırma). Otomatik analizde (oto-analiz-faz3/route.ts) sıralama zaten
- * TÜM sahayı kapsıyor (kod tabanlı, Faz2 puanına göre), ama manuel girişlerde kaynak
+ * TÜM sahayı kapsıyor (Claude'un ürettiği picks eksik kalırsa kod bir yedek sırayla
+ * tamamlıyor), ama manuel girişlerde kaynak
  * metin yalnız öne çıkan birkaç atı içerebiliyordu —
  * bu da Rotaganyan Puan Tablosu'nda sahanın geri kalanının hiç görünmemesine yol açıyordu
  * (kullanıcı tarafından tespit edildi: 2026-07-20 Bursa 1-2. Koşu, 5-6 pick / 11-12 at).
@@ -173,6 +178,14 @@ export async function completeFullField(raceId: string, picks: PickInput[]): Pro
 export async function upsertPrediction(input: PredictionInput) {
   const session = await requireRole("EDITOR");
 
+  // 2026-07-27 canlı bulgu (Bursa 10.Koşu): form hiç doldurulmadan (0 pick) "Kaydet"e
+  // basılınca completeFullField EKSİK atları (yani TÜM sahayı) start numarasına göre
+  // otomatik dolduruyor — assertPublishSafe'in "hiç pick yok" kontrolü bu doldurmadan
+  // SONRA çalıştığı için listeyi "dolu" görüp geçiyor, hiçbir gerekçe/skor olmadan
+  // tamamen anlamsız bir sıralama sessizce yayına giriyor. Gerçek gönderilen pick
+  // sayısını (doldurmadan ÖNCE) burada saklayıp aşağıda yayın denemesinden önce kontrol
+  // ediyoruz — boş form asla otomatik yayınlanamaz, kayıt olur ama published=false kalır.
+  const hicPickGonderilmedi = input.picks.length === 0;
   const completedPicks = await completeFullField(input.raceId, input.picks);
 
   const existing = await db.prediction.findUnique({ where: { raceId: input.raceId } });
@@ -248,6 +261,9 @@ export async function upsertPrediction(input: PredictionInput) {
   let publishError: string | null = null;
   let nowPublished = false;
   try {
+    if (hicPickGonderilmedi) {
+      throw new Error("Hiç at seçimi girilmeden (boş form) yayınlanamaz — önce en az bir at seçin ya da AI analizini çalıştırıp forma uygulayın.");
+    }
     await assertPublishSafe(predictionId);
     await db.prediction.update({
       where: { id: predictionId },
@@ -266,6 +282,11 @@ export async function upsertPrediction(input: PredictionInput) {
   // published durumunu yansıtması için publish denemesinden SONRA çağrılıyor.
   syncKarmaMirrors(predictionId).catch(console.error);
 
+  // Bu yarışın sonucu zaten varsa (ör. eski, sonuçlanmış bir tahmin sonradan düzeltildi),
+  // hitTop1/hitInCoupon'u GÜNCEL picks'e göre yeniden hesapla — bkz. recomputeHitStatsForRace
+  // yorumu, kullanıcı denetimi 2026-07-27'de bu alanların bayat kalabildiği bulundu.
+  recomputeHitStatsForRace(input.raceId).catch(console.error);
+
   // Bildirim YALNIZ taslak→yayında GEÇİŞİNDE gönderilir (publishPrediction()'ın eski
   // davranışıyla aynı) — yoksa zaten yayında olan bir analizi her "Kaydet"te (küçük bir
   // düzeltme için bile) yeniden bildirmek kullanıcılara spam gönderirdi.
@@ -280,6 +301,7 @@ export async function upsertPrediction(input: PredictionInput) {
   revalidatePath("/kosular");
   revalidatePath("/tahmin-onerileri");
   revalidatePath("/rotaganyanpuantablosu");
+  revalidatePath("/rotaganyansiralamasi");
   revalidatePath("/program");
   revalidatePath("/");
   return { id: predictionId, publishError };
@@ -302,12 +324,23 @@ export async function assertPublishSafe(id: string): Promise<void> {
       race: {
         select: {
           classType: true,
+          result: { select: { id: true } },
           runners: { where: { scratched: false }, select: { id: true, no: true, name: true, agf: true, raceStyle: true } },
         },
       },
     },
   });
   if (!pred) return;
+
+  // (0) Yarışın sonucu zaten girilmişse yayınlanamaz — 2026-07-27 canlı bulgu (Bursa
+  // 9./Karma 2.Koşu): koşu kendi post saatinden sonra analiz edilip yayınlanmıştı, bu hem
+  // yanıltıcı (kullanıcı hâlâ bahis yapılabilir sanabilir) hem de veri sızıntısına açık
+  // (atın kendi az önceki sonucu "geçmiş kanıt" gibi geri besleniyordu — bkz. veri-toplama.ts
+  // ve gecmis-baglam.actions.ts'teki aynı tarihli düzeltmeler). Sonuç girilmiş bir yarış
+  // için "tahmin" yayınlamanın hiçbir meşru senaryosu yok.
+  if (pred.race.result) {
+    throw new Error("Bu yarışın sonucu zaten girilmiş — artık bir 'tahmin' olarak yayınlanamaz.");
+  }
 
   // (1) Hiç pick yoksa yayın yok — 2026-07-23 Ankara 1-2. Koşu (boş saha) hatasından kalma.
   if (pred.picks.length === 0) {
@@ -329,6 +362,18 @@ export async function assertPublishSafe(id: string): Promise<void> {
       );
     }
   }
+
+  // (2b) AGF top-3'ün TAMAMINI (yalnız lider değil #2/#3'ü de) kapsayan sert yayın engeli
+  // (v6.22) GERİ ALINDI (v6.24, kullanıcı talimatı 2026-07-29: "AGF top-3 kuralı toptan
+  // saçmalık, ben atların doğru muhakeme edilmesini istiyorum"). Gerçek kök neden AGF sırası
+  // değildi — İstanbul 5.Koşu ÇOKOMEL KIZ (AGF #5, bu kuralın kapsamı DIŞINDA) aynı sorunla
+  // (hiç gerekçelendirilmeden mekanik puanla düşürülmüş) yine de kazandı. Asıl düzeltme artık
+  // üretim anında (Faz3 route.ts madde 4/5: TÜM saha için gerçek details zorunlu) ve admin
+  // panelinde her zaman görünür bir denetim olarak (kuralKontrolleriUret §XVIII.1 IHLAL/GECTI)
+  // yapılıyor — burada AGF'ye özel yeni bir sert yayın engeli EKLENMEDİ, çünkü manuel girilen
+  // (Faz3'süz) tahminler genelde yalnız ilk birkaç at için "details" doldurur; sahadaki HER
+  // pick için details zorunlu kılmak o meşru senaryoyu da bloke ederdi — sert koşul yasağıyla
+  // çelişir.
 
   // (3) Banko verilmişse AGF favorisi ile sistem 1.si farklı olamaz.
   const sistemBirinci = pred.picks.find((p) => p.rank === 1);

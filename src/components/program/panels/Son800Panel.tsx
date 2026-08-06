@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { getSon800ForRace, type Son800RunnerData } from "@/server/actions/son800.actions";
 import AccuraceSectionalTable from "./AccuraceSectionalTable";
 
 export default function Son800Panel({ raceId }: { raceId: string }) {
+  const t = useTranslations("programToolbar");
   const [data, setData] = useState<Son800RunnerData[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -24,19 +26,19 @@ export default function Son800Panel({ raceId }: { raceId: string }) {
   return (
     <div className="border-t">
       <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
-        <span className="text-sm font-bold tracking-wide text-white">Accurace — Tüm Kayıtlar</span>
+        <span className="text-sm font-bold tracking-wide text-white">{t("accuraceTitle")}</span>
       </div>
 
       {loading ? (
-        <div className="px-4 py-8 text-center text-sm text-muted-foreground">Yükleniyor…</div>
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">{t("yukleniyor")}</div>
       ) : error ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-          <p className="mb-2">Accurace verisi alınamadı.</p>
+          <p className="mb-2">{t("veriAlinamadi")}</p>
           <button
             onClick={() => setRetryKey((k) => k + 1)}
             className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
           >
-            Tekrar Dene
+            {t("tekrarDene")}
           </button>
         </div>
       ) : (
@@ -48,7 +50,7 @@ export default function Son800Panel({ raceId }: { raceId: string }) {
                 {d.horseName}
               </div>
               {d.records.length === 0 ? (
-                <div className="text-[11px] text-muted-foreground ml-5">Accurace kaydı yok</div>
+                <div className="text-[11px] text-muted-foreground ml-5">{t("accuraceKaydiYok")}</div>
               ) : (
                 <div className="space-y-2">
                   {d.records.map((rec, i) => (
@@ -58,7 +60,7 @@ export default function Son800Panel({ raceId }: { raceId: string }) {
                         <span>{rec.hippodrome}</span>
                         <span>{rec.ground}</span>
                         <span className="tabular-nums">{rec.length}m</span>
-                        <span className="tabular-nums">{rec.place}. sıra</span>
+                        <span className="tabular-nums">{t("siraSuffix", { place: rec.place })}</span>
                       </div>
                       <AccuraceSectionalTable
                         length={rec.length}
@@ -66,6 +68,7 @@ export default function Son800Panel({ raceId }: { raceId: string }) {
                         stil={rec.stil}
                         son800Sure={rec.son800Sure}
                         fark={rec.fark}
+                        t={t}
                       />
                     </div>
                   ))}

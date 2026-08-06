@@ -26,10 +26,12 @@ function fiyatFor(date: Date): FiyatDonemi {
 }
 
 // Prompt cache yazma/okuma fiyatı, temel input fiyatının katı olarak sabit (Anthropic'in
-// belgelenen oranı) — 5 dakikalık ephemeral cache (bizim kullandığımız, varsayılan TTL)
-// için yazma 1.25x, okuma 0.1x. Bunlar inputPerM'e göre TÜRETİLİR, ayrı sabitlenmez —
-// böylece fiyat dönemi değişince (bkz. FIYATLANDIRMA) otomatik doğru hesaplanır.
-const CACHE_WRITE_CARPAN = 1.25;
+// belgelenen oranı) — okuma TTL'den bağımsız hep 0.1x. Yazma TTL'e göre değişir: 5 dakikalık
+// ephemeral cache 1.25x, 1 saatlik ephemeral cache 2x (v6.31: metodoloji bloğu artık 1sa
+// cache'leniyor, bkz. oto-analiz-faz2/route.ts). Bunlar inputPerM'e göre TÜRETİLİR, ayrı
+// sabitlenmez — böylece fiyat dönemi değişince (bkz. FIYATLANDIRMA) otomatik doğru hesaplanır.
+const CACHE_WRITE_5M_CARPAN = 1.25;
+const CACHE_WRITE_1H_CARPAN = 2;
 const CACHE_READ_CARPAN = 0.1;
 
 export function tahminiMaliyet(
@@ -37,13 +39,17 @@ export function tahminiMaliyet(
   outputTokens: number,
   date: Date = new Date(),
   cacheCreationInputTokens = 0,
-  cacheReadInputTokens = 0
+  cacheReadInputTokens = 0,
+  cacheCreation1hInputTokens = 0
 ): number {
   const f = fiyatFor(date);
+  const cache1h = Math.min(cacheCreation1hInputTokens, cacheCreationInputTokens);
+  const cache5m = cacheCreationInputTokens - cache1h;
   return (
     (inputTokens / 1_000_000) * f.inputPerM +
     (outputTokens / 1_000_000) * f.outputPerM +
-    (cacheCreationInputTokens / 1_000_000) * f.inputPerM * CACHE_WRITE_CARPAN +
+    (cache5m / 1_000_000) * f.inputPerM * CACHE_WRITE_5M_CARPAN +
+    (cache1h / 1_000_000) * f.inputPerM * CACHE_WRITE_1H_CARPAN +
     (cacheReadInputTokens / 1_000_000) * f.inputPerM * CACHE_READ_CARPAN
   );
 }
@@ -52,12 +58,19 @@ export function tahminiMaliyet(
  *  hataya karşı sessizce yutulur, ana akışı bloklamaz. */
 export async function logClaudeUsage(input: {
   raceId?: string;
-  phase: "faz2" | "faz3";
+  // v6.46: "faz2v2"/"faz3v2" — yeni V1-V22 test motorunun (test-v2-engine/test-v3-engine)
+  // KENDİ etiketi. KRİTİK: "faz2"/"faz3" ile AYNI etiketi kullanmak, getRecentCachedResult'ın
+  // (aşağıda) üretim rotasında (oto-analiz-faz2/faz3) bu raceId için YENİ motorun FARKLI
+  // ŞEMALI JSON'ını "önbellekten" dönüp eski koda geçirmesine yol açardı (sessiz veri
+  // bozulması, gerçek para kararlarını etkileyen bir analizde) — canlıya hiç çıkmadan,
+  // kod incelemesinde bulundu (kullanıcı: "önce loglara bakıp ek bir doğrulama yap").
+  phase: "faz2" | "faz3" | "faz2v2" | "faz3v2";
   model: string;
   inputTokens: number;
   outputTokens: number;
   cacheCreationInputTokens?: number;
   cacheReadInputTokens?: number;
+  cacheCreation1hInputTokens?: number;
   resultText?: string;
   durationMs?: number;
 }): Promise<void> {
@@ -72,6 +85,7 @@ export async function logClaudeUsage(input: {
         outputTokens: input.outputTokens,
         cacheCreationInputTokens: input.cacheCreationInputTokens ?? 0,
         cacheReadInputTokens: input.cacheReadInputTokens ?? 0,
+        cacheCreation1hInputTokens: input.cacheCreation1hInputTokens ?? 0,
         resultText: input.resultText,
         durationMs: input.durationMs,
       },
@@ -92,7 +106,11 @@ export async function logClaudeUsage(input: {
  */
 export async function getRecentCachedResult(
   raceId: string,
-  phase: "faz2" | "faz3",
+  // v6.52 — "faz2v2"/"faz3v2" eklendi: V2 motoru da aynı "boşa ödeme" korumasına
+  // ihtiyaç duyuyor (canlı bulgu, Kocaeli 5.Koşu 2026-08-04: "Failed to fetch" — üretim
+  // sistemindeki AYNI platform davranışı, bkz. yukarıdaki yorum). Üretim rotaları
+  // ("faz2"/"faz3") hâlâ yalnız kendi literal'larını geçiyor, çapraz okuma riski yok.
+  phase: "faz2" | "faz3" | "faz2v2" | "faz3v2",
   windowMinutes = 20
 ): Promise<string | null> {
   try {
@@ -129,13 +147,16 @@ export type AnalysisRunSummary = {
 export async function getRecentAnalysisRuns(limit = 20): Promise<AnalysisRunSummary[]> {
   const { db } = await import("@/lib/db");
   const logs = await db.claudeUsageLog.findMany({
-    where: { raceId: { not: null } },
+    // v6.46: "faz2v2"/"faz3v2" (yeni V1-V22 test motoru) buraya BİLEREK dahil edilmiyor —
+    // yoksa admin'in bu koşu için gördüğü üretim maliyeti/süresi, izole test denemeleriyle
+    // yanlışlıkla toplanırdı.
+    where: { raceId: { not: null }, phase: { in: ["faz2", "faz3"] } },
     orderBy: { createdAt: "desc" },
     // faz2+faz3 (+ olası retry) satırlarını aynı koşu için toplayabilmek için bolluk payı.
     take: limit * 6,
     select: {
       raceId: true, phase: true, inputTokens: true, outputTokens: true,
-      cacheCreationInputTokens: true, cacheReadInputTokens: true,
+      cacheCreationInputTokens: true, cacheReadInputTokens: true, cacheCreation1hInputTokens: true,
       durationMs: true, createdAt: true,
     },
   });
@@ -170,7 +191,7 @@ export async function getRecentAnalysisRuns(limit = 20): Promise<AnalysisRunSumm
     const faz3DurationMs = sumDuration(rows, "faz3");
     const totalDurationMs = faz2DurationMs != null || faz3DurationMs != null ? (faz2DurationMs ?? 0) + (faz3DurationMs ?? 0) : null;
     const costUsd = rows.reduce(
-      (s, r) => s + tahminiMaliyet(r.inputTokens, r.outputTokens, r.createdAt, r.cacheCreationInputTokens, r.cacheReadInputTokens),
+      (s, r) => s + tahminiMaliyet(r.inputTokens, r.outputTokens, r.createdAt, r.cacheCreationInputTokens, r.cacheReadInputTokens, r.cacheCreation1hInputTokens),
       0
     );
     const raceLabel = race
@@ -201,12 +222,12 @@ export async function getClaudeBudgetStatus(): Promise<BudgetStatus | null> {
     where: { createdAt: { gte: budget.resetAt } },
     select: {
       inputTokens: true, outputTokens: true, createdAt: true,
-      cacheCreationInputTokens: true, cacheReadInputTokens: true,
+      cacheCreationInputTokens: true, cacheReadInputTokens: true, cacheCreation1hInputTokens: true,
     },
   });
 
   const spentUsd = logs.reduce(
-    (s, l) => s + tahminiMaliyet(l.inputTokens, l.outputTokens, l.createdAt, l.cacheCreationInputTokens, l.cacheReadInputTokens),
+    (s, l) => s + tahminiMaliyet(l.inputTokens, l.outputTokens, l.createdAt, l.cacheCreationInputTokens, l.cacheReadInputTokens, l.cacheCreation1hInputTokens),
     0
   );
 

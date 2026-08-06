@@ -28,7 +28,7 @@ export async function createStreamed(params: Anthropic.MessageCreateParamsNonStr
 export async function createWithTruncationRetry(
   params: Anthropic.MessageCreateParamsNonStreaming,
   raceId: string,
-  phase: "faz2" | "faz3",
+  phase: "faz2" | "faz3" | "faz2v2" | "faz3v2",
   retryMaxTokens: number
 ) {
   let start = Date.now();
@@ -38,6 +38,7 @@ export async function createWithTruncationRetry(
     inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens,
     cacheCreationInputTokens: msg.usage.cache_creation_input_tokens ?? 0,
     cacheReadInputTokens: msg.usage.cache_read_input_tokens ?? 0,
+    cacheCreation1hInputTokens: msg.usage.cache_creation?.ephemeral_1h_input_tokens ?? 0,
     resultText: extractText(msg),
     durationMs: Date.now() - start,
   });
@@ -49,6 +50,7 @@ export async function createWithTruncationRetry(
       inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens,
       cacheCreationInputTokens: msg.usage.cache_creation_input_tokens ?? 0,
       cacheReadInputTokens: msg.usage.cache_read_input_tokens ?? 0,
+      cacheCreation1hInputTokens: msg.usage.cache_creation?.ephemeral_1h_input_tokens ?? 0,
       resultText: extractText(msg),
       durationMs: Date.now() - start,
     });
@@ -72,12 +74,14 @@ export function extractText(msg: Anthropic.Message): string {
 // şema doğrulamasını (output_config.format) kullanıyoruz — "geçerli JSON döndür" gibi
 // bir talimata güvenmek yerine sunucu tarafında zorunlu kılınıyor.
 //
-// v4.16: Kullanıcının "Harmanlama / Tek Puanlama Deneyi" bulgularına göre A(0-60)/B+C(0-40)
-// katmanlı model kaldırıldı — kullanıcının kendi tespiti: harmanlama yalnız METİN/gerekçe
-// seviyesinde oluyordu, PUAN hesaplamasına hiç yansımıyordu (iki veri çelişse bile toplam
-// puan bunu sayısal olarak cezalandırmıyordu). Artık TEK bir "puan" (0-100) alanı var —
-// tüm veriler aynı havuzda değerlendirilir, çelişki-tutarlılık çarpanı (bkz. Faz2 prompt'u)
-// puana zaten işlenmiş halde gelir; ayrı A/B+C alt toplamı yok.
+// v6.26: kullanıcı talebi 2026-07-30 ("puanlama muhakemeden sonra yapılsa daha realist
+// olmaz mı") — eskiden Faz 2 doğrudan bir 0-100 "puan" üretiyordu, Faz 3 o sayıyı
+// "başlangıç noktası" sayıp gerekçelendiriyordu. Bir sayı bir kez ortaya çıkınca sonraki
+// adım genelde onu DOĞRULAMAYA çalışır, yeniden düşünmez (çapalama/anchoring önyargısı).
+// Artık roller TERSİNE: Faz 2 hiçbir sayısal puan üretmeden, yalnız her at için ayrıntılı
+// kanıta dayalı "muhakeme" metni yazıyor; "teknikSira" bu muhakemenin doğal, kaba bir
+// ÖZETİDİR (yalnız sıralama, ince puan değil) — asıl 0-100 puanlama, bu muhakemeyi girdi
+// olarak alan Faz 3'te (bkz. oto-analiz-faz3/route.ts) mekanik formülle yapılır.
 export const FAZ2_SCHEMA = {
   type: "object",
   properties: {
@@ -88,10 +92,10 @@ export const FAZ2_SCHEMA = {
         properties: {
           no: { type: "integer" },
           ad: { type: "string" },
-          puan: { type: "number" },
           teknikSira: { type: "integer" },
+          muhakeme: { type: "string" },
         },
-        required: ["no", "ad", "puan", "teknikSira"],
+        required: ["no", "ad", "teknikSira", "muhakeme"],
         additionalProperties: false,
       },
     },
@@ -101,13 +105,14 @@ export const FAZ2_SCHEMA = {
 } as const;
 
 // v6.0: Fazlar 5'ten (veri+puanlama+geçit+sıralama+gerekçe) 3'e indirildi (kullanıcı
-// kararı) — geçit motoru tamamen kaldırıldı. Faz 2 ham puanları YALNIZ bir BAŞLANGIÇ
-// NOKTASI: asıl işi — muhakeme ile NİHAİ SIRALAMAYI belirlemek, Kural Denetim
-// Protokolü'nü (§II.4) uygulamak, gerekirse puanı düzeltmek — Claude'un kendisi yapar
-// (Faz 3, "son kontrol" — kullanıcı talimatı: Claude'un işi en önemli iş olmalı).
-// Kupon/banko EŞİĞİ (Ekonomik/Normal/Geniş dilimleme, puan≥80+fark≥5+risk-yok testi)
-// kod tarafında Claude'un ÜRETTİĞİ nihai sıraya göre mekanik uygulanır — ama SIRANIN
-// KENDİSİ tamamen Claude'un muhakemesinin ürünüdür, kod bunu ASLA yeniden sıralamaz.
+// kararı) — geçit motoru tamamen kaldırıldı.
+// v6.26: PUANLAMA artık burada, Faz 3'te yapılıyor (Faz 2'nin ürettiği muhakeme metnini
+// girdi alarak) — NİHAİ SIRALAMAYI belirlemek, Kural Denetim Protokolü'nü (§II.4)
+// uygulamak hâlâ Claude'un kendisinin işi (Faz 3, "son kontrol" — kullanıcı talimatı:
+// Claude'un işi en önemli iş olmalı). Kupon/banko EŞİĞİ (Ekonomik/Normal/Geniş dilimleme,
+// puan≥80+fark≥5+risk-yok testi) kod tarafında Claude'un ÜRETTİĞİ nihai sıraya göre
+// mekanik uygulanır — ama SIRANIN KENDİSİ tamamen Claude'un muhakemesinin ürünüdür, kod
+// bunu ASLA yeniden sıralamaz.
 export const FAZ3_SCHEMA = {
   type: "object",
   properties: {
@@ -150,7 +155,7 @@ export const FAZ3_SCHEMA = {
 } as const;
 
 export type Faz2Atlar = {
-  atlar: { no: number; ad: string; puan: number; teknikSira: number | null }[];
+  atlar: { no: number; ad: string; teknikSira: number | null; muhakeme: string }[];
 };
 
 export type Faz3Pick = {

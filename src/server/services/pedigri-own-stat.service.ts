@@ -33,7 +33,7 @@ function pozisyonaGoreArttir(s: Sayac, pos: number | null): void {
   else if (pos === 5) s.besinci++;
 }
 
-export async function syncOwnPedigreeStats(): Promise<{ sireRows: number; damRows: number }> {
+export async function syncOwnPedigreeStats(): Promise<{ sireRows: number; damRows: number; damSireRows: number }> {
   // ── Aygır (sire) ──
   const sireRunners = await db.runner.findMany({
     where: { sire: { not: null }, race: { result: { isNot: null } } },
@@ -149,5 +149,50 @@ export async function syncOwnPedigreeStats(): Promise<{ sireRows: number; damRow
     `;
   }
 
-  return { sireRows: sireEntries.length, damRows: damEntries.length };
+  // ── Damsire (kısrak babası) TEK BAŞINA — damRunners'ı YENİDEN kullanır ama dam adını
+  // hiç saymadan, yalnız damSireName'e göre gruplar (kullanıcı doktrini: aygır+kısrak
+  // yanında ÜÇÜNCÜ ayrı bir istatistik — bu damsire'nin TÜM farklı kısraklardan gelen
+  // yavrularının toplu performansı, "broodmare sire etkisi").
+  const damSireGroups = new Map<string, {
+    damSireName: string; irk: string; pist: string; mesafe: string;
+    sayac: Sayac; torunlar: Map<string, boolean>;
+  }>();
+  for (const r of damRunners) {
+    if (!r.damSire || !r.race.result) continue;
+    const irk = breedToIrk(r.race.breed);
+    const pist = surfaceToPist(r.race.surface);
+    const mesafe = mesafeBucket(r.race.distance);
+    const key = `${r.damSire}||${irk}||${pist}||${mesafe}`;
+    let g = damSireGroups.get(key);
+    if (!g) {
+      g = { damSireName: r.damSire, irk, pist, mesafe, sayac: bosSayac(), torunlar: new Map() };
+      damSireGroups.set(key, g);
+    }
+    const pos = finishPos(r.race.result.actualOrder, r.no, r.race.result.winnerNos);
+    pozisyonaGoreArttir(g.sayac, pos);
+    g.torunlar.set(r.name, (g.torunlar.get(r.name) ?? false) || pos === 1);
+  }
+
+  const damSireEntries = [...damSireGroups.values()];
+  for (let i = 0; i < damSireEntries.length; i += BATCH_SIZE) {
+    const batch = damSireEntries.slice(i, i + BATCH_SIZE);
+    const values = Prisma.join(
+      batch.map((g) => {
+        const torunSayisi = g.torunlar.size;
+        const kazananTorunSayisi = [...g.torunlar.values()].filter(Boolean).length;
+        return Prisma.sql`(${randomUUID()}, ${g.damSireName}, ${g.irk}, ${g.pist}, ${g.mesafe}, ${g.sayac.start}, ${g.sayac.birinci}, ${g.sayac.ikinci}, ${g.sayac.ucuncu}, ${g.sayac.dorduncu}, ${g.sayac.besinci}, ${Math.round((g.sayac.birinci / g.sayac.start) * 100)}, ${torunSayisi}, ${kazananTorunSayisi}, now())`;
+      })
+    );
+    await db.$executeRaw`
+      INSERT INTO "DamSireStatOwn" ("id", "damSireName", "irk", "pist", "mesafe", "start", "birinci", "ikinci", "ucuncu", "dorduncu", "besinci", "kYuzde", "torunSayisi", "kazananTorunSayisi", "updatedAt")
+      VALUES ${values}
+      ON CONFLICT ("damSireName", "irk", "pist", "mesafe") DO UPDATE SET
+        "start" = EXCLUDED."start", "birinci" = EXCLUDED."birinci", "ikinci" = EXCLUDED."ikinci",
+        "ucuncu" = EXCLUDED."ucuncu", "dorduncu" = EXCLUDED."dorduncu", "besinci" = EXCLUDED."besinci",
+        "kYuzde" = EXCLUDED."kYuzde", "torunSayisi" = EXCLUDED."torunSayisi",
+        "kazananTorunSayisi" = EXCLUDED."kazananTorunSayisi", "updatedAt" = now()
+    `;
+  }
+
+  return { sireRows: sireEntries.length, damRows: damEntries.length, damSireRows: damSireEntries.length };
 }

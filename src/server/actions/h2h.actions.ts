@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/db";
 import { fetchTjkAtKosuBilgileri, type TjkAtKosuRow } from "@/server/services/ingest/tjk-at-performans.adapter";
+import { tjkTarihOncesiMi } from "@/lib/tjk-date";
 
 export type H2HResult = {
   horseName: string;
@@ -40,17 +41,21 @@ function parseTjkDate(d: string): number {
 export async function getH2HForRace(raceId: string): Promise<H2HEncounter[]> {
   const race = await db.race.findUnique({
     where: { id: raceId },
-    select: { runners: { select: { name: true, tjkAtId: true } } },
+    select: { runners: { select: { name: true, tjkAtId: true } }, raceDay: { select: { date: true } } },
   });
   if (!race) return [];
 
   const withTjkId = race.runners.filter((r) => r.tjkAtId != null);
   if (withTjkId.length < 2) return [];
 
+  // bkz. tjk-date.ts — bu koşu bittiyse (analiz sonradan tekrar çalıştırıldıysa) TJK'nın
+  // az önce güncellediği profildeki BUGÜNKÜ VE SONRAKİ satırlar dışlanır, aksi halde
+  // sahadaki tüm atlar "geçmiş karşılaşma" olarak BUGÜNÜN KENDİ KOŞUSUNU (veya hedef
+  // yarıştan SONRAKİ bir yarışı) görür (kendi sonucunu bilir).
   const histories = await Promise.all(
     withTjkId.map(async (r) => {
       try {
-        const rows = await fetchTjkAtKosuBilgileri(r.tjkAtId!);
+        const rows = (await fetchTjkAtKosuBilgileri(r.tjkAtId!)).filter((row) => tjkTarihOncesiMi(row.date, race.raceDay.date));
         return { name: r.name, rows };
       } catch {
         return { name: r.name, rows: [] as TjkAtKosuRow[] };

@@ -143,14 +143,14 @@ export async function getRaceDaysForPedigreeEntry(dateStr: string) {
       if (r.runners.length === 0) return;
       const [sireOzetler, damOzetler] = await Promise.all([
         getSireStatOzetleriForRace(r.runners.map((ru) => ru.sire), r.breed, r.surface, r.distance).catch(
-          () => r.runners.map(() => ({ ozet: null, ornekHipodromx: null, ornekKendiVeri: null }))
+          () => r.runners.map(() => ({ ozet: null, ornekKendiVeri: null }))
         ),
         getDamStatOzetleriForRace(
           r.runners.map((ru) => ({ dam: ru.dam, damSire: ru.damSire })),
           r.breed,
           r.surface,
           r.distance
-        ).catch(() => r.runners.map(() => ({ ozet: null, ornekHipodromx: null, ornekKendiVeri: null }))),
+        ).catch(() => r.runners.map(() => ({ ozet: null, ornekKendiVeri: null }))),
       ]);
       r.runners.forEach((ru, i) => {
         sireStatByRunnerId.set(ru.id, sireOzetler[i]?.ozet ?? null);
@@ -279,6 +279,13 @@ export type AnalystStats = {
   byConfidence: AnalystBreakdown[];
   byHippodrome: AnalystBreakdown[];
   byDistance: AnalystBreakdown[];
+  // v6.60 — kullanıcı talebi 2026-08-05: "Bu Koşu Tipinde Kazananlar" panelinin
+  // kullandığı AYNI hipodrom+pist+mesafe kovasına göre KENDİ isabet oranımız — eski
+  // kırılımlar (byHippodrome/bySurface/byDistance) bunları AYRI AYRI gösteriyordu,
+  // hangi TAM kombinasyonda güçlü/zayıf olduğumuzu görmek mümkün değildi. Az örnekli
+  // (n<3) kovalar gürültü sayılıp gösterilmiyor — pist-mesafe-stil.actions.ts'teki
+  // MIN_ORNEK ile tutarlı.
+  byRaceTypeBucket: AnalystBreakdown[];
   recentTrend: boolean[];
   dailyTrend: DailyPoint[];
   cumulativeTrend: CumulativePoint[];
@@ -468,6 +475,11 @@ export async function getAnalystStats(excludeRaceId?: string): Promise<AnalystSt
     byDistance: group((r) => distanceBucket(r.race.distance ?? 1400)).sort(
       (a, b) => DISTANCE_ORDER.indexOf(a.label) - DISTANCE_ORDER.indexOf(b.label)
     ),
+    byRaceTypeBucket: group(
+      (r) => `${r.race.raceDay.hippodrome.name} · ${SURFACE_LABEL[r.race.surface] ?? r.race.surface} · ${r.race.distance}m`
+    )
+      .filter((b) => b.total >= 3)
+      .sort((a, b) => b.total - a.total),
     recentTrend: rows.slice(-20).map((r) => r.race.result?.hitTop1 ?? false),
     dailyTrend,
     cumulativeTrend: (() => {
