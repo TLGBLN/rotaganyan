@@ -61,7 +61,7 @@ export default function GalopPanel({ runners, breed }: { runners: ProgramRunner[
                         {galopDate(g)}
                         {g.track && <span className="ml-1 opacity-70">{g.track}</span>}
                         {g.form && <span className="ml-1 opacity-70">· {g.form}</span>}
-                        {g.jockey && <span className="ml-1 opacity-70">· {g.jockey}</span>}
+                        {g.jockey && <span className="ml-1 font-semibold text-foreground opacity-100">· {g.jockey}</span>}
                         {isInner && <span className="ml-1 text-blue-400 opacity-80">{t("icKulvarKisa")}</span>}
                       </div>
                     </div>
