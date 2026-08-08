@@ -4,7 +4,7 @@ import { CheckCircle2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { ProgramRunner } from "@/server/services/race.service";
-import { galopSplits, galopDate, isSameJockey, galopQuality, galopTimeClass } from "./galop-helpers";
+import { galopSplits, galopDate, isSameJockey, galopQuality, galopTimeClass, trainingTypeClass } from "./galop-helpers";
 
 export default function GalopPanel({ runners, breed }: { runners: ProgramRunner[]; breed: string }) {
   const t = useTranslations("programToolbar");
@@ -49,20 +49,22 @@ export default function GalopPanel({ runners, breed }: { runners: ProgramRunner[
                           )}
                           {prepDist && finish && <span className="text-muted-foreground mx-0.5">/</span>}
                           {finish && (
-                            <span className={cn("text-amber-500 dark:text-amber-400", galopTimeClass(finQ))}>{`400·${finish}`}</span>
+                            <span className={galopTimeClass(finQ)}>{`400·${finish}`}</span>
                           )}
                           {(prepDist || finish) && final200 && <span className="text-muted-foreground mx-0.5">/</span>}
-                          {final200 && (
-                            <span className="text-sky-500 dark:text-sky-400">{`200·${final200}`}</span>
-                          )}
+                          {final200 && <span>{`200·${final200}`}</span>}
                         </span>
                       </div>
-                      <div className="text-[9px] text-muted-foreground">
-                        {galopDate(g)}
-                        {g.track && <span className="ml-1 opacity-70">{g.track}</span>}
-                        {g.form && <span className="ml-1 opacity-70">· {g.form}</span>}
-                        {g.jockey && <span className="ml-1 font-semibold text-foreground opacity-100">· {g.jockey}</span>}
-                        {isInner && <span className="ml-1 text-blue-400 opacity-80">{t("icKulvarKisa")}</span>}
+                      <div className="mt-0.5 flex items-center gap-1 text-[9px] text-muted-foreground">
+                        <span>{galopDate(g)}</span>
+                        {g.track && (
+                          <span className={cn("rounded px-1 py-0.5 font-medium leading-none", trainingTypeClass(g.track))}>
+                            {g.track}
+                          </span>
+                        )}
+                        {g.form && <span className="opacity-70">· {g.form}</span>}
+                        {g.jockey && <span className="font-semibold text-foreground">· {g.jockey}</span>}
+                        {isInner && <span className="text-blue-400 opacity-80">{t("icKulvarKisa")}</span>}
                       </div>
                     </div>
                   );

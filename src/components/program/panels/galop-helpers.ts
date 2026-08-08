@@ -80,3 +80,12 @@ export function galopTimeClass(q: GalopQuality | null): string {
   if (q === "iyi") return "text-emerald-500 dark:text-emerald-400";
   return "";
 }
+
+// İdman türü (Galop/Sprint/vb., TJK "İdman Türü" alanı) — renk yalnız TÜRÜ ayırt etmek
+// için, kalite/hız anlamı TAŞIMAZ (kalite rengi yalnız galopTimeClass'ta, sürelerde).
+export function trainingTypeClass(type: string): string {
+  const t = type.toUpperCase();
+  if (t.includes("SPRINT") || t.includes("SÜRAT") || t.includes("SURAT")) return "bg-orange-500/15 text-orange-400";
+  if (t.includes("GALOP")) return "bg-sky-500/15 text-sky-400";
+  return "bg-muted text-muted-foreground";
+}
