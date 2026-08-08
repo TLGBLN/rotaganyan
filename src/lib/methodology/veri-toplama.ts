@@ -431,6 +431,32 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   });
   if (!race || race.runners.length === 0) return null;
 
+  // v6.68 — kullanıcı denetimi 2026-08-09: "Karma" (küçük hipodromların TJK'nın ortak
+  // yayınladığı birleşik programı) koşularının classType'ı TJK'nın kendi sayfasında hiç
+  // yer almıyor, ingest bunu hep "—" ile dolduruyordu (519 koşu etkilendi, bugünküler
+  // dahil) — kategoriTespit bu yüzden "bilinmiyor" dönüp analizi tamamen engelliyordu.
+  // syncKarmaMirrors'ın (prediction.actions.ts) TERS yönünü kullanıyoruz: Karma
+  // koşusunun "conditions" alanı zaten gerçek kaynağı ("İstanbul 8. Koşu" gibi) taşıyor —
+  // bu isim+numaradan GERÇEK koşuyu bulup classType'ını ödünç alıyoruz. Yalnız OKUMA
+  // anında (ingest/cron'a dokunmadan) — eşleşme bulunamazsa sessizce "—" kalır, regresyon
+  // yok.
+  if (race.classType === "—" && race.conditions) {
+    const kaynakEslesme = race.conditions.match(/^(.+?)\s+(\d+)\.\s*Ko[şs]u$/i);
+    if (kaynakEslesme) {
+      const [, kaynakHipodrom, kaynakNoStr] = kaynakEslesme;
+      const kaynakRace = await db.race.findFirst({
+        where: {
+          raceNo: parseInt(kaynakNoStr, 10),
+          raceDay: { date: race.raceDay.date, hippodrome: { name: kaynakHipodrom.trim() } },
+        },
+        select: { classType: true },
+      });
+      if (kaynakRace && kaynakRace.classType !== "—") {
+        race.classType = kaynakRace.classType;
+      }
+    }
+  }
+
   // 2026-07-27 canlı bulgu (Bursa 9./Karma 2.Koşu — aynı fiziksel yarış iki program altında
   // mirror'lanmış): AccuraceHorseSplit sorguları yalnız horseName'e göre filtreleniyordu,
   // koşu kendi post saatinden SONRA (sonucu Accurace'e işlendikten sonra) analiz edilirse

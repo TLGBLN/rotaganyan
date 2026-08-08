@@ -56,7 +56,7 @@ function batchSchemaFor(nolar: number[]) {
     properties: {
       no: { type: "integer" },
       ad: { type: "string" },
-      karar: { type: "string" },
+      karar: { type: "string", enum: ["Güçlü Aday", "Düşük Risk", "Orta Risk", "Yüksek Risk"] },
       muhakeme: { type: "string" },
     },
     required: ["no", "ad", "karar", "muhakeme"],
@@ -71,6 +71,14 @@ function batchSchemaFor(nolar: number[]) {
   } as const;
 }
 
+// v6.68 — kullanıcı kararı 2026-08-09 (GOLDEN BEE dersi): "karar" (Güçlü Aday/Düşük
+// Risk/Orta Risk/Yüksek Risk) batch aşamasında, kod-garantili etiketler (V1/V4/V19/V22
+// vb.) muhakemeye eklenmeden ÖNCE veriliyordu — bu yüzden bir at güçlü, doğrulanmış
+// kanıtlara sahip olsa bile "karar" bunu hiç yansıtmayabiliyordu. Artık sıralama çağrısı
+// (atların TAM, garanti-etiketli muhakemesini zaten görüyor) HER at için "karar"ı da
+// YENİDEN veriyor — eski (batch aşamasındaki) karar tamamen bırakılıyor, yalnız bu YENİ
+// karar kullanılıyor. Bu, "karar ne zaman kararlaştırılıyor" sırasındaki asıl yapısal
+// açığı kapatıyor (bir formülle DEĞİL, Claude'un TAM bilgiyle yeniden muhakemesiyle).
 const SIRALAMA_SCHEMA = {
   type: "object",
   properties: {
@@ -78,8 +86,12 @@ const SIRALAMA_SCHEMA = {
       type: "array",
       items: {
         type: "object",
-        properties: { no: { type: "integer" }, teknikSira: { type: "integer" } },
-        required: ["no", "teknikSira"],
+        properties: {
+          no: { type: "integer" },
+          teknikSira: { type: "integer" },
+          karar: { type: "string", enum: ["Güçlü Aday", "Düşük Risk", "Orta Risk", "Yüksek Risk"] },
+        },
+        required: ["no", "teknikSira", "karar"],
         additionalProperties: false,
       },
     },
@@ -111,21 +123,23 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, örnek (alan adları "at_" + o atın
 // kelimeyle sayı çelişirse sayıyı esas alabilir.
 function siralamaReminder(atlar: (BatchAt & { hamVeri?: string })[]): string {
   const liste = atlar.map((a) =>
-    `#${a.no} ${a.ad} — karar: ${a.karar}\nGrup analiz metni: ${a.muhakeme}${a.hamVeri ? `\nHam veri: ${a.hamVeri}` : ""}`
+    `#${a.no} ${a.ad} — İLK karar (grup aşamasında, aşağıdaki etiketlerin bir kısmı henüz eklenmeden önce verildi — bkz. KARARI YENİDEN VER talimatı): ${a.karar}\nGrup analiz metni: ${a.muhakeme}${a.hamVeri ? `\nHam veri: ${a.hamVeri}` : ""}`
   ).join("\n\n");
   return `Aşağıda bu koşudaki HER at için ZATEN üretilmiş muhakeme metinleri VE o atın ham Faz1 verisi var — sen yeni bir analiz YAPMIYORSUN, yalnız bunları birbirine göre KARŞILAŞTIRIP nihai teknik sıralamayı (1'den sahadaki at sayısına kadar, hiç atlama/tekrar yok) belirliyorsun. En güçlü kanıta/karara sahip at 1, en zayıf en yüksek sıra numarasını alır.
+
+**KRİTİK — KARARI YENİDEN VER (v6.68, GOLDEN BEE dersi):** Her atın yanındaki "İLK karar" ESKİ ve GÜVENİLMEZ olabilir — o karar, muhakeme metnindeki "(KOD-GARANTİSİ: ...)" ile işaretli etiketler eklenmeden ÖNCE verilmişti. KOD-GARANTİSİ etiketleri Claude'un tahmini DEĞİL, koddan gelen DOĞRULANMIŞ GERÇEKLERDİR (ör. "aygırın sahadaki EN İYİ kazanma yüzdesi", "bugünküyle eşleşen zeminde kazandı", "son yarışını kazandı") — bunları TAM AĞIRLIĞIYLA say. Yanıtındaki "karar" alanı İLK kararı kopyalamak DEĞİL, TÜM muhakemeyi (KOD-GARANTİSİ etiketleri dahil) şimdi bir bütün olarak yeniden değerlendirip vereceğin NİHAİ karardır. Somut kural: bir atın muhakemesinde 2 veya daha fazla KOD-GARANTİSİ:destek etiketi varsa ve ciddi bir KOD-GARANTİSİ:risk/güçlü risk kanıtı yoksa, o at "Orta Risk" veya "Yüksek Risk"te KALAMAZ — en az "Düşük Risk" olmalı. GOLDEN BEE örneği: yalnız "1.3kg ağır" notu varken, iki KOD-GARANTİSİ:destek etiketi (aynı jokey + bugünküyle eşleşen zeminde galibiyet) görmezden gelinip "Yüksek Risk" verilmişti — bu YANLIŞTI, "Düşük Risk" olmalıydı.
 
 ÖNEMLİ — HAM VERİYİ ÇAPA OLARAK KULLAN: Grup analiz metinlerinde "ağır kilo", "düşük HP" gibi benzer sözel etiketler görsen bile, atları birbirine göre kıyaslarken MUTLAKA "Ham veri" satırındaki sayıları kontrol et. Örneğin iki ata da "ağır kilo" yazılmışsa, ham veride kilosu daha hafif olan atın kilo dezavantajını daha küçük bir risk say. Grup metninin tonlaması ile ham verideki sayı bariz çelişiyorsa (ör. sahadaki en hafif ata "ağır kilo" denmişse), sayısal gerçeği esas al, kelimeyi değil.
 
 ÖNEMLİ — SINIF DÜŞÜŞÜ/YÜKSELİŞİ HER ZAMAN DİKKATE ALINIR: Bazı atların muhakeme metninde sonda "[V14]:destek(sınıf düşüşü...)" veya "[V14]:nötr(sınıf yükselişi...)" etiketi bulacaksın — bu KOD TARAFINDAN eklenmiştir, Claude'un kendi tercihi değildir, ASLA yok sayma. Sınıf düşüşü olan bir at (önceki yarışı bugünkünden yüksek sınıftaysa) bu koşuda daha zayıf rakiplerle karşılaşıyor demektir — SKK farkı 1 kademe bile olsa bu gerçek bir avantajdır, sıralamada mutlaka lehine say.
 
-ÖNEMLİ — GENEL TUTARLILIK, YALNIZ İKİLİ KIYASLAR DEĞİL: Her atın başındaki "karar" alanı (Güçlü Aday / Orta Risk / Düşük Risk / Yüksek Risk) o atın GENEL profilinin özetidir — sıralamayı yalnız kod-çiftlerini ikili ikili karşılaştırarak değil, bu genel resmi de gözeterek oluştur. Geniş sahalarda (10+ at) atları yalnız birbirine yakın çiftler halinde kıyaslayıp kalanı gözden kaçırma; bitmiş sıralamaya bütün olarak bak — aynı "karar" etiketine sahip atlar birbirine yakın sıralarda kümelenmeli, "Güçlü Aday" bir at hiçbir güçlü gerekçe olmadan çok sayıda "Orta/Yüksek Risk" atın gerisine düşmemeli. Böyle bir çelişki varsa ya gerekçeni gözden geçir ya da sıralamayı düzelt.
+ÖNEMLİ — GENEL TUTARLILIK, YALNIZ İKİLİ KIYASLAR DEĞİL: Yeniden verdiğin "karar" (Güçlü Aday / Orta Risk / Düşük Risk / Yüksek Risk) o atın GENEL profilinin özetidir — sıralamayı yalnız kod-çiftlerini ikili ikili karşılaştırarak değil, bu genel resmi de gözeterek oluştur. Geniş sahalarda (10+ at) atları yalnız birbirine yakın çiftler halinde kıyaslayıp kalanı gözden kaçırma; bitmiş sıralamaya bütün olarak bak — aynı "karar" etiketine sahip atlar birbirine yakın sıralarda kümelenmeli, "Güçlü Aday" bir at hiçbir güçlü gerekçe olmadan çok sayıda "Orta/Yüksek Risk" atın gerisine düşmemeli. Böyle bir çelişki varsa ya gerekçeni gözden geçir ya da sıralamayı düzelt.
 
 ## ATLAR (muhakeme + ham veri)
 ${liste}
 
-Yanıtı YALNIZCA geçerli JSON olarak ver:
-{ "siralama": [ { "no": 0, "teknikSira": 1 } ] }`;
+Yanıtı YALNIZCA geçerli JSON olarak ver — "karar" alanı ZORUNLU ve YENİDEN DEĞERLENDİRİLMİŞ olmalı:
+{ "siralama": [ { "no": 0, "teknikSira": 1, "karar": "Güçlü Aday / Düşük Risk / Orta Risk / Yüksek Risk" } ] }`;
 }
 
 async function prepareRaceContext(raceId: string) {
@@ -326,10 +340,14 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
 
   let parsed: { atlar: TestV2Pick[] } | null = null;
   try {
-    const { siralama } = JSON.parse(siralamaRaw) as { siralama: { no: number; teknikSira: number }[] };
+    const { siralama } = JSON.parse(siralamaRaw) as { siralama: { no: number; teknikSira: number; karar?: string }[] };
     const siraByNo = new Map(siralama.map((s) => [s.no, s.teknikSira]));
+    // v6.68 — "karar" artık burada, TAM garanti-etiketli muhakemeyle YENİDEN veriliyor;
+    // eski (batch aşamasındaki, garantilerden önceki) karar yalnız yanıt bir şekilde
+    // eksik gelirse (şema "required" olsa da ekstra güvenlik) yedek olarak kullanılır.
+    const kararByNo = new Map(siralama.filter((s) => s.karar).map((s) => [s.no, s.karar!]));
     const atlar: TestV2Pick[] = allAtlar.map((a, i) => ({
-      no: a.no, ad: a.ad, karar: a.karar, muhakeme: a.muhakeme,
+      no: a.no, ad: a.ad, karar: kararByNo.get(a.no) ?? a.karar, muhakeme: a.muhakeme,
       teknikSira: siraByNo.get(a.no) ?? i + 1,
     }));
     parsed = { atlar };
