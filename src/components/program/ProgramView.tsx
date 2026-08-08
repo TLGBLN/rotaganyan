@@ -314,11 +314,12 @@ function XLogo({ className }: { className?: string }) {
 // ── Analiz paneli ────────────────────────────────────────────────────────────
 
 function AnalysisPanel({
-  picks, runners, winnerNos, isLoggedIn, isAdmin, isVerified, userEmail, raceNo, hippodromeName, raceId,
+  picks, runners, winnerNos, ganyan, isLoggedIn, isAdmin, isVerified, userEmail, raceNo, hippodromeName, raceId,
 }: {
   picks: ProgramPick[];
   runners: ProgramRunner[];
   winnerNos?: number[] | null;
+  ganyan?: number | null;
   isLoggedIn: boolean;
   isAdmin: boolean;
   isVerified: boolean;
@@ -435,6 +436,9 @@ function AnalysisPanel({
                   <td className={cn("px-2 py-2 font-semibold", isWinner ? "text-[#f5c518]" : rs.text)}>
                     <span className="inline-flex items-center gap-1.5">
                       {name}
+                      {isWinner && ganyan != null && (
+                        <span className="text-[10px] font-semibold text-[#f5c518]">Gny: {ganyan.toFixed(2)}</span>
+                      )}
                       {isWinner && isAdmin && (
                         <button
                           type="button"
@@ -480,6 +484,9 @@ function AnalysisPanel({
                 </span>
                 <span className={cn("font-bold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>#{no}</span>
                 <span className={cn("font-semibold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>{name}</span>
+                {isWinner && ganyan != null && (
+                  <span className="text-[10px] font-semibold text-[#f5c518]">Gny: {ganyan.toFixed(2)}</span>
+                )}
                 {isWinner && isAdmin && (
                   <button
                     type="button"
@@ -1224,6 +1231,7 @@ function RaceTable({
             picks={race.picks}
             runners={race.runners}
             winnerNos={winnerNos}
+            ganyan={race.result?.ganyan}
             isLoggedIn={isLoggedIn}
             isAdmin={isAdmin}
             isVerified={isVerified}
