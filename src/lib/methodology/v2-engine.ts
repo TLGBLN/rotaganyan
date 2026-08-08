@@ -19,7 +19,7 @@ export function kategoriTespit(classType: string): Kategori {
   if (/HAND[İI]KAP/.test(t)) return "2";
   if (/[ŞS]ARTLI\s*[2345]\b/.test(t)) return "3";
   if (/\bG\s*[123]\b|\bKV[\s-]?\d/.test(t)) return "4";
-  if (/SAT(?:IŞ|IS)\s*[123]\b/.test(t)) return "5";
+  if (/SAT(?:IŞ|IS)\s*\d+\b/.test(t)) return "5";
   return "bilinmiyor";
 }
 
@@ -39,7 +39,7 @@ export const KATEGORI_ADI: Record<Exclude<Kategori, "bilinmiyor">, string> = {
   "2": "Alt Sınıf/Sürpriz — Handikap (tümü)",
   "3": "Şartlı 2/3/4/5",
   "4": "Üst Sınıf/Kalite — Grup/KV",
-  "5": "Satış 1/2/3",
+  "5": "Satış (tüm varyasyonlar)",
 };
 
 // Cache'lenen, TÜM kategorilerde AYNI (birebir), tamamen statik referans metni —
