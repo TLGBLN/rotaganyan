@@ -149,12 +149,12 @@ async function handleBatch(raceId: string, batchIndex: number) {
   // v6.53 boşa ödeme koruması: bu grup zaten üretilmişse (ör. önceki denemede
   // tamamlanmış ama bağlantı sonradan kesilmişse) Claude tekrar ÇAĞRILMAZ.
   const grupRaceKey = `${raceId}__g${batchIndex}`;
-  const cachedBatch = await getRecentCachedResult(grupRaceKey, "faz2v2");
-  let raw: string;
-  if (cachedBatch) {
-    console.log(`[test-v2-engine] grup ${batchIndex + 1}/${batches.length} önbellekten bulundu, atlanıyor.`);
-    raw = cachedBatch;
-  } else {
+  async function grubuCagir(onbellegiAtla: boolean): Promise<string> {
+    const cachedBatch = onbellegiAtla ? null : await getRecentCachedResult(grupRaceKey, "faz2v2");
+    if (cachedBatch) {
+      console.log(`[test-v2-engine] grup ${batchIndex + 1}/${batches.length} önbellekten bulundu, atlanıyor.`);
+      return cachedBatch;
+    }
     console.log(`[test-v2-engine] grup ${batchIndex + 1}/${batches.length} çalışıyor (${batch.length} at), raceId:`, raceId);
     const msg = await createWithTruncationRetry(
       {
@@ -171,20 +171,59 @@ async function handleBatch(raceId: string, batchIndex: number) {
       grupRaceKey, "faz2v2", 64000
     );
     console.log(`[test-v2-engine] grup ${batchIndex + 1}/${batches.length} bitti, usage:`, JSON.stringify(msg.usage), "stop_reason:", msg.stop_reason);
-    raw = extractText(msg);
     if (msg.usage) {
       usage.input_tokens = msg.usage.input_tokens ?? 0;
       usage.output_tokens = msg.usage.output_tokens ?? 0;
       usage.cache_creation_input_tokens = msg.usage.cache_creation_input_tokens ?? 0;
       usage.cache_read_input_tokens = msg.usage.cache_read_input_tokens ?? 0;
     }
+    return extractText(msg);
   }
 
-  let atlar: BatchAt[];
-  try {
-    atlar = (JSON.parse(raw) as { atlar: BatchAt[] }).atlar;
-  } catch {
-    return NextResponse.json({ error: `Grup ${batchIndex + 1}/${batches.length} yanıtı parse edilemedi.`, raw }, { status: 500 });
+  function parseAtlar(raw: string): BatchAt[] | null {
+    try {
+      return (JSON.parse(raw) as { atlar: BatchAt[] }).atlar;
+    } catch {
+      return null;
+    }
+  }
+
+  // v6.68 — kullanıcı bulgusu 2026-08-08 (Ankara 2.Koşu: #3 GOLDEN BEE ve #4 TESCİL,
+  // piyasanın en çok bahis alan iki atı, "Ön Teknik Sıra"dan TAMAMEN kaybolmuştu):
+  // Claude'un şema-kısıtlı JSON çıktısı istenen attan bir/ikisini sessizce atlayabiliyor —
+  // hiçbir kontrol bunu yakalamıyordu. Artık istenen HER "no" gelene kadar (en fazla 2
+  // deneme, önbelleği atlayarak) otomatik tekrar dener; 2 denemede de eksikse admin'e AÇIK
+  // bir hata gösterilir — kullanıcı talimatı: "hiçbir detayı atlamayacak" — hiçbir koşulda
+  // sessizce eksik bir liste ile devam edilmez. 2 ile sınırlı: her deneme ayrı bir Claude
+  // çağrısı, 3+ deneme bu rotanın 300sn maxDuration sınırını (kullanıcı uyarısı) zorlayabilir.
+  const MAX_DENEME = 2;
+  const istenenNolar = batch.map((r) => r.no);
+  let raw = "";
+  let atlar: BatchAt[] | null = null;
+  let eksikNolar: number[] = istenenNolar;
+  for (let deneme = 1; deneme <= MAX_DENEME && eksikNolar.length > 0; deneme++) {
+    raw = await grubuCagir(deneme > 1);
+    const parsedAttempt = parseAtlar(raw);
+    if (parsedAttempt === null) {
+      if (deneme === MAX_DENEME) {
+        return NextResponse.json({ error: `Grup ${batchIndex + 1}/${batches.length} yanıtı ${MAX_DENEME} denemede de parse edilemedi.`, raw }, { status: 500 });
+      }
+      console.error(`[test-v2-engine] grup ${batchIndex + 1}/${batches.length}: deneme ${deneme} parse edilemedi, tekrar deneniyor.`);
+      continue;
+    }
+    atlar = parsedAttempt;
+    const gelenNolar = new Set(atlar.map((a) => a.no));
+    eksikNolar = istenenNolar.filter((no) => !gelenNolar.has(no));
+    if (eksikNolar.length > 0 && deneme < MAX_DENEME) {
+      console.error(`[test-v2-engine] grup ${batchIndex + 1}/${batches.length}: deneme ${deneme}/${MAX_DENEME}, ${eksikNolar.join(",")} numaralı at(lar) yanıtta yok, tekrar deneniyor.`);
+    }
+  }
+  if (atlar === null || eksikNolar.length > 0) {
+    const eksikAdlar = eksikNolar.map((no) => `#${no} ${batch.find((r) => r.no === no)?.ad ?? ""}`).join(", ");
+    return NextResponse.json(
+      { error: `Grup ${batchIndex + 1}/${batches.length}: ${eksikAdlar} ${MAX_DENEME} denemede de yanıtta yer almadı — analiz eksik kalmasın diye durduruldu, tekrar deneyin.` },
+      { status: 500 }
+    );
   }
 
   // v6.56/v6.57 — kullanıcı kararı: sayısal/objektif V-kodları (V13 kilo, V14 sınıf,
