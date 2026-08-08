@@ -846,6 +846,38 @@ export function faz2SonYarisKazandiEtiketiEkle(
   return `${muhakeme} | [V19]:destek(KOD-GARANTİSİ: son yarışını kazandı — form dizisi ${r.recentForm})`;
 }
 
+// V5 (halihazirdaTemizDestekVarMi'den farklı): Claude "destek/nötr/risk" hangi yönde
+// karar verirse versin, bir kez bahsetmişse yeterli — yalnız TAMAMEN SESSİZ kalmayı
+// engelliyoruz, yönü zorlamıyoruz (H2H "zayıf kanıt", yön kararı Claude'a bırakılır).
+function halihazirdaHerhangiBirEtiketVarMi(muhakeme: string, kodDeseni: string): boolean {
+  return new RegExp(`\\[${kodDeseni}\\]:`, "i").test(muhakeme);
+}
+
+/**
+ * v6.68 — kullanıcı kararı 2026-08-08 (ATLI FIRTINA/KASIRGA AĞASI dersi, "her analizin
+ * eksiksiz yapılmasını istedim... sistem kontrol etsin diye para ödüyorum"): rank 1-2
+ * için "Kullanılmayan Veri" hard-gate'i yalnız BİLDİRİYORDU, admin manuel ekliyordu — bu
+ * artık yetersiz. h2hOzet'in kendisi zaten "bugünkü rakiplerden biriyle geçmiş
+ * karşılaşma" GARANTİSİ taşır (getH2HForRace yalnız bugünün atları arasında ortak geçmiş
+ * yarış varsa döner) — bu yüzden var olduğunda ASLA sessiz kalınamaz, koda gömülü.
+ */
+export function faz2H2HEtiketiEkle(muhakeme: string, r: { h2hOzet: string | null }): string {
+  if (!r.h2hOzet) return muhakeme;
+  if (halihazirdaHerhangiBirEtiketVarMi(muhakeme, "V5")) return muhakeme;
+  return `${muhakeme} | [V5]:nötr(KOD-GARANTİSİ: bugünün rakiplerinden biriyle geçmiş karşılaşma var — ${r.h2hOzet})`;
+}
+
+/**
+ * v6.68 — aynı ders: zeminGecmisiOzet'teki "[BU ZEMİN SINIFINDA KAZANDI]" etiketi
+ * (bugünküyle eşleşen zemin durumunda geçmiş galibiyet) somut, ölçülebilir bir olumlu
+ * sinyal — hiç bahsedilmeden geçilemez.
+ */
+export function faz2ZeminKazanmaEtiketiEkle(muhakeme: string, r: { zeminGecmisiOzet: string | null }): string {
+  if (!r.zeminGecmisiOzet?.includes("[BU ZEMİN SINIFINDA KAZANDI]")) return muhakeme;
+  if (halihazirdaTemizDestekVarMi(muhakeme, "V22")) return muhakeme;
+  return `${muhakeme} | [V22]:destek(KOD-GARANTİSİ: bugünküyle eşleşen zemin sınıfında kazanmış geçmişi var)`;
+}
+
 export function kosuBaslikUret(faz1: Faz1Sonuc, izinliKodlar: string[]): string {
   // v6.61 — kullanıcı bulgusu 2026-08-05: raceStyleEtiket gerçek değeri "Kaçak At"
   // (Türkçe görünen etiket) DEĞİL, ham enum "KACAK_AT" — bu karşılaştırma HER ZAMAN
