@@ -39,27 +39,39 @@ export type TestV2Pick = {
 
 export type BatchAt = { no: number; ad: string; karar: string; muhakeme: string };
 
-const BATCH_SCHEMA = {
-  type: "object",
-  properties: {
-    atlar: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          no: { type: "integer" },
-          ad: { type: "string" },
-          karar: { type: "string" },
-          muhakeme: { type: "string" },
+// v6.68 — kullanıcı bulgusu 2026-08-08 (Ankara 2.Koşu, #3/#4 iki denemede de yanıttan
+// düşmüştü): loglardan çıkan ham kanıt, Claude'un HER İKİ denemede de "atlar" dizisini
+// TAM OLARAK aynı 2 atla (istenen 4'ün ilk ikisi) "bitirdiğini" gösterdi — rastgele değil,
+// sistematik. Sebep: şema "atlar" dizisinin UZUNLUĞUNU hiç sınırlamıyordu, bu yüzden 2
+// elemanlı bir dizi de şema açısından geçerliydi. minItems/maxItems ile dizi uzunluğunu
+// istenen at sayısına SABİTLİYORUZ — model artık "eksik ama geçerli" bir yanıt üretemez,
+// eksik bırakırsa yanıtın kendisi şema ihlali sayılıp yeniden üretilir (yapısal kapatma;
+// handleBatch'teki tekrar-deneme döngüsü hâlâ ikinci bir savunma katmanı olarak duruyor).
+function batchSchemaFor(atSayisi: number) {
+  return {
+    type: "object",
+    properties: {
+      atlar: {
+        type: "array",
+        minItems: atSayisi,
+        maxItems: atSayisi,
+        items: {
+          type: "object",
+          properties: {
+            no: { type: "integer" },
+            ad: { type: "string" },
+            karar: { type: "string" },
+            muhakeme: { type: "string" },
+          },
+          required: ["no", "ad", "karar", "muhakeme"],
+          additionalProperties: false,
         },
-        required: ["no", "ad", "karar", "muhakeme"],
-        additionalProperties: false,
       },
     },
-  },
-  required: ["atlar"],
-  additionalProperties: false,
-} as const;
+    required: ["atlar"],
+    additionalProperties: false,
+  } as const;
+}
 
 const SIRALAMA_SCHEMA = {
   type: "object",
@@ -161,7 +173,7 @@ async function handleBatch(raceId: string, batchIndex: number) {
         model: "claude-sonnet-5",
         thinking: { type: "adaptive" },
         max_tokens: 64000,
-        output_config: { format: { type: "json_schema", schema: BATCH_SCHEMA } },
+        output_config: { format: { type: "json_schema", schema: batchSchemaFor(batch.length) } },
         messages: [{ role: "user", content: [
           legendBlock,
           { type: "text", text: kosuBaslik + "\n\n## ATLAR (bu grup)\n" + atlarMetin },
