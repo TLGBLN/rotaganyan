@@ -154,6 +154,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                                 return pos != null ? (
                                   <span className={cn("ml-1 text-[10px] font-semibold", pos === 1 ? "text-[#F5C518]" : "text-muted-foreground")}>
                                     ({pos}.)
+                                    {pos === 1 && race.result?.ganyan != null && ` Gny: ${race.result.ganyan.toFixed(2)}`}
                                   </span>
                                 ) : null;
                               })()}
@@ -282,6 +283,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                                   return pos != null ? (
                                     <span className={cn("text-[10px] font-semibold", pos === 1 ? "text-[#F5C518]" : "text-muted-foreground")}>
                                       ({pos}.)
+                                      {pos === 1 && race.result?.ganyan != null && ` Gny: ${race.result.ganyan.toFixed(2)}`}
                                     </span>
                                   ) : null;
                                 })()}
