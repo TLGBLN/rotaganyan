@@ -20,7 +20,6 @@ import { getAtPerformansForRace } from "@/server/actions/at-performans.actions";
 import { getH2HForRace } from "@/server/actions/h2h.actions";
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getDamStatOzetleriForRace, getDamSireOwnStatForRace } from "@/server/actions/dam-stat.actions";
-import { getSireDosageForRace } from "@/server/actions/sire-dosage.actions";
 import {
   hpKalitesiYildizi, sinifGecisBonusu, galopSiniflandirmasi, tempoGuvenSeviyesi,
   kacakHaritasi, zeminKatsayisi, zeminDetayiBul, zeminDetayiSatirdanCikar, type GalopZinciriSonuc, type TempoGuven,
@@ -485,11 +484,10 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
     // talebi 2026-08-01: "Start Sorunu olan atları tespit edebilir miyiz"). bkz.
     // gec-cikis.actions.ts, Result.gecCikanlar (tjk-result.adapter.ts + result-sync.ts).
     getGecCikisOzetleriForRace(race.runners.map((r) => r.name), race.raceDay.date).catch(() => new Map()),
-    // Dozaj (DP/DI/CD) — bkz. sire-dosage.actions.ts yorumu, aygır/kısrak/damsire kazanma
-    // yüzdesinden BAĞIMSIZ, aygırın genetik hız/mesafe yapısına dayanan dördüncü pedigri sinyali.
-    getSireDosageForRace(race.runners.map((r) => r.sire)).catch(
-      () => race.runners.map(() => ({ ozet: null, di: null, cd: null }))
-    ),
+    // Dozaj (DP/DI/CD) — v6.67 kullanıcı kararı 2026-08-08: kaynak/kapsam netleşene kadar
+    // RAFA KALDIRILDI, canlı analize karışmasın diye bilerek sabit null döndürülüyor.
+    // Altyapı (SireDosageStat, sire-dosage.actions.ts) DURUYOR — yalnız burada devre dışı.
+    Promise.resolve(race.runners.map(() => ({ ozet: null, di: null, cd: null }))),
   ]);
   const horseStatsCacheMap = new Map(horseStatsCacheRows.map((h) => [h.tjkAtId, h.detailedStatsJson as unknown as HorseDetailStatSection[]]));
   const zeminGecmisiMap = new Map(gecmisBaglamSonuc.zemin.map((z) => [z.no, z]));

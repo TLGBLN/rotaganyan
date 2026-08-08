@@ -517,6 +517,39 @@ export function faz2KararSiraTutarsizlikDenetimi(
   return faz2Atlar.map((a) => ({ no: a.no, ad: a.ad, uyarilar: [...(uyarilarByNo.get(a.no) ?? [])] }));
 }
 
+export type KararHiyerarsiDegisikligi = { no: number; ad: string; eskiSira: number; yeniSira: number };
+export type KararHiyerarsiSonuc<T> = { atlar: T[]; degisiklikler: KararHiyerarsiDegisikligi[] };
+
+/**
+ * v6.67 — kullanıcı kararı 2026-08-07 (İstanbul 1.Koşu, TOUCH THE CLOUD/DARK MONEY dersi):
+ * "Düşük Risk, Orta Risk'in önünde olacak şekilde sırala — mantıklı sıralama Güçlü Aday -
+ * Düşük Risk - Orta Risk - Yüksek Risk'tir." Bu KOŞULSUZ bir kural — Orta Risk atının kaç
+ * kod-garantili sinyali olursa olsun, "karar" kategorisi daha iyi olan at HER ZAMAN önde
+ * olur. faz2KararSiraTutarsizlikDenetimi (yalnız uyarı, bloklamaz) yetersiz kalabileceği
+ * için (kullanıcı: "yetersiz kalma ihtimali görürsen garantici ol") bu, PROMPTTAN BAĞIMSIZ,
+ * kategoriye göre istikrarlı (stabil) yeniden sıralama yapan mekanik bir zorunluluk —
+ * aynı kategori içindeki göreli sıra (Claude'un/Top3Garantisi'nin ürettiği) KORUNUR, yalnız
+ * kategoriler arası ihlaller düzeltilir.
+ */
+export function faz2KararHiyerarsisiUygula<T extends { no: number; ad: string; karar: string; teknikSira: number }>(
+  atlar: T[]
+): KararHiyerarsiSonuc<T> {
+  const siraliOrijinal = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
+  const yeniSirali = [...siraliOrijinal].sort((a, b) => {
+    const wa = KARAR_AGIRLIK[a.karar] ?? 2;
+    const wb = KARAR_AGIRLIK[b.karar] ?? 2;
+    if (wa !== wb) return wb - wa;
+    return a.teknikSira - b.teknikSira;
+  });
+  const degisiklikler: KararHiyerarsiDegisikligi[] = [];
+  const guncellenmis = yeniSirali.map((a, i) => {
+    const yeniSira = i + 1;
+    if (yeniSira !== a.teknikSira) degisiklikler.push({ no: a.no, ad: a.ad, eskiSira: a.teknikSira, yeniSira });
+    return { ...a, teknikSira: yeniSira };
+  });
+  return { atlar: guncellenmis, degisiklikler };
+}
+
 export type BankoAdayiSonuc = {
   bankoAdayi: boolean;
   sebep: string;

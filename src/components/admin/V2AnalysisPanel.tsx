@@ -29,6 +29,7 @@ type BankoAdayiSonuc = {
 type KaliteUyariSatiri = { no: number; ad: string; uyarilar: string[] };
 type KullanilmayanVeriSatiri = { no: number; ad: string; kullanilmayanKodlar: string[] };
 type Top3TerfiSonuc = { no: number; ad: string; eskiSira: number; yeniSira: number };
+type KararHiyerarsiDegisikligi = { no: number; ad: string; eskiSira: number; yeniSira: number };
 
 type Props = { raceId: string };
 
@@ -69,6 +70,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
   const [kararSiraUyarilari, setKararSiraUyarilari] = useState<KaliteUyariSatiri[]>([]);
   const [kullanilmayanVeri, setKullanilmayanVeri] = useState<KullanilmayanVeriSatiri[]>([]);
   const [top3Terfileri, setTop3Terfileri] = useState<Top3TerfiSonuc[]>([]);
+  const [kararHiyerarsiDegisiklikleri, setKararHiyerarsiDegisiklikleri] = useState<KararHiyerarsiDegisikligi[]>([]);
   const [kullanilmayanVeriOnay, setKullanilmayanVeriOnay] = useState(false);
   const [tempoOzeti, setTempoOzeti] = useState<string>("");
   const [kuponlar, setKuponlar] = useState<{ narrow?: string; normal?: string; wide?: string }>({});
@@ -91,6 +93,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
     setKararSiraUyarilari([]);
     setKullanilmayanVeri([]);
     setTop3Terfileri([]);
+    setKararHiyerarsiDegisiklikleri([]);
     setKullanilmayanVeriOnay(false);
     setBankoAdayi(null);
     setLoading(true);
@@ -124,6 +127,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
         faz2KararSiraUyarilari: KaliteUyariSatiri[] | null;
         faz2KullanilmayanVeri: KullanilmayanVeriSatiri[] | null;
         faz2Top3Terfileri: Top3TerfiSonuc[] | null;
+        faz2KararHiyerarsiDegisiklikleri: KararHiyerarsiDegisikligi[] | null;
         tempoOzeti: string;
         couponNarrow?: string; couponNormal?: string; couponWide?: string;
       }>("/api/admin/test-v2-engine", { raceId, step: "rank", atlar: allAtlar });
@@ -138,6 +142,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
       setKararSiraUyarilari((res.faz2KararSiraUyarilari ?? []).filter((k) => k.uyarilar.length > 0));
       setKullanilmayanVeri(res.faz2KullanilmayanVeri ?? []);
       setTop3Terfileri(res.faz2Top3Terfileri ?? []);
+      setKararHiyerarsiDegisiklikleri(res.faz2KararHiyerarsiDegisiklikleri ?? []);
       setTempoOzeti(res.tempoOzeti ?? "");
       setKuponlar({ narrow: res.couponNarrow, normal: res.couponNormal, wide: res.couponWide });
     } catch (e: unknown) {
@@ -296,6 +301,22 @@ export default function V2AnalysisPanel({ raceId }: Props) {
           <ul className="space-y-0.5">
             {top3Terfileri.map((t) => (
               <li key={t.no} className="font-medium">#{t.no} {t.ad}: {t.eskiSira}. sıra → {t.yeniSira}. sıra</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {kararHiyerarsiDegisiklikleri.length > 0 && (
+        <div className="space-y-1 rounded-lg border border-brand/40 bg-brand/10 px-3 py-2.5 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-brand">
+            <Sparkles className="h-3.5 w-3.5" /> Karar Hiyerarşisi Düzeltmesi — İstanbul 1.Koşu dersi
+          </div>
+          <p className="text-muted-foreground">
+            Güçlü Aday &gt; Düşük Risk &gt; Orta Risk &gt; Yüksek Risk hiyerarşisi koşulsuz uygulandı:
+          </p>
+          <ul className="space-y-0.5">
+            {kararHiyerarsiDegisiklikleri.map((d) => (
+              <li key={d.no} className="font-medium">#{d.no} {d.ad}: {d.eskiSira}. sıra → {d.yeniSira}. sıra</li>
             ))}
           </ul>
         </div>

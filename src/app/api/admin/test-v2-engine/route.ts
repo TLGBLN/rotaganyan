@@ -5,7 +5,7 @@ import type { Anthropic } from "@anthropic-ai/sdk";
 import { createWithTruncationRetry, extractText } from "@/lib/methodology/claude-analiz-helpers";
 import { getRecentCachedResult } from "@/lib/claude-cost";
 import type { Role } from "@prisma/client";
-import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi } from "@/lib/methodology/v2-engine";
+import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula } from "@/lib/methodology/v2-engine";
 
 // v6.53 — kullanıcı bulgusu 2026-08-04 (Kocaeli 5.Koşu): tüm sahayı TEK bir Claude
 // çağrısında analiz etmek, zengin kategorilerde (3/4/5) + 8+ atlı sahalarda GERÇEKTEN
@@ -292,6 +292,16 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
     console.log("[test-v2-engine] Top3 garantisi tetiklendi:", JSON.stringify(faz2Top3Terfileri));
   }
 
+  // v6.67 — kullanıcı kararı 2026-08-07 (İstanbul 1.Koşu dersi): karar hiyerarşisi
+  // (Güçlü Aday > Düşük Risk > Orta Risk > Yüksek Risk) KOŞULSUZ olarak zorunlu kılınır —
+  // bkz. v2-engine.ts'deki faz2KararHiyerarsisiUygula yorumu.
+  const hiyerarsiSonuc = faz2KararHiyerarsisiUygula(parsed.atlar);
+  parsed = { atlar: hiyerarsiSonuc.atlar };
+  const faz2KararHiyerarsiDegisiklikleri = hiyerarsiSonuc.degisiklikler;
+  if (faz2KararHiyerarsiDegisiklikleri.length > 0) {
+    console.log("[test-v2-engine] Karar hiyerarşisi düzeltmesi:", JSON.stringify(faz2KararHiyerarsiDegisiklikleri));
+  }
+
   // v6.45 — kullanıcı talebi: "faz1'in neleri çektiğini ve faz2'nin neleri muhakeme
   // ettiğini tikli olarak görmek istiyorum. Muhakeme edilmediği halde edilmiş gibi
   // göstermemeli." İkisi de ek Claude çağrısı yapmaz, tamamen mekanik/koddur.
@@ -347,6 +357,7 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
     faz2KararSiraUyarilari,
     faz2KullanilmayanVeri,
     faz2Top3Terfileri,
+    faz2KararHiyerarsiDegisiklikleri,
     faz2BankoAdayi,
     runners,
     tempoOzeti,
