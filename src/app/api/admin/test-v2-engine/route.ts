@@ -42,33 +42,31 @@ export type BatchAt = { no: number; ad: string; karar: string; muhakeme: string 
 // v6.68 — kullanıcı bulgusu 2026-08-08 (Ankara 2.Koşu, #3/#4 iki denemede de yanıttan
 // düşmüştü): loglardan çıkan ham kanıt, Claude'un HER İKİ denemede de "atlar" dizisini
 // TAM OLARAK aynı 2 atla (istenen 4'ün ilk ikisi) "bitirdiğini" gösterdi — rastgele değil,
-// sistematik. Sebep: şema "atlar" dizisinin UZUNLUĞUNU hiç sınırlamıyordu, bu yüzden 2
-// elemanlı bir dizi de şema açısından geçerliydi. minItems/maxItems ile dizi uzunluğunu
-// istenen at sayısına SABİTLİYORUZ — model artık "eksik ama geçerli" bir yanıt üretemez,
-// eksik bırakırsa yanıtın kendisi şema ihlali sayılıp yeniden üretilir (yapısal kapatma;
-// handleBatch'teki tekrar-deneme döngüsü hâlâ ikinci bir savunma katmanı olarak duruyor).
-function batchSchemaFor(atSayisi: number) {
-  return {
+// sistematik. Önce dizi UZUNLUĞUNU minItems/maxItems ile sabitlemeyi denedik ama
+// Anthropic'in yapılandırılmış çıktı API'si "array" için minItems'ı YALNIZ 0/1 destekliyor
+// (2+ değer 400 hatası verdi, canlıda TÜM analiz akışını kırdı — hemen geri alındı).
+// KÖKTEN ÇÖZÜM: dizi yerine, HER at için "at_{no}" adlı AYRI BİR ZORUNLU ALAN kullanan bir
+// obje şeması — "required" (zorunlu alan) standart, evrensel bir JSON Schema özelliği ve
+// bu şemada zaten başka yerde (ör. her at objesinin kendi required'ı) kullanılıyor, minItems
+// gibi Anthropic-özel bir kısıtlamaya bağımlı değil. Bir alan eksikse yanıtın kendisi şema
+// ihlali sayılır — model artık "eksik ama geçerli" bir yanıt ÜRETEMEZ, yapısal olarak kapalı.
+function batchSchemaFor(nolar: number[]) {
+  const atSchema = {
     type: "object",
     properties: {
-      atlar: {
-        type: "array",
-        minItems: atSayisi,
-        maxItems: atSayisi,
-        items: {
-          type: "object",
-          properties: {
-            no: { type: "integer" },
-            ad: { type: "string" },
-            karar: { type: "string" },
-            muhakeme: { type: "string" },
-          },
-          required: ["no", "ad", "karar", "muhakeme"],
-          additionalProperties: false,
-        },
-      },
+      no: { type: "integer" },
+      ad: { type: "string" },
+      karar: { type: "string" },
+      muhakeme: { type: "string" },
     },
-    required: ["atlar"],
+    required: ["no", "ad", "karar", "muhakeme"],
+    additionalProperties: false,
+  } as const;
+  const alanAdi = (no: number) => `at_${no}`;
+  return {
+    type: "object",
+    properties: Object.fromEntries(nolar.map((no) => [alanAdi(no), atSchema])),
+    required: nolar.map(alanAdi),
     additionalProperties: false,
   } as const;
 }
@@ -90,15 +88,17 @@ const SIRALAMA_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-function batchReminder(kategori: string, batchNo: number, toplamBatch: number): string {
+function batchReminder(kategori: string, batchNo: number, toplamBatch: number, nolar: number[]): string {
   return `Şimdi yukarıdaki V-kodu tanımlarını, muhakeme matrisini ve AŞAĞIDAKİ AT GRUBUNU (bu, sahadaki atların yalnız bir kısmı — grup ${batchNo}/${toplamBatch}) kullanarak HER at için "muhakeme" üret. Bu koşu ${kategori} kategorisinde — yalnız KOŞU/AT verisinde GÖRÜNEN V-kodlarını kullan, görünmeyen bir kod hakkında veri uydurma. Bu aşamada teknikSira/karşılaştırmalı sıra İSTEMİYORUM (sahadaki diğer atları henüz görmüyorsun) — yalnız "karar" (Güçlü Aday / Düşük Risk / Orta Risk / Yüksek Risk, bu atın KENDİ verisine göre) ve "muhakeme" üret.
 
 **FORMAT — KOMPAKT ETİKET NOTASYONU:** "muhakeme" alanında TAM CÜMLE DEĞİL, kısa "Etiket:değer(bağlam)" parçaları yaz, "|" ile ayır. Fiil/bağlaç/özne YASAK. Muhakeme Matrisi'nde çapraz sorguladığın HER çift için "[Vx+Vy]:destek" veya "[Vx+Vy]:risk" etiketi ekle (bağlamı parantez içinde 1-3 kelime). Örnek: 'V10:KaçakAt | V18:3(iç) | [V10+V18]:destek(iç kulvar+kaçak avantajlı) | V9:n=4,med-0.6(güçlü) | [V2+V9]:destek(idman+kapanış örtüşüyor) | V13:56(-2kg) | [V13+V10]:risk(ağır kilo erken enerji riski)'.
 
 **ÖNEMLİ OLANI YAZ, DOLDURMA YAPMA:** Yalnız gerçekten anlamlı/karar etkileyici bulduğun V-kodu çiftlerini ve sinyalleri yaz — önemsiz bulduğun her kodu "yok/etkisiz" diye tek tek sıralamak ZORUNLU DEĞİL (v6.66 kullanıcı bulgusu: bu, 15 atlı sahalarda muhakemeyi anlamsız doldurmayla şişirip sıralama çağrısının asıl sinyali (karar: Güçlü Aday vb.) gürültü içinde kaybetmesine yol açtı — TAM TIME/İSPANOZ tarzı gerçekten önemli, geniş örneklemli sinyalleri (n≥5) ASLA atlama, ama sıradan/önemsiz her kodu doldurma amacıyla yazma).
 
-Yanıtı YALNIZCA geçerli JSON olarak ver:
-{ "atlar": [ { "no": 0, "ad": "...", "karar": "Güçlü Aday / Düşük Risk / Orta Risk / Yüksek Risk", "muhakeme": "Etiket:değer(bağlam) | [Vx+Vy]:destek(...) | ..." } ] }`;
+**KRİTİK — HİÇBİR ALANI ATLAMA:** Yanıt şeması bu gruptaki HER at için AYRI, ZORUNLU bir alan içeriyor (${nolar.map((no) => `"at_${no}"`).join(", ")}) — bunlardan biri bile eksik kalırsa yanıt GEÇERSİZ sayılır. Aşağıdaki ${nolar.length} atın HEPSİ için bir alan doldurmalısın, hiçbirini atlama.
+
+Yanıtı YALNIZCA geçerli JSON olarak ver, örnek (alan adları "at_" + o atın numarası):
+{ ${nolar.map((no) => `"at_${no}": { "no": ${no}, "ad": "...", "karar": "Güçlü Aday / Düşük Risk / Orta Risk / Yüksek Risk", "muhakeme": "Etiket:değer(bağlam) | [Vx+Vy]:destek(...) | ..." }`).join(", ")} }`;
 }
 
 // v6.55 — kullanıcı bulgusu (WOLF SEYFO, Kocaeli 7.Koşu): sıralama çağrısı yalnız
@@ -173,11 +173,11 @@ async function handleBatch(raceId: string, batchIndex: number) {
         model: "claude-sonnet-5",
         thinking: { type: "adaptive" },
         max_tokens: 64000,
-        output_config: { format: { type: "json_schema", schema: batchSchemaFor(batch.length) } },
+        output_config: { format: { type: "json_schema", schema: batchSchemaFor(batch.map((r) => r.no)) } },
         messages: [{ role: "user", content: [
           legendBlock,
           { type: "text", text: kosuBaslik + "\n\n## ATLAR (bu grup)\n" + atlarMetin },
-          { type: "text", text: batchReminder(KATEGORI_ADI[kategori], batchIndex + 1, batches.length) },
+          { type: "text", text: batchReminder(KATEGORI_ADI[kategori], batchIndex + 1, batches.length, batch.map((r) => r.no)) },
         ] }],
       },
       grupRaceKey, "faz2v2", 64000
@@ -192,9 +192,12 @@ async function handleBatch(raceId: string, batchIndex: number) {
     return extractText(msg);
   }
 
+  // Şema artık { "at_3": {...}, "at_4": {...} } biçiminde (bkz. batchSchemaFor yorumu) —
+  // her anahtarın değerini alıp düz bir diziye çeviriyoruz.
   function parseAtlar(raw: string): BatchAt[] | null {
     try {
-      return (JSON.parse(raw) as { atlar: BatchAt[] }).atlar;
+      const obj = JSON.parse(raw) as Record<string, BatchAt>;
+      return Object.values(obj);
     } catch {
       return null;
     }
