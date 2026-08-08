@@ -788,10 +788,114 @@ export function faz2Top3Garantisi(
     return {
       ...a,
       teknikSira,
+      // v6.68 düzeltme — kullanıcı bulgusu 2026-08-08/09: bu terfi yalnız teknikSira'yı
+      // değiştiriyordu, "karar" (ör. "Orta Risk") olduğu gibi kalıyordu — bu yüzden BU
+      // fonksiyondan SONRA çalışan faz2KararHiyerarsisiUygula (koşulsuz kategori sıralaması)
+      // terfiyi SESSİZCE GERİ ALABİLİYORDU. Artık terfi eden atın kararı da "Güçlü Aday"a
+      // yükseltiliyor — terfi, hiyerarşi kuralından SONRA da kalıcı.
+      karar: "Güçlü Aday",
       muhakeme: `${a.muhakeme} | [SİSTEM]:KOD-GARANTİSİ ilk 3'e terfi (eski sıra ${terfi.eskiSira} → ${teknikSira}) — sahanın #1 tarihsel kazanan stiliyle n≥10 gerçek örneklemle eşleşiyor, kendi kararı Yüksek Risk değil (DAELLA dersi, 2026-08-05).`,
     };
   });
 
+  return { atlar: yeniAtlar, terfiler };
+}
+
+// v6.68 — AGF-top4/top2 garantilerinin ikisi de aynı "bu at kaç KOD-GARANTİLİ destek
+// taşıyor" sayımına dayanıyor — V4 (aynı jokey) BİLEREK hariç, çünkü neredeyse her atta
+// görülüyor ve tek başına güçlü bir kombinasyon sinyali sayılamaz. Yalnız V1 (aygır en
+// iyisi), V19 (son yarış galibiyeti), V22 (zemin eşleşme galibiyeti) sayılır.
+const GUCLU_KOD_GARANTI_KODLARI = ["V1", "V19", "V22"];
+function gucluKodGarantiSayisi(muhakeme: string): number {
+  return GUCLU_KOD_GARANTI_KODLARI.filter((kod) =>
+    new RegExp(`\\[${kod}(?:\\+V\\d+)?\\]:destek\\(KOD-GARANTİSİ`, "i").test(muhakeme)
+  ).length;
+}
+
+/**
+ * v6.68 — kullanıcı kararı 2026-08-09: "diğer faktörler ve AGF trend birleşiyorsa
+ * kesinlikle ilk 2 içinde olacak." AGF trend yükselen bir at AYRICA en az bir güçlü
+ * kod-garantili sinyale (V1/V19/V22) sahipse ilk 2'ye koşulsuz terfi eder — yalnız AGF
+ * yükselişi (faz2AgfYukselenTop4Garantisi) tek başına ilk 4 garantisi veriyordu, bu daha
+ * sıkı/daha yüksek bir terfi katmanı. "karar" da "Güçlü Aday"a yükseltilir (Top3Garantisi
+ * ile aynı gerekçe: aksi halde hiyerarşi kuralı terfiyi geri alır).
+ */
+export function faz2GucluKombinasyonTop2Garantisi(
+  atlar: TeknikSiraliAt[],
+  faz1: Faz1Sonuc
+): { atlar: TeknikSiraliAt[]; terfiler: KararHiyerarsiDegisikligi[] } {
+  const yukselenler = faz1.race.enCokYukselenler;
+  if (!yukselenler || yukselenler.length === 0 || atlar.length <= 2) return { atlar, terfiler: [] };
+
+  let calisma = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
+  const terfiler: KararHiyerarsiDegisikligi[] = [];
+  const nitelikliler = yukselenler
+    .map((y) => y.runnerNo)
+    .map((no) => calisma.find((a) => a.no === no))
+    .filter((a): a is TeknikSiraliAt => !!a && gucluKodGarantiSayisi(a.muhakeme) >= 1)
+    .sort((a, b) => b.teknikSira - a.teknikSira); // en geride olan önce terfi etsin
+
+  for (const at of nitelikliler) {
+    const idx = calisma.findIndex((a) => a.no === at.no);
+    if (idx === -1 || idx < 2) continue; // zaten ilk 2'de
+    const eskiSira = calisma[idx].teknikSira;
+    const guncellenmisAt: TeknikSiraliAt = {
+      ...calisma[idx],
+      karar: "Güçlü Aday",
+      muhakeme: `${calisma[idx].muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF trend + güçlü sinyal birleşimiyle ilk 2'ye terfi (eski sıra ${eskiSira} → 2) — 2026-08-09 kullanıcı kararı.`,
+    };
+    const kalanlar = calisma.filter((a) => a.no !== at.no);
+    calisma = [kalanlar[0], guncellenmisAt, ...kalanlar.slice(1)];
+    terfiler.push({ no: at.no, ad: at.ad, eskiSira, yeniSira: 2 });
+  }
+  if (terfiler.length === 0) return { atlar, terfiler: [] };
+
+  const yeniAtlar = calisma.map((a, i) => ({ ...a, teknikSira: i + 1 }));
+  return { atlar: yeniAtlar, terfiler };
+}
+
+/**
+ * v6.68 — kullanıcı bulgusu 2026-08-08/09 (Ankara günü, 6/6 kontrol edilen koşuda kazanan
+ * atın gün içinde AGF'si belirgin şekilde yükselmişti — "en çok yükselenler" panelindeki
+ * ATLI FIRTINA, GOLDEN BEE, FAST PILOT, NERİS KIZIM, KUMBEY, EL INTOCABLE hepsi kazandı):
+ * kullanıcı kararı KOŞULSUZ — "AGF trend yükselende olan at ilk 4 içinde yer alsın
+ * kesinlikle." faz1.race.enCokYukselenler (agf-trend.actions.ts'teki AYNI anlamlı-eşik/
+ * gürültü filtresinden geçmiş, halihazırda public panelde gösterilen liste — burada YENİ
+ * bir eşik icat edilmiyor) içindeki her at, ilk 4'te değilse doğrudan konum garantisiyle
+ * oraya taşınır. Top3Garantisi'nin aynı dersiyle: "karar" da (Orta/Yüksek Risk ise) en az
+ * "Düşük Risk"e yükseltilir — aksi halde faz2KararHiyerarsisiUygula bu terfiyi geri alır.
+ * Not: teorik olarak 2+ nitelikli yükselen aynı anda 4 sıralık pencereye sığmayabilir; bu
+ * durumda hepsi pencereye ARDIŞIK olarak eklenir (güçlüsü önce), en güçlüsü kesin ilk 4'te
+ * kalır — pratikte (kontrol edilen tüm örneklerde) koşu başına tek belirgin yükselen çıktı.
+ */
+export function faz2AgfYukselenTop4Garantisi(
+  atlar: TeknikSiraliAt[],
+  faz1: Faz1Sonuc
+): { atlar: TeknikSiraliAt[]; terfiler: KararHiyerarsiDegisikligi[] } {
+  const yukselenler = faz1.race.enCokYukselenler;
+  if (!yukselenler || yukselenler.length === 0 || atlar.length <= 4) return { atlar, terfiler: [] };
+
+  let calisma = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
+  const terfiler: KararHiyerarsiDegisikligi[] = [];
+  const siraliYukselenler = [...yukselenler].sort((a, b) => b.fark - a.fark);
+
+  for (const y of siraliYukselenler) {
+    const idx = calisma.findIndex((a) => a.no === y.runnerNo);
+    if (idx === -1 || idx < 4) continue; // koşmuyor (çekilmiş) ya da zaten ilk 4'te
+    const at = calisma[idx];
+    const eskiSira = at.teknikSira;
+    const guncellenmisAt: TeknikSiraliAt = {
+      ...at,
+      karar: at.karar === "Orta Risk" || at.karar === "Yüksek Risk" ? "Düşük Risk" : at.karar,
+      muhakeme: `${at.muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF trend ile ilk 4'e terfi (eski sıra ${eskiSira} → 4) — gün içinde belirgin para akışı (+${y.fark} puan, 2026-08-08 Ankara günü dersi).`,
+    };
+    const kalanlar = calisma.filter((a) => a.no !== y.runnerNo);
+    calisma = [...kalanlar.slice(0, 3), guncellenmisAt, ...kalanlar.slice(3)];
+    terfiler.push({ no: at.no, ad: at.ad, eskiSira, yeniSira: 4 });
+  }
+  if (terfiler.length === 0) return { atlar, terfiler: [] };
+
+  const yeniAtlar = calisma.map((a, i) => ({ ...a, teknikSira: i + 1 }));
   return { atlar: yeniAtlar, terfiler };
 }
 

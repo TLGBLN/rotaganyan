@@ -70,6 +70,8 @@ export default function V2AnalysisPanel({ raceId }: Props) {
   const [kararSiraUyarilari, setKararSiraUyarilari] = useState<KaliteUyariSatiri[]>([]);
   const [kullanilmayanVeri, setKullanilmayanVeri] = useState<KullanilmayanVeriSatiri[]>([]);
   const [top3Terfileri, setTop3Terfileri] = useState<Top3TerfiSonuc[]>([]);
+  const [agfTop4Terfileri, setAgfTop4Terfileri] = useState<Top3TerfiSonuc[]>([]);
+  const [gucluTop2Terfileri, setGucluTop2Terfileri] = useState<Top3TerfiSonuc[]>([]);
   const [kararHiyerarsiDegisiklikleri, setKararHiyerarsiDegisiklikleri] = useState<KararHiyerarsiDegisikligi[]>([]);
   const [kullanilmayanVeriOnay, setKullanilmayanVeriOnay] = useState(false);
   const [tempoOzeti, setTempoOzeti] = useState<string>("");
@@ -93,6 +95,8 @@ export default function V2AnalysisPanel({ raceId }: Props) {
     setKararSiraUyarilari([]);
     setKullanilmayanVeri([]);
     setTop3Terfileri([]);
+    setAgfTop4Terfileri([]);
+    setGucluTop2Terfileri([]);
     setKararHiyerarsiDegisiklikleri([]);
     setKullanilmayanVeriOnay(false);
     setBankoAdayi(null);
@@ -127,6 +131,8 @@ export default function V2AnalysisPanel({ raceId }: Props) {
         faz2KararSiraUyarilari: KaliteUyariSatiri[] | null;
         faz2KullanilmayanVeri: KullanilmayanVeriSatiri[] | null;
         faz2Top3Terfileri: Top3TerfiSonuc[] | null;
+        faz2AgfTop4Terfileri: Top3TerfiSonuc[] | null;
+        faz2GucluTop2Terfileri: Top3TerfiSonuc[] | null;
         faz2KararHiyerarsiDegisiklikleri: KararHiyerarsiDegisikligi[] | null;
         tempoOzeti: string;
         couponNarrow?: string; couponNormal?: string; couponWide?: string;
@@ -142,6 +148,8 @@ export default function V2AnalysisPanel({ raceId }: Props) {
       setKararSiraUyarilari((res.faz2KararSiraUyarilari ?? []).filter((k) => k.uyarilar.length > 0));
       setKullanilmayanVeri(res.faz2KullanilmayanVeri ?? []);
       setTop3Terfileri(res.faz2Top3Terfileri ?? []);
+      setAgfTop4Terfileri(res.faz2AgfTop4Terfileri ?? []);
+      setGucluTop2Terfileri(res.faz2GucluTop2Terfileri ?? []);
       setKararHiyerarsiDegisiklikleri(res.faz2KararHiyerarsiDegisiklikleri ?? []);
       setTempoOzeti(res.tempoOzeti ?? "");
       setKuponlar({ narrow: res.couponNarrow, normal: res.couponNormal, wide: res.couponWide });
@@ -300,6 +308,38 @@ export default function V2AnalysisPanel({ raceId }: Props) {
           </p>
           <ul className="space-y-0.5">
             {top3Terfileri.map((t) => (
+              <li key={t.no} className="font-medium">#{t.no} {t.ad}: {t.eskiSira}. sıra → {t.yeniSira}. sıra</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {gucluTop2Terfileri.length > 0 && (
+        <div className="space-y-1 rounded-lg border border-brand/40 bg-brand/10 px-3 py-2.5 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-brand">
+            <Sparkles className="h-3.5 w-3.5" /> Güçlü Kombinasyon Terfisi — ilk 2
+          </div>
+          <p className="text-muted-foreground">
+            AGF trend yükselişi + en az bir güçlü kod-garantili sinyal (V1/V19/V22) birlikte bulunan atlar ilk 2&apos;ye koşulsuz alındı:
+          </p>
+          <ul className="space-y-0.5">
+            {gucluTop2Terfileri.map((t) => (
+              <li key={t.no} className="font-medium">#{t.no} {t.ad}: {t.eskiSira}. sıra → {t.yeniSira}. sıra</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {agfTop4Terfileri.length > 0 && (
+        <div className="space-y-1 rounded-lg border border-brand/40 bg-brand/10 px-3 py-2.5 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-brand">
+            <Sparkles className="h-3.5 w-3.5" /> AGF Trend Terfisi — Ankara günü dersi
+          </div>
+          <p className="text-muted-foreground">
+            Gün içinde parası belirgin şekilde yükselen atlar ilk 4&apos;e koşulsuz alındı:
+          </p>
+          <ul className="space-y-0.5">
+            {agfTop4Terfileri.map((t) => (
               <li key={t.no} className="font-medium">#{t.no} {t.ad}: {t.eskiSira}. sıra → {t.yeniSira}. sıra</li>
             ))}
           </ul>
