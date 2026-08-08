@@ -393,6 +393,7 @@
     "gurultuTitle": "Küçük başlangıç payından kaynaklı olası gürültü",
     "agfTrendKaynak": "Kaynak: günde birkaç kez alınan AGF ölçümleri (agf-sync). ∅ = henüz yalnız tek ölçüm var, trend hesaplanamaz.",
     "galopVerisiYok": "Galop verisi yok.",
+    "sonHazirliklarNot": "Yalnızca atın son koşusundan bugüne kadar yaptığı çalışmalar gösterilir.",
     "idmanJokeyiTitle": "İdman jokeyi ({jockey}) koşuda da binecek — olumlu bir etken",
     "icKulvarKisa": "İÇ",
     "kapat": "Kapat",

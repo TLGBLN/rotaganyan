@@ -74,6 +74,9 @@ export default function GalopPanel({ runners, breed }: { runners: ProgramRunner[
           ))}
         </div>
       )}
+      <div className="px-4 py-1.5 text-[10px] text-muted-foreground border-t">
+        {t("sonHazirliklarNot")}
+      </div>
     </div>
   );
 }
