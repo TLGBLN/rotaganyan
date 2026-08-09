@@ -5,7 +5,6 @@ import { useTranslations } from "next-intl";
 import type { KuponOnerisi, KuponStatus } from "@/server/services/race.service";
 import type { AltiliCityResult } from "@/server/services/ingest/tjk-altili.adapter";
 import { findIkramiyeForHippodrome } from "@/lib/altili-match";
-import { ekuriColorFor } from "@/lib/ekuri-colors";
 import { cn } from "@/lib/utils";
 
 type Kupon = NonNullable<KuponOnerisi>;
@@ -140,11 +139,6 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
                   <div className="space-y-1.5 text-sm font-semibold">
                     {leg.nos.map((no) => {
                       const ekuriWinnerNo = leg.ekuriWinnerByNo[no];
-                      // v6.68 — kullanıcı talebi: farklı eküri grupları (ör. 1-3 ve 4-8) birbirinden
-                      // FARKLI renkte gösterilmeli, sonuç beklenmeden de hangi numaraların birbirine
-                      // bağlı olduğu görülsün diye. Kazanma durumu (yeşil) her zaman önceliklidir.
-                      const ekuriGroup = leg.ekuriGroupByNo[no];
-                      const ekuriHex = ekuriGroup != null ? ekuriColorFor(ekuriGroup) : null;
                       return (
                         <div key={no}>
                           {leg.winnerNos.includes(no) ? (
@@ -157,16 +151,6 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
                                 {no}
                               </span>
                               <span className="text-[9px] text-hit">({ekuriWinnerNo} eküri)</span>
-                            </span>
-                          ) : ekuriHex != null ? (
-                            <span
-                              style={{ backgroundColor: ekuriHex }}
-                              className={cn(
-                                "inline-flex h-6 w-6 items-center justify-center rounded-full text-white text-xs font-bold",
-                                missed && "line-through opacity-50"
-                              )}
-                            >
-                              {no}
                             </span>
                           ) : (
                             <span className={missed ? "text-muted-foreground line-through" : undefined}>{no}</span>

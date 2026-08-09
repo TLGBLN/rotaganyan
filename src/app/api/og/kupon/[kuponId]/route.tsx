@@ -1,7 +1,6 @@
 import { ImageResponse } from "next/og";
 import { db } from "@/lib/db";
 import { buildKuponOnerisi } from "@/server/services/race.service";
-import { ekuriColorFor } from "@/lib/ekuri-colors";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -156,11 +155,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ kuponId:
                   <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "6px", marginTop: "10px" }}>
                     {leg.nos.map((no) => {
                       const won = leg.winnerNos.includes(no) || no in leg.ekuriWinnerByNo;
-                      // v6.68 — kullanıcı talebi: farklı eküri grupları (ör. 1-3 ve 4-8) birbirinden
-                      // FARKLI renkte gösterilmeli — sonuç beklenmeden hangi numaraların birbirine
-                      // bağlı olduğu görülsün diye. Kazanma durumu (yeşil) her zaman önceliklidir.
-                      const ekuriGroup = leg.ekuriGroupByNo[no];
-                      const ekuriHex = ekuriGroup != null ? ekuriColorFor(ekuriGroup) : null;
                       return (
                         <div
                           key={no}
@@ -171,8 +165,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ kuponId:
                             width: "40px",
                             height: "40px",
                             borderRadius: "10px",
-                            background: won ? HIT : ekuriHex ?? "rgba(255,255,255,0.06)",
-                            color: won || ekuriHex ? (won ? "#04150a" : "#fff") : missed ? INK_DIM : INK,
+                            background: won ? HIT : "rgba(255,255,255,0.06)",
+                            color: won ? "#04150a" : missed ? INK_DIM : INK,
                             fontSize: 22,
                             fontWeight: 800,
                             textDecoration: missed && !won ? "line-through" : "none",

@@ -6,7 +6,6 @@ import { tr } from "date-fns/locale";
 import { useTranslations } from "next-intl";
 import type { KazananKupon } from "@/server/services/race.service";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ekuriColorFor } from "@/lib/ekuri-colors";
 import { cn } from "@/lib/utils";
 
 function Card({ k, onOpen }: { k: KazananKupon; onOpen: () => void }) {
@@ -79,10 +78,6 @@ function KuponDetailDialog({ k, onClose }: { k: KazananKupon | null; onClose: ()
                     <div className="space-y-1.5 text-sm font-semibold">
                       {leg.nos.map((no) => {
                         const ekuriWinnerNo = leg.ekuriWinnerByNo[no];
-                        // v6.68 — farklı eküri grupları (ör. 1-3 ve 4-8) birbirinden FARKLI renkte
-                        // gösterilmeli, TahminOnerileri.tsx / OG kupon posteriyle AYNI kural.
-                        const ekuriGroup = leg.ekuriGroupByNo[no];
-                        const ekuriHex = ekuriGroup != null ? ekuriColorFor(ekuriGroup) : null;
                         return (
                           <div key={no}>
                             {leg.winnerNos.includes(no) ? (
@@ -95,13 +90,6 @@ function KuponDetailDialog({ k, onClose }: { k: KazananKupon | null; onClose: ()
                                   {no}
                                 </span>
                                 <span className="text-[9px] text-hit">({ekuriWinnerNo} eküri)</span>
-                              </span>
-                            ) : ekuriHex != null ? (
-                              <span
-                                style={{ backgroundColor: ekuriHex }}
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-full text-white text-xs font-bold"
-                              >
-                                {no}
                               </span>
                             ) : (
                               <span>{no}</span>
