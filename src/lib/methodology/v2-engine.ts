@@ -745,19 +745,30 @@ type TeknikSiraliAt = { no: number; ad: string; karar: string; muhakeme: string;
  * her terfi hem muhakeme metnine görünür şekilde eklenir hem admin panelinde ayrıca
  * listelenir (şeffaflık, kör bir kural gibi sessizce çalışmaz).
  */
+// v6.69 — kullanıcı talebi ("bir daha yaşanmamak üzere önle"): faz2Top3Garantisi eskiden
+// yalnız V10+V12/stil-popülasyon uyumunu HAM istatistikten yeniden hesaplıyordu — İzmir
+// 5.Koşu (ROSİLDA, n=12, popülasyonda 2. sırada) bu dar kapsamı (yalnız #1 sıra) aştığı
+// için kaçtı. Artık ham istatistik yerine DOĞRUDAN muhakeme metnindeki mekanik
+// KOD-GARANTİSİ işaretini ("...TAM destek sayılır, yumuşatılmamalı") arıyor — bu ibare
+// faz2StilPopulasyonEtiketiEkle tarafından HER ZAMAN, Claude'un yorumundan bağımsız
+// olarak yazılıyor. Böylece bu güvenlik ağı tek bir V-kodu kombinasyonuna kilitli
+// kalmıyor: gelecekte AYNI "yumuşatılmamalı" konvansiyonuyla eklenecek herhangi bir yeni
+// KOD-GARANTİSİ kuralı da otomatik olarak buraya bağlanır, ayrı bir fonksiyon/eşik
+// kopyalamaya gerek kalmaz. Bu mekanik bir puanlama formülü DEĞİL — yalnız kodun zaten
+// nesnel eşiklerle doğrulayıp "yumuşatılamaz" diye damgaladığı dar istisnalar için
+// devreye giriyor, Claude'un normal holistik muhakemesine dokunmuyor.
+function tamDestekMuhakemesiVar(muhakeme: string): boolean {
+  return /TAM destek say[ıi]l[ıi]r,?\s*yumuşat[ıi]lma/i.test(muhakeme);
+}
+
 export function faz2Top3Garantisi(
   atlar: TeknikSiraliAt[],
-  faz1: Faz1Sonuc
+  _faz1: Faz1Sonuc
 ): { atlar: TeknikSiraliAt[]; terfiler: Top3TerfiSonuc[] } {
-  const breakdown = faz1.race.pistMesafeStilBreakdown;
-  if (!breakdown || breakdown.length === 0 || atlar.length <= 3) return { atlar, terfiler: [] };
-  const topStyle = breakdown[0].style;
-  const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
+  if (atlar.length <= 3) return { atlar, terfiler: [] };
 
   function nitelikliMi(a: TeknikSiraliAt): boolean {
-    const r = runnerByNo.get(a.no);
-    if (!r || r.raceStyleEtiket !== topStyle) return false;
-    if (r.tempoVeriN == null || r.tempoVeriN < 10) return false;
+    if (!tamDestekMuhakemesiVar(a.muhakeme)) return false;
     if (a.karar === "Yüksek Risk") return false;
     return true;
   }
@@ -794,7 +805,7 @@ export function faz2Top3Garantisi(
       // terfiyi SESSİZCE GERİ ALABİLİYORDU. Artık terfi eden atın kararı da "Güçlü Aday"a
       // yükseltiliyor — terfi, hiyerarşi kuralından SONRA da kalıcı.
       karar: "Güçlü Aday",
-      muhakeme: `${a.muhakeme} | [SİSTEM]:KOD-GARANTİSİ ilk 3'e terfi (eski sıra ${terfi.eskiSira} → ${teknikSira}) — sahanın #1 tarihsel kazanan stiliyle n≥10 gerçek örneklemle eşleşiyor, kendi kararı Yüksek Risk değil (DAELLA dersi, 2026-08-05).`,
+      muhakeme: `${a.muhakeme} | [SİSTEM]:KOD-GARANTİSİ ilk 3'e terfi (eski sıra ${terfi.eskiSira} → ${teknikSira}) — muhakemesinde kod tarafından doğrulanmış "TAM destek, yumuşatılmamalı" işareti var, kendi kararı Yüksek Risk değil (DAELLA/İSPANOZ/ROSİLDA dersi).`,
     };
   });
 
