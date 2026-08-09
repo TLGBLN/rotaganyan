@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { startOfDay, endOfDay } from "date-fns";
 import { recomputeHitStatsForRace } from "@/lib/result-utils";
+import { kategoriTespit, KATEGORI_ADI } from "@/lib/methodology/v2-engine";
 import type { Confidence, PedigreeRating } from "@prisma/client";
 
 export type PickInput = {
@@ -413,6 +414,26 @@ export async function assertPublishSafe(id: string): Promise<void> {
   const handikapVeyaGrup = /^(Handikap|G\s*\d|Grup)/i.test(pred.race.classType);
   if (pred.isBanko && handikapVeyaGrup && !(pred.couponNarrow && pred.couponNormal && pred.couponWide)) {
     throw new Error("Handikap/Grup + banko → 3 kupon alanı (Ekonomik/Normal/Geniş) doldurulmadan yayınlanamaz.");
+  }
+
+  // (7) 2026-08-09 kullanıcı bulgusu (İstanbul 2./4. Koşu, İzmir 7.Koşu — üçü de aynı gün):
+  // bu koşuların sınıfı (Maiden, ŞARTLI 4) V2 motoru tarafından TAM destekleniyordu ama V2
+  // hiç çalıştırılmadan, PredictionForm'un serbest metin alanına "Takip"/"Hedef at" gibi tek
+  // kelimelik notlarla dolduruldu — hiçbir gerçek muhakeme (V-kodu) yoktu, yine de sessizce
+  // yayınlandı. Kategori V2 tarafından destekleniyorsa (kategoriTespit "bilinmiyor" dönmüyorsa)
+  // en az bir pick'te gerçek bir V-kodu etiketi ([V1]..[V22]) OLMASI zorunlu — yoksa bu,
+  // V2'nin hiç çalıştırılmadığının kanıtıdır. Diğer hard kurallar gibi ATLANAMAZ; gerçekten V2
+  // dışı bir kategori (ör. Amatör/DHÖW, henüz desteklenmiyor) bu kontrolün dışında kalır.
+  const kategori = kategoriTespit(pred.race.classType);
+  if (kategori !== "bilinmiyor") {
+    const vKoduVarMi = pred.picks.some(
+      (p) => Array.isArray(p.details) && p.details.some((d) => typeof d === "string" && /\[V\d/.test(d))
+    );
+    if (!vKoduVarMi) {
+      throw new Error(
+        `Bu koşu kategorisi (${KATEGORI_ADI[kategori]}) V2 motoru tarafından destekleniyor ama hiçbir at için V-kodu (KOD-GARANTİSİ) gerekçesi yok — muhtemelen V2 hiç çalıştırılmadı. Yayınlamak için önce V2 motorunu çalıştırıp sonucu uygulayın.`
+      );
+    }
   }
 }
 
