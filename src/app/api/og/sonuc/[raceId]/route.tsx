@@ -255,8 +255,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ raceId:
 
           {/* rotaganyan ne dedi — kullanıcı kararı 2026-08-09: yalnız TAM İSABET (1. sırada
               önerilen at kazandığında) gösterilir; daha alt sıradan bir tahmin övünme gibi
-              durmasın diye hiç yazılmaz. Hangi sırada önerildiği artık hiç yazılmıyor,
-              yerine karar (Güçlü Aday vb.) vurgulanıyor. */}
+              durmasın diye hiç yazılmaz. Bu koşul altında "1. sırada önerildi" artık her
+              zaman DOĞRU olduğu için tekrar yazılıyor, karar (Güçlü Aday vb.) rozeti de
+              yanında ayrıca vurgulanıyor. */}
           {winningPick?.rank === 1 && (
             <div
               style={{
@@ -276,10 +277,26 @@ export async function GET(_req: Request, { params }: { params: Promise<{ raceId:
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", marginTop: "18px" }}>
-                <StarIcon size={26} color={kararRenk ?? GOLD} />
-                <div style={{ display: "flex", fontSize: 36, color: kararRenk ?? INK, fontWeight: 800, marginLeft: "12px" }}>
-                  {karar ? `${karar} olarak işaretlenmişti` : "İlk sırada önerdiğimiz at kazandı"}
+                <StarIcon size={26} color={GOLD} />
+                <div style={{ display: "flex", fontSize: 34, color: INK, fontWeight: 700, marginLeft: "12px" }}>
+                  1. sırada önerildi
                 </div>
+                {karar && (
+                  <div
+                    style={{
+                      display: "flex",
+                      marginLeft: "16px",
+                      padding: "6px 18px",
+                      borderRadius: "999px",
+                      background: `${kararRenk}26`,
+                      color: kararRenk ?? GOLD_SOFT,
+                      fontSize: 24,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {karar}
+                  </div>
+                )}
               </div>
             </div>
           )}

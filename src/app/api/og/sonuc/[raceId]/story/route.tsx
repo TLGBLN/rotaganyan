@@ -250,8 +250,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ raceId:
           </div>
 
           {/* rotaganyan ne dedi — yalnız TAM İSABET (1. sırada önerilen at kazandığında)
-              gösterilir, ana /sonuç posteriyle AYNI kural. Sırada gösterilmiyor, karar
-              (Güçlü Aday vb.) vurgulanıyor. */}
+              gösterilir, ana /sonuç posteriyle AYNI kural. Bu koşulda "1. sırada önerildi"
+              her zaman doğru olduğu için yazılıyor, karar rozeti de yanında vurgulanıyor. */}
           {winningPick?.rank === 1 && (
             <div
               style={{
@@ -271,10 +271,26 @@ export async function GET(_req: Request, { params }: { params: Promise<{ raceId:
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", marginTop: "20px" }}>
-                <StarIcon size={28} color={kararRenk ?? GOLD} />
-                <div style={{ display: "flex", fontSize: 38, color: kararRenk ?? INK, fontWeight: 800, marginLeft: "14px" }}>
-                  {karar ? `${karar} olarak işaretlenmişti` : "İlk sırada önerdiğimiz at kazandı"}
+                <StarIcon size={28} color={GOLD} />
+                <div style={{ display: "flex", fontSize: 36, color: INK, fontWeight: 700, marginLeft: "14px" }}>
+                  1. sırada önerildi
                 </div>
+                {karar && (
+                  <div
+                    style={{
+                      display: "flex",
+                      marginLeft: "18px",
+                      padding: "7px 20px",
+                      borderRadius: "999px",
+                      background: `${kararRenk}26`,
+                      color: kararRenk ?? GOLD_SOFT,
+                      fontSize: 26,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {karar}
+                  </div>
+                )}
               </div>
             </div>
           )}
