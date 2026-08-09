@@ -32,6 +32,7 @@ type KaliteUyariSatiri = { no: number; ad: string; uyarilar: string[] };
 type KullanilmayanVeriSatiri = { no: number; ad: string; kullanilmayanKodlar: string[] };
 type Top3TerfiSonuc = { no: number; ad: string; eskiSira: number; yeniSira: number };
 type KararHiyerarsiDegisikligi = { no: number; ad: string; eskiSira: number; yeniSira: number };
+type GuvenTavaniIndirme = { no: number; ad: string; kod: string[]; eskiGuven: string; yeniGuven: string };
 
 type Props = { raceId: string };
 
@@ -68,6 +69,8 @@ export default function V2AnalysisPanel({ raceId }: Props) {
   const [runners, setRunners] = useState<Runner[]>([]);
   const [bankoAdayi, setBankoAdayi] = useState<BankoAdayiSonuc | null>(null);
   const [kaliteUyarilari, setKaliteUyarilari] = useState<KaliteUyariSatiri[]>([]);
+  const [guvenKalibrasyonUyarilari, setGuvenKalibrasyonUyarilari] = useState<KaliteUyariSatiri[]>([]);
+  const [guvenTavaniIndirmeleri, setGuvenTavaniIndirmeleri] = useState<GuvenTavaniIndirme[]>([]);
   const [siralamaUyarilari, setSiralamaUyarilari] = useState<KaliteUyariSatiri[]>([]);
   const [kararSiraUyarilari, setKararSiraUyarilari] = useState<KaliteUyariSatiri[]>([]);
   const [kullanilmayanVeri, setKullanilmayanVeri] = useState<KullanilmayanVeriSatiri[]>([]);
@@ -94,6 +97,8 @@ export default function V2AnalysisPanel({ raceId }: Props) {
     setManualOrder([]);
     setApplied(false);
     setKaliteUyarilari([]);
+    setGuvenKalibrasyonUyarilari([]);
+    setGuvenTavaniIndirmeleri([]);
     setSiralamaUyarilari([]);
     setKararSiraUyarilari([]);
     setKullanilmayanVeri([]);
@@ -131,6 +136,8 @@ export default function V2AnalysisPanel({ raceId }: Props) {
         runners: Runner[];
         faz2BankoAdayi: BankoAdayiSonuc | null;
         faz2KaliteUyarilari: KaliteUyariSatiri[] | null;
+        faz2GuvenKalibrasyonUyarilari: KaliteUyariSatiri[] | null;
+        faz2GuvenTavaniIndirmeleri: GuvenTavaniIndirme[] | null;
         faz2SiralamaUyarilari: KaliteUyariSatiri[] | null;
         faz2KararSiraUyarilari: KaliteUyariSatiri[] | null;
         faz2KullanilmayanVeri: KullanilmayanVeriSatiri[] | null;
@@ -149,6 +156,8 @@ export default function V2AnalysisPanel({ raceId }: Props) {
       setRunners(res.runners ?? []);
       setBankoAdayi(res.faz2BankoAdayi ?? null);
       setKaliteUyarilari((res.faz2KaliteUyarilari ?? []).filter((k) => k.uyarilar.length > 0));
+      setGuvenKalibrasyonUyarilari((res.faz2GuvenKalibrasyonUyarilari ?? []).filter((k) => k.uyarilar.length > 0));
+      setGuvenTavaniIndirmeleri(res.faz2GuvenTavaniIndirmeleri ?? []);
       setSiralamaUyarilari((res.faz2SiralamaUyarilari ?? []).filter((k) => k.uyarilar.length > 0));
       setKararSiraUyarilari((res.faz2KararSiraUyarilari ?? []).filter((k) => k.uyarilar.length > 0));
       setKullanilmayanVeri(res.faz2KullanilmayanVeri ?? []);
@@ -379,6 +388,38 @@ export default function V2AnalysisPanel({ raceId }: Props) {
           <ul className="space-y-0.5">
             {kararHiyerarsiDegisiklikleri.map((d) => (
               <li key={d.no} className="font-medium">#{d.no} {d.ad}: {d.eskiSira}. sıra → {d.yeniSira}. sıra</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {guvenTavaniIndirmeleri.length > 0 && (
+        <div className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="h-3.5 w-3.5" /> Güven Tavanı Uygulandı — küçük örneklem
+          </div>
+          <p className="text-muted-foreground">
+            V9/V10 satırlarında örneklem küçük olduğu halde (n&lt;10) yazılan yüksek güven, örneklem büyüklüğüne göre otomatik indirildi:
+          </p>
+          <ul className="space-y-0.5">
+            {guvenTavaniIndirmeleri.map((g, i) => (
+              <li key={`${g.no}-${i}`} className="font-medium">#{g.no} {g.ad} [{g.kod.join("+")}]: {g.eskiGuven} → {g.yeniGuven}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {guvenKalibrasyonUyarilari.length > 0 && (
+        <div className="space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="h-3.5 w-3.5" /> Güven Kalibrasyonu — İSPANOZ dersi
+          </div>
+          <p className="text-muted-foreground">
+            Geniş örneklemli (n≥10) V9/V10 destek sinyali var ama güven düşük seçilmiş — gözden geçirin:
+          </p>
+          <ul className="space-y-1">
+            {guvenKalibrasyonUyarilari.map((k) => (
+              <li key={k.no}><span className="font-medium">#{k.no} {k.ad}:</span> <span className="text-muted-foreground">{k.uyarilar.join(" ")}</span></li>
             ))}
           </ul>
         </div>

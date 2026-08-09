@@ -1,6 +1,7 @@
 import type { Faz1Sonuc, Faz1Runner } from "@/lib/methodology/veri-toplama";
-import type { MuhakemeSatiri, PickDetailsV2 } from "@/lib/methodology/muhakeme-format";
+import type { MuhakemeSatiri, MuhakemeGuven, PickDetailsV2 } from "@/lib/methodology/muhakeme-format";
 import { satirEkle, satirVarMi, satirleriSay, satirGosterimMetni } from "@/lib/methodology/muhakeme-format";
+import { tempoGuvenSeviyesi } from "@/lib/methodology/mekanik-puanlama";
 
 /**
  * v6.44 — YENİ ANALİZ MOTORU (V1-V22 + A-E Muhakeme Matrisi + Kanıt Ağırlıklı Katman).
@@ -376,6 +377,92 @@ export function faz2KaliteDenetimi(
         uyarilar.add(
           `${satir.kod.length > 0 ? `[${satir.kod.join("+")}] ` : ""}güven="${satir.guven}" bir destek sinyali var ama teknikSira alt yarıda (${a.teknikSira}/${saha}) — Elazığ 8.Koşu dersi (OLGUNADAM/FISILTIKAYA): bu tür sinyaller tek bir risk/popülasyon istatistiği (V12) yüzünden aşırı düşürülmüş olabilir. İlgili not: "${satir.aciklama}" — tekrar oku, gerekirse elle yukarı al.`
         );
+      }
+    }
+    return { no: a.no, ad: a.ad, uyarilar: [...uyarilar] };
+  });
+}
+
+const GUVEN_SIRA: Record<MuhakemeGuven, number> = { tam: 3, orta: 2, zayif: 1 };
+
+/** n≥10/n<5 eşiği zaten sitede sabit, tek yerden yönetilen bir kural (mekanik-puanlama.ts'in
+ * `tempoGuvenSeviyesi`'i, V_LEGEND'in "bireysel örneklem n≥10.../n<5..." metniyle AYNI eşik) —
+ * burada YENİ bir sayı icat edilmiyor, mevcut politika `guven` alanına uygulanıyor. */
+function guvenTavaniOrneklemden(n: number | null): MuhakemeGuven | null {
+  const seviye = tempoGuvenSeviyesi(n);
+  if (seviye === "DUSUK_GUVEN") return "orta";
+  if (seviye === "SINYAL_SAYMA") return "zayif";
+  return null; // GUVENILIR (n≥10) veya veri yok — tavan uygulanmaz, karar Claude'a kalır
+}
+
+export type GuvenTavaniIndirme = { no: number; ad: string; kod: string[]; eskiGuven: MuhakemeGuven; yeniGuven: MuhakemeGuven };
+
+/**
+ * v6.71 — kullanıcı talimatı 2026-08-09 ("bir atın gerçekte 'orta' güven hak ettiğini
+ * 'zayıf' olarak değerlendirebilir, bunu nasıl önleriz"): bunun TERSİ yönü (Claude'un
+ * KÜÇÜK bir örneklemi olduğundan FAZLA güvenli — "tam" — değerlendirmesi) mekanik olarak
+ * ÖNLENEBİLİR, çünkü örneklem büyüklüğü (n) objektif bir SAYIdır, domain yorumu değil.
+ * Büyük örneklem güveni ZORUNLU KILMAZ (Claude "n=15 ama sonuçlar karışık, orta" diyebilir,
+ * bu meşru) — ama KÜÇÜK örneklem YÜKSEK güveni HAKLI ÇIKARAMAZ, bu tek yönlü bir TAVAN.
+ * Yalnız V9 (Son800)/V10 (Accurace tempo) için uygulanır — n≥10/n<5 eşiği zaten bu iki kod
+ * için V_LEGEND'de ve faz2Top3Garantisi'nde kullanılan AYNI politika. Kod-garantili
+ * satırlara (zaten kendi eşiğini kontrol ediyorlar) dokunulmaz. Şeffaflık için (v6.64/v6.68
+ * ilkesiyle aynı) her indirme ayrıca listelenir, sessizce olmaz.
+ */
+export function faz2GuvenTavaniUygula<T extends { no: number; ad: string; muhakeme: MuhakemeSatiri[] }>(
+  atlar: T[],
+  faz1: Faz1Sonuc
+): { atlar: T[]; indirmeler: GuvenTavaniIndirme[] } {
+  const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
+  const indirmeler: GuvenTavaniIndirme[] = [];
+  const yeniAtlar = atlar.map((a) => {
+    const r = runnerByNo.get(a.no);
+    if (!r) return a;
+    const muhakeme = a.muhakeme.map((s) => {
+      if (s.kodGarantili || s.tip === "notr") return s;
+      const nAdaylari: number[] = [];
+      if (s.kod.includes("V9")) nAdaylari.push(r.son800BenzerKosuN);
+      if (s.kod.includes("V10")) nAdaylari.push(r.tempoVeriN ?? Infinity);
+      if (nAdaylari.length === 0) return s;
+      const enKucukN = Math.min(...nAdaylari);
+      const tavan = guvenTavaniOrneklemden(enKucukN === Infinity ? null : enKucukN);
+      if (!tavan || GUVEN_SIRA[s.guven] <= GUVEN_SIRA[tavan]) return s;
+      indirmeler.push({ no: a.no, ad: a.ad, kod: s.kod, eskiGuven: s.guven, yeniGuven: tavan });
+      return { ...s, guven: tavan };
+    });
+    return { ...a, muhakeme };
+  });
+  return { atlar: yeniAtlar, indirmeler };
+}
+
+export type GuvenKalibrasyonUyarisi = { no: number; ad: string; uyarilar: string[] };
+
+/**
+ * v6.71 — aynı kullanıcı talimatının TERS yönü: Claude genişörneklemli (n≥10, GÜVENİLİR)
+ * bir V9/V10 destek sinyalini gerçekte hak ettiğinden DAHA DÜŞÜK ("orta"/"zayıf") güvenle
+ * yazmış olabilir (İSPANOZ dersinin genel hali). Bu yön mekanik olarak DÜZELTİLMİYOR —
+ * yalnız faz2KaliteDenetimi gibi bir UYARI olarak admin'e gösteriliyor, çünkü büyük n
+ * yalnız güveni MÜMKÜN kılar, ZORUNLU kılmaz (Claude'un elinde güveni haklı şekilde
+ * düşürecek başka bir çelişki olabilir) — bu yüzden tek yönlü tavanın aksine burada
+ * otomatik müdahale YOK, yalnız görünürlük var.
+ */
+export function faz2GuvenKalibrasyonDenetimi(
+  faz2Atlar: { no: number; ad: string; muhakeme: MuhakemeSatiri[] }[],
+  faz1: Faz1Sonuc
+): GuvenKalibrasyonUyarisi[] {
+  const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
+  return faz2Atlar.map((a) => {
+    const r = runnerByNo.get(a.no);
+    const uyarilar = new Set<string>();
+    if (r) {
+      for (const satir of a.muhakeme) {
+        if (satir.tip !== "destek" || satir.guven === "tam") continue;
+        const n = satir.kod.includes("V9") ? r.son800BenzerKosuN : satir.kod.includes("V10") ? r.tempoVeriN : null;
+        if (n != null && tempoGuvenSeviyesi(n) === "GUVENILIR") {
+          uyarilar.add(
+            `[${satir.kod.join("+")}] örneklem n=${n} (≥10, GÜVENİLİR) ama guven="${satir.guven}" seçilmiş — İSPANOZ dersi: büyük örneklemli destek sinyalleri genelde "tam" güven hak eder, gözden geçirin. Not: "${satir.aciklama}"`
+          );
+        }
       }
     }
     return { no: a.no, ad: a.ad, uyarilar: [...uyarilar] };

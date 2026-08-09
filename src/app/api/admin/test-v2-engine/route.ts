@@ -5,7 +5,7 @@ import type { Anthropic } from "@anthropic-ai/sdk";
 import { createWithTruncationRetry, extractText } from "@/lib/methodology/claude-analiz-helpers";
 import { getRecentCachedResult } from "@/lib/claude-cost";
 import type { Role } from "@prisma/client";
-import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi, faz2AgfFavorisiDususeRagmenGarantisi } from "@/lib/methodology/v2-engine";
+import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi, faz2AgfFavorisiDususeRagmenGarantisi, faz2GuvenTavaniUygula, faz2GuvenKalibrasyonDenetimi } from "@/lib/methodology/v2-engine";
 import type { MuhakemeSatiri } from "@/lib/methodology/muhakeme-format";
 import { satirGosterimMetni } from "@/lib/methodology/muhakeme-format";
 
@@ -377,6 +377,19 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
   }
   console.log("[test-v2-engine] toplam parsed atlar sayısı:", parsed.atlar.length);
 
+  // v6.71 — kullanıcı talimatı 2026-08-09 ("bir atın gerçekte 'orta' güven hak ettiğini
+  // 'zayıf' olarak değerlendirebilir" sorusuna cevaben, TERS yön: Claude küçük örneklemi
+  // olduğundan FAZLA güvenli — "tam" — yazmış olabilir): örneklem büyüklüğü (n) objektif
+  // bir tavan uygular — bkz. v2-engine.ts'deki faz2GuvenTavaniUygula yorumu. Top3
+  // Garantisi'nden ÖNCE çalışır ki, n<10 olduğu halde "tam" yazılmış bir V10+V12 satırı
+  // yüzünden haksız bir terfi tetiklenmesin.
+  const guvenTavaniSonuc = faz2GuvenTavaniUygula(parsed.atlar, faz1);
+  parsed = { atlar: guvenTavaniSonuc.atlar };
+  const faz2GuvenTavaniIndirmeleri = guvenTavaniSonuc.indirmeler;
+  if (faz2GuvenTavaniIndirmeleri.length > 0) {
+    console.log("[test-v2-engine] Güven tavanı uygulandı:", JSON.stringify(faz2GuvenTavaniIndirmeleri));
+  }
+
   // v6.64 — kullanıcı kararı 2026-08-05 (DAELLA): en sıkı koşulda (sahanın #1 stili +
   // n≥10 + "Yüksek Risk" değil) ilk 3'e girmesi GEREKEN bir at, sıralama çağrısı
   // yanılmış olsa bile koda gömülü olarak terfi ettirilir — bkz. v2-engine.ts yorumu.
@@ -440,6 +453,10 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
   // promptuna EKLEMEK yerine (bu da maliyet demek) tamamen ücretsiz mekanik bir
   // son-kontrol olarak burada uyguluyoruz.
   const faz2KaliteUyarilari = faz2KaliteDenetimi(parsed.atlar);
+  // v6.71 — TERS yön (Claude büyük örneklemli bir sinyali HAK ETTİĞİNDEN AZ güvenle
+  // yazmış olabilir, İSPANOZ dersinin genel hali) mekanik olarak düzeltilmiyor, yalnız
+  // admin'e uyarı olarak gösteriliyor — bkz. v2-engine.ts'deki fonksiyon yorumu.
+  const faz2GuvenKalibrasyonUyarilari = faz2GuvenKalibrasyonDenetimi(parsed.atlar, faz1).filter((u) => u.uyarilar.length > 0);
   const faz2BankoAdayi = faz2BankoAdayiTespit(parsed.atlar);
   // v6.55 — kullanıcı bulgusu (WOLF SEYFO, Kocaeli 7.Koşu): aynı V-kodu çifti için
   // "destek" etiketli bir at, "destek olmayan" etiketli başka bir attan daha kötü
@@ -481,9 +498,11 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
     faz1VeriDenetimi,
     faz2Denetim,
     faz2KaliteUyarilari,
+    faz2GuvenKalibrasyonUyarilari,
     faz2SiralamaUyarilari,
     faz2KararSiraUyarilari,
     faz2KullanilmayanVeri,
+    faz2GuvenTavaniIndirmeleri,
     faz2Top3Terfileri,
     faz2GucluTop3Terfileri,
     faz2AgfFavoriTerfileri,
