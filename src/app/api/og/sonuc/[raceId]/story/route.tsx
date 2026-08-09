@@ -249,47 +249,35 @@ export async function GET(_req: Request, { params }: { params: Promise<{ raceId:
             </div>
           </div>
 
-          {/* rotaganyan ne dedi */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              marginTop: "48px",
-              background: "#0f1c2f",
-              border: "1px solid rgba(223,157,0,0.25)",
-              borderRadius: "20px",
-              padding: "38px 42px",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <ChatIcon size={26} color={GOLD} />
-              <div style={{ display: "flex", fontSize: 27, letterSpacing: "3px", color: GOLD, fontWeight: 700, textTransform: "uppercase", marginLeft: "12px" }}>
-                Rotaganyan Ne Dedi
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", marginTop: "20px" }}>
-              <StarIcon size={28} color={GOLD} />
-              <div style={{ display: "flex", fontSize: 36, color: INK, fontWeight: 700, marginLeft: "14px" }}>
-                {winningPick ? `${winningPick.rank}. sırada önerildi` : "Analiz listesinde vardı"}
-              </div>
-              {karar && (
-                <div
-                  style={{
-                    display: "flex",
-                    marginLeft: "18px",
-                    padding: "7px 20px",
-                    borderRadius: "999px",
-                    background: `${kararRenk}26`,
-                    color: kararRenk ?? GOLD_SOFT,
-                    fontSize: 26,
-                    fontWeight: 700,
-                  }}
-                >
-                  {karar}
+          {/* rotaganyan ne dedi — yalnız TAM İSABET (1. sırada önerilen at kazandığında)
+              gösterilir, ana /sonuç posteriyle AYNI kural. Sırada gösterilmiyor, karar
+              (Güçlü Aday vb.) vurgulanıyor. */}
+          {winningPick?.rank === 1 && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                marginTop: "48px",
+                background: "#0f1c2f",
+                border: "1px solid rgba(223,157,0,0.25)",
+                borderRadius: "20px",
+                padding: "38px 42px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <ChatIcon size={26} color={GOLD} />
+                <div style={{ display: "flex", fontSize: 27, letterSpacing: "3px", color: GOLD, fontWeight: 700, textTransform: "uppercase", marginLeft: "12px" }}>
+                  Rotaganyan Ne Dedi
                 </div>
-              )}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", marginTop: "20px" }}>
+                <StarIcon size={28} color={kararRenk ?? GOLD} />
+                <div style={{ display: "flex", fontSize: 38, color: kararRenk ?? INK, fontWeight: 800, marginLeft: "14px" }}>
+                  {karar ? `${karar} olarak işaretlenmişti` : "İlk sırada önerdiğimiz at kazandı"}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* esnek boşluk */}
           <div style={{ display: "flex", flex: 1 }} />

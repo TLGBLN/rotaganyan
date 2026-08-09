@@ -253,47 +253,36 @@ export async function GET(_req: Request, { params }: { params: Promise<{ raceId:
             </div>
           </div>
 
-          {/* rotaganyan ne dedi */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              marginTop: "40px",
-              background: "#0f1c2f",
-              border: "1px solid rgba(223,157,0,0.25)",
-              borderRadius: "18px",
-              padding: "34px 38px",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <ChatIcon size={24} color={GOLD} />
-              <div style={{ display: "flex", fontSize: 25, letterSpacing: "3px", color: GOLD, fontWeight: 700, textTransform: "uppercase", marginLeft: "10px" }}>
-                Rotaganyan Ne Dedi
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", marginTop: "18px" }}>
-              <StarIcon size={26} color={GOLD} />
-              <div style={{ display: "flex", fontSize: 34, color: INK, fontWeight: 700, marginLeft: "12px" }}>
-                {winningPick ? `${winningPick.rank}. sırada önerildi` : "Analiz listesinde vardı"}
-              </div>
-              {karar && (
-                <div
-                  style={{
-                    display: "flex",
-                    marginLeft: "16px",
-                    padding: "6px 18px",
-                    borderRadius: "999px",
-                    background: `${kararRenk}26`,
-                    color: kararRenk ?? GOLD_SOFT,
-                    fontSize: 24,
-                    fontWeight: 700,
-                  }}
-                >
-                  {karar}
+          {/* rotaganyan ne dedi — kullanıcı kararı 2026-08-09: yalnız TAM İSABET (1. sırada
+              önerilen at kazandığında) gösterilir; daha alt sıradan bir tahmin övünme gibi
+              durmasın diye hiç yazılmaz. Hangi sırada önerildiği artık hiç yazılmıyor,
+              yerine karar (Güçlü Aday vb.) vurgulanıyor. */}
+          {winningPick?.rank === 1 && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                marginTop: "40px",
+                background: "#0f1c2f",
+                border: "1px solid rgba(223,157,0,0.25)",
+                borderRadius: "18px",
+                padding: "34px 38px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <ChatIcon size={24} color={GOLD} />
+                <div style={{ display: "flex", fontSize: 25, letterSpacing: "3px", color: GOLD, fontWeight: 700, textTransform: "uppercase", marginLeft: "10px" }}>
+                  Rotaganyan Ne Dedi
                 </div>
-              )}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", marginTop: "18px" }}>
+                <StarIcon size={26} color={kararRenk ?? GOLD} />
+                <div style={{ display: "flex", fontSize: 36, color: kararRenk ?? INK, fontWeight: 800, marginLeft: "12px" }}>
+                  {karar ? `${karar} olarak işaretlenmişti` : "İlk sırada önerdiğimiz at kazandı"}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* esnek boşluk */}
           <div style={{ display: "flex", flex: 1 }} />
