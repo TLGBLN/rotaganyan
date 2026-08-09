@@ -433,8 +433,8 @@ function AnalysisPanel({
           v6.59 — V2 motorunun "Düşük Risk/Yüksek Risk" gibi uzun karar etiketleri eski dar
           sayısal Toplam sütununda (w-14) satır içi kırılıyordu; max-w de büyütülerek boşluk
           azaltıldı (kullanıcı ekran görüntüsü, 2026-08-04). */}
-      <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full max-w-xl text-xs">
+      <div className="hidden sm:flex overflow-x-auto">
+        <table className="w-full max-w-xl shrink-0 text-xs">
           <thead>
             <tr className="border-b bg-muted/60 text-[11px] text-muted-foreground">
               <th className="px-2 py-2 text-center w-8">{t("sira")}</th>
@@ -502,6 +502,41 @@ function AnalysisPanel({
             ))}
           </tbody>
         </table>
+
+        {/* Kupon Önerisi — kullanıcı talebi 2026-08-09: tablo max-w-xl'e sabitlendiği için
+            geniş ekranlarda sağda boş kalan alan, bu tablonun HEMEN yanında en doğal
+            tamamlayıcı bilgiyle (kademeli kupon önerisi) dolduruluyor. Kademe sınırı sabit
+            ve basit: Ekonomik ilk 3, Normal 4-5-6, Geniş 7 ve sonrası (unpickedRunners
+            dahil — Faz4 yalnız ilk 3-6 atı "pick" olarak kaydediyor, geri kalan saha zaten
+            unpickedRunners'ta). Ayrı depolanan couponNarrow/Normal/Wide string'lerine değil,
+            DOĞRUDAN bu tablodaki sırayla AYNI diziye dayanıyor — asla çelişmez.
+        */}
+        {(picks.length > 0 || unpickedRunners.length > 0) && (
+          <div className="flex-1 min-w-[150px] border-l px-4 py-3">
+            <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              {t("kuponOnerisi")}
+            </div>
+            <div className="space-y-2">
+              {([
+                { label: t("ekonomik"), color: "text-hit", nos: picks.slice(0, 3).map((p) => p.runner?.no).filter((n): n is number => n != null) },
+                { label: t("normal"), color: "text-brand", nos: picks.slice(3, 6).map((p) => p.runner?.no).filter((n): n is number => n != null) },
+                {
+                  label: t("genis"),
+                  color: "text-muted-foreground",
+                  nos: [
+                    ...picks.slice(6).map((p) => p.runner?.no).filter((n): n is number => n != null),
+                    ...unpickedRunners.map((r) => r.no),
+                  ].sort((a, b) => a - b),
+                },
+              ] as const).map((tier) => (
+                <div key={tier.label} className="flex items-baseline gap-2">
+                  <span className={cn("w-14 shrink-0 text-[10px] font-bold uppercase", tier.color)}>{tier.label}</span>
+                  <span className="font-mono text-xs font-semibold tabular-nums">{tier.nos.length > 0 ? tier.nos.join("-") : "—"}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Mobil kart listesi */}

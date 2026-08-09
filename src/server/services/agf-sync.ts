@@ -80,7 +80,6 @@ export async function syncAgfForDate(date: Date): Promise<AgfSyncResult> {
       }
 
       let racesUpdated = 0;
-      let runnersUpdated = 0;
 
       // Fetch latest snapshot per runner in bulk to avoid N+1 queries
       const allRunnerIds = raceDay.races.flatMap((rc) => rc.runners.map((r) => r.id));
@@ -92,6 +91,12 @@ export async function syncAgfForDate(date: Date): Promise<AgfSyncResult> {
       });
       const lastSnapshotMap = new Map(latestSnapshots.map((s) => [s.runnerId, s.agf]));
 
+      // v6.69 — kullanıcı bulgusu 2026-08-09: bu döngü her atı TEK TEK, sırayla
+      // (await içinde await) güncelliyordu — İstanbul gibi çok koşulu/atlı bir günde bu,
+      // tüm cron'u 60sn maxDuration'ın üzerine taşıyıp Vercel'in sessizce (504) kesmesine
+      // yol açtı, AGF verisi saatlerce donuk kaldı. Bir şehir içindeki TÜM at güncellemeleri
+      // birbirinden bağımsız olduğu için artık paralel (Promise.all) yazılıyor.
+      const updateJobs: Promise<boolean>[] = [];
       for (const race of raceDay.races) {
         const programRace = program.races.find((r) => r.raceNo === race.raceNo);
         if (!programRace) continue;
@@ -104,22 +109,24 @@ export async function syncAgfForDate(date: Date): Promise<AgfSyncResult> {
           const dbRunner = race.runners.find((r) => r.no === pr.no);
           if (!dbRunner) continue;
 
-          await db.runner.update({
-            where: { id: dbRunner.id },
-            data: { agf: pr.agf },
-          });
-
+          const newAgf = pr.agf as number;
           // Yalnızca değer değiştiyse snapshot oluştur; böylece first≠last garantilenir.
           const prevAgf = lastSnapshotMap.get(dbRunner.id);
-          const newAgf = pr.agf as number;
-          if (prevAgf === undefined || Math.abs(prevAgf - newAgf) >= 0.01) {
-            await db.agfSnapshot.create({
-              data: { runnerId: dbRunner.id, agf: newAgf },
-            });
-            runnersUpdated++;
-          }
+          const shouldSnapshot = prevAgf === undefined || Math.abs(prevAgf - newAgf) >= 0.01;
+
+          updateJobs.push(
+            (async () => {
+              await db.runner.update({ where: { id: dbRunner.id }, data: { agf: newAgf } });
+              if (shouldSnapshot) {
+                await db.agfSnapshot.create({ data: { runnerId: dbRunner.id, agf: newAgf } });
+              }
+              return shouldSnapshot;
+            })()
+          );
         }
       }
+      const snapshotResults = await Promise.all(updateJobs);
+      const runnersUpdated = snapshotResults.filter(Boolean).length;
 
       cityResults.push({ name: city.sehirAdi, ok: true, racesUpdated, runnersUpdated });
     } catch (err) {

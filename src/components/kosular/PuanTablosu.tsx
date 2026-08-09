@@ -1,5 +1,4 @@
 import { Lock, Star } from "lucide-react";
-import TargetBadge from "@/components/prediction/TargetBadge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -153,7 +152,6 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                               <span className={cn(pick.runner?.scratched && "line-through opacity-50")}>
                                 {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
                               </span>
-                              {isTarget && <TargetBadge className="ml-1 align-middle" />}
                               {pick.runner?.scratched && (
                                 <span className="ml-1 text-[10px] font-semibold text-red-400">Koşmaz</span>
                               )}
@@ -179,14 +177,21 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
               ))}
             </div>
 
-            {/* ── MASAÜSTÜ: tüm koşular yan yana tablo ── */}
+            {/* ── MASAÜSTÜ: tüm koşular yan yana tablo ──
+                v6.69 — kullanıcı talebi: sayfa altında yatay scroll çubuğu çıkmasın, 6
+                koşuluk bir altılı sayfaya (max-w-1400px) tek ekranda sığsın. At isimleri
+                sabit genişlikte kısaltılıp (truncate + title tooltip) yazı boyutu biraz
+                küçültüldü — eskiden isim sütunu sınırsız büyüyüp uzun isimlerde (ör.
+                "SULTANIM NERİMAN") tabloyu container genişliğinin çok üzerine taşırıyordu.
+                overflow-x-auto yine de bir güvenlik ağı olarak kalıyor (çok dar ekran/uç
+                durum için), ama normal masaüstü genişliğinde artık hiç scroll gerekmiyor. */}
             <div className="hidden sm:block overflow-x-auto">
-              <table className="w-full text-[10px]">
+              <table className="w-full text-[9px]">
                 <thead>
                   <tr className="border-b bg-muted/20">
                     <th
                       rowSpan={2}
-                      className="w-8 border-r px-2 text-center text-[10px] font-medium text-muted-foreground align-middle"
+                      className="w-6 border-r px-1 text-center text-[9px] font-medium text-muted-foreground align-middle"
                     >
                       #
                     </th>
@@ -195,14 +200,14 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                         key={race.id}
                         colSpan={3}
                         className={cn(
-                          "border-r px-3 py-2 text-center last:border-r-0",
+                          "border-r px-1.5 py-1 text-center last:border-r-0",
                           ri % 2 === 1 && "bg-muted/10"
                         )}
                       >
-                        <div className="whitespace-nowrap text-[11px] font-bold">
+                        <div className="whitespace-nowrap text-[10px] font-bold">
                           {race.raceNo}. Koşu
                         </div>
-                        <div className="whitespace-nowrap text-[10px] font-normal text-muted-foreground">
+                        <div className="whitespace-nowrap text-[9px] font-normal text-muted-foreground">
                           {race.time ?? "—"}
                         </div>
                       </th>
@@ -216,7 +221,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                           key={`${race.id}-ni`}
                           colSpan={2}
                           className={cn(
-                            "px-2 py-1.5 text-left text-[10px] font-medium text-muted-foreground",
+                            "px-1.5 py-1 text-left text-[9px] font-medium text-muted-foreground",
                             ri % 2 === 1 && "bg-muted/10"
                           )}
                         >
@@ -225,7 +230,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                         <th
                           key={`${race.id}-puan`}
                           className={cn(
-                            "w-10 border-r px-2 py-1.5 text-center text-[10px] font-medium text-muted-foreground last:border-r-0",
+                            "w-9 border-r px-1 py-1 text-center text-[9px] font-medium text-muted-foreground last:border-r-0",
                             ri % 2 === 1 && "bg-muted/10"
                           )}
                         >
@@ -239,7 +244,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                 <tbody>
                   {Array.from({ length: maxRows }).map((_, rowIdx) => (
                     <tr key={rowIdx} className="border-b last:border-0">
-                      <td className="border-r px-2 py-1.5 text-center text-[10px] tabular-nums text-muted-foreground">
+                      <td className="border-r px-1 py-1 text-center text-[9px] tabular-nums text-muted-foreground">
                         {rowIdx + 1}
                       </td>
 
@@ -259,8 +264,8 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                         if (!pick) {
                           return (
                             <>
-                              <td key={`${race.id}-${rowIdx}-a`} colSpan={2} className={cn("px-2 py-1.5", colBg)} />
-                              <td key={`${race.id}-${rowIdx}-b`} className={cn("border-r px-2 py-1.5 last:border-r-0", colBg)} />
+                              <td key={`${race.id}-${rowIdx}-a`} colSpan={2} className={cn("px-1.5 py-1", colBg)} />
+                              <td key={`${race.id}-${rowIdx}-b`} className={cn("border-r px-1.5 py-1 last:border-r-0", colBg)} />
                             </>
                           );
                         }
@@ -274,26 +279,28 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                             <td
                               key={`${race.id}-${rowIdx}-ni`}
                               colSpan={2}
-                              className={cn("px-2 py-1.5", rowBg, textColor)}
+                              className={cn("px-1.5 py-1", rowBg, textColor)}
                             >
-                              <div className="flex items-center gap-1 whitespace-nowrap">
+                              <div className="flex items-center gap-0.5 min-w-0">
                                 {isBanko && (
-                                  <Star className="h-3 w-3 shrink-0 fill-brand text-brand" />
+                                  <Star className="h-2.5 w-2.5 shrink-0 fill-brand text-brand" />
                                 )}
                                 <span className={cn("shrink-0 font-mono tabular-nums", weight)}>
                                   {pick.runner?.no ?? "—"}
                                 </span>
-                                <span className={cn(weight, pick.runner?.scratched && "line-through opacity-50")}>
+                                <span
+                                  title={(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
+                                  className={cn("min-w-0 max-w-[56px] truncate", weight, pick.runner?.scratched && "line-through opacity-50")}
+                                >
                                   {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
                                 </span>
-                                {isTarget && <TargetBadge className="shrink-0" />}
                                 {pick.runner?.scratched && (
-                                  <span className="text-[10px] font-semibold text-red-400">Koşmaz</span>
+                                  <span className="shrink-0 text-[9px] font-semibold text-red-400">Koşmaz</span>
                                 )}
                                 {(() => {
                                   const pos = finishPos(race.result?.actualOrder, pick.runner?.no, race.result?.winnerNos);
                                   return pos != null ? (
-                                    <span className={cn("text-[10px] font-semibold", pos === 1 ? "text-[#F5C518]" : "text-muted-foreground")}>
+                                    <span className={cn("shrink-0 text-[9px] font-semibold", pos === 1 ? "text-[#F5C518]" : "text-muted-foreground")}>
                                       ({pos}.)
                                       {pos === 1 && race.result?.ganyan != null && ` Gny: ${race.result.ganyan.toFixed(2)}`}
                                     </span>
@@ -305,7 +312,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                             <td
                               key={`${race.id}-${rowIdx}-puan`}
                               className={cn(
-                                "border-r px-2 py-1.5 text-center font-mono tabular-nums last:border-r-0",
+                                "border-r px-1.5 py-1 text-center font-mono tabular-nums last:border-r-0",
                                 rowBg,
                                 textColor,
                                 weight
