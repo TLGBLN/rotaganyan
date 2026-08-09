@@ -528,6 +528,18 @@ export async function getKuponOnerileri(): Promise<KuponOnerisi[]> {
   const today = turkeyDateString();
   const validActives = actives.filter((a) => a.date.toISOString().slice(0, 10) === today);
 
+  // Kullanıcı bulgusu (2026-08-09): eski sıralama (slot asc, updatedAt desc) aynı ŞEHRİN
+  // farklı slotlarını (1. Altılı / 2. Altılı) birbirinden ayırıp, 2 sütunlu ızgarada aynı
+  // slot'taki FARKLI şehirleri yan yana düşürüyordu (İzmir-1 yanında İstanbul-1, altında
+  // İzmir-2 yanında İstanbul-2). Artık önce şehre (hippodromeName'in " — " öncesi kısmı),
+  // sonra slot'a göre sıralanıyor — aynı şehrin kuponları hep yan yana/art arda kalır.
+  validActives.sort((a, b) => {
+    const cityA = a.hippodromeName.split(" — ")[0];
+    const cityB = b.hippodromeName.split(" — ")[0];
+    if (cityA !== cityB) return cityA.localeCompare(cityB, "tr");
+    return a.slot - b.slot;
+  });
+
   if (validActives.length > 0) {
     await syncResultsForDate(today);
   }
