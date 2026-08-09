@@ -5,7 +5,7 @@ import type { Anthropic } from "@anthropic-ai/sdk";
 import { createWithTruncationRetry, extractText } from "@/lib/methodology/claude-analiz-helpers";
 import { getRecentCachedResult } from "@/lib/claude-cost";
 import type { Role } from "@prisma/client";
-import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi } from "@/lib/methodology/v2-engine";
+import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi, faz2AgfFavorisiDususeRagmenGarantisi } from "@/lib/methodology/v2-engine";
 
 // v6.53 — kullanıcı bulgusu 2026-08-04 (Kocaeli 5.Koşu): tüm sahayı TEK bir Claude
 // çağrısında analiz etmek, zengin kategorilerde (3/4/5) + 8+ atlı sahalarda GERÇEKTEN
@@ -377,6 +377,17 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
     console.log("[test-v2-engine] Güçlü kombinasyon top3 garantisi tetiklendi:", JSON.stringify(faz2GucluTop3Terfileri));
   }
 
+  // v6.69 — kullanıcı kararı 2026-08-09 (TÜRKÖREN, İstanbul 3.Koşu): sahadaki GERÇEK AGF
+  // lideri gün içinde belirgin düşse bile hâlâ favori kaldığı sürece ilk 3'e terfi eder —
+  // bkz. v2-engine.ts'deki faz2AgfFavorisiDususeRagmenGarantisi yorumu (2026-07-29'da
+  // reddedilen KOŞULSUZ "AGF top-3" kuralından FARKLI, dar kapsamlı bir istisna).
+  const agfFavoriSonuc = faz2AgfFavorisiDususeRagmenGarantisi(parsed.atlar, faz1);
+  parsed = { atlar: agfFavoriSonuc.atlar };
+  const faz2AgfFavoriTerfileri = agfFavoriSonuc.terfiler;
+  if (faz2AgfFavoriTerfileri.length > 0) {
+    console.log("[test-v2-engine] AGF favorisi düşüşe rağmen ilk3 garantisi tetiklendi:", JSON.stringify(faz2AgfFavoriTerfileri));
+  }
+
   // v6.69 — kullanıcı kararı 2026-08-09: AGF trend'de (yükselen VEYA düşen) belirgin
   // hareket gösteren, yukarıdaki güçlü kombinasyon şartını karşılamayan diğer atlar
   // analiz gücüne göre 4-5-6 penceresine terfi ettirilir — bkz. v2-engine.ts'deki
@@ -454,6 +465,7 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
     faz2KullanilmayanVeri,
     faz2Top3Terfileri,
     faz2GucluTop3Terfileri,
+    faz2AgfFavoriTerfileri,
     faz2Agf456Terfileri,
     faz2KararHiyerarsiDegisiklikleri,
     faz2BankoAdayi,

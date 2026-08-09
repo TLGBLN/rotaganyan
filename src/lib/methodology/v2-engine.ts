@@ -944,6 +944,55 @@ export function faz2AgfTrend456Garantisi(
   return { atlar: yeniAtlar, terfiler: terfilerGercekKonumla };
 }
 
+/**
+ * v6.69 — kullanıcı kararı 2026-08-09 (TÜRKÖREN, İstanbul 3.Koşu: %43,79→%29,11, -14,68
+ * puan düşüş, yine de kazandı): sahadaki GERÇEK AGF favorisi (en yüksek güncel AGF) gün
+ * içinde belirgin şekilde DÜŞSE BİLE — hâlâ favori KALDIĞI sürece (başka bir at onu
+ * geçmediyse) — piyasanın toplam parası hâlâ ondadır, düşüş bunu geçersiz kılmaz.
+ *
+ * ÖNEMLİ AYRIM (kullanıcıyla açıkça netleştirildi): bu, 2026-07-29'da REDDEDİLEN genel
+ * "AGF top-3 kuralı"nın (ÇOKOMEL KIZ dersiyle geri alınmıştı — o zamanki kök neden AGF
+ * sırası değil, gerekçesizlik idi) YENİDEN getirilmesi DEĞİL. O kural KOŞULSUZDU (her AGF
+ * favorisi otomatik üst sıra). Bu kural DAR kapsamlı: yalnız (a) sahadaki GERÇEK/güncel
+ * AGF lideri VE (b) o at AYRICA enCokDusenler listesindeyse (gerçek, anlamlı düşüş —
+ * agf-trend.actions.ts'teki AYNI eşik) devreye girer. Sıradan bir AGF favorisi (düşmeyen)
+ * bu fonksiyondan hiç etkilenmez — genel muhakemeye bırakılır, tıpkı 2026-07-29 kararında
+ * olduğu gibi.
+ */
+export function faz2AgfFavorisiDususeRagmenGarantisi(
+  atlar: TeknikSiraliAt[],
+  faz1: Faz1Sonuc
+): { atlar: TeknikSiraliAt[]; terfiler: KararHiyerarsiDegisikligi[] } {
+  const dusenler = faz1.race.enCokDusenler ?? [];
+  if (dusenler.length === 0 || atlar.length <= 3) return { atlar, terfiler: [] };
+
+  const agfliAtlar = faz1.runners.filter((r) => !r.scratched && r.agf != null);
+  if (agfliAtlar.length === 0) return { atlar, terfiler: [] };
+  const favori = agfliAtlar.reduce((a, b) => (b.agf! > a.agf! ? b : a));
+
+  const favoriDusuyorMu = dusenler.some((d) => d.runnerNo === favori.no);
+  if (!favoriDusuyorMu) return { atlar, terfiler: [] };
+
+  const calisma = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
+  const idx = calisma.findIndex((a) => a.no === favori.no);
+  if (idx === -1 || idx < 3) return { atlar, terfiler: [] }; // koşmuyor ya da zaten ilk 3'te
+  if (calisma[idx].karar === "Yüksek Risk") return { atlar, terfiler: [] };
+
+  const eskiSira = calisma[idx].teknikSira;
+  const dususFarki = dusenler.find((d) => d.runnerNo === favori.no)!.fark;
+  const guncellenmisAt: TeknikSiraliAt = {
+    ...calisma[idx],
+    karar: "Güçlü Aday",
+    muhakeme: `${calisma[idx].muhakeme} | [SİSTEM]:KOD-GARANTİSİ sahadaki AGF lideri, gün içinde düşüşe rağmen (${dususFarki.toFixed(2)} puan) hâlâ favori — ilk 3'e terfi (eski sıra ${eskiSira} → 3) — piyasanın toplam parası hâlâ bu atta (TÜRKÖREN dersi, 2026-08-09).`,
+  };
+  const kalanlar = calisma.filter((a) => a.no !== favori.no);
+  const yeniSiraliListe = [...kalanlar.slice(0, 2), guncellenmisAt, ...kalanlar.slice(2)];
+  const terfiler: KararHiyerarsiDegisikligi[] = [{ no: favori.no, ad: favori.ad, eskiSira, yeniSira: 3 }];
+
+  const yeniAtlar = yeniSiraliListe.map((a, i) => ({ ...a, teknikSira: i + 1 }));
+  return { atlar: yeniAtlar, terfiler };
+}
+
 export function faz2AyniJokeyEtiketiEkle(
   muhakeme: string,
   r: { jockeyChanged: boolean; ilkStart: boolean }

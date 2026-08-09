@@ -72,6 +72,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
   const [top3Terfileri, setTop3Terfileri] = useState<Top3TerfiSonuc[]>([]);
   const [agf456Terfileri, setAgf456Terfileri] = useState<Top3TerfiSonuc[]>([]);
   const [gucluTop3Terfileri, setGucluTop3Terfileri] = useState<Top3TerfiSonuc[]>([]);
+  const [agfFavoriTerfileri, setAgfFavoriTerfileri] = useState<Top3TerfiSonuc[]>([]);
   const [kararHiyerarsiDegisiklikleri, setKararHiyerarsiDegisiklikleri] = useState<KararHiyerarsiDegisikligi[]>([]);
   const [kullanilmayanVeriOnay, setKullanilmayanVeriOnay] = useState(false);
   const [tempoOzeti, setTempoOzeti] = useState<string>("");
@@ -97,6 +98,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
     setTop3Terfileri([]);
     setAgf456Terfileri([]);
     setGucluTop3Terfileri([]);
+    setAgfFavoriTerfileri([]);
     setKararHiyerarsiDegisiklikleri([]);
     setKullanilmayanVeriOnay(false);
     setBankoAdayi(null);
@@ -133,6 +135,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
         faz2Top3Terfileri: Top3TerfiSonuc[] | null;
         faz2Agf456Terfileri: Top3TerfiSonuc[] | null;
         faz2GucluTop3Terfileri: Top3TerfiSonuc[] | null;
+        faz2AgfFavoriTerfileri: Top3TerfiSonuc[] | null;
         faz2KararHiyerarsiDegisiklikleri: KararHiyerarsiDegisikligi[] | null;
         tempoOzeti: string;
         couponNarrow?: string; couponNormal?: string; couponWide?: string;
@@ -150,6 +153,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
       setTop3Terfileri(res.faz2Top3Terfileri ?? []);
       setAgf456Terfileri(res.faz2Agf456Terfileri ?? []);
       setGucluTop3Terfileri(res.faz2GucluTop3Terfileri ?? []);
+      setAgfFavoriTerfileri(res.faz2AgfFavoriTerfileri ?? []);
       setKararHiyerarsiDegisiklikleri(res.faz2KararHiyerarsiDegisiklikleri ?? []);
       setTempoOzeti(res.tempoOzeti ?? "");
       setKuponlar({ narrow: res.couponNarrow, normal: res.couponNormal, wide: res.couponWide });
@@ -248,7 +252,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
     <div className="space-y-4 rounded-xl border border-purple-500/30 bg-purple-500/5 p-4">
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-purple-500" />
-        <h3 className="text-sm font-semibold">V2 Motoru — Deneysel (V1-V22, sayısal puanlama yok)</h3>
+        <h3 className="text-sm font-semibold">V2.1 Motoru — Deneysel (V1-V22, sayısal puanlama yok)</h3>
       </div>
 
       <div className="flex gap-2">
@@ -324,6 +328,22 @@ export default function V2AnalysisPanel({ raceId }: Props) {
           </p>
           <ul className="space-y-0.5">
             {gucluTop3Terfileri.map((t) => (
+              <li key={t.no} className="font-medium">#{t.no} {t.ad}: {t.eskiSira}. sıra → {t.yeniSira}. sıra</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {agfFavoriTerfileri.length > 0 && (
+        <div className="space-y-1 rounded-lg border border-brand/40 bg-brand/10 px-3 py-2.5 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-brand">
+            <Sparkles className="h-3.5 w-3.5" /> AGF Lideri Terfisi — düşüşe rağmen ilk 3
+          </div>
+          <p className="text-muted-foreground">
+            Sahadaki gerçek AGF lideri, gün içinde belirgin düşüşe rağmen hâlâ favori kaldığı için ilk 3&apos;e koşulsuz alındı (TÜRKÖREN dersi, 2026-08-09):
+          </p>
+          <ul className="space-y-0.5">
+            {agfFavoriTerfileri.map((t) => (
               <li key={t.no} className="font-medium">#{t.no} {t.ad}: {t.eskiSira}. sıra → {t.yeniSira}. sıra</li>
             ))}
           </ul>
