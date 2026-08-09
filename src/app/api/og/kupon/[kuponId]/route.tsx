@@ -229,6 +229,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ kuponId:
         </div>
       </div>
     ),
-    { width: 1080, height: 1120 }
+    { width: 1080, height: 1120, headers: { "Cache-Control": "no-store" } }
   );
 }

@@ -263,6 +263,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ raceId:
         </div>
       </div>
     ),
-    { width: 1080, height: 1920 }
+    { width: 1080, height: 1920, headers: { "Cache-Control": "no-store" } }
   );
 }

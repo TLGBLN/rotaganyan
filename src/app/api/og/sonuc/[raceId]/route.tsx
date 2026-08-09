@@ -313,6 +313,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ raceId:
         </div>
       </div>
     ),
-    { width: 1080, height: 1180 }
+    {
+      width: 1080,
+      height: 1180,
+      // v6.68 — kullanıcı bulgusu: next/og'nin varsayılan Cache-Control'ü
+      // (public, immutable, max-age=1yıl) bir raceId için ilk üretilen görseli Vercel
+      // CDN'inde KALICI olarak dondurup, sonraki tasarım/kod değişikliklerinin
+      // deploy edilmiş olsa bile o URL için asla görünmemesine yol açıyordu.
+      headers: { "Cache-Control": "no-store" },
+    }
   );
 }
