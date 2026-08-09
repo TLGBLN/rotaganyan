@@ -812,41 +812,51 @@ function gucluKodGarantiSayisi(muhakeme: string): number {
   ).length;
 }
 
+// v6.69 — kullanıcı bulgusu (İstanbul 1.Altılı 09.08.2026 kritiği): AGF'de en çok DÜŞEN
+// atlar da (ULUŞİRAN BEYİ -17,45, TÜRKÖREN -14,68) kazandı — sinyal yön bağımsız güçlü.
+// enCokYukselenler + enCokDusenler'i TEK bir "trend" listesine birleştirir, yön bilgisini
+// muhakeme metninde göstermek için saklar.
+type TrendAt = { runnerNo: number; ad: string; fark: number; yon: "yükseliş" | "düşüş" };
+function birlesikTrendListesi(faz1: Faz1Sonuc): TrendAt[] {
+  const yukselenler = (faz1.race.enCokYukselenler ?? []).map((y) => ({ ...y, yon: "yükseliş" as const }));
+  const dusenler = (faz1.race.enCokDusenler ?? []).map((d) => ({ ...d, yon: "düşüş" as const }));
+  return [...yukselenler, ...dusenler];
+}
+
 /**
- * v6.68 — kullanıcı kararı 2026-08-09: "diğer faktörler ve AGF trend birleşiyorsa
- * kesinlikle ilk 2 içinde olacak." AGF trend yükselen bir at AYRICA en az bir güçlü
- * kod-garantili sinyale (V1/V19/V22) sahipse ilk 2'ye koşulsuz terfi eder — yalnız AGF
- * yükselişi (faz2AgfYukselenTop4Garantisi) tek başına ilk 4 garantisi veriyordu, bu daha
- * sıkı/daha yüksek bir terfi katmanı. "karar" da "Güçlü Aday"a yükseltilir (Top3Garantisi
- * ile aynı gerekçe: aksi halde hiyerarşi kuralı terfiyi geri alır).
+ * v6.69 — kullanıcı kararı 2026-08-09 (İstanbul 1.Altılı kritiği sonrası): "birden çok V
+ * ile destekli en çok yükselen ve en çok düşen trendli at ilk 3'te olmalı" — eşik ikiye
+ * çıkarıldı (v6.68'de ≥1 idi, ilk 2'ye terfi ediyordu), hedef pencere ilk 3'e genişledi, VE
+ * artık yalnız yükselenler değil düşenler de sayılıyor (bkz. birlesikTrendListesi). "karar"
+ * da "Güçlü Aday"a yükseltilir (Top3Garantisi ile aynı gerekçe: aksi halde hiyerarşi kuralı
+ * terfiyi geri alır).
  */
-export function faz2GucluKombinasyonTop2Garantisi(
+export function faz2GucluKombinasyonTop3Garantisi(
   atlar: TeknikSiraliAt[],
   faz1: Faz1Sonuc
 ): { atlar: TeknikSiraliAt[]; terfiler: KararHiyerarsiDegisikligi[] } {
-  const yukselenler = faz1.race.enCokYukselenler;
-  if (!yukselenler || yukselenler.length === 0 || atlar.length <= 2) return { atlar, terfiler: [] };
+  const trendliler = birlesikTrendListesi(faz1);
+  if (trendliler.length === 0 || atlar.length <= 3) return { atlar, terfiler: [] };
 
   let calisma = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
   const terfiler: KararHiyerarsiDegisikligi[] = [];
-  const nitelikliler = yukselenler
-    .map((y) => y.runnerNo)
-    .map((no) => calisma.find((a) => a.no === no))
-    .filter((a): a is TeknikSiraliAt => !!a && gucluKodGarantiSayisi(a.muhakeme) >= 1)
-    .sort((a, b) => b.teknikSira - a.teknikSira); // en geride olan önce terfi etsin
+  const nitelikliler = trendliler
+    .map((t) => ({ t, at: calisma.find((a) => a.no === t.runnerNo) }))
+    .filter((x): x is { t: TrendAt; at: TeknikSiraliAt } => !!x.at && gucluKodGarantiSayisi(x.at.muhakeme) >= 2)
+    .sort((a, b) => b.at.teknikSira - a.at.teknikSira); // en geride olan önce terfi etsin
 
-  for (const at of nitelikliler) {
+  for (const { t, at } of nitelikliler) {
     const idx = calisma.findIndex((a) => a.no === at.no);
-    if (idx === -1 || idx < 2) continue; // zaten ilk 2'de
+    if (idx === -1 || idx < 3) continue; // zaten ilk 3'te
     const eskiSira = calisma[idx].teknikSira;
     const guncellenmisAt: TeknikSiraliAt = {
       ...calisma[idx],
       karar: "Güçlü Aday",
-      muhakeme: `${calisma[idx].muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF trend + güçlü sinyal birleşimiyle ilk 2'ye terfi (eski sıra ${eskiSira} → 2) — 2026-08-09 kullanıcı kararı.`,
+      muhakeme: `${calisma[idx].muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF trend (${t.yon}, ${t.fark >= 0 ? "+" : ""}${t.fark} puan) + birden çok güçlü sinyal birleşimiyle ilk 3'e terfi (eski sıra ${eskiSira} → 3) — 2026-08-09 kullanıcı kararı.`,
     };
     const kalanlar = calisma.filter((a) => a.no !== at.no);
-    calisma = [kalanlar[0], guncellenmisAt, ...kalanlar.slice(1)];
-    terfiler.push({ no: at.no, ad: at.ad, eskiSira, yeniSira: 2 });
+    calisma = [...kalanlar.slice(0, 2), guncellenmisAt, ...kalanlar.slice(2)];
+    terfiler.push({ no: at.no, ad: at.ad, eskiSira, yeniSira: 3 });
   }
   if (terfiler.length === 0) return { atlar, terfiler: [] };
 
@@ -855,48 +865,56 @@ export function faz2GucluKombinasyonTop2Garantisi(
 }
 
 /**
- * v6.68 — kullanıcı bulgusu 2026-08-08/09 (Ankara günü, 6/6 kontrol edilen koşuda kazanan
- * atın gün içinde AGF'si belirgin şekilde yükselmişti — "en çok yükselenler" panelindeki
- * ATLI FIRTINA, GOLDEN BEE, FAST PILOT, NERİS KIZIM, KUMBEY, EL INTOCABLE hepsi kazandı):
- * kullanıcı kararı KOŞULSUZ — "AGF trend yükselende olan at ilk 4 içinde yer alsın
- * kesinlikle." faz1.race.enCokYukselenler (agf-trend.actions.ts'teki AYNI anlamlı-eşik/
- * gürültü filtresinden geçmiş, halihazırda public panelde gösterilen liste — burada YENİ
- * bir eşik icat edilmiyor) içindeki her at, ilk 4'te değilse doğrudan konum garantisiyle
- * oraya taşınır. Top3Garantisi'nin aynı dersiyle: "karar" da (Orta/Yüksek Risk ise) en az
- * "Düşük Risk"e yükseltilir — aksi halde faz2KararHiyerarsisiUygula bu terfiyi geri alır.
- * Not: teorik olarak 2+ nitelikli yükselen aynı anda 4 sıralık pencereye sığmayabilir; bu
- * durumda hepsi pencereye ARDIŞIK olarak eklenir (güçlüsü önce), en güçlüsü kesin ilk 4'te
- * kalır — pratikte (kontrol edilen tüm örneklerde) koşu başına tek belirgin yükselen çıktı.
+ * v6.69 — kullanıcı kararı 2026-08-09: "en çok yükselen ve en çok düşen diğer atlar analiz
+ * gücüne göre geri kalan sıralamalarda yerini almalı, 4-5-6 içinde." v6.68'de bu tek bir
+ * sabit pozisyona (4) terfi ediyordu ve yalnız yükselenleri kapsıyordu; artık 3 sıralık bir
+ * PENCEREYE (4-5-6) terfi ediyor VE hem yükselen hem düşenleri kapsıyor.
+ * faz2GucluKombinasyonTop3Garantisi'nden SONRA çalışır — o zaten güçlü (≥2 kod-garantili
+ * sinyal) olanları ilk 3'e taşımış olur, burada kalan (0-1 sinyalli) trend atları işlenir.
+ * "Analiz gücüne göre" sırala: aynı pencereye birden fazla nitelikli at girecekse, HÂLİHAZIR
+ * teknikSira'sı (yani genel analiz sıralaması) daha iyi olan pencerenin önüne (4'e yakınına)
+ * konur — mevcut sırası zaten o gücü yansıtıyor, yeni bir puanlama icat edilmiyor. "karar"
+ * da (Orta/Yüksek Risk ise) en az "Düşük Risk"e yükseltilir (aksi halde hiyerarşi kuralı
+ * terfiyi geri alır).
  */
-export function faz2AgfYukselenTop4Garantisi(
+export function faz2AgfTrend456Garantisi(
   atlar: TeknikSiraliAt[],
   faz1: Faz1Sonuc
 ): { atlar: TeknikSiraliAt[]; terfiler: KararHiyerarsiDegisikligi[] } {
-  const yukselenler = faz1.race.enCokYukselenler;
-  if (!yukselenler || yukselenler.length === 0 || atlar.length <= 4) return { atlar, terfiler: [] };
+  const trendliler = birlesikTrendListesi(faz1);
+  if (trendliler.length === 0 || atlar.length <= 4) return { atlar, terfiler: [] };
 
   let calisma = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
   const terfiler: KararHiyerarsiDegisikligi[] = [];
-  const siraliYukselenler = [...yukselenler].sort((a, b) => b.fark - a.fark);
+  // Analiz gücü = hâlihazırdaki teknikSira (daha iyi sıra = daha güçlü). En GÜÇSÜZ önce
+  // işlenir ki en güçlü, pencereye EN SON eklenerek 4'e en yakın konumda kalsın (Top3/Top2
+  // garantilerindeki "en geride olan önce terfi etsin" deseniyle aynı mantık).
+  const nitelikliler = trendliler
+    .map((t) => ({ t, at: calisma.find((a) => a.no === t.runnerNo) }))
+    .filter((x): x is { t: TrendAt; at: TeknikSiraliAt } => !!x.at)
+    .sort((a, b) => b.at.teknikSira - a.at.teknikSira);
 
-  for (const y of siraliYukselenler) {
-    const idx = calisma.findIndex((a) => a.no === y.runnerNo);
-    if (idx === -1 || idx < 4) continue; // koşmuyor (çekilmiş) ya da zaten ilk 4'te
-    const at = calisma[idx];
-    const eskiSira = at.teknikSira;
+  for (const { t, at } of nitelikliler) {
+    const idx = calisma.findIndex((a) => a.no === at.no);
+    if (idx === -1 || idx < 6) continue; // koşmuyor (çekilmiş) ya da zaten ilk 6'da (Top3 dahil)
+    const eskiSira = calisma[idx].teknikSira;
     const guncellenmisAt: TeknikSiraliAt = {
-      ...at,
-      karar: at.karar === "Orta Risk" || at.karar === "Yüksek Risk" ? "Düşük Risk" : at.karar,
-      muhakeme: `${at.muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF trend ile ilk 4'e terfi (eski sıra ${eskiSira} → 4) — gün içinde belirgin para akışı (+${y.fark} puan, 2026-08-08 Ankara günü dersi).`,
+      ...calisma[idx],
+      karar: calisma[idx].karar === "Orta Risk" || calisma[idx].karar === "Yüksek Risk" ? "Düşük Risk" : calisma[idx].karar,
+      muhakeme: `${calisma[idx].muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF trend (${t.yon}, ${t.fark >= 0 ? "+" : ""}${t.fark} puan) ile 4-6 aralığına terfi (eski sıra ${eskiSira}) — gün içinde belirgin para hareketi.`,
     };
-    const kalanlar = calisma.filter((a) => a.no !== y.runnerNo);
+    const kalanlar = calisma.filter((a) => a.no !== at.no);
     calisma = [...kalanlar.slice(0, 3), guncellenmisAt, ...kalanlar.slice(3)];
-    terfiler.push({ no: at.no, ad: at.ad, eskiSira, yeniSira: 4 });
+    terfiler.push({ no: at.no, ad: at.ad, eskiSira, yeniSira: -1 }); // aşağıda gerçek son konumla düzeltilir
   }
   if (terfiler.length === 0) return { atlar, terfiler: [] };
 
   const yeniAtlar = calisma.map((a, i) => ({ ...a, teknikSira: i + 1 }));
-  return { atlar: yeniAtlar, terfiler };
+  // Her terfinin GERÇEK son konumu, üstteki döngüde sonraki terfiler yüzünden 4'ten 5/6'ya
+  // kayabiliyor — audit log'da yanlış "4" göstermemek için burada nihai teknikSira'dan okunuyor.
+  const sonKonumByNo = new Map(yeniAtlar.map((a) => [a.no, a.teknikSira]));
+  const terfilerGercekKonumla = terfiler.map((t) => ({ ...t, yeniSira: sonKonumByNo.get(t.no) ?? t.yeniSira }));
+  return { atlar: yeniAtlar, terfiler: terfilerGercekKonumla };
 }
 
 export function faz2AyniJokeyEtiketiEkle(

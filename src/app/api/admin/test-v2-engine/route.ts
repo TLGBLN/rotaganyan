@@ -5,7 +5,7 @@ import type { Anthropic } from "@anthropic-ai/sdk";
 import { createWithTruncationRetry, extractText } from "@/lib/methodology/claude-analiz-helpers";
 import { getRecentCachedResult } from "@/lib/claude-cost";
 import type { Role } from "@prisma/client";
-import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfYukselenTop4Garantisi, faz2GucluKombinasyonTop2Garantisi } from "@/lib/methodology/v2-engine";
+import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi } from "@/lib/methodology/v2-engine";
 
 // v6.53 — kullanıcı bulgusu 2026-08-04 (Kocaeli 5.Koşu): tüm sahayı TEK bir Claude
 // çağrısında analiz etmek, zengin kategorilerde (3/4/5) + 8+ atlı sahalarda GERÇEKTEN
@@ -366,24 +366,26 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
     console.log("[test-v2-engine] Top3 garantisi tetiklendi:", JSON.stringify(faz2Top3Terfileri));
   }
 
-  // v6.68 — kullanıcı kararı 2026-08-09: AGF trend yükselişi + en az bir güçlü kod-garantili
-  // sinyal (V1/V19/V22) birlikte varsa ilk 2'ye koşulsuz terfi — bkz. v2-engine.ts'deki
-  // faz2GucluKombinasyonTop2Garantisi yorumu. Top4 garantisinden ÖNCE çalışır.
-  const top2Sonuc = faz2GucluKombinasyonTop2Garantisi(parsed.atlar, faz1);
-  parsed = { atlar: top2Sonuc.atlar };
-  const faz2GucluTop2Terfileri = top2Sonuc.terfiler;
-  if (faz2GucluTop2Terfileri.length > 0) {
-    console.log("[test-v2-engine] Güçlü kombinasyon top2 garantisi tetiklendi:", JSON.stringify(faz2GucluTop2Terfileri));
+  // v6.69 — kullanıcı kararı 2026-08-09 (İstanbul 1.Altılı kritiği): AGF trend'de (yükselen
+  // VEYA düşen) belirgin hareket + birden çok güçlü kod-garantili sinyal (V1/V19/V22)
+  // birlikte varsa ilk 3'e koşulsuz terfi — bkz. v2-engine.ts'deki
+  // faz2GucluKombinasyonTop3Garantisi yorumu. 4-6 garantisinden ÖNCE çalışır.
+  const top3KombinasyonSonuc = faz2GucluKombinasyonTop3Garantisi(parsed.atlar, faz1);
+  parsed = { atlar: top3KombinasyonSonuc.atlar };
+  const faz2GucluTop3Terfileri = top3KombinasyonSonuc.terfiler;
+  if (faz2GucluTop3Terfileri.length > 0) {
+    console.log("[test-v2-engine] Güçlü kombinasyon top3 garantisi tetiklendi:", JSON.stringify(faz2GucluTop3Terfileri));
   }
 
-  // v6.68 — kullanıcı kararı 2026-08-08/09: AGF trend'i belirgin şekilde yükselen at
-  // (public "AGF Trend" panelindeki AYNI liste) ilk 4'e koşulsuz terfi ettirilir — bkz.
-  // v2-engine.ts'deki faz2AgfYukselenTop4Garantisi yorumu.
-  const agfTop4Sonuc = faz2AgfYukselenTop4Garantisi(parsed.atlar, faz1);
-  parsed = { atlar: agfTop4Sonuc.atlar };
-  const faz2AgfTop4Terfileri = agfTop4Sonuc.terfiler;
-  if (faz2AgfTop4Terfileri.length > 0) {
-    console.log("[test-v2-engine] AGF yükselen top4 garantisi tetiklendi:", JSON.stringify(faz2AgfTop4Terfileri));
+  // v6.69 — kullanıcı kararı 2026-08-09: AGF trend'de (yükselen VEYA düşen) belirgin
+  // hareket gösteren, yukarıdaki güçlü kombinasyon şartını karşılamayan diğer atlar
+  // analiz gücüne göre 4-5-6 penceresine terfi ettirilir — bkz. v2-engine.ts'deki
+  // faz2AgfTrend456Garantisi yorumu.
+  const agf456Sonuc = faz2AgfTrend456Garantisi(parsed.atlar, faz1);
+  parsed = { atlar: agf456Sonuc.atlar };
+  const faz2Agf456Terfileri = agf456Sonuc.terfiler;
+  if (faz2Agf456Terfileri.length > 0) {
+    console.log("[test-v2-engine] AGF trend 4-6 garantisi tetiklendi:", JSON.stringify(faz2Agf456Terfileri));
   }
 
   // v6.67 — kullanıcı kararı 2026-08-07 (İstanbul 1.Koşu dersi): karar hiyerarşisi
@@ -451,8 +453,8 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
     faz2KararSiraUyarilari,
     faz2KullanilmayanVeri,
     faz2Top3Terfileri,
-    faz2GucluTop2Terfileri,
-    faz2AgfTop4Terfileri,
+    faz2GucluTop3Terfileri,
+    faz2Agf456Terfileri,
     faz2KararHiyerarsiDegisiklikleri,
     faz2BankoAdayi,
     runners,

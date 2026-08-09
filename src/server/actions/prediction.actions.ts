@@ -170,7 +170,18 @@ export async function completeFullField(raceId: string, picks: PickInput[]): Pro
     pedigreeRating: "BILINMIYOR" as PedigreeRating,
     isTarget: false,
   }));
-  return [...picks, ...ekPicks];
+
+  // v6.68 — kullanıcı bulgusu (İstanbul 1.Altılı 4.Koşu, 09.08.2026): scratch olan atların
+  // pick'leri PredictionForm'da elle çıkarıldığında kalan pick'ler ESKİ rank'larını (ör.
+  // 3..12) koruyordu, hiçbir yerde 1'den başlayacak şekilde sıkıştırılmıyordu. Bu boşluk
+  // yalnız kozmetik değil: hitTop1 hesaplaması (result-utils.ts) ve "1. sırada önerildi"
+  // poster metni (og/sonuc/route.tsx) `rank === 1` arıyor — boşluksa o koşunun GERÇEK
+  // 1. sırası hiçbir zaman bulunamıyor, isabet sayılmıyor. Bu fonksiyon HER ÜÇ yazma
+  // yolunun (upsertPrediction, parse-report, V2AnalysisPanel→upsertPrediction) ortak
+  // noktası olduğu için sıkıştırma tek burada yapılıyor — sıra korunur, boşluk kalmaz.
+  return [...picks, ...ekPicks]
+    .sort((a, b) => a.rank - b.rank)
+    .map((p, i) => ({ ...p, rank: i + 1 }));
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────────

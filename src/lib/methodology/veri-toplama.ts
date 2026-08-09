@@ -386,6 +386,11 @@ export type Faz1Sonuc = {
     // — bkz. agf-trend.actions.ts ANLAMLI_PUAN_ESIGI) atların, kontrol edilen 6 koşunun
     // 6'sında da kazandığı gözlemlendi — kullanıcı kararı: bu at ilk 4'e KOŞULSUZ girsin.
     enCokYukselenler: { runnerNo: number; ad: string; fark: number }[];
+    // v6.69 — kullanıcı bulgusu (İstanbul 1.Altılı 09.08.2026 kritiği): kazananların çoğu
+    // AGF'de YÜKSELEN değil DÜŞEN taraftaydı (ör. ULUŞİRAN BEYİ -17,45, TÜRKÖREN -14,68) —
+    // yani "gün içinde belirgin para hareketi" sinyali yön bağımsız güçlü, yalnız yükseliş
+    // değil. enCokYukselenler ile AYNI kaynak/eşik (agf-trend.actions.ts), yalnız ters yön.
+    enCokDusenler: { runnerNo: number; ad: string; fark: number }[];
     // Sıklet Dağılımı / makas genişliği (v6.38, kullanıcı denetimi): sahadaki en hafif ve
     // en ağır kilo arasındaki fark — bir atın mutlak kilosu tek başına yeterli bağlam
     // değildir (60kg, taban 50kg'sa ezici bir yük, taban 58kg'sa önemsiz bir fark).
@@ -1174,6 +1179,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       pistMesafeStilOzeti, pistMesafeStilEnCokKazanan, pistMesafeStilEnCokKazananYuzde,
       pistMesafeStilBreakdown: pistMesafeStil ? pistMesafeStil.breakdown.map((b) => ({ style: b.style, percent: b.percent })) : null,
       enCokYukselenler: agfTrendSonuc.enCokYukselenler.map((a) => ({ runnerNo: a.runnerNo, ad: a.horseName, fark: a.fark ?? 0 })),
+      enCokDusenler: agfTrendSonuc.enCokDusenler.map((a) => ({ runnerNo: a.runnerNo, ad: a.horseName, fark: a.fark ?? 0 })),
       kiloEnHafif, kiloEnAgir, kiloMakasi, sonDuzlukUzunlugu,
       conditions: race.conditions, ageWeight: race.ageWeight, trackRecord: race.trackRecord,
       weather: race.raceDay.weather,

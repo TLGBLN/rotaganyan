@@ -115,7 +115,15 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                     </thead>
                     <tbody>
                       {race.prediction!.picks.map((pick, rowIdx) => {
-                        const isBanko = race.prediction!.isBanko && pick?.rank === 1;
+                        // v6.68 — kullanıcı bulgusu: ham pick.rank scratch sonrası boşluklu
+                        // kalabiliyordu (ör. 3..12) — ekrandaki "#" pozisyonu zaten sırayla
+                        // (rowIdx+1) gösteriliyordu, ama banko/renk/kalınlık HAM rank'a
+                        // bakıyordu, ikisi çelişebiliyordu. Artık ikisi de aynı (ekrandaki)
+                        // pozisyonu kullanıyor — completeFullField artık rank'ı yazarken
+                        // sıkıştırdığı için yeni veride zaten eşitler, eski veri için de bu
+                        // bileşen kendi içinde tutarlı kalır.
+                        const displayRank = rowIdx + 1;
+                        const isBanko = race.prediction!.isBanko && displayRank === 1;
                         const isTarget = pick?.isTarget;
                         const isWinner =
                           pick?.runner?.no != null &&
@@ -127,8 +135,8 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                           : "";
                         const textColor = isWinner
                           ? "text-[#F5C518]"
-                          : rankColor(pick.rank);
-                        const weight = rankWeight(pick.rank);
+                          : rankColor(displayRank);
+                        const weight = rankWeight(displayRank);
 
                         return (
                           <tr key={rowIdx} className={cn("border-b last:border-0", rowBg)}>
@@ -237,7 +245,11 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
 
                       {group.map((race, ri) => {
                         const pick = race.prediction!.picks[rowIdx];
-                        const isBanko = race.prediction!.isBanko && pick?.rank === 1;
+                        // v6.68 — bkz. mobil tablodaki aynı düzeltme: ekran pozisyonu
+                        // (rowIdx+1) ile ham pick.rank ayrışabildiği için stil/banko artık
+                        // ikisi için de aynı (ekrandaki) pozisyona bakıyor.
+                        const displayRank = rowIdx + 1;
+                        const isBanko = race.prediction!.isBanko && displayRank === 1;
                         const isTarget = pick?.isTarget;
                         const isWinner =
                           pick?.runner?.no != null &&
@@ -254,8 +266,8 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                         }
 
                         const rowBg = isWinner ? "bg-[#C98F02]/20" : isTarget ? "bg-hit/15" : colBg;
-                        const textColor = isWinner ? "text-[#F5C518]" : rankColor(pick.rank);
-                        const weight = rankWeight(pick.rank);
+                        const textColor = isWinner ? "text-[#F5C518]" : rankColor(displayRank);
+                        const weight = rankWeight(displayRank);
 
                         return (
                           <>
