@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { upsertPrediction, type PickInput } from "@/server/actions/prediction.actions";
 import { faz2PickDetaylari } from "@/lib/methodology/v2-engine";
+import type { MuhakemeSatiri } from "@/lib/methodology/muhakeme-format";
+import { satirGosterimMetni } from "@/lib/methodology/muhakeme-format";
 
 // v6.51 — kullanıcı kararı 2026-08-03 ("hepsini hayata sok"): bu, "sıfırdan" tasarlanan
 // V1-V22 + A-E muhakeme matrisi motorunun GERÇEK admin akışına bağlanmış hali —
@@ -18,8 +20,8 @@ import { faz2PickDetaylari } from "@/lib/methodology/v2-engine";
 // Banko/kupon, Faz2'nin kendi teknikSira+karar alanlarına dayanan MEKANİK bir işarettir
 // (faz2BankoAdayiTespit) — Faz3'ün gerçek 0-100 puanlamasından türetilen banko kadar
 // güvenilir değildir, bu yüzden "Banko Adayı" dille sunulur, "Banko" dille değil.
-type TestV2Pick = { no: number; ad: string; teknikSira: number; karar: string; muhakeme: string };
-type BatchAt = { no: number; ad: string; karar: string; muhakeme: string };
+type TestV2Pick = { no: number; ad: string; teknikSira: number; karar: string; muhakeme: MuhakemeSatiri[] };
+type BatchAt = { no: number; ad: string; karar: string; muhakeme: MuhakemeSatiri[] };
 type Runner = { id: string; no: number; name: string };
 type BankoAdayiSonuc = {
   bankoAdayi: boolean; sebep: string;
@@ -481,7 +483,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
                     <span className="font-semibold text-sm">#{a.no} {a.ad}</span>
                     <span className="text-[10px] font-semibold text-purple-500">{a.karar}</span>
                   </div>
-                  <p className="mt-1 pl-14 text-[11px] text-muted-foreground">{a.muhakeme}</p>
+                  <p className="mt-1 pl-14 text-[11px] text-muted-foreground">{a.muhakeme.map(satirGosterimMetni).join(" | ")}</p>
                 </div>
               );
             })}

@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { Confidence, PedigreeRating, Prisma } from "@prisma/client";
 import { Loader2 } from "lucide-react";
+import { detaylarBosMu, gosterimSatirlariUret } from "@/lib/methodology/muhakeme-format";
 
 type Runner = Prisma.RunnerGetPayload<{ include: { gallops: true } }>;
 
@@ -89,9 +90,7 @@ export default function PredictionForm({ raceId, runners, existingPrediction }: 
   // henüz desteklemediği kategoriler (ör. Amatör) için hâlâ gerekli, o yüzden komple
   // kaldırılamıyor — ama zaten İÇERİKLİ (details dolu) bir analiz varsa üzerine yazmadan
   // önce bilinçli onay ZORUNLU.
-  const varOlanIcerikliMi = (existingPrediction?.picks ?? []).some(
-    (p) => Array.isArray(p.details) && p.details.length > 0
-  );
+  const varOlanIcerikliMi = (existingPrediction?.picks ?? []).some((p) => !detaylarBosMu(p.details));
   const [uzerineYazOnay, setUzerineYazOnay] = useState(false);
 
   const defaultPicks: PickFormData[] = existingPrediction?.picks.map((p) => ({
@@ -101,7 +100,7 @@ export default function PredictionForm({ raceId, runners, existingPrediction }: 
     score: p.score ?? 0,
     isTarget: p.isTarget,
     pedigreeRating: p.pedigreeRating,
-    details: Array.isArray(p.details) ? (p.details as string[]).join("; ") : "",
+    details: gosterimSatirlariUret(p.details).join("; "),
   })) ?? [
     { rank: 1, runnerId: "", runnerLabel: "", score: 0, isTarget: false, pedigreeRating: "BILINMIYOR", details: "" },
     { rank: 2, runnerId: "", runnerLabel: "", score: 0, isTarget: false, pedigreeRating: "BILINMIYOR", details: "" },

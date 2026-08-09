@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp, Star, Info, PlayCircle } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
+import { kararOku } from "@/lib/methodology/muhakeme-format";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
 import HorseDetailModal from "./HorseDetailModal";
 import HipodromOzellikleriModal from "./HipodromOzellikleriModal";
@@ -289,12 +290,13 @@ function pickDisplay(p: ProgramPick): { no: number | string; name: string } {
 }
 
 // v6.55 — V2 motorunun (sayısal puanlama yok) picks'lerinde score her zaman null —
-// bunun yerine details[0]'daki "Karar: Güçlü Aday/Orta Risk/..." etiketini göster,
+// bunun yerine details'teki "karar" (Güçlü Aday/Orta Risk/...) etiketini göster,
 // PuanTablosu.tsx/InlineAnalysisPanel.tsx'teki aynı desen (bkz. puanHucresi orada).
-function puanHucresi(score: number | null, details: string[]): string {
+// v6.70 (V2.2): details artık iki farklı şekilde (eski string[] / yeni {versiyon:2,...}
+// objesi) gelebiliyor — okuma merkezi muhakeme-format.ts'teki kararOku'ya taşındı.
+function puanHucresi(score: number | null, details: unknown): string {
   if (score != null) return String(score);
-  const karar = details.find((d) => d.startsWith("Karar: "));
-  return karar ? karar.replace("Karar: ", "") : "—";
+  return kararOku(details) ?? "—";
 }
 
 function XLogo({ className }: { className?: string }) {

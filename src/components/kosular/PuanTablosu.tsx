@@ -4,6 +4,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { ProgramRaceDay } from "@/server/services/race.service";
 import { finishPos } from "@/lib/race-result";
+import { kararOku } from "@/lib/methodology/muhakeme-format";
 
 type Props = {
   raceDay: ProgramRaceDay;
@@ -49,9 +50,7 @@ function rankWeight(rank: number): string {
 // AYNEN korunuyor, hiçbir şey değişmiyor.
 function puanHucresi(score: number | null, details: unknown): string {
   if (score != null) return String(score);
-  const list = Array.isArray(details) ? (details as string[]) : [];
-  const karar = list.find((d) => d.startsWith("Karar: "));
-  return karar ? karar.replace("Karar: ", "") : "—";
+  return kararOku(details) ?? "—";
 }
 
 export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props) {

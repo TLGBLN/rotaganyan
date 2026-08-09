@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import { db } from "@/lib/db";
 import fs from "node:fs";
 import path from "node:path";
+import { kararOku } from "@/lib/methodology/muhakeme-format";
 
 export const runtime = "nodejs";
 
@@ -39,10 +40,7 @@ function getHorseIconDataUri(): string {
 // analiz jargonu, herkese açık bir paylaşım görseli için hiç uygun değil. Artık yalnız
 // "karar" (Güçlü Aday vb.) temiz bir rozet olarak gösteriliyor, teknik metin YOK.
 function extractKarar(details: unknown): string | null {
-  if (!Array.isArray(details)) return null;
-  const kararSatiri = details.find((d) => typeof d === "string" && d.startsWith("Karar:"));
-  if (typeof kararSatiri !== "string") return null;
-  return kararSatiri.replace(/^Karar:\s*/, "").trim() || null;
+  return kararOku(details);
 }
 
 function formatGanyan(v: number | null): string {

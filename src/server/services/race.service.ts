@@ -739,7 +739,7 @@ export type ProgramPick = {
   runnerLabel: string | null;
   runner: { no: number; name: string } | null;
   score: number | null;
-  details: string[];
+  details: unknown;
 };
 
 export type ProgramRace = {
@@ -923,7 +923,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
         hasAnalysis: pred != null && pred.picks.length > 0,
         picks: (pred?.picks ?? []).map((p) => ({
           ...p,
-          details: Array.isArray(p.details) ? (p.details as string[]) : [],
+          details: p.details,
         })),
       };
     }),

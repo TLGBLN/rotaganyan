@@ -6,14 +6,19 @@ import { revalidatePath } from "next/cache";
 import { startOfDay, endOfDay } from "date-fns";
 import { recomputeHitStatsForRace } from "@/lib/result-utils";
 import { kategoriTespit, KATEGORI_ADI } from "@/lib/methodology/v2-engine";
-import type { Confidence, PedigreeRating } from "@prisma/client";
+import { detaylarBosMu, isPickDetailsV2 } from "@/lib/methodology/muhakeme-format";
+import type { Confidence, PedigreeRating, Prisma } from "@prisma/client";
 
 export type PickInput = {
   rank: number;
   runnerId?: string;
   runnerLabel: string;
   score?: number;
-  details: string[];
+  // v6.70 (V2.2): eskiden string[] (yalnız "Karar: X" + [Vx+Vy] etiket dizisi) — artık
+  // ya legacy string[] (PredictionForm/parse-report/analysis-importer) ya da yeni
+  // {versiyon:2, karar, satirlar} objesi (V2AnalysisPanel) olabilir. Prisma'nın Json
+  // alanına doğrudan yazılabilecek herhangi bir değer kabul edilir.
+  details: Prisma.InputJsonValue;
   pedigreeRating: PedigreeRating;
   isTarget: boolean;
 };
@@ -89,7 +94,7 @@ export async function syncKarmaMirrors(predictionId: string): Promise<void> {
           runnerId: karmaRunnerId ?? undefined,
           runnerLabel: pick.runnerLabel,
           score: pick.score ?? undefined,
-          details: pick.details as string[],
+          details: pick.details as Prisma.InputJsonValue,
           pedigreeRating: pick.pedigreeRating,
           isTarget: pick.isTarget,
         };
@@ -367,7 +372,7 @@ export async function assertPublishSafe(id: string): Promise<void> {
   const agfFavori = agfAtlari.length ? agfAtlari.reduce((a, b) => (b.agf! > a.agf! ? b : a)) : null;
   if (agfFavori && agfFavori.agf! >= 25) {
     const pick = pred.picks.find((p) => p.runnerId === agfFavori.id);
-    const gerekcesiz = !pick || !Array.isArray(pick.details) || pick.details.length === 0;
+    const gerekcesiz = !pick || detaylarBosMu(pick.details);
     if (gerekcesiz) {
       throw new Error(
         `AGF favorisi #${agfFavori.no} ${agfFavori.name} (%${agfFavori.agf}) hiç gerekçelendirilmemiş — yayınlanamaz. Bu atı formda elle gerekçelendirin ya da analizi yeniden çalıştırın.`
@@ -426,9 +431,13 @@ export async function assertPublishSafe(id: string): Promise<void> {
   // dışı bir kategori (ör. Amatör/DHÖW, henüz desteklenmiyor) bu kontrolün dışında kalır.
   const kategori = kategoriTespit(pred.race.classType);
   if (kategori !== "bilinmiyor") {
-    const vKoduVarMi = pred.picks.some(
-      (p) => Array.isArray(p.details) && p.details.some((d) => typeof d === "string" && /\[V\d/.test(d))
-    );
+    // v6.70 (V2.2): yeni format ({versiyon:2, satirlar}) için gerçek bir V-kodu satırı
+    // (kod.length>0) ara; eski string[] formatları için ESKİ regex dalı KORUNUYOR
+    // (geçmiş kayıtlar geriye dönük migrate edilmiyor, bkz. muhakeme-format.ts notu).
+    const vKoduVarMi = pred.picks.some((p) => {
+      if (isPickDetailsV2(p.details)) return p.details.satirlar.some((s) => s.kod.length > 0);
+      return Array.isArray(p.details) && p.details.some((d) => typeof d === "string" && /\[V\d/.test(d));
+    });
     if (!vKoduVarMi) {
       throw new Error(
         `Bu koşu kategorisi (${KATEGORI_ADI[kategori]}) V2 motoru tarafından destekleniyor ama hiçbir at için V-kodu (KOD-GARANTİSİ) gerekçesi yok — muhtemelen V2 hiç çalıştırılmadı. Yayınlamak için önce V2 motorunu çalıştırıp sonucu uygulayın.`

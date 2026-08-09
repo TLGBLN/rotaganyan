@@ -6,6 +6,8 @@ import { createWithTruncationRetry, extractText } from "@/lib/methodology/claude
 import { getRecentCachedResult } from "@/lib/claude-cost";
 import type { Role } from "@prisma/client";
 import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi, faz2AgfFavorisiDususeRagmenGarantisi } from "@/lib/methodology/v2-engine";
+import type { MuhakemeSatiri } from "@/lib/methodology/muhakeme-format";
+import { satirGosterimMetni } from "@/lib/methodology/muhakeme-format";
 
 // v6.53 — kullanıcı bulgusu 2026-08-04 (Kocaeli 5.Koşu): tüm sahayı TEK bir Claude
 // çağrısında analiz etmek, zengin kategorilerde (3/4/5) + 8+ atlı sahalarda GERÇEKTEN
@@ -34,10 +36,10 @@ export type TestV2Pick = {
   ad: string;
   teknikSira: number;
   karar: string;
-  muhakeme: string;
+  muhakeme: MuhakemeSatiri[];
 };
 
-export type BatchAt = { no: number; ad: string; karar: string; muhakeme: string };
+export type BatchAt = { no: number; ad: string; karar: string; muhakeme: MuhakemeSatiri[] };
 
 // v6.68 — kullanıcı bulgusu 2026-08-08 (Ankara 2.Koşu, #3/#4 iki denemede de yanıttan
 // düşmüştü): loglardan çıkan ham kanıt, Claude'un HER İKİ denemede de "atlar" dizisini
@@ -50,6 +52,25 @@ export type BatchAt = { no: number; ad: string; karar: string; muhakeme: string 
 // bu şemada zaten başka yerde (ör. her at objesinin kendi required'ı) kullanılıyor, minItems
 // gibi Anthropic-özel bir kısıtlamaya bağımlı değil. Bir alan eksikse yanıtın kendisi şema
 // ihlali sayılır — model artık "eksik ama geçerli" bir yanıt ÜRETEMEZ, yapısal olarak kapalı.
+// v6.70 (V2.2) — kullanıcı talimatı 2026-08-09: "muhakeme" artık serbest metin değil,
+// yapılandırılmış bir MuhakemeSatiri[] şeması — CEMRE ATEŞİ dersi (Claude aynı objektif
+// sonuca kendi cümleleriyle vardığında kod'un aradığı kanonik ifadeyle eşleşmiyordu)
+// kökten kapanıyor: "guven" artık bir CÜMLE değil doğrudan seçilen bir enum. Anthropic'in
+// yapılandırılmış çıktı API'si array için minItems/maxItems'ı yalnız 0/1 destekliyor (bkz.
+// batchSchemaFor'un eski yorumu, 2+ değer canlıda 400 hatası vermişti) — bu yüzden ne
+// "muhakeme" dizisinde ne de "kod" alt-dizisinde HİÇ minItems/maxItems kullanılmıyor.
+const muhakemeSatirSchema = {
+  type: "object",
+  properties: {
+    kod: { type: "array", items: { type: "string" } },
+    tip: { type: "string", enum: ["destek", "risk", "notr"] },
+    guven: { type: "string", enum: ["tam", "orta", "zayif"] },
+    aciklama: { type: "string" },
+  },
+  required: ["kod", "tip", "guven", "aciklama"],
+  additionalProperties: false,
+} as const;
+
 function batchSchemaFor(nolar: number[]) {
   const atSchema = {
     type: "object",
@@ -57,7 +78,7 @@ function batchSchemaFor(nolar: number[]) {
       no: { type: "integer" },
       ad: { type: "string" },
       karar: { type: "string", enum: ["Güçlü Aday", "Düşük Risk", "Orta Risk", "Yüksek Risk"] },
-      muhakeme: { type: "string" },
+      muhakeme: { type: "array", items: muhakemeSatirSchema },
     },
     required: ["no", "ad", "karar", "muhakeme"],
     additionalProperties: false,
@@ -103,14 +124,14 @@ const SIRALAMA_SCHEMA = {
 function batchReminder(kategori: string, batchNo: number, toplamBatch: number, nolar: number[]): string {
   return `Şimdi yukarıdaki V-kodu tanımlarını, muhakeme matrisini ve AŞAĞIDAKİ AT GRUBUNU (bu, sahadaki atların yalnız bir kısmı — grup ${batchNo}/${toplamBatch}) kullanarak HER at için "muhakeme" üret. Bu koşu ${kategori} kategorisinde — yalnız KOŞU/AT verisinde GÖRÜNEN V-kodlarını kullan, görünmeyen bir kod hakkında veri uydurma. Bu aşamada teknikSira/karşılaştırmalı sıra İSTEMİYORUM (sahadaki diğer atları henüz görmüyorsun) — yalnız "karar" (Güçlü Aday / Düşük Risk / Orta Risk / Yüksek Risk, bu atın KENDİ verisine göre) ve "muhakeme" üret.
 
-**FORMAT — KOMPAKT ETİKET NOTASYONU:** "muhakeme" alanında TAM CÜMLE DEĞİL, kısa "Etiket:değer(bağlam)" parçaları yaz, "|" ile ayır. Fiil/bağlaç/özne YASAK. Muhakeme Matrisi'nde çapraz sorguladığın HER çift için "[Vx+Vy]:destek" veya "[Vx+Vy]:risk" etiketi ekle (bağlamı parantez içinde 1-3 kelime). Örnek: 'V10:KaçakAt | V18:3(iç) | [V10+V18]:destek(iç kulvar+kaçak avantajlı) | V9:n=4,med-0.6(güçlü) | [V2+V9]:destek(idman+kapanış örtüşüyor) | V13:56(-2kg) | [V13+V10]:risk(ağır kilo erken enerji riski)'.
+**FORMAT — YAPILANDIRILMIŞ MUHAKEME SATIRLARI (v6.70/V2.2):** "muhakeme" artık serbest metin DEĞİL, bir SATIR DİZİSİ — her satır: { "kod": [...ilgili V-kodları, ör. ["V10","V12"] veya tek kod ["V4"]], "tip": "destek"/"risk"/"notr", "guven": "tam"/"orta"/"zayif", "aciklama": "kısa 1-2 cümle/ifade" }. Cümle kurma zorunda değilsin — YÖNÜ (tip) ve GÜVENİ (guven) doğrudan alan olarak SEÇ, "hafif/nötr-hafif/kısmi" gibi kelime oyunlarıyla yumuşatma; kanıt gerçekten güçlüyse (ör. n≥10 + popülasyonda ilk 2 sıra, bkz. İSPANOZ dersi V_LEGEND'de) "guven":"tam" seç, ASLA daha zayıf bir "guven" ile kelimeyle telafi etme. Muhakeme Matrisi'nde çapraz sorguladığın HER çift için ayrı bir satır ekle (kod dizisinde İKİ kodu birlikte ver). Tekli gözlemler (ör. "V10:KaçakAt") de tek elemanlı kod dizisiyle (["V10"]) ayrı bir satır olabilir.
 
-**ÖNEMLİ OLANI YAZ, DOLDURMA YAPMA:** Yalnız gerçekten anlamlı/karar etkileyici bulduğun V-kodu çiftlerini ve sinyalleri yaz — önemsiz bulduğun her kodu "yok/etkisiz" diye tek tek sıralamak ZORUNLU DEĞİL (v6.66 kullanıcı bulgusu: bu, 15 atlı sahalarda muhakemeyi anlamsız doldurmayla şişirip sıralama çağrısının asıl sinyali (karar: Güçlü Aday vb.) gürültü içinde kaybetmesine yol açtı — TAM TIME/İSPANOZ tarzı gerçekten önemli, geniş örneklemli sinyalleri (n≥5) ASLA atlama, ama sıradan/önemsiz her kodu doldurma amacıyla yazma).
+**ÖNEMLİ OLANI YAZ, DOLDURMA YAPMA:** Yalnız gerçekten anlamlı/karar etkileyici bulduğun V-kodu çiftlerini ve sinyalleri satır olarak ekle — önemsiz bulduğun her kod için "etkisiz" satırı eklemek ZORUNLU DEĞİL (v6.66 kullanıcı bulgusu: bu, 15 atlı sahalarda muhakemeyi anlamsız doldurmayla şişirip sıralama çağrısının asıl sinyali (karar: Güçlü Aday vb.) gürültü içinde kaybetmesine yol açtı — TAM TIME/İSPANOZ tarzı gerçekten önemli, geniş örneklemli sinyalleri (n≥5) ASLA atlama, ama sıradan/önemsiz her kodu doldurma amacıyla yazma).
 
 **KRİTİK — HİÇBİR ALANI ATLAMA:** Yanıt şeması bu gruptaki HER at için AYRI, ZORUNLU bir alan içeriyor (${nolar.map((no) => `"at_${no}"`).join(", ")}) — bunlardan biri bile eksik kalırsa yanıt GEÇERSİZ sayılır. Aşağıdaki ${nolar.length} atın HEPSİ için bir alan doldurmalısın, hiçbirini atlama.
 
 Yanıtı YALNIZCA geçerli JSON olarak ver, örnek (alan adları "at_" + o atın numarası):
-{ ${nolar.map((no) => `"at_${no}": { "no": ${no}, "ad": "...", "karar": "Güçlü Aday / Düşük Risk / Orta Risk / Yüksek Risk", "muhakeme": "Etiket:değer(bağlam) | [Vx+Vy]:destek(...) | ..." }`).join(", ")} }`;
+{ ${nolar.map((no) => `"at_${no}": { "no": ${no}, "ad": "...", "karar": "Güçlü Aday / Düşük Risk / Orta Risk / Yüksek Risk", "muhakeme": [ { "kod": ["V10","V18"], "tip": "destek", "guven": "orta", "aciklama": "iç kulvar+kaçak avantajlı" }, { "kod": ["V13"], "tip": "risk", "guven": "zayif", "aciklama": "1kg ağır" } ] }`).join(", ")} }`;
 }
 
 // v6.55 — kullanıcı bulgusu (WOLF SEYFO, Kocaeli 7.Koşu): sıralama çağrısı yalnız
@@ -123,7 +144,7 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, örnek (alan adları "at_" + o atın
 // kelimeyle sayı çelişirse sayıyı esas alabilir.
 function siralamaReminder(atlar: (BatchAt & { hamVeri?: string })[]): string {
   const liste = atlar.map((a) =>
-    `#${a.no} ${a.ad} — İLK karar (grup aşamasında, aşağıdaki etiketlerin bir kısmı henüz eklenmeden önce verildi — bkz. KARARI YENİDEN VER talimatı): ${a.karar}\nGrup analiz metni: ${a.muhakeme}${a.hamVeri ? `\nHam veri: ${a.hamVeri}` : ""}`
+    `#${a.no} ${a.ad} — İLK karar (grup aşamasında, aşağıdaki etiketlerin bir kısmı henüz eklenmeden önce verildi — bkz. KARARI YENİDEN VER talimatı): ${a.karar}\nGrup analiz metni: ${a.muhakeme.map(satirGosterimMetni).join(" | ")}${a.hamVeri ? `\nHam veri: ${a.hamVeri}` : ""}`
   ).join("\n\n");
   return `Aşağıda bu koşudaki HER at için ZATEN üretilmiş muhakeme metinleri VE o atın ham Faz1 verisi var — sen yeni bir analiz YAPMIYORSUN, yalnız bunları birbirine göre KARŞILAŞTIRIP nihai teknik sıralamayı (1'den sahadaki at sayısına kadar, hiç atlama/tekrar yok) belirliyorsun. En güçlü kanıta/karara sahip at 1, en zayıf en yüksek sıra numarasını alır.
 

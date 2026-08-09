@@ -6,6 +6,7 @@ import TargetBadge from "@/components/prediction/TargetBadge";
 import FollowButton from "@/components/kosular/FollowButton";
 import { cn } from "@/lib/utils";
 import type { ProgramRaceDay } from "@/server/services/race.service";
+import { kararOku } from "@/lib/methodology/muhakeme-format";
 
 type Picks = NonNullable<ProgramRaceDay["races"][number]["prediction"]>["picks"];
 
@@ -33,9 +34,7 @@ function scoreOnly(value: string): string {
 // Eski (Faz3'lü) tahminlerde davranış AYNEN korunuyor (bkz. PuanTablosu.tsx'teki aynı desen).
 function puanHucresi(score: number | null | undefined, details: unknown): string {
   if (score != null) return String(score);
-  const list = Array.isArray(details) ? (details as string[]) : [];
-  const karar = list.find((d) => d.startsWith("Karar: "));
-  return karar ? karar.replace("Karar: ", "") : "—";
+  return kararOku(details) ?? "—";
 }
 
 function splitLayerDetails(details: unknown) {
