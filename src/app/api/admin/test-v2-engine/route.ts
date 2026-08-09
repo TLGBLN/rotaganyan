@@ -27,7 +27,11 @@ import { satirGosterimMetni } from "@/lib/methodology/muhakeme-format";
 // artık grup grup DEĞİL, TEK bir grup/sıralama işleyip dönüyor; hangi adımı çalıştıracağı
 // `step`+`batchIndex` ile tarayıcıdan (V2AnalysisPanel.tsx) yönetiliyor — tıpkı eski
 // sistemin 3 ayrı adımı gibi. Hiçbir tek istek artık bir Claude çağrısından uzun sürmez.
-export const maxDuration = 300;
+// v6.75 — kullanıcı bilgisi 2026-08-09: Vercel planı 800sn'ye kadar izin veriyor (bkz.
+// test-v3-engine/route.ts'in zaten kullandığı aynı sınır) — 300sn'de tek bir Claude
+// çağrısı (grup ya da sıralama) bazen kesiliyor, cevap tam oluşmadan istek düşüyordu
+// (hem "zaman aşımı" hatası hem boşa giden token maliyeti). Daha fazla headroom veriyor.
+export const maxDuration = 800;
 
 const BATCH_SIZE = 4;
 
