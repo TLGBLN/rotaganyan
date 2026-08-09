@@ -748,29 +748,45 @@ type TeknikSiraliAt = { no: number; ad: string; karar: string; muhakeme: string;
 // v6.69 — kullanıcı talebi ("bir daha yaşanmamak üzere önle"): faz2Top3Garantisi eskiden
 // yalnız V10+V12/stil-popülasyon uyumunu HAM istatistikten yeniden hesaplıyordu — İzmir
 // 5.Koşu (ROSİLDA, n=12, popülasyonda 2. sırada) bu dar kapsamı (yalnız #1 sıra) aştığı
-// için kaçtı. Artık ham istatistik yerine DOĞRUDAN muhakeme metnindeki mekanik
-// KOD-GARANTİSİ işaretini ("...TAM destek sayılır, yumuşatılmamalı") arıyor — bu ibare
-// faz2StilPopulasyonEtiketiEkle tarafından HER ZAMAN, Claude'un yorumundan bağımsız
-// olarak yazılıyor. Böylece bu güvenlik ağı tek bir V-kodu kombinasyonuna kilitli
-// kalmıyor: gelecekte AYNI "yumuşatılmamalı" konvansiyonuyla eklenecek herhangi bir yeni
-// KOD-GARANTİSİ kuralı da otomatik olarak buraya bağlanır, ayrı bir fonksiyon/eşik
-// kopyalamaya gerek kalmaz. Bu mekanik bir puanlama formülü DEĞİL — yalnız kodun zaten
-// nesnel eşiklerle doğrulayıp "yumuşatılamaz" diye damgaladığı dar istisnalar için
-// devreye giriyor, Claude'un normal holistik muhakemesine dokunmuyor.
+// için kaçtı. Muhakeme metnindeki mekanik KOD-GARANTİSİ işaretini ("...TAM destek
+// sayılır, yumuşatılmamalı") aramaya başlandı — bu ibare faz2StilPopulasyonEtiketiEkle
+// tarafından HER ZAMAN, Claude'un yorumundan bağımsız olarak yazılıyor.
+//
+// 2. tur bulgu (aynı gece, İstanbul 3.Koşu, CEMRE ATEŞİ): bu metin-tabanlı kontrol TEK
+// BAŞINA yetersiz kaldı — Claude AYNI objektif koşulu (n≥10 + popülasyon üst sıra)
+// kendi cümleleriyle ("tam destek,yumuşatma yok") doğru şekilde yazınca, kod enjeksiyonu
+// (zaten temiz "destek" var diye) haklı olarak atlanıyor — ama bu durumda metin kalıbı
+// KOD'un ürettiği kanonik ifadeyle birebir eşleşmediği için güvenlik ağı bunu da
+// kaçırıyordu (destek=6/risk=0 olan CEMRE ATEŞİ rank3'te kalmıştı). Artık HAM istatistik
+// koşulu (n≥10 + popülasyonda ilk 2 stil eşleşmesi) DA ayrıca kontrol ediliyor — ikisinden
+// HANGİSİ tetiklerse tetiklesin (metin kalıbı NASIL yazılırsa yazılsın, ya da hiç
+// yazılmamış olsa bile ham veri koşulu sağlanıyorsa) terfi devreye girer. Bu hâlâ mekanik
+// bir puanlama formülü DEĞİL — yalnız kodun zaten nesnel eşiklerle doğruladığı dar
+// istisnalar için devreye giriyor, Claude'un normal holistik muhakemesine dokunmuyor.
 function tamDestekMuhakemesiVar(muhakeme: string): boolean {
   return /TAM destek say[ıi]l[ıi]r,?\s*yumuşat[ıi]lma/i.test(muhakeme);
 }
 
 export function faz2Top3Garantisi(
   atlar: TeknikSiraliAt[],
-  _faz1: Faz1Sonuc
+  faz1: Faz1Sonuc
 ): { atlar: TeknikSiraliAt[]; terfiler: Top3TerfiSonuc[] } {
   if (atlar.length <= 3) return { atlar, terfiler: [] };
 
-  function nitelikliMi(a: TeknikSiraliAt): boolean {
-    if (!tamDestekMuhakemesiVar(a.muhakeme)) return false;
-    if (a.karar === "Yüksek Risk") return false;
+  const breakdown = faz1.race.pistMesafeStilBreakdown;
+  const topStyles = new Set((breakdown ?? []).slice(0, 2).map((b) => b.style));
+  const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
+
+  function hamIstatistikNitelikliMi(a: TeknikSiraliAt): boolean {
+    const r = runnerByNo.get(a.no);
+    if (!r || !r.raceStyleEtiket || !topStyles.has(r.raceStyleEtiket)) return false;
+    if (r.tempoVeriN == null || r.tempoVeriN < 10) return false;
     return true;
+  }
+
+  function nitelikliMi(a: TeknikSiraliAt): boolean {
+    if (a.karar === "Yüksek Risk") return false;
+    return tamDestekMuhakemesiVar(a.muhakeme) || hamIstatistikNitelikliMi(a);
   }
 
   const sirali = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
