@@ -294,7 +294,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
             <AlertTriangle className="h-3.5 w-3.5" /> Kullanılmayan Veri — kaydetmeden önce onay gerekir
           </div>
           <p className="text-muted-foreground">
-            İlk 2 sıradaki atlar için Faz1&apos;de gerçek veri bulunan ama muhakemede hiç geçmeyen kodlar (STARŞAH/PRENSES MEHLİKA dersi — veri var, kullanılmamış):
+Sahadaki HER at için Faz1&apos;de gerçek veri bulunan ama muhakemede hiç geçmeyen kodlar (STARŞAH/PRENSES MEHLİKA/TÜRKÖREN dersi — veri var, kullanılmamış):
           </p>
           <ul className="space-y-1">
             {kullanilmayanVeri.map((k) => (

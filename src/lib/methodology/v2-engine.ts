@@ -478,11 +478,15 @@ export type KullanilmayanVeriSonuc = { no: number; ad: string; kullanilmayanKodl
  * verileri doğru kullanamıyoruz" — V13/V14/V20 zaten koda gömüldü (garanti), ama geri
  * kalan (V2/V6/V8/V9/V15/V16/V17/V19 vb.) sentez gerektirdiği için koda gömülemez —
  * bunun yerine TÜM V1-V22 için GENEL bir "veri var ama hiç kullanılmadı" dedektörü.
- * Yalnız en yüksek riskli (rank 1-2, banko/kupon kararını doğrudan etkileyen) atlara
- * uygulanır — gürültüyü azaltmak için. Bu fonksiyon yalnız TESPİT eder; asıl önemli
- * olan (kullanıcının sorusu: "bu uyarıdan sonra ne olacak") bunun bir admin panelinde
- * gözden kaçırılabilecek kutu OLARAK KALMAMASI — V2AnalysisPanel.tsx'te bu liste boş
- * değilse "Kaydet ve Yayımla" butonu admin bilinçli onay vermeden ÇALIŞMIYOR.
+ * v6.73 — kullanıcı talimatı 2026-08-09 (TÜRKÖREN dersi, İKİNCİ TUR: 21 izinli koddan
+ * yalnız 6'sı kullanılmıştı — "sistem kafasına göre kod seçemez, gerçekten kullanılması
+ * gerekmeyenler hariç her kod gözden geçirilmeli"): eskiden yalnız rank 1-2'ye uygulanıyordu
+ * (gürültüyü azaltmak için), artık SAHADAKİ HER ATA uygulanıyor — bu kontrol tamamen
+ * mekanik/ücretsiz olduğu için genişletmenin maliyeti yok, yalnız görünürlük kazandırıyor.
+ * Bu fonksiyon yalnız TESPİT eder; asıl önemli olan (kullanıcının sorusu: "bu uyarıdan
+ * sonra ne olacak") bunun bir admin panelinde gözden kaçırılabilecek kutu OLARAK
+ * KALMAMASI — V2AnalysisPanel.tsx'te bu liste boş değilse "Kaydet ve Yayımla" butonu
+ * admin bilinçli onay vermeden ÇALIŞMIYOR.
  */
 export function faz2KullanilmayanVeriTespiti(
   faz1: Faz1Sonuc, izinliKodlar: string[],
@@ -490,7 +494,6 @@ export function faz2KullanilmayanVeriTespiti(
 ): KullanilmayanVeriSonuc[] {
   const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
   return faz2Atlar
-    .filter((a) => a.teknikSira <= 2)
     .map((a) => {
       const r = runnerByNo.get(a.no);
       const kullanilmayanKodlar: string[] = [];

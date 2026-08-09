@@ -126,7 +126,11 @@ function batchReminder(kategori: string, batchNo: number, toplamBatch: number, n
 
 **FORMAT — YAPILANDIRILMIŞ MUHAKEME SATIRLARI (v6.70/V2.2):** "muhakeme" artık serbest metin DEĞİL, bir SATIR DİZİSİ — her satır: { "kod": [...ilgili V-kodları, ör. ["V10","V12"] veya tek kod ["V4"]], "tip": "destek"/"risk"/"notr", "guven": "tam"/"orta"/"zayif", "aciklama": "kısa 1-2 cümle/ifade" }. Cümle kurma zorunda değilsin — YÖNÜ (tip) ve GÜVENİ (guven) doğrudan alan olarak SEÇ, "hafif/nötr-hafif/kısmi" gibi kelime oyunlarıyla yumuşatma; kanıt gerçekten güçlüyse (ör. n≥10 + popülasyonda ilk 2 sıra, bkz. İSPANOZ dersi V_LEGEND'de) "guven":"tam" seç, ASLA daha zayıf bir "guven" ile kelimeyle telafi etme. Muhakeme Matrisi'nde çapraz sorguladığın HER çift için ayrı bir satır ekle (kod dizisinde İKİ kodu birlikte ver). Tekli gözlemler (ör. "V10:KaçakAt") de tek elemanlı kod dizisiyle (["V10"]) ayrı bir satır olabilir.
 
-**ÖNEMLİ OLANI YAZ, DOLDURMA YAPMA:** Yalnız gerçekten anlamlı/karar etkileyici bulduğun V-kodu çiftlerini ve sinyalleri satır olarak ekle — önemsiz bulduğun her kod için "etkisiz" satırı eklemek ZORUNLU DEĞİL (v6.66 kullanıcı bulgusu: bu, 15 atlı sahalarda muhakemeyi anlamsız doldurmayla şişirip sıralama çağrısının asıl sinyali (karar: Güçlü Aday vb.) gürültü içinde kaybetmesine yol açtı — TAM TIME/İSPANOZ tarzı gerçekten önemli, geniş örneklemli sinyalleri (n≥5) ASLA atlama, ama sıradan/önemsiz her kodu doldurma amacıyla yazma).
+**KRİTİK — GÖRDÜĞÜN HER V-KODU SATIRINI DEĞERLENDİR, HİÇBİRİNİ SESSİZCE ATLAMA (v6.73, kullanıcı talimatı 2026-08-09: "sistem kafasına göre kod seçemez, gerçekten kullanılması gerekmeyenler hariç her kod gözden geçirilmeli"):** Aşağıdaki AT verisinde sana gösterilen HER "Vx ..." satırı, o kodun bu at için GERÇEKTEN veri taşıdığı anlamına gelir (veri yoksa zaten hiç gösterilmez) — gösterilen bu kodlardan HİÇBİRİNİ, "önemsiz buldum" diye sessizce atlayıp muhakeme dizisine hiç yazmaman KABUL EDİLMEZ. Gösterilen HER kod için en az bir satır üret:
+- Gerçekten karar etkileyici/anlamlı bulduğun kodlara normal ayrıntı ver.
+- Önemsiz/nötr bulduğun kodlar için de KISA bir satır yaz — tek-iki kelimelik "aciklama" yeterli (ör. "etkisiz, nötr", "tek kayıt, zayıf"), tip:"notr", guven:"zayif" seçebilirsin. Bu, v6.66'daki "muhakemeyi doldurup şişirme" endişesini (uzun cümlelerle doldurma) çözer — KISA bir "notr" satırı ile "hiç bahsetmeme" arasındaki fark budur, o yüzden artık ikincisi kabul edilmiyor.
+- TAM TIME/İSPANOZ tarzı gerçekten önemli, geniş örneklemli sinyalleri (n≥5) hâlâ ASLA yüzeysel geçme — bunlara hak ettikleri ayrıntıyı ver.
+Bu kural, muhakemenin uzunluğunu ARTIRMAK için değil — gösterilen HİÇBİR veri kaleminin gözden geçirilmeden atlanmadığından emin olmak için (STARŞAH/PRENSES MEHLİKA/TÜRKÖREN dersi: veri vardı, hiç değerlendirilmemişti).
 
 **KRİTİK — HİÇBİR ALANI ATLAMA:** Yanıt şeması bu gruptaki HER at için AYRI, ZORUNLU bir alan içeriyor (${nolar.map((no) => `"at_${no}"`).join(", ")}) — bunlardan biri bile eksik kalırsa yanıt GEÇERSİZ sayılır. Aşağıdaki ${nolar.length} atın HEPSİ için bir alan doldurmalısın, hiçbirini atlama.
 
@@ -466,8 +470,9 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
   // arasında büyük tutarsızlık varsa mekanik olarak uyar — büyük sahalarda (24 at)
   // otomatik ölçeklenir, prompt talimatına güvenmez.
   const faz2KararSiraUyarilari = faz2KararSiraTutarsizlikDenetimi(parsed.atlar);
-  // v6.58 — kullanıcı kararı: rank 1-2'de veri var ama muhakemede hiç kullanılmamışsa
-  // yalnız bilgilendirme değil, admin panelinde kaydı bilinçli onay olmadan engeller.
+  // v6.58/v6.73 — kullanıcı kararı: sahadaki HER atta veri var ama muhakemede hiç
+  // kullanılmamışsa yalnız bilgilendirme değil, admin panelinde kaydı bilinçli onay
+  // olmadan engeller (v6.73: kapsam rank 1-2'den TÜM sahaya genişletildi).
   const faz2KullanilmayanVeri = faz2KullanilmayanVeriTespiti(faz1, izinliKodlar, parsed.atlar).filter((k) => k.kullanilmayanKodlar.length > 0);
 
   // v6.51 — kullanıcı kararı 2026-08-03 ("hepsini hayata sok"): bu rota artık yalnız
