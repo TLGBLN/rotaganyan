@@ -359,6 +359,11 @@ export type KuponLeg = {
   // no'suna eşler (yalnız dolaylı/eküri yoluyla kazananlar için — gerçek kazananlar zaten
   // winnerNos'ta, burada tekrar yer almaz).
   ekuriWinnerByNo: Record<number, number>;
+  // v6.68 — kullanıcı talebi: kuponda 1-3 ve 4-8 gibi İKİ FARKLI eküri grubu varsa, bu
+  // grupların figürleri (numara rozetleri) BİRBİRİNDEN FARKLI renkte gösterilmeli — sonuç
+  // beklenmeden de hangi numaraların birbirine bağlı (coupled) olduğu görülebilsin diye.
+  // Sonuç/kazanma durumundan bağımsız, o ayaktaki TÜM koşucuların eküri grubu (varsa).
+  ekuriGroupByNo: Record<number, number>;
 };
 export type KuponStatus = "hit" | "miss" | "pending";
 export type KuponVariant = {
@@ -371,7 +376,7 @@ export type KuponVariant = {
    *  veya tamamen boşsa) kupon önerilerinde/paylaşımda ayrı bir kademe olarak gösterilmemeli. */
   filled: boolean;
 };
-export type KuponOnerisi = { hippodromeName: string; variants: KuponVariant[] } | null;
+export type KuponOnerisi = { id: string; hippodromeName: string; variants: KuponVariant[] } | null;
 export type HomeKuponLeg = { raceNo: number; narrow: number[]; normal: number[]; wide: number[] };
 
 /** Tüm yarışlar yurtiçi (yabancı hipodromlar ingest sırasında elenir) — birim bahis bedeli sabit. */
@@ -410,6 +415,7 @@ function kuponAmount(nosPerLeg: number[][]): number {
 }
 
 export async function buildKuponOnerisi(active: {
+  id: string;
   hippodromeName: string;
   date: Date;
   legs: unknown;
@@ -424,7 +430,7 @@ export async function buildKuponOnerisi(active: {
   // yeşil göstermek, eşleşmeyeni (sonuç girilmiş ama kazanan seçilmemiş) "kaçtı" olarak işaretlemek için.
   // Aynı sorguda o ayağın analiz sırasını (Pick.rank) da çekiyoruz — kupondaki atlar sayı sırasına göre
   // değil, analizdeki tahmin sırasına göre dizilsin diye.
-  const resultByRaceNo = new Map<number, { winnerNo: number | null; winnerNos: number[]; resulted: boolean; ekuriWinnerByNo: Record<number, number> }>();
+  const resultByRaceNo = new Map<number, { winnerNo: number | null; winnerNos: number[]; resulted: boolean; ekuriWinnerByNo: Record<number, number>; ekuriGroupByNo: Record<number, number> }>();
   const rankByRaceNo = new Map<number, Map<number, number>>();
   const races = await db.race.findMany({
     where: {
@@ -442,11 +448,16 @@ export async function buildKuponOnerisi(active: {
   });
   for (const r of races) {
     const winnerNos = r.result?.winnerNos ?? [];
+    const ekuriGroupByNo: Record<number, number> = {};
+    for (const runner of r.runners) {
+      if (runner.ekuriGroup != null && runner.ekuriGroup >= 1) ekuriGroupByNo[runner.no] = runner.ekuriGroup;
+    }
     resultByRaceNo.set(r.raceNo, {
       winnerNo: r.result?.winnerNo ?? null,
       winnerNos,
       resulted: r.result != null,
       ekuriWinnerByNo: buildEkuriWinnerMap(r.runners, winnerNos),
+      ekuriGroupByNo,
     });
     const rankByNo = new Map<number, number>();
     for (const pick of r.prediction?.picks ?? []) {
@@ -477,6 +488,7 @@ export async function buildKuponOnerisi(active: {
         winnerNos: entry?.winnerNos ?? [],
         resulted: entry?.resulted ?? false,
         ekuriWinnerByNo: entry?.ekuriWinnerByNo ?? {},
+        ekuriGroupByNo: entry?.ekuriGroupByNo ?? {},
       };
     });
   }
@@ -506,6 +518,7 @@ export async function buildKuponOnerisi(active: {
   const hasWide = legs.some((l) => l.wide.length > 0);
 
   return {
+    id: active.id,
     hippodromeName: active.hippodromeName,
     variants: [
       { key: "ekonomik", label: "Ekonomik", legs: narrowLegs, amount: kuponAmount(narrowLegs.map((l) => l.nos)), status: statusFor(narrowLegs), filled: hasNarrow },

@@ -297,16 +297,20 @@ function puanHucresi(score: number | null, details: string[]): string {
   return karar ? karar.replace("Karar: ", "") : "—";
 }
 
-function buildShareText(picks: ProgramPick[], raceNo: number, hippodromeName?: string): string {
-  const nos = picks.slice(0, 6).map((p) => pickDisplay(p).no).join("-");
-  const yer = hippodromeName ? `${hippodromeName} ` : "";
-  return `${yer}${raceNo}. Koşu Rotaganyan analizi: ${nos} 🐎`;
-}
-
 function XLogo({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
+function InstagramLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className} aria-hidden="true">
+      <rect x="2.5" y="2.5" width="19" height="19" rx="5" />
+      <circle cx="12" cy="12" r="4.2" />
+      <circle cx="17.4" cy="6.6" r="1" fill="currentColor" stroke="none" />
     </svg>
   );
 }
@@ -340,13 +344,32 @@ function AnalysisPanel({
     .filter((r) => !r.scratched && !pickedNos.has(r.no))
     .sort((a, b) => a.no - b.no);
 
-  function handleShare() {
-    const url = new URL("https://twitter.com/intent/tweet");
-    url.searchParams.set("text", buildShareText(picks, raceNo, hippodromeName));
-    if (typeof window !== "undefined") {
-      url.searchParams.set("url", `${window.location.origin}/sonuc/${raceId}`);
+  // v6.68 — kullanıcı talebi 2026-08-09: "link istemiyorum direk image üstüne
+  // yerleştirilmeli" — eskiden Twitter intent'ine bir URL (link) gönderiliyordu, o da
+  // OG görselini bir KART olarak unfurl ediyordu. Artık görsel bir DOSYA olarak Web
+  // Share API ile paylaşılıyor — mobil tarayıcılarda ilgili uygulamayı (Instagram/X)
+  // paylaşım hedefi olarak sunar, görsel doğrudan yapıştırılır, hiçbir link gitmez.
+  // İki AYRI buton var çünkü platforma göre en uygun format farklı: Instagram için
+  // dikey Story görseli (1080×1920), X için standart kart oranı (1080×1180).
+  async function handleShare(platform: "instagram" | "x") {
+    const imageUrl = `${window.location.origin}/api/og/sonuc/${raceId}${platform === "instagram" ? "/story" : ""}`;
+    try {
+      const res = await fetch(imageUrl);
+      const blob = await res.blob();
+      const file = new File([blob], "rotaganyan-sonuc.png", { type: "image/png" });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Rotaganyan" });
+        return;
+      }
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "rotaganyan-sonuc.png";
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch {
+      // Kullanıcı paylaşımı iptal etti ya da fetch başarısız oldu — sessizce geç,
+      // buton tekrar denenebilir.
     }
-    window.open(url.toString(), "_blank", "noopener,noreferrer");
   }
 
   useEffect(() => {
@@ -440,15 +463,26 @@ function AnalysisPanel({
                         <span className="text-[10px] font-semibold text-[#f5c518]">Gny: {ganyan.toFixed(2)}</span>
                       )}
                       {isWinner && isAdmin && (
-                        <button
-                          type="button"
-                          onClick={handleShare}
-                          title={t("xtePaylas")}
-                          aria-label={t("xtePaylas")}
-                          className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0 print:hidden"
-                        >
-                          <XLogo className="h-3 w-3" />
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleShare("instagram")}
+                            title={t("instagramdaPaylas")}
+                            aria-label={t("instagramdaPaylas")}
+                            className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0 print:hidden"
+                          >
+                            <InstagramLogo className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleShare("x")}
+                            title={t("xtePaylas")}
+                            aria-label={t("xtePaylas")}
+                            className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0 print:hidden"
+                          >
+                            <XLogo className="h-3 w-3" />
+                          </button>
+                        </>
                       )}
                     </span>
                   </td>
@@ -488,15 +522,26 @@ function AnalysisPanel({
                   <span className="text-[10px] font-semibold text-[#f5c518]">Gny: {ganyan.toFixed(2)}</span>
                 )}
                 {isWinner && isAdmin && (
-                  <button
-                    type="button"
-                    onClick={handleShare}
-                    title={t("xtePaylas")}
-                    aria-label={t("xtePaylas")}
-                    className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0"
-                  >
-                    <XLogo className="h-3 w-3" />
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleShare("instagram")}
+                      title={t("instagramdaPaylas")}
+                      aria-label={t("instagramdaPaylas")}
+                      className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0"
+                    >
+                      <InstagramLogo className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleShare("x")}
+                      title={t("xtePaylas")}
+                      aria-label={t("xtePaylas")}
+                      className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0"
+                    >
+                      <XLogo className="h-3 w-3" />
+                    </button>
+                  </>
                 )}
               </div>
               <div className="flex gap-3 text-[11px] text-muted-foreground mb-1">

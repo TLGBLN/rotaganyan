@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import type { KuponOnerisi, KuponStatus } from "@/server/services/race.service";
 import type { AltiliCityResult } from "@/server/services/ingest/tjk-altili.adapter";
 import { findIkramiyeForHippodrome } from "@/lib/altili-match";
+import { ekuriColorFor } from "@/lib/ekuri-colors";
 import { cn } from "@/lib/utils";
 
 type Kupon = NonNullable<KuponOnerisi>;
@@ -19,15 +20,22 @@ const TAB_CLASS = "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font
 const TAB_ACTIVE = "bg-brand text-brand-foreground";
 const TAB_INACTIVE = "bg-white/5 text-muted-foreground border hover:bg-muted";
 
-function buildTweetText(data: Kupon): string {
-  const visibleVariants = data.variants.filter((v) => v.status !== "miss" && v.filled);
-  const lines: string[] = [`🏇 ${data.hippodromeName}`, ""];
-  for (const variant of visibleVariants) {
-    const legs = variant.legs.map((l) => l.nos.join(",")).join(" | ");
-    lines.push(`${variant.label}: ${legs}`);
-  }
-  lines.push("", "rotaganyan.com/program");
-  return lines.join("\n");
+function XLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
+function InstagramLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className} aria-hidden="true">
+      <rect x="2.5" y="2.5" width="19" height="19" rx="5" />
+      <circle cx="12" cy="12" r="4.2" />
+      <circle cx="17.4" cy="6.6" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
 }
 
 function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string | null; isAdmin: boolean }) {
@@ -38,22 +46,58 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
   if (visibleVariants.length === 0) return null;
 
   const active = visibleVariants.find((v) => v.key === activeKey) ?? visibleVariants[0];
-  const tweetUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(buildTweetText(data))}`;
+
+  // v6.68 — kullanıcı talebi 2026-08-09: "kupon tahminlerinde de paylaş butonları
+  // olmalıydı" — /program'daki sonuç posteriyle AYNI kural: link paylaşılmaz (Twitter
+  // intent URL'i bir KART olarak unfurl ediyordu), görsel Web Share API ile DOSYA
+  // olarak paylaşılır. Sonuç posterinden farklı olarak tek bir görsel formatı hem
+  // Instagram hem X için kullanılıyor (ayrı Story boyutu yok), o yüzden platform
+  // parametresi almıyor — Web Share API zaten paylaşım hedefine göre uygun uygulamayı sunuyor.
+  async function handleShare() {
+    const imageUrl = `${window.location.origin}/api/og/kupon/${data.id}?variant=${active.key}`;
+    try {
+      const res = await fetch(imageUrl);
+      const blob = await res.blob();
+      const file = new File([blob], "rotaganyan-kupon.png", { type: "image/png" });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Rotaganyan" });
+        return;
+      }
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "rotaganyan-kupon.png";
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch {
+      // Kullanıcı paylaşımı iptal etti ya da fetch başarısız oldu — sessizce geç.
+    }
+  }
 
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">{data.hippodromeName}</span>
         {isAdmin && (
-          <a
-            href={tweetUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-md border border-muted-foreground/25 px-2.5 py-1 text-xs font-semibold hover:bg-muted transition-colors"
-          >
-            <span>𝕏</span>
-            <span>{t("paylas")}</span>
-          </a>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => handleShare()}
+              title={t("instagramdaPaylas")}
+              aria-label={t("instagramdaPaylas")}
+              className="inline-flex items-center rounded-md border border-muted-foreground/25 p-1.5 hover:bg-muted transition-colors"
+            >
+              <InstagramLogo className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleShare()}
+              title={t("xtePaylas")}
+              aria-label={t("xtePaylas")}
+              className="inline-flex items-center rounded-md border border-muted-foreground/25 p-1.5 hover:bg-muted transition-colors"
+            >
+              <XLogo className="h-3.5 w-3.5" />
+            </button>
+          </div>
         )}
       </div>
 
@@ -96,6 +140,11 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
                   <div className="space-y-1.5 text-sm font-semibold">
                     {leg.nos.map((no) => {
                       const ekuriWinnerNo = leg.ekuriWinnerByNo[no];
+                      // v6.68 — kullanıcı talebi: farklı eküri grupları (ör. 1-3 ve 4-8) birbirinden
+                      // FARKLI renkte gösterilmeli, sonuç beklenmeden de hangi numaraların birbirine
+                      // bağlı olduğu görülsün diye. Kazanma durumu (yeşil) her zaman önceliklidir.
+                      const ekuriGroup = leg.ekuriGroupByNo[no];
+                      const ekuriHex = ekuriGroup != null ? ekuriColorFor(ekuriGroup) : null;
                       return (
                         <div key={no}>
                           {leg.winnerNos.includes(no) ? (
@@ -108,6 +157,16 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
                                 {no}
                               </span>
                               <span className="text-[9px] text-hit">({ekuriWinnerNo} eküri)</span>
+                            </span>
+                          ) : ekuriHex != null ? (
+                            <span
+                              style={{ backgroundColor: ekuriHex }}
+                              className={cn(
+                                "inline-flex h-6 w-6 items-center justify-center rounded-full text-white text-xs font-bold",
+                                missed && "line-through opacity-50"
+                              )}
+                            >
+                              {no}
                             </span>
                           ) : (
                             <span className={missed ? "text-muted-foreground line-through" : undefined}>{no}</span>
