@@ -879,16 +879,26 @@ export function faz2Top3Garantisi(
   }
 
   const sirali = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
-  const terfiEdecekler = sirali.slice(3).filter(nitelikliMi);
+  const orijinalTop3 = sirali.slice(0, 3);
+
+  // v6.72 düzeltme — kullanıcı bulgusu 2026-08-09 (CEMRE ATEŞİ, İstanbul 3.Koşu, İKİNCİ
+  // TUR): ESENYIL (7.sıra) terfi ederken, kod "yer açmak" için orijinal top-3'ün SONUNCUSUNU
+  // (kim olursa olsun) körü körüne dışarı atıyordu — o sıradaki CEMRE ATEŞİ'nin KENDİSİ de
+  // (V10+V12 KOD-GARANTİLİ tam-destek, karar "Düşük Risk") nitelikliMi() testini geçtiği
+  // halde yalnızca "sırada son" olduğu için haksız yere top-3 dışına itildi. Artık orijinal
+  // top-3'teki bir üye, YALNIZ KENDİSİ nitelikliMi testini GEÇEMİYORSA terfi adaylarına yer
+  // açmak için düşürülebilir — nitelikli bir orijinal üye asla yalnızca "sırası en son" diye
+  // kurban edilmez. Tüm orijinal top-3 zaten nitelikliyse (3'ü de güçlüyse) terfi adayı(ları)
+  // için yer AÇILMAZ — 3 sabit slotta 4+ nitelikli at olduğunda hiçbiri haksız yere atılmaz.
+  const korunanOrijinaller = orijinalTop3.filter(nitelikliMi);
+  const yerAcilabilirSayi = Math.max(0, 3 - korunanOrijinaller.length);
+  const terfiEdecekler = sirali.slice(3).filter(nitelikliMi).slice(0, yerAcilabilirSayi);
   if (terfiEdecekler.length === 0) return { atlar, terfiler: [] };
 
-  const orijinalTop3 = sirali.slice(0, 3);
   // v6.64 düzeltme: terfi eden at "ilk 3'e girsin" demekti, "1. sıraya fırlasın" değil —
   // korunan orijinal top-3 üyeleri ÖNCE (kendi göreceli sırasıyla), terfi edenler
   // SONRA (yalnız boşalan alt sıra(lar)ı doldurarak) ekleniyor.
-  const yeniTop3 = terfiEdecekler.length >= 3
-    ? terfiEdecekler.slice(0, 3)
-    : [...orijinalTop3.slice(0, 3 - terfiEdecekler.length), ...terfiEdecekler];
+  const yeniTop3 = [...korunanOrijinaller, ...terfiEdecekler];
   const yeniTop3Nos = new Set(yeniTop3.map((a) => a.no));
   const kalan = sirali.filter((a) => !yeniTop3Nos.has(a.no));
   const yeniSiraliListe = [...yeniTop3, ...kalan];
@@ -965,6 +975,13 @@ export function faz2GucluKombinasyonTop3Garantisi(
   for (const { t, at } of nitelikliler) {
     const idx = calisma.findIndex((a) => a.no === at.no);
     if (idx === -1 || idx < 3) continue; // zaten ilk 3'te
+    // v6.72 düzeltme — CEMRE ATEŞİ dersinin İKİNCİ TUR bulgusu (faz2Top3Garantisi'nde
+    // bulunan AYNI hata sınıfı burada da vardı): 3. sıradaki at kim olursa olsun körü
+    // körüne dışarı itiliyordu. Şimdi, o at KENDİSİ de nitelikli ise (bu fonksiyonun kendi
+    // ölçütüyle ≥2 güçlü kod-garantili sinyal, YA DA Top3Garantisi'nin V10+V12 tam-destek
+    // ölçütüyle) yerinde bırakılır — bu aday atlanır, sıradaki nitelikli adaya geçilir.
+    const mevcut3 = calisma[2];
+    if (gucluKodGarantiSayisi(mevcut3.muhakeme) >= 2 || stilPopulasyonTamDestekVar(mevcut3.muhakeme)) continue;
     const eskiSira = calisma[idx].teknikSira;
     const guncellenmisAt: TeknikSiraliAt = {
       ...calisma[idx],
