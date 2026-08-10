@@ -309,7 +309,12 @@ async function handleBatch(raceId: string, batchIndex: number) {
     if (izinliKodlar.includes("V19")) muhakeme = faz2SonYarisKazandiEtiketiEkle(muhakeme, r);
     if (izinliKodlar.includes("V5")) muhakeme = faz2H2HEtiketiEkle(muhakeme, r);
     if (izinliKodlar.includes("V22")) muhakeme = faz2ZeminKazanmaEtiketiEkle(muhakeme, r);
-    return { ...a, muhakeme };
+    // v6.82 — kullanıcı bulgusu 2026-08-10 (Bursa 5.Koşu, 15 atlı büyük grup): Claude'un
+    // JSON yanıtındaki "ad" alanı (biz zaten kesin bildiğimiz, yalnız doğrulama amaçlı
+    // istenen bir alan) bazı atlarda gerçek isim yerine "placeholder" gibi anlamsız bir
+    // değerle dönmüştü — muhtemelen büyük gruplarda model kaynaklı bir hata. Artık isme
+    // HİÇ güvenilmiyor, her zaman kendi kesin verimizden (Faz1Runner.ad) alınıyor.
+    return { ...a, ad: r.ad, muhakeme };
   });
 
   return NextResponse.json({ ok: true, atlar, totalBatches: batches.length, kategori, usage });

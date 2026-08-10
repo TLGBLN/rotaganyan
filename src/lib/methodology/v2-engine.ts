@@ -723,7 +723,16 @@ export function faz2SinifGecisEtiketiEkle(
       aciklama: `sınıf yükselişi: ${r.sinifOnceki}(SKK ${r.sinifSkkOnceki}) → bugün SKK ${r.sinifSkkBugun}, dezavantaj sayılmaz`,
     });
   }
-  return muhakeme;
+  // v6.83 — kullanıcı talebi 2026-08-10: "her veri kullanılacak, kullanılmayanlar
+  // söylenecek bir şey yoksa kullanılmayacak" — SKK DEĞİŞMEDİYSE bu da bir sonuçtur
+  // (istikrar), "veri var ama es geçildi" gibi görünmemeli. veriVarMi("V14") yalnız
+  // sinifOnceki'nin varlığına bakıyor, değişip değişmediğine değil — bu satır
+  // olmadan "Kullanılmayan Veri" denetimi SKK değişmeyen HER atta V14'ü yanlış
+  // "kaçırılmış" sayıyordu (V11/V12 ile aynı hata sınıfı).
+  return satirEkle(muhakeme, {
+    kod: ["V14"], tip: "notr", guven: "tam", kodGarantili: true,
+    aciklama: `sınıf değişmedi: SKK ${r.sinifSkkOnceki} → SKK ${r.sinifSkkBugun}, istikrar`,
+  });
 }
 
 /**
@@ -1142,9 +1151,17 @@ export function faz2AyniJokeyEtiketiEkle(
   muhakeme: MuhakemeSatiri[],
   r: { jockeyChanged: boolean; ilkStart: boolean }
 ): MuhakemeSatiri[] {
-  if (r.ilkStart || r.jockeyChanged) return muhakeme;
-  if (satirVarMi(muhakeme, "V4", { tip: "destek" })) return muhakeme;
-  return satirEkle(muhakeme, { kod: ["V4"], tip: "destek", guven: "tam", kodGarantili: true, aciklama: "KOD-GARANTİSİ: son yarışını aynı jokeyle koştu, süreklilik olumlu" });
+  if (!r.ilkStart && !r.jockeyChanged) {
+    if (satirVarMi(muhakeme, "V4", { tip: "destek" })) return muhakeme;
+    return satirEkle(muhakeme, { kod: ["V4"], tip: "destek", guven: "tam", kodGarantili: true, aciklama: "KOD-GARANTİSİ: son yarışını aynı jokeyle koştu, süreklilik olumlu" });
+  }
+  // v6.83 — kullanıcı talebi 2026-08-10: jokey değiştiyse veya ilk start ise "aynı jokey
+  // sürekliliği" bonusu objektif olarak yok — bu da bir sonuçtur, "veri var ama es
+  // geçildi" görüntüsü vermemeli. jockeyWinPct/trainerWinPct'in KENDİSİ (genel form)
+  // Claude'un serbest yorumuna kalır, bu yalnız "aynı jokey mi" gerçeğini kayda geçirir.
+  if (satirVarMi(muhakeme, "V4")) return muhakeme;
+  const aciklama = r.ilkStart ? "KOD-GARANTİSİ: ilk start, jokey sürekliliği değerlendirilemez" : "KOD-GARANTİSİ: jokey değişti, süreklilik bonusu yok";
+  return satirEkle(muhakeme, { kod: ["V4"], tip: "notr", guven: "tam", kodGarantili: true, aciklama });
 }
 
 /**
@@ -1162,11 +1179,19 @@ export function faz2PedigriKarsilastirmaEtiketiEkle(
 ): MuhakemeSatiri[] {
   if (r.sireKazanmaOrani == null || r.sireOrneklemKendiVeri == null) return muhakeme;
   if (r.sireOrneklemKendiVeri < 20) return muhakeme;
-  if (sahaEnIyiKYuzde == null || r.sireKazanmaOrani < sahaEnIyiKYuzde) return muhakeme;
-  if (satirVarMi(muhakeme, "V1", { tip: "destek" })) return muhakeme;
+  if (sahaEnIyiKYuzde != null && r.sireKazanmaOrani >= sahaEnIyiKYuzde) {
+    if (satirVarMi(muhakeme, "V1", { tip: "destek" })) return muhakeme;
+    return satirEkle(muhakeme, {
+      kod: ["V1"], tip: "destek", guven: "tam", kodGarantili: true,
+      aciklama: `KOD-GARANTİSİ: aygırın sahadaki EN İYİ kazanma yüzdesi — %${r.sireKazanmaOrani}(n=${r.sireOrneklemKendiVeri}, gerçek örneklem)`,
+    });
+  }
+  // v6.83 — kullanıcı talebi 2026-08-10: sahanın en iyisi olmasa da örneklemi yeterli
+  // (n≥20) bir aygır kazanma yüzdesi var — bu da kayda geçmeli, sessizce atlanmamalı.
+  if (satirVarMi(muhakeme, "V1")) return muhakeme;
   return satirEkle(muhakeme, {
-    kod: ["V1"], tip: "destek", guven: "tam", kodGarantili: true,
-    aciklama: `KOD-GARANTİSİ: aygırın sahadaki EN İYİ kazanma yüzdesi — %${r.sireKazanmaOrani}(n=${r.sireOrneklemKendiVeri}, gerçek örneklem)`,
+    kod: ["V1"], tip: "notr", guven: "orta", kodGarantili: true,
+    aciklama: `KOD-GARANTİSİ: aygır kazanma yüzdesi %${r.sireKazanmaOrani}(n=${r.sireOrneklemKendiVeri}), sahanın en iyisi değil`,
   });
 }
 
@@ -1187,9 +1212,15 @@ export function faz2SonYarisKazandiEtiketiEkle(
   if (!r.recentForm) return muhakeme;
   const chars = r.recentForm.split("").filter((c) => /[\dK]/i.test(c));
   const son = chars.at(-1);
-  if (son !== "1") return muhakeme;
-  if (satirVarMi(muhakeme, "V19", { tip: "destek" })) return muhakeme;
-  return satirEkle(muhakeme, { kod: ["V19"], tip: "destek", guven: "tam", kodGarantili: true, aciklama: `KOD-GARANTİSİ: son yarışını kazandı — form dizisi ${r.recentForm}` });
+  if (son === "1") {
+    if (satirVarMi(muhakeme, "V19", { tip: "destek" })) return muhakeme;
+    return satirEkle(muhakeme, { kod: ["V19"], tip: "destek", guven: "tam", kodGarantili: true, aciklama: `KOD-GARANTİSİ: son yarışını kazandı — form dizisi ${r.recentForm}` });
+  }
+  // v6.83 — kullanıcı talebi 2026-08-10: son yarış galibiyet DEĞİLSE de bu objektif bir
+  // gerçek, sessizce geçilmemeli. Claude form dizisini kendi yorumuyla zaten ele aldıysa
+  // (satirVarMi true) tekrar eklenmiyor; hiç değinmediyse ham gerçek koda gömülü kalıyor.
+  if (satirVarMi(muhakeme, "V19")) return muhakeme;
+  return satirEkle(muhakeme, { kod: ["V19"], tip: "notr", guven: "tam", kodGarantili: true, aciklama: `KOD-GARANTİSİ: son yarışı kazanmadı — form dizisi ${r.recentForm}` });
 }
 
 /**
@@ -1215,9 +1246,15 @@ export function faz2H2HEtiketiEkle(muhakeme: MuhakemeSatiri[], r: { h2hOzet: str
  * sinyal — hiç bahsedilmeden geçilemez.
  */
 export function faz2ZeminKazanmaEtiketiEkle(muhakeme: MuhakemeSatiri[], r: { zeminGecmisiOzet: string | null }): MuhakemeSatiri[] {
-  if (!r.zeminGecmisiOzet?.includes("[BU ZEMİN SINIFINDA KAZANDI]")) return muhakeme;
-  if (satirVarMi(muhakeme, "V22", { tip: "destek" })) return muhakeme;
-  return satirEkle(muhakeme, { kod: ["V22"], tip: "destek", guven: "tam", kodGarantili: true, aciklama: "KOD-GARANTİSİ: bugünküyle eşleşen zemin sınıfında kazanmış geçmişi var" });
+  if (!r.zeminGecmisiOzet) return muhakeme;
+  if (r.zeminGecmisiOzet.includes("[BU ZEMİN SINIFINDA KAZANDI]")) {
+    if (satirVarMi(muhakeme, "V22", { tip: "destek" })) return muhakeme;
+    return satirEkle(muhakeme, { kod: ["V22"], tip: "destek", guven: "tam", kodGarantili: true, aciklama: "KOD-GARANTİSİ: bugünküyle eşleşen zemin sınıfında kazanmış geçmişi var" });
+  }
+  // v6.83 — kullanıcı talebi 2026-08-10: bu zemin sınıfında kazanmamış olmak da bir
+  // veridir, "veri var ama hiç bahsedilmedi" görüntüsü vermemeli.
+  if (satirVarMi(muhakeme, "V22")) return muhakeme;
+  return satirEkle(muhakeme, { kod: ["V22"], tip: "notr", guven: "orta", kodGarantili: true, aciklama: `KOD-GARANTİSİ: zemin geçmişi var, bu zemin sınıfında kazanma yok — ${r.zeminGecmisiOzet}` });
 }
 
 export function kosuBaslikUret(faz1: Faz1Sonuc, izinliKodlar: string[]): string {
