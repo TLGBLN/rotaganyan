@@ -5,7 +5,7 @@ import { persistRaceDays, TjkAdapter } from "@/server/services/ingest";
 import { syncResultsForDate } from "@/server/services/result-sync";
 import type { Role } from "@prisma/client";
 
-export const maxDuration = 300;
+export const maxDuration = 800; // v6.90 — kullanıcı talimatı 2026-08-10: en son sınıra çekildi
 
 const BATCH = 14;
 

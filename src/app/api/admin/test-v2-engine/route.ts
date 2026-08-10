@@ -25,7 +25,10 @@ import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUr
 // artık grup grup DEĞİL, TEK bir grup/sıralama işleyip dönüyor; hangi adımı çalıştıracağı
 // `step`+`batchIndex` ile tarayıcıdan (V2AnalysisPanel.tsx) yönetiliyor — tıpkı eski
 // sistemin 3 ayrı adımı gibi. Hiçbir tek istek artık bir Claude çağrısından uzun sürmez.
-export const maxDuration = 300;
+// v6.90 — kullanıcı talimatı 2026-08-10 ("her şeyi en son sınırına çek"): 800, bu
+// Vercel planında doğrulanmış (test-v3-engine'de zaten kullanılıyor) üst sınır — 30f3169
+// revertinde 300'e geri düşmüştü (62fa1dd kaybolmuştu), yeniden 800'e çekildi.
+export const maxDuration = 800;
 
 const BATCH_SIZE = 4;
 
@@ -220,12 +223,13 @@ async function handleBatch(raceId: string, batchIndex: number) {
   // v6.68 — kullanıcı bulgusu 2026-08-08 (Ankara 2.Koşu: #3 GOLDEN BEE ve #4 TESCİL,
   // piyasanın en çok bahis alan iki atı, "Ön Teknik Sıra"dan TAMAMEN kaybolmuştu):
   // Claude'un şema-kısıtlı JSON çıktısı istenen attan bir/ikisini sessizce atlayabiliyor —
-  // hiçbir kontrol bunu yakalamıyordu. Artık istenen HER "no" gelene kadar (en fazla 2
-  // deneme, önbelleği atlayarak) otomatik tekrar dener; 2 denemede de eksikse admin'e AÇIK
-  // bir hata gösterilir — kullanıcı talimatı: "hiçbir detayı atlamayacak" — hiçbir koşulda
-  // sessizce eksik bir liste ile devam edilmez. 2 ile sınırlı: her deneme ayrı bir Claude
-  // çağrısı, 3+ deneme bu rotanın 300sn maxDuration sınırını (kullanıcı uyarısı) zorlayabilir.
-  const MAX_DENEME = 2;
+  // hiçbir kontrol bunu yakalamıyordu. Artık istenen HER "no" gelene kadar (en fazla
+  // MAX_DENEME kez, önbelleği atlayarak) otomatik tekrar dener; son denemede de eksikse
+  // admin'e AÇIK bir hata gösterilir — kullanıcı talimatı: "hiçbir detayı atlamayacak" —
+  // hiçbir koşulda sessizce eksik bir liste ile devam edilmez.
+  // v6.90 — kullanıcı talimatı 2026-08-10 ("her şeyi en son sınırına çek"): maxDuration
+  // 800'e çıkınca 3+ deneme için yeterli pay oluştu, 2'den 3'e çıkarıldı.
+  const MAX_DENEME = 3;
   const istenenNolar = batch.map((r) => r.no);
   let raw = "";
   let atlar: BatchAt[] | null = null;
@@ -328,15 +332,18 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
     siralamaRaw = cachedSira;
   } else {
     console.log("[test-v2-engine] sıralama çağrısı başlıyor,", allAtlar.length, "at");
+    // v6.90 — kullanıcı talimatı 2026-08-10: max_tokens yalnız bir TAVAN, gerçek ücret
+    // üretilen token kadar (düşük tutmanın maliyet faydası yok) — batch çağrısıyla aynı
+    // gerçek üst sınıra (64000) çekildi, büyük sahalarda kesilme riski kalmasın.
     const sirMsg = await createWithTruncationRetry(
       {
         model: "claude-sonnet-5",
         thinking: { type: "adaptive" },
-        max_tokens: 16000,
+        max_tokens: 64000,
         output_config: { format: { type: "json_schema", schema: SIRALAMA_SCHEMA } },
         messages: [{ role: "user", content: [{ type: "text", text: siralamaReminder(atlarWithRaw) }] }],
       },
-      sirRaceKey, "faz2v2", 32000
+      sirRaceKey, "faz2v2", 64000
     );
     console.log("[test-v2-engine] sıralama bitti, usage:", JSON.stringify(sirMsg.usage), "stop_reason:", sirMsg.stop_reason);
     siralamaRaw = extractText(sirMsg);

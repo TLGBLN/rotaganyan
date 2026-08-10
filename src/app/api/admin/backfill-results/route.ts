@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { syncResultsForDate } from "@/server/services/result-sync";
 import type { Role } from "@prisma/client";
 
-export const maxDuration = 300;
+export const maxDuration = 800; // v6.90 — kullanıcı talimatı 2026-08-10: en son sınıra çekildi
 
 export async function POST(req: NextRequest) {
   const session = await auth();

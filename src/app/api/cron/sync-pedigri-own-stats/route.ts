@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncOwnPedigreeStats } from "@/server/services/pedigri-own-stat.service";
 
-export const maxDuration = 300;
+export const maxDuration = 800; // v6.90 — kullanıcı talimatı 2026-08-10: en son sınıra çekildi
 
 export async function GET(req: NextRequest) {
   const secret = req.headers.get("authorization")?.replace("Bearer ", "");

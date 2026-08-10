@@ -99,10 +99,13 @@ export async function logClaudeUsage(input: {
  * "Boşa ödeme" koruması: Vercel platform zaman aşımı Claude'u başarıyla ücretlendirdikten
  * SONRA ama yanıt istemciye ulaşmadan ÖNCE fonksiyonu kesebiliyor — admin "tekrar dene"
  * dediğinde bu, aynı işi ikinci kez (ikinci kez ücretli) Claude'a yaptırıyordu. Bu fonksiyon,
- * kısa bir pencere içinde (varsayılan 20dk) bu raceId+phase için zaten başarıyla üretilmiş
+ * kısa bir pencere içinde (varsayılan 60dk) bu raceId+phase için zaten başarıyla üretilmiş
  * bir yanıt var mı diye bakar — varsa onu döner, route Claude'u YENİDEN ÇAĞIRMAZ.
- * 20dk'lık pencere kasıtlı kısa tutuldu: admin gerçekten yeni bir analiz istiyorsa (ör. Faz 1
- * verisi değişti) bu süre kolayca geçer, o zaman normal şekilde yeniden üretilir.
+ * v6.90 — kullanıcı bulgusu 2026-08-10 (Bursa 9.Koşu): 20dk'lık eski pencere, bir hatayı
+ * tartışıp tekrar denemek gibi sıradan bir gecikmede bile dolup tüm koşuyu (5 grup) baştan
+ * ücretlendirdi. 60dk'ya çıkarıldı — hâlâ kısıtlı kalmalı (admin GERÇEKTEN yeni bir analiz
+ * istiyorsa, ör. Faz 1 verisi değişti, bu süre yine kolayca geçer ve normal şekilde yeniden
+ * üretilir), yalnız "birkaç dakika tartışıp tekrar dene" senaryosunu da kapsayacak kadar geniş.
  */
 export async function getRecentCachedResult(
   raceId: string,
@@ -111,7 +114,7 @@ export async function getRecentCachedResult(
   // sistemindeki AYNI platform davranışı, bkz. yukarıdaki yorum). Üretim rotaları
   // ("faz2"/"faz3") hâlâ yalnız kendi literal'larını geçiyor, çapraz okuma riski yok.
   phase: "faz2" | "faz3" | "faz2v2" | "faz3v2",
-  windowMinutes = 20
+  windowMinutes = 60
 ): Promise<string | null> {
   try {
     const { db } = await import("@/lib/db");

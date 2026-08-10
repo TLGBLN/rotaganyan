@@ -69,8 +69,8 @@ async function fetchHtml(url: string): Promise<string> {
     try {
       const { statusCode, body } = await request(url, {
         headers: HEADERS,
-        headersTimeout: 15_000,
-        bodyTimeout: 15_000,
+        headersTimeout: 30_000, // v6.90 — kullanıcı talimatı 2026-08-10: en son sınıra çekildi
+        bodyTimeout: 30_000,
         dispatcher: h1Agent,
       });
       if (statusCode !== 200) throw new Error(`HTTP ${statusCode}: ${url}`);

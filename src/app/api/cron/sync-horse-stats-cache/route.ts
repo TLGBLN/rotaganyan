@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { syncHorseStatsCache } from "@/server/services/ingest/tjk-at-profil.adapter";
 
-export const maxDuration = 300;
+export const maxDuration = 800; // v6.90 — kullanıcı talimatı 2026-08-10: en son sınıra çekildi
 
 const CRON_SECRET = process.env.CRON_SECRET;
 

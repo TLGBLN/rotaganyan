@@ -37,7 +37,8 @@ export type TjkAtKosuRow = {
 };
 
 async function fetchHtml(url: string): Promise<string> {
-  const { statusCode, body } = await request(url, { headers: HEADERS, headersTimeout: 10_000, bodyTimeout: 10_000 });
+  // v6.90 — kullanıcı talimatı 2026-08-10: en son sınıra çekildi
+  const { statusCode, body } = await request(url, { headers: HEADERS, headersTimeout: 30_000, bodyTimeout: 30_000 });
   if (statusCode !== 200) throw new Error(`HTTP ${statusCode}: ${url}`);
   return body.text();
 }

@@ -6,7 +6,7 @@ import { syncAgfForDate } from "@/server/services/agf-sync";
 // İstanbul'un AGF verisi 4+ saat güncellenmeden kalmıştı. Diğer ağır sync cron'larıyla
 // (ingest-program, sync-galop vb.) aynı üst sınıra çekildi; ayrıca agf-sync.ts'teki
 // per-runner DB yazımı artık paralel.
-export const maxDuration = 300;
+export const maxDuration = 800; // v6.90 — kullanıcı talimatı 2026-08-10: en son sınıra çekildi
 
 const CRON_SECRET = process.env.CRON_SECRET;
 

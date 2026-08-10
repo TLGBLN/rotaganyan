@@ -3,7 +3,7 @@ import { auth, hasRole } from "@/lib/auth";
 import { syncJockeyStatsFromTjk } from "@/server/services/race.service";
 import type { Role } from "@prisma/client";
 
-export const maxDuration = 300;
+export const maxDuration = 800; // v6.90 — kullanıcı talimatı 2026-08-10: en son sınıra çekildi
 
 export async function POST(req: NextRequest) {
   void req;
