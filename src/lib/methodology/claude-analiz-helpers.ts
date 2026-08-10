@@ -66,7 +66,17 @@ export async function createWithTruncationRetry(
     resultText: extractText(msg),
     durationMs: Date.now() - start,
   });
-  if (msg.stop_reason === "max_tokens") {
+  // v6.91 — kullanıcı bulgusu 2026-08-10 (Bursa 9.Koşu sıralama çağrısı): adaptive
+  // thinking bazen TÜM max_tokens bütçesini düşünmede tüketip hiç metin bloğu
+  // üretmeden kesiliyor — bu durumda stop_reason yine "max_tokens" olur AMA extractText
+  // "" döner. Eski kod yalnız stop_reason'a bakıyordu (bu durumu zaten yakalıyordu), asıl
+  // eksik: retryMaxTokens ARTIK ilk denemeyle AYNI (64000, gerçek model tavanı) olduğu
+  // için tekrar deneme "daha yüksek limitle" değil, aynı limitle "ikinci bir şans" —
+  // adaptive thinking deterministik olmadığı için genelde işe yarıyor, ama YİNE de boş
+  // dönerse artık sessizce boş bir "başarılı" sonuç gibi davranılmıyor, açık hata verilir
+  // (aşağıya bkz.) — hem admin'e net bir mesaj hem de MAX_DENEME/üst katman tekrar deneme
+  // döngülerinin bunu yakalayabilmesi için.
+  if (msg.stop_reason === "max_tokens" || extractText(msg) === "") {
     start = Date.now();
     msg = await createStreamed({ ...params, max_tokens: retryMaxTokens });
     await logClaudeUsage({
@@ -78,6 +88,11 @@ export async function createWithTruncationRetry(
       resultText: extractText(msg),
       durationMs: Date.now() - start,
     });
+  }
+  if (extractText(msg) === "") {
+    throw new Error(
+      "Claude düşünme bütçesinin tamamını tükettip hiç metin üretmeden iki denemede de kesildi — sonuç boş. Bu koşu için tekrar deneyin (bkz. tutarsız denemede farklı sonuç alma ihtimali)."
+    );
   }
   return msg;
 }

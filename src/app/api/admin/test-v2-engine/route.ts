@@ -245,8 +245,14 @@ async function handleBatch(raceId: string, batchIndex: number) {
       continue;
     }
     atlar = parsedAttempt;
-    const gelenNolar = new Set(atlar.map((a) => a.no));
-    eksikNolar = istenenNolar.filter((no) => !gelenNolar.has(no));
+    // v6.91 — kullanıcı bulgusu 2026-08-10 (Bursa 9.Koşu, "muhakeme":"placeholder" olarak
+    // döndü): "ad" alanı için zaten güvenmiyorduk (bkz. aşağıdaki ad:r.ad), ama "muhakeme"
+    // alanı için aynı koruma yoktu — büyük gruplarda Claude bazen bu alana da anlamsız
+    // "placeholder" metni koyuyor. Böyle bir at, "no" gelmiş olsa bile GERÇEKTEN eksik
+    // sayılır — aynı otomatik tekrar deneme döngüsüne (MAX_DENEME) dahil edilir.
+    const muhakemeGecerliMi = (m: string) => m.trim().length > 0 && m.trim().toLowerCase() !== "placeholder";
+    const gecerliNolar = new Set(atlar.filter((a) => muhakemeGecerliMi(a.muhakeme)).map((a) => a.no));
+    eksikNolar = istenenNolar.filter((no) => !gecerliNolar.has(no));
     if (eksikNolar.length > 0 && deneme < MAX_DENEME) {
       console.error(`[test-v2-engine] grup ${batchIndex + 1}/${batches.length}: deneme ${deneme}/${MAX_DENEME}, ${eksikNolar.join(",")} numaralı at(lar) yanıtta yok, tekrar deneniyor.`);
     }

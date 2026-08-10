@@ -118,10 +118,16 @@ export async function getRecentCachedResult(
 ): Promise<string | null> {
   try {
     const { db } = await import("@/lib/db");
+    // v6.91 — kullanıcı bulgusu 2026-08-10 (Bursa 9.Koşu sıralama çağrısı): adaptive
+    // thinking bazen TÜM max_tokens bütçesini düşünmede tüketip hiç metin bloğu
+    // üretmeden kesiliyor — extractText() bu durumda BOŞ STRING ("") döner, null değil,
+    // bu yüzden eski "not: null" filtresi bu boş/geçersiz sonucu da "önbellekte geçerli
+    // yanıt var" sayıp bir daha çalıştırılmaması gereken pencere boyunca TEKRAR TEKRAR
+    // döndürüyordu — hem para hem sonuç kaybı. Artık boş string de hariç tutuluyor.
     const log = await db.claudeUsageLog.findFirst({
       where: {
         raceId, phase,
-        resultText: { not: null },
+        resultText: { not: null, notIn: [""] },
         createdAt: { gte: new Date(Date.now() - windowMinutes * 60_000) },
       },
       orderBy: { createdAt: "desc" },
