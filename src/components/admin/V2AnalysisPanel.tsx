@@ -30,6 +30,7 @@ type KaliteUyariSatiri = { no: number; ad: string; uyarilar: string[] };
 type KullanilmayanVeriSatiri = { no: number; ad: string; kullanilmayanKodlar: string[] };
 type Top3TerfiSonuc = { no: number; ad: string; eskiSira: number; yeniSira: number };
 type KararHiyerarsiDegisikligi = { no: number; ad: string; eskiSira: number; yeniSira: number };
+type IlkSiraAgfTop3DenetimSonuc = { gecti: boolean; not: string };
 
 type Props = { raceId: string };
 
@@ -73,6 +74,9 @@ export default function V2AnalysisPanel({ raceId }: Props) {
   const [agf456Terfileri, setAgf456Terfileri] = useState<Top3TerfiSonuc[]>([]);
   const [gucluTop3Terfileri, setGucluTop3Terfileri] = useState<Top3TerfiSonuc[]>([]);
   const [agfFavoriTerfileri, setAgfFavoriTerfileri] = useState<Top3TerfiSonuc[]>([]);
+  const [agfStatikTerfileri, setAgfStatikTerfileri] = useState<Top3TerfiSonuc[]>([]);
+  const [ilkSiraTerfileri, setIlkSiraTerfileri] = useState<Top3TerfiSonuc[]>([]);
+  const [ilkSiraDenetimi, setIlkSiraDenetimi] = useState<IlkSiraAgfTop3DenetimSonuc | null>(null);
   const [kararHiyerarsiDegisiklikleri, setKararHiyerarsiDegisiklikleri] = useState<KararHiyerarsiDegisikligi[]>([]);
   const [kullanilmayanVeriOnay, setKullanilmayanVeriOnay] = useState(false);
   const [tempoOzeti, setTempoOzeti] = useState<string>("");
@@ -99,6 +103,9 @@ export default function V2AnalysisPanel({ raceId }: Props) {
     setAgf456Terfileri([]);
     setGucluTop3Terfileri([]);
     setAgfFavoriTerfileri([]);
+    setAgfStatikTerfileri([]);
+    setIlkSiraTerfileri([]);
+    setIlkSiraDenetimi(null);
     setKararHiyerarsiDegisiklikleri([]);
     setKullanilmayanVeriOnay(false);
     setBankoAdayi(null);
@@ -136,6 +143,9 @@ export default function V2AnalysisPanel({ raceId }: Props) {
         faz2Agf456Terfileri: Top3TerfiSonuc[] | null;
         faz2GucluTop3Terfileri: Top3TerfiSonuc[] | null;
         faz2AgfFavoriTerfileri: Top3TerfiSonuc[] | null;
+        faz2AgfStatikTerfileri: Top3TerfiSonuc[] | null;
+        faz2IlkSiraTerfileri: Top3TerfiSonuc[] | null;
+        faz2IlkSiraDenetimi: IlkSiraAgfTop3DenetimSonuc | null;
         faz2KararHiyerarsiDegisiklikleri: KararHiyerarsiDegisikligi[] | null;
         tempoOzeti: string;
         couponNarrow?: string; couponNormal?: string; couponWide?: string;
@@ -154,6 +164,9 @@ export default function V2AnalysisPanel({ raceId }: Props) {
       setAgf456Terfileri(res.faz2Agf456Terfileri ?? []);
       setGucluTop3Terfileri(res.faz2GucluTop3Terfileri ?? []);
       setAgfFavoriTerfileri(res.faz2AgfFavoriTerfileri ?? []);
+      setAgfStatikTerfileri(res.faz2AgfStatikTerfileri ?? []);
+      setIlkSiraTerfileri(res.faz2IlkSiraTerfileri ?? []);
+      setIlkSiraDenetimi(res.faz2IlkSiraDenetimi ?? null);
       setKararHiyerarsiDegisiklikleri(res.faz2KararHiyerarsiDegisiklikleri ?? []);
       setTempoOzeti(res.tempoOzeti ?? "");
       setKuponlar({ narrow: res.couponNarrow, normal: res.couponNormal, wide: res.couponWide });
@@ -363,6 +376,49 @@ export default function V2AnalysisPanel({ raceId }: Props) {
               <li key={t.no} className="font-medium">#{t.no} {t.ad}: {t.eskiSira}. sıra → {t.yeniSira}. sıra</li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {agfStatikTerfileri.length > 0 && (
+        <div className="space-y-1 rounded-lg border border-brand/40 bg-brand/10 px-3 py-2.5 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-brand">
+            <Sparkles className="h-3.5 w-3.5" /> AGF Statik Top-3 Terfisi — 4-5-6
+          </div>
+          <p className="text-muted-foreground">
+            Sahadaki güncel AGF&apos;ye göre top-3&apos;te olan ama geriye düşürülen atlar 4-6 sırasına koşulsuz alındı (n=66 doğrulama, 2026-08-10):
+          </p>
+          <ul className="space-y-0.5">
+            {agfStatikTerfileri.map((t) => (
+              <li key={t.no} className="font-medium">#{t.no} {t.ad}: {t.eskiSira}. sıra → {t.yeniSira}. sıra</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {ilkSiraTerfileri.length > 0 && (
+        <div className="space-y-1 rounded-lg border border-brand/40 bg-brand/10 px-3 py-2.5 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-brand">
+            <Sparkles className="h-3.5 w-3.5" /> İlk Sıra AGF Top-3 Sınırlaması
+          </div>
+          <p className="text-muted-foreground">
+            1.sıra AGF top-3 dışındaydı, top-3 içindeki en güçlü aday 1.sıraya koşulsuz alındı (n=104 doğrulama: top-3 dışı %5.9, top-3 içi %30.0 galibiyet, 2026-08-10):
+          </p>
+          <ul className="space-y-0.5">
+            {ilkSiraTerfileri.map((t) => (
+              <li key={t.no} className="font-medium">#{t.no} {t.ad}: {t.eskiSira}. sıra → {t.yeniSira}. sıra</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {ilkSiraDenetimi && (
+        <div className={cn("flex items-start gap-1.5 rounded-lg border px-3 py-2 text-xs", ilkSiraDenetimi.gecti ? "" : "border-amber-500/30 bg-amber-500/5")}>
+          {ilkSiraDenetimi.gecti
+            ? <CheckCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-muted-foreground" />
+            : <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />}
+          <span className={ilkSiraDenetimi.gecti ? "text-muted-foreground" : "text-amber-600 dark:text-amber-400 font-medium"}>
+            {ilkSiraDenetimi.not}
+          </span>
         </div>
       )}
 

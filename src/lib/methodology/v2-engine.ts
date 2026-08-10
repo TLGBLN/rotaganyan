@@ -1175,20 +1175,63 @@ export function faz2IlkSiraAgfTop3Sinirlamasi(
   const aday = calisma.find((a) => agfTop3Nos.has(a.no) && a.karar !== "Yüksek Risk");
   if (!aday) return { atlar, terfiler: [] }; // hepsi Yüksek Risk ise dokunma
 
-  // Karar "Güçlü Aday"a yükseltilir — aksi halde faz2KararHiyerarsisiUygula (KOŞULSUZ karar
-  // ağırlığına göre stabil sıralama) demote edilen eski 1.sıra "Güçlü Aday" ise bu terfiyi
-  // hemen geri alırdı (bkz. faz2AgfFavorisiDususeRagmenGarantisi'ndeki AYNI gerekçe).
+  // v6.102 — kullanıcı bulgusu 2026-08-11 ("Arnavutkız gibi atların ilk 3'e girememesine
+  // sebep olmamalı"): İLK versiyon adayı çıkarıp listenin BAŞINA ekliyordu ([aday, ...kalanlar])
+  // — bu, arada kalan HERKESİ bir pozisyon geriye itiyordu, yani aday 4.sıradan geliyorsa
+  // 3.sıradaki (AGF top-3 ile hiç ilgisi olmayan, gerçekten hak ederek orada olan) bir at
+  // sessizce 4.sıraya düşüyordu. Artık yalnız İKİ atın yeri DEĞİŞTİRİLİYOR (aday <-> eski
+  // 1.sıra) — 2. ve 3. sıradaki atlar (aday tam onların arasından gelmediği sürece)
+  // KESİNLİKLE yerinden oynamıyor. Bu, "AGF top-3'ü öne çıkar" ile "piyasanın göremediğini
+  // gören değerli atları asla top-3 dışına itme" ilkelerinin ikisini birden karşılıyor.
+  const adayIdx = calisma.findIndex((a) => a.no === aday.no);
   const guncellenmisAday: TeknikSiraliAt = {
     ...aday,
     karar: "Güçlü Aday",
-    muhakeme: `${aday.muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF top-3 içindeki en güçlü aday, 1. sıraya terfi — geriye dönük doğrulama: sistemin AGF top-3 dışından seçtiği #1 adaylar yalnız %5.9 kazanıyor, top-3 içinden seçilenler %30.0 (n=104, 2026-08-10).`,
+    muhakeme: `${aday.muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF top-3 içindeki en güçlü aday, 1. sıraya terfi (yalnız 1.sıra ile yer değişti, aradaki atlar yerinden oynamadı) — geriye dönük doğrulama: sistemin AGF top-3 dışından seçtiği #1 adaylar yalnız %5.9 kazanıyor, top-3 içinden seçilenler %30.0 (n=104, 2026-08-10).`,
   };
-  const kalanlar = calisma.filter((a) => a.no !== aday.no);
-  const yeniSiraliListe = [guncellenmisAday, ...kalanlar];
+  const yeniSiraliListe = [...calisma];
+  yeniSiraliListe[0] = guncellenmisAday;
+  yeniSiraliListe[adayIdx] = birinci; // eski 1.sıra, adayın boşalttığı tek pozisyona geçer
   const terfiler: KararHiyerarsiDegisikligi[] = [{ no: aday.no, ad: aday.ad, eskiSira: aday.teknikSira, yeniSira: 1 }];
 
   const yeniAtlar = yeniSiraliListe.map((a, i) => ({ ...a, teknikSira: i + 1 }));
   return { atlar: yeniAtlar, terfiler };
+}
+
+export type IlkSiraAgfTop3DenetimSonuc = { gecti: boolean; not: string };
+
+/**
+ * v6.101 — kullanıcı talebi 2026-08-11: "her düzeltmeyi Claude'un uygulayacağından emin
+ * olacağımız bir script/kod var mı" — faz2IlkSiraAgfTop3Sinirlamasi zaten KOŞULSUZ çalışan
+ * kod (Claude'un onayına bağlı değil), ama bunu her analizde GÖZLE de teyit edebilmek için
+ * ayrı, salt-okunur bir denetim: pipeline'ın TÜM terfi adımları bittikten SONRA, nihai
+ * 1.sıradaki atın gerçekten AGF top-3 içinde olup olmadığını yeniden kontrol eder. Ek
+ * Claude çağrısı yok, tamamen mekanik — asıl amacı, ileride pipeline sırası değişirse/bir
+ * adım yanlışlıkla silinirse bunu admin panelinde görünür kılmak (bugünkü koddan bağımsız
+ * bir ikinci doğrulama katmanı).
+ */
+export function faz2IlkSiraAgfTop3Denetimi(
+  atlar: TeknikSiraliAt[],
+  faz1: Faz1Sonuc
+): IlkSiraAgfTop3DenetimSonuc {
+  if (atlar.length <= 3) return { gecti: true, not: "Sahada 3 veya daha az at var, denetim uygulanmıyor." };
+
+  const agfliAtlar = faz1.runners.filter((r) => !r.scratched && r.agf != null);
+  if (agfliAtlar.length < 3) return { gecti: true, not: "AGF verisi yetersiz, denetim uygulanamadı." };
+  const agfTop3 = [...agfliAtlar].sort((a, b) => b.agf! - a.agf!).slice(0, 3);
+  const agfTop3Nos = new Set(agfTop3.map((r) => r.no));
+
+  const birinci = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira)[0];
+  if (!birinci) return { gecti: true, not: "Sıralanmış at yok." };
+
+  if (agfTop3Nos.has(birinci.no)) {
+    return { gecti: true, not: `✓ 1.sıra #${birinci.no} ${birinci.ad}, sahadaki AGF top-3 içinde.` };
+  }
+  const top3Ozet = agfTop3.map((r) => `#${r.no}(AGF ${r.agf})`).join(", ");
+  return {
+    gecti: false,
+    not: `✗ 1.sıra #${birinci.no} ${birinci.ad}, AGF top-3 (${top3Ozet}) DIŞINDA kalmış — faz2IlkSiraAgfTop3Sinirlamasi çalışmamış olabilir, pipeline'ı kontrol edin.`,
+  };
 }
 
 export function faz2AyniJokeyEtiketiEkle(

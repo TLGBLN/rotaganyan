@@ -7,7 +7,7 @@ import { getRecentCachedResult } from "@/lib/claude-cost";
 import { analizKilidiAl, analizKilidiBirak } from "@/lib/analysis-concurrency-lock";
 import { butceDurumunuBildir } from "@/lib/claude-budget-monitor";
 import type { Role } from "@prisma/client";
-import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi, faz2AgfFavorisiDususeRagmenGarantisi, faz2AgfStatikTop3Garantisi, faz2IlkSiraAgfTop3Sinirlamasi } from "@/lib/methodology/v2-engine";
+import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi, faz2AgfFavorisiDususeRagmenGarantisi, faz2AgfStatikTop3Garantisi, faz2IlkSiraAgfTop3Sinirlamasi, faz2IlkSiraAgfTop3Denetimi } from "@/lib/methodology/v2-engine";
 
 // v6.53 — kullanıcı bulgusu 2026-08-04 (Kocaeli 5.Koşu): tüm sahayı TEK bir Claude
 // çağrısında analiz etmek, zengin kategorilerde (3/4/5) + 8+ atlı sahalarda GERÇEKTEN
@@ -562,6 +562,15 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
     console.log("[test-v2-engine] Karar hiyerarşisi düzeltmesi:", JSON.stringify(faz2KararHiyerarsiDegisiklikleri));
   }
 
+  // v6.101 — kullanıcı talebi 2026-08-11: yukarıdaki terfi zincirinin gerçekten çalıştığını
+  // her analizde admin panelinde GÖZLE de teyit edebilmek için, tüm terfiler bittikten
+  // SONRA nihai 1.sırayı yeniden (bağımsız) denetleyen salt-okunur kontrol — ek Claude
+  // çağrısı yok. Bkz. v2-engine.ts'deki faz2IlkSiraAgfTop3Denetimi yorumu.
+  const faz2IlkSiraDenetimi = faz2IlkSiraAgfTop3Denetimi(parsed.atlar, faz1);
+  if (!faz2IlkSiraDenetimi.gecti) {
+    console.warn("[test-v2-engine] İlk sıra AGF top-3 denetimi BAŞARISIZ:", faz2IlkSiraDenetimi.not);
+  }
+
   // v6.45 — kullanıcı talebi: "faz1'in neleri çektiğini ve faz2'nin neleri muhakeme
   // ettiğini tikli olarak görmek istiyorum. Muhakeme edilmediği halde edilmiş gibi
   // göstermemeli." İkisi de ek Claude çağrısı yapmaz, tamamen mekanik/koddur.
@@ -628,6 +637,7 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
     faz2Agf456Terfileri,
     faz2AgfStatikTerfileri,
     faz2IlkSiraTerfileri,
+    faz2IlkSiraDenetimi,
     faz2KararHiyerarsiDegisiklikleri,
     faz2BankoAdayi,
     runners,

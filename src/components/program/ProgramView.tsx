@@ -512,6 +512,9 @@ function AnalysisPanel({
             dahil — Faz4 yalnız ilk 3-6 atı "pick" olarak kaydediyor, geri kalan saha zaten
             unpickedRunners'ta). Ayrı depolanan couponNarrow/Normal/Wide string'lerine değil,
             DOĞRUDAN bu tablodaki sırayla AYNI diziye dayanıyor — asla çelişmez.
+            v6.102 — kullanıcı talebi 2026-08-11: her kademe bir öncekini İÇERMELİ (Normal
+            = Ekonomik'in üstüne 4-5-6 ekler, Geniş = ikisinin üstüne 7+ ekler) — kademeler
+            artık ayrık dilimler değil, "/" ile ayrılmış KÜMÜLATİF gruplar halinde gösteriliyor.
         */}
         {(picks.length > 0 || unpickedRunners.length > 0) && (
           <div className="flex-1 min-w-[150px] border-l px-4 py-3">
@@ -519,23 +522,26 @@ function AnalysisPanel({
               {t("kuponOnerisi")}
             </div>
             <div className="space-y-2">
-              {([
-                { label: t("ekonomik"), color: "text-hit", nos: picks.slice(0, 3).map((p) => p.runner?.no).filter((n): n is number => n != null) },
-                { label: t("normal"), color: "text-brand", nos: picks.slice(3, 6).map((p) => p.runner?.no).filter((n): n is number => n != null) },
-                {
-                  label: t("genis"),
-                  color: "text-muted-foreground",
-                  nos: [
-                    ...picks.slice(6).map((p) => p.runner?.no).filter((n): n is number => n != null),
-                    ...unpickedRunners.map((r) => r.no),
-                  ].sort((a, b) => a - b),
-                },
-              ] as const).map((tier) => (
-                <div key={tier.label} className="flex items-baseline gap-2">
-                  <span className={cn("w-14 shrink-0 text-[10px] font-bold uppercase", tier.color)}>{tier.label}</span>
-                  <span className="font-mono text-xs font-semibold tabular-nums">{tier.nos.length > 0 ? tier.nos.join("-") : "—"}</span>
-                </div>
-              ))}
+              {(() => {
+                const ekonomikNos = picks.slice(0, 3).map((p) => p.runner?.no).filter((n): n is number => n != null);
+                const normalEkNos = picks.slice(3, 6).map((p) => p.runner?.no).filter((n): n is number => n != null);
+                const genisEkNos = [
+                  ...picks.slice(6).map((p) => p.runner?.no).filter((n): n is number => n != null),
+                  ...unpickedRunners.map((r) => r.no),
+                ].sort((a, b) => a - b);
+                const parcalar = [ekonomikNos, normalEkNos, genisEkNos].map((g) => (g.length > 0 ? g.join("-") : null));
+                const tiers = [
+                  { label: t("ekonomik"), color: "text-hit", metin: parcalar.slice(0, 1).filter(Boolean).join(" / ") },
+                  { label: t("normal"), color: "text-brand", metin: parcalar.slice(0, 2).filter(Boolean).join(" / ") },
+                  { label: t("genis"), color: "text-muted-foreground", metin: parcalar.slice(0, 3).filter(Boolean).join(" / ") },
+                ];
+                return tiers.map((tier) => (
+                  <div key={tier.label} className="flex items-baseline gap-2">
+                    <span className={cn("w-14 shrink-0 text-[10px] font-bold uppercase", tier.color)}>{tier.label}</span>
+                    <span className="font-mono text-xs font-semibold tabular-nums">{tier.metin || "—"}</span>
+                  </div>
+                ));
+              })()}
             </div>
           </div>
         )}
