@@ -99,3 +99,43 @@ export function formatDamSireStatOzet(s: DamSireStatOwnLite, mesafe: string, pis
   const torunStr = torunOrani != null ? ` · Kazanan torun oranı %${torunOrani} (${s.kazananTorunSayisi}/${s.torunSayisi} farklı torun)` : "";
   return `${s.damSireName} — kısrak babası olarak TÜM yavrularından (${pist} ${mesafe}), kendi verimiz: ${s.start} start, K% ${s.kYuzde}${ornekGuveniEtiketi(s.start)} (${s.birinci}/${s.start})${torunStr}`;
 }
+
+// ─── v6.76 — gün-çapında toplu havuz eşleştirme ──────────────────────────────
+// getProgramData (race.service.ts) eskiden getSireStatOzetleriForRace/getDamStatOzetleriForRace'i
+// YARIŞ BAŞINA çağırıyordu (24 yarışlık günde 24+24 sorgu, bkz. o dosyalardaki v6.76 yorumu).
+// Bu saf/senkron eşleştirme fonksiyonları BİLEREK burada (server action dosyalarında DEĞİL) —
+// "use server" dosyalarındaki HER export'un async olması gerekiyor, bu fonksiyonlar senkron.
+
+export function havuzAnahtari(irk: string, pist: string, mesafe: string): string {
+  return `${irk}|${pist}|${mesafe}`;
+}
+
+export function eslestirSireStatOzetleri(
+  ownPool: SireStatOwnLite[], sireNames: (string | null)[], mesafe: string, pist: string
+): { ozet: string | null; ornekKendiVeri: number | null; kYuzde: number | null }[] {
+  return sireNames.map((name) => {
+    const ownMatch = name ? ownPool.find((o) => normalizeSireName(o.sireName) === normalizeSireName(name)) ?? null : null;
+    const ornekKendiVeri = ownMatch?.start ?? null;
+    const ozet = ownMatch ? formatSireStatOzet(ownMatch, mesafe, pist) : null;
+    return { ozet, ornekKendiVeri, kYuzde: ownMatch?.kYuzde ?? null };
+  });
+}
+
+export function eslestirDamStatOzetleri(
+  ownPool: DamStatOwnLite[], dams: { dam: string | null; damSire: string | null }[], mesafe: string, pist: string
+): { ozet: string | null; ornekKendiVeri: number | null }[] {
+  return dams.map(({ dam, damSire }) => {
+    const ownCandidates = dam
+      ? ownPool.filter((o) => normalizeSireName(o.damName) === normalizeSireName(dam))
+      : [];
+    const ownMatch =
+      ownCandidates.length === 0
+        ? null
+        : ownCandidates.length === 1
+          ? ownCandidates[0]
+          : (damSire && ownCandidates.find((o) => normalizeSireName(o.damSireName) === normalizeSireName(damSire))) || ownCandidates[0];
+    const ornekKendiVeri = ownMatch?.start ?? null;
+    const ozet = ownMatch ? formatDamStatOzet(ownMatch, mesafe, pist) : null;
+    return { ozet, ornekKendiVeri };
+  });
+}

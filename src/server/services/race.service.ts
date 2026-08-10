@@ -3,9 +3,10 @@ import { startOfDay, endOfDay, subDays } from "date-fns";
 import { turkeyDateString } from "@/lib/tz";
 import type { Prisma, Confidence } from "@prisma/client";
 import { syncResultsForDate } from "./result-sync";
-import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
-import { getDamStatOzetleriForRace } from "@/server/actions/dam-stat.actions";
+import { getSireStatPoolsForCombos } from "@/server/actions/sire-stat.actions";
+import { getDamStatPoolsForCombos } from "@/server/actions/dam-stat.actions";
 import { getGecCikisOzetleriForRace } from "@/server/actions/gec-cikis.actions";
+import { breedToIrk, surfaceToPist, mesafeBucket, havuzAnahtari, eslestirSireStatOzetleri, eslestirDamStatOzetleri } from "@/lib/sire-stat-match";
 import { fetchTodaysAltiliResults } from "./ingest/tjk-altili.adapter";
 import { findIkramiyeForHippodrome } from "@/lib/altili-match";
 
@@ -845,37 +846,44 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     }
   }
 
-  // Aygır İstatistiği — koşu başına ırk/pist/mesafe SABİT olduğu için at başına değil,
-  // koşu başına tek bir havuz sorgusu yeterli (bkz. getSireStatOzetleriForRace).
+  // v6.76 — kullanıcı bulgusu 2026-08-10 (/program 20+ saniye): eskiden bu üç sorgu
+  // (aygır/kısrak istatistiği + geç-çıkış geçmişi) YARIŞ BAŞINA ayrı ayrı çalışıyordu —
+  // yoğun bir günde (24 yarış) bu 72 eşzamanlı sorgu demekti, bağlantı havuzunu boğup
+  // sayfayı yavaşlatıyordu. (irk,pist,mesafe) kombinasyonu yarışlar arasında sıklıkla
+  // tekrar ettiği ve geç-çıkış sorgusu zaten TÜM isimleri tek seferde kabul ettiği için,
+  // GÜNÜN TAMAMI için 3 toplu sorguya indirildi (72→3) — dönen veri/tazelik AYNI, yalnız
+  // kaç kez ve nasıl istendiği değişti (revalidate=0 korunuyor, hâlâ her açılışta taze).
   const allRaces = raceDays.flatMap((rd) => rd.races);
   const sireStatByRunnerId = new Map<string, string | null>();
   const damStatByRunnerId = new Map<string, string | null>();
   // Start Sorunu (v6.30) — TJK'nın "Geç Çıkış" tespiti, at adına göre (bkz. gec-cikis.actions.ts).
   const startSorunuByRunnerId = new Map<string, boolean | null>();
   const STARTSORUNU_ESIK = 2; // §XX.39 ile tutarlı: tekrarlayan (2+) geç çıkış "Evet" sayılır.
-  await Promise.all(
-    allRaces.map(async (r) => {
-      if (r.runners.length === 0) return;
-      const [sireOzetler, damOzetler, gecCikisMap] = await Promise.all([
-        getSireStatOzetleriForRace(r.runners.map((ru) => ru.sire), r.breed, r.surface, r.distance).catch(
-          () => r.runners.map(() => ({ ozet: null, ornekKendiVeri: null }))
-        ),
-        getDamStatOzetleriForRace(
-          r.runners.map((ru) => ({ dam: ru.dam, damSire: ru.damSire })),
-          r.breed,
-          r.surface,
-          r.distance
-        ).catch(() => r.runners.map(() => ({ ozet: null, ornekKendiVeri: null }))),
-        getGecCikisOzetleriForRace(r.runners.map((ru) => ru.name), date).catch(() => new Map()),
-      ]);
-      r.runners.forEach((ru, i) => {
-        sireStatByRunnerId.set(ru.id, sireOzetler[i]?.ozet ?? null);
-        damStatByRunnerId.set(ru.id, damOzetler[i]?.ozet ?? null);
-        const gc = gecCikisMap.get(ru.name);
-        startSorunuByRunnerId.set(ru.id, gc ? gc.gecCikisSayisi >= STARTSORUNU_ESIK : null);
-      });
-    })
-  );
+
+  const racesWithRunners = allRaces.filter((r) => r.runners.length > 0);
+  const combos = racesWithRunners.map((r) => ({
+    irk: breedToIrk(r.breed), pist: surfaceToPist(r.surface), mesafe: mesafeBucket(r.distance),
+  }));
+  const allHorseNames = racesWithRunners.flatMap((r) => r.runners.map((ru) => ru.name));
+
+  const [sirePools, damPools, gecCikisMap] = await Promise.all([
+    getSireStatPoolsForCombos(combos).catch(() => new Map()),
+    getDamStatPoolsForCombos(combos).catch(() => new Map()),
+    getGecCikisOzetleriForRace(allHorseNames, date).catch(() => new Map()),
+  ]);
+
+  for (const r of racesWithRunners) {
+    const irk = breedToIrk(r.breed), pist = surfaceToPist(r.surface), mesafe = mesafeBucket(r.distance);
+    const key = havuzAnahtari(irk, pist, mesafe);
+    const sireOzetler = eslestirSireStatOzetleri(sirePools.get(key) ?? [], r.runners.map((ru) => ru.sire), mesafe, pist);
+    const damOzetler = eslestirDamStatOzetleri(damPools.get(key) ?? [], r.runners.map((ru) => ({ dam: ru.dam, damSire: ru.damSire })), mesafe, pist);
+    r.runners.forEach((ru, i) => {
+      sireStatByRunnerId.set(ru.id, sireOzetler[i]?.ozet ?? null);
+      damStatByRunnerId.set(ru.id, damOzetler[i]?.ozet ?? null);
+      const gc = gecCikisMap.get(ru.name);
+      startSorunuByRunnerId.set(ru.id, gc ? gc.gecCikisSayisi >= STARTSORUNU_ESIK : null);
+    });
+  }
 
   return raceDays.map((rd) => ({
     id: rd.id,

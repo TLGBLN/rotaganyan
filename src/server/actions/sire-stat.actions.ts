@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { parseSireStatBulk } from "@/lib/sire-stat-parser";
-import { breedToIrk, surfaceToPist, mesafeBucket, formatSireStatOzet, normalizeSireName } from "@/lib/sire-stat-match";
+import { breedToIrk, surfaceToPist, mesafeBucket, havuzAnahtari, eslestirSireStatOzetleri } from "@/lib/sire-stat-match";
 
 export type SireStatFiltre = {
   irk: string;
@@ -84,6 +84,8 @@ export type SireStatOzetSonuc = {
  * Race.breed/surface/distance içinde ırk/pist/mesafe kombinasyonu SABİT olduğu için tek bir
  * havuz sorgusu yeterli, at başına ayrı sorgu gerekmiyor.
  */
+type SireStatOwnRow = Awaited<ReturnType<typeof db.sireStatOwn.findMany>>[number];
+
 export async function getSireStatOzetleriForRace(
   sireNames: (string | null)[],
   breed: string,
@@ -94,10 +96,31 @@ export async function getSireStatOzetleriForRace(
   const pist = surfaceToPist(surface);
   const mesafe = mesafeBucket(distance);
   const ownPool = await db.sireStatOwn.findMany({ where: { irk, pist, mesafe } });
-  return sireNames.map((name) => {
-    const ownMatch = name ? ownPool.find((o) => normalizeSireName(o.sireName) === normalizeSireName(name)) ?? null : null;
-    const ornekKendiVeri = ownMatch?.start ?? null;
-    const ozet = ownMatch ? formatSireStatOzet(ownMatch, mesafe, pist) : null;
-    return { ozet, ornekKendiVeri, kYuzde: ownMatch?.kYuzde ?? null };
+  return eslestirSireStatOzetleri(ownPool, sireNames, mesafe, pist);
+}
+
+/**
+ * v6.76 — kullanıcı bulgusu 2026-08-10 (/program 20+ saniye): getProgramData eskiden
+ * getSireStatOzetleriForRace'i YARIŞ BAŞINA çağırıyordu (24 yarışlık bir günde 24 ayrı
+ * sorgu) — (irk,pist,mesafe) kombinasyonu yarışlar arasında SIKLIKLA tekrar ettiği için
+ * (aynı ırk/pist/mesafe aralığındaki onlarca yarış), TEK bir sorguda TÜM benzersiz
+ * kombinasyonları çekip bellekte (irk|pist|mesafe) anahtarıyla gruplamak yeterli.
+ * Dönen Map'in anahtarı ile eşleştirmek için `havuzAnahtari` (lib/sire-stat-match.ts,
+ * "use server" olmadığı için senkron yardımcılar orada) kullanılıyor.
+ */
+export async function getSireStatPoolsForCombos(
+  combos: { irk: string; pist: string; mesafe: string }[]
+): Promise<Map<string, SireStatOwnRow[]>> {
+  const benzersizler = [...new Map(combos.map((c) => [havuzAnahtari(c.irk, c.pist, c.mesafe), c])).values()];
+  const havuz = new Map<string, SireStatOwnRow[]>();
+  if (benzersizler.length === 0) return havuz;
+  const tumSatirlar = await db.sireStatOwn.findMany({
+    where: { OR: benzersizler.map((c) => ({ irk: c.irk, pist: c.pist, mesafe: c.mesafe })) },
   });
+  for (const c of benzersizler) havuz.set(havuzAnahtari(c.irk, c.pist, c.mesafe), []);
+  for (const row of tumSatirlar) {
+    const key = havuzAnahtari(row.irk, row.pist, row.mesafe);
+    havuz.get(key)?.push(row);
+  }
+  return havuz;
 }

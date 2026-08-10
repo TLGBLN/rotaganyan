@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { parseDamStatBulk } from "@/lib/dam-stat-parser";
-import { breedToIrk, surfaceToPist, mesafeBucket, formatDamStatOzet, formatDamSireStatOzet, normalizeSireName } from "@/lib/sire-stat-match";
+import { breedToIrk, surfaceToPist, mesafeBucket, formatDamSireStatOzet, normalizeSireName, havuzAnahtari, eslestirDamStatOzetleri } from "@/lib/sire-stat-match";
 
 export type DamStatFiltre = {
   irk: string;
@@ -76,6 +76,8 @@ export type DamStatOzetSonuc = {
  * v6.32: yalnızca DamStatOwn (kendi verimiz) — hipodromx.com kaynaklı DamStat analiz
  * akışından çıkarıldı (kullanıcı kararı 2026-08-01, bkz. sire-stat-match.ts başlık notu).
  */
+type DamStatOwnRow = Awaited<ReturnType<typeof db.damStatOwn.findMany>>[number];
+
 export async function getDamStatOzetleriForRace(
   dams: { dam: string | null; damSire: string | null }[],
   breed: string,
@@ -86,20 +88,25 @@ export async function getDamStatOzetleriForRace(
   const pist = surfaceToPist(surface);
   const mesafe = mesafeBucket(distance);
   const ownPool = await db.damStatOwn.findMany({ where: { irk, pist, mesafe } });
-  return dams.map(({ dam, damSire }) => {
-    const ownCandidates = dam
-      ? ownPool.filter((o) => normalizeSireName(o.damName) === normalizeSireName(dam))
-      : [];
-    const ownMatch =
-      ownCandidates.length === 0
-        ? null
-        : ownCandidates.length === 1
-          ? ownCandidates[0]
-          : (damSire && ownCandidates.find((o) => normalizeSireName(o.damSireName) === normalizeSireName(damSire))) || ownCandidates[0];
-    const ornekKendiVeri = ownMatch?.start ?? null;
-    const ozet = ownMatch ? formatDamStatOzet(ownMatch, mesafe, pist) : null;
-    return { ozet, ornekKendiVeri };
+  return eslestirDamStatOzetleri(ownPool, dams, mesafe, pist);
+}
+
+// v6.76 — bkz. sire-stat.actions.ts getSireStatPoolsForCombos yorumu, aynı gerekçe/desen.
+export async function getDamStatPoolsForCombos(
+  combos: { irk: string; pist: string; mesafe: string }[]
+): Promise<Map<string, DamStatOwnRow[]>> {
+  const benzersizler = [...new Map(combos.map((c) => [havuzAnahtari(c.irk, c.pist, c.mesafe), c])).values()];
+  const havuz = new Map<string, DamStatOwnRow[]>();
+  if (benzersizler.length === 0) return havuz;
+  const tumSatirlar = await db.damStatOwn.findMany({
+    where: { OR: benzersizler.map((c) => ({ irk: c.irk, pist: c.pist, mesafe: c.mesafe })) },
   });
+  for (const c of benzersizler) havuz.set(havuzAnahtari(c.irk, c.pist, c.mesafe), []);
+  for (const row of tumSatirlar) {
+    const key = havuzAnahtari(row.irk, row.pist, row.mesafe);
+    havuz.get(key)?.push(row);
+  }
+  return havuz;
 }
 
 export type DamSireStatOzetSonuc = { ozet: string | null; ornekKendiVeri: number | null };
