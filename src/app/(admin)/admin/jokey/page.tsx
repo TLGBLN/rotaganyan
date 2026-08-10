@@ -2,7 +2,6 @@ import { db } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import RefreshButton from "@/components/admin/RefreshButton";
-import JokeyStatImport from "@/components/admin/JokeyStatImport";
 import JokeySyncButton from "@/components/admin/JokeySyncButton";
 import JokeyClearButton from "@/components/admin/JokeyClearButton";
 
@@ -137,7 +136,6 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {/* Sol: Import + yönetim */}
         <div className="space-y-4">
-          <JokeyStatImport />
           <JokeySyncButton />
           <JokeyClearButton />
 
