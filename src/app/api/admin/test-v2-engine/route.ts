@@ -37,10 +37,14 @@ export const maxDuration = 800;
 // ve boş-yanıt tespiti (createWithTruncationRetry) olduğu için büyük grupların asıl
 // riski (sessizce bozuk veri) artık YAKALANIP otomatik düzeltiliyor, eskisi kadar
 // tehlikeli değil. 20 atlık koşu 5 gruptan 4 gruba iniyor (1 çağrı tasarrufu).
-// v6.100 — kullanıcı kararı 2026-08-10 (deneysel): 6'dan 8'e çıkarılıp gerçek bir
-// backtest koşusunda (Bursa 9.Koşu, 20 at) güvenlik ağlarıyla (placeholder/boş-yanıt/
-// kısmi tekrar deneme) test ediliyor — güvenilirlik bozulursa geri alınacak.
-const BATCH_SIZE = 8;
+// v6.100 — deneysel 8'e çıkarma GERİ ALINDI (2026-08-10, aynı gün): Bursa 9.Koşu
+// canlı testinde (20 at → 3 grup: 8+8+4) son grup (4 at) 3 denemenin hepsini kullandı
+// — 1. denemede TÜM 4 at eksik geldi, 2. denemede daha önce hiç görülmemiş bir hata
+// (stop_reason: "refusal" — Claude'un kendi güvenlik filtresi yanıt üretmeyi
+// reddetti), yalnız 3. denemede başarılı oldu. Üç art arda deneme tek istekte uzayıp
+// "Failed to fetch"e yol açtı, sıralama adımına hiç ulaşılamadı. Güvenilirlik
+// bozuldu, 6'ya geri dönüldü.
+const BATCH_SIZE = 6;
 
 export type TestV2Pick = {
   no: number;
