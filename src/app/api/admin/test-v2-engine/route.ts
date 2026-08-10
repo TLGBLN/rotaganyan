@@ -214,40 +214,46 @@ async function handleBatch(raceId: string, batchIndex: number) {
   }
 
   const batch = batches[batchIndex];
-  const atlarMetin = batch.map((r) => atSatirlariUret(r, izinliKodlar)).join("\n\n");
   const legendBlock: Anthropic.TextBlockParam = { type: "text", text: V_LEGEND, cache_control: { type: "ephemeral", ttl: "1h" } };
   const usage = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
 
   // v6.53 boşa ödeme koruması: bu grup zaten üretilmişse (ör. önceki denemede
   // tamamlanmış ama bağlantı sonradan kesilmişse) Claude tekrar ÇAĞRILMAZ.
   const grupRaceKey = `${raceId}__g${batchIndex}`;
-  async function grubuCagir(onbellegiAtla: boolean): Promise<string> {
+  // v6.97 — kullanıcı bulgusu 2026-08-10 (Elazığ 6.Koşu): eksik-at tekrar deneme
+  // döngüsü her seferinde TÜM grubu (4-6 at) yeniden istiyordu — bu, tam olarak
+  // v6.53/54'ün kaçındığı "tek HTTP isteği dakikalarca açık kalır, ağ katmanı keser"
+  // sorununu İÇ döngüde yeniden yaratıyordu (3 deneme × tam grup = uzun tek istek,
+  // "Failed to fetch"). Artık `grubuCagir` yalnız o denemede EKSİK olan atları
+  // istiyor — daha küçük, daha hızlı, daha az riskli bir çağrı.
+  async function grubuCagir(onbellegiAtla: boolean, hedefAtlar: typeof batch): Promise<string> {
     const cachedBatch = onbellegiAtla ? null : await getRecentCachedResult(grupRaceKey, "faz2v2");
     if (cachedBatch) {
       console.log(`[test-v2-engine] grup ${batchIndex + 1}/${batches.length} önbellekten bulundu, atlanıyor.`);
       return cachedBatch;
     }
-    console.log(`[test-v2-engine] grup ${batchIndex + 1}/${batches.length} çalışıyor (${batch.length} at), raceId:`, raceId);
+    console.log(`[test-v2-engine] grup ${batchIndex + 1}/${batches.length} çalışıyor (${hedefAtlar.length}/${batch.length} at), raceId:`, raceId);
+    const atlarMetin = hedefAtlar.map((r) => atSatirlariUret(r, izinliKodlar)).join("\n\n");
     const msg = await createWithTruncationRetry(
       {
         model: "claude-sonnet-5",
         thinking: { type: "adaptive" },
         max_tokens: 64000,
-        output_config: { format: { type: "json_schema", schema: batchSchemaFor(batch.map((r) => r.no)) } },
+        output_config: { format: { type: "json_schema", schema: batchSchemaFor(hedefAtlar.map((r) => r.no)) } },
         messages: [{ role: "user", content: [
           legendBlock,
           { type: "text", text: kosuBaslik + "\n\n## ATLAR (bu grup)\n" + atlarMetin },
-          { type: "text", text: batchReminder(KATEGORI_ADI[kategori], batchIndex + 1, batches.length, batch.map((r) => r.no)) },
+          { type: "text", text: batchReminder(KATEGORI_ADI[kategori], batchIndex + 1, batches.length, hedefAtlar.map((r) => r.no)) },
         ] }],
       },
       grupRaceKey, "faz2v2", 64000
     );
     console.log(`[test-v2-engine] grup ${batchIndex + 1}/${batches.length} bitti, usage:`, JSON.stringify(msg.usage), "stop_reason:", msg.stop_reason);
     if (msg.usage) {
-      usage.input_tokens = msg.usage.input_tokens ?? 0;
-      usage.output_tokens = msg.usage.output_tokens ?? 0;
-      usage.cache_creation_input_tokens = msg.usage.cache_creation_input_tokens ?? 0;
-      usage.cache_read_input_tokens = msg.usage.cache_read_input_tokens ?? 0;
+      usage.input_tokens += msg.usage.input_tokens ?? 0;
+      usage.output_tokens += msg.usage.output_tokens ?? 0;
+      usage.cache_creation_input_tokens += msg.usage.cache_creation_input_tokens ?? 0;
+      usage.cache_read_input_tokens += msg.usage.cache_read_input_tokens ?? 0;
     }
     return extractText(msg);
   }
@@ -267,46 +273,58 @@ async function handleBatch(raceId: string, batchIndex: number) {
   // piyasanın en çok bahis alan iki atı, "Ön Teknik Sıra"dan TAMAMEN kaybolmuştu):
   // Claude'un şema-kısıtlı JSON çıktısı istenen attan bir/ikisini sessizce atlayabiliyor —
   // hiçbir kontrol bunu yakalamıyordu. Artık istenen HER "no" gelene kadar (en fazla
-  // MAX_DENEME kez, önbelleği atlayarak) otomatik tekrar dener; son denemede de eksikse
-  // admin'e AÇIK bir hata gösterilir — kullanıcı talimatı: "hiçbir detayı atlamayacak" —
-  // hiçbir koşulda sessizce eksik bir liste ile devam edilmez.
+  // MAX_DENEME kez) otomatik tekrar dener; son denemede de eksikse admin'e AÇIK bir hata
+  // gösterilir — kullanıcı talimatı: "hiçbir detayı atlamayacak" — hiçbir koşulda
+  // sessizce eksik bir liste ile devam edilmez.
   // v6.90 — kullanıcı talimatı 2026-08-10 ("her şeyi en son sınırına çek"): maxDuration
   // 800'e çıkınca 3+ deneme için yeterli pay oluştu, 2'den 3'e çıkarıldı.
+  // v6.97 — kullanıcı bulgusu 2026-08-10 (Elazığ 6.Koşu): eksik olan atlar hep grubun
+  // SONUNDAKİ numaralardı, hatta 2. denemede daha da FAZLASI eksik geldi — bu, "at
+  // sistemde yok" değil, adaptive thinking'in her denemede DEĞİŞKEN miktarda token
+  // tüketip bazen JSON'un sonuna yetecek yer bırakmaması (aynı sıralama-boş-yanıt
+  // hatasının kısmi hali). Eskiden her deneme TÜM grubu yeniden istiyordu — bu hem
+  // yavaş hem gereksiz büyüktü. Artık her deneme yalnız O ANA KADAR eksik kalan atları
+  // istiyor (daha küçük istek → daha az düşünme yükü → tekrar eksik kalma riski azalır),
+  // sonuçlar denemeler arasında BİRİKTİRİLİYOR.
   const MAX_DENEME = 3;
   const istenenNolar = batch.map((r) => r.no);
-  let raw = "";
-  let atlar: BatchAt[] | null = null;
+  const batchByNo = new Map(batch.map((r) => [r.no, r]));
+  const atlarByNo = new Map<number, BatchAt>();
+  const muhakemeGecerliMi = (m: string) => m.trim().length > 0 && m.trim().toLowerCase() !== "placeholder";
+  let sonRaw = "";
   let eksikNolar: number[] = istenenNolar;
   for (let deneme = 1; deneme <= MAX_DENEME && eksikNolar.length > 0; deneme++) {
-    raw = await grubuCagir(deneme > 1);
-    const parsedAttempt = parseAtlar(raw);
+    const hedefAtlar = batch.filter((r) => eksikNolar.includes(r.no));
+    sonRaw = await grubuCagir(deneme > 1, hedefAtlar);
+    const parsedAttempt = parseAtlar(sonRaw);
     if (parsedAttempt === null) {
       if (deneme === MAX_DENEME) {
-        return NextResponse.json({ error: `Grup ${batchIndex + 1}/${batches.length} yanıtı ${MAX_DENEME} denemede de parse edilemedi.`, raw }, { status: 500 });
+        return NextResponse.json({ error: `Grup ${batchIndex + 1}/${batches.length} yanıtı ${MAX_DENEME} denemede de parse edilemedi.`, raw: sonRaw }, { status: 500 });
       }
       console.error(`[test-v2-engine] grup ${batchIndex + 1}/${batches.length}: deneme ${deneme} parse edilemedi, tekrar deneniyor.`);
       continue;
     }
-    atlar = parsedAttempt;
     // v6.91 — kullanıcı bulgusu 2026-08-10 (Bursa 9.Koşu, "muhakeme":"placeholder" olarak
     // döndü): "ad" alanı için zaten güvenmiyorduk (bkz. aşağıdaki ad:r.ad), ama "muhakeme"
     // alanı için aynı koruma yoktu — büyük gruplarda Claude bazen bu alana da anlamsız
     // "placeholder" metni koyuyor. Böyle bir at, "no" gelmiş olsa bile GERÇEKTEN eksik
     // sayılır — aynı otomatik tekrar deneme döngüsüne (MAX_DENEME) dahil edilir.
-    const muhakemeGecerliMi = (m: string) => m.trim().length > 0 && m.trim().toLowerCase() !== "placeholder";
-    const gecerliNolar = new Set(atlar.filter((a) => muhakemeGecerliMi(a.muhakeme)).map((a) => a.no));
-    eksikNolar = istenenNolar.filter((no) => !gecerliNolar.has(no));
+    for (const a of parsedAttempt) {
+      if (muhakemeGecerliMi(a.muhakeme)) atlarByNo.set(a.no, a);
+    }
+    eksikNolar = istenenNolar.filter((no) => !atlarByNo.has(no));
     if (eksikNolar.length > 0 && deneme < MAX_DENEME) {
       console.error(`[test-v2-engine] grup ${batchIndex + 1}/${batches.length}: deneme ${deneme}/${MAX_DENEME}, ${eksikNolar.join(",")} numaralı at(lar) yanıtta yok, tekrar deneniyor.`);
     }
   }
-  if (atlar === null || eksikNolar.length > 0) {
-    const eksikAdlar = eksikNolar.map((no) => `#${no} ${batch.find((r) => r.no === no)?.ad ?? ""}`).join(", ");
+  if (eksikNolar.length > 0) {
+    const eksikAdlar = eksikNolar.map((no) => `#${no} ${batchByNo.get(no)?.ad ?? ""}`).join(", ");
     return NextResponse.json(
       { error: `Grup ${batchIndex + 1}/${batches.length}: ${eksikAdlar} ${MAX_DENEME} denemede de yanıtta yer almadı — analiz eksik kalmasın diye durduruldu, tekrar deneyin.` },
       { status: 500 }
     );
   }
+  let atlar: BatchAt[] = istenenNolar.map((no) => atlarByNo.get(no)!);
 
   // v6.56/v6.57 — kullanıcı kararı: sayısal/objektif V-kodları (V13 kilo, V14 sınıf,
   // V20 HP ivmesi) Claude'un kendi seçimine bırakılmıyor, kod GARANTİLİ olarak
