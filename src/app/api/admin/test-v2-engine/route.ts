@@ -145,6 +145,41 @@ Yanıtı YALNIZCA geçerli JSON olarak ver — "karar" alanı ZORUNLU ve YENİDE
 { "siralama": [ { "no": 0, "teknikSira": 1, "karar": "Güçlü Aday / Düşük Risk / Orta Risk / Yüksek Risk" } ] }`;
 }
 
+// v6.92 — kullanıcı bulgusu 2026-08-10 (Bursa 9.Koşu): TEK sıralama çağrısıyla büyük
+// sahalarda (20+ at) adaptive thinking TÜM token bütçesini tüketip hiç cevap üretmeden
+// kesilebiliyor (kanıtlı: 166sn, 16000 token, boş sonuç). Çözüm ELEME değil BİRLEŞTİRME
+// (merge) — Arnavutkızı dersi: yüzeysel sinyali zayıf ama gerçek kanıtı güçlü bir at,
+// kaba bir ön-sıralamayla "zayıf grup"a düşüp bir daha üst gruptaki atlarla hiç
+// karşılaştırılmadan kalabilirdi. Bunun yerine saha ARALIKLI (iş paylaşımı amaçlı,
+// güçle İLGİSİZ) ikiye bölünüyor, HER GRUP KENDİ İÇİNDE TAM sıralanıyor (küçük çağrı,
+// hiçbir at grubundan dışlanmıyor), sonra bu fonksiyon iki ZATEN sıralı listeyi klasik
+// "merge" mantığıyla TEK nihai sıralamada birleştiriyor — her at diğer gruptakilerle
+// gerçekten karşılaştırılıyor, hiçbiri atlanmıyor.
+const SIRALAMA_BOLME_ESIGI = 12;
+
+function mergeReminder(
+  siraliA: (BatchAt & { hamVeri?: string })[],
+  siraliB: (BatchAt & { hamVeri?: string })[]
+): string {
+  const blok = (etiket: string, liste: (BatchAt & { hamVeri?: string })[]) =>
+    liste.map((a, i) =>
+      `${etiket}${i + 1}. #${a.no} ${a.ad} — Karar: ${a.karar}\nMuhakeme: ${a.muhakeme}${a.hamVeri ? `\nHam veri: ${a.hamVeri}` : ""}`
+    ).join("\n\n");
+  const toplam = siraliA.length + siraliB.length;
+  return `Aşağıda İKİ AYRI liste var — Grup A ve Grup B, HER BİRİ KENDİ İÇİNDE ZATEN ayrıca analiz edilip en güçlüden en zayıfa doğru sıralanmış. Senin işin bu iki listeyi YENİDEN SIRALAMAK DEĞİL — TEK bir nihai sıralamada BİRLEŞTİRMEK (klasik "merge" işlemi): iki listeyi karşılıklı okuyup, hangi attan sonra hangi atın geleceğine, o atların muhakeme+ham veri kanıtlarını gerçekten karşılaştırarak karar veriyorsun.
+
+KESİN KURAL — HER GRUBUN KENDİ İÇİNDEKİ SIRASI ASLA BOZULMAZ: Grup A'da 3. olan at, Grup A'da 2. olan attan ASLA daha yükseğe (daha iyi bir nihai sıraya) çıkamaz — aynı kural Grup B için de geçerli. Yalnızca İKİ GRUP ARASINDA hangi atın diğerinden daha güçlü olduğuna karar veriyorsun — bu, iki sıralı deste kağıdı harmanlamaya benzer.
+
+Grup A (kendi içinde sıralı, 1=en güçlü):
+${blok("A", siraliA)}
+
+Grup B (kendi içinde sıralı, 1=en güçlü):
+${blok("B", siraliB)}
+
+Yanıtı YALNIZCA geçerli JSON olarak ver — TÜM ${toplam} at dahil olmalı, hiçbiri atlanamaz, "karar" alanı ZORUNLU:
+{ "siralama": [ { "no": 0, "teknikSira": 1, "karar": "Güçlü Aday / Düşük Risk / Orta Risk / Yüksek Risk" } ] }`;
+}
+
 async function prepareRaceContext(raceId: string) {
   const faz1 = await gatherFaz1(raceId);
   if (!faz1) return null;
@@ -328,54 +363,87 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
     return { ...a, hamVeri: r ? hamVeriOzetiUret(r) : undefined };
   });
 
-  // Hafif sıralama çağrısı — yeniden analiz YAPMAZ, zaten üretilmiş muhakemeleri karşılaştırıp
-  // teknikSira atar. V_LEGEND göndermiyoruz (V-kodu tanımları değil, hazır metin+ham veri okunuyor).
-  const sirRaceKey = `${raceId}__sira`;
-  const cachedSira = await getRecentCachedResult(sirRaceKey, "faz2v2");
-  let siralamaRaw: string;
-  if (cachedSira) {
-    console.log("[test-v2-engine] sıralama önbellekten bulundu, atlanıyor.");
-    siralamaRaw = cachedSira;
-  } else {
-    console.log("[test-v2-engine] sıralama çağrısı başlıyor,", allAtlar.length, "at");
-    // v6.90 — kullanıcı talimatı 2026-08-10: max_tokens yalnız bir TAVAN, gerçek ücret
-    // üretilen token kadar (düşük tutmanın maliyet faydası yok) — batch çağrısıyla aynı
-    // gerçek üst sınıra (64000) çekildi, büyük sahalarda kesilme riski kalmasın.
-    const sirMsg = await createWithTruncationRetry(
-      {
-        model: "claude-sonnet-5",
-        thinking: { type: "adaptive" },
-        max_tokens: 64000,
-        output_config: { format: { type: "json_schema", schema: SIRALAMA_SCHEMA } },
-        messages: [{ role: "user", content: [{ type: "text", text: siralamaReminder(atlarWithRaw) }] }],
-      },
-      sirRaceKey, "faz2v2", 64000
-    );
-    console.log("[test-v2-engine] sıralama bitti, usage:", JSON.stringify(sirMsg.usage), "stop_reason:", sirMsg.stop_reason);
-    siralamaRaw = extractText(sirMsg);
-    if (sirMsg.usage) {
-      usage.input_tokens = sirMsg.usage.input_tokens ?? 0;
-      usage.output_tokens = sirMsg.usage.output_tokens ?? 0;
-      usage.cache_creation_input_tokens = sirMsg.usage.cache_creation_input_tokens ?? 0;
-      usage.cache_read_input_tokens = sirMsg.usage.cache_read_input_tokens ?? 0;
+  type HamAt = BatchAt & { hamVeri?: string };
+  type SiraSonuc = { no: number; teknikSira: number; karar?: string };
+
+  // Tek bir sıralama/birleştirme çağrısı — önbellek+otomatik tekrar deneme (ETIMEDOUT,
+  // boş yanıt) createWithTruncationRetry üzerinden zaten geliyor. usage'a EKLENİR
+  // (toplam), tek çağrıda olduğu gibi ÜZERİNE YAZILMAZ — artık 1-3 çağrı olabiliyor.
+  async function siralamaCagir(prompt: string, cacheAnahtari: string, atSayisi: number): Promise<SiraSonuc[]> {
+    const cached = await getRecentCachedResult(cacheAnahtari, "faz2v2");
+    let raw: string;
+    if (cached) {
+      console.log(`[test-v2-engine] sıralama (${cacheAnahtari}) önbellekten bulundu, atlanıyor.`);
+      raw = cached;
+    } else {
+      console.log(`[test-v2-engine] sıralama (${cacheAnahtari}) başlıyor, ${atSayisi} at`);
+      const msg = await createWithTruncationRetry(
+        {
+          model: "claude-sonnet-5",
+          thinking: { type: "adaptive" },
+          max_tokens: 64000,
+          output_config: { format: { type: "json_schema", schema: SIRALAMA_SCHEMA } },
+          messages: [{ role: "user", content: [{ type: "text", text: prompt }] }],
+        },
+        cacheAnahtari, "faz2v2", 64000
+      );
+      console.log(`[test-v2-engine] sıralama (${cacheAnahtari}) bitti, usage:`, JSON.stringify(msg.usage), "stop_reason:", msg.stop_reason);
+      raw = extractText(msg);
+      if (msg.usage) {
+        usage.input_tokens += msg.usage.input_tokens ?? 0;
+        usage.output_tokens += msg.usage.output_tokens ?? 0;
+        usage.cache_creation_input_tokens += msg.usage.cache_creation_input_tokens ?? 0;
+        usage.cache_read_input_tokens += msg.usage.cache_read_input_tokens ?? 0;
+      }
     }
+    const { siralama } = JSON.parse(raw) as { siralama: SiraSonuc[] };
+    return siralama;
+  }
+
+  const sirRaceKey = `${raceId}__sira`;
+  let siralamaSonuc: SiraSonuc[];
+  try {
+    if (allAtlar.length <= SIRALAMA_BOLME_ESIGI) {
+      // Küçük/orta saha — tek çağrı, bu gece bulunan boş-yanıt riski küçük sahalarda
+      // hiç gözlenmedi (yalnız 20+ atlı sahalarda oldu), gereksiz ek çağrı yapılmıyor.
+      siralamaSonuc = await siralamaCagir(siralamaReminder(atlarWithRaw), sirRaceKey, allAtlar.length);
+    } else {
+      // v6.92 — büyük saha: böl (iş paylaşımı, güçle ilgisiz aralıklı bölme) + birleştir.
+      const grupA = atlarWithRaw.filter((_, i) => i % 2 === 0);
+      const grupB = atlarWithRaw.filter((_, i) => i % 2 === 1);
+      const [sonucA, sonucB] = await Promise.all([
+        siralamaCagir(siralamaReminder(grupA), `${sirRaceKey}_a`, grupA.length),
+        siralamaCagir(siralamaReminder(grupB), `${sirRaceKey}_b`, grupB.length),
+      ]);
+      const sirala = (grup: HamAt[], sonuc: SiraSonuc[]): HamAt[] => {
+        const kararByNo = new Map(sonuc.filter((s) => s.karar).map((s) => [s.no, s.karar!]));
+        const siraByNo = new Map(sonuc.map((s) => [s.no, s.teknikSira]));
+        return [...grup]
+          .map((a) => ({ ...a, karar: kararByNo.get(a.no) ?? a.karar }))
+          .sort((x, y) => (siraByNo.get(x.no) ?? 999) - (siraByNo.get(y.no) ?? 999));
+      };
+      const siraliA = sirala(grupA, sonucA);
+      const siraliB = sirala(grupB, sonucB);
+      siralamaSonuc = await siralamaCagir(mergeReminder(siraliA, siraliB), `${sirRaceKey}_merge`, allAtlar.length);
+    }
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Sıralama başarısız oldu." }, { status: 500 });
   }
 
   let parsed: { atlar: TestV2Pick[] } | null = null;
   try {
-    const { siralama } = JSON.parse(siralamaRaw) as { siralama: { no: number; teknikSira: number; karar?: string }[] };
-    const siraByNo = new Map(siralama.map((s) => [s.no, s.teknikSira]));
+    const siraByNo = new Map(siralamaSonuc.map((s) => [s.no, s.teknikSira]));
     // v6.68 — "karar" artık burada, TAM garanti-etiketli muhakemeyle YENİDEN veriliyor;
     // eski (batch aşamasındaki, garantilerden önceki) karar yalnız yanıt bir şekilde
     // eksik gelirse (şema "required" olsa da ekstra güvenlik) yedek olarak kullanılır.
-    const kararByNo = new Map(siralama.filter((s) => s.karar).map((s) => [s.no, s.karar!]));
+    const kararByNo = new Map(siralamaSonuc.filter((s) => s.karar).map((s) => [s.no, s.karar!]));
     const atlar: TestV2Pick[] = allAtlar.map((a, i) => ({
       no: a.no, ad: a.ad, karar: kararByNo.get(a.no) ?? a.karar, muhakeme: a.muhakeme,
       teknikSira: siraByNo.get(a.no) ?? i + 1,
     }));
     parsed = { atlar };
   } catch {
-    return NextResponse.json({ error: "Sıralama yanıtı parse edilemedi.", raw: siralamaRaw }, { status: 500 });
+    return NextResponse.json({ error: "Sıralama yanıtı parse edilemedi." }, { status: 500 });
   }
   console.log("[test-v2-engine] toplam parsed atlar sayısı:", parsed.atlar.length);
 
