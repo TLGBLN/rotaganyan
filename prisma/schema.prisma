@@ -245,6 +245,7 @@ model Runner {
   accuraceSplits AccuraceHorseSplit[]
 
   @@unique([raceId, no])
+  @@index([name])
 }
 
 /**
@@ -647,6 +648,7 @@ model SireStatOwn {
 
   @@unique([sireName, irk, pist, mesafe])
   @@index([sireName])
+  @@index([irk, pist, mesafe])
 }
 
 // DamStatOwn — bkz. SireStatOwn yorumu, aynı mantık kısrak+kısrak babası için.
@@ -674,6 +676,7 @@ model DamStatOwn {
 
   @@unique([damName, damSireName, irk, pist, mesafe])
   @@index([damName])
+  @@index([irk, pist, mesafe])
 }
 
 // Damsire'nin (kısrağın babası) KENDİ BAŞINA etkisi — DamStatOwn'dan farklı olarak dam
