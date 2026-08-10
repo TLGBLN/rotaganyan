@@ -69,7 +69,7 @@ V17 — Start Geçmişi: tekrarlayan (2+) geç çıkış gerçek olumsuz sinyal,
 V18 — Kulvar/Dıştan Start: start pozisyonu, DS atın kendi tercihi olduğu için asla olumsuz sayılmaz.
 V19 — Form Dizisi + Kilo Bağlamı: form serisi HANGİ KİLODA alındığıyla birlikte okunur — kilo geçmişe göre ağırlaşıyorsa bu artış daha önce kanıtlanmış bir aralıkta mı yoksa yeni bir üst sınır mı kontrol edilir.
 V20 — HP İvmesi: geçmiş→şimdi. Sürekli yükselen HP (örn. 24→32→38) en güçlü sinyallerden biridir.
-V21 — AGF Trend: gün içi para akışı. Düşük AGF asla tek başına olumsuz kanıt değildir — AMA bunun tersi de kritik ve daha az bilinen bir kural: gün içinde AGF'si GERÇEK/anlamlı şekilde YÜKSELEN (gürültü şüphesi işaretli olmayan) bir at, piyasanın kendi parasıyla doğruladığı GÜÇLÜ bir olumlu sinyaldir — kullanıcı doğrulaması (2026-08-08 Ankara günü): kontrol edilen 6 koşunun 6'sında da gün içi en çok yükselen at kazandı. Böyle bir yükseliş gördüğünde bunu yalnız "nötr, cezalandırma" değil, aktif bir "destek" gerekçesi say — düşük mutlak AGF yüzdesi bile olsa (ör. %5→%8) bu görmezden gelinmemesi gereken gerçek bir para hareketidir.
+V21 — AGF Trend: gün içi para akışı. Düşük AGF asla tek başına olumsuz kanıt değildir. Gün içinde AGF'si GERÇEK/anlamlı şekilde YÜKSELEN (gürültü şüphesi işaretli olmayan) bir at, piyasanın kendi parasıyla doğruladığı bir sinyal OLABİLİR — 2026-08-08 Ankara gününde 6/6 koşuda doğrulanmıştı, ama 2026-08-10 Osmangazi kritiğinde (ESTOCADE +8.56 puan, en çok yükselen, yine de 4. bitirdi — top-3'e giremedi) net bir destekleyici çift bulunamadan tek başına yeterli olmadığı görüldü. STATÜ: ADAY — trend TEK BAŞINA asla otomatik "destek" sayılmasın; yalnız BAŞKA en az bir V-kodu (V4 aynı jokey, V13 kilo, V5 H2H, V19 form) AYNI YÖNDE (yükselişi destekliyorsa olumlu, düşüşü açıklıyorsa nötr/olumsuz değil) doğruluyorsa gerçek bir destek/risk gerekçesi say — bkz. X7 çapraz-okuma etiketi.
 V22 — Pist Durumu: atın geçmiş yarışlarındaki pist durumu bugünküyle karşılaştırılır, bazı atlar yalnız belirli koşullarda (çamurlu kum, ağır çim) performans gösterir.
 
 ## GENEL İLKE — DİNAMİK KANIT (SABİT YÜZDE/TAVAN YOK)
@@ -91,6 +91,15 @@ Hiçbir V-koduna sabit yüzde/tavan uygulanmaz. Bir veri kalemi o koşunun kader
 [V21+genel muhakeme] Düşük AGF + yükselen trend + güçlü teknik görüş = piyasanın henüz göremediği bir değer sinyali olabilir, ASLA tek başına ceza gerekçesi değildir düşük AGF.
 [V5+V13/V22] Geçmiş H2H bugün hâlâ geçerli mi, şartlar (kilo/zemin) değiştiyse güven düşer.
 [V16+V10] Eküri ortağının stili somut kanıtla destekleniyorsa tempo/pozisyon ihtimali değerlendirilir (spekülasyon yasak).
+
+## ÇAPRAZ-OKUMA ETİKETLERİ (X1-X7 — yeni V numarası DEĞİL, var olan V'lerin birlikte okunma talimatı, ek veri çekimi yok)
+[X1] V13+V22: Kilo değişimi, zemin durumuyla (ıslak/nemli) birlikte okunur — ıslak zeminde kilo etkisi büyür.
+[X2] V4+V8: "Aynı jokey" sinyali, o hipodrom/mesafe/pistte "kazandı mı" bilgisiyle birlikte okunduğunda güçlü bir sadakat sinyaline dönüşür; ayrı ayrı zayıftır.
+[X3] V4+V6: Jokey/Antrenör değerlendirmesinde genel yüzde yerine, V6'daki bu-at+bu-jokey/bu-antrenör somut geçmişi (varsa) önceliklendirilir.
+[X4] V6 iç uyarı: Mesafe-Çim ve Mesafe-Kum ayrı tablolardır, karıştırılmaz — pist tipine özeldir.
+[X5] V7+V8: "En İyi Derecesi" ile "Detaylı Karşılaştırma" aynı bilginin iki görünümüdür; çelişirlerse sinyal üretme, veri hatası şüphesiyle not düş.
+[X6] V15+V6: KGS (dinlenme süresi), aylık form trendiyle birlikte okunur — bu at benzer aralıklardan sonra geçmişte nasıl sonuç almış.
+[X7 — ADAY, henüz kod-garantili değil] V21+V6: AGF hareketi, yıllık kazanç/plase oranıyla örtüşüyor mu kontrol edilir; örtüşmüyorsa uyumsuzluk sinyali sayılır, otomatik destek sayılmaz. V21 kendisi aday statüsünde olduğu için bu çapraz da adaydır.
 
 ## AĞIRLIKLI RİSK SİNYALLERİ (zorunlu belirtme, zorunlu SONUÇ değil)
 Koşuda 3+ at V10=Kaçak At ise, bu durumu HER kaçak atın analizinde belirt (atlanamaz) — Bekleme/Sprinter atlar lehine GÜÇLÜ BİR EĞİLİM oluşur, ama KESİN değildir: jokey taktiği veya bir kaçak atın istisnai V2+V9 kombinasyonu bu eğilimi geçersiz kılabilir. "Matematiksel olarak imkansız" gibi kesinlik ifadeleri YASAK — yalnız "yüksek risk/orta risk/düşük risk" gibi dereceli dil kullan.
@@ -832,12 +841,10 @@ export function faz2Top3Garantisi(
 // taşıyor" sayımına dayanıyor — V4 (aynı jokey) BİLEREK hariç, çünkü neredeyse her atta
 // görülüyor ve tek başına güçlü bir kombinasyon sinyali sayılamaz. Yalnız V1 (aygır en
 // iyisi), V19 (son yarış galibiyeti), V22 (zemin eşleşme galibiyeti) sayılır.
-// v6.86 — kullanıcı kararı 2026-08-10: AGF trend terfisinde "destekleyen veri çifti"
-// sayımına V4 (aynı jokeyle devam) eklendi — MY BOY GÖKSU/STORMER örneğinde bu, güçlü
-// bir sadakat sinyali sayıldı. V3 (takı) BİLEREK dışında bırakıldı: takı artık HER
-// atta (değişiklik varsa) destek üretiyor (bkz. faz2TakiDegisikligiEtiketiEkle), bunu
-// da sayarsa neredeyse her takı-değişen at "güçlü" sayılır, eşik anlamını yitirir.
-const GUCLU_KOD_GARANTI_KODLARI = ["V1", "V4", "V19", "V22"];
+// v6.87 — v6.86'nın V4 eklemesi (AGF trend "destekleyen çift" sayımına) geri alındı —
+// tek koşuluk (n=10) bir gözlemdi, V_LEGEND_final.md standardına göre ("3-5 sonuçlanmış
+// koşuda tutarlı çalışmalı") henüz kod-garantiye yükseltilecek kadar doğrulanmadı.
+const GUCLU_KOD_GARANTI_KODLARI = ["V1", "V19", "V22"];
 function gucluKodGarantiSayisi(muhakeme: string): number {
   return GUCLU_KOD_GARANTI_KODLARI.filter((kod) =>
     new RegExp(`\\[${kod}(?:\\+V\\d+)?\\]:destek\\(KOD-GARANTİSİ`, "i").test(muhakeme)
@@ -1081,23 +1088,11 @@ export function faz2ZeminKazanmaEtiketiEkle(muhakeme: string, r: { zeminGecmisiO
   return `${muhakeme} | [V22]:destek(KOD-GARANTİSİ: bugünküyle eşleşen zemin sınıfında kazanmış geçmişi var)`;
 }
 
-/**
- * v6.86 — kullanıcı kararı 2026-08-10 (Osmangazi 1400m Ç kritiği, RED SMOKE/SILENT
- * TOUCH/MY BOY GÖKSU örneği): "takılarda eklenen veya çıkarılsın fark etmeksizin olumlu
- * sayılmalı" — Claude'un yorumuna bırakılmadan, HERHANGİ bir takı değişikliği (eklenen
- * VEYA çıkarılan, ikisi birden de olabilir) KOD-GARANTİLİ destek sayılır. Not: bu kural
- * tek bir koşuda (n=10) test edildi, bir örnekte (SHADOW MASTER, takı çıkarıldı ama 8.
- * oldu) doğrulanmadı — kullanıcı bunu bilerek kabul etti ("zamanla revize ederiz").
- */
-export function faz2TakiDegisikligiEtiketiEkle(muhakeme: string, r: Faz1Runner): string {
-  const { eklenen, cikarilan } = takiEfektif(r);
-  if (!eklenen && !cikarilan) return muhakeme;
-  if (halihazirdaTemizDestekVarMi(muhakeme, "V3")) return muhakeme;
-  const parcalar: string[] = [];
-  if (eklenen) parcalar.push(`eklenen: ${eklenen}`);
-  if (cikarilan) parcalar.push(`çıkarılan: ${cikarilan}`);
-  return `${muhakeme} | [V3]:destek(KOD-GARANTİSİ: takı değişikliği — ${parcalar.join(", ")} — 2026-08-10 kullanıcı kararı)`;
-}
+// v6.87 — v6.86'nın V3 kod-garantisi (takı değişikliği = her zaman destek) kaldırıldı
+// (bkz. test-v2-engine/route.ts çağrı noktası yorumu) — SHADOW MASTER örneği tek koşuda
+// çürüttü, "çoklu değişim = belirsizlik" notuyla da çelişiyordu. V3 rehberliği (yön fark
+// etmez, ikisi de olumlu) V_LEGEND metninde Claude'un muhakemesine bırakılmış durumda,
+// artık koda zorla enjekte edilmiyor. 3-5 sonuçlanmış koşuda tutarlı çıkarsa geri gelir.
 
 export function kosuBaslikUret(faz1: Faz1Sonuc, izinliKodlar: string[]): string {
   // v6.61 — kullanıcı bulgusu 2026-08-05: raceStyleEtiket gerçek değeri "Kaçak At"

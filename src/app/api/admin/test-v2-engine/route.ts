@@ -5,7 +5,7 @@ import type { Anthropic } from "@anthropic-ai/sdk";
 import { createWithTruncationRetry, extractText } from "@/lib/methodology/claude-analiz-helpers";
 import { getRecentCachedResult } from "@/lib/claude-cost";
 import type { Role } from "@prisma/client";
-import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2TakiDegisikligiEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi, faz2AgfFavorisiDususeRagmenGarantisi } from "@/lib/methodology/v2-engine";
+import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi, faz2AgfFavorisiDususeRagmenGarantisi } from "@/lib/methodology/v2-engine";
 
 // v6.53 — kullanıcı bulgusu 2026-08-04 (Kocaeli 5.Koşu): tüm sahayı TEK bir Claude
 // çağrısında analiz etmek, zengin kategorilerde (3/4/5) + 8+ atlı sahalarda GERÇEKTEN
@@ -284,7 +284,12 @@ async function handleBatch(raceId: string, batchIndex: number) {
     if (izinliKodlar.includes("V19")) muhakeme = faz2SonYarisKazandiEtiketiEkle(muhakeme, r);
     if (izinliKodlar.includes("V5")) muhakeme = faz2H2HEtiketiEkle(muhakeme, r);
     if (izinliKodlar.includes("V22")) muhakeme = faz2ZeminKazanmaEtiketiEkle(muhakeme, r);
-    if (izinliKodlar.includes("V3")) muhakeme = faz2TakiDegisikligiEtiketiEkle(muhakeme, r);
+    // v6.87 — kullanıcı kararı 2026-08-10 (V_LEGEND_final.md): V3 kod-garantisi (v6.86)
+    // tek koşuda (n=10) SHADOW MASTER tarafından çürütüldü (takı çıkarıldı, 8. oldu) VE
+    // "çoklu takı değişimi = yüksek belirsizlik" notuyla doğrudan çelişiyordu — iki kural
+    // aynı anda doğru olamaz. Statü "aday"a düşürüldü: enjeksiyon KALDIRILDI, V3 yeniden
+    // yalnız Claude'un kendi muhakemesine (V_LEGEND'deki "yön fark etmez" rehberliğiyle)
+    // bırakıldı. 3-5 sonuçlanmış koşuda tutarlı çıkarsa kod-garantiye geri yükseltilir.
     // v6.82 — kullanıcı bulgusu 2026-08-10 (Bursa 5.Koşu, 15 atlı büyük grup, motor
     // revizyonundan BAĞIMSIZ bir hata): Claude'un JSON yanıtındaki "ad" alanı bazı
     // atlarda gerçek isim yerine "placeholder" dönmüştü — büyük gruplarda model kaynaklı

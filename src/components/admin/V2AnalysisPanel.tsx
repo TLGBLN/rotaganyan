@@ -252,7 +252,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
     <div className="space-y-4 rounded-xl border border-purple-500/30 bg-purple-500/5 p-4">
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-purple-500" />
-        <h3 className="text-sm font-semibold">V2.1 Motoru — Deneysel (V1-V22, sayısal puanlama yok)</h3>
+        <h3 className="text-sm font-semibold">V3 Analiz Motoru — Deneysel (V1-V22 + Çapraz-Okuma X1-X7, sayısal puanlama yok)</h3>
       </div>
 
       <div className="flex gap-2">

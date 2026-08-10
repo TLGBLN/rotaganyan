@@ -121,7 +121,7 @@ export default function TestV2Page() {
 
   return (
     <div className="mx-auto max-w-5xl p-4 space-y-6">
-      <h1 className="text-lg font-bold">Yeni Motor Testi — V2.1 (V1-V22, tüm kategoriler)</h1>
+      <h1 className="text-lg font-bold">Yeni Motor Testi — V3 (V1-V22 + Çapraz-Okuma X1-X7, tüm kategoriler)</h1>
       <p className="text-sm text-muted-foreground">
         Her adım (Faz2, Faz3) yalnız kendi butonuna bastığınızda gerçek bir Claude çağrısı yapar (maliyetli). Faz3,
         Faz2&apos;nin ürettiği muhakemeyi kullanır — Faz2&apos;yi tekrar çalıştırmaz.
