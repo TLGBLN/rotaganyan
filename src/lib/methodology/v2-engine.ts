@@ -948,9 +948,12 @@ export function faz2Top3Garantisi(
 
 // v6.68 — AGF-top4/top2 garantilerinin ikisi de aynı "bu at kaç KOD-GARANTİLİ destek
 // taşıyor" sayımına dayanıyor — V4 (aynı jokey) BİLEREK hariç, çünkü neredeyse her atta
-// görülüyor ve tek başına güçlü bir kombinasyon sinyali sayılamaz. Yalnız V1 (aygır en
-// iyisi), V19 (son yarış galibiyeti), V22 (zemin eşleşme galibiyeti) sayılır.
-const GUCLU_KOD_GARANTI_KODLARI = ["V1", "V19", "V22"];
+// görülüyor ve tek başına güçlü bir kombinasyon sinyali sayılamaz. v6.81 — kullanıcı
+// bulgusu 2026-08-10 (SAFDERUN OĞLU): V14 (gerçek sınıf düşüşü, kod-garantili) de bu
+// listeye eklendi — V4'ün aksine SKK farkı 1+ kademe olmadıkça hiç enjekte edilmiyor,
+// yani gerçekten ayırt edici/nadir bir sinyal (V1 aygır-en-iyisi, V19 son-yarış-galibiyeti,
+// V22 zemin-eşleşme-galibiyeti ile aynı kategoride).
+const GUCLU_KOD_GARANTI_KODLARI = ["V1", "V14", "V19", "V22"];
 function gucluKodGarantiSayisi(muhakeme: MuhakemeSatiri[]): number {
   return satirleriSay(muhakeme, (s) => !!s.kodGarantili && s.tip === "destek" && GUCLU_KOD_GARANTI_KODLARI.some((kod) => s.kod.includes(kod)));
 }
@@ -973,22 +976,30 @@ function birlesikTrendListesi(faz1: Faz1Sonuc): TrendAt[] {
  * artık yalnız yükselenler değil düşenler de sayılıyor (bkz. birlesikTrendListesi). "karar"
  * da "Güçlü Aday"a yükseltilir (Top3Garantisi ile aynı gerekçe: aksi halde hiyerarşi kuralı
  * terfiyi geri alır).
+ * v6.81 — kullanıcı bulgusu 2026-08-10 (SAFDERUN OĞLU, 3 kod-garantili tam-destek sinyali
+ * — V14 sınıf düşüşü + V4 aynı jokey + V22 zemin galibiyeti — taşıyıp 12/15 sırada
+ * kalmıştı): terfi KOŞULU yanlışlıkla "AYRICA AGF'si bugün hareketli olmalı" diye
+ * daraltılmıştı — SAFDERUN OĞLU'nun AGF'si sakin kaldığı için bu at hiç değerlendirmeye
+ * bile alınmıyordu, kanıtı yeterli olsa da. "≥2 güçlü kod-garantili sinyal" kriterinin
+ * kendisi zaten yeterince nadir/anlamlı (bkz. GUCLU_KOD_GARANTI_KODLARI yorumu) — AGF
+ * hareketiyle şartlanmasının mantıklı bir gerekçesi yoktu. Artık SAHADAKİ HER at bu
+ * kritere göre değerlendiriliyor; AGF trend bilgisi yalnız VARSA gerekçeye ek olarak
+ * ekleniyor, koşul olmaktan çıktı.
  */
 export function faz2GucluKombinasyonTop3Garantisi(
   atlar: TeknikSiraliAt[],
   faz1: Faz1Sonuc
 ): { atlar: TeknikSiraliAt[]; terfiler: KararHiyerarsiDegisikligi[] } {
-  const trendliler = birlesikTrendListesi(faz1);
-  if (trendliler.length === 0 || atlar.length <= 3) return { atlar, terfiler: [] };
+  if (atlar.length <= 3) return { atlar, terfiler: [] };
+  const trendByNo = new Map(birlesikTrendListesi(faz1).map((t) => [t.runnerNo, t]));
 
   let calisma = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
   const terfiler: KararHiyerarsiDegisikligi[] = [];
-  const nitelikliler = trendliler
-    .map((t) => ({ t, at: calisma.find((a) => a.no === t.runnerNo) }))
-    .filter((x): x is { t: TrendAt; at: TeknikSiraliAt } => !!x.at && gucluKodGarantiSayisi(x.at.muhakeme) >= 2)
-    .sort((a, b) => b.at.teknikSira - a.at.teknikSira); // en geride olan önce terfi etsin
+  const nitelikliler = calisma
+    .filter((at) => at.karar !== "Yüksek Risk" && gucluKodGarantiSayisi(at.muhakeme) >= 2)
+    .sort((a, b) => b.teknikSira - a.teknikSira); // en geride olan önce terfi etsin
 
-  for (const { t, at } of nitelikliler) {
+  for (const at of nitelikliler) {
     const idx = calisma.findIndex((a) => a.no === at.no);
     if (idx === -1 || idx < 3) continue; // zaten ilk 3'te
     // v6.72 düzeltme — CEMRE ATEŞİ dersinin İKİNCİ TUR bulgusu (faz2Top3Garantisi'nde
@@ -999,12 +1010,14 @@ export function faz2GucluKombinasyonTop3Garantisi(
     const mevcut3 = calisma[2];
     if (gucluKodGarantiSayisi(mevcut3.muhakeme) >= 2 || stilPopulasyonTamDestekVar(mevcut3.muhakeme)) continue;
     const eskiSira = calisma[idx].teknikSira;
+    const t = trendByNo.get(at.no);
+    const trendMetni = t ? `AGF trend (${t.yon}, ${t.fark >= 0 ? "+" : ""}${t.fark} puan) + ` : "";
     const guncellenmisAt: TeknikSiraliAt = {
       ...calisma[idx],
       karar: "Güçlü Aday",
       muhakeme: satirEkle(calisma[idx].muhakeme, {
         kod: [], tip: "destek", guven: "tam", kodGarantili: true,
-        aciklama: `KOD-GARANTİSİ AGF trend (${t.yon}, ${t.fark >= 0 ? "+" : ""}${t.fark} puan) + birden çok güçlü sinyal birleşimiyle ilk 3'e terfi (eski sıra ${eskiSira} → 3) — 2026-08-09 kullanıcı kararı.`,
+        aciklama: `KOD-GARANTİSİ ${trendMetni}birden çok güçlü sinyal birleşimiyle ilk 3'e terfi (eski sıra ${eskiSira} → 3) — SAFDERUN OĞLU dersi, 2026-08-10.`,
       }),
     };
     const kalanlar = calisma.filter((a) => a.no !== at.no);
