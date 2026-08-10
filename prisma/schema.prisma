@@ -534,10 +534,10 @@ model ClaudeBudget {
   note        String?
 }
 
-// v6.77 — kullanıcı kararı 2026-08-10: hipodromx.com'dan elle yapıştırılan SireStat/DamStat
-// modelleri (aşağıdaki SireStatOwn/DamStatOwn'dan FARKLI — bunlar hiç kullanılmıyordu, analiz
-// akışına zaten girmiyorlardı, "hipodromx'e ait hiçbir veri/iz kalmasın" talimatıyla admin
-// sayfaları/formları/parser'larıyla birlikte koddan VE veritabanından tamamen kaldırıldı.
+// v6.77 — kullanıcı kararı 2026-08-10: üçüncü parti bir siteden elle yapıştırılan eski
+// SireStat/DamStat modelleri (aşağıdaki SireStatOwn/DamStatOwn'dan FARKLI — bunlar hiç
+// kullanılmıyordu, analiz akışına zaten girmiyorlardı) admin sayfaları/formları/
+// parser'larıyla birlikte koddan VE veritabanından tamamen kaldırıldı.
 
 // rotaganyan'ın KENDİ Runner/Result verisinden hesaplanan aygır istatistiği. Yalnız
 // irk×pist×mesafe kırılımı var (kendi örneklemimiz küçük, daha ince kırılım örneklemi
@@ -580,7 +580,7 @@ model DamStatOwn {
   // 2026-07-24: kullanıcı isteği — "kazanan tay oranı" (kaç FARKLI yavrunun en az 1
   // galibiyeti var / toplam farklı yavru). start/birinci YARIŞ bazlı (aynı at birden
   // fazla start/galibiyet üretebilir) — bu ikisi ise AT (yavru) bazlı, distinct Runner.name
-  // gruplamasıyla hesaplanır. hipodromx bunu vermiyor (yalnız kendi verimizde mümkün).
+  // gruplamasıyla hesaplanır (yalnız kendi verimizde mümkün).
   yavruSayisi        Int @default(0)
   kazananYavruSayisi Int @default(0)
   updatedAt   DateTime @updatedAt

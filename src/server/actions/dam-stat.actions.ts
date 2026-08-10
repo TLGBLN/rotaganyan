@@ -12,12 +12,9 @@ export type DamStatOzetSonuc = {
 /**
  * Bir koşudaki tüm atların anne+anne babası için, o koşunun ırk/pist/mesafe kombinasyonuna
  * karşılık gelen kısrak istatistiği özetini (varsa) döner — girdilerle AYNI SIRADA.
- * v6.32: yalnızca DamStatOwn (kendi verimiz) — hipodromx.com kaynaklı DamStat analiz
- * akışından çıkarıldı (kullanıcı kararı 2026-08-01, bkz. sire-stat-match.ts başlık notu).
- * v6.77 — kullanıcı kararı 2026-08-10: hipodromx.com'a ait DamStat modeli/elle yapıştırma
- * akışı (saveDamStatBulk/listDamStats/DamStatFiltre) analiz akışına zaten hiç girmiyordu,
- * kalıntı olarak koddan ve veritabanından tamamen kaldırıldı — bu dosyada yalnız kendi
- * verimize dayanan fonksiyonlar kaldı.
+ * Tek pedigri istatistik kaynağı DamStatOwn (kendi verimiz) — üçüncü parti elle
+ * yapıştırma akışı (v6.77, kullanıcı kararı 2026-08-10) koddan ve veritabanından
+ * tamamen kaldırıldı, bu dosyada yalnız kendi verimize dayanan fonksiyonlar kaldı.
  */
 type DamStatOwnRow = Awaited<ReturnType<typeof db.damStatOwn.findMany>>[number];
 
@@ -57,8 +54,7 @@ export type DamSireStatOzetSonuc = { ozet: string | null; ornekKendiVeri: number
 /**
  * Damsire'nin (kısrağın babası) TEK BAŞINA — hangi kısraktan gelirse gelsin TÜM
  * yavrularından — kendi verimizdeki toplu performansı (bkz. formatDamSireStatOzet).
- * hipodromx bu kırılımı hiç vermediği için tamamen DamSireStatOwn'a (own-data motoru,
- * pedigri-own-stat.service.ts) dayanır.
+ * Tamamen DamSireStatOwn'a (own-data motoru, pedigri-own-stat.service.ts) dayanır.
  */
 export async function getDamSireOwnStatForRace(
   damSireNames: (string | null)[],

@@ -18,12 +18,9 @@ export type SireStatOzetSonuc = {
 /**
  * Bir koşudaki tüm atların babası için, o koşunun ırk/pist/mesafe kombinasyonuna karşılık
  * gelen aygır istatistiği özetini (varsa) döner — sireNames ile AYNI SIRADA, eşleşmeyenler null.
- * v6.32: yalnızca SireStatOwn (kendi verimiz) — hipodromx.com kaynaklı SireStat analiz
- * akışından çıkarıldı (kullanıcı kararı 2026-08-01, bkz. sire-stat-match.ts başlık notu).
- * v6.77 — kullanıcı kararı 2026-08-10: hipodromx.com'a ait SireStat modeli/elle yapıştırma
- * akışı (saveSireStatBulk/listSireStats/SireStatFiltre) analiz akışına zaten hiç girmiyordu,
- * kalıntı olarak koddan ve veritabanından tamamen kaldırıldı — bu dosyada yalnız kendi
- * verimize dayanan fonksiyonlar kaldı.
+ * Tek pedigri istatistik kaynağı SireStatOwn (kendi verimiz) — üçüncü parti elle
+ * yapıştırma akışı (v6.77, kullanıcı kararı 2026-08-10) koddan ve veritabanından
+ * tamamen kaldırıldı, bu dosyada yalnız kendi verimize dayanan fonksiyonlar kaldı.
  * Race.breed/surface/distance içinde ırk/pist/mesafe kombinasyonu SABİT olduğu için tek bir
  * havuz sorgusu yeterli, at başına ayrı sorgu gerekmiyor.
  */

@@ -177,9 +177,7 @@ export type Faz1Runner = {
   dam: string | null;
   damSire: string | null;
   // Kendi Runner/Result verimizden (SireStatOwn) bu koşunun ırk/pist/mesafe kombinasyonuna
-  // göre OTOMATİK eşleştirilen aygır istatistiği — v6.32: hipodromx.com kaynaklı SireStat
-  // analiz akışından çıkarıldı (kullanıcı kararı 2026-08-01, own-data pist×mesafe kırılımı
-  // AEI'den daha değerli görüldü), yalnızca own-data kaldı.
+  // göre OTOMATİK eşleştirilen aygır istatistiği — tek pedigri istatistik kaynağı budur.
   sireStatOzet: string | null;
   // Aygır/kısrak istatistiğinin dayandığı ham örneklem sayısı — eskiden yalnız sireStatOzet/
   // damStatOzet metnine gömülüydü ("Start 27" gibi), ayrı sayısal alan yoktu (kullanıcı
@@ -197,8 +195,8 @@ export type Faz1Runner = {
   // Damsire'nin (kısrağın babası) TEK BAŞINA — hangi kısraktan gelirse gelsin TÜM
   // yavrularından — kendi verimizdeki toplu performansı (kullanıcı doktrini 2026-07-26:
   // aygır+kısrak yanında ÜÇÜNCÜ ayrı bir istatistik, damsire'nin fiziksel/mizaç etkisi
-  // dam kaydına gömülmeden ayrıca görünür olmalı). hipodromx bu kırılımı hiç vermediği
-  // için tamamen own-data (DamSireStatOwn) kaynaklıdır, "base" satırı yok.
+  // dam kaydına gömülmeden ayrıca görünür olmalı). Tamamen own-data (DamSireStatOwn)
+  // kaynaklıdır.
   damSireStatOzet: string | null;
   damSireOrneklemKendiVeri: number | null;
   // Dozaj (DP/DI/CD) — bkz. sire-dosage.actions.ts, aygırın genetik hız/mesafe yapısına
@@ -1059,8 +1057,8 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       kategori: "Pedigriler (anne, baba ve anne babası — üçü ayrı ayrı)",
       bakildi: pedigriSayisi > 0,
       detay: pedigriSayisi > 0
-        ? `${pedigriSayisi}/${n} atın aygır, kısrak ve/veya damsire (kısrak babası) istatistiği (hipodromx veya kendi verimiz) eşleşti.`
-        : "Sahadaki hiçbir at için aygır/kısrak/damsire istatistiği eşleşmedi — bu ırk+pist+mesafe kombinasyonunda hipodromx'te de kendi verimizde de kayıt yok.",
+        ? `${pedigriSayisi}/${n} atın aygır, kısrak ve/veya damsire (kısrak babası) istatistiği (kendi verimiz) eşleşti.`
+        : "Sahadaki hiçbir at için aygır/kısrak/damsire istatistiği eşleşmedi — bu ırk+pist+mesafe kombinasyonunda kendi verimizde kayıt yok.",
     },
     {
       kategori: "H2H — Geçmiş Karşılaşmalar",

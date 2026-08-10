@@ -1,9 +1,8 @@
 /**
  * rotaganyan'ın KENDİ Runner/Result verisinden aygır/kısrak istatistiği (SireStatOwn/
- * DamStatOwn) hesaplar — SireStat/DamStat (hipodromx.com'dan elle yapıştırılan, geniş
- * tarihsel taban + AEI) ile PARALEL çalışır, onun yerine geçmez (bkz. schema.prisma
- * yorumu). Yalnız irk×pist×mesafe kırılımı var, AEI/ikramiye hesaplanmıyor (şemada
- * ödül/purse verisi yok). sync-pedigri-own-stats cron'u tarafından günlük çağrılır.
+ * DamStatOwn) hesaplar — tek pedigri istatistik kaynağı budur. Yalnız irk×pist×mesafe
+ * kırılımı var, AEI/ikramiye hesaplanmıyor (şemada ödül/purse verisi yok).
+ * sync-pedigri-own-stats cron'u tarafından günlük çağrılır.
  */
 
 import { randomUUID } from "crypto";
@@ -86,7 +85,7 @@ export async function syncOwnPedigreeStats(): Promise<{ sireRows: number; damRow
     `;
   }
 
-  // ── Kısrak (dam + dam babası) — hipodromx ile aynı: ikisi birlikte anahtar ──
+  // ── Kısrak (dam + dam babası) — ikisi birlikte anahtar ──
   const damRunners = await db.runner.findMany({
     where: { dam: { not: null }, damSire: { not: null }, race: { result: { isNot: null } } },
     select: {

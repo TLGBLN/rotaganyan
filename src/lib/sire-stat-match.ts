@@ -42,13 +42,10 @@ export function breedToIrk(breed: string): string {
 }
 
 // rotaganyan'ın KENDİ Runner/Result verisinden hesaplanan aygır/kısrak istatistiği (bkz.
-// SireStatOwn/DamStatOwn şema yorumu ve pedigri-own-stat.service.ts). v6.32'den önce
-// hipodromx.com'dan elle yapıştırılan SireStat/DamStat (AEI + geniş tarihsel taban)
-// "base" satırı, own-data ise ona eklenen tamamlayıcı sinyaldi. Kullanıcı kararı
-// (2026-08-01): kendi verimizin pist×mesafe kırılımı AEI'den daha değerli görüldü,
-// hipodromx analiz motorundan tamamen çıkarıldı — own-data artık TEK kaynak. hipodromx
-// admin sayfaları (SireStat/DamStat, Aygır/Kısrak İstatistik) kod tabanında duruyor ama
-// analiz akışına artık girmiyor.
+// SireStatOwn/DamStatOwn şema yorumu ve pedigri-own-stat.service.ts) — kullanıcı kararı
+// (2026-08-01): kendi verimizin pist×mesafe kırılımı, eskiden kullanılan üçüncü parti
+// elle yapıştırma akışından (2026-08-10'da koddan/veritabanından tamamen kaldırıldı,
+// v6.77) daha değerli görüldü — own-data TEK kaynak.
 
 // 2026-08-02: kullanıcı kararı — sabit "n<3 ise gösterme" eşiği KALDIRILDI (§II.1/
 // [[feedback_sert_kosul_yasak]] ile tutarlı: hiçbir kural sabit eşikle Claude'un elindeki
@@ -91,8 +88,7 @@ export type DamSireStatOwnLite = {
   torunSayisi: number; kazananTorunSayisi: number;
 };
 
-// Damsire'nin (kısrağın babası) TEK BAŞINA etkisi — hipodromx bunu hiç vermiyor (dam+damsire
-// hep birlikte), o yüzden yalnızca kendi verimiz varsa gösterilir, hiçbir "base" satırı yok
+// Damsire'nin (kısrağın babası) TEK BAŞINA etkisi — yalnızca kendi verimiz varsa gösterilir
 // (bkz. DamSireStatOwn şema yorumu, kullanıcı doktrini 2026-07-26).
 export function formatDamSireStatOzet(s: DamSireStatOwnLite, mesafe: string, pist: string): string {
   const torunOrani = s.torunSayisi > 0 ? Math.round((s.kazananTorunSayisi / s.torunSayisi) * 100) : null;
