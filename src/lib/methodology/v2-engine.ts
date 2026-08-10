@@ -832,7 +832,12 @@ export function faz2Top3Garantisi(
 // taşıyor" sayımına dayanıyor — V4 (aynı jokey) BİLEREK hariç, çünkü neredeyse her atta
 // görülüyor ve tek başına güçlü bir kombinasyon sinyali sayılamaz. Yalnız V1 (aygır en
 // iyisi), V19 (son yarış galibiyeti), V22 (zemin eşleşme galibiyeti) sayılır.
-const GUCLU_KOD_GARANTI_KODLARI = ["V1", "V19", "V22"];
+// v6.86 — kullanıcı kararı 2026-08-10: AGF trend terfisinde "destekleyen veri çifti"
+// sayımına V4 (aynı jokeyle devam) eklendi — MY BOY GÖKSU/STORMER örneğinde bu, güçlü
+// bir sadakat sinyali sayıldı. V3 (takı) BİLEREK dışında bırakıldı: takı artık HER
+// atta (değişiklik varsa) destek üretiyor (bkz. faz2TakiDegisikligiEtiketiEkle), bunu
+// da sayarsa neredeyse her takı-değişen at "güçlü" sayılır, eşik anlamını yitirir.
+const GUCLU_KOD_GARANTI_KODLARI = ["V1", "V4", "V19", "V22"];
 function gucluKodGarantiSayisi(muhakeme: string): number {
   return GUCLU_KOD_GARANTI_KODLARI.filter((kod) =>
     new RegExp(`\\[${kod}(?:\\+V\\d+)?\\]:destek\\(KOD-GARANTİSİ`, "i").test(muhakeme)
@@ -1074,6 +1079,24 @@ export function faz2ZeminKazanmaEtiketiEkle(muhakeme: string, r: { zeminGecmisiO
   if (!r.zeminGecmisiOzet?.includes("[BU ZEMİN SINIFINDA KAZANDI]")) return muhakeme;
   if (halihazirdaTemizDestekVarMi(muhakeme, "V22")) return muhakeme;
   return `${muhakeme} | [V22]:destek(KOD-GARANTİSİ: bugünküyle eşleşen zemin sınıfında kazanmış geçmişi var)`;
+}
+
+/**
+ * v6.86 — kullanıcı kararı 2026-08-10 (Osmangazi 1400m Ç kritiği, RED SMOKE/SILENT
+ * TOUCH/MY BOY GÖKSU örneği): "takılarda eklenen veya çıkarılsın fark etmeksizin olumlu
+ * sayılmalı" — Claude'un yorumuna bırakılmadan, HERHANGİ bir takı değişikliği (eklenen
+ * VEYA çıkarılan, ikisi birden de olabilir) KOD-GARANTİLİ destek sayılır. Not: bu kural
+ * tek bir koşuda (n=10) test edildi, bir örnekte (SHADOW MASTER, takı çıkarıldı ama 8.
+ * oldu) doğrulanmadı — kullanıcı bunu bilerek kabul etti ("zamanla revize ederiz").
+ */
+export function faz2TakiDegisikligiEtiketiEkle(muhakeme: string, r: Faz1Runner): string {
+  const { eklenen, cikarilan } = takiEfektif(r);
+  if (!eklenen && !cikarilan) return muhakeme;
+  if (halihazirdaTemizDestekVarMi(muhakeme, "V3")) return muhakeme;
+  const parcalar: string[] = [];
+  if (eklenen) parcalar.push(`eklenen: ${eklenen}`);
+  if (cikarilan) parcalar.push(`çıkarılan: ${cikarilan}`);
+  return `${muhakeme} | [V3]:destek(KOD-GARANTİSİ: takı değişikliği — ${parcalar.join(", ")} — 2026-08-10 kullanıcı kararı)`;
 }
 
 export function kosuBaslikUret(faz1: Faz1Sonuc, izinliKodlar: string[]): string {
