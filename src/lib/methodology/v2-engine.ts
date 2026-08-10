@@ -487,7 +487,19 @@ export type KullanilmayanVeriSonuc = { no: number; ad: string; kullanilmayanKodl
  * sonra ne olacak") bunun bir admin panelinde gözden kaçırılabilecek kutu OLARAK
  * KALMAMASI — V2AnalysisPanel.tsx'te bu liste boş değilse "Kaydet ve Yayımla" butonu
  * admin bilinçli onay vermeden ÇALIŞMIYOR.
+ * v6.79 — kullanıcı bulgusu 2026-08-10: V11/V12 SAHADAKİ HER ATTA "kullanılmayan" olarak
+ * çıkıyordu (yanlış pozitif, gürültü) — bu ikisi at satırına DEĞİL, tek seferlik koşu
+ * başlığına ekleniyor (bkz. atSatirlariUret yorumu: "V11/V12 koşu düzeyinde, at satırına
+ * eklenmez") ve `veriVarMi` bunları RACE-level (faz1.race.sonDuzlukUzunlugu/
+ * pistMesafeStilOzeti) kontrol ediyor — yani veri "var" ise HER at için aynı sonucu
+ * verir, atın KENDİSİNE özel eksik bir veri değildir. STARŞAH/PRENSES MEHLİKA/TÜRKÖREN
+ * dersi at-özel eksik veriyle ilgiliydi (ör. bir atın kendi sınıf geçişi, kendi örneklem
+ * büyüklüğü) — V11/V12'nin bir atın V10 stiliyle EŞLEŞTİRİLİP eşleştirilmediği ayrı bir
+ * (ve zaten Sıralama Tutarsızlığı/Kaçırma Uyarıları denetimlerinin dolaylı kapsadığı)
+ * soru, bu genel dedektörün kapsamı dışında tutuluyor.
  */
+const KULLANILMAYAN_VERI_HARIC_KODLAR = new Set(["V11", "V12"]);
+
 export function faz2KullanilmayanVeriTespiti(
   faz1: Faz1Sonuc, izinliKodlar: string[],
   faz2Atlar: { no: number; ad: string; teknikSira: number; muhakeme: MuhakemeSatiri[] }[]
@@ -499,6 +511,7 @@ export function faz2KullanilmayanVeriTespiti(
       const kullanilmayanKodlar: string[] = [];
       if (r) {
         for (const kod of izinliKodlar) {
+          if (KULLANILMAYAN_VERI_HARIC_KODLAR.has(kod)) continue;
           if (!veriVarMi(r, kod, faz1)) continue;
           if (!satirVarMi(a.muhakeme, kod)) kullanilmayanKodlar.push(kod);
         }
