@@ -69,7 +69,7 @@ V17 — Start Geçmişi: tekrarlayan (2+) geç çıkış gerçek olumsuz sinyal,
 V18 — Kulvar/Dıştan Start: start pozisyonu, DS atın kendi tercihi olduğu için asla olumsuz sayılmaz.
 V19 — Form Dizisi + Kilo Bağlamı: form serisi HANGİ KİLODA alındığıyla birlikte okunur — kilo geçmişe göre ağırlaşıyorsa bu artış daha önce kanıtlanmış bir aralıkta mı yoksa yeni bir üst sınır mı kontrol edilir.
 V20 — HP İvmesi: geçmiş→şimdi. Sürekli yükselen HP (örn. 24→32→38) en güçlü sinyallerden biridir.
-V21 — AGF Trend: gün içi para akışı. Düşük AGF asla tek başına olumsuz kanıt değildir. Gün içinde AGF'si GERÇEK/anlamlı şekilde YÜKSELEN (gürültü şüphesi işaretli olmayan) bir at, piyasanın kendi parasıyla doğruladığı bir sinyal OLABİLİR — 2026-08-08 Ankara gününde 6/6 koşuda doğrulanmıştı, ama 2026-08-10 Osmangazi kritiğinde (ESTOCADE +8.56 puan, en çok yükselen, yine de 4. bitirdi — top-3'e giremedi) net bir destekleyici çift bulunamadan tek başına yeterli olmadığı görüldü. STATÜ: ADAY — trend TEK BAŞINA asla otomatik "destek" sayılmasın; yalnız BAŞKA en az bir V-kodu (V4 aynı jokey, V13 kilo, V5 H2H, V19 form) AYNI YÖNDE (yükselişi destekliyorsa olumlu, düşüşü açıklıyorsa nötr/olumsuz değil) doğruluyorsa gerçek bir destek/risk gerekçesi say — bkz. X7 çapraz-okuma etiketi.
+V21 — AGF Trend: gün içi para akışı. Düşük AGF asla tek başına olumsuz kanıt değildir. Gün içinde AGF'si GERÇEK/anlamlı şekilde YÜKSELEN (gürültü şüphesi işaretli olmayan) bir at, piyasanın kendi parasıyla doğruladığı bir sinyal OLABİLİR — 2026-08-08 Ankara gününde 6/6 koşuda doğrulanmıştı, ama 2026-08-10 Osmangazi kritiğinde (ESTOCADE +8.56 puan, en çok yükselen, yine de 4. bitirdi — top-3'e giremedi) net bir destekleyici çift bulunamadan tek başına yeterli olmadığı görüldü. STATÜ: ADAY — trend TEK BAŞINA asla otomatik "destek" sayılmasın; yalnız BAŞKA en az bir V-kodu (V1 pedigri, V3 takı — eklenen/çıkarılan fark etmez, bir değişiklik atı bambaşka bir çehreye dönüştürebilir, V4 aynı jokey, V13 kilo, V5 H2H, V19 form) AYNI YÖNDE (yükselişi destekliyorsa olumlu, düşüşü açıklıyorsa nötr/olumsuz değil) doğruluyorsa gerçek bir destek/risk gerekçesi say — bkz. X7 çapraz-okuma etiketi.
 V22 — Pist Durumu: atın geçmiş yarışlarındaki pist durumu bugünküyle karşılaştırılır, bazı atlar yalnız belirli koşullarda (çamurlu kum, ağır çim) performans gösterir.
 
 ## GENEL İLKE — DİNAMİK KANIT (SABİT YÜZDE/TAVAN YOK)
@@ -837,18 +837,25 @@ export function faz2Top3Garantisi(
   return { atlar: yeniAtlar, terfiler };
 }
 
-// v6.68 — AGF-top4/top2 garantilerinin ikisi de aynı "bu at kaç KOD-GARANTİLİ destek
-// taşıyor" sayımına dayanıyor — V4 (aynı jokey) BİLEREK hariç, çünkü neredeyse her atta
-// görülüyor ve tek başına güçlü bir kombinasyon sinyali sayılamaz. Yalnız V1 (aygır en
-// iyisi), V19 (son yarış galibiyeti), V22 (zemin eşleşme galibiyeti) sayılır.
-// v6.87 — v6.86'nın V4 eklemesi (AGF trend "destekleyen çift" sayımına) geri alındı —
-// tek koşuluk (n=10) bir gözlemdi, V_LEGEND_final.md standardına göre ("3-5 sonuçlanmış
-// koşuda tutarlı çalışmalı") henüz kod-garantiye yükseltilecek kadar doğrulanmadı.
-const GUCLU_KOD_GARANTI_KODLARI = ["V1", "V19", "V22"];
-function gucluKodGarantiSayisi(muhakeme: string): number {
-  return GUCLU_KOD_GARANTI_KODLARI.filter((kod) =>
+// v6.88 — kullanıcı düzeltmesi 2026-08-10: v6.87'de V4 bu sayımdan çıkarılmıştı, ama
+// kullanıcı netleştirdi — "en çok yükselen/düşenler, BAŞKA verilerle destekleniyorsa
+// ilk 3'e" kuralında V4 (aynı jokeyle devam) GERÇEK bir destekleyen veri sayılmaya
+// devam edecek, çıkarılmayacaktı. V4 geri eklendi. AYRICA: V3 (takı) artık HER atta
+// zorla "destek" enjekte ETMİYOR (v6.87), ama kullanıcı: "yine de dikkate alınacak,
+// çünkü bir takı değişikliği atı bambaşka bir çehreye dönüştürebilir, eklenen/çıkarılan
+// fark etmez" — yani takı değişikliği bu SAYIMA (AGF trend desteği) dahil, ama artık
+// muhakeme metnine regex'le değil, HAM VERİDEN (takiEfektif) okunuyor; bkz. aşağıdaki
+// opsiyonel `runner` parametresi.
+const GUCLU_KOD_GARANTI_KODLARI = ["V1", "V4", "V19", "V22"];
+function gucluKodGarantiSayisi(muhakeme: string, runner?: Faz1Runner): number {
+  let sayi = GUCLU_KOD_GARANTI_KODLARI.filter((kod) =>
     new RegExp(`\\[${kod}(?:\\+V\\d+)?\\]:destek\\(KOD-GARANTİSİ`, "i").test(muhakeme)
   ).length;
+  if (runner) {
+    const { eklenen, cikarilan } = takiEfektif(runner);
+    if (eklenen || cikarilan) sayi += 1;
+  }
+  return sayi;
 }
 
 // v6.69 — kullanıcı bulgusu (İstanbul 1.Altılı 09.08.2026 kritiği): AGF'de en çok DÜŞEN
@@ -879,9 +886,10 @@ export function faz2GucluKombinasyonTop3Garantisi(
 
   let calisma = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
   const terfiler: KararHiyerarsiDegisikligi[] = [];
+  const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
   const nitelikliler = trendliler
     .map((t) => ({ t, at: calisma.find((a) => a.no === t.runnerNo) }))
-    .filter((x): x is { t: TrendAt; at: TeknikSiraliAt } => !!x.at && gucluKodGarantiSayisi(x.at.muhakeme) >= 2)
+    .filter((x): x is { t: TrendAt; at: TeknikSiraliAt } => !!x.at && gucluKodGarantiSayisi(x.at.muhakeme, runnerByNo.get(x.at.no)) >= 2)
     .sort((a, b) => b.at.teknikSira - a.at.teknikSira); // en geride olan önce terfi etsin
 
   for (const { t, at } of nitelikliler) {
