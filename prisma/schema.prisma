@@ -326,6 +326,8 @@ model Gallop {
   splits   Json
 
   runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+
+  @@index([runnerId, date])
 }
 
 // Accurace.net (GPS/sektörel zamanlama sağlayıcısı) bir yarışın 100m'lik her

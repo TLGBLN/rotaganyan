@@ -803,11 +803,6 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
               equipment: true, equipmentAdded: true, equipmentRemoved: true,
               bestTime: true, recentForm: true, recentFormSurfaces: true, agf: true,
               scratched: true, ekuriGroup: true, apprentice: true, raceStyle: true, tjkAtId: true, idmanVideoUrl: true,
-              gallops: {
-                orderBy: { date: "desc" },
-                take: 3,
-                select: { date: true, track: true, form: true, jockey: true, splits: true },
-              },
             },
           },
         },
@@ -830,29 +825,16 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     return runners.map((r) => normHorseNameForMirror(r.name)).sort().join("|");
   }
 
-  // Build lookup for original (non-karma) races: at isim kümesi imzası → prediction + runner verisi
-  const originalPred = new Map<string, typeof raceDays[0]["races"][0]["prediction"]>();
-  const originalRunnerData = new Map<string, Map<string, { gallops: typeof raceDays[0]["races"][0]["runners"][0]["gallops"]; raceStyle: unknown; idmanVideoUrl: string | null }>>();
-  for (const rd of raceDays) {
-    if (rd.hippodrome.slug === "karma") continue;
-    for (const r of rd.races) {
-      if (r.runners.length === 0) continue;
-      const key = runnerSetSignature(r.runners);
-      originalPred.set(key, r.prediction);
-      originalRunnerData.set(
-        key,
-        new Map(r.runners.map((ru) => [normHorseNameForMirror(ru.name), { gallops: ru.gallops, raceStyle: ru.raceStyle, idmanVideoUrl: ru.idmanVideoUrl }]))
-      );
-    }
-  }
-
   // v6.76 — kullanıcı bulgusu 2026-08-10 (/program 20+ saniye): eskiden bu üç sorgu
   // (aygır/kısrak istatistiği + geç-çıkış geçmişi) YARIŞ BAŞINA ayrı ayrı çalışıyordu —
   // yoğun bir günde (24 yarış) bu 72 eşzamanlı sorgu demekti, bağlantı havuzunu boğup
   // sayfayı yavaşlatıyordu. (irk,pist,mesafe) kombinasyonu yarışlar arasında sıklıkla
   // tekrar ettiği ve geç-çıkış sorgusu zaten TÜM isimleri tek seferde kabul ettiği için,
-  // GÜNÜN TAMAMI için 3 toplu sorguya indirildi (72→3) — dönen veri/tazelik AYNI, yalnız
-  // kaç kez ve nasıl istendiği değişti (revalidate=0 korunuyor, hâlâ her açılışta taze).
+  // GÜNÜN TAMAMI için toplu sorgulara indirildi — dönen veri/tazelik AYNI, yalnız kaç kez
+  // ve nasıl istendiği değişti (revalidate=0 korunuyor, hâlâ her açılışta taze). AYRICA:
+  // ana sorgudaki `gallops: {take:3}` (at başına "son 3 idman" alt-sorgusu, 291 at için
+  // TEK ana sorguyu ~9sn'ye kadar şişiriyordu) da buradan çıkarılıp aynı toplu desenle
+  // (TÜM runnerId'ler için tek `gallop.findMany`, JS'te at başına ilk 3'e kırpma) çekiliyor.
   const allRaces = raceDays.flatMap((rd) => rd.races);
   const sireStatByRunnerId = new Map<string, string | null>();
   const damStatByRunnerId = new Map<string, string | null>();
@@ -865,12 +847,26 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     irk: breedToIrk(r.breed), pist: surfaceToPist(r.surface), mesafe: mesafeBucket(r.distance),
   }));
   const allHorseNames = racesWithRunners.flatMap((r) => r.runners.map((ru) => ru.name));
+  const allRunnerIds = racesWithRunners.flatMap((r) => r.runners.map((ru) => ru.id));
 
-  const [sirePools, damPools, gecCikisMap] = await Promise.all([
+  type GallopRow = { runnerId: string; date: Date; track: string | null; form: string | null; jockey: string | null; splits: Prisma.JsonValue };
+  const [sirePools, damPools, gecCikisMap, allGallops] = await Promise.all([
     getSireStatPoolsForCombos(combos).catch(() => new Map()),
     getDamStatPoolsForCombos(combos).catch(() => new Map()),
     getGecCikisOzetleriForRace(allHorseNames, date).catch(() => new Map()),
+    allRunnerIds.length === 0 ? Promise.resolve([] as GallopRow[]) : db.gallop.findMany({
+      where: { runnerId: { in: allRunnerIds } },
+      orderBy: { date: "desc" },
+      select: { runnerId: true, date: true, track: true, form: true, jockey: true, splits: true },
+    }).catch(() => [] as GallopRow[]),
   ]);
+
+  const gallopsByRunnerId = new Map<string, GallopRow[]>();
+  for (const g of allGallops) {
+    const arr = gallopsByRunnerId.get(g.runnerId) ?? [];
+    if (arr.length < 3) arr.push(g);
+    gallopsByRunnerId.set(g.runnerId, arr);
+  }
 
   for (const r of racesWithRunners) {
     const irk = breedToIrk(r.breed), pist = surfaceToPist(r.surface), mesafe = mesafeBucket(r.distance);
@@ -885,6 +881,22 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     });
   }
 
+  // Build lookup for original (non-karma) races: at isim kümesi imzası → prediction + runner verisi
+  const originalPred = new Map<string, typeof raceDays[0]["races"][0]["prediction"]>();
+  const originalRunnerData = new Map<string, Map<string, { gallops: GallopRow[]; raceStyle: unknown; idmanVideoUrl: string | null }>>();
+  for (const rd of raceDays) {
+    if (rd.hippodrome.slug === "karma") continue;
+    for (const r of rd.races) {
+      if (r.runners.length === 0) continue;
+      const key = runnerSetSignature(r.runners);
+      originalPred.set(key, r.prediction);
+      originalRunnerData.set(
+        key,
+        new Map(r.runners.map((ru) => [normHorseNameForMirror(ru.name), { gallops: gallopsByRunnerId.get(ru.id) ?? [], raceStyle: ru.raceStyle, idmanVideoUrl: ru.idmanVideoUrl }]))
+      );
+    }
+  }
+
   return raceDays.map((rd) => ({
     id: rd.id,
     hippodromeName: rd.hippodrome.name,
@@ -894,7 +906,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     races: rd.races.map((r) => {
       // Karma mirror: inherit prediction + galop/yarış stili from original race
       let pred = r.prediction;
-      let originalRunners: Map<string, { gallops: typeof raceDays[0]["races"][0]["runners"][0]["gallops"]; raceStyle: unknown; idmanVideoUrl: string | null }> | undefined;
+      let originalRunners: Map<string, { gallops: GallopRow[]; raceStyle: unknown; idmanVideoUrl: string | null }> | undefined;
       if (rd.hippodrome.slug === "karma" && r.runners.length > 0) {
         const key = runnerSetSignature(r.runners);
         if (pred == null) pred = originalPred.get(key) ?? null;
@@ -911,7 +923,8 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
         conditions: r.conditions,
         runners: r.runners.map((ru) => {
           const inherited = originalRunners?.get(normHorseNameForMirror(ru.name));
-          const gallops = ru.gallops.length > 0 ? ru.gallops : inherited?.gallops ?? ru.gallops;
+          const ownGallops = gallopsByRunnerId.get(ru.id) ?? [];
+          const gallops = ownGallops.length > 0 ? ownGallops : inherited?.gallops ?? ownGallops;
           const raceStyle = ru.raceStyle ?? inherited?.raceStyle ?? null;
           const idmanVideoUrl = ru.idmanVideoUrl ?? inherited?.idmanVideoUrl ?? null;
           return {
