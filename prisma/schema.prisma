@@ -180,6 +180,14 @@ model Race {
   trackRecord String?
   createdAt   DateTime @default(now())
 
+  // v6.99 — kullanıcı kararı 2026-08-10: eşzamanlılık kilidi (analysis-concurrency-lock.ts).
+  // Aynı koşu için iki paralel analiz tetiklemesi (çift tık, cron+manuel çakışması) aynı
+  // Claude çağrılarını tekrarlayabiliyordu — ClaudeUsageLog önbelleği bunu TAM engellemez
+  // (iki istek aynı anda "önbellekte yok" görebilir). Basit metin alanı (gerçek Postgres
+  // enum DEĞİL) — "IDLE"|"IN_PROGRESS", kod tarafında kontrol edilir.
+  analysisStatus    String    @default("IDLE")
+  analysisClaimedAt DateTime?
+
   raceDay      RaceDay       @relation(fields: [raceDayId], references: [id], onDelete: Cascade)
   runners      Runner[]
   prediction   Prediction?

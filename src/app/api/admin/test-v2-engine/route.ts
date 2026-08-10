@@ -4,6 +4,7 @@ import { gatherFaz1 } from "@/lib/methodology/veri-toplama";
 import type { Anthropic } from "@anthropic-ai/sdk";
 import { createWithTruncationRetry, extractText } from "@/lib/methodology/claude-analiz-helpers";
 import { getRecentCachedResult } from "@/lib/claude-cost";
+import { analizKilidiAl, analizKilidiBirak } from "@/lib/analysis-concurrency-lock";
 import type { Role } from "@prisma/client";
 import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi, faz2AgfFavorisiDususeRagmenGarantisi } from "@/lib/methodology/v2-engine";
 
@@ -606,11 +607,34 @@ async function handlePost(req: NextRequest) {
   const { raceId, step, batchIndex, atlar } = body;
   if (!raceId) return NextResponse.json({ error: "raceId gerekli" }, { status: 400 });
 
-  if (step === "rank") {
-    if (!atlar?.length) return NextResponse.json({ error: "atlar gerekli" }, { status: 400 });
-    return handleRank(raceId, atlar);
+  // v6.99 — kullanıcı kararı 2026-08-10 (eşzamanlılık kilidi): yalnız İLK adımda
+  // (grup 0) devreye girer, aynı koşu için iki paralel analiz başlatılmasını
+  // (çift tık, iki sekme, cron+manuel çakışması) engeller. ClaudeUsageLog önbelleği
+  // (60dk pencere) bunu TAM engellemiyordu — iki istek aynı anda "önbellekte yok"
+  // görüp aynı anda gerçek çağrı başlatabiliyordu.
+  const ilkAdimMi = step !== "rank" && (batchIndex ?? 0) === 0;
+  if (ilkAdimMi) {
+    const claim = await analizKilidiAl(raceId);
+    if (!claim.basarili) {
+      return NextResponse.json(
+        { error: "Bu koşu için analiz zaten devam ediyor (başka bir sekme/istek) — bekleyin ya da birkaç dakika sonra tekrar deneyin." },
+        { status: 409 }
+      );
+    }
   }
-  return handleBatch(raceId, batchIndex ?? 0);
+
+  const res = step === "rank"
+    ? (!atlar?.length ? NextResponse.json({ error: "atlar gerekli" }, { status: 400 }) : await handleRank(raceId, atlar))
+    : await handleBatch(raceId, batchIndex ?? 0);
+
+  // Sıralama adımı (başarılı/başarısız fark etmez, akış BİTTİ) VEYA herhangi bir
+  // adımın hata döndürmesi durumunda kilidi hemen bırak — admin 15dk'lık
+  // stale-timeout'u beklemeden hemen tekrar deneyebilsin.
+  if (step === "rank" || res.status >= 400) {
+    await analizKilidiBirak(raceId);
+  }
+
+  return res;
 }
 
 export async function POST(req: NextRequest) {
