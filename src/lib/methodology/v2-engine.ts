@@ -905,25 +905,31 @@ export function faz2GucluKombinasyonTop3Garantisi(
       return b.at.teknikSira - a.at.teknikSira; // eşitlikte: en geride olan önce terfi etsin
     });
 
+  const terfiAdaylari = new Set<number>();
   for (const { t, at } of nitelikliler) {
     const idx = calisma.findIndex((a) => a.no === at.no);
     if (idx === -1 || idx < 3) continue; // zaten ilk 3'te
     const eskiSira = calisma[idx].teknikSira;
     const guncellenmisAt: TeknikSiraliAt = {
       ...calisma[idx],
-      karar: "Güçlü Aday",
-      // v6.95 — kullanıcı bulgusu 2026-08-10 (Bursa 3.Koşu): "eski sıra X → 3" metni
-      // YANLIŞ kesinlik iddia ediyordu — birden fazla at art arda terfi ettirildiğinde
-      // her biri bir öncekini geriye itiyor, gerçek nihai konum ancak TÜM terfiler
-      // bittikten SONRA belli oluyor (aşağıda düzeltiliyor). Metin artık kesin sayı
-      // iddia etmiyor, yalnız "ilk 3 bandına" diyor.
-      muhakeme: `${calisma[idx].muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF trend (${t.yon}, ${t.fark >= 0 ? "+" : ""}${t.fark} puan) + birden çok güçlü sinyal birleşimiyle ilk 3 bandına terfi (eski sıra ${eskiSira}) — 2026-08-09 kullanıcı kararı.`,
+      // v6.98 — kullanıcı bulgusu 2026-08-10 (Elazığ 8.Koşu, "12 atta Güçlü Aday"):
+      // karar burada HERKESE "Güçlü Aday" yazıyordu — ama 3+ at aynı anda aday olunca
+      // yalnız BİRİ gerçekten 3.'te kalabiliyor, geri kalanı 4./10./12. sıraya kadar
+      // itiliyordu, YİNE DE "Güçlü Aday" etiketini taşımaya devam ediyorlardı. Artık
+      // karar burada DEĞİŞTİRİLMİYOR — yalnız GERÇEKTEN ilk 3'te kalan(lar) aşağıda,
+      // tüm terfiler bittikten SONRA işaretleniyor.
+      muhakeme: `${calisma[idx].muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF trend (${t.yon}, ${t.fark >= 0 ? "+" : ""}${t.fark} puan) + birden çok güçlü sinyal birleşimiyle ilk 3 bandına terfi adayı (eski sıra ${eskiSira}) — 2026-08-09 kullanıcı kararı.`,
     };
     const kalanlar = calisma.filter((a) => a.no !== at.no);
     calisma = [...kalanlar.slice(0, 2), guncellenmisAt, ...kalanlar.slice(2)];
     terfiler.push({ no: at.no, ad: at.ad, eskiSira, yeniSira: 3 });
+    terfiAdaylari.add(at.no);
   }
   if (terfiler.length === 0) return { atlar, terfiler: [] };
+
+  // v6.98 — yalnız GERÇEKTEN ilk 3'te kalan aday(lar) "Güçlü Aday" olur; 4+ sıraya
+  // itilenler kendi orijinal kararını (ya da 4-6 penceresinin vereceği kararı) korur.
+  calisma = calisma.map((a, i) => (i < 3 && terfiAdaylari.has(a.no) ? { ...a, karar: "Güçlü Aday" } : a));
 
   const yeniAtlar = calisma.map((a, i) => ({ ...a, teknikSira: i + 1 }));
   // v6.95 — terfiler dizisindeki yeniSira SABİT "3" yazılıyordu (yukarıdaki push'ta),
@@ -972,20 +978,33 @@ export function faz2AgfTrend456Garantisi(
       return b.at.teknikSira - a.at.teknikSira; // eşitlikte: en geride olan önce terfi etsin
     });
 
+  const terfiAdaylari = new Set<number>();
   for (const { t, at } of nitelikliler) {
     const idx = calisma.findIndex((a) => a.no === at.no);
     if (idx === -1 || idx < 6) continue; // koşmuyor (çekilmiş) ya da zaten ilk 6'da (Top3 dahil)
     const eskiSira = calisma[idx].teknikSira;
     const guncellenmisAt: TeknikSiraliAt = {
       ...calisma[idx],
-      karar: calisma[idx].karar === "Orta Risk" || calisma[idx].karar === "Yüksek Risk" ? "Düşük Risk" : calisma[idx].karar,
-      muhakeme: `${calisma[idx].muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF trend (${t.yon}, ${t.fark >= 0 ? "+" : ""}${t.fark} puan) ile 4-6 aralığına terfi (eski sıra ${eskiSira}) — gün içinde belirgin para hareketi.`,
+      // v6.98 — kullanıcı bulgusu 2026-08-10 (Elazığ 8.Koşu, "12 atta Güçlü Aday"):
+      // karar upgrade'i burada HERKESE uygulanıyordu — 3+ at aynı anda aday olunca
+      // yalnız pencereye (4-6) gerçekten GİREN kalıyordu, kalanı 7./10./13. sıraya
+      // itiliyordu ama "Düşük Risk" yükseltmesini yine de taşıyordu. Artık karar
+      // burada DEĞİŞTİRİLMİYOR — yalnız GERÇEKTEN 4-6'da kalan(lar) aşağıda işaretlenir.
+      muhakeme: `${calisma[idx].muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF trend (${t.yon}, ${t.fark >= 0 ? "+" : ""}${t.fark} puan) ile 4-6 aralığına terfi adayı (eski sıra ${eskiSira}) — gün içinde belirgin para hareketi.`,
     };
     const kalanlar = calisma.filter((a) => a.no !== at.no);
     calisma = [...kalanlar.slice(0, 3), guncellenmisAt, ...kalanlar.slice(3)];
     terfiler.push({ no: at.no, ad: at.ad, eskiSira, yeniSira: -1 }); // aşağıda gerçek son konumla düzeltilir
+    terfiAdaylari.add(at.no);
   }
   if (terfiler.length === 0) return { atlar, terfiler: [] };
+
+  // v6.98 — yalnız GERÇEKTEN 4-6 penceresinde kalan aday(lar) "Düşük Risk"e yükseltilir.
+  calisma = calisma.map((a, i) =>
+    i >= 3 && i < 6 && terfiAdaylari.has(a.no) && (a.karar === "Orta Risk" || a.karar === "Yüksek Risk")
+      ? { ...a, karar: "Düşük Risk" }
+      : a
+  );
 
   const yeniAtlar = calisma.map((a, i) => ({ ...a, teknikSira: i + 1 }));
   // Her terfinin GERÇEK son konumu, üstteki döngüde sonraki terfiler yüzünden 4'ten 5/6'ya
