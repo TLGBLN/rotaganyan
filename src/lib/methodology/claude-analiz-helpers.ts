@@ -25,6 +25,23 @@ export async function createStreamed(params: Anthropic.MessageCreateParamsNonStr
  * otomatik olarak daha yüksek bir limitle BİR kez tekrar dene — kullanıcı ekstra
  * tıklama ve ekstra bekleme olmadan sonuç alır.
  */
+// v6.89 — kullanıcı bulgusu 2026-08-10 (Bursa 9.Koşu, grup 5/5): Anthropic'e giden
+// bağlantı ara sıra ağ katmanında kesiliyor ([Error: terminated] <- [read ETIMEDOUT]) —
+// bizim kodumuzdan bağımsız, geçici bir ağ sorunu. Öncesinde bu, kullanıcıyı elle
+// "Tekrar Dene"ye zorluyordu (zararsız — getRecentCachedResult zaten önceki grupları
+// tekrar ücretlendirmiyor — ama gereksiz bir adımdı). Artık BİR kez otomatik yeniden
+// deneniyor, tıpkı max_tokens kesilmesinde olduğu gibi.
+function agBaglantiHatasiMi(err: unknown): boolean {
+  const zincir: string[] = [];
+  let e: unknown = err;
+  for (let i = 0; i < 5 && e; i++) {
+    if (e instanceof Error) { zincir.push(e.message); e = (e as { cause?: unknown }).cause; }
+    else break;
+  }
+  const metin = zincir.join(" ").toLowerCase();
+  return metin.includes("terminated") || metin.includes("etimedout") || metin.includes("econnreset") || metin.includes("socket hang up");
+}
+
 export async function createWithTruncationRetry(
   params: Anthropic.MessageCreateParamsNonStreaming,
   raceId: string,
@@ -32,7 +49,14 @@ export async function createWithTruncationRetry(
   retryMaxTokens: number
 ) {
   let start = Date.now();
-  let msg = await createStreamed(params);
+  let msg: Anthropic.Message;
+  try {
+    msg = await createStreamed(params);
+  } catch (err) {
+    if (!agBaglantiHatasiMi(err)) throw err;
+    start = Date.now();
+    msg = await createStreamed(params);
+  }
   await logClaudeUsage({
     raceId, phase, model: "claude-sonnet-5",
     inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens,
