@@ -30,7 +30,12 @@ import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUr
 // revertinde 300'e geri düşmüştü (62fa1dd kaybolmuştu), yeniden 800'e çekildi.
 export const maxDuration = 800;
 
-const BATCH_SIZE = 4;
+// v6.93 — kullanıcı talimatı 2026-08-10 ("1.2 dolar kabul edilemez, 30-50 cente çek"):
+// 4'ten 6'ya çıkarıldı — artık placeholder-muhakeme tespiti (eksik-at döngüsüne dahil)
+// ve boş-yanıt tespiti (createWithTruncationRetry) olduğu için büyük grupların asıl
+// riski (sessizce bozuk veri) artık YAKALANIP otomatik düzeltiliyor, eskisi kadar
+// tehlikeli değil. 20 atlık koşu 5 gruptan 4 gruba iniyor (1 çağrı tasarrufu).
+const BATCH_SIZE = 6;
 
 export type TestV2Pick = {
   no: number;
@@ -155,7 +160,10 @@ Yanıtı YALNIZCA geçerli JSON olarak ver — "karar" alanı ZORUNLU ve YENİDE
 // hiçbir at grubundan dışlanmıyor), sonra bu fonksiyon iki ZATEN sıralı listeyi klasik
 // "merge" mantığıyla TEK nihai sıralamada birleştiriyor — her at diğer gruptakilerle
 // gerçekten karşılaştırılıyor, hiçbiri atlanmıyor.
-const SIRALAMA_BOLME_ESIGI = 12;
+// v6.94 — kullanıcı kararı 2026-08-10: 12'den 17'ye çıkarıldı (BATCH_SIZE=6 ile 16 ata
+// kadar zaten tek ucuz sıralama çağrısı yeterli oluyor, yalnız GERÇEKTEN büyük sahalar
+// böl+birleştirin ek maliyetini öder).
+const SIRALAMA_BOLME_ESIGI = 17;
 
 function mergeReminder(
   siraliA: (BatchAt & { hamVeri?: string })[],
@@ -403,12 +411,17 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
   const sirRaceKey = `${raceId}__sira`;
   let siralamaSonuc: SiraSonuc[];
   try {
-    if (allAtlar.length <= SIRALAMA_BOLME_ESIGI) {
-      // Küçük/orta saha — tek çağrı, bu gece bulunan boş-yanıt riski küçük sahalarda
-      // hiç gözlenmedi (yalnız 20+ atlı sahalarda oldu), gereksiz ek çağrı yapılmıyor.
+    // v6.94 — kullanıcı kararı 2026-08-10: "önce dene, başarısız olursa düş" yöntemi
+    // matematiksel olarak YANLIŞTI — başarısızlık durumunda hem başarısız denemenin
+    // (~$0.20-0.30, iki iç deneme hakkı) HEM böl+birleştirin tam maliyeti üst üste
+    // biniyordu, yani başarısızlıkta doğrudan böl+birleştirmekten DAHA PAHALIYA
+    // geliyordu. Ayrıca 20 atlık sahada gözlenen gerçek oran (1 başarılı, 1 başarısız,
+    // ~%50) "nadir" denemeyecek kadar yüksek çıktı. Geri dönüldü: eşik VE ÜSTÜ HER ZAMAN
+    // öngörülebilir şekilde böl+birleştir kullanır — eşik 12'den 17'ye çıkarıldı
+    // (BATCH_SIZE 6'ya çıktığı için 16 ata kadar zaten tek ucuz sıralama çağrısı yeterli).
+    if (allAtlar.length < SIRALAMA_BOLME_ESIGI) {
       siralamaSonuc = await siralamaCagir(siralamaReminder(atlarWithRaw), sirRaceKey, allAtlar.length);
     } else {
-      // v6.92 — büyük saha: böl (iş paylaşımı, güçle ilgisiz aralıklı bölme) + birleştir.
       const grupA = atlarWithRaw.filter((_, i) => i % 2 === 0);
       const grupB = atlarWithRaw.filter((_, i) => i % 2 === 1);
       const [sonucA, sonucB] = await Promise.all([
