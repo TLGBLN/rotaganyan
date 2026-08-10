@@ -6,7 +6,6 @@ import { createWithTruncationRetry, extractText, FAZ3_SCHEMA, type Faz2Atlar, ty
 import type { PedigreeRating, Role } from "@prisma/client";
 import { kategoriTespit, KATEGORI_KODLARI, V_LEGEND, atSatirlariUret, kosuBaslikUret, buildFaz3InstructionsV2, buildFaz3ReminderV2 } from "@/lib/methodology/v2-engine";
 import { kontrolNotlariUret, type FinalPick } from "@/lib/methodology/kural-kontrolleri";
-import { satirGosterimMetni } from "@/lib/methodology/muhakeme-format";
 import type { TestV2Pick } from "@/app/api/admin/test-v2-engine/route";
 
 // v6.44 — YENİ MOTOR, FAZ3 (Kanıt Ağırlıklı Katman puanlama+banko+kupon). Test-v2-engine'in
@@ -114,11 +113,10 @@ async function handlePost(req: NextRequest) {
   // Protokolü (a-t)" (kontrolNotlariUret, oto-analiz-faz3/route.ts) artık burada da
   // kullanılıyor — önceki oturumdaki basitleştirilmiş yeniden-yazım (kural-kontrolleri.ts)
   // kaldırıldı, ihtiyaç kalmadı.
-  // v6.70 (V2.2): faz2Atlar.muhakeme artık MuhakemeSatiri[] — kural-kontrolleri.ts
-  // (kasıtlı olarak dokunulmayan, izole Faz3 test aracı) hâlâ eski düz metin bekliyor,
-  // bu yüzden burada yalnız GÖSTERİM metnine çevriliyor.
+  // v6.84 — V2.2 (yapılandırılmış muhakeme) geri alındı, v2-engine.ts yeniden eski
+  // düz-metin muhakeme formatını üretiyor — bu köprü artık gereksiz, a.muhakeme zaten string.
   const faz2Legacy: Faz2Atlar = {
-    atlar: faz2Atlar.map((a) => ({ no: a.no, ad: a.ad, teknikSira: a.teknikSira, muhakeme: a.muhakeme.map(satirGosterimMetni).join(" | ") })),
+    atlar: faz2Atlar.map((a) => ({ no: a.no, ad: a.ad, teknikSira: a.teknikSira, muhakeme: a.muhakeme })),
   };
   const kuralKontrolleri = kontrolNotlariUret(faz1, faz2Legacy, tumSira, { isBanko, bankoNote: result.bankoNote ?? "" });
 

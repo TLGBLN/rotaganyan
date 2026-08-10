@@ -1,7 +1,4 @@
 import type { Faz1Sonuc, Faz1Runner } from "@/lib/methodology/veri-toplama";
-import type { MuhakemeSatiri, MuhakemeGuven, PickDetailsV2 } from "@/lib/methodology/muhakeme-format";
-import { satirEkle, satirVarMi, satirleriSay, satirGosterimMetni } from "@/lib/methodology/muhakeme-format";
-import { tempoGuvenSeviyesi } from "@/lib/methodology/mekanik-puanlama";
 
 /**
  * v6.44 — YENİ ANALİZ MOTORU (V1-V22 + A-E Muhakeme Matrisi + Kanıt Ağırlıklı Katman).
@@ -81,7 +78,7 @@ Hiçbir V-koduna sabit yüzde/tavan uygulanmaz. Bir veri kalemi o koşunun kader
 ## MUHAKEME MATRİSİ — ÇAPRAZ SORGULANACAK ÇİFTLER (olasılıksal dil, KESİNLİK YOK)
 [V2+V9] İdman keskinliği yarışın kapanış gücüyle örtüşüyor mu — ikisi de güçlüyse gerçek destekleyici çift.
 [V10+V11] Atın stili hipodromun düzlük uzunluğuna uyuyor mu.
-[V10+V12] Atın stili bu pist/mesafede tarihsel kazanan stille örtüşüyor mu. ÖNEMLİ (gerçek bulgu, Elazığ 8.Koşu 2026-08-03 — OLGUNADAM 2. geldi ama V12 uyumsuzluğu yüzünden 9. sıraya çekilmişti, FISILTIKAYA 3. geldi ama aynı sebeple son sıraya çekilmişti): V12, SAHANIN GENEL/tarihsel eğilimidir — atın KENDİ geniş örneklemli (n≥5) V9 (Son800) veya V10 (Accurace tempo) sinyali güçlüyse, yalnız V12 uyumsuzluğu YÜZÜNDEN bu atı aşağı çekme. Popülasyon istatistiği (V12), güçlü bireysel kanıtı (V9/V10, n≥5) BASTIRAMAZ — yalnız iki at birbirine yakın/eşit güçteyse aralarında ayırt edici bir ek unsur olarak kullanılabilir. AĞIRLIK NETLİĞİ (gerçek bulgu, İSPANOZ, İstanbul 3.Koşu 2026-08-05 — bireysel n=15 GÜÇLÜ sinyal + popülasyonda 2. sırada (%28) olmasına rağmen düşük "guven" değeriyle değerlendirilip 6. sıraya düşmüştü, oysa kazandı): bireysel örneklem n≥10 VE popülasyonda ilk 2 sırada ise bu satır için "tip":"destek" VE "guven":"tam" seç — "guven":"orta" veya "zayif" seçmek bu durumda YANLIŞTIR (muhakemeyi cümleyle yumuşatman gerekmiyor, doğrudan alanı doğru seç). Güveni düşürmek yalnız bireysel örneklem n<5 İSE veya popülasyonda alt sıralardaysa haklıdır. BÜYÜK ORANLI DEĞER SİNYALİ (gerçek bulgu, ARNAVUT KIZ, İstanbul 8.Koşu 2026-08-09 — Ganyan 17,85, sistemde 2. sırada/Güçlü Aday, kazandı): bu at yalnız V1 (aygırın sahadaki en iyi kazanma yüzdesi, n=90 gerçek örneklem) + V10+V12 (ÖnGrupArkası popülasyonda en yüksek kategori %37) taşıyordu, TEK bir ciddi risk bayrağı yoktu (yalnız 1,9kg hafif ağırlık notu). Bu ikili gerçek-örneklemli destek + temiz (az riskli) profil kombinasyonu, atın Ganyan oranı yüksek/piyasa favorisi olmasa BİLE üst sıralara konması için yeterlidir — "oranı yüksek, kimse oynamıyor" gibi piyasa varsayımları bu güçlü teknik kanıtı asla geçersiz kılmaz, sitenin temel amacı tam olarak budur (piyasanın göremediğini görmek).
+[V10+V12] Atın stili bu pist/mesafede tarihsel kazanan stille örtüşüyor mu. ÖNEMLİ (gerçek bulgu, Elazığ 8.Koşu 2026-08-03 — OLGUNADAM 2. geldi ama V12 uyumsuzluğu yüzünden 9. sıraya çekilmişti, FISILTIKAYA 3. geldi ama aynı sebeple son sıraya çekilmişti): V12, SAHANIN GENEL/tarihsel eğilimidir — atın KENDİ geniş örneklemli (n≥5) V9 (Son800) veya V10 (Accurace tempo) sinyali güçlüyse, yalnız V12 uyumsuzluğu YÜZÜNDEN bu atı aşağı çekme. Popülasyon istatistiği (V12), güçlü bireysel kanıtı (V9/V10, n≥5) BASTIRAMAZ — yalnız iki at birbirine yakın/eşit güçteyse aralarında ayırt edici bir ek unsur olarak kullanılabilir. AĞIRLIK NETLİĞİ (gerçek bulgu, İSPANOZ, İstanbul 3.Koşu 2026-08-05 — bireysel n=15 GÜÇLÜ sinyal + popülasyonda 2. sırada (%28) olmasına rağmen "nötr-hafif destek" gibi yumuşatılmış etiketle değerlendirilip 6. sıraya düşmüştü, oysa kazandı): bireysel örneklem n≥10 VE popülasyonda ilk 2 sırada ise bu TAM "destek" sayılır — "hafif/nötr/kısmi destek" gibi yumuşatılmış bir etiket KULLANILMAZ. Yumuşatma yalnız bireysel örneklem n<5 İSE veya popülasyonda alt sıralardaysa haklıdır. BÜYÜK ORANLI DEĞER SİNYALİ (gerçek bulgu, ARNAVUT KIZ, İstanbul 8.Koşu 2026-08-09 — Ganyan 17,85, sistemde 2. sırada/Güçlü Aday, kazandı): bu at yalnız V1 (aygırın sahadaki en iyi kazanma yüzdesi, n=90 gerçek örneklem) + V10+V12 (ÖnGrupArkası popülasyonda en yüksek kategori %37) taşıyordu, TEK bir ciddi risk bayrağı yoktu (yalnız 1,9kg hafif ağırlık notu). Bu ikili gerçek-örneklemli destek + temiz (az riskli) profil kombinasyonu, atın Ganyan oranı yüksek/piyasa favorisi olmasa BİLE üst sıralara konması için yeterlidir — "oranı yüksek, kimse oynamıyor" gibi piyasa varsayımları bu güçlü teknik kanıtı asla geçersiz kılmaz, sitenin temel amacı tam olarak budur (piyasanın göremediğini görmek).
 [V10+V18] İç kulvar+kaçak stili kolay öne çıkar; dış kulvar+kaçak stili ilk 400m'de enerji maliyeti yaratabilir (KESİN değil, ihtimal).
 [V13+V10] Ağır kilo Kaçak atta erken enerji tükenmesine, Bekleme/Sprinter atta son düzlük ivmelenmesinin gecikmesine yol açabilir.
 [V13+V22] Islak/çamur zeminde taşınan kilo normalden daha fazla yıpranma yaratabilir.
@@ -239,9 +236,9 @@ export function buildFaz3InstructionsV2(): string {
 10. "notes": genel koşu değerlendirmesi, sade özet. "tempo": tempo beklentisi (sade dil).`;
 }
 
-export function buildFaz3ReminderV2(sahaBuyuklugu: number, faz2Atlar: { no: number; ad: string; teknikSira: number; karar: string; muhakeme: MuhakemeSatiri[] }[]): string {
+export function buildFaz3ReminderV2(sahaBuyuklugu: number, faz2Atlar: { no: number; ad: string; teknikSira: number; karar: string; muhakeme: string }[]): string {
   return `## FAZ 2 MUHAKEMEN (senin az önce ürettiğin, kanıta dayalı analiz — şimdi bunu SAYISALLAŞTIR)
-${faz2Atlar.map((a) => `#${a.no} ${a.ad} (ön teknik sıra: ${a.teknikSira}, ön karar: ${a.karar}): ${a.muhakeme.map(satirGosterimMetni).join(" | ")}`).join("\n")}
+${faz2Atlar.map((a) => `#${a.no} ${a.ad} (ön teknik sıra: ${a.teknikSira}, ön karar: ${a.karar}): ${a.muhakeme}`).join("\n")}
 
 Şimdi yukarıdaki GÖREVİN talimatlarını (madde 1-10, Kural Denetim Protokolü a-t), yukarıdaki KOŞU/ATLAR verisine ve FAZ 2 MUHAKEMENE uygula. Saha büyüklüğü: ${sahaBuyuklugu} at — TÜM saha puanlanır, hiçbiri atlanamaz (madde 5).
 
@@ -311,31 +308,31 @@ export type MuhakemeDenetimSonuc = {
   supheliCiftler: { cift: string; kod: string; sebep: string }[];
 };
 
-/** Faz2'nin yapılandırılmış "muhakeme" satırlarında geçen HER V-kodunun, o at için
+/** Faz2'nin kompakt "muhakeme" metninde geçen HER "[Vx+Vy]" çiftinin, o at için
  * GERÇEKTEN var olan veriye dayanıp dayanmadığını denetler — Claude'un veri yokken var
  * gibi göstermesini (halüsinasyon) yakalamak için. Bir ek Claude çağrısı yapmaz,
- * tamamen mekanik/koddur. v6.70 (V2.2): muhakeme artık serbest metin değil
- * MuhakemeSatiri[] olduğu için regex ile "[Vx+Vy]" çıkarmaya gerek yok — doğrudan
- * `satir.kod` alanı okunuyor (yan kazanç: üçlü+ kombinasyonlar da artık denetleniyor). */
+ * tamamen mekanik/koddur. v6.47: kompakt tek-alan muhakeme formatına geçişle birlikte
+ * iki ayrı diziyi (dogrulananCiftler/riskliCiftler) tarama yerine, TEK metindeki her
+ * "[Vx+Vy]" örneğini kendi çevresindeki kısa bağlamla birlikte çıkarır. */
 export function faz2MuhakemeDenetle(
   faz1: Faz1Sonuc, izinliKodlar: string[],
-  faz2Atlar: { no: number; ad: string; muhakeme: MuhakemeSatiri[] }[]
+  faz2Atlar: { no: number; ad: string; muhakeme: string }[]
 ): MuhakemeDenetimSonuc[] {
   const izin = new Set(izinliKodlar);
   const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
+  const ciftRegex = /\[V\d+(?:\+V\d+)?\][^|]*/g;
   return faz2Atlar.map((a) => {
     const r = runnerByNo.get(a.no);
     const supheliCiftler: { cift: string; kod: string; sebep: string }[] = [];
-    for (const satir of a.muhakeme) {
-      if (satir.kod.length === 0) continue;
-      const cift = `[${satir.kod.join("+")}]`;
-      for (const kod of satir.kod) {
+    for (const cift of a.muhakeme.match(ciftRegex) ?? []) {
+      const kodlar = [...cift.matchAll(/V(\d+)/g)].map((m) => `V${m[1]}`);
+      for (const kod of kodlar) {
         if (!izin.has(kod)) {
-          supheliCiftler.push({ cift, kod, sebep: `${kod} bu kategoride kullanılmıyor` });
+          supheliCiftler.push({ cift: cift.trim(), kod, sebep: `${kod} bu kategoride kullanılmıyor` });
         } else if (!r) {
-          supheliCiftler.push({ cift, kod, sebep: `#${a.no} Faz1 verisinde bulunamadı` });
+          supheliCiftler.push({ cift: cift.trim(), kod, sebep: `#${a.no} Faz1 verisinde bulunamadı` });
         } else if (!veriVarMi(r, kod, faz1)) {
-          supheliCiftler.push({ cift, kod, sebep: `${kod} için bu atta gerçek veri yok` });
+          supheliCiftler.push({ cift: cift.trim(), kod, sebep: `${kod} için bu atta gerçek veri yok` });
         }
       }
     }
@@ -354,113 +351,31 @@ export type KaliteUyariSonuc = { no: number; ad: string; uyarilar: string[] };
  * metnini tarar, şüpheli durumları KULLANICIYA işaretler (kod hiçbir şeyi otomatik
  * değiştirmez, karar kullanıcıda kalır).
  */
-/**
- * v6.70 (V2.2): eskiden bu fonksiyon "muhakeme" serbest metninde "n=SAYI" + yakınında
- * güç kelimesi ("güçlü/iyi/sağlam" vb.) arayan bir regex taramasıydı — biçimden bağımsız
- * olması için tasarlanmıştı ama tam da bu yüzden Claude'un kelime seçimine bağımlıydı.
- * Artık muhakeme yapılandırılmış (MuhakemeSatiri[]) olduğu için Claude'un YAZDIĞI kelime
- * yerine SEÇTİĞİ "guven" alanı okunuyor — "tam"/"orta" güven, düşük teknikSira ile
- * birleştiğinde Elazığ 8.Koşu dersini (OLGUNADAM/FISILTIKAYA: geniş örneklemli güçlü
- * sinyal tek bir risk/V12 uyumsuzluğu yüzünden son sıralara çekildi) aynı hassasiyetle
- * ama kelimeye bağımlı olmadan yakalar.
- */
 export function faz2KaliteDenetimi(
-  faz2Atlar: { no: number; ad: string; teknikSira: number; muhakeme: MuhakemeSatiri[] }[]
+  faz2Atlar: { no: number; ad: string; teknikSira: number; muhakeme: string }[]
 ): KaliteUyariSonuc[] {
   const saha = faz2Atlar.length;
   const altYariEsigi = Math.ceil(saha / 2);
+  // v6.50 canlı bulgu: Claude, kompakt "Etiket:değer" talimatına rağmen çoğu zaman
+  // serbest metne dönüyor ("Tempo senaryosu: EN_GERİ_TAKİP stili (Accurace %71,n=7)
+  // ... zayıf stil eşleşmesi" gibi) — katı "V9:" önek arayan ilk sürüm bunu yakalayamadı.
+  // Artık TÜM metinde "n=SAYI" arıyor, çevresindeki pencerede güç kelimesi var mı bakıyor
+  // — biçimden bağımsız, gerçek çıktıya dayanıklı.
+  const gucKelimeleri = /güçlü|iyi\b|sağlam|yüksek|geniş\s*örneklem/i;
+  const nRegex = /n\s*[=~]\s*(\d+)/gi;
   return faz2Atlar.map((a) => {
     const uyarilar = new Set<string>();
     if (a.teknikSira > altYariEsigi) {
-      for (const satir of a.muhakeme) {
-        if (satir.tip !== "destek" || (satir.guven !== "tam" && satir.guven !== "orta")) continue;
-        uyarilar.add(
-          `${satir.kod.length > 0 ? `[${satir.kod.join("+")}] ` : ""}güven="${satir.guven}" bir destek sinyali var ama teknikSira alt yarıda (${a.teknikSira}/${saha}) — Elazığ 8.Koşu dersi (OLGUNADAM/FISILTIKAYA): bu tür sinyaller tek bir risk/popülasyon istatistiği (V12) yüzünden aşırı düşürülmüş olabilir. İlgili not: "${satir.aciklama}" — tekrar oku, gerekirse elle yukarı al.`
-        );
-      }
-    }
-    return { no: a.no, ad: a.ad, uyarilar: [...uyarilar] };
-  });
-}
-
-const GUVEN_SIRA: Record<MuhakemeGuven, number> = { tam: 3, orta: 2, zayif: 1 };
-
-/** n≥10/n<5 eşiği zaten sitede sabit, tek yerden yönetilen bir kural (mekanik-puanlama.ts'in
- * `tempoGuvenSeviyesi`'i, V_LEGEND'in "bireysel örneklem n≥10.../n<5..." metniyle AYNI eşik) —
- * burada YENİ bir sayı icat edilmiyor, mevcut politika `guven` alanına uygulanıyor. */
-function guvenTavaniOrneklemden(n: number | null): MuhakemeGuven | null {
-  const seviye = tempoGuvenSeviyesi(n);
-  if (seviye === "DUSUK_GUVEN") return "orta";
-  if (seviye === "SINYAL_SAYMA") return "zayif";
-  return null; // GUVENILIR (n≥10) veya veri yok — tavan uygulanmaz, karar Claude'a kalır
-}
-
-export type GuvenTavaniIndirme = { no: number; ad: string; kod: string[]; eskiGuven: MuhakemeGuven; yeniGuven: MuhakemeGuven };
-
-/**
- * v6.71 — kullanıcı talimatı 2026-08-09 ("bir atın gerçekte 'orta' güven hak ettiğini
- * 'zayıf' olarak değerlendirebilir, bunu nasıl önleriz"): bunun TERSİ yönü (Claude'un
- * KÜÇÜK bir örneklemi olduğundan FAZLA güvenli — "tam" — değerlendirmesi) mekanik olarak
- * ÖNLENEBİLİR, çünkü örneklem büyüklüğü (n) objektif bir SAYIdır, domain yorumu değil.
- * Büyük örneklem güveni ZORUNLU KILMAZ (Claude "n=15 ama sonuçlar karışık, orta" diyebilir,
- * bu meşru) — ama KÜÇÜK örneklem YÜKSEK güveni HAKLI ÇIKARAMAZ, bu tek yönlü bir TAVAN.
- * Yalnız V9 (Son800)/V10 (Accurace tempo) için uygulanır — n≥10/n<5 eşiği zaten bu iki kod
- * için V_LEGEND'de ve faz2Top3Garantisi'nde kullanılan AYNI politika. Kod-garantili
- * satırlara (zaten kendi eşiğini kontrol ediyorlar) dokunulmaz. Şeffaflık için (v6.64/v6.68
- * ilkesiyle aynı) her indirme ayrıca listelenir, sessizce olmaz.
- */
-export function faz2GuvenTavaniUygula<T extends { no: number; ad: string; muhakeme: MuhakemeSatiri[] }>(
-  atlar: T[],
-  faz1: Faz1Sonuc
-): { atlar: T[]; indirmeler: GuvenTavaniIndirme[] } {
-  const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
-  const indirmeler: GuvenTavaniIndirme[] = [];
-  const yeniAtlar = atlar.map((a) => {
-    const r = runnerByNo.get(a.no);
-    if (!r) return a;
-    const muhakeme = a.muhakeme.map((s) => {
-      if (s.kodGarantili || s.tip === "notr") return s;
-      const nAdaylari: number[] = [];
-      if (s.kod.includes("V9")) nAdaylari.push(r.son800BenzerKosuN);
-      if (s.kod.includes("V10")) nAdaylari.push(r.tempoVeriN ?? Infinity);
-      if (nAdaylari.length === 0) return s;
-      const enKucukN = Math.min(...nAdaylari);
-      const tavan = guvenTavaniOrneklemden(enKucukN === Infinity ? null : enKucukN);
-      if (!tavan || GUVEN_SIRA[s.guven] <= GUVEN_SIRA[tavan]) return s;
-      indirmeler.push({ no: a.no, ad: a.ad, kod: s.kod, eskiGuven: s.guven, yeniGuven: tavan });
-      return { ...s, guven: tavan };
-    });
-    return { ...a, muhakeme };
-  });
-  return { atlar: yeniAtlar, indirmeler };
-}
-
-export type GuvenKalibrasyonUyarisi = { no: number; ad: string; uyarilar: string[] };
-
-/**
- * v6.71 — aynı kullanıcı talimatının TERS yönü: Claude genişörneklemli (n≥10, GÜVENİLİR)
- * bir V9/V10 destek sinyalini gerçekte hak ettiğinden DAHA DÜŞÜK ("orta"/"zayıf") güvenle
- * yazmış olabilir (İSPANOZ dersinin genel hali). Bu yön mekanik olarak DÜZELTİLMİYOR —
- * yalnız faz2KaliteDenetimi gibi bir UYARI olarak admin'e gösteriliyor, çünkü büyük n
- * yalnız güveni MÜMKÜN kılar, ZORUNLU kılmaz (Claude'un elinde güveni haklı şekilde
- * düşürecek başka bir çelişki olabilir) — bu yüzden tek yönlü tavanın aksine burada
- * otomatik müdahale YOK, yalnız görünürlük var.
- */
-export function faz2GuvenKalibrasyonDenetimi(
-  faz2Atlar: { no: number; ad: string; muhakeme: MuhakemeSatiri[] }[],
-  faz1: Faz1Sonuc
-): GuvenKalibrasyonUyarisi[] {
-  const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
-  return faz2Atlar.map((a) => {
-    const r = runnerByNo.get(a.no);
-    const uyarilar = new Set<string>();
-    if (r) {
-      for (const satir of a.muhakeme) {
-        if (satir.tip !== "destek" || satir.guven === "tam") continue;
-        const n = satir.kod.includes("V9") ? r.son800BenzerKosuN : satir.kod.includes("V10") ? r.tempoVeriN : null;
-        if (n != null && tempoGuvenSeviyesi(n) === "GUVENILIR") {
+      let m: RegExpExecArray | null;
+      while ((m = nRegex.exec(a.muhakeme))) {
+        const n = parseInt(m[1], 10);
+        if (n < 5) continue;
+        const start = Math.max(0, m.index - 70);
+        const end = Math.min(a.muhakeme.length, m.index + 40);
+        const pencere = a.muhakeme.slice(start, end).replace(/\s+/g, " ").trim();
+        if (gucKelimeleri.test(pencere)) {
           uyarilar.add(
-            `[${satir.kod.join("+")}] örneklem n=${n} (≥10, GÜVENİLİR) ama guven="${satir.guven}" seçilmiş — İSPANOZ dersi: büyük örneklemli destek sinyalleri genelde "tam" güven hak eder, gözden geçirin. Not: "${satir.aciklama}"`
+            `Geniş örneklemli (n=${n}) güçlü bir sinyal var ama teknikSira alt yarıda (${a.teknikSira}/${saha}) — Elazığ 8.Koşu dersi (OLGUNADAM/FISILTIKAYA): bu tür sinyaller tek bir risk/popülasyon istatistiği (V12) yüzünden aşırı düşürülmüş olabilir. İlgili bölüm: "…${pencere}…" — tekrar oku, gerekirse elle yukarı al.`
           );
         }
       }
@@ -478,42 +393,28 @@ export type KullanilmayanVeriSonuc = { no: number; ad: string; kullanilmayanKodl
  * verileri doğru kullanamıyoruz" — V13/V14/V20 zaten koda gömüldü (garanti), ama geri
  * kalan (V2/V6/V8/V9/V15/V16/V17/V19 vb.) sentez gerektirdiği için koda gömülemez —
  * bunun yerine TÜM V1-V22 için GENEL bir "veri var ama hiç kullanılmadı" dedektörü.
- * v6.73 — kullanıcı talimatı 2026-08-09 (TÜRKÖREN dersi, İKİNCİ TUR: 21 izinli koddan
- * yalnız 6'sı kullanılmıştı — "sistem kafasına göre kod seçemez, gerçekten kullanılması
- * gerekmeyenler hariç her kod gözden geçirilmeli"): eskiden yalnız rank 1-2'ye uygulanıyordu
- * (gürültüyü azaltmak için), artık SAHADAKİ HER ATA uygulanıyor — bu kontrol tamamen
- * mekanik/ücretsiz olduğu için genişletmenin maliyeti yok, yalnız görünürlük kazandırıyor.
- * Bu fonksiyon yalnız TESPİT eder; asıl önemli olan (kullanıcının sorusu: "bu uyarıdan
- * sonra ne olacak") bunun bir admin panelinde gözden kaçırılabilecek kutu OLARAK
- * KALMAMASI — V2AnalysisPanel.tsx'te bu liste boş değilse "Kaydet ve Yayımla" butonu
- * admin bilinçli onay vermeden ÇALIŞMIYOR.
- * v6.79 — kullanıcı bulgusu 2026-08-10: V11/V12 SAHADAKİ HER ATTA "kullanılmayan" olarak
- * çıkıyordu (yanlış pozitif, gürültü) — bu ikisi at satırına DEĞİL, tek seferlik koşu
- * başlığına ekleniyor (bkz. atSatirlariUret yorumu: "V11/V12 koşu düzeyinde, at satırına
- * eklenmez") ve `veriVarMi` bunları RACE-level (faz1.race.sonDuzlukUzunlugu/
- * pistMesafeStilOzeti) kontrol ediyor — yani veri "var" ise HER at için aynı sonucu
- * verir, atın KENDİSİNE özel eksik bir veri değildir. STARŞAH/PRENSES MEHLİKA/TÜRKÖREN
- * dersi at-özel eksik veriyle ilgiliydi (ör. bir atın kendi sınıf geçişi, kendi örneklem
- * büyüklüğü) — V11/V12'nin bir atın V10 stiliyle EŞLEŞTİRİLİP eşleştirilmediği ayrı bir
- * (ve zaten Sıralama Tutarsızlığı/Kaçırma Uyarıları denetimlerinin dolaylı kapsadığı)
- * soru, bu genel dedektörün kapsamı dışında tutuluyor.
+ * Yalnız en yüksek riskli (rank 1-2, banko/kupon kararını doğrudan etkileyen) atlara
+ * uygulanır — gürültüyü azaltmak için. Bu fonksiyon yalnız TESPİT eder; asıl önemli
+ * olan (kullanıcının sorusu: "bu uyarıdan sonra ne olacak") bunun bir admin panelinde
+ * gözden kaçırılabilecek kutu OLARAK KALMAMASI — V2AnalysisPanel.tsx'te bu liste boş
+ * değilse "Kaydet ve Yayımla" butonu admin bilinçli onay vermeden ÇALIŞMIYOR.
  */
-const KULLANILMAYAN_VERI_HARIC_KODLAR = new Set(["V11", "V12"]);
-
 export function faz2KullanilmayanVeriTespiti(
   faz1: Faz1Sonuc, izinliKodlar: string[],
-  faz2Atlar: { no: number; ad: string; teknikSira: number; muhakeme: MuhakemeSatiri[] }[]
+  faz2Atlar: { no: number; ad: string; teknikSira: number; muhakeme: string }[]
 ): KullanilmayanVeriSonuc[] {
   const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
   return faz2Atlar
+    .filter((a) => a.teknikSira <= 2)
     .map((a) => {
       const r = runnerByNo.get(a.no);
       const kullanilmayanKodlar: string[] = [];
       if (r) {
         for (const kod of izinliKodlar) {
-          if (KULLANILMAYAN_VERI_HARIC_KODLAR.has(kod)) continue;
           if (!veriVarMi(r, kod, faz1)) continue;
-          if (!satirVarMi(a.muhakeme, kod)) kullanilmayanKodlar.push(kod);
+          const num = kod.slice(1);
+          const regex = new RegExp(`(?<!\\d)V${num}(?!\\d)`);
+          if (!regex.test(a.muhakeme)) kullanilmayanKodlar.push(kod);
         }
       }
       return { no: a.no, ad: a.ad, kullanilmayanKodlar };
@@ -536,19 +437,22 @@ export type SiralamaCiftUyarisi = { no: number; ad: string; uyarilar: string[] }
  * sıradaysa uyarır. Kod hiçbir şeyi otomatik değiştirmez, karar kullanıcıda kalır.
  */
 export function faz2SiralamaTutarlilikDenetimi(
-  faz2Atlar: { no: number; ad: string; teknikSira: number; muhakeme: MuhakemeSatiri[] }[]
+  faz2Atlar: { no: number; ad: string; teknikSira: number; muhakeme: string }[]
 ): SiralamaCiftUyarisi[] {
   type Girdi = { no: number; ad: string; teknikSira: number; destek: boolean; baglam: string };
   const ciftMap = new Map<string, Girdi[]>();
+  const etiketRegex = /\[V(\d+)\+V(\d+)\]:([a-zçğıöşü-]+)(?:\(([^)]*)\))?/gi;
 
   for (const a of faz2Atlar) {
-    for (const satir of a.muhakeme) {
-      if (satir.kod.length !== 2) continue;
-      const [kodA, kodB] = satir.kod;
-      const cift = kodA <= kodB ? `${kodA}+${kodB}` : `${kodB}+${kodA}`;
-      const destek = satir.tip === "destek";
+    let m: RegExpExecArray | null;
+    etiketRegex.lastIndex = 0;
+    while ((m = etiketRegex.exec(a.muhakeme))) {
+      const kodA = parseInt(m[1], 10), kodB = parseInt(m[2], 10);
+      const cift = kodA <= kodB ? `V${kodA}+V${kodB}` : `V${kodB}+V${kodA}`;
+      const destek = m[3].toLowerCase().includes("destek");
+      const baglam = m[4] ?? "";
       if (!ciftMap.has(cift)) ciftMap.set(cift, []);
-      ciftMap.get(cift)!.push({ no: a.no, ad: a.ad, teknikSira: a.teknikSira, destek, baglam: satir.aciklama });
+      ciftMap.get(cift)!.push({ no: a.no, ad: a.ad, teknikSira: a.teknikSira, destek, baglam });
     }
   }
 
@@ -685,16 +589,22 @@ export function faz2BankoAdayiTespit(
 
 /**
  * v6.51 — kullanıcı kararı: V2 motoru artık gerçek Prediction/Pick kaydına gidiyor.
- * v6.70 (V2.2): muhakeme artık yapılandırılmış (MuhakemeSatiri[]) geldiği için regex ile
- * "[Vx+Vy]" çıkarmaya/kesmeye gerek yok — Pick.details doğrudan {versiyon:2, karar,
- * satirlar} olarak saklanıyor, TÜM satırlar (kod-garantili olanlar dahil, hiçbiri
- * kesilmeden — bkz. v6.66 MELONCITTO dersi) korunuyor. assertPublishSafe'in "AGF
- * favorisi gerekçesiz kalamaz" kuralı için `satirlar` en az 1 eleman içermeli.
+ * Pick.details (Json, admin rozeti — "kısa iç etiketler") için Faz2'nin kompakt
+ * "muhakeme" metninden en anlamlı parçaları (karar + doğrulanan/riskli çiftler) çıkarır.
+ * assertPublishSafe'in "AGF favorisi gerekçesiz kalamaz" kuralı için de bu alanın DOLU
+ * olması gerekiyor — karar her zaman en az bir etiket garanti eder.
  */
-export function faz2PickDetaylari(karar: string, satirlar: MuhakemeSatiri[]): PickDetailsV2 {
-  const garantili = satirlar.filter((s) => s.kodGarantili);
-  const digerleri = satirlar.filter((s) => !s.kodGarantili);
-  return { versiyon: 2, karar, satirlar: [...garantili, ...digerleri] };
+export function faz2PickDetaylari(karar: string, muhakeme: string): string[] {
+  const etiketler = [...muhakeme.matchAll(/\[V\d+(?:\+V\d+)?\][^|]*/g)].map((m) => m[0].trim());
+  // v6.66 — kullanıcı bulgusu (MELONCITTO, Kocaeli 6.Koşu): sabit slice(0,5) kesmesi,
+  // Claude kendi 5 etiketini yazdıktan SONRA eklenen kod-garantili etiketleri (V1/V4/V12/
+  // V19 vb., hepsi sona eklenir) sessizce görünürden düşürüyordu — V19 (son yarışı
+  // kazandı) bu yüzden admin ekranında hiç görünmedi. Kod-garantili etiketler ASLA
+  // kesilmez, geri kalan yer Claude'un kendi etiketleriyle doldurulur.
+  const garantili = etiketler.filter((e) => e.includes("KOD-GARANTİSİ"));
+  const digerleri = etiketler.filter((e) => !e.includes("KOD-GARANTİSİ"));
+  const secili = [...garantili, ...digerleri.slice(0, Math.max(5, 8 - garantili.length))];
+  return [`Karar: ${karar}`, ...secili];
 }
 
 /**
@@ -707,32 +617,17 @@ export function faz2PickDetaylari(karar: string, satirlar: MuhakemeSatiri[]): Pi
  * Claude çağrısı yok, ücretsiz). Kullanıcı eşik istemedi — SKK farkı 1 bile olsa eklenir.
  */
 export function faz2SinifGecisEtiketiEkle(
-  muhakeme: MuhakemeSatiri[],
+  muhakeme: string,
   r: { sinifOnceki: string | null; sinifSkkOnceki: number | null; sinifSkkBugun: number | null }
-): MuhakemeSatiri[] {
+): string {
   if (r.sinifOnceki == null || r.sinifSkkOnceki == null || r.sinifSkkBugun == null) return muhakeme;
   if (r.sinifSkkBugun < r.sinifSkkOnceki) {
-    return satirEkle(muhakeme, {
-      kod: ["V14"], tip: "destek", guven: "tam", kodGarantili: true,
-      aciklama: `sınıf düşüşü: ${r.sinifOnceki}(SKK ${r.sinifSkkOnceki}) → bugün SKK ${r.sinifSkkBugun}`,
-    });
+    return `${muhakeme} | [V14]:destek(sınıf düşüşü: ${r.sinifOnceki}(SKK ${r.sinifSkkOnceki}) → bugün SKK ${r.sinifSkkBugun})`;
   }
   if (r.sinifSkkBugun > r.sinifSkkOnceki) {
-    return satirEkle(muhakeme, {
-      kod: ["V14"], tip: "notr", guven: "tam", kodGarantili: true,
-      aciklama: `sınıf yükselişi: ${r.sinifOnceki}(SKK ${r.sinifSkkOnceki}) → bugün SKK ${r.sinifSkkBugun}, dezavantaj sayılmaz`,
-    });
+    return `${muhakeme} | [V14]:nötr(sınıf yükselişi: ${r.sinifOnceki}(SKK ${r.sinifSkkOnceki}) → bugün SKK ${r.sinifSkkBugun}, dezavantaj sayılmaz)`;
   }
-  // v6.83 — kullanıcı talebi 2026-08-10: "her veri kullanılacak, kullanılmayanlar
-  // söylenecek bir şey yoksa kullanılmayacak" — SKK DEĞİŞMEDİYSE bu da bir sonuçtur
-  // (istikrar), "veri var ama es geçildi" gibi görünmemeli. veriVarMi("V14") yalnız
-  // sinifOnceki'nin varlığına bakıyor, değişip değişmediğine değil — bu satır
-  // olmadan "Kullanılmayan Veri" denetimi SKK değişmeyen HER atta V14'ü yanlış
-  // "kaçırılmış" sayıyordu (V11/V12 ile aynı hata sınıfı).
-  return satirEkle(muhakeme, {
-    kod: ["V14"], tip: "notr", guven: "tam", kodGarantili: true,
-    aciklama: `sınıf değişmedi: SKK ${r.sinifSkkOnceki} → SKK ${r.sinifSkkBugun}, istikrar`,
-  });
+  return muhakeme;
 }
 
 /**
@@ -746,28 +641,19 @@ export function faz2SinifGecisEtiketiEkle(
  * Claude çağrısı yok.
  */
 export function faz2KiloKarsilastirmaEtiketiEkle(
-  muhakeme: MuhakemeSatiri[],
+  muhakeme: string,
   r: { weight: number | null },
   ortKilo: number | null
-): MuhakemeSatiri[] {
+): string {
   if (r.weight == null || ortKilo == null) return muhakeme;
   const fark = Math.round((r.weight - ortKilo) * 10) / 10;
   if (fark <= -1) {
-    return satirEkle(muhakeme, {
-      kod: ["V13"], tip: "destek", guven: "tam", kodGarantili: true,
-      aciklama: `sahadaki ortalamadan ${Math.abs(fark)}kg hafif — ${r.weight}kg vs ort ${ortKilo.toFixed(1)}kg`,
-    });
+    return `${muhakeme} | [V13]:destek(sahadaki ortalamadan ${Math.abs(fark)}kg hafif — ${r.weight}kg vs ort ${ortKilo.toFixed(1)}kg)`;
   }
   if (fark >= 1) {
-    return satirEkle(muhakeme, {
-      kod: ["V13"], tip: "risk", guven: "tam", kodGarantili: true,
-      aciklama: `sahadaki ortalamadan ${fark}kg ağır — ${r.weight}kg vs ort ${ortKilo.toFixed(1)}kg`,
-    });
+    return `${muhakeme} | [V13]:risk(sahadaki ortalamadan ${fark}kg ağır — ${r.weight}kg vs ort ${ortKilo.toFixed(1)}kg)`;
   }
-  return satirEkle(muhakeme, {
-    kod: ["V13"], tip: "notr", guven: "tam", kodGarantili: true,
-    aciklama: `sahadaki ortalamaya yakın — ${r.weight}kg vs ort ${ortKilo.toFixed(1)}kg`,
-  });
+  return `${muhakeme} | [V13]:nötr(sahadaki ortalamaya yakın — ${r.weight}kg vs ort ${ortKilo.toFixed(1)}kg)`;
 }
 
 /**
@@ -777,17 +663,17 @@ export function faz2KiloKarsilastirmaEtiketiEkle(
  * olduğu için doğrudan koda gömülüyor — Claude'un yorumuna bağlı kalmıyor.
  */
 export function faz2HpIvmeEtiketiEkle(
-  muhakeme: MuhakemeSatiri[],
+  muhakeme: string,
   r: { hpIvmesi: number | null }
-): MuhakemeSatiri[] {
+): string {
   if (r.hpIvmesi == null) return muhakeme;
   if (r.hpIvmesi > 0) {
-    return satirEkle(muhakeme, { kod: ["V20"], tip: "destek", guven: "tam", kodGarantili: true, aciklama: `HP yükseliyor, ivme +${r.hpIvmesi}` });
+    return `${muhakeme} | [V20]:destek(HP yükseliyor, ivme +${r.hpIvmesi})`;
   }
   if (r.hpIvmesi < 0) {
-    return satirEkle(muhakeme, { kod: ["V20"], tip: "risk", guven: "tam", kodGarantili: true, aciklama: `HP geriliyor, ivme ${r.hpIvmesi} — fiziksel gerileme olabilir` });
+    return `${muhakeme} | [V20]:risk(HP geriliyor, ivme ${r.hpIvmesi} — fiziksel gerileme olabilir)`;
   }
-  return satirEkle(muhakeme, { kod: ["V20"], tip: "notr", guven: "tam", kodGarantili: true, aciklama: "HP sabit, ivme 0 — ne gerileme ne belirgin iyileşme" });
+  return `${muhakeme} | [V20]:nötr(HP sabit, ivme 0 — ne gerileme ne belirgin iyileşme)`;
 }
 
 /**
@@ -803,27 +689,35 @@ export function faz2HpIvmeEtiketiEkle(
  * garantili etiketi SİLEMEZ, yalnız yanına eklenir.
  */
 export function faz2StilPopulasyonEtiketiEkle(
-  muhakeme: MuhakemeSatiri[],
+  muhakeme: string,
   r: { raceStyleEtiket: string | null; tempoVeriN: number | null },
   breakdown: { style: string; percent: number }[] | null
-): MuhakemeSatiri[] {
+): string {
   if (!r.raceStyleEtiket || r.tempoVeriN == null || r.tempoVeriN < 10 || !breakdown) return muhakeme;
   const ilkIki = breakdown.slice(0, 2);
   const eslesen = ilkIki.find((b) => b.style === r.raceStyleEtiket);
   if (!eslesen) return muhakeme;
   // v6.62 — kullanıcı bulgusu 2026-08-05 (TAM TIME, 10 atlı koşu): V_LEGEND'e eklenen
-  // netlik bazen Claude'un KENDİSİ tarafından zaten doğru uygulanıyor (tip:"destek" +
-  // guven:"tam" ile) — bu durumda kod GARANTİSİNİ yine de eklemek aynı çifti İKİ KEZ
-  // yazdırıp tutarlılık kontrolünde yanıltıcı/tekrarlı uyarılara yol açıyordu. Artık
-  // yalnız Claude'un kendi satırı YUMUŞATILMIŞ (guven "tam" değil) veya HİÇ yoksa
-  // ekleniyor — zaten doğru seçilmişse dokunulmuyor.
-  const mevcutSatir = muhakeme.find((s) => s.kod.includes("V10") && s.kod.includes("V12"));
-  if (mevcutSatir?.tip === "destek" && mevcutSatir.guven === "tam") return muhakeme;
+  // netlik bazen Claude'un KENDİSİ tarafından zaten doğru uygulanıyor ("n=13≥10,
+  // popülasyonda ilk sıralarda-TAM destek" gibi temiz bir "destek" etiketiyle) — bu
+  // durumda kod GARANTİSİNİ yine de eklemek aynı çifti İKİ KEZ yazdırıp tutarlılık
+  // kontrolünde yanıltıcı/tekrarlı uyarılara yol açıyordu. Artık yalnız Claude'un
+  // kendi etiketi YUMUŞATILMIŞ (temiz "destek" değil) veya HİÇ yoksa ekleniyor —
+  // zaten doğru yazılmışsa dokunulmuyor.
+  const mevcutEtiket = muhakeme.match(/\[V(?:10\+V12|12\+V10)\]:([^|(]*)/i)?.[1]?.trim().toLowerCase();
+  if (mevcutEtiket === "destek") return muhakeme;
   const sira = breakdown.findIndex((b) => b.style === r.raceStyleEtiket) + 1;
-  return satirEkle(muhakeme, {
-    kod: ["V10", "V12"], tip: "destek", guven: "tam", kodGarantili: true,
-    aciklama: `KOD-GARANTİSİ: bireysel örneklem n=${r.tempoVeriN}(≥10) + popülasyonda ${sira}. sırada %${eslesen.percent} — bu TAM destek sayılır, yumuşatılmamalı`,
-  });
+  return `${muhakeme} | [V10+V12]:destek(KOD-GARANTİSİ: bireysel örneklem n=${r.tempoVeriN}(≥10) + popülasyonda ${sira}. sırada %${eslesen.percent} — bu TAM destek sayılır, yumuşatılmamalı)`;
+}
+
+/** Bir muhakeme metninde, verilen V-kodu çifti (tek veya çift kod, örn. "V4" ya da
+ * "V10+V12") için Claude'un ZATEN temiz bir "destek" yazıp yazmadığını kontrol eder —
+ * yazmışsa kod tekrar eklemez (v6.62 TAM TIME dersi: aynı çifti iki kez yazdırıp
+ * tutarlılık kontrolünü yanıltmamak için). */
+function halihazirdaTemizDestekVarMi(muhakeme: string, kodDeseni: string): boolean {
+  const re = new RegExp(`\\[${kodDeseni}\\]:([^|(]*)`, "i");
+  const etiket = muhakeme.match(re)?.[1]?.trim().toLowerCase();
+  return etiket === "destek";
 }
 
 /**
@@ -837,7 +731,7 @@ export type Top3TerfiSonuc = { no: number; ad: string; eskiSira: number; yeniSir
 
 // route.ts'teki TestV2Pick ile aynı şekil — döngüsel import'tan kaçınmak için burada
 // yerel bir tip takma adı olarak tekrarlanıyor.
-type TeknikSiraliAt = { no: number; ad: string; karar: string; muhakeme: MuhakemeSatiri[]; teknikSira: number };
+type TeknikSiraliAt = { no: number; ad: string; karar: string; muhakeme: string; teknikSira: number };
 
 /**
  * v6.64 — kullanıcı kararı 2026-08-05 (DAELLA, kazandı ama 5. sıradaydı): "bunları
@@ -869,16 +763,8 @@ type TeknikSiraliAt = { no: number; ad: string; karar: string; muhakeme: Muhakem
 // yazılmamış olsa bile ham veri koşulu sağlanıyorsa) terfi devreye girer. Bu hâlâ mekanik
 // bir puanlama formülü DEĞİL — yalnız kodun zaten nesnel eşiklerle doğruladığı dar
 // istisnalar için devreye giriyor, Claude'un normal holistik muhakemesine dokunmuyor.
-//
-// v6.70 (V2.2) — kullanıcı talimatı 2026-08-09 ("claude yazı yada yorumlardan muhakeme
-// yapamıyorsa bir kod sistemi geliştir"): metin-kalıbı arayan `tamDestekMuhakemesiVar`
-// regex'i TAMAMEN KALDIRILDI — CEMRE ATEŞİ'nin (İstanbul 3.Koşu) kanıtladığı gibi, Claude
-// AYNI objektif sonuca kendi cümleleriyle vardığında (kod'un ürettiği kanonik ifadeyle
-// birebir eşleşmeyen bir metinle) bu regex onu kaçırıyordu. Artık "TAM destek" durumu bir
-// CÜMLE değil, doğrudan yapılandırılmış alan: satırın kendisi tip:"destek" + guven:"tam"
-// mı diye bakılıyor — Claude'un kelime seçimi hiç devreye girmiyor.
-function stilPopulasyonTamDestekVar(muhakeme: MuhakemeSatiri[]): boolean {
-  return muhakeme.some((s) => s.kod.includes("V10") && s.kod.includes("V12") && s.tip === "destek" && s.guven === "tam");
+function tamDestekMuhakemesiVar(muhakeme: string): boolean {
+  return /TAM destek say[ıi]l[ıi]r,?\s*yumuşat[ıi]lma/i.test(muhakeme);
 }
 
 export function faz2Top3Garantisi(
@@ -900,30 +786,20 @@ export function faz2Top3Garantisi(
 
   function nitelikliMi(a: TeknikSiraliAt): boolean {
     if (a.karar === "Yüksek Risk") return false;
-    return stilPopulasyonTamDestekVar(a.muhakeme) || hamIstatistikNitelikliMi(a);
+    return tamDestekMuhakemesiVar(a.muhakeme) || hamIstatistikNitelikliMi(a);
   }
 
   const sirali = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
-  const orijinalTop3 = sirali.slice(0, 3);
-
-  // v6.72 düzeltme — kullanıcı bulgusu 2026-08-09 (CEMRE ATEŞİ, İstanbul 3.Koşu, İKİNCİ
-  // TUR): ESENYIL (7.sıra) terfi ederken, kod "yer açmak" için orijinal top-3'ün SONUNCUSUNU
-  // (kim olursa olsun) körü körüne dışarı atıyordu — o sıradaki CEMRE ATEŞİ'nin KENDİSİ de
-  // (V10+V12 KOD-GARANTİLİ tam-destek, karar "Düşük Risk") nitelikliMi() testini geçtiği
-  // halde yalnızca "sırada son" olduğu için haksız yere top-3 dışına itildi. Artık orijinal
-  // top-3'teki bir üye, YALNIZ KENDİSİ nitelikliMi testini GEÇEMİYORSA terfi adaylarına yer
-  // açmak için düşürülebilir — nitelikli bir orijinal üye asla yalnızca "sırası en son" diye
-  // kurban edilmez. Tüm orijinal top-3 zaten nitelikliyse (3'ü de güçlüyse) terfi adayı(ları)
-  // için yer AÇILMAZ — 3 sabit slotta 4+ nitelikli at olduğunda hiçbiri haksız yere atılmaz.
-  const korunanOrijinaller = orijinalTop3.filter(nitelikliMi);
-  const yerAcilabilirSayi = Math.max(0, 3 - korunanOrijinaller.length);
-  const terfiEdecekler = sirali.slice(3).filter(nitelikliMi).slice(0, yerAcilabilirSayi);
+  const terfiEdecekler = sirali.slice(3).filter(nitelikliMi);
   if (terfiEdecekler.length === 0) return { atlar, terfiler: [] };
 
+  const orijinalTop3 = sirali.slice(0, 3);
   // v6.64 düzeltme: terfi eden at "ilk 3'e girsin" demekti, "1. sıraya fırlasın" değil —
   // korunan orijinal top-3 üyeleri ÖNCE (kendi göreceli sırasıyla), terfi edenler
   // SONRA (yalnız boşalan alt sıra(lar)ı doldurarak) ekleniyor.
-  const yeniTop3 = [...korunanOrijinaller, ...terfiEdecekler];
+  const yeniTop3 = terfiEdecekler.length >= 3
+    ? terfiEdecekler.slice(0, 3)
+    : [...orijinalTop3.slice(0, 3 - terfiEdecekler.length), ...terfiEdecekler];
   const yeniTop3Nos = new Set(yeniTop3.map((a) => a.no));
   const kalan = sirali.filter((a) => !yeniTop3Nos.has(a.no));
   const yeniSiraliListe = [...yeniTop3, ...kalan];
@@ -945,10 +821,7 @@ export function faz2Top3Garantisi(
       // terfiyi SESSİZCE GERİ ALABİLİYORDU. Artık terfi eden atın kararı da "Güçlü Aday"a
       // yükseltiliyor — terfi, hiyerarşi kuralından SONRA da kalıcı.
       karar: "Güçlü Aday",
-      muhakeme: satirEkle(a.muhakeme, {
-        kod: [], tip: "destek", guven: "tam", kodGarantili: true,
-        aciklama: `KOD-GARANTİSİ ilk 3'e terfi (eski sıra ${terfi.eskiSira} → ${teknikSira}) — muhakemesinde kod tarafından doğrulanmış "TAM destek, yumuşatılmamalı" işareti var, kendi kararı Yüksek Risk değil (DAELLA/İSPANOZ/ROSİLDA dersi).`,
-      }),
+      muhakeme: `${a.muhakeme} | [SİSTEM]:KOD-GARANTİSİ ilk 3'e terfi (eski sıra ${terfi.eskiSira} → ${teknikSira}) — muhakemesinde kod tarafından doğrulanmış "TAM destek, yumuşatılmamalı" işareti var, kendi kararı Yüksek Risk değil (DAELLA/İSPANOZ/ROSİLDA dersi).`,
     };
   });
 
@@ -957,14 +830,13 @@ export function faz2Top3Garantisi(
 
 // v6.68 — AGF-top4/top2 garantilerinin ikisi de aynı "bu at kaç KOD-GARANTİLİ destek
 // taşıyor" sayımına dayanıyor — V4 (aynı jokey) BİLEREK hariç, çünkü neredeyse her atta
-// görülüyor ve tek başına güçlü bir kombinasyon sinyali sayılamaz. v6.81 — kullanıcı
-// bulgusu 2026-08-10 (SAFDERUN OĞLU): V14 (gerçek sınıf düşüşü, kod-garantili) de bu
-// listeye eklendi — V4'ün aksine SKK farkı 1+ kademe olmadıkça hiç enjekte edilmiyor,
-// yani gerçekten ayırt edici/nadir bir sinyal (V1 aygır-en-iyisi, V19 son-yarış-galibiyeti,
-// V22 zemin-eşleşme-galibiyeti ile aynı kategoride).
-const GUCLU_KOD_GARANTI_KODLARI = ["V1", "V14", "V19", "V22"];
-function gucluKodGarantiSayisi(muhakeme: MuhakemeSatiri[]): number {
-  return satirleriSay(muhakeme, (s) => !!s.kodGarantili && s.tip === "destek" && GUCLU_KOD_GARANTI_KODLARI.some((kod) => s.kod.includes(kod)));
+// görülüyor ve tek başına güçlü bir kombinasyon sinyali sayılamaz. Yalnız V1 (aygır en
+// iyisi), V19 (son yarış galibiyeti), V22 (zemin eşleşme galibiyeti) sayılır.
+const GUCLU_KOD_GARANTI_KODLARI = ["V1", "V19", "V22"];
+function gucluKodGarantiSayisi(muhakeme: string): number {
+  return GUCLU_KOD_GARANTI_KODLARI.filter((kod) =>
+    new RegExp(`\\[${kod}(?:\\+V\\d+)?\\]:destek\\(KOD-GARANTİSİ`, "i").test(muhakeme)
+  ).length;
 }
 
 // v6.69 — kullanıcı bulgusu (İstanbul 1.Altılı 09.08.2026 kritiği): AGF'de en çok DÜŞEN
@@ -985,49 +857,29 @@ function birlesikTrendListesi(faz1: Faz1Sonuc): TrendAt[] {
  * artık yalnız yükselenler değil düşenler de sayılıyor (bkz. birlesikTrendListesi). "karar"
  * da "Güçlü Aday"a yükseltilir (Top3Garantisi ile aynı gerekçe: aksi halde hiyerarşi kuralı
  * terfiyi geri alır).
- * v6.81 — kullanıcı bulgusu 2026-08-10 (SAFDERUN OĞLU, 3 kod-garantili tam-destek sinyali
- * — V14 sınıf düşüşü + V4 aynı jokey + V22 zemin galibiyeti — taşıyıp 12/15 sırada
- * kalmıştı): terfi KOŞULU yanlışlıkla "AYRICA AGF'si bugün hareketli olmalı" diye
- * daraltılmıştı — SAFDERUN OĞLU'nun AGF'si sakin kaldığı için bu at hiç değerlendirmeye
- * bile alınmıyordu, kanıtı yeterli olsa da. "≥2 güçlü kod-garantili sinyal" kriterinin
- * kendisi zaten yeterince nadir/anlamlı (bkz. GUCLU_KOD_GARANTI_KODLARI yorumu) — AGF
- * hareketiyle şartlanmasının mantıklı bir gerekçesi yoktu. Artık SAHADAKİ HER at bu
- * kritere göre değerlendiriliyor; AGF trend bilgisi yalnız VARSA gerekçeye ek olarak
- * ekleniyor, koşul olmaktan çıktı.
  */
 export function faz2GucluKombinasyonTop3Garantisi(
   atlar: TeknikSiraliAt[],
   faz1: Faz1Sonuc
 ): { atlar: TeknikSiraliAt[]; terfiler: KararHiyerarsiDegisikligi[] } {
-  if (atlar.length <= 3) return { atlar, terfiler: [] };
-  const trendByNo = new Map(birlesikTrendListesi(faz1).map((t) => [t.runnerNo, t]));
+  const trendliler = birlesikTrendListesi(faz1);
+  if (trendliler.length === 0 || atlar.length <= 3) return { atlar, terfiler: [] };
 
   let calisma = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
   const terfiler: KararHiyerarsiDegisikligi[] = [];
-  const nitelikliler = calisma
-    .filter((at) => at.karar !== "Yüksek Risk" && gucluKodGarantiSayisi(at.muhakeme) >= 2)
-    .sort((a, b) => b.teknikSira - a.teknikSira); // en geride olan önce terfi etsin
+  const nitelikliler = trendliler
+    .map((t) => ({ t, at: calisma.find((a) => a.no === t.runnerNo) }))
+    .filter((x): x is { t: TrendAt; at: TeknikSiraliAt } => !!x.at && gucluKodGarantiSayisi(x.at.muhakeme) >= 2)
+    .sort((a, b) => b.at.teknikSira - a.at.teknikSira); // en geride olan önce terfi etsin
 
-  for (const at of nitelikliler) {
+  for (const { t, at } of nitelikliler) {
     const idx = calisma.findIndex((a) => a.no === at.no);
     if (idx === -1 || idx < 3) continue; // zaten ilk 3'te
-    // v6.72 düzeltme — CEMRE ATEŞİ dersinin İKİNCİ TUR bulgusu (faz2Top3Garantisi'nde
-    // bulunan AYNI hata sınıfı burada da vardı): 3. sıradaki at kim olursa olsun körü
-    // körüne dışarı itiliyordu. Şimdi, o at KENDİSİ de nitelikli ise (bu fonksiyonun kendi
-    // ölçütüyle ≥2 güçlü kod-garantili sinyal, YA DA Top3Garantisi'nin V10+V12 tam-destek
-    // ölçütüyle) yerinde bırakılır — bu aday atlanır, sıradaki nitelikli adaya geçilir.
-    const mevcut3 = calisma[2];
-    if (gucluKodGarantiSayisi(mevcut3.muhakeme) >= 2 || stilPopulasyonTamDestekVar(mevcut3.muhakeme)) continue;
     const eskiSira = calisma[idx].teknikSira;
-    const t = trendByNo.get(at.no);
-    const trendMetni = t ? `AGF trend (${t.yon}, ${t.fark >= 0 ? "+" : ""}${t.fark} puan) + ` : "";
     const guncellenmisAt: TeknikSiraliAt = {
       ...calisma[idx],
       karar: "Güçlü Aday",
-      muhakeme: satirEkle(calisma[idx].muhakeme, {
-        kod: [], tip: "destek", guven: "tam", kodGarantili: true,
-        aciklama: `KOD-GARANTİSİ ${trendMetni}birden çok güçlü sinyal birleşimiyle ilk 3'e terfi (eski sıra ${eskiSira} → 3) — SAFDERUN OĞLU dersi, 2026-08-10.`,
-      }),
+      muhakeme: `${calisma[idx].muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF trend (${t.yon}, ${t.fark >= 0 ? "+" : ""}${t.fark} puan) + birden çok güçlü sinyal birleşimiyle ilk 3'e terfi (eski sıra ${eskiSira} → 3) — 2026-08-09 kullanıcı kararı.`,
     };
     const kalanlar = calisma.filter((a) => a.no !== at.no);
     calisma = [...kalanlar.slice(0, 2), guncellenmisAt, ...kalanlar.slice(2)];
@@ -1076,10 +928,7 @@ export function faz2AgfTrend456Garantisi(
     const guncellenmisAt: TeknikSiraliAt = {
       ...calisma[idx],
       karar: calisma[idx].karar === "Orta Risk" || calisma[idx].karar === "Yüksek Risk" ? "Düşük Risk" : calisma[idx].karar,
-      muhakeme: satirEkle(calisma[idx].muhakeme, {
-        kod: [], tip: "destek", guven: "orta", kodGarantili: true,
-        aciklama: `KOD-GARANTİSİ AGF trend (${t.yon}, ${t.fark >= 0 ? "+" : ""}${t.fark} puan) ile 4-6 aralığına terfi (eski sıra ${eskiSira}) — gün içinde belirgin para hareketi.`,
-      }),
+      muhakeme: `${calisma[idx].muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF trend (${t.yon}, ${t.fark >= 0 ? "+" : ""}${t.fark} puan) ile 4-6 aralığına terfi (eski sıra ${eskiSira}) — gün içinde belirgin para hareketi.`,
     };
     const kalanlar = calisma.filter((a) => a.no !== at.no);
     calisma = [...kalanlar.slice(0, 3), guncellenmisAt, ...kalanlar.slice(3)];
@@ -1134,10 +983,7 @@ export function faz2AgfFavorisiDususeRagmenGarantisi(
   const guncellenmisAt: TeknikSiraliAt = {
     ...calisma[idx],
     karar: "Güçlü Aday",
-    muhakeme: satirEkle(calisma[idx].muhakeme, {
-      kod: [], tip: "destek", guven: "tam", kodGarantili: true,
-      aciklama: `KOD-GARANTİSİ sahadaki AGF lideri, gün içinde düşüşe rağmen (${dususFarki.toFixed(2)} puan) hâlâ favori — ilk 3'e terfi (eski sıra ${eskiSira} → 3) — piyasanın toplam parası hâlâ bu atta (TÜRKÖREN dersi, 2026-08-09).`,
-    }),
+    muhakeme: `${calisma[idx].muhakeme} | [SİSTEM]:KOD-GARANTİSİ sahadaki AGF lideri, gün içinde düşüşe rağmen (${dususFarki.toFixed(2)} puan) hâlâ favori — ilk 3'e terfi (eski sıra ${eskiSira} → 3) — piyasanın toplam parası hâlâ bu atta (TÜRKÖREN dersi, 2026-08-09).`,
   };
   const kalanlar = calisma.filter((a) => a.no !== favori.no);
   const yeniSiraliListe = [...kalanlar.slice(0, 2), guncellenmisAt, ...kalanlar.slice(2)];
@@ -1148,20 +994,12 @@ export function faz2AgfFavorisiDususeRagmenGarantisi(
 }
 
 export function faz2AyniJokeyEtiketiEkle(
-  muhakeme: MuhakemeSatiri[],
+  muhakeme: string,
   r: { jockeyChanged: boolean; ilkStart: boolean }
-): MuhakemeSatiri[] {
-  if (!r.ilkStart && !r.jockeyChanged) {
-    if (satirVarMi(muhakeme, "V4", { tip: "destek" })) return muhakeme;
-    return satirEkle(muhakeme, { kod: ["V4"], tip: "destek", guven: "tam", kodGarantili: true, aciklama: "KOD-GARANTİSİ: son yarışını aynı jokeyle koştu, süreklilik olumlu" });
-  }
-  // v6.83 — kullanıcı talebi 2026-08-10: jokey değiştiyse veya ilk start ise "aynı jokey
-  // sürekliliği" bonusu objektif olarak yok — bu da bir sonuçtur, "veri var ama es
-  // geçildi" görüntüsü vermemeli. jockeyWinPct/trainerWinPct'in KENDİSİ (genel form)
-  // Claude'un serbest yorumuna kalır, bu yalnız "aynı jokey mi" gerçeğini kayda geçirir.
-  if (satirVarMi(muhakeme, "V4")) return muhakeme;
-  const aciklama = r.ilkStart ? "KOD-GARANTİSİ: ilk start, jokey sürekliliği değerlendirilemez" : "KOD-GARANTİSİ: jokey değişti, süreklilik bonusu yok";
-  return satirEkle(muhakeme, { kod: ["V4"], tip: "notr", guven: "tam", kodGarantili: true, aciklama });
+): string {
+  if (r.ilkStart || r.jockeyChanged) return muhakeme;
+  if (halihazirdaTemizDestekVarMi(muhakeme, "V4")) return muhakeme;
+  return `${muhakeme} | [V4]:destek(KOD-GARANTİSİ: son yarışını aynı jokeyle koştu, süreklilik olumlu)`;
 }
 
 /**
@@ -1173,26 +1011,15 @@ export function faz2AyniJokeyEtiketiEkle(
  * pedigriye sahip atlar için garantili ekleniyor.
  */
 export function faz2PedigriKarsilastirmaEtiketiEkle(
-  muhakeme: MuhakemeSatiri[],
+  muhakeme: string,
   r: { sireKazanmaOrani: number | null; sireOrneklemKendiVeri: number | null },
   sahaEnIyiKYuzde: number | null
-): MuhakemeSatiri[] {
+): string {
   if (r.sireKazanmaOrani == null || r.sireOrneklemKendiVeri == null) return muhakeme;
   if (r.sireOrneklemKendiVeri < 20) return muhakeme;
-  if (sahaEnIyiKYuzde != null && r.sireKazanmaOrani >= sahaEnIyiKYuzde) {
-    if (satirVarMi(muhakeme, "V1", { tip: "destek" })) return muhakeme;
-    return satirEkle(muhakeme, {
-      kod: ["V1"], tip: "destek", guven: "tam", kodGarantili: true,
-      aciklama: `KOD-GARANTİSİ: aygırın sahadaki EN İYİ kazanma yüzdesi — %${r.sireKazanmaOrani}(n=${r.sireOrneklemKendiVeri}, gerçek örneklem)`,
-    });
-  }
-  // v6.83 — kullanıcı talebi 2026-08-10: sahanın en iyisi olmasa da örneklemi yeterli
-  // (n≥20) bir aygır kazanma yüzdesi var — bu da kayda geçmeli, sessizce atlanmamalı.
-  if (satirVarMi(muhakeme, "V1")) return muhakeme;
-  return satirEkle(muhakeme, {
-    kod: ["V1"], tip: "notr", guven: "orta", kodGarantili: true,
-    aciklama: `KOD-GARANTİSİ: aygır kazanma yüzdesi %${r.sireKazanmaOrani}(n=${r.sireOrneklemKendiVeri}), sahanın en iyisi değil`,
-  });
+  if (sahaEnIyiKYuzde == null || r.sireKazanmaOrani < sahaEnIyiKYuzde) return muhakeme;
+  if (halihazirdaTemizDestekVarMi(muhakeme, "V1")) return muhakeme;
+  return `${muhakeme} | [V1]:destek(KOD-GARANTİSİ: aygırın sahadaki EN İYİ kazanma yüzdesi — %${r.sireKazanmaOrani}(n=${r.sireOrneklemKendiVeri}, gerçek örneklem))`;
 }
 
 /**
@@ -1206,21 +1033,22 @@ export function faz2PedigriKarsilastirmaEtiketiEkle(
  * yorumu (kaç yarış, hangi kiloda) hâlâ Claude'un muhakemesinde kalır.
  */
 export function faz2SonYarisKazandiEtiketiEkle(
-  muhakeme: MuhakemeSatiri[],
+  muhakeme: string,
   r: { recentForm: string | null }
-): MuhakemeSatiri[] {
+): string {
   if (!r.recentForm) return muhakeme;
   const chars = r.recentForm.split("").filter((c) => /[\dK]/i.test(c));
   const son = chars.at(-1);
-  if (son === "1") {
-    if (satirVarMi(muhakeme, "V19", { tip: "destek" })) return muhakeme;
-    return satirEkle(muhakeme, { kod: ["V19"], tip: "destek", guven: "tam", kodGarantili: true, aciklama: `KOD-GARANTİSİ: son yarışını kazandı — form dizisi ${r.recentForm}` });
-  }
-  // v6.83 — kullanıcı talebi 2026-08-10: son yarış galibiyet DEĞİLSE de bu objektif bir
-  // gerçek, sessizce geçilmemeli. Claude form dizisini kendi yorumuyla zaten ele aldıysa
-  // (satirVarMi true) tekrar eklenmiyor; hiç değinmediyse ham gerçek koda gömülü kalıyor.
-  if (satirVarMi(muhakeme, "V19")) return muhakeme;
-  return satirEkle(muhakeme, { kod: ["V19"], tip: "notr", guven: "tam", kodGarantili: true, aciklama: `KOD-GARANTİSİ: son yarışı kazanmadı — form dizisi ${r.recentForm}` });
+  if (son !== "1") return muhakeme;
+  if (halihazirdaTemizDestekVarMi(muhakeme, "V19")) return muhakeme;
+  return `${muhakeme} | [V19]:destek(KOD-GARANTİSİ: son yarışını kazandı — form dizisi ${r.recentForm})`;
+}
+
+// V5 (halihazirdaTemizDestekVarMi'den farklı): Claude "destek/nötr/risk" hangi yönde
+// karar verirse versin, bir kez bahsetmişse yeterli — yalnız TAMAMEN SESSİZ kalmayı
+// engelliyoruz, yönü zorlamıyoruz (H2H "zayıf kanıt", yön kararı Claude'a bırakılır).
+function halihazirdaHerhangiBirEtiketVarMi(muhakeme: string, kodDeseni: string): boolean {
+  return new RegExp(`\\[${kodDeseni}\\]:`, "i").test(muhakeme);
 }
 
 /**
@@ -1231,13 +1059,10 @@ export function faz2SonYarisKazandiEtiketiEkle(
  * karşılaşma" GARANTİSİ taşır (getH2HForRace yalnız bugünün atları arasında ortak geçmiş
  * yarış varsa döner) — bu yüzden var olduğunda ASLA sessiz kalınamaz, koda gömülü.
  */
-// V5: Claude "destek/nötr/risk" hangi yönde karar verirse versin, bir kez bahsetmişse
-// yeterli — yalnız TAMAMEN SESSİZ kalmayı engelliyoruz, yönü zorlamıyoruz (H2H "zayıf
-// kanıt", yön kararı Claude'a bırakılır) — bu yüzden `tip` filtresi VERİLMEDEN satirVarMi.
-export function faz2H2HEtiketiEkle(muhakeme: MuhakemeSatiri[], r: { h2hOzet: string | null }): MuhakemeSatiri[] {
+export function faz2H2HEtiketiEkle(muhakeme: string, r: { h2hOzet: string | null }): string {
   if (!r.h2hOzet) return muhakeme;
-  if (satirVarMi(muhakeme, "V5")) return muhakeme;
-  return satirEkle(muhakeme, { kod: ["V5"], tip: "notr", guven: "orta", kodGarantili: true, aciklama: `KOD-GARANTİSİ: bugünün rakiplerinden biriyle geçmiş karşılaşma var — ${r.h2hOzet}` });
+  if (halihazirdaHerhangiBirEtiketVarMi(muhakeme, "V5")) return muhakeme;
+  return `${muhakeme} | [V5]:nötr(KOD-GARANTİSİ: bugünün rakiplerinden biriyle geçmiş karşılaşma var — ${r.h2hOzet})`;
 }
 
 /**
@@ -1245,16 +1070,10 @@ export function faz2H2HEtiketiEkle(muhakeme: MuhakemeSatiri[], r: { h2hOzet: str
  * (bugünküyle eşleşen zemin durumunda geçmiş galibiyet) somut, ölçülebilir bir olumlu
  * sinyal — hiç bahsedilmeden geçilemez.
  */
-export function faz2ZeminKazanmaEtiketiEkle(muhakeme: MuhakemeSatiri[], r: { zeminGecmisiOzet: string | null }): MuhakemeSatiri[] {
-  if (!r.zeminGecmisiOzet) return muhakeme;
-  if (r.zeminGecmisiOzet.includes("[BU ZEMİN SINIFINDA KAZANDI]")) {
-    if (satirVarMi(muhakeme, "V22", { tip: "destek" })) return muhakeme;
-    return satirEkle(muhakeme, { kod: ["V22"], tip: "destek", guven: "tam", kodGarantili: true, aciklama: "KOD-GARANTİSİ: bugünküyle eşleşen zemin sınıfında kazanmış geçmişi var" });
-  }
-  // v6.83 — kullanıcı talebi 2026-08-10: bu zemin sınıfında kazanmamış olmak da bir
-  // veridir, "veri var ama hiç bahsedilmedi" görüntüsü vermemeli.
-  if (satirVarMi(muhakeme, "V22")) return muhakeme;
-  return satirEkle(muhakeme, { kod: ["V22"], tip: "notr", guven: "orta", kodGarantili: true, aciklama: `KOD-GARANTİSİ: zemin geçmişi var, bu zemin sınıfında kazanma yok — ${r.zeminGecmisiOzet}` });
+export function faz2ZeminKazanmaEtiketiEkle(muhakeme: string, r: { zeminGecmisiOzet: string | null }): string {
+  if (!r.zeminGecmisiOzet?.includes("[BU ZEMİN SINIFINDA KAZANDI]")) return muhakeme;
+  if (halihazirdaTemizDestekVarMi(muhakeme, "V22")) return muhakeme;
+  return `${muhakeme} | [V22]:destek(KOD-GARANTİSİ: bugünküyle eşleşen zemin sınıfında kazanmış geçmişi var)`;
 }
 
 export function kosuBaslikUret(faz1: Faz1Sonuc, izinliKodlar: string[]): string {

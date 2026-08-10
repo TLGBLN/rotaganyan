@@ -8,8 +8,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { upsertPrediction, type PickInput } from "@/server/actions/prediction.actions";
 import { faz2PickDetaylari } from "@/lib/methodology/v2-engine";
-import type { MuhakemeSatiri } from "@/lib/methodology/muhakeme-format";
-import { satirGosterimMetni } from "@/lib/methodology/muhakeme-format";
 
 // v6.51 — kullanıcı kararı 2026-08-03 ("hepsini hayata sok"): bu, "sıfırdan" tasarlanan
 // V1-V22 + A-E muhakeme matrisi motorunun GERÇEK admin akışına bağlanmış hali —
@@ -20,8 +18,8 @@ import { satirGosterimMetni } from "@/lib/methodology/muhakeme-format";
 // Banko/kupon, Faz2'nin kendi teknikSira+karar alanlarına dayanan MEKANİK bir işarettir
 // (faz2BankoAdayiTespit) — Faz3'ün gerçek 0-100 puanlamasından türetilen banko kadar
 // güvenilir değildir, bu yüzden "Banko Adayı" dille sunulur, "Banko" dille değil.
-type TestV2Pick = { no: number; ad: string; teknikSira: number; karar: string; muhakeme: MuhakemeSatiri[] };
-type BatchAt = { no: number; ad: string; karar: string; muhakeme: MuhakemeSatiri[] };
+type TestV2Pick = { no: number; ad: string; teknikSira: number; karar: string; muhakeme: string };
+type BatchAt = { no: number; ad: string; karar: string; muhakeme: string };
 type Runner = { id: string; no: number; name: string };
 type BankoAdayiSonuc = {
   bankoAdayi: boolean; sebep: string;
@@ -32,7 +30,6 @@ type KaliteUyariSatiri = { no: number; ad: string; uyarilar: string[] };
 type KullanilmayanVeriSatiri = { no: number; ad: string; kullanilmayanKodlar: string[] };
 type Top3TerfiSonuc = { no: number; ad: string; eskiSira: number; yeniSira: number };
 type KararHiyerarsiDegisikligi = { no: number; ad: string; eskiSira: number; yeniSira: number };
-type GuvenTavaniIndirme = { no: number; ad: string; kod: string[]; eskiGuven: string; yeniGuven: string };
 
 type Props = { raceId: string };
 
@@ -69,8 +66,6 @@ export default function V2AnalysisPanel({ raceId }: Props) {
   const [runners, setRunners] = useState<Runner[]>([]);
   const [bankoAdayi, setBankoAdayi] = useState<BankoAdayiSonuc | null>(null);
   const [kaliteUyarilari, setKaliteUyarilari] = useState<KaliteUyariSatiri[]>([]);
-  const [guvenKalibrasyonUyarilari, setGuvenKalibrasyonUyarilari] = useState<KaliteUyariSatiri[]>([]);
-  const [guvenTavaniIndirmeleri, setGuvenTavaniIndirmeleri] = useState<GuvenTavaniIndirme[]>([]);
   const [siralamaUyarilari, setSiralamaUyarilari] = useState<KaliteUyariSatiri[]>([]);
   const [kararSiraUyarilari, setKararSiraUyarilari] = useState<KaliteUyariSatiri[]>([]);
   const [kullanilmayanVeri, setKullanilmayanVeri] = useState<KullanilmayanVeriSatiri[]>([]);
@@ -97,8 +92,6 @@ export default function V2AnalysisPanel({ raceId }: Props) {
     setManualOrder([]);
     setApplied(false);
     setKaliteUyarilari([]);
-    setGuvenKalibrasyonUyarilari([]);
-    setGuvenTavaniIndirmeleri([]);
     setSiralamaUyarilari([]);
     setKararSiraUyarilari([]);
     setKullanilmayanVeri([]);
@@ -136,8 +129,6 @@ export default function V2AnalysisPanel({ raceId }: Props) {
         runners: Runner[];
         faz2BankoAdayi: BankoAdayiSonuc | null;
         faz2KaliteUyarilari: KaliteUyariSatiri[] | null;
-        faz2GuvenKalibrasyonUyarilari: KaliteUyariSatiri[] | null;
-        faz2GuvenTavaniIndirmeleri: GuvenTavaniIndirme[] | null;
         faz2SiralamaUyarilari: KaliteUyariSatiri[] | null;
         faz2KararSiraUyarilari: KaliteUyariSatiri[] | null;
         faz2KullanilmayanVeri: KullanilmayanVeriSatiri[] | null;
@@ -156,8 +147,6 @@ export default function V2AnalysisPanel({ raceId }: Props) {
       setRunners(res.runners ?? []);
       setBankoAdayi(res.faz2BankoAdayi ?? null);
       setKaliteUyarilari((res.faz2KaliteUyarilari ?? []).filter((k) => k.uyarilar.length > 0));
-      setGuvenKalibrasyonUyarilari((res.faz2GuvenKalibrasyonUyarilari ?? []).filter((k) => k.uyarilar.length > 0));
-      setGuvenTavaniIndirmeleri(res.faz2GuvenTavaniIndirmeleri ?? []);
       setSiralamaUyarilari((res.faz2SiralamaUyarilari ?? []).filter((k) => k.uyarilar.length > 0));
       setKararSiraUyarilari((res.faz2KararSiraUyarilari ?? []).filter((k) => k.uyarilar.length > 0));
       setKullanilmayanVeri(res.faz2KullanilmayanVeri ?? []);
@@ -294,7 +283,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
             <AlertTriangle className="h-3.5 w-3.5" /> Kullanılmayan Veri — kaydetmeden önce onay gerekir
           </div>
           <p className="text-muted-foreground">
-Sahadaki HER at için Faz1&apos;de gerçek veri bulunan ama muhakemede hiç geçmeyen kodlar (STARŞAH/PRENSES MEHLİKA/TÜRKÖREN dersi — veri var, kullanılmamış):
+            İlk 2 sıradaki atlar için Faz1&apos;de gerçek veri bulunan ama muhakemede hiç geçmeyen kodlar (STARŞAH/PRENSES MEHLİKA dersi — veri var, kullanılmamış):
           </p>
           <ul className="space-y-1">
             {kullanilmayanVeri.map((k) => (
@@ -388,38 +377,6 @@ Sahadaki HER at için Faz1&apos;de gerçek veri bulunan ama muhakemede hiç geç
           <ul className="space-y-0.5">
             {kararHiyerarsiDegisiklikleri.map((d) => (
               <li key={d.no} className="font-medium">#{d.no} {d.ad}: {d.eskiSira}. sıra → {d.yeniSira}. sıra</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {guvenTavaniIndirmeleri.length > 0 && (
-        <div className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-xs">
-          <div className="flex items-center gap-1.5 font-semibold text-amber-600 dark:text-amber-400">
-            <AlertTriangle className="h-3.5 w-3.5" /> Güven Tavanı Uygulandı — küçük örneklem
-          </div>
-          <p className="text-muted-foreground">
-            V9/V10 satırlarında örneklem küçük olduğu halde (n&lt;10) yazılan yüksek güven, örneklem büyüklüğüne göre otomatik indirildi:
-          </p>
-          <ul className="space-y-0.5">
-            {guvenTavaniIndirmeleri.map((g, i) => (
-              <li key={`${g.no}-${i}`} className="font-medium">#{g.no} {g.ad} [{g.kod.join("+")}]: {g.eskiGuven} → {g.yeniGuven}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {guvenKalibrasyonUyarilari.length > 0 && (
-        <div className="space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-xs">
-          <div className="flex items-center gap-1.5 font-semibold text-amber-600 dark:text-amber-400">
-            <AlertTriangle className="h-3.5 w-3.5" /> Güven Kalibrasyonu — İSPANOZ dersi
-          </div>
-          <p className="text-muted-foreground">
-            Geniş örneklemli (n≥10) V9/V10 destek sinyali var ama güven düşük seçilmiş — gözden geçirin:
-          </p>
-          <ul className="space-y-1">
-            {guvenKalibrasyonUyarilari.map((k) => (
-              <li key={k.no}><span className="font-medium">#{k.no} {k.ad}:</span> <span className="text-muted-foreground">{k.uyarilar.join(" ")}</span></li>
             ))}
           </ul>
         </div>
@@ -524,7 +481,7 @@ Sahadaki HER at için Faz1&apos;de gerçek veri bulunan ama muhakemede hiç geç
                     <span className="font-semibold text-sm">#{a.no} {a.ad}</span>
                     <span className="text-[10px] font-semibold text-purple-500">{a.karar}</span>
                   </div>
-                  <p className="mt-1 pl-14 text-[11px] text-muted-foreground">{a.muhakeme.map(satirGosterimMetni).join(" | ")}</p>
+                  <p className="mt-1 pl-14 text-[11px] text-muted-foreground">{a.muhakeme}</p>
                 </div>
               );
             })}

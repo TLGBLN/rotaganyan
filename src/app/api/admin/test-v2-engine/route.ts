@@ -5,9 +5,7 @@ import type { Anthropic } from "@anthropic-ai/sdk";
 import { createWithTruncationRetry, extractText } from "@/lib/methodology/claude-analiz-helpers";
 import { getRecentCachedResult } from "@/lib/claude-cost";
 import type { Role } from "@prisma/client";
-import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi, faz2AgfFavorisiDususeRagmenGarantisi, faz2GuvenTavaniUygula, faz2GuvenKalibrasyonDenetimi } from "@/lib/methodology/v2-engine";
-import type { MuhakemeSatiri } from "@/lib/methodology/muhakeme-format";
-import { satirGosterimMetni } from "@/lib/methodology/muhakeme-format";
+import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi, faz2AgfFavorisiDususeRagmenGarantisi } from "@/lib/methodology/v2-engine";
 
 // v6.53 — kullanıcı bulgusu 2026-08-04 (Kocaeli 5.Koşu): tüm sahayı TEK bir Claude
 // çağrısında analiz etmek, zengin kategorilerde (3/4/5) + 8+ atlı sahalarda GERÇEKTEN
@@ -27,11 +25,7 @@ import { satirGosterimMetni } from "@/lib/methodology/muhakeme-format";
 // artık grup grup DEĞİL, TEK bir grup/sıralama işleyip dönüyor; hangi adımı çalıştıracağı
 // `step`+`batchIndex` ile tarayıcıdan (V2AnalysisPanel.tsx) yönetiliyor — tıpkı eski
 // sistemin 3 ayrı adımı gibi. Hiçbir tek istek artık bir Claude çağrısından uzun sürmez.
-// v6.75 — kullanıcı bilgisi 2026-08-09: Vercel planı 800sn'ye kadar izin veriyor (bkz.
-// test-v3-engine/route.ts'in zaten kullandığı aynı sınır) — 300sn'de tek bir Claude
-// çağrısı (grup ya da sıralama) bazen kesiliyor, cevap tam oluşmadan istek düşüyordu
-// (hem "zaman aşımı" hatası hem boşa giden token maliyeti). Daha fazla headroom veriyor.
-export const maxDuration = 800;
+export const maxDuration = 300;
 
 const BATCH_SIZE = 4;
 
@@ -40,10 +34,10 @@ export type TestV2Pick = {
   ad: string;
   teknikSira: number;
   karar: string;
-  muhakeme: MuhakemeSatiri[];
+  muhakeme: string;
 };
 
-export type BatchAt = { no: number; ad: string; karar: string; muhakeme: MuhakemeSatiri[] };
+export type BatchAt = { no: number; ad: string; karar: string; muhakeme: string };
 
 // v6.68 — kullanıcı bulgusu 2026-08-08 (Ankara 2.Koşu, #3/#4 iki denemede de yanıttan
 // düşmüştü): loglardan çıkan ham kanıt, Claude'un HER İKİ denemede de "atlar" dizisini
@@ -56,25 +50,6 @@ export type BatchAt = { no: number; ad: string; karar: string; muhakeme: Muhakem
 // bu şemada zaten başka yerde (ör. her at objesinin kendi required'ı) kullanılıyor, minItems
 // gibi Anthropic-özel bir kısıtlamaya bağımlı değil. Bir alan eksikse yanıtın kendisi şema
 // ihlali sayılır — model artık "eksik ama geçerli" bir yanıt ÜRETEMEZ, yapısal olarak kapalı.
-// v6.70 (V2.2) — kullanıcı talimatı 2026-08-09: "muhakeme" artık serbest metin değil,
-// yapılandırılmış bir MuhakemeSatiri[] şeması — CEMRE ATEŞİ dersi (Claude aynı objektif
-// sonuca kendi cümleleriyle vardığında kod'un aradığı kanonik ifadeyle eşleşmiyordu)
-// kökten kapanıyor: "guven" artık bir CÜMLE değil doğrudan seçilen bir enum. Anthropic'in
-// yapılandırılmış çıktı API'si array için minItems/maxItems'ı yalnız 0/1 destekliyor (bkz.
-// batchSchemaFor'un eski yorumu, 2+ değer canlıda 400 hatası vermişti) — bu yüzden ne
-// "muhakeme" dizisinde ne de "kod" alt-dizisinde HİÇ minItems/maxItems kullanılmıyor.
-const muhakemeSatirSchema = {
-  type: "object",
-  properties: {
-    kod: { type: "array", items: { type: "string" } },
-    tip: { type: "string", enum: ["destek", "risk", "notr"] },
-    guven: { type: "string", enum: ["tam", "orta", "zayif"] },
-    aciklama: { type: "string" },
-  },
-  required: ["kod", "tip", "guven", "aciklama"],
-  additionalProperties: false,
-} as const;
-
 function batchSchemaFor(nolar: number[]) {
   const atSchema = {
     type: "object",
@@ -82,7 +57,7 @@ function batchSchemaFor(nolar: number[]) {
       no: { type: "integer" },
       ad: { type: "string" },
       karar: { type: "string", enum: ["Güçlü Aday", "Düşük Risk", "Orta Risk", "Yüksek Risk"] },
-      muhakeme: { type: "array", items: muhakemeSatirSchema },
+      muhakeme: { type: "string" },
     },
     required: ["no", "ad", "karar", "muhakeme"],
     additionalProperties: false,
@@ -128,14 +103,14 @@ const SIRALAMA_SCHEMA = {
 function batchReminder(kategori: string, batchNo: number, toplamBatch: number, nolar: number[]): string {
   return `Şimdi yukarıdaki V-kodu tanımlarını, muhakeme matrisini ve AŞAĞIDAKİ AT GRUBUNU (bu, sahadaki atların yalnız bir kısmı — grup ${batchNo}/${toplamBatch}) kullanarak HER at için "muhakeme" üret. Bu koşu ${kategori} kategorisinde — yalnız KOŞU/AT verisinde GÖRÜNEN V-kodlarını kullan, görünmeyen bir kod hakkında veri uydurma. Bu aşamada teknikSira/karşılaştırmalı sıra İSTEMİYORUM (sahadaki diğer atları henüz görmüyorsun) — yalnız "karar" (Güçlü Aday / Düşük Risk / Orta Risk / Yüksek Risk, bu atın KENDİ verisine göre) ve "muhakeme" üret.
 
-**FORMAT — YAPILANDIRILMIŞ MUHAKEME SATIRLARI (v6.70/V2.2):** "muhakeme" artık serbest metin DEĞİL, bir SATIR DİZİSİ — her satır: { "kod": [...ilgili V-kodları, ör. ["V10","V12"] veya tek kod ["V4"]], "tip": "destek"/"risk"/"notr", "guven": "tam"/"orta"/"zayif", "aciklama": "kısa 1-2 cümle/ifade" }. Cümle kurma zorunda değilsin — YÖNÜ (tip) ve GÜVENİ (guven) doğrudan alan olarak SEÇ, "hafif/nötr-hafif/kısmi" gibi kelime oyunlarıyla yumuşatma; kanıt gerçekten güçlüyse (ör. n≥10 + popülasyonda ilk 2 sıra, bkz. İSPANOZ dersi V_LEGEND'de) "guven":"tam" seç, ASLA daha zayıf bir "guven" ile kelimeyle telafi etme. Muhakeme Matrisi'nde çapraz sorguladığın HER çift için ayrı bir satır ekle (kod dizisinde İKİ kodu birlikte ver). Tekli gözlemler (ör. "V10:KaçakAt") de tek elemanlı kod dizisiyle (["V10"]) ayrı bir satır olabilir.
+**FORMAT — KOMPAKT ETİKET NOTASYONU:** "muhakeme" alanında TAM CÜMLE DEĞİL, kısa "Etiket:değer(bağlam)" parçaları yaz, "|" ile ayır. Fiil/bağlaç/özne YASAK. Muhakeme Matrisi'nde çapraz sorguladığın HER çift için "[Vx+Vy]:destek" veya "[Vx+Vy]:risk" etiketi ekle (bağlamı parantez içinde 1-3 kelime). Örnek: 'V10:KaçakAt | V18:3(iç) | [V10+V18]:destek(iç kulvar+kaçak avantajlı) | V9:n=4,med-0.6(güçlü) | [V2+V9]:destek(idman+kapanış örtüşüyor) | V13:56(-2kg) | [V13+V10]:risk(ağır kilo erken enerji riski)'.
 
-**ÖNEMLİ OLANI YAZ, DOLDURMA YAPMA (v6.80 — v6.73/v6.74'ün "her kodu zorunlu değerlendir" talimatı GERİ ALINDI):** Yalnız gerçekten anlamlı/karar etkileyici bulduğun V-kodu çiftlerini ve sinyalleri satır olarak ekle — önemsiz bulduğun her kod için satır eklemek ZORUNLU DEĞİL. Kullanıcı bulgusu 2026-08-10: "her kodu zorunlu değerlendir" talimatı maliyeti katladı VE yine de tam kapsama ulaşmadı (Claude yine de bazı kodları atlıyordu) — yani hem pahalı hem güvenilmezdi. TAM TIME/İSPANOZ tarzı gerçekten önemli, geniş örneklemli sinyalleri (n≥5) ASLA atlama — ama sıradan/önemsiz her kodu doldurma amacıyla yazma. "Veri var ama hiç değerlendirilmedi" riski (STARŞAH/PRENSES MEHLİKA/TÜRKÖREN dersi) artık SENDEN değil, ücretsiz mekanik bir denetimden (kaydetmeden önce admine gösterilen "Kullanılmayan Veri" listesi) karşılanıyor — sen doğal/kısa yaz, admin gerçekten önemli bir eksik görürse elle ekler.
+**ÖNEMLİ OLANI YAZ, DOLDURMA YAPMA:** Yalnız gerçekten anlamlı/karar etkileyici bulduğun V-kodu çiftlerini ve sinyalleri yaz — önemsiz bulduğun her kodu "yok/etkisiz" diye tek tek sıralamak ZORUNLU DEĞİL (v6.66 kullanıcı bulgusu: bu, 15 atlı sahalarda muhakemeyi anlamsız doldurmayla şişirip sıralama çağrısının asıl sinyali (karar: Güçlü Aday vb.) gürültü içinde kaybetmesine yol açtı — TAM TIME/İSPANOZ tarzı gerçekten önemli, geniş örneklemli sinyalleri (n≥5) ASLA atlama, ama sıradan/önemsiz her kodu doldurma amacıyla yazma).
 
 **KRİTİK — HİÇBİR ALANI ATLAMA:** Yanıt şeması bu gruptaki HER at için AYRI, ZORUNLU bir alan içeriyor (${nolar.map((no) => `"at_${no}"`).join(", ")}) — bunlardan biri bile eksik kalırsa yanıt GEÇERSİZ sayılır. Aşağıdaki ${nolar.length} atın HEPSİ için bir alan doldurmalısın, hiçbirini atlama.
 
 Yanıtı YALNIZCA geçerli JSON olarak ver, örnek (alan adları "at_" + o atın numarası):
-{ ${nolar.map((no) => `"at_${no}": { "no": ${no}, "ad": "...", "karar": "Güçlü Aday / Düşük Risk / Orta Risk / Yüksek Risk", "muhakeme": [ { "kod": ["V10","V18"], "tip": "destek", "guven": "orta", "aciklama": "iç kulvar+kaçak avantajlı" }, { "kod": ["V13"], "tip": "risk", "guven": "zayif", "aciklama": "1kg ağır" } ] }`).join(", ")} }`;
+{ ${nolar.map((no) => `"at_${no}": { "no": ${no}, "ad": "...", "karar": "Güçlü Aday / Düşük Risk / Orta Risk / Yüksek Risk", "muhakeme": "Etiket:değer(bağlam) | [Vx+Vy]:destek(...) | ..." }`).join(", ")} }`;
 }
 
 // v6.55 — kullanıcı bulgusu (WOLF SEYFO, Kocaeli 7.Koşu): sıralama çağrısı yalnız
@@ -148,7 +123,7 @@ Yanıtı YALNIZCA geçerli JSON olarak ver, örnek (alan adları "at_" + o atın
 // kelimeyle sayı çelişirse sayıyı esas alabilir.
 function siralamaReminder(atlar: (BatchAt & { hamVeri?: string })[]): string {
   const liste = atlar.map((a) =>
-    `#${a.no} ${a.ad} — İLK karar (grup aşamasında, aşağıdaki etiketlerin bir kısmı henüz eklenmeden önce verildi — bkz. KARARI YENİDEN VER talimatı): ${a.karar}\nGrup analiz metni: ${a.muhakeme.map(satirGosterimMetni).join(" | ")}${a.hamVeri ? `\nHam veri: ${a.hamVeri}` : ""}`
+    `#${a.no} ${a.ad} — İLK karar (grup aşamasında, aşağıdaki etiketlerin bir kısmı henüz eklenmeden önce verildi — bkz. KARARI YENİDEN VER talimatı): ${a.karar}\nGrup analiz metni: ${a.muhakeme}${a.hamVeri ? `\nHam veri: ${a.hamVeri}` : ""}`
   ).join("\n\n");
   return `Aşağıda bu koşudaki HER at için ZATEN üretilmiş muhakeme metinleri VE o atın ham Faz1 verisi var — sen yeni bir analiz YAPMIYORSUN, yalnız bunları birbirine göre KARŞILAŞTIRIP nihai teknik sıralamayı (1'den sahadaki at sayısına kadar, hiç atlama/tekrar yok) belirliyorsun. En güçlü kanıta/karara sahip at 1, en zayıf en yüksek sıra numarasını alır.
 
@@ -309,12 +284,7 @@ async function handleBatch(raceId: string, batchIndex: number) {
     if (izinliKodlar.includes("V19")) muhakeme = faz2SonYarisKazandiEtiketiEkle(muhakeme, r);
     if (izinliKodlar.includes("V5")) muhakeme = faz2H2HEtiketiEkle(muhakeme, r);
     if (izinliKodlar.includes("V22")) muhakeme = faz2ZeminKazanmaEtiketiEkle(muhakeme, r);
-    // v6.82 — kullanıcı bulgusu 2026-08-10 (Bursa 5.Koşu, 15 atlı büyük grup): Claude'un
-    // JSON yanıtındaki "ad" alanı (biz zaten kesin bildiğimiz, yalnız doğrulama amaçlı
-    // istenen bir alan) bazı atlarda gerçek isim yerine "placeholder" gibi anlamsız bir
-    // değerle dönmüştü — muhtemelen büyük gruplarda model kaynaklı bir hata. Artık isme
-    // HİÇ güvenilmiyor, her zaman kendi kesin verimizden (Faz1Runner.ad) alınıyor.
-    return { ...a, ad: r.ad, muhakeme };
+    return { ...a, muhakeme };
   });
 
   return NextResponse.json({ ok: true, atlar, totalBatches: batches.length, kategori, usage });
@@ -386,19 +356,6 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
   }
   console.log("[test-v2-engine] toplam parsed atlar sayısı:", parsed.atlar.length);
 
-  // v6.71 — kullanıcı talimatı 2026-08-09 ("bir atın gerçekte 'orta' güven hak ettiğini
-  // 'zayıf' olarak değerlendirebilir" sorusuna cevaben, TERS yön: Claude küçük örneklemi
-  // olduğundan FAZLA güvenli — "tam" — yazmış olabilir): örneklem büyüklüğü (n) objektif
-  // bir tavan uygular — bkz. v2-engine.ts'deki faz2GuvenTavaniUygula yorumu. Top3
-  // Garantisi'nden ÖNCE çalışır ki, n<10 olduğu halde "tam" yazılmış bir V10+V12 satırı
-  // yüzünden haksız bir terfi tetiklenmesin.
-  const guvenTavaniSonuc = faz2GuvenTavaniUygula(parsed.atlar, faz1);
-  parsed = { atlar: guvenTavaniSonuc.atlar };
-  const faz2GuvenTavaniIndirmeleri = guvenTavaniSonuc.indirmeler;
-  if (faz2GuvenTavaniIndirmeleri.length > 0) {
-    console.log("[test-v2-engine] Güven tavanı uygulandı:", JSON.stringify(faz2GuvenTavaniIndirmeleri));
-  }
-
   // v6.64 — kullanıcı kararı 2026-08-05 (DAELLA): en sıkı koşulda (sahanın #1 stili +
   // n≥10 + "Yüksek Risk" değil) ilk 3'e girmesi GEREKEN bir at, sıralama çağrısı
   // yanılmış olsa bile koda gömülü olarak terfi ettirilir — bkz. v2-engine.ts yorumu.
@@ -462,10 +419,6 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
   // promptuna EKLEMEK yerine (bu da maliyet demek) tamamen ücretsiz mekanik bir
   // son-kontrol olarak burada uyguluyoruz.
   const faz2KaliteUyarilari = faz2KaliteDenetimi(parsed.atlar);
-  // v6.71 — TERS yön (Claude büyük örneklemli bir sinyali HAK ETTİĞİNDEN AZ güvenle
-  // yazmış olabilir, İSPANOZ dersinin genel hali) mekanik olarak düzeltilmiyor, yalnız
-  // admin'e uyarı olarak gösteriliyor — bkz. v2-engine.ts'deki fonksiyon yorumu.
-  const faz2GuvenKalibrasyonUyarilari = faz2GuvenKalibrasyonDenetimi(parsed.atlar, faz1).filter((u) => u.uyarilar.length > 0);
   const faz2BankoAdayi = faz2BankoAdayiTespit(parsed.atlar);
   // v6.55 — kullanıcı bulgusu (WOLF SEYFO, Kocaeli 7.Koşu): aynı V-kodu çifti için
   // "destek" etiketli bir at, "destek olmayan" etiketli başka bir attan daha kötü
@@ -475,9 +428,8 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
   // arasında büyük tutarsızlık varsa mekanik olarak uyar — büyük sahalarda (24 at)
   // otomatik ölçeklenir, prompt talimatına güvenmez.
   const faz2KararSiraUyarilari = faz2KararSiraTutarsizlikDenetimi(parsed.atlar);
-  // v6.58/v6.73 — kullanıcı kararı: sahadaki HER atta veri var ama muhakemede hiç
-  // kullanılmamışsa yalnız bilgilendirme değil, admin panelinde kaydı bilinçli onay
-  // olmadan engeller (v6.73: kapsam rank 1-2'den TÜM sahaya genişletildi).
+  // v6.58 — kullanıcı kararı: rank 1-2'de veri var ama muhakemede hiç kullanılmamışsa
+  // yalnız bilgilendirme değil, admin panelinde kaydı bilinçli onay olmadan engeller.
   const faz2KullanilmayanVeri = faz2KullanilmayanVeriTespiti(faz1, izinliKodlar, parsed.atlar).filter((k) => k.kullanilmayanKodlar.length > 0);
 
   // v6.51 — kullanıcı kararı 2026-08-03 ("hepsini hayata sok"): bu rota artık yalnız
@@ -508,11 +460,9 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
     faz1VeriDenetimi,
     faz2Denetim,
     faz2KaliteUyarilari,
-    faz2GuvenKalibrasyonUyarilari,
     faz2SiralamaUyarilari,
     faz2KararSiraUyarilari,
     faz2KullanilmayanVeri,
-    faz2GuvenTavaniIndirmeleri,
     faz2Top3Terfileri,
     faz2GucluTop3Terfileri,
     faz2AgfFavoriTerfileri,
