@@ -1063,6 +1063,81 @@ export function faz2AgfFavorisiDususeRagmenGarantisi(
   return { atlar: yeniAtlar, terfiler };
 }
 
+/**
+ * v6.100 — kullanıcı kararı 2026-08-10 (CEVATHAN + CANYAMAN, iki ayrı gerçek kazanan,
+ * ikisi de sahadaki AGF'ye göre 3. ama sistemde 8. sıraya düşürülmüştü, "artık bu atlar
+ * geriye atılmasın" talebi): geriye dönük doğrulama (n=66, Haziran-Ağustos, çok tarihli)
+ * — sahadaki GÜNCEL AGF'ye göre top-3'te olan ama sistemde >=7. sıraya düşürülen atların
+ * galibiyet oranı %15.2, ilk-3 oranı %37.9. Kontrol grubu (tüm >=7. sıradakiler, n=1036):
+ * %3.9 galibiyet, %13.0 ilk-3. Yani bu grup kontrol grubunun 3-4 katı isabetli.
+ *
+ * ÖNEMLİ AYRIM (2026-07-29 ÇOKOMEL KIZ dersiyle ÇELİŞMİYOR): o zamanki genel "AGF top-3"
+ * kuralı atları HİÇ analiz etmeden (details boş) mekanik puanla geçiştiriyordu — kök neden
+ * gerekçesizlikti. CEVATHAN/CANYAMAN'da sorun bu değildi: ikisi de tam muhakeme edilmişti
+ * (8-9 satır), yalnız NİHAİ sıralama adımı kanıtlanmış güçlü bir piyasa sinyalini yeterince
+ * ağırlıklandırmadı. Bu fonksiyon faz2AgfTrend456Garantisi ile AYNI mimaride (analiz
+ * SONRASI çalışan bir terfi/taban kuralı, 4-6 penceresine) çalışır — analiz zorunluluğunu
+ * bypass etmez, Claude'un elindeki veriyi yok saymaz.
+ *
+ * faz2AgfFavorisiDususeRagmenGarantisi'nden (yalnız sahadaki #1 AGF lideri, VE düşüş şartı
+ * var) FARKLI: burada güncel AGF'ye göre ilk-3'teki HERHANGİ bir at kapsanır, düşüş şartı
+ * YOK — statik sıranın kendisi yukarıdaki n=66 doğrulamasıyla yeterli kanıt sayıldı.
+ */
+export function faz2AgfStatikTop3Garantisi(
+  atlar: TeknikSiraliAt[],
+  faz1: Faz1Sonuc
+): { atlar: TeknikSiraliAt[]; terfiler: KararHiyerarsiDegisikligi[] } {
+  if (atlar.length <= 4) return { atlar, terfiler: [] };
+
+  const agfliAtlar = faz1.runners.filter((r) => !r.scratched && r.agf != null);
+  if (agfliAtlar.length < 3) return { atlar, terfiler: [] };
+  const agfTop3 = [...agfliAtlar].sort((a, b) => b.agf! - a.agf!).slice(0, 3);
+
+  let calisma = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
+  const terfiler: KararHiyerarsiDegisikligi[] = [];
+  const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
+
+  // Aynı öncelik mantığı: en güçlü kod-garantili sinyali olan aday EN SON işlenir
+  // (4'e en yakın konumda kalır) — bkz. faz2AgfTrend456Garantisi'ndeki v6.96 dersi.
+  const nitelikliler = agfTop3
+    .map((r) => ({ r, at: calisma.find((a) => a.no === r.no) }))
+    .filter((x): x is { r: Faz1Runner; at: TeknikSiraliAt } => !!x.at)
+    .sort((a, b) => {
+      const gucA = gucluKodGarantiSayisi(a.at.muhakeme, runnerByNo.get(a.at.no));
+      const gucB = gucluKodGarantiSayisi(b.at.muhakeme, runnerByNo.get(b.at.no));
+      if (gucA !== gucB) return gucA - gucB;
+      return b.at.teknikSira - a.at.teknikSira;
+    });
+
+  const terfiAdaylari = new Set<number>();
+  for (const { r, at } of nitelikliler) {
+    const idx = calisma.findIndex((a) => a.no === at.no);
+    if (idx === -1 || idx < 6) continue; // koşmuyor ya da zaten ilk 6'da
+    const eskiSira = calisma[idx].teknikSira;
+    const agfSira = agfTop3.findIndex((x) => x.no === r.no) + 1;
+    const guncellenmisAt: TeknikSiraliAt = {
+      ...calisma[idx],
+      muhakeme: `${calisma[idx].muhakeme} | [SİSTEM]:KOD-GARANTİSİ sahadaki güncel AGF sırası ${agfSira} (top-3) — geriye dönük doğrulamada bu grup %15.2 galibiyet/%37.9 ilk-3 taşıyor, kontrol grubu %3.9/%13.0 (n=66, 2026-08-10) — 4-6 aralığına terfi adayı (eski sıra ${eskiSira}).`,
+    };
+    const kalanlar = calisma.filter((a) => a.no !== at.no);
+    calisma = [...kalanlar.slice(0, 3), guncellenmisAt, ...kalanlar.slice(3)];
+    terfiler.push({ no: at.no, ad: at.ad, eskiSira, yeniSira: -1 });
+    terfiAdaylari.add(at.no);
+  }
+  if (terfiler.length === 0) return { atlar, terfiler: [] };
+
+  calisma = calisma.map((a, i) =>
+    i >= 3 && i < 6 && terfiAdaylari.has(a.no) && (a.karar === "Orta Risk" || a.karar === "Yüksek Risk")
+      ? { ...a, karar: "Düşük Risk" }
+      : a
+  );
+
+  const yeniAtlar = calisma.map((a, i) => ({ ...a, teknikSira: i + 1 }));
+  const sonKonumByNo = new Map(yeniAtlar.map((a) => [a.no, a.teknikSira]));
+  const terfilerGercekKonumla = terfiler.map((t) => ({ ...t, yeniSira: sonKonumByNo.get(t.no) ?? t.yeniSira }));
+  return { atlar: yeniAtlar, terfiler: terfilerGercekKonumla };
+}
+
 export function faz2AyniJokeyEtiketiEkle(
   muhakeme: string,
   r: { jockeyChanged: boolean; ilkStart: boolean }
