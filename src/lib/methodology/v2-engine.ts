@@ -887,10 +887,23 @@ export function faz2GucluKombinasyonTop3Garantisi(
   let calisma = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
   const terfiler: KararHiyerarsiDegisikligi[] = [];
   const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
+  // v6.96 — kullanıcı bulgusu 2026-08-10 (Bursa 3.Koşu): 3+ at aynı anda bu terfiye hak
+  // kazanınca, eski sıralama ("en geride olan önce terfi etsin") YALNIZCA zaten 3. sıraya
+  // en yakın olanı 3.'te bırakıyordu — bu, atların GERÇEK sinyal gücüyle İLGİSİZDİ.
+  // PAPA RUNNER (2 kod-garantili sinyal, zaten 3.'e yakındı) 3.'te kaldı, SUN OF THE
+  // GÖKSU (3 kod-garantili sinyal, sahadaki EN GÜÇLÜ profil) 4.'e itildi — ve SUN OF THE
+  // GÖKSU gerçekten kazandı, PAPA RUNNER sondan 2. oldu. Artık öncelik sinyal SAYISINA
+  // göre: en GÜÇLÜ sinyalli at EN SON işlenir (kimse onu geriye itemesin, 3.'te kalsın),
+  // eşitlikte eski kural (geride olan önce) tie-break olarak korunur.
   const nitelikliler = trendliler
     .map((t) => ({ t, at: calisma.find((a) => a.no === t.runnerNo) }))
     .filter((x): x is { t: TrendAt; at: TeknikSiraliAt } => !!x.at && gucluKodGarantiSayisi(x.at.muhakeme, runnerByNo.get(x.at.no)) >= 2)
-    .sort((a, b) => b.at.teknikSira - a.at.teknikSira); // en geride olan önce terfi etsin
+    .sort((a, b) => {
+      const gucA = gucluKodGarantiSayisi(a.at.muhakeme, runnerByNo.get(a.at.no));
+      const gucB = gucluKodGarantiSayisi(b.at.muhakeme, runnerByNo.get(b.at.no));
+      if (gucA !== gucB) return gucA - gucB; // en güçlü EN SON (dizinin sonu = 3.'te kalır)
+      return b.at.teknikSira - a.at.teknikSira; // eşitlikte: en geride olan önce terfi etsin
+    });
 
   for (const { t, at } of nitelikliler) {
     const idx = calisma.findIndex((a) => a.no === at.no);
@@ -899,7 +912,12 @@ export function faz2GucluKombinasyonTop3Garantisi(
     const guncellenmisAt: TeknikSiraliAt = {
       ...calisma[idx],
       karar: "Güçlü Aday",
-      muhakeme: `${calisma[idx].muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF trend (${t.yon}, ${t.fark >= 0 ? "+" : ""}${t.fark} puan) + birden çok güçlü sinyal birleşimiyle ilk 3'e terfi (eski sıra ${eskiSira} → 3) — 2026-08-09 kullanıcı kararı.`,
+      // v6.95 — kullanıcı bulgusu 2026-08-10 (Bursa 3.Koşu): "eski sıra X → 3" metni
+      // YANLIŞ kesinlik iddia ediyordu — birden fazla at art arda terfi ettirildiğinde
+      // her biri bir öncekini geriye itiyor, gerçek nihai konum ancak TÜM terfiler
+      // bittikten SONRA belli oluyor (aşağıda düzeltiliyor). Metin artık kesin sayı
+      // iddia etmiyor, yalnız "ilk 3 bandına" diyor.
+      muhakeme: `${calisma[idx].muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF trend (${t.yon}, ${t.fark >= 0 ? "+" : ""}${t.fark} puan) + birden çok güçlü sinyal birleşimiyle ilk 3 bandına terfi (eski sıra ${eskiSira}) — 2026-08-09 kullanıcı kararı.`,
     };
     const kalanlar = calisma.filter((a) => a.no !== at.no);
     calisma = [...kalanlar.slice(0, 2), guncellenmisAt, ...kalanlar.slice(2)];
@@ -908,7 +926,12 @@ export function faz2GucluKombinasyonTop3Garantisi(
   if (terfiler.length === 0) return { atlar, terfiler: [] };
 
   const yeniAtlar = calisma.map((a, i) => ({ ...a, teknikSira: i + 1 }));
-  return { atlar: yeniAtlar, terfiler };
+  // v6.95 — terfiler dizisindeki yeniSira SABİT "3" yazılıyordu (yukarıdaki push'ta),
+  // ama sonraki her terfi bir öncekini geriye itiyor — GERÇEK nihai konum yalnız TÜM
+  // terfiler bittikten sonra, finalCalisma'daki asıl indeksten doğru okunabilir.
+  const finalSiraByNo = new Map(yeniAtlar.map((a) => [a.no, a.teknikSira]));
+  const duzeltilmisTerfiler = terfiler.map((t) => ({ ...t, yeniSira: finalSiraByNo.get(t.no) ?? t.yeniSira }));
+  return { atlar: yeniAtlar, terfiler: duzeltilmisTerfiler };
 }
 
 /**
@@ -933,13 +956,21 @@ export function faz2AgfTrend456Garantisi(
 
   let calisma = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
   const terfiler: KararHiyerarsiDegisikligi[] = [];
-  // Analiz gücü = hâlihazırdaki teknikSira (daha iyi sıra = daha güçlü). En GÜÇSÜZ önce
-  // işlenir ki en güçlü, pencereye EN SON eklenerek 4'e en yakın konumda kalsın (Top3/Top2
-  // garantilerindeki "en geride olan önce terfi etsin" deseniyle aynı mantık).
+  const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
+  // v6.96 — kullanıcı kararı 2026-08-10: "analiz gücü = hâlihazırdaki teknikSira" YANLIŞ
+  // bir vekildi — bu fonksiyon zaten o teknikSira'yı DÜZELTMEYE çalışıyor, kendi ürettiği
+  // hatalı sırayı "güç" sayıp kullanmak dairesel bir hataydı. Artık gerçek sinyal gücü
+  // (gucluKodGarantiSayisi) kullanılıyor — en GÜÇLÜ sinyalli at pencereye EN SON eklenir
+  // (4'e en yakın konumda kalır), 4-5-6 arası da böylece gerçek güce göre sıralanır.
   const nitelikliler = trendliler
     .map((t) => ({ t, at: calisma.find((a) => a.no === t.runnerNo) }))
     .filter((x): x is { t: TrendAt; at: TeknikSiraliAt } => !!x.at)
-    .sort((a, b) => b.at.teknikSira - a.at.teknikSira);
+    .sort((a, b) => {
+      const gucA = gucluKodGarantiSayisi(a.at.muhakeme, runnerByNo.get(a.at.no));
+      const gucB = gucluKodGarantiSayisi(b.at.muhakeme, runnerByNo.get(b.at.no));
+      if (gucA !== gucB) return gucA - gucB; // en güçlü EN SON (4'e en yakın kalır)
+      return b.at.teknikSira - a.at.teknikSira; // eşitlikte: en geride olan önce terfi etsin
+    });
 
   for (const { t, at } of nitelikliler) {
     const idx = calisma.findIndex((a) => a.no === at.no);
