@@ -7,7 +7,7 @@ import { getRecentCachedResult } from "@/lib/claude-cost";
 import { analizKilidiAl, analizKilidiBirak } from "@/lib/analysis-concurrency-lock";
 import { butceDurumunuBildir } from "@/lib/claude-budget-monitor";
 import type { Role } from "@prisma/client";
-import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi, faz2AgfFavorisiDususeRagmenGarantisi, faz2AgfStatikTop3Garantisi } from "@/lib/methodology/v2-engine";
+import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi, faz2AgfFavorisiDususeRagmenGarantisi, faz2AgfStatikTop3Garantisi, faz2IlkSiraAgfTop3Sinirlamasi } from "@/lib/methodology/v2-engine";
 
 // v6.53 — kullanıcı bulgusu 2026-08-04 (Kocaeli 5.Koşu): tüm sahayı TEK bir Claude
 // çağrısında analiz etmek, zengin kategorilerde (3/4/5) + 8+ atlı sahalarda GERÇEKTEN
@@ -541,6 +541,17 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
     console.log("[test-v2-engine] AGF statik top-3 4-6 garantisi tetiklendi:", JSON.stringify(faz2AgfStatikTerfileri));
   }
 
+  // v6.101 — kullanıcı kararı 2026-08-10 ("bu atları ilk sırada görebileceğimiz sistem nasıl
+  // olmalı"): sistemin 1.sırası AGF top-3 dışındaysa, AGF top-3 içindeki (sistemin kendi
+  // sırasına göre) en güçlü aday 1.sıraya terfi eder — bkz. v2-engine.ts'deki
+  // faz2IlkSiraAgfTop3Sinirlamasi yorumu (n=104 geriye dönük doğrulama, %5.9 vs %30.0).
+  const ilkSiraSonuc = faz2IlkSiraAgfTop3Sinirlamasi(parsed.atlar, faz1);
+  parsed = { atlar: ilkSiraSonuc.atlar };
+  const faz2IlkSiraTerfileri = ilkSiraSonuc.terfiler;
+  if (faz2IlkSiraTerfileri.length > 0) {
+    console.log("[test-v2-engine] İlk sıra AGF top-3 sınırlaması tetiklendi:", JSON.stringify(faz2IlkSiraTerfileri));
+  }
+
   // v6.67 — kullanıcı kararı 2026-08-07 (İstanbul 1.Koşu dersi): karar hiyerarşisi
   // (Güçlü Aday > Düşük Risk > Orta Risk > Yüksek Risk) KOŞULSUZ olarak zorunlu kılınır —
   // bkz. v2-engine.ts'deki faz2KararHiyerarsisiUygula yorumu.
@@ -616,6 +627,7 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
     faz2AgfFavoriTerfileri,
     faz2Agf456Terfileri,
     faz2AgfStatikTerfileri,
+    faz2IlkSiraTerfileri,
     faz2KararHiyerarsiDegisiklikleri,
     faz2BankoAdayi,
     runners,

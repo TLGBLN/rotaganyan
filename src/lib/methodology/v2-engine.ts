@@ -1138,6 +1138,59 @@ export function faz2AgfStatikTop3Garantisi(
   return { atlar: yeniAtlar, terfiler: terfilerGercekKonumla };
 }
 
+/**
+ * v6.101 — kullanıcı kararı 2026-08-10 ("bu atları ilk sırada görebileceğimiz sistem nasıl
+ * olmalı, neyi gözden kaçırıyoruz"): sistemin kendi 1.sırası ile sahadaki AGF liderinin
+ * FARKLI olduğu 104 geçmiş yarış tek tek incelendi. Sonuç çok net:
+ *   - Sistemin 1.sıraya koyduğu at AGF top-3 İÇİNDEYSE (AGF lideri olmasa bile #2/#3):
+ *     galibiyet oranı %30.0 (n=70).
+ *   - AGF top-3 DIŞINDAN bir atı 1.sıraya koyduysa: galibiyet oranı yalnız %5.9 (n=34).
+ * Yani sistemin AGF top-3'ün TAMAMEN dışına çıkarak 1.sıra vermesi neredeyse hiç
+ * doğrulanmıyor — buna karşın top-3 İÇİNDE hangi atın öne çıkacağına dair sistemin kendi
+ * analiz sırası zaten anlamlı bilgi taşıyor (o yüzden bu fonksiyon AGF liderini KÖRÜ
+ * KÖRÜNE dayatmaz, yalnız 1.sırayı AGF top-3 KÜMESİNE sabitler — hangi üçünün öne
+ * çıkacağına sistemin kendi teknikSira'sı karar verir).
+ *
+ * ÇOKOMEL KIZ/"sert koşul yasağı" ile ÇELİŞMEZ: Claude'un HİÇBİR veriyi analiz etmesi
+ * engellenmiyor, saha yine tam muhakeme ediliyor — yalnız NİHAİ 1.sıra konumu, yukarıdaki
+ * n=104 doğrulamasıyla desteklenen dar bir taban kuralına bağlanıyor. Adayların hepsi
+ * "Yüksek Risk" ise (aşırı uç durum) dokunulmaz, mevcut 1.sıra korunur.
+ */
+export function faz2IlkSiraAgfTop3Sinirlamasi(
+  atlar: TeknikSiraliAt[],
+  faz1: Faz1Sonuc
+): { atlar: TeknikSiraliAt[]; terfiler: KararHiyerarsiDegisikligi[] } {
+  if (atlar.length <= 3) return { atlar, terfiler: [] };
+
+  const agfliAtlar = faz1.runners.filter((r) => !r.scratched && r.agf != null);
+  if (agfliAtlar.length < 3) return { atlar, terfiler: [] };
+  const agfTop3Nos = new Set([...agfliAtlar].sort((a, b) => b.agf! - a.agf!).slice(0, 3).map((r) => r.no));
+
+  const calisma = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
+  const birinci = calisma[0];
+  if (agfTop3Nos.has(birinci.no)) return { atlar, terfiler: [] }; // zaten AGF top-3, dokunma
+
+  // Sistemin KENDİ sırasına göre en önde olan (Yüksek Risk olmayan) AGF top-3 adayı —
+  // AGF lideri KÖRÜ KÖRÜNE dayatılmıyor, hangi üçünün öne çıkacağına sistemin analizi karar verir.
+  const aday = calisma.find((a) => agfTop3Nos.has(a.no) && a.karar !== "Yüksek Risk");
+  if (!aday) return { atlar, terfiler: [] }; // hepsi Yüksek Risk ise dokunma
+
+  // Karar "Güçlü Aday"a yükseltilir — aksi halde faz2KararHiyerarsisiUygula (KOŞULSUZ karar
+  // ağırlığına göre stabil sıralama) demote edilen eski 1.sıra "Güçlü Aday" ise bu terfiyi
+  // hemen geri alırdı (bkz. faz2AgfFavorisiDususeRagmenGarantisi'ndeki AYNI gerekçe).
+  const guncellenmisAday: TeknikSiraliAt = {
+    ...aday,
+    karar: "Güçlü Aday",
+    muhakeme: `${aday.muhakeme} | [SİSTEM]:KOD-GARANTİSİ AGF top-3 içindeki en güçlü aday, 1. sıraya terfi — geriye dönük doğrulama: sistemin AGF top-3 dışından seçtiği #1 adaylar yalnız %5.9 kazanıyor, top-3 içinden seçilenler %30.0 (n=104, 2026-08-10).`,
+  };
+  const kalanlar = calisma.filter((a) => a.no !== aday.no);
+  const yeniSiraliListe = [guncellenmisAday, ...kalanlar];
+  const terfiler: KararHiyerarsiDegisikligi[] = [{ no: aday.no, ad: aday.ad, eskiSira: aday.teknikSira, yeniSira: 1 }];
+
+  const yeniAtlar = yeniSiraliListe.map((a, i) => ({ ...a, teknikSira: i + 1 }));
+  return { atlar: yeniAtlar, terfiler };
+}
+
 export function faz2AyniJokeyEtiketiEkle(
   muhakeme: string,
   r: { jockeyChanged: boolean; ilkStart: boolean }
