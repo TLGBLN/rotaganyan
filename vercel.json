@@ -89,14 +89,6 @@
       "schedule": "30 21 * * *"
     },
     {
-      "path": "/api/cron/sync-trainer-equipment-stats",
-      "schedule": "35 21 * * *"
-    },
-    {
-      "path": "/api/cron/sync-jokey-own-stats",
-      "schedule": "40 21 * * *"
-    },
-    {
       "path": "/api/cron/sync-pedigree-tree",
       "schedule": "30 6 * * *"
     },

@@ -70,8 +70,6 @@ function accuraceQueryNames(names: string[]): string[] {
 }
 
 // ── SKK Sınıf Piramidi (Ansiklopedi Bölüm III) — metin tabanlı en iyi eşleştirme ──
-// export: jokey-own-stat.service.ts da AYNI sınıflandırmayı kullanıyor (jokeyin
-// pist+mesafe+SKK kademesi bazında kazanma oranı için) — tek kaynak, kopya mantık yok.
 export function classToSkk(classType: string | null | undefined): number | null {
   if (!classType) return null;
   const t = classType.toUpperCase();

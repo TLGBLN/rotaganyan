@@ -59,20 +59,6 @@ enum NotificationType {
   HORSE_RACE
 }
 
-enum LessonCategory {
-  DERECE
-  SICIL_KILO
-  AGF
-  TEMPO
-  TUM_ATLAR
-  BANKO
-  JOKEY
-  GALOP
-  TAKI
-  GRUP
-  GENEL
-}
-
 // ─── AUTH & USERS ─────────────────────────────────────────────────────────────
 
 model User {
@@ -440,8 +426,7 @@ model Result {
   cikan       String?
   enteredAt   DateTime @default(now())
 
-  race    Race               @relation(fields: [raceId], references: [id], onDelete: Cascade)
-  lessons PostMortemLesson[]
+  race Race @relation(fields: [raceId], references: [id], onDelete: Cascade)
 
   @@index([hitTop1])
 }
@@ -631,91 +616,12 @@ model DamSireStatOwn {
   @@index([damSireName])
 }
 
-// Aygırın kendi 4 kuşaklık soy ağacındaki "chef-de-race" (Roman dozaj teorisi) sınıflı
-// atalarından hesaplanan Dosage Profile (B-I-C-S-P puanları), Dosage Index (DI, hız/
-// dayanıklılık oranı) ve Center of Distribution (CD). SireStatOwn/DamStatOwn'dan FARKLI:
-// o ikisi bizim kendi yarış sonucu verimizden (kazanma yüzdesi), bu ise aygırın soyağacı
-// yapısından (genetik hız/mesafe eğilimi) geliyor — birbirini tamamlayan, bağımsız iki
-// pedigri sinyali. Kaynak: kullanıcı tarafından sağlanan, önceden hesaplanmış bir tablo
-// (2026-08-06) — Werk Thoroughbred Consultants'ın chef-de-race listesi + standart Roman
-// dozaj formülüyle üretildiği iddia ediliyor, ancak GÜNCEL TAM chef-de-race listesine
-// (209+ isim) erişimimiz olmadığından bağımsız olarak birebir doğrulanamadı (bkz. proje
-// notu: önceki ChatGPT/Google AI kaynaklı dozaj listesi fabrikasyon içerdiği için iptal
-// edilmişti — bu tablo kullanıcının doğrudan talimatıyla, bu riski bilerek baz alınıyor).
-model SireDosageStat {
-  id         String @id @default(cuid())
-  sireName   String @unique
-  ulke       String? // "USA", "IRE", "TUR" vb.
-  dogumYili  Int?
-  dpB        Int
-  dpI        Int
-  dpC        Int
-  dpS        Int
-  dpP        Int
-  dpToplam   Int
-  di         Float
-  cd         Float
-  genetikKarakter String? // "Süratli miler", "Solid/Professional stamina" vb.
-  mesafeProfili   String? // "1400-1800 m" vb.
-  pistTempo       String? // "Normal-hızlı zemin; çok yönlü tempo" vb.
-  updatedAt  DateTime @updatedAt
-
-  @@index([sireName])
-}
-
-// Antrenörün EKİPMAN/TAKI DEĞİŞİKLİĞİ yaptığı start'lardaki kazanma oranı — genel
-// trainerWinPct'ten (TrainerStatSync, TJK kaynaklı yıllık toplam) FARKLI, tamamen
-// rotaganyan'ın kendi Runner geçmişinden hesaplanır (kullanıcı doktrini 2026-07-26:
-// "ekipman değişikliği antrenörün bu tür değişikliklerdeki genel başarı oranıyla
-// eşleştirilmeli"). Bir at için "değişiklik" = önceki starta göre takı ailesi (bkz.
-// equipment-family.ts) farklı — o starttaki antrenöre atfedilir. Tüm zamanlar/pist-mesafe
-// kırılımsız (örneklem küçük, ince kırılım anlamsızlaşır — SireStatOwn'daki gerekçeyle aynı).
-model TrainerEquipmentStatOwn {
-  id             String   @id @default(cuid())
-  trainer        String   @unique
-  degisimStart   Int
-  degisimBirinci Int
-  degisimKYuzde  Float
-  updatedAt      DateTime @updatedAt
-
-  @@index([trainer])
-}
-
-// Jokeyin BU pist+mesafe+SKK sınıf kademesindeki kazanma oranı — genel jockeyWinPct'ten
-// (JockeyStatSync, TJK kaynaklı yıllık toplam, kırılımsız) FARKLI, kullanıcı doktrini
-// 2026-07-27: "jokey önceliği — (1) bu pist+mesafe+tip oranı" — "tip" SKK sınıf kademesi
-// (§VIII.1) olarak yorumlandı, ince kırılımda (tam classType) örneklem çok küçük kalırdı.
-model JockeyPistMesafeSkkStatOwn {
-  id       String @id @default(cuid())
-  jockey   String
-  pist     String
-  mesafe   String
-  skk      Int
-  start    Int
-  birinci  Int
-  kYuzde   Float
-  updatedAt DateTime @updatedAt
-
-  @@unique([jockey, pist, mesafe, skk])
-  @@index([jockey])
-}
-
-// Jokey-Antrenör İKİLİSİNİN son 60 gündeki kombinasyon kazanma oranı ("hot streak" —
-// kullanıcı doktrini 2026-07-27: "(2) bu antrenörle son 60 gün kombinasyonu"). Rolling
-// pencere olduğu için her gün cron'la yeniden hesaplanır (o günkü "son 60 gün"e göre) —
-// TrainerStatSync'in yıllık deseniyle aynı mantık, yalnız pencere kayan.
-model JokeyAntrenorKombinasyonStatOwn {
-  id       String @id @default(cuid())
-  jockey   String
-  trainer  String
-  start    Int
-  birinci  Int
-  kYuzde   Float
-  updatedAt DateTime @updatedAt
-
-  @@unique([jockey, trainer])
-  @@index([jockey])
-}
+// v6.78 — kullanıcı kararı 2026-08-10 ("site genelinde kullanılmayan veri" taraması):
+// SireDosageStat (rafa kaldırılmış Dosage/DI-CD özelliği, hiç okunmuyordu),
+// TrainerEquipmentStatOwn/JockeyPistMesafeSkkStatOwn/JokeyAntrenorKombinasyonStatOwn
+// (üçü de gece cron'larıyla yazılıyordu ama hiçbir yerde okunmuyordu, v6.24/v6.26
+// kararıyla analiz akışından zaten çıkarılmışlardı) tamamen kaldırıldı — modeller,
+// onları besleyen cron rotaları/servisleri/action dosyaları koddan silindi.
 
 // ─── METHODOLOGY ──────────────────────────────────────────────────────────────
 
@@ -726,23 +632,6 @@ model MethodologyVersion {
   content       String
   isCurrent     Boolean  @default(false)
   createdAt     DateTime @default(now())
-}
-
-model PostMortemLesson {
-  id        String         @id @default(cuid())
-  title     String
-  date      DateTime
-  category  LessonCategory
-  rule      String
-  raceRef   String?
-  resultId  String?
-  tags      String[]
-  active    Boolean        @default(true)
-  createdAt DateTime       @default(now())
-
-  result Result? @relation(fields: [resultId], references: [id])
-
-  @@index([category, active])
 }
 
 // ─── ANASAYFA KUPON ───────────────────────────────────────────────────────────
@@ -765,16 +654,6 @@ model HomeKupon {
 
   @@index([isActive])
   @@index([slot])
-}
-
-// ─── ENGINE CONFIG ────────────────────────────────────────────────────────────
-
-model EngineConfig {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  value     Json
-  updatedBy String?
-  updatedAt DateTime @updatedAt
 }
 
 // ─── SITE SETTINGS ───────────────────────────────────────────────────────────

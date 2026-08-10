@@ -20,18 +20,4 @@ export const resultSchema = z.object({
   cikan: z.string().max(300).optional(),
 });
 
-export const postMortemLessonSchema = z.object({
-  title: z.string().min(3).max(200),
-  date: z.coerce.date(),
-  category: z.enum([
-    "DERECE", "SICIL_KILO", "AGF", "TEMPO", "TUM_ATLAR",
-    "BANKO", "JOKEY", "GALOP", "TAKI", "GRUP", "GENEL",
-  ]),
-  rule: z.string().min(10).max(1000),
-  raceRef: z.string().max(200).optional(),
-  resultId: z.string().cuid().optional(),
-  tags: z.array(z.string().max(30)).max(10).default([]),
-});
-
 export type ResultInput = z.infer<typeof resultSchema>;
-export type PostMortemLessonInput = z.infer<typeof postMortemLessonSchema>;
