@@ -37,7 +37,10 @@ export const maxDuration = 800;
 // ve boş-yanıt tespiti (createWithTruncationRetry) olduğu için büyük grupların asıl
 // riski (sessizce bozuk veri) artık YAKALANIP otomatik düzeltiliyor, eskisi kadar
 // tehlikeli değil. 20 atlık koşu 5 gruptan 4 gruba iniyor (1 çağrı tasarrufu).
-const BATCH_SIZE = 6;
+// v6.100 — kullanıcı kararı 2026-08-10 (deneysel): 6'dan 8'e çıkarılıp gerçek bir
+// backtest koşusunda (Bursa 9.Koşu, 20 at) güvenlik ağlarıyla (placeholder/boş-yanıt/
+// kısmi tekrar deneme) test ediliyor — güvenilirlik bozulursa geri alınacak.
+const BATCH_SIZE = 8;
 
 export type TestV2Pick = {
   no: number;
