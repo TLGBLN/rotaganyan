@@ -94,9 +94,14 @@ function parseTutar(text: string): number {
   return Number.isNaN(n) ? 0 : n;
 }
 
+// v6.85 — kullanıcı bulgusu 2026-08-10 (horse-detail-stat-match.ts'te aynı sınıf hata
+// bulundu, bkz. o dosyadaki yorum): hücreler "1 (%50)" gibi sayı+yüzde birleşik geliyor,
+// eski kod TÜM rakamları birleştirip parseInt ediyordu ("1 (%50)" → "150"). Bu fonksiyon
+// cells[2..6] (1./2./3./4./5. sütunları, hepsi bu formatta) için kullanılıyor — aynı
+// dosyadaki summaryStats bu yüzden yanlış (şişirilmiş) sayılar üretiyordu.
 function parseInt0(text: string): number {
-  const n = parseInt(text.replace(/[^\d-]/g, ""), 10);
-  return Number.isNaN(n) ? 0 : n;
+  const m = text.match(/-?\d+/);
+  return m ? parseInt(m[0], 10) : 0;
 }
 
 async function fetchHorseProfileUncached(atId: number): Promise<HorseProfile | null> {

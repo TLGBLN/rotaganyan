@@ -23,9 +23,13 @@ function surname(s: string): string {
   return n.split(" ").filter(Boolean).at(-1) ?? n;
 }
 
+// v6.85 — kullanıcı bulgusu 2026-08-10: hücreler "1 (%50)" gibi sayı+yüzde birleşik
+// geliyor; eski kod TÜM rakamları (yüzdeninkiler dahil) birleştirip parseInt ediyordu
+// ("1 (%50)" → "150" → 150!), yalnız 0 değerlerinde ("0 (%0)" → "00" → 0) tesadüfen
+// doğru sonuç veriyordu. Artık yalnız İLK sayı alınıyor (gerçek sayım, yüzde değil).
 function parseIntSafe(s: string | undefined): number {
-  const n = parseInt((s ?? "").replace(/[^\d-]/g, ""), 10);
-  return Number.isNaN(n) ? 0 : n;
+  const m = (s ?? "").match(/-?\d+/);
+  return m ? parseInt(m[0], 10) : 0;
 }
 
 function findSection(sections: HorseDetailStatSection[], titlePrefix: string): HorseDetailStatSection | undefined {
@@ -81,6 +85,19 @@ export function formatHorseDetailStatOzet(
     if (jokeyRow) {
       const k = parseIntSafe(jokeyRow[1]);
       if (k > 0) parts.push(`bu jokeyle ${k} start ${parseIntSafe(jokeyRow[2])}G`);
+    }
+  }
+
+  // Zaman (Yıl-Ay kırılımı) — son yakın dönemdeki form trendi. Diğer bölümlerin aksine
+  // bugünkü koşuyla eşleşen bir filtre yok, en güncel satırlar (TJK zaten en yeniden
+  // eskiye sıralı veriyor) doğrudan alınıyor. "Toplam" satırı (varsa) hariç tutulur.
+  const zamanSection = findSection(sections, "Zaman");
+  if (zamanSection) {
+    const sonAylar = zamanSection.rows.filter((r) => normTr(r[0] ?? "") !== "TOPLAM").slice(0, 3);
+    if (sonAylar.length > 0) {
+      const k = sonAylar.reduce((sum, r) => sum + parseIntSafe(r[1]), 0);
+      const w = sonAylar.reduce((sum, r) => sum + parseIntSafe(r[2]), 0);
+      if (k > 0) parts.push(`son ${sonAylar.length} ayda ${k} start ${w}G`);
     }
   }
 
