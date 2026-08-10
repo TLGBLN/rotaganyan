@@ -258,7 +258,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
       <div className="flex gap-2">
         <Button onClick={handleCalistir} disabled={loading} size="sm" className="gap-1.5" variant="outline">
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-          {loading ? (asama || "Analiz oluşturuluyor…") : "V2 ile Analiz Et"}
+          {loading ? (asama || "Analiz oluşturuluyor…") : "V3 ile Analiz Et"}
         </Button>
         {atlar && (
           <Button
