@@ -5,6 +5,7 @@ import type { Anthropic } from "@anthropic-ai/sdk";
 import { createWithTruncationRetry, extractText } from "@/lib/methodology/claude-analiz-helpers";
 import { getRecentCachedResult } from "@/lib/claude-cost";
 import { analizKilidiAl, analizKilidiBirak } from "@/lib/analysis-concurrency-lock";
+import { butceDurumunuBildir } from "@/lib/claude-budget-monitor";
 import type { Role } from "@prisma/client";
 import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi, faz2AgfFavorisiDususeRagmenGarantisi } from "@/lib/methodology/v2-engine";
 
@@ -576,9 +577,15 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
   const couponNormal = sirali.slice(3, 6).join("-");
   const couponWide = sirali.slice(6).join("-");
 
+  // v6.99 — kullanıcı kararı 2026-08-10: bütçe izleme (yalnız bilgi/uyarı, hiçbir
+  // çağrıyı ASLA engellemez) — analiz tamamlandıktan sonra bu koşunun toplam gerçek
+  // maliyetini kontrol eder, beklenenden pahalıysa yalnız webhook'a bildirir.
+  const butceDurumu = await butceDurumunuBildir(raceId).catch(() => null);
+
   return NextResponse.json({
     ok: true,
     usage,
+    butceDurumu,
     parsed,
     faz1VeriDenetimi,
     faz2Denetim,
