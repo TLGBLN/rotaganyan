@@ -17,10 +17,12 @@ import {
   TrendingUp,
   Dna,
   Gauge,
+  Activity,
 } from "lucide-react";
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/admin/performans", label: "Performans Denetimi", icon: Activity },
   { href: "/admin/analizler", label: "Analizler", icon: FileText },
   { href: "/admin/kosular", label: "Koşular", icon: Flag },
   { href: "/admin/pedigri", label: "Pedigriler", icon: Dna },
