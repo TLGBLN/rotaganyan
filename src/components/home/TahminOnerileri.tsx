@@ -53,22 +53,18 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
   // olarak paylaşılır. Sonuç posterinden farklı olarak tek bir görsel formatı hem
   // Instagram hem X için kullanılıyor (ayrı Story boyutu yok), o yüzden platform
   // parametresi almıyor — Web Share API zaten paylaşım hedefine göre uygun uygulamayı sunuyor.
-  // v6.106 — kullanıcı bulgusu 2026-08-11: "buton çalışmıyor" (bu panel + /program'daki
-  // aynı desen). İki sorun vardı: (1) masaüstünde navigator.share desteklenmediğinde
-  // görsel SESSİZCE iniyordu, hiçbir görünür onay yoktu — kullanıcı "hiçbir şey olmadı"
-  // sanıyordu; (2) X butonunun x.com'u açması için eklenecek window.open, await'lerden
-  // SONRA çağrılırsa tarayıcı "kullanıcı jesti" penceresi kapandığı için popup'ı sessizce
-  // engelliyor. Çözüm: pencere tıklamanın İÇİNDE senkron açılır (bkz. ProgramView.tsx'teki
-  // AYNI düzeltme), sonra yalnız adresi değiştirilir; indirme yolunda da toast onayı var.
+  // v6.107 — kullanıcı bulgusu 2026-08-11: senkron-aç-sonra-yönlendir denemesi bazı
+  // tarayıcılarda (Safari başta) "about:blank" olarak sabit kalıyordu — gecikmeli
+  // .location ataması da popup engeliyle AYNI kısıtlamaya takılabiliyor. Güvenilir
+  // tek yol: X'i açan linki GERÇEK bir kullanıcı tıklamasına bağlamak — toast'un
+  // action butonu tam bunu sağlıyor, kendi tıklaması olduğu için engellenmiyor.
   async function handleShare(platform: "instagram" | "x") {
-    const xWindow = platform === "x" ? window.open("", "_blank", "noopener,noreferrer") : null;
     const imageUrl = `${window.location.origin}/api/og/kupon/${data.id}?variant=${active.key}`;
     try {
       const res = await fetch(imageUrl);
       const blob = await res.blob();
       const file = new File([blob], "rotaganyan-kupon.png", { type: "image/png" });
       if (navigator.canShare?.({ files: [file] })) {
-        xWindow?.close();
         await navigator.share({ files: [file], title: "Rotaganyan" });
         return;
       }
@@ -77,10 +73,10 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
       link.download = "rotaganyan-kupon.png";
       link.click();
       URL.revokeObjectURL(link.href);
-      toast.success(t("gorselIndirildi"));
-      if (xWindow) xWindow.location.href = "https://x.com/home";
+      toast.success(t("gorselIndirildi"), platform === "x"
+        ? { action: { label: "X'i Aç", onClick: () => window.open("https://x.com/rotaganyantr", "_blank", "noopener,noreferrer") } }
+        : undefined);
     } catch {
-      xWindow?.close();
       toast.error(t("paylasimBasarisiz"));
     }
   }

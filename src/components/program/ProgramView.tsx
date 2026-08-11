@@ -403,23 +403,18 @@ function AnalysisPanel({
   // İki AYRI buton var çünkü platforma göre en uygun format farklı: Instagram için
   // dikey Story görseli (1080×1920), X için standart kart oranı (1080×1180).
   async function handleShare(platform: "instagram" | "x") {
-    // v6.106 — kullanıcı bulgusu 2026-08-11: "buton çalışmıyor" — önceki sürüm
-    // window.open()'ı fetch/blob await'lerinden SONRA çağırıyordu; bu noktada
-    // tarayıcının "kullanıcı jesti" penceresi çoktan kapanmış oluyor, çoğu
-    // tarayıcı popup'ı SESSİZCE engelliyor (görünürde hiçbir şey olmuyor, tam
-    // "çalışmıyor" hissi). Çözüm: pencere TIKLAMANIN hemen içinde, hiçbir await'ten
-    // ÖNCE (senkron) açılır — tarayıcı bunu her zaman izin verir — sonra async iş
-    // bitince yalnız o pencerenin adresi değiştirilir. Ayrıca masaüstü indirme
-    // yolunda görünür bir onay (toast) yok — kullanıcı hiçbir şey olmadığını
-    // düşünüyordu, artık "İndirildi" bildirimi de gösteriliyor.
-    const xWindow = platform === "x" ? window.open("", "_blank", "noopener,noreferrer") : null;
+    // v6.107 — kullanıcı bulgusu 2026-08-11: senkron-aç-sonra-yönlendir denemesi
+    // bazı tarayıcılarda (Safari başta) "about:blank" olarak sabit kalıyordu —
+    // gecikmeli .location ataması da o tarayıcılarda popup engeliyle AYNI kısıtlamaya
+    // takılabiliyor. Güvenilir tek yol: X'i açan linki GERÇEK bir kullanıcı
+    // tıklamasına bağlamak — toast'un action butonu tam bunu sağlıyor, kendi
+    // tıklaması olduğu için hiçbir tarayıcıda engellenmiyor.
     const imageUrl = `${window.location.origin}/api/og/sonuc/${raceId}${platform === "instagram" ? "/story" : ""}`;
     try {
       const res = await fetch(imageUrl);
       const blob = await res.blob();
       const file = new File([blob], "rotaganyan-sonuc.png", { type: "image/png" });
       if (navigator.canShare?.({ files: [file] })) {
-        xWindow?.close(); // yerel paylaşım sayfası zaten açılıyor, boş sekmeye gerek yok
         await navigator.share({ files: [file], title: "Rotaganyan" });
         return;
       }
@@ -428,10 +423,10 @@ function AnalysisPanel({
       link.download = "rotaganyan-sonuc.png";
       link.click();
       URL.revokeObjectURL(link.href);
-      toast.success(t("gorselIndirildi"));
-      if (xWindow) xWindow.location.href = "https://x.com/home";
+      toast.success(t("gorselIndirildi"), platform === "x"
+        ? { action: { label: "X'i Aç", onClick: () => window.open("https://x.com/rotaganyantr", "_blank", "noopener,noreferrer") } }
+        : undefined);
     } catch {
-      xWindow?.close();
       toast.error(t("paylasimBasarisiz"));
     }
   }
