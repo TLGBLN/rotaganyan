@@ -416,6 +416,11 @@ function AnalysisPanel({
       link.download = "rotaganyan-sonuc.png";
       link.click();
       URL.revokeObjectURL(link.href);
+      // v6.105 — kullanıcı talebi 2026-08-11: masaüstünde navigator.share dosya
+      // paylaşımını desteklemiyor, bu yüzden görsel yalnız indiriliyordu ve
+      // kullanıcının X'e gitmesi için ayrı bir yol yoktu — indirmeden sonra X'in
+      // ana sayfasını yeni sekmede açıp görseli elle eklemesini kolaylaştırıyoruz.
+      if (platform === "x") window.open("https://x.com/home", "_blank", "noopener,noreferrer");
     } catch {
       // Kullanıcı paylaşımı iptal etti ya da fetch başarısız oldu — sessizce geç,
       // buton tekrar denenebilir.
