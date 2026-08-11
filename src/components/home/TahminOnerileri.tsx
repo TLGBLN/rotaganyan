@@ -62,6 +62,7 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
     const imageUrl = `${window.location.origin}/api/og/kupon/${data.id}?variant=${active.key}`;
     try {
       const res = await fetch(imageUrl);
+      if (!res.ok) throw new Error(`Görsel oluşturulamadı (HTTP ${res.status})`);
       const blob = await res.blob();
       const file = new File([blob], "rotaganyan-kupon.png", { type: "image/png" });
       if (navigator.canShare?.({ files: [file] })) {
@@ -76,7 +77,11 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
       toast.success(t("gorselIndirildi"), platform === "x"
         ? { action: { label: "X'i Aç", onClick: () => window.open("https://x.com/rotaganyantr", "_blank", "noopener,noreferrer") } }
         : undefined);
-    } catch {
+    } catch (e) {
+      // v6.108 — kullanıcı bulgusu 2026-08-11: navigator.share() kullanıcı paylaşım
+      // menüsünü kapatınca (bir uygulama SEÇMEDEN) "AbortError" fırlatır — gerçek
+      // bir hata değil, yanlış alarm veriyordu.
+      if (e instanceof Error && e.name === "AbortError") return;
       toast.error(t("paylasimBasarisiz"));
     }
   }
