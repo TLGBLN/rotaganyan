@@ -317,6 +317,54 @@ function InstagramLogo({ className }: { className?: string }) {
   );
 }
 
+// ── Panel kilit kapısı ───────────────────────────────────────────────────────
+// v6.104 — kullanıcı talebi 2026-08-11: "bu kısımlar üye olmayanlara kilitli
+// gözüksün" (Accurace/AGF Trend/Son Hazırlıklar/Pedigriler/H2H/Karşılaştır/Son
+// Yarış Detayları/Hipodrom Özellikleri). Bu paneller o güne kadar isLoggedIn/
+// isVerified hiç almıyordu, herkese açıktı — yalnız "Analiz Detayları" (yukarıdaki
+// AnalysisPanel) gerçekten üyelik kontrolü yapıyordu. Bu bileşen AYNI kilit
+// deneyimini (🔒 + giriş/kayıt, ya da e-posta doğrulama kapısı) merkezi olarak
+// tekrar kullanılabilir kılıyor — her panel kendi kilit mantığını tekrar yazmasın.
+function PanelKilitGate({
+  isLoggedIn, isVerified, userEmail, children,
+}: {
+  isLoggedIn: boolean;
+  isVerified: boolean;
+  userEmail: string;
+  children: React.ReactNode;
+}) {
+  const t = useTranslations("programToolbar");
+
+  if (!isLoggedIn) {
+    return (
+      <div className="border-t px-4 py-8 text-center">
+        <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
+          <span className="text-2xl">🔒</span>
+          <p className="font-medium">{t("analiziGormekIcinUye")}</p>
+          <div className="flex gap-2">
+            <a href="/giris?callbackUrl=%2Fprogram" className="rounded-md bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground hover:bg-brand/90">
+              {t("girisYap")}
+            </a>
+            <a href="/kayit" className="rounded-md border px-4 py-2 text-xs font-semibold hover:bg-muted">
+              {t("kayitOl")}
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isVerified) {
+    return (
+      <div className="border-t">
+        <EmailVerificationGate email={userEmail} />
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 // ── Analiz paneli ────────────────────────────────────────────────────────────
 
 function AnalysisPanel({
@@ -1330,13 +1378,55 @@ function RaceTable({
           />
         )}
       </div>
-      <div id="panel-son800">{son800Open && <Son800Panel raceId={race.id} />}</div>
-      <div id="panel-agf-trend">{agfTrendOpen && <AgfTrendPanel raceId={race.id} />}</div>
-      <div id="panel-galop">{galopOpen && <GalopPanel runners={race.runners} breed={race.breed} />}</div>
-      <div id="panel-pedigriler">{pedigreeOpen && <PedigreePanel runners={race.runners} />}</div>
-      <div id="panel-karsilastir">{comparisonOpen && <ComparisonPanel raceId={race.id} />}</div>
-      <div id="panel-h2h">{h2hOpen && <H2HPanel raceId={race.id} />}</div>
-      <div id="panel-son-yaris-detay">{sonYarisOpen && <SonYarisDetayPanel raceId={race.id} />}</div>
+      <div id="panel-son800">
+        {son800Open && (
+          <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
+            <Son800Panel raceId={race.id} />
+          </PanelKilitGate>
+        )}
+      </div>
+      <div id="panel-agf-trend">
+        {agfTrendOpen && (
+          <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
+            <AgfTrendPanel raceId={race.id} />
+          </PanelKilitGate>
+        )}
+      </div>
+      <div id="panel-galop">
+        {galopOpen && (
+          <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
+            <GalopPanel runners={race.runners} breed={race.breed} />
+          </PanelKilitGate>
+        )}
+      </div>
+      <div id="panel-pedigriler">
+        {pedigreeOpen && (
+          <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
+            <PedigreePanel runners={race.runners} />
+          </PanelKilitGate>
+        )}
+      </div>
+      <div id="panel-karsilastir">
+        {comparisonOpen && (
+          <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
+            <ComparisonPanel raceId={race.id} />
+          </PanelKilitGate>
+        )}
+      </div>
+      <div id="panel-h2h">
+        {h2hOpen && (
+          <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
+            <H2HPanel raceId={race.id} />
+          </PanelKilitGate>
+        )}
+      </div>
+      <div id="panel-son-yaris-detay">
+        {sonYarisOpen && (
+          <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
+            <SonYarisDetayPanel raceId={race.id} />
+          </PanelKilitGate>
+        )}
+      </div>
 
       {openVideoRunner && openVideoRunner.idmanVideoUrl && (() => {
         const g0 = openVideoRunner.gallops[0] ?? null;
@@ -1404,6 +1494,12 @@ export default function ProgramView({
 
   // Site üstündeki sticky Header (h-14 = 56px) — panele scroll ederken başlığın
   // bu barın altında kalmaması için bu kadar pay bırakılır.
+  /** v6.104 — üye olmayana kilit ikonu, üyeye aç/kapa oku (bkz. PanelKilitGate). */
+  function kilitVeyaChevron(acik: boolean) {
+    if (!isLoggedIn) return "🔒";
+    return acik ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
+  }
+
   const STICKY_HEADER_OFFSET = 56;
 
   /** Panel butonuna basınca paneli aç/kapat; açılıyorsa render sonrası panelin başlığına scroll et. */
@@ -1528,7 +1624,7 @@ export default function ProgramView({
                   data-tour="hipodrom-ozellikleri"
                   className="sm:hidden ml-auto shrink-0 rounded border px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground whitespace-nowrap"
                 >
-                  {t("hipodromOzellikleri")}
+                  {t("hipodromOzellikleri")} {!isLoggedIn && "🔒"}
                 </button>
               )}
             </div>
@@ -1556,7 +1652,7 @@ export default function ProgramView({
                   data-tour="son800-buton"
                   className={cn(PANEL_BTN_CLASS, son800Open ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
-                  Accurace {son800Open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  Accurace {kilitVeyaChevron(son800Open)}
                 </button>
               )}
               {currentRace && (
@@ -1565,7 +1661,7 @@ export default function ProgramView({
                   data-tour="agf-trend"
                   className={cn(PANEL_BTN_CLASS, agfTrendOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
-                  {t("agfTrend")} {agfTrendOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  {t("agfTrend")} {kilitVeyaChevron(agfTrendOpen)}
                 </button>
               )}
               {currentRace && (
@@ -1574,7 +1670,7 @@ export default function ProgramView({
                   data-tour="galop"
                   className={cn(PANEL_BTN_CLASS, galopOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
-                  {t("sonHazirliklar")} {galopOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  {t("sonHazirliklar")} {kilitVeyaChevron(galopOpen)}
                 </button>
               )}
               {currentRace && (
@@ -1583,7 +1679,7 @@ export default function ProgramView({
                   data-tour="pedigriler-panel"
                   className={cn(PANEL_BTN_CLASS, pedigreeOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
-                  {t("pedigriler")} {pedigreeOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  {t("pedigriler")} {kilitVeyaChevron(pedigreeOpen)}
                 </button>
               )}
               {currentRace && (
@@ -1592,7 +1688,7 @@ export default function ProgramView({
                   data-tour="h2h-panel"
                   className={cn(PANEL_BTN_CLASS, h2hOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
-                  H2H {h2hOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  H2H {kilitVeyaChevron(h2hOpen)}
                 </button>
               )}
               {currentRace && (
@@ -1601,7 +1697,7 @@ export default function ProgramView({
                   data-tour="karsilastir"
                   className={cn(PANEL_BTN_CLASS, comparisonOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
-                  {t("karsilastir")} {comparisonOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  {t("karsilastir")} {kilitVeyaChevron(comparisonOpen)}
                 </button>
               )}
               {currentRace && (
@@ -1610,7 +1706,7 @@ export default function ProgramView({
                   data-tour="son-yaris-panel"
                   className={cn(PANEL_BTN_CLASS, sonYarisOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
                 >
-                  {t("sonYarisDetaylari")} {sonYarisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  {t("sonYarisDetaylari")} {kilitVeyaChevron(sonYarisOpen)}
                 </button>
               )}
               {currentRace && (
@@ -1619,7 +1715,7 @@ export default function ProgramView({
                   data-tour="hipodrom-ozellikleri"
                   className={cn(PANEL_BTN_CLASS, PANEL_BTN_CLOSED, "hidden sm:flex")}
                 >
-                  {t("hipodromOzellikleri")}
+                  {t("hipodromOzellikleri")} {!isLoggedIn && "🔒"}
                 </button>
               )}
               {currentRace && (
@@ -1660,13 +1756,26 @@ export default function ProgramView({
       )}
       {selectedHorse && <HorseDetailModal name={selectedHorse} onClose={() => setSelectedHorse(null)} />}
       {hipodromOzellikleriOpen && currentDay && (
-        <HipodromOzellikleriModal
-          hippodromeSlug={currentDay.hippodromeSlug}
-          hippodromeName={currentDay.hippodromeName}
-          distance={currentRace?.distance}
-          surface={currentRace?.surface}
-          onClose={() => setHipodromOzellikleriOpen(false)}
-        />
+        isLoggedIn && isVerified ? (
+          <HipodromOzellikleriModal
+            hippodromeSlug={currentDay.hippodromeSlug}
+            hippodromeName={currentDay.hippodromeName}
+            distance={currentRace?.distance}
+            surface={currentRace?.surface}
+            onClose={() => setHipodromOzellikleriOpen(false)}
+          />
+        ) : (
+          <div
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4"
+            onClick={() => setHipodromOzellikleriOpen(false)}
+          >
+            <div className="w-full max-w-sm rounded-lg border bg-background" onClick={(e) => e.stopPropagation()}>
+              <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
+                <></>
+              </PanelKilitGate>
+            </div>
+          </div>
+        )
       )}
     </div>
   );
