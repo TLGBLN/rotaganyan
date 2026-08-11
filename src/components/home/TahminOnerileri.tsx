@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 import type { KuponOnerisi, KuponStatus } from "@/server/services/race.service";
 import type { AltiliCityResult } from "@/server/services/ingest/tjk-altili.adapter";
 import { findIkramiyeForHippodrome } from "@/lib/altili-match";
@@ -52,13 +53,22 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
   // olarak paylaşılır. Sonuç posterinden farklı olarak tek bir görsel formatı hem
   // Instagram hem X için kullanılıyor (ayrı Story boyutu yok), o yüzden platform
   // parametresi almıyor — Web Share API zaten paylaşım hedefine göre uygun uygulamayı sunuyor.
-  async function handleShare() {
+  // v6.106 — kullanıcı bulgusu 2026-08-11: "buton çalışmıyor" (bu panel + /program'daki
+  // aynı desen). İki sorun vardı: (1) masaüstünde navigator.share desteklenmediğinde
+  // görsel SESSİZCE iniyordu, hiçbir görünür onay yoktu — kullanıcı "hiçbir şey olmadı"
+  // sanıyordu; (2) X butonunun x.com'u açması için eklenecek window.open, await'lerden
+  // SONRA çağrılırsa tarayıcı "kullanıcı jesti" penceresi kapandığı için popup'ı sessizce
+  // engelliyor. Çözüm: pencere tıklamanın İÇİNDE senkron açılır (bkz. ProgramView.tsx'teki
+  // AYNI düzeltme), sonra yalnız adresi değiştirilir; indirme yolunda da toast onayı var.
+  async function handleShare(platform: "instagram" | "x") {
+    const xWindow = platform === "x" ? window.open("", "_blank", "noopener,noreferrer") : null;
     const imageUrl = `${window.location.origin}/api/og/kupon/${data.id}?variant=${active.key}`;
     try {
       const res = await fetch(imageUrl);
       const blob = await res.blob();
       const file = new File([blob], "rotaganyan-kupon.png", { type: "image/png" });
       if (navigator.canShare?.({ files: [file] })) {
+        xWindow?.close();
         await navigator.share({ files: [file], title: "Rotaganyan" });
         return;
       }
@@ -67,8 +77,11 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
       link.download = "rotaganyan-kupon.png";
       link.click();
       URL.revokeObjectURL(link.href);
+      toast.success(t("gorselIndirildi"));
+      if (xWindow) xWindow.location.href = "https://x.com/home";
     } catch {
-      // Kullanıcı paylaşımı iptal etti ya da fetch başarısız oldu — sessizce geç.
+      xWindow?.close();
+      toast.error(t("paylasimBasarisiz"));
     }
   }
 
@@ -80,7 +93,7 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => handleShare()}
+              onClick={() => handleShare("instagram")}
               title={t("instagramdaPaylas")}
               aria-label={t("instagramdaPaylas")}
               className="inline-flex items-center rounded-md border border-muted-foreground/25 p-1.5 hover:bg-muted transition-colors"
@@ -89,7 +102,7 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
             </button>
             <button
               type="button"
-              onClick={() => handleShare()}
+              onClick={() => handleShare("x")}
               title={t("xtePaylas")}
               aria-label={t("xtePaylas")}
               className="inline-flex items-center rounded-md border border-muted-foreground/25 p-1.5 hover:bg-muted transition-colors"

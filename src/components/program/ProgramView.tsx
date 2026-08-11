@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp, Star, Info, PlayCircle } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
@@ -402,12 +403,23 @@ function AnalysisPanel({
   // İki AYRI buton var çünkü platforma göre en uygun format farklı: Instagram için
   // dikey Story görseli (1080×1920), X için standart kart oranı (1080×1180).
   async function handleShare(platform: "instagram" | "x") {
+    // v6.106 — kullanıcı bulgusu 2026-08-11: "buton çalışmıyor" — önceki sürüm
+    // window.open()'ı fetch/blob await'lerinden SONRA çağırıyordu; bu noktada
+    // tarayıcının "kullanıcı jesti" penceresi çoktan kapanmış oluyor, çoğu
+    // tarayıcı popup'ı SESSİZCE engelliyor (görünürde hiçbir şey olmuyor, tam
+    // "çalışmıyor" hissi). Çözüm: pencere TIKLAMANIN hemen içinde, hiçbir await'ten
+    // ÖNCE (senkron) açılır — tarayıcı bunu her zaman izin verir — sonra async iş
+    // bitince yalnız o pencerenin adresi değiştirilir. Ayrıca masaüstü indirme
+    // yolunda görünür bir onay (toast) yok — kullanıcı hiçbir şey olmadığını
+    // düşünüyordu, artık "İndirildi" bildirimi de gösteriliyor.
+    const xWindow = platform === "x" ? window.open("", "_blank", "noopener,noreferrer") : null;
     const imageUrl = `${window.location.origin}/api/og/sonuc/${raceId}${platform === "instagram" ? "/story" : ""}`;
     try {
       const res = await fetch(imageUrl);
       const blob = await res.blob();
       const file = new File([blob], "rotaganyan-sonuc.png", { type: "image/png" });
       if (navigator.canShare?.({ files: [file] })) {
+        xWindow?.close(); // yerel paylaşım sayfası zaten açılıyor, boş sekmeye gerek yok
         await navigator.share({ files: [file], title: "Rotaganyan" });
         return;
       }
@@ -416,14 +428,11 @@ function AnalysisPanel({
       link.download = "rotaganyan-sonuc.png";
       link.click();
       URL.revokeObjectURL(link.href);
-      // v6.105 — kullanıcı talebi 2026-08-11: masaüstünde navigator.share dosya
-      // paylaşımını desteklemiyor, bu yüzden görsel yalnız indiriliyordu ve
-      // kullanıcının X'e gitmesi için ayrı bir yol yoktu — indirmeden sonra X'in
-      // ana sayfasını yeni sekmede açıp görseli elle eklemesini kolaylaştırıyoruz.
-      if (platform === "x") window.open("https://x.com/home", "_blank", "noopener,noreferrer");
+      toast.success(t("gorselIndirildi"));
+      if (xWindow) xWindow.location.href = "https://x.com/home";
     } catch {
-      // Kullanıcı paylaşımı iptal etti ya da fetch başarısız oldu — sessizce geç,
-      // buton tekrar denenebilir.
+      xWindow?.close();
+      toast.error(t("paylasimBasarisiz"));
     }
   }
 
