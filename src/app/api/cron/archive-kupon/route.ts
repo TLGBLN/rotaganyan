@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { turkeyDateString } from "@/lib/tz";
 import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
 import { findIkramiyeForHippodrome } from "@/lib/altili-match";
+import { verifyCronRequest } from "@/lib/cron-auth";
 
 // Gün sonunda (Türkiye saatiyle) o güne ait tüm HomeKupon kayıtlarını arşivler
 // (isActive: false) — anasayfada yalnızca "bugünün" aktif kuponları gösterildiği
@@ -14,13 +15,9 @@ import { findIkramiyeForHippodrome } from "@/lib/altili-match";
 // ikramiye cümlesini de yakalayıp kaydediyoruz — TJK'nın AltiliSonuc sayfası yalnız
 // "bugünü" gösteriyor (geçmişe dönük sorgu yok), bu yüzden bu an kaçırılırsa o günün
 // gerçek ikramiye tutarı BİR DAHA hiç elde edilemez.
-const CRON_SECRET = process.env.CRON_SECRET;
-
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  if (CRON_SECRET && auth !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = verifyCronRequest(req);
+  if (denied) return denied;
 
   const today = turkeyDateString();
   const date = new Date(today + "T00:00:00.000Z");

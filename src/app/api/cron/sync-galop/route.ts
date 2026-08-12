@@ -1,16 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { syncIdmanForDate } from "@/server/services/ingest/tjk-idman-stats.adapter";
 import { turkeyDateString } from "@/lib/tz";
+import { verifyCronRequest } from "@/lib/cron-auth";
 
 export const maxDuration = 800; // v6.90 — kullanıcı talimatı 2026-08-10: en son sınıra çekildi
 
-const CRON_SECRET = process.env.CRON_SECRET;
-
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  if (CRON_SECRET && auth !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = verifyCronRequest(req);
+  if (denied) return denied;
 
   // Optional ?date=YYYY-MM-DD override; otherwise bugün + yarın senkronlanır
   const dateParam = req.nextUrl.searchParams.get("date");

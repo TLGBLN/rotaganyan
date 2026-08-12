@@ -1,20 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { syncIdmanForDate } from "@/server/services/ingest/tjk-idman-stats.adapter";
+import { verifyCronRequest } from "@/lib/cron-auth";
 
 export const maxDuration = 800; // v6.90 — kullanıcı talimatı 2026-08-10: en son sınıra çekildi
-
-const CRON_SECRET = process.env.CRON_SECRET;
 
 function toIsoDate(d: Date): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  if (CRON_SECRET && auth !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = verifyCronRequest(req);
+  if (denied) return denied;
 
   const now = new Date();
   const tomorrow = new Date(now);

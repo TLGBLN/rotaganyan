@@ -1,16 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { persistRaceDays, TjkAdapter } from "@/server/services/ingest";
-
-const INGEST_SECRET = process.env.INGEST_SECRET;
+import { verifyIngestRequest } from "@/lib/cron-auth";
 
 const PROVIDERS = [new TjkAdapter()];
 
 export async function POST(req: NextRequest) {
-  // Protect with a shared secret (set INGEST_SECRET in env)
-  const authHeader = req.headers.get("authorization");
-  if (INGEST_SECRET && authHeader !== `Bearer ${INGEST_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = verifyIngestRequest(req);
+  if (denied) return denied;
 
   const body = await req.json().catch(() => ({}));
   const date = body.date ? new Date(body.date) : new Date();

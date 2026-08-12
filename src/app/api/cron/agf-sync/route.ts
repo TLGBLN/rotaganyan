@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { syncAgfForDate } from "@/server/services/agf-sync";
+import { verifyCronRequest } from "@/lib/cron-auth";
 
 // v6.69 — kullanıcı bulgusu 2026-08-09: çoklu şehir günlerinde (İstanbul+İzmir+Karma
 // aynı anda) sıralı işleme 60sn'yi aşıp cron'u sessizce (Vercel 504) başarısız kılıyordu —
@@ -8,14 +9,9 @@ import { syncAgfForDate } from "@/server/services/agf-sync";
 // per-runner DB yazımı artık paralel.
 export const maxDuration = 800; // v6.90 — kullanıcı talimatı 2026-08-10: en son sınıra çekildi
 
-const CRON_SECRET = process.env.CRON_SECRET;
-
 export async function GET(req: NextRequest) {
-  // Allow Vercel Cron (sets Authorization header from CRON_SECRET env) or manual calls with secret
-  const auth = req.headers.get("authorization");
-  if (CRON_SECRET && auth !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = verifyCronRequest(req);
+  if (denied) return denied;
 
   try {
     const result = await syncAgfForDate(new Date());

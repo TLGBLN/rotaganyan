@@ -5,16 +5,13 @@ import { syncResultsForDate } from "@/server/services/result-sync";
 import { syncJockeyStatsFromTjk, syncTrainerStatsFromTjk } from "@/server/services/race.service";
 import { syncAccuraceForDate } from "@/server/services/accurace-sync.service";
 import { turkeyDateString } from "@/lib/tz";
+import { verifyCronRequest } from "@/lib/cron-auth";
 
 export const maxDuration = 60;
 
-const CRON_SECRET = process.env.CRON_SECRET;
-
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  if (CRON_SECRET && auth !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = verifyCronRequest(req);
+  if (denied) return denied;
 
   const today = turkeyDateString();
   await syncResultsForDate(today);

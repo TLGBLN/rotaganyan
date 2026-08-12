@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { syncAccuraceForDate } from "@/server/services/accurace-sync.service";
 import { turkeyDateString } from "@/lib/tz";
+import { verifyCronRequest } from "@/lib/cron-auth";
 
 // Kullanıcı talimatı: her günün sonunda (UTC 21:00 — vercel.json'da "0 21 * * *")
 // o günün BİTMİŞ koşularının Accurace verisi kesin olarak çekilsin. result-sync
@@ -10,13 +11,9 @@ import { turkeyDateString } from "@/lib/tz";
 // işlediği için iki kez çalışması güvenli/idempotent, çift veri oluşturmaz.
 export const maxDuration = 120;
 
-const CRON_SECRET = process.env.CRON_SECRET;
-
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  if (CRON_SECRET && auth !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = verifyCronRequest(req);
+  if (denied) return denied;
 
   const today = turkeyDateString();
   const dun = turkeyDateString(-1);

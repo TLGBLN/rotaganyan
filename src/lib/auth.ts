@@ -4,8 +4,18 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import type { Role } from "@prisma/client";
+import { checkRateLimit, loginLimiter } from "@/lib/ratelimit";
 
 import { authConfig } from "@/auth.config";
+
+function clientIpFromRequest(request?: Request): string {
+  if (!request) return "unknown";
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    request.headers.get("x-real-ip") ??
+    "unknown"
+  );
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -17,8 +27,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         email: { label: "E-posta", type: "email" },
         password: { label: "Şifre", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) return null;
+
+        // v6.109 — kullanıcı talebi 2026-08-11 ("uçtan uca dışarıdan gelebilecek
+        // tüm saldırılara karşı koruyucu önlemler al"): loginLimiter tanımlıydı
+        // ama HİÇBİR yerde kullanılmıyordu — giriş formuna karşı kaba kuvvet
+        // (brute-force) şifre denemesi tamamen sınırsızdı. IP başına dakikada 5
+        // deneme (bkz. src/lib/ratelimit.ts).
+        const ip = clientIpFromRequest(request);
+        const { success } = await checkRateLimit(loginLimiter, ip);
+        if (!success) return null;
 
         const user = await db.user.findUnique({
           where: { email: credentials.email as string },
