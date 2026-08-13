@@ -26,18 +26,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         email: { label: "E-posta", type: "email" },
         password: { label: "Şifre", type: "password" },
+        // v6.116 — kullanıcı bulgusu 2026-08-13: doğru şifreyle giriş yapan gerçek
+        // bir kullanıcı "yanlış şifre" hatası aldı. Kök neden: /giris'in SUNUCU
+        // taraflı signIn() çağrısında (Server Action → @/lib/auth) authorize()'a
+        // gelen `request` nesnesi güvenilir x-forwarded-for taşımıyor, ip hep
+        // "unknown" oluyordu — TÜM kullanıcıların rate-limit'i AYNI paylaşılan
+        // "unknown" kovaya düşüyordu, biri birkaç kez yanlış şifre denese bile
+        // başkasının doğru girişi bile reddedilebiliyordu. Artık IP, çağıran taraf
+        // (giris/page.tsx, headers() ile — LoginLog'un kullandığı AYNI güvenilir
+        // kaynak) tarafından açıkça gizli bir alan olarak gönderiliyor.
+        ip: { type: "hidden" },
       },
       async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        // v6.109 — kullanıcı talebi 2026-08-11 ("uçtan uca dışarıdan gelebilecek
-        // tüm saldırılara karşı koruyucu önlemler al"): loginLimiter tanımlıydı
-        // ama HİÇBİR yerde kullanılmıyordu — giriş formuna karşı kaba kuvvet
-        // (brute-force) şifre denemesi tamamen sınırsızdı. IP başına dakikada 5
-        // deneme (bkz. src/lib/ratelimit.ts).
-        const ip = clientIpFromRequest(request);
-        const { success } = await checkRateLimit(loginLimiter, ip);
-        if (!success) return null;
+        // v6.109/v6.116: IP önce credentials.ip'den (çağıranın headers() ile
+        // güvenilir şekilde okuduğu değer), yoksa request'ten denenir. İkisi de
+        // "unknown" ise rate-limit ATLANIR — bilinmeyen tek bir kovada TÜM
+        // kullanıcıları toplamak, hiç sınırlamamaktan daha kötü (bkz. yukarıdaki not).
+        const ip = (typeof credentials.ip === "string" && credentials.ip) || clientIpFromRequest(request);
+        if (ip !== "unknown") {
+          const { success } = await checkRateLimit(loginLimiter, ip);
+          if (!success) return null;
+        }
 
         const user = await db.user.findUnique({
           where: { email: credentials.email as string },

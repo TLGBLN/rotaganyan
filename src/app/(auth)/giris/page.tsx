@@ -66,7 +66,10 @@ async function login(formData: FormData) {
   }
 
   try {
-    await signIn("credentials", { email, password, redirectTo: callbackUrl });
+    // v6.116 — ip burada headers() ile güvenilir şekilde okunuyor (LoginLog'un da
+    // kullandığı aynı kaynak) — authorize()'a AÇIKÇA taşınıyor, çünkü signIn()'in
+    // kendi request nesnesinden okunan ip "unknown" çıkıyordu (bkz. auth.ts notu).
+    await signIn("credentials", { email, password, ip, redirectTo: callbackUrl });
   } catch (err) {
     if (err instanceof AuthError) {
       redirect(`/giris?hata=1&callbackUrl=${encodeURIComponent(callbackUrl)}`);
