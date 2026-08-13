@@ -164,6 +164,10 @@ model RaceDay {
   races      Race[]
 
   @@unique([date, hippodromeId])
+  // 2026-08-13 — Supabase lint uyarısı (unindexed foreign key) üzerine doğrudan
+  // veritabanında (Supabase SQL editörü) eklendi; burada yalnız şemayı gerçek
+  // durumla senkron tutmak için tanımlandı — prisma migrate ÇALIŞTIRILMADI.
+  @@index([hippodromeId], map: "ix_RaceDay_hippodromeId")
 }
 
 model Race {
