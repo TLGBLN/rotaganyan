@@ -117,8 +117,11 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
       {/* Tek kupon şablonu — Ekonomik/Normal/Geniş, /program'daki panel butonları gibi tıklanınca değişir */}
       <div className="flex flex-col overflow-hidden rounded-lg border bg-card">
         <div className="flex items-center justify-between gap-2 border-b bg-muted/30 px-4 py-2.5">
+          {/* v6.113 — kullanıcı talebi 2026-08-13: seçilecek tek kademe varsa (7'li Ganyan'da
+              yalnız "Geniş" doluyor) sekme göstermenin anlamı yok — aralarında gezinilecek
+              başka bir kademe olmadığı için etiket kafa karıştırıyordu, tamamen gizlendi. */}
           <div className="flex items-center gap-1.5 overflow-x-auto">
-            {visibleVariants.map((variant) => (
+            {visibleVariants.length > 1 && visibleVariants.map((variant) => (
               <button
                 key={variant.key}
                 type="button"
