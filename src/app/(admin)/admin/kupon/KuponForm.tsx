@@ -22,7 +22,11 @@ type Selections = Record<number, Record<Width, Set<number>>>;
 
 const WIDTHS: Width[] = ["narrow", "normal", "wide"];
 const WIDTH_LABEL: Record<Width, string> = { narrow: "Ekonomik", normal: "Normal", wide: "Geniş" };
-const STAKE_PER_COMBINATION = 1.25;
+const ALTILI_STAKE_PER_COMBINATION = 1.25;
+// v6.111 — kullanıcı düzeltmesi 2026-08-13: 7'li Ganyan'ın kombinasyon başı ücreti
+// Altılı'dan (1.25₺) farklı, TJK'da 2₺. Pool limitleri (600/1500/3000) için gerçek
+// 7'li Ganyan rakamı henüz doğrulanmadı, Altılı'dan aynen kopyalandı — yanlışsa düzelt.
+const YEDILI_GANYAN_STAKE_PER_COMBINATION = 2;
 const LIMITS: Record<Width, number> = { narrow: 600, normal: 1500, wide: 3000 };
 const TOLERANCE = 1.10; // %10 esneme payı
 
@@ -53,16 +57,16 @@ function legCounts(races: { raceNo: number }[], selections: Selections, width: W
   return races.map((r) => Math.max((selections[r.raceNo] ?? emptySelection())[width].size, 1));
 }
 
-function amountFor(counts: number[]): number {
+function amountFor(counts: number[], stakePerCombination: number): number {
   const combinations = counts.reduce((acc, n) => acc * n, 1);
-  return Math.round(combinations * STAKE_PER_COMBINATION * 100) / 100;
+  return Math.round(combinations * stakePerCombination * 100) / 100;
 }
 
 // v6.110 — Altılı gruplarıyla 7'li Ganyan bölümü AYNI tablo/özet/yayınla arayüzünü
 // paylaşıyor, yalnız hangi koşuları kapsadığı ve etiketi farklı — kod tekrarını
 // önlemek için ortak bileşene çıkarıldı.
 function KuponGrup({
-  label, races, selections, onToggle, amounts, onSubmit, publishing,
+  label, races, selections, onToggle, amounts, onSubmit, publishing, stakePerCombination, widths = WIDTHS,
 }: {
   label: string;
   races: RaceDayData["races"];
@@ -71,6 +75,9 @@ function KuponGrup({
   amounts: Record<Width, number>;
   onSubmit: () => void;
   publishing: boolean;
+  stakePerCombination: number;
+  /** v6.111 — kullanıcı talebi 2026-08-13: 7'li Ganyan yalnız "Geniş" gösterir, Altılı üçünü de. */
+  widths?: Width[];
 }) {
   return (
     <div className="space-y-2">
@@ -80,7 +87,7 @@ function KuponGrup({
           <thead>
             <tr className="bg-muted/40">
               <th className="border-b px-3 py-2 text-left text-xs font-medium text-muted-foreground">Koşu</th>
-              {WIDTHS.map((width) => (
+              {widths.map((width) => (
                 <th key={width} className="border-b px-3 py-2 text-left text-xs font-medium text-muted-foreground">
                   {WIDTH_LABEL[width]}
                 </th>
@@ -95,7 +102,7 @@ function KuponGrup({
                   <td className="px-3 py-3 align-top text-sm font-semibold whitespace-nowrap">
                     {race.raceNo}. Koşu
                   </td>
-                  {WIDTHS.map((width) => (
+                  {widths.map((width) => (
                     <td key={width} className="px-3 py-3 align-top">
                       <div className="flex flex-col gap-1">
                         {race.runners.map((runner) => {
@@ -139,14 +146,14 @@ function KuponGrup({
         </table>
       </div>
 
-      {/* Canlı özet — formül: ayaklardaki at sayıları çarpılır × 1.25 */}
-      <div className="grid grid-cols-3 gap-3">
-        {WIDTHS.map((width) => {
+      {/* Canlı özet — formül: ayaklardaki at sayıları çarpılır × kombinasyon ücreti */}
+      <div className={cn("grid gap-3", widths.length === 1 ? "grid-cols-1 max-w-xs" : "grid-cols-3")}>
+        {widths.map((width) => {
           const amount = amounts[width];
           const limit = LIMITS[width];
           const effectiveLimit = limit * TOLERANCE;
-          const maxCombos = Math.floor(effectiveLimit / STAKE_PER_COMBINATION);
-          const currentCombos = Math.round(amount / STAKE_PER_COMBINATION);
+          const maxCombos = Math.floor(effectiveLimit / stakePerCombination);
+          const currentCombos = Math.round(amount / stakePerCombination);
           const remaining = maxCombos - currentCombos;
           const over = amount > effectiveLimit;
           return (
@@ -171,7 +178,7 @@ function KuponGrup({
         })}
       </div>
 
-      {WIDTHS.some((w) => amounts[w] > LIMITS[w] * TOLERANCE) && (
+      {widths.some((w) => amounts[w] > LIMITS[w] * TOLERANCE) && (
         <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-500">
           ⚠ Bir veya daha fazla kupon türü limit aşıyor. Kaydetmeden önce seçimleri azaltın.
         </div>
@@ -189,9 +196,9 @@ function KuponGrup({
   );
 }
 
-function amountsForGroup(group: RaceDayData["races"], selections: Selections): Record<Width, number> {
+function amountsForGroup(group: RaceDayData["races"], selections: Selections, stakePerCombination: number): Record<Width, number> {
   return WIDTHS.reduce((acc, width) => {
-    acc[width] = amountFor(legCounts(group, selections, width));
+    acc[width] = amountFor(legCounts(group, selections, width), stakePerCombination);
     return acc;
   }, {} as Record<Width, number>);
 }
@@ -212,7 +219,7 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
   );
 
   const groupAmounts = useMemo(
-    () => altiliGroups.map((group) => amountsForGroup(group, selections)),
+    () => altiliGroups.map((group) => amountsForGroup(group, selections, ALTILI_STAKE_PER_COMBINATION)),
     [altiliGroups, selections]
   );
 
@@ -223,7 +230,7 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
     [raceDay]
   );
   const yediliGanyanAmounts = useMemo(
-    () => (yediliGanyanRaces ? amountsForGroup(yediliGanyanRaces, selections) : null),
+    () => (yediliGanyanRaces ? amountsForGroup(yediliGanyanRaces, selections, YEDILI_GANYAN_STAKE_PER_COMBINATION) : null),
     [yediliGanyanRaces, selections]
   );
 
@@ -336,6 +343,7 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
                 selections={selections}
                 onToggle={toggleHorse}
                 amounts={groupAmounts[chunkIdx]}
+                stakePerCombination={ALTILI_STAKE_PER_COMBINATION}
                 onSubmit={() => submitGroup(chunk, key, label, chunkIdx + 1)}
                 publishing={publishingKey === key}
               />
@@ -350,6 +358,8 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
               selections={selections}
               onToggle={toggleHorse}
               amounts={yediliGanyanAmounts}
+              stakePerCombination={YEDILI_GANYAN_STAKE_PER_COMBINATION}
+              widths={["wide"]}
               onSubmit={() => submitGroup(yediliGanyanRaces, "yedili-ganyan", "7'li Ganyan", YEDILI_GANYAN_SLOT)}
               publishing={publishingKey === "yedili-ganyan"}
             />
