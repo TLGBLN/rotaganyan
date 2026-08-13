@@ -1403,7 +1403,7 @@ function RaceTable({
       <div id="panel-agf-trend">
         {agfTrendOpen && (
           <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
-            <AgfTrendPanel raceId={race.id} />
+            <AgfTrendPanel raceId={race.id} winnerNos={winnerNos} />
           </PanelKilitGate>
         )}
       </div>

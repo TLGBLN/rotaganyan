@@ -33,7 +33,14 @@ function DegisimEtiketi({ item, t }: { item: AgfTrendItem; t: AgfT }) {
   );
 }
 
-function HareketKarti({ baslik, renk, atlar, t }: { baslik: string; renk: "dusen" | "yukselen"; atlar: AgfTrendItem[]; t: AgfT }) {
+// v6.114 — kullanıcı talebi 2026-08-13: bu listedeki bir at gerçekten kazanırsa, sitede
+// kazananlar için her yerde kullanılan AYNI altın rengiyle (bkz. ProgramView.tsx isWinner
+// → #f5c518) işaretlensin — ayrı bir renk icat edilmedi, mevcut kazanan kuralına uyuldu.
+const WINNER_COLOR = "text-[#f5c518]";
+
+function HareketKarti({
+  baslik, renk, atlar, t, winnerNos,
+}: { baslik: string; renk: "dusen" | "yukselen"; atlar: AgfTrendItem[]; t: AgfT; winnerNos: number[] }) {
   const isYukselen = renk === "yukselen";
   return (
     <div
@@ -49,22 +56,25 @@ function HareketKarti({ baslik, renk, atlar, t }: { baslik: string; renk: "dusen
         <div className="py-2 text-xs text-muted-foreground">{t("hareketYok")}</div>
       ) : (
         <ul className="space-y-1.5">
-          {atlar.map((a) => (
-            <li key={a.runnerNo} className="flex items-center justify-between gap-2 text-xs">
-              <span className="flex items-center gap-1.5 min-w-0">
-                <span className="font-mono text-muted-foreground">{a.runnerNo}</span>
-                <span className="truncate font-semibold">{a.horseName}</span>
-              </span>
-              <DegisimEtiketi item={a} t={t} />
-            </li>
-          ))}
+          {atlar.map((a) => {
+            const kazandi = winnerNos.includes(a.runnerNo);
+            return (
+              <li key={a.runnerNo} className="flex items-center justify-between gap-2 text-xs">
+                <span className="flex items-center gap-1.5 min-w-0">
+                  <span className={cn("font-mono", kazandi ? WINNER_COLOR : "text-muted-foreground")}>{a.runnerNo}</span>
+                  <span className={cn("truncate font-semibold", kazandi && WINNER_COLOR)}>{a.horseName}</span>
+                </span>
+                <DegisimEtiketi item={a} t={t} />
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
   );
 }
 
-export default function AgfTrendPanel({ raceId }: { raceId: string }) {
+export default function AgfTrendPanel({ raceId, winnerNos = [] }: { raceId: string; winnerNos?: number[] }) {
   const t = useTranslations("programToolbar");
   const [data, setData] = useState<Awaited<ReturnType<typeof getAgfTrendForRace>> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -110,8 +120,8 @@ export default function AgfTrendPanel({ raceId }: { raceId: string }) {
       ) : (
         <>
           <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2">
-            <HareketKarti baslik={t("enCokDusenler")} renk="dusen" atlar={data.enCokDusenler} t={t} />
-            <HareketKarti baslik={t("enCokYukselenler")} renk="yukselen" atlar={data.enCokYukselenler} t={t} />
+            <HareketKarti baslik={t("enCokDusenler")} renk="dusen" atlar={data.enCokDusenler} t={t} winnerNos={winnerNos} />
+            <HareketKarti baslik={t("enCokYukselenler")} renk="yukselen" atlar={data.enCokYukselenler} t={t} winnerNos={winnerNos} />
           </div>
 
           {/* Tam liste — istisnasız her at, en çok hareket edenlerin dışında kalanlar dahil */}
@@ -120,15 +130,18 @@ export default function AgfTrendPanel({ raceId }: { raceId: string }) {
               {t("sahadakiTumAtlar")}
             </div>
             <div className="divide-y">
-              {data.atlar.map((a) => (
-                <div key={a.runnerNo} className="flex items-center justify-between gap-2 px-1 py-1.5 text-xs">
-                  <span className="flex items-center gap-1.5 min-w-0">
-                    <span className="font-mono text-muted-foreground">{a.runnerNo}</span>
-                    <span className="truncate">{a.horseName}</span>
-                  </span>
-                  <DegisimEtiketi item={a} t={t} />
-                </div>
-              ))}
+              {data.atlar.map((a) => {
+                const kazandi = winnerNos.includes(a.runnerNo);
+                return (
+                  <div key={a.runnerNo} className="flex items-center justify-between gap-2 px-1 py-1.5 text-xs">
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span className={cn("font-mono", kazandi ? WINNER_COLOR : "text-muted-foreground")}>{a.runnerNo}</span>
+                      <span className={cn("truncate", kazandi && WINNER_COLOR, kazandi && "font-semibold")}>{a.horseName}</span>
+                    </span>
+                    <DegisimEtiketi item={a} t={t} />
+                  </div>
+                );
+              })}
             </div>
           </div>
 
