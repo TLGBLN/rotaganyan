@@ -375,8 +375,19 @@ export type KuponVariant = {
 export type KuponOnerisi = { id: string; hippodromeName: string; variants: KuponVariant[] } | null;
 export type HomeKuponLeg = { raceNo: number; narrow: number[]; normal: number[]; wide: number[] };
 
-/** Tüm yarışlar yurtiçi (yabancı hipodromlar ingest sırasında elenir) — birim bahis bedeli sabit. */
-const STAKE_PER_COMBINATION = 1.25;
+/**
+ * v6.112 — kullanıcı bulgusu 2026-08-13: bu sabit her kupon türü için 1.25 kullanıyordu,
+ * ama 7'li Ganyan'ın kombinasyon başı ücreti 2 TL — bir Kocaeli 7'li Ganyan kuponunda
+ * 960 kombinasyon × 1.25 = 1.200₺ gösteriyordu, doğrusu 960 × 2 = 1.920₺'ydi. Etiket
+ * ("Kocaeli — 7'li Ganyan" gibi) admin panelinde (KuponForm.tsx) zaten bu ayrımı taşıyor,
+ * burada da AYNI ayrımla doğru birim ücret seçiliyor.
+ */
+const ALTILI_STAKE_PER_COMBINATION = 1.25;
+const YEDILI_GANYAN_STAKE_PER_COMBINATION = 2;
+
+function stakeForHippodromeLabel(hippodromeName: string): number {
+  return hippodromeName.includes("7'li Ganyan") ? YEDILI_GANYAN_STAKE_PER_COMBINATION : ALTILI_STAKE_PER_COMBINATION;
+}
 
 /**
  * Eküri (coupled entry) haritası — v6.35, kullanıcı bulgusu: "#7 ve #10 eküri, #10 kazandı,
@@ -405,9 +416,9 @@ function buildEkuriWinnerMap(
   return map;
 }
 
-function kuponAmount(nosPerLeg: number[][]): number {
+function kuponAmount(nosPerLeg: number[][], stakePerCombination: number): number {
   const combinations = nosPerLeg.reduce((acc, nos) => acc * Math.max(nos.length, 1), 1);
-  return Math.round(combinations * STAKE_PER_COMBINATION * 100) / 100;
+  return Math.round(combinations * stakePerCombination * 100) / 100;
 }
 
 export async function buildKuponOnerisi(active: {
@@ -507,13 +518,15 @@ export async function buildKuponOnerisi(active: {
   const hasNormal = legs.some((l) => l.normal.length > 0);
   const hasWide = legs.some((l) => l.wide.length > 0);
 
+  const stake = stakeForHippodromeLabel(active.hippodromeName);
+
   return {
     id: active.id,
     hippodromeName: active.hippodromeName,
     variants: [
-      { key: "ekonomik", label: "Ekonomik", legs: narrowLegs, amount: kuponAmount(narrowLegs.map((l) => l.nos)), status: statusFor(narrowLegs), filled: hasNarrow },
-      { key: "normal", label: "Normal", legs: normalLegs, amount: kuponAmount(normalLegs.map((l) => l.nos)), status: statusFor(normalLegs), filled: hasNormal },
-      { key: "genis", label: "Geniş", legs: wideLegs, amount: kuponAmount(wideLegs.map((l) => l.nos)), status: statusFor(wideLegs), filled: hasWide },
+      { key: "ekonomik", label: "Ekonomik", legs: narrowLegs, amount: kuponAmount(narrowLegs.map((l) => l.nos), stake), status: statusFor(narrowLegs), filled: hasNarrow },
+      { key: "normal", label: "Normal", legs: normalLegs, amount: kuponAmount(normalLegs.map((l) => l.nos), stake), status: statusFor(normalLegs), filled: hasNormal },
+      { key: "genis", label: "Geniş", legs: wideLegs, amount: kuponAmount(wideLegs.map((l) => l.nos), stake), status: statusFor(wideLegs), filled: hasWide },
     ],
   };
 }
