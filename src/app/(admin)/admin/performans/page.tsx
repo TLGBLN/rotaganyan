@@ -1,5 +1,6 @@
 import { getAnalizPerformansOzeti } from "@/server/services/analiz-performans.service";
 import { getVersiyonKarsilastirmasi } from "@/server/services/analiz-versiyon-karsilastirma.service";
+import { getAgfTrendIstatistik } from "@/server/services/agf-trend-istatistik.service";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -27,10 +28,12 @@ function tarihFmt(d: Date) {
 }
 
 export default async function PerformansDenetimiPage() {
-  const [ozet, versiyonlar] = await Promise.all([
+  const [ozet, versiyonlar, agfTrendIstatistik] = await Promise.all([
     getAnalizPerformansOzeti(),
     getVersiyonKarsilastirmasi(),
+    getAgfTrendIstatistik(),
   ]);
+  const agfGrup = Object.fromEntries(agfTrendIstatistik.map((g) => [g.grup, g]));
 
   const durumStil =
     ozet.durum === "dusus"
@@ -67,6 +70,38 @@ export default async function PerformansDenetimiPage() {
           <div className="grid grid-cols-2 gap-3">
             <Kart baslik="Galibiyet (1.sıra)" deger={ozet.onceki ? `%${ozet.onceki.hitTop1Orani}` : "—"} alt={ozet.onceki ? `n=${ozet.onceki.n}` : "henüz yok"} />
             <Kart baslik="Kupon İsabeti" deger={ozet.onceki ? `%${ozet.onceki.hitInCouponOrani}` : "—"} alt={ozet.onceki ? `n=${ozet.onceki.n}` : "henüz yok"} />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3 pt-2">
+        <div>
+          <h2 className="text-base font-bold text-foreground">AGF Trend — Tarihsel Doğrulama</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Sitedeki tüm sonuçlanmış koşularda, günün ilk AGF ölçümünden yarış anına kadar en çok
+            hareket eden (top-5) atların gerçek galibiyet/ilk-3 oranı — sahadaki rastgele bir atla
+            (kontrol grubu) kıyaslanır. AGF trend kod-garanti kurallarının (faz2AgfTrend456Garantisi
+            vb.) neden var olduğunun kanıtı.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-lg border border-hit/30 bg-hit/[0.04] p-4">
+            <div className="text-xs font-bold uppercase tracking-wide text-hit">En Çok Yükselenler</div>
+            <div className="mt-1 text-2xl font-black tabular-nums text-foreground">%{agfGrup.yukselen?.galibiyetYuzde ?? "—"}</div>
+            <div className="text-[11px] text-muted-foreground">galibiyet · n={agfGrup.yukselen?.n ?? 0}</div>
+            <div className="mt-1 text-xs text-muted-foreground">İlk-3: %{agfGrup.yukselen?.top3Yuzde ?? "—"}</div>
+          </div>
+          <div className="rounded-lg border border-[#c0392b]/30 bg-[#c0392b]/[0.04] p-4">
+            <div className="text-xs font-bold uppercase tracking-wide text-[#c0392b]">En Çok Düşenler</div>
+            <div className="mt-1 text-2xl font-black tabular-nums text-foreground">%{agfGrup.dusen?.galibiyetYuzde ?? "—"}</div>
+            <div className="text-[11px] text-muted-foreground">galibiyet · n={agfGrup.dusen?.n ?? 0}</div>
+            <div className="mt-1 text-xs text-muted-foreground">İlk-3: %{agfGrup.dusen?.top3Yuzde ?? "—"}</div>
+          </div>
+          <div className="rounded-lg border border-brand/20 bg-[#0d0d14] p-4">
+            <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Kontrol (sahadaki tüm atlar)</div>
+            <div className="mt-1 text-2xl font-black tabular-nums text-foreground">%{agfGrup.kontrol?.galibiyetYuzde ?? "—"}</div>
+            <div className="text-[11px] text-muted-foreground">galibiyet · n={agfGrup.kontrol?.n ?? 0}</div>
+            <div className="mt-1 text-xs text-muted-foreground">İlk-3: %{agfGrup.kontrol?.top3Yuzde ?? "—"}</div>
           </div>
         </div>
       </div>
