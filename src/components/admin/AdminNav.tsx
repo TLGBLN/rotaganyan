@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   FileText,
-  Flag,
   Trophy,
   Settings,
   Users,
@@ -24,7 +23,6 @@ const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/performans", label: "Performans Denetimi", icon: Activity },
   { href: "/admin/analizler", label: "Analizler", icon: FileText },
-  { href: "/admin/kosular", label: "Koşular", icon: Flag },
   { href: "/admin/pedigri", label: "Pedigriler", icon: Dna },
   { href: "/admin/accurace", label: "Accurace Database", icon: Gauge },
   { href: "/admin/sonuclar", label: "Sonuçlar", icon: Trophy },

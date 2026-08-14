@@ -123,7 +123,7 @@ export async function forceIngestDate(date: string): Promise<{ runners: number }
   const tjkDate = toTjkDate(new Date(date + "T00:00:00Z"));
   const result = await ingestDate(tjkDate);
   const runners = result.cities.reduce((s, c) => s + c.runners, 0);
-  revalidatePath("/admin/kosular");
+  revalidatePath("/admin/kupon");
   revalidatePath("/program");
   revalidatePath("/altili");
   return { runners };

@@ -13,6 +13,10 @@ import KuponForm from "./KuponForm";
 import KuponActions from "./KuponActions";
 import type { HomeKuponLegInput } from "@/server/actions/home-kupon.actions";
 import { syncResultsForDate } from "@/server/services/result-sync";
+import DeleteRaceDayButton from "@/components/admin/DeleteRaceDayButton";
+import DeleteRaceButton from "@/components/admin/DeleteRaceButton";
+import ForceIngestButton from "@/components/admin/ForceIngestButton";
+import { forceIngestDate } from "@/server/actions/race.actions";
 
 export const dynamic = "force-dynamic";
 
@@ -110,7 +114,10 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-bold">Kupon Hazırla</h1>
-        <DateNavigator currentDate={currentDate} basePath="/admin/kupon" />
+        <div className="flex items-center gap-2">
+          <ForceIngestButton date={currentDate} action={forceIngestDate} />
+          <DateNavigator currentDate={currentDate} basePath="/admin/kupon" />
+        </div>
       </div>
 
       {/* ── Koşu Programı (kosular ile aynı veri) ── */}
@@ -121,8 +128,17 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
           </h2>
           {adminRaceDays.map((rd) => (
             <div key={rd.id} className="rounded-lg border">
-              <div className="border-b bg-muted/30 px-3 py-1.5 text-sm font-semibold">
-                {rd.hippodrome.name}
+              <div className="flex items-center justify-between border-b bg-muted/30 px-3 py-1.5">
+                <span className="text-sm font-semibold">{rd.hippodrome.name}</span>
+                <div className="flex items-center gap-3">
+                  <Badge variant="secondary" className="text-xs">
+                    {rd.races.length} koşu
+                  </Badge>
+                  <DeleteRaceDayButton
+                    raceDayId={rd.id}
+                    label={`${rd.hippodrome.name} — ${format(rd.date, "d MMMM yyyy", { locale: tr })}`}
+                  />
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
@@ -134,6 +150,8 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                       <th className="px-3 py-1.5 text-left font-medium">Mesafe</th>
                       <th className="px-3 py-1.5 text-left font-medium">At</th>
                       <th className="px-3 py-1.5 text-left font-medium">Analiz</th>
+                      <th className="px-3 py-1.5 text-left font-medium">Sonuç</th>
+                      <th className="px-3 py-1.5 text-right font-medium"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -197,7 +215,7 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                           <td className="px-3 py-1.5">{effectiveRunners.length}</td>
                           <td className="px-3 py-1.5">
                             {effectivePred ? (
-                              <div className="flex flex-wrap items-center gap-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
                                 <Link
                                   href={`/admin/analizler/${effectivePred.id}`}
                                   className={cn(
@@ -206,6 +224,13 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                                   )}
                                 >
                                   {effectivePred.published ? "Yayında" : "Taslak"}
+                                </Link>
+                                <Link
+                                  href={`/admin/analizler/yeni?kosu=${effectiveRaceIdFor(race)}`}
+                                  className="text-muted-foreground hover:text-brand"
+                                  title="Analizi revize et"
+                                >
+                                  + Ekle
                                 </Link>
                                 {effectivePred.picks
                                   .filter((p) => p.isTarget)
@@ -219,8 +244,26 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                                   ))}
                               </div>
                             ) : (
+                              <Link
+                                href={`/admin/analizler/yeni?kosu=${effectiveRaceIdFor(race)}`}
+                                className="text-muted-foreground hover:text-brand"
+                              >
+                                + Analiz Ekle
+                              </Link>
+                            )}
+                          </td>
+                          <td className="px-3 py-1.5">
+                            {race.result ? (
+                              <span className="text-hit">✓ Girildi</span>
+                            ) : (
                               <span className="text-muted-foreground">—</span>
                             )}
+                          </td>
+                          <td className="px-3 py-1.5 text-right">
+                            <DeleteRaceButton
+                              raceId={race.id}
+                              label={`${rd.hippodrome.name} ${race.raceNo}. Koşu`}
+                            />
                           </td>
                         </tr>
                       );
