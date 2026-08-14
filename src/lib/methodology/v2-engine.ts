@@ -953,17 +953,33 @@ export function faz2GucluKombinasyonTop3Garantisi(
 // SireStatOwn.kYuzde P80 (n>=20 örneklemli aygırlar, 2026-08-13 doğrulaması — n=530,
 // global=14, İngiliz=14 (n=268), Arap=14 (n=262)): ırklar arası fark yok, tek statik
 // eşik yeterli.
-const SIRE_TOP20_KYUZDE_ESIGI = 14;
-const SINYAL_YIGINI_ESIGI = 4;
+export const SIRE_TOP20_KYUZDE_ESIGI = 14;
+export const SINYAL_YIGINI_ESIGI = 4;
 
-type SinyalSonuc = { sayi: number; etiketler: string[] };
+export type SinyalSonuc = { sayi: number; etiketler: string[] };
 
-function altiSinyalSayisi(r: Faz1Runner, faz1: Faz1Sonuc): SinyalSonuc {
+/** 6-sinyal sayımının V2/V4 TARAFINDAN paylaşılan çekirdeği — Faz1Runner'ın (V2'nin geniş
+ *  tipi) tamamına değil, yalnız gerçekten kullanılan 7 alana bağımlı. `trend`, çağıranın
+ *  kendi AGF-trend listesinden (V2: birlesikTrendListesi, V4: kendi eşdeğeri) bulup
+ *  geçirdiği tek eşleşme — bu fonksiyon faz1/saha bilgisine hiç erişmez. */
+export type SinyalGirdisi = {
+  no: number;
+  recentForm: string | null;
+  accuraceSonYarisEnHizliKapanis: boolean | null;
+  gunAralik: number | null;
+  hipodromMesafedeKazandi: "EVET" | "HAYIR" | "KOSMADI";
+  sireKazanmaOrani: number | null;
+  sireOrneklemKendiVeri: number | null;
+};
+
+export function hesaplaSinyalSayisi(
+  r: SinyalGirdisi,
+  trend: { fark: number; yon: "yükseliş" | "düşüş" } | undefined
+): SinyalSonuc {
   const etiketler: string[] = [];
 
   // 1. AGF trend yönü — yükselen/düşen birbirini dışlar (aynı at ikisini birden
   //    taşıyamaz), tek slot sayılır.
-  const trend = birlesikTrendListesi(faz1).find((t) => t.runnerNo === r.no);
   if (trend) etiketler.push(`AGF trend (${trend.yon}, ${trend.fark >= 0 ? "+" : ""}${trend.fark} puan)`);
 
   // 2. Accurace — son yarışta sahanın en hızlı son 200m kapanışı
@@ -989,6 +1005,11 @@ function altiSinyalSayisi(r: Faz1Runner, faz1: Faz1Sonuc): SinyalSonuc {
   }
 
   return { sayi: etiketler.length, etiketler };
+}
+
+function altiSinyalSayisi(r: Faz1Runner, faz1: Faz1Sonuc): SinyalSonuc {
+  const trend = birlesikTrendListesi(faz1).find((t) => t.runnerNo === r.no);
+  return hesaplaSinyalSayisi(r, trend ? { fark: trend.fark, yon: trend.yon } : undefined);
 }
 
 /**

@@ -69,6 +69,100 @@ function accuraceQueryNames(names: string[]): string[] {
   return [...out];
 }
 
+export type AccuraceGecmisKayit = {
+  horseName: string;
+  accuraceRaceId: string;
+  checkpoints: unknown;
+  place: number;
+  accuraceRace: { date: Date; citySlug: string; ground: string | null; length: number | null };
+};
+export type AccuraceSibling = {
+  accuraceRaceId: string;
+  checkpoints: unknown;
+  accuraceRace: { length: number | null };
+};
+
+/**
+ * V2 (gatherFaz1, "Son 800 Gölge Mod") ve V4 (gatherFaz1V4, "en hızlı son 200m kapanışı"
+ * sinyali) TARAFINDAN paylaşılan tek sorgu — atların TÜM geçmiş Accurace kayıtları (ground/
+ * mesafe filtresi yok) + o yarışların TÜM sahası. Hedef yarışın tarihi VE sonrası hariç
+ * tutulur (bkz. v6.59 notu) — aksi halde bir at bu yarışı kendi kendine "geçmiş kanıt"
+ * olarak gösterebiliyordu.
+ */
+export async function fetchAccuraceGecmisKayitlari(
+  runnerNames: string[],
+  raceDate: Date
+): Promise<{ son800AccuraceKayitlari: AccuraceGecmisKayit[]; son800Siblings: AccuraceSibling[] }> {
+  const son800AccuraceKayitlariHam = runnerNames.length
+    ? await db.accuraceHorseSplit.findMany({
+        where: { horseName: { in: accuraceQueryNames(runnerNames) } },
+        select: {
+          horseName: true,
+          accuraceRaceId: true,
+          checkpoints: true,
+          place: true,
+          accuraceRace: { select: { date: true, citySlug: true, ground: true, length: true } },
+        },
+      })
+    : [];
+  const son800AccuraceKayitlari = son800AccuraceKayitlariHam.filter((k) => k.accuraceRace.date < raceDate);
+  const son800RaceIds = [...new Set(son800AccuraceKayitlari.map((k) => k.accuraceRaceId))];
+  const son800Siblings = son800RaceIds.length
+    ? await db.accuraceHorseSplit.findMany({
+        where: { accuraceRaceId: { in: son800RaceIds } },
+        select: { accuraceRaceId: true, checkpoints: true, accuraceRace: { select: { length: true } } },
+      })
+    : [];
+  return { son800AccuraceKayitlari, son800Siblings };
+}
+
+function last200SureSaniye(checkpoints: PaceCheckpoint[], length: number): number | null {
+  if (length < 200) return null;
+  const sorted = [...checkpoints].sort((a, b) => a.checkpoint - b.checkpoint);
+  const finish = sorted[sorted.length - 1];
+  if (!finish) return null;
+  const nokta = [...sorted].reverse().find((c) => c.checkpoint <= length - 200);
+  if (!nokta) return null;
+  return (finish.timeReal - nokta.timeReal) / 1000;
+}
+
+// Trivial "1-2 atlık sahada otomatik en hızlı" yanlış-pozitifini önlemek için minimum saha
+// büyüklüğü — backtest'teki kontrol grubu (rastgele bir sonraki yarış, n=20001) doğal
+// olarak büyük sahalardan oluşuyordu, bu eşik o koşulu üretim tarafında da korur.
+const MIN_SAHA_SON200 = 4;
+
+/** Atın en son Accurace-izlenen yarışında, o yarışın sahasındaki TÜM atlar arasında en
+ *  hızlı son 200m kapanışını yapmış olması — V2 ve V4 TARAFINDAN paylaşılır. */
+export function hesaplaAccuraceSonYarisEnHizliKapanisMap(
+  runnerNames: string[],
+  son800AccuraceKayitlari: AccuraceGecmisKayit[],
+  son800Siblings: AccuraceSibling[]
+): Map<string, boolean | null> {
+  const sonuc = new Map<string, boolean | null>();
+  for (const name of runnerNames) {
+    const kendiKayitlari = son800AccuraceKayitlari
+      .filter((k) => normalizeHorseName(k.horseName) === normalizeHorseName(name))
+      .sort((a, b) => b.accuraceRace.date.getTime() - a.accuraceRace.date.getTime());
+    const sonYaris = kendiKayitlari[0];
+    if (!sonYaris) {
+      sonuc.set(name, null);
+      continue;
+    }
+    const kendiSure = last200SureSaniye(sonYaris.checkpoints as unknown as PaceCheckpoint[], sonYaris.accuraceRace.length ?? 0);
+    const sahaSureleri = son800Siblings
+      .filter((s) => s.accuraceRaceId === sonYaris.accuraceRaceId)
+      .map((s) => last200SureSaniye(s.checkpoints as unknown as PaceCheckpoint[], s.accuraceRace.length ?? 0))
+      .filter((x): x is number => x != null);
+    if (kendiSure == null || sahaSureleri.length < MIN_SAHA_SON200) {
+      sonuc.set(name, null);
+      continue;
+    }
+    const sahaEnHizli = Math.min(...sahaSureleri);
+    sonuc.set(name, kendiSure <= sahaEnHizli + 1e-6);
+  }
+  return sonuc;
+}
+
 // ── SKK Sınıf Piramidi (Ansiklopedi Bölüm III) — metin tabanlı en iyi eşleştirme ──
 export function classToSkk(classType: string | null | undefined): number | null {
   if (!classType) return null;
@@ -622,31 +716,10 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   // süresini, O YARIŞTAKİ EN İYİ (field'in en hızlı) son 800m'siyle kıyaslıyoruz. Fark
   // (saniye): 0=o yarışın en iyi kapanışını yakaladı, pozitif=daha yavaş kapandı — eski TJK
   // formülüyle yön/birim uyumlu, gecit-motoru.ts'teki -0.5/+0.7 eşikleri değişmeden geçerli.
-  const son800AccuraceKayitlariHam = race.runners.length
-    ? await db.accuraceHorseSplit.findMany({
-        where: { horseName: { in: accuraceQueryNames(race.runners.map((r) => r.name)) } },
-        select: {
-          horseName: true,
-          accuraceRaceId: true,
-          checkpoints: true,
-          place: true,
-          accuraceRace: { select: { date: true, citySlug: true, ground: true, length: true } },
-        },
-      })
-    : [];
-  // Hedef yarışın tarihi VE sonrası hariç tutuluyor (bkz. gatherFaz1 başındaki v6.59 notu) —
-  // aksi halde bir at bu yarışı (veya sonraki bir yarışını) kendi kendine "geçmiş kanıt"
-  // olarak gösterebiliyordu.
-  const son800AccuraceKayitlari = son800AccuraceKayitlariHam.filter(
-    (k) => k.accuraceRace.date < race.raceDay.date
+  const { son800AccuraceKayitlari, son800Siblings } = await fetchAccuraceGecmisKayitlari(
+    race.runners.map((r) => r.name),
+    race.raceDay.date
   );
-  const son800RaceIds = [...new Set(son800AccuraceKayitlari.map((k) => k.accuraceRaceId))];
-  const son800Siblings = son800RaceIds.length
-    ? await db.accuraceHorseSplit.findMany({
-        where: { accuraceRaceId: { in: son800RaceIds } },
-        select: { accuraceRaceId: true, checkpoints: true, accuraceRace: { select: { length: true } } },
-      })
-    : [];
 
   function last800SureSaniye(checkpoints: PaceCheckpoint[], length: number): number | null {
     if (length < 800) return null;
@@ -667,46 +740,14 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
   }
 
   // ── 4+ Sinyal Yığını — Accurace "son yarışta en hızlı son 200m kapanışı" bayrağı ──────
-  // last800SureSaniye ile AYNI desen (finish.timeReal - nokta(length-200).timeReal), yalnız
-  // 800m yerine 200m. son800AccuraceKayitlari (atın TÜM geçmişi, ground/mesafe filtresi yok)
-  // ve son800Siblings (o yarışların TÜM sahası) YUKARIDA ZATEN çekilmişti — yeni bir DB
-  // sorgusu açılmıyor.
-  function last200SureSaniye(checkpoints: PaceCheckpoint[], length: number): number | null {
-    if (length < 200) return null;
-    const sorted = [...checkpoints].sort((a, b) => a.checkpoint - b.checkpoint);
-    const finish = sorted[sorted.length - 1];
-    if (!finish) return null;
-    const nokta = [...sorted].reverse().find((c) => c.checkpoint <= length - 200);
-    if (!nokta) return null;
-    return (finish.timeReal - nokta.timeReal) / 1000;
-  }
-
-  // Trivial "1-2 atlık sahada otomatik en hızlı" yanlış-pozitifini önlemek için minimum
-  // saha büyüklüğü — backtest'teki kontrol grubu (rastgele bir sonraki yarış, n=20001)
-  // doğal olarak büyük sahalardan oluşuyordu, bu eşik o koşulu üretim tarafında da korur.
-  const MIN_SAHA_SON200 = 4;
-  const accuraceSonYarisEnHizliKapanisByRunnerName = new Map<string, boolean | null>();
-  for (const r of race.runners) {
-    const kendiKayitlari = son800AccuraceKayitlari
-      .filter((k) => normalizeHorseName(k.horseName) === normalizeHorseName(r.name))
-      .sort((a, b) => b.accuraceRace.date.getTime() - a.accuraceRace.date.getTime());
-    const sonYaris = kendiKayitlari[0];
-    if (!sonYaris) {
-      accuraceSonYarisEnHizliKapanisByRunnerName.set(r.name, null);
-      continue;
-    }
-    const kendiSure = last200SureSaniye(sonYaris.checkpoints as unknown as PaceCheckpoint[], sonYaris.accuraceRace.length ?? 0);
-    const sahaSureleri = son800Siblings
-      .filter((s) => s.accuraceRaceId === sonYaris.accuraceRaceId)
-      .map((s) => last200SureSaniye(s.checkpoints as unknown as PaceCheckpoint[], s.accuraceRace.length ?? 0))
-      .filter((x): x is number => x != null);
-    if (kendiSure == null || sahaSureleri.length < MIN_SAHA_SON200) {
-      accuraceSonYarisEnHizliKapanisByRunnerName.set(r.name, null);
-      continue;
-    }
-    const sahaEnHizli = Math.min(...sahaSureleri);
-    accuraceSonYarisEnHizliKapanisByRunnerName.set(r.name, kendiSure <= sahaEnHizli + 1e-6);
-  }
+  // son800AccuraceKayitlari/son800Siblings YUKARIDA ZATEN çekilmişti — yeni bir DB sorgusu
+  // açılmıyor. Hesaplama V4 motorunun da kullanabilmesi için dışa aktarılmış durumda,
+  // bkz. hesaplaAccuraceSonYarisEnHizliKapanisMap.
+  const accuraceSonYarisEnHizliKapanisByRunnerName = hesaplaAccuraceSonYarisEnHizliKapanisMap(
+    race.runners.map((r) => r.name),
+    son800AccuraceKayitlari,
+    son800Siblings
+  );
 
   // Accurace'in kendi ham "ground" alanı Çim için Türkçe "Ç" (cedilla) harfini kullanıyor,
   // düz Latin "C" DEĞİL (canlı veriyle doğrulandı: AccuraceRace.ground="Ç") — bu satır
