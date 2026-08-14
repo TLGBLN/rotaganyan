@@ -223,17 +223,29 @@ export async function getDashboardStats() {
 // istatistiğine dahil edilmemeli.
 const GERCEK_OLMAYAN_HIPODROM_SLUGLARI = ["karma", "perak-malezya"];
 
+// 2026-08-14 — kullanıcı bulgusu: "Karma" TJK'nın küçük hipodromların koşularını AYRICA
+// ortak bir yayın altında BİREBİR KOPYA olarak ikinci kez listelediği sözde-hipodrom
+// (aynı koşu, aynı atlar, aynı sonuç — bu oturumda 592+ koşuda %100 isim eşleşmesiyle
+// doğrulandı). "Hipodrom" sayacı bunu zaten dışlıyordu ama "Koşu Arşivi"/"Arşiv Günü"/
+// "Geçmiş Yarış Kaydı"/"Pedigri Arşivi"/"Galop Kaydı" dışlamıyordu — kutunun kendi iddia
+// ettiği "gerçek zamanlı sayım, uydurma/yuvarlanmış değil" sözünü çift-sayım sessizce
+// bozuyordu (Koşu Arşivi 4.314→3.690, Arşiv Günü 561→457, Geçmiş Yarış Kaydı 42.807→
+// 36.716 — Karma hariç tutulunca). Artık HEPSİ aynı filtreyi kullanıyor.
+const GERCEK_HIPODROM_FILTRESI = { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI } };
+
 /** Dashboard'daki "Arşiv Kapsamı" kutusu için — hepsi gerçek DB sayımı, uydurma/yuvarlanmış değil. */
 export async function getArchiveStats() {
   const [gecmisYarisKaydi, koşuArsivi, arsivGunu, hipodrom, pedigriArsivi, galopKaydi, enEskiGun] =
     await Promise.all([
-      db.runner.count({ where: { race: { result: { isNot: null } } } }),
-      db.race.count(),
-      db.raceDay.count(),
-      db.hippodrome.count({ where: { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI } } }),
-      db.runner.count({ where: { sire: { not: null } } }),
-      db.gallop.count(),
-      db.raceDay.findFirst({ orderBy: { date: "asc" }, select: { date: true } }),
+      db.runner.count({
+        where: { race: { result: { isNot: null }, raceDay: { hippodrome: GERCEK_HIPODROM_FILTRESI } } },
+      }),
+      db.race.count({ where: { raceDay: { hippodrome: GERCEK_HIPODROM_FILTRESI } } }),
+      db.raceDay.count({ where: { hippodrome: GERCEK_HIPODROM_FILTRESI } }),
+      db.hippodrome.count({ where: GERCEK_HIPODROM_FILTRESI }),
+      db.runner.count({ where: { sire: { not: null }, race: { raceDay: { hippodrome: GERCEK_HIPODROM_FILTRESI } } } }),
+      db.gallop.count({ where: { runner: { race: { raceDay: { hippodrome: GERCEK_HIPODROM_FILTRESI } } } } }),
+      db.raceDay.findFirst({ where: { hippodrome: GERCEK_HIPODROM_FILTRESI }, orderBy: { date: "asc" }, select: { date: true } }),
     ]);
 
   return { gecmisYarisKaydi, koşuArsivi, arsivGunu, hipodrom, pedigriArsivi, galopKaydi, baslangicTarihi: enEskiGun?.date ?? null };
