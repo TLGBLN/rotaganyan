@@ -940,6 +940,107 @@ export function faz2GucluKombinasyonTop3Garantisi(
   return { atlar: yeniAtlar, terfiler: duzeltilmisTerfiler };
 }
 
+// ─── 4+ Sinyal Yığını ──────────────────────────────────────────────────────────────
+// 2026-08-13 — sitenin tüm geçmiş koşuları (n=40.798) üzerinde yapılan backtestte
+// (bkz. yayınlanan "agf-sinyal-raporu") 6 bağımsız sinyalden (AGF trend yönü, Accurace
+// son yarış en hızlı son 200m kapanışı, son yarışını kazanmış olmak, KGS 14-30 gün,
+// hipodrom+pist+mesafe uzmanlığı, aygır üst %20 kazanma dilimi) 4 veya fazlasını AYNI
+// ANDA taşıyan atlar n=547, %31.4 galibiyet (GA %27.6-35.3) / %61.4 ilk3 gösterdi —
+// mevcut TÜM kod-garanti kurallarından (faz2AgfStatikTop3Garantisi n=66, faz2IlkSira-
+// AgfTop3Sinirlamasi n=104) hem örneklem hem oran olarak daha güçlü. Kullanıcı kararı
+// 2026-08-13: doğrudan ilk-3'e terfi, faz2GucluKombinasyonTop3Garantisi ile aynı desen.
+
+// SireStatOwn.kYuzde P80 (n>=20 örneklemli aygırlar, 2026-08-13 doğrulaması — n=530,
+// global=14, İngiliz=14 (n=268), Arap=14 (n=262)): ırklar arası fark yok, tek statik
+// eşik yeterli.
+const SIRE_TOP20_KYUZDE_ESIGI = 14;
+const SINYAL_YIGINI_ESIGI = 4;
+
+type SinyalSonuc = { sayi: number; etiketler: string[] };
+
+function altiSinyalSayisi(r: Faz1Runner, faz1: Faz1Sonuc): SinyalSonuc {
+  const etiketler: string[] = [];
+
+  // 1. AGF trend yönü — yükselen/düşen birbirini dışlar (aynı at ikisini birden
+  //    taşıyamaz), tek slot sayılır.
+  const trend = birlesikTrendListesi(faz1).find((t) => t.runnerNo === r.no);
+  if (trend) etiketler.push(`AGF trend (${trend.yon}, ${trend.fark >= 0 ? "+" : ""}${trend.fark} puan)`);
+
+  // 2. Accurace — son yarışta sahanın en hızlı son 200m kapanışı
+  if (r.accuraceSonYarisEnHizliKapanis === true) etiketler.push("Accurace son yarış en hızlı son 200m kapanışı");
+
+  // 3. Son yarışını kazandı — faz2SonYarisKazandiEtiketiEkle ile AYNI parse mantığı
+  if (sonYarisKazandiMi(r.recentForm)) etiketler.push("son yarışını kazandı");
+
+  // 4. KGS 14-30 gün (sezgiye aykırı optimal dinlenme penceresi — <14 gün daha kötü)
+  if (r.gunAralik != null && r.gunAralik >= 14 && r.gunAralik <= 30) etiketler.push(`KGS ${r.gunAralik} gün (14-30 aralığı)`);
+
+  // 5. Bu hipodrom+pist+mesafe kombinasyonunda daha önce kazandı
+  if (r.hipodromMesafedeKazandi === "EVET") etiketler.push("hipodrom+pist+mesafe uzmanı");
+
+  // 6. Aygır üst %20 kazanma yüzdelik dilimi (n>=20 örneklem şartı, mevcut V1 konvansiyonu)
+  if (
+    r.sireKazanmaOrani != null &&
+    r.sireOrneklemKendiVeri != null &&
+    r.sireOrneklemKendiVeri >= 20 &&
+    r.sireKazanmaOrani >= SIRE_TOP20_KYUZDE_ESIGI
+  ) {
+    etiketler.push(`aygır üst %20 (K% ${r.sireKazanmaOrani}, n=${r.sireOrneklemKendiVeri})`);
+  }
+
+  return { sayi: etiketler.length, etiketler };
+}
+
+/**
+ * 4+ sinyal aynı anda taşıyan atları doğrudan ilk-3'e terfi ettirir — bkz. yukarıdaki
+ * not. faz2GucluKombinasyonTop3Garantisi şablonuyla birebir aynı desen (en güçlü
+ * sinyalli en son işlenir, ilk-3'e en yakın kalır; eşitlikte geride olan önce terfi
+ * eder; yalnız gerçekten ilk-3'te kalan(lar) "Güçlü Aday" olur).
+ */
+export function faz2SinyalYiginiTop3Garantisi(
+  atlar: TeknikSiraliAt[],
+  faz1: Faz1Sonuc
+): { atlar: TeknikSiraliAt[]; terfiler: KararHiyerarsiDegisikligi[] } {
+  if (atlar.length <= 3) return { atlar, terfiler: [] };
+
+  let calisma = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira);
+  const terfiler: KararHiyerarsiDegisikligi[] = [];
+  const runnerByNo = new Map(faz1.runners.map((r) => [r.no, r]));
+
+  const nitelikliler = calisma
+    .map((at) => ({ at, r: runnerByNo.get(at.no) }))
+    .filter((x): x is { at: TeknikSiraliAt; r: Faz1Runner } => !!x.r)
+    .map((x) => ({ ...x, sinyal: altiSinyalSayisi(x.r, faz1) }))
+    .filter((x) => x.sinyal.sayi >= SINYAL_YIGINI_ESIGI)
+    .sort((a, b) => {
+      if (a.sinyal.sayi !== b.sinyal.sayi) return a.sinyal.sayi - b.sinyal.sayi; // en güçlü EN SON
+      return b.at.teknikSira - a.at.teknikSira; // eşitlikte: en geride olan önce terfi etsin
+    });
+
+  const terfiAdaylari = new Set<number>();
+  for (const { at, sinyal } of nitelikliler) {
+    const idx = calisma.findIndex((a) => a.no === at.no);
+    if (idx === -1 || idx < 3) continue; // zaten ilk 3'te
+    const eskiSira = calisma[idx].teknikSira;
+    const guncellenmisAt: TeknikSiraliAt = {
+      ...calisma[idx],
+      muhakeme: `${calisma[idx].muhakeme} | [SİSTEM]:KOD-GARANTİSİ ${sinyal.sayi} bağımsız sinyal aynı anda taşınıyor (${sinyal.etiketler.join("; ")}) — geriye dönük doğrulama: 4+ sinyal n=547, %31.4 galibiyet (GA %27.6-35.3)/%61.4 ilk3, 2026-08-13 — ilk-3 bandına terfi adayı (eski sıra ${eskiSira}).`,
+    };
+    const kalanlar = calisma.filter((a) => a.no !== at.no);
+    calisma = [...kalanlar.slice(0, 2), guncellenmisAt, ...kalanlar.slice(2)];
+    terfiler.push({ no: at.no, ad: at.ad, eskiSira, yeniSira: 3 });
+    terfiAdaylari.add(at.no);
+  }
+  if (terfiler.length === 0) return { atlar, terfiler: [] };
+
+  calisma = calisma.map((a, i) => (i < 3 && terfiAdaylari.has(a.no) ? { ...a, karar: "Güçlü Aday" } : a));
+
+  const yeniAtlar2 = calisma.map((a, i) => ({ ...a, teknikSira: i + 1 }));
+  const finalSiraByNo2 = new Map(yeniAtlar2.map((a) => [a.no, a.teknikSira]));
+  const duzeltilmisTerfiler2 = terfiler.map((t) => ({ ...t, yeniSira: finalSiraByNo2.get(t.no) ?? t.yeniSira }));
+  return { atlar: yeniAtlar2, terfiler: duzeltilmisTerfiler2 };
+}
+
 /**
  * v6.69 — kullanıcı kararı 2026-08-09: "en çok yükselen ve en çok düşen diğer atlar analiz
  * gücüne göre geri kalan sıralamalarda yerini almalı, 4-5-6 içinde." v6.68'de bu tek bir
@@ -1234,13 +1335,23 @@ export function faz2IlkSiraAgfTop3Denetimi(
   };
 }
 
+/**
+ * 2026-08-13 — DÜZELTME: bu fonksiyon eskiden `r.jockeyChanged` (ham Runner.jockeyChanged
+ * DB sütunu) okuyordu — canlı veride bu sütun neredeyse HİÇ dolmuyor (43.573 kayıttan
+ * yalnız 55'i true), yani eski kod fiilen HER ata (ilkStart hariç) bu "destek" notunu
+ * veriyordu, ayırt edici hiçbir bilgi taşımıyordu. Doğru kaynak `sonYarisAyniJokey`
+ * (getSonYarisDetaylariForRace → TJK canlı geçmişinden soyadı bazlı karşılaştırma,
+ * son-yaris-detay.actions.ts) — Faz1Runner'da zaten hesaplanıyordu ama bu fonksiyon
+ * kullanmıyordu. Geriye dönük doğrulama (n=6.166, HorseRaceHistoryCache üzerinden, aynı
+ * mantıkla): aynı jokey %13.4 galibiyet/%39.2 ilk3, jokey değişti %9.4/%28.4.
+ */
 export function faz2AyniJokeyEtiketiEkle(
   muhakeme: string,
-  r: { jockeyChanged: boolean; ilkStart: boolean }
+  r: { sonYarisAyniJokey: boolean | null; ilkStart: boolean }
 ): string {
-  if (r.ilkStart || r.jockeyChanged) return muhakeme;
+  if (r.ilkStart || r.sonYarisAyniJokey !== true) return muhakeme;
   if (halihazirdaTemizDestekVarMi(muhakeme, "V4")) return muhakeme;
-  return `${muhakeme} | [V4]:destek(KOD-GARANTİSİ: son yarışını aynı jokeyle koştu, süreklilik olumlu)`;
+  return `${muhakeme} | [V4]:destek(KOD-GARANTİSİ: son yarışını aynı jokeyle koştu — geriye dönük doğrulama %13.4 galibiyet/%39.2 ilk3 vs jokey değişti %9.4/%28.4, n=6.166, 2026-08-13)`;
 }
 
 /**
@@ -1273,14 +1384,19 @@ export function faz2PedigriKarsilastirmaEtiketiEkle(
  * Yalnız EN SON yarışın kazanılıp kazanılmadığını garanti eder — daha geniş form
  * yorumu (kaç yarış, hangi kiloda) hâlâ Claude'un muhakemesinde kalır.
  */
+/** Form dizisinin en SAĞ karakteri "1" mi (son yarış kazanıldı mı) — faz2SonYarisKazandiEtiketiEkle
+ *  VE altiSinyalSayisi (4+ sinyal yığını) tarafından paylaşılan TEK parse mantığı. */
+export function sonYarisKazandiMi(recentForm: string | null): boolean {
+  if (!recentForm) return false;
+  const chars = recentForm.split("").filter((c) => /[\dK]/i.test(c));
+  return chars.at(-1) === "1";
+}
+
 export function faz2SonYarisKazandiEtiketiEkle(
   muhakeme: string,
   r: { recentForm: string | null }
 ): string {
-  if (!r.recentForm) return muhakeme;
-  const chars = r.recentForm.split("").filter((c) => /[\dK]/i.test(c));
-  const son = chars.at(-1);
-  if (son !== "1") return muhakeme;
+  if (!sonYarisKazandiMi(r.recentForm)) return muhakeme;
   if (halihazirdaTemizDestekVarMi(muhakeme, "V19")) return muhakeme;
   return `${muhakeme} | [V19]:destek(KOD-GARANTİSİ: son yarışını kazandı — form dizisi ${r.recentForm})`;
 }

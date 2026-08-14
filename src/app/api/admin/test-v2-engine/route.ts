@@ -7,7 +7,7 @@ import { getRecentCachedResult } from "@/lib/claude-cost";
 import { analizKilidiAl, analizKilidiBirak } from "@/lib/analysis-concurrency-lock";
 import { butceDurumunuBildir } from "@/lib/claude-budget-monitor";
 import type { Role } from "@prisma/client";
-import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi, faz2AgfFavorisiDususeRagmenGarantisi, faz2AgfStatikTop3Garantisi, faz2IlkSiraAgfTop3Sinirlamasi, faz2IlkSiraAgfTop3Denetimi } from "@/lib/methodology/v2-engine";
+import { kategoriTespit, KATEGORI_KODLARI, KATEGORI_ADI, V_LEGEND, atSatirlariUret, hamVeriOzetiUret, kosuBaslikUret, faz1VeriKapsami, faz2MuhakemeDenetle, faz2KaliteDenetimi, faz2BankoAdayiTespit, faz2SiralamaTutarlilikDenetimi, faz2SinifGecisEtiketiEkle, faz2KiloKarsilastirmaEtiketiEkle, faz2HpIvmeEtiketiEkle, faz2KullanilmayanVeriTespiti, faz2StilPopulasyonEtiketiEkle, faz2AyniJokeyEtiketiEkle, faz2PedigriKarsilastirmaEtiketiEkle, faz2Top3Garantisi, faz2SonYarisKazandiEtiketiEkle, faz2KararSiraTutarsizlikDenetimi, faz2KararHiyerarsisiUygula, faz2H2HEtiketiEkle, faz2ZeminKazanmaEtiketiEkle, faz2AgfTrend456Garantisi, faz2GucluKombinasyonTop3Garantisi, faz2AgfFavorisiDususeRagmenGarantisi, faz2AgfStatikTop3Garantisi, faz2IlkSiraAgfTop3Sinirlamasi, faz2IlkSiraAgfTop3Denetimi, faz2SinyalYiginiTop3Garantisi } from "@/lib/methodology/v2-engine";
 
 // v6.53 — kullanıcı bulgusu 2026-08-04 (Kocaeli 5.Koşu): tüm sahayı TEK bir Claude
 // çağrısında analiz etmek, zengin kategorilerde (3/4/5) + 8+ atlı sahalarda GERÇEKTEN
@@ -519,6 +519,18 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
     console.log("[test-v2-engine] AGF favorisi düşüşe rağmen ilk3 garantisi tetiklendi:", JSON.stringify(faz2AgfFavoriTerfileri));
   }
 
+  // 2026-08-13 — 6 bağımsız sinyalden (AGF trend, Accurace son yarış en hızlı son 200m
+  // kapanışı, son yarış galibiyeti, KGS 14-30 gün, hipodrom+pist+mesafe uzmanlığı, aygır
+  // üst %20) 4+ taşıyan atlar doğrudan ilk-3'e terfi eder — bkz. v2-engine.ts'deki
+  // faz2SinyalYiginiTop3Garantisi yorumu (n=547 geriye dönük doğrulama, %31.4 galibiyet
+  // (GA %27.6-35.3) / %61.4 ilk3 — mevcut kod-garanti kurallarının en güçlüsü).
+  const sinyalYiginiSonuc = faz2SinyalYiginiTop3Garantisi(parsed.atlar, faz1);
+  parsed = { atlar: sinyalYiginiSonuc.atlar };
+  const faz2SinyalYiginiTerfileri = sinyalYiginiSonuc.terfiler;
+  if (faz2SinyalYiginiTerfileri.length > 0) {
+    console.log("[test-v2-engine] 4+ sinyal yığını ilk3 garantisi tetiklendi:", JSON.stringify(faz2SinyalYiginiTerfileri));
+  }
+
   // v6.69 — kullanıcı kararı 2026-08-09: AGF trend'de (yükselen VEYA düşen) belirgin
   // hareket gösteren, yukarıdaki güçlü kombinasyon şartını karşılamayan diğer atlar
   // analiz gücüne göre 4-5-6 penceresine terfi ettirilir — bkz. v2-engine.ts'deki
@@ -634,6 +646,7 @@ async function handleRank(raceId: string, allAtlar: BatchAt[]) {
     faz2Top3Terfileri,
     faz2GucluTop3Terfileri,
     faz2AgfFavoriTerfileri,
+    faz2SinyalYiginiTerfileri,
     faz2Agf456Terfileri,
     faz2AgfStatikTerfileri,
     faz2IlkSiraTerfileri,

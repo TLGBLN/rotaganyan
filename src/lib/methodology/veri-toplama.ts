@@ -344,6 +344,14 @@ export type Faz1Runner = {
   // yarıştan kalıcı stil çıkarılmaz, bkz. §I.4 Veri Çifti Doktrini). Bu alan bugünkü
   // yarışın verisi DEĞİL, atın GEÇMİŞ yarışlarındaki tekrarlanan davranışıdır.
   accuraceEgilim: CokYarisEgilim | null;
+
+  // 4+ sinyal yığını kod-garantisi (bkz. v2-engine.ts faz2SinyalYiginiTop3Garantisi) için:
+  // atın EN SON (bugünden önceki en yakın tarihli) Accurace-izlenen yarışında, o yarışın
+  // SAHASINDAKİ TÜM atlar arasında en hızlı son 200m kapanışını yapmış olması. Bilhassa
+  // pist/mesafe eşleşmesi ARANMIYOR (backtest de bu şekilde tanımlandı — n=2872, %18.7
+  // galibiyet vs kontrol %10.7, 2026-08-12). null = Accurace kaydı yok VEYA o yarışta
+  // saha karşılaştırması için yeterli sayıda (MIN_SAHA_SON200) rakip splits'i yok.
+  accuraceSonYarisEnHizliKapanis: boolean | null;
 };
 
 export type Faz1Sonuc = {
@@ -658,6 +666,48 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
     if (mevcut == null || sure < mevcut) fieldBestSon800ByRaceId.set(s.accuraceRaceId, sure);
   }
 
+  // ── 4+ Sinyal Yığını — Accurace "son yarışta en hızlı son 200m kapanışı" bayrağı ──────
+  // last800SureSaniye ile AYNI desen (finish.timeReal - nokta(length-200).timeReal), yalnız
+  // 800m yerine 200m. son800AccuraceKayitlari (atın TÜM geçmişi, ground/mesafe filtresi yok)
+  // ve son800Siblings (o yarışların TÜM sahası) YUKARIDA ZATEN çekilmişti — yeni bir DB
+  // sorgusu açılmıyor.
+  function last200SureSaniye(checkpoints: PaceCheckpoint[], length: number): number | null {
+    if (length < 200) return null;
+    const sorted = [...checkpoints].sort((a, b) => a.checkpoint - b.checkpoint);
+    const finish = sorted[sorted.length - 1];
+    if (!finish) return null;
+    const nokta = [...sorted].reverse().find((c) => c.checkpoint <= length - 200);
+    if (!nokta) return null;
+    return (finish.timeReal - nokta.timeReal) / 1000;
+  }
+
+  // Trivial "1-2 atlık sahada otomatik en hızlı" yanlış-pozitifini önlemek için minimum
+  // saha büyüklüğü — backtest'teki kontrol grubu (rastgele bir sonraki yarış, n=20001)
+  // doğal olarak büyük sahalardan oluşuyordu, bu eşik o koşulu üretim tarafında da korur.
+  const MIN_SAHA_SON200 = 4;
+  const accuraceSonYarisEnHizliKapanisByRunnerName = new Map<string, boolean | null>();
+  for (const r of race.runners) {
+    const kendiKayitlari = son800AccuraceKayitlari
+      .filter((k) => normalizeHorseName(k.horseName) === normalizeHorseName(r.name))
+      .sort((a, b) => b.accuraceRace.date.getTime() - a.accuraceRace.date.getTime());
+    const sonYaris = kendiKayitlari[0];
+    if (!sonYaris) {
+      accuraceSonYarisEnHizliKapanisByRunnerName.set(r.name, null);
+      continue;
+    }
+    const kendiSure = last200SureSaniye(sonYaris.checkpoints as unknown as PaceCheckpoint[], sonYaris.accuraceRace.length ?? 0);
+    const sahaSureleri = son800Siblings
+      .filter((s) => s.accuraceRaceId === sonYaris.accuraceRaceId)
+      .map((s) => last200SureSaniye(s.checkpoints as unknown as PaceCheckpoint[], s.accuraceRace.length ?? 0))
+      .filter((x): x is number => x != null);
+    if (kendiSure == null || sahaSureleri.length < MIN_SAHA_SON200) {
+      accuraceSonYarisEnHizliKapanisByRunnerName.set(r.name, null);
+      continue;
+    }
+    const sahaEnHizli = Math.min(...sahaSureleri);
+    accuraceSonYarisEnHizliKapanisByRunnerName.set(r.name, kendiSure <= sahaEnHizli + 1e-6);
+  }
+
   // Accurace'in kendi ham "ground" alanı Çim için Türkçe "Ç" (cedilla) harfini kullanıyor,
   // düz Latin "C" DEĞİL (canlı veriyle doğrulandı: AccuraceRace.ground="Ç") — bu satır
   // eskiden "C" bekliyordu, bu yüzden ÇİM koşularında (ki bunlar sahadaki çoğunluk) bu
@@ -958,6 +1008,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         hpKalitesiYildizi: hpKalitesi, sinifGecisBonusuPuan: sinifBonusu,
         galopSiniflandirma: galopSinif, tempoGuven: tempoGuvenHesap,
         accuraceEgilim: accuraceEgilimMap.get(r.id) ?? null,
+        accuraceSonYarisEnHizliKapanis: accuraceSonYarisEnHizliKapanisByRunnerName.get(r.name) ?? null,
         detayliIstatistikOzet: r.tjkAtId != null
           ? formatHorseDetailStatOzet(horseStatsCacheMap.get(r.tjkAtId) ?? [], {
               hippodromeName, surface: race.surface, distance: race.distance, jockeyName: r.jockey,

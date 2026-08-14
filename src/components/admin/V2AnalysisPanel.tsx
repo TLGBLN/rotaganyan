@@ -74,6 +74,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
   const [agf456Terfileri, setAgf456Terfileri] = useState<Top3TerfiSonuc[]>([]);
   const [gucluTop3Terfileri, setGucluTop3Terfileri] = useState<Top3TerfiSonuc[]>([]);
   const [agfFavoriTerfileri, setAgfFavoriTerfileri] = useState<Top3TerfiSonuc[]>([]);
+  const [sinyalYiginiTerfileri, setSinyalYiginiTerfileri] = useState<Top3TerfiSonuc[]>([]);
   const [agfStatikTerfileri, setAgfStatikTerfileri] = useState<Top3TerfiSonuc[]>([]);
   const [ilkSiraTerfileri, setIlkSiraTerfileri] = useState<Top3TerfiSonuc[]>([]);
   const [ilkSiraDenetimi, setIlkSiraDenetimi] = useState<IlkSiraAgfTop3DenetimSonuc | null>(null);
@@ -103,6 +104,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
     setAgf456Terfileri([]);
     setGucluTop3Terfileri([]);
     setAgfFavoriTerfileri([]);
+    setSinyalYiginiTerfileri([]);
     setAgfStatikTerfileri([]);
     setIlkSiraTerfileri([]);
     setIlkSiraDenetimi(null);
@@ -143,6 +145,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
         faz2Agf456Terfileri: Top3TerfiSonuc[] | null;
         faz2GucluTop3Terfileri: Top3TerfiSonuc[] | null;
         faz2AgfFavoriTerfileri: Top3TerfiSonuc[] | null;
+        faz2SinyalYiginiTerfileri: Top3TerfiSonuc[] | null;
         faz2AgfStatikTerfileri: Top3TerfiSonuc[] | null;
         faz2IlkSiraTerfileri: Top3TerfiSonuc[] | null;
         faz2IlkSiraDenetimi: IlkSiraAgfTop3DenetimSonuc | null;
@@ -164,6 +167,7 @@ export default function V2AnalysisPanel({ raceId }: Props) {
       setAgf456Terfileri(res.faz2Agf456Terfileri ?? []);
       setGucluTop3Terfileri(res.faz2GucluTop3Terfileri ?? []);
       setAgfFavoriTerfileri(res.faz2AgfFavoriTerfileri ?? []);
+      setSinyalYiginiTerfileri(res.faz2SinyalYiginiTerfileri ?? []);
       setAgfStatikTerfileri(res.faz2AgfStatikTerfileri ?? []);
       setIlkSiraTerfileri(res.faz2IlkSiraTerfileri ?? []);
       setIlkSiraDenetimi(res.faz2IlkSiraDenetimi ?? null);
@@ -357,6 +361,22 @@ export default function V2AnalysisPanel({ raceId }: Props) {
           </p>
           <ul className="space-y-0.5">
             {agfFavoriTerfileri.map((t) => (
+              <li key={t.no} className="font-medium">#{t.no} {t.ad}: {t.eskiSira}. sıra → {t.yeniSira}. sıra</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {sinyalYiginiTerfileri.length > 0 && (
+        <div className="space-y-1 rounded-lg border border-brand/40 bg-brand/10 px-3 py-2.5 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-brand">
+            <Sparkles className="h-3.5 w-3.5" /> 4+ Sinyal Yığını Terfisi — İlk 3
+          </div>
+          <p className="text-muted-foreground">
+            Aynı anda 4 veya daha fazla bağımsız sinyal (AGF trend, Accurace en hızlı kapanış, son yarış galibiyeti, KGS 14-30, pist uzmanlığı, aygır üst %20) taşıyan atlar ilk 3&apos;e koşulsuz alındı (n=547, %31,4 galibiyet/%61,4 ilk3, 2026-08-13):
+          </p>
+          <ul className="space-y-0.5">
+            {sinyalYiginiTerfileri.map((t) => (
               <li key={t.no} className="font-medium">#{t.no} {t.ad}: {t.eskiSira}. sıra → {t.yeniSira}. sıra</li>
             ))}
           </ul>
