@@ -23,9 +23,19 @@ export type AgfTrendIstatistikSonuc = {
 }[];
 
 export async function getAgfTrendIstatistik(): Promise<AgfTrendIstatistikSonuc> {
-  const rows = await db.$queryRaw<
+  // 2026-08-14 canlı bulgu: ANLAMLI_PUAN_ESIGI'yi $queryRaw'ın bağlı parametresi (${...})
+  // olarak göndermek, CTE'den türetilen "fark" sütunuyla karşılaştırılınca Postgres'in
+  // hazırlıklı-ifade tip çıkarımını sürekli bozuyordu (önce "operator is not unique: -
+  // unknown", sonra "could not determine data type of parameter", `Prisma.raw` ile bile
+  // "bind message supplies 1 parameters, but prepared statement requires 0" —
+  // /admin/performans'ta "Bir Sorun Oluştu" ekranı). ANLAMLI_PUAN_ESIGI sabit bir TS
+  // sayısı (kullanıcı girdisi DEĞİL, enjeksiyon riski yok) — sorguyu düz bir JS template
+  // string olarak kurup $queryRawUnsafe ile çalıştırmak, TÜM parametre-bağlama
+  // belirsizliğini ortadan kaldırıyor.
+  const esikMetni = ANLAMLI_PUAN_ESIGI.toString();
+  const rows = await db.$queryRawUnsafe<
     { grup: string; n: bigint; galibiyet_yuzde: number | null; top3_yuzde: number | null }[]
-  >`
+  >(`
     WITH runner_agf AS (
       SELECT
         r.id AS runner_id, r."raceId" AS race_id, r.no, r.agf AS son_agf,
@@ -40,11 +50,11 @@ export async function getAgfTrendIstatistik(): Promise<AgfTrendIstatistikSonuc> 
     ),
     yukselenler AS (
       SELECT *, ROW_NUMBER() OVER (PARTITION BY race_id ORDER BY fark DESC) AS rnk
-      FROM runner_agf WHERE fark >= ${ANLAMLI_PUAN_ESIGI}
+      FROM runner_agf WHERE fark >= ${esikMetni}
     ),
     dusenler AS (
       SELECT *, ROW_NUMBER() OVER (PARTITION BY race_id ORDER BY fark ASC) AS rnk
-      FROM runner_agf WHERE fark <= -${ANLAMLI_PUAN_ESIGI}
+      FROM runner_agf WHERE fark <= -${esikMetni}
     ),
     yukselen_top5 AS (SELECT race_id, no FROM yukselenler WHERE rnk <= 5),
     dusen_top5 AS (SELECT race_id, no FROM dusenler WHERE rnk <= 5),
@@ -86,7 +96,7 @@ export async function getAgfTrendIstatistik(): Promise<AgfTrendIstatistikSonuc> 
       round(100.0 * sum(CASE WHEN pos=1 THEN 1 ELSE 0 END) / count(*), 1),
       round(100.0 * sum(CASE WHEN pos<=3 THEN 1 ELSE 0 END) / count(*), 1)
     FROM kontrol_sonuc;
-  `;
+  `);
 
   return rows.map((r) => ({
     grup: r.grup as "yukselen" | "dusen" | "kontrol",
