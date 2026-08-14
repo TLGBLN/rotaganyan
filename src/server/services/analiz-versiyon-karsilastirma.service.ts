@@ -69,13 +69,28 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V3.1",
     baslangic: new Date("2026-08-10T23:31:26+03:00"), // 689e0fb — AGF statik top-3 terfi garantisi
-    bitis: null,
+    bitis: new Date("2026-08-14T16:25:28+03:00"),
     aciklama: "AGF statik (güncel) sıraya dayalı iki yeni kod-garanti kuralı eklendi — CEVATHAN/CANYAMAN vakalarının (AGF top-3 ama sistemde 8.sıra) geriye dönük analiziyle doğrulandı.",
     neyiAnalizEdiyor: ["V1-V22 + X1-X7 (V3 ile aynı kapsam)"],
     caprazlamalar: [
       "AGF statik top-3 (güncel AGF'ye göre) + sistemde >=7.sıra → 4-6 penceresine terfi (n=66 doğrulama: %15.2 galibiyet/%37.9 ilk-3, kontrol grubu %3.9/%13.0)",
       "1.sıra AGF top-3 kümesine sabitlenir — yalnız aday ile eski 1.sıra yer değiştirir, aradaki atlar (değer atları) yerinden oynamaz (n=104 doğrulama: top-3 içi %30.0 vs top-3 dışı %5.9 galibiyet)",
       "AGF trend + ≥2 güçlü V-kodu → ilk-3 kuralı ayrıca test edildi, eşik değiştirilmedi (veri desteklemedi)",
+    ],
+  },
+  {
+    versiyon: "V4",
+    baslangic: new Date("2026-08-14T16:25:28+03:00"), // d424b44 — V4 motoru canlı admin akışına bağlandı
+    bitis: null,
+    aciklama: "V1-V22'nin geniş, Claude'un serbest muhakeme ettiği sistemi tamamen kaldırıldı. Faz1 yalnız 6 bağımsız, geriye dönük doğrulanmış sinyali (AGF trend yönü, Accurace en hızlı son 200m kapanışı, son yarış galibiyeti, KGS 14-30 gün, hipodrom+pist+mesafe uzmanlığı, aygır üst-%20) + jokey istatistiğini toplar. Faz2 Claude çağrısı yapmaz, sinyaller okunarak tamamen mekanik sıralanır — maliyet sıfıra iner.",
+    neyiAnalizEdiyor: [
+      "6 doğrulanmış sinyal: AGF trend yönü, Accurace en hızlı son 200m kapanışı, son yarış galibiyeti, KGS 14-30 gün, hipodrom+pist+mesafe uzmanlığı, aygır üst %20 K%",
+      "Jokey/antrenör genel win% + aynı-jokey sürekliliği (destek, sayaca dahil değil)",
+    ],
+    caprazlamalar: [
+      "Birincil sıralama: aynı anda taşınan sinyal sayısı (azalan)",
+      "4+ sinyal → doğrudan ilk-3 bandı (n=575, %29.7 galibiyet, GA %26.1-33.6 / %60.3 ilk3, 2026-08-13/14 backtest)",
+      "İlk-3 içinde: AGF trend + Accurace ikisi birden olan atlar öncelikli, tie-break güncel AGF sırası",
     ],
   },
 ];
