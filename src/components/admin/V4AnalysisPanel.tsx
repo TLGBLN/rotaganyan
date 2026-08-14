@@ -141,7 +141,14 @@ export default function V4AnalysisPanel({ raceId }: Props) {
         couponNarrow: couponNarrow || undefined,
         couponNormal: couponNormal || undefined,
         couponWide: couponWide || undefined,
-        isBanko: bankoAdayi?.bankoAdayi ?? false,
+        // 2026-08-14 — kullanıcı kararı: V4'te sıralama artık AGF favorisine değil sinyal
+        // sayısına göre belirleniyor, bu ikisi kasıtlı olarak farklılaşabilir (asıl amaç
+        // piyasanın görmediğini bulmak). assertPublishSafe (3) "banko ise AGF favorisiyle
+        // sistem 1.si aynı olmalı" kuralı bu yüzden V4'te sık sık gereksiz yere yayın
+        // engelliyordu (ör. ŞAFAKATEŞ vakası) — "Banko Adayı" rozeti bilgi amaçlı UI'da
+        // görünmeye devam eder, ama kayıtta ARTIK otomatik isBanko:true göndermiyoruz.
+        // İsterse admin PredictionForm üzerinden elle banko işaretleyebilir.
+        isBanko: false,
         bankoNote: bankoAdayi?.sebep,
         picks,
       });
