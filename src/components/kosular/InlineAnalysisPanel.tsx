@@ -194,7 +194,7 @@ export default function InlineAnalysisPanel({ picks, winnerNos, isLoggedIn, race
                   </td>
                   <td className="px-2 py-2 text-right font-mono">{a}</td>
                   <td className="px-2 py-2 text-right font-mono">{bc}</td>
-                  <td className="px-2 py-2 text-right font-mono font-bold text-brand">{puanHucresi(pick.score, pick.details)}</td>
+                  <td className="px-2 py-2 text-right font-mono font-bold text-brand whitespace-nowrap">{puanHucresi(pick.score, pick.details)}</td>
                 </tr>
               );
             })}

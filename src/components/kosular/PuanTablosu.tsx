@@ -164,7 +164,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                                 ) : null;
                               })()}
                             </td>
-                            <td className={cn("px-2 py-1.5 text-center font-mono tabular-nums", textColor, weight)}>
+                            <td className={cn("px-2 py-1.5 text-center font-mono tabular-nums whitespace-nowrap", textColor, weight)}>
                               {puanHucresi(pick.score, pick.details)}
                             </td>
                           </tr>
@@ -311,7 +311,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                             <td
                               key={`${race.id}-${rowIdx}-puan`}
                               className={cn(
-                                "border-r px-1.5 py-1 text-center font-mono tabular-nums last:border-r-0",
+                                "border-r px-1.5 py-1 text-center font-mono tabular-nums whitespace-nowrap last:border-r-0",
                                 rowBg,
                                 textColor,
                                 weight
