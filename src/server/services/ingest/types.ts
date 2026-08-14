@@ -26,7 +26,6 @@ export type IngestRunner = {
   ekuriGroup?: number;
   apprentice?: boolean;
   tjkAtId?: number;
-  idmanVideoUrl?: string;
 };
 
 export type IngestGallop = {

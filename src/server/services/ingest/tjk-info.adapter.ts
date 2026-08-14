@@ -385,25 +385,7 @@ export async function fetchCityProgram(
 
           const ekuriGroup = ekuriMap.get(no) ?? undefined;
 
-          // İdman (galop) videosu — "İdm" sütunundaki video-play ikonu, tıklandığında
-          // ../idmanpisti/Kosu?KosuKodu=X&Atkodu=Y açan bir link. TJK bu sayfada gerçek
-          // videoyu Radiant Media Player ile video-cdn.tjk.org'dan MP4 olarak sunuyor —
-          // dosya adı doğrudan {yıl}/{ay}/{KosuKodu}-{Atkodu}.mp4 kalıbında, aya sıfır
-          // eklenmiyor (ör. "2026/7/226457-117588.mp4"). İkon yoksa o at için TJK henüz
-          // idman videosu çekmemiş demektir — kullanıcı talebi 2026-07-29.
-          let idmanVideoUrl: string | undefined;
-          const idmanLink = $(row).find('a[href*="idmanpisti/Kosu"]').first();
-          if (idmanLink.length) {
-            const idmanHref = idmanLink.attr("href") ?? "";
-            const kosuM = idmanHref.match(/KosuKodu=(\d+)/i);
-            const atM = idmanHref.match(/Atkodu=(\d+)/i);
-            if (kosuM && atM) {
-              const [, mm, yyyy] = tjkDate.split("/");
-              idmanVideoUrl = `https://video-cdn.tjk.org/videoftp/idmanpisti/${yyyy}/${parseInt(mm, 10)}/${kosuM[1]}-${atM[1]}.mp4`;
-            }
-          }
-
-          runners.push({ no, name, age, startNo, disaridanStart, weight, jockey, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup, tjkAtId, equipment, idmanVideoUrl });
+          runners.push({ no, name, age, startNo, disaridanStart, weight, jockey, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup, tjkAtId, equipment });
         });
       }
     }

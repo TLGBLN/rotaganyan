@@ -741,7 +741,6 @@ export type ProgramRunner = {
   apprentice: boolean;
   raceStyle: { style: string; percent: number; veri: number | null } | null; // style: "KACAK_AT" | "ON_GRUP_ARKASI" | "BEKLEME_GRUBU" | "EN_GERI_TAKIP" (Accurace tabanlı, saha-yüzdelik); veri = örneklem sayısı (n)
   tjkAtId: number | null;
-  idmanVideoUrl: string | null;
   // Start Sorunu (v6.30, kullanıcı talebi 2026-08-01) — TJK'nın kendi resmi "Geç Çıkış"
   // tespitine göre: true=tekrarlayan (2+) geç çıkış geçmişi var, false=veri var ama sorun
   // yok, null=yeterli örneklem (3+ sonuçlu start) yok, "—" gösterilir (bkz. gec-cikis.actions.ts).
@@ -815,7 +814,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
               owner: true, sire: true, dam: true, damSire: true, adminNote: true, hp: true,
               equipment: true, equipmentAdded: true, equipmentRemoved: true,
               bestTime: true, recentForm: true, recentFormSurfaces: true, agf: true,
-              scratched: true, ekuriGroup: true, apprentice: true, raceStyle: true, tjkAtId: true, idmanVideoUrl: true,
+              scratched: true, ekuriGroup: true, apprentice: true, raceStyle: true, tjkAtId: true,
             },
           },
         },
@@ -896,7 +895,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
 
   // Build lookup for original (non-karma) races: at isim kümesi imzası → prediction + runner verisi
   const originalPred = new Map<string, typeof raceDays[0]["races"][0]["prediction"]>();
-  const originalRunnerData = new Map<string, Map<string, { gallops: GallopRow[]; raceStyle: unknown; idmanVideoUrl: string | null }>>();
+  const originalRunnerData = new Map<string, Map<string, { gallops: GallopRow[]; raceStyle: unknown }>>();
   for (const rd of raceDays) {
     if (rd.hippodrome.slug === "karma") continue;
     for (const r of rd.races) {
@@ -905,7 +904,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
       originalPred.set(key, r.prediction);
       originalRunnerData.set(
         key,
-        new Map(r.runners.map((ru) => [normHorseNameForMirror(ru.name), { gallops: gallopsByRunnerId.get(ru.id) ?? [], raceStyle: ru.raceStyle, idmanVideoUrl: ru.idmanVideoUrl }]))
+        new Map(r.runners.map((ru) => [normHorseNameForMirror(ru.name), { gallops: gallopsByRunnerId.get(ru.id) ?? [], raceStyle: ru.raceStyle }]))
       );
     }
   }
@@ -919,7 +918,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     races: rd.races.map((r) => {
       // Karma mirror: inherit prediction + galop/yarış stili from original race
       let pred = r.prediction;
-      let originalRunners: Map<string, { gallops: GallopRow[]; raceStyle: unknown; idmanVideoUrl: string | null }> | undefined;
+      let originalRunners: Map<string, { gallops: GallopRow[]; raceStyle: unknown }> | undefined;
       if (rd.hippodrome.slug === "karma" && r.runners.length > 0) {
         const key = runnerSetSignature(r.runners);
         if (pred == null) pred = originalPred.get(key) ?? null;
@@ -939,14 +938,12 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
           const ownGallops = gallopsByRunnerId.get(ru.id) ?? [];
           const gallops = ownGallops.length > 0 ? ownGallops : inherited?.gallops ?? ownGallops;
           const raceStyle = ru.raceStyle ?? inherited?.raceStyle ?? null;
-          const idmanVideoUrl = ru.idmanVideoUrl ?? inherited?.idmanVideoUrl ?? null;
           return {
             ...ru,
             sireStatOzet: sireStatByRunnerId.get(ru.id) ?? null,
             damStatOzet: damStatByRunnerId.get(ru.id) ?? null,
             startSorunu: startSorunuByRunnerId.get(ru.id) ?? null,
             raceStyle: parseRaceStyle(raceStyle),
-            idmanVideoUrl,
             gallops: gallops.map((g) => ({
               ...g,
               splits: (g.splits ?? {}) as Record<string, string | null>,

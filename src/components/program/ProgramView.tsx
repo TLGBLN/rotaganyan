@@ -5,14 +5,12 @@ import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, Star, Info, PlayCircle } from "lucide-react";
+import { ChevronDown, ChevronUp, Star, Info } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
 import { kararOku } from "@/lib/methodology/muhakeme-format";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
 import HorseDetailModal from "./HorseDetailModal";
 import HipodromOzellikleriModal from "./HipodromOzellikleriModal";
-import IdmanVideoModal from "./panels/IdmanVideoModal";
-import { galopSplits, galopDate } from "./panels/galop-helpers";
 import EmailVerificationGate from "./EmailVerificationGate";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getPistMesafeStilIstatistigi, type PistMesafeStilSonuc } from "@/server/actions/pist-mesafe-stil.actions";
@@ -673,7 +671,7 @@ function AnalysisPanel({
 // ── At satırı ────────────────────────────────────────────────────────────────
 
 function RunnerRow({
-  r, t, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, onSelectHorse, jockeyStat, trainerStat, onOpenVideo,
+  r, t, isWinner, idx, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, onSelectHorse, jockeyStat, trainerStat,
 }: {
   r: ProgramRunner;
   t: ProgramT;
@@ -688,7 +686,6 @@ function RunnerRow({
   onSelectHorse: (name: string) => void;
   jockeyStat?: JockeyStatRow;
   trainerStat?: TrainerStatRow;
-  onOpenVideo: () => void;
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
@@ -890,23 +887,6 @@ function RunnerRow({
         )}
       </td>
 
-      {/* İdman Görüntüsü */}
-      <td className="px-2 py-1.5 text-center">
-        {r.idmanVideoUrl ? (
-          <button
-            type="button"
-            onClick={onOpenVideo}
-            title={t("idmanIzle")}
-            aria-label={t("idmanIzleAria")}
-            className="inline-flex items-center justify-center text-[#c0392b] hover:opacity-70"
-          >
-            <PlayCircle className="h-5 w-5 fill-[#c0392b] text-white" />
-          </button>
-        ) : (
-          <span className="text-muted-foreground text-[10px]">—</span>
-        )}
-      </td>
-
       {/* Start Sorunu — TJK'nın resmi "Geç Çıkış" tespitine göre, tekrarlayan (2+) kayıt.
           Yetersiz veri de "Hayır" sayılır (kullanıcı talimatı 2026-08-01) — yalnız EVET
           kanıtlanmış bir sorunu işaret eder, diğer her durum "Hayır" gösterir. */}
@@ -946,7 +926,7 @@ function StatCell({
 // ── At kartı (mobil) ─────────────────────────────────────────────────────────
 
 function RunnerCard({
-  r, t, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, onSelectHorse, jockeyStat, trainerStat, onOpenVideo,
+  r, t, isWinner, isTopAgf, ekuriColor, agfRank, isBestTime, isFollowed, onToggleFollow, onSelectHorse, jockeyStat, trainerStat,
 }: {
   r: ProgramRunner;
   t: ProgramT;
@@ -960,7 +940,6 @@ function RunnerCard({
   onSelectHorse: (name: string) => void;
   jockeyStat?: JockeyStatRow;
   trainerStat?: TrainerStatRow;
-  onOpenVideo: () => void;
 }) {
   const formChars = (r.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-6);
   const surfaces = (r.recentFormSurfaces ?? "").split("");
@@ -1013,17 +992,6 @@ function RunnerCard({
                 <span title={`Eküri grubu ${r.ekuriGroup}`} className="ml-1 text-[11px]">🐴</span>
               ) : null}
             </button>
-            {r.idmanVideoUrl && (
-              <button
-                type="button"
-                onClick={onOpenVideo}
-                title={t("idmanIzle")}
-                aria-label={t("idmanIzleAria")}
-                className="shrink-0 inline-flex items-center justify-center text-[#c0392b]"
-              >
-                <PlayCircle className="h-4 w-4 fill-[#c0392b] text-white" />
-              </button>
-            )}
           </div>
           {(r.sire || r.dam) && (
             <div className="text-[10px] text-muted-foreground truncate ml-5">
@@ -1205,13 +1173,6 @@ function RaceTable({
   const surf = surfaceLabel(race.surface, t);
   const winnerNos = race.result?.winnerNos ?? [];
 
-  // İdman görüntüsü — TJK'nın kendi "Koşu Bilgisi" tablosundaki gibi ("İdm" sütunu, kırmızı
-  // ▶ ikon), Son Hazırlıklar alt paneline gömülü DEĞİL, doğrudan ana at tablosunda —
-  // kullanıcı talebi 2026-07-29: "direk ana sayfada yarış programının üzerinde olacak
-  // tjkdaki gibi". Aynı sayfada modal açılır (yeni sekme YOK, kullanıcı talebi).
-  const [openVideoRunnerId, setOpenVideoRunnerId] = useState<string | null>(null);
-  const openVideoRunner = race.runners.find((r) => r.id === openVideoRunnerId) ?? null;
-
   // AGF sıralama (en yüksek = 1. sıra)
   const agfSorted = race.runners
     .filter((r) => r.agf != null && r.agf > 0 && !r.scratched)
@@ -1292,7 +1253,6 @@ function RaceTable({
                   <RaceStyleInfoButton />
                 </span>
               </th>
-              <th className="px-2 py-1.5 text-center" title={t("idmTitle")} data-tour="idman-video">{t("idm")}</th>
               <th className="px-2 py-1.5 text-center" title={t("startSorunuTitle")} data-tour="start-sorunu">{t("startSorunu")}</th>
             </tr>
           </thead>
@@ -1320,7 +1280,6 @@ function RaceTable({
                   onSelectHorse={onSelectHorse}
                   jockeyStat={buildJockeyStat(r.jockey)}
                   trainerStat={buildTrainerStat(r.trainer)}
-                  onOpenVideo={() => setOpenVideoRunnerId(r.id)}
                 />
               ))
             )}
@@ -1350,7 +1309,6 @@ function RaceTable({
               onSelectHorse={onSelectHorse}
               jockeyStat={buildJockeyStat(r.jockey)}
               trainerStat={buildTrainerStat(r.trainer)}
-              onOpenVideo={() => setOpenVideoRunnerId(r.id)}
             />
           ))
         )}
@@ -1442,28 +1400,6 @@ function RaceTable({
           </PanelKilitGate>
         )}
       </div>
-
-      {openVideoRunner && openVideoRunner.idmanVideoUrl && (() => {
-        const g0 = openVideoRunner.gallops[0] ?? null;
-        const s = g0 ? galopSplits(g0) : null;
-        const splitsLabel = s
-          ? [s.prepDist && s.prepTime ? `${s.prepDist}·${s.prepTime}` : null, s.finish ? `400·${s.finish}` : null, s.final200 ? `200·${s.final200}` : null]
-              .filter(Boolean)
-              .join(" / ") || null
-          : null;
-        return (
-          <IdmanVideoModal
-            runnerName={openVideoRunner.name}
-            runnerNo={openVideoRunner.no}
-            videoUrl={openVideoRunner.idmanVideoUrl}
-            latestGallop={g0}
-            galopDateLabel={g0 ? galopDate(g0) : null}
-            splitsLabel={splitsLabel}
-            raceJockey={openVideoRunner.jockey}
-            onClose={() => setOpenVideoRunnerId(null)}
-          />
-        );
-      })()}
     </div>
   );
 }
