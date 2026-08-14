@@ -269,13 +269,13 @@ export default function V2AnalysisPanel({ raceId }: Props) {
     <div className="space-y-4 rounded-xl border border-purple-500/30 bg-purple-500/5 p-4">
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-purple-500" />
-        <h3 className="text-sm font-semibold">V3 Analiz Motoru — Deneysel (V1-V22 + Çapraz-Okuma X1-X7, sayısal puanlama yok)</h3>
+        <h3 className="text-sm font-semibold">Analiz Motoru — V1-V22 + Kanıt Ağırlıklı Katman (4+ Sinyal Yığını Garantili)</h3>
       </div>
 
       <div className="flex gap-2">
         <Button onClick={handleCalistir} disabled={loading} size="sm" className="gap-1.5" variant="outline">
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-          {loading ? (asama || "Analiz oluşturuluyor…") : "V3 ile Analiz Et"}
+          {loading ? (asama || "Analiz oluşturuluyor…") : "Analiz Et"}
         </Button>
         {atlar && (
           <Button
