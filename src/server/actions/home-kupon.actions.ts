@@ -166,10 +166,20 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
   };
 }
 
+// 2026-08-14 — kullanıcı bulgusu: İstanbul 7'li Ganyan kuponuna (slot=7) eski bir
+// akıştan kalma Ekonomik+Normal seçimler de girilmiş bulundu — yalnız Geniş olması
+// gerekiyordu (KuponForm.tsx zaten yalnız "wide" gönderiyor, ama bu yalnız İSTEMCİ
+// tarafı bir kısıt — burada, TEK yazma noktasında, sunucu tarafında da garanti altına
+// alınıyor ki hangi hipodromda olursa olsun, ileride hiçbir yoldan (elle düzenleme,
+// unutulan bir form değişikliği vb.) 7'li Ganyan'a Ekonomik/Normal giremesin).
+const YEDILI_GANYAN_SLOT = 7;
+
 export async function publishHomeKupon(input: HomeKuponInput) {
   await requireRole("EDITOR");
 
+  const yediliGanyanMi = input.slot === YEDILI_GANYAN_SLOT;
   const legs = input.legs
+    .map((l) => (yediliGanyanMi ? { ...l, narrow: [], normal: [] } : l))
     .filter((l) => l.narrow.length > 0 || l.normal.length > 0 || l.wide.length > 0)
     .map((l) => ({
       raceNo: l.raceNo,
