@@ -29,7 +29,48 @@ type V4At = {
 type Runner = { id: string; no: number; name: string };
 type BankoAdayiSonuc = { bankoAdayi: boolean; sebep: string };
 
-type Props = { raceId: string };
+// muhakemeUretV4'ün ürettiği 8 sayaç kodu — JOKEY (destek, sayaca dahil değil), JOKSTAT
+// (bilgi amaçlı) ve SIRA (0-sinyal kod-garantisi) hariç. Kaydedilmiş bir analizi (details)
+// ekrana geri koyarken sinyalSayisi/etiketler'i buradan yeniden türetiyoruz.
+const SAYILAN_KODLAR = ["AGF", "ACC", "FORM", "KGS", "PIST", "SIRE", "GALOP", "IDMJOK"];
+
+type SavedPick = {
+  rank: number;
+  runnerId?: string | null;
+  runnerLabel: string;
+  details: unknown;
+};
+type ExistingPrediction = {
+  couponNarrow?: string | null;
+  couponNormal?: string | null;
+  couponWide?: string | null;
+  bankoNote?: string | null;
+  picks: SavedPick[];
+};
+
+type Props = { raceId: string; runners?: Runner[]; existingPrediction?: ExistingPrediction };
+
+/** Kaydedilmiş bir Pick.details'ten (PickDetailsV2) V4At'e yakın bir görünüm türetir —
+ *  motoru yeniden ÇALIŞTIRMAZ, yalnız daha önce hesaplanmış/kaydedilmiş sonucu gösterir. */
+function savedPickToV4At(pick: SavedPick, runnersByNo: Map<number, Runner>): V4At | null {
+  const d = pick.details as { versiyon?: number; karar?: string; satirlar?: { kod: string[]; aciklama: string }[] } | null;
+  if (!d || d.versiyon !== 2 || !Array.isArray(d.satirlar)) return null;
+  const sayilanSatirlar = d.satirlar.filter((s) => s.kod?.some((k) => SAYILAN_KODLAR.includes(k)));
+  const noMatch = pick.runnerLabel.match(/^#(\d+)/);
+  const no = noMatch ? parseInt(noMatch[1], 10) : 0;
+  const runner = runnersByNo.get(no);
+  return {
+    no,
+    ad: runner?.name ?? pick.runnerLabel.replace(/^#\d+\s*/, ""),
+    teknikSira: pick.rank,
+    karar: d.karar ?? "—",
+    sinyalSayisi: sayilanSatirlar.length,
+    etiketler: sayilanSatirlar.map((s) => s.aciklama),
+    agfTrendVeAccuraceBirlikte:
+      d.satirlar.some((s) => s.kod?.includes("AGF")) && d.satirlar.some((s) => s.kod?.includes("ACC")),
+    details: d as PickDetailsV2,
+  };
+}
 
 const KARAR_RENK: Record<string, string> = {
   "Güçlü Aday": "text-hit",
@@ -38,17 +79,48 @@ const KARAR_RENK: Record<string, string> = {
   "Yüksek Risk": "text-muted-foreground",
 };
 
-export default function V4AnalysisPanel({ raceId }: Props) {
+export default function V4AnalysisPanel({ raceId, runners: raceRunners, existingPrediction }: Props) {
   const router = useRouter();
+
+  // Daha önce kaydedilmiş bir analiz varsa (existingPrediction.picks dolu), paneli motoru
+  // yeniden çalıştırmadan o kayıtlı sonuçla açıyoruz — kullanıcı bulgusu 2026-08-15:
+  // "yeniden analiz et" kısmına dönüldüğünde önceki analiz kayboluyordu, tekrar "Analiz
+  // Et"e basmak (AGF trend gibi gün içinde değişen verilerle) FARKLI bir sonuç üretebiliyordu.
+  const kayitliBaslangic = (() => {
+    if (!existingPrediction?.picks?.length || !raceRunners) return null;
+    const runnersByNo = new Map(raceRunners.map((r) => [r.no, r]));
+    const atlar = existingPrediction.picks
+      .map((p) => savedPickToV4At(p, runnersByNo))
+      .filter((a): a is V4At => !!a)
+      .sort((a, b) => a.teknikSira - b.teknikSira);
+    if (atlar.length === 0) return null;
+    return {
+      atlar,
+      manualOrder: atlar.map((a) => a.no),
+      runners: raceRunners.map((r) => ({ id: r.id, no: r.no, name: r.name })),
+      bankoAdayi: existingPrediction.bankoNote
+        ? { bankoAdayi: false, sebep: existingPrediction.bankoNote }
+        : null,
+      kuponlar: {
+        narrow: existingPrediction.couponNarrow ?? undefined,
+        normal: existingPrediction.couponNormal ?? undefined,
+        wide: existingPrediction.couponWide ?? undefined,
+      },
+    };
+  })();
+
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [applied, setApplied] = useState(false);
+  const [applied, setApplied] = useState(!!kayitliBaslangic);
   const [error, setError] = useState<string | null>(null);
-  const [atlar, setAtlar] = useState<V4At[] | null>(null);
-  const [manualOrder, setManualOrder] = useState<number[]>([]);
-  const [runners, setRunners] = useState<Runner[]>([]);
-  const [bankoAdayi, setBankoAdayi] = useState<BankoAdayiSonuc | null>(null);
-  const [kuponlar, setKuponlar] = useState<{ narrow?: string; normal?: string; wide?: string }>({});
+  const [atlar, setAtlar] = useState<V4At[] | null>(kayitliBaslangic?.atlar ?? null);
+  const [manualOrder, setManualOrder] = useState<number[]>(kayitliBaslangic?.manualOrder ?? []);
+  const [runners, setRunners] = useState<Runner[]>(kayitliBaslangic?.runners ?? []);
+  const [bankoAdayi, setBankoAdayi] = useState<BankoAdayiSonuc | null>(kayitliBaslangic?.bankoAdayi ?? null);
+  const [kuponlar, setKuponlar] = useState<{ narrow?: string; normal?: string; wide?: string }>(
+    kayitliBaslangic?.kuponlar ?? {}
+  );
+  const [kaynak, setKaynak] = useState<"kayitli" | "canli" | null>(kayitliBaslangic ? "kayitli" : null);
 
   async function handleCalistir() {
     setError(null);
@@ -56,6 +128,7 @@ export default function V4AnalysisPanel({ raceId }: Props) {
     setManualOrder([]);
     setApplied(false);
     setBankoAdayi(null);
+    setKaynak(null);
     setLoading(true);
     try {
       const res = await fetch("/api/admin/test-v4-engine", {
@@ -86,6 +159,7 @@ export default function V4AnalysisPanel({ raceId }: Props) {
       setRunners(data.runners ?? []);
       setBankoAdayi(data.bankoAdayi ?? null);
       setKuponlar({ narrow: data.couponNarrow, normal: data.couponNormal, wide: data.couponWide });
+      setKaynak("canli");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Beklenmeyen hata");
     } finally {
@@ -136,7 +210,7 @@ export default function V4AnalysisPanel({ raceId }: Props) {
         raceId,
         confidence: "ORTA",
         notes:
-          "Bu analiz V4 motoruyla üretildi — 6 doğrulanmış sinyalin (AGF trend, Accurace en hızlı kapanış, son yarış galibiyeti, KGS 14-30, pist+mesafe uzmanlığı, aygır üst %20) mekanik sayımına dayanır. Claude muhakemesi kullanılmadı.",
+          "Bu analiz V4 motoruyla üretildi — 8 doğrulanmış sinyalin (AGF trend, Accurace en hızlı kapanış, son yarış galibiyeti, KGS 14-30, pist+mesafe uzmanlığı, aygır üst %20, keskin galop zinciri, idman jokeyi uyumu) mekanik sayımına dayanır. Claude muhakemesi kullanılmadı.",
         tempo: "V4 motoru mekanik sinyal sayımına dayanır, ayrı bir tempo/stil senaryosu üretmez.",
         couponNarrow: couponNarrow || undefined,
         couponNormal: couponNormal || undefined,
@@ -177,10 +251,16 @@ export default function V4AnalysisPanel({ raceId }: Props) {
         </h3>
       </div>
 
+      {kaynak === "kayitli" && (
+        <div className="rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-xs text-purple-300">
+          Daha önce kaydedilmiş analiz gösteriliyor. Güncel veriyle (AGF gün içinde değişmiş olabilir) yeniden hesaplamak için &quot;Yeniden Analiz Et&quot;e bas.
+        </div>
+      )}
+
       <div className="flex gap-2">
         <Button onClick={handleCalistir} disabled={loading} size="sm" className="gap-1.5" variant="outline">
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-          {loading ? "Analiz ediliyor…" : "Analiz Et"}
+          {loading ? "Analiz ediliyor…" : kaynak === "kayitli" ? "Yeniden Analiz Et" : "Analiz Et"}
         </Button>
         {atlar && (
           <Button

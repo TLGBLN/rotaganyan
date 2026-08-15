@@ -36,7 +36,7 @@ export default function SmartAnalysisEditor({ raceId, runners, existingPredictio
   return (
     <div className="space-y-6">
       <Faz1VeriDurumu raceId={raceId} />
-      <V4AnalysisPanel raceId={raceId} />
+      <V4AnalysisPanel raceId={raceId} runners={runners} existingPrediction={existingPrediction} />
       <PredictionForm
         raceId={raceId}
         runners={runners}

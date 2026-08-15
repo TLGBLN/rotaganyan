@@ -186,7 +186,14 @@ export default function AnalizYeniClient({ gunler, selectedDate, today, tomorrow
               </button>
             </div>
 
-            {mod === "oto" && <SmartAnalysisEditor raceId={raceData.id} runners={raceData.runners} />}
+            {mod === "oto" && (
+              <SmartAnalysisEditor
+                key={raceData.id}
+                raceId={raceData.id}
+                runners={raceData.runners}
+                existingPrediction={raceData.prediction ?? undefined}
+              />
+            )}
             {mod === "md" && (
               <MarkdownRaceInput
                 raceId={raceData.id}

@@ -21,7 +21,23 @@ export async function getKosuAnalizVerisi(raceId: string) {
         orderBy: { no: "asc" },
         include: { gallops: { orderBy: { date: "desc" }, take: 3 } },
       },
-      prediction: { select: { id: true } },
+      prediction: {
+        select: {
+          id: true,
+          confidence: true,
+          notes: true,
+          tempo: true,
+          couponNarrow: true,
+          couponNormal: true,
+          couponWide: true,
+          isBanko: true,
+          bankoNote: true,
+          picks: {
+            orderBy: { rank: "asc" },
+            select: { rank: true, runnerId: true, runnerLabel: true, score: true, isTarget: true, pedigreeRating: true, details: true },
+          },
+        },
+      },
     },
   });
   return race;
