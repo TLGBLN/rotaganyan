@@ -249,14 +249,15 @@ export async function syncIdmanForDate(dateStr: string): Promise<{
             const byName = await fetchTjkIdmanByHorseName(normName);
             const lastRaceDate = lastRaceDateByName.get(normName);
             const exact = byName.filter((r) => normHorseName(r.horseName) === normName);
-            // Son koşu tarihi biliniyorsa YALNIZ o tarihten SONRAKİ idmanlar tutulur
-            // (bugünkü hazırlık dönemi) — bilinmiyorsa (ilk start vb.) eskisi gibi en
-            // güncel birkaçını alıp gereksiz onlarca eski satırı yazıp hemen budamaktan
-            // kaçınılır.
+            // Son koşu tarihi biliniyorsa o tarihten SONRAKİ idmanların TAMAMI tutulur —
+            // kullanıcı bulgusu 2026-08-14 (DRAGON HERO, 161 gün ara + 18 düzenli idman,
+            // AGF 2.sıra, kazandı): uzun aradan dönen bir atın DÜZENLİLİKLE idman yapmış
+            // olması başlı başına bir sinyal, sabit bir sayıya kırpılamaz. Bilinmiyorsa
+            // (ilk start vb.) eskisi gibi en güncel birkaçı yeterli.
             const relevant = exact
               .filter((r) => !lastRaceDate || r.trainingDate > lastRaceDate)
               .sort((a, b) => b.trainingDate.getTime() - a.trainingDate.getTime());
-            return lastRaceDate ? relevant.slice(0, 10) : relevant.slice(0, 5);
+            return lastRaceDate ? relevant : relevant.slice(0, 5);
           } catch {
             return [] as TjkIdmanRow[]; // TJK'da bu at için idman kaydı yok — atla
           }
@@ -310,10 +311,13 @@ export async function syncIdmanForDate(dateStr: string): Promise<{
       );
     }
 
-    // Son koşu tarihi biliniyorsa YALNIZ o tarihten SONRAKİ galoplar tutulur (bugünkü
-    // hazırlık dönemi, en fazla 10) — eski hazırlık dönemine ait idmanlar bugünü
-    // yansıtmaz ve "aynı jokey" eşleşmesini yanlış yorumlatabilir (kullanıcı talebi,
-    // 2026-07-26). Bilinmiyorsa (ilk start vb.) eskisi gibi en güncel 3'ü tutmaya devam eder.
+    // Son koşu tarihi biliniyorsa YALNIZ o tarihten SONRAKİ galoplar tutulur — ama
+    // SAYISI kırpılmaz (kullanıcı bulgusu 2026-08-14: DRAGON HERO 161 gün ara + 18
+    // düzenli idman ile kazandı, AGF 2.sıradaydı — düzenli idman sıklığı başlı başına
+    // bir sinyal, sabit "en fazla 10" onu görünmez kılıyordu). Eski hazırlık dönemine
+    // ait idmanlar (son koşudan ÖNCEKİler) hâlâ filtrelenir — yalnız SAYI sınırı
+    // kalktı. Son koşu tarihi bilinmiyorsa (ilk start vb.) eskisi gibi en güncel 3'ü
+    // tutmaya devam eder.
     const touchedList = [...touchedRunnerIds];
     for (let i = 0; i < touchedList.length; i += WRITE_CONCURRENCY) {
       const batch = touchedList.slice(i, i + WRITE_CONCURRENCY);
@@ -324,7 +328,7 @@ export async function syncIdmanForDate(dateStr: string): Promise<{
           const keep = await db.gallop.findMany({
             where: { runnerId, ...(lastRaceDate ? { date: { gt: lastRaceDate } } : {}) },
             orderBy: { date: "desc" },
-            take: lastRaceDate ? 10 : 3,
+            take: lastRaceDate ? undefined : 3,
             select: { id: true },
           });
           await db.gallop.deleteMany({

@@ -12,13 +12,25 @@
  * n=575, %29.7 galibiyet (GA %26.1-33.6) / %60.3 ilk3 gösterdiğini kanıtladı — V1-V22'nin
  * dayandığı hiçbir tekil bulgudan daha güçlü ve daha büyük örneklemli.
  *
+ * 2026-08-14 (aynı gün, ikinci güncelleme) — kullanıcı bulgusu: DRAGON HERO (Bursa 4.Koşu,
+ * 161 gün ara + 18 düzenli idman + AGF 2.sıra) kazandı ama V4 onu 0/6 sinyalle son sıraya
+ * atmıştı — galop verisi hiç toplanmıyordu. Geçmiş veride (n≈41.000 at) backtest edilen
+ * iki yeni mekanik sinyal eklendi: **Keskin Galop Zinciri** (son idman 400m barajı — n=3.295,
+ * %11.5 galibiyet/%34.5 top3, kontrol %10.3/%30.8'e karşı) ve **İdman Jokeyi Uyumu** ("sarı
+ * üçgen", bugünkü jokey idmanlardan birini yaptırmış — n=933, %12.3/%33.9). Artık **8
+ * sinyal**. Aynı oturumda `tjk-idman-stats.adapter.ts`'deki galop-saklama sınırı (eskiden
+ * son 10 kayıtla kırpılıyordu) da kaldırıldı — İdman Jokeyi Uyumu'nun n'i zamanla büyüyecek.
+ *
  * V4 iki temel farkla V2'den ayrılır:
- *  1. Faz1 (gatherFaz1V4) yalnız bu 6 sinyali + jokey/antrenör istatistiğini toplar —
+ *  1. Faz1 (gatherFaz1V4) yalnız bu 8 sinyali + jokey/antrenör istatistiğini toplar —
  *     pedigri detay metinleri, tempo/Accurace geçmiş eğilimi, sınıf geçişi, HP ivmesi,
- *     galop, H2H gibi V1-V22'nin dayandığı ~80 alan HİÇ toplanmaz.
+ *     H2H gibi V1-V22'nin dayandığı ~80 alandan geri kalanı HİÇ toplanmaz (galop artık
+ *     toplanıyor — yukarıdaki güncellemeye bkz.).
  *  2. Faz2 (faz2V4Sirala) Claude çağrısı YAPMAZ — sinyaller OKUNARAK tamamen mekanik
- *     sıralanır (birincil: sinyal sayısı; 4+ sinyalliler arasında AGF-trend+Accurace
- *     ikisi birden olanlar öncelikli; tie-break: agfSirasi). Maliyet sıfır.
+ *     sıralanır (birincil: sinyal sayısı; yüksek sinyalliler arasında AGF-trend+Accurace
+ *     ikisi birden olanlar öncelikli; tie-break: agfSirasi). "Güçlü Aday" kararı artık
+ *     sabit bir sayı eşiği değil, kararUret'teki birleşik kural (bkz. aşağıdaki
+ *     GUCLU_ADAY_SAYI_ESIGI). Maliyet sıfır.
  *
  * V2'nin dosyaları (v2-engine.ts, test-v2-engine/route.ts, V2AnalysisPanel.tsx,
  * test-v3-engine/route.ts) SİLİNMEDİ — yalnız artık canlı akıştan (SmartAnalysisEditor)
@@ -36,8 +48,8 @@ import {
 import {
   hesaplaSinyalSayisi,
   type SinyalSonuc,
-  SINYAL_YIGINI_ESIGI,
 } from "@/lib/methodology/v2-engine";
+import { galopQuality, isSameJockey } from "@/components/program/panels/galop-helpers";
 import type { PickDetailsV2, MuhakemeSatiri } from "@/lib/methodology/muhakeme-format";
 
 export type Faz1RunnerV4 = {
@@ -57,7 +69,12 @@ export type Faz1RunnerV4 = {
   sireKazanmaOrani: number | null;
   sireOrneklemKendiVeri: number | null;
   accuraceSonYarisEnHizliKapanis: boolean | null;
-  /** Yalnız bilgi/destek amaçlı — 6 sinyalin sayacına dahil değil. */
+  /** 7. sinyal (2026-08-14) — son idmanın 400m split'i "çok iyi"/"iyi" barajında. */
+  keskinGalopZinciri: boolean;
+  /** 8. sinyal (2026-08-14) — bugün binecek jokey, atın idmanlarından herhangi
+   *  birini yaptırmış mı ("sarı üçgen"). */
+  idmanJokeyiUyumu: boolean;
+  /** Yalnız bilgi/destek amaçlı — 8 sinyalin sayacına dahil değil. */
   jockeyWinPct: number | null;
   trainerWinPct: number | null;
 };
@@ -92,7 +109,10 @@ export async function gatherFaz1V4(raceId: string): Promise<Faz1SonucV4 | null> 
       runners: {
         where: { scratched: false },
         orderBy: { no: "asc" },
-        select: { id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true },
+        select: {
+          id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true,
+          gallops: { select: { date: true, jockey: true, splits: true }, orderBy: { date: "desc" } },
+        },
       },
     },
   });
@@ -138,6 +158,19 @@ export async function gatherFaz1V4(raceId: string): Promise<Faz1SonucV4 | null> 
     const sireOzet = sireOzetByRunnerId.get(r.id);
     const jockeyStat = r.jockey ? jockeyStats[r.jockey] : undefined;
     const trainerStat = r.trainer ? trainerStats[r.trainer] : undefined;
+
+    // Bu at, koşu gününden ÖNCEKİ galoplar (look-ahead önlemi — canlı akışta zaten
+    // hep böyledir, backtest'te de aynı filtre kullanıldı).
+    const gecerliGaloplar = r.gallops.filter((g) => g.date < race.raceDay.date);
+    const enSonGalop = gecerliGaloplar[0]; // zaten date desc sıralı
+    let keskinGalopZinciri = false;
+    if (enSonGalop) {
+      const s = (enSonGalop.splits as Record<string, string | null> | null) ?? {};
+      const q = galopQuality("400", s["400"] ?? null, race.breed, s["ic_dis"] === "İç");
+      keskinGalopZinciri = q === "cok_iyi" || q === "iyi";
+    }
+    const idmanJokeyiUyumu = gecerliGaloplar.some((g) => isSameJockey(g.jockey, r.jockey));
+
     return {
       id: r.id,
       no: r.no,
@@ -152,6 +185,8 @@ export async function gatherFaz1V4(raceId: string): Promise<Faz1SonucV4 | null> 
       sonYarisAyniJokey: sonYaris?.ayniJokey ?? null,
       sireKazanmaOrani: sireOzet?.kYuzde ?? null,
       sireOrneklemKendiVeri: sireOzet?.ornekKendiVeri ?? null,
+      keskinGalopZinciri,
+      idmanJokeyiUyumu,
       accuraceSonYarisEnHizliKapanis: accuraceMap.get(r.name) ?? null,
       jockeyWinPct:
         jockeyStat && jockeyStat.overall.rides > 0 ? Math.round((jockeyStat.overall.wins / jockeyStat.overall.rides) * 100) : null,
@@ -187,8 +222,32 @@ export type Faz1RunnerV4Sirali = Faz1RunnerV4 & {
   karar: string;
 };
 
-function kararUret(sinyalSayisi: number): string {
-  if (sinyalSayisi >= SINYAL_YIGINI_ESIGI) return "Güçlü Aday";
+// 2026-08-15 — kullanıcı bulgusu: Keskin Galop Zinciri + İdman Jokeyi Uyumu eklenince
+// (8 sinyal havuzu) sabit "sayı>=4" barajı sulandı — n=732, %21.2 galibiyet/%52.7 top3
+// (orijinal 6-sinyal doğrulaması n=547-575, %29.7-31.4/%60.3-61.4 idi). "sayı>=6"
+// orijinali geçiyor (n=72, %34.7/%66.7) ama örneklem çok küçülüyor. Tüm geçmiş veride
+// (n=35.246) hangi İKİLİ sinyal kombinasyonlarının en güçlü olduğu backtest edildi —
+// ACC+SIRE (n=110, %32.7/%58.2) ve FORM+SIRE (n=134, %25.4/%53.0) en güçlü ikili
+// çiftlerdi. Birleşik kural "sayı>=5 VEYA (sayı>=3 VE (ACC+SIRE veya FORM+SIRE))"
+// n=571, %29.6 galibiyet/%58.5 top3 verdi — orijinal doğrulamanın hem örneklem
+// büyüklüğüne (547-575) hem galibiyet oranına (%29.7-31.4) neredeyse birebir denk
+// düşüyor. GUCLU_ADAY_SAYI_ESIGI/GUCLU_ADAY_ALT_SAYI_ESIGI bu ikisini taşır —
+// SINYAL_YIGINI_ESIGI (V2'nin dormant faz2SinyalYiginiTop3Garantisi'si için) artık
+// V4'te KULLANILMIYOR.
+export const GUCLU_ADAY_SAYI_ESIGI = 5;
+export const GUCLU_ADAY_ALT_SAYI_ESIGI = 3;
+
+function gucluCiftVarMi(etiketler: string[]): boolean {
+  const acc = etiketler.includes("Accurace son yarış en hızlı son 200m kapanışı");
+  const form = etiketler.includes("son yarışını kazandı");
+  const sire = etiketler.some((e) => e.startsWith("aygır üst"));
+  return (acc && sire) || (form && sire);
+}
+
+function kararUret(sinyal: SinyalSonuc): string {
+  const sinyalSayisi = sinyal.sayi;
+  if (sinyalSayisi >= GUCLU_ADAY_SAYI_ESIGI) return "Güçlü Aday";
+  if (sinyalSayisi >= GUCLU_ADAY_ALT_SAYI_ESIGI && gucluCiftVarMi(sinyal.etiketler)) return "Güçlü Aday";
   if (sinyalSayisi >= 2) return "Düşük Risk";
   if (sinyalSayisi === 1) return "Orta Risk";
   return "Yüksek Risk";
@@ -226,7 +285,7 @@ export function faz2V4Sirala(faz1: Faz1SonucV4): Faz1RunnerV4Sirali[] {
     return a.no - b.no;
   });
 
-  return sirali.map((r, i) => ({ ...r, teknikSira: i + 1, karar: kararUret(r.sinyal.sayi) }));
+  return sirali.map((r, i) => ({ ...r, teknikSira: i + 1, karar: kararUret(r.sinyal) }));
 }
 
 // ─── Muhakeme metni — mekanik/template, Claude'suz ─────────────────────────────────
@@ -267,6 +326,12 @@ export function muhakemeUretV4(r: Faz1RunnerV4Sirali): PickDetailsV2 {
       aciklama: `Aygır üst %20 (K% ${r.sireKazanmaOrani}, n=${r.sireOrneklemKendiVeri})`,
     });
   }
+  if (r.keskinGalopZinciri) {
+    satirlar.push({ kod: ["GALOP"], tip: "destek", guven: "tam", aciklama: "Keskin galop zinciri (son idman 400m barajı)" });
+  }
+  if (r.idmanJokeyiUyumu) {
+    satirlar.push({ kod: ["IDMJOK"], tip: "destek", guven: "tam", aciklama: "İdman jokeyi uyumu (sarı üçgen) — bugünkü jokey idmanlardan birini yaptırmış" });
+  }
 
   // Destek sinyali — sayaca dahil DEĞİL (2026-08-14 kullanıcı kararı: "bunlar destek olsa")
   if (r.sonYarisAyniJokey === true) {
@@ -291,7 +356,7 @@ export function muhakemeUretV4(r: Faz1RunnerV4Sirali): PickDetailsV2 {
   // assertPublishSafe (7): kategori destekliyorsa en az bir pick'te kod dolu satır zorunlu
   // — 0/6 sinyalli atlarda dahi garanti (aynı zamanda UI'da şeffaflık sağlar).
   if (satirlar.filter((s) => s.kod.length > 0).length === 0) {
-    satirlar.push({ kod: ["SIRA"], tip: "notr", guven: "zayif", kodGarantili: true, aciklama: "0/6 doğrulanmış sinyal taşıyor" });
+    satirlar.push({ kod: ["SIRA"], tip: "notr", guven: "zayif", kodGarantili: true, aciklama: "0/8 doğrulanmış sinyal taşıyor" });
   }
 
   return { versiyon: 2, karar: r.karar, satirlar };

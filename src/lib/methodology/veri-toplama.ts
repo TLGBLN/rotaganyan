@@ -364,6 +364,11 @@ export type Faz1Runner = {
   sonSonucZayif: boolean;
   kondisyonZinciriVar: boolean;
   keskinGalopZinciri: boolean;
+  /** Bugün binecek jokey, atın idmanlarından (herhangi birinden) HERHANGİ birini
+   *  yaptırmış mı — "sarı üçgen" (bkz. topics.ts). Geçmiş veride backtest edildi
+   *  (2026-08-14, n=933, %12.3 galibiyet/%33.9 top3 — kontrol %10.3/%30.8'e karşı,
+   *  z≈2.0) — 6-sinyal havuzuna 7. sinyal olarak eklendi. */
+  idmanJokeyiUyumu: boolean;
 
   // Kilo, jokey/antrenör, takı — otomatik. kiloAvantaji: bu atın kilosu sahadaki
   // ortalamadan en az 1kg hafif mi — önceden hesaplanıyordu ama Faz2/Faz3 promptuna
@@ -904,6 +909,11 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
 
       const kiloAvantaji = r.weight != null && ortKilo != null ? r.weight <= ortKilo - 1 : false;
 
+      // "Sarı üçgen" — bugün binecek jokey, atın idmanlarından herhangi birini yaptırmış mı
+      // (yalnız son idman değil, TÜMÜ — galopOzet metnindeki [AYNI JOKEY İLE İDMAN YAPTI]
+      // etiketiyle aynı mantık, ama burada yapısal bir sinyal olarak da taşınıyor).
+      const idmanJokeyiUyumu = r.gallops.some((g) => isSameJockey(g.jockey, r.jockey));
+
       // Jokey/Antrenör GENEL yıllık win% (v6.26, kullanıcı talebi 2026-07-30).
       const jockeyStat = r.jockey ? jockeyStats[r.jockey] : undefined;
       const trainerStat = r.trainer ? trainerStats[r.trainer] : undefined;
@@ -1040,7 +1050,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         sinifOnceki, sinifSkkOnceki, sinifSkkBugun: bugunSkk, sinifDususu,
         bitirisGeriliyor: yonHesap.geriliyor, bitirisIyilesiyor: yonHesap.iyilesiyor,
         sonSonucZayif: sonSonucZayifMi(r.recentForm),
-        kondisyonZinciriVar, keskinGalopZinciri,
+        kondisyonZinciriVar, keskinGalopZinciri, idmanJokeyiUyumu,
         kiloAvantaji, hpAlanIciUst: hpAlanIciUstHesap,
         son800BenzerKosuN, son800Medyan,
         son800TumOzet: son800TumOzetByRunnerName.get(r.name) ?? null,

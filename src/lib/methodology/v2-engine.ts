@@ -970,6 +970,13 @@ export type SinyalGirdisi = {
   hipodromMesafedeKazandi: "EVET" | "HAYIR" | "KOSMADI";
   sireKazanmaOrani: number | null;
   sireOrneklemKendiVeri: number | null;
+  /** 7. sinyal (2026-08-14 eklendi) — son galobun 400m split'i "çok iyi"/"iyi" barajında.
+   *  Backtest: n=3.295, %11.5 galibiyet/%34.5 top3 (kontrol %10.3/%30.8, top3'te z≈4.6). */
+  keskinGalopZinciri: boolean;
+  /** 8. sinyal (2026-08-14 eklendi) — bugün binecek jokey, atın idmanlarından herhangi
+   *  birini yaptırmış mı ("sarı üçgen"). Backtest: n=933, %12.3/%33.9 (z≈2.0, sınırda —
+   *  galop-saklama düzeltmesi öncesi veriyle ölçüldü, olası düşük tahmin). */
+  idmanJokeyiUyumu: boolean;
 };
 
 export function hesaplaSinyalSayisi(
@@ -1003,6 +1010,12 @@ export function hesaplaSinyalSayisi(
   ) {
     etiketler.push(`aygır üst %20 (K% ${r.sireKazanmaOrani}, n=${r.sireOrneklemKendiVeri})`);
   }
+
+  // 7. Keskin galop zinciri — son idmanın 400m'si "çok iyi"/"iyi" barajında
+  if (r.keskinGalopZinciri) etiketler.push("keskin galop zinciri (son idman 400m barajı)");
+
+  // 8. İdman jokeyi uyumu ("sarı üçgen") — bugünkü jokey, idmanlardan birini yaptırmış
+  if (r.idmanJokeyiUyumu) etiketler.push("idman jokeyi uyumu (sarı üçgen)");
 
   return { sayi: etiketler.length, etiketler };
 }
