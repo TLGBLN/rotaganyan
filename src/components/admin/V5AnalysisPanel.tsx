@@ -176,9 +176,12 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
           rank: i + 1,
           runnerId: runner?.id,
           runnerLabel: runner ? `#${runner.no} ${runner.name}` : `#${a.no} ${a.ad}`,
-          // V1-V22'nin 0-100 "kalite skoru" ile karışmasın diye score bilerek boş
-          // bırakılıyor (V4'ün aynı kararı) — gerçek olasılık OLASILIK satırında/UI'da.
-          score: undefined,
+          // 2026-08-16 kullanıcı kararı: Puan Tablosu'nda gerçek bir sayı görünsün —
+          // V5'in kazanma olasılığı (%) 0-100 ölçeğe yuvarlanıp score'a yazılıyor.
+          // V1-V22'nin eski "kalite skoru"ndan farklı bir anlamı var (bu gerçek, kalibre
+          // edilmiş bir olasılık) ama Puan Tablosu ikisini de aynı sütunda gösterdiği
+          // için karışıklık riski var — kullanıcı bunu bilerek kabul etti.
+          score: Math.round(a.olasilik * 100),
           details: a.details,
           pedigreeRating: "BILINMIYOR",
           isTarget: false,
