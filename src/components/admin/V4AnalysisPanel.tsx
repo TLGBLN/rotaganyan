@@ -173,7 +173,7 @@ export default function V4AnalysisPanel({ raceId }: Props) {
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-purple-500" />
         <h3 className="text-sm font-semibold">
-          V4 — 6 Sinyal Mekanik Motoru (AGF trend, Accurace, form, KGS, pist uzmanlığı, aygır — Claude yok, maliyet sıfır)
+          V4 — 8 Sinyal Mekanik Motoru (AGF trend, Accurace, form, KGS, pist uzmanlığı, aygır, keskin galop zinciri, idman jokeyi uyumu — Claude yok, maliyet sıfır)
         </h3>
       </div>
 
@@ -233,7 +233,7 @@ export default function V4AnalysisPanel({ raceId }: Props) {
                     </span>
                     <span className={cn("font-medium", KARAR_RENK[a.karar] ?? "")}>{a.karar}</span>
                     <span className="rounded-full bg-purple-500/15 px-2 py-0.5 font-mono text-[11px] text-purple-600">
-                      {a.sinyalSayisi}/6 sinyal
+                      {a.sinyalSayisi}/8 sinyal
                     </span>
                     {a.agfTrendVeAccuraceBirlikte && (
                       <span className="rounded-full bg-hit/15 px-2 py-0.5 font-mono text-[11px] text-hit">AGF+ACC</span>
