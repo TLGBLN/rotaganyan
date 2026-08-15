@@ -82,6 +82,15 @@ export type Faz1RunnerV5 = {
   uzunAraGalopKatkisi: number;
   jokeyOrani: number;
   antrenorOrani: number;
+  /** "En çok yükselenler/düşenler" listesinden (getAgfTrendForRace) — modelin kendisi
+   *  agfFark'ı (bkz. toFeatureVector) istatistiksel olarak anlamsız bulsa da (agfSirasi
+   *  ile yüksek korelasyon/multicollinearity yüzünden), kullanıcı kararı 2026-08-16:
+   *  piyasa hareketi gerekçe metninde HER ZAMAN ön planda gösterilsin — V4'ün kendi
+   *  backtest'i bu sinyalin gerçek olduğunu kanıtlamıştı (trend+4sinyal: n=663,
+   *  %21.6 galibiyet/%53.8 top3, kontrol %10.2/%30.7). Skoru/olasılığı DEĞİŞTİRMEZ,
+   *  yalnız gerekçe metninin sırasını etkiler. */
+  agfTrendYonu: "yükseliş" | "düşüş" | null;
+  agfTrendFark: number | null;
 };
 
 export type Faz1SonucV5 = {
@@ -144,6 +153,10 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     accKayitlar.son800Siblings
   );
   const agfFarkByNo = new Map(agfTrend.atlar.map((a) => [a.runnerNo, a.fark ?? 0]));
+  const trendYonByNo = new Map<number, "yükseliş" | "düşüş">([
+    ...agfTrend.enCokYukselenler.map((y): [number, "yükseliş"] => [y.runnerNo, "yükseliş"]),
+    ...agfTrend.enCokDusenler.map((d): [number, "düşüş"] => [d.runnerNo, "düşüş"]),
+  ]);
   const agfSirali = [...runners].filter((r) => r.agf != null).sort((a, b) => (b.agf ?? 0) - (a.agf ?? 0));
   const agfSiraMap = new Map(agfSirali.map((r, i) => [r.id, i + 1]));
   const sahaOrtasi = Math.ceil(runners.length / 2);
@@ -192,6 +205,8 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       sireOrani, galop: keskinGalop, idmJokey,
       galopSayisi: gecerliGaloplar.length, uzunAraGalopKatkisi,
       jokeyOrani, antrenorOrani,
+      agfTrendYonu: trendYonByNo.get(r.no) ?? null,
+      agfTrendFark: trendYonByNo.has(r.no) ? (agfFarkByNo.get(r.no) ?? null) : null,
     };
   });
 
@@ -268,7 +283,6 @@ type OzellikGrubu = {
 const idx = (name: string) => FEATURE_NAMES.indexOf(name);
 
 const OZELLIK_GRUPLARI: OzellikGrubu[] = [
-  { kod: "AGFTREND", ozellikIndeksleri: [idx("agfFark")], aciklama: (r) => (r.agfFark !== 0 ? `AGF trend farkı: ${r.agfFark >= 0 ? "+" : ""}${r.agfFark.toFixed(1)} puan` : null) },
   { kod: "AGF", ozellikIndeksleri: [idx("agfSirasi")], aciklama: (r) => `AGF sırası: ${r.agfSirasi}` },
   { kod: "ACC", ozellikIndeksleri: [idx("accurace")], aciklama: (r) => (r.accurace ? "Accurace: son yarışta sahanın en hızlı son 200m kapanışı" : null) },
   { kod: "FORM", ozellikIndeksleri: [idx("formEgimi"), idx("formEgimi2")], aciklama: (r) => `Form eğimi: ${r.formEgimi.toFixed(1)} (${r.formEgimi < 0 ? "iyileşiyor" : r.formEgimi > 0 ? "kötüleşiyor" : "sabit"})` },
@@ -293,6 +307,24 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
   })).filter((g) => g.metin != null);
 
   const satirlar: MuhakemeSatiri[] = [];
+
+  // 2026-08-16 kullanıcı kararı: AGF trendi (en çok yükselenler/düşenler) HER ZAMAN
+  // gerekçenin en önünde gösterilir. Modelin kendi öğrendiği agfFark katsayısı (ham/
+  // sürekli hâliyle) istatistiksel olarak anlamsız çıktı (agfSirasi ile yüksek
+  // korelasyon/multicollinearity yüzünden olası) — bu satır o yüzden katkı sıralamasına
+  // değil, V4'ün kendi doğrulanmış backtest bulgusuna dayanıyor (trend+4sinyal: n=663,
+  // %21.6 galibiyet/%53.8 top3, kontrol %10.2/%30.7). Skoru/olasılığı DEĞİŞTİRMEZ —
+  // yalnız gerekçe metninin önceliğini belirler, kodGarantili:true (Claude'un/modelin
+  // satırı değil, kural-enjekte).
+  if (r.agfTrendYonu) {
+    satirlar.push({
+      kod: ["AGFTREND"],
+      tip: "destek",
+      guven: "tam",
+      kodGarantili: true,
+      aciklama: `AGF trend: ${r.agfTrendYonu} (${r.agfTrendFark! >= 0 ? "+" : ""}${r.agfTrendFark} puan) — piyasa hareketi, en çok ${r.agfTrendYonu === "yükseliş" ? "yükselenler" : "düşenler"} listesinde`,
+    });
+  }
 
   const pozitifSirali = gruplar.filter((g) => g.katki > 0).sort((a, b) => b.katki - a.katki);
   for (const g of pozitifSirali.slice(0, 5)) {

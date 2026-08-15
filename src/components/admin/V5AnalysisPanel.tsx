@@ -278,7 +278,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
           {manualOrder.map((no, i) => {
             const a = atlarByNo.get(no);
             if (!a) return null;
-            const kodluSatirlar = a.details.satirlar.filter((s) => s.kod.length > 0 && !s.kodGarantili);
+            const kodluSatirlar = a.details.satirlar.filter((s) => s.kod.length > 0 && !s.kod.includes("OLASILIK"));
             return (
               <div key={no} className="space-y-1 rounded-lg border border-border bg-background p-2.5 text-xs">
                 <div className="flex items-center justify-between gap-2">
