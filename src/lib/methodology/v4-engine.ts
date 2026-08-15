@@ -218,6 +218,9 @@ export type Faz1RunnerV4Sirali = Faz1RunnerV4 & {
   agfTrendYonu: "yükseliş" | "düşüş" | null;
   agfTrendFark: number | null;
   agfTrendVeAccuraceBirlikte: boolean;
+  /** AGF-trend terfi kaynağı — bkz. agfTrendTerfisiUygula. null = terfi almadı (mekanik
+   *  sıralamadaki yeri zaten yeterliydi ya da trend taşımıyordu). */
+  agfTerfi: "ilk3" | "ilk6" | null;
   teknikSira: number;
   karar: string;
 };
@@ -253,6 +256,73 @@ function kararUret(sinyal: SinyalSonuc): string {
   return "Yüksek Risk";
 }
 
+// 2026-08-15 — kullanıcı bulgusu (Ankara 2.Koşu, BALABAN SÜMBÜLÜ: AGF trendinde en çok
+// yükselenler arasındaydı, V4 onu 7. sıraya/Orta Risk'e gömmüştü, sonra KAZANDI):
+// tüm geçmiş veride (n=35.337) AGF trend taşıyan atlar toplam sinyal sayısına göre
+// backtest edildi. "trend + en az 4 sinyal" n=663, %21.6 galibiyet/%53.8 top3 (kontrol
+// %10.2/%30.7) — ilk-3'e terfiyi haklı çıkaracak kadar güçlü. Yalnız trend taşıyan
+// (sinyal sayısı ne olursa olsun) n=3210, %16.1/%44.6 — ilk-3 için yeterince güçlü değil
+// ama ilk-6 (Normal kupon kapsamı) için kontrolün belirgin üstünde. Not: aynı sinyal
+// sayısına sahip ama trend TAŞIMAYAN atlarla karşılaştırıldığında düşük sinyal
+// sayılarında (1-3) fark küçük — trend zaten 8 sinyalin biri olarak sayılıyor, asıl
+// ekstra güç 4+ sinyalle birleşince ortaya çıkıyor, bu yüzden ilk-3 eşiği 4.
+export const AGF_TERFI_ILK3_SINYAL_ESIGI = 4;
+
+/** Pencere dışındaki (index >= pencereBoyu), filtreyi geçen adayları pencerenin SON
+ *  slotuna (sınırına) yerleştirir — eski V2'nin kod-garanti desenİyle aynı: en zayıf
+ *  aday ÖNCE işlenir, en güçlü EN SON (bu yüzden pencereye en yakın/içeride kalma
+ *  ihtimali en yüksek olan odur). Aday sayısı pencere boyutunu aşarsa, en zayıflar
+ *  birbirini dışarı itebilir — bu kasıtlı: sınırlı sayıda slotu en güçlü adaylar kazanır. */
+function terfiPenceresineTasi<T extends { no: number }>(
+  sirali: T[],
+  pencereBoyu: number,
+  adayMi: (r: T, index: number) => boolean,
+  guc: (r: T) => number
+): { sonuc: T[]; terfiEdenNolar: Set<number> } {
+  let calisma = [...sirali];
+  const adaylar = calisma
+    .map((r, i) => ({ r, i }))
+    .filter(({ r, i }) => i >= pencereBoyu && adayMi(r, i))
+    .sort((a, b) => guc(a.r) - guc(b.r)); // en zayıf önce
+
+  const denenenNolar = new Set<number>();
+  for (const { r } of adaylar) {
+    const idx = calisma.findIndex((x) => x.no === r.no);
+    if (idx === -1 || idx < pencereBoyu) continue; // zaten pencerede (başka bir adımla girmiş olabilir)
+    const kalanlar = calisma.filter((x) => x.no !== r.no);
+    calisma = [...kalanlar.slice(0, pencereBoyu - 1), r, ...kalanlar.slice(pencereBoyu - 1)];
+    denenenNolar.add(r.no);
+  }
+  // Yalnız GERÇEKTEN pencerede kalanlar "terfi etti" sayılır — daha güçlü, sonradan
+  // işlenen bir aday tarafından dışarı itilmiş olabilir.
+  const pencereNoSet = new Set(calisma.slice(0, pencereBoyu).map((r) => r.no));
+  const terfiEdenNolar = new Set([...denenenNolar].filter((no) => pencereNoSet.has(no)));
+  return { sonuc: calisma, terfiEdenNolar };
+}
+
+/** İki katmanlı AGF-trend terfisi — bkz. AGF_TERFI_ILK3_SINYAL_ESIGI üstündeki not. */
+function agfTrendTerfisiUygula(
+  sirali: Omit<Faz1RunnerV4Sirali, "teknikSira" | "karar" | "agfTerfi">[]
+): (typeof sirali[number] & { agfTerfi: "ilk3" | "ilk6" | null })[] {
+  const isaretli = sirali.map((r) => ({ ...r, agfTerfi: null as "ilk3" | "ilk6" | null }));
+
+  const { sonuc: ilk3SonrasiSirali, terfiEdenNolar: ilk3Terfi } = terfiPenceresineTasi(
+    isaretli,
+    3,
+    (r) => r.agfTrendYonu != null && r.sinyal.sayi >= AGF_TERFI_ILK3_SINYAL_ESIGI,
+    (r) => r.sinyal.sayi
+  );
+  const ilk3Isaretli = ilk3SonrasiSirali.map((r) => (ilk3Terfi.has(r.no) ? { ...r, agfTerfi: "ilk3" as const } : r));
+
+  const { sonuc: ilk6SonrasiSirali, terfiEdenNolar: ilk6Terfi } = terfiPenceresineTasi(
+    ilk3Isaretli,
+    6,
+    (r) => r.agfTrendYonu != null,
+    (r) => r.sinyal.sayi
+  );
+  return ilk6SonrasiSirali.map((r) => (ilk6Terfi.has(r.no) ? { ...r, agfTerfi: "ilk6" as const } : r));
+}
+
 export function faz2V4Sirala(faz1: Faz1SonucV4): Faz1RunnerV4Sirali[] {
   const trendler = [
     ...faz1.race.enCokYukselenler.map((y) => ({ ...y, yon: "yükseliş" as const })),
@@ -285,7 +355,18 @@ export function faz2V4Sirala(faz1: Faz1SonucV4): Faz1RunnerV4Sirali[] {
     return a.no - b.no;
   });
 
-  return sirali.map((r, i) => ({ ...r, teknikSira: i + 1, karar: kararUret(r.sinyal) }));
+  const terfili = agfTrendTerfisiUygula(sirali);
+
+  return terfili.map((r, i) => {
+    let karar = kararUret(r.sinyal);
+    // Terfi eden bir at, mekanik sinyal sayısı yetmese bile pozisyonuyla tutarlı bir
+    // karar etiketi taşımalı — "ilk-3'te ama Orta Risk" gibi kafa karıştırıcı bir
+    // görünüm istemiyoruz. ilk3: doğrudan Güçlü Aday (n=663, %21.6/%53.8 ile
+    // savunulabilir). ilk6: en az Düşük Risk.
+    if (r.agfTerfi === "ilk3") karar = "Güçlü Aday";
+    else if (r.agfTerfi === "ilk6" && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
+    return { ...r, teknikSira: i + 1, karar };
+  });
 }
 
 // ─── Muhakeme metni — mekanik/template, Claude'suz ─────────────────────────────────
@@ -350,6 +431,26 @@ export function muhakemeUretV4(r: Faz1RunnerV4Sirali): PickDetailsV2 {
       tip: "notr",
       guven: "zayif",
       aciklama: `${r.jockey ?? "?"}(%${r.jockeyWinPct ?? "?"}) / ${r.trainer ?? "?"}(%${r.trainerWinPct ?? "?"})`,
+    });
+  }
+
+  // AGF-trend terfi denetim satırı — bkz. agfTrendTerfisiUygula (2026-08-15, BALABAN
+  // SÜMBÜLÜ dersi). kodGarantili:true, sayaca dahil değil (AGF kodu zaten sayıldı).
+  if (r.agfTerfi === "ilk3") {
+    satirlar.push({
+      kod: ["AGFTERFI"],
+      tip: "destek",
+      guven: "tam",
+      kodGarantili: true,
+      aciklama: `AGF trend + ${r.sinyal.sayi} sinyal — ilk-3'e terfi (backtest: n=663, %21.6 galibiyet/%53.8 top3)`,
+    });
+  } else if (r.agfTerfi === "ilk6") {
+    satirlar.push({
+      kod: ["AGFTERFI"],
+      tip: "destek",
+      guven: "orta",
+      kodGarantili: true,
+      aciklama: `AGF trend taşıyor — ilk-6'ya terfi (backtest: n=3210, %16.1 galibiyet/%44.6 top3)`,
     });
   }
 
