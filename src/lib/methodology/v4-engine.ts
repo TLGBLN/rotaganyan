@@ -273,7 +273,7 @@ export const AGF_TERFI_ILK3_SINYAL_ESIGI = 4;
  *  aday ÖNCE işlenir, en güçlü EN SON (bu yüzden pencereye en yakın/içeride kalma
  *  ihtimali en yüksek olan odur). Aday sayısı pencere boyutunu aşarsa, en zayıflar
  *  birbirini dışarı itebilir — bu kasıtlı: sınırlı sayıda slotu en güçlü adaylar kazanır. */
-function terfiPenceresineTasi<T extends { no: number }>(
+export function terfiPenceresineTasi<T extends { no: number }>(
   sirali: T[],
   pencereBoyu: number,
   adayMi: (r: T, index: number) => boolean,

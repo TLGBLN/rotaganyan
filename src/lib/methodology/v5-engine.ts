@@ -38,6 +38,8 @@ import {
 } from "@/lib/methodology/veri-toplama";
 import { galopQuality, isSameJockey } from "@/components/program/panels/galop-helpers";
 import type { PickDetailsV2, MuhakemeSatiri } from "@/lib/methodology/muhakeme-format";
+import { hesaplaSinyalSayisi } from "@/lib/methodology/v2-engine";
+import { terfiPenceresineTasi, AGF_TERFI_ILK3_SINYAL_ESIGI as SINYAL_ESIGI } from "@/lib/methodology/v4-engine";
 import v5Weights from "@/lib/methodology/weights/v5-weights.json";
 
 const { featureNames: FEATURE_NAMES, weights: WEIGHTS, means: MEANS, stds: STDS } = v5Weights as {
@@ -91,6 +93,12 @@ export type Faz1RunnerV5 = {
    *  yalnız gerekçe metninin sırasını etkiler. */
   agfTrendYonu: "yükseliş" | "düşüş" | null;
   agfTrendFark: number | null;
+  /** V4'ün 8-sinyal sayımıyla (hesaplaSinyalSayisi) uyumlu ham alanlar — SADECE terfi
+   *  kapısı için (bkz. AGF_TERFI_ILK3_SINYAL_ESIGI), regresyon skoruna girmez. */
+  recentForm: string | null;
+  hipodromMesafedeKazandi: "EVET" | "HAYIR" | "KOSMADI";
+  sireKazanmaOraniHam: number | null;
+  sireOrneklemKendiVeri: number | null;
 };
 
 export type Faz1SonucV5 = {
@@ -207,6 +215,10 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       jokeyOrani, antrenorOrani,
       agfTrendYonu: trendYonByNo.get(r.no) ?? null,
       agfTrendFark: trendYonByNo.has(r.no) ? (agfFarkByNo.get(r.no) ?? null) : null,
+      recentForm: r.recentForm,
+      hipodromMesafedeKazandi: sonYaris?.kazandi ?? "KOSMADI",
+      sireKazanmaOraniHam: sireOzet?.kYuzde ?? null,
+      sireOrneklemKendiVeri: sireOzet?.ornekKendiVeri ?? null,
     };
   });
 
@@ -244,6 +256,8 @@ export type Faz1RunnerV5Sirali = Faz1RunnerV5 & {
   olasilik: number;
   standartVektor: number[];
   katkilar: number[]; // standartVektor[i] * WEIGHTS[i], her özelliğin bu attaki katkısı
+  sinyalSayisi: number; // V4'ün 8-sinyal sayımı — yalnız terfi kapısı için, skora girmez
+  agfTerfi: "ilk3" | "ilk6" | null;
   teknikSira: number;
   karar: string;
 };
@@ -255,21 +269,74 @@ function kararUret(p: number): string {
   return "Yüksek Risk";
 }
 
+/** V4'ün kanıtlanmış AGF-trend terfi kuralının V5'e uyarlanmış hâli — kullanıcı kararı
+ *  2026-08-16: büyük AGF trendi taşıyan atlar, YETERİNCE başka sinyal de taşıyorsa
+ *  (bkz. AGF_TERFI_ILK3_SINYAL_ESIGI=4, V4'ün backtest'i: n=663, %21.6/%53.8, kontrol
+ *  %10.2/%30.7) modelin ham olasılık sıralamasında geride kalsa bile ilk-3'e/ilk-6'ya
+ *  taşınır. Regresyon skorunu/olasılığı DEĞİŞTİRMEZ — yalnız GÖSTERİM sırasını ve kararı
+ *  etkiler (V4'teki aynı mekanizma, terfiPenceresineTasi de birebir o koddan). Sinyal
+ *  sayısı YETERSİZSE (KURUŞHAN örneği: trend var ama yalnız 2 sinyal) terfi olmaz —
+ *  bu KASITLI, trend TEK BAŞINA V4'ün kendi backtest'inde de ilk-3 için yeterli değildi. */
+function agfTrendTerfisiUygula<T extends { no: number; agfTrendYonu: "yükseliş" | "düşüş" | null; sinyalSayisi: number }>(
+  sirali: T[]
+): (T & { agfTerfi: "ilk3" | "ilk6" | null })[] {
+  const isaretli = sirali.map((r) => ({ ...r, agfTerfi: null as "ilk3" | "ilk6" | null }));
+
+  const { sonuc: ilk3Sonrasi, terfiEdenNolar: ilk3Terfi } = terfiPenceresineTasi(
+    isaretli,
+    3,
+    (r) => r.agfTrendYonu != null && r.sinyalSayisi >= SINYAL_ESIGI,
+    (r) => r.sinyalSayisi
+  );
+  const ilk3Isaretli = ilk3Sonrasi.map((r) => (ilk3Terfi.has(r.no) ? { ...r, agfTerfi: "ilk3" as const } : r));
+
+  const { sonuc: ilk6Sonrasi, terfiEdenNolar: ilk6Terfi } = terfiPenceresineTasi(
+    ilk3Isaretli,
+    6,
+    (r) => r.agfTrendYonu != null,
+    (r) => r.sinyalSayisi
+  );
+  return ilk6Sonrasi.map((r) => (ilk6Terfi.has(r.no) ? { ...r, agfTerfi: "ilk6" as const } : r));
+}
+
 export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
   const vektorler = faz1.runners.map((r) => standardize(toFeatureVector(r)));
   const scores = vektorler.map((v) => v.reduce((s, x, i) => s + x * WEIGHTS[i], 0));
   const probs = softmax(scores);
 
-  const enriched = faz1.runners.map((r, i) => ({
-    ...r,
-    olasilik: probs[i],
-    standartVektor: vektorler[i],
-    katkilar: vektorler[i].map((x, j) => x * WEIGHTS[j]),
-  }));
+  const enriched = faz1.runners.map((r, i) => {
+    const sinyal = hesaplaSinyalSayisi(
+      {
+        no: r.no,
+        recentForm: r.recentForm,
+        accuraceSonYarisEnHizliKapanis: r.accurace === 1,
+        gunAralik: r.kgsVarMi ? r.kgs : null,
+        hipodromMesafedeKazandi: r.hipodromMesafedeKazandi,
+        sireKazanmaOrani: r.sireKazanmaOraniHam,
+        sireOrneklemKendiVeri: r.sireOrneklemKendiVeri,
+        keskinGalopZinciri: r.galop === 1,
+        idmanJokeyiUyumu: r.idmJokey === 1,
+      },
+      r.agfTrendYonu ? { fark: r.agfTrendFark!, yon: r.agfTrendYonu } : undefined
+    );
+    return {
+      ...r,
+      olasilik: probs[i],
+      standartVektor: vektorler[i],
+      katkilar: vektorler[i].map((x, j) => x * WEIGHTS[j]),
+      sinyalSayisi: sinyal.sayi,
+    };
+  });
 
   const sirali = [...enriched].sort((a, b) => (b.olasilik !== a.olasilik ? b.olasilik - a.olasilik : a.no - b.no));
+  const terfili = agfTrendTerfisiUygula(sirali);
 
-  return sirali.map((r, i) => ({ ...r, teknikSira: i + 1, karar: kararUret(r.olasilik) }));
+  return terfili.map((r, i) => {
+    let karar = kararUret(r.olasilik);
+    if (r.agfTerfi === "ilk3") karar = "Güçlü Aday";
+    else if (r.agfTerfi === "ilk6" && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
+    return { ...r, teknikSira: i + 1, karar };
+  });
 }
 
 // ─── Muhakeme metni — özellik-katkı ayrıştırması, Claude'suz ─────────────────────────
@@ -344,6 +411,26 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
       tip: "risk",
       guven: g.katki <= -GUCLU_ESIK ? "tam" : "orta",
       aciklama: g.metin!,
+    });
+  }
+
+  // AGF-trend terfi denetim satırı — bkz. agfTrendTerfisiUygula (2026-08-16, KURUŞHAN
+  // dersi). kodGarantili:true, sayaca dahil değil (AGFTREND kodu zaten yukarıda var).
+  if (r.agfTerfi === "ilk3") {
+    satirlar.push({
+      kod: ["AGFTERFI"],
+      tip: "destek",
+      guven: "tam",
+      kodGarantili: true,
+      aciklama: `AGF trend + ${r.sinyalSayisi} sinyal — ilk-3'e terfi (V4 backtest: n=663, %21.6 galibiyet/%53.8 top3)`,
+    });
+  } else if (r.agfTerfi === "ilk6") {
+    satirlar.push({
+      kod: ["AGFTERFI"],
+      tip: "destek",
+      guven: "orta",
+      kodGarantili: true,
+      aciklama: `AGF trend taşıyor ama yalnız ${r.sinyalSayisi} sinyal (ilk-3 için en az 4 gerekir) — ilk-6'ya terfi (V4 backtest: n=3210, %16.1 galibiyet/%44.6 top3)`,
     });
   }
 
