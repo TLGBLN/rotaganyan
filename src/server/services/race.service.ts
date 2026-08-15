@@ -846,7 +846,9 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
   // ve nasıl istendiği değişti (revalidate=0 korunuyor, hâlâ her açılışta taze). AYRICA:
   // ana sorgudaki `gallops: {take:3}` (at başına "son 3 idman" alt-sorgusu, 291 at için
   // TEK ana sorguyu ~9sn'ye kadar şişiriyordu) da buradan çıkarılıp aynı toplu desenle
-  // (TÜM runnerId'ler için tek `gallop.findMany`, JS'te at başına ilk 3'e kırpma) çekiliyor.
+  // (TÜM runnerId'ler için tek `gallop.findMany`) çekiliyor — JS'te artık 3'e KIRPILMIYOR
+  // (2026-08-15 kullanıcı talebi), DB zaten yalnız son yarıştan sonrakileri tuttuğu için
+  // (tjk-idman-stats.adapter.ts) tümünü göstermek performans sorunu yaratmıyor.
   const allRaces = raceDays.flatMap((rd) => rd.races);
   const sireStatByRunnerId = new Map<string, string | null>();
   const damStatByRunnerId = new Map<string, string | null>();
@@ -873,10 +875,16 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     }).catch(() => [] as GallopRow[]),
   ]);
 
+  // 2026-08-15 — kullanıcı talebi: "sadece 3 galop görmek istemiyorum, son yarış
+  // tarihinden sonra kaç galop çalışması yaptıysa çekilsin" — eskiden burada 3'e
+  // kırpılıyordu. tjk-idman-stats.adapter.ts'deki saklama sınırı da aynı gün kaldırıldı
+  // (bkz. o dosyadaki not) — DB zaten yalnız "son yarıştan sonrakileri" tutuyor, o yüzden
+  // burada TÜMÜNÜ göstermek performans riski taşımıyor (tek toplu sorgu zaten değişmedi,
+  // yalnız JS'te kırpma kaldırıldı).
   const gallopsByRunnerId = new Map<string, GallopRow[]>();
   for (const g of allGallops) {
     const arr = gallopsByRunnerId.get(g.runnerId) ?? [];
-    if (arr.length < 3) arr.push(g);
+    arr.push(g);
     gallopsByRunnerId.set(g.runnerId, arr);
   }
 

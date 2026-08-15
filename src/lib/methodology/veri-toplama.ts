@@ -533,7 +533,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
       runners: {
         where: { scratched: false },
         orderBy: { no: "asc" },
-        include: { gallops: { orderBy: { date: "desc" }, take: 5 } },
+        include: { gallops: { orderBy: { date: "desc" } } },
       },
     },
   });
@@ -924,7 +924,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
 
       const galopOzet = r.gallops.length === 0
         ? "İdman kaydı yok"
-        : r.gallops.slice(0, 3).map((g) => {
+        : r.gallops.map((g) => {
             const s = (g.splits as Record<string, string | null> | null) ?? {};
             const parcalar = ["1200", "1000", "800", "600", "400", "200"]
               .filter((d) => s[d])

@@ -19,7 +19,10 @@ export async function getKosuAnalizVerisi(raceId: string) {
       raceDay: { include: { hippodrome: true } },
       runners: {
         orderBy: { no: "asc" },
-        include: { gallops: { orderBy: { date: "desc" }, take: 3 } },
+        // 2026-08-15 kullanıcı talebi: 3'e kırpma kaldırıldı — DB zaten yalnız son
+        // yarıştan sonrakileri tutuyor (tjk-idman-stats.adapter.ts), admin panelinde
+        // analiz yaparken hiçbir idman/idman jokeyi eşleşmesi gözden kaçmasın.
+        include: { gallops: { orderBy: { date: "desc" } } },
       },
       prediction: {
         select: {

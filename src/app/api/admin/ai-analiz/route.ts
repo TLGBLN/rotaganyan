@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
         where: { scratched: false },
         orderBy: { no: "asc" },
         include: {
-          gallops: { orderBy: { date: "desc" }, take: 3 },
+          gallops: { orderBy: { date: "desc" } },
         },
       },
     },

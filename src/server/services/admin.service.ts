@@ -60,7 +60,7 @@ export async function getAdminPredictionById(id: string) {
           raceDay: { include: { hippodrome: true } },
           runners: {
             orderBy: { no: "asc" },
-            include: { gallops: { orderBy: { date: "desc" }, take: 3 } },
+            include: { gallops: { orderBy: { date: "desc" } } },
           },
           result: true,
         },
@@ -78,7 +78,7 @@ export async function getRaceForAnalysis(raceId: string) {
       raceDay: { include: { hippodrome: true } },
       runners: {
         orderBy: { no: "asc" },
-        include: { gallops: { orderBy: { date: "desc" }, take: 3 } },
+        include: { gallops: { orderBy: { date: "desc" } } },
       },
       prediction: true,
     },

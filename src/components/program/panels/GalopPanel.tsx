@@ -25,7 +25,7 @@ export default function GalopPanel({ runners, breed }: { runners: ProgramRunner[
                 {r.name}
               </div>
               <div className="space-y-1">
-                {r.gallops.slice(0, 3).map((g, i) => {
+                {r.gallops.map((g, i) => {
                   const { prepDist, prepTime, finish, final200 } = galopSplits(g);
                   if (!prepDist && !finish && !final200) return null;
                   const isInner = (g.splits["ic_dis"] ?? "").includes("İÇ") || (g.splits["ic_dis"] ?? "").toUpperCase().includes("IC");
