@@ -197,7 +197,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         raceId,
         confidence: "ORTA",
         notes:
-          "Bu analiz V5 motoruyla üretildi — koşullu logit (Plackett-Luce) modeli 15 sürekli/ham özelliği (AGF trend+sıra, Accurace, form eğimi, KGS, pist uzmanlığı, aygır/jokey/antrenör kazanma oranı, galop) TEK skorda birleştirip atları doğrudan kıyaslar. Claude muhakemesi kullanılmadı.",
+          "Bu analiz V5 motoruyla üretildi — koşullu logit (Plackett-Luce) modeli 17 özelliği (AGF trend/sıra/favori, Accurace, form eğimi, KGS, pist uzmanlığı, aygır/jokey/antrenör kazanma oranı, galop, kaçak at) TEK skorda birleştirip atları doğrudan kıyaslar. Claude muhakemesi kullanılmadı.",
         tempo: "V5 motoru koşullu logit skoruna dayanır, ayrı bir tempo/stil senaryosu üretmez.",
         couponNarrow: couponNarrow || undefined,
         couponNormal: couponNormal || undefined,
@@ -227,7 +227,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-purple-500" />
         <h3 className="text-sm font-semibold">
-          V5 — Koşullu Logit Modeli (15 özellik, atları doğrudan kıyaslar — Claude yok, maliyet sıfır)
+          V5 — Koşullu Logit Modeli (17 özellik, atları doğrudan kıyaslar — Claude yok, maliyet sıfır)
         </h3>
       </div>
 
