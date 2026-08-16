@@ -333,7 +333,15 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
         <div className="space-y-4">
           {/* Bahis kuponu tarzı: her ayak için at numarası butonları, sütun=şablon */}
           {altiliGroups.map((chunk, chunkIdx) => {
-            const label = `${raceDay.hippodromeName} — ${altiliGroups.length > 1 ? `${chunkIdx + 1}. Altılı` : "1. Altılı"}`;
+            // 2026-08-16 kullanıcı bulgusu: bu slotLabel eskiden hem burada hem
+            // submitGroup içinde raceDay.hippodromeName ile birleştiriliyordu —
+            // "İstanbul — İstanbul — 1. Altılı" gibi ÇİFT şehir adı üretiyordu, bu da
+            // altili-match.ts'in "cityName — altiliLabel" 2-parçalı bölme varsayımını
+            // bozup TJK ikramiye eşleşmesini sessizce hep null döndürüyordu. label
+            // (gösterim) şehirli kalır, submitGroup'a şehirsiz slotLabel gönderilir —
+            // şehir prefiksi ARTIK YALNIZ submitGroup'ta tek yerde ekleniyor.
+            const slotLabel = altiliGroups.length > 1 ? `${chunkIdx + 1}. Altılı` : "1. Altılı";
+            const label = `${raceDay.hippodromeName} — ${slotLabel}`;
             const key = `altili-${chunkIdx}`;
             return (
               <KuponGrup
@@ -344,7 +352,7 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
                 onToggle={toggleHorse}
                 amounts={groupAmounts[chunkIdx]}
                 stakePerCombination={ALTILI_STAKE_PER_COMBINATION}
-                onSubmit={() => submitGroup(chunk, key, label, chunkIdx + 1)}
+                onSubmit={() => submitGroup(chunk, key, slotLabel, chunkIdx + 1)}
                 publishing={publishingKey === key}
               />
             );

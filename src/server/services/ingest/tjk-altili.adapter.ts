@@ -39,7 +39,11 @@ function extractIkramiyeSentence(raw: string): string | null {
   // "Ganyan \d" (boşluk + rakam) şart — yoksa "Ganyanda dağıtılacak..." cümlesiyle de eşleşir.
   // .*? (DEĞİL [^.]*) kullanılıyor çünkü tutar "52.263,00" gibi nokta (binlik ayraç) içerebilir.
   const match = raw.match(/6'lı Ganyan \d.*?vermiştir\./);
-  return match ? match[0].trim() : null;
+  if (!match) return null;
+  // TJK'nın kendi sayfası "TL" yerine (muhtemelen bir simge/ikon kaybı yüzünden) tek başına
+  // "t" bırakıyor ("18.575,43 t vermiştir.") — kullanıcı talebi 2026-08-16: ₺ sembolüyle
+  // gösterelim. Tutar + ayraç kalıbından (\d[\d.,]*) hemen sonraki "TL"/"t" işaretini ₺'ye çevirir.
+  return match[0].trim().replace(/(\d[\d.,]*)\s*(?:TL|t)\s+vermiştir\./, "$1 ₺ vermiştir.");
 }
 
 export async function fetchAltiliSonuc(sehirId: number, sehirAdi: string): Promise<AltiliCityResult | null> {
