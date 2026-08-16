@@ -106,7 +106,7 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
   }
   const allEffectiveRaceIds = [...new Set(adminRaceDays.flatMap((rd) => rd.races.map((race) => effectiveRaceIdFor(race))))];
   const analystStatsEntries = await Promise.all(
-    allEffectiveRaceIds.map(async (id) => [id, await getAnalystStats(id)] as const)
+    allEffectiveRaceIds.map(async (id) => [id, await getAnalystStats(id, true)] as const)
   );
   const analystStatsByRaceId = new Map(analystStatsEntries);
 

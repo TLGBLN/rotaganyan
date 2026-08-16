@@ -81,7 +81,7 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V4",
     baslangic: new Date("2026-08-14T16:25:28+03:00"), // d424b44 — V4 motoru canlı admin akışına bağlandı
-    bitis: null,
+    bitis: new Date("2026-08-16T00:11:08+03:00"), // 54cb73c — V5 motoru canlıya alındı
     aciklama: "V1-V22'nin geniş, Claude'un serbest muhakeme ettiği sistemi tamamen kaldırıldı. Faz1 yalnız 6 bağımsız, geriye dönük doğrulanmış sinyali (AGF trend yönü, Accurace en hızlı son 200m kapanışı, son yarış galibiyeti, KGS 14-30 gün, hipodrom+pist+mesafe uzmanlığı, aygır üst-%20) + jokey istatistiğini toplar. Faz2 Claude çağrısı yapmaz, sinyaller okunarak tamamen mekanik sıralanır — maliyet sıfıra iner.",
     neyiAnalizEdiyor: [
       "6 doğrulanmış sinyal: AGF trend yönü, Accurace en hızlı son 200m kapanışı, son yarış galibiyeti, KGS 14-30 gün, hipodrom+pist+mesafe uzmanlığı, aygır üst %20 K%",
@@ -91,6 +91,21 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
       "Birincil sıralama: aynı anda taşınan sinyal sayısı (azalan)",
       "4+ sinyal → doğrudan ilk-3 bandı (n=575, %29.7 galibiyet, GA %26.1-33.6 / %60.3 ilk3, 2026-08-13/14 backtest)",
       "İlk-3 içinde: AGF trend + Accurace ikisi birden olan atlar öncelikli, tie-break güncel AGF sırası",
+    ],
+  },
+  {
+    versiyon: "V5",
+    baslangic: new Date("2026-08-16T00:11:08+03:00"), // 54cb73c — V5 motoru canlıya alındı
+    bitis: null,
+    aciklama: "V4'ün mekanik sinyal-sayım/eşik sistemi tamamen kaldırıldı. Koşullu logit (Plackett-Luce / yarış-gruplu softmax) modeli 17 sürekli/ikili özelliği TEK skorda birleştirip atları doğrudan kıyaslar (eşiklerle kutulamaz). 826-830 koşuluk kronolojik train/test + bootstrap güven aralığıyla doğrulandı, V4 ile aynı test kümesinde canlı A/B kıyaslandı. Claude çağrısı yok, maliyet sıfır.",
+    neyiAnalizEdiyor: [
+      "17 özellik: AGF sırası+favorisi+eşik-bazlı yükseliş, Accurace, form eğimi, KGS, pist uzmanlığı, aygır/jokey/antrenör kazanma oranı (shrinkage), keskin galop, idman jokeyi uyumu, uzun-ara galop sayısı, kaçak at (tempo/koşu stili)",
+      "V4'ün AGF-trend terfi mekanizması (trend+4sinyal→ilk-3, trend tek başına→ilk-6) aynen taşındı, skor/olasılığı değiştirmez",
+    ],
+    caprazlamalar: [
+      "Test: top1 %36.5 (GA %30.3-43.3), top3 %70.2 (GA %63.9-76.4) — V4'ün top1 %24.2/top3 %55.1'ini net geçiyor, GA'lar V4 rakamlarını içermiyor",
+      "agfFavorisiMi (+0.09), agfYukselisVarMi (+0.10), kacakAtMi (+0.09) — hepsi bağımsız test edilip anlamlı çıktı; aynı jokey sürekliliği/takı değişikliği/sınıf geçişi×uzun-ara/düşüş×temel-güç — hepsi anlamsız çıktı, modele DAHİL EDİLMEDİ",
+      "Banko Adayı eşiği ham olasılığa göre %40 (V4'ün karar-metni eşleşmesinden farklı, kendi backtest'i: n=296/826, %53.7 isabet)",
     ],
   },
 ];

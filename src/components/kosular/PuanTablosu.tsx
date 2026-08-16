@@ -48,9 +48,20 @@ function rankWeight(rank: number): string {
 // etiketini (details[0] = "Karar: Güçlü Aday" gibi) gösteriyoruz, kullanıcı boş bir
 // hücreyle karşılaşmasın. Eski (Faz3'lü) tahminlerde score dolu olduğu için davranış
 // AYNEN korunuyor, hiçbir şey değişmiyor.
-function puanHucresi(score: number | null, details: unknown): string {
-  if (score != null) return String(score);
-  return kararOku(details) ?? "—";
+// 2026-08-16 kullanıcı talebi: çıplak sayı (81, 3, 1...) "güven vermiyor" hissi
+// veriyordu — mantık/ölçek (0-100) AYNEN korunuyor, yalnız gösterime atın kendi
+// puanıyla orantılı ince bir dolgu çubuğu eklendi (bg-current, hücrenin zaten
+// hesaplanmış rank rengini miras alır) — sayı artık boşlukta değil, görsel bir
+// büyüklük göstergesinin üstünde duruyor.
+function PuanHucre({ score, details }: { score: number | null; details: unknown }) {
+  if (score == null) return <span>{kararOku(details) ?? "—"}</span>;
+  const pct = Math.max(0, Math.min(100, score));
+  return (
+    <span className="relative isolate inline-flex w-full items-center justify-center overflow-hidden rounded-sm py-px">
+      <span aria-hidden className="absolute inset-y-0 left-0 -z-10 bg-current opacity-[0.16]" style={{ width: `${pct}%` }} />
+      <span>{score}</span>
+    </span>
+  );
 }
 
 export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props) {
@@ -165,7 +176,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                               })()}
                             </td>
                             <td className={cn("px-2 py-1.5 text-center font-mono tabular-nums whitespace-nowrap", textColor, weight)}>
-                              {puanHucresi(pick.score, pick.details)}
+                              <PuanHucre score={pick.score} details={pick.details} />
                             </td>
                           </tr>
                         );
@@ -317,7 +328,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                                 weight
                               )}
                             >
-                              {puanHucresi(pick.score, pick.details)}
+                              <PuanHucre score={pick.score} details={pick.details} />
                             </td>
                           </>
                         );

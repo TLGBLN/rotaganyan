@@ -3,6 +3,13 @@ import { startOfDay, endOfDay } from "date-fns";
 import type { Prisma } from "@prisma/client";
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getDamStatOzetleriForRace } from "@/server/actions/dam-stat.actions";
+import { ENGINE_VERSIONS } from "@/server/services/analiz-versiyon-karsilastirma.service";
+
+// 2026-08-16 kullanıcı kararı: kupon hazırlama safhasındaki sınıf-bazlı istatistikler
+// (Eko/Nor/Gen %, "1.seçim 1.geldi") V1-V22/V4/V5 karışık tüm geçmişi topluyordu — V5
+// canlıya alındığında ENGINE_VERSIONS'a yeni kayıt eklenmesi gerekirken unutulmuştu.
+// Bu sabit, o kaydın (bkz. analiz-versiyon-karsilastirma.service.ts) başlangıç tarihi.
+const GUNCEL_MOTOR_BASLANGIC = ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].baslangic;
 
 export type AdminPrediction = Prisma.PredictionGetPayload<{
   include: {
@@ -356,10 +363,11 @@ function couponTierForRank(rank: number | undefined): CouponTier {
  * sonucu kendi tavsiyesini beslemesin diye. Bugün daha erken biten diğer koşuların sonuçları dahildir
  * (onlar zaten kesinleşmiş, tavsiye edilen koşuyu beslemesinde bir sakınca yok — sayaç gün içinde de büyür).
  */
-export async function getAnalystStats(excludeRaceId?: string): Promise<AnalystStats> {
+export async function getAnalystStats(excludeRaceId?: string, sadeceGuncelMotor = false): Promise<AnalystStats> {
   const rows = await db.prediction.findMany({
     where: {
       published: true,
+      ...(sadeceGuncelMotor ? { createdAt: { gte: GUNCEL_MOTOR_BASLANGIC } } : {}),
       race: {
         result: { isNot: null },
         conditions: null,

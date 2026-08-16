@@ -21,7 +21,7 @@ export default async function EditAnalizPage({ params }: PageProps) {
   if (!pred) notFound();
 
   const race = pred.race;
-  const analystStats = await getAnalystStats(race.id);
+  const analystStats = await getAnalystStats(race.id, true);
   const advice = getClassTypeAdvice(analystStats, race.classType);
 
   // Taslak kalma sebebini canlı hesapla — statik/eski bir metin değil, o an geçerli
