@@ -54,6 +54,13 @@ const FEATURE_NAMES = [
   // "KACAK_AT" olan atlar. Kapı no / kilo farkı / HP farkı da AYNI ANDA test edildi,
   // ÜÇÜ DE anlamsız çıktı; yalnız kacakAtMi tek başına anlamlı (+0.0878, GA
   // [0.0290, 0.1811]) VE genel performansı iyileştirdi (top1 %34.8→%36.5).
+  "dususAmaIyiPozisyon", // YENİ — 2026-08-16 kullanıcı bulgusu (KINDBERO/ANGEL ON THE
+  // RIGHT vakaları, İzmir K3/K4): ham "düşüş" (agfDususVarMi) daha önce anlamsız
+  // çıkmıştı, ama kullanıcının "para bilerek geri çekiliyor, ganyan yüksek tutuluyor"
+  // teorisi daha İNCE bir formülasyon öneriyordu — düşüş TEK BAŞINA değil, düşüşe
+  // RAĞMEN hâlâ iyi AGF pozisyonunda kalma (agfFark<=-1.0 VE agfSirasi<=4). Bu
+  // formülasyon ANLAMLI çıktı (+0.1282, GA [0.0188, 0.2043]) — kullanıcının sezgisi
+  // doğruydu, önceki kaba eşik yanlış operasyonelleştirmeydi.
 ];
 
 function toFeatureVector(row) {
@@ -75,6 +82,7 @@ function toFeatureVector(row) {
     row.agfSirasi === 1 ? 1 : 0,
     row.agfFark >= ANLAMLI_PUAN_ESIGI ? 1 : 0,
     row.kacakAtMi ?? 0,
+    (row.agfFark <= -ANLAMLI_PUAN_ESIGI && row.agfSirasi <= 4) ? 1 : 0,
   ];
 }
 

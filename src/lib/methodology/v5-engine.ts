@@ -263,6 +263,11 @@ function toFeatureVector(r: Faz1RunnerV5): number[] {
     // edildi, üçü de anlamsız çıktı; yalnız bu anlamlı (+0.0878, GA [0.0290,0.1811])
     // VE genel performansı iyileştirdi (top1 %34.8→%36.5).
     r.kacakAtMi,
+    // 2026-08-16 kullanıcı bulgusu (KINDBERO/ANGEL ON THE RIGHT vakaları, İzmir K3/K4):
+    // ham "düşüş" tek başına anlamsızdı, ama "düşüşe RAĞMEN hâlâ iyi AGF pozisyonunda
+    // kalma" (para bilerek geri çekiliyor ama at hâlâ favoriler arasında) ANLAMLI çıktı
+    // (+0.1282, GA [0.0576, 0.1982]).
+    r.agfFark <= -ANLAMLI_PUAN_ESIGI && r.agfSirasi <= 4 ? 1 : 0,
   ];
 }
 
