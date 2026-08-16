@@ -67,6 +67,9 @@ export type ModelRow = {
   ayniJokeySurekliligi: 0 | 1; // önceki YARIŞTA (idman değil) aynı jokey mi bindi
   takiEklendiMi: 0 | 1;
   takiCikarildiMi: 0 | 1;
+  // 2026-08-16 — kacakAtMi ANLAMLI çıktı (bkz. arac-model-egit.mjs), Runner.raceStyle'dan
+  // (Accurace tabanlı) TEK sorguda alınıyor, ekstra TJK isteği gerektirmiyor.
+  kacakAtMi: 0 | 1;
 };
 
 async function main() {
@@ -78,7 +81,7 @@ async function main() {
       result: { select: { actualOrder: true } },
       runners: {
         where: { scratched: false },
-        select: { id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true },
+        select: { id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true, raceStyle: true },
       },
     },
     orderBy: { raceDay: { date: "asc" } },
@@ -206,6 +209,7 @@ async function main() {
                 ayniJokeySurekliligi: sonYaris?.ayniJokey === true ? 1 : 0,
                 takiEklendiMi: (sonYaris?.eklenenTaki?.length ?? 0) > 0 ? 1 : 0,
                 takiCikarildiMi: (sonYaris?.cikarilanTaki?.length ?? 0) > 0 ? 1 : 0,
+                kacakAtMi: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" ? 1 : 0,
               });
             }
           })(), 25_000);

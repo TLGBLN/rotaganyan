@@ -47,7 +47,13 @@ const FEATURE_NAMES = [
   // PUAN_ESIGI ile aynı) test edilince ANLAMLI çıktı (+0.0968→+0.1058, GA sıfırı
   // dışlıyor) — ham agfFark BU ÖZELLİKLE DEĞİŞTİRİLDİ (ikisi birden multicollinearity
   // yaratıyordu). "Düşüş" (agfDususVarMi) ayrı test edildi, ANLAMSIZ çıktı — modele
-  // eklenmedi (bkz. ayrı düşüş×temel-güç etkileşim testi, devam ediyor).
+  // eklenmedi (bkz. ayrı düşüş×temel-güç etkileşim testi, sonucu da anlamsız çıktı).
+  "kacakAtMi", // YENİ — 2026-08-16 kullanıcı talebi: sektör araştırması ("tempo/koşu
+  // stili" en çarpıcı boşluk olarak işaretlendi) sonrası test edildi. Runner.raceStyle
+  // (Accurace tabanlı, V1-V22'den beri DB'de var ama V5 hiç kullanmıyordu) — style==
+  // "KACAK_AT" olan atlar. Kapı no / kilo farkı / HP farkı da AYNI ANDA test edildi,
+  // ÜÇÜ DE anlamsız çıktı; yalnız kacakAtMi tek başına anlamlı (+0.0878, GA
+  // [0.0290, 0.1811]) VE genel performansı iyileştirdi (top1 %34.8→%36.5).
 ];
 
 function toFeatureVector(row) {
@@ -68,6 +74,7 @@ function toFeatureVector(row) {
     row.uzunAraGalopKatkisi ?? 0,
     row.agfSirasi === 1 ? 1 : 0,
     row.agfFark >= ANLAMLI_PUAN_ESIGI ? 1 : 0,
+    row.kacakAtMi ?? 0,
   ];
 }
 

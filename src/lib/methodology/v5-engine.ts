@@ -99,6 +99,10 @@ export type Faz1RunnerV5 = {
   hipodromMesafedeKazandi: "EVET" | "HAYIR" | "KOSMADI";
   sireKazanmaOraniHam: number | null;
   sireOrneklemKendiVeri: number | null;
+  /** 2026-08-16 kullanıcı talebi (sektör araştırması) — Runner.raceStyle (Accurace
+   *  tabanlı, style: "KACAK_AT"|...) — kapı no/kilo farkı/HP farkı AYNI ANDA test
+   *  edildi, üçü de anlamsız çıktı; yalnız bu anlamlı (+0.0878, GA [0.0290,0.1811]). */
+  kacakAtMi: 0 | 1;
 };
 
 export type Faz1SonucV5 = {
@@ -129,6 +133,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
         orderBy: { no: "asc" },
         select: {
           id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true,
+          raceStyle: true,
           gallops: { select: { date: true, jockey: true, splits: true }, orderBy: { date: "desc" } },
         },
       },
@@ -219,6 +224,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       hipodromMesafedeKazandi: sonYaris?.kazandi ?? "KOSMADI",
       sireKazanmaOraniHam: sireOzet?.kYuzde ?? null,
       sireOrneklemKendiVeri: sireOzet?.ornekKendiVeri ?? null,
+      kacakAtMi: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" ? 1 : 0,
     };
   });
 
@@ -252,6 +258,11 @@ function toFeatureVector(r: Faz1RunnerV5): number[] {
     // ham agfFark bu özellikle DEĞİŞTİRİLDİ. "Düşüş" ayrı test edildi, anlamsız
     // çıktı, eklenmedi.
     r.agfFark >= ANLAMLI_PUAN_ESIGI ? 1 : 0,
+    // 2026-08-16 kullanıcı talebi (sektör araştırması sonrası): Runner.raceStyle
+    // ("KACAK_AT" vb, Accurace tabanlı) — kapı no/kilo farkı/HP farkı AYNI ANDA test
+    // edildi, üçü de anlamsız çıktı; yalnız bu anlamlı (+0.0878, GA [0.0290,0.1811])
+    // VE genel performansı iyileştirdi (top1 %34.8→%36.5).
+    r.kacakAtMi,
   ];
 }
 
