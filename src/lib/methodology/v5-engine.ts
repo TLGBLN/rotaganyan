@@ -39,7 +39,7 @@ import {
 import { galopQuality, isSameJockey } from "@/components/program/panels/galop-helpers";
 import type { PickDetailsV2, MuhakemeSatiri } from "@/lib/methodology/muhakeme-format";
 import { hesaplaSinyalSayisi } from "@/lib/methodology/v2-engine";
-import { terfiPenceresineTasi, AGF_TERFI_ILK3_SINYAL_ESIGI as SINYAL_ESIGI } from "@/lib/methodology/v4-engine";
+import { AGF_TERFI_ILK3_SINYAL_ESIGI as SINYAL_ESIGI } from "@/lib/methodology/v4-engine";
 import v5Weights from "@/lib/methodology/weights/v5-weights.json";
 
 const { featureNames: FEATURE_NAMES, weights: WEIGHTS, means: MEANS, stds: STDS } = v5Weights as {
@@ -299,32 +299,68 @@ function kararUret(p: number): string {
   return "Yüksek Risk";
 }
 
+/** V4'ün terfiPenceresineTasi'sinin (tek-tek-sırayla-boyuta-ekle) V5 için DÜZELTİLMİŞ
+ *  hâli — 2026-08-16 kullanıcı bulgusu (KING ZELAY vakası, İzmir K4): eski mekanizma
+ *  "en zayıf önce, boyutun SON slotuna ekle" yapıyordu — bu, pencerede DOĞAL OLARAK
+ *  zaten bulunan (aday bile sayılmayan, i<pencereBoyu) güçlü bir atı, sonradan eklenen
+ *  daha zayıf bir adayla mekanik olarak dışarı itebiliyordu (KING ZELAY %14.6 ile doğal
+ *  3.sıradaydı, ANGEL ON THE RIGHT'ın terfi eklenmesiyle 8.sıraya düştü). Artık: doğal
+ *  pencere sakinleri + terfi adayları TEK bir havuzda toplanıp olasılığa göre sıralanır,
+ *  en güçlü pencereBoyu tanesi kazanır — kimin "aday" kimin "sakin" olduğu ayrımı
+ *  rekabeti etkilemez, yalnız kim en güçlü olduğu belirler. */
+function terfiPenceresiV5<T extends { no: number; olasilik: number }>(
+  sirali: T[],
+  pencereBoyu: number,
+  adayMi: (r: T, index: number) => boolean
+): { sonuc: T[]; terfiEdenNolar: Set<number> } {
+  const dogalSakinler = sirali.slice(0, pencereBoyu);
+  const disaridakiAdaylar = sirali
+    .map((r, i) => ({ r, i }))
+    .filter(({ r, i }) => i >= pencereBoyu && adayMi(r, i))
+    .map(({ r }) => r);
+
+  const havuz = [...dogalSakinler, ...disaridakiAdaylar].sort((a, b) => b.olasilik - a.olasilik);
+  const secilenler = havuz.slice(0, pencereBoyu);
+  const secilenNoSet = new Set(secilenler.map((r) => r.no));
+
+  const terfiEdenNolar = new Set(disaridakiAdaylar.filter((r) => secilenNoSet.has(r.no)).map((r) => r.no));
+  const geriKalanlar = sirali.filter((r) => !secilenNoSet.has(r.no)).sort((a, b) => b.olasilik - a.olasilik);
+  return { sonuc: [...secilenler, ...geriKalanlar], terfiEdenNolar };
+}
+
 /** V4'ün kanıtlanmış AGF-trend terfi kuralının V5'e uyarlanmış hâli — kullanıcı kararı
  *  2026-08-16: büyük AGF trendi taşıyan atlar, YETERİNCE başka sinyal de taşıyorsa
  *  (bkz. AGF_TERFI_ILK3_SINYAL_ESIGI=4, V4'ün backtest'i: n=663, %21.6/%53.8, kontrol
  *  %10.2/%30.7) modelin ham olasılık sıralamasında geride kalsa bile ilk-3'e/ilk-6'ya
  *  taşınır. Regresyon skorunu/olasılığı DEĞİŞTİRMEZ — yalnız GÖSTERİM sırasını ve kararı
- *  etkiler (V4'teki aynı mekanizma, terfiPenceresineTasi de birebir o koddan). Sinyal
- *  sayısı YETERSİZSE (KURUŞHAN örneği: trend var ama yalnız 2 sinyal) terfi olmaz —
- *  bu KASITLI, trend TEK BAŞINA V4'ün kendi backtest'inde de ilk-3 için yeterli değildi. */
-function agfTrendTerfisiUygula<T extends { no: number; agfTrendYonu: "yükseliş" | "düşüş" | null; sinyalSayisi: number }>(
-  sirali: T[]
-): (T & { agfTerfi: "ilk3" | "ilk6" | null })[] {
+ *  etkiler. Sinyal sayısı YETERSİZSE (KURUŞHAN örneği: trend var ama yalnız 2 sinyal) VE
+ *  düşüş-iyi-pozisyon örüntüsü de yoksa terfi olmaz — bu KASITLI, trend TEK BAŞINA V4'ün
+ *  kendi backtest'inde de ilk-3 için yeterli değildi. */
+function agfTrendTerfisiUygula<
+  T extends {
+    no: number; agfTrendYonu: "yükseliş" | "düşüş" | null; sinyalSayisi: number;
+    agfFark: number; agfSirasi: number; olasilik: number;
+  }
+>(sirali: T[]): (T & { agfTerfi: "ilk3" | "ilk6" | null })[] {
   const isaretli = sirali.map((r) => ({ ...r, agfTerfi: null as "ilk3" | "ilk6" | null }));
 
-  const { sonuc: ilk3Sonrasi, terfiEdenNolar: ilk3Terfi } = terfiPenceresineTasi(
+  // 2026-08-16 kullanıcı bulgusu (KINDBERO/ANGEL ON THE RIGHT, İzmir K3/K4): "düşüş ama
+  // hâlâ iyi AGF pozisyonu" (agfFark<=-1.0 VE agfSirasi<=4) TEK BAŞINA (V4'ün 4-sinyal
+  // şartı olmadan) ilk-3 için yeterince güçlü — backtest: n=930, %19.9 galibiyet/%55.1
+  // top3, kontrol grubu %9.3/%28.4 (V4'ün kendi trend+4sinyal kuralıyla aynı seviyede).
+  const dususAmaIyiPozisyonMu = (r: T) => r.agfFark <= -ANLAMLI_PUAN_ESIGI && r.agfSirasi <= 4;
+
+  const { sonuc: ilk3Sonrasi, terfiEdenNolar: ilk3Terfi } = terfiPenceresiV5(
     isaretli,
     3,
-    (r) => r.agfTrendYonu != null && r.sinyalSayisi >= SINYAL_ESIGI,
-    (r) => r.sinyalSayisi
+    (r) => (r.agfTrendYonu != null && r.sinyalSayisi >= SINYAL_ESIGI) || dususAmaIyiPozisyonMu(r)
   );
   const ilk3Isaretli = ilk3Sonrasi.map((r) => (ilk3Terfi.has(r.no) ? { ...r, agfTerfi: "ilk3" as const } : r));
 
-  const { sonuc: ilk6Sonrasi, terfiEdenNolar: ilk6Terfi } = terfiPenceresineTasi(
+  const { sonuc: ilk6Sonrasi, terfiEdenNolar: ilk6Terfi } = terfiPenceresiV5(
     ilk3Isaretli,
     6,
-    (r) => r.agfTrendYonu != null,
-    (r) => r.sinyalSayisi
+    (r) => r.agfTrendYonu != null
   );
   return ilk6Sonrasi.map((r) => (ilk6Terfi.has(r.no) ? { ...r, agfTerfi: "ilk6" as const } : r));
 }
@@ -473,12 +509,15 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
   // AGF-trend terfi denetim satırı — bkz. agfTrendTerfisiUygula (2026-08-16, KURUŞHAN
   // dersi). kodGarantili:true, sayaca dahil değil (AGFTREND kodu zaten yukarıda var).
   if (r.agfTerfi === "ilk3") {
+    const dususAmaIyiPozisyonMu = r.agfFark <= -ANLAMLI_PUAN_ESIGI && r.agfSirasi <= 4;
     satirlar.push({
       kod: ["AGFTERFI"],
       tip: "destek",
       guven: "tam",
       kodGarantili: true,
-      aciklama: `AGF trend + ${r.sinyalSayisi} sinyal — ilk-3'e terfi (V4 backtest: n=663, %21.6 galibiyet/%53.8 top3)`,
+      aciklama: dususAmaIyiPozisyonMu
+        ? `Düşüşe rağmen hâlâ iyi AGF pozisyonu (sıra ${r.agfSirasi}) — ilk-3'e terfi (backtest: n=930, %19.9 galibiyet/%55.1 top3, kontrol %9.3/%28.4)`
+        : `AGF trend + ${r.sinyalSayisi} sinyal — ilk-3'e terfi (V4 backtest: n=663, %21.6 galibiyet/%53.8 top3)`,
     });
   } else if (r.agfTerfi === "ilk6") {
     satirlar.push({
