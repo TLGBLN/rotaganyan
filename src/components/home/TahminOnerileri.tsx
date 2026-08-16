@@ -237,8 +237,12 @@ export default function TahminOnerileri({ data, altiliResults = [], isLoggedIn =
       <div className="mx-auto max-w-6xl space-y-4">
         <h2 className="text-lg font-semibold">{t("title")}</h2>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* 2026-08-16 kullanıcı bulgusu: "7'li Ganyan" gibi TJK'nın AltiliSonuc
+              sayfasının kapsamadığı bahis türlerinde canlı eşleşme sessizce null
+              dönüyordu — admin'in elle girdiği kupon.ikramiye artık yedek olarak
+              kullanılıyor (canlı TJK eşleşmesi varsa o önceliklidir, daha güncel). */}
           {items.map((kupon, i) => (
-            <KuponBlock key={i} data={kupon} ikramiye={findIkramiyeForHippodrome(kupon.hippodromeName, altiliResults)} isAdmin={isAdmin} />
+            <KuponBlock key={i} data={kupon} ikramiye={findIkramiyeForHippodrome(kupon.hippodromeName, altiliResults) ?? kupon.ikramiye} isAdmin={isAdmin} />
           ))}
         </div>
       </div>

@@ -372,7 +372,7 @@ export type KuponVariant = {
    *  veya tamamen boşsa) kupon önerilerinde/paylaşımda ayrı bir kademe olarak gösterilmemeli. */
   filled: boolean;
 };
-export type KuponOnerisi = { id: string; hippodromeName: string; variants: KuponVariant[] } | null;
+export type KuponOnerisi = { id: string; hippodromeName: string; ikramiye: string | null; variants: KuponVariant[] } | null;
 export type HomeKuponLeg = { raceNo: number; narrow: number[]; normal: number[]; wide: number[] };
 
 /**
@@ -426,6 +426,7 @@ export async function buildKuponOnerisi(active: {
   hippodromeName: string;
   date: Date;
   legs: unknown;
+  ikramiye?: string | null;
 }): Promise<KuponOnerisi> {
   const legs = active.legs as unknown as HomeKuponLeg[];
   if (!Array.isArray(legs) || legs.length === 0) return null;
@@ -523,6 +524,12 @@ export async function buildKuponOnerisi(active: {
   return {
     id: active.id,
     hippodromeName: active.hippodromeName,
+    // 2026-08-16 kullanıcı bulgusu: "7'li Ganyan" gibi TJK'nın AltiliSonuc sayfasının
+    // hiç kapsamadığı bahis türlerinde findIkramiyeForHippodrome() SESSİZCE null
+    // dönüyordu (o tabloyu scrape etmiyoruz) — admin'in elle girdiği ikramiye artık
+    // buradan geçip aşağı akıyor, canlı TJK eşleşmesi başarısız olursa yedek olarak
+    // kullanılabilsin diye (bkz. TahminOnerileri.tsx çağrı yeri).
+    ikramiye: active.ikramiye ?? null,
     variants: [
       { key: "ekonomik", label: "Ekonomik", legs: narrowLegs, amount: kuponAmount(narrowLegs.map((l) => l.nos), stake), status: statusFor(narrowLegs), filled: hasNarrow },
       { key: "normal", label: "Normal", legs: normalLegs, amount: kuponAmount(normalLegs.map((l) => l.nos), stake), status: statusFor(normalLegs), filled: hasNormal },

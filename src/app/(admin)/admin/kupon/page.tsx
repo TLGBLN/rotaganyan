@@ -60,7 +60,7 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
 
   // Her kuponun güncel isabet durumu (Ekonomik/Normal/Geniş) — koşular bittikçe burada da görülsün diye.
   const kuponSonuclari = await Promise.all(
-    kuponlar.map((k) => buildKuponOnerisi({ id: k.id, hippodromeName: k.hippodromeName, date: k.date, legs: k.legs }))
+    kuponlar.map((k) => buildKuponOnerisi({ id: k.id, hippodromeName: k.hippodromeName, date: k.date, legs: k.legs, ikramiye: k.ikramiye }))
   );
   const statusBadge: Record<KuponStatus, { label: string; cls: string }> = {
     hit: { label: "Tuttu", cls: "bg-hit/15 text-hit" },
