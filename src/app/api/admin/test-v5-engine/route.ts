@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
-import { gatherFaz1V5, faz2V5Sirala, muhakemeUretV5 } from "@/lib/methodology/v5-engine";
-import { faz2BankoAdayiTespit, kategoriTespit } from "@/lib/methodology/v2-engine";
+import { gatherFaz1V5, faz2V5Sirala, muhakemeUretV5, v5BankoAdayiTespit } from "@/lib/methodology/v5-engine";
+import { kategoriTespit } from "@/lib/methodology/v2-engine";
 
 // 2026-08-16 — V5 motoru: Claude çağrısı YOK (yalnız DB okuma + koşullu logit skoru),
 // V4 ile aynı sebeple maxDuration/batching gerekmiyor — tek istekte döner.
@@ -33,7 +33,7 @@ async function handlePost(req: NextRequest) {
     details: muhakemeUretV5(r, sahaBuyuklugu),
   }));
 
-  const bankoAdayi = faz2BankoAdayiTespit(sirali.map((r) => ({ no: r.no, ad: r.ad, teknikSira: r.teknikSira, karar: r.karar })));
+  const bankoAdayi = v5BankoAdayiTespit(sirali);
 
   const nolar = sirali.map((r) => r.no);
   const couponNarrow = nolar.slice(0, 3).join("-");

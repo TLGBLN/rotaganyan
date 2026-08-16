@@ -17,8 +17,10 @@ const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.
 const DATA_PATH = "C:\\Users\\tlgbi\\AppData\\Local\\Temp\\claude\\c--Users-tlgbi-OneDrive-Belgeler-Rota\\76598f4f-31f1-4414-a3f6-fbab0aab98d4\\scratchpad\\model-veri.json";
 const WEIGHTS_PATH = "C:\\Users\\tlgbi\\AppData\\Local\\Temp\\claude\\c--Users-tlgbi-OneDrive-Belgeler-Rota\\76598f4f-31f1-4414-a3f6-fbab0aab98d4\\scratchpad\\model-agirliklar.json";
 
+const ANLAMLI_PUAN_ESIGI = 1.0; // agf-trend.actions.ts ile aynı eşik
+
 const FEATURE_NAMES = [
-  "agfFark", "agfSirasi", "accurace", "formEgimi", "formEgimi2",
+  "agfSirasi", "accurace", "formEgimi", "formEgimi2",
   "kgs", "kgs2", "kgsVarMi", "pistUzmani", "sireOrani",
   "galop", "idmJokey", "jokeyOrani", "antrenorOrani",
   "uzunAraGalopKatkisi", // YENİ — 2026-08-15 kullanıcı talebi: KGS>30 (uzun ara) olan
@@ -29,11 +31,27 @@ const FEATURE_NAMES = [
   // bootstrap CI'da sıfırı içerdi — veri desteklemiyor, modele DAHİL EDİLMEDİ (kullanıcı
   // kararı). model-veri.json'da sinifGecisi/sinifGecisiEtkilesim alanları hâlâ duruyor
   // ama burada kullanılmıyor.
+  "agfFavorisiMi", // YENİ — 2026-08-16 kullanıcı bulgusu (KURUŞHAN): agfSirasi==1 alt
+  // grubunda modelin ortalama tahmini (%28.6) gerçek kazanma oranından (%32.6, n=807)
+  // düşük çıktı — agfSirasi'nin doğrusal etkisi #1 OLMANIN kendisini (2.,3. vs farkından
+  // ayrı, ayrık bir sıçrama olabilir) tam yakalamıyor olabilir. Ayrık ikili özellik
+  // olarak test ediliyor.
+  // NOT — 2026-08-16: dört aday sinyal daha test edildi (aynı jokey sürekliliği, takı
+  // eklendi, takı çıkarıldı, sınıf düşüşü×uzun-ara-galop) — DÖRDÜ DE bootstrap CI'da
+  // sıfırı içerdi VE genel test performansını hafifçe düşürdü (top1 %37.2→%35.7).
+  // Modele DAHİL EDİLMEDİ. model-veri.json'da ayniJokeySurekliligi/takiEklendiMi/
+  // takiCikarildiMi/sinifGecisiXUzunAra alanları hâlâ duruyor ama kullanılmıyor.
+  "agfYukselisVarMi", // YENİ — 2026-08-16 kullanıcı ısrarı: ham agfFark (sürekli puan
+  // farkı) HİÇBİR formülasyonda anlamlı çıkmamıştı (agfSirasi ile multicollinearity
+  // olası). Eşik-bazlı ikili hâliyle (|fark|>=1.0, agf-trend.actions.ts'teki ANLAMLI_
+  // PUAN_ESIGI ile aynı) test edilince ANLAMLI çıktı (+0.0968→+0.1058, GA sıfırı
+  // dışlıyor) — ham agfFark BU ÖZELLİKLE DEĞİŞTİRİLDİ (ikisi birden multicollinearity
+  // yaratıyordu). "Düşüş" (agfDususVarMi) ayrı test edildi, ANLAMSIZ çıktı — modele
+  // eklenmedi (bkz. ayrı düşüş×temel-güç etkileşim testi, devam ediyor).
 ];
 
 function toFeatureVector(row) {
   return [
-    row.agfFark,
     row.agfSirasi,
     row.accurace,
     row.formEgimi,
@@ -48,6 +66,8 @@ function toFeatureVector(row) {
     row.jokeyOrani,
     row.antrenorOrani,
     row.uzunAraGalopKatkisi ?? 0,
+    row.agfSirasi === 1 ? 1 : 0,
+    row.agfFark >= ANLAMLI_PUAN_ESIGI ? 1 : 0,
   ];
 }
 

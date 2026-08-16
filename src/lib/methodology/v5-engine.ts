@@ -233,11 +233,25 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
 
 // ─── Faz2 — koşullu logit skoru + softmax → olasılık, atlar BİRBİRİNE göre kıyaslanır ───
 
+const ANLAMLI_PUAN_ESIGI = 1.0; // agf-trend.actions.ts'teki ANLAMLI_PUAN_ESIGI ile aynı
+
 function toFeatureVector(r: Faz1RunnerV5): number[] {
   return [
-    r.agfFark, r.agfSirasi, r.accurace, r.formEgimi, r.formEgimi * r.formEgimi,
+    r.agfSirasi, r.accurace, r.formEgimi, r.formEgimi * r.formEgimi,
     r.kgsVarMi ? r.kgs : 0, r.kgsVarMi ? r.kgs * r.kgs : 0, r.kgsVarMi, r.pistUzmani,
     r.sireOrani, r.galop, r.idmJokey, r.jokeyOrani, r.antrenorOrani, r.uzunAraGalopKatkisi,
+    // 2026-08-16 kullanıcı bulgusu (KURUŞHAN): agfSirasi==1 alt grubunda modelin
+    // ortalama tahmini gerçek kazanma oranından düşük çıkıyordu (%28.6 vs %32.6,
+    // n=807) — agfSirasi'nin doğrusal etkisi #1 OLMANIN kendisini (ayrık bir sıçrama)
+    // tam yakalamıyordu. Ayrı ikili özellik olarak eklendi, anlamlı çıktı (katsayı
+    // +0.0922, %95 GA [0.0067, 0.1531]).
+    r.agfSirasi === 1 ? 1 : 0,
+    // 2026-08-16 kullanıcı ısrarı: ham agfFark (sürekli puan farkı) HİÇBİR
+    // formülasyonda anlamlı çıkmamıştı (agfSirasi ile multicollinearity). Eşik-bazlı
+    // ikili hâliyle (|fark|>=1.0) ANLAMLI çıktı (+0.1058, GA [0.0446, 0.1780]) —
+    // ham agfFark bu özellikle DEĞİŞTİRİLDİ. "Düşüş" ayrı test edildi, anlamsız
+    // çıktı, eklenmedi.
+    r.agfFark >= ANLAMLI_PUAN_ESIGI ? 1 : 0,
   ];
 }
 
@@ -339,6 +353,32 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
   });
 }
 
+// V4'ün faz2BankoAdayiTespit'i "Güçlü Aday" (p>=%30) metnine bakıyordu — 826 koşuluk
+// backtest'te bu eşikte isabet oranı yalnız %44.8 çıktı (2026-08-16 kullanıcı bulgusu:
+// "Banko Adayı" dedikleri çoğu gelmiyor). V5 kendi ham olasılığına göre AYRI ve daha
+// yüksek bir eşik (%40, backtest'te n=296/826 koşuda tetiklenip %53.7 isabet) kullanıyor
+// — "Güçlü Aday" etiketinin genel anlamını (diğer yerlerde de kullanılıyor) bozmadan.
+const BANKO_OLASILIK_ESIGI = 0.4;
+
+export type V5BankoSonuc = { bankoAdayi: boolean; sebep: string; birinci?: { no: number; ad: string; karar: string } };
+
+export function v5BankoAdayiTespit(sirali: Faz1RunnerV5Sirali[]): V5BankoSonuc {
+  const birinci = sirali[0];
+  if (!birinci) return { bankoAdayi: false, sebep: "Veri yok." };
+  if (birinci.olasilik >= BANKO_OLASILIK_ESIGI) {
+    return {
+      bankoAdayi: true,
+      sebep: `#${birinci.no} ${birinci.ad} — model tahmini %${(birinci.olasilik * 100).toFixed(1)} (backtest: bu eşikte n=296/826 koşuda tetiklenip %53.7 isabet). Yalnız bir işaret — muhakeme metnindeki riskleri kendiniz teyit edin.`,
+      birinci: { no: birinci.no, ad: birinci.ad, karar: birinci.karar },
+    };
+  }
+  return {
+    bankoAdayi: false,
+    sebep: `#${birinci.no} ${birinci.ad} en yüksek olasılıklı ama %${(birinci.olasilik * 100).toFixed(1)}, banko eşiğinin (%${(BANKO_OLASILIK_ESIGI * 100).toFixed(0)}) altında — net bir banko işareti yok.`,
+    birinci: { no: birinci.no, ad: birinci.ad, karar: birinci.karar },
+  };
+}
+
 // ─── Muhakeme metni — özellik-katkı ayrıştırması, Claude'suz ─────────────────────────
 
 type OzellikGrubu = {
@@ -350,7 +390,7 @@ type OzellikGrubu = {
 const idx = (name: string) => FEATURE_NAMES.indexOf(name);
 
 const OZELLIK_GRUPLARI: OzellikGrubu[] = [
-  { kod: "AGF", ozellikIndeksleri: [idx("agfSirasi")], aciklama: (r) => `AGF sırası: ${r.agfSirasi}` },
+  { kod: "AGF", ozellikIndeksleri: [idx("agfSirasi"), idx("agfFavorisiMi")], aciklama: (r) => `AGF sırası: ${r.agfSirasi}${r.agfSirasi === 1 ? " (AGF favorisi)" : ""}` },
   { kod: "ACC", ozellikIndeksleri: [idx("accurace")], aciklama: (r) => (r.accurace ? "Accurace: son yarışta sahanın en hızlı son 200m kapanışı" : null) },
   { kod: "FORM", ozellikIndeksleri: [idx("formEgimi"), idx("formEgimi2")], aciklama: (r) => `Form eğimi: ${r.formEgimi.toFixed(1)} (${r.formEgimi < 0 ? "iyileşiyor" : r.formEgimi > 0 ? "kötüleşiyor" : "sabit"})` },
   { kod: "KGS", ozellikIndeksleri: [idx("kgs"), idx("kgs2"), idx("kgsVarMi")], aciklama: (r) => (r.kgsVarMi ? `KGS ${r.kgs} gün` : null) },

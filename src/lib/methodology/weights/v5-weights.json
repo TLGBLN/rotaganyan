@@ -1,6 +1,5 @@
 {
   "featureNames": [
-    "agfFark",
     "agfSirasi",
     "accurace",
     "formEgimi",
@@ -14,27 +13,29 @@
     "idmJokey",
     "jokeyOrani",
     "antrenorOrani",
-    "uzunAraGalopKatkisi"
+    "uzunAraGalopKatkisi",
+    "agfFavorisiMi",
+    "agfYukselisVarMi"
   ],
   "weights": [
-    -0.0006137718719342572,
-    -0.788598440394878,
-    0.033582899233511584,
-    -0.02111101561163893,
-    -0.03269039354022351,
-    0.003678718553551086,
-    0.02410596657093303,
-    0.15354302562962474,
-    -0.0010781650083317032,
-    0.6149484369862876,
-    -0.04547018411033445,
-    0.05094281002377023,
-    0.15778378874819915,
-    0.28922010829769607,
-    0.02021752185107065
+    -0.6549320926078159,
+    0.02945984417266495,
+    -0.024755472961400585,
+    -0.03711384243397788,
+    0.006245659062869938,
+    0.022336566543008553,
+    0.1850219209261287,
+    -0.007761944982932032,
+    0.6161648845899799,
+    -0.05429860971417221,
+    0.0442629315952944,
+    0.14975581779493335,
+    0.276511667571959,
+    0.007841483253180874,
+    0.09219250025926692,
+    0.10577056217580677
   ],
   "means": [
-    0.11807118644067774,
     5.882542372881421,
     0.09813559322033803,
     -0.008389830508474517,
@@ -48,10 +49,11 @@
     0.10542372881355826,
     10.308738569590961,
     9.884832229139066,
-    0.29118644067796495
+    0.29118644067796495,
+    0.10220338983050746,
+    0.18949152542372644
   ],
   "stds": [
-    3.2654086994729346,
     3.6416052025987957,
     0.29749789673814764,
     1.733925433043243,
@@ -65,141 +67,143 @@
     0.3070986262043595,
     5.339034292814675,
     3.5262395240945485,
-    1.194602387217149
+    1.194602387217149,
+    0.3029155937512306,
+    0.3918985675099145
   ],
   "testEval": {
     "n": 207,
-    "top1P": 33.81642512077295,
-    "top3P": 70.04830917874396,
-    "avgLogLoss": 1.788451786353625,
+    "top1P": 34.78260869565217,
+    "top3P": 71.01449275362319,
+    "avgLogLoss": 1.7755175982403648,
     "kalibrasyon": [
       {
         "dilim": "%0-10",
-        "n": 1269,
-        "ortalamaTahmin": "3.9",
-        "gercekOran": "4.3"
+        "n": 1304,
+        "ortalamaTahmin": "4.0",
+        "gercekOran": "4.1"
       },
       {
         "dilim": "%10-20",
-        "n": 394,
+        "n": 353,
         "ortalamaTahmin": "14.1",
-        "gercekOran": "15.7"
+        "gercekOran": "15.3"
       },
       {
         "dilim": "%20-30",
         "n": 153,
-        "ortalamaTahmin": "24.2",
-        "gercekOran": "22.9"
+        "ortalamaTahmin": "24.1",
+        "gercekOran": "24.2"
       },
       {
         "dilim": "%30-40",
-        "n": 76,
-        "ortalamaTahmin": "34.6",
-        "gercekOran": "28.9"
+        "n": 69,
+        "ortalamaTahmin": "34.1",
+        "gercekOran": "34.8"
       },
       {
         "dilim": "%40-50",
-        "n": 31,
-        "ortalamaTahmin": "44.4",
-        "gercekOran": "41.9"
+        "n": 41,
+        "ortalamaTahmin": "44.5",
+        "gercekOran": "39.0"
       },
       {
         "dilim": "%50-60",
-        "n": 17,
-        "ortalamaTahmin": "54.1",
-        "gercekOran": "41.2"
+        "n": 20,
+        "ortalamaTahmin": "54.0",
+        "gercekOran": "50.0"
       },
       {
         "dilim": "%60-70",
-        "n": 13,
-        "ortalamaTahmin": "64.0",
-        "gercekOran": "69.2"
+        "n": 12,
+        "ortalamaTahmin": "64.9",
+        "gercekOran": "41.7"
       },
       {
         "dilim": "%70-80",
-        "n": 4,
-        "ortalamaTahmin": "72.6",
-        "gercekOran": "75.0"
+        "n": 5,
+        "ortalamaTahmin": "74.2",
+        "gercekOran": "100.0"
       },
       {
         "dilim": "%80-90",
         "n": 3,
-        "ortalamaTahmin": "81.0",
+        "ortalamaTahmin": "84.1",
         "gercekOran": "33.3"
       },
       {
         "dilim": "%90-100",
         "n": 2,
-        "ortalamaTahmin": "94.1",
+        "ortalamaTahmin": "94.7",
         "gercekOran": "50.0"
       }
     ]
   },
   "trainEval": {
     "n": 619,
-    "top1P": 39.5799676898223,
-    "top3P": 75.12116316639741,
-    "avgLogLoss": 1.6888696957211378,
+    "top1P": 39.74151857835218,
+    "top3P": 76.5751211631664,
+    "avgLogLoss": 1.679576381274759,
     "kalibrasyon": [
       {
         "dilim": "%0-10",
-        "n": 3953,
-        "ortalamaTahmin": "3.9",
+        "n": 4025,
+        "ortalamaTahmin": "4.0",
         "gercekOran": "3.5"
       },
       {
         "dilim": "%10-20",
-        "n": 1028,
-        "ortalamaTahmin": "14.3",
-        "gercekOran": "15.9"
+        "n": 990,
+        "ortalamaTahmin": "14.2",
+        "gercekOran": "16.3"
       },
       {
         "dilim": "%20-30",
-        "n": 458,
-        "ortalamaTahmin": "24.1",
-        "gercekOran": "25.3"
+        "n": 421,
+        "ortalamaTahmin": "24.5",
+        "gercekOran": "27.1"
       },
       {
         "dilim": "%30-40",
-        "n": 232,
-        "ortalamaTahmin": "34.1",
-        "gercekOran": "33.6"
+        "n": 210,
+        "ortalamaTahmin": "34.6",
+        "gercekOran": "31.9"
       },
       {
         "dilim": "%40-50",
-        "n": 103,
-        "ortalamaTahmin": "44.5",
-        "gercekOran": "43.7"
+        "n": 116,
+        "ortalamaTahmin": "44.4",
+        "gercekOran": "47.4"
       },
       {
         "dilim": "%50-60",
         "n": 54,
-        "ortalamaTahmin": "54.4",
-        "gercekOran": "59.3"
+        "ortalamaTahmin": "54.8",
+        "gercekOran": "42.6"
       },
       {
         "dilim": "%60-70",
-        "n": 34,
-        "ortalamaTahmin": "64.0",
-        "gercekOran": "55.9"
+        "n": 45,
+        "ortalamaTahmin": "65.0",
+        "gercekOran": "62.2"
       },
       {
         "dilim": "%70-80",
-        "n": 21,
-        "ortalamaTahmin": "74.8",
-        "gercekOran": "76.2"
+        "n": 14,
+        "ortalamaTahmin": "75.0",
+        "gercekOran": "85.7"
       },
       {
         "dilim": "%80-90",
-        "n": 11,
-        "ortalamaTahmin": "84.0",
-        "gercekOran": "81.8"
+        "n": 18,
+        "ortalamaTahmin": "83.5",
+        "gercekOran": "83.3"
       },
       {
         "dilim": "%90-100",
-        "n": 6,
+        "n": 7,
         "ortalamaTahmin": "94.3",
-        "gercekOran": "66.7"
+        "gercekOran": "57.1"
       }
     ]
   }
