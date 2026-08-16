@@ -47,6 +47,12 @@ type PredictionInput = {
 // v6.35 — geriye dönük backfill script'lerinin (Karma conditions alanı yeni doldurulmaya
 // başladığı için önceden hiç eşleşmemiş, zaten yayınlanmış analizler var) bu fonksiyonu
 // tekrar çağırabilmesi için dışa açık — buildFaz2Prompt/kuralKontrolleriUret ile aynı desen.
+function parseKarmaConditionsRef(conditions: string): { hippodromeName: string; raceNo: number } | null {
+  const m = conditions.match(/^(.+?)\s+(\d+)\.\s*Ko[şs]u/i);
+  if (!m) return null;
+  return { hippodromeName: m[1].trim(), raceNo: parseInt(m[2], 10) };
+}
+
 export async function syncKarmaMirrors(predictionId: string): Promise<void> {
   const pred = await db.prediction.findUnique({
     where: { id: predictionId },
@@ -69,9 +75,34 @@ export async function syncKarmaMirrors(predictionId: string): Promise<void> {
     select: { id: true },
   });
 
-  if (karmaRaces.length === 0) return;
+  // 2026-08-16 kullanıcı bulgusu: syncKarmaMirrors eskiden yalnız TEK yönlüydü
+  // (gerçek hipodrom → Karma). Bir analiz önce KARMA tarafından girilip
+  // yayınlanırsa, gerçek hipodrom tarafı hiç güncellenmiyordu — aynı koşu iki
+  // ayrı Prediction kaydı olarak elle tekrar analiz edilebiliyordu (İstanbul K8/9/10
+  // vakası). Kaynak koşunun KENDİSİ Karma ise (conditions dolu), asıl koşuyu bulup
+  // ona da mirror'la — artık hangi taraftan başlanırsa başlansın ikisi de senkron.
+  const karmaTargetIds = [...karmaRaces.map((r) => r.id)];
+  if (race.conditions) {
+    const ref = parseKarmaConditionsRef(race.conditions);
+    if (ref) {
+      const asilKosu = await db.race.findFirst({
+        where: {
+          raceNo: ref.raceNo,
+          raceDay: {
+            date: { gte: startOfDay(raceDate), lte: endOfDay(raceDate) },
+            hippodrome: { name: ref.hippodromeName },
+          },
+        },
+        select: { id: true },
+      });
+      if (asilKosu) karmaTargetIds.push(asilKosu.id);
+    }
+  }
 
-  for (const karmaRace of karmaRaces) {
+  if (karmaTargetIds.length === 0) return;
+
+  for (const karmaRaceId of karmaTargetIds) {
+    const karmaRace = { id: karmaRaceId };
     // Pick'leri kaynak runner no'suyla Karma runner'larına eşleştir
     const mirrorPicks = await Promise.all(
       pred.picks.map(async (pick) => {
