@@ -59,6 +59,14 @@ export type ModelRow = {
   breed: string;
   distance: number;
   surface: string;
+  // 2026-08-16 kullanıcı geri bildirimi — "sürekli sürekli neden çekiyorsun, bir tam
+  // liste çekip tüm testleri o listeden yapman işini kısaltır": getSonYarisDetaylariForRace
+  // ZATEN her koşuda çağrılıyordu (yukarıda), ayniJokey/eklenenTaki/cikarilanTaki alanları
+  // hesaplanıp ATILIYORDU. Artık kaydediliyor — YENİ TJK isteği GEREKTİRMİYOR, ileride bu
+  // sinyallerle ilgili bir hipotez test edilmek istenirse ayrı backfill'e gerek kalmaz.
+  ayniJokeySurekliligi: 0 | 1; // önceki YARIŞTA (idman değil) aynı jokey mi bindi
+  takiEklendiMi: 0 | 1;
+  takiCikarildiMi: 0 | 1;
 };
 
 async function main() {
@@ -195,6 +203,9 @@ async function main() {
                 jokeyOrani: jokeyOran,
                 antrenorOrani: antrenorOran,
                 kategori, breed: race.breed, distance: race.distance, surface: race.surface,
+                ayniJokeySurekliligi: sonYaris?.ayniJokey === true ? 1 : 0,
+                takiEklendiMi: (sonYaris?.eklenenTaki?.length ?? 0) > 0 ? 1 : 0,
+                takiCikarildiMi: (sonYaris?.cikarilanTaki?.length ?? 0) > 0 ? 1 : 0,
               });
             }
           })(), 25_000);
