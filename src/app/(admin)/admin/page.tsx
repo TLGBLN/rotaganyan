@@ -11,6 +11,7 @@ import { getV5SinyalPerformansi } from "@/server/services/v5-sinyal-performans.s
 import v5Weights from "@/lib/methodology/weights/v5-weights.json";
 import PerformanceBreakdown from "@/components/admin/PerformanceBreakdown";
 import CouponTierChart from "@/components/admin/CouponTierChart";
+import type { CouponTierBreakdown } from "@/server/services/admin.service";
 import InsightsPanel from "@/components/admin/InsightsPanel";
 import NarrativeSummary from "@/components/admin/NarrativeSummary";
 import AgfEdgeCard from "@/components/admin/AgfEdgeCard";
@@ -43,6 +44,24 @@ export default async function AdminDashboard() {
   const last10 = analyst.recentTrend.slice(-10);
   const last10Hits = last10.filter(Boolean).length;
   const couponTier = analyst.overallCouponTier;
+
+  // 2026-08-17 kullanıcı talebi: "Koşu Tipine Göre Kazanan Hangi Kupon Kademesinde Geldi"
+  // paneli her alt-sınıfı (ŞARTLI 1, ŞARTLI 2, ...) ayrı satır gösteriyordu — çoğu n<5,
+  // saf gürültü. V5'in hiçbir sinyali sınıf-bazlı değil (sınıf geçişi test edilip
+  // reddedildi), bu yüzden yalnız üst grup (Şartlı/Handikap/Maiden/...) toplamına indirildi.
+  const couponTierByGroup: CouponTierBreakdown[] = Object.values(
+    analyst.couponTierByClassType.reduce<Record<string, CouponTierBreakdown>>((acc, r) => {
+      const key = r.group ?? r.label;
+      const entry = acc[key] ?? { label: key, total: 0, ekonomik: 0, normal: 0, genis: 0, kacti: 0 };
+      entry.total += r.total;
+      entry.ekonomik += r.ekonomik;
+      entry.normal += r.normal;
+      entry.genis += r.genis;
+      entry.kacti += r.kacti;
+      acc[key] = entry;
+      return acc;
+    }, {})
+  ).sort((a, b) => b.total - a.total);
 
   const trendStats = {
     overall: analyst.overall,
@@ -133,10 +152,6 @@ export default async function AdminDashboard() {
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <PerformanceBreakdown
-                title="Güven Seviyesine Göre"
-                rows={analyst.byConfidence}
-              />
-              <PerformanceBreakdown
                 title="Pist Tipine Göre"
                 rows={analyst.bySurface}
               />
@@ -151,26 +166,22 @@ export default async function AdminDashboard() {
               />
             </div>
 
-            {/* v6.60 — "Bu Koşu Tipinde Kazananlar" panelinin aynı hipodrom+pist+mesafe
-                kovasına göre kendi isabet oranımız (n≥3) — hangi TAM kombinasyonda
-                güçlü/zayıf olduğumuzu ayrı ayrı kırılımlardan daha net gösterir. */}
-            {analyst.byRaceTypeBucket.length > 0 && (
-              <PerformanceBreakdown
-                title="Hipodrom+Pist+Mesafe Kombinasyonuna Göre (n≥3)"
-                rows={analyst.byRaceTypeBucket}
-                limit={10}
-              />
-            )}
+            <CouponTierChart
+              rows={couponTierByGroup}
+              title="Koşu Grubuna Göre Kazanan Hangi Kupon Kademesinde Geldi"
+            />
 
-            <CouponTierChart rows={analyst.couponTierByClassType} />
-
+            {/* kacakAtMi (KACAK) V5 sinyalinin dayandığı ham veri: TÜM TJK geçmişinde
+                (Rotaganyan tahminlerinden bağımsız) hangi yarış stili ne sıklıkla kazanıyor.
+                Üstteki "Sinyal Bazlı Gerçek İsabet Oranı" paneli bizim tahminlerimizde
+                KACAK'ın sonucunu gösterir, bu ikisi genel piyasa gerçeğini gösterir. */}
             <div className="grid gap-4 sm:grid-cols-2">
               <PerformanceBreakdown
-                title="Kazanan Yarış Stili — Mesafeye Göre"
+                title="Kazanan Yarış Stili — Mesafeye Göre (KACAK sinyalinin dayandığı veri)"
                 rows={raceStyleBreakdownToRows(raceStyleStats.byDistance)}
               />
               <PerformanceBreakdown
-                title="Kazanan Yarış Stili — At Sayısına Göre"
+                title="Kazanan Yarış Stili — At Sayısına Göre (KACAK sinyalinin dayandığı veri)"
                 rows={raceStyleBreakdownToRows(raceStyleStats.byFieldSize)}
               />
             </div>
