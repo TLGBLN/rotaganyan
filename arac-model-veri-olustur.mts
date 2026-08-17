@@ -70,6 +70,11 @@ export type ModelRow = {
   // 2026-08-16 — kacakAtMi ANLAMLI çıktı (bkz. arac-model-egit.mjs), Runner.raceStyle'dan
   // (Accurace tabanlı) TEK sorguda alınıyor, ekstra TJK isteği gerektirmiyor.
   kacakAtMi: 0 | 1;
+  // 2026-08-17 — ham win-rate testinde anlamlıydı ama arac-model-egit.mjs'de diğer 18
+  // özellikle BİRLİKTE test edilince anlamsız çıktı (confounding, bkz. o dosyadaki not) —
+  // modele DAHİL EDİLMEDİ. Alan yine de toplanıyor (ekstra TJK isteği gerektirmiyor),
+  // ileride farklı bir formülasyonla yeniden test edilmek istenirse hazır olsun diye.
+  onGrupArkasiMi: 0 | 1;
 };
 
 async function main() {
@@ -210,6 +215,7 @@ async function main() {
                 takiEklendiMi: (sonYaris?.eklenenTaki?.length ?? 0) > 0 ? 1 : 0,
                 takiCikarildiMi: (sonYaris?.cikarilanTaki?.length ?? 0) > 0 ? 1 : 0,
                 kacakAtMi: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" ? 1 : 0,
+                onGrupArkasiMi: (r.raceStyle as { style?: string } | null)?.style === "ON_GRUP_ARKASI" ? 1 : 0,
               });
             }
           })(), 25_000);

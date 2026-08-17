@@ -61,6 +61,16 @@ const FEATURE_NAMES = [
   // RAĞMEN hâlâ iyi AGF pozisyonunda kalma (agfFark<=-1.0 VE agfSirasi<=4). Bu
   // formülasyon ANLAMLI çıktı (+0.1282, GA [0.0188, 0.2043]) — kullanıcının sezgisi
   // doğruydu, önceki kaba eşik yanlış operasyonelleştirmeydi.
+  // NOT — 2026-08-17: "onGrupArkasiMi" (kacakAtMi'nin ikili olup diğer 3 stili tek "0"
+  // kutusuna attığı eleştirisiyle, kullanıcı talebiyle test edildi) TEK BAŞINA (ham
+  // win-rate) anlamlıydı (ON_GRUP_ARKASI %11.5 vs Bekleme+Geri %9.6, bootstrap GA
+  // [2.2,3.6], n=38542) AMA diğer 18 özellikle BİRLİKTE (gerçek koşullu logit modeli)
+  // test edilince ANLAMSIZ çıktı (nokta=0.016, GA=[-0.108, 0.091], sıfırı içeriyor) —
+  // klasik confounding: Ön Grup Arkası etiketli atlar zaten AGF/aygır/jokey gibi diğer
+  // sinyallerde öne çıkıyor, stil etiketinin kendisi ek bilgi katmıyor. Modele DAHİL
+  // EDİLMEDİ. Ayrıca "tempo çöküşü geriden gelenlere yarar" hipotezi (Batı handikap
+  // literatüründe var) hem kişisel-etiket hem GERÇEK aynı-gün zaman-farkı verisiyle
+  // ayrıca test edildi, TJK verisinde hiç tutmadı.
 ];
 
 function toFeatureVector(row) {
