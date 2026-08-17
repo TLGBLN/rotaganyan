@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { BASARI_ORANI_HIPODROM_FILTRESI } from "@/server/services/basari-orani-filtresi";
 
 /**
  * v6.103 — kullanıcı kararı 2026-08-11: "Rotaganyan'ın çalışma mantığı bu olacak: veri
@@ -44,7 +45,9 @@ function pencereOzeti(sonuclar: { hitTop1: boolean; hitInCoupon: boolean }[]): P
 
 export async function getAnalizPerformansOzeti(): Promise<AnalizPerformansOzeti> {
   const sonuclar = await db.result.findMany({
-    where: { race: { prediction: { published: true } } },
+    where: {
+      race: { prediction: { published: true }, raceDay: { hippodrome: BASARI_ORANI_HIPODROM_FILTRESI } },
+    },
     select: { hitTop1: true, hitInCoupon: true, enteredAt: true },
     orderBy: { enteredAt: "desc" },
     take: PENCERE_BOYUTU * 2,

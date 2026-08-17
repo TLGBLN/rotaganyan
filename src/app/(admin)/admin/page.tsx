@@ -7,6 +7,8 @@ import {
   getAgfEdgeStats,
 } from "@/server/services/admin.service";
 import { getRaceStyleWinStats, raceStyleBreakdownToRows } from "@/lib/stats";
+import { getV5SinyalPerformansi } from "@/server/services/v5-sinyal-performans.service";
+import v5Weights from "@/lib/methodology/weights/v5-weights.json";
 import PerformanceBreakdown from "@/components/admin/PerformanceBreakdown";
 import CouponTierChart from "@/components/admin/CouponTierChart";
 import InsightsPanel from "@/components/admin/InsightsPanel";
@@ -23,7 +25,7 @@ import { getClaudeBudget } from "@/server/actions/claude-budget.actions";
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
-  const [stats, analyst, recentPredictions, pendingPredictions, raceStyleStats, claudeBudget, archiveStats, agfEdge] = await Promise.all([
+  const [stats, analyst, recentPredictions, pendingPredictions, raceStyleStats, claudeBudget, archiveStats, agfEdge, v5SinyalPerformansi] = await Promise.all([
     getDashboardStats(),
     getAnalystStats(),
     getRecentPredictions(16),
@@ -32,7 +34,9 @@ export default async function AdminDashboard() {
     getClaudeBudget(),
     getArchiveStats(),
     getAgfEdgeStats(),
+    getV5SinyalPerformansi(),
   ]);
+  const v5Test = v5Weights.testEval;
 
   const hasData = analyst.overall.total > 0;
   const banko = analyst.byConfidence.find((b) => b.label === "★ Banko");
@@ -104,6 +108,24 @@ export default async function AdminDashboard() {
           </h2>
 
           <div className="space-y-4">
+            {/* v6.17x — kullanıcı talebi 2026-08-17: "/admin dashboard'u V5'in 18 sinyaline
+                göre detaylandır." Üstteki kutu modelin KENDİ test-seti iddiası (offline
+                backtest); alttaki tablo ise yayınlanmış+sonuçlanmış GERÇEK V5 tahminlerinde
+                her sinyalin taşındığı atın fiilen kazanma oranı — ikisi kasıtlı ayrı tutuldu,
+                biri teoriyi biri sahadaki gerçeği gösteriyor. */}
+            <div className="rounded-lg border p-4 text-xs leading-relaxed text-muted-foreground">
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-brand">
+                V5 Motoru — Kendi Test Seti (offline backtest, n={v5Test.n})
+              </span>
+              Hiç görülmemiş {v5Test.n} koşuda{" "}
+              <span className="font-semibold text-foreground">%{v5Test.top1P.toFixed(1)} ilk sıra</span> /{" "}
+              <span className="font-semibold text-foreground">%{v5Test.top3P.toFixed(1)} ilk-3</span> isabet
+              (18 özellik, koşullu logit). Alttaki tablo ise modelin iddiası değil — canlıda
+              yayınlanmış+sonuçlanmış V5 tahminlerinde her sinyalin taşındığı atın gerçekten
+              kazandığı oran (Şanlıurfa/Elazığ/Diyarbakır hariç tutuldu — düşük kalite, öngörülemez).
+            </div>
+            <PerformanceBreakdown title="Sinyal Bazlı Gerçek İsabet Oranı — V5 Dönemi" rows={v5SinyalPerformansi} />
+
             <CouponTierChart
               rows={[analyst.overallCouponTier]}
               title="Genel: Kazanan Hangi Kupon Kademesinde Geldi"

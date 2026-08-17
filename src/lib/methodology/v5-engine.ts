@@ -10,17 +10,18 @@
  * doğrudan KIYASLAR, eşiklerle kutulamaz.
  *
  * Doğrulama (bu oturumda yapıldı, arac-model-veri-olustur.mts + arac-model-egit.mjs):
- *  - 826 koşu (2026-07-01 sonrası — Rotaganyan'ın kendi AGF/galop takip altyapısının
- *    başladığı tarih, öncesi sistematik %0 kapsamalı), kronolojik 619 eğitim/207 test.
- *  - Test (görülmemiş veri): top1=%33.8 (bootstrap %95 GA %28.0-40.6), top3=%70.0
- *    (GA %63.8-76.8) — V4'ün AYNI 207 koşuda canlı çalıştırılan top1=%24.2/top3=%55.1'ini
- *    net geçiyor, GA'lar V4 rakamlarını içermiyor.
+ *  - 830 koşu (2026-07-01 sonrası — Rotaganyan'ın kendi AGF/galop takip altyapısının
+ *    başladığı tarih, öncesi sistematik %0 kapsamalı), kronolojik 622 eğitim/208 test.
+ *  - Test (görülmemiş veri, 18 özellikli son eğitim — 2026-08-17): top1=%35.6 (bootstrap
+ *    %95 GA %29.3-42.3), top3=%66.8 (GA %60.1-73.6) — V4'ün AYNI dönemde canlı çalıştırılan
+ *    top1=%24.2/top3=%55.1'ini net geçiyor, GA'lar V4 rakamlarını içermiyor.
  *  - Gerçek KÖR canlı test (2026-08-15, Ankara+İzmir+Diyarbakır, 23 koşu, sonuçlara
  *    bakılmadan tahmin üretildi): V5 top1=%30.4/top3=%60.9 vs V4 top1=%26.1/top3=%52.2 —
  *    tek günlük örneklem küçük ama yön backtest'le tutarlı.
  *  - "Sınıf geçişi" (classToSkk farkı) sinyali 3 formülasyonda test edildi, üçü de
- *    bootstrap CI'da sıfırı içerdi — modele DAHİL EDİLMEDİ (bkz. weights/v5-weights.json
- *    featureNames, 15 özellik).
+ *    bootstrap CI'da sıfırı içerdi — modele DAHİL EDİLMEDİ. 2026-08-17: kacakAtMi ve
+ *    dususAmaIyiPozisyon eklenip 16→18 özelliğe çıkarıldı (bkz. weights/v5-weights.json
+ *    featureNames, tam liste + gerekçe yorumları toFeatureVector üzerinde).
  *
  * Ağırlıklar `weights/v5-weights.json`'da COMMIT EDİLMİŞ (production'da Vercel'in
  * scratchpad'e erişimi yok) — yeniden eğitim gerekirse arac-model-egit.mjs çalıştırılıp
@@ -453,6 +454,11 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   { kod: "JOKSTAT", ozellikIndeksleri: [idx("jokeyOrani")], aciklama: (r) => `Jokey kazanma oranı (küçültülmüş): %${r.jokeyOrani.toFixed(1)}` },
   { kod: "ANTSTAT", ozellikIndeksleri: [idx("antrenorOrani")], aciklama: (r) => `Antrenör kazanma oranı (küçültülmüş): %${r.antrenorOrani.toFixed(1)}` },
   { kod: "UZUNARA", ozellikIndeksleri: [idx("uzunAraGalopKatkisi")], aciklama: (r) => (r.uzunAraGalopKatkisi > 0 ? `Uzun aradan sonra ${r.uzunAraGalopKatkisi} galop yapmış (düzenli çalışmış)` : null) },
+  // 2026-08-17 denetim bulgusu: kacakAtMi ve dususAmaIyiPozisyon anlamlı sinyaller
+  // (bkz. toFeatureVector üstündeki notlar) ama hiçbir OzellikGrubu'na dahil değildi —
+  // katkıları skoru etkiliyordu ama gerekçe metninde hiç görünmüyordu. Eklendi.
+  { kod: "KACAK", ozellikIndeksleri: [idx("kacakAtMi")], aciklama: (r) => (r.kacakAtMi ? "Kaçak at / erken tempo yapan (Accurace koşu stili sinyali)" : null) },
+  { kod: "DUSUSIYI", ozellikIndeksleri: [idx("dususAmaIyiPozisyon")], aciklama: (r) => (r.agfFark <= -ANLAMLI_PUAN_ESIGI && r.agfSirasi <= 4 ? "AGF düşüşüne rağmen sahada hâlâ öne yakın (para akışı sinyali olabilir)" : null) },
 ];
 
 const GUCLU_ESIK = 0.3;

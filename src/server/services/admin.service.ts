@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getDamStatOzetleriForRace } from "@/server/actions/dam-stat.actions";
 import { ENGINE_VERSIONS } from "@/server/services/analiz-versiyon-karsilastirma.service";
+import { BASARI_ORANI_HIPODROM_FILTRESI } from "@/server/services/basari-orani-filtresi";
 
 // 2026-08-16 kullanıcı kararı: kupon hazırlama safhasındaki sınıf-bazlı istatistikler
 // (Eko/Nor/Gen %, "1.seçim 1.geldi") V1-V22/V4/V5 karışık tüm geçmişi topluyordu — V5
@@ -371,6 +372,7 @@ export async function getAnalystStats(excludeRaceId?: string, sadeceGuncelMotor 
       race: {
         result: { isNot: null },
         conditions: null,
+        raceDay: { hippodrome: BASARI_ORANI_HIPODROM_FILTRESI },
         ...(excludeRaceId ? { id: { not: excludeRaceId } } : {}),
       },
     },
@@ -557,7 +559,7 @@ export async function getAgfEdgeStats(): Promise<AgfEdgeStats> {
   const rows = await db.prediction.findMany({
     where: {
       published: true,
-      race: { result: { isNot: null }, conditions: null },
+      race: { result: { isNot: null }, conditions: null, raceDay: { hippodrome: BASARI_ORANI_HIPODROM_FILTRESI } },
     },
     select: {
       picks: { where: { rank: 1 }, select: { runner: { select: { no: true } } } },
