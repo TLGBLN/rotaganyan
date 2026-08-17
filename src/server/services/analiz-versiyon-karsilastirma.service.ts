@@ -1,5 +1,4 @@
 import { db } from "@/lib/db";
-import { BASARI_ORANI_HIPODROM_FILTRESI } from "@/server/services/basari-orani-filtresi";
 
 /**
  * v6.103 — kullanıcı kararı 2026-08-11: "bunu sistematik olarak dashboarda da ekle, analiz
@@ -127,7 +126,6 @@ export async function getVersiyonKarsilastirmasi(): Promise<EngineVersionSonuc[]
             published: true,
             createdAt: { gte: v.baslangic, ...(v.bitis ? { lt: v.bitis } : {}) },
           },
-          raceDay: { hippodrome: BASARI_ORANI_HIPODROM_FILTRESI },
         },
       },
       select: { hitTop1: true, hitInCoupon: true },

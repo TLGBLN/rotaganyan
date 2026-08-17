@@ -1,6 +1,5 @@
 import { db } from "@/lib/db";
 import { ENGINE_VERSIONS } from "@/server/services/analiz-versiyon-karsilastirma.service";
-import { BASARI_ORANI_HIPODROM_FILTRESI } from "@/server/services/basari-orani-filtresi";
 import type { AnalystBreakdown } from "@/server/services/admin.service";
 
 /**
@@ -11,8 +10,9 @@ import type { AnalystBreakdown } from "@/server/services/admin.service";
  * yayınlanmış+sonuçlanmış V5 dönemi verisine dayanır. OLASILIK kodu her atta zorunlu
  * olduğu için taban oranı (baseline) referansı olarak eklenir.
  *
- * Yalnız V5 dönemi (createdAt >= V5 başlangıcı) ve düşük-kalite hipodromlar hariç
- * (bkz. basari-orani-filtresi.ts) — diğer başarı oranı metrikleriyle tutarlı kapsam.
+ * Yalnız V5 dönemi (createdAt >= V5 başlangıcı). 2026-08-17: Şanlıurfa/Elazığ/Diyarbakır
+ * hariç tutma kararı kullanıcı tarafından GERİ ALINDI — bkz. git log, basari-orani-
+ * filtresi.ts artık hiçbir yerde kullanılmıyor.
  */
 const V5_BASLANGIC = ENGINE_VERSIONS.find((v) => v.versiyon === "V5")!.baslangic;
 
@@ -43,7 +43,6 @@ export async function getV5SinyalPerformansi(): Promise<AnalystBreakdown[]> {
       race: {
         result: { isNot: null },
         conditions: null,
-        raceDay: { hippodrome: BASARI_ORANI_HIPODROM_FILTRESI },
       },
     },
     select: {

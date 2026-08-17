@@ -149,7 +149,7 @@ export default async function AdminDashboard() {
               <span className="font-semibold text-foreground">%{v5Test.top3P.toFixed(1)} ilk-3</span> isabet
               (18 özellik, koşullu logit). Alttaki tablo ise modelin iddiası değil — canlıda
               yayınlanmış+sonuçlanmış V5 tahminlerinde her sinyalin taşındığı atın gerçekten
-              kazandığı oran (Şanlıurfa/Elazığ/Diyarbakır hariç tutuldu — düşük kalite, öngörülemez).
+              kazandığı oran.
             </div>
             <PerformanceBreakdown title="Sinyal Bazlı Gerçek İsabet Oranı — V5 Dönemi" rows={v5SinyalPerformansi} />
 
