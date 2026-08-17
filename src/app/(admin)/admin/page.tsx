@@ -16,22 +16,19 @@ import PerformanceBreakdown from "@/components/admin/PerformanceBreakdown";
 import CouponTierChart from "@/components/admin/CouponTierChart";
 import PerformansDenetimiPanel from "@/components/admin/PerformansDenetimiPanel";
 import type { CouponTierBreakdown } from "@/server/services/admin.service";
-import InsightsPanel from "@/components/admin/InsightsPanel";
 import NarrativeSummary from "@/components/admin/NarrativeSummary";
 import AgfEdgeCard from "@/components/admin/AgfEdgeCard";
 import DailyTrendChart from "@/components/admin/DailyTrendChart";
 import RecentFeed from "@/components/admin/RecentFeed";
 import PendingList from "@/components/admin/PendingList";
 import AdminRefresh from "@/components/admin/AdminRefresh";
-import ClaudeBudgetWidget from "@/components/admin/ClaudeBudgetWidget";
 import ArchiveStatsWidget from "@/components/admin/ArchiveStatsWidget";
-import { getClaudeBudget } from "@/server/actions/claude-budget.actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
   const [
-    stats, analyst, recentPredictions, pendingPredictions, raceStyleStats, claudeBudget,
+    stats, analyst, recentPredictions, pendingPredictions, raceStyleStats,
     archiveStats, agfEdge, v5SinyalPerformansi, performansOzeti, versiyonKarsilastirmasi, agfTrendIstatistik,
   ] = await Promise.all([
     getDashboardStats(),
@@ -39,7 +36,6 @@ export default async function AdminDashboard() {
     getRecentPredictions(16),
     getPendingPredictions(),
     getRaceStyleWinStats(),
-    getClaudeBudget(),
     getArchiveStats(),
     getAgfEdgeStats(),
     getV5SinyalPerformansi(),
@@ -106,7 +102,7 @@ export default async function AdminDashboard() {
       <NarrativeSummary analyst={analyst} pendingResults={stats.pendingResults} />
 
       {/* ── Sistem vs AGF Favorisi ─────────────────────────────────── */}
-      <AgfEdgeCard stats={agfEdge} />
+      <AgfEdgeCard stats={agfEdge} overallTotal={analyst.overall.total} />
 
       {/* ── Performans Denetimi ──────────────────────────────────────
           2026-08-17 kullanıcı talebi: eskiden ayrı /admin/performans sayfasındaydı,
@@ -125,15 +121,11 @@ export default async function AdminDashboard() {
         </div>
         <div className="space-y-4">
           <PendingList pending={pendingPredictions} />
-          <ClaudeBudgetWidget status={claudeBudget} />
         </div>
       </div>
 
       {/* ── Son Tahminler Akışı ────────────────────────────────────── */}
       <RecentFeed predictions={recentPredictions} />
-
-      {/* ── Kritik Tespitler ───────────────────────────────────────── */}
-      <InsightsPanel analyst={analyst} pendingResults={stats.pendingResults} />
 
       {/* ── Performans Tabloları ───────────────────────────────────── */}
       {hasData && (

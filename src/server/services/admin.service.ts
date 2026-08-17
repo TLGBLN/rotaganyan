@@ -501,12 +501,16 @@ export async function getAnalystStats(excludeRaceId?: string, sadeceGuncelMotor 
         dateMap.set(date, { cumHits: cHits, cumTotal: i + 1 });
       });
       let prevRate = -1;
-      return Array.from(dateMap.entries()).map(([date, { cumHits, cumTotal }]) => {
+      const tumNoktalar = Array.from(dateMap.entries()).map(([date, { cumHits, cumTotal }]) => {
         const rate = (cumHits / cumTotal) * 100;
         const improved = prevRate < 0 ? rate > 0 : rate > prevRate;
         prevRate = rate;
         return { date, rate, hits: cumHits, total: cumTotal, improved };
       });
+      // 2026-08-17 kullanıcı talebi: bu dizi gün bazlı, siteler büyüdükçe (şu an 40+ gün)
+      // sınırsız genişleyip dashboard'daki tabloyu aşırı geniş yapıyordu — kümülatif oran
+      // TAM geçmişten hesaplanır (yukarıda), yalnız GÖSTERİM son 30 güne indirilir.
+      return tumNoktalar.slice(-30);
     })(),
     couponTierByClassType: groupCouponTier((r) => normalizeClassType(r.race.classType), classTypeGroup),
     overallCouponTier: groupCouponTier(() => "Tüm Tahminler")[0] ?? {
