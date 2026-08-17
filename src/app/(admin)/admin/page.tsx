@@ -8,9 +8,13 @@ import {
 } from "@/server/services/admin.service";
 import { getRaceStyleWinStats, raceStyleBreakdownToRows } from "@/lib/stats";
 import { getV5SinyalPerformansi } from "@/server/services/v5-sinyal-performans.service";
+import { getAnalizPerformansOzeti } from "@/server/services/analiz-performans.service";
+import { getVersiyonKarsilastirmasi } from "@/server/services/analiz-versiyon-karsilastirma.service";
+import { getAgfTrendIstatistik } from "@/server/services/agf-trend-istatistik.service";
 import v5Weights from "@/lib/methodology/weights/v5-weights.json";
 import PerformanceBreakdown from "@/components/admin/PerformanceBreakdown";
 import CouponTierChart from "@/components/admin/CouponTierChart";
+import PerformansDenetimiPanel from "@/components/admin/PerformansDenetimiPanel";
 import type { CouponTierBreakdown } from "@/server/services/admin.service";
 import InsightsPanel from "@/components/admin/InsightsPanel";
 import NarrativeSummary from "@/components/admin/NarrativeSummary";
@@ -26,7 +30,10 @@ import { getClaudeBudget } from "@/server/actions/claude-budget.actions";
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
-  const [stats, analyst, recentPredictions, pendingPredictions, raceStyleStats, claudeBudget, archiveStats, agfEdge, v5SinyalPerformansi] = await Promise.all([
+  const [
+    stats, analyst, recentPredictions, pendingPredictions, raceStyleStats, claudeBudget,
+    archiveStats, agfEdge, v5SinyalPerformansi, performansOzeti, versiyonKarsilastirmasi, agfTrendIstatistik,
+  ] = await Promise.all([
     getDashboardStats(),
     getAnalystStats(),
     getRecentPredictions(16),
@@ -36,6 +43,9 @@ export default async function AdminDashboard() {
     getArchiveStats(),
     getAgfEdgeStats(),
     getV5SinyalPerformansi(),
+    getAnalizPerformansOzeti(),
+    getVersiyonKarsilastirmasi(),
+    getAgfTrendIstatistik(),
   ]);
   const v5Test = v5Weights.testEval;
 
@@ -97,6 +107,12 @@ export default async function AdminDashboard() {
 
       {/* ── Sistem vs AGF Favorisi ─────────────────────────────────── */}
       <AgfEdgeCard stats={agfEdge} />
+
+      {/* ── Performans Denetimi ──────────────────────────────────────
+          2026-08-17 kullanıcı talebi: eskiden ayrı /admin/performans sayfasındaydı,
+          "dashboard'a bağlanabilir mi, fazlalık yapmasın" — tek sayfaya taşındı,
+          ayrı route/nav girdisi kaldırıldı. */}
+      <PerformansDenetimiPanel ozet={performansOzeti} versiyonlar={versiyonKarsilastirmasi} agfTrendIstatistik={agfTrendIstatistik} />
 
       {/* ── Trend + Bekleyen ───────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
