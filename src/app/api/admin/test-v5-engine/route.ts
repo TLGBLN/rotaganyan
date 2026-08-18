@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
-import { gatherFaz1V5, faz2V5Sirala, muhakemeUretV5, v5BankoAdayiTespit } from "@/lib/methodology/v5-engine";
+import { gatherFaz1V5, faz2V5Sirala, muhakemeUretV5, v5BankoAdayiTespit, tumOzellikleriListele } from "@/lib/methodology/v5-engine";
 import { kategoriTespit } from "@/lib/methodology/v2-engine";
 
 // 2026-08-16 — V5 motoru: Claude çağrısı YOK (yalnız DB okuma + koşullu logit skoru),
@@ -31,6 +31,7 @@ async function handlePost(req: NextRequest) {
     karar: r.karar,
     olasilik: r.olasilik,
     details: muhakemeUretV5(r, sahaBuyuklugu),
+    tumSinyaller: tumOzellikleriListele(r),
   }));
 
   const bankoAdayi = v5BankoAdayiTespit(sirali);

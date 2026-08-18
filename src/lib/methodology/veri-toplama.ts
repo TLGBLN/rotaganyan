@@ -89,6 +89,28 @@ export type AccuraceSibling = {
  * tutulur (bkz. v6.59 notu) — aksi halde bir at bu yarışı kendi kendine "geçmiş kanıt"
  * olarak gösterebiliyordu.
  */
+// 2026-08-18 — Supabase pgbouncer pooler'ı, Prisma'nın nested `accuraceRace: {select}`
+// için otomatik ürettiği TEK büyük "WHERE id IN (...)" sorgusunda (geniş sahalarda 400+
+// id) bazen tıkanıp askıda kalıyor (gatherFaz1V5'te gerçek hang ile doğrulandı). Çözüm:
+// AccuraceRace'i nested relation olarak DEĞİL, ayrı ve KÜÇÜK parçalar halinde (CHUNK=25)
+// çekip JS'te birleştiriyoruz — aynı veri, tek seferde değil.
+const ACCURACE_RACE_CHUNK = 25;
+
+async function fetchAccuraceRacesByIds(
+  ids: string[]
+): Promise<Map<string, { date: Date; citySlug: string; ground: string | null; length: number | null }>> {
+  const map = new Map<string, { date: Date; citySlug: string; ground: string | null; length: number | null }>();
+  for (let i = 0; i < ids.length; i += ACCURACE_RACE_CHUNK) {
+    const chunk = ids.slice(i, i + ACCURACE_RACE_CHUNK);
+    const rows = await db.accuraceRace.findMany({
+      where: { id: { in: chunk } },
+      select: { id: true, date: true, citySlug: true, ground: true, length: true },
+    });
+    for (const r of rows) map.set(r.id, { date: r.date, citySlug: r.citySlug, ground: r.ground, length: r.length });
+  }
+  return map;
+}
+
 export async function fetchAccuraceGecmisKayitlari(
   runnerNames: string[],
   raceDate: Date
@@ -96,23 +118,33 @@ export async function fetchAccuraceGecmisKayitlari(
   const son800AccuraceKayitlariHam = runnerNames.length
     ? await db.accuraceHorseSplit.findMany({
         where: { horseName: { in: accuraceQueryNames(runnerNames) } },
-        select: {
-          horseName: true,
-          accuraceRaceId: true,
-          checkpoints: true,
-          place: true,
-          accuraceRace: { select: { date: true, citySlug: true, ground: true, length: true } },
-        },
+        select: { horseName: true, accuraceRaceId: true, checkpoints: true, place: true },
       })
     : [];
-  const son800AccuraceKayitlari = son800AccuraceKayitlariHam.filter((k) => k.accuraceRace.date < raceDate);
+  // Tüm ilgili AccuraceRace'leri TEK seferde, küçük parçalar halinde çek — hem
+  // son800AccuraceKayitlari hem de son800Siblings bu ortak haritayı kullanır (eskiden
+  // ikisi ayrı ayrı nested-relation sorgusu yapıyordu, artık tek chunked fetch yeterli).
+  const hamRaceIds = [...new Set(son800AccuraceKayitlariHam.map((k) => k.accuraceRaceId))];
+  const raceMap = await fetchAccuraceRacesByIds(hamRaceIds);
+  const son800AccuraceKayitlari = son800AccuraceKayitlariHam
+    .map((k): AccuraceGecmisKayit | null => {
+      const accuraceRace = raceMap.get(k.accuraceRaceId);
+      return accuraceRace ? { ...k, accuraceRace } : null;
+    })
+    .filter((k): k is AccuraceGecmisKayit => k != null && k.accuraceRace.date < raceDate);
   const son800RaceIds = [...new Set(son800AccuraceKayitlari.map((k) => k.accuraceRaceId))];
-  const son800Siblings = son800RaceIds.length
+  const son800SiblingsHam = son800RaceIds.length
     ? await db.accuraceHorseSplit.findMany({
         where: { accuraceRaceId: { in: son800RaceIds } },
-        select: { accuraceRaceId: true, checkpoints: true, accuraceRace: { select: { length: true } } },
+        select: { accuraceRaceId: true, checkpoints: true },
       })
     : [];
+  const son800Siblings = son800SiblingsHam
+    .map((s): AccuraceSibling | null => {
+      const accuraceRace = raceMap.get(s.accuraceRaceId);
+      return accuraceRace ? { ...s, accuraceRace: { length: accuraceRace.length } } : null;
+    })
+    .filter((s): s is AccuraceSibling => s != null);
   return { son800AccuraceKayitlari, son800Siblings };
 }
 

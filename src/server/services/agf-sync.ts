@@ -146,37 +146,48 @@ const SOGUMA_MS = 3 * 60 * 1000;
  * durumunda (TJK erişilemez vb.) sessizce yutulur — analiz, DB'deki mevcut en son veriyle
  * devam eder, bu adım hiçbir zaman analizi BLOKE ETMEZ.
  */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`syncAgfForRace: ${ms}ms zaman aşımı`)), ms)),
+  ]);
+}
+
 export async function syncAgfForRace(raceId: string): Promise<void> {
   try {
-    const race = await db.race.findUnique({
-      where: { id: raceId },
-      select: {
-        raceDayId: true,
-        raceDay: { select: { date: true, hippodrome: { select: { name: true, slug: true } } } },
-      },
-    });
-    if (!race) return;
-
-    // Soğuma kontrolü: bu hipodrom+gün için AGF en son ne zaman yazıldı?
-    const enYeniSnapshot = await db.agfSnapshot.findFirst({
-      where: { runner: { race: { raceDayId: race.raceDayId } } },
-      orderBy: { capturedAt: "desc" },
-      select: { capturedAt: true },
-    });
-    if (enYeniSnapshot && Date.now() - enYeniSnapshot.capturedAt.getTime() < SOGUMA_MS) {
-      return; // yakın zamanda zaten tazelendi, TJK'ya tekrar gitme
-    }
-
-    const d = new Date(race.raceDay.date);
-    d.setUTCHours(0, 0, 0, 0);
-    const tjkDate = toTjkDate(d);
-
-    const cities = await discoverTurkishCities(tjkDate);
-    const city = cities.find((c) => toSlug(c.sehirAdi) === race.raceDay.hippodrome.slug);
-    if (!city) return;
-
-    await syncOneCity(city, tjkDate, d);
+    await withTimeout(syncAgfForRaceInner(raceId), 10_000);
   } catch {
-    // TJK erişilemedi/başka bir hata — analiz DB'deki mevcut veriyle devam eder.
+    // TJK erişilemedi/zaman aşımı/başka bir hata — analiz DB'deki mevcut veriyle devam eder.
   }
+}
+
+async function syncAgfForRaceInner(raceId: string): Promise<void> {
+  const race = await db.race.findUnique({
+    where: { id: raceId },
+    select: {
+      raceDayId: true,
+      raceDay: { select: { date: true, hippodrome: { select: { name: true, slug: true } } } },
+    },
+  });
+  if (!race) return;
+
+  // Soğuma kontrolü: bu hipodrom+gün için AGF en son ne zaman yazıldı?
+  const enYeniSnapshot = await db.agfSnapshot.findFirst({
+    where: { runner: { race: { raceDayId: race.raceDayId } } },
+    orderBy: { capturedAt: "desc" },
+    select: { capturedAt: true },
+  });
+  if (enYeniSnapshot && Date.now() - enYeniSnapshot.capturedAt.getTime() < SOGUMA_MS) {
+    return; // yakın zamanda zaten tazelendi, TJK'ya tekrar gitme
+  }
+
+  const d = new Date(race.raceDay.date);
+  d.setUTCHours(0, 0, 0, 0);
+  const tjkDate = toTjkDate(d);
+
+  const cities = await discoverTurkishCities(tjkDate);
+  const city = cities.find((c) => toSlug(c.sehirAdi) === race.raceDay.hippodrome.slug);
+  if (!city) return;
+
+  await syncOneCity(city, tjkDate, d);
 }

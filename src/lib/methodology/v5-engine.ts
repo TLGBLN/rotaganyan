@@ -252,7 +252,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
 
 const ANLAMLI_PUAN_ESIGI = 1.0; // agf-trend.actions.ts'teki ANLAMLI_PUAN_ESIGI ile aynı
 
-function toFeatureVector(r: Faz1RunnerV5): number[] {
+export function toFeatureVector(r: Faz1RunnerV5): number[] {
   return [
     r.agfSirasi, r.accurace, r.formEgimi, r.formEgimi * r.formEgimi,
     r.kgsVarMi ? r.kgs : 0, r.kgsVarMi ? r.kgs * r.kgs : 0, r.kgsVarMi, r.pistUzmani,
@@ -470,6 +470,38 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   { kod: "KACAK", ozellikIndeksleri: [idx("kacakAtMi")], aciklama: (r) => (r.kacakAtMi ? "Kaçak at / erken tempo yapan (Accurace koşu stili sinyali)" : null) },
   { kod: "DUSUSIYI", ozellikIndeksleri: [idx("dususAmaIyiPozisyon")], aciklama: (r) => (r.agfFark <= -ANLAMLI_PUAN_ESIGI && r.agfSirasi <= 4 ? "AGF düşüşüne rağmen sahada hâlâ öne yakın (para akışı sinyali olabilir)" : null) },
 ];
+
+// 2026-08-18 kullanıcı talebi: "18 sinyalin hepsinin kontrol edildiğini bana göstermesini
+// istiyorum, kanıtlamalı." — muhakemeUretV5'in gerekçe satırları YALNIZ en belirgin
+// katkıları gösteriyor (üst-5 pozitif + üst-2 negatif, eşik altındakiler hiç görünmüyor) —
+// bu, "az katkılı = hiç hesaplanmadı" izlenimi verebiliyordu. Bu fonksiyon FİLTRESİZ,
+// TÜM 18 özelliği (ham değer + standardize + gerçek model katkısı) sırayla döner —
+// admin panelinde "Tüm Sinyaller" açılır bölümü için, denetim amaçlı.
+const FEATURE_LABELS: Record<string, string> = {
+  agfSirasi: "AGF Sırası", accurace: "Accurace (son yarış en hızlı kapanış)",
+  formEgimi: "Form Eğimi", formEgimi2: "Form Eğimi (karesi, doğrusal-olmayan etki)",
+  kgs: "KGS (dinlenme günü)", kgs2: "KGS (karesi)", kgsVarMi: "KGS Verisi Var Mı",
+  pistUzmani: "Pist Uzmanlığı (bu hipodrom+pist+mesafede yıl içi galibiyet)",
+  sireOrani: "Aygır Kazanma Oranı (küçültülmüş)", galop: "Keskin Galop Zinciri",
+  idmJokey: "İdman Jokeyi Uyumu", jokeyOrani: "Jokey Kazanma Oranı (küçültülmüş)",
+  antrenorOrani: "Antrenör Kazanma Oranı (küçültülmüş)",
+  uzunAraGalopKatkisi: "Uzun Aradan Sonra Galop Sayısı",
+  agfFavorisiMi: "AGF Favorisi Mi (1. sıra)", agfYukselisVarMi: "AGF Eşik-Üstü Yükseliş Var Mı",
+  kacakAtMi: "Kaçak At / Erken Tempo", dususAmaIyiPozisyon: "AGF Düşüşüne Rağmen İyi Pozisyon",
+};
+
+export type TumOzellikDetay = { kod: string; etiket: string; hamDeger: number; standartDeger: number; katki: number };
+
+export function tumOzellikleriListele(r: Faz1RunnerV5Sirali): TumOzellikDetay[] {
+  const ham = toFeatureVector(r);
+  return FEATURE_NAMES.map((kod, i) => ({
+    kod,
+    etiket: FEATURE_LABELS[kod] ?? kod,
+    hamDeger: Math.round(ham[i] * 1000) / 1000,
+    standartDeger: Math.round(r.standartVektor[i] * 1000) / 1000,
+    katki: Math.round(r.katkilar[i] * 10000) / 10000,
+  }));
+}
 
 const GUCLU_ESIK = 0.3;
 const ORTA_ESIK = 0.1;

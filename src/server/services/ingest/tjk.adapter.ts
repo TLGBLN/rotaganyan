@@ -74,7 +74,7 @@ function toDmy(date: Date): string {
 }
 
 async function fetchHtml(url: string): Promise<string> {
-  const { statusCode, body } = await request(url, { headers: HEADERS });
+  const { statusCode, body } = await request(url, { headers: HEADERS, headersTimeout: 30_000, bodyTimeout: 30_000 });
   if (statusCode !== 200) throw new Error(`HTTP ${statusCode}: ${url}`);
   return body.text();
 }

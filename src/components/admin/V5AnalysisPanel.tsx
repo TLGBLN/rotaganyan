@@ -16,6 +16,7 @@ import type { PickDetailsV2 } from "@/lib/methodology/muhakeme-format";
 // V4'ün AYNI test kümesinde canlı top1=%24.2/top3=%55.1'ini net geçiyor. Detaylar
 // src/lib/methodology/v5-engine.ts başlık yorumunda.
 
+type TumOzellikDetay = { kod: string; etiket: string; hamDeger: number; standartDeger: number; katki: number };
 type V5At = {
   no: number;
   ad: string;
@@ -23,6 +24,7 @@ type V5At = {
   karar: string;
   olasilik: number;
   details: PickDetailsV2;
+  tumSinyaller?: TumOzellikDetay[];
 };
 type Runner = { id: string; no: number; name: string };
 type BankoAdayiSonuc = { bankoAdayi: boolean; sebep: string };
@@ -106,6 +108,16 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
   const [bankoAdayi, setBankoAdayi] = useState<BankoAdayiSonuc | null>(kayitliBaslangic?.bankoAdayi ?? null);
   const [kuponlar, setKuponlar] = useState<{ narrow?: string; normal?: string; wide?: string }>(kayitliBaslangic?.kuponlar ?? {});
   const [kaynak, setKaynak] = useState<"kayitli" | "canli" | null>(kayitliBaslangic ? "kayitli" : null);
+  const [acikDetay, setAcikDetay] = useState<Set<number>>(new Set());
+
+  function toggleDetay(no: number) {
+    setAcikDetay((prev) => {
+      const next = new Set(prev);
+      if (next.has(no)) next.delete(no);
+      else next.add(no);
+      return next;
+    });
+  }
 
   async function handleCalistir() {
     setError(null);
@@ -315,6 +327,47 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                     ? kodluSatirlar.map((s) => `${s.tip === "risk" ? "⚠ " : ""}${s.aciklama}`).join(" · ")
                     : "Belirgin bir özellik katkısı yok."}
                 </p>
+
+                {a.tumSinyaller && (
+                  <div className="border-t border-border/60 pt-1.5">
+                    <button
+                      onClick={() => toggleDetay(no)}
+                      className="flex items-center gap-1 text-[11px] font-medium text-purple-500 hover:underline"
+                    >
+                      {acikDetay.has(no) ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                      Tüm 18 Sinyal — Denetim Kaydı ({a.tumSinyaller.length}/18 hesaplandı)
+                    </button>
+                    {acikDetay.has(no) && (
+                      <div className="mt-1.5 overflow-x-auto">
+                        <table className="w-full min-w-[420px] text-[10px]">
+                          <thead>
+                            <tr className="text-left text-muted-foreground">
+                              <th className="pb-1 pr-2 font-medium">Sinyal</th>
+                              <th className="pb-1 pr-2 font-medium">Ham Değer</th>
+                              <th className="pb-1 pr-2 font-medium">Standardize</th>
+                              <th className="pb-1 font-medium">Model Katkısı</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {a.tumSinyaller.map((s) => (
+                              <tr key={s.kod} className="border-t border-border/40">
+                                <td className="py-1 pr-2 text-foreground/90">{s.etiket}</td>
+                                <td className="py-1 pr-2 font-mono text-muted-foreground">{s.hamDeger}</td>
+                                <td className="py-1 pr-2 font-mono text-muted-foreground">{s.standartDeger}</td>
+                                <td className={cn("py-1 font-mono", s.katki > 0 ? "text-hit" : s.katki < 0 ? "text-miss" : "text-muted-foreground")}>
+                                  {s.katki > 0 ? "+" : ""}{s.katki}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <p className="mt-1 text-[10px] text-muted-foreground/70">
+                          Bu tablo, gerekçe metninde eşik altı kaldığı için görünmeyen sinyalleri de gösterir — modelin her at için 18 özelliğin TAMAMINI hesapladığının kanıtıdır.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
