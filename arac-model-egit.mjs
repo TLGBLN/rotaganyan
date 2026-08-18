@@ -71,6 +71,12 @@ const FEATURE_NAMES = [
   // EDİLMEDİ. Ayrıca "tempo çöküşü geriden gelenlere yarar" hipotezi (Batı handikap
   // literatüründe var) hem kişisel-etiket hem GERÇEK aynı-gün zaman-farkı verisiyle
   // ayrıca test edildi, TJK verisinde hiç tutmadı.
+  // NOT — 2026-08-17: "disaridanStart" (TJK "St" sütunundaki turuncu "DS" işareti, at
+  // kendi tercihiyle dıştan başlıyor — eski V1-V22'de vardı, V5 hiç kullanmamıştı) TEK
+  // BAŞINA anlamlıydı (%14.8 vs %10.1, bootstrap GA [1.9,7.6], n=42466) AMA diğer 18
+  // özellikle BİRLİKTE test edilince ANLAMSIZ çıktı (nokta=0.045, GA=[-0.057, 0.154],
+  // sıfırı içeriyor) — yine confounding (muhtemelen DS tercih eden ekipler zaten
+  // aygır/jokey/antrenör sinyallerinde öne çıkıyor). Modele DAHİL EDİLMEDİ.
 ];
 
 function toFeatureVector(row) {

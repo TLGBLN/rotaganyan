@@ -75,6 +75,10 @@ export type ModelRow = {
   // modele DAHİL EDİLMEDİ. Alan yine de toplanıyor (ekstra TJK isteği gerektirmiyor),
   // ileride farklı bir formülasyonla yeniden test edilmek istenirse hazır olsun diye.
   onGrupArkasiMi: 0 | 1;
+  // 2026-08-17 — ham win-rate testinde anlamlıydı (%14.8 vs %10.1, GA [1.9,7.6]) ama
+  // arac-model-egit.mjs'de diğer 18 özellikle BİRLİKTE test edilince anlamsız çıktı
+  // (confounding, bkz. o dosyadaki not) — modele DAHİL EDİLMEDİ. Alan yine de toplanıyor.
+  disaridanStart: 0 | 1;
 };
 
 async function main() {
@@ -86,7 +90,7 @@ async function main() {
       result: { select: { actualOrder: true } },
       runners: {
         where: { scratched: false },
-        select: { id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true, raceStyle: true },
+        select: { id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true, raceStyle: true, disaridanStart: true },
       },
     },
     orderBy: { raceDay: { date: "asc" } },
@@ -216,6 +220,7 @@ async function main() {
                 takiCikarildiMi: (sonYaris?.cikarilanTaki?.length ?? 0) > 0 ? 1 : 0,
                 kacakAtMi: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" ? 1 : 0,
                 onGrupArkasiMi: (r.raceStyle as { style?: string } | null)?.style === "ON_GRUP_ARKASI" ? 1 : 0,
+                disaridanStart: r.disaridanStart ? 1 : 0,
               });
             }
           })(), 25_000);
