@@ -32,6 +32,7 @@ import { db } from "@/lib/db";
 import { getSonYarisDetaylariForRace } from "@/server/actions/son-yaris-detay.actions";
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getAgfTrendForRace } from "@/server/actions/agf-trend.actions";
+import { syncAgfForRace } from "@/server/services/agf-sync";
 import { getJockeyStats, getTrainerStats } from "@/server/services/race.service";
 import {
   fetchAccuraceGecmisKayitlari,
@@ -124,6 +125,15 @@ const TRAINER_POP_ORT = 0.1;
 const SIRE_POP_ORT = 0.14;
 
 export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> {
+  // 2026-08-18 kullanıcı talebi (SELLYGIRL/Kocaeli K3 vakası): AGF trend, analiz anındaki
+  // en son veriyle hesaplanıyor — post saatinden önce yapılan bir analizde henüz eşiği
+  // geçmemiş bir hareket, analizden SONRA gelen bir ölçümle eşiği geçebiliyor ve
+  // yakalanamıyor. Analiz başlamadan İLK ADIM olarak bu koşunun hipodromu için AGF'yi
+  // tazeliyoruz (3dk soğuma ile — aynı hipodromda art arda analiz TJK'yı gereksiz yormaz).
+  // Hata durumunda sessizce yutulur (syncAgfForRace kendi içinde try/catch'li) — bu adım
+  // analizi ASLA bloke etmez, DB'deki mevcut veriyle devam eder.
+  await syncAgfForRace(raceId);
+
   const race = await db.race.findUnique({
     where: { id: raceId },
     select: {
