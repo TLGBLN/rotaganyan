@@ -79,6 +79,11 @@ export type ModelRow = {
   // arac-model-egit.mjs'de diğer 18 özellikle BİRLİKTE test edilince anlamsız çıktı
   // (confounding, bkz. o dosyadaki not) — modele DAHİL EDİLMEDİ. Alan yine de toplanıyor.
   disaridanStart: 0 | 1;
+  // 2026-08-17 — ham win-rate testinde çok güçlü anlamlıydı (korelasyon -0.164, GA
+  // [-0.174,-0.154]) ama diğer 18 özellikle BİRLİKTE test edilince anlamsız çıktı
+  // (confounding — AGF sırası + aygır/jokey/antrenör oranlarıyla örtüşüyor, bkz.
+  // arac-model-egit.mjs'deki not) — modele DAHİL EDİLMEDİ. Alan yine de toplanıyor.
+  hpSirasi: number;
 };
 
 async function main() {
@@ -90,7 +95,7 @@ async function main() {
       result: { select: { actualOrder: true } },
       runners: {
         where: { scratched: false },
-        select: { id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true, raceStyle: true, disaridanStart: true },
+        select: { id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true, raceStyle: true, disaridanStart: true, hp: true },
       },
     },
     orderBy: { raceDay: { date: "asc" } },
@@ -164,6 +169,11 @@ async function main() {
             );
             const agfSirali = [...runners].filter((r) => r.agf != null).sort((a, b) => (b.agf ?? 0) - (a.agf ?? 0));
             const agfSiraMap = new Map(agfSirali.map((r, i2) => [r.id, i2 + 1]));
+            // 2026-08-17 kullanıcı talebi — hiç kullanılmayan HP (resmi handikap puanı)
+            // alanı test ediliyor. agfSirasi ile AYNI desen: sahadaki HP'ye göre sıra
+            // (yüksek HP = 1.sıra), veri yoksa saha ortası.
+            const hpSirali = [...runners].filter((r) => r.hp != null).sort((a, b) => (b.hp ?? 0) - (a.hp ?? 0));
+            const hpSiraMap = new Map(hpSirali.map((r, i2) => [r.id, i2 + 1]));
 
             for (const r of runners) {
               const pos = actualOrder.indexOf(r.no) + 1;
@@ -221,6 +231,7 @@ async function main() {
                 kacakAtMi: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" ? 1 : 0,
                 onGrupArkasiMi: (r.raceStyle as { style?: string } | null)?.style === "ON_GRUP_ARKASI" ? 1 : 0,
                 disaridanStart: r.disaridanStart ? 1 : 0,
+                hpSirasi: hpSiraMap.get(r.id) ?? Math.ceil(runners.length / 2),
               });
             }
           })(), 25_000);

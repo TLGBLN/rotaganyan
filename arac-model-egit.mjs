@@ -77,6 +77,12 @@ const FEATURE_NAMES = [
   // özellikle BİRLİKTE test edilince ANLAMSIZ çıktı (nokta=0.045, GA=[-0.057, 0.154],
   // sıfırı içeriyor) — yine confounding (muhtemelen DS tercih eden ekipler zaten
   // aygır/jokey/antrenör sinyallerinde öne çıkıyor). Modele DAHİL EDİLMEDİ.
+  // NOT — 2026-08-17: "hpSirasi" (HP/resmi handikap puanı, agfSirasi ile aynı desende
+  // sıralama) TEK BAŞINA çok güçlü anlamlıydı (korelasyon -0.164, GA [-0.174,-0.154],
+  // n=32067) AMA diğer 18 özellikle BİRLİKTE test edilince ANLAMSIZ çıktı (nokta=0.010,
+  // GA=[-0.126, 0.123], sıfırı içeriyor) — HP muhtemelen AGF sırası + aygır/jokey/
+  // antrenör oranlarıyla zaten yüksek örtüşüyor (piyasa da atın kalitesini fiyatlıyor),
+  // ek bilgi katmıyor. Modele DAHİL EDİLMEDİ.
 ];
 
 function toFeatureVector(row) {
