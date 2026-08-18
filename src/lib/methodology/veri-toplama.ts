@@ -92,20 +92,31 @@ export type AccuraceSibling = {
 // 2026-08-18 — Supabase pgbouncer pooler'ı, Prisma'nın nested `accuraceRace: {select}`
 // için otomatik ürettiği TEK büyük "WHERE id IN (...)" sorgusunda (geniş sahalarda 400+
 // id) bazen tıkanıp askıda kalıyor (gatherFaz1V5'te gerçek hang ile doğrulandı). Çözüm:
-// AccuraceRace'i nested relation olarak DEĞİL, ayrı ve KÜÇÜK parçalar halinde (CHUNK=25)
-// çekip JS'te birleştiriyoruz — aynı veri, tek seferde değil.
-const ACCURACE_RACE_CHUNK = 25;
+// AccuraceRace'i nested relation olarak DEĞİL, ayrı ve KÜÇÜK parçalar halinde çekip JS'te
+// birleştiriyoruz. İLK sürüm (CHUNK=25, sıralı/sequential await) doğruluğu düzeltti ama
+// DB pooler'ının bölgesi (aws-1-ap-northeast-2, Seul) yüzünden her round-trip'in kendi
+// gecikmesi var — büyük sahalarda (13+ at) çok sayıda ardışık round-trip 270 saniyeye
+// kadar çıkabiliyordu (Kocaeli K3 ile gerçek ölçümle doğrulandı). Düzeltme: chunk boyutu
+// büyütüldü (100 — orijinal hang'e yol açan 400+ id'nin hâlâ çok altında, güvenli marj)
+// VE kalan chunk'lar sıralı değil PARALEL (Promise.all) çekiliyor — round-trip SAYISI ve
+// round-trip'lerin TOPLAM bekleme süresi birlikte düşüyor.
+const ACCURACE_RACE_CHUNK = 100;
 
 async function fetchAccuraceRacesByIds(
   ids: string[]
 ): Promise<Map<string, { date: Date; citySlug: string; ground: string | null; length: number | null }>> {
   const map = new Map<string, { date: Date; citySlug: string; ground: string | null; length: number | null }>();
-  for (let i = 0; i < ids.length; i += ACCURACE_RACE_CHUNK) {
-    const chunk = ids.slice(i, i + ACCURACE_RACE_CHUNK);
-    const rows = await db.accuraceRace.findMany({
-      where: { id: { in: chunk } },
-      select: { id: true, date: true, citySlug: true, ground: true, length: true },
-    });
+  const chunkler: string[][] = [];
+  for (let i = 0; i < ids.length; i += ACCURACE_RACE_CHUNK) chunkler.push(ids.slice(i, i + ACCURACE_RACE_CHUNK));
+  const sonuclar = await Promise.all(
+    chunkler.map((chunk) =>
+      db.accuraceRace.findMany({
+        where: { id: { in: chunk } },
+        select: { id: true, date: true, citySlug: true, ground: true, length: true },
+      })
+    )
+  );
+  for (const rows of sonuclar) {
     for (const r of rows) map.set(r.id, { date: r.date, citySlug: r.citySlug, ground: r.ground, length: r.length });
   }
   return map;
