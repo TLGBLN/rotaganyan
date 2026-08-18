@@ -1,7 +1,6 @@
 "use client";
 
 import V5AnalysisPanel from "./V5AnalysisPanel";
-import Faz1VeriDurumu from "./Faz1VeriDurumu";
 import PredictionForm from "./PredictionForm";
 import type { PedigreeRating, Prisma } from "@prisma/client";
 
@@ -35,7 +34,6 @@ type Props = {
 export default function SmartAnalysisEditor({ raceId, runners, existingPrediction }: Props) {
   return (
     <div className="space-y-6">
-      <Faz1VeriDurumu raceId={raceId} />
       <V5AnalysisPanel raceId={raceId} runners={runners} existingPrediction={existingPrediction} />
       <PredictionForm
         raceId={raceId}
