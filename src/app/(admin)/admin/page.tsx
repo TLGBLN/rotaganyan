@@ -142,7 +142,7 @@ export default async function AdminDashboard() {
                 biri teoriyi biri sahadaki gerçeği gösteriyor. */}
             <div className="rounded-lg border p-4 text-xs leading-relaxed text-muted-foreground">
               <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-brand">
-                V5 Motoru — Kendi Test Seti (offline backtest, n={v5Test.n})
+                V5.1 Motoru — Kendi Test Seti (offline backtest, n={v5Test.n})
               </span>
               Hiç görülmemiş {v5Test.n} koşuda{" "}
               <span className="font-semibold text-foreground">%{v5Test.top1P.toFixed(1)} ilk sıra</span> /{" "}

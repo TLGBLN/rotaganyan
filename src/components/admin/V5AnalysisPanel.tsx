@@ -239,7 +239,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-purple-500" />
         <h3 className="text-sm font-semibold">
-          V5 — Koşullu Logit Modeli (19 özellik, atları doğrudan kıyaslar — Claude yok, maliyet sıfır)
+          V5.1 — Koşullu Logit Modeli (19 özellik, atları doğrudan kıyaslar — Claude yok, maliyet sıfır)
         </h3>
       </div>
 
