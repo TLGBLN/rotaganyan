@@ -31,11 +31,12 @@ const FEATURE_NAMES = [
   // bootstrap CI'da sıfırı içerdi — veri desteklemiyor, modele DAHİL EDİLMEDİ (kullanıcı
   // kararı). model-veri.json'da sinifGecisi/sinifGecisiEtkilesim alanları hâlâ duruyor
   // ama burada kullanılmıyor.
-  "agfFavorisiMi", // YENİ — 2026-08-16 kullanıcı bulgusu (KURUŞHAN): agfSirasi==1 alt
-  // grubunda modelin ortalama tahmini (%28.6) gerçek kazanma oranından (%32.6, n=807)
-  // düşük çıktı — agfSirasi'nin doğrusal etkisi #1 OLMANIN kendisini (2.,3. vs farkından
-  // ayrı, ayrık bir sıçrama olabilir) tam yakalamıyor olabilir. Ayrık ikili özellik
-  // olarak test ediliyor.
+  // ESKİ — 2026-08-16'da "agfFavorisiMi" eklenmişti (agfSirasi==1 alt grubunda modelin
+  // ortalama tahmini gerçek kazanma oranından düşük çıkıyordu, #1 OLMANIN ayrık sıçramasını
+  // yakalamak için ikili bayrak eklendi, o zaman anlamlıydı: +0.0846). 2026-08-19'da
+  // "agfPayi" (aşağıda) eklenince agfFavorisiMi'nin katsayısı -0.0284'e düştü (anlamsız) —
+  // agfPayi aynı bilgiyi (favori olma) çok daha güçlü ve sürekli (rank değil, gerçek pay
+  // büyüklüğü) yakalıyor. agfFavorisiMi bu yüzden ARTIK GEREKSİZ, modelden ÇIKARILDI.
   // NOT — 2026-08-16: dört aday sinyal daha test edildi (aynı jokey sürekliliği, takı
   // eklendi, takı çıkarıldı, sınıf düşüşü×uzun-ara-galop) — DÖRDÜ DE bootstrap CI'da
   // sıfırı içerdi VE genel test performansını hafifçe düşürdü (top1 %37.2→%35.7).
@@ -83,6 +84,22 @@ const FEATURE_NAMES = [
   // GA=[-0.126, 0.123], sıfırı içeriyor) — HP muhtemelen AGF sırası + aygır/jokey/
   // antrenör oranlarıyla zaten yüksek örtüşüyor (piyasa da atın kalitesini fiyatlıyor),
   // ek bilgi katmıyor. Modele DAHİL EDİLMEDİ.
+  // NOT — 2026-08-19: BODUBEY (İstanbul K5) ve EL LEON (Elazığ K3) — ikisi de AGF favorisi
+  // ama zayıf aygır profiliyle sistemde çok düşük sıraya düşmüştü, ikisi de kazandı.
+  // Kapsamlı kalibrasyon denetimi: zayıf-aygırlı-favori grubunda model +5.1 puan hafife
+  // alıyordu (n=1165, GA bunu dışlıyordu). Üç düzeltme denemesi (aygır×agfSirasi etkileşim
+  // terimi, aygır²/antrenör² kare terimleri, L2 gevşetme) BAŞARISIZ oldu — kare terim
+  // durumu KÖTÜLEŞTİRDİ bile. Kök neden: "agfFavorisiMi" yalnız SIRAYI (1. mi değil mi)
+  // yakalıyordu, AGF payının BÜYÜKLÜĞÜNÜ değil (LEJUR %47 ile EL LEON %22 aynı "favori"
+  // etiketini alıyordu). "agfPayi" (ham AGF yüzdesi) ayrı özellik olarak eklenince ÇOK
+  // güçlü anlamlı çıktı (+0.4578, GA[0.2095,0.6566], sireOrani'ye yakın büyüklükte) ve
+  // zayıf-aygırlı-favori kalibrasyon farkını +5.1'den +1.2 puana indirdi — test top1
+  // (%35.6→%37.5), top3 (%66.8→%68.8), log-loss (1.7828→1.7696) ÜÇÜ BİRDEN iyileşti.
+  // "agfFarkiIkinciye" (sahadaki 2.'ye göre dominans farkı, yalnız favori için sıfırdan
+  // farklı) da ayrıca anlamlı çıktı (-0.1311, GA[-0.2711,-0.0020]). agfFavorisiMi bu
+  // ikisinin yanında ARTIK GEREKSİZ hale geldi (katsayısı -0.0284'e düştü, anlamsız
+  // bölgede) — modelden ÇIKARILDI, yerini agfPayi + agfFarkiIkinciye aldı.
+  "agfPayi", "agfFarkiIkinciye",
 ];
 
 function toFeatureVector(row) {
@@ -101,10 +118,11 @@ function toFeatureVector(row) {
     row.jokeyOrani,
     row.antrenorOrani,
     row.uzunAraGalopKatkisi ?? 0,
-    row.agfSirasi === 1 ? 1 : 0,
     row.agfFark >= ANLAMLI_PUAN_ESIGI ? 1 : 0,
     row.kacakAtMi ?? 0,
     (row.agfFark <= -ANLAMLI_PUAN_ESIGI && row.agfSirasi <= 4) ? 1 : 0,
+    row.agfPayi ?? 0,
+    row.agfFarkiIkinciye ?? 0,
   ];
 }
 

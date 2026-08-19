@@ -12,16 +12,25 @@
  * Doğrulama (bu oturumda yapıldı, arac-model-veri-olustur.mts + arac-model-egit.mjs):
  *  - 830 koşu (2026-07-01 sonrası — Rotaganyan'ın kendi AGF/galop takip altyapısının
  *    başladığı tarih, öncesi sistematik %0 kapsamalı), kronolojik 622 eğitim/208 test.
- *  - Test (görülmemiş veri, 18 özellikli son eğitim — 2026-08-17): top1=%35.6 (bootstrap
- *    %95 GA %29.3-42.3), top3=%66.8 (GA %60.1-73.6) — V4'ün AYNI dönemde canlı çalıştırılan
+ *  - Test (görülmemiş veri, 19 özellikli son eğitim — 2026-08-19): top1=%37.0 (bootstrap
+ *    %95 GA %30.8-43.3), top3=%68.3 (GA %62.0-74.0) — V4'ün AYNI dönemde canlı çalıştırılan
  *    top1=%24.2/top3=%55.1'ini net geçiyor, GA'lar V4 rakamlarını içermiyor.
  *  - Gerçek KÖR canlı test (2026-08-15, Ankara+İzmir+Diyarbakır, 23 koşu, sonuçlara
  *    bakılmadan tahmin üretildi): V5 top1=%30.4/top3=%60.9 vs V4 top1=%26.1/top3=%52.2 —
  *    tek günlük örneklem küçük ama yön backtest'le tutarlı.
  *  - "Sınıf geçişi" (classToSkk farkı) sinyali 3 formülasyonda test edildi, üçü de
  *    bootstrap CI'da sıfırı içerdi — modele DAHİL EDİLMEDİ. 2026-08-17: kacakAtMi ve
- *    dususAmaIyiPozisyon eklenip 16→18 özelliğe çıkarıldı (bkz. weights/v5-weights.json
- *    featureNames, tam liste + gerekçe yorumları toFeatureVector üzerinde).
+ *    dususAmaIyiPozisyon eklenip 16→18 özelliğe çıkarıldı.
+ *  - 2026-08-19 (BODUBEY/EL LEON vakaları): kapsamlı kalibrasyon denetiminde
+ *    zayıf-aygırlı-AGF-favorisi grubunda model +5.1 puan hafife alıyordu. "agfFavorisiMi"
+ *    (yalnız SIRA, #1 mi değil mi) çıkarıldı, yerine "agfPayi" (ham AGF yüzdesi, +0.4500,
+ *    ÇOK anlamlı) + "agfFarkiIkinciye" (2.'ye dominans farkı, sınırda) eklendi — 18→19
+ *    özellik. Kalibrasyon farkı +5.1'den +1.2 puana düştü, top1/top3/log-loss ÜÇÜ BİRDEN
+ *    iyileşti. Ayrıca %80+ tahmin diliminde aşırı-güven bulundu (n=78, tahmin %88.1 vs
+ *    gerçek %67.9) — softmax'a KOŞULLU sıcaklık ölçeklendirmesi eklendi (bkz. softmax
+ *    fonksiyonu üstündeki not), top1/top3'ü DEĞİŞTİRMEDEN yalnız aşırı-uçtaki mutlak
+ *    olasılığı yumuşatıyor. Tam liste + gerekçe yorumları toFeatureVector üzerinde
+ *    (bkz. weights/v5-weights.json featureNames).
  *
  * Ağırlıklar `weights/v5-weights.json`'da COMMIT EDİLMİŞ (production'da Vercel'in
  * scratchpad'e erişimi yok) — yeniden eğitim gerekirse arac-model-egit.mjs çalıştırılıp
@@ -105,6 +114,21 @@ export type Faz1RunnerV5 = {
    *  tabanlı, style: "KACAK_AT"|...) — kapı no/kilo farkı/HP farkı AYNI ANDA test
    *  edildi, üçü de anlamsız çıktı; yalnız bu anlamlı (+0.0878, GA [0.0290,0.1811]). */
   kacakAtMi: 0 | 1;
+  /** 2026-08-19 kullanıcı bulgusu (BODUBEY/EL LEON vakaları): agfSirasi/agfFavorisiMi
+   *  yalnız SIRAYI yakalıyordu, AGF payının BÜYÜKLÜĞÜNÜ değil (LEJUR'un %47'si ile
+   *  EL LEON'un %22'si aynı "favori" etiketini alıyordu). Kapsamlı kalibrasyon denetiminde
+   *  zayıf-aygırlı-favori grubunda modelin sistematik olarak hafife aldığı (+5.1 puan
+   *  kalibrasyon farkı) bulundu — üç ayrı düzeltme denemesi (aygır×AGF etkileşimi, kare
+   *  terimler, L2 gevşetme) başarısız oldu. Ham AGF payı ayrı özellik olarak eklenince
+   *  (agfPayi: +0.4578, ÇOK anlamlı, GA[0.2095,0.6566]) kalibrasyon farkı +5.1'den
+   *  +1.2 puana düştü, test top1/top3/logloss ÜÇÜ BİRDEN iyileşti (bkz. arac-model-egit.mjs
+   *  üstündeki not). agfFavorisiMi bu yüzden ARTIK GEREKSİZ hale geldi, modelden çıkarıldı. */
+  agfPayi: number;
+  /** Sahadaki 2. sıradaki ata göre AGF dominans farkı — yalnız AGF favorisi (1. sırada
+   *  olan) at için sıfırdan farklı, diğerlerinde 0. "Ne kadar EZİCİ favori" sorusunu
+   *  agfPayi'den bağımsız ayrıca ölçüyor (agfPayi: 0.4578, agfFarkiIkinciye: -0.1311,
+   *  ikisi de anlamlı — bkz. yukarıdaki not). */
+  agfFarkiIkinciye: number;
 };
 
 export type Faz1SonucV5 = {
@@ -184,6 +208,9 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
   const agfSirali = [...runners].filter((r) => r.agf != null).sort((a, b) => (b.agf ?? 0) - (a.agf ?? 0));
   const agfSiraMap = new Map(agfSirali.map((r, i) => [r.id, i + 1]));
   const sahaOrtasi = Math.ceil(runners.length / 2);
+  // 2026-08-19 kullanıcı bulgusu (BODUBEY/EL LEON) — bkz. Faz1RunnerV5.agfPayi üstündeki not.
+  const birinciAgf = agfSirali[0]?.agf ?? null;
+  const ikinciAgf = agfSirali[1]?.agf ?? null;
 
   const faz1Runners: Faz1RunnerV5[] = runners.map((r) => {
     const sonYaris = sonYarisByNo.get(r.no);
@@ -222,6 +249,11 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       id: r.id, no: r.no, ad: r.name, jockey: r.jockey, trainer: r.trainer, agf: r.agf,
       agfFark: agfFarkByNo.get(r.no) ?? 0,
       agfSirasi: agfSiraMap.get(r.id) ?? sahaOrtasi,
+      agfPayi: r.agf ?? 0,
+      agfFarkiIkinciye:
+        r.agf != null && birinciAgf != null && r.agf === birinciAgf && ikinciAgf != null
+          ? birinciAgf - ikinciAgf
+          : 0,
       accurace: accuraceMap.get(r.name) === true ? 1 : 0,
       formEgimi: formEgimi(r.recentForm),
       kgs: kgsVal, kgsVarMi,
@@ -257,12 +289,6 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     r.agfSirasi, r.accurace, r.formEgimi, r.formEgimi * r.formEgimi,
     r.kgsVarMi ? r.kgs : 0, r.kgsVarMi ? r.kgs * r.kgs : 0, r.kgsVarMi, r.pistUzmani,
     r.sireOrani, r.galop, r.idmJokey, r.jokeyOrani, r.antrenorOrani, r.uzunAraGalopKatkisi,
-    // 2026-08-16 kullanıcı bulgusu (KURUŞHAN): agfSirasi==1 alt grubunda modelin
-    // ortalama tahmini gerçek kazanma oranından düşük çıkıyordu (%28.6 vs %32.6,
-    // n=807) — agfSirasi'nin doğrusal etkisi #1 OLMANIN kendisini (ayrık bir sıçrama)
-    // tam yakalamıyordu. Ayrı ikili özellik olarak eklendi, anlamlı çıktı (katsayı
-    // +0.0922, %95 GA [0.0067, 0.1531]).
-    r.agfSirasi === 1 ? 1 : 0,
     // 2026-08-16 kullanıcı ısrarı: ham agfFark (sürekli puan farkı) HİÇBİR
     // formülasyonda anlamlı çıkmamıştı (agfSirasi ile multicollinearity). Eşik-bazlı
     // ikili hâliyle (|fark|>=1.0) ANLAMLI çıktı (+0.1058, GA [0.0446, 0.1780]) —
@@ -279,6 +305,12 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     // kalma" (para bilerek geri çekiliyor ama at hâlâ favoriler arasında) ANLAMLI çıktı
     // (+0.1282, GA [0.0576, 0.1982]).
     r.agfFark <= -ANLAMLI_PUAN_ESIGI && r.agfSirasi <= 4 ? 1 : 0,
+    // 2026-08-19 kullanıcı bulgusu (BODUBEY/EL LEON) — bkz. Faz1RunnerV5.agfPayi
+    // üstündeki not. Eski "agfSirasi===1?1:0" (agfFavorisiMi) buradan ÇIKARILDI,
+    // yerini bu ikisi aldı (agfPayi: +0.4578, agfFarkiIkinciye: -0.1311, ikisi de
+    // anlamlı — agfFavorisiMi -0.0284'e düşüp anlamsızlaştı).
+    r.agfPayi,
+    r.agfFarkiIkinciye,
   ];
 }
 
@@ -473,7 +505,7 @@ type OzellikGrubu = {
 const idx = (name: string) => FEATURE_NAMES.indexOf(name);
 
 const OZELLIK_GRUPLARI: OzellikGrubu[] = [
-  { kod: "AGF", ozellikIndeksleri: [idx("agfSirasi"), idx("agfFavorisiMi")], aciklama: (r) => `AGF sırası: ${r.agfSirasi}${r.agfSirasi === 1 ? " (AGF favorisi)" : ""}` },
+  { kod: "AGF", ozellikIndeksleri: [idx("agfSirasi"), idx("agfPayi"), idx("agfFarkiIkinciye")], aciklama: (r) => `AGF sırası: ${r.agfSirasi}${r.agfSirasi === 1 ? ` (AGF favorisi, %${r.agfPayi.toFixed(1)})` : ` (%${r.agfPayi.toFixed(1)})`}` },
   { kod: "ACC", ozellikIndeksleri: [idx("accurace")], aciklama: (r) => (r.accurace ? "Accurace: son yarışta sahanın en hızlı son 200m kapanışı" : null) },
   { kod: "FORM", ozellikIndeksleri: [idx("formEgimi"), idx("formEgimi2")], aciklama: (r) => `Form eğimi: ${r.formEgimi.toFixed(1)} (${r.formEgimi < 0 ? "iyileşiyor" : r.formEgimi > 0 ? "kötüleşiyor" : "sabit"})` },
   { kod: "KGS", ozellikIndeksleri: [idx("kgs"), idx("kgs2"), idx("kgsVarMi")], aciklama: (r) => (r.kgsVarMi ? `KGS ${r.kgs} gün` : null) },
@@ -506,8 +538,9 @@ const FEATURE_LABELS: Record<string, string> = {
   idmJokey: "İdman Jokeyi Uyumu", jokeyOrani: "Jokey Kazanma Oranı (küçültülmüş)",
   antrenorOrani: "Antrenör Kazanma Oranı (küçültülmüş)",
   uzunAraGalopKatkisi: "Uzun Aradan Sonra Galop Sayısı",
-  agfFavorisiMi: "AGF Favorisi Mi (1. sıra)", agfYukselisVarMi: "AGF Eşik-Üstü Yükseliş Var Mı",
+  agfYukselisVarMi: "AGF Eşik-Üstü Yükseliş Var Mı",
   kacakAtMi: "Kaçak At / Erken Tempo", dususAmaIyiPozisyon: "AGF Düşüşüne Rağmen İyi Pozisyon",
+  agfPayi: "AGF Payı (ham yüzde)", agfFarkiIkinciye: "AGF Dominans Farkı (2.'ye göre, yalnız favoride)",
 };
 
 export type TumOzellikDetay = { kod: string; etiket: string; hamDeger: number; standartDeger: number; katki: number };

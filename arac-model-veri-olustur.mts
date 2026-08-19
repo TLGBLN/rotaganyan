@@ -84,6 +84,11 @@ export type ModelRow = {
   // (confounding — AGF sırası + aygır/jokey/antrenör oranlarıyla örtüşüyor, bkz.
   // arac-model-egit.mjs'deki not) — modele DAHİL EDİLMEDİ. Alan yine de toplanıyor.
   hpSirasi: number;
+  // 2026-08-19 — ham AGF payı (yüzde) + sahadaki 2.'ye göre dominans farkı (yalnız
+  // favori için sıfırdan farklı). arac-model-egit.mjs'de MODELE DAHİL (bkz. o dosyadaki
+  // not) — agfFavorisiMi'nin yerini aldı.
+  agfPayi: number;
+  agfFarkiIkinciye: number;
 };
 
 async function main() {
@@ -169,6 +174,11 @@ async function main() {
             );
             const agfSirali = [...runners].filter((r) => r.agf != null).sort((a, b) => (b.agf ?? 0) - (a.agf ?? 0));
             const agfSiraMap = new Map(agfSirali.map((r, i2) => [r.id, i2 + 1]));
+            // 2026-08-19 kullanıcı bulgusu (BODUBEY/EL LEON) — agfSirasi yalnız SIRAYI
+            // yakalıyor, AGF payının BÜYÜKLÜĞÜNÜ değil (LEJUR %47 ile EL LEON %22 aynı
+            // "favori" etiketini alıyordu). Ham pay + sahadaki 2.'ye göre dominans farkı.
+            const birinciAgf = agfSirali[0]?.agf ?? null;
+            const ikinciAgf = agfSirali[1]?.agf ?? null;
             // 2026-08-17 kullanıcı talebi — hiç kullanılmayan HP (resmi handikap puanı)
             // alanı test ediliyor. agfSirasi ile AYNI desen: sahadaki HP'ye göre sıra
             // (yüksek HP = 1.sıra), veri yoksa saha ortası.
@@ -232,6 +242,11 @@ async function main() {
                 onGrupArkasiMi: (r.raceStyle as { style?: string } | null)?.style === "ON_GRUP_ARKASI" ? 1 : 0,
                 disaridanStart: r.disaridanStart ? 1 : 0,
                 hpSirasi: hpSiraMap.get(r.id) ?? Math.ceil(runners.length / 2),
+                agfPayi: r.agf ?? 0,
+                agfFarkiIkinciye:
+                  r.agf != null && birinciAgf != null && r.agf === birinciAgf && ikinciAgf != null
+                    ? birinciAgf - ikinciAgf
+                    : 0,
               });
             }
           })(), 25_000);

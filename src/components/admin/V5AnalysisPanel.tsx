@@ -239,7 +239,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-purple-500" />
         <h3 className="text-sm font-semibold">
-          V5 — Koşullu Logit Modeli (18 özellik, atları doğrudan kıyaslar — Claude yok, maliyet sıfır)
+          V5 — Koşullu Logit Modeli (19 özellik, atları doğrudan kıyaslar — Claude yok, maliyet sıfır)
         </h3>
       </div>
 
@@ -335,7 +335,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                       className="flex items-center gap-1 text-[11px] font-medium text-purple-500 hover:underline"
                     >
                       {acikDetay.has(no) ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                      Tüm 18 Sinyal — Denetim Kaydı ({a.tumSinyaller.length}/18 hesaplandı)
+                      Tüm 19 Sinyal — Denetim Kaydı ({a.tumSinyaller.length}/19 hesaplandı)
                     </button>
                     {acikDetay.has(no) && (
                       <div className="mt-1.5 overflow-x-auto">
