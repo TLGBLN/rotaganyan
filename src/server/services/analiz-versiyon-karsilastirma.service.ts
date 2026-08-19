@@ -96,7 +96,7 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5",
     baslangic: new Date("2026-08-16T00:11:08+03:00"), // 54cb73c — V5 motoru canlıya alındı
-    bitis: null,
+    bitis: new Date("2026-08-19T21:15:34+03:00"), // 01f154a — agfPayi eklenip V5.1'e geçildi
     aciklama: "V4'ün mekanik sinyal-sayım/eşik sistemi tamamen kaldırıldı. Koşullu logit (Plackett-Luce / yarış-gruplu softmax) modeli 18 sürekli/ikili özelliği TEK skorda birleştirip atları doğrudan kıyaslar (eşiklerle kutulamaz). 830 koşuluk kronolojik train/test + bootstrap güven aralığıyla doğrulandı, V4 ile aynı test kümesinde canlı A/B kıyaslandı. Claude çağrısı yok, maliyet sıfır. (2026-08-17: kacakAtMi + dususAmaIyiPozisyon eklenip 16→18 özelliğe çıkarıldı, aşağıdaki rakamlar bu son eğitimden.)",
     neyiAnalizEdiyor: [
       "18 özellik: AGF sırası+favorisi+eşik-bazlı yükseliş, Accurace, form eğimi, KGS, pist uzmanlığı, aygır/jokey/antrenör kazanma oranı (shrinkage), keskin galop, idman jokeyi uyumu, uzun-ara galop sayısı, kaçak at (tempo/koşu stili), düşüşe rağmen iyi AGF pozisyonu (para akışı sinyali)",
@@ -106,6 +106,21 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
       "Test (n=208, hiç görülmemiş): top1 %35.6 (GA %29.3-42.3), top3 %66.8 (GA %60.1-73.6) — V4'ün top1 %24.2/top3 %55.1'ini net geçiyor, GA'lar V4 rakamlarını içermiyor. Eğitim (n=622): top1 %40.2, top3 %75.1",
       "Anlamlı (bootstrap GA sıfırı dışlıyor): agfSirasi, sireOrani, jokeyOrani, antrenorOrani, agfFavorisiMi (+0.08), agfYukselisVarMi (+0.18), kacakAtMi (+0.09), dususAmaIyiPozisyon (+0.13); aynı jokey sürekliliği/takı değişikliği/sınıf geçişi×uzun-ara/düşüş×temel-güç — hepsi anlamsız çıktı, modele DAHİL EDİLMEDİ",
       "Banko Adayı eşiği ham olasılığa göre %40 (V4'ün karar-metni eşleşmesinden farklı, kendi backtest'i: n=296/826, %53.7 isabet)",
+    ],
+  },
+  {
+    versiyon: "V5.1",
+    baslangic: new Date("2026-08-19T21:15:34+03:00"), // 01f154a — agfPayi eklendi, agfFavorisiMi çıkarıldı
+    bitis: null,
+    aciklama: "BODUBEY (İstanbul K5) ve EL LEON (Elazığ K3) — ikisi de AGF favorisi ama zayıf aygır profiliyle sistemde çok düşük sıraya düşmüştü, ikisi de kazandı. Kapsamlı kalibrasyon denetiminde zayıf-aygırlı-favori grubunda model +5.1 puan hafife alıyordu; üç düzeltme denemesi (aygır×AGF etkileşimi, kare terimler, L2 gevşetme) başarısız oldu. Kök neden: agfFavorisiMi yalnız SIRAYI yakalıyordu, AGF payının BÜYÜKLÜĞÜNÜ değil. Ham AGF payı ayrı özellik eklenince (+0.45, çok güçlü anlamlı) kalibrasyon farkı +1.2 puana düştü. Ayrıca %80+ tahmin diliminde bulunan aşırı-güvene (n=78, tahmin %88.1 vs gerçek %67.9) koşullu sıcaklık ölçeklendirmesi eklendi — top1/top3'ü değiştirmeden yalnız uç mutlak olasılığı yumuşatır.",
+    neyiAnalizEdiyor: [
+      "19 özellik: V5'in 18'i minus agfFavorisiMi (yalnız SIRA), artı agfPayi (ham AGF yüzdesi) + agfFarkiIkinciye (sahadaki 2.'ye göre dominans farkı)",
+      "Softmax'a koşullu sıcaklık ölçeklendirmesi (yalnız lider zaten %70+ ise T=1.5) — sıralama korunur, yalnız aşırı-uç olasılık yumuşar",
+    ],
+    caprazlamalar: [
+      "Test (n=208, hiç görülmemiş): top1 %37.0 (GA %30.8-43.3), top3 %68.3 (GA %62.0-74.0), log-loss 1.7705 — V5'in top1 %35.6/top3 %66.8/logloss 1.7828'ini geçiyor. Eğitim (n=622): top1 %40.5, top3 %75.6",
+      "Anlamlı: agfSirasi, sireOrani, jokeyOrani, antrenorOrani, agfYukselisVarMi, dususAmaIyiPozisyon, agfPayi (+0.45, en büyük yeni katsayı); agfFarkiIkinciye sınırda (-0.14, GA üst sınırı 0.002)",
+      "Zayıf-aygırlı-AGF-favorisi kalibrasyon farkı: V5'te +5.1 puan → V5.1'de +1.2 puan (n=1165/274)",
     ],
   },
 ];
