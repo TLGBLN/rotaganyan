@@ -5,7 +5,6 @@ import { tr } from "date-fns/locale";
 import { getAdminPredictionById, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
 import { assertPublishSafe } from "@/server/actions/prediction.actions";
 import SmartAnalysisEditor from "@/components/admin/SmartAnalysisEditor";
-import MarkdownRaceInput from "@/components/admin/MarkdownRaceInput";
 import DeletePredictionButton from "@/components/admin/DeletePredictionButton";
 import ClassTypeAdviceCard from "@/components/admin/ClassTypeAdviceCard";
 import { Badge } from "@/components/ui/badge";
@@ -57,11 +56,6 @@ export default async function EditAnalizPage({ params }: PageProps) {
           <DeletePredictionButton predictionId={pred.id} />
         </div>
       </div>
-
-      <MarkdownRaceInput
-        raceId={race.id}
-        raceLabel={`Markdown İle Yeniden Gir — ${race.raceNo}. Koşu · ${race.runners.length} at`}
-      />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
         <SmartAnalysisEditor

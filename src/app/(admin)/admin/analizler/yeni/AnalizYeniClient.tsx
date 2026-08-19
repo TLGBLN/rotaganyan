@@ -6,8 +6,6 @@ import Link from "next/link";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { getKosuAnalizVerisi } from "@/server/actions/admin-analiz.actions";
 import SmartAnalysisEditor from "@/components/admin/SmartAnalysisEditor";
-import MarkdownRaceInput from "@/components/admin/MarkdownRaceInput";
-import BultenUpload from "@/components/admin/BultenUpload";
 import DatePickerNav from "./DatePickerNav";
 
 // 2026-08-14 — kullanıcı talebi: "Veri Gir — Koşu Seç" listesi ile analiz paneli tek
@@ -20,8 +18,6 @@ export type KosuSecimGunu = {
   gunEtiketi: string;
   races: { id: string; raceNo: number; hasAnaliz: boolean }[];
 };
-
-type Mod = "oto" | "md" | "screenshot";
 
 type RaceData = NonNullable<Awaited<ReturnType<typeof getKosuAnalizVerisi>>>;
 
@@ -39,13 +35,11 @@ export default function AnalizYeniClient({ gunler, selectedDate, today, tomorrow
   const [raceData, setRaceData] = useState<RaceData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mod, setMod] = useState<Mod>("oto");
 
   const loadRace = useCallback(async (raceId: string) => {
     setLoading(true);
     setError(null);
     setRaceData(null);
-    setMod("oto");
     try {
       const data = await getKosuAnalizVerisi(raceId);
       if (!data) {
@@ -156,52 +150,12 @@ export default function AnalizYeniClient({ gunler, selectedDate, today, tomorrow
               )}
             </div>
 
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setMod("oto")}
-                className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${
-                  mod === "oto" ? "bg-brand text-black" : "border border-white/10 text-muted-foreground hover:bg-white/5"
-                }`}
-              >
-                Otomatik Analiz
-              </button>
-              <button
-                type="button"
-                onClick={() => setMod("md")}
-                className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${
-                  mod === "md" ? "bg-brand text-black" : "border border-white/10 text-muted-foreground hover:bg-white/5"
-                }`}
-              >
-                Markdown Giriş
-              </button>
-              <button
-                type="button"
-                onClick={() => setMod("screenshot")}
-                className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${
-                  mod === "screenshot" ? "bg-brand text-black" : "border border-white/10 text-muted-foreground hover:bg-white/5"
-                }`}
-              >
-                Ekran Görüntüsü
-              </button>
-            </div>
-
-            {mod === "oto" && (
-              <SmartAnalysisEditor
-                key={raceData.id}
-                raceId={raceData.id}
-                runners={raceData.runners}
-                existingPrediction={raceData.prediction ?? undefined}
-              />
-            )}
-            {mod === "md" && (
-              <MarkdownRaceInput
-                raceId={raceData.id}
-                raceLabel={`${raceData.raceNo}. Koşu — ${raceData.runners.length} at`}
-                defaultOpen
-              />
-            )}
-            {mod === "screenshot" && <BultenUpload raceId={raceData.id} raceName={raceName} />}
+            <SmartAnalysisEditor
+              key={raceData.id}
+              raceId={raceData.id}
+              runners={raceData.runners}
+              existingPrediction={raceData.prediction ?? undefined}
+            />
           </>
         )}
       </div>

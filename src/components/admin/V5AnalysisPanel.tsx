@@ -11,10 +11,9 @@ import type { PickDetailsV2 } from "@/lib/methodology/muhakeme-format";
 
 // 2026-08-16 — V5 motoru: V4'ün mekanik sinyal-sayımının YERİNE geçer (bkz.
 // SmartAnalysisEditor.tsx). Claude çağrısı YAPMAZ — koşullu logit (Plackett-Luce) modeli
-// 15 sürekli/ham özelliği TEK skorda birleştirip atları doğrudan kıyaslar (eşiklerle
-// kutulamaz). Doğrulama: test top1=%33.8 (GA %28.0-40.6)/top3=%70.0 (GA %63.8-76.8),
-// V4'ün AYNI test kümesinde canlı top1=%24.2/top3=%55.1'ini net geçiyor. Detaylar
-// src/lib/methodology/v5-engine.ts başlık yorumunda.
+// 18 sürekli/ham özelliği TEK skorda birleştirip atları doğrudan kıyaslar (eşiklerle
+// kutulamaz). Doğrulama (V5.1, 2026-08-19): test top1=%38.0 (GA %31.3-43.8)/top3=%68.3
+// (GA %61.5-74.5). Detaylar src/lib/methodology/v5-engine.ts başlık yorumunda.
 
 type TumOzellikDetay = { kod: string; etiket: string; hamDeger: number; standartDeger: number; katki: number };
 type V5At = {
