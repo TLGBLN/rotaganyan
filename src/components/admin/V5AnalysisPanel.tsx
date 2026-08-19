@@ -321,11 +321,18 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                     </Button>
                   </div>
                 </div>
-                <p className="text-muted-foreground">
-                  {kodluSatirlar.length > 0
-                    ? kodluSatirlar.map((s) => `${s.tip === "risk" ? "⚠ " : ""}${s.aciklama}`).join(" · ")
-                    : "Belirgin bir özellik katkısı yok."}
-                </p>
+                {kodluSatirlar.length > 0 ? (
+                  <ul className="list-disc space-y-0.5 pl-4 text-muted-foreground">
+                    {kodluSatirlar.map((s, si) => (
+                      <li key={si}>
+                        {s.tip === "risk" ? "⚠ " : ""}
+                        {s.aciklama}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-muted-foreground">Belirgin bir özellik katkısı yok.</p>
+                )}
 
                 {a.tumSinyaller && (
                   <div className="border-t border-border/60 pt-1.5">
