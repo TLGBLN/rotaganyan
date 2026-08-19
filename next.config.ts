@@ -1,6 +1,5 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
-import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   images: {
@@ -44,15 +43,4 @@ const nextConfig: NextConfig = {
 // yalnız request-config eklentisi kullanılıyor.
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
-// Sentry — 2026-08-19 kullanıcı talebi: "Bir Sorun Oluştu" hatası bazen mobil/web'de
-// çıkıyordu ama hiçbir yere kaydedilmiyordu (error.tsx yalnız console.error yapıyordu,
-// kullanıcının kendi tarayıcı konsolu dışında iz kalmıyordu). SENTRY_AUTH_TOKEN
-// ayarlanmadıkça source map yüklemesi sessizce atlanır (build kırılmaz) — DSN de
-// ayarlanmadıkça Sentry SDK'sı kendi kendine devre dışı kalır (bkz. instrumentation*.ts).
-export default withSentryConfig(withNextIntl(nextConfig), {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  authToken: process.env.SENTRY_AUTH_TOKEN,
-  silent: true,
-  disableLogger: true,
-});
+export default withNextIntl(nextConfig);
