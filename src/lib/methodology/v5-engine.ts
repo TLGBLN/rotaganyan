@@ -286,11 +286,31 @@ function standardize(v: number[]): number[] {
   return v.map((x, i) => (STDS[i] > 1e-9 ? (x - MEANS[i]) / STDS[i] : 0));
 }
 
-function softmax(scores: number[]): number[] {
+function softmaxHam(scores: number[]): number[] {
   const max = Math.max(...scores);
   const exps = scores.map((s) => Math.exp(s - max));
   const sum = exps.reduce((a, b) => a + b, 0);
   return exps.map((e) => e / sum);
+}
+
+// 2026-08-19 kullanıcı talebi (BODUBEY/EL LEON sonrası kapsamlı kalibrasyon denetimi):
+// %80+ tahmin dilimi gerçek galibiyet oranından belirgin yüksek çıkıyordu (n=78, tahmin
+// %88.1 vs gerçek %67.9, %95 GA bunu dışlıyordu — tüm 35.453 satırlık veride doğrulandı).
+// Kök neden aranırken üç ayrı düzeltme denendi (aygır×AGF etkileşim terimi, aygır/antrenör
+// kare terimleri, L2 gevşetme) — üçü de sorunu çözmedi, kare terim durumu KÖTÜLEŞTİRDİ.
+// Bu, sorunun katsayı/özellik eksikliği değil, softmax'ın kendi uç-nokta aşırı-güveni
+// olduğunu gösterdi. Çözüm: yalnız LİDERİ zaten %70+ olan koşularda (T=1.5) sıcaklık
+// ölçeklendirmesi — softmax sıralamayı KORUR (T monoton, top1/top3 hiç değişmez), yalnız
+// mutlak olasılığı yumuşatır. Backtest: sabit %80+ grubunun ort. tahmini %88.1→%70.3
+// (gerçek %67.9'a çok yakın), genel top1 DEĞİŞMEDİ (%38.9), genel logloss KÖTÜLEŞMEDİ
+// (1.7132→1.7131, hafif iyileşme). Diğer koşulara (lider <%70) hiç dokunulmuyor.
+const ASIRI_GUVEN_LIDER_ESIGI = 0.7;
+const ASIRI_GUVEN_SICAKLIGI = 1.5;
+
+function softmax(scores: number[]): number[] {
+  const ham = softmaxHam(scores);
+  if (Math.max(...ham) < ASIRI_GUVEN_LIDER_ESIGI) return ham;
+  return softmaxHam(scores.map((s) => s / ASIRI_GUVEN_SICAKLIGI));
 }
 
 export type Faz1RunnerV5Sirali = Faz1RunnerV5 & {
