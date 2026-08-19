@@ -147,7 +147,7 @@ export default async function AdminDashboard() {
               Hiç görülmemiş {v5Test.n} koşuda{" "}
               <span className="font-semibold text-foreground">%{v5Test.top1P.toFixed(1)} ilk sıra</span> /{" "}
               <span className="font-semibold text-foreground">%{v5Test.top3P.toFixed(1)} ilk-3</span> isabet
-              (19 özellik, koşullu logit). Alttaki tablo ise modelin iddiası değil — canlıda
+              (18 özellik, koşullu logit). Alttaki tablo ise modelin iddiası değil — canlıda
               yayınlanmış+sonuçlanmış V5 tahminlerinde her sinyalin taşındığı atın gerçekten
               kazandığı oran.
             </div>

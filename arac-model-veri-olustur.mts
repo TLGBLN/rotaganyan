@@ -84,10 +84,13 @@ export type ModelRow = {
   // (confounding — AGF sırası + aygır/jokey/antrenör oranlarıyla örtüşüyor, bkz.
   // arac-model-egit.mjs'deki not) — modele DAHİL EDİLMEDİ. Alan yine de toplanıyor.
   hpSirasi: number;
-  // 2026-08-19 — ham AGF payı (yüzde) + sahadaki 2.'ye göre dominans farkı (yalnız
-  // favori için sıfırdan farklı). arac-model-egit.mjs'de MODELE DAHİL (bkz. o dosyadaki
-  // not) — agfFavorisiMi'nin yerini aldı.
+  // 2026-08-19 — ham AGF payı (yüzde). arac-model-egit.mjs'de MODELE DAHİL (bkz. o
+  // dosyadaki not) — agfFavorisiMi'nin yerini aldı.
   agfPayi: number;
+  // Sahadaki 2.'ye göre dominans farkı (yalnız favori için sıfırdan farklı) — test
+  // edildi, resmi eğitimde SINIRDA çıktı ve EL LEON vakasında dominant favoriyi
+  // cezalandırdığı görülünce MODELDEN ÇIKARILDI (bkz. arac-model-egit.mjs'deki not).
+  // Alan yine de toplanıyor, gelecekte farklı formülasyonla tekrar test edilebilir.
   agfFarkiIkinciye: number;
 };
 

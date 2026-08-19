@@ -12,8 +12,8 @@
  * Doğrulama (bu oturumda yapıldı, arac-model-veri-olustur.mts + arac-model-egit.mjs):
  *  - 830 koşu (2026-07-01 sonrası — Rotaganyan'ın kendi AGF/galop takip altyapısının
  *    başladığı tarih, öncesi sistematik %0 kapsamalı), kronolojik 622 eğitim/208 test.
- *  - Test (görülmemiş veri, 19 özellikli son eğitim — 2026-08-19): top1=%37.0 (bootstrap
- *    %95 GA %30.8-43.3), top3=%68.3 (GA %62.0-74.0) — V4'ün AYNI dönemde canlı çalıştırılan
+ *  - Test (görülmemiş veri, 18 özellikli son eğitim — 2026-08-19): top1=%38.0 (bootstrap
+ *    %95 GA %31.3-43.8), top3=%68.3 (GA %61.5-74.5) — V4'ün AYNI dönemde canlı çalıştırılan
  *    top1=%24.2/top3=%55.1'ini net geçiyor, GA'lar V4 rakamlarını içermiyor.
  *  - Gerçek KÖR canlı test (2026-08-15, Ankara+İzmir+Diyarbakır, 23 koşu, sonuçlara
  *    bakılmadan tahmin üretildi): V5 top1=%30.4/top3=%60.9 vs V4 top1=%26.1/top3=%52.2 —
@@ -21,16 +21,19 @@
  *  - "Sınıf geçişi" (classToSkk farkı) sinyali 3 formülasyonda test edildi, üçü de
  *    bootstrap CI'da sıfırı içerdi — modele DAHİL EDİLMEDİ. 2026-08-17: kacakAtMi ve
  *    dususAmaIyiPozisyon eklenip 16→18 özelliğe çıkarıldı.
- *  - 2026-08-19 (BODUBEY/EL LEON vakaları): kapsamlı kalibrasyon denetiminde
+ *  - 2026-08-19 (BODUBEY/EL LEON vakaları, V5.1): kapsamlı kalibrasyon denetiminde
  *    zayıf-aygırlı-AGF-favorisi grubunda model +5.1 puan hafife alıyordu. "agfFavorisiMi"
- *    (yalnız SIRA, #1 mi değil mi) çıkarıldı, yerine "agfPayi" (ham AGF yüzdesi, +0.4500,
- *    ÇOK anlamlı) + "agfFarkiIkinciye" (2.'ye dominans farkı, sınırda) eklendi — 18→19
- *    özellik. Kalibrasyon farkı +5.1'den +1.2 puana düştü, top1/top3/log-loss ÜÇÜ BİRDEN
- *    iyileşti. Ayrıca %80+ tahmin diliminde aşırı-güven bulundu (n=78, tahmin %88.1 vs
- *    gerçek %67.9) — softmax'a KOŞULLU sıcaklık ölçeklendirmesi eklendi (bkz. softmax
- *    fonksiyonu üstündeki not), top1/top3'ü DEĞİŞTİRMEDEN yalnız aşırı-uçtaki mutlak
- *    olasılığı yumuşatıyor. Tam liste + gerekçe yorumları toFeatureVector üzerinde
- *    (bkz. weights/v5-weights.json featureNames).
+ *    (yalnız SIRA, #1 mi değil mi) çıkarıldı, yerine "agfPayi" (ham AGF yüzdesi) eklendi —
+ *    18 özellik aynı kaldı (biri çıktı biri girdi). Kalibrasyon farkı +5.1'den +1.2 puana
+ *    düştü. "agfFarkiIkinciye" (2.'ye dominans farkı) de denendi, ilk testte anlamlıydı
+ *    ama resmi eğitimde SINIRDA çıktı ve EL LEON vakasında (dominant favoriyi CEZALANDIRDI,
+ *    sezgiye aykırı) gerçek zarar verdiği görülünce DAHİL EDİLMEDİ — yalnız agfPayi kaldı,
+ *    top1 %35.6→%38.0, top3 %66.8→%68.3, log-loss 1.7828→1.7695 iyileşti. Ayrıca %80+
+ *    tahmin diliminde aşırı-güven bulundu (n=78, tahmin %88.1 vs gerçek %67.9) —
+ *    softmax'a KOŞULLU sıcaklık ölçeklendirmesi eklendi (bkz. softmax fonksiyonu
+ *    üstündeki not), top1/top3'ü DEĞİŞTİRMEDEN yalnız aşırı-uçtaki mutlak olasılığı
+ *    yumuşatıyor. Tam liste + gerekçe yorumları toFeatureVector üzerinde (bkz.
+ *    weights/v5-weights.json featureNames).
  *
  * Ağırlıklar `weights/v5-weights.json`'da COMMIT EDİLMİŞ (production'da Vercel'in
  * scratchpad'e erişimi yok) — yeniden eğitim gerekirse arac-model-egit.mjs çalıştırılıp
@@ -126,8 +129,13 @@ export type Faz1RunnerV5 = {
   agfPayi: number;
   /** Sahadaki 2. sıradaki ata göre AGF dominans farkı — yalnız AGF favorisi (1. sırada
    *  olan) at için sıfırdan farklı, diğerlerinde 0. "Ne kadar EZİCİ favori" sorusunu
-   *  agfPayi'den bağımsız ayrıca ölçüyor (agfPayi: 0.4578, agfFarkiIkinciye: -0.1311,
-   *  ikisi de anlamlı — bkz. yukarıdaki not). */
+   *  agfPayi'den bağımsız ayrıca ölçmek için eklenmişti, ilk testte anlamlıydı ama resmi
+   *  eğitimde SINIRDA çıktı (GA=[-0.2370, 0.0018]). 2026-08-19 EL LEON vakasında (Elazığ
+   *  K3) gerçek zararı görüldü: en yakın rakibinden 4.27 puan önde olmasına rağmen
+   *  (dominant favori — sezgisel olarak İYİ bir şey) negatif katsayı yüzünden CEZA aldı.
+   *  toFeatureVector'DAN ÇIKARILDI (agfPayi tek başına kaldı, top1 %37.0→%38.0 iyileşti,
+   *  tüm katsayılar net anlamlı/anlamsız oldu, sınırda kalan olmadı) — alan yine de
+   *  toplanıyor, gelecekte farklı bir formülasyonla tekrar test edilebilir. */
   agfFarkiIkinciye: number;
 };
 
@@ -307,10 +315,10 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     r.agfFark <= -ANLAMLI_PUAN_ESIGI && r.agfSirasi <= 4 ? 1 : 0,
     // 2026-08-19 kullanıcı bulgusu (BODUBEY/EL LEON) — bkz. Faz1RunnerV5.agfPayi
     // üstündeki not. Eski "agfSirasi===1?1:0" (agfFavorisiMi) buradan ÇIKARILDI,
-    // yerini bu ikisi aldı (agfPayi: +0.4578, agfFarkiIkinciye: -0.1311, ikisi de
-    // anlamlı — agfFavorisiMi -0.0284'e düşüp anlamsızlaştı).
+    // yerini bu aldı (agfPayi: +0.25, anlamlı — agfFavorisiMi -0.0284'e düşüp
+    // anlamsızlaşmıştı). agfFarkiIkinciye de denendi ama sınırda/zararlı çıktı
+    // (bkz. Faz1RunnerV5.agfFarkiIkinciye üstündeki not) — DAHİL EDİLMEDİ.
     r.agfPayi,
-    r.agfFarkiIkinciye,
   ];
 }
 
@@ -505,7 +513,7 @@ type OzellikGrubu = {
 const idx = (name: string) => FEATURE_NAMES.indexOf(name);
 
 const OZELLIK_GRUPLARI: OzellikGrubu[] = [
-  { kod: "AGF", ozellikIndeksleri: [idx("agfSirasi"), idx("agfPayi"), idx("agfFarkiIkinciye")], aciklama: (r) => `AGF sırası: ${r.agfSirasi}${r.agfSirasi === 1 ? ` (AGF favorisi, %${r.agfPayi.toFixed(1)})` : ` (%${r.agfPayi.toFixed(1)})`}` },
+  { kod: "AGF", ozellikIndeksleri: [idx("agfSirasi"), idx("agfPayi")], aciklama: (r) => `AGF sırası: ${r.agfSirasi}${r.agfSirasi === 1 ? ` (AGF favorisi, %${r.agfPayi.toFixed(1)})` : ` (%${r.agfPayi.toFixed(1)})`}` },
   { kod: "ACC", ozellikIndeksleri: [idx("accurace")], aciklama: (r) => (r.accurace ? "Accurace: son yarışta sahanın en hızlı son 200m kapanışı" : null) },
   { kod: "FORM", ozellikIndeksleri: [idx("formEgimi"), idx("formEgimi2")], aciklama: (r) => `Form eğimi: ${r.formEgimi.toFixed(1)} (${r.formEgimi < 0 ? "iyileşiyor" : r.formEgimi > 0 ? "kötüleşiyor" : "sabit"})` },
   { kod: "KGS", ozellikIndeksleri: [idx("kgs"), idx("kgs2"), idx("kgsVarMi")], aciklama: (r) => (r.kgsVarMi ? `KGS ${r.kgs} gün` : null) },

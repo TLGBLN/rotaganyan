@@ -112,14 +112,14 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
     versiyon: "V5.1",
     baslangic: new Date("2026-08-19T21:15:34+03:00"), // 01f154a — agfPayi eklendi, agfFavorisiMi çıkarıldı
     bitis: null,
-    aciklama: "BODUBEY (İstanbul K5) ve EL LEON (Elazığ K3) — ikisi de AGF favorisi ama zayıf aygır profiliyle sistemde çok düşük sıraya düşmüştü, ikisi de kazandı. Kapsamlı kalibrasyon denetiminde zayıf-aygırlı-favori grubunda model +5.1 puan hafife alıyordu; üç düzeltme denemesi (aygır×AGF etkileşimi, kare terimler, L2 gevşetme) başarısız oldu. Kök neden: agfFavorisiMi yalnız SIRAYI yakalıyordu, AGF payının BÜYÜKLÜĞÜNÜ değil. Ham AGF payı ayrı özellik eklenince (+0.45, çok güçlü anlamlı) kalibrasyon farkı +1.2 puana düştü. Ayrıca %80+ tahmin diliminde bulunan aşırı-güvene (n=78, tahmin %88.1 vs gerçek %67.9) koşullu sıcaklık ölçeklendirmesi eklendi — top1/top3'ü değiştirmeden yalnız uç mutlak olasılığı yumuşatır.",
+    aciklama: "BODUBEY (İstanbul K5) ve EL LEON (Elazığ K3) — ikisi de AGF favorisi ama zayıf aygır profiliyle sistemde çok düşük sıraya düşmüştü, ikisi de kazandı. Kapsamlı kalibrasyon denetiminde zayıf-aygırlı-favori grubunda model +5.1 puan hafife alıyordu; üç düzeltme denemesi (aygır×AGF etkileşimi, kare terimler, L2 gevşetme) başarısız oldu. Kök neden: agfFavorisiMi yalnız SIRAYI yakalıyordu, AGF payının BÜYÜKLÜĞÜNÜ değil. Ham AGF payı ayrı özellik eklenince (+0.25, anlamlı) kalibrasyon farkı +1.2 puana düştü. Aynı gün ikinci bir aday ('agfFarkiIkinciye', 2.'ye dominans farkı) da denendi, resmi eğitimde SINIRDA çıktı ve EL LEON'u (rakibinden 4.27 puan önde olmasına rağmen) CEZALANDIRDIĞI görülünce çıkarıldı — yalnız agfPayi kaldı. Ayrıca %80+ tahmin diliminde bulunan aşırı-güvene (n=78, tahmin %88.1 vs gerçek %67.9) koşullu sıcaklık ölçeklendirmesi eklendi — top1/top3'ü değiştirmeden yalnız uç mutlak olasılığı yumuşatır.",
     neyiAnalizEdiyor: [
-      "19 özellik: V5'in 18'i minus agfFavorisiMi (yalnız SIRA), artı agfPayi (ham AGF yüzdesi) + agfFarkiIkinciye (sahadaki 2.'ye göre dominans farkı)",
+      "18 özellik: V5'in 18'i minus agfFavorisiMi (yalnız SIRA), artı agfPayi (ham AGF yüzdesi) — sayı aynı kaldı, biri çıktı biri girdi",
       "Softmax'a koşullu sıcaklık ölçeklendirmesi (yalnız lider zaten %70+ ise T=1.5) — sıralama korunur, yalnız aşırı-uç olasılık yumuşar",
     ],
     caprazlamalar: [
-      "Test (n=208, hiç görülmemiş): top1 %37.0 (GA %30.8-43.3), top3 %68.3 (GA %62.0-74.0), log-loss 1.7705 — V5'in top1 %35.6/top3 %66.8/logloss 1.7828'ini geçiyor. Eğitim (n=622): top1 %40.5, top3 %75.6",
-      "Anlamlı: agfSirasi, sireOrani, jokeyOrani, antrenorOrani, agfYukselisVarMi, dususAmaIyiPozisyon, agfPayi (+0.45, en büyük yeni katsayı); agfFarkiIkinciye sınırda (-0.14, GA üst sınırı 0.002)",
+      "Test (n=208, hiç görülmemiş): top1 %38.0 (GA %31.3-43.8), top3 %68.3 (GA %61.5-74.5), log-loss 1.7695 — V5'in top1 %35.6/top3 %66.8/logloss 1.7828'ini geçiyor. Eğitim (n=622): top1 %41.3, top3 %75.4",
+      "Anlamlı: agfSirasi, sireOrani, antrenorOrani, agfYukselisVarMi, kacakAtMi, dususAmaIyiPozisyon, agfPayi (+0.25) — sınırda kalan katsayı YOK",
       "Zayıf-aygırlı-AGF-favorisi kalibrasyon farkı: V5'te +5.1 puan → V5.1'de +1.2 puan (n=1165/274)",
     ],
   },

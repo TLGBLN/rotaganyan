@@ -99,7 +99,15 @@ const FEATURE_NAMES = [
   // farklı) da ayrıca anlamlı çıktı (-0.1311, GA[-0.2711,-0.0020]). agfFavorisiMi bu
   // ikisinin yanında ARTIK GEREKSİZ hale geldi (katsayısı -0.0284'e düştü, anlamsız
   // bölgede) — modelden ÇIKARILDI, yerini agfPayi + agfFarkiIkinciye aldı.
-  "agfPayi", "agfFarkiIkinciye",
+  // NOT — 2026-08-19 (V5.1 → V5.2): "agfFarkiIkinciye" resmi eğitimde SINIRDA çıkmıştı
+  // (nokta=-0.1430, GA=[-0.2370, 0.0018], sıfırı neredeyse içeriyordu). Canlı bir vakada
+  // (Elazığ K3, EL LEON) gerçek zararı görüldü: EL LEON en yakın rakibinden 4.27 puan
+  // önde olmasına rağmen (agfFarkiIkinciye=4.27, negatif katsayı yüzünden) bu −0.056
+  // CEZA olarak işledi — "ne kadar ezici favori" sezgisiyle TERS yönde. agfPayi zaten
+  // AGF payının büyüklüğünü güçlü ve tutarlı şekilde yakalıyor (her testte anlamlı,
+  // +0.45 civarı) — agfFarkiIkinciye'nin marjinal/sınırda katkısı buna değmiyor.
+  // MODELDEN ÇIKARILDI.
+  "agfPayi",
 ];
 
 function toFeatureVector(row) {
@@ -122,7 +130,6 @@ function toFeatureVector(row) {
     row.kacakAtMi ?? 0,
     (row.agfFark <= -ANLAMLI_PUAN_ESIGI && row.agfSirasi <= 4) ? 1 : 0,
     row.agfPayi ?? 0,
-    row.agfFarkiIkinciye ?? 0,
   ];
 }
 
