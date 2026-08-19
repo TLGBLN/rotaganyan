@@ -36,7 +36,7 @@ async function syncOneCity(city: CityInfo, tjkDate: string, d: Date): Promise<Ag
   let raceDay = hippodrome
     ? await db.raceDay.findFirst({
         where: { date: d, hippodromeId: hippodrome.id },
-        include: { races: { include: { runners: { select: { id: true, no: true } } } } },
+        include: { races: { include: { runners: { select: { id: true, no: true } }, result: { select: { id: true } } } } },
       })
     : null;
 
@@ -48,7 +48,7 @@ async function syncOneCity(city: CityInfo, tjkDate: string, d: Date): Promise<Ag
       if (hippodrome) {
         raceDay = await db.raceDay.findFirst({
           where: { date: d, hippodromeId: hippodrome.id },
-          include: { races: { include: { runners: { select: { id: true, no: true } } } } },
+          include: { races: { include: { runners: { select: { id: true, no: true } }, result: { select: { id: true } } } } },
         });
       }
     } catch { /* ingest başarısız olursa AGF sync de atla */ }
@@ -77,6 +77,11 @@ async function syncOneCity(city: CityInfo, tjkDate: string, d: Date): Promise<Ag
   // birbirinden bağımsız olduğu için artık paralel (Promise.all) yazılıyor.
   const updateJobs: Promise<boolean>[] = [];
   for (const race of raceDay.races) {
+    // 2026-08-19 kullanıcı talebi: koşu bitip Sonuç girildiyse AGF kilitlenir — bkz.
+    // syncAgfForRaceInner'daki aynı kural. Toplu/günlük cron burada da aynı korumayı
+    // uygular, aksi halde günün geri kalan taramaları biten bir koşuyu yine de günceller.
+    if (race.result) continue;
+
     const programRace = program.races.find((r) => r.raceNo === race.raceNo);
     if (!programRace) continue;
 
@@ -167,9 +172,19 @@ async function syncAgfForRaceInner(raceId: string): Promise<void> {
     select: {
       raceDayId: true,
       raceDay: { select: { date: true, hippodrome: { select: { name: true, slug: true } } } },
+      result: { select: { id: true } },
     },
   });
   if (!race) return;
+
+  // 2026-08-19 kullanıcı talebi: "AGF trendler ilgili koşu koştuktan sonra kilitlensin" —
+  // koşu bitip resmi Sonuç (Result) girildiyse AGF artık KESİNLEŞMİŞTİR, bahis kapanmıştır.
+  // Bu noktadan sonra TJK'ya tekrar gitmenin hiçbir faydası yok (yakalanacak yeni bir eşik
+  // geçişi olamaz) ve TJK'nın eski/geçmiş bir güne ait sayfası bazen beklenmedik veri
+  // döndürebiliyor — bu da geçmiş bir koşuyu tekrar tekrar test ederken (deneme/backtest)
+  // Runner.agf ve AgfSnapshot geçmişinin sessizce değişip sonuçlarda oynaklık yaratmasına yol
+  // açıyordu. Sonuç girilmiş bir koşu için senkronizasyon burada kesin olarak durdurulur.
+  if (race.result) return;
 
   // Soğuma kontrolü: bu hipodrom+gün için AGF en son ne zaman yazıldı?
   const enYeniSnapshot = await db.agfSnapshot.findFirst({
