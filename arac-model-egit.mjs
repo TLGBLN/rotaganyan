@@ -55,13 +55,20 @@ const FEATURE_NAMES = [
   // "KACAK_AT" olan atlar. Kapı no / kilo farkı / HP farkı da AYNI ANDA test edildi,
   // ÜÇÜ DE anlamsız çıktı; yalnız kacakAtMi tek başına anlamlı (+0.0878, GA
   // [0.0290, 0.1811]) VE genel performansı iyileştirdi (top1 %34.8→%36.5).
-  "dususAmaIyiPozisyon", // YENİ — 2026-08-16 kullanıcı bulgusu (KINDBERO/ANGEL ON THE
-  // RIGHT vakaları, İzmir K3/K4): ham "düşüş" (agfDususVarMi) daha önce anlamsız
-  // çıkmıştı, ama kullanıcının "para bilerek geri çekiliyor, ganyan yüksek tutuluyor"
-  // teorisi daha İNCE bir formülasyon öneriyordu — düşüş TEK BAŞINA değil, düşüşe
-  // RAĞMEN hâlâ iyi AGF pozisyonunda kalma (agfFark<=-1.0 VE agfSirasi<=4). Bu
-  // formülasyon ANLAMLI çıktı (+0.1282, GA [0.0188, 0.2043]) — kullanıcının sezgisi
-  // doğruydu, önceki kaba eşik yanlış operasyonelleştirmeydi.
+  "agfDususVarMi", // 2026-08-16'da "dususAmaIyiPozisyon" adıyla eklenmişti (KINDBERO/
+  // ANGEL ON THE RIGHT, İzmir K3/K4) — o zamanki formülasyon agfFark<=-1.0 VE
+  // agfSirasi<=4 (yalnız ilk-4'teki düşüşler sayılıyordu). 2026-08-19 kullanıcı bulgusu
+  // (SHINNY vakası, AGF Trend panelinde ilk-4 DIŞINDA anlamlı düşüş gösterip modelin
+  // hiç yakalamadığı bir at): pozisyon şartı gerçek sinyali dışlıyor olabilir — kullanıcı
+  // "tüm atlar için" (SHINNY'ye özel değil) genel bir kural istedi. Pozisyon şartı
+  // KALDIRILIP yalnız eşik testi edildi (agfFark<=-1.0, agfYukselisVarMi ile simetrik) —
+  // sonuç: top1 aynı (%38.0), top3 iyileşti (%68.3→%70.2), log-loss iyileşti
+  // (1.7695→1.7617). Katsayı yönü tutarlı (+), ham AGF Trend istatistiğiyle uyumlu
+  // (düşenler grubu galibiyet %13.8 vs saha ort. %10.3, bkz. agf-trend-istatistik.
+  // service.ts). Bootstrap GA'sı sınırda ([-0.0075,0.1950]) ama agfYukselisVarMi'nin
+  // GA'sı da bu koşuda sınıra kaydı (GA gürültüsü, B=200'ün doğal varyansı) — üç
+  // metrik BİRDEN aynı/iyileşti VE yön mantıklı olduğu için KABUL EDİLDİ. Eski
+  // pozisyon-şartlı formülasyon ARTIK KULLANILMIYOR (ad da bu yüzden değişti).
   // NOT — 2026-08-17: "onGrupArkasiMi" (kacakAtMi'nin ikili olup diğer 3 stili tek "0"
   // kutusuna attığı eleştirisiyle, kullanıcı talebiyle test edildi) TEK BAŞINA (ham
   // win-rate) anlamlıydı (ON_GRUP_ARKASI %11.5 vs Bekleme+Geri %9.6, bootstrap GA
@@ -128,7 +135,7 @@ function toFeatureVector(row) {
     row.uzunAraGalopKatkisi ?? 0,
     row.agfFark >= ANLAMLI_PUAN_ESIGI ? 1 : 0,
     row.kacakAtMi ?? 0,
-    (row.agfFark <= -ANLAMLI_PUAN_ESIGI && row.agfSirasi <= 4) ? 1 : 0,
+    row.agfFark <= -ANLAMLI_PUAN_ESIGI ? 1 : 0,
     row.agfPayi ?? 0,
   ];
 }

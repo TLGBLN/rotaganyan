@@ -13,7 +13,7 @@
  *  - 830 koşu (2026-07-01 sonrası — Rotaganyan'ın kendi AGF/galop takip altyapısının
  *    başladığı tarih, öncesi sistematik %0 kapsamalı), kronolojik 622 eğitim/208 test.
  *  - Test (görülmemiş veri, 18 özellikli son eğitim — 2026-08-19): top1=%38.0 (bootstrap
- *    %95 GA %31.3-43.8), top3=%68.3 (GA %61.5-74.5) — V4'ün AYNI dönemde canlı çalıştırılan
+ *    %95 GA %31.7-44.2), top3=%70.2 (GA %63.9-76.4) — V4'ün AYNI dönemde canlı çalıştırılan
  *    top1=%24.2/top3=%55.1'ini net geçiyor, GA'lar V4 rakamlarını içermiyor.
  *  - Gerçek KÖR canlı test (2026-08-15, Ankara+İzmir+Diyarbakır, 23 koşu, sonuçlara
  *    bakılmadan tahmin üretildi): V5 top1=%30.4/top3=%60.9 vs V4 top1=%26.1/top3=%52.2 —
@@ -32,7 +32,13 @@
  *    tahmin diliminde aşırı-güven bulundu (n=78, tahmin %88.1 vs gerçek %67.9) —
  *    softmax'a KOŞULLU sıcaklık ölçeklendirmesi eklendi (bkz. softmax fonksiyonu
  *    üstündeki not), top1/top3'ü DEĞİŞTİRMEDEN yalnız aşırı-uçtaki mutlak olasılığı
- *    yumuşatıyor. Tam liste + gerekçe yorumları toFeatureVector üzerinde (bkz.
+ *    yumuşatıyor.
+ *  - 2026-08-19 (SHINNY vakası): "dususAmaIyiPozisyon" (agfFark<=-1.0 VE agfSirasi<=4)
+ *    yalnız ilk-4'teki düşüşleri sayıyordu — kullanıcı, AGF Trend panelinde ilk-4 DIŞINDA
+ *    anlamlı düşüş gösteren bir atın modelde hiç yakalanmadığını fark etti. Pozisyon şartı
+ *    kaldırılıp "agfDususVarMi" (agfFark<=-1.0, agfYukselisVarMi ile simetrik) olarak
+ *    yeniden test edildi — top1 aynı (%38.0), top3 %68.3→%70.2, log-loss 1.7695→1.7617
+ *    iyileşti, KABUL EDİLDİ. Tam liste + gerekçe yorumları toFeatureVector üzerinde (bkz.
  *    weights/v5-weights.json featureNames).
  *
  * Ağırlıklar `weights/v5-weights.json`'da COMMIT EDİLMİŞ (production'da Vercel'in
@@ -310,9 +316,14 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     r.kacakAtMi,
     // 2026-08-16 kullanıcı bulgusu (KINDBERO/ANGEL ON THE RIGHT vakaları, İzmir K3/K4):
     // ham "düşüş" tek başına anlamsızdı, ama "düşüşe RAĞMEN hâlâ iyi AGF pozisyonunda
-    // kalma" (para bilerek geri çekiliyor ama at hâlâ favoriler arasında) ANLAMLI çıktı
-    // (+0.1282, GA [0.0576, 0.1982]).
-    r.agfFark <= -ANLAMLI_PUAN_ESIGI && r.agfSirasi <= 4 ? 1 : 0,
+    // kalma" (agfSirasi<=4 şartlı) ANLAMLI çıktı (+0.1282, GA [0.0576, 0.1982]).
+    // 2026-08-19 kullanıcı bulgusu (SHINNY vakası, AGF Trend panelinde ilk-4 DIŞINDA
+    // anlamlı düşüş gösterip modelin hiç yakalamadığı bir at): pozisyon şartı gerçek
+    // sinyali dışlıyordu. Kaldırılıp yalnız eşik testi edildi (agfYukselisVarMi ile
+    // simetrik) — top1 aynı (%38.0), top3 iyileşti (%68.3→%70.2), log-loss iyileşti
+    // (1.7695→1.7617), yön tutarlı. KABUL EDİLDİ, ad "agfDususVarMi" oldu (bkz.
+    // arac-model-egit.mjs'teki aynı isimli notun tamamı).
+    r.agfFark <= -ANLAMLI_PUAN_ESIGI ? 1 : 0,
     // 2026-08-19 kullanıcı bulgusu (BODUBEY/EL LEON) — bkz. Faz1RunnerV5.agfPayi
     // üstündeki not. Eski "agfSirasi===1?1:0" (agfFavorisiMi) buradan ÇIKARILDI,
     // yerini bu aldı (agfPayi: +0.25, anlamlı — agfFavorisiMi -0.0284'e düşüp
@@ -419,6 +430,9 @@ function agfTrendTerfisiUygula<
   // hâlâ iyi AGF pozisyonu" (agfFark<=-1.0 VE agfSirasi<=4) TEK BAŞINA (V4'ün 4-sinyal
   // şartı olmadan) ilk-3 için yeterince güçlü — backtest: n=930, %19.9 galibiyet/%55.1
   // top3, kontrol grubu %9.3/%28.4 (V4'ün kendi trend+4sinyal kuralıyla aynı seviyede).
+  // NOT — 2026-08-19: bu, SKOR özelliği "agfDususVarMi"dan (toFeatureVector) FARKLI —
+  // o pozisyon şartını kaldırdı, ama bu GÖSTERİM TERFİSİ penceresi kendi ayrı backtest'i
+  // (yukarıdaki) yalnız ilk-4 için doğrulandığından bilerek pozisyon şartlı BIRAKILDI.
   const dususAmaIyiPozisyonMu = (r: T) => r.agfFark <= -ANLAMLI_PUAN_ESIGI && r.agfSirasi <= 4;
 
   const { sonuc: ilk3Sonrasi, terfiEdenNolar: ilk3Terfi } = terfiPenceresiV5(
@@ -528,7 +542,7 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // (bkz. toFeatureVector üstündeki notlar) ama hiçbir OzellikGrubu'na dahil değildi —
   // katkıları skoru etkiliyordu ama gerekçe metninde hiç görünmüyordu. Eklendi.
   { kod: "KACAK", ozellikIndeksleri: [idx("kacakAtMi")], aciklama: (r) => (r.kacakAtMi ? "Kaçak at / erken tempo yapan (Accurace koşu stili sinyali)" : null) },
-  { kod: "DUSUSIYI", ozellikIndeksleri: [idx("dususAmaIyiPozisyon")], aciklama: (r) => (r.agfFark <= -ANLAMLI_PUAN_ESIGI && r.agfSirasi <= 4 ? "AGF düşüşüne rağmen sahada hâlâ öne yakın (para akışı sinyali olabilir)" : null) },
+  { kod: "DUSUSIYI", ozellikIndeksleri: [idx("agfDususVarMi")], aciklama: (r) => (r.agfFark <= -ANLAMLI_PUAN_ESIGI ? "AGF trend: düşüş (para akışı sinyali olabilir)" : null) },
 ];
 
 // 2026-08-18 kullanıcı talebi: "18 sinyalin hepsinin kontrol edildiğini bana göstermesini
@@ -547,7 +561,7 @@ const FEATURE_LABELS: Record<string, string> = {
   antrenorOrani: "Antrenör Kazanma Oranı (küçültülmüş)",
   uzunAraGalopKatkisi: "Uzun Aradan Sonra Galop Sayısı",
   agfYukselisVarMi: "AGF Eşik-Üstü Yükseliş Var Mı",
-  kacakAtMi: "Kaçak At / Erken Tempo", dususAmaIyiPozisyon: "AGF Düşüşüne Rağmen İyi Pozisyon",
+  kacakAtMi: "Kaçak At / Erken Tempo", agfDususVarMi: "AGF Eşik-Üstü Düşüş Var Mı",
   agfPayi: "AGF Payı (ham yüzde)", agfFarkiIkinciye: "AGF Dominans Farkı (2.'ye göre, yalnız favoride)",
 };
 

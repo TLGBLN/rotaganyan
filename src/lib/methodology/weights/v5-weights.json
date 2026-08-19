@@ -16,28 +16,28 @@
     "uzunAraGalopKatkisi",
     "agfYukselisVarMi",
     "kacakAtMi",
-    "dususAmaIyiPozisyon",
+    "agfDususVarMi",
     "agfPayi"
   ],
   "weights": [
-    -0.4660961062516171,
-    0.01572247448283799,
-    -0.016111139728766634,
-    -0.02139797887920484,
-    0.007315009556871136,
-    0.022229047591125855,
-    0.14861709130810224,
-    -0.02362472328661751,
-    0.607057649613898,
-    -0.053118046898087926,
-    0.0458388742277069,
-    0.10357726855059919,
-    0.2566316546595333,
-    0.009574169132607158,
-    0.12026482773719854,
-    0.07447051198195562,
-    0.10466354411641922,
-    0.25147116778686246
+    -0.4896221893358754,
+    0.0166175485850189,
+    -0.017319146968040763,
+    -0.020627820496013714,
+    0.0027984150692762057,
+    0.024287654928658756,
+    0.15290530048147605,
+    -0.022847428305704288,
+    0.6084993161015414,
+    -0.05258655537015312,
+    0.04646609053943209,
+    0.10779028336644177,
+    0.25518062807268305,
+    0.007215507127517651,
+    0.10383360880445018,
+    0.07435257043066085,
+    0.08450514885951196,
+    0.2567222442746325
   ],
   "means": [
     5.877995275059194,
@@ -56,7 +56,7 @@
     0.29075261559230453,
     0.1896726290921329,
     0.09584880188997708,
-    0.11052986837664618,
+    0.17077286533918112,
     9.804173135335796
   ],
   "stds": [
@@ -76,67 +76,67 @@
     1.1928486172666417,
     0.3920419912017262,
     0.2943837785378813,
-    0.3135490656552674,
+    0.37631036898155795,
     11.423232169243214
   ],
   "testEval": {
     "n": 208,
     "top1P": 37.98076923076923,
-    "top3P": 68.26923076923077,
-    "avgLogLoss": 1.7694785852664425,
+    "top3P": 70.1923076923077,
+    "avgLogLoss": 1.7617305107302708,
     "kalibrasyon": [
       {
         "dilim": "%0-10",
-        "n": 1326,
-        "ortalamaTahmin": "3.9",
+        "n": 1325,
+        "ortalamaTahmin": "4.0",
         "gercekOran": "3.9"
       },
       {
         "dilim": "%10-20",
-        "n": 352,
+        "n": 359,
         "ortalamaTahmin": "14.1",
-        "gercekOran": "17.9"
+        "gercekOran": "16.7"
       },
       {
         "dilim": "%20-30",
-        "n": 135,
-        "ortalamaTahmin": "24.4",
-        "gercekOran": "18.5"
+        "n": 138,
+        "ortalamaTahmin": "24.8",
+        "gercekOran": "21.7"
       },
       {
         "dilim": "%30-40",
-        "n": 70,
-        "ortalamaTahmin": "33.7",
-        "gercekOran": "34.3"
+        "n": 65,
+        "ortalamaTahmin": "34.2",
+        "gercekOran": "35.4"
       },
       {
         "dilim": "%40-50",
-        "n": 34,
-        "ortalamaTahmin": "45.2",
-        "gercekOran": "47.1"
+        "n": 30,
+        "ortalamaTahmin": "45.3",
+        "gercekOran": "50.0"
       },
       {
         "dilim": "%50-60",
-        "n": 24,
-        "ortalamaTahmin": "55.3",
-        "gercekOran": "45.8"
+        "n": 26,
+        "ortalamaTahmin": "55.2",
+        "gercekOran": "50.0"
       },
       {
         "dilim": "%60-70",
         "n": 15,
-        "ortalamaTahmin": "62.5",
-        "gercekOran": "60.0"
+        "ortalamaTahmin": "64.0",
+        "gercekOran": "53.3"
       },
       {
         "dilim": "%70-80",
-        "n": 9,
-        "ortalamaTahmin": "75.3",
-        "gercekOran": "55.6"
+        "n": 7,
+        "ortalamaTahmin": "76.8",
+        "gercekOran": "57.1"
       },
       {
         "dilim": "%80-90",
         "n": 3,
-        "ortalamaTahmin": "85.4",
+        "ortalamaTahmin": "85.1",
         "gercekOran": "66.7"
       },
       {
@@ -150,67 +150,67 @@
   "trainEval": {
     "n": 622,
     "top1P": 41.31832797427653,
-    "top3P": 75.40192926045016,
-    "avgLogLoss": 1.653929976952802,
+    "top3P": 75.88424437299035,
+    "avgLogLoss": 1.6556436423745555,
     "kalibrasyon": [
       {
         "dilim": "%0-10",
-        "n": 4103,
+        "n": 4106,
         "ortalamaTahmin": "3.9",
         "gercekOran": "3.6"
       },
       {
         "dilim": "%10-20",
-        "n": 961,
+        "n": 957,
         "ortalamaTahmin": "14.3",
-        "gercekOran": "15.8"
+        "gercekOran": "15.4"
       },
       {
         "dilim": "%20-30",
-        "n": 385,
-        "ortalamaTahmin": "24.4",
-        "gercekOran": "26.5"
+        "n": 394,
+        "ortalamaTahmin": "24.5",
+        "gercekOran": "27.2"
       },
       {
         "dilim": "%30-40",
-        "n": 210,
+        "n": 199,
         "ortalamaTahmin": "34.4",
-        "gercekOran": "35.7"
+        "gercekOran": "36.7"
       },
       {
         "dilim": "%40-50",
-        "n": 90,
-        "ortalamaTahmin": "44.8",
-        "gercekOran": "46.7"
+        "n": 98,
+        "ortalamaTahmin": "44.7",
+        "gercekOran": "44.9"
       },
       {
         "dilim": "%50-60",
-        "n": 74,
-        "ortalamaTahmin": "54.3",
-        "gercekOran": "50.0"
+        "n": 69,
+        "ortalamaTahmin": "54.4",
+        "gercekOran": "50.7"
       },
       {
         "dilim": "%60-70",
         "n": 39,
-        "ortalamaTahmin": "64.3",
+        "ortalamaTahmin": "64.4",
         "gercekOran": "48.7"
       },
       {
         "dilim": "%70-80",
-        "n": 33,
+        "n": 32,
         "ortalamaTahmin": "74.8",
-        "gercekOran": "69.7"
+        "gercekOran": "71.9"
       },
       {
         "dilim": "%80-90",
-        "n": 22,
-        "ortalamaTahmin": "85.0",
-        "gercekOran": "90.9"
+        "n": 23,
+        "ortalamaTahmin": "84.7",
+        "gercekOran": "87.0"
       },
       {
         "dilim": "%90-100",
         "n": 9,
-        "ortalamaTahmin": "94.5",
+        "ortalamaTahmin": "94.6",
         "gercekOran": "66.7"
       }
     ]
