@@ -44,7 +44,13 @@ async function tekSorgu(baslangicTarihi: string) {
       FROM "Runner" r
       JOIN "Race" ra ON ra.id = r."raceId"
       JOIN "RaceDay" rd ON rd.id = ra."raceDayId"
+      JOIN "Hippodrome" h ON h.id = rd."hippodromeId"
       WHERE r.scratched = false AND rd.date >= '${baslangicTarihi}'
+        -- "karma" (kendi tjkAtId'si YOK, veri asıl hipodromun kaydında yaşar — bkz.
+        -- syncKarmaResultMirrors) ve "perak-malezya" (yabancı hipodrom) model eğitiminde
+        -- de GERCEK_OLMAYAN_HIPODROM_SLUGLARI ile hariç tutuluyor — burada da hariç
+        -- tutulmazsa yapısal/beklenen boşluklar gerçek eksiklik gibi görünür.
+        AND h.slug NOT IN ('karma', 'perak-malezya')
     ),
     galop_kapsam AS (
       SELECT k.runner_id, count(g.id) > 0 AS var_mi
