@@ -34,6 +34,29 @@ function shrink(wins: number, rides: number, populasyonOrt: number, k = 20): num
   return (wins + k * populasyonOrt) / (rides + k);
 }
 
+function parseKiloSayi(w: string | undefined | null): number | null {
+  if (!w) return null;
+  const n = parseFloat(w.replace(",", "."));
+  return isNaN(n) ? null : n;
+}
+function surfaceFromRaw(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  if (raw.startsWith("Ç")) return "CIM";
+  if (raw.startsWith("K")) return "KUM";
+  if (raw.startsWith("S")) return "SENTETIK";
+  return null;
+}
+// "15.07.2026" (TjkAtKosuRow.date formatı) → Date. Geçmiş koşu filtrelemesinde KRİTİK:
+// bu olmadan HorseRaceHistoryCache'in GÜNCEL (bugüne kadar tüm) hâli kullanılıp, o anda
+// henüz olmamış gelecekteki koşular da "geçmiş" sayılıyordu — veri sızıntısı (bkz.
+// kiloFarkiEnIyiKosuya/atJokeyIkiliOrani üstündeki 2026-08-20 notu).
+function parseGecmisTarih(s: string | undefined | null): Date | null {
+  if (!s) return null;
+  const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!m) return null;
+  return new Date(`${m[3]}-${m[2]}-${m[1]}T00:00:00Z`);
+}
+
 export type ModelRow = {
   raceId: string;
   runnerId: string;
@@ -110,6 +133,33 @@ export type ModelRow = {
   // eksikliği gerçekti ve düzeltildi ama düzeltilmiş veriyle bile "rahat/çalışarak" ayrımı
   // gerçek bir sinyal taşımıyor. MODELE DAHİL EDİLMEDİ — canlı model hâlâ eski "galop".
   galopRahatVeIyi: 0 | 1;
+  // 2026-08-20 kullanıcı kontrol listesi — 3 yeni aday, HorseRaceHistoryCache/mevcut
+  // jockeyStats'tan (ek TJK isteği gerektirmeden) toplanıyor:
+  // (1) Bugünkü kilo, atın AYNI pistte en iyi derecesini (en düşük finishPos) aldığı
+  // koşudaki kiloya göre kaç kg fark ediyor — pozitif=bugün daha ağır.
+  kiloFarkiEnIyiKosuya: number;
+  // (2) Bu at-jokey ikilisinin KENDİ geçmişi (jokeyOrani'nin genel jokey oranından farklı,
+  // yalnız bu ikilinin birlikte kaç kez koşup kaçını kazandığı) — küçültülmüş (shrinkage).
+  atJokeyIkiliOrani: number;
+  // (3) Jokey değişmişse (jockeyChanged), yeni jokeyin genel oranı ESKİ jokeyin oranından
+  // ne kadar YÜKSEK/DÜŞÜK — yön taşıyan bir "niyet" sinyali (üst jokeye geçiş vs alt
+  // jokeye düşüş). Değişmemişse 0.
+  //
+  // SONUÇ (2026-08-20, resmi eğitim+B=200 bootstrap+backtest, üçü BİRDEN mevcut canlı
+  // 18 özelliğe eklenerek test edildi): İLK denemede atJokeyIkiliOrani nokta=+1.13 —
+  // diğer TÜM katsayıların (0.01-0.6 aralığı) 10-20 katı, eğitim top1 %43→%64'e fırladı
+  // (aşırı öğrenme işareti). Kök neden bulundu: HorseRaceHistoryCache satırları TARİHE
+  // göre filtrelenmemişti — bu koşudan SONRAKİ (bugüne kadarki TÜM) koşular da "geçmiş"
+  // sayılıp sonucu sızdırıyordu (veri sızıntısı). Düzeltilip (yalnız kesinlikle önceki
+  // tarihli kayıtlar) YENİDEN test edildi: atJokeyIkiliOrani normal boyuta döndü
+  // (-0.0371, GA=[-0.1341,0.0497], anlamsız), kiloFarkiEnIyiKosuya da anlamsız
+  // (-0.0362, GA=[-0.1367,0.0671]). Backtest: eski top1=%35.4/top3=%71.6/logloss=1.7699
+  // vs yeni top1=%34.5/top3=%70.7/logloss=1.7753 — üç metrikte de hafif kötü.
+  // jokeyDegisimYonu yalnız 54/9465 atta (%0.57) tetikleniyor — bootstrap'ta HER
+  // örneklemde tam 0.0000 çıktı (GA=[0,0,0,0]), ama bu örneklem o kadar az ki güvenilir
+  // bir "hayır" bile sayılamaz, yalnız "şu an test edilemeyecek kadar seyrek" demek
+  // doğru. ÜÇÜ DE MODELE DAHİL EDİLMEDİ — canlı model değişmedi.
+  jokeyDegisimYonu: number;
 };
 
 async function main() {
@@ -121,7 +171,7 @@ async function main() {
       result: { select: { actualOrder: true } },
       runners: {
         where: { scratched: false },
-        select: { id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true, raceStyle: true, disaridanStart: true, hp: true },
+        select: { id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true, raceStyle: true, disaridanStart: true, hp: true, tjkAtId: true, previousJockey: true, jockeyChanged: true, weight: true },
       },
     },
     orderBy: { raceDay: { date: "asc" } },
@@ -155,12 +205,18 @@ async function main() {
             const runners = race.runners;
             if (runners.length === 0) return;
 
-            const [sonYarisDetaylari, sireOzetleri, jockeyStats, trainerStats, accKayitlar, agfSnaps] = await Promise.all([
+            const jokeyIsimleriHepsi = [...new Set([
+              ...runners.map((r) => r.jockey).filter((x): x is string => !!x),
+              ...runners.map((r) => r.previousJockey).filter((x): x is string => !!x),
+            ])];
+            const tjkAtIdler = runners.map((r) => r.tjkAtId).filter((x): x is number => x != null);
+
+            const [sonYarisDetaylari, sireOzetleri, jockeyStats, trainerStats, accKayitlar, agfSnaps, gecmisKayitlari] = await Promise.all([
               getSonYarisDetaylariForRace(race.id).catch(() => []),
               getSireStatOzetleriForRace(runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(() =>
                 runners.map(() => ({ ozet: null, ornekKendiVeri: null, kYuzde: null }))
               ),
-              getJockeyStats([...new Set(runners.map((r) => r.jockey).filter((x): x is string => !!x))]).catch(() => ({})),
+              getJockeyStats(jokeyIsimleriHepsi).catch(() => ({})),
               getTrainerStats([...new Set(runners.map((r) => r.trainer).filter((x): x is string => !!x))]).catch(() => ({})),
               fetchAccuraceGecmisKayitlari(runners.map((r) => r.name), race.raceDay.date),
               db.agfSnapshot.findMany({
@@ -168,7 +224,17 @@ async function main() {
                 orderBy: { capturedAt: "asc" },
                 select: { runnerId: true, agf: true },
               }),
+              // 2026-08-20 kullanıcı talebi — "kilo-derece ilişkisi" ve "at-jokey ikili
+              // oranı" için: TJK'nın "At Koşu Bilgileri" tam geçmişi (weight/finishPos/
+              // jockey/surface per geçmiş koşu), tjkAtId'ye göre önbellekten.
+              tjkAtIdler.length > 0
+                ? db.horseRaceHistoryCache.findMany({
+                    where: { tjkAtId: { in: tjkAtIdler } },
+                    select: { tjkAtId: true, rowsJson: true },
+                  })
+                : Promise.resolve([]),
             ]);
+            const gecmisByTjkAtId = new Map(gecmisKayitlari.map((g) => [g.tjkAtId, g.rowsJson as unknown as { finishPos: string; weight: string; jockey: string; surface: string; date: string }[]]));
 
             // galop verisi
             const gallops = await db.gallop.findMany({
@@ -216,6 +282,39 @@ async function main() {
 
               const ilkAgf = ilkAgfByRunner.get(r.id);
               const agfFark = ilkAgf != null && r.agf != null ? r.agf - ilkAgf : 0;
+
+              // (1) Kilo farkı — atın AYNI pistteki en iyi (en düşük finishPos) geçmiş
+              // koşusundaki kiloya göre bugün kaç kg fark ediyor. YALNIZ bu koşudan
+              // KESİNLİKLE ÖNCEKİ tarihli kayıtlar — aksi hâlde gelecekteki koşular
+              // "geçmiş" sayılıp sonucu sızdırır (bkz. yukarıdaki parseGecmisTarih notu).
+              const gecmisTumu = r.tjkAtId != null ? (gecmisByTjkAtId.get(r.tjkAtId) ?? []) : [];
+              const gecmis = gecmisTumu.filter((g) => {
+                const t = parseGecmisTarih(g.date);
+                return t != null && t < race.raceDay.date;
+              });
+              const ayniPistGecmis = gecmis.filter((g) => surfaceFromRaw(g.surface) === race.surface && parseKiloSayi(g.weight) != null && /^\d+$/.test(g.finishPos ?? ""));
+              let enIyiKosu: (typeof ayniPistGecmis)[number] | null = null;
+              for (const g of ayniPistGecmis) {
+                if (!enIyiKosu || parseInt(g.finishPos, 10) < parseInt(enIyiKosu.finishPos, 10)) enIyiKosu = g;
+              }
+              const enIyiKilo = enIyiKosu ? parseKiloSayi(enIyiKosu.weight) : null;
+              const kiloFarkiEnIyiKosuya = r.weight != null && enIyiKilo != null ? r.weight - enIyiKilo : 0;
+
+              // (2) At-jokey ikili oranı — bu ikilinin KENDİ geçmişi (küçültülmüş).
+              const buJokeyleGecmis = gecmis.filter((g) => isSameJockey(g.jockey, r.jockey));
+              const buJokeyRides = buJokeyleGecmis.length;
+              const buJokeyWins = buJokeyleGecmis.filter((g) => g.finishPos === "1").length;
+              const atJokeyIkiliOrani = shrink(buJokeyWins, buJokeyRides, jockeyPopOrt) * 100;
+
+              // (3) Jokey değişim yönü — yeni jokeyin oranı eski jokeyin oranından ne
+              // kadar yüksek/düşük (yön taşıyan "niyet" sinyali).
+              let jokeyDegisimYonu = 0;
+              if (r.jockeyChanged && r.previousJockey) {
+                const prevStat = (jockeyStats as any)[r.previousJockey];
+                const curRate = jockeyStat && jockeyStat.overall.rides > 0 ? shrink(jockeyStat.overall.wins, jockeyStat.overall.rides, jockeyPopOrt) : jockeyPopOrt;
+                const prevRate = prevStat && prevStat.overall.rides > 0 ? shrink(prevStat.overall.wins, prevStat.overall.rides, jockeyPopOrt) : jockeyPopOrt;
+                jokeyDegisimYonu = (curRate - prevRate) * 100;
+              }
 
               const myGallops = (gallopsByRunner.get(r.id) ?? []).filter((g) => g.date < race.raceDay.date);
               const sonGalop = myGallops[0];
@@ -275,6 +374,9 @@ async function main() {
                     : 0,
                 galopVerisiVarMi,
                 galopRahatVeIyi,
+                kiloFarkiEnIyiKosuya,
+                atJokeyIkiliOrani,
+                jokeyDegisimYonu,
               });
             }
           })(), 25_000);
