@@ -1,4 +1,5 @@
-import { auth } from "@/lib/auth";
+import { auth, hasRole } from "@/lib/auth";
+import type { Role } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { getRaceDaysByDate } from "@/server/services/race.service";
@@ -26,6 +27,7 @@ export default async function RotaganyanSiralamasiPage({ searchParams }: PagePro
       `/giris?callbackUrl=${encodeURIComponent(`/rotaganyansiralamasi${params.tarih ? `?tarih=${params.tarih}` : ""}`)}`
     );
   }
+  const isAdmin = hasRole(session.user.role as Role, "ADMIN");
 
   // Kazanan atı hemen yansıtmak için (saatlik cron'u beklemeden) sayfa açılışında senkronla.
   const daysAhead = Math.round(
@@ -54,7 +56,7 @@ export default async function RotaganyanSiralamasiPage({ searchParams }: PagePro
       ) : (
         <div className="space-y-6">
           {visibleRaceDays.map((rd) => (
-            <PuanTablosu key={rd.id} raceDay={rd} isLoggedIn={true} currentDate={currentDate} />
+            <PuanTablosu key={rd.id} raceDay={rd} isLoggedIn={true} currentDate={currentDate} isAdmin={isAdmin} />
           ))}
         </div>
       )}

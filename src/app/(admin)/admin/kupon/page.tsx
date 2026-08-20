@@ -278,7 +278,7 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
 
       {/* ── Puan Tablosu ── */}
       {raceDays.map((rd) => (
-        <PuanTablosu key={rd.id} raceDay={rd} isLoggedIn={true} currentDate={today} />
+        <PuanTablosu key={rd.id} raceDay={rd} isLoggedIn={true} currentDate={today} isAdmin />
       ))}
 
       <div className="rounded-lg border p-4">

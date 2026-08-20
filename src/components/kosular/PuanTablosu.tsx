@@ -10,7 +10,19 @@ type Props = {
   raceDay: ProgramRaceDay;
   isLoggedIn: boolean;
   currentDate: string;
+  isAdmin?: boolean;
 };
+
+// 2026-08-20 kullanıcı talebi: her atın yanında o koşudaki AGF sırasını (kaçıncı at
+// olduğunu) göster — yalnız admin görsün, diğer kullanıcılar (piyasa bilgisini önceden
+// bilmek avantaj sağlayabileceği için) görmesin. Koşu içi AGF büyükten küçüğe sıralanır,
+// agf null olanlar sıraya girmez (eşitlikte no'ya göre kararlı sıra).
+function agfSiraMapOlustur(runners: { no: number; agf: number | null }[]): Map<number, number> {
+  const sirali = runners
+    .filter((r) => r.agf != null)
+    .sort((a, b) => (b.agf! !== a.agf! ? b.agf! - a.agf! : a.no - b.no));
+  return new Map(sirali.map((r, i) => [r.no, i + 1]));
+}
 
 type Race = { raceNo: number };
 function chunkIntoAltili<T extends Race>(
@@ -64,12 +76,14 @@ function PuanHucre({ score, details }: { score: number | null; details: unknown 
   );
 }
 
-export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props) {
+export default function PuanTablosu({ raceDay, isLoggedIn, currentDate, isAdmin = false }: Props) {
   const analyzedRaces = raceDay.races.filter(
     (r) => r.prediction?.published && (r.prediction.picks?.length ?? 0) > 0
   );
 
   if (analyzedRaces.length === 0) return null;
+
+  const agfSiraByRaceId = new Map(raceDay.races.map((r) => [r.id, agfSiraMapOlustur(r.runners)]));
 
   const hipName = raceDay.hippodrome.name;
   const racePath = `/kosular?tarih=${currentDate}&hippodrom=${raceDay.hippodrome.slug}`;
@@ -174,6 +188,11 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                                   </span>
                                 ) : null;
                               })()}
+                              {isAdmin && pick.runner?.no != null && agfSiraByRaceId.get(race.id)?.has(pick.runner.no) && (
+                                <span className="ml-1 rounded bg-purple-500/15 px-1 text-[9px] font-semibold text-purple-500">
+                                  AGF {agfSiraByRaceId.get(race.id)!.get(pick.runner.no)}.
+                                </span>
+                              )}
                             </td>
                             <td className={cn("px-2 py-1.5 text-center font-mono tabular-nums whitespace-nowrap", textColor, weight)}>
                               <PuanHucre score={pick.score} details={pick.details} />
@@ -316,6 +335,11 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate }: Props)
                                     </span>
                                   ) : null;
                                 })()}
+                                {isAdmin && pick.runner?.no != null && agfSiraByRaceId.get(race.id)?.has(pick.runner.no) && (
+                                  <span className="shrink-0 rounded bg-purple-500/15 px-1 text-[8px] font-semibold text-purple-500">
+                                    A{agfSiraByRaceId.get(race.id)!.get(pick.runner.no)}
+                                  </span>
+                                )}
                               </div>
                             </td>
 

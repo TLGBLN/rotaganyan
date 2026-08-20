@@ -9,7 +9,21 @@ import { ENGINE_VERSIONS } from "@/server/services/analiz-versiyon-karsilastirma
 // (Eko/Nor/Gen %, "1.seçim 1.geldi") V1-V22/V4/V5 karışık tüm geçmişi topluyordu — V5
 // canlıya alındığında ENGINE_VERSIONS'a yeni kayıt eklenmesi gerekirken unutulmuştu.
 // Bu sabit, o kaydın (bkz. analiz-versiyon-karsilastirma.service.ts) başlangıç tarihi.
-const GUNCEL_MOTOR_BASLANGIC = ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].baslangic;
+//
+// 2026-08-20 kullanıcı bulgusu (/admin/kupon, "Geçmiş veri yok" hepsi boş): önceki
+// hâli EN SON ENGINE_VERSIONS kaydının başlangıcını alıyordu — V5.1 aynı gün içinde
+// birkaç kez (SHINNY vakası dahil) YERİNDE düzeltilip başlangıç tarihi her seferinde
+// ileri kaydığı için, bu istatistik her düzeltmeden sonra kısa süreliğine tamamen
+// boşalıyordu (o zamana kadar hiçbir yeni tahmin üretilmemiş oluyor). V5 ve V5.1 (ve
+// gelecekteki aynı ana-sürüm düzeltmeleri) kullanıcının gözünde TEK bir "V5 dönemi" —
+// bu yüzden EN SON kaydın kendi başlangıcı yerine, aynı ANA sürüme ("V5.1" → "V5")
+// ait EN ERKEN kaydın başlangıcı kullanılıyor. V6 gibi yeni bir ana sürüm eklendiğinde
+// otomatik olarak o sürümün kendi başlangıcına geçer.
+const GUNCEL_SURUM = ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].versiyon;
+const GUNCEL_ANA_SURUM = GUNCEL_SURUM.split(".")[0];
+const GUNCEL_MOTOR_BASLANGIC =
+  ENGINE_VERSIONS.find((v) => v.versiyon.split(".")[0] === GUNCEL_ANA_SURUM)?.baslangic ??
+  ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].baslangic;
 
 export type AdminPrediction = Prisma.PredictionGetPayload<{
   include: {

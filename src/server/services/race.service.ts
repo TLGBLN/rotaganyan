@@ -47,6 +47,11 @@ export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
           };
         };
         result: { select: { hitTop1: true; hitInCoupon: true; ganyan: true; winnerNo: true; winnerNos: true; actualOrder: true } };
+        // 2026-08-20 kullanıcı talebi: Rotaganyan Sıralama Tablosu'nda her atın o koşudaki
+        // AGF sırasını da (yalnız admin görsün) göstermek için — sıralamayı bileşen kendi
+        // içinde runners listesinden hesaplıyor (pick.runner tekil kaydı kendi agf'ini
+        // taşımıyor, tüm sahayla KIYASLANMASI gerekiyor).
+        runners: { where: { scratched: false }; select: { no: true; agf: true } };
       };
     };
   };
@@ -131,6 +136,7 @@ export async function getRaceDaysByDate(
             },
           },
           result: { select: { hitTop1: true, hitInCoupon: true, ganyan: true, winnerNo: true, winnerNos: true, actualOrder: true } },
+          runners: { where: { scratched: false }, select: { no: true, agf: true } },
         },
         orderBy: { raceNo: "asc" },
       },
