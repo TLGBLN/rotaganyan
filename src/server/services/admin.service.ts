@@ -733,12 +733,23 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string): Clas
     ? `${tierText} (${tier!.total} koşu) · 1. seçim 1. geldi: ${isabet}`
     : `1. seçim 1. geldi: ${isabet} (${breakdown.total} koşu)`;
 
-  const economicShare = (tier?.ekonomik ?? 0) / (tier?.total ?? 1);
-  const genisShare = (tier?.genis ?? 0) / (tier?.total ?? 1);
-
+  // 2026-08-20 kullanıcı bulgusu (/admin/kupon): rengin dayandığı metrik (eskiden ham
+  // "1. seçim 1. geldi" oranı) ile kartta gösterilen ana metrik (Eko/Nor/Gen dağılımı)
+  // FARKLI şeylerdi — aynı Eko%80/Nor%20/Gen%0 dağılımına sahip iki satır, yalnız
+  // altındaki farklı "1.geldi" oranı yüzünden biri kehribar biri kırmızı çıkabiliyordu.
+  // Artık renk HER ZAMAN metinde gösterilen aynı Eko/Nor/Gen dağılımından türetiliyor —
+  // aynı dağılım artık her zaman aynı rengi alır. tier örneklemi küçükse (<5, tierText
+  // gösterilmiyorsa) elimizdeki tek sinyal ham orandır, o zaman ona düşülür.
   let level: ClassTypeAdvice["level"] = "info";
-  if (breakdown.rate < 25 || (tier && tier.total >= 5 && genisShare >= 0.45)) level = "warn";
-  else if (breakdown.rate >= 50 && economicShare >= 0.35) level = "good";
+  if (tierText && tier) {
+    const geriKalanPay = ((tier.genis ?? 0) + (tier.kacti ?? 0)) / tier.total;
+    const economicShare = (tier.ekonomik ?? 0) / tier.total;
+    if (geriKalanPay >= 0.35) level = "warn";
+    else if (economicShare >= 0.6) level = "good";
+  } else {
+    if (breakdown.rate < 25) level = "warn";
+    else if (breakdown.rate >= 50) level = "good";
+  }
 
   return { level, text };
 }
