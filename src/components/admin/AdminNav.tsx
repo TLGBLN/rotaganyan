@@ -16,6 +16,7 @@ import {
   TrendingUp,
   Dna,
   Gauge,
+  ClipboardCheck,
 } from "lucide-react";
 
 const NAV = [
@@ -23,6 +24,7 @@ const NAV = [
   { href: "/admin/analizler", label: "Analizler", icon: FileText },
   { href: "/admin/pedigri", label: "Pedigriler", icon: Dna },
   { href: "/admin/accurace", label: "Accurace Database", icon: Gauge },
+  { href: "/admin/veri-tamligi", label: "Veri Tamlığı", icon: ClipboardCheck },
   { href: "/admin/sonuclar", label: "Sonuçlar", icon: Trophy },
   { href: "/admin/kupon", label: "Kupon Hazırla", icon: Ticket },
   { href: "/admin/jokey", label: "Jokey İstatistikleri", icon: TrendingUp },
