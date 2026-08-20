@@ -92,6 +92,24 @@ export type ModelRow = {
   // cezalandırdığı görülünce MODELDEN ÇIKARILDI (bkz. arac-model-egit.mjs'deki not).
   // Alan yine de toplanıyor, gelecekte farklı formülasyonla tekrar test edilebilir.
   agfFarkiIkinciye: number;
+  // 2026-08-20 kullanıcı bulgusu: "galop"/"uzunAraGalopKatkisi" modelde neredeyse hiç
+  // katkı vermiyordu (bootstrap GA sıfırı içeriyor) — sebep araştırıldı, iki aday bulundu
+  // VE TEST EDİLDİ, İKİSİ DE REDDEDİLDİ:
+  // (1) atların %47.8'inin hiç galop kaydı yoktu — meğer TJK'da varmış, yalnız sync-galop
+  // cron'u yalnız bugün/yarın için çalıştığından geçmiş hiç taranmamış. Tam geriye dönük
+  // tarama yapılıp kapsam %86'ya çıkarıldı (galopVerisiVarMi bu düzeltmeyi yansıtıyor).
+  galopVerisiVarMi: 0 | 1;
+  // (2) TJK'nın kendi "Şekil" alanı (ÇR/R rahat...Ç/HÇ çalışarak) hiç kullanılmıyordu —
+  // "galop" (yalnız dereceye bakan) YERİNE, dereceyi HEM iyi/çok-iyi HEM rahat/çok-rahat
+  // şekilde tamamlamış olmayı işaretleyen bu daha zengin versiyon denendi.
+  // SONUÇ (2026-08-20, veri tamamen düzeltildikten SONRA resmi eğitimle test edildi):
+  // ikisi de anlamsız çıktı — galopVerisiVarMi nokta=-0.0196 GA=[-0.1034,0.0944],
+  // galopRahatVeIyi nokta=+0.0572 GA=[-0.0588,0.1595]. Aynı büyümüş veri setinde ADİL
+  // kıyaslama (eski "galop" ile yeniden eğitim): eski top1=%35.4/top3=%71.6/logloss=1.7699
+  // vs yeni top1=%34.1/top3=%71.2/logloss=1.7710 — üç metrikte de hafif kötü. Veri
+  // eksikliği gerçekti ve düzeltildi ama düzeltilmiş veriyle bile "rahat/çalışarak" ayrımı
+  // gerçek bir sinyal taşımıyor. MODELE DAHİL EDİLMEDİ — canlı model hâlâ eski "galop".
+  galopRahatVeIyi: 0 | 1;
 };
 
 async function main() {
@@ -156,7 +174,7 @@ async function main() {
             const gallops = await db.gallop.findMany({
               where: { runnerId: { in: runners.map((r) => r.id) } },
               orderBy: { date: "desc" },
-              select: { runnerId: true, date: true, jockey: true, splits: true },
+              select: { runnerId: true, date: true, jockey: true, splits: true, form: true },
             });
             const gallopsByRunner = new Map<string, typeof gallops>();
             for (const g of gallops) {
@@ -202,10 +220,15 @@ async function main() {
               const myGallops = (gallopsByRunner.get(r.id) ?? []).filter((g) => g.date < race.raceDay.date);
               const sonGalop = myGallops[0];
               let keskinGalop = 0;
+              let galopVerisiVarMi: 0 | 1 = 0;
+              let galopRahatVeIyi: 0 | 1 = 0;
               if (sonGalop) {
                 const s = (sonGalop.splits as Record<string, string | null>) ?? {};
+                galopVerisiVarMi = s["400"] != null ? 1 : 0;
                 const q = galopQuality("400", s["400"] ?? null, race.breed, s["ic_dis"] === "İç");
                 keskinGalop = q === "cok_iyi" || q === "iyi" ? 1 : 0;
+                const KOLAY_SEKILLER = new Set(["R", "Rahat", "ÇR", "Çok Rahat", "HR"]);
+                galopRahatVeIyi = keskinGalop === 1 && sonGalop.form != null && KOLAY_SEKILLER.has(sonGalop.form) ? 1 : 0;
               }
               const idmJokey = myGallops.some((g) => isSameJockey(g.jockey, r.jockey)) ? 1 : 0;
 
@@ -250,6 +273,8 @@ async function main() {
                   r.agf != null && birinciAgf != null && r.agf === birinciAgf && ikinciAgf != null
                     ? birinciAgf - ikinciAgf
                     : 0,
+                galopVerisiVarMi,
+                galopRahatVeIyi,
               });
             }
           })(), 25_000);
