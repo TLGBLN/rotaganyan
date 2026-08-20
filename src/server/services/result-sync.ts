@@ -7,7 +7,7 @@
 import { db } from "@/lib/db";
 import { discoverTurkishCities, toSlug, toTjkDate } from "./ingest/tjk-info.adapter";
 import { fetchCityResults, type CityRaceResult } from "./ingest/tjk-result.adapter";
-import { computeHitTop1 } from "@/lib/result-utils";
+import { computeHitTop1, syncKarmaResultMirrors } from "@/lib/result-utils";
 
 export async function syncResultsForDate(dateStr: string): Promise<void> {
   const date = new Date(dateStr + "T00:00:00.000Z");
@@ -79,5 +79,18 @@ export async function syncResultsForDate(dateStr: string): Promise<void> {
     await db.result.create({
       data: { raceId: race.id, winnerNo, winnerNos, actualOrder, ganyan, time, farklar, hitTop1, hitInCoupon, gecCikanlar: gecCikanlar.length > 0 ? gecCikanlar : undefined },
     });
+  }
+
+  // 2026-08-20 kullanıcı bulgusu (KARA ALEV/UYGURKIZI vakası): Karma'nın kendi TJK sayfası,
+  // asıl hipodromun sayfasından bağımsız çekildiği için ayrı yanlış okunabiliyor. Günün TÜM
+  // asıl (Karma olmayan) ve sonuçlanmış koşuları için mirror'ı yeniden uygula — yalnız bu
+  // çalıştırmada yeni gelenler değil, geçmişte hatalı kalmış Karma kopyaları da kendiliğinden
+  // düzelir (bkz. syncKarmaResultMirrors, result-utils.ts).
+  const asilSonuclu = await db.race.findMany({
+    where: { raceDay: { date }, conditions: null, result: { isNot: null } },
+    select: { id: true },
+  });
+  for (const race of asilSonuclu) {
+    try { await syncKarmaResultMirrors(race.id); } catch { /* bir sonraki senkronizasyona bırak */ }
   }
 }

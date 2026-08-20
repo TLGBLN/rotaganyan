@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+
 /**
  * "Tuttu" kuralı: tahminin 1. seçimi yarışı kesin olarak kazanırsa hit sayılır.
  * Top-3/top-6 gibi yakınsama kabul edilmez — kazanmayan at "tuttu" sayılmaz.
@@ -43,6 +45,75 @@ export async function recomputeHitStatsForRace(raceId: string): Promise<void> {
   const hitInCoupon = winnerNos.some((no) => top3Nos.includes(no));
   if (hitTop1 === race.result.hitTop1 && hitInCoupon === race.result.hitInCoupon) return;
   await db.result.update({ where: { id: race.result.id }, data: { hitTop1, hitInCoupon } });
+}
+
+/**
+ * "Kocaeli 2. Koşu" gibi bir Race.conditions metnini {hippodromeName, raceNo}'ya çözer —
+ * Karma (birden fazla hipodromu birleştiren) koşuların hangi ASIL koşuyu yansıttığını
+ * bulmak için kullanılır. syncKarmaMirrors (analiz/pick, prediction.actions.ts) ve
+ * syncKarmaResultMirrors (sonuç, aşağıda) aynı ayrıştırmayı paylaşır.
+ */
+export function parseKarmaConditionsRef(conditions: string): { hippodromeName: string; raceNo: number } | null {
+  const m = conditions.match(/^(.+?)\s+(\d+)\.\s*Ko[şs]u/i);
+  if (!m) return null;
+  return { hippodromeName: m[1].trim(), raceNo: parseInt(m[2], 10) };
+}
+
+/**
+ * 2026-08-20 kullanıcı bulgusu (KARA ALEV/UYGURKIZI vakası, Kocaeli↔Karma): syncKarmaMirrors
+ * yalnız ANALİZ/pick verisini eşliyordu — Sonuç (Result) hiç kapsanmıyordu. Karma'nın TJK
+ * sayfası, asıl hipodromun kendi sayfasından BAĞIMSIZ çekildiği için ikisi ayrı ayrı yanlış/
+ * doğru olabiliyor (bu vakada Kocaeli'nin kendi sayfası doğruydu, Karma'nın kendi sayfası
+ * KARA ALEV yerine UYGURKIZI'yı kazanan göstermişti). ASIL hipodromun kendi sonucu her zaman
+ * otorite kabul edilir — Karma'daki mirror(lar) HER senkronizasyonda ondan kopyalanır (zaten
+ * yanlışsa bile kendi kendini düzeltir), tersi asla olmaz. result-sync.ts, günün tüm ASIL
+ * (conditions'ı boş) ve sonuçlanmış koşuları için bunu her çalıştığında yeniden çağırır —
+ * yalnız yeni gelen sonuçlar değil, geçmişte hatalı kalmış Karma kopyaları da kendiliğinden
+ * düzelir.
+ */
+export async function syncKarmaResultMirrors(asilRaceId: string): Promise<void> {
+  const { db } = await import("@/lib/db");
+  const { startOfDay, endOfDay } = await import("date-fns");
+
+  const asil = await db.race.findUnique({
+    where: { id: asilRaceId },
+    select: {
+      raceNo: true,
+      conditions: true,
+      raceDay: { select: { date: true, hippodrome: { select: { name: true } } } },
+      result: true,
+    },
+  });
+  // Karma'nın KENDİSİ için çağrılırsa (conditions dolu) atla — yayılım yalnız asıl
+  // hipodromdan Karma'ya doğrudur, tersi yok.
+  if (!asil?.result || asil.conditions) return;
+
+  const conditionsKey = `${asil.raceDay.hippodrome.name} ${asil.raceNo}. Koşu`;
+  const karmaRaces = await db.race.findMany({
+    where: {
+      conditions: conditionsKey,
+      raceDay: { date: { gte: startOfDay(asil.raceDay.date), lte: endOfDay(asil.raceDay.date) } },
+    },
+    select: { id: true, result: { select: { id: true } } },
+  });
+  if (karmaRaces.length === 0) return;
+
+  const { actualOrder, winnerNo, winnerNos, ganyan, time, farklar, gecCikanlar } = asil.result;
+  const actualOrderInput = actualOrder as Prisma.InputJsonValue;
+  const gecCikanlarInput = gecCikanlar == null ? undefined : (gecCikanlar as Prisma.InputJsonValue);
+  for (const karma of karmaRaces) {
+    if (karma.result) {
+      await db.result.update({
+        where: { raceId: karma.id },
+        data: { actualOrder: actualOrderInput, winnerNo, winnerNos, ganyan, time, farklar, gecCikanlar: gecCikanlarInput },
+      });
+    } else {
+      await db.result.create({
+        data: { raceId: karma.id, actualOrder: actualOrderInput, winnerNo, winnerNos, ganyan, time, farklar, gecCikanlar: gecCikanlarInput },
+      });
+    }
+    await recomputeHitStatsForRace(karma.id);
+  }
 }
 
 /** "1-3-7" gibi tire ile ayrılmış kupon string'ini at numaralarına çevirir. */

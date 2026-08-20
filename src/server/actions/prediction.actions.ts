@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { startOfDay, endOfDay } from "date-fns";
-import { recomputeHitStatsForRace } from "@/lib/result-utils";
+import { recomputeHitStatsForRace, parseKarmaConditionsRef } from "@/lib/result-utils";
 import { kategoriTespit, KATEGORI_ADI } from "@/lib/methodology/v2-engine";
 import { detaylarBosMu, isPickDetailsV2 } from "@/lib/methodology/muhakeme-format";
 import type { Confidence, PedigreeRating, Prisma } from "@prisma/client";
@@ -44,15 +44,8 @@ type PredictionInput = {
  * Örnek: İstanbul 8. Koşu için analiz girilince, conditions="İstanbul 8. Koşu"
  * olan tüm Karma koşularına da aynı analiz kopyalanır.
  */
-// v6.35 — geriye dönük backfill script'lerinin (Karma conditions alanı yeni doldurulmaya
-// başladığı için önceden hiç eşleşmemiş, zaten yayınlanmış analizler var) bu fonksiyonu
-// tekrar çağırabilmesi için dışa açık — buildFaz2Prompt/kuralKontrolleriUret ile aynı desen.
-function parseKarmaConditionsRef(conditions: string): { hippodromeName: string; raceNo: number } | null {
-  const m = conditions.match(/^(.+?)\s+(\d+)\.\s*Ko[şs]u/i);
-  if (!m) return null;
-  return { hippodromeName: m[1].trim(), raceNo: parseInt(m[2], 10) };
-}
-
+// 2026-08-20 — parseKarmaConditionsRef artık result-utils.ts'te paylaşılıyor
+// (syncKarmaResultMirrors de aynı ayrıştırmayı kullanıyor, bkz. o dosya).
 export async function syncKarmaMirrors(predictionId: string): Promise<void> {
   const pred = await db.prediction.findUnique({
     where: { id: predictionId },
