@@ -94,15 +94,24 @@ export async function syncKarmaResultMirrors(asilRaceId: string): Promise<void> 
       conditions: conditionsKey,
       raceDay: { date: { gte: startOfDay(asil.raceDay.date), lte: endOfDay(asil.raceDay.date) } },
     },
-    select: { id: true, result: { select: { id: true } } },
+    select: { id: true, result: { select: { id: true, winnerNo: true } } },
   });
   if (karmaRaces.length === 0) return;
 
   const { actualOrder, winnerNo, winnerNos, ganyan, time, farklar, gecCikanlar } = asil.result;
   const actualOrderInput = actualOrder as Prisma.InputJsonValue;
   const gecCikanlarInput = gecCikanlar == null ? undefined : (gecCikanlar as Prisma.InputJsonValue);
+  // 2026-08-20 kullanıcı talebi ("sürekli siteyi kolaçan edecek bir agent"): var olan bir
+  // Karma sonucu YANLIŞ değerden asıl'a düzeltiliyorsa (ilk kez doldurulması DEĞİL, gerçek
+  // bir tutarsızlık) — bu, TJK'nın Karma sayfasının o gün gerçekten yanlış veri verdiğinin
+  // kanıtı. Admin'e SYSTEM bildirimi olarak anında düşürülür (bkz. veri-denetimi bölümü,
+  // /admin/bildirimler'de görünür) — sessizce düzelmesin, kullanıcı haberdar olsun.
+  const gercekUyusmazliklar: { karmaRaceId: string; eskiKazananNo: number | null }[] = [];
   for (const karma of karmaRaces) {
     if (karma.result) {
+      if (karma.result.winnerNo !== winnerNo) {
+        gercekUyusmazliklar.push({ karmaRaceId: karma.id, eskiKazananNo: karma.result.winnerNo });
+      }
       await db.result.update({
         where: { raceId: karma.id },
         data: { actualOrder: actualOrderInput, winnerNo, winnerNos, ganyan, time, farklar, gecCikanlar: gecCikanlarInput },
@@ -113,6 +122,34 @@ export async function syncKarmaResultMirrors(asilRaceId: string): Promise<void> 
       });
     }
     await recomputeHitStatsForRace(karma.id);
+  }
+
+  if (gercekUyusmazliklar.length > 0) {
+    try {
+      const aranankNolar = [winnerNo, ...gercekUyusmazliklar.map((u) => u.eskiKazananNo)].filter((n): n is number => n != null);
+      const runners = await db.runner.findMany({
+        where: { raceId: asilRaceId, no: { in: aranankNolar } },
+        select: { no: true, name: true },
+      });
+      const adByNo = new Map(runners.map((r) => [r.no, r.name]));
+      const dogruAd = winnerNo != null ? (adByNo.get(winnerNo) ?? `#${winnerNo}`) : "?";
+      const eski = gercekUyusmazliklar[0].eskiKazananNo;
+      const eskiAd = eski != null ? (adByNo.get(eski) ?? `#${eski}`) : "?";
+      const admins = await db.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
+      if (admins.length > 0) {
+        await db.notification.createMany({
+          data: admins.map((a) => ({
+            userId: a.id,
+            type: "SYSTEM" as const,
+            title: "Karma/asıl hipodrom sonuç uyuşmazlığı düzeltildi",
+            body: `${asil.raceDay.hippodrome.name} ${asil.raceNo}. Koşu — Karma'nın kendi sayfası "${eskiAd}" kazandı diyordu, asıl hipodrom sayfası "${dogruAd}" diyor. Otomatik düzeltildi (asıl otorite kabul edildi).`,
+            link: "/admin/kupon",
+          })),
+        });
+      }
+    } catch {
+      // Bildirim başarısız olsa bile veri düzeltmesi zaten uygulandı — sessizce geç.
+    }
   }
 }
 

@@ -103,6 +103,10 @@
     {
       "path": "/api/cron/sync-horse-stats-cache",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/veri-denetimi",
+      "schedule": "0 7 * * *"
     }
   ]
 }
