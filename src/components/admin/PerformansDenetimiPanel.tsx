@@ -4,6 +4,7 @@ import { tr } from "date-fns/locale";
 import type { AnalizPerformansOzeti } from "@/server/services/analiz-performans.service";
 import type { EngineVersionSonuc } from "@/server/services/analiz-versiyon-karsilastirma.service";
 import type { AgfTrendIstatistikSonuc } from "@/server/services/agf-trend-istatistik.service";
+import Gauge from "./Gauge";
 
 // 2026-08-17 kullanıcı talebi: "/admin/performans dashboard'a bağlanabilir mi, fazlalık
 // yapmasın" — ayrı sayfa/nav girdisi kaldırıldı, içerik doğrudan ana dashboard'a
@@ -16,6 +17,15 @@ function Kart({ baslik, deger, alt }: { baslik: string; deger: string; alt: stri
       <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{baslik}</div>
       <div className="mt-1 text-2xl font-black tabular-nums text-foreground">{deger}</div>
       <div className="mt-0.5 text-[11px] text-muted-foreground">{alt}</div>
+    </div>
+  );
+}
+
+function GaugeKart({ baslik, deger, alt }: { baslik: string; deger: number; alt: string }) {
+  return (
+    <div className="rounded-lg border border-brand/20 bg-[#0d0d14] p-4">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{baslik}</div>
+      <Gauge value={deger} size={110} altBilgi={alt} />
     </div>
   );
 }
@@ -59,15 +69,24 @@ export default function PerformansDenetimiPanel({
         <div className="space-y-3">
           <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Güncel (son {ozet.guncel.n} koşu)</div>
           <div className="grid grid-cols-2 gap-3">
-            <Kart baslik="Galibiyet (1.sıra)" deger={`%${ozet.guncel.hitTop1Orani}`} alt={`n=${ozet.guncel.n}`} />
-            <Kart baslik="Kupon İsabeti" deger={`%${ozet.guncel.hitInCouponOrani}`} alt={`n=${ozet.guncel.n}`} />
+            <GaugeKart baslik="Galibiyet (1.sıra)" deger={ozet.guncel.hitTop1Orani} alt={`n=${ozet.guncel.n}`} />
+            <GaugeKart baslik="Kupon İsabeti" deger={ozet.guncel.hitInCouponOrani} alt={`n=${ozet.guncel.n}`} />
           </div>
         </div>
         <div className="space-y-3">
           <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Önceki {ozet.onceki?.n ?? 100} koşu</div>
           <div className="grid grid-cols-2 gap-3">
-            <Kart baslik="Galibiyet (1.sıra)" deger={ozet.onceki ? `%${ozet.onceki.hitTop1Orani}` : "—"} alt={ozet.onceki ? `n=${ozet.onceki.n}` : "henüz yok"} />
-            <Kart baslik="Kupon İsabeti" deger={ozet.onceki ? `%${ozet.onceki.hitInCouponOrani}` : "—"} alt={ozet.onceki ? `n=${ozet.onceki.n}` : "henüz yok"} />
+            {ozet.onceki ? (
+              <>
+                <GaugeKart baslik="Galibiyet (1.sıra)" deger={ozet.onceki.hitTop1Orani} alt={`n=${ozet.onceki.n}`} />
+                <GaugeKart baslik="Kupon İsabeti" deger={ozet.onceki.hitInCouponOrani} alt={`n=${ozet.onceki.n}`} />
+              </>
+            ) : (
+              <>
+                <Kart baslik="Galibiyet (1.sıra)" deger="—" alt="henüz yok" />
+                <Kart baslik="Kupon İsabeti" deger="—" alt="henüz yok" />
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -85,21 +104,30 @@ export default function PerformansDenetimiPanel({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-lg border border-hit/30 bg-hit/[0.04] p-4">
             <div className="text-xs font-bold uppercase tracking-wide text-hit">En Çok Yükselenler</div>
-            <div className="mt-1 text-2xl font-black tabular-nums text-foreground">%{agfGrup.yukselen?.galibiyetYuzde ?? "—"}</div>
-            <div className="text-[11px] text-muted-foreground">galibiyet · n={agfGrup.yukselen?.n ?? 0}</div>
-            <div className="mt-1 text-xs text-muted-foreground">İlk-3: %{agfGrup.yukselen?.top3Yuzde ?? "—"}</div>
+            {agfGrup.yukselen ? (
+              <Gauge value={agfGrup.yukselen.galibiyetYuzde} size={110} altBilgi={`galibiyet · n=${agfGrup.yukselen.n}`} />
+            ) : (
+              <div className="mt-1 text-2xl font-black tabular-nums text-foreground">—</div>
+            )}
+            <div className="mt-1 text-center text-xs text-muted-foreground">İlk-3: %{agfGrup.yukselen?.top3Yuzde ?? "—"}</div>
           </div>
           <div className="rounded-lg border border-[#c0392b]/30 bg-[#c0392b]/[0.04] p-4">
             <div className="text-xs font-bold uppercase tracking-wide text-[#c0392b]">En Çok Düşenler</div>
-            <div className="mt-1 text-2xl font-black tabular-nums text-foreground">%{agfGrup.dusen?.galibiyetYuzde ?? "—"}</div>
-            <div className="text-[11px] text-muted-foreground">galibiyet · n={agfGrup.dusen?.n ?? 0}</div>
-            <div className="mt-1 text-xs text-muted-foreground">İlk-3: %{agfGrup.dusen?.top3Yuzde ?? "—"}</div>
+            {agfGrup.dusen ? (
+              <Gauge value={agfGrup.dusen.galibiyetYuzde} size={110} altBilgi={`galibiyet · n=${agfGrup.dusen.n}`} />
+            ) : (
+              <div className="mt-1 text-2xl font-black tabular-nums text-foreground">—</div>
+            )}
+            <div className="mt-1 text-center text-xs text-muted-foreground">İlk-3: %{agfGrup.dusen?.top3Yuzde ?? "—"}</div>
           </div>
           <div className="rounded-lg border border-brand/20 bg-[#0d0d14] p-4">
             <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Kontrol (sahadaki tüm atlar)</div>
-            <div className="mt-1 text-2xl font-black tabular-nums text-foreground">%{agfGrup.kontrol?.galibiyetYuzde ?? "—"}</div>
-            <div className="text-[11px] text-muted-foreground">galibiyet · n={agfGrup.kontrol?.n ?? 0}</div>
-            <div className="mt-1 text-xs text-muted-foreground">İlk-3: %{agfGrup.kontrol?.top3Yuzde ?? "—"}</div>
+            {agfGrup.kontrol ? (
+              <Gauge value={agfGrup.kontrol.galibiyetYuzde} size={110} altBilgi={`galibiyet · n=${agfGrup.kontrol.n}`} />
+            ) : (
+              <div className="mt-1 text-2xl font-black tabular-nums text-foreground">—</div>
+            )}
+            <div className="mt-1 text-center text-xs text-muted-foreground">İlk-3: %{agfGrup.kontrol?.top3Yuzde ?? "—"}</div>
           </div>
         </div>
       </div>

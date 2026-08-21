@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { AgfEdgeStats } from "@/server/services/admin.service";
+import Gauge from "./Gauge";
 
 /**
  * Amaç: sistemin (V5) 1. seçimi, hiç analiz yapmadan sadece kalabalığın parasını (en yüksek
@@ -48,12 +49,10 @@ export default function AgfEdgeCard({ stats, overallTotal }: { stats: AgfEdgeSta
 
       <div className="grid grid-cols-2 gap-3 text-center">
         <div className="rounded-md border bg-muted/20 px-3 py-2">
-          <div className="text-lg font-bold tabular-nums">%{stats.systemRate.toFixed(0)}</div>
-          <div className="text-[10px] text-muted-foreground">Sistem isabeti ({stats.systemHits}/{stats.total})</div>
+          <Gauge value={stats.systemRate} size={100} altBilgi={`Sistem isabeti (${stats.systemHits}/${stats.total})`} />
         </div>
         <div className="rounded-md border bg-muted/20 px-3 py-2">
-          <div className="text-lg font-bold tabular-nums">%{stats.agfFavoriteRate.toFixed(0)}</div>
-          <div className="text-[10px] text-muted-foreground">AGF favorisi isabeti ({stats.agfFavoriteHits}/{stats.total})</div>
+          <Gauge value={stats.agfFavoriteRate} size={100} altBilgi={`AGF favorisi isabeti (${stats.agfFavoriteHits}/${stats.total})`} />
         </div>
       </div>
 
@@ -64,20 +63,10 @@ export default function AgfEdgeCard({ stats, overallTotal }: { stats: AgfEdgeSta
           </p>
           <div className="grid grid-cols-2 gap-3 text-center">
             <div className="rounded-md border bg-muted/20 px-3 py-2">
-              <div className="text-sm font-semibold tabular-nums">
-                %{stats.agreeRate.toFixed(0)}
-              </div>
-              <div className="text-[10px] text-muted-foreground">
-                AGF ile aynı fikirde ({stats.agreeHits}/{stats.agreeTotal})
-              </div>
+              <Gauge value={stats.agreeRate} size={90} decimals={0} altBilgi={`AGF ile aynı fikirde (${stats.agreeHits}/${stats.agreeTotal})`} />
             </div>
             <div className="rounded-md border bg-muted/20 px-3 py-2">
-              <div className={cn("text-sm font-semibold tabular-nums", disagreeBeatsAgree && "text-hit")}>
-                %{stats.disagreeRate.toFixed(0)}
-              </div>
-              <div className="text-[10px] text-muted-foreground">
-                AGF&apos;den farklı ({stats.disagreeHits}/{stats.disagreeTotal})
-              </div>
+              <Gauge value={stats.disagreeRate} size={90} decimals={0} altBilgi={`AGF'den farklı (${stats.disagreeHits}/${stats.disagreeTotal})`} />
             </div>
           </div>
           {hasDisagreeSample && stats.agreeTotal >= 5 && (
