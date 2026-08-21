@@ -654,7 +654,26 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
     });
   }
 
-  const pozitifSirali = gruplar.filter((g) => g.katki > 0).sort((a, b) => b.katki - a.katki);
+  // 2026-08-21 kullanıcı kararı: düşük-şart/maiden segmentinde sireOrani ELLE en güçlü
+  // katsayı yapıldı (bkz. weights/v5-weights-dusuksart.json notu) — ama eski gösterim
+  // mantığı "önce tüm pozitifler, sonra tüm negatifler" sıralıyordu, bu yüzden SIRE
+  // negatif çıktığında (atın kendi aygırı segment ortalamasının altındaysa) listenin en
+  // altına, bir "risk" uyarısına düşüyordu — kullanıcı bunu "öncelikli değil" diye
+  // işaretledi (ŞENGÜL SULTAN/Bursa vakası). SIRE artık işaretine bakılmaksızın (destek/
+  // risk) AGFTREND'den hemen sonra, İKİNCİ satır olarak sabitleniyor — katkısı bu
+  // segmentte zaten en büyük olduğu için bu, gerçek etkiyle tutarlı bir öncelik.
+  const sireGrubu = gruplar.find((g) => g.kod === "SIRE");
+  if (sireGrubu && Math.abs(sireGrubu.katki) >= 0.03) {
+    satirlar.push({
+      kod: ["SIRE"],
+      tip: sireGrubu.katki >= 0 ? "destek" : "risk",
+      guven: Math.abs(sireGrubu.katki) >= GUCLU_ESIK ? "tam" : Math.abs(sireGrubu.katki) >= ORTA_ESIK ? "orta" : "zayif",
+      aciklama: sireGrubu.metin!,
+    });
+  }
+  const gruplarSiresiz = gruplar.filter((g) => g.kod !== "SIRE");
+
+  const pozitifSirali = gruplarSiresiz.filter((g) => g.katki > 0).sort((a, b) => b.katki - a.katki);
   for (const g of pozitifSirali.slice(0, 5)) {
     if (g.katki < 0.03) continue; // ihmal edilebilir katkı, gösterime değmez
     satirlar.push({
@@ -665,7 +684,7 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
     });
   }
 
-  const negatifSirali = gruplar.filter((g) => g.katki < -ORTA_ESIK).sort((a, b) => a.katki - b.katki);
+  const negatifSirali = gruplarSiresiz.filter((g) => g.katki < -ORTA_ESIK).sort((a, b) => a.katki - b.katki);
   for (const g of negatifSirali.slice(0, 2)) {
     satirlar.push({
       kod: [g.kod],
