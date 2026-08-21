@@ -70,8 +70,16 @@
  *    `v5-weights-dusuksart.json`'da sireOrani AĞIRLIĞI ELLE 0.65'e YÜKSELTİLDİ (segmentteki
  *    en büyük katsayı, agfSirasi'nin |0.40|'ından ve antrenorOrani'nin 0.36'sından büyük).
  *    BU DEĞER VERİDEN ÖĞRENİLMEDİ — kullanıcı talimatıyla manuel enjekte edildi, istatistiksel
- *    anlamlılık iddiası YOK. Yalnız düşük-şart/maiden segmentini etkiler, "diğer" segment
- *    (v5-weights-diger.json) veriden öğrenilen (+0.035, zayıf) değerinde kaldı.
+ *    anlamlılık iddiası YOK.
+ *  - 2026-08-21 (V5.3 devamı — İKİNCİ MANUEL OVERRIDE): kullanıcı talimatı netleşti —
+ *    düşük-şart/maiden segmentinde ÖNCELİKLİ sinyaller sireOrani VE AGF trend (ikisi
+ *    birlikte), "diğer" segmentte YALNIZ AGF trend öncelikli, geri kalan sinyaller veriden
+ *    öğrenilen (gerçek başarı oranını yansıtan) değerlerinde bırakılsın. Bu yüzden:
+ *    `v5-weights-dusuksart.json`'da agfYukselisVarMi VE agfDususVarMi de ELLE 0.65'e
+ *    yükseltildi (sireOrani ile eşit, üçü birlikte segmentin en büyük üç katsayısı).
+ *    `v5-weights-diger.json`'da agfYukselisVarMi/agfDususVarMi ELLE 0.7'ye yükseltildi
+ *    (agfSirasi'nin |0.51|'inden büyük, segmentin tek en büyük katsayısı) — o segmentteki
+ *    DİĞER 16 katsayıya DOKUNULMADI, hâlâ veriden öğrenilen (fitted) değerlerinde.
  *
  * Ağırlıklar `weights/v5-weights-dusuksart.json` (şartlı1/19/27+maiden) ve
  * `weights/v5-weights-diger.json` (diğer tüm koşular) altında AYRI AYRI COMMIT EDİLMİŞ
