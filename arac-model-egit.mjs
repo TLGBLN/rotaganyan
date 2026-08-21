@@ -1,4 +1,7 @@
-// KALICI ARAÇ (V5 model eğitimi) — 2026-08-15, SİLİNMİYOR.
+// KALICI ARAÇ (V5 model eğitimi, TEK-MODEL) — 2026-08-15, SİLİNMİYOR.
+// 2026-08-21 NOT: canlı motor V5.3'te segment-bazlı İKİ AYRI modele geçti (şartlı1/19/27+
+// maiden vs diğer) — güncel eğitim için arac-model-egit-segment.mjs kullanılmalı. Bu dosya
+// tek-model karşılaştırma/referans amaçlı hâlâ çalışır durumda tutuluyor.
 // arac-model-veri-olustur.mts'nin ürettiği ham/sürekli veriyi okuyup, koşullu logit
 // (Plackett-Luce / yarış-gruplu softmax) modelini gradyan inişi + L2 ile eğitir.
 // Yarış-bazlı KRONOLOJİK train/test bölmesi kullanır (ilk ~%75 eğitim, son ~%25 test).

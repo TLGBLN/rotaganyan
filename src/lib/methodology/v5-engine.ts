@@ -39,7 +39,7 @@
  *    kaldırılıp "agfDususVarMi" (agfFark<=-1.0, agfYukselisVarMi ile simetrik) olarak
  *    yeniden test edildi — top1 aynı (%38.0), top3 %68.3→%70.2, log-loss 1.7695→1.7617
  *    iyileşti, KABUL EDİLDİ. Tam liste + gerekçe yorumları toFeatureVector üzerinde (bkz.
- *    weights/v5-weights.json featureNames).
+ *    weights/v5-weights-diger.json featureNames).
  *  - 2026-08-21 (MR TT vakası, İstanbul K3): AGF'de sahadaki en büyük hareketi (+9.52
  *    puan) yapan at, zayıf aygır oranı (%8.5) yüzünden model'de 6.sıraya düşmüştü — 7 boy
  *    farkla kazandı. İki hipotez test edildi: (1) AGF hareketinin BÜYÜKLÜĞÜNE göre doğrusal
@@ -50,10 +50,25 @@
  *    sireOrani'nin baskın ağırlığı (+0.61, modeldeki en büyük katsayı) hiçbir AGF-hareket
  *    formülasyonuyla dengelenemedi — bu, tek bir n=1 sürpriz galibiyet, üçüncü bir
  *    hipotezle kovalanmadı (overfitting riski).
+ *  - 2026-08-21 (V5.2): sireOrani/jokeyOrani/antrenorOrani EĞİTİM verisinde her zaman
+ *    GÜNCEL (bugüne kadarki) tablodan okunuyordu — canlı tahmin için doğru ama geçmiş
+ *    eğitim satırları için gerçek bir sızıntıydı. sireOrani, kendi Runner/Result verimizden
+ *    yalnız o koşudan KESİNLİKLE önceki tarihli kayıtlarla hesaplanacak şekilde düzeltildi
+ *    (jokeyOrani/antrenorOrani izole test için TJK kaynağına bırakıldı). sireOrani katsayısı
+ *    +0.608'den +0.043'e (anlamsız) düştü — eski %35.4/%71.6 test rakamları da AYNI
+ *    sızıntıdan şişmişti, yeni %30.8/%66.7 daha dürüst bir referans.
+ *  - 2026-08-21 (V5.3): kullanıcı kararı — sireOrani şartlı1/19/27+maiden koşularında,
+ *    AGF trend diğer koşularda ağırlıklı olmalı. İki test (etkileşim terimi + seyreltmesiz
+ *    ayrı-model) yönü doğruladı (düşük-şart segmentte sireOrani nokta tahmini ~2 kat daha
+ *    yüksek) ama istatistiksel anlamlılığa ulaşmadı (n=240 düşük-şart koşusu, GA'lar geniş)
+ *    — kullanıcı buna rağmen segment-bazlı MİMARİNİN canlıya alınmasını istedi. Motor artık
+ *    TEK bir ortak ağırlık yerine, koşunun kategorisine (kategoriTespit) göre İKİ TAMAMEN
+ *    AYRI eğitilmiş model arasında seçim yapıyor (bkz. agirlikSetiSec).
  *
- * Ağırlıklar `weights/v5-weights.json`'da COMMIT EDİLMİŞ (production'da Vercel'in
- * scratchpad'e erişimi yok) — yeniden eğitim gerekirse arac-model-egit.mjs çalıştırılıp
- * çıktısı bu dosyaya kopyalanmalı.
+ * Ağırlıklar `weights/v5-weights-dusuksart.json` (şartlı1/19/27+maiden) ve
+ * `weights/v5-weights-diger.json` (diğer tüm koşular) altında AYRI AYRI COMMIT EDİLMİŞ
+ * (production'da Vercel'in scratchpad'e erişimi yok) — yeniden eğitim gerekirse
+ * arac-model-egit-segment.mjs çalıştırılıp çıktıları bu iki dosyaya kopyalanmalı.
  */
 
 import { db } from "@/lib/db";
@@ -68,16 +83,28 @@ import {
 } from "@/lib/methodology/veri-toplama";
 import { galopQuality, isSameJockey } from "@/components/program/panels/galop-helpers";
 import type { PickDetailsV2, MuhakemeSatiri } from "@/lib/methodology/muhakeme-format";
-import { hesaplaSinyalSayisi } from "@/lib/methodology/v2-engine";
+import { hesaplaSinyalSayisi, kategoriTespit } from "@/lib/methodology/v2-engine";
 import { AGF_TERFI_ILK3_SINYAL_ESIGI as SINYAL_ESIGI } from "@/lib/methodology/v4-engine";
-import v5Weights from "@/lib/methodology/weights/v5-weights.json";
+import v5WeightsDusukSart from "@/lib/methodology/weights/v5-weights-dusuksart.json";
+import v5WeightsDiger from "@/lib/methodology/weights/v5-weights-diger.json";
 
-const { featureNames: FEATURE_NAMES, weights: WEIGHTS, means: MEANS, stds: STDS } = v5Weights as {
-  featureNames: string[];
-  weights: number[];
-  means: number[];
-  stds: number[];
-};
+type AgirlikSeti = { featureNames: string[]; weights: number[]; means: number[]; stds: number[] };
+
+// 2026-08-21 (V5.3) kullanıcı kararı: sireOrani şartlı1/19/27+maiden (kategoriTespit
+// "1a"/"1b") koşularında, AGF trend sinyalleri (agfYukselisVarMi/agfDususVarMi) diğer
+// koşularda ağırlıklı olmalı. İki ayrı test (ortak modelde etkileşim terimi, VE seyreltmesiz
+// iki-ayrı-model) bu yönü doğruladı ama istatistiksel anlamlılığa ulaşmadı (küçük örneklem,
+// n=240 düşük-şart koşusu) — kullanıcı buna rağmen segment-bazlı iki-model mimarisinin
+// CANLIYA alınmasını istedi (bkz. arac-model-egit-segment.mjs). Tek bir ortak ağırlık
+// yerine, koşunun kategorisine göre İKİ TAMAMEN AYRI eğitilmiş model arasında seçim yapılır.
+const WEIGHTS_DUSUK_SART = v5WeightsDusukSart as AgirlikSeti;
+const WEIGHTS_DIGER = v5WeightsDiger as AgirlikSeti;
+const FEATURE_NAMES = WEIGHTS_DIGER.featureNames; // iki set de AYNI 18 özellik/sırayı kullanır
+
+function agirlikSetiSec(classType: string): AgirlikSeti {
+  const kategori = kategoriTespit(classType);
+  return kategori === "1a" || kategori === "1b" ? WEIGHTS_DUSUK_SART : WEIGHTS_DIGER;
+}
 
 function shrink(wins: number, rides: number, populasyonOrt: number, k = 20): number {
   return (wins + k * populasyonOrt) / (rides + k);
@@ -343,8 +370,8 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
   ];
 }
 
-function standardize(v: number[]): number[] {
-  return v.map((x, i) => (STDS[i] > 1e-9 ? (x - MEANS[i]) / STDS[i] : 0));
+function standardize(v: number[], ws: AgirlikSeti): number[] {
+  return v.map((x, i) => (ws.stds[i] > 1e-9 ? (x - ws.means[i]) / ws.stds[i] : 0));
 }
 
 function softmaxHam(scores: number[]): number[] {
@@ -461,8 +488,9 @@ function agfTrendTerfisiUygula<
 }
 
 export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
-  const vektorler = faz1.runners.map((r) => standardize(toFeatureVector(r)));
-  const scores = vektorler.map((v) => v.reduce((s, x, i) => s + x * WEIGHTS[i], 0));
+  const ws = agirlikSetiSec(faz1.race.classType);
+  const vektorler = faz1.runners.map((r) => standardize(toFeatureVector(r), ws));
+  const scores = vektorler.map((v) => v.reduce((s, x, i) => s + x * ws.weights[i], 0));
   const probs = softmax(scores);
 
   const enriched = faz1.runners.map((r, i) => {
@@ -484,7 +512,7 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
       ...r,
       olasilik: probs[i],
       standartVektor: vektorler[i],
-      katkilar: vektorler[i].map((x, j) => x * WEIGHTS[j]),
+      katkilar: vektorler[i].map((x, j) => x * ws.weights[j]),
       sinyalSayisi: sinyal.sayi,
     };
   });

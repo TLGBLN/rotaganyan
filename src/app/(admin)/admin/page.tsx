@@ -11,7 +11,8 @@ import { getV5SinyalPerformansi } from "@/server/services/v5-sinyal-performans.s
 import { getAnalizPerformansOzeti } from "@/server/services/analiz-performans.service";
 import { getVersiyonKarsilastirmasi } from "@/server/services/analiz-versiyon-karsilastirma.service";
 import { getAgfTrendIstatistik } from "@/server/services/agf-trend-istatistik.service";
-import v5Weights from "@/lib/methodology/weights/v5-weights.json";
+import v5WeightsDusukSart from "@/lib/methodology/weights/v5-weights-dusuksart.json";
+import v5WeightsDiger from "@/lib/methodology/weights/v5-weights-diger.json";
 import PerformanceBreakdown from "@/components/admin/PerformanceBreakdown";
 import CouponTierChart from "@/components/admin/CouponTierChart";
 import PerformansDenetimiPanel from "@/components/admin/PerformansDenetimiPanel";
@@ -43,7 +44,16 @@ export default async function AdminDashboard() {
     getVersiyonKarsilastirmasi(),
     getAgfTrendIstatistik(),
   ]);
-  const v5Test = v5Weights.testEval;
+  // V5.3 (2026-08-21): motor artık koşu kategorisine göre İKİ AYRI eğitilmiş modelden
+  // birini kullanıyor (şartlı1/19/27+maiden vs diğer) — bkz. v5-engine.ts üstündeki not.
+  // Buradaki "kendi test seti" özeti ikisinin birleşik (ağırlıklı ortalama) hâli.
+  const dsTest = v5WeightsDusukSart.testEval;
+  const dgTest = v5WeightsDiger.testEval;
+  const v5Test = {
+    n: dsTest.n + dgTest.n,
+    top1P: (dsTest.top1P * dsTest.n + dgTest.top1P * dgTest.n) / (dsTest.n + dgTest.n),
+    top3P: (dsTest.top3P * dsTest.n + dgTest.top3P * dgTest.n) / (dsTest.n + dgTest.n),
+  };
 
   const hasData = analyst.overall.total > 0;
   const banko = analyst.byConfidence.find((b) => b.label === "★ Banko");
@@ -142,7 +152,7 @@ export default async function AdminDashboard() {
                 biri teoriyi biri sahadaki gerçeği gösteriyor. */}
             <div className="rounded-lg border p-4 text-xs leading-relaxed text-muted-foreground">
               <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-brand">
-                V5.1 Motoru — Kendi Test Seti (offline backtest, n={v5Test.n})
+                V5.3 Motoru — Kendi Test Seti (offline backtest, n={v5Test.n}, iki segment modeli birleşik)
               </span>
               Hiç görülmemiş {v5Test.n} koşuda{" "}
               <span className="font-semibold text-foreground">%{v5Test.top1P.toFixed(1)} ilk sıra</span> /{" "}
