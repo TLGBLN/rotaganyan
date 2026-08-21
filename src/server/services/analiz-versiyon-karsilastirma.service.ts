@@ -111,7 +111,7 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.1",
     baslangic: new Date("2026-08-19T21:15:34+03:00"), // 01f154a — agfPayi eklendi, agfFavorisiMi çıkarıldı
-    bitis: null,
+    bitis: new Date("2026-08-21T21:18:57+03:00"), // 846293b — sireOrani eğitim-zamanı sızıntısı düzeltildi, V5.2
     aciklama: "BODUBEY (İstanbul K5) ve EL LEON (Elazığ K3) — ikisi de AGF favorisi ama zayıf aygır profiliyle sistemde çok düşük sıraya düşmüştü, ikisi de kazandı. Kapsamlı kalibrasyon denetiminde zayıf-aygırlı-favori grubunda model +5.1 puan hafife alıyordu; üç düzeltme denemesi (aygır×AGF etkileşimi, kare terimler, L2 gevşetme) başarısız oldu. Kök neden: agfFavorisiMi yalnız SIRAYI yakalıyordu, AGF payının BÜYÜKLÜĞÜNÜ değil. Ham AGF payı ayrı özellik eklenince (+0.25, anlamlı) kalibrasyon farkı +1.2 puana düştü. Aynı gün ikinci bir aday ('agfFarkiIkinciye', 2.'ye dominans farkı) da denendi, resmi eğitimde SINIRDA çıktı ve EL LEON'u (rakibinden 4.27 puan önde olmasına rağmen) CEZALANDIRDIĞI görülünce çıkarıldı — yalnız agfPayi kaldı. Ayrıca %80+ tahmin diliminde bulunan aşırı-güvene (n=78, tahmin %88.1 vs gerçek %67.9) koşullu sıcaklık ölçeklendirmesi eklendi — top1/top3'ü değiştirmeden yalnız uç mutlak olasılığı yumuşatır. Aynı gün ayrıca SHINNY vakası: 'dususAmaIyiPozisyon' (agfFark<=-1.0 VE agfSirasi<=4) yalnız ilk-4'teki düşüşleri sayıyordu, ilk-4 dışındaki anlamlı düşüşler hiç yakalanmıyordu — pozisyon şartı kaldırılıp 'agfDususVarMi' (agfYukselisVarMi ile simetrik) oldu, top3 %68.3→%70.2 ve log-loss 1.7695→1.7617 iyileşti.",
     neyiAnalizEdiyor: [
       "18 özellik: V5'in 18'i minus agfFavorisiMi (yalnız SIRA), artı agfPayi (ham AGF yüzdesi) — sayı aynı kaldı, biri çıktı biri girdi",
@@ -122,6 +122,21 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
       "Test (n=208, hiç görülmemiş): top1 %38.0 (GA %31.7-44.2), top3 %70.2 (GA %63.9-76.4), log-loss 1.7617 — V5'in top1 %35.6/top3 %66.8/logloss 1.7828'ini geçiyor. Eğitim (n=622): top1 %41.3, top3 %75.9",
       "Anlamlı: agfSirasi, sireOrani, antrenorOrani, agfPayi (+0.26) — agfYukselisVarMi/agfDususVarMi resmi B=50'de sınırda ama üç metrik (top1/top3/logloss) BİRDEN aynı/iyileşti ve yön ham AGF Trend istatistiğiyle (düşenler %13.8 vs saha %10.3) tutarlı",
       "Zayıf-aygırlı-AGF-favorisi kalibrasyon farkı: V5'te +5.1 puan → V5.1'de +1.2 puan (n=1165/274)",
+    ],
+  },
+  {
+    versiyon: "V5.2",
+    baslangic: new Date("2026-08-21T21:18:57+03:00"), // 846293b — sireOrani eğitim-zamanı sızıntısı düzeltildi
+    bitis: null,
+    aciklama: "sireOrani (aygır kazanma oranı), eğitim verisinde her zaman GÜNCEL (SireStatOwn — günlük tam yeniden hesap, tarih filtresi yok) tablodan okunuyordu. Canlı tahmin için doğruydu (bugüne kadarki en güncel bilgiyi kullanmak istenen davranış) ama geçmiş eğitim satırları için gerçek bir sızıntıydı — Temmuz'daki bir koşunun sireOrani'si Ağustos sonuçlarını da içerebiliyordu. MR TT vakası (İstanbul K3, gerçek kazananın modelde 6.sıraya düşmesi) sonrası yapılan literatür araştırması sireOrani'nin akademik/sektör normlarına göre atipik derecede baskın olduğunu işaret edince kök nedene inildi. Düzeltme: kendi Runner/Result verimizden, yalnız o koşudan KESİNLİKLE önceki tarihli kayıtlarla (irk|pist|mesafe|aygır adı anahtarıyla tek seferlik indekslenip) hesaplanıyor. jokeyOrani/antrenorOrani (TJK'nın uzun-vadeli resmi kaynağı) İZOLE test için değiştirilmedi — kendi verimize çevirmek hem sızıntıyı düzeltiyor hem örneklemi ~7 haftaya küçültüyordu, ikisi ayrıştırılamadığı için kullanıcı kararıyla yalnız sireOrani düzeltildi.",
+    neyiAnalizEdiyor: [
+      "V5.1 ile aynı 18 özellik, aynı isim/sıra — yalnız sireOrani'nin EĞİTİM verisi tarihe-duyarlı hale geldi (canlı tahmin hesaplaması değişmedi)",
+    ],
+    caprazlamalar: [
+      "Test (n=234, hiç görülmemiş): top1 %30.8 (GA %24.8-37.6), top3 %66.7 (GA %60.7-73.1), log-loss 1.8298 — V4 temel çizgisini (top1 %24.2/top3 %55.1) hâlâ GA dışında geçiyor",
+      "sireOrani katsayısı +0.608'den +0.043'e düştü, artık ANLAMSIZ (GA sıfırı içeriyor) — literatür beklentisiyle (pedigri, form kanıtı biriktikçe zayıflayan bir önsel) uyumlu",
+      "V5.1'in %35.4/%71.6 rakamları da AYNI sızıntıdan şişmişti (test dönemi koşuları için de sireOrani 'bugüne kadarki' veriden hesaplanıyordu) — doğrudan karşılaştırılabilir değil, V5.2'nin %30.8/%66.7'si daha dürüst bir referans noktası",
+      "Anlamlı kalan: agfSirasi, idmJokey, jokeyOrani, antrenorOrani, agfYukselisVarMi, kacakAtMi, agfPayi",
     ],
   },
 ];
