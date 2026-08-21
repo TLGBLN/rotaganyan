@@ -108,10 +108,16 @@ export async function syncKarmaResultMirrors(asilRaceId: string): Promise<void> 
   // /admin/bildirimler'de görünür) — sessizce düzelmesin, kullanıcı haberdar olsun.
   const gercekUyusmazliklar: { karmaRaceId: string; eskiKazananNo: number | null }[] = [];
   for (const karma of karmaRaces) {
+    // 2026-08-21 kullanıcı bulgusu (Vercel "Function Duration" uyarısı, 7 kat artış):
+    // bu fonksiyon result-sync.ts'in HER çalışmasında (15dk'da bir, koşu saatleri boyunca)
+    // günün TÜM sonuçlanmış koşuları için çağrılıyor — daha önce KOŞULSUZ yazıyordu, yani
+    // zaten senkron olan bir Karma kopyasını bile her seferinde yeniden update+recompute
+    // ediyordu. Zaten eşleşiyorsa hiçbir şey yapmadan atla — yalnız gerçekten yeni/farklı
+    // olan durumlar (nadir) DB'ye yazar.
+    if (karma.result && karma.result.winnerNo === winnerNo) continue;
+
     if (karma.result) {
-      if (karma.result.winnerNo !== winnerNo) {
-        gercekUyusmazliklar.push({ karmaRaceId: karma.id, eskiKazananNo: karma.result.winnerNo });
-      }
+      gercekUyusmazliklar.push({ karmaRaceId: karma.id, eskiKazananNo: karma.result.winnerNo });
       await db.result.update({
         where: { raceId: karma.id },
         data: { actualOrder: actualOrderInput, winnerNo, winnerNos, ganyan, time, farklar, gecCikanlar: gecCikanlarInput },
