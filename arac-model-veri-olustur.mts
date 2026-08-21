@@ -5,10 +5,11 @@
 // Çalıştırma: node --env-file=.env node_modules/tsx/dist/cli.mjs arac-model-veri-olustur.mts
 import { db } from "./src/lib/db";
 import { getSonYarisDetaylariForRace } from "./src/server/actions/son-yaris-detay.actions";
-import { getSireStatOzetleriForRace } from "./src/server/actions/sire-stat.actions";
 import { fetchAccuraceGecmisKayitlari, hesaplaAccuraceSonYarisEnHizliKapanisMap } from "./src/lib/methodology/veri-toplama";
 import { kategoriTespit } from "./src/lib/methodology/v2-engine";
 import { galopQuality, isSameJockey } from "./src/components/program/panels/galop-helpers";
+import { breedToIrk, surfaceToPist, mesafeBucket, normalizeSireName } from "./src/lib/sire-stat-match";
+import { finishPos } from "./src/lib/race-result";
 import { getJockeyStats, getTrainerStats } from "./src/server/services/race.service";
 import { writeFileSync, existsSync, readFileSync } from "fs";
 
@@ -160,6 +161,10 @@ export type ModelRow = {
   // bir "hayır" bile sayılamaz, yalnız "şu an test edilemeyecek kadar seyrek" demek
   // doğru. ÜÇÜ DE MODELE DAHİL EDİLMEDİ — canlı model değişmedi.
   jokeyDegisimYonu: number;
+  // 2026-08-21 — atın GERÇEK kariyer start sayısı (HorseRaceHistoryCache, tarihe göre
+  // filtrelenmiş). sireOrani × "az deneyimli" etkileşimini test etmek için — literatür
+  // (TwinSpires): pedigri, atın kendi kanıtlanmış performansı YOKSA/azsa devreye girmeli.
+  kariyerStartSayisi: number;
 };
 
 async function main() {
@@ -189,6 +194,64 @@ async function main() {
   const jockeyPopOrt = 0.10; // TJK genel jokey kazanma oranı kabaca %8-12 bandında; kesin değeri aşağıda hesaplanacak
   const trainerPopOrt = 0.10;
 
+  // 2026-08-21 kullanıcı bulgusu (literatür araştırması + MR TT vakası): sireOrani
+  // ÖNCEDEN her zaman GÜNCEL (bugüne kadarki) toplu tablodan (SireStatOwn —
+  // syncOwnPedigreeStats cron'u GÜNLÜK, TARİH FİLTRESİ OLMADAN tüm geçmişi yeniden
+  // hesaplıyor) okunuyordu. CANLI tahmin için doğru (bugünün koşusu bugüne kadarki
+  // kariyeri bilmeli) ama EĞİTİM için gerçek bir sızıntı — Temmuz'daki bir koşu, Ağustos'taki
+  // sonuçları da "biliyordu" (bkz. atJokeyIkiliOrani'nde bulunan AYNI sınıf hata, yukarıki
+  // not). Şimdi kendi Runner/Result verimizden, YALNIZ o koşudan KESİNLİKLE ÖNCEKİ
+  // tarihli kayıtlarla — TEK seferlik büyük bir geçmiş yükleyip (irk|pist|mesafe|isim)
+  // anahtarıyla indeksliyoruz, per-koşu filtre O(grup büyüklüğü) kalıyor.
+  //
+  // jokeyOrani/antrenorOrani için AYNI düzeltme İLK denemede yapılmış, ama SONUÇLARI
+  // KARIŞIK çıkmıştı: bunlar TJK'nın yıllarca birikmiş resmi (JockeyStatSync/
+  // TrainerStatSync) kaynağından geliyordu — kendi verimize (yalnız ~7 haftalık) çevirmek
+  // hem sızıntıyı düzeltiyor HEM örneklemi çok küçültüyordu, ikisi ayrıştırılamadı. Kullanıcı
+  // kararı (2026-08-21): yalnız sireOrani düzeltilsin (temiz, tek-etkenli test için),
+  // jokeyOrani/antrenorOrani TJK'nın güvenilir uzun-vadeli kaynağına GERİ alındı (aşağıda).
+  console.log("Tarihe-duyarlı aygır geçmişi yükleniyor...");
+  const tumGecmisRunnerlar = await db.runner.findMany({
+    where: { scratched: false, sire: { not: null }, race: { result: { isNot: null } } },
+    select: {
+      sire: true, no: true,
+      race: {
+        select: {
+          breed: true, surface: true, distance: true,
+          raceDay: { select: { date: true } },
+          result: { select: { actualOrder: true, winnerNos: true } },
+        },
+      },
+    },
+  });
+  console.log(`Geçmiş havuzu: ${tumGecmisRunnerlar.length} at satırı`);
+
+  type GecmisNokta = { tarih: Date; pos: number | null };
+  const sireIndex = new Map<string, GecmisNokta[]>();
+  for (const r of tumGecmisRunnerlar) {
+    if (!r.race.result || !r.sire) continue;
+    const pos = finishPos(r.race.result.actualOrder, r.no, r.race.result.winnerNos);
+    const tarih = r.race.raceDay.date;
+    const key = `${breedToIrk(r.race.breed)}|${surfaceToPist(r.race.surface)}|${mesafeBucket(r.race.distance)}|${normalizeSireName(r.sire)}`;
+    const arr = sireIndex.get(key) ?? [];
+    arr.push({ tarih, pos });
+    sireIndex.set(key, arr);
+  }
+
+  /** Verilen indeks anahtarında, YALNIZ cutoffTarih'ten KESİNLİKLE ÖNCEKİ kayıtlarla
+   *  start/galibiyet sayısı — sızıntısız. */
+  function tarihliOranHesapla(index: Map<string, GecmisNokta[]>, key: string, cutoffTarih: Date): { start: number; wins: number } {
+    const arr = index.get(key);
+    if (!arr) return { start: 0, wins: 0 };
+    let start = 0, wins = 0;
+    for (const g of arr) {
+      if (g.tarih.getTime() >= cutoffTarih.getTime()) continue;
+      start++;
+      if (g.pos === 1) wins++;
+    }
+    return { start, wins };
+  }
+
   let processed = 0, failed = 0, timedOut = 0;
   const CONCURRENCY = 6;
   const startTime = Date.now();
@@ -205,18 +268,16 @@ async function main() {
             const runners = race.runners;
             if (runners.length === 0) return;
 
-            const jokeyIsimleriHepsi = [...new Set([
-              ...runners.map((r) => r.jockey).filter((x): x is string => !!x),
-              ...runners.map((r) => r.previousJockey).filter((x): x is string => !!x),
-            ])];
             const tjkAtIdler = runners.map((r) => r.tjkAtId).filter((x): x is number => x != null);
 
-            const [sonYarisDetaylari, sireOzetleri, jockeyStats, trainerStats, accKayitlar, agfSnaps, gecmisKayitlari] = await Promise.all([
+            const [sonYarisDetaylari, jockeyStats, trainerStats, accKayitlar, agfSnaps, gecmisKayitlari] = await Promise.all([
               getSonYarisDetaylariForRace(race.id).catch(() => []),
-              getSireStatOzetleriForRace(runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(() =>
-                runners.map(() => ({ ozet: null, ornekKendiVeri: null, kYuzde: null }))
-              ),
-              getJockeyStats(jokeyIsimleriHepsi).catch(() => ({})),
+              getJockeyStats([
+                ...new Set([
+                  ...runners.map((r) => r.jockey).filter((x): x is string => !!x),
+                  ...runners.map((r) => r.previousJockey).filter((x): x is string => !!x),
+                ]),
+              ]).catch(() => ({})),
               getTrainerStats([...new Set(runners.map((r) => r.trainer).filter((x): x is string => !!x))]).catch(() => ({})),
               fetchAccuraceGecmisKayitlari(runners.map((r) => r.name), race.raceDay.date),
               db.agfSnapshot.findMany({
@@ -255,7 +316,6 @@ async function main() {
             }
 
             const sonYarisByNo = new Map(sonYarisDetaylari.map((d) => [d.runnerNo, d]));
-            const sireOzetByRunnerId = new Map(runners.map((r, i2) => [r.id, sireOzetleri[i2]]));
             const accuraceMap = hesaplaAccuraceSonYarisEnHizliKapanisMap(
               runners.map((r) => r.name), accKayitlar.son800AccuraceKayitlari, accKayitlar.son800Siblings
             );
@@ -276,7 +336,6 @@ async function main() {
               const pos = actualOrder.indexOf(r.no) + 1;
               if (pos <= 0) continue;
               const sonYaris = sonYarisByNo.get(r.no);
-              const sireOzet = sireOzetByRunnerId.get(r.id);
               const jockeyStat = r.jockey ? (jockeyStats as any)[r.jockey] : undefined;
               const trainerStat = r.trainer ? (trainerStats as any)[r.trainer] : undefined;
 
@@ -307,7 +366,8 @@ async function main() {
               const atJokeyIkiliOrani = shrink(buJokeyWins, buJokeyRides, jockeyPopOrt) * 100;
 
               // (3) Jokey değişim yönü — yeni jokeyin oranı eski jokeyin oranından ne
-              // kadar yüksek/düşük (yön taşıyan "niyet" sinyali).
+              // kadar yüksek/düşük (yön taşıyan "niyet" sinyali). TJK'nın resmi jokey
+              // istatistiğini kullanır (2026-08-21 kararı — bkz. yukarıdaki not).
               let jokeyDegisimYonu = 0;
               if (r.jockeyChanged && r.previousJockey) {
                 const prevStat = (jockeyStats as any)[r.previousJockey];
@@ -331,16 +391,31 @@ async function main() {
               }
               const idmJokey = myGallops.some((g) => isSameJockey(g.jockey, r.jockey)) ? 1 : 0;
 
-              const sireOran = sireOzet?.kYuzde != null && sireOzet?.ornekKendiVeri != null
-                ? shrink(Math.round((sireOzet.kYuzde / 100) * sireOzet.ornekKendiVeri), sireOzet.ornekKendiVeri, 0.14) * 100
-                : 14 * 0.5; // veri yoksa nötr-altı bir değer (populasyon ortalamasının yarısına çekilmiş)
+              // Tarihe-duyarlı (sızıntısız) sireOrani — bkz. yukarıdaki 2026-08-21 notu.
+              // Veri yoksa (özellikle erken Temmuz'da, kendi takip altyapımız henüz
+              // birikmemişken) eskisiyle AYNI nötr-altı değere düşer — bu artık DÜRÜST bir
+              // "henüz veri yok" durumu, sızıntıyla suni şekilde doldurulmuyor.
+              const sireKey = `${breedToIrk(race.breed)}|${surfaceToPist(race.surface)}|${mesafeBucket(race.distance)}|${r.sire ? normalizeSireName(r.sire) : ""}`;
+              const sireTarihli = tarihliOranHesapla(sireIndex, sireKey, race.raceDay.date);
+              const sireOran = sireTarihli.start > 0
+                ? shrink(sireTarihli.wins, sireTarihli.start, 0.14) * 100
+                : 14 * 0.5;
 
+              // jokeyOrani/antrenorOrani — TJK'nın resmi (uzun-vadeli, güvenilir) kaynağına
+              // GERİ alındı (2026-08-21 kararı, bkz. yukarıdaki not).
               const jokeyOran = jockeyStat && jockeyStat.overall.rides > 0
                 ? shrink(jockeyStat.overall.wins, jockeyStat.overall.rides, jockeyPopOrt) * 100
                 : jockeyPopOrt * 100;
               const antrenorOran = trainerStat && trainerStat.rides > 0
                 ? shrink(trainerStat.wins, trainerStat.rides, trainerPopOrt) * 100
                 : trainerPopOrt * 100;
+
+              // Kullanıcı hipotezi 2026-08-21 (literatür: TwinSpires pedigri-handikapçılık
+              // rehberi — pedigri, atın KENDİ kanıtlanmış performansı YOKSA/az startlıysa
+              // bir "prior" olarak devreye girmeli): atın GERÇEK kariyer start sayısı
+              // (HorseRaceHistoryCache'ten, tarihe göre zaten filtrelenmiş "gecmis" —
+              // TJK'nın tam geçmişi, bizim kısa takip penceremizden daha güvenilir).
+              const kariyerStartSayisi = gecmis.length;
 
               rows.push({
                 raceId: race.id, runnerId: r.id, no: r.no,
@@ -377,6 +452,7 @@ async function main() {
                 kiloFarkiEnIyiKosuya,
                 atJokeyIkiliOrani,
                 jokeyDegisimYonu,
+                kariyerStartSayisi,
               });
             }
           })(), 25_000);
