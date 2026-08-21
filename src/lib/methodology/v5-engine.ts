@@ -40,6 +40,16 @@
  *    yeniden test edildi — top1 aynı (%38.0), top3 %68.3→%70.2, log-loss 1.7695→1.7617
  *    iyileşti, KABUL EDİLDİ. Tam liste + gerekçe yorumları toFeatureVector üzerinde (bkz.
  *    weights/v5-weights.json featureNames).
+ *  - 2026-08-21 (MR TT vakası, İstanbul K3): AGF'de sahadaki en büyük hareketi (+9.52
+ *    puan) yapan at, zayıf aygır oranı (%8.5) yüzünden model'de 6.sıraya düşmüştü — 7 boy
+ *    farkla kazandı. İki hipotez test edildi: (1) AGF hareketinin BÜYÜKLÜĞÜNE göre doğrusal
+ *    ağırlıklandırma (agfYukselisMiktari/agfDususMiktari, ikili eşik yerine) — anlamsız
+ *    çıktı, top1 kötüleşti, REDDEDİLDİ (2026-08-20). (2) "Sahadaki EN BÜYÜK hareketi bu at
+ *    mı yaptı" (kategorik, uç-nokta sinyali) — nokta=-0.0458, GA=[-0.1352,0.0401], anlamsız
+ *    (yön bile ters), backtest top1 hafif kötüleşti (%35.4→%34.9). İKİSİ DE DAHİL EDİLMEDİ.
+ *    sireOrani'nin baskın ağırlığı (+0.61, modeldeki en büyük katsayı) hiçbir AGF-hareket
+ *    formülasyonuyla dengelenemedi — bu, tek bir n=1 sürpriz galibiyet, üçüncü bir
+ *    hipotezle kovalanmadı (overfitting riski).
  *
  * Ağırlıklar `weights/v5-weights.json`'da COMMIT EDİLMİŞ (production'da Vercel'in
  * scratchpad'e erişimi yok) — yeniden eğitim gerekirse arac-model-egit.mjs çalıştırılıp
