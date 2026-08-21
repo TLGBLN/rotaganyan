@@ -26,6 +26,12 @@ const FEATURE_NAMES = [
   // 2026-08-21 — H2H net skoru: sınırda bootstrap (GA=[-0.0105,0.1603]) ama top1/top3
   // İKİSİ BİRDEN iyileşti (logloss ihmal edilebilir), kullanıcı kararıyla eklendi.
   "h2hNetSkor",
+  // 2026-08-21 — hizDerecesi: TJK "süre" alanından (at-bazlı gerçek bitiriş süresi),
+  // popülasyon (irk|pist|mesafe) ortalama tempo'suna göre göreli hız — yalnız son 365
+  // gün (uzun aradan dönen atların eski "en iyi dönemi" güncelmiş gibi kullanılmasın).
+  // B=200 bootstrap: nokta=+0.3479, GA=[0.1856,0.5291] GÜÇLÜ ANLAMLI — agfSirasi'nden
+  // sonra en büyük katsayı. VIF=1.02 (accurace/formEgimi ile ÇAKIŞMIYOR, bağımsız bilgi).
+  "hizDerecesi",
 ];
 
 function toFeatureVector(row) {
@@ -38,6 +44,7 @@ function toFeatureVector(row) {
     row.agfFark <= -ANLAMLI_PUAN_ESIGI ? 1 : 0,
     row.agfPayi ?? 0,
     row.h2hNetSkor ?? 0,
+    row.hizDerecesi ?? 0,
   ];
 }
 function groupByRace(rows) {

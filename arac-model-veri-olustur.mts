@@ -40,6 +40,22 @@ function parseKiloSayi(w: string | undefined | null): number | null {
   const n = parseFloat(w.replace(",", "."));
   return isNaN(n) ? null : n;
 }
+// "1.16.30" (dk.sn.yüzde) veya "58.78" (sn.yüzde) → toplam saniye. Hız derecesi için.
+function sureyiSaniyeyeCevir(t: string | undefined | null): number | null {
+  if (!t) return null;
+  const parcalar = t.split(".");
+  if (parcalar.length === 3) {
+    const dk = parseInt(parcalar[0], 10), sn = parseInt(parcalar[1], 10), yuzde = parseInt(parcalar[2], 10);
+    if (isNaN(dk) || isNaN(sn) || isNaN(yuzde)) return null;
+    return dk * 60 + sn + yuzde / 100;
+  }
+  if (parcalar.length === 2) {
+    const sn = parseInt(parcalar[0], 10), yuzde = parseInt(parcalar[1], 10);
+    if (isNaN(sn) || isNaN(yuzde)) return null;
+    return sn + yuzde / 100;
+  }
+  return null;
+}
 function surfaceFromRaw(raw: string | undefined | null): string | null {
   if (!raw) return null;
   if (raw.startsWith("Ç")) return "CIM";
@@ -170,6 +186,11 @@ export type ModelRow = {
   // bootstrap'ta sınırda (GA=[-0.0105,0.1603]) ama backtest'te top1/top3 İKİSİ BİRDEN
   // iyileşti (logloss ihmal edilebilir kötüleşme) — kullanıcı kararıyla KABUL EDİLDİ.
   h2hNetSkor: number;
+  // 2026-08-21 (V5.4) — Hız derecesi: son 365 gündeki en yeni 3 koşunun popülasyon
+  // (irk|pist|mesafe) ortalama tempo'suna göre göreli hızı (%). B=200 bootstrap'ta HER
+  // İKİ segmentte de güçlü anlamlı (düşük-şart +0.58 — modelin en büyük katsayısı,
+  // diğer +0.26), VIF=1.02-1.10 (hiçbir sinyalle çakışmıyor) — KABUL EDİLDİ.
+  hizDerecesi: number;
 };
 
 async function main() {
@@ -255,6 +276,86 @@ async function main() {
       if (g.pos === 1) wins++;
     }
     return { start, wins };
+  }
+
+  // 2026-08-21 (V5.4) — hizDerecesi: TJK "At Koşu Bilgileri"ndeki "süre" alanı AT-BAZLI
+  // (kendi bitiriş süresi, "1.16.30"). Popülasyon (irk|pist|mesafe kovası) ortalama
+  // tempo'suna göre göreli hız — B=200 bootstrap'ta HER İKİ segmentte de güçlü anlamlı
+  // (düşük-şart +0.58 — modelin en büyük katsayısı, diğer +0.26), VIF=1.02-1.10 (çakışma
+  // yok). Yalnız son 365 GÜN içindeki koşular "güncel form" sayılır (bkz. kullanıcı
+  // bulgusu: uzun aradan dönen bir atın yıllar önceki "en iyi dönemi" güncelmiş gibi
+  // kullanılmasın). sireIndex ile AYNI desen: tek seferlik büyük yükleme + indeksleme.
+  console.log("Hız derecesi için pace indeksi yükleniyor...");
+  const GUNCEL_FORM_PENCERESI_GUN = 365;
+  const paceRunnerlar = await db.runner.findMany({
+    where: { scratched: false, tjkAtId: { not: null } },
+    select: { tjkAtId: true, raceId: true },
+  });
+  const paceTjkAtIdler = [...new Set(paceRunnerlar.map((r) => r.tjkAtId!))];
+  const paceGecmisKayitlari: { tjkAtId: number; rowsJson: unknown }[] = [];
+  const PACE_CH = 500;
+  for (let i = 0; i < paceTjkAtIdler.length; i += PACE_CH) {
+    const dilim = paceTjkAtIdler.slice(i, i + PACE_CH);
+    const rows = await db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: dilim } }, select: { tjkAtId: true, rowsJson: true } });
+    paceGecmisKayitlari.push(...rows);
+  }
+  const paceGecmisByTjkAtId = new Map(paceGecmisKayitlari.map((g) => [g.tjkAtId, g.rowsJson as { date: string; time: string; distance: number; surface: string }[]]));
+  const paceBreedByRaceId = new Map<string, string>();
+  const paceRaceBreeds = await db.race.findMany({ where: { id: { in: [...new Set(paceRunnerlar.map((r) => r.raceId))] } }, select: { id: true, breed: true } });
+  for (const r of paceRaceBreeds) paceBreedByRaceId.set(r.id, r.breed);
+
+  type PaceNokta = { tarih: Date; pace: number };
+  const paceIndex = new Map<string, PaceNokta[]>();
+  for (const r of paceRunnerlar) {
+    if (r.tjkAtId == null) continue;
+    const gecmis = paceGecmisByTjkAtId.get(r.tjkAtId) ?? [];
+    const raceBreed = paceBreedByRaceId.get(r.raceId);
+    const irk = breedToIrk(raceBreed ?? "İNGİLİZ");
+    for (const g of gecmis) {
+      const tarih = parseGecmisTarih(g.date);
+      if (!tarih) continue;
+      const saniye = sureyiSaniyeyeCevir(g.time);
+      if (saniye == null || saniye <= 0 || !g.distance) continue;
+      const pist = surfaceFromRaw(g.surface);
+      if (!pist) continue;
+      const key = `${irk}|${surfaceToPist(pist)}|${mesafeBucket(g.distance)}`;
+      const pace = g.distance / saniye;
+      const arr = paceIndex.get(key) ?? [];
+      arr.push({ tarih, pace });
+      paceIndex.set(key, arr);
+    }
+  }
+  console.log(`Pace indeksi: ${paceIndex.size} kova`);
+
+  function populasyonOrtPace(key: string, cutoff: Date): { ort: number } | null {
+    const arr = paceIndex.get(key);
+    if (!arr) return null;
+    let toplam = 0, sayi = 0;
+    for (const p of arr) { if (p.tarih.getTime() >= cutoff.getTime()) continue; toplam += p.pace; sayi++; }
+    return sayi >= 20 ? { ort: toplam / sayi } : null;
+  }
+
+  function hizDerecesiHesapla(tjkAtId: number | null, raceBreed: string, cutoff: Date): number {
+    if (tjkAtId == null) return 0;
+    const irk = breedToIrk(raceBreed);
+    const pencereBaslangic = new Date(cutoff.getTime() - GUNCEL_FORM_PENCERESI_GUN * 24 * 60 * 60 * 1000);
+    const gecmis = (paceGecmisByTjkAtId.get(tjkAtId) ?? [])
+      .map((g) => ({ ...g, tarih: parseGecmisTarih(g.date), saniye: sureyiSaniyeyeCevir(g.time) }))
+      .filter((g) => g.tarih && g.tarih.getTime() < cutoff.getTime() && g.tarih.getTime() >= pencereBaslangic.getTime() && g.saniye != null && g.saniye > 0 && g.distance)
+      .sort((a, b) => b.tarih!.getTime() - a.tarih!.getTime())
+      .slice(0, 3);
+    let toplamFark = 0, sayi = 0;
+    for (const g of gecmis) {
+      const pist = surfaceFromRaw(g.surface);
+      if (!pist) continue;
+      const key = `${irk}|${surfaceToPist(pist)}|${mesafeBucket(g.distance)}`;
+      const popOrt = populasyonOrtPace(key, g.tarih!);
+      if (!popOrt) continue;
+      const kendiPace = g.distance / g.saniye!;
+      toplamFark += (100 * (kendiPace - popOrt.ort)) / popOrt.ort;
+      sayi++;
+    }
+    return sayi > 0 ? toplamFark / sayi : 0;
   }
 
   let processed = 0, failed = 0, timedOut = 0;
@@ -495,6 +596,7 @@ async function main() {
                 jokeyDegisimYonu,
                 kariyerStartSayisi,
                 h2hNetSkor: h2hNetSkorHesapla(r.name),
+                hizDerecesi: hizDerecesiHesapla(r.tjkAtId, race.breed, race.raceDay.date),
               });
             }
           })(), 25_000);

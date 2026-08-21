@@ -125,6 +125,7 @@ import { getSonYarisDetaylariForRace } from "@/server/actions/son-yaris-detay.ac
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getAgfTrendForRace } from "@/server/actions/agf-trend.actions";
 import { getH2HForRace } from "@/server/actions/h2h.actions";
+import { getHizDerecesiForRace } from "@/server/actions/hiz-derecesi.actions";
 import { syncAgfForRace } from "@/server/services/agf-sync";
 import { getJockeyStats, getTrainerStats } from "@/server/services/race.service";
 import {
@@ -233,6 +234,11 @@ export type Faz1RunnerV5 = {
   /** 2026-08-21 — H2H net skoru: bugünkü sahadaki rakiplerle ortak geçmiş yarışlarda
    *  kaç kez önde bitirdi eksi kaç kez geride bitirdi (getH2HForRace, leak-free). */
   h2hNetSkor: number;
+  /** 2026-08-21 — Hız derecesi (%): son 365 gündeki en yeni 3 koşunun popülasyon
+   *  (irk|pist|mesafe) ortalama tempo'suna göre göreli hızı. B=200 bootstrap'ta HER
+   *  İKİ segmentte de güçlü anlamlı (düşük-şart +0.58 — modelin en büyük katsayısı,
+   *  diğer +0.26), VIF=1.02-1.10 (hiçbir sinyalle çakışmıyor). */
+  hizDerecesi: number;
 };
 
 export type Faz1SonucV5 = {
@@ -282,7 +288,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
   const runners = race.runners;
   if (runners.length === 0) return { race: { id: race.id, hippodromeName: race.raceDay.hippodrome.name.trim(), raceNo: race.raceNo, classType: race.classType, breed: race.breed, surface: race.surface, distance: race.distance }, runners: [] };
 
-  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters] = await Promise.all([
+  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters, hizByNo] = await Promise.all([
     getSonYarisDetaylariForRace(raceId).catch(() => []),
     getSireStatOzetleriForRace(runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(() =>
       runners.map(() => ({ ozet: null, ornekKendiVeri: null, kYuzde: null }))
@@ -296,6 +302,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     ),
     fetchAccuraceGecmisKayitlari(runners.map((r) => r.name), race.raceDay.date),
     getH2HForRace(raceId).catch(() => []),
+    getHizDerecesiForRace(raceId).catch(() => new Map<number, number>()),
   ]);
 
   const raceNameToNo = new Map(runners.map((r) => [r.name, r.no]));
@@ -393,6 +400,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       sireOrneklemKendiVeri: sireOzet?.ornekKendiVeri ?? null,
       kacakAtMi: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" ? 1 : 0,
       h2hNetSkor: h2hNetSkorHesapla(r.name),
+      hizDerecesi: hizByNo.get(r.no) ?? 0,
     };
   });
 
@@ -444,6 +452,9 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     // 2026-08-21 — H2H net skoru: bkz. dosya başındaki V5.3 H2H notu. Sınırda bootstrap
     // ama top1/top3 İKİSİ BİRDEN iyileşti, veriden fit edilerek eklendi.
     r.h2hNetSkor,
+    // 2026-08-21 — Hız derecesi: bkz. dosya başındaki V5.4 notu. HER İKİ segmentte de
+    // güçlü anlamlı (B=200), VIF=1.02-1.10 (çakışma yok).
+    r.hizDerecesi,
   ];
 }
 
@@ -661,6 +672,9 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // 2026-08-21 — H2H: bugünkü rakiplerle ortak geçmiş yarış yoksa (h2hNetSkor=0) satır
   // hiç gösterilmez — "0 karşılaşma" ile "hep berabere" ayrımı yapılamadığı için nötr.
   { kod: "H2H", ozellikIndeksleri: [idx("h2hNetSkor")], aciklama: (r) => (r.h2hNetSkor !== 0 ? `Baş-başa geçmiş: bugünkü rakiplerle ${r.h2hNetSkor > 0 ? "+" : ""}${r.h2hNetSkor} net (${r.h2hNetSkor > 0 ? "önde" : "geride"} bitirmiş)` : null) },
+  // 2026-08-21 — Hız derecesi: veri yoksa (son 365 günde uygun geçmiş yok) 0, satır
+  // gösterilmez — "hızlı değil" ile "veri yok" karışmasın.
+  { kod: "HIZ", ozellikIndeksleri: [idx("hizDerecesi")], aciklama: (r) => (r.hizDerecesi !== 0 ? `Hız derecesi: popülasyona göre ${r.hizDerecesi > 0 ? "+" : ""}${r.hizDerecesi.toFixed(1)}% (${r.hizDerecesi > 0 ? "daha hızlı" : "daha yavaş"})` : null) },
 ];
 
 // 2026-08-18 kullanıcı talebi: "18 sinyalin hepsinin kontrol edildiğini bana göstermesini
@@ -682,6 +696,7 @@ const FEATURE_LABELS: Record<string, string> = {
   kacakAtMi: "Kaçak At / Erken Tempo", agfDususVarMi: "AGF Eşik-Üstü Düşüş Var Mı",
   agfPayi: "AGF Payı (ham yüzde)", agfFarkiIkinciye: "AGF Dominans Farkı (2.'ye göre, yalnız favoride)",
   h2hNetSkor: "H2H Net Skoru (bugünkü rakiplerle geçmiş karşılaşma)",
+  hizDerecesi: "Hız Derecesi (popülasyona göre göreli tempo, son 365 gün)",
 };
 
 export type TumOzellikDetay = { kod: string; etiket: string; hamDeger: number; standartDeger: number; katki: number };
