@@ -127,7 +127,7 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.2",
     baslangic: new Date("2026-08-21T21:18:57+03:00"), // 846293b — sireOrani eğitim-zamanı sızıntısı düzeltildi
-    bitis: null,
+    bitis: new Date("2026-08-21T21:43:19+03:00"), // a04309d — segment-bazlı iki-model mimarisi, V5.3
     aciklama: "sireOrani (aygır kazanma oranı), eğitim verisinde her zaman GÜNCEL (SireStatOwn — günlük tam yeniden hesap, tarih filtresi yok) tablodan okunuyordu. Canlı tahmin için doğruydu (bugüne kadarki en güncel bilgiyi kullanmak istenen davranış) ama geçmiş eğitim satırları için gerçek bir sızıntıydı — Temmuz'daki bir koşunun sireOrani'si Ağustos sonuçlarını da içerebiliyordu. MR TT vakası (İstanbul K3, gerçek kazananın modelde 6.sıraya düşmesi) sonrası yapılan literatür araştırması sireOrani'nin akademik/sektör normlarına göre atipik derecede baskın olduğunu işaret edince kök nedene inildi. Düzeltme: kendi Runner/Result verimizden, yalnız o koşudan KESİNLİKLE önceki tarihli kayıtlarla (irk|pist|mesafe|aygır adı anahtarıyla tek seferlik indekslenip) hesaplanıyor. jokeyOrani/antrenorOrani (TJK'nın uzun-vadeli resmi kaynağı) İZOLE test için değiştirilmedi — kendi verimize çevirmek hem sızıntıyı düzeltiyor hem örneklemi ~7 haftaya küçültüyordu, ikisi ayrıştırılamadığı için kullanıcı kararıyla yalnız sireOrani düzeltildi.",
     neyiAnalizEdiyor: [
       "V5.1 ile aynı 18 özellik, aynı isim/sıra — yalnız sireOrani'nin EĞİTİM verisi tarihe-duyarlı hale geldi (canlı tahmin hesaplaması değişmedi)",
@@ -137,6 +137,22 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
       "sireOrani katsayısı +0.608'den +0.043'e düştü, artık ANLAMSIZ (GA sıfırı içeriyor) — literatür beklentisiyle (pedigri, form kanıtı biriktikçe zayıflayan bir önsel) uyumlu",
       "V5.1'in %35.4/%71.6 rakamları da AYNI sızıntıdan şişmişti (test dönemi koşuları için de sireOrani 'bugüne kadarki' veriden hesaplanıyordu) — doğrudan karşılaştırılabilir değil, V5.2'nin %30.8/%66.7'si daha dürüst bir referans noktası",
       "Anlamlı kalan: agfSirasi, idmJokey, jokeyOrani, antrenorOrani, agfYukselisVarMi, kacakAtMi, agfPayi",
+    ],
+  },
+  {
+    versiyon: "V5.3",
+    baslangic: new Date("2026-08-21T21:43:19+03:00"), // a04309d — segment-bazlı iki-model mimarisi canlıya alındı
+    bitis: null,
+    aciklama: "Kullanıcı kararı: sireOrani şartlı1/19/27+maiden koşularında, AGF trend (agfYukselisVarMi/agfDususVarMi) diğer koşularda ağırlıklı olmalı — literatür (TwinSpires pedigri-handikapçılık rehberi: pedigri, atın kendi kanıtlanmış formu yokken bir önsel görevi görür) bu yönü destekliyor. İki ayrı test çalıştırıldı: (1) ortak modelde sireOrani/agfYukselisVarMi/agfDususVarMi'yi segment×sinyal etkileşim terimine bölmek, (2) hiçbir paylaşımlı regularizasyon olmadan iki TAMAMEN AYRI model eğitmek (seyreltmesiz, en güçlü test). İkisi de YÖNÜ doğruladı — düşük-şart segmentte sireOrani'nin nokta tahmini diğer segmentten yaklaşık iki kat yüksek (+0.064 vs +0.035, ayrı-model testinde) — ama HİÇBİR testte istatistiksel anlamlılığa ulaşmadı (n=240 düşük-şart koşusu, %95 GA'lar geniş ve çakışıyor). Kullanıcı bu belirsizliğe rağmen segment-bazlı mimarinin canlıya alınmasına karar verdi.",
+    neyiAnalizEdiyor: [
+      "V5.2 ile aynı canlı Faz1 veri toplama (gatherFaz1V5) HİÇ DEĞİŞMEDİ — yalnız Faz2'nin skorlama ağırlıkları, koşunun kategorisine (kategoriTespit: 1a=Şartlı1/27, 1b=Maiden/Şartlı19, diğerleri=diger) göre iki tam ayrı eğitilmiş model arasında seçiliyor",
+      "v5-weights-dusuksart.json: yalnız şartlı1/19/27+maiden koşularında (n=240) eğitildi — test (n=60): top1 %33.3, top3 %70.0, log-loss 1.8848",
+      "v5-weights-diger.json: geri kalan tüm koşularda (n=693) eğitildi — test (n=174): top1 %29.9, top3 %64.4, log-loss 1.8298",
+    ],
+    caprazlamalar: [
+      "sireOrani: düşük-şart modelinde nokta=+0.064 (GA=[-0.151,0.224], anlamsız), diğer modelde nokta=+0.035 (GA=[-0.074,0.130], anlamsız) — yön tutarlı, anlamlılık yok",
+      "agfYukselisVarMi/agfDususVarMi: her iki segmentte de anlamsız çıktı, beklenen (diğer segmentte daha güçlü) yön DOĞRULANMADI",
+      "Düşük-şart modeli yalnız 180 koşuyla eğitildi — overfitting riski normalden yüksek, örneklem büyüdükçe (birkaç ay sonra) yeniden değerlendirilmeli",
     ],
   },
 ];
