@@ -165,6 +165,11 @@ export type ModelRow = {
   // filtrelenmiş). sireOrani × "az deneyimli" etkileşimini test etmek için — literatür
   // (TwinSpires): pedigri, atın kendi kanıtlanmış performansı YOKSA/azsa devreye girmeli.
   kariyerStartSayisi: number;
+  // 2026-08-21 — H2H (baş-başa geçmiş karşılaşma) net skoru: bugünkü sahadaki rakiplerle
+  // ortak geçmiş yarışlarda kaç kez önde bitirdi eksi kaç kez geride bitirdi. B=200
+  // bootstrap'ta sınırda (GA=[-0.0105,0.1603]) ama backtest'te top1/top3 İKİSİ BİRDEN
+  // iyileşti (logloss ihmal edilebilir kötüleşme) — kullanıcı kararıyla KABUL EDİLDİ.
+  h2hNetSkor: number;
 };
 
 async function main() {
@@ -295,7 +300,43 @@ async function main() {
                   })
                 : Promise.resolve([]),
             ]);
-            const gecmisByTjkAtId = new Map(gecmisKayitlari.map((g) => [g.tjkAtId, g.rowsJson as unknown as { finishPos: string; weight: string; jockey: string; surface: string; date: string }[]]));
+            const gecmisByTjkAtId = new Map(gecmisKayitlari.map((g) => [g.tjkAtId, g.rowsJson as unknown as { finishPos: string; weight: string; jockey: string; surface: string; date: string; raceNo: string; city: string }[]]));
+
+            // H2H (baş-başa geçmiş karşılaşma) — 2026-08-21 kullanıcı talebi: V1-V22'de
+            // vardı, V5'in yeniden inşasında hiç dahil edilmemişti. getH2HForRace ile AYNI
+            // mantık (tarih+şehir+koşu_no anahtarıyla ortak geçmiş yarış eşleştirme) ama
+            // zaten toplu çekilmiş gecmisByTjkAtId'den — ekstra sorgu YOK, verimli.
+            const raceNameToNo = new Map(runners.map((r) => [r.name, r.no]));
+            const h2hByAnahtar = new Map<string, { horseName: string; pos: number }[]>();
+            for (const r of runners) {
+              if (r.tjkAtId == null) continue;
+              const gecmisTumu = gecmisByTjkAtId.get(r.tjkAtId) ?? [];
+              for (const g of gecmisTumu) {
+                const t = parseGecmisTarih(g.date);
+                if (t == null || !(t < race.raceDay.date)) continue;
+                if (!g.raceNo || !g.city) continue;
+                const pos = parseInt(g.finishPos, 10);
+                if (isNaN(pos)) continue;
+                const anahtar = `${g.date}|${g.city}|${g.raceNo}`;
+                const arr = h2hByAnahtar.get(anahtar) ?? [];
+                if (!arr.some((e) => e.horseName === r.name)) arr.push({ horseName: r.name, pos });
+                h2hByAnahtar.set(anahtar, arr);
+              }
+            }
+            function h2hNetSkorHesapla(kendiAd: string): number {
+              let skor = 0;
+              for (const arr of h2hByAnahtar.values()) {
+                if (arr.length < 2) continue;
+                const beni = arr.find((e) => e.horseName === kendiAd);
+                if (!beni) continue;
+                for (const other of arr) {
+                  if (other.horseName === kendiAd) continue;
+                  if (!raceNameToNo.has(other.horseName)) continue;
+                  skor += beni.pos < other.pos ? 1 : beni.pos > other.pos ? -1 : 0;
+                }
+              }
+              return skor;
+            }
 
             // galop verisi
             const gallops = await db.gallop.findMany({
@@ -453,6 +494,7 @@ async function main() {
                 atJokeyIkiliOrani,
                 jokeyDegisimYonu,
                 kariyerStartSayisi,
+                h2hNetSkor: h2hNetSkorHesapla(r.name),
               });
             }
           })(), 25_000);

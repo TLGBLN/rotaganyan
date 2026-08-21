@@ -92,6 +92,16 @@
  *    Sonuç: düşük-şart/maiden segmentinde artık sireOrani/AGF-trend/antrenorOrani için
  *    özel bir öncelik YOK — hepsi veriden öğrenilen doğal ağırlığında. "Diğer" segmentte
  *    AGF trend hâlâ elle en büyük katsayı.
+ *  - 2026-08-21 (V5.3 devamı — H2H eklendi, 18→19 özellik): kullanıcı talebiyle yeni
+ *    sinyal araştırıldı. H2H (baş-başa geçmiş karşılaşma) — V1-V22'de vardı, V5'in
+ *    yeniden inşasında hiç dahil edilmemişti. h2hNetSkor = bugünkü sahadaki rakiplerle
+ *    ortak geçmiş yarışlarda net galibiyet farkı (getH2HForRace, leak-free — yalnız
+ *    o koşudan ÖNCEKİ TJK kayıtları). B=200 bootstrap'ta sınırda (nokta=+0.0708,
+ *    GA=[-0.0105,0.1603]) ama backtest'te top1 %30.8→%31.6 VE top3 %66.7→%67.9 İKİSİ
+ *    BİRDEN iyileşti (logloss ihmal edilebilir, +0.0016) — V5.1'in agfYukselisVarMi/
+ *    agfDususVarMi'yi kabul ettiği aynı standartla (sınırda + çok metrik birden iyileşme)
+ *    KABUL EDİLDİ. Her iki segment ağırlık dosyasına da veriden fit edilerek eklendi
+ *    (manuel override DEĞİL).
  *
  * Ağırlıklar `weights/v5-weights-dusuksart.json` (şartlı1/19/27+maiden) ve
  * `weights/v5-weights-diger.json` (diğer tüm koşular) altında AYRI AYRI COMMIT EDİLMİŞ
@@ -103,6 +113,7 @@ import { db } from "@/lib/db";
 import { getSonYarisDetaylariForRace } from "@/server/actions/son-yaris-detay.actions";
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getAgfTrendForRace } from "@/server/actions/agf-trend.actions";
+import { getH2HForRace } from "@/server/actions/h2h.actions";
 import { syncAgfForRace } from "@/server/services/agf-sync";
 import { getJockeyStats, getTrainerStats } from "@/server/services/race.service";
 import {
@@ -208,6 +219,9 @@ export type Faz1RunnerV5 = {
    *  tüm katsayılar net anlamlı/anlamsız oldu, sınırda kalan olmadı) — alan yine de
    *  toplanıyor, gelecekte farklı bir formülasyonla tekrar test edilebilir. */
   agfFarkiIkinciye: number;
+  /** 2026-08-21 — H2H net skoru: bugünkü sahadaki rakiplerle ortak geçmiş yarışlarda
+   *  kaç kez önde bitirdi eksi kaç kez geride bitirdi (getH2HForRace, leak-free). */
+  h2hNetSkor: number;
 };
 
 export type Faz1SonucV5 = {
@@ -257,7 +271,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
   const runners = race.runners;
   if (runners.length === 0) return { race: { id: race.id, hippodromeName: race.raceDay.hippodrome.name.trim(), raceNo: race.raceNo, classType: race.classType, breed: race.breed, surface: race.surface, distance: race.distance }, runners: [] };
 
-  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar] = await Promise.all([
+  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters] = await Promise.all([
     getSonYarisDetaylariForRace(raceId).catch(() => []),
     getSireStatOzetleriForRace(runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(() =>
       runners.map(() => ({ ozet: null, ornekKendiVeri: null, kYuzde: null }))
@@ -270,7 +284,27 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       () => ({}) as Record<string, { wins: number; rides: number }>
     ),
     fetchAccuraceGecmisKayitlari(runners.map((r) => r.name), race.raceDay.date),
+    getH2HForRace(raceId).catch(() => []),
   ]);
+
+  const raceNameToNo = new Map(runners.map((r) => [r.name, r.no]));
+  function h2hNetSkorHesapla(kendiAd: string): number {
+    let skor = 0;
+    for (const enc of h2hEncounters) {
+      const beniIceren = enc.results.find((e) => e.horseName === kendiAd);
+      if (!beniIceren) continue;
+      const benimPos = parseInt(beniIceren.finishPos, 10);
+      if (isNaN(benimPos)) continue;
+      for (const other of enc.results) {
+        if (other.horseName === kendiAd) continue;
+        if (!raceNameToNo.has(other.horseName)) continue;
+        const otherPos = parseInt(other.finishPos, 10);
+        if (isNaN(otherPos)) continue;
+        skor += benimPos < otherPos ? 1 : benimPos > otherPos ? -1 : 0;
+      }
+    }
+    return skor;
+  }
 
   const sonYarisByNo = new Map(sonYarisDetaylari.map((d) => [d.runnerNo, d]));
   const sireOzetByRunnerId = new Map(runners.map((r, i) => [r.id, sireOzetleri[i]]));
@@ -347,6 +381,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       sireKazanmaOraniHam: sireOzet?.kYuzde ?? null,
       sireOrneklemKendiVeri: sireOzet?.ornekKendiVeri ?? null,
       kacakAtMi: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" ? 1 : 0,
+      h2hNetSkor: h2hNetSkorHesapla(r.name),
     };
   });
 
@@ -395,6 +430,9 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     // anlamsızlaşmıştı). agfFarkiIkinciye de denendi ama sınırda/zararlı çıktı
     // (bkz. Faz1RunnerV5.agfFarkiIkinciye üstündeki not) — DAHİL EDİLMEDİ.
     r.agfPayi,
+    // 2026-08-21 — H2H net skoru: bkz. dosya başındaki V5.3 H2H notu. Sınırda bootstrap
+    // ama top1/top3 İKİSİ BİRDEN iyileşti, veriden fit edilerek eklendi.
+    r.h2hNetSkor,
   ];
 }
 
@@ -609,6 +647,9 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // katkıları skoru etkiliyordu ama gerekçe metninde hiç görünmüyordu. Eklendi.
   { kod: "KACAK", ozellikIndeksleri: [idx("kacakAtMi")], aciklama: (r) => (r.kacakAtMi ? "Kaçak at / erken tempo yapan (Accurace koşu stili sinyali)" : null) },
   { kod: "DUSUSIYI", ozellikIndeksleri: [idx("agfDususVarMi")], aciklama: (r) => (r.agfFark <= -ANLAMLI_PUAN_ESIGI ? "AGF trend: düşüş (para akışı sinyali olabilir)" : null) },
+  // 2026-08-21 — H2H: bugünkü rakiplerle ortak geçmiş yarış yoksa (h2hNetSkor=0) satır
+  // hiç gösterilmez — "0 karşılaşma" ile "hep berabere" ayrımı yapılamadığı için nötr.
+  { kod: "H2H", ozellikIndeksleri: [idx("h2hNetSkor")], aciklama: (r) => (r.h2hNetSkor !== 0 ? `Baş-başa geçmiş: bugünkü rakiplerle ${r.h2hNetSkor > 0 ? "+" : ""}${r.h2hNetSkor} net (${r.h2hNetSkor > 0 ? "önde" : "geride"} bitirmiş)` : null) },
 ];
 
 // 2026-08-18 kullanıcı talebi: "18 sinyalin hepsinin kontrol edildiğini bana göstermesini
@@ -629,6 +670,7 @@ const FEATURE_LABELS: Record<string, string> = {
   agfYukselisVarMi: "AGF Eşik-Üstü Yükseliş Var Mı",
   kacakAtMi: "Kaçak At / Erken Tempo", agfDususVarMi: "AGF Eşik-Üstü Düşüş Var Mı",
   agfPayi: "AGF Payı (ham yüzde)", agfFarkiIkinciye: "AGF Dominans Farkı (2.'ye göre, yalnız favoride)",
+  h2hNetSkor: "H2H Net Skoru (bugünkü rakiplerle geçmiş karşılaşma)",
 };
 
 export type TumOzellikDetay = { kod: string; etiket: string; hamDeger: number; standartDeger: number; katki: number };

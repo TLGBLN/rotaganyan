@@ -23,6 +23,9 @@ const FEATURE_NAMES = [
   "agfSirasi", "accurace", "formEgimi", "formEgimi2", "kgs", "kgs2", "kgsVarMi", "pistUzmani", "sireOrani",
   "galop", "idmJokey", "jokeyOrani", "antrenorOrani", "uzunAraGalopKatkisi",
   "agfYukselisVarMi", "kacakAtMi", "agfDususVarMi", "agfPayi",
+  // 2026-08-21 — H2H net skoru: sınırda bootstrap (GA=[-0.0105,0.1603]) ama top1/top3
+  // İKİSİ BİRDEN iyileşti (logloss ihmal edilebilir), kullanıcı kararıyla eklendi.
+  "h2hNetSkor",
 ];
 
 function toFeatureVector(row) {
@@ -34,6 +37,7 @@ function toFeatureVector(row) {
     row.kacakAtMi ?? 0,
     row.agfFark <= -ANLAMLI_PUAN_ESIGI ? 1 : 0,
     row.agfPayi ?? 0,
+    row.h2hNetSkor ?? 0,
   ];
 }
 function groupByRace(rows) {
