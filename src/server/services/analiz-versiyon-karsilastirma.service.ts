@@ -142,7 +142,7 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.3",
     baslangic: new Date("2026-08-21T21:43:19+03:00"), // a04309d — segment-bazlı iki-model mimarisi canlıya alındı
-    bitis: null,
+    bitis: new Date("2026-08-21T23:17:46+03:00"), // 8b620d0 — H2H sinyali eklendi, V5.4
     aciklama: "Kullanıcı kararı: sireOrani şartlı1/19/27+maiden koşularında, AGF trend (agfYukselisVarMi/agfDususVarMi) diğer koşularda ağırlıklı olmalı — literatür (TwinSpires pedigri-handikapçılık rehberi: pedigri, atın kendi kanıtlanmış formu yokken bir önsel görevi görür) bu yönü destekliyor. İki ayrı test çalıştırıldı: (1) ortak modelde sireOrani/agfYukselisVarMi/agfDususVarMi'yi segment×sinyal etkileşim terimine bölmek, (2) hiçbir paylaşımlı regularizasyon olmadan iki TAMAMEN AYRI model eğitmek (seyreltmesiz, en güçlü test). İkisi de YÖNÜ doğruladı — düşük-şart segmentte sireOrani'nin nokta tahmini diğer segmentten yaklaşık iki kat yüksek (+0.064 vs +0.035, ayrı-model testinde) — ama HİÇBİR testte istatistiksel anlamlılığa ulaşmadı (n=240 düşük-şart koşusu, %95 GA'lar geniş ve çakışıyor). Kullanıcı bu belirsizliğe rağmen segment-bazlı mimarinin canlıya alınmasına karar verdi.",
     neyiAnalizEdiyor: [
       "V5.2 ile aynı canlı Faz1 veri toplama (gatherFaz1V5) HİÇ DEĞİŞMEDİ — yalnız Faz2'nin skorlama ağırlıkları, koşunun kategorisine (kategoriTespit: 1a=Şartlı1/27, 1b=Maiden/Şartlı19, diğerleri=diger) göre iki tam ayrı eğitilmiş model arasında seçiliyor",
@@ -153,6 +153,19 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
       "sireOrani: düşük-şart modelinde nokta=+0.064 (GA=[-0.151,0.224], anlamsız), diğer modelde nokta=+0.035 (GA=[-0.074,0.130], anlamsız) — yön tutarlı, anlamlılık yok",
       "agfYukselisVarMi/agfDususVarMi: her iki segmentte de anlamsız çıktı, beklenen (diğer segmentte daha güçlü) yön DOĞRULANMADI",
       "Düşük-şart modeli yalnız 180 koşuyla eğitildi — overfitting riski normalden yüksek, örneklem büyüdükçe (birkaç ay sonra) yeniden değerlendirilmeli",
+    ],
+  },
+  {
+    versiyon: "V5.4",
+    baslangic: new Date("2026-08-21T23:17:46+03:00"), // 8b620d0 — H2H sinyali eklendi
+    bitis: null,
+    aciklama: "H2H (baş-başa geçmiş karşılaşma) sinyali eklendi, 18→19 özellik. V1-V22'de vardı, V5'in yeniden inşasında hiç dahil edilmemişti — kullanıcı talebiyle araştırıldı. h2hNetSkor = bugünkü sahadaki rakiplerle ortak geçmiş yarışlarda net galibiyet farkı (getH2HForRace, leak-free — yalnız o koşudan ÖNCEKİ TJK kayıtları, ekstra sorgu olmadan zaten toplu çekilen HorseRaceHistoryCache'ten). Segment-bazlı iki-model mimarisinin (V5.3) her iki ağırlık dosyasına da veriden fit edilerek eklendi (manuel override DEĞİL).",
+    neyiAnalizEdiyor: [
+      "V5.3 ile aynı segment-bazlı mimari (düşük-şart/diğer iki ayrı model) + canlı Faz1 veri toplama — yalnız h2hNetSkor 19. özellik olarak eklendi",
+    ],
+    caprazlamalar: [
+      "h2hNetSkor: diğer segmentte (n=174 test) ANLAMLI (+0.103, GA=[0.027,0.207]); düşük-şart segmentte (n=60 test) küçük-örneklem gürültüsüyle anlamsız/ters yönlü (-0.108, GA=[-0.278,0.065])",
+      "Backtest: düşük-şart top1 %33.3→%35.0 (top3 %70.0 aynı, logloss 1.8848→1.8782), diğer top1 %29.9→%31.0 (top3 %67.8 aynı) — ikisi birden iyileşti, hiçbir metrik kötüleşmedi",
     ],
   },
 ];
