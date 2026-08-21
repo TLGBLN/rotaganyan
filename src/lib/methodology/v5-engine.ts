@@ -91,7 +91,18 @@
  *    döndürüldü. `v5-weights-diger.json` DEĞİŞMEDİ (AGF-trend override'ı hâlâ geçerli).
  *    Sonuç: düşük-şart/maiden segmentinde artık sireOrani/AGF-trend/antrenorOrani için
  *    özel bir öncelik YOK — hepsi veriden öğrenilen doğal ağırlığında. "Diğer" segmentte
- *    AGF trend hâlâ elle en büyük katsayı.
+ *    AGF trend elle en büyük katsayı yapılmıştı (0.7/0.7).
+ *  - 2026-08-21 (V5.3 devamı — "DİĞER" AGF-TREND OVERRIDE'I DA GERİ ALINDI, KAZARA+
+ *    DOĞRULANDI): H2H eklenirken (aşağıdaki not) resmi eğitim script'inin çıktısı
+ *    doğrudan kopyalanmıştı — bu, "diğer" segmentteki 0.7/0.7 override'ını farkında
+ *    olmadan fit değerlerine (agfYukselisVarMi +0.081, agfDususVarMi +0.035) geri
+ *    döndürdü. Kullanıcının "AGF trend'de en çok yükselen/düşen ne kadar kazanıyor"
+ *    araştırma isteği sonrası (yükselenler %18.0 galibiyet, düşenler %13.8, kontrol
+ *    %10.3 — yükseliş gerçekten daha güçlü) bu asimetriyi ELLE de test ettik: eşit
+ *    (0.7/0.7), oranlı-asimetrik (0.7/0.32, 0.5/0.22) ve saf fit — SAF FİT üçünde de
+ *    (top1/top3/logloss) en iyi veya en iyilerden çıktı, hiçbir manuel versiyon onu
+ *    geçemedi. Yani kazara oluşan bu geri dönüş aslında doğruymuş — KORUNDU, "diğer"
+ *    segmentte AGF trend için de artık hiçbir manuel override YOK.
  *  - 2026-08-21 (V5.3 devamı — H2H eklendi, 18→19 özellik): kullanıcı talebiyle yeni
  *    sinyal araştırıldı. H2H (baş-başa geçmiş karşılaşma) — V1-V22'de vardı, V5'in
  *    yeniden inşasında hiç dahil edilmemişti. h2hNetSkor = bugünkü sahadaki rakiplerle
