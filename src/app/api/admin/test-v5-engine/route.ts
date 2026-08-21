@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
-import { gatherFaz1V5, faz2V5Sirala, muhakemeUretV5, v5BankoAdayiTespit, tumOzellikleriListele } from "@/lib/methodology/v5-engine";
+import { gatherFaz1V5, faz2V5Sirala, muhakemeUretV5, v5BankoAdayiTespit, tumOzellikleriListele, CURRENT_ENGINE_LABEL } from "@/lib/methodology/v5-engine";
 import { kategoriTespit } from "@/lib/methodology/v2-engine";
 
 // 2026-08-16 — V5 motoru: Claude çağrısı YOK (yalnız DB okuma + koşullu logit skoru),
@@ -43,6 +43,7 @@ async function handlePost(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
+    motorEtiketi: CURRENT_ENGINE_LABEL,
     kategori: kategoriTespit(faz1.race.classType),
     kosuBaslik: `${faz1.race.hippodromeName} — ${faz1.race.raceNo}.Koşu | ${faz1.race.classType} | ${faz1.race.breed} | ${faz1.race.distance}m ${faz1.race.surface} | ${faz1.runners.length} at`,
     atlar,

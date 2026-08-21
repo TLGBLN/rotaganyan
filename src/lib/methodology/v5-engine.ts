@@ -138,6 +138,7 @@ import { hesaplaSinyalSayisi, kategoriTespit } from "@/lib/methodology/v2-engine
 import { AGF_TERFI_ILK3_SINYAL_ESIGI as SINYAL_ESIGI } from "@/lib/methodology/v4-engine";
 import v5WeightsDusukSart from "@/lib/methodology/weights/v5-weights-dusuksart.json";
 import v5WeightsDiger from "@/lib/methodology/weights/v5-weights-diger.json";
+import { ENGINE_VERSIONS } from "@/server/services/analiz-versiyon-karsilastirma.service";
 
 type AgirlikSeti = { featureNames: string[]; weights: number[]; means: number[]; stds: number[] };
 
@@ -150,7 +151,14 @@ type AgirlikSeti = { featureNames: string[]; weights: number[]; means: number[];
 // yerine, koşunun kategorisine göre İKİ TAMAMEN AYRI eğitilmiş model arasında seçim yapılır.
 const WEIGHTS_DUSUK_SART = v5WeightsDusukSart as AgirlikSeti;
 const WEIGHTS_DIGER = v5WeightsDiger as AgirlikSeti;
-const FEATURE_NAMES = WEIGHTS_DIGER.featureNames; // iki set de AYNI 18 özellik/sırayı kullanır
+const FEATURE_NAMES = WEIGHTS_DIGER.featureNames; // iki set de AYNI özellik/sırayı kullanır
+
+// 2026-08-22 kullanıcı bulgusu: panel başlığındaki sürüm/özellik-sayısı METNİ daha önce
+// İKİ KEZ sabit (hardcoded) yazılıp güncellenmeyi unutulmuştu (V5.1→V5.3, sonra V5.3→V5.5
+// arası) — kullanıcı ekranda hâlâ eski sürümü görüyordu. Artık FEATURE_NAMES.length'ten
+// (gerçek özellik sayısı) VE ENGINE_VERSIONS'ın son (bitis:null) girdisinden TÜRETİLİYOR,
+// bir daha elle güncellenmesi gerekmiyor.
+export const CURRENT_ENGINE_LABEL = `${ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].versiyon} — Koşullu Logit Modeli (${FEATURE_NAMES.length} özellik, segment-bazlı iki model — atları doğrudan kıyaslar, Claude yok, maliyet sıfır)`;
 
 function agirlikSetiSec(classType: string): AgirlikSeti {
   const kategori = kategoriTespit(classType);

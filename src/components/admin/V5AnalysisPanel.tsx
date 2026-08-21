@@ -116,6 +116,10 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
   // 2026-08-21 kullanıcı bulgusu (Bursa/ŞENGÜL SULTAN vakası): panel hangi ağırlık
   // setinin (düşük-şart/diğer) kullanıldığını hiç göstermiyordu — şeffaflık eksikliği.
   const [kategori, setKategori] = useState<string | null>(null);
+  // 2026-08-22 kullanıcı bulgusu: başlıktaki sürüm/özellik-sayısı metni iki kez sabit
+  // (hardcoded) yazılıp güncellenmeyi unutulmuştu — artık API'den (CURRENT_ENGINE_LABEL,
+  // gerçek özellik sayısından türetilmiş) geliyor, elle güncelleme GEREKMİYOR.
+  const [motorEtiketi, setMotorEtiketi] = useState<string | null>(null);
 
   function toggleDetay(no: number) {
     setAcikDetay((prev) => {
@@ -134,6 +138,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
     setBankoAdayi(null);
     setKaynak(null);
     setKategori(null);
+    setMotorEtiketi(null);
     setLoading(true);
     try {
       const res = await fetch("/api/admin/test-v5-engine", {
@@ -146,6 +151,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         ok?: boolean;
         error?: string;
         kategori?: string;
+        motorEtiketi?: string;
         atlar: V5At[];
         runners: Runner[];
         bankoAdayi: BankoAdayiSonuc;
@@ -166,6 +172,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       setBankoAdayi(data.bankoAdayi ?? null);
       setKuponlar({ narrow: data.couponNarrow, normal: data.couponNormal, wide: data.couponWide });
       setKategori(data.kategori ?? null);
+      setMotorEtiketi(data.motorEtiketi ?? null);
       setKaynak("canli");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Beklenmeyen hata");
@@ -249,7 +256,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-purple-500" />
         <h3 className="text-sm font-semibold">
-          V5.3 — Koşullu Logit Modeli (18 özellik, segment-bazlı iki model — atları doğrudan kıyaslar, Claude yok, maliyet sıfır)
+          {motorEtiketi ?? "Koşullu Logit Modeli — atları doğrudan kıyaslar, Claude yok, maliyet sıfır (sürüm bilgisi \"Analiz Et\"e basınca görünür)"}
         </h3>
       </div>
 
