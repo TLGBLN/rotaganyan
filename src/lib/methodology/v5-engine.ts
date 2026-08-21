@@ -80,6 +80,18 @@
  *    `v5-weights-diger.json`'da agfYukselisVarMi/agfDususVarMi ELLE 0.7'ye yükseltildi
  *    (agfSirasi'nin |0.51|'inden büyük, segmentin tek en büyük katsayısı) — o segmentteki
  *    DİĞER 16 katsayıya DOKUNULMADI, hâlâ veriden öğrenilen (fitted) değerlerinde.
+ *  - 2026-08-21 (V5.3 devamı — DÜŞÜK-ŞART OVERRIDE GERİ ALINDI): kullanıcı, override'lı
+ *    düşük-şart backtest'inin (top1 %33.3/top3 %63.3/logloss 2.14) FİT edilmiş hâlden
+ *    (top1 %33.3/top3 %70.0/logloss 1.8848) belirgin şekilde KÖTÜ olduğunu gördükten
+ *    sonra "en verimli sonucu ver" dedi. Ölçüm: düşük-şart TAMAMEN fit değerlerine
+ *    dönüp, diğer segment AGF-trend override'ında (0.7/0.7) sabit kalınca birleşik
+ *    top1 %30.8 (hedeflenenle birebir) / top3 %68.4 (hedeflenen %66.7'yi de geçiyor)
+ *    çıktı — bu en iyi ölçülen kombinasyon. `v5-weights-dusuksart.json` bu yüzden
+ *    TAMAMEN orijinal (veriden fit edilmiş, hiçbir manuel override YOK) hâline
+ *    döndürüldü. `v5-weights-diger.json` DEĞİŞMEDİ (AGF-trend override'ı hâlâ geçerli).
+ *    Sonuç: düşük-şart/maiden segmentinde artık sireOrani/AGF-trend/antrenorOrani için
+ *    özel bir öncelik YOK — hepsi veriden öğrenilen doğal ağırlığında. "Diğer" segmentte
+ *    AGF trend hâlâ elle en büyük katsayı.
  *
  * Ağırlıklar `weights/v5-weights-dusuksart.json` (şartlı1/19/27+maiden) ve
  * `weights/v5-weights-diger.json` (diğer tüm koşular) altında AYRI AYRI COMMIT EDİLMİŞ
