@@ -158,7 +158,7 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.4",
     baslangic: new Date("2026-08-21T23:17:46+03:00"), // 8b620d0 — H2H sinyali eklendi
-    bitis: null,
+    bitis: new Date("2026-08-22T00:12:10+03:00"), // d402ef2 — hizDerecesi sinyali eklendi, V5.5
     aciklama: "H2H (baş-başa geçmiş karşılaşma) sinyali eklendi, 18→19 özellik. V1-V22'de vardı, V5'in yeniden inşasında hiç dahil edilmemişti — kullanıcı talebiyle araştırıldı. h2hNetSkor = bugünkü sahadaki rakiplerle ortak geçmiş yarışlarda net galibiyet farkı (getH2HForRace, leak-free — yalnız o koşudan ÖNCEKİ TJK kayıtları, ekstra sorgu olmadan zaten toplu çekilen HorseRaceHistoryCache'ten). Segment-bazlı iki-model mimarisinin (V5.3) her iki ağırlık dosyasına da veriden fit edilerek eklendi (manuel override DEĞİL).",
     neyiAnalizEdiyor: [
       "V5.3 ile aynı segment-bazlı mimari (düşük-şart/diğer iki ayrı model) + canlı Faz1 veri toplama — yalnız h2hNetSkor 19. özellik olarak eklendi",
@@ -166,6 +166,21 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
     caprazlamalar: [
       "h2hNetSkor: diğer segmentte (n=174 test) ANLAMLI (+0.103, GA=[0.027,0.207]); düşük-şart segmentte (n=60 test) küçük-örneklem gürültüsüyle anlamsız/ters yönlü (-0.108, GA=[-0.278,0.065])",
       "Backtest: düşük-şart top1 %33.3→%35.0 (top3 %70.0 aynı, logloss 1.8848→1.8782), diğer top1 %29.9→%31.0 (top3 %67.8 aynı) — ikisi birden iyileşti, hiçbir metrik kötüleşmedi",
+    ],
+  },
+  {
+    versiyon: "V5.5",
+    baslangic: new Date("2026-08-22T00:12:10+03:00"), // d402ef2 — hizDerecesi sinyali eklendi
+    bitis: null,
+    aciklama: "hizDerecesi (hız/tempo derecesi) eklendi, 19→20 özellik. Literatür (Beyer-tipi hız derecelendirmesi profesyonel modellerde genelde en güçlü tekil sinyal — bizde bu role en yakın adaylar accurace/formEgimi ikisi de anlamsızdı) ışığında araştırıldı. TJK 'At Koşu Bilgileri'ndeki 'süre' alanı AT-BAZLI (gerçek bitiriş süresi, '1.16.30' formatı) — popülasyon (irk|pist|mesafe kovası) ortalama tempo'suna göre, yalnız son 365 GÜN içindeki en yeni 3 koşunun göreli hızı (uzun aradan dönen bir atın yıllar önceki 'en iyi dönemi' güncelmiş gibi kullanılmasın diye). Aynı gün ayrıca accurace'nin 'anlamsız' görünmesinin nedeni araştırıldı: gerçek bir ham sinyal (kazananlarda %15.7 vs genel %8.8, ~1.78x) ama agfSirasi/agfPayi ile güçlü korelasyonlu (-0.19/+0.21) — piyasa zaten fark ediyor, confounding (VIF'te YÜKSEK değil, yalnız marjinal katkısı küçük).",
+    neyiAnalizEdiyor: [
+      "V5.4 ile aynı segment-bazlı mimari + canlı Faz1 veri toplama — yalnız hizDerecesi 20. özellik olarak eklendi",
+      "Yeni src/server/actions/hiz-derecesi.actions.ts: HorseRaceHistoryCache küçük olduğu için (~4000 at) ayrı önbellek tablosu/cron gerekmedi, canlı hesaplanıyor (6 saatli TTL'li modül-içi önbellek — ilk istek ~10-15sn, sonrakiler <1-2sn)",
+    ],
+    caprazlamalar: [
+      "hizDerecesi: HER İKİ segmentte de güçlü ANLAMLI — düşük-şart nokta=+0.5815 (GA=[0.3026,0.9828], modelin en büyük tek katsayısı, agfSirasi'nden bile büyük), diğer nokta=+0.2562 (GA=[0.0886,0.4008])",
+      "Tam VIF taraması (18 sinyal, tüm 36439 satır): en yükseği bile (kgsVarMi VIF=2.48) düşük kategoride — hiçbir sinyal bir diğerini gölgelemiyor",
+      "Backtest: düşük-şart top1 %35.0/top3 %70.0/logloss 1.8727 (n=60), diğer top1 %31.0/top3 %67.2/logloss 1.8257 (n=174)",
     ],
   },
 ];
