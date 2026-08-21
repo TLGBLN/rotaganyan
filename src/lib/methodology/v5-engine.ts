@@ -64,6 +64,14 @@
  *    — kullanıcı buna rağmen segment-bazlı MİMARİNİN canlıya alınmasını istedi. Motor artık
  *    TEK bir ortak ağırlık yerine, koşunun kategorisine (kategoriTespit) göre İKİ TAMAMEN
  *    AYRI eğitilmiş model arasında seçim yapıyor (bkz. agirlikSetiSec).
+ *  - 2026-08-21 (V5.3 devamı — MANUEL OVERRIDE): kullanıcı, segment-özel ayrı katsayının
+ *    yetersiz olduğunu belirtti — "ayrı katsayı" ile "EN GÜÇLÜ sinyal" aynı şey değil.
+ *    Veriden öğrenilen düşük-şart sireOrani katsayısı (+0.064) zayıf kaldığı için,
+ *    `v5-weights-dusuksart.json`'da sireOrani AĞIRLIĞI ELLE 0.65'e YÜKSELTİLDİ (segmentteki
+ *    en büyük katsayı, agfSirasi'nin |0.40|'ından ve antrenorOrani'nin 0.36'sından büyük).
+ *    BU DEĞER VERİDEN ÖĞRENİLMEDİ — kullanıcı talimatıyla manuel enjekte edildi, istatistiksel
+ *    anlamlılık iddiası YOK. Yalnız düşük-şart/maiden segmentini etkiler, "diğer" segment
+ *    (v5-weights-diger.json) veriden öğrenilen (+0.035, zayıf) değerinde kaldı.
  *
  * Ağırlıklar `weights/v5-weights-dusuksart.json` (şartlı1/19/27+maiden) ve
  * `weights/v5-weights-diger.json` (diğer tüm koşular) altında AYRI AYRI COMMIT EDİLMİŞ

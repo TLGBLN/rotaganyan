@@ -66,6 +66,11 @@ function savedPickToV5At(pick: SavedPick, runnersByNo: Map<number, Runner>): V5A
   };
 }
 
+const KATEGORI_ETIKET: Record<string, string> = {
+  "1a": "Düşük-şart (Şartlı 1/27) ağırlık seti",
+  "1b": "Düşük-şart (Maiden/Şartlı 19) ağırlık seti",
+};
+
 const KARAR_RENK: Record<string, string> = {
   "Güçlü Aday": "text-hit",
   "Düşük Risk": "text-emerald-500",
@@ -108,6 +113,9 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
   const [kuponlar, setKuponlar] = useState<{ narrow?: string; normal?: string; wide?: string }>(kayitliBaslangic?.kuponlar ?? {});
   const [kaynak, setKaynak] = useState<"kayitli" | "canli" | null>(kayitliBaslangic ? "kayitli" : null);
   const [acikDetay, setAcikDetay] = useState<Set<number>>(new Set());
+  // 2026-08-21 kullanıcı bulgusu (Bursa/ŞENGÜL SULTAN vakası): panel hangi ağırlık
+  // setinin (düşük-şart/diğer) kullanıldığını hiç göstermiyordu — şeffaflık eksikliği.
+  const [kategori, setKategori] = useState<string | null>(null);
 
   function toggleDetay(no: number) {
     setAcikDetay((prev) => {
@@ -125,6 +133,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
     setApplied(false);
     setBankoAdayi(null);
     setKaynak(null);
+    setKategori(null);
     setLoading(true);
     try {
       const res = await fetch("/api/admin/test-v5-engine", {
@@ -136,6 +145,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       let data: {
         ok?: boolean;
         error?: string;
+        kategori?: string;
         atlar: V5At[];
         runners: Runner[];
         bankoAdayi: BankoAdayiSonuc;
@@ -155,6 +165,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       setRunners(data.runners ?? []);
       setBankoAdayi(data.bankoAdayi ?? null);
       setKuponlar({ narrow: data.couponNarrow, normal: data.couponNormal, wide: data.couponWide });
+      setKategori(data.kategori ?? null);
       setKaynak("canli");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Beklenmeyen hata");
@@ -241,6 +252,12 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
           V5.3 — Koşullu Logit Modeli (18 özellik, segment-bazlı iki model — atları doğrudan kıyaslar, Claude yok, maliyet sıfır)
         </h3>
       </div>
+
+      {kategori && (
+        <div className="inline-block rounded-full border border-purple-500/40 bg-purple-500/10 px-2.5 py-1 text-[11px] font-medium text-purple-300">
+          Bu koşuda kullanılan model: {KATEGORI_ETIKET[kategori] ?? "Genel (diğer koşular) ağırlık seti"}
+        </div>
+      )}
 
       {kaynak === "kayitli" && (
         <div className="rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-xs text-purple-300">
