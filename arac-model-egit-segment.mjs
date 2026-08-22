@@ -32,6 +32,18 @@ const FEATURE_NAMES = [
   // B=200 bootstrap: nokta=+0.3479, GA=[0.1856,0.5291] GÜÇLÜ ANLAMLI — agfSirasi'nden
   // sonra en büyük katsayı. VIF=1.02 (accurace/formEgimi ile ÇAKIŞMIYOR, bağımsız bilgi).
   "hizDerecesi",
+  // 2026-08-22 — kullanıcının paylaştığı "bugünkü şartlarda geçmiş kazananlar" tablosu
+  // HP bandına göre kazanma oranı gösteriyordu. hpSirasi (HP'ye göre SIRA, yukarıda
+  // arac-model-veri-olustur.mts'de belgeli) zaten reddedilmişti. Bu kez HAM HP DEĞERİ
+  // (hpPuani) denendi — saha-büyüklüğünden arındırılmış ham analizde 0-15 HP bandı
+  // beklenenin %24'ü, 48+ bandı %114'ü kadar kazanıyordu (n=32905, agfSirasi ile
+  // korelasyon r=-0.314). AMA diğer 20 özellikle BİRLİKTE test edilince (B=50 bootstrap)
+  // İKİ SEGMENTTE DE anlamsız çıktı: düşük-şart nokta=0.1062 GA=[-0.0826,0.3912],
+  // diğer nokta=0.1022 GA=[-0.0280,0.2673] — hpSirasi ile AYNI confounding (agfSirasi/
+  // agfPayi/antrenorOrani/jokeyOrani zaten yakalıyor). MODELE DAHİL EDİLMEDİ — hpPuani
+  // alanı yine de arac-model-veri-olustur.mts'de toplanıyor (ekstra TJK isteği
+  // gerektirmiyor), ileride farklı formülasyonla (örn. saha ortalamasına göre relatif)
+  // yeniden test edilmek istenirse hazır olsun diye.
 ];
 
 function toFeatureVector(row) {

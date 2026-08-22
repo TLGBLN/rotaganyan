@@ -191,6 +191,17 @@ export type ModelRow = {
   // İKİ segmentte de güçlü anlamlı (düşük-şart +0.58 — modelin en büyük katsayısı,
   // diğer +0.26), VIF=1.02-1.10 (hiçbir sinyalle çakışmıyor) — KABUL EDİLDİ.
   hizDerecesi: number;
+  // 2026-08-22 kullanıcı bulgusu (ekran görüntüsü — "bugünkü şartlarda geçmiş kazananlar"
+  // tablosu, HP bandına göre kazanma oranı gösteriyordu): hpSirasi (HP'ye göre SIRA) daha
+  // önce test edilip reddedilmişti (bkz. yukarıdaki not, agfSirasi+sire/jokey/antrenor
+  // oranıyla confounded çıkmıştı). Bu kez HAM HP DEĞERİ (sıra değil) deneniyor — saha
+  // büyüklüğünden arındırılmış (lift=gözlenen/beklenen) ham analizde 0-15 HP bandı
+  // beklenenin %24'ü, 48+ bandı %114'ü kadar kazanıyordu (n=32905), agfSirasi ile
+  // korelasyon r=-0.314 (orta düzey, piyasa tam fiyatlamıyor). hpSirasi'nden FARKLI bir
+  // encoding olduğu için ayrı test ediliyor. Veri yoksa (yapısal muaf: maiden/şartlı1/19/27)
+  // 0 — kariyerStartSayisi gibi "dusuksart" segmentinde ayırt edici olmayacağı ama zarar da
+  // vermeyeceği beklentisiyle.
+  hpPuani: number;
 };
 
 async function main() {
@@ -597,6 +608,7 @@ async function main() {
                 kariyerStartSayisi,
                 h2hNetSkor: h2hNetSkorHesapla(r.name),
                 hizDerecesi: hizDerecesiHesapla(r.tjkAtId, race.breed, race.raceDay.date),
+                hpPuani: r.hp ?? 0,
               });
             }
           })(), 25_000);

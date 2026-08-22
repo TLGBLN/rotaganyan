@@ -627,19 +627,46 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
 // V4'ün faz2BankoAdayiTespit'i "Güçlü Aday" (p>=%30) metnine bakıyordu — 826 koşuluk
 // backtest'te bu eşikte isabet oranı yalnız %44.8 çıktı (2026-08-16 kullanıcı bulgusu:
 // "Banko Adayı" dedikleri çoğu gelmiyor). V5 kendi ham olasılığına göre AYRI ve daha
-// yüksek bir eşik (%40, backtest'te n=296/826 koşuda tetiklenip %53.7 isabet) kullanıyor
-// — "Güçlü Aday" etiketinin genel anlamını (diğer yerlerde de kullanılıyor) bozmadan.
-const BANKO_OLASILIK_ESIGI = 0.4;
+// yüksek bir eşik (%40, backtest'te n=296/826 koşuda tetiklenip %53.7 isabet) kullanmıştı.
+//
+// 2026-08-22 kullanıcı bulgusu — CANLIDA bu iddia doğrulanmadı: yayınlanan 11 bankonun
+// yalnız 3'ü isabet etti (%27.3), %53.7 backtest iddiasının çok altında. Kök neden
+// ARAŞTIRILDI (kullanıcı talebi: "kazanan atlarda hangi sinyaller görülüyor"): 8 ıska
+// bankonun 8'inde de ortak desen — banko seçimi neredeyse SADECE AGF favorisi olmaktan
+// güç alıyordu (AGF Sırası+Payı skorun en büyük bileşeni), gerçek kazanan ise AGF
+// favorisi DEĞİLDİ ve kendi alanında bağımsız bir sinyal (hız/antrenör/jokey) taşıyordu.
+// TÜM geçmiş veride (n=411 sonuçlu tahmin) doğrulandı: #1 seçim AGF favorisi ve SADECE
+// AGF baskınsa isabet %23.6 (n=106) — AGF favorisi bile OLMAYAN kontrol grubundan
+// (%20.5, n=127) neredeyse farksız! AGF favorisi + EN AZ BİR bağımsız güçlü sinyal
+// (katkı>=0.3) varsa isabet %34.8'e (n=178) çıkıyor. Tekil sinyal kırılımında en
+// güvenilir onaylayıcılar (büyük örneklem): jokeyOrani %36.1 (n=61), antrenorOrani
+// %29.9 (n=167), hizDerecesi %29.1 (n=117).
+// SONUÇ: olasılık eşiği TEK BAŞINA yeterli değilmiş — AGF baskınlığı bağımsız bir
+// sinyalle DOĞRULANMADIKÇA banko sayılmayacak şekilde ikinci bir koşul eklendi.
+const BANKO_OLASILIK_ESIGI = 0.5;
+const AGF_OZELLIK_KODLARI = new Set(["agfSirasi", "agfPayi", "agfYukselisVarMi", "agfDususVarMi"]);
 
 export type V5BankoSonuc = { bankoAdayi: boolean; sebep: string; birinci?: { no: number; ad: string; karar: string } };
 
 export function v5BankoAdayiTespit(sirali: Faz1RunnerV5Sirali[]): V5BankoSonuc {
   const birinci = sirali[0];
   if (!birinci) return { bankoAdayi: false, sebep: "Veri yok." };
-  if (birinci.olasilik >= BANKO_OLASILIK_ESIGI) {
+
+  const bagimsizGuclu = tumOzellikleriListele(birinci).find(
+    (o) => !AGF_OZELLIK_KODLARI.has(o.kod) && o.katki >= GUCLU_ESIK
+  );
+
+  if (birinci.olasilik >= BANKO_OLASILIK_ESIGI && bagimsizGuclu) {
     return {
       bankoAdayi: true,
-      sebep: `#${birinci.no} ${birinci.ad} — model tahmini %${(birinci.olasilik * 100).toFixed(1)} (backtest: bu eşikte n=296/826 koşuda tetiklenip %53.7 isabet). Yalnız bir işaret — muhakeme metnindeki riskleri kendiniz teyit edin.`,
+      sebep: `#${birinci.no} ${birinci.ad} — model tahmini %${(birinci.olasilik * 100).toFixed(1)}, AGF favoriliği "${bagimsizGuclu.etiket}" (bağımsız sinyal) ile doğrulanıyor (backtest: bu ikisi birlikteyken n=178 koşuda %34.8 isabet). Yalnız bir işaret — muhakeme metnindeki riskleri kendiniz teyit edin.`,
+      birinci: { no: birinci.no, ad: birinci.ad, karar: birinci.karar },
+    };
+  }
+  if (birinci.olasilik >= BANKO_OLASILIK_ESIGI && !bagimsizGuclu) {
+    return {
+      bankoAdayi: false,
+      sebep: `#${birinci.no} ${birinci.ad} olasılığı yüksek (%${(birinci.olasilik * 100).toFixed(1)}) ama SADECE AGF favoriliğinden güç alıyor, bağımsız güçlü bir sinyal (hız/antrenör/jokey) yok — bu profilde backtest isabeti yalnız %23.6 (n=106), banko sayılmıyor.`,
       birinci: { no: birinci.no, ad: birinci.ad, karar: birinci.karar },
     };
   }
