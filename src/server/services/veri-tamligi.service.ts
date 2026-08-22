@@ -31,6 +31,8 @@ async function tekSorgu(baslangicTarihi: string) {
       toplam: bigint;
       agf_dolu: bigint;
       hp_dolu: bigint;
+      hp_uygun_toplam: bigint;
+      hp_uygun_dolu: bigint;
       tjkatid_dolu: bigint;
       galop_dolu: bigint;
       agf_trend_dolu: bigint;
@@ -40,7 +42,13 @@ async function tekSorgu(baslangicTarihi: string) {
     }[]
   >(`
     WITH kapsam AS (
-      SELECT r.id AS runner_id, r.agf, r.hp, r."tjkAtId", rd.date AS race_date
+      SELECT r.id AS runner_id, r.agf, r.hp, r."tjkAtId", rd.date AS race_date,
+        -- 2026-08-22 kullanıcı bulgusu: HP eksikliğinin %72'si (170/237) şartlı1/19/27+
+        -- maiden koşularında çıktı — bunlar gerçek debüt/az deneyimli atlar, TJK henüz
+        -- resmi bir handikap puanı VERMEMİŞ (yapısal olarak imkansız, backfill edilemez).
+        -- kategoriTespit'in (v2-engine.ts) "1a"/"1b" regex'iyle AYNI mantık — HP satırı
+        -- yalnız bu atlar HARİÇ TUTULARAK hesaplanır, diğer metrikler etkilenmez.
+        (ra."classType" ~* 'MAIDEN|[ŞS]ARTLI\s*19|[ŞS]ARTLI\s*1\b|[ŞS]ARTLI\s*27\b') AS hp_yapisal_muaf
       FROM "Runner" r
       JOIN "Race" ra ON ra.id = r."raceId"
       JOIN "RaceDay" rd ON rd.id = ra."raceDayId"
@@ -68,6 +76,8 @@ async function tekSorgu(baslangicTarihi: string) {
       count(*) AS toplam,
       sum(CASE WHEN k.agf IS NOT NULL THEN 1 ELSE 0 END) AS agf_dolu,
       sum(CASE WHEN k.hp IS NOT NULL THEN 1 ELSE 0 END) AS hp_dolu,
+      sum(CASE WHEN NOT k.hp_yapisal_muaf THEN 1 ELSE 0 END) AS hp_uygun_toplam,
+      sum(CASE WHEN NOT k.hp_yapisal_muaf AND k.hp IS NOT NULL THEN 1 ELSE 0 END) AS hp_uygun_dolu,
       sum(CASE WHEN k."tjkAtId" IS NOT NULL THEN 1 ELSE 0 END) AS tjkatid_dolu,
       sum(CASE WHEN gk.var_mi THEN 1 ELSE 0 END) AS galop_dolu,
       sum(CASE WHEN atk.var_mi THEN 1 ELSE 0 END) AS agf_trend_dolu,
@@ -93,22 +103,30 @@ export async function getVeriTamligiRaporu(): Promise<VeriTamligiSatiri[]> {
 
   const pct = (dolu: bigint, toplam: bigint) => (toplam > BigInt(0) ? Math.round((Number(dolu) / Number(toplam)) * 1000) / 10 : 0);
 
-  const satir = (alan: string, aciklama: string, key: keyof typeof tumKapsam): VeriTamligiSatiri => ({
+  const satir = (
+    alan: string,
+    aciklama: string,
+    key: keyof typeof tumKapsam,
+    toplamKey: keyof typeof tumKapsam = "toplam"
+  ): VeriTamligiSatiri => ({
     alan,
     aciklama,
-    toplamKapsam: Number(tumKapsam.toplam),
+    toplamKapsam: Number(tumKapsam[toplamKey]),
     doluKapsam: Number(tumKapsam[key]),
-    yuzdeKapsam: pct(tumKapsam[key], tumKapsam.toplam),
-    toplamSon7: Number(sonYediGun.toplam),
+    yuzdeKapsam: pct(tumKapsam[key], tumKapsam[toplamKey]),
+    toplamSon7: Number(sonYediGun[toplamKey]),
     doluSon7: Number(sonYediGun[key]),
-    yuzdeSon7: pct(sonYediGun[key], sonYediGun.toplam),
+    yuzdeSon7: pct(sonYediGun[key], sonYediGun[toplamKey]),
   });
 
   return [
     satir("Galop (idman)", "Koşudan önce en az 1 galop kaydı var mı", "galop_dolu"),
     satir("AGF Trend", "En az 2 AgfSnapshot (trend hesaplanabilir mi)", "agf_trend_dolu"),
     satir("AGF (güncel)", "Runner.agf dolu mu", "agf_dolu"),
-    satir("HP (handikap puanı)", "Runner.hp dolu mu", "hp_dolu"),
+    // 2026-08-22 kullanıcı bulgusu: eksikliğin %72'si şartlı1/19/27+maiden'de (gerçek
+    // debüt/az deneyimli atlar, TJK henüz resmi HP vermemiş — yapısal, backfill edilemez).
+    // Payda bu atlar hariç tutularak hesaplanır (bkz. yukarıdaki hp_yapisal_muaf notu).
+    satir("HP (handikap puanı)", "Runner.hp dolu mu (şartlı1/19/27+maiden hariç — TJK henüz HP vermemiş)", "hp_uygun_dolu", "hp_uygun_toplam"),
     satir("tjkAtId", "TJK at kimliği eşleşmiş mi (pedigri/profil/geçmiş sorguları buna bağlı)", "tjkatid_dolu"),
     satir("Pedigri önbelleği", "HorsePedigree'de soy ağacı önbelleklenmiş mi", "pedigri_dolu"),
     satir("At profil önbelleği", "HorseStatsCache'de profil/istatistik önbelleklenmiş mi", "statscache_dolu"),
