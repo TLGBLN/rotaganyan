@@ -32,7 +32,8 @@
     "iletisim": "İletişim",
     "gizlilik": "Gizlilik",
     "kullanimKosullari": "Kullanım Koşulları",
-    "disclaimer": "Analizler yatırım tavsiyesi değildir. Her zaman en doğru tercih sizin tercihlerinizdir."
+    "disclaimer": "Analizler yatırım tavsiyesi değildir. Her zaman en doğru tercih sizin tercihlerinizdir.",
+    "telifUyarisi": "Bu platformda yer alan tüm veri, analiz ve puanlamalar 5846 sayılı Fikir ve Sanat Eserleri Kanunu kapsamında korunmaktadır. Kaynak gösterilmeden kopyalanması, izinsiz kullanımı veya başka platformlarda paylaşılması durumunda yasal işlem başlatılabilir."
   },
   "home": {
     "altili": {
@@ -424,7 +425,7 @@
     "s2i2": "Hesap açarken doğru ve güncel bilgi vermeyi kabul edersiniz.",
     "s2i3": "Hesap güvenliğinden kullanıcı sorumludur; şifrenizi paylaşmayın.",
     "s2i4": "İçerik scraping, otomatik erişim veya sistemi aşırı yükleme yasaktır.",
-    "s2i5": "İçerikler telif hakkına tabidir; kaynak gösterilmeden kopyalanamaz.",
+    "s2i5": "Platformdaki tüm veri, analiz ve puanlamalar 5846 sayılı Fikir ve Sanat Eserleri Kanunu kapsamında korunmaktadır; kaynak gösterilmeden (metin veya görsel olarak) kısmen dahi olsa kopyalanması, izinsiz kullanımı veya ticari/kişisel amaçla başka platformlarda paylaşılması durumunda yasal işlem başlatılabilir.",
     "s3Baslik": "3. Sorumluluk Reddi",
     "s3Onemli": "Önemli:",
     "s3p1": "ROTAGANYAN'da yayımlanan analizler ve tahminler yatırım tavsiyesi, finansal öneri veya bahis rehberi niteliği taşımamaktadır.",

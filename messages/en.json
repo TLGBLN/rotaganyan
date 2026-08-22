@@ -32,7 +32,8 @@
     "iletisim": "Contact",
     "gizlilik": "Privacy",
     "kullanimKosullari": "Terms of Use",
-    "disclaimer": "Analyses are not investment advice. The choice that's right for you is always your own."
+    "disclaimer": "Analyses are not investment advice. The choice that's right for you is always your own.",
+    "telifUyarisi": "All data, analysis, and ratings on this platform are protected under Turkish Law No. 5846 on Intellectual and Artistic Works. Copying without attribution, unauthorized use, or redistribution on other platforms may result in legal action."
   },
   "home": {
     "altili": {
@@ -424,7 +425,7 @@
     "s2i2": "You agree to provide accurate and up-to-date information when creating an account.",
     "s2i3": "You are responsible for your account's security; do not share your password.",
     "s2i4": "Content scraping, automated access, or overloading the system is prohibited.",
-    "s2i5": "Content is protected by copyright; it may not be copied without attribution.",
+    "s2i5": "All data, analysis, and ratings on the platform are protected under Turkish Law No. 5846 on Intellectual and Artistic Works; copying (in text or image form) without attribution, unauthorized use, or redistribution on other platforms for commercial or personal purposes may result in legal action.",
     "s3Baslik": "3. Disclaimer",
     "s3Onemli": "Important:",
     "s3p1": "The analyses and predictions published on ROTAGANYAN do not constitute investment advice, financial recommendations, or betting guidance.",

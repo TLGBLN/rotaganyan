@@ -24,6 +24,9 @@ export default function Footer() {
         <p className="mt-4 text-center text-xs">
           {t("disclaimer")}
         </p>
+        <p className="mt-1 text-center text-[11px] text-muted-foreground/70">
+          {t("telifUyarisi")}
+        </p>
       </div>
     </footer>
   );

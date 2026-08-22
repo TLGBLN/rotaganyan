@@ -84,14 +84,19 @@ export default function SplashScreen() {
       </div>
 
       <div
-        className="absolute bottom-6 left-4 right-4 flex items-center justify-center gap-2 opacity-0"
+        className="absolute bottom-6 left-4 right-4 flex flex-col items-center gap-2 opacity-0"
         style={{ animation: "splash-fade-up 500ms ease-out 1000ms both" }}
       >
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#c0392b] text-[9px] font-black text-[#c0392b] sm:h-7 sm:w-7 sm:text-xs">
-          18+
-        </span>
-        <p className="max-w-md text-center text-[10px] leading-tight text-white/40 sm:text-sm">
-          ROTAGANYAN 18 yaşından büyükler içindir. Bahis oynatmaz, yorum, analiz ve kupon önerilerinde bulunur.
+        <div className="flex items-center justify-center gap-2">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#c0392b] text-[9px] font-black text-[#c0392b] sm:h-7 sm:w-7 sm:text-xs">
+            18+
+          </span>
+          <p className="max-w-md text-center text-[10px] leading-tight text-white/40 sm:text-sm">
+            ROTAGANYAN 18 yaşından büyükler içindir. Bahis oynatmaz, yorum, analiz ve kupon önerilerinde bulunur.
+          </p>
+        </div>
+        <p className="max-w-md text-center text-[9px] leading-tight text-white/25 sm:text-xs">
+          Bu platformda yer alan tüm veri, analiz ve puanlamalar 5846 sayılı Fikir ve Sanat Eserleri Kanunu kapsamında korunmaktadır. Kaynak gösterilmeden (metin veya görsel olarak) kısmen dahi olsa kopyalanması, izinsiz kullanımı veya ticari/kişisel amaçla başka platformlarda paylaşılması durumunda yasal işlem başlatılabilir.
         </p>
       </div>
     </div>
