@@ -153,6 +153,15 @@
  *    karışık (top1 +1.7p ama top3 -1.7p, net kazanç yok). Kullanıcı bu maliyeti göze
  *    alarak ısrarla kaldırılmasını istedi. getTrainerStats/TRAINER_POP_ORT/ANTSTAT
  *    gerekçe satırı tamamen kaldırıldı — antrenör bilgisi artık hiçbir şekilde toplanmıyor.
+ *  - 2026-08-24 (MANUEL OVERRIDE — VERİDEN ÖĞRENİLMEDİ): agfYukselisVarMi/agfDususVarMi
+ *    ELLE segmentin en büyük katsayısından da büyük yapıldı (düşük-şart 0.65, diğer 0.55).
+ *    Öncesinde üç ayrı yöntemle (post-hoc ölçekleme, zorla hedef değer, L2 cezası SIFIRA
+ *    indirilip veri serbest bırakılması) test edilmişti — üçünde de veri bu büyüklüğü
+ *    DESTEKLEMİYORDU (L2=0'da bile katsayı 0.14'ü geçmedi, backtest her seviyede
+ *    kötüleşti). Kullanıcı bu kanıta rağmen ısrarla AGF trend'in en baskın sinyal
+ *    olmasını istedi — bu değerin istatistiksel anlamlılık/backtest-doğrulama iddiası
+ *    YOKTUR, tamamen kullanıcı kararıyla enjekte edilmiştir (V5.3'teki sireOrani/AGF-trend
+ *    manuel override precedentiyle aynı desen).
  *
  * Ağırlıklar `weights/v5-weights-dusuksart.json` (şartlı1/19/27+maiden) ve
  * `weights/v5-weights-diger.json` (diğer tüm koşular) altında AYRI AYRI COMMIT EDİLMİŞ
