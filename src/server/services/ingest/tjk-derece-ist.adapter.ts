@@ -64,7 +64,11 @@ async function fetchSayfa(yil: number, sayfaNo: number): Promise<Kayit[]> {
     if (!idMatch) return; // kayıt kimliği yoksa upsert edilemez, atla
 
     const val = (i: number) => $(tds[i]).text().replace(/\s+/g, " ").trim();
-    const tarihStr = tarihMatch ? decodeURIComponent(tarihMatch[1]).replace(/%2[fF]/g, ".") : null;
+    // 2026-08-23 bug: decodeURIComponent zaten "%2f"yi "/"ye çeviriyordu, ardından ikinci
+    // .replace("%2f"->".") artık var olmayan bir deseni arıyordu (no-op) — sonuç "11/06/2026"
+    // (slash) kalıyordu ama parseTarih nokta bekliyordu, tarih HER ZAMAN null çıkıyordu.
+    // Düzeltme: decode ETMEDEN doğrudan "%2f" -> "." çevir.
+    const tarihStr = tarihMatch ? tarihMatch[1].replace(/%2[fF]/g, ".") : null;
 
     kayitlar.push({
       tjkKayitId: idMatch[1],
