@@ -23,10 +23,14 @@
  *
  * 2026-08-23 kullanıcı sorusu — İSİM EŞLEŞME KAPSAMI: 500 rastgele Runner ismi test
  * edildi, %70,2'si TjkDereceKaydi'de birebir bulundu (büyük/küçük harf farkı sıfır —
- * yazım sorunu yok, saf kapsam sınırı: arşiv muhtemelen her koşuyu değil, belirli
- * koşullardaki dereceleri kaydediyor, ör. çok yeni/debüt atların orada hiç kaydı yok).
- * Eşleşmeyen ~%30 için bu fonksiyon SESSİZCE 0 (nötr) döner — hata vermez ama bu atlar
- * için sinyal fiilen "veri yok" demektir, bunu bilerek kullanılmalı.
+ * yazım sorunu yok). Eşleşmeyen örnekler (DIRAXTER, ATAERİ, FORLORN, KOCAHANIM...) tek
+ * tek incelendi: bunlar bizim veritabanımızda GERÇEK, tjkAtId'si olan, düzenli koşan
+ * atlar — sayfa-hatası/ağ sorunu da DEĞİL (retry mantığı eklenip hata oranı %26'dan
+ * %0,6'ya düşürüldükten SONRA bile bu atlar hâlâ arşivde yok). Sonuç: TJK'nın bu arşivi
+ * muhtemelen yalnız resmi bir "derece" (bitiş süresi) kaydedilmiş koşuları tutuyor —
+ * bazı koşularda derece kaydı hiç oluşmamış olabilir (yapısal bir kaynak sınırı, bizim
+ * tarafımızdaki bir hata değil). Eşleşmeyen ~%30 için bu fonksiyon SESSİZCE 0 (nötr)
+ * döner — hata vermez ama bu atlar için sinyal fiilen "veri yok" demektir.
  *
  * 2026-08-23 kullanıcı notu — MEVSİM ŞARTI YOK: yağmur/ıslak pist yalnız kışa özgü
  * değil, yazın da olabilir. sync-derece-ist cron'u (vercel.json, her gece 23:00) zaten

@@ -22,7 +22,7 @@ const HEADERS = {
   Referer: "https://www.tjk.org/TR/YarisSever/Query/Page/DetayliDereceIst",
 };
 const SAYFA_BOYU = 50;
-const CONCURRENCY = 8;
+const CONCURRENCY = 5;
 
 type Kayit = {
   tjkKayitId: string;
@@ -91,9 +91,30 @@ async function fetchSayfa(yil: number, sayfaNo: number): Promise<Kayit[]> {
 
 export type DereceIstSyncSonuc = { yil: number; toplamSayfa: number; kayitSayisi: number; hataSayfaSayisi: number };
 
+function bekle(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// 2026-08-23 kullanıcı bulgusu: art arda iki senkronizasyonda da ~%26 sayfa hatası
+// çıktı (41-43/159) — tesadüfi ağ gürültüsü değil, TJK'nın 8 eşzamanlı isteğe karşı
+// hız sınırlaması/kısıtlaması olabilir. Başarısız sayfalar artık 3 kez, aralarda kısa
+// bir bekleme ile yeniden deneniyor.
+async function fetchSayfaRetryli(yil: number, sayfaNo: number, deneme = 3): Promise<Kayit[]> {
+  let sonHata: unknown;
+  for (let i = 0; i < deneme; i++) {
+    try {
+      return await fetchSayfa(yil, sayfaNo);
+    } catch (e) {
+      sonHata = e;
+      if (i < deneme - 1) await bekle(500 * (i + 1));
+    }
+  }
+  throw sonHata;
+}
+
 /** Verilen yıl için TÜM sayfaları çekip TjkDereceKaydi'ne upsert eder. */
 export async function syncDereceIstatistikleri(yil: number): Promise<DereceIstSyncSonuc> {
-  const ilkSayfa = await fetchSayfa(yil, 1);
+  const ilkSayfa = await fetchSayfaRetryli(yil, 1);
   const ilkHtml = await (await fetch(`${BASE}?QueryParameter_Yil=${yil}`, { headers: HEADERS })).text();
   const toplamMatch = /(\d+)\s*sonu[cç]/i.exec(ilkHtml);
   const toplamSonuc = toplamMatch ? parseInt(toplamMatch[1], 10) : ilkSayfa.length;
@@ -106,7 +127,7 @@ export async function syncDereceIstatistikleri(yil: number): Promise<DereceIstSy
     const dilim = Array.from({ length: Math.min(CONCURRENCY, toplamSayfa - i + 1) }, (_, j) => i + j);
     const sonuclar = await Promise.all(
       dilim.map((sayfaNo) =>
-        fetchSayfa(yil, sayfaNo).catch(() => {
+        fetchSayfaRetryli(yil, sayfaNo).catch(() => {
           hataSayfaSayisi++;
           return [] as Kayit[];
         })
