@@ -131,37 +131,6 @@
  *    basit ve öngörülebilir tutmak tercih edildi. h2h.actions.ts / H2HPanel.tsx (ayrı bir
  *    UI paneli, V5 skoruna dahil değil) ve v2-engine.ts'in kendi H2H kullanımı ETKİLENMEDİ,
  *    yalnız V5'in skorlama vektöründen çıkarıldı.
- *  - 2026-08-23 (SADELEŞTİRME, 19→15 özellik): kullanıcı talebiyle her 19 sinyal tek tek
- *    çıkarılıp (leave-one-out ablasyon) tam yeniden eğitildi. kgs (ham gün sayısı+karesi),
- *    pistUzmani, uzunAraGalopKatkisi — HER İKİ segmentte de hem bootstrap GA'da anlamsız
- *    HEM ablasyonda çıkarılınca top1/top3'ü neredeyse hiç değiştirmiyordu (dosya HER
- *    zaman kgsVarMi'yi korudu — o diğer segmentte gerçekten anlamlıydı, kgs/kgs2 sadece
- *    ham süreklileri gereksizdi). Çıkarılınca: düşük-şart top1 aynı (%35.0), top3 -1.7p
- *    (%75.0→%73.3); diğer top1 -0.6p, top3 -0.6p — ikisi de gürültü seviyesinde küçük,
- *    modelin gerçek doğruluğunu değiştirmeden 4 sinyal (dolayısıyla karmaşıklık) azaldı.
- *    Bonus: agfYukselisVarMi "diğer" segmentte artık anlamlı (multicollinearity azaldı).
- *    pistUzmani/uzunAraGalopKatkisi alanları Faz1RunnerV5'ten TAMAMEN kaldırıldı (başka
- *    hiçbir yerde kullanılmıyordu); kgs/kgsVarMi yalnız KGS gerekçe satırı için kaldı.
- *  - 2026-08-23 (V5.8): antrenorOrani'ye eğitim script'inde asimetrik L2 cezası eklendi
- *    (ANTRENOR_L2_EXTRA=0.09, bkz. arac-model-egit-segment.mjs) — kod/toFeatureVector
- *    DEĞİŞMEDİ, yalnız ağırlık dosyalarındaki antrenorOrani katsayısı küçüldü (düşük-şart
- *    0.35→0.29, diğer 0.25→0.21), backtest'te top1/top3 kayıpsız, logloss iyileşti.
- *  - 2026-08-23 (V5.9): antrenorOrani KOMPLE ÇIKARILDI, 15→14 özellik — kullanıcı kararı,
- *    x10 L2 küçültmesi bu at vakalarını (MAKE A FIRE/SANAE/ERKOÇUM/BARİ) hareket ettirmedi,
- *    x20'de de değişmedi. Backtest MALİYETİ açıkça gösterildi ve kabul edildi: düşük-şart
- *    top1 %35.0→%30.0 (-5p), top3 %73.3→%68.3 (-5p) — kesin kayıp. "Diğer" segmentte
- *    karışık (top1 +1.7p ama top3 -1.7p, net kazanç yok). Kullanıcı bu maliyeti göze
- *    alarak ısrarla kaldırılmasını istedi. getTrainerStats/TRAINER_POP_ORT/ANTSTAT
- *    gerekçe satırı tamamen kaldırıldı — antrenör bilgisi artık hiçbir şekilde toplanmıyor.
- *  - 2026-08-24 (MANUEL OVERRIDE — VERİDEN ÖĞRENİLMEDİ): agfYukselisVarMi/agfDususVarMi
- *    ELLE segmentin en büyük katsayısından da büyük yapıldı (düşük-şart 0.65, diğer 0.55).
- *    Öncesinde üç ayrı yöntemle (post-hoc ölçekleme, zorla hedef değer, L2 cezası SIFIRA
- *    indirilip veri serbest bırakılması) test edilmişti — üçünde de veri bu büyüklüğü
- *    DESTEKLEMİYORDU (L2=0'da bile katsayı 0.14'ü geçmedi, backtest her seviyede
- *    kötüleşti). Kullanıcı bu kanıta rağmen ısrarla AGF trend'in en baskın sinyal
- *    olmasını istedi — bu değerin istatistiksel anlamlılık/backtest-doğrulama iddiası
- *    YOKTUR, tamamen kullanıcı kararıyla enjekte edilmiştir (V5.3'teki sireOrani/AGF-trend
- *    manuel override precedentiyle aynı desen).
  *
  * Ağırlıklar `weights/v5-weights-dusuksart.json` (şartlı1/19/27+maiden) ve
  * `weights/v5-weights-diger.json` (diğer tüm koşular) altında AYRI AYRI COMMIT EDİLMİŞ
@@ -175,7 +144,7 @@ import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getAgfTrendForRace } from "@/server/actions/agf-trend.actions";
 import { getHizDerecesiForRace } from "@/server/actions/hiz-derecesi.actions";
 import { syncAgfForRace } from "@/server/services/agf-sync";
-import { getJockeyStats } from "@/server/services/race.service";
+import { getJockeyStats, getTrainerStats } from "@/server/services/race.service";
 import {
   fetchAccuraceGecmisKayitlari,
   hesaplaAccuraceSonYarisEnHizliKapanisMap,
@@ -240,10 +209,14 @@ export type Faz1RunnerV5 = {
   formEgimi: number;
   kgs: number;
   kgsVarMi: 0 | 1;
+  pistUzmani: 0 | 1;
   sireOrani: number;
   galop: 0 | 1;
   idmJokey: 0 | 1;
+  galopSayisi: number;
+  uzunAraGalopKatkisi: number;
   jokeyOrani: number;
+  antrenorOrani: number;
   /** "En çok yükselenler/düşenler" listesinden (getAgfTrendForRace) — modelin kendisi
    *  agfFark'ı (bkz. toFeatureVector) istatistiksel olarak anlamsız bulsa da (agfSirasi
    *  ile yüksek korelasyon/multicollinearity yüzünden), kullanıcı kararı 2026-08-16:
@@ -304,6 +277,7 @@ export type Faz1SonucV5 = {
 };
 
 const JOKEY_POP_ORT = 0.1;
+const TRAINER_POP_ORT = 0.1;
 const SIRE_POP_ORT = 0.14;
 
 export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> {
@@ -336,7 +310,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
   const runners = race.runners;
   if (runners.length === 0) return { race: { id: race.id, hippodromeName: race.raceDay.hippodrome.name.trim(), raceNo: race.raceNo, classType: race.classType, breed: race.breed, surface: race.surface, distance: race.distance }, runners: [] };
 
-  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, accKayitlar, hizByNo] = await Promise.all([
+  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, hizByNo] = await Promise.all([
     getSonYarisDetaylariForRace(raceId).catch(() => []),
     getSireStatOzetleriForRace(runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(() =>
       runners.map(() => ({ ozet: null, ornekKendiVeri: null, kYuzde: null }))
@@ -344,6 +318,9 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     getAgfTrendForRace(raceId).catch(() => ({ atlar: [], enCokDusenler: [], enCokYukselenler: [] })),
     getJockeyStats([...new Set(runners.map((r) => r.jockey).filter((x): x is string => !!x))]).catch(
       () => ({}) as Record<string, { overall: { wins: number; rides: number } }>
+    ),
+    getTrainerStats([...new Set(runners.map((r) => r.trainer).filter((x): x is string => !!x))]).catch(
+      () => ({}) as Record<string, { wins: number; rides: number }>
     ),
     fetchAccuraceGecmisKayitlari(runners.map((r) => r.name), race.raceDay.date),
     getHizDerecesiForRace(raceId).catch(() => new Map<number, number>()),
@@ -372,6 +349,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     const sonYaris = sonYarisByNo.get(r.no);
     const sireOzet = sireOzetByRunnerId.get(r.id);
     const jockeyStat = r.jockey ? jockeyStats[r.jockey] : undefined;
+    const trainerStat = r.trainer ? trainerStats[r.trainer] : undefined;
 
     const gecerliGaloplar = r.gallops.filter((g) => g.date < race.raceDay.date);
     const enSonGalop = gecerliGaloplar[0];
@@ -385,6 +363,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
 
     const kgsVal = sonYaris?.gunFarki ?? -1;
     const kgsVarMi: 0 | 1 = sonYaris?.gunFarki != null ? 1 : 0;
+    const uzunAraGalopKatkisi = kgsVarMi && kgsVal > 30 ? gecerliGaloplar.length : 0;
 
     const sireOrani =
       sireOzet?.kYuzde != null && sireOzet?.ornekKendiVeri != null
@@ -394,6 +373,10 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       jockeyStat && jockeyStat.overall.rides > 0
         ? shrink(jockeyStat.overall.wins, jockeyStat.overall.rides, JOKEY_POP_ORT) * 100
         : JOKEY_POP_ORT * 100;
+    const antrenorOrani =
+      trainerStat && trainerStat.rides > 0
+        ? shrink(trainerStat.wins, trainerStat.rides, TRAINER_POP_ORT) * 100
+        : TRAINER_POP_ORT * 100;
 
     return {
       id: r.id, no: r.no, ad: r.name, jockey: r.jockey, trainer: r.trainer, agf: r.agf,
@@ -407,8 +390,10 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       accurace: accuraceMap.get(r.name) === true ? 1 : 0,
       formEgimi: formEgimi(r.recentForm),
       kgs: kgsVal, kgsVarMi,
+      pistUzmani: sonYaris?.kazandi === "EVET" ? 1 : 0,
       sireOrani, galop: keskinGalop, idmJokey,
-      jokeyOrani,
+      galopSayisi: gecerliGaloplar.length, uzunAraGalopKatkisi,
+      jokeyOrani, antrenorOrani,
       agfTrendYonu: trendYonByNo.get(r.no) ?? null,
       agfTrendFark: trendYonByNo.has(r.no) ? (agfFarkByNo.get(r.no) ?? null) : null,
       recentForm: r.recentForm,
@@ -436,22 +421,29 @@ const ANLAMLI_PUAN_ESIGI = 1.0; // agf-trend.actions.ts'teki ANLAMLI_PUAN_ESIGI 
 export function toFeatureVector(r: Faz1RunnerV5): number[] {
   return [
     r.agfSirasi, r.accurace, r.formEgimi, r.formEgimi * r.formEgimi,
-    r.kgsVarMi,
-    r.sireOrani, r.galop, r.idmJokey, r.jokeyOrani,
+    r.kgsVarMi ? r.kgs : 0, r.kgsVarMi ? r.kgs * r.kgs : 0, r.kgsVarMi, r.pistUzmani,
+    r.sireOrani, r.galop, r.idmJokey, r.jokeyOrani, r.antrenorOrani, r.uzunAraGalopKatkisi,
+    // 2026-08-16 kullanıcı ısrarı: ham agfFark (sürekli puan farkı) HİÇBİR
+    // formülasyonda anlamlı çıkmamıştı (agfSirasi ile multicollinearity). Eşik-bazlı
+    // ikili hâliyle (|fark|>=1.0) ANLAMLI çıktı (+0.1058, GA [0.0446, 0.1780]) —
+    // ham agfFark bu özellikle DEĞİŞTİRİLDİ. "Düşüş" ayrı test edildi, anlamsız
+    // çıktı, eklenmedi.
+    r.agfFark >= ANLAMLI_PUAN_ESIGI ? 1 : 0,
     // 2026-08-16 kullanıcı talebi (sektör araştırması sonrası): Runner.raceStyle
     // ("KACAK_AT" vb, Accurace tabanlı) — kapı no/kilo farkı/HP farkı AYNI ANDA test
     // edildi, üçü de anlamsız çıktı; yalnız bu anlamlı (+0.0878, GA [0.0290,0.1811])
     // VE genel performansı iyileştirdi (top1 %34.8→%36.5).
     r.kacakAtMi,
-    // 2026-08-24 — agfYukselisVarMi VE agfDususVarMi TEK ozellikte ("agfTrendVarMi")
-    // BİRLEŞTİRİLDİ. Sebep: ikisi ayrı ayrı büyük katsayı alınca (bkz. dosya başı
-    // 2026-08-24 manuel override notu), bir at hangi yönde hareket ETMEMİŞSE o "0"
-    // durumu da standardizasyon yüzünden orantısız büyük bir CEZAya dönüşüyordu (BARİ
-    // vakası: düşüş ödülü +1.15 ama "yükselmemiş olma" cezası -0.27 — birbirini
-    // götürüyordu). Tek birleşik bayrak (yükseliş VEYA düşüş, ikisi de "1") bu karşıt-yön
-    // cezasını tamamen ortadan kaldırıyor — [X1]/AGF-ayrılış bulgusu zaten her iki yönün
-    // de "para akışı" anlamında eşit bilgi taşıdığını söylüyordu, ayrı katsayı gerekmiyordu.
-    r.agfFark >= ANLAMLI_PUAN_ESIGI || r.agfFark <= -ANLAMLI_PUAN_ESIGI ? 1 : 0,
+    // 2026-08-16 kullanıcı bulgusu (KINDBERO/ANGEL ON THE RIGHT vakaları, İzmir K3/K4):
+    // ham "düşüş" tek başına anlamsızdı, ama "düşüşe RAĞMEN hâlâ iyi AGF pozisyonunda
+    // kalma" (agfSirasi<=4 şartlı) ANLAMLI çıktı (+0.1282, GA [0.0576, 0.1982]).
+    // 2026-08-19 kullanıcı bulgusu (SHINNY vakası, AGF Trend panelinde ilk-4 DIŞINDA
+    // anlamlı düşüş gösterip modelin hiç yakalamadığı bir at): pozisyon şartı gerçek
+    // sinyali dışlıyordu. Kaldırılıp yalnız eşik testi edildi (agfYukselisVarMi ile
+    // simetrik) — top1 aynı (%38.0), top3 iyileşti (%68.3→%70.2), log-loss iyileşti
+    // (1.7695→1.7617), yön tutarlı. KABUL EDİLDİ, ad "agfDususVarMi" oldu (bkz.
+    // arac-model-egit.mjs'teki aynı isimli notun tamamı).
+    r.agfFark <= -ANLAMLI_PUAN_ESIGI ? 1 : 0,
     // 2026-08-19 kullanıcı bulgusu (BODUBEY/EL LEON) — bkz. Faz1RunnerV5.agfPayi
     // üstündeki not. Eski "agfSirasi===1?1:0" (agfFavorisiMi) buradan ÇIKARILDI,
     // yerini bu aldı (agfPayi: +0.25, anlamlı — agfFavorisiMi -0.0284'e düşüp
@@ -642,7 +634,7 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
 // SONUÇ: olasılık eşiği TEK BAŞINA yeterli değilmiş — AGF baskınlığı bağımsız bir
 // sinyalle DOĞRULANMADIKÇA banko sayılmayacak şekilde ikinci bir koşul eklendi.
 const BANKO_OLASILIK_ESIGI = 0.5;
-const AGF_OZELLIK_KODLARI = new Set(["agfSirasi", "agfPayi", "agfTrendVarMi"]);
+const AGF_OZELLIK_KODLARI = new Set(["agfSirasi", "agfPayi", "agfYukselisVarMi", "agfDususVarMi"]);
 
 export type V5BankoSonuc = { bankoAdayi: boolean; sebep: string; birinci?: { no: number; ad: string; karar: string } };
 
@@ -689,19 +681,19 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   { kod: "AGF", ozellikIndeksleri: [idx("agfSirasi"), idx("agfPayi")], aciklama: (r) => `AGF sırası: ${r.agfSirasi}${r.agfSirasi === 1 ? ` (AGF favorisi, %${r.agfPayi.toFixed(1)})` : ` (%${r.agfPayi.toFixed(1)})`}` },
   { kod: "ACC", ozellikIndeksleri: [idx("accurace")], aciklama: (r) => (r.accurace ? "Accurace: son yarışta sahanın en hızlı son 200m kapanışı" : null) },
   { kod: "FORM", ozellikIndeksleri: [idx("formEgimi"), idx("formEgimi2")], aciklama: (r) => `Form eğimi: ${r.formEgimi.toFixed(1)} (${r.formEgimi < 0 ? "iyileşiyor" : r.formEgimi > 0 ? "kötüleşiyor" : "sabit"})` },
-  // 2026-08-23 — kgs/kgs2 (ham gun sayisi/karesi) CIKARILDI, ablasyon+bootstrap ikisinde
-  // de her iki segmentte anlamsiz/etkisiz cikti (bkz. dosya basi 2026-08-23 sadelestirme
-  // notu) — yalniz kgsVarMi (veri var mi) kaldi, satirda ham gun sayisi yine gosterilir.
-  { kod: "KGS", ozellikIndeksleri: [idx("kgsVarMi")], aciklama: (r) => (r.kgsVarMi ? `KGS ${r.kgs} gün` : null) },
+  { kod: "KGS", ozellikIndeksleri: [idx("kgs"), idx("kgs2"), idx("kgsVarMi")], aciklama: (r) => (r.kgsVarMi ? `KGS ${r.kgs} gün` : null) },
+  { kod: "PIST", ozellikIndeksleri: [idx("pistUzmani")], aciklama: (r) => (r.pistUzmani ? "Bu hipodrom+pist+mesafede bu yıl kazandı" : null) },
   { kod: "SIRE", ozellikIndeksleri: [idx("sireOrani")], aciklama: (r) => `Aygır kazanma oranı (küçültülmüş): %${r.sireOrani.toFixed(1)}` },
   { kod: "GALOP", ozellikIndeksleri: [idx("galop")], aciklama: (r) => (r.galop ? "Keskin galop zinciri (son idman 400m barajı)" : null) },
   { kod: "IDMJOK", ozellikIndeksleri: [idx("idmJokey")], aciklama: (r) => (r.idmJokey ? "İdman jokeyi uyumu (bugünkü jokey idmanlardan birini yaptırmış)" : null) },
   { kod: "JOKSTAT", ozellikIndeksleri: [idx("jokeyOrani")], aciklama: (r) => `Jokey kazanma oranı (küçültülmüş): %${r.jokeyOrani.toFixed(1)}` },
+  { kod: "ANTSTAT", ozellikIndeksleri: [idx("antrenorOrani")], aciklama: (r) => `Antrenör kazanma oranı (küçültülmüş): %${r.antrenorOrani.toFixed(1)}` },
+  { kod: "UZUNARA", ozellikIndeksleri: [idx("uzunAraGalopKatkisi")], aciklama: (r) => (r.uzunAraGalopKatkisi > 0 ? `Uzun aradan sonra ${r.uzunAraGalopKatkisi} galop yapmış (düzenli çalışmış)` : null) },
   // 2026-08-17 denetim bulgusu: kacakAtMi ve dususAmaIyiPozisyon anlamlı sinyaller
   // (bkz. toFeatureVector üstündeki notlar) ama hiçbir OzellikGrubu'na dahil değildi —
   // katkıları skoru etkiliyordu ama gerekçe metninde hiç görünmüyordu. Eklendi.
   { kod: "KACAK", ozellikIndeksleri: [idx("kacakAtMi")], aciklama: (r) => (r.kacakAtMi ? "Kaçak at / erken tempo yapan (Accurace koşu stili sinyali)" : null) },
-  { kod: "DUSUSIYI", ozellikIndeksleri: [idx("agfTrendVarMi")], aciklama: (r) => (r.agfFark <= -ANLAMLI_PUAN_ESIGI ? "AGF trend: düşüş (para akışı sinyali olabilir)" : null) },
+  { kod: "DUSUSIYI", ozellikIndeksleri: [idx("agfDususVarMi")], aciklama: (r) => (r.agfFark <= -ANLAMLI_PUAN_ESIGI ? "AGF trend: düşüş (para akışı sinyali olabilir)" : null) },
   // 2026-08-21 — Hız derecesi: veri yoksa (son 365 günde uygun geçmiş yok) 0, satır
   // gösterilmez — "hızlı değil" ile "veri yok" karışmasın.
   { kod: "HIZ", ozellikIndeksleri: [idx("hizDerecesi")], aciklama: (r) => (r.hizDerecesi !== 0 ? `Hız derecesi: popülasyona göre ${r.hizDerecesi > 0 ? "+" : ""}${r.hizDerecesi.toFixed(1)}% (${r.hizDerecesi > 0 ? "daha hızlı" : "daha yavaş"})` : null) },
@@ -716,11 +708,14 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
 const FEATURE_LABELS: Record<string, string> = {
   agfSirasi: "AGF Sırası", accurace: "Accurace (son yarış en hızlı kapanış)",
   formEgimi: "Form Eğimi", formEgimi2: "Form Eğimi (karesi, doğrusal-olmayan etki)",
-  kgsVarMi: "KGS Verisi Var Mı",
+  kgs: "KGS (dinlenme günü)", kgs2: "KGS (karesi)", kgsVarMi: "KGS Verisi Var Mı",
+  pistUzmani: "Pist Uzmanlığı (bu hipodrom+pist+mesafede yıl içi galibiyet)",
   sireOrani: "Aygır Kazanma Oranı (küçültülmüş)", galop: "Keskin Galop Zinciri",
   idmJokey: "İdman Jokeyi Uyumu", jokeyOrani: "Jokey Kazanma Oranı (küçültülmüş)",
-  kacakAtMi: "Kaçak At / Erken Tempo",
-  agfTrendVarMi: "AGF Eşik-Üstü Anlamlı Hareket Var Mı (yükseliş veya düşüş)",
+  antrenorOrani: "Antrenör Kazanma Oranı (küçültülmüş)",
+  uzunAraGalopKatkisi: "Uzun Aradan Sonra Galop Sayısı",
+  agfYukselisVarMi: "AGF Eşik-Üstü Yükseliş Var Mı",
+  kacakAtMi: "Kaçak At / Erken Tempo", agfDususVarMi: "AGF Eşik-Üstü Düşüş Var Mı",
   agfPayi: "AGF Payı (ham yüzde)", agfFarkiIkinciye: "AGF Dominans Farkı (2.'ye göre, yalnız favoride)",
   hizDerecesi: "Hız Derecesi (popülasyona göre göreli tempo, son 365 gün)",
 };
