@@ -225,13 +225,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.9",
     baslangic: new Date("2026-08-23T23:57:07+03:00"), // e9a21af — antrenorOrani komple kaldırıldı
-    bitis: null,
-    aciklama: "antrenorOrani KOMPLE ÇIKARILDI, 15→14 özellik. x10 ve x20 L2 küçültmesi bile MAKE A FIRE/SANAE/ERKOÇUM/BARİ vakalarını hareket ettirmeyince, kullanıcı bu maliyeti (düşük-şart top1/top3 -5 puan, diğer segmentte karışık: top1 +1.7p top3 -1.7p) açıkça görüp yine de komple kaldırılmasını istedi. getTrainerStats/TRAINER_POP_ORT/ANTSTAT gerekçe satırı tamamen kaldırıldı — antrenör istatistiği artık hiçbir şekilde toplanmıyor/kullanılmıyor.",
+    bitis: new Date("2026-08-24T00:58:16+03:00"), // fbce87b — V5.6 durumuna geri dönüldü
+    aciklama: "antrenorOrani KOMPLE ÇIKARILDI, 15→14 özellik. x10 ve x20 L2 küçültmesi bile MAKE A FIRE/SANAE/ERKOÇUM/BARİ vakalarını hareket ettirmeyince, kullanıcı bu maliyeti (düşük-şart top1/top3 -5 puan, diğer segmentte karışık: top1 +1.7p top3 -1.7p) açıkça görüp yine de komple kaldırılmasını istedi. getTrainerStats/TRAINER_POP_ORT/ANTSTAT gerekçe satırı tamamen kaldırıldı — antrenör istatistiği artık hiçbir şekilde toplanmıyor/kullanılmıyor. NOT: bu versiyondan sonra aynı gün içinde AGF trend'i (agfYukselisVarMi+agfDususVarMi) tek sinyalde birleştirip manuel olarak en baskın katsayı yapma denemesi de yapıldı (BARİ vakasını çözmek için) — bu da işe yaramayınca (aynı eşiği paylaşan 7 attan biri olduğu, kendi hareketinde bile en büyük olmadığı görülünce) kullanıcı kararıyla V5.6'ya geri dönüldü, bu ara denemeler kalıcı bir versiyon numarası almadı.",
     neyiAnalizEdiyor: [
       "V5.8 ile aynı segment-bazlı mimari + canlı Faz1 veri toplama — 14 özellik: agfSirasi, accurace, formEgimi(+karesi), kgsVarMi, sireOrani, galop, idmJokey, jokeyOrani, agfYukselisVarMi, kacakAtMi, agfDususVarMi, agfPayi, hizDerecesi",
     ],
     caprazlamalar: [
       "Backtest: düşük-şart top1 %35.0→%30.0 (-5p), top3 %73.3→%68.3 (-5p); diğer top1 %31.6→%33.3 (+1.7p), top3 %67.2→%65.5 (-1.7p) — kullanıcı kararıyla kabul edilen bilinçli bir maliyet",
+    ],
+  },
+  {
+    versiyon: "V5.6",
+    baslangic: new Date("2026-08-24T00:58:16+03:00"), // fbce87b — V5.6 durumuna (19 sinyal, H2H'sız) geri dönüldü
+    bitis: null,
+    aciklama: "Kullanıcı kararıyla V5.7/V5.8/V5.9 ve aynı gün içindeki AGF-trend manuel override denemeleri (hepsi antrenorOrani veya AGF trend ile ilgili) geri alındı, tamamen veriden fit edilmiş, hiçbir manuel override İÇERMEYEN son doğrulanmış durağan hale (V5.6) dönüldü. git checkout 2a5ee5a ile v5-engine.ts + iki ağırlık dosyası + arac-model-egit-segment.mjs birebir o commit'teki hâline döndürüldü — bu yüzden versiyon adı da aynı ('V5.6' tekrar).",
+    neyiAnalizEdiyor: [
+      "19 özellik: agfSirasi, accurace, formEgimi(+karesi), kgs(+karesi), kgsVarMi, pistUzmani, sireOrani, galop, idmJokey, jokeyOrani, antrenorOrani, uzunAraGalopKatkisi, agfYukselisVarMi, kacakAtMi, agfDususVarMi, agfPayi, hizDerecesi — segment-bazlı iki ayrı model (düşük-şart/diğer)",
+    ],
+    caprazlamalar: [
+      "Aynı bu commit setinin ilk yayınında (2a5ee5a) ölçülen sayılar geçerli: düşük-şart top1 %35.0/top3 %75.0/logloss 1.8716; diğer top1 %31.6/top3 %67.2/logloss 1.8241",
     ],
   },
 ];
