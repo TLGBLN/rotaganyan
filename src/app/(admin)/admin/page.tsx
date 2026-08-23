@@ -54,6 +54,10 @@ export default async function AdminDashboard() {
     top1P: (dsTest.top1P * dsTest.n + dgTest.top1P * dgTest.n) / (dsTest.n + dgTest.n),
     top3P: (dsTest.top3P * dsTest.n + dgTest.top3P * dgTest.n) / (dsTest.n + dgTest.n),
   };
+  // 2026-08-23 — sabit "V5.3" etiketi bayatlamıştı (aynı hata FEATURE_NAMES.length'te de
+  // yaşanmıştı, bkz. v5-engine.ts) — artık versiyonKarsilastirmasi'nin son (bitis:null)
+  // girdisinden türetiliyor, bir daha elle güncellenmesi gerekmiyor.
+  const guncelVersiyon = versiyonKarsilastirmasi[versiyonKarsilastirmasi.length - 1]?.versiyon ?? "V5";
 
   const hasData = analyst.overall.total > 0;
   const banko = analyst.byConfidence.find((b) => b.label === "★ Banko");
@@ -152,12 +156,12 @@ export default async function AdminDashboard() {
                 biri teoriyi biri sahadaki gerçeği gösteriyor. */}
             <div className="rounded-lg border p-4 text-xs leading-relaxed text-muted-foreground">
               <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-brand">
-                V5.3 Motoru — Kendi Test Seti (offline backtest, n={v5Test.n}, iki segment modeli birleşik)
+                {guncelVersiyon} Motoru — Kendi Test Seti (offline backtest, n={v5Test.n}, iki segment modeli birleşik)
               </span>
               Hiç görülmemiş {v5Test.n} koşuda{" "}
               <span className="font-semibold text-foreground">%{v5Test.top1P.toFixed(1)} ilk sıra</span> /{" "}
               <span className="font-semibold text-foreground">%{v5Test.top3P.toFixed(1)} ilk-3</span> isabet
-              (18 özellik, koşullu logit). Alttaki tablo ise modelin iddiası değil — canlıda
+              ({v5WeightsDiger.featureNames.length} özellik, koşullu logit). Alttaki tablo ise modelin iddiası değil — canlıda
               yayınlanmış+sonuçlanmış V5 tahminlerinde her sinyalin taşındığı atın gerçekten
               kazandığı oran.
             </div>

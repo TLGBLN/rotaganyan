@@ -365,7 +365,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                       className="flex items-center gap-1 text-[11px] font-medium text-purple-500 hover:underline"
                     >
                       {acikDetay.has(no) ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                      Tüm 18 Sinyal — Denetim Kaydı ({a.tumSinyaller.length}/18 hesaplandı)
+                      Tüm {a.tumSinyaller.length} Sinyal — Denetim Kaydı ({a.tumSinyaller.length}/{a.tumSinyaller.length} hesaplandı)
                     </button>
                     {acikDetay.has(no) && (
                       <div className="mt-1.5 overflow-x-auto">

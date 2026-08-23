@@ -171,7 +171,7 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.5",
     baslangic: new Date("2026-08-22T00:12:10+03:00"), // d402ef2 — hizDerecesi sinyali eklendi
-    bitis: null,
+    bitis: new Date("2026-08-23T21:41:17+03:00"), // 2a5ee5a — H2H komple çıkarıldı, V5.6
     aciklama: "hizDerecesi (hız/tempo derecesi) eklendi, 19→20 özellik. Literatür (Beyer-tipi hız derecelendirmesi profesyonel modellerde genelde en güçlü tekil sinyal — bizde bu role en yakın adaylar accurace/formEgimi ikisi de anlamsızdı) ışığında araştırıldı. TJK 'At Koşu Bilgileri'ndeki 'süre' alanı AT-BAZLI (gerçek bitiriş süresi, '1.16.30' formatı) — popülasyon (irk|pist|mesafe kovası) ortalama tempo'suna göre, yalnız son 365 GÜN içindeki en yeni 3 koşunun göreli hızı (uzun aradan dönen bir atın yıllar önceki 'en iyi dönemi' güncelmiş gibi kullanılmasın diye). Aynı gün ayrıca accurace'nin 'anlamsız' görünmesinin nedeni araştırıldı: gerçek bir ham sinyal (kazananlarda %15.7 vs genel %8.8, ~1.78x) ama agfSirasi/agfPayi ile güçlü korelasyonlu (-0.19/+0.21) — piyasa zaten fark ediyor, confounding (VIF'te YÜKSEK değil, yalnız marjinal katkısı küçük).",
     neyiAnalizEdiyor: [
       "V5.4 ile aynı segment-bazlı mimari + canlı Faz1 veri toplama — yalnız hizDerecesi 20. özellik olarak eklendi",
@@ -181,6 +181,32 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
       "hizDerecesi: HER İKİ segmentte de güçlü ANLAMLI — düşük-şart nokta=+0.5815 (GA=[0.3026,0.9828], modelin en büyük tek katsayısı, agfSirasi'nden bile büyük), diğer nokta=+0.2562 (GA=[0.0886,0.4008])",
       "Tam VIF taraması (18 sinyal, tüm 36439 satır): en yükseği bile (kgsVarMi VIF=2.48) düşük kategoride — hiçbir sinyal bir diğerini gölgelemiyor",
       "Backtest: düşük-şart top1 %35.0/top3 %70.0/logloss 1.8727 (n=60), diğer top1 %31.0/top3 %67.2/logloss 1.8257 (n=174)",
+    ],
+  },
+  {
+    versiyon: "V5.6",
+    baslangic: new Date("2026-08-23T21:41:17+03:00"), // 2a5ee5a — H2H komple çıkarıldı
+    bitis: new Date("2026-08-23T23:05:58+03:00"), // e6f5bda — 19→15 sinyale sadeleştirildi, V5.7
+    aciklama: "H2H (h2hNetSkor) sinyali komple çıkarıldı, 20→19 özellik. İzmir 2.Koşu'da GOLDEN CITY'nin (AGF favorisi, bugünkü rakiplerle geçmişte +5 net ÖNDE bitirmiş) H2H için 'risk' etiketi aldığı fark edildi — kontrol: düşük-şart segmentinin canlı ağırlığında h2hNetSkor katsayısı NEGATİF (-0.1524) çıkmıştı, sezgiye tam ters. H2H eklendiğinde zaten 'sınırda' (GA sıfırı içeriyordu) olarak not edilmişti — düşük-şart'ın küçük örneklemi (o zamanki n=180) bu zayıf sinyali yanlış yönde sabitlemiş. 'Diğer' segmentte katsayı doğru yönde (+0.0994, anlamlı) olsa da, kullanıcı kararıyla tutarlılık için HER İKİ segmentten de kaldırıldı.",
+    neyiAnalizEdiyor: [
+      "V5.5 ile aynı segment-bazlı mimari + canlı Faz1 veri toplama — yalnız h2hNetSkor çıkarıldı",
+    ],
+    caprazlamalar: [
+      "Güncel veriyle doğrulama: düşük-şart h2hNetSkor B=50 GA=[-0.3145,0.0676] hâlâ sıfırı içeriyor (asla sağlam anlamlı olmamış)",
+      "Backtest: h2hNetSkor çıkarılınca düşük-şart top1 aynı (%35.0), top3 İYİLEŞTİ (%70.0→%75.0); diğer top1/top3 kayıpsız — net kazanç",
+    ],
+  },
+  {
+    versiyon: "V5.7",
+    baslangic: new Date("2026-08-23T23:05:58+03:00"), // e6f5bda — 19→15 sinyale sadeleştirildi
+    bitis: null,
+    aciklama: "kgs (ham gün sayısı+karesi), pistUzmani, uzunAraGalopKatkisi çıkarıldı, 19→15 özellik. Kullanıcı talebiyle 19 sinyalin her biri tek tek çıkarılıp (leave-one-out ablasyon) tam yeniden eğitildi — bu üçü HER İKİ segmentte de hem bootstrap güven aralığında anlamsız hem ablasyonda çıkarılınca top1/top3'ü neredeyse hiç değiştirmiyordu (kgsVarMi kaldı — diğer segmentte gerçekten anlamlıydı, ham kgs/kgs2 sürekli değerleri gereksizdi). pistUzmani/uzunAraGalopKatkisi alanları Faz1RunnerV5'ten tamamen kaldırıldı.",
+    neyiAnalizEdiyor: [
+      "V5.6 ile aynı segment-bazlı mimari + canlı Faz1 veri toplama — 15 özellik: agfSirasi, accurace, formEgimi(+karesi), kgsVarMi, sireOrani, galop, idmJokey, jokeyOrani, antrenorOrani, agfYukselisVarMi, kacakAtMi, agfDususVarMi, agfPayi, hizDerecesi",
+    ],
+    caprazlamalar: [
+      "Backtest: düşük-şart top1 aynı (%35.0), top3 -1.7p (%75.0→%73.3); diğer top1/top3 -0.6p — ikisi de gürültü seviyesinde küçük, gerçek doğruluk değişmeden karmaşıklık azaldı",
+      "Bonus: agfYukselisVarMi 'diğer' segmentte artık anlamlı (multicollinearity azaldı, GA=[0.0036,0.2037])",
     ],
   },
 ];
