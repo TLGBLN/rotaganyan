@@ -199,7 +199,7 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.7",
     baslangic: new Date("2026-08-23T23:05:58+03:00"), // e6f5bda — 19→15 sinyale sadeleştirildi
-    bitis: null,
+    bitis: new Date("2026-08-23T23:38:10+03:00"), // 24319ed — antrenorOrani L2 küçültme, V5.8
     aciklama: "kgs (ham gün sayısı+karesi), pistUzmani, uzunAraGalopKatkisi çıkarıldı, 19→15 özellik. Kullanıcı talebiyle 19 sinyalin her biri tek tek çıkarılıp (leave-one-out ablasyon) tam yeniden eğitildi — bu üçü HER İKİ segmentte de hem bootstrap güven aralığında anlamsız hem ablasyonda çıkarılınca top1/top3'ü neredeyse hiç değiştirmiyordu (kgsVarMi kaldı — diğer segmentte gerçekten anlamlıydı, ham kgs/kgs2 sürekli değerleri gereksizdi). pistUzmani/uzunAraGalopKatkisi alanları Faz1RunnerV5'ten tamamen kaldırıldı.",
     neyiAnalizEdiyor: [
       "V5.6 ile aynı segment-bazlı mimari + canlı Faz1 veri toplama — 15 özellik: agfSirasi, accurace, formEgimi(+karesi), kgsVarMi, sireOrani, galop, idmJokey, jokeyOrani, antrenorOrani, agfYukselisVarMi, kacakAtMi, agfDususVarMi, agfPayi, hizDerecesi",
@@ -211,8 +211,8 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   },
   {
     versiyon: "V5.8",
-    baslangic: new Date("2026-08-23T23:05:58+03:00"),
-    bitis: null,
+    baslangic: new Date("2026-08-23T23:38:10+03:00"), // 24319ed — antrenorOrani L2 küçültme
+    bitis: null, // sonraki commit'te (antrenorOrani komple çıkarma, V5.9) kapatılacak
     aciklama: "antrenorOrani'ye ASİMETRİK L2 cezası eklendi (kod DEĞİL, yalnız eğitim script'inde ANTRENOR_L2_EXTRA=0.09) — kullanıcı, MAKE A FIRE/SANAE/ERKOÇUM/RÜZGAR VEYSEL/SOMEBODY LOVES YOU vakalarında antrenorOrani'nin tekrar tekrar en büyük tekil negatif katkı olduğunu gözlemleyip komple çıkarmayı önerdi. Test: komple çıkarmak düşük-şartta top1/top3'ü 5 puan birden düşürdü (gerçek değerli sinyal, çıkarılamaz) — bunun yerine katsayıyı EKSTRA L2 cezasıyla (diğer 14 katsayı serbestçe yeniden ayarlanarak) küçültmek denendi. x5/x10'a kadar top1/top3'te SIFIR kayıpla logloss iyileşti, x20+'de top1/top3 düşmeye başladı — x10 (toplam L2=0.10) güvenli sınır olarak KABUL EDİLDİ.",
     neyiAnalizEdiyor: [
       "V5.7 ile aynı 15 özellik/segment mimarisi — yalnız antrenorOrani'nin eğitimdeki L2 cezası artırıldı, katsayısı küçüldü (düşük-şart 0.3485→0.2868, diğer 0.2537→0.2080), hâlâ HER İKİ segmentte anlamlı",

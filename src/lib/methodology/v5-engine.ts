@@ -146,6 +146,13 @@
  *    (ANTRENOR_L2_EXTRA=0.09, bkz. arac-model-egit-segment.mjs) — kod/toFeatureVector
  *    DEĞİŞMEDİ, yalnız ağırlık dosyalarındaki antrenorOrani katsayısı küçüldü (düşük-şart
  *    0.35→0.29, diğer 0.25→0.21), backtest'te top1/top3 kayıpsız, logloss iyileşti.
+ *  - 2026-08-23 (V5.9): antrenorOrani KOMPLE ÇIKARILDI, 15→14 özellik — kullanıcı kararı,
+ *    x10 L2 küçültmesi bu at vakalarını (MAKE A FIRE/SANAE/ERKOÇUM/BARİ) hareket ettirmedi,
+ *    x20'de de değişmedi. Backtest MALİYETİ açıkça gösterildi ve kabul edildi: düşük-şart
+ *    top1 %35.0→%30.0 (-5p), top3 %73.3→%68.3 (-5p) — kesin kayıp. "Diğer" segmentte
+ *    karışık (top1 +1.7p ama top3 -1.7p, net kazanç yok). Kullanıcı bu maliyeti göze
+ *    alarak ısrarla kaldırılmasını istedi. getTrainerStats/TRAINER_POP_ORT/ANTSTAT
+ *    gerekçe satırı tamamen kaldırıldı — antrenör bilgisi artık hiçbir şekilde toplanmıyor.
  *
  * Ağırlıklar `weights/v5-weights-dusuksart.json` (şartlı1/19/27+maiden) ve
  * `weights/v5-weights-diger.json` (diğer tüm koşular) altında AYRI AYRI COMMIT EDİLMİŞ
@@ -159,7 +166,7 @@ import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getAgfTrendForRace } from "@/server/actions/agf-trend.actions";
 import { getHizDerecesiForRace } from "@/server/actions/hiz-derecesi.actions";
 import { syncAgfForRace } from "@/server/services/agf-sync";
-import { getJockeyStats, getTrainerStats } from "@/server/services/race.service";
+import { getJockeyStats } from "@/server/services/race.service";
 import {
   fetchAccuraceGecmisKayitlari,
   hesaplaAccuraceSonYarisEnHizliKapanisMap,
@@ -228,7 +235,6 @@ export type Faz1RunnerV5 = {
   galop: 0 | 1;
   idmJokey: 0 | 1;
   jokeyOrani: number;
-  antrenorOrani: number;
   /** "En çok yükselenler/düşenler" listesinden (getAgfTrendForRace) — modelin kendisi
    *  agfFark'ı (bkz. toFeatureVector) istatistiksel olarak anlamsız bulsa da (agfSirasi
    *  ile yüksek korelasyon/multicollinearity yüzünden), kullanıcı kararı 2026-08-16:
@@ -289,7 +295,6 @@ export type Faz1SonucV5 = {
 };
 
 const JOKEY_POP_ORT = 0.1;
-const TRAINER_POP_ORT = 0.1;
 const SIRE_POP_ORT = 0.14;
 
 export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> {
@@ -322,7 +327,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
   const runners = race.runners;
   if (runners.length === 0) return { race: { id: race.id, hippodromeName: race.raceDay.hippodrome.name.trim(), raceNo: race.raceNo, classType: race.classType, breed: race.breed, surface: race.surface, distance: race.distance }, runners: [] };
 
-  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, hizByNo] = await Promise.all([
+  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, accKayitlar, hizByNo] = await Promise.all([
     getSonYarisDetaylariForRace(raceId).catch(() => []),
     getSireStatOzetleriForRace(runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(() =>
       runners.map(() => ({ ozet: null, ornekKendiVeri: null, kYuzde: null }))
@@ -330,9 +335,6 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     getAgfTrendForRace(raceId).catch(() => ({ atlar: [], enCokDusenler: [], enCokYukselenler: [] })),
     getJockeyStats([...new Set(runners.map((r) => r.jockey).filter((x): x is string => !!x))]).catch(
       () => ({}) as Record<string, { overall: { wins: number; rides: number } }>
-    ),
-    getTrainerStats([...new Set(runners.map((r) => r.trainer).filter((x): x is string => !!x))]).catch(
-      () => ({}) as Record<string, { wins: number; rides: number }>
     ),
     fetchAccuraceGecmisKayitlari(runners.map((r) => r.name), race.raceDay.date),
     getHizDerecesiForRace(raceId).catch(() => new Map<number, number>()),
@@ -361,7 +363,6 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     const sonYaris = sonYarisByNo.get(r.no);
     const sireOzet = sireOzetByRunnerId.get(r.id);
     const jockeyStat = r.jockey ? jockeyStats[r.jockey] : undefined;
-    const trainerStat = r.trainer ? trainerStats[r.trainer] : undefined;
 
     const gecerliGaloplar = r.gallops.filter((g) => g.date < race.raceDay.date);
     const enSonGalop = gecerliGaloplar[0];
@@ -384,10 +385,6 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       jockeyStat && jockeyStat.overall.rides > 0
         ? shrink(jockeyStat.overall.wins, jockeyStat.overall.rides, JOKEY_POP_ORT) * 100
         : JOKEY_POP_ORT * 100;
-    const antrenorOrani =
-      trainerStat && trainerStat.rides > 0
-        ? shrink(trainerStat.wins, trainerStat.rides, TRAINER_POP_ORT) * 100
-        : TRAINER_POP_ORT * 100;
 
     return {
       id: r.id, no: r.no, ad: r.name, jockey: r.jockey, trainer: r.trainer, agf: r.agf,
@@ -402,7 +399,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       formEgimi: formEgimi(r.recentForm),
       kgs: kgsVal, kgsVarMi,
       sireOrani, galop: keskinGalop, idmJokey,
-      jokeyOrani, antrenorOrani,
+      jokeyOrani,
       agfTrendYonu: trendYonByNo.get(r.no) ?? null,
       agfTrendFark: trendYonByNo.has(r.no) ? (agfFarkByNo.get(r.no) ?? null) : null,
       recentForm: r.recentForm,
@@ -431,7 +428,7 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
   return [
     r.agfSirasi, r.accurace, r.formEgimi, r.formEgimi * r.formEgimi,
     r.kgsVarMi,
-    r.sireOrani, r.galop, r.idmJokey, r.jokeyOrani, r.antrenorOrani,
+    r.sireOrani, r.galop, r.idmJokey, r.jokeyOrani,
     // 2026-08-16 kullanıcı ısrarı: ham agfFark (sürekli puan farkı) HİÇBİR
     // formülasyonda anlamlı çıkmamıştı (agfSirasi ile multicollinearity). Eşik-bazlı
     // ikili hâliyle (|fark|>=1.0) ANLAMLI çıktı (+0.1058, GA [0.0446, 0.1780]) —
@@ -698,7 +695,6 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   { kod: "GALOP", ozellikIndeksleri: [idx("galop")], aciklama: (r) => (r.galop ? "Keskin galop zinciri (son idman 400m barajı)" : null) },
   { kod: "IDMJOK", ozellikIndeksleri: [idx("idmJokey")], aciklama: (r) => (r.idmJokey ? "İdman jokeyi uyumu (bugünkü jokey idmanlardan birini yaptırmış)" : null) },
   { kod: "JOKSTAT", ozellikIndeksleri: [idx("jokeyOrani")], aciklama: (r) => `Jokey kazanma oranı (küçültülmüş): %${r.jokeyOrani.toFixed(1)}` },
-  { kod: "ANTSTAT", ozellikIndeksleri: [idx("antrenorOrani")], aciklama: (r) => `Antrenör kazanma oranı (küçültülmüş): %${r.antrenorOrani.toFixed(1)}` },
   // 2026-08-17 denetim bulgusu: kacakAtMi ve dususAmaIyiPozisyon anlamlı sinyaller
   // (bkz. toFeatureVector üstündeki notlar) ama hiçbir OzellikGrubu'na dahil değildi —
   // katkıları skoru etkiliyordu ama gerekçe metninde hiç görünmüyordu. Eklendi.
@@ -721,7 +717,6 @@ const FEATURE_LABELS: Record<string, string> = {
   kgsVarMi: "KGS Verisi Var Mı",
   sireOrani: "Aygır Kazanma Oranı (küçültülmüş)", galop: "Keskin Galop Zinciri",
   idmJokey: "İdman Jokeyi Uyumu", jokeyOrani: "Jokey Kazanma Oranı (küçültülmüş)",
-  antrenorOrani: "Antrenör Kazanma Oranı (küçültülmüş)",
   agfYukselisVarMi: "AGF Eşik-Üstü Yükseliş Var Mı",
   kacakAtMi: "Kaçak At / Erken Tempo", agfDususVarMi: "AGF Eşik-Üstü Düşüş Var Mı",
   agfPayi: "AGF Payı (ham yüzde)", agfFarkiIkinciye: "AGF Dominans Farkı (2.'ye göre, yalnız favoride)",
