@@ -25,7 +25,11 @@ const FEATURE_NAMES = [
   // 2026-08-23 — antrenorOrani KOMPLE ÇIKARILDI (bkz. v5-engine.ts dosya başındaki
   // 2026-08-23 V5.9 notu) — kullanıcı kararı, backtest maliyeti (düşük-şart top1/top3
   // -5 puan) açıkça gösterilip kabul edildi.
-  "agfYukselisVarMi", "kacakAtMi", "agfDususVarMi", "agfPayi",
+  // 2026-08-24 — agfYukselisVarMi + agfDususVarMi TEK ozellikte ("agfTrendVarMi")
+  // BİRLEŞTİRİLDİ (bkz. v5-engine.ts dosya başındaki 2026-08-24 notu) — ayrı ayrı büyük
+  // manuel katsayı verildiğinde bir atın hangi yönde HAREKET ETMEMİŞSE o "0" durumu da
+  // standardizasyon yüzünden orantısız ceza oluyordu (karşıt-yön cezası).
+  "kacakAtMi", "agfTrendVarMi", "agfPayi",
   // 2026-08-23 — H2H net skoru KOMPLE ÇIKARILDI (bkz. v5-engine.ts dosya başındaki
   // 2026-08-23 notu) — düşük-şart segmentinde katsayı yanlış yöne (negatif) sabitlenmişti,
   // hiçbir zaman sağlam anlamlı olmamıştı (GA hep sıfırı içeriyordu). Kullanıcı kararıyla
@@ -58,9 +62,8 @@ function toFeatureVector(row) {
     row.agfSirasi, row.accurace, row.formEgimi, row.formEgimi * row.formEgimi,
     row.kgsVarMi,
     row.sireOrani, row.galop, row.idmJokey, row.jokeyOrani,
-    row.agfFark >= ANLAMLI_PUAN_ESIGI ? 1 : 0,
     row.kacakAtMi ?? 0,
-    row.agfFark <= -ANLAMLI_PUAN_ESIGI ? 1 : 0,
+    row.agfFark >= ANLAMLI_PUAN_ESIGI || row.agfFark <= -ANLAMLI_PUAN_ESIGI ? 1 : 0,
     row.agfPayi ?? 0,
     row.hizDerecesi ?? 0,
   ];

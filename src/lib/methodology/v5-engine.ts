@@ -438,27 +438,20 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     r.agfSirasi, r.accurace, r.formEgimi, r.formEgimi * r.formEgimi,
     r.kgsVarMi,
     r.sireOrani, r.galop, r.idmJokey, r.jokeyOrani,
-    // 2026-08-16 kullanıcı ısrarı: ham agfFark (sürekli puan farkı) HİÇBİR
-    // formülasyonda anlamlı çıkmamıştı (agfSirasi ile multicollinearity). Eşik-bazlı
-    // ikili hâliyle (|fark|>=1.0) ANLAMLI çıktı (+0.1058, GA [0.0446, 0.1780]) —
-    // ham agfFark bu özellikle DEĞİŞTİRİLDİ. "Düşüş" ayrı test edildi, anlamsız
-    // çıktı, eklenmedi.
-    r.agfFark >= ANLAMLI_PUAN_ESIGI ? 1 : 0,
     // 2026-08-16 kullanıcı talebi (sektör araştırması sonrası): Runner.raceStyle
     // ("KACAK_AT" vb, Accurace tabanlı) — kapı no/kilo farkı/HP farkı AYNI ANDA test
     // edildi, üçü de anlamsız çıktı; yalnız bu anlamlı (+0.0878, GA [0.0290,0.1811])
     // VE genel performansı iyileştirdi (top1 %34.8→%36.5).
     r.kacakAtMi,
-    // 2026-08-16 kullanıcı bulgusu (KINDBERO/ANGEL ON THE RIGHT vakaları, İzmir K3/K4):
-    // ham "düşüş" tek başına anlamsızdı, ama "düşüşe RAĞMEN hâlâ iyi AGF pozisyonunda
-    // kalma" (agfSirasi<=4 şartlı) ANLAMLI çıktı (+0.1282, GA [0.0576, 0.1982]).
-    // 2026-08-19 kullanıcı bulgusu (SHINNY vakası, AGF Trend panelinde ilk-4 DIŞINDA
-    // anlamlı düşüş gösterip modelin hiç yakalamadığı bir at): pozisyon şartı gerçek
-    // sinyali dışlıyordu. Kaldırılıp yalnız eşik testi edildi (agfYukselisVarMi ile
-    // simetrik) — top1 aynı (%38.0), top3 iyileşti (%68.3→%70.2), log-loss iyileşti
-    // (1.7695→1.7617), yön tutarlı. KABUL EDİLDİ, ad "agfDususVarMi" oldu (bkz.
-    // arac-model-egit.mjs'teki aynı isimli notun tamamı).
-    r.agfFark <= -ANLAMLI_PUAN_ESIGI ? 1 : 0,
+    // 2026-08-24 — agfYukselisVarMi VE agfDususVarMi TEK ozellikte ("agfTrendVarMi")
+    // BİRLEŞTİRİLDİ. Sebep: ikisi ayrı ayrı büyük katsayı alınca (bkz. dosya başı
+    // 2026-08-24 manuel override notu), bir at hangi yönde hareket ETMEMİŞSE o "0"
+    // durumu da standardizasyon yüzünden orantısız büyük bir CEZAya dönüşüyordu (BARİ
+    // vakası: düşüş ödülü +1.15 ama "yükselmemiş olma" cezası -0.27 — birbirini
+    // götürüyordu). Tek birleşik bayrak (yükseliş VEYA düşüş, ikisi de "1") bu karşıt-yön
+    // cezasını tamamen ortadan kaldırıyor — [X1]/AGF-ayrılış bulgusu zaten her iki yönün
+    // de "para akışı" anlamında eşit bilgi taşıdığını söylüyordu, ayrı katsayı gerekmiyordu.
+    r.agfFark >= ANLAMLI_PUAN_ESIGI || r.agfFark <= -ANLAMLI_PUAN_ESIGI ? 1 : 0,
     // 2026-08-19 kullanıcı bulgusu (BODUBEY/EL LEON) — bkz. Faz1RunnerV5.agfPayi
     // üstündeki not. Eski "agfSirasi===1?1:0" (agfFavorisiMi) buradan ÇIKARILDI,
     // yerini bu aldı (agfPayi: +0.25, anlamlı — agfFavorisiMi -0.0284'e düşüp
@@ -649,7 +642,7 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
 // SONUÇ: olasılık eşiği TEK BAŞINA yeterli değilmiş — AGF baskınlığı bağımsız bir
 // sinyalle DOĞRULANMADIKÇA banko sayılmayacak şekilde ikinci bir koşul eklendi.
 const BANKO_OLASILIK_ESIGI = 0.5;
-const AGF_OZELLIK_KODLARI = new Set(["agfSirasi", "agfPayi", "agfYukselisVarMi", "agfDususVarMi"]);
+const AGF_OZELLIK_KODLARI = new Set(["agfSirasi", "agfPayi", "agfTrendVarMi"]);
 
 export type V5BankoSonuc = { bankoAdayi: boolean; sebep: string; birinci?: { no: number; ad: string; karar: string } };
 
@@ -708,7 +701,7 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // (bkz. toFeatureVector üstündeki notlar) ama hiçbir OzellikGrubu'na dahil değildi —
   // katkıları skoru etkiliyordu ama gerekçe metninde hiç görünmüyordu. Eklendi.
   { kod: "KACAK", ozellikIndeksleri: [idx("kacakAtMi")], aciklama: (r) => (r.kacakAtMi ? "Kaçak at / erken tempo yapan (Accurace koşu stili sinyali)" : null) },
-  { kod: "DUSUSIYI", ozellikIndeksleri: [idx("agfDususVarMi")], aciklama: (r) => (r.agfFark <= -ANLAMLI_PUAN_ESIGI ? "AGF trend: düşüş (para akışı sinyali olabilir)" : null) },
+  { kod: "DUSUSIYI", ozellikIndeksleri: [idx("agfTrendVarMi")], aciklama: (r) => (r.agfFark <= -ANLAMLI_PUAN_ESIGI ? "AGF trend: düşüş (para akışı sinyali olabilir)" : null) },
   // 2026-08-21 — Hız derecesi: veri yoksa (son 365 günde uygun geçmiş yok) 0, satır
   // gösterilmez — "hızlı değil" ile "veri yok" karışmasın.
   { kod: "HIZ", ozellikIndeksleri: [idx("hizDerecesi")], aciklama: (r) => (r.hizDerecesi !== 0 ? `Hız derecesi: popülasyona göre ${r.hizDerecesi > 0 ? "+" : ""}${r.hizDerecesi.toFixed(1)}% (${r.hizDerecesi > 0 ? "daha hızlı" : "daha yavaş"})` : null) },
@@ -726,8 +719,8 @@ const FEATURE_LABELS: Record<string, string> = {
   kgsVarMi: "KGS Verisi Var Mı",
   sireOrani: "Aygır Kazanma Oranı (küçültülmüş)", galop: "Keskin Galop Zinciri",
   idmJokey: "İdman Jokeyi Uyumu", jokeyOrani: "Jokey Kazanma Oranı (küçültülmüş)",
-  agfYukselisVarMi: "AGF Eşik-Üstü Yükseliş Var Mı",
-  kacakAtMi: "Kaçak At / Erken Tempo", agfDususVarMi: "AGF Eşik-Üstü Düşüş Var Mı",
+  kacakAtMi: "Kaçak At / Erken Tempo",
+  agfTrendVarMi: "AGF Eşik-Üstü Anlamlı Hareket Var Mı (yükseliş veya düşüş)",
   agfPayi: "AGF Payı (ham yüzde)", agfFarkiIkinciye: "AGF Dominans Farkı (2.'ye göre, yalnız favoride)",
   hizDerecesi: "Hız Derecesi (popülasyona göre göreli tempo, son 365 gün)",
 };
