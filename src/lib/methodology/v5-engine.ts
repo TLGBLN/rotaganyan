@@ -113,6 +113,24 @@
  *    agfDususVarMi'yi kabul ettiği aynı standartla (sınırda + çok metrik birden iyileşme)
  *    KABUL EDİLDİ. Her iki segment ağırlık dosyasına da veriden fit edilerek eklendi
  *    (manuel override DEĞİL).
+ *  - 2026-08-23 (H2H KOMPLE ÇIKARILDI, 20→19 özellik): kullanıcı canlı yayınlanmış
+ *    İzmir 2.Koşu'yu (düşük-şart/ŞARTLI19) incelerken, GOLDEN CITY'nin (AGF favorisi,
+ *    bugünkü rakiplerle geçmişte +5 net ÖNDE bitirmiş) H2H için "risk" etiketi aldığını
+ *    fark etti — sezgiye tamamen aykırı. Kontrol: düşük-şart segmentinin CANLI ağırlık
+ *    dosyasında h2hNetSkor katsayısı NEGATİF (-0.1524) çıkmış — yani bu segmentte model
+ *    "geçmişte önde bitirmiş"i hafif ceza, "geride bitirmiş"i hafif ödül sayıyor,
+ *    yönün TAM TERSİ. "Diğer" segmentte katsayı doğru yönde (+0.0994, anlamlı). H2H zaten
+ *    eklendiğinde "sınırda" (GA sıfırı içeriyordu) olarak not edilmişti — düşük-şart'ın
+ *    küçük örneklemi (n=180 eğitim) bu zayıf sinyali YANLIŞ yönde sabitlemiş. Güncel veriyle
+ *    doğrulama: düşük-şart B=50 GA=[-0.3145,0.0676] hâlâ sıfırı içeriyor (asla sağlam
+ *    anlamlı olmamış); h2hNetSkor çıkarılınca düşük-şart backtest top1 aynı (%35.0),
+ *    top3 İYİLEŞTİ (%70.0→%75.0). Kullanıcı kararı: segment-özel yama (yalnız düşük-şart'tan
+ *    çıkar) yerine H2H'ı HER İKİ segmentten de komple çıkarıp V5.3-öncesi hâline dön —
+ *    "diğer" segmentte ölçülmüş küçük kazancından (top1 +0.8, top3 +1.2) feragat edilmiş
+ *    oldu, ama sınırda/kırılgan bir sinyali segment bazında dengesiz tutmaktansa modeli
+ *    basit ve öngörülebilir tutmak tercih edildi. h2h.actions.ts / H2HPanel.tsx (ayrı bir
+ *    UI paneli, V5 skoruna dahil değil) ve v2-engine.ts'in kendi H2H kullanımı ETKİLENMEDİ,
+ *    yalnız V5'in skorlama vektöründen çıkarıldı.
  *
  * Ağırlıklar `weights/v5-weights-dusuksart.json` (şartlı1/19/27+maiden) ve
  * `weights/v5-weights-diger.json` (diğer tüm koşular) altında AYRI AYRI COMMIT EDİLMİŞ
@@ -124,7 +142,6 @@ import { db } from "@/lib/db";
 import { getSonYarisDetaylariForRace } from "@/server/actions/son-yaris-detay.actions";
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getAgfTrendForRace } from "@/server/actions/agf-trend.actions";
-import { getH2HForRace } from "@/server/actions/h2h.actions";
 import { getHizDerecesiForRace } from "@/server/actions/hiz-derecesi.actions";
 import { syncAgfForRace } from "@/server/services/agf-sync";
 import { getJockeyStats, getTrainerStats } from "@/server/services/race.service";
@@ -239,9 +256,6 @@ export type Faz1RunnerV5 = {
    *  tüm katsayılar net anlamlı/anlamsız oldu, sınırda kalan olmadı) — alan yine de
    *  toplanıyor, gelecekte farklı bir formülasyonla tekrar test edilebilir. */
   agfFarkiIkinciye: number;
-  /** 2026-08-21 — H2H net skoru: bugünkü sahadaki rakiplerle ortak geçmiş yarışlarda
-   *  kaç kez önde bitirdi eksi kaç kez geride bitirdi (getH2HForRace, leak-free). */
-  h2hNetSkor: number;
   /** 2026-08-21 — Hız derecesi (%): son 365 gündeki en yeni 3 koşunun popülasyon
    *  (irk|pist|mesafe) ortalama tempo'suna göre göreli hızı. B=200 bootstrap'ta HER
    *  İKİ segmentte de güçlü anlamlı (düşük-şart +0.58 — modelin en büyük katsayısı,
@@ -296,7 +310,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
   const runners = race.runners;
   if (runners.length === 0) return { race: { id: race.id, hippodromeName: race.raceDay.hippodrome.name.trim(), raceNo: race.raceNo, classType: race.classType, breed: race.breed, surface: race.surface, distance: race.distance }, runners: [] };
 
-  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters, hizByNo] = await Promise.all([
+  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, hizByNo] = await Promise.all([
     getSonYarisDetaylariForRace(raceId).catch(() => []),
     getSireStatOzetleriForRace(runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(() =>
       runners.map(() => ({ ozet: null, ornekKendiVeri: null, kYuzde: null }))
@@ -309,28 +323,8 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       () => ({}) as Record<string, { wins: number; rides: number }>
     ),
     fetchAccuraceGecmisKayitlari(runners.map((r) => r.name), race.raceDay.date),
-    getH2HForRace(raceId).catch(() => []),
     getHizDerecesiForRace(raceId).catch(() => new Map<number, number>()),
   ]);
-
-  const raceNameToNo = new Map(runners.map((r) => [r.name, r.no]));
-  function h2hNetSkorHesapla(kendiAd: string): number {
-    let skor = 0;
-    for (const enc of h2hEncounters) {
-      const beniIceren = enc.results.find((e) => e.horseName === kendiAd);
-      if (!beniIceren) continue;
-      const benimPos = parseInt(beniIceren.finishPos, 10);
-      if (isNaN(benimPos)) continue;
-      for (const other of enc.results) {
-        if (other.horseName === kendiAd) continue;
-        if (!raceNameToNo.has(other.horseName)) continue;
-        const otherPos = parseInt(other.finishPos, 10);
-        if (isNaN(otherPos)) continue;
-        skor += benimPos < otherPos ? 1 : benimPos > otherPos ? -1 : 0;
-      }
-    }
-    return skor;
-  }
 
   const sonYarisByNo = new Map(sonYarisDetaylari.map((d) => [d.runnerNo, d]));
   const sireOzetByRunnerId = new Map(runners.map((r, i) => [r.id, sireOzetleri[i]]));
@@ -407,7 +401,6 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       sireKazanmaOraniHam: sireOzet?.kYuzde ?? null,
       sireOrneklemKendiVeri: sireOzet?.ornekKendiVeri ?? null,
       kacakAtMi: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" ? 1 : 0,
-      h2hNetSkor: h2hNetSkorHesapla(r.name),
       hizDerecesi: hizByNo.get(r.no) ?? 0,
     };
   });
@@ -457,9 +450,6 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     // anlamsızlaşmıştı). agfFarkiIkinciye de denendi ama sınırda/zararlı çıktı
     // (bkz. Faz1RunnerV5.agfFarkiIkinciye üstündeki not) — DAHİL EDİLMEDİ.
     r.agfPayi,
-    // 2026-08-21 — H2H net skoru: bkz. dosya başındaki V5.3 H2H notu. Sınırda bootstrap
-    // ama top1/top3 İKİSİ BİRDEN iyileşti, veriden fit edilerek eklendi.
-    r.h2hNetSkor,
     // 2026-08-21 — Hız derecesi: bkz. dosya başındaki V5.4 notu. HER İKİ segmentte de
     // güçlü anlamlı (B=200), VIF=1.02-1.10 (çakışma yok).
     r.hizDerecesi,
@@ -704,9 +694,6 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // katkıları skoru etkiliyordu ama gerekçe metninde hiç görünmüyordu. Eklendi.
   { kod: "KACAK", ozellikIndeksleri: [idx("kacakAtMi")], aciklama: (r) => (r.kacakAtMi ? "Kaçak at / erken tempo yapan (Accurace koşu stili sinyali)" : null) },
   { kod: "DUSUSIYI", ozellikIndeksleri: [idx("agfDususVarMi")], aciklama: (r) => (r.agfFark <= -ANLAMLI_PUAN_ESIGI ? "AGF trend: düşüş (para akışı sinyali olabilir)" : null) },
-  // 2026-08-21 — H2H: bugünkü rakiplerle ortak geçmiş yarış yoksa (h2hNetSkor=0) satır
-  // hiç gösterilmez — "0 karşılaşma" ile "hep berabere" ayrımı yapılamadığı için nötr.
-  { kod: "H2H", ozellikIndeksleri: [idx("h2hNetSkor")], aciklama: (r) => (r.h2hNetSkor !== 0 ? `Baş-başa geçmiş: bugünkü rakiplerle ${r.h2hNetSkor > 0 ? "+" : ""}${r.h2hNetSkor} net (${r.h2hNetSkor > 0 ? "önde" : "geride"} bitirmiş)` : null) },
   // 2026-08-21 — Hız derecesi: veri yoksa (son 365 günde uygun geçmiş yok) 0, satır
   // gösterilmez — "hızlı değil" ile "veri yok" karışmasın.
   { kod: "HIZ", ozellikIndeksleri: [idx("hizDerecesi")], aciklama: (r) => (r.hizDerecesi !== 0 ? `Hız derecesi: popülasyona göre ${r.hizDerecesi > 0 ? "+" : ""}${r.hizDerecesi.toFixed(1)}% (${r.hizDerecesi > 0 ? "daha hızlı" : "daha yavaş"})` : null) },
@@ -730,7 +717,6 @@ const FEATURE_LABELS: Record<string, string> = {
   agfYukselisVarMi: "AGF Eşik-Üstü Yükseliş Var Mı",
   kacakAtMi: "Kaçak At / Erken Tempo", agfDususVarMi: "AGF Eşik-Üstü Düşüş Var Mı",
   agfPayi: "AGF Payı (ham yüzde)", agfFarkiIkinciye: "AGF Dominans Farkı (2.'ye göre, yalnız favoride)",
-  h2hNetSkor: "H2H Net Skoru (bugünkü rakiplerle geçmiş karşılaşma)",
   hizDerecesi: "Hız Derecesi (popülasyona göre göreli tempo, son 365 gün)",
 };
 

@@ -47,7 +47,8 @@ function baseVector(row) {
 // sinyalin anlamlı çıkması gerekmez), muhtemelen anlamsız çıkacak — bu bir "henüz test
 // edilemez" durumu, gerçek geçerlilik ancak kış/yağmurlu günlerde ölçülebilir.
 const ADAY_OZELLIKLER = [
-  { ad: "zeminToleransi", hesapla: (row) => row.zeminToleransi ?? 0 },
+  { ad: "kiloDegisimi", hesapla: (row) => row.kiloDegisimi ?? 0 },
+  { ad: "hpIvmesi", hesapla: (row) => row.hpIvmesi ?? 0 },
 ];
 // ──────────────────────────────────────────────────────────────────────────────────────
 
@@ -161,8 +162,13 @@ await db.$disconnect();
 const raceGroupsRaw = groupByRace(raw).filter((g) => g.runners.length >= 2);
 const dusukSartGruplar = raceGroupsRaw.filter((g) => g.runners[0].kategori === "1a" || g.runners[0].kategori === "1b");
 const digerGruplar = raceGroupsRaw.filter((g) => !(g.runners[0].kategori === "1a" || g.runners[0].kategori === "1b"));
+// kategori "2" = Handikap (tümü) — bkz. v2-engine.ts KATEGORI_ADI. Kullanıcının özel hipotezi
+// ("handikap yarışlarda kilo değişimleri ve HP ivmeler önemli") "DİĞER KOŞULAR" içinde
+// Şartlı2-5/Grup/KV/Satış ile seyreltiliyor — bu yüzden ayrı, saf bir Handikap dilimi de test edilir.
+const handikapGruplar = raceGroupsRaw.filter((g) => g.runners[0].kategori === "2");
 
 console.log("Test edilen adaylar: " + ADAY_OZELLIKLER.map((a) => a.ad).join(", "));
 egit("SARTLI 1/19/27+MAIDEN", dusukSartGruplar);
 egit("DIGER KOSULAR", digerGruplar);
+egit("SADECE HANDIKAP", handikapGruplar);
 process.exit(0);
