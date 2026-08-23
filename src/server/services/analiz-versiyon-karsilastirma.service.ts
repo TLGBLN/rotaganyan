@@ -209,6 +209,18 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
       "Bonus: agfYukselisVarMi 'diğer' segmentte artık anlamlı (multicollinearity azaldı, GA=[0.0036,0.2037])",
     ],
   },
+  {
+    versiyon: "V5.8",
+    baslangic: new Date("2026-08-23T23:05:58+03:00"),
+    bitis: null,
+    aciklama: "antrenorOrani'ye ASİMETRİK L2 cezası eklendi (kod DEĞİL, yalnız eğitim script'inde ANTRENOR_L2_EXTRA=0.09) — kullanıcı, MAKE A FIRE/SANAE/ERKOÇUM/RÜZGAR VEYSEL/SOMEBODY LOVES YOU vakalarında antrenorOrani'nin tekrar tekrar en büyük tekil negatif katkı olduğunu gözlemleyip komple çıkarmayı önerdi. Test: komple çıkarmak düşük-şartta top1/top3'ü 5 puan birden düşürdü (gerçek değerli sinyal, çıkarılamaz) — bunun yerine katsayıyı EKSTRA L2 cezasıyla (diğer 14 katsayı serbestçe yeniden ayarlanarak) küçültmek denendi. x5/x10'a kadar top1/top3'te SIFIR kayıpla logloss iyileşti, x20+'de top1/top3 düşmeye başladı — x10 (toplam L2=0.10) güvenli sınır olarak KABUL EDİLDİ.",
+    neyiAnalizEdiyor: [
+      "V5.7 ile aynı 15 özellik/segment mimarisi — yalnız antrenorOrani'nin eğitimdeki L2 cezası artırıldı, katsayısı küçüldü (düşük-şart 0.3485→0.2868, diğer 0.2537→0.2080), hâlâ HER İKİ segmentte anlamlı",
+    ],
+    caprazlamalar: [
+      "Backtest: düşük-şart top1/top3 aynı (%35.0/%73.3), logloss 1.8797→1.8716; diğer top1/top3 aynı (%31.6/%67.2), logloss 1.8283→1.8241 — ikisi de kayıpsız iyileşme",
+    ],
+  },
 ];
 
 export type EngineVersionSonuc = EngineVersionTanimi & {

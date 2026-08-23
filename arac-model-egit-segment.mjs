@@ -85,8 +85,16 @@ function softmax(scores) {
   const sum = exps.reduce((a, b) => a + b, 0);
   return exps.map((e) => e / sum);
 }
+// 2026-08-23 — antrenorOrani ASİMETRİK L2: kullanıcı gözlemi (MAKE A FIRE/SANAE/ERKOÇUM/
+// RÜZGAR VEYSEL/SOMEBODY LOVES YOU vakalarında antrenorOrani tekrar tekrar en büyük tekil
+// negatif katkı olarak çıkıyordu) sonrası test edildi: komple çıkarmak düşük-şartta top1/
+// top3'ü 5 puan birden düşürdü (gerçek değerli sinyal) ama katsayıyı EKSTRA L2 cezasıyla
+// küçültmek (diğer 14 katsayı serbestçe yeniden ayarlanarak) x10'a kadar top1/top3'te
+// SIFIR kayıpla logloss'u iyileştirdi (aşırı-güveni azalttı) — x20+'de top1/top3 düşmeye
+// başlıyordu, x10 güvenli sınır. KABUL EDİLDİ (ANTRENOR_L2_EXTRA = 0.09, toplam L2=0.10).
+const ANTRENOR_L2_EXTRA = 0.09;
 function trainConditionalLogit(raceGroups, dim, opts) {
-  const { epochs = 800, lr = 0.08, l2 = 0.01, momentum = 0.9 } = opts;
+  const { epochs = 800, lr = 0.08, l2 = 0.01, momentum = 0.9, antrenorIdx = null } = opts;
   let w = new Array(dim).fill(0), velocity = new Array(dim).fill(0);
   for (let epoch = 0; epoch < epochs; epoch++) {
     const grad = new Array(dim).fill(0);
@@ -99,7 +107,8 @@ function trainConditionalLogit(raceGroups, dim, opts) {
       }
     }
     for (let d = 0; d < dim; d++) {
-      grad[d] = grad[d] / raceGroups.length + 2 * l2 * w[d];
+      const l2Toplam = d === antrenorIdx ? l2 + ANTRENOR_L2_EXTRA : l2;
+      grad[d] = grad[d] / raceGroups.length + 2 * l2Toplam * w[d];
       velocity[d] = momentum * velocity[d] - lr * grad[d];
       w[d] += velocity[d];
     }
@@ -152,7 +161,8 @@ function egit(etiket, raceGroupsRaw, outPath) {
   const trainGroups = trainRaces.map(toRaceGroup).filter((g) => g.winnerIdx >= 0);
   const testGroups = testRaces.map(toRaceGroup).filter((g) => g.winnerIdx >= 0);
 
-  const w = trainConditionalLogit(trainGroups, FEATURE_NAMES.length, { epochs: 800, lr: 0.08, l2: 0.01 });
+  const antrenorIdx = FEATURE_NAMES.indexOf("antrenorOrani");
+  const w = trainConditionalLogit(trainGroups, FEATURE_NAMES.length, { epochs: 800, lr: 0.08, l2: 0.01, antrenorIdx });
   FEATURE_NAMES.forEach((name, i) => console.log(`  ${name.padEnd(20)} ${w[i] >= 0 ? "+" : ""}${w[i].toFixed(4)}`));
 
   const testEval = evaluate(testGroups, w);
@@ -162,7 +172,7 @@ function egit(etiket, raceGroupsRaw, outPath) {
 
   const B_WEIGHTS = 50;
   const bootWeights = [];
-  for (let b = 0; b < B_WEIGHTS; b++) bootWeights.push(trainConditionalLogit(bootstrapResample(trainGroups), FEATURE_NAMES.length, { epochs: 400, lr: 0.08, l2: 0.01 }));
+  for (let b = 0; b < B_WEIGHTS; b++) bootWeights.push(trainConditionalLogit(bootstrapResample(trainGroups), FEATURE_NAMES.length, { epochs: 400, lr: 0.08, l2: 0.01, antrenorIdx }));
   console.log(`Bootstrap B=${B_WEIGHTS} tamamlandı.`);
   FEATURE_NAMES.forEach((name, i) => {
     const vals = bootWeights.map((wb) => wb[i]).sort((a, b) => a - b);

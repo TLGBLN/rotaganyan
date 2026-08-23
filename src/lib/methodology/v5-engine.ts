@@ -142,6 +142,10 @@
  *    Bonus: agfYukselisVarMi "diğer" segmentte artık anlamlı (multicollinearity azaldı).
  *    pistUzmani/uzunAraGalopKatkisi alanları Faz1RunnerV5'ten TAMAMEN kaldırıldı (başka
  *    hiçbir yerde kullanılmıyordu); kgs/kgsVarMi yalnız KGS gerekçe satırı için kaldı.
+ *  - 2026-08-23 (V5.8): antrenorOrani'ye eğitim script'inde asimetrik L2 cezası eklendi
+ *    (ANTRENOR_L2_EXTRA=0.09, bkz. arac-model-egit-segment.mjs) — kod/toFeatureVector
+ *    DEĞİŞMEDİ, yalnız ağırlık dosyalarındaki antrenorOrani katsayısı küçüldü (düşük-şart
+ *    0.35→0.29, diğer 0.25→0.21), backtest'te top1/top3 kayıpsız, logloss iyileşti.
  *
  * Ağırlıklar `weights/v5-weights-dusuksart.json` (şartlı1/19/27+maiden) ve
  * `weights/v5-weights-diger.json` (diğer tüm koşular) altında AYRI AYRI COMMIT EDİLMİŞ
