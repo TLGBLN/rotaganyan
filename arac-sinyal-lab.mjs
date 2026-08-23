@@ -46,9 +46,13 @@ function baseVector(row) {
 // Normal koşullar altında olduğu için (bugünkü koşunun kendisi Normal-dışı DEĞİLSE bu
 // sinyalin anlamlı çıkması gerekmez), muhtemelen anlamsız çıkacak — bu bir "henüz test
 // edilemez" durumu, gerçek geçerlilik ancak kış/yağmurlu günlerde ölçülebilir.
+// 2026-08-23 — agfTop5Hareketli: bu at, KENDİ KOŞUSUNDA |agfFark| büyüklüğüne göre
+// sıralandığında ilk 5'te mi (göreli, sabit eşik değil) — kullanıcının İstanbul+İzmir'de
+// gözlemlediği "kazananlar hep AGF trend listesinde" örüntüsünü test eder. 2026-08-21'de
+// "sahadaki EN BÜYÜK hareketi bu at mı yaptı" (tekil uç-nokta) zaten reddedilmişti
+// (anlamsız, yön ters) — bu, göreli-ilk-5 varyantı, henüz test edilmemişti.
 const ADAY_OZELLIKLER = [
-  { ad: "kiloDegisimi", hesapla: (row) => row.kiloDegisimi ?? 0 },
-  { ad: "hpIvmesi", hesapla: (row) => row.hpIvmesi ?? 0 },
+  { ad: "agfTop5Hareketli", hesapla: (row) => row.agfTop5Hareketli ?? 0 },
 ];
 // ──────────────────────────────────────────────────────────────────────────────────────
 

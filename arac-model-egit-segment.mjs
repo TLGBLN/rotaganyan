@@ -20,13 +20,16 @@ const OUT_DIGER = "C:\\Users\\tlgbi\\AppData\\Local\\Temp\\claude\\c--Users-tlgb
 const ANLAMLI_PUAN_ESIGI = 1.0;
 
 const FEATURE_NAMES = [
-  "agfSirasi", "accurace", "formEgimi", "formEgimi2", "kgs", "kgs2", "kgsVarMi", "pistUzmani", "sireOrani",
-  "galop", "idmJokey", "jokeyOrani", "antrenorOrani", "uzunAraGalopKatkisi",
+  "agfSirasi", "accurace", "formEgimi", "formEgimi2", "kgsVarMi", "sireOrani",
+  "galop", "idmJokey", "jokeyOrani", "antrenorOrani",
   "agfYukselisVarMi", "kacakAtMi", "agfDususVarMi", "agfPayi",
   // 2026-08-23 — H2H net skoru KOMPLE ÇIKARILDI (bkz. v5-engine.ts dosya başındaki
   // 2026-08-23 notu) — düşük-şart segmentinde katsayı yanlış yöne (negatif) sabitlenmişti,
   // hiçbir zaman sağlam anlamlı olmamıştı (GA hep sıfırı içeriyordu). Kullanıcı kararıyla
   // her iki segmentten de kaldırıldı.
+  // 2026-08-23 — SADELEŞTİRME: kgs (ham gün+karesi), pistUzmani, uzunAraGalopKatkisi
+  // leave-one-out ablasyon + bootstrap ile HER İKİ segmentte anlamsız/etkisiz bulunup
+  // çıkarıldı (kgsVarMi kaldı — diğer segmentte gerçekten anlamlıydı). 19→15 özellik.
   // 2026-08-21 — hizDerecesi: TJK "süre" alanından (at-bazlı gerçek bitiriş süresi),
   // popülasyon (irk|pist|mesafe) ortalama tempo'suna göre göreli hız — yalnız son 365
   // gün (uzun aradan dönen atların eski "en iyi dönemi" güncelmiş gibi kullanılmasın).
@@ -50,8 +53,8 @@ const FEATURE_NAMES = [
 function toFeatureVector(row) {
   return [
     row.agfSirasi, row.accurace, row.formEgimi, row.formEgimi * row.formEgimi,
-    row.kgsVarMi ? row.kgs : 0, row.kgsVarMi ? row.kgs * row.kgs : 0, row.kgsVarMi, row.pistUzmani,
-    row.sireOrani, row.galop, row.idmJokey, row.jokeyOrani, row.antrenorOrani, row.uzunAraGalopKatkisi ?? 0,
+    row.kgsVarMi,
+    row.sireOrani, row.galop, row.idmJokey, row.jokeyOrani, row.antrenorOrani,
     row.agfFark >= ANLAMLI_PUAN_ESIGI ? 1 : 0,
     row.kacakAtMi ?? 0,
     row.agfFark <= -ANLAMLI_PUAN_ESIGI ? 1 : 0,
