@@ -32,6 +32,25 @@
  * tarafımızdaki bir hata değil). Eşleşmeyen ~%30 için bu fonksiyon SESSİZCE 0 (nötr)
  * döner — hata vermez ama bu atlar için sinyal fiilen "veri yok" demektir.
  *
+ * 2026-08-23 DÜZELTME: ilk hipotez ("arşiv yalnız sabit-kilolu/Maiden koşularını
+ * tutuyor, Handikap gibi değişken-kilolu koşuları hiç almıyor") YANLIŞ çıktı —
+ * kontrol edildi, Handikap koşuları arşivde bol miktarda var (Handikap 15: 855,
+ * Handikap 16: 611, Handikap 14: 582 kayıt). Eksik atların (DIRAXTER vb.) nedeni hâlâ
+ * netleşmedi — muhtemelen kalan ~%0,6'lık kapsam boşluğu ya da o SPESİFİK koşuda TJK'nın
+ * kendi sisteminde hiç derece kaydı oluşmaması, genel bir sınıf dışlaması değil.
+ *
+ * 2026-08-23 — KİLO DÜZELTMESİ test edildi, gerekli bulunmadı: bucket-içi (aynı
+ * irk|pist|mesafe) kilo ile pace arasındaki korelasyon r=-0,057 (n=6277, Normal
+ * koşullar) — pratikte ihmal edilebilir. Yani popülasyon ortalamasını kiloya göre
+ * ayrıştırmaya gerek yok, mevcut basit yaklaşım (yalnız irk|pist|mesafe bucket'ı) yeterli.
+ *
+ * 2026-08-23 — V5'in mevcut 20 özelliğine eklenip test edildi (arac-sinyal-lab.mjs):
+ * beklendiği gibi HER İKİ segmentte de anlamsız (GA sıfırı içeriyor) — çünkü kendi
+ * Prediction/Result verimizdeki koşuların neredeyse tamamı zaten "Normal" zeminde,
+ * sinyalin devreye girmesi gereken durum (bugünün de Normal-dışı olması) oluşmuyor.
+ * Bu, hipotezin çürütülmesi değil — gerçek geçerlilik testi ancak yeterli sayıda
+ * Normal-dışı GÜNCEL koşu birikince yapılabilir.
+ *
  * 2026-08-23 kullanıcı notu — MEVSİM ŞARTI YOK: yağmur/ıslak pist yalnız kışa özgü
  * değil, yazın da olabilir. sync-derece-ist cron'u (vercel.json, her gece 23:00) zaten
  * mevsimden bağımsız her gün çalışıyor — "kışı bekleme" yalnız yeterli ÖRNEKLEM birikmesi

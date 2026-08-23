@@ -38,8 +38,16 @@ function baseVector(row) {
 // backtest top1 %31.0→%32.8, top3 %67.2→%68.4, logloss 1.8257→1.8193 (üçü de iyileşti).
 // Düşük-şart segmentinde anlamsız (beklenen — o segmentte start sayısı zaten düşük/az
 // değişken). HENÜZ CANLIYA ALINMADI — kullanıcı onayı bekleniyor.
+//
+// 2026-08-23 — zeminToleransi test ediliyor: atın geçmiş Normal-dışı (ıslak/ağır) pist
+// koşularındaki göreli performansı (TjkDereceKaydi arşivinden, leak-free). Popülasyon
+// düzeyinde split-half güvenilirlik testinde GERÇEK bir özellik olduğu doğrulandı
+// (r=0.444, n=179) ama BEKLENTİ: kendi Prediction/Result verimiz neredeyse tamamen
+// Normal koşullar altında olduğu için (bugünkü koşunun kendisi Normal-dışı DEĞİLSE bu
+// sinyalin anlamlı çıkması gerekmez), muhtemelen anlamsız çıkacak — bu bir "henüz test
+// edilemez" durumu, gerçek geçerlilik ancak kış/yağmurlu günlerde ölçülebilir.
 const ADAY_OZELLIKLER = [
-  { ad: "kariyerStartSayisi", hesapla: (row) => row.kariyerStartSayisi ?? 0 },
+  { ad: "zeminToleransi", hesapla: (row) => row.zeminToleransi ?? 0 },
 ];
 // ──────────────────────────────────────────────────────────────────────────────────────
 
