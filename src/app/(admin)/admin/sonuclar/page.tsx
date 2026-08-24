@@ -4,31 +4,45 @@ import { tr } from "date-fns/locale";
 
 export const dynamic = "force-dynamic";
 
-async function getResultsWithPicks(limit = 100) {
-  return db.result.findMany({
-    where: { race: { prediction: { published: true } } },
-    include: {
-      race: {
-        include: {
-          raceDay: { include: { hippodrome: true } },
-          prediction: {
-            include: {
-              picks: {
-                include: { runner: { select: { no: true } } },
-                orderBy: { rank: "asc" },
+const SAYFA_BOYU = 100;
+
+// 2026-08-24 kullanıcı bulgusu: "20 Ağustos öncesi neden yok" — sayfa hep en son 100
+// sonucu (enteredAt DESC) gösterip sabit kalıyordu, öncesine gitmenin bir yolu yoktu.
+// Artık `sayfa` (offset) parametresiyle geriye doğru gezilebiliyor; toplam sayı da
+// ayrıca sayılıyor ki "Daha Eski Sonuçlar" bağlantısı yalnız gerçekten daha eskisi
+// varken görünsün.
+async function getResultsWithPicks(sayfa: number) {
+  const skip = sayfa * SAYFA_BOYU;
+  const where = { race: { prediction: { published: true } } };
+  const [results, total] = await Promise.all([
+    db.result.findMany({
+      where,
+      include: {
+        race: {
+          include: {
+            raceDay: { include: { hippodrome: true } },
+            prediction: {
+              include: {
+                picks: {
+                  include: { runner: { select: { no: true } } },
+                  orderBy: { rank: "asc" },
+                },
               },
             },
           },
         },
       },
-    },
-    orderBy: { enteredAt: "desc" },
-    take: limit,
-  });
+      orderBy: { enteredAt: "desc" },
+      skip,
+      take: SAYFA_BOYU,
+    }),
+    db.result.count({ where }),
+  ]);
+  return { results, total, skip };
 }
 
 type Tier = "rank1" | "rank2_3" | "rank4_6" | "miss";
-type Result = Awaited<ReturnType<typeof getResultsWithPicks>>[number];
+type Result = Awaited<ReturnType<typeof getResultsWithPicks>>["results"][number];
 
 function getTier(r: Result): Tier {
   if (r.hitTop1) return "rank1";
@@ -49,8 +63,14 @@ const TIER = {
   miss: { label: "Listede Yok", className: "bg-[#c0392b]/15 text-[#c0392b] border border-[#c0392b]/30" },
 };
 
-export default async function SonuclarPage() {
-  const results = await getResultsWithPicks();
+type PageProps = { searchParams: Promise<{ sayfa?: string }> };
+
+export default async function SonuclarPage({ searchParams }: PageProps) {
+  const { sayfa: sayfaParam } = await searchParams;
+  const sayfa = Math.max(0, parseInt(sayfaParam ?? "0", 10) || 0);
+  const { results, total: toplamKayitSayisi, skip } = await getResultsWithPicks(sayfa);
+  const hasOlder = skip + results.length < toplamKayitSayisi;
+  const hasNewer = sayfa > 0;
 
   const tiers = results.map(getTier);
   const total = results.length;
@@ -70,7 +90,30 @@ export default async function SonuclarPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-lg font-bold">Sonuç Analizi</h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h1 className="text-lg font-bold">Sonuç Analizi</h1>
+        <div className="flex items-center gap-2 text-xs">
+          {hasNewer && (
+            <a
+              href={`/admin/sonuclar${sayfa - 1 > 0 ? `?sayfa=${sayfa - 1}` : ""}`}
+              className="rounded-md border px-3 py-1.5 font-medium text-foreground transition-colors hover:border-foreground/30"
+            >
+              ← Daha Yeni
+            </a>
+          )}
+          <span className="text-muted-foreground">
+            {skip + 1}–{skip + results.length} / {toplamKayitSayisi}
+          </span>
+          {hasOlder && (
+            <a
+              href={`/admin/sonuclar?sayfa=${sayfa + 1}`}
+              className="rounded-md border px-3 py-1.5 font-medium text-foreground transition-colors hover:border-foreground/30"
+            >
+              Daha Eski Sonuçlar →
+            </a>
+          )}
+        </div>
+      </div>
 
       {/* Özet istatistikler */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -87,7 +130,7 @@ export default async function SonuclarPage() {
 
       <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
         <span>
-          Toplam: <strong className="text-foreground">{total}</strong> analiz edilmiş koşu
+          Bu sayfada: <strong className="text-foreground">{total}</strong> analiz edilmiş koşu (toplam {toplamKayitSayisi})
         </span>
         {avgGanyan && (
           <span>
@@ -169,6 +212,17 @@ export default async function SonuclarPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {hasOlder && (
+        <div className="flex justify-center">
+          <a
+            href={`/admin/sonuclar?sayfa=${sayfa + 1}`}
+            className="rounded-md border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-foreground/30"
+          >
+            Daha Eski Sonuçlar →
+          </a>
         </div>
       )}
     </div>

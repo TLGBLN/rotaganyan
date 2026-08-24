@@ -73,7 +73,14 @@ export async function fetchCityResults(
       clone.find("span, sup, img").remove();
       const raw = clone.text().replace(/\s+/g, " ").trim();
 
-      const numMatch = raw.match(/\((\d+)\)\s*$/);
+      // 2026-08-24 kullanıcı bulgusu (Elazığ K8, SKY TURK(14) vakası): yurt dışı doğumlu
+      // atların TJK'daki gösterimi "AD(NO) (ÜLKE)" biçiminde — örn. "SKY TURK(14) (USA)".
+      // Eski regex yalnız string'in TAM SONUNDA "(sayı)" arıyordu, bu yüzden ülke kodu
+      // sonda olduğunda at numarasını hiç yakalayamıyor ve SATIR TAMAMEN ATLANIYORDU.
+      // O at kazanansa (rank=1), en düşük rank'e sahip KALAN satır yanlışlıkla "kazanan"
+      // sayılıyordu — gerçek kazanan sessizce kaybolup ikinci/üçüncü at kazanan olarak
+      // kaydediliyordu. Artık numara sonrasında opsiyonel " (ÜLKE)" ekini de kabul ediyor.
+      const numMatch = raw.match(/\((\d+)\)(?:\s*\([A-ZÇĞİÖŞÜ]+\))?\s*$/);
       if (!numMatch) return;
       const no = parseInt(numMatch[1], 10);
       const name = raw.slice(0, numMatch.index).trim();
