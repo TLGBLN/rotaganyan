@@ -17,6 +17,17 @@ function sortableFromTjkDate(tjkDate: string): string | null {
   return `${m[3]}-${m[2]}-${m[1]}`;
 }
 
+// 2026-08-24 kullanıcı bulgusu (İSPANOZ vakası, gerçek kuponları etkiledi): TJK'nın
+// "GG.AA.YYYY" formatı için kod tabanında 4 AYRI fonksiyon vardı, biri (hiz-derecesi.
+// actions.ts) gün/ay sırasını TERS yazmıştı — "15.08.2026" 8 Mart 2027'ye dönüşüyordu.
+// Artık TEK paylaşılan implementasyon burada — yeni bir TJK tarih ayrıştırması
+// gerektiğinde YENİDEN YAZILMAMALI, buradan import edilmeli.
+export function parseTjkDate(s: string): Date | null {
+  const m = s.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!m) return null;
+  return new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1])));
+}
+
 function sortableFromDate(date: Date): string {
   const dd = String(date.getUTCDate()).padStart(2, "0");
   const mm = String(date.getUTCMonth() + 1).padStart(2, "0");

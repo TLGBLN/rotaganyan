@@ -14,6 +14,7 @@
  */
 import * as cheerio from "cheerio";
 import { db } from "@/lib/db";
+import { parseTjkDate } from "@/lib/tjk-date";
 
 const BASE = "https://www.tjk.org/TR/YarisSever/Query/DataRows/DetayliDereceIst";
 const HEADERS = {
@@ -39,12 +40,6 @@ type Kayit = {
   derece: string | null;
   cinsAdi: string;
 };
-
-function parseTarih(s: string): Date | null {
-  const m = /(\d{2})\.(\d{2})\.(\d{4})/.exec(s);
-  if (!m) return null;
-  return new Date(Date.UTC(+m[3], +m[2] - 1, +m[1]));
-}
 
 async function fetchSayfa(yil: number, sayfaNo: number): Promise<Kayit[]> {
   const url = `${BASE}?QueryParameter_Yil=${yil}&PageNumber=${sayfaNo}`;
@@ -73,7 +68,7 @@ async function fetchSayfa(yil: number, sayfaNo: number): Promise<Kayit[]> {
     kayitlar.push({
       tjkKayitId: idMatch[1],
       atAdi: val(0),
-      tarih: tarihStr ? parseTarih(tarihStr) : null,
+      tarih: tarihStr ? parseTjkDate(tarihStr) : null,
       kilo: val(1) || null,
       irk: val(2),
       cinsiyet: val(3),

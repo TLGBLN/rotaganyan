@@ -10,6 +10,7 @@
 
 import { request } from "undici";
 import * as cheerio from "cheerio";
+import { parseTjkDate } from "@/lib/tjk-date";
 
 const BASE = "https://www.tjk.org";
 const HEADERS = {
@@ -54,13 +55,6 @@ async function fetchHtml(url: string): Promise<string> {
 }
 
 // "14.07.2026" → Date
-function parseIdmanDate(s: string): Date | null {
-  const m = s.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-  if (!m) return null;
-  const [, d, mo, y] = m;
-  return new Date(`${y}-${mo}-${d}T00:00:00Z`);
-}
-
 function parseRows(html: string): TjkIdmanRow[] {
   // Sayfa 2+ yanıtları çıplak <tbody><tr>... döner (tablosuz); cheerio bunu
   // <table> olmadan doğru ayrıştıramıyor, satırları sessizce kaybediyor.
@@ -72,7 +66,7 @@ function parseRows(html: string): TjkIdmanRow[] {
 
     const horseName = cell("ATADI");
     if (!horseName) return;
-    const trainingDate = parseIdmanDate(cell("IDMANTARIH"));
+    const trainingDate = parseTjkDate(cell("IDMANTARIH"));
     if (!trainingDate) return;
 
     const splits: Record<string, string | null> = {};

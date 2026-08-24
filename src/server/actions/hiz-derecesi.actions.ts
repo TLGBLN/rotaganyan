@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/db";
 import { mesafeBucket } from "@/lib/sire-stat-match";
+import { parseTjkDate } from "@/lib/tjk-date";
 
 /**
  * 2026-08-21 kullanıcı talebi — hız derecesi. TJK "At Koşu Bilgileri"ndeki "süre" alanı
@@ -30,21 +31,14 @@ function sureyiSaniyeyeCevir(t: string): number | null {
   }
   return null;
 }
-// TJK tarih formatı "GG.AA.YYYY" (örn. "15.08.2026" = 15 Ağustos). 2026-08-24 kullanıcı
-// bulgusu (İSPANOZ vakası): burada GÜN/AY YER DEĞİŞTİRİLMİŞTİ (new Date(yıl, gün-1, ay))
-// — "15.08.2026" yanlışlıkla 8 Mart 2027 gibi hesaplanıyordu (ay indeksi 14 taşıp bir
-// sonraki yıla sarkıyordu), yani atın 9 gün önceki TAM eşleşen (pist+mesafe) yarışı
-// "gelecekte" sanılıp hizDerecesi hesabından tamamen düşüyordu. arac-model-veri-
-// olustur.mts'teki (offline backtest/eğitim) AYNI isimli fonksiyon zaten DOĞRU sıradaydı
-// — yalnız bu CANLI/gerçek-zamanlı dosya etkilenmişti. hizDerecesi 2026-08-21'de (V5.4)
-// eklendiği için etki penceresi ~3 gün (21-24 Ağustos) — bu aralıkta yayınlanan
-// analizlerde hizDerecesi bazı atlar için olması gerekenden düşük/sıfır hesaplanmış
-// olabilir (katsayının kendisi geçerli, yalnız canlı girdi değeri bozuktu).
-function parseGecmisTarih(s: string): Date | null {
-  const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-  if (!m) return null;
-  return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
-}
+// 2026-08-24 kullanıcı bulgusu (İSPANOZ vakası, gerçek kuponları etkiledi): bu dosyada
+// yerel bir parseGecmisTarih vardı ve gün/ay sırası TERS yazılmıştı ("15.08.2026" 8 Mart
+// 2027'ye dönüşüyordu, atın 9 gün önceki TAM eşleşen yarışı "gelecekte" sanılıp
+// hizDerecesi'nden düşüyordu). Artık src/lib/tjk-date.ts'teki TEK paylaşılan
+// parseTjkDate kullanılıyor (bkz. o dosyadaki not — aynı format için 4 ayrı fonksiyon
+// vardı, birleştirildi). hizDerecesi 2026-08-21'de (V5.4) eklendiği için etki penceresi
+// ~3 gün (21-24 Ağustos) — katsayının kendisi (backtest'te doğrulanan) geçerli, yalnız
+// canlı girdisi bozuktu.
 function surfaceFromRaw(raw: string): "CIM" | "KUM" | "SENTETIK" | null {
   if (!raw) return null;
   if (raw.startsWith("Ç")) return "CIM";
@@ -109,7 +103,7 @@ export async function getHizDerecesiForRace(
   let popToplam = 0, popSayi = 0;
   for (const rows of gecmisByTjkAtId.values()) {
     for (const g of rows) {
-      const tarih = parseGecmisTarih(g.date);
+      const tarih = parseTjkDate(g.date);
       if (!tarih || tarih.getTime() >= cutoff.getTime()) continue;
       const saniye = sureyiSaniyeyeCevir(g.time);
       if (saniye == null || saniye <= 0 || !g.distance) continue;
@@ -131,7 +125,7 @@ export async function getHizDerecesiForRace(
   for (const r of race.runners) {
     if (r.tjkAtId == null) { sonuc.set(r.no, 0); continue; }
     const gecmis = (gecmisByTjkAtId.get(r.tjkAtId) ?? [])
-      .map((g) => ({ ...g, tarih: parseGecmisTarih(g.date), saniye: sureyiSaniyeyeCevir(g.time) }))
+      .map((g) => ({ ...g, tarih: parseTjkDate(g.date), saniye: sureyiSaniyeyeCevir(g.time) }))
       .filter(
         (g): g is GecmisSatir & { tarih: Date; saniye: number } =>
           g.tarih != null &&
