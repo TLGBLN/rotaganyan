@@ -297,13 +297,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.13",
     baslangic: new Date("2026-08-24T19:50:31+03:00"), // 8b7da14 — AGF favorisi ilk-3 garantisi eklendi
-    bitis: null,
-    aciklama: "AGF sırası=1 (favori) olan at artık KOŞULSUZ ilk-3'e alınıyor. Kullanıcı bulgusu: Bursa K10'da Kaşmir Tay (AGF-1, %18.8 pay) modelin ham olasılık sıralamasında 4.sıraya düşmüştü ve kazandı — agfTrendTerfisiUygula bunu korumadı çünkü o mekanizma olasılığa göre YARIŞIYOR (AGF-1'in olasılığı zaten düşükse yine dışarıda kalıyordu). Backtest (512 sonuçlanmış yarış, 2026-07-01 sonrası, yayınlanan Prediction.picks ile): AGF-1 favorisi %33.6 kazanıyor, modelin top3'ü bunların %91.9'unu zaten yakalıyordu — kalan %8.1 (14 yarış) top3 dışındaydı. AGF-1'i koşulsuz 3.sıraya zorlayınca (mevcut #3'ün yerini alarak): +14 yeni galibiyet yakalanır, yalnız 5 kez yerini aldığımız #3 zaten kazanandı — NET +9/512 (top3 isabeti %60.2→%61.9). NOT: bu, V2'nin eski 'AGF-top3' hard-rule'unun (Çokomel Kız vakasıyla çürütülüp kaldırılmıştı, bkz. proje hafızası) bir tekrarı DEĞİL — o, Claude'un serbest muhakemesini önceden kısıtlıyordu; bu, V5'in tamamen mekanik/istatistiksel sıralamasında yalnız GÖSTERİM sırasını etkileyen, gerçek 512-yarışlık pozitif backtestle desteklenen ayrı bir kural.",
+    bitis: new Date("2026-08-24T22:18:10+03:00"), // 067bfd9 — TJK sonuç parse bugu düzeltmesi + retrain
+    aciklama: "AGF sırası=1 (favori) olan at artık KOŞULSUZ ilk-3'e alınıyor. Kullanıcı bulgusu: Bursa K10'da Kaşmir Tay (AGF-1, %18.8 pay) modelin ham olasılık sıralamasında 4.sıraya düşmüştü ve kazandı — agfTrendTerfisiUygula bunu korumadı çünkü o mekanizma olasılığa göre YARIŞIYOR (AGF-1'in olasılığı zaten düşükse yine dışarıda kalıyordu). İlk backtest (512 yarış) Karma'yı (kaynak yarışların aynası) yanlışlıkla çift saymıştı — DÜZELTİLMİŞ backtest (Karma hariç, n=428): mevcut top3 isabeti %60.0 (257/428) → AGF-1 zorla eklenince %61.2 (262/428). 50 yarışta AGF-1 zaten top3'te değildi: 10'unda yeni galibiyet yakalandı, 5'inde yerini aldığımız #3 zaten kazanandı — net +5. NOT: bu, V2'nin eski 'AGF-top3' hard-rule'unun (Çokomel Kız vakasıyla çürütülüp kaldırılmıştı, bkz. proje hafızası) bir tekrarı DEĞİL — o, Claude'un serbest muhakemesini önceden kısıtlıyordu; bu, V5'in tamamen mekanik/istatistiksel sıralamasında yalnız GÖSTERİM sırasını etkileyen, gerçek backtestle desteklenen ayrı bir kural.",
     neyiAnalizEdiyor: [
       "V5.12 ile aynı 21 özellik/segment-bazlı mimari, skor/olasılık hesaplaması DEĞİŞMEDİ — yalnız gösterim sıralamasına AGF-favori-ilk3-garantisi post-processing adımı eklendi",
     ],
     caprazlamalar: [
-      "512 yarış (Prediction.picks bazlı simülasyon): mevcut top3 isabeti %60.2 (308/512) → AGF-1 zorla eklenince %61.9 (317/512). 61 yarışta AGF-1 zaten top3'te değildi: 14'ünde yeni galibiyet yakalandı, 5'inde yerini aldığımız #3 zaten kazanandı — net +9.",
+      "428 yarış (Karma hariç, düzeltilmiş): mevcut top3 isabeti %60.0 (257/428) → AGF-1 zorla eklenince %61.2 (262/428) — net +5.",
+    ],
+  },
+  {
+    versiyon: "V5.14",
+    baslangic: new Date("2026-08-24T22:18:10+03:00"), // 067bfd9 — TJK sonuç parse bugu düzeltmesi + retrain
+    bitis: null,
+    aciklama: "KRİTİK VERİ BÜTÜNLÜĞÜ DÜZELTMESİ: yurt dışı doğumlu atların (TJK gösterimi \"AD(NO) (ÜLKE)\", örn. \"SKY TURK(14) (USA)\") kazandığı yarışlarda gerçek kazanan sessizce yanlış kaydediliyordu. Kök neden — tjk-result.adapter.ts'teki at-numarası regex'i yalnız string SONUNDA \"(sayı)\" arıyordu; ülke kodu sonda olduğunda numara hiç yakalanamıyor, o satır (genelde kazanan, rank=1) tamamen ATLANIYOR, kalan en düşük rank'li at yanlışlıkla \"kazanan\" sayılıyordu. Kullanıcı bulgusu: Elazığ K8 (24 Ağustos) — sistem NIGHT KING(4) kazanan gösteriyordu, gerçek kazanan SKY TURK(14) idi. Regex düzeltildi (numaradan sonra opsiyonel \" (ÜLKE)\" ekini de kabul ediyor). Kapsam taraması: benzer isim deseni taşıyan 55 sonuçlanmış yarışın 14'ünde (%25) aynı hata bulundu — hepsi düzeltildi (Result.winnerNo/winnerNos/actualOrder/farklar/hitTop1/hitInCoupon yeniden hesaplandı, Karma mirror'ları senkronize edildi). Yalnız 1'i (27 Temmuz Elazığ K5) V5 eğitim penceresindeydi (2026-07-01+) — model-veri.json o yarış için yenilendi, segment modelleri yeniden eğitildi.",
+    neyiAnalizEdiyor: [
+      "V5.13 ile aynı 21 özellik/segment-bazlı mimari/kurallar — skorlama mantığı DEĞİŞMEDİ, yalnız eğitim verisindeki 1 hatalı gözlem düzeltilip yeniden eğitildi (991 yarış, önceki 980'den +11 yeni + 1 düzeltme)",
+    ],
+    caprazlamalar: [
+      "Düşük-şart (254 yarış, test n=64): top1=%34.4/top3=%71.9/logloss=1.8748. Diğer (737 yarış, test n=185): top1=%29.2/top3=%64.3/logloss=1.8387. Katsayılar öncekiyle istatistiksel olarak tutarlı (tek gözlem düzeltmesi, büyük sapma yok) — accurace/idmJokey/jokeyOrani/kacakAtMi/agfDususVarMi düşük-şartta örneklem büyüyünce anlamlı hale geldi.",
     ],
   },
 ];
