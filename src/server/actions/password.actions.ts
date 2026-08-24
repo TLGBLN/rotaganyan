@@ -3,8 +3,9 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import { auth } from "@/lib/auth";
 import { sendPasswordResetEmail } from "@/lib/email";
-import { checkRateLimit, passwordResetLimiter } from "@/lib/ratelimit";
+import { checkRateLimit, passwordResetLimiter, changePasswordLimiter } from "@/lib/ratelimit";
 import { headers } from "next/headers";
 
 export async function requestPasswordReset(email: string) {
@@ -56,6 +57,35 @@ export async function resetPassword(token: string, newPassword: string) {
   });
 
   await db.verificationToken.delete({ where: { token } });
+
+  return { success: true };
+}
+
+// 2026-08-24 kullanıcı talebi: "kullanıcı şifre değiştirmek te isteyebilir. Buna olanak
+// sağlayacak bir alanının oluşturulması gerek" — oturumu açıkken (e-posta bağlantısı
+// beklemeden) doğrudan şifre değiştirme. /panel'deki ChangePasswordForm tarafından
+// çağrılır — hem mobil hem web aynı responsive sayfayı kullandığı için tek yer yeterli.
+export async function changePassword(currentPassword: string, newPassword: string) {
+  const session = await auth();
+  if (!session?.user) return { error: "Oturum bulunamadı. Lütfen tekrar giriş yapın." };
+
+  const { success } = await checkRateLimit(changePasswordLimiter, session.user.id);
+  if (!success) {
+    return { error: "Çok fazla deneme yapıldı. Lütfen bir dakika sonra tekrar deneyin." };
+  }
+
+  if (newPassword.length < 8) {
+    return { error: "Yeni şifre en az 8 karakter olmalı." };
+  }
+
+  const user = await db.user.findUnique({ where: { id: session.user.id }, select: { passwordHash: true } });
+  if (!user?.passwordHash) return { error: "Hesap bulunamadı." };
+
+  const gecerli = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!gecerli) return { error: "Mevcut şifre yanlış." };
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await db.user.update({ where: { id: session.user.id }, data: { passwordHash } });
 
   return { success: true };
 }

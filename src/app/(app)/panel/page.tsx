@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import type { Role, Plan } from "@prisma/client";
 import { formatDate } from "@/lib/utils";
+import ChangePasswordForm from "./ChangePasswordForm";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,14 @@ export default async function PanelPage() {
         <p className="mt-3 text-xs text-muted-foreground">
           Üyelik tarihi: {formatDate(user.createdAt, "d MMMM yyyy")}
         </p>
+      </div>
+
+      {/* Şifre değiştirme — kullanıcı talebi 2026-08-24: oturum açıkken de (e-posta
+          bağlantısı beklemeden) şifre değiştirebilme alanı, hem mobil hem web (aynı
+          responsive /panel sayfası). */}
+      <div className="rounded-lg border p-4">
+        <h2 className="mb-3 text-sm font-semibold">Şifre Değiştir</h2>
+        <ChangePasswordForm />
       </div>
 
       {/* Notifications preview */}

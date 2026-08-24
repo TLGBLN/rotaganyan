@@ -26,6 +26,11 @@ export const registerLimiter = createRateLimiter(3, "1 h");
 // 3 password reset requests per hour per IP
 export const passwordResetLimiter = createRateLimiter(3, "1 h");
 
+// Oturum açıkken şifre değiştirme — mevcut şifreyi kaba kuvvetle denemeyi zorlaştırmak
+// için 5 deneme/dk, kullanıcı ID başına (IP değil — çalınmış bir oturumla farklı IP'den
+// denense bile aynı hesaba karşı sınırlı kalır).
+export const changePasswordLimiter = createRateLimiter(5, "1 m");
+
 // Kayıt doğrulama KODU gönderimi (ilk gönderim + "tekrar gönder") — saatte 5, IP başına.
 export const registrationCodeSendLimiter = createRateLimiter(5, "1 h");
 
