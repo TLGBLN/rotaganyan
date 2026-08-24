@@ -587,6 +587,7 @@ export type Faz1RunnerV5Sirali = Faz1RunnerV5 & {
   katkilar: number[]; // standartVektor[i] * WEIGHTS[i], her özelliğin bu attaki katkısı
   sinyalSayisi: number; // V4'ün 8-sinyal sayımı — yalnız terfi kapısı için, skora girmez
   agfTerfi: "ilk3" | "ilk6" | null;
+  agfFavoriGarantisi: boolean;
   teknikSira: number;
   karar: string;
 };
@@ -667,6 +668,30 @@ function agfTrendTerfisiUygula<
   return ilk6Sonrasi.map((r) => (ilk6Terfi.has(r.no) ? { ...r, agfTerfi: "ilk6" as const } : r));
 }
 
+// 2026-08-24 kullanıcı bulgusu (Bursa K10, Kaşmir Tay vakası): AGF sırası=1 (favori) bir
+// at, modelin ham olasılık sıralamasında 4.sıraya düşmüştü — at kazandı. agfTrendTerfisiUygula
+// AGF-1'i BURADA KORUMAZ, çünkü o mekanizma olasılığa göre YARIŞIYOR (candidate havuzda
+// en güçlü N tanesi kazanıyor) — AGF-1'in olasılığı zaten düşükse yine dışarıda kalır.
+// Backtest (512 sonuçlanmış yarış, 2026-07-01 sonrası, yayınlanan Prediction.picks ile):
+// AGF-1 favorisi %33.6 kazanıyor (gerçek), modelin top3'ü bunların %91.9'unu zaten
+// yakalıyordu — geri kalan %8.1 (14 yarış) modelin top3'ünde YOKTU. AGF-1'i KOŞULSUZ
+// 3.sıraya zorlarsak (mevcut #3'ün yerini alarak): +14 yeni galibiyet yakalanır, yalnız
+// 5 kez yerini aldığımız #3 zaten kazanandı — NET +9/512 (top3 isabeti %60.2→%61.9).
+// Olasılığı/skoru DEĞİŞTİRMEZ, yalnız GÖSTERİM sırasını etkiler (agfTrendTerfisiUygula
+// ile aynı ilke) — ama o mekanizmadan FARKLI olarak koşulsuzdur, rekabete girmez.
+function agfFavoriIlk3Garantisi<T extends { no: number; agfSirasi: number }>(
+  sirali: T[]
+): (T & { agfFavoriGarantisi: boolean })[] {
+  const isaretsiz = sirali.map((r) => ({ ...r, agfFavoriGarantisi: false }));
+  const idx = isaretsiz.findIndex((r) => r.agfSirasi === 1);
+  if (idx < 0 || idx < 3) return isaretsiz;
+
+  const kopya = [...isaretsiz];
+  const [agf1] = kopya.splice(idx, 1);
+  kopya.splice(2, 0, { ...agf1, agfFavoriGarantisi: true });
+  return kopya;
+}
+
 export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
   const ws = agirlikSetiSec(faz1.race.classType);
   const vektorler = faz1.runners.map((r) => standardize(toFeatureVector(r), ws));
@@ -699,8 +724,9 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
 
   const sirali = [...enriched].sort((a, b) => (b.olasilik !== a.olasilik ? b.olasilik - a.olasilik : a.no - b.no));
   const terfili = agfTrendTerfisiUygula(sirali);
+  const garantili = agfFavoriIlk3Garantisi(terfili);
 
-  return terfili.map((r, i) => {
+  return garantili.map((r, i) => {
     let karar = kararUret(r.olasilik);
     if (r.agfTerfi === "ilk3") karar = "Güçlü Aday";
     else if (r.agfTerfi === "ilk6" && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
@@ -938,6 +964,18 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
       guven: "orta",
       kodGarantili: true,
       aciklama: `AGF trend taşıyor ama yalnız ${r.sinyalSayisi} sinyal (ilk-3 için en az 4 gerekir) — ilk-6'ya terfi (V4 backtest: n=3210, %16.1 galibiyet/%44.6 top3)`,
+    });
+  }
+
+  // AGF favorisi ilk-3 garantisi — bkz. agfFavoriIlk3Garantisi (2026-08-24, Kaşmir Tay
+  // dersi). agfTrendTerfisiUygula'dan FARKLI: koşulsuz, olasılıkla yarışmaz.
+  if (r.agfFavoriGarantisi) {
+    satirlar.push({
+      kod: ["AGFFAVORI"],
+      tip: "destek",
+      guven: "tam",
+      kodGarantili: true,
+      aciklama: `AGF favorisi (sıra 1, %${r.agfPayi.toFixed(1)} pay) — modelin ham sıralaması geride bıraksa da ilk-3'e koşulsuz alınır (backtest: n=512, AGF-1 galibiyetlerinin %8.1'i top3 dışında kalıyordu, garanti net +9/512 top3 isabeti)`,
     });
   }
 
