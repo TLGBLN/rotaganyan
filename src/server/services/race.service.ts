@@ -667,6 +667,55 @@ export async function getGecmisKazananKuponlar(limit = 20): Promise<KazananKupon
   return results.map(({ _needsIkramiye, ...r }) => r);
 }
 
+/** "6'lı Ganyan 51.384,31 ₺ vermiştir." cümlesinden sayısal tutarı çıkarır (Türkçe biçim:
+ *  nokta=binlik, virgül=ondalık). Eşleşmezse (ikramiye null/beklenmedik biçim) 0 döner. */
+function parseIkramiyeTutar(ikramiye: string | null): number {
+  if (!ikramiye) return 0;
+  const m = ikramiye.match(/([\d.]+,\d+)/);
+  if (!m) return 0;
+  const n = parseFloat(m[1].replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
+}
+
+export type AylikKuponKazanci = { ay: string; ayEtiketi: string; toplam: number; kuponSayisi: number; eksikIkramiyeliSayisi: number };
+
+/**
+ * Kullanıcı talebi 2026-08-24: "dashboard'ta aylık kupon kazancı olsun, her tutan kupon
+ * ilgili ayın kazancına eklenecek". getGecmisKazananKuponlar'ın ZATEN doğru hesapladığı
+ * (tuttu/tutmadı bizim Result verimizden, ikramiye TJK'nın resmi cümlesinden) İSABET
+ * SAĞLAYAN kupon listesini aya göre gruplayıp toplar — yeni bir hesaplama YOK, yalnız
+ * mevcut doğrulanmış veriyi aylık kırar.
+ *
+ * ÖNEMLİ SINIR: "ikramiye" alanı yalnız archive-kupon cron'unun 2026-07-26'dan itibaren
+ * yakaladığı kayıtlarda dolu (TJK'nın kaynağı geçmişe dönük sorgulanamıyor) — bu tarihten
+ * önce tutan kupon varsa bile o ayın toplamına dahil OLMAZ. `eksikIkramiyeliSayisi` bu
+ * boşluğu şeffaf göstermek için ayrıca sayılıyor.
+ */
+export async function getAylikKuponKazanci(): Promise<AylikKuponKazanci[]> {
+  const kazananlar = await getGecmisKazananKuponlar(500);
+
+  const byAy = new Map<string, { toplam: number; kuponSayisi: number; eksikIkramiyeliSayisi: number; ornekTarih: Date }>();
+  for (const k of kazananlar) {
+    const ay = `${k.date.getUTCFullYear()}-${String(k.date.getUTCMonth() + 1).padStart(2, "0")}`;
+    const mevcut = byAy.get(ay) ?? { toplam: 0, kuponSayisi: 0, eksikIkramiyeliSayisi: 0, ornekTarih: k.date };
+    mevcut.kuponSayisi++;
+    if (k.ikramiye) mevcut.toplam += parseIkramiyeTutar(k.ikramiye);
+    else mevcut.eksikIkramiyeliSayisi++;
+    byAy.set(ay, mevcut);
+  }
+
+  const AY_ADLARI = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+  return [...byAy.entries()]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([ay, v]) => ({
+      ay,
+      ayEtiketi: `${AY_ADLARI[v.ornekTarih.getUTCMonth()]} ${v.ornekTarih.getUTCFullYear()}`,
+      toplam: v.toplam,
+      kuponSayisi: v.kuponSayisi,
+      eksikIkramiyeliSayisi: v.eksikIkramiyeliSayisi,
+    }));
+}
+
 // ─── Canlı Oranlar (anasayfa) ───────────────────────────────────────────────────
 
 export type CurrentRace = {
