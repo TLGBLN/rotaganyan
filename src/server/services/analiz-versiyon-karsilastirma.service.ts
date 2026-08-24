@@ -237,13 +237,37 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.6",
     baslangic: new Date("2026-08-24T00:58:16+03:00"), // fbce87b — V5.6 durumuna (19 sinyal, H2H'sız) geri dönüldü
-    bitis: null,
+    bitis: new Date("2026-08-24T10:01:58+03:00"), // 74e382e — H2H segment-özel geri getirildi
     aciklama: "Kullanıcı kararıyla V5.7/V5.8/V5.9 ve aynı gün içindeki AGF-trend manuel override denemeleri (hepsi antrenorOrani veya AGF trend ile ilgili) geri alındı, tamamen veriden fit edilmiş, hiçbir manuel override İÇERMEYEN son doğrulanmış durağan hale (V5.6) dönüldü. git checkout 2a5ee5a ile v5-engine.ts + iki ağırlık dosyası + arac-model-egit-segment.mjs birebir o commit'teki hâline döndürüldü — bu yüzden versiyon adı da aynı ('V5.6' tekrar).",
     neyiAnalizEdiyor: [
       "19 özellik: agfSirasi, accurace, formEgimi(+karesi), kgs(+karesi), kgsVarMi, pistUzmani, sireOrani, galop, idmJokey, jokeyOrani, antrenorOrani, uzunAraGalopKatkisi, agfYukselisVarMi, kacakAtMi, agfDususVarMi, agfPayi, hizDerecesi — segment-bazlı iki ayrı model (düşük-şart/diğer)",
     ],
     caprazlamalar: [
       "Aynı bu commit setinin ilk yayınında (2a5ee5a) ölçülen sayılar geçerli: düşük-şart top1 %35.0/top3 %75.0/logloss 1.8716; diğer top1 %31.6/top3 %67.2/logloss 1.8241",
+    ],
+  },
+  {
+    versiyon: "V5.6b",
+    baslangic: new Date("2026-08-24T10:01:58+03:00"), // 74e382e — H2H segment-özel geri getirildi
+    bitis: new Date("2026-08-24T12:58:22+03:00"), // ce43452 — Handikap'ta hizDerecesi sıfırlandı
+    aciklama: "Kullanıcı önerisi (\"H2H'ı düşük segmentte kullanma diğer segmentte kullanıyosun\"): H2H 20. özellik olarak geri getirildi (20 sinyal), AMA katsayısı YALNIZ düşük-şart ağırlık dosyasında elle sıfırlandı (v5-weights-dusuksart.json: h2hNetSkor=0) — diğer segmentte doğal fit (+0.0994) korundu. Aynı tam-retrain sonrası tek-katsayı-manuel-override deseni, ilk kez BURADA kuruldu (Handikap-hizDerecesi düzeltmesi bu deseni tekrar kullandı).",
+    neyiAnalizEdiyor: [
+      "20 özellik: V5.6'nın 19'u + h2hNetSkor — segment-bazlı iki model, düşük-şartta h2hNetSkor katkısı elle 0'a sabitlendi",
+    ],
+    caprazlamalar: [
+      "MAKE A FIRE vakası: H2H'sız 3. sıradaydı, H2H eklenince (düzeltmesiz) 7.sıraya düşmüştü — segment-özel sıfırlamayla 5.sıraya geldi (kalan fark, aynı gün içindeki tekrarlı retrain'lerin doğal katsayı driftinden)",
+    ],
+  },
+  {
+    versiyon: "V5.10",
+    baslangic: new Date("2026-08-24T12:58:22+03:00"), // ce43452 — Handikap'ta hizDerecesi sıfırlandı
+    bitis: null,
+    aciklama: "Kullanıcı bulgusu: \"sinyaller bu sebeple önemli, çalışan sinyale sahip atların puanları artması gerekmez mi?\" — Handikap (kategoriTespit===\"2\") kendi verisiyle (267 koşu) ayrı eğitildiğinde hizDerecesi'nin katkısı istatistiksel sıfır çıktı (nokta=-0.0177, %95 GA=[-0.2220,0.1782]), pooled diğer-modelin +0.2562'si (3. en güçlü katsayı) bu kategoride yanlış yönlendiriyordu. V5.6b'deki H2H/düşük-şart deseniyle AYNI cerrahi yöntem: yalnız hizDerecesi Handikap'ta sıfırlandı (WEIGHTS_DIGER_HANDIKAP), diğer 19 katsayı/means/stds dokunulmadı.",
+    neyiAnalizEdiyor: [
+      "V5.6b ile aynı 20 özellik/segment mimarisi — yalnız Handikap (kategori 2) yarışlarında hizDerecesi katkısı 0'a sabitlendi, diğer tüm kategorilerde (Şartlı2-5/Grup-KV/Satış) değişiklik yok",
+    ],
+    caprazlamalar: [
+      "Aynı 67 Handikap test yarışında: pooled model top1=%26.9/top3=%62.7 → hizDerecesi=0 top1=%26.9 (değişmedi)/top3=%67.2 (+4.5p), logloss 1.9917→1.9810 — tam kategori-özel retrain'den (top1=%28.4/top3=%64.2, n=267 overfit riskli) bile daha iyi",
     ],
   },
 ];
