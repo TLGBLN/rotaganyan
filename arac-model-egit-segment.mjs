@@ -23,10 +23,9 @@ const FEATURE_NAMES = [
   "agfSirasi", "accurace", "formEgimi", "formEgimi2", "kgs", "kgs2", "kgsVarMi", "pistUzmani", "sireOrani",
   "galop", "idmJokey", "jokeyOrani", "antrenorOrani", "uzunAraGalopKatkisi",
   "agfYukselisVarMi", "kacakAtMi", "agfDususVarMi", "agfPayi",
-  // 2026-08-23 — H2H net skoru KOMPLE ÇIKARILDI (bkz. v5-engine.ts dosya başındaki
-  // 2026-08-23 notu) — düşük-şart segmentinde katsayı yanlış yöne (negatif) sabitlenmişti,
-  // hiçbir zaman sağlam anlamlı olmamıştı (GA hep sıfırı içeriyordu). Kullanıcı kararıyla
-  // her iki segmentten de kaldırıldı.
+  // 2026-08-21 — H2H net skoru: sınırda bootstrap (GA=[-0.0105,0.1603]) ama top1/top3
+  // İKİSİ BİRDEN iyileşti (logloss ihmal edilebilir), kullanıcı kararıyla eklendi.
+  "h2hNetSkor",
   // 2026-08-21 — hizDerecesi: TJK "süre" alanından (at-bazlı gerçek bitiriş süresi),
   // popülasyon (irk|pist|mesafe) ortalama tempo'suna göre göreli hız — yalnız son 365
   // gün (uzun aradan dönen atların eski "en iyi dönemi" güncelmiş gibi kullanılmasın).
@@ -56,6 +55,7 @@ function toFeatureVector(row) {
     row.kacakAtMi ?? 0,
     row.agfFark <= -ANLAMLI_PUAN_ESIGI ? 1 : 0,
     row.agfPayi ?? 0,
+    row.h2hNetSkor ?? 0,
     row.hizDerecesi ?? 0,
   ];
 }
