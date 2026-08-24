@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { redirectIfLoggedIn } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import VerifyCodeForm from "./VerifyCodeForm";
 
@@ -12,6 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
 type Props = { searchParams: Promise<{ email?: string; callbackUrl?: string }> };
 
 export default async function KayitDogrulaPage({ searchParams }: Props) {
+  await redirectIfLoggedIn();
   const { email, callbackUrl } = await searchParams;
   if (!email) redirect("/kayit");
 

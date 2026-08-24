@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import type { Role } from "@prisma/client";
 import { checkRateLimit, loginLimiter } from "@/lib/ratelimit";
@@ -127,6 +128,21 @@ const ROLE_ORDER: Record<Role, number> = { USER: 0, EDITOR: 1, ADMIN: 2 };
 
 export function hasRole(userRole: Role, minRole: Role): boolean {
   return ROLE_ORDER[userRole] >= ROLE_ORDER[minRole];
+}
+
+// 2026-08-24 kullanıcı bulgusu ("direk siteye aldı beni şifre sıfırlaya bastığımda
+// şifre istemeden, telefonda"): bu kontrol eskiden (auth)/layout.tsx'te TÜM auth
+// sayfaları (giriş/kayıt/şifre sıfırlama) için ortaktı — zaten oturumu açık bir
+// kullanıcı /sifre-sifirla/[token]'a girdiğinde form hiç render edilmeden /panel'e
+// atılıyordu. Oturumu açıkken şifre değiştirmek (ör. hesabın ele geçirildiğinden
+// şüphelenmek) geçerli bir akış — bu kontrol artık yalnız giriş/kayıt sayfalarında
+// (redirectIfLoggedIn çağıran) uygulanıyor, şifre sıfırlama sayfaları MUAF.
+export async function redirectIfLoggedIn() {
+  const session = await auth();
+  if (session?.user) {
+    if (hasRole(session.user.role, "EDITOR")) redirect("/admin");
+    redirect("/panel");
+  }
 }
 
 export async function requireRole(minRole: Role) {

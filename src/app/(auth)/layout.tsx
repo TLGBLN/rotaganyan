@@ -1,21 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
-import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
-import { hasRole } from "@/lib/auth";
 import Wordmark from "@/components/layout/Wordmark";
 
-export default async function AuthLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth();
-
-  // Zaten giriş yapmışsa giriş/kayıt sayfalarına erişimi engelle
-  if (session?.user) {
-    if (hasRole(session.user.role, "EDITOR")) {
-      redirect("/admin");
-    }
-    redirect("/panel");
-  }
-
+// 2026-08-24 kullanıcı bulgusu: "zaten giriş yapmışsa engelle" kontrolü buradan
+// kaldırıldı — bu layout /sifre-sifirla ve /sifre-sifirla/[token]'ı da kapsıyordu,
+// oturumu açık bir kullanıcı şifre sıfırlamak istediğinde form hiç görünmeden
+// /panel'e atılıyordu. Kontrol artık yalnız giriş/kayıt sayfalarında (bkz.
+// redirectIfLoggedIn, src/lib/auth.ts) uygulanıyor.
+export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
       <Link href="/" className="mb-8 flex flex-col items-center gap-3">

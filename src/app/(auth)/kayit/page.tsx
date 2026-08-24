@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { BarChart3, Bell, Satellite, Sparkles, Ticket, TrendingUp } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+import { redirectIfLoggedIn } from "@/lib/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import AuthTabs from "../AuthTabs";
 import RegisterForm from "./RegisterForm";
@@ -13,6 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
 type Props = { searchParams: Promise<{ callbackUrl?: string }> };
 
 export default async function KayitPage({ searchParams }: Props) {
+  await redirectIfLoggedIn();
   const { callbackUrl } = await searchParams;
   const t = await getTranslations("auth.kayit");
   const MEMBER_FEATURES = [

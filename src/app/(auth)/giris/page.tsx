@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { getTranslations } from "next-intl/server";
 import { AuthError } from "next-auth";
 import bcrypt from "bcryptjs";
-import { signIn } from "@/lib/auth";
+import { signIn, redirectIfLoggedIn } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -81,6 +81,7 @@ async function login(formData: FormData) {
 type Props = { searchParams: Promise<{ hata?: string; callbackUrl?: string; dogrulandi?: string; email?: string }> };
 
 export default async function GirisPage({ searchParams }: Props) {
+  await redirectIfLoggedIn();
   const { hata, callbackUrl, dogrulandi, email } = await searchParams;
   const t = await getTranslations("auth.giris");
 
