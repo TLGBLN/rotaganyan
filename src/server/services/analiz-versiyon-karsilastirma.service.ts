@@ -285,13 +285,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.12",
     baslangic: new Date("2026-08-24T17:19:18+03:00"), // 3c06e17 — galopTrendFarki sızıntı nedeniyle geri alındı
-    bitis: null,
+    bitis: new Date("2026-08-24T19:50:31+03:00"), // 8b7da14 — AGF favorisi ilk-3 garantisi eklendi
     aciklama: "KRİTİK DÜZELTME: galopTrendFarki'yi hesaplayan (silinen) arac-galop-trend-ekle.mjs script'inde tarih filtresi UNUTULMUŞTU — yarış tarihinden SONRAKİ idman kayıtları da \"son idman\" sayılabiliyordu (ölçüldü: sıfırdan farklı satırların %74.7'si sızıntılıydı — örnek: İzgioğlu'nun 11 Ağustos yarışı için 20-22 Ağustos'ta yapılmış idmanlar \"geçmiş\" sayılmıştı). Temiz (leak-free, g.date<race.raceDay.date) veriyle yeniden test edilince katsayı tamamen çöktü (düşük-şart +0.280→+0.008, diğer +0.003→-0.005) — V5.11'i gerekçeleyen \"4/4 yön tutarlılığı\" bulgusu BAŞTAN SONA sızıntı kaynaklıymış. galopTrendFarki KOMPLE ÇIKARILDI (22→21 özellik). h2hKiloDegisimi ETKİLENMEDİ (o script'te tarih filtresi baştan doğruydu) — kaldı. Ayrıca aynı oturumda model-veri.json 933→980 yarışa güncellendi (21-24 Ağustos arası 47 yeni sonuçlanmış yarış hiç işlenmemişti, kullanıcı \"neden hâlâ 933\" diye fark etti) — h2hKiloDegisimi taze veriyle diğer segmentte artık ANLAMLI çıktı (nokta=0.0688 GA=[0.0066,0.1503], sıfırı kapsamıyor).",
     neyiAnalizEdiyor: [
       "21 özellik: V5.10'un 20'si + h2hKiloDegisimi — segment-bazlı iki model, 980 yarışlık güncel veriyle eğitildi, Handikap-hizDerecesi/düşük-şart-h2hNetSkor override'ları KORUNDU",
     ],
     caprazlamalar: [
       "Düşük-şart (250 yarış, test n=63): top1=%36.5/top3=%74.6/logloss=1.8210. Diğer (730 yarış, test n=183): top1=%29.5/top3=%64.5/logloss=1.8291, h2hKiloDegisimi B=50 bootstrap nokta=0.0688 GA=[0.0066,0.1503] ✓ anlamlı.",
+    ],
+  },
+  {
+    versiyon: "V5.13",
+    baslangic: new Date("2026-08-24T19:50:31+03:00"), // 8b7da14 — AGF favorisi ilk-3 garantisi eklendi
+    bitis: null,
+    aciklama: "AGF sırası=1 (favori) olan at artık KOŞULSUZ ilk-3'e alınıyor. Kullanıcı bulgusu: Bursa K10'da Kaşmir Tay (AGF-1, %18.8 pay) modelin ham olasılık sıralamasında 4.sıraya düşmüştü ve kazandı — agfTrendTerfisiUygula bunu korumadı çünkü o mekanizma olasılığa göre YARIŞIYOR (AGF-1'in olasılığı zaten düşükse yine dışarıda kalıyordu). Backtest (512 sonuçlanmış yarış, 2026-07-01 sonrası, yayınlanan Prediction.picks ile): AGF-1 favorisi %33.6 kazanıyor, modelin top3'ü bunların %91.9'unu zaten yakalıyordu — kalan %8.1 (14 yarış) top3 dışındaydı. AGF-1'i koşulsuz 3.sıraya zorlayınca (mevcut #3'ün yerini alarak): +14 yeni galibiyet yakalanır, yalnız 5 kez yerini aldığımız #3 zaten kazanandı — NET +9/512 (top3 isabeti %60.2→%61.9). NOT: bu, V2'nin eski 'AGF-top3' hard-rule'unun (Çokomel Kız vakasıyla çürütülüp kaldırılmıştı, bkz. proje hafızası) bir tekrarı DEĞİL — o, Claude'un serbest muhakemesini önceden kısıtlıyordu; bu, V5'in tamamen mekanik/istatistiksel sıralamasında yalnız GÖSTERİM sırasını etkileyen, gerçek 512-yarışlık pozitif backtestle desteklenen ayrı bir kural.",
+    neyiAnalizEdiyor: [
+      "V5.12 ile aynı 21 özellik/segment-bazlı mimari, skor/olasılık hesaplaması DEĞİŞMEDİ — yalnız gösterim sıralamasına AGF-favori-ilk3-garantisi post-processing adımı eklendi",
+    ],
+    caprazlamalar: [
+      "512 yarış (Prediction.picks bazlı simülasyon): mevcut top3 isabeti %60.2 (308/512) → AGF-1 zorla eklenince %61.9 (317/512). 61 yarışta AGF-1 zaten top3'te değildi: 14'ünde yeni galibiyet yakalandı, 5'inde yerini aldığımız #3 zaten kazanandı — net +9.",
     ],
   },
 ];
