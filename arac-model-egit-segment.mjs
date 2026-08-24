@@ -55,8 +55,12 @@ const FEATURE_NAMES = [
   // kilo avantajının geçmiş karşılaşmaya göre değişimi. galopTrendFarki: Gallop.splits
   // (zaten idman senkronundan geliyor) — son 400m idman ile bir önceki AYNI mesafedeki
   // idman arasındaki süre farkı (pozitif=hızlandı).
+  // 2026-08-24 — galopTrendFarki BURADAN ÇIKARILDI: hesaplama script'inde (arac-galop-
+  // trend-ekle.mjs, artık silindi) tarih filtresi eksikti, yarış tarihinden SONRAKİ
+  // idman kayıtları "son idman" sayılmıştı (ölçüldü: sıfırdan farklı satırların %74.7'si
+  // sızıntılı). Temiz veriyle yeniden test edilince katsayı tamamen çöktü (düşük-şart
+  // +0.280→+0.008, diğer +0.003→-0.005) — "yön tutarlılığı" kabul gerekçesi geçersizdi.
   "h2hKiloDegisimi",
-  "galopTrendFarki",
 ];
 
 function toFeatureVector(row) {
@@ -71,7 +75,6 @@ function toFeatureVector(row) {
     row.h2hNetSkor ?? 0,
     row.hizDerecesi ?? 0,
     row.h2hKiloDegisimi ?? 0,
-    row.galopTrendFarki ?? 0,
   ];
 }
 function groupByRace(rows) {
