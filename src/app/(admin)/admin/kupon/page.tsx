@@ -4,10 +4,9 @@ import { tr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { getHippodromes, getRaceDaysByDate, buildKuponOnerisi, type KuponStatus } from "@/server/services/race.service";
+import { getHippodromes, buildKuponOnerisi, type KuponStatus } from "@/server/services/race.service";
 import { getAdminRaceDays, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
 import { turkeyDateString } from "@/lib/tz";
-import PuanTablosu from "@/components/kosular/PuanTablosu";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import KuponForm from "./KuponForm";
 import KuponActions from "./KuponActions";
@@ -51,10 +50,9 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
     try { await syncResultsForDate(currentDate); } catch { /* TJK geçici olarak erişilemezse sessizce geç, mevcut veriyle devam et */ }
   }
 
-  const [kuponlar, hippodromes, raceDays, adminRaceDays] = await Promise.all([
+  const [kuponlar, hippodromes, adminRaceDays] = await Promise.all([
     db.homeKupon.findMany({ orderBy: { createdAt: "desc" }, take: 20 }),
     getHippodromes(),
-    getRaceDaysByDate(currentDate),        // PuanTablosu için
     getAdminRaceDays(currentDate),         // Koşu programı tablosu için (kosular ile aynı)
   ]);
 
@@ -242,6 +240,12 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                                       🎯 {couponTierLabel(p.rank)}
                                     </span>
                                   ))}
+                                <span className="w-full text-[10px] text-muted-foreground">
+                                  {effectivePred.picks.slice(0, 3).map((p) => {
+                                    const no = p.runnerLabel.match(/^#*(\d+)/)?.[1] ?? "?";
+                                    return `#${no}${p.score != null ? ` %${p.score}` : ""}`;
+                                  }).join(" · ")}
+                                </span>
                               </div>
                             ) : (
                               <Link
@@ -275,11 +279,6 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
           ))}
         </div>
       )}
-
-      {/* ── Puan Tablosu ── */}
-      {raceDays.map((rd) => (
-        <PuanTablosu key={rd.id} raceDay={rd} isLoggedIn={true} currentDate={today} isAdmin />
-      ))}
 
       <div className="rounded-lg border p-4">
         <h2 className="mb-4 text-sm font-semibold">Yeni Kombine Kupon</h2>

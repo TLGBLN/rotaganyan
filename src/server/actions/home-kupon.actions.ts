@@ -45,7 +45,7 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
             select: {
               picks: {
                 orderBy: { rank: "asc" },
-                select: { rank: true, runnerId: true },
+                select: { rank: true, runnerId: true, score: true },
               },
             },
           },
@@ -80,6 +80,8 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
 
   // rankByNo: Karma yarışlar için at numarası → analiz sırası
   const rankByNoById = new Map<string, Map<number, number>>();
+  // scoreByNo: Karma yarışlar için at numarası → V5 modeli yüzdesi (Pick.score)
+  const scoreByNoById = new Map<string, Map<number, number | null>>();
   // metaByNo: Karma yarışlar için at numarası → { scratched, ekuriGroup }
   const metaByNoById = new Map<string, Map<number, { scratched: boolean; ekuriGroup: number | null }>>();
 
@@ -94,7 +96,7 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
         runners: { select: { id: true, no: true, name: true, scratched: true, ekuriGroup: true } },
         prediction: {
           select: {
-            picks: { orderBy: { rank: "asc" }, select: { rank: true, runnerId: true } },
+            picks: { orderBy: { rank: "asc" }, select: { rank: true, runnerId: true, score: true } },
           },
         },
       },
@@ -108,15 +110,17 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
       const match = sourceBySignature.get(runnerSetSignature(r.runners));
       if (!match?.prediction) continue;
 
-      // Kaynak runner ID'den at numarasına map oluştur, sonra no→rank yap
+      // Kaynak runner ID'den at numarasına map oluştur, sonra no→rank/skor yap
       const runnerIdToNo = new Map(match.runners.map((ru) => [ru.id, ru.no]));
       const noToRank = new Map<number, number>();
+      const noToScore = new Map<number, number | null>();
       for (const pick of match.prediction.picks) {
         if (!pick.runnerId) continue;
         const no = runnerIdToNo.get(pick.runnerId);
-        if (no != null) noToRank.set(no, pick.rank);
+        if (no != null) { noToRank.set(no, pick.rank); noToScore.set(no, pick.score); }
       }
       rankByNoById.set(r.id, noToRank);
+      scoreByNoById.set(r.id, noToScore);
 
       // at no → meta
       const noToMeta = new Map<number, { scratched: boolean; ekuriGroup: number | null }>();
@@ -133,6 +137,8 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
       // Kendi prediction'ı varsa runnerId bazlı, Karma aynasıysa no bazlı sırala
       let rankByRunnerId: Map<string, number> | null = null;
       let rankByNo: Map<number, number> | null = null;
+      let scoreByRunnerId: Map<string, number | null> | null = null;
+      let scoreByNo: Map<number, number | null> | null = null;
 
       if (r.prediction) {
         const picks = r.prediction.picks;
@@ -140,8 +146,13 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
           picks.filter((p): p is typeof p & { runnerId: string } => p.runnerId != null)
                .map((p) => [p.runnerId, p.rank])
         );
+        scoreByRunnerId = new Map(
+          picks.filter((p): p is typeof p & { runnerId: string } => p.runnerId != null)
+               .map((p) => [p.runnerId, p.score])
+        );
       } else {
         rankByNo = rankByNoById.get(r.id) ?? null;
+        scoreByNo = scoreByNoById.get(r.id) ?? null;
       }
 
       const runners = [...r.runners].sort((a, b) => {
@@ -159,6 +170,7 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
             name: runner.name,
             scratched: karmaMeta?.scratched ?? runner.scratched,
             ekuriGroup: karmaMeta?.ekuriGroup ?? runner.ekuriGroup,
+            score: scoreByRunnerId?.get(runner.id) ?? scoreByNo?.get(runner.no) ?? null,
           };
         }),
       };

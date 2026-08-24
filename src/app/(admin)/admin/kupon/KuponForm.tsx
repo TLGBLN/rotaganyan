@@ -11,7 +11,7 @@ import {
 } from "@/server/actions/home-kupon.actions";
 
 type Hippodrome = { id: string; name: string; slug: string };
-type RaceRunner = { no: number; name: string; scratched: boolean; ekuriGroup: number | null };
+type RaceRunner = { no: number; name: string; scratched: boolean; ekuriGroup: number | null; score: number | null };
 type RaceDayData = {
   hippodromeName: string;
   races: { raceNo: number; runners: RaceRunner[] }[];
@@ -128,6 +128,11 @@ function KuponGrup({
                               <span className={cn("truncate font-medium", runner.scratched && "line-through")}>
                                 {runner.name}
                               </span>
+                              {runner.score != null && (
+                                <span className="shrink-0 text-[10px] font-semibold tabular-nums opacity-80">
+                                  %{runner.score}
+                                </span>
+                              )}
                               {runner.scratched ? (
                                 <span className="ml-auto shrink-0 text-[10px] text-red-400 font-semibold">Koşmaz</span>
                               ) : runner.ekuriGroup != null ? (

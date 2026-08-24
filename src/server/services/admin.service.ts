@@ -42,7 +42,7 @@ export type AdminRaceDay = Prisma.RaceDayGetPayload<{
           select: {
             id: true;
             published: true;
-            picks: { select: { rank: true; isTarget: true } };
+            picks: { select: { rank: true; isTarget: true; score: true; runnerLabel: true } };
           };
         };
         result: { select: { id: true } };
@@ -119,7 +119,7 @@ export async function getAdminRaceDays(dateStr?: string, limit = 30): Promise<Ad
             select: {
               id: true,
               published: true,
-              picks: { select: { rank: true, isTarget: true } },
+              picks: { orderBy: { rank: "asc" }, select: { rank: true, isTarget: true, score: true, runnerLabel: true } },
             },
           },
           result: { select: { id: true } },
