@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
+import SonuclarPaginator from "@/components/admin/SonuclarPaginator";
 
 export const dynamic = "force-dynamic";
 
@@ -69,8 +70,7 @@ export default async function SonuclarPage({ searchParams }: PageProps) {
   const { sayfa: sayfaParam } = await searchParams;
   const sayfa = Math.max(0, parseInt(sayfaParam ?? "0", 10) || 0);
   const { results, total: toplamKayitSayisi, skip } = await getResultsWithPicks(sayfa);
-  const hasOlder = skip + results.length < toplamKayitSayisi;
-  const hasNewer = sayfa > 0;
+  const sonSayfa = Math.max(0, Math.ceil(toplamKayitSayisi / SAYFA_BOYU) - 1);
 
   const tiers = results.map(getTier);
   const total = results.length;
@@ -92,26 +92,11 @@ export default async function SonuclarPage({ searchParams }: PageProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-lg font-bold">Sonuç Analizi</h1>
-        <div className="flex items-center gap-2 text-xs">
-          {hasNewer && (
-            <a
-              href={`/admin/sonuclar${sayfa - 1 > 0 ? `?sayfa=${sayfa - 1}` : ""}`}
-              className="rounded-md border px-3 py-1.5 font-medium text-foreground transition-colors hover:border-foreground/30"
-            >
-              ← Daha Yeni
-            </a>
-          )}
+        <div className="flex items-center gap-3 text-xs">
           <span className="text-muted-foreground">
             {skip + 1}–{skip + results.length} / {toplamKayitSayisi}
           </span>
-          {hasOlder && (
-            <a
-              href={`/admin/sonuclar?sayfa=${sayfa + 1}`}
-              className="rounded-md border px-3 py-1.5 font-medium text-foreground transition-colors hover:border-foreground/30"
-            >
-              Daha Eski Sonuçlar →
-            </a>
-          )}
+          <SonuclarPaginator sayfa={sayfa} sonSayfa={sonSayfa} />
         </div>
       </div>
 
@@ -215,14 +200,9 @@ export default async function SonuclarPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      {hasOlder && (
+      {sonSayfa > 0 && (
         <div className="flex justify-center">
-          <a
-            href={`/admin/sonuclar?sayfa=${sayfa + 1}`}
-            className="rounded-md border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-foreground/30"
-          >
-            Daha Eski Sonuçlar →
-          </a>
+          <SonuclarPaginator sayfa={sayfa} sonSayfa={sonSayfa} />
         </div>
       )}
     </div>
