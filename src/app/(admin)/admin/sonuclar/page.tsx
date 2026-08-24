@@ -45,16 +45,52 @@ async function getResultsWithPicks(sayfa: number) {
 type Tier = "rank1" | "rank2_3" | "rank4_6" | "miss";
 type Result = Awaited<ReturnType<typeof getResultsWithPicks>>["results"][number];
 
-function getTier(r: Result): Tier {
+function getTier(r: { hitTop1: boolean; hitInCoupon: boolean; winnerNos: number[]; picks: { rank: number; runnerNo: number | null }[] }): Tier {
   if (r.hitTop1) return "rank1";
   if (r.hitInCoupon) return "rank2_3";
   const winnerNos = r.winnerNos;
   if (winnerNos.length > 0) {
-    const picks = r.race.prediction?.picks ?? [];
-    const pick = picks.find((p) => p.runner?.no != null && winnerNos.includes(p.runner.no));
+    const pick = r.picks.find((p) => p.runnerNo != null && winnerNos.includes(p.runnerNo));
     if (pick && pick.rank >= 4 && pick.rank <= 6) return "rank4_6";
   }
   return "miss";
+}
+
+// 2026-08-24 kullanıcı bulgusu: özet kartlar (1.Sıra/2-3.Sıra/4-6.Sıra/Listede Yok) yalnız
+// GÖRÜNTÜLENEN sayfanın 100 satırından hesaplanıyordu — sayfa değiştikçe sayılar değişiyordu.
+// Artık TÜM (sayfalanmamış) sonuçlardan, hafif bir select ile (getAnalystStats'ın da
+// kullandığı "tüm satırları çek, JS'te hesapla" deseniyle — admin.service.ts) ayrı
+// hesaplanıyor; sayfalama yalnız aşağıdaki liste görünümünü etkiler, özet kartlar sabit kalır.
+async function getOzetIstatistikler() {
+  const rows = await db.result.findMany({
+    where: { race: { prediction: { published: true } } },
+    select: {
+      hitTop1: true,
+      hitInCoupon: true,
+      winnerNos: true,
+      ganyan: true,
+      race: { select: { prediction: { select: { picks: { select: { rank: true, runner: { select: { no: true } } } } } } } },
+    },
+  });
+  const tiers = rows.map((r) =>
+    getTier({
+      hitTop1: r.hitTop1,
+      hitInCoupon: r.hitInCoupon,
+      winnerNos: r.winnerNos,
+      picks: (r.race.prediction?.picks ?? []).map((p) => ({ rank: p.rank, runnerNo: p.runner?.no ?? null })),
+    })
+  );
+  const total = rows.length;
+  const counts = {
+    rank1: tiers.filter((t) => t === "rank1").length,
+    rank2_3: tiers.filter((t) => t === "rank2_3").length,
+    rank4_6: tiers.filter((t) => t === "rank4_6").length,
+    miss: tiers.filter((t) => t === "miss").length,
+  };
+  const ganyanHits = rows.filter((r, i) => tiers[i] === "rank1" && r.ganyan != null);
+  const avgGanyan =
+    ganyanHits.length > 0 ? (ganyanHits.reduce((s, r) => s + r.ganyan!, 0) / ganyanHits.length).toFixed(2) : null;
+  return { total, counts, avgGanyan };
 }
 
 const TIER = {
@@ -69,24 +105,25 @@ type PageProps = { searchParams: Promise<{ sayfa?: string }> };
 export default async function SonuclarPage({ searchParams }: PageProps) {
   const { sayfa: sayfaParam } = await searchParams;
   const sayfa = Math.max(0, parseInt(sayfaParam ?? "0", 10) || 0);
-  const { results, total: toplamKayitSayisi, skip } = await getResultsWithPicks(sayfa);
+  const [{ results, total: toplamKayitSayisi, skip }, ozet] = await Promise.all([
+    getResultsWithPicks(sayfa),
+    getOzetIstatistikler(),
+  ]);
   const sonSayfa = Math.max(0, Math.ceil(toplamKayitSayisi / SAYFA_BOYU) - 1);
 
-  const tiers = results.map(getTier);
-  const total = results.length;
-  const counts = {
-    rank1: tiers.filter((t) => t === "rank1").length,
-    rank2_3: tiers.filter((t) => t === "rank2_3").length,
-    rank4_6: tiers.filter((t) => t === "rank4_6").length,
-    miss: tiers.filter((t) => t === "miss").length,
-  };
-  const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
-
-  const ganyanHits = results.filter((r, i) => tiers[i] === "rank1" && r.ganyan != null);
-  const avgGanyan =
-    ganyanHits.length > 0
-      ? (ganyanHits.reduce((s, r) => s + r.ganyan!, 0) / ganyanHits.length).toFixed(2)
-      : null;
+  // Sayfadaki satırların rozetleri (görsel etiket) hâlâ kendi tier'ını kullanır — yalnız
+  // yukarıdaki ÖZET kartlar artık ozet.counts'tan (TÜM sonuçlar) geliyor.
+  const tiers = results.map((r) =>
+    getTier({
+      hitTop1: r.hitTop1,
+      hitInCoupon: r.hitInCoupon,
+      winnerNos: r.winnerNos,
+      picks: (r.race.prediction?.picks ?? []).map((p) => ({ rank: p.rank, runnerNo: p.runner?.no ?? null })),
+    })
+  );
+  const counts = ozet.counts;
+  const pct = (n: number) => (ozet.total > 0 ? Math.round((n / ozet.total) * 100) : 0);
+  const avgGanyan = ozet.avgGanyan;
 
   return (
     <div className="space-y-6">
@@ -108,14 +145,14 @@ export default async function SonuclarPage({ searchParams }: PageProps) {
               {TIER[tier].label}
             </div>
             <div className="text-2xl font-bold">{counts[tier]}</div>
-            <div className="text-xs text-muted-foreground">%{pct(counts[tier])} · {counts[tier]}/{total}</div>
+            <div className="text-xs text-muted-foreground">%{pct(counts[tier])} · {counts[tier]}/{ozet.total}</div>
           </div>
         ))}
       </div>
 
       <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
         <span>
-          Bu sayfada: <strong className="text-foreground">{total}</strong> analiz edilmiş koşu (toplam {toplamKayitSayisi})
+          Toplam: <strong className="text-foreground">{ozet.total}</strong> analiz edilmiş koşu (bu sayfada {results.length})
         </span>
         {avgGanyan && (
           <span>
