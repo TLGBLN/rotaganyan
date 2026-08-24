@@ -44,6 +44,19 @@ const FEATURE_NAMES = [
   // alanı yine de arac-model-veri-olustur.mts'de toplanıyor (ekstra TJK isteği
   // gerektirmiyor), ileride farklı formülasyonla (örn. saha ortalamasına göre relatif)
   // yeniden test edilmek istenirse hazır olsun diye.
+  // 2026-08-24 — Kilo-ayarlı H2H + Galop trendi: kullanıcı hipotezi (SANCAR EFESİ vakası
+  // + paylaşılan "Galop Değişimi" ekranı). İKİSİ DE tek başına sınırda/anlamsız (GA
+  // sıfırı kapsıyor: h2hKilo düşük-şart nokta=+0.089 GA=[-0.162,0.279], diğer nokta=
+  // +0.061 GA=[-0.022,0.164]; galopTrend düşük-şart nokta=+0.280 GA=[-0.007,0.637]
+  // NEREDEYSE anlamlı, diğer nokta=+0.003 pratikte sıfır) AMA HER İKİ sinyal HER İKİ
+  // segmentte de POZİTİF yön gösterdi (4/4) — kullanıcı bu yön-tutarlılığını yeterli
+  // kanıt sayıp EKLENMESİNİ istedi (2026-08-24). h2hKiloDegisimi: HorseRaceHistoryCache
+  // (H2H'nin zaten kullandığı kaynak, ekstra TJK isteği yok) — bugünkü rakiplere göre
+  // kilo avantajının geçmiş karşılaşmaya göre değişimi. galopTrendFarki: Gallop.splits
+  // (zaten idman senkronundan geliyor) — son 400m idman ile bir önceki AYNI mesafedeki
+  // idman arasındaki süre farkı (pozitif=hızlandı).
+  "h2hKiloDegisimi",
+  "galopTrendFarki",
 ];
 
 function toFeatureVector(row) {
@@ -57,6 +70,8 @@ function toFeatureVector(row) {
     row.agfPayi ?? 0,
     row.h2hNetSkor ?? 0,
     row.hizDerecesi ?? 0,
+    row.h2hKiloDegisimi ?? 0,
+    row.galopTrendFarki ?? 0,
   ];
 }
 function groupByRace(rows) {

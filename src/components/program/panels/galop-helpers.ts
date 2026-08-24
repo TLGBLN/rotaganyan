@@ -52,7 +52,7 @@ const GALOP_BENCHMARKS: Record<string, Record<string, { iyi: number; cokIyi: num
 // TJK zaman formatı "dk.sn.yüzdeSn" (örn. "0.25.40" = 0dk 25.40sn) — 3. segment
 // yüzde saniye (centisecond), decisecond DEĞİL; bkz. veri-toplama.ts parseSaniye
 // yorumu (481 gerçek galop kaydıyla doğrulandı).
-function parseGalopSec(t: string | null): number | null {
+export function parseGalopSec(t: string | null): number | null {
   if (!t) return null;
   const p = t.split(".");
   if (p.length === 2) return parseFloat(t) || null;

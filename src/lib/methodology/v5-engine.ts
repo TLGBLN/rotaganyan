@@ -141,7 +141,7 @@ import {
   fetchAccuraceGecmisKayitlari,
   hesaplaAccuraceSonYarisEnHizliKapanisMap,
 } from "@/lib/methodology/veri-toplama";
-import { galopQuality, isSameJockey } from "@/components/program/panels/galop-helpers";
+import { galopQuality, isSameJockey, parseGalopSec } from "@/components/program/panels/galop-helpers";
 import type { PickDetailsV2, MuhakemeSatiri } from "@/lib/methodology/muhakeme-format";
 import { hesaplaSinyalSayisi, kategoriTespit } from "@/lib/methodology/v2-engine";
 import { AGF_TERFI_ILK3_SINYAL_ESIGI as SINYAL_ESIGI } from "@/lib/methodology/v4-engine";
@@ -274,6 +274,21 @@ export type Faz1RunnerV5 = {
    *  İKİ segmentte de güçlü anlamlı (düşük-şart +0.58 — modelin en büyük katsayısı,
    *  diğer +0.26), VIF=1.02-1.10 (hiçbir sinyalle çakışmıyor). */
   hizDerecesi: number;
+  /** 2026-08-24 — Kilo-ayarlı H2H: bugünkü sahadaki rakiplere göre kilo avantajı,
+   *  o rakiplerle geçmiş karşılaşmadaki kilo avantajına göre ne kadar DEĞİŞTİ
+   *  (pozitif = kilo pozisyonu iyileşti). SANCAR EFESİ vakası (24 Ağu, Bursa K1)
+   *  ile bulundu — geçmişte eşit/dezavantajlı kiloyla kaybettiği rakipleri, bugün
+   *  belirgin hafif olunca geçti. 933 yarışta tam retrain+B=200 bootstrap: HER İKİ
+   *  segmentte de katsayı POZİTİF (düşük-şart +0.089 GA=[-0.162,0.279], diğer +0.061
+   *  GA=[-0.022,0.164]) — ikisi de tek başına sınırda/anlamsız ama YÖN TUTARLI
+   *  (4/4 pozitif h2hKilo+galopTrend×2 segment) kullanıcı kararıyla KABUL EDİLDİ. */
+  h2hKiloDegisimi: number;
+  /** 2026-08-24 — Galop trendi: son idman ile AYNI mesafedeki (400m) bir önceki
+   *  idman arasındaki süre farkı (pozitif = hızlandı/iyi). Kullanıcının paylaştığı
+   *  "Galop Değişimi" ekran fikrinden test edildi. Düşük-şartta nokta=+0.280
+   *  GA=[-0.007,0.637] (neredeyse anlamlı), diğerde nokta=+0.003 (pratikte sıfır) —
+   *  h2hKiloDegisimi ile AYNI yön-tutarlılığı gerekçesiyle KABUL EDİLDİ. */
+  galopTrendFarki: number;
 };
 
 export type Faz1SonucV5 = {
@@ -313,7 +328,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
         orderBy: { no: "asc" },
         select: {
           id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true,
-          raceStyle: true,
+          raceStyle: true, weight: true,
           gallops: { select: { date: true, jockey: true, splits: true }, orderBy: { date: "desc" } },
         },
       },
@@ -357,6 +372,55 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       }
     }
     return skor;
+  }
+
+  // 2026-08-24 — Kilo-ayarlı H2H (bkz. Faz1RunnerV5.h2hKiloDegisimi üstündeki not).
+  // H2HResult.weight zaten getH2HForRace'ten geliyor (TJK "At Koşu Bilgileri" — ekstra
+  // istek YOK), yalnız o veriyi kullanan bir hesap eksikti.
+  function parseKiloSayi(w: string | null | undefined): number | null {
+    if (!w) return null;
+    const n = parseFloat(w.replace(",", "."));
+    return isNaN(n) ? null : n;
+  }
+  const bugunKiloByNo = new Map(runners.map((r) => [r.no, r.weight]));
+  function h2hKiloDegisimiHesapla(kendiAd: string, kendiBugunKilo: number | null): number {
+    if (kendiBugunKilo == null) return 0;
+    let toplam = 0;
+    for (const enc of h2hEncounters) {
+      const beni = enc.results.find((e) => e.horseName === kendiAd);
+      if (!beni) continue;
+      const kendiOKilo = parseKiloSayi(beni.weight);
+      if (kendiOKilo == null) continue;
+      for (const other of enc.results) {
+        if (other.horseName === kendiAd) continue;
+        const otherNo = raceNameToNo.get(other.horseName);
+        if (otherNo == null) continue;
+        const otherOKilo = parseKiloSayi(other.weight);
+        if (otherOKilo == null) continue;
+        const otherBugunKilo = bugunKiloByNo.get(otherNo);
+        if (otherBugunKilo == null) continue;
+        const todayAdvantage = otherBugunKilo - kendiBugunKilo;
+        const histAdvantage = otherOKilo - kendiOKilo;
+        toplam += todayAdvantage - histAdvantage;
+      }
+    }
+    return toplam;
+  }
+
+  // 2026-08-24 — Galop trendi (bkz. Faz1RunnerV5.galopTrendFarki üstündeki not): son
+  // idman ile AYNI mesafedeki (400m) bir önceki idman arasındaki süre farkı.
+  function galopTrendHesapla(gecerliGaloplar: { splits: unknown }[]): number {
+    let son: number | null = null;
+    let onceki: number | null = null;
+    for (const g of gecerliGaloplar) {
+      const s = (g.splits as Record<string, string | null> | null) ?? {};
+      const sec = parseGalopSec(s["400"] ?? null);
+      if (sec == null) continue;
+      const adj = s["ic_dis"] === "İç" ? sec - 1.0 : sec;
+      if (son == null) son = adj;
+      else { onceki = adj; break; }
+    }
+    return son != null && onceki != null ? onceki - son : 0;
   }
 
   const sonYarisByNo = new Map(sonYarisDetaylari.map((d) => [d.runnerNo, d]));
@@ -436,6 +500,8 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       kacakAtMi: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" ? 1 : 0,
       h2hNetSkor: h2hNetSkorHesapla(r.name),
       hizDerecesi: hizByNo.get(r.no) ?? 0,
+      h2hKiloDegisimi: h2hKiloDegisimiHesapla(r.name, r.weight),
+      galopTrendFarki: galopTrendHesapla(gecerliGaloplar),
     };
   });
 
@@ -490,6 +556,11 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     // 2026-08-21 — Hız derecesi: bkz. dosya başındaki V5.4 notu. HER İKİ segmentte de
     // güçlü anlamlı (B=200), VIF=1.02-1.10 (çakışma yok).
     r.hizDerecesi,
+    // 2026-08-24 — Kilo-ayarlı H2H + Galop trendi: bkz. Faz1RunnerV5 üstündeki notlar.
+    // İkisi de TEK BAŞINA sınırda/anlamsız (GA sıfırı kapsıyor) ama HER İKİ segmentte
+    // de yön POZİTİF (4/4) — kullanıcı kararıyla "yön tutarlılığı" gerekçesiyle eklendi.
+    r.h2hKiloDegisimi,
+    r.galopTrendFarki,
   ];
 }
 
@@ -737,6 +808,11 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // 2026-08-21 — Hız derecesi: veri yoksa (son 365 günde uygun geçmiş yok) 0, satır
   // gösterilmez — "hızlı değil" ile "veri yok" karışmasın.
   { kod: "HIZ", ozellikIndeksleri: [idx("hizDerecesi")], aciklama: (r) => (r.hizDerecesi !== 0 ? `Hız derecesi: popülasyona göre ${r.hizDerecesi > 0 ? "+" : ""}${r.hizDerecesi.toFixed(1)}% (${r.hizDerecesi > 0 ? "daha hızlı" : "daha yavaş"})` : null) },
+  // 2026-08-24 — Kilo-ayarlı H2H: veri yoksa (kilo bilgili ortak karşılaşma yok) 0,
+  // satır hiç gösterilmez.
+  { kod: "H2HKILO", ozellikIndeksleri: [idx("h2hKiloDegisimi")], aciklama: (r) => (r.h2hKiloDegisimi !== 0 ? `Kilo-ayarlı H2H: bugünkü rakiplere göre kilo pozisyonu geçmiş karşılaşmalara kıyasla ${r.h2hKiloDegisimi > 0 ? "+" : ""}${r.h2hKiloDegisimi.toFixed(1)}kg ${r.h2hKiloDegisimi > 0 ? "iyileşti" : "kötüleşti"}` : null) },
+  // 2026-08-24 — Galop trendi: veri yoksa (aynı mesafede 2 idman yok) 0, satır gösterilmez.
+  { kod: "GALOPTREND", ozellikIndeksleri: [idx("galopTrendFarki")], aciklama: (r) => (r.galopTrendFarki !== 0 ? `Galop trendi: bir önceki idmana göre 400m'de ${Math.abs(r.galopTrendFarki).toFixed(2)}sn ${r.galopTrendFarki > 0 ? "hızlandı" : "yavaşladı"}` : null) },
 ];
 
 // 2026-08-18 kullanıcı talebi: "18 sinyalin hepsinin kontrol edildiğini bana göstermesini
@@ -759,6 +835,8 @@ const FEATURE_LABELS: Record<string, string> = {
   agfPayi: "AGF Payı (ham yüzde)", agfFarkiIkinciye: "AGF Dominans Farkı (2.'ye göre, yalnız favoride)",
   h2hNetSkor: "H2H Net Skoru (bugünkü rakiplerle geçmiş karşılaşma)",
   hizDerecesi: "Hız Derecesi (popülasyona göre göreli tempo, son 365 gün)",
+  h2hKiloDegisimi: "Kilo-Ayarlı H2H (rakiplere göre kilo pozisyonu değişimi)",
+  galopTrendFarki: "Galop Trendi (bir önceki aynı-mesafe idmana göre hızlanma/yavaşlama)",
 };
 
 export type TumOzellikDetay = { kod: string; etiket: string; hamDeger: number; standartDeger: number; katki: number };
