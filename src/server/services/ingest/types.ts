@@ -36,6 +36,12 @@ export type IngestGallop = {
   splits: Record<string, string>;
 };
 
+export type IngestIkramiyeDetay = {
+  ikramiye: number[];
+  yetistiriciPrimi: number[];
+  atSahibiPrimi: number[];
+};
+
 export type IngestRace = {
   raceNo: number;
   time?: string;
@@ -46,6 +52,7 @@ export type IngestRace = {
   conditions?: string;
   ageWeight?: string;
   trackRecord?: string;
+  ikramiyeDetay?: IngestIkramiyeDetay;
   runners: IngestRunner[];
   gallops: IngestGallop[];
 };

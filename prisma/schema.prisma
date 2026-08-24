@@ -183,6 +183,11 @@ model Race {
   conditions  String?
   ageWeight   String?
   trackRecord String?
+  // 2026-08-24 kullanıcı talebi — TJK program sayfasının ".race-share" bloğu (Ikramiye/
+  // Yetiştirici Primi/At Sahibi Primi, her biri 1.-5. sıra kırılımlı) — sınıf hiyerarşisi
+  // ikramiye üzerinden de karşılaştırılabilsin diye. {ikramiye:number[5], yetistiriciPrimi:
+  // number[5], atSahibiPrimi:number[5]} — index 0 = 1.lik. Değer yoksa null.
+  ikramiyeDetay Json?
   createdAt   DateTime @default(now())
 
   // v6.99 — kullanıcı kararı 2026-08-10: eşzamanlılık kilidi (analysis-concurrency-lock.ts).

@@ -85,6 +85,7 @@ export async function persistRaceDays(raceDays: IngestRaceDay[]): Promise<Ingest
           conditions: r.conditions,
           ageWeight: r.ageWeight,
           trackRecord: r.trackRecord,
+          ...(r.ikramiyeDetay ? { ikramiyeDetay: r.ikramiyeDetay } : {}),
         };
 
         const race = existing

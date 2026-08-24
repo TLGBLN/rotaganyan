@@ -5,7 +5,7 @@
 
 import { request } from "undici";
 import * as cheerio from "cheerio";
-import type { IngestRaceDay, IngestRace, IngestRunner } from "./types";
+import type { IngestRaceDay, IngestRace, IngestRunner, IngestIkramiyeDetay } from "./types";
 import type { Breed, Surface } from "@prisma/client";
 
 const BASE = "https://www.tjk.org";
@@ -51,6 +51,36 @@ function parseSurface(text: string): Surface {
 
 function parseBreed(text: string): Breed {
   return text.toUpperCase().includes("ARAP") ? "ARAP" : "INGILIZ";
+}
+
+// 2026-08-24 kullanıcı talebi — ".race-share" bloğu (Ikramiye/Yetistirici Primi/At Sahibi
+// Primi, her biri "1.) 490.000 t" biçiminde 5 sıra) — sınıf hiyerarşisini ikramiye
+// üzerinden karşılaştırabilmek için. Her h3 etiketinden hemen sonraki dl'nin dd'lerini
+// okur — TJK üç bloğu da AYNI ".race-share" div'i içinde, art arda üç h3+dl çifti olarak
+// yayınlıyor (doğrulandı: gerçek Bursa sayfası, 2026-08-24).
+function parseTutar(text: string): number {
+  const cleaned = text.replace(/\./g, "").replace(/[^\d,]/g, "").replace(",", ".");
+  const n = parseFloat(cleaned);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function parseIkramiyeDetay($: cheerio.CheerioAPI, raceDiv: Parameters<typeof $>[0]): IngestIkramiyeDetay | undefined {
+  const share = $(".race-share", raceDiv).first();
+  if (share.length === 0) return undefined;
+
+  const dizi = (etiketBaslar: string): number[] => {
+    const h3 = share.find("h3").filter((_, el) => $(el).text().replace(/\s+/g, " ").trim().toLowerCase().startsWith(etiketBaslar)).first();
+    if (h3.length === 0) return [];
+    const dl = h3.nextAll("dl").first();
+    return dl.find("dd").toArray().map((dd) => parseTutar($(dd).text()));
+  };
+
+  const ikramiye = dizi("ikramiye");
+  const yetistiriciPrimi = dizi("yeti");
+  const atSahibiPrimi = dizi("at sahibi");
+  if (ikramiye.length === 0) return undefined;
+
+  return { ikramiye, yetistiriciPrimi, atSahibiPrimi };
 }
 
 // Convert "DD/MM/YYYY" ↔ Date
@@ -191,6 +221,7 @@ export async function fetchCityProgram(
     const distance = distMatch ? parseInt(distMatch[1], 10) : 1200;
     const surface = parseSurface(configText);
     const breed = parseBreed(configText);
+    const ikramiyeDetay = parseIkramiyeDetay($, raceDiv);
 
     // ── Runner table and eküri are inside sibling div#kosubilgisi-{raceId} ──────
     const kosuDiv = $(`#kosubilgisi-${raceId}`);
@@ -399,6 +430,7 @@ export async function fetchCityProgram(
         surface,
         distance,
         conditions: sourceRace,
+        ikramiyeDetay,
         runners,
         gallops: [],
       });
