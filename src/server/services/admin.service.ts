@@ -317,6 +317,12 @@ export type AnalystStats = {
   cumulativeTrend: CumulativePoint[];
   couponTierByClassType: CouponTierBreakdown[];
   overallCouponTier: CouponTierBreakdown;
+  // 2026-08-24 kullanıcı talebi: dar classType örneklemi (ör. "Handikap 14" n=14) küçük
+  // örneklem gürültüsüne çok açık — TÜM koşu gruplarını (Maiden/Şartlı/Handikap/KV/Satış/
+  // Açık) kapsayan, çok daha büyük örneklemli bir üst-grup istatistiği de burada tutulur,
+  // getClassTypeAdvice dar sınıf güvenilir değilse buna düşer (bkz. classTypeGroup).
+  byClassTypeGroup: AnalystBreakdown[];
+  couponTierByClassTypeGroup: CouponTierBreakdown[];
 };
 
 const SURFACE_LABEL: Record<string, string> = { CIM: "Çim", KUM: "Kum", SENTETIK: "Sentetik" };
@@ -525,6 +531,8 @@ export async function getAnalystStats(excludeRaceId?: string, sadeceGuncelMotor 
       return tumNoktalar.slice(-30);
     })(),
     couponTierByClassType: groupCouponTier((r) => normalizeClassType(r.race.classType), classTypeGroup),
+    byClassTypeGroup: group((r) => classTypeGroup(r.race.classType)),
+    couponTierByClassTypeGroup: groupCouponTier((r) => classTypeGroup(r.race.classType)),
     overallCouponTier: groupCouponTier(() => "Tüm Tahminler")[0] ?? {
       label: "Tüm Tahminler",
       total: 0,
@@ -704,52 +712,94 @@ export async function getPendingPredictions(): Promise<PendingPrediction[]> {
 
 export type ClassTypeAdvice = { level: "warn" | "info" | "good" | "none"; text: string };
 
+/** Wilson skor aralığı (normal yaklaşımdan farklı olarak küçük n'de ve uç oranlarda
+ *  (%0'a/%100'e yakın) çökmüyor) — bir oranın %95 güven aralığını verir. */
+function wilsonAraligi(basari: number, n: number): { alt: number; ust: number } {
+  if (n === 0) return { alt: 0, ust: 0 };
+  const z = 1.96;
+  const pHat = basari / n;
+  const merkez = (pHat + (z * z) / (2 * n)) / (1 + (z * z) / n);
+  const pay = (z * Math.sqrt((pHat * (1 - pHat)) / n + (z * z) / (4 * n * n))) / (1 + (z * z) / n);
+  return { alt: Math.max(0, merkez - pay), ust: Math.min(1, merkez + pay) };
+}
+
+// 2026-08-24 kullanıcı denetimi: "Eko %X diyorsa gerçekten ilk-3'te sonuçlanmalı" —
+// split-half doğrulama yapıldı (446 tahmin, 9 sınıf n≥20): eğitim-yarısından hesaplanan
+// Eko% ile görülmemiş test-yarısındaki GERÇEK Eko% arasında ortalama MUTLAK fark 13.3
+// puan çıktı — çoğu sınıfta makul (±5-10p) ama Handikap 14'te (n=14/yarı) %14.3→%71.4
+// gibi 57 puanlık bir sapma bulundu (hesaplama hatası değil, saf küçük-örneklem gürültüsü).
+// Bu yüzden artık n<GUVEN_ESIGI olan sınıflarda "good"/"warn" (yeşil/kırmızı, kesin
+// kanaat) rozeti VERİLMİYOR — yalnız "info" (nötr) + Wilson %95 güven aralığı gösteriliyor,
+// ki admin küçük örneklemli bir sınıfa büyük-örneklemliymiş gibi güvenmesin.
+const TIER_GUVEN_ESIGI = 20;
+
+function tierYuzdeMetni(t: CouponTierBreakdown, gaGoster: boolean): string {
+  const p = (n: number) => Math.round((n / t.total) * 100);
+  const base = `Eko %${p(t.ekonomik)} · Nor %${p(t.normal)} · Gen %${p(t.genis)}` + (t.kacti > 0 ? ` · Kaçtı %${p(t.kacti)}` : "");
+  if (!gaGoster) return base;
+  const ga = wilsonAraligi(t.ekonomik, t.total);
+  return `${base} (Eko GA %${Math.round(ga.alt * 100)}-${Math.round(ga.ust * 100)}, küçük örneklem)`;
+}
+
+function tierSeviye(t: CouponTierBreakdown): ClassTypeAdvice["level"] {
+  const geriKalanPay = ((t.genis ?? 0) + (t.kacti ?? 0)) / t.total;
+  const economicShare = (t.ekonomik ?? 0) / t.total;
+  if (geriKalanPay >= 0.35) return "warn";
+  if (economicShare >= 0.6) return "good";
+  return "info";
+}
+
 /**
  * Bir koşu sınıfının geçmiş performansından, o sınıfta analiz girerken dikkat
  * edilmesi gereken noktayı çıkarır. Az veri varsa (n<3) yanlış güven vermemek
  * için yorum yapmaz, ama "veri yok" olduğunu da ayrıca belirtir — aksi halde
  * rozetin hiç görünmemesi, özelliğin çalışmadığıyla karıştırılabiliyor.
+ *
+ * 2026-08-24 kullanıcı talebi: "bütün koşu gruplarını kapsasın" — dar classType
+ * (ör. "Handikap 14", n=14) örneklemi TIER_GUVEN_ESIGI'nin altındaysa, çok daha
+ * geniş örneklemli ÜST GRUBA (Maiden/Şartlı/Handikap/KV/Satış/Açık Koşular —
+ * classTypeGroup) düşülür; dar sınıfın kendi (küçük, geniş GA'lı) rakamı da
+ * ayrıca gösterilir ki admin ikisini birden görüp kendi kararını versin.
  */
 export function getClassTypeAdvice(stats: AnalystStats, classType: string): ClassTypeAdvice {
   const normalized = normalizeClassType(classType);
+  const grupAdi = classTypeGroup(classType);
   const breakdown = stats.byClassType.find((b) => b.label === normalized);
-
-  // Az veriyle anlamlı yorum yapılamaz — yeterli veri yoksa uyarı ver.
-  if (!breakdown || breakdown.total < 3) {
-    const n = breakdown?.total ?? 0;
-    return { level: "warn", text: n > 0 ? `${n} koşu — yeterli geçmiş veri yok` : "Geçmiş veri yok" };
-  }
-
   const tier = stats.couponTierByClassType.find((t) => t.label === normalized);
-  const pct = (n: number) => Math.round((n / (tier?.total ?? breakdown.total)) * 100);
+  const grupTier = stats.couponTierByClassTypeGroup.find((t) => t.label === grupAdi);
+  const grupBreakdown = stats.byClassTypeGroup.find((b) => b.label === grupAdi);
 
-  const tierText = tier && tier.total >= 5
-    ? `Eko %${pct(tier.ekonomik)} · Nor %${pct(tier.normal)} · Gen %${pct(tier.genis)}` +
-      (tier.kacti > 0 ? ` · Kaçtı %${pct(tier.kacti)}` : "")
-    : null;
+  const darYeterli = !!tier && tier.total >= TIER_GUVEN_ESIGI;
+  const grupYeterli = !!grupTier && grupTier.total >= TIER_GUVEN_ESIGI;
 
-  const isabet = `%${breakdown.rate.toFixed(0)} (${breakdown.hits}/${breakdown.total})`;
-  const text = tierText
-    ? `${tierText} (${tier!.total} koşu) · 1. seçim 1. geldi: ${isabet}`
-    : `1. seçim 1. geldi: ${isabet} (${breakdown.total} koşu)`;
+  // Dar sınıfın kendi metni — az veri de olsa (n>=5) her zaman gösterilir, şeffaflık için.
+  const darMetin = tier && tier.total >= 5 ? tierYuzdeMetni(tier, !darYeterli) : null;
 
-  // 2026-08-20 kullanıcı bulgusu (/admin/kupon): rengin dayandığı metrik (eskiden ham
-  // "1. seçim 1. geldi" oranı) ile kartta gösterilen ana metrik (Eko/Nor/Gen dağılımı)
-  // FARKLI şeylerdi — aynı Eko%80/Nor%20/Gen%0 dağılımına sahip iki satır, yalnız
-  // altındaki farklı "1.geldi" oranı yüzünden biri kehribar biri kırmızı çıkabiliyordu.
-  // Artık renk HER ZAMAN metinde gösterilen aynı Eko/Nor/Gen dağılımından türetiliyor —
-  // aynı dağılım artık her zaman aynı rengi alır. tier örneklemi küçükse (<5, tierText
-  // gösterilmiyorsa) elimizdeki tek sinyal ham orandır, o zaman ona düşülür.
-  let level: ClassTypeAdvice["level"] = "info";
-  if (tierText && tier) {
-    const geriKalanPay = ((tier.genis ?? 0) + (tier.kacti ?? 0)) / tier.total;
-    const economicShare = (tier.ekonomik ?? 0) / tier.total;
-    if (geriKalanPay >= 0.35) level = "warn";
-    else if (economicShare >= 0.6) level = "good";
-  } else {
-    if (breakdown.rate < 25) level = "warn";
-    else if (breakdown.rate >= 50) level = "good";
+  if (darYeterli && tier) {
+    // Dar sınıfın kendi örneklemi zaten yeterli — üst gruba düşmeye gerek yok.
+    const isabet = `%${breakdown!.rate.toFixed(0)} (${breakdown!.hits}/${breakdown!.total})`;
+    return { level: tierSeviye(tier), text: `${darMetin} (${tier.total} koşu) · 1. seçim 1. geldi: ${isabet}` };
   }
 
-  return { level, text };
+  if (grupYeterli && grupTier && grupBreakdown) {
+    // Dar sınıf yetersiz (veya hiç yok) — güvenilir üst-grup rakamına düş, dar sınıfın
+    // kendi (varsa) küçük-örneklem rakamını da parantez içinde ayrıca göster.
+    const grupIsabet = `%${grupBreakdown.rate.toFixed(0)} (${grupBreakdown.hits}/${grupBreakdown.total})`;
+    const grupMetin = `[${grupAdi}] ${tierYuzdeMetni(grupTier, false)} (${grupTier.total} koşu) · 1. seçim 1. geldi: ${grupIsabet}`;
+    const text = darMetin ? `${grupMetin} — bu alt-tür (${normalized}): ${darMetin}` : grupMetin;
+    return { level: tierSeviye(grupTier), text };
+  }
+
+  // Ne dar sınıf ne üst grup yeterli veri taşıyor — dürüstçe "veri yok" de.
+  if (darMetin) {
+    const isabet = `%${breakdown!.rate.toFixed(0)} (${breakdown!.hits}/${breakdown!.total})`;
+    return { level: "info", text: `${darMetin} (${tier!.total} koşu) · 1. seçim 1. geldi: ${isabet}` };
+  }
+  if (breakdown && breakdown.total >= 3) {
+    const isabet = `%${breakdown.rate.toFixed(0)} (${breakdown.hits}/${breakdown.total})`;
+    const level = breakdown.total >= TIER_GUVEN_ESIGI ? (breakdown.rate < 25 ? "warn" : breakdown.rate >= 50 ? "good" : "info") : "info";
+    return { level, text: `1. seçim 1. geldi: ${isabet} (${breakdown.total} koşu)` };
+  }
+  const n = breakdown?.total ?? 0;
+  return { level: "warn", text: n > 0 ? `${n} koşu — yeterli geçmiş veri yok` : "Geçmiş veri yok" };
 }
