@@ -30,10 +30,20 @@ function sureyiSaniyeyeCevir(t: string): number | null {
   }
   return null;
 }
+// TJK tarih formatı "GG.AA.YYYY" (örn. "15.08.2026" = 15 Ağustos). 2026-08-24 kullanıcı
+// bulgusu (İSPANOZ vakası): burada GÜN/AY YER DEĞİŞTİRİLMİŞTİ (new Date(yıl, gün-1, ay))
+// — "15.08.2026" yanlışlıkla 8 Mart 2027 gibi hesaplanıyordu (ay indeksi 14 taşıp bir
+// sonraki yıla sarkıyordu), yani atın 9 gün önceki TAM eşleşen (pist+mesafe) yarışı
+// "gelecekte" sanılıp hizDerecesi hesabından tamamen düşüyordu. arac-model-veri-
+// olustur.mts'teki (offline backtest/eğitim) AYNI isimli fonksiyon zaten DOĞRU sıradaydı
+// — yalnız bu CANLI/gerçek-zamanlı dosya etkilenmişti. hizDerecesi 2026-08-21'de (V5.4)
+// eklendiği için etki penceresi ~3 gün (21-24 Ağustos) — bu aralıkta yayınlanan
+// analizlerde hizDerecesi bazı atlar için olması gerekenden düşük/sıfır hesaplanmış
+// olabilir (katsayının kendisi geçerli, yalnız canlı girdi değeri bozuktu).
 function parseGecmisTarih(s: string): Date | null {
   const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
   if (!m) return null;
-  return new Date(Number(m[3]), Number(m[1]) - 1, Number(m[2]));
+  return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
 }
 function surfaceFromRaw(raw: string): "CIM" | "KUM" | "SENTETIK" | null {
   if (!raw) return null;
