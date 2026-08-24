@@ -261,13 +261,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.10",
     baslangic: new Date("2026-08-24T12:58:22+03:00"), // ce43452 — Handikap'ta hizDerecesi sıfırlandı
-    bitis: null,
+    bitis: new Date("2026-08-24T16:15:06+03:00"), // cda5872 — h2hKiloDegisimi + galopTrendFarki eklendi
     aciklama: "Kullanıcı bulgusu: \"sinyaller bu sebeple önemli, çalışan sinyale sahip atların puanları artması gerekmez mi?\" — Handikap (kategoriTespit===\"2\") kendi verisiyle (267 koşu) ayrı eğitildiğinde hizDerecesi'nin katkısı istatistiksel sıfır çıktı (nokta=-0.0177, %95 GA=[-0.2220,0.1782]), pooled diğer-modelin +0.2562'si (3. en güçlü katsayı) bu kategoride yanlış yönlendiriyordu. V5.6b'deki H2H/düşük-şart deseniyle AYNI cerrahi yöntem: yalnız hizDerecesi Handikap'ta sıfırlandı (WEIGHTS_DIGER_HANDIKAP), diğer 19 katsayı/means/stds dokunulmadı.",
     neyiAnalizEdiyor: [
       "V5.6b ile aynı 20 özellik/segment mimarisi — yalnız Handikap (kategori 2) yarışlarında hizDerecesi katkısı 0'a sabitlendi, diğer tüm kategorilerde (Şartlı2-5/Grup-KV/Satış) değişiklik yok",
     ],
     caprazlamalar: [
       "Aynı 67 Handikap test yarışında: pooled model top1=%26.9/top3=%62.7 → hizDerecesi=0 top1=%26.9 (değişmedi)/top3=%67.2 (+4.5p), logloss 1.9917→1.9810 — tam kategori-özel retrain'den (top1=%28.4/top3=%64.2, n=267 overfit riskli) bile daha iyi",
+    ],
+  },
+  {
+    versiyon: "V5.11",
+    baslangic: new Date("2026-08-24T16:15:06+03:00"), // cda5872 — h2hKiloDegisimi + galopTrendFarki eklendi
+    bitis: null,
+    aciklama: "İKİ yeni sinyal eklendi (20→22 özellik), İKİSİ DE h2hNetSkor'un ilk kabul barını (\"top1 VE top3 birlikte iyileşti\") KARŞILAMADI — yalnız \"yön tutarlılığı\" (4/4: her iki sinyal her iki segmentte de pozitif) gerekçesiyle kullanıcı kararıyla eklendi, dürüstçe kaydediliyor. (1) h2hKiloDegisimi — SANCAR EFESİ vakası (Bursa K1, 24 Ağu, kazandı): H2H rakiplere karşı bugünkü kilo pozisyonunun geçmiş karşılaşmaya göre değişimi (getH2HForRace'in zaten döndürdüğü H2HResult.weight — ek TJK isteği yok). Düşük-şart nokta=+0.089 GA=[-0.162,0.279], diğer nokta=+0.061 GA=[-0.022,0.164] — İKİSİ DE sıfırı kapsıyor. (2) galopTrendFarki — kullanıcının paylaştığı \"Galop Değişimi\" ekranından: son idman ile bir önceki AYNI mesafedeki (400m) idman arasındaki süre farkı (Gallop.splits, ek istek yok). Düşük-şart nokta=+0.280 GA=[-0.007,0.637] (neredeyse anlamlı), diğer nokta=+0.003 (pratikte sıfır).",
+    neyiAnalizEdiyor: [
+      "V5.10 ile aynı segment-bazlı mimari + Handikap-hizDerecesi/düşük-şart-h2hNetSkor override'ları KORUNDU — 22 özellik: V5.10'un 20'si + h2hKiloDegisimi + galopTrendFarki",
+    ],
+    caprazlamalar: [
+      "933 yarış, tam retrain + B=200 bootstrap: backtest top1/top3 metrikleri İKİ sinyal için de düz/karışık kaldı (net bir kazanç YOK) — yalnız katsayı işaretinin 4/4 pozitif çıkması kabul gerekçesi. SANCAR EFESİ canlı testte h2hKiloDegisimi=+27.5kg hesaplandı, gerekçe metninde göründü — ama küçük katsayı yüzünden sıralamayı tek başına değiştirmedi (hâlâ 4. sırada), beklenen davranış.",
     ],
   },
 ];

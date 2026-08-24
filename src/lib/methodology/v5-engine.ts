@@ -283,6 +283,11 @@ export type Faz1RunnerV5 = {
    *  GA=[-0.022,0.164]) — ikisi de tek başına sınırda/anlamsız ama YÖN TUTARLI
    *  (4/4 pozitif h2hKilo+galopTrend×2 segment) kullanıcı kararıyla KABUL EDİLDİ. */
   h2hKiloDegisimi: number;
+  /** h2hKiloDegisimi'nin toplandığı karşılaştırma (rakip) sayısı — yalnız gerekçe
+   *  metninde "toplam" ifadesinin tek bir gerçek kiloymuş gibi yanlış anlaşılmasını
+   *  önlemek için (kullanıcı bulgusu 2026-08-24: "+27.5 toplam kilo diye belirtilmesi
+   *  kullanıcılar tarafından farklı anlaşılabilir"). Skora girmez. */
+  h2hKiloKarsilasmaSayisi: number;
   /** 2026-08-24 — Galop trendi: son idman ile AYNI mesafedeki (400m) bir önceki
    *  idman arasındaki süre farkı (pozitif = hızlandı/iyi). Kullanıcının paylaştığı
    *  "Galop Değişimi" ekran fikrinden test edildi. Düşük-şartta nokta=+0.280
@@ -383,9 +388,10 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     return isNaN(n) ? null : n;
   }
   const bugunKiloByNo = new Map(runners.map((r) => [r.no, r.weight]));
-  function h2hKiloDegisimiHesapla(kendiAd: string, kendiBugunKilo: number | null): number {
-    if (kendiBugunKilo == null) return 0;
+  function h2hKiloDegisimiHesapla(kendiAd: string, kendiBugunKilo: number | null): { toplam: number; sayi: number } {
+    if (kendiBugunKilo == null) return { toplam: 0, sayi: 0 };
     let toplam = 0;
+    let sayi = 0;
     for (const enc of h2hEncounters) {
       const beni = enc.results.find((e) => e.horseName === kendiAd);
       if (!beni) continue;
@@ -402,9 +408,10 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
         const todayAdvantage = otherBugunKilo - kendiBugunKilo;
         const histAdvantage = otherOKilo - kendiOKilo;
         toplam += todayAdvantage - histAdvantage;
+        sayi++;
       }
     }
-    return toplam;
+    return { toplam, sayi };
   }
 
   // 2026-08-24 — Galop trendi (bkz. Faz1RunnerV5.galopTrendFarki üstündeki not): son
@@ -457,6 +464,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       keskinGalop = q === "cok_iyi" || q === "iyi" ? 1 : 0;
     }
     const idmJokey: 0 | 1 = gecerliGaloplar.some((g) => isSameJockey(g.jockey, r.jockey)) ? 1 : 0;
+    const h2hKiloHesap = h2hKiloDegisimiHesapla(r.name, r.weight);
 
     const kgsVal = sonYaris?.gunFarki ?? -1;
     const kgsVarMi: 0 | 1 = sonYaris?.gunFarki != null ? 1 : 0;
@@ -500,7 +508,8 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       kacakAtMi: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" ? 1 : 0,
       h2hNetSkor: h2hNetSkorHesapla(r.name),
       hizDerecesi: hizByNo.get(r.no) ?? 0,
-      h2hKiloDegisimi: h2hKiloDegisimiHesapla(r.name, r.weight),
+      h2hKiloDegisimi: h2hKiloHesap.toplam,
+      h2hKiloKarsilasmaSayisi: h2hKiloHesap.sayi,
       galopTrendFarki: galopTrendHesapla(gecerliGaloplar),
     };
   });
@@ -810,7 +819,20 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   { kod: "HIZ", ozellikIndeksleri: [idx("hizDerecesi")], aciklama: (r) => (r.hizDerecesi !== 0 ? `Hız derecesi: popülasyona göre ${r.hizDerecesi > 0 ? "+" : ""}${r.hizDerecesi.toFixed(1)}% (${r.hizDerecesi > 0 ? "daha hızlı" : "daha yavaş"})` : null) },
   // 2026-08-24 — Kilo-ayarlı H2H: veri yoksa (kilo bilgili ortak karşılaşma yok) 0,
   // satır hiç gösterilmez.
-  { kod: "H2HKILO", ozellikIndeksleri: [idx("h2hKiloDegisimi")], aciklama: (r) => (r.h2hKiloDegisimi !== 0 ? `Kilo-ayarlı H2H: bugünkü rakiplere göre kilo pozisyonu geçmiş karşılaşmalara kıyasla ${r.h2hKiloDegisimi > 0 ? "+" : ""}${r.h2hKiloDegisimi.toFixed(1)}kg ${r.h2hKiloDegisimi > 0 ? "iyileşti" : "kötüleşti"}` : null) },
+  // 2026-08-24 kullanıcı bulgusu: "+27.5 toplam kilo diye belirtilmesi kullanıcılar
+  // tarafından farklı anlaşılabilir" — tek bir gerçek kiloymuş gibi okunmasın diye
+  // kaç rakiple kıyaslandığı VE ortalama fark AYRI belirtiliyor, "toplam" kelimesi
+  // artık ham sayının hemen yanında geçiyor.
+  {
+    kod: "H2HKILO",
+    ozellikIndeksleri: [idx("h2hKiloDegisimi")],
+    aciklama: (r) => {
+      if (r.h2hKiloDegisimi === 0 || r.h2hKiloKarsilasmaSayisi === 0) return null;
+      const ortalama = r.h2hKiloDegisimi / r.h2hKiloKarsilasmaSayisi;
+      const yon = ortalama > 0 ? "hafif" : "ağır";
+      return `Kilo-ayarlı H2H: bugünkü ${r.h2hKiloKarsilasmaSayisi} rakibe göre, geçmiş karşılaşmalara kıyasla ortalama ${Math.abs(ortalama).toFixed(1)}kg daha ${yon} koşuyor`;
+    },
+  },
   // 2026-08-24 — Galop trendi: veri yoksa (aynı mesafede 2 idman yok) 0, satır gösterilmez.
   { kod: "GALOPTREND", ozellikIndeksleri: [idx("galopTrendFarki")], aciklama: (r) => (r.galopTrendFarki !== 0 ? `Galop trendi: bir önceki idmana göre 400m'de ${Math.abs(r.galopTrendFarki).toFixed(2)}sn ${r.galopTrendFarki > 0 ? "hızlandı" : "yavaşladı"}` : null) },
 ];
