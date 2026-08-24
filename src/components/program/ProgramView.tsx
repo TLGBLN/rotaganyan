@@ -71,7 +71,10 @@ function useRaceCountdown(time: string | null, hasResult: boolean, dateStr: stri
       const hrs = Math.floor(diffSec / 3600);
       const mins = Math.floor((diffSec % 3600) / 60);
       const secs = diffSec % 60;
-      setDisplay(hrs > 0 ? t("sureSaatDk", { hrs, mins }) : mins > 0 ? t("sureDkSn", { mins, secs }) : t("sureSn", { secs }));
+      // 2026-08-24 kullanıcı talebi: sitedeki TÜM geri sayımlar tek biçime (saniye
+      // hassasiyetiyle HH:MM:SS) getirildi — bkz. RaceCountdown.tsx'teki aynı desen.
+      const pad = (n: number) => String(n).padStart(2, "0");
+      setDisplay(`${pad(hrs)}:${pad(mins)}:${pad(secs)}`);
     };
     tick();
     const id = setInterval(tick, 1000);

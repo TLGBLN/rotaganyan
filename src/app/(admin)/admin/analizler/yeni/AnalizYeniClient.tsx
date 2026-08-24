@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { getKosuAnalizVerisi } from "@/server/actions/admin-analiz.actions";
 import SmartAnalysisEditor from "@/components/admin/SmartAnalysisEditor";
+import RaceCountdown from "@/components/kosular/RaceCountdown";
 import DatePickerNav from "./DatePickerNav";
 
 // 2026-08-14 — kullanıcı talebi: "Veri Gir — Koşu Seç" listesi ile analiz paneli tek
@@ -136,8 +137,14 @@ export default function AnalizYeniClient({ gunler, selectedDate, today, tomorrow
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-bold">{raceName}</h2>
-                <p className="text-xs text-muted-foreground">
-                  {raceData.classType} · {raceData.distance}m · {raceData.runners.length} at
+                <p className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                  <span>{raceData.classType} · {raceData.distance}m · {raceData.runners.length} at</span>
+                  {raceData.time && (
+                    <span className="inline-flex items-center gap-1 rounded bg-brand/10 px-1.5 py-0.5 text-brand">
+                      ⏱ {raceData.time}
+                      <RaceCountdown date={raceData.raceDay.date.toISOString().slice(0, 10)} time={raceData.time} />
+                    </span>
+                  )}
                 </p>
               </div>
               {raceData.prediction && (

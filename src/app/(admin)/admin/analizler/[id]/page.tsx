@@ -5,6 +5,7 @@ import { tr } from "date-fns/locale";
 import { getAdminPredictionById, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
 import { assertPublishSafe } from "@/server/actions/prediction.actions";
 import SmartAnalysisEditor from "@/components/admin/SmartAnalysisEditor";
+import RaceCountdown from "@/components/kosular/RaceCountdown";
 import DeletePredictionButton from "@/components/admin/DeletePredictionButton";
 import ClassTypeAdviceCard from "@/components/admin/ClassTypeAdviceCard";
 import { Badge } from "@/components/ui/badge";
@@ -42,8 +43,14 @@ export default async function EditAnalizPage({ params }: PageProps) {
           <h1 className="text-lg font-bold">
             {race.raceDay.hippodrome.name} — {race.raceNo}. Koşu
           </h1>
-          <p className="text-sm text-muted-foreground">
-            {format(race.raceDay.date, "d MMMM yyyy", { locale: tr })}
+          <p className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+            <span>{format(race.raceDay.date, "d MMMM yyyy", { locale: tr })}</span>
+            {race.time && (
+              <span className="inline-flex items-center gap-1 rounded bg-brand/10 px-1.5 py-0.5 text-brand text-xs">
+                ⏱ {race.time}
+                <RaceCountdown date={format(race.raceDay.date, "yyyy-MM-dd")} time={race.time} />
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">
