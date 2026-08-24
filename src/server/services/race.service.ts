@@ -163,7 +163,12 @@ export async function getAvailableDates(limit = 14): Promise<{ date: Date }[]> {
 }
 
 export async function getHippodromes() {
-  return db.hippodrome.findMany({ orderBy: { name: "asc" } });
+  // 2026-08-24 kullanıcı bulgusu: "Perak Malezya" (yanlışlıkla/nadiren ingest edilmiş
+  // yabancı bir hipodrom, 9 ilgisiz koşu — bkz. admin.service.ts'teki aynı isimli not)
+  // KuponForm'un hipodrom seçicisinde seçilebilir bir seçenek olarak görünüyordu. "Karma"
+  // gerçek/işlevsel (7'li Ganyan vb. için kullanılıyor) — o hariç tutulmadı, yalnız
+  // Perak Malezya çıkarıldı.
+  return db.hippodrome.findMany({ where: { slug: { not: "perak-malezya" } }, orderBy: { name: "asc" } });
 }
 
 export async function getRaceDetail(

@@ -7,11 +7,14 @@
  * yeniden çekip yalnız ikramiyeDetay alanını dolduran tek-seferlik + tekrar-çalıştırılabilir
  * bir backfill.
  *
- * "Karma" hipodromu hariç tutulur — Karma koşuları başka hipodromların aynasıdır
- * (kaynak koşuyla birebir aynı at kadrosu/koşu), ikramiye de kaynaktan gelir; Karma'nın
- * kendi ikramiyeDetay'ı kaynağınkiyle özdeş olacağından ayrıca çekmeye gerek yok — sınıf
- * düşüşü sinyali hesaplanırken bir horse'un geçmiş yarışı Karma'da görünse bile TJK'nın
- * kendi "At Koşu Bilgileri" city alanı gerçek kaynak hipodromu verir, oradan eşleşir.
+ * 2026-08-24 GÜNCELLEME — kullanıcı bulgusu: ilk sürüm "Karma" hipodromunu bilerek dışladı
+ * (Karma koşuları başka hipodromların aynasıdır, ikramiye kaynaktan aynı olacağı için
+ * analiz açısından gereksiz sayıldı) — ama bu, Karma'nın kendi Race satırlarını boş
+ * bıraktı (6/333 dolu) ve kullanıcı bunu eksik/tuhaf buldu. Karma da TJK'nın kendi
+ * `discoverTurkishCities` listesinde geçerli bir şehir (sehirId var) — dışlama KALDIRILDI,
+ * artık TÜM hipodromlar (Karma dahil) taranıyor. Yabancı hipodromlar (örn. "Perak
+ * Malezya", DB'de ilgisiz eski bir araştırmadan kalma) TJK'nın Türkiye şehir listesinde
+ * hiç yer almadığından doğal olarak atlanır (log'da "şehir bulunamadı" görünür, hata değil).
  *
  * Nazik kazıma: tarih başına TEK discoverTurkishCities + yalnız DB'de o tarihte hipodromu
  * olan şehirler için fetchCityProgram, aralarda kısa gecikme.
@@ -34,7 +37,6 @@ async function main() {
   const raceDays = await db.raceDay.findMany({
     where: {
       date: { gte: new Date(`${COVERAGE_START_DATE}T00:00:00Z`) },
-      hippodrome: { slug: { not: "karma" } },
     },
     select: {
       id: true,
