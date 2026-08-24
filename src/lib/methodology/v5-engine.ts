@@ -162,6 +162,22 @@ const WEIGHTS_DUSUK_SART = v5WeightsDusukSart as AgirlikSeti;
 const WEIGHTS_DIGER = v5WeightsDiger as AgirlikSeti;
 const FEATURE_NAMES = WEIGHTS_DIGER.featureNames; // iki set de AYNI özellik/sırayı kullanır
 
+// 2026-08-24 kullanıcı bulgusu: Handikap (kategoriTespit==="2") yarışları KENDİ verisiyle
+// (267 koşu, n=200 eğitim/67 test) ayrı eğitildiğinde hizDerecesi'nin gerçek katkısı
+// istatistiksel sıfır çıktı (nokta=-0.0177, %95 GA=[-0.2220, 0.1782] — sıfırı kapsıyor,
+// B=50 bootstrap). Pooled "diğer" modelin bu sinyale verdiği +0.2562 (3. en güçlü katsayı)
+// Handikap'ta yanlış yönlendiriyor. H2H/düşük-şart düzeltmesiyle AYNI cerrahi desen
+// uygulandı: yalnız BU TEK sinyal Handikap'ta sıfırlandı, diğer 19 katsayıya (ve means/
+// stds'e) dokunulmadı — tam kategori-özel retrain (n=267, overfit riskli, top1=%28.4/
+// top3=%64.2) yerine bu tercih edildi çünkü AYNI 67 yarışlık test setinde top1 hiç
+// bozulmadan (%26.9→%26.9) top3 %62.7'den %67.2'ye çıktı — tam retrain'den bile iyi,
+// hiç overfit riski yok (yalnız 1 katsayı sıfırlanıyor).
+const HIZ_DERECESI_IDX = FEATURE_NAMES.indexOf("hizDerecesi");
+const WEIGHTS_DIGER_HANDIKAP: AgirlikSeti = {
+  ...WEIGHTS_DIGER,
+  weights: WEIGHTS_DIGER.weights.map((w, i) => (i === HIZ_DERECESI_IDX ? 0 : w)),
+};
+
 // 2026-08-22 kullanıcı bulgusu: panel başlığındaki sürüm/özellik-sayısı METNİ daha önce
 // İKİ KEZ sabit (hardcoded) yazılıp güncellenmeyi unutulmuştu (V5.1→V5.3, sonra V5.3→V5.5
 // arası) — kullanıcı ekranda hâlâ eski sürümü görüyordu. Artık FEATURE_NAMES.length'ten
@@ -171,7 +187,9 @@ export const CURRENT_ENGINE_LABEL = `${ENGINE_VERSIONS[ENGINE_VERSIONS.length - 
 
 function agirlikSetiSec(classType: string): AgirlikSeti {
   const kategori = kategoriTespit(classType);
-  return kategori === "1a" || kategori === "1b" ? WEIGHTS_DUSUK_SART : WEIGHTS_DIGER;
+  if (kategori === "1a" || kategori === "1b") return WEIGHTS_DUSUK_SART;
+  if (kategori === "2") return WEIGHTS_DIGER_HANDIKAP;
+  return WEIGHTS_DIGER;
 }
 
 function shrink(wins: number, rides: number, populasyonOrt: number, k = 20): number {
