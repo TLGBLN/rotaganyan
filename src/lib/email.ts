@@ -5,19 +5,37 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 const FROM = "ROTAGANYAN <noreply@rotaganyan.com>";
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
 
-export async function sendPasswordResetEmail(email: string, token: string) {
+// 2026-08-24 kullanıcı bulgusu ("şifremi unuttum dediğimde şifre sıfırlama olanağım
+// yok"): resend.emails.send() İSTİSNA FIRLATMAZ, başarısızlıkta {data:null, error:{...}}
+// döner (bkz. node_modules/resend/dist/index.d.mts Response<T> tipi) — bu dosyadaki
+// TÜM gönderim fonksiyonları bu dönüş değerini hiç kontrol etmiyordu, yani Resend
+// API'si gerçekten başarısız olsa bile (kanıtlandı: prod RESEND_API_KEY şu an geçersiz,
+// Resend "API key is invalid" 400 döndürüyor) çağıran taraf sessizce "başarılı" sanıyordu.
+// Artık her fonksiyon {error} varsa console.error ile LOGLUYOR (Vercel logs'ta görünür)
+// ve çağırana sent:false döndürüyor — arayüz davranışı (e-posta numaralandırmasını
+// önlemek için her zaman "gönderildi" göstermek) KASITLI olarak korunuyor, yalnız artık
+// sunucu tarafında görünmez bir başarısızlık kalmıyor.
+async function gonder(params: Parameters<Resend["emails"]["send"]>[0], baglam: string): Promise<boolean> {
   if (!resend) {
-    console.warn("[email] RESEND_API_KEY not set — skipping email send");
-    return;
+    console.warn(`[email] RESEND_API_KEY yok — ${baglam} atlandı`);
+    return false;
   }
+  const { error } = await resend.emails.send(params);
+  if (error) {
+    console.error(`[email] ${baglam} GÖNDERİLEMEDİ:`, error);
+    return false;
+  }
+  return true;
+}
 
+export async function sendPasswordResetEmail(email: string, token: string): Promise<boolean> {
   const resetUrl = `${BASE_URL}/sifre-sifirla/${token}`;
-
-  await resend.emails.send({
-    from: FROM,
-    to: email,
-    subject: "Şifre Sıfırlama — ROTAGANYAN",
-    html: `
+  return gonder(
+    {
+      from: FROM,
+      to: email,
+      subject: "Şifre Sıfırlama — ROTAGANYAN",
+      html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2 style="color:#15803d">ROTAGANYAN</h2>
         <p>Şifrenizi sıfırlamak için aşağıdaki bağlantıya tıklayın.</p>
@@ -34,17 +52,18 @@ export async function sendPasswordResetEmail(email: string, token: string) {
         </p>
       </div>
     `,
-  });
+    },
+    "şifre sıfırlama e-postası"
+  );
 }
 
-export async function sendPremiumConfirmationEmail(email: string, name: string) {
-  if (!resend) return;
-
-  await resend.emails.send({
-    from: FROM,
-    to: email,
-    subject: "Premium üyeliğiniz aktif — ROTAGANYAN",
-    html: `
+export async function sendPremiumConfirmationEmail(email: string, name: string): Promise<boolean> {
+  return gonder(
+    {
+      from: FROM,
+      to: email,
+      subject: "Premium üyeliğiniz aktif — ROTAGANYAN",
+      html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2 style="color:#15803d">Merhaba ${name}!</h2>
         <p>Premium üyeliğiniz başarıyla aktive edildi.</p>
@@ -60,22 +79,19 @@ export async function sendPremiumConfirmationEmail(email: string, name: string) 
         </p>
       </div>
     `,
-  });
+    },
+    "premium onay e-postası"
+  );
 }
 
-export async function sendVerificationEmail(email: string, name: string, token: string) {
-  if (!resend) {
-    console.warn("[email] RESEND_API_KEY not set — skipping email send");
-    return;
-  }
-
+export async function sendVerificationEmail(email: string, name: string, token: string): Promise<boolean> {
   const verifyUrl = `${BASE_URL}/eposta-dogrula/${token}`;
-
-  await resend.emails.send({
-    from: FROM,
-    to: email,
-    subject: "E-postanızı doğrulayın — ROTAGANYAN",
-    html: `
+  return gonder(
+    {
+      from: FROM,
+      to: email,
+      subject: "E-postanızı doğrulayın — ROTAGANYAN",
+      html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2 style="color:#15803d">Merhaba ${name}!</h2>
         <p>ROTAGANYAN'a kayıt olduğunuz için teşekkürler. Hesabınızı tam olarak kullanabilmek
@@ -91,20 +107,18 @@ export async function sendVerificationEmail(email: string, name: string, token: 
         </p>
       </div>
     `,
-  });
+    },
+    "e-posta doğrulama bağlantısı"
+  );
 }
 
-export async function sendVerificationCodeEmail(email: string, name: string, code: string) {
-  if (!resend) {
-    console.warn("[email] RESEND_API_KEY not set — skipping email send");
-    return;
-  }
-
-  await resend.emails.send({
-    from: FROM,
-    to: email,
-    subject: `${code} — ROTAGANYAN doğrulama kodunuz`,
-    html: `
+export async function sendVerificationCodeEmail(email: string, name: string, code: string): Promise<boolean> {
+  return gonder(
+    {
+      from: FROM,
+      to: email,
+      subject: `${code} — ROTAGANYAN doğrulama kodunuz`,
+      html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2 style="color:#15803d">Merhaba ${name}!</h2>
         <p>ROTAGANYAN'a kayıt olduğunuz için teşekkürler. Hesabınızı aktive etmek için
@@ -119,17 +133,18 @@ export async function sendVerificationCodeEmail(email: string, name: string, cod
         </p>
       </div>
     `,
-  });
+    },
+    "doğrulama kodu e-postası"
+  );
 }
 
-export async function sendWelcomeEmail(email: string, name: string) {
-  if (!resend) return;
-
-  await resend.emails.send({
-    from: FROM,
-    to: email,
-    subject: "ROTAGANYAN'a Hoş Geldiniz!",
-    html: `
+export async function sendWelcomeEmail(email: string, name: string): Promise<boolean> {
+  return gonder(
+    {
+      from: FROM,
+      to: email,
+      subject: "ROTAGANYAN'a Hoş Geldiniz!",
+      html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2 style="color:#15803d">Merhaba ${name}!</h2>
         <p>ROTAGANYAN'a kayıt olduğunuz için teşekkürler.</p>
@@ -142,5 +157,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
         </a>
       </div>
     `,
-  });
+    },
+    "hoş geldin e-postası"
+  );
 }
