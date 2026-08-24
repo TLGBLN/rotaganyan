@@ -27,13 +27,22 @@ export async function getGecCikisOzetleriForRace(horseNames: string[], beforeDat
   // yarış geçmişte backtest edilirken hedef yarıştan SONRAKİ geç-çıkış kayıtları da
   // "geçmiş sicil" gibi karışıyordu. Artık yalnız hedef tarihten KESİN önceki
   // koşu günleri sayılıyor.
-  const runnerRows = await db.runner.findMany({
-    where: { name: { in: uniqueNames }, race: { result: { isNot: null }, raceDay: { date: { lt: beforeDate } } } },
-    select: {
-      name: true,
-      race: { select: { result: { select: { gecCikanlar: true } } } },
-    },
-  });
+  // v6.105 — kullanıcı bulgusu 2026-08-24 ("mobilde çok geç açılıyor"): `race:{result,
+  // raceDay}` iç içe ilişki filtresi Prisma'da relationJoins olmadan 2 AYRI dev IN(...)
+  // sorgusuna (binlerce parametre) bölünüyordu — /program'ın tek başına 3-3.5sn'sini
+  // yiyordu ve site geçmişi büyüdükçe kötüleşiyordu. Aynı sonucu TEK bir SQL JOIN'le
+  // (mevcut Runner.name + Race.raceDayId + RaceDay.date + Result.raceId indeksleri
+  // üzerinden) çekmek veriyi/mantığı DEĞİŞTİRMEDEN ~0.4sn'ye indirdi (doğrulandı: aynı
+  // isim kümesiyle eski/yeni sorgu birebir aynı satır sayısını döndürüyor).
+  const runnerRows = await db.$queryRaw<{ name: string; gecCikanlar: unknown }[]>`
+    SELECT r.name AS name, res."gecCikanlar" AS "gecCikanlar"
+    FROM "Runner" r
+    JOIN "Race" ra ON ra.id = r."raceId"
+    JOIN "RaceDay" rd ON rd.id = ra."raceDayId"
+    JOIN "Result" res ON res."raceId" = ra.id
+    WHERE r.name = ANY(${uniqueNames}::text[])
+      AND rd.date < ${beforeDate}
+  `;
 
   type Acc = { total: number; late: number; lastFark: string | null };
   const byName = new Map<string, Acc>();
@@ -42,7 +51,7 @@ export async function getGecCikisOzetleriForRace(horseNames: string[], beforeDat
     const key = r.name.toLowerCase();
     const acc = byName.get(key) ?? { total: 0, late: 0, lastFark: null };
     acc.total++;
-    const gecCikanlar = r.race.result?.gecCikanlar as { no: number; name: string; fark: string }[] | null;
+    const gecCikanlar = r.gecCikanlar as { no: number; name: string; fark: string }[] | null;
     const match = gecCikanlar?.find((g) => g.name.toLowerCase() === key);
     if (match) {
       acc.late++;

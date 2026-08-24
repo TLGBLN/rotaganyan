@@ -294,7 +294,7 @@ function pickDisplay(p: ProgramPick): { no: number | string; name: string } {
 // v6.70 (V2.2): details artık iki farklı şekilde (eski string[] / yeni {versiyon:2,...}
 // objesi) gelebiliyor — okuma merkezi muhakeme-format.ts'teki kararOku'ya taşındı.
 function puanHucresi(score: number | null, details: unknown): string {
-  if (score != null) return String(score);
+  if (score != null) return `%${score}`;
   return kararOku(details) ?? "—";
 }
 

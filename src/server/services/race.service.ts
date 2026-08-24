@@ -798,6 +798,12 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
   const [raceDays] = await Promise.all([
     db.raceDay.findMany({
     where: { date: { gte: startOfDay(date), lte: endOfDay(date) } },
+    // v6.105 — kullanıcı bulgusu 2026-08-24 ("mobilde çok geç açılıyor"): bu derin iç içe
+    // include (races→runners/result/prediction.picks.runner) relationJoins olmadan Prisma'nın
+    // varsayılan "query" stratejisiyle onlarca ayrı round-trip'e bölünüyordu (canlıda /program
+    // 50+ saniye). Tek bir SQL JOIN'e zorlamak (relationJoins preview + bu bayrak) veriyi
+    // DEĞİŞTİRMEDEN yalnız round-trip sayısını azaltıyor — yerelde 8.3sn'den 3.4sn'ye indi.
+    relationLoadStrategy: "join",
     include: {
       hippodrome: { select: { name: true, slug: true } },
       races: {

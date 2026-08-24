@@ -33,7 +33,7 @@ function scoreOnly(value: string): string {
 // null — bu durumda "—" yerine Faz2'nin "karar" etiketini (details[0]) gösteriyoruz.
 // Eski (Faz3'lü) tahminlerde davranış AYNEN korunuyor (bkz. PuanTablosu.tsx'teki aynı desen).
 function puanHucresi(score: number | null | undefined, details: unknown): string {
-  if (score != null) return String(score);
+  if (score != null) return `%${score}`;
   return kararOku(details) ?? "—";
 }
 
