@@ -31,7 +31,11 @@ const KOD_ETIKET: Record<string, string> = {
   ANTSTAT: "Antrenör Kazanma Oranı",
   UZUNARA: "Uzun Aradan Sonra Galop",
   KACAK: "Kaçak At / Erken Tempo",
-  DUSUSIYI: "Düşüşe Rağmen İyi Pozisyon",
+  DUSUSIYI: "AGF Düşüşü (eşik-üstü)",
+  H2H: "Baş-Başa Net Skor",
+  HIZ: "Hız Derecesi",
+  H2HKILO: "Kilo-Ayarlı H2H",
+  AGFFAVORI: "AGF Favorisi İlk-3 Garantisi",
   OLASILIK: "— Taban Oranı (tüm atlar) —",
 };
 

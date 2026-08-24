@@ -1,15 +1,13 @@
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
 import type { AnalizPerformansOzeti } from "@/server/services/analiz-performans.service";
-import type { EngineVersionSonuc } from "@/server/services/analiz-versiyon-karsilastirma.service";
 import type { AgfTrendIstatistikSonuc } from "@/server/services/agf-trend-istatistik.service";
 import Gauge from "./Gauge";
 
 // 2026-08-17 kullanıcı talebi: "/admin/performans dashboard'a bağlanabilir mi, fazlalık
 // yapmasın" — ayrı sayfa/nav girdisi kaldırıldı, içerik doğrudan ana dashboard'a
 // (admin/page.tsx) taşındı. v6.103'teki orijinal karar (100 koşuluk pencere denetimi)
-// ve AGF trend / motor versiyon kıyaslaması AYNEN korunuyor, yalnız tek sayfada.
+// ve AGF trend kıyaslaması korunuyor. "Analiz Motoru Versiyon Karşılaştırması" bölümü
+// 2026-08-24'te kaldırıldı (kullanıcı talebi) — yerini SinyalKutuguPanel aldı.
 
 function Kart({ baslik, deger, alt }: { baslik: string; deger: string; alt: string }) {
   return (
@@ -30,17 +28,11 @@ function GaugeKart({ baslik, deger, alt }: { baslik: string; deger: number; alt:
   );
 }
 
-function tarihFmt(d: Date) {
-  return format(d, "d MMM, HH:mm", { locale: tr });
-}
-
 export default function PerformansDenetimiPanel({
   ozet,
-  versiyonlar,
   agfTrendIstatistik,
 }: {
   ozet: AnalizPerformansOzeti;
-  versiyonlar: EngineVersionSonuc[];
   agfTrendIstatistik: AgfTrendIstatistikSonuc;
 }) {
   const agfGrup = Object.fromEntries(agfTrendIstatistik.map((g) => [g.grup, g]));
@@ -132,66 +124,6 @@ export default function PerformansDenetimiPanel({
         </div>
       </div>
 
-      <div className="space-y-3 pt-2">
-        <div>
-          <h3 className="text-base font-bold text-foreground">Analiz Motoru Versiyon Karşılaştırması</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Her bölüm bir motor sürümünün geçerli olduğu tarih aralığını, o dönemde neyin analiz edildiğini, hangi çaprazlamaların/kod-garanti kurallarının kullanıldığını ve o dönemde gerçekleşen başarı oranını gösterir. Sınırlar gerçek commit zaman damgalarından alındı.
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          {versiyonlar.map((v) => (
-            <div key={v.versiyon} className="rounded-lg border border-brand/20 bg-[#0d0d14] p-4 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="rounded-sm bg-brand/20 px-2 py-0.5 text-xs font-black uppercase tracking-widest text-brand">
-                    {v.versiyon}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {tarihFmt(v.baslangic)} → {v.bitis ? tarihFmt(v.bitis) : "güncel"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <div className="text-[10px] font-semibold uppercase text-muted-foreground">Galibiyet</div>
-                    <div className="text-sm font-black tabular-nums text-foreground">{v.n > 0 ? `%${v.hitTop1Orani}` : "—"}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[10px] font-semibold uppercase text-muted-foreground">Kupon İsabeti</div>
-                    <div className="text-sm font-black tabular-nums text-foreground">{v.n > 0 ? `%${v.hitInCouponOrani}` : "—"}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[10px] font-semibold uppercase text-muted-foreground">n</div>
-                    <div className="text-sm font-black tabular-nums text-foreground">{v.n}</div>
-                  </div>
-                </div>
-              </div>
-
-              <p className="text-xs text-muted-foreground">{v.aciklama}</p>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1">Neyi Analiz Ediyor</div>
-                  <ul className="space-y-0.5 text-xs text-foreground/90 list-disc list-inside">
-                    {v.neyiAnalizEdiyor.map((s, i) => <li key={i}>{s}</li>)}
-                  </ul>
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1">Çaprazlamalar / Kod-Garanti Kuralları</div>
-                  <ul className="space-y-0.5 text-xs text-foreground/90 list-disc list-inside">
-                    {v.caprazlamalar.map((s, i) => <li key={i}>{s}</li>)}
-                  </ul>
-                </div>
-              </div>
-
-              {v.n === 0 && (
-                <p className="text-[11px] text-muted-foreground italic">Bu dönemde henüz sonuçlanmış+yayınlanmış koşu yok — n büyüdükçe oranlar burada görünecek.</p>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
     </section>
   );
 }
