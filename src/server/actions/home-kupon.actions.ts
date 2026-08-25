@@ -40,7 +40,7 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
       hippodrome: true,
       races: {
         include: {
-          runners: { orderBy: { no: "asc" }, select: { id: true, no: true, name: true, scratched: true, ekuriGroup: true } },
+          runners: { orderBy: { no: "asc" }, select: { id: true, no: true, name: true, scratched: true, ekuriGroup: true, agf: true } },
           prediction: {
             select: {
               picks: {
@@ -161,6 +161,15 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
         if (rankA !== rankB) return rankA - rankB;
         return a.no - b.no;
       });
+
+      // 2026-08-24 kullanıcı talebi: KuponForm'da her atın AGF sırası da görünsün.
+      // v5-engine.ts'teki agfSiraMap ile AYNI mantık (yalnız agf'si olanlar arasında,
+      // yüksekten düşüğe sıralanıp 1'den başlar) — Karma'nın kendi runner satırlarından
+      // hesaplanır (kaynaktan mirror EDİLMEZ, çünkü AGF havuzu Karma'da ayrı olabilir —
+      // bkz. ikramiye ile aynı ders, proje hafızası).
+      const agfSirali = [...r.runners].filter((ru) => ru.agf != null).sort((a, b) => (b.agf ?? 0) - (a.agf ?? 0));
+      const agfSiraByRunnerId = new Map(agfSirali.map((ru, i) => [ru.id, i + 1]));
+
       return {
         raceNo: r.raceNo,
         runners: runners.map((runner) => {
@@ -171,6 +180,7 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
             scratched: karmaMeta?.scratched ?? runner.scratched,
             ekuriGroup: karmaMeta?.ekuriGroup ?? runner.ekuriGroup,
             score: scoreByRunnerId?.get(runner.id) ?? scoreByNo?.get(runner.no) ?? null,
+            agfSirasi: agfSiraByRunnerId.get(runner.id) ?? null,
           };
         }),
       };

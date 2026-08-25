@@ -11,7 +11,7 @@ import {
 } from "@/server/actions/home-kupon.actions";
 
 type Hippodrome = { id: string; name: string; slug: string };
-type RaceRunner = { no: number; name: string; scratched: boolean; ekuriGroup: number | null; score: number | null };
+type RaceRunner = { no: number; name: string; scratched: boolean; ekuriGroup: number | null; score: number | null; agfSirasi: number | null };
 type RaceDayData = {
   hippodromeName: string;
   races: { raceNo: number; runners: RaceRunner[] }[];
@@ -131,6 +131,14 @@ function KuponGrup({
                               {runner.score != null && (
                                 <span className="shrink-0 text-[10px] font-semibold tabular-nums opacity-80">
                                   %{runner.score}
+                                </span>
+                              )}
+                              {runner.agfSirasi != null && (
+                                <span
+                                  title="AGF sırası"
+                                  className="shrink-0 rounded-sm bg-black/10 px-1 text-[9px] font-bold tabular-nums opacity-70"
+                                >
+                                  AGF{runner.agfSirasi}
                                 </span>
                               )}
                               {runner.scratched ? (
