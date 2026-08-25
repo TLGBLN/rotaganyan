@@ -19,6 +19,13 @@ import { forceIngestDate } from "@/server/actions/race.actions";
 
 export const dynamic = "force-dynamic";
 
+const ADVICE_LEVEL_LABEL: Record<string, string> = {
+  warn: "Dikkat",
+  good: "Güçlü geçmiş",
+  info: "Bilgi",
+  none: "Veri yok",
+};
+
 function couponTierLabel(rank: number): string {
   if (rank <= 3) return "Ekonomik";
   if (rank <= 6) return "Normal";
@@ -187,7 +194,7 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                               <span
                                 title={advice.text}
                                 className={cn(
-                                  "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold cursor-help",
+                                  "inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0 text-[9px] font-semibold cursor-help",
                                   advice.level === "warn" && "bg-miss/20 text-miss",
                                   advice.level === "info" && "bg-brand/20 text-brand",
                                   advice.level === "good" && "bg-hit/20 text-hit",
@@ -195,15 +202,24 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                                 )}
                               >
                                 {advice.level === "warn" ? "!" : advice.level === "good" ? "✓" : advice.level === "none" ? "–" : "i"}
+                                {ADVICE_LEVEL_LABEL[advice.level]}
                               </span>
                             </div>
+                            {advice.oneri && (
+                              <div
+                                className={cn(
+                                  "mt-0.5 text-[10px] font-semibold leading-tight",
+                                  advice.level === "warn" && "text-miss",
+                                  advice.level === "good" && "text-hit",
+                                  advice.level === "info" && "text-brand"
+                                )}
+                              >
+                                → {advice.oneri}
+                              </div>
+                            )}
                             <div
                               className={cn(
-                                "mt-0.5 text-[10px] leading-tight",
-                                advice.level === "warn" && "text-miss",
-                                advice.level === "info" && "text-brand",
-                                advice.level === "good" && "text-hit",
-                                advice.level === "none" && "text-muted-foreground/70"
+                                "mt-0.5 text-[10px] leading-tight text-muted-foreground/70"
                               )}
                             >
                               {advice.text}

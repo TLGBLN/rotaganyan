@@ -710,7 +710,7 @@ export async function getPendingPredictions(): Promise<PendingPrediction[]> {
   }));
 }
 
-export type ClassTypeAdvice = { level: "warn" | "info" | "good" | "none"; text: string };
+export type ClassTypeAdvice = { level: "warn" | "info" | "good" | "none"; text: string; oneri?: string };
 
 /** Wilson skor aralığı (normal yaklaşımdan farklı olarak küçük n'de ve uç oranlarda
  *  (%0'a/%100'e yakın) çökmüyor) — bir oranın %95 güven aralığını verir. */
@@ -739,6 +739,26 @@ function tierYuzdeMetni(t: CouponTierBreakdown, gaGoster: boolean): string {
   if (!gaGoster) return base;
   const ga = wilsonAraligi(t.ekonomik, t.total);
   return `${base} (Eko GA %${Math.round(ga.alt * 100)}-${Math.round(ga.ust * 100)}, küçük örneklem)`;
+}
+
+// 2026-08-25 kullanıcı talebi: "%80 eko diyorsa kaç at yazayım" sorusunu her seferinde
+// admin'e bıraktırmak yerine, ham Eko/Nor/Gen yüzdelerini (bunlar münhasır dilim —
+// kazananın hangi aralıkta çıktığının dağılımı) KÜMÜLATİF bir "kaç at yaz" cümlesine
+// çevirir. Yalnız yeterli örneklemli (TIER_GUVEN_ESIGI üstü) durumlarda çağrılır —
+// küçük örneklemde net bir tavsiye vermek, tam da split-half testinin gösterdiği
+// yanlış-güven riskini geri getirir.
+function tierOneri(t: CouponTierBreakdown): string {
+  const p = (n: number) => (n / t.total) * 100;
+  const eko = p(t.ekonomik);
+  const ilk6 = eko + p(t.normal);
+  const kacti = p(t.kacti ?? 0);
+  let cumle: string;
+  if (eko >= 65) cumle = "İlk 3 at genelde yeterli.";
+  else if (ilk6 >= 80) cumle = "Normal'e (ilk 6 at) kadar yazmak güvenli, yalnız ilk 3 dar kalabilir.";
+  else if (ilk6 >= 60) cumle = "Normal'den de at yazmak faydalı olabilir.";
+  else cumle = "Geniş'ten de at eklemeyi düşün — bu türde dar kupon sık kaçırıyor.";
+  if (kacti >= 15) cumle += ` Dikkat: geçmişte %${Math.round(kacti)} favoriler bile dışarıda kalmış.`;
+  return cumle;
 }
 
 function tierSeviye(t: CouponTierBreakdown): ClassTypeAdvice["level"] {
@@ -778,7 +798,11 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string): Clas
   if (darYeterli && tier) {
     // Dar sınıfın kendi örneklemi zaten yeterli — üst gruba düşmeye gerek yok.
     const isabet = `%${breakdown!.rate.toFixed(0)} (${breakdown!.hits}/${breakdown!.total})`;
-    return { level: tierSeviye(tier), text: `${darMetin} (${tier.total} koşu) · 1. seçim 1. geldi: ${isabet}` };
+    return {
+      level: tierSeviye(tier),
+      text: `${darMetin} (${tier.total} koşu) · 1. seçim 1. geldi: ${isabet}`,
+      oneri: tierOneri(tier),
+    };
   }
 
   if (grupYeterli && grupTier && grupBreakdown) {
@@ -787,7 +811,7 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string): Clas
     const grupIsabet = `%${grupBreakdown.rate.toFixed(0)} (${grupBreakdown.hits}/${grupBreakdown.total})`;
     const grupMetin = `[${grupAdi}] ${tierYuzdeMetni(grupTier, false)} (${grupTier.total} koşu) · 1. seçim 1. geldi: ${grupIsabet}`;
     const text = darMetin ? `${grupMetin} — bu alt-tür (${normalized}): ${darMetin}` : grupMetin;
-    return { level: tierSeviye(grupTier), text };
+    return { level: tierSeviye(grupTier), text, oneri: tierOneri(grupTier) };
   }
 
   // Ne dar sınıf ne üst grup yeterli veri taşıyor — dürüstçe "veri yok" de.
