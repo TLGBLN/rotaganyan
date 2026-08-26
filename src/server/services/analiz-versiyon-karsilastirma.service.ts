@@ -333,13 +333,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.16",
     baslangic: new Date("2026-08-26T19:58:21+03:00"), // efc4d1e — Maiden/Satış hibrit harmanlama
-    bitis: null,
+    bitis: new Date("2026-08-26T21:13:59+03:00"), // 7693f77 — Handikap aşırı-güven düzeltmesi
     aciklama: "Kullanıcı talebi: \"Maiden/Satış\" gibi karma koşu tipleri, kategoriTespit'in MAIDEN'ı önce yakalayan regex'i yüzünden SADECE düşük-şart (Maiden) modeliyle puanlanıyordu — Satış'a özgü hiçbir katkı yoktu (ayrı bir Satış modeli hiç var olmadı, kategoriTespit tek kategori kodu döndürüyor). Artık düşük-şart VE diğer ağırlık setlerinin standardize+skor sonucu eşit ağırlıkla ortalanıyor (harmanliSkorla, agirlikSetleriSec). Tek-set durumlarda (n=434/448, hibrit olmayan TÜM yarışlar) matematiksel olarak SIFIR değişiklik — yalnız n=14 hibrit yarış (\"Maiden/Satış\"+\"Maiden/Satış/DHÖW\") etkileniyor. DÜRÜST NOT: bu harmanlamayı kendi başına doğrulayacak yeterli veri yok (n=14, TIER_GUVEN_ESIGI'nin çok altında) — iki tarafın da (düşük-şart n=254, diğer n=737) ayrı ayrı test edilmiş modelini eşit ağırlıkla ortalamak yapısal/temkinli bir tercih, istatistiksel olarak KANITLANMIŞ bir iyileştirme değil.",
     neyiAnalizEdiyor: [
       "V5.15 ile aynı 21 özellik/segment-bazlı mimari, iki ayrı eğitilmiş ağırlık seti DEĞİŞMEDİ — yalnız \"Maiden/Satış\" hibrit koşularda ikisinin skoru harmanlanıyor, diğer tüm koşu tiplerinde davranış birebir aynı",
     ],
     caprazlamalar: [
       "n=14 (yalnız hibrit tip) — ayrı bir istatistiksel doğrulama YAPILAMADI, örneklem yetersiz. Gerçek bir hibrit yarış (İstanbul, 26 Ağustos, Maiden/Satış/DHÖW) üzerinde uçtan uca sanity-check yapıldı: sistem #1 seçimi gerçek kazananla eşleşti (anekdot, istatistiksel kanıt değil).",
+    ],
+  },
+  {
+    versiyon: "V5.17",
+    baslangic: new Date("2026-08-26T21:13:59+03:00"), // 7693f77 — Handikap aşırı-güven düzeltmesi
+    bitis: null,
+    aciklama: "Kullanıcı bulgusu/ısrarı: skor>=%35 bandında Handikap Koşular'da model ciddi aşırı-güvenli çıktı (tahmin ort. %44.4, gerçek %15.0, -29.4 puan; split-half iki yarıda da tutarlı: -30.6/-28.2). Aynı bantta Şartlı Koşular'da kalibrasyon neredeyse mükemmelken (-0.4 puan) bu Handikap'a özgü bir sorun. Yeni bir sıcaklık katsayısı UYDURULMADI (n=15-20 çok küçük, kendi başına güvenle tespit edilemez) — zaten V5.1'de doğrulanmış ASIRI_GUVEN_SICAKLIGI (1.5) katsayısı, yalnız Handikap'a özel daha düşük bir liderlik eşiğinde (0.35, genel eşik 0.70) tetikleniyor. Backtest (51 Handikap yarışı, gerçek pipeline'dan yeniden inşa edilen ham skor): \"Güçlü Aday\" (>=%30) grubu n=22→13'e düştü, kalibrasyon -12.4'ten +3.7 puana geldi (n=13, gürültü sınırında ama makul). Genel Handikap top1 isabeti DEĞİŞMEDİ (%21.6, 11/51) — sıcaklık ölçeklendirmesi sıralamayı korur, yalnız gösterilen yüzdeyi/karar etiketini (Güçlü Aday/Düşük Risk/...) düzeltir, hangi atın seçildiğini DEĞİŞTİRMEZ.",
+    neyiAnalizEdiyor: [
+      "V5.16 ile aynı mimari/skorlama — yalnız Handikap kategorisinde (kategoriTespit==='2') softmax'ın aşırı-güven düzeltmesi tetikleme eşiği %70'ten %35'e indirildi, katsayı (1.5) aynı kaldı",
+    ],
+    caprazlamalar: [
+      "51 Handikap yarışı (V5 dönemi, gerçek pipeline'dan yeniden inşa): Güçlü Aday grubu (n=22, eski eşik) tahmin %39.7/gerçek %27.3 (-12.4) → (n=13, yeni eşik) tahmin %34.8/gerçek %38.5 (+3.7). Genel top1 isabeti %21.6 (11/51), değişmedi.",
     ],
   },
 ];
