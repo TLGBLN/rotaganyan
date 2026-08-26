@@ -196,7 +196,7 @@ export const CURRENT_ENGINE_LABEL = `${ENGINE_VERSIONS[ENGINE_VERSIONS.length - 
 // spesifik harmanlamayı kendi başına doğrulayacak kadar veri yok, iki tarafın da (düşük-
 // şart n=254, diğer n=737) ayrı ayrı zaten test edilmiş modelini eşit ağırlıkla
 // ortalamak yapısal/temkinli bir tercih, istatistiksel olarak KANITLANMIŞ değil.
-function hibritMaidenSatisMi(classType: string): boolean {
+export function hibritMaidenSatisMi(classType: string): boolean {
   const t = classType.toUpperCase();
   const maidenMi = /MAIDEN|[ŞS]ARTLI\s*19\b/.test(t);
   const satisMi = /SAT(?:IŞ|IS)/.test(t);

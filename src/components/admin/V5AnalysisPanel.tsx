@@ -69,6 +69,11 @@ function savedPickToV5At(pick: SavedPick, runnersByNo: Map<number, Runner>): V5A
 const KATEGORI_ETIKET: Record<string, string> = {
   "1a": "Düşük-şart (Şartlı 1/27) ağırlık seti",
   "1b": "Düşük-şart (Maiden/Şartlı 19) ağırlık seti",
+  // 2026-08-26 kullanıcı bulgusu: "Maiden/Satış" hibrit koşularda eskiden yanlışlıkla
+  // "1b" (saf düşük-şart) gösteriliyordu — gerçekte düşük-şart+diğer HARMANLANIYOR
+  // (bkz. v5-engine.ts hibritMaidenSatisMi/agirlikSetleriSec). Yalnız etiket yanlıştı,
+  // skorlama hep doğruydu.
+  hibrit: "Harmanlanmış (Düşük-şart + Diğer — Maiden/Satış hibrit)",
 };
 
 const KARAR_RENK: Record<string, string> = {
