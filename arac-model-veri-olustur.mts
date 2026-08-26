@@ -110,6 +110,10 @@ export type ModelRow = {
   // 2026-08-16 — kacakAtMi ANLAMLI çıktı (bkz. arac-model-egit.mjs), Runner.raceStyle'dan
   // (Accurace tabanlı) TEK sorguda alınıyor, ekstra TJK isteği gerektirmiyor.
   kacakAtMi: 0 | 1;
+  // 2026-08-26 — kacakAtMi'nin İÇİNDEKİ gerçek ayrım: sahada TEK kaçak-at bu mu (rakipsiz,
+  // rahat kaçış — gerçek avantaj), yoksa birden fazla kaçak-attan biri mi (rekabetli tempo —
+  // avantaj yok, bkz. arac-model-egit-segment.mjs üstündeki not). Sızıntı riski yok.
+  kacakYalniz: 0 | 1;
   // 2026-08-17 — ham win-rate testinde anlamlıydı ama arac-model-egit.mjs'de diğer 18
   // özellikle BİRLİKTE test edilince anlamsız çıktı (confounding, bkz. o dosyadaki not) —
   // modele DAHİL EDİLMEDİ. Alan yine de toplanıyor (ekstra TJK isteği gerektirmiyor),
@@ -485,6 +489,17 @@ async function main() {
             const hpSirali = [...runners].filter((r) => r.hp != null).sort((a, b) => (b.hp ?? 0) - (a.hp ?? 0));
             const hpSiraMap = new Map(hpSirali.map((r, i2) => [r.id, i2 + 1]));
 
+            // 2026-08-26 kullanıcı bulgusu: kacakAtMi tek parça sinyali aslında iki farklı
+            // şeyi karıştırıyordu — RAKİPSİZ kaçak olmak (uzun süre yalnız önde, rahat kaçış)
+            // gerçek bir avantaj, RAKİPLİ kaçak olmak (birden fazla at öne geçmeye çalışıyor,
+            // tempo yükseliyor) değil. Derinlemesine backtest (saha büyüklüğü sabit tutularak
+            // kontrol edilmiş, deneyimsiz atlarda bile split-half tutarlı +12-14 puan fark)
+            // düşük-şart segmentinde anlamlı (nokta=+0.145, GA=[0.031,0.266]) bulundu.
+            // Sızıntı riski yok — bugünkü sahanın kompozisyonu zaten önceden bilinen bir şey.
+            const kacakSayisiSahada = runners.filter(
+              (rr) => (rr.raceStyle as { style?: string } | null)?.style === "KACAK_AT"
+            ).length;
+
             for (const r of runners) {
               const pos = actualOrder.indexOf(r.no) + 1;
               if (pos <= 0) continue;
@@ -592,6 +607,7 @@ async function main() {
                 takiEklendiMi: (sonYaris?.eklenenTaki?.length ?? 0) > 0 ? 1 : 0,
                 takiCikarildiMi: (sonYaris?.cikarilanTaki?.length ?? 0) > 0 ? 1 : 0,
                 kacakAtMi: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" ? 1 : 0,
+                kacakYalniz: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" && kacakSayisiSahada === 1 ? 1 : 0,
                 onGrupArkasiMi: (r.raceStyle as { style?: string } | null)?.style === "ON_GRUP_ARKASI" ? 1 : 0,
                 disaridanStart: r.disaridanStart ? 1 : 0,
                 hpSirasi: hpSiraMap.get(r.id) ?? Math.ceil(runners.length / 2),

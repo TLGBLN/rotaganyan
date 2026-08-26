@@ -280,8 +280,10 @@ export type Faz1RunnerV5 = {
   sireOrneklemKendiVeri: number | null;
   /** 2026-08-16 kullanıcı talebi (sektör araştırması) — Runner.raceStyle (Accurace
    *  tabanlı, style: "KACAK_AT"|...) — kapı no/kilo farkı/HP farkı AYNI ANDA test
-   *  edildi, üçü de anlamsız çıktı; yalnız bu anlamlı (+0.0878, GA [0.0290,0.1811]). */
-  kacakAtMi: 0 | 1;
+   *  edildi, üçü de anlamsız çıktı; yalnız bu anlamlı (+0.0878, GA [0.0290,0.1811]).
+   *  2026-08-26: bu tek-parça sinyal RAKİPSİZ (kacakYalniz, gerçek avantaj) ve RAKİPLİ
+   *  (avantaj yok) olarak ikiye ayrıldı — bkz. gatherFaz1V5'teki kacakSayisiSahada notu. */
+  kacakYalniz: 0 | 1;
   /** 2026-08-19 kullanıcı bulgusu (BODUBEY/EL LEON vakaları): agfSirasi/agfFavorisiMi
    *  yalnız SIRAYI yakalıyordu, AGF payının BÜYÜKLÜĞÜNÜ değil (LEJUR'un %47'si ile
    *  EL LEON'un %22'si aynı "favori" etiketini alıyordu). Kapsamlı kalibrasyon denetiminde
@@ -461,6 +463,15 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
   const agfSirali = [...runners].filter((r) => r.agf != null).sort((a, b) => (b.agf ?? 0) - (a.agf ?? 0));
   const agfSiraMap = new Map(agfSirali.map((r, i) => [r.id, i + 1]));
   const sahaOrtasi = Math.ceil(runners.length / 2);
+  // 2026-08-26 kullanıcı bulgusu: kacakAtMi (tek parça "kaçak at mı") YERİNE kacakYalniz —
+  // derinlemesine backtest (saha büyüklüğü sabit tutularak kontrol edilmiş, deneyimsiz
+  // atlarda bile split-half tutarlı +12-14 puan fark) sahada RAKİPSİZ kaçak olmanın gerçek
+  // avantaj taşıdığını, RAKİPLİ kaçak olmanın (birden fazla at öne geçmeye çalışırken) taşımadığını
+  // gösterdi (düşük-şart nokta=+0.145, GA=[0.031,0.266] anlamlı). Sızıntı riski yok — bugünkü
+  // sahanın kompozisyonu zaten önceden bilinen bir şey.
+  const kacakSayisiSahada = runners.filter(
+    (rr) => (rr.raceStyle as { style?: string } | null)?.style === "KACAK_AT"
+  ).length;
   // 2026-08-19 kullanıcı bulgusu (BODUBEY/EL LEON) — bkz. Faz1RunnerV5.agfPayi üstündeki not.
   const birinciAgf = agfSirali[0]?.agf ?? null;
   const ikinciAgf = agfSirali[1]?.agf ?? null;
@@ -521,7 +532,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       hipodromMesafedeKazandi: sonYaris?.kazandi ?? "KOSMADI",
       sireKazanmaOraniHam: sireOzet?.kYuzde ?? null,
       sireOrneklemKendiVeri: sireOzet?.ornekKendiVeri ?? null,
-      kacakAtMi: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" ? 1 : 0,
+      kacakYalniz: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" && kacakSayisiSahada === 1 ? 1 : 0,
       h2hNetSkor: h2hNetSkorHesapla(r.name),
       hizDerecesi: hizByNo.get(r.no) ?? 0,
       h2hKiloDegisimi: h2hKiloHesap.toplam,
@@ -556,8 +567,9 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     // 2026-08-16 kullanıcı talebi (sektör araştırması sonrası): Runner.raceStyle
     // ("KACAK_AT" vb, Accurace tabanlı) — kapı no/kilo farkı/HP farkı AYNI ANDA test
     // edildi, üçü de anlamsız çıktı; yalnız bu anlamlı (+0.0878, GA [0.0290,0.1811])
-    // VE genel performansı iyileştirdi (top1 %34.8→%36.5).
-    r.kacakAtMi,
+    // VE genel performansı iyileştirdi (top1 %34.8→%36.5). 2026-08-26: kacakAtMi YERİNE
+    // kacakYalniz — bkz. Faz1RunnerV5.kacakYalniz üstündeki not.
+    r.kacakYalniz,
     // 2026-08-16 kullanıcı bulgusu (KINDBERO/ANGEL ON THE RIGHT vakaları, İzmir K3/K4):
     // ham "düşüş" tek başına anlamsızdı, ama "düşüşe RAĞMEN hâlâ iyi AGF pozisyonunda
     // kalma" (agfSirasi<=4 şartlı) ANLAMLI çıktı (+0.1282, GA [0.0576, 0.1982]).
@@ -886,7 +898,7 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // 2026-08-17 denetim bulgusu: kacakAtMi ve dususAmaIyiPozisyon anlamlı sinyaller
   // (bkz. toFeatureVector üstündeki notlar) ama hiçbir OzellikGrubu'na dahil değildi —
   // katkıları skoru etkiliyordu ama gerekçe metninde hiç görünmüyordu. Eklendi.
-  { kod: "KACAK", ozellikIndeksleri: [idx("kacakAtMi")], aciklama: (r) => (r.kacakAtMi ? "Kaçak at / erken tempo yapan (Accurace koşu stili sinyali)" : null) },
+  { kod: "KACAK", ozellikIndeksleri: [idx("kacakYalniz")], aciklama: (r) => (r.kacakYalniz ? "Rakipsiz kaçak at / erken tempo yapan (Accurace koşu stili sinyali, sahada tek kaçak)" : null) },
   { kod: "DUSUSIYI", ozellikIndeksleri: [idx("agfDususVarMi")], aciklama: (r) => (r.agfFark <= -ANLAMLI_PUAN_ESIGI ? "AGF trend: düşüş (para akışı sinyali olabilir)" : null) },
   // 2026-08-21 — H2H: bugünkü rakiplerle ortak geçmiş yarış yoksa (h2hNetSkor=0) satır
   // hiç gösterilmez — "0 karşılaşma" ile "hep berabere" ayrımı yapılamadığı için nötr.
@@ -928,7 +940,7 @@ const FEATURE_LABELS: Record<string, string> = {
   antrenorOrani: "Antrenör Kazanma Oranı (küçültülmüş)",
   uzunAraGalopKatkisi: "Uzun Aradan Sonra Galop Sayısı",
   agfYukselisVarMi: "AGF Eşik-Üstü Yükseliş Var Mı",
-  kacakAtMi: "Kaçak At / Erken Tempo", agfDususVarMi: "AGF Eşik-Üstü Düşüş Var Mı",
+  kacakYalniz: "Rakipsiz Kaçak At / Erken Tempo", agfDususVarMi: "AGF Eşik-Üstü Düşüş Var Mı",
   agfPayi: "AGF Payı (ham yüzde)", agfFarkiIkinciye: "AGF Dominans Farkı (2.'ye göre, yalnız favoride)",
   h2hNetSkor: "H2H Net Skoru (bugünkü rakiplerle geçmiş karşılaşma)",
   hizDerecesi: "Hız Derecesi (popülasyona göre göreli tempo, son 365 gün)",

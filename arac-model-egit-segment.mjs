@@ -22,7 +22,11 @@ const ANLAMLI_PUAN_ESIGI = 1.0;
 const FEATURE_NAMES = [
   "agfSirasi", "accurace", "formEgimi", "formEgimi2", "kgs", "kgs2", "kgsVarMi", "pistUzmani", "sireOrani",
   "galop", "idmJokey", "jokeyOrani", "antrenorOrani", "uzunAraGalopKatkisi",
-  "agfYukselisVarMi", "kacakAtMi", "agfDususVarMi", "agfPayi",
+  // 2026-08-26 — kacakAtMi (tek parça "kaçak at mı") YERİNE kacakYalniz kondu: derinlemesine
+  // backtest (saha büyüklüğü sabit tutulmuş kontrol + deneyimsiz atlarda split-half tutarlı
+  // +12-14 puan fark) sahada RAKİPSİZ kaçak olmanın gerçek avantaj taşıdığını, RAKİPLİ kaçak
+  // olmanın taşımadığını gösterdi (düşük-şart nokta=+0.145, GA=[0.031,0.266] anlamlı).
+  "agfYukselisVarMi", "kacakYalniz", "agfDususVarMi", "agfPayi",
   // 2026-08-21 — H2H net skoru: sınırda bootstrap (GA=[-0.0105,0.1603]) ama top1/top3
   // İKİSİ BİRDEN iyileşti (logloss ihmal edilebilir), kullanıcı kararıyla eklendi.
   "h2hNetSkor",
@@ -69,7 +73,7 @@ function toFeatureVector(row) {
     row.kgsVarMi ? row.kgs : 0, row.kgsVarMi ? row.kgs * row.kgs : 0, row.kgsVarMi, row.pistUzmani,
     row.sireOrani, row.galop, row.idmJokey, row.jokeyOrani, row.antrenorOrani, row.uzunAraGalopKatkisi ?? 0,
     row.agfFark >= ANLAMLI_PUAN_ESIGI ? 1 : 0,
-    row.kacakAtMi ?? 0,
+    row.kacakYalniz ?? 0,
     row.agfFark <= -ANLAMLI_PUAN_ESIGI ? 1 : 0,
     row.agfPayi ?? 0,
     row.h2hNetSkor ?? 0,
