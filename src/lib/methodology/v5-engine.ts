@@ -692,6 +692,32 @@ function agfFavoriIlk3Garantisi<T extends { no: number; agfSirasi: number }>(
   return kopya;
 }
 
+// 2026-08-26 kullanıcı bulgusu: "sistemin 1. seçimi, AGF favorisinden daha isabetsiz"
+// (dashboard'daki Sistem vs AGF Favorisi kartı: -4.2 puan, n=448). Kök neden araştırıldı:
+// sorun Handikap'a özel değil (orada fark en KÜÇÜK, -1.5) — asıl kanama, sistemin AGF
+// favorisinden FARKLI bir at seçtiği durumlarda, o atın AGF sırasına göre keskin biçimde
+// ayrışıyor. Split-half doğrulandı (2 bağımsız dönemde de aynı desen):
+//   AGF sırası 2. seçilince: %38.5 / %20.5 isabet (gerçek değer bulma — dokunulmadı)
+//   AGF sırası 3. seçilince: %25.0 / %15.4 isabet (hâlâ makul — dokunulmadı)
+//   AGF sırası 4.+ seçilince: %2.9 / %0.0 isabet (n=60 toplam, 1 galibiyet) — bu "değer
+//   bulma" değil, modelin derin bir longshot'a köpürmesi.
+// Bu atları AGF favorisine ZORLAMIYORUZ (o da yalnız %35 kurtarıyor, kalan %65'i BAŞKA
+// bir at kazanıyor — "her zaman AGF'ye güven" kullanıcının reddettiği bir yaklaşım).
+// Bunun yerine modelin KENDİ sıralı listesinde AGF sırası<=3 olan EN ÜST adayına inilir
+// (çoğunlukla AGF favorisiyle çakışıyor ama illa değil — model muhakemesi birincil kalır).
+// Geriye dönük simülasyon (448 sonuçlanmış yarış): %28.6→%33.0 (net +20), AGF favorisinin
+// kendi oranını (%32.8) hafifçe geçiyor. 2./3. sıradaki değer-bulma yeteneğine dokunulmadı.
+const DERIN_LONGSHOT_AGF_ESIGI = 3;
+
+function derinLongshotDuzelt<T extends { no: number; agfSirasi: number }>(sirali: T[]): T[] {
+  if (sirali.length === 0 || sirali[0].agfSirasi <= DERIN_LONGSHOT_AGF_ESIGI) return sirali;
+  const idx = sirali.findIndex((r, i) => i > 0 && r.agfSirasi <= DERIN_LONGSHOT_AGF_ESIGI);
+  if (idx < 0) return sirali; // uygun aday yoksa (ör. tüm sahada AGF verisi eksik) dokunma
+  const kopya = [...sirali];
+  [kopya[0], kopya[idx]] = [kopya[idx], kopya[0]];
+  return kopya;
+}
+
 export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
   const ws = agirlikSetiSec(faz1.race.classType);
   const vektorler = faz1.runners.map((r) => standardize(toFeatureVector(r), ws));
@@ -725,8 +751,9 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
   const sirali = [...enriched].sort((a, b) => (b.olasilik !== a.olasilik ? b.olasilik - a.olasilik : a.no - b.no));
   const terfili = agfTrendTerfisiUygula(sirali);
   const garantili = agfFavoriIlk3Garantisi(terfili);
+  const duzeltilmis = derinLongshotDuzelt(garantili);
 
-  return garantili.map((r, i) => {
+  return duzeltilmis.map((r, i) => {
     let karar = kararUret(r.olasilik);
     if (r.agfTerfi === "ilk3") karar = "Güçlü Aday";
     else if (r.agfTerfi === "ilk6" && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
