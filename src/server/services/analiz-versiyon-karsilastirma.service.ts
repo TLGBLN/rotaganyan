@@ -321,13 +321,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.15",
     baslangic: new Date("2026-08-26T19:43:22+03:00"), // 26f042c — derin AGF-longshot #1 düzeltmesi
-    bitis: null,
+    bitis: new Date("2026-08-26T19:58:21+03:00"), // efc4d1e — Maiden/Satış hibrit harmanlama
     aciklama: "Kullanıcı bulgusu: dashboard'daki Sistem vs AGF Favorisi kartı sistemin 1. seçiminin AGF favorisinden -4.2 puan geride kaldığını gösterdi (n=448). Kök neden: sorun Handikap'a özel değil (en küçük fark orada, -1.5) — sistem AGF favorisinden farklı bir at seçtiğinde, o atın AGF sırasına göre keskin ayrışıyor. Split-half doğrulandı (2 bağımsız dönemde de aynı desen): AGF sırası 2./3. seçilince hâlâ makul (%20-38 / %15-25, gerçek değer bulma — dokunulmadı), ama AGF sırası 4.+ seçilince pratik olarak hiç tutmuyor (%0-3, n=60 toplam, split-half'te her iki yarıda da aynı). AGF favorisine kör kör dönmek çözüm değil (o da yalnız %35 kurtarıyor, kalan %65'i BAŞKA bir at kazanıyor) — bunun yerine sistem #1'i derin bir longshot (AGF sırası>=4) olmak üzereyse, modelin KENDİ sıralı listesindeki AGF sırası<=3 en üst adayına inilir (derinLongshotDuzelt). 2./3. sıradaki değer-bulma yeteneğine dokunulmadı.",
     neyiAnalizEdiyor: [
       "V5.14 ile aynı 21 özellik/segment-bazlı mimari, skor/olasılık hesaplaması DEĞİŞMEDİ — yalnız gösterim sıralamasına derin-AGF-longshot post-processing adımı eklendi (agfFavoriIlk3Garantisi'nden SONRA çalışır)",
     ],
     caprazlamalar: [
       "448 yarış (yayınlanan gerçek Pick sırası üzerinden geriye dönük simülasyon): mevcut sistem top1 isabeti %28.6 (128/448) → kural uygulanınca %33.0 (148/448) — net +20, AGF favorisinin kendi oranını (%32.8) hafifçe geçiyor. Somut örneklerle (BROARTS, AZİMLİ vb.) doğrulandı — bazı gerçek derin-favori galibiyetleri (ör. ŞEKER ASLAN, AGF 4.) feda ediliyor ama çok daha fazla kötü seçim düzeltiliyor.",
+    ],
+  },
+  {
+    versiyon: "V5.16",
+    baslangic: new Date("2026-08-26T19:58:21+03:00"), // efc4d1e — Maiden/Satış hibrit harmanlama
+    bitis: null,
+    aciklama: "Kullanıcı talebi: \"Maiden/Satış\" gibi karma koşu tipleri, kategoriTespit'in MAIDEN'ı önce yakalayan regex'i yüzünden SADECE düşük-şart (Maiden) modeliyle puanlanıyordu — Satış'a özgü hiçbir katkı yoktu (ayrı bir Satış modeli hiç var olmadı, kategoriTespit tek kategori kodu döndürüyor). Artık düşük-şart VE diğer ağırlık setlerinin standardize+skor sonucu eşit ağırlıkla ortalanıyor (harmanliSkorla, agirlikSetleriSec). Tek-set durumlarda (n=434/448, hibrit olmayan TÜM yarışlar) matematiksel olarak SIFIR değişiklik — yalnız n=14 hibrit yarış (\"Maiden/Satış\"+\"Maiden/Satış/DHÖW\") etkileniyor. DÜRÜST NOT: bu harmanlamayı kendi başına doğrulayacak yeterli veri yok (n=14, TIER_GUVEN_ESIGI'nin çok altında) — iki tarafın da (düşük-şart n=254, diğer n=737) ayrı ayrı test edilmiş modelini eşit ağırlıkla ortalamak yapısal/temkinli bir tercih, istatistiksel olarak KANITLANMIŞ bir iyileştirme değil.",
+    neyiAnalizEdiyor: [
+      "V5.15 ile aynı 21 özellik/segment-bazlı mimari, iki ayrı eğitilmiş ağırlık seti DEĞİŞMEDİ — yalnız \"Maiden/Satış\" hibrit koşularda ikisinin skoru harmanlanıyor, diğer tüm koşu tiplerinde davranış birebir aynı",
+    ],
+    caprazlamalar: [
+      "n=14 (yalnız hibrit tip) — ayrı bir istatistiksel doğrulama YAPILAMADI, örneklem yetersiz. Gerçek bir hibrit yarış (İstanbul, 26 Ağustos, Maiden/Satış/DHÖW) üzerinde uçtan uca sanity-check yapıldı: sistem #1 seçimi gerçek kazananla eşleşti (anekdot, istatistiksel kanıt değil).",
     ],
   },
 ];
