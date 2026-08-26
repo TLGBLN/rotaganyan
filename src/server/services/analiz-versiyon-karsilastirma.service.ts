@@ -309,13 +309,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.14",
     baslangic: new Date("2026-08-24T22:18:10+03:00"), // 067bfd9 — TJK sonuç parse bugu düzeltmesi + retrain
-    bitis: null,
+    bitis: new Date("2026-08-26T19:43:22+03:00"), // 26f042c — derin AGF-longshot #1 düzeltmesi
     aciklama: "KRİTİK VERİ BÜTÜNLÜĞÜ DÜZELTMESİ: yurt dışı doğumlu atların (TJK gösterimi \"AD(NO) (ÜLKE)\", örn. \"SKY TURK(14) (USA)\") kazandığı yarışlarda gerçek kazanan sessizce yanlış kaydediliyordu. Kök neden — tjk-result.adapter.ts'teki at-numarası regex'i yalnız string SONUNDA \"(sayı)\" arıyordu; ülke kodu sonda olduğunda numara hiç yakalanamıyor, o satır (genelde kazanan, rank=1) tamamen ATLANIYOR, kalan en düşük rank'li at yanlışlıkla \"kazanan\" sayılıyordu. Kullanıcı bulgusu: Elazığ K8 (24 Ağustos) — sistem NIGHT KING(4) kazanan gösteriyordu, gerçek kazanan SKY TURK(14) idi. Regex düzeltildi (numaradan sonra opsiyonel \" (ÜLKE)\" ekini de kabul ediyor). Kapsam taraması: benzer isim deseni taşıyan 55 sonuçlanmış yarışın 14'ünde (%25) aynı hata bulundu — hepsi düzeltildi (Result.winnerNo/winnerNos/actualOrder/farklar/hitTop1/hitInCoupon yeniden hesaplandı, Karma mirror'ları senkronize edildi). Yalnız 1'i (27 Temmuz Elazığ K5) V5 eğitim penceresindeydi (2026-07-01+) — model-veri.json o yarış için yenilendi, segment modelleri yeniden eğitildi.",
     neyiAnalizEdiyor: [
       "V5.13 ile aynı 21 özellik/segment-bazlı mimari/kurallar — skorlama mantığı DEĞİŞMEDİ, yalnız eğitim verisindeki 1 hatalı gözlem düzeltilip yeniden eğitildi (991 yarış, önceki 980'den +11 yeni + 1 düzeltme)",
     ],
     caprazlamalar: [
       "Düşük-şart (254 yarış, test n=64): top1=%34.4/top3=%71.9/logloss=1.8748. Diğer (737 yarış, test n=185): top1=%29.2/top3=%64.3/logloss=1.8387. Katsayılar öncekiyle istatistiksel olarak tutarlı (tek gözlem düzeltmesi, büyük sapma yok) — accurace/idmJokey/jokeyOrani/kacakAtMi/agfDususVarMi düşük-şartta örneklem büyüyünce anlamlı hale geldi.",
+    ],
+  },
+  {
+    versiyon: "V5.15",
+    baslangic: new Date("2026-08-26T19:43:22+03:00"), // 26f042c — derin AGF-longshot #1 düzeltmesi
+    bitis: null,
+    aciklama: "Kullanıcı bulgusu: dashboard'daki Sistem vs AGF Favorisi kartı sistemin 1. seçiminin AGF favorisinden -4.2 puan geride kaldığını gösterdi (n=448). Kök neden: sorun Handikap'a özel değil (en küçük fark orada, -1.5) — sistem AGF favorisinden farklı bir at seçtiğinde, o atın AGF sırasına göre keskin ayrışıyor. Split-half doğrulandı (2 bağımsız dönemde de aynı desen): AGF sırası 2./3. seçilince hâlâ makul (%20-38 / %15-25, gerçek değer bulma — dokunulmadı), ama AGF sırası 4.+ seçilince pratik olarak hiç tutmuyor (%0-3, n=60 toplam, split-half'te her iki yarıda da aynı). AGF favorisine kör kör dönmek çözüm değil (o da yalnız %35 kurtarıyor, kalan %65'i BAŞKA bir at kazanıyor) — bunun yerine sistem #1'i derin bir longshot (AGF sırası>=4) olmak üzereyse, modelin KENDİ sıralı listesindeki AGF sırası<=3 en üst adayına inilir (derinLongshotDuzelt). 2./3. sıradaki değer-bulma yeteneğine dokunulmadı.",
+    neyiAnalizEdiyor: [
+      "V5.14 ile aynı 21 özellik/segment-bazlı mimari, skor/olasılık hesaplaması DEĞİŞMEDİ — yalnız gösterim sıralamasına derin-AGF-longshot post-processing adımı eklendi (agfFavoriIlk3Garantisi'nden SONRA çalışır)",
+    ],
+    caprazlamalar: [
+      "448 yarış (yayınlanan gerçek Pick sırası üzerinden geriye dönük simülasyon): mevcut sistem top1 isabeti %28.6 (128/448) → kural uygulanınca %33.0 (148/448) — net +20, AGF favorisinin kendi oranını (%32.8) hafifçe geçiyor. Somut örneklerle (BROARTS, AZİMLİ vb.) doğrulandı — bazı gerçek derin-favori galibiyetleri (ör. ŞEKER ASLAN, AGF 4.) feda ediliyor ama çok daha fazla kötü seçim düzeltiliyor.",
     ],
   },
 ];
