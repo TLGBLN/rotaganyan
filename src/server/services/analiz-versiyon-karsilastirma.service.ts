@@ -345,13 +345,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.17",
     baslangic: new Date("2026-08-26T21:13:59+03:00"), // 7693f77 — Handikap aşırı-güven düzeltmesi
-    bitis: null,
+    bitis: new Date("2026-08-26T23:10:00+03:00"), // 8e311c3 — kacakYalniz (rakipsiz kaçak)
     aciklama: "Kullanıcı bulgusu/ısrarı: skor>=%35 bandında Handikap Koşular'da model ciddi aşırı-güvenli çıktı (tahmin ort. %44.4, gerçek %15.0, -29.4 puan; split-half iki yarıda da tutarlı: -30.6/-28.2). Aynı bantta Şartlı Koşular'da kalibrasyon neredeyse mükemmelken (-0.4 puan) bu Handikap'a özgü bir sorun. Yeni bir sıcaklık katsayısı UYDURULMADI (n=15-20 çok küçük, kendi başına güvenle tespit edilemez) — zaten V5.1'de doğrulanmış ASIRI_GUVEN_SICAKLIGI (1.5) katsayısı, yalnız Handikap'a özel daha düşük bir liderlik eşiğinde (0.35, genel eşik 0.70) tetikleniyor. Backtest (51 Handikap yarışı, gerçek pipeline'dan yeniden inşa edilen ham skor): \"Güçlü Aday\" (>=%30) grubu n=22→13'e düştü, kalibrasyon -12.4'ten +3.7 puana geldi (n=13, gürültü sınırında ama makul). Genel Handikap top1 isabeti DEĞİŞMEDİ (%21.6, 11/51) — sıcaklık ölçeklendirmesi sıralamayı korur, yalnız gösterilen yüzdeyi/karar etiketini (Güçlü Aday/Düşük Risk/...) düzeltir, hangi atın seçildiğini DEĞİŞTİRMEZ.",
     neyiAnalizEdiyor: [
       "V5.16 ile aynı mimari/skorlama — yalnız Handikap kategorisinde (kategoriTespit==='2') softmax'ın aşırı-güven düzeltmesi tetikleme eşiği %70'ten %35'e indirildi, katsayı (1.5) aynı kaldı",
     ],
     caprazlamalar: [
       "51 Handikap yarışı (V5 dönemi, gerçek pipeline'dan yeniden inşa): Güçlü Aday grubu (n=22, eski eşik) tahmin %39.7/gerçek %27.3 (-12.4) → (n=13, yeni eşik) tahmin %34.8/gerçek %38.5 (+3.7). Genel top1 isabeti %21.6 (11/51), değişmedi.",
+    ],
+  },
+  {
+    versiyon: "V5.18",
+    baslangic: new Date("2026-08-26T23:10:00+03:00"), // 8e311c3 — kacakYalniz (rakipsiz kaçak)
+    bitis: null,
+    aciklama: "Kullanıcı hipotezi (\"kaçaklar birbirini yorar, geriden gelen avantajlanır\") ayrıca test edildi ve REDDEDİLDİ (BEKLEME_GRUBU/EN_GERİ_TAKİP/ON_GRUP_ARKASI'nın hiçbirinde kaçak sayısı arttıkça galibiyet artmadı, tam tersi — split-half'te de tutarlı). Ama kacakAtMi (tek parça \"kaçak at mı\") sinyalinin İÇİNDE gerçek bir ayrım bulundu: sahada RAKİPSİZ tek kaçak olmak gerçek avantaj taşıyor, RAKİPLİ kaçak olmak taşımıyor. Derinlemesine doğrulama (kullanıcının \"yüzeysel test ettin\" eleştirisi sonrası): saha büyüklüğü SABİT tutularak kontrol edildi (etki her saha diliminde ayrı ayrı +5.8 ila +9.5 puan, AGF/saha-büyüklüğü confound değil — korelasyon yalnız 0.148-0.154); deneyimsiz atlarda (0-2 önceki yarış) etki DAHA GÜÇLÜ çıktı (split-half +13.8/+12.8 puan) — \"stili oturmamış at, veri güvenilmez\" endişesi doğrulanmadı.",
+    neyiAnalizEdiyor: [
+      "V5.17 ile aynı 21 özellik/segment-bazlı mimari — yalnız kacakAtMi özelliği kacakYalniz ile DEĞİŞTİRİLDİ (aynı pozisyon, aynı özellik sayısı), diğer 20 özellik/kural DEĞİŞMEDİ",
+    ],
+    caprazlamalar: [
+      "Tam model entegrasyonu (991 yarış, 21 özellik, bootstrap B=50): düşük-şart kacakYalniz nokta=+0.145 GA=[0.031,0.266] ANLAMLI. Diğer nokta=+0.057 GA=[-0.009,0.113] sınırda. Top1 değişmedi (düşük-şart %34.4, diğer %29.2), diğer segmentte top3 %64.3→%66.5 iyileşti.",
     ],
   },
 ];
