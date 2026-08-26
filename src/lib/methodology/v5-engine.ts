@@ -63,7 +63,9 @@
  *    yüksek) ama istatistiksel anlamlılığa ulaşmadı (n=240 düşük-şart koşusu, GA'lar geniş)
  *    — kullanıcı buna rağmen segment-bazlı MİMARİNİN canlıya alınmasını istedi. Motor artık
  *    TEK bir ortak ağırlık yerine, koşunun kategorisine (kategoriTespit) göre İKİ TAMAMEN
- *    AYRI eğitilmiş model arasında seçim yapıyor (bkz. agirlikSetiSec).
+ *    AYRI eğitilmiş model arasında seçim yapıyor (bkz. agirlikSetleriSec — 2026-08-26'dan
+ *    itibaren "Maiden/Satış" gibi karma koşularda İKİSİNİ BİRDEN harmanlıyor, tekil seçim
+ *    değil).
  *  - 2026-08-21 (V5.3 devamı — MANUEL OVERRIDE): kullanıcı, segment-özel ayrı katsayının
  *    yetersiz olduğunu belirtti — "ayrı katsayı" ile "EN GÜÇLÜ sinyal" aynı şey değil.
  *    Veriden öğrenilen düşük-şart sireOrani katsayısı (+0.064) zayıf kaldığı için,
@@ -185,11 +187,45 @@ const WEIGHTS_DIGER_HANDIKAP: AgirlikSeti = {
 // bir daha elle güncellenmesi gerekmiyor.
 export const CURRENT_ENGINE_LABEL = `${ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].versiyon} — Koşullu Logit Modeli (${FEATURE_NAMES.length} özellik, segment-bazlı iki model — atları doğrudan kıyaslar, Claude yok, maliyet sıfır)`;
 
-function agirlikSetiSec(classType: string): AgirlikSeti {
+// 2026-08-26 kullanıcı talebi: "Maiden/Satış" gibi karma koşu tipleri, kategoriTespit'in
+// MAIDEN'ı önce yakalayan regex'i yüzünden SADECE düşük-şart (Maiden) modeliyle
+// puanlanıyordu — Satış'a özgü hiçbir katkı yoktu (kategoriTespit tek bir kategori kodu
+// döndürüyor, "SATIŞ N" biçimi zaten "diğer" segmentinin bir parçası, ayrı bir Satış
+// modeli hiç var olmadı). Kullanıcı bu iki grubun kurallarının AYRI AYRI, birlikte
+// uygulanmasını istedi. Not: n=14 (yalnız "Maiden/Satış"+"Maiden/Satış/DHÖW") — bu
+// spesifik harmanlamayı kendi başına doğrulayacak kadar veri yok, iki tarafın da (düşük-
+// şart n=254, diğer n=737) ayrı ayrı zaten test edilmiş modelini eşit ağırlıkla
+// ortalamak yapısal/temkinli bir tercih, istatistiksel olarak KANITLANMIŞ değil.
+function hibritMaidenSatisMi(classType: string): boolean {
+  const t = classType.toUpperCase();
+  const maidenMi = /MAIDEN|[ŞS]ARTLI\s*19\b/.test(t);
+  const satisMi = /SAT(?:IŞ|IS)/.test(t);
+  return maidenMi && satisMi;
+}
+
+function agirlikSetleriSec(classType: string): AgirlikSeti[] {
+  if (hibritMaidenSatisMi(classType)) return [WEIGHTS_DUSUK_SART, WEIGHTS_DIGER];
   const kategori = kategoriTespit(classType);
-  if (kategori === "1a" || kategori === "1b") return WEIGHTS_DUSUK_SART;
-  if (kategori === "2") return WEIGHTS_DIGER_HANDIKAP;
-  return WEIGHTS_DIGER;
+  if (kategori === "1a" || kategori === "1b") return [WEIGHTS_DUSUK_SART];
+  if (kategori === "2") return [WEIGHTS_DIGER_HANDIKAP];
+  return [WEIGHTS_DIGER];
+}
+
+/** Bir at için, verilen ağırlık setleri üzerinden ortalama (standardize edilmiş vektör,
+ *  katkılar, toplam skor) — tek set varsa harmanlama etkisizdir, aynen önceki davranış. */
+function harmanliSkorla(v: number[], setler: AgirlikSeti[]): { skor: number; standartVektor: number[]; katkilar: number[] } {
+  const n = v.length;
+  const standartToplam = new Array(n).fill(0);
+  const katkiToplam = new Array(n).fill(0);
+  for (const ws of setler) {
+    const sv = standardize(v, ws);
+    for (let j = 0; j < n; j++) {
+      standartToplam[j] += sv[j] / setler.length;
+      katkiToplam[j] += (sv[j] * ws.weights[j]) / setler.length;
+    }
+  }
+  const skor = katkiToplam.reduce((a, b) => a + b, 0);
+  return { skor, standartVektor: standartToplam, katkilar: katkiToplam };
 }
 
 function shrink(wins: number, rides: number, populasyonOrt: number, k = 20): number {
@@ -719,10 +755,9 @@ function derinLongshotDuzelt<T extends { no: number; agfSirasi: number }>(sirali
 }
 
 export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
-  const ws = agirlikSetiSec(faz1.race.classType);
-  const vektorler = faz1.runners.map((r) => standardize(toFeatureVector(r), ws));
-  const scores = vektorler.map((v) => v.reduce((s, x, i) => s + x * ws.weights[i], 0));
-  const probs = softmax(scores);
+  const setler = agirlikSetleriSec(faz1.race.classType);
+  const harmanlar = faz1.runners.map((r) => harmanliSkorla(toFeatureVector(r), setler));
+  const probs = softmax(harmanlar.map((h) => h.skor));
 
   const enriched = faz1.runners.map((r, i) => {
     const sinyal = hesaplaSinyalSayisi(
@@ -742,8 +777,8 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
     return {
       ...r,
       olasilik: probs[i],
-      standartVektor: vektorler[i],
-      katkilar: vektorler[i].map((x, j) => x * ws.weights[j]),
+      standartVektor: harmanlar[i].standartVektor,
+      katkilar: harmanlar[i].katkilar,
       sinyalSayisi: sinyal.sayi,
     };
   });
