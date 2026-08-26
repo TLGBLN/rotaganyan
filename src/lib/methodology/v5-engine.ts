@@ -611,9 +611,20 @@ function softmaxHam(scores: number[]): number[] {
 const ASIRI_GUVEN_LIDER_ESIGI = 0.7;
 const ASIRI_GUVEN_SICAKLIGI = 1.5;
 
-function softmax(scores: number[]): number[] {
+// 2026-08-26 kullanıcı bulgusu: yukarıdaki %70+ genel eşiği Handikap'ta yetersiz kalıyordu —
+// "Güçlü Aday" (>=%30) etiketi alan Handikap yarışlarında (n=22, mevcut %70 eşiğiyle) ortalama
+// tahmin %39.7 iken gerçek isabet yalnız %27.3 (-12.4 puan aşırı-güven). İki bağımsız ölçüm
+// (kayıtlı skorlardan n=20, yeniden inşa edilen ham skordan n=15) aynı yönde ama küçük
+// örneklem yüzünden YENİ bir sıcaklık katsayısı UYDURULMADI — zaten doğrulanmış aynı
+// ASIRI_GUVEN_SICAKLIGI (1.5), yalnız Handikap'a özel DAHA DÜŞÜK bir eşikte (0.35) tetikleniyor.
+// Backtest (51 Handikap yarışı, yeniden inşa): "Güçlü Aday" grubu n=22→13'e düştü, kalibrasyon
+// -12.4'ten +3.7 puana geldi (n=13, gürültü sınırında ama makul). Genel top1 isabeti
+// DEĞİŞMEDİ (%21.6, 11/51 — sıcaklık sıralamayı korur, yalnız gösterilen yüzdeyi düzeltir).
+const ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP = 0.35;
+
+function softmax(scores: number[], liderEsigi = ASIRI_GUVEN_LIDER_ESIGI): number[] {
   const ham = softmaxHam(scores);
-  if (Math.max(...ham) < ASIRI_GUVEN_LIDER_ESIGI) return ham;
+  if (Math.max(...ham) < liderEsigi) return ham;
   return softmaxHam(scores.map((s) => s / ASIRI_GUVEN_SICAKLIGI));
 }
 
@@ -757,7 +768,8 @@ function derinLongshotDuzelt<T extends { no: number; agfSirasi: number }>(sirali
 export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
   const setler = agirlikSetleriSec(faz1.race.classType);
   const harmanlar = faz1.runners.map((r) => harmanliSkorla(toFeatureVector(r), setler));
-  const probs = softmax(harmanlar.map((h) => h.skor));
+  const handikapMi = kategoriTespit(faz1.race.classType) === "2";
+  const probs = softmax(harmanlar.map((h) => h.skor), handikapMi ? ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP : ASIRI_GUVEN_LIDER_ESIGI);
 
   const enriched = faz1.runners.map((r, i) => {
     const sinyal = hesaplaSinyalSayisi(
