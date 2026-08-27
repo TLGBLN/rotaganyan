@@ -357,13 +357,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.18",
     baslangic: new Date("2026-08-26T23:10:00+03:00"), // 8e311c3 — kacakYalniz (rakipsiz kaçak)
-    bitis: null,
+    bitis: new Date("2026-08-27T09:09:29+03:00"), // 710a285 — h2hNetSkor override kalıcı hâle getirildi
     aciklama: "Kullanıcı hipotezi (\"kaçaklar birbirini yorar, geriden gelen avantajlanır\") ayrıca test edildi ve REDDEDİLDİ (BEKLEME_GRUBU/EN_GERİ_TAKİP/ON_GRUP_ARKASI'nın hiçbirinde kaçak sayısı arttıkça galibiyet artmadı, tam tersi — split-half'te de tutarlı). Ama kacakAtMi (tek parça \"kaçak at mı\") sinyalinin İÇİNDE gerçek bir ayrım bulundu: sahada RAKİPSİZ tek kaçak olmak gerçek avantaj taşıyor, RAKİPLİ kaçak olmak taşımıyor. Derinlemesine doğrulama (kullanıcının \"yüzeysel test ettin\" eleştirisi sonrası): saha büyüklüğü SABİT tutularak kontrol edildi (etki her saha diliminde ayrı ayrı +5.8 ila +9.5 puan, AGF/saha-büyüklüğü confound değil — korelasyon yalnız 0.148-0.154); deneyimsiz atlarda (0-2 önceki yarış) etki DAHA GÜÇLÜ çıktı (split-half +13.8/+12.8 puan) — \"stili oturmamış at, veri güvenilmez\" endişesi doğrulanmadı.",
     neyiAnalizEdiyor: [
       "V5.17 ile aynı 21 özellik/segment-bazlı mimari — yalnız kacakAtMi özelliği kacakYalniz ile DEĞİŞTİRİLDİ (aynı pozisyon, aynı özellik sayısı), diğer 20 özellik/kural DEĞİŞMEDİ",
     ],
     caprazlamalar: [
       "Tam model entegrasyonu (991 yarış, 21 özellik, bootstrap B=50): düşük-şart kacakYalniz nokta=+0.145 GA=[0.031,0.266] ANLAMLI. Diğer nokta=+0.057 GA=[-0.009,0.113] sınırda. Top1 değişmedi (düşük-şart %34.4, diğer %29.2), diğer segmentte top3 %64.3→%66.5 iyileşti.",
+    ],
+  },
+  {
+    versiyon: "V5.19",
+    baslangic: new Date("2026-08-27T09:09:29+03:00"), // 710a285 — h2hNetSkor override kalıcı hâle getirildi
+    bitis: null,
+    aciklama: "Kullanıcı denetimi (\"muhakemeler doğru mu yapılıyor\") sırasında bulundu: h2hNetSkor'un düşük-şart'taki \"elle sıfırlandı\" düzeltmesi (V5.7, ham katsayı ters yönlüydü + GA sıfırı kapsıyordu) yalnız v5-weights-dusuksart.json dosyasına ELLE yazılmıştı, koda gömülü değildi. 2026-08-26'da kacakYalniz için model yeniden eğitilince (arac-model-egit-segment.mjs, sıfırdan gradient descent) bu düzeltme SESSİZCE KAYBOLMUŞTU (h2hNetSkor=-0.141 çıkmıştı, GA hâlâ sıfırı kapsıyor — aynı güvenilmezlik). HIZ_DERECESI_IDX/WEIGHTS_DIGER_HANDIKAP ile AYNI desende artık KODA gömülü (WEIGHTS_DUSUK_SART override) — bir daha retrain'de kaybolmaz. Ayrıca: HIZ (Handikap'ta) ve H2H (düşük-şart'ta) muhakeme satırlarının gösterilip gösterilmeyeceği artık HAM özellik değerine değil GERÇEK katkıya (r.katkilar) bakıyor — katsayısı sıfırlanmış bir sinyal için yanıltıcı bir satır artık gösterilmiyor.",
+    neyiAnalizEdiyor: [
+      "V5.18 ile aynı 21 özellik/segment-bazlı mimari/skorlama — yalnız h2hNetSkor'un düşük-şart override'ı koda taşındı (skor DEĞİŞMEDİ, zaten olması gereken hâle döndü) ve muhakeme metni gösterim mantığı düzeltildi (skor/karar ETKİLENMEDİ, yalnız gerekçe metni)",
+    ],
+    caprazlamalar: [
+      "Kod denetimi: düşük-şart Maiden yarışında INFERNO BLAZE (ham h2hNetSkor=4) katkısının gerçekten 0 olduğu ve muhakeme metninde H2H satırının artık gösterilmediği doğrulandı.",
     ],
   },
 ];
