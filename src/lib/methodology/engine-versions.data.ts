@@ -360,13 +360,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.19",
     baslangic: new Date("2026-08-27T09:09:29+03:00"), // 710a285 — h2hNetSkor override kalıcı hâle getirildi
-    bitis: null,
+    bitis: new Date("2026-08-27T17:35:11+03:00"), // d8fa2a9 — gösterim sırası düzeltmeleri kaldırıldı
     aciklama: "Kullanıcı denetimi (\"muhakemeler doğru mu yapılıyor\") sırasında bulundu: h2hNetSkor'un düşük-şart'taki \"elle sıfırlandı\" düzeltmesi (V5.7, ham katsayı ters yönlüydü + GA sıfırı kapsıyordu) yalnız v5-weights-dusuksart.json dosyasına ELLE yazılmıştı, koda gömülü değildi. 2026-08-26'da kacakYalniz için model yeniden eğitilince (arac-model-egit-segment.mjs, sıfırdan gradient descent) bu düzeltme SESSİZCE KAYBOLMUŞTU (h2hNetSkor=-0.141 çıkmıştı, GA hâlâ sıfırı kapsıyor — aynı güvenilmezlik). HIZ_DERECESI_IDX/WEIGHTS_DIGER_HANDIKAP ile AYNI desende artık KODA gömülü (WEIGHTS_DUSUK_SART override) — bir daha retrain'de kaybolmaz. Ayrıca: HIZ (Handikap'ta) ve H2H (düşük-şart'ta) muhakeme satırlarının gösterilip gösterilmeyeceği artık HAM özellik değerine değil GERÇEK katkıya (r.katkilar) bakıyor — katsayısı sıfırlanmış bir sinyal için yanıltıcı bir satır artık gösterilmiyor.",
     neyiAnalizEdiyor: [
       "V5.18 ile aynı 21 özellik/segment-bazlı mimari/skorlama — yalnız h2hNetSkor'un düşük-şart override'ı koda taşındı (skor DEĞİŞMEDİ, zaten olması gereken hâle döndü) ve muhakeme metni gösterim mantığı düzeltildi (skor/karar ETKİLENMEDİ, yalnız gerekçe metni)",
     ],
     caprazlamalar: [
       "Kod denetimi: düşük-şart Maiden yarışında INFERNO BLAZE (ham h2hNetSkor=4) katkısının gerçekten 0 olduğu ve muhakeme metninde H2H satırının artık gösterilmediği doğrulandı.",
+    ],
+  },
+  {
+    versiyon: "V5.20",
+    baslangic: new Date("2026-08-27T17:35:11+03:00"), // d8fa2a9 — gösterim sırası düzeltmeleri kaldırıldı
+    bitis: null,
+    aciklama: "Kullanıcı kararı (Kocaeli 2.Koşu vakası — MAŞİDE %24 ile 3.sıraya, %12'lik KARAKÖPRÜ ATEŞİ 1.sıraya düşmüştü, kullanıcı \"yüzdelere göre sıralama olacak, eskisi gibi, sistemimizi bozamazsın\" dedi): üç gösterim-sırası düzeltmesi (AGF Trend Terfisi, AGF Favorisi İlk-3 Garantisi [V5.13], Derin AGF-Longshot Düzeltmesi [V5.15]) KOMPLE KALDIRILDI. Skorlama/olasılık hesaplaması (harmanliSkorla, softmax, ağırlık setleri) HİÇ DEĞİŞMEDİ — yalnız teknikSira artık doğrudan olasılığa göre azalan sırada, hiçbir gösterim müdahalesi yok. Üç kuralın ÜÇÜ de kaldırılmadan önce gerçek backtest kanıtına dayanıyordu (aşağıya bakınız) — kaldırılma sebebi istatistiksel bir çürütme DEĞİL, kullanıcının açık tercihi. sinyal-kutugu.service.ts'teki SIRALAMA_KURALLARI kaydı silinmedi, \"GERİ ALINDI\" olarak işaretlendi.",
+    neyiAnalizEdiyor: [
+      "V5.19 ile AYNI 21 özellik/segment-bazlı model/skorlama — yalnız gösterim sırası artık ham olasılığa eşit, hiçbir terfi/garanti/düzeltme uygulanmıyor",
+    ],
+    caprazlamalar: [
+      "Geri alınan kuralların önceki (geçerliliğini koruyan, ama artık UYGULANMAYAN) backtest bulguları: AGF Trend Terfisi n=663 → %21.6/%53.8; AGF Favorisi İlk-3 Garantisi n=428 → top3 %60.0→%61.2 (net +5); Derin AGF-Longshot Düzeltmesi n=448 → top1 %28.6→%33.0 (net +20).",
     ],
   },
 ];
