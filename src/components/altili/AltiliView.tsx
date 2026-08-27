@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ekuriRengi } from "@/lib/ekuri-colors";
 import type { ProgramDay, ProgramRace, ProgramRunner } from "@/server/services/race.service";
 
 // effectiveAgf: eküri grubundaki atlar için grup toplamı, tekil for tek at
@@ -306,6 +307,12 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                                 <span className={cn("font-medium", r.scratched && "line-through")}>
                                   {r.name}
                                 </span>
+                                {!r.scratched && r.ekuriGroup != null && r.ekuriGroup >= 1 && (
+                                  <span title={`Eküri grubu ${r.ekuriGroup}`} className="ml-1 inline-flex items-center gap-0.5 text-[10px]">
+                                    <span className={cn("inline-block h-1.5 w-1.5 rounded-full", ekuriRengi(r.ekuriGroup).badge)} />
+                                    🐴
+                                  </span>
+                                )}
                                 {r.scratched && (
                                   <span className="ml-1.5 text-[10px] text-red-400">(Koşmaz)</span>
                                 )}

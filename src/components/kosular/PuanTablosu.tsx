@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import type { ProgramRaceDay } from "@/server/services/race.service";
 import { finishPos } from "@/lib/race-result";
 import { kararOku } from "@/lib/methodology/muhakeme-format";
+import { ekuriRengi } from "@/lib/ekuri-colors";
 
 type Props = {
   raceDay: ProgramRaceDay;
@@ -177,7 +178,10 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate, isAdmin 
                                 {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
                               </span>
                               {!pick.runner?.scratched && pick.runner?.ekuriGroup != null && (
-                                <span title={`Eküri grubu ${pick.runner.ekuriGroup}`} className="ml-1 text-[10px]">🐴</span>
+                                <span title={`Eküri grubu ${pick.runner.ekuriGroup}`} className="ml-1 inline-flex items-center gap-0.5 text-[10px]">
+                                  <span className={cn("inline-block h-1.5 w-1.5 rounded-full", ekuriRengi(pick.runner.ekuriGroup).badge)} />
+                                  🐴
+                                </span>
                               )}
                               {pick.runner?.scratched && (
                                 <span className="ml-1 text-[10px] font-semibold text-red-400">Koşmaz</span>
@@ -327,7 +331,10 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate, isAdmin 
                                   {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
                                 </span>
                                 {!pick.runner?.scratched && pick.runner?.ekuriGroup != null && (
-                                  <span title={`Eküri grubu ${pick.runner.ekuriGroup}`} className="shrink-0 text-[9px]">🐴</span>
+                                  <span title={`Eküri grubu ${pick.runner.ekuriGroup}`} className="shrink-0 inline-flex items-center gap-0.5 text-[9px]">
+                                    <span className={cn("inline-block h-1.5 w-1.5 rounded-full", ekuriRengi(pick.runner.ekuriGroup).badge)} />
+                                    🐴
+                                  </span>
                                 )}
                                 {pick.runner?.scratched && (
                                   <span className="shrink-0 text-[9px] font-semibold text-red-400">Koşmaz</span>

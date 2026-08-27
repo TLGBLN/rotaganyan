@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ekuriRengi } from "@/lib/ekuri-colors";
 import {
   getRaceDayLegs,
   publishHomeKupon,
@@ -144,7 +145,10 @@ function KuponGrup({
                               {runner.scratched ? (
                                 <span className="ml-auto shrink-0 text-[10px] text-red-400 font-semibold">Koşmaz</span>
                               ) : runner.ekuriGroup != null ? (
-                                <span title={`Eküri grubu ${runner.ekuriGroup}`} className="ml-auto shrink-0 text-[10px]">🐴</span>
+                                <span title={`Eküri grubu ${runner.ekuriGroup}`} className="ml-auto shrink-0 inline-flex items-center gap-0.5 text-[10px]">
+                                  <span className={cn("inline-block h-1.5 w-1.5 rounded-full", ekuriRengi(runner.ekuriGroup).badge)} />
+                                  🐴
+                                </span>
                               ) : null}
                             </button>
                           );

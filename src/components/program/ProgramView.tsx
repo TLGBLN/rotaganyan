@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { EKURI_COLORS, ekuriRengi } from "@/lib/ekuri-colors";
 import { ChevronDown, ChevronUp, Star, Info } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
 import { kararOku } from "@/lib/methodology/muhakeme-format";
@@ -83,15 +84,6 @@ function useRaceCountdown(time: string | null, hasResult: boolean, dateStr: stri
 
   return display;
 }
-
-// ── Eküri renk paleti ────────────────────────────────────────────────────────
-
-const EKURI_COLORS = [
-  { border: "border-l-[3px] border-[#3498db]", badge: "bg-[#3498db]" },
-  { border: "border-l-[3px] border-[#e67e22]", badge: "bg-[#e67e22]" },
-  { border: "border-l-[3px] border-[#9b59b6]", badge: "bg-[#9b59b6]" },
-  { border: "border-l-[3px] border-[#e74c3c]", badge: "bg-[#e74c3c]" },
-];
 
 // ── Son Yarışlar renk ────────────────────────────────────────────────────────
 
@@ -1195,7 +1187,7 @@ function RaceTable({
   const ekuriColorMap = new Map<number, typeof EKURI_COLORS[0]>();
   race.runners.forEach((r) => {
     if (r.ekuriGroup != null && r.ekuriGroup >= 1) {
-      ekuriColorMap.set(r.no, EKURI_COLORS[(r.ekuriGroup - 1) % EKURI_COLORS.length]);
+      ekuriColorMap.set(r.no, ekuriRengi(r.ekuriGroup));
     }
   });
 
