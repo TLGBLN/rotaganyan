@@ -794,6 +794,17 @@ function agfFavoriIlk3Garantisi<T extends { no: number; agfSirasi: number }>(
 // maliyet (net GA=[0,0] — hiçbir bootstrap örneğinde top3 seti değişmedi).
 const DERIN_LONGSHOT_AGF_ESIGI = 3;
 
+// 2026-08-27 kullanıcı KESİN kararı (Kocaeli 2.Koşu örneği somut kanıt oldu — TEYZEOĞLU
+// %11.1 ile 1.sırada, MAŞİDE %23.5 ile 3.sırada duruyordu): "sıralama yüzdeye göre olur,
+// 1.sıradaki ata %24 vermelisin." Bugün İKİ YÖNDE de değişti (V5.20'de kaldırıldı, V5.21-23'te
+// tek tek geri geldi, şimdi KESİN olarak tekrar kaldırılıyor) — bu tek `false` anahtarı,
+// gelecekte tekrar karar değişirse tüm faz2V5Sirala'yı yeniden yazmadan tek satırda
+// açılıp/kapanabilsin diye eklendi. Fonksiyonların (agfTrendTerfisiUygula/
+// agfFavoriIlk3Garantisi/derinLongshotDuzelt) HİÇBİRİ silinmedi, yalnız çağrılmıyor —
+// üçünün de kendi backtest kanıtı (n=663/428/448) hâlâ GEÇERLİ, yalnız kullanıcı ham
+// yüzdeden SAPMA istemiyor.
+const GOSTERIM_SIRASI_DUZELTMELERI_AKTIF = false;
+
 function derinLongshotDuzelt<T extends { no: number; agfSirasi: number }>(sirali: T[]): T[] {
   if (sirali.length === 0 || sirali[0].agfSirasi <= DERIN_LONGSHOT_AGF_ESIGI) return sirali;
   const idx = sirali.findIndex((r, i) => i > 0 && r.agfSirasi <= DERIN_LONGSHOT_AGF_ESIGI);
@@ -834,6 +845,11 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
   });
 
   const sirali = [...enriched].sort((a, b) => (b.olasilik !== a.olasilik ? b.olasilik - a.olasilik : a.no - b.no));
+
+  if (!GOSTERIM_SIRASI_DUZELTMELERI_AKTIF) {
+    return sirali.map((r, i) => ({ ...r, agfTerfi: null, agfFavoriGarantisi: false, teknikSira: i + 1, karar: kararUret(r.olasilik) }));
+  }
+
   const terfili = agfTrendTerfisiUygula(sirali);
   const garantili = agfFavoriIlk3Garantisi(terfili);
   const duzeltilmis = derinLongshotDuzelt(garantili);

@@ -60,31 +60,32 @@ export type SiralamaKurali = {
   backtestOzet: string;
 };
 
-// 2026-08-27 kullanıcı kararı: "sıralamalar yüzdelere göre olacak, eskisi gibi" — üç
-// gösterim-sırası düzeltmesi (ikisi burada belgeliydi, üçüncüsü hiç eklenmemişti) TÜMÜ
-// v5-engine.ts'ten kaldırılmıştı. AYNI GÜN, kullanıcı AGF Trend Terfisi'ni GERİ istedi
-// ("bunu kaldır demedim, en çok ağırlık vermeni istediğim sinyaldi") — o kural CANLIYA
-// GERİ ALINDI (V5.21). Diğer iki kural (AGF Favorisi Garantisi, Derin Longshot) hâlâ
-// KALDIRILMIŞ durumda. Backtest kanıtları geçerliliğini koruyor (yanlış değillerdi) —
-// kaldırılma sebebi istatistiksel bir çürütme değil, kullanıcı tercihiydi.
+// 2026-08-27: aynı gün İKİ YÖNDE değişti. Sabah "sıralamalar yüzdelere göre olacak" dendi,
+// üçü kaldırıldı (V5.20). Sonra kullanıcı kendi testleriyle (versiyon karşılaştırması,
+// sinyal harmonisi B=500) üçünü de tek tek geri getirtti (V5.21→V5.23). AMA Kocaeli
+// 2.Koşu SOMUT ÖRNEĞİNDE (TEYZEOĞLU %11.1 ile 1.sırada, MAŞİDE %23.5 ile 3.sırada)
+// kullanıcı KESİN karar verdi: "sıralama yüzdeye göre olur, 1.sıradaki ata %24
+// vermelisin." v5-engine.ts'te tek bir anahtar eklendi (GOSTERIM_SIRASI_DUZELTMELERI_AKTIF
+// = false) — üçü de KOD OLARAK duruyor (silinmedi, backtest kanıtları geçerli) ama hiçbiri
+// ÇAĞRILMIYOR. Gösterim sırası artık kesin olarak yalnız ham olasılığa göre (V5.24).
 export const SIRALAMA_KURALLARI: SiralamaKurali[] = [
   {
     ad: "AGF Trend Terfisi",
-    etiket: "CANLI (2026-08-27'de geri getirildi, V5.21)",
-    aciklama: "En çok yükselen/düşen AGF trendini taşıyan + yeterli sinyal sayısına (≥4) sahip atlar, ham sıralamada geride kalsa bile ilk-3'e/ilk-6'ya terfi eder. Aynı gün kısa süreliğine kaldırılmış (V5.20), kullanıcı isteğiyle hemen geri getirilmiştir (V5.21) — kaldırılmadı.",
-    backtestOzet: "n=663 → %21.6 galibiyet / %53.8 top3",
+    etiket: "GERİ ALINDI (2026-08-27, V5.24, kesin karar)",
+    aciklama: "En çok yükselen/düşen AGF trendini taşıyan + yeterli sinyal sayısına (≥4) sahip atlar, ham sıralamada geride kalsa bile ilk-3'e/ilk-6'ya terfi ediyordu. Aynı gün 3 kez el değiştirdi (kaldırıldı→geri geldi→kesin kaldırıldı) — Kocaeli 2.Koşu örneği kullanıcının kesin kararını netleştirdi: sıralama artık İSTİSNASIZ yüzdeye göre.",
+    backtestOzet: "n=663 → %21.6 galibiyet / %53.8 top3 (geçerliliğini koruyor, uygulanmıyor)",
   },
   {
     ad: "AGF Favorisi İlk-3 Garantisi",
-    etiket: "CANLI (2026-08-27'de geri getirildi, V5.22)",
-    aciklama: "AGF sırası=1 olan at, ham olasılık sıralamasında top3 dışında kalsa bile KOŞULSUZ 3.sıraya alınır. Aynı gün kısa süreliğine kaldırılmış (V5.20), kullanıcı \"V5.14'e dön\" kararıyla (o dönem canlı en yüksek başarı oranını gösteren versiyondu) geri getirilmiş ve GÜNCEL/daha büyük veriyle B=500 bootstrap-CI ile yeniden doğrulanmıştır.",
-    backtestOzet: "Orijinal: n=428 → net +5 yarış (top3 %60.0→%61.2). Güncel B=500 doğrulama (2026-08-27, 249 test yarışı): top3 %67.5→%68.7, net +3/249, GA=[0,7] — %100 bootstrap örneği ≥0, hiç negatif çıkmadı.",
+    etiket: "GERİ ALINDI (2026-08-27, V5.24, kesin karar)",
+    aciklama: "AGF sırası=1 olan at, ham olasılık sıralamasında top3 dışında kalsa bile KOŞULSUZ 3.sıraya alınıyordu. Kocaeli 2.Koşu örneğiyle kullanıcı kesin karar verdi: sıralama İSTİSNASIZ yüzdeye göre.",
+    backtestOzet: "n=428 → net +5 yarış (top3 %60.0→%61.2). Güncel B=500 doğrulama da yapılmıştı (top3 net GA=[0,7]) — geçerliliğini koruyor, uygulanmıyor.",
   },
   {
     ad: "Derin AGF-Longshot Düzeltmesi",
-    etiket: "CANLI (2026-08-27'de geri getirildi, V5.23)",
-    aciklama: "Sistemin ham #1'i AGF sırası≥4 (piyasanın neredeyse hiç güvenmediği bir at) olduğunda, modelin kendi AGF≤3 içindeki en iyi adayıyla yer değiştirir. Kullanıcının \"tüm V5'ler içinde en yüksek kazanma oranına götürecek sinyal harmonisi ne olurdu\" talebiyle 8 kombinasyon walk-forward + B=500 ile test edildi. İLK test (794 yarış, model-veri.json o gün eskiydi — bugünün yarışlarını içermiyordu) top1 net GA=[2,19] (anlamlı) göstermişti; veri tazelenip (1042 yarış, 834 out-of-fold) TEKRAR test edilince bu net etki SINIRA geldi (GA sıfırı içeriyor artık) — düzeltilmiş, dürüst sonuç aşağıda. Yine de nokta tahmini en iyisi ve top3'e hiç zarar kanıtı yok, bu yüzden CANLIDA KALDI.",
-    backtestOzet: "Orijinal (2026-08-24): n=448 → net +20 yarış (top1 %28.6→%33.0). Güncel walk-forward (2026-08-27, 1042 yarış/834 out-of-fold, DÜZELTİLMİŞ): V5.23 vs V5.22 (Longshot'suz) top1 net GA=[-3,11] (artık sıfırı içeriyor, anlamlılık kanıtlanamadı), top3 net GA=[0,0] (hiç zarar yok). V5.23 vs hiç kural yok: top3 net GA=[1,15] (anlamlı, paket genel olarak işe yarıyor).",
+    etiket: "GERİ ALINDI (2026-08-27, V5.24, kesin karar)",
+    aciklama: "Sistemin ham #1'i AGF sırası≥4 (piyasanın neredeyse hiç güvenmediği bir at) olduğunda, modelin kendi AGF≤3 içindeki en iyi adayıyla yer değiştiriyordu. Bu KURAL, Kocaeli 2.Koşu'da MAŞİDE'yi (ham #1, %23.5) TEYZEOĞLU (%11.1) ile yer değiştirmişti — kullanıcı bunu somut örnekte görüp KESİN reddetti: sıralama İSTİSNASIZ yüzdeye göre.",
+    backtestOzet: "Orijinal: n=448 → net +20 yarış. Güncel/tazelenmiş veriyle (1042 yarış) tekrar test edildiğinde bu net etki artık istatistiksel olarak kanıtlanamıyordu (GA=[-3,11], sıfırı içeriyor) — geçerliliğini koruyor sayılmıyor, uygulanmıyor.",
   },
 ];
 
