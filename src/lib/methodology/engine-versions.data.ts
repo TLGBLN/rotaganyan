@@ -384,13 +384,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.21",
     baslangic: new Date("2026-08-27T19:04:08+03:00"), // 6d6e478 — AGF Trend Terfisi geri getirildi
-    bitis: null,
+    bitis: new Date("2026-08-27T19:22:33+03:00"), // 8f058db — AGF Favorisi İlk-3 Garantisi de geri getirildi
     aciklama: "V5.20'nin geri alınmasının KISMİ düzeltmesi: kullanıcı yalnız AGF Trend Terfisi'nin (agfTrendTerfisiUygula + terfiPenceresiV5, AGFTERFI muhakeme satırı) geri getirilmesini istedi — bu kural birebir V5.19'daki hâliyle (backtest/eşikler DEĞİŞMEDEN) yeniden eklendi. AGF Favorisi İlk-3 Garantisi ve Derin AGF-Longshot Düzeltmesi KALDIRILMIŞ olarak kalıyor — kullanıcı bu ikisinin geri gelmesini istemedi. Ayrıca netleştirildi: AGF Trend SİNYALİ (agfYukselisVarMi/agfDususVarMi, skora katkı yapan özellikler) ve AGFTREND bilgi satırı zaten hiç dokunulmamıştı — V5.20'de kaldırılan yalnız gösterim-sırası PROMOSYONUYDU, sinyalin kendisi değil.",
     neyiAnalizEdiyor: [
       "V5.19 ile AYNI 21 özellik/segment-bazlı model/skorlama VE aynı AGF Trend Terfisi gösterim kuralı — yalnız AGF Favorisi Garantisi/Derin Longshot Düzeltmesi hâlâ uygulanmıyor",
     ],
     caprazlamalar: [
       "AGF Trend Terfisi'nin backtest'i DEĞİŞMEDİ: n=663 → %21.6 galibiyet/%53.8 top3, kontrol grubu %10.2/%30.7.",
+    ],
+  },
+  {
+    versiyon: "V5.22",
+    baslangic: new Date("2026-08-27T19:22:33+03:00"), // 8f058db — AGF Favorisi İlk-3 Garantisi de geri getirildi
+    bitis: null,
+    aciklama: "Kullanıcı, gerçek yayınlanmış tahmin geçmişini (getVersiyonKarsilastirmasi) inceleyip V5.14'ün (AGF Trend Terfisi + AGF Favorisi İlk-3 Garantisi ikisi de aktifken) en yüksek canlı başarı oranını gösterdiğini fark etti (n=32, top1 %46.9/top3 %81.3) ve \"V5.14'e dön\" dedi. Kapsam netleştirildi: yalnız AGF Favorisi İlk-3 Garantisi kuralı geri getirildi (V5.14'ün SONRASINDA bulunan hizDerecesi tarih bugu, galopTrendFarki sızıntısı, yurt dışı kazanan bugu gibi düzeltmeler ve büyümüş eğitim verisi KORUNDU, geri alınmadı). Kullanıcı talebiyle B=500 bootstrap-CI ile GÜNCEL/çok daha büyük veride (249 test yarışı, 3 segment havuzlanmış) yeniden doğrulandı.",
+    neyiAnalizEdiyor: [
+      "V5.19 ile AYNI 21 özellik/segment-bazlı model/skorlama, AGF Trend Terfisi VE AGF Favorisi İlk-3 Garantisi ikisi de aktif — yalnız Derin AGF-Longshot Düzeltmesi hâlâ kaldırılmış durumda",
+    ],
+    caprazlamalar: [
+      "B=500 bootstrap doğrulama (2026-08-27, güncel veri, 249 test yarışı, 3 segment kendi override'ıyla eğitilip havuzlandı): HAM top3 %67.5 (168/249) → KURALLI top3 %68.7 (171/249), net +3/249, GA=[0,7] — bootstrap örneklerinin %100'ü ≥0, hiç negatif çıkmadı. Orijinal (2026-08-24) backtest ile aynı yönde, güncel veride de doğrulandı.",
     ],
   },
 ];
