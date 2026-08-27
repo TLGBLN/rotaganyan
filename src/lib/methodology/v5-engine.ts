@@ -658,9 +658,7 @@ export type Faz1RunnerV5Sirali = Faz1RunnerV5 & {
   olasilik: number;
   standartVektor: number[];
   katkilar: number[]; // standartVektor[i] * WEIGHTS[i], her özelliğin bu attaki katkısı
-  sinyalSayisi: number; // V4'ün 8-sinyal sayımı — yalnız terfi kapısı için, skora girmez
-  agfTerfi: "ilk3" | "ilk6" | null;
-  agfFavoriGarantisi: boolean;
+  sinyalSayisi: number; // V4'ün 8-sinyal sayımı — yalnız gerekçe metninde bilgi amaçlı
   teknikSira: number;
   karar: string;
 };
@@ -672,125 +670,12 @@ function kararUret(p: number): string {
   return "Yüksek Risk";
 }
 
-/** V4'ün terfiPenceresineTasi'sinin (tek-tek-sırayla-boyuta-ekle) V5 için DÜZELTİLMİŞ
- *  hâli — 2026-08-16 kullanıcı bulgusu (KING ZELAY vakası, İzmir K4): eski mekanizma
- *  "en zayıf önce, boyutun SON slotuna ekle" yapıyordu — bu, pencerede DOĞAL OLARAK
- *  zaten bulunan (aday bile sayılmayan, i<pencereBoyu) güçlü bir atı, sonradan eklenen
- *  daha zayıf bir adayla mekanik olarak dışarı itebiliyordu (KING ZELAY %14.6 ile doğal
- *  3.sıradaydı, ANGEL ON THE RIGHT'ın terfi eklenmesiyle 8.sıraya düştü). Artık: doğal
- *  pencere sakinleri + terfi adayları TEK bir havuzda toplanıp olasılığa göre sıralanır,
- *  en güçlü pencereBoyu tanesi kazanır — kimin "aday" kimin "sakin" olduğu ayrımı
- *  rekabeti etkilemez, yalnız kim en güçlü olduğu belirler. */
-function terfiPenceresiV5<T extends { no: number; olasilik: number }>(
-  sirali: T[],
-  pencereBoyu: number,
-  adayMi: (r: T, index: number) => boolean
-): { sonuc: T[]; terfiEdenNolar: Set<number> } {
-  const dogalSakinler = sirali.slice(0, pencereBoyu);
-  const disaridakiAdaylar = sirali
-    .map((r, i) => ({ r, i }))
-    .filter(({ r, i }) => i >= pencereBoyu && adayMi(r, i))
-    .map(({ r }) => r);
-
-  const havuz = [...dogalSakinler, ...disaridakiAdaylar].sort((a, b) => b.olasilik - a.olasilik);
-  const secilenler = havuz.slice(0, pencereBoyu);
-  const secilenNoSet = new Set(secilenler.map((r) => r.no));
-
-  const terfiEdenNolar = new Set(disaridakiAdaylar.filter((r) => secilenNoSet.has(r.no)).map((r) => r.no));
-  const geriKalanlar = sirali.filter((r) => !secilenNoSet.has(r.no)).sort((a, b) => b.olasilik - a.olasilik);
-  return { sonuc: [...secilenler, ...geriKalanlar], terfiEdenNolar };
-}
-
-/** V4'ün kanıtlanmış AGF-trend terfi kuralının V5'e uyarlanmış hâli — kullanıcı kararı
- *  2026-08-16: büyük AGF trendi taşıyan atlar, YETERİNCE başka sinyal de taşıyorsa
- *  (bkz. AGF_TERFI_ILK3_SINYAL_ESIGI=4, V4'ün backtest'i: n=663, %21.6/%53.8, kontrol
- *  %10.2/%30.7) modelin ham olasılık sıralamasında geride kalsa bile ilk-3'e/ilk-6'ya
- *  taşınır. Regresyon skorunu/olasılığı DEĞİŞTİRMEZ — yalnız GÖSTERİM sırasını ve kararı
- *  etkiler. Sinyal sayısı YETERSİZSE (KURUŞHAN örneği: trend var ama yalnız 2 sinyal) VE
- *  düşüş-iyi-pozisyon örüntüsü de yoksa terfi olmaz — bu KASITLI, trend TEK BAŞINA V4'ün
- *  kendi backtest'inde de ilk-3 için yeterli değildi. */
-function agfTrendTerfisiUygula<
-  T extends {
-    no: number; agfTrendYonu: "yükseliş" | "düşüş" | null; sinyalSayisi: number;
-    agfFark: number; agfSirasi: number; olasilik: number;
-  }
->(sirali: T[]): (T & { agfTerfi: "ilk3" | "ilk6" | null })[] {
-  const isaretli = sirali.map((r) => ({ ...r, agfTerfi: null as "ilk3" | "ilk6" | null }));
-
-  // 2026-08-16 kullanıcı bulgusu (KINDBERO/ANGEL ON THE RIGHT, İzmir K3/K4): "düşüş ama
-  // hâlâ iyi AGF pozisyonu" (agfFark<=-1.0 VE agfSirasi<=4) TEK BAŞINA (V4'ün 4-sinyal
-  // şartı olmadan) ilk-3 için yeterince güçlü — backtest: n=930, %19.9 galibiyet/%55.1
-  // top3, kontrol grubu %9.3/%28.4 (V4'ün kendi trend+4sinyal kuralıyla aynı seviyede).
-  // NOT — 2026-08-19: bu, SKOR özelliği "agfDususVarMi"dan (toFeatureVector) FARKLI —
-  // o pozisyon şartını kaldırdı, ama bu GÖSTERİM TERFİSİ penceresi kendi ayrı backtest'i
-  // (yukarıdaki) yalnız ilk-4 için doğrulandığından bilerek pozisyon şartlı BIRAKILDI.
-  const dususAmaIyiPozisyonMu = (r: T) => r.agfFark <= -ANLAMLI_PUAN_ESIGI && r.agfSirasi <= 4;
-
-  const { sonuc: ilk3Sonrasi, terfiEdenNolar: ilk3Terfi } = terfiPenceresiV5(
-    isaretli,
-    3,
-    (r) => (r.agfTrendYonu != null && r.sinyalSayisi >= SINYAL_ESIGI) || dususAmaIyiPozisyonMu(r)
-  );
-  const ilk3Isaretli = ilk3Sonrasi.map((r) => (ilk3Terfi.has(r.no) ? { ...r, agfTerfi: "ilk3" as const } : r));
-
-  const { sonuc: ilk6Sonrasi, terfiEdenNolar: ilk6Terfi } = terfiPenceresiV5(
-    ilk3Isaretli,
-    6,
-    (r) => r.agfTrendYonu != null
-  );
-  return ilk6Sonrasi.map((r) => (ilk6Terfi.has(r.no) ? { ...r, agfTerfi: "ilk6" as const } : r));
-}
-
-// 2026-08-24 kullanıcı bulgusu (Bursa K10, Kaşmir Tay vakası): AGF sırası=1 (favori) bir
-// at, modelin ham olasılık sıralamasında 4.sıraya düşmüştü — at kazandı. agfTrendTerfisiUygula
-// AGF-1'i BURADA KORUMAZ, çünkü o mekanizma olasılığa göre YARIŞIYOR (candidate havuzda
-// en güçlü N tanesi kazanıyor) — AGF-1'in olasılığı zaten düşükse yine dışarıda kalır.
-// Backtest (512 sonuçlanmış yarış, 2026-07-01 sonrası, yayınlanan Prediction.picks ile):
-// AGF-1 favorisi %33.6 kazanıyor (gerçek), modelin top3'ü bunların %91.9'unu zaten
-// yakalıyordu — geri kalan %8.1 (14 yarış) modelin top3'ünde YOKTU. AGF-1'i KOŞULSUZ
-// 3.sıraya zorlarsak (mevcut #3'ün yerini alarak): +14 yeni galibiyet yakalanır, yalnız
-// 5 kez yerini aldığımız #3 zaten kazanandı — NET +9/512 (top3 isabeti %60.2→%61.9).
-// Olasılığı/skoru DEĞİŞTİRMEZ, yalnız GÖSTERİM sırasını etkiler (agfTrendTerfisiUygula
-// ile aynı ilke) — ama o mekanizmadan FARKLI olarak koşulsuzdur, rekabete girmez.
-function agfFavoriIlk3Garantisi<T extends { no: number; agfSirasi: number }>(
-  sirali: T[]
-): (T & { agfFavoriGarantisi: boolean })[] {
-  const isaretsiz = sirali.map((r) => ({ ...r, agfFavoriGarantisi: false }));
-  const idx = isaretsiz.findIndex((r) => r.agfSirasi === 1);
-  if (idx < 0 || idx < 3) return isaretsiz;
-
-  const kopya = [...isaretsiz];
-  const [agf1] = kopya.splice(idx, 1);
-  kopya.splice(2, 0, { ...agf1, agfFavoriGarantisi: true });
-  return kopya;
-}
-
-// 2026-08-26 kullanıcı bulgusu: "sistemin 1. seçimi, AGF favorisinden daha isabetsiz"
-// (dashboard'daki Sistem vs AGF Favorisi kartı: -4.2 puan, n=448). Kök neden araştırıldı:
-// sorun Handikap'a özel değil (orada fark en KÜÇÜK, -1.5) — asıl kanama, sistemin AGF
-// favorisinden FARKLI bir at seçtiği durumlarda, o atın AGF sırasına göre keskin biçimde
-// ayrışıyor. Split-half doğrulandı (2 bağımsız dönemde de aynı desen):
-//   AGF sırası 2. seçilince: %38.5 / %20.5 isabet (gerçek değer bulma — dokunulmadı)
-//   AGF sırası 3. seçilince: %25.0 / %15.4 isabet (hâlâ makul — dokunulmadı)
-//   AGF sırası 4.+ seçilince: %2.9 / %0.0 isabet (n=60 toplam, 1 galibiyet) — bu "değer
-//   bulma" değil, modelin derin bir longshot'a köpürmesi.
-// Bu atları AGF favorisine ZORLAMIYORUZ (o da yalnız %35 kurtarıyor, kalan %65'i BAŞKA
-// bir at kazanıyor — "her zaman AGF'ye güven" kullanıcının reddettiği bir yaklaşım).
-// Bunun yerine modelin KENDİ sıralı listesinde AGF sırası<=3 olan EN ÜST adayına inilir
-// (çoğunlukla AGF favorisiyle çakışıyor ama illa değil — model muhakemesi birincil kalır).
-// Geriye dönük simülasyon (448 sonuçlanmış yarış): %28.6→%33.0 (net +20), AGF favorisinin
-// kendi oranını (%32.8) hafifçe geçiyor. 2./3. sıradaki değer-bulma yeteneğine dokunulmadı.
-const DERIN_LONGSHOT_AGF_ESIGI = 3;
-
-function derinLongshotDuzelt<T extends { no: number; agfSirasi: number }>(sirali: T[]): T[] {
-  if (sirali.length === 0 || sirali[0].agfSirasi <= DERIN_LONGSHOT_AGF_ESIGI) return sirali;
-  const idx = sirali.findIndex((r, i) => i > 0 && r.agfSirasi <= DERIN_LONGSHOT_AGF_ESIGI);
-  if (idx < 0) return sirali; // uygun aday yoksa (ör. tüm sahada AGF verisi eksik) dokunma
-  const kopya = [...sirali];
-  [kopya[0], kopya[idx]] = [kopya[idx], kopya[0]];
-  return kopya;
-}
-
+// 2026-08-27 kullanıcı kararı: gösterim sırası artık YALNIZ olasılığa göre — üç gösterim-
+// sırası düzeltmesi (agfTrendTerfisiUygula/agfFavoriIlk3Garantisi/derinLongshotDuzelt,
+// V5.13/V5.15) komple kaldırıldı. Bu üçü gerçek backtest kanıtına dayanıyordu (net +5/428
+// ve +20/448 top3) ama kullanıcı ham yüzde dışında hiçbir müdahale istemedi — bkz.
+// ENGINE_VERSIONS V5.20 notu ve [[feedback_...]] hafıza kaydı. AGFTREND bilgi satırı (yalnız
+// açıklama, sıra değiştirmez) ve agfTrendYonu/agfFark alanları DOKUNULMADI.
 export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
   const setler = agirlikSetleriSec(faz1.race.classType);
   const harmanlar = faz1.runners.map((r) => harmanliSkorla(toFeatureVector(r), setler));
@@ -822,16 +707,8 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
   });
 
   const sirali = [...enriched].sort((a, b) => (b.olasilik !== a.olasilik ? b.olasilik - a.olasilik : a.no - b.no));
-  const terfili = agfTrendTerfisiUygula(sirali);
-  const garantili = agfFavoriIlk3Garantisi(terfili);
-  const duzeltilmis = derinLongshotDuzelt(garantili);
 
-  return duzeltilmis.map((r, i) => {
-    let karar = kararUret(r.olasilik);
-    if (r.agfTerfi === "ilk3") karar = "Güçlü Aday";
-    else if (r.agfTerfi === "ilk6" && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
-    return { ...r, teknikSira: i + 1, karar };
-  });
+  return sirali.map((r, i) => ({ ...r, teknikSira: i + 1, karar: kararUret(r.olasilik) }));
 }
 
 // V4'ün faz2BankoAdayiTespit'i "Güçlü Aday" (p>=%30) metnine bakıyordu — 826 koşuluk
@@ -1053,40 +930,9 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
     });
   }
 
-  // AGF-trend terfi denetim satırı — bkz. agfTrendTerfisiUygula (2026-08-16, KURUŞHAN
-  // dersi). kodGarantili:true, sayaca dahil değil (AGFTREND kodu zaten yukarıda var).
-  if (r.agfTerfi === "ilk3") {
-    const dususAmaIyiPozisyonMu = r.agfFark <= -ANLAMLI_PUAN_ESIGI && r.agfSirasi <= 4;
-    satirlar.push({
-      kod: ["AGFTERFI"],
-      tip: "destek",
-      guven: "tam",
-      kodGarantili: true,
-      aciklama: dususAmaIyiPozisyonMu
-        ? `Düşüşe rağmen hâlâ iyi AGF pozisyonu (sıra ${r.agfSirasi}) — ilk-3'e terfi (backtest: n=930, %19.9 galibiyet/%55.1 top3, kontrol %9.3/%28.4)`
-        : `AGF trend + ${r.sinyalSayisi} sinyal — ilk-3'e terfi (V4 backtest: n=663, %21.6 galibiyet/%53.8 top3)`,
-    });
-  } else if (r.agfTerfi === "ilk6") {
-    satirlar.push({
-      kod: ["AGFTERFI"],
-      tip: "destek",
-      guven: "orta",
-      kodGarantili: true,
-      aciklama: `AGF trend taşıyor ama yalnız ${r.sinyalSayisi} sinyal (ilk-3 için en az 4 gerekir) — ilk-6'ya terfi (V4 backtest: n=3210, %16.1 galibiyet/%44.6 top3)`,
-    });
-  }
-
-  // AGF favorisi ilk-3 garantisi — bkz. agfFavoriIlk3Garantisi (2026-08-24, Kaşmir Tay
-  // dersi). agfTrendTerfisiUygula'dan FARKLI: koşulsuz, olasılıkla yarışmaz.
-  if (r.agfFavoriGarantisi) {
-    satirlar.push({
-      kod: ["AGFFAVORI"],
-      tip: "destek",
-      guven: "tam",
-      kodGarantili: true,
-      aciklama: `AGF favorisi (sıra 1, %${r.agfPayi.toFixed(1)} pay) — modelin ham sıralaması geride bıraksa da ilk-3'e koşulsuz alınır (backtest: n=512, AGF-1 galibiyetlerinin %8.1'i top3 dışında kalıyordu, garanti net +9/512 top3 isabeti)`,
-    });
-  }
+  // 2026-08-27 kullanıcı kararı: AGF-trend terfi ve AGF-favori-garantisi gösterim-sırası
+  // düzeltmeleri (AGFTERFI/AGFFAVORI satırları dahil) komple kaldırıldı — bkz.
+  // faz2V5Sirala üstündeki not. Gösterim sırası artık yalnız ham olasılığa göre.
 
   // Her zaman garanti — hem assertPublishSafe (7) hem UI şeffaflığı için: modelin
   // ham çıktısı (olasılık + saha içi sıra), kodGarantili (Claude'un satırı değil).

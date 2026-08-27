@@ -60,18 +60,29 @@ export type SiralamaKurali = {
   backtestOzet: string;
 };
 
+// 2026-08-27 kullanıcı kararı: "sıralamalar yüzdelere göre olacak, eskisi gibi" — aşağıdaki
+// ÜÇ gösterim-sırası düzeltmesinin (ikisi burada belgeliydi, üçüncüsü hiç eklenmemişti)
+// TÜMÜ v5-engine.ts'ten kaldırıldı. Gösterim sırası artık YALNIZ ham olasılığa göre.
+// Backtest kanıtları geçerliliğini koruyor (yanlış değildi) — kaldırılma sebebi istatistiksel
+// bir çürütme değil, kullanıcının "yüzde dışında hiçbir müdahale istemiyorum" tercihi.
 export const SIRALAMA_KURALLARI: SiralamaKurali[] = [
   {
     ad: "AGF Trend Terfisi",
-    etiket: "İLK3 / İLK6 · olasılıkla YARIŞIR",
-    aciklama: "En çok yükselen/düşen AGF trendini taşıyan + yeterli sinyal sayısına (≥4) sahip atlar, ham sıralamada geride kalsa bile ilk-3'e/ilk-6'ya terfi eder. Aday havuzu + doğal sakinler birlikte olasılığa göre yeniden sıralanır.",
-    backtestOzet: "n=663 → %21.6 galibiyet / %53.8 top3",
+    etiket: "GERİ ALINDI (2026-08-27)",
+    aciklama: "En çok yükselen/düşen AGF trendini taşıyan + yeterli sinyal sayısına (≥4) sahip atlar, ham sıralamada geride kalsa bile ilk-3'e/ilk-6'ya terfi ediyordu. Kullanıcı kararıyla kaldırıldı, artık sıralamayı etkilemiyor.",
+    backtestOzet: "n=663 → %21.6 galibiyet / %53.8 top3 (geçerliliğini koruyor, uygulanmıyor)",
   },
   {
     ad: "AGF Favorisi İlk-3 Garantisi",
-    etiket: "V5.13 · koşulsuz",
-    aciklama: "AGF sırası=1 olan at, ham olasılık sıralamasında top3 dışında kalsa bile KOŞULSUZ 3.sıraya alınır (mevcut #3'ün yerini alarak). Olasılıkla yarışmaz.",
-    backtestOzet: "n=428 (Karma hariç, düzeltilmiş) → net +5 yarış (top3 %60.0→%61.2)",
+    etiket: "GERİ ALINDI (2026-08-27, idi: V5.13)",
+    aciklama: "AGF sırası=1 olan at, ham olasılık sıralamasında top3 dışında kalsa bile KOŞULSUZ 3.sıraya alınıyordu. Kullanıcı kararıyla kaldırıldı, artık sıralamayı etkilemiyor.",
+    backtestOzet: "n=428 (Karma hariç, düzeltilmiş) → net +5 yarış (top3 %60.0→%61.2) (geçerliliğini koruyor, uygulanmıyor)",
+  },
+  {
+    ad: "Derin AGF-Longshot Düzeltmesi",
+    etiket: "GERİ ALINDI (2026-08-27, idi: V5.15)",
+    aciklama: "Sistemin ham #1'i AGF sırası≥4 (piyasanın neredeyse hiç güvenmediği bir at) olduğunda, modelin kendi AGF≤3 içindeki en iyi adayıyla yer değiştiriyordu. Kullanıcı kararıyla kaldırıldı, artık sıralamayı etkilemiyor. (Bu kural daha önce bu listeye hiç eklenmemişti — eksiklik burada düzeltildi.)",
+    backtestOzet: "n=448 → net +20 yarış (top1 %28.6→%33.0) (geçerliliğini koruyor, uygulanmıyor)",
   },
 ];
 
