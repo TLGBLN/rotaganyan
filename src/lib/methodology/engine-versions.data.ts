@@ -372,13 +372,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.20",
     baslangic: new Date("2026-08-27T17:35:11+03:00"), // d8fa2a9 — gösterim sırası düzeltmeleri kaldırıldı
-    bitis: null,
-    aciklama: "Kullanıcı kararı (Kocaeli 2.Koşu vakası — MAŞİDE %24 ile 3.sıraya, %12'lik KARAKÖPRÜ ATEŞİ 1.sıraya düşmüştü, kullanıcı \"yüzdelere göre sıralama olacak, eskisi gibi, sistemimizi bozamazsın\" dedi): üç gösterim-sırası düzeltmesi (AGF Trend Terfisi, AGF Favorisi İlk-3 Garantisi [V5.13], Derin AGF-Longshot Düzeltmesi [V5.15]) KOMPLE KALDIRILDI. Skorlama/olasılık hesaplaması (harmanliSkorla, softmax, ağırlık setleri) HİÇ DEĞİŞMEDİ — yalnız teknikSira artık doğrudan olasılığa göre azalan sırada, hiçbir gösterim müdahalesi yok. Üç kuralın ÜÇÜ de kaldırılmadan önce gerçek backtest kanıtına dayanıyordu (aşağıya bakınız) — kaldırılma sebebi istatistiksel bir çürütme DEĞİL, kullanıcının açık tercihi. sinyal-kutugu.service.ts'teki SIRALAMA_KURALLARI kaydı silinmedi, \"GERİ ALINDI\" olarak işaretlendi.",
+    bitis: new Date("2026-08-27T19:04:08+03:00"), // 6d6e478 — AGF Trend Terfisi geri getirildi
+    aciklama: "Kullanıcı kararı (Kocaeli 2.Koşu vakası — MAŞİDE %24 ile 3.sıraya, %12'lik KARAKÖPRÜ ATEŞİ 1.sıraya düşmüştü, kullanıcı \"yüzdelere göre sıralama olacak, eskisi gibi, sistemimizi bozamazsın\" dedi): üç gösterim-sırası düzeltmesi (AGF Trend Terfisi, AGF Favorisi İlk-3 Garantisi [V5.13], Derin AGF-Longshot Düzeltmesi [V5.15]) KOMPLE KALDIRILDI. Skorlama/olasılık hesaplaması (harmanliSkorla, softmax, ağırlık setleri) HİÇ DEĞİŞMEDİ — yalnız teknikSira artık doğrudan olasılığa göre azalan sırada, hiçbir gösterim müdahalesi yok. Üç kuralın ÜÇÜ de kaldırılmadan önce gerçek backtest kanıtına dayanıyordu (aşağıya bakınız) — kaldırılma sebebi istatistiksel bir çürütme DEĞİL, kullanıcının açık tercihi. Ama aynı gün, bir başka örnek (ABANOZ/AGF Trend paneli) üzerinden kullanıcı netleştirdi: AGF Trend Terfisi'ni HİÇ kaldırmamı istememişti (\"en çok ağırlık vermeni istediğim sinyaldi\") — bu kural V5.21'de geri getirildi, yalnız 1.5 saat canlı kaldı.",
     neyiAnalizEdiyor: [
       "V5.19 ile AYNI 21 özellik/segment-bazlı model/skorlama — yalnız gösterim sırası artık ham olasılığa eşit, hiçbir terfi/garanti/düzeltme uygulanmıyor",
     ],
     caprazlamalar: [
-      "Geri alınan kuralların önceki (geçerliliğini koruyan, ama artık UYGULANMAYAN) backtest bulguları: AGF Trend Terfisi n=663 → %21.6/%53.8; AGF Favorisi İlk-3 Garantisi n=428 → top3 %60.0→%61.2 (net +5); Derin AGF-Longshot Düzeltmesi n=448 → top1 %28.6→%33.0 (net +20).",
+      "Geri alınan kuralların önceki (geçerliliğini koruyan, ama bu pencerede UYGULANMAYAN) backtest bulguları: AGF Trend Terfisi n=663 → %21.6/%53.8; AGF Favorisi İlk-3 Garantisi n=428 → top3 %60.0→%61.2 (net +5); Derin AGF-Longshot Düzeltmesi n=448 → top1 %28.6→%33.0 (net +20).",
+    ],
+  },
+  {
+    versiyon: "V5.21",
+    baslangic: new Date("2026-08-27T19:04:08+03:00"), // 6d6e478 — AGF Trend Terfisi geri getirildi
+    bitis: null,
+    aciklama: "V5.20'nin geri alınmasının KISMİ düzeltmesi: kullanıcı yalnız AGF Trend Terfisi'nin (agfTrendTerfisiUygula + terfiPenceresiV5, AGFTERFI muhakeme satırı) geri getirilmesini istedi — bu kural birebir V5.19'daki hâliyle (backtest/eşikler DEĞİŞMEDEN) yeniden eklendi. AGF Favorisi İlk-3 Garantisi ve Derin AGF-Longshot Düzeltmesi KALDIRILMIŞ olarak kalıyor — kullanıcı bu ikisinin geri gelmesini istemedi. Ayrıca netleştirildi: AGF Trend SİNYALİ (agfYukselisVarMi/agfDususVarMi, skora katkı yapan özellikler) ve AGFTREND bilgi satırı zaten hiç dokunulmamıştı — V5.20'de kaldırılan yalnız gösterim-sırası PROMOSYONUYDU, sinyalin kendisi değil.",
+    neyiAnalizEdiyor: [
+      "V5.19 ile AYNI 21 özellik/segment-bazlı model/skorlama VE aynı AGF Trend Terfisi gösterim kuralı — yalnız AGF Favorisi Garantisi/Derin Longshot Düzeltmesi hâlâ uygulanmıyor",
+    ],
+    caprazlamalar: [
+      "AGF Trend Terfisi'nin backtest'i DEĞİŞMEDİ: n=663 → %21.6 galibiyet/%53.8 top3, kontrol grubu %10.2/%30.7.",
     ],
   },
 ];
