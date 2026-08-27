@@ -65,6 +65,15 @@ const FEATURE_NAMES = [
   // sızıntılı). Temiz veriyle yeniden test edilince katsayı tamamen çöktü (düşük-şart
   // +0.280→+0.008, diğer +0.003→-0.005) — "yön tutarlılığı" kabul gerekçesi geçersizdi.
   "h2hKiloDegisimi",
+  // 2026-08-27 — kullanıcı talebi ("piyasayı araştır"): AGF payı kalibrasyon kontrolü
+  // %40+ payılı güçlü favorilerin gerçek kazanma oranından -4.1 puan geride, AGF sırası
+  // 4-5 olan orta sıradaki atların +2.1/+2.5 puan önde olduğunu gösterdi — doğrusal
+  // olmayan bir kalıp. agfPayi'nin karesi (formEgimi2/kgs2 ile AYNI desen) "diğer"
+  // segmentte ANLAMLI (nokta=-0.207, GA=[-0.366,-0.053]) VE top3'ü gerçekten iyileştirdi
+  // (%64.8→%65.3, logloss 1.8409→1.8392) — B=500, izole test. Kategorik alternatifler
+  // (AGF sırası 4-5 göstergesi, %40+ göstergesi) anlamlı ama top1/top3'ü kötüleştirdi,
+  // DAHİL EDİLMEDİ.
+  "agfPayi2",
 ];
 
 function toFeatureVector(row) {
@@ -79,6 +88,7 @@ function toFeatureVector(row) {
     row.h2hNetSkor ?? 0,
     row.hizDerecesi ?? 0,
     row.h2hKiloDegisimi ?? 0,
+    (row.agfPayi ?? 0) * (row.agfPayi ?? 0),
   ];
 }
 function groupByRace(rows) {

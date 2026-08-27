@@ -609,6 +609,17 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     // 2026-08-24 — Kilo-ayarlı H2H: bkz. Faz1RunnerV5 üstündeki not. Tek başına sınırda/
     // anlamsız (GA sıfırı kapsıyor) ama kullanıcı kararıyla eklendi.
     r.h2hKiloDegisimi,
+    // 2026-08-27 kullanıcı talebi ("piyasayı araştır") — AGF payı kalibrasyon kontrolü:
+    // %40+ payı olan güçlü favoriler gerçek kazanma oranından -4.1 puan geride
+    // (piyasa fazla seviyor), AGF sırası 4-5 olan orta sıradaki atlar +2.1/+2.5 puan
+    // önde (piyasa hafife alıyor) — doğrusal olmayan bir kalıp. agfPayi'nin karesi
+    // (formEgimi2/kgs2 ile AYNI desen) test edildi: "diğer" segmentte ANLAMLI
+    // (nokta=-0.207, GA=[-0.366,-0.053]) VE top3 gerçekten iyileşti (%64.8→%65.3,
+    // logloss 1.8409→1.8392) — bugünkü ~13 adaydan yalnız bunda hem anlamlılık hem
+    // pratik kazanç birlikte çıktı. Kategorik alternatifler (AGF sırası 4-5 göstergesi,
+    // %40+ göstergesi) anlamlı ama top1/top3'ü KÖTÜLEŞTİRDİ (kariyerStartSayisi deseni),
+    // DAHİL EDİLMEDİ — yalnız bu kare terim eklendi.
+    r.agfPayi * r.agfPayi,
   ];
 }
 
@@ -926,7 +937,7 @@ type OzellikGrubu = {
 const idx = (name: string) => FEATURE_NAMES.indexOf(name);
 
 const OZELLIK_GRUPLARI: OzellikGrubu[] = [
-  { kod: "AGF", ozellikIndeksleri: [idx("agfSirasi"), idx("agfPayi")], aciklama: (r) => `AGF sırası: ${r.agfSirasi}${r.agfSirasi === 1 ? ` (AGF favorisi, %${r.agfPayi.toFixed(1)})` : ` (%${r.agfPayi.toFixed(1)})`}` },
+  { kod: "AGF", ozellikIndeksleri: [idx("agfSirasi"), idx("agfPayi"), idx("agfPayi2")], aciklama: (r) => `AGF sırası: ${r.agfSirasi}${r.agfSirasi === 1 ? ` (AGF favorisi, %${r.agfPayi.toFixed(1)})` : ` (%${r.agfPayi.toFixed(1)})`}` },
   { kod: "ACC", ozellikIndeksleri: [idx("accurace")], aciklama: (r) => (r.accurace ? "Accurace: son yarışta sahanın en hızlı son 200m kapanışı" : null) },
   { kod: "FORM", ozellikIndeksleri: [idx("formEgimi"), idx("formEgimi2")], aciklama: (r) => `Form eğimi: ${r.formEgimi.toFixed(1)} (${r.formEgimi < 0 ? "iyileşiyor" : r.formEgimi > 0 ? "kötüleşiyor" : "sabit"})` },
   { kod: "KGS", ozellikIndeksleri: [idx("kgs"), idx("kgs2"), idx("kgsVarMi")], aciklama: (r) => (r.kgsVarMi ? `KGS ${r.kgs} gün` : null) },
@@ -996,6 +1007,7 @@ const FEATURE_LABELS: Record<string, string> = {
   h2hNetSkor: "H2H Net Skoru (bugünkü rakiplerle geçmiş karşılaşma)",
   hizDerecesi: "Hız Derecesi (popülasyona göre göreli tempo, son 365 gün)",
   h2hKiloDegisimi: "Kilo-Ayarlı H2H (rakiplere göre kilo pozisyonu değişimi)",
+  agfPayi2: "AGF Payı (karesi, piyasa kalibrasyon eğriselliği)",
 };
 
 export type TumOzellikDetay = { kod: string; etiket: string; hamDeger: number; standartDeger: number; katki: number };
