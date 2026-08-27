@@ -60,17 +60,19 @@ export type SiralamaKurali = {
   backtestOzet: string;
 };
 
-// 2026-08-27 kullanıcı kararı: "sıralamalar yüzdelere göre olacak, eskisi gibi" — aşağıdaki
-// ÜÇ gösterim-sırası düzeltmesinin (ikisi burada belgeliydi, üçüncüsü hiç eklenmemişti)
-// TÜMÜ v5-engine.ts'ten kaldırıldı. Gösterim sırası artık YALNIZ ham olasılığa göre.
-// Backtest kanıtları geçerliliğini koruyor (yanlış değildi) — kaldırılma sebebi istatistiksel
-// bir çürütme değil, kullanıcının "yüzde dışında hiçbir müdahale istemiyorum" tercihi.
+// 2026-08-27 kullanıcı kararı: "sıralamalar yüzdelere göre olacak, eskisi gibi" — üç
+// gösterim-sırası düzeltmesi (ikisi burada belgeliydi, üçüncüsü hiç eklenmemişti) TÜMÜ
+// v5-engine.ts'ten kaldırılmıştı. AYNI GÜN, kullanıcı AGF Trend Terfisi'ni GERİ istedi
+// ("bunu kaldır demedim, en çok ağırlık vermeni istediğim sinyaldi") — o kural CANLIYA
+// GERİ ALINDI (V5.21). Diğer iki kural (AGF Favorisi Garantisi, Derin Longshot) hâlâ
+// KALDIRILMIŞ durumda. Backtest kanıtları geçerliliğini koruyor (yanlış değillerdi) —
+// kaldırılma sebebi istatistiksel bir çürütme değil, kullanıcı tercihiydi.
 export const SIRALAMA_KURALLARI: SiralamaKurali[] = [
   {
     ad: "AGF Trend Terfisi",
-    etiket: "GERİ ALINDI (2026-08-27)",
-    aciklama: "En çok yükselen/düşen AGF trendini taşıyan + yeterli sinyal sayısına (≥4) sahip atlar, ham sıralamada geride kalsa bile ilk-3'e/ilk-6'ya terfi ediyordu. Kullanıcı kararıyla kaldırıldı, artık sıralamayı etkilemiyor.",
-    backtestOzet: "n=663 → %21.6 galibiyet / %53.8 top3 (geçerliliğini koruyor, uygulanmıyor)",
+    etiket: "CANLI (2026-08-27'de geri getirildi, V5.21)",
+    aciklama: "En çok yükselen/düşen AGF trendini taşıyan + yeterli sinyal sayısına (≥4) sahip atlar, ham sıralamada geride kalsa bile ilk-3'e/ilk-6'ya terfi eder. Aynı gün kısa süreliğine kaldırılmış (V5.20), kullanıcı isteğiyle hemen geri getirilmiştir (V5.21) — kaldırılmadı.",
+    backtestOzet: "n=663 → %21.6 galibiyet / %53.8 top3",
   },
   {
     ad: "AGF Favorisi İlk-3 Garantisi",
