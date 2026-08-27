@@ -160,9 +160,25 @@ type AgirlikSeti = { featureNames: string[]; weights: number[]; means: number[];
 // n=240 düşük-şart koşusu) — kullanıcı buna rağmen segment-bazlı iki-model mimarisinin
 // CANLIYA alınmasını istedi (bkz. arac-model-egit-segment.mjs). Tek bir ortak ağırlık
 // yerine, koşunun kategorisine göre İKİ TAMAMEN AYRI eğitilmiş model arasında seçim yapılır.
-const WEIGHTS_DUSUK_SART = v5WeightsDusukSart as AgirlikSeti;
 const WEIGHTS_DIGER = v5WeightsDiger as AgirlikSeti;
 const FEATURE_NAMES = WEIGHTS_DIGER.featureNames; // iki set de AYNI özellik/sırayı kullanır
+
+// 2026-08-21 kullanıcı önerisi ("H2H'ı düşük segmentte kullanma diğer segmentte
+// kullanıyosun"): h2hNetSkor'un düşük-şart'taki katsayısı ham/doğal eğitimde ters yönlü
+// ve GA sıfırı kapsıyordu (bkz. ENGINE_VERSIONS V5.7 notu) — elle 0'a sabitlendi, diğer
+// segmentte doğal fit (+0.0994 civarı) korundu.
+// 2026-08-27 kullanıcı denetimi ("handikapta hızı neden 0'ladık, H2H de mi") sırasında
+// bulundu: bu override YALNIZ v5-weights-dusuksart.json dosyasına ELLE yazılmıştı, koda
+// gömülü DEĞİLDİ — 2026-08-26'da kacakYalniz için model yeniden eğitilince (arac-model-
+// egit-segment.mjs, sıfırdan gradient descent) bu manuel düzeltme SESSİZCE KAYBOLDU
+// (yeniden eğitilen dosyada h2hNetSkor=-0.141 çıktı, GA'sı hâlâ sıfırı kapsıyor — aynı
+// güvenilmezlik, farklı ham değer). HIZ_DERECESI_IDX/WEIGHTS_DIGER_HANDIKAP ile AYNI
+// desende, artık KODA gömülü — bir daha retrain'de kaybolmaz.
+const H2H_NET_SKOR_IDX = FEATURE_NAMES.indexOf("h2hNetSkor");
+const WEIGHTS_DUSUK_SART: AgirlikSeti = {
+  ...(v5WeightsDusukSart as AgirlikSeti),
+  weights: (v5WeightsDusukSart as AgirlikSeti).weights.map((w, i) => (i === H2H_NET_SKOR_IDX ? 0 : w)),
+};
 
 // 2026-08-24 kullanıcı bulgusu: Handikap (kategoriTespit==="2") yarışları KENDİ verisiyle
 // (267 koşu, n=200 eğitim/67 test) ayrı eğitildiğinde hizDerecesi'nin gerçek katkısı
@@ -902,10 +918,19 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   { kod: "DUSUSIYI", ozellikIndeksleri: [idx("agfDususVarMi")], aciklama: (r) => (r.agfFark <= -ANLAMLI_PUAN_ESIGI ? "AGF trend: düşüş (para akışı sinyali olabilir)" : null) },
   // 2026-08-21 — H2H: bugünkü rakiplerle ortak geçmiş yarış yoksa (h2hNetSkor=0) satır
   // hiç gösterilmez — "0 karşılaşma" ile "hep berabere" ayrımı yapılamadığı için nötr.
-  { kod: "H2H", ozellikIndeksleri: [idx("h2hNetSkor")], aciklama: (r) => (r.h2hNetSkor !== 0 ? `Baş-başa geçmiş: bugünkü rakiplerle ${r.h2hNetSkor > 0 ? "+" : ""}${r.h2hNetSkor} net (${r.h2hNetSkor > 0 ? "önde" : "geride"} bitirmiş)` : null) },
+  // 2026-08-27 — düşük-şart'ta bu sinyalin katsayısı ELLE sıfırlanmış (bkz. WEIGHTS_DUSUK_SART
+  // üstündeki not) — HIZ ile aynı düzeltme: ham değere değil gerçek katkıya bakılıyor,
+  // düşük-şart'ta satır hiç gösterilmez (puana katkısı yok), diğer'de davranış değişmedi.
+  { kod: "H2H", ozellikIndeksleri: [idx("h2hNetSkor")], aciklama: (r) => (r.katkilar[H2H_NET_SKOR_IDX] !== 0 ? `Baş-başa geçmiş: bugünkü rakiplerle ${r.h2hNetSkor > 0 ? "+" : ""}${r.h2hNetSkor} net (${r.h2hNetSkor > 0 ? "önde" : "geride"} bitirmiş)` : null) },
   // 2026-08-21 — Hız derecesi: veri yoksa (son 365 günde uygun geçmiş yok) 0, satır
   // gösterilmez — "hızlı değil" ile "veri yok" karışmasın.
-  { kod: "HIZ", ozellikIndeksleri: [idx("hizDerecesi")], aciklama: (r) => (r.hizDerecesi !== 0 ? `Hız derecesi: popülasyona göre ${r.hizDerecesi > 0 ? "+" : ""}${r.hizDerecesi.toFixed(1)}% (${r.hizDerecesi > 0 ? "daha hızlı" : "daha yavaş"})` : null) },
+  // 2026-08-27 kullanıcı denetimi ("muhakemeler doğru mu"): Handikap kategorisinde
+  // (WEIGHTS_DIGER_HANDIKAP) bu sinyalin katsayısı ELLE SIFIRLANMIŞ (bkz. dosya başındaki
+  // V5.10 notu) — yani puana HİÇ katkısı yok. Eski kod ham r.hizDerecesi'ye bakıyordu,
+  // Handikap'ta bile "yavaş/hızlı" diye yanıltıcı bir satır gösteriyordu. Artık GERÇEK
+  // katkıya (r.katkilar) bakılıyor — Handikap'ta katkı her zaman 0 olduğundan satır hiç
+  // gösterilmez, diğer kategorilerde davranış değişmedi.
+  { kod: "HIZ", ozellikIndeksleri: [idx("hizDerecesi")], aciklama: (r) => (r.katkilar[HIZ_DERECESI_IDX] !== 0 ? `Hız derecesi: popülasyona göre ${r.hizDerecesi > 0 ? "+" : ""}${r.hizDerecesi.toFixed(1)}% (${r.hizDerecesi > 0 ? "daha hızlı" : "daha yavaş"})` : null) },
   // 2026-08-24 — Kilo-ayarlı H2H: veri yoksa (kilo bilgili ortak karşılaşma yok) 0,
   // satır hiç gösterilmez.
   // 2026-08-24 kullanıcı bulgusu: "+27.5 toplam kilo diye belirtilmesi kullanıcılar
