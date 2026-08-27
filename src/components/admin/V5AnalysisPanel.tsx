@@ -230,8 +230,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       const res = await upsertPrediction({
         raceId,
         confidence: "ORTA",
-        notes:
-          "Bu analiz V5 motoruyla üretildi — koşullu logit (Plackett-Luce) modeli 18 özelliği (AGF trend/sıra/favori, Accurace, form eğimi, KGS, pist uzmanlığı, aygır/jokey/antrenör kazanma oranı, galop, kaçak at, düşüş-ama-iyi-pozisyon) TEK skorda birleştirip atları doğrudan kıyaslar. Claude muhakemesi kullanılmadı.",
+        notes: `Bu analiz ${motorEtiketi ?? "V5 motoruyla"} üretildi — koşullu logit (Plackett-Luce) modeli AGF trend/sıra/favori/payı, Accurace, form eğimi, KGS, pist uzmanlığı, aygır/jokey/antrenör kazanma oranı, galop, idman jokeyi uyumu, uzun-ara galop takibi, rakipsiz kaçak, H2H (net skor + kilo-ayarlı), hız derecesi sinyallerini TEK skorda birleştirip atları doğrudan kıyaslar. Claude muhakemesi kullanılmadı.`,
         tempo: "V5 motoru koşullu logit skoruna dayanır, ayrı bir tempo/stil senaryosu üretmez.",
         couponNarrow: couponNarrow || undefined,
         couponNormal: couponNormal || undefined,
