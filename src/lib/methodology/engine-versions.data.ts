@@ -431,4 +431,16 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
       "Doğrulama: Kocaeli 2.Koşu canlı yeniden çalıştırıldı, sonuç artık tam monoton azalan olasılık sırası (%14.1→%13.4→%13.0→%12.2→%11.6→%7.3→%5.6→%4.7) — önceki (V5.23) TEYZEOĞLU %11.1 1.sırada/MAŞİDE %23.5 3.sırada anomalisi düzeldi.",
     ],
   },
+  {
+    versiyon: "V5.25",
+    baslangic: new Date("2026-08-27T22:25:30+03:00"), // e5b5385 — agfPayi2 (22. özellik) eklendi
+    bitis: null,
+    aciklama: "Kullanıcı talebi (\"piyasayı araştır, başka ne bulabiliriz\"): AGF payı kalibrasyon kontrolü yapıldı — %40+ payılı güçlü favoriler gerçek kazanma oranından -4.1 puan geride (piyasa fazla seviyor), AGF sırası 4-5 orta sıradaki atlar +2.1/+2.5 puan önde (piyasa hafife alıyor). Doğrusal olmayan bir kalıp — agfPayi'nin karesi (formEgimi2/kgs2 ile AYNI desen) eklendi. 22. özellik. Model 1042 yarışlık güncel veriyle (o günün yarışları dahil) yeniden eğitildi; Handikap hizDerecesi=0/düşük-şart h2hNetSkor=0 override'ları (koda gömülü) retrain sonrası canlı doğrulandı, etkilenmedi.",
+    neyiAnalizEdiyor: [
+      "V5.24 ile AYNI segment-bazlı mimari/gösterim (sıralama hâlâ yalnız olasılığa göre) — 21 özellik 22'ye çıktı (agfPayi2 eklendi), model 1042 yarışlık güncel veriyle yeniden eğitildi",
+    ],
+    caprazlamalar: [
+      "B=500 izole test (2026-08-27): agfPayi2 'diğer' segmentte anlamlı (nokta=-0.207, GA=[-0.366,-0.053]), top3 %64.8→%65.3, logloss 1.8409→1.8392. Düşük-şartta sınırda (GA=[-0.490,0.018]). Tam model retrain'de aynı katsayılar doğrulandı (nokta=-0.2071/-0.2139). Reddedilen alternatifler: AGF sırası 4-5 göstergesi (anlamlı ama top1/top3 kötüleşti), %40+ payı göstergesi (anlamsız). Ayrıca bu retrain'de h2hKiloDegisimi 'diğer' segmentte 'sınırda'dan 'anlamlı'ya yükseldi (GA=[0.011,0.166], daha fazla veriyle).",
+    ],
+  },
 ];
