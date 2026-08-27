@@ -196,12 +196,10 @@ const WEIGHTS_DIGER_HANDIKAP: AgirlikSeti = {
   weights: WEIGHTS_DIGER.weights.map((w, i) => (i === HIZ_DERECESI_IDX ? 0 : w)),
 };
 
-// 2026-08-22 kullanıcı bulgusu: panel başlığındaki sürüm/özellik-sayısı METNİ daha önce
-// İKİ KEZ sabit (hardcoded) yazılıp güncellenmeyi unutulmuştu (V5.1→V5.3, sonra V5.3→V5.5
-// arası) — kullanıcı ekranda hâlâ eski sürümü görüyordu. Artık FEATURE_NAMES.length'ten
-// (gerçek özellik sayısı) VE ENGINE_VERSIONS'ın son (bitis:null) girdisinden TÜRETİLİYOR,
-// bir daha elle güncellenmesi gerekmiyor.
-export const CURRENT_ENGINE_LABEL = `${ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].versiyon} — Koşullu Logit Modeli (${FEATURE_NAMES.length} özellik, segment-bazlı iki model — atları doğrudan kıyaslar, Claude yok, maliyet sıfır)`;
+// 2026-08-27: CURRENT_ENGINE_LABEL artık client-safe v5-engine-label.ts'te (bu dosya db
+// import ettiği için client bileşenlerinden doğrudan import edilemiyordu) — buradan
+// re-export ediliyor, mevcut importlar (test-v5-engine/route.ts vb.) DEĞİŞMEDİ.
+export { CURRENT_ENGINE_LABEL } from "@/lib/methodology/v5-engine-label";
 
 // 2026-08-26 kullanıcı talebi: "Maiden/Satış" gibi karma koşu tipleri, kategoriTespit'in
 // MAIDEN'ı önce yakalayan regex'i yüzünden SADECE düşük-şart (Maiden) modeliyle

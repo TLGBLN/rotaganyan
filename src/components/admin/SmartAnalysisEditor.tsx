@@ -1,7 +1,6 @@
 "use client";
 
 import V5AnalysisPanel from "./V5AnalysisPanel";
-import PredictionForm from "./PredictionForm";
 import type { PedigreeRating, Prisma } from "@prisma/client";
 
 type Runner = Prisma.RunnerGetPayload<{ include: { gallops: true } }>;
@@ -35,11 +34,6 @@ export default function SmartAnalysisEditor({ raceId, runners, existingPredictio
   return (
     <div className="space-y-6">
       <V5AnalysisPanel raceId={raceId} runners={runners} existingPrediction={existingPrediction} />
-      <PredictionForm
-        raceId={raceId}
-        runners={runners}
-        existingPrediction={existingPrediction}
-      />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { upsertPrediction, type PickInput } from "@/server/actions/prediction.actions";
 import type { PickDetailsV2 } from "@/lib/methodology/muhakeme-format";
+import { CURRENT_ENGINE_LABEL } from "@/lib/methodology/v5-engine-label";
 
 // 2026-08-16 — V5 motoru: V4'ün mekanik sinyal-sayımının YERİNE geçer (bkz.
 // SmartAnalysisEditor.tsx). Claude çağrısı YAPMAZ — koşullu logit (Plackett-Luce) modeli
@@ -122,9 +123,12 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
   // setinin (düşük-şart/diğer) kullanıldığını hiç göstermiyordu — şeffaflık eksikliği.
   const [kategori, setKategori] = useState<string | null>(null);
   // 2026-08-22 kullanıcı bulgusu: başlıktaki sürüm/özellik-sayısı metni iki kez sabit
-  // (hardcoded) yazılıp güncellenmeyi unutulmuştu — artık API'den (CURRENT_ENGINE_LABEL,
-  // gerçek özellik sayısından türetilmiş) geliyor, elle güncelleme GEREKMİYOR.
-  const [motorEtiketi, setMotorEtiketi] = useState<string | null>(null);
+  // (hardcoded) yazılıp güncellenmeyi unutulmuştu — artık CURRENT_ENGINE_LABEL'den (gerçek
+  // özellik sayısından türetilmiş) geliyor, elle güncelleme GEREKMİYOR.
+  // 2026-08-27 kullanıcı talebi: "Analiz Et"e basmadan ÖNCE de görünsün — başlangıç
+  // değeri artık import edilen sabitten geliyor (API cevabı gelince AYNI değerle
+  // üzerine yazılır, davranış değişmez, yalnız ilk render'da da doğru gösterir).
+  const [motorEtiketi, setMotorEtiketi] = useState<string | null>(CURRENT_ENGINE_LABEL);
 
   function toggleDetay(no: number) {
     setAcikDetay((prev) => {
@@ -257,10 +261,10 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
 
   return (
     <div className="space-y-4 rounded-xl border border-purple-500/30 bg-purple-500/5 p-4">
-      <div className="flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-purple-500" />
-        <h3 className="text-sm font-semibold">
-          {motorEtiketi ?? "Koşullu Logit Modeli — atları doğrudan kıyaslar, Claude yok, maliyet sıfır (sürüm bilgisi \"Analiz Et\"e basınca görünür)"}
+      <div className="flex items-start gap-2">
+        <Sparkles className="h-4 w-4 shrink-0 text-purple-500 mt-0.5" />
+        <h3 className="min-w-0 text-sm font-semibold break-words">
+          {motorEtiketi}
         </h3>
       </div>
 
