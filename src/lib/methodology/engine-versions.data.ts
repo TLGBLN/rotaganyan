@@ -409,13 +409,26 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.23",
     baslangic: new Date("2026-08-27T20:10:26+03:00"), // 1ccc8c8 — Derin AGF-Longshot Düzeltmesi de geri getirildi
-    bitis: null,
+    bitis: new Date("2026-08-27T20:44:57+03:00"), // 53e1eab — üç kural da kesin olarak devre dışı bırakıldı
+
     aciklama: "Kullanıcı talebi: \"tüm V5'ler içinde bizi en yüksek kazanma oranlarına götürecek sinyal harmonisi ne olurdu — B=500 testlerini ve tüm sonuçlanmış koşular üzerinden testini yap.\" 3 gösterim kuralının (AGF Trend Terfisi, AGF Favorisi İlk-3 Garantisi, Derin AGF-Longshot Düzeltmesi) 8 açık/kapalı kombinasyonu, walk-forward (5-dilim genişleyen pencere) test edildi. Derin AGF-Longshot Düzeltmesi geri eklendi — üçü de artık aktif. DÜZELTME (aynı gün, kullanıcının \"794 mü, 1000 üzerine çıkmış olmalı\" uyarısı üzerine): İLK test model-veri.json'un ESKİ (bir önceki günden kalma, o günün yarışlarını içermeyen) hâliyle yapılmıştı — kullanıcı gerçek sayının 1000'i geçmiş olması gerektiğini fark etti, haklı çıktı (canlı DB: 1390 sonuçlanmış yarış, veri dosyasındaki 991'e karşı). Veri tazelenip (1042 yarış/834 out-of-fold) test TEKRARLANDI — sonuç aşağıda düzeltildi.",
     neyiAnalizEdiyor: [
       "V5.19 ile AYNI 21 özellik/segment-bazlı model/skorlama, üç gösterim kuralının (Trend Terfisi, Favori Garantisi, Longshot Düzeltmesi) ÜÇÜ de aktif — V5.14/V5.15 dönemiyle aynı kural seti, ama çok daha büyük/güncel eğitim verisiyle",
     ],
     caprazlamalar: [
       "İLK test (794 out-of-fold, ESKİ/eksik veri): en iyi top1=%31.6/top3=%65.5, Longshot eklemenin net etkisi top1 GA=[2,19] (anlamlı görünüyordu). DÜZELTİLMİŞ test (834 out-of-fold, 1042 güncel yarış): en iyi top1=%31.2/top3=%64.1 (aynı en iyi kombinasyon, ama Longshot'un V5.22'ye EK katkısı artık top1 GA=[-3,11] — sıfırı içeriyor, istatistiksel olarak KANITLANAMADI. Yine de: V5.23 vs hiç-kural-yok top3 GA=[1,15] (anlamlı, paket genel işe yarıyor), ve hiçbir kombinasyonda top3'e anlamlı ZARAR görülmedi — nokta tahmini hâlâ en iyisi olduğu için canlıda kaldı, ama 'Longshot kesin +19 kazandırıyor' iddiası GERİ ÇEKİLDİ. AGF Trend Terfisi açık/kapalı HER İKİ testte de bit-bir-bire aynı sonucu verdi — bu simülasyonun yeniden inşa ettiği sinyalSayisi yaklaşıklığının (aygır örneklem-eşiği tam kurulamadı) muhtemelen eşiği (≥4) gereğinden az geçirmesinden kaynaklanıyor, güvenilmez bir ölçüm sayıldı; kuralın kendi n=663 backtest'i GEÇERLİLİĞİNİ KORUYOR.",
+    ],
+  },
+  {
+    versiyon: "V5.24",
+    baslangic: new Date("2026-08-27T20:44:57+03:00"), // 53e1eab — üç kural da kesin olarak devre dışı bırakıldı
+    bitis: null,
+    aciklama: "Kullanıcının Kocaeli 2.Koşu SOMUT örneğiyle KESİN kararı: TEYZEOĞLU (%11.1) 1.sırada, MAŞİDE (%23.5) 3.sırada duruyordu (AGF Favorisi Garantisi + Derin Longshot Düzeltmesi birlikte tetiklenmişti). Kullanıcı: \"sıralama yüzdeye göre olur, 1.sıradaki ata %24 vermelisin.\" Bugün üç kural (Trend Terfisi/Favori Garantisi/Longshot Düzeltmesi) üç kez el değiştirmişti (V5.20'de kaldırıldı → V5.21-23'te tek tek geri geldi) — bu KESİN karardan sonra üçü de tekrar devre dışı bırakıldı, ama bu kez fonksiyonlar SİLİNMEDİ: v5-engine.ts'te tek bir `GOSTERIM_SIRASI_DUZELTMELERI_AKTIF=false` anahtarı eklendi, gelecekte tekrar gerekirse tek satırla açılabilir. Skorlama/olasılık hesaplaması hiç değişmedi, yalnız teknikSira artık İSTİSNASIZ ham olasılığa göre.",
+    neyiAnalizEdiyor: [
+      "V5.19 ile AYNI 21 özellik/segment-bazlı model/skorlama — yalnız gösterim sırası artık istisnasız ham olasılığa eşit, üç gösterim kuralı da (kod olarak duruyor ama) uygulanmıyor",
+    ],
+    caprazlamalar: [
+      "Doğrulama: Kocaeli 2.Koşu canlı yeniden çalıştırıldı, sonuç artık tam monoton azalan olasılık sırası (%14.1→%13.4→%13.0→%12.2→%11.6→%7.3→%5.6→%4.7) — önceki (V5.23) TEYZEOĞLU %11.1 1.sırada/MAŞİDE %23.5 3.sırada anomalisi düzeldi.",
     ],
   },
 ];
