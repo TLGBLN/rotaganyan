@@ -83,8 +83,8 @@ export const SIRALAMA_KURALLARI: SiralamaKurali[] = [
   {
     ad: "Derin AGF-Longshot Düzeltmesi",
     etiket: "CANLI (2026-08-27'de geri getirildi, V5.23)",
-    aciklama: "Sistemin ham #1'i AGF sırası≥4 (piyasanın neredeyse hiç güvenmediği bir at) olduğunda, modelin kendi AGF≤3 içindeki en iyi adayıyla yer değiştirir. Kullanıcının \"tüm V5'ler içinde en yüksek kazanma oranına götürecek sinyal harmonisi ne olurdu\" talebiyle 8 kombinasyon walk-forward + B=500 ile test edildi, bu kuralın (Favori Garantisi ile birlikte) en iyi sonucu verdiği doğrulanıp geri getirildi.",
-    backtestOzet: "Orijinal: n=448 → net +20 yarış (top1 %28.6→%33.0). Güncel walk-forward doğrulama (2026-08-27, 794 out-of-fold yarış): top1 net GA=[2,19] (sıfırı içermiyor), top3'e maliyeti SIFIR (net GA=[0,0]).",
+    aciklama: "Sistemin ham #1'i AGF sırası≥4 (piyasanın neredeyse hiç güvenmediği bir at) olduğunda, modelin kendi AGF≤3 içindeki en iyi adayıyla yer değiştirir. Kullanıcının \"tüm V5'ler içinde en yüksek kazanma oranına götürecek sinyal harmonisi ne olurdu\" talebiyle 8 kombinasyon walk-forward + B=500 ile test edildi. İLK test (794 yarış, model-veri.json o gün eskiydi — bugünün yarışlarını içermiyordu) top1 net GA=[2,19] (anlamlı) göstermişti; veri tazelenip (1042 yarış, 834 out-of-fold) TEKRAR test edilince bu net etki SINIRA geldi (GA sıfırı içeriyor artık) — düzeltilmiş, dürüst sonuç aşağıda. Yine de nokta tahmini en iyisi ve top3'e hiç zarar kanıtı yok, bu yüzden CANLIDA KALDI.",
+    backtestOzet: "Orijinal (2026-08-24): n=448 → net +20 yarış (top1 %28.6→%33.0). Güncel walk-forward (2026-08-27, 1042 yarış/834 out-of-fold, DÜZELTİLMİŞ): V5.23 vs V5.22 (Longshot'suz) top1 net GA=[-3,11] (artık sıfırı içeriyor, anlamlılık kanıtlanamadı), top3 net GA=[0,0] (hiç zarar yok). V5.23 vs hiç kural yok: top3 net GA=[1,15] (anlamlı, paket genel olarak işe yarıyor).",
   },
 ];
 
