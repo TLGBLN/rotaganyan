@@ -179,7 +179,12 @@ function egit(etiket, raceGroupsRaw, outPath) {
   const trainEval = evaluate(trainGroups, w);
   console.log(`EĞİTİM: n=${trainEval.n} top1=%${trainEval.top1P.toFixed(1)} top3=%${trainEval.top3P.toFixed(1)} logloss=${trainEval.avgLogLoss.toFixed(4)}`);
 
-  const B_WEIGHTS = 50;
+  // 2026-08-27 kullanıcı talebi: B=50 sınırda sinyallerde (kacakYalniz, idmJokey — nokta
+  // ~0.14-0.17) yanlış "anlamsız" sonucu üretebiliyordu (aynı veriyle B=150'de sıfırı
+  // içeriyordu, B=500'de %98+ güvenle anlamlı çıktı — saf bootstrap örnekleme gürültüsü).
+  // Varsayılan artık B=500 — güçlü sinyallerde (agfSirasi gibi) zaten fark etmiyordu,
+  // sınırda sinyallerde artık güvenilir bir GA veriyor.
+  const B_WEIGHTS = 500;
   const bootWeights = [];
   for (let b = 0; b < B_WEIGHTS; b++) bootWeights.push(trainConditionalLogit(bootstrapResample(trainGroups), FEATURE_NAMES.length, { epochs: 400, lr: 0.08, l2: 0.01 }));
   console.log(`Bootstrap B=${B_WEIGHTS} tamamlandı.`);

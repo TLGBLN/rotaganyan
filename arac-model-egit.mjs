@@ -310,8 +310,10 @@ function percentile(sorted, p) {
   return sorted[idx];
 }
 
-console.log("\n=== BOOTSTRAP — KATSAYI GÜVEN ARALIĞI (B=50, yarış-bazlı yeniden örnekleme) ===");
-const B_WEIGHTS = 50;
+// 2026-08-27 kullanıcı talebi: B=50 sınırda sinyallerde yanlış "anlamsız" sonucu
+// üretebiliyordu (bkz. arac-model-egit-segment.mjs'teki aynı isimli not) — B=500'e çıkarıldı.
+console.log("\n=== BOOTSTRAP — KATSAYI GÜVEN ARALIĞI (B=500, yarış-bazlı yeniden örnekleme) ===");
+const B_WEIGHTS = 500;
 const bootWeights = [];
 for (let b = 0; b < B_WEIGHTS; b++) {
   const resampled = bootstrapResample(trainGroups);
