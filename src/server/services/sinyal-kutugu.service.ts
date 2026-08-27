@@ -82,9 +82,9 @@ export const SIRALAMA_KURALLARI: SiralamaKurali[] = [
   },
   {
     ad: "Derin AGF-Longshot Düzeltmesi",
-    etiket: "GERİ ALINDI (2026-08-27, idi: V5.15)",
-    aciklama: "Sistemin ham #1'i AGF sırası≥4 (piyasanın neredeyse hiç güvenmediği bir at) olduğunda, modelin kendi AGF≤3 içindeki en iyi adayıyla yer değiştiriyordu. Kullanıcı kararıyla kaldırıldı, artık sıralamayı etkilemiyor. (Bu kural daha önce bu listeye hiç eklenmemişti — eksiklik burada düzeltildi.)",
-    backtestOzet: "n=448 → net +20 yarış (top1 %28.6→%33.0) (geçerliliğini koruyor, uygulanmıyor)",
+    etiket: "CANLI (2026-08-27'de geri getirildi, V5.23)",
+    aciklama: "Sistemin ham #1'i AGF sırası≥4 (piyasanın neredeyse hiç güvenmediği bir at) olduğunda, modelin kendi AGF≤3 içindeki en iyi adayıyla yer değiştirir. Kullanıcının \"tüm V5'ler içinde en yüksek kazanma oranına götürecek sinyal harmonisi ne olurdu\" talebiyle 8 kombinasyon walk-forward + B=500 ile test edildi, bu kuralın (Favori Garantisi ile birlikte) en iyi sonucu verdiği doğrulanıp geri getirildi.",
+    backtestOzet: "Orijinal: n=448 → net +20 yarış (top1 %28.6→%33.0). Güncel walk-forward doğrulama (2026-08-27, 794 out-of-fold yarış): top1 net GA=[2,19] (sıfırı içermiyor), top3'e maliyeti SIFIR (net GA=[0,0]).",
   },
 ];
 
