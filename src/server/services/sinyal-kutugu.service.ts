@@ -76,9 +76,9 @@ export const SIRALAMA_KURALLARI: SiralamaKurali[] = [
   },
   {
     ad: "AGF Favorisi İlk-3 Garantisi",
-    etiket: "GERİ ALINDI (2026-08-27, idi: V5.13)",
-    aciklama: "AGF sırası=1 olan at, ham olasılık sıralamasında top3 dışında kalsa bile KOŞULSUZ 3.sıraya alınıyordu. Kullanıcı kararıyla kaldırıldı, artık sıralamayı etkilemiyor.",
-    backtestOzet: "n=428 (Karma hariç, düzeltilmiş) → net +5 yarış (top3 %60.0→%61.2) (geçerliliğini koruyor, uygulanmıyor)",
+    etiket: "CANLI (2026-08-27'de geri getirildi, V5.22)",
+    aciklama: "AGF sırası=1 olan at, ham olasılık sıralamasında top3 dışında kalsa bile KOŞULSUZ 3.sıraya alınır. Aynı gün kısa süreliğine kaldırılmış (V5.20), kullanıcı \"V5.14'e dön\" kararıyla (o dönem canlı en yüksek başarı oranını gösteren versiyondu) geri getirilmiş ve GÜNCEL/daha büyük veriyle B=500 bootstrap-CI ile yeniden doğrulanmıştır.",
+    backtestOzet: "Orijinal: n=428 → net +5 yarış (top3 %60.0→%61.2). Güncel B=500 doğrulama (2026-08-27, 249 test yarışı): top3 %67.5→%68.7, net +3/249, GA=[0,7] — %100 bootstrap örneği ≥0, hiç negatif çıkmadı.",
   },
   {
     ad: "Derin AGF-Longshot Düzeltmesi",
