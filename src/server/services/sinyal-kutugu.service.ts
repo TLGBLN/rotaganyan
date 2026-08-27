@@ -7,6 +7,16 @@
  * edilmeli. GERÇEK (yayınlanmış tahminlerdeki fiili kazanma oranı) tarafı ayrı bir mekanizma:
  * v5-sinyal-performans.service.ts — bu ikisi kasıtlı ayrı tutuluyor (biri modelin kendi
  * iddiası/katsayısı, diğeri sahadaki gerçek sonuç).
+ *
+ * 2026-08-27 kullanıcı denetimi ("her sinyale bak, önce iyi dediğin kötü çıkıyor"):
+ * B=50 bootstrap sınırda sinyallerde (nokta ~0.1-0.2) run-to-run kararsız sonuç
+ * üretebiliyordu (aynı veriyle bazen anlamlı, bazen sıfırı içeriyor). Kalıcı eğitim
+ * araçlarının (arac-model-egit-segment.mjs/arac-model-egit.mjs) varsayılan bootstrap'ı
+ * B=500'e çıkarıldı — bu dosyadaki durum alanları o denetimin sonucunu yansıtıyor.
+ * Not: B=500'de bile bazı sinyaller (accurace/idmJokey, düşük-şart) tam kararlı değil —
+ * bunun sebebi bootstrap sayısı değil örneklem büyüklüğü (n=254); daha fazla bootstrap
+ * var olan veriden daha fazla bilgi çıkaramaz, yalnız o veriden GA'yı daha hassas tahmin
+ * eder. Bu sinyaller veri arttıkça yeniden değerlendirilmeli.
  */
 
 export type SinyalAnlamlilik = "anlamli" | "sinirda" | "anlamsiz" | "override" | "veri-yok";
@@ -24,12 +34,12 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
   { ad: "AGF Payı", kod: "agfPayi", dusukSart: { katsayi: 0.227, durum: "anlamli" }, diger: { katsayi: 0.257, durum: "anlamli" }, aciklama: "agfSirasi'ndan bağımsız: sıralamadan çok kalabalıktan ne kadar öne çıktığı." },
   { ad: "Hız Derecesi", kod: "hizDerecesi", dusukSart: { katsayi: 0.563, durum: "anlamli" }, diger: { katsayi: 0.266, durum: "anlamli", not: "Handikap'ta elle 0'a sabitlendi (V5.10)" }, aciklama: "Son 365 gün, popülasyon ortalamasına göre göreli hız. Handikap kategorisinde katkısı istatistiksel olarak sıfır bulunduğu için override edildi." },
   { ad: "Antrenör Oranı", kod: "antrenorOrani", dusukSart: { katsayi: 0.357, durum: "anlamli" }, diger: { katsayi: 0.247, durum: "anlamli" }, aciklama: "Düşük-şartta belirgin daha ağır basıyor." },
-  { ad: "Accurace", kod: "accurace", dusukSart: { katsayi: 0.14, durum: "anlamli" }, diger: { katsayi: 0.009, durum: "anlamsiz" }, aciklama: "Son yarışta sahanın en hızlı son 200m kapanışı — düşük-şartta örneklem büyüyünce anlamlı çıkmaya başladı." },
-  { ad: "İdman Jokeyi Uyumu", kod: "idmJokey", dusukSart: { katsayi: 0.169, durum: "anlamli" }, diger: { katsayi: 0.092, durum: "sinirda" }, aciklama: "Yarıştıracak jokey, atın idmanlarından birini yaptırmış mı." },
+  { ad: "Accurace", kod: "accurace", dusukSart: { katsayi: 0.137, durum: "sinirda", not: "2026-08-27 B=500 denetimi: GA sıfıra çok yakın (~-0.006/+0.27), çalıştırmalar arası kararsız — n=254 örneklem sınırı, daha fazla bootstrap değil daha fazla veri gerektiriyor" }, diger: { katsayi: 0.006, durum: "anlamsiz" }, aciklama: "Son yarışta sahanın en hızlı son 200m kapanışı." },
+  { ad: "İdman Jokeyi Uyumu", kod: "idmJokey", dusukSart: { katsayi: 0.172, durum: "sinirda", not: "2026-08-27 B=500 denetimi: aynı kararsızlık (GA sıfıra çok yakın, çalıştırmalar arası değişiyor) — n=254 örneklem sınırı" }, diger: { katsayi: 0.094, durum: "anlamsiz" }, aciklama: "Yarıştıracak jokey, atın idmanlarından birini yaptırmış mı." },
   { ad: "Jokey Oranı", kod: "jokeyOrani", dusukSart: { katsayi: 0.221, durum: "anlamli" }, diger: { katsayi: 0.116, durum: "anlamli" }, aciklama: "Jokeyin genel kazanma yüzdesi." },
-  { ad: "Rakipsiz Kaçak At", kod: "kacakYalniz", dusukSart: { katsayi: 0.145, durum: "anlamli" }, diger: { katsayi: 0.057, durum: "sinirda" }, aciklama: "Accurace tabanlı erken-tempo profili — 2026-08-26'dan itibaren yalnız SAHADA TEK kaçak-at olma durumunda sayılıyor (rakipli kaçak olmanın avantajı yok, derinlemesine backtest'te saha büyüklüğü sabit tutularak doğrulandı)." },
+  { ad: "Rakipsiz Kaçak At", kod: "kacakYalniz", dusukSart: { katsayi: 0.145, durum: "anlamli", not: "2026-08-27 B=500 ile doğrulandı (GA=[0.004,0.267], bootstrap örneklerinin %98.2'si pozitif) — B=150'de bir ara sıfırı içeriyordu, saf örnekleme gürültüsüydü" }, diger: { katsayi: 0.057, durum: "sinirda" }, aciklama: "Accurace tabanlı erken-tempo profili — 2026-08-26'dan itibaren yalnız SAHADA TEK kaçak-at olma durumunda sayılıyor (rakipli kaçak olmanın avantajı yok, derinlemesine backtest'te saha büyüklüğü sabit tutularak doğrulandı)." },
   { ad: "AGF Düşüşü Var Mı", kod: "agfDususVarMi", dusukSart: { katsayi: 0.129, durum: "anlamli" }, diger: { katsayi: 0.051, durum: "anlamsiz" }, aciklama: "Eşik-üstü (≥1.0 puan) AGF düşüşü — para akışı sinyali." },
-  { ad: "Kilo-Ayarlı H2H", kod: "h2hKiloDegisimi", dusukSart: { katsayi: 0.085, durum: "sinirda" }, diger: { katsayi: 0.07, durum: "anlamli" }, aciklama: "Bugünkü rakiplere göre kilo pozisyonunun geçmiş karşılaşmaya göre değişimi — diğer segmentte örneklem büyüyünce anlamlı hale geldi." },
+  { ad: "Kilo-Ayarlı H2H", kod: "h2hKiloDegisimi", dusukSart: { katsayi: 0.087, durum: "sinirda" }, diger: { katsayi: 0.071, durum: "sinirda", not: "2026-08-27 B=500 denetimi: GA=[-0.010,0.141], sıfıra çok yakın — önceki 'anlamlı' kaydı daha küçük bootstrap örneklemine dayanıyordu" }, aciklama: "Bugünkü rakiplere göre kilo pozisyonunun geçmiş karşılaşmaya göre değişimi." },
   { ad: "H2H Net Skor", kod: "h2hNetSkor", dusukSart: { katsayi: 0, durum: "override", not: "Ham değer ters yönlüydü, elle sıfırlandı" }, diger: { katsayi: 0.115, durum: "anlamli" }, aciklama: "Baş-başa geçmiş karşılaşmalarda net galibiyet farkı." },
   { ad: "Kısa Galop Aralığı Var Mı", kod: "kgsVarMi", dusukSart: { katsayi: -0.033, durum: "anlamsiz" }, diger: { katsayi: 0.145, durum: "anlamli" }, aciklama: "14-30 gün aralığı — yalnız diğer segmentte anlamlı." },
   { ad: "AGF Yükselişi Var Mı", kod: "agfYukselisVarMi", dusukSart: { katsayi: 0.119, durum: "anlamsiz" }, diger: { katsayi: 0.08, durum: "anlamsiz" }, aciklama: "agfDususVarMi ile simetrik eşik sinyali." },
