@@ -176,6 +176,9 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate, isAdmin 
                               <span className={cn(pick.runner?.scratched && "line-through opacity-50")}>
                                 {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
                               </span>
+                              {!pick.runner?.scratched && pick.runner?.ekuriGroup != null && (
+                                <span title={`Eküri grubu ${pick.runner.ekuriGroup}`} className="ml-1 text-[10px]">🐴</span>
+                              )}
                               {pick.runner?.scratched && (
                                 <span className="ml-1 text-[10px] font-semibold text-red-400">Koşmaz</span>
                               )}
@@ -323,6 +326,9 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate, isAdmin 
                                 >
                                   {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
                                 </span>
+                                {!pick.runner?.scratched && pick.runner?.ekuriGroup != null && (
+                                  <span title={`Eküri grubu ${pick.runner.ekuriGroup}`} className="shrink-0 text-[9px]">🐴</span>
+                                )}
                                 {pick.runner?.scratched && (
                                   <span className="shrink-0 text-[9px] font-semibold text-red-400">Koşmaz</span>
                                 )}
