@@ -396,13 +396,26 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.22",
     baslangic: new Date("2026-08-27T19:22:33+03:00"), // 8f058db — AGF Favorisi İlk-3 Garantisi de geri getirildi
-    bitis: null,
+    bitis: new Date("2026-08-27T20:10:26+03:00"), // 1ccc8c8 — Derin AGF-Longshot Düzeltmesi de geri getirildi
+
     aciklama: "Kullanıcı, gerçek yayınlanmış tahmin geçmişini (getVersiyonKarsilastirmasi) inceleyip V5.14'ün (AGF Trend Terfisi + AGF Favorisi İlk-3 Garantisi ikisi de aktifken) en yüksek canlı başarı oranını gösterdiğini fark etti (n=32, top1 %46.9/top3 %81.3) ve \"V5.14'e dön\" dedi. Kapsam netleştirildi: yalnız AGF Favorisi İlk-3 Garantisi kuralı geri getirildi (V5.14'ün SONRASINDA bulunan hizDerecesi tarih bugu, galopTrendFarki sızıntısı, yurt dışı kazanan bugu gibi düzeltmeler ve büyümüş eğitim verisi KORUNDU, geri alınmadı). Kullanıcı talebiyle B=500 bootstrap-CI ile GÜNCEL/çok daha büyük veride (249 test yarışı, 3 segment havuzlanmış) yeniden doğrulandı.",
     neyiAnalizEdiyor: [
       "V5.19 ile AYNI 21 özellik/segment-bazlı model/skorlama, AGF Trend Terfisi VE AGF Favorisi İlk-3 Garantisi ikisi de aktif — yalnız Derin AGF-Longshot Düzeltmesi hâlâ kaldırılmış durumda",
     ],
     caprazlamalar: [
       "B=500 bootstrap doğrulama (2026-08-27, güncel veri, 249 test yarışı, 3 segment kendi override'ıyla eğitilip havuzlandı): HAM top3 %67.5 (168/249) → KURALLI top3 %68.7 (171/249), net +3/249, GA=[0,7] — bootstrap örneklerinin %100'ü ≥0, hiç negatif çıkmadı. Orijinal (2026-08-24) backtest ile aynı yönde, güncel veride de doğrulandı.",
+    ],
+  },
+  {
+    versiyon: "V5.23",
+    baslangic: new Date("2026-08-27T20:10:26+03:00"), // 1ccc8c8 — Derin AGF-Longshot Düzeltmesi de geri getirildi
+    bitis: null,
+    aciklama: "Kullanıcı talebi: \"tüm V5'ler içinde bizi en yüksek kazanma oranlarına götürecek sinyal harmonisi ne olurdu — B=500 testlerini ve tüm sonuçlanmış koşular üzerinden testini yap.\" 3 gösterim kuralının (AGF Trend Terfisi, AGF Favorisi İlk-3 Garantisi, Derin AGF-Longshot Düzeltmesi) 8 açık/kapalı kombinasyonu, walk-forward (5-dilim genişleyen pencere) ile üretilen 794 out-of-fold yarışlık havuzda (tüm sonuçlanmış koşuların ~%80'i, hiçbiri kendi eğitiminde görülmemiş) test edildi. En iyi kombinasyon Favori Garantisi+Longshot ikisi birden açıkken bulundu (Trend'in açık/kapalı olması bu simülasyonda ölçülemedi, bkz. not). Derin AGF-Longshot Düzeltmesi geri eklendi — üçü de artık aktif.",
+    neyiAnalizEdiyor: [
+      "V5.19 ile AYNI 21 özellik/segment-bazlı model/skorlama, üç gösterim kuralının (Trend Terfisi, Favori Garantisi, Longshot Düzeltmesi) ÜÇÜ de aktif — V5.14/V5.15 dönemiyle aynı kural seti, ama çok daha büyük/güncel eğitim verisiyle",
+    ],
+    caprazlamalar: [
+      "8 kombinasyon (794 out-of-fold yarış): en iyi top1=%31.6/top3=%65.5 (Favori+Longshot açık). B=500 bootstrap, V5.22'ye (Trend+Favori, Longshot kapalı) karşı Longshot eklemenin net etkisi: top1 GA=[2,19] (sıfırı içermiyor), top3 GA=[0,0] (hiçbir bootstrap örneğinde top3 seti değişmedi — Longshot yalnız zaten-top3'teki #1'i düzeltiyor, top3'e girip çıkan yok). AGF Trend Terfisi açık/kapalı BİT-BİR-BİRE aynı sonucu verdi — bu simülasyonun kendi yeniden inşa ettiği sinyalSayisi yaklaşıklığının (aygır örneklem-eşiği tam kurulamadı) muhtemelen eşiği (≥4) gereğinden az geçirmesinden kaynaklanıyor, güvenilmez bir ölçüm sayıldı; kuralın kendi n=663 backtest'i bu yüzden GEÇERLİLİĞİNİ KORUYOR, kaldırılmadı.",
     ],
   },
 ];
