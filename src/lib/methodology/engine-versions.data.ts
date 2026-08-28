@@ -455,4 +455,16 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
       "B=500/n=1059 test sonucu: düşük-şart nokta=-0.0020 GA=[-0.1136,0.2071] (sıfırı içeriyor), diğer nokta=0.0009 GA=[-0.0769,0.1051] (sıfırı içeriyor) — istatistiksel olarak anlamsız. Split-half güvenilirlik testi (2026-08-23, r=0.467, n=286) sinyalin at-bazlı GERÇEK/tekrarlanabilir olduğunu doğruluyor, ama bu V5'in mevcut 22 özelliğine ek bir tahmin gücü sağlamıyor. Handikap hizDerecesi=0/düşük-şart h2hNetSkor=0 override'ları (isim-bazlı idx() lookup) retrain sonrası 3 gerçek yarışta (bugünkü İstanbul Handikap, geçmiş bir Handikap, geçmiş bir Maiden) canlı doğrulandı, etkilenmedi.",
     ],
   },
+  {
+    versiyon: "V5.27",
+    baslangic: new Date("2026-08-28T22:28:55+03:00"), // 552cdbe — katkısız 11 sinyal silindi (23->12 özellik)
+    bitis: null,
+    aciklama: "Kullanıcı talebi (\"23 sinyali en verimli nasıl kullanırız, katkısı olmayanları sil\"): B=500'de İKİ segmentte de %95 GA'sı sıfırı içeren 11 özellik (accurace, formEgimi, formEgimi2, kgs, kgs2, pistUzmani, sireOrani, galop, uzunAraGalopKatkisi, agfYukselisVarMi, agfDususVarMi) toFeatureVector'dan çıkarıldı. Gerekçe: projenin bir sinyali EKLEMEK için kullandığı baraj hep 'kendi katkısı B=500'de kanıtlandı mı' idi (agfPayi2, h2hKiloDegisimi hep böyle eklendi) — aynı barajı çıkarmaya da simetrik uygulamak tutarlıydı. Karar öncesi üç aşamalı doğrulama yapıldı (kullanıcının 'emin misin/detaylıca analiz ettin mi' itirazları üzerine): (1) tek %75/25 bölünme, (2) 4-parçalı walk-forward, (3) B=500 bootstrap FARK testi (aynı resample'la hem tam hem budanmış model eğitilip kıyaslandı) — hem top1/top3 hem logloss için ayrı ayrı.",
+    neyiAnalizEdiyor: [
+      "V5.26 ile AYNI segment-bazlı mimari/gösterim — 23 özellik 12'ye indi (11 kanıtlanmamış sinyal çıkarıldı), model aynı 1059 yarışlık pencerede yeniden eğitildi",
+    ],
+    caprazlamalar: [
+      "B=500 bootstrap FARK testi (Budanmış-Tam, aynı resample): top1 farkı düşük-şart ortalama+2.74pp GA=[-2.90,8.70] (sıfırı içeriyor), diğer ortalama+0.15pp GA=[-3.06,3.57] (sıfırı içeriyor) — top1/top3'te fark KANITLANAMADI ama yön tutarlı pozitif (zarar yok). logloss farkı düşük-şart ortalama-0.0598 GA=[-0.1389,-0.0067] SIFIRI DIŞLIYOR (✓ anlamlı iyileşme), diğer ortalama-0.0235 GA=[-0.0853,0.0057] (sıfıra çok yakın, kanıtlanamadı ama yön aynı). Handikap hizDerecesi=0/düşük-şart h2hNetSkor=0 override'ları (isim-bazlı idx() lookup, 12 özelliğe küçülen dizide adları hâlâ var) retrain sonrası 2 gerçek yarışta canlı doğrulandı, etkilenmedi. Ham 11 alan veri toplama pipeline'ında hâlâ toplanıyor, silinmedi.",
+    ],
+  },
 ];
