@@ -190,9 +190,10 @@ export const ADAY_SINYALLER: AdaySinyal[] = [
   },
   {
     ad: "Handikap 3. Segment (İzole Model)",
-    durum: "beklemede",
-    etiket: "Onaylandı · ertelendi",
-    aciklama: "hpIvmesi/kiloDegisimi gibi Handikap'a özgü sinyalleri kendi izole segmentine ayırma fikri — kullanıcı onayladı, şimdilik ertelendi.",
+    durum: "reddedildi",
+    etiket: "Test edildi (n=307) · reddedildi",
+    aciklama: "hpIvmesi/kiloDegisimi gibi Handikap'a özgü sinyalleri kendi izole segmentine ayırma fikri — kullanıcı onaylamıştı, 2026-08-28'de yeterli veri (307 Handikap koşusu) birikince gerçek karşılaştırma yapıldı. Handikap-only TAM bağımsız 23-özellik retrain, mevcut havuzlanmış+cerrahi-düzeltme yaklaşımından DAHA KÖTÜ çıktı — n=230 eğitim hâlâ 23 serbest parametre için yetersiz (overfit riski).",
+    metrik: "Aynı 77 test koşusu: Handikap-only top1=%20.8/top3=%51.9/logloss=2.0707 vs Canlı top1=%20.8/top3=%57.1/logloss=2.0452",
   },
   {
     ad: "Zemin Ağırlığı Sinyali (RaceDay.surfaceConditions — GÜNCEL gün verisi)",
