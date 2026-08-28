@@ -747,17 +747,35 @@ function tierYuzdeMetni(t: CouponTierBreakdown, gaGoster: boolean): string {
 // çevirir. Yalnız yeterli örneklemli (TIER_GUVEN_ESIGI üstü) durumlarda çağrılır —
 // küçük örneklemde net bir tavsiye vermek, tam da split-half testinin gösterdiği
 // yanlış-güven riskini geri getirir.
+// 2026-08-28 kullanıcı bulgusu (Bursa 8.Koşu — KV-6, "İlk 3 at genelde yeterli" derken
+// kazanan 6.sıradaydı, gerçek para kaybı oldu): eski %65 eşiği "genelde yeterli" gibi
+// güven veren bir ifade için çok gevşekti — %65-79 aralığında bile her 3-4 yarıştan
+// birinde ilk 3 yetersiz kalıyordu ama metin bunu hiç söylemiyordu. Kullanıcı "netlik
+// istiyorum" dedi: eşik %80'e çekildi VE artık HER tavsiye cümlesi, o tavsiyeye uyulursa
+// geçmişte GERÇEKTEN kaç kez kazananın kaçırılmış olacağını sayıyla söylüyor (yalnız
+// yüksek riskte değil, her zaman) — "genelde yeterli" gibi rahatlatıcı bir ifade artık
+// hiçbir zaman gerçek kaçırma oranını gizlemiyor.
 function tierOneri(t: CouponTierBreakdown): string {
   const p = (n: number) => (n / t.total) * 100;
   const eko = p(t.ekonomik);
   const ilk6 = eko + p(t.normal);
-  const kacti = p(t.kacti ?? 0);
+  const genisToplam = ilk6 + p(t.genis);
   let cumle: string;
-  if (eko >= 65) cumle = "İlk 3 at genelde yeterli.";
-  else if (ilk6 >= 80) cumle = "Normal'e (ilk 6 at) kadar yazmak güvenli, yalnız ilk 3 dar kalabilir.";
-  else if (ilk6 >= 60) cumle = "Normal'den de at yazmak faydalı olabilir.";
-  else cumle = "Geniş'ten de at eklemeyi düşün — bu türde dar kupon sık kaçırıyor.";
-  if (kacti >= 15) cumle += ` Dikkat: geçmişte %${Math.round(kacti)} favoriler bile dışarıda kalmış.`;
+  let kacirma: number; // bu tavsiyeye uyulsaydı geçmişte kazananın kaçırılma oranı
+  if (eko >= 80) {
+    cumle = "İlk 3 at genelde yeterli.";
+    kacirma = 100 - eko;
+  } else if (ilk6 >= 85) {
+    cumle = "Normal'e (ilk 6 at) kadar yazmak güvenli.";
+    kacirma = 100 - ilk6;
+  } else if (ilk6 >= 60) {
+    cumle = "Normal'den de at yazmak faydalı olabilir.";
+    kacirma = 100 - ilk6;
+  } else {
+    cumle = "Geniş'ten de at eklemeyi düşün — bu türde dar kupon sık kaçırıyor.";
+    kacirma = 100 - genisToplam;
+  }
+  cumle += ` (Bu tavsiyeye uyulsaydı, geçmişte kazanan yaklaşık %${Math.round(Math.max(0, kacirma))} ihtimalle KAÇIRILMIŞ olurdu.)`;
   return cumle;
 }
 
