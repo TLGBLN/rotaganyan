@@ -19,79 +19,27 @@ const OUT_DIGER = "C:\\Users\\tlgbi\\AppData\\Local\\Temp\\claude\\c--Users-tlgb
 
 const ANLAMLI_PUAN_ESIGI = 1.0;
 
+// 2026-08-28 kullanıcı kararı ("faydası yoksa sil"): B=500'de İKİ segmentte de %95 GA'sı
+// sıfırı içeren 11 özellik (accurace, formEgimi, formEgimi2, kgs, kgs2, pistUzmani,
+// sireOrani, galop, uzunAraGalopKatkisi, agfYukselisVarMi, agfDususVarMi) ÇIKARILDI — 23'ten
+// 12'ye indi. Bootstrap FARK testi (B=500, aynı resample'la iki model de eğitilip
+// kıyaslandı): logloss farkı düşük-şart'ta ANLAMLI iyileşme (-0.0598, GA=[-0.1389,-0.0067]),
+// diğer'de yön aynı ama kanıtlanamadı (-0.0235, GA=[-0.0853,0.0057]). top1/top3 farkı
+// ikisinde de GA sıfırı içeriyor ama ortalama pozitif (zarar yok). zeminToleransi
+// kullanıcının bilinçli istisnası olduğu için korundu.
 const FEATURE_NAMES = [
-  "agfSirasi", "accurace", "formEgimi", "formEgimi2", "kgs", "kgs2", "kgsVarMi", "pistUzmani", "sireOrani",
-  "galop", "idmJokey", "jokeyOrani", "antrenorOrani", "uzunAraGalopKatkisi",
-  // 2026-08-26 — kacakAtMi (tek parça "kaçak at mı") YERİNE kacakYalniz kondu: derinlemesine
-  // backtest (saha büyüklüğü sabit tutulmuş kontrol + deneyimsiz atlarda split-half tutarlı
-  // +12-14 puan fark) sahada RAKİPSİZ kaçak olmanın gerçek avantaj taşıdığını, RAKİPLİ kaçak
-  // olmanın taşımadığını gösterdi (düşük-şart nokta=+0.145, GA=[0.031,0.266] anlamlı).
-  "agfYukselisVarMi", "kacakYalniz", "agfDususVarMi", "agfPayi",
-  // 2026-08-21 — H2H net skoru: sınırda bootstrap (GA=[-0.0105,0.1603]) ama top1/top3
-  // İKİSİ BİRDEN iyileşti (logloss ihmal edilebilir), kullanıcı kararıyla eklendi.
-  "h2hNetSkor",
-  // 2026-08-21 — hizDerecesi: TJK "süre" alanından (at-bazlı gerçek bitiriş süresi),
-  // popülasyon (irk|pist|mesafe) ortalama tempo'suna göre göreli hız — yalnız son 365
-  // gün (uzun aradan dönen atların eski "en iyi dönemi" güncelmiş gibi kullanılmasın).
-  // B=200 bootstrap: nokta=+0.3479, GA=[0.1856,0.5291] GÜÇLÜ ANLAMLI — agfSirasi'nden
-  // sonra en büyük katsayı. VIF=1.02 (accurace/formEgimi ile ÇAKIŞMIYOR, bağımsız bilgi).
-  "hizDerecesi",
-  // 2026-08-22 — kullanıcının paylaştığı "bugünkü şartlarda geçmiş kazananlar" tablosu
-  // HP bandına göre kazanma oranı gösteriyordu. hpSirasi (HP'ye göre SIRA, yukarıda
-  // arac-model-veri-olustur.mts'de belgeli) zaten reddedilmişti. Bu kez HAM HP DEĞERİ
-  // (hpPuani) denendi — saha-büyüklüğünden arındırılmış ham analizde 0-15 HP bandı
-  // beklenenin %24'ü, 48+ bandı %114'ü kadar kazanıyordu (n=32905, agfSirasi ile
-  // korelasyon r=-0.314). AMA diğer 20 özellikle BİRLİKTE test edilince (B=50 bootstrap)
-  // İKİ SEGMENTTE DE anlamsız çıktı: düşük-şart nokta=0.1062 GA=[-0.0826,0.3912],
-  // diğer nokta=0.1022 GA=[-0.0280,0.2673] — hpSirasi ile AYNI confounding (agfSirasi/
-  // agfPayi/antrenorOrani/jokeyOrani zaten yakalıyor). MODELE DAHİL EDİLMEDİ — hpPuani
-  // alanı yine de arac-model-veri-olustur.mts'de toplanıyor (ekstra TJK isteği
-  // gerektirmiyor), ileride farklı formülasyonla (örn. saha ortalamasına göre relatif)
-  // yeniden test edilmek istenirse hazır olsun diye.
-  // 2026-08-24 — Kilo-ayarlı H2H + Galop trendi: kullanıcı hipotezi (SANCAR EFESİ vakası
-  // + paylaşılan "Galop Değişimi" ekranı). İKİSİ DE tek başına sınırda/anlamsız (GA
-  // sıfırı kapsıyor: h2hKilo düşük-şart nokta=+0.089 GA=[-0.162,0.279], diğer nokta=
-  // +0.061 GA=[-0.022,0.164]; galopTrend düşük-şart nokta=+0.280 GA=[-0.007,0.637]
-  // NEREDEYSE anlamlı, diğer nokta=+0.003 pratikte sıfır) AMA HER İKİ sinyal HER İKİ
-  // segmentte de POZİTİF yön gösterdi (4/4) — kullanıcı bu yön-tutarlılığını yeterli
-  // kanıt sayıp EKLENMESİNİ istedi (2026-08-24). h2hKiloDegisimi: HorseRaceHistoryCache
-  // (H2H'nin zaten kullandığı kaynak, ekstra TJK isteği yok) — bugünkü rakiplere göre
-  // kilo avantajının geçmiş karşılaşmaya göre değişimi. galopTrendFarki: Gallop.splits
-  // (zaten idman senkronundan geliyor) — son 400m idman ile bir önceki AYNI mesafedeki
-  // idman arasındaki süre farkı (pozitif=hızlandı).
-  // 2026-08-24 — galopTrendFarki BURADAN ÇIKARILDI: hesaplama script'inde (arac-galop-
-  // trend-ekle.mjs, artık silindi) tarih filtresi eksikti, yarış tarihinden SONRAKİ
-  // idman kayıtları "son idman" sayılmıştı (ölçüldü: sıfırdan farklı satırların %74.7'si
-  // sızıntılı). Temiz veriyle yeniden test edilince katsayı tamamen çöktü (düşük-şart
-  // +0.280→+0.008, diğer +0.003→-0.005) — "yön tutarlılığı" kabul gerekçesi geçersizdi.
-  "h2hKiloDegisimi",
-  // 2026-08-27 — kullanıcı talebi ("piyasayı araştır"): AGF payı kalibrasyon kontrolü
-  // %40+ payılı güçlü favorilerin gerçek kazanma oranından -4.1 puan geride, AGF sırası
-  // 4-5 olan orta sıradaki atların +2.1/+2.5 puan önde olduğunu gösterdi — doğrusal
-  // olmayan bir kalıp. agfPayi'nin karesi (formEgimi2/kgs2 ile AYNI desen) "diğer"
-  // segmentte ANLAMLI (nokta=-0.207, GA=[-0.366,-0.053]) VE top3'ü gerçekten iyileştirdi
-  // (%64.8→%65.3, logloss 1.8409→1.8392) — B=500, izole test. Kategorik alternatifler
-  // (AGF sırası 4-5 göstergesi, %40+ göstergesi) anlamlı ama top1/top3'ü kötüleştirdi,
-  // DAHİL EDİLMEDİ.
-  "agfPayi2",
-  // 2026-08-28 — Zemin Toleransı: atın Normal-dışı (ıslak/ağır/yumuşak) pist koşullarındaki
-  // geçmiş performansı (TjkDereceKaydi arşivi, hesaplaZeminToleransiMap, leak-free/kilo-
-  // ayarlı). Split-half güvenilirlik testinde GERÇEK bir at-bazlı özellik doğrulandı
-  // (r=0.467, n=286) AMA İKİ KEZ (2026-08-23 B=50, 2026-08-28 B=500/n=1059 koşu) V5'in
-  // mevcut özelliklerine eklenip test edildiğinde katsayı %95 GA'sı sıfırı içerdi —
-  // istatistiksel ANLAMSIZ. Kullanıcı bu sonucu bilerek, açık bir kural istisnası olarak
-  // eklenmesini istedi (bkz. v5-engine.ts Faz1RunnerV5.zeminToleransi üstündeki not).
-  "zeminToleransi",
+  "agfSirasi", "kgsVarMi", "idmJokey", "jokeyOrani", "antrenorOrani", "kacakYalniz",
+  "agfPayi", "h2hNetSkor", "hizDerecesi", "h2hKiloDegisimi", "agfPayi2", "zeminToleransi",
 ];
 
 function toFeatureVector(row) {
   return [
-    row.agfSirasi, row.accurace, row.formEgimi, row.formEgimi * row.formEgimi,
-    row.kgsVarMi ? row.kgs : 0, row.kgsVarMi ? row.kgs * row.kgs : 0, row.kgsVarMi, row.pistUzmani,
-    row.sireOrani, row.galop, row.idmJokey, row.jokeyOrani, row.antrenorOrani, row.uzunAraGalopKatkisi ?? 0,
-    row.agfFark >= ANLAMLI_PUAN_ESIGI ? 1 : 0,
+    row.agfSirasi,
+    row.kgsVarMi,
+    row.idmJokey,
+    row.jokeyOrani,
+    row.antrenorOrani,
     row.kacakYalniz ?? 0,
-    row.agfFark <= -ANLAMLI_PUAN_ESIGI ? 1 : 0,
     row.agfPayi ?? 0,
     row.h2hNetSkor ?? 0,
     row.hizDerecesi ?? 0,

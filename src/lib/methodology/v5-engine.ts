@@ -581,63 +581,32 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
 
 const ANLAMLI_PUAN_ESIGI = 1.0; // agf-trend.actions.ts'teki ANLAMLI_PUAN_ESIGI ile aynı
 
+// 2026-08-28 kullanıcı kararı ("faydası yoksa sil, tutarlı ol"): projenin bugüne kadar bir
+// sinyali EKLEMEK için kullandığı baraj hep "kendi katkısı B=500'de kanıtlandı mı" idi
+// (agfPayi2, h2hKiloDegisimi hep böyle eklendi). Aynı barajı çıkarmaya da uyguluyoruz —
+// "silmenin ayrıca modelin genelini iyileştirdiğini kanıtla" ek şartı tutarsızdı (hiçbir
+// eklenen sinyalden bu istenmemişti). B=500'de İKİ segmentte de %95 GA'sı sıfırı içeren
+// 11 özellik (accurace, formEgimi, formEgimi2, kgs, kgs2, pistUzmani, sireOrani, galop,
+// uzunAraGalopKatkisi, agfYukselisVarMi, agfDususVarMi) toFeatureVector'DAN ÇIKARILDI.
+// Ek doğrulama: bootstrap FARK testi (23 vs 12 özellik, aynı resample'la ikisi de eğitilip
+// kıyaslandı) top1/top3'te zarar GÖSTERMEDİ (ortalama fark pozitif: düşük-şart +2.74pp,
+// diğer +0.15pp — ikisi de GA sıfırı içeriyor ama YÖN tutarlı, h2hKiloDegisimi'nin kabul
+// edilme gerekçesiyle aynı desen). Ham alanlar Faz1RunnerV5/arac-model-veri-olustur.mts'te
+// HÂLÂ TOPLANIYOR (maliyetsiz) — yalnız skorlamadan çıkarıldı. zeminToleransi kullanıcının
+// bilinçli istisnası olduğu için (bkz. üstteki not) KORUNDU.
 export function toFeatureVector(r: Faz1RunnerV5): number[] {
   return [
-    r.agfSirasi, r.accurace, r.formEgimi, r.formEgimi * r.formEgimi,
-    r.kgsVarMi ? r.kgs : 0, r.kgsVarMi ? r.kgs * r.kgs : 0, r.kgsVarMi, r.pistUzmani,
-    r.sireOrani, r.galop, r.idmJokey, r.jokeyOrani, r.antrenorOrani, r.uzunAraGalopKatkisi,
-    // 2026-08-16 kullanıcı ısrarı: ham agfFark (sürekli puan farkı) HİÇBİR
-    // formülasyonda anlamlı çıkmamıştı (agfSirasi ile multicollinearity). Eşik-bazlı
-    // ikili hâliyle (|fark|>=1.0) ANLAMLI çıktı (+0.1058, GA [0.0446, 0.1780]) —
-    // ham agfFark bu özellikle DEĞİŞTİRİLDİ. "Düşüş" ayrı test edildi, anlamsız
-    // çıktı, eklenmedi.
-    r.agfFark >= ANLAMLI_PUAN_ESIGI ? 1 : 0,
-    // 2026-08-16 kullanıcı talebi (sektör araştırması sonrası): Runner.raceStyle
-    // ("KACAK_AT" vb, Accurace tabanlı) — kapı no/kilo farkı/HP farkı AYNI ANDA test
-    // edildi, üçü de anlamsız çıktı; yalnız bu anlamlı (+0.0878, GA [0.0290,0.1811])
-    // VE genel performansı iyileştirdi (top1 %34.8→%36.5). 2026-08-26: kacakAtMi YERİNE
-    // kacakYalniz — bkz. Faz1RunnerV5.kacakYalniz üstündeki not.
+    r.agfSirasi,
+    r.kgsVarMi,
+    r.idmJokey,
+    r.jokeyOrani,
+    r.antrenorOrani,
     r.kacakYalniz,
-    // 2026-08-16 kullanıcı bulgusu (KINDBERO/ANGEL ON THE RIGHT vakaları, İzmir K3/K4):
-    // ham "düşüş" tek başına anlamsızdı, ama "düşüşe RAĞMEN hâlâ iyi AGF pozisyonunda
-    // kalma" (agfSirasi<=4 şartlı) ANLAMLI çıktı (+0.1282, GA [0.0576, 0.1982]).
-    // 2026-08-19 kullanıcı bulgusu (SHINNY vakası, AGF Trend panelinde ilk-4 DIŞINDA
-    // anlamlı düşüş gösterip modelin hiç yakalamadığı bir at): pozisyon şartı gerçek
-    // sinyali dışlıyordu. Kaldırılıp yalnız eşik testi edildi (agfYukselisVarMi ile
-    // simetrik) — top1 aynı (%38.0), top3 iyileşti (%68.3→%70.2), log-loss iyileşti
-    // (1.7695→1.7617), yön tutarlı. KABUL EDİLDİ, ad "agfDususVarMi" oldu (bkz.
-    // arac-model-egit.mjs'teki aynı isimli notun tamamı).
-    r.agfFark <= -ANLAMLI_PUAN_ESIGI ? 1 : 0,
-    // 2026-08-19 kullanıcı bulgusu (BODUBEY/EL LEON) — bkz. Faz1RunnerV5.agfPayi
-    // üstündeki not. Eski "agfSirasi===1?1:0" (agfFavorisiMi) buradan ÇIKARILDI,
-    // yerini bu aldı (agfPayi: +0.25, anlamlı — agfFavorisiMi -0.0284'e düşüp
-    // anlamsızlaşmıştı). agfFarkiIkinciye de denendi ama sınırda/zararlı çıktı
-    // (bkz. Faz1RunnerV5.agfFarkiIkinciye üstündeki not) — DAHİL EDİLMEDİ.
     r.agfPayi,
-    // 2026-08-21 — H2H net skoru: bkz. dosya başındaki V5.3 H2H notu. Sınırda bootstrap
-    // ama top1/top3 İKİSİ BİRDEN iyileşti, veriden fit edilerek eklendi.
     r.h2hNetSkor,
-    // 2026-08-21 — Hız derecesi: bkz. dosya başındaki V5.4 notu. HER İKİ segmentte de
-    // güçlü anlamlı (B=200), VIF=1.02-1.10 (çakışma yok).
     r.hizDerecesi,
-    // 2026-08-24 — Kilo-ayarlı H2H: bkz. Faz1RunnerV5 üstündeki not. Tek başına sınırda/
-    // anlamsız (GA sıfırı kapsıyor) ama kullanıcı kararıyla eklendi.
     r.h2hKiloDegisimi,
-    // 2026-08-27 kullanıcı talebi ("piyasayı araştır") — AGF payı kalibrasyon kontrolü:
-    // %40+ payı olan güçlü favoriler gerçek kazanma oranından -4.1 puan geride
-    // (piyasa fazla seviyor), AGF sırası 4-5 olan orta sıradaki atlar +2.1/+2.5 puan
-    // önde (piyasa hafife alıyor) — doğrusal olmayan bir kalıp. agfPayi'nin karesi
-    // (formEgimi2/kgs2 ile AYNI desen) test edildi: "diğer" segmentte ANLAMLI
-    // (nokta=-0.207, GA=[-0.366,-0.053]) VE top3 gerçekten iyileşti (%64.8→%65.3,
-    // logloss 1.8409→1.8392) — bugünkü ~13 adaydan yalnız bunda hem anlamlılık hem
-    // pratik kazanç birlikte çıktı. Kategorik alternatifler (AGF sırası 4-5 göstergesi,
-    // %40+ göstergesi) anlamlı ama top1/top3'ü KÖTÜLEŞTİRDİ (kariyerStartSayisi deseni),
-    // DAHİL EDİLMEDİ — yalnız bu kare terim eklendi.
     r.agfPayi * r.agfPayi,
-    // 2026-08-28 — Zemin Toleransı (bkz. Faz1RunnerV5.zeminToleransi üstündeki not).
-    // B=500/n=1059 testinde İKİ segmentte de anlamsız çıktı (GA sıfırı içeriyor) — bu,
-    // istisnai bir kullanıcı kararıyla (test sonucu bilinerek) eklendi, önerilen/varsayılan
-    // uygulama değil.
     r.zeminToleransi,
   ];
 }
@@ -957,21 +926,18 @@ const idx = (name: string) => FEATURE_NAMES.indexOf(name);
 
 const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   { kod: "AGF", ozellikIndeksleri: [idx("agfSirasi"), idx("agfPayi"), idx("agfPayi2")], aciklama: (r) => `AGF sırası: ${r.agfSirasi}${r.agfSirasi === 1 ? ` (AGF favorisi, %${r.agfPayi.toFixed(1)})` : ` (%${r.agfPayi.toFixed(1)})`}` },
-  { kod: "ACC", ozellikIndeksleri: [idx("accurace")], aciklama: (r) => (r.accurace ? "Accurace: son yarışta sahanın en hızlı son 200m kapanışı" : null) },
-  { kod: "FORM", ozellikIndeksleri: [idx("formEgimi"), idx("formEgimi2")], aciklama: (r) => `Form eğimi: ${r.formEgimi.toFixed(1)} (${r.formEgimi < 0 ? "iyileşiyor" : r.formEgimi > 0 ? "kötüleşiyor" : "sabit"})` },
-  { kod: "KGS", ozellikIndeksleri: [idx("kgs"), idx("kgs2"), idx("kgsVarMi")], aciklama: (r) => (r.kgsVarMi ? `KGS ${r.kgs} gün` : null) },
-  { kod: "PIST", ozellikIndeksleri: [idx("pistUzmani")], aciklama: (r) => (r.pistUzmani ? "Bu hipodrom+pist+mesafede bu yıl kazandı" : null) },
-  { kod: "SIRE", ozellikIndeksleri: [idx("sireOrani")], aciklama: (r) => `Aygır kazanma oranı (küçültülmüş): %${r.sireOrani.toFixed(1)}` },
-  { kod: "GALOP", ozellikIndeksleri: [idx("galop")], aciklama: (r) => (r.galop ? "Keskin galop zinciri (son idman 400m barajı)" : null) },
+  // 2026-08-28 kullanıcı kararı ("faydası yoksa sil"): ACC/FORM/PIST/SIRE/GALOP/UZUNARA/
+  // DUSUSIYI grupları (accurace, formEgimi/2, pistUzmani, sireOrani, galop,
+  // uzunAraGalopKatkisi, agfDususVarMi) toFeatureVector'dan çıkarıldığı için buradan da
+  // kaldırıldı — artık skora katkıları yok, gerekçe metninde göstermek yanıltıcı olurdu.
+  { kod: "KGS", ozellikIndeksleri: [idx("kgsVarMi")], aciklama: (r) => (r.kgsVarMi ? `KGS ${r.kgs} gün` : null) },
   { kod: "IDMJOK", ozellikIndeksleri: [idx("idmJokey")], aciklama: (r) => (r.idmJokey ? "İdman jokeyi uyumu (bugünkü jokey idmanlardan birini yaptırmış)" : null) },
   { kod: "JOKSTAT", ozellikIndeksleri: [idx("jokeyOrani")], aciklama: (r) => `Jokey kazanma oranı (küçültülmüş): %${r.jokeyOrani.toFixed(1)}` },
   { kod: "ANTSTAT", ozellikIndeksleri: [idx("antrenorOrani")], aciklama: (r) => `Antrenör kazanma oranı (küçültülmüş): %${r.antrenorOrani.toFixed(1)}` },
-  { kod: "UZUNARA", ozellikIndeksleri: [idx("uzunAraGalopKatkisi")], aciklama: (r) => (r.uzunAraGalopKatkisi > 0 ? `Uzun aradan sonra ${r.uzunAraGalopKatkisi} galop yapmış (düzenli çalışmış)` : null) },
   // 2026-08-17 denetim bulgusu: kacakAtMi ve dususAmaIyiPozisyon anlamlı sinyaller
   // (bkz. toFeatureVector üstündeki notlar) ama hiçbir OzellikGrubu'na dahil değildi —
   // katkıları skoru etkiliyordu ama gerekçe metninde hiç görünmüyordu. Eklendi.
   { kod: "KACAK", ozellikIndeksleri: [idx("kacakYalniz")], aciklama: (r) => (r.kacakYalniz ? "Rakipsiz kaçak at / erken tempo yapan (Accurace koşu stili sinyali, sahada tek kaçak)" : null) },
-  { kod: "DUSUSIYI", ozellikIndeksleri: [idx("agfDususVarMi")], aciklama: (r) => (r.agfFark <= -ANLAMLI_PUAN_ESIGI ? "AGF trend: düşüş (para akışı sinyali olabilir)" : null) },
   // 2026-08-21 — H2H: bugünkü rakiplerle ortak geçmiş yarış yoksa (h2hNetSkor=0) satır
   // hiç gösterilmez — "0 karşılaşma" ile "hep berabere" ayrımı yapılamadığı için nötr.
   // 2026-08-27 — düşük-şart'ta bu sinyalin katsayısı ELLE sıfırlanmış (bkz. WEIGHTS_DUSUK_SART
