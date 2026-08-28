@@ -205,6 +205,14 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                                 {ADVICE_LEVEL_LABEL[advice.level]}
                               </span>
                             </div>
+                            {effectivePred?.isBanko && (
+                              <div
+                                title={effectivePred.bankoNote ?? undefined}
+                                className="mt-0.5 text-[10px] font-semibold leading-tight text-hit cursor-help"
+                              >
+                                ★ BANKO — tek at yeterli, bütçeyi diğer ayaklara kaydırın
+                              </div>
+                            )}
                             {advice.oneri && (
                               <div
                                 className={cn(

@@ -42,6 +42,8 @@ export type AdminRaceDay = Prisma.RaceDayGetPayload<{
           select: {
             id: true;
             published: true;
+            isBanko: true;
+            bankoNote: true;
             picks: { select: { rank: true; isTarget: true; score: true; runnerLabel: true } };
           };
         };
@@ -119,6 +121,8 @@ export async function getAdminRaceDays(dateStr?: string, limit = 30): Promise<Ad
             select: {
               id: true,
               published: true,
+              isBanko: true,
+              bankoNote: true,
               picks: { orderBy: { rank: "asc" }, select: { rank: true, isTarget: true, score: true, runnerLabel: true } },
             },
           },
@@ -748,13 +752,19 @@ function tierYuzdeMetni(t: CouponTierBreakdown, gaGoster: boolean): string {
 // küçük örneklemde net bir tavsiye vermek, tam da split-half testinin gösterdiği
 // yanlış-güven riskini geri getirir.
 // 2026-08-28 kullanıcı bulgusu (Bursa 8.Koşu — KV-6, "İlk 3 at genelde yeterli" derken
-// kazanan 6.sıradaydı, gerçek para kaybı oldu): eski %65 eşiği "genelde yeterli" gibi
-// güven veren bir ifade için çok gevşekti — %65-79 aralığında bile her 3-4 yarıştan
-// birinde ilk 3 yetersiz kalıyordu ama metin bunu hiç söylemiyordu. Kullanıcı "netlik
-// istiyorum" dedi: eşik %80'e çekildi VE artık HER tavsiye cümlesi, o tavsiyeye uyulursa
-// geçmişte GERÇEKTEN kaç kez kazananın kaçırılmış olacağını sayıyla söylüyor (yalnız
-// yüksek riskte değil, her zaman) — "genelde yeterli" gibi rahatlatıcı bir ifade artık
-// hiçbir zaman gerçek kaçırma oranını gizlemiyor.
+// kazanan 6.sıradaydı, gerçek para kaybı oldu): eşik geçici olarak %80'e çekilmiş ve
+// HER tavsiye cümlesine, o tavsiyeye uyulursa geçmişte GERÇEKTEN kaç kez kazananın
+// kaçırılmış olacağını sayıyla söyleyen bir ek cümle YAPIŞTIRILMIŞTI (bu disclosure
+// KALICI, aşağıda hâlâ duruyor). Ama %80 eşiği gerçek veriyle test edilince (2026-08-28,
+// tüm classTypeGroup dağılımı tarandı) TÜM güvenilir gruplar (Şartlı %66, Handikap %54,
+// Maiden %61, KV %75) bu barı geçemiyor — yani HER ayak "ilk 6 yaz" tavsiyesi alıyor.
+// Kullanıcının bulgusu: bunu bir altılı/6'lı gibi çok ayaklı kuponda uygulamak (her ayağa
+// 6 at) maliyeti karşılanamaz hale getiriyor. Kullanıcının kararı: eşik gerçek veriyi
+// ayırt edecek şekilde eskisine (%65) döner — "İlk 3 yeterli" yine çıkabilir (ör. KV %75,
+// Şartlı %66) ama disclosure cümlesi SİLİNMEDİ, her zaman gerçek kaçırma yüzdesini
+// söylüyor. Ayrıca en zayıf dilimin metni artık yalnız "geniş ekle" demiyor, o ayağı
+// HİÇ OYNAMAMAYI da açıkça bir seçenek olarak sunuyor (çok ayaklı kuponda bütçe kısıtı
+// varsa, geniş yazmak yerine o ayaktan tamamen çekilmek de rasyonel bir seçenek).
 function tierOneri(t: CouponTierBreakdown): string {
   const p = (n: number) => (n / t.total) * 100;
   const eko = p(t.ekonomik);
@@ -762,17 +772,17 @@ function tierOneri(t: CouponTierBreakdown): string {
   const genisToplam = ilk6 + p(t.genis);
   let cumle: string;
   let kacirma: number; // bu tavsiyeye uyulsaydı geçmişte kazananın kaçırılma oranı
-  if (eko >= 80) {
-    cumle = "İlk 3 at genelde yeterli.";
+  if (eko >= 65) {
+    cumle = "İlk 3 at genelde yeterli — bu ayakta dar kalabilirsiniz.";
     kacirma = 100 - eko;
-  } else if (ilk6 >= 85) {
+  } else if (ilk6 >= 80) {
     cumle = "Normal'e (ilk 6 at) kadar yazmak güvenli.";
     kacirma = 100 - ilk6;
   } else if (ilk6 >= 60) {
     cumle = "Normal'den de at yazmak faydalı olabilir.";
     kacirma = 100 - ilk6;
   } else {
-    cumle = "Geniş'ten de at eklemeyi düşün — bu türde dar kupon sık kaçırıyor.";
+    cumle = "Bu türde dar kupon sık kaçırıyor — ya Geniş'ten de at ekleyin, ya da bu ayağı hiç oynamayın.";
     kacirma = 100 - genisToplam;
   }
   cumle += ` (Bu tavsiyeye uyulsaydı, geçmişte kazanan yaklaşık %${Math.round(Math.max(0, kacirma))} ihtimalle KAÇIRILMIŞ olurdu.)`;
