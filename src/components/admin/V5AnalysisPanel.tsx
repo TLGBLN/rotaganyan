@@ -239,7 +239,14 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         couponNarrow: couponNarrow || undefined,
         couponNormal: couponNormal || undefined,
         couponWide: couponWide || undefined,
-        isBanko: false,
+        // 2026-08-28 kullanıcı bulgusu: bu alan öncesinde SABİT `false` yazılıyordu —
+        // ekranda "★ BANKO ADAYI" gösterilse bile kaydet/yayımla anında hep false
+        // gönderiliyordu. V5 döneminde (16-27 Ağustos, 210 yarış) v5BankoAdayiTespit
+        // 31 kez GERÇEKTEN tetiklenmiş (isabet %51.6) ama HİÇBİRİ hiç kaydedilmemiş.
+        // Kontrol edildi: bu 31'in 30'u zaten AGF favorisiyle aynı (assertPublishSafe
+        // kural 3'ü sorunsuz geçer), yalnız 1'i çakışırdı (o da kaybetmiş) — düzeltme
+        // güvenli.
+        isBanko: bankoAdayi?.bankoAdayi ?? false,
         bankoNote: bankoAdayi?.sebep,
         picks,
       });
