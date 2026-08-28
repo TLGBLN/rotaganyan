@@ -137,6 +137,7 @@ import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getAgfTrendForRace } from "@/server/actions/agf-trend.actions";
 import { getH2HForRace } from "@/server/actions/h2h.actions";
 import { getHizDerecesiForRace } from "@/server/actions/hiz-derecesi.actions";
+import { hesaplaZeminToleransiMap } from "@/server/actions/zemin-toleransi.actions";
 import { syncAgfForRace } from "@/server/services/agf-sync";
 import { getJockeyStats, getTrainerStats } from "@/server/services/race.service";
 import {
@@ -342,6 +343,17 @@ export type Faz1RunnerV5 = {
    *  önlemek için (kullanıcı bulgusu 2026-08-24: "+27.5 toplam kilo diye belirtilmesi
    *  kullanıcılar tarafından farklı anlaşılabilir"). Skora girmez. */
   h2hKiloKarsilasmaSayisi: number;
+  /** 2026-08-28 — Zemin Toleransı: atın Normal-dışı (ıslak/ağır/yumuşak) pist
+   *  koşullarındaki geçmiş performansı, TjkDereceKaydi arşivinden (hesaplaZeminToleransiMap,
+   *  leak-free, kilo-ayarlı, kategori bazlı). Split-half güvenilirlik testinde GERÇEK bir
+   *  at-bazlı özellik olduğu doğrulandı (r=0.467, n=286) ama V5'in mevcut 22 özelliğine
+   *  eklenip test edildiğinde İKİ KEZ (2026-08-23 B=50, 2026-08-28 B=500/n=1059 koşu)
+   *  katsayı %95 GA'sı sıfırı içerdi — istatistiksel olarak ANLAMSIZ. Kullanıcı bu sonucu
+   *  bilerek, açık bir kural istisnası olarak eklenmesini istedi (AskUserQuestion ile
+   *  teyit edildi) — normalde bu oturumun standart kuralı ("önce backtest, iyi çıkmazsa
+   *  ekleme") bunu dışlardı. Risk: model bu özelliğe gereksiz ağırlık verebilir veya
+   *  hiçbir fayda sağlamadan gürültü ekleyebilir. */
+  zeminToleransi: number;
 };
 
 export type Faz1SonucV5 = {
@@ -391,7 +403,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
   const runners = race.runners;
   if (runners.length === 0) return { race: { id: race.id, hippodromeName: race.raceDay.hippodrome.name.trim(), raceNo: race.raceNo, classType: race.classType, breed: race.breed, surface: race.surface, distance: race.distance }, runners: [] };
 
-  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters, hizByNo] = await Promise.all([
+  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters, hizByNo, zeminToleransiByAd] = await Promise.all([
     getSonYarisDetaylariForRace(raceId).catch(() => []),
     getSireStatOzetleriForRace(runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(() =>
       runners.map(() => ({ ozet: null, ornekKendiVeri: null, kYuzde: null }))
@@ -406,6 +418,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     fetchAccuraceGecmisKayitlari(runners.map((r) => r.name), race.raceDay.date),
     getH2HForRace(raceId).catch(() => []),
     getHizDerecesiForRace(raceId).catch(() => new Map<number, number>()),
+    hesaplaZeminToleransiMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, number>()),
   ]);
 
   const raceNameToNo = new Map(runners.map((r) => [r.name, r.no]));
@@ -551,6 +564,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       hizDerecesi: hizByNo.get(r.no) ?? 0,
       h2hKiloDegisimi: h2hKiloHesap.toplam,
       h2hKiloKarsilasmaSayisi: h2hKiloHesap.sayi,
+      zeminToleransi: zeminToleransiByAd.get(r.name) ?? 0,
     };
   });
 
@@ -620,6 +634,11 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     // %40+ göstergesi) anlamlı ama top1/top3'ü KÖTÜLEŞTİRDİ (kariyerStartSayisi deseni),
     // DAHİL EDİLMEDİ — yalnız bu kare terim eklendi.
     r.agfPayi * r.agfPayi,
+    // 2026-08-28 — Zemin Toleransı (bkz. Faz1RunnerV5.zeminToleransi üstündeki not).
+    // B=500/n=1059 testinde İKİ segmentte de anlamsız çıktı (GA sıfırı içeriyor) — bu,
+    // istisnai bir kullanıcı kararıyla (test sonucu bilinerek) eklendi, önerilen/varsayılan
+    // uygulama değil.
+    r.zeminToleransi,
   ];
 }
 
@@ -984,6 +1003,9 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
       return `Kilo-ayarlı H2H: bugünkü ${r.h2hKiloKarsilasmaSayisi} rakibe göre, geçmiş karşılaşmalara kıyasla ortalama ${Math.abs(ortalama).toFixed(1)}kg daha ${yon} koşuyor`;
     },
   },
+  // 2026-08-28 — Zemin Toleransı: bkz. Faz1RunnerV5.zeminToleransi üstündeki not. Veri
+  // yoksa (Normal-dışı geçmiş koşu yok) 0, satır hiç gösterilmez.
+  { kod: "ZEMIN", ozellikIndeksleri: [idx("zeminToleransi")], aciklama: (r) => (r.zeminToleransi !== 0 ? `Zemin toleransı: Normal-dışı pistteki geçmişinde popülasyona göre ${r.zeminToleransi > 0 ? "+" : ""}${r.zeminToleransi.toFixed(1)}% (${r.zeminToleransi > 0 ? "daha hızlı" : "daha yavaş"})` : null) },
 ];
 
 // 2026-08-18 kullanıcı talebi: "18 sinyalin hepsinin kontrol edildiğini bana göstermesini
@@ -1008,6 +1030,7 @@ const FEATURE_LABELS: Record<string, string> = {
   hizDerecesi: "Hız Derecesi (popülasyona göre göreli tempo, son 365 gün)",
   h2hKiloDegisimi: "Kilo-Ayarlı H2H (rakiplere göre kilo pozisyonu değişimi)",
   agfPayi2: "AGF Payı (karesi, piyasa kalibrasyon eğriselliği)",
+  zeminToleransi: "Zemin Toleransı (Normal-dışı pistte geçmiş göreli performans)",
 };
 
 export type TumOzellikDetay = { kod: string; etiket: string; hamDeger: number; standartDeger: number; katki: number };

@@ -52,6 +52,11 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
   { ad: "Galop", kod: "galop", dusukSart: { katsayi: -0.079, durum: "anlamsiz" }, diger: { katsayi: 0.047, durum: "anlamsiz" }, aciklama: "Keskin galop zinciri — düşük-şartta yön TERS, ikisi de anlamsız." },
   { ad: "Form Eğimi", kod: "formEgimi", dusukSart: { katsayi: -0.096, durum: "anlamsiz" }, diger: { katsayi: 0.018, durum: "anlamsiz" }, aciklama: "Son starların bitiş sırası eğimi." },
   { ad: "Pist Uzmanı", kod: "pistUzmani", dusukSart: { katsayi: 0, durum: "veri-yok" }, diger: { katsayi: 0.012, durum: "anlamsiz" }, aciklama: "Bugünkü pist+mesafede geçmiş galibiyet." },
+  // 2026-08-28 — KURAL İSTİSNASI: bu sinyal B=500 testinde İKİ KEZ (2026-08-23 ve
+  // 2026-08-28) anlamsız çıktı ama kullanıcı, sonucu bilerek (AskUserQuestion ile teyit
+  // edilerek) modele eklenmesini istedi. "Önce backtest, iyi çıkmazsa ekleme" standart
+  // kuralının açık bir istisnası — diğer tüm satırlardan farklı olarak.
+  { ad: "Zemin Toleransı (İSTİSNA — anlamsız test sonucuna rağmen eklendi)", kod: "zeminToleransi", dusukSart: { katsayi: -0.002, durum: "anlamsiz", not: "2026-08-28 B=500/n=1059: GA=[-0.114,0.207]. Kullanıcı kararıyla yine de eklendi." }, diger: { katsayi: 0.001, durum: "anlamsiz", not: "2026-08-28 B=500/n=1059: GA=[-0.077,0.105]. Kullanıcı kararıyla yine de eklendi." }, aciklama: "Atın Normal-dışı (ıslak/ağır/yumuşak) pistteki geçmiş göreli performansı (TjkDereceKaydi arşivi). At-bazlı gerçek/tekrarlanabilir bir özellik (split-half r=0.467) ama V5'in tahmin doğruluğuna ölçülebilir katkısı yok." },
 ];
 
 export type SiralamaKurali = {
@@ -190,10 +195,10 @@ export const ADAY_SINYALLER: AdaySinyal[] = [
     aciklama: "hpIvmesi/kiloDegisimi gibi Handikap'a özgü sinyalleri kendi izole segmentine ayırma fikri — kullanıcı onayladı, şimdilik ertelendi.",
   },
   {
-    ad: "Zemin Ağırlığı Sinyali",
+    ad: "Zemin Ağırlığı Sinyali (RaceDay.surfaceConditions — GÜNCEL gün verisi)",
     durum: "beklemede",
     etiket: "Veri yetersiz",
-    aciklama: "RaceDay.surfaceConditions gerçekten değişiyor ama n=3 gün — kış yağmurlarında veri birikince tekrar test edilecek.",
+    aciklama: "RaceDay.surfaceConditions (yalnız güncel/ingest edilen günler) gerçekten değişiyor ama n=3 gün — kış yağmurlarında veri birikince tekrar test edilecek. KARIŞTIRILMASIN: apayrı bir kaynağa (TjkDereceKaydi arşivi) dayanan 'Zemin Toleransı' sinyali (kod: zeminToleransi) zaten CANLI SİNYALLER'de — o test edildi, anlamsız çıktı, kullanıcı kararıyla yine de eklendi.",
   },
   {
     ad: "Yurt Dışı Yarış Genişletmesi",

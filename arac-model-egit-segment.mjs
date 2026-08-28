@@ -74,6 +74,14 @@ const FEATURE_NAMES = [
   // (AGF sırası 4-5 göstergesi, %40+ göstergesi) anlamlı ama top1/top3'ü kötüleştirdi,
   // DAHİL EDİLMEDİ.
   "agfPayi2",
+  // 2026-08-28 — Zemin Toleransı: atın Normal-dışı (ıslak/ağır/yumuşak) pist koşullarındaki
+  // geçmiş performansı (TjkDereceKaydi arşivi, hesaplaZeminToleransiMap, leak-free/kilo-
+  // ayarlı). Split-half güvenilirlik testinde GERÇEK bir at-bazlı özellik doğrulandı
+  // (r=0.467, n=286) AMA İKİ KEZ (2026-08-23 B=50, 2026-08-28 B=500/n=1059 koşu) V5'in
+  // mevcut özelliklerine eklenip test edildiğinde katsayı %95 GA'sı sıfırı içerdi —
+  // istatistiksel ANLAMSIZ. Kullanıcı bu sonucu bilerek, açık bir kural istisnası olarak
+  // eklenmesini istedi (bkz. v5-engine.ts Faz1RunnerV5.zeminToleransi üstündeki not).
+  "zeminToleransi",
 ];
 
 function toFeatureVector(row) {
@@ -89,6 +97,7 @@ function toFeatureVector(row) {
     row.hizDerecesi ?? 0,
     row.h2hKiloDegisimi ?? 0,
     (row.agfPayi ?? 0) * (row.agfPayi ?? 0),
+    row.zeminToleransi ?? 0,
   ];
 }
 function groupByRace(rows) {

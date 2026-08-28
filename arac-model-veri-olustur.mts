@@ -12,6 +12,7 @@ import { breedToIrk, surfaceToPist, mesafeBucket, normalizeSireName } from "./sr
 import { finishPos } from "./src/lib/race-result";
 import { getJockeyStats, getTrainerStats } from "./src/server/services/race.service";
 import { zeminKatsayisi, zeminDetayiBul } from "./src/lib/methodology/mekanik-puanlama";
+import { hesaplaZeminToleransiMap } from "./src/server/actions/zemin-toleransi.actions";
 import { writeFileSync, existsSync, readFileSync } from "fs";
 
 const GERCEK_OLMAYAN_HIPODROM_SLUGLARI = ["karma", "perak-malezya"];
@@ -220,6 +221,10 @@ export type ModelRow = {
   // ki kış yağmurlarında/ileride "Normal-dışı" gün sayısı yeterli örnekleme ulaşınca GERÇEK
   // bir B=500 testi yapılabilsin — geriye dönük backfill'e gerek kalmadan.
   zeminKatsayisi: number;
+  // 2026-08-28 — Zemin Toleransı (bkz. Faz1RunnerV5.zeminToleransi, v5-engine.ts, aynı
+  // isimli notun tamamı). B=500 testinde anlamsız çıktı ama kullanıcı kararıyla 23.
+  // özellik olarak eklendi (kural istisnası).
+  zeminToleransi: number;
 };
 
 async function main() {
@@ -405,7 +410,7 @@ async function main() {
 
             const tjkAtIdler = runners.map((r) => r.tjkAtId).filter((x): x is number => x != null);
 
-            const [sonYarisDetaylari, jockeyStats, trainerStats, accKayitlar, agfSnaps, gecmisKayitlari] = await Promise.all([
+            const [sonYarisDetaylari, jockeyStats, trainerStats, accKayitlar, agfSnaps, gecmisKayitlari, zeminToleransiMap] = await Promise.all([
               getSonYarisDetaylariForRace(race.id).catch(() => []),
               getJockeyStats([
                 ...new Set([
@@ -429,6 +434,10 @@ async function main() {
                     select: { tjkAtId: true, rowsJson: true },
                   })
                 : Promise.resolve([]),
+              // 2026-08-28 — Zemin Toleransı (bkz. ModelRow.zeminKatsayisi üstündeki not,
+              // ve Faz1RunnerV5.zeminToleransi, v5-engine.ts). Aynı hesaplaZeminToleransiMap
+              // (TjkDereceKaydi, leak-free) fonksiyonu reuse ediliyor.
+              hesaplaZeminToleransiMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, number>()),
             ]);
             const gecmisByTjkAtId = new Map(gecmisKayitlari.map((g) => [g.tjkAtId, g.rowsJson as unknown as { finishPos: string; weight: string; jockey: string; surface: string; date: string; raceNo: string; city: string }[]]));
 
@@ -646,6 +655,7 @@ async function main() {
                 hizDerecesi: hizDerecesiHesapla(r.tjkAtId, race.breed, race.raceDay.date),
                 hpPuani: r.hp ?? 0,
                 zeminKatsayisi: zeminKatsayisiDeger,
+                zeminToleransi: zeminToleransiMap.get(r.name) ?? 0,
               });
             }
           })(), 25_000);
