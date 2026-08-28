@@ -443,4 +443,16 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
       "B=500 izole test (2026-08-27): agfPayi2 'diğer' segmentte anlamlı (nokta=-0.207, GA=[-0.366,-0.053]), top3 %64.8→%65.3, logloss 1.8409→1.8392. Düşük-şartta sınırda (GA=[-0.490,0.018]). Tam model retrain'de aynı katsayılar doğrulandı (nokta=-0.2071/-0.2139). Reddedilen alternatifler: AGF sırası 4-5 göstergesi (anlamlı ama top1/top3 kötüleşti), %40+ payı göstergesi (anlamsız). Ayrıca bu retrain'de h2hKiloDegisimi 'diğer' segmentte 'sınırda'dan 'anlamlı'ya yükseldi (GA=[0.011,0.166], daha fazla veriyle).",
     ],
   },
+  {
+    versiyon: "V5.26",
+    baslangic: new Date("2026-08-28T20:01:24+03:00"), // 01dd2df — zeminToleransi (23. özellik) eklendi
+    bitis: null,
+    aciklama: "KURAL İSTİSNASI: kullanıcı, İstanbul'un bugünkü Normal-dışı zemin durumunu (\"Çim: Yumuşak 3,6\") görünce zemin/pist konusunun analizde göz önüne alınıp alınmadığını sordu. İlk kontrol yalnız RaceDay.surfaceConditions'a bakıp yanlışlıkla \"n=3, yetersiz\" dedi — kullanıcı /admin/derece-istatistikleri sayfasını göstererek çok daha zengin bir arşivin (TjkDereceKaydi) zaten var olduğunu ve bunu kullanan hazır bir fonksiyonun (zemin-toleransi.actions.ts, 2026-08-23'te yazılmış ama hiç canlıya bağlanmamış) olduğunu gösterdi. Sinyal GÜNCEL/büyümüş veriyle (B=500, n=1059 koşu) yeniden test edildi — İKİ SEGMENTTE DE anlamsız çıktı (düşük-şart GA=[-0.114,0.207], diğer GA=[-0.077,0.105]). Bu sonuç kullanıcıya açıkça bildirildi ve AskUserQuestion ile \"yine de eklensin mi\" diye soruldu — kullanıcı test sonucunu bilerek \"evet, yine de ekle\" dedi. Bu, oturumun standart \"önce backtest, iyi çıkmazsa ekleme\" kuralının BİLİNÇLİ bir istisnasıdır.",
+    neyiAnalizEdiyor: [
+      "V5.25 ile AYNI segment-bazlı mimari/gösterim — 22 özellik 23'e çıktı (zeminToleransi eklendi), model 1059 yarışlık (>=2026-07-01) güncel veriyle yeniden eğitildi",
+    ],
+    caprazlamalar: [
+      "B=500/n=1059 test sonucu: düşük-şart nokta=-0.0020 GA=[-0.1136,0.2071] (sıfırı içeriyor), diğer nokta=0.0009 GA=[-0.0769,0.1051] (sıfırı içeriyor) — istatistiksel olarak anlamsız. Split-half güvenilirlik testi (2026-08-23, r=0.467, n=286) sinyalin at-bazlı GERÇEK/tekrarlanabilir olduğunu doğruluyor, ama bu V5'in mevcut 22 özelliğine ek bir tahmin gücü sağlamıyor. Handikap hizDerecesi=0/düşük-şart h2hNetSkor=0 override'ları (isim-bazlı idx() lookup) retrain sonrası 3 gerçek yarışta (bugünkü İstanbul Handikap, geçmiş bir Handikap, geçmiş bir Maiden) canlı doğrulandı, etkilenmedi.",
+    ],
+  },
 ];
