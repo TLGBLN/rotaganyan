@@ -11,6 +11,7 @@ import { galopQuality, isSameJockey } from "./src/components/program/panels/galo
 import { breedToIrk, surfaceToPist, mesafeBucket, normalizeSireName } from "./src/lib/sire-stat-match";
 import { finishPos } from "./src/lib/race-result";
 import { getJockeyStats, getTrainerStats } from "./src/server/services/race.service";
+import { zeminKatsayisi, zeminDetayiBul } from "./src/lib/methodology/mekanik-puanlama";
 import { writeFileSync, existsSync, readFileSync } from "fs";
 
 const GERCEK_OLMAYAN_HIPODROM_SLUGLARI = ["karma", "perak-malezya"];
@@ -206,6 +207,19 @@ export type ModelRow = {
   // 0 — kariyerStartSayisi gibi "dusuksart" segmentinde ayırt edici olmayacağı ama zarar da
   // vermeyeceği beklentisiyle.
   hpPuani: number;
+  // 2026-08-28 kullanıcı talebi ("çime bak, artık çekilsin") — RaceDay.surfaceConditions
+  // zaten ingest'te toplanıyordu ama Faz1/modele hiç aktarılmıyordu (bkz. mekanik-
+  // puanlama.ts §VII, eski V1-V22 matrisinde "Göreli kilo/zemin" bileşeni için vardı,
+  // V5'e hiç taşınmadı). GERÇEK bir backtest istendi ama denendi: 605 RaceDay'in
+  // TAMAMI tarandı, "Çim" alanı yalnız 51 günde dolu ve bunların 48'i BİREBİR AYNI sabit
+  // değer ("Normal 3,3") — yani şu ana kadar yalnız 3 GERÇEK farklı olay var (2× "Çok Ağır"
+  // Temmuz, 1× "Yumuşak" bugün). n=3 ile istatistiksel bir sonuç çıkarmak (B=500 bootstrap
+  // gerektiren diğer tüm sinyallerle tutarsız şekilde) yanlış-güven riski taşır — bu yüzden
+  // MODELE (toFeatureVector) HENÜZ EKLENMEDİ. Yalnız ham değer (zeminKatsayisi() — mevcut,
+  // canlıda kullanılmayan §VII fonksiyonu, 1.0/1.15/1.3) artık her koşu için kaydediliyor
+  // ki kış yağmurlarında/ileride "Normal-dışı" gün sayısı yeterli örnekleme ulaşınca GERÇEK
+  // bir B=500 testi yapılabilsin — geriye dönük backfill'e gerek kalmadan.
+  zeminKatsayisi: number;
 };
 
 async function main() {
@@ -213,7 +227,7 @@ async function main() {
     where: { result: { isNot: null }, raceDay: { hippodrome: { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI } } } },
     select: {
       id: true, classType: true, breed: true, distance: true, surface: true,
-      raceDay: { select: { date: true } },
+      raceDay: { select: { date: true, surfaceConditions: true } },
       result: { select: { actualOrder: true } },
       runners: {
         where: { scratched: false },
@@ -500,6 +514,12 @@ async function main() {
               (rr) => (rr.raceStyle as { style?: string } | null)?.style === "KACAK_AT"
             ).length;
 
+            const zeminDetayi = zeminDetayiBul(
+              race.raceDay.surfaceConditions as { label: string; detail: string }[] | null,
+              race.surface
+            );
+            const zeminKatsayisiDeger = zeminKatsayisi(zeminDetayi).katsayi;
+
             for (const r of runners) {
               const pos = actualOrder.indexOf(r.no) + 1;
               if (pos <= 0) continue;
@@ -625,6 +645,7 @@ async function main() {
                 h2hNetSkor: h2hNetSkorHesapla(r.name),
                 hizDerecesi: hizDerecesiHesapla(r.tjkAtId, race.breed, race.raceDay.date),
                 hpPuani: r.hp ?? 0,
+                zeminKatsayisi: zeminKatsayisiDeger,
               });
             }
           })(), 25_000);
