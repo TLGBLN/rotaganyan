@@ -61,11 +61,13 @@ export default async function RotaganyanSiralamasiPage({ searchParams }: PagePro
       ) : (
         // 2026-08-29 kullanıcı talebi: birden fazla hipodrom aynı gün koştuğunda hepsi
         // alt alta açık duruyordu (uzun kaydırma) — artık her hipodrom adı (Ankara/İzmir/
-        // Diyarbakır/Karma vb.) bir başlık, tıklanınca içeriği aşağı doğru açılıyor.
-        <Accordion type="single" collapsible defaultValue={visibleRaceDays[0]?.id} className="space-y-2">
+        // Diyarbakır/Karma vb.) bir başlık, tıklanınca içeriği aşağı doğru açılıyor. Kullanıcı
+        // talebiyle: ilk açılışta HEPSİ kapalı gelsin (defaultValue YOK) — hangisine
+        // tıklanırsa yalnız o açılır.
+        <Accordion type="single" collapsible className="space-y-2">
           {visibleRaceDays.map((rd) => (
-            <AccordionItem key={rd.id} value={rd.id} className="rounded-xl border px-4">
-              <AccordionTrigger className="text-base font-semibold hover:no-underline">
+            <AccordionItem key={rd.id} value={rd.id} className="rounded-xl border px-3 sm:px-4">
+              <AccordionTrigger className="text-sm sm:text-base font-semibold hover:no-underline">
                 {rd.hippodrome.name}
               </AccordionTrigger>
               <AccordionContent>

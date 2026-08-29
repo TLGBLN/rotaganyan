@@ -174,3 +174,16 @@ button:not(:disabled):active {
   60% { background: rgba(240, 217, 166, 0.16); height: 12px; box-shadow: none; }
 }
 
+/* ─── Accordion (Rotaganyan Sıralama Tablosu, 2026-08-29) ───────────────────
+   tw-animate-css'in varsayılan accordion-down/up'ı yalnız height animasyonu
+   yapıyordu (opaklık yok) — kullanıcı "çok zarif açılsın, beğenmedim" dedi.
+   Height + opacity birlikte, yumuşak bir "ease-out-expo" eğrisiyle. */
+@keyframes rota-accordion-down {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-accordion-content-height); opacity: 1; }
+}
+@keyframes rota-accordion-up {
+  from { height: var(--radix-accordion-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+
