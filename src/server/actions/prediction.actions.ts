@@ -21,6 +21,14 @@ export type PickInput = {
   details: Prisma.InputJsonValue;
   pedigreeRating: PedigreeRating;
   isTarget: boolean;
+  // 2026-08-29 — V6 Aşama 2 (bkz. plan): V5AnalysisPanel'in faz2V5Sirala çıktısından
+  // gönderdiği olasılık katmanları + o anki ham/standart vektör+katkılar dondurulmuş
+  // hâli. Hepsi opsiyonel — eski çağıranlar (parse-report, analysis-importer, manuel
+  // form) bunları hiç göndermez, Prisma tarafında zaten nullable.
+  probTop2?: number;
+  probTop3?: number;
+  marketBlindProb1?: number;
+  featureSnapshot?: Prisma.InputJsonValue;
 };
 
 type PredictionInput = {
@@ -259,6 +267,10 @@ export async function upsertPrediction(input: PredictionInput) {
             details: p.details,
             pedigreeRating: p.pedigreeRating,
             isTarget: p.isTarget,
+            probTop2: p.probTop2,
+            probTop3: p.probTop3,
+            marketBlindProb1: p.marketBlindProb1,
+            featureSnapshot: p.featureSnapshot,
           })),
         },
       },
@@ -286,6 +298,10 @@ export async function upsertPrediction(input: PredictionInput) {
             details: p.details,
             pedigreeRating: p.pedigreeRating,
             isTarget: p.isTarget,
+            probTop2: p.probTop2,
+            probTop3: p.probTop3,
+            marketBlindProb1: p.marketBlindProb1,
+            featureSnapshot: p.featureSnapshot,
           })),
         },
       },

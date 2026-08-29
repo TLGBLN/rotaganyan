@@ -23,6 +23,12 @@ type V5At = {
   teknikSira: number;
   karar: string;
   olasilik: number;
+  // 2026-08-29 — V6 Aşama 2 (bkz. plan): kayıtlı bir Pick'ten türetilen (savedPickToV5At)
+  // görünümde YOK — yalnız canlı /api/admin/test-v5-engine cevabında geliyor, bu yüzden
+  // opsiyonel. handleKaydet bunları PickInput'a taşır.
+  probTop2?: number;
+  probTop3?: number;
+  marketBlindProb1?: number;
   details: PickDetailsV2;
   tumSinyaller?: TumOzellikDetay[];
 };
@@ -223,6 +229,15 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
           details: a.details,
           pedigreeRating: "BILINMIYOR",
           isTarget: false,
+          // 2026-08-29 — V6 Aşama 2: probTop2/probTop3/marketBlindProb1 yalnız canlı
+          // ("canli") çalıştırmada dolu — "kayitli" kaynaktan (savedPickToV5At) gelen
+          // atlar bunları taşımaz, undefined olarak Prisma'nın nullable alanına gider
+          // (mevcut değeri SİLMEZ mi diye dikkat: bu zaten her kaydetmede picks
+          // deleteMany+create ile TAMAMEN yeniden yazılıyor, üzerine yazma riski yok).
+          probTop2: a.probTop2,
+          probTop3: a.probTop3,
+          marketBlindProb1: a.marketBlindProb1,
+          featureSnapshot: a.tumSinyaller ? { tumSinyaller: a.tumSinyaller, motorEtiketi } : undefined,
         };
       });
       const orijinalSira = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira).map((a) => a.no);

@@ -30,6 +30,9 @@ async function handlePost(req: NextRequest) {
     teknikSira: r.teknikSira,
     karar: r.karar,
     olasilik: r.olasilik,
+    probTop2: r.probTop2,
+    probTop3: r.probTop3,
+    marketBlindProb1: r.marketBlindProb1,
     details: muhakemeUretV5(r, sahaBuyuklugu),
     tumSinyaller: tumOzellikleriListele(r),
   }));

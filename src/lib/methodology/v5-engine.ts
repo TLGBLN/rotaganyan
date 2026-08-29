@@ -197,6 +197,16 @@ const WEIGHTS_DIGER_HANDIKAP: AgirlikSeti = {
   weights: WEIGHTS_DIGER.weights.map((w, i) => (i === HIZ_DERECESI_IDX ? 0 : w)),
 };
 
+// 2026-08-29 — V6 Aşama 2 (bkz. plan): "market-blind" skor için AGF-türevi özelliklerin
+// katkısını (katkilar dizisinden) çıkarmakta kullanılan indeksler — OZELLIK_GRUPLARI'ndeki
+// "AGF" grubuyla (aşağıda) BİREBİR aynı üç özellik, ayrı bir sabitte tutuluyor çünkü o grup
+// bu noktada henüz tanımlı değil (dosyanın altında).
+const AGF_KATKI_INDEKSLERI = [
+  FEATURE_NAMES.indexOf("agfSirasi"),
+  FEATURE_NAMES.indexOf("agfPayi"),
+  FEATURE_NAMES.indexOf("agfPayi2"),
+];
+
 // 2026-08-27: CURRENT_ENGINE_LABEL artık client-safe v5-engine-label.ts'te (bu dosya db
 // import ettiği için client bileşenlerinden doğrudan import edilemiyordu) — buradan
 // re-export ediliyor, mevcut importlar (test-v5-engine/route.ts vb.) DEĞİŞMEDİ.
@@ -647,14 +657,82 @@ const ASIRI_GUVEN_SICAKLIGI = 1.5;
 // DEĞİŞMEDİ (%21.6, 11/51 — sıcaklık sıralamayı korur, yalnız gösterilen yüzdeyi düzeltir).
 const ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP = 0.35;
 
-function softmax(scores: number[], liderEsigi = ASIRI_GUVEN_LIDER_ESIGI): number[] {
+// 2026-08-29 — V6 Aşama 2 (bkz. plan): softmax'ın içindeki sıcaklık-ölçeklendirme kararını
+// (lider zaten %70+/%35+ ise sıcaklığı uygula) dışarı çıkarır — SAF REFAKTOR, davranış
+// değişmedi (softmax artık bunu birebir çağırıyor). Amaç: yeni P(TOP2)/P(TOP3) hesabının
+// (plackettLuceTopKMarginals) AYNI etkin/sıcaklık-sonrası skor vektörünü kullanabilmesi —
+// yoksa k=1 durumu mevcut `olasilik`'le bit-bit eşleşmez.
+function effektifSkorlar(scores: number[], liderEsigi = ASIRI_GUVEN_LIDER_ESIGI): number[] {
   const ham = softmaxHam(scores);
-  if (Math.max(...ham) < liderEsigi) return ham;
-  return softmaxHam(scores.map((s) => s / ASIRI_GUVEN_SICAKLIGI));
+  if (Math.max(...ham) < liderEsigi) return scores;
+  return scores.map((s) => s / ASIRI_GUVEN_SICAKLIGI);
+}
+
+function softmax(scores: number[], liderEsigi = ASIRI_GUVEN_LIDER_ESIGI): number[] {
+  return softmaxHam(effektifSkorlar(scores, liderEsigi));
+}
+
+// 2026-08-29 — V6 Aşama 2: Plackett-Luce KESİN (Monte Carlo değil) top-k marjinal olasılığı.
+// Saha küçük olduğu için (≤~20-24 at) k≤3 için maliyet n*(n-1)*(n-2) mertebesinde, önemsiz.
+// Yöntem: sırayla "kim önde" olasılığını dağıt, o atı çıkarıp kalanları yeniden normalize et
+// (özyinelemeli kaldırma) — her atın topK[i]'si, o atın 1..k sıralarından HERHANGİ birinde
+// bitirme olasılıklarının toplamı. k=1 için topK[i], softmaxHam(scores)[i] ile BİREBİR aynı
+// çıkar (aynı ağırlıklar, tek adım) — bu birim testinde doğrulanıyor.
+export function plackettLuceTopKMarginals(scores: number[], k: number): number[] {
+  const n = scores.length;
+  const topK = new Array(n).fill(0);
+  if (n === 0 || k <= 0) return topK;
+
+  const max = Math.max(...scores);
+  const weights = scores.map((s) => Math.exp(s - max));
+  const kEtkin = Math.min(k, n);
+
+  function recurse(remaining: number[], remainingSum: number, pathProb: number, depth: number) {
+    if (depth >= kEtkin) return;
+    for (const i of remaining) {
+      const p = pathProb * (weights[i] / remainingSum);
+      topK[i] += p;
+      if (depth + 1 < kEtkin) {
+        recurse(
+          remaining.filter((j) => j !== i),
+          remainingSum - weights[i],
+          p,
+          depth + 1
+        );
+      }
+    }
+  }
+
+  recurse(
+    Array.from({ length: n }, (_, i) => i),
+    weights.reduce((a, b) => a + b, 0),
+    1,
+    0
+  );
+  return topK;
+}
+
+// 2026-08-29 — V6 Aşama 2: "piyasayı hiç görmeseydi model ne derdi" skoru. harmanliSkorla
+// zaten her özelliğin standart-vektör katkısını (katkilar) döndürüyor — AGF-türevi 3
+// özelliğin (agfSirasi/agfPayi/agfPayi2) katkısı toplam skordan çıkarılıp TÜM saha AYRICA
+// (kendi effektifSkorlar→softmaxHam hattından) yeniden normalize edilir. Favori
+// değişebileceği için bu `olasilik`'in basit bir ölçeklemesi DEĞİL, tam yeni bir softmax.
+export function marketBlindOlasiliklariHesapla(
+  skorlar: number[],
+  katkilarListesi: number[][],
+  liderEsigi: number
+): number[] {
+  const marketBlindSkorlar = skorlar.map(
+    (skor, i) => skor - AGF_KATKI_INDEKSLERI.reduce((toplam, idx) => toplam + katkilarListesi[i][idx], 0)
+  );
+  return softmaxHam(effektifSkorlar(marketBlindSkorlar, liderEsigi));
 }
 
 export type Faz1RunnerV5Sirali = Faz1RunnerV5 & {
   olasilik: number;
+  probTop2: number; // 2026-08-29 V6 Aşama 2 — Plackett-Luce kesin marjinal, olasilik'in basit bir çarpımı DEĞİL
+  probTop3: number;
+  marketBlindProb1: number; // 2026-08-29 V6 Aşama 2 — AGF-türevi katkılar çıkarılıp saha ayrıca normalize edilmiş P(WIN)
   standartVektor: number[];
   katkilar: number[]; // standartVektor[i] * WEIGHTS[i], her özelliğin bu attaki katkısı
   sinyalSayisi: number; // V4'ün 8-sinyal sayımı — terfi kapısı VE gerekçe metninde bilgi amaçlı
@@ -817,7 +895,17 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
   const setler = agirlikSetleriSec(faz1.race.classType);
   const harmanlar = faz1.runners.map((r) => harmanliSkorla(toFeatureVector(r), setler));
   const handikapMi = kategoriTespit(faz1.race.classType) === "2";
-  const probs = softmax(harmanlar.map((h) => h.skor), handikapMi ? ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP : ASIRI_GUVEN_LIDER_ESIGI);
+  const liderEsigi = handikapMi ? ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP : ASIRI_GUVEN_LIDER_ESIGI;
+  const skorlar = harmanlar.map((h) => h.skor);
+  const probs = softmax(skorlar, liderEsigi);
+  const etkinSkorlar = effektifSkorlar(skorlar, liderEsigi);
+  const top2Marjinal = plackettLuceTopKMarginals(etkinSkorlar, 2);
+  const top3Marjinal = plackettLuceTopKMarginals(etkinSkorlar, 3);
+  const marketBlindProbs = marketBlindOlasiliklariHesapla(
+    skorlar,
+    harmanlar.map((h) => h.katkilar),
+    liderEsigi
+  );
 
   const enriched = faz1.runners.map((r, i) => {
     const sinyal = hesaplaSinyalSayisi(
@@ -837,6 +925,9 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
     return {
       ...r,
       olasilik: probs[i],
+      probTop2: top2Marjinal[i],
+      probTop3: top3Marjinal[i],
+      marketBlindProb1: marketBlindProbs[i],
       standartVektor: harmanlar[i].standartVektor,
       katkilar: harmanlar[i].katkilar,
       sinyalSayisi: sinyal.sayi,
