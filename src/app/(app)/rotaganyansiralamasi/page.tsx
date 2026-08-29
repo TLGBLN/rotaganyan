@@ -7,6 +7,7 @@ import { syncResultsForDate } from "@/server/services/result-sync";
 import { turkeyDateString } from "@/lib/tz";
 import PuanTablosu from "@/components/kosular/PuanTablosu";
 import DateNavigator from "@/components/kosular/DateNavigator";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export const revalidate = 0;
 
@@ -40,7 +41,11 @@ export default async function RotaganyanSiralamasiPage({ searchParams }: PagePro
   }
 
   const raceDays = await getRaceDaysByDate(currentDate, undefined);
-  const visibleRaceDays = raceDays.filter((rd) => rd.races.length > 0);
+  // PuanTablosu, yayınlanmış+pick'li en az bir koşu yoksa null döner (bkz. o dosya) — accordion
+  // başlığı tıklanınca boş içerikle karşılaşılmasın diye aynı koşul burada da uygulanıyor.
+  const visibleRaceDays = raceDays.filter((rd) =>
+    rd.races.some((r) => r.prediction?.published && (r.prediction.picks?.length ?? 0) > 0)
+  );
 
   return (
     <div className="mx-auto max-w-[1400px] px-3 py-4 space-y-4">
@@ -54,11 +59,21 @@ export default async function RotaganyanSiralamasiPage({ searchParams }: PagePro
           Bu tarih için sıralama tablosu verisi bulunamadı.
         </div>
       ) : (
-        <div className="space-y-6">
+        // 2026-08-29 kullanıcı talebi: birden fazla hipodrom aynı gün koştuğunda hepsi
+        // alt alta açık duruyordu (uzun kaydırma) — artık her hipodrom adı (Ankara/İzmir/
+        // Diyarbakır/Karma vb.) bir başlık, tıklanınca içeriği aşağı doğru açılıyor.
+        <Accordion type="single" collapsible defaultValue={visibleRaceDays[0]?.id} className="space-y-2">
           {visibleRaceDays.map((rd) => (
-            <PuanTablosu key={rd.id} raceDay={rd} isLoggedIn={true} currentDate={currentDate} isAdmin={isAdmin} />
+            <AccordionItem key={rd.id} value={rd.id} className="rounded-xl border px-4">
+              <AccordionTrigger className="text-base font-semibold hover:no-underline">
+                {rd.hippodrome.name}
+              </AccordionTrigger>
+              <AccordionContent>
+                <PuanTablosu raceDay={rd} isLoggedIn={true} currentDate={currentDate} isAdmin={isAdmin} />
+              </AccordionContent>
+            </AccordionItem>
           ))}
-        </div>
+        </Accordion>
       )}
     </div>
   );
