@@ -360,13 +360,15 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                       %{(a.olasilik * 100).toFixed(1)}
                     </span>
                     {/* 2026-08-29 — V6 Aşama 2 (bkz. plan): yalnız QA amaçlı, admin-only —
-                        public gösterime henüz alınmadı, ayrı bir karar bekliyor. */}
+                        public gösterime henüz alınmadı, ayrı bir karar bekliyor. "körü"
+                        kullanıcı geri bildirimiyle "AGF'siz"e çevrildi — kendi başına
+                        anlaşılmıyordu (2026-08-29). */}
                     {a.probTop3 != null && (
                       <span
                         className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
-                        title="P(TOP2) / P(TOP3) / piyasa-körü P(WIN) — Plackett-Luce, yalnız QA"
+                        title="İlk2: ilk 2'ye girme olasılığı. İlk3: ilk 3'e girme olasılığı. AGF'siz: AGF/piyasa etkisi tamamen çıkarılıp yeniden hesaplanınca modelin bu ata verdiği kazanma olasılığı — piyasadan bağımsız, yalnız modelin kendi görüşü. Hepsi yalnız bilgi amaçlı, sıralamayı/kararı etkilemez."
                       >
-                        T2 %{((a.probTop2 ?? 0) * 100).toFixed(0)} · T3 %{((a.probTop3 ?? 0) * 100).toFixed(0)} · körü %
+                        İlk2 %{((a.probTop2 ?? 0) * 100).toFixed(0)} · İlk3 %{((a.probTop3 ?? 0) * 100).toFixed(0)} · AGF&apos;siz %
                         {((a.marketBlindProb1 ?? 0) * 100).toFixed(0)}
                       </span>
                     )}
