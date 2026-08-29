@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { syncAgfForDate } from "@/server/services/agf-sync";
 import { verifyCronRequest } from "@/lib/cron-auth";
+import { runChallengerShadowLog } from "@/server/services/challenger-shadow-log.service";
 
 // v6.69 — kullanıcı bulgusu 2026-08-09: çoklu şehir günlerinde (İstanbul+İzmir+Karma
 // aynı anda) sıralı işleme 60sn'yi aşıp cron'u sessizce (Vercel 504) başarısız kılıyordu —
@@ -16,6 +17,17 @@ export async function GET(req: NextRequest) {
   try {
     const result = await syncAgfForDate(new Date());
     const total = result.cities.reduce((s, c) => s + c.runnersUpdated, 0);
+
+    // 2026-08-29 — V6 Aşama 3 (bkz. plan): asalak ekleme deseni (sync-derece-ist/
+    // veri-denetimi emsali, 2026-08-25 — yeni cron path'leri Vercel'e hiç kaydolmayabiliyor)
+    // — ayrı /api/cron/challenger-shadow-log rotası da var ama buraya da güvenlik ağı
+    // olarak eklendi. Hata durumunda AGF senkronunu ASLA bloke etmez/başarısız kılmaz.
+    try {
+      await runChallengerShadowLog();
+    } catch (e) {
+      console.error("[agf-sync] challenger-shadow-log piggyback hatası (AGF senkronu etkilenmedi)", e);
+    }
+
     return NextResponse.json({ ...result, totalRunnersUpdated: total });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
