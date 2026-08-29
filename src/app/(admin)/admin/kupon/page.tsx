@@ -8,6 +8,7 @@ import { getHippodromes, buildKuponOnerisi, type KuponStatus } from "@/server/se
 import { getAdminRaceDays, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
 import { turkeyDateString } from "@/lib/tz";
 import DateNavigator from "@/components/kosular/DateNavigator";
+import ClassTypeAdviceCard from "@/components/admin/ClassTypeAdviceCard";
 import KuponForm from "./KuponForm";
 import KuponActions from "./KuponActions";
 import type { HomeKuponLegInput } from "@/server/actions/home-kupon.actions";
@@ -213,24 +214,8 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                                 ★ BANKO — tek at yeterli, bütçeyi diğer ayaklara kaydırın
                               </div>
                             )}
-                            {advice.oneri && (
-                              <div
-                                className={cn(
-                                  "mt-0.5 text-[10px] font-semibold leading-tight",
-                                  advice.level === "warn" && "text-miss",
-                                  advice.level === "good" && "text-hit",
-                                  advice.level === "info" && "text-brand"
-                                )}
-                              >
-                                → {advice.oneri}
-                              </div>
-                            )}
-                            <div
-                              className={cn(
-                                "mt-0.5 text-[10px] leading-tight text-muted-foreground/70"
-                              )}
-                            >
-                              {advice.text}
+                            <div className="mt-1">
+                              <ClassTypeAdviceCard advice={advice} classType={effectiveClassType} compact />
                             </div>
                           </td>
                           <td className="px-3 py-1.5 text-muted-foreground">{race.distance}m</td>

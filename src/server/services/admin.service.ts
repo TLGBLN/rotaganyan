@@ -714,7 +714,17 @@ export async function getPendingPredictions(): Promise<PendingPrediction[]> {
   }));
 }
 
-export type ClassTypeAdvice = { level: "warn" | "info" | "good" | "none"; text: string; oneri?: string };
+// 2026-08-30 kullanıcı talebi ("tam bir kılavuz olarak ver, verimli hale getir"):
+// tierYuzdeler, admin/kupon'daki tabloda önceden tek bir uzun/kesilen cümleye
+// sıkıştırılan Eko/Nor/Geniş dağılımını görsel bir orantı çubuğu olarak çizebilmek
+// için — text/oneri (mevcut serbest metin, ClassTypeAdviceCard'ın tek başına
+// analiz sayfasında zaten kullandığı) DEĞİŞMEDİ, yalnız EK bir yapılandırılmış alan.
+export type ClassTypeAdvice = {
+  level: "warn" | "info" | "good" | "none";
+  text: string;
+  oneri?: string;
+  tierYuzdeler?: { eko: number; nor: number; genis: number; kacti: number; toplam: number };
+};
 
 /** Wilson skor aralığı (normal yaklaşımdan farklı olarak küçük n'de ve uç oranlarda
  *  (%0'a/%100'e yakın) çökmüyor) — bir oranın %95 güven aralığını verir. */
@@ -830,6 +840,7 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string): Clas
       level: tierSeviye(tier),
       text: `${darMetin} (${tier.total} koşu) · 1. seçim 1. geldi: ${isabet}`,
       oneri: tierOneri(tier),
+      tierYuzdeler: { eko: tier.ekonomik, nor: tier.normal, genis: tier.genis, kacti: tier.kacti, toplam: tier.total },
     };
   }
 
@@ -839,7 +850,12 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string): Clas
     const grupIsabet = `%${grupBreakdown.rate.toFixed(0)} (${grupBreakdown.hits}/${grupBreakdown.total})`;
     const grupMetin = `[${grupAdi}] ${tierYuzdeMetni(grupTier, false)} (${grupTier.total} koşu) · 1. seçim 1. geldi: ${grupIsabet}`;
     const text = darMetin ? `${grupMetin} — bu alt-tür (${normalized}): ${darMetin}` : grupMetin;
-    return { level: tierSeviye(grupTier), text, oneri: tierOneri(grupTier) };
+    return {
+      level: tierSeviye(grupTier),
+      text,
+      oneri: tierOneri(grupTier),
+      tierYuzdeler: { eko: grupTier.ekonomik, nor: grupTier.normal, genis: grupTier.genis, kacti: grupTier.kacti, toplam: grupTier.total },
+    };
   }
 
   // Ne dar sınıf ne üst grup yeterli veri taşıyor — dürüstçe "veri yok" de.
