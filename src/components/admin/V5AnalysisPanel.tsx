@@ -359,6 +359,17 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                     <span className="rounded-full bg-purple-500/15 px-2 py-0.5 font-mono text-[11px] text-purple-600">
                       %{(a.olasilik * 100).toFixed(1)}
                     </span>
+                    {/* 2026-08-29 — V6 Aşama 2 (bkz. plan): yalnız QA amaçlı, admin-only —
+                        public gösterime henüz alınmadı, ayrı bir karar bekliyor. */}
+                    {a.probTop3 != null && (
+                      <span
+                        className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
+                        title="P(TOP2) / P(TOP3) / piyasa-körü P(WIN) — Plackett-Luce, yalnız QA"
+                      >
+                        T2 %{((a.probTop2 ?? 0) * 100).toFixed(0)} · T3 %{((a.probTop3 ?? 0) * 100).toFixed(0)} · körü %
+                        {((a.marketBlindProb1 ?? 0) * 100).toFixed(0)}
+                      </span>
+                    )}
                   </div>
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => moveManual(no, -1)} disabled={i === 0}>
