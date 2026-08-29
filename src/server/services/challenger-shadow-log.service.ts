@@ -47,7 +47,7 @@ export async function runChallengerShadowLog(now: Date = new Date()): Promise<Ch
       const championOzet = ozetle(faz2V5Sirala(faz1));
 
       for (const def of CHALLENGER_REGISTRY) {
-        const challengerOzet = ozetle(def.scoreFn(faz1));
+        const challengerOzet = ozetle(await def.scoreFn(faz1));
         await db.challengerRun.upsert({
           where: { raceId_challengerKey: { raceId: race.id, challengerKey: def.key } },
           create: {
