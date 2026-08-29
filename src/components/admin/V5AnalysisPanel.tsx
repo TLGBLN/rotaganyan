@@ -29,6 +29,12 @@ type V5At = {
   probTop2?: number;
   probTop3?: number;
   marketBlindProb1?: number;
+  // 2026-08-30 — B katmanı (bkz. plan: A/B/C Sinyal Katmanlama Mimarisi). "Tüm 12 Sinyal"
+  // paneli yalnız A katmanını (12 özellik) listeler — B katmanı (şimdilik sireOrani/
+  // düşük-şart) ORADA GÖRÜNMÜYOR, kullanıcı bunu fark edip sordu. Bu iki alan o boşluğu
+  // dolduruyor: bu atta B katmanı fiilen uygulandı mı ve sireOrani'nin ham değeri neydi.
+  bKatmaniUygulandiMi?: boolean;
+  sireOrani?: number;
   details: PickDetailsV2;
   tumSinyaller?: TumOzellikDetay[];
 };
@@ -373,6 +379,16 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                         {((a.marketBlindProb1 ?? 0) * 100).toFixed(0)}
                       </span>
                     )}
+                    {/* 2026-08-30 — B katmanı görünürlüğü: "Tüm 12 Sinyal" paneli B
+                        katmanını içermiyor, bu yüzden ayrı bir rozet gerekiyor. */}
+                    {a.bKatmaniUygulandiMi && (
+                      <span
+                        className="rounded-full bg-amber-500/15 px-2 py-0.5 font-mono text-[10px] text-amber-600"
+                        title="B katmanı (kanıtsız ama kullanıcı kararıyla eklenen istisna) bu atta uygulandı — mevcut 12 özellikten AYRI, düşük-şart'a özel bir terim olarak skora eklendi."
+                      >
+                        B: sireOrani ({(a.sireOrani ?? 0).toFixed(1)})
+                      </span>
+                    )}
                   </div>
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => moveManual(no, -1)} disabled={i === 0}>
@@ -409,7 +425,9 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                       className="flex items-center gap-1 text-[11px] font-medium text-purple-500 hover:underline"
                     >
                       {acikDetay.has(no) ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                      Tüm {a.tumSinyaller.length} Sinyal — Denetim Kaydı ({a.tumSinyaller.length}/{a.tumSinyaller.length} hesaplandı)
+                      Tüm {a.tumSinyaller.length} Sinyal{a.bKatmaniUygulandiMi ? " + B Katmanı" : ""} — Denetim Kaydı ({a.tumSinyaller.length}
+                      {a.bKatmaniUygulandiMi ? "+1" : ""}/{a.tumSinyaller.length}
+                      {a.bKatmaniUygulandiMi ? "+1" : ""} hesaplandı)
                     </button>
                     {acikDetay.has(no) && (
                       <div className="mt-1.5 overflow-x-auto">
@@ -433,10 +451,26 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                                 </td>
                               </tr>
                             ))}
+                            {/* 2026-08-30 — B katmanı bu tabloda AYRI bir satır olarak
+                                gösteriliyor, A katmanının 12 özelliğiyle karışmasın diye
+                                amber renkte işaretli. bAgirlikOrani/katsayı/standardizasyon
+                                v5-engine.ts'teki B_SIREORANI_* sabitleriyle BİREBİR aynı —
+                                değişirse burası da güncellenmeli. */}
+                            {a.bKatmaniUygulandiMi && (
+                              <tr className="border-t border-amber-500/30 bg-amber-500/5">
+                                <td className="py-1 pr-2 text-amber-600">Sire Oranı (B katmanı)</td>
+                                <td className="py-1 pr-2 font-mono text-amber-600/80">{(a.sireOrani ?? 0).toFixed(2)}</td>
+                                <td className="py-1 pr-2 font-mono text-amber-600/80">{(((a.sireOrani ?? 0) - 11.6305) / 3.6563).toFixed(2)}</td>
+                                <td className="py-1 font-mono text-amber-600">
+                                  {(((((a.sireOrani ?? 0) - 11.6305) / 3.6563) * 0.0477) >= 0 ? "+" : "")}
+                                  {((((a.sireOrani ?? 0) - 11.6305) / 3.6563) * 0.0477).toFixed(3)}
+                                </td>
+                              </tr>
+                            )}
                           </tbody>
                         </table>
                         <p className="mt-1 text-[10px] text-muted-foreground/70">
-                          Bu tablo, gerekçe metninde eşik altı kaldığı için görünmeyen sinyalleri de gösterir — modelin her at için 18 özelliğin TAMAMINI hesapladığının kanıtıdır.
+                          Bu tablo, gerekçe metninde eşik altı kaldığı için görünmeyen sinyalleri de gösterir — modelin her at için A katmanının {a.tumSinyaller.length} özelliğinin TAMAMINI hesapladığının kanıtıdır{a.bKatmaniUygulandiMi ? " (B katmanı ayrı satırda, amber renkte)" : ""}.
                         </p>
                       </div>
                     )}
