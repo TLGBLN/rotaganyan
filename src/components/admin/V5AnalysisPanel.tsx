@@ -360,15 +360,16 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                       %{(a.olasilik * 100).toFixed(1)}
                     </span>
                     {/* 2026-08-29 — V6 Aşama 2 (bkz. plan): yalnız QA amaçlı, admin-only —
-                        public gösterime henüz alınmadı, ayrı bir karar bekliyor. "körü"
-                        kullanıcı geri bildirimiyle "AGF'siz"e çevrildi — kendi başına
-                        anlaşılmıyordu (2026-08-29). */}
+                        public gösterime henüz alınmadı, ayrı bir karar bekliyor. Kullanıcı
+                        "T2/T3/körü" VE ardından "AGF'siz %18" kısaltmalarının kendi başına
+                        anlaşılmadığını belirtti (2026-08-29) — artık her rakamın ne olduğu
+                        tam kelimelerle, tooltip'e bakmaya gerek kalmadan yazılıyor. */}
                     {a.probTop3 != null && (
                       <span
                         className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
-                        title="İlk2: ilk 2'ye girme olasılığı. İlk3: ilk 3'e girme olasılığı. AGF'siz: AGF/piyasa etkisi tamamen çıkarılıp yeniden hesaplanınca modelin bu ata verdiği kazanma olasılığı — piyasadan bağımsız, yalnız modelin kendi görüşü. Hepsi yalnız bilgi amaçlı, sıralamayı/kararı etkilemez."
+                        title="Bu üçü de yalnız bilgi amaçlı — sıralamayı/kararı ETKİLEMEZ. İlk 2'ye/3'e girme olasılığı: at yarışı bitince ilk 2 ya da ilk 3 içinde olma ihtimali (yalnız kazanma değil). AGF'siz kazanma ihtimali: AGF (bahis payı/piyasa favorisi) bilgisi TAMAMEN çıkarılıp yeniden hesaplanırsa modelin bu ata vereceği kazanma olasılığı — yani piyasa bu atı hiç tanımasaydı model ne düşünürdü."
                       >
-                        İlk2 %{((a.probTop2 ?? 0) * 100).toFixed(0)} · İlk3 %{((a.probTop3 ?? 0) * 100).toFixed(0)} · AGF&apos;siz %
+                        İlk 2&apos;ye girme: %{((a.probTop2 ?? 0) * 100).toFixed(0)} · İlk 3&apos;e girme: %{((a.probTop3 ?? 0) * 100).toFixed(0)} · AGF&apos;siz kazanma: %
                         {((a.marketBlindProb1 ?? 0) * 100).toFixed(0)}
                       </span>
                     )}
