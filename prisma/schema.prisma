@@ -198,11 +198,12 @@ model Race {
   analysisStatus    String    @default("IDLE")
   analysisClaimedAt DateTime?
 
-  raceDay      RaceDay       @relation(fields: [raceDayId], references: [id], onDelete: Cascade)
-  runners      Runner[]
-  prediction   Prediction?
-  result       Result?
-  accuraceRace AccuraceRace?
+  raceDay        RaceDay         @relation(fields: [raceDayId], references: [id], onDelete: Cascade)
+  runners        Runner[]
+  prediction     Prediction?
+  result         Result?
+  accuraceRace   AccuraceRace?
+  challengerRuns ChallengerRun[]
 
   @@unique([raceDayId, raceNo])
 }
@@ -419,10 +420,50 @@ model Pick {
   pedigreeRating PedigreeRating @default(BILINMIYOR)
   isTarget       Boolean        @default(false)
 
+  // 2026-08-28 — V6 mimarisi (bkz. plan): P(WIN) zaten `score`'da (olasilik*100) donuyordu,
+  // ama P(TOP2)/P(TOP3) hic modellenmiyordu (top3 yalnizca "ilk 3 siralamada mi" seklinde
+  // TURETILIYORDU, kendi basina kalibre edilmis bir olasilik degildi). Plackett-Luce
+  // ozyinelemeli kaldirma formuluyle, MEVCUT/zaten canli 12-ozellikli modelin ustune saf
+  // matematikle hesaplaniyor - yeni egitim/veri gerektirmiyor. marketBlindProb1, AGF-turevi
+  // ozelliklerin katkisi cikarilip TUM sahanin AYRICA softmax'tan gecirilmesiyle bulunan
+  // "piyasayi hic gormeseydi ne derdi" skoru. featureSnapshot, kaydedilme anindaki ham/
+  // standart vektor + katkilar + kullanilan agirlik seti - gelecekte bu tahmini yeniden
+  // degerlendirmek icin CANLI veriyi tekrar cekmeye gerek kalmasin diye (bugun ogrenildi:
+  // canli yeniden-hesaplama AGF'nin zamanla degismesi yuzunden guvenilmez, bkz. memory).
+  // Hepsi nullable/additive - eski Pick'ler etkilenmez, assertPublishSafe DEGISMEDI.
+  probTop2         Float?
+  probTop3         Float?
+  marketBlindProb1 Float?
+  featureSnapshot  Json?
+
   prediction Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
   runner     Runner?    @relation(fields: [runnerId], references: [id])
 
   @@unique([predictionId, rank])
+}
+
+// 2026-08-28 — V6 champion/challenger altyapisi (bkz. plan). Prediction/Pick'e KASITLI
+// olarak HIC dokunmuyor - bu yuzden yapisal olarak assertPublishSafe'i/published durumunu
+// asla etkileyemez. Bir challenger (yeni ozellik/model varyanti denemesi) her gece,
+// sonucu henuz gelmemis koşular icin SESSIZCE calisip kendi tahminini + o anki canli
+// (champion) tahmini birlikte dondurur - hicbir kullaniciya/admin'e gosterilmez. Yeterli
+// ornek (~250-300 sonuclanmis golge-kosu, bugunku Handikap n=307-yetersiz dersiyle
+// tutarli) birikince B=500 bootstrap FARK testiyle degerlendirilir, terfi HER ZAMAN elle.
+model ChallengerRun {
+  id               String    @id @default(cuid())
+  raceId           String
+  challengerKey    String // ör. "v6-agfblind-test" - hangi deneme/varyant oldugunu isaretler
+  computedAt       DateTime  @default(now())
+  faz1Snapshot     Json // gatherFaz1V5 ciktisinin o anki dondurulmus hali
+  championSnapshot Json // AYNI anda dondurulmus canli (mevcut/champion) faz2V5Sirala ciktisi
+  challengerOutput Json // challenger'in kendi sirali/olasilik ciktisi
+  raceDayDate      DateTime // ucuz sorgulama icin denormalize
+  evaluatedAt      DateTime?
+
+  race Race @relation(fields: [raceId], references: [id], onDelete: Cascade)
+
+  @@unique([raceId, challengerKey])
+  @@index([challengerKey, evaluatedAt])
 }
 
 // ─── RESULT ───────────────────────────────────────────────────────────────────
