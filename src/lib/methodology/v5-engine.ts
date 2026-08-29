@@ -733,6 +733,7 @@ export type Faz1RunnerV5Sirali = Faz1RunnerV5 & {
   probTop2: number; // 2026-08-29 V6 Aşama 2 — Plackett-Luce kesin marjinal, olasilik'in basit bir çarpımı DEĞİL
   probTop3: number;
   marketBlindProb1: number; // 2026-08-29 V6 Aşama 2 — AGF-türevi katkılar çıkarılıp saha ayrıca normalize edilmiş P(WIN)
+  bKatmaniUygulandiMi: boolean; // 2026-08-30 — sireOrani/B katmanı bu atta uygulandı mı (yalnız düşük-şart)
   standartVektor: number[];
   katkilar: number[]; // standartVektor[i] * WEIGHTS[i], her özelliğin bu attaki katkısı
   sinyalSayisi: number; // V4'ün 8-sinyal sayımı — terfi kapısı VE gerekçe metninde bilgi amaçlı
@@ -891,12 +892,50 @@ function derinLongshotDuzelt<T extends { no: number; agfSirasi: number }>(sirali
   return kopya;
 }
 
+// 2026-08-29/30 — "B katmanı" (bkz. plan: A/B/C Sinyal Katmanlama Mimarisi). sireOrani
+// bugün 8 aday arasında en güçlü göründü ama KALICI araçla (n=1060, segment-bazlı, gerçek
+// train/test) yeniden test edilince düşük-şart'ta da anlamsız çıktı (nokta=0.0477,
+// GA=[-0.1352,0.2045]). Kullanıcı KARARIYLA (zeminToleransi emsaliyle, AYNI oturumda
+// AskUserQuestion ile teyit alındı) yine de düşük-şart'a ÖZEL, mevcut 12-özellikli A
+// katmanına KARIŞMADAN (13. terim olarak yeniden fit EDİLMEDEN — bu, bugün 7/8 adayda
+// "küçük örneklemde güç kaybı" sorununa yol açan yöntemdi) ayrı bir katman olarak eklendi.
+// Katsayı, bugünün gerçek düşük-şart eğitiminden (nokta tahmini, kanıtsız ama KEYFİ
+// DEĞİL) alındı. Ortalama/sapma, model-veri.json'daki düşük-şart runner satırlarından
+// (n=10612) tek seferlik hesaplandı — WEIGHTS_DUSUK_SART.means/stds ile AYNI kaynak,
+// yalnız sireOrani A katmanının dışında tutulduğu için ayrı sabitlendi.
+const B_SIREORANI_KATSAYI = 0.0477;
+const B_SIREORANI_ORTALAMA = 11.6305;
+const B_SIREORANI_SAPMA = 3.6563;
+
+/** Bir koşunun düşük-şart ağırlığı — agirlikSetleriSec ile AYNI mantık (saf düşük-şart=1,
+ *  hibrit Maiden/Satış=0.5 [harmanliSkorla'nın kendi ortalamasıyla tutarlı], diğer=0). */
+function bAgirlikOrani(classType: string): number {
+  if (hibritMaidenSatisMi(classType)) return 0.5;
+  const kategori = kategoriTespit(classType);
+  return kategori === "1a" || kategori === "1b" ? 1 : 0;
+}
+
+/** B katmanını (şimdilik yalnız sireOrani/düşük-şart) softmax'a girmeden ÖNCE skora ekler.
+ *  softmax(skor+Δ) ∝ softmax(skor)×exp(Δ) olduğu için bu, "olasılığı çarpmak" ile
+ *  matematiksel olarak AYNI şey — ama A'nın kendi regresyonuna karışmadan, ayrı kalibre
+ *  edilmiş bir terim olarak. Diğer/Handikap koşularında oran=0, skor BİREBİR değişmez. */
+function bKatmaniUygula(skorlar: number[], runners: Faz1RunnerV5[], classType: string): { skorlar: number[]; uygulandi: boolean[] } {
+  const oran = bAgirlikOrani(classType);
+  if (oran === 0) return { skorlar, uygulandi: runners.map(() => false) };
+  const yeniSkorlar = skorlar.map((skor, i) => {
+    const standartSireOrani = (runners[i].sireOrani - B_SIREORANI_ORTALAMA) / B_SIREORANI_SAPMA;
+    return skor + oran * B_SIREORANI_KATSAYI * standartSireOrani;
+  });
+  return { skorlar: yeniSkorlar, uygulandi: runners.map(() => true) };
+}
+
 export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
   const setler = agirlikSetleriSec(faz1.race.classType);
   const harmanlar = faz1.runners.map((r) => harmanliSkorla(toFeatureVector(r), setler));
   const handikapMi = kategoriTespit(faz1.race.classType) === "2";
   const liderEsigi = handikapMi ? ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP : ASIRI_GUVEN_LIDER_ESIGI;
-  const skorlar = harmanlar.map((h) => h.skor);
+  const skorlarHam = harmanlar.map((h) => h.skor);
+  const { skorlar, uygulandi: bKatmaniUygulandi } = bKatmaniUygula(skorlarHam, faz1.runners, faz1.race.classType);
   const probs = softmax(skorlar, liderEsigi);
   const etkinSkorlar = effektifSkorlar(skorlar, liderEsigi);
   const top2Marjinal = plackettLuceTopKMarginals(etkinSkorlar, 2);
@@ -928,6 +967,7 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
       probTop2: top2Marjinal[i],
       probTop3: top3Marjinal[i],
       marketBlindProb1: marketBlindProbs[i],
+      bKatmaniUygulandiMi: bKatmaniUygulandi[i],
       standartVektor: harmanlar[i].standartVektor,
       katkilar: harmanlar[i].katkilar,
       sinyalSayisi: sinyal.sayi,

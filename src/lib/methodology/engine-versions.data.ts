@@ -458,13 +458,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.27",
     baslangic: new Date("2026-08-28T22:28:55+03:00"), // 552cdbe — katkısız 11 sinyal silindi (23->12 özellik)
-    bitis: null,
+    bitis: new Date("2026-08-30T00:00:23+03:00"), // B katmanı (sireOrani/düşük-şart) eklendi
     aciklama: "Kullanıcı talebi (\"23 sinyali en verimli nasıl kullanırız, katkısı olmayanları sil\"): B=500'de İKİ segmentte de %95 GA'sı sıfırı içeren 11 özellik (accurace, formEgimi, formEgimi2, kgs, kgs2, pistUzmani, sireOrani, galop, uzunAraGalopKatkisi, agfYukselisVarMi, agfDususVarMi) toFeatureVector'dan çıkarıldı. Gerekçe: projenin bir sinyali EKLEMEK için kullandığı baraj hep 'kendi katkısı B=500'de kanıtlandı mı' idi (agfPayi2, h2hKiloDegisimi hep böyle eklendi) — aynı barajı çıkarmaya da simetrik uygulamak tutarlıydı. Karar öncesi üç aşamalı doğrulama yapıldı (kullanıcının 'emin misin/detaylıca analiz ettin mi' itirazları üzerine): (1) tek %75/25 bölünme, (2) 4-parçalı walk-forward, (3) B=500 bootstrap FARK testi (aynı resample'la hem tam hem budanmış model eğitilip kıyaslandı) — hem top1/top3 hem logloss için ayrı ayrı.",
     neyiAnalizEdiyor: [
       "V5.26 ile AYNI segment-bazlı mimari/gösterim — 23 özellik 12'ye indi (11 kanıtlanmamış sinyal çıkarıldı), model aynı 1059 yarışlık pencerede yeniden eğitildi",
     ],
     caprazlamalar: [
       "B=500 bootstrap FARK testi (Budanmış-Tam, aynı resample): top1 farkı düşük-şart ortalama+2.74pp GA=[-2.90,8.70] (sıfırı içeriyor), diğer ortalama+0.15pp GA=[-3.06,3.57] (sıfırı içeriyor) — top1/top3'te fark KANITLANAMADI ama yön tutarlı pozitif (zarar yok). logloss farkı düşük-şart ortalama-0.0598 GA=[-0.1389,-0.0067] SIFIRI DIŞLIYOR (✓ anlamlı iyileşme), diğer ortalama-0.0235 GA=[-0.0853,0.0057] (sıfıra çok yakın, kanıtlanamadı ama yön aynı). Handikap hizDerecesi=0/düşük-şart h2hNetSkor=0 override'ları (isim-bazlı idx() lookup, 12 özelliğe küçülen dizide adları hâlâ var) retrain sonrası 2 gerçek yarışta canlı doğrulandı, etkilenmedi. Ham 11 alan veri toplama pipeline'ında hâlâ toplanıyor, silinmedi.",
+    ],
+  },
+  {
+    versiyon: "V5.28",
+    baslangic: new Date("2026-08-30T00:00:23+03:00"),
+    bitis: null,
+    aciklama: "Kullanıcı talebi (\"en baştan sinyal araştır\"): dün silinen 11 sinyal V5 penceresinde (249-253 koşu) B=500 MODEL-FARKI testiyle tek tek yeniden denendi. 7'si (accurace, formEgimi+formEgimi2, kgs+kgs2, pistUzmani, galop, agfYukselisVarMi+agfDususVarMi) yine katkısız çıktı — VIF kontrolü (hepsi 1.0-1.2) bunun 'A katmanı tarafından zaten yakalanmış olma' değil, küçük örneklemde güç yetersizliği olduğunu gösterdi. sireOrani ilk testte güçlü çıktı (top3 +6.9pp, GA sıfırı dışlıyor, hem in-sample hem gerçek train/test'te) ama KALICI araçla (n=1060, segment bazlı, gerçek train/test) yeniden test edilince HEM düşük-şart HEM diğer'de anlamsız çıktı (düşük-şart nokta=0.0477 GA=[-0.1352,0.2045]) — küçük örneklemin yanıltıcı olduğu bir örnek daha. Kullanıcı KARARIYLA (zeminToleransi emsaliyle, AskUserQuestion ile teyit edildi) sireOrani yine de düşük-şart'a özel bir 'B katmanı' olarak eklendi — AMA A'nın 12-özellikli regresyonuna 13. terim olarak DEĞİL: softmax'a girmeden önce skora ayrı, bağımsız kalibre edilmiş bir terim olarak (bkz. v5-engine.ts bKatmaniUygula). Bu, V6 vizyonundaki 'A/B/C katmanlama' mimarisinin ilk somut uygulaması.",
+    neyiAnalizEdiyor: [
+      "A katmanı (mevcut 12 özellik, kendi regresyonu) HİÇ değişmedi — yalnız düşük-şart koşularda skora softmax öncesi küçük bir B katmanı terimi (sireOrani, katsayı=0.0477, düşük-şart popülasyon ortalama=11.6305/sapma=3.6563 ile standardize) ekleniyor. Diğer/Handikap koşularında oran=0, skor/olasılık BİREBİR V5.27 ile aynı.",
+    ],
+    caprazlamalar: [
+      "8 aday V5 penceresinde (n=249-253) B=500 model-farkı testiyle tek tek denendi — tam sonuçlar sinyal-kutugu.service.ts'in arşiv yorumunda. sireOrani'nin düşük-şart katsayısı (0.0477) kalıcı aracın (arac-model-egit-segment.mjs, n=1060, gerçek %75/25 train/test) GERÇEK nokta tahmininden alındı — kanıtsız ama keyfi değil. B katmanı uygulanmadığı (diğer/Handikap) koşularda bKatmaniUygulandiMi=false doğrulandı (gerçek race verisiyle), P(TOP2)/P(TOP3)/piyasa-körü skor birim testleri (v5-engine.test.ts) B katmanından bağımsız geçmeye devam ediyor.",
     ],
   },
 ];

@@ -54,13 +54,39 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
   // kuralının açık bir istisnası — diğer tüm satırlardan farklı olarak. 11 sinyal silinirken
   // özellikle KORUNMASI istendi.
   { ad: "Zemin Toleransı (İSTİSNA — anlamsız test sonucuna rağmen eklendi)", kod: "zeminToleransi", dusukSart: { katsayi: 0.008, durum: "anlamsiz" }, diger: { katsayi: 0.0002, durum: "anlamsiz" }, aciklama: "Atın Normal-dışı (ıslak/ağır/yumuşak) pistteki geçmiş göreli performansı (TjkDereceKaydi arşivi). At-bazlı gerçek/tekrarlanabilir bir özellik (split-half r=0.467) ama V5'in tahmin doğruluğuna ölçülebilir katkısı yok." },
+  // 2026-08-30 — B KATMANI (bkz. plan: A/B/C Sinyal Katmanlama Mimarisi). zeminToleransi
+  // ile AYNI türden bir istisna (AskUserQuestion ile teyit edildi) AMA farklı MEKANİZMA:
+  // mevcut 12-özellikli (A katmanı) doğrusal regresyona 13. terim olarak yeniden fit
+  // EDİLMEDİ (bu, aynı gece 7/8 adayda "küçük örneklemde güç kaybı" sorununa yol açmıştı)
+  // — softmax'a girmeden ÖNCE skora ayrı, bağımsız kalibre edilmiş bir terim olarak
+  // eklendi (bkz. v5-engine.ts bKatmaniUygula). Yalnız düşük-şart'ta aktif, diğer/
+  // Handikap'ta katsayısı fiilen 0 (skor birebir A katmanıyla aynı kalır).
+  {
+    ad: "Sire Oranı (B KATMANI — düşük-şart istisnası, kanıtsız ama kullanıcı kararıyla aktif)",
+    kod: "sireOrani",
+    dusukSart: { katsayi: 0.0477, durum: "anlamsiz", not: "Kalıcı araçla (n=1060, gerçek train/test) GA=[-0.1352,0.2045] — sıfırı içeriyor. Katsayı yine de bu gerçek eğitimden alındı, keyfi değil." },
+    diger: { katsayi: 0, durum: "veri-yok", not: "B katmanı diğer/Handikap'ta hiç uygulanmıyor, oran=0." },
+    aciklama: "Aygırın kazanma oranı (shrink edilmiş). 5 farklı yöntemle (tek-değişkenli, VIF, model-farkı) test edildi, hiçbirinde A katmanına (12 özellik) kanıtlanmış bir katkı bulunamadı — yine de kullanıcı at yetiştiriciliğinin gerçek bir faktör olduğuna inanıyor, düşük-şart'a özel küçük bir B katmanı itmesi olarak eklendi.",
+  },
 ];
 
-// 2026-08-28 — SİLİNEN 11 sinyal (arşiv amaçlı, artık toFeatureVector'da değil): accurace,
-// formEgimi, formEgimi2, kgs (ham), kgs2, pistUzmani, sireOrani, galop, uzunAraGalopKatkisi,
-// agfYukselisVarMi, agfDususVarMi. Hepsi B=500'de İKİ segmentte de GA sıfırı içeriyordu.
-// Ham alanlar Faz1RunnerV5/arac-model-veri-olustur.mts'de hâlâ toplanıyor (maliyetsiz),
-// yalnız skorlamadan çıkarıldı — ileride farklı formülasyonla yeniden test edilebilir.
+// 2026-08-28 — SİLİNEN 11 sinyal (arşiv amaçlı, artık toFeatureVector'da/A katmanında
+// değil): accurace, formEgimi, formEgimi2, kgs (ham), kgs2, pistUzmani, galop,
+// uzunAraGalopKatkisi, agfYukselisVarMi, agfDususVarMi. Hepsi B=500'de İKİ segmentte de
+// GA sıfırı içeriyordu. Ham alanlar Faz1RunnerV5/arac-model-veri-olustur.mts'de hâlâ
+// toplanıyor (maliyetsiz), yalnız skorlamadan çıkarıldı — ileride farklı formülasyonla
+// yeniden test edilebilir. (sireOrani bu listeden 2026-08-30'da B katmanı istisnası
+// olarak çıkarıldı — yukarıdaki CANLI_SINYALLER girdisine bakınız.)
+//
+// 2026-08-29/30 — Bu 11 sinyal, "en baştan sinyal araştır" talebiyle V5 penceresinde
+// (249-253 koşu) B=500 MODEL-FARKI testiyle TEKRAR denendi: 7'si (accurace, formEgimi+2,
+// kgs+2, pistUzmani, galop, agfYukselisVarMi+agfDususVarMi) yine katkısız çıktı — ama VIF
+// kontrolüyle bunun "A katmanı tarafından zaten yakalanmış olma" değil, küçük örneklemde
+// (n≈251) güç yetersizliği olduğu netleşti (hepsi VIF 1.0-1.2, neredeyse tam bağımsız).
+// uzunAraGalopKatkisi küçük ama gerçek bir logloss-only etki gösterdi (henüz B katmanına
+// eklenmedi, izlemede). sireOrani ilk testte güçlü çıktı (top3 +6.9pp, GA sıfırı dışlıyor)
+// ama kalıcı araçla (n=1060, gerçek train/test) yeniden test edilince ANLAMSIZ çıktı —
+// küçük örneklemin (V5 penceresi) yanıltıcı olduğu bir örnek daha.
 
 export type SiralamaKurali = {
   ad: string;
