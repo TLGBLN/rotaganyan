@@ -136,6 +136,7 @@ import { getSonYarisDetaylariForRace } from "@/server/actions/son-yaris-detay.ac
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getAgfTrendForRace } from "@/server/actions/agf-trend.actions";
 import { getH2HForRace } from "@/server/actions/h2h.actions";
+import { zeminDetayiBul, zeminDetayiSatirdanCikar, zeminKatsayisi } from "@/lib/methodology/mekanik-puanlama";
 import { getHizDerecesiForRace } from "@/server/actions/hiz-derecesi.actions";
 import { hesaplaZeminToleransiMap } from "@/server/actions/zemin-toleransi.actions";
 import { syncAgfForRace } from "@/server/services/agf-sync";
@@ -330,8 +331,18 @@ export type Faz1RunnerV5 = {
    *  toplanıyor, gelecekte farklı bir formülasyonla tekrar test edilebilir. */
   agfFarkiIkinciye: number;
   /** 2026-08-21 — H2H net skoru: bugünkü sahadaki rakiplerle ortak geçmiş yarışlarda
-   *  kaç kez önde bitirdi eksi kaç kez geride bitirdi (getH2HForRace, leak-free). */
+   *  kaç kez önde bitirdi eksi kaç kez geride bitirdi (getH2HForRace, leak-free).
+   *  2026-08-30 kullanıcı talebi: artık ÖNCE bugünün zemin koşuluyla eşleşen karşılaşmalar
+   *  kullanılır (varsa) — bkz. h2hZeminFiltresiUygulandiMi notu, gatherFaz1V5 içinde. */
   h2hNetSkor: number;
+  /** 2026-08-30 — h2hNetSkor'un bugünün zemin koşuluyla EŞLEŞEN karşılaşmalardan mı (true)
+   *  yoksa tüm karşılaşmalardan mı (false — eşleşen yok ya da bugünün zemini bilinmiyor)
+   *  hesaplandığı. Yalnız gerekçe metninde şeffaflık için, skora girmez. */
+  h2hZeminEslesmesiVarMi: boolean;
+  /** 2026-08-30 — h2hZeminEslesmesiVarMi=true ise, o eşleşen karşılaşmada atın kendi
+   *  derecesi (TJK "1.34.20" formatı) — gerekçe metninde somut kanıt olarak gösterilir.
+   *  Skora girmez. */
+  h2hKendiDerece: string | null;
   /** 2026-08-21 — Hız derecesi (%): son 365 gündeki en yeni 3 koşunun popülasyon
    *  (irk|pist|mesafe) ortalama tempo'suna göre göreli hızı. B=200 bootstrap'ta HER
    *  İKİ segmentte de güçlü anlamlı (düşük-şart +0.58 — modelin en büyük katsayısı,
@@ -397,7 +408,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     where: { id: raceId },
     select: {
       id: true, raceNo: true, classType: true, breed: true, distance: true, surface: true,
-      raceDay: { select: { date: true, hippodrome: { select: { name: true } } } },
+      raceDay: { select: { date: true, hippodrome: { select: { name: true } }, surfaceConditions: true } },
       runners: {
         where: { scratched: false },
         orderBy: { no: "asc" },
@@ -431,14 +442,36 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     hesaplaZeminToleransiMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, number>()),
   ]);
 
+  // 2026-08-30 kullanıcı talebi ("kum ıslak ise ıslak kum koşularına göre H2H yapacaksın
+  // kilo ve H2H Net Skor yanında, dereceleri de ekleyeceksin"): H2H Net Skor/Kilo-Ayarlı
+  // H2H artık ÖNCE bugünün zemin koşuluyla EŞLEŞEN geçmiş karşılaşmaları kullanır. Bugünün
+  // zemin durumu bilinmiyorsa (RaceDay.surfaceConditions henüz TJK'dan yayımlanmadıysa,
+  // "seyrek" — bkz. horse-detail.actions.ts notu) filtre uygulanmaz, tüm karşılaşmalar
+  // kullanılır (eski davranış). Bugünün durumu biliniyor ama HİÇBİR geçmiş karşılaşma o
+  // koşulla eşleşmiyorsa da yine TÜM karşılaşmalara dönülür — bilgi kaybı olmasın diye
+  // (0 karşılaşmalı bir sinyal, "veri yok" ile "eşit" ayrımını bozar).
+  const bugunZeminDetay = zeminDetayiBul(
+    race.raceDay.surfaceConditions as { label: string; detail: string }[] | null,
+    race.surface
+  );
+  const bugunZeminKatsayi = bugunZeminDetay ? zeminKatsayisi(bugunZeminDetay).katsayi : null;
+  const zeminEslesenEncounters =
+    bugunZeminKatsayi != null
+      ? h2hEncounters.filter((enc) => zeminKatsayisi(zeminDetayiSatirdanCikar(enc.surface)).katsayi === bugunZeminKatsayi)
+      : [];
+  const h2hZeminFiltresiUygulandiMi = zeminEslesenEncounters.length > 0;
+  const h2hEncountersKullanilan = h2hZeminFiltresiUygulandiMi ? zeminEslesenEncounters : h2hEncounters;
+
   const raceNameToNo = new Map(runners.map((r) => [r.name, r.no]));
-  function h2hNetSkorHesapla(kendiAd: string): number {
+  function h2hNetSkorHesapla(kendiAd: string): { skor: number; zeminEslesti: boolean; kendiDerece: string | null } {
     let skor = 0;
-    for (const enc of h2hEncounters) {
+    let kendiDerece: string | null = null;
+    for (const enc of h2hEncountersKullanilan) {
       const beniIceren = enc.results.find((e) => e.horseName === kendiAd);
       if (!beniIceren) continue;
       const benimPos = parseInt(beniIceren.finishPos, 10);
       if (isNaN(benimPos)) continue;
+      if (kendiDerece == null && beniIceren.time) kendiDerece = beniIceren.time;
       for (const other of enc.results) {
         if (other.horseName === kendiAd) continue;
         if (!raceNameToNo.has(other.horseName)) continue;
@@ -447,7 +480,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
         skor += benimPos < otherPos ? 1 : benimPos > otherPos ? -1 : 0;
       }
     }
-    return skor;
+    return { skor, zeminEslesti: h2hZeminFiltresiUygulandiMi, kendiDerece };
   }
 
   // 2026-08-24 — Kilo-ayarlı H2H (bkz. Faz1RunnerV5.h2hKiloDegisimi üstündeki not).
@@ -463,7 +496,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     if (kendiBugunKilo == null) return { toplam: 0, sayi: 0 };
     let toplam = 0;
     let sayi = 0;
-    for (const enc of h2hEncounters) {
+    for (const enc of h2hEncountersKullanilan) {
       const beni = enc.results.find((e) => e.horseName === kendiAd);
       if (!beni) continue;
       const kendiOKilo = parseKiloSayi(beni.weight);
@@ -529,6 +562,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     }
     const idmJokey: 0 | 1 = gecerliGaloplar.some((g) => isSameJockey(g.jockey, r.jockey)) ? 1 : 0;
     const h2hKiloHesap = h2hKiloDegisimiHesapla(r.name, r.weight);
+    const h2hNetSkorHesap = h2hNetSkorHesapla(r.name);
 
     const kgsVal = sonYaris?.gunFarki ?? -1;
     const kgsVarMi: 0 | 1 = sonYaris?.gunFarki != null ? 1 : 0;
@@ -570,7 +604,9 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       sireKazanmaOraniHam: sireOzet?.kYuzde ?? null,
       sireOrneklemKendiVeri: sireOzet?.ornekKendiVeri ?? null,
       kacakYalniz: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" && kacakSayisiSahada === 1 ? 1 : 0,
-      h2hNetSkor: h2hNetSkorHesapla(r.name),
+      h2hNetSkor: h2hNetSkorHesap.skor,
+      h2hZeminEslesmesiVarMi: h2hNetSkorHesap.zeminEslesti,
+      h2hKendiDerece: h2hNetSkorHesap.kendiDerece,
       hizDerecesi: hizByNo.get(r.no) ?? 0,
       h2hKiloDegisimi: h2hKiloHesap.toplam,
       h2hKiloKarsilasmaSayisi: h2hKiloHesap.sayi,
@@ -1086,7 +1122,20 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // 2026-08-27 — düşük-şart'ta bu sinyalin katsayısı ELLE sıfırlanmış (bkz. WEIGHTS_DUSUK_SART
   // üstündeki not) — HIZ ile aynı düzeltme: ham değere değil gerçek katkıya bakılıyor,
   // düşük-şart'ta satır hiç gösterilmez (puana katkısı yok), diğer'de davranış değişmedi.
-  { kod: "H2H", ozellikIndeksleri: [idx("h2hNetSkor")], aciklama: (r) => (r.katkilar[H2H_NET_SKOR_IDX] !== 0 ? `Baş-başa geçmiş: bugünkü rakiplerle ${r.h2hNetSkor > 0 ? "+" : ""}${r.h2hNetSkor} net (${r.h2hNetSkor > 0 ? "önde" : "geride"} bitirmiş)` : null) },
+  // 2026-08-30 kullanıcı talebi: "zemin ıslaksa ıslak koşulara göre H2H yap, dereceleri
+  // de ekle" — h2hZeminEslesmesiVarMi=true ise gerekçe metni bunun BUGÜNÜN zemin koşuluyla
+  // eşleşen karşılaşma(lar)a dayandığını ve atın o karşılaşmadaki kendi derecesini açıkça
+  // belirtir; eşleşme yoksa (ya da bugünün zemini bilinmiyorsa) eski (tüm karşılaşmalar)
+  // metin aynen kalır.
+  {
+    kod: "H2H",
+    ozellikIndeksleri: [idx("h2hNetSkor")],
+    aciklama: (r) => {
+      if (r.katkilar[H2H_NET_SKOR_IDX] === 0) return null;
+      const taban = `Baş-başa geçmiş${r.h2hZeminEslesmesiVarMi ? " (bugünkü zemin koşuluyla eşleşen karşılaşma)" : ""}: bugünkü rakiplerle ${r.h2hNetSkor > 0 ? "+" : ""}${r.h2hNetSkor} net (${r.h2hNetSkor > 0 ? "önde" : "geride"} bitirmiş)`;
+      return r.h2hZeminEslesmesiVarMi && r.h2hKendiDerece ? `${taban}, kendi derecesi: ${r.h2hKendiDerece}` : taban;
+    },
+  },
   // 2026-08-21 — Hız derecesi: veri yoksa (son 365 günde uygun geçmiş yok) 0, satır
   // gösterilmez — "hızlı değil" ile "veri yok" karışmasın.
   // 2026-08-27 kullanıcı denetimi ("muhakemeler doğru mu"): Handikap kategorisinde
