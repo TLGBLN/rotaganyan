@@ -215,9 +215,19 @@ const WEIGHTS_DIGER_DUZELTILMIS: AgirlikSeti = {
   ...WEIGHTS_DIGER,
   weights: WEIGHTS_DIGER.weights.map((w, i) => (i === H2H_KILO_IDX ? 0 : w)),
 };
+// 2026-08-31 (V5.31) — Opus'un V5.30-sonrası tekrar denetimi: idmJokey Handikap'ta DÖRT
+// bağımsız ölçütte de ters/anlamsız çıktı — canlı model-düzeltilmiş bakiye -5.93pp
+// (GA=[-10.34,-1.60], sıfırı dışlıyor, n=107 kod-lift -4.2pp ile aynı yönde); üretim-sadık
+// katsayı kayması (canlı %75 fit → tüm veri) 0.1033→0.0266 (GA=[-0.041,0.125], artık
+// anlamsız) — 12 sinyalin en büyük kayması; görülmemiş son %25 (n=76) üzerinde sıfırlarsa
+// top1 +3.95pp/top3 +2.63pp/logloss -0.0306, hepsi anlamlı iyileşme. Düşük-şart'ta TERSİ:
+// katsayı +0.2140 GA=[0.102,0.372] sağlam pozitif, sıfırlamak logloss'u anlamlı kötüleştiriyor
+// — orası KORUNDU. HIZ_DERECESI_IDX/V5.10 ile BİREBİR aynı cerrahi desen: yalnız Handikap'ta
+// bu tek katsayı sıfırlandı.
+const IDM_JOKEY_IDX = FEATURE_NAMES.indexOf("idmJokey");
 const WEIGHTS_DIGER_HANDIKAP: AgirlikSeti = {
   ...WEIGHTS_DIGER_DUZELTILMIS,
-  weights: WEIGHTS_DIGER_DUZELTILMIS.weights.map((w, i) => (i === HIZ_DERECESI_IDX ? 0 : w)),
+  weights: WEIGHTS_DIGER_DUZELTILMIS.weights.map((w, i) => (i === HIZ_DERECESI_IDX || i === IDM_JOKEY_IDX ? 0 : w)),
 };
 
 // 2026-08-29 — V6 Aşama 2 (bkz. plan): "market-blind" skor için AGF-türevi özelliklerin
@@ -1220,7 +1230,12 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // uzunAraGalopKatkisi, agfDususVarMi) toFeatureVector'dan çıkarıldığı için buradan da
   // kaldırıldı — artık skora katkıları yok, gerekçe metninde göstermek yanıltıcı olurdu.
   { kod: "KGS", ozellikIndeksleri: [idx("kgsVarMi")], aciklama: (r) => (r.kgsVarMi ? `KGS ${r.kgs} gün` : null) },
-  { kod: "IDMJOK", ozellikIndeksleri: [idx("idmJokey")], aciklama: (r) => (r.idmJokey ? "İdman jokeyi uyumu (bugünkü jokey idmanlardan birini yaptırmış)" : null) },
+  // 2026-08-31 (V5.31) — Handikap'ta bu sinyalin katsayısı ELLE SIFIRLANMIŞ (bkz. dosya
+  // başındaki IDM_JOKEY_IDX/V5.31 notu, HIZ ile AYNI düzeltme deseni) — eski kod ham
+  // r.idmJokey'e bakıyordu, Handikap'ta bile "idman jokeyi uyumu" diye yanıltıcı bir satır
+  // gösterebilirdi. Artık GERÇEK katkıya (r.katkilar) bakılıyor — Handikap'ta katkı her
+  // zaman 0 olduğundan satır hiç gösterilmez, diğer kategorilerde davranış değişmedi.
+  { kod: "IDMJOK", ozellikIndeksleri: [idx("idmJokey")], aciklama: (r) => (r.katkilar[IDM_JOKEY_IDX] !== 0 ? "İdman jokeyi uyumu (bugünkü jokey idmanlardan birini yaptırmış)" : null) },
   { kod: "JOKSTAT", ozellikIndeksleri: [idx("jokeyOrani")], aciklama: (r) => `Jokey kazanma oranı (küçültülmüş): %${r.jokeyOrani.toFixed(1)}` },
   { kod: "ANTSTAT", ozellikIndeksleri: [idx("antrenorOrani")], aciklama: (r) => `Antrenör kazanma oranı (küçültülmüş): %${r.antrenorOrani.toFixed(1)}` },
   // 2026-08-17 denetim bulgusu: kacakAtMi ve dususAmaIyiPozisyon anlamlı sinyaller

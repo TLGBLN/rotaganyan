@@ -482,7 +482,12 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.29",
     baslangic: new Date("2026-08-30T12:40:59+03:00"),
-    bitis: new Date("2026-08-30T17:05:32+03:00"),
+    // 2026-08-31 düzeltmesi (Opus'un V5.30-sonrası denetimi): bu alan önceden yanlışlıkla
+    // V5.30'un COMMIT edilme anından ÖNCE (17:05:32) kesilmişti — gerçek kod deploy'u
+    // 20:07:17'de oldu (commit 6e0eca4). Aradaki ~3 saatte (17:05-20:07) yayınlanan
+    // koşular fiilen HÂLÂ V5.29 ile üretilmişti ama /admin/performans onları yanlışlıkla
+    // V5.30'a yazıyordu — bu, o yanlış atfı düzeltir.
+    bitis: new Date("2026-08-30T20:07:17+03:00"),
     aciklama: "Kullanıcı, 2026-08-27'de (V5.24, Kocaeli 2.Koşu örneğiyle) tek bir ortak anahtarla (GOSTERIM_SIRASI_DUZELTMELERI_AKTIF=false) kapatılan üç gösterim-sırası kuralını (AGF Trend Terfisi/AGF Favorisi İlk-3 Garantisi/Derin AGF-Longshot Düzeltmesi) tek tek yeniden değerlendirdi. Ortak anahtar ÜÇE bölündü (bkz. v5-engine.ts): AGF Trend Terfisi GERİ AÇILDI — bu kural KOŞULSUZ değil, terfi eden adayın olasılığı diğer adaylarla YARIŞIR (terfiPenceresiV5), bu yüzden Kocaeli'deki 'modelin kendi yüzdesini koşulsuz ezme' sorununu taşımıyor; kendi backtest kanıtı (n=663, %21.6 galibiyet/%53.8 top3) hiç sorgulanmamıştı. Diğer ikisi KAPALI KALDI: AGF Favorisi İlk-3 Garantisi tam olarak Kocaeli'deki davranışın kendisi (AGF favorisini modelin yüzdesine bakmadan koşulsuz 3.sıraya zorluyor) — kanıtı (n=428) hâlâ geçerli sayılıyor ama prensip gerekçesiyle kapalı; Derin AGF-Longshot Düzeltmesi hem aynı prensip hem de artık istatistiksel kanıtı da yok (güncel/tazelenmiş veride net etki GA=[-3,11], sıfırı içeriyor).",
     neyiAnalizEdiyor: [
       "Skor/olasılık HİÇ değişmedi — yalnız GÖSTERİM sırası/kararı etkileniyor (agfTrendTerfisiUygula, faz2V5Sirala içinde softmax SONRASI çalışıyor). A/B katmanları (V5.27/V5.28) bu değişiklikten bağımsız, hiç dokunulmadı.",
@@ -493,14 +498,27 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   },
   {
     versiyon: "V5.30",
-    baslangic: new Date("2026-08-30T17:05:32+03:00"),
-    bitis: null,
+    baslangic: new Date("2026-08-30T20:07:17+03:00"), // 6e0eca4 — bkz. V5.29'un bitis notu
+    bitis: new Date("2026-08-31T00:45:23+03:00"),
     aciklama: "Kullanıcı talebiyle (\"sinyalleri opus değerlendirsin... v5 ile kullanılan ve sonuçlanan tüm koşularda\") Opus'a (Agent tool, model:\"opus\") CANLI_SINYALLER + ADAY_SINYALLER'in tamamı, V5 döneminde (16-30 Ağustos, n=248 sonuçlanmış karma-olmayan koşu) GERÇEK yayınlanmış+sonuçlanmış Prediction verisiyle (kod-bazlı + featureSnapshot z-skoru, iki bağımsız ölçüt) denetlettirildi. İki bulgu bu sürümde düzeltildi: (1) h2hKiloDegisimi eğitimde her iki segmentte pozitif (diğer +0.0727, düşük-şart +0.0665) ama canlı iki ölçütte de TERS çıktı (kod-lift -0.6pp→budama sonrası -3.4pp; featureSnapshot z=-0.521, GA=[-0.888,-0.150] sıfırı dışlıyor) — H2H/düşük-şart (V5.6b) ve Handikap/hizDerecesi (V5.10) ile AYNI cerrahi desenle TÜM segmentlerde 0'a sabitlendi (kanıt pooled, tek segmente özgü değildi). (2) sireOrani'nin B katmanı gerekçe/ölçüm bloğunun 2026-08-28'deki 11-sinyal budamasından beri ÖLÜ KOD olduğu bulundu (OZELLIK_GRUPLARI'ndan SIRE grubu kaldırılınca `gruplar.find(g=>g.kod===\"SIRE\")` hep undefined dönüyordu) — skora katkı gerçekleşmeye devam etti ama ne gerekçe metninde ne featureSnapshot'ta hiç görünmüyordu. Gerçek katkı artık ayrı alanlarda (bSireKatkisi/bZeminMesafeKatkisi) hesaplanıp hem gerekçe satırına hem featureSnapshot.bKatmani'ye taşınıyor — B katmanı sinyalleri artık ölçülebilir. jokeyOrani'nin 'anlamsız' notu da güncel canlı veriyle çelişiyor bulundu (kod-lift +3.9→+6.0pp, 4 koşu tipinde de pozitif, z=+0.651) — katsayı DEĞİŞTİRİLMEDİ (zaten sıfırlanmamıştı), yalnız sinyal-kutugu.service.ts'teki not güncellendi.",
     neyiAnalizEdiyor: [
       "Skor/olasılık DEĞİŞTİ: h2hKiloDegisimi'nin katkısı artık TÜM kategorilerde (düşük-şart/diğer/Handikap) her zaman 0 — gerçek race verisiyle doğrulandı (scratch script, 4 kategori). Diğer 11 A-katmanı katsayısına dokunulmadı. B katmanı (sireOrani/zeminMesafeDeneyim) skor etkisi HİÇ değişmedi — yalnız artık ölçülebilir/görünür.",
     ],
     caprazlamalar: [
       "Yeni bir bootstrap/model-farkı testi çalıştırılmadı — bu bir 'yeni sinyal ekleme' değil, mevcut canlı bir katsayının GERÇEK sonuçlanmış V5 koşularında ters çıktığı bulgusuna dayalı cerrahi düzeltme (H2H/düşük-şart ve Handikap/hizDerecesi ile AYNI eşik: ham/gerçek katsayı ters yönlü + GA sıfırı dışlıyor veya dışlamaya çok yakın). Doğrulama: tsc --noEmit temiz, npm run build temiz, v5-engine.test.ts 7/7 geçti, scratch script ile 4 farklı kategoride (1a/2/3/bilinmiyor) h2hKiloDegisimi katkısının gerçekten 0 olduğu VE SIRE gerekçe satırının artık (eşik≥0.03'te) gerçekten göründüğü canlı race verisiyle doğrulandı.",
+      "SONRADAN EK (2026-08-31, Opus tekrar denetimi): h2hKiloDegisimi'nin o günkü kanıtı (n=19 featureSnapshot) n=24'e çıkınca REPLİKE OLMADI (z=-0.521→-0.123, GA artık sıfırı kapsıyor) ve üretim-sadık testte sıfırlamanın top1/logloss'a etkisi pratikte sıfır çıktı — yani sıfırlama zararsız ama gerekçe kanıtı ilk düşünülenden zayıf. Katsayı yine de sıfırlı bırakıldı (geri almanın da kanıtı yok), izlemede — bkz. sinyal-kutugu.service.ts'in güncellenmiş notu.",
+    ],
+  },
+  {
+    versiyon: "V5.31",
+    baslangic: new Date("2026-08-31T00:45:23+03:00"),
+    bitis: null,
+    aciklama: "Kullanıcı talebiyle (\"6 atı verirken v5 motorunun titiz analizi gerek, sinyaller sağlıklı mı, opus test yapsın\") Opus'a V5.30 düzeltmelerinin doğrulanması + tüm 12 A-katmanı sinyalinin güncel V5 verisiyle (n=253) tazelenmiş bir sağlık taraması yaptırıldı. idmJokey Handikap'ta DÖRT bağımsız ölçütte de ters/anlamsız çıktı: canlı model-düzeltilmiş bakiye -5.93pp (GA=[-10.34,-1.60], sıfırı dışlıyor, n=107); üretim-sadık katsayı canlı %75 fit'te 0.1033'ten tüm veride 0.0266'ya (artık anlamsız) kaymış — 12 sinyalin en büyük kayması; görülmemiş son %25'te (n=76) sıfırlarsa top1 +3.95pp/top3 +2.63pp/logloss -0.0306, hepsi anlamlı iyileşme. Düşük-şart'ta katsayı sağlam pozitif (GA=[0.102,0.372]) — KORUNDU. HIZ_DERECESI_IDX/V5.10 ile BİREBİR aynı cerrahi desen: yalnız Handikap'ta idmJokey sıfırlandı. Ayrıca gerekçe metnindeki IDMJOK bloğu (eski kod ham r.idmJokey'e bakıyordu) HIZ ile aynı düzeltmeyle gerçek katkıya (r.katkilar) bağlandı — Handikap'ta artık hiç görünmüyor. Bununla birlikte: Sınıf Düşüşü (İkramiye) adayı n=553 ile yeniden test edilip REDDEDİLDİ (CV'de top1/top3/logloss üçü de anlamlı kötüleşiyor), h2hKiloDegisimi/V5.30'un notu düzeltildi (bkz. V5.30 kaydı), V5.29/V5.30 arasındaki yanlış zaman damgası (17:05→20:07) düzeltildi.",
+    neyiAnalizEdiyor: [
+      "Skor/olasılık DEĞİŞTİ: idmJokey'in katkısı artık Handikap'ta her zaman 0 (WEIGHTS_DIGER_HANDIKAP, hizDerecesi'nin yanına ikinci sıfırlama olarak eklendi) — gerçek race verisiyle doğrulandı (54/54 Handikap atında katki=0, IDMJOK satırı hiç görünmüyor). Düşük-şart ve diğer 10 A-katmanı katsayısına dokunulmadı.",
+    ],
+    caprazlamalar: [
+      "Yeni bir bootstrap/model-farkı testi çalıştırılmadı — H2H/düşük-şart, Handikap/hizDerecesi (V5.10) ve h2hKiloDegisimi (V5.30) ile AYNI cerrahi düzeltme standardı: ham/gerçek katsayı ters yönlü + üretim-sadık OOS testte GA sıfırı dışlıyor. Doğrulama: tsc --noEmit temiz, npm run build temiz, gerçek race verisiyle 40 Handikap koşusunda idmJokey=true olan 54 atın 54'ünde de katki=0 ve gerekçe satırı gösterilmediği doğrulandı.",
     ],
   },
 ];
