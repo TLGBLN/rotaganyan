@@ -18,6 +18,18 @@ import DeleteRaceButton from "@/components/admin/DeleteRaceButton";
 import ForceIngestButton from "@/components/admin/ForceIngestButton";
 import { forceIngestDate } from "@/server/actions/race.actions";
 
+// 2026-08-30 kullanıcı talebi ("Banko rozetinin yanına gerçek yüzdeyi daha göze çarpar
+// şekilde ekle") — CABOOSE/İstanbul 6.Koşu vakası: banko tuttu sanılırken jokey hatasıyla
+// kaçtı, kullanıcı "banko=kesin" beklentisine kapılmasın diye bankoNote'ta ZATEN var olan
+// gerçek model olasılığı (v5BankoAdayiTespit'in "model tahmini %X" metni, bkz. v5-engine.ts)
+// artık yalnız hover tooltip'te değil, rozetin YANINDA görünüyor. Yeni bir sayı üretmiyor,
+// var olanı görünür kılıyor.
+function bankoOlasilikCikar(bankoNote: string | null | undefined): string | null {
+  if (!bankoNote) return null;
+  const m = bankoNote.match(/tahmini %(\d+(?:\.\d+)?)/);
+  return m ? m[1] : null;
+}
+
 export const dynamic = "force-dynamic";
 
 const ADVICE_LEVEL_LABEL: Record<string, string> = {
@@ -216,7 +228,11 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                                 title={effectivePred.bankoNote ?? undefined}
                                 className="mt-0.5 text-[10px] font-semibold leading-tight text-hit cursor-help"
                               >
-                                ★ BANKO — tek at yeterli, bütçeyi diğer ayaklara kaydırın
+                                ★ BANKO
+                                {bankoOlasilikCikar(effectivePred.bankoNote) && (
+                                  <span className="text-muted-foreground"> (model %{bankoOlasilikCikar(effectivePred.bankoNote)} diyor, garanti değil)</span>
+                                )}
+                                {" "}— tek at yeterli, bütçeyi diğer ayaklara kaydırın
                               </div>
                             )}
                             <div className="mt-1">

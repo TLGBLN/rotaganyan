@@ -172,7 +172,9 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
                             </td>
                             <td className={cn("px-2 py-1.5", textColor, weight)}>
                               {isBanko && (
-                                <Star className="inline-block h-3 w-3 mr-0.5 -mt-0.5 fill-brand text-brand" />
+                                <span title="Banko — modelin en güçlü işareti, garanti değil (yandaki % modelin kendi olasılığı)">
+                                  <Star className="inline-block h-3 w-3 mr-0.5 -mt-0.5 fill-brand text-brand" />
+                                </span>
                               )}
                               <span className="font-mono mr-1 tabular-nums">
                                 {pick.runner?.no ?? "—"}
