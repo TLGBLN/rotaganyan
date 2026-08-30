@@ -1,7 +1,8 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
+import { formatDate } from "@/lib/utils";
+import { getLocale } from "next-intl/server";
+import type { AppLocale } from "@/i18n/request";
 import { Bookmark } from "lucide-react";
 import UnfollowButton from "./UnfollowButton";
 import FollowNoteEditor from "./FollowNoteEditor";
@@ -9,7 +10,7 @@ import FollowNoteEditor from "./FollowNoteEditor";
 export const dynamic = "force-dynamic";
 
 export default async function TakipAtlarimPage() {
-  const session = await auth();
+  const [session, locale] = await Promise.all([auth(), getLocale()]);
   if (!session?.user?.id) return null;
 
   const follows = await db.horseFollow.findMany({
@@ -42,7 +43,7 @@ export default async function TakipAtlarimPage() {
                 <p className="font-semibold text-sm">{follow.horseName}</p>
                 <FollowNoteEditor horseName={follow.horseName} note={follow.note} />
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  Takip tarihi: {format(new Date(follow.createdAt), "d MMM yyyy", { locale: tr })}
+                  Takip tarihi: {formatDate(follow.createdAt, locale as AppLocale, "d MMM yyyy")}
                 </p>
               </div>
               <UnfollowButton horseName={follow.horseName} />

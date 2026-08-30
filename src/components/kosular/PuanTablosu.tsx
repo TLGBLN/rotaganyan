@@ -1,7 +1,9 @@
 import { Lock, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, raceTimeForLocale } from "@/lib/utils";
+import { getLocale } from "next-intl/server";
+import type { AppLocale } from "@/i18n/request";
 import type { ProgramRaceDay } from "@/server/services/race.service";
 import { finishPos } from "@/lib/race-result";
 import { kararOku } from "@/lib/methodology/muhakeme-format";
@@ -77,7 +79,8 @@ function PuanHucre({ score, details }: { score: number | null; details: unknown 
   );
 }
 
-export default function PuanTablosu({ raceDay, isLoggedIn, currentDate, isAdmin = false }: Props) {
+export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, isAdmin = false }: Props) {
+  const locale = (await getLocale()) as AppLocale;
   const analyzedRaces = raceDay.races.filter(
     (r) => r.prediction?.published && (r.prediction.picks?.length ?? 0) > 0
   );
@@ -127,7 +130,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate, isAdmin 
               {group.map((race) => (
                 <div key={race.id}>
                   <div className="bg-muted/20 px-3 py-2 text-xs font-bold">
-                    {race.raceNo}. Koşu{race.time ? ` · ${race.time}` : ""}
+                    {race.raceNo}. Koşu{race.time ? ` · ${raceTimeForLocale(race.time, locale)}` : ""}
                   </div>
                   <table className="w-full text-xs">
                     <thead>
@@ -244,7 +247,7 @@ export default function PuanTablosu({ raceDay, isLoggedIn, currentDate, isAdmin 
                           {race.raceNo}. Koşu
                         </div>
                         <div className="whitespace-nowrap text-[9px] font-normal text-muted-foreground">
-                          {race.time ?? "—"}
+                          {race.time ? raceTimeForLocale(race.time, locale) : "—"}
                         </div>
                       </th>
                     ))}

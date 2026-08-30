@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, XCircle } from "lucide-react";
 import CouponBox from "./CouponBox";
 import { formatDate } from "@/lib/utils";
+import { getLocale } from "next-intl/server";
+import type { AppLocale } from "@/i18n/request";
 import type { RaceDetail } from "@/server/services/race.service";
 
 type Props = {
@@ -10,7 +12,8 @@ type Props = {
   result?: RaceDetail["result"];
 };
 
-export default function PredictionBoard({ prediction, result }: Props) {
+export default async function PredictionBoard({ prediction, result }: Props) {
+  const locale = (await getLocale()) as AppLocale;
   return (
     <section className="space-y-4">
       {/* Header */}
@@ -19,7 +22,7 @@ export default function PredictionBoard({ prediction, result }: Props) {
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {prediction.author?.name && <span>{prediction.author.name}</span>}
           {prediction.publishedAt && (
-            <span>{formatDate(prediction.publishedAt, "d MMM HH:mm")}</span>
+            <span>{formatDate(prediction.publishedAt, locale, "d MMM HH:mm")}</span>
           )}
         </div>
       </div>

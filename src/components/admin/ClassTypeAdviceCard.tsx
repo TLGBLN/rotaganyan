@@ -20,7 +20,7 @@ function TierCubugu({ t }: { t: NonNullable<ClassTypeAdvice["tierYuzdeler"]> }) 
   const segments = [
     { pay: pct(t.eko), cls: "bg-hit", etiket: "Eko", yuzde: pct(t.eko) },
     { pay: pct(t.nor), cls: "bg-brand", etiket: "Nor", yuzde: pct(t.nor) },
-    { pay: pct(t.genis), cls: "bg-amber-500", etiket: "Gen", yuzde: pct(t.genis) },
+    { pay: pct(t.genis), cls: "bg-red-500", etiket: "Gen", yuzde: pct(t.genis) },
     { pay: pct(t.kacti), cls: "bg-miss", etiket: "Kaçtı", yuzde: pct(t.kacti) },
   ].filter((s) => s.pay > 0.5);
 

@@ -2,10 +2,12 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Bell, CheckCircle2 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
+import { getLocale } from "next-intl/server";
+import type { AppLocale } from "@/i18n/request";
 import MarkAllReadButton from "./MarkAllReadButton";
 
 export default async function BildirimlerPage() {
-  const session = await auth();
+  const [session, locale] = await Promise.all([auth(), getLocale()]);
   if (!session?.user) return null;
 
   const notifications = await db.notification.findMany({
@@ -47,7 +49,7 @@ export default async function BildirimlerPage() {
                 <p className="text-sm font-medium">{n.title}</p>
                 {n.body && <p className="mt-0.5 text-xs text-muted-foreground">{n.body}</p>}
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  {formatDate(n.createdAt, "d MMM yyyy, HH:mm")}
+                  {formatDate(n.createdAt, locale as AppLocale, "d MMM yyyy, HH:mm")}
                 </p>
               </div>
             </div>

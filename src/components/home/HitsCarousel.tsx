@@ -2,9 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
 import { useTranslations } from "next-intl";
+import { formatDate } from "@/lib/utils";
+import { useLocaleSwitch } from "@/components/providers/LocaleProvider";
 
 type Item = {
   id: string;
@@ -21,9 +21,10 @@ type Item = {
 
 function Card({ p }: { p: Item }) {
   const t = useTranslations("home.hits");
+  const { locale } = useLocaleSwitch();
   const pick1 = p.picks[0];
   const rd = p.race.raceDay;
-  const dateStr = format(new Date(rd.date), "d MMM yyyy", { locale: tr });
+  const dateStr = formatDate(rd.date, locale, "d MMM yyyy");
   const href = "/analizler";
 
   return (

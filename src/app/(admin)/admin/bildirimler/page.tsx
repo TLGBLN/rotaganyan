@@ -49,7 +49,7 @@ export default async function AdminBildirimlerPage() {
                 <p className="text-sm font-medium">{n.title}</p>
                 {n.body && <p className="mt-0.5 text-xs text-muted-foreground">{n.body}</p>}
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  {formatDate(n.createdAt, "d MMM yyyy, HH:mm")}
+                  {formatDate(n.createdAt, "tr", "d MMM yyyy, HH:mm")}
                 </p>
               </div>
             </div>

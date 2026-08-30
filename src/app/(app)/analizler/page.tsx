@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
+import { getLocale } from "next-intl/server";
+import type { AppLocale } from "@/i18n/request";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { auth } from "@/lib/auth";
 import { getPublishedPredictions } from "@/server/services/race.service";
 import { syncResultsForDate } from "@/server/services/result-sync";
@@ -17,7 +17,7 @@ type PageProps = {
 const PER_PAGE = 20;
 
 export default async function AnalizlerPage({ searchParams }: PageProps) {
-  const [session, params] = await Promise.all([auth(), searchParams]);
+  const [session, params, locale] = await Promise.all([auth(), searchParams, getLocale()]);
   if (!session?.user) {
     redirect("/giris?callbackUrl=%2Fanalizler");
   }
@@ -89,7 +89,7 @@ export default async function AnalizlerPage({ searchParams }: PageProps) {
                         </div>
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">
-                        {format(raceDay.date, "d MMM yyyy", { locale: tr })}
+                        {formatDate(raceDay.date, locale as AppLocale, "d MMM yyyy")}
                       </td>
                       <td className="px-3 py-2">
                         {pick1?.runner ? (
@@ -145,7 +145,7 @@ export default async function AnalizlerPage({ searchParams }: PageProps) {
                         {raceDay.hippodrome.name} {race.raceNo}. Koşu
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {format(raceDay.date, "d MMM yyyy", { locale: tr })}
+                        {formatDate(raceDay.date, locale as AppLocale, "d MMM yyyy")}
                       </p>
                     </div>
                     {result ? (

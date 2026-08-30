@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, raceTimeForLocale } from "@/lib/utils";
+import { useLocaleSwitch } from "@/components/providers/LocaleProvider";
 import { EKURI_COLORS, ekuriRengi } from "@/lib/ekuri-colors";
 import { ChevronDown, ChevronUp, Star, Info } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
@@ -1165,6 +1166,7 @@ function RaceTable({
   trainerStats?: TrainerStatsMap;
 }) {
   const t = useTranslations("programToolbar");
+  const { locale } = useLocaleSwitch();
   const surf = surfaceLabel(race.surface, t);
   const winnerNos = race.result?.winnerNos ?? [];
 
@@ -1211,7 +1213,7 @@ function RaceTable({
       {/* Koşu başlığı */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 bg-muted/50 border-b text-sm">
         <span className="font-bold">{t("raceNoLabel", { no: race.raceNo })}</span>
-        {race.time && <span className="text-muted-foreground">{race.time}</span>}
+        {race.time && <span className="text-muted-foreground">{raceTimeForLocale(race.time, locale)}</span>}
         <span className="font-medium">{race.distance}m</span>
         <span className={cn("font-semibold", surf.cls)}>● {surf.label}</span>
         <span className="text-muted-foreground">{breedShort(race.breed, t)}</span>

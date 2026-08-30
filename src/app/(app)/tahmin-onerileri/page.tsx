@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import { tr } from "date-fns/locale";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
+import { getLocale } from "next-intl/server";
+import type { AppLocale } from "@/i18n/request";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatDate } from "@/lib/utils";
 import { auth } from "@/lib/auth";
@@ -22,7 +23,7 @@ export default async function TahminOnerileriPage() {
     try { await syncResultsForDate(turkeyDateString()); } catch { /* ignore */ }
   });
 
-  const [items, session] = await Promise.all([getActivePredictions(), auth()]);
+  const [items, session, locale] = await Promise.all([getActivePredictions(), auth(), getLocale()]);
   if (!session?.user) {
     redirect("/giris?callbackUrl=%2Ftahmin-onerileri");
   }
@@ -84,10 +85,10 @@ export default async function TahminOnerileriPage() {
                       </div>
                     </td>
                     <td className="hidden px-3 py-2 text-xs text-muted-foreground sm:table-cell">
-                      {format(raceDay.date, "d MMM yyyy", { locale: tr })}
+                      {formatDate(raceDay.date, locale as AppLocale, "d MMM yyyy")}
                       {pred.publishedAt && (
                         <div className="text-[10px]">
-                          Yayım: {formatDate(pred.publishedAt, "d MMM HH:mm")}
+                          Yayım: {formatDate(pred.publishedAt, locale as AppLocale, "d MMM HH:mm")}
                         </div>
                       )}
                     </td>

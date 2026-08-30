@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import type { Role, Plan } from "@prisma/client";
 import { formatDate } from "@/lib/utils";
+import { getLocale } from "next-intl/server";
+import type { AppLocale } from "@/i18n/request";
 import ChangePasswordForm from "./ChangePasswordForm";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +14,7 @@ const PLAN_LABEL: Record<Plan, string> = { FREE: "Ücretsiz", PREMIUM: "Premium"
 const ROLE_LABEL: Record<Role, string> = { USER: "Üye", EDITOR: "Editör", ADMIN: "Admin" };
 
 export default async function PanelPage() {
-  const session = await auth();
+  const [session, locale] = await Promise.all([auth(), getLocale()]);
   if (!session?.user) return null;
 
   const notifications = await db.notification.findMany({
@@ -42,7 +44,7 @@ export default async function PanelPage() {
           </div>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Üyelik tarihi: {formatDate(user.createdAt, "d MMMM yyyy")}
+          Üyelik tarihi: {formatDate(user.createdAt, locale as AppLocale, "d MMMM yyyy")}
         </p>
       </div>
 
@@ -73,7 +75,7 @@ export default async function PanelPage() {
                   <p className="text-sm font-medium">{n.title}</p>
                   {n.body && <p className="text-xs text-muted-foreground">{n.body}</p>}
                   <p className="mt-0.5 text-[10px] text-muted-foreground">
-                    {formatDate(n.createdAt, "d MMM HH:mm")}
+                    {formatDate(n.createdAt, locale as AppLocale, "d MMM HH:mm")}
                   </p>
                 </div>
               </div>

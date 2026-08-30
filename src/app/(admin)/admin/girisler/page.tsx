@@ -233,8 +233,8 @@ export default async function GirislerPage({ searchParams }: PageProps) {
                       )}
                     >
                       <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
-                        <div>{formatDate(log.createdAt, "d MMM HH:mm")}</div>
-                        <div className="text-[10px] opacity-60">{formatDate(log.createdAt, "yyyy")}</div>
+                        <div>{formatDate(log.createdAt, "tr", "d MMM HH:mm")}</div>
+                        <div className="text-[10px] opacity-60">{formatDate(log.createdAt, "tr", "yyyy")}</div>
                       </td>
                       <td className="px-3 py-2">
                         <div className="font-medium">{log.user?.name ?? log.email.split("@")[0]}</div>

@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
 import { useTranslations } from "next-intl";
 import type { KazananKupon } from "@/server/services/race.service";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
+import { useLocaleSwitch } from "@/components/providers/LocaleProvider";
 
 function Card({ k, onOpen }: { k: KazananKupon; onOpen: () => void }) {
   const t = useTranslations("home.kupon");
-  const dateStr = format(new Date(k.date), "d MMM yyyy", { locale: tr });
+  const { locale } = useLocaleSwitch();
+  const dateStr = formatDate(k.date, locale, "d MMM yyyy");
 
   return (
     <button
@@ -42,6 +42,7 @@ function Card({ k, onOpen }: { k: KazananKupon; onOpen: () => void }) {
 
 function KuponDetailDialog({ k, onClose }: { k: KazananKupon | null; onClose: () => void }) {
   const t = useTranslations("home.kupon");
+  const { locale } = useLocaleSwitch();
   return (
     <Dialog open={k != null} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-3xl">
@@ -61,7 +62,7 @@ function KuponDetailDialog({ k, onClose }: { k: KazananKupon | null; onClose: ()
                 {k.variantLabel}
               </span>
               <span className="text-xs text-muted-foreground">
-                {format(new Date(k.date), "d MMMM yyyy", { locale: tr })}
+                {formatDate(k.date, locale, "d MMMM yyyy")}
               </span>
             </div>
 
