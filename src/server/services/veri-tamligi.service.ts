@@ -94,12 +94,38 @@ async function tekSorgu(baslangicTarihi: string) {
   return rows[0];
 }
 
+// 2026-08-30 kullanıcı bulgusu: TjkDereceKaydi (zeminToleransi/yüzey-değişikliği
+// sinyallerinin TEK kaynağı, /admin/derece-istatistikleri) 5 GÜN boyunca hiç
+// güncellenmemiş, kimse fark etmemişti — çünkü bu tablo yukarıdaki denetimin HİÇBİRİNDE
+// yoktu (Runner'a bağlı değil, atAdi ile eşleşen bağımsız bir arşiv, yukarıdaki CTE
+// deseni ona uymuyor). Kök neden: sync-derece-ist Vercel'e hiç kaydolmadığı için
+// sync-trainer-stats'a "asalak" eklenmişti (Promise.allSettled ile), hatası SESSİZCE
+// yutuluyordu. Bu fonksiyon farklı bir şey ölçüyor — per-runner kapsam değil, SENKRONUN
+// GÜNLÜK GERÇEKTEN ÇALIŞIP ÇALIŞMADIĞI (kaç farklı günde yeni/güncellenmiş kayıt geldi).
+async function dereceIstTazelik(baslangicTarihi: string): Promise<{ toplam: number; dolu: number }> {
+  const rows = await db.$queryRawUnsafe<{ gun_sayisi: bigint }[]>(`
+    SELECT count(DISTINCT date_trunc('day', "updatedAt")) AS gun_sayisi
+    FROM "TjkDereceKaydi"
+    WHERE "updatedAt" >= '${baslangicTarihi}'
+  `);
+  const beklenenGun = Math.max(
+    1,
+    Math.round((Date.now() - new Date(baslangicTarihi).getTime()) / (24 * 60 * 60 * 1000))
+  );
+  return { toplam: beklenenGun, dolu: Number(rows[0]?.gun_sayisi ?? 0) };
+}
+
 export async function getVeriTamligiRaporu(): Promise<VeriTamligiSatiri[]> {
   const son7 = new Date();
   son7.setDate(son7.getDate() - 7);
   const son7Str = son7.toISOString().slice(0, 10);
 
-  const [tumKapsam, sonYediGun] = await Promise.all([tekSorgu(KAPSAMA_BASLANGIC), tekSorgu(son7Str)]);
+  const [tumKapsam, sonYediGun, dereceTumKapsam, dereceSon7] = await Promise.all([
+    tekSorgu(KAPSAMA_BASLANGIC),
+    tekSorgu(son7Str),
+    dereceIstTazelik(KAPSAMA_BASLANGIC),
+    dereceIstTazelik(son7Str),
+  ]);
 
   const pct = (dolu: bigint, toplam: bigint) => (toplam > BigInt(0) ? Math.round((Number(dolu) / Number(toplam)) * 1000) / 10 : 0);
 
@@ -131,5 +157,15 @@ export async function getVeriTamligiRaporu(): Promise<VeriTamligiSatiri[]> {
     satir("Pedigri önbelleği", "HorsePedigree'de soy ağacı önbelleklenmiş mi", "pedigri_dolu"),
     satir("At profil önbelleği", "HorseStatsCache'de profil/istatistik önbelleklenmiş mi", "statscache_dolu"),
     satir("At yarış geçmişi önbelleği", "HorseRaceHistoryCache'de tam geçmiş önbelleklenmiş mi", "historycache_dolu"),
+    {
+      alan: "Derece İstatistikleri (TjkDereceKaydi)",
+      aciklama: "zeminToleransi/yüzey-değişikliği'nin TEK kaynağı — kaç GÜN gerçekten yeni veri geldi (günlük senkron sağlığı, per-koşu kapsam değil)",
+      toplamKapsam: dereceTumKapsam.toplam,
+      doluKapsam: dereceTumKapsam.dolu,
+      yuzdeKapsam: Math.round((dereceTumKapsam.dolu / dereceTumKapsam.toplam) * 1000) / 10,
+      toplamSon7: dereceSon7.toplam,
+      doluSon7: dereceSon7.dolu,
+      yuzdeSon7: Math.round((dereceSon7.dolu / dereceSon7.toplam) * 1000) / 10,
+    },
   ];
 }
