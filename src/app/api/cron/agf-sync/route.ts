@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { syncAgfForDate } from "@/server/services/agf-sync";
 import { verifyCronRequest } from "@/lib/cron-auth";
 import { runChallengerShadowLog } from "@/server/services/challenger-shadow-log.service";
-import { dereceIstatistikleriniKontrolEtVeOnar } from "@/server/services/veri-tamligi-onarim.service";
+import { dereceIstatistikleriniKontrolEtVeOnar, atProfiliniKontrolEtVeOnar } from "@/server/services/veri-tamligi-onarim.service";
 
 // v6.69 — kullanıcı bulgusu 2026-08-09: çoklu şehir günlerinde (İstanbul+İzmir+Karma
 // aynı anda) sıralı işleme 60sn'yi aşıp cron'u sessizce (Vercel 504) başarısız kılıyordu —
@@ -37,6 +37,15 @@ export async function GET(req: NextRequest) {
       await dereceIstatistikleriniKontrolEtVeOnar();
     } catch (e) {
       console.error("[agf-sync] veri-tamligi-onarim piggyback hatası (AGF senkronu etkilenmedi)", e);
+    }
+
+    // 2026-08-30 (aynı gün, ikinci tur) — At profil önbelleği de kanıtlanmış/fixable
+    // bulununca aynı güvenlik ağına ikinci alan olarak eklendi. Kontrol ucuz (tek COUNT
+    // sorgusu), onarım yalnız backlog eşiği aşılırsa tetiklenir (bkz. AT_PROFIL_ESIK).
+    try {
+      await atProfiliniKontrolEtVeOnar();
+    } catch (e) {
+      console.error("[agf-sync] at-profili-onarim piggyback hatası (AGF senkronu etkilenmedi)", e);
     }
 
     return NextResponse.json({ ...result, totalRunnersUpdated: total });

@@ -795,7 +795,10 @@ function tierOneri(t: CouponTierBreakdown): string {
     cumle = "Bu türde dar kupon sık kaçırıyor — ya Geniş'ten de at ekleyin, ya da bu ayağı hiç oynamayın.";
     kacirma = 100 - genisToplam;
   }
-  cumle += ` (Bu tavsiyeye uyulsaydı, geçmişte kazanan yaklaşık %${Math.round(Math.max(0, kacirma))} ihtimalle KAÇIRILMIŞ olurdu.)`;
+  // 2026-08-30 kullanıcı bulgusu: "Bu tavsiyeye uyulsaydı... KAÇIRILMIŞ olurdu" biçimindeki
+  // varsayımsal/çift-olumsuz cümle kafa karıştırıyordu ("düz mantıkla yaz" talebi) — doğrudan
+  // geçmiş-veri ifadesine çevrildi, aynı sayı, koşullu kip yok.
+  cumle += ` (Geçmişte kazanan atların yaklaşık %${Math.round(Math.max(0, kacirma))}'i bu aralığın dışında kaldı.)`;
   return cumle;
 }
 
