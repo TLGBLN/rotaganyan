@@ -208,6 +208,16 @@ export default async function AdminDashboard() {
               title="Koşu Grubuna Göre Kazanan Hangi Kupon Kademesinde Geldi"
             />
 
+            {/* 2026-08-30 kullanıcı talebi: "at sayılarına göre hangi katmanda yazılan
+                atlar daha şanslı oluyor" araştırması — saha büyüdükçe Ekonomik'in isabet
+                oranı düşüyor, Geniş'e kaçma oranı artıyor (bkz. admin.service.ts'teki
+                atSayisiBucket notu). Şimdilik yalnız GÖRÜNÜR kılınıyor, tierOneri()'nin
+                eşiklerine henüz dokunulmadı. */}
+            <CouponTierChart
+              rows={analyst.couponTierByAtSayisi}
+              title="At Sayısına Göre Kazanan Hangi Kupon Kademesinde Geldi"
+            />
+
             {/* kacakAtMi (KACAK) V5 sinyalinin dayandığı ham veri: TÜM TJK geçmişinde
                 (Rotaganyan tahminlerinden bağımsız) hangi yarış stili ne sıklıkla kazanıyor.
                 Üstteki "Sinyal Bazlı Gerçek İsabet Oranı" paneli bizim tahminlerimizde

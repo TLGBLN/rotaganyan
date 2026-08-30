@@ -327,6 +327,10 @@ export type AnalystStats = {
   // getClassTypeAdvice dar sınıf güvenilir değilse buna düşer (bkz. classTypeGroup).
   byClassTypeGroup: AnalystBreakdown[];
   couponTierByClassTypeGroup: CouponTierBreakdown[];
+  // 2026-08-30 kullanıcı talebi: at sayısına (saha büyüklüğüne) göre kazananın hangi
+  // kupon kademesinde yakalandığı — bkz. atSayisiBucket notu.
+  byAtSayisi: AnalystBreakdown[];
+  couponTierByAtSayisi: CouponTierBreakdown[];
 };
 
 const SURFACE_LABEL: Record<string, string> = { CIM: "Çim", KUM: "Kum", SENTETIK: "Sentetik" };
@@ -402,6 +406,7 @@ export async function getAnalystStats(excludeRaceId?: string, sadeceGuncelMotor 
           distance: true,
           raceDay: { select: { hippodrome: { select: { name: true } }, date: true } },
           result: { select: { hitTop1: true, winnerNos: true } },
+          runners: { select: { id: true }, where: { scratched: false } },
         },
       },
     },
@@ -415,6 +420,20 @@ export async function getAnalystStats(excludeRaceId?: string, sadeceGuncelMotor 
     if (d <= 1600) return "1401–1600m";
     if (d <= 1800) return "1601–1800m";
     return "1800m+";
+  }
+
+  // 2026-08-30 kullanıcı bulgusu ("at sayılarına göre hangi katmanda yazılan atlar daha
+  // şanslı oluyor" araştırması): saha büyüdükçe kazananın Ekonomik'te (ilk 3) yakalanma
+  // oranı düşüyor, Geniş'e kaçma oranı belirgin artıyor (≤6 at: Geniş %0 → 13+ at: Geniş
+  // %24.8, n=527 üzerinden) — tierOneri() şu an at sayısını hiç dikkate almıyor. Bu
+  // kırılım önce GÖRÜNÜR kılınıyor (öneri eşiklerine dokunmadan) — bkz. admin/page.tsx.
+  const AT_SAYISI_ORDER = ["≤6 at", "7-8 at", "9-10 at", "11-12 at", "13+ at"];
+  function atSayisiBucket(n: number): string {
+    if (n <= 6) return "≤6 at";
+    if (n <= 8) return "7-8 at";
+    if (n <= 10) return "9-10 at";
+    if (n <= 12) return "11-12 at";
+    return "13+ at";
   }
 
   /** Aynı üst gruba (örn. "Handikap") ait satırları yan yana toplar; gruplar kendi içindeki toplam koşu
@@ -537,6 +556,12 @@ export async function getAnalystStats(excludeRaceId?: string, sadeceGuncelMotor 
     couponTierByClassType: groupCouponTier((r) => normalizeClassType(r.race.classType), classTypeGroup),
     byClassTypeGroup: group((r) => classTypeGroup(r.race.classType)),
     couponTierByClassTypeGroup: groupCouponTier((r) => classTypeGroup(r.race.classType)),
+    byAtSayisi: group((r) => atSayisiBucket(r.race.runners.length)).sort(
+      (a, b) => AT_SAYISI_ORDER.indexOf(a.label) - AT_SAYISI_ORDER.indexOf(b.label)
+    ),
+    couponTierByAtSayisi: groupCouponTier((r) => atSayisiBucket(r.race.runners.length)).sort(
+      (a, b) => AT_SAYISI_ORDER.indexOf(a.label) - AT_SAYISI_ORDER.indexOf(b.label)
+    ),
     overallCouponTier: groupCouponTier(() => "Tüm Tahminler")[0] ?? {
       label: "Tüm Tahminler",
       total: 0,
