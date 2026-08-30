@@ -22,7 +22,10 @@ export default async function EditAnalizPage({ params }: PageProps) {
 
   const race = pred.race;
   const analystStats = await getAnalystStats(race.id, true);
-  const advice = getClassTypeAdvice(analystStats, race.classType);
+  // 2026-08-30 kullanıcı talebi: at sayısı arttıkça kazananın Ekonomik'te yakalanma oranı
+  // düşüyor, Geniş'e kaçma oranı artıyor — bkz. admin.service.ts'teki tierOneri notu.
+  const atSayisi = race.runners.filter((r) => !r.scratched).length;
+  const advice = getClassTypeAdvice(analystStats, race.classType, atSayisi);
 
   // Taslak kalma sebebini canlı hesapla — statik/eski bir metin değil, o an geçerli
   // yayın öncesi kontrollerin (assertPublishSafe) gerçek sonucu (kullanıcı talimatı:

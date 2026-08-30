@@ -173,7 +173,12 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                           : (original?.classType ?? race.classType);
                       const effectiveRunners =
                         race.runners.length > 0 ? race.runners : (original?.runners ?? []);
-                      const advice = getClassTypeAdvice(analystStatsByRaceId.get(effectiveRaceIdFor(race))!, effectiveClassType);
+                      // 2026-08-30 kullanıcı talebi: at sayısı arttıkça kazananın Ekonomik'te
+                      // yakalanma oranı düşüyor, Geniş'e kaçma oranı artıyor — bu koşunun
+                      // GERÇEK at sayısı (scratched hariç, bkz. getAdminRaceDays) tierOneri'ye
+                      // aktarılıyor ki koşu-tipi bazlı öneriden daha geniş bir kupon
+                      // gerekiyorsa öneri buna göre yükselsin.
+                      const advice = getClassTypeAdvice(analystStatsByRaceId.get(effectiveRaceIdFor(race))!, effectiveClassType, effectiveRunners.length);
 
                       return (
                         <tr

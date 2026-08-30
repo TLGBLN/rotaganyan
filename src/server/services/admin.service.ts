@@ -127,7 +127,12 @@ export async function getAdminRaceDays(dateStr?: string, limit = 30): Promise<Ad
             },
           },
           result: { select: { id: true } },
-          runners: { select: { id: true, no: true, name: true } },
+          // 2026-08-30 kullanıcı bulgusu: çekilen (scratched) atlar hiçbir yerde saha
+          // büyüklüğüne sayılmıyor (bkz. getAnalystStats'ın byAtSayisi kırılımı, "Saha
+          // Büyüklüğü = Gerçek Start Sayısı" kararı) — bu sorgu filtre UYGULAMIYORDU,
+          // admin/kupon'daki "At" sütunu ve at-sayısı-duyarlı tavsiye bu yüzden yanlış
+          // (fazla) sayabiliyordu. Artık tutarlı.
+          runners: { select: { id: true, no: true, name: true }, where: { scratched: false } },
         },
         orderBy: { raceNo: "asc" },
       },
@@ -378,6 +383,21 @@ function couponTierForRank(rank: number | undefined): CouponTier {
   return "genis";
 }
 
+// 2026-08-30 kullanıcı bulgusu ("at sayılarına göre hangi katmanda yazılan atlar daha
+// şanslı oluyor" araştırması): saha büyüdükçe kazananın Ekonomik'te (ilk 3) yakalanma
+// oranı düşüyor, Geniş'e kaçma oranı belirgin artıyor (≤6 at: Geniş %0 → 13+ at: Geniş
+// %24.8, n=527 üzerinden). Modül seviyesinde tanımlı — hem getAnalystStats (kırılımı
+// hesaplarken) hem getClassTypeAdvice (canlı bir koşunun at sayısını hangi kovaya
+// koyacağını bulurken) kullanıyor.
+export const AT_SAYISI_ORDER = ["≤6 at", "7-8 at", "9-10 at", "11-12 at", "13+ at"];
+export function atSayisiBucket(n: number): string {
+  if (n <= 6) return "≤6 at";
+  if (n <= 8) return "7-8 at";
+  if (n <= 10) return "9-10 at";
+  if (n <= 12) return "11-12 at";
+  return "13+ at";
+}
+
 /**
  * Yayında ve sonuçlanmış tahminleri sınıf/pist/güven/hipodroma göre kırarak isabet oranını çıkarır.
  * `excludeRaceId` verilirse o koşu hariç tutulur — bir koşuya "tavsiye" gösterirken o koşunun kendi
@@ -420,20 +440,6 @@ export async function getAnalystStats(excludeRaceId?: string, sadeceGuncelMotor 
     if (d <= 1600) return "1401–1600m";
     if (d <= 1800) return "1601–1800m";
     return "1800m+";
-  }
-
-  // 2026-08-30 kullanıcı bulgusu ("at sayılarına göre hangi katmanda yazılan atlar daha
-  // şanslı oluyor" araştırması): saha büyüdükçe kazananın Ekonomik'te (ilk 3) yakalanma
-  // oranı düşüyor, Geniş'e kaçma oranı belirgin artıyor (≤6 at: Geniş %0 → 13+ at: Geniş
-  // %24.8, n=527 üzerinden) — tierOneri() şu an at sayısını hiç dikkate almıyor. Bu
-  // kırılım önce GÖRÜNÜR kılınıyor (öneri eşiklerine dokunmadan) — bkz. admin/page.tsx.
-  const AT_SAYISI_ORDER = ["≤6 at", "7-8 at", "9-10 at", "11-12 at", "13+ at"];
-  function atSayisiBucket(n: number): string {
-    if (n <= 6) return "≤6 at";
-    if (n <= 8) return "7-8 at";
-    if (n <= 10) return "9-10 at";
-    if (n <= 12) return "11-12 at";
-    return "13+ at";
   }
 
   /** Aynı üst gruba (örn. "Handikap") ait satırları yan yana toplar; gruplar kendi içindeki toplam koşu
@@ -800,26 +806,65 @@ function tierYuzdeMetni(t: CouponTierBreakdown, gaGoster: boolean): string {
 // söylüyor. Ayrıca en zayıf dilimin metni artık yalnız "geniş ekle" demiyor, o ayağı
 // HİÇ OYNAMAMAYI da açıkça bir seçenek olarak sunuyor (çok ayaklı kuponda bütçe kısıtı
 // varsa, geniş yazmak yerine o ayaktan tamamen çekilmek de rasyonel bir seçenek).
-function tierOneri(t: CouponTierBreakdown): string {
+// 2026-08-30 kullanıcı talebi ("at sayılarına göre hangi katmanda yazılan atlar daha
+// şanslı oluyor... zaten odak noktamız bu, tierOneri'nin at sayısını da hesaba katması")
+// — tierOneri'nin 4 sabit eşiği (eko≥65/ilk6≥80/ilk6≥60/else) SIRALI bir seviye koduna
+// çevrildi (0=en dar...3=en geniş) ki koşu-tipi bazlı seviye ile at-sayısı bazlı seviye
+// KARŞILAŞTIRILABİLSİN — ikisinden HANGİSİ daha geniş kupon öneriyorsa o kazanır (daha
+// az veri kaybettiren tarafı, yani daha temkinli tarafı seçmek güvenlik açısından doğru).
+type TierSeviyeKodu = 0 | 1 | 2 | 3;
+const TIER_METNI: Record<TierSeviyeKodu, string> = {
+  0: "İlk 3 at genelde yeterli — bu ayakta dar kalabilirsiniz.",
+  1: "Normal'e (ilk 6 at) kadar yazmak güvenli.",
+  2: "Normal'den de at yazmak faydalı olabilir.",
+  3: "Bu türde dar kupon sık kaçırıyor — ya Geniş'ten de at ekleyin, ya da bu ayağı hiç oynamayın.",
+};
+function tierSeviyeKodu(t: CouponTierBreakdown): TierSeviyeKodu {
+  const p = (n: number) => (n / t.total) * 100;
+  const eko = p(t.ekonomik);
+  const ilk6 = eko + p(t.normal);
+  if (eko >= 65) return 0;
+  if (ilk6 >= 80) return 1;
+  if (ilk6 >= 60) return 2;
+  return 3;
+}
+/** Bir seviyeye göre "bu tavsiyeye uyulsaydı geçmişte kazananın kaçırılma oranı" — tierOneri'nin disclosure cümlesinde kullanılır. */
+function kacirmaOrani(t: CouponTierBreakdown, seviye: TierSeviyeKodu): number {
   const p = (n: number) => (n / t.total) * 100;
   const eko = p(t.ekonomik);
   const ilk6 = eko + p(t.normal);
   const genisToplam = ilk6 + p(t.genis);
-  let cumle: string;
-  let kacirma: number; // bu tavsiyeye uyulsaydı geçmişte kazananın kaçırılma oranı
-  if (eko >= 65) {
-    cumle = "İlk 3 at genelde yeterli — bu ayakta dar kalabilirsiniz.";
-    kacirma = 100 - eko;
-  } else if (ilk6 >= 80) {
-    cumle = "Normal'e (ilk 6 at) kadar yazmak güvenli.";
-    kacirma = 100 - ilk6;
-  } else if (ilk6 >= 60) {
-    cumle = "Normal'den de at yazmak faydalı olabilir.";
-    kacirma = 100 - ilk6;
-  } else {
-    cumle = "Bu türde dar kupon sık kaçırıyor — ya Geniş'ten de at ekleyin, ya da bu ayağı hiç oynamayın.";
-    kacirma = 100 - genisToplam;
+  if (seviye === 0) return 100 - eko;
+  if (seviye === 3) return 100 - genisToplam;
+  return 100 - ilk6;
+}
+
+/**
+ * `t`: koşu tipine (classType/classTypeGroup) göre kupon kademesi dağılımı — mevcut davranış.
+ * `atSayisiTier`: BU KOŞUNUN gerçek at sayısı kovasının (bkz. atSayisiBucket) tarihsel dağılımı,
+ * yalnız yeterli örneklemliyse (TIER_GUVEN_ESIGI üstü) verilir. Verilmişse ve koşu-tipi
+ * bazlı seviyeden DAHA GENİŞ bir kupon öneriyorsa, at sayısı bazlı seviye kazanır — saha
+ * büyüdükçe kazananın Ekonomik'te yakalanma oranı düşüyor, Geniş'e kaçma oranı artıyor
+ * (≤6 at: Geniş %0 → 13+ at: Geniş %24.8, n=527) — bu artık öneri metnine yansıyor.
+ */
+function tierOneri(t: CouponTierBreakdown, atSayisiTier?: CouponTierBreakdown): string {
+  const siniftSeviye = tierSeviyeKodu(t);
+  let seviye = siniftSeviye;
+  let kaynak = t;
+  let atSayisiNedeniyle = false;
+  if (atSayisiTier && atSayisiTier.total >= TIER_GUVEN_ESIGI) {
+    const atSeviye = tierSeviyeKodu(atSayisiTier);
+    if (atSeviye > siniftSeviye) {
+      seviye = atSeviye;
+      kaynak = atSayisiTier;
+      atSayisiNedeniyle = true;
+    }
   }
+  let cumle = TIER_METNI[seviye];
+  if (atSayisiNedeniyle) {
+    cumle += " (Bu koşudaki at sayısı, benzer kalabalıklıktaki koşularda geçmişte daha geniş kupon gerektirmiş.)";
+  }
+  const kacirma = kacirmaOrani(kaynak, seviye);
   // 2026-08-30 kullanıcı bulgusu: "Bu tavsiyeye uyulsaydı... KAÇIRILMIŞ olurdu" biçimindeki
   // varsayımsal/çift-olumsuz cümle kafa karıştırıyordu ("düz mantıkla yaz" talebi) — doğrudan
   // geçmiş-veri ifadesine çevrildi, aynı sayı, koşullu kip yok.
@@ -847,13 +892,17 @@ function tierSeviye(t: CouponTierBreakdown): ClassTypeAdvice["level"] {
  * classTypeGroup) düşülür; dar sınıfın kendi (küçük, geniş GA'lı) rakamı da
  * ayrıca gösterilir ki admin ikisini birden görüp kendi kararını versin.
  */
-export function getClassTypeAdvice(stats: AnalystStats, classType: string): ClassTypeAdvice {
+export function getClassTypeAdvice(stats: AnalystStats, classType: string, atSayisi?: number): ClassTypeAdvice {
   const normalized = normalizeClassType(classType);
   const grupAdi = classTypeGroup(classType);
   const breakdown = stats.byClassType.find((b) => b.label === normalized);
   const tier = stats.couponTierByClassType.find((t) => t.label === normalized);
   const grupTier = stats.couponTierByClassTypeGroup.find((t) => t.label === grupAdi);
   const grupBreakdown = stats.byClassTypeGroup.find((b) => b.label === grupAdi);
+  // 2026-08-30 kullanıcı talebi: bu koşunun GERÇEK at sayısı verildiyse, o kovanın
+  // (bkz. atSayisiBucket) tarihsel kademe dağılımı da tierOneri'ye aktarılır — koşu-tipi
+  // bazlı öneriden DAHA GENİŞ bir kupon gerektiriyorsa o kazanır (bkz. tierOneri notu).
+  const atSayisiTier = atSayisi != null ? stats.couponTierByAtSayisi.find((t) => t.label === atSayisiBucket(atSayisi)) : undefined;
 
   const darYeterli = !!tier && tier.total >= TIER_GUVEN_ESIGI;
   const grupYeterli = !!grupTier && grupTier.total >= TIER_GUVEN_ESIGI;
@@ -867,7 +916,7 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string): Clas
     return {
       level: tierSeviye(tier),
       text: `${darMetin} (${tier.total} koşu) · 1. seçim 1. geldi: ${isabet}`,
-      oneri: tierOneri(tier),
+      oneri: tierOneri(tier, atSayisiTier),
       tierYuzdeler: { eko: tier.ekonomik, nor: tier.normal, genis: tier.genis, kacti: tier.kacti, toplam: tier.total },
     };
   }
@@ -881,7 +930,7 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string): Clas
     return {
       level: tierSeviye(grupTier),
       text,
-      oneri: tierOneri(grupTier),
+      oneri: tierOneri(grupTier, atSayisiTier),
       tierYuzdeler: { eko: grupTier.ekonomik, nor: grupTier.normal, genis: grupTier.genis, kacti: grupTier.kacti, toplam: grupTier.total },
     };
   }
