@@ -813,11 +813,17 @@ function tierYuzdeMetni(t: CouponTierBreakdown, gaGoster: boolean): string {
 // KARŞILAŞTIRILABİLSİN — ikisinden HANGİSİ daha geniş kupon öneriyorsa o kazanır (daha
 // az veri kaybettiren tarafı, yani daha temkinli tarafı seçmek güvenlik açısından doğru).
 type TierSeviyeKodu = 0 | 1 | 2 | 3;
-const TIER_METNI: Record<TierSeviyeKodu, string> = {
-  0: "İlk 3 at genelde yeterli — bu ayakta dar kalabilirsiniz.",
-  1: "Normal'e (ilk 6 at) kadar yazmak güvenli.",
-  2: "Normal'den de at yazmak faydalı olabilir.",
-  3: "Bu türde dar kupon sık kaçırıyor — ya Geniş'ten de at ekleyin, ya da bu ayağı hiç oynamayın.",
+// 2026-08-30 kullanıcı talebi ("tek satırlık kısa cümle... 3 at yer 6 at yeter 6 ve fazası
+// gibi... tabi kazanma yüzdeleri de olsun"): eski tam cümleler + ayrı "(...%X'i dışında
+// kaldı)" dışlama-cümlesi net değildi. Artık gerçek yakalama yüzdesi DOĞRUDAN kısa cümlenin
+// içinde — ayrı bir dışlama cümlesine gerek kalmadı, sayı zaten en önde. Detaylı Eko/Nor/
+// Gen/1.seçim kırılımı `advice.text`'te (ClassTypeAdviceCard'da hemen altında, küçük/soluk)
+// DEĞİŞMEDEN duruyor — yalnız üstteki başlık cümlesi kısaldı.
+const TIER_KISA_METIN: Record<TierSeviyeKodu, (yuzde: number) => string> = {
+  0: (y) => `3 at yeter (%${Math.round(y)})`,
+  1: (y) => `6 at yeter (%${Math.round(y)})`,
+  2: (y) => `6 ve fazası (%${Math.round(y)})`,
+  3: (y) => `Geniş şart, ya da oynamayın (%${Math.round(y)})`,
 };
 function tierSeviyeKodu(t: CouponTierBreakdown): TierSeviyeKodu {
   const p = (n: number) => (n / t.total) * 100;
@@ -851,25 +857,15 @@ function tierOneri(t: CouponTierBreakdown, atSayisiTier?: CouponTierBreakdown): 
   const siniftSeviye = tierSeviyeKodu(t);
   let seviye = siniftSeviye;
   let kaynak = t;
-  let atSayisiNedeniyle = false;
   if (atSayisiTier && atSayisiTier.total >= TIER_GUVEN_ESIGI) {
     const atSeviye = tierSeviyeKodu(atSayisiTier);
     if (atSeviye > siniftSeviye) {
       seviye = atSeviye;
       kaynak = atSayisiTier;
-      atSayisiNedeniyle = true;
     }
   }
-  let cumle = TIER_METNI[seviye];
-  if (atSayisiNedeniyle) {
-    cumle += " (Bu koşudaki at sayısı, benzer kalabalıklıktaki koşularda geçmişte daha geniş kupon gerektirmiş.)";
-  }
-  const kacirma = kacirmaOrani(kaynak, seviye);
-  // 2026-08-30 kullanıcı bulgusu: "Bu tavsiyeye uyulsaydı... KAÇIRILMIŞ olurdu" biçimindeki
-  // varsayımsal/çift-olumsuz cümle kafa karıştırıyordu ("düz mantıkla yaz" talebi) — doğrudan
-  // geçmiş-veri ifadesine çevrildi, aynı sayı, koşullu kip yok.
-  cumle += ` (Geçmişte kazanan atların yaklaşık %${Math.round(Math.max(0, kacirma))}'i bu aralığın dışında kaldı.)`;
-  return cumle;
+  const yakalama = 100 - kacirmaOrani(kaynak, seviye);
+  return TIER_KISA_METIN[seviye](Math.max(0, yakalama));
 }
 
 function tierSeviye(t: CouponTierBreakdown): ClassTypeAdvice["level"] {
