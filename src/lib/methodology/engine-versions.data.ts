@@ -470,13 +470,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.28",
     baslangic: new Date("2026-08-30T00:00:23+03:00"),
-    bitis: null,
+    bitis: new Date("2026-08-30T12:40:59+03:00"),
     aciklama: "Kullanıcı talebi (\"en baştan sinyal araştır\"): dün silinen 11 sinyal V5 penceresinde (249-253 koşu) B=500 MODEL-FARKI testiyle tek tek yeniden denendi. 7'si (accurace, formEgimi+formEgimi2, kgs+kgs2, pistUzmani, galop, agfYukselisVarMi+agfDususVarMi) yine katkısız çıktı — VIF kontrolü (hepsi 1.0-1.2) bunun 'A katmanı tarafından zaten yakalanmış olma' değil, küçük örneklemde güç yetersizliği olduğunu gösterdi. sireOrani ilk testte güçlü çıktı (top3 +6.9pp, GA sıfırı dışlıyor, hem in-sample hem gerçek train/test'te) ama KALICI araçla (n=1060, segment bazlı, gerçek train/test) yeniden test edilince HEM düşük-şart HEM diğer'de anlamsız çıktı (düşük-şart nokta=0.0477 GA=[-0.1352,0.2045]) — küçük örneklemin yanıltıcı olduğu bir örnek daha. Kullanıcı KARARIYLA (zeminToleransi emsaliyle, AskUserQuestion ile teyit edildi) sireOrani yine de düşük-şart'a özel bir 'B katmanı' olarak eklendi — AMA A'nın 12-özellikli regresyonuna 13. terim olarak DEĞİL: softmax'a girmeden önce skora ayrı, bağımsız kalibre edilmiş bir terim olarak (bkz. v5-engine.ts bKatmaniUygula). Bu, V6 vizyonundaki 'A/B/C katmanlama' mimarisinin ilk somut uygulaması.",
     neyiAnalizEdiyor: [
       "A katmanı (mevcut 12 özellik, kendi regresyonu) HİÇ değişmedi — yalnız düşük-şart koşularda skora softmax öncesi küçük bir B katmanı terimi (sireOrani, katsayı=0.0477, düşük-şart popülasyon ortalama=11.6305/sapma=3.6563 ile standardize) ekleniyor. Diğer/Handikap koşularında oran=0, skor/olasılık BİREBİR V5.27 ile aynı.",
     ],
     caprazlamalar: [
       "8 aday V5 penceresinde (n=249-253) B=500 model-farkı testiyle tek tek denendi — tam sonuçlar sinyal-kutugu.service.ts'in arşiv yorumunda. sireOrani'nin düşük-şart katsayısı (0.0477) kalıcı aracın (arac-model-egit-segment.mjs, n=1060, gerçek %75/25 train/test) GERÇEK nokta tahmininden alındı — kanıtsız ama keyfi değil. B katmanı uygulanmadığı (diğer/Handikap) koşularda bKatmaniUygulandiMi=false doğrulandı (gerçek race verisiyle), P(TOP2)/P(TOP3)/piyasa-körü skor birim testleri (v5-engine.test.ts) B katmanından bağımsız geçmeye devam ediyor.",
+    ],
+  },
+  {
+    versiyon: "V5.29",
+    baslangic: new Date("2026-08-30T12:40:59+03:00"),
+    bitis: null,
+    aciklama: "Kullanıcı, 2026-08-27'de (V5.24, Kocaeli 2.Koşu örneğiyle) tek bir ortak anahtarla (GOSTERIM_SIRASI_DUZELTMELERI_AKTIF=false) kapatılan üç gösterim-sırası kuralını (AGF Trend Terfisi/AGF Favorisi İlk-3 Garantisi/Derin AGF-Longshot Düzeltmesi) tek tek yeniden değerlendirdi. Ortak anahtar ÜÇE bölündü (bkz. v5-engine.ts): AGF Trend Terfisi GERİ AÇILDI — bu kural KOŞULSUZ değil, terfi eden adayın olasılığı diğer adaylarla YARIŞIR (terfiPenceresiV5), bu yüzden Kocaeli'deki 'modelin kendi yüzdesini koşulsuz ezme' sorununu taşımıyor; kendi backtest kanıtı (n=663, %21.6 galibiyet/%53.8 top3) hiç sorgulanmamıştı. Diğer ikisi KAPALI KALDI: AGF Favorisi İlk-3 Garantisi tam olarak Kocaeli'deki davranışın kendisi (AGF favorisini modelin yüzdesine bakmadan koşulsuz 3.sıraya zorluyor) — kanıtı (n=428) hâlâ geçerli sayılıyor ama prensip gerekçesiyle kapalı; Derin AGF-Longshot Düzeltmesi hem aynı prensip hem de artık istatistiksel kanıtı da yok (güncel/tazelenmiş veride net etki GA=[-3,11], sıfırı içeriyor).",
+    neyiAnalizEdiyor: [
+      "Skor/olasılık HİÇ değişmedi — yalnız GÖSTERİM sırası/kararı etkileniyor (agfTrendTerfisiUygula, faz2V5Sirala içinde softmax SONRASI çalışıyor). A/B katmanları (V5.27/V5.28) bu değişiklikten bağımsız, hiç dokunulmadı.",
+    ],
+    caprazlamalar: [
+      "Yeni bir backtest çalıştırılmadı — üçünün de 2026-08-27'deki kanıtları (n=663/428/448) zaten geçerli kabul ediliyordu, kapatma kararı o zaman da istatistiksel değil PRENSİP kararıydı (Kocaeli 2.Koşu). Bugünkü değişiklik yalnız üç kuralı ayrı ayrı değerlendirip aynı prensip testinden (koşulsuz mu, olasılıkla yarışıyor mu) geçenin geri açılması — Derin AGF-Longshot'ın istatistiksel kanıtının artık geçersiz olduğu bilgisi 2026-08-27'nin kendi notundan (1042 yarışlık güncel retest) alındı, bugün yeniden ölçülmedi.",
     ],
   },
 ];

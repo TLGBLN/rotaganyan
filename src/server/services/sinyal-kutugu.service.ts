@@ -100,27 +100,33 @@ export type SiralamaKurali = {
 // sinyal harmonisi B=500) üçünü de tek tek geri getirtti (V5.21→V5.23). AMA Kocaeli
 // 2.Koşu SOMUT ÖRNEĞİNDE (TEYZEOĞLU %11.1 ile 1.sırada, MAŞİDE %23.5 ile 3.sırada)
 // kullanıcı KESİN karar verdi: "sıralama yüzdeye göre olur, 1.sıradaki ata %24
-// vermelisin." v5-engine.ts'te tek bir anahtar eklendi (GOSTERIM_SIRASI_DUZELTMELERI_AKTIF
-// = false) — üçü de KOD OLARAK duruyor (silinmedi, backtest kanıtları geçerli) ama hiçbiri
-// ÇAĞRILMIYOR. Gösterim sırası artık kesin olarak yalnız ham olasılığa göre (V5.24).
+// vermelisin." (V5.24) — üçü de tek bir ortak anahtarla (GOSTERIM_SIRASI_DUZELTMELERI_AKTIF
+// = false) kapatılmıştı.
+//
+// 2026-08-30 — kullanıcı üçünü TEK TEK yeniden değerlendirdi, ortak anahtar ÜÇE bölündü
+// (AGF_TREND_TERFISI_AKTIF/AGF_FAVORI_ILK3_GARANTISI_AKTIF/DERIN_LONGSHOT_DUZELTMESI_AKTIF,
+// bkz. v5-engine.ts): AGF Trend Terfisi GERİ AÇILDI (Kocaeli-tipi çakışmaya yol açmaz —
+// koşulsuz değil, adayın olasılığı diğerleriyle yarışır), diğer ikisi KAPALI KALDI (biri
+// tam olarak Kocaeli'deki koşulsuz-favori-zorlama davranışının kendisi, diğerinin artık
+// istatistiksel kanıtı da yok).
 export const SIRALAMA_KURALLARI: SiralamaKurali[] = [
   {
     ad: "AGF Trend Terfisi",
-    etiket: "GERİ ALINDI (2026-08-27, V5.24, kesin karar)",
-    aciklama: "En çok yükselen/düşen AGF trendini taşıyan + yeterli sinyal sayısına (≥4) sahip atlar, ham sıralamada geride kalsa bile ilk-3'e/ilk-6'ya terfi ediyordu. Aynı gün 3 kez el değiştirdi (kaldırıldı→geri geldi→kesin kaldırıldı) — Kocaeli 2.Koşu örneği kullanıcının kesin kararını netleştirdi: sıralama artık İSTİSNASIZ yüzdeye göre.",
-    backtestOzet: "n=663 → %21.6 galibiyet / %53.8 top3 (geçerliliğini koruyor, uygulanmıyor)",
+    etiket: "GERİ AÇILDI (2026-08-30, V5.28+)",
+    aciklama: "En çok yükselen/düşen AGF trendini taşıyan + yeterli sinyal sayısına (≥4) sahip atlar, ham sıralamada geride kalsa bile ilk-3'e/ilk-6'ya terfi eder. 2026-08-27'de diğer ikisiyle birlikte kapatılmıştı (Kocaeli 2.Koşu örneği), ama bu kural KOŞULSUZ değil — adayın olasılığı diğer adaylarla YARIŞIR (terfiPenceresiV5), bu yüzden Kocaeli'deki gibi modelin kendi yüzdesini ezme riski taşımıyor. Kullanıcı 2026-08-30'da tek tek yeniden değerlendirip yalnız bunu geri açtı.",
+    backtestOzet: "n=663 → %21.6 galibiyet / %53.8 top3 — GEÇERLİ ve UYGULANIYOR.",
   },
   {
     ad: "AGF Favorisi İlk-3 Garantisi",
-    etiket: "GERİ ALINDI (2026-08-27, V5.24, kesin karar)",
-    aciklama: "AGF sırası=1 olan at, ham olasılık sıralamasında top3 dışında kalsa bile KOŞULSUZ 3.sıraya alınıyordu. Kocaeli 2.Koşu örneğiyle kullanıcı kesin karar verdi: sıralama İSTİSNASIZ yüzdeye göre.",
-    backtestOzet: "n=428 → net +5 yarış (top3 %60.0→%61.2). Güncel B=500 doğrulama da yapılmıştı (top3 net GA=[0,7]) — geçerliliğini koruyor, uygulanmıyor.",
+    etiket: "KAPALI (2026-08-27, V5.24, kesin karar — 2026-08-30'da yeniden değerlendirilip KORUNDU)",
+    aciklama: "AGF sırası=1 olan at, ham olasılık sıralamasında top3 dışında kalsa bile KOŞULSUZ 3.sıraya alınıyordu. Kocaeli 2.Koşu örneğiyle kullanıcı kesin karar verdi: sıralama İSTİSNASIZ yüzdeye göre. 2026-08-30'da AGF Trend Terfisi'yle birlikte yeniden gündeme geldi ama BİLEREK kapalı bırakıldı — bu, Kocaeli'deki (AGF favorisini modelin yüzdesine bakmadan koşulsuz zorlama) davranışın ta kendisi.",
+    backtestOzet: "n=428 → net +5 yarış (top3 %60.0→%61.2). Kanıt hâlâ geçerli sayılıyor, ama prensip gerekçesiyle uygulanmıyor.",
   },
   {
     ad: "Derin AGF-Longshot Düzeltmesi",
-    etiket: "GERİ ALINDI (2026-08-27, V5.24, kesin karar)",
-    aciklama: "Sistemin ham #1'i AGF sırası≥4 (piyasanın neredeyse hiç güvenmediği bir at) olduğunda, modelin kendi AGF≤3 içindeki en iyi adayıyla yer değiştiriyordu. Bu KURAL, Kocaeli 2.Koşu'da MAŞİDE'yi (ham #1, %23.5) TEYZEOĞLU (%11.1) ile yer değiştirmişti — kullanıcı bunu somut örnekte görüp KESİN reddetti: sıralama İSTİSNASIZ yüzdeye göre.",
-    backtestOzet: "Orijinal: n=448 → net +20 yarış. Güncel/tazelenmiş veriyle (1042 yarış) tekrar test edildiğinde bu net etki artık istatistiksel olarak kanıtlanamıyordu (GA=[-3,11], sıfırı içeriyor) — geçerliliğini koruyor sayılmıyor, uygulanmıyor.",
+    etiket: "KAPALI (2026-08-27, V5.24, kesin karar — 2026-08-30'da istatistiksel kanıt da geçersiz bulundu)",
+    aciklama: "Sistemin ham #1'i AGF sırası≥4 (piyasanın neredeyse hiç güvenmediği bir at) olduğunda, modelin kendi AGF≤3 içindeki en iyi adayıyla yer değiştiriyordu. Bu KURAL, Kocaeli 2.Koşu'da MAŞİDE'yi (ham #1, %23.5) TEYZEOĞLU (%11.1) ile yer değiştirmişti — kullanıcı bunu somut örnekte görüp KESİN reddetti.",
+    backtestOzet: "Orijinal: n=448 → net +20 yarış. Güncel/tazelenmiş veriyle (1042 yarış) tekrar test edildiğinde net etki artık istatistiksel olarak kanıtlanamıyor (GA=[-3,11], sıfırı içeriyor) — hem prensip hem artık kanıt da yok, uygulanmıyor.",
   },
 ];
 

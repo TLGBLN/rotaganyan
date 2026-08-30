@@ -874,14 +874,24 @@ const DERIN_LONGSHOT_AGF_ESIGI = 3;
 
 // 2026-08-27 kullanıcı KESİN kararı (Kocaeli 2.Koşu örneği somut kanıt oldu — TEYZEOĞLU
 // %11.1 ile 1.sırada, MAŞİDE %23.5 ile 3.sırada duruyordu): "sıralama yüzdeye göre olur,
-// 1.sıradaki ata %24 vermelisin." Bugün İKİ YÖNDE de değişti (V5.20'de kaldırıldı, V5.21-23'te
-// tek tek geri geldi, şimdi KESİN olarak tekrar kaldırılıyor) — bu tek `false` anahtarı,
-// gelecekte tekrar karar değişirse tüm faz2V5Sirala'yı yeniden yazmadan tek satırda
-// açılıp/kapanabilsin diye eklendi. Fonksiyonların (agfTrendTerfisiUygula/
-// agfFavoriIlk3Garantisi/derinLongshotDuzelt) HİÇBİRİ silinmedi, yalnız çağrılmıyor —
-// üçünün de kendi backtest kanıtı (n=663/428/448) hâlâ GEÇERLİ, yalnız kullanıcı ham
-// yüzdeden SAPMA istemiyor.
-const GOSTERIM_SIRASI_DUZELTMELERI_AKTIF = false;
+// 1.sıradaki ata %24 vermelisin." O gün İKİ YÖNDE de değişti (V5.20'de kaldırıldı, V5.21-23'te
+// tek tek geri geldi, sonra KESİN olarak tekrar kaldırılmıştı) — üçünün kendi backtest kanıtı
+// (n=663/428/448) o zaman da GEÇERLİ sayılıyordu, yalnız kullanıcı ham yüzdeden SAPMA
+// istemiyordu (prensip vetosu, istatistik değil).
+//
+// 2026-08-30 — kullanıcı bu üç kuralı tek tek yeniden değerlendirdi, TEK bir ortak
+// anahtar yerine ÜÇ AYRI anahtara bölündü ki karar üçü için de aynı olmak zorunda kalmasın:
+// - AGF Trend Terfisi: GERİ AÇILDI. Kocaeli-tipi bir çakışmaya YOL AÇMAZ (agfSirasi'na göre
+//   koşulsuz değil, adayın olasılığı diğer adaylarla YARIŞIR — bkz. terfiPenceresiV5/
+//   agfTrendTerfisiUygula'nın kendi notu) ve n=663 kanıtı hâlâ geçerli.
+// - AGF Favorisi İlk-3 Garantisi: KAPALI KALDI. Tam olarak Kocaeli 2.Koşu'daki gibi bir
+//   durumda (AGF favorisi ham sıralamada top3 dışına düşünce) modelin kendi yüzdesini
+//   YOK SAYIP o atı KOŞULSUZ 3.sıraya çeker — kullanıcının reddettiği davranışın ta kendisi.
+// - Derin AGF-Longshot Düzeltmesi: KAPALI KALDI, hem aynı prensip gerekçesiyle hem de
+//   artık istatistiksel kanıtı da yok (güncel/tazelenmiş veride GA=[-3,11], sıfırı içeriyor).
+const AGF_TREND_TERFISI_AKTIF = true;
+const AGF_FAVORI_ILK3_GARANTISI_AKTIF = false;
+const DERIN_LONGSHOT_DUZELTMESI_AKTIF = false;
 
 function derinLongshotDuzelt<T extends { no: number; agfSirasi: number }>(sirali: T[]): T[] {
   if (sirali.length === 0 || sirali[0].agfSirasi <= DERIN_LONGSHOT_AGF_ESIGI) return sirali;
@@ -976,13 +986,15 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
 
   const sirali = [...enriched].sort((a, b) => (b.olasilik !== a.olasilik ? b.olasilik - a.olasilik : a.no - b.no));
 
-  if (!GOSTERIM_SIRASI_DUZELTMELERI_AKTIF) {
-    return sirali.map((r, i) => ({ ...r, agfTerfi: null, agfFavoriGarantisi: false, teknikSira: i + 1, karar: kararUret(r.olasilik) }));
-  }
+  const terfili = AGF_TREND_TERFISI_AKTIF
+    ? agfTrendTerfisiUygula(sirali)
+    : sirali.map((r) => ({ ...r, agfTerfi: null as "ilk3" | "ilk6" | null }));
 
-  const terfili = agfTrendTerfisiUygula(sirali);
-  const garantili = agfFavoriIlk3Garantisi(terfili);
-  const duzeltilmis = derinLongshotDuzelt(garantili);
+  const garantili = AGF_FAVORI_ILK3_GARANTISI_AKTIF
+    ? agfFavoriIlk3Garantisi(terfili)
+    : terfili.map((r) => ({ ...r, agfFavoriGarantisi: false }));
+
+  const duzeltilmis = DERIN_LONGSHOT_DUZELTMESI_AKTIF ? derinLongshotDuzelt(garantili) : garantili;
 
   return duzeltilmis.map((r, i) => {
     let karar = kararUret(r.olasilik);
