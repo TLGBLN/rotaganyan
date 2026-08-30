@@ -112,6 +112,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Yatay kaydırılabilir şeritlerde (ör. filtre çubukları) kaydırma işlevini koruyup
+   görünür kaydırma çubuğunu gizlemek için — kaydırma çubuğu dar konteynerlerde
+   görüntüyü bozuyordu. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Satır zebra rengi */
 .race-row-even { background: oklch(0.16 0.038 240); }
 

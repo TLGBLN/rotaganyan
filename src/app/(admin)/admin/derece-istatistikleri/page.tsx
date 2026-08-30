@@ -117,7 +117,7 @@ export default async function DereceIstatistikleriPage({
           hem arka plan hem yazı rengi (tema tokenlarından) verildi. Ayrıca "tek satır"
           talebi: flex-wrap yerine flex-nowrap + overflow-x-auto, dar ekranda yatay
           kaydırma ile tek satırda kalır. */}
-      <form className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1">
+      <form className="no-scrollbar flex flex-nowrap items-center gap-2 overflow-x-auto">
         <input
           type="text"
           name="atAdi"
@@ -157,8 +157,8 @@ export default async function DereceIstatistikleriPage({
         </select>
         <select name="pistDurumu" defaultValue={sp.pistDurumu ?? ""} className="shrink-0 rounded-md border bg-[var(--background)] px-2 py-1.5 text-xs text-[var(--foreground)]">
           <option value="" className="bg-[var(--background)] text-[var(--foreground)]">Tüm Pist Durumları</option>
-          {ozet.pistDurumuDagilimi.map((p) => (
-            <option key={p.pistDurumu} value={p.pistDurumu} className="bg-[var(--background)] text-[var(--foreground)]">{p.pistDurumu || "(boş)"}</option>
+          {ozet.pistDurumuDagilimi.filter((p) => p.pistDurumu).map((p) => (
+            <option key={p.pistDurumu} value={p.pistDurumu} className="bg-[var(--background)] text-[var(--foreground)]">{p.pistDurumu}</option>
           ))}
         </select>
         <select name="mesafe" defaultValue={sp.mesafe ?? ""} className="shrink-0 rounded-md border bg-[var(--background)] px-2 py-1.5 text-xs text-[var(--foreground)]">
