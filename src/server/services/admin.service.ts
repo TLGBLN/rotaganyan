@@ -358,7 +358,7 @@ function normalizeClassType(classType: string): string {
  * "Kısa Vade Handikap" adında "Handikap" geçtiği için KV- önekinden önce
  * kontrol edilir, böylece Handikap grubuna düşer (KV grubuna değil).
  */
-function classTypeGroup(classType: string): string {
+export function classTypeGroup(classType: string): string {
   const normalized = normalizeClassType(classType);
   if (!normalized || normalized === "—") return "Diğer";
   if (normalized.startsWith("Maiden")) return "Maiden Koşular";

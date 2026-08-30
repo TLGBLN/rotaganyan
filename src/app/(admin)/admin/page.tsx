@@ -7,7 +7,7 @@ import {
   getAgfEdgeStats,
 } from "@/server/services/admin.service";
 import { getRaceStyleWinStats, raceStyleBreakdownToRows } from "@/lib/stats";
-import { getV5SinyalPerformansi } from "@/server/services/v5-sinyal-performans.service";
+import { getV5SinyalPerformansi, getV5SinyalPerformansiKosuTipineGore } from "@/server/services/v5-sinyal-performans.service";
 import { getAnalizPerformansOzeti } from "@/server/services/analiz-performans.service";
 import { getVersiyonKarsilastirmasi } from "@/server/services/analiz-versiyon-karsilastirma.service";
 import { getAgfTrendIstatistik } from "@/server/services/agf-trend-istatistik.service";
@@ -34,7 +34,7 @@ export default async function AdminDashboard() {
   const [
     stats, analyst, recentPredictions, pendingPredictions, raceStyleStats,
     archiveStats, agfEdge, v5SinyalPerformansi, performansOzeti, versiyonKarsilastirmasi, agfTrendIstatistik,
-    aylikKuponKazanci,
+    aylikKuponKazanci, v5SinyalPerformansiKosuTipineGore,
   ] = await Promise.all([
     getDashboardStats(),
     getAnalystStats(),
@@ -48,6 +48,7 @@ export default async function AdminDashboard() {
     getVersiyonKarsilastirmasi(),
     getAgfTrendIstatistik(),
     getAylikKuponKazanci(),
+    getV5SinyalPerformansiKosuTipineGore(),
   ]);
   // V5.3 (2026-08-21): motor artık koşu kategorisine göre İKİ AYRI eğitilmiş modelden
   // birini kullanıyor (şartlı1/19/27+maiden vs diğer) — bkz. v5-engine.ts üstündeki not.
@@ -181,6 +182,28 @@ export default async function AdminDashboard() {
               kazandığı oran.
             </div>
             <PerformanceBreakdown title="Sinyal Bazlı Gerçek İsabet Oranı — V5 Dönemi" rows={v5SinyalPerformansi} />
+
+            {/* 2026-08-30 kullanıcı talebi ("V5 Sinyal Kütüğü... koşular koştukça hangi
+                sinyallerin hangi yarışlarda daha faydalı olduğunu görmek istiyorum...
+                ileride yarışlara göre sinyal seçimleri yapabilmemiz için altyapısını
+                hazırla") — üstteki panelin AYNI verisi, koşu-tipi-grubuna (Maiden/Şartlı/
+                Handikap/KV/Satış/Açık) göre kırılmış hâli. Şimdilik yalnız GÖZLEM amaçlı —
+                hiçbir seçim/ağırlıklandırma otomatik uygulanmıyor, gelecekteki koşu-tipine-
+                özel sinyal seçimi kararları için temel oluşturuyor. */}
+            <div>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Sinyal Bazlı Gerçek İsabet Oranı — Koşu Tipine Göre (henüz otomatik bir seçim/ağırlıklandırma uygulanmıyor, yalnız gözlem amaçlı)
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {v5SinyalPerformansiKosuTipineGore.map((g) => (
+                  <PerformanceBreakdown
+                    key={g.koşuTipi}
+                    title={`${g.koşuTipi} (${g.toplamKosu} koşu)`}
+                    rows={g.sinyaller}
+                  />
+                ))}
+              </div>
+            </div>
 
             <CouponTierChart
               rows={[analyst.overallCouponTier]}
