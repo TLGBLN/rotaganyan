@@ -482,13 +482,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.29",
     baslangic: new Date("2026-08-30T12:40:59+03:00"),
-    bitis: null,
+    bitis: new Date("2026-08-30T17:05:32+03:00"),
     aciklama: "Kullanıcı, 2026-08-27'de (V5.24, Kocaeli 2.Koşu örneğiyle) tek bir ortak anahtarla (GOSTERIM_SIRASI_DUZELTMELERI_AKTIF=false) kapatılan üç gösterim-sırası kuralını (AGF Trend Terfisi/AGF Favorisi İlk-3 Garantisi/Derin AGF-Longshot Düzeltmesi) tek tek yeniden değerlendirdi. Ortak anahtar ÜÇE bölündü (bkz. v5-engine.ts): AGF Trend Terfisi GERİ AÇILDI — bu kural KOŞULSUZ değil, terfi eden adayın olasılığı diğer adaylarla YARIŞIR (terfiPenceresiV5), bu yüzden Kocaeli'deki 'modelin kendi yüzdesini koşulsuz ezme' sorununu taşımıyor; kendi backtest kanıtı (n=663, %21.6 galibiyet/%53.8 top3) hiç sorgulanmamıştı. Diğer ikisi KAPALI KALDI: AGF Favorisi İlk-3 Garantisi tam olarak Kocaeli'deki davranışın kendisi (AGF favorisini modelin yüzdesine bakmadan koşulsuz 3.sıraya zorluyor) — kanıtı (n=428) hâlâ geçerli sayılıyor ama prensip gerekçesiyle kapalı; Derin AGF-Longshot Düzeltmesi hem aynı prensip hem de artık istatistiksel kanıtı da yok (güncel/tazelenmiş veride net etki GA=[-3,11], sıfırı içeriyor).",
     neyiAnalizEdiyor: [
       "Skor/olasılık HİÇ değişmedi — yalnız GÖSTERİM sırası/kararı etkileniyor (agfTrendTerfisiUygula, faz2V5Sirala içinde softmax SONRASI çalışıyor). A/B katmanları (V5.27/V5.28) bu değişiklikten bağımsız, hiç dokunulmadı.",
     ],
     caprazlamalar: [
       "Yeni bir backtest çalıştırılmadı — üçünün de 2026-08-27'deki kanıtları (n=663/428/448) zaten geçerli kabul ediliyordu, kapatma kararı o zaman da istatistiksel değil PRENSİP kararıydı (Kocaeli 2.Koşu). Bugünkü değişiklik yalnız üç kuralı ayrı ayrı değerlendirip aynı prensip testinden (koşulsuz mu, olasılıkla yarışıyor mu) geçenin geri açılması — Derin AGF-Longshot'ın istatistiksel kanıtının artık geçersiz olduğu bilgisi 2026-08-27'nin kendi notundan (1042 yarışlık güncel retest) alındı, bugün yeniden ölçülmedi.",
+    ],
+  },
+  {
+    versiyon: "V5.30",
+    baslangic: new Date("2026-08-30T17:05:32+03:00"),
+    bitis: null,
+    aciklama: "Kullanıcı talebiyle (\"sinyalleri opus değerlendirsin... v5 ile kullanılan ve sonuçlanan tüm koşularda\") Opus'a (Agent tool, model:\"opus\") CANLI_SINYALLER + ADAY_SINYALLER'in tamamı, V5 döneminde (16-30 Ağustos, n=248 sonuçlanmış karma-olmayan koşu) GERÇEK yayınlanmış+sonuçlanmış Prediction verisiyle (kod-bazlı + featureSnapshot z-skoru, iki bağımsız ölçüt) denetlettirildi. İki bulgu bu sürümde düzeltildi: (1) h2hKiloDegisimi eğitimde her iki segmentte pozitif (diğer +0.0727, düşük-şart +0.0665) ama canlı iki ölçütte de TERS çıktı (kod-lift -0.6pp→budama sonrası -3.4pp; featureSnapshot z=-0.521, GA=[-0.888,-0.150] sıfırı dışlıyor) — H2H/düşük-şart (V5.6b) ve Handikap/hizDerecesi (V5.10) ile AYNI cerrahi desenle TÜM segmentlerde 0'a sabitlendi (kanıt pooled, tek segmente özgü değildi). (2) sireOrani'nin B katmanı gerekçe/ölçüm bloğunun 2026-08-28'deki 11-sinyal budamasından beri ÖLÜ KOD olduğu bulundu (OZELLIK_GRUPLARI'ndan SIRE grubu kaldırılınca `gruplar.find(g=>g.kod===\"SIRE\")` hep undefined dönüyordu) — skora katkı gerçekleşmeye devam etti ama ne gerekçe metninde ne featureSnapshot'ta hiç görünmüyordu. Gerçek katkı artık ayrı alanlarda (bSireKatkisi/bZeminMesafeKatkisi) hesaplanıp hem gerekçe satırına hem featureSnapshot.bKatmani'ye taşınıyor — B katmanı sinyalleri artık ölçülebilir. jokeyOrani'nin 'anlamsız' notu da güncel canlı veriyle çelişiyor bulundu (kod-lift +3.9→+6.0pp, 4 koşu tipinde de pozitif, z=+0.651) — katsayı DEĞİŞTİRİLMEDİ (zaten sıfırlanmamıştı), yalnız sinyal-kutugu.service.ts'teki not güncellendi.",
+    neyiAnalizEdiyor: [
+      "Skor/olasılık DEĞİŞTİ: h2hKiloDegisimi'nin katkısı artık TÜM kategorilerde (düşük-şart/diğer/Handikap) her zaman 0 — gerçek race verisiyle doğrulandı (scratch script, 4 kategori). Diğer 11 A-katmanı katsayısına dokunulmadı. B katmanı (sireOrani/zeminMesafeDeneyim) skor etkisi HİÇ değişmedi — yalnız artık ölçülebilir/görünür.",
+    ],
+    caprazlamalar: [
+      "Yeni bir bootstrap/model-farkı testi çalıştırılmadı — bu bir 'yeni sinyal ekleme' değil, mevcut canlı bir katsayının GERÇEK sonuçlanmış V5 koşularında ters çıktığı bulgusuna dayalı cerrahi düzeltme (H2H/düşük-şart ve Handikap/hizDerecesi ile AYNI eşik: ham/gerçek katsayı ters yönlü + GA sıfırı dışlıyor veya dışlamaya çok yakın). Doğrulama: tsc --noEmit temiz, npm run build temiz, v5-engine.test.ts 7/7 geçti, scratch script ile 4 farklı kategoride (1a/2/3/bilinmiyor) h2hKiloDegisimi katkısının gerçekten 0 olduğu VE SIRE gerekçe satırının artık (eşik≥0.03'te) gerçekten göründüğü canlı race verisiyle doğrulandı.",
     ],
   },
 ];

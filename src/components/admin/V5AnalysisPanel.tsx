@@ -35,6 +35,12 @@ type V5At = {
   // dolduruyor: bu atta B katmanı fiilen uygulandı mı ve sireOrani'nin ham değeri neydi.
   bKatmaniUygulandiMi?: boolean;
   sireOrani?: number;
+  // 2026-08-30 (V5.30) — Opus denetimi: bu iki B katmanı teriminin GERÇEK sayısal katkısı
+  // (uygulandı/uygulanmadı booleanının ötesinde) önceden hiçbir yerde saklanmıyordu — ne
+  // gerekçe metninde ne featureSnapshot'ta ölçülebiliyordu. Artık gerçek katkı burada da
+  // taşınıyor, featureSnapshot'a (handleKaydet) ve amber denetim satırlarına besleniyor.
+  bSireKatkisi?: number;
+  bZeminMesafeKatkisi?: number;
   // 2026-08-30 — Zemin+Mesafe Deneyimi B katmanı (bkz. zemin-mesafe-deneyimi.actions.ts) —
   // sireOrani'nin AKSİNE TÜM kategorilerde uygulanıyor, kullanıcı kararıyla hiç gölge-test
   // tamamlanmadan canlıya alındı.
@@ -249,7 +255,22 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
           probTop2: a.probTop2,
           probTop3: a.probTop3,
           marketBlindProb1: a.marketBlindProb1,
-          featureSnapshot: a.tumSinyaller ? { tumSinyaller: a.tumSinyaller, motorEtiketi } : undefined,
+          // 2026-08-30 (V5.30) — Opus denetimi: tumSinyaller yalnız A katmanının 12
+          // özelliğini kapsıyor, B katmanı (sireOrani/zeminMesafeDeneyim) hiç ölçülemiyordu.
+          // bKatmani alanı bu boşluğu kapatıyor — canlı sonuçlar birikince B katmanı
+          // sinyalleri de featureSnapshot z-skoru yöntemiyle denetlenebilecek.
+          featureSnapshot: a.tumSinyaller
+            ? {
+                tumSinyaller: a.tumSinyaller,
+                motorEtiketi,
+                bKatmani: {
+                  sireUygulandiMi: a.bKatmaniUygulandiMi ?? false,
+                  sireKatkisi: a.bSireKatkisi ?? 0,
+                  zeminMesafeUygulandiMi: a.zeminMesafeBKatmaniUygulandiMi ?? false,
+                  zeminMesafeKatkisi: a.bZeminMesafeKatkisi ?? 0,
+                },
+              }
+            : undefined,
         };
       });
       const orijinalSira = [...atlar].sort((a, b) => a.teknikSira - b.teknikSira).map((a) => a.no);
@@ -474,26 +495,26 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                                 </td>
                               </tr>
                             ))}
-                            {/* 2026-08-30 — B katmanı bu tabloda AYRI bir satır olarak
-                                gösteriliyor, A katmanının 12 özelliğiyle karışmasın diye
-                                amber renkte işaretli. bAgirlikOrani/katsayı/standardizasyon
-                                v5-engine.ts'teki B_SIREORANI_* sabitleriyle BİREBİR aynı —
-                                değişirse burası da güncellenmeli. */}
+                            {/* 2026-08-30 (V5.30) — B katmanı bu tabloda AYRI bir satır olarak
+                                gösteriliyor, A katmanının 12 özelliğiyle karışmasın diye amber
+                                renkte işaretli. Opus denetimi öncesi bu satır katsayı/ortalama/
+                                sapmayı v5-engine.ts'ten KOPYALAYIP burada yeniden hesaplıyordu —
+                                iki yerde aynı sabitler ayrı ayrı güncellenmek zorunda kalıyordu,
+                                drift riski. Artık gerçek katkı (r.bSireKatkisi) motor tarafında
+                                hesaplanıp doğrudan taşınıyor, burada yeniden türetilmiyor. */}
                             {a.bKatmaniUygulandiMi && (
                               <tr className="border-t border-amber-500/30 bg-amber-500/5">
                                 <td className="py-1 pr-2 text-amber-600">Sire Oranı (B katmanı)</td>
                                 <td className="py-1 pr-2 font-mono text-amber-600/80">{(a.sireOrani ?? 0).toFixed(2)}</td>
-                                <td className="py-1 pr-2 font-mono text-amber-600/80">{(((a.sireOrani ?? 0) - 11.6305) / 3.6563).toFixed(2)}</td>
+                                <td className="py-1 pr-2 font-mono text-amber-600/80">—</td>
                                 <td className="py-1 font-mono text-amber-600">
-                                  {(((((a.sireOrani ?? 0) - 11.6305) / 3.6563) * 0.0477) >= 0 ? "+" : "")}
-                                  {((((a.sireOrani ?? 0) - 11.6305) / 3.6563) * 0.0477).toFixed(3)}
+                                  {(a.bSireKatkisi ?? 0) >= 0 ? "+" : ""}
+                                  {(a.bSireKatkisi ?? 0).toFixed(3)}
                                 </td>
                               </tr>
                             )}
-                            {/* 2026-08-30 — Zemin+Mesafe Deneyimi B katmanı — sireOrani satırıyla
-                                AYNI desen. Standardizasyon GEREKMİYOR (değer zaten popülasyona-
-                                göreli %), katsayı v5-engine.ts'teki B_ZEMINMESAFE_KATSAYI ile
-                                BİREBİR aynı — değişirse burası da güncellenmeli. */}
+                            {/* 2026-08-30 (V5.30) — Zemin+Mesafe Deneyimi B katmanı — sireOrani
+                                satırıyla AYNI desen, aynı sebeple gerçek katkı taşınıyor. */}
                             {a.zeminMesafeBKatmaniUygulandiMi && (
                               <tr className="border-t border-amber-500/30 bg-amber-500/5">
                                 <td className="py-1 pr-2 text-amber-600">Zemin+Mesafe Deneyimi (B katmanı)</td>
@@ -503,8 +524,8 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                                 </td>
                                 <td className="py-1 pr-2 font-mono text-amber-600/80">—</td>
                                 <td className="py-1 font-mono text-amber-600">
-                                  {((a.zeminMesafeDeneyim ?? 0) * 0.02) >= 0 ? "+" : ""}
-                                  {((a.zeminMesafeDeneyim ?? 0) * 0.02).toFixed(3)}
+                                  {(a.bZeminMesafeKatkisi ?? 0) >= 0 ? "+" : ""}
+                                  {(a.bZeminMesafeKatkisi ?? 0).toFixed(3)}
                                 </td>
                               </tr>
                             )}

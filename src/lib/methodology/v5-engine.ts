@@ -179,9 +179,21 @@ const FEATURE_NAMES = WEIGHTS_DIGER.featureNames; // iki set de AYNI özellik/s�
 // güvenilmezlik, farklı ham değer). HIZ_DERECESI_IDX/WEIGHTS_DIGER_HANDIKAP ile AYNI
 // desende, artık KODA gömülü — bir daha retrain'de kaybolmaz.
 const H2H_NET_SKOR_IDX = FEATURE_NAMES.indexOf("h2hNetSkor");
+
+// 2026-08-30 (V5.30) — Opus denetimi ("v5 ile kullanılan ve sonuçlanan tüm koşularda
+// sinyalleri değerlendir"): h2hKiloDegisimi eğitimde her iki segmentte de pozitif
+// (diğer +0.0727, düşük-şart +0.0665) ama V5 döneminin GERÇEK sonuçlanmış koşularında
+// (16-30 Ağustos, n=248) İKİ BAĞIMSIZ canlı ölçütte de TERS yönde çıktı: kod-bazlı lift
+// -0.6pp (budama sonrası -3.4pp, n=1135→n≈370), featureSnapshot z-farkı -0.521 (%95 GA
+// race-clustered bootstrap B=500=[-0.888,-0.150], SIFIRI DIŞLIYOR — küçük n=19 olsa da
+// H2H/düşük-şart'ın (V5.6b) kabul standardından daha güçlü kanıt). H2H/düşük-şart ve
+// Handikap/hizDerecesi (V5.10) ile AYNI cerrahi desen: yalnız BU TEK katsayı, TÜM
+// segmentlerde (kanıt pooled, tek kategoriye özgü değil) sıfırlandı — diğer katsayılara
+// dokunulmadı. Ham h2hKiloDegisimi hesabı (toFeatureVector) KORUNDU, yalnız ağırlığı 0.
+const H2H_KILO_IDX = FEATURE_NAMES.indexOf("h2hKiloDegisimi");
 const WEIGHTS_DUSUK_SART: AgirlikSeti = {
   ...(v5WeightsDusukSart as AgirlikSeti),
-  weights: (v5WeightsDusukSart as AgirlikSeti).weights.map((w, i) => (i === H2H_NET_SKOR_IDX ? 0 : w)),
+  weights: (v5WeightsDusukSart as AgirlikSeti).weights.map((w, i) => (i === H2H_NET_SKOR_IDX || i === H2H_KILO_IDX ? 0 : w)),
 };
 
 // 2026-08-24 kullanıcı bulgusu: Handikap (kategoriTespit==="2") yarışları KENDİ verisiyle
@@ -195,9 +207,17 @@ const WEIGHTS_DUSUK_SART: AgirlikSeti = {
 // bozulmadan (%26.9→%26.9) top3 %62.7'den %67.2'ye çıktı — tam retrain'den bile iyi,
 // hiç overfit riski yok (yalnız 1 katsayı sıfırlanıyor).
 const HIZ_DERECESI_IDX = FEATURE_NAMES.indexOf("hizDerecesi");
-const WEIGHTS_DIGER_HANDIKAP: AgirlikSeti = {
+// 2026-08-30 (V5.30) — WEIGHTS_DIGER_DUZELTILMIS: h2hKiloDegisimi'nin yukarıdaki global
+// sıfırlaması "diğer" tabanlı TÜM ağırlık setlerine (diğer/Handikap/hibrit Maiden-Satış'ın
+// diğer yarısı) yansısın diye WEIGHTS_DIGER'ın ÜZERİNE ayrı bir katman olarak eklendi —
+// WEIGHTS_DIGER_HANDIKAP artık bunun üzerine inşa ediliyor (hem h2hKilo=0 HEM hizDerecesi=0).
+const WEIGHTS_DIGER_DUZELTILMIS: AgirlikSeti = {
   ...WEIGHTS_DIGER,
-  weights: WEIGHTS_DIGER.weights.map((w, i) => (i === HIZ_DERECESI_IDX ? 0 : w)),
+  weights: WEIGHTS_DIGER.weights.map((w, i) => (i === H2H_KILO_IDX ? 0 : w)),
+};
+const WEIGHTS_DIGER_HANDIKAP: AgirlikSeti = {
+  ...WEIGHTS_DIGER_DUZELTILMIS,
+  weights: WEIGHTS_DIGER_DUZELTILMIS.weights.map((w, i) => (i === HIZ_DERECESI_IDX ? 0 : w)),
 };
 
 // 2026-08-29 — V6 Aşama 2 (bkz. plan): "market-blind" skor için AGF-türevi özelliklerin
@@ -232,11 +252,11 @@ export function hibritMaidenSatisMi(classType: string): boolean {
 }
 
 function agirlikSetleriSec(classType: string): AgirlikSeti[] {
-  if (hibritMaidenSatisMi(classType)) return [WEIGHTS_DUSUK_SART, WEIGHTS_DIGER];
+  if (hibritMaidenSatisMi(classType)) return [WEIGHTS_DUSUK_SART, WEIGHTS_DIGER_DUZELTILMIS];
   const kategori = kategoriTespit(classType);
   if (kategori === "1a" || kategori === "1b") return [WEIGHTS_DUSUK_SART];
   if (kategori === "2") return [WEIGHTS_DIGER_HANDIKAP];
-  return [WEIGHTS_DIGER];
+  return [WEIGHTS_DIGER_DUZELTILMIS];
 }
 
 /** Bir at için, verilen ağırlık setleri üzerinden ortalama (standardize edilmiş vektör,
@@ -823,6 +843,13 @@ export type Faz1RunnerV5Sirali = Faz1RunnerV5 & {
   marketBlindProb1: number; // 2026-08-29 V6 Aşama 2 — AGF-türevi katkılar çıkarılıp saha ayrıca normalize edilmiş P(WIN)
   bKatmaniUygulandiMi: boolean; // 2026-08-30 — sireOrani/B katmanı bu atta uygulandı mı (yalnız düşük-şart)
   zeminMesafeBKatmaniUygulandiMi: boolean; // 2026-08-30 — Zemin+Mesafe Deneyimi/B katmanı bu atta uygulandı mı (TÜM kategoriler)
+  // 2026-08-30 (V5.30) — Opus denetimi: bu iki B katmanı teriminin GERÇEK sayısal katkısı
+  // önceden hiçbir yerde saklanmıyordu (yalnız uygulandı/uygulanmadı booleanı) — skoru
+  // gerçekten değiştiriyordu ama ne gerekçe metninde ne featureSnapshot'ta ölçülebiliyordu.
+  // Artık gerçek katkı (softmax öncesi skora eklenen Δ) burada tutuluyor — muhakemeUretV5
+  // VE tumOzellikleriListele'nin ikisi de bunu kullanıyor.
+  bSireKatkisi: number;
+  bZeminMesafeKatkisi: number;
   standartVektor: number[];
   katkilar: number[]; // standartVektor[i] * WEIGHTS[i], her özelliğin bu attaki katkısı
   sinyalSayisi: number; // V4'ün 8-sinyal sayımı — terfi kapısı VE gerekçe metninde bilgi amaçlı
@@ -1033,18 +1060,19 @@ function bKatmaniUygula(
   skorlar: number[],
   runners: Faz1RunnerV5[],
   classType: string
-): { skorlar: number[]; uygulandi: boolean[]; zeminMesafeUygulandi: boolean[] } {
+): { skorlar: number[]; uygulandi: boolean[]; zeminMesafeUygulandi: boolean[]; sireKatkilar: number[]; zeminMesafeKatkilar: number[] } {
   const sireOran = bAgirlikOrani(classType);
-  const yeniSkorlar = skorlar.map((skor, i) => {
-    const sireTerimi =
-      sireOran === 0 ? 0 : sireOran * B_SIREORANI_KATSAYI * ((runners[i].sireOrani - B_SIREORANI_ORTALAMA) / B_SIREORANI_SAPMA);
-    const zeminMesafeTerimi = B_ZEMINMESAFE_KATSAYI * runners[i].zeminMesafeDeneyim;
-    return skor + sireTerimi + zeminMesafeTerimi;
-  });
+  const sireKatkilar = runners.map((r) =>
+    sireOran === 0 ? 0 : sireOran * B_SIREORANI_KATSAYI * ((r.sireOrani - B_SIREORANI_ORTALAMA) / B_SIREORANI_SAPMA)
+  );
+  const zeminMesafeKatkilar = runners.map((r) => B_ZEMINMESAFE_KATSAYI * r.zeminMesafeDeneyim);
+  const yeniSkorlar = skorlar.map((skor, i) => skor + sireKatkilar[i] + zeminMesafeKatkilar[i]);
   return {
     skorlar: yeniSkorlar,
     uygulandi: runners.map(() => sireOran > 0),
     zeminMesafeUygulandi: runners.map((r) => r.zeminMesafeDeneyim !== 0),
+    sireKatkilar,
+    zeminMesafeKatkilar,
   };
 }
 
@@ -1054,7 +1082,13 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
   const handikapMi = kategoriTespit(faz1.race.classType) === "2";
   const liderEsigi = handikapMi ? ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP : ASIRI_GUVEN_LIDER_ESIGI;
   const skorlarHam = harmanlar.map((h) => h.skor);
-  const { skorlar, uygulandi: bKatmaniUygulandi, zeminMesafeUygulandi } = bKatmaniUygula(skorlarHam, faz1.runners, faz1.race.classType);
+  const {
+    skorlar,
+    uygulandi: bKatmaniUygulandi,
+    zeminMesafeUygulandi,
+    sireKatkilar: bSireKatkilar,
+    zeminMesafeKatkilar: bZeminMesafeKatkilar,
+  } = bKatmaniUygula(skorlarHam, faz1.runners, faz1.race.classType);
   const probs = softmax(skorlar, liderEsigi);
   const etkinSkorlar = effektifSkorlar(skorlar, liderEsigi);
   const top2Marjinal = plackettLuceTopKMarginals(etkinSkorlar, 2);
@@ -1088,6 +1122,8 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
       marketBlindProb1: marketBlindProbs[i],
       bKatmaniUygulandiMi: bKatmaniUygulandi[i],
       zeminMesafeBKatmaniUygulandiMi: zeminMesafeUygulandi[i],
+      bSireKatkisi: bSireKatkilar[i],
+      bZeminMesafeKatkisi: bZeminMesafeKatkilar[i],
       standartVektor: harmanlar[i].standartVektor,
       katkilar: harmanlar[i].katkilar,
       sinyalSayisi: sinyal.sayi,
@@ -1330,23 +1366,28 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
   }
 
   // 2026-08-21 kullanıcı kararı: düşük-şart/maiden segmentinde sireOrani ELLE en güçlü
-  // katsayı yapıldı (bkz. weights/v5-weights-dusuksart.json notu) — ama eski gösterim
-  // mantığı "önce tüm pozitifler, sonra tüm negatifler" sıralıyordu, bu yüzden SIRE
-  // negatif çıktığında (atın kendi aygırı segment ortalamasının altındaysa) listenin en
-  // altına, bir "risk" uyarısına düşüyordu — kullanıcı bunu "öncelikli değil" diye
-  // işaretledi (ŞENGÜL SULTAN/Bursa vakası). SIRE artık işaretine bakılmaksızın (destek/
-  // risk) AGFTREND'den hemen sonra, İKİNCİ satır olarak sabitleniyor — katkısı bu
-  // segmentte zaten en büyük olduğu için bu, gerçek etkiyle tutarlı bir öncelik.
-  const sireGrubu = gruplar.find((g) => g.kod === "SIRE");
-  if (sireGrubu && Math.abs(sireGrubu.katki) >= 0.03) {
+  // katsayı yapıldı (bkz. weights/v5-weights-dusuksart.json notu) — SIRE işaretine
+  // bakılmaksızın (destek/risk) AGFTREND/ZEMINMESAFE'den hemen sonra sabit sırada gösterilir
+  // (ŞENGÜL SULTAN/Bursa vakası — "öncelikli değil" diye işaretlenmemeli, katkısı bu
+  // segmentte zaten en büyük).
+  // 2026-08-30 (V5.30) — Opus denetimi BUG BULDU: SIRE grubu 2026-08-28'de A katmanının
+  // 12-özelliğe küçültülmesiyle OZELLIK_GRUPLARI'ndan TAMAMEN kaldırıldı (sireOrani zaten
+  // A'da değil, B katmanında) ama bu blok hâlâ `gruplar.find(g => g.kod === "SIRE")`
+  // arıyordu — HER ZAMAN undefined döndü, yani bu blok 2026-08-28'den beri ÖLÜ KODDU.
+  // bKatmaniUygula skoru gerçekten değiştirmeye devam etti ama gerekçe metninde/
+  // pick.details'te hiç görünmedi — sessizce yanlış olsa fark edilemezdi. ZEMINMESAFE
+  // ile AYNI doğrudan-enjekte desenine geçirildi: gerçek B katmanı katkısına (r.bSireKatkisi,
+  // bkz. bKatmaniUygula) doğrudan bakılıyor, OZELLIK_GRUPLARI/gruplar'a bağımlı değil.
+  if (r.bKatmaniUygulandiMi && Math.abs(r.bSireKatkisi) >= 0.03) {
     satirlar.push({
       kod: ["SIRE"],
-      tip: sireGrubu.katki >= 0 ? "destek" : "risk",
-      guven: Math.abs(sireGrubu.katki) >= GUCLU_ESIK ? "tam" : Math.abs(sireGrubu.katki) >= ORTA_ESIK ? "orta" : "zayif",
-      aciklama: sireGrubu.metin!,
+      tip: r.bSireKatkisi >= 0 ? "destek" : "risk",
+      guven: Math.abs(r.bSireKatkisi) >= GUCLU_ESIK ? "tam" : Math.abs(r.bSireKatkisi) >= ORTA_ESIK ? "orta" : "zayif",
+      kodGarantili: true,
+      aciklama: `Aygır kazanma oranı (küçültülmüş, B katmanı — düşük-şart'a özel, kanıtsız istisna): %${r.sireOrani.toFixed(1)}`,
     });
   }
-  const gruplarSiresiz = gruplar.filter((g) => g.kod !== "SIRE");
+  const gruplarSiresiz = gruplar; // SIRE zaten 2026-08-28'den beri OZELLIK_GRUPLARI'nda yok
 
   const pozitifSirali = gruplarSiresiz.filter((g) => g.katki > 0).sort((a, b) => b.katki - a.katki);
   for (const g of pozitifSirali.slice(0, 5)) {
