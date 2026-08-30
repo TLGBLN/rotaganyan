@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatRaceDate } from "@/lib/utils";
+import { useLocaleSwitch } from "@/components/providers/LocaleProvider";
 import { getHorseHistory, type HorseHistoryEntry } from "@/server/actions/horse-detail.actions";
 import { getHorsePedigreeTree } from "@/server/actions/horse-pedigree.actions";
 import type { PedigreeTree } from "@/lib/pedigree-tree-types";
@@ -25,6 +26,7 @@ function finishClass(pos: number | null) {
 }
 
 export default function HorseDetailModal({ name, onClose }: { name: string; onClose: () => void }) {
+  const { locale } = useLocaleSwitch();
   const [data, setData] = useState<HorseHistoryEntry[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -206,7 +208,7 @@ export default function HorseDetailModal({ name, onClose }: { name: string; onCl
                     return (
                       <tr key={h.raceId} className="border-b text-xs">
                         <td className="px-2 py-1.5 tabular-nums whitespace-nowrap">
-                          {new Date(h.date).toLocaleDateString("tr-TR")}
+                          {formatRaceDate(h.date, locale)}
                         </td>
                         <td className="px-2 py-1.5">{h.hippodrome} · {h.raceNo}.K</td>
                         <td className="px-2 py-1.5 text-center tabular-nums">{h.distance}m</td>
