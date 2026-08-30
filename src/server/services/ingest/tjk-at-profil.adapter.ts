@@ -231,7 +231,7 @@ export async function fetchHorseDetailedStats(atId: number): Promise<HorseDetail
  * biri taze biri bayatsa yalnız bayat olan yeniden çekilir, gereksiz TJK isteği yapılmaz.
  */
 export async function syncHorseStatsCache(
-  limit = 150,
+  limit = 250,
   staleDays = 3
 ): Promise<{ ok: number; fail: number; remaining: number }> {
   const { db } = await import("@/lib/db");
@@ -247,18 +247,32 @@ export async function syncHorseStatsCache(
 
   const staleCutoff = new Date(Date.now() - staleDays * 86_400_000);
   const MAX_ATTEMPTS = 3;
-  const [freshStats, freshHistory, givenUp] = await Promise.all([
+  const [freshStats, freshHistory, givenUp, existingStats, existingHistory] = await Promise.all([
     db.horseStatsCache.findMany({ where: { tjkAtId: { in: allIds }, updatedAt: { gte: staleCutoff } }, select: { tjkAtId: true } }),
     db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: allIds }, updatedAt: { gte: staleCutoff } }, select: { tjkAtId: true } }),
     db.horseSyncFailure.findMany({ where: { tjkAtId: { in: allIds }, attempts: { gte: MAX_ATTEMPTS } }, select: { tjkAtId: true } }),
+    db.horseStatsCache.findMany({ where: { tjkAtId: { in: allIds } }, select: { tjkAtId: true } }),
+    db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: allIds } }, select: { tjkAtId: true } }),
   ]);
   const freshStatsIds = new Set(freshStats.map((h) => h.tjkAtId));
   const freshHistoryIds = new Set(freshHistory.map((h) => h.tjkAtId));
   const givenUpIds = new Set(givenUp.map((h) => h.tjkAtId));
+  const existingStatsIds = new Set(existingStats.map((h) => h.tjkAtId));
+  const existingHistoryIds = new Set(existingHistory.map((h) => h.tjkAtId));
   // Israrla (MAX_ATTEMPTS kez) başarısız olan atlar taramadan tamamen çıkarılır — kullanıcı
   // talimatı 2026-07-30: "ısrarla başarısız olanları atla". Sessizce değil: HorseSyncFailure
   // tablosunda görünür kalırlar, gerçek bir TJK eksikliği mi yoksa geçici mi ayrıca incelenebilir.
-  const needsSync = allIds.filter((id) => !givenUpIds.has(id) && (!freshStatsIds.has(id) || !freshHistoryIds.has(id)));
+  const needsSyncAll = allIds.filter((id) => !givenUpIds.has(id) && (!freshStatsIds.has(id) || !freshHistoryIds.has(id)));
+  // 2026-08-30 kullanıcı bulgusu: /admin/veri-tamligi'de "At profil önbelleği" 2026-08-24'ten
+  // itibaren gerçek bir bozulma gösterdi (bug değil — backlog büyüklüğü). Toplam 4293 attan
+  // 3945'i "bayat" (3+ gün önce güncellenmiş, staleDays yenileme mantığı) — günde 150 işlenince
+  // bu kuyruk ~26 gün sürüyor. TAMAMEN eksik (hiç satırı olmayan, dashboard'da "eksik" sayılan)
+  // atlar, findMany'nin (orderBy yok) rastgele sırasında bu devasa bayat kuyruğunun arkasında
+  // kalıp süresiz aç kalabiliyordu. Artık aynı günlük bütçe içinde önce tamamen eksik olanlar
+  // işlenir, kalan bütçe bayat-yenilemeye gider — yük artmaz, yalnız öncelik doğru sıralanır.
+  const tamamenEksik = needsSyncAll.filter((id) => !existingStatsIds.has(id) || !existingHistoryIds.has(id));
+  const sadeceBayat = needsSyncAll.filter((id) => existingStatsIds.has(id) && existingHistoryIds.has(id));
+  const needsSync = [...tamamenEksik, ...sadeceBayat];
 
   // At başına birden fazla TJK isteği (profil+detay+geçmiş) bazen yavaş/kararsız
   // uç noktalara denk geldiğinde tek tek işlemek çok yavaş kalıyordu (kullanıcı

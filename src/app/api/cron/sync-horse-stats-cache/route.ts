@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   // cron'a paralel asalak eklendi; runVeriDenetimi kendi içinde gün-bazlı tekilleştirme
   // yaptığı için saatin 07:00 yerine 03:00 UTC olması sorun yaratmaz.
   const [statsResult, denetimResult] = await Promise.allSettled([
-    syncHorseStatsCache(150, 3),
+    syncHorseStatsCache(250, 3),
     runVeriDenetimi(),
   ]);
 

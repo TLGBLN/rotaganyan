@@ -23,6 +23,17 @@ export type VeriTamligiSatiri = {
   yuzdeSon7: number;
 };
 
+// 2026-08-30 kullanıcı bulgusu: "AGF Trend" ve "AGF (güncel)" satırları hiçbir zaman
+// %100'e yaklaşamıyordu çünkü paydaya HENÜZ KOŞULMAMIŞ (bugün/yarın için programa
+// alınmış) yarışlar da giriyordu — bir yarış henüz olmadıysa AGF bülteni de, ardışık
+// AGF anlık görüntüsü de FİZİKSEL OLARAK var olamaz (hp_yapisal_muaf ile AYNI mantık).
+// Gün bazlı gerçek dağılım ölçüldü: geçmiş günler ~%95-100, bugün+yarın ise AGF
+// Trend'de %0 (henüz 2. anlık görüntü birikmemiş), AGF güncel'de yalnız YARIN %0
+// (bugünün bülteni genelde koşudan önce yayımlanıyor, AGF güncel bugün için zaten
+// %100'e ulaşıyor).
+const AGF_GELECEK_MUAF_SQL = `rd.date > CURRENT_DATE`;
+const AGF_TREND_GELECEK_MUAF_SQL = `rd.date >= CURRENT_DATE`;
+
 const KAPSAMA_BASLANGIC = "2026-07-01";
 
 async function tekSorgu(baslangicTarihi: string) {
@@ -30,12 +41,16 @@ async function tekSorgu(baslangicTarihi: string) {
     {
       toplam: bigint;
       agf_dolu: bigint;
+      agf_uygun_toplam: bigint;
+      agf_uygun_dolu: bigint;
       hp_dolu: bigint;
       hp_uygun_toplam: bigint;
       hp_uygun_dolu: bigint;
       tjkatid_dolu: bigint;
       galop_dolu: bigint;
       agf_trend_dolu: bigint;
+      agf_trend_uygun_toplam: bigint;
+      agf_trend_uygun_dolu: bigint;
       pedigri_dolu: bigint;
       statscache_dolu: bigint;
       historycache_dolu: bigint;
@@ -48,7 +63,20 @@ async function tekSorgu(baslangicTarihi: string) {
         -- resmi bir handikap puanı VERMEMİŞ (yapısal olarak imkansız, backfill edilemez).
         -- kategoriTespit'in (v2-engine.ts) "1a"/"1b" regex'iyle AYNI mantık — HP satırı
         -- yalnız bu atlar HARİÇ TUTULARAK hesaplanır, diğer metrikler etkilenmez.
-        (ra."classType" ~* 'MAIDEN|[ŞS]ARTLI\s*19|[ŞS]ARTLI\s*1\b|[ŞS]ARTLI\s*27\b') AS hp_yapisal_muaf
+        -- 2026-08-30 BUG DÜZELTMESİ (iki katmanlı): (1) Postgres regex motorunda \b kelime
+        -- sınırı DEĞİL, BACKSPACE karakteri anlamına geliyor (JS/PCRE'den farklı!) — doğru
+        -- token \y. (2) TypeScript template literal'de TEK ters eğik çizgi (\s, \y) JS'in
+        -- kendisi tarafından SESSİZCE yutuluyor (\s → düz "s", \y → düz "y") — Postgres'e
+        -- hiç ulaşmadan kayboluyor. Bu yüzden regex hem \b hem \s yüzünden bozuktu; doğrusu
+        -- ÇİFT ters eğik çizgi (\\s, \\y) ki JS bunları TEK ters eğik çizgiye indirgeyip
+        -- Postgres'e doğru regex olarak göndersin. Sonuç: "ŞARTLI 1"/"ŞARTLI 19"/"ŞARTLI 27"
+        -- hiçbiri hiç eşleşmiyordu (yalnız "MAIDEN" doğru çalışıyordu), yapısal olarak HP'si
+        -- olamayacak binlerce at yanlışlıkla "eksik" sayılıyordu.
+        (ra."classType" ~* 'MAIDEN|[ŞS]ARTLI\\s*19|[ŞS]ARTLI\\s*1\\y|[ŞS]ARTLI\\s*27\\y') AS hp_yapisal_muaf,
+        -- Henüz koşulmamış (bugün/yarın programa alınmış) yarışlarda AGF bülteni/trend
+        -- FİZİKSEL OLARAK var olamaz — bkz. dosyanın üstündeki AGF_*_GELECEK_MUAF_SQL notu.
+        (${AGF_GELECEK_MUAF_SQL}) AS agf_gelecek_muaf,
+        (${AGF_TREND_GELECEK_MUAF_SQL}) AS agf_trend_gelecek_muaf
       FROM "Runner" r
       JOIN "Race" ra ON ra.id = r."raceId"
       JOIN "RaceDay" rd ON rd.id = ra."raceDayId"
@@ -75,12 +103,16 @@ async function tekSorgu(baslangicTarihi: string) {
     SELECT
       count(*) AS toplam,
       sum(CASE WHEN k.agf IS NOT NULL THEN 1 ELSE 0 END) AS agf_dolu,
+      sum(CASE WHEN NOT k.agf_gelecek_muaf THEN 1 ELSE 0 END) AS agf_uygun_toplam,
+      sum(CASE WHEN NOT k.agf_gelecek_muaf AND k.agf IS NOT NULL THEN 1 ELSE 0 END) AS agf_uygun_dolu,
       sum(CASE WHEN k.hp IS NOT NULL THEN 1 ELSE 0 END) AS hp_dolu,
       sum(CASE WHEN NOT k.hp_yapisal_muaf THEN 1 ELSE 0 END) AS hp_uygun_toplam,
       sum(CASE WHEN NOT k.hp_yapisal_muaf AND k.hp IS NOT NULL THEN 1 ELSE 0 END) AS hp_uygun_dolu,
       sum(CASE WHEN k."tjkAtId" IS NOT NULL THEN 1 ELSE 0 END) AS tjkatid_dolu,
       sum(CASE WHEN gk.var_mi THEN 1 ELSE 0 END) AS galop_dolu,
       sum(CASE WHEN atk.var_mi THEN 1 ELSE 0 END) AS agf_trend_dolu,
+      sum(CASE WHEN NOT k.agf_trend_gelecek_muaf THEN 1 ELSE 0 END) AS agf_trend_uygun_toplam,
+      sum(CASE WHEN NOT k.agf_trend_gelecek_muaf AND atk.var_mi THEN 1 ELSE 0 END) AS agf_trend_uygun_dolu,
       sum(CASE WHEN hp2."tjkAtId" IS NOT NULL THEN 1 ELSE 0 END) AS pedigri_dolu,
       sum(CASE WHEN hs."tjkAtId" IS NOT NULL THEN 1 ELSE 0 END) AS statscache_dolu,
       sum(CASE WHEN hh."tjkAtId" IS NOT NULL THEN 1 ELSE 0 END) AS historycache_dolu
@@ -148,8 +180,13 @@ export async function getVeriTamligiRaporu(): Promise<VeriTamligiSatiri[]> {
 
   return [
     satir("Galop (idman)", "Koşudan önce en az 1 galop kaydı var mı", "galop_dolu"),
-    satir("AGF Trend", "En az 2 AgfSnapshot (trend hesaplanabilir mi)", "agf_trend_dolu"),
-    satir("AGF (güncel)", "Runner.agf dolu mu", "agf_dolu"),
+    // 2026-08-30 kullanıcı bulgusu: henüz koşulmamış (bugün+yarın) yarışlarda trend
+    // fiziksel olarak hesaplanamaz (2. AGF anlık görüntüsü birikmemiş) — payda bu
+    // yarışlar hariç tutularak hesaplanır (bkz. AGF_TREND_GELECEK_MUAF_SQL notu).
+    satir("AGF Trend", "En az 2 AgfSnapshot (trend hesaplanabilir mi; henüz koşulmamış yarışlar hariç)", "agf_trend_uygun_dolu", "agf_trend_uygun_toplam"),
+    // Aynı mantık, yalnız YARIN (henüz bülteni yayımlanmamış) hariç tutuluyor — bugünün
+    // AGF'i koşudan önce zaten yayımlanmış oluyor, "bugün"ü hariç tutmaya gerek yok.
+    satir("AGF (güncel)", "Runner.agf dolu mu (henüz bülteni yayımlanmamış yarınki yarışlar hariç)", "agf_uygun_dolu", "agf_uygun_toplam"),
     // 2026-08-22 kullanıcı bulgusu: eksikliğin %72'si şartlı1/19/27+maiden'de (gerçek
     // debüt/az deneyimli atlar, TJK henüz resmi HP vermemiş — yapısal, backfill edilemez).
     // Payda bu atlar hariç tutularak hesaplanır (bkz. yukarıdaki hp_yapisal_muaf notu).
