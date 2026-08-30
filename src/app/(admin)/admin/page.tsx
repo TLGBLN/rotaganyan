@@ -37,7 +37,13 @@ export default async function AdminDashboard() {
     aylikKuponKazanci, v5SinyalPerformansiKosuTipineGore,
   ] = await Promise.all([
     getDashboardStats(),
-    getAnalystStats(),
+    // 2026-08-30 kullanıcı talebi ("v5'e kilitlensin"): /admin/analizler ve /admin/kupon
+    // sayfaları zaten sadeceGuncelMotor=true çağırıyordu (yalnız V5 dönemi) — dashboard'un
+    // genel özeti (bu sayfa) parametre vermediği için VARSAYILAN false ile tüm motor
+    // dönemlerini (V1-V22/V2/V3/V4/V5) karıştırıyordu. Artık tutarlı: dashboard'daki tüm
+    // özet/trend/kupon-kademe grafikleri de yalnız güncel ana sürümün (GUNCEL_MOTOR_BASLANGIC)
+    // verisini gösteriyor.
+    getAnalystStats(undefined, true),
     getRecentPredictions(16),
     getPendingPredictions(),
     getRaceStyleWinStats(),
