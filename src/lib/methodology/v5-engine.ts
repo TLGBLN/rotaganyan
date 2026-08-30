@@ -139,6 +139,8 @@ import { getH2HForRace } from "@/server/actions/h2h.actions";
 import { zeminDetayiBul, zeminDetayiSatirdanCikar, zeminKatsayisi } from "@/lib/methodology/mekanik-puanlama";
 import { getHizDerecesiForRace } from "@/server/actions/hiz-derecesi.actions";
 import { hesaplaZeminToleransiMap } from "@/server/actions/zemin-toleransi.actions";
+import { hesaplaZeminMesafeDeneyimiMap } from "@/server/actions/zemin-mesafe-deneyimi.actions";
+import { surfaceToPist } from "@/lib/sire-stat-match";
 import { syncAgfForRace } from "@/server/services/agf-sync";
 import { getJockeyStats, getTrainerStats } from "@/server/services/race.service";
 import {
@@ -375,6 +377,18 @@ export type Faz1RunnerV5 = {
    *  ekleme") bunu dışlardı. Risk: model bu özelliğe gereksiz ağırlık verebilir veya
    *  hiçbir fayda sağlamadan gürültü ekleyebilir. */
   zeminToleransi: number;
+  /** 2026-08-30 — Zemin+Mesafe Deneyimi (bkz. zemin-mesafe-deneyimi.actions.ts): atın
+   *  BUGÜNKÜ tam (pist, zemin koşulu, mesafe) kombinasyonunda kanıtlanmış deneyimi.
+   *  "tam" = bu mesafede de koşmuş, "kismi" = pist+zemin'de koşmuş ama başka mesafede,
+   *  "yok" = bu pist+zemin'de hiç kaydı yok. HENÜZ CANLI SKORA GİRMİYOR (C katmanı/
+   *  gölge-test adayı) — yalnız muhakeme metninde şeffaflık için taşınır. */
+  zeminMesafeDeneyimSeviyesi: "tam" | "kismi" | "yok";
+  /** zeminMesafeDeneyimSeviyesi hesaplanırken kullanılan geçmiş koşu sayısı. Skora girmez. */
+  zeminMesafeOrnekSayisi: number;
+  /** Zemin+Mesafe Deneyimi'nin HAM sayısal değeri (popülasyona göre göreli pace %,
+   *  zeminToleransi ile AYNI ölçek) — C katmanı challenger'ının (v6-zemin-mesafe-deneyimi)
+   *  gerçek girdisi budur, tier (seviye) yalnız muhakeme metni için. Skora HENÜZ girmez. */
+  zeminMesafeDeneyim: number;
 };
 
 export type Faz1SonucV5 = {
@@ -461,6 +475,19 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       : [];
   const h2hZeminFiltresiUygulandiMi = zeminEslesenEncounters.length > 0;
   const h2hEncountersKullanilan = h2hZeminFiltresiUygulandiMi ? zeminEslesenEncounters : h2hEncounters;
+
+  // 2026-08-30 kullanıcı talebi (H2H zemin-duyarlılığının hemen ardından): "o pist, zemin
+  // koşul ve mesafede yarış geçmişi olan daha tecrübeli görülmeli... mesafede ilk defa
+  // koşacaksa mevcut mesafelere göre analiz yapılacak" — bkz. zemin-mesafe-deneyimi.actions.ts.
+  // HENÜZ CANLI SKORA GİRMİYOR (C katmanı/gölge-test adayı, bkz. plan) — yalnız muhakeme
+  // metninde şeffaflık için hesaplanıyor, aynı bugunZeminKatsayi burada tekrar kullanılıyor.
+  const zeminMesafeDeneyimByAd = await hesaplaZeminMesafeDeneyimiMap(
+    runners.map((r) => r.name),
+    race.raceDay.date,
+    surfaceToPist(race.surface),
+    bugunZeminKatsayi,
+    race.distance
+  );
 
   const raceNameToNo = new Map(runners.map((r) => [r.name, r.no]));
   function h2hNetSkorHesapla(kendiAd: string): { skor: number; zeminEslesti: boolean; kendiDerece: string | null } {
@@ -611,6 +638,9 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       h2hKiloDegisimi: h2hKiloHesap.toplam,
       h2hKiloKarsilasmaSayisi: h2hKiloHesap.sayi,
       zeminToleransi: zeminToleransiByAd.get(r.name) ?? 0,
+      zeminMesafeDeneyimSeviyesi: zeminMesafeDeneyimByAd.get(r.name)?.seviye ?? "yok",
+      zeminMesafeOrnekSayisi: zeminMesafeDeneyimByAd.get(r.name)?.ornekSayisi ?? 0,
+      zeminMesafeDeneyim: zeminMesafeDeneyimByAd.get(r.name)?.deger ?? 0,
     };
   });
 
@@ -1231,6 +1261,26 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
       guven: "tam",
       kodGarantili: true,
       aciklama: `AGF trend: ${r.agfTrendYonu} (${r.agfTrendFark! >= 0 ? "+" : ""}${r.agfTrendFark} puan) — piyasa hareketi, en çok ${r.agfTrendYonu === "yükseliş" ? "yükselenler" : "düşenler"} listesinde`,
+    });
+  }
+
+  // 2026-08-30 kullanıcı talebi ("o pist, zemin koşul ve mesafede yarış geçmişi olan daha
+  // tecrübeli görülmeli... mesafede ilk defa koşacaksa mevcut mesafelere göre analiz
+  // yapılacak") — bkz. zemin-mesafe-deneyimi.actions.ts. HENÜZ CANLI SKORA GİRMİYOR (C
+  // katmanı/gölge-test adayı, tip:"notr" — destek/risk sayaçlarını etkilemez), yalnız
+  // şeffaflık için gösterilir. OZELLIK_GRUPLARI/katkı mekanizması yerine AGFTREND ile AYNI
+  // doğrudan-enjekte deseni kullanıldı çünkü bu satırın hiçbir zaman gerçek bir katkısı
+  // (r.katkilar) yok — katkı-eşikli pozitif/negatif sıralamasından asla geçemezdi.
+  if (r.zeminMesafeDeneyimSeviyesi !== "yok") {
+    satirlar.push({
+      kod: ["ZEMINMESAFE"],
+      tip: "notr",
+      guven: r.zeminMesafeDeneyimSeviyesi === "tam" ? "tam" : "orta",
+      kodGarantili: true,
+      aciklama:
+        r.zeminMesafeDeneyimSeviyesi === "tam"
+          ? `Bugünkü pist+zemin+mesafede geçmişi var (${r.zeminMesafeOrnekSayisi} koşu) — henüz skora dahil değil, C katmanı gölge-testinde`
+          : `Bugünkü pist+zemin'de tecrübeli ama bu mesafede ilk kez — diğer mesafelerindeki performansına göre değerlendirildi (${r.zeminMesafeOrnekSayisi} koşu, henüz skora dahil değil)`,
     });
   }
 

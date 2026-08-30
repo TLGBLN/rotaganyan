@@ -44,6 +44,25 @@ async function yuzeyDegisikligiScoreFn(faz1: Faz1SonucV5): Promise<Faz1RunnerV5S
   return baseline.map((r, i) => ({ ...r, olasilik: (r.olasilik * carpanlar[i]) / agirlikliToplam }));
 }
 
+// 2026-08-30 — kullanıcı talebi: "o pist, zemin koşul ve mesafede yarış geçmişi olan
+// daha tecrübeli görülmeli olmayanlara göre. o pist, zemin koşul var ama mesafede ilk
+// defa koşacaksa mevcut mesafelere göre analiz yapılacak" — bkz. plan (Zemin+Mesafe
+// Deneyim Önceliklendirmesi). gatherFaz1V5 zaten her runner için zeminMesafeDeneyim (ham
+// popülasyona-göreli pace %, zeminToleransi ile AYNI ölçek) hesaplıyor (bkz.
+// zemin-mesafe-deneyimi.actions.ts) — bu challenger EK bir veri kaynağına gitmeden,
+// doğrudan faz2V5Sirala çıktısındaki bu alanı skor-uzayında test eder. HENÜZ HİÇ TEST
+// EDİLMEDİ — yuzeyDegisikligiScoreFn ile AYNI disiplin: katsayı (0.02, %1 göreli pace
+// farkı başına log-skor uzayında) KANITLANMAMIŞ bir başlangıç varsayımı, gerçek yönü/
+// büyüklüğü yalnız arac-challenger-degerlendir.mjs'in B=500 sonucuyla belirlenecek.
+const ZEMIN_MESAFE_DENEYIM_KATSAYI = 0.02;
+
+async function zeminMesafeDeneyimiScoreFn(faz1: Faz1SonucV5): Promise<Faz1RunnerV5Sirali[]> {
+  const baseline = faz2V5Sirala(faz1);
+  const carpanlar = baseline.map((r) => Math.exp(ZEMIN_MESAFE_DENEYIM_KATSAYI * r.zeminMesafeDeneyim));
+  const agirlikliToplam = baseline.reduce((s, r, i) => s + r.olasilik * carpanlar[i], 0);
+  return baseline.map((r, i) => ({ ...r, olasilik: (r.olasilik * carpanlar[i]) / agirlikliToplam }));
+}
+
 export const CHALLENGER_REGISTRY: ChallengerDef[] = [
   {
     // 2026-08-29 — gerçek bir aday DEĞİL: champion'ın birebir kopyası (A/A sağlık
@@ -60,5 +79,10 @@ export const CHALLENGER_REGISTRY: ChallengerDef[] = [
     key: "v6-yuzey-degisikligi",
     label: "Yüzey Değişikliği (ilk kez bu pist tipinde koşuyor — deneysel, kanıtlanmamış)",
     scoreFn: yuzeyDegisikligiScoreFn,
+  },
+  {
+    key: "v6-zemin-mesafe-deneyimi",
+    label: "Zemin+Mesafe Deneyimi (bugünkü pist+zemin+mesafede kanıtlanmış geçmiş — deneysel, kanıtlanmamış)",
+    scoreFn: zeminMesafeDeneyimiScoreFn,
   },
 ];

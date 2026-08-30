@@ -142,6 +142,12 @@ export type AdaySinyal = {
 
 export const ADAY_SINYALLER: AdaySinyal[] = [
   {
+    ad: "Zemin+Mesafe Deneyimi",
+    durum: "acik",
+    etiket: "Açık · C katmanı gölge-testinde (v6-zemin-mesafe-deneyimi)",
+    aciklama: "Kullanıcı talebi (2026-08-30, H2H'nin zemin-duyarlı yapılmasının hemen ardından): bugünkü tam (pist, zemin koşulu, mesafe) kombinasyonunda geçmişi olan at daha tecrübeli sayılmalı; pist+zemin'de tecrübeli ama bu mesafede ilk kezse, atın diğer mesafelerindeki performansına düşülmeli. zemin-mesafe-deneyimi.actions.ts, zeminToleransi'nin AYNI popülasyona-göreli/kilo-düzeltmeli formülünü kullanır, yalnız BUGÜNÜN tam pist+zemin'ine filtrelenmiş (üç kademe: tam mesafe eşleşmesi / yalnız pist+zemin eşleşmesi / hiç eşleşme yok). Henüz hiç test edilmedi — v6-yuzey-degisikligi ile AYNI disiplin, n≥250-300 gölge-koşu birikip B=500 kanıtlanmadan A/B katmanına eklenmeyecek.",
+  },
+  {
     ad: "Sınıf Düşüşü (İkramiye Bazlı)",
     durum: "acik",
     etiket: "Açık · veri birikiyor",
