@@ -68,6 +68,21 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
     diger: { katsayi: 0, durum: "veri-yok", not: "B katmanı diğer/Handikap'ta hiç uygulanmıyor, oran=0." },
     aciklama: "Aygırın kazanma oranı (shrink edilmiş). 5 farklı yöntemle (tek-değişkenli, VIF, model-farkı) test edildi, hiçbirinde A katmanına (12 özellik) kanıtlanmış bir katkı bulunamadı — yine de kullanıcı at yetiştiriciliğinin gerçek bir faktör olduğuna inanıyor, düşük-şart'a özel küçük bir B katmanı itmesi olarak eklendi.",
   },
+  // 2026-08-30 — kullanıcı KARARI: normalde bu oturumun "önce n≥250-300 gölge-koşu +
+  // B=500 kanıtı, sonra canlı" kuralı geçerliyken, kullanıcı bu adayın gölge-testi HİÇ
+  // TAMAMLANMADAN (0 sonuçlanmış gölge-koşu) DERHAL B katmanına eklenmesini istedi —
+  // sireOrani/zeminToleransi'den FARKLI olarak, o ikisi en azından KENDİ backtest'lerinden
+  // (anlamsız da çıksa) geçmişti; bu, hiç istatistiksel değerlendirmeden eklenen İLK
+  // istisna. v6-zemin-mesafe-deneyimi challenger'ı (v6-challenger-registry.ts) PARALEL
+  // olarak gölge-veri biriktirmeye devam ediyor — ileride yeterli örneklem birikirse
+  // gerçek bir B=500 karşılaştırması yine yapılabilir.
+  {
+    ad: "Zemin+Mesafe Deneyimi (B KATMANI — TÜM kategoriler, hiç test edilmeden kullanıcı kararıyla aktif)",
+    kod: "zeminMesafeDeneyim",
+    dusukSart: { katsayi: 0.02, durum: "anlamsiz", not: "HİÇ test edilmedi — gölge-test (v6-zemin-mesafe-deneyimi) 0 sonuçlanmış koşuyla, kullanıcı isteğiyle derhal canlıya alındı. Katsayı keyfi bir başlangıç varsayımı." },
+    diger: { katsayi: 0.02, durum: "anlamsiz", not: "sireOrani'den FARKLI: TÜM kategorilerde AYNI katsayıyla uygulanıyor (düşük-şart'a özgü değil)." },
+    aciklama: "Atın bugünkü tam (pist, zemin koşulu, mesafe) kombinasyonunda kanıtlanmış deneyimi — popülasyona göre göreli pace %, TjkDereceKaydi'den (zeminToleransi ile AYNI kilo-düzeltmeli formül, yalnız bugünün tam koşuluna filtrelenmiş, 3 kademeli: tam mesafe eşleşmesi/yalnız pist+zemin eşleşmesi/hiç eşleşme yok). Hiçbir istatistiksel doğrulama yapılmadan eklendi.",
+  },
 ];
 
 // 2026-08-28 — SİLİNEN 11 sinyal (arşiv amaçlı, artık toFeatureVector'da/A katmanında
@@ -141,12 +156,6 @@ export type AdaySinyal = {
 };
 
 export const ADAY_SINYALLER: AdaySinyal[] = [
-  {
-    ad: "Zemin+Mesafe Deneyimi",
-    durum: "acik",
-    etiket: "Açık · C katmanı gölge-testinde (v6-zemin-mesafe-deneyimi)",
-    aciklama: "Kullanıcı talebi (2026-08-30, H2H'nin zemin-duyarlı yapılmasının hemen ardından): bugünkü tam (pist, zemin koşulu, mesafe) kombinasyonunda geçmişi olan at daha tecrübeli sayılmalı; pist+zemin'de tecrübeli ama bu mesafede ilk kezse, atın diğer mesafelerindeki performansına düşülmeli. zemin-mesafe-deneyimi.actions.ts, zeminToleransi'nin AYNI popülasyona-göreli/kilo-düzeltmeli formülünü kullanır, yalnız BUGÜNÜN tam pist+zemin'ine filtrelenmiş (üç kademe: tam mesafe eşleşmesi / yalnız pist+zemin eşleşmesi / hiç eşleşme yok). Henüz hiç test edilmedi — v6-yuzey-degisikligi ile AYNI disiplin, n≥250-300 gölge-koşu birikip B=500 kanıtlanmadan A/B katmanına eklenmeyecek.",
-  },
   {
     ad: "Sınıf Düşüşü (İkramiye Bazlı)",
     durum: "acik",

@@ -800,6 +800,7 @@ export type Faz1RunnerV5Sirali = Faz1RunnerV5 & {
   probTop3: number;
   marketBlindProb1: number; // 2026-08-29 V6 Aşama 2 — AGF-türevi katkılar çıkarılıp saha ayrıca normalize edilmiş P(WIN)
   bKatmaniUygulandiMi: boolean; // 2026-08-30 — sireOrani/B katmanı bu atta uygulandı mı (yalnız düşük-şart)
+  zeminMesafeBKatmaniUygulandiMi: boolean; // 2026-08-30 — Zemin+Mesafe Deneyimi/B katmanı bu atta uygulandı mı (TÜM kategoriler)
   standartVektor: number[];
   katkilar: number[]; // standartVektor[i] * WEIGHTS[i], her özelliğin bu attaki katkısı
   sinyalSayisi: number; // V4'ün 8-sinyal sayımı — terfi kapısı VE gerekçe metninde bilgi amaçlı
@@ -991,18 +992,38 @@ function bAgirlikOrani(classType: string): number {
   return kategori === "1a" || kategori === "1b" ? 1 : 0;
 }
 
-/** B katmanını (şimdilik yalnız sireOrani/düşük-şart) softmax'a girmeden ÖNCE skora ekler.
- *  softmax(skor+Δ) ∝ softmax(skor)×exp(Δ) olduğu için bu, "olasılığı çarpmak" ile
- *  matematiksel olarak AYNI şey — ama A'nın kendi regresyonuna karışmadan, ayrı kalibre
- *  edilmiş bir terim olarak. Diğer/Handikap koşularında oran=0, skor BİREBİR değişmez. */
-function bKatmaniUygula(skorlar: number[], runners: Faz1RunnerV5[], classType: string): { skorlar: number[]; uygulandi: boolean[] } {
-  const oran = bAgirlikOrani(classType);
-  if (oran === 0) return { skorlar, uygulandi: runners.map(() => false) };
+// 2026-08-30 kullanıcı KARARI: Zemin+Mesafe Deneyimi (bkz. zemin-mesafe-deneyimi.actions.ts,
+// C katmanı/v6-zemin-mesafe-deneyimi challenger'ı) n≥250-300 gölge-koşu/B=500 kanıtı
+// beklenmeden DERHAL canlıya alınması istendi — sireOrani/zeminToleransi ile AYNI türden
+// bilinçli, kanıtsız bir istisna (standart "önce backtest" kuralının açık ihlali, kullanıcı
+// kararıyla). sireOrani'nin AKSİNE düşük-şart'a özgü değil — kavram (bugünkü tam pist+zemin+
+// mesafe koşulunda kanıtlanmış deneyim) TÜM kategorilerde anlamlı, bu yüzden oran HER ZAMAN
+// 1 (bAgirlikOrani'ye tabi değil). Katsayı (0.02), challenger'da test edilen AYNI
+// kanıtlanmamış varsayım. Standartlaştırma GEREKMİYOR — değer zaten popülasyona-göreli bir
+// % (doğal olarak ~0 merkezli, zeminToleransi'yle aynı ölçek).
+const B_ZEMINMESAFE_KATSAYI = 0.02;
+
+/** B katmanını (sireOrani/düşük-şart + zeminMesafeDeneyim/TÜM kategoriler) softmax'a girmeden
+ *  ÖNCE skora ekler. softmax(skor+Δ) ∝ softmax(skor)×exp(Δ) olduğu için bu, "olasılığı
+ *  çarpmak" ile matematiksel olarak AYNI şey — ama A'nın kendi regresyonuna karışmadan, ayrı
+ *  kalibre edilmiş terimler olarak. */
+function bKatmaniUygula(
+  skorlar: number[],
+  runners: Faz1RunnerV5[],
+  classType: string
+): { skorlar: number[]; uygulandi: boolean[]; zeminMesafeUygulandi: boolean[] } {
+  const sireOran = bAgirlikOrani(classType);
   const yeniSkorlar = skorlar.map((skor, i) => {
-    const standartSireOrani = (runners[i].sireOrani - B_SIREORANI_ORTALAMA) / B_SIREORANI_SAPMA;
-    return skor + oran * B_SIREORANI_KATSAYI * standartSireOrani;
+    const sireTerimi =
+      sireOran === 0 ? 0 : sireOran * B_SIREORANI_KATSAYI * ((runners[i].sireOrani - B_SIREORANI_ORTALAMA) / B_SIREORANI_SAPMA);
+    const zeminMesafeTerimi = B_ZEMINMESAFE_KATSAYI * runners[i].zeminMesafeDeneyim;
+    return skor + sireTerimi + zeminMesafeTerimi;
   });
-  return { skorlar: yeniSkorlar, uygulandi: runners.map(() => true) };
+  return {
+    skorlar: yeniSkorlar,
+    uygulandi: runners.map(() => sireOran > 0),
+    zeminMesafeUygulandi: runners.map((r) => r.zeminMesafeDeneyim !== 0),
+  };
 }
 
 export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
@@ -1011,7 +1032,7 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
   const handikapMi = kategoriTespit(faz1.race.classType) === "2";
   const liderEsigi = handikapMi ? ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP : ASIRI_GUVEN_LIDER_ESIGI;
   const skorlarHam = harmanlar.map((h) => h.skor);
-  const { skorlar, uygulandi: bKatmaniUygulandi } = bKatmaniUygula(skorlarHam, faz1.runners, faz1.race.classType);
+  const { skorlar, uygulandi: bKatmaniUygulandi, zeminMesafeUygulandi } = bKatmaniUygula(skorlarHam, faz1.runners, faz1.race.classType);
   const probs = softmax(skorlar, liderEsigi);
   const etkinSkorlar = effektifSkorlar(skorlar, liderEsigi);
   const top2Marjinal = plackettLuceTopKMarginals(etkinSkorlar, 2);
@@ -1044,6 +1065,7 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
       probTop3: top3Marjinal[i],
       marketBlindProb1: marketBlindProbs[i],
       bKatmaniUygulandiMi: bKatmaniUygulandi[i],
+      zeminMesafeBKatmaniUygulandiMi: zeminMesafeUygulandi[i],
       standartVektor: harmanlar[i].standartVektor,
       katkilar: harmanlar[i].katkilar,
       sinyalSayisi: sinyal.sayi,
@@ -1266,21 +1288,22 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
 
   // 2026-08-30 kullanıcı talebi ("o pist, zemin koşul ve mesafede yarış geçmişi olan daha
   // tecrübeli görülmeli... mesafede ilk defa koşacaksa mevcut mesafelere göre analiz
-  // yapılacak") — bkz. zemin-mesafe-deneyimi.actions.ts. HENÜZ CANLI SKORA GİRMİYOR (C
-  // katmanı/gölge-test adayı, tip:"notr" — destek/risk sayaçlarını etkilemez), yalnız
-  // şeffaflık için gösterilir. OZELLIK_GRUPLARI/katkı mekanizması yerine AGFTREND ile AYNI
-  // doğrudan-enjekte deseni kullanıldı çünkü bu satırın hiçbir zaman gerçek bir katkısı
-  // (r.katkilar) yok — katkı-eşikli pozitif/negatif sıralamasından asla geçemezdi.
+  // yapılacak") — bkz. zemin-mesafe-deneyimi.actions.ts. Kullanıcı KARARIYLA, n≥250-300
+  // gölge-koşu/B=500 kanıtı BEKLENMEDEN B katmanına (TÜM kategoriler, bkz. bKatmaniUygula
+  // içindeki B_ZEMINMESAFE_KATSAYI notu) eklendi — sireOrani/zeminToleransi ile AYNI türden
+  // bilinçli, kanıtsız istisna. AGFTREND ile AYNI doğrudan-enjekte deseni kullanıldı çünkü
+  // bu terim OZELLIK_GRUPLARI/A katmanının katkı-eşikli sıralamasının DIŞINDA (B katmanı,
+  // ayrı kalibre edilmiş bir terim) — o mekanizmadan asla geçemezdi.
   if (r.zeminMesafeDeneyimSeviyesi !== "yok") {
     satirlar.push({
       kod: ["ZEMINMESAFE"],
-      tip: "notr",
+      tip: r.zeminMesafeDeneyim >= 0 ? "destek" : "risk",
       guven: r.zeminMesafeDeneyimSeviyesi === "tam" ? "tam" : "orta",
       kodGarantili: true,
       aciklama:
         r.zeminMesafeDeneyimSeviyesi === "tam"
-          ? `Bugünkü pist+zemin+mesafede geçmişi var (${r.zeminMesafeOrnekSayisi} koşu) — henüz skora dahil değil, C katmanı gölge-testinde`
-          : `Bugünkü pist+zemin'de tecrübeli ama bu mesafede ilk kez — diğer mesafelerindeki performansına göre değerlendirildi (${r.zeminMesafeOrnekSayisi} koşu, henüz skora dahil değil)`,
+          ? `Bugünkü pist+zemin+mesafede geçmişi var (${r.zeminMesafeOrnekSayisi} koşu): popülasyona göre ${r.zeminMesafeDeneyim > 0 ? "+" : ""}${r.zeminMesafeDeneyim.toFixed(1)}% (B katmanı, kanıtsız istisna)`
+          : `Bugünkü pist+zemin'de tecrübeli ama bu mesafede ilk kez — diğer mesafelerindeki performansına göre değerlendirildi (${r.zeminMesafeOrnekSayisi} koşu): popülasyona göre ${r.zeminMesafeDeneyim > 0 ? "+" : ""}${r.zeminMesafeDeneyim.toFixed(1)}% (B katmanı, kanıtsız istisna)`,
     });
   }
 

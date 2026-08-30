@@ -35,6 +35,9 @@ async function handlePost(req: NextRequest) {
     marketBlindProb1: r.marketBlindProb1,
     bKatmaniUygulandiMi: r.bKatmaniUygulandiMi,
     sireOrani: r.sireOrani,
+    zeminMesafeBKatmaniUygulandiMi: r.zeminMesafeBKatmaniUygulandiMi,
+    zeminMesafeDeneyim: r.zeminMesafeDeneyim,
+    zeminMesafeDeneyimSeviyesi: r.zeminMesafeDeneyimSeviyesi,
     details: muhakemeUretV5(r, sahaBuyuklugu),
     tumSinyaller: tumOzellikleriListele(r),
   }));
