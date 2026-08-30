@@ -428,7 +428,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
         orderBy: { no: "asc" },
         select: {
           id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true,
-          raceStyle: true, weight: true,
+          raceStyle: true, weight: true, ekuriGroup: true,
           gallops: { select: { date: true, jockey: true, splits: true }, orderBy: { date: "desc" } },
         },
       },
@@ -557,8 +557,30 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     ...agfTrend.enCokYukselenler.map((y): [number, "yükseliş"] => [y.runnerNo, "yükseliş"]),
     ...agfTrend.enCokDusenler.map((d): [number, "düşüş"] => [d.runnerNo, "düşüş"]),
   ]);
-  const agfSirali = [...runners].filter((r) => r.agf != null).sort((a, b) => (b.agf ?? 0) - (a.agf ?? 0));
-  const agfSiraMap = new Map(agfSirali.map((r, i) => [r.id, i + 1]));
+  // 2026-08-30 kullanıcı bulgusu (İstanbul 2.Koşu, MAKİNİST+SÜPER HAN eküri): agfSirasi
+  // ekuriGroup'u hiç dikkate almıyordu — TJK'nın kendi AGF tablosu eküri ortaklarının
+  // paylarını TOPLU değerlendirip market favorisini buna göre belirliyor (bugünkü örnek:
+  // eküri birleşik %36.06, DOĞANHAN'ın bireysel %24.02'sinden YÜKSEK — TJK'nın gerçek
+  // 1.favorisi eküri iken, eski kod yanlışlıkla DOĞANHAN'ı 1.sıraya koyuyordu). Bu bir BUG
+  // DÜZELTMESİ (yeni bir sinyal değil) — agfPayi (ham %, her at kendi bireysel değerini
+  // korur) DEĞİŞMEDİ, yalnız agfSirasi'nin (piyasa favorisi SIRASI) eküri-farkında olması
+  // düzeltildi. Eküri ortakları AYNI sırayı paylaşır (TJK'nın kendi gösterimiyle tutarlı).
+  const agfToplamByEkuriGroup = new Map<number, number>();
+  for (const r of runners) {
+    if (r.ekuriGroup != null && r.agf != null) {
+      agfToplamByEkuriGroup.set(r.ekuriGroup, (agfToplamByEkuriGroup.get(r.ekuriGroup) ?? 0) + r.agf);
+    }
+  }
+  function agfSiralamaDegeri(r: (typeof runners)[number]): number {
+    if (r.ekuriGroup != null) return agfToplamByEkuriGroup.get(r.ekuriGroup) ?? (r.agf ?? 0);
+    return r.agf ?? 0;
+  }
+  const benzersizSiralamaDegerleri = [...new Set(runners.filter((r) => r.agf != null).map((r) => agfSiralamaDegeri(r)))].sort(
+    (a, b) => b - a
+  );
+  const siraByDeger = new Map(benzersizSiralamaDegerleri.map((deger, i) => [deger, i + 1]));
+  const agfSirali = [...runners].filter((r) => r.agf != null).sort((a, b) => agfSiralamaDegeri(b) - agfSiralamaDegeri(a));
+  const agfSiraMap = new Map(agfSirali.map((r) => [r.id, siraByDeger.get(agfSiralamaDegeri(r))!]));
   const sahaOrtasi = Math.ceil(runners.length / 2);
   // 2026-08-26 kullanıcı bulgusu: kacakAtMi (tek parça "kaçak at mı") YERİNE kacakYalniz —
   // derinlemesine backtest (saha büyüklüğü sabit tutularak kontrol edilmiş, deneyimsiz
