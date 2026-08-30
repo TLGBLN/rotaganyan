@@ -456,9 +456,23 @@ export async function assertPublishSafe(id: string): Promise<void> {
   }
 
   // (6) Handikap/Grup koşusunda banko veriliyorsa 3 kupon alanı (Ekonomik/Normal/Geniş) zorunlu.
+  // 2026-08-30 kullanıcı bulgusu (İstanbul 6.Koşu, G 2, 6 at): Ekonomik(ilk 3)+Normal
+  // (sonraki 3) zaten sahanın TAMAMINI (6 at) kapsıyorsa Geniş'e koyacak 7. at hiç yok —
+  // couponWide'ın dolu olmasını istemek bu durumda MATEMATİKSEL OLARAK İMKANSIZ bir şart
+  // koymak oluyordu (veri eksikliği değil, kuralın kendisi hatalıydı). Saha ≤6 atsa Geniş
+  // şartı aranmaz.
   const handikapVeyaGrup = /^(Handikap|G\s*\d|Grup)/i.test(pred.race.classType);
-  if (pred.isBanko && handikapVeyaGrup && !(pred.couponNarrow && pred.couponNormal && pred.couponWide)) {
-    throw new Error("Handikap/Grup + banko → 3 kupon alanı (Ekonomik/Normal/Geniş) doldurulmadan yayınlanamaz.");
+  const genisMumkunMu = aktifAtlar.length > 6;
+  if (
+    pred.isBanko &&
+    handikapVeyaGrup &&
+    !(pred.couponNarrow && pred.couponNormal && (!genisMumkunMu || pred.couponWide))
+  ) {
+    throw new Error(
+      genisMumkunMu
+        ? "Handikap/Grup + banko → 3 kupon alanı (Ekonomik/Normal/Geniş) doldurulmadan yayınlanamaz."
+        : "Handikap/Grup + banko → Ekonomik/Normal alanları doldurulmadan yayınlanamaz."
+    );
   }
 
   // (7) 2026-08-09 kullanıcı bulgusu (İstanbul 2./4. Koşu, İzmir 7.Koşu — üçü de aynı gün):
