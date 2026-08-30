@@ -13,11 +13,14 @@ function surfaceShort(raw: string, t: ReturnType<typeof useTranslations<"program
   return raw || "—";
 }
 
-function zeminEtiketi(raw: string): string | null {
+// 2026-08-30 kullanıcı talebi: zemin durumu daha önce yalnız Normal-DIŞI (Islak/Ağır/
+// Nemli) olduğunda gösteriliyordu — /admin/derece-istatistikleri sayfasındaki gibi HER
+// ZAMAN görünür ve renkli olsun istendi (Normal dahil), ki karşılaştırma tam olsun.
+function zeminEtiketi(raw: string): { etiket: string; renk: string } {
   const detay = zeminDetayiSatirdanCikar(raw);
-  if (!detay) return null;
   const z = zeminKatsayisi(detay);
-  return z.katsayi === 1.0 ? null : z.etiket;
+  const renk = z.katsayi >= 1.3 ? "text-miss" : z.katsayi >= 1.15 ? "text-brand" : "text-muted-foreground";
+  return { etiket: z.etiket, renk };
 }
 
 export default function H2HPanel({ raceId }: { raceId: string }) {
@@ -80,7 +83,9 @@ export default function H2HPanel({ raceId }: { raceId: string }) {
                 </tr>
               </thead>
               <tbody>
-                {data.map((enc, gi) => (
+                {data.map((enc, gi) => {
+                  const zemin = zeminEtiketi(enc.surface);
+                  return (
                   <>
                     {enc.results.map((r, i) => (
                       <tr
@@ -104,9 +109,7 @@ export default function H2HPanel({ raceId }: { raceId: string }) {
                             </td>
                             <td rowSpan={enc.results.length} className="px-2 py-1.5 align-top whitespace-nowrap">
                               {enc.distance}m · {surfaceShort(enc.surface, t)}
-                              {zeminEtiketi(enc.surface) && (
-                                <div className="text-[10px] text-muted-foreground">{zeminEtiketi(enc.surface)}</div>
-                              )}
+                              <div className={cn("text-[10px]", zemin.renk)}>{zemin.etiket}</div>
                             </td>
                           </>
                         )}
@@ -122,18 +125,23 @@ export default function H2HPanel({ raceId }: { raceId: string }) {
                       </tr>
                     ))}
                   </>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {/* Mobil: yatay kaydırma olmasın diye karşılaşma başına dikey kart */}
           <div className="sm:hidden divide-y">
-            {data.map((enc) => (
+            {data.map((enc) => {
+              const zemin = zeminEtiketi(enc.surface);
+              return (
               <div key={enc.key} className="px-3 py-2.5">
                 <div className="text-[11px] text-muted-foreground mb-1.5">
                   {enc.hippodrome} · {t("raceNoLabel", { no: enc.raceNo })} · {enc.date} · {enc.distance}m {surfaceShort(enc.surface, t)}
-                  {zeminEtiketi(enc.surface) && <> ({zeminEtiketi(enc.surface)})</>}
+                  {" ("}
+                  <span className={zemin.renk}>{zemin.etiket}</span>
+                  {")"}
                 </div>
                 <div className="space-y-1">
                   {enc.results.map((r, i) => (
@@ -157,7 +165,8 @@ export default function H2HPanel({ raceId }: { raceId: string }) {
                   ))}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
