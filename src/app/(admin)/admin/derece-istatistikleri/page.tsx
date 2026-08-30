@@ -1,4 +1,4 @@
-import { getDereceIstOzeti, getDereceIstListesi } from "@/server/services/derece-ist.service";
+import { getDereceIstOzeti, getDereceIstListesi, getDereceIstFiltreSecenekleri } from "@/server/services/derece-ist.service";
 import DereceIstSyncButton from "@/components/admin/DereceIstSyncButton";
 import { cn } from "@/lib/utils";
 
@@ -10,17 +10,43 @@ function pistDurumuRenk(pistDurumu: string): string {
   return "text-brand";
 }
 
+type SearchParams = {
+  atAdi?: string;
+  pistDurumu?: string;
+  irk?: string;
+  cinsiyet?: string;
+  yil?: string;
+  hipodrom?: string;
+  pist?: string;
+  mesafe?: string;
+  cinsAdi?: string;
+  sayfa?: string;
+};
+
 export default async function DereceIstatistikleriPage({
   searchParams,
 }: {
-  searchParams: Promise<{ atAdi?: string; pistDurumu?: string; sayfa?: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
   const sp = await searchParams;
-  const [ozet, liste] = await Promise.all([
+  const [ozet, liste, filtreSecenekleri] = await Promise.all([
     getDereceIstOzeti(),
-    getDereceIstListesi({ atAdi: sp.atAdi, pistDurumu: sp.pistDurumu, sayfa: sp.sayfa ? parseInt(sp.sayfa, 10) : 1 }),
+    getDereceIstListesi({
+      atAdi: sp.atAdi,
+      pistDurumu: sp.pistDurumu,
+      irk: sp.irk,
+      cinsiyet: sp.cinsiyet,
+      yil: sp.yil ? parseInt(sp.yil, 10) : undefined,
+      hipodrom: sp.hipodrom,
+      pist: sp.pist,
+      mesafe: sp.mesafe,
+      cinsAdi: sp.cinsAdi,
+      sayfa: sp.sayfa ? parseInt(sp.sayfa, 10) : 1,
+    }),
+    getDereceIstFiltreSecenekleri(),
   ]);
   const yil = new Date().getUTCFullYear();
+  const filtreAktifMi = !!(sp.atAdi || sp.pistDurumu || sp.irk || sp.cinsiyet || sp.yil || sp.hipodrom || sp.pist || sp.mesafe || sp.cinsAdi);
 
   return (
     <div className="space-y-4">
@@ -78,19 +104,72 @@ export default async function DereceIstatistikleriPage({
         </div>
       </div>
 
+      {/* 2026-08-30 kullanıcı talebi: TJK'nın kendi "Detaylı Derece İstatistikleri"
+          sayfasındakiyle aynı filtre çubuğu (At Adı / Irk / Cinsiyet / Yıl / Şehir /
+          Pist / Mesafe / Koşu Cinsi) — "aynı pist+zemin durumu+mesafede koşan atları
+          bul" iş akışını (zemin toleransı karşılaştırmaları için) kolaylaştırmak için.
+          Dropdown seçenekleri getDereceIstFiltreSecenekleri'nden GERÇEK distinct
+          değerler — elle sabitlenmiş bir liste değil. */}
       <form className="flex flex-wrap items-center gap-2">
         <input
           type="text"
           name="atAdi"
           defaultValue={sp.atAdi}
-          placeholder="At ismine göre ara..."
+          placeholder="At Adı giriniz"
           className="rounded-md border bg-transparent px-3 py-1.5 text-xs"
         />
-        {sp.pistDurumu && <input type="hidden" name="pistDurumu" value={sp.pistDurumu} />}
+        <select name="irk" defaultValue={sp.irk ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-xs">
+          <option value="">Tüm Irklar</option>
+          {filtreSecenekleri.irklar.map((v) => (
+            <option key={v} value={v}>{v}</option>
+          ))}
+        </select>
+        <select name="cinsiyet" defaultValue={sp.cinsiyet ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-xs">
+          <option value="">Tüm Cinsiyetler</option>
+          {filtreSecenekleri.cinsiyetler.map((v) => (
+            <option key={v} value={v}>{v}</option>
+          ))}
+        </select>
+        <select name="yil" defaultValue={sp.yil ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-xs">
+          <option value="">Tüm Yıllar</option>
+          {filtreSecenekleri.yillar.map((v) => (
+            <option key={v} value={v}>{v}</option>
+          ))}
+        </select>
+        <select name="hipodrom" defaultValue={sp.hipodrom ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-xs">
+          <option value="">Tüm Şehirler</option>
+          {filtreSecenekleri.hipodromlar.map((v) => (
+            <option key={v} value={v}>{v}</option>
+          ))}
+        </select>
+        <select name="pist" defaultValue={sp.pist ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-xs">
+          <option value="">Tüm Pistler</option>
+          {filtreSecenekleri.pistler.map((v) => (
+            <option key={v} value={v}>{v}</option>
+          ))}
+        </select>
+        <select name="pistDurumu" defaultValue={sp.pistDurumu ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-xs">
+          <option value="">Tüm Pist Durumları</option>
+          {ozet.pistDurumuDagilimi.map((p) => (
+            <option key={p.pistDurumu} value={p.pistDurumu}>{p.pistDurumu || "(boş)"}</option>
+          ))}
+        </select>
+        <select name="mesafe" defaultValue={sp.mesafe ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-xs">
+          <option value="">Tüm Mesafeler</option>
+          {filtreSecenekleri.mesafeler.map((v) => (
+            <option key={v} value={v}>{v}</option>
+          ))}
+        </select>
+        <select name="cinsAdi" defaultValue={sp.cinsAdi ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-xs">
+          <option value="">Tüm Koşu Cinsleri</option>
+          {filtreSecenekleri.cinsAdlari.map((v) => (
+            <option key={v} value={v}>{v}</option>
+          ))}
+        </select>
         <button type="submit" className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted">
           Ara
         </button>
-        {(sp.atAdi || sp.pistDurumu) && (
+        {filtreAktifMi && (
           <a href="/admin/derece-istatistikleri" className="text-xs text-muted-foreground underline">
             Filtreleri temizle
           </a>

@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { syncAgfForDate } from "@/server/services/agf-sync";
 import { verifyCronRequest } from "@/lib/cron-auth";
 import { runChallengerShadowLog } from "@/server/services/challenger-shadow-log.service";
+import { dereceIstatistikleriniKontrolEtVeOnar } from "@/server/services/veri-tamligi-onarim.service";
 
 // v6.69 — kullanıcı bulgusu 2026-08-09: çoklu şehir günlerinde (İstanbul+İzmir+Karma
 // aynı anda) sıralı işleme 60sn'yi aşıp cron'u sessizce (Vercel 504) başarısız kılıyordu —
@@ -26,6 +27,16 @@ export async function GET(req: NextRequest) {
       await runChallengerShadowLog();
     } catch (e) {
       console.error("[agf-sync] challenger-shadow-log piggyback hatası (AGF senkronu etkilenmedi)", e);
+    }
+
+    // 2026-08-30 — kullanıcı talebi: veri-tamligi'nin kanıtlanmış-kırılgan alanı (Derece
+    // İstatistikleri) için ikinci bir güvenlik ağı. Kontrol sorgusu ucuz (yalnız COUNT) —
+    // onarım GEREKMEDİKÇE (haftada birkaç gün eksikse) tetiklenmez, gerektiğinde nadiren
+    // uzun sürer. Hata durumunda AGF senkronunu ASLA bloke etmez/başarısız kılmaz.
+    try {
+      await dereceIstatistikleriniKontrolEtVeOnar();
+    } catch (e) {
+      console.error("[agf-sync] veri-tamligi-onarim piggyback hatası (AGF senkronu etkilenmedi)", e);
     }
 
     return NextResponse.json({ ...result, totalRunnersUpdated: total });

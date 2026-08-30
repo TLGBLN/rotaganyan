@@ -100,19 +100,18 @@ async function tekSorgu(baslangicTarihi: string) {
 // yoktu (Runner'a bağlı değil, atAdi ile eşleşen bağımsız bir arşiv, yukarıdaki CTE
 // deseni ona uymuyor). Kök neden: sync-derece-ist Vercel'e hiç kaydolmadığı için
 // sync-trainer-stats'a "asalak" eklenmişti (Promise.allSettled ile), hatası SESSİZCE
-// yutuluyordu. Bu fonksiyon farklı bir şey ölçüyor — per-runner kapsam değil, SENKRONUN
-// GÜNLÜK GERÇEKTEN ÇALIŞIP ÇALIŞMADIĞI (kaç farklı günde yeni/güncellenmiş kayıt geldi).
-async function dereceIstTazelik(baslangicTarihi: string): Promise<{ toplam: number; dolu: number }> {
-  const rows = await db.$queryRawUnsafe<{ gun_sayisi: bigint }[]>(`
-    SELECT count(DISTINCT date_trunc('day', "updatedAt")) AS gun_sayisi
-    FROM "TjkDereceKaydi"
-    WHERE "updatedAt" >= '${baslangicTarihi}'
-  `);
-  const beklenenGun = Math.max(
-    1,
-    Math.round((Date.now() - new Date(baslangicTarihi).getTime()) / (24 * 60 * 60 * 1000))
-  );
-  return { toplam: beklenenGun, dolu: Number(rows[0]?.gun_sayisi ?? 0) };
+// yutuluyordu.
+//
+// DÜZELTME (aynı gün): ilk tasarım "kaç farklı GÜN updatedAt gördü" ölçüyordu — ama bir
+// defalık toplu backfill (bugün olduğu gibi) TÜM satırları TEK günde güncelliyor, bu da
+// gerçekte sağlıklıyken "yalnız 1/7 gün aktif" gibi yanlış-düşük görünmesine yol açıyordu.
+// Doğru ölçüt: arşivdeki EN GÜNCEL koşu tarihi (tarih alanı, updatedAt DEĞİL) bugüne ne
+// kadar yakın — toplu/günlük senkron farkını gözetmeden "veri ne kadar geride kaldı"
+// sorusuna doğrudan cevap verir, veri-tamligi-onarim.service.ts'in kullandığı AYNI mantık.
+async function dereceIstTazelik(): Promise<{ toplam: number; dolu: number }> {
+  const enSon = await db.tjkDereceKaydi.findFirst({ orderBy: { tarih: "desc" }, select: { tarih: true } });
+  const gecikmeGun = enSon?.tarih ? (Date.now() - enSon.tarih.getTime()) / (24 * 60 * 60 * 1000) : 7;
+  return { toplam: 7, dolu: Math.max(0, 7 - gecikmeGun) };
 }
 
 export async function getVeriTamligiRaporu(): Promise<VeriTamligiSatiri[]> {
@@ -120,11 +119,13 @@ export async function getVeriTamligiRaporu(): Promise<VeriTamligiSatiri[]> {
   son7.setDate(son7.getDate() - 7);
   const son7Str = son7.toISOString().slice(0, 10);
 
-  const [tumKapsam, sonYediGun, dereceTumKapsam, dereceSon7] = await Promise.all([
+  // dereceIstTazelik'in tek çağrısı yeter — "ne kadar geride kaldı" an itibarıyla TEK bir
+  // ölçüm, "tüm kapsam" ile "son 7 gün" arasında ayrım yapmıyor (diğer satırlardan farklı
+  // olarak, bkz. fonksiyonun üstündeki not).
+  const [tumKapsam, sonYediGun, dereceTazelik] = await Promise.all([
     tekSorgu(KAPSAMA_BASLANGIC),
     tekSorgu(son7Str),
-    dereceIstTazelik(KAPSAMA_BASLANGIC),
-    dereceIstTazelik(son7Str),
+    dereceIstTazelik(),
   ]);
 
   const pct = (dolu: bigint, toplam: bigint) => (toplam > BigInt(0) ? Math.round((Number(dolu) / Number(toplam)) * 1000) / 10 : 0);
@@ -159,13 +160,13 @@ export async function getVeriTamligiRaporu(): Promise<VeriTamligiSatiri[]> {
     satir("At yarış geçmişi önbelleği", "HorseRaceHistoryCache'de tam geçmiş önbelleklenmiş mi", "historycache_dolu"),
     {
       alan: "Derece İstatistikleri (TjkDereceKaydi)",
-      aciklama: "zeminToleransi/yüzey-değişikliği'nin TEK kaynağı — kaç GÜN gerçekten yeni veri geldi (günlük senkron sağlığı, per-koşu kapsam değil)",
-      toplamKapsam: dereceTumKapsam.toplam,
-      doluKapsam: dereceTumKapsam.dolu,
-      yuzdeKapsam: Math.round((dereceTumKapsam.dolu / dereceTumKapsam.toplam) * 1000) / 10,
-      toplamSon7: dereceSon7.toplam,
-      doluSon7: dereceSon7.dolu,
-      yuzdeSon7: Math.round((dereceSon7.dolu / dereceSon7.toplam) * 1000) / 10,
+      aciklama: "zeminToleransi/yüzey-değişikliği'nin TEK kaynağı — arşivdeki en güncel koşu tarihi bugüne ne kadar yakın (günlük senkron sağlığı, per-koşu kapsam değil)",
+      toplamKapsam: dereceTazelik.toplam,
+      doluKapsam: dereceTazelik.dolu,
+      yuzdeKapsam: Math.round((dereceTazelik.dolu / dereceTazelik.toplam) * 1000) / 10,
+      toplamSon7: dereceTazelik.toplam,
+      doluSon7: dereceTazelik.dolu,
+      yuzdeSon7: Math.round((dereceTazelik.dolu / dereceTazelik.toplam) * 1000) / 10,
     },
   ];
 }
