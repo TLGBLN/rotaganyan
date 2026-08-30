@@ -110,67 +110,74 @@ export default async function DereceIstatistikleriPage({
           bul" iş akışını (zemin toleransı karşılaştırmaları için) kolaylaştırmak için.
           Dropdown seçenekleri getDereceIstFiltreSecenekleri'nden GERÇEK distinct
           değerler — elle sabitlenmiş bir liste değil. */}
-      <form className="flex flex-wrap items-center gap-2">
+      {/* 2026-08-30 kullanıcı bulgusu: native <select>'in AÇILAN listesi tarayıcı/OS
+          varsayılan (beyaz) arka planla render ediliyordu, metin ise sayfanın koyu
+          temasından miras aldığı AÇIK renkteydi — yalnız hover'da (mavi vurgu arka
+          planı kontrast sağlayınca) okunuyordu. Her <select>/<option> için AÇIKÇA
+          hem arka plan hem yazı rengi (tema tokenlarından) verildi. Ayrıca "tek satır"
+          talebi: flex-wrap yerine flex-nowrap + overflow-x-auto, dar ekranda yatay
+          kaydırma ile tek satırda kalır. */}
+      <form className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1">
         <input
           type="text"
           name="atAdi"
           defaultValue={sp.atAdi}
           placeholder="At Adı giriniz"
-          className="rounded-md border bg-transparent px-3 py-1.5 text-xs"
+          className="shrink-0 rounded-md border bg-transparent px-3 py-1.5 text-xs"
         />
-        <select name="irk" defaultValue={sp.irk ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-xs">
-          <option value="">Tüm Irklar</option>
+        <select name="irk" defaultValue={sp.irk ?? ""} className="shrink-0 rounded-md border bg-[var(--background)] px-2 py-1.5 text-xs text-[var(--foreground)]">
+          <option value="" className="bg-[var(--background)] text-[var(--foreground)]">Tüm Irklar</option>
           {filtreSecenekleri.irklar.map((v) => (
-            <option key={v} value={v}>{v}</option>
+            <option key={v} value={v} className="bg-[var(--background)] text-[var(--foreground)]">{v}</option>
           ))}
         </select>
-        <select name="cinsiyet" defaultValue={sp.cinsiyet ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-xs">
-          <option value="">Tüm Cinsiyetler</option>
+        <select name="cinsiyet" defaultValue={sp.cinsiyet ?? ""} className="shrink-0 rounded-md border bg-[var(--background)] px-2 py-1.5 text-xs text-[var(--foreground)]">
+          <option value="" className="bg-[var(--background)] text-[var(--foreground)]">Tüm Cinsiyetler</option>
           {filtreSecenekleri.cinsiyetler.map((v) => (
-            <option key={v} value={v}>{v}</option>
+            <option key={v} value={v} className="bg-[var(--background)] text-[var(--foreground)]">{v}</option>
           ))}
         </select>
-        <select name="yil" defaultValue={sp.yil ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-xs">
-          <option value="">Tüm Yıllar</option>
+        <select name="yil" defaultValue={sp.yil ?? ""} className="shrink-0 rounded-md border bg-[var(--background)] px-2 py-1.5 text-xs text-[var(--foreground)]">
+          <option value="" className="bg-[var(--background)] text-[var(--foreground)]">Tüm Yıllar</option>
           {filtreSecenekleri.yillar.map((v) => (
-            <option key={v} value={v}>{v}</option>
+            <option key={v} value={v} className="bg-[var(--background)] text-[var(--foreground)]">{v}</option>
           ))}
         </select>
-        <select name="hipodrom" defaultValue={sp.hipodrom ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-xs">
-          <option value="">Tüm Şehirler</option>
+        <select name="hipodrom" defaultValue={sp.hipodrom ?? ""} className="shrink-0 rounded-md border bg-[var(--background)] px-2 py-1.5 text-xs text-[var(--foreground)]">
+          <option value="" className="bg-[var(--background)] text-[var(--foreground)]">Tüm Şehirler</option>
           {filtreSecenekleri.hipodromlar.map((v) => (
-            <option key={v} value={v}>{v}</option>
+            <option key={v} value={v} className="bg-[var(--background)] text-[var(--foreground)]">{v}</option>
           ))}
         </select>
-        <select name="pist" defaultValue={sp.pist ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-xs">
-          <option value="">Tüm Pistler</option>
+        <select name="pist" defaultValue={sp.pist ?? ""} className="shrink-0 rounded-md border bg-[var(--background)] px-2 py-1.5 text-xs text-[var(--foreground)]">
+          <option value="" className="bg-[var(--background)] text-[var(--foreground)]">Tüm Pistler</option>
           {filtreSecenekleri.pistler.map((v) => (
-            <option key={v} value={v}>{v}</option>
+            <option key={v} value={v} className="bg-[var(--background)] text-[var(--foreground)]">{v}</option>
           ))}
         </select>
-        <select name="pistDurumu" defaultValue={sp.pistDurumu ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-xs">
-          <option value="">Tüm Pist Durumları</option>
+        <select name="pistDurumu" defaultValue={sp.pistDurumu ?? ""} className="shrink-0 rounded-md border bg-[var(--background)] px-2 py-1.5 text-xs text-[var(--foreground)]">
+          <option value="" className="bg-[var(--background)] text-[var(--foreground)]">Tüm Pist Durumları</option>
           {ozet.pistDurumuDagilimi.map((p) => (
-            <option key={p.pistDurumu} value={p.pistDurumu}>{p.pistDurumu || "(boş)"}</option>
+            <option key={p.pistDurumu} value={p.pistDurumu} className="bg-[var(--background)] text-[var(--foreground)]">{p.pistDurumu || "(boş)"}</option>
           ))}
         </select>
-        <select name="mesafe" defaultValue={sp.mesafe ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-xs">
-          <option value="">Tüm Mesafeler</option>
+        <select name="mesafe" defaultValue={sp.mesafe ?? ""} className="shrink-0 rounded-md border bg-[var(--background)] px-2 py-1.5 text-xs text-[var(--foreground)]">
+          <option value="" className="bg-[var(--background)] text-[var(--foreground)]">Tüm Mesafeler</option>
           {filtreSecenekleri.mesafeler.map((v) => (
-            <option key={v} value={v}>{v}</option>
+            <option key={v} value={v} className="bg-[var(--background)] text-[var(--foreground)]">{v}</option>
           ))}
         </select>
-        <select name="cinsAdi" defaultValue={sp.cinsAdi ?? ""} className="rounded-md border bg-transparent px-2 py-1.5 text-xs">
-          <option value="">Tüm Koşu Cinsleri</option>
+        <select name="cinsAdi" defaultValue={sp.cinsAdi ?? ""} className="shrink-0 rounded-md border bg-[var(--background)] px-2 py-1.5 text-xs text-[var(--foreground)]">
+          <option value="" className="bg-[var(--background)] text-[var(--foreground)]">Tüm Koşu Cinsleri</option>
           {filtreSecenekleri.cinsAdlari.map((v) => (
-            <option key={v} value={v}>{v}</option>
+            <option key={v} value={v} className="bg-[var(--background)] text-[var(--foreground)]">{v}</option>
           ))}
         </select>
-        <button type="submit" className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted">
+        <button type="submit" className="shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted">
           Ara
         </button>
         {filtreAktifMi && (
-          <a href="/admin/derece-istatistikleri" className="text-xs text-muted-foreground underline">
+          <a href="/admin/derece-istatistikleri" className="shrink-0 text-xs text-muted-foreground underline">
             Filtreleri temizle
           </a>
         )}
