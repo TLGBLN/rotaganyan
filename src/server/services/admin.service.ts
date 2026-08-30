@@ -750,11 +750,18 @@ export async function getPendingPredictions(): Promise<PendingPrediction[]> {
 // sıkıştırılan Eko/Nor/Geniş dağılımını görsel bir orantı çubuğu olarak çizebilmek
 // için — text/oneri (mevcut serbest metin, ClassTypeAdviceCard'ın tek başına
 // analiz sayfasında zaten kullandığı) DEĞİŞMEDİ, yalnız EK bir yapılandırılmış alan.
+// 2026-08-31 — Opus denetimi (BANKO × koşu-tipi top-1 oranı testi) bir kafa karışıklığı
+// bulguladı: "Güçlü geçmiş" (good) rozeti `tierSeviye`'den geliyor, o da Ekonomik (ilk-3)
+// payına bakıyor — BANKO ise tek at (top-1) gerektiriyor, tamamen farklı bir soru. KV/Maiden
+// gibi gruplarda Eko payı %60-77 (rozet yeşil) olsa da top-1 oranı yalnız %25-31 çıkabiliyor.
+// `top1Rate` bu ayrımı görünür kılmak için eklendi — `text` içinde zaten var olan "1. seçim
+// 1. geldi" rakamının SAYISAL karşılığı, string parse etmeden doğrudan kullanılabilsin diye.
 export type ClassTypeAdvice = {
   level: "warn" | "info" | "good" | "none";
   text: string;
   oneri?: string;
   tierYuzdeler?: { eko: number; nor: number; genis: number; kacti: number; toplam: number };
+  top1Rate?: { rate: number; hits: number; total: number };
 };
 
 /** Wilson skor aralığı (normal yaklaşımdan farklı olarak küçük n'de ve uç oranlarda
@@ -914,6 +921,7 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string, atSay
       text: `${darMetin} (${tier.total} koşu) · 1. seçim 1. geldi: ${isabet}`,
       oneri: tierOneri(tier, atSayisiTier),
       tierYuzdeler: { eko: tier.ekonomik, nor: tier.normal, genis: tier.genis, kacti: tier.kacti, toplam: tier.total },
+      top1Rate: { rate: breakdown!.rate, hits: breakdown!.hits, total: breakdown!.total },
     };
   }
 
@@ -928,18 +936,27 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string, atSay
       text,
       oneri: tierOneri(grupTier, atSayisiTier),
       tierYuzdeler: { eko: grupTier.ekonomik, nor: grupTier.normal, genis: grupTier.genis, kacti: grupTier.kacti, toplam: grupTier.total },
+      top1Rate: { rate: grupBreakdown.rate, hits: grupBreakdown.hits, total: grupBreakdown.total },
     };
   }
 
   // Ne dar sınıf ne üst grup yeterli veri taşıyor — dürüstçe "veri yok" de.
   if (darMetin) {
     const isabet = `%${breakdown!.rate.toFixed(0)} (${breakdown!.hits}/${breakdown!.total})`;
-    return { level: "info", text: `${darMetin} (${tier!.total} koşu) · 1. seçim 1. geldi: ${isabet}` };
+    return {
+      level: "info",
+      text: `${darMetin} (${tier!.total} koşu) · 1. seçim 1. geldi: ${isabet}`,
+      top1Rate: { rate: breakdown!.rate, hits: breakdown!.hits, total: breakdown!.total },
+    };
   }
   if (breakdown && breakdown.total >= 3) {
     const isabet = `%${breakdown.rate.toFixed(0)} (${breakdown.hits}/${breakdown.total})`;
     const level = breakdown.total >= TIER_GUVEN_ESIGI ? (breakdown.rate < 25 ? "warn" : breakdown.rate >= 50 ? "good" : "info") : "info";
-    return { level, text: `1. seçim 1. geldi: ${isabet} (${breakdown.total} koşu)` };
+    return {
+      level,
+      text: `1. seçim 1. geldi: ${isabet} (${breakdown.total} koşu)`,
+      top1Rate: { rate: breakdown.rate, hits: breakdown.hits, total: breakdown.total },
+    };
   }
   const n = breakdown?.total ?? 0;
   return { level: "warn", text: n > 0 ? `${n} koşu — yeterli geçmiş veri yok` : "Geçmiş veri yok" };

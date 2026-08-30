@@ -233,6 +233,16 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                                   <span className="text-muted-foreground"> (model %{bankoOlasilikCikar(effectivePred.bankoNote)} diyor, garanti değil)</span>
                                 )}
                                 {" "}— tek at yeterli, bütçeyi diğer ayaklara kaydırın
+                                {/* 2026-08-31 — Opus denetimi: "Güçlü geçmiş" rozeti Ekonomik
+                                    (ilk-3) payına bakıyor, BANKO ise top-1 gerektiriyor —
+                                    ayrı bir soru. Bu koşu tipinde favori GERÇEKTE ne sıklıkla
+                                    kazanmış, doğrudan burada gösteriliyor ki yeşil rozet
+                                    yanıltmasın. */}
+                                {advice.top1Rate && advice.top1Rate.total >= 5 && (
+                                  <span className="block font-normal text-muted-foreground">
+                                    Bu sınıfta favori tarihte %{advice.top1Rate.rate.toFixed(0)} kazanmış ({advice.top1Rate.hits}/{advice.top1Rate.total})
+                                  </span>
+                                )}
                               </div>
                             )}
                             <div className="mt-1">
