@@ -1449,8 +1449,15 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
   }
   const gruplarSiresiz = gruplar; // SIRE zaten 2026-08-28'den beri OZELLIK_GRUPLARI'nda yok
 
+  // 2026-08-31 kullanıcı talebi ("en belirgin 5 pozitif + 2 negatif katkıyı hepsi olacak
+  // gerçek nedenleriyle sıralamalar belirlenecek, her at için"): eskiden burada yalnız
+  // üst-5 pozitif + üst-2 negatif katkı gösteriliyordu, geri kalanı METİNDE hiç
+  // görünmüyordu (skor/sıralama HİÇ etkilenmedi — r.katkilar zaten her zaman TÜM 12
+  // sinyalden hesaplanıyordu, bu yalnız gösterim kısıtıydı). Artık ihmal edilebilir
+  // olmayan (positif için ≥0.03, negatif için ORTA_ESIK'i aşan) TÜM katkılar, HER at
+  // için, hiçbir üst sınır olmadan gösteriliyor.
   const pozitifSirali = gruplarSiresiz.filter((g) => g.katki > 0).sort((a, b) => b.katki - a.katki);
-  for (const g of pozitifSirali.slice(0, 5)) {
+  for (const g of pozitifSirali) {
     if (g.katki < 0.03) continue; // ihmal edilebilir katkı, gösterime değmez
     satirlar.push({
       kod: [g.kod],
@@ -1461,7 +1468,7 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
   }
 
   const negatifSirali = gruplarSiresiz.filter((g) => g.katki < -ORTA_ESIK).sort((a, b) => a.katki - b.katki);
-  for (const g of negatifSirali.slice(0, 2)) {
+  for (const g of negatifSirali) {
     satirlar.push({
       kod: [g.kod],
       tip: "risk",
