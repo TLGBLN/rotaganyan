@@ -38,14 +38,14 @@ export type CanliSinyal = {
 // aşağıda GÜNCEL (budanmış model, deployed weight dosyası) rakamlarla.
 export const CANLI_SINYALLER: CanliSinyal[] = [
   { ad: "AGF Sırası", kod: "agfSirasi", dusukSart: { katsayi: -0.359, durum: "anlamli" }, diger: { katsayi: -0.389, durum: "anlamli" }, aciklama: "Her iki segmentte de en güvenilir sinyallerden biri — piyasa favoriliği." },
-  { ad: "AGF Payı", kod: "agfPayi", dusukSart: { katsayi: 0.566, durum: "anlamli" }, diger: { katsayi: 0.527, durum: "anlamli" }, aciklama: "agfSirasi'ndan bağımsız: sıralamadan çok kalabalıktan ne kadar öne çıktığı." },
+  { ad: "AGF Payı", kod: "agfPayi", dusukSart: { katsayi: 0.566, durum: "anlamli" }, diger: { katsayi: 0.527, durum: "anlamli" }, aciklama: "agfSirasi'ndan bağımsız: sıralamadan çok kalabalıktan ne kadar öne çıktığı. VIF BULGUSU (2026-08-31): agfPayi/agfPayi² arasında CİDDİ çoklu-doğrusal-bağlantı (VIF=12.12/7.94, diğer 10 sinyal VIF~1, r=0.90) — bireysel katsayı tahminleri güvenilmez. İKİ ayrı düzeltme denendi (agfTrend ile DEĞİŞTİRME ve EKLEME, bkz. ADAY_SİNYALLER), ikisi de gerçek performansı iyileştirmedi/kötüleştirdi — VIF kabul edildi, dokunulmadı (yüksek VIF burada tahmin gücünü değil yalnız katsayı yorumunu etkiliyor)." },
   { ad: "Hız Derecesi", kod: "hizDerecesi", dusukSart: { katsayi: 0.492, durum: "anlamli" }, diger: { katsayi: 0.238, durum: "anlamli", not: "Handikap'ta elle 0'a sabitlendi (V5.10)" }, aciklama: "Son 365 gün, popülasyon ortalamasına göre göreli hız. Handikap kategorisinde katkısı istatistiksel olarak sıfır bulunduğu için override edildi. DÜZELTME (V5.33, 2026-08-31): canlı sunum ve eğitim, V5.32'nin retrain incelemesi sırasında fark edilen bir train/serve uyumsuzluğu taşıyordu (canlı yalnız BUGÜNKÜ kova/popülasyona bakıyordu, eğitim atın son 3 koşusunun HER BİRİNİ KENDİ kovasına/tarihine göre kıyaslıyordu — canlıda %43.8 sıfır dönerken eğitimde %8.2). Artık ikisi de aynı paylaşılan çekirdeği (hiz-derecesi-hesapla.ts) kullanıyor, katsayı değişmedi. Gerçek 60 sonuçlanmış koşuda kazanan/diğer Cohen's d ESKİ mantıkta 0.369, YENİ mantıkta 0.578 — düzeltme win-discrimination'ı somut biçimde güçlendirdi." },
   { ad: "Antrenör Oranı", kod: "antrenorOrani", dusukSart: { katsayi: 0.313, durum: "anlamli" }, diger: { katsayi: 0.235, durum: "anlamli" }, aciklama: "Düşük-şartta belirgin daha ağır basıyor." },
   { ad: "İdman Jokeyi Uyumu", kod: "idmJokey", dusukSart: { katsayi: 0.199, durum: "anlamli" }, diger: { katsayi: 0.103, durum: "anlamli", not: "Handikap'ta elle 0'a sabitlendi (V5.31, 2026-08-31) — Opus denetimi: canlı model-düzeltilmiş bakiye -5.93pp (GA=[-10.34,-1.60], sıfırı dışlıyor, n=107), üretim-sadık katsayı canlı %75 fit'te 0.1033'ten tüm veride 0.0266'ya (GA sıfırı kapsıyor) kaymış — 12 sinyalin en büyük kayması. Görülmemiş son %25'te sıfırlarsa top1 +3.95pp/top3 +2.63pp/logloss -0.0306, hepsi anlamlı iyileşme. Düşük-şart'ta katsayı sağlam pozitif (GA=[0.102,0.372]), KORUNDU — hizDerecesi/Handikap (V5.10) ile AYNI cerrahi desen." }, aciklama: "Yarıştıracak jokey, atın idmanlarından birini yaptırmış mı. Diğer 11 özellik silindikten sonra iki segmentte de netleşti." },
   { ad: "Jokey Oranı", kod: "jokeyOrani", dusukSart: { katsayi: 0.182, durum: "anlamli" }, diger: { katsayi: 0.089, durum: "anlamsiz", not: "2026-08-28 zamansal kayma bulundu: Ocak-Mayıs nokta=0.162 GA=[0.110,0.225] anlamlı, Haziran-Ağustos nokta=0.114 GA=[0.044,0.186] hâlâ anlamlı — VIF artmadı (kollinearlik hipotezi doğrulanmadı), gerçek sebep belirsiz. Sıfırlanmadı, izlemede. GÜNCELLEME (2026-08-30, Opus denetimi): V5 döneminde sonuçlanmış TÜM koşularda (n=248) canlı isabet iki bağımsız ölçütte de bu 'anlamsız' etiketiyle ÇELİŞİYOR — kod-bazlı lift +3.9pp (budama sonrası +6.0pp), 4 koşu tipinin (Maiden/Şartlı/Handikap/diğer) HEPSİNDE pozitif, featureSnapshot z-farkı +0.651. Katsayı sıfırlanmadan bırakılması doğru karar çıktı, 'anlamsız' notu artık güncel canlı veriyle desteklenmiyor." }, aciklama: "Jokeyin genel kazanma yüzdesi." },
   { ad: "Rakipsiz Kaçak At", kod: "kacakYalniz", dusukSart: { katsayi: 0, durum: "override", not: "2026-08-31 (V5.32) TÜM segmentlerde 0'a sabitlendi — eski 'anlamlı +0.136/+0.082' katsayıları TAMAMEN eğitim-verisi sızıntısı ürünüymüş: `Runner.raceStyle` tarih filtresi olmadan hesaplanıp atın TÜM (geçmiş+gelecek) Runner satırlarına yazılıyordu. İKİ bağımsız Opus denetimi (aynı gün, birbirinden habersiz) aynı kök nedeni buldu. Sızıntısız yeniden hesaplanınca: düşük-şart -0.0934 GA=[-0.384,0.047] (P(>0)=%9, TERS yönlü), diğer +0.0101 (P(>0)=%64, null) — ikisi de gerçek değil. H2H/düşük-şart ve h2hKiloDegisimi (V5.30) ile AYNI cerrahi desen." }, diger: { katsayi: 0, durum: "override", not: "Aynı düzeltme, bkz. dusukSart notu." }, aciklama: "Accurace tabanlı erken-tempo profili — yalnız SAHADA TEK kaçak-at olma durumunda sayılıyor." },
   { ad: "Kilo-Ayarlı H2H", kod: "h2hKiloDegisimi", dusukSart: { katsayi: 0, durum: "override", not: "2026-08-30 (V5.30) TÜM segmentlerde 0'a sabitlendi — o gün n=248'de canlı GA sıfırı dışlıyordu (z=-0.521, GA=[-0.888,-0.150]). GÜNCELLEME (2026-08-31, Opus tekrar denetimi): n 24'e çıkınca bu REPLİKE OLMADI (z=-0.123, GA=[-0.332,+0.038], sıfırı kapsıyor) — model-düzeltilmiş bakiye ise +1.84pp (POZİTİF), eğitim katsayısı diğer'de GA=[0.0020,0.1348] anlamlı pozitif. Üretim-sadık testte sıfırlamanın etkisi pratikte sıfır (top1 Δ=0.00pp, logloss Δ=+0.0021, anlamsız) — yani sıfırlama ZARARSIZ ama dünkü gerekçe abartılıydı. Şimdilik sıfırlı bırakıldı (geri almanın da kanıtı yok), izlemede." }, diger: { katsayi: 0, durum: "override", not: "Aynı düzeltme+güncelleme, bkz. dusukSart notu." }, aciklama: "Bugünkü rakiplere göre kilo pozisyonunun geçmiş karşılaşmaya göre değişimi." },
-  { ad: "AGF Payı² (kare terimi)", kod: "agfPayi2", dusukSart: { katsayi: -0.205, durum: "anlamsiz" }, diger: { katsayi: -0.201, durum: "anlamli" }, aciklama: "AGF payının doğrusal-olmayan (kare) terimi — güçlü favorilerin piyasada fazla değerli görülmesini düzeltir." },
+  { ad: "AGF Payı² (kare terimi)", kod: "agfPayi2", dusukSart: { katsayi: -0.205, durum: "anlamsiz" }, diger: { katsayi: -0.201, durum: "anlamli" }, aciklama: "AGF payının doğrusal-olmayan (kare) terimi — güçlü favorilerin piyasada fazla değerli görülmesini düzeltir. VIF notu: bkz. agfPayi girdisi." },
   { ad: "H2H Net Skor", kod: "h2hNetSkor", dusukSart: { katsayi: 0, durum: "override", not: "Ham değer ters yönlüydü, elle sıfırlandı" }, diger: { katsayi: 0.099, durum: "anlamli" }, aciklama: "Baş-başa geçmiş karşılaşmalarda net galibiyet farkı." },
   { ad: "Kısa Galop Aralığı Var Mı", kod: "kgsVarMi", dusukSart: { katsayi: 0.035, durum: "anlamsiz" }, diger: { katsayi: 0.14, durum: "anlamli" }, aciklama: "14-30 gün aralığı — yalnız diğer segmentte anlamlı." },
   // 2026-08-28 — KURAL İSTİSNASI: bu sinyal B=500 testinde İKİ KEZ (2026-08-23 ve
@@ -257,4 +257,39 @@ export const ADAY_SINYALLER: AdaySinyal[] = [
     etiket: "Karar verilmedi",
     aciklama: "TJK'nın yabancı hipodromları Türk formatında yayınlıyor — AGF/HP/Sıklet/tam geçmiş dolu, ücretli kaynağa gerek yok. İş planı hazır, başlanmadı.",
   },
+  {
+    ad: "AGF Trend (agfYukselisVarMi/agfDususVarMi) — agfPayi/agfPayi²'nin YERİNE",
+    durum: "reddedildi",
+    etiket: "Adil kıyas · reddedildi",
+    aciklama: "2026-08-31 kullanıcı talebi: agfPayi/agfPayi²'nin VIF sorunu (bkz. CANLI_SİNYALLER) yüzünden V5.27'de silinen agfYukselisVarMi/agfDususVarMi (agfFark eşik≥1.0 puan) geri getirilip payı/²'nin YERİNE kondu. Aynı test setinde adil kıyas: 'diğer' segmentte top1 %35.0→%32.5 (-2.5pp), top3 %67.3→%66.6, logloss kötüleşti — agfPayi sürekli/dereceli piyasa bilgisi taşıyor, agfTrend yalnız ikili eşik, DEĞİŞTİRMEK bilgi kaybı.",
+    metrik: "Diğer segment (n=719 test): top1 -2.5pp, top3 -0.7pp, logloss +0.022 (üçü de kötü)",
+  },
+  {
+    ad: "AGF Trend (agfYukselisVarMi/agfDususVarMi) — agfPayi/agfPayi²'nin ÜSTÜNE EKLEME",
+    durum: "reddedildi",
+    etiket: "B=500 bootstrap · reddedildi",
+    aciklama: "Değiştirme işe yaramayınca kullanıcı kararıyla EKLEME denendi (12→14 özellik, agfPayi/² korunarak). Sonuç: agfPayi/² zaten modeldeyken agfTrend'in kendi katkısı istatistiksel anlamlılığını kaybediyor (GA sıfırı içeriyor) — AGF trend ve AGF payı büyük ölçüde AYNI piyasa bilgisini taşıyor, biri diğerinin üstüne gerçek ek bilgi eklemiyor. Aynı test setinde top1/top3/logloss farkı ihmal edilebilir (ne zarar ne kazanç).",
+    metrik: "Diğer: agfYukselisVarMi nokta=0.0965 GA=[-0.0125,0.2098] ⚠ · agfDususVarMi nokta=0.0505 GA=[-0.0464,0.1486] ⚠ (ikisi de sıfırı içeriyor)",
+  },
+  {
+    ad: "Büyük Saha (10+ At) İçin Ayrı Segment",
+    durum: "reddedildi",
+    etiket: "Adil kıyas + B=500 · reddedildi",
+    aciklama: "Kullanıcı gözlemi: 12+ atlık sahalarda hem model hem AGF sırası top-6'da gerçek kazananı %16.8 oranında kaçırıyor (küçük sahada %0.6). Düşük-şart/diğer ayrımıyla AYNI mimaride üçüncü bir segment (10+ at, kendi retrain'i + jokeyOrani/onGrupArkasiMi adayları) denendi. Bootstrap'ta jokeyOrani (nokta=0.041, GA sıfırı içeriyor) ve onGrupArkasiMi (nokta=0.025, GA sıfırı içeriyor) İKİSİ DE anlamsız çıktı — ayrıca AYNI test yarışlarında mevcut TEK 'diğer' modeli, 3-segment adayından top1'de 3.9pp DAHA İYİ (816 koşuluk havuzu ikiye bölmek her parçayı daha az veriyle/daha gürültülü eğitiyor).",
+    metrik: "Pooled (n=204 test): mevcut top1=%34.3 vs 3-segment top1=%30.4 (-3.9pp)",
+  },
+  {
+    ad: "Yakınsama (Çoklu Zayıf Sinyalin Aynı Atta Hizalanması)",
+    durum: "reddedildi",
+    etiket: "B=500 bootstrap (5 bileşen) · reddedildi",
+    aciklama: "MEGAFAUNA vakası (model 8./%4, gerçek kazanan) üzerinden kullanıcı hipotezi: pist uzmanlığı+sınıf düşüşü(ikramiye bazlı)+at-jokey ikilisi+AGF trend+pedigri gibi TEK TEK zayıf/anlamsız sinyaller AYNI ATTA hizalandığında gerçek ek bilgi taşıyabilir. Basit tek-geçişlik tabloda umut verici göründü (top6-dışı atlarda yakınsama≥2: %5.00 kazanma vs %2.43 baseline, ~2x) ama 13. özellik olarak tam koşullu-logit + B=500 bootstrap'a sokulunca İKİ segmentte de anlamsız çıktı — tekil çarpıcı vakalar (MEGAFAUNA) genele YANSITILAMIYOR, yakınsama grubundaki 1544 attan çoğu kazanmadı.",
+    metrik: "Diğer: nokta=0.0337 GA=[-0.0555,0.1146] ⚠ · Düşük-şart: nokta=0.0428 GA=[-0.0996,0.1622] ⚠ (n=10506 at, 1544'ü 2+ hizalanma)",
+  },
 ];
+
+// 2026-09-01 — Yukarıdaki "Yakınsama" testinin BİLEŞENLERİ (pist uzmanlığı, sınıf
+// durumu/ikramiye trendi, at-jokey ikilisi, AGF trend, pedigri kYuzde), skora hiç
+// katılmadan, /program sayfasının "Hızlı Özet" panelinde (HizliOzetPanel.tsx,
+// hizli-ozet.actions.ts) GÖSTERİM AMAÇLI tutuldu — kullanıcı MEGAFAUNA gibi vakaları
+// ELLE tararken hız kazansın diye. Bu satır istatistiksel bir "kabul" değil, yalnız
+// nerede kullanıldığının referansı.
