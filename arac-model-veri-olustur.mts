@@ -5,7 +5,8 @@
 // Çalıştırma: node --env-file=.env node_modules/tsx/dist/cli.mjs arac-model-veri-olustur.mts
 import { db } from "./src/lib/db";
 import { getSonYarisDetaylariForRace } from "./src/server/actions/son-yaris-detay.actions";
-import { fetchAccuraceGecmisKayitlari, hesaplaAccuraceSonYarisEnHizliKapanisMap } from "./src/lib/methodology/veri-toplama";
+import { fetchAccuraceGecmisKayitlari, hesaplaAccuraceSonYarisEnHizliKapanisMap, normalizeHorseName } from "./src/lib/methodology/veri-toplama";
+import { analizEtTekYaris, hesaplaCokYarisEgilimi, type PaceCheckpoint } from "./src/lib/methodology/pace-analizi";
 import { kategoriTespit } from "./src/lib/methodology/v2-engine";
 import { galopQuality, isSameJockey } from "./src/components/program/panels/galop-helpers";
 import { breedToIrk, surfaceToPist, mesafeBucket, normalizeSireName } from "./src/lib/sire-stat-match";
@@ -236,7 +237,10 @@ async function main() {
       result: { select: { actualOrder: true } },
       runners: {
         where: { scratched: false },
-        select: { id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true, raceStyle: true, disaridanStart: true, hp: true, tjkAtId: true, previousJockey: true, jockeyChanged: true, weight: true },
+        // 2026-08-31 — raceStyle artık BURADAN çekilmiyor (sızıntılıydı, bkz. aşağıdaki
+        // stilEgilimMap notu) — kaldırıldı, yerine ham Accurace checkpoint verisinden
+        // sızıntısız yeniden hesaplanıyor.
+        select: { id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true, disaridanStart: true, hp: true, tjkAtId: true, previousJockey: true, jockeyChanged: true, weight: true },
       },
     },
     orderBy: { raceDay: { date: "asc" } },
@@ -512,15 +516,42 @@ async function main() {
             const hpSirali = [...runners].filter((r) => r.hp != null).sort((a, b) => (b.hp ?? 0) - (a.hp ?? 0));
             const hpSiraMap = new Map(hpSirali.map((r, i2) => [r.id, i2 + 1]));
 
+            // 2026-08-31 BUG DÜZELTMESİ (Opus denetimi): Runner.raceStyle DB alanı tarih
+            // filtresi OLMADAN (atın TÜM Accurace kayıtlarından, bu yarışın kendisi ve
+            // SONRASI dahil) hesaplanıyor — eğitim verisine sızıntı taşıyordu (canlı
+            // serving ayrı, sızıntısız bir hesap kullanıyordu, klasik train/serve
+            // uyumsuzluğu). Düzeltme: veri-toplama.ts'teki accuraceEgilimMap İLE AYNI
+            // desen — accKayitlar (YUKARIDA zaten fetchAccuraceGecmisKayitlari ile
+            // race.raceDay.date'ten KESİNLİKLE ÖNCEKİ kayıtlarla sızıntısız çekilmişti,
+            // bkz. o fonksiyonun `accuraceRace.date < raceDate` filtresi) BURADA yeniden
+            // kullanılarak her at için stil eğilimi sıfırdan, sızıntısız hesaplanıyor.
+            const siblingSayisiMap = new Map<string, number>();
+            for (const s of accKayitlar.son800Siblings) {
+              siblingSayisiMap.set(s.accuraceRaceId, (siblingSayisiMap.get(s.accuraceRaceId) ?? 0) + 1);
+            }
+            const stilEgilimMap = new Map<string, ReturnType<typeof hesaplaCokYarisEgilimi>>();
+            for (const rr of runners) {
+              const norm = normalizeHorseName(rr.name);
+              const kayitlar = accKayitlar.son800AccuraceKayitlari.filter((k) => normalizeHorseName(k.horseName) === norm);
+              const sonuclar = kayitlar
+                .map((k) => analizEtTekYaris(k.checkpoints as unknown as PaceCheckpoint[], k.accuraceRace.length ?? 0, siblingSayisiMap.get(k.accuraceRaceId) ?? 0))
+                .filter((s): s is NonNullable<typeof s> => s != null);
+              stilEgilimMap.set(rr.id, hesaplaCokYarisEgilimi(sonuclar));
+            }
+
             // 2026-08-26 kullanıcı bulgusu: kacakAtMi tek parça sinyali aslında iki farklı
             // şeyi karıştırıyordu — RAKİPSİZ kaçak olmak (uzun süre yalnız önde, rahat kaçış)
             // gerçek bir avantaj, RAKİPLİ kaçak olmak (birden fazla at öne geçmeye çalışıyor,
             // tempo yükseliyor) değil. Derinlemesine backtest (saha büyüklüğü sabit tutularak
             // kontrol edilmiş, deneyimsiz atlarda bile split-half tutarlı +12-14 puan fark)
-            // düşük-şart segmentinde anlamlı (nokta=+0.145, GA=[0.031,0.266]) bulundu.
-            // Sızıntı riski yok — bugünkü sahanın kompozisyonu zaten önceden bilinen bir şey.
+            // düşük-şart segmentinde anlamlı (nokta=+0.145, GA=[0.031,0.266]) bulundu —
+            // AMA bu backtest de sızıntılı raceStyle alanıyla yapılmıştı, yeniden eğitimle
+            // birlikte doğruluğu yeniden sınanacak. Sızıntı riski (kompozisyon açısından)
+            // yok — bugünkü sahanın kompozisyonu zaten önceden bilinen bir şey; sızıntı
+            // yalnız HER ATIN KENDİ geçmiş eğilimi hesaplanırken vardı, o da yukarıda
+            // düzeltildi.
             const kacakSayisiSahada = runners.filter(
-              (rr) => (rr.raceStyle as { style?: string } | null)?.style === "KACAK_AT"
+              (rr) => stilEgilimMap.get(rr.id)?.stil === "KACAK_AT"
             ).length;
 
             const zeminDetayi = zeminDetayiBul(
@@ -635,9 +666,9 @@ async function main() {
                 ayniJokeySurekliligi: sonYaris?.ayniJokey === true ? 1 : 0,
                 takiEklendiMi: (sonYaris?.eklenenTaki?.length ?? 0) > 0 ? 1 : 0,
                 takiCikarildiMi: (sonYaris?.cikarilanTaki?.length ?? 0) > 0 ? 1 : 0,
-                kacakAtMi: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" ? 1 : 0,
-                kacakYalniz: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" && kacakSayisiSahada === 1 ? 1 : 0,
-                onGrupArkasiMi: (r.raceStyle as { style?: string } | null)?.style === "ON_GRUP_ARKASI" ? 1 : 0,
+                kacakAtMi: stilEgilimMap.get(r.id)?.stil === "KACAK_AT" ? 1 : 0,
+                kacakYalniz: stilEgilimMap.get(r.id)?.stil === "KACAK_AT" && kacakSayisiSahada === 1 ? 1 : 0,
+                onGrupArkasiMi: stilEgilimMap.get(r.id)?.stil === "ON_GRUP_ARKASI" ? 1 : 0,
                 disaridanStart: r.disaridanStart ? 1 : 0,
                 hpSirasi: hpSiraMap.get(r.id) ?? Math.ceil(runners.length / 2),
                 agfPayi: r.agf ?? 0,

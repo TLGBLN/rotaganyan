@@ -191,9 +191,22 @@ const H2H_NET_SKOR_IDX = FEATURE_NAMES.indexOf("h2hNetSkor");
 // segmentlerde (kanıt pooled, tek kategoriye özgü değil) sıfırlandı — diğer katsayılara
 // dokunulmadı. Ham h2hKiloDegisimi hesabı (toFeatureVector) KORUNDU, yalnız ağırlığı 0.
 const H2H_KILO_IDX = FEATURE_NAMES.indexOf("h2hKiloDegisimi");
+
+// 2026-08-31 (V5.32) — Opus'un iki AYRI, bağımsız denetimi (yarış-stili araştırması +
+// retrain doğrulaması) AYNI kök nedeni buldu: `Runner.raceStyle` (kacakYalniz'ın kaynağı)
+// `accurace-sync.service.ts`'te tarih filtresi OLMADAN hesaplanıp atın TÜM geçmiş+gelecek
+// Runner satırlarına yazılıyor — eğitim verisine sızıntı taşıyordu. Sızıntısız yeniden
+// hesaplanınca (bkz. arac-model-veri-olustur.mts'teki stilEgilimMap düzeltmesi): düşük-şart
+// eski "+0.1361 anlamlı" → bağımsız B=500'de -0.0934 GA=[-0.384,0.047] (P(>0)=%9, TERS
+// yönlü); diğer eski "+0.0822 anlamlı" → +0.0101 (P(>0)=%64, null). Yani her iki segmentteki
+// "anlamlı" statü TAMAMEN sızıntı ürünüymüş — h2hKiloDegisimi (V5.30) ile AYNI cerrahi
+// desen: tam retrain YERİNE (o turda ilgisiz bir hızDerecesi veri-tazeleme kayması da
+// karıştı, ayrı bir konu, henüz çözülmedi), yalnız BU TEK katsayı TÜM segmentlerde koda
+// gömülü sıfırlandı. Ham kacakYalniz hesabı (toFeatureVector) KORUNDU, yalnız ağırlığı 0.
+const KACAK_YALNIZ_IDX = FEATURE_NAMES.indexOf("kacakYalniz");
 const WEIGHTS_DUSUK_SART: AgirlikSeti = {
   ...(v5WeightsDusukSart as AgirlikSeti),
-  weights: (v5WeightsDusukSart as AgirlikSeti).weights.map((w, i) => (i === H2H_NET_SKOR_IDX || i === H2H_KILO_IDX ? 0 : w)),
+  weights: (v5WeightsDusukSart as AgirlikSeti).weights.map((w, i) => (i === H2H_NET_SKOR_IDX || i === H2H_KILO_IDX || i === KACAK_YALNIZ_IDX ? 0 : w)),
 };
 
 // 2026-08-24 kullanıcı bulgusu: Handikap (kategoriTespit==="2") yarışları KENDİ verisiyle
@@ -213,7 +226,7 @@ const HIZ_DERECESI_IDX = FEATURE_NAMES.indexOf("hizDerecesi");
 // WEIGHTS_DIGER_HANDIKAP artık bunun üzerine inşa ediliyor (hem h2hKilo=0 HEM hizDerecesi=0).
 const WEIGHTS_DIGER_DUZELTILMIS: AgirlikSeti = {
   ...WEIGHTS_DIGER,
-  weights: WEIGHTS_DIGER.weights.map((w, i) => (i === H2H_KILO_IDX ? 0 : w)),
+  weights: WEIGHTS_DIGER.weights.map((w, i) => (i === H2H_KILO_IDX || i === KACAK_YALNIZ_IDX ? 0 : w)),
 };
 // 2026-08-31 (V5.31) — Opus'un V5.30-sonrası tekrar denetimi: idmJokey Handikap'ta DÖRT
 // bağımsız ölçütte de ters/anlamsız çıktı — canlı model-düzeltilmiş bakiye -5.93pp
@@ -1179,10 +1192,25 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
 // %29.9 (n=167), hizDerecesi %29.1 (n=117).
 // SONUÇ: olasılık eşiği TEK BAŞINA yeterli değilmiş — AGF baskınlığı bağımsız bir
 // sinyalle DOĞRULANMADIKÇA banko sayılmayacak şekilde ikinci bir koşul eklendi.
+//
+// 2026-08-31 (V5.32) — Opus'un çerçeve denetimi: hafızadaki "n=7, %28.6" rakamı
+// `isBanko`'nun 2026-08-28'e kadar hep false kaydedildiği bir kayıt bugunun kalıntısıydı,
+// mekanizmanın GERÇEK performansı değil. Mekanizma çevrimdışı (canlı ağırlıklar+override'lar
+// BİREBİR) 1.060 koşuda yeniden çalıştırıldı: n=122/1060 (%11.5) tetik, top1 %56.6 [GA
+// %48-65], top3 %90.2 — örneklem-dışı (son %25) %64.3, V5 döneminde (çevrimdışı) %66.7.
+// Yukarıdaki 2026-08-22 notundaki "n=178, %34.8" ve "n=106, %23.6" rakamları BAYAT (o zamanki
+// 23-özellikli modelden) — güncel referans bu. Ayrıca eşik taraması TEMİZ monoton çıktı:
+// %55'te 78 tetik/%57.7, %60'ta 41 tetik (%3.9)/%65.9 (örneklem-dışı %85.7, V5'te %100 n=6).
+// Bu yüzden ayrı, daha güçlü bir "Güçlü Banko" kademesi eklendi (mevcut %50 eşiği/mantığı
+// DEĞİŞMEDİ, üstüne ek bir kademe). Test edilip DESTEKLENMEYEN öneriler (AGF-favorisi şartı,
+// ≥2-farklı-aile bağımsız sinyal şartı, pistUzmani/kaçak-tek kapıları, negatif-sinyal
+// diskalifiye kapısı) BİLEREK eklenmedi — hiçbiri isabeti artırmadı, çoğu tetik sayısını
+// 2-6 kat düşürdü (bkz. sinyal-kutugu.service.ts).
 const BANKO_OLASILIK_ESIGI = 0.5;
+const GUCLU_BANKO_OLASILIK_ESIGI = 0.6;
 const AGF_OZELLIK_KODLARI = new Set(["agfSirasi", "agfPayi", "agfYukselisVarMi", "agfDususVarMi"]);
 
-export type V5BankoSonuc = { bankoAdayi: boolean; sebep: string; birinci?: { no: number; ad: string; karar: string } };
+export type V5BankoSonuc = { bankoAdayi: boolean; gucluBanko?: boolean; sebep: string; birinci?: { no: number; ad: string; karar: string } };
 
 export function v5BankoAdayiTespit(sirali: Faz1RunnerV5Sirali[]): V5BankoSonuc {
   const birinci = sirali[0];
@@ -1193,16 +1221,27 @@ export function v5BankoAdayiTespit(sirali: Faz1RunnerV5Sirali[]): V5BankoSonuc {
   );
 
   if (birinci.olasilik >= BANKO_OLASILIK_ESIGI && bagimsizGuclu) {
+    const gucluBanko = birinci.olasilik >= GUCLU_BANKO_OLASILIK_ESIGI;
+    // 2026-08-31 — "AGF favoriliği ... ile doğrulanıyor" cümlesi eskiden atın AGF
+    // favorisi OLDUĞUNU varsayıyordu, ama bu koşul yalnız modelin #1 seçimine (birinci)
+    // bakıyor — o her zaman AGF favorisi değil (Opus: p≥%50 havuzunda AGF favorisi
+    // OLMAYAN 9 bankonun isabeti %66.7, favori olanlardan bile YÜKSEK). Metin artık
+    // gerçek AGF durumuna göre değişiyor.
+    const agfCumlesi =
+      birinci.agfSirasi === 1
+        ? `AGF favoriliği "${bagimsizGuclu.etiket}" (bağımsız sinyal) ile doğrulanıyor`
+        : `AGF favorisi olmamasına rağmen "${bagimsizGuclu.etiket}" (bağımsız sinyal) taşıyor`;
     return {
       bankoAdayi: true,
-      sebep: `#${birinci.no} ${birinci.ad} — model tahmini %${(birinci.olasilik * 100).toFixed(1)}, AGF favoriliği "${bagimsizGuclu.etiket}" (bağımsız sinyal) ile doğrulanıyor (backtest: bu ikisi birlikteyken n=178 koşuda %34.8 isabet). Yalnız bir işaret — muhakeme metnindeki riskleri kendiniz teyit edin.`,
+      gucluBanko,
+      sebep: `#${birinci.no} ${birinci.ad} — model tahmini %${(birinci.olasilik * 100).toFixed(1)}, ${agfCumlesi} (bu profildeki geçmiş isabet: çevrimdışı n=122 koşuda %56.6, V5 döneminde canlı n=33'te %51.5)${gucluBanko ? ` — olasılık %${(GUCLU_BANKO_OLASILIK_ESIGI * 100).toFixed(0)}'ın da üstünde, GÜÇLÜ BANKO (bu eşikte isabet %60-100 arası, tetik çok daha nadir)` : ""}. Yalnız bir işaret — muhakeme metnindeki riskleri kendiniz teyit edin.`,
       birinci: { no: birinci.no, ad: birinci.ad, karar: birinci.karar },
     };
   }
   if (birinci.olasilik >= BANKO_OLASILIK_ESIGI && !bagimsizGuclu) {
     return {
       bankoAdayi: false,
-      sebep: `#${birinci.no} ${birinci.ad} olasılığı yüksek (%${(birinci.olasilik * 100).toFixed(1)}) ama SADECE AGF favoriliğinden güç alıyor, bağımsız güçlü bir sinyal (hız/antrenör/jokey) yok — bu profilde backtest isabeti yalnız %23.6 (n=106), banko sayılmıyor.`,
+      sebep: `#${birinci.no} ${birinci.ad} olasılığı yüksek (%${(birinci.olasilik * 100).toFixed(1)}) ama SADECE AGF favoriliğinden güç alıyor, bağımsız güçlü bir sinyal (hız/antrenör/jokey) yok — banko sayılmıyor.`,
       birinci: { no: birinci.no, ad: birinci.ad, karar: birinci.karar },
     };
   }
@@ -1241,7 +1280,13 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // 2026-08-17 denetim bulgusu: kacakAtMi ve dususAmaIyiPozisyon anlamlı sinyaller
   // (bkz. toFeatureVector üstündeki notlar) ama hiçbir OzellikGrubu'na dahil değildi —
   // katkıları skoru etkiliyordu ama gerekçe metninde hiç görünmüyordu. Eklendi.
-  { kod: "KACAK", ozellikIndeksleri: [idx("kacakYalniz")], aciklama: (r) => (r.kacakYalniz ? "Rakipsiz kaçak at / erken tempo yapan (Accurace koşu stili sinyali, sahada tek kaçak)" : null) },
+  // 2026-08-31 (V5.32) — Opus denetimi: bu satır ham r.kacakYalniz boolean'ına bakıyordu,
+  // HIZ/IDMJOK'ta ZATEN düzeltilmiş olan aynı hataya sahipti — katsayı artık sızıntı
+  // bulgusuyla TÜM segmentlerde sıfırlandığı için satır hiç görünmemeli, ama katsayı
+  // ileride yeniden değerlendirilip sıfır DIŞI bir değere dönerse (ör. yalnız bir
+  // segmentte), gerçek katkıya bakmayan bu blok yine "olumlu" göstermeye devam ederdi.
+  // Artık HIZ ile AYNI desende, gerçek katkıya (r.katkilar) bakıyor.
+  { kod: "KACAK", ozellikIndeksleri: [idx("kacakYalniz")], aciklama: (r) => (r.katkilar[KACAK_YALNIZ_IDX] !== 0 ? `Rakipsiz kaçak at / erken tempo yapan (Accurace koşu stili sinyali, sahada tek kaçak): popülasyona göre ${r.katkilar[KACAK_YALNIZ_IDX] > 0 ? "olumlu" : "olumsuz"}` : null) },
   // 2026-08-21 — H2H: bugünkü rakiplerle ortak geçmiş yarış yoksa (h2hNetSkor=0) satır
   // hiç gösterilmez — "0 karşılaşma" ile "hep berabere" ayrımı yapılamadığı için nötr.
   // 2026-08-27 — düşük-şart'ta bu sinyalin katsayısı ELLE sıfırlanmış (bkz. WEIGHTS_DUSUK_SART

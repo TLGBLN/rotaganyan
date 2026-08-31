@@ -48,7 +48,7 @@ function formatGecCikisOzet(ozet: GecCikisOzet | undefined): string | null {
 const COMBINING_MARKS_RE = /[̀-ͯ]/g;
 // Yabancı doğumlu atlarda Runner.name "(USA)"/"(IRE)" gibi ülke koduyla biter, Accurace bunu yazmıyor.
 const TRAILING_COUNTRY_CODE_RE = /\s*\([A-ZİĞÜŞÖÇ]{2,4}\)\s*$/i;
-function normalizeHorseName(s: string): string {
+export function normalizeHorseName(s: string): string {
   return s.replace(TRAILING_COUNTRY_CODE_RE, "").toLocaleUpperCase("tr-TR").normalize("NFD").replace(COMBINING_MARKS_RE, "").replace(/[^A-ZİĞÜŞÖÇ0-9 ]/g, "").replace(/\s+/g, " ").trim();
 }
 
