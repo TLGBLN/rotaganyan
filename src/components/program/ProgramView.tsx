@@ -1482,6 +1482,18 @@ export default function ProgramView({
     setComparisonOpen(hedef);
     setH2hOpen(hedef);
     setSonYarisOpen(hedef);
+    // Açılırken ilk panelin (Accurace) başlığına kaydır — toggleAndScroll ile aynı desen,
+    // kullanıcı butona bastıktan sonra veriyi görmek için elle aşağı kaydırmasın.
+    if (hedef) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const el = document.getElementById("panel-son800");
+          if (!el) return;
+          const top = el.getBoundingClientRect().top + window.scrollY - STICKY_HEADER_OFFSET;
+          window.scrollTo({ top, behavior: "smooth" });
+        });
+      });
+    }
   }
 
   function handleToggleFollow(horseName: string) {
