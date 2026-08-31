@@ -30,6 +30,7 @@ const PedigreePanel = dynamic(() => import("./panels/PedigreePanel"), { loading:
 const ComparisonPanel = dynamic(() => import("./panels/ComparisonPanel"), { loading: () => PANEL_LOADING, ssr: false });
 const H2HPanel = dynamic(() => import("./panels/H2HPanel"), { loading: () => PANEL_LOADING, ssr: false });
 const SonYarisDetayPanel = dynamic(() => import("./panels/SonYarisDetayPanel"), { loading: () => PANEL_LOADING, ssr: false });
+const AtDetaylariPanel = dynamic(() => import("./panels/AtDetaylariPanel"), { loading: () => PANEL_LOADING, ssr: false });
 
 // Detay paneli açma/kapama butonları (Son 800/Galop/Pedigriler/H2H/Karşılaştır/Son Yarış Detayları) —
 // her biri farklı renkteyken karmaşık görünüyordu; artık hepsi tek tip, sadece açık/kapalı
@@ -1141,7 +1142,7 @@ type JockeyStatsMap = Record<string, {
 type TrainerStatsMap = Record<string, TrainerStatRow>;
 
 function RaceTable({
-  race, dateStr, analysisOpen, onAnalysisToggle, son800Open, agfTrendOpen, galopOpen, pedigreeOpen, comparisonOpen, h2hOpen, sonYarisOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, isVerified, userEmail, jockeyStats, trainerStats, hippodromeName,
+  race, dateStr, analysisOpen, onAnalysisToggle, son800Open, agfTrendOpen, galopOpen, pedigreeOpen, comparisonOpen, h2hOpen, sonYarisOpen, atDetayOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, isVerified, userEmail, jockeyStats, trainerStats, hippodromeName,
 }: {
   race: ProgramRace;
   dateStr: string;
@@ -1154,6 +1155,7 @@ function RaceTable({
   comparisonOpen: boolean;
   h2hOpen: boolean;
   sonYarisOpen: boolean;
+  atDetayOpen: boolean;
   followedSet: Set<string>;
   onToggleFollow: (horseName: string) => void;
   onSelectHorse: (name: string) => void;
@@ -1397,6 +1399,13 @@ function RaceTable({
           </PanelKilitGate>
         )}
       </div>
+      <div id="panel-at-detaylari">
+        {atDetayOpen && (
+          <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
+            <AtDetaylariPanel runners={race.runners} />
+          </PanelKilitGate>
+        )}
+      </div>
     </div>
   );
 }
@@ -1435,6 +1444,7 @@ export default function ProgramView({
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [h2hOpen, setH2hOpen] = useState(false);
   const [sonYarisOpen, setSonYarisOpen] = useState(false);
+  const [atDetayOpen, setAtDetayOpen] = useState(false);
   const [selectedHorse, setSelectedHorse] = useState<string | null>(null);
   const [hipodromOzellikleriOpen, setHipodromOzellikleriOpen] = useState(false);
   const [followedSet, setFollowedSet] = useState(() => new Set(followedNames));
@@ -1472,7 +1482,7 @@ export default function ProgramView({
   // tek açılması gerekiyordu — bir atı (ör. MEGAFAUNA) değerlendirirken 7 ayrı panele
   // tek tek tıklamak yerine, hepsini AYNI ANDA açan tek bir anahtar. Analizi Gör ayrı
   // tutuldu (farklı amaç, ayrı kilit/CTA akışı).
-  const tumPanellerAcikMi = son800Open && agfTrendOpen && galopOpen && pedigreeOpen && comparisonOpen && h2hOpen && sonYarisOpen;
+  const tumPanellerAcikMi = son800Open && agfTrendOpen && galopOpen && pedigreeOpen && comparisonOpen && h2hOpen && sonYarisOpen && atDetayOpen;
   function tumPanelleriAcVeyaKapat() {
     const hedef = !tumPanellerAcikMi;
     setSon800Open(hedef);
@@ -1482,6 +1492,7 @@ export default function ProgramView({
     setComparisonOpen(hedef);
     setH2hOpen(hedef);
     setSonYarisOpen(hedef);
+    setAtDetayOpen(hedef);
     // Açılırken ilk panelin (Accurace) başlığına kaydır — toggleAndScroll ile aynı desen,
     // kullanıcı butona bastıktan sonra veriyi görmek için elle aşağı kaydırmasın.
     if (hedef) {
@@ -1664,6 +1675,7 @@ export default function ProgramView({
               comparisonOpen={comparisonOpen}
               h2hOpen={h2hOpen}
               sonYarisOpen={sonYarisOpen}
+              atDetayOpen={atDetayOpen}
               followedSet={followedSet}
               onToggleFollow={handleToggleFollow}
               onSelectHorse={setSelectedHorse}
