@@ -1212,21 +1212,13 @@ const AGF_OZELLIK_KODLARI = new Set(["agfSirasi", "agfPayi", "agfYukselisVarMi",
 
 export type V5BankoSonuc = { bankoAdayi: boolean; gucluBanko?: boolean; sebep: string; birinci?: { no: number; ad: string; karar: string } };
 
-// 2026-08-31 — v5BankoAdayiTespit'in İÇİNDEKİ "bağımsız güçlü sinyal" testi dışa aktarıldı,
-// admin panelindeki "gizli değer atı" kırmızı/amber bayrağı AYNI testi (yeni bir heuristik
-// İCAT ETMEDEN) kullanabilsin diye — bugün Opus'un ayrı testi "bağımsız sinyal sayma"/
-// "model-piyasa farkı" gibi YENİ puanlama fikirlerini desteklemedi, o yüzden burada YENİ bir
-// şey icat etmek yerine zaten kanıtlı olan bu TEK testi paylaşmak doğru seçim. Davranış
-// DEĞİŞMEDİ, yalnız çağırma yeri paylaşılabilir hale geldi.
-export function bagimsizGucluSinyalBul(ozellikler: TumOzellikDetay[]): TumOzellikDetay | undefined {
-  return ozellikler.find((o) => !AGF_OZELLIK_KODLARI.has(o.kod) && o.katki >= GUCLU_ESIK);
-}
-
 export function v5BankoAdayiTespit(sirali: Faz1RunnerV5Sirali[]): V5BankoSonuc {
   const birinci = sirali[0];
   if (!birinci) return { bankoAdayi: false, sebep: "Veri yok." };
 
-  const bagimsizGuclu = bagimsizGucluSinyalBul(tumOzellikleriListele(birinci));
+  const bagimsizGuclu = tumOzellikleriListele(birinci).find(
+    (o) => !AGF_OZELLIK_KODLARI.has(o.kod) && o.katki >= GUCLU_ESIK
+  );
 
   if (birinci.olasilik >= BANKO_OLASILIK_ESIGI && bagimsizGuclu) {
     const gucluBanko = birinci.olasilik >= GUCLU_BANKO_OLASILIK_ESIGI;

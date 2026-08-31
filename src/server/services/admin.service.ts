@@ -4,7 +4,6 @@ import type { Prisma } from "@prisma/client";
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getDamStatOzetleriForRace } from "@/server/actions/dam-stat.actions";
 import { ENGINE_VERSIONS } from "@/server/services/analiz-versiyon-karsilastirma.service";
-import { bagimsizGucluSinyalBul, type TumOzellikDetay } from "@/lib/methodology/v5-engine";
 
 // 2026-08-16 kullanıcı kararı: kupon hazırlama safhasındaki sınıf-bazlı istatistikler
 // (Eko/Nor/Gen %, "1.seçim 1.geldi") V1-V22/V4/V5 karışık tüm geçmişi topluyordu — V5
@@ -45,9 +44,7 @@ export type AdminRaceDay = Prisma.RaceDayGetPayload<{
             published: true;
             isBanko: true;
             bankoNote: true;
-            // 2026-08-31 — featureSnapshot eklendi: findHiddenValueHorses'ın "gizli değer atı"
-          // bayrağı için gerekli (zaten kayıtlı veriyi okuyor, yeni hesaplama gerektirmiyor).
-          picks: { select: { rank: true; isTarget: true; score: true; runnerLabel: true; featureSnapshot: true } };
+            picks: { select: { rank: true; isTarget: true; score: true; runnerLabel: true } };
           };
         };
         result: { select: { id: true } };
@@ -963,39 +960,4 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string, atSay
   }
   const n = breakdown?.total ?? 0;
   return { level: "warn", text: n > 0 ? `${n} koşu — yeterli geçmiş veri yok` : "Geçmiş veri yok" };
-}
-
-// 2026-08-31 kullanıcı talebi: admin/kupon panelinde "sıkıntılı" (modelin favori isabetinin
-// tarihte düşük olduğu) koşu türlerini görsel olarak işaretlemek — top1Rate ZATEN hesaplı
-// (BANKO şeffaflığı için eklenmişti, 2026-08-30), burada YENİ bir istatistik üretilmiyor,
-// yalnız düşük-oran+yeterli-örneklem eşiği uygulanıyor. `advice.level` (Eko/Nor/Geniş
-// DAĞILIMINA bakar) ile KARIŞTIRILMAMALI — bu yalnız top-1 isabetine bakan AYRI bir bayrak.
-const TOP1_SIKINTILI_ESIGI = 25;
-export function isSiniftipiSikintili(advice: ClassTypeAdvice): boolean {
-  return !!advice.top1Rate && advice.top1Rate.total >= TIER_GUVEN_ESIGI && advice.top1Rate.rate < TOP1_SIKINTILI_ESIGI;
-}
-
-export type HiddenValueHorse = { runnerLabel: string; rank: number; score: number | null; sinyalEtiket: string; sinyalKatki: number };
-
-// 2026-08-31 kullanıcı talebi ("gizli değerli atları bul, kırmızı işaretle"): BANKO'nun
-// zaten kullandığı "bağımsız güçlü sinyal" testini (bagimsizGucluSinyalBul, v5-engine.ts)
-// modelin ilk-3'ü DIŞINDAKİ atlara uygular — bugün Opus'un ayrı testi "bağımsız sinyal
-// sayma"/"model-piyasa farkı" gibi YENİ puanlama fikirlerini DESTEKLEMEDİĞİ için burada
-// YENİ bir heuristik İCAT EDİLMİYOR, yalnız zaten kanıtlı BANKO testi farklı bir yerde
-// (rank>3) GÖSTERİM amaçlı uygulanıyor — skor/sıralama hiç değişmiyor. `Pick.featureSnapshot`
-// zaten `tumOzellikleriListele` çıktısını TÜM atlar için saklıyor (V5AnalysisPanel.tsx,
-// tam saha üzerinde map yapıyor) — burada yeniden hesaplama YOK, yalnız kayıtlı veri okunuyor.
-export function findHiddenValueHorses(
-  picks: { rank: number; runnerLabel: string; score: number | null; featureSnapshot: Prisma.JsonValue | null }[]
-): HiddenValueHorse[] {
-  const out: HiddenValueHorse[] = [];
-  for (const p of picks) {
-    if (p.rank <= 3) continue;
-    const snapshot = p.featureSnapshot as { tumSinyaller?: TumOzellikDetay[] } | null;
-    const ozellikler = snapshot?.tumSinyaller;
-    if (!Array.isArray(ozellikler)) continue;
-    const sinyal = bagimsizGucluSinyalBul(ozellikler);
-    if (sinyal) out.push({ runnerLabel: p.runnerLabel, rank: p.rank, score: p.score, sinyalEtiket: sinyal.etiket, sinyalKatki: sinyal.katki });
-  }
-  return out;
 }
