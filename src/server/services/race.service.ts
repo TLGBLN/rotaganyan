@@ -393,7 +393,9 @@ export type HomeKuponLeg = { raceNo: number; narrow: number[]; normal: number[];
  * ("Kocaeli — 7'li Ganyan" gibi) admin panelinde (KuponForm.tsx) zaten bu ayrımı taşıyor,
  * burada da AYNI ayrımla doğru birim ücret seçiliyor.
  */
-const ALTILI_STAKE_PER_COMBINATION = 1.25;
+// 2026-08-31 — export edildi: yeni kupon-generation.actions.ts (Kupon Oluştur otomasyonu)
+// bu sabiti tekrar tanımlamak yerine buradan import ediyor.
+export const ALTILI_STAKE_PER_COMBINATION = 1.25;
 const YEDILI_GANYAN_STAKE_PER_COMBINATION = 2;
 
 function stakeForHippodromeLabel(hippodromeName: string): number {

@@ -10,6 +10,7 @@ import {
   publishHomeKupon,
   type HomeKuponLegInput,
 } from "@/server/actions/home-kupon.actions";
+import { generateKuponOnerisi } from "@/server/actions/kupon-generation.actions";
 
 type Hippodrome = { id: string; name: string; slug: string };
 type RaceRunner = { no: number; name: string; scratched: boolean; ekuriGroup: number | null; score: number | null; agfSirasi: number | null };
@@ -68,6 +69,7 @@ function amountFor(counts: number[], stakePerCombination: number): number {
 // önlemek için ortak bileşene çıkarıldı.
 function KuponGrup({
   label, races, selections, onToggle, amounts, onSubmit, publishing, stakePerCombination, widths = WIDTHS,
+  onAutoGenerate, autoGenerating, autoGenNotes,
 }: {
   label: string;
   races: RaceDayData["races"];
@@ -79,10 +81,33 @@ function KuponGrup({
   stakePerCombination: number;
   /** v6.111 — kullanıcı talebi 2026-08-13: 7'li Ganyan yalnız "Geniş" gösterir, Altılı üçünü de. */
   widths?: Width[];
+  /** 2026-08-31 — "Kupon Oluştur" (otomatik doldur) — yalnız Altılı gruplarında geçerli,
+   *  7'li Ganyan çağrı yerinde bu prop hiç geçirilmiyor. */
+  onAutoGenerate?: () => void;
+  autoGenerating?: boolean;
+  autoGenNotes?: string[];
 }) {
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold">{label}</h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold">{label}</h3>
+        {onAutoGenerate && (
+          <button
+            type="button"
+            onClick={onAutoGenerate}
+            disabled={autoGenerating}
+            title="Gerçek model olasılıklarına göre bütçe-optimizasyonu yapıp formu ön-doldurur — YAYINLAMAZ, gözden geçirip Yayınla'ya siz basarsınız."
+            className="rounded-md border border-brand/40 px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10 disabled:opacity-50"
+          >
+            {autoGenerating ? "Analiz ediliyor…" : "✨ Kupon Oluştur"}
+          </button>
+        )}
+      </div>
+      {autoGenNotes && autoGenNotes.length > 0 && (
+        <div className="rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-[11px] text-muted-foreground space-y-0.5">
+          {autoGenNotes.map((note, i) => <div key={i}>{note}</div>)}
+        </div>
+      )}
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full border-collapse text-sm">
           <thead>
@@ -207,7 +232,7 @@ function KuponGrup({
         disabled={publishing}
         className="w-full rounded-md bg-brand px-4 py-3 text-sm font-semibold text-brand-foreground hover:bg-brand/90 disabled:opacity-50"
       >
-        {publishing ? "Oluşturuluyor…" : "Kupon Oluştur"}
+        {publishing ? "Yayınlanıyor…" : "Yayınla"}
       </button>
     </div>
   );
@@ -229,6 +254,9 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [raceDay, setRaceDay] = useState<RaceDayData | null>(null);
   const [selections, setSelections] = useState<Selections>({});
+  // 2026-08-31 — "Kupon Oluştur" (otomatik doldur) durumu, grup anahtarına göre.
+  const [autoGenKey, setAutoGenKey] = useState<string | null>(null);
+  const [autoGenNotesByKey, setAutoGenNotesByKey] = useState<Record<string, string[]>>({});
 
   const altiliGroups = useMemo(
     () => (raceDay ? chunkIntoAltili(raceDay.races) : []),
@@ -275,6 +303,39 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
       else set.add(no);
       return { ...prev, [raceNo]: { ...race, [width]: set } };
     });
+  }
+
+  // 2026-08-31 kullanıcı talebi: "Kupon Oluştur" butonu — gerçek model olasılıklarına göre
+  // bütçe-optimizasyonu yapıp formu ÖN-DOLDURUR. `publishHomeKupon` ÇAĞIRMAZ — admin gözden
+  // geçirip mevcut "Yayınla" butonuyla yayınlar (bkz. kupon-generation.actions.ts notu).
+  async function autoGenerate(group: RaceDayData["races"], key: string) {
+    if (!raceDay) return;
+    setAutoGenKey(key);
+    try {
+      const result = await generateKuponOnerisi({
+        hippodromeSlug: slug,
+        date,
+        raceNos: group.map((r) => r.raceNo),
+        butceler: { narrow: LIMITS.narrow, normal: LIMITS.normal, wide: LIMITS.wide },
+      });
+      setSelections((prev) => {
+        const next = { ...prev };
+        for (const leg of result.legs) {
+          next[leg.raceNo] = {
+            narrow: new Set(leg.narrow),
+            normal: new Set(leg.normal),
+            wide: new Set(leg.wide),
+          };
+        }
+        return next;
+      });
+      setAutoGenNotesByKey((prev) => ({ ...prev, [key]: result.notes }));
+      if (result.notes.length === 0) toast.success("Kupon önerisi hazırlandı, gözden geçirip Yayınla'ya basın");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kupon önerisi hazırlanamadı");
+    } finally {
+      setAutoGenKey(null);
+    }
   }
 
   async function submitGroup(group: RaceDayData["races"], key: string, label: string, slot: number) {
@@ -371,6 +432,9 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
                 stakePerCombination={ALTILI_STAKE_PER_COMBINATION}
                 onSubmit={() => submitGroup(chunk, key, slotLabel, chunkIdx + 1)}
                 publishing={publishingKey === key}
+                onAutoGenerate={() => autoGenerate(chunk, key)}
+                autoGenerating={autoGenKey === key}
+                autoGenNotes={autoGenNotesByKey[key]}
               />
             );
           })}

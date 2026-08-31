@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { getHippodromes, buildKuponOnerisi, type KuponStatus } from "@/server/services/race.service";
-import { getAdminRaceDays, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
+import { getAdminRaceDays, getAnalystStats, getClassTypeAdvice, isSiniftipiSikintili, findHiddenValueHorses } from "@/server/services/admin.service";
 import { turkeyDateString } from "@/lib/tz";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import ClassTypeAdviceCard from "@/components/admin/ClassTypeAdviceCard";
@@ -191,6 +191,13 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                       // aktarılıyor ki koşu-tipi bazlı öneriden daha geniş bir kupon
                       // gerekiyorsa öneri buna göre yükselsin.
                       const advice = getClassTypeAdvice(analystStatsByRaceId.get(effectiveRaceIdFor(race))!, effectiveClassType, effectiveRunners.length);
+                      // 2026-08-31 kullanıcı talebi ("sıkıntılı koşu türlerinde bu tarz atları
+                      // kırmızı ile belirt"): sınıf riski (modelin favori isabetinin tarihte
+                      // düşük olduğu) + gizli-değer atları (ilk-3 dışında ama BANKO'nun zaten
+                      // kullandığı bağımsız-güçlü-sinyal testini geçen) — TAMAMEN gösterim
+                      // amaçlı, skor/sıralama hiç değişmiyor (bkz. admin.service.ts notları).
+                      const sinifRiskli = isSiniftipiSikintili(advice);
+                      const gizliDegerAtlari = effectivePred ? findHiddenValueHorses(effectivePred.picks) : [];
 
                       return (
                         <tr
@@ -222,7 +229,28 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                                 {advice.level === "warn" ? "!" : advice.level === "good" ? "✓" : advice.level === "none" ? "–" : "i"}
                                 {ADVICE_LEVEL_LABEL[advice.level]}
                               </span>
+                              {sinifRiskli && (
+                                <span
+                                  title={`Bu sınıfta model favorisi tarihte yalnız %${advice.top1Rate!.rate.toFixed(0)} kazanmış (${advice.top1Rate!.hits}/${advice.top1Rate!.total}) — düşük güvenilirlik, tek at kararında dikkatli olun.`}
+                                  className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-miss/20 px-1.5 py-0 text-[9px] font-semibold text-miss cursor-help"
+                                >
+                                  🚩 Sınıf riski
+                                </span>
+                              )}
                             </div>
+                            {gizliDegerAtlari.length > 0 && (
+                              <div className="mt-0.5 flex flex-wrap gap-1">
+                                {gizliDegerAtlari.map((h) => (
+                                  <span
+                                    key={h.runnerLabel}
+                                    title={`İlk-3 dışında (${h.rank}. sırada) ama bağımsız güçlü bir sinyal taşıyor: ${h.sinyalEtiket} (katkı ${h.sinyalKatki >= 0 ? "+" : ""}${h.sinyalKatki.toFixed(2)}). Skoru/sıralamayı DEĞİŞTİRMEZ, yalnız dikkat çekmek içindir.`}
+                                    className="inline-flex shrink-0 items-center rounded-full bg-amber-500/15 px-1.5 py-0 text-[9px] font-semibold text-amber-600 cursor-help"
+                                  >
+                                    💡 {h.runnerLabel} (#{h.rank})
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                             {effectivePred?.isBanko && (
                               <div
                                 title={effectivePred.bankoNote ?? undefined}
