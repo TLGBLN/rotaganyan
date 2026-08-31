@@ -1466,6 +1466,24 @@ export default function ProgramView({
     }
   }
 
+  // 2026-08-31 kullanıcı talebi ("bunların hepsini tek bir çatı altına taşısak nasıl
+  // olur") — Accurace/AGF Trend/Son Hazırlıklar/Pedigriler/H2H/Karşılaştır/Son Yarış
+  // Detayları'nın yedisi de zaten koşu-bazlı (sahadaki TÜM atları kapsıyor) ama tek
+  // tek açılması gerekiyordu — bir atı (ör. MEGAFAUNA) değerlendirirken 7 ayrı panele
+  // tek tek tıklamak yerine, hepsini AYNI ANDA açan tek bir anahtar. Analizi Gör ayrı
+  // tutuldu (farklı amaç, ayrı kilit/CTA akışı).
+  const tumPanellerAcikMi = son800Open && agfTrendOpen && galopOpen && pedigreeOpen && comparisonOpen && h2hOpen && sonYarisOpen;
+  function tumPanelleriAcVeyaKapat() {
+    const hedef = !tumPanellerAcikMi;
+    setSon800Open(hedef);
+    setAgfTrendOpen(hedef);
+    setGalopOpen(hedef);
+    setPedigreeOpen(hedef);
+    setComparisonOpen(hedef);
+    setH2hOpen(hedef);
+    setSonYarisOpen(hedef);
+  }
+
   function handleToggleFollow(horseName: string) {
     setFollowedSet((prev) => {
       const next = new Set(prev);
@@ -1593,6 +1611,15 @@ export default function ProgramView({
                 </button>
               ) : (
                 <span className="text-xs font-semibold text-[#e74c3c] shrink-0 whitespace-nowrap">{t("analizHazirlaniyor")}</span>
+              )}
+              {currentRace && (
+                <button
+                  onClick={tumPanelleriAcVeyaKapat}
+                  data-tour="tum-panelleri-ac"
+                  className={cn(PANEL_BTN_CLASS, tumPanellerAcikMi ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "font-bold")}
+                >
+                  {tumPanellerAcikMi ? "Tümünü Kapat" : "Tümünü Göster"} {kilitVeyaChevron(tumPanellerAcikMi)}
+                </button>
               )}
               {currentRace && (
                 <button
