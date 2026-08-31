@@ -54,6 +54,30 @@ function sonYediKosu<T>(races: T[]): T[] | null {
   return races.length >= 7 ? races.slice(races.length - 7) : null;
 }
 
+// 2026-08-31 kullanıcı bulgusu (Karma/GÜL AYALI vakası, kök-neden analiziyle KANITLANDI):
+// bir ayakta Ekonomik/Normal/Geniş'in AYNI atları taşıması ("statik ayak") — Geniş'e
+// bütçe ödenip hiç genişletilmemesi — kuponun en zayıf halkası oluyor. O gerçek vakada
+// 6 ayaktan 5'i tuttu, yalnız statik bırakılan tek ayak kaçırdı (gerçek kazanan %3
+// olasılıklı bir at, hiçbir tier'de yoktu). Bu, otomatik kupon oluşturma DEĞİL (o
+// özellik ayrı bir kullanıcı kararıyla tamamen geri alındı) — yalnız yayınlamadan ÖNCE
+// admin'i UYARAN, engellemeyen bir kontrol. Genişletmenin gerçekten MÜMKÜN olduğu
+// (sahada seçilenden daha fazla koşabilir at varken) durumlarda tetiklenir.
+function statikAyaklariBul(races: RaceDayData["races"], selections: Selections): number[] {
+  const sonuc: number[] = [];
+  for (const race of races) {
+    const sel = selections[race.raceNo] ?? emptySelection();
+    if (sel.narrow.size === 0) continue;
+    const ayniMi =
+      sel.narrow.size === sel.normal.size &&
+      sel.normal.size === sel.wide.size &&
+      [...sel.narrow].every((no) => sel.normal.has(no) && sel.wide.has(no));
+    if (!ayniMi) continue;
+    const musaitAtSayisi = race.runners.filter((r) => !r.scratched).length;
+    if (musaitAtSayisi > sel.narrow.size) sonuc.push(race.raceNo);
+  }
+  return sonuc;
+}
+
 function legCounts(races: { raceNo: number }[], selections: Selections, width: Width): number[] {
   return races.map((r) => Math.max((selections[r.raceNo] ?? emptySelection())[width].size, 1));
 }
@@ -198,6 +222,14 @@ function KuponGrup({
       {widths.some((w) => amounts[w] > LIMITS[w] * TOLERANCE) && (
         <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-500">
           ⚠ Bir veya daha fazla kupon türü limit aşıyor. Kaydetmeden önce seçimleri azaltın.
+        </div>
+      )}
+
+      {widths.length === 3 && statikAyaklariBul(races, selections).length > 0 && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-500">
+          ⚠ {statikAyaklariBul(races, selections).map((n) => `${n}. Koşu`).join(", ")} ayağında Ekonomik/Normal/Geniş
+          AYNI atları taşıyor — bu ayak hiç genişletilmemiş. Genişletmeden bütçe ödemek, kazananın
+          başka bir atta çıktığı her senaryoda TÜM kuponu düşürür (bkz. Karma/GÜL AYALI vakası).
         </div>
       )}
 
