@@ -524,13 +524,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.32",
     baslangic: new Date("2026-08-31T14:16:02+03:00"),
-    bitis: null,
+    bitis: new Date("2026-08-31T21:07:59+03:00"),
     aciklama: "Kullanıcı talebiyle (\"sistemimde kusur istemiyorum\") kacakYalniz sinyalinin eğitim-verisi SIZINTISI düzeltildi. Kök neden: `accurace-sync.service.ts`'teki `Runner.raceStyle` alanı tarih filtresi OLMADAN, atın TÜM (geçmiş+GELECEK) Accurace kayıtlarından hesaplanıp atın adına ait TÜM Runner satırlarına yazılıyordu — eğitim script'i (`arac-model-veri-olustur.mts`) bu alanı doğrudan okuyordu, canlı serving ise ayrı ve sızıntısız bir yöntem (`accuraceEgilimMap`, veri-toplama.ts) kullanıyordu; klasik train/serve uyumsuzluğu. İKİ BAĞIMSIZ Opus denetimi (aynı gün, birbirinden habersiz iki ayrı görev) aynı kök nedeni buldu. Sızıntısız yeniden hesaplanınca: düşük-şart eski 'anlamlı +0.1361' → bağımsız B=500'de -0.0934 GA=[-0.384,0.047] (P(>0)=%9, TERS yönlü); diğer eski 'anlamlı +0.0822' → +0.0101 (P(>0)=%64, null). Her iki segmentteki eski 'anlamlı' statü TAMAMEN sızıntı ürünüymüş. h2hKiloDegisimi (V5.30) ile AYNI cerrahi desen: tam retrain DENENDİ ama aynı turda ilgisiz bir hızDerecesi veri-tazeleme kayması karıştığı (önbellek tam silinince hızDerecesi'nin KENDİ ayrı, önceden var olan bir train/serve uyumsuzluğu — yalnız %8.2 örtüşme — su yüzüne çıktı, henüz çözülmedi) ve adil (aynı test seti) karşılaştırmada net bir kazanç göstermediği için retrain'in TAMAMI REDDEDİLDİ — yalnız kacakYalniz TEK katsayısı koda gömülü olarak TÜM segmentlerde sıfırlandı, diğer 11 katsayıya dokunulmadı. Gerekçe metnindeki KACAK bloğu da (eski kod ham r.kacakYalniz'a bakıyordu) HIZ/IDMJOK ile aynı düzeltmeyle gerçek katkıya (r.katkilar) bağlandı. `arac-model-veri-olustur.mts`'teki sızıntı düzeltmesi (stilEgilimMap) KALICI ARAÇTA kaldı — ileride yeniden değerlendirilebilir, ama BUGÜN üretilen ağırlık dosyaları CANLIYA ALINMADI.",
     neyiAnalizEdiyor: [
       "Skor/olasılık DEĞİŞTİ: kacakYalniz'in katkısı artık TÜM kategorilerde her zaman 0 — gerçek race verisiyle doğrulandı (12 koşuda kacakYalniz=true olan 3 atın 3'ünde de katki=0, KACAK gerekçe satırı hiç görünmüyor). Diğer 11 A-katmanı katsayısına dokunulmadı — bu turdaki tam retrain denemesi TAMAMEN reddedildi.",
     ],
     caprazlamalar: [
       "Tam retrain denendi (1104 koşu, önbellek sıfırdan üretildi) ama REDDEDİLDİ: (1) 'diğer' segmentteki görünen iyileşme (top1 %30.6→%34.3) farklı test setlerini karşılaştırmaktan kaynaklanan bir YANILSAMA çıktı — aynı test setinde canlı zaten %34.8 yapıyor; (2) hızDerecesi'ndeki büyük kayma (düşük-şart 0.49→0.21) kacakYalniz'la ilgisiz, önbellek tazelemesinden kaynaklandı VE hızDerecesi'nin eğitim/canlı hesaplamaları arasında ÖNCEDEN VAR olan ağır bir uyumsuzluk (yalnız %8.2 örtüşme) bulundu — bu ayrı, çözülmemiş bir sorun; (3) h2hKiloDegisimi yeni üretilen veride 0/38072 satırda hiç yok — script'te ayrı bir eksiklik, şimdilik zararsız (zaten kod-seviyesinde sıfır) ama düzeltilmeli. Bu üç ilgisiz bulgu netleşene kadar yalnız kanıtlanan TEK bulgu (kacakYalniz sızıntısı) cerrahi olarak düzeltildi. Doğrulama: tsc --noEmit temiz, npm run build temiz, v5-engine.test.ts 7/7 geçti.",
+    ],
+  },
+  {
+    versiyon: "V5.33",
+    baslangic: new Date("2026-08-31T21:07:59+03:00"),
+    bitis: null,
+    aciklama: "Kullanıcı talebiyle (\"uyumsuzlukları çöz\") hızDerecesi'nin V5.32'de su yüzüne çıkan train/serve uyumsuzluğu çözüldü. Kök neden: eğitim (arac-model-veri-olustur.mts) atın son 3 (365 gün içi) koşusunun HER BİRİNİ KENDİ kovasına (irk|pist|mesafe) ve KENDİ tarihine göre (sızıntısız) popülasyon ortalamasıyla kıyaslıyordu; canlı sunum (hiz-derecesi.actions.ts) ise yalnız BUGÜNKÜ kovayla eşleşen geçmiş koşuları sayıp hepsini BUGÜNKÜ popülasyon ortalamasına vuruyordu — Opus'un ölçümü: canlı atların %43.8'i sıfır dönerken eğitimde yalnız %8.2'si sıfırdı, ortalama mutlak fark ~2.86 puan (~0.8 SD). Ayrıca eğitimin popülasyon indeksi HER 'start' (Runner satırı) için atın TÜM geçmişini tekrar tekrar ekliyordu — çok start yapan atların geçmiş koşuları popülasyonu orantısız ağırlıklandırıyordu (ayrı, bağımsız bir hata, aynı işte fark edildi). Yeni paylaşılan çekirdek (hiz-derecesi-hesapla.ts) her iki tarafça da çağrılıyor; popülasyon indeksi artık her at TAM OLARAK BİR KEZ işleniyor. Katsayı DEĞİŞMEDİ (retrain yapılmadı) — yalnız canlı girdi artık katsayının fit edildiği dağılımla eşleşiyor.",
+    neyiAnalizEdiyor: [
+      "Skor/olasılık DEĞİŞTİ: hızDerecesi'nin canlı hesaplanan değeri artık eğitimle aynı mantığı kullanıyor — gerçek sonuçlanmış 200 koşuda (2004 at) sıfır oranı %43.8'den %5.2'ye düştü. Katsayının kendisi (WEIGHTS_DUSUK_SART/WEIGHTS_DIGER/WEIGHTS_DIGER_HANDIKAP'taki HIZ_DERECESI_IDX) DEĞİŞMEDİ.",
+    ],
+    caprazlamalar: [
+      "Gerçek 60 sonuçlanmış koşuda (596 at) kazanan-vs-diğer Cohen's d karşılaştırması: ESKİ (bugünkü-kova-yalnız) mantık d=0.369, YENİ (eğitimle birleşik) mantık d=0.578 — düzeltme yalnız teorik tutarlılık değil, gerçek kazanan/kaybeden ayrımını da somut biçimde güçlendirdi. Doğrulama: tsc --noEmit temiz, npm run build temiz, v5-engine.test.ts 7/7 geçti, gerçek 200 sonuçlanmış koşuda (2004 at) crash yok, değer dağılımı makul (medyan -0.29, p10/p90 -6.81/+2.82).",
     ],
   },
 ];

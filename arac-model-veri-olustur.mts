@@ -14,6 +14,7 @@ import { finishPos } from "./src/lib/race-result";
 import { getJockeyStats, getTrainerStats } from "./src/server/services/race.service";
 import { zeminKatsayisi, zeminDetayiBul } from "./src/lib/methodology/mekanik-puanlama";
 import { hesaplaZeminToleransiMap } from "./src/server/actions/zemin-toleransi.actions";
+import { hizPaceIndexKur, hizDerecesiHesaplaOrtak, type HizGecmisSatir } from "./src/lib/methodology/hiz-derecesi-hesapla";
 import { writeFileSync, existsSync, readFileSync } from "fs";
 
 const GERCEK_OLMAYAN_HIPODROM_SLUGLARI = ["karma", "perak-malezya"];
@@ -324,12 +325,18 @@ async function main() {
   // bulgusu: uzun aradan dönen bir atın yıllar önceki "en iyi dönemi" güncelmiş gibi
   // kullanılmasın). sireIndex ile AYNI desen: tek seferlik büyük yükleme + indeksleme.
   console.log("Hız derecesi için pace indeksi yükleniyor...");
-  const GUNCEL_FORM_PENCERESI_GUN = 365;
-  const paceRunnerlar = await db.runner.findMany({
+  // 2026-08-31 düzeltmesi: eskiden burada HER "start" (Runner satırı) için atın TÜM
+  // geçmişi tekrar tekrar popülasyona ekleniyordu (çok start yapan atlar orantısız
+  // ağırlıklandırılıyordu) — artık `distinct` ile her at TAM OLARAK BİR KEZ işleniyor,
+  // hesaplama çekirdeği de canlı sunumla (hiz-derecesi.actions.ts) paylaşılan
+  // hiz-derecesi-hesapla.ts'e taşındı (train/serve uyumsuzluğu kökten çözüldü).
+  const paceAtIrkKayitlari = await db.runner.findMany({
     where: { scratched: false, tjkAtId: { not: null } },
-    select: { tjkAtId: true, raceId: true },
+    select: { tjkAtId: true, race: { select: { breed: true } } },
+    distinct: ["tjkAtId"],
   });
-  const paceTjkAtIdler = [...new Set(paceRunnerlar.map((r) => r.tjkAtId!))];
+  const paceIrkByTjkAtId = new Map(paceAtIrkKayitlari.map((r) => [r.tjkAtId!, breedToIrk(r.race.breed)]));
+  const paceTjkAtIdler = [...paceIrkByTjkAtId.keys()];
   const paceGecmisKayitlari: { tjkAtId: number; rowsJson: unknown }[] = [];
   const PACE_CH = 500;
   for (let i = 0; i < paceTjkAtIdler.length; i += PACE_CH) {
@@ -337,63 +344,14 @@ async function main() {
     const rows = await db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: dilim } }, select: { tjkAtId: true, rowsJson: true } });
     paceGecmisKayitlari.push(...rows);
   }
-  const paceGecmisByTjkAtId = new Map(paceGecmisKayitlari.map((g) => [g.tjkAtId, g.rowsJson as { date: string; time: string; distance: number; surface: string }[]]));
-  const paceBreedByRaceId = new Map<string, string>();
-  const paceRaceBreeds = await db.race.findMany({ where: { id: { in: [...new Set(paceRunnerlar.map((r) => r.raceId))] } }, select: { id: true, breed: true } });
-  for (const r of paceRaceBreeds) paceBreedByRaceId.set(r.id, r.breed);
-
-  type PaceNokta = { tarih: Date; pace: number };
-  const paceIndex = new Map<string, PaceNokta[]>();
-  for (const r of paceRunnerlar) {
-    if (r.tjkAtId == null) continue;
-    const gecmis = paceGecmisByTjkAtId.get(r.tjkAtId) ?? [];
-    const raceBreed = paceBreedByRaceId.get(r.raceId);
-    const irk = breedToIrk(raceBreed ?? "İNGİLİZ");
-    for (const g of gecmis) {
-      const tarih = parseGecmisTarih(g.date);
-      if (!tarih) continue;
-      const saniye = sureyiSaniyeyeCevir(g.time);
-      if (saniye == null || saniye <= 0 || !g.distance) continue;
-      const pist = surfaceFromRaw(g.surface);
-      if (!pist) continue;
-      const key = `${irk}|${surfaceToPist(pist)}|${mesafeBucket(g.distance)}`;
-      const pace = g.distance / saniye;
-      const arr = paceIndex.get(key) ?? [];
-      arr.push({ tarih, pace });
-      paceIndex.set(key, arr);
-    }
-  }
-  console.log(`Pace indeksi: ${paceIndex.size} kova`);
-
-  function populasyonOrtPace(key: string, cutoff: Date): { ort: number } | null {
-    const arr = paceIndex.get(key);
-    if (!arr) return null;
-    let toplam = 0, sayi = 0;
-    for (const p of arr) { if (p.tarih.getTime() >= cutoff.getTime()) continue; toplam += p.pace; sayi++; }
-    return sayi >= 20 ? { ort: toplam / sayi } : null;
-  }
+  const paceGecmisByTjkAtId = new Map(paceGecmisKayitlari.map((g) => [g.tjkAtId, g.rowsJson as HizGecmisSatir[]]));
+  const paceIndex = hizPaceIndexKur(paceGecmisByTjkAtId, paceIrkByTjkAtId);
+  console.log(`Pace indeksi: ${paceIndex.size} kova (${paceTjkAtIdler.length} at)`);
 
   function hizDerecesiHesapla(tjkAtId: number | null, raceBreed: string, cutoff: Date): number {
     if (tjkAtId == null) return 0;
-    const irk = breedToIrk(raceBreed);
-    const pencereBaslangic = new Date(cutoff.getTime() - GUNCEL_FORM_PENCERESI_GUN * 24 * 60 * 60 * 1000);
-    const gecmis = (paceGecmisByTjkAtId.get(tjkAtId) ?? [])
-      .map((g) => ({ ...g, tarih: parseGecmisTarih(g.date), saniye: sureyiSaniyeyeCevir(g.time) }))
-      .filter((g) => g.tarih && g.tarih.getTime() < cutoff.getTime() && g.tarih.getTime() >= pencereBaslangic.getTime() && g.saniye != null && g.saniye > 0 && g.distance)
-      .sort((a, b) => b.tarih!.getTime() - a.tarih!.getTime())
-      .slice(0, 3);
-    let toplamFark = 0, sayi = 0;
-    for (const g of gecmis) {
-      const pist = surfaceFromRaw(g.surface);
-      if (!pist) continue;
-      const key = `${irk}|${surfaceToPist(pist)}|${mesafeBucket(g.distance)}`;
-      const popOrt = populasyonOrtPace(key, g.tarih!);
-      if (!popOrt) continue;
-      const kendiPace = g.distance / g.saniye!;
-      toplamFark += (100 * (kendiPace - popOrt.ort)) / popOrt.ort;
-      sayi++;
-    }
-    return sayi > 0 ? toplamFark / sayi : 0;
+    const gecmis = paceGecmisByTjkAtId.get(tjkAtId) ?? [];
+    return hizDerecesiHesaplaOrtak(gecmis, breedToIrk(raceBreed), cutoff, paceIndex);
   }
 
   let processed = 0, failed = 0, timedOut = 0;

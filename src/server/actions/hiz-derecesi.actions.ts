@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { mesafeBucket } from "@/lib/sire-stat-match";
-import { parseTjkDate } from "@/lib/tjk-date";
+import { breedToIrk } from "@/lib/sire-stat-match";
+import { hizPaceIndexKur, hizDerecesiHesaplaOrtak, type HizGecmisSatir, type PaceIndex } from "@/lib/methodology/hiz-derecesi-hesapla";
 
 /**
  * 2026-08-21 kullanıcı talebi — hız derecesi. TJK "At Koşu Bilgileri"ndeki "süre" alanı
@@ -12,41 +12,20 @@ import { parseTjkDate } from "@/lib/tjk-date";
  * VIF=1.02-1.10 (hiçbir sinyalle çakışmıyor). Yalnız son 365 GÜN içindeki koşular "güncel
  * form" sayılır — uzun aradan (sakatlık/mola) dönen bir atın yıllar önceki "en iyi dönemi"
  * güncelmiş gibi kullanılmasın diye (bkz. v5-engine.ts başlık notu).
+ *
+ * 2026-08-31 düzeltmesi (Opus bulgusu): bu dosyadaki hesaplama, eğitimin
+ * (arac-model-veri-olustur.mts) kullandığı mantıktan TAMAMEN FARKLIYDI — burada yalnız
+ * BUGÜNKÜ kovayla (irk|pist|mesafe) eşleşen geçmiş koşular sayılıp hepsi BUGÜNKÜ
+ * popülasyon ortalamasına vuruluyordu; eğitim ise atın son 3 koşusunun HER BİRİNİ KENDİ
+ * kovasına ve KENDİ tarihine göre kıyaslıyordu. Sonuç: canlı atların %43.8'i sıfır
+ * dönerken eğitimde yalnız %8.2'si sıfırdı, ortalama mutlak fark ~2.86 puan (~0.8 SD) —
+ * modelin en büyük katsayılarından birinin canlıda neredeyse rastgele bir girdiyle
+ * çalıştığı anlamına geliyordu. Artık hesaplama çekirdeği (hiz-derecesi-hesapla.ts)
+ * eğitimle BİREBİR PAYLAŞILIYOR — katsayı DEĞİŞMEDİ (retrain yapılmadı), yalnız canlı
+ * girdi artık katsayının fit edildiği dağılımla eşleşiyor.
  */
 
-const GUNCEL_FORM_PENCERESI_GUN = 365;
-
-function sureyiSaniyeyeCevir(t: string): number | null {
-  if (!t) return null;
-  const parcalar = t.split(".");
-  if (parcalar.length === 3) {
-    const dk = parseInt(parcalar[0], 10), sn = parseInt(parcalar[1], 10), yuzde = parseInt(parcalar[2], 10);
-    if (isNaN(dk) || isNaN(sn) || isNaN(yuzde)) return null;
-    return dk * 60 + sn + yuzde / 100;
-  }
-  if (parcalar.length === 2) {
-    const sn = parseInt(parcalar[0], 10), yuzde = parseInt(parcalar[1], 10);
-    if (isNaN(sn) || isNaN(yuzde)) return null;
-    return sn + yuzde / 100;
-  }
-  return null;
-}
-// 2026-08-24 kullanıcı bulgusu (İSPANOZ vakası, gerçek kuponları etkiledi): bu dosyada
-// yerel bir parseGecmisTarih vardı ve gün/ay sırası TERS yazılmıştı ("15.08.2026" 8 Mart
-// 2027'ye dönüşüyordu, atın 9 gün önceki TAM eşleşen yarışı "gelecekte" sanılıp
-// hizDerecesi'nden düşüyordu). Artık src/lib/tjk-date.ts'teki TEK paylaşılan
-// parseTjkDate kullanılıyor (bkz. o dosyadaki not — aynı format için 4 ayrı fonksiyon
-// vardı, birleştirildi). hizDerecesi 2026-08-21'de (V5.4) eklendiği için etki penceresi
-// ~3 gün (21-24 Ağustos) — katsayının kendisi (backtest'te doğrulanan) geçerli, yalnız
-// canlı girdisi bozuktu.
-function surfaceFromRaw(raw: string): "CIM" | "KUM" | "SENTETIK" | null {
-  if (!raw) return null;
-  if (raw.startsWith("Ç")) return "CIM";
-  if (raw.startsWith("K")) return "KUM";
-  return "SENTETIK";
-}
-
-type GecmisSatir = { date: string; time: string; distance: number; surface: string };
+type GecmisSatir = HizGecmisSatir;
 
 // 2026-08-21 performans notu: HorseRaceHistoryCache'in TAMAMINI (~4000 at, büyük JSON
 // blokları) her "Analiz Et" isteğinde yeniden çekmek ~10 saniye sürüyordu — canlı analiz
@@ -55,21 +34,29 @@ type GecmisSatir = { date: string; time: string; distance: number; surface: stri
 // instance) içindeki tekrar eden istekler artık anında dönüyor, yalnız ilk istek/TTL
 // dolduğunda tekrar 10sn'lik tam çekim gerekiyor.
 const ONBELLEK_TTL_MS = 6 * 60 * 60 * 1000;
-let onbellekCache: { veri: Map<number, GecmisSatir[]>; zaman: number } | null = null;
+let onbellekCache: { gecmis: Map<number, GecmisSatir[]>; irk: Map<number, string>; paceIndex: PaceIndex; zaman: number } | null = null;
 
-async function tumOnbellegiGetir(): Promise<Map<number, GecmisSatir[]>> {
-  if (onbellekCache && Date.now() - onbellekCache.zaman < ONBELLEK_TTL_MS) return onbellekCache.veri;
-  const tumOnbellek = await db.horseRaceHistoryCache.findMany({ select: { tjkAtId: true, rowsJson: true } });
-  const veri = new Map(tumOnbellek.map((g) => [g.tjkAtId, g.rowsJson as unknown as GecmisSatir[]]));
-  onbellekCache = { veri, zaman: Date.now() };
-  return veri;
+async function tumOnbellegiGetir(): Promise<{ gecmis: Map<number, GecmisSatir[]>; irk: Map<number, string>; paceIndex: PaceIndex }> {
+  if (onbellekCache && Date.now() - onbellekCache.zaman < ONBELLEK_TTL_MS) return onbellekCache;
+  const [tumOnbellek, atIrkKayitlari] = await Promise.all([
+    db.horseRaceHistoryCache.findMany({ select: { tjkAtId: true, rowsJson: true } }),
+    db.runner.findMany({
+      where: { scratched: false, tjkAtId: { not: null } },
+      select: { tjkAtId: true, race: { select: { breed: true } } },
+      distinct: ["tjkAtId"],
+    }),
+  ]);
+  const gecmis = new Map(tumOnbellek.map((g) => [g.tjkAtId, g.rowsJson as unknown as GecmisSatir[]]));
+  const irk = new Map(atIrkKayitlari.map((r) => [r.tjkAtId!, breedToIrk(r.race.breed)]));
+  const paceIndex = hizPaceIndexKur(gecmis, irk);
+  onbellekCache = { gecmis, irk, paceIndex, zaman: Date.now() };
+  return onbellekCache;
 }
 
 /**
  * Bugünkü sahadaki atların hızDerecesini (%) döner — runnerNo -> değer. Popülasyon
- * ortalaması, BUGÜNKÜ ırk|pist|mesafe kovası için, HorseRaceHistoryCache'in TAMAMINDAN
- * (küçük tablo, ~4000 at) canlı hesaplanır — SireStatOwn gibi ayrı bir önbellek
- * tablosu/cron GEREKMEZ, tablo küçük olduğu için tek istekte hızlı hesaplanabiliyor.
+ * indeksi HorseRaceHistoryCache'in TAMAMINDAN (küçük tablo, ~4000 at) canlı kurulur —
+ * SireStatOwn gibi ayrı bir önbellek tablosu/cron GEREKMEZ.
  */
 export async function getHizDerecesiForRace(
   raceId: string
@@ -78,81 +65,21 @@ export async function getHizDerecesiForRace(
     where: { id: raceId },
     select: {
       breed: true,
-      surface: true,
-      distance: true,
       raceDay: { select: { date: true } },
       runners: { where: { scratched: false }, select: { no: true, tjkAtId: true } },
     },
   });
   if (!race) return new Map();
 
-  const irk = race.breed === "ARAP" ? "Arap" : "İngiliz";
-  const pist = race.surface === "CIM" ? "Çim" : race.surface === "KUM" ? "Kum" : "Sentetik";
-  const bugunkuAnahtar = `${irk}|${pist}|${mesafeBucket(race.distance)}`;
-
-  const tjkAtIdler = race.runners.map((r) => r.tjkAtId).filter((x): x is number => x != null);
-  if (tjkAtIdler.length === 0) return new Map();
-
-  // Popülasyon ortalaması için TÜM önbellek (küçük tablo) + bugünkü atların kendi
-  // geçmişi — aynı sorgu ikisini de kapsıyor, ayrı çekmeye gerek yok.
-  const gecmisByTjkAtId = await tumOnbellegiGetir();
-
+  const irk = breedToIrk(race.breed);
   const cutoff = race.raceDay.date;
-  // Popülasyon ortalaması — YALNIZ bugünkü kova (irk|pist|mesafe), yalnız cutoff'tan
-  // önceki kayıtlar (leak-free).
-  let popToplam = 0, popSayi = 0;
-  for (const rows of gecmisByTjkAtId.values()) {
-    for (const g of rows) {
-      const tarih = parseTjkDate(g.date);
-      if (!tarih || tarih.getTime() >= cutoff.getTime()) continue;
-      const saniye = sureyiSaniyeyeCevir(g.time);
-      if (saniye == null || saniye <= 0 || !g.distance) continue;
-      const gPist = surfaceFromRaw(g.surface);
-      if (!gPist) continue;
-      const gPistTr = gPist === "CIM" ? "Çim" : gPist === "KUM" ? "Kum" : "Sentetik";
-      const key = `${irk}|${gPistTr}|${mesafeBucket(g.distance)}`;
-      if (key !== bugunkuAnahtar) continue;
-      popToplam += g.distance / saniye;
-      popSayi++;
-    }
-  }
-  if (popSayi < 20) return new Map(); // güvenilir popülasyon yok, tüm sahada 0 kabul edilir
-
-  const popOrt = popToplam / popSayi;
-  const pencereBaslangic = new Date(cutoff.getTime() - GUNCEL_FORM_PENCERESI_GUN * 24 * 60 * 60 * 1000);
+  const { gecmis: gecmisByTjkAtId, paceIndex } = await tumOnbellegiGetir();
 
   const sonuc = new Map<number, number>();
   for (const r of race.runners) {
     if (r.tjkAtId == null) { sonuc.set(r.no, 0); continue; }
-    const gecmis = (gecmisByTjkAtId.get(r.tjkAtId) ?? [])
-      .map((g) => ({ ...g, tarih: parseTjkDate(g.date), saniye: sureyiSaniyeyeCevir(g.time) }))
-      .filter(
-        (g): g is GecmisSatir & { tarih: Date; saniye: number } =>
-          g.tarih != null &&
-          g.tarih.getTime() < cutoff.getTime() &&
-          g.tarih.getTime() >= pencereBaslangic.getTime() &&
-          g.saniye != null &&
-          g.saniye > 0 &&
-          !!g.distance
-      );
-    gecmis.sort((a, b) => b.tarih.getTime() - a.tarih.getTime());
-    const sonUc = gecmis.slice(0, 3);
-    let toplamFark = 0, sayi = 0;
-    for (const g of sonUc) {
-      // NOT: her geçmiş koşunun KENDİ kovasına göre popülasyon karşılaştırması daha
-      // doğru olurdu ama bu yalnız BUGÜNKÜ kovanın popülasyonunu hesapladık (verimlilik
-      // için) — geçmiş koşu bugünküyle AYNI kovadaysa doğrudan kullan, değilse atla
-      // (farklı mesafe/pist'te koşulmuş geçmiş satırlar bu basitleştirmeyle sayılmaz).
-      const gPist = surfaceFromRaw(g.surface);
-      if (!gPist) continue;
-      const gPistTr = gPist === "CIM" ? "Çim" : gPist === "KUM" ? "Kum" : "Sentetik";
-      const key = `${irk}|${gPistTr}|${mesafeBucket(g.distance)}`;
-      if (key !== bugunkuAnahtar) continue;
-      const kendiPace = g.distance / g.saniye;
-      toplamFark += (100 * (kendiPace - popOrt)) / popOrt;
-      sayi++;
-    }
-    sonuc.set(r.no, sayi > 0 ? toplamFark / sayi : 0);
+    const gecmis = gecmisByTjkAtId.get(r.tjkAtId) ?? [];
+    sonuc.set(r.no, hizDerecesiHesaplaOrtak(gecmis, irk, cutoff, paceIndex));
   }
   return sonuc;
 }
