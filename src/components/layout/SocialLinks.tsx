@@ -32,7 +32,7 @@ function FacebookIcon() {
 const LINKS = [
   { href: "https://x.com/rotaganyantr", label: "X (Twitter)", Icon: XIcon, bg: "bg-black" },
   {
-    href: "https://www.instagram.com/rotaganyantr",
+    href: "https://www.instagram.com/rotaganyan/",
     label: "Instagram",
     Icon: InstagramIcon,
     // Instagram'ın resmi degrade kimliği (sarı→pembe→mor)

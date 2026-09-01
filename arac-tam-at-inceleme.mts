@@ -31,6 +31,7 @@
 import { db } from "./src/lib/db";
 import { gatherFaz1V5, faz2V5Sirala, toFeatureVector } from "./src/lib/methodology/v5-engine";
 import { getHizliOzet } from "./src/server/actions/hizli-ozet.actions";
+import { getSonYarisDetaylariForRace } from "./src/server/actions/son-yaris-detay.actions";
 import { getHorseHistory } from "./src/server/actions/horse-detail.actions";
 import { getHorsePedigreeTree } from "./src/server/actions/horse-pedigree.actions";
 import { getHorseProfileByName, getHorseDetailedStatsByName } from "./src/server/actions/horse-profile.actions";
@@ -129,6 +130,11 @@ async function tekKosuIsle(raceId: string) {
 
   const ozetSatirlari = await getHizliOzet(raceId).catch(() => []);
   const ozetByName = new Map(ozetSatirlari.map((o) => [o.name, o]));
+  // 2026-09-01 — KIZIM BİNDAL vakası: takı/kilo değişimi (SonYarisDetay) bu araçta HİÇ
+  // yoktu, elle ayrı sorgu gerekti (KG+GKR çıkarılmış olması kazananı öngörmede kilit
+  // ayrıntıydı). Artık her atın bloğunda VE özet tabloda gösteriliyor.
+  const sonYarisSatirlari = await getSonYarisDetaylariForRace(raceId).catch(() => []);
+  const sonYarisByName = new Map(sonYarisSatirlari.map((s) => [s.horseName, s]));
 
   const raceMeta = await db.race.findUnique({
     where: { id: raceId },
@@ -155,6 +161,14 @@ async function tekKosuIsle(raceId: string) {
 
     if (ozet) {
       console.log(`  Hızlı Özet: pistUzmani=${ozet.pistUzmani} sinifDurumu=${ozet.sinifDurumu} atJokeyIkilisi=${JSON.stringify(ozet.atJokeyIkilisi)} agfFark=${ozet.agfFark} pedigriK=${ozet.pedigriKYuzde} pedigriOzet="${ozet.pedigriOzet ?? "-"}"`);
+    }
+    const sonYaris = sonYarisByName.get(r.ad);
+    if (sonYaris) {
+      const takiMetni = [
+        ...sonYaris.eklenenTaki.map((t) => `+${t.code}`),
+        ...sonYaris.cikarilanTaki.map((t) => `-${t.code}`),
+      ].join(" ") || "değişiklik yok";
+      console.log(`  Son Yarış Detayı: takı=${takiMetni} kiloDegisimi=${sonYaris.kiloDegisimi ?? "?"}kg ayniJokey=${sonYaris.ayniJokey} kgs=${sonYaris.gunFarki ?? "?"}`);
     }
 
     const [pedigree, profile, detailedStats, history, dereceKayitlari, accuraceGecmis, galopSplitleri] = await Promise.all([
@@ -218,6 +232,28 @@ async function tekKosuIsle(raceId: string) {
       console.log(`  Antrenör (${r.trainer}) — TrainerStatSync (TJK AntrenorIstatistikleri, ${new Date().getFullYear()}): ${stat ? `${stat.wins}/${stat.rides} (%${(100 * stat.wins / (stat.rides || 1)).toFixed(1)})` : "eşleşme yok"}`);
     }
   }
+
+  // 2026-09-01 — KIZIM BİNDAL vakası: veri EKSİK değildi (yukarıdaki döngü zaten TÜM
+  // atları tek tek dökmüştü), asıl hata SENTEZ hatasıydı — uzun at-at okuma sırasında
+  // 2-3 ata takılıp TÜM sahayı yan yana kıyaslamayı atlamak. Bu tablo, o kıyası ELLE
+  // yapmaya güvenmek yerine OTOMATİK ve ZORUNLU hale getiriyor — okuması gereken tek şey.
+  console.log(`\n  ── ÖZET KIYAS TABLOSU (${sirali.length} at, model sırasına göre) ──`);
+  console.log(`  No  At                    Sıra  Olasılık  AGF Farkı  PedigriK  Sınıf     Yakınsama  Sprint  Takı`);
+  sirali.forEach((r, i) => {
+    const sira = i + 1;
+    const ozet = ozetByName.get(r.ad);
+    const sonYaris = sonYarisByName.get(r.ad);
+    const vektor = toFeatureVector(r);
+    const yakinsamaIdx = A_KATMANI_ADLARI.indexOf("yakinsama2Plus");
+    const sprintIdx = A_KATMANI_ADLARI.indexOf("sonIdmanSprint");
+    const takiMetni = sonYaris
+      ? [...sonYaris.eklenenTaki.map((t) => `+${t.code}`), ...sonYaris.cikarilanTaki.map((t) => `-${t.code}`)].join(" ") || "∅"
+      : "?";
+    console.log(
+      `  ${String(r.no).padEnd(3)} ${r.ad.padEnd(21)} ${String(sira).padEnd(5)} %${(r.olasilik * 100).toFixed(1).padEnd(7)} ${String(ozet?.agfFark ?? "?").padEnd(10)} ${String(ozet?.pedigriKYuzde ?? "?").padEnd(9)} ${String(ozet?.sinifDurumu ?? "?").padEnd(9)} ${String(vektor[yakinsamaIdx]).padEnd(10)} ${String(vektor[sprintIdx]).padEnd(7)} ${takiMetni}`
+    );
+  });
+  console.log(`  ── Bu tabloyu satır satır tara — pedigriK/AGF farkı/takı sütunlarında model sırasıyla ÇELİŞEN bir at varsa mutlaka belirt. ──\n`);
 }
 
 async function main() {
