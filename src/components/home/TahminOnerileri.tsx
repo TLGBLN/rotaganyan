@@ -61,7 +61,11 @@ function ShareLogo({ className }: { className?: string }) {
 function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon; ikramiye: string | null; isAdmin: boolean; cityLabel?: string }) {
   const t = useTranslations("home.tahminOnerileri");
   const STATUS_LABEL: Record<KuponStatus, string> = { hit: t("hit"), miss: t("miss"), pending: t("pending") };
-  const visibleVariants = data.variants.filter((v) => v.status !== "miss" && v.filled);
+  // 2026-09-01 kullanıcı kararı ("yatsa da 20dk kalsın") sonrası DÜZELTİLDİ: "miss"
+  // varyantları burada TEKRAR filtrelemek getKuponOnerileri'nin (race.service.ts) 20dk
+  // görünür-kalma kuralını EZİYORDU — sunucu zaten doğru filtrelenmiş veriyi gönderiyor,
+  // burada yalnız "filled" (admin gerçekten at girmiş mi) kontrolü yeterli.
+  const visibleVariants = data.variants.filter((v) => v.filled);
   const [activeKey, setActiveKey] = useState(visibleVariants[0]?.key);
   if (visibleVariants.length === 0) return null;
 
@@ -111,19 +115,19 @@ function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon; ikram
       <div className="mb-3 flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">{cityLabel ?? data.hippodromeName}</span>
         <div className="flex items-center gap-1.5">
-          {/* 2026-09-01 kullanıcı talebi — WhatsApp'a doğrudan görsel gönderebilecek TEK
-              genel paylaş ikonu, admin ayrımı olmadan TÜM kullanıcılara açık. */}
-          <button
-            type="button"
-            onClick={() => handleShare()}
-            title={t("paylas")}
-            aria-label={t("paylas")}
-            className="inline-flex items-center rounded-md border border-brand/40 bg-brand/10 p-1.5 text-brand hover:bg-brand/20 transition-colors"
-          >
-            <ShareLogo className="h-3.5 w-3.5" />
-          </button>
         {isAdmin && (
           <>
+            {/* 2026-09-01 kullanıcı kararı: paylaşım ikonlarının HEPSİ (genel Paylaş dahil)
+                yalnız admin'e görünür — normal kullanıcılara açılmadı. */}
+            <button
+              type="button"
+              onClick={() => handleShare()}
+              title={t("paylas")}
+              aria-label={t("paylas")}
+              className="inline-flex items-center rounded-md border border-brand/40 bg-brand/10 p-1.5 text-brand hover:bg-brand/20 transition-colors"
+            >
+              <ShareLogo className="h-3.5 w-3.5" />
+            </button>
             <button
               type="button"
               onClick={() => handleShare("instagram")}
