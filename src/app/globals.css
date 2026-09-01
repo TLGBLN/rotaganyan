@@ -37,6 +37,17 @@
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* 2026-09-01 kullanıcı talebi — "Helvetica" ailesi Google Fonts'ta/lisanssız
+     bulunmuyor (Monotype'a ait, ücretli). En yakın ücretsiz/yasal karşılık: gerçek
+     Helvetica Neue'yi Mac/iOS'ta İSMEN çağırmak (bu platformlarda önceden yüklü),
+     diğer platformlarda metrik-uyumlu Arial'e düşmek. "Rounded" için Safari'nin
+     standart ui-rounded jenerik ailesi kullanılıyor (Apple cihazlarda GERÇEK
+     yuvarlatılmış San Francisco Rounded'ı verir) — desteklemeyen tarayıcılarda
+     sessizce bir sonraki fontuna düşer. Işık ağırlık notu: Windows'ta kurulu Arial'in
+     gerçek bir "Light" kesimi yok, font-weight:300 ince değil yalnız normal görünür.  */
+  --font-heading-rounded: ui-rounded, "Helvetica Neue", Arial, sans-serif;
+  --font-body-light: "Helvetica Neue", Arial, sans-serif;
 }
 
 /*
@@ -110,6 +121,25 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* 2026-09-01 kullanıcı talebi: başlıklar Helvetica Rounded Bold, ince açıklama
+   yazıları Helvetica Light — bkz. yukarıdaki --font-heading-rounded/--font-body-light
+   notu. text-muted-foreground zaten kod genelinde "ince açıklama" metninin standart
+   işareti olduğu için, tek tek dosya değiştirmek yerine buradan uygulanıyor.
+   @layer base'e BİLEREK konuldu — Tailwind'in @layer utilities'i (ör. bir yerde
+   birlikte kullanılan font-semibold) CSS katman sırası gereği bunun üstüne
+   yazabilsin diye; düz (katmansız) bir kural bunu FARKINDA OLMADAN ezerdi. */
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading-rounded);
+    font-weight: 700;
+  }
+
+  .text-muted-foreground {
+    font-family: var(--font-body-light);
+    font-weight: 300;
+  }
 }
 
 /* Yatay kaydırılabilir şeritlerde (ör. filtre çubukları) kaydırma işlevini koruyup
