@@ -116,10 +116,6 @@ export default function MobileNav({ isLoggedIn, followedHorses = [] }: Props) {
             </div>
           </div>
 
-          <div className="border-t pt-4 pb-1 flex items-center justify-center">
-            <SocialLinks />
-          </div>
-
           <div className="border-t pt-4">
             {isLoggedIn ? (
               <>
@@ -155,6 +151,10 @@ export default function MobileNav({ isLoggedIn, followedHorses = [] }: Props) {
                 </Link>
               </>
             )}
+          </div>
+
+          <div className="border-t pt-4 pb-1 flex items-center justify-center">
+            <SocialLinks />
           </div>
         </nav>
       </SheetContent>
