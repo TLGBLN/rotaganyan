@@ -14,6 +14,7 @@ import OnlineCounter from "./OnlineCounter";
 import Wordmark from "./Wordmark";
 import LocaleToggle from "./LocaleToggle";
 import HeaderLabel from "./HeaderLabel";
+import SocialLinks from "./SocialLinks";
 
 export default async function Header() {
   const session = await auth();
@@ -57,10 +58,8 @@ export default async function Header() {
           <Button asChild variant="outline" size="sm">
             <Link href="/altili" data-tour="altili"><HeaderLabel k="altiliNeVerir" /></Link>
           </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/tahmin-onerileri" data-tour="banko"><HeaderLabel k="bankoOnerileri" /></Link>
-          </Button>
           <LiveTvPlayer compact />
+          <SocialLinks />
         </nav>
 
         {/* Actions */}
