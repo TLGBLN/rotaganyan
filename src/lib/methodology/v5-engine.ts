@@ -253,9 +253,10 @@ const SON_IDMAN_SPRINT_IDX = FEATURE_NAMES.indexOf("sonIdmanSprint");
 // istisnası — GERÇEK fit edilen katsayı kullanılıyor, elle yön verilmedi.
 const TAKI_EKLENDI_IDX = FEATURE_NAMES.indexOf("takiEklendiMi");
 const TAKI_CIKARILDI_IDX = FEATURE_NAMES.indexOf("takiCikarildiMi");
-// 2026-09-01 — YARIS_GIDISATI_IDX: kullanıcı tasarımı ("Yarış Gidişatı"), B-katmanı kural
-// istisnası — bkz. Faz1RunnerV5.yarisGidisatiSkoru üstündeki not. GERÇEK fit edilen
-// katsayı kullanılıyor, elle yön verilmedi.
+// 2026-09-01 — YARIS_GIDISATI_IDX: kullanıcı tasarımı ("Yarış Gidişatı") — bkz.
+// Faz1RunnerV5.yarisGidisatiSkoru üstündeki not. Sınırda/run-to-run değişken sonuçla
+// eklendi, aynı gün kullanıcı kararıyla A-katmanına taşındı (sinyal-kutugu.service.ts).
+// GERÇEK fit edilen katsayı kullanılıyor, elle yön verilmedi.
 const YARIS_GIDISATI_IDX = FEATURE_NAMES.indexOf("yarisGidisatiSkoru");
 const WEIGHTS_DIGER_HANDIKAP: AgirlikSeti = {
   ...WEIGHTS_DIGER_DUZELTILMIS,
