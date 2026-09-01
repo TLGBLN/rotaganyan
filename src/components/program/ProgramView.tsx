@@ -129,21 +129,44 @@ function breedShort(b: string, t: ProgramT) {
   return b === "ARAP" ? t("breedArap") : t("breedIngiliz");
 }
 
+const STIL_KISA_ETIKET_KEY: Record<string, "kacakAtKisa" | "onGrupArkasiKisa" | "beklemeGrubuKisa" | "enGeriTakipKisa"> = {
+  KACAK_AT: "kacakAtKisa", ON_GRUP_ARKASI: "onGrupArkasiKisa", BEKLEME_GRUBU: "beklemeGrubuKisa", EN_GERI_TAKIP: "enGeriTakipKisa",
+};
+const STIL_RENK_CLS: Record<string, string> = {
+  KACAK_AT: "bg-[#e74c3c]/15 text-[#e74c3c]", ON_GRUP_ARKASI: "bg-[#d4a017]/15 text-[#d4a017]",
+  BEKLEME_GRUBU: "bg-[#2980b9]/15 text-[#2980b9]", EN_GERI_TAKIP: "bg-[#8e44ad]/15 text-[#8e44ad]",
+};
+
 // Yarış stili — Accurace (GPS/sektörel zamanlama) geçmişinden n>=3 yarışla hesaplanan
 // kalıcı eğilim (bkz. pace-analizi.ts). Eski TJK Son800 tabanlı 4'lü sistemin yerini aldı.
-function raceStyleBadge(raceStyle: { style: string; percent: number; veri?: number | null } | null, t: ProgramT): { text: string; cls: string; dusukGuven: boolean } | null {
+// 2026-09-01 kullanıcı talebi ("tek değil yüzdesel stillerini çıkarmalısın"): rozet artık
+// yalnız BASKIN stili değil, dagilim varsa (Yarış Gidişatı çalışmasıyla eklendi — bkz.
+// accurace-sync.service.ts) 4 stilin TAMAMINI (sıfır olmayanları) yüzdesiyle gösteriyor.
+// dagilim henüz hesaplanmamış (eski kayıt) atlarda eski tek-stil gösterimine düşer.
+function raceStyleBadge(
+  raceStyle: { style: string; percent: number; veri?: number | null; dagilim?: Record<string, number> } | null,
+  t: ProgramT
+): { text: string; cls: string; dusukGuven: boolean } | null {
   if (!raceStyle) return null;
-  const { style, percent, veri } = raceStyle;
+  const { style, percent, veri, dagilim } = raceStyle;
+  if (!STIL_RENK_CLS[style]) return null;
   // n=3-4 ile çıkan bir yüzde (örn. %33, 3 yarışta 3 farklı stil demek) gerçek bir
   // eğilim değil, neredeyse rastgele — rozette n'i göstermezsek kullanıcı bunu
   // yüksek-güvenilirlikli bir örüntüyle (örn. n=20+ %80) karıştırabilir.
   const dusukGuven = veri != null && veri <= 4;
   const n = veri != null ? ` (${veri})` : "";
-  if (style === "KACAK_AT") return { text: t("styleBadgeText", { percent, style: t("kacakAt"), n }), cls: "bg-[#e74c3c]/15 text-[#e74c3c]", dusukGuven };
-  if (style === "ON_GRUP_ARKASI") return { text: t("styleBadgeText", { percent, style: t("onGrupArkasi"), n }), cls: "bg-[#d4a017]/15 text-[#d4a017]", dusukGuven };
-  if (style === "BEKLEME_GRUBU") return { text: t("styleBadgeText", { percent, style: t("beklemeGrubu"), n }), cls: "bg-[#2980b9]/15 text-[#2980b9]", dusukGuven };
-  if (style === "EN_GERI_TAKIP") return { text: t("styleBadgeText", { percent, style: t("enGeriTakip"), n }), cls: "bg-[#8e44ad]/15 text-[#8e44ad]", dusukGuven };
-  return null;
+  const cls = STIL_RENK_CLS[style];
+
+  if (dagilim) {
+    const parcalar = (Object.entries(dagilim) as [string, number][])
+      .filter(([, p]) => p > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([s, p]) => `%${p} ${t(STIL_KISA_ETIKET_KEY[s] ?? "kacakAtKisa")}`)
+      .join(" · ");
+    return { text: `${parcalar}${n}`, cls, dusukGuven };
+  }
+  const styleKey = style === "KACAK_AT" ? "kacakAt" : style === "ON_GRUP_ARKASI" ? "onGrupArkasi" : style === "BEKLEME_GRUBU" ? "beklemeGrubu" : "enGeriTakip";
+  return { text: t("styleBadgeText", { percent, style: t(styleKey), n }), cls, dusukGuven };
 }
 
 function getRaceStyleInfo(t: ProgramT): { style: string; label: string; desc: string; cls: string }[] {

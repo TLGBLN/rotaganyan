@@ -10,11 +10,16 @@ import { breedToIrk, surfaceToPist, mesafeBucket, havuzAnahtari, eslestirSireSta
 import { fetchTodaysAltiliResults } from "./ingest/tjk-altili.adapter";
 import { findIkramiyeForHippodrome } from "@/lib/altili-match";
 
-/** Runner.raceStyle JSON alanından ("style" + "percent" + "veri") ekranda gösterilecek değeri çıkarır. */
-function parseRaceStyle(raw: unknown): { style: string; percent: number; veri: number | null } | null {
-  const r = raw as { style?: string; percent?: number; veri?: number } | null;
+/** Runner.raceStyle JSON alanından ("style" + "percent" + "veri" + "dagilim") ekranda
+ *  gösterilecek değeri çıkarır. dagilim (2026-09-01, Yarış Gidişatı çalışmasıyla eklendi) —
+ *  4 stilin TAMAMININ yüzdesi — kullanıcı talebiyle rozette TEK dominant stil yerine TAM
+ *  dağılım gösterilsin diye buradan istemciye taşınıyor (bkz. ProgramView.tsx raceStyleBadge).
+ *  Eski (dagilim'den ÖNCE yazılmış) kayıtlarda bu alan yok — undefined döner, rozet o zaman
+ *  eski tek-stil gösterimine düşer. */
+function parseRaceStyle(raw: unknown): { style: string; percent: number; veri: number | null; dagilim?: Record<string, number> } | null {
+  const r = raw as { style?: string; percent?: number; veri?: number; dagilim?: Record<string, number> } | null;
   if (!r?.style || r.percent == null) return null;
-  return { style: r.style, percent: r.percent, veri: r.veri ?? null };
+  return { style: r.style, percent: r.percent, veri: r.veri ?? null, dagilim: r.dagilim };
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -873,7 +878,7 @@ export type ProgramRunner = {
   gallops: ProgramGallop[];
   ekuriGroup: number | null;
   apprentice: boolean;
-  raceStyle: { style: string; percent: number; veri: number | null } | null; // style: "KACAK_AT" | "ON_GRUP_ARKASI" | "BEKLEME_GRUBU" | "EN_GERI_TAKIP" (Accurace tabanlı, saha-yüzdelik); veri = örneklem sayısı (n)
+  raceStyle: { style: string; percent: number; veri: number | null; dagilim?: Record<string, number> } | null; // style: "KACAK_AT" | "ON_GRUP_ARKASI" | "BEKLEME_GRUBU" | "EN_GERI_TAKIP" (Accurace tabanlı, saha-yüzdelik); veri = örneklem sayısı (n); dagilim = 4 stilin TAMAMININ yüzdesi
   tjkAtId: number | null;
   // Start Sorunu (v6.30, kullanıcı talebi 2026-08-01) — TJK'nın kendi resmi "Geç Çıkış"
   // tespitine göre: true=tekrarlayan (2+) geç çıkış geçmişi var, false=veri var ama sorun
