@@ -10,7 +10,7 @@ sorular) — cevap vermeden ÖNCE, o koşu için şunu çalıştır:
 node --env-file=.env node_modules/tsx/dist/cli.mjs arac-tam-at-inceleme.mts --hipodrom <slug> --tarih <YYYY-MM-DD> --kosu <no>
 ```
 
-Bu KALICI ARAÇ, sahadaki HER at için TEK seferde şunları döker: modelin 13 skor
+Bu KALICI ARAÇ, sahadaki HER at için TEK seferde şunları döker: modelin 14 skor
 girdisinin tamamı (A+B katmanı), Hızlı Özet (pist uzmanlığı/sınıf/at-jokey ikilisi/AGF
 trend/pedigri), soy ağacı, sahiplik/kazanç, detaylı istatistik tablolarının TAM içeriği,
 son 5 yarış, Accurace'in tam sektörel geçmişi, galop split'leri, derece istatistikleri

@@ -32,10 +32,14 @@ const ANLAMLI_PUAN_ESIGI = 1.0;
 // düşüşünün EN AZ 2'sinin AYNI ATTA hizalanması (MEGAFAUNA vakası). B=500 bootstrap'ta
 // İKİ segmentte de anlamsız çıktı (bkz. sinyal-kutugu.service.ts ADAY_SİNYALLER) —
 // zeminToleransi/sireOrani ile AYNI türden BİLİNÇLİ istisna, kullanıcı kararıyla eklendi.
+// 2026-09-01 kullanıcı kararı — "Son İdman Sprint": son idmanın TÜRÜ (TJK Gallop.track)
+// Sprint/Sürat mi (ESENYIL vakası). Backtest (n=9148, leak-free) yönü DOĞRULAMADI (nokta
+// tahmini hafif negatif, GA sıfırı kapsıyor) — yakınsama/zeminToleransi ile AYNI türden
+// BİLİNÇLİ istisna, GERÇEK fit edilen katsayı kullanılıyor, elle pozitif yapılmadı.
 const FEATURE_NAMES = [
   "agfSirasi", "kgsVarMi", "idmJokey", "jokeyOrani", "antrenorOrani", "kacakYalniz",
   "agfPayi", "h2hNetSkor", "hizDerecesi", "h2hKiloDegisimi", "agfPayi2", "zeminToleransi",
-  "yakinsama2Plus",
+  "yakinsama2Plus", "sonIdmanSprint",
 ];
 
 function toFeatureVector(row) {
@@ -53,6 +57,7 @@ function toFeatureVector(row) {
     (row.agfPayi ?? 0) * (row.agfPayi ?? 0),
     row.zeminToleransi ?? 0,
     row.yakinsama2Plus ?? 0,
+    row.sonIdmanSprint ?? 0,
   ];
 }
 

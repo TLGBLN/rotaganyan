@@ -8,7 +8,7 @@ import { getSonYarisDetaylariForRace } from "./src/server/actions/son-yaris-deta
 import { fetchAccuraceGecmisKayitlari, hesaplaAccuraceSonYarisEnHizliKapanisMap, normalizeHorseName } from "./src/lib/methodology/veri-toplama";
 import { analizEtTekYaris, hesaplaCokYarisEgilimi, type PaceCheckpoint } from "./src/lib/methodology/pace-analizi";
 import { kategoriTespit } from "./src/lib/methodology/v2-engine";
-import { galopQuality, isSameJockey } from "./src/components/program/panels/galop-helpers";
+import { galopQuality, isSameJockey, isSprintIdman } from "./src/components/program/panels/galop-helpers";
 import { breedToIrk, surfaceToPist, mesafeBucket, normalizeSireName } from "./src/lib/sire-stat-match";
 import { finishPos } from "./src/lib/race-result";
 import { getJockeyStats, getTrainerStats } from "./src/server/services/race.service";
@@ -98,6 +98,10 @@ export type ModelRow = {
   // ile (İSME göre, Karma hariç, sızıntısız) hesaplanır — canlı sunumla AYNI fonksiyon.
   sinifDususu: 0 | 1;
   ajiGalibiyetVarMi: 0 | 1;
+  // 2026-09-01 kullanıcı talebi (ESENYIL vakası) — son idman türü Sprint/Sürat mi (Gallop.
+  // track). Backtest yönü doğrulamadı (bkz. v5-engine.ts notu), yine de B-katmanı kural
+  // istisnası olarak eklendi.
+  sonIdmanSprint: 0 | 1;
   sireOrani: number; // küçültülmüş (shrinkage), 0-100
   galop: 0 | 1;
   idmJokey: 0 | 1;
@@ -459,7 +463,7 @@ async function main() {
             const gallops = await db.gallop.findMany({
               where: { runnerId: { in: runners.map((r) => r.id) } },
               orderBy: { date: "desc" },
-              select: { runnerId: true, date: true, jockey: true, splits: true, form: true },
+              select: { runnerId: true, date: true, jockey: true, splits: true, form: true, track: true },
             });
             const gallopsByRunner = new Map<string, typeof gallops>();
             for (const g of gallops) {
@@ -592,6 +596,7 @@ async function main() {
                 galopRahatVeIyi = keskinGalop === 1 && sonGalop.form != null && KOLAY_SEKILLER.has(sonGalop.form) ? 1 : 0;
               }
               const idmJokey = myGallops.some((g) => isSameJockey(g.jockey, r.jockey)) ? 1 : 0;
+              const sonIdmanSprint: 0 | 1 = sonGalop ? (isSprintIdman(sonGalop.track) ? 1 : 0) : 0;
 
               // Tarihe-duyarlı (sızıntısız) sireOrani — bkz. yukarıdaki 2026-08-21 notu.
               // Veri yoksa (özellikle erken Temmuz'da, kendi takip altyapımız henüz
@@ -638,6 +643,7 @@ async function main() {
                 antrenorOrani: antrenorOran,
                 sinifDususu: yakinsamaGecmis.get(r.no)?.sinifDususu ? 1 : 0,
                 ajiGalibiyetVarMi: yakinsamaGecmis.get(r.no)?.ajiGalibiyetVarMi ? 1 : 0,
+                sonIdmanSprint,
                 kategori, breed: race.breed, distance: race.distance, surface: race.surface,
                 ayniJokeySurekliligi: sonYaris?.ayniJokey === true ? 1 : 0,
                 takiEklendiMi: (sonYaris?.eklenenTaki?.length ?? 0) > 0 ? 1 : 0,

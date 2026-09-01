@@ -548,13 +548,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.34",
     baslangic: new Date("2026-09-01T08:58:10+03:00"),
-    bitis: null,
+    bitis: new Date("2026-09-01T13:36:00+03:00"),
     aciklama: "Kullanıcı kararıyla ('skora dahil olsun puana eklensin') 13. özellik olarak 'Yakınsama' eklendi — MEGAFAUNA vakasından (model 8./%4 verdi, at kazandı) doğan hipotez: pistUzmani + sahada ilk-2 pedigri (sireOrani) + at-jokey ikilisinde geçmiş galibiyet + AGF eşik-üstü yükseliş + sınıf düşüşünün (bugünkü 1.ikramiye, son 3 startın ortalamasının <%80'i) EN AZ 2'sinin AYNI ATTA hizalanması. Beşi de tek tek VE birlikte B=500 bootstrap ile test edildi, hiçbiri istatistiksel olarak anlamlı çıkmadı (bkz. sinyal-kutugu.service.ts) — zeminToleransi/sireOrani ile AYNI türden BİLİNÇLİ istisna. İki yeni bileşen (sınıf düşüşü, at-jokey ikilisi) hem eğitim (arac-model-veri-olustur.mts) hem canlı sunum (v5-engine.ts gatherFaz1V5) TEK bir paylaşılan fonksiyondan (yakinsama-gecmis.ts) hesaplanıyor — hızDerecesi'nin (V5.33) train/serve dersi bir daha yaşanmasın diye. Bu süreçte MEGAFAUNA üzerinden GERÇEK bir veri boşluğu bulundu: geçmiş Runner kayıtlarının bir kısmında tjkAtId boş, tjkAtId'ye göre eşleşme gerçek galibiyetleri kaçırıyordu — İSME göre eşleşmeye geçildi (Karma mükerrer kaydı da hariç tutuluyor). model-veri.json tam yenilendi (3923 koşu, 38264 satır), 13 özellikle yeniden eğitildi.",
     neyiAnalizEdiyor: [
       "Skor/olasılık DEĞİŞTİ: yakinsama2Plus artık 13. özellik olarak TÜM skorlara katkı veriyor (diğer +0.042, düşük-şart -0.028 — ikisi de küçük ve GA sıfırı içeriyor). Diğer 12 katsayı, model-veri.json'un tam yenilenmesi nedeniyle hafifçe kaydı (doğal yeniden-örnekleme varyansı) ama yön/anlamlılık durumları değişmedi.",
     ],
     caprazlamalar: [
       "Adil kıyas (aynı test seti, mevcut canlı 12-özellik vs yeni 13-özellik): diğer segmentte top1/top3/logloss farkı ihmal edilebilir (-0.4pp/-0.3pp, logloss hafif iyi), düşük-şart'ta hafif iyi (+1.2pp/+1.6pp) — zeminToleransi gibi ölçülebilir bir zarar yok. Doğrulama: tsc --noEmit temiz, npm run build temiz, v5-engine.test.ts 7/7 geçti.",
+    ],
+  },
+  {
+    versiyon: "V5.35",
+    baslangic: new Date("2026-09-01T13:36:00+03:00"),
+    bitis: null,
+    aciklama: "Kullanıcı kararıyla ('B katmanına destekleyici sinyal olarak eklensin') 14. özellik olarak 'Son İdman Sprint' eklendi — ESENYIL vakasından (model 9./%4.9 verdi, at kazandı) doğan hipotez: son idmanın TÜRÜ (TJK Gallop.track) Sprint/Sürat mi. Önce basit (regresyonsuz) karşılaştırma yapıldı: n=9148 (leak-free, karma hariç), Sprint grubu top1 %9.5 vs diğer %11.1 — YÖN TERSİYDİ (nokta -1.5pp, GA sıfırı kapsıyor); yarışa yakınlık (≤3 gün) kırılımı da yönü değiştirmedi. Kullanıcı yine de eklenmesini istedi — zeminToleransi/yakınsama ile AYNI türden BİLİNÇLİ istisna, GERÇEK fit edilen katsayı kullanıldı (elle pozitif yapılmadı). Ortak 14-özellik regresyonda (diğer 13 değişkeni kontrol ederek) katsayı iki segmentte de sıfıra çok yakın çıktı (düşük-şart +0.008, diğer -0.019) — basit karşılaştırmadaki negatif yön büyük ölçüde confounding'den kaynaklanıyormuş. Gallop sorgusuna `track` alanı eklendi (hem arac-model-veri-olustur.mts hem v5-engine.ts), Sprint/Sürat eşleşmesi galop-helpers.ts'teki tek bir paylaşılan fonksiyondan (isSprintIdman) hem eğitim hem canlı sunumda kullanılıyor. model-veri.json tam yenilendi (3923 koşu, 38264 satır), 14 özellikle yeniden eğitildi.",
+    neyiAnalizEdiyor: [
+      "Skor/olasılık DEĞİŞTİ: sonIdmanSprint artık 14. özellik olarak TÜM skorlara katkı veriyor (düşük-şart +0.008, diğer -0.019 — ikisi de ihmal edilebilir küçüklükte ve GA sıfırı içeriyor). Diğer 13 katsayı, model-veri.json'un tam yenilenmesi nedeniyle hafifçe kaydı (doğal yeniden-örnekleme varyansı) ama yön/anlamlılık durumları değişmedi.",
+    ],
+    caprazlamalar: [
+      "Adil kıyas (aynı test seti, aynı model-veri.json, 13-özellik vs 14-özellik): top1/top3 BİREBİR AYNI (düşük-şart %37.8/%64.9, diğer %32.2/%67.3), logloss farkı gürültü seviyesinde (düşük-şart +0.0003, diğer -0.0009) — ölçülebilir bir zarar yok. Doğrulama: tsc --noEmit temiz, npm run build temiz, v5-engine.test.ts 7/7 geçti.",
     ],
   },
 ];

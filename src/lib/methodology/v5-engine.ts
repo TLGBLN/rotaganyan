@@ -148,7 +148,7 @@ import {
   fetchAccuraceGecmisKayitlari,
   hesaplaAccuraceSonYarisEnHizliKapanisMap,
 } from "@/lib/methodology/veri-toplama";
-import { galopQuality, isSameJockey } from "@/components/program/panels/galop-helpers";
+import { galopQuality, isSameJockey, isSprintIdman } from "@/components/program/panels/galop-helpers";
 import type { PickDetailsV2, MuhakemeSatiri } from "@/lib/methodology/muhakeme-format";
 import { hesaplaSinyalSayisi, kategoriTespit } from "@/lib/methodology/v2-engine";
 import { AGF_TERFI_ILK3_SINYAL_ESIGI as SINYAL_ESIGI } from "@/lib/methodology/v4-engine";
@@ -243,6 +243,10 @@ const IDM_JOKEY_IDX = FEATURE_NAMES.indexOf("idmJokey");
 // vakası, kural istisnası). Gerekçe metninde diğer override'lı sinyallerle (HIZ/KACAK/
 // IDMJOK) AYNI desen: ham boolean'a değil gerçek katkıya (r.katkilar) bakılıyor.
 const YAKINSAMA_IDX = FEATURE_NAMES.indexOf("yakinsama2Plus");
+// 2026-09-01 — SON_IDMAN_SPRINT_IDX: kullanıcı talebi (ESENYIL vakası), B-katmanı kural
+// istisnası. Backtest (n=9148, leak-free) yönü DOĞRULAMADI (nokta tahmini hafif negatif,
+// GA sıfırı kapsıyor) — GERÇEK fit edilen katsayı kullanılıyor, elle pozitif yapılmadı.
+const SON_IDMAN_SPRINT_IDX = FEATURE_NAMES.indexOf("sonIdmanSprint");
 const WEIGHTS_DIGER_HANDIKAP: AgirlikSeti = {
   ...WEIGHTS_DIGER_DUZELTILMIS,
   weights: WEIGHTS_DIGER_DUZELTILMIS.weights.map((w, i) => (i === HIZ_DERECESI_IDX || i === IDM_JOKEY_IDX ? 0 : w)),
@@ -339,6 +343,9 @@ export type Faz1RunnerV5 = {
    *  GA sıfırı içeriyor — bkz. sinyal-kutugu.service.ts ADAY_SİNYALLER) — zeminToleransi/
    *  sireOrani ile AYNI türden BİLİNÇLİ istisna, kullanıcı kararıyla eklendi. */
   yakinsama2Plus: 0 | 1;
+  /** Son idman TÜRÜ (TJK Gallop.track) Sprint/Sürat mi — kullanıcı kararıyla eklenen B-katmanı
+   *  kural istisnası (bkz. yukarıdaki toFeatureVector üstü not, backtest yönü doğrulamadı). */
+  sonIdmanSprint: 0 | 1;
   sireOrani: number;
   galop: 0 | 1;
   idmJokey: 0 | 1;
@@ -484,7 +491,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
         select: {
           id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true,
           raceStyle: true, weight: true, ekuriGroup: true,
-          gallops: { select: { date: true, jockey: true, splits: true }, orderBy: { date: "desc" } },
+          gallops: { select: { date: true, jockey: true, splits: true, track: true }, orderBy: { date: "desc" } },
         },
       },
     },
@@ -672,6 +679,12 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       keskinGalop = q === "cok_iyi" || q === "iyi" ? 1 : 0;
     }
     const idmJokey: 0 | 1 = gecerliGaloplar.some((g) => isSameJockey(g.jockey, r.jockey)) ? 1 : 0;
+    // 2026-09-01 kullanıcı talebi (ESENYIL vakası) — son idmanın TÜRÜ (TJK "İdman Türü")
+    // Sprint/Sürat mi. Backtest (n=9148, karma hariç, leak-free) yönü DOĞRULAMADI: Sprint
+    // grubu top1 %9.5 vs diğer %11.1 (fark −1.5pp, GA [−3.3,+0.5] sıfırı kapsıyor, nokta
+    // tahmini HAFİF NEGATİF). Kullanıcı yine de B-katmanı kural istisnası olarak eklenmesini
+    // istedi — GERÇEK (veriden fit edilen) katsayı kullanılıyor, elle pozitif YAPILMADI.
+    const sonIdmanSprint: 0 | 1 = enSonGalop ? (isSprintIdman(enSonGalop.track) ? 1 : 0) : 0;
     const h2hKiloHesap = h2hKiloDegisimiHesapla(r.name, r.weight);
     const h2hNetSkorHesap = h2hNetSkorHesapla(r.name);
 
@@ -714,6 +727,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       kgs: kgsVal, kgsVarMi,
       pistUzmani: sonYaris?.kazandi === "EVET" ? 1 : 0,
       yakinsama2Plus: 0, // aşağıda, TÜM runner'lar hazır olduktan sonra (sahaya-göreli pedigri sırası gerekiyor) dolduruluyor
+      sonIdmanSprint,
       sireOrani, galop: keskinGalop, idmJokey,
       galopSayisi: gecerliGaloplar.length, uzunAraGalopKatkisi,
       jokeyOrani, antrenorOrani,
@@ -790,6 +804,7 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     r.agfPayi * r.agfPayi,
     r.zeminToleransi,
     r.yakinsama2Plus,
+    r.sonIdmanSprint,
   ];
 }
 
@@ -1376,6 +1391,7 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // yoksa (Normal-dışı geçmiş koşu yok) 0, satır hiç gösterilmez.
   { kod: "ZEMIN", ozellikIndeksleri: [idx("zeminToleransi")], aciklama: (r) => (r.zeminToleransi !== 0 ? `Zemin toleransı: Normal-dışı pistteki geçmişinde popülasyona göre ${r.zeminToleransi > 0 ? "+" : ""}${r.zeminToleransi.toFixed(1)}% (${r.zeminToleransi > 0 ? "daha hızlı" : "daha yavaş"})` : null) },
   { kod: "YAKINSAMA", ozellikIndeksleri: [idx("yakinsama2Plus")], aciklama: (r) => (r.katkilar[YAKINSAMA_IDX] !== 0 ? "Yakınsama: pist uzmanlığı/pedigri/at-jokey ikilisi/AGF trend/sınıf düşüşünden en az 2'si bu atta hizalanmış (istatistiksel kanıtı yok, kullanıcı kararıyla eklendi)" : null) },
+  { kod: "SPRINT", ozellikIndeksleri: [idx("sonIdmanSprint")], aciklama: (r) => (r.katkilar[SON_IDMAN_SPRINT_IDX] !== 0 ? `Son idman türü Sprint/Sürat (backtest yönü doğrulamadı, kullanıcı kararıyla eklendi): ${r.katkilar[SON_IDMAN_SPRINT_IDX] > 0 ? "olumlu" : "olumsuz"}` : null) },
 ];
 
 // 2026-08-18 kullanıcı talebi: "18 sinyalin hepsinin kontrol edildiğini bana göstermesini
@@ -1402,6 +1418,7 @@ const FEATURE_LABELS: Record<string, string> = {
   agfPayi2: "AGF Payı (karesi, piyasa kalibrasyon eğriselliği)",
   zeminToleransi: "Zemin Toleransı (Normal-dışı pistte geçmiş göreli performans)",
   yakinsama2Plus: "Yakınsama (pist uzmanlığı+pedigri+at-jokey ikilisi+AGF trend+sınıf düşüşünden ≥2'si aynı atta)",
+  sonIdmanSprint: "Son İdman Türü Sprint/Sürat",
 };
 
 export type TumOzellikDetay = { kod: string; etiket: string; hamDeger: number; standartDeger: number; katki: number };

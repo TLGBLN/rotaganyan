@@ -13,7 +13,7 @@
 //
 // Bu script TEK komutla, analiz motorunun analiz edeceği (henüz sonuçlanmamış) bir
 // günün/hipodromun TÜM koşularındaki İSTİSNASIZ HER at için TÜM veriyi döker:
-//   - Modelin 13 skor girdisinin TAMAMI (A+B katmanı)
+//   - Modelin 14 skor girdisinin TAMAMI (A+B katmanı)
 //   - Hızlı Özet (pist uzmanlığı/sınıf durumu/at-jokey ikilisi/AGF trend/pedigri)
 //   - Soy ağacı (3 kuşak) + pedigri özet metni (SireStatOwn)
 //   - Sahiplik/kazanç + DETAYLI İSTATİSTİK TABLOLARININ TAM İÇERİĞİ (başlık+satırlar)
@@ -41,7 +41,7 @@ import { fmtSaniye, checkpointCols, STIL_LABEL } from "./src/lib/methodology/pac
 const A_KATMANI_ADLARI = [
   "agfSirasi", "kgsVarMi", "idmJokey", "jokeyOrani", "antrenorOrani", "kacakYalniz",
   "agfPayi", "h2hNetSkor", "hizDerecesi", "h2hKiloDegisimi", "agfPayi2", "zeminToleransi",
-  "yakinsama2Plus",
+  "yakinsama2Plus", "sonIdmanSprint",
 ];
 
 function get(argv: string[], bayrak: string) {
@@ -150,7 +150,7 @@ async function tekKosuIsle(raceId: string) {
     console.log(`\n──────────────────────────────────────────────────────────`);
     console.log(`#${r.no} ${r.ad} — Model sırası: ${sira}/${sirali.length}, olasılık=%${(r.olasilik * 100).toFixed(1)}`);
 
-    console.log(`  A-Katmanı (13 skor girdisinin TAMAMI):`);
+    console.log(`  A-Katmanı (14 skor girdisinin TAMAMI):`);
     A_KATMANI_ADLARI.forEach((ad, i) => console.log(`    ${ad.padEnd(18)} = ${vektor[i]}`));
 
     if (ozet) {

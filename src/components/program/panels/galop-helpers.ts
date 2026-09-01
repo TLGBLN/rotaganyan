@@ -89,3 +89,11 @@ export function trainingTypeClass(type: string): string {
   if (t.includes("GALOP")) return "bg-sky-500/15 text-sky-400";
   return "bg-muted text-muted-foreground";
 }
+
+/** Son idman TÜRÜ (Gallop.track) "Sprint"/"Sürat" mi — trainingTypeClass'la AYNI eşleşme,
+ * skorlama tarafında (v5-engine.ts + arac-model-veri-olustur.mts) tek kaynaktan kullanılsın diye. */
+export function isSprintIdman(track: string | null | undefined): boolean {
+  if (!track) return false;
+  const t = track.toUpperCase();
+  return t.includes("SPRINT") || t.includes("SÜRAT") || t.includes("SURAT");
+}

@@ -24,13 +24,15 @@ export type SinyalAnlamlilik = "anlamli" | "sinirda" | "anlamsiz" | "override" |
 // 2026-09-01 kullanıcı kararı — kavramsal yeniden gruplama (kod/matematik DEĞİŞMEDİ,
 // yalnız raporlama/etiketleme): "A Katmanı" = istatistiksel olarak kanıtlanmış (veya en
 // azından karışık/gerçek katsayıya dayanan) 11 çekirdek sinyal; "B Katmanı" = tek başına
-// anlamsız çıkan ama MEGAFAUNA türü vakalarda fark yaratabileceği düşünülen, kullanıcı
-// kararıyla eklenen 4 sinyal (zeminToleransi, yakinsama2Plus, sireOrani, zeminMesafeDeneyim).
+// anlamsız çıkan ama MEGAFAUNA/ESENYIL türü vakalarda fark yaratabileceği düşünülen,
+// kullanıcı kararıyla eklenen 5 sinyal (zeminToleransi, yakinsama2Plus, sonIdmanSprint,
+// sireOrani, zeminMesafeDeneyim).
 // ÖNEMLİ NÜANS: B Katmanı kendi içinde MEKANİZMA olarak homojen DEĞİL — zeminToleransi/
-// yakinsama2Plus hâlâ A'nın 13'lük ORTAK regresyonunda birlikte fit ediliyor (yalnız
-// kanıt gücü zayıf olduğu için B etiketleniyor); sireOrani/zeminMesafeDeneyim ise
-// GERÇEKTEN ayrı bir mekanizma (softmax'a girmeden önce skora eklenen, bkz. v5-engine.ts
-// bKatmaniUygula). Bu ayrımı gizlememek için her B-katmanı girdisinde belirtiliyor.
+// yakinsama2Plus/sonIdmanSprint hâlâ A'nın 14'lük ORTAK regresyonunda birlikte fit
+// ediliyor (yalnız kanıt gücü zayıf olduğu için B etiketleniyor); sireOrani/
+// zeminMesafeDeneyim ise GERÇEKTEN ayrı bir mekanizma (softmax'a girmeden önce skora
+// eklenen, bkz. v5-engine.ts bKatmaniUygula). Bu ayrımı gizlememek için her B-katmanı
+// girdisinde belirtiliyor.
 export type SinyalKatmani = "A" | "B";
 
 export type CanliSinyal = {
@@ -113,6 +115,25 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
     dusukSart: { katsayi: -0.028, durum: "anlamsiz", not: "B=500: GA=[-0.1535,0.0756], sıfırı içeriyor. Diğer bileşenlerle (12 özellik) birlikte, YENİDEN yapılan tam retrain'den (model-veri.json tam yenilendi, düzeltilmiş sınıf-düşüşü/at-jokey tanımlarıyla)." },
     diger: { katsayi: 0.042, durum: "anlamsiz", not: "B=500: GA=[-0.0405,0.1197], sıfırı içeriyor." },
     aciklama: "pistUzmani + sahada ilk-2 pedigri (sireOrani) + at-jokey ikilisinde geçmiş galibiyet + AGF eşik-üstü (≥1.0 puan) yükseliş + sınıf düşüşünün (bugünkü 1.ikramiye, son 3 startın ortalamasının <%80'i) EN AZ 2'sinin AYNI ATTA hizalanması. Beşi de TEK TEK ve BİRLİKTE B=500 bootstrap ile test edildi, hiçbiri istatistiksel olarak anlamlı çıkmadı — kullanıcı MEGAFAUNA vakasını (model 8./%4 verdi, at kazandı; pistUzmanı+at-jokey ikilisi+AGF yükselişi hizalanmıştı) gerekçe göstererek yine de eklenmesini istedi.",
+  },
+  // 2026-09-01 — ESENYIL vakası (model 9./%4.9 verdi, at kazandı; kullanıcı son idmanının
+  // "Sprint" etiketli olduğunu, pedigrisinin mesafeye uygun olduğunu ve at-jokey ikilisinin
+  // geçmişte %50 galibiyetli olduğunu belirtti). Önce basit (regresyonsuz) karşılaştırma
+  // yapıldı: n=9148 (leak-free, karma hariç), son idmanı Sprint/Sürat olanlar top1 %9.5 vs
+  // diğerleri %11.1 — YÖN TERSİYDİ (nokta -1.5pp, GA sıfırı kapsıyor). Kullanıcı yine de
+  // B-katmanı kural istisnası olarak eklenmesini istedi — 14. özellik olarak ORTAK
+  // regresyona katıldı (yakinsama2Plus ile AYNI mekanizma). Diğer değişkenleri kontrol
+  // eden TAM regresyonda katsayı ikisi de sıfıra çok yakın çıktı (basit karşılaştırmadaki
+  // negatif yön, confounding'den kaynaklanıyormuş). Adil önce/sonra kıyası (aynı test seti,
+  // 13 vs 14 özellik): top1/top3 BİREBİR AYNI, logloss farkı gürültü seviyesinde
+  // (düşük-şart +0.0003, diğer -0.0009) — zeminToleransi gibi ölçülebilir zarar yok.
+  {
+    ad: "Son İdman Sprint (İSTİSNA — basit kıyas yönü ters çıktı, tam regresyonda sıfıra yakın, kullanıcı kararıyla eklendi)",
+    kod: "sonIdmanSprint",
+    katman: "B",
+    dusukSart: { katsayi: 0.008, durum: "anlamsiz", not: "B=500: GA=[-0.1620,0.1465], sıfırı içeriyor." },
+    diger: { katsayi: -0.019, durum: "anlamsiz", not: "B=500: GA=[-0.1063,0.0651], sıfırı içeriyor." },
+    aciklama: "Son idmanın TÜRÜ (TJK Gallop.track) Sprint/Sürat mi. Basit karşılaştırma (regresyonsuz, n=9148) YÖNÜ DOĞRULAMADI (Sprint grubu top1 %9.5, diğer %11.1) — kullanıcı ESENYIL vakasını gerekçe göstererek yine de eklenmesini istedi. Ortak regresyonda (13 kontrol değişkeniyle birlikte) katsayı iki segmentte de sıfıra çok yakın (+0.008 / -0.019), istatistiksel olarak anlamsız.",
   },
 ];
 
