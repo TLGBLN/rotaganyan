@@ -6,7 +6,6 @@ import { getTodaysFollowedRaces } from "@/server/actions/horse-follow";
 import { Button } from "@/components/ui/button";
 import MobileNav from "./MobileNav";
 import HeaderUserMenu from "./HeaderUserMenu";
-import LiveTvPlayer from "@/components/home/LiveTvPlayer";
 import NotificationBell from "./NotificationBell";
 import IntroTour from "./IntroTour";
 import FollowedHorsesPopup from "./FollowedHorsesPopup";
@@ -58,7 +57,6 @@ export default async function Header() {
           <Button asChild variant="outline" size="sm">
             <Link href="/altili" data-tour="altili"><HeaderLabel k="altiliNeVerir" /></Link>
           </Button>
-          <LiveTvPlayer compact />
           <SocialLinks />
         </nav>
 
