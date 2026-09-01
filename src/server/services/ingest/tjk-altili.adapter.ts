@@ -91,13 +91,15 @@ async function fetchTodaysAltiliResultsUncached(tjkDate: string): Promise<Altili
   const { discoverTurkishCities } = await import("./tjk-info.adapter");
   const cities = await discoverTurkishCities(tjkDate);
 
-  const results: AltiliCityResult[] = [];
-  for (const city of cities) {
-    const result = await fetchAltiliSonuc(city.sehirId, city.sehirAdi);
-    if (result) results.push(result);
-    await new Promise((r) => setTimeout(r, 300)); // polite delay between cities
-  }
-  return results;
+  // 2026-09-01 performans düzeltmesi: şehirler eskiden TEK TEK, aralarında 300ms "kibar
+  // gecikme" ile sırayla çekiliyordu — 8-10 şehirde bu, /program sayfasının tamamını 15-18
+  // saniye bekletiyordu (kullanıcı şikayeti: "tarih seçince anlık değil, yavaşladı").
+  // Paralel çekime geçildi — toplam süre artık en yavaş tek şehrin süresine iniyor.
+  const settled = await Promise.allSettled(cities.map((c) => fetchAltiliSonuc(c.sehirId, c.sehirAdi)));
+  return settled
+    .filter((r): r is PromiseFulfilledResult<AltiliCityResult | null> => r.status === "fulfilled")
+    .map((r) => r.value)
+    .filter((v): v is AltiliCityResult => v !== null);
 }
 
 // next/cache'in unstable_cache()'i yerine process-içi TTL cache — bkz. tjk-at-performans.
