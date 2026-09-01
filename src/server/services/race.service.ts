@@ -371,6 +371,9 @@ export type KuponLeg = {
   // no'suna eşler (yalnız dolaylı/eküri yoluyla kazananlar için — gerçek kazananlar zaten
   // winnerNos'ta, burada tekrar yer almaz).
   ekuriWinnerByNo: Record<number, number>;
+  /** 2026-09-01 kullanıcı talebi — sonuç gelmeden ÖNCE de: seçili bir no'nun eküri ortağı
+   *  varsa (grup arkadaşı), sonuç bağımsız burada gösterilir (bkz. buildEkuriPartnerMap). */
+  ekuriPartnerByNo: Record<number, number>;
 };
 export type KuponStatus = "hit" | "miss" | "pending";
 export type KuponVariant = {
@@ -404,6 +407,30 @@ const YEDILI_GANYAN_STAKE_PER_COMBINATION = 2;
 
 function stakeForHippodromeLabel(hippodromeName: string): number {
   return hippodromeName.includes("7'li Ganyan") ? YEDILI_GANYAN_STAKE_PER_COMBINATION : ALTILI_STAKE_PER_COMBINATION;
+}
+
+/**
+ * 2026-09-01 kullanıcı talebi: "kupon yayınlandığında eküri seçilmişse yanında eküri de
+ * otomatik belirtilsin" — SONUÇ gelmeden ÖNCE bile, bir seçili no'nun eküri ortağı varsa
+ * gösterilebilsin diye. buildEkuriWinnerMap'ten farkı: kazanan olup olmadığına bakmadan,
+ * AYNI GRUPTAKİ HER atı karşılıklı eşler (grup 2+ üyeliyse ilk ortağı alır).
+ */
+function buildEkuriPartnerMap(runners: { no: number; ekuriGroup: number | null }[]): Record<number, number> {
+  const map: Record<number, number> = {};
+  const byGroup = new Map<number, number[]>();
+  for (const r of runners) {
+    if (r.ekuriGroup == null || r.ekuriGroup < 1) continue;
+    const arr = byGroup.get(r.ekuriGroup) ?? [];
+    arr.push(r.no);
+    byGroup.set(r.ekuriGroup, arr);
+  }
+  for (const nos of byGroup.values()) {
+    if (nos.length < 2) continue;
+    for (const no of nos) {
+      map[no] = nos.find((n) => n !== no)!;
+    }
+  }
+  return map;
 }
 
 /**
@@ -455,7 +482,7 @@ export async function buildKuponOnerisi(active: {
   // yeşil göstermek, eşleşmeyeni (sonuç girilmiş ama kazanan seçilmemiş) "kaçtı" olarak işaretlemek için.
   // Aynı sorguda o ayağın analiz sırasını (Pick.rank) da çekiyoruz — kupondaki atlar sayı sırasına göre
   // değil, analizdeki tahmin sırasına göre dizilsin diye.
-  const resultByRaceNo = new Map<number, { winnerNo: number | null; winnerNos: number[]; resulted: boolean; ekuriWinnerByNo: Record<number, number> }>();
+  const resultByRaceNo = new Map<number, { winnerNo: number | null; winnerNos: number[]; resulted: boolean; ekuriWinnerByNo: Record<number, number>; ekuriPartnerByNo: Record<number, number> }>();
   const rankByRaceNo = new Map<number, Map<number, number>>();
   const races = await db.race.findMany({
     where: {
@@ -468,7 +495,9 @@ export async function buildKuponOnerisi(active: {
     include: {
       result: { select: { winnerNo: true, winnerNos: true, enteredAt: true } },
       prediction: { select: { picks: { select: { rank: true, runner: { select: { no: true } } } } } },
-      runners: { select: { no: true, ekuriGroup: true } },
+      // scratched:false — çekilmiş bir at hâlâ ekuriGroup taşıyabilir, koşmayan bir atı
+      // "eküri ortağı" diye göstermek yanıltıcı olurdu.
+      runners: { where: { scratched: false }, select: { no: true, ekuriGroup: true } },
     },
   });
   // 2026-09-01 kullanıcı kararı: bir kupon "yatınca" (miss) ANINDA anasayfadan kalkmasın —
@@ -484,6 +513,7 @@ export async function buildKuponOnerisi(active: {
       winnerNos,
       resulted: r.result != null,
       ekuriWinnerByNo: buildEkuriWinnerMap(r.runners, winnerNos),
+      ekuriPartnerByNo: buildEkuriPartnerMap(r.runners),
     });
     if (r.raceNo === sonAyakRaceNo) sonAyakSonuclandiAt = r.result?.enteredAt ?? null;
     const rankByNo = new Map<number, number>();
@@ -515,6 +545,7 @@ export async function buildKuponOnerisi(active: {
         winnerNos: entry?.winnerNos ?? [],
         resulted: entry?.resulted ?? false,
         ekuriWinnerByNo: entry?.ekuriWinnerByNo ?? {},
+        ekuriPartnerByNo: entry?.ekuriPartnerByNo ?? {},
       };
     });
   }

@@ -390,6 +390,29 @@ function AnalysisPanel({
     .filter((r) => !r.scratched && !pickedNos.has(r.no))
     .sort((a, b) => a.no - b.no);
 
+  // 2026-09-01 kullanıcı talebi: "sıralama yaparken de yer kaplamasın, eküriler yan yana
+  // belirtilsin" — Analiz Detayları tablosunda iki eküri ortağı AYRI satır olarak iki kat
+  // yer kaplamasın, aynı satırda birlikte gösterilsin (No/At/Toplam'ın hepsi "A / B" biçiminde).
+  const ekuriGroupByNo = new Map<number, number>();
+  runners.forEach((r) => { if (r.ekuriGroup != null && r.ekuriGroup >= 1) ekuriGroupByNo.set(r.no, r.ekuriGroup); });
+  const renderedPickNos = new Set<number>();
+  const pickRows: ProgramPick[][] = [];
+  for (const p of picks) {
+    const no = p.runner?.no;
+    if (no != null && renderedPickNos.has(no)) continue;
+    const grp = no != null ? ekuriGroupByNo.get(no) : undefined;
+    const partner = grp != null
+      ? picks.find((q) => q !== p && q.runner?.no != null && !renderedPickNos.has(q.runner.no) && ekuriGroupByNo.get(q.runner.no) === grp)
+      : undefined;
+    if (no != null) renderedPickNos.add(no);
+    if (partner?.runner?.no != null) {
+      renderedPickNos.add(partner.runner.no);
+      pickRows.push([p, partner]);
+    } else {
+      pickRows.push([p]);
+    }
+  }
+
   // v6.68 — kullanıcı talebi 2026-08-09: "link istemiyorum direk image üstüne
   // yerleştirilmeli" — eskiden Twitter intent'ine bir URL (link) gönderiliyordu, o da
   // OG görselini bir KART olarak unfurl ediyordu. Artık görsel bir DOSYA olarak Web
@@ -504,21 +527,30 @@ function AnalysisPanel({
             </tr>
           </thead>
           <tbody>
-            {picks.map((p) => {
-              const { no, name } = pickDisplay(p);
-              const isWinner = p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no);
-              const rs = rankStyle(p.rank);
+            {pickRows.map((rowPicks, rowIdx) => {
+              const first = rowPicks[0];
+              // 2026-09-01 kullanıcı talebi: eküri ortağı aynı satırda birleşince, SONRAKİ
+              // atların gösterilen sırası da yukarı kaysın (ör. 7 at → eküri birleşince 6
+              // satır, Barbuda 7.den 6.ya çıkar) — rozet/renk artık pick.rank DEĞİL, birleşmiş
+              // listedeki SIRALI konum (rowIdx+1). İyi olan ortak İLK yazılır (picks zaten
+              // rank sırasına göre taranıp eşleştiği için doğal olarak öyle geliyor).
+              const displayRank = rowIdx + 1;
+              const winnerPick = rowPicks.find((p) => p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no));
+              const isWinner = winnerPick != null;
+              const rs = rankStyle(displayRank);
+              const noText = rowPicks.map((p) => pickDisplay(p).no).join(" / ");
+              const nameText = rowPicks.map((p) => pickDisplay(p).name).join(" / ");
               return (
-                <tr key={p.rank} className={cn("border-b last:border-0", isWinner && "bg-[#f5c518]/10")}>
+                <tr key={first.rank} className={cn("border-b last:border-0", isWinner && "bg-[#f5c518]/10")}>
                   <td className="px-2 py-2 text-center">
                     <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold", rs.badge)}>
-                      {p.rank}
+                      {displayRank}
                     </span>
                   </td>
-                  <td className={cn("px-2 py-2 text-center font-mono font-bold", isWinner ? "text-[#f5c518]" : rs.text)}>{no}</td>
+                  <td className={cn("px-2 py-2 text-center font-mono font-bold", isWinner ? "text-[#f5c518]" : rs.text)}>{noText}</td>
                   <td className={cn("px-2 py-2 font-semibold", isWinner ? "text-[#f5c518]" : rs.text)}>
                     <span className="inline-flex items-center gap-1.5">
-                      {name}
+                      {nameText}
                       {isWinner && ganyan != null && (
                         <span className="text-[10px] font-semibold text-[#f5c518]">Gny: {ganyan.toFixed(2)}</span>
                       )}
@@ -547,7 +579,7 @@ function AnalysisPanel({
                     </span>
                   </td>
                   <td className="px-2 py-2 text-center tabular-nums font-bold whitespace-nowrap">
-                    <span>{puanHucresi(p.score, p.details)}</span>
+                    <span>{rowPicks.map((p) => puanHucresi(p.score, p.details)).join(" / ")}</span>
                   </td>
                 </tr>
               );
@@ -607,18 +639,22 @@ function AnalysisPanel({
 
       {/* Mobil kart listesi */}
       <div className="sm:hidden divide-y">
-        {picks.map((p) => {
-          const { no, name } = pickDisplay(p);
-          const isWinner = p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no);
-          const rs = rankStyle(p.rank);
+        {pickRows.map((rowPicks, rowIdx) => {
+          const first = rowPicks[0];
+          const displayRank = rowIdx + 1;
+          const winnerPick = rowPicks.find((p) => p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no));
+          const isWinner = winnerPick != null;
+          const rs = rankStyle(displayRank);
+          const noText = rowPicks.map((p) => pickDisplay(p).no).join(" / ");
+          const nameText = rowPicks.map((p) => pickDisplay(p).name).join(" / ");
           return (
-            <div key={p.rank} className={cn("px-3 py-2.5", isWinner && "bg-[#f5c518]/10")}>
+            <div key={first.rank} className={cn("px-3 py-2.5", isWinner && "bg-[#f5c518]/10")}>
               <div className="flex items-center gap-2 mb-1">
                 <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0", rs.badge)}>
-                  {p.rank}
+                  {displayRank}
                 </span>
-                <span className={cn("font-bold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>#{no}</span>
-                <span className={cn("font-semibold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>{name}</span>
+                <span className={cn("font-bold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>#{noText}</span>
+                <span className={cn("font-semibold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>{nameText}</span>
                 {isWinner && ganyan != null && (
                   <span className="text-[10px] font-semibold text-[#f5c518]">Gny: {ganyan.toFixed(2)}</span>
                 )}
@@ -646,7 +682,7 @@ function AnalysisPanel({
                 )}
               </div>
               <div className="flex gap-3 text-[11px] text-muted-foreground mb-1">
-                <span>{t("toplamPrefix")} <span className="font-bold text-foreground">{puanHucresi(p.score, p.details)}</span></span>
+                <span>{t("toplamPrefix")} <span className="font-bold text-foreground">{rowPicks.map((p) => puanHucresi(p.score, p.details)).join(" / ")}</span></span>
               </div>
             </div>
           );
