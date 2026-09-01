@@ -59,11 +59,15 @@ async function raceIdleriBul(argv: string[]): Promise<string[]> {
     console.log("Kullanım: arac-tam-at-inceleme.mts <raceId>  VEYA  --hipodrom <slug> --tarih YYYY-MM-DD [--kosu <no>]");
     return [];
   }
+  const sonuclanmisDahil = argv.includes("--sonuclanmis-dahil");
   const raceDay = new Date(`${tarih}T00:00:00.000Z`);
   const races = await db.race.findMany({
     where: {
       raceDay: { date: raceDay, hippodrome: { slug: hipodrom } },
-      result: { is: null }, // yalnız HENÜZ SONUÇLANMAMIŞ — analiz motorunun gerçekten analiz edeceği koşular
+      // Varsayılan: yalnız HENÜZ SONUÇLANMAMIŞ koşular (analiz motorunun gerçekten analiz
+      // edeceği koşular). --sonuclanmis-dahil ile geçmiş/sonuçlanmış koşular da (retrospektif
+      // doğrulama/test amaçlı, ör. "31.08.2026 Bursa'da nasıl çıkardı" sorusu) dahil edilebilir.
+      ...(sonuclanmisDahil ? {} : { result: { is: null } }),
       ...(kosuStr ? { raceNo: parseInt(kosuStr, 10) } : {}),
     },
     select: { id: true },
