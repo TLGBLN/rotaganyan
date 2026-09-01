@@ -24,15 +24,16 @@ export type SinyalAnlamlilik = "anlamli" | "sinirda" | "anlamsiz" | "override" |
 // 2026-09-01 kullanıcı kararı — kavramsal yeniden gruplama (kod/matematik DEĞİŞMEDİ,
 // yalnız raporlama/etiketleme): "A Katmanı" = istatistiksel olarak kanıtlanmış (veya en
 // azından karışık/gerçek katsayıya dayanan) 11 çekirdek sinyal; "B Katmanı" = tek başına
-// anlamsız çıkan ama MEGAFAUNA/ESENYIL türü vakalarda fark yaratabileceği düşünülen,
-// kullanıcı kararıyla eklenen 7 sinyal (zeminToleransi, yakinsama2Plus, sonIdmanSprint,
-// takiEklendiMi, takiCikarildiMi, sireOrani, zeminMesafeDeneyim).
+// anlamsız/sınırda çıkan ama MEGAFAUNA/ESENYIL/KIZIM BİNDAL/Kocaeli-K1 türü vakalarda fark
+// yaratabileceği düşünülen, kullanıcı kararıyla eklenen 8 sinyal (zeminToleransi,
+// yakinsama2Plus, sonIdmanSprint, takiEklendiMi, takiCikarildiMi, yarisGidisatiSkoru,
+// sireOrani, zeminMesafeDeneyim).
 // ÖNEMLİ NÜANS: B Katmanı kendi içinde MEKANİZMA olarak homojen DEĞİL — zeminToleransi/
-// yakinsama2Plus/sonIdmanSprint/takiEklendiMi/takiCikarildiMi hâlâ A'nın 16'lık ORTAK
-// regresyonunda birlikte fit ediliyor (yalnız kanıt gücü zayıf olduğu için B etiketleniyor); sireOrani/
-// zeminMesafeDeneyim ise GERÇEKTEN ayrı bir mekanizma (softmax'a girmeden önce skora
-// eklenen, bkz. v5-engine.ts bKatmaniUygula). Bu ayrımı gizlememek için her B-katmanı
-// girdisinde belirtiliyor.
+// yakinsama2Plus/sonIdmanSprint/takiEklendiMi/takiCikarildiMi/yarisGidisatiSkoru hâlâ A'nın
+// 17'lik ORTAK regresyonunda birlikte fit ediliyor (yalnız kanıt gücü zayıf/sınırda olduğu
+// için B etiketleniyor); sireOrani/zeminMesafeDeneyim ise GERÇEKTEN ayrı bir mekanizma
+// (softmax'a girmeden önce skora eklenen, bkz. v5-engine.ts bKatmaniUygula). Bu ayrımı
+// gizlememek için her B-katmanı girdisinde belirtiliyor.
 export type SinyalKatmani = "A" | "B";
 
 export type CanliSinyal = {
@@ -155,6 +156,26 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
     dusukSart: { katsayi: -0.030, durum: "anlamsiz", not: "B=500: GA=[-0.3117,0.2511], sıfırı içeriyor." },
     diger: { katsayi: 0.061, durum: "anlamsiz", not: "B=500: GA=[-0.1401,0.2486], sıfırı içeriyor." },
     aciklama: "Son yarışına göre takı çıkarılmış mı (SonYarisDetay.cikarilanTaki) — KIZIM BİNDAL'ın (KG+GKR çıkarılmış, kazandı) gerekçe gösterildiği sinyal. n=3174/38264 (%8.3). Diğer segmentte yön KIZIM BİNDAL'ın işaret ettiği yönde (+0.061) ama anlamsız; düşük-şart'ta ters (-0.030), o da anlamsız.",
+  },
+  // 2026-09-01 — Yarış Gidişatı (kullanıcı tasarımı): saha-geneli tempo senaryosu
+  // (Rahat Liderlik/Yavaş Tempo/Dengeli/Mücadeleli/Çok Yüksek/Dağılma Riski, Accurace
+  // geçmişinden kural-tabanlı olasılık dağılımı) × atın kendi stil dağılımının uyum-
+  // matrisiyle ağırlıklı beklenen değeri × mesafe katsayısı (bkz. pace-analizi.ts
+  // hesaplaYarisGidisati). Kocaeli K1 gerçek yarışıyla (Female Warrior lider gidip
+  // Kardaha'ya yakalanması) doğrulanan bir hata (saha-ortalaması yerine EN GÜÇLÜ tek
+  // kaçak adayına bakmak gerektiği) düzeltildikten sonra test edildi. B=500 bootstrap:
+  // diğer segmentte GA sıfırı DIŞLIYOR (anlamlı), düşük-şart'ta sıfırı içeriyor — ama
+  // İKİ ayrı bootstrap koşusunda diğer segmentin alt sınırı sıfıra çok yakın gidip geldi
+  // (0.0025 / -0.0020) — run-to-run gürültüye duyarlı, sınırda bir anlamlılık. Kullanıcı
+  // yine de eklenmesini istedi (zeminToleransi/yakınsama/sonIdmanSprint/takı ile AYNI
+  // türden istisna).
+  {
+    ad: "Yarış Gidişatı (İSTİSNA — sınırda/run-to-run değişken, kullanıcı kararıyla eklendi)",
+    kod: "yarisGidisatiSkoru",
+    katman: "B",
+    dusukSart: { katsayi: 0.139, durum: "anlamsiz", not: "B=500: GA=[-0.0307,0.3090], sıfırı içeriyor." },
+    diger: { katsayi: 0.098, durum: "sinirda", not: "B=500: GA=[0.0025,0.2004] (bu koşuda sıfırı DIŞLIYOR, anlamlı) — ama önceki bir B=500 koşusunda GA=[-0.0020,0.1909] (sıfırı içeriyor) çıkmıştı. Sınırda katsayılarda B=500'ün bile tam kararlı olmadığının kanıtı." },
+    aciklama: "Sahadaki her atın (Accurace geçmişinden, sızıntısız) stil dağılımı + erken hız gücünden saha-geneli beklenen tempo senaryosu (6 sınıf, olasılık dağılımı) çıkarılır, sonra bu atın kendi stiline uygunluğu bir uyum matrisiyle skorlanır. Kapsama %74.7 (n<3 Accurace geçmişi olan atlarda 0/nötr). Diğer segmentte pozitif ve sınırda-anlamlı, düşük-şart'ta pozitif ama anlamsız.",
   },
 ];
 

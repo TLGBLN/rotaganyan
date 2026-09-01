@@ -6,7 +6,14 @@
 import { db } from "./src/lib/db";
 import { getSonYarisDetaylariForRace } from "./src/server/actions/son-yaris-detay.actions";
 import { fetchAccuraceGecmisKayitlari, hesaplaAccuraceSonYarisEnHizliKapanisMap, normalizeHorseName } from "./src/lib/methodology/veri-toplama";
-import { analizEtTekYaris, hesaplaCokYarisEgilimi, type PaceCheckpoint } from "./src/lib/methodology/pace-analizi";
+import {
+  analizEtTekYaris,
+  hesaplaCokYarisEgilimi,
+  hesaplaYuzdelikSelfVsSiblings,
+  hesaplaYarisGidisati,
+  type PaceCheckpoint,
+  type AtTempoProfili,
+} from "./src/lib/methodology/pace-analizi";
 import { kategoriTespit } from "./src/lib/methodology/v2-engine";
 import { galopQuality, isSameJockey, isSprintIdman } from "./src/components/program/panels/galop-helpers";
 import { breedToIrk, surfaceToPist, mesafeBucket, normalizeSireName } from "./src/lib/sire-stat-match";
@@ -237,6 +244,14 @@ export type ModelRow = {
   // isimli notun tamamı). B=500 testinde anlamsız çıktı ama kullanıcı kararıyla 23.
   // özellik olarak eklendi (kural istisnası).
   zeminToleransi: number;
+  // 2026-09-01 — Yarış Gidişatı (bkz. pace-analizi.ts hesaplaYarisGidisati, kullanıcı
+  // tasarımı): saha-geneli tempo senaryosu olasılıkları × atın kendi stil dağılımının
+  // uyum matrisiyle ağırlıklı beklenen değeri × mesafe katsayısı. stilEgilimMap İLE AYNI
+  // sızıntısız (accKayitlar, race.raceDay.date'ten KESİNLİKLE ÖNCEKİ) kaynaktan — yalnız
+  // artık dagilim (4 stilin TAMAMI) + erkenHizGucu (saha-içi göreli, siblings'ten) da
+  // hesaplanıyor. HENÜZ toFeatureVector'a eklenmedi — arac-model-egit-segment.mjs'de
+  // B=500 bootstrap ile test edilecek, "yenilik önce backtest" kuralı gereği.
+  yarisGidisatiSkoru: number;
 };
 
 async function main() {
@@ -507,15 +522,49 @@ async function main() {
             for (const s of accKayitlar.son800Siblings) {
               siblingSayisiMap.set(s.accuraceRaceId, (siblingSayisiMap.get(s.accuraceRaceId) ?? 0) + 1);
             }
+            // Yarış Gidişatı (2026-09-01) — erkenHizGucu SAHA-İÇİ göreli olmak zorunda (bkz.
+            // pace-analizi.ts yorumu), o yüzden her geçmiş accuraceRaceId için TÜM siblings'in
+            // ilkYariOrtHiz'ini önceden hesaplıyoruz — son800Siblings isimsiz döndüğü için
+            // (fetchAccuraceGecmisKayitlari, leak-free sorgu) self'i değer eşitliğiyle aramak
+            // yerine hesaplaYuzdelikSelfVsSiblings ile analitik sıra hesaplanıyor (bkz. o
+            // fonksiyonun dosya başı notu).
+            const ilkYariHizByRaceId = new Map<string, number[]>();
+            for (const s of accKayitlar.son800Siblings) {
+              const sonuc = analizEtTekYaris(
+                s.checkpoints as unknown as PaceCheckpoint[],
+                s.accuraceRace.length ?? 0,
+                siblingSayisiMap.get(s.accuraceRaceId) ?? 0
+              );
+              if (!sonuc) continue;
+              const arr = ilkYariHizByRaceId.get(s.accuraceRaceId) ?? [];
+              arr.push(sonuc.ilkYariOrtHiz);
+              ilkYariHizByRaceId.set(s.accuraceRaceId, arr);
+            }
             const stilEgilimMap = new Map<string, ReturnType<typeof hesaplaCokYarisEgilimi>>();
             for (const rr of runners) {
               const norm = normalizeHorseName(rr.name);
               const kayitlar = accKayitlar.son800AccuraceKayitlari.filter((k) => normalizeHorseName(k.horseName) === norm);
-              const sonuclar = kayitlar
-                .map((k) => analizEtTekYaris(k.checkpoints as unknown as PaceCheckpoint[], k.accuraceRace.length ?? 0, siblingSayisiMap.get(k.accuraceRaceId) ?? 0))
-                .filter((s): s is NonNullable<typeof s> => s != null);
-              stilEgilimMap.set(rr.id, hesaplaCokYarisEgilimi(sonuclar));
+              const sonuclar: NonNullable<ReturnType<typeof analizEtTekYaris>>[] = [];
+              const yuzdelikler: (number | null)[] = [];
+              for (const k of kayitlar) {
+                const sonuc = analizEtTekYaris(k.checkpoints as unknown as PaceCheckpoint[], k.accuraceRace.length ?? 0, siblingSayisiMap.get(k.accuraceRaceId) ?? 0);
+                if (!sonuc) continue;
+                sonuclar.push(sonuc);
+                const saha = ilkYariHizByRaceId.get(k.accuraceRaceId);
+                yuzdelikler.push(saha ? hesaplaYuzdelikSelfVsSiblings(sonuc.ilkYariOrtHiz, saha) : null);
+              }
+              stilEgilimMap.set(rr.id, hesaplaCokYarisEgilimi(sonuclar, yuzdelikler));
             }
+            // Saha-geneli Yarış Gidişatı — sızıntısız stilEgilimMap'ten TEK pipeline çağrısı,
+            // runners ile AYNI SIRADA profil listesi. Kacak sayımı/yakınsama gibi bu koşunun
+            // KENDİ kompozisyonuna bakıyor (sızıntı riski yok — bugünün sahası zaten bilinen
+            // bir şey, bkz. aşağıdaki kacakSayisiSahada notu).
+            const tempoProfilleri: (AtTempoProfili | null)[] = runners.map((rr) => {
+              const egilim = stilEgilimMap.get(rr.id);
+              return egilim ? { dagilim: egilim.dagilim, erkenHizGucu: egilim.erkenHizGucu, n: egilim.n } : null;
+            });
+            const gidisatSonucu = hesaplaYarisGidisati(tempoProfilleri, race.distance);
+            const gidisatByRunnerId = new Map(runners.map((rr, i) => [rr.id, gidisatSonucu.atSonuclari[i]]));
 
             // 2026-08-26 kullanıcı bulgusu: kacakAtMi tek parça sinyali aslında iki farklı
             // şeyi karıştırıyordu — RAKİPSİZ kaçak olmak (uzun süre yalnız önde, rahat kaçış)
@@ -669,6 +718,7 @@ async function main() {
                 hpPuani: r.hp ?? 0,
                 zeminKatsayisi: zeminKatsayisiDeger,
                 zeminToleransi: zeminToleransiMap.get(r.name) ?? 0,
+                yarisGidisatiSkoru: gidisatByRunnerId.get(r.id)?.finalSkor ?? 0,
               });
             }
           })(), 25_000);

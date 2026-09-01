@@ -572,13 +572,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.36",
     baslangic: new Date("2026-09-01T19:00:00+03:00"),
-    bitis: null,
+    bitis: new Date("2026-09-01T20:30:00+03:00"), // Yarış Gidişatı (17. özellik) eklendi
     aciklama: "Kullanıcı kararıyla ('adam takı çıkarmayı sinyal olarak görmüş, DB/KG/K gibi takılar önemli — model bunu görecek') 15. ve 16. özellik olarak 'Takı Eklendi'/'Takı Çıkarıldı' eklendi — KIZIM BİNDAL vakasından (model 5./%9.4 verdi, at kazandı) doğdu: bir yorumcu KG+GKR çıkarılmasını galibiyet gerekçesi olarak kullanmıştı, model bu bilgiyi (Son Yarış Detayları paneli) ZATEN GÖSTERİYORDU ama hiç skorlamıyordu. İki alan (takiEklendiMi/takiCikarildiMi) arac-model-veri-olustur.mts'te ZATEN hesaplanıyordu (SonYarisDetay'dan, leak-free) — model-veri.json'da hazırdı, YENİDEN ÜRETİM GEREKMEDİ. v5-engine.ts zaten getSonYarisDetaylariForRace'i çağırıyordu (kgs/pistUzmani için) — yalnız eklenenTaki/cikarilanTaki alanlarından 2 türetilmiş 0/1 alan eklendi. GERÇEK fit edilen katsayı kullanıldı, elle yön verilmedi: B=500 bootstrap her iki segmentte de sıfıra yakın/anlamsız çıktı (takiEklendiMi: düşük-şart -0.052/diğer -0.018; takiCikarildiMi: düşük-şart -0.030/diğer +0.061). takiCikarildiMi'nin diğer segmentteki yönü (+0.061) KIZIM BİNDAL'ın işaret ettiği yönle tutarlı ama istatistiksel olarak kanıtlanamadı.",
     neyiAnalizEdiyor: [
       "Skor/olasılık DEĞİŞTİ: takiEklendiMi/takiCikarildiMi artık 15-16. özellikler olarak TÜM skorlara katkı veriyor (dördü de küçük ve GA sıfırı içeriyor). Diğer 14 katsayı aynı model-veri.json üzerinden yeniden fit edildiği için hafifçe kaydı (doğal varyans) ama yön/anlamlılık durumları değişmedi.",
     ],
     caprazlamalar: [
       "Adil kıyas (aynı test seti, aynı model-veri.json, 14-özellik vs 16-özellik): düşük-şart'ta top1 aynı (%37.8), top3 belirgin İYİLEŞTİ (+2.7pp: %64.9→%67.6), logloss gürültü seviyesinde kötüleşti (+0.0007). Diğer segmentte top1 hafif iyi (+0.5pp), top3 hafif kötü (-0.5pp), logloss gürültü seviyesinde (+0.0005) — net bir zarar kanıtlanmadı. Doğrulama: tsc --noEmit temiz, npm run build temiz, v5-engine.test.ts 7/7 geçti, arac-tam-at-inceleme.mts'in özet kıyas tablosu (16 sütun) gerçek bir koşuda (Ankara K5, KIZIM BİNDAL) doğrulandı.",
+    ],
+  },
+  {
+    versiyon: "V5.37",
+    baslangic: new Date("2026-09-01T20:30:00+03:00"),
+    bitis: null,
+    aciklama: "Kullanıcı tasarımıyla ('yarış-geneli tempo tahmini ve ardından at-bazlı tempo uygunluğu') 17. özellik olarak 'Yarış Gidişatı' eklendi. Pipeline: her atın Accurace geçmişinden (n≥3, sızıntısız) 4 koşu-stilinin (Kaçak At/Ön Grup/Bekleme Grubu/En Geri Takip) TAM olasılık dağılımı + saha-içi göreli erken hız gücü çıkarılır (hesaplaCokYarisEgilimi, artık dagilim+erkenHizGucu de döndürüyor) → sahanın 4 tempo değişkeni (liderlik talebi, en güçlü kaçak baskısı, liderler arası denge, arkadan gelme yoğunluğu) hesaplanır → yumuşak-eşikli kural tabanlı 6 senaryo olasılığı (Rahat Liderlik/Yavaş Tempo/Dengeli/Mücadeleli/Çok Yüksek/Dağılma Riski) üretilir → sabit bir uyum matrisiyle (kullanıcı tasarımı, ilk versiyon) atın stil dağılımı × senaryo olasılığı çarpılıp beklenen değer alınır → dar bir mesafe katsayısıyla (1200m 1.15 / 1800m 1.0 / 2400m+ 0.85) ölçeklenir. GERÇEK Kocaeli K1 yarışıyla (01.09.2026, Female Warrior tüm yarışa liderlik edip son bölümde Kardaha'ya yakalanması) uçtan uca doğrulanırken, saha ORTALAMASINA bakan bir tasarım hatası bulundu (tek gerçek kaçak adayı 7 sıfır-kaçaklı atla sulanıp senaryo yanlış çıkıyordu) — düzeltme: gate artık sahadaki EN GÜÇLÜ tek kaçak adayına bakıyor. Runner.raceStyle (accurace-sync.service.ts) artık dagilim+erkenHizGucu de yazıyor — kacakYalniz'in kaynağıyla AYNI, sızıntısız. B=500 bootstrap testi (arac-model-veri-olustur.mts'e backfill edilen 38264 satır, 2026-07-01+ kapsam, 1122 koşu): diğer segmentte GA sıfırı dışlıyor (anlamlı, nokta=0.098) ama İKİ ayrı bootstrap koşusunda alt sınır sıfıra çok yakın gidip geldi (0.0025 / -0.0020) — run-to-run gürültüye duyarlı, sınırda bir sonuç; düşük-şart'ta GA sıfırı içeriyor (anlamsız, nokta=0.139) ama AYNI YÖNDE. zeminToleransi/yakınsama/sonIdmanSprint/takı ile AYNI türden BİLİNÇLİ istisna — kullanıcı, sınırda/gürültülü sonucu bilerek eklenmesini istedi.",
+    neyiAnalizEdiyor: [
+      "Skor/olasılık DEĞİŞTİ: yarisGidisatiSkoru artık 17. özellik olarak TÜM skorlara katkı veriyor (düşük-şart +0.139 anlamsız, diğer +0.098 sınırda-anlamlı). Diğer 16 katsayı, model-veri.json'un yarisGidisatiSkoru sütunuyla genişletilip yeniden fit edilmesi nedeniyle hafifçe kaydı (doğal varyans) ama yön/anlamlılık durumları değişmedi.",
+    ],
+    caprazlamalar: [
+      "Adil kıyas (aynı test seti, aynı model-veri.json+yarisGidisatiSkoru sütunu, 16-özellik vs 17-özellik): düşük-şart top1/top3 DEĞİŞMEDİ (%37.8/%67.6), logloss gürültü seviyesinde iyi (1.8332→1.8170). Diğer segmentte top1 +1.0pp (%32.7→%33.7), top3 -0.9pp (%66.8→%65.9) — birbirini büyük ölçüde götürüyor, logloss gürültü seviyesinde (1.8081→1.8065). Net bir zarar kanıtlanmadı. Kapsama: satırların %74.7'sinde (2026-07-01+ kapsamda) gerçek dagilim/erkenHizGucu verisi var, geri kalanı dürüstçe 0/nötr. Doğrulama: tsc --noEmit temiz, arac-tam-at-inceleme.mts'in özet kıyas tablosu (17 sütun, Gidşt dahil) Kocaeli K1'de doğrulandı.",
     ],
   },
 ];

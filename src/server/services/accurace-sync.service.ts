@@ -7,7 +7,12 @@
 
 import { db } from "@/lib/db";
 import { fetchAccuraceRace, toAccuraceCitySlug, parseAccuraceTimeToMs } from "./ingest/accurace.adapter";
-import { analizEtTekYaris, hesaplaCokYarisEgilimi, type PaceCheckpoint } from "@/lib/methodology/pace-analizi";
+import {
+  analizEtTekYaris,
+  hesaplaCokYarisEgilimi,
+  hesaplaErkenHizYuzdelikleri,
+  type PaceCheckpoint,
+} from "@/lib/methodology/pace-analizi";
 
 const TURKISH_UPPER_I_RE = /I/g;
 const COMBINING_MARKS_RE = /[̀-ͯ]/g;
@@ -52,14 +57,46 @@ export async function updateRaceStyleForHorseNames(horseNames: string[]): Promis
   // gitmiş bir at hiç arka sıraları görmemiş olabilir), o yüzden her accuraceRaceId için
   // ayrıca kaç at start ettiğini sayıyoruz.
   const raceIds = [...new Set(splits.map((s) => s.accuraceRaceId))];
-  const counts = await db.accuraceHorseSplit.groupBy({
-    by: ["accuraceRaceId"],
-    where: { accuraceRaceId: { in: raceIds } },
-    _count: { _all: true },
-  });
-  const fieldSizeByRaceId = new Map(counts.map((c) => [c.accuraceRaceId, c._count._all]));
 
-  const byName = new Map<string, { checkpoints: PaceCheckpoint[]; length: number; fieldSize: number }[]>();
+  // Erken hız gücü (Yarış Gidişatı, v6.4) SAHA-İÇİ göreli olmak ZORUNDA (bkz. pace-analizi.ts
+  // yorumu) — bu atın kendi checkpoint'i tek başına yetmez, o yarıştaki HERKESİN erken yarı
+  // hızını karşılaştırmak gerekir. Bu yüzden "named horses"ın geçtiği her yarış için TÜM
+  // sahayı (isim eşleşmesi aranan atlarla sınırlı olmadan) tek seferde çekiyoruz.
+  const tumSahaSplits = await db.accuraceHorseSplit.findMany({
+    where: { accuraceRaceId: { in: raceIds } },
+    select: { horseName: true, checkpoints: true, accuraceRaceId: true, accuraceRace: { select: { length: true } } },
+  });
+  const sahaByRaceId = new Map<string, { horseName: string; checkpoints: PaceCheckpoint[]; length: number }[]>();
+  for (const s of tumSahaSplits) {
+    const list = sahaByRaceId.get(s.accuraceRaceId) ?? [];
+    list.push({ horseName: s.horseName, checkpoints: s.checkpoints as unknown as PaceCheckpoint[], length: s.accuraceRace.length ?? 0 });
+    sahaByRaceId.set(s.accuraceRaceId, list);
+  }
+  // raceId -> (normalizeName(horseName) -> erken hız yüzdelik dilimi, o yarışın sahasına göre)
+  const yuzdelikByRaceId = new Map<string, Map<string, number>>();
+  const fieldSizeByRaceId = new Map<string, number>();
+  for (const [raceId, saha] of sahaByRaceId) {
+    fieldSizeByRaceId.set(raceId, saha.length);
+    const sonuclar = saha.map((h) => analizEtTekYaris(h.checkpoints, h.length, saha.length));
+    const yuzdelikler = hesaplaErkenHizYuzdelikleri(
+      sonuclar.filter((s): s is NonNullable<typeof s> => s != null)
+    );
+    // sonuclar'da null olan (checkpoints<4) atlar filtrelendiği için indeks kayması olmasın
+    // diye ayrı bir sayaçla eşliyoruz.
+    const map = new Map<string, number>();
+    let yi = 0;
+    saha.forEach((h, i) => {
+      if (sonuclar[i] == null) return;
+      map.set(normalizeName(h.horseName), yuzdelikler[yi]);
+      yi++;
+    });
+    yuzdelikByRaceId.set(raceId, map);
+  }
+
+  const byName = new Map<
+    string,
+    { checkpoints: PaceCheckpoint[]; length: number; fieldSize: number; erkenHizYuzdelik: number | null }[]
+  >();
   for (const s of splits) {
     const norm = normalizeName(s.horseName);
     const list = byName.get(norm) ?? [];
@@ -67,6 +104,7 @@ export async function updateRaceStyleForHorseNames(horseNames: string[]): Promis
       checkpoints: s.checkpoints as unknown as PaceCheckpoint[],
       length: s.accuraceRace.length ?? 0,
       fieldSize: fieldSizeByRaceId.get(s.accuraceRaceId) ?? 1,
+      erkenHizYuzdelik: yuzdelikByRaceId.get(s.accuraceRaceId)?.get(norm) ?? null,
     });
     byName.set(norm, list);
   }
@@ -86,9 +124,23 @@ export async function updateRaceStyleForHorseNames(horseNames: string[]): Promis
     const sonuclar = kayitlar
       .map((k) => analizEtTekYaris(k.checkpoints, k.length, k.fieldSize))
       .filter((s): s is NonNullable<typeof s> => s != null);
-    const egilim = hesaplaCokYarisEgilimi(sonuclar);
+    // hesaplaCokYarisEgilimi'nin ikinci parametresi sonuclar ile AYNI SIRADA olmalı — burada
+    // kayitlar ile sonuclar arasında filtrelemeden dolayı kayma olmasın diye aynı map+filter
+    // zincirini paralel uyguluyoruz (analizEtTekYaris null dönerse ikisi de o kaydı atlar).
+    const yuzdelikler = kayitlar
+      .filter((k) => analizEtTekYaris(k.checkpoints, k.length, k.fieldSize) != null)
+      .map((k) => k.erkenHizYuzdelik);
+    const egilim = hesaplaCokYarisEgilimi(sonuclar, yuzdelikler);
     if (!egilim) continue;
-    const value = { style: egilim.stil, percent: egilim.percent, veri: egilim.n, source: "accurace", updatedAt: new Date().toISOString() };
+    const value = {
+      style: egilim.stil,
+      percent: egilim.percent,
+      veri: egilim.n,
+      dagilim: egilim.dagilim,
+      erkenHizGucu: egilim.erkenHizGucu,
+      source: "accurace",
+      updatedAt: new Date().toISOString(),
+    };
     await db.runner.updateMany({ where: { id: { in: ids } }, data: { raceStyle: value } });
   }
 }

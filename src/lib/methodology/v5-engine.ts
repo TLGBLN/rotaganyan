@@ -149,6 +149,7 @@ import {
   hesaplaAccuraceSonYarisEnHizliKapanisMap,
 } from "@/lib/methodology/veri-toplama";
 import { galopQuality, isSameJockey, isSprintIdman } from "@/components/program/panels/galop-helpers";
+import { hesaplaYarisGidisati, type AtTempoProfili, type TekYarisStil } from "@/lib/methodology/pace-analizi";
 import type { PickDetailsV2, MuhakemeSatiri } from "@/lib/methodology/muhakeme-format";
 import { hesaplaSinyalSayisi, kategoriTespit } from "@/lib/methodology/v2-engine";
 import { AGF_TERFI_ILK3_SINYAL_ESIGI as SINYAL_ESIGI } from "@/lib/methodology/v4-engine";
@@ -252,6 +253,10 @@ const SON_IDMAN_SPRINT_IDX = FEATURE_NAMES.indexOf("sonIdmanSprint");
 // istisnası — GERÇEK fit edilen katsayı kullanılıyor, elle yön verilmedi.
 const TAKI_EKLENDI_IDX = FEATURE_NAMES.indexOf("takiEklendiMi");
 const TAKI_CIKARILDI_IDX = FEATURE_NAMES.indexOf("takiCikarildiMi");
+// 2026-09-01 — YARIS_GIDISATI_IDX: kullanıcı tasarımı ("Yarış Gidişatı"), B-katmanı kural
+// istisnası — bkz. Faz1RunnerV5.yarisGidisatiSkoru üstündeki not. GERÇEK fit edilen
+// katsayı kullanılıyor, elle yön verilmedi.
+const YARIS_GIDISATI_IDX = FEATURE_NAMES.indexOf("yarisGidisatiSkoru");
 const WEIGHTS_DIGER_HANDIKAP: AgirlikSeti = {
   ...WEIGHTS_DIGER_DUZELTILMIS,
   weights: WEIGHTS_DIGER_DUZELTILMIS.weights.map((w, i) => (i === HIZ_DERECESI_IDX || i === IDM_JOKEY_IDX ? 0 : w)),
@@ -460,6 +465,15 @@ export type Faz1RunnerV5 = {
    *  zeminToleransi ile AYNI ölçek) — C katmanı challenger'ının (v6-zemin-mesafe-deneyimi)
    *  gerçek girdisi budur, tier (seviye) yalnız muhakeme metni için. Skora HENÜZ girmez. */
   zeminMesafeDeneyim: number;
+  /** 2026-09-01 kullanıcı tasarımı — "Yarış Gidişatı": saha-geneli tempo senaryosu (Rahat
+   *  Liderlik/Yavaş Tempo/Dengeli/Mücadeleli/Çok Yüksek/Dağılma Riski, Accurace geçmişinden
+   *  kural-tabanlı olasılık dağılımı, bkz. pace-analizi.ts hesaplaYarisGidisati) × atın kendi
+   *  stil dağılımının uyum-matrisiyle ağırlıklı beklenen değeri × mesafe katsayısı. B=500
+   *  bootstrap testi (bkz. arac-model-egit-segment.mjs'teki not) İKİ segmentte de sıfırı
+   *  içeren GA verdi — KANITLANMADI, ama iki segmentte de AYNI YÖNDE (pozitif) ve diğer
+   *  segmentte neredeyse anlamlı (alt sınır sıfıra 0.002 kala). zeminToleransi/yakınsama/
+   *  sonIdmanSprint/takı ile AYNI türden BİLİNÇLİ istisna, kullanıcı kararıyla eklendi. */
+  yarisGidisatiSkoru: number;
 };
 
 export type Faz1SonucV5 = {
@@ -667,6 +681,18 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
   const kacakSayisiSahada = runners.filter(
     (rr) => (rr.raceStyle as { style?: string } | null)?.style === "KACAK_AT"
   ).length;
+  // 2026-09-01 kullanıcı tasarımı — Yarış Gidişatı: kacakYalniz İLE AYNI kaynaktan
+  // (Runner.raceStyle, sızıntısız — accurace-sync.service.ts her atın KENDİ geçmişinden
+  // hesaplayıp yazıyor) ama artık TÜM stil dağılımını (dagilim) + erken hız gücünü
+  // (erkenHizGucu) kullanıyor. Sahanın KOMPOZİSYONU (kaç kaçak, ne kadar güçlü) zaten
+  // önceden bilinen bir şey — sızıntı riski yok, tıpkı kacakSayisiSahada gibi.
+  const tempoProfilleri: (AtTempoProfili | null)[] = runners.map((rr) => {
+    const rs = rr.raceStyle as { dagilim?: Record<TekYarisStil, number>; erkenHizGucu?: number | null; veri?: number } | null;
+    if (!rs?.dagilim) return null;
+    return { dagilim: rs.dagilim, erkenHizGucu: rs.erkenHizGucu ?? null, n: rs.veri ?? 0 };
+  });
+  const gidisatSonucu = hesaplaYarisGidisati(tempoProfilleri, race.distance);
+  const gidisatByRunnerId = new Map(runners.map((rr, i) => [rr.id, gidisatSonucu.atSonuclari[i]]));
   // 2026-08-19 kullanıcı bulgusu (BODUBEY/EL LEON) — bkz. Faz1RunnerV5.agfPayi üstündeki not.
   const birinciAgf = agfSirali[0]?.agf ?? null;
   const ikinciAgf = agfSirali[1]?.agf ?? null;
@@ -763,6 +789,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       zeminMesafeDeneyimSeviyesi: zeminMesafeDeneyimByAd.get(r.name)?.seviye ?? "yok",
       zeminMesafeOrnekSayisi: zeminMesafeDeneyimByAd.get(r.name)?.ornekSayisi ?? 0,
       zeminMesafeDeneyim: zeminMesafeDeneyimByAd.get(r.name)?.deger ?? 0,
+      yarisGidisatiSkoru: gidisatByRunnerId.get(r.id)?.finalSkor ?? 0,
     };
   });
 
@@ -822,6 +849,7 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     r.sonIdmanSprint,
     r.takiEklendiMi,
     r.takiCikarildiMi,
+    r.yarisGidisatiSkoru,
   ];
 }
 
@@ -1411,6 +1439,7 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   { kod: "SPRINT", ozellikIndeksleri: [idx("sonIdmanSprint")], aciklama: (r) => (r.katkilar[SON_IDMAN_SPRINT_IDX] !== 0 ? `Son idman türü Sprint/Sürat (backtest yönü doğrulamadı, kullanıcı kararıyla eklendi): ${r.katkilar[SON_IDMAN_SPRINT_IDX] > 0 ? "olumlu" : "olumsuz"}` : null) },
   { kod: "TAKIEK", ozellikIndeksleri: [idx("takiEklendiMi")], aciklama: (r) => (r.katkilar[TAKI_EKLENDI_IDX] !== 0 ? `Takı eklendi (son yarışına göre): ${r.katkilar[TAKI_EKLENDI_IDX] > 0 ? "olumlu" : "olumsuz"}` : null) },
   { kod: "TAKICIK", ozellikIndeksleri: [idx("takiCikarildiMi")], aciklama: (r) => (r.katkilar[TAKI_CIKARILDI_IDX] !== 0 ? `Takı çıkarıldı (son yarışına göre): ${r.katkilar[TAKI_CIKARILDI_IDX] > 0 ? "olumlu" : "olumsuz"}` : null) },
+  { kod: "GIDISAT", ozellikIndeksleri: [idx("yarisGidisatiSkoru")], aciklama: (r) => (r.katkilar[YARIS_GIDISATI_IDX] !== 0 ? `Yarış Gidişatı: sahanın beklenen tempo senaryosuna göre bu atın stiline uygunluk skoru ${r.yarisGidisatiSkoru > 0 ? "+" : ""}${r.yarisGidisatiSkoru.toFixed(1)} (istatistiksel olarak kanıtlanmadı, kullanıcı kararıyla eklendi): ${r.katkilar[YARIS_GIDISATI_IDX] > 0 ? "olumlu" : "olumsuz"}` : null) },
 ];
 
 // 2026-08-18 kullanıcı talebi: "18 sinyalin hepsinin kontrol edildiğini bana göstermesini
@@ -1440,6 +1469,7 @@ const FEATURE_LABELS: Record<string, string> = {
   sonIdmanSprint: "Son İdman Türü Sprint/Sürat",
   takiEklendiMi: "Takı Eklendi (son yarışına göre)",
   takiCikarildiMi: "Takı Çıkarıldı (son yarışına göre)",
+  yarisGidisatiSkoru: "Yarış Gidişatı (saha-geneli tempo senaryosuna stil uygunluğu)",
 };
 
 export type TumOzellikDetay = { kod: string; etiket: string; hamDeger: number; standartDeger: number; katki: number };

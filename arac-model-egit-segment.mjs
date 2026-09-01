@@ -40,10 +40,20 @@ const ANLAMLI_PUAN_ESIGI = 1.0;
 // son yarışına göre takı değişikliği. arac-model-veri-olustur.mts'te ZATEN
 // hesaplanıyordu (takiEklendiMi/takiCikarildiMi), model-veri.json'da hazır — yeniden
 // üretim GEREKMEDİ. GERÇEK fit edilen katsayı kullanılıyor, elle yön verilmedi.
+// 2026-09-01 kullanıcı kararı — "Yarış Gidişatı": saha-geneli tempo senaryosu (Rahat
+// Liderlik...Dağılma Riski, kullanıcı tasarımı, bkz. pace-analizi.ts hesaplaYarisGidisati)
+// × atın kendi stil dağılımının uyum-matrisiyle ağırlıklı beklenen değeri × mesafe katsayısı.
+// B=500 bootstrap testi (arac-model-veri-olustur.mts'e backfill edilen 38264 satırla,
+// 2026-07-01+ kapsam, 1122 koşu) İKİ segmentte de sıfırı içeren GA verdi (düşük-şart
+// nokta=+0.139 GA=[-0.030,0.320], diğer nokta=+0.098 GA=[-0.002,0.191] — alt sınır sıfıra
+// 0.002 kala) — teknik olarak KANITLANMADI ama iki segmentte de AYNI YÖNDE (pozitif) ve
+// diğer segmentte neredeyse anlamlı. zeminToleransi/yakınsama/sonIdmanSprint/takı ile AYNI
+// türden BİLİNÇLİ istisna, kullanıcı kararıyla eklendi. GERÇEK fit edilen katsayı
+// kullanılıyor, elle pozitif yapılmadı.
 const FEATURE_NAMES = [
   "agfSirasi", "kgsVarMi", "idmJokey", "jokeyOrani", "antrenorOrani", "kacakYalniz",
   "agfPayi", "h2hNetSkor", "hizDerecesi", "h2hKiloDegisimi", "agfPayi2", "zeminToleransi",
-  "yakinsama2Plus", "sonIdmanSprint", "takiEklendiMi", "takiCikarildiMi",
+  "yakinsama2Plus", "sonIdmanSprint", "takiEklendiMi", "takiCikarildiMi", "yarisGidisatiSkoru",
 ];
 
 function toFeatureVector(row) {
@@ -64,6 +74,7 @@ function toFeatureVector(row) {
     row.sonIdmanSprint ?? 0,
     row.takiEklendiMi ?? 0,
     row.takiCikarildiMi ?? 0,
+    row.yarisGidisatiSkoru ?? 0,
   ];
 }
 

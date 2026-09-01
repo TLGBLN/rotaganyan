@@ -13,7 +13,7 @@
 //
 // Bu script TEK komutla, analiz motorunun analiz edeceği (henüz sonuçlanmamış) bir
 // günün/hipodromun TÜM koşularındaki İSTİSNASIZ HER at için TÜM veriyi döker:
-//   - Modelin 16 skor girdisinin TAMAMI (A+B katmanı)
+//   - Modelin 17 skor girdisinin TAMAMI (A+B katmanı)
 //   - Hızlı Özet (pist uzmanlığı/sınıf durumu/at-jokey ikilisi/AGF trend/pedigri)
 //   - Soy ağacı (3 kuşak) + pedigri özet metni (SireStatOwn)
 //   - Sahiplik/kazanç + DETAYLI İSTATİSTİK TABLOLARININ TAM İÇERİĞİ (başlık+satırlar)
@@ -23,6 +23,8 @@
 //   - Bugünün hava/zemin koşulu metni
 //   - Derece istatistikleri arşivi (TjkDereceKaydi) — bu atın kayıtlı satırları
 //   - Ham jokey istatistiği kırılımı (JockeyStatSync) — bugünkü jokeyin hipodrom/yıl/pist kırılımı
+//   - Yarış Gidişatı (17. A-Katmanı sinyali, 2026-09-01): saha-geneli tempo senaryosu
+//     olasılıkları + her atın senaryoya uygunluk skoru (bkz. pace-analizi.ts)
 //
 // Çalıştırma:
 //   node --env-file=.env node_modules/tsx/dist/cli.mjs arac-tam-at-inceleme.mts <raceId>
@@ -36,13 +38,34 @@ import { getHorseHistory } from "./src/server/actions/horse-detail.actions";
 import { getHorsePedigreeTree } from "./src/server/actions/horse-pedigree.actions";
 import { getHorseProfileByName, getHorseDetailedStatsByName } from "./src/server/actions/horse-profile.actions";
 import { getDereceIstListesi } from "./src/server/services/derece-ist.service";
-import { analizEtTekYaris, type PaceCheckpoint } from "./src/lib/methodology/pace-analizi";
+import {
+  analizEtTekYaris,
+  hesaplaYarisGidisati,
+  TEMPO_SENARYOLARI,
+  type PaceCheckpoint,
+  type AtTempoProfili,
+  type TekYarisStil,
+} from "./src/lib/methodology/pace-analizi";
 import { fmtSaniye, checkpointCols, STIL_LABEL } from "./src/lib/methodology/pace-format";
+
+const TEMPO_SENARYO_ETIKET: Record<string, string> = {
+  RAHAT_LIDERLIK: "Rahat Liderlik", YAVAS_TEMPO: "Yavaş Tempo", DENGELI: "Dengeli",
+  MUCADELELI: "Mücadeleli", COK_YUKSEK: "Çok Yüksek", DAGILMA_RISKI: "Dağılma Riski",
+};
+
+/** Runner.raceStyle JSON'undan (bkz. accurace-sync.service.ts updateRaceStyleForHorseNames)
+ *  Yarış Gidişatı pipeline'ının girdisi olan AtTempoProfili'yi çıkarır. dagilim/erkenHizGucu
+ *  YOKSA (eski kayıt formatı veya n<3) null döner — "veri yok" sessizce 0 sayılmaz. */
+function raceStyleToTempoProfili(raw: unknown): AtTempoProfili | null {
+  const r = raw as { dagilim?: Record<TekYarisStil, number>; erkenHizGucu?: number | null; veri?: number } | null;
+  if (!r?.dagilim) return null;
+  return { dagilim: r.dagilim, erkenHizGucu: r.erkenHizGucu ?? null, n: r.veri ?? 0 };
+}
 
 const A_KATMANI_ADLARI = [
   "agfSirasi", "kgsVarMi", "idmJokey", "jokeyOrani", "antrenorOrani", "kacakYalniz",
   "agfPayi", "h2hNetSkor", "hizDerecesi", "h2hKiloDegisimi", "agfPayi2", "zeminToleransi",
-  "yakinsama2Plus", "sonIdmanSprint", "takiEklendiMi", "takiCikarildiMi",
+  "yakinsama2Plus", "sonIdmanSprint", "takiEklendiMi", "takiCikarildiMi", "yarisGidisatiSkoru",
 ];
 
 function get(argv: string[], bayrak: string) {
@@ -138,14 +161,38 @@ async function tekKosuIsle(raceId: string) {
 
   const raceMeta = await db.race.findUnique({
     where: { id: raceId },
-    select: { raceDay: { select: { weather: true, surfaceConditions: true } }, runners: { where: { scratched: false }, select: { id: true, no: true } } },
+    select: {
+      distance: true,
+      raceDay: { select: { weather: true, surfaceConditions: true } },
+      runners: { where: { scratched: false }, select: { id: true, no: true, raceStyle: true } },
+    },
   });
   const runnerIdByNo = new Map((raceMeta?.runners ?? []).map((r) => [r.no, r.id]));
+  const tempoProfilByNo = new Map((raceMeta?.runners ?? []).map((r) => [r.no, raceStyleToTempoProfili(r.raceStyle)]));
+
+  // Yarış Gidişatı (17. A-Katmanı sinyali — bkz. pace-analizi.ts): sirali ile AYNI SIRADA
+  // profil listesi kurup TEK pipeline çağrısıyla hem saha-geneli tempo senaryosunu hem her
+  // atın senaryoya uygunluk skorunu hesaplıyoruz. Bu, gatherFaz1V5 içindeki GERÇEK canlı
+  // hesaplamayla AYNI kaynaktan (Runner.raceStyle) besleniyor — nihai skor için r.yarisGidisatiSkoru
+  // (vektor'ün 17. elemanı) tek doğru kaynak, buradaki gidisat yalnız NEDEN o skorun çıktığını
+  // (senaryo dağılımı, saha değişkenleri) göstermek için ayrıca hesaplanıyor.
+  const tempoProfilleri = sirali.map((r) => tempoProfilByNo.get(r.no) ?? null);
+  const gidisat = hesaplaYarisGidisati(tempoProfilleri, raceMeta?.distance ?? faz1.race.distance ?? 1800);
+  const gidisatByNo = new Map(sirali.map((r, i) => [r.no, gidisat.atSonuclari[i]]));
 
   console.log(`\n\n═══════════════════════════════════════════════════════════`);
   console.log(`${faz1.race.hippodromeName} — Koşu ${faz1.race.raceNo} (${faz1.race.classType ?? "?"}, ${faz1.race.breed}, ${faz1.race.surface} ${faz1.race.distance}m) — ${sirali.length} at`);
   console.log(`Hava/Zemin: ${raceMeta?.raceDay.weather ?? "?"} | ${JSON.stringify(raceMeta?.raceDay.surfaceConditions ?? [])}`);
   console.log(`═══════════════════════════════════════════════════════════`);
+  console.log(`  Yarış Gidişatı (saha-geneli): baskın senaryo = ${TEMPO_SENARYO_ETIKET[gidisat.baskinSenaryo]}`);
+  console.log(
+    `    Senaryo olasılıkları: ` +
+      TEMPO_SENARYOLARI.map((s) => `${TEMPO_SENARYO_ETIKET[s]}=%${gidisat.senaryoOlasiliklari[s]}`).join(" | ")
+  );
+  const d = gidisat.sahaTempoDegiskenleri;
+  console.log(
+    `    Saha değişkenleri: liderlikTalebi=${d.liderlikTalebi.toFixed(0)} erkenHizYogunlugu(ort)=${d.erkenHizYogunlugu.toFixed(0)} enGucluKacakBaskisi=${d.enGucluKacakBaskisi.toFixed(0)} liderlerArasiDenge=${d.liderlerArasiDenge.toFixed(0)} arkadanGelmeYogunlugu=${d.arkadanGelmeYogunlugu.toFixed(0)} (${d.gecerliAtSayisi}/${sirali.length} atta yeterli Accurace verisi var)`
+  );
 
   for (const r of sirali) {
     const sira = sirali.indexOf(r) + 1;
@@ -156,11 +203,23 @@ async function tekKosuIsle(raceId: string) {
     console.log(`\n──────────────────────────────────────────────────────────`);
     console.log(`#${r.no} ${r.ad} — Model sırası: ${sira}/${sirali.length}, olasılık=%${(r.olasilik * 100).toFixed(1)}`);
 
-    console.log(`  A-Katmanı (16 skor girdisinin TAMAMI):`);
+    console.log(`  A-Katmanı (17 skor girdisinin TAMAMI):`);
     A_KATMANI_ADLARI.forEach((ad, i) => console.log(`    ${ad.padEnd(18)} = ${vektor[i]}`));
 
     if (ozet) {
       console.log(`  Hızlı Özet: pistUzmani=${ozet.pistUzmani} sinifDurumu=${ozet.sinifDurumu} atJokeyIkilisi=${JSON.stringify(ozet.atJokeyIkilisi)} agfFark=${ozet.agfFark} pedigriK=${ozet.pedigriKYuzde} pedigriOzet="${ozet.pedigriOzet ?? "-"}"`);
+    }
+    const tempoProfil = tempoProfilByNo.get(r.no);
+    const gidisatSonuc = gidisatByNo.get(r.no);
+    if (tempoProfil) {
+      const dagilimMetni = (Object.keys(tempoProfil.dagilim) as TekYarisStil[])
+        .map((s) => `${STIL_LABEL[s]}=%${tempoProfil.dagilim[s]}`)
+        .join(" / ");
+      console.log(
+        `  Yarış Gidişatı: stil dağılımı (n=${tempoProfil.n}) ${dagilimMetni} | erkenHizGucu=${tempoProfil.erkenHizGucu ?? "veri yok"} | skor=${r.yarisGidisatiSkoru} (ham=${gidisatSonuc?.hamSkor ?? "?"} × mesafeKats=${gidisatSonuc?.mesafeKatsayisi ?? "?"})`
+      );
+    } else {
+      console.log(`  Yarış Gidişatı: yetersiz Accurace verisi (n<3), profil yok (skor=${r.yarisGidisatiSkoru})`);
     }
     const sonYaris = sonYarisByName.get(r.ad);
     if (sonYaris) {
@@ -245,6 +304,7 @@ async function tekKosuIsle(raceId: string) {
     antrenorOrani: "AntOr", kacakYalniz: "Kaçk", agfPayi: "AGF%", h2hNetSkor: "H2H",
     hizDerecesi: "HızDr", h2hKiloDegisimi: "H2HKilo", agfPayi2: "AGF%²",
     zeminToleransi: "ZemTol", yakinsama2Plus: "Yaknsm", sonIdmanSprint: "Sprint",
+    takiEklendiMi: "TakıEk", takiCikarildiMi: "TakıÇk", yarisGidisatiSkoru: "Gidşt",
   };
   const basliklar = [
     "No", "At", "Sıra", "Olsk",
@@ -270,7 +330,7 @@ async function tekKosuIsle(raceId: string) {
     ];
     console.log("  " + hucreler.map((h) => h.padEnd(8)).join(""));
   });
-  console.log(`  ── Sütun sırası başlıkla eşleşir. A-Katmanı=16 skor girdisi (AGFsr..TakıÇık), ayrı-mekanizmalı B-Katmanı=SireOr/ZemMsf, gösterim-amaçlı=AGFfrk/PedK/Sınıf/Takı. Satır satır tara — model sırasıyla ÇELİŞEN bir sütun varsa mutlaka belirt. ──\n`);
+  console.log(`  ── Sütun sırası başlıkla eşleşir. A-Katmanı=17 skor girdisi (AGFsr..Gidşt), ayrı-mekanizmalı B-Katmanı=SireOr/ZemMsf, gösterim-amaçlı=AGFfrk/PedK/Sınıf/Takı. Satır satır tara — model sırasıyla ÇELİŞEN bir sütun varsa mutlaka belirt. ──\n`);
 }
 
 async function main() {
