@@ -51,41 +51,95 @@ export default function SinyalKutuguPanel() {
       <div>
         <h2 className="text-lg font-bold text-foreground">V5 Sinyal Kütüğü</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Canlı skorlamaya giren 21 sinyal, segment bazlı katsayılarıyla (Düşük-şart = Maiden/Şartlı 1/19/27,
+          Canlı skorlamaya giren 13 sinyal (11 A-Katmanı + 2 B-Katmanı — bkz. aşağıdaki iki ayrı tablo),
+          segment bazlı katsayılarıyla (Düşük-şart = Maiden/Şartlı 1/19/27,
           Diğer = Handikap/Şartlı 2-5/KV-Grup/Satış); sıralama kuralları; ve test edilmiş aday sinyaller.
           Katsayı/GA her yeniden eğitimde elle güncellenir — sahadaki GERÇEK isabet oranı için aşağıdaki
           &quot;Sinyal Bazlı Gerçek İsabet Oranı&quot; tablosuna bakın.
         </p>
       </div>
 
-      {/* ── Canlı sinyaller tablosu ── */}
-      <div className="overflow-x-auto rounded-lg border border-brand/20">
-        <table className="w-full min-w-[640px] border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-brand/20 bg-[#0d0d14] text-left text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
-              <th className="px-3 py-2">Sinyal</th>
-              <th className="px-3 py-2">Düşük-şart</th>
-              <th className="px-3 py-2">Diğer</th>
-            </tr>
-          </thead>
-          <tbody>
-            {CANLI_SINYALLER.map((s) => (
-              <tr key={s.kod} className="border-b border-brand/10 last:border-0 hover:bg-[#0d0d14]/60">
-                <td className="px-3 py-2.5 align-top">
-                  <div className="font-semibold text-foreground">{s.ad}</div>
-                  <div className="font-mono text-[10.5px] text-muted-foreground">{s.kod}</div>
-                  <div className="mt-1 max-w-xs text-[11px] leading-snug text-muted-foreground">{s.aciklama}</div>
-                </td>
-                <td className="px-3 py-2.5 align-top">
-                  <KatsayiHucre {...s.dusukSart} />
-                </td>
-                <td className="px-3 py-2.5 align-top">
-                  <KatsayiHucre {...s.diger} />
-                </td>
+      {/* ── A Katmanı: istatistiksel olarak kanıtlanmış (veya en azından karışık/gerçek
+          katsayıya dayanan) 11 çekirdek sinyal — ana koşullu-logit regresyonun omurgası. ── */}
+      <div className="space-y-2">
+        <div>
+          <h3 className="text-base font-bold text-foreground">A Katmanı — Güçlü Sinyaller</h3>
+          <p className="text-xs text-muted-foreground">Ana regresyonun kanıtlanmış/çekirdek 11 sinyali.</p>
+        </div>
+        <div className="overflow-x-auto rounded-lg border border-brand/20">
+          <table className="w-full min-w-[640px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-brand/20 bg-[#0d0d14] text-left text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <th className="px-3 py-2">Sinyal</th>
+                <th className="px-3 py-2">Düşük-şart</th>
+                <th className="px-3 py-2">Diğer</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {CANLI_SINYALLER.filter((s) => s.katman === "A").map((s) => (
+                <tr key={s.kod} className="border-b border-brand/10 last:border-0 hover:bg-[#0d0d14]/60">
+                  <td className="px-3 py-2.5 align-top">
+                    <div className="font-semibold text-foreground">{s.ad}</div>
+                    <div className="font-mono text-[10.5px] text-muted-foreground">{s.kod}</div>
+                    <div className="mt-1 max-w-xs text-[11px] leading-snug text-muted-foreground">{s.aciklama}</div>
+                  </td>
+                  <td className="px-3 py-2.5 align-top">
+                    <KatsayiHucre {...s.dusukSart} />
+                  </td>
+                  <td className="px-3 py-2.5 align-top">
+                    <KatsayiHucre {...s.diger} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── B Katmanı: tek başına anlamsız çıkan ama MEGAFAUNA türü vakalarda fark
+          yaratabileceği düşünülen, kullanıcı kararıyla eklenen 4 sinyal. MEKANİZMA olarak
+          homojen DEĞİL — zeminToleransi/yakinsama2Plus hâlâ A'nın 13'lük ORTAK regresyonunda
+          birlikte fit ediliyor; sireOrani/zeminMesafeDeneyim GERÇEKTEN ayrı bir mekanizma
+          (softmax'a girmeden önce skora eklenen, bkz. v5-engine.ts bKatmaniUygula). ── */}
+      <div className="space-y-2">
+        <div>
+          <h3 className="text-base font-bold text-foreground">B Katmanı — Zayıf Ama Fark Yaratabilecek Sinyaller</h3>
+          <p className="text-xs text-muted-foreground">
+            Dördü de tek başına (ve bazıları birlikte) test edildi, istatistiksel olarak anlamsız çıktı —
+            yine de kullanıcı kararıyla toplam puana dahil. Mekanizma homojen değil: zeminToleransi ve
+            Yakınsama hâlâ A&apos;nın ortak regresyonunda birlikte fit ediliyor (yalnız kanıt zayıf
+            olduğu için burada gruplanıyor); Sire Oranı ve Zemin+Mesafe Deneyimi gerçekten ayrı,
+            softmax&apos;a girmeden önce skora eklenen bir mekanizma.
+          </p>
+        </div>
+        <div className="overflow-x-auto rounded-lg border border-amber-500/20">
+          <table className="w-full min-w-[640px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-amber-500/20 bg-[#0d0d14] text-left text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <th className="px-3 py-2">Sinyal</th>
+                <th className="px-3 py-2">Düşük-şart</th>
+                <th className="px-3 py-2">Diğer</th>
+              </tr>
+            </thead>
+            <tbody>
+              {CANLI_SINYALLER.filter((s) => s.katman === "B").map((s) => (
+                <tr key={s.kod} className="border-b border-amber-500/10 last:border-0 hover:bg-[#0d0d14]/60">
+                  <td className="px-3 py-2.5 align-top">
+                    <div className="font-semibold text-foreground">{s.ad}</div>
+                    <div className="font-mono text-[10.5px] text-muted-foreground">{s.kod}</div>
+                    <div className="mt-1 max-w-xs text-[11px] leading-snug text-muted-foreground">{s.aciklama}</div>
+                  </td>
+                  <td className="px-3 py-2.5 align-top">
+                    <KatsayiHucre {...s.dusukSart} />
+                  </td>
+                  <td className="px-3 py-2.5 align-top">
+                    <KatsayiHucre {...s.diger} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* ── Sıralama kuralları ── */}
