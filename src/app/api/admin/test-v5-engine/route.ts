@@ -33,6 +33,8 @@ async function handlePost(req: NextRequest) {
     probTop2: r.probTop2,
     probTop3: r.probTop3,
     marketBlindProb1: r.marketBlindProb1,
+    agfPayi: r.agfPayi,
+    agfSirasi: r.agfSirasi,
     bKatmaniUygulandiMi: r.bKatmaniUygulandiMi,
     sireOrani: r.sireOrani,
     bSireKatkisi: r.bSireKatkisi,

@@ -29,6 +29,11 @@ type V5At = {
   probTop2?: number;
   probTop3?: number;
   marketBlindProb1?: number;
+  // 2026-09-01 — "Saf Model" kıyası (kullanıcı talebi, KARDAHA vakası): marketBlindProb1
+  // zaten vardı ama AGF'nin kendisiyle YAN YANA kıyaslanmıyordu. agfPayi/agfSirasi bu
+  // kıyası (Saf Model % vs AGF % vs nihai Piyasa-Ayarlı %) mümkün kılmak için eklendi.
+  agfPayi?: number;
+  agfSirasi?: number;
   // 2026-08-30 — B katmanı (bkz. plan: A/B/C Sinyal Katmanlama Mimarisi). "Tüm 12 Sinyal"
   // paneli yalnız A katmanını (12 özellik) listeler — B katmanı (şimdilik sireOrani/
   // düşük-şart) ORADA GÖRÜNMÜYOR, kullanıcı bunu fark edip sordu. Bu iki alan o boşluğu
@@ -376,7 +381,16 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
 
       {atlar && (
         <div className="space-y-1.5">
-          {manualOrder.map((no, i) => {
+          {(() => {
+            // 2026-09-01 — Saf Model sırası: marketBlindProb1'e göre sahadaki sırası
+            // (AGF hiç yokmuş gibi model kime en çok güveniyor). agfSirasi zaten sunucudan
+            // geliyor (yeniden hesaplamaya gerek yok). Yalnız canlı yeniden-analizde
+            // (marketBlindProb1 dolu) anlamlı — kayıtlı eski Pick görünümünde sessizce
+            // gizlenir (guard aşağıda, .safModelSirasi == null ise satır hiç basılmaz).
+            const gecerliAtlar = atlar.filter((x) => x.marketBlindProb1 != null);
+            const safModelSirali = [...gecerliAtlar].sort((x, y) => (y.marketBlindProb1 ?? 0) - (x.marketBlindProb1 ?? 0));
+            const safModelSiraByNo = new Map(safModelSirali.map((x, idx) => [x.no, idx + 1]));
+            return manualOrder.map((no, i) => {
             const a = atlarByNo.get(no);
             if (!a) return null;
             const kodluSatirlar = a.details.satirlar.filter((s) => s.kod.length > 0 && !s.kod.includes("OLASILIK"));
@@ -406,6 +420,29 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                         {((a.marketBlindProb1 ?? 0) * 100).toFixed(0)}
                       </span>
                     )}
+                    {/* 2026-09-01 — "Saf Model" kıyası (kullanıcı talebi, KARDAHA vakası):
+                        Saf Model (AGF'siz, marketBlindProb1) / AGF (piyasa) / Piyasa-Ayarlı
+                        (nihai olasilik) sıra+yüzde YAN YANA — piyasanın görmediği ama modelin
+                        bağımsız olarak bulduğu değeri göstermek için. Fark = Saf Model% - AGF% —
+                        büyük pozitif fark "model piyasadan bağımsız değer buldu, ama nihai skor
+                        AGF yüzünden düşük kaldı" demek (yalnız bilgi amaçlı, sıralamayı/kararı
+                        ETKİLEMEZ — tıpkı üstteki rozet gibi). */}
+                    {a.marketBlindProb1 != null && a.agfPayi != null && a.agfSirasi != null && (() => {
+                      const safYuzde = a.marketBlindProb1 * 100;
+                      const fark = safYuzde - a.agfPayi;
+                      const safSira = safModelSiraByNo.get(a.no);
+                      return (
+                        <span
+                          className={cn(
+                            "rounded-full px-2 py-0.5 font-mono text-[10px]",
+                            fark >= 5 ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground"
+                          )}
+                          title="Saf Model: AGF bilgisi HİÇ olmasaydı model bu atı sahada nereye koyardı (marketBlindProb1'in sıra+yüzdesi). AGF: piyasanın (bahis payının) kendi sırası+yüzdesi. Fark büyük ve pozitifse, model piyasanın görmediği bağımsız bir değer buluyor ama nihai (Piyasa-Ayarlı) skor AGF ile harmanlandığı için bu değer sönümleniyor demektir. Yalnız bilgi amaçlı — sıralamayı/kararı ETKİLEMEZ."
+                        >
+                          Saf Model: {safSira ?? "?"}. sıra (%{safYuzde.toFixed(1)}) · AGF: {a.agfSirasi}. sıra (%{a.agfPayi.toFixed(1)}) · Fark: {fark > 0 ? "+" : ""}{fark.toFixed(1)}pp
+                        </span>
+                      );
+                    })()}
                     {/* 2026-08-30 — B katmanı görünürlüğü: "Tüm 12 Sinyal" paneli B
                         katmanını içermiyor, bu yüzden ayrı bir rozet gerekiyor. */}
                     {a.bKatmaniUygulandiMi && (
@@ -540,7 +577,8 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                 )}
               </div>
             );
-          })}
+            });
+          })()}
         </div>
       )}
     </div>

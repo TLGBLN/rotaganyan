@@ -194,6 +194,14 @@ async function tekKosuIsle(raceId: string) {
     `    Saha değişkenleri: liderlikTalebi=${d.liderlikTalebi.toFixed(0)} erkenHizYogunlugu(ort)=${d.erkenHizYogunlugu.toFixed(0)} enGucluKacakBaskisi=${d.enGucluKacakBaskisi.toFixed(0)} liderlerArasiDenge=${d.liderlerArasiDenge.toFixed(0)} arkadanGelmeYogunlugu=${d.arkadanGelmeYogunlugu.toFixed(0)} (${d.gecerliAtSayisi}/${sirali.length} atta yeterli Accurace verisi var)`
   );
 
+  // 2026-09-01 — "Saf Model" kıyası (kullanıcı talebi, KARDAHA vakası): marketBlindProb1
+  // (AGF bilgisi hiç yokmuş gibi yeniden normalize edilmiş kazanma olasılığı) zaten
+  // Faz1RunnerV5Sirali'de vardı, yalnız AGF'nin kendi sırasıyla YAN YANA gösterilmiyordu.
+  // Büyük pozitif fark = "model piyasadan bağımsız gerçek değer buldu ama nihai skor AGF
+  // ile harmanlandığı için sönümlendi" — tam bu tür durumları YAKALAMAK için var.
+  const safModelSirali = [...sirali].sort((a, b) => b.marketBlindProb1 - a.marketBlindProb1);
+  const safModelSiraByNo = new Map(safModelSirali.map((r, i) => [r.no, i + 1]));
+
   for (const r of sirali) {
     const sira = sirali.indexOf(r) + 1;
     const ozet = ozetByName.get(r.ad);
@@ -202,6 +210,11 @@ async function tekKosuIsle(raceId: string) {
 
     console.log(`\n──────────────────────────────────────────────────────────`);
     console.log(`#${r.no} ${r.ad} — Model sırası: ${sira}/${sirali.length}, olasılık=%${(r.olasilik * 100).toFixed(1)}`);
+    const safYuzde = r.marketBlindProb1 * 100;
+    const safFark = safYuzde - r.agfPayi;
+    console.log(
+      `  Saf Model (AGF'siz): ${safModelSiraByNo.get(r.no)}. sıra (%${safYuzde.toFixed(1)}) | AGF: ${r.agfSirasi}. sıra (%${r.agfPayi.toFixed(1)}) | Fark: ${safFark > 0 ? "+" : ""}${safFark.toFixed(1)}pp${safFark >= 5 ? "  ⚠ model piyasadan bağımsız değer buluyor, nihai skorda sönümlenmiş olabilir" : ""}`
+    );
 
     console.log(`  A-Katmanı (17 skor girdisinin TAMAMI):`);
     A_KATMANI_ADLARI.forEach((ad, i) => console.log(`    ${ad.padEnd(18)} = ${vektor[i]}`));
