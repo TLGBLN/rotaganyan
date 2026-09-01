@@ -383,7 +383,13 @@ export type KuponVariant = {
    *  veya tamamen boşsa) kupon önerilerinde/paylaşımda ayrı bir kademe olarak gösterilmemeli. */
   filled: boolean;
 };
-export type KuponOnerisi = { id: string; hippodromeName: string; ikramiye: string | null; variants: KuponVariant[] } | null;
+export type KuponOnerisi = {
+  id: string; hippodromeName: string; ikramiye: string | null; variants: KuponVariant[];
+  /** Bu kuponun KENDİ son ayağı (legs'teki en büyük raceNo) sonuçlandığında girildi — null ise
+   *  o ayak henüz sonuçlanmadı. "Yatan" (miss) bir kuponun anasayfada ne zaman kalkacağını
+   *  belirlemek için kullanılır (bkz. getKuponOnerileri, kullanıcı kararı 2026-09-01). */
+  sonAyakSonuclandiAt: Date | null;
+} | null;
 export type HomeKuponLeg = { raceNo: number; narrow: number[]; normal: number[]; wide: number[] };
 
 /**
@@ -460,11 +466,17 @@ export async function buildKuponOnerisi(active: {
       },
     },
     include: {
-      result: { select: { winnerNo: true, winnerNos: true } },
+      result: { select: { winnerNo: true, winnerNos: true, enteredAt: true } },
       prediction: { select: { picks: { select: { rank: true, runner: { select: { no: true } } } } } },
       runners: { select: { no: true, ekuriGroup: true } },
     },
   });
+  // 2026-09-01 kullanıcı kararı: bir kupon "yatınca" (miss) ANINDA anasayfadan kalkmasın —
+  // KENDİ son ayağı (legs'teki en büyük raceNo) sonuçlandıktan 20dk sonrasına kadar
+  // görünür kalsın (bkz. aşağıdaki getKuponOnerileri). "Son ayak" her kuponun KENDİ son
+  // koşusu — 1. Altılı ise 1. Altılı'nın, 2. Altılı ise 2. Altılı'nın son koşusu.
+  const sonAyakRaceNo = Math.max(...legs.map((l) => l.raceNo));
+  let sonAyakSonuclandiAt: Date | null = null;
   for (const r of races) {
     const winnerNos = r.result?.winnerNos ?? [];
     resultByRaceNo.set(r.raceNo, {
@@ -473,6 +485,7 @@ export async function buildKuponOnerisi(active: {
       resulted: r.result != null,
       ekuriWinnerByNo: buildEkuriWinnerMap(r.runners, winnerNos),
     });
+    if (r.raceNo === sonAyakRaceNo) sonAyakSonuclandiAt = r.result?.enteredAt ?? null;
     const rankByNo = new Map<number, number>();
     for (const pick of r.prediction?.picks ?? []) {
       if (pick.runner) rankByNo.set(pick.runner.no, pick.rank);
@@ -541,6 +554,7 @@ export async function buildKuponOnerisi(active: {
     // buradan geçip aşağı akıyor, canlı TJK eşleşmesi başarısız olursa yedek olarak
     // kullanılabilsin diye (bkz. TahminOnerileri.tsx çağrı yeri).
     ikramiye: active.ikramiye ?? null,
+    sonAyakSonuclandiAt,
     variants: [
       { key: "ekonomik", label: "Ekonomik", legs: narrowLegs, amount: kuponAmount(narrowLegs.map((l) => l.nos), stake), status: statusFor(narrowLegs), filled: hasNarrow },
       { key: "normal", label: "Normal", legs: normalLegs, amount: kuponAmount(normalLegs.map((l) => l.nos), stake), status: statusFor(normalLegs), filled: hasNormal },
@@ -577,15 +591,29 @@ export async function getKuponOnerileri(): Promise<KuponOnerisi[]> {
   }
 
   const results = await Promise.all(validActives.map((a) => buildKuponOnerisi(a)));
-  // Yatan (miss) varyantlar gün bitmeden anasayfadan kalksın — tutan (hit) ve henüz
-  // sonuçlanmamış (pending) varyantlar gün boyu yayında kalmaya devam eder. Bir
-  // hipodromun Ekonomik/Normal/Geniş varyantları birbirinden bağımsız yatabilir
-  // (ör. Ekonomik yatar ama Geniş hâlâ tutuyor olabilir). Geçmiş (yatan dahil)
-  // admin panelindeki "Geçmiş Kuponlar" listesinde zaten saklanıyor — bu sadece
-  // anasayfa görünümünü filtreler, veriyi silmez.
+  // 2026-09-01 kullanıcı kararı: yatan (miss) bir kupon ANINDA anasayfadan kalkmasın —
+  // KENDİ son ayağı (o kuponun en büyük raceNo'lu koşusu; 1. Altılı ise 1. Altılı'nın,
+  // 2. Altılı ise 2. Altılı'nın son koşusu) sonuçlandıktan 20dk sonrasına kadar görünür
+  // kalır, sonra kalkar. Tutan (hit) ve henüz sonuçlanmamış (pending) varyantlar gün
+  // boyu yayında kalmaya devam eder (DEĞİŞMEDİ). Son ayak henüz sonuçlanmadıysa
+  // (sonAyakSonuclandiAt: null) 20dk sayacı hiç başlamaz, kupon görünür kalır. Bir
+  // hipodromun Ekonomik/Normal/Geniş varyantları birbirinden bağımsız yatabilir (ör.
+  // Ekonomik yatar ama Geniş hâlâ tutuyor olabilir). Geçmiş (yatan dahil) admin
+  // panelindeki "Geçmiş Kuponlar" listesinde zaten saklanıyor — bu sadece anasayfa
+  // görünümünü filtreler, veriyi silmez.
+  const MISS_GORUNUR_KALMA_SURESI_MS = 20 * 60 * 1000;
+  const now = Date.now();
   return results
     .filter((r): r is NonNullable<typeof r> => r !== null)
-    .map((r) => ({ ...r, variants: r.variants.filter((v) => v.status !== "miss" && v.filled) }))
+    .map((r) => ({
+      ...r,
+      variants: r.variants.filter((v) => {
+        if (!v.filled) return false;
+        if (v.status !== "miss") return true;
+        if (!r.sonAyakSonuclandiAt) return true;
+        return now - r.sonAyakSonuclandiAt.getTime() < MISS_GORUNUR_KALMA_SURESI_MS;
+      }),
+    }))
     .filter((r) => r.variants.length > 0);
 }
 

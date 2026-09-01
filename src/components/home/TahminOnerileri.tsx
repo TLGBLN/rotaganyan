@@ -38,6 +38,14 @@ function InstagramLogo({ className }: { className?: string }) {
   );
 }
 
+function FacebookLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M15 3h-2a5 5 0 0 0-5 5v3H6v4h2v6h4v-6h2.5l.5-4H12V8a1 1 0 0 1 1-1h2z" />
+    </svg>
+  );
+}
+
 // 2026-09-01 kullanıcı talebi — WhatsApp gibi platformlara TEK bir genel paylaş
 // ikonuyla (uçak/gönder simgesi) direkt görsel gönderilebilsin, admin'e özel
 // Instagram/X ikonlarının yanına, TÜM kullanıcılara açık.
@@ -133,6 +141,15 @@ function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon; ikram
               className="inline-flex items-center rounded-md border border-muted-foreground/25 p-1.5 hover:bg-muted transition-colors"
             >
               <XLogo className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleShare()}
+              title={t("facebooktaPaylas")}
+              aria-label={t("facebooktaPaylas")}
+              className="inline-flex items-center rounded-md border border-muted-foreground/25 p-1.5 hover:bg-muted transition-colors"
+            >
+              <FacebookLogo className="h-3.5 w-3.5" />
             </button>
           </>
         )}

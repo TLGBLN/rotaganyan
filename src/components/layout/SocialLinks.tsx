@@ -2,8 +2,10 @@
 // onerileri'ne giden ikinci bir bağlantıydı) kaldırılıp yerine gerçek sosyal medya
 // hesaplarına giden ikonlar kondu. lucide-react'te marka ikonları (Instagram/Facebook/X)
 // yok — bu yüzden resmi glif yollarıyla minimal inline SVG kullanılıyor, ek paket eklenmedi.
-// Kullanıcı talebi (aynı gün): monokrom yerine markaların GERÇEK renkleriyle gösterilsin.
-const ICON_CLASS = "h-[13px] w-[13px] fill-white";
+// 2026-09-01 (aynı gün, ikinci karar): önce markaların GERÇEK renkleriyle denendi, sonra
+// kullanıcı kupon paylaşım satırındaki (TahminOnerileri.tsx) koyu/kenarlıklı/tek-renkli
+// stile döndürülmesini istedi — o butonlarla AYNI görünüm burada da uygulanıyor.
+const ICON_CLASS = "h-3.5 w-3.5 fill-current";
 
 function XIcon() {
   return (
@@ -30,28 +32,22 @@ function FacebookIcon() {
 }
 
 const LINKS = [
-  { href: "https://x.com/rotaganyantr", label: "X (Twitter)", Icon: XIcon, bg: "bg-black" },
-  {
-    href: "https://www.instagram.com/rotaganyan/",
-    label: "Instagram",
-    Icon: InstagramIcon,
-    // Instagram'ın resmi degrade kimliği (sarı→pembe→mor)
-    bg: "bg-[radial-gradient(circle_at_30%_110%,#fdf497_0%,#fdf497_5%,#fd5949_45%,#d6249f_60%,#285AEB_90%)]",
-  },
-  { href: "https://www.facebook.com/profile.php?id=61593665895810", label: "Facebook", Icon: FacebookIcon, bg: "bg-[#1877F2]" },
+  { href: "https://x.com/rotaganyantr", label: "X (Twitter)", Icon: XIcon },
+  { href: "https://www.instagram.com/rotaganyan/", label: "Instagram", Icon: InstagramIcon },
+  { href: "https://www.facebook.com/profile.php?id=61593665895810", label: "Facebook", Icon: FacebookIcon },
 ] as const;
 
 export default function SocialLinks({ className }: { className?: string }) {
   return (
     <div className={className ?? "flex items-center gap-2"}>
-      {LINKS.map(({ href, label, Icon, bg }) => (
+      {LINKS.map(({ href, label, Icon }) => (
         <a
           key={label}
           href={href}
           target="_blank"
           rel="noopener noreferrer"
           aria-label={label}
-          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-brand transition-opacity hover:opacity-85 ${bg}`}
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-muted-foreground/25 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <Icon />
         </a>
