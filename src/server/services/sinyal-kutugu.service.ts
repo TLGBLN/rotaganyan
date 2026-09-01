@@ -83,6 +83,21 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
     diger: { katsayi: 0.02, durum: "anlamsiz", not: "sireOrani'den FARKLI: TÜM kategorilerde AYNI katsayıyla uygulanıyor (düşük-şart'a özgü değil)." },
     aciklama: "Atın bugünkü tam (pist, zemin koşulu, mesafe) kombinasyonunda kanıtlanmış deneyimi — popülasyona göre göreli pace %, TjkDereceKaydi'den (zeminToleransi ile AYNI kilo-düzeltmeli formül, yalnız bugünün tam koşuluna filtrelenmiş, 3 kademeli: tam mesafe eşleşmesi/yalnız pist+zemin eşleşmesi/hiç eşleşme yok). Hiçbir istatistiksel doğrulama yapılmadan eklendi.",
   },
+  // 2026-09-01 — MEGAFAUNA vakasından doğan "Yakınsama" hipotezi ADAY_SİNYALLER'de
+  // REDDEDİLDİ olarak belgelenmişti (B=500'de anlamsız) AMA kullanıcı, zeminToleransi/
+  // sireOrani ile AYNI türden BİLİNÇLİ istisna olarak eklenmesini istedi. Adil kıyas
+  // (aynı test seti): "diğer" top1/top3/logloss farkı ihmal edilebilir, düşük-şart'ta
+  // hafif iyi — zeminToleransi gibi zararsız. Katsayı gerçek retrain'den (13. özellik,
+  // model-veri.json tam yenilendi, 2 yeni bileşen — sınıf düşüşü + at-jokey ikilisi —
+  // yakinsama-gecmis.ts ile hem eğitim hem canlı sunum AYNI fonksiyondan, hızDerecesi
+  // train/serve dersinden ders alınarak).
+  {
+    ad: "Yakınsama (İSTİSNA — anlamsız test sonucuna rağmen kullanıcı kararıyla eklendi)",
+    kod: "yakinsama2Plus",
+    dusukSart: { katsayi: -0.028, durum: "anlamsiz", not: "B=500: GA=[-0.1535,0.0756], sıfırı içeriyor. Diğer bileşenlerle (12 özellik) birlikte, YENİDEN yapılan tam retrain'den (model-veri.json tam yenilendi, düzeltilmiş sınıf-düşüşü/at-jokey tanımlarıyla)." },
+    diger: { katsayi: 0.042, durum: "anlamsiz", not: "B=500: GA=[-0.0405,0.1197], sıfırı içeriyor." },
+    aciklama: "pistUzmani + sahada ilk-2 pedigri (sireOrani) + at-jokey ikilisinde geçmiş galibiyet + AGF eşik-üstü (≥1.0 puan) yükseliş + sınıf düşüşünün (bugünkü 1.ikramiye, son 3 startın ortalamasının <%80'i) EN AZ 2'sinin AYNI ATTA hizalanması. Beşi de TEK TEK ve BİRLİKTE B=500 bootstrap ile test edildi, hiçbiri istatistiksel olarak anlamlı çıkmadı — kullanıcı MEGAFAUNA vakasını (model 8./%4 verdi, at kazandı; pistUzmanı+at-jokey ikilisi+AGF yükselişi hizalanmıştı) gerekçe göstererek yine de eklenmesini istedi.",
+  },
 ];
 
 // 2026-08-28 — SİLİNEN 11 sinyal (arşiv amaçlı, artık toFeatureVector'da/A katmanında
@@ -281,9 +296,9 @@ export const ADAY_SINYALLER: AdaySinyal[] = [
   {
     ad: "Yakınsama (Çoklu Zayıf Sinyalin Aynı Atta Hizalanması)",
     durum: "reddedildi",
-    etiket: "B=500 bootstrap (5 bileşen) · reddedildi",
-    aciklama: "MEGAFAUNA vakası (model 8./%4, gerçek kazanan) üzerinden kullanıcı hipotezi: pist uzmanlığı+sınıf düşüşü(ikramiye bazlı)+at-jokey ikilisi+AGF trend+pedigri gibi TEK TEK zayıf/anlamsız sinyaller AYNI ATTA hizalandığında gerçek ek bilgi taşıyabilir. Basit tek-geçişlik tabloda umut verici göründü (top6-dışı atlarda yakınsama≥2: %5.00 kazanma vs %2.43 baseline, ~2x) ama 13. özellik olarak tam koşullu-logit + B=500 bootstrap'a sokulunca İKİ segmentte de anlamsız çıktı — tekil çarpıcı vakalar (MEGAFAUNA) genele YANSITILAMIYOR, yakınsama grubundaki 1544 attan çoğu kazanmadı.",
-    metrik: "Diğer: nokta=0.0337 GA=[-0.0555,0.1146] ⚠ · Düşük-şart: nokta=0.0428 GA=[-0.0996,0.1622] ⚠ (n=10506 at, 1544'ü 2+ hizalanma)",
+    etiket: "B=500 bootstrap (5 bileşen) · istatistiksel olarak reddedildi AMA sonradan kullanıcı kararıyla CANLI'ya eklendi",
+    aciklama: "MEGAFAUNA vakası (model 8./%4, gerçek kazanan) üzerinden kullanıcı hipotezi: pist uzmanlığı+sınıf düşüşü(ikramiye bazlı)+at-jokey ikilisi+AGF trend+pedigri gibi TEK TEK zayıf/anlamsız sinyaller AYNI ATTA hizalandığında gerçek ek bilgi taşıyabilir. Basit tek-geçişlik tabloda umut verici göründü (top6-dışı atlarda yakınsama≥2: %5.00 kazanma vs %2.43 baseline, ~2x) ama 13. özellik olarak tam koşullu-logit + B=500 bootstrap'a sokulunca İKİ segmentte de anlamsız çıktı — tekil çarpıcı vakalar (MEGAFAUNA) genele YANSITILAMIYOR, yakınsama grubundaki 1544 attan çoğu kazanmadı. NOT (2026-09-01): istatistiksel sonuç DEĞİŞMEDİ ama kullanıcı zeminToleransi/sireOrani ile AYNI türden bilinçli bir istisna olarak eklenmesini istedi — düzeltilmiş (isme göre, tjkAtId boşluğu giderilmiş) tanımlarla YENİDEN eğitildi, gerçek katsayılar CANLI_SİNYALLER'de.",
+    metrik: "İlk test (tjkAtId'ye göre, kısmen eksik): Diğer nokta=0.0337 GA=[-0.0555,0.1146] ⚠ · Düşük-şart nokta=0.0428 GA=[-0.0996,0.1622] ⚠. Düzeltilmiş/canlı: Diğer nokta=0.0417 GA=[-0.0405,0.1197] ⚠ · Düşük-şart nokta=-0.0280 GA=[-0.1535,0.0756] ⚠ (n=10506 at, 1544'ü 2+ hizalanma)",
   },
 ];
 

@@ -15,6 +15,7 @@ import { getJockeyStats, getTrainerStats } from "./src/server/services/race.serv
 import { zeminKatsayisi, zeminDetayiBul } from "./src/lib/methodology/mekanik-puanlama";
 import { hesaplaZeminToleransiMap } from "./src/server/actions/zemin-toleransi.actions";
 import { hizPaceIndexKur, hizDerecesiHesaplaOrtak, type HizGecmisSatir } from "./src/lib/methodology/hiz-derecesi-hesapla";
+import { yakinsamaGecmisHesapla } from "./src/lib/methodology/yakinsama-gecmis";
 import { writeFileSync, existsSync, readFileSync } from "fs";
 
 const GERCEK_OLMAYAN_HIPODROM_SLUGLARI = ["karma", "perak-malezya"];
@@ -92,6 +93,11 @@ export type ModelRow = {
   kgs: number; // gün, veri yoksa -1 (modelde ayrı bir "veri yok" göstergesiyle ele alınabilir)
   kgsVarMi: 0 | 1;
   pistUzmani: 0 | 1;
+  // 2026-09-01 — Yakınsama'nın (kural istisnası, bkz. v5-engine.ts) İKİ YENİ bileşeni;
+  // diğer üçü (pistUzmani/sireOrani/agfFark) zaten yukarıda/aşağıda var. yakinsama-gecmis.ts
+  // ile (İSME göre, Karma hariç, sızıntısız) hesaplanır — canlı sunumla AYNI fonksiyon.
+  sinifDususu: 0 | 1;
+  ajiGalibiyetVarMi: 0 | 1;
   sireOrani: number; // küçültülmüş (shrinkage), 0-100
   galop: 0 | 1;
   idmJokey: 0 | 1;
@@ -233,7 +239,7 @@ async function main() {
   const races = await db.race.findMany({
     where: { result: { isNot: null }, raceDay: { hippodrome: { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI } } } },
     select: {
-      id: true, classType: true, breed: true, distance: true, surface: true,
+      id: true, classType: true, breed: true, distance: true, surface: true, ikramiyeDetay: true,
       raceDay: { select: { date: true, surfaceConditions: true } },
       result: { select: { actualOrder: true } },
       runners: {
@@ -372,7 +378,7 @@ async function main() {
 
             const tjkAtIdler = runners.map((r) => r.tjkAtId).filter((x): x is number => x != null);
 
-            const [sonYarisDetaylari, jockeyStats, trainerStats, accKayitlar, agfSnaps, gecmisKayitlari, zeminToleransiMap] = await Promise.all([
+            const [sonYarisDetaylari, jockeyStats, trainerStats, accKayitlar, agfSnaps, gecmisKayitlari, zeminToleransiMap, yakinsamaGecmis] = await Promise.all([
               getSonYarisDetaylariForRace(race.id).catch(() => []),
               getJockeyStats([
                 ...new Set([
@@ -400,6 +406,16 @@ async function main() {
               // ve Faz1RunnerV5.zeminToleransi, v5-engine.ts). Aynı hesaplaZeminToleransiMap
               // (TjkDereceKaydi, leak-free) fonksiyonu reuse ediliyor.
               hesaplaZeminToleransiMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, number>()),
+              // 2026-09-01 — Yakınsama (kural istisnası, bkz. v5-engine.ts'teki Faz1RunnerV5.
+              // yakinsama2Plus notu): sınıf düşüşü + at-jokey ikilisi bileşenleri, CANLI
+              // sunumla (v5-engine.ts) AYNI paylaşılan fonksiyondan — train/serve uyumsuzluğu
+              // (hızDerecesi dersi) bir daha yaşanmasın diye.
+              yakinsamaGecmisHesapla(
+                db,
+                runners.map((r) => ({ no: r.no, name: r.name, jockey: r.jockey })),
+                race.raceDay.date,
+                (race.ikramiyeDetay as { ikramiye?: number[] } | null)?.ikramiye?.[0] ?? null
+              ).catch(() => new Map<number, { sinifDususu: boolean; ajiGalibiyetVarMi: boolean }>()),
             ]);
             const gecmisByTjkAtId = new Map(gecmisKayitlari.map((g) => [g.tjkAtId, g.rowsJson as unknown as { finishPos: string; weight: string; jockey: string; surface: string; date: string; raceNo: string; city: string }[]]));
 
@@ -620,6 +636,8 @@ async function main() {
                 uzunAraGalopKatkisi: (sonYaris?.gunFarki != null && sonYaris.gunFarki > 30) ? myGallops.length : 0,
                 jokeyOrani: jokeyOran,
                 antrenorOrani: antrenorOran,
+                sinifDususu: yakinsamaGecmis.get(r.no)?.sinifDususu ? 1 : 0,
+                ajiGalibiyetVarMi: yakinsamaGecmis.get(r.no)?.ajiGalibiyetVarMi ? 1 : 0,
                 kategori, breed: race.breed, distance: race.distance, surface: race.surface,
                 ayniJokeySurekliligi: sonYaris?.ayniJokey === true ? 1 : 0,
                 takiEklendiMi: (sonYaris?.eklenenTaki?.length ?? 0) > 0 ? 1 : 0,

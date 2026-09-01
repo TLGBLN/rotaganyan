@@ -140,6 +140,7 @@ import { zeminDetayiBul, zeminDetayiSatirdanCikar, zeminKatsayisi } from "@/lib/
 import { getHizDerecesiForRace } from "@/server/actions/hiz-derecesi.actions";
 import { hesaplaZeminToleransiMap } from "@/server/actions/zemin-toleransi.actions";
 import { hesaplaZeminMesafeDeneyimiMap } from "@/server/actions/zemin-mesafe-deneyimi.actions";
+import { yakinsamaGecmisHesapla } from "@/lib/methodology/yakinsama-gecmis";
 import { surfaceToPist } from "@/lib/sire-stat-match";
 import { syncAgfForRace } from "@/server/services/agf-sync";
 import { getJockeyStats, getTrainerStats } from "@/server/services/race.service";
@@ -238,6 +239,10 @@ const WEIGHTS_DIGER_DUZELTILMIS: AgirlikSeti = {
 // — orası KORUNDU. HIZ_DERECESI_IDX/V5.10 ile BİREBİR aynı cerrahi desen: yalnız Handikap'ta
 // bu tek katsayı sıfırlandı.
 const IDM_JOKEY_IDX = FEATURE_NAMES.indexOf("idmJokey");
+// 2026-09-01 — YAKINSAMA_IDX: bkz. Faz1RunnerV5.yakinsama2Plus üstündeki not (MEGAFAUNA
+// vakası, kural istisnası). Gerekçe metninde diğer override'lı sinyallerle (HIZ/KACAK/
+// IDMJOK) AYNI desen: ham boolean'a değil gerçek katkıya (r.katkilar) bakılıyor.
+const YAKINSAMA_IDX = FEATURE_NAMES.indexOf("yakinsama2Plus");
 const WEIGHTS_DIGER_HANDIKAP: AgirlikSeti = {
   ...WEIGHTS_DIGER_DUZELTILMIS,
   weights: WEIGHTS_DIGER_DUZELTILMIS.weights.map((w, i) => (i === HIZ_DERECESI_IDX || i === IDM_JOKEY_IDX ? 0 : w)),
@@ -327,6 +332,13 @@ export type Faz1RunnerV5 = {
   kgs: number;
   kgsVarMi: 0 | 1;
   pistUzmani: 0 | 1;
+  /** 2026-09-01 kullanıcı kararı — MEGAFAUNA vakası (model 8./%4 verdi, at kazandı):
+   *  pistUzmani + sahada ilk-2 pedigri (sireOrani) + at-jokey ikilisinde geçmiş
+   *  galibiyet + AGF eşik-üstü yükseliş + sınıf düşüşünün EN AZ 2'sinin AYNI ATTA
+   *  hizalanması. B=500 bootstrap'ta İKİ segmentte de anlamsız çıktı (nokta=0.03-0.04,
+   *  GA sıfırı içeriyor — bkz. sinyal-kutugu.service.ts ADAY_SİNYALLER) — zeminToleransi/
+   *  sireOrani ile AYNI türden BİLİNÇLİ istisna, kullanıcı kararıyla eklendi. */
+  yakinsama2Plus: 0 | 1;
   sireOrani: number;
   galop: 0 | 1;
   idmJokey: 0 | 1;
@@ -464,7 +476,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
   const race = await db.race.findUnique({
     where: { id: raceId },
     select: {
-      id: true, raceNo: true, classType: true, breed: true, distance: true, surface: true,
+      id: true, raceNo: true, classType: true, breed: true, distance: true, surface: true, ikramiyeDetay: true,
       raceDay: { select: { date: true, hippodrome: { select: { name: true } }, surfaceConditions: true } },
       runners: {
         where: { scratched: false },
@@ -481,7 +493,9 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
   const runners = race.runners;
   if (runners.length === 0) return { race: { id: race.id, hippodromeName: race.raceDay.hippodrome.name.trim(), raceNo: race.raceNo, classType: race.classType, breed: race.breed, surface: race.surface, distance: race.distance }, runners: [] };
 
-  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters, hizByNo, zeminToleransiByAd] = await Promise.all([
+  const bugunIkramiye1 = (race.ikramiyeDetay as { ikramiye?: number[] } | null)?.ikramiye?.[0] ?? null;
+
+  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters, hizByNo, zeminToleransiByAd, yakinsamaGecmis] = await Promise.all([
     getSonYarisDetaylariForRace(raceId).catch(() => []),
     getSireStatOzetleriForRace(runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(() =>
       runners.map(() => ({ ozet: null, ornekKendiVeri: null, kYuzde: null }))
@@ -497,6 +511,9 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     getH2HForRace(raceId).catch(() => []),
     getHizDerecesiForRace(raceId).catch(() => new Map<number, number>()),
     hesaplaZeminToleransiMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, number>()),
+    yakinsamaGecmisHesapla(db, runners.map((r) => ({ no: r.no, name: r.name, jockey: r.jockey })), race.raceDay.date, bugunIkramiye1).catch(
+      () => new Map<number, { sinifDususu: boolean; ajiGalibiyetVarMi: boolean }>()
+    ),
   ]);
 
   // 2026-08-30 kullanıcı talebi ("kum ıslak ise ıslak kum koşularına göre H2H yapacaksın
@@ -638,6 +655,8 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
   const birinciAgf = agfSirali[0]?.agf ?? null;
   const ikinciAgf = agfSirali[1]?.agf ?? null;
 
+  const yakinsamaOnHesaplar = new Map<number, { pistUzmaniPoz: boolean; agfTrendPoz: boolean; ajiPoz: boolean; sinifDususuPoz: boolean }>();
+
   const faz1Runners: Faz1RunnerV5[] = runners.map((r) => {
     const sonYaris = sonYarisByNo.get(r.no);
     const sireOzet = sireOzetByRunnerId.get(r.id);
@@ -673,6 +692,14 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
         ? shrink(trainerStat.wins, trainerStat.rides, TRAINER_POP_ORT) * 100
         : TRAINER_POP_ORT * 100;
 
+    const yGecmis = yakinsamaGecmis.get(r.no);
+    yakinsamaOnHesaplar.set(r.no, {
+      pistUzmaniPoz: sonYaris?.kazandi === "EVET",
+      agfTrendPoz: (agfFarkByNo.get(r.no) ?? 0) >= ANLAMLI_PUAN_ESIGI,
+      ajiPoz: yGecmis?.ajiGalibiyetVarMi ?? false,
+      sinifDususuPoz: yGecmis?.sinifDususu ?? false,
+    });
+
     return {
       id: r.id, no: r.no, ad: r.name, jockey: r.jockey, trainer: r.trainer, agf: r.agf,
       agfFark: agfFarkByNo.get(r.no) ?? 0,
@@ -686,6 +713,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       formEgimi: formEgimi(r.recentForm),
       kgs: kgsVal, kgsVarMi,
       pistUzmani: sonYaris?.kazandi === "EVET" ? 1 : 0,
+      yakinsama2Plus: 0, // aşağıda, TÜM runner'lar hazır olduktan sonra (sahaya-göreli pedigri sırası gerekiyor) dolduruluyor
       sireOrani, galop: keskinGalop, idmJokey,
       galopSayisi: gecerliGaloplar.length, uzunAraGalopKatkisi,
       jokeyOrani, antrenorOrani,
@@ -708,6 +736,18 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       zeminMesafeDeneyim: zeminMesafeDeneyimByAd.get(r.name)?.deger ?? 0,
     };
   });
+
+  // Yakınsama'nın pedigri bileşeni saha-İÇİ göreli (sireOrani'ne göre ilk-2) — tüm
+  // runner'lar hazır olmadan hesaplanamaz, bu yüzden ayrı bir son geçiş.
+  const sireSiraliYakinsama = [...faz1Runners].sort((a, b) => b.sireOrani - a.sireOrani);
+  const sireRankByNoYakinsama = new Map(sireSiraliYakinsama.map((r, i) => [r.no, i + 1]));
+  for (const r of faz1Runners) {
+    const on = yakinsamaOnHesaplar.get(r.no);
+    if (!on) continue;
+    const sirePoz = (sireRankByNoYakinsama.get(r.no) ?? 999) <= 2;
+    const sayi = [on.pistUzmaniPoz, sirePoz, on.ajiPoz, on.agfTrendPoz, on.sinifDususuPoz].filter(Boolean).length;
+    r.yakinsama2Plus = sayi >= 2 ? 1 : 0;
+  }
 
   return {
     race: {
@@ -749,6 +789,7 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     r.h2hKiloDegisimi,
     r.agfPayi * r.agfPayi,
     r.zeminToleransi,
+    r.yakinsama2Plus,
   ];
 }
 
@@ -1334,6 +1375,7 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // 2026-08-28 — Zemin Toleransı: bkz. Faz1RunnerV5.zeminToleransi üstündeki not. Veri
   // yoksa (Normal-dışı geçmiş koşu yok) 0, satır hiç gösterilmez.
   { kod: "ZEMIN", ozellikIndeksleri: [idx("zeminToleransi")], aciklama: (r) => (r.zeminToleransi !== 0 ? `Zemin toleransı: Normal-dışı pistteki geçmişinde popülasyona göre ${r.zeminToleransi > 0 ? "+" : ""}${r.zeminToleransi.toFixed(1)}% (${r.zeminToleransi > 0 ? "daha hızlı" : "daha yavaş"})` : null) },
+  { kod: "YAKINSAMA", ozellikIndeksleri: [idx("yakinsama2Plus")], aciklama: (r) => (r.katkilar[YAKINSAMA_IDX] !== 0 ? "Yakınsama: pist uzmanlığı/pedigri/at-jokey ikilisi/AGF trend/sınıf düşüşünden en az 2'si bu atta hizalanmış (istatistiksel kanıtı yok, kullanıcı kararıyla eklendi)" : null) },
 ];
 
 // 2026-08-18 kullanıcı talebi: "18 sinyalin hepsinin kontrol edildiğini bana göstermesini
@@ -1359,6 +1401,7 @@ const FEATURE_LABELS: Record<string, string> = {
   h2hKiloDegisimi: "Kilo-Ayarlı H2H (rakiplere göre kilo pozisyonu değişimi)",
   agfPayi2: "AGF Payı (karesi, piyasa kalibrasyon eğriselliği)",
   zeminToleransi: "Zemin Toleransı (Normal-dışı pistte geçmiş göreli performans)",
+  yakinsama2Plus: "Yakınsama (pist uzmanlığı+pedigri+at-jokey ikilisi+AGF trend+sınıf düşüşünden ≥2'si aynı atta)",
 };
 
 export type TumOzellikDetay = { kod: string; etiket: string; hamDeger: number; standartDeger: number; katki: number };

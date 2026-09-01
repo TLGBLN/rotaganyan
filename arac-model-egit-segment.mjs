@@ -27,9 +27,15 @@ const ANLAMLI_PUAN_ESIGI = 1.0;
 // diğer'de yön aynı ama kanıtlanamadı (-0.0235, GA=[-0.0853,0.0057]). top1/top3 farkı
 // ikisinde de GA sıfırı içeriyor ama ortalama pozitif (zarar yok). zeminToleransi
 // kullanıcının bilinçli istisnası olduğu için korundu.
+// 2026-09-01 kullanıcı kararı — "Yakınsama": pistUzmani + sahada ilk-2 pedigri
+// (sireOrani) + at-jokey ikilisinde geçmiş galibiyet + AGF eşik-üstü yükseliş + sınıf
+// düşüşünün EN AZ 2'sinin AYNI ATTA hizalanması (MEGAFAUNA vakası). B=500 bootstrap'ta
+// İKİ segmentte de anlamsız çıktı (bkz. sinyal-kutugu.service.ts ADAY_SİNYALLER) —
+// zeminToleransi/sireOrani ile AYNI türden BİLİNÇLİ istisna, kullanıcı kararıyla eklendi.
 const FEATURE_NAMES = [
   "agfSirasi", "kgsVarMi", "idmJokey", "jokeyOrani", "antrenorOrani", "kacakYalniz",
   "agfPayi", "h2hNetSkor", "hizDerecesi", "h2hKiloDegisimi", "agfPayi2", "zeminToleransi",
+  "yakinsama2Plus",
 ];
 
 function toFeatureVector(row) {
@@ -46,8 +52,28 @@ function toFeatureVector(row) {
     row.h2hKiloDegisimi ?? 0,
     (row.agfPayi ?? 0) * (row.agfPayi ?? 0),
     row.zeminToleransi ?? 0,
+    row.yakinsama2Plus ?? 0,
   ];
 }
+
+// Yakınsama'nın pedigri bileşeni saha-İÇİ göreli (sireOrani'ne göre ilk-2) — v5-engine.ts'in
+// gatherFaz1V5'teki AYNI mantığı, burada koşu GRUBU seviyesinde (tüm runner'lar hazır).
+function yakinsama2PlusEkle(raceGroupsRaw) {
+  for (const g of raceGroupsRaw) {
+    const sireSirali = [...g.runners].sort((a, b) => (b.sireOrani ?? 0) - (a.sireOrani ?? 0));
+    const sireRankOf = new Map(sireSirali.map((r, i) => [r, i + 1]));
+    for (const r of g.runners) {
+      const pistUzmaniPoz = (r.pistUzmani ?? 0) === 1;
+      const sirePoz = sireRankOf.get(r) <= 2;
+      const ajiPoz = (r.ajiGalibiyetVarMi ?? 0) === 1;
+      const agfTrendPoz = (r.agfFark ?? 0) >= 1.0;
+      const sinifDususuPoz = (r.sinifDususu ?? 0) === 1;
+      const sayi = [pistUzmaniPoz, sirePoz, ajiPoz, agfTrendPoz, sinifDususuPoz].filter(Boolean).length;
+      r.yakinsama2Plus = sayi >= 2 ? 1 : 0;
+    }
+  }
+}
+
 function groupByRace(rows) {
   const byRace = new Map();
   for (const r of rows) { const arr = byRace.get(r.raceId) ?? []; arr.push(r); byRace.set(r.raceId, arr); }
@@ -174,6 +200,7 @@ const raw = rawAll.filter((r) => { const d = tarihByRaceId.get(r.raceId); return
 await db.$disconnect();
 
 const raceGroupsRaw = groupByRace(raw).filter((g) => g.runners.length >= 2);
+yakinsama2PlusEkle(raceGroupsRaw);
 const dusukSartGruplar = raceGroupsRaw.filter((g) => g.runners[0].kategori === "1a" || g.runners[0].kategori === "1b");
 const digerGruplar = raceGroupsRaw.filter((g) => !(g.runners[0].kategori === "1a" || g.runners[0].kategori === "1b"));
 console.log(`Toplam: ${raceGroupsRaw.length} koşu — Düşük-şart/maiden: ${dusukSartGruplar.length}, Diğer: ${digerGruplar.length}`);

@@ -536,13 +536,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.33",
     baslangic: new Date("2026-08-31T21:07:59+03:00"),
-    bitis: null,
+    bitis: new Date("2026-09-01T08:58:10+03:00"),
     aciklama: "Kullanıcı talebiyle (\"uyumsuzlukları çöz\") hızDerecesi'nin V5.32'de su yüzüne çıkan train/serve uyumsuzluğu çözüldü. Kök neden: eğitim (arac-model-veri-olustur.mts) atın son 3 (365 gün içi) koşusunun HER BİRİNİ KENDİ kovasına (irk|pist|mesafe) ve KENDİ tarihine göre (sızıntısız) popülasyon ortalamasıyla kıyaslıyordu; canlı sunum (hiz-derecesi.actions.ts) ise yalnız BUGÜNKÜ kovayla eşleşen geçmiş koşuları sayıp hepsini BUGÜNKÜ popülasyon ortalamasına vuruyordu — Opus'un ölçümü: canlı atların %43.8'i sıfır dönerken eğitimde yalnız %8.2'si sıfırdı, ortalama mutlak fark ~2.86 puan (~0.8 SD). Ayrıca eğitimin popülasyon indeksi HER 'start' (Runner satırı) için atın TÜM geçmişini tekrar tekrar ekliyordu — çok start yapan atların geçmiş koşuları popülasyonu orantısız ağırlıklandırıyordu (ayrı, bağımsız bir hata, aynı işte fark edildi). Yeni paylaşılan çekirdek (hiz-derecesi-hesapla.ts) her iki tarafça da çağrılıyor; popülasyon indeksi artık her at TAM OLARAK BİR KEZ işleniyor. Katsayı DEĞİŞMEDİ (retrain yapılmadı) — yalnız canlı girdi artık katsayının fit edildiği dağılımla eşleşiyor.",
     neyiAnalizEdiyor: [
       "Skor/olasılık DEĞİŞTİ: hızDerecesi'nin canlı hesaplanan değeri artık eğitimle aynı mantığı kullanıyor — gerçek sonuçlanmış 200 koşuda (2004 at) sıfır oranı %43.8'den %5.2'ye düştü. Katsayının kendisi (WEIGHTS_DUSUK_SART/WEIGHTS_DIGER/WEIGHTS_DIGER_HANDIKAP'taki HIZ_DERECESI_IDX) DEĞİŞMEDİ.",
     ],
     caprazlamalar: [
       "Gerçek 60 sonuçlanmış koşuda (596 at) kazanan-vs-diğer Cohen's d karşılaştırması: ESKİ (bugünkü-kova-yalnız) mantık d=0.369, YENİ (eğitimle birleşik) mantık d=0.578 — düzeltme yalnız teorik tutarlılık değil, gerçek kazanan/kaybeden ayrımını da somut biçimde güçlendirdi. Doğrulama: tsc --noEmit temiz, npm run build temiz, v5-engine.test.ts 7/7 geçti, gerçek 200 sonuçlanmış koşuda (2004 at) crash yok, değer dağılımı makul (medyan -0.29, p10/p90 -6.81/+2.82).",
+    ],
+  },
+  {
+    versiyon: "V5.34",
+    baslangic: new Date("2026-09-01T08:58:10+03:00"),
+    bitis: null,
+    aciklama: "Kullanıcı kararıyla ('skora dahil olsun puana eklensin') 13. özellik olarak 'Yakınsama' eklendi — MEGAFAUNA vakasından (model 8./%4 verdi, at kazandı) doğan hipotez: pistUzmani + sahada ilk-2 pedigri (sireOrani) + at-jokey ikilisinde geçmiş galibiyet + AGF eşik-üstü yükseliş + sınıf düşüşünün (bugünkü 1.ikramiye, son 3 startın ortalamasının <%80'i) EN AZ 2'sinin AYNI ATTA hizalanması. Beşi de tek tek VE birlikte B=500 bootstrap ile test edildi, hiçbiri istatistiksel olarak anlamlı çıkmadı (bkz. sinyal-kutugu.service.ts) — zeminToleransi/sireOrani ile AYNI türden BİLİNÇLİ istisna. İki yeni bileşen (sınıf düşüşü, at-jokey ikilisi) hem eğitim (arac-model-veri-olustur.mts) hem canlı sunum (v5-engine.ts gatherFaz1V5) TEK bir paylaşılan fonksiyondan (yakinsama-gecmis.ts) hesaplanıyor — hızDerecesi'nin (V5.33) train/serve dersi bir daha yaşanmasın diye. Bu süreçte MEGAFAUNA üzerinden GERÇEK bir veri boşluğu bulundu: geçmiş Runner kayıtlarının bir kısmında tjkAtId boş, tjkAtId'ye göre eşleşme gerçek galibiyetleri kaçırıyordu — İSME göre eşleşmeye geçildi (Karma mükerrer kaydı da hariç tutuluyor). model-veri.json tam yenilendi (3923 koşu, 38264 satır), 13 özellikle yeniden eğitildi.",
+    neyiAnalizEdiyor: [
+      "Skor/olasılık DEĞİŞTİ: yakinsama2Plus artık 13. özellik olarak TÜM skorlara katkı veriyor (diğer +0.042, düşük-şart -0.028 — ikisi de küçük ve GA sıfırı içeriyor). Diğer 12 katsayı, model-veri.json'un tam yenilenmesi nedeniyle hafifçe kaydı (doğal yeniden-örnekleme varyansı) ama yön/anlamlılık durumları değişmedi.",
+    ],
+    caprazlamalar: [
+      "Adil kıyas (aynı test seti, mevcut canlı 12-özellik vs yeni 13-özellik): diğer segmentte top1/top3/logloss farkı ihmal edilebilir (-0.4pp/-0.3pp, logloss hafif iyi), düşük-şart'ta hafif iyi (+1.2pp/+1.6pp) — zeminToleransi gibi ölçülebilir bir zarar yok. Doğrulama: tsc --noEmit temiz, npm run build temiz, v5-engine.test.ts 7/7 geçti.",
     ],
   },
 ];
