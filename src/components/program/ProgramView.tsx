@@ -538,7 +538,7 @@ function AnalysisPanel({
               const winnerPick = rowPicks.find((p) => p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no));
               const isWinner = winnerPick != null;
               const rs = rankStyle(displayRank);
-              const noText = rowPicks.map((p) => pickDisplay(p).no).join(" / ");
+              const noText = rowPicks.map((p) => pickDisplay(p).no).join("-");
               const nameText = rowPicks.map((p) => pickDisplay(p).name).join(" / ");
               return (
                 <tr key={first.rank} className={cn("border-b last:border-0", isWinner && "bg-[#f5c518]/10")}>
@@ -547,7 +547,7 @@ function AnalysisPanel({
                       {displayRank}
                     </span>
                   </td>
-                  <td className={cn("px-2 py-2 text-center font-mono font-bold", isWinner ? "text-[#f5c518]" : rs.text)}>{noText}</td>
+                  <td className={cn("px-2 py-2 text-center font-mono font-bold whitespace-nowrap", isWinner ? "text-[#f5c518]" : rs.text)}>{noText}</td>
                   <td className={cn("px-2 py-2 font-semibold", isWinner ? "text-[#f5c518]" : rs.text)}>
                     <span className="inline-flex items-center gap-1.5">
                       {nameText}
@@ -645,7 +645,7 @@ function AnalysisPanel({
           const winnerPick = rowPicks.find((p) => p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no));
           const isWinner = winnerPick != null;
           const rs = rankStyle(displayRank);
-          const noText = rowPicks.map((p) => pickDisplay(p).no).join(" / ");
+          const noText = rowPicks.map((p) => pickDisplay(p).no).join("-");
           const nameText = rowPicks.map((p) => pickDisplay(p).name).join(" / ");
           return (
             <div key={first.rank} className={cn("px-3 py-2.5", isWinner && "bg-[#f5c518]/10")}>
