@@ -153,7 +153,7 @@ export default function MobileNav({ isLoggedIn, followedHorses = [] }: Props) {
             )}
           </div>
 
-          <div className="border-t pt-4 pb-1 flex items-center justify-center">
+          <div className="border-t pt-4 pb-1 flex items-center justify-start px-3">
             <SocialLinks />
           </div>
         </nav>

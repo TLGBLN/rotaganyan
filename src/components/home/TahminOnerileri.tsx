@@ -274,7 +274,9 @@ function KuponGroup({ kuponlar, altiliResults, isAdmin }: { kuponlar: Kupon[]; a
                 type="button"
                 onClick={() => setSecili(i)}
                 className={cn(
-                  "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                  // 2026-09-01 kullanıcı talebi: tam kapsül (rounded-full) değil, orta
+                  // yuvarlaklıkta köşeli dikdörtgen ("köşeler sivriye yakın ama oval").
+                  "rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors",
                   i === secili ? "bg-brand text-brand-foreground" : "bg-white/5 text-muted-foreground border hover:bg-muted"
                 )}
               >
