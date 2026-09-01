@@ -36,10 +36,14 @@ const ANLAMLI_PUAN_ESIGI = 1.0;
 // Sprint/Sürat mi (ESENYIL vakası). Backtest (n=9148, leak-free) yönü DOĞRULAMADI (nokta
 // tahmini hafif negatif, GA sıfırı kapsıyor) — yakınsama/zeminToleransi ile AYNI türden
 // BİLİNÇLİ istisna, GERÇEK fit edilen katsayı kullanılıyor, elle pozitif yapılmadı.
+// 2026-09-01 kullanıcı kararı (KIZIM BİNDAL vakası) — "Takı Eklendi"/"Takı Çıkarıldı":
+// son yarışına göre takı değişikliği. arac-model-veri-olustur.mts'te ZATEN
+// hesaplanıyordu (takiEklendiMi/takiCikarildiMi), model-veri.json'da hazır — yeniden
+// üretim GEREKMEDİ. GERÇEK fit edilen katsayı kullanılıyor, elle yön verilmedi.
 const FEATURE_NAMES = [
   "agfSirasi", "kgsVarMi", "idmJokey", "jokeyOrani", "antrenorOrani", "kacakYalniz",
   "agfPayi", "h2hNetSkor", "hizDerecesi", "h2hKiloDegisimi", "agfPayi2", "zeminToleransi",
-  "yakinsama2Plus", "sonIdmanSprint",
+  "yakinsama2Plus", "sonIdmanSprint", "takiEklendiMi", "takiCikarildiMi",
 ];
 
 function toFeatureVector(row) {
@@ -58,6 +62,8 @@ function toFeatureVector(row) {
     row.zeminToleransi ?? 0,
     row.yakinsama2Plus ?? 0,
     row.sonIdmanSprint ?? 0,
+    row.takiEklendiMi ?? 0,
+    row.takiCikarildiMi ?? 0,
   ];
 }
 

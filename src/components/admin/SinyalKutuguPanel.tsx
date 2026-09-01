@@ -51,7 +51,7 @@ export default function SinyalKutuguPanel() {
       <div>
         <h2 className="text-lg font-bold text-foreground">V5 Sinyal Kütüğü</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Canlı skorlamaya giren 14 sinyal (11 A-Katmanı + 3 B-Katmanı ortak regresyonda, +2 B-Katmanı ayrı mekanizmada — bkz. aşağıdaki iki ayrı tablo),
+          Canlı skorlamaya giren 16 sinyal (11 A-Katmanı + 5 B-Katmanı ortak regresyonda, +2 B-Katmanı ayrı mekanizmada — bkz. aşağıdaki iki ayrı tablo),
           segment bazlı katsayılarıyla (Düşük-şart = Maiden/Şartlı 1/19/27,
           Diğer = Handikap/Şartlı 2-5/KV-Grup/Satış); sıralama kuralları; ve test edilmiş aday sinyaller.
           Katsayı/GA her yeniden eğitimde elle güncellenir — sahadaki GERÇEK isabet oranı için aşağıdaki

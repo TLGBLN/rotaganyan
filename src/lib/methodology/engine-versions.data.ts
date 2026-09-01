@@ -560,13 +560,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.35",
     baslangic: new Date("2026-09-01T13:36:00+03:00"),
-    bitis: null,
+    bitis: new Date("2026-09-01T19:00:00+03:00"),
     aciklama: "Kullanıcı kararıyla ('B katmanına destekleyici sinyal olarak eklensin') 14. özellik olarak 'Son İdman Sprint' eklendi — ESENYIL vakasından (model 9./%4.9 verdi, at kazandı) doğan hipotez: son idmanın TÜRÜ (TJK Gallop.track) Sprint/Sürat mi. Önce basit (regresyonsuz) karşılaştırma yapıldı: n=9148 (leak-free, karma hariç), Sprint grubu top1 %9.5 vs diğer %11.1 — YÖN TERSİYDİ (nokta -1.5pp, GA sıfırı kapsıyor); yarışa yakınlık (≤3 gün) kırılımı da yönü değiştirmedi. Kullanıcı yine de eklenmesini istedi — zeminToleransi/yakınsama ile AYNI türden BİLİNÇLİ istisna, GERÇEK fit edilen katsayı kullanıldı (elle pozitif yapılmadı). Ortak 14-özellik regresyonda (diğer 13 değişkeni kontrol ederek) katsayı iki segmentte de sıfıra çok yakın çıktı (düşük-şart +0.008, diğer -0.019) — basit karşılaştırmadaki negatif yön büyük ölçüde confounding'den kaynaklanıyormuş. Gallop sorgusuna `track` alanı eklendi (hem arac-model-veri-olustur.mts hem v5-engine.ts), Sprint/Sürat eşleşmesi galop-helpers.ts'teki tek bir paylaşılan fonksiyondan (isSprintIdman) hem eğitim hem canlı sunumda kullanılıyor. model-veri.json tam yenilendi (3923 koşu, 38264 satır), 14 özellikle yeniden eğitildi.",
     neyiAnalizEdiyor: [
       "Skor/olasılık DEĞİŞTİ: sonIdmanSprint artık 14. özellik olarak TÜM skorlara katkı veriyor (düşük-şart +0.008, diğer -0.019 — ikisi de ihmal edilebilir küçüklükte ve GA sıfırı içeriyor). Diğer 13 katsayı, model-veri.json'un tam yenilenmesi nedeniyle hafifçe kaydı (doğal yeniden-örnekleme varyansı) ama yön/anlamlılık durumları değişmedi.",
     ],
     caprazlamalar: [
       "Adil kıyas (aynı test seti, aynı model-veri.json, 13-özellik vs 14-özellik): top1/top3 BİREBİR AYNI (düşük-şart %37.8/%64.9, diğer %32.2/%67.3), logloss farkı gürültü seviyesinde (düşük-şart +0.0003, diğer -0.0009) — ölçülebilir bir zarar yok. Doğrulama: tsc --noEmit temiz, npm run build temiz, v5-engine.test.ts 7/7 geçti.",
+    ],
+  },
+  {
+    versiyon: "V5.36",
+    baslangic: new Date("2026-09-01T19:00:00+03:00"),
+    bitis: null,
+    aciklama: "Kullanıcı kararıyla ('adam takı çıkarmayı sinyal olarak görmüş, DB/KG/K gibi takılar önemli — model bunu görecek') 15. ve 16. özellik olarak 'Takı Eklendi'/'Takı Çıkarıldı' eklendi — KIZIM BİNDAL vakasından (model 5./%9.4 verdi, at kazandı) doğdu: bir yorumcu KG+GKR çıkarılmasını galibiyet gerekçesi olarak kullanmıştı, model bu bilgiyi (Son Yarış Detayları paneli) ZATEN GÖSTERİYORDU ama hiç skorlamıyordu. İki alan (takiEklendiMi/takiCikarildiMi) arac-model-veri-olustur.mts'te ZATEN hesaplanıyordu (SonYarisDetay'dan, leak-free) — model-veri.json'da hazırdı, YENİDEN ÜRETİM GEREKMEDİ. v5-engine.ts zaten getSonYarisDetaylariForRace'i çağırıyordu (kgs/pistUzmani için) — yalnız eklenenTaki/cikarilanTaki alanlarından 2 türetilmiş 0/1 alan eklendi. GERÇEK fit edilen katsayı kullanıldı, elle yön verilmedi: B=500 bootstrap her iki segmentte de sıfıra yakın/anlamsız çıktı (takiEklendiMi: düşük-şart -0.052/diğer -0.018; takiCikarildiMi: düşük-şart -0.030/diğer +0.061). takiCikarildiMi'nin diğer segmentteki yönü (+0.061) KIZIM BİNDAL'ın işaret ettiği yönle tutarlı ama istatistiksel olarak kanıtlanamadı.",
+    neyiAnalizEdiyor: [
+      "Skor/olasılık DEĞİŞTİ: takiEklendiMi/takiCikarildiMi artık 15-16. özellikler olarak TÜM skorlara katkı veriyor (dördü de küçük ve GA sıfırı içeriyor). Diğer 14 katsayı aynı model-veri.json üzerinden yeniden fit edildiği için hafifçe kaydı (doğal varyans) ama yön/anlamlılık durumları değişmedi.",
+    ],
+    caprazlamalar: [
+      "Adil kıyas (aynı test seti, aynı model-veri.json, 14-özellik vs 16-özellik): düşük-şart'ta top1 aynı (%37.8), top3 belirgin İYİLEŞTİ (+2.7pp: %64.9→%67.6), logloss gürültü seviyesinde kötüleşti (+0.0007). Diğer segmentte top1 hafif iyi (+0.5pp), top3 hafif kötü (-0.5pp), logloss gürültü seviyesinde (+0.0005) — net bir zarar kanıtlanmadı. Doğrulama: tsc --noEmit temiz, npm run build temiz, v5-engine.test.ts 7/7 geçti, arac-tam-at-inceleme.mts'in özet kıyas tablosu (16 sütun) gerçek bir koşuda (Ankara K5, KIZIM BİNDAL) doğrulandı.",
     ],
   },
 ];

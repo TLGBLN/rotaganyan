@@ -25,11 +25,11 @@ export type SinyalAnlamlilik = "anlamli" | "sinirda" | "anlamsiz" | "override" |
 // yalnız raporlama/etiketleme): "A Katmanı" = istatistiksel olarak kanıtlanmış (veya en
 // azından karışık/gerçek katsayıya dayanan) 11 çekirdek sinyal; "B Katmanı" = tek başına
 // anlamsız çıkan ama MEGAFAUNA/ESENYIL türü vakalarda fark yaratabileceği düşünülen,
-// kullanıcı kararıyla eklenen 5 sinyal (zeminToleransi, yakinsama2Plus, sonIdmanSprint,
-// sireOrani, zeminMesafeDeneyim).
+// kullanıcı kararıyla eklenen 7 sinyal (zeminToleransi, yakinsama2Plus, sonIdmanSprint,
+// takiEklendiMi, takiCikarildiMi, sireOrani, zeminMesafeDeneyim).
 // ÖNEMLİ NÜANS: B Katmanı kendi içinde MEKANİZMA olarak homojen DEĞİL — zeminToleransi/
-// yakinsama2Plus/sonIdmanSprint hâlâ A'nın 14'lük ORTAK regresyonunda birlikte fit
-// ediliyor (yalnız kanıt gücü zayıf olduğu için B etiketleniyor); sireOrani/
+// yakinsama2Plus/sonIdmanSprint/takiEklendiMi/takiCikarildiMi hâlâ A'nın 16'lık ORTAK
+// regresyonunda birlikte fit ediliyor (yalnız kanıt gücü zayıf olduğu için B etiketleniyor); sireOrani/
 // zeminMesafeDeneyim ise GERÇEKTEN ayrı bir mekanizma (softmax'a girmeden önce skora
 // eklenen, bkz. v5-engine.ts bKatmaniUygula). Bu ayrımı gizlememek için her B-katmanı
 // girdisinde belirtiliyor.
@@ -134,6 +134,27 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
     dusukSart: { katsayi: 0.008, durum: "anlamsiz", not: "B=500: GA=[-0.1620,0.1465], sıfırı içeriyor." },
     diger: { katsayi: -0.019, durum: "anlamsiz", not: "B=500: GA=[-0.1063,0.0651], sıfırı içeriyor." },
     aciklama: "Son idmanın TÜRÜ (TJK Gallop.track) Sprint/Sürat mi. Basit karşılaştırma (regresyonsuz, n=9148) YÖNÜ DOĞRULAMADI (Sprint grubu top1 %9.5, diğer %11.1) — kullanıcı ESENYIL vakasını gerekçe göstererek yine de eklenmesini istedi. Ortak regresyonda (13 kontrol değişkeniyle birlikte) katsayı iki segmentte de sıfıra çok yakın (+0.008 / -0.019), istatistiksel olarak anlamsız.",
+  },
+  // 2026-09-01 — KIZIM BİNDAL vakası: kullanıcı, bir yorumcunun takı çıkarma/ekleme
+  // bilgisini (KG+GKR çıkarılmış) gerçek galibiyeti öngörmede kullandığını gösterdi.
+  // Model bu bilgiyi ZATEN görüntülüyordu (Son Yarış Detayları) ama HİÇ skorlanmıyordu.
+  // Kullanıcı kararıyla 15-16. özellik olarak eklendi — B=500 bootstrap her iki segmentte
+  // de sıfıra yakın/anlamsız çıktı, GERÇEK fit edilen katsayı kullanıldı (elle yön verilmedi).
+  {
+    ad: "Takı Eklendi (İSTİSNA — anlamsız, kullanıcı kararıyla eklendi)",
+    kod: "takiEklendiMi",
+    katman: "B",
+    dusukSart: { katsayi: -0.052, durum: "anlamsiz", not: "B=500: GA=[-0.2630,0.1260], sıfırı içeriyor." },
+    diger: { katsayi: -0.018, durum: "anlamsiz", not: "B=500: GA=[-0.1367,0.0781], sıfırı içeriyor." },
+    aciklama: "Son yarışına göre takı eklenmiş mi (SonYarisDetay.eklenenTaki). n=913/38264 (%2.4) — küçük örneklem, GA geniş. Her iki segmentte de hafif negatif ama anlamsız.",
+  },
+  {
+    ad: "Takı Çıkarıldı (İSTİSNA — anlamsız, kullanıcı kararıyla eklendi)",
+    kod: "takiCikarildiMi",
+    katman: "B",
+    dusukSart: { katsayi: -0.030, durum: "anlamsiz", not: "B=500: GA=[-0.3117,0.2511], sıfırı içeriyor." },
+    diger: { katsayi: 0.061, durum: "anlamsiz", not: "B=500: GA=[-0.1401,0.2486], sıfırı içeriyor." },
+    aciklama: "Son yarışına göre takı çıkarılmış mı (SonYarisDetay.cikarilanTaki) — KIZIM BİNDAL'ın (KG+GKR çıkarılmış, kazandı) gerekçe gösterildiği sinyal. n=3174/38264 (%8.3). Diğer segmentte yön KIZIM BİNDAL'ın işaret ettiği yönde (+0.061) ama anlamsız; düşük-şart'ta ters (-0.030), o da anlamsız.",
   },
 ];
 

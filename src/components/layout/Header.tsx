@@ -57,11 +57,11 @@ export default async function Header() {
           <Button asChild variant="outline" size="sm">
             <Link href="/altili" data-tour="altili"><HeaderLabel k="altiliNeVerir" /></Link>
           </Button>
+          <OnlineCounter />
         </nav>
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          <OnlineCounter />
           <SocialLinks className="hidden items-center gap-2 md:flex" />
           {user && <span data-tour="bildirim"><NotificationBell /></span>}
           {user ? (

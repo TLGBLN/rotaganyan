@@ -3,7 +3,7 @@
 // hesaplarına giden ikonlar kondu. lucide-react'te marka ikonları (Instagram/Facebook/X)
 // yok — bu yüzden resmi glif yollarıyla minimal inline SVG kullanılıyor, ek paket eklenmedi.
 // Kullanıcı talebi (aynı gün): monokrom yerine markaların GERÇEK renkleriyle gösterilsin.
-const ICON_CLASS = "h-[18px] w-[18px] fill-white";
+const ICON_CLASS = "h-[13px] w-[13px] fill-white";
 
 function XIcon() {
   return (
@@ -51,7 +51,7 @@ export default function SocialLinks({ className }: { className?: string }) {
           target="_blank"
           rel="noopener noreferrer"
           aria-label={label}
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-opacity hover:opacity-85 ${bg}`}
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-brand transition-opacity hover:opacity-85 ${bg}`}
         >
           <Icon />
         </a>

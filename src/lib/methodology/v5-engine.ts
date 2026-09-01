@@ -247,6 +247,11 @@ const YAKINSAMA_IDX = FEATURE_NAMES.indexOf("yakinsama2Plus");
 // istisnası. Backtest (n=9148, leak-free) yönü DOĞRULAMADI (nokta tahmini hafif negatif,
 // GA sıfırı kapsıyor) — GERÇEK fit edilen katsayı kullanılıyor, elle pozitif yapılmadı.
 const SON_IDMAN_SPRINT_IDX = FEATURE_NAMES.indexOf("sonIdmanSprint");
+// 2026-09-01 — TAKI_EKLENDI_IDX/TAKI_CIKARILDI_IDX: kullanıcı talebi (KIZIM BİNDAL vakası,
+// "adam takı çıkarmayı sinyal olarak görmüş, DB/KG/K gibi takılar önemli"). B-katmanı kural
+// istisnası — GERÇEK fit edilen katsayı kullanılıyor, elle yön verilmedi.
+const TAKI_EKLENDI_IDX = FEATURE_NAMES.indexOf("takiEklendiMi");
+const TAKI_CIKARILDI_IDX = FEATURE_NAMES.indexOf("takiCikarildiMi");
 const WEIGHTS_DIGER_HANDIKAP: AgirlikSeti = {
   ...WEIGHTS_DIGER_DUZELTILMIS,
   weights: WEIGHTS_DIGER_DUZELTILMIS.weights.map((w, i) => (i === HIZ_DERECESI_IDX || i === IDM_JOKEY_IDX ? 0 : w)),
@@ -346,6 +351,10 @@ export type Faz1RunnerV5 = {
   /** Son idman TÜRÜ (TJK Gallop.track) Sprint/Sürat mi — kullanıcı kararıyla eklenen B-katmanı
    *  kural istisnası (bkz. yukarıdaki toFeatureVector üstü not, backtest yönü doğrulamadı). */
   sonIdmanSprint: 0 | 1;
+  /** Son yarışına göre takı değişikliği (SonYarisDetay.eklenenTaki/cikarilanTaki) — kullanıcı
+   *  kararıyla eklenen B-katmanı kural istisnası (bkz. yukarıdaki not, KIZIM BİNDAL vakası). */
+  takiEklendiMi: 0 | 1;
+  takiCikarildiMi: 0 | 1;
   sireOrani: number;
   galop: 0 | 1;
   idmJokey: 0 | 1;
@@ -666,6 +675,12 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
 
   const faz1Runners: Faz1RunnerV5[] = runners.map((r) => {
     const sonYaris = sonYarisByNo.get(r.no);
+    // 2026-09-01 kullanıcı talebi (KIZIM BİNDAL vakası) — takı değişikliği (SonYarisDetay)
+    // önceden yalnız GÖSTERİM içindi (kgs/pistUzmani gibi diğer alanları zaten kullanıyorduk,
+    // eklenenTaki/cikarilanTaki'yi hiç almamıştık). arac-model-veri-olustur.mts'te ZATEN
+    // hesaplanıyordu (takiEklendiMi/takiCikarildiMi) — burada AYNI mantıkla ekleniyor.
+    const takiEklendiMi: 0 | 1 = (sonYaris?.eklenenTaki?.length ?? 0) > 0 ? 1 : 0;
+    const takiCikarildiMi: 0 | 1 = (sonYaris?.cikarilanTaki?.length ?? 0) > 0 ? 1 : 0;
     const sireOzet = sireOzetByRunnerId.get(r.id);
     const jockeyStat = r.jockey ? jockeyStats[r.jockey] : undefined;
     const trainerStat = r.trainer ? trainerStats[r.trainer] : undefined;
@@ -727,7 +742,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       kgs: kgsVal, kgsVarMi,
       pistUzmani: sonYaris?.kazandi === "EVET" ? 1 : 0,
       yakinsama2Plus: 0, // aşağıda, TÜM runner'lar hazır olduktan sonra (sahaya-göreli pedigri sırası gerekiyor) dolduruluyor
-      sonIdmanSprint,
+      sonIdmanSprint, takiEklendiMi, takiCikarildiMi,
       sireOrani, galop: keskinGalop, idmJokey,
       galopSayisi: gecerliGaloplar.length, uzunAraGalopKatkisi,
       jokeyOrani, antrenorOrani,
@@ -805,6 +820,8 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     r.zeminToleransi,
     r.yakinsama2Plus,
     r.sonIdmanSprint,
+    r.takiEklendiMi,
+    r.takiCikarildiMi,
   ];
 }
 
@@ -1392,6 +1409,8 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   { kod: "ZEMIN", ozellikIndeksleri: [idx("zeminToleransi")], aciklama: (r) => (r.zeminToleransi !== 0 ? `Zemin toleransı: Normal-dışı pistteki geçmişinde popülasyona göre ${r.zeminToleransi > 0 ? "+" : ""}${r.zeminToleransi.toFixed(1)}% (${r.zeminToleransi > 0 ? "daha hızlı" : "daha yavaş"})` : null) },
   { kod: "YAKINSAMA", ozellikIndeksleri: [idx("yakinsama2Plus")], aciklama: (r) => (r.katkilar[YAKINSAMA_IDX] !== 0 ? "Yakınsama: pist uzmanlığı/pedigri/at-jokey ikilisi/AGF trend/sınıf düşüşünden en az 2'si bu atta hizalanmış (istatistiksel kanıtı yok, kullanıcı kararıyla eklendi)" : null) },
   { kod: "SPRINT", ozellikIndeksleri: [idx("sonIdmanSprint")], aciklama: (r) => (r.katkilar[SON_IDMAN_SPRINT_IDX] !== 0 ? `Son idman türü Sprint/Sürat (backtest yönü doğrulamadı, kullanıcı kararıyla eklendi): ${r.katkilar[SON_IDMAN_SPRINT_IDX] > 0 ? "olumlu" : "olumsuz"}` : null) },
+  { kod: "TAKIEK", ozellikIndeksleri: [idx("takiEklendiMi")], aciklama: (r) => (r.katkilar[TAKI_EKLENDI_IDX] !== 0 ? `Takı eklendi (son yarışına göre): ${r.katkilar[TAKI_EKLENDI_IDX] > 0 ? "olumlu" : "olumsuz"}` : null) },
+  { kod: "TAKICIK", ozellikIndeksleri: [idx("takiCikarildiMi")], aciklama: (r) => (r.katkilar[TAKI_CIKARILDI_IDX] !== 0 ? `Takı çıkarıldı (son yarışına göre): ${r.katkilar[TAKI_CIKARILDI_IDX] > 0 ? "olumlu" : "olumsuz"}` : null) },
 ];
 
 // 2026-08-18 kullanıcı talebi: "18 sinyalin hepsinin kontrol edildiğini bana göstermesini
@@ -1419,6 +1438,8 @@ const FEATURE_LABELS: Record<string, string> = {
   zeminToleransi: "Zemin Toleransı (Normal-dışı pistte geçmiş göreli performans)",
   yakinsama2Plus: "Yakınsama (pist uzmanlığı+pedigri+at-jokey ikilisi+AGF trend+sınıf düşüşünden ≥2'si aynı atta)",
   sonIdmanSprint: "Son İdman Türü Sprint/Sürat",
+  takiEklendiMi: "Takı Eklendi (son yarışına göre)",
+  takiCikarildiMi: "Takı Çıkarıldı (son yarışına göre)",
 };
 
 export type TumOzellikDetay = { kod: string; etiket: string; hamDeger: number; standartDeger: number; katki: number };
