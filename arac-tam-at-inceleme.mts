@@ -237,23 +237,40 @@ async function tekKosuIsle(raceId: string) {
   // atları tek tek dökmüştü), asıl hata SENTEZ hatasıydı — uzun at-at okuma sırasında
   // 2-3 ata takılıp TÜM sahayı yan yana kıyaslamayı atlamak. Bu tablo, o kıyası ELLE
   // yapmaya güvenmek yerine OTOMATİK ve ZORUNLU hale getiriyor — okuması gereken tek şey.
-  console.log(`\n  ── ÖZET KIYAS TABLOSU (${sirali.length} at, model sırasına göre) ──`);
-  console.log(`  No  At                    Sıra  Olasılık  AGF Farkı  PedigriK  Sınıf     Yakınsama  Sprint  Takı`);
+  // Aynı gün kullanıcı talebi: yalnız birkaç seçili alan değil, A-Katmanı'nın 14
+  // özelliğinin TAMAMI + ayrı-mekanizmalı B-Katmanı sinyalleri (sireOrani,
+  // zeminMesafeDeneyim — bkz. v5-engine.ts bKatmaniUygula) tabloya eklendi.
+  const KISA_ETIKET: Record<string, string> = {
+    agfSirasi: "AGFsr", kgsVarMi: "KGSv", idmJokey: "İdmJk", jokeyOrani: "JokOr",
+    antrenorOrani: "AntOr", kacakYalniz: "Kaçk", agfPayi: "AGF%", h2hNetSkor: "H2H",
+    hizDerecesi: "HızDr", h2hKiloDegisimi: "H2HKilo", agfPayi2: "AGF%²",
+    zeminToleransi: "ZemTol", yakinsama2Plus: "Yaknsm", sonIdmanSprint: "Sprint",
+  };
+  const basliklar = [
+    "No", "At", "Sıra", "Olsk",
+    ...A_KATMANI_ADLARI.map((a) => KISA_ETIKET[a] ?? a),
+    "SireOr", "ZemMsf", "AGFfrk", "PedK", "Sınıf", "Takı",
+  ];
+  console.log(`\n  ── ÖZET KIYAS TABLOSU (${sirali.length} at, TÜM A+B katmanı sinyalleri, model sırasına göre) ──`);
+  console.log("  " + basliklar.map((b) => b.padEnd(8)).join(""));
   sirali.forEach((r, i) => {
     const sira = i + 1;
     const ozet = ozetByName.get(r.ad);
     const sonYaris = sonYarisByName.get(r.ad);
     const vektor = toFeatureVector(r);
-    const yakinsamaIdx = A_KATMANI_ADLARI.indexOf("yakinsama2Plus");
-    const sprintIdx = A_KATMANI_ADLARI.indexOf("sonIdmanSprint");
     const takiMetni = sonYaris
       ? [...sonYaris.eklenenTaki.map((t) => `+${t.code}`), ...sonYaris.cikarilanTaki.map((t) => `-${t.code}`)].join(" ") || "∅"
       : "?";
-    console.log(
-      `  ${String(r.no).padEnd(3)} ${r.ad.padEnd(21)} ${String(sira).padEnd(5)} %${(r.olasilik * 100).toFixed(1).padEnd(7)} ${String(ozet?.agfFark ?? "?").padEnd(10)} ${String(ozet?.pedigriKYuzde ?? "?").padEnd(9)} ${String(ozet?.sinifDurumu ?? "?").padEnd(9)} ${String(vektor[yakinsamaIdx]).padEnd(10)} ${String(vektor[sprintIdx]).padEnd(7)} ${takiMetni}`
-    );
+    const yuvarla = (x: number) => (Number.isInteger(x) ? String(x) : x.toFixed(1));
+    const hucreler = [
+      String(r.no), r.ad.length > 6 ? r.ad.slice(0, 6) : r.ad, String(sira), `%${(r.olasilik * 100).toFixed(1)}`,
+      ...vektor.map((v) => yuvarla(v)),
+      yuvarla(r.sireOrani), yuvarla(r.zeminMesafeDeneyim),
+      String(ozet?.agfFark ?? "?"), String(ozet?.pedigriKYuzde ?? "?"), String(ozet?.sinifDurumu ?? "?"), takiMetni,
+    ];
+    console.log("  " + hucreler.map((h) => h.padEnd(8)).join(""));
   });
-  console.log(`  ── Bu tabloyu satır satır tara — pedigriK/AGF farkı/takı sütunlarında model sırasıyla ÇELİŞEN bir at varsa mutlaka belirt. ──\n`);
+  console.log(`  ── Sütun sırası başlıkla eşleşir. A-Katmanı=14 skor girdisi (AGFsr..Sprint), ayrı-mekanizmalı B-Katmanı=SireOr/ZemMsf, gösterim-amaçlı=AGFfrk/PedK/Sınıf/Takı. Satır satır tara — model sırasıyla ÇELİŞEN bir sütun varsa mutlaka belirt. ──\n`);
 }
 
 async function main() {
