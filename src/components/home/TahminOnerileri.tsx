@@ -38,7 +38,19 @@ function InstagramLogo({ className }: { className?: string }) {
   );
 }
 
-function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string | null; isAdmin: boolean }) {
+// 2026-09-01 kullanıcı talebi — WhatsApp gibi platformlara TEK bir genel paylaş
+// ikonuyla (uçak/gönder simgesi) direkt görsel gönderilebilsin, admin'e özel
+// Instagram/X ikonlarının yanına, TÜM kullanıcılara açık.
+function ShareLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M22 2 11 13" />
+      <path d="M22 2 15 22l-4-9-9-4z" />
+    </svg>
+  );
+}
+
+function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon; ikramiye: string | null; isAdmin: boolean; cityLabel?: string }) {
   const t = useTranslations("home.tahminOnerileri");
   const STATUS_LABEL: Record<KuponStatus, string> = { hit: t("hit"), miss: t("miss"), pending: t("pending") };
   const visibleVariants = data.variants.filter((v) => v.status !== "miss" && v.filled);
@@ -58,7 +70,7 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
   // .location ataması da popup engeliyle AYNI kısıtlamaya takılabiliyor. Güvenilir
   // tek yol: X'i açan linki GERÇEK bir kullanıcı tıklamasına bağlamak — toast'un
   // action butonu tam bunu sağlıyor, kendi tıklaması olduğu için engellenmiyor.
-  async function handleShare(platform: "instagram" | "x") {
+  async function handleShare(platform?: "instagram" | "x") {
     const imageUrl = `${window.location.origin}/api/og/kupon/${data.id}?variant=${active.key}`;
     try {
       const res = await fetch(imageUrl);
@@ -89,9 +101,21 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-sm font-medium text-muted-foreground">{data.hippodromeName}</span>
+        <span className="text-sm font-medium text-muted-foreground">{cityLabel ?? data.hippodromeName}</span>
+        <div className="flex items-center gap-1.5">
+          {/* 2026-09-01 kullanıcı talebi — WhatsApp'a doğrudan görsel gönderebilecek TEK
+              genel paylaş ikonu, admin ayrımı olmadan TÜM kullanıcılara açık. */}
+          <button
+            type="button"
+            onClick={() => handleShare()}
+            title={t("paylas")}
+            aria-label={t("paylas")}
+            className="inline-flex items-center rounded-md border border-brand/40 bg-brand/10 p-1.5 text-brand hover:bg-brand/20 transition-colors"
+          >
+            <ShareLogo className="h-3.5 w-3.5" />
+          </button>
         {isAdmin && (
-          <div className="flex items-center gap-1.5">
+          <>
             <button
               type="button"
               onClick={() => handleShare("instagram")}
@@ -110,8 +134,9 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
             >
               <XLogo className="h-3.5 w-3.5" />
             </button>
-          </div>
+          </>
         )}
+        </div>
       </div>
 
       {/* Tek kupon şablonu — Ekonomik/Normal/Geniş, /program'daki panel butonları gibi tıklanınca değişir */}
@@ -202,6 +227,52 @@ function KuponBlock({ data, ikramiye, isAdmin }: { data: Kupon; ikramiye: string
   );
 }
 
+// 2026-09-01 kullanıcı talebi — aynı şehrin birden fazla altılısı (1. Altılı/2. Altılı)
+// varsa, ikisini ayrı kartlar olarak yan yana/alt alta göstermek yerine TEK kartın
+// üstünde bir segment seçiciyle (referans: "İsmet Demir" tarzı tahminci sayfaları)
+// değiştirilebilir hale getirildi — hippodromeName "Şehir — N. Altılı" formatını
+// zaten taşıyor (bkz. KuponForm.tsx slotLabel), burada ayrıştırılıyor.
+function KuponGroup({ kuponlar, altiliResults, isAdmin }: { kuponlar: Kupon[]; altiliResults: AltiliCityResult[]; isAdmin: boolean }) {
+  const [secili, setSecili] = useState(0);
+  const parcala = (ad: string) => {
+    const [sehir, slot] = ad.split(" — ");
+    return { sehir, slot: slot ?? null };
+  };
+  const cityLabel = parcala(kuponlar[0].hippodromeName).sehir;
+  const aktif = kuponlar[secili];
+
+  return (
+    <div>
+      {kuponlar.length > 1 && (
+        <div className="mb-2 flex items-center gap-1.5">
+          {kuponlar.map((k, i) => {
+            const { slot } = parcala(k.hippodromeName);
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setSecili(i)}
+                className={cn(
+                  "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                  i === secili ? "bg-brand text-brand-foreground" : "bg-white/5 text-muted-foreground border hover:bg-muted"
+                )}
+              >
+                {slot ?? `${i + 1}. Altılı`}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <KuponBlock
+        data={aktif}
+        cityLabel={cityLabel}
+        ikramiye={findIkramiyeForHippodrome(aktif.hippodromeName, altiliResults) ?? aktif.ikramiye}
+        isAdmin={isAdmin}
+      />
+    </div>
+  );
+}
+
 type Props = { data: KuponOnerisi[]; altiliResults?: AltiliCityResult[]; isLoggedIn?: boolean; isAdmin?: boolean };
 
 export default function TahminOnerileri({ data, altiliResults = [], isLoggedIn = false, isAdmin = false }: Props) {
@@ -209,6 +280,16 @@ export default function TahminOnerileri({ data, altiliResults = [], isLoggedIn =
   const items = data.filter((k): k is Kupon => k !== null);
   const hasVisible = items.some((k) => k.variants.some((v) => v.status !== "miss"));
   if (items.length === 0 || !hasVisible) return null;
+
+  // Aynı şehrin (hippodromeName'in " — " öncesi kısmı) 1./2. Altılı'sını TEK gruba
+  // topla — getKuponOnerileri zaten şehre göre sıralı döndüğü için art arda gelirler.
+  const gruplar: Kupon[][] = [];
+  for (const kupon of items) {
+    const sehir = kupon.hippodromeName.split(" — ")[0];
+    const sonGrup = gruplar[gruplar.length - 1];
+    if (sonGrup && sonGrup[0].hippodromeName.split(" — ")[0] === sehir) sonGrup.push(kupon);
+    else gruplar.push([kupon]);
+  }
 
   if (!isLoggedIn) {
     return (
@@ -241,8 +322,8 @@ export default function TahminOnerileri({ data, altiliResults = [], isLoggedIn =
               sayfasının kapsamadığı bahis türlerinde canlı eşleşme sessizce null
               dönüyordu — admin'in elle girdiği kupon.ikramiye artık yedek olarak
               kullanılıyor (canlı TJK eşleşmesi varsa o önceliklidir, daha güncel). */}
-          {items.map((kupon, i) => (
-            <KuponBlock key={i} data={kupon} ikramiye={findIkramiyeForHippodrome(kupon.hippodromeName, altiliResults) ?? kupon.ikramiye} isAdmin={isAdmin} />
+          {gruplar.map((grup, i) => (
+            <KuponGroup key={i} kuponlar={grup} altiliResults={altiliResults} isAdmin={isAdmin} />
           ))}
         </div>
       </div>
