@@ -31,7 +31,6 @@ const ComparisonPanel = dynamic(() => import("./panels/ComparisonPanel"), { load
 const H2HPanel = dynamic(() => import("./panels/H2HPanel"), { loading: () => PANEL_LOADING, ssr: false });
 const SonYarisDetayPanel = dynamic(() => import("./panels/SonYarisDetayPanel"), { loading: () => PANEL_LOADING, ssr: false });
 const AtDetaylariPanel = dynamic(() => import("./panels/AtDetaylariPanel"), { loading: () => PANEL_LOADING, ssr: false });
-const HizliOzetPanel = dynamic(() => import("./panels/HizliOzetPanel"), { loading: () => PANEL_LOADING, ssr: false });
 
 // Detay paneli açma/kapama butonları (Son 800/Galop/Pedigriler/H2H/Karşılaştır/Son Yarış Detayları) —
 // her biri farklı renkteyken karmaşık görünüyordu; artık hepsi tek tip, sadece açık/kapalı
@@ -1143,7 +1142,7 @@ type JockeyStatsMap = Record<string, {
 type TrainerStatsMap = Record<string, TrainerStatRow>;
 
 function RaceTable({
-  race, dateStr, analysisOpen, onAnalysisToggle, son800Open, agfTrendOpen, galopOpen, pedigreeOpen, comparisonOpen, h2hOpen, sonYarisOpen, atDetayOpen, hizliOzetOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, isVerified, userEmail, jockeyStats, trainerStats, hippodromeName,
+  race, dateStr, analysisOpen, onAnalysisToggle, son800Open, agfTrendOpen, galopOpen, pedigreeOpen, comparisonOpen, h2hOpen, sonYarisOpen, atDetayOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, isVerified, userEmail, jockeyStats, trainerStats, hippodromeName,
 }: {
   race: ProgramRace;
   dateStr: string;
@@ -1157,7 +1156,6 @@ function RaceTable({
   h2hOpen: boolean;
   sonYarisOpen: boolean;
   atDetayOpen: boolean;
-  hizliOzetOpen: boolean;
   followedSet: Set<string>;
   onToggleFollow: (horseName: string) => void;
   onSelectHorse: (name: string) => void;
@@ -1352,10 +1350,10 @@ function RaceTable({
           />
         )}
       </div>
-      <div id="panel-hizli-ozet">
-        {hizliOzetOpen && (
+      <div id="panel-son-yaris-detay">
+        {sonYarisOpen && (
           <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
-            <HizliOzetPanel raceId={race.id} />
+            <SonYarisDetayPanel raceId={race.id} />
           </PanelKilitGate>
         )}
       </div>
@@ -1398,13 +1396,6 @@ function RaceTable({
         {h2hOpen && (
           <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
             <H2HPanel raceId={race.id} />
-          </PanelKilitGate>
-        )}
-      </div>
-      <div id="panel-son-yaris-detay">
-        {sonYarisOpen && (
-          <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
-            <SonYarisDetayPanel raceId={race.id} />
           </PanelKilitGate>
         )}
       </div>
@@ -1454,7 +1445,6 @@ export default function ProgramView({
   const [h2hOpen, setH2hOpen] = useState(false);
   const [sonYarisOpen, setSonYarisOpen] = useState(false);
   const [atDetayOpen, setAtDetayOpen] = useState(false);
-  const [hizliOzetOpen, setHizliOzetOpen] = useState(false);
   const [selectedHorse, setSelectedHorse] = useState<string | null>(null);
   const [hipodromOzellikleriOpen, setHipodromOzellikleriOpen] = useState(false);
   const [followedSet, setFollowedSet] = useState(() => new Set(followedNames));
@@ -1492,7 +1482,7 @@ export default function ProgramView({
   // tek açılması gerekiyordu — bir atı (ör. MEGAFAUNA) değerlendirirken 7 ayrı panele
   // tek tek tıklamak yerine, hepsini AYNI ANDA açan tek bir anahtar. Analizi Gör ayrı
   // tutuldu (farklı amaç, ayrı kilit/CTA akışı).
-  const tumPanellerAcikMi = son800Open && agfTrendOpen && galopOpen && pedigreeOpen && comparisonOpen && h2hOpen && sonYarisOpen && atDetayOpen && hizliOzetOpen;
+  const tumPanellerAcikMi = son800Open && agfTrendOpen && galopOpen && pedigreeOpen && comparisonOpen && h2hOpen && sonYarisOpen && atDetayOpen;
   function tumPanelleriAcVeyaKapat() {
     const hedef = !tumPanellerAcikMi;
     setSon800Open(hedef);
@@ -1503,13 +1493,12 @@ export default function ProgramView({
     setH2hOpen(hedef);
     setSonYarisOpen(hedef);
     setAtDetayOpen(hedef);
-    setHizliOzetOpen(hedef);
-    // Açılırken ilk panelin (Accurace) başlığına kaydır — toggleAndScroll ile aynı desen,
+    // Açılırken ilk panelin (Son Yarış Detayları) başlığına kaydır — toggleAndScroll ile aynı desen,
     // kullanıcı butona bastıktan sonra veriyi görmek için elle aşağı kaydırmasın.
     if (hedef) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          const el = document.getElementById("panel-hizli-ozet");
+          const el = document.getElementById("panel-son-yaris-detay");
           if (!el) return;
           const top = el.getBoundingClientRect().top + window.scrollY - STICKY_HEADER_OFFSET;
           window.scrollTo({ top, behavior: "smooth" });
@@ -1687,7 +1676,6 @@ export default function ProgramView({
               h2hOpen={h2hOpen}
               sonYarisOpen={sonYarisOpen}
               atDetayOpen={atDetayOpen}
-              hizliOzetOpen={hizliOzetOpen}
               followedSet={followedSet}
               onToggleFollow={handleToggleFollow}
               onSelectHorse={setSelectedHorse}

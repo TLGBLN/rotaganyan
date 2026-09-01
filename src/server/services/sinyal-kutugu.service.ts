@@ -320,7 +320,7 @@ export const ADAY_SINYALLER: AdaySinyal[] = [
 
 // 2026-09-01 — Yukarıdaki "Yakınsama" testinin BİLEŞENLERİ (pist uzmanlığı, sınıf
 // durumu/ikramiye trendi, at-jokey ikilisi, AGF trend, pedigri kYuzde), skora hiç
-// katılmadan, /program sayfasının "Hızlı Özet" panelinde (HizliOzetPanel.tsx,
+// katılmadan, /program sayfasının "Son Yarış Detayları" panelinde (SonYarisDetayPanel.tsx,
 // hizli-ozet.actions.ts) GÖSTERİM AMAÇLI tutuldu — kullanıcı MEGAFAUNA gibi vakaları
 // ELLE tararken hız kazansın diye. Bu satır istatistiksel bir "kabul" değil, yalnız
 // nerede kullanıldığının referansı.
