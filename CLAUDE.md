@@ -1,0 +1,34 @@
+# ROTAGANYAN — Proje Talimatları
+
+## Bir at/koşu değerlendirmesi istendiğinde ZORUNLU ilk adım
+
+Kullanıcı belirli bir at, koşu veya günün programı hakkında gerçek bir analiz/yorum
+istediğinde (MEGAFAUNA türü "bu at neden ilk 6'da değil", "bu koşuda kim öne çıkar" gibi
+sorular) — cevap vermeden ÖNCE, o koşu için şunu çalıştır:
+
+```
+node --env-file=.env node_modules/tsx/dist/cli.mjs arac-tam-at-inceleme.mts --hipodrom <slug> --tarih <YYYY-MM-DD> --kosu <no>
+```
+
+Bu KALICI ARAÇ, sahadaki HER at için TEK seferde şunları döker: modelin 13 skor
+girdisinin tamamı (A+B katmanı), Hızlı Özet (pist uzmanlığı/sınıf/at-jokey ikilisi/AGF
+trend/pedigri), soy ağacı, sahiplik/kazanç, detaylı istatistik tablolarının TAM içeriği,
+son 5 yarış, Accurace'in tam sektörel geçmişi, galop split'leri, derece istatistikleri
+arşivi, ham jokey VE antrenör kırılımı.
+
+**Neden zorunlu:** 2026-09-01'de (MEGAFAUNA vakası) kullanıcı, yalnız modelin skor
+girdilerine/Hızlı Özet'e bakıp pedigri/detaylı istatistik/Accurace geçmişini atlama
+alışkanlığını defalarca yakaladı — araç kurulduktan SONRA bile bu alışkanlık kendiliğinden
+değişmedi (bkz. proje hafızası: feedback_tam_at_incelemesi_araci.md). Bu dosya o
+alışkanlığı YAPISAL olarak kesmek için var — "atlamayı unuttum" artık bir seçenek değil,
+bu talimat her oturumda otomatik yükleniyor.
+
+**Bir günün TÜM koşuları için** (tek koşu değil): `--kosu` parametresini çıkar —
+o hipodrom/günün henüz sonuçlanmamış TÜM koşularını sırayla işler.
+
+Script'in çıktısı uzun olabilir — tamamını oku, yalnız ilk birkaç atı değil, sahadaki
+İSTİSNASIZ HER atı.
+
+## Diğer kalıcı araçlar (silinmiyor, kök dizinde)
+- `arac-model-veri-olustur.mts` — V5 eğitim verisi cache'ini üretir/günceller
+- `arac-model-egit-segment.mjs` — düşük-şart/diğer segmentlerini ayrı ayrı eğitir

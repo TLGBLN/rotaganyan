@@ -202,6 +202,17 @@ async function tekKosuIsle(raceId: string) {
       });
       console.log(`  Jokey (${r.jockey}) ham kırılım (JockeyStatSync, ilk 5): ${jokeyKirilim.map((j) => `${j.hippoSlug}/${j.year}/${j.breed}/${j.surface}: ${j.wins}/${j.rides} (%${(j.winRate * 100).toFixed(1)})`).join(" | ") || "kayıt yok"}`);
     }
+
+    if (r.trainer) {
+      // getTrainerStats ZATEN kısaltma/soyad/baş harf eşleştirmesini içeriyor (bkz.
+      // race.service.ts resolveByInitials) — programdaki "A.YILMAZ" gibi kısaltılmış
+      // isimlerle TrainerStatSync'teki tam isimleri (AntrenorIstatistikleri, TJK) burada
+      // NAİF karşılaştırma yapmadan, aynı olgunlaşmış fonksiyondan eşleştiriyoruz.
+      const { getTrainerStats } = await import("./src/server/services/race.service");
+      const antrenorSonuc = await getTrainerStats([r.trainer]);
+      const stat = antrenorSonuc[r.trainer];
+      console.log(`  Antrenör (${r.trainer}) — TrainerStatSync (TJK AntrenorIstatistikleri, ${new Date().getFullYear()}): ${stat ? `${stat.wins}/${stat.rides} (%${(100 * stat.wins / (stat.rides || 1)).toFixed(1)})` : "eşleşme yok"}`);
+    }
   }
 }
 
