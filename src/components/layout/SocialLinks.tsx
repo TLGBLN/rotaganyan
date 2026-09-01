@@ -2,7 +2,8 @@
 // onerileri'ne giden ikinci bir bağlantıydı) kaldırılıp yerine gerçek sosyal medya
 // hesaplarına giden ikonlar kondu. lucide-react'te marka ikonları (Instagram/Facebook/X)
 // yok — bu yüzden resmi glif yollarıyla minimal inline SVG kullanılıyor, ek paket eklenmedi.
-const ICON_CLASS = "h-4 w-4 fill-current";
+// Kullanıcı talebi (aynı gün): monokrom yerine markaların GERÇEK renkleriyle gösterilsin.
+const ICON_CLASS = "h-[18px] w-[18px] fill-white";
 
 function XIcon() {
   return (
@@ -29,22 +30,28 @@ function FacebookIcon() {
 }
 
 const LINKS = [
-  { href: "https://x.com/rotaganyantr", label: "X (Twitter)", Icon: XIcon },
-  { href: "https://www.instagram.com/rotaganyantr", label: "Instagram", Icon: InstagramIcon },
-  { href: "https://www.facebook.com/profile.php?id=61593665895810", label: "Facebook", Icon: FacebookIcon },
+  { href: "https://x.com/rotaganyantr", label: "X (Twitter)", Icon: XIcon, bg: "bg-black" },
+  {
+    href: "https://www.instagram.com/rotaganyantr",
+    label: "Instagram",
+    Icon: InstagramIcon,
+    // Instagram'ın resmi degrade kimliği (sarı→pembe→mor)
+    bg: "bg-[radial-gradient(circle_at_30%_110%,#fdf497_0%,#fdf497_5%,#fd5949_45%,#d6249f_60%,#285AEB_90%)]",
+  },
+  { href: "https://www.facebook.com/profile.php?id=61593665895810", label: "Facebook", Icon: FacebookIcon, bg: "bg-[#1877F2]" },
 ] as const;
 
 export default function SocialLinks({ className }: { className?: string }) {
   return (
-    <div className={className ?? "flex items-center gap-1.5"}>
-      {LINKS.map(({ href, label, Icon }) => (
+    <div className={className ?? "flex items-center gap-2"}>
+      {LINKS.map(({ href, label, Icon, bg }) => (
         <a
           key={label}
           href={href}
           target="_blank"
           rel="noopener noreferrer"
           aria-label={label}
-          className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-opacity hover:opacity-85 ${bg}`}
         >
           <Icon />
         </a>
