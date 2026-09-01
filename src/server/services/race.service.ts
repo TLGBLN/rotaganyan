@@ -629,16 +629,24 @@ export async function getGecmisKazananKuponlar(limit = 20): Promise<KazananKupon
     return true;
   });
 
+  // 2026-09-01 performans düzeltmesi: bu SIRAYLA (for...await) çalışıyordu — her aday için
+  // ayrı bir DB sorgusu (buildKuponOnerisi) bekleniyordu, "hit" olmayanları da dahil TÜM
+  // adaylar (limit*6'ya kadar, ör. 96) taranana kadar. /program sayfasında bu tek başına
+  // ~13 saniye tutuyordu (kullanıcı şikayeti: "tarih seçince yavaşladı"). Adayların hepsi
+  // paralel sorgulanıyor artık — toplam süre artık en yavaş TEK sorgunun süresine iniyor.
+  // Sıra (tarih desc) korunuyor çünkü Promise.all girdi sırasını korur.
+  const built = await Promise.all(dedup.map((k) => buildKuponOnerisi(k)));
   const results: (KazananKupon & { _needsIkramiye: boolean })[] = [];
-  for (const k of dedup) {
+  for (let i = 0; i < dedup.length; i++) {
     if (results.length >= limit) break;
-    const built = await buildKuponOnerisi(k);
-    if (!built) continue;
-    const hitVariant = built.variants.find((v) => v.filled && v.status === "hit");
+    const b = built[i];
+    if (!b) continue;
+    const hitVariant = b.variants.find((v) => v.filled && v.status === "hit");
     if (!hitVariant) continue;
+    const k = dedup[i];
     results.push({
       id: k.id,
-      hippodromeName: built.hippodromeName,
+      hippodromeName: b.hippodromeName,
       date: k.date,
       variantLabel: hitVariant.label,
       amount: hitVariant.amount,
