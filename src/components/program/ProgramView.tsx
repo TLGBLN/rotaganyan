@@ -1381,7 +1381,7 @@ function RaceTable({
       )}
 
       {/* Analiz paneli */}
-      <div id="panel-analiz">
+      <div id="panel-analiz" className="scroll-mt-14">
         {race.hasAnalysis && analysisOpen && (
           <AnalysisPanel
             picks={race.picks}
@@ -1398,7 +1398,7 @@ function RaceTable({
           />
         )}
       </div>
-      <div id="panel-son-yaris-detay">
+      <div id="panel-son-yaris-detay" className="scroll-mt-14">
         {sonYarisOpen && (
           <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
             <SonYarisDetayPanel raceId={race.id} />
@@ -1498,15 +1498,19 @@ export default function ProgramView({
   const [followedSet, setFollowedSet] = useState(() => new Set(followedNames));
   const [, startFollowTransition] = useTransition();
 
-  // Site üstündeki sticky Header (h-14 = 56px) — panele scroll ederken başlığın
-  // bu barın altında kalmaması için bu kadar pay bırakılır.
   /** v6.104 — üye olmayana kilit ikonu, üyeye aç/kapa oku (bkz. PanelKilitGate). */
   function kilitVeyaChevron(acik: boolean) {
     if (!isLoggedIn) return "🔒";
     return acik ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
   }
 
-  const STICKY_HEADER_OFFSET = 56;
+  // 2026-09-02 kullanıcı talebi ("açılır menü açıldığında bu şekilde scroll hizalı
+  // açılsın") — önceki sürüm `getBoundingClientRect` ile ELLE hesaplayıp `window.scrollTo`
+  // çağırıyordu; bu ölçüm React'ın panel içeriğini gerçekten boyayışından bir video karesi
+  // önce alınabiliyordu (double rAF her zaman yetmiyor), bu da başlığın sticky nav'ın
+  // altına TAM oturmayıp birkaç piksel kayık açılmasına yol açıyordu. `scrollIntoView` +
+  // panel div'lerindeki `scroll-mt-14` (56px, nav yüksekliğiyle birebir) tarayıcının kendi
+  // paint anında hesapladığı, bu yarış koşuluna kapalı yerel bir mekanizma.
 
   /** Panel butonuna basınca paneli aç/kapat; açılıyorsa render sonrası panelin başlığına scroll et. */
   function toggleAndScroll(setter: (v: (prev: boolean) => boolean) => void, current: boolean, panelId: string) {
@@ -1515,10 +1519,7 @@ export default function ProgramView({
     if (willOpen) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          const el = document.getElementById(panelId);
-          if (!el) return;
-          const top = el.getBoundingClientRect().top + window.scrollY - STICKY_HEADER_OFFSET;
-          window.scrollTo({ top, behavior: "smooth" });
+          document.getElementById(panelId)?.scrollIntoView({ behavior: "smooth", block: "start" });
         });
       });
     }
@@ -1546,10 +1547,7 @@ export default function ProgramView({
     if (hedef) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          const el = document.getElementById("panel-son-yaris-detay");
-          if (!el) return;
-          const top = el.getBoundingClientRect().top + window.scrollY - STICKY_HEADER_OFFSET;
-          window.scrollTo({ top, behavior: "smooth" });
+          document.getElementById("panel-son-yaris-detay")?.scrollIntoView({ behavior: "smooth", block: "start" });
         });
       });
     }
