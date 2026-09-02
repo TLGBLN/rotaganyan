@@ -223,9 +223,15 @@ export type SiralamaKurali = {
 export const SIRALAMA_KURALLARI: SiralamaKurali[] = [
   {
     ad: "AGF Trend Terfisi",
-    etiket: "GERİ AÇILDI (2026-08-30, V5.28+)",
-    aciklama: "En çok yükselen/düşen AGF trendini taşıyan + yeterli sinyal sayısına (≥4) sahip atlar, ham sıralamada geride kalsa bile ilk-3'e/ilk-6'ya terfi eder. 2026-08-27'de diğer ikisiyle birlikte kapatılmıştı (Kocaeli 2.Koşu örneği), ama bu kural KOŞULSUZ değil — adayın olasılığı diğer adaylarla YARIŞIR (terfiPenceresiV5), bu yüzden Kocaeli'deki gibi modelin kendi yüzdesini ezme riski taşımıyor. Kullanıcı 2026-08-30'da tek tek yeniden değerlendirip yalnız bunu geri açtı.",
-    backtestOzet: "n=663 → %21.6 galibiyet / %53.8 top3 — GEÇERLİ ve UYGULANIYOR.",
+    etiket: "GERİ AÇILDI (2026-08-30, V5.28+) — BUG DÜZELTİLDİ (2026-09-02, V5.38)",
+    aciklama: "En çok yükselen/düşen AGF trendini taşıyan + yeterli sinyal sayısına (≥4) sahip atlar, ham sıralamada geride kalsa bile ilk-3'e/ilk-6'ya terfi eder. 2026-08-27'de diğer ikisiyle birlikte kapatılmıştı (Kocaeli 2.Koşu örneği), 2026-08-30'da geri açıldı. GERÇEK BİR BUG (2026-09-02'de bulundu, arac-tam-at-inceleme.mts ile THEATER OF WAR incelemesi sırasında): eski uygulama 'adayın olasılığı diğerleriyle yarışır' ilkesiyle çalışıyordu (terfiPenceresiV5), ama girdi ZATEN olasılığa göre sıralı geldiği için pencere dışındaki hiçbir aday hiçbir doğal sakini matematiksel olarak geçemiyordu — bu kural 2026-08-30'dan 2026-09-02'ye kadar SESSİZCE HİÇ ÇALIŞMAMIŞ, terfiEdenNolar HER ZAMAN boş dönmüş (sentetik testle doğrulandı: düzeltme öncesi/sonrası aynı senaryoda agfTerfi hep null'dan gerçek terfiye geçti). Düzeltme: agfFavoriIlk3Garantisi ile aynı ilke — en güçlü aday, pencerenin en zayıf sakinini KOŞULSUZ yerinden alır (yalnız o tek sakin değişir, güçlü sakinler asla elenmez).",
+    backtestOzet: "n=663 → %21.6 galibiyet / %53.8 top3 — bu rakam V4'ün ORİJİNAL (çalışan) mekanizmasından. V5 portundaki 2026-08-30→2026-09-02 arası GERÇEKTE UYGULANMIYORDU (yukarıya bak). 2026-09-02'den itibaren düzeltilmiş haliyle GEÇERLİ ve UYGULANIYOR — güncel veriyle toplu backtest henüz YAPILMADI (yalnız sentetik doğrulama).",
+  },
+  {
+    ad: "Saf Model Değer Terfisi",
+    etiket: "YENİ (2026-09-02, V5.38)",
+    aciklama: "Saf Model (marketBlindProb1, AGF'siz) ile AGF payı arasındaki fark ≥5pp VE yeterli sinyal sayısı (≥4) varsa, at ham sıralamada geride kalsa bile ilk-6'ya KOŞULSUZ terfi eder (agfFavoriIlk3Garantisi/düzeltilmiş agfTrendTerfisi ile aynı splice ilkesi). THEATER OF WAR vakasından doğdu (İstanbul, Saf Model 4.sıra/%10.2 derken AGF payı %5.0'a gömüp nihai skoru 8.sıraya düşürmüştü, at günün en iyi performanslarından birini verdi). Kullanıcı kararı: 'olumlu sinyaller varken agf piyasaya göre at aşağılara çekilmemeli en azından 6. at dışına atılmamalı.'",
+    backtestOzet: "Kullanıcı kararıyla backtest İSTENMEDEN doğrudan canlıya alındı (zeminToleransi/yakınsama/yarisGidisatiSkoru ile aynı türden bilinçli istisna). Yalnız sentetik doğrulama: THEATER OF WAR'ı taklit eden senaryoda (fark=5.3pp, sinyalSayisi=4) doğal 8. sıradaki aday 6. sıraya taşındı, 1-5. sıradaki güçlü sakinler dokunulmadı.",
   },
   {
     ad: "AGF Favorisi İlk-3 Garantisi",
