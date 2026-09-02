@@ -9,6 +9,11 @@ import { finishPos } from "@/lib/race-result";
 import { kararOku } from "@/lib/methodology/muhakeme-format";
 import { ekuriRengi } from "@/lib/ekuri-colors";
 
+// PuanTablosu.tsx'in kendi pick şekli — ProgramView.tsx'in ProgramPick'inden FARKLI
+// (o daha dar, runner.scratched/ekuriGroup taşımıyor). ProgramRaceDay'den türetiliyor
+// ki tek kaynaktan (Prisma select) sapmasın.
+type PuanPick = NonNullable<ProgramRaceDay["races"][number]["prediction"]>["picks"][number];
+
 type Props = {
   raceDay: ProgramRaceDay;
   isLoggedIn: boolean;
@@ -43,6 +48,31 @@ function chunkIntoAltili<T extends Race>(
   if (g1.length > 0) result.push({ label: "1.Altılı", races: g1 });
   if (g2.length > 0) result.push({ label: "2.Altılı", races: g2 });
   return result;
+}
+
+// 2026-09-02 kullanıcı talebi ("ekürileri yan yana al") — ProgramView.tsx'in Analiz
+// Detayları tablosundaki AYNI mantık: iki eküri ortağı ayrı satır olarak iki kat yer
+// kaplamasın, aynı satırda birlikte gösterilsin. Bu tablo o zaman GÜNCELLENMEMİŞTİ
+// (farklı bir dosya, PuanTablosu.tsx) — burada da aynı desen uygulanıyor.
+function buildPickRows(picks: PuanPick[]): PuanPick[][] {
+  const renderedNos = new Set<number>();
+  const rows: PuanPick[][] = [];
+  for (const p of picks) {
+    const no = p.runner?.no;
+    if (no != null && renderedNos.has(no)) continue;
+    const grp = p.runner?.ekuriGroup;
+    const partner = grp != null
+      ? picks.find((q) => q !== p && q.runner?.no != null && !renderedNos.has(q.runner.no) && q.runner?.ekuriGroup === grp)
+      : undefined;
+    if (no != null) renderedNos.add(no);
+    if (partner?.runner?.no != null) {
+      renderedNos.add(partner.runner.no);
+      rows.push([p, partner]);
+    } else {
+      rows.push([p]);
+    }
+  }
+  return rows;
 }
 
 function rankColor(rank: number): string {
@@ -114,7 +144,11 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
   return (
     <div className="space-y-6">
       {groups.map(({ label: altiliLabel, races: group }, gi) => {
-        const maxRows = Math.max(...group.map((r) => r.prediction!.picks.length));
+        // 2026-09-02 — eküri ortakları birleşince (buildPickRows) satır sayısı raw
+        // picks.length'ten AZ olabilir — maxRows/desktop tablosu BİRLEŞMİŞ satır
+        // sayısına göre hesaplanmalı, yoksa gereksiz boş satırlar oluşur.
+        const pickRowsByRaceId = new Map(group.map((r) => [r.id, buildPickRows(r.prediction!.picks)]));
+        const maxRows = Math.max(...group.map((r) => pickRowsByRaceId.get(r.id)!.length));
 
         return (
           <div key={gi} className="rounded-xl border">
@@ -141,7 +175,7 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
                       </tr>
                     </thead>
                     <tbody>
-                      {race.prediction!.picks.map((pick, rowIdx) => {
+                      {buildPickRows(race.prediction!.picks).map((rowPicks, rowIdx) => {
                         // v6.68 — kullanıcı bulgusu: ham pick.rank scratch sonrası boşluklu
                         // kalabiliyordu (ör. 3..12) — ekrandaki "#" pozisyonu zaten sırayla
                         // (rowIdx+1) gösteriliyordu, ama banko/renk/kalınlık HAM rank'a
@@ -149,12 +183,14 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
                         // pozisyonu kullanıyor — completeFullField artık rank'ı yazarken
                         // sıkıştırdığı için yeni veride zaten eşitler, eski veri için de bu
                         // bileşen kendi içinde tutarlı kalır.
+                        // 2026-09-02 — eküri ortağı aynı satırda birleşince (bkz. buildPickRows)
+                        // displayRank artık HAM rank değil, birleşmiş listedeki SIRALI konum.
                         const displayRank = rowIdx + 1;
                         const isBanko = race.prediction!.isBanko && displayRank === 1;
-                        const isTarget = pick?.isTarget;
-                        const isWinner =
-                          pick?.runner?.no != null &&
-                          (race.result?.winnerNos ?? []).includes(pick.runner.no);
+                        const isTarget = rowPicks.some((p) => p.isTarget);
+                        const isWinner = rowPicks.some(
+                          (p) => p.runner?.no != null && (race.result?.winnerNos ?? []).includes(p.runner.no)
+                        );
                         const rowBg = isWinner
                           ? "bg-[#C98F02]/20"
                           : isTarget
@@ -176,38 +212,44 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
                                   <Star className="inline-block h-3 w-3 mr-0.5 -mt-0.5 fill-brand text-brand" />
                                 </span>
                               )}
-                              <span className="font-mono mr-1 tabular-nums">
-                                {pick.runner?.no ?? "—"}
-                              </span>
-                              <span className={cn(pick.runner?.scratched && "line-through opacity-50")}>
-                                {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
-                              </span>
-                              {!pick.runner?.scratched && pick.runner?.ekuriGroup != null && (
-                                <span title={`Eküri grubu ${pick.runner.ekuriGroup}`} className="ml-1 inline-flex items-center gap-0.5 text-[10px]">
-                                  <span className={cn("inline-block h-1.5 w-1.5 rounded-full", ekuriRengi(pick.runner.ekuriGroup).badge)} />
-                                  🐴
-                                </span>
-                              )}
-                              {pick.runner?.scratched && (
-                                <span className="ml-1 text-[10px] font-semibold text-red-400">Koşmaz</span>
-                              )}
-                              {(() => {
-                                const pos = finishPos(race.result?.actualOrder, pick.runner?.no, race.result?.winnerNos);
-                                return pos != null ? (
-                                  <span className={cn("ml-1 text-[10px] font-semibold", pos === 1 ? "text-[#F5C518]" : "text-muted-foreground")}>
-                                    ({pos}.)
-                                    {pos === 1 && race.result?.ganyan != null && ` Gny: ${race.result.ganyan.toFixed(2)}`}
+                              {rowPicks.map((pick, pi) => (
+                                <span key={pick.runner?.no ?? pi} className={cn(pi > 0 && "ml-1.5 before:content-['/'] before:mr-1.5 before:text-muted-foreground")}>
+                                  <span className="font-mono mr-1 tabular-nums">
+                                    {pick.runner?.no ?? "—"}
                                   </span>
-                                ) : null;
-                              })()}
-                              {isAdmin && pick.runner?.no != null && agfSiraByRaceId.get(race.id)?.has(pick.runner.no) && (
-                                <span className="ml-1 rounded bg-purple-500/15 px-1 text-[9px] font-semibold text-purple-500">
-                                  AGF {agfSiraByRaceId.get(race.id)!.get(pick.runner.no)}.
+                                  <span className={cn(pick.runner?.scratched && "line-through opacity-50")}>
+                                    {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
+                                  </span>
+                                  {rowPicks.length === 1 && !pick.runner?.scratched && pick.runner?.ekuriGroup != null && (
+                                    <span title={`Eküri grubu ${pick.runner.ekuriGroup}`} className="ml-1 inline-flex items-center gap-0.5 text-[10px]">
+                                      <span className={cn("inline-block h-1.5 w-1.5 rounded-full", ekuriRengi(pick.runner.ekuriGroup).badge)} />
+                                      🐴
+                                    </span>
+                                  )}
+                                  {pick.runner?.scratched && (
+                                    <span className="ml-1 text-[10px] font-semibold text-red-400">Koşmaz</span>
+                                  )}
+                                  {(() => {
+                                    const pos = finishPos(race.result?.actualOrder, pick.runner?.no, race.result?.winnerNos);
+                                    return pos != null ? (
+                                      <span className={cn("ml-1 text-[10px] font-semibold", pos === 1 ? "text-[#F5C518]" : "text-muted-foreground")}>
+                                        ({pos}.)
+                                        {pos === 1 && race.result?.ganyan != null && ` Gny: ${race.result.ganyan.toFixed(2)}`}
+                                      </span>
+                                    ) : null;
+                                  })()}
+                                  {isAdmin && pick.runner?.no != null && agfSiraByRaceId.get(race.id)?.has(pick.runner.no) && (
+                                    <span className="ml-1 rounded bg-purple-500/15 px-1 text-[9px] font-semibold text-purple-500">
+                                      AGF {agfSiraByRaceId.get(race.id)!.get(pick.runner.no)}.
+                                    </span>
+                                  )}
                                 </span>
-                              )}
+                              ))}
                             </td>
                             <td className={cn("px-2 py-1.5 text-center font-mono tabular-nums whitespace-nowrap", textColor, weight)}>
-                              <PuanHucre score={pick.score} details={pick.details} />
+                              <span className="inline-flex items-center gap-1">
+                                {rowPicks.map((p) => <PuanHucre key={p.runner?.no ?? p.runnerLabel} score={p.score} details={p.details} />)}
+                              </span>
                             </td>
                           </tr>
                         );
@@ -290,19 +332,19 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
                       </td>
 
                       {group.map((race, ri) => {
-                        const pick = race.prediction!.picks[rowIdx];
+                        const rowPicks = pickRowsByRaceId.get(race.id)![rowIdx];
                         // v6.68 — bkz. mobil tablodaki aynı düzeltme: ekran pozisyonu
                         // (rowIdx+1) ile ham pick.rank ayrışabildiği için stil/banko artık
-                        // ikisi için de aynı (ekrandaki) pozisyona bakıyor.
+                        // ikisi için de aynı (ekrandaki) pozisyona bakıyor. 2026-09-02 —
+                        // eküri ortağı birleşince displayRank de birleşmiş listedeki sıra.
                         const displayRank = rowIdx + 1;
                         const isBanko = race.prediction!.isBanko && displayRank === 1;
-                        const isTarget = pick?.isTarget;
+                        const isTarget = rowPicks?.some((p) => p.isTarget) ?? false;
                         const isWinner =
-                          pick?.runner?.no != null &&
-                          (race.result?.winnerNos ?? []).includes(pick.runner.no);
+                          rowPicks?.some((p) => p.runner?.no != null && (race.result?.winnerNos ?? []).includes(p.runner.no)) ?? false;
                         const colBg = ri % 2 === 1 ? "bg-muted/5" : "";
 
-                        if (!pick) {
+                        if (!rowPicks) {
                           return (
                             <>
                               <td key={`${race.id}-${rowIdx}-a`} colSpan={2} className={cn("px-1.5 py-1", colBg)} />
@@ -314,6 +356,7 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
                         const rowBg = isWinner ? "bg-[#C98F02]/20" : isTarget ? "bg-hit/15" : colBg;
                         const textColor = isWinner ? "text-[#F5C518]" : rankColor(displayRank);
                         const weight = rankWeight(displayRank);
+                        const nameMaxWidth = rowPicks.length > 1 ? "max-w-[26px]" : "max-w-[56px]";
 
                         return (
                           <>
@@ -326,37 +369,44 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
                                 {isBanko && (
                                   <Star className="h-2.5 w-2.5 shrink-0 fill-brand text-brand" />
                                 )}
-                                <span className={cn("shrink-0 font-mono tabular-nums", weight)}>
-                                  {pick.runner?.no ?? "—"}
-                                </span>
-                                <span
-                                  title={(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
-                                  className={cn("min-w-0 max-w-[56px] truncate", weight, pick.runner?.scratched && "line-through opacity-50")}
-                                >
-                                  {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
-                                </span>
-                                {!pick.runner?.scratched && pick.runner?.ekuriGroup != null && (
-                                  <span title={`Eküri grubu ${pick.runner.ekuriGroup}`} className="shrink-0 inline-flex items-center gap-0.5 text-[9px]">
-                                    <span className={cn("inline-block h-1.5 w-1.5 rounded-full", ekuriRengi(pick.runner.ekuriGroup).badge)} />
-                                    🐴
-                                  </span>
-                                )}
-                                {pick.runner?.scratched && (
-                                  <span className="shrink-0 text-[9px] font-semibold text-red-400">Koşmaz</span>
-                                )}
-                                {(() => {
-                                  const pos = finishPos(race.result?.actualOrder, pick.runner?.no, race.result?.winnerNos);
-                                  return pos != null ? (
-                                    <span className={cn("shrink-0 text-[9px] font-semibold", pos === 1 ? "text-[#F5C518]" : "text-muted-foreground")}>
-                                      ({pos}.)
-                                      {pos === 1 && race.result?.ganyan != null && ` Gny: ${race.result.ganyan.toFixed(2)}`}
+                                {rowPicks.map((pick, pi) => (
+                                  <span key={pick.runner?.no ?? pi} className="flex items-center gap-0.5 min-w-0">
+                                    {pi > 0 && <span className="shrink-0 text-muted-foreground">/</span>}
+                                    <span className={cn("shrink-0 font-mono tabular-nums", weight)}>
+                                      {pick.runner?.no ?? "—"}
                                     </span>
-                                  ) : null;
-                                })()}
-                                {isAdmin && pick.runner?.no != null && agfSiraByRaceId.get(race.id)?.has(pick.runner.no) && (
-                                  <span className="shrink-0 rounded bg-purple-500/15 px-1 text-[8px] font-semibold text-purple-500">
-                                    A{agfSiraByRaceId.get(race.id)!.get(pick.runner.no)}
+                                    <span
+                                      title={(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
+                                      className={cn("min-w-0 truncate", nameMaxWidth, weight, pick.runner?.scratched && "line-through opacity-50")}
+                                    >
+                                      {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
+                                    </span>
+                                    {rowPicks.length === 1 && !pick.runner?.scratched && pick.runner?.ekuriGroup != null && (
+                                      <span title={`Eküri grubu ${pick.runner.ekuriGroup}`} className="shrink-0 inline-flex items-center gap-0.5 text-[9px]">
+                                        <span className={cn("inline-block h-1.5 w-1.5 rounded-full", ekuriRengi(pick.runner.ekuriGroup).badge)} />
+                                        🐴
+                                      </span>
+                                    )}
+                                    {pick.runner?.scratched && (
+                                      <span className="shrink-0 text-[9px] font-semibold text-red-400">Koşmaz</span>
+                                    )}
+                                    {(() => {
+                                      const pos = finishPos(race.result?.actualOrder, pick.runner?.no, race.result?.winnerNos);
+                                      return pos != null ? (
+                                        <span className={cn("shrink-0 text-[9px] font-semibold", pos === 1 ? "text-[#F5C518]" : "text-muted-foreground")}>
+                                          ({pos}.)
+                                        </span>
+                                      ) : null;
+                                    })()}
+                                    {isAdmin && pick.runner?.no != null && agfSiraByRaceId.get(race.id)?.has(pick.runner.no) && (
+                                      <span className="shrink-0 rounded bg-purple-500/15 px-1 text-[8px] font-semibold text-purple-500">
+                                        A{agfSiraByRaceId.get(race.id)!.get(pick.runner.no)}
+                                      </span>
+                                    )}
                                   </span>
+                                ))}
+                                {isWinner && race.result?.ganyan != null && (
+                                  <span className="shrink-0 text-[9px] font-semibold text-[#F5C518]">Gny: {race.result.ganyan.toFixed(2)}</span>
                                 )}
                               </div>
                             </td>
@@ -370,7 +420,9 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
                                 weight
                               )}
                             >
-                              <PuanHucre score={pick.score} details={pick.details} />
+                              <span className="inline-flex items-center gap-0.5">
+                                {rowPicks.map((p) => <PuanHucre key={p.runner?.no ?? p.runnerLabel} score={p.score} details={p.details} />)}
+                              </span>
                             </td>
                           </>
                         );
