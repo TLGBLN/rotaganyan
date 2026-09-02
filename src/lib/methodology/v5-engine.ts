@@ -267,7 +267,7 @@ const WEIGHTS_DIGER_HANDIKAP: AgirlikSeti = {
 // katkısını (katkilar dizisinden) çıkarmakta kullanılan indeksler — OZELLIK_GRUPLARI'ndeki
 // "AGF" grubuyla (aşağıda) BİREBİR aynı üç özellik, ayrı bir sabitte tutuluyor çünkü o grup
 // bu noktada henüz tanımlı değil (dosyanın altında).
-const AGF_KATKI_INDEKSLERI = [
+export const AGF_KATKI_INDEKSLERI = [
   FEATURE_NAMES.indexOf("agfSirasi"),
   FEATURE_NAMES.indexOf("agfPayi"),
   FEATURE_NAMES.indexOf("agfPayi2"),
