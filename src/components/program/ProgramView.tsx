@@ -1674,7 +1674,7 @@ export default function ProgramView({
                 <button
                   onClick={() => toggleAndScroll(setAnalysisOpen, analysisOpen, "panel-analiz")}
                   data-tour="analiz-buton"
-                  className="flex items-center gap-1 rounded-md bg-[#00944D] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
+                  className="flex items-center gap-1 rounded-md bg-[#006D05] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
                 >
                   {isLoggedIn
                     ? <><Radio className="h-3 w-3 animate-pulse" /> {t("analiziGor")} {analysisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}</>

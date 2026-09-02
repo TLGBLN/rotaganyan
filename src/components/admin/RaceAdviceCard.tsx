@@ -141,7 +141,7 @@ export default function RaceAdviceCard({
 
         <div className="flex shrink-0 flex-col items-end gap-2">
           {prediction ? (
-            <span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold", prediction.published ? "text-hit" : "text-brand")}>
+            <span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold", prediction.published ? "text-[#006D05]" : "text-brand")}>
               {prediction.published && <Radio className="h-3 w-3 animate-pulse" />}
               Analiz {prediction.published ? "Yayında" : "Taslak"}
             </span>
