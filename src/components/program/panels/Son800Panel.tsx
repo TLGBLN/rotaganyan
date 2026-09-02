@@ -25,7 +25,7 @@ export default function Son800Panel({ raceId }: { raceId: string }) {
 
   return (
     <div className="border-t">
-      <div className="px-4 py-2.5 bg-[#C98F02] border-b flex items-center">
+      <div className="px-4 py-2.5 bg-[#022637] border-b flex items-center">
         <span className="text-sm font-bold tracking-wide text-black">{t("accuraceTitle")}</span>
       </div>
 

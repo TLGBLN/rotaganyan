@@ -65,7 +65,7 @@ export default function ComparisonPanel({ raceId }: { raceId: string }) {
 
   return (
     <div className="border-t">
-      <div className="px-4 py-2.5 bg-[#C98F02] border-b">
+      <div className="px-4 py-2.5 bg-[#022637] border-b">
         <div className="text-sm font-bold tracking-wide text-black">
           {t("comparisonTitle")}
         </div>

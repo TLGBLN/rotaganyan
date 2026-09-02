@@ -518,7 +518,7 @@ function AnalysisPanel({
   if (!isVerified) {
     return (
       <div ref={ref} className="border-t">
-        <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
+        <div className="px-4 py-2.5 bg-[#022637] border-b flex items-center">
           <span className="text-sm font-bold tracking-wide text-white">{t("analizDetaylari")}</span>
         </div>
         <EmailVerificationGate email={userEmail} />
@@ -529,7 +529,7 @@ function AnalysisPanel({
   return (
     <div ref={ref} className="border-t">
       {/* Başlık */}
-      <div className="px-4 py-2.5 bg-[#c0392b] border-b flex items-center">
+      <div className="px-4 py-2.5 bg-[#022637] border-b flex items-center">
         <span className="text-sm font-bold tracking-wide text-white">Analiz Detayları</span>
       </div>
 

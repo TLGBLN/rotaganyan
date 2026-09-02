@@ -8,7 +8,7 @@ export default function PedigreePanel({ runners }: { runners: ProgramRunner[] })
   const t = useTranslations("programToolbar");
   return (
     <div className="border-t">
-      <div className="px-4 py-2.5 bg-[#C98F02] border-b flex items-center">
+      <div className="px-4 py-2.5 bg-[#022637] border-b flex items-center">
         <span className="text-sm font-bold tracking-wide text-black">{t("pedigriler")}</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2">
