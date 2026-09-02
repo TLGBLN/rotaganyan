@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getDamStatOzetleriForRace } from "@/server/actions/dam-stat.actions";
 import { ENGINE_VERSIONS } from "@/server/services/analiz-versiyon-karsilastirma.service";
+import { mesafeBucket } from "@/lib/sire-stat-match";
 
 // 2026-08-16 kullanıcı kararı: kupon hazırlama safhasındaki sınıf-bazlı istatistikler
 // (Eko/Nor/Gen %, "1.seçim 1.geldi") V1-V22/V4/V5 karışık tüm geçmişi topluyordu — V5
@@ -336,6 +337,19 @@ export type AnalystStats = {
   // kupon kademesinde yakalandığı — bkz. atSayisiBucket notu.
   byAtSayisi: AnalystBreakdown[];
   couponTierByAtSayisi: CouponTierBreakdown[];
+  // 2026-09-02 kullanıcı talebi ("bu kısımlar çok genel oluyor, at sayıları-mesafe-yarış
+  // tipine göre sınıflandır"): classTypeGroup TEK BAŞINA tüm mesafeleri/saha büyüklüklerini
+  // pool'luyordu. Bu üç çapraz kırılım getClassTypeAdvice'ın YENİ, daha spesifik ilk
+  // basamakları — kademeli düşme (bkz. o fonksiyonun notu) TIER_GUVEN_ESIGI'yi
+  // karşılamayan hücrelerde otomatik olarak daha geniş (ve halihazırda var olan)
+  // kırılımlara iner, hiçbir zaman "veri yok" demeden önce mevcut güvenilir bir kırılımı
+  // atlamaz.
+  byTipMesafeAt: AnalystBreakdown[];
+  couponTierByTipMesafeAt: CouponTierBreakdown[];
+  byTipMesafe: AnalystBreakdown[];
+  couponTierByTipMesafe: CouponTierBreakdown[];
+  byTipAt: AnalystBreakdown[];
+  couponTierByTipAt: CouponTierBreakdown[];
 };
 
 const SURFACE_LABEL: Record<string, string> = { CIM: "Çim", KUM: "Kum", SENTETIK: "Sentetik" };
@@ -568,6 +582,15 @@ export async function getAnalystStats(excludeRaceId?: string, sadeceGuncelMotor 
     couponTierByAtSayisi: groupCouponTier((r) => atSayisiBucket(r.race.runners.length)).sort(
       (a, b) => AT_SAYISI_ORDER.indexOf(a.label) - AT_SAYISI_ORDER.indexOf(b.label)
     ),
+    // 2026-09-02 — bkz. AnalystStats.byTipMesafeAt üstündeki not. Anahtarlar "|" ile
+    // birleştiriliyor (classType/mesafe/atSayısı etiketlerinin hiçbiri "|" içermiyor,
+    // çakışma riski yok) — getClassTypeAdvice AYNI anahtar biçimini kurup arıyor.
+    byTipMesafeAt: group((r) => `${classTypeGroup(r.race.classType)}|${mesafeBucket(r.race.distance)}|${atSayisiBucket(r.race.runners.length)}`),
+    couponTierByTipMesafeAt: groupCouponTier((r) => `${classTypeGroup(r.race.classType)}|${mesafeBucket(r.race.distance)}|${atSayisiBucket(r.race.runners.length)}`),
+    byTipMesafe: group((r) => `${classTypeGroup(r.race.classType)}|${mesafeBucket(r.race.distance)}`),
+    couponTierByTipMesafe: groupCouponTier((r) => `${classTypeGroup(r.race.classType)}|${mesafeBucket(r.race.distance)}`),
+    byTipAt: group((r) => `${classTypeGroup(r.race.classType)}|${atSayisiBucket(r.race.runners.length)}`),
+    couponTierByTipAt: groupCouponTier((r) => `${classTypeGroup(r.race.classType)}|${atSayisiBucket(r.race.runners.length)}`),
     overallCouponTier: groupCouponTier(() => "Tüm Tahminler")[0] ?? {
       label: "Tüm Tahminler",
       total: 0,
@@ -894,8 +917,19 @@ function tierSeviye(t: CouponTierBreakdown): ClassTypeAdvice["level"] {
  * geniş örneklemli ÜST GRUBA (Maiden/Şartlı/Handikap/KV/Satış/Açık Koşular —
  * classTypeGroup) düşülür; dar sınıfın kendi (küçük, geniş GA'lı) rakamı da
  * ayrıca gösterilir ki admin ikisini birden görüp kendi kararını versin.
+ *
+ * 2026-09-02 kullanıcı talebi ("bu kısımlar çok genel oluyor — at sayıları, mesafe ve
+ * yarış tipine göre sınıflandır"): mesafe/atSayısı verildiyse, dar/geniş sınıf
+ * basamaklarından ÖNCE üç YENİ, daha spesifik basamak denenir (kademeli düşme):
+ * 1) yarış-tipi-grubu × mesafe × atSayısı  2) yarış-tipi-grubu × mesafe
+ * 3) yarış-tipi-grubu × atSayısı — her biri yalnız TIER_GUVEN_ESIGI'yi karşılıyorsa
+ * kullanılır, karşılamıyorsa sessizce bir alt basamağa (nihayetinde mevcut dar/geniş
+ * sınıf mantığına) düşer. Veri hacmi arttıkça bu basamaklar otomatik olarak devreye
+ * girer — bugün (V5 dönemi ~300 koşu) çoğu hücre hâlâ yetersiz, sistem dürüstçe daha
+ * geniş bir kırılıma iner (bkz. proje hafızası: bu özelliğin kabul testinde ölçülen
+ * gerçek hücre doluluk oranları).
  */
-export function getClassTypeAdvice(stats: AnalystStats, classType: string, atSayisi?: number): ClassTypeAdvice {
+export function getClassTypeAdvice(stats: AnalystStats, classType: string, atSayisi?: number, distance?: number): ClassTypeAdvice {
   const normalized = normalizeClassType(classType);
   const grupAdi = classTypeGroup(classType);
   const breakdown = stats.byClassType.find((b) => b.label === normalized);
@@ -906,6 +940,55 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string, atSay
   // (bkz. atSayisiBucket) tarihsel kademe dağılımı da tierOneri'ye aktarılır — koşu-tipi
   // bazlı öneriden DAHA GENİŞ bir kupon gerektiriyorsa o kazanır (bkz. tierOneri notu).
   const atSayisiTier = atSayisi != null ? stats.couponTierByAtSayisi.find((t) => t.label === atSayisiBucket(atSayisi)) : undefined;
+
+  const mesafeKovasi = distance != null ? mesafeBucket(distance) : null;
+  const atKovasi = atSayisi != null ? atSayisiBucket(atSayisi) : null;
+
+  if (mesafeKovasi && atKovasi) {
+    const key = `${grupAdi}|${mesafeKovasi}|${atKovasi}`;
+    const ucluTier = stats.couponTierByTipMesafeAt.find((t) => t.label === key);
+    const ucluBreakdown = stats.byTipMesafeAt.find((b) => b.label === key);
+    if (ucluTier && ucluBreakdown && ucluTier.total >= TIER_GUVEN_ESIGI) {
+      const isabet = `%${ucluBreakdown.rate.toFixed(0)} (${ucluBreakdown.hits}/${ucluBreakdown.total})`;
+      return {
+        level: tierSeviye(ucluTier),
+        text: `[${grupAdi}, ${mesafeKovasi}, ${atKovasi}] ${tierYuzdeMetni(ucluTier, false)} (${ucluTier.total} koşu) · 1. seçim 1. geldi: ${isabet}`,
+        oneri: tierOneri(ucluTier),
+        tierYuzdeler: { eko: ucluTier.ekonomik, nor: ucluTier.normal, genis: ucluTier.genis, kacti: ucluTier.kacti, toplam: ucluTier.total },
+        top1Rate: { rate: ucluBreakdown.rate, hits: ucluBreakdown.hits, total: ucluBreakdown.total },
+      };
+    }
+  }
+  if (mesafeKovasi) {
+    const key = `${grupAdi}|${mesafeKovasi}`;
+    const ikiliTier = stats.couponTierByTipMesafe.find((t) => t.label === key);
+    const ikiliBreakdown = stats.byTipMesafe.find((b) => b.label === key);
+    if (ikiliTier && ikiliBreakdown && ikiliTier.total >= TIER_GUVEN_ESIGI) {
+      const isabet = `%${ikiliBreakdown.rate.toFixed(0)} (${ikiliBreakdown.hits}/${ikiliBreakdown.total})`;
+      return {
+        level: tierSeviye(ikiliTier),
+        text: `[${grupAdi}, ${mesafeKovasi}] ${tierYuzdeMetni(ikiliTier, false)} (${ikiliTier.total} koşu) · 1. seçim 1. geldi: ${isabet}`,
+        oneri: tierOneri(ikiliTier, atSayisiTier),
+        tierYuzdeler: { eko: ikiliTier.ekonomik, nor: ikiliTier.normal, genis: ikiliTier.genis, kacti: ikiliTier.kacti, toplam: ikiliTier.total },
+        top1Rate: { rate: ikiliBreakdown.rate, hits: ikiliBreakdown.hits, total: ikiliBreakdown.total },
+      };
+    }
+  }
+  if (atKovasi) {
+    const key = `${grupAdi}|${atKovasi}`;
+    const ikiliTier = stats.couponTierByTipAt.find((t) => t.label === key);
+    const ikiliBreakdown = stats.byTipAt.find((b) => b.label === key);
+    if (ikiliTier && ikiliBreakdown && ikiliTier.total >= TIER_GUVEN_ESIGI) {
+      const isabet = `%${ikiliBreakdown.rate.toFixed(0)} (${ikiliBreakdown.hits}/${ikiliBreakdown.total})`;
+      return {
+        level: tierSeviye(ikiliTier),
+        text: `[${grupAdi}, ${atKovasi}] ${tierYuzdeMetni(ikiliTier, false)} (${ikiliTier.total} koşu) · 1. seçim 1. geldi: ${isabet}`,
+        oneri: tierOneri(ikiliTier),
+        tierYuzdeler: { eko: ikiliTier.ekonomik, nor: ikiliTier.normal, genis: ikiliTier.genis, kacti: ikiliTier.kacti, toplam: ikiliTier.total },
+        top1Rate: { rate: ikiliBreakdown.rate, hits: ikiliBreakdown.hits, total: ikiliBreakdown.total },
+      };
+    }
+  }
 
   const darYeterli = !!tier && tier.total >= TIER_GUVEN_ESIGI;
   const grupYeterli = !!grupTier && grupTier.total >= TIER_GUVEN_ESIGI;
