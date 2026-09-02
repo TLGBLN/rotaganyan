@@ -88,9 +88,11 @@ async function main() {
 
     // Yakın ıskalar — Saf Model Değer Terfisi'nin birincil koşulunu (fark>=eşik) geçip
     // ikincil koşulda (AGF-dışı katkı toplamı>0) VEYA pencere-yarışında elenenler.
-    const ilk6NoSet = new Set(sirali.slice(0, 6).map((r) => r.no));
+    // ekuriIlk6Efektif kullanılıyor (ham ilk-6 DEĞİL) — bkz. v5-engine.ts efektifPencereSiniri:
+    // eküri ortakları tek slot saydığında GERÇEKTE ilk-6 içinde olan bir at (THEATER OF WAR
+    // gibi) burada yanlışlıkla "yakın-ıska" sayılmasın diye.
     for (const r of sirali) {
-      if (ilk6NoSet.has(r.no)) continue; // zaten ilk 6'da, terfiye ihtiyacı yok
+      if (r.ekuriIlk6Efektif) continue; // zaten (eküri-farkında) ilk 6'da, terfiye ihtiyacı yok
       const fark = r.marketBlindProb1 * 100 - r.agfPayi;
       if (fark < SAF_MODEL_DEGER_ESIGI) continue;
       const nonAgf = nonAgfKatkiToplami(r.katkilar);

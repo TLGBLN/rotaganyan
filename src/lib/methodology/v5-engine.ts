@@ -339,6 +339,12 @@ export type Faz1RunnerV5 = {
   ad: string;
   jockey: string | null;
   trainer: string | null;
+  /** 2026-09-02 kullanıcı bulgusu (THEATER OF WAR/K6 — JAEHAERA+DAELLA eküri, 1. ve 4.
+   *  sırada, birbirinden bağımsız iki "slot" tüketiyordu): terfi pencerelerinin (bkz.
+   *  efektifPencereSiniri) eküri-farkında olması için taşınıyor — agfSirasi'nin eküri
+   *  ortaklarını AYNI sıraya koyma mantığıyla (yukarıdaki 2026-08-30 notu) AYNI ilke,
+   *  farklı bir uygulama noktası. Skora/regresyona GİRMEZ. */
+  ekuriGroup: number | null;
   agf: number | null;
   agfFark: number;
   agfSirasi: number;
@@ -757,6 +763,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
 
     return {
       id: r.id, no: r.no, ad: r.name, jockey: r.jockey, trainer: r.trainer, agf: r.agf,
+      ekuriGroup: r.ekuriGroup,
       agfFark: agfFarkByNo.get(r.no) ?? 0,
       agfSirasi: agfSiraMap.get(r.id) ?? sahaOrtasi,
       agfPayi: r.agf ?? 0,
@@ -981,9 +988,14 @@ export type Faz1RunnerV5Sirali = Faz1RunnerV5 & {
   agfTerfi: "ilk3" | "ilk6" | null;
   agfFavoriGarantisi: boolean;
   /** 2026-09-02 — Saf Model Değer Terfisi (bkz. safModelDegerTerfisiUygula): bu at,
-   *  marketBlindProb1 vs agfPayi ayrışması + yeterli sinyalSayisi yüzünden ilk-6'ya
-   *  koşulsuz taşındı mı. */
+   *  marketBlindProb1 vs agfPayi ayrışması + AGF-dışı katkı toplamının net pozitif
+   *  olması yüzünden ilk-6'ya koşulsuz taşındı mı (V5.39, bkz. AGF_KATKI_INDEKSLERI). */
   degerTerfisi: boolean;
+  /** 2026-09-02 EKÜRİ DÜZELTMESİ (THEATER OF WAR/K6) — bkz. efektifPencereSiniri. Bu at,
+   *  ilk-6 penceresi eküri ortaklarını TEK slot sayacak şekilde hesaplandığında (ham
+   *  teknikSira'dan BAĞIMSIZ) GERÇEKTE ilk-6 içinde mi. true ise karar "Düşük Risk"e
+   *  çekilir — teknikSira'nın kendisi (ham 1..N sıra) DEĞİŞMEZ. */
+  ekuriIlk6Efektif: boolean;
   teknikSira: number;
   karar: string;
 };
@@ -1025,21 +1037,45 @@ function kararUret(p: number): string {
  *  pencere dışındaki adaylar arasında (kendi aralarında) EN GÜÇLÜ olanı, pencerenin en
  *  zayıf (son) sakinini yerinden ederek pencereye TEK seferde girer. KING ZELAY'ı koruyan
  *  şey artık "olasılık yarışı" değil, "aday listesindeki en iyisi, en fazla BİR sakinin
- *  yerini alır" sınırı — pencerenin 1. ve 2. sıradaki güçlü sakinleri hiçbir zaman elenmez. */
-function terfiPenceresiV5<T extends { no: number; olasilik: number }>(
+ *  yerini alır" sınırı — pencerenin 1. ve 2. sıradaki güçlü sakinleri hiçbir zaman elenmez.
+ *
+ *  2026-09-02 EKÜRİ DÜZELTMESİ (kullanıcı bulgusu, İstanbul K6 — THEATER OF WAR 7.sırada,
+ *  ama 1. ve 4. sıradaki JAEHAERA+DAELLA gerçek eküri): pencere sınırı ham dizi indeksi
+ *  (pencereBoyu) yerine efektifPencereSiniri ile hesaplanıyor — bir eküri çifti pencere
+ *  İÇİNDE aynı anda İKİ ayrı ham pozisyon tutsa da TEK slot sayılır, bu da pencerenin
+ *  gerçek sınırını dışarı iter (THEATER OF WAR artık pencerenin İÇİNDE sayılıyor, dışarıdaki
+ *  tek gerçek aday ANGEL OF DEFNE kalıyor). agfSirasi'nin eküri ortaklarını AYNI sıraya
+ *  koyma mantığıyla (gatherFaz1V5'teki 2026-08-30 notu) AYNI ilke, farklı uygulama noktası. */
+function efektifPencereSiniri<T extends { ekuriGroup: number | null }>(sirali: T[], pencereBoyu: number): number {
+  let slotSayisi = 0;
+  const gorulenGruplar = new Set<number>();
+  for (let i = 0; i < sirali.length; i++) {
+    const grup = sirali[i].ekuriGroup;
+    const yeniSlotMu = grup == null || !gorulenGruplar.has(grup);
+    if (yeniSlotMu) {
+      slotSayisi++;
+      if (grup != null) gorulenGruplar.add(grup);
+    }
+    if (slotSayisi > pencereBoyu) return i;
+  }
+  return sirali.length;
+}
+
+function terfiPenceresiV5<T extends { no: number; olasilik: number; ekuriGroup: number | null }>(
   sirali: T[],
   pencereBoyu: number,
   adayMi: (r: T, index: number) => boolean
 ): { sonuc: T[]; terfiEdenNolar: Set<number> } {
+  const efektifSinir = efektifPencereSiniri(sirali, pencereBoyu);
   const disaridakiAdaylar = sirali
     .map((r, i) => ({ r, i }))
-    .filter(({ r, i }) => i >= pencereBoyu && adayMi(r, i));
+    .filter(({ r, i }) => i >= efektifSinir && adayMi(r, i));
   if (disaridakiAdaylar.length === 0) return { sonuc: sirali, terfiEdenNolar: new Set() };
 
   const enGuclusu = disaridakiAdaylar.reduce((a, b) => (b.r.olasilik > a.r.olasilik ? b : a));
   const kopya = [...sirali];
   const [aday] = kopya.splice(enGuclusu.i, 1);
-  kopya.splice(pencereBoyu - 1, 0, aday);
+  kopya.splice(efektifSinir - 1, 0, aday);
   return { sonuc: kopya, terfiEdenNolar: new Set([aday.no]) };
 }
 
@@ -1054,7 +1090,7 @@ function terfiPenceresiV5<T extends { no: number; olasilik: number }>(
 function agfTrendTerfisiUygula<
   T extends {
     no: number; agfTrendYonu: "yükseliş" | "düşüş" | null; sinyalSayisi: number;
-    agfFark: number; agfSirasi: number; olasilik: number;
+    agfFark: number; agfSirasi: number; olasilik: number; ekuriGroup: number | null;
   }
 >(sirali: T[]): (T & { agfTerfi: "ilk3" | "ilk6" | null })[] {
   const isaretli = sirali.map((r) => ({ ...r, agfTerfi: null as "ilk3" | "ilk6" | null }));
@@ -1144,7 +1180,10 @@ function agfFavoriIlk3Garantisi<T extends { no: number; agfSirasi: number }>(
 const SAF_MODEL_DEGER_ESIGI = 5;
 
 function safModelDegerTerfisiUygula<
-  T extends { no: number; olasilik: number; marketBlindProb1: number; agfPayi: number; katkilar: number[] }
+  T extends {
+    no: number; olasilik: number; marketBlindProb1: number; agfPayi: number; katkilar: number[];
+    ekuriGroup: number | null;
+  }
 >(sirali: T[]): (T & { degerTerfisi: boolean })[] {
   const isaretsiz = sirali.map((r) => ({ ...r, degerTerfisi: false }));
   const { sonuc, terfiEdenNolar } = terfiPenceresiV5(isaretsiz, 6, (r) => {
@@ -1339,12 +1378,21 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
     ? safModelDegerTerfisiUygula(duzeltilmis)
     : duzeltilmis.map((r) => ({ ...r, degerTerfisi: false }));
 
+  // 2026-09-02 EKÜRİ DÜZELTMESİ (İstanbul K6, THEATER OF WAR) — bkz. efektifPencereSiniri
+  // üstündeki not. Bir eküri çifti ilk-6 içinde iki ayrı ham pozisyon tutuyorsa, hemen
+  // ardından gelen at (THEATER OF WAR gibi) GERÇEKTE ilk-6'nın içinde sayılır — teknikSira
+  // (ham 1..N sıra) DEĞİŞMEZ, yalnız "Orta/Yüksek Risk → Düşük Risk" kararı, tıpkı ilk6
+  // terfisi/değer terfisi almış bir at gibi, ona da uygulanır.
+  const ilk6EfektifSinir = efektifPencereSiniri(degerliSiralanmis, 6);
+
   return degerliSiralanmis.map((r, i) => {
     let karar = kararUret(r.olasilik);
     if (r.agfTerfi === "ilk3") karar = "Güçlü Aday";
     else if (r.agfTerfi === "ilk6" && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
     if (r.degerTerfisi && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
-    return { ...r, teknikSira: i + 1, karar };
+    const ekuriIlk6Efektif = i < ilk6EfektifSinir;
+    if (ekuriIlk6Efektif && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
+    return { ...r, teknikSira: i + 1, karar, ekuriIlk6Efektif };
   });
 }
 
