@@ -980,6 +980,10 @@ export type Faz1RunnerV5Sirali = Faz1RunnerV5 & {
   sinyalSayisi: number; // V4'ün 8-sinyal sayımı — terfi kapısı VE gerekçe metninde bilgi amaçlı
   agfTerfi: "ilk3" | "ilk6" | null;
   agfFavoriGarantisi: boolean;
+  /** 2026-09-02 — Saf Model Değer Terfisi (bkz. safModelDegerTerfisiUygula): bu at,
+   *  marketBlindProb1 vs agfPayi ayrışması + yeterli sinyalSayisi yüzünden ilk-6'ya
+   *  koşulsuz taşındı mı. */
+  degerTerfisi: boolean;
   teknikSira: number;
   karar: string;
 };
@@ -1001,28 +1005,42 @@ function kararUret(p: number): string {
  *  "en zayıf önce, boyutun SON slotuna ekle" yapıyordu — bu, pencerede DOĞAL OLARAK
  *  zaten bulunan (aday bile sayılmayan, i<pencereBoyu) güçlü bir atı, sonradan eklenen
  *  daha zayıf bir adayla mekanik olarak dışarı itebiliyordu (KING ZELAY %14.6 ile doğal
- *  3.sıradaydı, ANGEL ON THE RIGHT'ın terfi eklenmesiyle 8.sıraya düştü). Artık: doğal
- *  pencere sakinleri + terfi adayları TEK bir havuzda toplanıp olasılığa göre sıralanır,
- *  en güçlü pencereBoyu tanesi kazanır — kimin "aday" kimin "sakin" olduğu ayrımı
- *  rekabeti etkilemez, yalnız kim en güçlü olduğu belirler. */
+ *  3.sıradaydı, ANGEL ON THE RIGHT'ın terfi eklenmesiyle 8.sıraya düştü).
+ *
+ *  2026-08-16'daki DÜZELTME ("doğal sakinler + adaylar TEK havuzda olasılığa göre
+ *  sıralanır") YANLIŞ ÇIKTI — 2026-09-02'de fark edildi (arac-tam-at-inceleme.mts ile
+ *  THEATER OF WAR incelemesi sırasında, sentetik bir repro ile doğrulandı): `sirali`
+ *  bu fonksiyona HER ZAMAN zaten ham olasılığa göre azalan sırada geliyor (faz2V5Sirala,
+ *  `const sirali = [...enriched].sort(...)`). Bu durumda pencere dışındaki HİÇBİR aday
+ *  havuzdaki hiçbir doğal sakini olasılıkça geçemez (sakinler tanım gereği zaten daha
+ *  yüksek olasılıklı) — yani `terfiEdenNolar` HER ZAMAN boş dönüyordu, mekanizma tümüyle
+ *  etkisizdi (bkz. agfFavoriIlk3Garantisi'nin üstündeki 2026-08-27 notu: "AGF Trend
+ *  Terfisi ... olasılığa göre YARIŞIYOR ... olasılığı zaten düşükse yine dışarıda kalır"
+ *  — bu not sorunu betimliyordu ama kimse ekstrem sonucunu, hiç kimsenin asla terfi
+ *  edemediğini, fark etmemiş). "Terfi" kavramının kendisi modelin düşük verdiği bir atı
+ *  YÜKSELTMEK demek — düşük olasılıklı bir adayın yüksek olasılıklı bir sakinle "adil"
+ *  yarışması matematiksel olarak imkânsız bir görev.
+ *
+ *  Gerçek düzeltme: agfFavoriIlk3Garantisi ile AYNI ilke (koşulsuz, tek-adaylık splice) —
+ *  pencere dışındaki adaylar arasında (kendi aralarında) EN GÜÇLÜ olanı, pencerenin en
+ *  zayıf (son) sakinini yerinden ederek pencereye TEK seferde girer. KING ZELAY'ı koruyan
+ *  şey artık "olasılık yarışı" değil, "aday listesindeki en iyisi, en fazla BİR sakinin
+ *  yerini alır" sınırı — pencerenin 1. ve 2. sıradaki güçlü sakinleri hiçbir zaman elenmez. */
 function terfiPenceresiV5<T extends { no: number; olasilik: number }>(
   sirali: T[],
   pencereBoyu: number,
   adayMi: (r: T, index: number) => boolean
 ): { sonuc: T[]; terfiEdenNolar: Set<number> } {
-  const dogalSakinler = sirali.slice(0, pencereBoyu);
   const disaridakiAdaylar = sirali
     .map((r, i) => ({ r, i }))
-    .filter(({ r, i }) => i >= pencereBoyu && adayMi(r, i))
-    .map(({ r }) => r);
+    .filter(({ r, i }) => i >= pencereBoyu && adayMi(r, i));
+  if (disaridakiAdaylar.length === 0) return { sonuc: sirali, terfiEdenNolar: new Set() };
 
-  const havuz = [...dogalSakinler, ...disaridakiAdaylar].sort((a, b) => b.olasilik - a.olasilik);
-  const secilenler = havuz.slice(0, pencereBoyu);
-  const secilenNoSet = new Set(secilenler.map((r) => r.no));
-
-  const terfiEdenNolar = new Set(disaridakiAdaylar.filter((r) => secilenNoSet.has(r.no)).map((r) => r.no));
-  const geriKalanlar = sirali.filter((r) => !secilenNoSet.has(r.no)).sort((a, b) => b.olasilik - a.olasilik);
-  return { sonuc: [...secilenler, ...geriKalanlar], terfiEdenNolar };
+  const enGuclusu = disaridakiAdaylar.reduce((a, b) => (b.r.olasilik > a.r.olasilik ? b : a));
+  const kopya = [...sirali];
+  const [aday] = kopya.splice(enGuclusu.i, 1);
+  kopya.splice(pencereBoyu - 1, 0, aday);
+  return { sonuc: kopya, terfiEdenNolar: new Set([aday.no]) };
 }
 
 /** V4'ün kanıtlanmış AGF-trend terfi kuralının V5'e uyarlanmış hâli — kullanıcı kararı
@@ -1093,6 +1111,35 @@ function agfFavoriIlk3Garantisi<T extends { no: number; agfSirasi: number }>(
   return kopya;
 }
 
+// 2026-09-02 kullanıcı kararı (THEATER OF WAR vakası, İstanbul — Saf Model marketBlindProb1
+// atı 4.sıraya/%10.2 koyuyordu, AGF payı yalnız %5.0'dı, harmanlanan nihai skor 8.sıraya
+// gömdü — at günün en iyi performanslarından birini verdi). Kullanıcı: "olumlu sinyaller
+// varken agf piyasaya göre at aşağılara çekilmemeli en azından 6. at dışına atılmamalı."
+// SAF_MODEL_DEGER_ESIGI, V5AnalysisPanel'deki "Saf Model vs AGF" rozetinin ⚠ eşiğiyle
+// (fark=marketBlindProb1*100-agfPayi>=5) AYNI — o rozet o zamana kadar "yalnız bilgi
+// amaçlı, sıralamayı etkilemez" idi, kullanıcı bu kararla bunu tersine çevirdi.
+// pistUzmani'nin kendisi (genel yüzey/hipodrom-bağımsız kazanma oranı) BİLEREK skorlamaya
+// eklenmedi — bkz. sinyal-kutugu.service.ts "Genel Pist Tercihi (Hipodrom-Bağımsız Yüzey
+// Kazanma Oranı)": GREEN GULET vakasıyla (aynı THEATER OF WAR türü tetikleyici) test
+// edilmiş, leak-free B=500 bootstrap'ta iki segmentte de TAMAMEN anlamsız çıkmıştı — aynı
+// sıfır-etkili sinyali sinyalSayisi/terfi kapısından arka kapıyla sokmamak için burada
+// KULLANILMADI. Bunun yerine ZATEN kanıtlı iki bileşen birleştirildi: Saf Model/AGF
+// ayrışması (KARDAHA + THEATER OF WAR, iki gerçek vaka ile doğrulandı) + sinyalSayisi>=
+// SINYAL_ESIGI (agfTrendTerfisi'yle AYNI, V4'ün n=663 backtest'i olan eşik).
+const SAF_MODEL_DEGER_ESIGI = 5;
+
+function safModelDegerTerfisiUygula<
+  T extends { no: number; olasilik: number; marketBlindProb1: number; agfPayi: number; sinyalSayisi: number }
+>(sirali: T[]): (T & { degerTerfisi: boolean })[] {
+  const isaretsiz = sirali.map((r) => ({ ...r, degerTerfisi: false }));
+  const { sonuc, terfiEdenNolar } = terfiPenceresiV5(
+    isaretsiz,
+    6,
+    (r) => r.marketBlindProb1 * 100 - r.agfPayi >= SAF_MODEL_DEGER_ESIGI && r.sinyalSayisi >= SINYAL_ESIGI
+  );
+  return sonuc.map((r) => (terfiEdenNolar.has(r.no) ? { ...r, degerTerfisi: true } : r));
+}
+
 // 2026-08-26 kullanıcı bulgusu: "sistemin 1. seçimi, AGF favorisinden daha isabetsiz"
 // (dashboard'daki Sistem vs AGF Favorisi kartı: -4.2 puan, n=448). Kök neden araştırıldı:
 // sorun Handikap'a özel değil (orada fark en KÜÇÜK, -1.5) — asıl kanama, sistemin AGF
@@ -1133,6 +1180,11 @@ const DERIN_LONGSHOT_AGF_ESIGI = 3;
 const AGF_TREND_TERFISI_AKTIF = true;
 const AGF_FAVORI_ILK3_GARANTISI_AKTIF = false;
 const DERIN_LONGSHOT_DUZELTMESI_AKTIF = false;
+// 2026-09-02 kullanıcı kararı (THEATER OF WAR) — bkz. safModelDegerTerfisiUygula'nın
+// üstündeki not. AGF_FAVORI_ILK3_GARANTISI_AKTIF/DERIN_LONGSHOT_DUZELTMESI_AKTIF'ın
+// AKSİNE bu KAPALI DEĞİL: farklı bir ilkeye dayanıyor (piyasa payını YOK SAYMIYOR,
+// piyasanın GÖRMEDİĞİ bağımsız modeli değeri + ayrı sinyal kanıtını birlikte arıyor).
+const SAF_MODEL_DEGER_TERFISI_AKTIF = true;
 
 function derinLongshotDuzelt<T extends { no: number; agfSirasi: number }>(sirali: T[]): T[] {
   if (sirali.length === 0 || sirali[0].agfSirasi <= DERIN_LONGSHOT_AGF_ESIGI) return sirali;
@@ -1267,10 +1319,15 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
 
   const duzeltilmis = DERIN_LONGSHOT_DUZELTMESI_AKTIF ? derinLongshotDuzelt(garantili) : garantili;
 
-  return duzeltilmis.map((r, i) => {
+  const degerliSiralanmis = SAF_MODEL_DEGER_TERFISI_AKTIF
+    ? safModelDegerTerfisiUygula(duzeltilmis)
+    : duzeltilmis.map((r) => ({ ...r, degerTerfisi: false }));
+
+  return degerliSiralanmis.map((r, i) => {
     let karar = kararUret(r.olasilik);
     if (r.agfTerfi === "ilk3") karar = "Güçlü Aday";
     else if (r.agfTerfi === "ilk6" && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
+    if (r.degerTerfisi && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
     return { ...r, teknikSira: i + 1, karar };
   });
 }

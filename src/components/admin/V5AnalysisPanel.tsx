@@ -34,6 +34,10 @@ type V5At = {
   // kıyası (Saf Model % vs AGF % vs nihai Piyasa-Ayarlı %) mümkün kılmak için eklendi.
   agfPayi?: number;
   agfSirasi?: number;
+  // 2026-09-02 — Saf Model Değer Terfisi (THEATER OF WAR vakası): fark>=5pp VE yeterli
+  // sinyalSayisi varsa at artık koşulsuz ilk-6'ya taşınıyor — aşağıdaki rozet artık
+  // YALNIZ bilgi amaçlı değil, bu atın GERÇEKTEN terfi ettiğini de gösteriyor.
+  degerTerfisi?: boolean;
   // 2026-08-30 — B katmanı (bkz. plan: A/B/C Sinyal Katmanlama Mimarisi). "Tüm 12 Sinyal"
   // paneli yalnız A katmanını (12 özellik) listeler — B katmanı (şimdilik sireOrani/
   // düşük-şart) ORADA GÖRÜNMÜYOR, kullanıcı bunu fark edip sordu. Bu iki alan o boşluğu
@@ -423,10 +427,11 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                     {/* 2026-09-01 — "Saf Model" kıyası (kullanıcı talebi, KARDAHA vakası):
                         Saf Model (AGF'siz, marketBlindProb1) / AGF (piyasa) / Piyasa-Ayarlı
                         (nihai olasilik) sıra+yüzde YAN YANA — piyasanın görmediği ama modelin
-                        bağımsız olarak bulduğu değeri göstermek için. Fark = Saf Model% - AGF% —
-                        büyük pozitif fark "model piyasadan bağımsız değer buldu, ama nihai skor
-                        AGF yüzünden düşük kaldı" demek (yalnız bilgi amaçlı, sıralamayı/kararı
-                        ETKİLEMEZ — tıpkı üstteki rozet gibi). */}
+                        bağımsız olarak bulduğu değeri göstermek için. Fark = Saf Model% - AGF%.
+                        2026-09-02 GÜNCELLEME (THEATER OF WAR vakası, kullanıcı kararı): bu
+                        artık YALNIZ bilgi amaçlı DEĞİL — fark>=5pp VE yeterli sinyalSayisi
+                        varsa safModelDegerTerfisiUygula bu atı koşulsuz ilk-6'ya taşıyor
+                        (bkz. v5-engine.ts). degerTerfisi=true ise rozet bunu ayrıca belirtir. */}
                     {a.marketBlindProb1 != null && a.agfPayi != null && a.agfSirasi != null && (() => {
                       const safYuzde = a.marketBlindProb1 * 100;
                       const fark = safYuzde - a.agfPayi;
@@ -435,11 +440,12 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                         <span
                           className={cn(
                             "rounded-full px-2 py-0.5 font-mono text-[10px]",
-                            fark >= 5 ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground"
+                            a.degerTerfisi ? "bg-hit/15 text-hit" : fark >= 5 ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground"
                           )}
-                          title="Saf Model: AGF bilgisi HİÇ olmasaydı model bu atı sahada nereye koyardı (marketBlindProb1'in sıra+yüzdesi). AGF: piyasanın (bahis payının) kendi sırası+yüzdesi. Fark büyük ve pozitifse, model piyasanın görmediği bağımsız bir değer buluyor ama nihai (Piyasa-Ayarlı) skor AGF ile harmanlandığı için bu değer sönümleniyor demektir. Yalnız bilgi amaçlı — sıralamayı/kararı ETKİLEMEZ."
+                          title="Saf Model: AGF bilgisi HİÇ olmasaydı model bu atı sahada nereye koyardı (marketBlindProb1'in sıra+yüzdesi). AGF: piyasanın (bahis payının) kendi sırası+yüzdesi. Fark büyük ve pozitifse, model piyasanın görmediği bağımsız bir değer buluyor. Fark>=5pp VE yeterli başka sinyal varsa (sinyalSayisi) at artık GERÇEKTEN ilk-6'ya koşulsuz taşınıyor — degerTerfisi rozeti bunu gösterir."
                         >
                           Saf Model: {safSira ?? "?"}. sıra (%{safYuzde.toFixed(1)}) · AGF: {a.agfSirasi}. sıra (%{a.agfPayi.toFixed(1)}) · Fark: {fark > 0 ? "+" : ""}{fark.toFixed(1)}pp
+                          {a.degerTerfisi && " · ✓ İlk-6 Terfisi"}
                         </span>
                       );
                     })()}

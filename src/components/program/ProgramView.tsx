@@ -1363,7 +1363,7 @@ function RaceTable({
 
       {/* Sonuç kartı — koşu sonuçlandığında TJK formatında otomatik doldurulur */}
       {race.result && (
-        <div className="border-t bg-muted/10 px-3 py-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] font-mono">
+        <div className="border-t bg-muted/10 px-3 pt-2 pb-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] font-mono">
           <span className="font-semibold text-foreground">{t("sonucLabel")}</span>
           <span>
             {(Array.isArray(race.result.actualOrder) ? (race.result.actualOrder as number[]).slice(0, 5) : []).join(" · ") || "—"}
