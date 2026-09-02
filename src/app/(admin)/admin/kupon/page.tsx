@@ -9,6 +9,7 @@ import { getAdminRaceDays, getAnalystStats, getClassTypeAdvice } from "@/server/
 import { turkeyDateString } from "@/lib/tz";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import RaceAdviceCard from "@/components/admin/RaceAdviceCard";
+import CollapsibleHipodrom from "@/components/admin/CollapsibleHipodrom";
 import KuponForm from "./KuponForm";
 import KuponActions from "./KuponActions";
 import type { HomeKuponLegInput } from "@/server/actions/home-kupon.actions";
@@ -131,20 +132,17 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
             Koşu Programı
           </h2>
           {adminRaceDays.map((rd) => (
-            <div key={rd.id} className="rounded-lg border">
-              <div className="flex items-center justify-between border-b bg-muted/30 px-3 py-1.5">
-                <span className="text-sm font-semibold">{rd.hippodrome.name}</span>
-                <div className="flex items-center gap-3">
-                  <Badge variant="secondary" className="text-xs">
-                    {rd.races.length} koşu
-                  </Badge>
-                  <DeleteRaceDayButton
-                    raceDayId={rd.id}
-                    label={`${rd.hippodrome.name} — ${format(rd.date, "d MMMM yyyy", { locale: tr })}`}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2 p-2">
+            <CollapsibleHipodrom
+              key={rd.id}
+              title={rd.hippodrome.name}
+              raceCount={rd.races.length}
+              deleteSlot={
+                <DeleteRaceDayButton
+                  raceDayId={rd.id}
+                  label={`${rd.hippodrome.name} — ${format(rd.date, "d MMMM yyyy", { locale: tr })}`}
+                />
+              }
+            >
                 {rd.races.map((race) => {
                   const karmaRef = race.conditions ? parseConditionsRef(race.conditions) : null;
                   const original = karmaRef
@@ -200,8 +198,7 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                     />
                   );
                 })}
-              </div>
-            </div>
+            </CollapsibleHipodrom>
           ))}
         </div>
       )}

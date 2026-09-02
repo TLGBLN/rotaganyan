@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { cn, raceTimeForLocale } from "@/lib/utils";
 import { useLocaleSwitch } from "@/components/providers/LocaleProvider";
 import { EKURI_COLORS, ekuriRengi } from "@/lib/ekuri-colors";
-import { ChevronDown, ChevronUp, Star, Info } from "lucide-react";
+import { ChevronDown, ChevronUp, Star, Info, Radio } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
 import { kararOku } from "@/lib/methodology/muhakeme-format";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
@@ -1677,8 +1677,8 @@ export default function ProgramView({
                   className="flex items-center gap-1 rounded-md bg-[#00944D] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
                 >
                   {isLoggedIn
-                    ? <>{t("analiziGor")} {analysisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}</>
-                    : `${t("analiziGor")} 🔒`}
+                    ? <><Radio className="h-3 w-3 animate-pulse" /> {t("analiziGor")} {analysisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}</>
+                    : <><Radio className="h-3 w-3 animate-pulse" /> {t("analiziGor")} 🔒</>}
                 </button>
               ) : (
                 <span className="text-xs font-semibold text-[#e74c3c] shrink-0 whitespace-nowrap">{t("analizHazirlaniyor")}</span>
