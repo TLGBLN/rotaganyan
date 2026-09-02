@@ -387,12 +387,17 @@ function PanelKilitGate({
 // ── Analiz paneli ────────────────────────────────────────────────────────────
 
 function AnalysisPanel({
-  picks, runners, winnerNos, ganyan, isLoggedIn, isAdmin, isVerified, userEmail, raceNo, hippodromeName, raceId,
+  picks, runners, winnerNos, ganyan, result, isLoggedIn, isAdmin, isVerified, userEmail, raceNo, hippodromeName, raceId,
 }: {
   picks: ProgramPick[];
   runners: ProgramRunner[];
   winnerNos?: number[] | null;
   ganyan?: number | null;
+  // 2026-09-02 kullanıcı talebi ("Analiz Detayları açıldığında tam sayfaya eşitlensin,
+  // üst satır olmasın") — SONUÇ/MÜDDET/FARKLAR/GANYAN şeridi eskiden bu panelin HEMEN
+  // ÜSTÜNDE ayrı bir bg-muted/10 satırdı, iki başlık üst üste gibi duruyordu. Artık AYNI
+  // koyu (#022637) başlık bloğunun İÇİNDE, küçük bir üst satır olarak birleşti.
+  result?: { actualOrder: unknown; time: string | null; farklar: string | null; ganyan: number | null } | null;
   isLoggedIn: boolean;
   isAdmin: boolean;
   isVerified: boolean;
@@ -403,6 +408,22 @@ function AnalysisPanel({
 }) {
   const t = useTranslations("programToolbar");
   const ref = useRef<HTMLDivElement>(null);
+
+  const sonucSatiri = result && (
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] font-mono text-white/70">
+      <span className="font-semibold text-white">{t("sonucLabel")}</span>
+      <span>{(Array.isArray(result.actualOrder) ? (result.actualOrder as number[]).slice(0, 5) : []).join(" · ") || "—"}</span>
+      <span className="mx-1">/</span>
+      <span className="font-semibold text-white">{t("muddetLabel")}</span>
+      <span>{result.time || "—"}</span>
+      <span className="mx-1">/</span>
+      <span className="font-semibold text-white">{t("farklarLabel")}</span>
+      <span>{result.farklar || "—"}</span>
+      <span className="mx-1">/</span>
+      <span className="font-semibold text-white">{t("ganyanLabel")}</span>
+      <span>{result.ganyan != null ? String(result.ganyan).replace(".", ",") : "—"}</span>
+    </div>
+  );
 
   // Faz 4 yalnız en iyi 3-6 atı sıralayıp "pick" olarak kaydediyor — geri kalanı
   // (Geniş kupon) yalnız couponWide metninde numara olarak geçiyor, ayrı satır
@@ -518,7 +539,8 @@ function AnalysisPanel({
   if (!isVerified) {
     return (
       <div ref={ref} className="border-t">
-        <div className="px-4 py-2.5 bg-[#022637] border-b flex items-center">
+        <div className="px-4 py-2.5 bg-[#022637] border-b flex flex-col gap-1">
+          {sonucSatiri}
           <span className="text-sm font-bold tracking-wide text-white">{t("analizDetaylari")}</span>
         </div>
         <EmailVerificationGate email={userEmail} />
@@ -529,7 +551,8 @@ function AnalysisPanel({
   return (
     <div ref={ref} className="border-t">
       {/* Başlık */}
-      <div className="px-4 py-2.5 bg-[#022637] border-b flex items-center">
+      <div className="px-4 py-2.5 bg-[#022637] border-b flex flex-col gap-1">
+        {sonucSatiri}
         <span className="text-sm font-bold tracking-wide text-white">Analiz Detayları</span>
       </div>
 
@@ -1361,25 +1384,6 @@ function RaceTable({
         )}
       </div>
 
-      {/* Sonuç kartı — koşu sonuçlandığında TJK formatında otomatik doldurulur */}
-      {race.result && (
-        <div className="border-t bg-muted/10 px-3 py-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] font-mono">
-          <span className="font-semibold text-foreground">{t("sonucLabel")}</span>
-          <span>
-            {(Array.isArray(race.result.actualOrder) ? (race.result.actualOrder as number[]).slice(0, 5) : []).join(" · ") || "—"}
-          </span>
-          <span className="mx-1 text-muted-foreground">/</span>
-          <span className="font-semibold text-foreground">{t("muddetLabel")}</span>
-          <span>{race.result.time || "—"}</span>
-          <span className="mx-1 text-muted-foreground">/</span>
-          <span className="font-semibold text-foreground">{t("farklarLabel")}</span>
-          <span>{race.result.farklar || "—"}</span>
-          <span className="mx-1 text-muted-foreground">/</span>
-          <span className="font-semibold text-foreground">{t("ganyanLabel")}</span>
-          <span>{race.result.ganyan != null ? String(race.result.ganyan).replace(".", ",") : "—"}</span>
-        </div>
-      )}
-
       {/* Analiz paneli */}
       <div id="panel-analiz">
         {race.hasAnalysis && analysisOpen && (
@@ -1388,6 +1392,7 @@ function RaceTable({
             runners={race.runners}
             winnerNos={winnerNos}
             ganyan={race.result?.ganyan}
+            result={race.result}
             isLoggedIn={isLoggedIn}
             isAdmin={isAdmin}
             isVerified={isVerified}

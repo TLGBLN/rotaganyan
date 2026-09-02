@@ -44,7 +44,7 @@ export default function H2HPanel({ raceId }: { raceId: string }) {
   return (
     <div className="border-t">
       <div className="px-4 py-2.5 bg-[#022637] border-b flex items-center">
-        <span className="text-sm font-bold tracking-wide text-black">{t("h2hPanelTitle")}</span>
+        <span className="text-sm font-bold tracking-wide text-white">{t("h2hPanelTitle")}</span>
       </div>
       {loading ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">{t("h2hLoading")}</div>

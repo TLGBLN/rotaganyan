@@ -100,8 +100,8 @@ export default function SonYarisDetayPanel({ raceId }: { raceId: string }) {
   return (
     <div className="border-t">
       <div className="px-4 py-2.5 bg-[#022637] border-b">
-        <div className="text-sm font-bold tracking-wide text-black">{t("sonYarisTitle")}</div>
-        <div className="mt-0.5 text-[11px] text-black/70">
+        <div className="text-sm font-bold tracking-wide text-white">{t("sonYarisTitle")}</div>
+        <div className="mt-0.5 text-[11px] text-white/70">
           {t("sonYarisDescription")}
         </div>
       </div>

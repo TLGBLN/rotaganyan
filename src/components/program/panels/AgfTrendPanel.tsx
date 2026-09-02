@@ -95,8 +95,8 @@ export default function AgfTrendPanel({ raceId, winnerNos = [] }: { raceId: stri
   return (
     <div className="border-t">
       <div className="px-4 py-2.5 bg-[#022637] border-b">
-        <div className="text-sm font-bold tracking-wide text-black">{t("agfTrend")}</div>
-        <div className="mt-0.5 text-[11px] text-black/70">
+        <div className="text-sm font-bold tracking-wide text-white">{t("agfTrend")}</div>
+        <div className="mt-0.5 text-[11px] text-white/70">
           {t("agfTrendDesc")}
         </div>
       </div>

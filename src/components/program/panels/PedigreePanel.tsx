@@ -9,7 +9,7 @@ export default function PedigreePanel({ runners }: { runners: ProgramRunner[] })
   return (
     <div className="border-t">
       <div className="px-4 py-2.5 bg-[#022637] border-b flex items-center">
-        <span className="text-sm font-bold tracking-wide text-black">{t("pedigriler")}</span>
+        <span className="text-sm font-bold tracking-wide text-white">{t("pedigriler")}</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2">
         {runners.map((r, idx) => (
