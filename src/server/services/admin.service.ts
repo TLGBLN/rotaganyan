@@ -787,17 +787,6 @@ export type ClassTypeAdvice = {
   top1Rate?: { rate: number; hits: number; total: number };
 };
 
-/** Wilson skor aralığı (normal yaklaşımdan farklı olarak küçük n'de ve uç oranlarda
- *  (%0'a/%100'e yakın) çökmüyor) — bir oranın %95 güven aralığını verir. */
-function wilsonAraligi(basari: number, n: number): { alt: number; ust: number } {
-  if (n === 0) return { alt: 0, ust: 0 };
-  const z = 1.96;
-  const pHat = basari / n;
-  const merkez = (pHat + (z * z) / (2 * n)) / (1 + (z * z) / n);
-  const pay = (z * Math.sqrt((pHat * (1 - pHat)) / n + (z * z) / (4 * n * n))) / (1 + (z * z) / n);
-  return { alt: Math.max(0, merkez - pay), ust: Math.min(1, merkez + pay) };
-}
-
 // 2026-08-24 kullanıcı denetimi: "Eko %X diyorsa gerçekten ilk-3'te sonuçlanmalı" —
 // split-half doğrulama yapıldı (446 tahmin, 9 sınıf n≥20): eğitim-yarısından hesaplanan
 // Eko% ile görülmemiş test-yarısındaki GERÇEK Eko% arasında ortalama MUTLAK fark 13.3
@@ -807,14 +796,6 @@ function wilsonAraligi(basari: number, n: number): { alt: number; ust: number } 
 // kanaat) rozeti VERİLMİYOR — yalnız "info" (nötr) + Wilson %95 güven aralığı gösteriliyor,
 // ki admin küçük örneklemli bir sınıfa büyük-örneklemliymiş gibi güvenmesin.
 const TIER_GUVEN_ESIGI = 20;
-
-function tierYuzdeMetni(t: CouponTierBreakdown, gaGoster: boolean): string {
-  const p = (n: number) => Math.round((n / t.total) * 100);
-  const base = `Eko %${p(t.ekonomik)} · Nor %${p(t.normal)} · Gen %${p(t.genis)}` + (t.kacti > 0 ? ` · Kaçtı %${p(t.kacti)}` : "");
-  if (!gaGoster) return base;
-  const ga = wilsonAraligi(t.ekonomik, t.total);
-  return `${base} (Eko GA %${Math.round(ga.alt * 100)}-${Math.round(ga.ust * 100)}, küçük örneklem)`;
-}
 
 // 2026-08-25 kullanıcı talebi: "%80 eko diyorsa kaç at yazayım" sorusunu her seferinde
 // admin'e bıraktırmak yerine, ham Eko/Nor/Gen yüzdelerini (bunlar münhasır dilim —
@@ -929,6 +910,16 @@ function tierSeviye(t: CouponTierBreakdown): ClassTypeAdvice["level"] {
  * geniş bir kırılıma iner (bkz. proje hafızası: bu özelliğin kabul testinde ölçülen
  * gerçek hücre doluluk oranları).
  */
+// 2026-09-02 kullanıcı talebi ("yine çok karışık gözüküyor, sade ve anlaşılır olsun") —
+// eskiden `text` alanı Eko/Nor/Gen yüzdelerini TEKRAR yazıyordu (ClassTypeAdviceCard zaten
+// bunu renkli bir çubukla ayrıca gösteriyor, bkz. TierCubugu) VE parantez içi köşeli-parantez
+// notasyon ("[Maiden Koşular, 800-1400]") kullanıyordu — ikisi de sade bir okuyucu için
+// gürültüydü. Artık `text` yalnız düz bir cümleyle HANGİ geçmişe bakıldığını + "1. seçim
+// 1. geldi" oranını söylüyor, sayısal dağılımı tekrarlamıyor (o, çubukta zaten var).
+function isabetCumlesi(b: AnalystBreakdown): string {
+  return `1. seçim 1. geldi: %${b.rate.toFixed(0)} (${b.hits}/${b.total} koşu)`;
+}
+
 export function getClassTypeAdvice(stats: AnalystStats, classType: string, atSayisi?: number, distance?: number): ClassTypeAdvice {
   const normalized = normalizeClassType(classType);
   const grupAdi = classTypeGroup(classType);
@@ -943,16 +934,16 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string, atSay
 
   const mesafeKovasi = distance != null ? mesafeBucket(distance) : null;
   const atKovasi = atSayisi != null ? atSayisiBucket(atSayisi) : null;
+  const mesafeMetni = (m: string) => `${m.replace("-", "–")}m mesafede`;
 
   if (mesafeKovasi && atKovasi) {
     const key = `${grupAdi}|${mesafeKovasi}|${atKovasi}`;
     const ucluTier = stats.couponTierByTipMesafeAt.find((t) => t.label === key);
     const ucluBreakdown = stats.byTipMesafeAt.find((b) => b.label === key);
     if (ucluTier && ucluBreakdown && ucluTier.total >= TIER_GUVEN_ESIGI) {
-      const isabet = `%${ucluBreakdown.rate.toFixed(0)} (${ucluBreakdown.hits}/${ucluBreakdown.total})`;
       return {
         level: tierSeviye(ucluTier),
-        text: `[${grupAdi}, ${mesafeKovasi}, ${atKovasi}] ${tierYuzdeMetni(ucluTier, false)} (${ucluTier.total} koşu) · 1. seçim 1. geldi: ${isabet}`,
+        text: `${grupAdi.replace(" Koşular", "")} arasında, ${mesafeMetni(mesafeKovasi)} ve ${atKovasi} sahalarda: ${isabetCumlesi(ucluBreakdown)}`,
         oneri: tierOneri(ucluTier),
         tierYuzdeler: { eko: ucluTier.ekonomik, nor: ucluTier.normal, genis: ucluTier.genis, kacti: ucluTier.kacti, toplam: ucluTier.total },
         top1Rate: { rate: ucluBreakdown.rate, hits: ucluBreakdown.hits, total: ucluBreakdown.total },
@@ -964,10 +955,9 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string, atSay
     const ikiliTier = stats.couponTierByTipMesafe.find((t) => t.label === key);
     const ikiliBreakdown = stats.byTipMesafe.find((b) => b.label === key);
     if (ikiliTier && ikiliBreakdown && ikiliTier.total >= TIER_GUVEN_ESIGI) {
-      const isabet = `%${ikiliBreakdown.rate.toFixed(0)} (${ikiliBreakdown.hits}/${ikiliBreakdown.total})`;
       return {
         level: tierSeviye(ikiliTier),
-        text: `[${grupAdi}, ${mesafeKovasi}] ${tierYuzdeMetni(ikiliTier, false)} (${ikiliTier.total} koşu) · 1. seçim 1. geldi: ${isabet}`,
+        text: `${grupAdi.replace(" Koşular", "")} arasında, ${mesafeMetni(mesafeKovasi)}: ${isabetCumlesi(ikiliBreakdown)}`,
         oneri: tierOneri(ikiliTier, atSayisiTier),
         tierYuzdeler: { eko: ikiliTier.ekonomik, nor: ikiliTier.normal, genis: ikiliTier.genis, kacti: ikiliTier.kacti, toplam: ikiliTier.total },
         top1Rate: { rate: ikiliBreakdown.rate, hits: ikiliBreakdown.hits, total: ikiliBreakdown.total },
@@ -979,10 +969,9 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string, atSay
     const ikiliTier = stats.couponTierByTipAt.find((t) => t.label === key);
     const ikiliBreakdown = stats.byTipAt.find((b) => b.label === key);
     if (ikiliTier && ikiliBreakdown && ikiliTier.total >= TIER_GUVEN_ESIGI) {
-      const isabet = `%${ikiliBreakdown.rate.toFixed(0)} (${ikiliBreakdown.hits}/${ikiliBreakdown.total})`;
       return {
         level: tierSeviye(ikiliTier),
-        text: `[${grupAdi}, ${atKovasi}] ${tierYuzdeMetni(ikiliTier, false)} (${ikiliTier.total} koşu) · 1. seçim 1. geldi: ${isabet}`,
+        text: `${grupAdi.replace(" Koşular", "")} arasında, ${atKovasi} sahalarda: ${isabetCumlesi(ikiliBreakdown)}`,
         oneri: tierOneri(ikiliTier),
         tierYuzdeler: { eko: ikiliTier.ekonomik, nor: ikiliTier.normal, genis: ikiliTier.genis, kacti: ikiliTier.kacti, toplam: ikiliTier.total },
         top1Rate: { rate: ikiliBreakdown.rate, hits: ikiliBreakdown.hits, total: ikiliBreakdown.total },
@@ -993,30 +982,24 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string, atSay
   const darYeterli = !!tier && tier.total >= TIER_GUVEN_ESIGI;
   const grupYeterli = !!grupTier && grupTier.total >= TIER_GUVEN_ESIGI;
 
-  // Dar sınıfın kendi metni — az veri de olsa (n>=5) her zaman gösterilir, şeffaflık için.
-  const darMetin = tier && tier.total >= 5 ? tierYuzdeMetni(tier, !darYeterli) : null;
-
-  if (darYeterli && tier) {
+  if (darYeterli && tier && breakdown) {
     // Dar sınıfın kendi örneklemi zaten yeterli — üst gruba düşmeye gerek yok.
-    const isabet = `%${breakdown!.rate.toFixed(0)} (${breakdown!.hits}/${breakdown!.total})`;
     return {
       level: tierSeviye(tier),
-      text: `${darMetin} (${tier.total} koşu) · 1. seçim 1. geldi: ${isabet}`,
+      text: `${normalized} yarışlarında: ${isabetCumlesi(breakdown)}`,
       oneri: tierOneri(tier, atSayisiTier),
       tierYuzdeler: { eko: tier.ekonomik, nor: tier.normal, genis: tier.genis, kacti: tier.kacti, toplam: tier.total },
-      top1Rate: { rate: breakdown!.rate, hits: breakdown!.hits, total: breakdown!.total },
+      top1Rate: { rate: breakdown.rate, hits: breakdown.hits, total: breakdown.total },
     };
   }
 
   if (grupYeterli && grupTier && grupBreakdown) {
     // Dar sınıf yetersiz (veya hiç yok) — güvenilir üst-grup rakamına düş, dar sınıfın
-    // kendi (varsa) küçük-örneklem rakamını da parantez içinde ayrıca göster.
-    const grupIsabet = `%${grupBreakdown.rate.toFixed(0)} (${grupBreakdown.hits}/${grupBreakdown.total})`;
-    const grupMetin = `[${grupAdi}] ${tierYuzdeMetni(grupTier, false)} (${grupTier.total} koşu) · 1. seçim 1. geldi: ${grupIsabet}`;
-    const text = darMetin ? `${grupMetin} — bu alt-tür (${normalized}): ${darMetin}` : grupMetin;
+    // kendi (varsa) küçük-örneklem rakamını da kısaca ayrıca belirt.
+    const darEk = tier && tier.total >= 5 && breakdown ? ` (bu alt-tür, ${normalized}, tek başına: %${breakdown.rate.toFixed(0)}, az örneklem)` : "";
     return {
       level: tierSeviye(grupTier),
-      text,
+      text: `${grupAdi} arasında: ${isabetCumlesi(grupBreakdown)}${darEk}`,
       oneri: tierOneri(grupTier, atSayisiTier),
       tierYuzdeler: { eko: grupTier.ekonomik, nor: grupTier.normal, genis: grupTier.genis, kacti: grupTier.kacti, toplam: grupTier.total },
       top1Rate: { rate: grupBreakdown.rate, hits: grupBreakdown.hits, total: grupBreakdown.total },
@@ -1024,20 +1007,18 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string, atSay
   }
 
   // Ne dar sınıf ne üst grup yeterli veri taşıyor — dürüstçe "veri yok" de.
-  if (darMetin) {
-    const isabet = `%${breakdown!.rate.toFixed(0)} (${breakdown!.hits}/${breakdown!.total})`;
+  if (tier && tier.total >= 5 && breakdown) {
     return {
       level: "info",
-      text: `${darMetin} (${tier!.total} koşu) · 1. seçim 1. geldi: ${isabet}`,
-      top1Rate: { rate: breakdown!.rate, hits: breakdown!.hits, total: breakdown!.total },
+      text: `${normalized} yarışlarında (az örneklem, ${tier.total} koşu): ${isabetCumlesi(breakdown)}`,
+      top1Rate: { rate: breakdown.rate, hits: breakdown.hits, total: breakdown.total },
     };
   }
   if (breakdown && breakdown.total >= 3) {
-    const isabet = `%${breakdown.rate.toFixed(0)} (${breakdown.hits}/${breakdown.total})`;
     const level = breakdown.total >= TIER_GUVEN_ESIGI ? (breakdown.rate < 25 ? "warn" : breakdown.rate >= 50 ? "good" : "info") : "info";
     return {
       level,
-      text: `1. seçim 1. geldi: ${isabet} (${breakdown.total} koşu)`,
+      text: isabetCumlesi(breakdown),
       top1Rate: { rate: breakdown.rate, hits: breakdown.hits, total: breakdown.total },
     };
   }

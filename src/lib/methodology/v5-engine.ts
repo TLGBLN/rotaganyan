@@ -1370,15 +1370,15 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // DUSUSIYI grupları (accurace, formEgimi/2, pistUzmani, sireOrani, galop,
   // uzunAraGalopKatkisi, agfDususVarMi) toFeatureVector'dan çıkarıldığı için buradan da
   // kaldırıldı — artık skora katkıları yok, gerekçe metninde göstermek yanıltıcı olurdu.
-  { kod: "KGS", ozellikIndeksleri: [idx("kgsVarMi")], aciklama: (r) => (r.kgsVarMi ? `KGS ${r.kgs} gün` : null) },
+  { kod: "KGS", ozellikIndeksleri: [idx("kgsVarMi")], aciklama: (r) => (r.kgsVarMi ? `Son yarışından bu yana ${r.kgs} gün geçmiş` : null) },
   // 2026-08-31 (V5.31) — Handikap'ta bu sinyalin katsayısı ELLE SIFIRLANMIŞ (bkz. dosya
   // başındaki IDM_JOKEY_IDX/V5.31 notu, HIZ ile AYNI düzeltme deseni) — eski kod ham
   // r.idmJokey'e bakıyordu, Handikap'ta bile "idman jokeyi uyumu" diye yanıltıcı bir satır
   // gösterebilirdi. Artık GERÇEK katkıya (r.katkilar) bakılıyor — Handikap'ta katkı her
   // zaman 0 olduğundan satır hiç gösterilmez, diğer kategorilerde davranış değişmedi.
-  { kod: "IDMJOK", ozellikIndeksleri: [idx("idmJokey")], aciklama: (r) => (r.katkilar[IDM_JOKEY_IDX] !== 0 ? "İdman jokeyi uyumu (bugünkü jokey idmanlardan birini yaptırmış)" : null) },
-  { kod: "JOKSTAT", ozellikIndeksleri: [idx("jokeyOrani")], aciklama: (r) => `Jokey kazanma oranı (küçültülmüş): %${r.jokeyOrani.toFixed(1)}` },
-  { kod: "ANTSTAT", ozellikIndeksleri: [idx("antrenorOrani")], aciklama: (r) => `Antrenör kazanma oranı (küçültülmüş): %${r.antrenorOrani.toFixed(1)}` },
+  { kod: "IDMJOK", ozellikIndeksleri: [idx("idmJokey")], aciklama: (r) => (r.katkilar[IDM_JOKEY_IDX] !== 0 ? "Bugünkü jokey, bu atın idmanlarından birini bizzat yaptırmış" : null) },
+  { kod: "JOKSTAT", ozellikIndeksleri: [idx("jokeyOrani")], aciklama: (r) => `Jokeyin genel kazanma oranı (dengelenmiş rakam): %${r.jokeyOrani.toFixed(1)}` },
+  { kod: "ANTSTAT", ozellikIndeksleri: [idx("antrenorOrani")], aciklama: (r) => `Antrenörün genel kazanma oranı (dengelenmiş rakam): %${r.antrenorOrani.toFixed(1)}` },
   // 2026-08-17 denetim bulgusu: kacakAtMi ve dususAmaIyiPozisyon anlamlı sinyaller
   // (bkz. toFeatureVector üstündeki notlar) ama hiçbir OzellikGrubu'na dahil değildi —
   // katkıları skoru etkiliyordu ama gerekçe metninde hiç görünmüyordu. Eklendi.
@@ -1388,7 +1388,7 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // ileride yeniden değerlendirilip sıfır DIŞI bir değere dönerse (ör. yalnız bir
   // segmentte), gerçek katkıya bakmayan bu blok yine "olumlu" göstermeye devam ederdi.
   // Artık HIZ ile AYNI desende, gerçek katkıya (r.katkilar) bakıyor.
-  { kod: "KACAK", ozellikIndeksleri: [idx("kacakYalniz")], aciklama: (r) => (r.katkilar[KACAK_YALNIZ_IDX] !== 0 ? `Rakipsiz kaçak at / erken tempo yapan (Accurace koşu stili sinyali, sahada tek kaçak): popülasyona göre ${r.katkilar[KACAK_YALNIZ_IDX] > 0 ? "olumlu" : "olumsuz"}` : null) },
+  { kod: "KACAK", ozellikIndeksleri: [idx("kacakYalniz")], aciklama: (r) => (r.katkilar[KACAK_YALNIZ_IDX] !== 0 ? `Genelde öne geçip liderlik yapıyor ve sahada rakip olacak başka bir kaçak at yok: bu durum geçmişte ${r.katkilar[KACAK_YALNIZ_IDX] > 0 ? "avantajlı" : "dezavantajlı"} çıkmış` : null) },
   // 2026-08-21 — H2H: bugünkü rakiplerle ortak geçmiş yarış yoksa (h2hNetSkor=0) satır
   // hiç gösterilmez — "0 karşılaşma" ile "hep berabere" ayrımı yapılamadığı için nötr.
   // 2026-08-27 — düşük-şart'ta bu sinyalin katsayısı ELLE sıfırlanmış (bkz. WEIGHTS_DUSUK_SART
@@ -1404,7 +1404,7 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
     ozellikIndeksleri: [idx("h2hNetSkor")],
     aciklama: (r) => {
       if (r.katkilar[H2H_NET_SKOR_IDX] === 0) return null;
-      const taban = `Baş-başa geçmiş${r.h2hZeminEslesmesiVarMi ? " (bugünkü zemin koşuluyla eşleşen karşılaşma)" : ""}: bugünkü rakiplerle ${r.h2hNetSkor > 0 ? "+" : ""}${r.h2hNetSkor} net (${r.h2hNetSkor > 0 ? "önde" : "geride"} bitirmiş)`;
+      const taban = `Bugünkü rakipleriyle daha önce karşılaşmış${r.h2hZeminEslesmesiVarMi ? " (bugünküne benzer zemin koşulunda)" : ""}: toplamda ${r.h2hNetSkor > 0 ? "+" : ""}${r.h2hNetSkor} net ${r.h2hNetSkor > 0 ? "önde" : "geride"} bitirmiş`;
       return r.h2hZeminEslesmesiVarMi && r.h2hKendiDerece ? `${taban}, kendi derecesi: ${r.h2hKendiDerece}` : taban;
     },
   },
@@ -1416,7 +1416,7 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // Handikap'ta bile "yavaş/hızlı" diye yanıltıcı bir satır gösteriyordu. Artık GERÇEK
   // katkıya (r.katkilar) bakılıyor — Handikap'ta katkı her zaman 0 olduğundan satır hiç
   // gösterilmez, diğer kategorilerde davranış değişmedi.
-  { kod: "HIZ", ozellikIndeksleri: [idx("hizDerecesi")], aciklama: (r) => (r.katkilar[HIZ_DERECESI_IDX] !== 0 ? `Hız derecesi: popülasyona göre ${r.hizDerecesi > 0 ? "+" : ""}${r.hizDerecesi.toFixed(1)}% (${r.hizDerecesi > 0 ? "daha hızlı" : "daha yavaş"})` : null) },
+  { kod: "HIZ", ozellikIndeksleri: [idx("hizDerecesi")], aciklama: (r) => (r.katkilar[HIZ_DERECESI_IDX] !== 0 ? `Son yarışlarındaki hızı, benzer atların ortalamasına göre %${Math.abs(r.hizDerecesi).toFixed(1)} ${r.hizDerecesi > 0 ? "daha hızlı" : "daha yavaş"}` : null) },
   // 2026-08-24 — Kilo-ayarlı H2H: veri yoksa (kilo bilgili ortak karşılaşma yok) 0,
   // satır hiç gösterilmez.
   // 2026-08-24 kullanıcı bulgusu: "+27.5 toplam kilo diye belirtilmesi kullanıcılar
@@ -1430,17 +1430,17 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
       if (r.h2hKiloDegisimi === 0 || r.h2hKiloKarsilasmaSayisi === 0) return null;
       const ortalama = r.h2hKiloDegisimi / r.h2hKiloKarsilasmaSayisi;
       const yon = ortalama > 0 ? "hafif" : "ağır";
-      return `Kilo-ayarlı H2H: bugünkü ${r.h2hKiloKarsilasmaSayisi} rakibe göre, geçmiş karşılaşmalara kıyasla ortalama ${Math.abs(ortalama).toFixed(1)}kg daha ${yon} koşuyor`;
+      return `Bugünkü ${r.h2hKiloKarsilasmaSayisi} rakibine göre, geçmiş karşılaşmalarda ortalama ${Math.abs(ortalama).toFixed(1)}kg daha ${yon} kilo taşıyarak koşmuş`;
     },
   },
   // 2026-08-28 — Zemin Toleransı: bkz. Faz1RunnerV5.zeminToleransi üstündeki not. Veri
   // yoksa (Normal-dışı geçmiş koşu yok) 0, satır hiç gösterilmez.
-  { kod: "ZEMIN", ozellikIndeksleri: [idx("zeminToleransi")], aciklama: (r) => (r.zeminToleransi !== 0 ? `Zemin toleransı: Normal-dışı pistteki geçmişinde popülasyona göre ${r.zeminToleransi > 0 ? "+" : ""}${r.zeminToleransi.toFixed(1)}% (${r.zeminToleransi > 0 ? "daha hızlı" : "daha yavaş"})` : null) },
-  { kod: "YAKINSAMA", ozellikIndeksleri: [idx("yakinsama2Plus")], aciklama: (r) => (r.katkilar[YAKINSAMA_IDX] !== 0 ? "Yakınsama: pist uzmanlığı/pedigri/at-jokey ikilisi/AGF trend/sınıf düşüşünden en az 2'si bu atta hizalanmış (istatistiksel kanıtı yok, kullanıcı kararıyla eklendi)" : null) },
-  { kod: "SPRINT", ozellikIndeksleri: [idx("sonIdmanSprint")], aciklama: (r) => (r.katkilar[SON_IDMAN_SPRINT_IDX] !== 0 ? `Son idman türü Sprint/Sürat (backtest yönü doğrulamadı, kullanıcı kararıyla eklendi): ${r.katkilar[SON_IDMAN_SPRINT_IDX] > 0 ? "olumlu" : "olumsuz"}` : null) },
-  { kod: "TAKIEK", ozellikIndeksleri: [idx("takiEklendiMi")], aciklama: (r) => (r.katkilar[TAKI_EKLENDI_IDX] !== 0 ? `Takı eklendi (son yarışına göre): ${r.katkilar[TAKI_EKLENDI_IDX] > 0 ? "olumlu" : "olumsuz"}` : null) },
-  { kod: "TAKICIK", ozellikIndeksleri: [idx("takiCikarildiMi")], aciklama: (r) => (r.katkilar[TAKI_CIKARILDI_IDX] !== 0 ? `Takı çıkarıldı (son yarışına göre): ${r.katkilar[TAKI_CIKARILDI_IDX] > 0 ? "olumlu" : "olumsuz"}` : null) },
-  { kod: "GIDISAT", ozellikIndeksleri: [idx("yarisGidisatiSkoru")], aciklama: (r) => (r.katkilar[YARIS_GIDISATI_IDX] !== 0 ? `Yarış Gidişatı: sahanın beklenen tempo senaryosuna göre bu atın stiline uygunluk skoru ${r.yarisGidisatiSkoru > 0 ? "+" : ""}${r.yarisGidisatiSkoru.toFixed(1)} (istatistiksel olarak kanıtlanmadı, kullanıcı kararıyla eklendi): ${r.katkilar[YARIS_GIDISATI_IDX] > 0 ? "olumlu" : "olumsuz"}` : null) },
+  { kod: "ZEMIN", ozellikIndeksleri: [idx("zeminToleransi")], aciklama: (r) => (r.zeminToleransi !== 0 ? `Ağır/yağmurlu pist gibi normal-dışı zeminlerdeki geçmişinde, diğer atlara göre %${Math.abs(r.zeminToleransi).toFixed(1)} ${r.zeminToleransi > 0 ? "daha hızlı" : "daha yavaş"}` : null) },
+  { kod: "YAKINSAMA", ozellikIndeksleri: [idx("yakinsama2Plus")], aciklama: (r) => (r.katkilar[YAKINSAMA_IDX] !== 0 ? "Bu atta birden fazla olumlu işaret aynı anda bir araya gelmiş (pist uzmanlığı, pedigri, at-jokey geçmişi, AGF yükselişi, sınıf düşüşünden en az ikisi) — deneysel bir gözlem, henüz kanıtlanmamış" : null) },
+  { kod: "SPRINT", ozellikIndeksleri: [idx("sonIdmanSprint")], aciklama: (r) => (r.katkilar[SON_IDMAN_SPRINT_IDX] !== 0 ? `Son idmanını hızlı/sürat çalışması olarak yapmış (deneysel bir gözlem, henüz kanıtlanmamış): geçmişte ${r.katkilar[SON_IDMAN_SPRINT_IDX] > 0 ? "olumlu" : "olumsuz"} çıkmış` : null) },
+  { kod: "TAKIEK", ozellikIndeksleri: [idx("takiEklendiMi")], aciklama: (r) => (r.katkilar[TAKI_EKLENDI_IDX] !== 0 ? `Son yarışından bu yana bir ekipman eklenmiş (göz siperliği, burun bandı vb.): geçmişte ${r.katkilar[TAKI_EKLENDI_IDX] > 0 ? "olumlu" : "olumsuz"} çıkmış` : null) },
+  { kod: "TAKICIK", ozellikIndeksleri: [idx("takiCikarildiMi")], aciklama: (r) => (r.katkilar[TAKI_CIKARILDI_IDX] !== 0 ? `Son yarışından bu yana bir ekipman çıkarılmış: geçmişte ${r.katkilar[TAKI_CIKARILDI_IDX] > 0 ? "olumlu" : "olumsuz"} çıkmış` : null) },
+  { kod: "GIDISAT", ozellikIndeksleri: [idx("yarisGidisatiSkoru")], aciklama: (r) => (r.katkilar[YARIS_GIDISATI_IDX] !== 0 ? `Bu yarışın beklenen gidişatına (kimin öne geçeceği, temponun nasıl olacağı) göre bu atın koşu tarzı ${r.katkilar[YARIS_GIDISATI_IDX] > 0 ? "uygun düşüyor" : "uygun düşmüyor"} (deneysel bir gözlem, henüz kanıtlanmamış)` : null) },
 ];
 
 // 2026-08-18 kullanıcı talebi: "18 sinyalin hepsinin kontrol edildiğini bana göstermesini
@@ -1512,7 +1512,7 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
       tip: "destek",
       guven: "tam",
       kodGarantili: true,
-      aciklama: `AGF trend: ${r.agfTrendYonu} (${r.agfTrendFark! >= 0 ? "+" : ""}${r.agfTrendFark} puan) — piyasa hareketi, en çok ${r.agfTrendYonu === "yükseliş" ? "yükselenler" : "düşenler"} listesinde`,
+      aciklama: `Bahis payı (AGF) son saatlerde ${r.agfTrendYonu === "yükseliş" ? "yükseliyor" : "düşüyor"} (${r.agfTrendFark! >= 0 ? "+" : ""}${r.agfTrendFark} puan) — bu at, piyasada en çok ${r.agfTrendYonu === "yükseliş" ? "rağbet görenler" : "terk edilenler"} arasında`,
     });
   }
 
@@ -1532,8 +1532,8 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
       kodGarantili: true,
       aciklama:
         r.zeminMesafeDeneyimSeviyesi === "tam"
-          ? `Bugünkü pist+zemin+mesafede geçmişi var (${r.zeminMesafeOrnekSayisi} koşu): popülasyona göre ${r.zeminMesafeDeneyim > 0 ? "+" : ""}${r.zeminMesafeDeneyim.toFixed(1)}% (B katmanı, kanıtsız istisna)`
-          : `Bugünkü pist+zemin'de tecrübeli ama bu mesafede ilk kez — diğer mesafelerindeki performansına göre değerlendirildi (${r.zeminMesafeOrnekSayisi} koşu): popülasyona göre ${r.zeminMesafeDeneyim > 0 ? "+" : ""}${r.zeminMesafeDeneyim.toFixed(1)}% (B katmanı, kanıtsız istisna)`,
+          ? `Bugünkü pist, zemin ve mesafenin aynısında daha önce koşmuş (${r.zeminMesafeOrnekSayisi} koşu): o yarışlarda diğer atlara göre ${r.zeminMesafeDeneyim > 0 ? "+" : ""}${r.zeminMesafeDeneyim.toFixed(1)}% ${r.zeminMesafeDeneyim > 0 ? "daha hızlı" : "daha yavaş"} (deneysel bir gözlem, henüz kanıtlanmamış)`
+          : `Bugünkü pist ve zeminde tecrübeli ama bu mesafede ilk kez koşacak — diğer mesafelerdeki performansına bakılarak değerlendirildi (${r.zeminMesafeOrnekSayisi} koşu): diğer atlara göre ${r.zeminMesafeDeneyim > 0 ? "+" : ""}${r.zeminMesafeDeneyim.toFixed(1)}% ${r.zeminMesafeDeneyim > 0 ? "daha hızlı" : "daha yavaş"} (deneysel bir gözlem, henüz kanıtlanmamış)`,
     });
   }
 
@@ -1556,7 +1556,7 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
       tip: r.bSireKatkisi >= 0 ? "destek" : "risk",
       guven: Math.abs(r.bSireKatkisi) >= GUCLU_ESIK ? "tam" : Math.abs(r.bSireKatkisi) >= ORTA_ESIK ? "orta" : "zayif",
       kodGarantili: true,
-      aciklama: `Aygır kazanma oranı (küçültülmüş, B katmanı — düşük-şart'a özel, kanıtsız istisna): %${r.sireOrani.toFixed(1)}`,
+      aciklama: `Babasının bu tip yarışlardaki kazanma oranı (dengelenmiş rakam, deneysel bir gözlem): %${r.sireOrani.toFixed(1)}`,
     });
   }
   const gruplarSiresiz = gruplar; // SIRE zaten 2026-08-28'den beri OZELLIK_GRUPLARI'nda yok
