@@ -943,16 +943,6 @@ function RunnerRow({
         )}
       </td>
 
-      {/* Start Sorunu — TJK'nın resmi "Geç Çıkış" tespitine göre, tekrarlayan (2+) kayıt.
-          Yetersiz veri de "Hayır" sayılır (kullanıcı talimatı 2026-08-01) — yalnız EVET
-          kanıtlanmış bir sorunu işaret eder, diğer her durum "Hayır" gösterir. */}
-      <td className="px-2 py-1.5 text-center">
-        {r.startSorunu ? (
-          <span className="text-[11px] font-semibold text-miss">{t("evet")}</span>
-        ) : (
-          <span className="text-[11px] text-muted-foreground">{t("hayir")}</span>
-        )}
-      </td>
     </tr>
   );
 }
@@ -1311,7 +1301,6 @@ function RaceTable({
                   <RaceStyleInfoButton />
                 </span>
               </th>
-              <th className="px-2 py-1.5 text-center" title={t("startSorunuTitle")} data-tour="start-sorunu">{t("startSorunu")}</th>
             </tr>
           </thead>
           <tbody>
