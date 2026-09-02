@@ -1121,22 +1121,38 @@ function agfFavoriIlk3Garantisi<T extends { no: number; agfSirasi: number }>(
 // pistUzmani'nin kendisi (genel yüzey/hipodrom-bağımsız kazanma oranı) BİLEREK skorlamaya
 // eklenmedi — bkz. sinyal-kutugu.service.ts "Genel Pist Tercihi (Hipodrom-Bağımsız Yüzey
 // Kazanma Oranı)": GREEN GULET vakasıyla (aynı THEATER OF WAR türü tetikleyici) test
-// edilmiş, leak-free B=500 bootstrap'ta iki segmentte de TAMAMEN anlamsız çıkmıştı — aynı
-// sıfır-etkili sinyali sinyalSayisi/terfi kapısından arka kapıyla sokmamak için burada
-// KULLANILMADI. Bunun yerine ZATEN kanıtlı iki bileşen birleştirildi: Saf Model/AGF
-// ayrışması (KARDAHA + THEATER OF WAR, iki gerçek vaka ile doğrulandı) + sinyalSayisi>=
-// SINYAL_ESIGI (agfTrendTerfisi'yle AYNI, V4'ün n=663 backtest'i olan eşik).
+// edilmiş, leak-free B=500 bootstrap'ta iki segmentte de TAMAMEN anlamsız çıkmıştı.
+//
+// DÜZELTME (aynı gün, canlıya alındıktan hemen sonra) — kullanıcı gerçek BAY UMUT/İstanbul
+// K4 vakasını sordu: fark=+5.1pp olmasına rağmen terfi etmemişti. Kök neden: ilk sürüm
+// ikinci koşul olarak sinyalSayisi>=SINYAL_ESIGI kullanıyordu (agfTrendTerfisi'nden ödünç
+// alınmış) — ama bu, V4/V2 döneminden kalma DAR bir 8-maddelik kontrol listesi (Accurace/
+// KGS-14-30/hipodrom-mesafe kazanma/aygır-üst-%20/galop/idman-jokeyi/AGF-trend/form) ve
+// BAY UMUT'un marketBlindProb1'ini GERÇEKTE yükselten asıl sinyallerle (hizDerecesi=+1.24,
+// h2hNetSkor=+1, antrenorOrani=%13.8) HİÇ ÖRTÜŞMÜYOR — BAY UMUT'un sinyalSayisi'si 0 çıktı,
+// yanlış kapıdan reddedildi. Gerçek İstanbul K4 verisiyle (12 at) doğrulandı: doğru soru
+// "modelin AGF-hariç kendi görüşü GERÇEKTEN net pozitif mi" — bu zaten marketBlindProb1'in
+// KENDİ hesaplama yöntemiyle (AGF_KATKI_INDEKSLERI hariç tutulan katkılar toplamı) birebir
+// ölçülebiliyor, ayrı/uyumsuz bir sinyal sayacı icat etmeye gerek yok. Yeni koşul: katkilar
+// dizisinin AGF-dışı toplamı > 0 (yani modelin AGF'siz görüşü GERÇEKTEN, net olarak pozitif
+// — yalnız AGF'nin ortalamadan daha kötümser olması yüzünden ORTAYA ÇIKAN sahte bir fark
+// değil). Gerçek K4/K6 verisiyle çapraz kontrol edildi: BAY UMUT (+0.27) ve K4'teki
+// ŞİMŞEKKIRAN (+0.30) doğru şekilde nitelik kazanıyor; K4'teki DİLAN KIZ (toplam -0.14,
+// fark yine de +5.9pp) ve K6'daki ANGEL OF DEFNE (negatif temel sinyaller) doğru şekilde
+// DIŞLANIYOR — ikisi de büyük farkı yalnız AGF'nin ekstra kötümserliğinden alıyor, modelin
+// kendi (AGF'siz) görüşü onlar için de zaten olumsuz.
 const SAF_MODEL_DEGER_ESIGI = 5;
 
 function safModelDegerTerfisiUygula<
-  T extends { no: number; olasilik: number; marketBlindProb1: number; agfPayi: number; sinyalSayisi: number }
+  T extends { no: number; olasilik: number; marketBlindProb1: number; agfPayi: number; katkilar: number[] }
 >(sirali: T[]): (T & { degerTerfisi: boolean })[] {
   const isaretsiz = sirali.map((r) => ({ ...r, degerTerfisi: false }));
-  const { sonuc, terfiEdenNolar } = terfiPenceresiV5(
-    isaretsiz,
-    6,
-    (r) => r.marketBlindProb1 * 100 - r.agfPayi >= SAF_MODEL_DEGER_ESIGI && r.sinyalSayisi >= SINYAL_ESIGI
-  );
+  const { sonuc, terfiEdenNolar } = terfiPenceresiV5(isaretsiz, 6, (r) => {
+    const fark = r.marketBlindProb1 * 100 - r.agfPayi;
+    if (fark < SAF_MODEL_DEGER_ESIGI) return false;
+    const nonAgfToplam = r.katkilar.reduce((toplam, k, i) => (AGF_KATKI_INDEKSLERI.includes(i) ? toplam : toplam + k), 0);
+    return nonAgfToplam > 0;
+  });
   return sonuc.map((r) => (terfiEdenNolar.has(r.no) ? { ...r, degerTerfisi: true } : r));
 }
 

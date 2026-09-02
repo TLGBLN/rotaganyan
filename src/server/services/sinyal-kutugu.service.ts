@@ -229,9 +229,9 @@ export const SIRALAMA_KURALLARI: SiralamaKurali[] = [
   },
   {
     ad: "Saf Model Değer Terfisi",
-    etiket: "YENİ (2026-09-02, V5.38)",
-    aciklama: "Saf Model (marketBlindProb1, AGF'siz) ile AGF payı arasındaki fark ≥5pp VE yeterli sinyal sayısı (≥4) varsa, at ham sıralamada geride kalsa bile ilk-6'ya KOŞULSUZ terfi eder (agfFavoriIlk3Garantisi/düzeltilmiş agfTrendTerfisi ile aynı splice ilkesi). THEATER OF WAR vakasından doğdu (İstanbul, Saf Model 4.sıra/%10.2 derken AGF payı %5.0'a gömüp nihai skoru 8.sıraya düşürmüştü, at günün en iyi performanslarından birini verdi). Kullanıcı kararı: 'olumlu sinyaller varken agf piyasaya göre at aşağılara çekilmemeli en azından 6. at dışına atılmamalı.'",
-    backtestOzet: "Kullanıcı kararıyla backtest İSTENMEDEN doğrudan canlıya alındı (zeminToleransi/yakınsama/yarisGidisatiSkoru ile aynı türden bilinçli istisna). Yalnız sentetik doğrulama: THEATER OF WAR'ı taklit eden senaryoda (fark=5.3pp, sinyalSayisi=4) doğal 8. sıradaki aday 6. sıraya taşındı, 1-5. sıradaki güçlü sakinler dokunulmadı.",
+    etiket: "YENİ (2026-09-02, V5.38) — KAPISI DÜZELTİLDİ (aynı gün, V5.39)",
+    aciklama: "Saf Model (marketBlindProb1, AGF'siz) ile AGF payı arasındaki fark ≥5pp VE modelin AGF-dışı katkılarının TOPLAMI net pozitifse, at ham sıralamada geride kalsa bile ilk-6'ya KOŞULSUZ terfi eder (agfFavoriIlk3Garantisi/düzeltilmiş agfTrendTerfisi ile aynı splice ilkesi). THEATER OF WAR vakasından doğdu. İLK SÜRÜM (V5.38) ikinci koşul olarak sinyalSayisi≥4 (agfTrendTerfisi'nden ödünç) kullanıyordu — kullanıcı GERÇEK bir vakayla (İstanbul K4, BAY UMUT: fark=+5.1pp ama terfi etmedi) bunu sorguladı, kök neden bulundu: sinyalSayisi V4/V2'den kalma 8 maddelik dar bir liste, BAY UMUT'u yükselten ASIL sinyallerle (hizDerecesi/h2hNetSkor/antrenorOrani) hiç örtüşmüyordu. Düzeltme: marketBlindProb1'i zaten üreten AYNI hesabı (AGF-dışı katkı toplamı) yeniden kullanıyor.",
+    backtestOzet: "Kullanıcı kararıyla backtest İSTENMEDEN doğrudan canlıya alındı. Gerçek 3 koşuyla (İstanbul K4/K6/K9, 2026-09-02) çapraz doğrulandı: K4'te BAY UMUT artık doğru şekilde 8.'den 6.'ya terfi ediyor; K4'teki DİLAN KIZ ve K6'daki ANGEL OF DEFNE (büyük fark ama AGF-dışı katkıları NET NEGATİF — yalnız AGF'nin ekstra kötümserliğinden kaynaklanan sahte bir fark) doğru şekilde DIŞLANIYOR.",
   },
   {
     ad: "AGF Favorisi İlk-3 Garantisi",
