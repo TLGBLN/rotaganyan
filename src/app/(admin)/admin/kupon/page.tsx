@@ -8,13 +8,12 @@ import { getHippodromes, buildKuponOnerisi, type KuponStatus } from "@/server/se
 import { getAdminRaceDays, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
 import { turkeyDateString } from "@/lib/tz";
 import DateNavigator from "@/components/kosular/DateNavigator";
-import ClassTypeAdviceCard from "@/components/admin/ClassTypeAdviceCard";
+import RaceAdviceCard from "@/components/admin/RaceAdviceCard";
 import KuponForm from "./KuponForm";
 import KuponActions from "./KuponActions";
 import type { HomeKuponLegInput } from "@/server/actions/home-kupon.actions";
 import { syncResultsForDate } from "@/server/services/result-sync";
 import DeleteRaceDayButton from "@/components/admin/DeleteRaceDayButton";
-import DeleteRaceButton from "@/components/admin/DeleteRaceButton";
 import ForceIngestButton from "@/components/admin/ForceIngestButton";
 import { forceIngestDate } from "@/server/actions/race.actions";
 
@@ -31,19 +30,6 @@ function bankoOlasilikCikar(bankoNote: string | null | undefined): string | null
 }
 
 export const dynamic = "force-dynamic";
-
-const ADVICE_LEVEL_LABEL: Record<string, string> = {
-  warn: "Dikkat",
-  good: "Güçlü geçmiş",
-  info: "Bilgi",
-  none: "Veri yok",
-};
-
-function couponTierLabel(rank: number): string {
-  if (rank <= 3) return "Ekonomik";
-  if (rank <= 6) return "Normal";
-  return "Geniş";
-}
 
 function parseConditionsRef(conditions: string): { slug: string; raceNo: number } | null {
   const m = conditions.match(/^(.+?)\s+(\d+)\.\s*Ko[şs]u/i);
@@ -158,166 +144,62 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                   />
                 </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b text-muted-foreground">
-                      <th className="px-3 py-1.5 text-left font-medium">No</th>
-                      <th className="px-3 py-1.5 text-left font-medium">Saat</th>
-                      <th className="px-3 py-1.5 text-left font-medium">Tür</th>
-                      <th className="px-3 py-1.5 text-left font-medium">Mesafe</th>
-                      <th className="px-3 py-1.5 text-left font-medium">At</th>
-                      <th className="px-3 py-1.5 text-left font-medium">Analiz</th>
-                      <th className="px-3 py-1.5 text-left font-medium">Sonuç</th>
-                      <th className="px-3 py-1.5 text-right font-medium"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rd.races.map((race, i) => {
-                      const karmaRef = race.conditions ? parseConditionsRef(race.conditions) : null;
-                      const original = karmaRef
-                        ? (originalByKey.get(`${karmaRef.slug}:${karmaRef.raceNo}`) ?? (race.time ? originalByTime.get(race.time) : null))
-                        : null;
-                      const effectivePred = race.prediction ?? original?.prediction ?? null;
-                      const effectiveClassType =
-                        race.classType && race.classType !== "—"
-                          ? race.classType
-                          : (original?.classType ?? race.classType);
-                      const effectiveRunners =
-                        race.runners.length > 0 ? race.runners : (original?.runners ?? []);
-                      // 2026-09-02 kullanıcı talebi: mesafe de artık kırılıma giriyor (bkz.
-                      // admin.service.ts getClassTypeAdvice notu) — karma/mirror koşularda
-                      // aynı effectiveClassType/effectiveRunners deseniyle gerçek mesafeye düşer.
-                      const effectiveDistance = race.distance || original?.distance;
-                      // 2026-08-30 kullanıcı talebi: at sayısı arttıkça kazananın Ekonomik'te
-                      // yakalanma oranı düşüyor, Geniş'e kaçma oranı artıyor — bu koşunun
-                      // GERÇEK at sayısı (scratched hariç, bkz. getAdminRaceDays) tierOneri'ye
-                      // aktarılıyor ki koşu-tipi bazlı öneriden daha geniş bir kupon
-                      // gerekiyorsa öneri buna göre yükselsin.
-                      const advice = getClassTypeAdvice(analystStatsByRaceId.get(effectiveRaceIdFor(race))!, effectiveClassType, effectiveRunners.length, effectiveDistance);
+              <div className="space-y-2 p-2">
+                {rd.races.map((race) => {
+                  const karmaRef = race.conditions ? parseConditionsRef(race.conditions) : null;
+                  const original = karmaRef
+                    ? (originalByKey.get(`${karmaRef.slug}:${karmaRef.raceNo}`) ?? (race.time ? originalByTime.get(race.time) : null))
+                    : null;
+                  const effectivePred = race.prediction ?? original?.prediction ?? null;
+                  const effectiveClassType =
+                    race.classType && race.classType !== "—"
+                      ? race.classType
+                      : (original?.classType ?? race.classType);
+                  const effectiveRunners =
+                    race.runners.length > 0 ? race.runners : (original?.runners ?? []);
+                  // 2026-09-02 kullanıcı talebi: mesafe de artık kırılıma giriyor (bkz.
+                  // admin.service.ts getClassTypeAdvice notu) — karma/mirror koşularda
+                  // aynı effectiveClassType/effectiveRunners deseniyle gerçek mesafeye düşer.
+                  const effectiveDistance = race.distance || original?.distance;
+                  // 2026-08-30 kullanıcı talebi: at sayısı arttıkça kazananın Ekonomik'te
+                  // yakalanma oranı düşüyor, Geniş'e kaçma oranı artıyor — bu koşunun
+                  // GERÇEK at sayısı (scratched hariç, bkz. getAdminRaceDays) tierOneri'ye
+                  // aktarılıyor ki koşu-tipi bazlı öneriden daha geniş bir kupon
+                  // gerekiyorsa öneri buna göre yükselsin.
+                  const advice = getClassTypeAdvice(analystStatsByRaceId.get(effectiveRaceIdFor(race))!, effectiveClassType, effectiveRunners.length, effectiveDistance);
 
-                      return (
-                        <tr
-                          key={race.id}
-                          className={cn("border-b last:border-0", i % 2 === 1 && "race-row-even")}
-                        >
-                          <td className="px-3 py-1.5 font-semibold">
-                            {race.raceNo}
-                            {race.conditions && (
-                              <div className="text-[10px] font-normal text-muted-foreground">
-                                {race.conditions}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-3 py-1.5 text-muted-foreground">{race.time ?? "—"}</td>
-                          <td className="px-3 py-1.5">
-                            <div className="flex items-center gap-1.5">
-                              <span>{effectiveClassType}</span>
-                              <span
-                                title={advice.text}
-                                className={cn(
-                                  "inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0 text-[9px] font-semibold cursor-help",
-                                  advice.level === "warn" && "bg-miss/20 text-miss",
-                                  advice.level === "info" && "bg-brand/20 text-brand",
-                                  advice.level === "good" && "bg-hit/20 text-hit",
-                                  advice.level === "none" && "bg-muted text-muted-foreground"
-                                )}
-                              >
-                                {advice.level === "warn" ? "!" : advice.level === "good" ? "✓" : advice.level === "none" ? "–" : "i"}
-                                {ADVICE_LEVEL_LABEL[advice.level]}
-                              </span>
-                            </div>
-                            {effectivePred?.isBanko && (
-                              <div
-                                title={effectivePred.bankoNote ?? undefined}
-                                className="mt-0.5 text-[10px] font-semibold leading-tight text-hit cursor-help"
-                              >
-                                ★ BANKO
-                                {bankoOlasilikCikar(effectivePred.bankoNote) && (
-                                  <span className="text-muted-foreground"> (model %{bankoOlasilikCikar(effectivePred.bankoNote)} diyor, garanti değil)</span>
-                                )}
-                                {" "}— tek at yeterli, bütçeyi diğer ayaklara kaydırın
-                                {/* 2026-08-31 — Opus denetimi: "Güçlü geçmiş" rozeti Ekonomik
-                                    (ilk-3) payına bakıyor, BANKO ise top-1 gerektiriyor —
-                                    ayrı bir soru. Bu koşu tipinde favori GERÇEKTE ne sıklıkla
-                                    kazanmış, doğrudan burada gösteriliyor ki yeşil rozet
-                                    yanıltmasın. */}
-                                {advice.top1Rate && advice.top1Rate.total >= 5 && (
-                                  <span className="block font-normal text-muted-foreground">
-                                    Bu sınıfta favori tarihte %{advice.top1Rate.rate.toFixed(0)} kazanmış ({advice.top1Rate.hits}/{advice.top1Rate.total})
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                            <div className="mt-1">
-                              <ClassTypeAdviceCard advice={advice} classType={effectiveClassType} compact />
-                            </div>
-                          </td>
-                          <td className="px-3 py-1.5 text-muted-foreground">{race.distance}m</td>
-                          <td className="px-3 py-1.5">{effectiveRunners.length}</td>
-                          <td className="px-3 py-1.5">
-                            {effectivePred ? (
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <Link
-                                  href={`/admin/analizler/${effectivePred.id}`}
-                                  className={cn(
-                                    "font-medium hover:underline",
-                                    effectivePred.published ? "text-hit" : "text-brand"
-                                  )}
-                                >
-                                  {effectivePred.published ? "Yayında" : "Taslak"}
-                                </Link>
-                                <Link
-                                  href={`/admin/analizler/yeni?kosu=${effectiveRaceIdFor(race)}`}
-                                  className="text-muted-foreground hover:text-brand"
-                                  title="Analizi revize et"
-                                >
-                                  + Ekle
-                                </Link>
-                                {effectivePred.picks
-                                  .filter((p) => p.isTarget)
-                                  .map((p) => (
-                                    <span
-                                      key={p.rank}
-                                      className="inline-flex items-center gap-0.5 rounded-full border border-brand/40 bg-brand/10 px-1 py-0 text-[9px] font-semibold text-brand"
-                                    >
-                                      🎯 {couponTierLabel(p.rank)}
-                                    </span>
-                                  ))}
-                                <span className="w-full text-[10px] text-muted-foreground">
-                                  {effectivePred.picks.slice(0, 3).map((p) => {
-                                    const no = p.runnerLabel.match(/^#*(\d+)/)?.[1] ?? "?";
-                                    return `#${no}${p.score != null ? ` %${p.score}` : ""}`;
-                                  }).join(" · ")}
-                                </span>
-                              </div>
-                            ) : (
-                              <Link
-                                href={`/admin/analizler/yeni?kosu=${effectiveRaceIdFor(race)}`}
-                                className="text-muted-foreground hover:text-brand"
-                              >
-                                + Analiz Ekle
-                              </Link>
-                            )}
-                          </td>
-                          <td className="px-3 py-1.5">
-                            {race.result ? (
-                              <span className="text-hit">✓ Girildi</span>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-1.5 text-right">
-                            <DeleteRaceButton
-                              raceId={race.id}
-                              label={`${rd.hippodrome.name} ${race.raceNo}. Koşu`}
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                  return (
+                    <RaceAdviceCard
+                      key={race.id}
+                      hippodromeName={rd.hippodrome.name}
+                      raceId={race.id}
+                      raceNo={race.raceNo}
+                      time={race.time}
+                      classType={effectiveClassType}
+                      conditions={race.conditions}
+                      distance={race.distance}
+                      atSayisi={effectiveRunners.length}
+                      advice={advice}
+                      hasResult={!!race.result}
+                      newAnalysisHref={`/admin/analizler/yeni?kosu=${effectiveRaceIdFor(race)}`}
+                      prediction={
+                        effectivePred
+                          ? {
+                              id: effectivePred.id,
+                              published: effectivePred.published,
+                              isBanko: effectivePred.isBanko,
+                              bankoOlasilik: bankoOlasilikCikar(effectivePred.bankoNote),
+                              topPicks: effectivePred.picks.slice(0, 3).map((p) => ({
+                                rank: p.rank,
+                                no: `#${p.runnerLabel.match(/^#*(\d+)/)?.[1] ?? "?"}`,
+                                score: p.score,
+                              })),
+                            }
+                          : null
+                      }
+                    />
+                  );
+                })}
               </div>
             </div>
           ))}
