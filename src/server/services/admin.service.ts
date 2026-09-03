@@ -350,6 +350,11 @@ export type AnalystStats = {
   couponTierByTipMesafe: CouponTierBreakdown[];
   byTipAt: AnalystBreakdown[];
   couponTierByTipAt: CouponTierBreakdown[];
+  // 2026-09-03 kullanıcı talebi ("koşu cinsi-pist-mesafe-at sayısına göre analiz yap") —
+  // tip×mesafe/tip×at ile AYNI (2'li) seviyede, ayrı bir kademe. bkz. byTipMesafeAt'ın
+  // üstündeki not: pist'i 4'lü kombinasyona eklemek veri hacmini fazla parçalardı.
+  byTipPist: AnalystBreakdown[];
+  couponTierByTipPist: CouponTierBreakdown[];
 };
 
 const SURFACE_LABEL: Record<string, string> = { CIM: "Çim", KUM: "Kum", SENTETIK: "Sentetik" };
@@ -591,6 +596,14 @@ export async function getAnalystStats(excludeRaceId?: string, sadeceGuncelMotor 
     couponTierByTipMesafe: groupCouponTier((r) => `${classTypeGroup(r.race.classType)}|${mesafeBucket(r.race.distance)}`),
     byTipAt: group((r) => `${classTypeGroup(r.race.classType)}|${atSayisiBucket(r.race.runners.length)}`),
     couponTierByTipAt: groupCouponTier((r) => `${classTypeGroup(r.race.classType)}|${atSayisiBucket(r.race.runners.length)}`),
+    // 2026-09-03 kullanıcı talebi ("koşu cinsi-pist-mesafe ve at sayısına göre analiz
+    // yap"): pist'i tip×mesafe×at 4'lüsüne EKLEMEDİK — 600 örneklem 75 hücreye
+    // bölününce yalnız 9'u yeterli örneklemliydi (bkz. proje hafızası), pist eklenince
+    // (~3 kat hücre) neredeyse tamamı boşalırdı. Bunun yerine pist KENDİ BAŞINA yeterli
+    // örneklemli (bySurface: Kum n=310/Çim n=229/Sentetik n=61) olduğu için tip×mesafe
+    // ve tip×at ile AYNI seviyede (2'li), ayrı bir kademe olarak eklendi.
+    byTipPist: group((r) => `${classTypeGroup(r.race.classType)}|${SURFACE_LABEL[r.race.surface] ?? r.race.surface}`),
+    couponTierByTipPist: groupCouponTier((r) => `${classTypeGroup(r.race.classType)}|${SURFACE_LABEL[r.race.surface] ?? r.race.surface}`),
     overallCouponTier: groupCouponTier(() => "Tüm Tahminler")[0] ?? {
       label: "Tüm Tahminler",
       total: 0,
@@ -920,7 +933,13 @@ function isabetCumlesi(b: AnalystBreakdown): string {
   return `1. seçim 1. geldi: %${b.rate.toFixed(0)} (${b.hits}/${b.total} koşu)`;
 }
 
-export function getClassTypeAdvice(stats: AnalystStats, classType: string, atSayisi?: number, distance?: number): ClassTypeAdvice {
+export function getClassTypeAdvice(
+  stats: AnalystStats,
+  classType: string,
+  atSayisi?: number,
+  distance?: number,
+  surface?: string
+): ClassTypeAdvice {
   const normalized = normalizeClassType(classType);
   const grupAdi = classTypeGroup(classType);
   const breakdown = stats.byClassType.find((b) => b.label === normalized);
@@ -973,6 +992,25 @@ export function getClassTypeAdvice(stats: AnalystStats, classType: string, atSay
         level: tierSeviye(ikiliTier),
         text: `${grupAdi.replace(" Koşular", "")} arasında, ${atKovasi} sahalarda: ${isabetCumlesi(ikiliBreakdown)}`,
         oneri: tierOneri(ikiliTier),
+        tierYuzdeler: { eko: ikiliTier.ekonomik, nor: ikiliTier.normal, genis: ikiliTier.genis, kacti: ikiliTier.kacti, toplam: ikiliTier.total },
+        top1Rate: { rate: ikiliBreakdown.rate, hits: ikiliBreakdown.hits, total: ikiliBreakdown.total },
+      };
+    }
+  }
+
+  // 2026-09-03 kullanıcı talebi ("pist'e göre de analiz yap") — bkz. AnalystStats.byTipPist
+  // üstündeki not: pist 4'lü kombinasyona eklenmedi (veri parçalanırdı), tip×mesafe/tip×at
+  // ile AYNI seviyede ayrı bir 2'li kademe.
+  const pistAdi = surface ? SURFACE_LABEL[surface] ?? surface : null;
+  if (pistAdi) {
+    const key = `${grupAdi}|${pistAdi}`;
+    const ikiliTier = stats.couponTierByTipPist.find((t) => t.label === key);
+    const ikiliBreakdown = stats.byTipPist.find((b) => b.label === key);
+    if (ikiliTier && ikiliBreakdown && ikiliTier.total >= TIER_GUVEN_ESIGI) {
+      return {
+        level: tierSeviye(ikiliTier),
+        text: `${grupAdi.replace(" Koşular", "")} arasında, ${pistAdi} pistte: ${isabetCumlesi(ikiliBreakdown)}`,
+        oneri: tierOneri(ikiliTier, atSayisiTier),
         tierYuzdeler: { eko: ikiliTier.ekonomik, nor: ikiliTier.normal, genis: ikiliTier.genis, kacti: ikiliTier.kacti, toplam: ikiliTier.total },
         top1Rate: { rate: ikiliBreakdown.rate, hits: ikiliBreakdown.hits, total: ikiliBreakdown.total },
       };

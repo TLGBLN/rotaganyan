@@ -80,6 +80,7 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
     prediction: RaceRow["prediction"];
     classType: string;
     distance: number;
+    surface: RaceRow["surface"];
     runners: RaceRow["runners"];
   };
   const originalByKey = new Map<string, OriginalMeta>();
@@ -93,6 +94,7 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
         prediction: race.prediction,
         classType: race.classType,
         distance: race.distance,
+        surface: race.surface,
         runners: race.runners,
       };
       originalByKey.set(`${rd.hippodrome.slug}:${race.raceNo}`, meta);
@@ -159,12 +161,16 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                   // admin.service.ts getClassTypeAdvice notu) — karma/mirror koşularda
                   // aynı effectiveClassType/effectiveRunners deseniyle gerçek mesafeye düşer.
                   const effectiveDistance = race.distance || original?.distance;
+                  // 2026-09-03 kullanıcı talebi: pist de artık kırılıma giriyor (bkz.
+                  // admin.service.ts getClassTypeAdvice/byTipPist notu) — AYNI karma/mirror
+                  // deseniyle gerçek pist'e düşer.
+                  const effectiveSurface = race.surface || original?.surface;
                   // 2026-08-30 kullanıcı talebi: at sayısı arttıkça kazananın Ekonomik'te
                   // yakalanma oranı düşüyor, Geniş'e kaçma oranı artıyor — bu koşunun
                   // GERÇEK at sayısı (scratched hariç, bkz. getAdminRaceDays) tierOneri'ye
                   // aktarılıyor ki koşu-tipi bazlı öneriden daha geniş bir kupon
                   // gerekiyorsa öneri buna göre yükselsin.
-                  const advice = getClassTypeAdvice(analystStatsByRaceId.get(effectiveRaceIdFor(race))!, effectiveClassType, effectiveRunners.length, effectiveDistance);
+                  const advice = getClassTypeAdvice(analystStatsByRaceId.get(effectiveRaceIdFor(race))!, effectiveClassType, effectiveRunners.length, effectiveDistance, effectiveSurface);
 
                   return (
                     <RaceAdviceCard
