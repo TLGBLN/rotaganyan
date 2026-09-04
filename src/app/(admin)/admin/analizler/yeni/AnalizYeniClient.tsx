@@ -4,21 +4,18 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, Loader2 } from "lucide-react";
-import { getKosuAnalizVerisi } from "@/server/actions/admin-analiz.actions";
+import { getKosuAnalizVerisi, getKosuSecimGunuVerisi } from "@/server/actions/admin-analiz.actions";
 import SmartAnalysisEditor from "@/components/admin/SmartAnalysisEditor";
 import RaceCountdown from "@/components/kosular/RaceCountdown";
 import DatePickerNav from "./DatePickerNav";
+import type { KosuSecimGunu } from "./types";
 
 // 2026-08-14 — kullanıcı talebi: "Veri Gir — Koşu Seç" listesi ile analiz paneli tek
 // sayfada birleştirildi — bir koşuya tıklayınca sayfa DEĞİŞMEZ, yalnız aşağıdaki analiz
 // bölümü seçilen koşuya göre güncellenir. Liste her zaman görünür kalır, aralarında
 // gezinmek için geri dönmeye gerek yok.
 
-export type KosuSecimGunu = {
-  id: string;
-  gunEtiketi: string;
-  races: { id: string; raceNo: number; hasAnaliz: boolean }[];
-};
+export type { KosuSecimGunu } from "./types";
 
 type RaceData = NonNullable<Awaited<ReturnType<typeof getKosuAnalizVerisi>>>;
 
@@ -30,12 +27,38 @@ type Props = {
   initialRaceId?: string;
 };
 
-export default function AnalizYeniClient({ gunler, selectedDate, today, tomorrow, initialRaceId }: Props) {
+export default function AnalizYeniClient({ gunler: gunlerBaslangic, selectedDate: tarihBaslangic, today, tomorrow, initialRaceId }: Props) {
   const router = useRouter();
+  const [gunler, setGunler] = useState<KosuSecimGunu[]>(gunlerBaslangic);
+  const [selectedDate, setSelectedDate] = useState(tarihBaslangic);
+  const [gunlerLoading, setGunlerLoading] = useState(false);
   const [selectedRaceId, setSelectedRaceId] = useState<string | null>(initialRaceId ?? null);
   const [raceData, setRaceData] = useState<RaceData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 2026-09-03 kullanıcı bulgusu ("tarihlere tıkladığımda çok yavaş değişiyor sayfa") —
+  // eskiden DatePickerNav router.push ile TAM sayfa navigasyonu tetikliyordu: bu sayfa
+  // force-dynamic olduğu için Next.js her seferinde page.tsx'i baştan sunucu tarafında
+  // çalıştırıp YENİ bir RSC payload'u indiriyordu (~700-1100ms, ölçüldü). Artık koşu
+  // seçimindeki (handleSelectRace) AYNI desen: hafif bir server action ile veri çekilip
+  // yalnız state güncelleniyor. URL'i güncel tutmak için router.replace YERİNE çıplak
+  // window.history.replaceState kullanılıyor — bu, Next.js router'ını (ve onun tetiklediği
+  // sunucu round-trip'ini) HİÇ devreye sokmadan URL çubuğunu günceller.
+  const handleDateChange = useCallback(async (tarih: string) => {
+    setGunlerLoading(true);
+    setSelectedRaceId(null);
+    setRaceData(null);
+    setError(null);
+    try {
+      const yeniGunler = await getKosuSecimGunuVerisi(tarih);
+      setGunler(yeniGunler);
+      setSelectedDate(tarih);
+      window.history.replaceState(null, "", `/admin/analizler/yeni?tarih=${tarih}`);
+    } finally {
+      setGunlerLoading(false);
+    }
+  }, []);
 
   const loadRace = useCallback(async (raceId: string) => {
     setLoading(true);
@@ -79,10 +102,14 @@ export default function AnalizYeniClient({ gunler, selectedDate, today, tomorrow
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <h1 className="text-lg font-bold">Veri Gir — Koşu Seç</h1>
         </div>
-        <DatePickerNav selectedDate={selectedDate} today={today} tomorrow={tomorrow} />
+        <DatePickerNav selectedDate={selectedDate} today={today} tomorrow={tomorrow} onDateChange={handleDateChange} />
         <p className="text-xs text-muted-foreground">Günü seçip analiz gireceğin koşuya tıkla.</p>
 
-        {gunler.length === 0 ? (
+        {gunlerLoading ? (
+          <div className="flex items-center gap-2 py-8 justify-center text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Yükleniyor…
+          </div>
+        ) : gunler.length === 0 ? (
           <div className="rounded-lg border border-dashed py-12 text-center text-sm text-muted-foreground">
             Bu tarih için koşu programı bulunamadı.
             {selectedDate >= today && <p className="mt-1 text-xs">Program henüz import edilmemiş olabilir.</p>}

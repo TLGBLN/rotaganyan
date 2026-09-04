@@ -1,19 +1,18 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+// 2026-09-03 kullanıcı bulgusu ("tarihlere tıkladığımda çok yavaş değişiyor sayfa") —
+// eskiden burada router.push tam sayfa navigasyonu tetikliyordu (force-dynamic sayfa,
+// her tıklamada sunucu round-trip'i, ~700-1100ms). Artık tarih seçimi AnalizYeniClient'ın
+// verdiği onDateChange callback'ine devrediliyor — o, hafif bir server action ile veriyi
+// çekip yalnız state güncelliyor, sayfa hiç yeniden yüklenmiyor.
+type Props = { selectedDate: string; today: string; tomorrow: string; onDateChange: (date: string) => void };
 
-type Props = { selectedDate: string; today: string; tomorrow: string };
-
-export default function DatePickerNav({ selectedDate, today, tomorrow }: Props) {
-  const router = useRouter();
-
-  const nav = (date: string) => router.push(`/admin/analizler/yeni?tarih=${date}`);
-
+export default function DatePickerNav({ selectedDate, today, tomorrow, onDateChange }: Props) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <button
         type="button"
-        onClick={() => nav(today)}
+        onClick={() => onDateChange(today)}
         className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
           selectedDate === today
             ? "bg-brand text-black border-brand"
@@ -24,7 +23,7 @@ export default function DatePickerNav({ selectedDate, today, tomorrow }: Props) 
       </button>
       <button
         type="button"
-        onClick={() => nav(tomorrow)}
+        onClick={() => onDateChange(tomorrow)}
         className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
           selectedDate === tomorrow
             ? "bg-brand text-black border-brand"
@@ -36,7 +35,7 @@ export default function DatePickerNav({ selectedDate, today, tomorrow }: Props) 
       <input
         type="date"
         value={selectedDate}
-        onChange={(e) => { if (e.target.value) nav(e.target.value); }}
+        onChange={(e) => { if (e.target.value) onDateChange(e.target.value); }}
         className="rounded-md border bg-background px-2 py-1.5 text-xs [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:brightness-200"
       />
     </div>
