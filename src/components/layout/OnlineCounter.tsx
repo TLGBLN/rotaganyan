@@ -24,12 +24,21 @@ export default function OnlineCounter() {
   if (count == null) return null;
 
   return (
-    <span className="flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium text-muted-foreground">
+    // 2026-09-03 kullanıcı talebi ("ana ekranda gözüksün") — bileşen artık TÜM ekran
+    // boyutlarında görünüyor (eskiden yalnız masaüstü menüsündeydi). En dar mobil
+    // genişliklerde (320px) "çevrimiçi" kelimesi pil içinde satır kırıyordu (zil/avatar/
+    // hamburger'a sıkışınca) — whitespace-nowrap + mobilde kelimeyi gizleyip yalnız
+    // nokta+sayı gösterme (md: üstünde tam metin) bunu çözüyor.
+    <span
+      className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-1 text-[11px] font-medium text-muted-foreground"
+      title={`${count} ${t("cevrimici")}`}
+    >
       <span className="relative flex h-2 w-2 shrink-0">
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#27ae60] opacity-75" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-[#27ae60]" />
       </span>
-      {count} {t("cevrimici")}
+      {count}
+      <span className="hidden md:inline">{t("cevrimici")}</span>
     </span>
   );
 }

@@ -41,10 +41,17 @@ export default async function Header() {
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 print:hidden">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4">
-        {/* Logo */}
-        <Link href="/program" className="flex shrink-0 items-center gap-2.5">
-          <Wordmark />
-        </Link>
+        {/* Logo + çevrimiçi sayacı — birlikte TEK flex birimi, justify-between'in bu
+            ikisini birbirinden ayırıp ortalamaması için. 2026-09-03 kullanıcı talebi
+            ("ana ekranda gözüksün") — sayaç eskiden yalnız masaüstü hızlı-erişim
+            menüsünün (aşağıdaki nav, hidden md:flex) içindeydi, mobilde hiç görünmüyordu;
+            mobilde nav gizlendiği için burada zaten boş yer vardı. */}
+        <div className="flex min-w-0 shrink items-center gap-2.5">
+          <Link href="/program" className="flex shrink-0 items-center gap-2.5">
+            <Wordmark />
+          </Link>
+          <OnlineCounter />
+        </div>
 
         {/* Hızlı erişim */}
         <nav className="hidden flex-1 items-center gap-2 md:flex">
@@ -57,7 +64,6 @@ export default async function Header() {
           <Button asChild variant="outline" size="sm">
             <Link href="/altili" data-tour="altili"><HeaderLabel k="altiliNeVerir" /></Link>
           </Button>
-          <OnlineCounter />
         </nav>
 
         {/* Actions */}
