@@ -1405,13 +1405,25 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
   // terfisi/değer terfisi almış bir at gibi, ona da uygulanır.
   const ilk6EfektifSinir = efektifPencereSiniri(degerliSiralanmis, 6);
 
+  // 2026-09-03 kullanıcı bulgusu (İzmir K7, PRENSES BERRİN): agfTrendTerfisiUygula ilk6
+  // ADIMINDA onu 6.sıraya taşımıştı (agfTerfi="ilk6" damgalandı) — ama HEMEN ARDINDAN
+  // çalışan safModelDegerTerfisiUygula, AYNI 6.slotu YURTKURAN için kullanıp onu sessizce
+  // 7.sıraya GERİ itti. agfTerfi/degerTerfisi bayrakları o ANDAKİ (artık BAYAT) durumu
+  // taşımaya devam etti — PRENSES BERRİN son halde 7.sırada (ilk-6 DIŞINDA) olmasına
+  // rağmen "Düşük Risk" kararı ve "ilk-6'ya terfi" gerekçe metni GÖSTERMEYE devam etti,
+  // bu YANILTICIYDI. Düzeltme: bayraklar burada GERÇEK son pozisyona (i) göre YENİDEN
+  // hesaplanıyor — bir terfi sonraki bir mekanizma tarafından geri alınmışsa (evict
+  // edilmişse) bayrak da onunla birlikte sıfırlanır (ya alt kademeye — ilk3→ilk6 — iner
+  // ya da tamamen null olur), muhakeme metni/karar artık HER ZAMAN gerçek son durumu yansıtır.
   return degerliSiralanmis.map((r, i) => {
+    const gercekAgfTerfi: "ilk3" | "ilk6" | null = r.agfTerfi != null ? (i < 3 ? "ilk3" : i < 6 ? "ilk6" : null) : null;
+    const gercekDegerTerfisi: "ilk3" | "ilk6" | null = r.degerTerfisi != null ? (i < 3 ? "ilk3" : i < 6 ? "ilk6" : null) : null;
     let karar = kararUret(r.olasilik);
-    if (r.agfTerfi === "ilk3" || r.degerTerfisi === "ilk3") karar = "Güçlü Aday";
-    else if ((r.agfTerfi === "ilk6" || r.degerTerfisi === "ilk6") && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
+    if (gercekAgfTerfi === "ilk3" || gercekDegerTerfisi === "ilk3") karar = "Güçlü Aday";
+    else if ((gercekAgfTerfi === "ilk6" || gercekDegerTerfisi === "ilk6") && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
     const ekuriIlk6Efektif = i < ilk6EfektifSinir;
     if (ekuriIlk6Efektif && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
-    return { ...r, teknikSira: i + 1, karar, ekuriIlk6Efektif };
+    return { ...r, teknikSira: i + 1, karar, ekuriIlk6Efektif, agfTerfi: gercekAgfTerfi, degerTerfisi: gercekDegerTerfisi };
   });
 }
 

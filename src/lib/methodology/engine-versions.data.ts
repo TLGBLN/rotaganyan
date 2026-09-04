@@ -641,4 +641,16 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
       "Gerçek İzmir K5 ile doğrulandı: KINDBERO artık 4.'ten 3.'e terfi ediyor (degerTerfisi=\"ilk3\"). Aynı koşuda ARDAPAŞA da nitelik kazanıyor (fark=+11.4pp, KINDBERO'dan bile büyük) ama KINDBERO'nun daha yüksek ham olasılığı (%9.4 vs doğal 6.sıra) yüzünden tek terfi slotunu kazanamıyor — beklenen davranış (terfiPenceresiV5 en güçlü ham olasılıklı adayı seçiyor, fark büyüklüğüne göre değil). arac-terfi-denetimi.mts ile İzmir K5 + önceki 4 doğrulanmış koşuda (İstanbul K1/K4/K6/K9) toplu regresyon kontrolü: hiçbir mevcut terfi/karar bozulmadı, yeni ilk-3 yakın-ıskaları hep mantıklı gerekçeyle açıklanabiliyor. tsc --noEmit temiz, v5-engine.test.ts 7/7 geçti.",
     ],
   },
+  {
+    versiyon: "V5.42",
+    baslangic: new Date("2026-09-03T11:00:00+03:00"),
+    bitis: null,
+    aciklama: "GERÇEK BİR TUTARSIZLIK BUGU DÜZELTİLDİ — kullanıcı bulgusu (İzmir K7, PRENSES BERRİN): admin panelinde 'Düşük Risk' kararı VE 'AGF trend taşıyor... ilk-6'ya terfi' gerekçe metni gösteriyordu, ama at aslında 7.sırada (ilk-6 DIŞINDA) duruyordu. Kök neden: agfTrendTerfisiUygula'nın ilk6 ADIMI onu 6.sıraya taşımış (agfTerfi=\"ilk6\" damgalanmış) — ama HEMEN ARDINDAN çalışan safModelDegerTerfisiUygula, AYNI 6.slotu (daha yüksek ham olasılıklı) YURTKURAN için kullanıp PRENSES BERRİN'i sessizce 7.sıraya GERİ itmiş. agfTerfi bayrağı bu 'evict edilme' olayından SONRA da eski (artık BAYAT) değerini taşımaya devam etmiş — dört terfi/garanti mekanizması SIRAYLA aynı pencerelere yazdığı için, bir mekanizmanın kararını bir SONRAKİsi sessizce geri alabiliyor ve bayrak/karar/gerekçe metni bunu hiç yansıtmıyordu. Sentetik testle DAHA ÖNCE bu senaryo hiç kurulmamıştı (yalnız TEK bir mekanizmanın kendi başına çalıştığı senaryolar test edilmişti) — gerçek, çok mekanizmalı bir koşuda ilk kez ortaya çıktı.",
+    neyiAnalizEdiyor: [
+      "Skor/olasılık DEĞİŞMEDİ, teknikSira DEĞİŞMEDİ — yalnız agfTerfi/degerTerfisi bayrakları ve bunlara bağlı karar, faz2V5Sirala'nın EN SONUNDA gerçek nihai pozisyona (i) göre YENİDEN hesaplanıyor. Bir terfi sonraki bir mekanizma tarafından evict edilmişse bayrak da onunla birlikte sıfırlanıyor (ilk3→ilk6'ya iner ya da tamamen null olur) — muhakeme metni/karar artık HER ZAMAN gerçek son durumu yansıtıyor.",
+    ],
+    caprazlamalar: [
+      "Gerçek İzmir K7 ile doğrulandı: düzeltme ÖNCESİ PRENSES BERRİN agfTerfi=\"ilk6\"/karar=\"Düşük Risk\" gösteriyordu (7.sırada olmasına rağmen); düzeltme SONRASI agfTerfi=null/degerTerfisi=null/karar=\"Yüksek Risk\" — gerçek durumla (7.sırada, YURTKURAN'ın meşru şekilde 6.sırayı aldığı) artık tutarlı. arac-terfi-denetimi.mts ile son 20 koşuda toplu regresyon: mevcut hiçbir DOĞRU terfi/karar bozulmadı (yalnız bu türden YANLIŞ/bayat bayraklar düzeltildi). tsc --noEmit temiz, v5-engine.test.ts 7/7 geçti.",
+    ],
+  },
 ];
