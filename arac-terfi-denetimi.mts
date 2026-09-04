@@ -19,7 +19,7 @@ import { db } from "./src/lib/db";
 import { gatherFaz1V5, faz2V5Sirala, AGF_KATKI_INDEKSLERI } from "./src/lib/methodology/v5-engine";
 
 const SAF_MODEL_DEGER_ESIGI = 5; // v5-engine.ts'teki SAF_MODEL_DEGER_ESIGI ile AYNI tutulmalı
-const SINYAL_ESIGI = 4; // v5-engine.ts'teki (v4-engine'den import edilen) SINYAL_ESIGI ile AYNI tutulmalı
+const SAF_MODEL_DEGER_ESIGI_ILK3 = 8; // v5-engine.ts'teki SAF_MODEL_DEGER_ESIGI_ILK3 ile AYNI tutulmalı (V5.41, KINDBERO vakası)
 
 function get(argv: string[], bayrak: string) {
   const i = argv.indexOf(bayrak);
@@ -82,7 +82,7 @@ async function main() {
     const terfiEdenler = sirali.filter((r) => r.agfTerfi || r.agfFavoriGarantisi || r.degerTerfisi);
     for (const r of terfiEdenler) {
       toplamTerfi++;
-      const etiket = r.degerTerfisi ? "SAF-MODEL-DEĞER" : r.agfFavoriGarantisi ? "AGF-FAVORİ-GARANTİ" : `AGF-TREND-${r.agfTerfi}`;
+      const etiket = r.degerTerfisi ? `SAF-MODEL-DEĞER-${r.degerTerfisi}` : r.agfFavoriGarantisi ? "AGF-FAVORİ-GARANTİ" : `AGF-TREND-${r.agfTerfi}`;
       console.log(`  ✓ TERFİ [${etiket}] ${sahaAdi} — #${r.no} ${r.ad} → sıra ${r.teknikSira} (olasılık %${(r.olasilik * 100).toFixed(1)})`);
     }
 
@@ -99,8 +99,21 @@ async function main() {
       toplamYakinIska++;
       const supheli = nonAgf > -0.05 && nonAgf <= 0; // sınırda — pozitif eşiğe çok yakın negatif
       const bayrak = supheli ? "❓ SINIRDA" : nonAgf > 0 ? "✓ (başka aday kazandı)" : "  (temel sinyaller net negatif, doğru dışlanmış)";
-      console.log(`    yakın-ıska: #${r.no} ${r.ad} sıra=${r.teknikSira} fark=${fark.toFixed(1)}pp nonAgfKatki=${nonAgf.toFixed(2)} ${bayrak}`);
-      if (supheli) supheliYakinIskalar.push(`${sahaAdi} — #${r.no} ${r.ad} (nonAgfKatki=${nonAgf.toFixed(2)})`);
+      console.log(`    yakın-ıska (ilk-6): #${r.no} ${r.ad} sıra=${r.teknikSira} fark=${fark.toFixed(1)}pp nonAgfKatki=${nonAgf.toFixed(2)} ${bayrak}`);
+      if (supheli) supheliYakinIskalar.push(`${sahaAdi} — #${r.no} ${r.ad} (ilk-6, nonAgfKatki=${nonAgf.toFixed(2)})`);
+    }
+
+    // 2026-09-03 (V5.41, KINDBERO vakası) — ilk-3 için AYNI kontrol, daha sıkı eşikle (8pp).
+    for (const r of sirali) {
+      if (r.teknikSira <= 3) continue; // zaten ilk-3'te
+      const fark = r.marketBlindProb1 * 100 - r.agfPayi;
+      if (fark < SAF_MODEL_DEGER_ESIGI_ILK3) continue;
+      const nonAgf = nonAgfKatkiToplami(r.katkilar);
+      toplamYakinIska++;
+      const supheli = nonAgf > -0.05 && nonAgf <= 0;
+      const bayrak = supheli ? "❓ SINIRDA" : nonAgf > 0 ? "✓ (başka aday kazandı)" : "  (temel sinyaller net negatif, doğru dışlanmış)";
+      console.log(`    yakın-ıska (ilk-3): #${r.no} ${r.ad} sıra=${r.teknikSira} fark=${fark.toFixed(1)}pp nonAgfKatki=${nonAgf.toFixed(2)} ${bayrak}`);
+      if (supheli) supheliYakinIskalar.push(`${sahaAdi} — #${r.no} ${r.ad} (ilk-3, nonAgfKatki=${nonAgf.toFixed(2)})`);
     }
   }
 

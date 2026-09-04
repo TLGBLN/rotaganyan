@@ -37,7 +37,7 @@ type V5At = {
   // 2026-09-02 — Saf Model Değer Terfisi (THEATER OF WAR vakası): fark>=5pp VE yeterli
   // sinyalSayisi varsa at artık koşulsuz ilk-6'ya taşınıyor — aşağıdaki rozet artık
   // YALNIZ bilgi amaçlı değil, bu atın GERÇEKTEN terfi ettiğini de gösteriyor.
-  degerTerfisi?: boolean;
+  degerTerfisi?: "ilk3" | "ilk6" | null;
   // 2026-08-30 — B katmanı (bkz. plan: A/B/C Sinyal Katmanlama Mimarisi). "Tüm 12 Sinyal"
   // paneli yalnız A katmanını (12 özellik) listeler — B katmanı (şimdilik sireOrani/
   // düşük-şart) ORADA GÖRÜNMÜYOR, kullanıcı bunu fark edip sordu. Bu iki alan o boşluğu
@@ -410,64 +410,6 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                     <span className="rounded-full bg-purple-500/15 px-2 py-0.5 font-mono text-[11px] text-purple-600">
                       %{(a.olasilik * 100).toFixed(1)}
                     </span>
-                    {/* 2026-08-29 — V6 Aşama 2 (bkz. plan): yalnız QA amaçlı, admin-only —
-                        public gösterime henüz alınmadı, ayrı bir karar bekliyor. Kullanıcı
-                        "T2/T3/körü" VE ardından "AGF'siz %18" kısaltmalarının kendi başına
-                        anlaşılmadığını belirtti (2026-08-29) — artık her rakamın ne olduğu
-                        tam kelimelerle, tooltip'e bakmaya gerek kalmadan yazılıyor. */}
-                    {a.probTop3 != null && (
-                      <span
-                        className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
-                        title="Bu üçü de yalnız bilgi amaçlı — sıralamayı/kararı ETKİLEMEZ. İlk 2'ye/3'e girme olasılığı: at yarışı bitince ilk 2 ya da ilk 3 içinde olma ihtimali (yalnız kazanma değil). AGF'siz kazanma ihtimali: AGF (bahis payı/piyasa favorisi) bilgisi TAMAMEN çıkarılıp yeniden hesaplanırsa modelin bu ata vereceği kazanma olasılığı — yani piyasa bu atı hiç tanımasaydı model ne düşünürdü."
-                      >
-                        İlk 2&apos;ye girme: %{((a.probTop2 ?? 0) * 100).toFixed(0)} · İlk 3&apos;e girme: %{((a.probTop3 ?? 0) * 100).toFixed(0)} · AGF&apos;siz kazanma: %
-                        {((a.marketBlindProb1 ?? 0) * 100).toFixed(0)}
-                      </span>
-                    )}
-                    {/* 2026-09-01 — "Saf Model" kıyası (kullanıcı talebi, KARDAHA vakası):
-                        Saf Model (AGF'siz, marketBlindProb1) / AGF (piyasa) / Piyasa-Ayarlı
-                        (nihai olasilik) sıra+yüzde YAN YANA — piyasanın görmediği ama modelin
-                        bağımsız olarak bulduğu değeri göstermek için. Fark = Saf Model% - AGF%.
-                        2026-09-02 GÜNCELLEME (THEATER OF WAR vakası, kullanıcı kararı): bu
-                        artık YALNIZ bilgi amaçlı DEĞİL — fark>=5pp VE yeterli sinyalSayisi
-                        varsa safModelDegerTerfisiUygula bu atı koşulsuz ilk-6'ya taşıyor
-                        (bkz. v5-engine.ts). degerTerfisi=true ise rozet bunu ayrıca belirtir. */}
-                    {a.marketBlindProb1 != null && a.agfPayi != null && a.agfSirasi != null && (() => {
-                      const safYuzde = a.marketBlindProb1 * 100;
-                      const fark = safYuzde - a.agfPayi;
-                      const safSira = safModelSiraByNo.get(a.no);
-                      return (
-                        <span
-                          className={cn(
-                            "rounded-full px-2 py-0.5 font-mono text-[10px]",
-                            a.degerTerfisi ? "bg-hit/15 text-hit" : fark >= 5 ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground"
-                          )}
-                          title="Saf Model: AGF bilgisi HİÇ olmasaydı model bu atı sahada nereye koyardı (marketBlindProb1'in sıra+yüzdesi). AGF: piyasanın (bahis payının) kendi sırası+yüzdesi. Fark büyük ve pozitifse, model piyasanın görmediği bağımsız bir değer buluyor. Fark>=5pp VE yeterli başka sinyal varsa (sinyalSayisi) at artık GERÇEKTEN ilk-6'ya koşulsuz taşınıyor — degerTerfisi rozeti bunu gösterir."
-                        >
-                          Saf Model: {safSira ?? "?"}. sıra (%{safYuzde.toFixed(1)}) · AGF: {a.agfSirasi}. sıra (%{a.agfPayi.toFixed(1)}) · Fark: {fark > 0 ? "+" : ""}{fark.toFixed(1)}pp
-                          {a.degerTerfisi && " · ✓ İlk-6 Terfisi"}
-                        </span>
-                      );
-                    })()}
-                    {/* 2026-08-30 — B katmanı görünürlüğü: "Tüm 12 Sinyal" paneli B
-                        katmanını içermiyor, bu yüzden ayrı bir rozet gerekiyor. */}
-                    {a.bKatmaniUygulandiMi && (
-                      <span
-                        className="rounded-full bg-amber-500/15 px-2 py-0.5 font-mono text-[10px] text-amber-600"
-                        title="B katmanı (kanıtsız ama kullanıcı kararıyla eklenen istisna) bu atta uygulandı — mevcut 12 özellikten AYRI, düşük-şart'a özel bir terim olarak skora eklendi."
-                      >
-                        B: sireOrani ({(a.sireOrani ?? 0).toFixed(1)})
-                      </span>
-                    )}
-                    {a.zeminMesafeBKatmaniUygulandiMi && (
-                      <span
-                        className="rounded-full bg-amber-500/15 px-2 py-0.5 font-mono text-[10px] text-amber-600"
-                        title="Zemin+Mesafe Deneyimi (hiç gölge-test edilmeden kullanıcı kararıyla eklenen istisna) bu atta uygulandı — TÜM kategorilerde, mevcut 12 özellikten AYRI bir terim olarak skora eklendi."
-                      >
-                        B: zeminMesafeDeneyim ({(a.zeminMesafeDeneyim ?? 0) > 0 ? "+" : ""}
-                        {(a.zeminMesafeDeneyim ?? 0).toFixed(1)}%, {a.zeminMesafeDeneyimSeviyesi})
-                      </span>
-                    )}
                   </div>
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => moveManual(no, -1)} disabled={i === 0}>
@@ -484,6 +426,69 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                     </Button>
                   </div>
                 </div>
+                {/* 2026-09-03 kullanıcı talebi ("bu kısımlarda görsel olarak kötü gözüküyor,
+                    alt alta madde halinde yaz") — bu dört madde eskiden başlık satırında
+                    dar rozetler (rounded-full pill) olarak yan yana sıkışıyor, dar ekranda
+                    ortasından bölünüyordu. Artık kodluSatirlar ile AYNI liste stilinde,
+                    alt alta madde halinde. */}
+                {(a.probTop3 != null || (a.marketBlindProb1 != null && a.agfPayi != null && a.agfSirasi != null) || a.bKatmaniUygulandiMi || a.zeminMesafeBKatmaniUygulandiMi) && (
+                  <ul className="list-disc space-y-0.5 pl-4 text-muted-foreground">
+                    {/* 2026-08-29 — V6 Aşama 2 (bkz. plan): yalnız QA amaçlı, admin-only —
+                        public gösterime henüz alınmadı, ayrı bir karar bekliyor. Kullanıcı
+                        "T2/T3/körü" VE ardından "AGF'siz %18" kısaltmalarının kendi başına
+                        anlaşılmadığını belirtti (2026-08-29) — artık her rakamın ne olduğu
+                        tam kelimelerle, tooltip'e bakmaya gerek kalmadan yazılıyor. */}
+                    {a.probTop3 != null && (
+                      <li title="Bu üçü de yalnız bilgi amaçlı — sıralamayı/kararı ETKİLEMEZ. İlk 2'ye/3'e girme olasılığı: at yarışı bitince ilk 2 ya da ilk 3 içinde olma ihtimali (yalnız kazanma değil). AGF'siz kazanma ihtimali: AGF (bahis payı/piyasa favorisi) bilgisi TAMAMEN çıkarılıp yeniden hesaplanırsa modelin bu ata vereceği kazanma olasılığı — yani piyasa bu atı hiç tanımasaydı model ne düşünürdü.">
+                        İlk 2&apos;ye girme: %{((a.probTop2 ?? 0) * 100).toFixed(0)} · İlk 3&apos;e girme: %{((a.probTop3 ?? 0) * 100).toFixed(0)} · AGF&apos;siz kazanma: %
+                        {((a.marketBlindProb1 ?? 0) * 100).toFixed(0)}
+                      </li>
+                    )}
+                    {/* 2026-09-01 — "Saf Model" kıyası (kullanıcı talebi, KARDAHA vakası):
+                        Saf Model (AGF'siz, marketBlindProb1) / AGF (piyasa) / Piyasa-Ayarlı
+                        (nihai olasilik) sıra+yüzde YAN YANA — piyasanın görmediği ama modelin
+                        bağımsız olarak bulduğu değeri göstermek için. Fark = Saf Model% - AGF%.
+                        2026-09-02 GÜNCELLEME (THEATER OF WAR vakası, kullanıcı kararı): bu
+                        artık YALNIZ bilgi amaçlı DEĞİL — fark>=5pp VE AGF-dışı katkı toplamı
+                        net pozitifse safModelDegerTerfisiUygula bu atı koşulsuz ilk-6'ya
+                        taşıyor (bkz. v5-engine.ts). degerTerfisi="ilk3"/"ilk6" ise madde bunu belirtir
+                        (V5.41 — ilk-3 için daha sıkı bir eşik, fark>=8pp, kullanılır). */}
+                    {a.marketBlindProb1 != null && a.agfPayi != null && a.agfSirasi != null && (() => {
+                      const safYuzde = a.marketBlindProb1 * 100;
+                      const fark = safYuzde - a.agfPayi;
+                      const safSira = safModelSiraByNo.get(a.no);
+                      return (
+                        <li
+                          className={cn(a.degerTerfisi ? "text-hit" : fark >= 5 ? "text-amber-600" : "")}
+                          title="Saf Model: AGF bilgisi HİÇ olmasaydı model bu atı sahada nereye koyardı (marketBlindProb1'in sıra+yüzdesi). AGF: piyasanın (bahis payının) kendi sırası+yüzdesi. Fark büyük ve pozitifse, model piyasanın görmediği bağımsız bir değer buluyor. Fark>=8pp ilk-3'e, >=5pp ilk-6'ya koşulsuz taşır (modelin AGF-dışı görüşü net pozitifse) — degerTerfisi bunu gösterir."
+                        >
+                          Saf Model: {safSira ?? "?"}. sıra (%{safYuzde.toFixed(1)}) · AGF: {a.agfSirasi}. sıra (%{a.agfPayi.toFixed(1)}) · Fark: {fark > 0 ? "+" : ""}{fark.toFixed(1)}pp
+                          {a.degerTerfisi === "ilk3" && " · ✓ İlk-3 Terfisi"}
+                          {a.degerTerfisi === "ilk6" && " · ✓ İlk-6 Terfisi"}
+                        </li>
+                      );
+                    })()}
+                    {/* 2026-08-30 — B katmanı görünürlüğü: "Tüm 12 Sinyal" paneli B
+                        katmanını içermiyor, bu yüzden ayrı bir madde gerekiyor. */}
+                    {a.bKatmaniUygulandiMi && (
+                      <li
+                        className="text-amber-600"
+                        title="B katmanı (kanıtsız ama kullanıcı kararıyla eklenen istisna) bu atta uygulandı — mevcut 12 özellikten AYRI, düşük-şart'a özel bir terim olarak skora eklendi."
+                      >
+                        B: sireOrani ({(a.sireOrani ?? 0).toFixed(1)})
+                      </li>
+                    )}
+                    {a.zeminMesafeBKatmaniUygulandiMi && (
+                      <li
+                        className="text-amber-600"
+                        title="Zemin+Mesafe Deneyimi (hiç gölge-test edilmeden kullanıcı kararıyla eklenen istisna) bu atta uygulandı — TÜM kategorilerde, mevcut 12 özellikten AYRI bir terim olarak skora eklendi."
+                      >
+                        B: zeminMesafeDeneyim ({(a.zeminMesafeDeneyim ?? 0) > 0 ? "+" : ""}
+                        {(a.zeminMesafeDeneyim ?? 0).toFixed(1)}%, {a.zeminMesafeDeneyimSeviyesi})
+                      </li>
+                    )}
+                  </ul>
+                )}
                 {kodluSatirlar.length > 0 ? (
                   <ul className="list-disc space-y-0.5 pl-4 text-muted-foreground">
                     {kodluSatirlar.map((s, si) => (

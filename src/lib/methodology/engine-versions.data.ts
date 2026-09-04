@@ -629,4 +629,16 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
       "Gerçek İstanbul K6 ile doğrulandı: efektifPencereSiniri(sirali, 6) artık 7 dönüyor (JAEHAERA+DAELLA tek slot sayıldığı için sınır bir pozisyon dışarı kayıyor) — THEATER OF WAR (ham 7.) ekuriIlk6Efektif=true, karar=Düşük Risk; yalnız ANGEL OF DEFNE (ham 8.) hâlâ dışarıda (ekuriIlk6Efektif=false). arac-terfi-denetimi.mts ile son 20 gerçek koşuda (--son 20) toplu doğrulama: iki mekanizma de (AGF Trend Terfisi, Saf Model Değer Terfisi) çok sayıda koşuda tutarlı tetikleniyor, yakın-ıskaların neredeyse tamamı gerekçeyle açıklanabiliyor (ya 'başka aday kazandı' ya 'temel sinyaller net negatif, doğru dışlanmış'), yalnız BİR tanesi (Elazığ K4, LADY İSİS, nonAgfKatki=-0.01) sınırda — pratik olarak sıfıra eşit, endişe verici değil. tsc --noEmit temiz, npm run build temiz, v5-engine.test.ts 7/7 geçti.",
     ],
   },
+  {
+    versiyon: "V5.41",
+    baslangic: new Date("2026-09-03T10:45:00+03:00"),
+    bitis: null,
+    aciklama: "Saf Model Değer Terfisi'ne İLK-3 kademesi eklendi — kullanıcı bulgusu (İzmir K5, 2026-09-03, KINDBERO): at kazandı ama 4.sırada kaldı. Saf Model (AGF'siz) onu 2.sırada (%16.4) görüyordu — hızDerecesi +4.0 (güçlü), h2hNetSkor +4, son 8 startta 2 galibiyet, bugünden önceki son starttı da galibiyetti. AGF onu yalnız 5.sıraya koymuştu (fark=+8.2pp). 4.sıra zaten ilk-6 içi olduğu için V5.39/40'ın ilk-6 tabanı hiç devreye girmedi — kullanıcı ilk-3 için de aynı ilkeyi istedi. AYNI (koşulsuz splice) mekanizma, agfTrendTerfisi'nin ilk3→ilk6 İKİ KADEMELİ desenIYLE birebir aynı yapıda uygulandı: önce daha SIKI bir eşikle (SAF_MODEL_DEGER_ESIGI_ILK3=8pp, KINDBERO'nun kendi rakamıyla uyumlu — ilk-3 daha büyük bir iddia, yanlış-pozitif riski daha yüksek) ilk-3 denenir, sonra (ilk-3'ü kazanamayan adaylar dahil) mevcut 5pp eşiğiyle ilk-6 denenir. degerTerfisi alanı boolean'dan \"ilk3\"|\"ilk6\"|null'a genişletildi (agfTerfi ile AYNI şekil).",
+    neyiAnalizEdiyor: [
+      "Skor/olasılık DEĞİŞMEDİ. teknikSira DEĞİŞMEDİ — yalnız degerTerfisi'nin alabileceği değerler (artık \"ilk3\"|\"ilk6\"|null) ve buna bağlı karar (agfTerfi===\"ilk3\" ile AYNI, \"Güçlü Aday\"a çekiliyor) etkilendi.",
+    ],
+    caprazlamalar: [
+      "Gerçek İzmir K5 ile doğrulandı: KINDBERO artık 4.'ten 3.'e terfi ediyor (degerTerfisi=\"ilk3\"). Aynı koşuda ARDAPAŞA da nitelik kazanıyor (fark=+11.4pp, KINDBERO'dan bile büyük) ama KINDBERO'nun daha yüksek ham olasılığı (%9.4 vs doğal 6.sıra) yüzünden tek terfi slotunu kazanamıyor — beklenen davranış (terfiPenceresiV5 en güçlü ham olasılıklı adayı seçiyor, fark büyüklüğüne göre değil). arac-terfi-denetimi.mts ile İzmir K5 + önceki 4 doğrulanmış koşuda (İstanbul K1/K4/K6/K9) toplu regresyon kontrolü: hiçbir mevcut terfi/karar bozulmadı, yeni ilk-3 yakın-ıskaları hep mantıklı gerekçeyle açıklanabiliyor. tsc --noEmit temiz, v5-engine.test.ts 7/7 geçti.",
+    ],
+  },
 ];

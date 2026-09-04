@@ -987,10 +987,11 @@ export type Faz1RunnerV5Sirali = Faz1RunnerV5 & {
   sinyalSayisi: number; // V4'ün 8-sinyal sayımı — terfi kapısı VE gerekçe metninde bilgi amaçlı
   agfTerfi: "ilk3" | "ilk6" | null;
   agfFavoriGarantisi: boolean;
-  /** 2026-09-02 — Saf Model Değer Terfisi (bkz. safModelDegerTerfisiUygula): bu at,
+  /** 2026-09-02/03 — Saf Model Değer Terfisi (bkz. safModelDegerTerfisiUygula): bu at,
    *  marketBlindProb1 vs agfPayi ayrışması + AGF-dışı katkı toplamının net pozitif
-   *  olması yüzünden ilk-6'ya koşulsuz taşındı mı (V5.39, bkz. AGF_KATKI_INDEKSLERI). */
-  degerTerfisi: boolean;
+   *  olması yüzünden ilk-3'e (fark>=8pp, V5.41) veya ilk-6'ya (fark>=5pp, V5.39) koşulsuz
+   *  taşındı mı — agfTerfi ile AYNI iki-kademeli desen (bkz. AGF_KATKI_INDEKSLERI). */
+  degerTerfisi: "ilk3" | "ilk6" | null;
   /** 2026-09-02 EKÜRİ DÜZELTMESİ (THEATER OF WAR/K6) — bkz. efektifPencereSiniri. Bu at,
    *  ilk-6 penceresi eküri ortaklarını TEK slot sayacak şekilde hesaplandığında (ham
    *  teknikSira'dan BAĞIMSIZ) GERÇEKTE ilk-6 içinde mi. true ise karar "Düşük Risk"e
@@ -1179,20 +1180,39 @@ function agfFavoriIlk3Garantisi<T extends { no: number; agfSirasi: number }>(
 // kendi (AGF'siz) görüşü onlar için de zaten olumsuz.
 const SAF_MODEL_DEGER_ESIGI = 5;
 
+// 2026-09-03 kullanıcı bulgusu (İzmir K5, KINDBERO — kazandı ama 4.sırada kaldı): Saf
+// Model onu 2.sırada (%16.4) görüyordu, AGF yalnız 5.sıraya koymuştu (fark=+8.2pp), 4.sıra
+// (ilk-6 içi) Saf Model Değer Terfisi'nin hiç devreye girmesini gerektirmiyordu — ama
+// kullanıcı ilk-3 için de aynı ilkeyi istedi. AYNI (koşulsuz splice) mekanizma, agfTrend
+// Terfisi'nin ilk3→ilk6 İKİ KADEMELİ desenIYLE (bkz. agfTrendTerfisiUygula) birebir aynı
+// yapıda: önce daha SIKI bir eşikle (8pp, KINDBERO'nun kendi rakamıyla uyumlu — ilk-3
+// daha büyük bir iddia, yanlış-pozitif riski daha yüksek) ilk-3 denenir, sonra (ilk-3'ü
+// kazanamayan adaylar dahil) mevcut 5pp eşiğiyle ilk-6 denenir.
+const SAF_MODEL_DEGER_ESIGI_ILK3 = 8;
+
 function safModelDegerTerfisiUygula<
   T extends {
     no: number; olasilik: number; marketBlindProb1: number; agfPayi: number; katkilar: number[];
     ekuriGroup: number | null;
   }
->(sirali: T[]): (T & { degerTerfisi: boolean })[] {
-  const isaretsiz = sirali.map((r) => ({ ...r, degerTerfisi: false }));
-  const { sonuc, terfiEdenNolar } = terfiPenceresiV5(isaretsiz, 6, (r) => {
-    const fark = r.marketBlindProb1 * 100 - r.agfPayi;
-    if (fark < SAF_MODEL_DEGER_ESIGI) return false;
+>(sirali: T[]): (T & { degerTerfisi: "ilk3" | "ilk6" | null })[] {
+  const nonAgfPozitifMi = (r: T) => {
     const nonAgfToplam = r.katkilar.reduce((toplam, k, i) => (AGF_KATKI_INDEKSLERI.includes(i) ? toplam : toplam + k), 0);
     return nonAgfToplam > 0;
+  };
+  const isaretsiz = sirali.map((r) => ({ ...r, degerTerfisi: null as "ilk3" | "ilk6" | null }));
+
+  const { sonuc: ilk3Sonrasi, terfiEdenNolar: ilk3Terfi } = terfiPenceresiV5(isaretsiz, 3, (r) => {
+    const fark = r.marketBlindProb1 * 100 - r.agfPayi;
+    return fark >= SAF_MODEL_DEGER_ESIGI_ILK3 && nonAgfPozitifMi(r);
   });
-  return sonuc.map((r) => (terfiEdenNolar.has(r.no) ? { ...r, degerTerfisi: true } : r));
+  const ilk3Isaretli = ilk3Sonrasi.map((r) => (ilk3Terfi.has(r.no) ? { ...r, degerTerfisi: "ilk3" as const } : r));
+
+  const { sonuc: ilk6Sonrasi, terfiEdenNolar: ilk6Terfi } = terfiPenceresiV5(ilk3Isaretli, 6, (r) => {
+    const fark = r.marketBlindProb1 * 100 - r.agfPayi;
+    return fark >= SAF_MODEL_DEGER_ESIGI && nonAgfPozitifMi(r);
+  });
+  return ilk6Sonrasi.map((r) => (ilk6Terfi.has(r.no) ? { ...r, degerTerfisi: "ilk6" as const } : r));
 }
 
 // 2026-08-26 kullanıcı bulgusu: "sistemin 1. seçimi, AGF favorisinden daha isabetsiz"
@@ -1376,7 +1396,7 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
 
   const degerliSiralanmis = SAF_MODEL_DEGER_TERFISI_AKTIF
     ? safModelDegerTerfisiUygula(duzeltilmis)
-    : duzeltilmis.map((r) => ({ ...r, degerTerfisi: false }));
+    : duzeltilmis.map((r) => ({ ...r, degerTerfisi: null as "ilk3" | "ilk6" | null }));
 
   // 2026-09-02 EKÜRİ DÜZELTMESİ (İstanbul K6, THEATER OF WAR) — bkz. efektifPencereSiniri
   // üstündeki not. Bir eküri çifti ilk-6 içinde iki ayrı ham pozisyon tutuyorsa, hemen
@@ -1387,9 +1407,8 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
 
   return degerliSiralanmis.map((r, i) => {
     let karar = kararUret(r.olasilik);
-    if (r.agfTerfi === "ilk3") karar = "Güçlü Aday";
-    else if (r.agfTerfi === "ilk6" && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
-    if (r.degerTerfisi && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
+    if (r.agfTerfi === "ilk3" || r.degerTerfisi === "ilk3") karar = "Güçlü Aday";
+    else if ((r.agfTerfi === "ilk6" || r.degerTerfisi === "ilk6") && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
     const ekuriIlk6Efektif = i < ilk6EfektifSinir;
     if (ekuriIlk6Efektif && (karar === "Orta Risk" || karar === "Yüksek Risk")) karar = "Düşük Risk";
     return { ...r, teknikSira: i + 1, karar, ekuriIlk6Efektif };
