@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Loader2 } from "lucide-react";
+import { ChevronLeft, Loader2, Radio } from "lucide-react";
 import { getKosuAnalizVerisi, getKosuSecimGunuVerisi } from "@/server/actions/admin-analiz.actions";
 import SmartAnalysisEditor from "@/components/admin/SmartAnalysisEditor";
 import RaceCountdown from "@/components/kosular/RaceCountdown";
@@ -59,6 +59,16 @@ export default function AnalizYeniClient({ gunler: gunlerBaslangic, selectedDate
       setGunlerLoading(false);
     }
   }, []);
+
+  // 2026-09-05 kullanıcı bulgusu ("6 koşu için analiz yapıldı ama koşula işlenmiyor,
+  // eskiden ✓ Analiz var diye gözükürdü") — bkz. handleDateChange üstündeki not. gunler
+  // artık istemci state'inde tutulduğu için kaydetme sonrası router.refresh() bunu
+  // güncellemiyor; V5AnalysisPanel'in onSaved'i bu fonksiyonu çağırıp listeyi AYNI
+  // (getKosuSecimGunuVerisi) server action'ıyla, MEVCUT tarih için yeniden çeker.
+  const handleSaved = useCallback(async () => {
+    const yeniGunler = await getKosuSecimGunuVerisi(selectedDate);
+    setGunler(yeniGunler);
+  }, [selectedDate]);
 
   const loadRace = useCallback(async (raceId: string) => {
     setLoading(true);
@@ -130,7 +140,14 @@ export default function AnalizYeniClient({ gunler: gunlerBaslangic, selectedDate
                       }`}
                     >
                       <span className="font-semibold">{race.raceNo}. Koşu</span>
-                      {race.hasAnaliz && <div className="mt-0.5 text-[10px] text-brand">✓ Analiz var</div>}
+                      {/* 2026-09-05 kullanıcı talebi — admin/kupon'daki RaceAdviceCard ile AYNI
+                          "Analiz Yayında" rozeti (Radio ikonu + #006D05), eski sade "✓ Analiz
+                          var" yerine. */}
+                      {race.hasAnaliz && (
+                        <div className="mt-0.5 flex items-center justify-center gap-1 text-[10px] font-semibold text-[#006D05]">
+                          <Radio className="h-2.5 w-2.5 animate-pulse" /> Analiz Yayında
+                        </div>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -189,6 +206,7 @@ export default function AnalizYeniClient({ gunler: gunlerBaslangic, selectedDate
               raceId={raceData.id}
               runners={raceData.runners}
               existingPrediction={raceData.prediction ?? undefined}
+              onSaved={handleSaved}
             />
           </>
         )}

@@ -28,12 +28,13 @@ type Props = {
       details: unknown;
     }>;
   };
+  onSaved?: () => void;
 };
 
-export default function SmartAnalysisEditor({ raceId, runners, existingPrediction }: Props) {
+export default function SmartAnalysisEditor({ raceId, runners, existingPrediction, onSaved }: Props) {
   return (
     <div className="space-y-6">
-      <V5AnalysisPanel raceId={raceId} runners={runners} existingPrediction={existingPrediction} />
+      <V5AnalysisPanel raceId={raceId} runners={runners} existingPrediction={existingPrediction} onSaved={onSaved} />
     </div>
   );
 }

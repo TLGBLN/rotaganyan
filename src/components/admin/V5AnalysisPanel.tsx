@@ -76,7 +76,7 @@ type ExistingPrediction = {
   picks: SavedPick[];
 };
 
-type Props = { raceId: string; runners?: Runner[]; existingPrediction?: ExistingPrediction };
+type Props = { raceId: string; runners?: Runner[]; existingPrediction?: ExistingPrediction; onSaved?: () => void };
 
 /** Kaydedilmiş bir Pick.details'ten (PickDetailsV2) V5At'e yakın bir görünüm türetir —
  *  motoru yeniden ÇALIŞTIRMAZ. Olasılık, kod-garantili OLASILIK satırının metninden
@@ -117,7 +117,7 @@ const KARAR_RENK: Record<string, string> = {
   "Yüksek Risk": "text-muted-foreground",
 };
 
-export default function V5AnalysisPanel({ raceId, runners: raceRunners, existingPrediction }: Props) {
+export default function V5AnalysisPanel({ raceId, runners: raceRunners, existingPrediction, onSaved }: Props) {
   const router = useRouter();
 
   const kayitliBaslangic = (() => {
@@ -314,6 +314,14 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       }
       setApplied(true);
       router.refresh();
+      // 2026-09-05 kullanıcı bulgusu ("6 koşu için analiz yapıldı ama koşula işlenmiyor,
+      // eskiden ✓ Analiz var diye gözükürdü") — bu sayfanın tarih değişimini hızlandıran
+      // düzeltme (bkz. AnalizYeniClient.tsx) "gunler" listesini artık İSTEMCİ state'inde
+      // tutuyor, window.history.replaceState (Next.js router'ını atlayarak) kullandığı
+      // için router.refresh()'in bu state'i güncellemesi GÜVENİLİR değil. onSaved,
+      // AnalizYeniClient'a kaydın gerçekleştiğini AÇIKÇA bildirip listesini kendi
+      // (getKosuSecimGunuVerisi) server action'ıyla yeniden çekmesini sağlıyor.
+      onSaved?.();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Kayıt hatası");
     } finally {
