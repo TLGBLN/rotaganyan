@@ -19,7 +19,16 @@ type RaceDayData = {
 };
 
 type Width = "narrow" | "normal" | "wide";
-type Selections = Record<number, Record<Width, Set<number>>>;
+// 2026-09-05 kullanıcı bulgusu: "kuponlar birbirinden bağımsız olsun, birini
+// işaretleyince diğerleri etkileniyor" — GroupSelections eskiden TEK, tüm KuponGrup
+// örnekleri (1.Altılı/2.Altılı/7'li Ganyan) arasında raceNo bazında PAYLAŞILAN tek bir
+// nesneydi. Altılı pencereleri kasıtlı olarak üst üste biniyor (bkz. chunkIntoAltili) ve
+// 7'li Ganyan neredeyse her zaman 2.Altılı ile aynı koşuları kapsıyor — ortak bir raceNo
+// için bir gruptaki işaret diğerinde de aynı at olarak görünüyordu. Artık her kupon grubu
+// kendi anahtarıyla (altili-0/altili-1/yedili-ganyan) TAMAMEN ayrı bir GroupSelections
+// tutuyor, aynı koşu numarası birden fazla grupta olsa bile birbirinden bağımsız.
+type GroupSelections = Record<number, Record<Width, Set<number>>>;
+type Selections = Record<string, GroupSelections>;
 
 const WIDTHS: Width[] = ["narrow", "normal", "wide"];
 const WIDTH_LABEL: Record<Width, string> = { narrow: "Ekonomik", normal: "Normal", wide: "Geniş" };
@@ -37,6 +46,12 @@ const TOLERANCES: Record<Width, number> = { narrow: 700 / LIMITS.narrow, normal:
 
 function emptySelection(): Record<Width, Set<number>> {
   return { narrow: new Set(), normal: new Set(), wide: new Set() };
+}
+
+function emptyGroupSelections(races: { raceNo: number }[]): GroupSelections {
+  const sel: GroupSelections = {};
+  races.forEach((r) => { sel[r.raceNo] = emptySelection(); });
+  return sel;
 }
 
 /**
@@ -66,7 +81,7 @@ function sonYediKosu<T>(races: T[]): T[] | null {
 // özellik ayrı bir kullanıcı kararıyla tamamen geri alındı) — yalnız yayınlamadan ÖNCE
 // admin'i UYARAN, engellemeyen bir kontrol. Genişletmenin gerçekten MÜMKÜN olduğu
 // (sahada seçilenden daha fazla koşabilir at varken) durumlarda tetiklenir.
-function statikAyaklariBul(races: RaceDayData["races"], selections: Selections): number[] {
+function statikAyaklariBul(races: RaceDayData["races"], selections: GroupSelections): number[] {
   const sonuc: number[] = [];
   for (const race of races) {
     const sel = selections[race.raceNo] ?? emptySelection();
@@ -82,7 +97,7 @@ function statikAyaklariBul(races: RaceDayData["races"], selections: Selections):
   return sonuc;
 }
 
-function legCounts(races: { raceNo: number }[], selections: Selections, width: Width): number[] {
+function legCounts(races: { raceNo: number }[], selections: GroupSelections, width: Width): number[] {
   return races.map((r) => Math.max((selections[r.raceNo] ?? emptySelection())[width].size, 1));
 }
 
@@ -99,7 +114,7 @@ function KuponGrup({
 }: {
   label: string;
   races: RaceDayData["races"];
-  selections: Selections;
+  selections: GroupSelections;
   onToggle: (raceNo: number, width: Width, no: number) => void;
   amounts: Record<Width, number>;
   onSubmit: () => void;
@@ -250,7 +265,7 @@ function KuponGrup({
   );
 }
 
-function amountsForGroup(group: RaceDayData["races"], selections: Selections, stakePerCombination: number): Record<Width, number> {
+function amountsForGroup(group: RaceDayData["races"], selections: GroupSelections, stakePerCombination: number): Record<Width, number> {
   return WIDTHS.reduce((acc, width) => {
     acc[width] = amountFor(legCounts(group, selections, width), stakePerCombination);
     return acc;
@@ -273,7 +288,7 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
   );
 
   const groupAmounts = useMemo(
-    () => altiliGroups.map((group) => amountsForGroup(group, selections, ALTILI_STAKE_PER_COMBINATION)),
+    () => altiliGroups.map((group, i) => amountsForGroup(group, selections[`altili-${i}`] ?? {}, ALTILI_STAKE_PER_COMBINATION)),
     [altiliGroups, selections]
   );
 
@@ -284,7 +299,7 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
     [raceDay]
   );
   const yediliGanyanAmounts = useMemo(
-    () => (yediliGanyanRaces ? amountsForGroup(yediliGanyanRaces, selections, YEDILI_GANYAN_STAKE_PER_COMBINATION) : null),
+    () => (yediliGanyanRaces ? amountsForGroup(yediliGanyanRaces, selections["yedili-ganyan"] ?? {}, YEDILI_GANYAN_STAKE_PER_COMBINATION) : null),
     [yediliGanyanRaces, selections]
   );
 
@@ -299,27 +314,31 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
       }
       setRaceDay(data);
       const next: Selections = {};
-      data.races.forEach((r) => { next[r.raceNo] = emptySelection(); });
+      chunkIntoAltili(data.races).forEach((group, i) => { next[`altili-${i}`] = emptyGroupSelections(group); });
+      const yedili = sonYediKosu(data.races);
+      if (yedili) next["yedili-ganyan"] = emptyGroupSelections(yedili);
       setSelections(next);
     });
   }
 
-  function toggleHorse(raceNo: number, width: Width, no: number) {
+  function toggleHorse(groupKey: string, raceNo: number, width: Width, no: number) {
     setSelections((prev) => {
-      const race = prev[raceNo] ?? emptySelection();
+      const group = prev[groupKey] ?? {};
+      const race = group[raceNo] ?? emptySelection();
       const set = new Set(race[width]);
       if (set.has(no)) set.delete(no);
       else set.add(no);
-      return { ...prev, [raceNo]: { ...race, [width]: set } };
+      return { ...prev, [groupKey]: { ...group, [raceNo]: { ...race, [width]: set } } };
     });
   }
 
   async function submitGroup(group: RaceDayData["races"], key: string, label: string, slot: number) {
     if (!raceDay) return;
 
+    const groupSel = selections[key] ?? {};
     const legs: HomeKuponLegInput[] = group
       .map((r) => {
-        const sel = selections[r.raceNo] ?? emptySelection();
+        const sel = groupSel[r.raceNo] ?? emptySelection();
         return {
           raceNo: r.raceNo,
           narrow: [...sel.narrow].sort((a, b) => a - b),
@@ -402,8 +421,8 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
                 key={key}
                 label={label}
                 races={chunk}
-                selections={selections}
-                onToggle={toggleHorse}
+                selections={selections[key] ?? {}}
+                onToggle={(raceNo, width, no) => toggleHorse(key, raceNo, width, no)}
                 amounts={groupAmounts[chunkIdx]}
                 stakePerCombination={ALTILI_STAKE_PER_COMBINATION}
                 onSubmit={() => submitGroup(chunk, key, slotLabel, chunkIdx + 1)}
@@ -417,8 +436,8 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
             <KuponGrup
               label={`${raceDay.hippodromeName} — 7'li Ganyan`}
               races={yediliGanyanRaces}
-              selections={selections}
-              onToggle={toggleHorse}
+              selections={selections["yedili-ganyan"] ?? {}}
+              onToggle={(raceNo, width, no) => toggleHorse("yedili-ganyan", raceNo, width, no)}
               amounts={yediliGanyanAmounts}
               stakePerCombination={YEDILI_GANYAN_STAKE_PER_COMBINATION}
               widths={["wide"]}
