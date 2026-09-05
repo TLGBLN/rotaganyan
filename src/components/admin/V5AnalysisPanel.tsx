@@ -38,8 +38,9 @@ type V5At = {
   // sinyalSayisi varsa at artık koşulsuz ilk-6'ya taşınıyor — aşağıdaki rozet artık
   // YALNIZ bilgi amaçlı değil, bu atın GERÇEKTEN terfi ettiğini de gösteriyor.
   degerTerfisi?: "ilk3" | "ilk6" | null;
-  // 2026-08-30 — B katmanı (bkz. plan: A/B/C Sinyal Katmanlama Mimarisi). "Tüm 12 Sinyal"
-  // paneli yalnız A katmanını (12 özellik) listeler — B katmanı (şimdilik sireOrani/
+  // 2026-08-30 — B katmanı (bkz. plan: A/B/C Sinyal Katmanlama Mimarisi). "Tüm N Sinyal"
+  // paneli yalnız A katmanını (yazıldığı tarihte 12, V5.34-37 ile 2026-09-01'de 17'ye
+  // çıktı — panelin kendi başlığı dinamik) listeler — B katmanı (şimdilik sireOrani/
   // düşük-şart) ORADA GÖRÜNMÜYOR, kullanıcı bunu fark edip sordu. Bu iki alan o boşluğu
   // dolduruyor: bu atta B katmanı fiilen uygulandı mı ve sireOrani'nin ham değeri neydi.
   bKatmaniUygulandiMi?: boolean;
@@ -534,12 +535,18 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                         </li>
                       );
                     })()}
-                    {/* 2026-08-30 — B katmanı görünürlüğü: "Tüm 12 Sinyal" paneli B
-                        katmanını içermiyor, bu yüzden ayrı bir madde gerekiyor. */}
+                    {/* 2026-08-30 — B katmanı görünürlüğü: "Tüm N Sinyal" paneli B
+                        katmanını içermiyor, bu yüzden ayrı bir madde gerekiyor.
+                        2026-09-05 kullanıcı bulgusu: bu iki title metni hâlâ "mevcut 12
+                        özellikten" diyordu — A katmanı V5.34-V5.37 arasında 12'den 17'ye
+                        çıktı (yakınsama/sonIdmanSprint/takı x2/yarisGidisatiSkoru eklendi),
+                        bu statik metinler hiç güncellenmemişti. Panelin kendi başlığı
+                        (aşağıda, "Tüm {a.tumSinyaller!.length} Sinyal") zaten DİNAMİKTİ,
+                        sorun yalnız bu iki sabit tooltip'teydi. */}
                     {a.bKatmaniUygulandiMi && (
                       <li
                         className="text-amber-600"
-                        title="B katmanı (kanıtsız ama kullanıcı kararıyla eklenen istisna) bu atta uygulandı — mevcut 12 özellikten AYRI, düşük-şart'a özel bir terim olarak skora eklendi."
+                        title="B katmanı (kanıtsız ama kullanıcı kararıyla eklenen istisna) bu atta uygulandı — mevcut 17 özellikten AYRI, düşük-şart'a özel bir terim olarak skora eklendi."
                       >
                         B: sireOrani ({(a.sireOrani ?? 0).toFixed(1)})
                       </li>
@@ -547,7 +554,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                     {a.zeminMesafeBKatmaniUygulandiMi && (
                       <li
                         className="text-amber-600"
-                        title="Zemin+Mesafe Deneyimi (hiç gölge-test edilmeden kullanıcı kararıyla eklenen istisna) bu atta uygulandı — TÜM kategorilerde, mevcut 12 özellikten AYRI bir terim olarak skora eklendi."
+                        title="Zemin+Mesafe Deneyimi (hiç gölge-test edilmeden kullanıcı kararıyla eklenen istisna) bu atta uygulandı — TÜM kategorilerde, mevcut 17 özellikten AYRI bir terim olarak skora eklendi."
                       >
                         B: zeminMesafeDeneyim ({(a.zeminMesafeDeneyim ?? 0) > 0 ? "+" : ""}
                         {(a.zeminMesafeDeneyim ?? 0).toFixed(1)}%, {a.zeminMesafeDeneyimSeviyesi})
