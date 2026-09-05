@@ -47,6 +47,20 @@ gerekçeyi (AGF-dışı katkı toplamı, vb.) gösterir. Çıktıda "❓ SINIRDA
 varsa veya bir yakın-ıskanın gerekçesi mantıksız görünüyorsa (BAY UMUT gibi), deploy'u
 DURDUR ve önce kapıyı düzelt.
 
+## Herkese açık bir pick/at listesi tablosu eklerken veya değiştirirken ZORUNLU kural
+
+2026-09-05'te (İstanbul K4, BALDER/TERCAN HAN) AYNI bug bağımsız olarak ÜÇ ayrı dosyada
+(`ProgramView.tsx`, `PuanTablosu.tsx`, `InlineAnalysisPanel.tsx`) bulundu: gösterim sırası
+kayıtlı `Pick.rank`'e göre yapılıyordu, ama terfi/garanti mekanizmaları (`v5-engine.ts`,
+`terfiPenceresiV5`) rank'i kasıtlı olarak ham olasılıktan saptırabiliyor — tablo yüzdeye
+(Toplam/Puan) göre sıralı GÖRÜNMÜYORDU, gerçek bir kupon kaybına yol açtı.
+
+Artık `src/lib/methodology/pick-display-order.ts`'teki `siraliPickler`/`siraliPickSatirlari`
+TEK, test edilen (`pick-display-order.test.ts`) kaynak. Herkese açık (public/`(app)`) bir
+tabloda at listesi gösterilecekse bu fonksiyonlardan biri kullanılmalı — rank'e göre elle
+sıralama YENİDEN YAZILMAMALI. (Admin tarafındaki `V5AnalysisPanel.tsx`/`RaceAdviceCard.tsx`
+bu kuralın DIŞINDA — admin bilerek terfi-ayarlı Sıra'yı görmeli.)
+
 ## Diğer kalıcı araçlar (silinmiyor, kök dizinde)
 - `arac-terfi-denetimi.mts` — yukarıya bakınız
 - `arac-model-veri-olustur.mts` — V5 eğitim verisi cache'ini üretir/günceller

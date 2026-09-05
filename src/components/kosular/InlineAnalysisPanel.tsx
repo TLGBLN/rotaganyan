@@ -7,6 +7,7 @@ import FollowButton from "@/components/kosular/FollowButton";
 import { cn } from "@/lib/utils";
 import type { ProgramRaceDay } from "@/server/services/race.service";
 import { kararOku } from "@/lib/methodology/muhakeme-format";
+import { siraliPickler } from "@/lib/methodology/pick-display-order";
 
 type Picks = NonNullable<ProgramRaceDay["races"][number]["prediction"]>["picks"];
 
@@ -80,11 +81,12 @@ export default function InlineAnalysisPanel({ picks, winnerNos, isLoggedIn, race
     );
   }
 
-  // 2026-09-05 kullanıcı talebi (ProgramView.tsx/PuanTablosu.tsx'teki AYNI düzeltme):
-  // gösterim sırası artık HER ZAMAN yüzdesel (Toplam/score) yüksekten azalana — admin
-  // tarafında tutulan Sıra (pick.rank) terfi/garanti mekanizmalarıyla kasıtlı olarak ham
-  // olasılıktan sapabildiği için burada kullanılmıyor, yalnız etiket olarak gösteriliyor.
-  const sortedPicks = [...picks].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  // 2026-09-05 kullanıcı talebi: gösterim sırası artık HER ZAMAN yüzdesel (Toplam/score)
+  // yüksekten azalana — admin tarafında tutulan Sıra (pick.rank) terfi/garanti
+  // mekanizmalarıyla kasıtlı olarak ham olasılıktan sapabildiği için burada kullanılmıyor,
+  // yalnız etiket olarak gösteriliyor. Paylaşılan/test edilen fonksiyon — bkz.
+  // pick-display-order.ts'in başındaki not (bu bug üç ayrı dosyada bağımsız yazılmıştı).
+  const sortedPicks = siraliPickler(picks);
 
   return (
     <div className="space-y-2">

@@ -8,6 +8,7 @@ import type { ProgramRaceDay } from "@/server/services/race.service";
 import { finishPos } from "@/lib/race-result";
 import { kararOku } from "@/lib/methodology/muhakeme-format";
 import { ekuriRengi } from "@/lib/ekuri-colors";
+import { siraliPickSatirlari } from "@/lib/methodology/pick-display-order";
 
 // PuanTablosu.tsx'in kendi pick şekli — ProgramView.tsx'in ProgramPick'inden FARKLI
 // (o daha dar, runner.scratched/ekuriGroup taşımıyor). ProgramRaceDay'den türetiliyor
@@ -73,13 +74,12 @@ function buildPickRows(picks: PuanPick[]): PuanPick[][] {
     }
   }
 
-  // 2026-09-05 kullanıcı talebi (ProgramView.tsx'teki AYNI düzeltme, bu tablo AYRI bir
-  // dosya olduğu için o zaman güncellenmemişti): gösterim sırası artık HER ZAMAN yüzdesel
-  // (Puan/score) yüksekten azalana — terfi/garanti mekanizmalarının admin tarafında tuttuğu
-  // Sıra (rank) kasıtlı olarak ham olasılıktan sapabildiği için burada KULLANILMIYOR.
-  // displayRank zaten rowIdx+1 olarak hesaplanıyor, diziyi puana göre sıralamak yeterli.
-  rows.sort((a, b) => Math.max(...b.map((p) => p.score ?? 0)) - Math.max(...a.map((p) => p.score ?? 0)));
-  return rows;
+  // 2026-09-05 kullanıcı talebi: gösterim sırası artık HER ZAMAN yüzdesel (Puan/score)
+  // yüksekten azalana — terfi/garanti mekanizmalarının admin tarafında tuttuğu Sıra (rank)
+  // kasıtlı olarak ham olasılıktan sapabildiği için burada KULLANILMIYOR. displayRank zaten
+  // rowIdx+1 olarak hesaplanıyor, diziyi puana göre sıralamak yeterli. Paylaşılan/test edilen
+  // fonksiyon — bkz. pick-display-order.ts'in başındaki not (bu bug üç ayrı dosyada vardı).
+  return siraliPickSatirlari(rows);
 }
 
 function rankColor(rank: number): string {

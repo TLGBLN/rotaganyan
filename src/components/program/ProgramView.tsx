@@ -10,6 +10,7 @@ import { EKURI_COLORS, ekuriRengi } from "@/lib/ekuri-colors";
 import { ChevronDown, ChevronUp, Star, Info, Radio } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
 import { kararOku } from "@/lib/methodology/muhakeme-format";
+import { siraliPickSatirlari } from "@/lib/methodology/pick-display-order";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
 import HorseDetailModal from "./HorseDetailModal";
 import HipodromOzellikleriModal from "./HipodromOzellikleriModal";
@@ -440,8 +441,9 @@ function AnalysisPanel({
   // (Toplam/score) yüksekten azalana göre — terfi/garanti mekanizmalarının admin tarafında
   // tuttuğu Sıra (rank, gösterim amaçlı kasıtlı olarak ham olasılıktan sapabiliyor) burada
   // KULLANILMIYOR. displayRank zaten aşağıda dizideki konumdan (rowIdx+1) hesaplanıyor, bu
-  // yüzden diziyi puana göre sıralamak yeterli.
-  pickRows.sort((a, b) => Math.max(...b.map((p) => p.score ?? 0)) - Math.max(...a.map((p) => p.score ?? 0)));
+  // yüzden diziyi puana göre sıralamak yeterli. Bkz. pick-display-order.ts'in başındaki not
+  // — bu AYNI sıralama PuanTablosu.tsx'te de gerekiyordu, artık tek yerden.
+  const sortedPickRows = siraliPickSatirlari(pickRows);
 
   // v6.68 — kullanıcı talebi 2026-08-09: "link istemiyorum direk image üstüne
   // yerleştirilmeli" — eskiden Twitter intent'ine bir URL (link) gönderiliyordu, o da
@@ -557,7 +559,7 @@ function AnalysisPanel({
             </tr>
           </thead>
           <tbody>
-            {pickRows.map((rowPicks, rowIdx) => {
+            {sortedPickRows.map((rowPicks, rowIdx) => {
               const first = rowPicks[0];
               // 2026-09-01 kullanıcı talebi: eküri ortağı aynı satırda birleşince, SONRAKİ
               // atların gösterilen sırası da yukarı kaysın (ör. 7 at → eküri birleşince 6
@@ -669,7 +671,7 @@ function AnalysisPanel({
 
       {/* Mobil kart listesi */}
       <div className="sm:hidden divide-y">
-        {pickRows.map((rowPicks, rowIdx) => {
+        {sortedPickRows.map((rowPicks, rowIdx) => {
           const first = rowPicks[0];
           const displayRank = rowIdx + 1;
           const winnerPick = rowPicks.find((p) => p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no));
