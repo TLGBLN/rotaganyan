@@ -323,6 +323,53 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
 
   const atlarByNo = new Map((atlar ?? []).map((a) => [a.no, a]));
 
+  // 2026-09-05 kullanıcı talebi ("analizler bittikten sonra bu alanda ... çekilen atla
+  // ilgili açıklama yer alsın, başında ünlem işaretiyle") — KOPUK UÇURTMA vakasından
+  // (İzmir K3, 2026-09-04: Saf Model onu 1.sırada görüyordu, AGF payı düşük olduğu için
+  // final skor 4.'e çekmişti, at yine de kazandı) doğan bir özet notu. Banko kutusuyla
+  // AYNI üst özet alanında, TEK TEK at kartlarına inmeden görünür. Eşik (3pp) BİLEREK
+  // safModelDegerTerfisiUygula'nın terfi eşiklerinden (5pp ilk-6/8pp ilk-3) DAHA DÜŞÜK —
+  // bu not yalnız bilgi amaçlı (KOPUK UÇURTMA'nın kendi vakası +3.8pp'ydi, mevcut 5pp
+  // terfi eşiğini bile geçmemişti), sıralamayı/kararı HİÇ etkilemiyor.
+  const CEKILEN_AT_ESIGI = 3;
+  const cekilenAtNotlari = (() => {
+    if (!atlar) return [];
+    const gecerliAtlar = atlar.filter((x) => x.marketBlindProb1 != null && x.agfPayi != null && x.agfSirasi != null);
+    if (gecerliAtlar.length === 0) return [];
+    const safModelSirali = [...gecerliAtlar].sort((x, y) => (y.marketBlindProb1 ?? 0) - (x.marketBlindProb1 ?? 0));
+    const safModelSiraByNo = new Map(safModelSirali.map((x, idx) => [x.no, idx + 1]));
+    const notlar: string[] = [];
+    for (const a of gecerliAtlar) {
+      const safSira = safModelSiraByNo.get(a.no);
+      if (safSira == null || safSira >= a.teknikSira) continue; // yalnız GERÇEKTEN aşağı çekilmişse
+      const safYuzde = (a.marketBlindProb1 ?? 0) * 100;
+      const fark = safYuzde - (a.agfPayi ?? 0);
+      if (fark < CEKILEN_AT_ESIGI) continue;
+      // 2026-09-05 — safModelDegerTerfisiUygula ile AYNI kalite filtresi: yalnız fark'a
+      // bakmak yeterli değil, düşük AGF payı OLAN HER at matematiksel olarak pozitif bir
+      // fark üretebiliyor (KOPUK UÇURTMA testi sırasında 11 attan 6'sı tetiklendi, çoğu
+      // GERÇEKTEN zayıf atlar). AGF-dışı katkı toplamı net pozitif değilse (modelin kendi
+      // GÖRÜŞÜ de zaten olumsuzsa) not üretilmez.
+      const nonAgfToplam = (a.tumSinyaller ?? [])
+        .filter((o) => !["agfSirasi", "agfPayi", "agfPayi2"].includes(o.kod))
+        .reduce((s, o) => s + o.katki, 0);
+      if (nonAgfToplam <= 0) continue;
+      const destek: string[] = [];
+      const bul = (kod: string) => a.tumSinyaller?.find((o) => o.kod === kod);
+      const hiz = bul("hizDerecesi");
+      if (hiz && hiz.hamDeger > 1) destek.push(`hızDerecesi +${hiz.hamDeger.toFixed(2)}`);
+      const yakinsama = bul("yakinsama2Plus");
+      if (yakinsama && yakinsama.hamDeger === 1) destek.push("yakınsama (2+ olumlu işaret) var");
+      const h2h = bul("h2hNetSkor");
+      if (h2h && h2h.hamDeger > 0) destek.push(`H2H net ${h2h.hamDeger}`);
+      const destekMetni = destek.length > 0 ? ` — ${destek.slice(0, 2).join(", ")}.` : "";
+      notlar.push(
+        `#${a.no} ${a.ad}: Saf Model (AGF'siz) onu zaten ${safSira}. sırada (%${safYuzde.toFixed(1)}) görüyordu.${destekMetni} AGF payı düşük olduğu için (%${a.agfPayi!.toFixed(1)}, sıra ${a.agfSirasi}) harmanlanan skor onu ${a.teknikSira}.'e çekmiş.`
+      );
+    }
+    return notlar;
+  })();
+
   return (
     <div className="space-y-4 rounded-xl border border-purple-500/30 bg-purple-500/5 p-4">
       <div className="flex items-start gap-2">
@@ -380,6 +427,17 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
             {bankoAdayi.bankoAdayi ? "★ BANKO ADAYI: " : "Banko adayı yok: "}
           </span>
           {bankoAdayi.sebep}
+        </div>
+      )}
+
+      {cekilenAtNotlari.length > 0 && (
+        <div className="space-y-1.5">
+          {cekilenAtNotlari.map((not, i) => (
+            <div key={i} className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-700">
+              <span className="font-semibold">! </span>
+              {not}
+            </div>
+          ))}
         </div>
       )}
 
