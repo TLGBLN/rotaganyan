@@ -653,4 +653,16 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
       "Gerçek İzmir K7 ile doğrulandı: düzeltme ÖNCESİ PRENSES BERRİN agfTerfi=\"ilk6\"/karar=\"Düşük Risk\" gösteriyordu (7.sırada olmasına rağmen); düzeltme SONRASI agfTerfi=null/degerTerfisi=null/karar=\"Yüksek Risk\" — gerçek durumla (7.sırada, YURTKURAN'ın meşru şekilde 6.sırayı aldığı) artık tutarlı. arac-terfi-denetimi.mts ile son 20 koşuda toplu regresyon: mevcut hiçbir DOĞRU terfi/karar bozulmadı (yalnız bu türden YANLIŞ/bayat bayraklar düzeltildi). tsc --noEmit temiz, v5-engine.test.ts 7/7 geçti.",
     ],
   },
+  {
+    versiyon: "V5.43",
+    baslangic: new Date("2026-09-05T20:35:00+03:00"),
+    bitis: null,
+    aciklama: "GERÇEK KUPON KAYBI BUGU DÜZELTİLDİ — kullanıcı bulgusu (İstanbul K4, 2026-09-05, BALDER): BALDER %6.9-7.0 ham olasılıkla saha ortalamasının üstünde, doğal sırası 6 iken, TERCAN HAN (yalnız %4.1) agfTrendTerfisiUygula'nın ilk-6 kademesiyle (koşul: agfTrendYonu != null — HİÇBİR olasılık/büyüklük tabanı yok) 4.sıraya terfi edip BALDER'i zincirleme olarak 7.sıraya (ilk-6 DIŞINA) itti. BALDER koşuyu 6.25 ganyanla KAZANDI, Result.hitTop1=false/hitInCoupon=false. Kök neden: dört terfi/garanti mekanizmasının (agfTrendTerfisi ilk3/ilk6, safModelDegerTerfisi ilk3/ilk6) HİÇBİRİNDE 'bu terfi kimin yerini alıyor, o at ne kadar güçlüydü' diye bir kontrol yoktu. Kullanıcının kendi ifadesiyle: '%4'lük atı %10'un önüne koyuyorsan bu bir problemdir'. İLK denenen çözüm (adayın ham olasılığının saha ortalamasının (1/atSayısı) altında olmasını engelleme) arac-terfi-denetimi.mts --son 20 ile ÇOK KATI çıktı — terfi sayısını 28'den 3'e düşürdü (küçük/orta sahalarda favori dışı HER at zaten ortalamanın altında kalıyor, dağılım sağa çarpık). Bunun yerine terfiPenceresiV5 (paylaşılan çekirdek fonksiyon, dört mekanizmanın da içinden geçtiği) artık adayın olasılığını doğrudan YERİNİ ALACAĞI ATIN olasılığıyla kıyaslıyor: DISPLACED_ORAN_ESIGI=0.7 — aday, yerini alacağı atın olasılığının en az %70'i kadar güçlü değilse terfi iptal ediliyor. Aynı 20 koşuda 20 terfi tetiklendi (28'den makul bir düşüş, 3'e kıyasla çok daha dengeli) ve BALDER artık kendi hakkı olan 6.sıraya terfi ediyor.",
+    neyiAnalizEdiyor: [
+      "Skor/olasılık DEĞİŞMEDİ — yalnız terfiPenceresiV5'in dört çağrısındaki (agfTrendTerfisi ilk3/ilk6, safModelDegerTerfisi ilk3/ilk6) aday seçimi artık yerini alacağı atın gücünü de hesaba katıyor.",
+    ],
+    caprazlamalar: [
+      "TAM V5-dönemi geriye dönük tarama (2026-08-16 sonrası 494 sonuçlanmış koşu, gatherFaz1V5+faz2V5Sirala eski/yeni kod ile iki kez çalıştırılıp gerçek kazananın sırası kıyaslandı — git stash ile kontrollü A/B): İLK-3 kademesinde kazanılan=29/kaybedilen=16 (NET +13); İLK-6 kademesinde kazanılan=6/kaybedilen=9 (NET -3). İlk-6'daki kayıpların TAMAMI kazananın kendi olasılığı saha ortalamasının çok altında (ortalama %4.1, örn. %2.7/%3.0/%3.1/%3.7) — yani AYNI TERCAN HAN türü hatanın bu sefer şans eseri doğru tarafa düşmüş hali; kazanılanlar ise saha ortalamasına yakın/üstü (%6.7-11.3) gerçek rakip atlar. Toplamda (ilk3+ilk6) net +10 gerçek koşuda kazanan artık doğru kademede. tsc --noEmit temiz, npm run build temiz, v5-engine.test.ts 7/7 geçti, arac-terfi-denetimi.mts --son 20 ile ayrıca doğrulandı.",
+    ],
+  },
 ];

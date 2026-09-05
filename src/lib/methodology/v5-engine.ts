@@ -1062,6 +1062,22 @@ function efektifPencereSiniri<T extends { ekuriGroup: number | null }>(sirali: T
   return sirali.length;
 }
 
+// 2026-09-05 kullanıcı bulgusu (İstanbul K4, BALDER — kazandı ama TERCAN HAN'ın (%4)
+// terfisi yüzünden ilk-6'nın dışına, 7.sıraya itildi — GERÇEK kupon kaybı, hitTop1=false):
+// dört terfi/garanti mekanizmasının (agfTrendTerfisi ilk3/ilk6, safModelDegerTerfisi
+// ilk3/ilk6) hiçbirinde "bu terfi kimin yerini alıyor, o at ne kadar güçlüydü" diye bir
+// kontrol yoktu — trend/değer sinyali ne kadar büyük olsa da, adayın ham olasılığı yerini
+// alacağı atın çok altında olsa bile (somut vaka: %4 vs %7, oran 0.57) terfi gerçekleşiyordu.
+// Kullanıcının kendi ifadesiyle: "%4'lük atı %10'un önüne koyuyorsan bu bir problemdir".
+// Denenen İLK çözüm (adayın ham olasılığının saha ortalamasının altında olmasını engelleme)
+// arac-terfi-denetimi.mts ile test edilince ÇOK KATI çıktı — aynı 20 gerçek koşuda terfi
+// sayısını 28'den 3'e düşürdü, çünkü küçük/orta sahalarda favori dışı HER at zaten
+// ortalamanın altında kalıyor (dağılım sağa çarpık). Bunun yerine adayın olasılığı doğrudan
+// YERİNİ ALACAĞI ATIN olasılığıyla KIYASLANIYOR — mekanizmanın kendi ilkesiyle (trend/değer
+// bulma) tutarlı kalıp yalnız "bariz derecede daha zayıf birini terfi ettirme" durumunu
+// engelliyor. DISPLACED_ORAN_ESIGI=0.7 ile aynı 20 koşuda doğrulandı (bkz. commit notu).
+const DISPLACED_ORAN_ESIGI = 0.7;
+
 function terfiPenceresiV5<T extends { no: number; olasilik: number; ekuriGroup: number | null }>(
   sirali: T[],
   pencereBoyu: number,
@@ -1074,6 +1090,12 @@ function terfiPenceresiV5<T extends { no: number; olasilik: number; ekuriGroup: 
   if (disaridakiAdaylar.length === 0) return { sonuc: sirali, terfiEdenNolar: new Set() };
 
   const enGuclusu = disaridakiAdaylar.reduce((a, b) => (b.r.olasilik > a.r.olasilik ? b : a));
+
+  const yeriAlinacakAt = sirali[efektifSinir - 1];
+  if (yeriAlinacakAt && enGuclusu.r.olasilik < yeriAlinacakAt.olasilik * DISPLACED_ORAN_ESIGI) {
+    return { sonuc: sirali, terfiEdenNolar: new Set() };
+  }
+
   const kopya = [...sirali];
   const [aday] = kopya.splice(enGuclusu.i, 1);
   kopya.splice(efektifSinir - 1, 0, aday);

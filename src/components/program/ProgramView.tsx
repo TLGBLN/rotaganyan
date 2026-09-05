@@ -436,6 +436,13 @@ function AnalysisPanel({
     }
   }
 
+  // 2026-09-05 kullanıcı talebi: bu tablodaki gösterim sırası artık HER ZAMAN yüzdesel
+  // (Toplam/score) yüksekten azalana göre — terfi/garanti mekanizmalarının admin tarafında
+  // tuttuğu Sıra (rank, gösterim amaçlı kasıtlı olarak ham olasılıktan sapabiliyor) burada
+  // KULLANILMIYOR. displayRank zaten aşağıda dizideki konumdan (rowIdx+1) hesaplanıyor, bu
+  // yüzden diziyi puana göre sıralamak yeterli.
+  pickRows.sort((a, b) => Math.max(...b.map((p) => p.score ?? 0)) - Math.max(...a.map((p) => p.score ?? 0)));
+
   // v6.68 — kullanıcı talebi 2026-08-09: "link istemiyorum direk image üstüne
   // yerleştirilmeli" — eskiden Twitter intent'ine bir URL (link) gönderiliyordu, o da
   // OG görselini bir KART olarak unfurl ediyordu. Artık görsel bir DOSYA olarak Web
