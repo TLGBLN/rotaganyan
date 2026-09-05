@@ -72,6 +72,13 @@ function buildPickRows(picks: PuanPick[]): PuanPick[][] {
       rows.push([p]);
     }
   }
+
+  // 2026-09-05 kullanıcı talebi (ProgramView.tsx'teki AYNI düzeltme, bu tablo AYRI bir
+  // dosya olduğu için o zaman güncellenmemişti): gösterim sırası artık HER ZAMAN yüzdesel
+  // (Puan/score) yüksekten azalana — terfi/garanti mekanizmalarının admin tarafında tuttuğu
+  // Sıra (rank) kasıtlı olarak ham olasılıktan sapabildiği için burada KULLANILMIYOR.
+  // displayRank zaten rowIdx+1 olarak hesaplanıyor, diziyi puana göre sıralamak yeterli.
+  rows.sort((a, b) => Math.max(...b.map((p) => p.score ?? 0)) - Math.max(...a.map((p) => p.score ?? 0)));
   return rows;
 }
 

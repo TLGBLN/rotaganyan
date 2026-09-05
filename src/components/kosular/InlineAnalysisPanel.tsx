@@ -80,13 +80,20 @@ export default function InlineAnalysisPanel({ picks, winnerNos, isLoggedIn, race
     );
   }
 
+  // 2026-09-05 kullanıcı talebi (ProgramView.tsx/PuanTablosu.tsx'teki AYNI düzeltme):
+  // gösterim sırası artık HER ZAMAN yüzdesel (Toplam/score) yüksekten azalana — admin
+  // tarafında tutulan Sıra (pick.rank) terfi/garanti mekanizmalarıyla kasıtlı olarak ham
+  // olasılıktan sapabildiği için burada kullanılmıyor, yalnız etiket olarak gösteriliyor.
+  const sortedPicks = [...picks].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+
   return (
     <div className="space-y-2">
       {/* ── MOBİL: her at ayrı satır ── */}
       <div className="md:hidden rounded-lg border divide-y">
-        {picks.map((pick, i) => {
+        {sortedPicks.map((pick, i) => {
           const isWinner = pick.runner?.no != null && (winnerNos ?? []).includes(pick.runner.no);
-          const coupon = couponCategory(pick.rank);
+          const displayRank = i + 1;
+          const coupon = couponCategory(displayRank);
           return (
             <div
               key={pick.id}
@@ -98,7 +105,7 @@ export default function InlineAnalysisPanel({ picks, winnerNos, isLoggedIn, race
               )}
             >
               <span className="w-4 shrink-0 text-center text-[11px] text-muted-foreground tabular-nums">
-                {pick.rank}
+                {displayRank}
               </span>
               <span className="w-5 shrink-0 font-mono text-xs tabular-nums">
                 {pick.runner?.no ?? "—"}
@@ -149,10 +156,11 @@ export default function InlineAnalysisPanel({ picks, winnerNos, isLoggedIn, race
             </tr>
           </thead>
           <tbody>
-            {picks.map((pick, i) => {
+            {sortedPicks.map((pick, i) => {
               const { a, bc } = splitLayerDetails(pick.details);
               const isWinner = pick.runner?.no != null && (winnerNos ?? []).includes(pick.runner.no);
-              const coupon = couponCategory(pick.rank);
+              const displayRank = i + 1;
+              const coupon = couponCategory(displayRank);
               return (
                 <tr
                   key={pick.id}
@@ -163,7 +171,7 @@ export default function InlineAnalysisPanel({ picks, winnerNos, isLoggedIn, race
                     isWinner && "bg-[#C98F02]/20"
                   )}
                 >
-                  <td className="px-2 py-2 font-semibold">{pick.rank}</td>
+                  <td className="px-2 py-2 font-semibold">{displayRank}</td>
                   <td className="px-2 py-2">
                     <Badge variant="outline" className={cn("text-[10px]", coupon.className)}>
                       {coupon.label}
