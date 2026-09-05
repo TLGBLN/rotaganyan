@@ -30,6 +30,10 @@ const ALTILI_STAKE_PER_COMBINATION = 1.25;
 const YEDILI_GANYAN_STAKE_PER_COMBINATION = 2;
 const LIMITS: Record<Width, number> = { narrow: 600, normal: 1500, wide: 3000 };
 const TOLERANCE = 1.10; // %10 esneme payı
+// 2026-09-05 kullanıcı talebi: Ekonomik'te esneme payı 660₺ değil 700₺'ye kadar izin
+// versin (diğer ikisi hâlâ standart +%10). Base LIMITS.narrow (600₺) hedef olarak kalır,
+// yalnız üst sınır (effectiveLimit) genişliyor.
+const TOLERANCES: Record<Width, number> = { narrow: 700 / LIMITS.narrow, normal: TOLERANCE, wide: TOLERANCE };
 
 function emptySelection(): Record<Width, Set<number>> {
   return { narrow: new Set(), normal: new Set(), wide: new Set() };
@@ -192,7 +196,7 @@ function KuponGrup({
         {widths.map((width) => {
           const amount = amounts[width];
           const limit = LIMITS[width];
-          const effectiveLimit = limit * TOLERANCE;
+          const effectiveLimit = limit * TOLERANCES[width];
           const maxCombos = Math.floor(effectiveLimit / stakePerCombination);
           const currentCombos = Math.round(amount / stakePerCombination);
           const remaining = maxCombos - currentCombos;
@@ -212,14 +216,15 @@ function KuponGrup({
                   : `${remaining.toLocaleString("tr-TR")} kombo kaldı`}
               </div>
               <div className="text-[10px] text-muted-foreground mt-1 border-t pt-1">
-                max {maxCombos.toLocaleString("tr-TR")} kombo · {effectiveLimit.toLocaleString("tr-TR")} ₺ <span className="opacity-60">(+%10)</span>
+                max {maxCombos.toLocaleString("tr-TR")} kombo · {effectiveLimit.toLocaleString("tr-TR")} ₺{" "}
+                <span className="opacity-60">(+%{Math.round((TOLERANCES[width] - 1) * 100)})</span>
               </div>
             </div>
           );
         })}
       </div>
 
-      {widths.some((w) => amounts[w] > LIMITS[w] * TOLERANCE) && (
+      {widths.some((w) => amounts[w] > LIMITS[w] * TOLERANCES[w]) && (
         <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-500">
           ⚠ Bir veya daha fazla kupon türü limit aşıyor. Kaydetmeden önce seçimleri azaltın.
         </div>
