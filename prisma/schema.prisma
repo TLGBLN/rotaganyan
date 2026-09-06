@@ -202,6 +202,7 @@ model Race {
   runners        Runner[]
   prediction     Prediction?
   result         Result?
+  pendingResult  PendingResult?
   accuraceRace   AccuraceRace?
   challengerRuns ChallengerRun[]
 
@@ -492,6 +493,27 @@ model Result {
   race Race @relation(fields: [raceId], references: [id], onDelete: Cascade)
 
   @@index([hitTop1])
+}
+
+// 2026-09-06 kullanıcı bulgusu (İstanbul K5, MOLFIT/AZİMLİ) — TJK, bir koşunun sonucunu
+// yayınladıktan SONRA (itiraz/foto-finiş incelemesi) değiştirebiliyor; result-sync.ts'in
+// eski "ganyan varsa kesinleşmiştir" varsayımı bunu yakalayamadı — geçici/yanlış bir
+// kazanan ganyan değeriyle birlikte gelip kalıcı Result olarak yazıldı. Artık HİÇBİR
+// sonuç, aynı kazanan+ganyan İKİ ARDIŞIK senkronizasyonda (result-sync cron'u 15 dk'da
+// bir çalışıyor) DEĞİŞMEDEN görülmeden Result'a yazılmıyor — bu, "yakala ve düzelt" değil
+// "en baştan olmasın" prensibiyle eklendi (kullanıcı talebi: "bunlar olmasın, yakalanması
+// değil olmayacak"). Bir koşu bu aşamada asla kalıp Result'a hiç geçmezse (TJK verisi
+// sürekli değişiyorsa) admin panelinde ayrıca görünür olmalı — bkz. result-sync.ts.
+model PendingResult {
+  id          String   @id @default(cuid())
+  raceId      String   @unique
+  winnerNo    Int?
+  winnerNos   Int[]    @default([])
+  ganyan      Float?
+  actualOrder Json
+  firstSeenAt DateTime @default(now())
+
+  race Race @relation(fields: [raceId], references: [id], onDelete: Cascade)
 }
 
 // ─── CONTENT ──────────────────────────────────────────────────────────────────

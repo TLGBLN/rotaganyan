@@ -9,6 +9,30 @@ import { discoverTurkishCities, toSlug, toTjkDate } from "./ingest/tjk-info.adap
 import { fetchCityResults, type CityRaceResult } from "./ingest/tjk-result.adapter";
 import { computeHitTop1, syncKarmaResultMirrors } from "@/lib/result-utils";
 
+// 2026-09-06 kullanıcı bulgusu (İstanbul K5, MOLFIT/AZİMLİ) — TJK bir koşunun sonucunu
+// yayınladıktan SONRA (itiraz/foto-finiş incelemesi) değiştirebiliyor, ganyan değeriyle
+// birlikte gelmiş olsa bile. Eski kod "ganyan varsa kesinleşmiştir" varsayımıyla ilk
+// gördüğü veriyi kalıcı Result olarak yazıyordu — bu varsayım o gün yanlış çıktı, yanlış
+// kazanan (AZİMLİ) günlerce kalıcı kayıtta durdu, kullanıcı fark edip elle düzeltti.
+// Kullanıcı talebi ("bunlar olmasın, yakalanması değil olmayacak") üzerine "yakala ve
+// düzelt" yerine "en baştan yazma" prensibine geçildi: bir koşunun sonucu, AYNI kazanan
+// + AYNI ganyan + AYNI sıralama İKİ ARDIŞIK senkronizasyonda (cron 15 dk'da bir çalışıyor,
+// bkz. vercel.json) DEĞİŞMEDEN görülmeden Result tablosuna hiç yazılmıyor — ilk görülen
+// aday PendingResult'a "bekleyen" olarak yazılır, ikinci turda eşleşirse Result'a taşınıp
+// PendingResult silinir; eşleşmezse PendingResult'ın kendisi güncellenip saat sıfırlanır
+// (yeniden doğrulama baştan başlar).
+function ayniAday(
+  a: { winnerNo: number | null; winnerNos: number[]; ganyan: number | null; actualOrder: unknown },
+  b: { winnerNo: number | null; winnerNos: number[]; ganyan: number | null; actualOrder: unknown }
+): boolean {
+  return (
+    a.winnerNo === b.winnerNo &&
+    a.ganyan === b.ganyan &&
+    JSON.stringify(a.winnerNos) === JSON.stringify(b.winnerNos) &&
+    JSON.stringify(a.actualOrder) === JSON.stringify(b.actualOrder)
+  );
+}
+
 export async function syncResultsForDate(dateStr: string): Promise<void> {
   const date = new Date(dateStr + "T00:00:00.000Z");
 
@@ -17,6 +41,7 @@ export async function syncResultsForDate(dateStr: string): Promise<void> {
     include: {
       raceDay: { include: { hippodrome: true } },
       runners: { select: { no: true } },
+      pendingResult: true,
       prediction: {
         include: { picks: { where: { rank: { lte: 3 } }, include: { runner: { select: { no: true } } } } },
       },
@@ -55,11 +80,25 @@ export async function syncResultsForDate(dateStr: string): Promise<void> {
     const winnerNo = winnerNos[0] ?? null;
     const ganyan = raceResult.rows[0]?.ganyan;
     // TJK, bir koşunun ganyanını (kazanan oranı) ancak sonuç kesinleştikten (itiraz/foto-finiş
-    // incelemesi bittikten) sonra yayınlar. Ganyan henüz yoksa sıralama geçici/olası yanlış
-    // olabilir (bir kez yaşandı: 14 atlık geçici bir sıralama kaydedildi, sonradan TJK sıralamayı
-    // tamamen değiştirdi) — böyle bir koşuyu KAYDETMEYİP bir sonraki senkronizasyona bırakıyoruz,
-    // ki yanlış/geçici bir sonuç kalıcı olarak Result tablosuna yazılıp kupon isabet hesaplarını bozmasın.
+    // incelemesi bittikten) sonra yayınlar. Ganyan henüz yoksa sıralama kesin olarak geçicidir —
+    // bu koşuyu KAYDETMEYİP bir sonraki senkronizasyona bırakıyoruz.
     if (ganyan == null) continue;
+
+    const aday = { winnerNo, winnerNos, ganyan, actualOrder };
+    if (!race.pendingResult || !ayniAday(race.pendingResult, aday)) {
+      // İlk kez görülen aday (ya da öncekinden FARKLI bir aday) — henüz Result'a YAZILMIYOR,
+      // yalnız "bekleyen" olarak kaydedilip bir sonraki senkronizasyonda aynısı tekrar
+      // görülürse kesinleştirilecek.
+      await db.pendingResult.upsert({
+        where: { raceId: race.id },
+        create: { raceId: race.id, winnerNo, winnerNos, ganyan, actualOrder },
+        update: { winnerNo, winnerNos, ganyan, actualOrder, firstSeenAt: new Date() },
+      });
+      continue;
+    }
+    // İkinci ardışık senkronizasyonda AYNI aday doğrulandı — artık kesinleştirilebilir.
+    await db.pendingResult.delete({ where: { raceId: race.id } }).catch(() => {});
+
     const picks = race.prediction?.picks ?? [];
     const topPick = picks.find(p => p.rank === 1);
     const hitTop1 = computeHitTop1(actualOrder, winnerNos, topPick?.runner?.no);
