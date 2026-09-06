@@ -16,7 +16,7 @@ import { computeHitTop1, syncKarmaResultMirrors } from "@/lib/result-utils";
 // kazanan (AZİMLİ) günlerce kalıcı kayıtta durdu, kullanıcı fark edip elle düzeltti.
 // Kullanıcı talebi ("bunlar olmasın, yakalanması değil olmayacak") üzerine "yakala ve
 // düzelt" yerine "en baştan yazma" prensibine geçildi: bir koşunun sonucu, AYNI kazanan
-// + AYNI ganyan + AYNI sıralama İKİ ARDIŞIK senkronizasyonda (cron 15 dk'da bir çalışıyor,
+// + AYNI ganyan + AYNI sıralama İKİ ARDIŞIK senkronizasyonda (cron 5 dk'da bir çalışıyor,
 // bkz. vercel.json) DEĞİŞMEDEN görülmeden Result tablosuna hiç yazılmıyor — ilk görülen
 // aday PendingResult'a "bekleyen" olarak yazılır, ikinci turda eşleşirse Result'a taşınıp
 // PendingResult silinir; eşleşmezse PendingResult'ın kendisi güncellenip saat sıfırlanır

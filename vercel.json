@@ -30,7 +30,7 @@
     },
     {
       "path": "/api/cron/result-sync",
-      "schedule": "*/15 11-21 * * *"
+      "schedule": "*/5 11-21 * * *"
     },
     {
       "path": "/api/cron/horse-notifications-morning",

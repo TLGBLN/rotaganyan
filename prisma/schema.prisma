@@ -499,7 +499,7 @@ model Result {
 // yayınladıktan SONRA (itiraz/foto-finiş incelemesi) değiştirebiliyor; result-sync.ts'in
 // eski "ganyan varsa kesinleşmiştir" varsayımı bunu yakalayamadı — geçici/yanlış bir
 // kazanan ganyan değeriyle birlikte gelip kalıcı Result olarak yazıldı. Artık HİÇBİR
-// sonuç, aynı kazanan+ganyan İKİ ARDIŞIK senkronizasyonda (result-sync cron'u 15 dk'da
+// sonuç, aynı kazanan+ganyan İKİ ARDIŞIK senkronizasyonda (result-sync cron'u 5 dk'da
 // bir çalışıyor) DEĞİŞMEDEN görülmeden Result'a yazılmıyor — bu, "yakala ve düzelt" değil
 // "en baştan olmasın" prensibiyle eklendi (kullanıcı talebi: "bunlar olmasın, yakalanması
 // değil olmayacak"). Bir koşu bu aşamada asla kalıp Result'a hiç geçmezse (TJK verisi
