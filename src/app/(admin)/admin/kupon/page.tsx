@@ -193,7 +193,14 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                               published: effectivePred.published,
                               isBanko: effectivePred.isBanko,
                               bankoOlasilik: bankoOlasilikCikar(effectivePred.bankoNote),
-                              topPicks: effectivePred.picks.slice(0, 3).map((p) => ({
+                              // 2026-09-07 kullanıcı talebi ("nokta atışı... 3 at yeter ya
+                              // da GERÇEKTEN 6 at yeter demesini istiyorum"): geçmiş
+                              // koşu-tipi istatistiği (advice.oneri) sahaya özel değil, bir
+                              // ÜST GRUBUN ortalaması. Bu koşunun KENDİ yayınlanmış
+                              // olasılıklarından (score) doğrudan kapsama hesaplamak için
+                              // ilk 6'nın tamamı gerekiyor, yalnız 3 değil — bkz.
+                              // RaceAdviceCard'daki modelTabanliKapsamOnerisi.
+                              topPicks: effectivePred.picks.slice(0, 6).map((p) => ({
                                 rank: p.rank,
                                 no: `#${p.runnerLabel.match(/^#*(\d+)/)?.[1] ?? "?"}`,
                                 score: p.score,

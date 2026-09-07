@@ -27,6 +27,30 @@ export type RaceAdviceCardPrediction = {
   topPicks: RaceAdviceCardPick[];
 } | null;
 
+// 2026-09-07 kullanıcı talebi ("ben nokta atışı 3 at yeter ya da gerçekten 6 at yeter
+// demesini istiyorum, spesifik") — `advice.oneri` (ClassTypeAdvice) bu koşunun TİPİNE
+// (Şartlı/Handikap × mesafe × at sayısı) ait TARİHSEL bir ortalama, bu KOŞUYA özel değil.
+// V5 motorunun her at için verdiği skor (pick.score) zaten kalibre edilmiş bir kazanma
+// olasılığı (%) — bu koşunun kendi yayınlanmış olasılıklarının TOPLAMI, "ilk N at
+// kazananı ne kadar kapsıyor" sorusuna bu SPESİFİK koşu için doğrudan, istatistiksel
+// küçük-örneklem riski taşımayan bir cevap verir (tarihsel frekans değil, modelin kendi
+// kalibre edilmiş tahmini). Eşikler (65/80) mevcut tierSeviyeKodu ile AYNI — aynı soruyu
+// (yeterli kapsama nedir) iki farklı kanıt türüyle (tarihsel vs bu-koşuya-özel) ölçüyor.
+function modelTabanliKapsamOnerisi(topPicks: RaceAdviceCardPick[]): { top3: number; top6: number; text: string } | null {
+  const scores = [...topPicks]
+    .sort((a, b) => a.rank - b.rank)
+    .map((p) => p.score)
+    .filter((s): s is number => s != null);
+  if (scores.length < 3) return null;
+  const top3 = scores.slice(0, 3).reduce((a, b) => a + b, 0);
+  const top6 = scores.slice(0, 6).reduce((a, b) => a + b, 0);
+  let text: string;
+  if (top3 >= 65) text = `3 at yeter — bu koşuda modelin kendi olasılığına göre %${Math.round(top3)} kapsama`;
+  else if (top6 >= 80) text = `6 at yeter — bu koşuda %${Math.round(top6)} kapsama`;
+  else text = `6'dan fazla gerekebilir — ilk 6 bu koşuda yalnız %${Math.round(top6)} kapsıyor`;
+  return { top3, top6, text };
+}
+
 export default function RaceAdviceCard({
   hippodromeName,
   raceId,
@@ -57,6 +81,7 @@ export default function RaceAdviceCard({
   const style = LEVEL_STYLE[advice.level];
   const LevelIcon = style.icon;
   const ekoPct = advice.tierYuzdeler ? Math.round((advice.tierYuzdeler.eko / advice.tierYuzdeler.toplam) * 100) : null;
+  const kapsamOnerisi = prediction ? modelTabanliKapsamOnerisi(prediction.topPicks) : null;
 
   return (
     <div className="rounded-xl border p-4">
@@ -84,9 +109,24 @@ export default function RaceAdviceCard({
             </div>
           </div>
 
-          {advice.oneri && (
+          {kapsamOnerisi && (
             <div className="mt-3">
-              <p className={cn("text-lg font-bold leading-tight", style.textCls)}>{advice.oneri}</p>
+              <p className={cn("text-lg font-bold leading-tight", style.textCls)}>{kapsamOnerisi.text}</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                Bu koşuya özel — modelin BU ATLAR için yayınlanmış olasılıklarının toplamı (ilk 3: %{Math.round(kapsamOnerisi.top3)}, ilk 6: %{Math.round(kapsamOnerisi.top6)}), tarihsel bir ortalama değil.
+              </p>
+            </div>
+          )}
+
+          {advice.oneri && (
+            <div className={kapsamOnerisi ? "mt-3 border-t pt-3" : "mt-3"}>
+              {kapsamOnerisi ? (
+                <p className="text-xs text-muted-foreground">
+                  Karşılaştırma — bu koşu <b>tipinin</b> tarihte gerektirdiği: <span className={style.textCls}>{advice.oneri}</span>
+                </p>
+              ) : (
+                <p className={cn("text-lg font-bold leading-tight", style.textCls)}>{advice.oneri}</p>
+              )}
               {ekoPct != null && advice.tierYuzdeler && (
                 <>
                   <div className="mt-2 h-2 w-full max-w-sm overflow-hidden rounded-full bg-muted">
