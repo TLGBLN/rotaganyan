@@ -56,11 +56,16 @@ function Card({ p }: { p: Item }) {
       <div className="mt-1 text-xs text-muted-foreground">
         {p.race.raceNo}. {t("kosuSuffix")} · {p.race.classType}
       </div>
-      <div className="mt-2">
-        <span className="text-xs border border-brand/40 text-brand bg-brand/10 rounded-full px-2 py-0.5">
-          {t("banko")}
-        </span>
-      </div>
+      {/* 2026-09-07 kullanıcı bulgusu: bu rozet öncesinde koşulsuz gösteriliyordu — isBanko
+          hiç kontrol edilmiyordu, üst sorgu artık isBanko:true filtreliyor (bkz.
+          getHitPredictions), ama burada da savunma katmanı olarak gerçek değere bakılıyor. */}
+      {p.isBanko && (
+        <div className="mt-2">
+          <span className="text-xs border border-brand/40 text-brand bg-brand/10 rounded-full px-2 py-0.5">
+            {t("banko")}
+          </span>
+        </div>
+      )}
     </Link>
   );
 }

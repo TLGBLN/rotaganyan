@@ -211,10 +211,16 @@ export async function getRaceDetail(
   });
 }
 
+// 2026-09-07 kullanıcı bulgusu — "İsabet Sağlayan Bankolar" bölümü (tek çağıran:
+// program/page.tsx'teki ProofSection) her kartta koşulsuz "★ Banko" rozeti gösteriyordu
+// (bkz. HitsCarousel.tsx), ama bu sorgu isBanko'ya HİÇ bakmıyordu — yalnız top-1 seçim
+// tutmuş HERHANGİ bir yayınlanmış tahmin bile "Banko" diye etiketleniyordu. Bölümün adı
+// "Bankolar" olduğuna göre gerçekten banko işaretlenmiş olmalı.
 export async function getHitPredictions(limit = 12): Promise<PredictionListItem[]> {
   return db.prediction.findMany({
     where: {
       published: true,
+      isBanko: true,
       race: { result: { hitTop1: true } },
     },
     include: {
