@@ -42,6 +42,11 @@ export async function getAgfTrendIstatistik(): Promise<AgfTrendIstatistikSonuc> 
         fs.ilk_agf, fs.kayit_sayisi,
         ROUND((r.agf - fs.ilk_agf)::numeric, 2) AS fark
       FROM "Runner" r
+      -- 2026-09-07 kullanıcı bulgusu: bu sorgu Karma mirror koşularını (Race.conditions
+      -- dolu — asıl koşunun BAĞIMSIZ bir kopyası, kendi Runner/AgfSnapshot/Result satırları
+      -- var) hariç tutmuyordu. Ölçüm: 4773 Result'ın 242'si (%5) Karma kopyasıydı — aynı
+      -- gerçek koşu iki kez sayılıyordu (bkz. [[feedback_karma_cift_sayim_kontrolu]]).
+      JOIN "Race" race ON race.id = r."raceId" AND race.conditions IS NULL
       JOIN LATERAL (
         SELECT (array_agg(s.agf ORDER BY s."capturedAt" ASC))[1] AS ilk_agf, count(*) AS kayit_sayisi
         FROM "AgfSnapshot" s WHERE s."runnerId" = r.id

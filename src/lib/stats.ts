@@ -92,8 +92,11 @@ export async function getRaceStyleWinStats(): Promise<{
   byDistance: RaceStyleWinBreakdown[];
   byFieldSize: RaceStyleWinBreakdown[];
 }> {
+  // 2026-09-07 kullanıcı bulgusu — komple admin denetimi: Karma mirror koşuları (bkz.
+  // [[feedback_karma_cift_sayim_kontrolu]]) burada da hariç tutulmuyordu, aynı gerçek
+  // koşuyu iki kez sayıp stil dağılımını hafifçe şişiriyordu.
   const results = await db.result.findMany({
-    where: { winnerNos: { isEmpty: false } },
+    where: { winnerNos: { isEmpty: false }, race: { conditions: null } },
     select: {
       race: {
         select: {

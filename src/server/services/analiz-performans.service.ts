@@ -10,10 +10,18 @@ import { db } from "@/lib/db";
  * istatistiksel gücü sabit tutar.
  *
  * Ek Claude çağrısı YOK — yalnız zaten `recomputeHitStatsForRace`'in bakımını yaptığı
- * `Result.hitTop1`/`hitInCoupon` alanlarını okur (bkz. src/lib/result-utils.ts). Yalnız
- * `published: true` tahminler sayılır — bu, Karma mirror kopyalarının (bkz.
- * [[project_darkrok_details_bug]] tarzı geçmiş bulgular) çift saymasını doğal olarak önler,
- * çünkü bir yarışın yalnız TEK yayınlanmış tahmini olur.
+ * `Result.hitTop1`/`hitInCoupon` alanlarını okur (bkz. src/lib/result-utils.ts).
+ *
+ * 2026-09-07 kullanıcı bulgusu — DÜZELTME: bu dosya önceden "yalnız published:true
+ * tahminler sayılır, bu Karma mirror'ların çift saymasını doğal olarak önler, çünkü bir
+ * yarışın yalnız TEK yayınlanmış tahmini olur" diyordu — bu YANLIŞTI. Karma bir koşu,
+ * asıl koşudan BAĞIMSIZ bir Race satırıdır (Race.conditions ile asıl koşuyu işaret eder,
+ * bkz. syncKarmaMirrors/syncKarmaResultMirrors) — kendi AYRI Prediction'ı ve Result'ı
+ * vardır, ikisi de "TEK" ama BİRBİRİNDEN bağımsız iki satırdır. Gerçek ölçüm: 810 sonuçtan
+ * 155'i (%19) Karma mirror kopyasıydı — aynı gerçek koşu iki kez sayılıp 100'lük pencereyi
+ * (gerçekte ~80 bağımsız koşuluk bilgiyi 100'e şişirerek) çarpıtıyordu. Artık projedeki
+ * HER YERDEKİ aynı desenle (bkz. [[feedback_karma_cift_sayim_kontrolu]]) `conditions: null`
+ * filtreleniyor.
  */
 
 const PENCERE_BOYUTU = 100;
@@ -45,7 +53,7 @@ function pencereOzeti(sonuclar: { hitTop1: boolean; hitInCoupon: boolean }[]): P
 export async function getAnalizPerformansOzeti(): Promise<AnalizPerformansOzeti> {
   const sonuclar = await db.result.findMany({
     where: {
-      race: { prediction: { published: true } },
+      race: { prediction: { published: true }, conditions: null },
     },
     select: { hitTop1: true, hitInCoupon: true, enteredAt: true },
     orderBy: { enteredAt: "desc" },

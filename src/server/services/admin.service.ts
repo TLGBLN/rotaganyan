@@ -638,10 +638,17 @@ export type AgfEdgeStats = {
  * favorisinden farklı bir at seçtiğinde isabet oranı düşüyor mu, yükseliyor mu?
  * AGF verisi olmayan koşular (agf tüm atlarda null) karşılaştırmaya girmez.
  */
+// 2026-09-07 kullanıcı bulgusu: bu sorgu HİÇ tarih/motor filtresi kullanmıyordu — V1-V22/
+// V2/V3/V4 döneminden kalma (bambaşka metodolojili) yayınlanmış tahminler de "Sistem vs AGF
+// Favorisi" karşılaştırmasına dahil oluyordu. Ekranda 634 (bu fonksiyon) ile 363
+// (getAnalystStats'ın GÜNCEL-MOTOR-filtreli "genel toplam"ı) yan yana gösterilince
+// 634>363 çıkması bunu ele verdi — aynı sayfadaki iki sayı iki FARKLI popülasyonu
+// ölçüyordu. getAnalystStats'taki AYNI GUNCEL_MOTOR_BASLANGIC sınırı buraya da eklendi.
 export async function getAgfEdgeStats(): Promise<AgfEdgeStats> {
   const rows = await db.prediction.findMany({
     where: {
       published: true,
+      createdAt: { gte: GUNCEL_MOTOR_BASLANGIC },
       race: { result: { isNot: null }, conditions: null },
     },
     select: {
