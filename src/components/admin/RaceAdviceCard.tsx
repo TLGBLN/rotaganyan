@@ -25,6 +25,11 @@ export type RaceAdviceCardPrediction = {
   isBanko: boolean;
   bankoOlasilik: string | null;
   topPicks: RaceAdviceCardPick[];
+  // 2026-09-07 kullanıcı bulgusu ("v5 dönemi dimi? geçmiş veriler olmamalı") — eski
+  // motorların (V1-V22/V2/V3/V4) Pick.score'u gerçek bir kalibre olasılık DEĞİL, bu
+  // oturumda bulunan model-sağlık bug'ıyla AYNI desen. modelTabanliKapsamOnerisi yalnız
+  // bu true İSE çağrılır (bkz. çağıran taraf, kupon/page.tsx — GUNCEL_MOTOR_BASLANGIC).
+  guncelMotor: boolean;
 } | null;
 
 // 2026-09-07 kullanıcı talebi ("ben nokta atışı 3 at yeter ya da gerçekten 6 at yeter
@@ -81,19 +86,19 @@ export default function RaceAdviceCard({
   const style = LEVEL_STYLE[advice.level];
   const LevelIcon = style.icon;
   const ekoPct = advice.tierYuzdeler ? Math.round((advice.tierYuzdeler.eko / advice.tierYuzdeler.toplam) * 100) : null;
-  const kapsamOnerisi = prediction ? modelTabanliKapsamOnerisi(prediction.topPicks) : null;
+  const kapsamOnerisi = prediction?.guncelMotor ? modelTabanliKapsamOnerisi(prediction.topPicks) : null;
 
   return (
-    <div className="rounded-xl border p-4">
-      <div className="flex items-start justify-between gap-4">
+    <div className="rounded-xl border p-3">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-bold">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-bold">
               {raceNo}
             </div>
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="truncate font-bold">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <h3 className="truncate text-sm font-bold">
                   {hippodromeName} — {raceNo}. Koşu
                 </h3>
                 <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold", style.badgeCls)}>
@@ -110,22 +115,22 @@ export default function RaceAdviceCard({
           </div>
 
           {kapsamOnerisi && (
-            <div className="mt-3">
-              <p className={cn("text-lg font-bold leading-tight", style.textCls)}>{kapsamOnerisi.text}</p>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
+            <div className="mt-2">
+              <p className={cn("text-sm font-bold leading-tight", style.textCls)}>{kapsamOnerisi.text}</p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">
                 Bu koşuya özel — modelin BU ATLAR için yayınlanmış olasılıklarının toplamı (ilk 3: %{Math.round(kapsamOnerisi.top3)}, ilk 6: %{Math.round(kapsamOnerisi.top6)}), tarihsel bir ortalama değil.
               </p>
             </div>
           )}
 
           {advice.oneri && (
-            <div className={kapsamOnerisi ? "mt-3 border-t pt-3" : "mt-3"}>
+            <div className={kapsamOnerisi ? "mt-2 border-t pt-2" : "mt-2"}>
               {kapsamOnerisi ? (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[11px] text-muted-foreground">
                   Karşılaştırma — bu koşu <b>tipinin</b> tarihte gerektirdiği: <span className={style.textCls}>{advice.oneri}</span>
                 </p>
               ) : (
-                <p className={cn("text-lg font-bold leading-tight", style.textCls)}>{advice.oneri}</p>
+                <p className={cn("text-sm font-bold leading-tight", style.textCls)}>{advice.oneri}</p>
               )}
               {ekoPct != null && advice.tierYuzdeler && (
                 <>

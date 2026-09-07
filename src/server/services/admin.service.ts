@@ -22,7 +22,11 @@ import { mesafeBucket } from "@/lib/sire-stat-match";
 // otomatik olarak o sürümün kendi başlangıcına geçer.
 const GUNCEL_SURUM = ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].versiyon;
 const GUNCEL_ANA_SURUM = GUNCEL_SURUM.split(".")[0];
-const GUNCEL_MOTOR_BASLANGIC =
+// 2026-09-07 kullanıcı bulgusu ("v5 dönemi dimi? geçmiş veriler olmamalı") — /admin/kupon'daki
+// modelTabanliKapsamOnerisi (RaceAdviceCard.tsx) bu SINIRI kullanabilsin diye export edildi;
+// eski motorların (V1-V22/V2/V3/V4) Pick.score'u gerçek bir olasılık DEĞİL (bkz. bu oturumdaki
+// model sağlık kontrolü notu) — o dönem tahminleri kapsam hesabına ASLA girmemeli.
+export const GUNCEL_MOTOR_BASLANGIC =
   ENGINE_VERSIONS.find((v) => v.versiyon.split(".")[0] === GUNCEL_ANA_SURUM)?.baslangic ??
   ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].baslangic;
 
@@ -45,6 +49,7 @@ export type AdminRaceDay = Prisma.RaceDayGetPayload<{
             published: true;
             isBanko: true;
             bankoNote: true;
+            createdAt: true;
             picks: { select: { rank: true; isTarget: true; score: true; runnerLabel: true } };
           };
         };
@@ -124,6 +129,9 @@ export async function getAdminRaceDays(dateStr?: string, limit = 30): Promise<Ad
               published: true,
               isBanko: true,
               bankoNote: true,
+              // 2026-09-07 — kupon/page.tsx'in modelTabanliKapsamOnerisi'ni (RaceAdviceCard.tsx)
+              // yalnız GÜNCEL motor dönemindeki tahminlerde çalıştırabilmesi için.
+              createdAt: true,
               picks: { orderBy: { rank: "asc" }, select: { rank: true, isTarget: true, score: true, runnerLabel: true } },
             },
           },

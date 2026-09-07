@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { getHippodromes, buildKuponOnerisi, type KuponStatus } from "@/server/services/race.service";
-import { getAdminRaceDays, getAnalystStats, getClassTypeAdvice } from "@/server/services/admin.service";
+import { getAdminRaceDays, getAnalystStats, getClassTypeAdvice, GUNCEL_MOTOR_BASLANGIC } from "@/server/services/admin.service";
 import { turkeyDateString } from "@/lib/tz";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import RaceAdviceCard from "@/components/admin/RaceAdviceCard";
@@ -193,6 +193,12 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                               published: effectivePred.published,
                               isBanko: effectivePred.isBanko,
                               bankoOlasilik: bankoOlasilikCikar(effectivePred.bankoNote),
+                              // 2026-09-07 kullanıcı bulgusu ("v5 dönemi dimi? geçmiş
+                              // veriler olmamalı"): eski motorların (V1-V22/V2/V3/V4)
+                              // Pick.score'u gerçek bir kalibre olasılık DEĞİL (bu oturumda
+                              // bulunan model-sağlık bug'ıyla aynı desen) — modelTabanliKapsamOnerisi
+                              // yalnız GÜNCEL motor döneminde yayınlanmış tahminlerde çalışmalı.
+                              guncelMotor: effectivePred.createdAt >= GUNCEL_MOTOR_BASLANGIC,
                               // 2026-09-07 kullanıcı talebi ("nokta atışı... 3 at yeter ya
                               // da GERÇEKTEN 6 at yeter demesini istiyorum"): geçmiş
                               // koşu-tipi istatistiği (advice.oneri) sahaya özel değil, bir

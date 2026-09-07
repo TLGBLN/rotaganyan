@@ -7,11 +7,15 @@ import { cn } from "@/lib/utils";
 
 // 2026-09-02 kullanıcı talebi ("açılır kapanır scroll olsun") — RaceAdviceCard'lar eski
 // tablo satırlarından çok daha uzun, bir günde birden çok hipodrom varsa sayfa aşırı
-// uzuyordu. Her hipodrom bölümü kapanabilir — kapatınca yalnız başlık kalır; açıkken kart
-// listesi kendi içinde (max-h + overflow-y-auto) kayıyor, sayfanın tamamı değil.
+// uzuyordu. Her hipodrom bölümü kapanabilir — kapatınca yalnız başlık kalır.
 // 2026-09-07 kullanıcı talebi ("hepsi açılır menü olmalı ama ilk başta açık değil kapalı
 // gelmeli"): varsayılan artık KAPALI — sayfa yüklenince yalnız başlıklar görünüyor, admin
 // ilgilendiği hipodromu kendi açıyor.
+// 2026-09-07 (aynı gün) kullanıcı bulgusu ("iç içe scroll hiç kullanışlı olmamış"): açıkken
+// içerik kendi max-h+overflow-y-auto'suyla AYRI kayıyordu — sayfanın kendi scroll'uyla iç
+// içe girip iki ayrı kaydırma çubuğu (biri sayfa, biri kutu) oluşturuyordu, karışıktı.
+// Artık kapalıyken zaten varsayılan olduğu için sayfa boyu sorunu yok — açık bölüm
+// sayfanın DOĞAL akışıyla birlikte kayıyor, kendi iç scroll'u kaldırıldı.
 export default function CollapsibleHipodrom({
   title,
   raceCount,
@@ -43,7 +47,7 @@ export default function CollapsibleHipodrom({
           {deleteSlot}
         </div>
       </button>
-      <div className={cn("space-y-2 overflow-y-auto p-2", !open && "hidden")} style={open ? { maxHeight: "70vh" } : undefined}>
+      <div className={cn("space-y-2 p-2", !open && "hidden")}>
         {children}
       </div>
     </div>
