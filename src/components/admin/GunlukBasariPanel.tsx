@@ -9,6 +9,12 @@ import type { GunlukBasariOzeti } from "@/server/services/admin.service";
 // olarak duruyor. "Tarihsel kayıt" ayrıca bir arşiv mekanizması gerektirmiyor — Prediction/
 // Pick/Result zaten kalıcı, bu panel o kalıcı veriden GÜN GÜN yeniden hesaplıyor; V5
 // başladığından beri HER gün burada görünür kalır (silinmeyen, canlı bir tarihçe).
+//
+// 2026-09-07 (aynı gün) kullanıcı bulgusu ("banko kısmı düzeltilmesi gerek") — 23 günde
+// toplam yalnız 13 banko tetiklendi (günde ortalama <1), bu yüzden GÜNLÜK bir banko
+// oranı/yüzdesi ("0/1"=%0, "1/1"=%100) saf gürültü, hiçbir gün için anlamlı değil. Günlük
+// sütun kaldırıldı — yalnız o gün bir banko varsa TUTTU/IŞKA işareti gösteriliyor (oran
+// değil), gerçek istatistik yalnız üstteki genel özet kutusunda (n=13 birikmiş) kalıyor.
 
 function sapmaRengi(gunOrani: number, genelLo: number, genelHi: number): string {
   if (gunOrani < genelLo) return "text-miss";
@@ -42,7 +48,7 @@ export default function GunlukBasariPanel({ ozet }: { ozet: GunlukBasariOzeti })
         <div>
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Genel Banko ({genel.bankoN})</div>
           <div className="text-lg font-bold">{genel.bankoRate != null ? `%${genel.bankoRate.toFixed(1)}` : "—"}</div>
-          <div className="text-[10px] text-muted-foreground">{genel.bankoN < 20 ? "küçük örneklem" : " "}</div>
+          <div className="text-[10px] text-amber-500">n çok küçük — tek başına yorumlanmaz</div>
         </div>
       </div>
 
@@ -68,8 +74,15 @@ export default function GunlukBasariPanel({ ozet }: { ozet: GunlukBasariOzeti })
                 <td className={cn("px-2 py-1.5 text-right font-semibold tabular-nums", sapmaRengi(g.top3Rate, genel.top3Ga.lo, genel.top3Ga.hi))}>
                   %{g.top3Rate.toFixed(0)} <span className="font-normal text-muted-foreground">({g.top3}/{g.n})</span>
                 </td>
-                <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
-                  {g.bankoN > 0 ? `${g.bankoHit}/${g.bankoN}` : "—"}
+                <td className="px-2 py-1.5 text-right">
+                  {g.bankoN === 0 ? (
+                    <span className="text-muted-foreground/50">—</span>
+                  ) : (
+                    <span className={cn("font-semibold", g.bankoHit > 0 ? "text-hit" : "text-miss")}>
+                      {g.bankoHit > 0 ? "★ Tuttu" : "★ Işka"}
+                      {g.bankoN > 1 && <span className="ml-1 font-normal text-muted-foreground">({g.bankoHit}/{g.bankoN})</span>}
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -77,7 +90,7 @@ export default function GunlukBasariPanel({ ozet }: { ozet: GunlukBasariOzeti })
         </table>
       </div>
       <p className="mt-2 text-[10.5px] text-muted-foreground">
-        Yeşil: genelin %95 güven aralığının ÜSTÜNDE · Kırmızı: ALTINDA · Beyaz: normal varyans içinde. Tek günlük n küçük olduğu için tek başına bir günün rengi anlamlı değildir, art arda birden fazla kırmızı gün dikkat gerektirir.
+        Yeşil: genelin %95 güven aralığının ÜSTÜNDE · Kırmızı: ALTINDA · Beyaz: normal varyans içinde. Tek günlük n küçük olduğu için tek başına bir günün rengi anlamlı değildir, art arda birden fazla kırmızı gün dikkat gerektirir. Banko sütunu bir oran DEĞİL — o gün tetiklenen bankonun (varsa) yalnız sonucu; gerçek banko istatistiği yalnız üstteki genel kutuda.
       </p>
     </div>
   );
