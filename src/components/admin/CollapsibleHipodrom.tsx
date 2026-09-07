@@ -7,9 +7,11 @@ import { cn } from "@/lib/utils";
 
 // 2026-09-02 kullanıcı talebi ("açılır kapanır scroll olsun") — RaceAdviceCard'lar eski
 // tablo satırlarından çok daha uzun, bir günde birden çok hipodrom varsa sayfa aşırı
-// uzuyordu. Her hipodrom bölümü artık kapanabilir (varsayılan açık) — kapatınca yalnız
-// başlık kalır; açıkken kart listesi kendi içinde (max-h + overflow-y-auto) kayıyor,
-// sayfanın tamamı değil.
+// uzuyordu. Her hipodrom bölümü kapanabilir — kapatınca yalnız başlık kalır; açıkken kart
+// listesi kendi içinde (max-h + overflow-y-auto) kayıyor, sayfanın tamamı değil.
+// 2026-09-07 kullanıcı talebi ("hepsi açılır menü olmalı ama ilk başta açık değil kapalı
+// gelmeli"): varsayılan artık KAPALI — sayfa yüklenince yalnız başlıklar görünüyor, admin
+// ilgilendiği hipodromu kendi açıyor.
 export default function CollapsibleHipodrom({
   title,
   raceCount,
@@ -21,7 +23,7 @@ export default function CollapsibleHipodrom({
   deleteSlot: ReactNode;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
 
   return (
     <div className="rounded-lg border">
