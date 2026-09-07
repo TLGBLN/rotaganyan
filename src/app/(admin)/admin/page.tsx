@@ -5,6 +5,7 @@ import {
   getPendingPredictions,
   getArchiveStats,
   getAgfEdgeStats,
+  getGunlukBasariOzeti,
 } from "@/server/services/admin.service";
 import { getRaceStyleWinStats, raceStyleBreakdownToRows } from "@/lib/stats";
 import { getV5SinyalPerformansi, getV5SinyalPerformansiKosuTipineGore } from "@/server/services/v5-sinyal-performans.service";
@@ -27,6 +28,7 @@ import RecentFeed from "@/components/admin/RecentFeed";
 import PendingList from "@/components/admin/PendingList";
 import AdminRefresh from "@/components/admin/AdminRefresh";
 import ArchiveStatsWidget from "@/components/admin/ArchiveStatsWidget";
+import GunlukBasariPanel from "@/components/admin/GunlukBasariPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +36,7 @@ export default async function AdminDashboard() {
   const [
     stats, analyst, recentPredictions, pendingPredictions, raceStyleStats,
     archiveStats, agfEdge, v5SinyalPerformansi, performansOzeti, versiyonKarsilastirmasi, agfTrendIstatistik,
-    aylikKuponKazanci, v5SinyalPerformansiKosuTipineGore,
+    aylikKuponKazanci, v5SinyalPerformansiKosuTipineGore, gunlukBasariOzeti,
   ] = await Promise.all([
     getDashboardStats(),
     // 2026-08-30 kullanıcı talebi ("v5'e kilitlensin"): /admin/analizler ve /admin/kupon
@@ -55,6 +57,7 @@ export default async function AdminDashboard() {
     getAgfTrendIstatistik(),
     getAylikKuponKazanci(),
     getV5SinyalPerformansiKosuTipineGore(),
+    getGunlukBasariOzeti(),
   ]);
   // V5.3 (2026-08-21): motor artık koşu kategorisine göre İKİ AYRI eğitilmiş modelden
   // birini kullanıyor (şartlı1/19/27+maiden vs diğer) — bkz. v5-engine.ts üstündeki not.
@@ -129,6 +132,12 @@ export default async function AdminDashboard() {
 
       {/* ── Sistem vs AGF Favorisi ─────────────────────────────────── */}
       <AgfEdgeCard stats={agfEdge} overallTotal={analyst.overall.total} />
+
+      {/* ── Rotaganyan Puan Sıralaması — Günlük Başarı Analizi ──────────
+          2026-09-07 kullanıcı talebi: "gün sonunda başarı oranını çıkar, genele bağla
+          istatistiksel oranlara" — her gün ayrı satır, genel V5-dönemi ortalaması
+          (Wilson %95 GA) referans olarak üstte. */}
+      <GunlukBasariPanel ozet={gunlukBasariOzeti} />
 
       {/* ── Aylık Kupon Kazancı ────────────────────────────────────────
           2026-08-24 kullanıcı talebi: "dashboard'ta aylık kupon kazancında olsun,

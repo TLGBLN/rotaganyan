@@ -720,6 +720,114 @@ export async function getAgfEdgeStats(): Promise<AgfEdgeStats> {
   };
 }
 
+export type GunlukBasariSatiri = {
+  tarih: string; // YYYY-MM-DD
+  n: number;
+  top1: number;
+  top1Rate: number;
+  top3: number;
+  top3Rate: number;
+  bankoN: number;
+  bankoHit: number;
+  bankoRate: number | null;
+};
+export type GunlukBasariOzeti = {
+  gunler: GunlukBasariSatiri[]; // en yeni gün önce
+  genel: {
+    n: number;
+    top1Rate: number;
+    top3Rate: number;
+    bankoN: number;
+    bankoRate: number | null;
+    top1Ga: { lo: number; hi: number };
+    top3Ga: { lo: number; hi: number };
+  };
+};
+
+// 2026-09-07 kullanıcı talebi ("dashboarda rotaganyan puan sıralaması analiz diye bir
+// bölüm aç, gün sonunda başarı oranını çıkar, genele bağla istatistiksel oranlara") —
+// Performans Denetimi paneli (analiz-performans.service.ts) yalnız rolling 100-koşuluk
+// bir "güncel vs önceki" penceresi gösteriyor, GÜN GÜN kırılım yok. Bu fonksiyon her günü
+// AYRI bir satır olarak (public /rotaganyansiralamasi sayfasının gösterdiği AYNI veri
+// kümesi — published:true, Karma hariç, GUNCEL_MOTOR_BASLANGIC sonrası) özetler ve genel
+// V5-dönemi ortalamasını (Wilson %95 GA ile) yanına koyar, ki bir günün gerçekten normalin
+// dışında mı yoksa doğal varyans içinde mi olduğu görülebilsin.
+function wilsonGa(hits: number, n: number): { lo: number; hi: number } {
+  if (n === 0) return { lo: 0, hi: 0 };
+  const z = 1.96;
+  const p = hits / n;
+  const denom = 1 + (z * z) / n;
+  const center = p + (z * z) / (2 * n);
+  const margin = z * Math.sqrt((p * (1 - p) + (z * z) / (4 * n)) / n);
+  return { lo: Math.max(0, (center - margin) / denom) * 100, hi: Math.min(1, (center + margin) / denom) * 100 };
+}
+
+export async function getGunlukBasariOzeti(gunSayisi = 14): Promise<GunlukBasariOzeti> {
+  const rows = await db.prediction.findMany({
+    where: {
+      published: true,
+      createdAt: { gte: GUNCEL_MOTOR_BASLANGIC },
+      race: { conditions: null, result: { isNot: null } },
+    },
+    select: {
+      isBanko: true,
+      race: {
+        select: {
+          raceDay: { select: { date: true } },
+          result: { select: { hitTop1: true, hitInCoupon: true } },
+        },
+      },
+    },
+  });
+
+  const byGun = new Map<string, { n: number; top1: number; top3: number; bankoN: number; bankoHit: number }>();
+  let genelN = 0, genelTop1 = 0, genelTop3 = 0, genelBankoN = 0, genelBankoHit = 0;
+  for (const r of rows) {
+    const tarih = r.race.raceDay.date.toISOString().slice(0, 10);
+    const cur = byGun.get(tarih) ?? { n: 0, top1: 0, top3: 0, bankoN: 0, bankoHit: 0 };
+    const hitTop1 = r.race.result?.hitTop1 ?? false;
+    const hitTop3 = r.race.result?.hitInCoupon ?? false;
+    cur.n++;
+    genelN++;
+    if (hitTop1) { cur.top1++; genelTop1++; }
+    if (hitTop3) { cur.top3++; genelTop3++; }
+    if (r.isBanko) {
+      cur.bankoN++;
+      genelBankoN++;
+      if (hitTop1) { cur.bankoHit++; genelBankoHit++; }
+    }
+    byGun.set(tarih, cur);
+  }
+
+  const gunler: GunlukBasariSatiri[] = [...byGun.entries()]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .slice(0, gunSayisi)
+    .map(([tarih, v]) => ({
+      tarih,
+      n: v.n,
+      top1: v.top1,
+      top1Rate: v.n > 0 ? (v.top1 / v.n) * 100 : 0,
+      top3: v.top3,
+      top3Rate: v.n > 0 ? (v.top3 / v.n) * 100 : 0,
+      bankoN: v.bankoN,
+      bankoHit: v.bankoHit,
+      bankoRate: v.bankoN > 0 ? (v.bankoHit / v.bankoN) * 100 : null,
+    }));
+
+  return {
+    gunler,
+    genel: {
+      n: genelN,
+      top1Rate: genelN > 0 ? (genelTop1 / genelN) * 100 : 0,
+      top3Rate: genelN > 0 ? (genelTop3 / genelN) * 100 : 0,
+      bankoN: genelBankoN,
+      bankoRate: genelBankoN > 0 ? (genelBankoHit / genelBankoN) * 100 : null,
+      top1Ga: wilsonGa(genelTop1, genelN),
+      top3Ga: wilsonGa(genelTop3, genelN),
+    },
+  };
+}
+
 export async function getRecentPredictions(n = 15): Promise<RecentPrediction[]> {
   const preds = await db.prediction.findMany({
     where: { published: true, race: { conditions: null } },
