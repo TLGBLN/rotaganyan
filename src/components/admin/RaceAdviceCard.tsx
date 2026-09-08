@@ -46,6 +46,35 @@ export type RaceAdviceCardPrediction = {
 // küçük-örneklem riski taşımayan bir cevap verir (tarihsel frekans değil, modelin kendi
 // kalibre edilmiş tahmini). Eşikler (65/80) mevcut tierSeviyeKodu ile AYNI — aynı soruyu
 // (yeterli kapsama nedir) iki farklı kanıt türüyle (tarihsel vs bu-koşuya-özel) ölçüyor.
+// 2026-09-08 kullanıcı bulgusu ("sitem bana bir işaret göstermeli, sitemi anlayamıyorum")
+// — kapsamOnerisi/advice.oneri/isBanko üç ayrı paragrafta duruyordu, admin hepsini okuyup
+// zihninde birleştirmek zorunda kalıyordu. Bu fonksiyon üçünü TEK bir büyük, renkli, ikonlu
+// rozete indiriyor — kartın en üstünde, hiç metin okumadan tek bakışta "kaç at oynamalıyım"
+// sorusunun cevabı. Öncelik sırası: banko (en güvenilir, mekanizması en katı) > bu koşuya
+// özel kapsam (score toplamı) > yalnız koşu-tipi tarihsel oranı (analiz henüz yoksa).
+function tekAtVerdisi(
+  isBanko: boolean,
+  kapsamOnerisi: { top3: number; top6: number } | null,
+  advice: ClassTypeAdvice
+): { label: string; cls: string } | null {
+  if (isBanko) return { label: "🎯 TEK AT YETER", cls: "bg-hit text-white" };
+  if (kapsamOnerisi) {
+    if (kapsamOnerisi.top3 >= 65) return { label: "3 AT", cls: "bg-brand text-white" };
+    if (kapsamOnerisi.top6 >= 80) return { label: "6 AT", cls: "bg-amber-500 text-white" };
+    return { label: "GENİŞ OYNA", cls: "bg-red-500 text-white" };
+  }
+  // Henüz analiz yok (ya da eski motor) — yalnız koşu TİPİNİN tarihsel eğilimi varsa onu göster.
+  if (advice.tierYuzdeler) {
+    const t = advice.tierYuzdeler;
+    const eko = (t.eko / t.toplam) * 100;
+    const ilk6 = eko + (t.nor / t.toplam) * 100;
+    if (eko >= 65) return { label: "3 AT (tarihsel)", cls: "bg-brand/70 text-white" };
+    if (ilk6 >= 80) return { label: "6 AT (tarihsel)", cls: "bg-amber-500/70 text-white" };
+    return { label: "GENİŞ (tarihsel)", cls: "bg-red-500/70 text-white" };
+  }
+  return null;
+}
+
 function modelTabanliKapsamOnerisi(topPicks: RaceAdviceCardPick[]): { top3: number; top6: number; text: string } | null {
   const scores = [...topPicks]
     .sort((a, b) => a.rank - b.rank)
@@ -92,6 +121,7 @@ export default function RaceAdviceCard({
   const LevelIcon = style.icon;
   const ekoPct = advice.tierYuzdeler ? Math.round((advice.tierYuzdeler.eko / advice.tierYuzdeler.toplam) * 100) : null;
   const kapsamOnerisi = prediction?.guncelMotor ? modelTabanliKapsamOnerisi(prediction.topPicks) : null;
+  const verdi = tekAtVerdisi(prediction?.isBanko ?? false, kapsamOnerisi, advice);
 
   return (
     <div className="rounded-xl border p-3">
@@ -101,6 +131,14 @@ export default function RaceAdviceCard({
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-bold">
               {raceNo}
             </div>
+            {/* 2026-09-08 kullanıcı bulgusu ("sitem bana bir işaret göstermeli") — tek,
+                büyük, renkli, ikonlu rozet: aşağıdaki paragrafları hiç okumadan "kaç at
+                oynamalıyım" sorusunun cevabı tek bakışta burada. */}
+            {verdi && (
+              <span className={cn("shrink-0 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm font-extrabold shadow-sm", verdi.cls)}>
+                {verdi.label}
+              </span>
+            )}
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-1.5">
                 <h3 className="truncate text-sm font-bold">
