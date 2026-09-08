@@ -18,18 +18,6 @@ import DeleteRaceDayButton from "@/components/admin/DeleteRaceDayButton";
 import ForceIngestButton from "@/components/admin/ForceIngestButton";
 import { forceIngestDate } from "@/server/actions/race.actions";
 
-// 2026-08-30 kullanıcı talebi ("Banko rozetinin yanına gerçek yüzdeyi daha göze çarpar
-// şekilde ekle") — CABOOSE/İstanbul 6.Koşu vakası: banko tuttu sanılırken jokey hatasıyla
-// kaçtı, kullanıcı "banko=kesin" beklentisine kapılmasın diye bankoNote'ta ZATEN var olan
-// gerçek model olasılığı (v5BankoAdayiTespit'in "model tahmini %X" metni, bkz. v5-engine.ts)
-// artık yalnız hover tooltip'te değil, rozetin YANINDA görünüyor. Yeni bir sayı üretmiyor,
-// var olanı görünür kılıyor.
-function bankoOlasilikCikar(bankoNote: string | null | undefined): string | null {
-  if (!bankoNote) return null;
-  const m = bankoNote.match(/tahmini %(\d+(?:\.\d+)?)/);
-  return m ? m[1] : null;
-}
-
 export const dynamic = "force-dynamic";
 
 function parseConditionsRef(conditions: string): { slug: string; raceNo: number } | null {
@@ -192,7 +180,18 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                               id: effectivePred.id,
                               published: effectivePred.published,
                               isBanko: effectivePred.isBanko,
-                              bankoOlasilik: bankoOlasilikCikar(effectivePred.bankoNote),
+                              // 2026-09-08 kullanıcı bulgusu ("1. sıradaki atı nasıl
+                              // bulucaz, tek bırakmalı mıyım anlayamıyorum") — v5BankoAdayiTespit
+                              // ZATEN her koşuda (banko olsun olmasın) bunun tam gerekçesini
+                              // (olasılık + bağımsız sinyal var mı) hesaplayıp bankoNote'a
+                              // yazıyordu, ama admin ekranı bunu yalnız isBanko=true iken
+                              // gösteriyordu — "hayır" cevabı hiç görünmüyordu, admin
+                              // sessizlikle karşılaşıyordu. Artık ham metin her durumda
+                              // geçiyor, RaceAdviceCard HER ZAMAN bir "tek at" verdisi
+                              // gösteriyor (eski bankoOlasilikCikar kaldırıldı — bankoNote
+                              // zaten olasılığı metin içinde taşıyor, ayrı bir sayı
+                              // türetmeye gerek yoktu).
+                              bankoNote: effectivePred.bankoNote,
                               // 2026-09-07 kullanıcı bulgusu ("v5 dönemi dimi? geçmiş
                               // veriler olmamalı"): eski motorların (V1-V22/V2/V3/V4)
                               // Pick.score'u gerçek bir kalibre olasılık DEĞİL (bu oturumda

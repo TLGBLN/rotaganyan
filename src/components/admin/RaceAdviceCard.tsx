@@ -23,7 +23,12 @@ export type RaceAdviceCardPrediction = {
   id: string;
   published: boolean;
   isBanko: boolean;
-  bankoOlasilik: string | null;
+  // 2026-09-08 kullanıcı bulgusu ("1. sıradaki atı nasıl bulucaz, tek bırakmalı mıyım
+  // anlayamıyorum") — v5BankoAdayiTespit HER koşuda (banko olsun olmasın) "neden banko/
+  // neden değil" gerekçesini zaten hesaplayıp bankoNote'a yazıyor, ama ekran bunu yalnız
+  // isBanko=true iken gösteriyordu — "hayır" cevabı hiç görünmüyordu. Artık ham metin her
+  // zaman geçiyor, aşağıda HER durumda gösteriliyor.
+  bankoNote: string | null;
   topPicks: RaceAdviceCardPick[];
   // 2026-09-07 kullanıcı bulgusu ("v5 dönemi dimi? geçmiş veriler olmamalı") — eski
   // motorların (V1-V22/V2/V3/V4) Pick.score'u gerçek bir kalibre olasılık DEĞİL, bu
@@ -166,17 +171,30 @@ export default function RaceAdviceCard({
             </div>
           )}
 
-          {prediction?.isBanko && (
-            <div className="mt-2 text-xs font-semibold leading-tight text-hit">
-              ★ BANKO
-              {prediction.bankoOlasilik && <span className="font-normal text-muted-foreground"> (model %{prediction.bankoOlasilik} diyor, garanti değil)</span>}
-              {" "}— tek at yeterli, bütçeyi diğer ayaklara kaydırın
+          {/* 2026-09-08 kullanıcı bulgusu ("1. sıradaki atı nasıl bulucaz, tek bırakmalı
+              mıyım anlayamıyorum, sistemim bana ne diyor anlayamıyorum") — bu blok eskiden
+              YALNIZ isBanko=true iken görünüyordu; "hayır, tek at değil" cevabı hiçbir
+              zaman gösterilmiyordu, admin sessizlikle karşılaşıp kararsız kalıyordu.
+              v5BankoAdayiTespit HER koşu için (evet/hayır fark etmeksizin) net bir gerekçe
+              (bankoNote) zaten üretiyor — artık HER ZAMAN gösteriliyor, yeşil (evet) ya da
+              nötr (hayır) çerçeveyle. */}
+          {prediction?.bankoNote && (
+            <div
+              className={cn(
+                "mt-2 rounded-md border px-2.5 py-2 text-xs leading-snug",
+                prediction.isBanko ? "border-hit/40 bg-hit/5" : "border-muted-foreground/25 bg-muted/20"
+              )}
+            >
+              <div className={cn("font-semibold", prediction.isBanko ? "text-hit" : "text-muted-foreground")}>
+                {prediction.isBanko ? "★ Tek at yeterli (Banko) — garanti değil" : "Tek at YETERLİ DEĞİL"}
+              </div>
+              <p className="mt-0.5 text-muted-foreground">{prediction.bankoNote}</p>
               {/* 2026-08-31 — Opus denetimi: "Güçlü geçmiş" rozeti Ekonomik (ilk-3) payına
                   bakıyor, BANKO ise top-1 gerektiriyor — ayrı bir soru. Bu koşu tipinde
                   favori GERÇEKTE ne sıklıkla kazanmış, doğrudan burada gösteriliyor ki
                   yeşil rozet yanıltmasın. */}
-              {advice.top1Rate && advice.top1Rate.total >= 5 && (
-                <span className="block font-normal text-muted-foreground">
+              {prediction.isBanko && advice.top1Rate && advice.top1Rate.total >= 5 && (
+                <span className="mt-1 block text-muted-foreground">
                   Bu sınıfta favori tarihte %{advice.top1Rate.rate.toFixed(0)} kazanmış ({advice.top1Rate.hits}/{advice.top1Rate.total})
                 </span>
               )}
