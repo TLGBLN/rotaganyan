@@ -63,14 +63,19 @@ function tekAtVerdisi(
     if (kapsamOnerisi.top6 >= 80) return { label: "6 AT", cls: "bg-amber-500 text-white" };
     return { label: "GENİŞ OYNA", cls: "bg-red-500 text-white" };
   }
-  // Henüz analiz yok (ya da eski motor) — yalnız koşu TİPİNİN tarihsel eğilimi varsa onu göster.
-  if (advice.tierYuzdeler) {
-    const t = advice.tierYuzdeler;
-    const eko = (t.eko / t.toplam) * 100;
-    const ilk6 = eko + (t.nor / t.toplam) * 100;
-    if (eko >= 65) return { label: "3 AT (tarihsel)", cls: "bg-brand/70 text-white" };
-    if (ilk6 >= 80) return { label: "6 AT (tarihsel)", cls: "bg-amber-500/70 text-white" };
-    return { label: "GENİŞ (tarihsel)", cls: "bg-red-500/70 text-white" };
+  // Henüz analiz yok (ya da eski motor) — yalnız koşu TİPİNİN tarihsel eğilimi varsa onu
+  // göster. 2026-09-08 düzeltmesi: bu artık `advice.tierYuzdeler`den KENDİ eko/ilk6'sını
+  // yeniden hesaplamıyor — `tierYuzdeler` yalnız sınıf-tipi dağılımını taşır, ama asıl
+  // metin (`advice.oneri`) at-sayısı override'ını da içerebilir (bkz. admin.service.ts —
+  // efektifTierSeviye). İkisi ayrı kaynaktan hesaplanınca rozet "6 AT" derken metin "6 ve
+  // fazası (%77)" diyebiliyordu — aynı `tierSeviyeKodu` kullanılarak birleştirildi.
+  if (advice.tierSeviyeKodu != null) {
+    switch (advice.tierSeviyeKodu) {
+      case 0: return { label: "3 AT (tarihsel)", cls: "bg-brand/70 text-white" };
+      case 1: return { label: "6 AT (tarihsel)", cls: "bg-amber-500/70 text-white" };
+      case 2: return { label: "6+ AT (tarihsel)", cls: "bg-orange-600/70 text-white" };
+      case 3: return { label: "GENİŞ (tarihsel)", cls: "bg-red-500/70 text-white" };
+    }
   }
   return null;
 }

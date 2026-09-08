@@ -919,6 +919,10 @@ export type ClassTypeAdvice = {
   level: "warn" | "info" | "good" | "none";
   text: string;
   oneri?: string;
+  // `oneri`'nin GERÇEKTEN hangi seviyeden üretildiği (at-sayısı override'ı DAHİL) — bkz.
+  // efektifTierSeviye. `tierYuzdeler` yalnız sınıf-tipi dağılımını taşır, bu alan ONUNLA
+  // AYNI ŞEY DEĞİLDİR; "kaç at yeter" gösteren her rozet/UI bunu kullanmalı.
+  tierSeviyeKodu?: 0 | 1 | 2 | 3;
   tierYuzdeler?: { eko: number; nor: number; genis: number; kacti: number; toplam: number };
   top1Rate?: { rate: number; hits: number; total: number };
 };
@@ -1000,7 +1004,17 @@ function kacirmaOrani(t: CouponTierBreakdown, seviye: TierSeviyeKodu): number {
  * büyüdükçe kazananın Ekonomik'te yakalanma oranı düşüyor, Geniş'e kaçma oranı artıyor
  * (≤6 at: Geniş %0 → 13+ at: Geniş %24.8, n=527) — bu artık öneri metnine yansıyor.
  */
-function tierOneri(t: CouponTierBreakdown, atSayisiTier?: CouponTierBreakdown): string {
+/**
+ * Sınıf-tipi tabanlı seviye ile (varsa) at-sayısı tabanlı seviyeden HANGİSİ daha geniş
+ * (daha temkinli) kupon öneriyorsa onu döner — bkz. tierOneri üstündeki not. `tierYuzdeler`
+ * (ClassTypeAdvice) HER ZAMAN yalnız sınıf-tipi `t`'yi yansıtır; bu fonksiyonun sonucu ise
+ * at-sayısı override'ını İÇEREBİLİR — ikisi kasıtlı olarak farklı sorulara cevap verir, ama
+ * ekranda TEK bir "kaç at yeter" sonucu göstermek isteyen her yer (rozet/badge) buradaki
+ * seviyeyi kullanmalı, tierYuzdeler'den kendi hesabını YENİDEN YAPMAMALI — 2026-09-08'de
+ * (Ankara 9.Koşu, "6 AT" rozeti vs "6 ve fazası %77" metni çelişkisi) tam bu ayrımın
+ * gözden kaçması yüzünden rozet ile metin birbirini yalanladı.
+ */
+function efektifTierSeviye(t: CouponTierBreakdown, atSayisiTier?: CouponTierBreakdown): { seviye: TierSeviyeKodu; kaynak: CouponTierBreakdown } {
   const siniftSeviye = tierSeviyeKodu(t);
   let seviye = siniftSeviye;
   let kaynak = t;
@@ -1011,6 +1025,11 @@ function tierOneri(t: CouponTierBreakdown, atSayisiTier?: CouponTierBreakdown): 
       kaynak = atSayisiTier;
     }
   }
+  return { seviye, kaynak };
+}
+
+function tierOneri(t: CouponTierBreakdown, atSayisiTier?: CouponTierBreakdown): string {
+  const { seviye, kaynak } = efektifTierSeviye(t, atSayisiTier);
   const yakalama = 100 - kacirmaOrani(kaynak, seviye);
   return TIER_KISA_METIN[seviye](Math.max(0, yakalama));
 }
@@ -1087,6 +1106,7 @@ export function getClassTypeAdvice(
         level: tierSeviye(ucluTier),
         text: `${grupAdi.replace(" Koşular", "")} arasında, ${mesafeMetni(mesafeKovasi)} ve ${atKovasi} sahalarda: ${isabetCumlesi(ucluBreakdown)}`,
         oneri: tierOneri(ucluTier),
+        tierSeviyeKodu: efektifTierSeviye(ucluTier).seviye,
         tierYuzdeler: { eko: ucluTier.ekonomik, nor: ucluTier.normal, genis: ucluTier.genis, kacti: ucluTier.kacti, toplam: ucluTier.total },
         top1Rate: { rate: ucluBreakdown.rate, hits: ucluBreakdown.hits, total: ucluBreakdown.total },
       };
@@ -1101,6 +1121,7 @@ export function getClassTypeAdvice(
         level: tierSeviye(ikiliTier),
         text: `${grupAdi.replace(" Koşular", "")} arasında, ${mesafeMetni(mesafeKovasi)}: ${isabetCumlesi(ikiliBreakdown)}`,
         oneri: tierOneri(ikiliTier, atSayisiTier),
+        tierSeviyeKodu: efektifTierSeviye(ikiliTier, atSayisiTier).seviye,
         tierYuzdeler: { eko: ikiliTier.ekonomik, nor: ikiliTier.normal, genis: ikiliTier.genis, kacti: ikiliTier.kacti, toplam: ikiliTier.total },
         top1Rate: { rate: ikiliBreakdown.rate, hits: ikiliBreakdown.hits, total: ikiliBreakdown.total },
       };
@@ -1115,6 +1136,7 @@ export function getClassTypeAdvice(
         level: tierSeviye(ikiliTier),
         text: `${grupAdi.replace(" Koşular", "")} arasında, ${atKovasi} sahalarda: ${isabetCumlesi(ikiliBreakdown)}`,
         oneri: tierOneri(ikiliTier),
+        tierSeviyeKodu: efektifTierSeviye(ikiliTier).seviye,
         tierYuzdeler: { eko: ikiliTier.ekonomik, nor: ikiliTier.normal, genis: ikiliTier.genis, kacti: ikiliTier.kacti, toplam: ikiliTier.total },
         top1Rate: { rate: ikiliBreakdown.rate, hits: ikiliBreakdown.hits, total: ikiliBreakdown.total },
       };
@@ -1134,6 +1156,7 @@ export function getClassTypeAdvice(
         level: tierSeviye(ikiliTier),
         text: `${grupAdi.replace(" Koşular", "")} arasında, ${pistAdi} pistte: ${isabetCumlesi(ikiliBreakdown)}`,
         oneri: tierOneri(ikiliTier, atSayisiTier),
+        tierSeviyeKodu: efektifTierSeviye(ikiliTier, atSayisiTier).seviye,
         tierYuzdeler: { eko: ikiliTier.ekonomik, nor: ikiliTier.normal, genis: ikiliTier.genis, kacti: ikiliTier.kacti, toplam: ikiliTier.total },
         top1Rate: { rate: ikiliBreakdown.rate, hits: ikiliBreakdown.hits, total: ikiliBreakdown.total },
       };
@@ -1149,6 +1172,7 @@ export function getClassTypeAdvice(
       level: tierSeviye(tier),
       text: `${normalized} yarışlarında: ${isabetCumlesi(breakdown)}`,
       oneri: tierOneri(tier, atSayisiTier),
+      tierSeviyeKodu: efektifTierSeviye(tier, atSayisiTier).seviye,
       tierYuzdeler: { eko: tier.ekonomik, nor: tier.normal, genis: tier.genis, kacti: tier.kacti, toplam: tier.total },
       top1Rate: { rate: breakdown.rate, hits: breakdown.hits, total: breakdown.total },
     };
@@ -1162,6 +1186,7 @@ export function getClassTypeAdvice(
       level: tierSeviye(grupTier),
       text: `${grupAdi} arasında: ${isabetCumlesi(grupBreakdown)}${darEk}`,
       oneri: tierOneri(grupTier, atSayisiTier),
+      tierSeviyeKodu: efektifTierSeviye(grupTier, atSayisiTier).seviye,
       tierYuzdeler: { eko: grupTier.ekonomik, nor: grupTier.normal, genis: grupTier.genis, kacti: grupTier.kacti, toplam: grupTier.total },
       top1Rate: { rate: grupBreakdown.rate, hits: grupBreakdown.hits, total: grupBreakdown.total },
     };
