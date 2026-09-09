@@ -21,9 +21,13 @@ export type HomeKuponInput = {
 };
 
 /**
- * Bir hipodrom/günün koşu+at listesini döner. Yayınlanmış analizi olan koşularda
- * atlar /kosular sayfasındaki gibi analiz sıralamasına (Pick.rank) göre dizilir;
- * analizde yer almayan atlar listenin sonuna at numarasına göre eklenir.
+ * Bir hipodrom/günün koşu+at listesini döner. Analizi olan koşularda atlar Pick.score'a
+ * (yüksekten düşüğe) göre dizilir — kayıtlı Pick.rank'e GÖRE DEĞİL. 2026-09-09 kullanıcı
+ * bulgusu: bu fonksiyon eskiden rank'e göre sıralıyordu, ama terfi/garanti mekanizmaları
+ * (v5-engine.ts, terfiPenceresiV5) rank'i ham puandan kasıtlı olarak saptırabiliyor — bu
+ * yüzden KuponForm'daki at sırası aynı günün puan tablosuyla (score bazlı, bkz.
+ * pick-display-order.ts) tutarsız çıkıyordu (Kocaeli 08 Eylül, 3 koşuda doğrulandı). Bu,
+ * CLAUDE.md'deki BALDER/TERCAN HAN kuralıyla AYNI hata sınıfının dördüncü tekrarıydı.
  */
 export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
   await requireRole("EDITOR");
@@ -44,8 +48,7 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
           prediction: {
             select: {
               picks: {
-                orderBy: { rank: "asc" },
-                select: { rank: true, runnerId: true, score: true },
+                select: { runnerId: true, score: true },
               },
             },
           },
@@ -78,8 +81,6 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
 
   const karmaRaces = raceDay.races.filter((r) => !r.prediction && r.runners.length > 0);
 
-  // rankByNo: Karma yarışlar için at numarası → analiz sırası
-  const rankByNoById = new Map<string, Map<number, number>>();
   // scoreByNo: Karma yarışlar için at numarası → V5 modeli yüzdesi (Pick.score)
   const scoreByNoById = new Map<string, Map<number, number | null>>();
   // metaByNo: Karma yarışlar için at numarası → { scratched, ekuriGroup }
@@ -96,7 +97,7 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
         runners: { select: { id: true, no: true, name: true, scratched: true, ekuriGroup: true } },
         prediction: {
           select: {
-            picks: { orderBy: { rank: "asc" }, select: { rank: true, runnerId: true, score: true } },
+            picks: { select: { runnerId: true, score: true } },
           },
         },
       },
@@ -110,16 +111,14 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
       const match = sourceBySignature.get(runnerSetSignature(r.runners));
       if (!match?.prediction) continue;
 
-      // Kaynak runner ID'den at numarasına map oluştur, sonra no→rank/skor yap
+      // Kaynak runner ID'den at numarasına map oluştur, sonra no→skor yap
       const runnerIdToNo = new Map(match.runners.map((ru) => [ru.id, ru.no]));
-      const noToRank = new Map<number, number>();
       const noToScore = new Map<number, number | null>();
       for (const pick of match.prediction.picks) {
         if (!pick.runnerId) continue;
         const no = runnerIdToNo.get(pick.runnerId);
-        if (no != null) { noToRank.set(no, pick.rank); noToScore.set(no, pick.score); }
+        if (no != null) noToScore.set(no, pick.score);
       }
-      rankByNoById.set(r.id, noToRank);
       scoreByNoById.set(r.id, noToScore);
 
       // at no → meta
@@ -135,30 +134,24 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
     hippodromeName: raceDay.hippodrome.name,
     races: raceDay.races.map((r) => {
       // Kendi prediction'ı varsa runnerId bazlı, Karma aynasıysa no bazlı sırala
-      let rankByRunnerId: Map<string, number> | null = null;
-      let rankByNo: Map<number, number> | null = null;
       let scoreByRunnerId: Map<string, number | null> | null = null;
       let scoreByNo: Map<number, number | null> | null = null;
 
       if (r.prediction) {
         const picks = r.prediction.picks;
-        rankByRunnerId = new Map(
-          picks.filter((p): p is typeof p & { runnerId: string } => p.runnerId != null)
-               .map((p) => [p.runnerId, p.rank])
-        );
         scoreByRunnerId = new Map(
           picks.filter((p): p is typeof p & { runnerId: string } => p.runnerId != null)
                .map((p) => [p.runnerId, p.score])
         );
       } else {
-        rankByNo = rankByNoById.get(r.id) ?? null;
         scoreByNo = scoreByNoById.get(r.id) ?? null;
       }
 
+      // Score'a göre (yüksekten düşüğe) sırala — bkz. yukarıdaki fonksiyon yorumu.
       const runners = [...r.runners].sort((a, b) => {
-        const rankA = rankByRunnerId?.get(a.id) ?? rankByNo?.get(a.no) ?? Infinity;
-        const rankB = rankByRunnerId?.get(b.id) ?? rankByNo?.get(b.no) ?? Infinity;
-        if (rankA !== rankB) return rankA - rankB;
+        const scoreA = scoreByRunnerId?.get(a.id) ?? scoreByNo?.get(a.no) ?? -1;
+        const scoreB = scoreByRunnerId?.get(b.id) ?? scoreByNo?.get(b.no) ?? -1;
+        if (scoreA !== scoreB) return scoreB - scoreA;
         return a.no - b.no;
       });
 

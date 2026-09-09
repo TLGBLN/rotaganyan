@@ -98,14 +98,12 @@ function statikAyaklariBul(races: RaceDayData["races"], selections: GroupSelecti
 }
 
 // 2026-09-09 kullanıcı talebi ("kırmızı bir çizgi ile sınırı çizebilirsin, toplamları
-// göstermek için") — seçim tablosunda atlar puana göre sıralanıp ilk 3/ilk 6'nın kümülatif
-// toplamı gösteriliyor; RaceAdviceCard'daki modelTabanliKapsamOnerisi'nin (top3≥%65/
-// top6≥%80 eşikleri) AYNISI, burada da admin seçim yaparken görsün diye kırmızı çizgiyle
-// işaretleniyor. Çekilen (scratched) at kümülatif toplama katkı vermiyor — koşamayan at
-// gerçek kapsamaya dahil değil.
-function siraliRunnerlar(runners: RaceRunner[]): RaceRunner[] {
-  return [...runners].sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
-}
+// göstermek için") — seçim tablosunda ilk 3/ilk 6 atın kümülatif toplamı gösteriliyor;
+// RaceAdviceCard'daki modelTabanliKapsamOnerisi'nin (top3≥%65/top6≥%80 eşikleri) AYNISI,
+// burada da admin seçim yaparken görsün diye kırmızı çizgiyle işaretleniyor. `race.runners`
+// artık getRaceDayLegs'ten ZATEN puana göre (yüksekten düşüğe) sıralı geliyor — bkz.
+// home-kupon.actions.ts, 2026-09-09 düzeltmesi (eskiden Pick.rank'e göreydi, puan tablosuyla
+// tutarsızlık yaratıyordu). Çekilen (scratched) at kümülatif toplama katkı vermiyor.
 function kumulatifToplam(sirali: RaceRunner[], n: number): number {
   return sirali.slice(0, n).reduce((acc, r) => acc + (r.scratched ? 0 : r.score ?? 0), 0);
 }
@@ -154,7 +152,7 @@ function KuponGrup({
           <tbody>
             {races.map((race, i) => {
               const sel = selections[race.raceNo] ?? emptySelection();
-              const sirali = siraliRunnerlar(race.runners);
+              const sirali = race.runners;
               return (
                 <tr key={race.raceNo} className={cn("border-b last:border-0", i % 2 === 1 && "bg-muted/20")}>
                   <td className="px-3 py-3 align-top text-sm font-semibold whitespace-nowrap">
