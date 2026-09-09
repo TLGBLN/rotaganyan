@@ -92,6 +92,18 @@ function handikapOrtaBantUyarisi(classType: string, topPicks: RaceAdviceCardPick
   return topPicks.some((p) => p.score != null && p.score >= 40 && p.score < 60);
 }
 
+// Kupon Pusulası Adım 4 ("eşit saha uyarısı") — ilk 3 at birbirine çok yakın puandaysa
+// (ör. %20/%20/%20) rozet "6 AT" dese bile saha gerçekten belirsiz demektir, sürprize açık.
+// Zaten banko ise (isBanko=true) bu uyarı anlamsız — çağıran taraf onu filtreliyor.
+function esitSahaUyarisi(topPicks: RaceAdviceCardPick[]): boolean {
+  const scores = [...topPicks]
+    .sort((a, b) => (b.score ?? -1) - (a.score ?? -1))
+    .map((p) => p.score)
+    .filter((s): s is number => s != null);
+  if (scores.length < 3) return false;
+  return scores[0] - scores[2] <= 7;
+}
+
 function modelTabanliKapsamOnerisi(topPicks: RaceAdviceCardPick[]): { top3: number; top6: number; text: string } | null {
   const scores = [...topPicks]
     .sort((a, b) => a.rank - b.rank)
@@ -140,6 +152,7 @@ export default function RaceAdviceCard({
   const kapsamOnerisi = prediction?.guncelMotor ? modelTabanliKapsamOnerisi(prediction.topPicks) : null;
   const verdi = tekAtVerdisi(prediction?.isBanko ?? false, kapsamOnerisi, advice);
   const handikapUyari = prediction ? handikapOrtaBantUyarisi(classType, prediction.topPicks) : false;
+  const esitSaha = prediction && !prediction.isBanko ? esitSahaUyarisi(prediction.topPicks) : false;
 
   return (
     <div className="rounded-xl border p-3">
@@ -219,6 +232,13 @@ export default function RaceAdviceCard({
             <div className="mt-2 rounded-md border border-miss/40 bg-miss/5 px-2.5 py-2 text-xs leading-snug text-miss">
               <span className="font-semibold">⚠️ Handikap orta-bant (%40-60)</span>
               <span className="text-muted-foreground"> — bu aralıkta model tarihte fazla iddialı çıktı (küçük örneklem, temkinli ol; rozeti bir kademe geniş say).</span>
+            </div>
+          )}
+
+          {esitSaha && (
+            <div className="mt-2 rounded-md border border-miss/40 bg-miss/5 px-2.5 py-2 text-xs leading-snug text-miss">
+              <span className="font-semibold">⚖️ Eşit saha</span>
+              <span className="text-muted-foreground"> — ilk 3 at birbirine çok yakın puanda, net bir favori yok. Rozet ne derse desin sürprize açık.</span>
             </div>
           )}
 
