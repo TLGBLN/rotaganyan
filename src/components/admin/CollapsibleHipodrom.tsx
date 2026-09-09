@@ -29,12 +29,26 @@ export default function CollapsibleHipodrom({
 }) {
   const [open, setOpen] = useState(false);
 
+  // 2026-09-09 kullanıcı bulgusu ("iki tane yeni kombine kupon bölümü olmuş") — bu satır
+  // bir <button> İÇİNDE DeleteRaceDayButton'ın kendi <button>'ını taşıyordu. HTML buna izin
+  // vermiyor (interaktif element interaktif element içeremez); tarayıcı dış butonu erken
+  // kapatıp React'in beklediğiyle uyuşmayan bir DOM üretiyordu — React hydration mismatch'i
+  // fark edip TÜM sayfayı bu noktadan itibaren client'ta yeniden bastı, "Yeni Kombine Kupon"
+  // ve "Geçmiş Kuponlar" iki kez görünüyordu. Toggle artık <button> değil, klavye erişimi
+  // korunan bir <div role="button">.
   return (
     <div className="rounded-lg border">
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between border-b bg-muted/30 px-3 py-1.5 text-left"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen((o) => !o);
+          }
+        }}
+        className="flex w-full cursor-pointer items-center justify-between border-b bg-muted/30 px-3 py-1.5 text-left"
       >
         <span className="flex items-center gap-2 text-sm font-semibold">
           {open ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -46,7 +60,7 @@ export default function CollapsibleHipodrom({
           </Badge>
           {deleteSlot}
         </div>
-      </button>
+      </div>
       <div className={cn("space-y-2 p-2", !open && "hidden")}>
         {children}
       </div>
