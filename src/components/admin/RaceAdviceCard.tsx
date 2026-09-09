@@ -154,11 +154,18 @@ export default function RaceAdviceCard({
   const handikapUyari = prediction ? handikapOrtaBantUyarisi(classType, prediction.topPicks) : false;
   const esitSaha = prediction && !prediction.isBanko ? esitSahaUyarisi(prediction.topPicks) : false;
 
+  // Handikap/eşit-saha uyarıları artık tek bir kutuda birleşiyor — iki ayrı kutu, iki ayrı
+  // tam cümle yerine kısa madde satırları (2026-09-09 kullanıcı bulgusu: "çok bilgi var
+  // kirlilik yapıyor").
+  const uyarilar: string[] = [];
+  if (handikapUyari) uyarilar.push("⚠️ Handikap %40-60 bandı — geçmişte fazla iddialı çıktı, bir kademe geniş say.");
+  if (esitSaha) uyarilar.push("⚖️ Eşit saha — ilk 3 at yakın puanda, net favori yok.");
+
   return (
     <div className="rounded-xl border p-3">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-bold">
               {raceNo}
             </div>
@@ -171,16 +178,9 @@ export default function RaceAdviceCard({
               </span>
             )}
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <h3 className="truncate text-sm font-bold">
-                  {hippodromeName} — {raceNo}. Koşu
-                </h3>
-                <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold", style.badgeCls)}>
-                  <LevelIcon className="h-3 w-3" />
-                  {style.label}
-                </span>
-                {hasResult && <span className="shrink-0 text-[11px] font-medium text-hit">✓ Sonuç girildi</span>}
-              </div>
+              <h3 className="truncate text-sm font-bold">
+                {hippodromeName} — {raceNo}. Koşu
+              </h3>
               <p className="text-xs text-muted-foreground">
                 {time ?? "—"} · {classType} · {distance}m · {atSayisi} At
                 {conditions && <span className="italic"> · {conditions}</span>}
@@ -188,69 +188,70 @@ export default function RaceAdviceCard({
             </div>
           </div>
 
-          {kapsamOnerisi && (
-            <div className="mt-2">
-              <p className={cn("text-sm font-bold leading-tight", style.textCls)}>{kapsamOnerisi.text}</p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">
-                Bu koşuya özel — modelin BU ATLAR için yayınlanmış olasılıklarının toplamı (ilk 3: %{Math.round(kapsamOnerisi.top3)}, ilk 6: %{Math.round(kapsamOnerisi.top6)}), tarihsel bir ortalama değil.
-              </p>
-            </div>
-          )}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold", style.badgeCls)}>
+              <LevelIcon className="h-3 w-3" />
+              {style.label}
+            </span>
+            {hasResult && <span className="shrink-0 text-[11px] font-medium text-hit">✓ Sonuç girildi</span>}
+            {prediction && prediction.topPicks.length > 0 &&
+              prediction.topPicks.slice(0, 6).map((p) => (
+                <span key={p.rank} className="rounded-full border px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                  #{p.no}
+                  {p.score != null && ` %${p.score}`}
+                </span>
+              ))}
+          </div>
 
-          {advice.oneri && (
-            <div className={kapsamOnerisi ? "mt-2 border-t pt-2" : "mt-2"}>
-              {kapsamOnerisi ? (
-                <p className="text-[11px] text-muted-foreground">
-                  Karşılaştırma — bu koşu <b>tipinin</b> tarihte gerektirdiği: <span className={style.textCls}>{advice.oneri}</span>
-                </p>
-              ) : (
-                <p className={cn("text-sm font-bold leading-tight", style.textCls)}>{advice.oneri}</p>
+          {/* Canlı (bu koşuya özel) ve tarihsel (koşu tipine özel) kapsam bilgisi TEK
+              satırda — eskiden iki ayrı paragraf + açıklama cümlesiydi. */}
+          {(kapsamOnerisi || advice.oneri) && (
+            <p className="mt-2 text-xs leading-snug">
+              {kapsamOnerisi && (
+                <span
+                  className={cn("font-semibold", style.textCls)}
+                  title="Bu koşuya özel — modelin BU ATLAR için yayınlanmış olasılıklarının toplamı, tarihsel bir ortalama değil."
+                >
+                  İlk 3: %{Math.round(kapsamOnerisi.top3)} · İlk 6: %{Math.round(kapsamOnerisi.top6)}
+                </span>
               )}
-              {ekoPct != null && advice.tierYuzdeler && (
-                <>
-                  <div className="mt-2 h-2 w-full max-w-sm overflow-hidden rounded-full bg-muted">
-                    <div className={cn("h-full rounded-full", style.barCls)} style={{ width: `${ekoPct}%` }} />
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="inline-block h-2 w-2 rounded-full bg-hit" /> Ekonomik %{Math.round((advice.tierYuzdeler.eko / advice.tierYuzdeler.toplam) * 100)}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <span className="inline-block h-2 w-2 rounded-full bg-brand" /> Normal %{Math.round((advice.tierYuzdeler.nor / advice.tierYuzdeler.toplam) * 100)}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <span className="inline-block h-2 w-2 rounded-full bg-red-500" /> Geniş %{Math.round((advice.tierYuzdeler.genis / advice.tierYuzdeler.toplam) * 100)}
-                    </span>
-                    <span className="text-muted-foreground/70">{advice.tierYuzdeler.toplam} benzer koşuya göre</span>
-                  </div>
-                </>
+              {kapsamOnerisi && advice.oneri && <span className="text-muted-foreground"> · </span>}
+              {advice.oneri && (
+                <span className="text-muted-foreground">
+                  {kapsamOnerisi && "Tarihsel: "}
+                  <span className={kapsamOnerisi ? "" : cn("font-semibold", style.textCls)}>{advice.oneri}</span>
+                </span>
               )}
-            </div>
+            </p>
           )}
 
-          {handikapUyari && (
-            <div className="mt-2 rounded-md border border-miss/40 bg-miss/5 px-2.5 py-2 text-xs leading-snug text-miss">
-              <span className="font-semibold">⚠️ Handikap orta-bant (%40-60)</span>
-              <span className="text-muted-foreground"> — bu aralıkta model tarihte fazla iddialı çıktı (küçük örneklem, temkinli ol; rozeti bir kademe geniş say).</span>
-            </div>
+          {/* Ekonomik/Normal/Geniş dağılım çubuğu — yalnız CANLI bir analiz yokken (yani
+              tarihsel oran TEK kanıt kaynağıyken) gösteriliyor, aksi halde yukarıdaki tek
+              satır zaten yeterli, çubuk gereksiz kalabalık yapardı. */}
+          {!kapsamOnerisi && ekoPct != null && advice.tierYuzdeler && (
+            <>
+              <div className="mt-2 h-1.5 w-full max-w-sm overflow-hidden rounded-full bg-muted">
+                <div className={cn("h-full rounded-full", style.barCls)} style={{ width: `${ekoPct}%` }} />
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-muted-foreground">
+                <span>Eko %{Math.round((advice.tierYuzdeler.eko / advice.tierYuzdeler.toplam) * 100)}</span>
+                <span>Nor %{Math.round((advice.tierYuzdeler.nor / advice.tierYuzdeler.toplam) * 100)}</span>
+                <span>Geniş %{Math.round((advice.tierYuzdeler.genis / advice.tierYuzdeler.toplam) * 100)}</span>
+                <span className="text-muted-foreground/70">({advice.tierYuzdeler.toplam} koşu)</span>
+              </div>
+            </>
           )}
 
-          {esitSaha && (
-            <div className="mt-2 rounded-md border border-miss/40 bg-miss/5 px-2.5 py-2 text-xs leading-snug text-miss">
-              <span className="font-semibold">⚖️ Eşit saha</span>
-              <span className="text-muted-foreground"> — ilk 3 at birbirine çok yakın puanda, net bir favori yok. Rozet ne derse desin sürprize açık.</span>
+          {uyarilar.length > 0 && (
+            <div className="mt-2 space-y-0.5 rounded-md border border-miss/40 bg-miss/5 px-2.5 py-1.5 text-[11px] leading-snug text-miss">
+              {uyarilar.map((u) => <div key={u}>{u}</div>)}
             </div>
           )}
 
           {advice.top1Rate && advice.top1Rate.total >= 3 && (
-            <div className="mt-3 flex items-center gap-2 border-t pt-3 text-sm">
-              <TrendingUp className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <span>
-                1. tercih kazanma oranı: <b>%{advice.top1Rate.rate.toFixed(0)}</b>
-              </span>
-              <span className="text-xs text-muted-foreground">
-                ({advice.top1Rate.hits}/{advice.top1Rate.total} koşu)
-              </span>
+            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+              1. tercih kazanma oranı: <b className="text-foreground">%{advice.top1Rate.rate.toFixed(0)}</b> ({advice.top1Rate.hits}/{advice.top1Rate.total})
             </div>
           )}
 
@@ -264,7 +265,7 @@ export default function RaceAdviceCard({
           {prediction?.bankoNote && (
             <div
               className={cn(
-                "mt-2 rounded-md border px-2.5 py-2 text-xs leading-snug",
+                "mt-2 rounded-md border px-2.5 py-1.5 text-[11px] leading-snug",
                 prediction.isBanko ? "border-hit/40 bg-hit/5" : "border-muted-foreground/25 bg-muted/20"
               )}
             >
@@ -285,7 +286,7 @@ export default function RaceAdviceCard({
           )}
         </div>
 
-        <div className="flex shrink-0 flex-col items-end gap-2">
+        <div className="flex shrink-0 items-center justify-between gap-2 sm:flex-col sm:items-end">
           {prediction ? (
             <span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold", prediction.published ? "text-[#006D05]" : "text-brand")}>
               {prediction.published && <Radio className="h-3 w-3 animate-pulse" />}
@@ -295,26 +296,17 @@ export default function RaceAdviceCard({
             <span className="text-xs text-muted-foreground">Analiz yok</span>
           )}
 
-          {prediction && prediction.topPicks.length > 0 && (
-            <div className="flex flex-wrap justify-end gap-1">
-              {prediction.topPicks.map((p) => (
-                <span key={p.rank} className="rounded-full border px-2 py-0.5 text-[11px] font-semibold">
-                  {p.no}
-                  {p.score != null && <span className="text-muted-foreground"> (%{p.score})</span>}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <Link
+              href={prediction ? `/admin/analizler/${prediction.id}` : newAnalysisHref}
+              className="inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+            >
+              {prediction ? "Analize Git" : "Analiz Ekle"}
+              <ArrowRight className="h-3 w-3" />
+            </Link>
 
-          <Link
-            href={prediction ? `/admin/analizler/${prediction.id}` : newAnalysisHref}
-            className="inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
-          >
-            {prediction ? "Analize Git" : "Analiz Ekle"}
-            <ArrowRight className="h-3 w-3" />
-          </Link>
-
-          <DeleteRaceButton raceId={raceId} label={`${hippodromeName} ${raceNo}. Koşu`} />
+            <DeleteRaceButton raceId={raceId} label={`${hippodromeName} ${raceNo}. Koşu`} />
+          </div>
         </div>
       </div>
     </div>
