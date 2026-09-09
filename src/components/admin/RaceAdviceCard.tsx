@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ShieldCheck, ShieldAlert, Info, TrendingUp, ArrowRight, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ClassTypeAdvice } from "@/server/services/admin.service";
+import { classTypeGroup, type ClassTypeAdvice } from "@/server/services/admin.service";
 import DeleteRaceButton from "@/components/admin/DeleteRaceButton";
 
 // 2026-09-02 kullanıcı talebi ("bu şekilde ayarlar mısın bu kısımları" — bir mockup
@@ -80,6 +80,18 @@ function tekAtVerdisi(
   return null;
 }
 
+// 2026-09-09 kullanıcı talebi ("Kupon Pusulası" rehberine göre kupon sayfası dizayn
+// edilmeli) — bir ad-hoc kalibrasyon taraması (V5 dönemi, ~397 yayınlanmış tahmin) Handikap
+// koşularında model %40-60 dediğinde GERÇEK kazanma oranının beklenenden düşük çıktığını
+// gösterdi (%40-50: gerçek %20.0, %50-60: gerçek %20.0 — komşu %30-40 diliminin (%32.4)
+// bile altında). Örneklem ÇOK KÜÇÜK (n=10 ve n=5) — TIER_GUVEN_ESIGI=20'nin altında,
+// admin.service.ts'in kendi "küçük örneklemde kesin hüküm verme" ilkesiyle aynı gerekçeyle
+// rozet/skor OTOMATİK DEĞİŞTİRİLMİYOR, yalnız bilgilendirici bir ihtiyat notu gösteriliyor.
+function handikapOrtaBantUyarisi(classType: string, topPicks: RaceAdviceCardPick[]): boolean {
+  if (classTypeGroup(classType) !== "Handikap Koşular") return false;
+  return topPicks.some((p) => p.score != null && p.score >= 40 && p.score < 60);
+}
+
 function modelTabanliKapsamOnerisi(topPicks: RaceAdviceCardPick[]): { top3: number; top6: number; text: string } | null {
   const scores = [...topPicks]
     .sort((a, b) => a.rank - b.rank)
@@ -127,6 +139,7 @@ export default function RaceAdviceCard({
   const ekoPct = advice.tierYuzdeler ? Math.round((advice.tierYuzdeler.eko / advice.tierYuzdeler.toplam) * 100) : null;
   const kapsamOnerisi = prediction?.guncelMotor ? modelTabanliKapsamOnerisi(prediction.topPicks) : null;
   const verdi = tekAtVerdisi(prediction?.isBanko ?? false, kapsamOnerisi, advice);
+  const handikapUyari = prediction ? handikapOrtaBantUyarisi(classType, prediction.topPicks) : false;
 
   return (
     <div className="rounded-xl border p-3">
@@ -199,6 +212,13 @@ export default function RaceAdviceCard({
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {handikapUyari && (
+            <div className="mt-2 rounded-md border border-miss/40 bg-miss/5 px-2.5 py-2 text-xs leading-snug text-miss">
+              <span className="font-semibold">⚠️ Handikap orta-bant (%40-60)</span>
+              <span className="text-muted-foreground"> — bu aralıkta model tarihte fazla iddialı çıktı (küçük örneklem, temkinli ol; rozeti bir kademe geniş say).</span>
             </div>
           )}
 

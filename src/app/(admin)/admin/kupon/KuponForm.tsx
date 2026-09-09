@@ -97,6 +97,19 @@ function statikAyaklariBul(races: RaceDayData["races"], selections: GroupSelecti
   return sonuc;
 }
 
+// 2026-09-09 kullanıcı talebi ("kırmızı bir çizgi ile sınırı çizebilirsin, toplamları
+// göstermek için") — seçim tablosunda atlar puana göre sıralanıp ilk 3/ilk 6'nın kümülatif
+// toplamı gösteriliyor; RaceAdviceCard'daki modelTabanliKapsamOnerisi'nin (top3≥%65/
+// top6≥%80 eşikleri) AYNISI, burada da admin seçim yaparken görsün diye kırmızı çizgiyle
+// işaretleniyor. Çekilen (scratched) at kümülatif toplama katkı vermiyor — koşamayan at
+// gerçek kapsamaya dahil değil.
+function siraliRunnerlar(runners: RaceRunner[]): RaceRunner[] {
+  return [...runners].sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+}
+function kumulatifToplam(sirali: RaceRunner[], n: number): number {
+  return sirali.slice(0, n).reduce((acc, r) => acc + (r.scratched ? 0 : r.score ?? 0), 0);
+}
+
 function legCounts(races: { raceNo: number }[], selections: GroupSelections, width: Width): number[] {
   return races.map((r) => Math.max((selections[r.raceNo] ?? emptySelection())[width].size, 1));
 }
@@ -141,6 +154,7 @@ function KuponGrup({
           <tbody>
             {races.map((race, i) => {
               const sel = selections[race.raceNo] ?? emptySelection();
+              const sirali = siraliRunnerlar(race.runners);
               return (
                 <tr key={race.raceNo} className={cn("border-b last:border-0", i % 2 === 1 && "bg-muted/20")}>
                   <td className="px-3 py-3 align-top text-sm font-semibold whitespace-nowrap">
@@ -149,51 +163,61 @@ function KuponGrup({
                   {widths.map((width) => (
                     <td key={width} className="px-3 py-3 align-top">
                       <div className="flex flex-col gap-1">
-                        {race.runners.map((runner) => {
+                        {sirali.map((runner, idx) => {
                           const checked = sel[width].has(runner.no);
                           return (
-                            <button
-                              key={runner.no}
-                              type="button"
-                              onClick={() => !runner.scratched && onToggle(race.raceNo, width, runner.no)}
-                              disabled={runner.scratched}
-                              className={cn(
-                                "flex items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-xs transition-colors",
-                                runner.scratched
-                                  ? "border-muted-foreground/15 opacity-40 cursor-not-allowed"
-                                  : checked
-                                  ? "border-brand bg-brand text-brand-foreground"
-                                  : "border-muted-foreground/30 text-muted-foreground hover:border-brand/50 hover:text-foreground"
-                              )}
-                            >
-                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-black/10 font-bold">
-                                {runner.no}
-                              </span>
-                              <span className={cn("truncate font-medium", runner.scratched && "line-through")}>
-                                {runner.name}
-                              </span>
-                              {runner.score != null && (
-                                <span className="shrink-0 text-[10px] font-semibold tabular-nums opacity-80">
-                                  %{runner.score}
+                            <div key={runner.no}>
+                              <button
+                                type="button"
+                                onClick={() => !runner.scratched && onToggle(race.raceNo, width, runner.no)}
+                                disabled={runner.scratched}
+                                className={cn(
+                                  "flex w-full items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-xs transition-colors",
+                                  runner.scratched
+                                    ? "border-muted-foreground/15 opacity-40 cursor-not-allowed"
+                                    : checked
+                                    ? "border-brand bg-brand text-brand-foreground"
+                                    : "border-muted-foreground/30 text-muted-foreground hover:border-brand/50 hover:text-foreground"
+                                )}
+                              >
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-black/10 font-bold">
+                                  {runner.no}
                                 </span>
-                              )}
-                              {runner.agfSirasi != null && (
-                                <span
-                                  title="AGF sırası"
-                                  className="shrink-0 rounded-sm bg-black/10 px-1 text-[9px] font-bold tabular-nums opacity-70"
-                                >
-                                  AGF{runner.agfSirasi}
+                                <span className={cn("truncate font-medium", runner.scratched && "line-through")}>
+                                  {runner.name}
                                 </span>
+                                {runner.score != null && (
+                                  <span className="shrink-0 text-[10px] font-semibold tabular-nums opacity-80">
+                                    %{runner.score}
+                                  </span>
+                                )}
+                                {runner.agfSirasi != null && (
+                                  <span
+                                    title="AGF sırası"
+                                    className="shrink-0 rounded-sm bg-black/10 px-1 text-[9px] font-bold tabular-nums opacity-70"
+                                  >
+                                    AGF{runner.agfSirasi}
+                                  </span>
+                                )}
+                                {runner.scratched ? (
+                                  <span className="ml-auto shrink-0 text-[10px] text-red-400 font-semibold">Koşmaz</span>
+                                ) : runner.ekuriGroup != null ? (
+                                  <span title={`Eküri grubu ${runner.ekuriGroup}`} className="ml-auto shrink-0 inline-flex items-center gap-0.5 text-[10px]">
+                                    <span className={cn("inline-block h-1.5 w-1.5 rounded-full", ekuriRengi(runner.ekuriGroup).badge)} />
+                                    🐴
+                                  </span>
+                                ) : null}
+                              </button>
+                              {(idx === 2 || idx === 5) && sirali.length > idx + 1 && (
+                                <div className="my-1 flex items-center gap-1.5 px-0.5" title={`İlk ${idx + 1} atın modele göre toplam kazanma olasılığı`}>
+                                  <div className="h-px flex-1 bg-red-500/50" />
+                                  <span className="shrink-0 text-[9px] font-bold tabular-nums text-red-500">
+                                    İlk {idx + 1}: %{Math.round(kumulatifToplam(sirali, idx + 1))}
+                                  </span>
+                                  <div className="h-px flex-1 bg-red-500/50" />
+                                </div>
                               )}
-                              {runner.scratched ? (
-                                <span className="ml-auto shrink-0 text-[10px] text-red-400 font-semibold">Koşmaz</span>
-                              ) : runner.ekuriGroup != null ? (
-                                <span title={`Eküri grubu ${runner.ekuriGroup}`} className="ml-auto shrink-0 inline-flex items-center gap-0.5 text-[10px]">
-                                  <span className={cn("inline-block h-1.5 w-1.5 rounded-full", ekuriRengi(runner.ekuriGroup).badge)} />
-                                  🐴
-                                </span>
-                              ) : null}
-                            </button>
+                            </div>
                           );
                         })}
                       </div>
