@@ -9,6 +9,7 @@ import { finishPos } from "@/lib/race-result";
 import { kararOku } from "@/lib/methodology/muhakeme-format";
 import { ekuriRengi } from "@/lib/ekuri-colors";
 import { siraliPickSatirlari } from "@/lib/methodology/pick-display-order";
+import { agfSiraMapOlustur } from "@/lib/agf-sira";
 
 // PuanTablosu.tsx'in kendi pick şekli — ProgramView.tsx'in ProgramPick'inden FARKLI
 // (o daha dar, runner.scratched/ekuriGroup taşımıyor). ProgramRaceDay'den türetiliyor
@@ -21,17 +22,6 @@ type Props = {
   currentDate: string;
   isAdmin?: boolean;
 };
-
-// 2026-08-20 kullanıcı talebi: her atın yanında o koşudaki AGF sırasını (kaçıncı at
-// olduğunu) göster — yalnız admin görsün, diğer kullanıcılar (piyasa bilgisini önceden
-// bilmek avantaj sağlayabileceği için) görmesin. Koşu içi AGF büyükten küçüğe sıralanır,
-// agf null olanlar sıraya girmez (eşitlikte no'ya göre kararlı sıra).
-function agfSiraMapOlustur(runners: { no: number; agf: number | null }[]): Map<number, number> {
-  const sirali = runners
-    .filter((r) => r.agf != null)
-    .sort((a, b) => (b.agf! !== a.agf! ? b.agf! - a.agf! : a.no - b.no));
-  return new Map(sirali.map((r, i) => [r.no, i + 1]));
-}
 
 type Race = { raceNo: number };
 function chunkIntoAltili<T extends Race>(

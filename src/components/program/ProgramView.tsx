@@ -11,6 +11,7 @@ import { ChevronDown, ChevronUp, Star, Info, Radio } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
 import { kararOku } from "@/lib/methodology/muhakeme-format";
 import { siraliPickSatirlari } from "@/lib/methodology/pick-display-order";
+import { agfSiraMapOlustur } from "@/lib/agf-sira";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
 import HorseDetailModal from "./HorseDetailModal";
 import HipodromOzellikleriModal from "./HipodromOzellikleriModal";
@@ -414,6 +415,10 @@ function AnalysisPanel({
     .filter((r) => !r.scratched && !pickedNos.has(r.no))
     .sort((a, b) => a.no - b.no);
 
+  // 2026-09-10 kullanıcı talebi: PuanTablosu.tsx'teki gibi, admin için at adının yanında
+  // o koşudaki AGF sırası da görünsün — yalnız admin (bkz. agf-sira.ts'teki gerekçe).
+  const agfSiraMap = agfSiraMapOlustur(runners);
+
   // 2026-09-01 kullanıcı talebi: "sıralama yaparken de yer kaplamasın, eküriler yan yana
   // belirtilsin" — Analiz Detayları tablosunda iki eküri ortağı AYRI satır olarak iki kat
   // yer kaplamasın, aynı satırda birlikte gösterilsin (No/At/Toplam'ın hepsi "A / B" biçiminde).
@@ -572,6 +577,9 @@ function AnalysisPanel({
               const rs = rankStyle(displayRank);
               const noText = rowPicks.map((p) => pickDisplay(p).no).join("-");
               const nameText = rowPicks.map((p) => pickDisplay(p).name).join(" / ");
+              const agfRanks = rowPicks
+                .map((p) => (p.runner?.no != null ? agfSiraMap.get(p.runner.no) : null))
+                .filter((n): n is number => n != null);
               return (
                 <tr key={first.rank} className={cn("border-b last:border-0", isWinner && "bg-[#f5c518]/10")}>
                   <td className="px-2 py-2 text-center">
@@ -583,6 +591,11 @@ function AnalysisPanel({
                   <td className={cn("px-2 py-2 font-semibold", isWinner ? "text-[#f5c518]" : rs.text)}>
                     <span className="inline-flex items-center gap-1.5">
                       {nameText}
+                      {isAdmin && agfRanks.length > 0 && (
+                        <span className="rounded bg-purple-500/15 px-1 text-[9px] font-semibold text-purple-500">
+                          AGF {agfRanks.join("/")}.
+                        </span>
+                      )}
                       {isWinner && ganyan != null && (
                         <span className="text-[10px] font-semibold text-[#f5c518]">Gny: {ganyan.toFixed(2)}</span>
                       )}
@@ -679,6 +692,9 @@ function AnalysisPanel({
           const rs = rankStyle(displayRank);
           const noText = rowPicks.map((p) => pickDisplay(p).no).join("-");
           const nameText = rowPicks.map((p) => pickDisplay(p).name).join(" / ");
+          const agfRanks = rowPicks
+            .map((p) => (p.runner?.no != null ? agfSiraMap.get(p.runner.no) : null))
+            .filter((n): n is number => n != null);
           return (
             <div key={first.rank} className={cn("px-3 py-2.5", isWinner && "bg-[#f5c518]/10")}>
               <div className="flex items-center gap-2 mb-1">
@@ -687,6 +703,11 @@ function AnalysisPanel({
                 </span>
                 <span className={cn("font-bold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>#{noText}</span>
                 <span className={cn("font-semibold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>{nameText}</span>
+                {isAdmin && agfRanks.length > 0 && (
+                  <span className="rounded bg-purple-500/15 px-1 text-[9px] font-semibold text-purple-500 shrink-0">
+                    AGF {agfRanks.join("/")}.
+                  </span>
+                )}
                 {isWinner && ganyan != null && (
                   <span className="text-[10px] font-semibold text-[#f5c518]">Gny: {ganyan.toFixed(2)}</span>
                 )}
