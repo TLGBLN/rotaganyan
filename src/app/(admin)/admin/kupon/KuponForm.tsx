@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ekuriRengi } from "@/lib/ekuri-colors";
+import { KAPSAM_ESIK_ILK3, KAPSAM_ESIK_ILK6 } from "@/lib/methodology/kapsam-esikleri";
 import {
   getRaceDayLegs,
   publishHomeKupon,
@@ -206,15 +207,26 @@ function KuponGrup({
                                   </span>
                                 ) : null}
                               </button>
-                              {(idx === 2 || idx === 5) && sirali.length > idx + 1 && (
-                                <div className="my-1 flex items-center gap-1.5 px-0.5" title={`İlk ${idx + 1} atın modele göre toplam kazanma olasılığı`}>
-                                  <div className="h-px flex-1 bg-red-500/50" />
-                                  <span className="shrink-0 text-[9px] font-bold tabular-nums text-red-500">
-                                    İlk {idx + 1}: %{Math.round(kumulatifToplam(sirali, idx + 1))}
-                                  </span>
-                                  <div className="h-px flex-1 bg-red-500/50" />
-                                </div>
-                              )}
+                              {(idx === 2 || idx === 5) && sirali.length > idx + 1 && (() => {
+                                // 2026-09-10 kullanıcı talebi: ayraç eşik altındaysa kırmızı,
+                                // eşik ve üstündeyse yeşil olsun — RaceAdviceCard'daki rozetle
+                                // AYNI paylaşılan eşiklerden (kapsam-esikleri.ts) besleniyor.
+                                const esik = idx === 2 ? KAPSAM_ESIK_ILK3 : KAPSAM_ESIK_ILK6;
+                                const toplam = kumulatifToplam(sirali, idx + 1);
+                                const yeterli = toplam >= esik;
+                                return (
+                                  <div
+                                    className="my-1 flex items-center gap-1.5 px-0.5"
+                                    title={`İlk ${idx + 1} atın modele göre toplam kazanma olasılığı — eşik ≥%${esik}`}
+                                  >
+                                    <div className={cn("h-px flex-1", yeterli ? "bg-hit/50" : "bg-red-500/50")} />
+                                    <span className={cn("shrink-0 text-[9px] font-bold tabular-nums", yeterli ? "text-hit" : "text-red-500")}>
+                                      İlk {idx + 1}: %{Math.round(toplam)} {yeterli ? "✓" : `(eşik ≥%${esik})`}
+                                    </span>
+                                    <div className={cn("h-px flex-1", yeterli ? "bg-hit/50" : "bg-red-500/50")} />
+                                  </div>
+                                );
+                              })()}
                             </div>
                           );
                         })}

@@ -3,6 +3,7 @@ import { ShieldCheck, ShieldAlert, Info, TrendingUp, ArrowRight, Radio } from "l
 import { cn } from "@/lib/utils";
 import { classTypeGroup, type ClassTypeAdvice } from "@/server/services/admin.service";
 import DeleteRaceButton from "@/components/admin/DeleteRaceButton";
+import { KAPSAM_ESIK_ILK3, KAPSAM_ESIK_ILK6 } from "@/lib/methodology/kapsam-esikleri";
 
 // 2026-09-02 kullanıcı talebi ("bu şekilde ayarlar mısın bu kısımları" — bir mockup
 // gösterdi): admin/kupon'daki yoğun koşu tablosu satırının YERİNE, her koşu için bu kart
@@ -59,8 +60,8 @@ function tekAtVerdisi(
 ): { label: string; cls: string } | null {
   if (isBanko) return { label: "🎯 TEK AT YETER", cls: "bg-hit text-white" };
   if (kapsamOnerisi) {
-    if (kapsamOnerisi.top3 >= 65) return { label: "3 AT", cls: "bg-brand text-white" };
-    if (kapsamOnerisi.top6 >= 80) return { label: "6 AT", cls: "bg-amber-500 text-white" };
+    if (kapsamOnerisi.top3 >= KAPSAM_ESIK_ILK3) return { label: "3 AT", cls: "bg-brand text-white" };
+    if (kapsamOnerisi.top6 >= KAPSAM_ESIK_ILK6) return { label: "6 AT", cls: "bg-amber-500 text-white" };
     return { label: "GENİŞ OYNA", cls: "bg-red-500 text-white" };
   }
   // Henüz analiz yok (ya da eski motor) — yalnız koşu TİPİNİN tarihsel eğilimi varsa onu
@@ -113,10 +114,21 @@ function modelTabanliKapsamOnerisi(topPicks: RaceAdviceCardPick[]): { top3: numb
   const top3 = scores.slice(0, 3).reduce((a, b) => a + b, 0);
   const top6 = scores.slice(0, 6).reduce((a, b) => a + b, 0);
   let text: string;
-  if (top3 >= 65) text = `3 at yeter — bu koşuda modelin kendi olasılığına göre %${Math.round(top3)} kapsama`;
-  else if (top6 >= 80) text = `6 at yeter — bu koşuda %${Math.round(top6)} kapsama`;
+  if (top3 >= KAPSAM_ESIK_ILK3) text = `3 at yeter — bu koşuda modelin kendi olasılığına göre %${Math.round(top3)} kapsama`;
+  else if (top6 >= KAPSAM_ESIK_ILK6) text = `6 at yeter — bu koşuda %${Math.round(top6)} kapsama`;
   else text = `6'dan fazla gerekebilir — ilk 6 bu koşuda yalnız %${Math.round(top6)} kapsıyor`;
   return { top3, top6, text };
+}
+
+// Kartta doğrudan gösterilen, EŞİĞİ AÇIKÇA yazan kısa metin — tekAtVerdisi'nin hangi
+// koşulu kullandığını (65/80) admin ezbere bilmeden okuyabilsin diye. Mobilde de tek
+// satır (gerekirse doğal sarar) — kartın kendi flex-col yapısı taşmayı zaten engelliyor.
+function kapsamEsikMetni(k: { top3: number; top6: number }): string {
+  const top3 = Math.round(k.top3);
+  const top6 = Math.round(k.top6);
+  if (k.top3 >= KAPSAM_ESIK_ILK3) return `İlk 3: %${top3} ✓ (eşik ≥%${KAPSAM_ESIK_ILK3})`;
+  if (k.top6 >= KAPSAM_ESIK_ILK6) return `İlk 3: %${top3} (eşik ≥%${KAPSAM_ESIK_ILK3}, yetersiz) → İlk 6: %${top6} ✓ (eşik ≥%${KAPSAM_ESIK_ILK6})`;
+  return `İlk 6: %${top6} (eşik ≥%${KAPSAM_ESIK_ILK6}, yetersiz)`;
 }
 
 export default function RaceAdviceCard({
@@ -212,7 +224,7 @@ export default function RaceAdviceCard({
                   className={cn("font-semibold", style.textCls)}
                   title="Bu koşuya özel — modelin BU ATLAR için yayınlanmış olasılıklarının toplamı, tarihsel bir ortalama değil."
                 >
-                  İlk 3: %{Math.round(kapsamOnerisi.top3)} · İlk 6: %{Math.round(kapsamOnerisi.top6)}
+                  {kapsamEsikMetni(kapsamOnerisi)}
                 </span>
               )}
               {kapsamOnerisi && advice.oneri && <span className="text-muted-foreground"> · </span>}
