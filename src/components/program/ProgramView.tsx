@@ -141,6 +141,33 @@ const STIL_RENK_CLS: Record<string, string> = {
   BEKLEME_GRUBU: "bg-[#2980b9]/15 text-[#2980b9]", EN_GERI_TAKIP: "bg-[#8e44ad]/15 text-[#8e44ad]",
 };
 
+// 2026-09-11 kullanıcı talebi — saha geneli "Yarış Temposu" rozeti. Veri zaten
+// hesaplanıyordu (v5-engine.ts yarisGidisatiSkoru için), yalnız hiçbir yere
+// gösterilmiyordu — bkz. race.service.ts hesaplaRaceTempoSenaryosu.
+const TEMPO_LABEL_KEY: Record<string, "tempoRahatLiderlik" | "tempoYavasTempo" | "tempoDengeli" | "tempoMucadeleli" | "tempoCokYuksek" | "tempoDagilmaRiski"> = {
+  RAHAT_LIDERLIK: "tempoRahatLiderlik", YAVAS_TEMPO: "tempoYavasTempo", DENGELI: "tempoDengeli",
+  MUCADELELI: "tempoMucadeleli", COK_YUKSEK: "tempoCokYuksek", DAGILMA_RISKI: "tempoDagilmaRiski",
+};
+const TEMPO_RENK_CLS: Record<string, string> = {
+  RAHAT_LIDERLIK: "bg-[#2980b9]/15 text-[#2980b9]",
+  YAVAS_TEMPO: "bg-muted text-muted-foreground",
+  DENGELI: "bg-[#27ae60]/15 text-[#27ae60]",
+  MUCADELELI: "bg-[#d4a017]/10 text-[#8a6510] dark:bg-[#d4a017]/15 dark:text-[#d4a017]",
+  COK_YUKSEK: "bg-[#e74c3c]/15 text-[#e74c3c]",
+  DAGILMA_RISKI: "bg-[#8e44ad]/15 text-[#8e44ad]",
+};
+function TempoSenaryosuBadge({ tempoSenaryosu, t }: { tempoSenaryosu: string | null; t: ProgramT }) {
+  if (!tempoSenaryosu || !TEMPO_LABEL_KEY[tempoSenaryosu]) return null;
+  return (
+    <span
+      className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", TEMPO_RENK_CLS[tempoSenaryosu])}
+      title={t("yarisTemposuAciklama")}
+    >
+      {t("yarisTemposu")}: {t(TEMPO_LABEL_KEY[tempoSenaryosu])}
+    </span>
+  );
+}
+
 // Yarış stili — Accurace (GPS/sektörel zamanlama) geçmişinden n>=3 yarışla hesaplanan
 // kalıcı eğilim (bkz. pace-analizi.ts). Eski TJK Son800 tabanlı 4'lü sistemin yerini aldı.
 // 2026-09-01 kullanıcı talebi ("tek değil yüzdesel stillerini çıkarmalısın"): rozet artık
@@ -1302,6 +1329,7 @@ function RaceTable({
         <span className="text-muted-foreground">{breedShort(race.breed, t)}</span>
         {race.classType && <span className="text-muted-foreground">· {race.classType}</span>}
         {race.conditions && <span className="text-xs text-brand">· {race.conditions}</span>}
+        <TempoSenaryosuBadge tempoSenaryosu={race.tempoSenaryosu} t={t} />
         <span className="sm:hidden ml-auto">
           <RaceTimer time={race.time} hasResult={race.result != null} dateStr={dateStr} />
         </span>

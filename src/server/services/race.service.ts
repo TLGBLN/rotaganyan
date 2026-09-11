@@ -9,6 +9,7 @@ import { getGecCikisOzetleriForRace } from "@/server/actions/gec-cikis.actions";
 import { breedToIrk, surfaceToPist, mesafeBucket, havuzAnahtari, eslestirSireStatOzetleri, eslestirDamStatOzetleri } from "@/lib/sire-stat-match";
 import { fetchTodaysAltiliResults } from "./ingest/tjk-altili.adapter";
 import { findIkramiyeForHippodrome } from "@/lib/altili-match";
+import { hesaplaYarisGidisati, type AtTempoProfili, type TekYarisStil, type TempoSenaryosu } from "@/lib/methodology/pace-analizi";
 
 /** Runner.raceStyle JSON alanından ("style" + "percent" + "veri" + "dagilim") ekranda
  *  gösterilecek değeri çıkarır. dagilim (2026-09-01, Yarış Gidişatı çalışmasıyla eklendi) —
@@ -16,10 +17,30 @@ import { findIkramiyeForHippodrome } from "@/lib/altili-match";
  *  dağılım gösterilsin diye buradan istemciye taşınıyor (bkz. ProgramView.tsx raceStyleBadge).
  *  Eski (dagilim'den ÖNCE yazılmış) kayıtlarda bu alan yok — undefined döner, rozet o zaman
  *  eski tek-stil gösterimine düşer. */
-function parseRaceStyle(raw: unknown): { style: string; percent: number; veri: number | null; dagilim?: Record<string, number> } | null {
-  const r = raw as { style?: string; percent?: number; veri?: number; dagilim?: Record<string, number> } | null;
+function parseRaceStyle(raw: unknown): { style: string; percent: number; veri: number | null; dagilim?: Record<string, number>; erkenHizGucu?: number | null } | null {
+  const r = raw as { style?: string; percent?: number; veri?: number; dagilim?: Record<string, number>; erkenHizGucu?: number | null } | null;
   if (!r?.style || r.percent == null) return null;
-  return { style: r.style, percent: r.percent, veri: r.veri ?? null, dagilim: r.dagilim };
+  return { style: r.style, percent: r.percent, veri: r.veri ?? null, dagilim: r.dagilim, erkenHizGucu: r.erkenHizGucu ?? null };
+}
+
+// 2026-09-11 kullanıcı talebi — "Yarış Temposu": v5-engine.ts'in yarisGidisatiSkoru
+// hesabı için ZATEN çalıştırdığı hesaplaYarisGidisati()'nin baskinSenaryo çıktısı,
+// admin analizi hiç gerekmeden (Runner.raceStyle zaten public/sync verisi) doğrudan
+// public program sayfasında gösteriliyor. gecerliAtSayisi<3 ise (çok az at profili
+// varsa) güvenilmez sayılıp null dönüyor — per-horse "(n)" uyarısıyla aynı mantık.
+const TEMPO_MIN_GECERLI_AT = 3;
+function hesaplaRaceTempoSenaryosu(
+  runners: { raceStyle: { dagilim?: Record<string, number>; erkenHizGucu?: number | null; veri: number | null } | null }[],
+  distance: number
+): TempoSenaryosu | null {
+  const profiller: (AtTempoProfili | null)[] = runners.map((ru) => {
+    const rs = ru.raceStyle;
+    if (!rs?.dagilim) return null;
+    return { dagilim: rs.dagilim as Record<TekYarisStil, number>, erkenHizGucu: rs.erkenHizGucu ?? null, n: rs.veri ?? 0 };
+  });
+  const sonuc = hesaplaYarisGidisati(profiller, distance);
+  if (sonuc.sahaTempoDegiskenleri.gecerliAtSayisi < TEMPO_MIN_GECERLI_AT) return null;
+  return sonuc.baskinSenaryo;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -913,6 +934,9 @@ export type ProgramRace = {
   result: { winnerNo: number | null; winnerNos: number[]; actualOrder: unknown; ganyan: number | null; time: string | null; farklar: string | null } | null;
   hasAnalysis: boolean;
   picks: ProgramPick[];
+  /** 2026-09-11 — saha geneli tempo senaryosu (bkz. hesaplaRaceTempoSenaryosu), yeterli
+   *  at profili yoksa null. */
+  tempoSenaryosu: TempoSenaryosu | null;
 };
 
 export type ProgramDay = {
@@ -1083,6 +1107,23 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
         if (pred == null) pred = originalPred.get(key) ?? null;
         originalRunners = originalRunnerData.get(key);
       }
+      const mappedRunners = r.runners.map((ru) => {
+        const inherited = originalRunners?.get(normHorseNameForMirror(ru.name));
+        const ownGallops = gallopsByRunnerId.get(ru.id) ?? [];
+        const gallops = ownGallops.length > 0 ? ownGallops : inherited?.gallops ?? ownGallops;
+        const raceStyle = ru.raceStyle ?? inherited?.raceStyle ?? null;
+        return {
+          ...ru,
+          sireStatOzet: sireStatByRunnerId.get(ru.id) ?? null,
+          damStatOzet: damStatByRunnerId.get(ru.id) ?? null,
+          startSorunu: startSorunuByRunnerId.get(ru.id) ?? null,
+          raceStyle: parseRaceStyle(raceStyle),
+          gallops: gallops.map((g) => ({
+            ...g,
+            splits: (g.splits ?? {}) as Record<string, string | null>,
+          })),
+        };
+      });
       return {
         id: r.id,
         raceNo: r.raceNo,
@@ -1092,23 +1133,8 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
         surface: r.surface,
         distance: r.distance,
         conditions: r.conditions,
-        runners: r.runners.map((ru) => {
-          const inherited = originalRunners?.get(normHorseNameForMirror(ru.name));
-          const ownGallops = gallopsByRunnerId.get(ru.id) ?? [];
-          const gallops = ownGallops.length > 0 ? ownGallops : inherited?.gallops ?? ownGallops;
-          const raceStyle = ru.raceStyle ?? inherited?.raceStyle ?? null;
-          return {
-            ...ru,
-            sireStatOzet: sireStatByRunnerId.get(ru.id) ?? null,
-            damStatOzet: damStatByRunnerId.get(ru.id) ?? null,
-            startSorunu: startSorunuByRunnerId.get(ru.id) ?? null,
-            raceStyle: parseRaceStyle(raceStyle),
-            gallops: gallops.map((g) => ({
-              ...g,
-              splits: (g.splits ?? {}) as Record<string, string | null>,
-            })),
-          };
-        }),
+        runners: mappedRunners,
+        tempoSenaryosu: hesaplaRaceTempoSenaryosu(mappedRunners, r.distance),
         result: r.result,
         hasAnalysis: pred != null && pred.picks.length > 0,
         picks: (pred?.picks ?? []).map((p) => ({
