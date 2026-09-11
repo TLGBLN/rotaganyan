@@ -432,13 +432,14 @@ export async function assertPublishSafe(id: string): Promise<void> {
   // pick için details zorunlu kılmak o meşru senaryoyu da bloke ederdi — sert koşul yasağıyla
   // çelişir.
 
-  // (3) Banko verilmişse AGF favorisi ile sistem 1.si farklı olamaz.
-  const sistemBirinci = pred.picks.find((p) => p.rank === 1);
-  if (pred.isBanko && agfFavori && sistemBirinci && agfFavori.id !== sistemBirinci.runnerId) {
-    throw new Error(
-      `AGF favorisi #${agfFavori.no} ${agfFavori.name}, sistem 1.sinden farklı — BANKO verilemez. Bankoyu kaldırın veya sıralamayı gözden geçirin.`
-    );
-  }
+  // (3) KALDIRILDI (2026-09-11, CANOZANIM vakası) — "Banko verilmişse AGF favorisi ile
+  // sistem 1.si farklı olamaz" sert engeli, AGF top-3 kuralıyla (bkz. yukarıdaki (2b) notu,
+  // v6.24) AYNI ilkeyle çelişiyordu: "hiçbir kural sabit eşikle admin'in muhakemesini
+  // mekanik olarak ELEMEMELİ" (sert-koşul-yasağı). Hem saf model hem ağırlıklı model AYNI
+  // atı (CANOZANIM) net biçimde 1. gösterdiği bir günde, yalnızca piyasa (AGF) farklı
+  // düşünüyor diye banko'nun HİÇBİR override yolu olmadan tamamen engellenmesi, tam olarak
+  // (2b)'nin geri alınma gerekçesiyle aynı hata. Karar artık tamamen admin'e bırakıldı —
+  // istisna/uyarı mekanizması EKLENMEDİ, kullanıcı kararıyla kural DOĞRUDAN kaldırıldı.
 
   // (4) 2+ kaçak stilli at varsa tempo alanı boş bırakılamaz.
   const kacakSayisi = aktifAtlar.filter((r) => (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT").length;
