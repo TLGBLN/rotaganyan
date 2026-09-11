@@ -143,10 +143,17 @@ const STIL_RENK_CLS: Record<string, string> = {
 
 // 2026-09-11 kullanıcı talebi — saha geneli "Yarış Temposu" rozeti. Veri zaten
 // hesaplanıyordu (v5-engine.ts yarisGidisatiSkoru için), yalnız hiçbir yere
-// gösterilmiyordu — bkz. race.service.ts hesaplaRaceTempoSenaryosu.
-const TEMPO_LABEL_KEY: Record<string, "tempoRahatLiderlik" | "tempoYavasTempo" | "tempoDengeli" | "tempoMucadeleli" | "tempoCokYuksek" | "tempoDagilmaRiski"> = {
-  RAHAT_LIDERLIK: "tempoRahatLiderlik", YAVAS_TEMPO: "tempoYavasTempo", DENGELI: "tempoDengeli",
-  MUCADELELI: "tempoMucadeleli", COK_YUKSEK: "tempoCokYuksek", DAGILMA_RISKI: "tempoDagilmaRiski",
+// gösterilmiyordu — bkz. race.service.ts hesaplaRaceTempoSenaryosu. Hesaplama
+// pace-analizi.ts'in 6 teknik senaryosunu (RAHAT_LİDERLİK vb.) üretir — kullanıcı
+// talebiyle (2026-09-11, "alışılmamış terimler kullanılmamalı") GÖSTERİM 4 basit
+// hız terimine indirgendi, HESAPLAMA MANTIĞI DEĞİŞMEDİ, yalnız etiket eşlemesi.
+const TEMPO_LABEL_KEY: Record<string, "tempoCokYavas" | "tempoYavas" | "tempoNormal" | "tempoHizli" | "tempoCokHizli"> = {
+  RAHAT_LIDERLIK: "tempoCokYavas",
+  YAVAS_TEMPO: "tempoYavas",
+  DENGELI: "tempoNormal",
+  MUCADELELI: "tempoHizli",
+  COK_YUKSEK: "tempoCokHizli",
+  DAGILMA_RISKI: "tempoCokHizli",
 };
 const TEMPO_RENK_CLS: Record<string, string> = {
   RAHAT_LIDERLIK: "bg-[#2980b9]/15 text-[#2980b9]",
@@ -154,7 +161,7 @@ const TEMPO_RENK_CLS: Record<string, string> = {
   DENGELI: "bg-[#27ae60]/15 text-[#27ae60]",
   MUCADELELI: "bg-[#d4a017]/10 text-[#8a6510] dark:bg-[#d4a017]/15 dark:text-[#d4a017]",
   COK_YUKSEK: "bg-[#e74c3c]/15 text-[#e74c3c]",
-  DAGILMA_RISKI: "bg-[#8e44ad]/15 text-[#8e44ad]",
+  DAGILMA_RISKI: "bg-[#e74c3c]/15 text-[#e74c3c]",
 };
 function TempoSenaryosuBadge({ tempoSenaryosu, t }: { tempoSenaryosu: string | null; t: ProgramT }) {
   if (!tempoSenaryosu || !TEMPO_LABEL_KEY[tempoSenaryosu]) return null;
