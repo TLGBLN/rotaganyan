@@ -34,7 +34,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </div>
             <Link
               href="/admin/bildirimler"
-              className="relative flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+              className="relative flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
             >
               <Bell className="h-4 w-4" />
               {unreadCount > 0 && (

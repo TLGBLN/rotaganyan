@@ -34,6 +34,10 @@
   --color-target-foreground:   var(--target-foreground);
   --color-hit:                 var(--hit);
   --color-miss:                var(--miss);
+  /* 2026-09-11 — "kazanan" satır vurgusu (eskiden tüm kod genelinde sabit #f5c518
+     hex ile yazılıyordu). Açık temada parlak sarı beyaz zeminde okunmuyordu, o
+     yüzden değişkenleştirildi. */
+  --color-winner:              var(--winner);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -51,13 +55,67 @@
 }
 
 /*
-  Tek tema — daima koyu lacivert.
-  #0F1B29 → oklch(0.12 0.038 240)
-  html'de class="dark" var, bu yüzden shadcn bileşenleri .dark varyantı kullanır.
-  Hem :root hem .dark aynı değerleri taşıyor — temayı kilitliyoruz.
+  2026-09-11 kullanıcı talebi — açık/koyu tema seçimi eklendi (next-themes,
+  bkz. ThemeProvider.tsx + ThemeToggle.tsx). Önceden ":root ve .dark aynı
+  değerleri taşıyor, temayı kilitliyoruz" notu vardı — artık iki AYRI palet var.
+  Koyu palet (marka rengi, varsayılan) DEĞİŞMEDİ. Açık palet aynı marka kimliğini
+  (altın + çelik mavi) beyaz zemine uyarlıyor — kontrast için gerektiğinde
+  lightness/chroma ayarlandı, hue'lar (82=altın, 228=çelik mavi, 155=yeşil,
+  27=kırmızı) sabit tutuldu.
 */
 
-:root,
+:root {
+  --radius: 0.5rem;
+
+  /* Ana arka plan: sıcak beyaz (marka lacivertine hafif hue eğimli) */
+  --background:  oklch(0.98 0.006 240);
+  --foreground:  oklch(0.16 0.038 240);
+
+  /* Kartlar — zeminden bir kademe daha beyaz */
+  --card:              oklch(1 0 0);
+  --card-foreground:   oklch(0.16 0.038 240);
+
+  --popover:           oklch(1 0 0);
+  --popover-foreground:oklch(0.16 0.038 240);
+
+  /* Primary: altın (marka düğmeler) — beyaz zeminde kontrast için koyu mode'dan biraz daha koyu/doygun */
+  --primary:           oklch(0.68 0.16 82);
+  --primary-foreground:oklch(0.16 0.038 240);
+
+  /* İkincil alanlar */
+  --secondary:         oklch(0.94 0.01 240);
+  --secondary-foreground: oklch(0.20 0.038 240);
+
+  --muted:             oklch(0.94 0.01 240);
+  --muted-foreground:  oklch(0.46 0.02 240);
+
+  --accent:            oklch(0.92 0.014 240);
+  --accent-foreground: oklch(0.16 0.038 240);
+
+  --destructive:       oklch(0.55 0.22 27);
+
+  --border:            oklch(0.88 0.012 240);
+  --input:             oklch(0.88 0.012 240);
+  --ring:              oklch(0.68 0.16 82);
+
+  /* ── ROTAGANYAN marka renkleri ─────────── */
+
+  /* Altın sarı — logo GANYAN */
+  --brand:             oklch(0.68 0.16 82);
+  --brand-foreground:  oklch(0.16 0.038 240);
+
+  /* Çelik mavi — logo grafik */
+  --target:            oklch(0.50 0.14 228);
+  --target-foreground: oklch(0.98 0.006 240);
+
+  --hit:               oklch(0.48 0.15 155);
+  --miss:              oklch(0.55 0.22 27);
+
+  /* Kazanan vurgusu — koyu moddaki parlak altın (#f5c518) beyaz zeminde
+     okunmuyor, kontrast için belirgin şekilde koyulaştırıldı. */
+  --winner:            oklch(0.55 0.16 82);
+}
+
 .dark {
   --radius: 0.5rem;
 
@@ -104,15 +162,18 @@
 
   --hit:               oklch(0.58 0.16 155);
   --miss:              oklch(0.62 0.22 27);
+
+  /* Kazanan vurgusu — eski sabit #f5c518 değeri, koyu modda birebir korunuyor. */
+  --winner:            #f5c518;
 }
 
 /* ─── Base ─────────────────────────────────── */
 *, *::before, *::after {
-  border-color: #1B354F;
+  border-color: var(--border);
 }
 
 html {
-  background: oklch(0.12 0.038 240);
+  background: var(--background);
 }
 
 body {
@@ -153,8 +214,8 @@ body {
   display: none;
 }
 
-/* Satır zebra rengi */
-.race-row-even { background: oklch(0.16 0.038 240); }
+/* Satır zebra rengi — kart rengini kullanır, iki temada da otomatik uyar */
+.race-row-even { background: var(--card); }
 
 /* Tıklama geri bildirimi — her butona (TR/EN dahil) basılınca hissedilir bir
    "basıldı" tepkisi versin diye tek noktadan tanımlı. transform kullanılan

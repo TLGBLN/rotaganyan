@@ -9,6 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import LocaleToggle from "./LocaleToggle";
+import ThemeToggle from "./ThemeToggle";
 import SocialLinks from "./SocialLinks";
 
 type FollowedHorse = { horseName: string; note?: string | null };
@@ -109,7 +110,11 @@ export default function MobileNav({ isLoggedIn, followedHorses = [] }: Props) {
             </div>
           )}
 
-          <div className="border-t pt-4 pb-3">
+          <div className="border-t pt-4 pb-3 space-y-2">
+            <div className="flex items-center justify-between gap-2 rounded-md border px-3 py-2.5">
+              <span className="text-sm font-medium text-muted-foreground">{t("tema")}</span>
+              <ThemeToggle />
+            </div>
             <div className="flex items-center justify-between gap-2 rounded-md border px-3 py-2.5">
               <span className="text-sm font-medium text-muted-foreground">{t("dil")}</span>
               <LocaleToggle />

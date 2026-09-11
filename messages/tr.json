@@ -24,7 +24,12 @@
     "cikisYap": "Çıkış Yap",
     "girisYap": "Giriş Yap",
     "kayitOl": "Kayıt Ol",
-    "dil": "Dil"
+    "dil": "Dil",
+    "tema": "Tema"
+  },
+  "tema": {
+    "acik": "Açık",
+    "koyu": "Koyu"
   },
   "footer": {
     "copyright": "© 2026 At Yarışı Analiz Platformu",

@@ -36,7 +36,7 @@ export default function AdminMobileNav({ userName, userEmail, unreadCount }: Pro
             <Link
               href="/admin/bildirimler"
               onClick={() => setOpen(false)}
-              className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+              className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
             >
               <Bell className="h-4 w-4" />
               {unreadCount > 0 && (

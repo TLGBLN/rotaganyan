@@ -18,7 +18,7 @@ const STATUS_CLASS: Record<KuponStatus, string> = {
 
 const TAB_CLASS = "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors shrink-0";
 const TAB_ACTIVE = "bg-brand text-brand-foreground";
-const TAB_INACTIVE = "bg-white/5 text-muted-foreground border hover:bg-muted";
+const TAB_INACTIVE = "bg-foreground/5 text-muted-foreground border hover:bg-muted";
 
 function XLogo({ className }: { className?: string }) {
   return (
@@ -285,7 +285,7 @@ function KuponGroup({ kuponlar, altiliResults, isAdmin }: { kuponlar: Kupon[]; a
                   // 2026-09-01 kullanıcı talebi: tam kapsül (rounded-full) değil, orta
                   // yuvarlaklıkta köşeli dikdörtgen ("köşeler sivriye yakın ama oval").
                   "rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors",
-                  i === secili ? "bg-brand text-brand-foreground" : "bg-white/5 text-muted-foreground border hover:bg-muted"
+                  i === secili ? "bg-brand text-brand-foreground" : "bg-foreground/5 text-muted-foreground border hover:bg-muted"
                 )}
               >
                 {slot ?? `${i + 1}. Altılı`}

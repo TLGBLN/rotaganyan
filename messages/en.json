@@ -24,7 +24,12 @@
     "cikisYap": "Log Out",
     "girisYap": "Log In",
     "kayitOl": "Sign Up",
-    "dil": "Language"
+    "dil": "Language",
+    "tema": "Theme"
+  },
+  "tema": {
+    "acik": "Light",
+    "koyu": "Dark"
   },
   "footer": {
     "copyright": "© 2026 Horse Racing Analysis Platform",

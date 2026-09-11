@@ -36,7 +36,7 @@ function DegisimEtiketi({ item, t }: { item: AgfTrendItem; t: AgfT }) {
 // v6.114 — kullanıcı talebi 2026-08-13: bu listedeki bir at gerçekten kazanırsa, sitede
 // kazananlar için her yerde kullanılan AYNI altın rengiyle (bkz. ProgramView.tsx isWinner
 // → #f5c518) işaretlensin — ayrı bir renk icat edilmedi, mevcut kazanan kuralına uyuldu.
-const WINNER_COLOR = "text-[#f5c518]";
+const WINNER_COLOR = "text-winner";
 
 function HareketKarti({
   baslik, renk, atlar, t, winnerNos,

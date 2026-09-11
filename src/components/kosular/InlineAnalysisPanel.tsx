@@ -113,7 +113,7 @@ export default function InlineAnalysisPanel({ picks, winnerNos, isLoggedIn, race
                 {pick.runner?.no ?? "—"}
               </span>
               <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                <span className={cn("truncate text-xs font-medium", isWinner && "font-bold text-[#F5C518]", pick.runner?.scratched && "line-through opacity-50")}>
+                <span className={cn("truncate text-xs font-medium", isWinner && "font-bold text-winner", pick.runner?.scratched && "line-through opacity-50")}>
                   {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
                 </span>
                 {pick.runner?.scratched && (
@@ -182,7 +182,7 @@ export default function InlineAnalysisPanel({ picks, winnerNos, isLoggedIn, race
                   <td className="px-2 py-2 font-mono">{pick.runner?.no ?? "—"}</td>
                   <td className="px-2 py-2 font-medium">
                     <div className="flex items-center gap-1.5">
-                      <span className={cn(isWinner ? "font-bold text-[#F5C518]" : "", pick.runner?.scratched && "line-through opacity-50")}>
+                      <span className={cn(isWinner ? "font-bold text-winner" : "", pick.runner?.scratched && "line-through opacity-50")}>
                         {(pick.runner?.name && !/^\d+$/.test(pick.runner.name) ? pick.runner.name : null) ?? pick.runnerLabel?.replace(/^\d+\s+/, "") ?? pick.runnerLabel ?? "—"}
                       </span>
                       {pick.runner?.scratched && (

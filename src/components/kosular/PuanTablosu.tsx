@@ -194,7 +194,7 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
                           ? "bg-hit/15"
                           : "";
                         const textColor = isWinner
-                          ? "text-[#F5C518]"
+                          ? "text-winner"
                           : rankColor(displayRank);
                         const weight = rankWeight(displayRank);
 
@@ -229,7 +229,7 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
                                   {(() => {
                                     const pos = finishPos(race.result?.actualOrder, pick.runner?.no, race.result?.winnerNos);
                                     return pos != null ? (
-                                      <span className={cn("ml-1 text-[10px] font-semibold", pos === 1 ? "text-[#F5C518]" : "text-muted-foreground")}>
+                                      <span className={cn("ml-1 text-[10px] font-semibold", pos === 1 ? "text-winner" : "text-muted-foreground")}>
                                         ({pos}.)
                                         {pos === 1 && race.result?.ganyan != null && ` Gny: ${race.result.ganyan.toFixed(2)}`}
                                       </span>
@@ -351,7 +351,7 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
                         }
 
                         const rowBg = isWinner ? "bg-[#C98F02]/20" : isTarget ? "bg-hit/15" : colBg;
-                        const textColor = isWinner ? "text-[#F5C518]" : rankColor(displayRank);
+                        const textColor = isWinner ? "text-winner" : rankColor(displayRank);
                         const weight = rankWeight(displayRank);
                         const nameMaxWidth = rowPicks.length > 1 ? "max-w-[26px]" : "max-w-[56px]";
 
@@ -390,7 +390,7 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
                                     {(() => {
                                       const pos = finishPos(race.result?.actualOrder, pick.runner?.no, race.result?.winnerNos);
                                       return pos != null ? (
-                                        <span className={cn("shrink-0 text-[9px] font-semibold", pos === 1 ? "text-[#F5C518]" : "text-muted-foreground")}>
+                                        <span className={cn("shrink-0 text-[9px] font-semibold", pos === 1 ? "text-winner" : "text-muted-foreground")}>
                                           ({pos}.)
                                         </span>
                                       ) : null;
@@ -403,7 +403,7 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
                                   </span>
                                 ))}
                                 {isWinner && race.result?.ganyan != null && (
-                                  <span className="shrink-0 text-[9px] font-semibold text-[#F5C518]">Gny: {race.result.ganyan.toFixed(2)}</span>
+                                  <span className="shrink-0 text-[9px] font-semibold text-winner">Gny: {race.result.ganyan.toFixed(2)}</span>
                                 )}
                               </div>
                             </td>

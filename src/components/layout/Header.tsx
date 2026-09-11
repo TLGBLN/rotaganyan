@@ -12,6 +12,7 @@ import FollowedHorsesPopup from "./FollowedHorsesPopup";
 import OnlineCounter from "./OnlineCounter";
 import Wordmark from "./Wordmark";
 import LocaleToggle from "./LocaleToggle";
+import ThemeToggle from "./ThemeToggle";
 import HeaderLabel from "./HeaderLabel";
 import SocialLinks from "./SocialLinks";
 
@@ -88,7 +89,8 @@ export default async function Header() {
           )}
           {/* Dar mobil ekranlarda bildirim/hesap/hamburger ile birlikte sıkışıyordu —
               mobilde dil seçimi artık MobileNav sheet'i içinde bir kart olarak yer alıyor. */}
-          <div className="hidden md:block">
+          <div className="hidden items-center gap-2 md:flex">
+            <ThemeToggle />
             <LocaleToggle />
           </div>
           <MobileNav isLoggedIn={!!user} followedHorses={followedHorses} />

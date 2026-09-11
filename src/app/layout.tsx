@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import SessionProvider from "@/components/providers/SessionProvider";
 import LocaleProvider from "@/components/providers/LocaleProvider";
+import ThemeProvider from "@/components/providers/ThemeProvider";
 import VersionWatcher from "@/components/layout/VersionWatcher";
 import ServiceWorkerRegister from "@/components/layout/ServiceWorkerRegister";
 import ScrollToTopButton from "@/components/layout/ScrollToTopButton";
@@ -71,7 +72,13 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0F1B29",
+  // 2026-09-11 — açık/koyu tema seçimiyle birlikte tarayıcı çubuğu rengi de OS
+  // tercihine göre iki değer alıyor (next-themes'in class'ı ile birebir senkron
+  // değil ama pratikte örtüşüyor, varsayılan zaten koyu).
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F7F5F1" },
+    { media: "(prefers-color-scheme: dark)", color: "#0F1B29" },
+  ],
 };
 
 export default async function RootLayout({
@@ -83,24 +90,26 @@ export default async function RootLayout({
   const locale = await getLocale();
 
   return (
-    <html lang={locale} className="dark" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${barlowCondensed.variable} antialiased min-h-screen bg-background text-foreground`}
         suppressHydrationWarning
       >
-        <LocaleProvider initialLocale={locale as AppLocale}>
-          <SessionProvider session={session}>
-            <TooltipProvider>
-              <SplashScreen />
-              {children}
-              <Toaster richColors position="bottom-right" />
-              <VersionWatcher />
-              <ServiceWorkerRegister />
-              <ScrollToTopButton />
-              <PageTracker />
-            </TooltipProvider>
-          </SessionProvider>
-        </LocaleProvider>
+        <ThemeProvider>
+          <LocaleProvider initialLocale={locale as AppLocale}>
+            <SessionProvider session={session}>
+              <TooltipProvider>
+                <SplashScreen />
+                {children}
+                <Toaster richColors position="bottom-right" />
+                <VersionWatcher />
+                <ServiceWorkerRegister />
+                <ScrollToTopButton />
+                <PageTracker />
+              </TooltipProvider>
+            </SessionProvider>
+          </LocaleProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

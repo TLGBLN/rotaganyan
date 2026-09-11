@@ -24,7 +24,7 @@ export default function Wordmark({ className, style, showIcon = true, iconClassN
         />
       )}
       <span className="inline-flex items-center">
-        <span className="text-white">ROTA</span>
+        <span className="text-foreground">ROTA</span>
         <span className="text-brand">GANYAN</span>
       </span>
     </span>

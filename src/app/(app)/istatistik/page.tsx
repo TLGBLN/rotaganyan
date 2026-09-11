@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 const STYLE_COLOR: Record<string, string> = {
   KACAK_AT: "text-[#e74c3c]",
-  ON_GRUP_ARKASI: "text-[#d4a017]",
+  ON_GRUP_ARKASI: "text-[#8a6510] dark:text-[#d4a017]",
   BEKLEME_GRUBU: "text-[#2980b9]",
   EN_GERI_TAKIP: "text-[#8e44ad]",
 };

@@ -40,7 +40,7 @@ const AtDetaylariPanel = dynamic(() => import("./panels/AtDetaylariPanel"), { lo
 const LAST_HIPO_STORAGE_KEY = "rg-last-hipo";
 const PANEL_BTN_CLASS = "flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors shrink-0";
 const PANEL_BTN_OPEN = "bg-brand text-brand-foreground";
-const PANEL_BTN_CLOSED = "bg-white/5 text-[#c7d0dc] border border-white/10 hover:bg-white/10";
+const PANEL_BTN_CLOSED = "bg-foreground/5 text-muted-foreground border border-foreground/10 hover:bg-foreground/10";
 
 // Koşu tab'ları — kullanıcı isteği: TJK'nın kendi sitesindeki gibi pist türüne göre
 // renklendirilsin, TJK'nın KENDİ renk kodlarıyla birebir (bkz. tjk.adapter.ts'teki
@@ -135,7 +135,9 @@ const STIL_KISA_ETIKET_KEY: Record<string, "kacakAtKisa" | "onGrupArkasiKisa" | 
   KACAK_AT: "kacakAtKisa", ON_GRUP_ARKASI: "onGrupArkasiKisa", BEKLEME_GRUBU: "beklemeGrubuKisa", EN_GERI_TAKIP: "enGeriTakipKisa",
 };
 const STIL_RENK_CLS: Record<string, string> = {
-  KACAK_AT: "bg-[#e74c3c]/15 text-[#e74c3c]", ON_GRUP_ARKASI: "bg-[#d4a017]/15 text-[#d4a017]",
+  KACAK_AT: "bg-[#e74c3c]/15 text-[#e74c3c]",
+  // #d4a017 (koyu sarı) beyaz zeminde neredeyse okunmuyordu — açık temada koyulaştırıldı.
+  ON_GRUP_ARKASI: "bg-[#d4a017]/10 text-[#8a6510] dark:bg-[#d4a017]/15 dark:text-[#d4a017]",
   BEKLEME_GRUBU: "bg-[#2980b9]/15 text-[#2980b9]", EN_GERI_TAKIP: "bg-[#8e44ad]/15 text-[#8e44ad]",
 };
 
@@ -174,7 +176,7 @@ function raceStyleBadge(
 function getRaceStyleInfo(t: ProgramT): { style: string; label: string; desc: string; cls: string }[] {
   return [
     { style: "KACAK_AT", label: t("kacakAt"), desc: t("kacakAtDesc"), cls: "text-[#e74c3c]" },
-    { style: "ON_GRUP_ARKASI", label: t("onGrupArkasi"), desc: t("onGrupArkasiDesc"), cls: "text-[#d4a017]" },
+    { style: "ON_GRUP_ARKASI", label: t("onGrupArkasi"), desc: t("onGrupArkasiDesc"), cls: "text-[#8a6510] dark:text-[#d4a017]" },
     { style: "BEKLEME_GRUBU", label: t("beklemeGrubu"), desc: t("beklemeGrubuDesc"), cls: "text-[#2980b9]" },
     { style: "EN_GERI_TAKIP", label: t("enGeriTakip"), desc: t("enGeriTakipDesc"), cls: "text-[#8e44ad]" },
   ];
@@ -587,8 +589,8 @@ function AnalysisPanel({
                       {displayRank}
                     </span>
                   </td>
-                  <td className={cn("px-2 py-2 text-center font-mono font-bold whitespace-nowrap", isWinner ? "text-[#f5c518]" : rs.text)}>{noText}</td>
-                  <td className={cn("px-2 py-2 font-semibold", isWinner ? "text-[#f5c518]" : rs.text)}>
+                  <td className={cn("px-2 py-2 text-center font-mono font-bold whitespace-nowrap", isWinner ? "text-winner" : rs.text)}>{noText}</td>
+                  <td className={cn("px-2 py-2 font-semibold", isWinner ? "text-winner" : rs.text)}>
                     <span className="inline-flex items-center gap-1.5">
                       {nameText}
                       {isAdmin && agfRanks.length > 0 && (
@@ -597,7 +599,7 @@ function AnalysisPanel({
                         </span>
                       )}
                       {isWinner && ganyan != null && (
-                        <span className="text-[10px] font-semibold text-[#f5c518]">Gny: {ganyan.toFixed(2)}</span>
+                        <span className="text-[10px] font-semibold text-winner">Gny: {ganyan.toFixed(2)}</span>
                       )}
                       {isWinner && isAdmin && (
                         <>
@@ -606,7 +608,7 @@ function AnalysisPanel({
                             onClick={() => handleShare("instagram")}
                             title={t("instagramdaPaylas")}
                             aria-label={t("instagramdaPaylas")}
-                            className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0 print:hidden"
+                            className="flex items-center justify-center w-4 h-4 rounded hover:bg-foreground/15 transition-colors shrink-0 print:hidden"
                           >
                             <InstagramLogo className="h-3 w-3" />
                           </button>
@@ -615,7 +617,7 @@ function AnalysisPanel({
                             onClick={() => handleShare("x")}
                             title={t("xtePaylas")}
                             aria-label={t("xtePaylas")}
-                            className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0 print:hidden"
+                            className="flex items-center justify-center w-4 h-4 rounded hover:bg-foreground/15 transition-colors shrink-0 print:hidden"
                           >
                             <XLogo className="h-3 w-3" />
                           </button>
@@ -701,15 +703,15 @@ function AnalysisPanel({
                 <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0", rs.badge)}>
                   {displayRank}
                 </span>
-                <span className={cn("font-bold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>#{noText}</span>
-                <span className={cn("font-semibold text-xs", isWinner ? "text-[#f5c518]" : rs.text)}>{nameText}</span>
+                <span className={cn("font-bold text-xs", isWinner ? "text-winner" : rs.text)}>#{noText}</span>
+                <span className={cn("font-semibold text-xs", isWinner ? "text-winner" : rs.text)}>{nameText}</span>
                 {isAdmin && agfRanks.length > 0 && (
                   <span className="rounded bg-purple-500/15 px-1 text-[9px] font-semibold text-purple-500 shrink-0">
                     AGF {agfRanks.join("/")}.
                   </span>
                 )}
                 {isWinner && ganyan != null && (
-                  <span className="text-[10px] font-semibold text-[#f5c518]">Gny: {ganyan.toFixed(2)}</span>
+                  <span className="text-[10px] font-semibold text-winner">Gny: {ganyan.toFixed(2)}</span>
                 )}
                 {isWinner && isAdmin && (
                   <>
@@ -718,7 +720,7 @@ function AnalysisPanel({
                       onClick={() => handleShare("instagram")}
                       title={t("instagramdaPaylas")}
                       aria-label={t("instagramdaPaylas")}
-                      className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0"
+                      className="flex items-center justify-center w-4 h-4 rounded hover:bg-foreground/15 transition-colors shrink-0"
                     >
                       <InstagramLogo className="h-3 w-3" />
                     </button>
@@ -727,7 +729,7 @@ function AnalysisPanel({
                       onClick={() => handleShare("x")}
                       title={t("xtePaylas")}
                       aria-label={t("xtePaylas")}
-                      className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/15 transition-colors shrink-0"
+                      className="flex items-center justify-center w-4 h-4 rounded hover:bg-foreground/15 transition-colors shrink-0"
                     >
                       <XLogo className="h-3 w-3" />
                     </button>
@@ -820,7 +822,7 @@ function RunnerRow({
             type="button"
             onClick={() => onSelectHorse(r.name)}
             data-tour="at-detay"
-            className={cn("font-semibold text-left hover:underline", isWinner && "text-[#f5c518]")}
+            className={cn("font-semibold text-left hover:underline", isWinner && "text-winner")}
           >
             {r.name}
             {r.scratched ? (
@@ -1059,7 +1061,7 @@ function RunnerCard({
             <button
               type="button"
               onClick={() => onSelectHorse(r.name)}
-              className={cn("font-semibold truncate text-left hover:underline", isWinner && "text-[#f5c518]")}
+              className={cn("font-semibold truncate text-left hover:underline", isWinner && "text-winner")}
             >
               {r.name}
               {r.scratched ? (
