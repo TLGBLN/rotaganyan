@@ -64,6 +64,13 @@ export type SonYarisDetay = {
   sonYarisTarihi: string | null;
   /** "KGS" — son startından bugünkü koşuya kadar geçen gün sayısı. null = bilinmiyor (ilk start/TJK verisi yok). */
   gunFarki: number | null;
+  /** 2026-09-11 kullanıcı talebi ("son yarısındaki sınıfı ve şimdi koşacağı sınıfı yan
+   * yana ekle") — atın TJK'daki EN SON koşusunun sınıfı (ör. "Maiden/Satış"). null = ilk
+   * start/TJK verisi yok. */
+  sonYarisSinifi: string | null;
+  /** Bugün koşacağı BU yarışın sınıfı — tüm atlar için aynı (Race.classType), tekrar
+   * TJK'ya gitmeye gerek yok, zaten bu fonksiyonun kendi sorgusunda var. */
+  simdikiSinif: string;
 };
 
 /**
@@ -86,11 +93,13 @@ export async function getSonYarisDetaylariForRace(raceId: string): Promise<SonYa
     select: {
       distance: true,
       surface: true,
+      classType: true,
       raceDay: { select: { date: true, hippodrome: { select: { name: true } } } },
       runners: { select: { no: true, name: true, weight: true, jockey: true, equipment: true, tjkAtId: true } },
     },
   });
   if (!race) return [];
+  const simdikiSinif = race.classType;
 
   const hippodromeName = race.raceDay.hippodrome.name.trim();
   const surfacePrefix = SURFACE_PREFIX[race.surface] ?? "";
@@ -106,6 +115,7 @@ export async function getSonYarisDetaylariForRace(raceId: string): Promise<SonYa
           runnerNo: r.no, horseName: r.name, hasTjkId: false,
           eklenenTaki: [], cikarilanTaki: [], kiloDegisimi: null, ayniJokey: null,
           hipodromMesafeEtiket, kazandi: "KOSMADI", enIyiDerecesi: null, sonYarisTarihi: null, gunFarki: null,
+          sonYarisSinifi: null, simdikiSinif,
         };
       }
 
@@ -159,12 +169,14 @@ export async function getSonYarisDetaylariForRace(raceId: string): Promise<SonYa
           eklenenTaki, cikarilanTaki, kiloDegisimi, ayniJokey,
           hipodromMesafeEtiket, kazandi, enIyiDerecesi, sonYarisTarihi,
           gunFarki: gunFarkiHesapla(sonYarisTarihi, race.raceDay.date),
+          sonYarisSinifi: last?.classType ?? null, simdikiSinif,
         };
       } catch {
         return {
           runnerNo: r.no, horseName: r.name, hasTjkId: true,
           eklenenTaki: [], cikarilanTaki: [], kiloDegisimi: null, ayniJokey: null,
           hipodromMesafeEtiket, kazandi: "KOSMADI", enIyiDerecesi: null, sonYarisTarihi: null, gunFarki: null,
+          sonYarisSinifi: null, simdikiSinif,
         };
       }
     })

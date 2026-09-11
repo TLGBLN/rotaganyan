@@ -133,11 +133,14 @@ export default function SonYarisDetayPanel({ raceId }: { raceId: string }) {
                 <tr className="border-b bg-muted/40 text-muted-foreground">
                   <th className="px-2 py-1.5 text-left font-medium" rowSpan={2}>{t("no")}</th>
                   <th className="px-2 py-1.5 text-left font-medium" rowSpan={2}>{t("at")}</th>
+                  <th className="px-2 py-1.5 text-center font-medium" colSpan={2}>{t("sonYarisColSinif")}</th>
                   <th className="px-2 py-1.5 text-center font-medium" rowSpan={2}>{t("sonYarisColKgs")}</th>
                   <th className="px-2 py-1.5 text-center font-medium" colSpan={3}>{t("sonYarisColSonYarisinaGore")}</th>
                   <th className="px-2 py-1.5 text-center font-medium" colSpan={2}>{hipodromMesafeEtiket || t("hipodromMesafeDefault")}</th>
                 </tr>
                 <tr className="border-b bg-muted/40 text-muted-foreground">
+                  <th className="px-2 py-1.5 text-center font-medium">{t("sonYarisColSonSinif")}</th>
+                  <th className="px-2 py-1.5 text-center font-medium">{t("sonYarisColSimdikiSinif")}</th>
                   <th className="px-2 py-1.5 text-center font-medium">{t("sonYarisColTakiDegisikligi")}</th>
                   <th className="px-2 py-1.5 text-center font-medium">{t("sonYarisColKiloDegisimi")}</th>
                   <th className="px-2 py-1.5 text-center font-medium">{t("sonYarisColAyniJokey")}</th>
@@ -150,6 +153,12 @@ export default function SonYarisDetayPanel({ raceId }: { raceId: string }) {
                   <tr key={d.runnerNo} className={cn("border-b border-border/30", i % 2 === 1 && "race-row-even")}>
                     <td className="px-2 py-1.5 font-mono text-muted-foreground">{d.runnerNo}</td>
                     <td className="px-2 py-1.5 font-semibold whitespace-nowrap">{d.horseName}</td>
+                    <td className="px-2 py-1.5 text-center whitespace-nowrap text-muted-foreground">
+                      {d.sonYarisSinifi ?? "—"}
+                    </td>
+                    <td className="px-2 py-1.5 text-center whitespace-nowrap font-semibold">
+                      {d.simdikiSinif}
+                    </td>
                     <td className={cn(
                       "px-2 py-1.5 text-center tabular-nums font-semibold",
                       d.gunFarki == null ? "text-muted-foreground" : d.gunFarki >= 30 ? "text-amber-500" : "text-foreground"
@@ -195,6 +204,10 @@ export default function SonYarisDetayPanel({ raceId }: { raceId: string }) {
                   {d.horseName}
                 </div>
                 <div className="grid grid-cols-2 gap-y-1 gap-x-3">
+                  <div className="text-muted-foreground">{t("sonYarisColSonSinif")}</div>
+                  <div className="text-muted-foreground">{d.sonYarisSinifi ?? "—"}</div>
+                  <div className="text-muted-foreground">{t("sonYarisColSimdikiSinif")}</div>
+                  <div className="font-semibold">{d.simdikiSinif}</div>
                   <div className="text-muted-foreground">{t("sonYarisColKgs")}</div>
                   <div className={cn(
                     "tabular-nums font-semibold",
