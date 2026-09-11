@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ekuriRengi } from "@/lib/ekuri-colors";
 import { KAPSAM_ESIK_ILK3, KAPSAM_ESIK_ILK6 } from "@/lib/methodology/kapsam-esikleri";
+import { optimizeKuponAllocation, type LegProbability } from "@/lib/methodology/kupon-optimizer";
 import {
   getRaceDayLegs,
   publishHomeKupon,
@@ -52,6 +53,32 @@ function emptySelection(): Record<Width, Set<number>> {
 function emptyGroupSelections(races: { raceNo: number }[]): GroupSelections {
   const sel: GroupSelections = {};
   races.forEach((r) => { sel[r.raceNo] = emptySelection(); });
+  return sel;
+}
+
+// 2026-09-11 kullanıcı bulgusu ("bir 600 TL'lik kupon yaparken bu mantıkla hiç kupon
+// tutturamayız") — her ayağa kendi "güvenli" genişliğini vermek sabit bütçeye SIĞMIYOR
+// (6 ayağın hepsine 3 at bile yazsan 3⁶=729 kombinasyon, 700₺'nin üstü). Gerçek çözüm her
+// ayağı ayrı ayrı değil, sabit bütçeyi TÜM ayaklar arasında en yüksek toplam-isabet
+// olasılığını verecek şekilde DAĞITMAK — bkz. kupon-optimizer.ts. Bu fonksiyon her üç
+// kademe (Ekonomik/Normal/Geniş) için AYRI bir optimizasyon çalıştırıp TEK bir
+// GroupSelections'ta birleştiriyor.
+function otomatikGroupSelections(races: RaceDayData["races"], stakePerCombination: number): GroupSelections {
+  const legs: LegProbability[] = races.map((race) => ({
+    raceNo: race.raceNo,
+    runners: race.runners
+      .filter((r) => !r.scratched)
+      .map((r) => ({ no: r.no, olasilik: (r.score ?? 0) / 100 })),
+  }));
+  const sel = emptyGroupSelections(races);
+  for (const width of WIDTHS) {
+    const effectiveLimit = LIMITS[width] * TOLERANCES[width];
+    const maxCombinations = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
+    const { secimler } = optimizeKuponAllocation(legs, maxCombinations);
+    for (const race of races) {
+      sel[race.raceNo][width] = new Set(secimler[race.raceNo] ?? []);
+    }
+  }
   return sel;
 }
 
@@ -122,12 +149,13 @@ function amountFor(counts: number[], stakePerCombination: number): number {
 // paylaşıyor, yalnız hangi koşuları kapsadığı ve etiketi farklı — kod tekrarını
 // önlemek için ortak bileşene çıkarıldı.
 function KuponGrup({
-  label, races, selections, onToggle, amounts, onSubmit, publishing, stakePerCombination, widths = WIDTHS,
+  label, races, selections, onToggle, onAutoFill, amounts, onSubmit, publishing, stakePerCombination, widths = WIDTHS,
 }: {
   label: string;
   races: RaceDayData["races"];
   selections: GroupSelections;
   onToggle: (raceNo: number, width: Width, no: number) => void;
+  onAutoFill: () => void;
   amounts: Record<Width, number>;
   onSubmit: () => void;
   publishing: boolean;
@@ -137,7 +165,22 @@ function KuponGrup({
 }) {
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold">{label}</h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold">{label}</h3>
+        {/* 2026-09-11 kullanıcı bulgusu ("600₺'ye bu mantıkla hiç kupon tutturamayız") —
+            her ayağa kendi güvenli genişliğini vermek sabit bütçeye sığmıyor; bu buton
+            sabit bütçeyi ayaklar arasında en yüksek toplam-isabet olasılığını verecek
+            şekilde dağıtır (bkz. kupon-optimizer.ts), üç kademeyi de TEK tıkla doldurur.
+            Yalnız ÖNERİ doldurur — "Kupon Oluştur" (Yayınla) ayrı, admin gözden geçirip
+            onaylamadan hiçbir şey yayınlanmaz. */}
+        <button
+          type="button"
+          onClick={onAutoFill}
+          className="shrink-0 rounded-md border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand/20"
+        >
+          ⚡ Otomatik Doldur (bütçeye göre)
+        </button>
+      </div>
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full border-collapse text-sm">
           <thead>
@@ -366,6 +409,12 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
     });
   }
 
+  function autoFillGroup(groupKey: string, races: RaceDayData["races"], stakePerCombination: number) {
+    const sel = otomatikGroupSelections(races, stakePerCombination);
+    setSelections((prev) => ({ ...prev, [groupKey]: sel }));
+    toast.success("Öneri dolduruldu — gözden geçirip yayınlamadan önce düzenleyebilirsin");
+  }
+
   async function submitGroup(group: RaceDayData["races"], key: string, label: string, slot: number) {
     if (!raceDay) return;
 
@@ -457,6 +506,7 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
                 races={chunk}
                 selections={selections[key] ?? {}}
                 onToggle={(raceNo, width, no) => toggleHorse(key, raceNo, width, no)}
+                onAutoFill={() => autoFillGroup(key, chunk, ALTILI_STAKE_PER_COMBINATION)}
                 amounts={groupAmounts[chunkIdx]}
                 stakePerCombination={ALTILI_STAKE_PER_COMBINATION}
                 onSubmit={() => submitGroup(chunk, key, slotLabel, chunkIdx + 1)}
@@ -472,6 +522,7 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
               races={yediliGanyanRaces}
               selections={selections["yedili-ganyan"] ?? {}}
               onToggle={(raceNo, width, no) => toggleHorse("yedili-ganyan", raceNo, width, no)}
+              onAutoFill={() => autoFillGroup("yedili-ganyan", yediliGanyanRaces, YEDILI_GANYAN_STAKE_PER_COMBINATION)}
               amounts={yediliGanyanAmounts}
               stakePerCombination={YEDILI_GANYAN_STAKE_PER_COMBINATION}
               widths={["wide"]}
