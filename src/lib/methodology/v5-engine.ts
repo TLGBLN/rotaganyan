@@ -150,6 +150,7 @@ import {
 } from "@/lib/methodology/veri-toplama";
 import { galopQuality, isSameJockey, isSprintIdman } from "@/components/program/panels/galop-helpers";
 import { hesaplaYarisGidisati, type AtTempoProfili, type TekYarisStil } from "@/lib/methodology/pace-analizi";
+import { hesaplaTempoTasimaGucuMap } from "@/server/actions/tempo-tasima-gucu.actions";
 import type { PickDetailsV2, MuhakemeSatiri } from "@/lib/methodology/muhakeme-format";
 import { hesaplaSinyalSayisi, kategoriTespit } from "@/lib/methodology/v2-engine";
 import { AGF_TERFI_ILK3_SINYAL_ESIGI as SINYAL_ESIGI } from "@/lib/methodology/v4-engine";
@@ -539,7 +540,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
 
   const bugunIkramiye1 = (race.ikramiyeDetay as { ikramiye?: number[] } | null)?.ikramiye?.[0] ?? null;
 
-  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters, hizByNo, zeminToleransiByAd, yakinsamaGecmis] = await Promise.all([
+  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters, hizByNo, zeminToleransiByAd, yakinsamaGecmis, tempoTasimaGucuByAd] = await Promise.all([
     getSonYarisDetaylariForRace(raceId).catch(() => []),
     getSireStatOzetleriForRace(runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(() =>
       runners.map(() => ({ ozet: null, ornekKendiVeri: null, kYuzde: null }))
@@ -558,6 +559,9 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     yakinsamaGecmisHesapla(db, runners.map((r) => ({ no: r.no, name: r.name, jockey: r.jockey })), race.raceDay.date, bugunIkramiye1).catch(
       () => new Map<number, { sinifDususu: boolean; ajiGalibiyetVarMi: boolean }>()
     ),
+    // 2026-09-11 — Tempo Taşıma Gücü (bkz. tempo-tasima-gucu.actions.ts), artık AYRI bir
+    // özellik değil — yarisGidisatiSkoru'nun KENDİ formülüne girdi (bkz. gidisatSonucu notu).
+    hesaplaTempoTasimaGucuMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, number>()),
   ]);
 
   // 2026-08-30 kullanıcı talebi ("kum ıslak ise ıslak kum koşularına göre H2H yapacaksın
@@ -705,7 +709,15 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     if (!rs?.dagilim) return null;
     return { dagilim: rs.dagilim, erkenHizGucu: rs.erkenHizGucu ?? null, n: rs.veri ?? 0 };
   });
-  const gidisatSonucu = hesaplaYarisGidisati(tempoProfilleri, race.distance);
+  // 2026-09-11 (V5.45) — Tempo Taşıma Gücü artık yarisGidisatiSkoru'nun İÇİNE (zorluk-
+  // ağırlıklı, bkz. pace-analizi.ts) giriyor; AYRI regresyon özelliği olarak denendiğinde
+  // (B=500) her iki segmentte de anlamsız/ters çıkmıştı (diğer 17 sinyal zaten aynı bilgiyi
+  // açıklıyordu) — bkz. proje hafızası: project_accurace_tempo_yarisgidisati.md. Birleştirilmiş
+  // haliyle retrain: "diğer" segmentte ARTIK anlamlı (GA=[0.005,0.184], önceden GA=[-0.009,0.166]
+  // idi), düşük-şart hâlâ sınırda ama TERS DEĞİL (aynı yarisGidisatiSkoru'nun ilk kabul
+  // standardı — "iki segmentte de aynı yönde" — karşılanıyor/aşılıyor).
+  const tempoTasimaListesi = runners.map((rr) => tempoTasimaGucuByAd.get(rr.name) ?? null);
+  const gidisatSonucu = hesaplaYarisGidisati(tempoProfilleri, race.distance, tempoTasimaListesi);
   const gidisatByRunnerId = new Map(runners.map((rr, i) => [rr.id, gidisatSonucu.atSonuclari[i]]));
   // 2026-08-19 kullanıcı bulgusu (BODUBEY/EL LEON) — bkz. Faz1RunnerV5.agfPayi üstündeki not.
   const birinciAgf = agfSirali[0]?.agf ?? null;

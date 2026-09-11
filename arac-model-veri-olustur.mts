@@ -21,6 +21,7 @@ import { finishPos } from "./src/lib/race-result";
 import { getJockeyStats, getTrainerStats } from "./src/server/services/race.service";
 import { zeminKatsayisi, zeminDetayiBul } from "./src/lib/methodology/mekanik-puanlama";
 import { hesaplaZeminToleransiMap } from "./src/server/actions/zemin-toleransi.actions";
+import { hesaplaTempoTasimaGucuMap } from "./src/server/actions/tempo-tasima-gucu.actions";
 import { hizPaceIndexKur, hizDerecesiHesaplaOrtak, type HizGecmisSatir } from "./src/lib/methodology/hiz-derecesi-hesapla";
 import { yakinsamaGecmisHesapla } from "./src/lib/methodology/yakinsama-gecmis";
 import { writeFileSync, existsSync, readFileSync } from "fs";
@@ -261,6 +262,16 @@ export type ModelRow = {
   // hesaplanıyor. HENÜZ toFeatureVector'a eklenmedi — arac-model-egit-segment.mjs'de
   // B=500 bootstrap ile test edilecek, "yenilik önce backtest" kuralı gereği.
   yarisGidisatiSkoru: number;
+  // 2026-09-11 kullanıcı tasarımı — "Tempo Taşıma Gücü": atın GEÇMİŞ Accurace
+  // yarışlarındaki son 800m'de o yarışın en iyisine göre kalış farkının (saniye,
+  // sızıntısız — tempo-tasima-gucu.actions.ts) ortalaması, işareti çevrilmiş (yüksek=iyi).
+  // Bu oturumda GERÇEK backtest yapıldı (n=1424): kazanma oranı %18.8→%10.7→%6.2→%4.2
+  // temiz ayrışıyor, yarisGidisatiSkoru ile korelasyon r=0.002 (bağımsız). AGF ile orta
+  // düzey korele (r=-0.277) ama yarisGidisatiSkoru'nun HER diliminde ayrışma sürüyor —
+  // bkz. proje hafızası: project_accurace_tempo_yarisgidisati.md. arac-model-egit-
+  // segment.mjs'de B=500 bootstrap ile segment bazlı test edilecek, "yenilik önce
+  // backtest" kuralı gereği HENÜZ toFeatureVector'a eklenmedi.
+  tempoTasimaGucu: number;
 };
 
 async function main() {
@@ -406,7 +417,7 @@ async function main() {
 
             const tjkAtIdler = runners.map((r) => r.tjkAtId).filter((x): x is number => x != null);
 
-            const [sonYarisDetaylari, jockeyStats, trainerStats, accKayitlar, agfSnaps, gecmisKayitlari, zeminToleransiMap, yakinsamaGecmis] = await Promise.all([
+            const [sonYarisDetaylari, jockeyStats, trainerStats, accKayitlar, agfSnaps, gecmisKayitlari, zeminToleransiMap, tempoTasimaGucuMap, yakinsamaGecmis] = await Promise.all([
               getSonYarisDetaylariForRace(race.id).catch(() => []),
               getJockeyStats([
                 ...new Set([
@@ -434,6 +445,10 @@ async function main() {
               // ve Faz1RunnerV5.zeminToleransi, v5-engine.ts). Aynı hesaplaZeminToleransiMap
               // (TjkDereceKaydi, leak-free) fonksiyonu reuse ediliyor.
               hesaplaZeminToleransiMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, number>()),
+              // 2026-09-11 — Tempo Taşıma Gücü (bkz. ModelRow.tempoTasimaGucu notu,
+              // tempo-tasima-gucu.actions.ts). Aynı sızıntısız desen: atAdi eşleştirme,
+              // race.raceDay.date'ten KESİNLİKLE ÖNCEKİ Accurace geçmişi.
+              hesaplaTempoTasimaGucuMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, number>()),
               // 2026-09-01 — Yakınsama (kural istisnası, bkz. v5-engine.ts'teki Faz1RunnerV5.
               // yakinsama2Plus notu): sınıf düşüşü + at-jokey ikilisi bileşenleri, CANLI
               // sunumla (v5-engine.ts) AYNI paylaşılan fonksiyondan — train/serve uyumsuzluğu
@@ -608,7 +623,11 @@ async function main() {
               const egilim = stilEgilimMap.get(rr.id);
               return egilim ? { dagilim: egilim.dagilim, erkenHizGucu: egilim.erkenHizGucu, n: egilim.n } : null;
             });
-            const gidisatSonucu = hesaplaYarisGidisati(tempoProfilleri, race.distance);
+            // 2026-09-11 (V5.45) — tempoTasimaGucuMap artık AYRI özellik değil, buradan
+            // yarisGidisatiSkoru'nun İÇİNE (zorluk-ağırlıklı) giriyor — bkz. v5-engine.ts'teki
+            // AYNI değişiklik ve pace-analizi.ts'teki tempoZorlukAgirligi notu.
+            const tempoTasimaListesi = runners.map((rr) => tempoTasimaGucuMap.get(rr.name) ?? null);
+            const gidisatSonucu = hesaplaYarisGidisati(tempoProfilleri, race.distance, tempoTasimaListesi);
             const gidisatByRunnerId = new Map(runners.map((rr, i) => [rr.id, gidisatSonucu.atSonuclari[i]]));
 
             // 2026-08-26 kullanıcı bulgusu: kacakAtMi tek parça sinyali aslında iki farklı
@@ -757,6 +776,7 @@ async function main() {
                 zeminKatsayisi: zeminKatsayisiDeger,
                 zeminToleransi: zeminToleransiMap.get(r.name) ?? 0,
                 yarisGidisatiSkoru: gidisatByRunnerId.get(r.id)?.finalSkor ?? 0,
+                tempoTasimaGucu: tempoTasimaGucuMap.get(r.name) ?? 0,
               });
             }
           })(), 25_000);

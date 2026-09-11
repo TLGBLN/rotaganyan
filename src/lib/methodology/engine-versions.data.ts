@@ -668,13 +668,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.44",
     baslangic: new Date("2026-09-11T12:00:00+03:00"),
-    bitis: null,
+    bitis: new Date("2026-09-11T19:00:00+03:00"),
     aciklama: "Yarış Gidişatı sinyali (yarisGidisatiSkoru) artık Handikap koşularında sıfır ağırlıklı — HIZ_DERECESI_IDX/V5.10 ve IDM_JOKEY_IDX/V5.31 ile BİREBİR AYNI cerrahi desen. Opus'un B=500 sinyal-sağlığı denetimi (2026-09-11, 1291 koşu, %75/%25 kronolojik bölme): Handikap DIŞINDA (585 koşu) katsayı kesin anlamlı (+0.1698, %95 GA=[0.0596,0.2775], P(>0)=%100); Handikap İÇİNDE (366 koşu) ters/anlamsız (-0.0295, GA=[-0.168,0.104], P(>0)=%35). Havuzlanmış 'diğer' modelin bu sinyale verdiği katsayı (+0.0890, GA=[0.0003,0.1714]) sürekli bıçak sırtında çıkıyordu — kök neden Handikap'ın sinyali seyreltmesiymiş, tıpkı hizDerecesi/idmJokey'de daha önce bulunduğu gibi. Yalnız BU TEK katsayı Handikap'ta sıfırlandı, diğer 16 katsayıya dokunulmadı. Aynı denetimde ayrıca: (1) h2hKiloDegisimi'nin arac-model-veri-olustur.mts'te (eğitim verisi üretici script) hiç hesaplanmadığı bulundu — canlı ağırlığı zaten V5.30'dan beri BİLEREK sıfır (bu denetim onu DEĞİŞTİRMEDİ), yalnız gelecekteki yeniden-testler için ham hesap eklendi (v5-engine.ts'teki AYNI mantık, h2hByAnahtar'a artık ağırlık/weight de taşınıyor). (2) kariyerStartSayisi (hiçbir zaman canlı FEATURE_NAMES'te olmayan, yalnız araştırma amaçlı toplanan bir aday sinyal) kullanıcı kararıyla arac-model-veri-olustur.mts'ten tamamen kaldırıldı — eski ret gerekçesi (top3'ü düşürüyordu) taze veriyle geçersiz çıktı ama yeni bir kabul gerekçesi de doğmadı, belirsiz durumda bırakılmak yerine temizlendi.",
     neyiAnalizEdiyor: [
       "Skor/olasılık YALNIZ Handikap koşularında değişti (yarisGidisatiSkoru katkısı sıfırlandı) — diğer tüm koşu tiplerinde ve teknikSira'da hiçbir değişiklik yok. h2hKiloDegisimi/kariyerStartSayisi değişiklikleri canlı skorlamayı HİÇ ETKİLEMİYOR (biri zaten sıfır ağırlıklıydı, diğeri hiç canlı özellik değildi) — yalnız gelecekteki model araştırması için veri hattı düzeltmesi.",
     ],
     caprazlamalar: [
       "arac-terfi-denetimi.mts --son 20 ile değişiklik sonrası toplu regresyon: 21 terfi, 45 yakın-ıska, hiçbir SINIRDA vaka BAY UMUT tarzı bariz bir hata göstermiyor (hepsi ya 'başka aday kazandı' ya 'temel sinyaller net negatif, doğru dışlanmış' ile açıklanabiliyor). tsc --noEmit temiz, npm run build temiz, v5-engine.test.ts+pick-display-order.test.ts+kupon-optimizer.test.ts (16/16) geçti.",
+    ],
+  },
+  {
+    versiyon: "V5.45",
+    baslangic: new Date("2026-09-11T19:00:00+03:00"),
+    bitis: null,
+    aciklama: "Yarış Gidişatı (yarisGidisatiSkoru) formülüne 'Tempo Taşıma Gücü' (atın GEÇMİŞ Accurace yarışlarında son 800m'de o yarışın en iyisine göre kalış farkının ortalaması, sızıntısız, tempo-tasima-gucu.actions.ts) eklendi. Kullanıcı tasarımı: bu bilgi ÖNCE ayrı bir 18. regresyon özelliği olarak denendi — gerçek B=500 backtest'te (n=33096, mevcut cache'in tamamı) tek başına ÇOK güçlü göründü (segment+AGF+yarisGidisatiSkoru dilimlerinin HEPSİNDE anlamlı, 8-14pp fark) ama GERÇEK koşullu-logit retrain'de (diğer 17 sinyal AYNI ANDA kontrol edilerek) katsayısı HER İKİ segmentte de anlamsız VE TERS çıktı (düşük-şart -0.1205 GA=[-0.308,0.140], diğer -0.1011 GA=[-0.214,0.057]) — univariate etkinin tamamı zaten yarisGidisatiSkoru dahil diğer sinyallerce açıklanıyormuş (sireOrani/kilo sinyallerinde daha önce yakalanan AYNI confound deseni). Kullanıcı kararı: ayrı özellik değil, yarisGidisatiSkoru'nun KENDİ formülüne (hesaplaYarisGidisati, pace-analizi.ts) zorluk-ağırlıklı bir terim olarak eklensin — yalnız beklenen tempo senaryosu zorluysa (MÜCADELELİ/ÇOK_YÜKSEK/DAĞILMA_RİSKİ olasılığı) devreye girer, rahat/yavaş beklenen yarışlarda etkisi küçülür. Ölçek katsayısı (TEMPO_TASIMA_OLCEK=4) birkaç aday değer arasından retrain sonucuna göre seçildi. Sonuç: pooled 'diğer' segment katsayısı 0.098'den 0.092'ye kaydı ama ARTIK anlamlı (%95 GA=[0.0049,0.1835], önceden GA=[-0.0085,0.1659] idi) — orijinal yarisGidisatiSkoru'nun kabul standardını AŞIYOR. Düşük-şart hâlâ sınırda (GA=[-0.049,0.280]) ama yön pozitif kaldı, ters DEĞİL. Handikap-özel sıfırlama (V5.44) İHTİYATLA KORUNDU — yeni formülle Handikap'a özel ayrı test henüz yapılmadı.",
+    neyiAnalizEdiyor: [
+      "yarisGidisatiSkoru'nun HAM DEĞERİ değişti (artık tempo taşıma gücü terimini de içeriyor) — FEATURE_NAMES/toFeatureVector boyutu (17) DEĞİŞMEDİ, yeni bir regresyon özelliği EKLENMEDİ. WEIGHTS_DIGER_HANDIKAP override'ı (YARIS_GIDISATI_IDX sıfırlama) aynen çalışmaya devam ediyor.",
+    ],
+    caprazlamalar: [
+      "Ayrı-özellik denemesi tamamen reddedildi (arac-model-egit-segment.mjs'e hiç eklenmedi, canlı FEATURE_NAMES 17'de sabit). Birleştirilmiş formülle retrain: tsc --noEmit temiz, npm run build temiz, vitest 16/16 geçti. arac-terfi-denetimi.mts --son 20 ile ayrıca regresyon kontrolü yapıldı (terfi kapısı eşiği değişmedi ama teknikSira'yı besleyen olasılık değiştiği için ihtiyaten çalıştırıldı): 20 koşu, 18 terfi, 58 yakın-ıska, yalnız 3 sınırda vaka (nonAgfKatki ±0.05 içinde) — hiçbiri BAY UMUT tarzı bariz hata değil.",
     ],
   },
 ];

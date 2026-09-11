@@ -50,6 +50,19 @@ const ANLAMLI_PUAN_ESIGI = 1.0;
 // diğer segmentte neredeyse anlamlı. zeminToleransi/yakınsama/sonIdmanSprint/takı ile AYNI
 // türden BİLİNÇLİ istisna, kullanıcı kararıyla eklendi. GERÇEK fit edilen katsayı
 // kullanılıyor, elle pozitif yapılmadı.
+// 2026-09-11 — "Tempo Taşıma Gücü" (bkz. tempo-tasima-gucu.actions.ts) TEST EDİLDİ,
+// EKLENMEDİ. Basit univariate/tercile bootstrap testinde çok güçlü göründü (n=33096,
+// her segmentte+AGF diliminde anlamlı, 8-14pp fark) — ama GERÇEK koşullu-logit
+// retrain'de (bu script, TÜM diğer 17 özellik kontrol edilerek) katsayısı HER İKİ
+// segmentte de anlamsız VE TERS yönlü çıktı (düşük-şart -0.1205 GA=[-0.308,0.140],
+// diğer -0.1011 GA=[-0.214,0.057]). Yani univariate etkinin tamamı zaten modeldeki
+// BAŞKA sinyallerce (AGF, hızDerecesi, form vb.) açıklanıyormuş — sireOrani/kilo
+// sinyallerinde daha önce yakalanan AYNI türden confound deseni. MODELE EKLENMEDİ.
+// Kullanıcı kararıyla YERİNE: yarisGidisatiSkoru'nun KENDİ formülüne (pace-analizi.ts
+// hesaplaYarisGidisati, zorluk-ağırlıklı) girdi olarak eklendi (V5.45) — ayrı katsayı
+// yarışmadığı için "diğer" segmentte artık anlamlı çıktı. Bu script hâlâ 17 özellikli,
+// DEĞİŞMEDİ — birleştirme yarisGidisatiSkoru'nun HAM DEĞERİNİ değiştiriyor, yeni bir
+// regresyon sütunu eklemiyor.
 const FEATURE_NAMES = [
   "agfSirasi", "kgsVarMi", "idmJokey", "jokeyOrani", "antrenorOrani", "kacakYalniz",
   "agfPayi", "h2hNetSkor", "hizDerecesi", "h2hKiloDegisimi", "agfPayi2", "zeminToleransi",

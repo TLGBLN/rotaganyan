@@ -394,11 +394,32 @@ export type YarisGidisatiSonucu = {
   atSonuclari: YarisGidisatiAtSonucu[]; // profiller ile AYNI SIRADA
 };
 
+// 2026-09-11 kullanıcı kararı — "Tempo Taşıma Gücü" (bkz. tempo-tasima-gucu.actions.ts,
+// atın GEÇMİŞ Accurace yarışlarında son 800m'de o yarışın en iyisine göre kalış farkı,
+// işareti çevrilmiş) AYRI bir regresyon özelliği olarak eklendiğinde koşullu-logit
+// retrain'de anlamsız/ters çıktı (B=500, iki segmentte de GA sıfırı kapsıyor) — çünkü
+// diğer 17 sinyal (özellikle bizzat yarisGidisatiSkoru) zaten aynı bilgiyi büyük ölçüde
+// açıklıyordu, AYRI katsayı olarak varyans paylaşımı ters işaret üretti. Kullanıcı kararı:
+// ayrı sinyal DEĞİL, yarisGidisatiSkoru'nun KENDİ formülüne GİRDİ olarak eklensin — "bu
+// tempo hangi ata yarar" sorusunun, TEMPO_UYUM_MATRISI'nin (yalnız STİL kategorisine bakan
+// sabit tablo) yanına, atın GERÇEK ÖLÇÜLEN dayanıklılığını da katmasın diye. Yalnız pace
+// GERÇEKTEN zorlu beklenmişse (MUCADELELI/COK_YUKSEK/DAGILMA_RISKI olasılığı yüksekse)
+// devreye girer — rahat/yavaş beklenen bir yarışta tempo taşıma gücünün önemi azalır.
+function tempoZorlukAgirligi(senaryoOlasiliklari: Record<TempoSenaryosu, number>): number {
+  return (senaryoOlasiliklari.MUCADELELI + senaryoOlasiliklari.COK_YUKSEK + senaryoOlasiliklari.DAGILMA_RISKI) / 100;
+}
+const TEMPO_TASIMA_OLCEK = 4; // tempoTasimaGucu (saniye ölçeğinde) TEMPO_UYUM_MATRISI'nin (-10..10) skalasına yaklaştırır
+
 /** Tüm pipeline'ı tek çağrıda çalıştırır: saha değişkenleri → senaryo olasılıkları →
- *  her at için (varsa) uyum skoru × mesafe katsayısı = final "Yarış Gidişatı" skoru. */
+ *  her at için (varsa) uyum skoru (+ tempo taşıma gücü katkısı, zorluk-ağırlıklı) ×
+ *  mesafe katsayısı = final "Yarış Gidişatı" skoru. tempoTasimaGucuListesi opsiyonel —
+ *  verilmezse (ör. arac-model-veri-olustur.mts'in henüz bu veriyi hesaplamadığı eski
+ *  çağrılarda) eski davranış (yalnız stil uyumu) korunur. */
 export function hesaplaYarisGidisati(
   profiller: (AtTempoProfili | null)[],
-  mesafeM: number
+  mesafeM: number,
+  tempoTasimaGucuListesi?: (number | null)[],
+  tempoTasimaOlcek: number = TEMPO_TASIMA_OLCEK
 ): YarisGidisatiSonucu {
   const sahaTempoDegiskenleri = hesaplaSahaTempoDegiskenleri(profiller);
   const senaryoOlasiliklari = hesaplaTempoSenaryoOlasiliklari(sahaTempoDegiskenleri);
@@ -406,11 +427,14 @@ export function hesaplaYarisGidisati(
     senaryoOlasiliklari[s] > senaryoOlasiliklari[best] ? s : best
   );
   const katsayi = tempoMesafeKatsayisi(mesafeM);
+  const zorluk = tempoZorlukAgirligi(senaryoOlasiliklari);
 
-  const atSonuclari = profiller.map((p) => {
+  const atSonuclari = profiller.map((p, i) => {
     if (!p) return { hamSkor: null, mesafeKatsayisi: katsayi, finalSkor: null };
-    const hamSkor = hesaplaAtSenaryoUyumu(p.dagilim, senaryoOlasiliklari);
-    return { hamSkor, mesafeKatsayisi: katsayi, finalSkor: Math.round(hamSkor * katsayi * 100) / 100 };
+    const stilUyumu = hesaplaAtSenaryoUyumu(p.dagilim, senaryoOlasiliklari);
+    const tempoTasima = tempoTasimaGucuListesi?.[i];
+    const hamSkor = tempoTasima != null ? stilUyumu + zorluk * tempoTasima * tempoTasimaOlcek : stilUyumu;
+    return { hamSkor: Math.round(hamSkor * 100) / 100, mesafeKatsayisi: katsayi, finalSkor: Math.round(hamSkor * katsayi * 100) / 100 };
   });
 
   return { sahaTempoDegiskenleri, senaryoOlasiliklari, baskinSenaryo, atSonuclari };
