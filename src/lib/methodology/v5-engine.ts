@@ -258,9 +258,16 @@ const TAKI_CIKARILDI_IDX = FEATURE_NAMES.indexOf("takiCikarildiMi");
 // eklendi, aynı gün kullanıcı kararıyla A-katmanına taşındı (sinyal-kutugu.service.ts).
 // GERÇEK fit edilen katsayı kullanılıyor, elle yön verilmedi.
 const YARIS_GIDISATI_IDX = FEATURE_NAMES.indexOf("yarisGidisatiSkoru");
+// 2026-09-11 (Opus B=500 denetimi, kullanıcı kararıyla uygulandı) — HIZ_DERECESI_IDX/V5.10
+// ve IDM_JOKEY_IDX/V5.31 ile BİREBİR AYNI cerrahi desen: Yarış Gidişatı, Handikap DIŞINDA
+// (585 koşu) kesin anlamlı (+0.1698, %95 GA=[0.0596,0.2775], P(>0)=%100), Handikap İÇİNDE
+// (366 koşu) ters/anlamsız (-0.0295, GA=[-0.168,0.104], P(>0)=%35) — havuzlanmış "diğer"
+// katsayısının sürekli bıçak sırtında (GA=[0.0003,0.1714]) çıkmasının sebebi Handikap'ın
+// sinyali seyreltmesiydi. Yalnız BU TEK katsayı Handikap'ta sıfırlandı, diğerlerine
+// dokunulmadı.
 const WEIGHTS_DIGER_HANDIKAP: AgirlikSeti = {
   ...WEIGHTS_DIGER_DUZELTILMIS,
-  weights: WEIGHTS_DIGER_DUZELTILMIS.weights.map((w, i) => (i === HIZ_DERECESI_IDX || i === IDM_JOKEY_IDX ? 0 : w)),
+  weights: WEIGHTS_DIGER_DUZELTILMIS.weights.map((w, i) => (i === HIZ_DERECESI_IDX || i === IDM_JOKEY_IDX || i === YARIS_GIDISATI_IDX ? 0 : w)),
 };
 
 // 2026-08-29 — V6 Aşama 2 (bkz. plan): "market-blind" skor için AGF-türevi özelliklerin

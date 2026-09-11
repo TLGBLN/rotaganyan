@@ -202,15 +202,25 @@ export type ModelRow = {
   // bir "hayır" bile sayılamaz, yalnız "şu an test edilemeyecek kadar seyrek" demek
   // doğru. ÜÇÜ DE MODELE DAHİL EDİLMEDİ — canlı model değişmedi.
   jokeyDegisimYonu: number;
-  // 2026-08-21 — atın GERÇEK kariyer start sayısı (HorseRaceHistoryCache, tarihe göre
-  // filtrelenmiş). sireOrani × "az deneyimli" etkileşimini test etmek için — literatür
-  // (TwinSpires): pedigri, atın kendi kanıtlanmış performansı YOKSA/azsa devreye girmeli.
-  kariyerStartSayisi: number;
+  // 2026-09-11 kullanıcı talebi ("eski ret gerekçesi artık geçersiz ama yeni bir kabul
+  // gerekçesi de yok, kullanılmıyorsa kaldır") — kariyerStartSayisi alanı (2026-08-21'de
+  // eklenmişti, sireOrani × "az deneyimli" etkileşimini test etmek için) KALDIRILDI. Son
+  // Opus denetimi: üç segmentte de yön aynı (negatif) ve ikisinde anlamlı, logloss'ta da
+  // gerçek iyileşme vardı — ama top1 kazancı hiçbir segmentte kanıtlanamadı, projenin
+  // "Top1 Önceliği" kuralı barajı geçmiyor. Not: bu, "veriyi biriktir, ileride yeniden test
+  // et" alışkanlığının (bkz. onGrupArkasiMi/disaridanStart gibi komşu alanlar) bilinçli bir
+  // istisnası — kullanıcı kararıyla.
   // 2026-08-21 — H2H (baş-başa geçmiş karşılaşma) net skoru: bugünkü sahadaki rakiplerle
   // ortak geçmiş yarışlarda kaç kez önde bitirdi eksi kaç kez geride bitirdi. B=200
   // bootstrap'ta sınırda (GA=[-0.0105,0.1603]) ama backtest'te top1/top3 İKİSİ BİRDEN
   // iyileşti (logloss ihmal edilebilir kötüleşme) — kullanıcı kararıyla KABUL EDİLDİ.
   h2hNetSkor: number;
+  // 2026-09-11 — Kilo-ayarlı H2H (v5-engine.ts'teki AYNI isimli canlı özellik/hesap ile
+  // birebir): bugünkü rakiplere göre kilo pozisyonunun, geçmiş karşılaşmalardaki kilo
+  // pozisyonuna göre NASIL DEĞİŞTİĞİ. Canlıda V5.30'dan beri BİLEREK sıfır ağırlıklı
+  // (gerçek V5 sonuçlarında pooled kanıt replike olmadı) — bu alan yalnız artık GERÇEK
+  // (daha önce sabit-sıfırdı) veri taşısın diye eklendi, canlı ağırlığı DEĞİŞTİRMİYOR.
+  h2hKiloDegisimi: number;
   // 2026-08-21 (V5.4) — Hız derecesi: son 365 gündeki en yeni 3 koşunun popülasyon
   // (irk|pist|mesafe) ortalama tempo'suna göre göreli hızı (%). B=200 bootstrap'ta HER
   // İKİ segmentte de güçlü anlamlı (düşük-şart +0.58 — modelin en büyük katsayısı,
@@ -224,8 +234,7 @@ export type ModelRow = {
   // beklenenin %24'ü, 48+ bandı %114'ü kadar kazanıyordu (n=32905), agfSirasi ile
   // korelasyon r=-0.314 (orta düzey, piyasa tam fiyatlamıyor). hpSirasi'nden FARKLI bir
   // encoding olduğu için ayrı test ediliyor. Veri yoksa (yapısal muaf: maiden/şartlı1/19/27)
-  // 0 — kariyerStartSayisi gibi "dusuksart" segmentinde ayırt edici olmayacağı ama zarar da
-  // vermeyeceği beklentisiyle.
+  // 0 — "dusuksart" segmentinde ayırt edici olmayacağı ama zarar da vermeyeceği beklentisiyle.
   hpPuani: number;
   // 2026-08-28 kullanıcı talebi ("çime bak, artık çekilsin") — RaceDay.surfaceConditions
   // zaten ingest'te toplanıyordu ama Faz1/modele hiç aktarılmıyordu (bkz. mekanik-
@@ -443,7 +452,7 @@ async function main() {
             // mantık (tarih+şehir+koşu_no anahtarıyla ortak geçmiş yarış eşleştirme) ama
             // zaten toplu çekilmiş gecmisByTjkAtId'den — ekstra sorgu YOK, verimli.
             const raceNameToNo = new Map(runners.map((r) => [r.name, r.no]));
-            const h2hByAnahtar = new Map<string, { horseName: string; pos: number }[]>();
+            const h2hByAnahtar = new Map<string, { horseName: string; pos: number; weight: string | null }[]>();
             for (const r of runners) {
               if (r.tjkAtId == null) continue;
               const gecmisTumu = gecmisByTjkAtId.get(r.tjkAtId) ?? [];
@@ -455,7 +464,7 @@ async function main() {
                 if (isNaN(pos)) continue;
                 const anahtar = `${g.date}|${g.city}|${g.raceNo}`;
                 const arr = h2hByAnahtar.get(anahtar) ?? [];
-                if (!arr.some((e) => e.horseName === r.name)) arr.push({ horseName: r.name, pos });
+                if (!arr.some((e) => e.horseName === r.name)) arr.push({ horseName: r.name, pos, weight: g.weight ?? null });
                 h2hByAnahtar.set(anahtar, arr);
               }
             }
@@ -472,6 +481,42 @@ async function main() {
                 }
               }
               return skor;
+            }
+
+            // 2026-09-11 kullanıcı talebi ("h2hKiloDegisimi tamamen ölü, düzelt") — Opus
+            // B=500 denetimi bu alanın arac-model-veri-olustur.mts'te HİÇ hesaplanmadığını
+            // (0/12311 satır) buldu: v5-engine.ts'in CANLI hesabı (h2hKiloDegisimiHesapla,
+            // bkz. o dosyadaki aynı isimli fonksiyon) zaten çalışıyor ve doğru, yalnız
+            // EĞİTİM verisi hep sabit sıfırdı. Canlı ağırlık zaten V5.30'dan beri BİLEREK
+            // sıfırlanmış durumda (o zamanki pooled kanıt gerçek V5 sonuçlarında replike
+            // olmadı) — bu düzeltme O ağırlığı DEĞİŞTİRMİYOR, yalnız gelecekte bu sinyal
+            // yeniden test edilmek istendiğinde artık GERÇEK (sabit-sıfır değil) veri
+            // kullanılabilsin diye. h2hByAnahtar zaten ağırlık (weight) taşıyor (yukarıya
+            // bakınız) — v5-engine.ts'teki AYNI mantık (bugünkü kilo farkı - geçmiş kilo
+            // farkı, rakip bazında toplanır) burada da uygulanıyor.
+            const bugunKiloByNo = new Map(runners.map((r) => [r.no, r.weight]));
+            function h2hKiloDegisimiHesapla(kendiAd: string, kendiBugunKilo: number | null): number {
+              if (kendiBugunKilo == null) return 0;
+              let toplam = 0;
+              for (const arr of h2hByAnahtar.values()) {
+                const beni = arr.find((e) => e.horseName === kendiAd);
+                if (!beni) continue;
+                const kendiOKilo = parseKiloSayi(beni.weight);
+                if (kendiOKilo == null) continue;
+                for (const other of arr) {
+                  if (other.horseName === kendiAd) continue;
+                  const otherNo = raceNameToNo.get(other.horseName);
+                  if (otherNo == null) continue;
+                  const otherOKilo = parseKiloSayi(other.weight);
+                  if (otherOKilo == null) continue;
+                  const otherBugunKilo = bugunKiloByNo.get(otherNo);
+                  if (otherBugunKilo == null) continue;
+                  const todayAdvantage = otherBugunKilo - kendiBugunKilo;
+                  const histAdvantage = otherOKilo - kendiOKilo;
+                  toplam += todayAdvantage - histAdvantage;
+                }
+              }
+              return toplam;
             }
 
             // galop verisi
@@ -666,13 +711,6 @@ async function main() {
                 ? shrink(trainerStat.wins, trainerStat.rides, trainerPopOrt) * 100
                 : trainerPopOrt * 100;
 
-              // Kullanıcı hipotezi 2026-08-21 (literatür: TwinSpires pedigri-handikapçılık
-              // rehberi — pedigri, atın KENDİ kanıtlanmış performansı YOKSA/az startlıysa
-              // bir "prior" olarak devreye girmeli): atın GERÇEK kariyer start sayısı
-              // (HorseRaceHistoryCache'ten, tarihe göre zaten filtrelenmiş "gecmis" —
-              // TJK'nın tam geçmişi, bizim kısa takip penceremizden daha güvenilir).
-              const kariyerStartSayisi = gecmis.length;
-
               rows.push({
                 raceId: race.id, runnerId: r.id, no: r.no,
                 win: pos === 1 ? 1 : 0, top3: pos <= 3 ? 1 : 0,
@@ -712,8 +750,8 @@ async function main() {
                 kiloFarkiEnIyiKosuya,
                 atJokeyIkiliOrani,
                 jokeyDegisimYonu,
-                kariyerStartSayisi,
                 h2hNetSkor: h2hNetSkorHesapla(r.name),
+                h2hKiloDegisimi: h2hKiloDegisimiHesapla(r.name, r.weight),
                 hizDerecesi: hizDerecesiHesapla(r.tjkAtId, race.breed, race.raceDay.date),
                 hpPuani: r.hp ?? 0,
                 zeminKatsayisi: zeminKatsayisiDeger,

@@ -665,4 +665,16 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
       "TAM V5-dönemi geriye dönük tarama (2026-08-16 sonrası 494 sonuçlanmış koşu, gatherFaz1V5+faz2V5Sirala eski/yeni kod ile iki kez çalıştırılıp gerçek kazananın sırası kıyaslandı — git stash ile kontrollü A/B): İLK-3 kademesinde kazanılan=29/kaybedilen=16 (NET +13); İLK-6 kademesinde kazanılan=6/kaybedilen=9 (NET -3). İlk-6'daki kayıpların TAMAMI kazananın kendi olasılığı saha ortalamasının çok altında (ortalama %4.1, örn. %2.7/%3.0/%3.1/%3.7) — yani AYNI TERCAN HAN türü hatanın bu sefer şans eseri doğru tarafa düşmüş hali; kazanılanlar ise saha ortalamasına yakın/üstü (%6.7-11.3) gerçek rakip atlar. Toplamda (ilk3+ilk6) net +10 gerçek koşuda kazanan artık doğru kademede. tsc --noEmit temiz, npm run build temiz, v5-engine.test.ts 7/7 geçti, arac-terfi-denetimi.mts --son 20 ile ayrıca doğrulandı.",
     ],
   },
+  {
+    versiyon: "V5.44",
+    baslangic: new Date("2026-09-11T12:00:00+03:00"),
+    bitis: null,
+    aciklama: "Yarış Gidişatı sinyali (yarisGidisatiSkoru) artık Handikap koşularında sıfır ağırlıklı — HIZ_DERECESI_IDX/V5.10 ve IDM_JOKEY_IDX/V5.31 ile BİREBİR AYNI cerrahi desen. Opus'un B=500 sinyal-sağlığı denetimi (2026-09-11, 1291 koşu, %75/%25 kronolojik bölme): Handikap DIŞINDA (585 koşu) katsayı kesin anlamlı (+0.1698, %95 GA=[0.0596,0.2775], P(>0)=%100); Handikap İÇİNDE (366 koşu) ters/anlamsız (-0.0295, GA=[-0.168,0.104], P(>0)=%35). Havuzlanmış 'diğer' modelin bu sinyale verdiği katsayı (+0.0890, GA=[0.0003,0.1714]) sürekli bıçak sırtında çıkıyordu — kök neden Handikap'ın sinyali seyreltmesiymiş, tıpkı hizDerecesi/idmJokey'de daha önce bulunduğu gibi. Yalnız BU TEK katsayı Handikap'ta sıfırlandı, diğer 16 katsayıya dokunulmadı. Aynı denetimde ayrıca: (1) h2hKiloDegisimi'nin arac-model-veri-olustur.mts'te (eğitim verisi üretici script) hiç hesaplanmadığı bulundu — canlı ağırlığı zaten V5.30'dan beri BİLEREK sıfır (bu denetim onu DEĞİŞTİRMEDİ), yalnız gelecekteki yeniden-testler için ham hesap eklendi (v5-engine.ts'teki AYNI mantık, h2hByAnahtar'a artık ağırlık/weight de taşınıyor). (2) kariyerStartSayisi (hiçbir zaman canlı FEATURE_NAMES'te olmayan, yalnız araştırma amaçlı toplanan bir aday sinyal) kullanıcı kararıyla arac-model-veri-olustur.mts'ten tamamen kaldırıldı — eski ret gerekçesi (top3'ü düşürüyordu) taze veriyle geçersiz çıktı ama yeni bir kabul gerekçesi de doğmadı, belirsiz durumda bırakılmak yerine temizlendi.",
+    neyiAnalizEdiyor: [
+      "Skor/olasılık YALNIZ Handikap koşularında değişti (yarisGidisatiSkoru katkısı sıfırlandı) — diğer tüm koşu tiplerinde ve teknikSira'da hiçbir değişiklik yok. h2hKiloDegisimi/kariyerStartSayisi değişiklikleri canlı skorlamayı HİÇ ETKİLEMİYOR (biri zaten sıfır ağırlıklıydı, diğeri hiç canlı özellik değildi) — yalnız gelecekteki model araştırması için veri hattı düzeltmesi.",
+    ],
+    caprazlamalar: [
+      "arac-terfi-denetimi.mts --son 20 ile değişiklik sonrası toplu regresyon: 21 terfi, 45 yakın-ıska, hiçbir SINIRDA vaka BAY UMUT tarzı bariz bir hata göstermiyor (hepsi ya 'başka aday kazandı' ya 'temel sinyaller net negatif, doğru dışlanmış' ile açıklanabiliyor). tsc --noEmit temiz, npm run build temiz, v5-engine.test.ts+pick-display-order.test.ts+kupon-optimizer.test.ts (16/16) geçti.",
+    ],
+  },
 ];
