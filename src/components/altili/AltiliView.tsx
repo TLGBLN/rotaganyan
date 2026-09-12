@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ekuriRengi } from "@/lib/ekuri-colors";
 import type { ProgramDay, ProgramRace, ProgramRunner } from "@/server/services/race.service";
+import type { GunlukTevziTutarlari } from "@/server/services/ingest/tjk-altili.adapter";
 
 // effectiveAgf: eküri grubundaki atlar için grup toplamı, tekil for tek at
 type SelValue = { no: number; name: string; agf: number | null; effectiveAgf: number };
@@ -16,6 +17,14 @@ function chunkAltili(races: ProgramRace[]): { label: string; races: ProgramRace[
     { label: "1. Altılı", races: races.slice(0, 6) },
     { label: "2. Altılı", races: races.slice(races.length - 6) },
   ];
+}
+
+// 2026-09-12 kullanıcı talebi — "7'li Ganyan" da hesaplansın: admin/kupon/KuponForm.tsx'teki
+// sonYediKosu ile AYNI kural (Altılı pencerelerinden BAĞIMSIZ, her zaman günün SON 7 koşusu).
+// Ayrı bir sabit YEDILI_IDX ile normal Altılı gruplarından (0,1,...) ayırt ediliyor.
+const YEDILI_IDX = -1;
+function sonYediKosu(races: ProgramRace[]): ProgramRace[] {
+  return races.length >= 7 ? races.slice(races.length - 7) : [];
 }
 
 function breedShort(b: string) {
@@ -37,7 +46,7 @@ function effectiveAgf(runner: ProgramRunner, allRunners: ProgramRunner[]): numbe
   return total > 0 ? total : runner.agf;
 }
 
-export default function AltiliView({ days }: { days: ProgramDay[] }) {
+export default function AltiliView({ days, tevzi }: { days: ProgramDay[]; tevzi: Record<string, GunlukTevziTutarlari> }) {
   const [activeHipo, setActiveHipo] = useState(days[0]?.hippodromeSlug ?? "");
   const [altiliIdx, setAltiliIdx] = useState<Record<string, number>>({});
   const [ayakIdx, setAyakIdx] = useState<Record<string, number>>({});
@@ -46,8 +55,10 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
   // Derived state — computed before any early return so hooks stay unconditional
   const currentDay = days.find((d) => d.hippodromeSlug === activeHipo) ?? days[0];
   const groups = currentDay ? chunkAltili(currentDay.races) : [];
+  const yediliRaces = currentDay ? sonYediKosu(currentDay.races) : [];
   const curAltili = altiliIdx[activeHipo] ?? 0;
-  const currentGroup = groups[curAltili];
+  const isYedili = curAltili === YEDILI_IDX;
+  const currentGroup = isYedili ? { label: "7'li Ganyan", races: yediliRaces } : groups[curAltili];
   const ayakKey = `${activeHipo}/${curAltili}`;
   // Varsayılan olarak henüz sonuçlanmamış ilk ayağı göster — sonuçlanmış ayaklar zaten
   // otomatik işaretlendiği için kullanıcının onlarla uğraşmasına gerek yok.
@@ -78,10 +89,10 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
     }
     return null;
   }
-  function clearGroup(hipo: string, alt: number) {
+  function clearGroup(hipo: string, alt: number, legCount: number) {
     setSelections((prev) => {
       const next = { ...prev };
-      for (let i = 0; i < 6; i++) delete next[selKey(hipo, alt, i)];
+      for (let i = 0; i < legCount; i++) delete next[selKey(hipo, alt, i)];
       return next;
     });
   }
@@ -115,17 +126,31 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
 
   // Beşli/Dörtlü/Üçlü Ganyan havuzları, TJK'da o günün Altılı grubunun SON N ayağını kapsar
   // (ör. Altılı 4-9. koşularsa, Beşli 5-9, Dörtlü 6-9, Üçlü 7-9) — aynı seçimler tüm havuzlarda
-  // ortak kullanılır, kullanıcı ayrıca seçim yapmaz.
-  const POOL_DEFS = [
-    { key: "altili", label: "Altılı (6'lı)" },
-    { key: "besli", label: "Beşli (5'li)" },
-    { key: "dortlu", label: "Dörtlü (4'lü)" },
-    { key: "uclu", label: "Üçlü (3'lü)" },
-  ] as const;
+  // ortak kullanılır, kullanıcı ayrıca seçim yapmaz. 7'li Ganyan modunda yalnız kendi 7 ayağı var.
+  const POOL_DEFS = isYedili
+    ? ([{ key: "yedili", label: "7'li Ganyan", n: 7 }] as const)
+    : ([
+        { key: "altili", label: "Altılı (6'lı)", n: 6 },
+        { key: "besli", label: "Beşli (5'li)", n: 5 },
+        { key: "dortlu", label: "Dörtlü (4'lü)", n: 4 },
+        { key: "uclu", label: "Üçlü (3'lü)", n: 3 },
+      ] as const);
 
-  const poolResults = POOL_DEFS.map(({ key, label }, i) => {
-    const n = 6 - i;
-    if (totalLegs < n) return { key, label, n, katsayi: null, lower: null, upper: null };
+  // 2026-09-12 DÜZELTME (kullanıcı: "yanlış yere bakıyorsun") — bu tablo ULUSAL DEĞİL,
+  // HER HİPODROMUN KENDİ sayfasında kendi tutarlarını gösteriyor (bkz. tjk-altili.
+  // adapter.ts'teki not). Artık cross-city tahmin YOK — doğrudan currentDay'in kendi
+  // hipodrom adıyla tevzi nesnesinden okunuyor, döküman sırası (1.Altılı önce) curAltili
+  // ile BİREBİR eşleşir.
+  const hipoTevzi = currentDay ? tevzi[currentDay.hippodromeName] : undefined;
+
+  const poolResults = POOL_DEFS.map(({ key, label, n }) => {
+    const gercek =
+      key === "yedili" ? hipoTevzi?.yedili ?? null
+      : key === "dortlu" ? hipoTevzi?.dortlu ?? null
+      : key === "altili" ? hipoTevzi?.altili[curAltili] ?? null
+      : key === "besli" ? hipoTevzi?.besli[curAltili] ?? null
+      : hipoTevzi?.uclu[curAltili] ?? null;
+    if (totalLegs < n) return { key, label, n, katsayi: null, lower: null, upper: null, gercek };
     const subset = groupSelections.slice(totalLegs - n);
     const ready = subset.length === n && subset.every((s) => s != null && s.effectiveAgf > 0);
     const katsayi = ready ? subset.reduce((prod, s) => prod * (100 / s!.effectiveAgf), 1) : null;
@@ -138,9 +163,13 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
       // gerçekte çok daha fazla bilet doğru tahmin ettiği için havuz daha fazla kişiye
       // bölünüyor ve gerçek ikramiye teorik çarpımdan belirgin biçimde düşük kalıyor.
       // %75-87.5 aralığı bile gözlemlenen gerçek sonuçların üzerinde çıktığı için
-      // aralık %65-80'e çekildi.
+      // aralık %65-80'e çekildi. 2026-09-12 doğrulaması (24 gerçek TJK sonucu): medyan
+      // gerçek/tahmin oranı %76 ama VARYANS ÇOK YÜKSEK (%37-%116) — özellikle uzun-kuyruklu
+      // (düşük AGF'li) kazananlarda gerçek payout bu tahminin ÇOK ÜSTÜNE çıkabiliyor, bu
+      // yüzden TJK'nın gerçek "Dağıtılacak Tutar"ı (varsa) AYRICA gösteriliyor.
       lower: katsayi != null ? katsayi * 0.65 : null,
       upper: katsayi != null ? katsayi * 0.8 : null,
+      gercek,
     };
   }).filter((p) => p.n <= totalLegs);
 
@@ -178,8 +207,8 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
         </div>
       ) : (
         <>
-          {/* Altılı tabs */}
-          {groups.length > 1 && (
+          {/* Altılı / 7'li Ganyan tabs */}
+          {(groups.length > 1 || yediliRaces.length > 0) && (
             <div className="flex border-b bg-background shrink-0">
               {groups.map((g, i) => (
                 <button
@@ -195,6 +224,19 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                   {g.label}
                 </button>
               ))}
+              {yediliRaces.length > 0 && (
+                <button
+                  onClick={() => setAltiliIdx((prev) => ({ ...prev, [activeHipo]: YEDILI_IDX }))}
+                  className={cn(
+                    "px-5 py-2.5 text-sm font-semibold transition-colors whitespace-nowrap",
+                    isYedili
+                      ? "border-b-2 border-[#c9a54e] text-[#c9a54e]"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  7&apos;li Ganyan
+                </button>
+              )}
             </div>
           )}
 
@@ -360,14 +402,14 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                   </span>
                   {filledCount > 0 && (
                     <button
-                      onClick={() => clearGroup(activeHipo, curAltili)}
+                      onClick={() => clearGroup(activeHipo, curAltili, totalLegs)}
                       className="text-[11px] text-red-500 hover:text-red-600 transition-colors"
                     >
                       Temizle
                     </button>
                   )}
                 </div>
-                <div className="grid grid-cols-6 gap-1.5">
+                <div className={cn("grid gap-1.5", isYedili ? "grid-cols-7" : "grid-cols-6")}>
                   {currentGroup.races.map((race, i) => {
                     const sel = getSelected(activeHipo, curAltili, i);
                     const isActive = curAyak === i;
@@ -442,6 +484,16 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                             Son {p.n} ayağı doldurun
                           </div>
                         )}
+                        {p.gercek != null && (
+                          <div className="mt-1.5 border-t pt-1.5">
+                            <div className="text-[9px] text-muted-foreground uppercase tracking-wide">
+                              TJK Gerçek Havuz
+                            </div>
+                            <div className="text-xs font-bold text-[#c9a54e] tabular-nums leading-tight">
+                              {formatTL(p.gercek)}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -449,6 +501,9 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                 {poolResults.some((p) => p.lower != null) && (
                   <div className="mt-2 text-[10px] text-muted-foreground">
                     AGF bazlı tahmin — her havuz kendi son N ayağının seçimlerinden hesaplanır. Gerçek ikramiye havuz büyüklüğü ve kazanan sayısına göre değişir.
+                    {poolResults.some((p) => p.gercek != null) && (
+                      <> &quot;TJK Gerçek Havuz&quot; bu hipodromun TJK&apos;da o an dağıtılacak TOPLAM havuz büyüklüğüdür (kombinasyon başına düşen tutar değil, havuz kapanınca kaybolur).</>
+                    )}
                   </div>
                 )}
               </div>

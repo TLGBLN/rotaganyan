@@ -5,6 +5,7 @@ import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter
 import { tryAcquireIngestLock } from "@/lib/ingest-lock";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import AltiliView from "@/components/altili/AltiliView";
+import { fetchGunlukTevziTutarlariByHipodrom } from "@/server/services/ingest/tjk-altili.adapter";
 
 export const revalidate = 0;
 
@@ -47,6 +48,13 @@ export default async function AltiliPage({ searchParams }: PageProps) {
   }
 
   const days = await getProgramData(currentDate);
+  // 2026-09-12 kullanıcı talebi — TJK'nın gerçek "Dağıtılacak Tutar"ı yalnız BUGÜN için
+  // anlamlı (geçmiş/gelecek bir tarihte TJK'nın canlı sayfası o güne ait veri döndürmez).
+  // HER hipodromun KENDİ tutarı var (ulusal DEĞİL, bkz. adapter'daki 2026-09-12 düzeltme
+  // notu) — Map, Client Component'e (AltiliView) JSON-serileştirilemediği için düz nesneye
+  // çevriliyor, anahtar TJK'nın sehirAdi'si (hippodromeName ile aynı Türkçe isim).
+  const tevziByHipo = currentDate === today ? await fetchGunlukTevziTutarlariByHipodrom().catch(() => new Map()) : new Map();
+  const tevzi = Object.fromEntries(tevziByHipo);
 
   return (
     <div className="mx-auto max-w-[1400px] px-3 py-4 space-y-3">
@@ -54,13 +62,13 @@ export default async function AltiliPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-lg font-bold">Altılı Ne Verir?</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Her ayak için bir at seçin — Altılı, Beşli, Dörtlü ve Üçlü Ganyan tahminleri aynı anda hesaplanır
+            Her ayak için bir at seçin — Altılı, Beşli, Dörtlü, Üçlü ve 7&apos;li Ganyan tahminleri aynı anda hesaplanır
           </p>
         </div>
         <DateNavigator currentDate={currentDate} basePath="/altili" />
       </div>
       <div className="rounded-lg border overflow-hidden">
-        <AltiliView days={days} />
+        <AltiliView days={days} tevzi={tevzi} />
       </div>
     </div>
   );
