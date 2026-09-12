@@ -36,11 +36,11 @@ const WIDTHS: Width[] = ["narrow", "normal", "wide"];
 const WIDTH_LABEL: Record<Width, string> = { narrow: "Ekonomik", normal: "Normal", wide: "Geniş" };
 const ALTILI_STAKE_PER_COMBINATION = 1.25;
 // 2026-09-12 kullanıcı talebi: Diyarbakır/Şanlıurfa/Elazığ'ın Altılı kombinasyon başı
-// ücreti diğer hipodromlardan farklı, 0.8₺ — race.service.ts'teki stakeForHippodromeLabel
+// ücreti diğer hipodromlardan farklı, 1₺ — race.service.ts'teki stakeForHippodromeLabel
 // ile AYNI ayrım burada da uygulanıyor (iki dosya AYRI kopyalar, admin formu ile
 // yayınlanan kuponun anasayfa gösterimi tutarlı kalsın diye).
 const DUSUK_UCRETLI_HIPODROMLAR = ["Diyarbakır", "Şanlıurfa", "Elazığ"];
-const ALTILI_STAKE_DUSUK = 0.8;
+const ALTILI_STAKE_DUSUK = 1;
 function stakeForHippodrome(hippodromeName: string): number {
   return DUSUK_UCRETLI_HIPODROMLAR.some((h) => hippodromeName.includes(h)) ? ALTILI_STAKE_DUSUK : ALTILI_STAKE_PER_COMBINATION;
 }
