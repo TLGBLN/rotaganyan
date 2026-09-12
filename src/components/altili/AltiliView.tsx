@@ -5,18 +5,7 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ekuriRengi } from "@/lib/ekuri-colors";
 import type { ProgramDay, ProgramRace, ProgramRunner } from "@/server/services/race.service";
-import type { GunlukTevziTutarlari, AltiliCityResult } from "@/server/services/ingest/tjk-altili.adapter";
-
-// race.service.ts'teki parseIkramiyeTutar ile AYNI mantık (ayrı kopya, client component
-// server-only dosyayı import edemez) — "6'lı Ganyan 71.233,25 ₺ vermiştir." cümlesinden
-// sayısal tutarı çıkarır.
-function parseIkramiyeTutar(ikramiye: string | null | undefined): number | null {
-  if (!ikramiye) return null;
-  const m = ikramiye.match(/([\d.]+,\d+)/);
-  if (!m) return null;
-  const n = parseFloat(m[1].replace(/\./g, "").replace(",", "."));
-  return Number.isFinite(n) ? n : null;
-}
+import type { GunlukTevziTutarlari } from "@/server/services/ingest/tjk-altili.adapter";
 
 // effectiveAgf: eküri grubundaki atlar için grup toplamı, tekil for tek at
 type SelValue = { no: number; name: string; agf: number | null; effectiveAgf: number };
@@ -60,11 +49,9 @@ function effectiveAgf(runner: ProgramRunner, allRunners: ProgramRunner[]): numbe
 export default function AltiliView({
   days,
   tevzi,
-  altiliSonuclari,
 }: {
   days: ProgramDay[];
   tevzi: Record<string, GunlukTevziTutarlari>;
-  altiliSonuclari: Record<string, AltiliCityResult>;
 }) {
   const [activeHipo, setActiveHipo] = useState(days[0]?.hippodromeSlug ?? "");
   const [altiliIdx, setAltiliIdx] = useState<Record<string, number>>({});
@@ -161,15 +148,11 @@ export default function AltiliView({
   // hipodrom adıyla tevzi nesnesinden okunuyor, döküman sırası (1.Altılı önce) curAltili
   // ile BİREBİR eşleşir.
   const hipoTevzi = currentDay ? tevzi[currentDay.hippodromeName] : undefined;
-  // 2026-09-12 kullanıcı bulgusu: "Dağıtılacak Tutar" (havuz TOPLAMI, örn. 14,53 Milyon₺)
-  // İLE gerçek "X ₺ vermiştir" (kombinasyon başı GERÇEK ikramiye, örn. 71.233,25₺) TAMAMEN
-  // FARKLI sayılar — biri sonuçlanmadan önceki havuz büyüklüğü, diğeri sonuçlandıktan
-  // SONRAKİ gerçek ödeme. Yalnız Altılı için TJK'nın AltiliSonuc sayfası (fetchTodaysAltiliResults,
-  // zaten HomeKupon.ikramiye'yi besleyen AYNI scraper) gerçek "vermiştir" cümlesini veriyor —
-  // Beşli/Dörtlü/Üçlü/Yedili için henüz böyle bir kaynak yok, yalnız havuz büyüklüğü gösterilir.
-  const altiliGrup = !isYedili ? altiliSonuclari[currentDay?.hippodromeName ?? ""]?.groups[curAltili] : undefined;
-  const gercekIkramiyeAltili = parseIkramiyeTutar(altiliGrup?.ikramiye);
-
+  // 2026-09-12 kullanıcı kararı: Altılı'da bir ara TJK'nın gerçek "X ₺ vermiştir" ikramiyesi
+  // AYRICA gösteriliyordu — kullanıcı, tahmini aralıkla yan yana gösterilince kafa karıştırdığı
+  // için (tahmin doğal olarak sapabiliyor, bu "hata" değil) TÜM dört havuzda TUTARLI şekilde
+  // yalnız "Dağıtılacak Tutar" gösterilmesini istedi. Gerçek ikramiye artık HİÇBİR pool'da
+  // gösterilmiyor — yalnız arka planda AltiliIkramiyeLog'a kalibrasyon için kaydediliyor.
   const poolResults = POOL_DEFS.map(({ key, label, n }) => {
     const gercek =
       key === "yedili" ? hipoTevzi?.yedili ?? null
@@ -177,9 +160,7 @@ export default function AltiliView({
       : key === "altili" ? hipoTevzi?.altili[curAltili] ?? null
       : key === "besli" ? hipoTevzi?.besli[curAltili] ?? null
       : hipoTevzi?.uclu[curAltili] ?? null;
-    // Altılı'da GERÇEK ikramiye biliniyorsa (sonuçlandıysa), havuz-büyüklüğü YERİNE onu göster.
-    const gercekIkramiye = key === "altili" ? gercekIkramiyeAltili : null;
-    if (totalLegs < n) return { key, label, n, katsayi: null, lower: null, upper: null, gercek, gercekIkramiye };
+    if (totalLegs < n) return { key, label, n, katsayi: null, lower: null, upper: null, gercek };
     const subset = groupSelections.slice(totalLegs - n);
     const ready = subset.length === n && subset.every((s) => s != null && s.effectiveAgf > 0);
     const katsayi = ready ? subset.reduce((prod, s) => prod * (100 / s!.effectiveAgf), 1) : null;
@@ -199,7 +180,6 @@ export default function AltiliView({
       lower: katsayi != null ? katsayi * 0.65 : null,
       upper: katsayi != null ? katsayi * 0.8 : null,
       gercek,
-      gercekIkramiye,
     };
   }).filter((p) => p.n <= totalLegs);
 
@@ -520,16 +500,7 @@ export default function AltiliView({
                             Son {p.n} ayağı doldurun
                           </div>
                         )}
-                        {p.gercekIkramiye != null ? (
-                          <div className="mt-1.5 border-t pt-1.5">
-                            <div className="text-[9px] text-muted-foreground uppercase tracking-wide">
-                              TJK Gerçek İkramiye
-                            </div>
-                            <div className="text-xs font-bold text-[#27ae60] tabular-nums leading-tight">
-                              {formatTL(p.gercekIkramiye)}
-                            </div>
-                          </div>
-                        ) : p.gercek != null ? (
+                        {p.gercek != null ? (
                           <div className="mt-1.5 border-t pt-1.5">
                             <div className="text-[9px] text-muted-foreground uppercase tracking-wide">
                               TJK Dağıtılacak Tutar
@@ -546,10 +517,7 @@ export default function AltiliView({
                 {poolResults.some((p) => p.lower != null) && (
                   <div className="mt-2 text-[10px] text-muted-foreground">
                     AGF bazlı tahmin — her havuz kendi son N ayağının seçimlerinden hesaplanır. Gerçek ikramiye havuz büyüklüğü ve kazanan sayısına göre değişir.
-                    {poolResults.some((p) => p.gercekIkramiye != null) && (
-                      <> &quot;TJK Gerçek İkramiye&quot; Altılı sonuçlandıktan sonra TJK&apos;nın açıkladığı GERÇEK kombinasyon başı ödemedir.</>
-                    )}
-                    {poolResults.some((p) => p.gercek != null && p.gercekIkramiye == null) && (
+                    {poolResults.some((p) => p.gercek != null) && (
                       <> &quot;TJK Dağıtılacak Tutar&quot; o an TJK&apos;da dağıtılacak TOPLAM havuz büyüklüğüdür (henüz sonuçlanmadı, kombinasyon başına düşen tutar değil).</>
                     )}
                   </div>
