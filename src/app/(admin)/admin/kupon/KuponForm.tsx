@@ -54,6 +54,12 @@ const TOLERANCE = 1.10; // %10 esneme payı
 // versin (diğer ikisi hâlâ standart +%10). Base LIMITS.narrow (600₺) hedef olarak kalır,
 // yalnız üst sınır (effectiveLimit) genişliyor.
 const TOLERANCES: Record<Width, number> = { narrow: 700 / LIMITS.narrow, normal: TOLERANCE, wide: TOLERANCE };
+// 2026-09-12 kullanıcı talebi — 7'li Ganyan da artık Ekonomik/Normal/Geniş üçünü birden
+// gösteriyor (v6.111'deki "yalnız Geniş" kararı GERİ ALINDI), kendi hedef aralıklarıyla:
+// Eko 500-700₺, Normal 1400-1500₺, Geniş 3000-3200₺ — Altılı'nın LIMITS/TOLERANCES'ından
+// BAĞIMSIZ, kendi sabitleri (kombinasyon ücreti hâlâ 2₺, YEDILI_GANYAN_STAKE_PER_COMBINATION).
+const YEDILI_LIMITS: Record<Width, number> = { narrow: 500, normal: 1400, wide: 3000 };
+const YEDILI_TOLERANCES: Record<Width, number> = { narrow: 700 / 500, normal: 1500 / 1400, wide: 3200 / 3000 };
 
 function emptySelection(): Record<Width, Set<number>> {
   return { narrow: new Set(), normal: new Set(), wide: new Set() };
@@ -72,7 +78,12 @@ function emptyGroupSelections(races: { raceNo: number }[]): GroupSelections {
 // olasılığını verecek şekilde DAĞITMAK — bkz. kupon-optimizer.ts. Bu fonksiyon her üç
 // kademe (Ekonomik/Normal/Geniş) için AYRI bir optimizasyon çalıştırıp TEK bir
 // GroupSelections'ta birleştiriyor.
-function otomatikGroupSelections(races: RaceDayData["races"], stakePerCombination: number): GroupSelections {
+function otomatikGroupSelections(
+  races: RaceDayData["races"],
+  stakePerCombination: number,
+  limits: Record<Width, number> = LIMITS,
+  tolerances: Record<Width, number> = TOLERANCES
+): GroupSelections {
   const legs: LegProbability[] = races.map((race) => ({
     raceNo: race.raceNo,
     runners: race.runners
@@ -81,7 +92,7 @@ function otomatikGroupSelections(races: RaceDayData["races"], stakePerCombinatio
   }));
   const sel = emptyGroupSelections(races);
   for (const width of WIDTHS) {
-    const effectiveLimit = LIMITS[width] * TOLERANCES[width];
+    const effectiveLimit = limits[width] * tolerances[width];
     const maxCombinations = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
     const { secimler } = optimizeKuponAllocation(legs, maxCombinations);
     for (const race of races) {
@@ -159,6 +170,7 @@ function amountFor(counts: number[], stakePerCombination: number): number {
 // önlemek için ortak bileşene çıkarıldı.
 function KuponGrup({
   label, races, selections, onToggle, onAutoFill, amounts, onSubmit, publishing, stakePerCombination, widths = WIDTHS,
+  limits = LIMITS, tolerances = TOLERANCES,
 }: {
   label: string;
   races: RaceDayData["races"];
@@ -169,8 +181,11 @@ function KuponGrup({
   onSubmit: () => void;
   publishing: boolean;
   stakePerCombination: number;
-  /** v6.111 — kullanıcı talebi 2026-08-13: 7'li Ganyan yalnız "Geniş" gösterir, Altılı üçünü de. */
   widths?: Width[];
+  /** 2026-09-12 — 7'li Ganyan Altılı'dan FARKLI hedef aralıklar kullanıyor (YEDILI_LIMITS/
+   *  YEDILI_TOLERANCES) — verilmezse Altılı'nın varsayılan LIMITS/TOLERANCES'ı kullanılır. */
+  limits?: Record<Width, number>;
+  tolerances?: Record<Width, number>;
 }) {
   return (
     <div className="space-y-2">
@@ -296,8 +311,8 @@ function KuponGrup({
       <div className={cn("grid gap-3", widths.length === 1 ? "grid-cols-1 max-w-xs" : "grid-cols-3")}>
         {widths.map((width) => {
           const amount = amounts[width];
-          const limit = LIMITS[width];
-          const effectiveLimit = limit * TOLERANCES[width];
+          const limit = limits[width];
+          const effectiveLimit = limit * tolerances[width];
           const maxCombos = Math.floor(effectiveLimit / stakePerCombination);
           const currentCombos = Math.round(amount / stakePerCombination);
           const remaining = maxCombos - currentCombos;
@@ -318,14 +333,14 @@ function KuponGrup({
               </div>
               <div className="text-[10px] text-muted-foreground mt-1 border-t pt-1">
                 max {maxCombos.toLocaleString("tr-TR")} kombo · {effectiveLimit.toLocaleString("tr-TR")} ₺{" "}
-                <span className="opacity-60">(+%{Math.round((TOLERANCES[width] - 1) * 100)})</span>
+                <span className="opacity-60">(+%{Math.round((tolerances[width] - 1) * 100)})</span>
               </div>
             </div>
           );
         })}
       </div>
 
-      {widths.some((w) => amounts[w] > LIMITS[w] * TOLERANCES[w]) && (
+      {widths.some((w) => amounts[w] > limits[w] * tolerances[w]) && (
         <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-500">
           ⚠ Bir veya daha fazla kupon türü limit aşıyor. Kaydetmeden önce seçimleri azaltın.
         </div>
@@ -420,8 +435,14 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
     });
   }
 
-  function autoFillGroup(groupKey: string, races: RaceDayData["races"], stakePerCombination: number) {
-    const sel = otomatikGroupSelections(races, stakePerCombination);
+  function autoFillGroup(
+    groupKey: string,
+    races: RaceDayData["races"],
+    stakePerCombination: number,
+    limits?: Record<Width, number>,
+    tolerances?: Record<Width, number>
+  ) {
+    const sel = otomatikGroupSelections(races, stakePerCombination, limits, tolerances);
     setSelections((prev) => ({ ...prev, [groupKey]: sel }));
     toast.success("Öneri dolduruldu — gözden geçirip yayınlamadan önce düzenleyebilirsin");
   }
@@ -526,17 +547,20 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
             );
           })}
 
-          {/* v6.110 — "7'li Ganyan": her zaman günün son 7 koşusu, kullanıcı talebi 2026-08-13. */}
+          {/* v6.110 — "7'li Ganyan": her zaman günün son 7 koşusu, kullanıcı talebi 2026-08-13.
+              2026-09-12: artık Ekonomik/Normal/Geniş üçünü birden gösterir (v6.111'deki
+              "yalnız Geniş" kararı geri alındı), kendi hedef aralıklarıyla (YEDILI_LIMITS). */}
           {yediliGanyanRaces && yediliGanyanAmounts && (
             <KuponGrup
               label={`${raceDay.hippodromeName} — 7'li Ganyan`}
               races={yediliGanyanRaces}
               selections={selections["yedili-ganyan"] ?? {}}
               onToggle={(raceNo, width, no) => toggleHorse("yedili-ganyan", raceNo, width, no)}
-              onAutoFill={() => autoFillGroup("yedili-ganyan", yediliGanyanRaces, YEDILI_GANYAN_STAKE_PER_COMBINATION)}
+              onAutoFill={() => autoFillGroup("yedili-ganyan", yediliGanyanRaces, YEDILI_GANYAN_STAKE_PER_COMBINATION, YEDILI_LIMITS, YEDILI_TOLERANCES)}
               amounts={yediliGanyanAmounts}
               stakePerCombination={YEDILI_GANYAN_STAKE_PER_COMBINATION}
-              widths={["wide"]}
+              limits={YEDILI_LIMITS}
+              tolerances={YEDILI_TOLERANCES}
               onSubmit={() => submitGroup(yediliGanyanRaces, "yedili-ganyan", "7'li Ganyan", YEDILI_GANYAN_SLOT)}
               publishing={publishingKey === "yedili-ganyan"}
             />
