@@ -355,9 +355,15 @@ export default function AltiliView({
                               onClick={() => {
                                 if (r.scratched) return;
                                 const key = selKey(activeHipo, curAltili, curAyak);
-                                const wasSelected = getSelected(activeHipo, curAltili, curAyak)?.no === r.no;
+                                // 2026-09-12 kullanıcı bulgusu: sonuçlanmış bir ayakta varsayılan
+                                // olarak GÖSTERİLEN kazanana (henüz MANUEL seçim yokken) tıklamak
+                                // "aynı atı seçtin, kaldır" gibi davranıp İLERLEMİYORDU — çünkü
+                                // wasSelected eskiden getSelected()'a (varsayılanı da içeren)
+                                // bakıyordu. Artık yalnız MANUEL kayda (selections[key]) bakılıyor
+                                // — varsayılanı "onayla" gibi tıklamak da artık sonraki ayağa geçirir.
+                                const wasManuallySelected = selections[key]?.no === r.no;
                                 setSelections((prev) => {
-                                  if (wasSelected) {
+                                  if (wasManuallySelected) {
                                     const next = { ...prev };
                                     delete next[key];
                                     return next;
@@ -367,8 +373,8 @@ export default function AltiliView({
                                     [key]: { no: r.no, name: r.name, agf: r.agf, effectiveAgf: effAgf },
                                   };
                                 });
-                                // Otomatik sonraki ayağa geç (seçim yapılıyorsa, iptal değil)
-                                if (!wasSelected && curAyak < currentGroup.races.length - 1) {
+                                // Otomatik sonraki ayağa geç (seçim yapılıyorsa, manuel iptal değil)
+                                if (!wasManuallySelected && curAyak < currentGroup.races.length - 1) {
                                   setAyakIdx((prev) => ({ ...prev, [ayakKey]: curAyak + 1 }));
                                 }
                               }}
@@ -526,7 +532,7 @@ export default function AltiliView({
                         ) : p.gercek != null ? (
                           <div className="mt-1.5 border-t pt-1.5">
                             <div className="text-[9px] text-muted-foreground uppercase tracking-wide">
-                              TJK Gerçek Havuz
+                              TJK Dağıtılacak Tutar
                             </div>
                             <div className="text-xs font-bold text-[#c9a54e] tabular-nums leading-tight">
                               {formatTL(p.gercek)}
@@ -544,7 +550,7 @@ export default function AltiliView({
                       <> &quot;TJK Gerçek İkramiye&quot; Altılı sonuçlandıktan sonra TJK&apos;nın açıkladığı GERÇEK kombinasyon başı ödemedir.</>
                     )}
                     {poolResults.some((p) => p.gercek != null && p.gercekIkramiye == null) && (
-                      <> &quot;TJK Gerçek Havuz&quot; o an dağıtılacak TOPLAM havuz büyüklüğüdür (henüz sonuçlanmadı, kombinasyon başına düşen tutar değil).</>
+                      <> &quot;TJK Dağıtılacak Tutar&quot; o an TJK&apos;da dağıtılacak TOPLAM havuz büyüklüğüdür (henüz sonuçlanmadı, kombinasyon başına düşen tutar değil).</>
                     )}
                   </div>
                 )}
