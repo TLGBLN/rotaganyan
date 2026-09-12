@@ -35,6 +35,15 @@ type Selections = Record<string, GroupSelections>;
 const WIDTHS: Width[] = ["narrow", "normal", "wide"];
 const WIDTH_LABEL: Record<Width, string> = { narrow: "Ekonomik", normal: "Normal", wide: "Geniş" };
 const ALTILI_STAKE_PER_COMBINATION = 1.25;
+// 2026-09-12 kullanıcı talebi: Diyarbakır/Şanlıurfa/Elazığ'ın Altılı kombinasyon başı
+// ücreti diğer hipodromlardan farklı, 0.8₺ — race.service.ts'teki stakeForHippodromeLabel
+// ile AYNI ayrım burada da uygulanıyor (iki dosya AYRI kopyalar, admin formu ile
+// yayınlanan kuponun anasayfa gösterimi tutarlı kalsın diye).
+const DUSUK_UCRETLI_HIPODROMLAR = ["Diyarbakır", "Şanlıurfa", "Elazığ"];
+const ALTILI_STAKE_DUSUK = 0.8;
+function stakeForHippodrome(hippodromeName: string): number {
+  return DUSUK_UCRETLI_HIPODROMLAR.some((h) => hippodromeName.includes(h)) ? ALTILI_STAKE_DUSUK : ALTILI_STAKE_PER_COMBINATION;
+}
 // v6.111 — kullanıcı düzeltmesi 2026-08-13: 7'li Ganyan'ın kombinasyon başı ücreti
 // Altılı'dan (1.25₺) farklı, TJK'da 2₺. Pool limitleri (600/1500/3000) için gerçek
 // 7'li Ganyan rakamı henüz doğrulanmadı, Altılı'dan aynen kopyalandı — yanlışsa düzelt.
@@ -364,9 +373,11 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
     [raceDay]
   );
 
+  const altiliStake = stakeForHippodrome(raceDay?.hippodromeName ?? "");
+
   const groupAmounts = useMemo(
-    () => altiliGroups.map((group, i) => amountsForGroup(group, selections[`altili-${i}`] ?? {}, ALTILI_STAKE_PER_COMBINATION)),
-    [altiliGroups, selections]
+    () => altiliGroups.map((group, i) => amountsForGroup(group, selections[`altili-${i}`] ?? {}, altiliStake)),
+    [altiliGroups, selections, altiliStake]
   );
 
   // v6.110 — "7'li Ganyan": her zaman günün SON 7 koşusu, Altılı pencerelerinden
@@ -506,9 +517,9 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
                 races={chunk}
                 selections={selections[key] ?? {}}
                 onToggle={(raceNo, width, no) => toggleHorse(key, raceNo, width, no)}
-                onAutoFill={() => autoFillGroup(key, chunk, ALTILI_STAKE_PER_COMBINATION)}
+                onAutoFill={() => autoFillGroup(key, chunk, altiliStake)}
                 amounts={groupAmounts[chunkIdx]}
-                stakePerCombination={ALTILI_STAKE_PER_COMBINATION}
+                stakePerCombination={altiliStake}
                 onSubmit={() => submitGroup(chunk, key, slotLabel, chunkIdx + 1)}
                 publishing={publishingKey === key}
               />

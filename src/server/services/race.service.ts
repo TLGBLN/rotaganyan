@@ -436,9 +436,16 @@ export type HomeKuponLeg = { raceNo: number; narrow: number[]; normal: number[];
  */
 const ALTILI_STAKE_PER_COMBINATION = 1.25;
 const YEDILI_GANYAN_STAKE_PER_COMBINATION = 2;
+// 2026-09-12 kullanıcı talebi: Diyarbakır/Şanlıurfa/Elazığ'ın Altılı kombinasyon başı
+// ücreti diğer hipodromlardan farklı, 0.8₺ — admin/kupon/KuponForm.tsx'teki AYNI ayrımın
+// (ayrı kopya, o formun canlı önizlemesi için) burada da uygulanan hali — bu fonksiyon
+// yayınlanmış kuponun anasayfa gösterimindeki tutarı hesaplıyor, ikisi TUTARLI kalmalı.
+const DUSUK_UCRETLI_HIPODROMLAR = ["Diyarbakır", "Şanlıurfa", "Elazığ"];
+const ALTILI_STAKE_DUSUK = 0.8;
 
 function stakeForHippodromeLabel(hippodromeName: string): number {
-  return hippodromeName.includes("7'li Ganyan") ? YEDILI_GANYAN_STAKE_PER_COMBINATION : ALTILI_STAKE_PER_COMBINATION;
+  if (hippodromeName.includes("7'li Ganyan")) return YEDILI_GANYAN_STAKE_PER_COMBINATION;
+  return DUSUK_UCRETLI_HIPODROMLAR.some((h) => hippodromeName.includes(h)) ? ALTILI_STAKE_DUSUK : ALTILI_STAKE_PER_COMBINATION;
 }
 
 /**
