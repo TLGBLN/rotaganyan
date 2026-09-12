@@ -59,9 +59,15 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
   function selKey(hipo: string, alt: number, ayak: number) {
     return `${hipo}/${alt}/${ayak}`;
   }
-  // Sonuçlanmış bir yarış varsa seçim otomatik olarak gerçek kazanana kilitlenir —
-  // kullanıcının artık bilmediği bir sonucu tahmin etmesine gerek kalmaz.
+  // 2026-09-12 kullanıcı bulgusu: sonuçlanmış bir yarışta seçim ESKİDEN gerçek kazanana
+  // KİLİTLENİYORDU (tıklama tamamen engelleniyordu) — kullanıcı "kendi gelebilecek atları
+  // için önceden ne vereceğine bakmak" istediğinde, henüz sonuçlanmamış ayaklarla birlikte
+  // sonuçlanmış bir ayakta da İSTEDİĞİ atı deneyebilmesi gerekiyordu. Artık kazanan yalnız
+  // kullanıcı henüz manuel bir seçim yapmadıysa VARSAYILAN olarak gösteriliyor — manuel
+  // seçim varsa (gerçek kazanan dahil, aynı at olsa bile) her zaman ONA öncelik verilir.
   function getSelected(hipo: string, alt: number, ayak: number): SelValue | null {
+    const manual = selections[selKey(hipo, alt, ayak)];
+    if (manual) return manual;
     const race = currentGroup?.races[ayak];
     const winnerNo = race?.result?.winnerNo;
     if (race && winnerNo != null) {
@@ -70,7 +76,7 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
         return { no: winner.no, name: winner.name, agf: winner.agf, effectiveAgf: effectiveAgf(winner, race.runners) };
       }
     }
-    return selections[selKey(hipo, alt, ayak)] ?? null;
+    return null;
   }
   function clearGroup(hipo: string, alt: number) {
     setSelections((prev) => {
@@ -199,6 +205,7 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                 {currentGroup.races.map((r, i) => {
                   const sel = getSelected(activeHipo, curAltili, i);
                   const resulted = r.result?.winnerNo != null;
+                  const isActualWinner = resulted && sel?.no === r.result?.winnerNo;
                   return (
                     <button
                       key={r.id}
@@ -215,7 +222,7 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                         <span
                           className={cn(
                             "absolute top-1 right-0.5 w-1.5 h-1.5 rounded-full",
-                            resulted ? "bg-[#f0d9a6]" : "bg-[#27ae60]"
+                            isActualWinner ? "bg-[#f0d9a6]" : "bg-[#27ae60]"
                           )}
                         />
                       )}
@@ -234,7 +241,7 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                   {currentRace.classType && <span>· {currentRace.classType}</span>}
                   {currentResulted && (
                     <span className="ml-auto rounded-full bg-[#f0d9a6]/15 px-2 py-0.5 text-[10px] font-semibold text-[#c9a54e]">
-                      Sonuçlandı — otomatik işaretlendi
+                      Sonuçlandı — kazanan varsayılan seçili, istediğiniz atı seçebilirsiniz
                     </span>
                   )}
                 </div>
@@ -261,6 +268,11 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                         })
                         .map((r, i) => {
                           const isSelected = getSelected(activeHipo, curAltili, curAyak)?.no === r.no;
+                          // 2026-09-12: "sonuçlandı" artık tıklamayı ENGELLEMİYOR (kullanıcı
+                          // istediği atı deneyebilsin) — yalnız gösterim rengini ayırt etmek
+                          // için gerçek kazananla eşleşip eşleşmediğine bakılıyor (altın=gerçek
+                          // kazanan, yeşil=kullanıcının kendi/hipotetik seçimi).
+                          const isActualWinner = currentResulted && currentRace.result?.winnerNo === r.no;
                           const isTopAgf = !r.scratched && i === 0;
                           const effAgf = effectiveAgf(r, currentRace.runners);
                           const isEkuri = r.ekuriGroup != null && r.ekuriGroup >= 1 && effAgf > (r.agf ?? 0) + 0.01;
@@ -269,7 +281,7 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                             <tr
                               key={r.id}
                               onClick={() => {
-                                if (r.scratched || currentResulted) return;
+                                if (r.scratched) return;
                                 const key = selKey(activeHipo, curAltili, curAyak);
                                 const wasSelected = getSelected(activeHipo, curAltili, curAyak)?.no === r.no;
                                 setSelections((prev) => {
@@ -290,16 +302,16 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                               }}
                               className={cn(
                                 "border-b transition-colors",
-                                r.scratched ? "opacity-40 cursor-not-allowed" : currentResulted ? "cursor-default" : "cursor-pointer",
+                                r.scratched ? "opacity-40 cursor-not-allowed" : "cursor-pointer",
                                 i % 2 === 0 ? "bg-background" : "bg-muted/20",
-                                isSelected && currentResulted && "bg-[#f0d9a6]/15",
-                                isSelected && !currentResulted && "bg-[#27ae60]/15 hover:bg-[#27ae60]/20",
-                                !isSelected && !r.scratched && !currentResulted && "hover:bg-muted/40"
+                                isSelected && isActualWinner && "bg-[#f0d9a6]/15",
+                                isSelected && !isActualWinner && "bg-[#27ae60]/15 hover:bg-[#27ae60]/20",
+                                !isSelected && !r.scratched && "hover:bg-muted/40"
                               )}
                             >
                               <td className="px-2 py-2.5 text-center w-8">
                                 {isSelected && (
-                                  <Check className={cn("h-4 w-4 mx-auto", currentResulted ? "text-[#c9a54e]" : "text-[#27ae60]")} />
+                                  <Check className={cn("h-4 w-4 mx-auto", isActualWinner ? "text-[#c9a54e]" : "text-[#27ae60]")} />
                                 )}
                               </td>
                               <td className="px-2 py-2.5 text-center font-bold tabular-nums">{r.no}</td>
@@ -359,14 +371,18 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                   {currentGroup.races.map((race, i) => {
                     const sel = getSelected(activeHipo, curAltili, i);
                     const isActive = curAyak === i;
+                    // 2026-09-12: "resulted" artık tek başına altın rengi tetiklemiyor —
+                    // yalnız gösterilen seçim GERÇEKTEN kazananla eşleşiyorsa altın, kullanıcı
+                    // farklı/hipotetik bir at seçtiyse (sonuçlanmış olsa bile) yeşil kalır.
                     const resulted = race.result?.winnerNo != null;
+                    const isActualWinner = resulted && sel?.no === race.result?.winnerNo;
                     return (
                       <button
                         key={i}
                         onClick={() => setAyakIdx((prev) => ({ ...prev, [ayakKey]: i }))}
                         className={cn(
                           "flex flex-col items-center rounded-lg border p-1.5 text-center transition-colors min-h-[58px] justify-center",
-                          resulted
+                          isActualWinner
                             ? "border-[#c9a54e] bg-[#f0d9a6]/10"
                             : sel
                             ? "border-[#27ae60] bg-[#27ae60]/10"
@@ -384,7 +400,7 @@ export default function AltiliView({ days }: { days: ProgramDay[] }) {
                             <span className="text-[9px] truncate w-full leading-tight mt-0.5 px-0.5">
                               {sel.name.split(" ")[0]}
                             </span>
-                            <span className={cn("text-[9px] font-semibold", resulted ? "text-[#c9a54e]" : "text-[#27ae60]")}>
+                            <span className={cn("text-[9px] font-semibold", isActualWinner ? "text-[#c9a54e]" : "text-[#27ae60]")}>
                               %{sel.effectiveAgf.toFixed(0)}
                             </span>
                           </>

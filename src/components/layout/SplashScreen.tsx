@@ -67,7 +67,12 @@ export default function SplashScreen() {
         />
       </div>
 
-      <Wordmark className="text-3xl opacity-0" showIcon={false} style={{ animation: "splash-fade-up 500ms ease-out 520ms both" }} />
+      <Wordmark
+        className="text-3xl opacity-0"
+        showIcon={false}
+        firstPartClassName="text-white"
+        style={{ animation: "splash-fade-up 500ms ease-out 520ms both" }}
+      />
 
       <div
         className="flex items-end gap-2.5 h-[22px] opacity-0"
