@@ -741,6 +741,32 @@ model HomeKupon {
   @@index([slot])
 }
 
+// 2026-09-12 kullanıcı talebi — "Altılı Ne Verir?"'in AGF-tabanlı tahmini, gerçek TJK
+// ikramiyesinden büyük sapma gösterebiliyor (24 örnekte medyan %61-76, ama varyans %30-116).
+// Kullanıcı "Dağıtılacak Tutar"ı (havuz büyüklüğü) da girdi olarak kullanan daha iyi bir
+// kalibrasyon istedi — TEK günün 2 gerçek örneğiyle denendi, havuz+katsayı+gerçek-ikramiye
+// arasında STABİL bir ilişki bulunamadı (bkz. proje hafızası). Karar: geriye dönük TJK verisi
+// çekilemediği için (yalnız "bugün" sorgulanabiliyor), BUNDAN SONRA sonuçlanan HER Altılı için
+// bu üçlüyü kaydedip, yeterli örnek (20-30+) birikince GERÇEK bir regresyon kurulacak.
+model AltiliIkramiyeLog {
+  id             String   @id @default(cuid())
+  hippodromeName String // TJK'nın sehirAdi'si (ör. "Ankara") — AltiliCityResult.sehirAdi ile aynı
+  date           DateTime
+  slot           Int // 1 veya 2 (1. Altılı / 2. Altılı)
+  // Havuz kapanmadan ÖNCEKİ son bilinen "Dağıtılacak Tutar" — sonuçlandıktan sonra TJK'nın
+  // kendi sayfası bu değeri artık göstermediği için, kapanmadan önce yakalanıp burada donar.
+  havuzBuyuklugu Int?
+  // Gerçek kazanan kombinasyonun AGF-bazlı katsayısı (Σ 100/effectiveAgf) — kendi Race/Runner
+  // verimizden, sonuçlandıktan SONRA hesaplanır (leak yok, geçmişe dönük gerçek sonuç).
+  katsayi        Float?
+  // TJK'nın "X ₺ vermiştir" cümlesinden ayrıştırılan GERÇEK kombinasyon-başı ödeme.
+  gercekIkramiye Float?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([hippodromeName, date, slot])
+}
+
 // ─── SITE SETTINGS ───────────────────────────────────────────────────────────
 
 model SiteSetting {
