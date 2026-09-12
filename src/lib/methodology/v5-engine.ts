@@ -1326,9 +1326,14 @@ function bAgirlikOrani(classType: string): number {
 // kararıyla). sireOrani'nin AKSİNE düşük-şart'a özgü değil — kavram (bugünkü tam pist+zemin+
 // mesafe koşulunda kanıtlanmış deneyim) TÜM kategorilerde anlamlı, bu yüzden oran HER ZAMAN
 // 1 (bAgirlikOrani'ye tabi değil). Katsayı (0.02), challenger'da test edilen AYNI
-// kanıtlanmamış varsayım. Standartlaştırma GEREKMİYOR — değer zaten popülasyona-göreli bir
-// % (doğal olarak ~0 merkezli, zeminToleransi'yle aynı ölçek).
+// kanıtlanmamış varsayım.
+// 2026-09-12 DÜZELTME: "doğal olarak ~0 merkezli" varsayımı hiç ÖLÇÜLMEMİŞTİ — gerçek
+// veride (n=4482 veri-olan at, model-veri-yg4.json) ortalama -0.515 (std=2.624) çıktı,
+// yani her ata küçük bir sistematik CEZA biniyordu. Artık sireOrani ile AYNI desende
+// merkezleniyor (yalnız GERÇEK veri olan atlarda — "veri yok" için 0 nötr kalmalı, aksi
+// halde eksik veriye sahte bir sinyal binerdi).
 const B_ZEMINMESAFE_KATSAYI = 0.02;
+const B_ZEMINMESAFE_ORTALAMA = -0.515;
 
 /** B katmanını (sireOrani/düşük-şart + zeminMesafeDeneyim/TÜM kategoriler) softmax'a girmeden
  *  ÖNCE skora ekler. softmax(skor+Δ) ∝ softmax(skor)×exp(Δ) olduğu için bu, "olasılığı
@@ -1343,7 +1348,9 @@ function bKatmaniUygula(
   const sireKatkilar = runners.map((r) =>
     sireOran === 0 ? 0 : sireOran * B_SIREORANI_KATSAYI * ((r.sireOrani - B_SIREORANI_ORTALAMA) / B_SIREORANI_SAPMA)
   );
-  const zeminMesafeKatkilar = runners.map((r) => B_ZEMINMESAFE_KATSAYI * r.zeminMesafeDeneyim);
+  const zeminMesafeKatkilar = runners.map((r) =>
+    r.zeminMesafeDeneyimSeviyesi === "yok" ? 0 : B_ZEMINMESAFE_KATSAYI * (r.zeminMesafeDeneyim - B_ZEMINMESAFE_ORTALAMA)
+  );
   const yeniSkorlar = skorlar.map((skor, i) => skor + sireKatkilar[i] + zeminMesafeKatkilar[i]);
   return {
     skorlar: yeniSkorlar,
