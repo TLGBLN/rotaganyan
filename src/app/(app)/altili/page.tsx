@@ -5,7 +5,7 @@ import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter
 import { tryAcquireIngestLock } from "@/lib/ingest-lock";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import AltiliView from "@/components/altili/AltiliView";
-import { fetchGunlukTevziTutarlariByHipodrom } from "@/server/services/ingest/tjk-altili.adapter";
+import { fetchGunlukTevziTutarlariByHipodrom, fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
 
 export const revalidate = 0;
 
@@ -55,6 +55,12 @@ export default async function AltiliPage({ searchParams }: PageProps) {
   // çevriliyor, anahtar TJK'nın sehirAdi'si (hippodromeName ile aynı Türkçe isim).
   const tevziByHipo = currentDate === today ? await fetchGunlukTevziTutarlariByHipodrom().catch(() => new Map()) : new Map();
   const tevzi = Object.fromEntries(tevziByHipo);
+  // 2026-09-12 kullanıcı bulgusu: "Dağıtılacak Tutar" (havuz TOPLAMI) ile gerçek
+  // "X ₺ vermiştir" (kombinasyon başı GERÇEK ikramiye) TAMAMEN FARKLI sayılar — Altılı
+  // sonuçlanınca artık pool-büyüklüğü değil GERÇEK ikramiyeyi göstermeliyiz. fetchTodaysAltiliResults
+  // (zaten var olan, HomeKupon.ikramiye'yi de besleyen scraper) bunu grup başına taşıyor.
+  const altiliSonuclariListesi = currentDate === today ? await fetchTodaysAltiliResults().catch(() => []) : [];
+  const altiliSonuclari = Object.fromEntries(altiliSonuclariListesi.map((r) => [r.sehirAdi, r]));
 
   return (
     <div className="mx-auto max-w-[1400px] px-3 py-4 space-y-3">
@@ -68,7 +74,7 @@ export default async function AltiliPage({ searchParams }: PageProps) {
         <DateNavigator currentDate={currentDate} basePath="/altili" />
       </div>
       <div className="rounded-lg border overflow-hidden">
-        <AltiliView days={days} tevzi={tevzi} />
+        <AltiliView days={days} tevzi={tevzi} altiliSonuclari={altiliSonuclari} />
       </div>
     </div>
   );
