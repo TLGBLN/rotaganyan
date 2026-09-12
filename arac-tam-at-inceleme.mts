@@ -13,7 +13,7 @@
 //
 // Bu script TEK komutla, analiz motorunun analiz edeceği (henüz sonuçlanmamış) bir
 // günün/hipodromun TÜM koşularındaki İSTİSNASIZ HER at için TÜM veriyi döker:
-//   - Modelin 17 skor girdisinin TAMAMI (A+B katmanı)
+//   - Modelin 13 skor girdisinin TAMAMI (A+B katmanı, V5.46)
 //   - Hızlı Özet (pist uzmanlığı/sınıf durumu/at-jokey ikilisi/AGF trend/pedigri)
 //   - Soy ağacı (3 kuşak) + pedigri özet metni (SireStatOwn)
 //   - Sahiplik/kazanç + DETAYLI İSTATİSTİK TABLOLARININ TAM İÇERİĞİ (başlık+satırlar)
@@ -62,10 +62,14 @@ function raceStyleToTempoProfili(raw: unknown): AtTempoProfili | null {
   return { dagilim: r.dagilim, erkenHizGucu: r.erkenHizGucu ?? null, n: r.veri ?? 0 };
 }
 
+// 2026-09-12 (V5.46) — kgsVarMi/kacakYalniz/h2hKiloDegisimi toFeatureVector'dan çıktı,
+// takiEklendiMi+takiCikarildiMi tek sinyale (takiDegisikligi) birleşti — bu liste
+// v5-engine.ts'in GERÇEK toFeatureVector sırasıyla BİREBİR eşleşmeli, yoksa aşağıdaki
+// tablo yanlış isim/sütuna yanlış değer eşler (ya da "undefined" basar).
 const A_KATMANI_ADLARI = [
-  "agfSirasi", "kgsVarMi", "idmJokey", "jokeyOrani", "antrenorOrani", "kacakYalniz",
-  "agfPayi", "h2hNetSkor", "hizDerecesi", "h2hKiloDegisimi", "agfPayi2", "zeminToleransi",
-  "yakinsama2Plus", "sonIdmanSprint", "takiEklendiMi", "takiCikarildiMi", "yarisGidisatiSkoru",
+  "agfSirasi", "idmJokey", "jokeyOrani", "antrenorOrani",
+  "agfPayi", "h2hNetSkor", "hizDerecesi", "agfPayi2", "zeminToleransi",
+  "yakinsama2Plus", "sonIdmanSprint", "takiDegisikligi", "yarisGidisatiSkoru",
 ];
 
 function get(argv: string[], bayrak: string) {
@@ -216,7 +220,7 @@ async function tekKosuIsle(raceId: string) {
       `  Saf Model (AGF'siz): ${safModelSiraByNo.get(r.no)}. sıra (%${safYuzde.toFixed(1)}) | AGF: ${r.agfSirasi}. sıra (%${r.agfPayi.toFixed(1)}) | Fark: ${safFark > 0 ? "+" : ""}${safFark.toFixed(1)}pp${safFark >= 5 ? "  ⚠ model piyasadan bağımsız değer buluyor, nihai skorda sönümlenmiş olabilir" : ""}`
     );
 
-    console.log(`  A-Katmanı (17 skor girdisinin TAMAMI):`);
+    console.log(`  A-Katmanı (13 skor girdisinin TAMAMI):`);
     A_KATMANI_ADLARI.forEach((ad, i) => console.log(`    ${ad.padEnd(18)} = ${vektor[i]}`));
 
     if (ozet) {
@@ -313,11 +317,11 @@ async function tekKosuIsle(raceId: string) {
   // özelliğinin TAMAMI + ayrı-mekanizmalı B-Katmanı sinyalleri (sireOrani,
   // zeminMesafeDeneyim — bkz. v5-engine.ts bKatmaniUygula) tabloya eklendi.
   const KISA_ETIKET: Record<string, string> = {
-    agfSirasi: "AGFsr", kgsVarMi: "KGSv", idmJokey: "İdmJk", jokeyOrani: "JokOr",
-    antrenorOrani: "AntOr", kacakYalniz: "Kaçk", agfPayi: "AGF%", h2hNetSkor: "H2H",
-    hizDerecesi: "HızDr", h2hKiloDegisimi: "H2HKilo", agfPayi2: "AGF%²",
+    agfSirasi: "AGFsr", idmJokey: "İdmJk", jokeyOrani: "JokOr",
+    antrenorOrani: "AntOr", agfPayi: "AGF%", h2hNetSkor: "H2H",
+    hizDerecesi: "HızDr", agfPayi2: "AGF%²",
     zeminToleransi: "ZemTol", yakinsama2Plus: "Yaknsm", sonIdmanSprint: "Sprint",
-    takiEklendiMi: "TakıEk", takiCikarildiMi: "TakıÇk", yarisGidisatiSkoru: "Gidşt",
+    takiDegisikligi: "TakıDğ", yarisGidisatiSkoru: "Gidşt",
   };
   const basliklar = [
     "No", "At", "Sıra", "Olsk",
@@ -343,7 +347,7 @@ async function tekKosuIsle(raceId: string) {
     ];
     console.log("  " + hucreler.map((h) => h.padEnd(8)).join(""));
   });
-  console.log(`  ── Sütun sırası başlıkla eşleşir. A-Katmanı=17 skor girdisi (AGFsr..Gidşt), ayrı-mekanizmalı B-Katmanı=SireOr/ZemMsf, gösterim-amaçlı=AGFfrk/PedK/Sınıf/Takı. Satır satır tara — model sırasıyla ÇELİŞEN bir sütun varsa mutlaka belirt. ──\n`);
+  console.log(`  ── Sütun sırası başlıkla eşleşir. A-Katmanı=13 skor girdisi (AGFsr..Gidşt), ayrı-mekanizmalı B-Katmanı=SireOr/ZemMsf, gösterim-amaçlı=AGFfrk/PedK/Sınıf/Takı. Satır satır tara — model sırasıyla ÇELİŞEN bir sütun varsa mutlaka belirt. ──\n`);
 }
 
 async function main() {
