@@ -680,13 +680,25 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.45",
     baslangic: new Date("2026-09-11T19:00:00+03:00"),
-    bitis: null,
+    bitis: new Date("2026-09-12T10:00:00+03:00"),
     aciklama: "Yarış Gidişatı (yarisGidisatiSkoru) formülüne 'Tempo Taşıma Gücü' (atın GEÇMİŞ Accurace yarışlarında son 800m'de o yarışın en iyisine göre kalış farkının ortalaması, sızıntısız, tempo-tasima-gucu.actions.ts) eklendi. Kullanıcı tasarımı: bu bilgi ÖNCE ayrı bir 18. regresyon özelliği olarak denendi — gerçek B=500 backtest'te (n=33096, mevcut cache'in tamamı) tek başına ÇOK güçlü göründü (segment+AGF+yarisGidisatiSkoru dilimlerinin HEPSİNDE anlamlı, 8-14pp fark) ama GERÇEK koşullu-logit retrain'de (diğer 17 sinyal AYNI ANDA kontrol edilerek) katsayısı HER İKİ segmentte de anlamsız VE TERS çıktı (düşük-şart -0.1205 GA=[-0.308,0.140], diğer -0.1011 GA=[-0.214,0.057]) — univariate etkinin tamamı zaten yarisGidisatiSkoru dahil diğer sinyallerce açıklanıyormuş (sireOrani/kilo sinyallerinde daha önce yakalanan AYNI confound deseni). Kullanıcı kararı: ayrı özellik değil, yarisGidisatiSkoru'nun KENDİ formülüne (hesaplaYarisGidisati, pace-analizi.ts) zorluk-ağırlıklı bir terim olarak eklensin — yalnız beklenen tempo senaryosu zorluysa (MÜCADELELİ/ÇOK_YÜKSEK/DAĞILMA_RİSKİ olasılığı) devreye girer, rahat/yavaş beklenen yarışlarda etkisi küçülür. Ölçek katsayısı (TEMPO_TASIMA_OLCEK=4) birkaç aday değer arasından retrain sonucuna göre seçildi. Sonuç: pooled 'diğer' segment katsayısı 0.098'den 0.092'ye kaydı ama ARTIK anlamlı (%95 GA=[0.0049,0.1835], önceden GA=[-0.0085,0.1659] idi) — orijinal yarisGidisatiSkoru'nun kabul standardını AŞIYOR. Düşük-şart hâlâ sınırda (GA=[-0.049,0.280]) ama yön pozitif kaldı, ters DEĞİL. Handikap-özel sıfırlama (V5.44) İHTİYATLA KORUNDU — yeni formülle Handikap'a özel ayrı test henüz yapılmadı.",
     neyiAnalizEdiyor: [
       "yarisGidisatiSkoru'nun HAM DEĞERİ değişti (artık tempo taşıma gücü terimini de içeriyor) — FEATURE_NAMES/toFeatureVector boyutu (17) DEĞİŞMEDİ, yeni bir regresyon özelliği EKLENMEDİ. WEIGHTS_DIGER_HANDIKAP override'ı (YARIS_GIDISATI_IDX sıfırlama) aynen çalışmaya devam ediyor.",
     ],
     caprazlamalar: [
       "Ayrı-özellik denemesi tamamen reddedildi (arac-model-egit-segment.mjs'e hiç eklenmedi, canlı FEATURE_NAMES 17'de sabit). Birleştirilmiş formülle retrain: tsc --noEmit temiz, npm run build temiz, vitest 16/16 geçti. arac-terfi-denetimi.mts --son 20 ile ayrıca regresyon kontrolü yapıldı (terfi kapısı eşiği değişmedi ama teknikSira'yı besleyen olasılık değiştiği için ihtiyaten çalıştırıldı): 20 koşu, 18 terfi, 58 yakın-ıska, yalnız 3 sınırda vaka (nonAgfKatki ±0.05 içinde) — hiçbiri BAY UMUT tarzı bariz hata değil.",
+    ],
+  },
+  {
+    versiyon: "V5.46",
+    baslangic: new Date("2026-09-12T10:00:00+03:00"),
+    bitis: null,
+    aciklama: "Kullanıcı talebiyle kapsamlı sinyal sadeleştirmesi: (1) kgsVarMi/kacakYalniz/h2hKiloDegisimi toFeatureVector'dan TAMAMEN ÇIKARILDI — üçü de pratikte ölü (kacakYalniz/h2hKiloDegisimi zaten sızıntı bulgusuyla TÜM segmentlerde koda-gömülü sıfırlanmıştı, kgsVarMi'yi sıfırlamak hiçbir görülmemiş koşuda top1/top3'ü değiştirmiyordu). (2) takiEklendiMi+takiCikarildiMi TEK sinyale (takiDegisikligi=cikarildi-eklendi) birleştirildi. 17→13 özellik. Bootstrap FARK testi (B=500, aynı chronological split, ESKİ 17-özellik vs YENİ 13-özellik): 'diğer' segmentte top1/top3 farkı BİREBİR 0.00pp (GA=[-1.26,1.26]/[-1.68,1.68]) — hiçbir kayıp yok; düşük-şart'ta yön pozitif (top1 +2.35pp/top3 +3.53pp, ikisi de anlamsız ama tutarlı) ve logloss neredeyse anlamlı iyileşme sınırında (-0.0469, GA=[-0.1142,0.0067]). (3) AYRICA: Zemin+Mesafe Deneyimi'nin arac-model-veri-olustur.mts'te HİÇ hesaplanmadığı bulundu (39877/39877 satırda sabit 0) — bu sinyal CANLI skora zaten giriyordu (bKatmaniUygula, softmax öncesi ayrı mekanizma) ama hiç gerçek veriyle test edilememişti. Düzeltilip GERÇEK B=500 bootstrap FARK testi (mevcut production ağırlıklarıyla AÇIK/KAPALI kıyası) yapıldı: 'diğer'de top3 ANLAMLI iyileşme (+0.53pp, GA=[0.11,1.05]), düşük-şart'ta sınırda pozitif (+0.59pp, GA=[0.00,1.76]), top1'de HİÇBİR SEGMENTTE kayıp yok — sinyal GERÇEKTEN doğrulandı, koda dokunulmadı (formül zaten doğruymuş, yalnız hiç test edilmemiş).",
+    neyiAnalizEdiyor: [
+      "FEATURE_NAMES/toFeatureVector 17'den 13'e indi (WEIGHTS_DIGER_DUZELTILMIS ara katmanı da kaldırıldı, artık gereksiz — WEIGHTS_DIGER_HANDIKAP doğrudan WEIGHTS_DIGER üzerine kuruluyor). Ham kgsVarMi/kacakYalniz/h2hKiloDegisimi/takiEklendiMi/takiCikarildiMi alanları Faz1RunnerV5'te HÂLÂ hesaplanıyor (maliyetsiz, ileride yeniden test için) — yalnız skordan çıktı/birleşti. Zemin+Mesafe Deneyimi'nin KENDİSİ hiç değişmedi, yalnız eğitim verisi pipeline'ındaki (arac-model-veri-olustur.mts) eksiklik giderildi.",
+    ],
+    caprazlamalar: [
+      "tsc --noEmit temiz, npm run build temiz, vitest 16/16 geçti. arac-terfi-denetimi.mts --son 20: 20 koşu, 16 terfi, 57 yakın-ıska, 8 sınırda vaka — hiçbiri bariz hata değil (önceki turlarla tutarlı sayıda). Yeni ağırlık dosyalarının featureNames dizisi elle doğrulandı (v5-engine.ts'teki toFeatureVector sırasıyla BİREBİR eşleşiyor) — sıra uyuşmazlığı riski (katsayıların yanlış özelliğe eşlenmesi) özellikle kontrol edildi.",
     ],
   },
 ];

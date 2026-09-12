@@ -61,11 +61,15 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
   { ad: "Antrenör Oranı", kod: "antrenorOrani", katman: "A", dusukSart: { katsayi: 0.313, durum: "anlamli" }, diger: { katsayi: 0.235, durum: "anlamli" }, aciklama: "Düşük-şartta belirgin daha ağır basıyor." },
   { ad: "İdman Jokeyi Uyumu", kod: "idmJokey", katman: "A", dusukSart: { katsayi: 0.199, durum: "anlamli" }, diger: { katsayi: 0.103, durum: "anlamli", not: "Handikap'ta elle 0'a sabitlendi (V5.31, 2026-08-31) — Opus denetimi: canlı model-düzeltilmiş bakiye -5.93pp (GA=[-10.34,-1.60], sıfırı dışlıyor, n=107), üretim-sadık katsayı canlı %75 fit'te 0.1033'ten tüm veride 0.0266'ya (GA sıfırı kapsıyor) kaymış — 12 sinyalin en büyük kayması. Görülmemiş son %25'te sıfırlarsa top1 +3.95pp/top3 +2.63pp/logloss -0.0306, hepsi anlamlı iyileşme. Düşük-şart'ta katsayı sağlam pozitif (GA=[0.102,0.372]), KORUNDU — hizDerecesi/Handikap (V5.10) ile AYNI cerrahi desen." }, aciklama: "Yarıştıracak jokey, atın idmanlarından birini yaptırmış mı. Diğer 11 özellik silindikten sonra iki segmentte de netleşti." },
   { ad: "Jokey Oranı", kod: "jokeyOrani", katman: "A", dusukSart: { katsayi: 0.182, durum: "anlamli" }, diger: { katsayi: 0.089, durum: "anlamsiz", not: "2026-08-28 zamansal kayma bulundu: Ocak-Mayıs nokta=0.162 GA=[0.110,0.225] anlamlı, Haziran-Ağustos nokta=0.114 GA=[0.044,0.186] hâlâ anlamlı — VIF artmadı (kollinearlik hipotezi doğrulanmadı), gerçek sebep belirsiz. Sıfırlanmadı, izlemede. GÜNCELLEME (2026-08-30, Opus denetimi): V5 döneminde sonuçlanmış TÜM koşularda (n=248) canlı isabet iki bağımsız ölçütte de bu 'anlamsız' etiketiyle ÇELİŞİYOR — kod-bazlı lift +3.9pp (budama sonrası +6.0pp), 4 koşu tipinin (Maiden/Şartlı/Handikap/diğer) HEPSİNDE pozitif, featureSnapshot z-farkı +0.651. Katsayı sıfırlanmadan bırakılması doğru karar çıktı, 'anlamsız' notu artık güncel canlı veriyle desteklenmiyor." }, aciklama: "Jokeyin genel kazanma yüzdesi." },
-  { ad: "Rakipsiz Kaçak At", kod: "kacakYalniz", katman: "A", dusukSart: { katsayi: 0, durum: "override", not: "2026-08-31 (V5.32) TÜM segmentlerde 0'a sabitlendi — eski 'anlamlı +0.136/+0.082' katsayıları TAMAMEN eğitim-verisi sızıntısı ürünüymüş: `Runner.raceStyle` tarih filtresi olmadan hesaplanıp atın TÜM (geçmiş+gelecek) Runner satırlarına yazılıyordu. İKİ bağımsız Opus denetimi (aynı gün, birbirinden habersiz) aynı kök nedeni buldu. Sızıntısız yeniden hesaplanınca: düşük-şart -0.0934 GA=[-0.384,0.047] (P(>0)=%9, TERS yönlü), diğer +0.0101 (P(>0)=%64, null) — ikisi de gerçek değil. H2H/düşük-şart ve h2hKiloDegisimi (V5.30) ile AYNI cerrahi desen." }, diger: { katsayi: 0, durum: "override", not: "Aynı düzeltme, bkz. dusukSart notu." }, aciklama: "Accurace tabanlı erken-tempo profili — yalnız SAHADA TEK kaçak-at olma durumunda sayılıyor." },
-  { ad: "Kilo-Ayarlı H2H", kod: "h2hKiloDegisimi", katman: "A", dusukSart: { katsayi: 0, durum: "override", not: "2026-08-30 (V5.30) TÜM segmentlerde 0'a sabitlendi — o gün n=248'de canlı GA sıfırı dışlıyordu (z=-0.521, GA=[-0.888,-0.150]). GÜNCELLEME (2026-08-31, Opus tekrar denetimi): n 24'e çıkınca bu REPLİKE OLMADI (z=-0.123, GA=[-0.332,+0.038], sıfırı kapsıyor) — model-düzeltilmiş bakiye ise +1.84pp (POZİTİF), eğitim katsayısı diğer'de GA=[0.0020,0.1348] anlamlı pozitif. Üretim-sadık testte sıfırlamanın etkisi pratikte sıfır (top1 Δ=0.00pp, logloss Δ=+0.0021, anlamsız) — yani sıfırlama ZARARSIZ ama dünkü gerekçe abartılıydı. Şimdilik sıfırlı bırakıldı (geri almanın da kanıtı yok), izlemede. EK (2026-09-11, Opus B=500 denetimi): arac-model-veri-olustur.mts'in (eğitim verisi üretici) bu alanı HİÇ HESAPLAMADIĞI bulundu (0/12311 satır, sabit sıfır) — canlı hesap (v5-engine.ts) zaten doğru çalışıyordu, yalnız EĞİTİM verisi hep sabit sıfırdı. Düzeltildi (h2hByAnahtar artık ağırlık/weight de taşıyor, canlıyla AYNI hesap) — bu düzeltme ağırlığı DEĞİŞTİRMEDİ, yalnız gelecekte yeniden test edilmek istendiğinde artık gerçek veri kullanılabilir." }, diger: { katsayi: 0, durum: "override", not: "Aynı düzeltme+güncelleme, bkz. dusukSart notu." }, aciklama: "Bugünkü rakiplere göre kilo pozisyonunun geçmiş karşılaşmaya göre değişimi." },
   { ad: "AGF Payı² (kare terimi)", kod: "agfPayi2", katman: "A", dusukSart: { katsayi: -0.205, durum: "anlamsiz" }, diger: { katsayi: -0.201, durum: "anlamli" }, aciklama: "AGF payının doğrusal-olmayan (kare) terimi — güçlü favorilerin piyasada fazla değerli görülmesini düzeltir. VIF notu: bkz. agfPayi girdisi." },
   { ad: "H2H Net Skor", kod: "h2hNetSkor", katman: "A", dusukSart: { katsayi: 0, durum: "override", not: "Ham değer ters yönlüydü, elle sıfırlandı" }, diger: { katsayi: 0.099, durum: "anlamli" }, aciklama: "Baş-başa geçmiş karşılaşmalarda net galibiyet farkı." },
-  { ad: "KGS Verisi Var Mı", kod: "kgsVarMi", katman: "A", dusukSart: { katsayi: -0.047, durum: "anlamsiz" }, diger: { katsayi: 0.005, durum: "anlamsiz", not: "2026-09-05 (Opus sinyal denetimi) DÜZELTME: bu girdi dört noktada birden yanlıştı — (1) adı 'Kısa Galop Aralığı Var Mı' yazıyordu, oysa kgsVarMi galopla İLGİSİZ: v5-engine.ts:740 `sonYaris?.gunFarki != null ? 1 : 0`, yani atın ÖNCEKİ KOŞU verisi var mı (0 = ilk kez koşuyor). Motorun kendi FEATURE_LABELS'ı zaten 'KGS Verisi Var Mı' diyordu, kütük ondan sapmıştı — [[project_darkrok_details_bug]]'ta kayıtlı 'KGS karıştırılmasın' dersinin tekrarı. (2) açıklaması '14-30 gün aralığı' diyordu, böyle bir eşik yok. (3) düşük-şart katsayısı +0.035 yazıyordu ama deploy edilmiş v5-weights-dusuksart.json'da -0.0465 — TERS İŞARET. (4) diğer katsayısı 0.14/'anlamli' yazıyordu ama deploy edilmiş dosyada +0.0047 (~30 kat abartılmış); taze veriyle (1205 koşu, B=500) yeniden eğitimde nokta=+0.0057 GA=[-0.0443,0.1336] sıfırı İÇERİYOR, düşük-şart nokta=-0.1082 GA=[-0.3794,0.2347] da sıfırı içeriyor. Katsayılar bu düzeltmede DEĞİŞTİRİLMEDİ — yalnız kütük gerçek deploy edilmiş değerlere senkronlandı. Sinyalin kendisi pratikte ölü: görülmemiş test setinde ağırlığı sıfırlamak 'diğer' segmentte tek bir koşunun bile top1/top3 sırasını değiştirmiyor (Δ=0.00pp). Düşük-şart'ta post-hoc sıfırlama iyileşme gösterdi ama TAM YENİDEN EĞİTİM + eşleşmiş bootstrap (B=200) bunu DOĞRULAMADI (Δtop1 GA=[-1.27,2.53], Δlogloss GA=[-0.029,0.010], hepsi sıfırı içeriyor) — çıkarılması için kanıt YOK, dokunulmadı." }, aciklama: "Atın önceki koşusuna dair 'kaç gün sonra' (KGS) verisi var mı — 0 ise at ilk kez koşuyor. İki segmentte de istatistiksel olarak anlamsız." },
+  // 2026-09-12 (V5.46) — Rakipsiz Kaçak At / Kilo-Ayarlı H2H / KGS Verisi Var Mı BURADAN
+  // TAMAMEN KALDIRILDI (toFeatureVector'dan çıktı) — üçü de gerçek performansı hiç
+  // değiştirmiyordu (ilk ikisi zaten koda-gömülü sıfırlanmıştı, sızıntı bulgusu; kgsVarMi
+  // sıfırlamak Δtop1/top3=0.00pp). Bootstrap FARK testi (B=500, 17→13 özellik, aynı
+  // chronological split): top1/top3 farkı "diğer"de BİREBİR 0.00pp, düşük-şart'ta yön
+  // pozitif (anlamsız). Ham hesaplar (Faz1RunnerV5) hâlâ toplanıyor, yalnız skordan çıktı
+  // — Sinyal Budama (V5.27) ile AYNI baraj.
   // 2026-08-28 — KURAL İSTİSNASI: bu sinyal B=500 testinde İKİ KEZ (2026-08-23 ve
   // 2026-08-28) anlamsız çıktı ama kullanıcı, sonucu bilerek (AskUserQuestion ile teyit
   // edilerek) modele eklenmesini istedi. "Önce backtest, iyi çıkmazsa ekleme" standart
@@ -96,12 +100,12 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
   // olarak gölge-veri biriktirmeye devam ediyor — ileride yeterli örneklem birikirse
   // gerçek bir B=500 karşılaştırması yine yapılabilir.
   {
-    ad: "Zemin+Mesafe Deneyimi (B KATMANI — TÜM kategoriler, hiç test edilmeden kullanıcı kararıyla aktif)",
+    ad: "Zemin+Mesafe Deneyimi (B KATMANI — TÜM kategoriler, artık GERÇEK veriyle doğrulandı)",
     kod: "zeminMesafeDeneyim",
     katman: "B",
-    dusukSart: { katsayi: 0.02, durum: "anlamsiz", not: "HİÇ test edilmedi — gölge-test (v6-zemin-mesafe-deneyimi) 0 sonuçlanmış koşuyla, kullanıcı isteğiyle derhal canlıya alındı. Katsayı keyfi bir başlangıç varsayımı." },
-    diger: { katsayi: 0.02, durum: "anlamsiz", not: "sireOrani'den FARKLI: TÜM kategorilerde AYNI katsayıyla uygulanıyor (düşük-şart'a özgü değil)." },
-    aciklama: "Atın bugünkü tam (pist, zemin koşulu, mesafe) kombinasyonunda kanıtlanmış deneyimi — popülasyona göre göreli pace %, TjkDereceKaydi'den (zeminToleransi ile AYNI kilo-düzeltmeli formül, yalnız bugünün tam koşuluna filtrelenmiş, 3 kademeli: tam mesafe eşleşmesi/yalnız pist+zemin eşleşmesi/hiç eşleşme yok). Hiçbir istatistiksel doğrulama yapılmadan eklendi.",
+    dusukSart: { katsayi: 0.02, durum: "anlamsiz", not: "2026-09-12 DÜZELTME: arac-model-veri-olustur.mts bu alanı HİÇ hesaplamıyordu (39877/39877 satırda sabit 0) — gerçek para etkileyen bir sinyal hiç test edilememişti. Düzeltilip GERÇEK B=500 bootstrap FARK testi yapıldı (AÇIK vs KAPALI, mevcut production ağırlıklarıyla): top3 +0.59pp GA=[0.00,1.76] (sınırda pozitif), top1 farkı 0.00pp (kayıp yok)." },
+    diger: { katsayi: 0.02, durum: "anlamli", not: "2026-09-12: aynı düzeltme sonrası test — top3 ANLAMLI iyileşme (+0.53pp, GA=[0.11,1.05], sıfırı dışlıyor), top1 farkı 0.00pp GA=[-0.42,0.42] (kayıp yok), logloss -0.0010 (iyileşme yönü). sireOrani'den FARKLI: TÜM kategorilerde AYNI katsayıyla uygulanıyor (düşük-şart'a özgü değil)." },
+    aciklama: "Atın bugünkü tam (pist, zemin koşulu, mesafe) kombinasyonunda kanıtlanmış deneyimi — popülasyona göre göreli pace %, TjkDereceKaydi'den (zeminToleransi ile AYNI kilo-düzeltmeli formül, yalnız bugünün tam koşuluna filtrelenmiş, 3 kademeli: tam mesafe eşleşmesi/yalnız pist+zemin eşleşmesi/hiç eşleşme yok). 2026-09-12'de İLK KEZ gerçek veriyle doğrulandı — diğer segmentte top3'te gerçek/anlamlı katkısı var, top1'de kayıp yok.",
   },
   // 2026-09-01 — MEGAFAUNA vakasından doğan "Yakınsama" hipotezi ADAY_SİNYALLER'de
   // REDDEDİLDİ olarak belgelenmişti (B=500'de anlamsız) AMA kullanıcı, zeminToleransi/
@@ -143,21 +147,17 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
   // Model bu bilgiyi ZATEN görüntülüyordu (Son Yarış Detayları) ama HİÇ skorlanmıyordu.
   // Kullanıcı kararıyla 15-16. özellik olarak eklendi — B=500 bootstrap her iki segmentte
   // de sıfıra yakın/anlamsız çıktı, GERÇEK fit edilen katsayı kullanıldı (elle yön verilmedi).
+  // 2026-09-12 (V5.46) — İKİ ayrı özellik (takiEklendiMi/takiCikarildiMi, ikisi de
+  // anlamsız/geniş GA) kullanıcı kararıyla TEK sinyale birleştirildi: takiDegisikligi =
+  // takiCikarildiMi - takiEklendiMi (+1=yalnız çıkarılmış, -1=yalnız eklenmiş). Ham iki
+  // alan (Faz1RunnerV5) hâlâ ayrı tutuluyor (Son Yarış Detayları gösterimi), skora TEK terim.
   {
-    ad: "Takı Eklendi (İSTİSNA — anlamsız, kullanıcı kararıyla eklendi)",
-    kod: "takiEklendiMi",
+    ad: "Takı Değişikliği (İSTİSNA — anlamsız, kullanıcı kararıyla eklendi)",
+    kod: "takiDegisikligi",
     katman: "B",
-    dusukSart: { katsayi: -0.052, durum: "anlamsiz", not: "B=500: GA=[-0.2630,0.1260], sıfırı içeriyor." },
-    diger: { katsayi: -0.018, durum: "anlamsiz", not: "B=500: GA=[-0.1367,0.0781], sıfırı içeriyor." },
-    aciklama: "Son yarışına göre takı eklenmiş mi (SonYarisDetay.eklenenTaki). n=913/38264 (%2.4) — küçük örneklem, GA geniş. Her iki segmentte de hafif negatif ama anlamsız.",
-  },
-  {
-    ad: "Takı Çıkarıldı (İSTİSNA — anlamsız, kullanıcı kararıyla eklendi)",
-    kod: "takiCikarildiMi",
-    katman: "B",
-    dusukSart: { katsayi: -0.030, durum: "anlamsiz", not: "B=500: GA=[-0.3117,0.2511], sıfırı içeriyor." },
-    diger: { katsayi: 0.061, durum: "anlamsiz", not: "B=500: GA=[-0.1401,0.2486], sıfırı içeriyor." },
-    aciklama: "Son yarışına göre takı çıkarılmış mı (SonYarisDetay.cikarilanTaki) — KIZIM BİNDAL'ın (KG+GKR çıkarılmış, kazandı) gerekçe gösterildiği sinyal. n=3174/38264 (%8.3). Diğer segmentte yön KIZIM BİNDAL'ın işaret ettiği yönde (+0.061) ama anlamsız; düşük-şart'ta ters (-0.030), o da anlamsız.",
+    dusukSart: { katsayi: 0.080, durum: "anlamsiz", not: "B=500 (13 özellik, tam geçmiş): GA sıfırı içeriyor, önceki iki-ayrı-sinyal haline göre daha güçlü/tutarlı yön." },
+    diger: { katsayi: 0.064, durum: "anlamsiz", not: "B=500 (13 özellik, tam geçmiş): GA sıfırı içeriyor." },
+    aciklama: "Son yarışına göre takı çıkarılmış mı eklenmiş mi (SonYarisDetay) — KIZIM BİNDAL'ın (takı çıkarılmış, kazandı) gerekçe gösterildiği sinyal, artık tek bir yön (+ =çıkarılmış lehine) olarak ölçülüyor. Her iki segmentte de pozitif yönlü ama istatistiksel olarak anlamsız.",
   },
   // 2026-09-01 — Yarış Gidişatı (kullanıcı tasarımı): saha-geneli tempo senaryosu
   // (Rahat Liderlik/Yavaş Tempo/Dengeli/Mücadeleli/Çok Yüksek/Dağılma Riski, Accurace

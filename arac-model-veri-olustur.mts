@@ -22,6 +22,7 @@ import { getJockeyStats, getTrainerStats } from "./src/server/services/race.serv
 import { zeminKatsayisi, zeminDetayiBul } from "./src/lib/methodology/mekanik-puanlama";
 import { hesaplaZeminToleransiMap } from "./src/server/actions/zemin-toleransi.actions";
 import { hesaplaTempoTasimaGucuMap } from "./src/server/actions/tempo-tasima-gucu.actions";
+import { hesaplaZeminMesafeDeneyimiMap } from "./src/server/actions/zemin-mesafe-deneyimi.actions";
 import { hizPaceIndexKur, hizDerecesiHesaplaOrtak, type HizGecmisSatir } from "./src/lib/methodology/hiz-derecesi-hesapla";
 import { yakinsamaGecmisHesapla } from "./src/lib/methodology/yakinsama-gecmis";
 import { writeFileSync, existsSync, readFileSync } from "fs";
@@ -272,6 +273,16 @@ export type ModelRow = {
   // segment.mjs'de B=500 bootstrap ile segment bazlı test edilecek, "yenilik önce
   // backtest" kuralı gereği HENÜZ toFeatureVector'a eklenmedi.
   tempoTasimaGucu: number;
+  // 2026-09-12 (V5.46 denetimi) — Zemin+Mesafe Deneyimi (bkz. zemin-mesafe-deneyimi.actions.ts,
+  // v5-engine.ts'teki bKatmaniUygula) CANLI skora zaten ekleniyordu (softmax'tan önce, ayrı
+  // mekanizma — toFeatureVector'a GİRMİYOR) ama bu alan burada HİÇ hesaplanmıyordu (39877/
+  // 39877 satırda sabit 0) — yani gerçek para etkileyen bir sinyal hiç test edilememişti.
+  // Düzeltildi, leak-free (v5-engine.ts'teki AYNI hesaplaZeminMesafeDeneyimiMap). GERÇEK
+  // backtest (B=500 bootstrap FARK testi, mevcut production ağırlıklarıyla AÇIK/KAPALI
+  // kıyası): "diğer"de top3 anlamlı iyileşme (+0.53pp, GA=[0.11,1.05]), düşük-şart'ta
+  // sınırda pozitif (+0.59pp, GA=[0.00,1.76]), top1'de HİÇBİR SEGMENTTE kayıp yok (0.00pp)
+  // — sinyal GERÇEKTEN doğrulandı, KORUNDU, kodda değişiklik gerekmedi.
+  zeminMesafeDeneyim: number;
 };
 
 async function main() {
@@ -650,6 +661,18 @@ async function main() {
               race.surface
             );
             const zeminKatsayisiDeger = zeminKatsayisi(zeminDetayi).katsayi;
+            // 2026-09-12 — Zemin+Mesafe Deneyimi (bkz. ModelRow.zeminMesafeDeneyim üstündeki
+            // not): v5-engine.ts'teki AYNI nullable hesap (zeminDetayi bilinmiyorsa null,
+            // zeminKatsayisiDeger'in varsayılan-1.0 davranışından FARKLI — fonksiyon zemin
+            // bilinmediğinde nötr sonuç döner).
+            const bugunZeminKatsayiNullable = zeminDetayi ? zeminKatsayisi(zeminDetayi).katsayi : null;
+            const zeminMesafeDeneyimMap = await hesaplaZeminMesafeDeneyimiMap(
+              runners.map((rr) => rr.name),
+              race.raceDay.date,
+              surfaceToPist(race.surface),
+              bugunZeminKatsayiNullable,
+              race.distance
+            ).catch(() => new Map<string, { deger: number }>());
 
             for (const r of runners) {
               const pos = actualOrder.indexOf(r.no) + 1;
@@ -777,6 +800,7 @@ async function main() {
                 zeminToleransi: zeminToleransiMap.get(r.name) ?? 0,
                 yarisGidisatiSkoru: gidisatByRunnerId.get(r.id)?.finalSkor ?? 0,
                 tempoTasimaGucu: tempoTasimaGucuMap.get(r.name) ?? 0,
+                zeminMesafeDeneyim: zeminMesafeDeneyimMap.get(r.name)?.deger ?? 0,
               });
             }
           })(), 25_000);

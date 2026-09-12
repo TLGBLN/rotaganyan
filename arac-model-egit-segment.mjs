@@ -13,7 +13,11 @@ import { PrismaPg } from "@prisma/adapter-pg";
 const COVERAGE_START_DATE = "2026-07-01";
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 
-const DATA_PATH = "C:\\Users\\tlgbi\\AppData\\Local\\Temp\\claude\\c--Users-tlgbi-OneDrive-Belgeler-Rota\\76598f4f-31f1-4414-a3f6-fbab0aab98d4\\scratchpad\\model-veri.json";
+// 2026-09-12 (V5.46) — model-veri.json'DAN model-veri-yg4.json'a taşındı: bu dosya
+// yarisGidisatiSkoru'nun BİRLEŞTİRİLMİŞ (tempo taşıma gücü dahil, V5.45) değerlerini VE
+// zeminMesafeDeneyim'in gerçek (daha önce hep 0 olan) değerlerini içeriyor — model-veri.json
+// artık STALE, kullanılmamalı.
+const DATA_PATH = "C:\\Users\\tlgbi\\AppData\\Local\\Temp\\claude\\c--Users-tlgbi-OneDrive-Belgeler-Rota\\76598f4f-31f1-4414-a3f6-fbab0aab98d4\\scratchpad\\model-veri-yg4.json";
 const OUT_DUSUKSART = "C:\\Users\\tlgbi\\AppData\\Local\\Temp\\claude\\c--Users-tlgbi-OneDrive-Belgeler-Rota\\76598f4f-31f1-4414-a3f6-fbab0aab98d4\\scratchpad\\v5-weights-dusuksart.json";
 const OUT_DIGER = "C:\\Users\\tlgbi\\AppData\\Local\\Temp\\claude\\c--Users-tlgbi-OneDrive-Belgeler-Rota\\76598f4f-31f1-4414-a3f6-fbab0aab98d4\\scratchpad\\v5-weights-diger.json";
 
@@ -60,33 +64,33 @@ const ANLAMLI_PUAN_ESIGI = 1.0;
 // sinyallerinde daha önce yakalanan AYNI türden confound deseni. MODELE EKLENMEDİ.
 // Kullanıcı kararıyla YERİNE: yarisGidisatiSkoru'nun KENDİ formülüne (pace-analizi.ts
 // hesaplaYarisGidisati, zorluk-ağırlıklı) girdi olarak eklendi (V5.45) — ayrı katsayı
-// yarışmadığı için "diğer" segmentte artık anlamlı çıktı. Bu script hâlâ 17 özellikli,
-// DEĞİŞMEDİ — birleştirme yarisGidisatiSkoru'nun HAM DEĞERİNİ değiştiriyor, yeni bir
-// regresyon sütunu eklemiyor.
+// yarışmadığı için "diğer" segmentte artık anlamlı çıktı.
+// 2026-09-12 (V5.46) — kgsVarMi/kacakYalniz/h2hKiloDegisimi TAMAMEN ÇIKARILDI (üçü de
+// pratikte ölü/sıfır — bkz. v5-engine.ts'teki AYNI tarihli not), takiEklendiMi+
+// takiCikarildiMi TEK sinyale (takiDegisikligi = cikarildi-eklendi) birleştirildi.
+// Bootstrap FARK testi (B=500, 17 vs 13 özellik, aynı chronological split): "diğer"de
+// top1/top3 farkı BİREBİR 0.00pp (GA=[-1.26,1.26]/[-1.68,1.68]), düşük-şart'ta yön
+// pozitif (anlamsız, logloss neredeyse anlamlı iyileşme sınırında) — hiçbir kayıp yok.
 const FEATURE_NAMES = [
-  "agfSirasi", "kgsVarMi", "idmJokey", "jokeyOrani", "antrenorOrani", "kacakYalniz",
-  "agfPayi", "h2hNetSkor", "hizDerecesi", "h2hKiloDegisimi", "agfPayi2", "zeminToleransi",
-  "yakinsama2Plus", "sonIdmanSprint", "takiEklendiMi", "takiCikarildiMi", "yarisGidisatiSkoru",
+  "agfSirasi", "idmJokey", "jokeyOrani", "antrenorOrani",
+  "agfPayi", "h2hNetSkor", "hizDerecesi", "agfPayi2", "zeminToleransi",
+  "yakinsama2Plus", "sonIdmanSprint", "takiDegisikligi", "yarisGidisatiSkoru",
 ];
 
 function toFeatureVector(row) {
   return [
     row.agfSirasi,
-    row.kgsVarMi,
     row.idmJokey,
     row.jokeyOrani,
     row.antrenorOrani,
-    row.kacakYalniz ?? 0,
     row.agfPayi ?? 0,
     row.h2hNetSkor ?? 0,
     row.hizDerecesi ?? 0,
-    row.h2hKiloDegisimi ?? 0,
     (row.agfPayi ?? 0) * (row.agfPayi ?? 0),
     row.zeminToleransi ?? 0,
     row.yakinsama2Plus ?? 0,
     row.sonIdmanSprint ?? 0,
-    row.takiEklendiMi ?? 0,
-    row.takiCikarildiMi ?? 0,
+    (row.takiCikarildiMi ?? 0) - (row.takiEklendiMi ?? 0),
     row.yarisGidisatiSkoru ?? 0,
   ];
 }

@@ -183,33 +183,22 @@ const FEATURE_NAMES = WEIGHTS_DIGER.featureNames; // iki set de AYNI özellik/s�
 // desende, artık KODA gömülü — bir daha retrain'de kaybolmaz.
 const H2H_NET_SKOR_IDX = FEATURE_NAMES.indexOf("h2hNetSkor");
 
-// 2026-08-30 (V5.30) — Opus denetimi ("v5 ile kullanılan ve sonuçlanan tüm koşularda
-// sinyalleri değerlendir"): h2hKiloDegisimi eğitimde her iki segmentte de pozitif
-// (diğer +0.0727, düşük-şart +0.0665) ama V5 döneminin GERÇEK sonuçlanmış koşularında
-// (16-30 Ağustos, n=248) İKİ BAĞIMSIZ canlı ölçütte de TERS yönde çıktı: kod-bazlı lift
-// -0.6pp (budama sonrası -3.4pp, n=1135→n≈370), featureSnapshot z-farkı -0.521 (%95 GA
-// race-clustered bootstrap B=500=[-0.888,-0.150], SIFIRI DIŞLIYOR — küçük n=19 olsa da
-// H2H/düşük-şart'ın (V5.6b) kabul standardından daha güçlü kanıt). H2H/düşük-şart ve
-// Handikap/hizDerecesi (V5.10) ile AYNI cerrahi desen: yalnız BU TEK katsayı, TÜM
-// segmentlerde (kanıt pooled, tek kategoriye özgü değil) sıfırlandı — diğer katsayılara
-// dokunulmadı. Ham h2hKiloDegisimi hesabı (toFeatureVector) KORUNDU, yalnız ağırlığı 0.
-const H2H_KILO_IDX = FEATURE_NAMES.indexOf("h2hKiloDegisimi");
-
-// 2026-08-31 (V5.32) — Opus'un iki AYRI, bağımsız denetimi (yarış-stili araştırması +
-// retrain doğrulaması) AYNI kök nedeni buldu: `Runner.raceStyle` (kacakYalniz'ın kaynağı)
-// `accurace-sync.service.ts`'te tarih filtresi OLMADAN hesaplanıp atın TÜM geçmiş+gelecek
-// Runner satırlarına yazılıyor — eğitim verisine sızıntı taşıyordu. Sızıntısız yeniden
-// hesaplanınca (bkz. arac-model-veri-olustur.mts'teki stilEgilimMap düzeltmesi): düşük-şart
-// eski "+0.1361 anlamlı" → bağımsız B=500'de -0.0934 GA=[-0.384,0.047] (P(>0)=%9, TERS
-// yönlü); diğer eski "+0.0822 anlamlı" → +0.0101 (P(>0)=%64, null). Yani her iki segmentteki
-// "anlamlı" statü TAMAMEN sızıntı ürünüymüş — h2hKiloDegisimi (V5.30) ile AYNI cerrahi
-// desen: tam retrain YERİNE (o turda ilgisiz bir hızDerecesi veri-tazeleme kayması da
-// karıştı, ayrı bir konu, henüz çözülmedi), yalnız BU TEK katsayı TÜM segmentlerde koda
-// gömülü sıfırlandı. Ham kacakYalniz hesabı (toFeatureVector) KORUNDU, yalnız ağırlığı 0.
-const KACAK_YALNIZ_IDX = FEATURE_NAMES.indexOf("kacakYalniz");
+// 2026-09-12 (V5.46) — kgsVarMi/kacakYalniz/h2hKiloDegisimi toFeatureVector'DAN TAMAMEN
+// ÇIKARILDI (17→13 özellik, takı birleşimiyle birlikte — bkz. toFeatureVector notu).
+// kacakYalniz (V5.32) ve h2hKiloDegisimi (V5.30) zaten TÜM segmentlerde koda-gömülü 0
+// katsayıyla skorlanıyordu (sızıntı bulgusu) — bir daha "belki geri alınır" diye ayrı
+// override sabitleri (H2H_KILO_IDX/KACAK_YALNIZ_IDX) taşımanın anlamı kalmadı, WEIGHTS_
+// DIGER_DUZELTILMIS katmanı bu yüzden TAMAMEN KALDIRILDI (artık WEIGHTS_DIGER'dan farksız).
+// kgsVarMi ise hiç override edilmemişti ama gerçek etkisi ölçülemez küçüktü (B=500 testi,
+// Δtop1/top3=0.00pp) — Sinyal Budama (V5.27) ile AYNI baraj: "eklemek için kanıt gerekiyorsa
+// çıkarmak için de yalnız etkisizlik kanıtı yeterli". Ham hesaplar (Faz1RunnerV5) HÂLÂ
+// TOPLANIYOR (kgsVarMi ayrıca terfi penceresi gösteriminde kullanılıyor) — yalnız skordan
+// çıktı. Retrain: B=500 bootstrap FARK testi, 17→13 özellik, top1/top3 farkı "diğer"de
+// BİREBİR 0.00pp (GA=[-1.26,1.26]/[-1.68,1.68]), düşük-şart'ta yön pozitif (anlamsız,
+// logloss neredeyse anlamlı iyileşme sınırında) — hiçbir kayıp yok, model sadeleşti.
 const WEIGHTS_DUSUK_SART: AgirlikSeti = {
   ...(v5WeightsDusukSart as AgirlikSeti),
-  weights: (v5WeightsDusukSart as AgirlikSeti).weights.map((w, i) => (i === H2H_NET_SKOR_IDX || i === H2H_KILO_IDX || i === KACAK_YALNIZ_IDX ? 0 : w)),
+  weights: (v5WeightsDusukSart as AgirlikSeti).weights.map((w, i) => (i === H2H_NET_SKOR_IDX ? 0 : w)),
 };
 
 // 2026-08-24 kullanıcı bulgusu: Handikap (kategoriTespit==="2") yarışları KENDİ verisiyle
@@ -223,14 +212,10 @@ const WEIGHTS_DUSUK_SART: AgirlikSeti = {
 // bozulmadan (%26.9→%26.9) top3 %62.7'den %67.2'ye çıktı — tam retrain'den bile iyi,
 // hiç overfit riski yok (yalnız 1 katsayı sıfırlanıyor).
 const HIZ_DERECESI_IDX = FEATURE_NAMES.indexOf("hizDerecesi");
-// 2026-08-30 (V5.30) — WEIGHTS_DIGER_DUZELTILMIS: h2hKiloDegisimi'nin yukarıdaki global
-// sıfırlaması "diğer" tabanlı TÜM ağırlık setlerine (diğer/Handikap/hibrit Maiden-Satış'ın
-// diğer yarısı) yansısın diye WEIGHTS_DIGER'ın ÜZERİNE ayrı bir katman olarak eklendi —
-// WEIGHTS_DIGER_HANDIKAP artık bunun üzerine inşa ediliyor (hem h2hKilo=0 HEM hizDerecesi=0).
-const WEIGHTS_DIGER_DUZELTILMIS: AgirlikSeti = {
-  ...WEIGHTS_DIGER,
-  weights: WEIGHTS_DIGER.weights.map((w, i) => (i === H2H_KILO_IDX || i === KACAK_YALNIZ_IDX ? 0 : w)),
-};
+// 2026-09-12 (V5.46) — WEIGHTS_DIGER_DUZELTILMIS katmanı KALDIRILDI: yalnız h2hKiloDegisimi/
+// kacakYalniz'ı sıfırlamak için vardı, ikisi de artık toFeatureVector'dan tamamen çıktığı
+// için WEIGHTS_DIGER'dan farksız hale geldi. WEIGHTS_DIGER_HANDIKAP artık DOĞRUDAN
+// WEIGHTS_DIGER üzerine inşa ediliyor.
 // 2026-08-31 (V5.31) — Opus'un V5.30-sonrası tekrar denetimi: idmJokey Handikap'ta DÖRT
 // bağımsız ölçütte de ters/anlamsız çıktı — canlı model-düzeltilmiş bakiye -5.93pp
 // (GA=[-10.34,-1.60], sıfırı dışlıyor, n=107 kod-lift -4.2pp ile aynı yönde); üretim-sadık
@@ -249,11 +234,15 @@ const YAKINSAMA_IDX = FEATURE_NAMES.indexOf("yakinsama2Plus");
 // istisnası. Backtest (n=9148, leak-free) yönü DOĞRULAMADI (nokta tahmini hafif negatif,
 // GA sıfırı kapsıyor) — GERÇEK fit edilen katsayı kullanılıyor, elle pozitif yapılmadı.
 const SON_IDMAN_SPRINT_IDX = FEATURE_NAMES.indexOf("sonIdmanSprint");
-// 2026-09-01 — TAKI_EKLENDI_IDX/TAKI_CIKARILDI_IDX: kullanıcı talebi (KIZIM BİNDAL vakası,
-// "adam takı çıkarmayı sinyal olarak görmüş, DB/KG/K gibi takılar önemli"). B-katmanı kural
-// istisnası — GERÇEK fit edilen katsayı kullanılıyor, elle yön verilmedi.
-const TAKI_EKLENDI_IDX = FEATURE_NAMES.indexOf("takiEklendiMi");
-const TAKI_CIKARILDI_IDX = FEATURE_NAMES.indexOf("takiCikarildiMi");
+// 2026-09-01 — TAKI_DEGISIKLIGI_IDX: kullanıcı talebi (KIZIM BİNDAL vakası, "adam takı
+// çıkarmayı sinyal olarak görmüş, DB/KG/K gibi takılar önemli"). B-katmanı kural istisnası
+// — GERÇEK fit edilen katsayı kullanılıyor, elle yön verilmedi. 2026-09-12 (V5.46): eskiden
+// İKİ ayrı özellikti (takiEklendiMi/takiCikarildiMi, ikisi de anlamsız, GA'ları geniş) —
+// kullanıcı kararıyla TEK sinyale birleştirildi: takiCikarildiMi-takiEklendiMi (+1=yalnız
+// çıkarılmış, -1=yalnız eklenmiş, 0=değişiklik yok VEYA ikisi birden). Ham iki alan
+// (Faz1RunnerV5) hâlâ ayrı ayrı tutuluyor (Son Yarış Detayları gösterimi için), yalnız
+// skora TEK terim olarak giriyor.
+const TAKI_DEGISIKLIGI_IDX = FEATURE_NAMES.indexOf("takiDegisikligi");
 // 2026-09-01 — YARIS_GIDISATI_IDX: kullanıcı tasarımı ("Yarış Gidişatı") — bkz.
 // Faz1RunnerV5.yarisGidisatiSkoru üstündeki not. Sınırda/run-to-run değişken sonuçla
 // eklendi, aynı gün kullanıcı kararıyla A-katmanına taşındı (sinyal-kutugu.service.ts).
@@ -267,8 +256,8 @@ const YARIS_GIDISATI_IDX = FEATURE_NAMES.indexOf("yarisGidisatiSkoru");
 // sinyali seyreltmesiydi. Yalnız BU TEK katsayı Handikap'ta sıfırlandı, diğerlerine
 // dokunulmadı.
 const WEIGHTS_DIGER_HANDIKAP: AgirlikSeti = {
-  ...WEIGHTS_DIGER_DUZELTILMIS,
-  weights: WEIGHTS_DIGER_DUZELTILMIS.weights.map((w, i) => (i === HIZ_DERECESI_IDX || i === IDM_JOKEY_IDX || i === YARIS_GIDISATI_IDX ? 0 : w)),
+  ...WEIGHTS_DIGER,
+  weights: WEIGHTS_DIGER.weights.map((w, i) => (i === HIZ_DERECESI_IDX || i === IDM_JOKEY_IDX || i === YARIS_GIDISATI_IDX ? 0 : w)),
 };
 
 // 2026-08-29 — V6 Aşama 2 (bkz. plan): "market-blind" skor için AGF-türevi özelliklerin
@@ -303,11 +292,11 @@ export function hibritMaidenSatisMi(classType: string): boolean {
 }
 
 function agirlikSetleriSec(classType: string): AgirlikSeti[] {
-  if (hibritMaidenSatisMi(classType)) return [WEIGHTS_DUSUK_SART, WEIGHTS_DIGER_DUZELTILMIS];
+  if (hibritMaidenSatisMi(classType)) return [WEIGHTS_DUSUK_SART, WEIGHTS_DIGER];
   const kategori = kategoriTespit(classType);
   if (kategori === "1a" || kategori === "1b") return [WEIGHTS_DUSUK_SART];
   if (kategori === "2") return [WEIGHTS_DIGER_HANDIKAP];
-  return [WEIGHTS_DIGER_DUZELTILMIS];
+  return [WEIGHTS_DIGER];
 }
 
 /** Bir at için, verilen ağırlık setleri üzerinden ortalama (standardize edilmiş vektör,
@@ -861,21 +850,17 @@ const ANLAMLI_PUAN_ESIGI = 1.0; // agf-trend.actions.ts'teki ANLAMLI_PUAN_ESIGI 
 export function toFeatureVector(r: Faz1RunnerV5): number[] {
   return [
     r.agfSirasi,
-    r.kgsVarMi,
     r.idmJokey,
     r.jokeyOrani,
     r.antrenorOrani,
-    r.kacakYalniz,
     r.agfPayi,
     r.h2hNetSkor,
     r.hizDerecesi,
-    r.h2hKiloDegisimi,
     r.agfPayi * r.agfPayi,
     r.zeminToleransi,
     r.yakinsama2Plus,
     r.sonIdmanSprint,
-    r.takiEklendiMi,
-    r.takiCikarildiMi,
+    r.takiCikarildiMi - r.takiEklendiMi,
     r.yarisGidisatiSkoru,
   ];
 }
@@ -1563,7 +1548,9 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // DUSUSIYI grupları (accurace, formEgimi/2, pistUzmani, sireOrani, galop,
   // uzunAraGalopKatkisi, agfDususVarMi) toFeatureVector'dan çıkarıldığı için buradan da
   // kaldırıldı — artık skora katkıları yok, gerekçe metninde göstermek yanıltıcı olurdu.
-  { kod: "KGS", ozellikIndeksleri: [idx("kgsVarMi")], aciklama: (r) => (r.kgsVarMi ? `Son yarışından bu yana ${r.kgs} gün geçmiş` : null) },
+  // 2026-09-12 (V5.46) — KGS/KACAK/H2HKILO buradan da kaldırıldı: kgsVarMi/kacakYalniz/
+  // h2hKiloDegisimi toFeatureVector'dan tamamen çıktı (bkz. dosya başındaki not), artık
+  // skora hiç katkıları yok.
   // 2026-08-31 (V5.31) — Handikap'ta bu sinyalin katsayısı ELLE SIFIRLANMIŞ (bkz. dosya
   // başındaki IDM_JOKEY_IDX/V5.31 notu, HIZ ile AYNI düzeltme deseni) — eski kod ham
   // r.idmJokey'e bakıyordu, Handikap'ta bile "idman jokeyi uyumu" diye yanıltıcı bir satır
@@ -1575,13 +1562,6 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // 2026-08-17 denetim bulgusu: kacakAtMi ve dususAmaIyiPozisyon anlamlı sinyaller
   // (bkz. toFeatureVector üstündeki notlar) ama hiçbir OzellikGrubu'na dahil değildi —
   // katkıları skoru etkiliyordu ama gerekçe metninde hiç görünmüyordu. Eklendi.
-  // 2026-08-31 (V5.32) — Opus denetimi: bu satır ham r.kacakYalniz boolean'ına bakıyordu,
-  // HIZ/IDMJOK'ta ZATEN düzeltilmiş olan aynı hataya sahipti — katsayı artık sızıntı
-  // bulgusuyla TÜM segmentlerde sıfırlandığı için satır hiç görünmemeli, ama katsayı
-  // ileride yeniden değerlendirilip sıfır DIŞI bir değere dönerse (ör. yalnız bir
-  // segmentte), gerçek katkıya bakmayan bu blok yine "olumlu" göstermeye devam ederdi.
-  // Artık HIZ ile AYNI desende, gerçek katkıya (r.katkilar) bakıyor.
-  { kod: "KACAK", ozellikIndeksleri: [idx("kacakYalniz")], aciklama: (r) => (r.katkilar[KACAK_YALNIZ_IDX] !== 0 ? `Genelde öne geçip liderlik yapıyor ve sahada rakip olacak başka bir kaçak at yok: bu durum geçmişte ${r.katkilar[KACAK_YALNIZ_IDX] > 0 ? "avantajlı" : "dezavantajlı"} çıkmış` : null) },
   // 2026-08-21 — H2H: bugünkü rakiplerle ortak geçmiş yarış yoksa (h2hNetSkor=0) satır
   // hiç gösterilmez — "0 karşılaşma" ile "hep berabere" ayrımı yapılamadığı için nötr.
   // 2026-08-27 — düşük-şart'ta bu sinyalin katsayısı ELLE sıfırlanmış (bkz. WEIGHTS_DUSUK_SART
@@ -1610,29 +1590,25 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
   // katkıya (r.katkilar) bakılıyor — Handikap'ta katkı her zaman 0 olduğundan satır hiç
   // gösterilmez, diğer kategorilerde davranış değişmedi.
   { kod: "HIZ", ozellikIndeksleri: [idx("hizDerecesi")], aciklama: (r) => (r.katkilar[HIZ_DERECESI_IDX] !== 0 ? `Son yarışlarındaki hızı, benzer atların ortalamasına göre %${Math.abs(r.hizDerecesi).toFixed(1)} ${r.hizDerecesi > 0 ? "daha hızlı" : "daha yavaş"}` : null) },
-  // 2026-08-24 — Kilo-ayarlı H2H: veri yoksa (kilo bilgili ortak karşılaşma yok) 0,
-  // satır hiç gösterilmez.
-  // 2026-08-24 kullanıcı bulgusu: "+27.5 toplam kilo diye belirtilmesi kullanıcılar
-  // tarafından farklı anlaşılabilir" — tek bir gerçek kiloymuş gibi okunmasın diye
-  // kaç rakiple kıyaslandığı VE ortalama fark AYRI belirtiliyor, "toplam" kelimesi
-  // artık ham sayının hemen yanında geçiyor.
-  {
-    kod: "H2HKILO",
-    ozellikIndeksleri: [idx("h2hKiloDegisimi")],
-    aciklama: (r) => {
-      if (r.h2hKiloDegisimi === 0 || r.h2hKiloKarsilasmaSayisi === 0) return null;
-      const ortalama = r.h2hKiloDegisimi / r.h2hKiloKarsilasmaSayisi;
-      const yon = ortalama > 0 ? "hafif" : "ağır";
-      return `Bugünkü ${r.h2hKiloKarsilasmaSayisi} rakibine göre, geçmiş karşılaşmalarda ortalama ${Math.abs(ortalama).toFixed(1)}kg daha ${yon} kilo taşıyarak koşmuş`;
-    },
-  },
+  // 2026-09-12 (V5.46) — H2HKILO buradan kaldırıldı: h2hKiloDegisimi toFeatureVector'dan
+  // tamamen çıktı, artık skora katkısı yok (bkz. dosya başındaki not).
   // 2026-08-28 — Zemin Toleransı: bkz. Faz1RunnerV5.zeminToleransi üstündeki not. Veri
   // yoksa (Normal-dışı geçmiş koşu yok) 0, satır hiç gösterilmez.
   { kod: "ZEMIN", ozellikIndeksleri: [idx("zeminToleransi")], aciklama: (r) => (r.zeminToleransi !== 0 ? `Ağır/yağmurlu pist gibi normal-dışı zeminlerdeki geçmişinde, diğer atlara göre %${Math.abs(r.zeminToleransi).toFixed(1)} ${r.zeminToleransi > 0 ? "daha hızlı" : "daha yavaş"}` : null) },
   { kod: "YAKINSAMA", ozellikIndeksleri: [idx("yakinsama2Plus")], aciklama: (r) => (r.katkilar[YAKINSAMA_IDX] !== 0 ? "Bu atta birden fazla olumlu işaret aynı anda bir araya gelmiş (pist uzmanlığı, pedigri, at-jokey geçmişi, AGF yükselişi, sınıf düşüşünden en az ikisi) — deneysel bir gözlem, henüz kanıtlanmamış" : null) },
   { kod: "SPRINT", ozellikIndeksleri: [idx("sonIdmanSprint")], aciklama: (r) => (r.katkilar[SON_IDMAN_SPRINT_IDX] !== 0 ? `Son idmanını hızlı/sürat çalışması olarak yapmış (deneysel bir gözlem, henüz kanıtlanmamış): geçmişte ${r.katkilar[SON_IDMAN_SPRINT_IDX] > 0 ? "olumlu" : "olumsuz"} çıkmış` : null) },
-  { kod: "TAKIEK", ozellikIndeksleri: [idx("takiEklendiMi")], aciklama: (r) => (r.katkilar[TAKI_EKLENDI_IDX] !== 0 ? `Son yarışından bu yana bir ekipman eklenmiş (göz siperliği, burun bandı vb.): geçmişte ${r.katkilar[TAKI_EKLENDI_IDX] > 0 ? "olumlu" : "olumsuz"} çıkmış` : null) },
-  { kod: "TAKICIK", ozellikIndeksleri: [idx("takiCikarildiMi")], aciklama: (r) => (r.katkilar[TAKI_CIKARILDI_IDX] !== 0 ? `Son yarışından bu yana bir ekipman çıkarılmış: geçmişte ${r.katkilar[TAKI_CIKARILDI_IDX] > 0 ? "olumlu" : "olumsuz"} çıkmış` : null) },
+  // 2026-09-12 (V5.46) — TAKIEK/TAKICIK TEK sinyale (takiDegisikligi) birleştirildi (bkz.
+  // TAKI_DEGISIKLIGI_IDX üstündeki not) — ham iki alana (takiEklendiMi/takiCikarildiMi)
+  // bakılarak YÖN belirleniyor, katkı TEK indeksten okunuyor.
+  {
+    kod: "TAKIDEGISIM",
+    ozellikIndeksleri: [idx("takiDegisikligi")],
+    aciklama: (r) => {
+      if (r.katkilar[TAKI_DEGISIKLIGI_IDX] === 0) return null;
+      const yon = r.takiCikarildiMi && !r.takiEklendiMi ? "çıkarılmış" : r.takiEklendiMi && !r.takiCikarildiMi ? "eklenmiş" : "değişmiş";
+      return `Son yarışından bu yana bir ekipman ${yon}: geçmişte ${r.katkilar[TAKI_DEGISIKLIGI_IDX] > 0 ? "olumlu" : "olumsuz"} çıkmış`;
+    },
+  },
   { kod: "GIDISAT", ozellikIndeksleri: [idx("yarisGidisatiSkoru")], aciklama: (r) => (r.katkilar[YARIS_GIDISATI_IDX] !== 0 ? `Bu yarışın beklenen gidişatına (kimin öne geçeceği, temponun nasıl olacağı) göre bu atın koşu tarzı ${r.katkilar[YARIS_GIDISATI_IDX] > 0 ? "uygun düşüyor" : "uygun düşmüyor"} (deneysel bir gözlem, henüz kanıtlanmamış)` : null) },
 ];
 
@@ -1663,6 +1639,7 @@ const FEATURE_LABELS: Record<string, string> = {
   sonIdmanSprint: "Son İdman Türü Sprint/Sürat",
   takiEklendiMi: "Takı Eklendi (son yarışına göre)",
   takiCikarildiMi: "Takı Çıkarıldı (son yarışına göre)",
+  takiDegisikligi: "Takı Değişikliği (çıkarıldı-eklendi, V5.46 birleşimi)",
   yarisGidisatiSkoru: "Yarış Gidişatı (saha-geneli tempo senaryosuna stil uygunluğu)",
 };
 
