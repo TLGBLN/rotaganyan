@@ -565,7 +565,23 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     race.raceDay.surfaceConditions as { label: string; detail: string }[] | null,
     race.surface
   );
-  const bugunZeminKatsayi = bugunZeminDetay ? zeminKatsayisi(bugunZeminDetay).katsayi : null;
+  // 2026-09-13 kullanıcı bulgusu (İstanbul K9, SENSEİ BAHA "yeniden analiz et" sonrası hiç
+  // değişmedi) — kök neden zeminMesafeDeneyimi'nin kendi tabanı DEĞİL, buradaki null'du.
+  // Gerçek veriyle doğrulandı: son 30 günün Sentetik pistli GÜNÜNÜN HİÇBİRİNDE (28/28)
+  // RaceDay.surfaceConditions'ta "Sentetik" etiketi yok — Sentetik pist hava koşullarından
+  // etkilenmediği için TJK muhtemelen bu pist için zemin durumu HİÇ yayınlamıyor (Çim/Kum'un
+  // aksine, "henüz yayımlanmadı, sonra gelir" durumu değil, YAPISAL OLARAK HİÇ GELMİYOR).
+  // Eskiden bu null, Çim/Kum'daki "TJK henüz yayımlamadı" (geçici/"seyrek") durumuyla AYNI
+  // şekilde işleniyordu — zeminMesafeDeneyimi (ve aşağıdaki H2H zemin-filtresi) TÜM Sentetik
+  // koşularında baştan "yok"/filtresiz kalıyordu. Sentetik için null artık "bilinmiyor"
+  // değil, HER ZAMAN "Normal" (1.0) sayılıyor — zeminKatsayisi(null) zaten aynı varsayılanı
+  // dönüyordu, yalnız BURADAKİ ternary onu görmeden null'a sabitliyordu. Çim/Kum'daki gerçek
+  // "seyrek" (geçici) null davranışı DEĞİŞMEDİ.
+  const bugunZeminKatsayi = bugunZeminDetay
+    ? zeminKatsayisi(bugunZeminDetay).katsayi
+    : race.surface === "SENTETIK"
+    ? 1.0
+    : null;
   const zeminEslesenEncounters =
     bugunZeminKatsayi != null
       ? h2hEncounters.filter((enc) => zeminKatsayisi(zeminDetayiSatirdanCikar(enc.surface)).katsayi === bugunZeminKatsayi)
