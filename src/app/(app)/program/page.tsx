@@ -69,9 +69,14 @@ async function ProofSection() {
 }
 
 async function CouponsAndResults({ isLoggedIn, isAdmin }: { isLoggedIn: boolean; isAdmin: boolean }) {
+  // 2026-09-13 kullanıcı bulgusu ("kuponlar neden kalktı") — getKuponOnerileri() içinde
+  // syncResultsForDate (canlı TJK çağrısı) var; bu hata fırlatırsa TÜM kupon bölümü
+  // sessizce kayboluyordu (.catch(() => [])), hiçbir iz bırakmadan — bu yüzden bir daha
+  // olduğunda TEŞHİS EDİLEMİYORDU. Davranış (hata olursa boş dön, sayfa çökmesin) AYNEN
+  // korunuyor, yalnız artık console.error ile iz bırakılıyor (Vercel loglarında görünür).
   const [coupons, altiliResults] = await Promise.all([
-    getKuponOnerileri().catch(() => []),
-    fetchTodaysAltiliResults().catch(() => [] as AltiliCityResult[]),
+    getKuponOnerileri().catch((e) => { console.error("getKuponOnerileri hata:", e); return []; }),
+    fetchTodaysAltiliResults().catch((e) => { console.error("fetchTodaysAltiliResults hata:", e); return [] as AltiliCityResult[]; }),
   ]);
   return (
     <>
