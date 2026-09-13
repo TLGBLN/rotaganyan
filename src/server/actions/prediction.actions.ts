@@ -14,6 +14,9 @@ export type PickInput = {
   runnerId?: string;
   runnerLabel: string;
   score?: number;
+  // 2026-09-13 — bkz. şema yorumu (Pick.scoreExact): score'un yuvarlanmadan önceki hali,
+  // kupon otomatik doldurmada sahte eşitlikleri (11=11) önlemek için.
+  scoreExact?: number;
   // v6.70 (V2.2): eskiden string[] (yalnız "Karar: X" + [Vx+Vy] etiket dizisi) — artık
   // ya legacy string[] (PredictionForm/parse-report/analysis-importer) ya da yeni
   // {versiyon:2, karar, satirlar} objesi (V2AnalysisPanel) olabilir. Prisma'nın Json
@@ -264,6 +267,7 @@ export async function upsertPrediction(input: PredictionInput) {
             runnerId: p.runnerId,
             runnerLabel: p.runnerLabel,
             score: p.score,
+            scoreExact: p.scoreExact,
             details: p.details,
             pedigreeRating: p.pedigreeRating,
             isTarget: p.isTarget,
@@ -295,6 +299,7 @@ export async function upsertPrediction(input: PredictionInput) {
             runnerId: p.runnerId,
             runnerLabel: p.runnerLabel,
             score: p.score,
+            scoreExact: p.scoreExact,
             details: p.details,
             pedigreeRating: p.pedigreeRating,
             isTarget: p.isTarget,

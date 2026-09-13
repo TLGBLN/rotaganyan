@@ -48,7 +48,7 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
           prediction: {
             select: {
               picks: {
-                select: { runnerId: true, score: true },
+                select: { runnerId: true, score: true, scoreExact: true },
               },
             },
           },
@@ -83,6 +83,8 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
 
   // scoreByNo: Karma yarışlar için at numarası → V5 modeli yüzdesi (Pick.score)
   const scoreByNoById = new Map<string, Map<number, number | null>>();
+  // scoreExactByNo: Karma yarışlar için at numarası → V5 modeli ham (yuvarlanmamış) olasılık
+  const scoreExactByNoById = new Map<string, Map<number, number | null>>();
   // metaByNo: Karma yarışlar için at numarası → { scratched, ekuriGroup }
   const metaByNoById = new Map<string, Map<number, { scratched: boolean; ekuriGroup: number | null }>>();
 
@@ -97,7 +99,7 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
         runners: { select: { id: true, no: true, name: true, scratched: true, ekuriGroup: true } },
         prediction: {
           select: {
-            picks: { select: { runnerId: true, score: true } },
+            picks: { select: { runnerId: true, score: true, scoreExact: true } },
           },
         },
       },
@@ -114,12 +116,17 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
       // Kaynak runner ID'den at numarasına map oluştur, sonra no→skor yap
       const runnerIdToNo = new Map(match.runners.map((ru) => [ru.id, ru.no]));
       const noToScore = new Map<number, number | null>();
+      const noToScoreExact = new Map<number, number | null>();
       for (const pick of match.prediction.picks) {
         if (!pick.runnerId) continue;
         const no = runnerIdToNo.get(pick.runnerId);
-        if (no != null) noToScore.set(no, pick.score);
+        if (no != null) {
+          noToScore.set(no, pick.score);
+          noToScoreExact.set(no, pick.scoreExact);
+        }
       }
       scoreByNoById.set(r.id, noToScore);
+      scoreExactByNoById.set(r.id, noToScoreExact);
 
       // at no → meta
       const noToMeta = new Map<number, { scratched: boolean; ekuriGroup: number | null }>();
@@ -136,6 +143,8 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
       // Kendi prediction'ı varsa runnerId bazlı, Karma aynasıysa no bazlı sırala
       let scoreByRunnerId: Map<string, number | null> | null = null;
       let scoreByNo: Map<number, number | null> | null = null;
+      let scoreExactByRunnerId: Map<string, number | null> | null = null;
+      let scoreExactByNo: Map<number, number | null> | null = null;
 
       if (r.prediction) {
         const picks = r.prediction.picks;
@@ -143,12 +152,25 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
           picks.filter((p): p is typeof p & { runnerId: string } => p.runnerId != null)
                .map((p) => [p.runnerId, p.score])
         );
+        scoreExactByRunnerId = new Map(
+          picks.filter((p): p is typeof p & { runnerId: string } => p.runnerId != null)
+               .map((p) => [p.runnerId, p.scoreExact])
+        );
       } else {
         scoreByNo = scoreByNoById.get(r.id) ?? null;
+        scoreExactByNo = scoreExactByNoById.get(r.id) ?? null;
       }
 
-      // Score'a göre (yüksekten düşüğe) sırala — bkz. yukarıdaki fonksiyon yorumu.
+      // 2026-09-13 kullanıcı bulgusu (İstanbul K5, MİHRA FARAH/POTOCHNITSA) — Pick.score
+      // Int'e yuvarlandığı için iki at aynı tam sayıya düşüp SIRALAMADA sahte eşitlik
+      // yaratabiliyor (11=11 iken gerçek olasılıklar %25.6/%24.8). Sıralama artık ÖNCE ham
+      // scoreExact'e (varsa), YALNIZ o yoksa (eski kayıtlar) yuvarlanmış score'a bakıyor —
+      // eşitlik son çare olarak hâlâ at numarasına düşüyor.
+      const exactA = (id: string, no: number) => scoreExactByRunnerId?.get(id) ?? scoreExactByNo?.get(no) ?? null;
       const runners = [...r.runners].sort((a, b) => {
+        const exA = exactA(a.id, a.no);
+        const exB = exactA(b.id, b.no);
+        if (exA != null && exB != null && exA !== exB) return exB - exA;
         const scoreA = scoreByRunnerId?.get(a.id) ?? scoreByNo?.get(a.no) ?? -1;
         const scoreB = scoreByRunnerId?.get(b.id) ?? scoreByNo?.get(b.no) ?? -1;
         if (scoreA !== scoreB) return scoreB - scoreA;
@@ -173,6 +195,7 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
             scratched: karmaMeta?.scratched ?? runner.scratched,
             ekuriGroup: karmaMeta?.ekuriGroup ?? runner.ekuriGroup,
             score: scoreByRunnerId?.get(runner.id) ?? scoreByNo?.get(runner.no) ?? null,
+            scoreExact: exactA(runner.id, runner.no),
             agfSirasi: agfSiraByRunnerId.get(runner.id) ?? null,
           };
         }),

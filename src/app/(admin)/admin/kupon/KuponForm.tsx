@@ -14,7 +14,7 @@ import {
 } from "@/server/actions/home-kupon.actions";
 
 type Hippodrome = { id: string; name: string; slug: string };
-type RaceRunner = { no: number; name: string; scratched: boolean; ekuriGroup: number | null; score: number | null; agfSirasi: number | null };
+type RaceRunner = { no: number; name: string; scratched: boolean; ekuriGroup: number | null; score: number | null; scoreExact: number | null; agfSirasi: number | null };
 type RaceDayData = {
   hippodromeName: string;
   races: { raceNo: number; runners: RaceRunner[] }[];
@@ -88,13 +88,27 @@ function otomatikGroupSelections(
     raceNo: race.raceNo,
     runners: race.runners
       .filter((r) => !r.scratched)
-      .map((r) => ({ no: r.no, olasilik: (r.score ?? 0) / 100 })),
+      // 2026-09-13 kullanıcı bulgusu (İstanbul K5) — yuvarlanmış tam sayı score (11=11)
+      // gerçekte farklı iki atı eşitmiş gibi gösterip DP'nin yanlış atı seçmesine yol
+      // açabiliyordu; varsa ham scoreExact kullanılıyor. ekuriGroup de taşınıyor —
+      // optimizer artık eküri çiftini TEK kombinasyon birimi olarak sayabiliyor (bkz.
+      // kupon-optimizer.ts, aynı bulgudan gelen ikinci düzeltme).
+      .map((r) => ({ no: r.no, olasilik: (r.scoreExact ?? r.score ?? 0) / 100, ekuriGroup: r.ekuriGroup })),
   }));
   const sel = emptyGroupSelections(races);
+  // 2026-09-13 kullanıcı bulgusu (Adana K1/K2) — Ekonomik/Normal/Geniş eskiden birbirinden
+  // habersiz üç bağımsız DP koşusuydu; gerçek veriyle test edilince bütçe arttıkça bir
+  // ayaktaki at sayısının MONOTON artmadığı kanıtlandı (daha pahalı kademe bazı ayaklarda
+  // daha ucuz kademeden DAHA AZ at seçebiliyordu). WIDTHS zaten ucuzdan pahalıya sıralı
+  // (narrow→normal→wide) — her kademe artık bir öncekinin seçtiği birim sayısını TABAN
+  // alıyor (yalnız üzerine ekler, hiç eksiltmez), taban bir sonraki DP çağrısına
+  // `minUnitCounts` olarak geçiyor.
+  let oncekiBirimSayilari: Record<number, number> | undefined;
   for (const width of WIDTHS) {
     const effectiveLimit = limits[width] * tolerances[width];
     const maxCombinations = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
-    const { secimler } = optimizeKuponAllocation(legs, maxCombinations);
+    const { secimler, birimSayilari } = optimizeKuponAllocation(legs, maxCombinations, oncekiBirimSayilari);
+    oncekiBirimSayilari = birimSayilari;
     for (const race of races) {
       sel[race.raceNo][width] = new Set(secimler[race.raceNo] ?? []);
     }
@@ -156,8 +170,27 @@ function kumulatifToplam(sirali: RaceRunner[], n: number): number {
   return sirali.slice(0, n).reduce((acc, r) => acc + (r.scratched ? 0 : r.score ?? 0), 0);
 }
 
-function legCounts(races: { raceNo: number }[], selections: GroupSelections, width: Width): number[] {
-  return races.map((r) => Math.max((selections[r.raceNo] ?? emptySelection())[width].size, 1));
+// 2026-09-13 kullanıcı bulgusu (İstanbul K5) — bkz. kupon-optimizer.ts'teki eküri-birimi
+// yorumu. Otomatik doldurma artık eküri çiftini tek birim sayıyor ama admin bir ayakta
+// AYNI eküriden iki atı ELLE de işaretleyebilir — kombinasyon/tutar hesabı da (yalnız DP
+// değil) tutarlı olsun diye burada da aynı gruplama uygulanıyor: aynı ekuriGroup'tan
+// seçilen atlar TEK kombinasyon birimi sayılır.
+function secilenBirimSayisi(race: RaceDayData["races"][number], secilenNolar: Set<number>): number {
+  const gruplar = new Set<number>();
+  let tekilSayisi = 0;
+  for (const no of secilenNolar) {
+    const runner = race.runners.find((r) => r.no === no);
+    if (runner?.ekuriGroup != null && runner.ekuriGroup >= 1) {
+      gruplar.add(runner.ekuriGroup);
+    } else {
+      tekilSayisi++;
+    }
+  }
+  return tekilSayisi + gruplar.size;
+}
+
+function legCounts(races: RaceDayData["races"], selections: GroupSelections, width: Width): number[] {
+  return races.map((r) => Math.max(secilenBirimSayisi(r, (selections[r.raceNo] ?? emptySelection())[width]), 1));
 }
 
 function amountFor(counts: number[], stakePerCombination: number): number {
@@ -253,8 +286,15 @@ function KuponGrup({
                                   {runner.name}
                                 </span>
                                 {runner.score != null && (
-                                  <span className="shrink-0 text-[10px] font-semibold tabular-nums opacity-80">
-                                    %{runner.score}
+                                  <span
+                                    className="shrink-0 text-[10px] font-semibold tabular-nums opacity-80"
+                                    title={runner.scoreExact != null ? "Ham (yuvarlanmamış) olasılık" : undefined}
+                                  >
+                                    {/* 2026-09-13 kullanıcı bulgusu (İstanbul K5) — yuvarlanmış
+                                        tam sayı (%11) iki farklı atı eşitmiş gibi gösterip kupon
+                                        seçiminde yanlış tercihe yol açabiliyor (gerçek: %25.6 vs
+                                        %24.8) — ondalık hane varsa göster. */}
+                                    %{runner.scoreExact != null ? runner.scoreExact.toFixed(1) : runner.score}
                                   </span>
                                 )}
                                 {runner.agfSirasi != null && (

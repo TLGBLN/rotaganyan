@@ -417,6 +417,13 @@ model Pick {
   runnerId       String?
   runnerLabel    String
   score          Int?
+  // 2026-09-13 kullanıcı bulgusu (İstanbul K5, MİHRA FARAH/POTOCHNITSA) — score Int'e
+  // yuvarlanınca iki at aynı tam sayıya düşüp EKRANDA eşitmiş gibi görünebiliyor (11=11),
+  // oysa gerçek olasılıkları farklı (%25.6 vs %24.8) — kupon otomatik doldurma/sıralama bu
+  // sahte eşitliğe göre yanlış tercih yapabiliyor. Ham (yuvarlanmamış) olasılık*100 burada
+  // ayrıca saklanıyor, yalnız V5AnalysisPanel'in kaydettiği YENİ pick'lerde dolu (nullable,
+  // eski kayıtlar etkilenmez).
+  scoreExact     Float?
   details        Json
   pedigreeRating PedigreeRating @default(BILINMIYOR)
   isTarget       Boolean        @default(false)

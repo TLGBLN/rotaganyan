@@ -15,8 +15,9 @@
 // aşan hiçbir dal saklanmaz), pratikte birkaç bin durumda milisaniyeler içinde biter.
 export type LegProbability = {
   raceNo: number;
-  /** Bu ayaktaki (çekilenler hariç) her atın no'su ve kazanma olasılığı (0-1 arası, kesir). */
-  runners: { no: number; olasilik: number }[];
+  /** Bu ayaktaki (çekilenler hariç) her atın no'su, kazanma olasılığı (0-1 arası, kesir)
+   *  ve varsa eküri grubu. */
+  runners: { no: number; olasilik: number; ekuriGroup?: number | null }[];
 };
 
 export type OptimizeResult = {
@@ -25,22 +26,71 @@ export type OptimizeResult = {
   toplamKombinasyon: number;
   /** Kuponun TAMAMININ tutma olasılığı (∏ᵢ pᵢ(nᵢ)) — 0-1 arası. */
   kapsamaOlasiligi: number;
+  /** raceNo -> seçilen KOMBİNASYON BİRİMİ sayısı (eküri çifti tek birim) — bir sonraki
+   *  (daha geniş bütçeli) kademeye taban olarak geçirmek için, bkz. minUnitCounts. */
+  birimSayilari: Record<number, number>;
 };
 
-export function optimizeKuponAllocation(legs: LegProbability[], maxCombinations: number): OptimizeResult {
+// 2026-09-13 kullanıcı bulgusu (İstanbul K5, COSTA ADEJE/POTOCHNITSA eküri çifti) —
+// TJK'da AYNI eküri grubundaki iki at aynı ayakta birlikte seçilirse tek kombinasyon
+// birimi sayılır (ikisinden biri kazansa da aynı bilet öder) — Altılı/7'li Ganyan'da bir
+// eküriyi "sigorta" olarak ikilemek, favorinin tekil seçilmesiyle AYNI bütçeyi harcamalı,
+// iki katını DEĞİL. Eskiden bu fonksiyon her at numarasını ayrı bir kombinasyon birimi
+// sayıyordu — bir eküri çifti seçildiğinde bütçeyi gereksiz yere 2x tüketip, o bütçeyle
+// alınabilecek bağımsız bir başka atı (bu vakada gerçek kazanan MİHRA FARAH) dışarıda
+// bırakabiliyordu. Artık aynı ekuriGroup'taki atlar TEK bir "birim" olarak gruplanıyor
+// (birim olasılığı = üyelerin olasılık TOPLAMI, çünkü ikisinden biri kazanınca da tutuyor),
+// DP birim sayısı üzerinden çalışıyor, seçilen birimin TÜM üyeleri kupona yazılıyor.
+type Birim = { nos: number[]; olasilik: number };
+function ekuriBirimleriOlustur(runners: LegProbability["runners"]): Birim[] {
+  const gruplu = new Map<number, number[]>();
+  const tekil: Birim[] = [];
+  for (const r of runners) {
+    if (r.ekuriGroup != null && r.ekuriGroup >= 1) {
+      if (!gruplu.has(r.ekuriGroup)) gruplu.set(r.ekuriGroup, []);
+      gruplu.get(r.ekuriGroup)!.push(r.no);
+    } else {
+      tekil.push({ nos: [r.no], olasilik: r.olasilik });
+    }
+  }
+  const birimler: Birim[] = [...tekil];
+  const noToOlasilik = new Map(runners.map((r) => [r.no, r.olasilik]));
+  for (const nos of gruplu.values()) {
+    birimler.push({ nos, olasilik: nos.reduce((s, no) => s + (noToOlasilik.get(no) ?? 0), 0) });
+  }
+  return birimler;
+}
+
+// 2026-09-13 kullanıcı bulgusu (Adana K1/K2) — Ekonomik/Normal/Geniş üç kademe eskiden
+// TAMAMEN BAĞIMSIZ üç DP koşusuydu (aynı kombinasyon bütçesinin farklı boyutları). Gerçek
+// veriyle test edilince bu bağımsızlığın ayak-başı at sayısını bütçeyle MONOTON artırmadığı
+// kanıtlandı — Ekonomik (560 kombinasyon) bir ayakta 7 at seçerken, 2.3× daha büyük bütçeli
+// Normal (1320 kombinasyon) AYNI ayakta yalnızca 6 at seçebiliyordu (budget 400→1400 arası
+// taranınca o ayağın at sayısı 5-6-7 arası tamamen düzensiz sıçradı, hiç monoton değildi) —
+// çarpımsal bütçe kısıtı + tam sayı kısıtı altında bu matematiksel olarak mümkün ama bir
+// admin/kullanıcı için "daha pahalı kademe daha az kapsıyor" kabul edilemez bir tutarsızlık.
+// Çözüm: her kademe, KENDİNDEN BİR ÖNCEKİ (ucuz) kademenin seçtiği at sayısını TABAN olarak
+// alır — yalnız ÜZERİNE ekler, asla eksiltmez. Taban keyfi bir eşik DEĞİL, zaten onaylanmış
+// bir önceki kademenin kendi optimal sonucu (bkz. otomatikGroupSelections'taki zincirleme).
+export function optimizeKuponAllocation(
+  legs: LegProbability[],
+  maxCombinations: number,
+  minUnitCounts?: Record<number, number>
+): OptimizeResult {
   if (legs.length === 0 || maxCombinations < 1) {
-    return { secimler: {}, toplamKombinasyon: 0, kapsamaOlasiligi: 0 };
+    return { secimler: {}, toplamKombinasyon: 0, kapsamaOlasiligi: 0, birimSayilari: {} };
   }
 
   const legOptions = legs.map((leg) => {
-    const sirali = [...leg.runners].sort((a, b) => b.olasilik - a.olasilik);
+    const sirali = ekuriBirimleriOlustur(leg.runners).sort((a, b) => b.olasilik - a.olasilik);
     const kumulatif: number[] = [];
     let toplam = 0;
     for (const r of sirali) {
       toplam += r.olasilik;
       kumulatif.push(toplam);
     }
-    return { raceNo: leg.raceNo, sirali, kumulatif };
+    const minN = Math.min(Math.max(1, minUnitCounts?.[leg.raceNo] ?? 1), Math.max(sirali.length, 1));
+    return { raceNo: leg.raceNo, sirali, kumulatif, minN };
   });
 
   type Durum = { logOlasilik: number; secimSayilari: number[] };
@@ -49,7 +99,7 @@ export function optimizeKuponAllocation(legs: LegProbability[], maxCombinations:
   for (const opt of legOptions) {
     const yeniDp = new Map<number, Durum>();
     for (const [c, durum] of dp) {
-      for (let n = 1; n <= opt.kumulatif.length; n++) {
+      for (let n = opt.minN; n <= opt.kumulatif.length; n++) {
         const yeniC = c * n;
         if (yeniC > maxCombinations) break; // n arttıkça c*n de artar — erken kesilebilir
         const p = opt.kumulatif[n - 1];
@@ -72,13 +122,17 @@ export function optimizeKuponAllocation(legs: LegProbability[], maxCombinations:
       enIyiC = c;
     }
   }
-  if (!enIyi) return { secimler: {}, toplamKombinasyon: 0, kapsamaOlasiligi: 0 };
+  if (!enIyi) return { secimler: {}, toplamKombinasyon: 0, kapsamaOlasiligi: 0, birimSayilari: {} };
 
   const secimler: Record<number, number[]> = {};
+  const birimSayilari: Record<number, number> = {};
   legOptions.forEach((opt, i) => {
     const n = enIyi!.secimSayilari[i];
-    secimler[opt.raceNo] = opt.sirali.slice(0, n).map((r) => r.no);
+    // Bir "birim" eküri çiftiyse İKİ at numarası birden yazılır (bkz. yukarıdaki yorum) —
+    // kombinasyon sayısına (n/toplamKombinasyon) tek birim olarak katılmaya devam eder.
+    secimler[opt.raceNo] = opt.sirali.slice(0, n).flatMap((birim) => birim.nos);
+    birimSayilari[opt.raceNo] = n;
   });
 
-  return { secimler, toplamKombinasyon: enIyiC, kapsamaOlasiligi: Math.exp(enIyi.logOlasilik) };
+  return { secimler, toplamKombinasyon: enIyiC, kapsamaOlasiligi: Math.exp(enIyi.logOlasilik), birimSayilari };
 }

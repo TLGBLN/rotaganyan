@@ -254,6 +254,9 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
           // edilmiş bir olasılık) ama Puan Tablosu ikisini de aynı sütunda gösterdiği
           // için karışıklık riski var — kullanıcı bunu bilerek kabul etti.
           score: Math.round(a.olasilik * 100),
+          // 2026-09-13 kullanıcı bulgusu — bkz. Pick.scoreExact şema yorumu, yuvarlanmamış
+          // ham değer kupon otomatik doldurmada sahte eşitlikleri (11=11) önlemek için.
+          scoreExact: a.olasilik * 100,
           details: a.details,
           pedigreeRating: "BILINMIYOR",
           isTarget: false,
