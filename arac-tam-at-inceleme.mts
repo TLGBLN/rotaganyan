@@ -31,7 +31,7 @@
 //   ...arac-tam-at-inceleme.mts --hipodrom bursa --tarih 2026-08-31 --kosu 4   (tek koşu)
 //   ...arac-tam-at-inceleme.mts --hipodrom bursa --tarih 2026-08-31            (o günün TÜM sonuçlanmamış koşuları)
 import { db } from "./src/lib/db";
-import { gatherFaz1V5, faz2V5Sirala, toFeatureVector } from "./src/lib/methodology/v5-engine";
+import { gatherFaz1V5, faz2V5Sirala, toFeatureVector, tumOzellikleriListele } from "./src/lib/methodology/v5-engine";
 import { getHizliOzet } from "./src/server/actions/hizli-ozet.actions";
 import { getSonYarisDetaylariForRace } from "./src/server/actions/son-yaris-detay.actions";
 import { getHorseHistory } from "./src/server/actions/horse-detail.actions";
@@ -220,8 +220,26 @@ async function tekKosuIsle(raceId: string) {
       `  Saf Model (AGF'siz): ${safModelSiraByNo.get(r.no)}. sıra (%${safYuzde.toFixed(1)}) | AGF: ${r.agfSirasi}. sıra (%${r.agfPayi.toFixed(1)}) | Fark: ${safFark > 0 ? "+" : ""}${safFark.toFixed(1)}pp${safFark >= 5 ? "  ⚠ model piyasadan bağımsız değer buluyor, nihai skorda sönümlenmiş olabilir" : ""}`
     );
 
-    console.log(`  A-Katmanı (13 skor girdisinin TAMAMI):`);
+    console.log(`  A-Katmanı (13 skor girdisinin TAMAMI, ham/standart değer):`);
     A_KATMANI_ADLARI.forEach((ad, i) => console.log(`    ${ad.padEnd(18)} = ${vektor[i]}`));
+
+    // 2026-09-13 kullanıcı talebi — "Model Etki Dökümü": yukarıdaki ham/standart değerler
+    // yerine (ya da yanında) motorun GERÇEKTEN kullandığı katkı (β_j·z_ij) değerlerini göster.
+    // Amaç: manuel analizde "at'ın idmanı iyi, +1 sıra yükselteyim" gibi bir sinyali motor
+    // ZATEN saymışsa bunu İKİNCİ KEZ hesaba katmayı (double-counting) önlemek — gerekçe
+    // yazarken burada 0.00'a yakın çıkan bir sinyali "güçlü pozitif" diye anlatmak yanlış
+    // olur. tumOzellikleriListele zaten canlı skorun/featureSnapshot'ın kullandığı AYNI
+    // fonksiyon (v5-engine.ts) — burada YENİDEN hesaplama yapılmıyor, yalnız gösteriliyor.
+    const etkiDokumu = tumOzellikleriListele(r);
+    console.log(`  Model Etki Dökümü (A-katmanı katkısı = β_j·z_ij, motorun GERÇEKTEN kullandığı):`);
+    for (const s of etkiDokumu) {
+      const isaret = s.katki > 0 ? "+" : "";
+      console.log(`    ${s.etiket.padEnd(45)} katki=${isaret}${s.katki.toFixed(4)}`);
+    }
+    const aToplam = etkiDokumu.reduce((sum, s) => sum + s.katki, 0);
+    const sireD = (r as unknown as { bSireKatkisi?: number }).bSireKatkisi ?? 0;
+    const zeminMesafeD = (r as unknown as { bZeminMesafeKatkisi?: number }).bZeminMesafeKatkisi ?? 0;
+    console.log(`    ── A toplamı=${aToplam.toFixed(4)} | Sire Δ=${sireD >= 0 ? "+" : ""}${sireD.toFixed(4)} | ZeminMesafe Δ=${zeminMesafeD >= 0 ? "+" : ""}${zeminMesafeD.toFixed(4)} | Final skor=${(aToplam + sireD + zeminMesafeD).toFixed(4)} | P(win)=%${(r.olasilik * 100).toFixed(1)}`);
 
     if (ozet) {
       console.log(`  Hızlı Özet: pistUzmani=${ozet.pistUzmani} sinifDurumu=${ozet.sinifDurumu} atJokeyIkilisi=${JSON.stringify(ozet.atJokeyIkilisi)} agfFark=${ozet.agfFark} pedigriK=${ozet.pedigriKYuzde} pedigriOzet="${ozet.pedigriOzet ?? "-"}"`);
