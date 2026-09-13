@@ -50,7 +50,7 @@ export type AdminRaceDay = Prisma.RaceDayGetPayload<{
             isBanko: true;
             bankoNote: true;
             createdAt: true;
-            picks: { select: { rank: true; isTarget: true; score: true; runnerLabel: true } };
+            picks: { select: { rank: true; isTarget: true; score: true; scoreExact: true; runnerLabel: true } };
           };
         };
         result: { select: { id: true } };
@@ -132,7 +132,7 @@ export async function getAdminRaceDays(dateStr?: string, limit = 30): Promise<Ad
               // 2026-09-07 — kupon/page.tsx'in modelTabanliKapsamOnerisi'ni (RaceAdviceCard.tsx)
               // yalnız GÜNCEL motor dönemindeki tahminlerde çalıştırabilmesi için.
               createdAt: true,
-              picks: { orderBy: { rank: "asc" }, select: { rank: true, isTarget: true, score: true, runnerLabel: true } },
+              picks: { orderBy: { rank: "asc" }, select: { rank: true, isTarget: true, score: true, scoreExact: true, runnerLabel: true } },
             },
           },
           result: { select: { id: true } },

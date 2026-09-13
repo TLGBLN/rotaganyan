@@ -64,6 +64,7 @@ export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
                 id: true;
                 rank: true;
                 score: true;
+                scoreExact: true;
                 isTarget: true;
                 runnerLabel: true;
                 details: true;
@@ -153,6 +154,7 @@ export async function getRaceDaysByDate(
                   id: true,
                   rank: true,
                   score: true,
+                  scoreExact: true,
                   isTarget: true,
                   runnerLabel: true,
                   details: true,
@@ -925,6 +927,11 @@ export type ProgramPick = {
   runnerLabel: string | null;
   runner: { no: number; name: string } | null;
   score: number | null;
+  // 2026-09-13 kullanıcı talebi — analiz yapıldığındaki ham (yuvarlanmamış) olasılık,
+  // KuponForm ile AYNI ondalıklı değer her yerde (Puan Tablosu, Analiz Detayları) tutarlı
+  // görünsün diye. Yalnız BUNDAN SONRA kaydedilen analizlerde dolu (bkz. Pick.scoreExact
+  // şema yorumu) — eski kayıtlarda null, gösterim tam sayı score'a düşer.
+  scoreExact: number | null;
   details: unknown;
 };
 
@@ -981,6 +988,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
                   rank: true,
                   runnerLabel: true,
                   score: true,
+                  scoreExact: true,
                   details: true,
                   runner: { select: { no: true, name: true } },
                 },

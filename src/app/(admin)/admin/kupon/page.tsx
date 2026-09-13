@@ -209,6 +209,7 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                                 rank: p.rank,
                                 no: `#${p.runnerLabel.match(/^#*(\d+)/)?.[1] ?? "?"}`,
                                 score: p.score,
+                                scoreExact: p.scoreExact,
                               })),
                             }
                           : null

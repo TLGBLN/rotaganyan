@@ -9,7 +9,7 @@ import { useLocaleSwitch } from "@/components/providers/LocaleProvider";
 import { EKURI_COLORS, ekuriRengi } from "@/lib/ekuri-colors";
 import { ChevronDown, ChevronUp, Star, Info, Radio } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
-import { kararOku } from "@/lib/methodology/muhakeme-format";
+import { kararOku, puanYuzdesiMetni } from "@/lib/methodology/muhakeme-format";
 import { siraliPickSatirlari } from "@/lib/methodology/pick-display-order";
 import { agfSiraMapOlustur } from "@/lib/agf-sira";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
@@ -351,8 +351,9 @@ function pickDisplay(p: ProgramPick): { no: number | string; name: string } {
 // PuanTablosu.tsx/InlineAnalysisPanel.tsx'teki aynı desen (bkz. puanHucresi orada).
 // v6.70 (V2.2): details artık iki farklı şekilde (eski string[] / yeni {versiyon:2,...}
 // objesi) gelebiliyor — okuma merkezi muhakeme-format.ts'teki kararOku'ya taşındı.
-function puanHucresi(score: number | null, details: unknown): string {
-  if (score != null) return `%${score}`;
+function puanHucresi(score: number | null, details: unknown, scoreExact?: number | null): string {
+  const metin = puanYuzdesiMetni(score, scoreExact);
+  if (metin != null) return `%${metin}`;
   return kararOku(details) ?? "—";
 }
 
@@ -660,7 +661,7 @@ function AnalysisPanel({
                     </span>
                   </td>
                   <td className="px-2 py-2 text-center tabular-nums font-bold whitespace-nowrap">
-                    <span>{rowPicks.map((p) => puanHucresi(p.score, p.details)).join(" / ")}</span>
+                    <span>{rowPicks.map((p) => puanHucresi(p.score, p.details, p.scoreExact)).join(" / ")}</span>
                   </td>
                 </tr>
               );
@@ -771,7 +772,7 @@ function AnalysisPanel({
                 )}
               </div>
               <div className="flex gap-3 text-[11px] text-muted-foreground mb-1">
-                <span>{t("toplamPrefix")} <span className="font-bold text-foreground">{rowPicks.map((p) => puanHucresi(p.score, p.details)).join(" / ")}</span></span>
+                <span>{t("toplamPrefix")} <span className="font-bold text-foreground">{rowPicks.map((p) => puanHucresi(p.score, p.details, p.scoreExact)).join(" / ")}</span></span>
               </div>
             </div>
           );

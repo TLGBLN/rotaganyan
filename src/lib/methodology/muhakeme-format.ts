@@ -69,6 +69,21 @@ export function kararOku(details: unknown): string | null {
   return null;
 }
 
+/**
+ * 2026-09-13 kullanıcı talebi — "analiz yapıldığında oran ne ise her yerde (Puan Tablosu,
+ * Analiz Detayları, KuponForm) aynı ondalıklı değer görünsün". `score` (Int, yuvarlanmış)
+ * yerine varsa `scoreExact` (ham olasılık*100) gösterilir — İstanbul K5 vakasında iki farklı
+ * atın yuvarlamayla eşitmiş gibi görünmesini (11=11) önleyen aynı düzeltmenin gösterim
+ * tarafı. `scoreExact` yalnız BUNDAN SONRA kaydedilen analizlerde dolu (Pick.scoreExact
+ * şema yorumuna bkz.) — eski kayıtlarda null, tam sayı score'a düşülür. `%` işaretsiz,
+ * çağıran kendi formatına (ör. "%34.2") göre birleştirir.
+ */
+export function puanYuzdesiMetni(score: number | null | undefined, scoreExact: number | null | undefined): string | null {
+  if (scoreExact != null) return scoreExact.toFixed(1);
+  if (score != null) return String(score);
+  return null;
+}
+
 /** Bir MuhakemeSatiri'nin admin/iç gösterim metni — eski "[Vx+Vy]:tip(açıklama)"
  * notasyonuyla görsel olarak tutarlı, ama artık kod tarafında PARSE edilmiyor. */
 export function satirGosterimMetni(satir: MuhakemeSatiri): string {

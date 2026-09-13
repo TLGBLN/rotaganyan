@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { classTypeGroup, type ClassTypeAdvice } from "@/server/services/admin.service";
 import DeleteRaceButton from "@/components/admin/DeleteRaceButton";
 import { KAPSAM_ESIK_ILK3, KAPSAM_ESIK_ILK6 } from "@/lib/methodology/kapsam-esikleri";
+import { puanYuzdesiMetni } from "@/lib/methodology/muhakeme-format";
 
 // 2026-09-02 kullanıcı talebi ("bu şekilde ayarlar mısın bu kısımları" — bir mockup
 // gösterdi): admin/kupon'daki yoğun koşu tablosu satırının YERİNE, her koşu için bu kart
@@ -19,7 +20,7 @@ const LEVEL_STYLE: Record<ClassTypeAdvice["level"], { icon: typeof ShieldCheck; 
   none: { icon: Info, badgeCls: "bg-muted text-muted-foreground", textCls: "text-muted-foreground", barCls: "bg-muted-foreground", label: "Veri yok" },
 };
 
-export type RaceAdviceCardPick = { rank: number; no: string; score: number | null };
+export type RaceAdviceCardPick = { rank: number; no: string; score: number | null; scoreExact?: number | null };
 export type RaceAdviceCardPrediction = {
   id: string;
   published: boolean;
@@ -210,7 +211,7 @@ export default function RaceAdviceCard({
               prediction.topPicks.slice(0, 6).map((p) => (
                 <span key={p.rank} className="rounded-full border px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
                   #{p.no}
-                  {p.score != null && ` %${p.score}`}
+                  {puanYuzdesiMetni(p.score, p.scoreExact) != null && ` %${puanYuzdesiMetni(p.score, p.scoreExact)}`}
                 </span>
               ))}
           </div>

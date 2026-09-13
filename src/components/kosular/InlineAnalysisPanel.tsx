@@ -6,7 +6,7 @@ import TargetBadge from "@/components/prediction/TargetBadge";
 import FollowButton from "@/components/kosular/FollowButton";
 import { cn } from "@/lib/utils";
 import type { ProgramRaceDay } from "@/server/services/race.service";
-import { kararOku } from "@/lib/methodology/muhakeme-format";
+import { kararOku, puanYuzdesiMetni } from "@/lib/methodology/muhakeme-format";
 import { siraliPickler } from "@/lib/methodology/pick-display-order";
 
 type Picks = NonNullable<ProgramRaceDay["races"][number]["prediction"]>["picks"];
@@ -33,8 +33,9 @@ function scoreOnly(value: string): string {
 // v6.51 — V2 motoru (Faz3/sayısal puanlama yok) kaydettiği pick'lerde score HER ZAMAN
 // null — bu durumda "—" yerine Faz2'nin "karar" etiketini (details[0]) gösteriyoruz.
 // Eski (Faz3'lü) tahminlerde davranış AYNEN korunuyor (bkz. PuanTablosu.tsx'teki aynı desen).
-function puanHucresi(score: number | null | undefined, details: unknown): string {
-  if (score != null) return `%${score}`;
+function puanHucresi(score: number | null | undefined, details: unknown, scoreExact?: number | null): string {
+  const metin = puanYuzdesiMetni(score, scoreExact);
+  if (metin != null) return `%${metin}`;
   return kararOku(details) ?? "—";
 }
 
@@ -133,7 +134,7 @@ export default function InlineAnalysisPanel({ picks, winnerNos, isLoggedIn, race
                 )}
               </div>
               <span className="shrink-0 font-mono text-xs font-bold text-brand">
-                {puanHucresi(pick.score, pick.details)}
+                {puanHucresi(pick.score, pick.details, pick.scoreExact)}
               </span>
               <Badge variant="outline" className={cn("shrink-0 text-[10px]", coupon.className)}>
                 {coupon.label}
@@ -204,7 +205,7 @@ export default function InlineAnalysisPanel({ picks, winnerNos, isLoggedIn, race
                   </td>
                   <td className="px-2 py-2 text-right font-mono">{a}</td>
                   <td className="px-2 py-2 text-right font-mono">{bc}</td>
-                  <td className="px-2 py-2 text-right font-mono font-bold text-brand whitespace-nowrap">{puanHucresi(pick.score, pick.details)}</td>
+                  <td className="px-2 py-2 text-right font-mono font-bold text-brand whitespace-nowrap">{puanHucresi(pick.score, pick.details, pick.scoreExact)}</td>
                 </tr>
               );
             })}

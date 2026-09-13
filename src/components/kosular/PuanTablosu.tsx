@@ -6,7 +6,7 @@ import { getLocale } from "next-intl/server";
 import type { AppLocale } from "@/i18n/request";
 import type { ProgramRaceDay } from "@/server/services/race.service";
 import { finishPos } from "@/lib/race-result";
-import { kararOku } from "@/lib/methodology/muhakeme-format";
+import { kararOku, puanYuzdesiMetni } from "@/lib/methodology/muhakeme-format";
 import { ekuriRengi } from "@/lib/ekuri-colors";
 import { siraliPickSatirlari } from "@/lib/methodology/pick-display-order";
 import { agfSiraMapOlustur } from "@/lib/agf-sira";
@@ -95,13 +95,17 @@ function rankWeight(rank: number): string {
 // puanıyla orantılı ince bir dolgu çubuğu eklendi (bg-current, hücrenin zaten
 // hesaplanmış rank rengini miras alır) — sayı artık boşlukta değil, görsel bir
 // büyüklük göstergesinin üstünde duruyor.
-function PuanHucre({ score, details }: { score: number | null; details: unknown }) {
-  if (score == null) return <span>{kararOku(details) ?? "—"}</span>;
-  const pct = Math.max(0, Math.min(100, score));
+function PuanHucre({ score, details, scoreExact }: { score: number | null; details: unknown; scoreExact?: number | null }) {
+  const metin = puanYuzdesiMetni(score, scoreExact);
+  if (metin == null) return <span>{kararOku(details) ?? "—"}</span>;
+  // Dolgu çubuğu genişliği hep tam sayı score'a göre (scoreExact yalnız metinde daha
+  // hassas) — score null ama scoreExact doluysa (teorik olarak olmaz, ikisi birlikte
+  // yazılıyor) çubuk 0 kalır, metin yine de gösterilir.
+  const pct = Math.max(0, Math.min(100, score ?? Math.round(scoreExact ?? 0)));
   return (
     <span className="relative isolate inline-flex w-full items-center justify-center overflow-hidden rounded-sm py-px">
       <span aria-hidden className="absolute inset-y-0 left-0 -z-10 bg-current opacity-[0.16]" style={{ width: `${pct}%` }} />
-      <span>%{score}</span>
+      <span>%{metin}</span>
     </span>
   );
 }
@@ -245,7 +249,7 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
                             </td>
                             <td className={cn("px-2 py-1.5 text-center font-mono tabular-nums whitespace-nowrap", textColor, weight)}>
                               <span className="inline-flex items-center gap-1">
-                                {rowPicks.map((p) => <PuanHucre key={p.runner?.no ?? p.runnerLabel} score={p.score} details={p.details} />)}
+                                {rowPicks.map((p) => <PuanHucre key={p.runner?.no ?? p.runnerLabel} score={p.score} details={p.details} scoreExact={p.scoreExact} />)}
                               </span>
                             </td>
                           </tr>
@@ -418,7 +422,7 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
                               )}
                             >
                               <span className="inline-flex items-center gap-0.5">
-                                {rowPicks.map((p) => <PuanHucre key={p.runner?.no ?? p.runnerLabel} score={p.score} details={p.details} />)}
+                                {rowPicks.map((p) => <PuanHucre key={p.runner?.no ?? p.runnerLabel} score={p.score} details={p.details} scoreExact={p.scoreExact} />)}
                               </span>
                             </td>
                           </>
