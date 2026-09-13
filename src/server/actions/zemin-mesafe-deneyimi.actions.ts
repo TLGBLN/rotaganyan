@@ -17,13 +17,20 @@
  * TjkDereceKaydi'de tjkAtId YOK, yalnız atAdi (isim) var — zeminToleransi/sireOrani/
  * yuzeyDegisikligi ile AYNI isim-eşleştirme risk profili (kabul edilebilir).
  *
- * HENÜZ CANLI SKORA EKLENMEDİ — yalnız V6 Aşama 3 (challenger) altyapısıyla gölge-test
- * edilecek (bkz. v6-challenger-registry.ts, "v6-zemin-mesafe-deneyimi"). Bu oturumun temel
- * disiplini: n≥250-300 sonuçlanmış gölge-koşu birikip B=500 ile gerçek katkısı kanıtlanmadan
- * A/B katmanına ASLA eklenmeyecek.
+ * 2026-09-12 (V5.46) GÜNCELLEME — yukarıdaki "henüz canlı skora eklenmedi" paragrafı ARTIK
+ * YANLIŞ, burada bırakılmıştı (2026-09-13'te bu oturumda fark edildi): sinyal kullanıcı
+ * kararıyla (sireOrani/zeminToleransi ile AYNI türden, "önce backtest" kuralının bilinçli
+ * istisnası) DERHAL canlıya alınmış, SONRA V5.46'da arac-model-veri-olustur.mts'teki bir
+ * eğitim-verisi eksikliği düzeltilip GERÇEK B=500 bootstrap testiyle doğrulanmıştı (bkz.
+ * engine-versions.data.ts, V5.46 açıklaması: "diğer"de top3 +0.53pp, düşük-şart'ta +0.59pp,
+ * top1'de kayıp yok). Yani sinyal HEM canlı HEM kanıtlanmış — yalnız bu dosyanın kendi
+ * yorumu güncellenmemişti.
  */
 import { db } from "@/lib/db";
-import { zeminKatsayisi } from "@/lib/methodology/mekanik-puanlama";
+import { zeminKatsayisi, zeminDetayiSatirdanCikar } from "@/lib/methodology/mekanik-puanlama";
+import { hizSurfaceFromRaw } from "@/lib/methodology/hiz-derecesi-hesapla";
+import { surfaceToPist } from "@/lib/sire-stat-match";
+import { parseTjkDate } from "@/lib/tjk-date";
 
 function dereceyeSaniye(t: string | null): number | null {
   if (!t) return null;
@@ -74,6 +81,64 @@ const MIN_EGIM_ORNEKLEM = 30;
 
 export type ZeminMesafeDeneyimi = { deger: number; seviye: "tam" | "kismi" | "yok"; ornekSayisi: number };
 
+// 2026-09-13 kullanıcı bulgusu (İstanbul K9, SENSEİ BAHA) — bu at için sinyal "yok" dönüyordu,
+// kova (İstanbul/Sentetik/1.500) popülasyonu yeterliydi (108 örnek), sorun ATIN KENDİ
+// 20.05.2026 koşusunun TjkDereceKaydi'de HİÇ olmamasıydı — oysa HorseRaceHistoryCache'te
+// (ayrı bir TJK kaynağından, at profili sayfasından çekilen) doğru şekilde vardı. Kanıtlandı:
+// TjkDereceKaydi'nin kaynağı ("Detaylı Derece İstatistikleri") ülke çapında yalnız ~8700
+// kayıt/yıl döndürüyor — adaptörün kendi yorumunun iddia ettiği gibi "TÜM koşu performansları"
+// DEĞİL, TJK'nın kısıtlı/seçilmiş bir alt kümesi. Popülasyon tabanı (bucketOrt/kiloEgimi,
+// geniş çaplı kıyas gerektirir) HÂLÂ yalnız TjkDereceKaydi'den — o zaten yeterince geniş.
+// Yalnız BİREYSEL at eşleşmesi (bir atın KENDİ geçmişi) için, TjkDereceKaydi'de hiç kaydı
+// olmayan atlarda HorseRaceHistoryCache'e EK bir kaynak olarak bakılıyor — var olan bir
+// eşleşmeyi asla EZMEZ, yalnız "yok" kalacak atlara ek şans tanır.
+async function horseRaceHistoryCacheTenEkKayitlarGetir(
+  eksikAdlar: string[],
+  irk: string
+): Promise<ArsivSatiri[]> {
+  if (eksikAdlar.length === 0) return [];
+  const runnerlar = await db.runner.findMany({
+    where: { name: { in: eksikAdlar }, tjkAtId: { not: null } },
+    select: { name: true, tjkAtId: true },
+  });
+  const tjkAtIdByAd = new Map<string, number>();
+  for (const r of runnerlar) if (r.tjkAtId != null && !tjkAtIdByAd.has(r.name)) tjkAtIdByAd.set(r.name, r.tjkAtId);
+  const tjkAtIdler = [...new Set(tjkAtIdByAd.values())];
+  if (tjkAtIdler.length === 0) return [];
+
+  const cacheKayitlari = await db.horseRaceHistoryCache.findMany({
+    where: { tjkAtId: { in: tjkAtIdler } },
+    select: { tjkAtId: true, rowsJson: true },
+  });
+  const adByTjkAtId = new Map<number, string>();
+  for (const [ad, id] of tjkAtIdByAd) adByTjkAtId.set(id, ad);
+
+  const sonuc: ArsivSatiri[] = [];
+  for (const cache of cacheKayitlari) {
+    const ad = adByTjkAtId.get(cache.tjkAtId);
+    if (!ad) continue;
+    const rows = cache.rowsJson as unknown as {
+      date?: string; time?: string; surface?: string; distance?: number; weight?: string; classType?: string;
+    }[];
+    if (!Array.isArray(rows)) continue;
+    for (const row of rows) {
+      if (row.distance == null || !row.surface) continue;
+      sonuc.push({
+        atAdi: ad,
+        irk,
+        pist: surfaceToPist(hizSurfaceFromRaw(row.surface) ?? "SENTETIK"),
+        mesafe: String(row.distance),
+        pistDurumu: zeminDetayiSatirdanCikar(row.surface) ?? "Sert/Normal",
+        derece: row.time ?? null,
+        kilo: row.weight ?? null,
+        cinsAdi: row.classType ?? "",
+        tarih: row.date ? parseTjkDate(row.date) : null,
+      });
+    }
+  }
+  return sonuc;
+}
+
 /**
  * Verilen atların, bugünkü (bugunPist, bugunZeminKatsayi, bugunMesafe) kombinasyonuna göre
  * kademeli deneyim skorunu döner. bugunZeminKatsayi null ise (bugünün zemini TJK'dan henüz
@@ -84,7 +149,12 @@ export async function hesaplaZeminMesafeDeneyimiMap(
   cutoffTarihi: Date,
   bugunPist: string,
   bugunZeminKatsayi: number | null,
-  bugunMesafe: number
+  bugunMesafe: number,
+  // 2026-09-13 kullanıcı bulgusu — TjkDereceKaydi'de kaydı olmayan atlarda HorseRaceHistoryCache'e
+  // ek kaynak olarak bakabilmek için atın ırkı (TjkDereceKaydi.irk ile AYNI format: "İngiliz"/"Arap")
+  // gerekiyor — HorseRaceHistoryCache satırları kendi ırkını taşımıyor. Verilmezse (eski
+  // çağıranlar) ek kaynak atlanır, davranış AYNEN eskisi gibi kalır.
+  bugunIrk?: string
 ): Promise<Map<string, ZeminMesafeDeneyimi>> {
   const notrSonuc = new Map<string, ZeminMesafeDeneyimi>(atIsimleri.map((ad) => [ad, { deger: 0, seviye: "yok" as const, ornekSayisi: 0 }]));
   if (bugunZeminKatsayi == null) return notrSonuc;
@@ -171,6 +241,33 @@ export async function hesaplaZeminMesafeDeneyimiMap(
     const arr = atPistZeminKayitlari.get(s.atAdi) ?? [];
     arr.push(s);
     atPistZeminKayitlari.set(s.atAdi, arr);
+  }
+
+  // Popülasyon tabanı (bucketOrt/kiloEgimi) BİLEREK yalnız TjkDereceKaydi'den kuruldu (yukarıda,
+  // bu satırdan ÖNCE) — geniş çaplı kıyas için yeterli örneklem zaten var. Ek kaynak yalnız
+  // TjkDereceKaydi'de HİÇ kaydı olmayan atlar için, BİREYSEL eşleşmeyi tamamlamak amacıyla
+  // devreye giriyor — mevcut bir eşleşmeyi asla ezmiyor.
+  if (bugunIrk) {
+    const eksikAdlar = atIsimleri.filter((ad) => !atPistZeminKayitlari.has(ad));
+    if (eksikAdlar.length > 0) {
+      const ekKayitlar = await horseRaceHistoryCacheTenEkKayitlarGetir(eksikAdlar, bugunIrk);
+      for (const s0 of ekKayitlar) {
+        if (s0.tarih && s0.tarih >= cutoffTarihi) continue;
+        if (s0.pist !== bugunPist) continue;
+        const zeminK = zeminKatsayisi(s0.pistDurumu).katsayi;
+        if (zeminK !== bugunZeminKatsayi) continue;
+        const s: Zenginlestirilmis = {
+          ...s0,
+          zeminKatsayi: zeminK,
+          metre: (() => { try { return mesafeyeMetre(s0.mesafe); } catch { return null; } })(),
+          saniye: dereceyeSaniye(s0.derece),
+          kiloSayi: parseKilo(s0.kilo),
+        };
+        const arr = atPistZeminKayitlari.get(s.atAdi) ?? [];
+        arr.push(s);
+        atPistZeminKayitlari.set(s.atAdi, arr);
+      }
+    }
   }
 
   for (const ad of atIsimleri) {

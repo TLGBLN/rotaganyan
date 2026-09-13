@@ -576,14 +576,17 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
   // 2026-08-30 kullanıcı talebi (H2H zemin-duyarlılığının hemen ardından): "o pist, zemin
   // koşul ve mesafede yarış geçmişi olan daha tecrübeli görülmeli... mesafede ilk defa
   // koşacaksa mevcut mesafelere göre analiz yapılacak" — bkz. zemin-mesafe-deneyimi.actions.ts.
-  // HENÜZ CANLI SKORA GİRMİYOR (C katmanı/gölge-test adayı, bkz. plan) — yalnız muhakeme
-  // metninde şeffaflık için hesaplanıyor, aynı bugunZeminKatsayi burada tekrar kullanılıyor.
+  // V5.46'dan beri CANLI skora giriyor (bKatmaniUygula, softmax öncesi, B=500 ile doğrulandı —
+  // bkz. engine-versions.data.ts). Üstteki yorum ("henüz canlı skora girmiyor") artık YANLIŞ,
+  // bu oturumda düzeltildi. bugunIrk (2026-09-13 eklendi): TjkDereceKaydi'de kaydı olmayan
+  // atlar için HorseRaceHistoryCache'e ek kaynak olarak bakabilmesi için gerekiyor.
   const zeminMesafeDeneyimByAd = await hesaplaZeminMesafeDeneyimiMap(
     runners.map((r) => r.name),
     race.raceDay.date,
     surfaceToPist(race.surface),
     bugunZeminKatsayi,
-    race.distance
+    race.distance,
+    race.breed === "ARAP" ? "Arap" : "İngiliz"
   );
 
   const raceNameToNo = new Map(runners.map((r) => [r.name, r.no]));
