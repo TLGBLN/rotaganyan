@@ -107,6 +107,45 @@ async function fetchSayfaRetryli(yil: number, sayfaNo: number, deneme = 3): Prom
   throw sonHata;
 }
 
+/**
+ * 2026-09-13 kullanıcı bulgusu (İstanbul K9, SENSEİ BAHA) — zeminMesafeDeneyimi sinyali bu
+ * at için "yok" dönüyordu; kovanın (İstanbul/Sentetik/1.500) 108 örneği vardı, sorun kova
+ * boyutu DEĞİLDİ — atın KENDİ 20.05.2026 koşusu bu tabloda hiç yoktu (halbuki
+ * HorseRaceHistoryCache'te vardı, yani TJK'dan çekilebiliyor). Kök neden: yukarıdaki
+ * "~%26 sayfa hatası" notu — başarısız sayfalar SAYILIYOR ama hangi sayfa olduğu hiç
+ * kaydedilmiyordu, bu yüzden bir sonraki (aynı biçimdeki) senkron da AYNI sayfalarda
+ * şansa bağlı olarak tekrar başarısız olabiliyordu. Artık başarısız sayfa NUMARALARI
+ * tutuluyor ve ana geçişten SONRA, kısa bir bekleme ile 2 kez daha YALNIZ o sayfalar
+ * tekrar deneniyor — idempotent upsert olduğu için zararsız, yalnızca boşluğu daraltır.
+ */
+async function basarisizSayfalariTekrarDene(
+  yil: number,
+  sayfaNolar: number[],
+  tumKayitlar: Kayit[]
+): Promise<number[]> {
+  let kalanlar = sayfaNolar;
+  for (let tur = 0; tur < 2 && kalanlar.length > 0; tur++) {
+    await bekle(2000 * (tur + 1));
+    const yeniKalanlar: number[] = [];
+    for (let i = 0; i < kalanlar.length; i += CONCURRENCY) {
+      const dilim = kalanlar.slice(i, i + CONCURRENCY);
+      const sonuclar = await Promise.all(
+        dilim.map(async (sayfaNo) => {
+          try {
+            return await fetchSayfaRetryli(yil, sayfaNo);
+          } catch {
+            yeniKalanlar.push(sayfaNo);
+            return [] as Kayit[];
+          }
+        })
+      );
+      for (const s of sonuclar) tumKayitlar.push(...s);
+    }
+    kalanlar = yeniKalanlar;
+  }
+  return kalanlar;
+}
+
 /** Verilen yıl için TÜM sayfaları çekip TjkDereceKaydi'ne upsert eder. */
 export async function syncDereceIstatistikleri(yil: number): Promise<DereceIstSyncSonuc> {
   const ilkSayfa = await fetchSayfaRetryli(yil, 1);
@@ -116,20 +155,23 @@ export async function syncDereceIstatistikleri(yil: number): Promise<DereceIstSy
   const toplamSayfa = Math.max(1, Math.ceil(toplamSonuc / SAYFA_BOYU));
 
   const tumKayitlar: Kayit[] = [...ilkSayfa];
-  let hataSayfaSayisi = 0;
+  const basarisizSayfaNolar: number[] = [];
 
   for (let i = 2; i <= toplamSayfa; i += CONCURRENCY) {
     const dilim = Array.from({ length: Math.min(CONCURRENCY, toplamSayfa - i + 1) }, (_, j) => i + j);
     const sonuclar = await Promise.all(
       dilim.map((sayfaNo) =>
         fetchSayfaRetryli(yil, sayfaNo).catch(() => {
-          hataSayfaSayisi++;
+          basarisizSayfaNolar.push(sayfaNo);
           return [] as Kayit[];
         })
       )
     );
     for (const s of sonuclar) tumKayitlar.push(...s);
   }
+
+  const halaBasarisiz = await basarisizSayfalariTekrarDene(yil, basarisizSayfaNolar, tumKayitlar);
+  const hataSayfaSayisi = halaBasarisiz.length;
 
   const BATCH = 500;
   for (let i = 0; i < tumKayitlar.length; i += BATCH) {
