@@ -31,9 +31,6 @@ const TEMPO_LABEL: Record<string, string> = {
   COK_YUKSEK: "Çok Hızlı",
   DAGILMA_RISKI: "Çok Hızlı",
 };
-// Prediction.confidence (koşu-bazlı, at-bazlı DEĞİL) — CouponBox.tsx'teki AYNI
-// etiket eşlemesinin küçük bir kopyası (o dosyaya export eklemek yerine).
-const GUVEN_LABEL: Record<string, string> = { DUSUK: "Düşük", ORTA: "Orta", YUKSEK: "Yüksek" };
 
 function hasAnalysis(r: Race): boolean {
   return !!r.prediction?.published && (r.prediction.picks?.length ?? 0) > 0;
@@ -117,18 +114,6 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
             </div>
 
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-              {fark != null && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wide opacity-60">Piyasa Farkı</div>
-                  <div className={cn("font-bold", fark >= 0 ? "text-hit" : "text-miss")}>{fark >= 0 ? "+" : ""}{fark.toFixed(1)} puan</div>
-                </div>
-              )}
-              {race.prediction?.confidence && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wide opacity-60">Banko Güveni</div>
-                  <div className="font-bold">{GUVEN_LABEL[race.prediction.confidence] ?? race.prediction.confidence}</div>
-                </div>
-              )}
               {tempo && TEMPO_LABEL[tempo] && (
                 <div>
                   <div className="text-[10px] uppercase tracking-wide opacity-60">Yarış Gidişatı</div>
