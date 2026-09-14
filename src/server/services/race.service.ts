@@ -68,7 +68,9 @@ export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
                 isTarget: true;
                 runnerLabel: true;
                 details: true;
-                runner: { select: { name: true; no: true; jockeyChanged: true; previousJockey: true; scratched: true; ekuriGroup: true } };
+                // jockey/trainer (2026-09-14 eklendi) — bkz. feedback_mutfagi_acma_ilkesi:
+                // bunlar TJK'nın zaten kamuya açık ham verisi, modelin iç mantığını ifşa etmez.
+                runner: { select: { name: true; no: true; jockey: true; trainer: true; jockeyChanged: true; previousJockey: true; scratched: true; ekuriGroup: true } };
               };
             };
           };
@@ -80,7 +82,9 @@ export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
         // taşımıyor, tüm sahayla KIYASLANMASI gerekiyor).
         // raceStyle (2026-09-14 eklendi): Yarış Gidişatı rozeti için — hesaplaRaceTempoSenaryosu
         // ile aynı desen (bkz. getProgramData), yalnız bu sayfanın sayfasında (page.tsx) çağrılır.
-        runners: { where: { scratched: false }; select: { no: true; agf: true; raceStyle: true } };
+        // recentForm/recentFormSurfaces (2026-09-14 eklendi): Son 5 Yarış rozeti — TJK'nın
+        // kamuya açık geçmiş sonuç verisi, bkz. feedback_mutfagi_acma_ilkesi.
+        runners: { where: { scratched: false }; select: { no: true; agf: true; raceStyle: true; recentForm: true; recentFormSurfaces: true } };
       };
     };
   };
@@ -160,13 +164,13 @@ export async function getRaceDaysByDate(
                   isTarget: true,
                   runnerLabel: true,
                   details: true,
-                  runner: { select: { name: true, no: true, jockeyChanged: true, previousJockey: true, scratched: true, ekuriGroup: true } },
+                  runner: { select: { name: true, no: true, jockey: true, trainer: true, jockeyChanged: true, previousJockey: true, scratched: true, ekuriGroup: true } },
                 },
               },
             },
           },
           result: { select: { hitTop1: true, hitInCoupon: true, ganyan: true, winnerNo: true, winnerNos: true, actualOrder: true } },
-          runners: { where: { scratched: false }, select: { no: true, agf: true, raceStyle: true } },
+          runners: { where: { scratched: false }, select: { no: true, agf: true, raceStyle: true, recentForm: true, recentFormSurfaces: true } },
         },
         orderBy: { raceNo: "asc" },
       },

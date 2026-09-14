@@ -54,6 +54,7 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
   const race = raceDay.races.find((r) => r.raceNo === activeRaceNo) ?? analyzed[0];
   const picks = race.prediction?.picks ?? [];
   const agfByNo = new Map(race.runners.map((r) => [r.no, r.agf]));
+  const formByNo = new Map(race.runners.map((r) => [r.no, { recentForm: r.recentForm, recentFormSurfaces: r.recentFormSurfaces }]));
   const topPick = siraliPickler(picks)[0];
   const topModel = topPick ? topPick.scoreExact ?? topPick.score : null;
   const topAgf = topPick?.runner?.no != null ? agfByNo.get(topPick.runner.no) ?? null : null;
@@ -141,7 +142,7 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
-        <SiralamaListesi race={race} agfByNo={agfByNo} />
+        <SiralamaListesi race={race} agfByNo={agfByNo} formByNo={formByNo} />
 
         <div className="space-y-4 lg:sticky lg:top-4">
           {kupon ? (

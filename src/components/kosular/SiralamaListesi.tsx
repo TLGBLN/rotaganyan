@@ -42,7 +42,54 @@ function rankColor(rank: number): string {
   return "text-muted-foreground";
 }
 
-export default function SiralamaListesi({ race, agfByNo }: { race: Race; agfByNo: Map<number, number | null> }) {
+// 2026-09-14 — "Son 5 Yarış" rozetleri: ProgramView.tsx'teki formBoxClass/formBoxClassByPos
+// ile AYNI kaynaktan (TJK pist renkleri, bkz. proje hafızası) — o dosyanın büyüklüğü
+// yüzünden (SURFACE_TAB_BG'de olduğu gibi) burada da küçük bir kopya olarak tutuluyor.
+// Bu veri TJK'nın kamuya açık geçmiş sonuçları — modelin iç mantığını ifşa etmiyor
+// (bkz. feedback_mutfagi_acma_ilkesi), bu yüzden herkese açık gösterilebilir.
+function formBoxClassByPos(pos: string): string {
+  if (pos === "1") return "bg-[#27ae60] text-white";
+  if (pos === "2") return "bg-[#2980b9] text-white";
+  if (pos === "3") return "bg-[#f39c12] text-white";
+  if (pos === "0") return "bg-[#7f8c8d] text-white";
+  const n = parseInt(pos, 10);
+  if (n >= 4 && n <= 6) return "bg-[#e74c3c] text-white";
+  return "bg-[#922b21] text-white";
+}
+function formBoxClass(pos: string, surface: string): string {
+  if (pos === "K") return "bg-[#7f8c8d] text-white";
+  if (surface === "C") return "bg-[#009900] text-white";
+  if (surface === "S") return "bg-[#D39B1E] text-white";
+  if (surface === "K") return "bg-[#996633] text-white";
+  return formBoxClassByPos(pos);
+}
+
+type FormInfo = { recentForm: string | null; recentFormSurfaces: string | null };
+
+function Son5Yaris({ form, adet }: { form: FormInfo | undefined; adet: number }) {
+  const formChars = (form?.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-adet);
+  const surfaces = (form?.recentFormSurfaces ?? "").split("");
+  if (formChars.length === 0) return null;
+  return (
+    <div className="flex gap-0.5">
+      {formChars.map((c, i) => (
+        <span key={i} className={cn("inline-flex h-4 w-4 items-center justify-center rounded text-[9px] font-bold", formBoxClass(c, surfaces[i]?.trim() ?? ""))}>
+          {c}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export default function SiralamaListesi({
+  race,
+  agfByNo,
+  formByNo,
+}: {
+  race: Race;
+  agfByNo: Map<number, number | null>;
+  formByNo: Map<number, FormInfo>;
+}) {
   const picks = race.prediction?.picks ?? [];
   if (picks.length === 0) return null;
   const rows = buildRows(picks);
@@ -133,11 +180,20 @@ export default function SiralamaListesi({ race, agfByNo }: { race: Race; agfByNo
                     </span>
                   ))}
                 </div>
-                {/* <640px: AGF/Fark ayrı sütun değil, isim altında tek satır özet — bkz.
-                    yukarıdaki sütun-lejantı yorumu. */}
-                <div className="flex items-center gap-2 text-[11px] text-muted-foreground sm:hidden">
-                  {agf != null && <span>AGF %{agf.toFixed(1)}</span>}
-                  <span className={cn("font-semibold", farkRenk)}>{farkMetin !== "—" ? `Fark ${farkMetin}` : null}</span>
+                {/* Jokey/Antrenör — TJK'nın kamuya açık ham verisi, bkz. feedback_mutfagi_acma_ilkesi */}
+                {(primary.runner?.jockey || primary.runner?.trainer) && (
+                  <div className="truncate text-[11px] text-muted-foreground">
+                    {[primary.runner?.jockey, primary.runner?.trainer].filter(Boolean).join(" · ")}
+                  </div>
+                )}
+                <div className="mt-1 flex items-center gap-2">
+                  <Son5Yaris form={formByNo.get(primary.runner?.no ?? -1)} adet={5} />
+                  {/* <640px: AGF/Fark ayrı sütun değil, isim altında tek satır özet — bkz.
+                      yukarıdaki sütun-lejantı yorumu. */}
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground sm:hidden">
+                    {agf != null && <span>AGF %{agf.toFixed(1)}</span>}
+                    <span className={cn("font-semibold", farkRenk)}>{farkMetin !== "—" ? `Fark ${farkMetin}` : null}</span>
+                  </div>
                 </div>
                 {kararOku(primary.details) && (
                   <div className="hidden truncate text-[11px] text-muted-foreground sm:block">{kararOku(primary.details)}</div>
