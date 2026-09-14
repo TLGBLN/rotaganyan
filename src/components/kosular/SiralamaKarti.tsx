@@ -41,11 +41,19 @@ type Props = {
   tempoByRaceId: Record<string, TempoSenaryosu | null>;
   kuponlar: Kupon[];
   isAdmin: boolean;
+  /** 2026-09-14 — /program'daki "Rotaganyan Sıralaması" butonundan derin bağlantı:
+   *  bu koşu bu raceDay'de gerçekten analiz edilmişse başlangıç sekmesi bu olur,
+   *  aksi halde (undefined veya eşleşmiyorsa) eski davranışa (ilk analiz edilen koşu) düşer. */
+  initialRaceNo?: number;
 };
 
-export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmin }: Props) {
+export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmin, initialRaceNo }: Props) {
   const analyzed = raceDay.races.filter(hasAnalysis);
-  const [activeRaceNo, setActiveRaceNo] = useState<number>(analyzed[0]?.raceNo ?? raceDay.races[0]?.raceNo ?? 1);
+  const baslangicRaceNo =
+    initialRaceNo != null && analyzed.some((r) => r.raceNo === initialRaceNo)
+      ? initialRaceNo
+      : analyzed[0]?.raceNo ?? raceDay.races[0]?.raceNo ?? 1;
+  const [activeRaceNo, setActiveRaceNo] = useState<number>(baslangicRaceNo);
   if (analyzed.length === 0) return null;
 
   const race = raceDay.races.find((r) => r.raceNo === activeRaceNo) ?? analyzed[0];

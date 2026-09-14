@@ -12,7 +12,10 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 
 export const revalidate = 0;
 
-type PageProps = { searchParams: Promise<{ tarih?: string }> };
+// hipodrom/kosu (2026-09-14 eklendi): /program'daki "Rotaganyan Sıralaması" butonundan
+// derin bağlantı (deep link) için — ikisi de opsiyonel, verilmezse eski davranış
+// (tüm accordion kapalı, her SiralamaKarti kendi ilk analiz edilen koşusunu seçer) aynen korunur.
+type PageProps = { searchParams: Promise<{ tarih?: string; hipodrom?: string; kosu?: string }> };
 
 // v6.50 — kullanıcı talebi 2026-08-03: yeni V2 motorunda Faz3 (sayısal puanlama)
 // kullanılmayacağı için (bkz. [[project_v2_manuel_siralama]]) "Puan Tablosu" adı artık
@@ -68,6 +71,11 @@ export default async function RotaganyanSiralamasiPage({ searchParams }: PagePro
     }
   }
 
+  const derinBaglantiRaceDay = params.hipodrom
+    ? visibleRaceDays.find((rd) => rd.hippodrome.slug === params.hipodrom)
+    : undefined;
+  const derinBaglantiKosu = params.kosu ? parseInt(params.kosu, 10) : undefined;
+
   return (
     <div className="mx-auto max-w-[1400px] px-3 py-4 space-y-4">
       <div className="flex items-center justify-between">
@@ -85,14 +93,20 @@ export default async function RotaganyanSiralamasiPage({ searchParams }: PagePro
         // Diyarbakır/Karma vb.) bir başlık, tıklanınca içeriği aşağı doğru açılıyor. Kullanıcı
         // talebiyle: ilk açılışta HEPSİ kapalı gelsin (defaultValue YOK) — hangisine
         // tıklanırsa yalnız o açılır.
-        <Accordion type="single" collapsible className="space-y-2">
+        <Accordion type="single" collapsible className="space-y-2" defaultValue={derinBaglantiRaceDay?.id}>
           {visibleRaceDays.map((rd) => (
             <AccordionItem key={rd.id} value={rd.id} className="rounded-xl border px-3 sm:px-4">
               <AccordionTrigger className="text-sm sm:text-base font-semibold hover:no-underline">
                 {rd.hippodrome.name}
               </AccordionTrigger>
               <AccordionContent>
-                <SiralamaKarti raceDay={rd} tempoByRaceId={tempoByRaceId} kuponlar={kuponlar} isAdmin={isAdmin} />
+                <SiralamaKarti
+                  raceDay={rd}
+                  tempoByRaceId={tempoByRaceId}
+                  kuponlar={kuponlar}
+                  isAdmin={isAdmin}
+                  initialRaceNo={rd.id === derinBaglantiRaceDay?.id ? derinBaglantiKosu : undefined}
+                />
               </AccordionContent>
             </AccordionItem>
           ))}
