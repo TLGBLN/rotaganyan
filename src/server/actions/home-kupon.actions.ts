@@ -205,19 +205,20 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
 }
 
 // 2026-08-14 — kullanıcı bulgusu: İstanbul 7'li Ganyan kuponuna (slot=7) eski bir
-// akıştan kalma Ekonomik+Normal seçimler de girilmiş bulundu — yalnız Geniş olması
-// gerekiyordu (KuponForm.tsx zaten yalnız "wide" gönderiyor, ama bu yalnız İSTEMCİ
-// tarafı bir kısıt — burada, TEK yazma noktasında, sunucu tarafında da garanti altına
-// alınıyor ki hangi hipodromda olursa olsun, ileride hiçbir yoldan (elle düzenleme,
-// unutulan bir form değişikliği vb.) 7'li Ganyan'a Ekonomik/Normal giremesin).
-const YEDILI_GANYAN_SLOT = 7;
-
+// akıştan kalma Ekonomik+Normal seçimler de girilmiş bulundu — O ZAMAN yalnız Geniş
+// olması gerekiyordu, bu yüzden burada sunucu tarafında narrow/normal ZORLA siliniyordu.
+//
+// 2026-09-12 kullanıcı kararı: "7'li Ganyan da artık Ekonomik/Normal/Geniş üçünü birden
+// göstersin" — KuponForm.tsx güncellendi (widths={["wide"]} kısıtı kaldırıldı) AMA bu
+// SUNUCU tarafındaki zorla-silme unutulmuştu — admin Ekonomik/Normal'i doldurup
+// yayınlasa bile sessizce siliniyordu. 2026-09-14 kullanıcı bulgusu ("anasayfada
+// ekonomik/normal 7'li Ganyan'da hiç görünmüyor") ile yakalandı: DB'de 20 Ağustos'tan
+// bugüne kadar yayınlanan HER 7'li Ganyan kuponunda narrow/normal boştu, istisnasız —
+// bu satır kaldırıldı, artık diğer slotlarla (Altılı) AYNI şekilde davranıyor.
 export async function publishHomeKupon(input: HomeKuponInput) {
   await requireRole("EDITOR");
 
-  const yediliGanyanMi = input.slot === YEDILI_GANYAN_SLOT;
   const legs = input.legs
-    .map((l) => (yediliGanyanMi ? { ...l, narrow: [], normal: [] } : l))
     .filter((l) => l.narrow.length > 0 || l.normal.length > 0 || l.wide.length > 0)
     .map((l) => ({
       raceNo: l.raceNo,
