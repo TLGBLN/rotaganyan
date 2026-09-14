@@ -98,10 +98,8 @@ export default function SiralamaListesi({
     <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
       {/* 2026-09-14 kullanıcı bulguları: sayfanın kendi H1'i zaten "Rotaganyan Sıralama
           Tablosu" diyor (bkz. page.tsx) — bu kart AYNI başlığı tekrarlıyordu, kaldırıldı.
-          AGF/Fark sütunları da kullanıcı talebiyle kaldırıldı — yalnız Model % kalıyor. */}
-      <div className="flex items-center justify-end border-b px-4 py-2 text-[11px] text-muted-foreground">
-        <span>Model %</span>
-      </div>
+          AGF/Fark sütunları da kullanıcı talebiyle kaldırıldı. Ayrıca boş "Model %" lejant
+          şeridi de (sm+'ta zaten sütun başlığı var, mobilde gereksiz boşluktu) kaldırıldı. */}
 
       {/* 2026-09-14 kullanıcı bulgusu: jokey/antrenör ve Son 5 Yarış isim altında ALT
           ALTA duruyordu, geniş masaüstü ekranda çok boş yatay alan bırakıyordu. sm+'ta
@@ -135,7 +133,7 @@ export default function SiralamaListesi({
             <div
               key={rowIdx}
               className={cn(
-                "grid grid-cols-[24px_1fr_50px] items-center gap-2 px-4 py-2.5 sm:grid-cols-[28px_1fr_170px_140px_70px]",
+                "grid grid-cols-[24px_1fr_50px] items-center gap-2 px-3 py-1.5 sm:grid-cols-[28px_1fr_170px_140px_70px] sm:px-4 sm:py-2.5",
                 displayRank === 1 && "bg-brand/10"
               )}
             >
@@ -175,14 +173,16 @@ export default function SiralamaListesi({
                   ))}
                 </div>
                 {/* Jokey/Antrenör + Son 5 Yarış: sm+'ta kendi sütunlarına taşındığı için
-                    burada yalnız mobilde (<640px) isim altında gösteriliyor. TJK'nın kamuya
-                    açık ham verisi, bkz. feedback_mutfagi_acma_ilkesi. */}
-                {jokeyAntrenor && (
-                  <div className="truncate text-[11px] text-muted-foreground sm:hidden">{jokeyAntrenor}</div>
+                    burada yalnız mobilde (<640px) isim altında, TEK satırda (yan yana,
+                    gerekirse sarılarak) gösteriliyor — iki ayrı satır dar ekranda satırları
+                    gereksiz uzatıyordu. TJK'nın kamuya açık ham verisi, bkz.
+                    feedback_mutfagi_acma_ilkesi. */}
+                {(jokeyAntrenor || formByNo.get(primary.runner?.no ?? -1)?.recentForm) && (
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 sm:hidden">
+                    {jokeyAntrenor && <span className="truncate text-[11px] text-muted-foreground">{jokeyAntrenor}</span>}
+                    <Son5Yaris form={formByNo.get(primary.runner?.no ?? -1)} adet={5} />
+                  </div>
                 )}
-                <div className="mt-1 sm:hidden">
-                  <Son5Yaris form={formByNo.get(primary.runner?.no ?? -1)} adet={5} />
-                </div>
                 {kararOku(primary.details) && (
                   <div className="hidden truncate text-[11px] text-muted-foreground sm:block">{kararOku(primary.details)}</div>
                 )}
