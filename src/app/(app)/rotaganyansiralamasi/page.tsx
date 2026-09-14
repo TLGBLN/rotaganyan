@@ -2,10 +2,11 @@ import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { getRaceDaysByDate } from "@/server/services/race.service";
+import { getRaceDaysByDate, getKuponOnerileri, hesaplaRaceTempoSenaryosu, parseRaceStyle, type KuponOnerisi } from "@/server/services/race.service";
+import type { TempoSenaryosu } from "@/lib/methodology/pace-analizi";
 import { syncResultsForDate } from "@/server/services/result-sync";
 import { turkeyDateString } from "@/lib/tz";
-import PuanTablosu from "@/components/kosular/PuanTablosu";
+import SiralamaKarti from "@/components/kosular/SiralamaKarti";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
@@ -40,12 +41,32 @@ export default async function RotaganyanSiralamasiPage({ searchParams }: PagePro
     });
   }
 
-  const raceDays = await getRaceDaysByDate(currentDate, undefined);
-  // PuanTablosu, yayınlanmış+pick'li en az bir koşu yoksa null döner (bkz. o dosya) — accordion
-  // başlığı tıklanınca boş içerikle karşılaşılmasın diye aynı koşul burada da uygulanıyor.
+  const [raceDays, kuponlarHam] = await Promise.all([
+    getRaceDaysByDate(currentDate, undefined),
+    // 2026-09-14 — Rotaganyan Sıralama Tablosu "karar katmanı": SiralamaKarti'nin sidebar'ındaki
+    // Kupon Önerisi widget'ı için, TÜM hipodromlara paylaşılan TEK sorgu (her hipodrom için
+    // ayrı ayrı çağırmıyoruz).
+    getKuponOnerileri(),
+  ]);
+  const kuponlar = kuponlarHam.filter((k): k is NonNullable<KuponOnerisi> => k !== null);
+  // SiralamaKarti (yayınlanmış+pick'li en az bir koşu yoksa null döner, bkz. o dosya) —
+  // accordion başlığı tıklanınca boş içerikle karşılaşılmasın diye aynı koşul burada da
+  // uygulanıyor.
   const visibleRaceDays = raceDays.filter((rd) =>
     rd.races.some((r) => r.prediction?.published && (r.prediction.picks?.length ?? 0) > 0)
   );
+  // Yarış Gidişatı rozeti — getProgramData'nın AYNI deseni (hesaplaRaceTempoSenaryosu +
+  // parseRaceStyle), yalnız burada koşu-bazlı bir map olarak hazırlanıp SiralamaKarti'ye
+  // geçiriliyor (bu sayfanın sorgusu getProgramData'dan ayrı, kendi ham raceStyle'ını taşıyor).
+  const tempoByRaceId: Record<string, TempoSenaryosu | null> = {};
+  for (const rd of visibleRaceDays) {
+    for (const r of rd.races) {
+      tempoByRaceId[r.id] = hesaplaRaceTempoSenaryosu(
+        r.runners.map((ru) => ({ raceStyle: parseRaceStyle(ru.raceStyle) })),
+        r.distance
+      );
+    }
+  }
 
   return (
     <div className="mx-auto max-w-[1400px] px-3 py-4 space-y-4">
@@ -71,7 +92,7 @@ export default async function RotaganyanSiralamasiPage({ searchParams }: PagePro
                 {rd.hippodrome.name}
               </AccordionTrigger>
               <AccordionContent>
-                <PuanTablosu raceDay={rd} isLoggedIn={true} currentDate={currentDate} isAdmin={isAdmin} />
+                <SiralamaKarti raceDay={rd} tempoByRaceId={tempoByRaceId} kuponlar={kuponlar} isAdmin={isAdmin} />
               </AccordionContent>
             </AccordionItem>
           ))}

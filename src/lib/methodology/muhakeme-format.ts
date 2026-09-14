@@ -141,3 +141,12 @@ export function satirVarMi(satirlar: MuhakemeSatiri[], kod: string, opts?: { tip
 export function satirleriSay(satirlar: MuhakemeSatiri[], filtre: (s: MuhakemeSatiri) => boolean): number {
   return satirlar.filter(filtre).length;
 }
+
+// ─── Rotaganyan Sıralama Tablosu "karar katmanı" (2026-09-14) ─────────────────
+
+/** Model% − AGF% farkı (puan) — Piyasa Farkı rozetinin/Fark sütununun tek girdisi,
+ *  yeni veri gerektirmez (ikisi de zaten seçili: Pick.scoreExact/score, Runner.agf). */
+export function piyasaFarkiPuani(modelYuzde: number, agfYuzde: number | null): number | null {
+  if (agfYuzde == null) return null;
+  return Math.round((modelYuzde - agfYuzde) * 10) / 10;
+}

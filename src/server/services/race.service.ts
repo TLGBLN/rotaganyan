@@ -17,7 +17,7 @@ import { hesaplaYarisGidisati, type AtTempoProfili, type TekYarisStil, type Temp
  *  dağılım gösterilsin diye buradan istemciye taşınıyor (bkz. ProgramView.tsx raceStyleBadge).
  *  Eski (dagilim'den ÖNCE yazılmış) kayıtlarda bu alan yok — undefined döner, rozet o zaman
  *  eski tek-stil gösterimine düşer. */
-function parseRaceStyle(raw: unknown): { style: string; percent: number; veri: number | null; dagilim?: Record<string, number>; erkenHizGucu?: number | null } | null {
+export function parseRaceStyle(raw: unknown): { style: string; percent: number; veri: number | null; dagilim?: Record<string, number>; erkenHizGucu?: number | null } | null {
   const r = raw as { style?: string; percent?: number; veri?: number; dagilim?: Record<string, number>; erkenHizGucu?: number | null } | null;
   if (!r?.style || r.percent == null) return null;
   return { style: r.style, percent: r.percent, veri: r.veri ?? null, dagilim: r.dagilim, erkenHizGucu: r.erkenHizGucu ?? null };
@@ -29,7 +29,7 @@ function parseRaceStyle(raw: unknown): { style: string; percent: number; veri: n
 // public program sayfasında gösteriliyor. gecerliAtSayisi<3 ise (çok az at profili
 // varsa) güvenilmez sayılıp null dönüyor — per-horse "(n)" uyarısıyla aynı mantık.
 const TEMPO_MIN_GECERLI_AT = 3;
-function hesaplaRaceTempoSenaryosu(
+export function hesaplaRaceTempoSenaryosu(
   runners: { raceStyle: { dagilim?: Record<string, number>; erkenHizGucu?: number | null; veri: number | null } | null }[],
   distance: number
 ): TempoSenaryosu | null {
@@ -78,7 +78,9 @@ export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
         // AGF sırasını da (yalnız admin görsün) göstermek için — sıralamayı bileşen kendi
         // içinde runners listesinden hesaplıyor (pick.runner tekil kaydı kendi agf'ini
         // taşımıyor, tüm sahayla KIYASLANMASI gerekiyor).
-        runners: { where: { scratched: false }; select: { no: true; agf: true } };
+        // raceStyle (2026-09-14 eklendi): Yarış Gidişatı rozeti için — hesaplaRaceTempoSenaryosu
+        // ile aynı desen (bkz. getProgramData), yalnız bu sayfanın sayfasında (page.tsx) çağrılır.
+        runners: { where: { scratched: false }; select: { no: true; agf: true; raceStyle: true } };
       };
     };
   };
@@ -164,7 +166,7 @@ export async function getRaceDaysByDate(
             },
           },
           result: { select: { hitTop1: true, hitInCoupon: true, ganyan: true, winnerNo: true, winnerNos: true, actualOrder: true } },
-          runners: { where: { scratched: false }, select: { no: true, agf: true } },
+          runners: { where: { scratched: false }, select: { no: true, agf: true, raceStyle: true } },
         },
         orderBy: { raceNo: "asc" },
       },

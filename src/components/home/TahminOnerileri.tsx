@@ -58,7 +58,10 @@ function ShareLogo({ className }: { className?: string }) {
   );
 }
 
-function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon; ikramiye: string | null; isAdmin: boolean; cityLabel?: string }) {
+// 2026-09-14 — export edildi: Rotaganyan Sıralama Tablosu'nun (SiralamaKarti.tsx)
+// sidebar'ındaki Kupon Önerisi widget'ı bu render mantığını AYNEN yeniden kullanıyor
+// (tier sekmeleri + ayak ızgarası + tutar) — kopyalama yerine tek kaynak.
+export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon; ikramiye: string | null; isAdmin: boolean; cityLabel?: string }) {
   const t = useTranslations("home.tahminOnerileri");
   const STATUS_LABEL: Record<KuponStatus, string> = { hit: t("hit"), miss: t("miss"), pending: t("pending") };
   // 2026-09-01 kullanıcı kararı ("yatsa da 20dk kalsın") sonrası DÜZELTİLDİ: "miss"
