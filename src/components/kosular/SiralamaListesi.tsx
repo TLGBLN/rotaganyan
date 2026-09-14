@@ -103,9 +103,14 @@ export default function SiralamaListesi({
         <span>Model %</span>
       </div>
 
-      <div className="hidden sm:grid grid-cols-[28px_1fr_70px] gap-2 px-4 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+      {/* 2026-09-14 kullanıcı bulgusu: jokey/antrenör ve Son 5 Yarış isim altında ALT
+          ALTA duruyordu, geniş masaüstü ekranda çok boş yatay alan bırakıyordu. sm+'ta
+          artık kendi sütunları var (yan yana), dar mobilde eskisi gibi isim altında kalır. */}
+      <div className="hidden sm:grid grid-cols-[28px_1fr_170px_140px_70px] gap-2 px-4 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
         <span>#</span>
         <span>At</span>
+        <span>Jokey / Antrenör</span>
+        <span>Son 5 Koşu</span>
         <span className="text-center">Model</span>
       </div>
 
@@ -124,11 +129,13 @@ export default function SiralamaListesi({
           );
           const textColor = isWinner ? "text-winner" : rankColor(displayRank);
 
+          const jokeyAntrenor = [primary.runner?.jockey, primary.runner?.trainer].filter(Boolean).join(" · ");
+
           return (
             <div
               key={rowIdx}
               className={cn(
-                "grid grid-cols-[24px_1fr_50px] items-center gap-2 px-4 py-2.5 sm:grid-cols-[28px_1fr_70px]",
+                "grid grid-cols-[24px_1fr_50px] items-center gap-2 px-4 py-2.5 sm:grid-cols-[28px_1fr_170px_140px_70px]",
                 displayRank === 1 && "bg-brand/10"
               )}
             >
@@ -167,19 +174,26 @@ export default function SiralamaListesi({
                     </span>
                   ))}
                 </div>
-                {/* Jokey/Antrenör — TJK'nın kamuya açık ham verisi, bkz. feedback_mutfagi_acma_ilkesi */}
-                {(primary.runner?.jockey || primary.runner?.trainer) && (
-                  <div className="truncate text-[11px] text-muted-foreground">
-                    {[primary.runner?.jockey, primary.runner?.trainer].filter(Boolean).join(" · ")}
-                  </div>
+                {/* Jokey/Antrenör + Son 5 Yarış: sm+'ta kendi sütunlarına taşındığı için
+                    burada yalnız mobilde (<640px) isim altında gösteriliyor. TJK'nın kamuya
+                    açık ham verisi, bkz. feedback_mutfagi_acma_ilkesi. */}
+                {jokeyAntrenor && (
+                  <div className="truncate text-[11px] text-muted-foreground sm:hidden">{jokeyAntrenor}</div>
                 )}
-                <div className="mt-1">
+                <div className="mt-1 sm:hidden">
                   <Son5Yaris form={formByNo.get(primary.runner?.no ?? -1)} adet={5} />
                 </div>
                 {kararOku(primary.details) && (
                   <div className="hidden truncate text-[11px] text-muted-foreground sm:block">{kararOku(primary.details)}</div>
                 )}
               </div>
+
+              {/* sm+: Jokey/Antrenör kendi sütununda */}
+              <span className="hidden truncate text-xs text-muted-foreground sm:block">{jokeyAntrenor || "—"}</span>
+              {/* sm+: Son 5 Koşu kendi sütununda */}
+              <span className="hidden sm:block">
+                <Son5Yaris form={formByNo.get(primary.runner?.no ?? -1)} adet={5} />
+              </span>
 
               <span className="text-center text-sm font-bold tabular-nums">
                 {modelMetin != null ? `%${modelMetin}` : "—"}
