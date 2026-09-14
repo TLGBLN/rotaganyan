@@ -67,8 +67,6 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
     hipoKuponlari.find((k) => k.variants.some((v) => v.legs.some((l) => l.raceNo === activeRaceNo))) ??
     hipoKuponlari[0] ??
     null;
-  const kuponVaryant = kupon?.variants.find((v) => v.filled && v.key === "normal") ?? kupon?.variants.find((v) => v.filled);
-
   return (
     <div className="space-y-4">
       {/* Koşu sekmesi şeridi */}
@@ -138,16 +136,6 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
               )}
             </div>
 
-            {kuponVaryant && (
-              <div className="sm:text-right">
-                <div className="text-[10px] uppercase tracking-wide opacity-60">Kupon · {kuponVaryant.label}</div>
-                <div className="mt-1 flex flex-wrap gap-1 font-mono text-xs font-semibold sm:justify-end">
-                  {kuponVaryant.legs.map((l) => (
-                    <span key={l.raceNo} className="rounded bg-background/15 px-1.5 py-0.5">{l.nos.join("-")}</span>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
