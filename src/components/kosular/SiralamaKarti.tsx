@@ -92,18 +92,22 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
         ))}
       </div>
 
-      {/* Karar hero'su */}
+      {/* Karar hero'su — 2026-09-14 kullanıcı bulgusu (mobil): eskiden tek satırlık
+          flex-wrap, dar ekranda at adı/piyasa farkı/kupon bloklarını üst üste garip
+          kırıyordu. Artık <640px'te DİKEY istiflenen, kupon ayaklarının ayrı ayrı
+          "chip" olarak sarıldığı (tek uzun "/" dizesi yerine) bir düzen; sm+'ta eski
+          yatay tek satır geri geliyor. */}
       {topPick && (
-        <div className="rounded-2xl bg-gradient-to-br from-foreground to-foreground/80 px-5 py-4 text-background shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-baseline gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-lg font-extrabold text-brand-foreground">
+        <div className="rounded-2xl bg-gradient-to-br from-foreground to-foreground/80 px-4 py-4 text-background shadow-sm sm:px-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-baseline gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand text-lg font-extrabold text-brand-foreground">
                 {topPick.runner?.no ?? "—"}
               </span>
-              <div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-xl font-bold">{topPick.runner?.name ?? topPick.runnerLabel ?? "—"}</span>
-                  <span className="text-xl font-extrabold text-brand">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="truncate text-lg font-bold sm:text-xl">{topPick.runner?.name ?? topPick.runnerLabel ?? "—"}</span>
+                  <span className="text-lg font-extrabold text-brand sm:text-xl">
                     %{puanYuzdesiMetni(topPick.score, topPick.scoreExact) ?? "—"}
                   </span>
                 </div>
@@ -113,7 +117,7 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 text-sm">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
               {fark != null && (
                 <div>
                   <div className="text-[10px] uppercase tracking-wide opacity-60">Piyasa Farkı</div>
@@ -135,10 +139,12 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
             </div>
 
             {kuponVaryant && (
-              <div className="text-right">
+              <div className="sm:text-right">
                 <div className="text-[10px] uppercase tracking-wide opacity-60">Kupon · {kuponVaryant.label}</div>
-                <div className="font-mono text-sm font-semibold">
-                  {kuponVaryant.legs.map((l) => l.nos.join("-")).join(" / ")}
+                <div className="mt-1 flex flex-wrap gap-1 font-mono text-xs font-semibold sm:justify-end">
+                  {kuponVaryant.legs.map((l) => (
+                    <span key={l.raceNo} className="rounded bg-background/15 px-1.5 py-0.5">{l.nos.join("-")}</span>
+                  ))}
                 </div>
               </div>
             )}

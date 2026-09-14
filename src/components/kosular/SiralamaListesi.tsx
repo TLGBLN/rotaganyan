@@ -49,12 +49,19 @@ export default function SiralamaListesi({ race, agfByNo }: { race: Race; agfByNo
 
   return (
     <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between border-b px-4 py-3">
-        <h2 className="text-base font-bold">Rotaganyan Sıralama Tablosu</h2>
-        <span className="text-xs text-muted-foreground">Model % · AGF % · Fark</span>
+      {/* 2026-09-14 kullanıcı bulgusu: sayfanın kendi H1'i zaten "Rotaganyan Sıralama
+          Tablosu" diyor (bkz. page.tsx) — bu kart AYNI başlığı tekrarlıyordu, mobilde
+          gereksiz tekrar/yer kaybıydı. Artık yalnız sütun lejantı kalıyor. */}
+      <div className="flex items-center justify-end border-b px-4 py-2 text-[11px] text-muted-foreground">
+        <span className="hidden sm:inline">Model % · AGF % · Fark</span>
+        <span className="sm:hidden">Model · Fark</span>
       </div>
 
-      <div className="grid grid-cols-[28px_1fr_64px_64px_70px] gap-2 px-4 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+      {/* 2026-09-14 kullanıcı bulgusu (mobil): sabit 5 sütun (#/At/Model/AGF/Fark) dar
+          ekranda isim sütununu sıkıştırıp satırları çirkin kırıyordu. <640px'te AGF/Fark
+          ayrı sütun olmaktan çıkıp at adının altına tek satır özet olarak taşınıyor —
+          640px+'ta eski 5 sütunlu tablo aynen kalıyor. */}
+      <div className="hidden sm:grid grid-cols-[28px_1fr_64px_64px_70px] gap-2 px-4 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
         <span>#</span>
         <span>At</span>
         <span className="text-center">Model</span>
@@ -80,11 +87,14 @@ export default function SiralamaListesi({ race, agfByNo }: { race: Race; agfByNo
           );
           const textColor = isWinner ? "text-winner" : rankColor(displayRank);
 
+          const farkMetin = fark != null ? `${fark >= 0 ? "+" : ""}${fark.toFixed(1)}` : "—";
+          const farkRenk = fark == null ? "text-muted-foreground" : fark >= 0 ? "text-hit" : "text-miss";
+
           return (
             <div
               key={rowIdx}
               className={cn(
-                "grid grid-cols-[28px_1fr_64px_64px_70px] items-center gap-2 px-4 py-2.5",
+                "grid grid-cols-[24px_1fr_50px] items-center gap-2 px-4 py-2.5 sm:grid-cols-[28px_1fr_64px_64px_70px]",
                 displayRank === 1 && "bg-brand/10"
               )}
             >
@@ -123,24 +133,25 @@ export default function SiralamaListesi({ race, agfByNo }: { race: Race; agfByNo
                     </span>
                   ))}
                 </div>
+                {/* <640px: AGF/Fark ayrı sütun değil, isim altında tek satır özet — bkz.
+                    yukarıdaki sütun-lejantı yorumu. */}
+                <div className="flex items-center gap-2 text-[11px] text-muted-foreground sm:hidden">
+                  {agf != null && <span>AGF %{agf.toFixed(1)}</span>}
+                  <span className={cn("font-semibold", farkRenk)}>{farkMetin !== "—" ? `Fark ${farkMetin}` : null}</span>
+                </div>
                 {kararOku(primary.details) && (
-                  <div className="truncate text-[11px] text-muted-foreground">{kararOku(primary.details)}</div>
+                  <div className="hidden truncate text-[11px] text-muted-foreground sm:block">{kararOku(primary.details)}</div>
                 )}
               </div>
 
               <span className="text-center text-sm font-bold tabular-nums">
                 {modelMetin != null ? `%${modelMetin}` : "—"}
               </span>
-              <span className="text-center text-sm tabular-nums text-muted-foreground">
+              <span className="hidden text-center text-sm tabular-nums text-muted-foreground sm:inline">
                 {agf != null ? `%${agf.toFixed(1)}` : "—"}
               </span>
-              <span
-                className={cn(
-                  "text-center text-sm font-semibold tabular-nums",
-                  fark == null ? "text-muted-foreground" : fark >= 0 ? "text-hit" : "text-miss"
-                )}
-              >
-                {fark != null ? `${fark >= 0 ? "+" : ""}${fark.toFixed(1)}` : "—"}
+              <span className={cn("hidden text-center text-sm font-semibold tabular-nums sm:inline", farkRenk)}>
+                {farkMetin}
               </span>
             </div>
           );
