@@ -35,28 +35,36 @@ export type OptimizeResult = {
 // TJK'da AYNI eküri grubundaki iki at aynı ayakta birlikte seçilirse tek kombinasyon
 // birimi sayılır (ikisinden biri kazansa da aynı bilet öder) — Altılı/7'li Ganyan'da bir
 // eküriyi "sigorta" olarak ikilemek, favorinin tekil seçilmesiyle AYNI bütçeyi harcamalı,
-// iki katını DEĞİL. Eskiden bu fonksiyon her at numarasını ayrı bir kombinasyon birimi
-// sayıyordu — bir eküri çifti seçildiğinde bütçeyi gereksiz yere 2x tüketip, o bütçeyle
-// alınabilecek bağımsız bir başka atı (bu vakada gerçek kazanan MİHRA FARAH) dışarıda
-// bırakabiliyordu. Artık aynı ekuriGroup'taki atlar TEK bir "birim" olarak gruplanıyor
-// (birim olasılığı = üyelerin olasılık TOPLAMI, çünkü ikisinden biri kazanınca da tutuyor),
-// DP birim sayısı üzerinden çalışıyor, seçilen birimin TÜM üyeleri kupona yazılıyor.
+// iki katını DEĞİL.
+//
+// 2026-09-14 kullanıcı düzeltmesi ("4-7 eküriyse ikisini de işaretleme, 4'ü seçmen
+// yeterli") — bir önceki gün BURAYA "birim seçilince TÜM üyeleri kupona yaz" mantığı
+// eklenmişti, ama bu YANLIŞ katmandaydı: sitenin KENDİ hit/miss takibi zaten eküri
+// ortağı kazanınca da kuponu "tuttu" sayıyor (bkz. race.service.ts ekuriWinnerByNo/
+// buildEkuriWinnerMap, 2026-08-02) — yani TEK üyeyi işaretlemek ZATEN "ikisinden biri
+// kazansa tutar" korumasını veriyor. İkisini birden yazmak (önceki davranış) hem
+// gereksizdi (aynı korumayı tek atla da alıyorduk) hem de kuponu okurken "2 at yazılmış"
+// izlenimi verip tutar/kombinasyon sayısını gerçekte olduğundan yüksek gösteriyordu.
+// Artık birim TEK numara taşıyor (grubun en yüksek bireysel olasılıklı üyesi) — olasılık
+// hâlâ grubun TOPLAMI (ikisinden biri kazanınca da tuttuğu için), yalnız KAĞIDA yazılan
+// numara tek.
 type Birim = { nos: number[]; olasilik: number };
 function ekuriBirimleriOlustur(runners: LegProbability["runners"]): Birim[] {
-  const gruplu = new Map<number, number[]>();
+  const gruplu = new Map<number, { no: number; olasilik: number }[]>();
   const tekil: Birim[] = [];
   for (const r of runners) {
     if (r.ekuriGroup != null && r.ekuriGroup >= 1) {
       if (!gruplu.has(r.ekuriGroup)) gruplu.set(r.ekuriGroup, []);
-      gruplu.get(r.ekuriGroup)!.push(r.no);
+      gruplu.get(r.ekuriGroup)!.push({ no: r.no, olasilik: r.olasilik });
     } else {
       tekil.push({ nos: [r.no], olasilik: r.olasilik });
     }
   }
   const birimler: Birim[] = [...tekil];
-  const noToOlasilik = new Map(runners.map((r) => [r.no, r.olasilik]));
-  for (const nos of gruplu.values()) {
-    birimler.push({ nos, olasilik: nos.reduce((s, no) => s + (noToOlasilik.get(no) ?? 0), 0) });
+  for (const uyeler of gruplu.values()) {
+    const enGuclu = [...uyeler].sort((a, b) => b.olasilik - a.olasilik)[0];
+    const toplamOlasilik = uyeler.reduce((s, u) => s + u.olasilik, 0);
+    birimler.push({ nos: [enGuclu.no], olasilik: toplamOlasilik });
   }
   return birimler;
 }
