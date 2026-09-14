@@ -64,9 +64,11 @@ function formBoxClass(pos: string, surface: string): string {
   return formBoxClassByPos(pos);
 }
 
-type FormInfo = { recentForm: string | null; recentFormSurfaces: string | null };
+export type FormInfo = { recentForm: string | null; recentFormSurfaces: string | null };
 
-function Son5Yaris({ form, adet }: { form: FormInfo | undefined; adet: number }) {
+// export edildi: karar-hero'su (SiralamaKarti.tsx) da 1. sıradaki at için AYNI
+// rozeti kullanıyor — kopyalamak yerine tek kaynak.
+export function Son5Yaris({ form, adet }: { form: FormInfo | undefined; adet: number }) {
   const formChars = (form?.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-adet);
   const surfaces = (form?.recentFormSurfaces ?? "").split("");
   if (formChars.length === 0) return null;

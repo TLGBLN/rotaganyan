@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useTransition } from "react";
-import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -1758,18 +1757,6 @@ export default function ProgramView({
                 >
                   {tumPanellerAcikMi ? "Tüm Verileri Kapat" : "Tüm Verileri Göster"} {kilitVeyaChevron(tumPanellerAcikMi)}
                 </button>
-              )}
-              {currentRace && (
-                // 2026-09-14 kullanıcı talebi — /program'da bir koşuya bakarken tek tıkla
-                // o koşunun "karar katmanı" görünümüne (Rotaganyan Sıralama Tablosu)
-                // geçilebilsin. Mevcut buton satırındaki AYNI stil (PANEL_BTN_CLASS) —
-                // yeni bir görsel desen icat etmek yerine öğrenilmiş bir yere ekleniyor.
-                <Link
-                  href={`/rotaganyansiralamasi?tarih=${dateStr}&hipodrom=${currentDay.hippodromeSlug}&kosu=${currentRace.raceNo}`}
-                  className={cn(PANEL_BTN_CLASS, PANEL_BTN_CLOSED)}
-                >
-                  📊 Rotaganyan Sıralaması
-                </Link>
               )}
               {currentRace && (
                 <button

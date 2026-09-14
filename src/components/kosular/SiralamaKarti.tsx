@@ -7,7 +7,7 @@ import type { TempoSenaryosu } from "@/lib/methodology/pace-analizi";
 import { siraliPickler } from "@/lib/methodology/pick-display-order";
 import { puanYuzdesiMetni, piyasaFarkiPuani } from "@/lib/methodology/muhakeme-format";
 import { KuponBlock } from "@/components/home/TahminOnerileri";
-import SiralamaListesi from "./SiralamaListesi";
+import SiralamaListesi, { Son5Yaris } from "./SiralamaListesi";
 
 type Race = ProgramRaceDay["races"][number];
 type Kupon = NonNullable<KuponOnerisi>;
@@ -104,7 +104,13 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
       {topPick && (
         <div className="rounded-2xl bg-gradient-to-br from-foreground to-foreground/80 px-4 py-4 text-background shadow-sm sm:px-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-baseline gap-3">
+            <div className="flex min-w-0 items-baseline gap-2">
+              {/* 2026-09-14 kullanıcı talebi: hero'daki at, listedeki sıra rozetleriyle
+                  (1,2,3...) TUTARLI şekilde ayrıca "1." (model sırası) taşısın — bib
+                  numarasından (turuncu kutu) ayrı, ne olduğu karışmasın diye. */}
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-background/20 text-sm font-bold">
+                1.
+              </span>
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand text-lg font-extrabold text-brand-foreground">
                 {topPick.runner?.no ?? "—"}
               </span>
@@ -118,6 +124,16 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
                 {topAgf != null && (
                   <div className="text-xs opacity-75">AGF %{topAgf.toFixed(1)} — piyasa {fark != null && fark > 0 ? "henüz fiyatlamıyor" : "farklı görüyor"}</div>
                 )}
+                {/* 2026-09-14 kullanıcı talebi: hero da liste satırlarıyla AYNI jokey/
+                    antrenör + Son 5 Yarış bilgisini taşısın. */}
+                {(topPick.runner?.jockey || topPick.runner?.trainer) && (
+                  <div className="text-xs opacity-75">
+                    {[topPick.runner?.jockey, topPick.runner?.trainer].filter(Boolean).join(" · ")}
+                  </div>
+                )}
+                <div className="mt-1">
+                  <Son5Yaris form={formByNo.get(topPick.runner?.no ?? -1)} adet={5} />
+                </div>
               </div>
             </div>
 
