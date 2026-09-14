@@ -127,7 +127,7 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
-        <SiralamaListesi race={race} agfByNo={agfByNo} formByNo={formByNo} />
+        <SiralamaListesi race={race} formByNo={formByNo} />
 
         <div className="space-y-4 lg:sticky lg:top-4">
           {kupon ? (

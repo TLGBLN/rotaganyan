@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils";
 import type { ProgramRaceDay } from "@/server/services/race.service";
 import { finishPos } from "@/lib/race-result";
-import { kararOku, puanYuzdesiMetni, piyasaFarkiPuani } from "@/lib/methodology/muhakeme-format";
+import { kararOku, puanYuzdesiMetni } from "@/lib/methodology/muhakeme-format";
 import { ekuriRengi } from "@/lib/ekuri-colors";
 import { siraliPickSatirlari } from "@/lib/methodology/pick-display-order";
 
@@ -83,11 +83,9 @@ function Son5Yaris({ form, adet }: { form: FormInfo | undefined; adet: number })
 
 export default function SiralamaListesi({
   race,
-  agfByNo,
   formByNo,
 }: {
   race: Race;
-  agfByNo: Map<number, number | null>;
   formByNo: Map<number, FormInfo>;
 }) {
   const picks = race.prediction?.picks ?? [];
@@ -96,24 +94,17 @@ export default function SiralamaListesi({
 
   return (
     <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
-      {/* 2026-09-14 kullanıcı bulgusu: sayfanın kendi H1'i zaten "Rotaganyan Sıralama
-          Tablosu" diyor (bkz. page.tsx) — bu kart AYNI başlığı tekrarlıyordu, mobilde
-          gereksiz tekrar/yer kaybıydı. Artık yalnız sütun lejantı kalıyor. */}
+      {/* 2026-09-14 kullanıcı bulguları: sayfanın kendi H1'i zaten "Rotaganyan Sıralama
+          Tablosu" diyor (bkz. page.tsx) — bu kart AYNI başlığı tekrarlıyordu, kaldırıldı.
+          AGF/Fark sütunları da kullanıcı talebiyle kaldırıldı — yalnız Model % kalıyor. */}
       <div className="flex items-center justify-end border-b px-4 py-2 text-[11px] text-muted-foreground">
-        <span className="hidden sm:inline">Model % · AGF % · Fark</span>
-        <span className="sm:hidden">Model · Fark</span>
+        <span>Model %</span>
       </div>
 
-      {/* 2026-09-14 kullanıcı bulgusu (mobil): sabit 5 sütun (#/At/Model/AGF/Fark) dar
-          ekranda isim sütununu sıkıştırıp satırları çirkin kırıyordu. <640px'te AGF/Fark
-          ayrı sütun olmaktan çıkıp at adının altına tek satır özet olarak taşınıyor —
-          640px+'ta eski 5 sütunlu tablo aynen kalıyor. */}
-      <div className="hidden sm:grid grid-cols-[28px_1fr_64px_64px_70px] gap-2 px-4 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+      <div className="hidden sm:grid grid-cols-[28px_1fr_70px] gap-2 px-4 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
         <span>#</span>
         <span>At</span>
         <span className="text-center">Model</span>
-        <span className="text-center">AGF</span>
-        <span className="text-center">Fark</span>
       </div>
 
       <div className="divide-y">
@@ -126,22 +117,16 @@ export default function SiralamaListesi({
           const displayRank = rowIdx + 1;
           const primary = rowPicks[0];
           const modelMetin = puanYuzdesiMetni(primary.score, primary.scoreExact);
-          const modelSayi = primary.scoreExact ?? primary.score;
-          const agf = primary.runner?.no != null ? agfByNo.get(primary.runner.no) ?? null : null;
-          const fark = modelSayi != null ? piyasaFarkiPuani(modelSayi, agf) : null;
           const isWinner = rowPicks.some(
             (p) => p.runner?.no != null && (race.result?.winnerNos ?? []).includes(p.runner.no)
           );
           const textColor = isWinner ? "text-winner" : rankColor(displayRank);
 
-          const farkMetin = fark != null ? `${fark >= 0 ? "+" : ""}${fark.toFixed(1)}` : "—";
-          const farkRenk = fark == null ? "text-muted-foreground" : fark >= 0 ? "text-hit" : "text-miss";
-
           return (
             <div
               key={rowIdx}
               className={cn(
-                "grid grid-cols-[24px_1fr_50px] items-center gap-2 px-4 py-2.5 sm:grid-cols-[28px_1fr_64px_64px_70px]",
+                "grid grid-cols-[24px_1fr_50px] items-center gap-2 px-4 py-2.5 sm:grid-cols-[28px_1fr_70px]",
                 displayRank === 1 && "bg-brand/10"
               )}
             >
@@ -186,14 +171,8 @@ export default function SiralamaListesi({
                     {[primary.runner?.jockey, primary.runner?.trainer].filter(Boolean).join(" · ")}
                   </div>
                 )}
-                <div className="mt-1 flex items-center gap-2">
+                <div className="mt-1">
                   <Son5Yaris form={formByNo.get(primary.runner?.no ?? -1)} adet={5} />
-                  {/* <640px: AGF/Fark ayrı sütun değil, isim altında tek satır özet — bkz.
-                      yukarıdaki sütun-lejantı yorumu. */}
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground sm:hidden">
-                    {agf != null && <span>AGF %{agf.toFixed(1)}</span>}
-                    <span className={cn("font-semibold", farkRenk)}>{farkMetin !== "—" ? `Fark ${farkMetin}` : null}</span>
-                  </div>
                 </div>
                 {kararOku(primary.details) && (
                   <div className="hidden truncate text-[11px] text-muted-foreground sm:block">{kararOku(primary.details)}</div>
@@ -202,12 +181,6 @@ export default function SiralamaListesi({
 
               <span className="text-center text-sm font-bold tabular-nums">
                 {modelMetin != null ? `%${modelMetin}` : "—"}
-              </span>
-              <span className="hidden text-center text-sm tabular-nums text-muted-foreground sm:inline">
-                {agf != null ? `%${agf.toFixed(1)}` : "—"}
-              </span>
-              <span className={cn("hidden text-center text-sm font-semibold tabular-nums sm:inline", farkRenk)}>
-                {farkMetin}
               </span>
             </div>
           );
