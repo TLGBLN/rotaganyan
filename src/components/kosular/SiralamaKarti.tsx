@@ -101,8 +101,12 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
           kırıyordu. Artık <640px'te DİKEY istiflenen, kupon ayaklarının ayrı ayrı
           "chip" olarak sarıldığı (tek uzun "/" dizesi yerine) bir düzen; sm+'ta eski
           yatay tek satır geri geliyor. */}
+      {/* 2026-09-14 kullanıcı talebi: eskiden "from-foreground to-foreground/80" —
+          aynı rengin saydamlığı farklı olduğu için gözle neredeyse fark edilmiyordu.
+          Artık sitenin KENDİ marka rengine (brand, kehribar) doğru gerçek bir renk
+          geçişi var — jenerik mor/mavi gradyan değil. */}
       {topPick && (
-        <div className="rounded-2xl bg-gradient-to-br from-foreground to-foreground/80 px-4 py-4 text-background shadow-sm sm:px-5">
+        <div className="rounded-2xl bg-gradient-to-br from-foreground via-foreground to-brand/25 px-4 py-4 text-background shadow-sm sm:px-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-baseline gap-2">
               {/* 2026-09-14 kullanıcı talebi: hero'daki at, listedeki sıra rozetleriyle
