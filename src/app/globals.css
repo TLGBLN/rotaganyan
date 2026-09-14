@@ -42,16 +42,12 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  /* 2026-09-01 kullanıcı talebi — "Helvetica" ailesi Google Fonts'ta/lisanssız
-     bulunmuyor (Monotype'a ait, ücretli). En yakın ücretsiz/yasal karşılık: gerçek
-     Helvetica Neue'yi Mac/iOS'ta İSMEN çağırmak (bu platformlarda önceden yüklü),
-     diğer platformlarda metrik-uyumlu Arial'e düşmek. "Rounded" için Safari'nin
-     standart ui-rounded jenerik ailesi kullanılıyor (Apple cihazlarda GERÇEK
-     yuvarlatılmış San Francisco Rounded'ı verir) — desteklemeyen tarayıcılarda
-     sessizce bir sonraki fontuna düşer. Işık ağırlık notu: Windows'ta kurulu Arial'in
-     gerçek bir "Light" kesimi yok, font-weight:300 ince değil yalnız normal görünür.  */
-  --font-heading-rounded: ui-rounded, "Helvetica Neue", Arial, sans-serif;
-  --font-body-light: "Helvetica Neue", Arial, sans-serif;
+  /* 2026-09-01 kullanıcı talebi: başlıklar Helvetica Rounded, ince açıklamalar
+     Helvetica Light olsun diye bu iki değişken ayrı tanımlanmıştı. 2026-09-14
+     kullanıcı talebiyle GERİ ALINDI — "tüm site tek yazı karakteri (Geist) kullansın"
+     — artık ikisi de --font-sans'a işaret ediyor, siteye tutarlı TEK bir font. */
+  --font-heading-rounded: var(--font-sans);
+  --font-body-light: var(--font-sans);
 }
 
 /*
