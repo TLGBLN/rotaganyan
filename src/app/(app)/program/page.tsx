@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { after } from "next/server";
 import { db } from "@/lib/db";
 import { getProgramData, getKuponOnerileri, getHitPredictions, getGecmisKazananKuponlar, getJockeyStats, getTrainerStats, type JockeyStat, type TrainerStat } from "@/server/services/race.service";
@@ -65,9 +66,16 @@ async function ProofSection() {
       {/* 2026-09-15 kullanıcı talebi: Kuponlar ÖNCE, Bankolar ALTINDA (eskiden tersiydi). */}
       {kazananKuponlar.length > 0 && (
         <section className="border-t pt-8" data-tour="isabet-kuponlar">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-hit" />
-            <h2 className="text-base font-semibold"><ProgramPageLabel k="kuponlarBaslik" /></h2>
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-hit" />
+              <h2 className="text-base font-semibold"><ProgramPageLabel k="kuponlarBaslik" /></h2>
+            </div>
+            {/* 2026-09-15 kullanıcı talebi: üye olmayan bir ziyaretçi merak ederse
+                diye, tüm zamanların tutan kuponlarını gösteren public sayfaya link. */}
+            <Link href="/tutan-kuponlar" className="shrink-0 text-xs font-semibold text-brand hover:underline">
+              <ProgramPageLabel k="tumunuGor" /> →
+            </Link>
           </div>
           <KazananKuponlarCarousel items={kazananKuponlar} />
         </section>

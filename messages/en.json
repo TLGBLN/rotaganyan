@@ -251,7 +251,8 @@
   "programPage": {
     "title": "Race Program",
     "bankolarBaslik": "Winning Banko Picks",
-    "kuponlarBaslik": "Winning Coupons"
+    "kuponlarBaslik": "Winning Coupons",
+    "tumunuGor": "View All"
   },
   "programToolbar": {
     "agfTrend": "Odds Trend",
