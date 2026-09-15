@@ -19,7 +19,7 @@ import PerformanceBreakdown from "@/components/admin/PerformanceBreakdown";
 import CouponTierChart from "@/components/admin/CouponTierChart";
 import PerformansDenetimiPanel from "@/components/admin/PerformansDenetimiPanel";
 import SinyalKutuguPanel from "@/components/admin/SinyalKutuguPanel";
-import AylikKuponKazanciCard from "@/components/admin/AylikKuponKazanciCard";
+import AylikKuponKazanciCard from "@/components/home/AylikKuponKazanciCard";
 import type { CouponTierBreakdown } from "@/server/services/admin.service";
 import NarrativeSummary from "@/components/admin/NarrativeSummary";
 import AgfEdgeCard from "@/components/admin/AgfEdgeCard";

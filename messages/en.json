@@ -126,6 +126,7 @@
       "sifre": "Password",
       "hataliGiris": "Incorrect email or password.",
       "girisYap": "Log In",
+      "beniHatirla": "Remember me",
       "sifremiUnuttum": "Forgot Password"
     },
     "kayit": {
