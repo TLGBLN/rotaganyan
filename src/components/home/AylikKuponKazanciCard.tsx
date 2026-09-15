@@ -4,6 +4,11 @@ function tlFormat(n: number): string {
   return n.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " ₺";
 }
 
+// 2026-09-15 kullanıcı talebi: bu kart admin panelinden public /program sayfasına
+// (giriş yapmamış ziyaretçiler için, İsabet Sağlayan Bankolar'ın ÜSTÜNE) taşındı —
+// saf gösterim bileşeni olduğu (admin'e özel hiçbir aksiyon/veri taşımıyor) için
+// src/components/admin/'den src/components/home/'a alındı, admin/page.tsx da
+// buradan import ediyor.
 export default function AylikKuponKazanciCard({ aylar }: { aylar: AylikKuponKazanci[] }) {
   const genelToplam = aylar.reduce((s, a) => s + a.toplam, 0);
   const eksikVar = aylar.some((a) => a.eksikIkramiyeliSayisi > 0);

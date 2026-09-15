@@ -20,6 +20,8 @@ import HitsCarousel from "@/components/home/HitsCarousel";
 import KazananKuponlarCarousel from "@/components/home/KazananKuponlarCarousel";
 import NewsTicker from "@/components/home/NewsTicker";
 import ProgramPageLabel from "@/components/program/ProgramPageLabel";
+import AylikKuponKazanciCard from "@/components/home/AylikKuponKazanciCard";
+import { getAylikKuponKazanci } from "@/server/services/race.service";
 
 export const revalidate = 0;
 
@@ -37,6 +39,20 @@ async function TickerSection() {
   const tickerItems = await fetchTjkTicker().catch(() => []);
   if (tickerItems.length === 0) return null;
   return <NewsTicker items={tickerItems} />;
+}
+
+// 2026-09-15 kullanıcı talebi: "Aylık Kupon Kazancı" (eskiden yalnız admin panelinde)
+// artık giriş yapmamış ziyaretçilere de gösteriliyor — İsabet Sağlayan Bankolar'ın
+// ÜSTÜNDE. Diğer bölümler gibi kendi <Suspense> sınırında, sayfanın geri kalanını
+// bloklamıyor.
+async function AylikKazanciSection() {
+  const aylikKuponKazanci = await getAylikKuponKazanci().catch(() => []);
+  if (aylikKuponKazanci.length === 0) return null;
+  return (
+    <section className="border-t pt-8">
+      <AylikKuponKazanciCard aylar={aylikKuponKazanci} />
+    </section>
+  );
 }
 
 async function ProofSection() {
@@ -192,11 +208,17 @@ export default async function ProgramPage({ searchParams }: PageProps) {
         <TickerSection />
       </Suspense>
 
-      {/* İsabet Sağlayan Bankolar/Kuponlar — yalnız giriş yapmamış ziyaretçiler için üstte */}
+      {/* Aylık Kupon Kazancı + İsabet Sağlayan Bankolar/Kuponlar — yalnız giriş yapmamış
+          ziyaretçiler için üstte, bu sırayla (kazanç özeti önce). */}
       {!isLoggedIn && (
-        <Suspense fallback={SKELETON_ROW}>
-          <ProofSection />
-        </Suspense>
+        <>
+          <Suspense fallback={null}>
+            <AylikKazanciSection />
+          </Suspense>
+          <Suspense fallback={SKELETON_ROW}>
+            <ProofSection />
+          </Suspense>
+        </>
       )}
 
       {/* Program */}
