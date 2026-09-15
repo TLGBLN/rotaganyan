@@ -62,15 +62,7 @@ async function ProofSection() {
   ]);
   return (
     <>
-      {hitPredictions.length > 0 && (
-        <section className="border-t pt-8" data-tour="isabet-bankolar">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-hit" />
-            <h2 className="text-base font-semibold"><ProgramPageLabel k="bankolarBaslik" /></h2>
-          </div>
-          <HitsCarousel items={hitPredictions} />
-        </section>
-      )}
+      {/* 2026-09-15 kullanıcı talebi: Kuponlar ÖNCE, Bankolar ALTINDA (eskiden tersiydi). */}
       {kazananKuponlar.length > 0 && (
         <section className="border-t pt-8" data-tour="isabet-kuponlar">
           <div className="mb-4 flex items-center gap-2">
@@ -78,6 +70,15 @@ async function ProofSection() {
             <h2 className="text-base font-semibold"><ProgramPageLabel k="kuponlarBaslik" /></h2>
           </div>
           <KazananKuponlarCarousel items={kazananKuponlar} />
+        </section>
+      )}
+      {hitPredictions.length > 0 && (
+        <section className="border-t pt-8" data-tour="isabet-bankolar">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-hit" />
+            <h2 className="text-base font-semibold"><ProgramPageLabel k="bankolarBaslik" /></h2>
+          </div>
+          <HitsCarousel items={hitPredictions} />
         </section>
       )}
     </>
