@@ -251,7 +251,8 @@
   "programPage": {
     "title": "Yarış Programı",
     "bankolarBaslik": "İsabet Sağlayan Bankolar",
-    "kuponlarBaslik": "İsabet Sağlayan Kuponlar"
+    "kuponlarBaslik": "İsabet Sağlayan Kuponlar",
+    "tumunuGor": "Tümünü Gör"
   },
   "programToolbar": {
     "agfTrend": "AGF Trend",
