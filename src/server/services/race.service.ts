@@ -58,6 +58,11 @@ export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
             isBanko: true;
             couponNormal: true;
             couponWide: true;
+            // 2026-09-16 — Anormal Pist Modu v1 (bkz. anormal-pist-risk.ts): public
+            // sade rozet için ("⚠ Anormal Pist"), sayısal detay TAŞIMAZ.
+            pistAnormalMi: true;
+            pistDuyarliligi: true;
+            pistUyariMesaji: true;
             picks: {
               orderBy: { rank: "asc" };
               select: {
@@ -154,6 +159,9 @@ export async function getRaceDaysByDate(
               isBanko: true,
               couponNormal: true,
               couponWide: true,
+              pistAnormalMi: true,
+              pistDuyarliligi: true,
+              pistUyariMesaji: true,
               picks: {
                 orderBy: { rank: "asc" },
                 select: {

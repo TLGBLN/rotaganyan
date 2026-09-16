@@ -211,6 +211,10 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                                 score: p.score,
                                 scoreExact: p.scoreExact,
                               })),
+                              pistAnormalMi: effectivePred.pistAnormalMi,
+                              pistDuyarliligi: effectivePred.pistDuyarliligi,
+                              gecmisRiskSeviyesi: effectivePred.gecmisRiskSeviyesi,
+                              pistUyariMesaji: effectivePred.pistUyariMesaji,
                             }
                           : null
                       }

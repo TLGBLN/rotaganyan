@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { upsertPrediction, type PickInput } from "@/server/actions/prediction.actions";
 import type { PickDetailsV2 } from "@/lib/methodology/muhakeme-format";
 import { CURRENT_ENGINE_LABEL } from "@/lib/methodology/v5-engine-label";
+import type { AnormalPistRiskSonucu } from "@/lib/methodology/anormal-pist-risk";
 
 // 2026-08-16 — V5 motoru: V4'ün mekanik sinyal-sayımının YERİNE geçer (bkz.
 // SmartAnalysisEditor.tsx). Claude çağrısı YAPMAZ — koşullu logit (Plackett-Luce) modeli
@@ -150,6 +151,10 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
   const [manualOrder, setManualOrder] = useState<number[]>(kayitliBaslangic?.manualOrder ?? []);
   const [runners, setRunners] = useState<Runner[]>(kayitliBaslangic?.runners ?? []);
   const [bankoAdayi, setBankoAdayi] = useState<BankoAdayiSonuc | null>(kayitliBaslangic?.bankoAdayi ?? null);
+  // 2026-09-16 — Anormal Pist Modu v1 (bkz. anormal-pist-risk.ts). Yalnız CANLI analizde
+  // dolar (kayıtlı/eski kayıtlarda null) — V5.46 skoruna girmez, yalnız banko kapısını
+  // besler ve admin'e detay gösterir.
+  const [anormalPistRiski, setAnormalPistRiski] = useState<AnormalPistRiskSonucu | null>(null);
   const [kuponlar, setKuponlar] = useState<{ narrow?: string; normal?: string; wide?: string }>(kayitliBaslangic?.kuponlar ?? {});
   const [kaynak, setKaynak] = useState<"kayitli" | "canli" | null>(kayitliBaslangic ? "kayitli" : null);
   const [acikDetay, setAcikDetay] = useState<Set<number>>(new Set());
@@ -179,6 +184,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
     setManualOrder([]);
     setApplied(false);
     setBankoAdayi(null);
+    setAnormalPistRiski(null);
     setKaynak(null);
     setKategori(null);
     setMotorEtiketi(null);
@@ -198,6 +204,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         atlar: V5At[];
         runners: Runner[];
         bankoAdayi: BankoAdayiSonuc;
+        anormalPistRiski?: AnormalPistRiskSonucu;
         couponNarrow?: string;
         couponNormal?: string;
         couponWide?: string;
@@ -213,6 +220,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       setManualOrder([...data.atlar].sort((a, b) => a.teknikSira - b.teknikSira).map((a) => a.no));
       setRunners(data.runners ?? []);
       setBankoAdayi(data.bankoAdayi ?? null);
+      setAnormalPistRiski(data.anormalPistRiski ?? null);
       setKuponlar({ narrow: data.couponNarrow, normal: data.couponNormal, wide: data.couponWide });
       setKategori(data.kategori ?? null);
       setMotorEtiketi(data.motorEtiketi ?? null);
@@ -309,6 +317,10 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         // güvenli.
         isBanko: bankoAdayi?.bankoAdayi ?? false,
         bankoNote: bankoAdayi?.sebep,
+        pistAnormalMi: anormalPistRiski?.pistAnormalMi ?? false,
+        pistDuyarliligi: anormalPistRiski?.pistDuyarliligi ?? null,
+        gecmisRiskSeviyesi: anormalPistRiski?.gecmisRiskSeviyesi ?? null,
+        pistUyariMesaji: anormalPistRiski?.operasyon.uyariMesaji || null,
         picks,
       });
       if (res.publishError) {
@@ -439,6 +451,45 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
             {bankoAdayi.bankoAdayi ? "★ BANKO ADAYI: " : "Banko adayı yok: "}
           </span>
           {bankoAdayi.sebep}
+        </div>
+      )}
+
+      {/* 2026-09-16 — Anormal Pist Modu v1 (bkz. anormal-pist-risk.ts). V5.46 skoruna
+          HİÇ girmez — yalnız admin'e RİSK detayını gösterir (public'te sade rozet olarak
+          görünür, bkz. feedback_mutfagi_acma_ilkesi). pistAnormalMi false ise (büyük
+          çoğunluk gün) hiçbir şey gösterilmez. */}
+      {anormalPistRiski?.pistAnormalMi && (
+        <div
+          className={cn(
+            "space-y-2 rounded-lg border px-3 py-2.5 text-xs",
+            anormalPistRiski.pistDuyarliligi === "COK_HASSAS" || anormalPistRiski.gecmisRiskSeviyesi === "YETERSIZ"
+              ? "border-miss/40 bg-miss/10"
+              : "border-amber-500/40 bg-amber-500/10"
+          )}
+        >
+          <div>
+            <span className="font-semibold">⚠ Anormal Pist ({anormalPistRiski.pistRejimi}): </span>
+            Pist Duyarlılığı <strong>{anormalPistRiski.pistDuyarliligi}</strong> · Geçmiş Riski{" "}
+            <strong>{anormalPistRiski.gecmisRiskSeviyesi}</strong>
+            {anormalPistRiski.operasyon.uyariMesaji && <> — {anormalPistRiski.operasyon.uyariMesaji}</>}
+          </div>
+          {anormalPistRiski.detay && (
+            <>
+              <div className="text-muted-foreground">
+                Lider {anormalPistRiski.detay.pistDayaniklilik.liderDegismedi ? "5 senaryoda da aynı" : "senaryoya göre DEĞİŞİYOR"} ·
+                {" "}Top3 örtüşme %{(anormalPistRiski.detay.pistDayaniklilik.top3OrtusmeOrani * 100).toFixed(0)} ·{" "}
+                Lider olasılık aralığı [%{(anormalPistRiski.detay.pistDayaniklilik.liderOlasilikAraligi[0] * 100).toFixed(1)}
+                –%{(anormalPistRiski.detay.pistDayaniklilik.liderOlasilikAraligi[1] * 100).toFixed(1)}]
+              </div>
+              <div className="text-muted-foreground">
+                Geçmiş kütlesi (P× yetersiz): %{(anormalPistRiski.detay.gecmisYeterliligi.yetersizlikKutlesi * 100).toFixed(0)} —{" "}
+                {anormalPistRiski.detay.gecmisYeterliligi.atDurumlari
+                  .slice(0, 5)
+                  .map((a) => `#${a.no}:${a.durum}`)
+                  .join(", ")}
+              </div>
+            </>
+          )}
         </div>
       )}
 

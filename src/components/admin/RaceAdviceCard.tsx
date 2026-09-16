@@ -20,6 +20,12 @@ const LEVEL_STYLE: Record<ClassTypeAdvice["level"], { icon: typeof ShieldCheck; 
   none: { icon: Info, badgeCls: "bg-muted text-muted-foreground", textCls: "text-muted-foreground", barCls: "bg-muted-foreground", label: "Veri yok" },
 };
 
+// 2026-09-16 — Anormal Pist Modu v1 admin rozeti (bkz. anormal-pist-risk.ts). ÇOK_HASSAS
+// veya YETERSİZ varsa kırmızı (riskli operasyonel sonuç — banko/kupon kısıtlandı), HASSAS/
+// SINIRLI ise amber (yalnız gözlem), yoksa hiç gösterilmiyor.
+const PIST_DUYARLILIK_LABEL: Record<string, string> = { STABIL: "Stabil", HASSAS: "Hassas", COK_HASSAS: "Çok Hassas" };
+const GECMIS_RISK_LABEL: Record<string, string> = { YETERLI: "Yeterli", SINIRLI: "Sınırlı", YETERSIZ: "Yetersiz" };
+
 export type RaceAdviceCardPick = { rank: number; no: string; score: number | null; scoreExact?: number | null };
 export type RaceAdviceCardPrediction = {
   id: string;
@@ -37,6 +43,13 @@ export type RaceAdviceCardPrediction = {
   // oturumda bulunan model-sağlık bug'ıyla AYNI desen. modelTabanliKapsamOnerisi yalnız
   // bu true İSE çağrılır (bkz. çağıran taraf, kupon/page.tsx — GUNCEL_MOTOR_BASLANGIC).
   guncelMotor: boolean;
+  // 2026-09-16 — Anormal Pist Modu v1 (bkz. anormal-pist-risk.ts). Admin bu 4 alanla
+  // KATSAYI/z-score/senaryo detayını değil, yalnız NİHAİ sınıflandırmayı görür — asıl
+  // ham senaryo verisi V5AnalysisPanel'in kendi (daha ayrıntılı) rozetinde.
+  pistAnormalMi: boolean;
+  pistDuyarliligi: string | null;
+  gecmisRiskSeviyesi: string | null;
+  pistUyariMesaji: string | null;
 } | null;
 
 // 2026-09-07 kullanıcı talebi ("ben nokta atışı 3 at yeter ya da gerçekten 6 at yeter
@@ -258,6 +271,23 @@ export default function RaceAdviceCard({
           {uyarilar.length > 0 && (
             <div className="mt-2 space-y-0.5 rounded-md border border-miss/40 bg-miss/5 px-2.5 py-1.5 text-[11px] leading-snug text-miss">
               {uyarilar.map((u) => <div key={u}>{u}</div>)}
+            </div>
+          )}
+
+          {prediction?.pistAnormalMi && (
+            <div
+              className={cn(
+                "mt-2 rounded-md border px-2.5 py-1.5 text-[11px] leading-snug",
+                prediction.pistDuyarliligi === "COK_HASSAS" || prediction.gecmisRiskSeviyesi === "YETERSIZ"
+                  ? "border-miss/40 bg-miss/5 text-miss"
+                  : "border-amber-500/40 bg-amber-500/5 text-amber-600 dark:text-amber-400"
+              )}
+            >
+              <div className="font-semibold">
+                ⚠ Anormal Pist — Dayanıklılık: {(prediction.pistDuyarliligi && PIST_DUYARLILIK_LABEL[prediction.pistDuyarliligi]) ?? "—"}
+                {prediction.gecmisRiskSeviyesi && ` · Geçmiş Riski: ${GECMIS_RISK_LABEL[prediction.gecmisRiskSeviyesi] ?? prediction.gecmisRiskSeviyesi}`}
+              </div>
+              <p className="mt-0.5 opacity-90">{prediction.pistUyariMesaji || "Normal davranılıyor — model bu pist koşulundan etkilenmedi, favori adayların geçmiş verisi de yeterli."}</p>
             </div>
           )}
 

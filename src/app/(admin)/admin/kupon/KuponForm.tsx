@@ -15,9 +15,17 @@ import {
 
 type Hippodrome = { id: string; name: string; slug: string };
 type RaceRunner = { no: number; name: string; scratched: boolean; ekuriGroup: number | null; score: number | null; scoreExact: number | null; agfSirasi: number | null };
+// 2026-09-16 — Anormal Pist Modu v1 (bkz. anormal-pist-risk.ts). V5.46 skoruna hiç
+// girmez, yalnız otomatikGroupSelections'ın minUnitCounts zorlaması + amber uyarı için.
+type RaceRiskInfo = {
+  pistAnormalMi: boolean;
+  pistDuyarliligi: string | null;
+  gecmisRiskSeviyesi: string | null;
+  pistUyariMesaji: string | null;
+};
 type RaceDayData = {
   hippodromeName: string;
-  races: { raceNo: number; runners: RaceRunner[] }[];
+  races: ({ raceNo: number; runners: RaceRunner[] } & RaceRiskInfo)[];
 };
 
 type Width = "narrow" | "normal" | "wide";
@@ -78,12 +86,29 @@ function emptyGroupSelections(races: { raceNo: number }[]): GroupSelections {
 // olasılığını verecek şekilde DAĞITMAK — bkz. kupon-optimizer.ts. Bu fonksiyon her üç
 // kademe (Ekonomik/Normal/Geniş) için AYRI bir optimizasyon çalıştırıp TEK bir
 // GroupSelections'ta birleştiriyor.
+// 2026-09-16 — Anormal Pist Modu v1 (bkz. anormal-pist-risk.ts): HASSAS/ÇOK HASSAS
+// ayaklarda "tek at yazma, en az bir alternatif daha bırak" kuralı — kullanıcı kararı:
+// v1'de ikisi de aynı zorunlu minimuma (2) tabi, "natural pick count + 1" hesaplamak
+// (optimizer'ı önce kısıtsız çalıştırmayı gerektirir) ŞİMDİLİK basitleştirildi.
+const ANORMAL_PIST_ZORUNLU_MINIMUM = 2;
+
+function anormalPistZorunluMinimumHesapla(races: RaceDayData["races"]): Record<number, number> {
+  const zorunlu: Record<number, number> = {};
+  for (const race of races) {
+    if (race.pistDuyarliligi === "HASSAS" || race.pistDuyarliligi === "COK_HASSAS") {
+      zorunlu[race.raceNo] = ANORMAL_PIST_ZORUNLU_MINIMUM;
+    }
+  }
+  return zorunlu;
+}
+
 function otomatikGroupSelections(
   races: RaceDayData["races"],
   stakePerCombination: number,
   limits: Record<Width, number> = LIMITS,
   tolerances: Record<Width, number> = TOLERANCES
 ): GroupSelections {
+  const zorunluMinimum = anormalPistZorunluMinimumHesapla(races);
   const legs: LegProbability[] = races.map((race) => ({
     raceNo: race.raceNo,
     runners: race.runners
@@ -107,7 +132,17 @@ function otomatikGroupSelections(
   for (const width of WIDTHS) {
     const effectiveLimit = limits[width] * tolerances[width];
     const maxCombinations = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
-    const { secimler, birimSayilari } = optimizeKuponAllocation(legs, maxCombinations, oncekiBirimSayilari);
+    // Anormal Pist Modu: zorunlu minimum, bir önceki (ucuz) kademenin tabanıyla
+    // BİRLEŞTİRİLİR (ikisinin büyüğü) — HASSAS/ÇOK HASSAS bir ayak Ekonomik'te bile
+    // en az 2 at taşır; bütçeye sığmıyorsa optimizeKuponAllocation zaten boş
+    // (toplamKombinasyon=0) döner, o kademe otomatik boş kalır (bkz. buildKuponOnerisi
+    // hasNarrow/hasNormal/hasWide — boş kademe yayınlanmaz, ZORLA doldurulmaz).
+    const minUnitCounts: Record<number, number> = { ...oncekiBirimSayilari };
+    for (const [raceNoStr, min] of Object.entries(zorunluMinimum)) {
+      const raceNo = Number(raceNoStr);
+      minUnitCounts[raceNo] = Math.max(minUnitCounts[raceNo] ?? 1, min);
+    }
+    const { secimler, birimSayilari } = optimizeKuponAllocation(legs, maxCombinations, minUnitCounts);
     oncekiBirimSayilari = birimSayilari;
     for (const race of races) {
       sel[race.raceNo][width] = new Set(secimler[race.raceNo] ?? []);
@@ -391,6 +426,23 @@ function KuponGrup({
           ⚠ {statikAyaklariBul(races, selections).map((n) => `${n}. Koşu`).join(", ")} ayağında Ekonomik/Normal/Geniş
           AYNI atları taşıyor — bu ayak hiç genişletilmemiş. Genişletmeden bütçe ödemek, kazananın
           başka bir atta çıktığı her senaryoda TÜM kuponu düşürür (bkz. Karma/GÜL AYALI vakası).
+        </div>
+      )}
+
+      {/* 2026-09-16 — Anormal Pist Modu v1 (bkz. anormal-pist-risk.ts): V5.46 skoruna
+          hiç girmez, yalnız admin'i bilgilendirir — bu ayaklarda zorunlu minimum 2 at
+          uygulandı, bütçeye sığmıyorsa o kademe (özellikle Ekonomik) boş kalabilir. */}
+      {races.some((r) => r.pistDuyarliligi === "HASSAS" || r.pistDuyarliligi === "COK_HASSAS") && (
+        <div className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-500">
+          {races
+            .filter((r) => r.pistDuyarliligi === "HASSAS" || r.pistDuyarliligi === "COK_HASSAS")
+            .map((r) => (
+              <div key={r.raceNo}>
+                ⚠ {r.raceNo}. Koşu — Anormal Pist ({r.pistDuyarliligi}
+                {r.gecmisRiskSeviyesi && r.gecmisRiskSeviyesi !== "YETERLI" ? `, Geçmiş Riski: ${r.gecmisRiskSeviyesi}` : ""}):{" "}
+                {r.pistUyariMesaji || "bu ayakta en az 2 at zorunlu tutuldu, bütçeye sığmıyorsa kademe boş kalabilir."}
+              </div>
+            ))}
         </div>
       )}
 

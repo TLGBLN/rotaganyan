@@ -506,7 +506,21 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
   // Hata durumunda sessizce yutulur (syncAgfForRace kendi içinde try/catch'li) — bu adım
   // analizi ASLA bloke etmez, DB'deki mevcut veriyle devam eder.
   await syncAgfForRace(raceId);
+  return gatherFaz1V5Core(raceId);
+}
 
+// 2026-09-16 — Anormal Pist Modu v1 backfill'i için (bkz. anormal-pist-risk.ts,
+// arac-pist-dayanikliligi-backfill.mts): gatherFaz1V5 ile TAMAMEN AYNI, sızıntısız
+// (race.raceDay.date'e göre) hesaplama zincirini kullanır — TEK fark, üstteki canlı
+// AGF senkronizasyonu (syncAgfForRace) burada YOK. O çağrı geçmiş (sonuçlanmış) bir
+// koşu için hem gereksiz hem yanlış (bugünün TJK sayfasından o günün AGF'sini "tazelemeye"
+// çalışır) olurdu — DB'deki (o günden kalma) agf/recentForm/raceStyle gibi alanlar zaten
+// puan-anındaki halleriyle saklı, yeniden senkronize edilmemeli.
+export async function gatherFaz1V5Historical(raceId: string): Promise<Faz1SonucV5 | null> {
+  return gatherFaz1V5Core(raceId);
+}
+
+async function gatherFaz1V5Core(raceId: string): Promise<Faz1SonucV5 | null> {
   const race = await db.race.findUnique({
     where: { id: raceId },
     select: {
@@ -931,8 +945,18 @@ function effektifSkorlar(scores: number[], liderEsigi = ASIRI_GUVEN_LIDER_ESIGI)
   return scores.map((s) => s / ASIRI_GUVEN_SICAKLIGI);
 }
 
-function softmax(scores: number[], liderEsigi = ASIRI_GUVEN_LIDER_ESIGI): number[] {
+// export edildi (2026-09-16, Anormal Pist Modu): pist-dayanikliligi.ts, zeminToleransi
+// katkısını ölçekleyip shadow senaryoları AYNI kalibrasyonla (sıcaklık dahil) yeniden
+// hesaplamak için bunu çağırıyor — davranış DEĞİŞMEDİ, yalnız dışa açıldı.
+export function softmax(scores: number[], liderEsigi = ASIRI_GUVEN_LIDER_ESIGI): number[] {
   return softmaxHam(effektifSkorlar(scores, liderEsigi));
+}
+
+// export edildi (2026-09-16, Anormal Pist Modu): faz2V5Sirala'nın liderEsigi seçim
+// mantığının (handikapMi ? HANDIKAP eşiği : genel eşik) TEK kaynağı — pist-dayanikliligi.ts
+// aynı eşiği kullanmak için kendi kopyasını YAZMAK yerine bunu çağırır.
+export function liderEsigiHesapla(classType: string): number {
+  return kategoriTespit(classType) === "2" ? ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP : ASIRI_GUVEN_LIDER_ESIGI;
 }
 
 // 2026-08-29 — V6 Aşama 2: Plackett-Luce KESİN (Monte Carlo değil) top-k marjinal olasılığı.

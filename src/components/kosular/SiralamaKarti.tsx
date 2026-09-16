@@ -101,6 +101,36 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
           kırıyordu. Artık <640px'te DİKEY istiflenen, kupon ayaklarının ayrı ayrı
           "chip" olarak sarıldığı (tek uzun "/" dizesi yerine) bir düzen; sm+'ta eski
           yatay tek satır geri geliyor. */}
+      {/* 2026-09-16 — Anormal Pist Modu v1 (bkz. anormal-pist-risk.ts). SADE public
+          rozet — sayısal katsayı/z-score/multiplier YOK (bkz. feedback_mutfagi_acma_ilkesi),
+          yalnız TJK'nın kendi pist etiketi + kuponun SONUCU (genişletildi/banko yok)
+          gösteriliyor. pistAnormalMi false olan (büyük çoğunluk) günlerde hiç görünmez.
+          Kullanıcı kararı (2026-09-16): rozet TJK'nın o gün anormal pist bildirdiği HER
+          koşuda gösterilsin — Stabil çıkan (model etkilenmemiş) koşularda da şeffaflık
+          için görünsün, ama bu durumda ⚠ yerine nötr ℹ + sakinleştirici bir mesajla,
+          yanlış alarm izlenimi vermeden. */}
+      {race.prediction?.pistAnormalMi && (() => {
+        const stabilVeMesajsiz = race.prediction.pistDuyarliligi === "STABIL" && !race.prediction.pistUyariMesaji;
+        return (
+          <div
+            className={cn(
+              "rounded-xl border px-4 py-2.5 text-sm",
+              stabilVeMesajsiz
+                ? "border-muted-foreground/25 bg-muted/30 text-muted-foreground"
+                : "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            )}
+          >
+            <span className="font-semibold">
+              {stabilVeMesajsiz ? "ℹ Anormal Pist" : "⚠ Anormal Pist"}
+              {race.prediction.pistDuyarliligi && ` — Pist Dayanıklılığı: ${race.prediction.pistDuyarliligi === "COK_HASSAS" ? "Çok Hassas" : race.prediction.pistDuyarliligi === "HASSAS" ? "Hassas" : "Stabil"}`}
+            </span>
+            <div className="mt-0.5 text-xs opacity-90">
+              {race.prediction.pistUyariMesaji || "TJK bugün bu pist için normal-dışı bir koşul bildirdi — model bu durumu test etti, sıralaması etkilenmedi."}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* 2026-09-14 kullanıcı talebi: eskiden "from-foreground to-foreground/80" —
           aynı rengin saydamlığı farklı olduğu için gözle neredeyse fark edilmiyordu.
           Artık sitenin KENDİ marka rengine (brand, kehribar) doğru gerçek bir renk

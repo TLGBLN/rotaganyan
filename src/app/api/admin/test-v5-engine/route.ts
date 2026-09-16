@@ -3,6 +3,8 @@ import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
 import { gatherFaz1V5, faz2V5Sirala, muhakemeUretV5, v5BankoAdayiTespit, tumOzellikleriListele, CURRENT_ENGINE_LABEL, hibritMaidenSatisMi } from "@/lib/methodology/v5-engine";
 import { kategoriTespit } from "@/lib/methodology/v2-engine";
+import { hesaplaAnormalPistRiski } from "@/lib/methodology/anormal-pist-risk";
+import { db } from "@/lib/db";
 
 // 2026-08-16 — V5 motoru: Claude çağrısı YOK (yalnız DB okuma + koşullu logit skoru),
 // V4 ile aynı sebeple maxDuration/batching gerekmiyor — tek istekte döner.
@@ -47,7 +49,23 @@ async function handlePost(req: NextRequest) {
     tumSinyaller: tumOzellikleriListele(r),
   }));
 
-  const bankoAdayi = v5BankoAdayiTespit(sirali);
+  const bankoAdayiHam = v5BankoAdayiTespit(sirali);
+
+  // 2026-09-16 — Anormal Pist Modu v1 (bkz. anormal-pist-risk.ts): V5.46'nın kendi
+  // banko/skor mantığına HİÇ dokunmadan, yalnız pist anormalse (Çim/Kum Normal-dışı)
+  // ek bir risk değerlendirmesi. v5BankoAdayiTespit'in SONUCU, yalnız bu değerlendirme
+  // "banko verilmesin" derse EZİLİR — kendi eşiği/mantığı değişmez.
+  const raceDayIcin = await db.race.findUnique({
+    where: { id: raceId },
+    select: { raceDay: { select: { surfaceConditions: true } } },
+  });
+  const anormalPistRiski = hesaplaAnormalPistRiski(
+    faz1,
+    raceDayIcin?.raceDay.surfaceConditions as { label: string; detail: string }[] | null
+  );
+  const bankoAdayi = anormalPistRiski.operasyon.bankoIzinVer
+    ? bankoAdayiHam
+    : { bankoAdayi: false, sebep: anormalPistRiski.operasyon.uyariMesaji || bankoAdayiHam.sebep };
 
   const nolar = sirali.map((r) => r.no);
   const couponNarrow = nolar.slice(0, 3).join("-");
@@ -66,6 +84,7 @@ async function handlePost(req: NextRequest) {
     atlar,
     runners: faz1.runners.map((r) => ({ id: r.id, no: r.no, name: r.ad })),
     bankoAdayi,
+    anormalPistRiski,
     couponNarrow,
     couponNormal,
     couponWide,

@@ -50,6 +50,12 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
               picks: {
                 select: { runnerId: true, score: true, scoreExact: true },
               },
+              // 2026-09-16 — Anormal Pist Modu v1: KuponForm'un ÇOK HASSAS/HASSAS
+              // ayaklarda minUnitCounts zorlaması + amber uyarısı için.
+              pistAnormalMi: true,
+              pistDuyarliligi: true,
+              gecmisRiskSeviyesi: true,
+              pistUyariMesaji: true,
             },
           },
         },
@@ -187,6 +193,10 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
 
       return {
         raceNo: r.raceNo,
+        pistAnormalMi: r.prediction?.pistAnormalMi ?? false,
+        pistDuyarliligi: r.prediction?.pistDuyarliligi ?? null,
+        gecmisRiskSeviyesi: r.prediction?.gecmisRiskSeviyesi ?? null,
+        pistUyariMesaji: r.prediction?.pistUyariMesaji ?? null,
         runners: runners.map((runner) => {
           const karmaMeta = metaByNoById.get(r.id)?.get(runner.no);
           return {

@@ -2,6 +2,7 @@ import { faz2V5Sirala, type Faz1RunnerV5Sirali, type Faz1SonucV5 } from "./v5-en
 import { hesaplaGecmisPistleriMap } from "@/server/actions/yuzey-degisikligi.actions";
 import { ilkKezBuPisteMi } from "@/lib/yuzey-degisikligi";
 import { surfaceToPist } from "@/lib/sire-stat-match";
+import { zeminToleransiOlcekli, PIST_OLCEK_GRID } from "./pist-dayanikliligi";
 
 // 2026-08-29 — V6 Aşama 3 (bkz. plan): champion/challenger gölge-testi altyapısının
 // kayıt defteri. Her girdi, AYNI gatherFaz1V5 çıktısını (faz1) girdi alıp kendi
@@ -85,4 +86,21 @@ export const CHALLENGER_REGISTRY: ChallengerDef[] = [
     label: "Zemin+Mesafe Deneyimi (bugünkü pist+zemin+mesafede kanıtlanmış geçmiş — deneysel, kanıtlanmamış)",
     scoreFn: zeminMesafeDeneyimiScoreFn,
   },
+  // 2026-09-16 — Anormal Pist Modu v1 (bkz. src/lib/methodology/pist-dayanikliligi.ts
+  // ve anormal-pist-risk.ts): İstanbul "Çim: Çok Ağır" günündeki K1/K2 kaybı sonrası,
+  // zeminToleransi'nin anormal-pist GÜNLERİNDE production'dakinden daha güçlü/zayıf
+  // ağırlıklandırılsaydı ne olurdu sorusunu ÖLÇMEK için 5 noktalı bir ölçek taraması
+  // (0/0.5/1/1.5/2x). 1x = champion'ın birebir kopyası (v6-aa-sanity ile aynı rol,
+  // ayrıca bir sağlık kontrolü). Point-in-time bulgu (12 geçmiş anormal-çim koşusu,
+  // 3 gün) yönü doğru ama n=3 gün-kümesi istatistiksel güven için YETERSİZ — bu
+  // yüzden HENÜZ production'a ALINMIYOR, yalnız gölge-testte biriktiriliyor. Gate
+  // eşiği (≥30 koşu VE ≥6 farklı anormal gün, gün-kümeli bootstrap, ΔLogLoss) proje
+  // planında dondurulmuştur.
+  ...PIST_OLCEK_GRID.map(
+    (olcek): ChallengerDef => ({
+      key: `v6-zemin-toleransi-olcek-${olcek}x`,
+      label: `Zemin Toleransı ${olcek}× Ölçekli (Anormal Pist Modu — deneysel, kanıtlanmamış)`,
+      scoreFn: async (faz1) => zeminToleransiOlcekli(faz1, olcek),
+    })
+  ),
 ];

@@ -50,6 +50,12 @@ export type AdminRaceDay = Prisma.RaceDayGetPayload<{
             isBanko: true;
             bankoNote: true;
             createdAt: true;
+            // 2026-09-16 — Anormal Pist Modu v1: KuponForm'un ÇOK HASSAS/HASSAS ayaklarda
+            // minUnitCounts zorlaması + amber uyarısı için (bkz. anormal-pist-risk.ts).
+            pistAnormalMi: true;
+            pistDuyarliligi: true;
+            gecmisRiskSeviyesi: true;
+            pistUyariMesaji: true;
             picks: { select: { rank: true; isTarget: true; score: true; scoreExact: true; runnerLabel: true } };
           };
         };
@@ -132,6 +138,10 @@ export async function getAdminRaceDays(dateStr?: string, limit = 30): Promise<Ad
               // 2026-09-07 — kupon/page.tsx'in modelTabanliKapsamOnerisi'ni (RaceAdviceCard.tsx)
               // yalnız GÜNCEL motor dönemindeki tahminlerde çalıştırabilmesi için.
               createdAt: true,
+              pistAnormalMi: true,
+              pistDuyarliligi: true,
+              gecmisRiskSeviyesi: true,
+              pistUyariMesaji: true,
               picks: { orderBy: { rank: "asc" }, select: { rank: true, isTarget: true, score: true, scoreExact: true, runnerLabel: true } },
             },
           },

@@ -400,6 +400,14 @@ model Prediction {
   manualOverride Boolean  @default(false)
   published    Boolean    @default(false)
   publishedAt  DateTime?
+  // 2026-09-16 — Anormal Pist Modu v1 (bkz. src/lib/methodology/anormal-pist-risk.ts):
+  // V5.46 skoruna HİÇ girmez, yalnız yayın anında hesaplanıp SAKLANAN bir risk
+  // değerlendirmesi — Banko kapısını ve public rozetini besler. pistAnormalMi false
+  // (büyük çoğunluk gün) ise diğer üçü hep null.
+  pistAnormalMi      Boolean @default(false)
+  pistDuyarliligi    String? // "STABIL" | "HASSAS" | "COK_HASSAS"
+  gecmisRiskSeviyesi String? // "YETERLI" | "SINIRLI" | "YETERSIZ"
+  pistUyariMesaji    String? // public'e gösterilecek, sayısal detay İÇERMEYEN gerekçe
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 

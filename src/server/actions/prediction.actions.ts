@@ -44,6 +44,13 @@ type PredictionInput = {
   couponWide?: string;
   isBanko: boolean;
   bankoNote?: string;
+  // 2026-09-16 — Anormal Pist Modu v1 (bkz. src/lib/methodology/anormal-pist-risk.ts).
+  // Hepsi opsiyonel — V5.46 dışındaki eski çağıranlar (parse-report, analysis-importer,
+  // manuel form) bunları hiç göndermez, Prisma tarafında zaten nullable/default false.
+  pistAnormalMi?: boolean;
+  pistDuyarliligi?: string | null;
+  gecmisRiskSeviyesi?: string | null;
+  pistUyariMesaji?: string | null;
   picks: PickInput[];
 };
 
@@ -258,6 +265,10 @@ export async function upsertPrediction(input: PredictionInput) {
         couponWide: input.couponWide,
         isBanko: input.isBanko,
         bankoNote: input.bankoNote,
+        pistAnormalMi: input.pistAnormalMi ?? false,
+        pistDuyarliligi: input.pistDuyarliligi,
+        gecmisRiskSeviyesi: input.gecmisRiskSeviyesi,
+        pistUyariMesaji: input.pistUyariMesaji,
         // published/publishedAt burada YOK — aşağıda assertPublishSafe geçince ayrıca
         // set ediliyor (bkz. fonksiyonun sonu, 2026-07-26 kullanıcı talimatı: "Kaydet"
         // artık ayrı bir "Yayımla" adımı olmadan doğrudan yayınlamayı dener).
@@ -293,6 +304,10 @@ export async function upsertPrediction(input: PredictionInput) {
         couponWide: input.couponWide,
         isBanko: input.isBanko,
         bankoNote: input.bankoNote,
+        pistAnormalMi: input.pistAnormalMi ?? false,
+        pistDuyarliligi: input.pistDuyarliligi,
+        gecmisRiskSeviyesi: input.gecmisRiskSeviyesi,
+        pistUyariMesaji: input.pistUyariMesaji,
         picks: {
           create: completedPicks.map((p) => ({
             rank: p.rank,
