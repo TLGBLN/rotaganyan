@@ -16,6 +16,8 @@ import {
   hesaplaPistDayaniklilikSiniflandirmasi,
   kosununRejimi,
   kosuAnormalMi,
+  hamZeminDetayiBul,
+  surfaceRejimEtiketi,
   type ZeminRejimi,
   type SurfaceCondition,
   type PistDayaniklilikSonucu,
@@ -51,6 +53,14 @@ export type AnormalPistOperasyon = {
 export type AnormalPistRiskSonucu = {
   pistAnormalMi: boolean;
   pistRejimi: ZeminRejimi;
+  // 2026-09-16 kullanıcı talebi ("Çim ağırlaşması ≠ Kum ıslanması") — shadow veri
+  // setinde kaybolmaması için: pist türü + normalize rejim birleşik etiketi (ör.
+  // "CIM_COK_AGIR", "KUM_NEMLI") ve TJK'nın kendi ham metni (ör. "Çok Ağır 5,4").
+  // İKİSİ DE yalnız ETİKET — pistAnormalMi/pistDuyarliligi/operasyon kararına girmez,
+  // V5.47 interaction test aşamasında Çim/Kum'u (ve gerekirse alt-rejimleri) AYRI
+  // değerlendirebilmek için saklanıyor.
+  surfaceRegimeEtiketi: string;
+  hamZeminDetayi: string | null;
   pistDuyarliligi: PistDayaniklilikSonucu["siniflandirma"] | null;
   gecmisRiskSeviyesi: GecmisRiskSeviyesi | null;
   operasyon: AnormalPistOperasyon;
@@ -135,10 +145,14 @@ export function hesaplaAnormalPistRiski(
   surfaceConditions: SurfaceCondition[] | null | undefined
 ): AnormalPistRiskSonucu {
   const pistRejimi = kosununRejimi(faz1.race.surface, surfaceConditions);
+  const surfaceRegimeEtiketi = surfaceRejimEtiketi(faz1.race.surface, pistRejimi);
+  const hamZeminDetayi = hamZeminDetayiBul(faz1.race.surface, surfaceConditions);
   if (!kosuAnormalMi(pistRejimi)) {
     return {
       pistAnormalMi: false,
       pistRejimi,
+      surfaceRegimeEtiketi,
+      hamZeminDetayi,
       pistDuyarliligi: null,
       gecmisRiskSeviyesi: null,
       operasyon: NORMAL_GUNUN_OPERASYONU,
@@ -154,6 +168,8 @@ export function hesaplaAnormalPistRiski(
   return {
     pistAnormalMi: true,
     pistRejimi,
+    surfaceRegimeEtiketi,
+    hamZeminDetayi,
     pistDuyarliligi: pistDayaniklilik.siniflandirma,
     gecmisRiskSeviyesi,
     operasyon,

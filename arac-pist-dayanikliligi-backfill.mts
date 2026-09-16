@@ -55,6 +55,12 @@ async function main() {
         continue;
       }
       const sirali = faz2V5Sirala(faz1);
+      // 2026-09-16 kullanıcı talebi — shadow veri setinde hipodrom, ne zaman ihtiyaç
+      // duyulursa faz1Snapshot.race'ten yeniden parse etmek yerine ÜSTTE, düz sorgulanabilir
+      // bir alan olarak da dursun (raceDayDate'in ZATEN denormalize edildiği AYNI gerekçeyle,
+      // bkz. ChallengerRun şema notu). surfaceRegimeEtiketi/hamZeminDetayi zaten risk
+      // içinde (anormal-pist-risk.ts) geliyor.
+      const challengerOutputZengin = { ...risk, hipodrom: faz1.race.hippodromeName };
       await db.challengerRun.upsert({
         where: { raceId_challengerKey: { raceId: race.id, challengerKey: CHALLENGER_KEY } },
         create: {
@@ -62,19 +68,19 @@ async function main() {
           challengerKey: CHALLENGER_KEY,
           faz1Snapshot: faz1 as unknown as Prisma.InputJsonValue,
           championSnapshot: sirali as unknown as Prisma.InputJsonValue,
-          challengerOutput: risk as unknown as Prisma.InputJsonValue,
+          challengerOutput: challengerOutputZengin as unknown as Prisma.InputJsonValue,
           raceDayDate: gun.date,
         },
         update: {
           computedAt: new Date(),
           faz1Snapshot: faz1 as unknown as Prisma.InputJsonValue,
           championSnapshot: sirali as unknown as Prisma.InputJsonValue,
-          challengerOutput: risk as unknown as Prisma.InputJsonValue,
+          challengerOutput: challengerOutputZengin as unknown as Prisma.InputJsonValue,
         },
       });
       kaydedilen++;
       console.log(
-        `  K${race.raceNo} (${race.surface}, ${race.classType}): duyarlılık=${risk.pistDuyarliligi} · geçmişRiski=${risk.gecmisRiskSeviyesi} · banko=${risk.operasyon.bankoIzinVer ? "izinli" : "KAPALI"}`
+        `  K${race.raceNo} (${race.surface}, ${race.classType}) [${risk.surfaceRegimeEtiketi} — "${risk.hamZeminDetayi}"]: duyarlılık=${risk.pistDuyarliligi} · geçmişRiski=${risk.gecmisRiskSeviyesi} · banko=${risk.operasyon.bankoIzinVer ? "izinli" : "KAPALI"}`
       );
     }
   }

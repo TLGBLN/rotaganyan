@@ -65,6 +65,37 @@ export function kosuAnormalMi(rejim: ZeminRejimi): boolean {
   return rejim !== "NORMAL";
 }
 
+// 2026-09-16 kullanıcı talebi ("Çim ağırlaşması ≠ Kum ıslanması") — literatür (JRA
+// n=183.465 start, biyomekanik kum-sertliği çalışması) Çim'de zemin yumuşadıkça sürelerin
+// DÜZENLİ uzadığını, Kum'da ilişkinin DOĞRUSAL OLMADIĞINI (bazı ıslak/çamurlu koşullar
+// kuru "fast"tan bile hızlı olabiliyor) gösteriyor — yani "Çim-Yumuşak" ile "Kum-Nemli"yi
+// TEK bir "anormal" rejim gibi ele almak yanlış olur. Şimdilik (19 koşu/4 gün ile 5 ayrı β
+// fit etmek parametre patlaması olur) risk katmanı hâlâ TEK "anormal mı" bayrağıyla açılıyor
+// (kosuAnormalMi) — ama shadow veri setinde ham TJK etiketi ve pist-türü+rejim birleşik
+// etiketi KAYBOLMASIN diye bu iki saf, hesaplamaya girmeyen yardımcı ekleniyor. V5.47
+// interaction test aşamasına gelindiğinde (bkz. proje hafızası: project_anormal_pist_modu_v1)
+// önce Çim/Kum için AYRI β denenecek, alt-rejimlere (Yumuşak/Çok Ağır/Nemli/Islak) ayrı β
+// ancak veri gerçekten yeterli olursa.
+
+/** TJK'nın kendi ham etiketini (ör. "Çok Ağır 5,4") olduğu gibi döner — normalize edilmiş
+ *  rejimin (ZeminRejimi) YANINDA saklanmalı, YERİNE değil. */
+export function hamZeminDetayiBul(
+  raceSurface: string,
+  surfaceConditions: SurfaceCondition[] | null | undefined
+): string | null {
+  if (!surfaceConditions || raceSurface === "SENTETIK") return null;
+  const etiket = raceSurface === "CIM" ? "Çim" : raceSurface === "KUM" ? "Kum" : null;
+  if (!etiket) return null;
+  return surfaceConditions.find((c) => c.label === etiket)?.detail ?? null;
+}
+
+/** Pist türü + normalize rejim BİRLEŞİK etiketi (ör. "CIM_COK_AGIR", "KUM_NEMLI") —
+ *  Çim-anormal ile Kum-anormal aynı "anormal" bayrağını paylaşsa da AYNI rejim
+ *  SAYILMAMALI (kullanıcı talebi). Yalnız bir ETİKET, hiçbir hesaplamaya/skora girmez. */
+export function surfaceRejimEtiketi(raceSurface: string, rejim: ZeminRejimi): string {
+  return `${raceSurface}_${rejim}`;
+}
+
 // ─── Shadow duyarlılık taraması ─────────────────────────────────────────────
 
 function zeminToleransiKatkisi(r: Faz1RunnerV5Sirali): number {
