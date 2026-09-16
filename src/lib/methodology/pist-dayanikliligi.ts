@@ -32,17 +32,40 @@ const ZEMIN_TOLERANSI_KOD = "zeminToleransi";
 export const PIST_OLCEK_GRID = [0, 0.5, 1, 1.5, 2] as const;
 
 // ─── Rejim tespiti — yalnız TJK'nın GERÇEKTEN verdiği etiketlerden ─────────────
-// Veritabanında gözlenen değerler (2026-09-16 itibarıyla): Çim → "Normal 3,3" /
-// "Yumuşak 3,6" / "Çok Ağır 5,3" / "Çok Ağır 5,4"; Kum → "Normal" / "Nemli". Başka
-// bir kategori (ör. DRF tarzı "wet-fast"/"muddy") İCAT EDİLMEZ — TJK böyle bir ayrım
-// vermiyor, bkz. proje planı "Kapsam Dışı".
-export type ZeminRejimi = "NORMAL" | "YUMUSAK" | "NEMLI" | "COK_AGIR";
+// 2026-09-16 DÜZELTME (kullanıcı bulgusu — /admin/derece-istatistikleri "Pist Durumu
+// Dağılımı" ile çapraz kontrol): RaceDay.surfaceConditions'ta (yalnız 134 gün) o ana
+// kadar GÖRÜLEN dar örnekle ("Normal/Yumuşak/Nemli/Çok Ağır") yazılmış İLK sürüm, TJK'nın
+// KENDİ çok daha zengin arşivinde (TjkDereceKaydi.pistDurumu, ~8245 satır) GERÇEKTEN VAR
+// olan ara kademeleri (Biraz Yumuşak/Çok Yumuşak, Biraz Ağır, Sulu, Islak) TANIMIYORDU —
+// bunlar prefix eşleşmediği için sessizce "NORMAL"a düşüyordu (992/8245 satır, %12 —
+// arac ile doğrulandı: Sulu 418, Islak 404, Biraz Yumuşak 98, Çok Yumuşak 56, Biraz Ağır
+// 16). RaceDay.surfaceConditions henüz bu ara kademelerin hiçbirini GÖSTERMEDİ ama TJK'nın
+// kelime dağarcığı bu olduğu için gelecekte gösterebilir — bu YİNE "Tek Kaynağa Bakma
+// Hatası" (bkz. proje hafızası) ile aynı sınıf bir bulgu, farklı bir özellikte tekrarı.
+// Aşağıdaki tam liste İCAT EDİLMİŞ bir kategori DEĞİL — TJK'nın kendi arşivinde birebir
+// gözlenen 10 değerin tamamı (/admin/derece-istatistikleri'nin kendi `pistDurumuRenk`
+// fonksiyonuyla da UYUMLU: o da ağır/sulu/nemli/ıslak'ı "anormal" sayıyor).
+export type ZeminRejimi =
+  | "NORMAL"
+  | "BIRAZ_YUMUSAK" | "YUMUSAK" | "COK_YUMUSAK" // Çim yumuşama merdiveni
+  | "BIRAZ_AGIR" | "AGIR" | "COK_AGIR" // Çim sertleşme merdiveni
+  | "NEMLI" | "SULU" | "ISLAK"; // Kum ıslanma merdiveni
 export type SurfaceCondition = { label: string; detail: string };
 
 export function zeminRejimiCikar(detail: string | undefined | null): ZeminRejimi {
   const d = (detail ?? "").trim().toLowerCase();
-  if (d.startsWith("çok ağır") || d.startsWith("ağır")) return "COK_AGIR";
+  // Sıralama önemli değil — TJK'nın gerçek etiketlerinin ("Biraz X"/"Çok X"/"X") ilk
+  // kelimeleri birbirinden AYRIK (biraz.../çok.../x...), prefix çakışması yok.
+  if (d.startsWith("çok yumuşak")) return "COK_YUMUSAK";
+  if (d.startsWith("biraz yumuşak")) return "BIRAZ_YUMUSAK";
   if (d.startsWith("yumuşak")) return "YUMUSAK";
+  if (d.startsWith("çok ağır")) return "COK_AGIR";
+  if (d.startsWith("biraz ağır")) return "BIRAZ_AGIR";
+  if (d.startsWith("ağır")) return "AGIR";
+  // "Islak" (JS'in locale-duyarsız toLowerCase'i "I"yı "i"ye çevirir, "ıslak" değil) +
+  // "ıslak" (DB'de doğrudan küçük harfle gelirse) ikisi de karşılanıyor.
+  if (d.startsWith("islak") || d.startsWith("ıslak")) return "ISLAK";
+  if (d.startsWith("sulu")) return "SULU";
   if (d.startsWith("nemli")) return "NEMLI";
   return "NORMAL"; // "Normal ..." dahil — bilinmeyen/eksik bir değer GÜVENLİ VARSAYILANa düşer
 }
