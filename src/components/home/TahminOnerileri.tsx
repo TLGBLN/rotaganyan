@@ -312,8 +312,14 @@ type Props = { data: KuponOnerisi[]; altiliResults?: AltiliCityResult[]; isLogge
 export default function TahminOnerileri({ data, altiliResults = [], isLoggedIn = false, isAdmin = false }: Props) {
   const t = useTranslations("home.tahminOnerileri");
   const items = data.filter((k): k is Kupon => k !== null);
-  const hasVisible = items.some((k) => k.variants.some((v) => v.status !== "miss"));
-  if (items.length === 0 || !hasVisible) return null;
+  // 2026-09-16 kullanıcı bulgusu: bu "hasVisible" kontrolü, BUGÜN TÜM hipodromların
+  // TÜM kuponları yattıysa (ör. İstanbul'un üç kuponu da) koca bölümü TAMAMEN
+  // gizliyordu — race.service.ts'teki getKuponOnerileri artık yatan kuponları da gün
+  // sonuna kadar döndürüyor (bkz. o dosyadaki 2026-09-16 notu), ama bu istemci-taraflı
+  // kontrol o kararı EZİYORDU. Kaldırıldı — her KuponBlock zaten kendi içinde
+  // (visibleVariants.length===0) boşsa kendini gizliyor, üst düzeyde yalnız hiç
+  // yayınlanmış kupon YOKSA (items.length===0) bölüm tamamen kalkar.
+  if (items.length === 0) return null;
 
   // Aynı şehrin (hippodromeName'in " — " öncesi kısmı) 1./2. Altılı'sını TEK gruba
   // topla — getKuponOnerileri zaten şehre göre sıralı döndüğü için art arda gelirler.
