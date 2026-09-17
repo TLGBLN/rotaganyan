@@ -291,9 +291,24 @@ export function hibritMaidenSatisMi(classType: string): boolean {
   return maidenMi && satisMi;
 }
 
-function agirlikSetleriSec(classType: string): AgirlikSeti[] {
+// export edildi (2026-09-17, Challenger backtest altyapısı): yeni aday sinyalleri (bkz.
+// proje hafızası) mevcut V5.46 üretim skorunu (agirlikSetleriSec+harmanliSkorla+
+// bKatmaniUygula+softmax zinciri) TAMAMEN aynı şekilde yeniden kurup üzerine tek bir
+// izole β terimi eklemek için — davranış DEĞİŞMEDİ, yalnız dışa açıldı (softmax/
+// liderEsigiHesapla/gatherFaz1V5Historical ile AYNI gerekçe/desen).
+export function agirlikSetleriSec(classType: string): AgirlikSeti[] {
   if (hibritMaidenSatisMi(classType)) return [WEIGHTS_DUSUK_SART, WEIGHTS_DIGER];
   const kategori = kategoriTespit(classType);
+  return agirlikSetleriIcinKategori(kategori);
+}
+
+// export edildi (2026-09-17, Challenger backtest altyapısı) — arac-model-veri-olustur.mts'in
+// ürettiği model-veri*.json satırlarında HAM classType YOK, yalnız önceden hesaplanmış
+// `kategori` kodu var (kategoriTespit'in çıktısı) — bu yüzden ham metin isteyen
+// agirlikSetleriSec çağrılamıyor. Bu varyant DOĞRUDAN kategori koduyla çalışır (hibrit
+// Maiden/Satış harmanlaması HARİÇ — o yalnız ham metinden tespit edilebiliyor, n=14 gibi
+// çok küçük bir dilim olduğu için backtest'te ihmal edilebilir bir basitleştirme).
+export function agirlikSetleriIcinKategori(kategori: string): AgirlikSeti[] {
   if (kategori === "1a" || kategori === "1b") return [WEIGHTS_DUSUK_SART];
   if (kategori === "2") return [WEIGHTS_DIGER_HANDIKAP];
   return [WEIGHTS_DIGER];
@@ -301,7 +316,7 @@ function agirlikSetleriSec(classType: string): AgirlikSeti[] {
 
 /** Bir at için, verilen ağırlık setleri üzerinden ortalama (standardize edilmiş vektör,
  *  katkılar, toplam skor) — tek set varsa harmanlama etkisizdir, aynen önceki davranış. */
-function harmanliSkorla(v: number[], setler: AgirlikSeti[]): { skor: number; standartVektor: number[]; katkilar: number[] } {
+export function harmanliSkorla(v: number[], setler: AgirlikSeti[]): { skor: number; standartVektor: number[]; katkilar: number[] } {
   const n = v.length;
   const standartToplam = new Array(n).fill(0);
   const katkiToplam = new Array(n).fill(0);
@@ -1382,7 +1397,7 @@ const B_ZEMINMESAFE_ORTALAMA = -0.515;
  *  ÖNCE skora ekler. softmax(skor+Δ) ∝ softmax(skor)×exp(Δ) olduğu için bu, "olasılığı
  *  çarpmak" ile matematiksel olarak AYNI şey — ama A'nın kendi regresyonuna karışmadan, ayrı
  *  kalibre edilmiş terimler olarak. */
-function bKatmaniUygula(
+export function bKatmaniUygula(
   skorlar: number[],
   runners: Faz1RunnerV5[],
   classType: string

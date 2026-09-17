@@ -7,6 +7,7 @@ import type { KuponOnerisi, KuponStatus } from "@/server/services/race.service";
 import type { AltiliCityResult } from "@/server/services/ingest/tjk-altili.adapter";
 import { findIkramiyeForHippodrome } from "@/lib/altili-match";
 import { cn } from "@/lib/utils";
+import Wordmark from "@/components/layout/Wordmark";
 
 type Kupon = NonNullable<KuponOnerisi>;
 
@@ -165,6 +166,12 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
 
       {/* Tek kupon şablonu — Ekonomik/Normal/Geniş, /program'daki panel butonları gibi tıklanınca değişir */}
       <div className="flex flex-col overflow-hidden rounded-lg border bg-card">
+        {/* 2026-09-17 kullanıcı talebi: Ekonomik/Normal/Geniş kupon kartının kendisinde de
+            (yalnız paylaşım görselinde değil, sitedeki canlı widget'ta da) Rotaganyan markası
+            görünsün — mevcut, tema-duyarlı Wordmark bileşeni reuse edildi. */}
+        <div className="flex items-center justify-center border-b bg-muted/20 py-2">
+          <Wordmark className="text-xs" />
+        </div>
         <div className="flex items-center justify-between gap-2 border-b bg-muted/30 px-4 py-2.5">
           {/* v6.113 — kullanıcı talebi 2026-08-13: seçilecek tek kademe varsa (7'li Ganyan'da
               yalnız "Geniş" doluyor) sekme göstermenin anlamı yok — aralarında gezinilecek
