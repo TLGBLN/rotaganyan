@@ -107,9 +107,21 @@ export default async function RootLayout({
   const locale = await getLocale();
 
   return (
-    <html lang={locale} suppressHydrationWarning>
+    <html
+      lang={locale}
+      // 2026-09-17 BUG DÜZELTMESİ: next/font'un ürettiği --font-cmu-roman/--font-cm-math-italic
+      // değişkenleri eskiden yalnız <body>'de tanımlıydı — ama Tailwind v4 --font-sans/
+      // --default-font-family'i :root (yani <html>) seviyesinde tanımlıyor. CSS custom
+      // property'ler TANIMLANDIĞI elementte çözümlenir: :root'taki "var(--font-cmu-roman)"
+      // referansı :root'ta bu değişken YOK diye GEÇERSİZ oluyor, bu geçersizlik <body>'ye
+      // miras kalıyor — sonuç Tailwind'in kendi yedek sans-serif yığınına (ui-sans-serif,
+      // system-ui) düşülmesi (kullanıcı bulgusu: "Inter/Segoe UI gibi görünüyor"). Font
+      // değişkenleri artık <html>'e taşındı — --font-sans'ın tanımlandığı AYNI element.
+      className={`${cmuRoman.variable} ${cmMathItalic.variable} ${geistMono.variable} ${barlowCondensed.variable}`}
+      suppressHydrationWarning
+    >
       <body
-        className={`${cmuRoman.variable} ${cmMathItalic.variable} ${geistMono.variable} ${barlowCondensed.variable} antialiased min-h-screen bg-background text-foreground`}
+        className="antialiased min-h-screen bg-background text-foreground"
         suppressHydrationWarning
       >
         <ThemeProvider>
