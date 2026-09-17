@@ -830,6 +830,88 @@ export async function getAylikKuponKazanci(): Promise<AylikKuponKazanci[]> {
     }));
 }
 
+export type KuponRoiOzeti = {
+  toplamKuponSayisi: number;
+  hitSayisi: number;
+  harcanan: number;
+  kazanc: number;
+  netKar: number;
+  roi: number; // yüzde, harcanan üzerinden
+  // 2026-09-17 kullanıcı talebi ("bu takip edilmesi gereken bir analiz mi?" sorusuna
+  // verilen yanıt): Altılı/7'li ikramiyeleri doğası gereği "lumpy" — tek bir büyük vuruş
+  // toplam kazancın büyük kısmını oluşturabilir, çıplak ROI% başlığı yanıltıcı olur.
+  // Bu yüzden en büyük vuruş AYRIŞTIRILARAK gösteriliyor (admin kendi karar versin).
+  enBuyukVurus: { tutar: number; tarih: string; hippodrome: string } | null;
+  enBuyukVurusPayi: number; // toplam kazanç içindeki yüzdesi
+  netKarHaricEnBuyuk: number;
+  roiHaricEnBuyuk: number;
+};
+
+/**
+ * "Bugüne kadar ne kadar harcadık, ne kadar kazandık" — harcanan tarafı HER yayınlanmış
+ * kuponun (tutsun/tutmasın/bekliyor olsun fark etmez) en düşük tutarlı DOLU kademesi
+ * üzerinden (kullanıcı kararı: "hesaplarken tutan en düşük tutarlı kupon üzerinden
+ * hesapla" — aynı kural harcanan tarafına da tutarlı uygulanıyor). Kazanç tarafı
+ * getGecmisKazananKuponlar'ın ZATEN doğrulanmış ikramiye toplamıyla birebir aynı mantık
+ * (aynı "en düşük tutarlı tutan kademe" seçimi, TJK'nın resmi ikramiye cümlesi).
+ * Yalnız admin görür (bkz. proje kararı 2026-09-17) — kamuya açık sayfalarda harcanan
+ * tutar/ROI gibi rakamlar yanlış bağlamda yanıltıcı olabilir.
+ */
+export async function getKuponRoiOzeti(): Promise<KuponRoiOzeti> {
+  const all = await db.homeKupon.findMany({ orderBy: [{ date: "desc" }, { updatedAt: "desc" }] });
+  const seen = new Set<string>();
+  const dedup = all.filter((k) => {
+    const key = `${k.hippodromeName}|${k.date.toISOString()}|${k.slot}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  const built = await Promise.all(dedup.map((k) => buildKuponOnerisi(k)));
+
+  let harcanan = 0;
+  let kazanc = 0;
+  let hitSayisi = 0;
+  const vurus: { tutar: number; tarih: string; hippodrome: string }[] = [];
+
+  for (let i = 0; i < dedup.length; i++) {
+    const b = built[i];
+    if (!b) continue;
+    // Harcanan: en düşük tutarlı DOLU kademe (tuttu/tutmadı fark etmez — "hep en ucuz
+    // kademeyi oynasaydık" varsayımı). Kazanç: en düşük tutarlı TUTAN kademe — bu ikisi
+    // FARKLI kademeler olabilir (ör. Ekonomik yattı ama Normal tuttu) — getGecmisKazananKuponlar
+    // ile AYNI seçim mantığı (bkz. o fonksiyon), birbirine karıştırılmamalı.
+    const lowestFilled = b.variants.find((v) => v.filled);
+    if (lowestFilled) harcanan += lowestFilled.amount;
+    const hitVariant = b.variants.find((v) => v.filled && v.status === "hit");
+    if (hitVariant) {
+      hitSayisi++;
+      const tutar = parseIkramiyeTutar(dedup[i].ikramiye);
+      kazanc += tutar;
+      if (tutar > 0) vurus.push({ tutar, tarih: dedup[i].date.toISOString().slice(0, 10), hippodrome: b.hippodromeName });
+    }
+  }
+
+  vurus.sort((a, b) => b.tutar - a.tutar);
+  const enBuyukVurus = vurus[0] ?? null;
+  const enBuyukVurusPayi = enBuyukVurus && kazanc > 0 ? (enBuyukVurus.tutar / kazanc) * 100 : 0;
+  const kazancHaricEnBuyuk = kazanc - (enBuyukVurus?.tutar ?? 0);
+  const netKarHaricEnBuyuk = kazancHaricEnBuyuk - harcanan;
+
+  return {
+    toplamKuponSayisi: dedup.length,
+    hitSayisi,
+    harcanan,
+    kazanc,
+    netKar: kazanc - harcanan,
+    roi: harcanan > 0 ? (kazanc / harcanan) * 100 : 0,
+    enBuyukVurus,
+    enBuyukVurusPayi,
+    netKarHaricEnBuyuk,
+    roiHaricEnBuyuk: harcanan > 0 ? (kazancHaricEnBuyuk / harcanan) * 100 : 0,
+  };
+}
+
 // ─── Canlı Oranlar (anasayfa) ───────────────────────────────────────────────────
 
 export type CurrentRace = {

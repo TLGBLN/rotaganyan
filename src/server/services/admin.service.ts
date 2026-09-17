@@ -646,6 +646,17 @@ export type AgfEdgeStats = {
   disagreeTotal: number;
   disagreeHits: number;
   disagreeRate: number;
+  // 2026-09-17 kullanıcı bulgusu: agreeRate (kolay durum — favori zaten güçlü) ile
+  // disagreeRate (zor durum — favori dışı, daha kalabalık ihtimal havuzu) doğrudan
+  // kıyaslamak adil değil, panel gereğinden fazla kötümser görünüyordu. disagreeRandomBaseline
+  // = o alt kümedeki koşularda rastgele TEK at seçseydik beklenen isabet oranı (ortalama
+  // 1/saha büyüklüğü) — disagreeRate'in gerçek karşılaştırması agreeRate değil, budur.
+  disagreeRandomBaseline: number;
+  // Sistemin favori dışı seçimi tuttuğunda ortalama ganyan (getiri çarpanı) — favoriyle
+  // aynı fikirdeyken tutan bir seçimden çok daha yüksek olması beklenir (düşük olasılık,
+  // yüksek ödeme). İsabet oranı düşük görünse de EV pozitif olabilir, bkz. kart metni.
+  agreeAvgGanyan: number | null;
+  disagreeAvgGanyan: number | null;
 };
 
 /**
@@ -673,8 +684,11 @@ export async function getAgfEdgeStats(): Promise<AgfEdgeStats> {
       picks: { where: { rank: 1 }, select: { runner: { select: { no: true } } } },
       race: {
         select: {
-          runners: { select: { no: true, agf: true } },
-          result: { select: { hitTop1: true, winnerNos: true } },
+          // scratched (2026-09-17 eklendi): saha büyüklüğü hesabı "gerçek start sayısı"
+          // kuralına uysun diye (bkz. proje hafızası project_saha_buyuklugu_scratched) —
+          // çekilen atlar rastgele-seçim referansına dahil edilmemeli.
+          runners: { select: { no: true, agf: true, scratched: true } },
+          result: { select: { hitTop1: true, winnerNos: true, ganyan: true } },
         },
       },
     },
@@ -687,15 +701,22 @@ export async function getAgfEdgeStats(): Promise<AgfEdgeStats> {
   let agreeHits = 0;
   let disagreeTotal = 0;
   let disagreeHits = 0;
+  let disagreeRandomBaselineSum = 0;
+  let agreeGanyanSum = 0;
+  let agreeGanyanN = 0;
+  let disagreeGanyanSum = 0;
+  let disagreeGanyanN = 0;
 
   for (const r of rows) {
-    const runnersWithAgf = r.race.runners.filter((x): x is { no: number; agf: number } => x.agf != null);
+    const runnersWithAgf = r.race.runners.filter((x): x is { no: number; agf: number; scratched: boolean } => x.agf != null);
     const winnerNos = r.race.result?.winnerNos ?? [];
     const systemPickNo = r.picks[0]?.runner?.no;
     if (runnersWithAgf.length === 0 || winnerNos.length === 0 || systemPickNo == null) continue;
 
     const agfFavorite = runnersWithAgf.reduce((a, b) => (b.agf > a.agf ? b : a));
     const systemWon = r.race.result?.hitTop1 ?? false;
+    const ganyan = r.race.result?.ganyan ?? null;
+    const sahaBuyuklugu = r.race.runners.filter((x) => !x.scratched).length;
 
     total++;
     if (systemWon) systemHits++;
@@ -703,10 +724,17 @@ export async function getAgfEdgeStats(): Promise<AgfEdgeStats> {
 
     if (systemPickNo === agfFavorite.no) {
       agreeTotal++;
-      if (systemWon) agreeHits++;
+      if (systemWon) {
+        agreeHits++;
+        if (ganyan != null) { agreeGanyanSum += ganyan; agreeGanyanN++; }
+      }
     } else {
       disagreeTotal++;
-      if (systemWon) disagreeHits++;
+      if (sahaBuyuklugu > 0) disagreeRandomBaselineSum += 100 / sahaBuyuklugu;
+      if (systemWon) {
+        disagreeHits++;
+        if (ganyan != null) { disagreeGanyanSum += ganyan; disagreeGanyanN++; }
+      }
     }
   }
 
@@ -727,6 +755,9 @@ export async function getAgfEdgeStats(): Promise<AgfEdgeStats> {
     disagreeTotal,
     disagreeHits,
     disagreeRate: rate(disagreeHits, disagreeTotal),
+    disagreeRandomBaseline: disagreeTotal > 0 ? disagreeRandomBaselineSum / disagreeTotal : 0,
+    agreeAvgGanyan: agreeGanyanN > 0 ? agreeGanyanSum / agreeGanyanN : null,
+    disagreeAvgGanyan: disagreeGanyanN > 0 ? disagreeGanyanSum / disagreeGanyanN : null,
   };
 }
 

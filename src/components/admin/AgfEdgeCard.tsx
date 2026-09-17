@@ -19,8 +19,13 @@ export default function AgfEdgeCard({ stats, overallTotal }: { stats: AgfEdgeSta
   const edgeLabel = stats.edge >= 0 ? `+${stats.edge.toFixed(1)}` : stats.edge.toFixed(1);
   const edgeGood = stats.edge > 0;
   const hasDisagreeSample = stats.disagreeTotal >= 5;
-  const disagreeBeatsAgree = hasDisagreeSample && stats.agreeTotal >= 5 && stats.disagreeRate > stats.agreeRate;
+  // 2026-09-17 kullanıcı bulgusu: disagreeRate'i agreeRate'e karşı ölçmek adil değildi —
+  // agree bucket zaten "favori güçlü, kolay durum" alt kümesi, disagree bucket "favori dışı,
+  // daha kalabalık ihtimal havuzu" alt kümesi. disagreeRate'in doğru kıyası kendi rastgele-
+  // seçim referansı (disagreeRandomBaseline) — bunu geçiyorsa gerçek edge var demektir.
+  const disagreeBeatsRandom = hasDisagreeSample && stats.disagreeRate > stats.disagreeRandomBaseline;
   const eksikAgf = overallTotal - stats.total;
+  const hasGanyanKarsilastirma = stats.agreeAvgGanyan != null && stats.disagreeAvgGanyan != null;
 
   return (
     <div className="rounded-lg border p-4 space-y-3">
@@ -67,13 +72,31 @@ export default function AgfEdgeCard({ stats, overallTotal }: { stats: AgfEdgeSta
             </div>
             <div className="rounded-md border bg-muted/20 px-3 py-2">
               <Gauge value={stats.disagreeRate} size={90} decimals={0} altBilgi={`AGF'den farklı (${stats.disagreeHits}/${stats.disagreeTotal})`} />
+              {hasDisagreeSample && (
+                <p className="mt-1 text-[9px] text-muted-foreground/70">
+                  rastgele seçim beklentisi: %{stats.disagreeRandomBaseline.toFixed(1)}
+                </p>
+              )}
             </div>
           </div>
-          {hasDisagreeSample && stats.agreeTotal >= 5 && (
+          {/* 2026-09-17 kullanıcı bulgusu: agreeRate zaten "favori güçlü, kolay durum" alt
+              kümesi olduğu için disagreeRate'i ona karşı ölçmek yapısal olarak dezavantajlı
+              çıkıyordu — panel gerçekte olduğundan kötü görünüyordu. Artık disagreeRate'in
+              kıyası kendi rastgele-seçim referansı (saha büyüklüğüne göre) ve — varsa —
+              ortalama ganyan (getiri) farkı: düşük ihtimalli ama yüksek ödemeli bir seçim
+              az isabetle bile EV-pozitif olabilir. */}
+          {hasDisagreeSample && (
             <p className="text-[10px] text-muted-foreground/80">
-              {disagreeBeatsAgree
-                ? "AGF'ye karşı çıkılan seçimler daha isabetli — AGF ayrışma kuralı veriyle destekleniyor."
-                : "AGF favorisine karşı çıkmak henüz getiri sağlamıyor — ayrışma kararlarını gözden geçir."}
+              {disagreeBeatsRandom
+                ? `AGF'ye karşı çıkılan seçimler rastgele beklentiyi (%${stats.disagreeRandomBaseline.toFixed(1)}) aşıyor — gerçek bir edge var.`
+                : `AGF'ye karşı çıkılan seçimler rastgele beklentinin (%${stats.disagreeRandomBaseline.toFixed(1)}) altında — ayrışma kararları gözden geçirilebilir.`}
+              {hasGanyanKarsilastirma && (
+                <>
+                  {" "}Tuttuğunda ortalama ganyan: AGF ile aynı fikirde {stats.agreeAvgGanyan!.toFixed(2)}x,
+                  farklı fikirde {stats.disagreeAvgGanyan!.toFixed(2)}x
+                  {stats.disagreeAvgGanyan! > stats.agreeAvgGanyan! ? " — düşük isabet oranını yüksek ödeme dengeliyor." : "."}
+                </>
+              )}
             </p>
           )}
         </div>
