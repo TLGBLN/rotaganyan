@@ -166,14 +166,16 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
       </div>
 
       {/* Tek kupon şablonu — Ekonomik/Normal/Geniş, /program'daki panel butonları gibi tıklanınca değişir */}
-      <div className="relative flex flex-col overflow-hidden rounded-lg border bg-card">
-        {/* 2026-09-17 kullanıcı talebi: kuponun ORTASINA, içeriğin ARKASINDA, düşük
-            opaklıkta bir filigran (watermark) — tıklamayı/okumayı engellemesin diye
-            pointer-events-none; NEGATİF z-index (-z-10) kullanılıyor, yalnız z-0 vermek
-            YETMEZ (absolute+z-0 bir eleman, normal akıştaki KONUMLANDIRILMAMIŞ kardeşlerin
-            ÜZERİNDE boyanır — CSS yığın sırası kuralı), -z-10 ile KESİN olarak arkada kalır. */}
+      {/* 2026-09-17 kullanıcı bulgusu: ilk sürümde filigran (opacity 0.06-0.08, -z-10)
+          canlıda GÖRÜNMÜYORDU — iki olası sebep birden düzeltildi: (1) `relative` TEK
+          BAŞINA yeni bir stacking context AÇMAZ (yalnız position≠static VE z-index≠auto
+          birlikte açar) — `-z-10` alt-eleman, üst bir atanın bağlamına "kaçıp" beklenmedik
+          bir yerde kaybolabiliyordu; `isolate` eklenerek bu karta AÇIKÇA kendi stacking
+          context'i veriliyor, kaçış imkansız. (2) altın rengin koyu zeminde %6-8 opaklığı
+          gerçek ekranda/ekran görüntüsünde neredeyse hiç okunmuyordu — %14'e çıkarıldı. */}
+      <div className="isolate relative flex flex-col overflow-hidden rounded-lg border bg-card">
         <div className="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center">
-          <Image src="/horse-icon-gold.png" alt="" width={180} height={180} className="opacity-[0.06] dark:opacity-[0.08]" />
+          <Image src="/horse-icon-gold.png" alt="" width={200} height={200} className="opacity-[0.14]" />
         </div>
         {/* 2026-09-17 kullanıcı talebi: Ekonomik/Normal/Geniş kupon kartının kendisinde de
             (yalnız paylaşım görselinde değil, sitedeki canlı widget'ta da) Rotaganyan markası
