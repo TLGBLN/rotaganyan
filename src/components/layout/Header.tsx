@@ -48,17 +48,16 @@ export default async function Header() {
             menüsünün (aşağıdaki nav, hidden md:flex) içindeydi, mobilde hiç görünmüyordu;
             mobilde nav gizlendiği için burada zaten boş yer vardı. */}
         <div className="flex min-w-0 shrink items-center gap-2.5">
-          <Link href="/program" className="flex shrink-0 items-center gap-2.5">
+          <Link href="/program" data-tour="program" className="flex shrink-0 items-center gap-2.5">
             <Wordmark />
           </Link>
           <OnlineCounter />
         </div>
 
-        {/* Hızlı erişim */}
+        {/* Hızlı erişim — 2026-09-17 kullanıcı bulgusu: "Yarış Programı" butonu kaldırıldı,
+            logo zaten /program'a gidiyor (satır 51) ve sayfa açılışta zaten program
+            gösteriyor — buton tamamen aynı hedefe giden gereksiz bir tekrardı. */}
         <nav className="hidden flex-1 items-center gap-2 md:flex">
-          <Button asChild size="sm" className="bg-brand hover:bg-brand/90 text-brand-foreground">
-            <Link href="/program" data-tour="program"><HeaderLabel k="program" /></Link>
-          </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/rotaganyansiralamasi" data-tour="puantablosu"><HeaderLabel k="puanTablosu" /></Link>
           </Button>
