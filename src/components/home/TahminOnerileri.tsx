@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import type { KuponOnerisi, KuponStatus } from "@/server/services/race.service";
@@ -165,7 +166,15 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
       </div>
 
       {/* Tek kupon şablonu — Ekonomik/Normal/Geniş, /program'daki panel butonları gibi tıklanınca değişir */}
-      <div className="flex flex-col overflow-hidden rounded-lg border bg-card">
+      <div className="relative flex flex-col overflow-hidden rounded-lg border bg-card">
+        {/* 2026-09-17 kullanıcı talebi: kuponun ORTASINA, içeriğin ARKASINDA, düşük
+            opaklıkta bir filigran (watermark) — tıklamayı/okumayı engellemesin diye
+            pointer-events-none; NEGATİF z-index (-z-10) kullanılıyor, yalnız z-0 vermek
+            YETMEZ (absolute+z-0 bir eleman, normal akıştaki KONUMLANDIRILMAMIŞ kardeşlerin
+            ÜZERİNDE boyanır — CSS yığın sırası kuralı), -z-10 ile KESİN olarak arkada kalır. */}
+        <div className="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center">
+          <Image src="/horse-icon-gold.png" alt="" width={180} height={180} className="opacity-[0.06] dark:opacity-[0.08]" />
+        </div>
         {/* 2026-09-17 kullanıcı talebi: Ekonomik/Normal/Geniş kupon kartının kendisinde de
             (yalnız paylaşım görselinde değil, sitedeki canlı widget'ta da) Rotaganyan markası
             görünsün — mevcut, tema-duyarlı Wordmark bileşeni reuse edildi. */}
