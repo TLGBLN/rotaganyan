@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Barlow_Condensed } from "next/font/google";
+import { Inter, Geist_Mono, Barlow_Condensed } from "next/font/google";
 import localFont from "next/font/local";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Toaster } from "@/components/ui/sonner";
@@ -19,20 +19,15 @@ import { auth } from "@/lib/auth";
 import type { AppLocale } from "@/i18n/request";
 import "./globals.css";
 
-// 2026-09-17 kullanıcı kararı: 2026-09-14'teki "tüm site tek font (Geist)" kararı BİLEREK
-// geri alındı — LaTeX'in klasik ikilisi (Computer Modern Roman düz metin/rakamlar için,
-// Computer Modern Math Italic yalnız matematiksel formül/skor gösterimi için) siteye
-// eklendi. Roman = "computer-modern" npm paketinin CMU Serif ailesi (OFL lisanslı).
-// Math Italic = KaTeX'in kendi "KaTeX_Math-Italic" fontu — bu, LaTeX'in cmmi10 (Computer
-// Modern Math Italic) fontunun web'e uyarlanmış BİREBİR metrik karşılığı (MIT lisanslı).
-const cmuRoman = localFont({
-  variable: "--font-cmu-roman",
-  src: [
-    { path: "../../public/fonts/CMURoman-Regular.woff2", weight: "400", style: "normal" },
-    { path: "../../public/fonts/CMURoman-Bold.woff2", weight: "700", style: "normal" },
-    { path: "../../public/fonts/CMURoman-Italic.woff2", weight: "400", style: "italic" },
-    { path: "../../public/fonts/CMURoman-BoldItalic.woff2", weight: "700", style: "italic" },
-  ],
+// 2026-09-17 kullanıcı kararı (İKİ AŞAMALI): önce Computer Modern Roman denendi (sitewide),
+// ama gerçek tarayıcıda render sorunları netleşmeden ("Georgia/Inter gibi görünüyor")
+// önce bir CSS scope bug'ı bulunup düzeltildi, sonra kullanıcı pratik/güvenilirlik
+// gerekçesiyle Roman denemesinden TAMAMEN vazgeçip Inter'e geçmeye karar verdi — yalnız
+// matematiksel formül/skor gösterimi Computer Modern Math Italic olarak KALDI (KaTeX'in
+// "KaTeX_Math-Italic" fontu, LaTeX'in cmmi10'unun web karşılığı, MIT lisanslı).
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
 });
 
 const cmMathItalic = localFont({
@@ -109,15 +104,15 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      // 2026-09-17 BUG DÜZELTMESİ: next/font'un ürettiği --font-cmu-roman/--font-cm-math-italic
-      // değişkenleri eskiden yalnız <body>'de tanımlıydı — ama Tailwind v4 --font-sans/
-      // --default-font-family'i :root (yani <html>) seviyesinde tanımlıyor. CSS custom
-      // property'ler TANIMLANDIĞI elementte çözümlenir: :root'taki "var(--font-cmu-roman)"
-      // referansı :root'ta bu değişken YOK diye GEÇERSİZ oluyor, bu geçersizlik <body>'ye
-      // miras kalıyor — sonuç Tailwind'in kendi yedek sans-serif yığınına (ui-sans-serif,
-      // system-ui) düşülmesi (kullanıcı bulgusu: "Inter/Segoe UI gibi görünüyor"). Font
-      // değişkenleri artık <html>'e taşındı — --font-sans'ın tanımlandığı AYNI element.
-      className={`${cmuRoman.variable} ${cmMathItalic.variable} ${geistMono.variable} ${barlowCondensed.variable}`}
+      // 2026-09-17 BUG DÜZELTMESİ (genel next/font+Tailwind v4 kuralı, hâlâ geçerli):
+      // next/font'un ürettiği --font-* değişkenleri eskiden yalnız <body>'de tanımlıydı —
+      // ama Tailwind v4 --font-sans/--default-font-family'i :root (yani <html>) seviyesinde
+      // tanımlıyor. CSS custom property'ler TANIMLANDIĞI elementte çözümlenir: :root'taki
+      // "var(--font-...)" referansı :root'ta bu değişken YOK diye GEÇERSİZ oluyor, bu
+      // geçersizlik <body>'ye miras kalıyor — sonuç Tailwind'in kendi yedek sans-serif
+      // yığınına düşülmesi. Font değişkenleri bu yüzden <html>'de tanımlanıyor —
+      // --font-sans'ın tanımlandığı AYNI element.
+      className={`${inter.variable} ${cmMathItalic.variable} ${geistMono.variable} ${barlowCondensed.variable}`}
       suppressHydrationWarning
     >
       <body

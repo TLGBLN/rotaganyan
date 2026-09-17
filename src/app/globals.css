@@ -39,13 +39,12 @@
      yüzden değişkenleştirildi. */
   --color-winner:              var(--winner);
 
-  /* 2026-09-17 kullanıcı kararı: 2026-09-14'teki "tüm site tek font (Geist)" kararı
-     BİLEREK geri alındı — LaTeX'in klasik ikilisi siteye eklendi. Düz metin/rakamlar
-     Computer Modern Roman (--font-sans, TEK sitewide varsayılan — Geist'in eski yeri),
-     yalnız matematiksel formül/skor gösterimi olan yerler --font-math (Computer Modern
-     Math Italic, KaTeX'in cmmi10 karşılığı) kullanır — bkz. layout.tsx'teki localFont
-     tanımları. */
-  --font-sans: var(--font-cmu-roman);
+  /* 2026-09-17 kullanıcı kararı (iki aşamalı): önce Computer Modern Roman sitewide denendi,
+     gerçek tarayıcı sonucu netleşmeden kullanıcı Inter'e geçmeye karar verdi (okunaklılık/
+     güvenilirlik) — yalnız matematiksel formül/skor gösterimi olan yerler --font-math
+     (Computer Modern Math Italic, KaTeX'in cmmi10 karşılığı) olarak KALDI. --font-sans
+     artık Geist'in eski yerini alan Inter'e işaret ediyor. */
+  --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
   --font-math: var(--font-cm-math-italic);
 
@@ -182,7 +181,7 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), "Times New Roman", Georgia, serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
