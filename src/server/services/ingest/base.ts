@@ -1,5 +1,6 @@
 import type { IngestRaceDay, IngestResult } from "./types";
 import { Prisma } from "@prisma/client";
+import { raceContextGecerliligKontrolEt } from "./race-context-invalidation";
 
 /**
  * Abstract data provider. Implement this interface for each source
@@ -126,6 +127,22 @@ export async function persistRaceDays(raceDays: IngestRaceDay[]): Promise<Ingest
             },
           });
         }
+
+        // 2026-09-17 — Race Context Invalidation: bu koşunun GÜNCEL (bu ingest turunun
+        // getirdiği) bağlamı, varsa yayınlanmış/kaydedilmiş analizin dondurduğu bağlamla
+        // uyuşmuyorsa Prediction'ı STALE işaretler (bkz. race-context-invalidation.ts).
+        // r.runners'ın KENDİSİ kullanılıyor (DB'den yeniden okumaya gerek yok) — ingest'in
+        // bu turda TJK'dan getirdiği veri zaten "güncel" olanı temsil ediyor.
+        await raceContextGecerliligKontrolEt(race.id, {
+          surface: r.surface,
+          distance: r.distance,
+          classType: r.classType,
+          runnerSignature: r.runners
+            .filter((x) => !(x.scratched ?? false))
+            .map((x) => x.no)
+            .sort((a, b) => a - b)
+            .join(","),
+        });
 
         // Insert gallops (skip duplicates by date+runner)
         for (const gallop of r.gallops) {

@@ -85,6 +85,14 @@ async function handlePost(req: NextRequest) {
     runners: faz1.runners.map((r) => ({ id: r.id, no: r.no, name: r.ad })),
     bankoAdayi,
     anormalPistRiski,
+    // 2026-09-17 — Race Context Invalidation: bu analizin HANGİ yarış bağlamı için
+    // üretildiğinin donmuş özeti (bkz. Prediction.analyzed* alanları, prediction.actions.ts).
+    // faz1.runners zaten scratched=false filtreli (gatherFaz1V5) — bu yüzden imza doğrudan
+    // "gerçekten koşacak" at listesini yansıtıyor.
+    analyzedSurface: faz1.race.surface,
+    analyzedDistance: faz1.race.distance,
+    analyzedClassType: faz1.race.classType,
+    analyzedRunnerSignature: faz1.runners.map((r) => r.no).sort((a, b) => a - b).join(","),
     couponNarrow,
     couponNormal,
     couponWide,

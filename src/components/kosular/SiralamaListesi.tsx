@@ -5,7 +5,7 @@ import type { ProgramRaceDay } from "@/server/services/race.service";
 import { finishPos } from "@/lib/race-result";
 import { kararOku, puanYuzdesiMetni } from "@/lib/methodology/muhakeme-format";
 import { ekuriRengi } from "@/lib/ekuri-colors";
-import { siraliPickSatirlari } from "@/lib/methodology/pick-display-order";
+import { siraliPickSatirlari, analizCanliMi } from "@/lib/methodology/pick-display-order";
 
 type Race = ProgramRaceDay["races"][number];
 type Pick = NonNullable<Race["prediction"]>["picks"][number];
@@ -90,7 +90,11 @@ export default function SiralamaListesi({
   race: Race;
   formByNo: Map<number, FormInfo>;
 }) {
-  const picks = race.prediction?.picks ?? [];
+  // 2026-09-17 — Race Context Invalidation (bkz. pick-display-order.ts analizCanliMi):
+  // AYNI kapı SiralamaKarti.tsx'te de uygulanıyor — bu bileşen `race`'i BAĞIMSIZ okuduğu
+  // için (CLAUDE.md'nin "aynı bug üç dosyada" dersiyle AYNI risk sınıfı) burada da tekrar
+  // kontrol edilmeli, üst bileşenin zaten filtrelediğine güvenilmemeli.
+  const picks = analizCanliMi(race.prediction) ? race.prediction?.picks ?? [] : [];
   if (picks.length === 0) return null;
   const rows = buildRows(picks);
 

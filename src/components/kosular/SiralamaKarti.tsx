@@ -4,7 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ProgramRaceDay, KuponOnerisi } from "@/server/services/race.service";
 import type { TempoSenaryosu } from "@/lib/methodology/pace-analizi";
-import { siraliPickler } from "@/lib/methodology/pick-display-order";
+import { siraliPickler, analizCanliMi } from "@/lib/methodology/pick-display-order";
 import { puanYuzdesiMetni, piyasaFarkiPuani } from "@/lib/methodology/muhakeme-format";
 import { KuponBlock } from "@/components/home/TahminOnerileri";
 import SiralamaListesi, { Son5Yaris } from "./SiralamaListesi";
@@ -33,7 +33,9 @@ const TEMPO_LABEL: Record<string, string> = {
 };
 
 function hasAnalysis(r: Race): boolean {
-  return !!r.prediction?.published && (r.prediction.picks?.length ?? 0) > 0;
+  // 2026-09-17 — Race Context Invalidation: `published` TEK BAŞINA yetmez, analiz hâlâ
+  // GEÇERLİ bir yarış bağlamı için mi (status≠STALE) — bkz. pick-display-order.ts.
+  return analizCanliMi(r.prediction) && (r.prediction!.picks?.length ?? 0) > 0;
 }
 
 type Props = {
@@ -57,7 +59,11 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
   if (analyzed.length === 0) return null;
 
   const race = raceDay.races.find((r) => r.raceNo === activeRaceNo) ?? analyzed[0];
-  const picks = race.prediction?.picks ?? [];
+  // 2026-09-17 — Race Context Invalidation: sekme şeridi tıklamayla STALE bir koşuya da
+  // gidilebiliyor (yalnız İLK seçim analyzed'tan geliyor) — bu yüzden hasAnalysis'teki AYNI
+  // kapı burada da uygulanmalı, yoksa eski/geçersiz picks sessizce render edilir.
+  const analizGecerli = analizCanliMi(race.prediction);
+  const picks = analizGecerli ? race.prediction?.picks ?? [] : [];
   const agfByNo = new Map(race.runners.map((r) => [r.no, r.agf]));
   const formByNo = new Map(race.runners.map((r) => [r.no, { recentForm: r.recentForm, recentFormSurfaces: r.recentFormSurfaces }]));
   const topPick = siraliPickler(picks)[0];

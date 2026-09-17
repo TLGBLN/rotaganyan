@@ -205,6 +205,7 @@ model Race {
   pendingResult  PendingResult?
   accuraceRace   AccuraceRace?
   challengerRuns ChallengerRun[]
+  contextChanges RaceContextChange[]
 
   @@unique([raceDayId, raceNo])
 }
@@ -408,6 +409,21 @@ model Prediction {
   pistDuyarliligi    String? // "STABIL" | "HASSAS" | "COK_HASSAS"
   gecmisRiskSeviyesi String? // "YETERLI" | "SINIRLI" | "YETERSIZ"
   pistUyariMesaji    String? // public'e gösterilecek, sayısal detay İÇERMEYEN gerekçe
+  // 2026-09-17 — Race Context Invalidation (bkz. proje hafızası project_race_context_invalidation).
+  // Anormal Pist Modu'nun ALTINDA, daha temel bir katman: "aynı pist koşulu kötüleşti" değil
+  // "yarışın bağlamı DEĞİŞTİ" (TJK'nın Komiserler Kurulu kararıyla Çim→Sentetik alması, at
+  // çekilmesi, mesafe/sınıf değişikliği). analyzed* alanları analiz anındaki (V5AnalysisPanel
+  // "Kaydet ve Yayımla") girdi özetini donduruyor; bir sonraki ingest bunlardan biriyle
+  // ÇELİŞEN güncel veri getirirse status "STALE"ye düşer — published DEĞİŞTİRİLMEZ (geçmiş
+  // kaydı/publishedAt bozulmasın), yalnız canlı gösterim/kupon kararı status'e bakar (bkz.
+  // pick-display-order.ts'teki analizCanliMi — TEK, paylaşılan kapı).
+  analyzedSurface         String?
+  analyzedDistance        Int?
+  analyzedClassType       String?
+  analyzedRunnerSignature String? // sıralı, virgülle ayrılmış KOŞACAK (scratched=false) at no'ları
+  status                  String    @default("FRESH") // "FRESH" | "STALE"
+  staleReason             String? // public'e gösterilecek SADE mesaj (Mutfağı Açma İlkesi)
+  staleAt                 DateTime?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -416,6 +432,24 @@ model Prediction {
   picks  Pick[]
 
   @@index([published])
+}
+
+// 2026-09-17 — Race Context Invalidation audit izi: bir Prediction STALE'e her düştüğünde
+// HANGİ alanın (surface/distance/classType/runners) ne zaman, hangi değerden hangi değere
+// değiştiğini kaydeder — admin'de "15:58 Pist değişti: Çim → Sentetik" gibi bir zaman
+// çizelgesi göstermek için. Salt kayıt — hiçbir hesaplamaya girmez.
+model RaceContextChange {
+  id        String   @id @default(cuid())
+  raceId    String
+  changedAt DateTime @default(now())
+  field     String // "surface" | "distance" | "classType" | "runners"
+  oldValue  String
+  newValue  String
+  source    String   @default("TJK_PROGRAM")
+
+  race Race @relation(fields: [raceId], references: [id], onDelete: Cascade)
+
+  @@index([raceId, changedAt])
 }
 
 model Pick {

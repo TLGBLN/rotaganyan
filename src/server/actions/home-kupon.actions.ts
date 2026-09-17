@@ -56,6 +56,10 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
               pistDuyarliligi: true,
               gecmisRiskSeviyesi: true,
               pistUyariMesaji: true,
+              // 2026-09-17 — Race Context Invalidation: kupon motoru STALE bir analizden
+              // karar ÜRETMEMELİ (bkz. KuponForm.tsx'teki dışlama).
+              status: true,
+              staleReason: true,
             },
           },
         },
@@ -197,6 +201,9 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
         pistDuyarliligi: r.prediction?.pistDuyarliligi ?? null,
         gecmisRiskSeviyesi: r.prediction?.gecmisRiskSeviyesi ?? null,
         pistUyariMesaji: r.prediction?.pistUyariMesaji ?? null,
+        // 2026-09-17 — Race Context Invalidation.
+        stale: r.prediction?.status === "STALE",
+        staleReason: r.prediction?.staleReason ?? null,
         runners: runners.map((runner) => {
           const karmaMeta = metaByNoById.get(r.id)?.get(runner.no);
           return {

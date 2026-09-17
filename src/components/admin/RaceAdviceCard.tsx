@@ -50,6 +50,12 @@ export type RaceAdviceCardPrediction = {
   pistDuyarliligi: string | null;
   gecmisRiskSeviyesi: string | null;
   pistUyariMesaji: string | null;
+  // 2026-09-17 — Race Context Invalidation (bkz. race-context-invalidation.ts). "STALE"
+  // ise bu analiz YAYINLANMIŞ görünse bile artık GEÇERSİZ bir yarış bağlamı için üretilmiş
+  // demektir (pist/mesafe/sınıf/at listesi değişti) — canlıda zaten gösterilmiyor (bkz.
+  // pick-display-order.ts analizCanliMi), ama admin bunu BURADA görüp yeniden analiz etmeli.
+  status: string;
+  staleReason: string | null;
 } | null;
 
 // 2026-09-07 kullanıcı talebi ("ben nokta atışı 3 at yeter ya da gerçekten 6 at yeter
@@ -188,7 +194,18 @@ export default function RaceAdviceCard({
   if (esitSaha) uyarilar.push("⚖️ Eşit saha — ilk 3 at yakın puanda, net favori yok.");
 
   return (
-    <div className="rounded-xl border p-3">
+    <div className={cn("rounded-xl border p-3", prediction?.status === "STALE" && "border-red-500/50")}>
+      {/* 2026-09-17 — Race Context Invalidation (bkz. race-context-invalidation.ts). En
+          üstte, her şeyden önce: bu koşunun YAYINLANMIŞ analizi artık GEÇERSİZ bir yarış
+          bağlamı için üretilmiş (pist/mesafe/sınıf/at listesi değişti) — public'te zaten
+          gösterilmiyor (analizCanliMi), ama admin bunu görüp yeniden analiz etmeden bu
+          kartın geri kalanına (banko/kupon önerisi) GÜVENMEMELİ. */}
+      {prediction?.status === "STALE" && (
+        <div className="mb-2.5 rounded-md border border-red-500/50 bg-red-500/10 px-2.5 py-2 text-xs text-red-600 dark:text-red-400">
+          <div className="font-bold">🛑 ANALİZ BAYAT — yarış bağlamı değişti, yeniden analiz gerekli</div>
+          {prediction.staleReason && <p className="mt-0.5">{prediction.staleReason}</p>}
+        </div>
+      )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -331,9 +348,17 @@ export default function RaceAdviceCard({
 
         <div className="flex shrink-0 items-center justify-between gap-2 sm:flex-col sm:items-end">
           {prediction ? (
-            <span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold", prediction.published ? "text-[#006D05]" : "text-brand")}>
-              {prediction.published && <Radio className="h-3 w-3 animate-pulse" />}
-              Analiz {prediction.published ? "Yayında" : "Taslak"}
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 text-xs font-semibold",
+                prediction.status === "STALE" ? "text-red-600 dark:text-red-400" : prediction.published ? "text-[#006D05]" : "text-brand"
+              )}
+            >
+              {prediction.published && prediction.status !== "STALE" && <Radio className="h-3 w-3 animate-pulse" />}
+              {/* 2026-09-17 — Race Context Invalidation: `published` fiziksel olarak hâlâ
+                  true kalabilir (geçmiş kaydı bozulmasın diye dokunulmuyor), ama admin'e
+                  ASLA "Yayında" görünmemeli — canlıda zaten gösterilmiyor. */}
+              Analiz {prediction.status === "STALE" ? "BAYAT (geçersiz)" : prediction.published ? "Yayında" : "Taslak"}
             </span>
           ) : (
             <span className="text-xs text-muted-foreground">Analiz yok</span>

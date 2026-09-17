@@ -10,6 +10,7 @@ import { breedToIrk, surfaceToPist, mesafeBucket, havuzAnahtari, eslestirSireSta
 import { fetchTodaysAltiliResults } from "./ingest/tjk-altili.adapter";
 import { findIkramiyeForHippodrome } from "@/lib/altili-match";
 import { hesaplaYarisGidisati, type AtTempoProfili, type TekYarisStil, type TempoSenaryosu } from "@/lib/methodology/pace-analizi";
+import { analizCanliMi } from "@/lib/methodology/pick-display-order";
 
 /** Runner.raceStyle JSON alanından ("style" + "percent" + "veri" + "dagilim") ekranda
  *  gösterilecek değeri çıkarır. dagilim (2026-09-01, Yarış Gidişatı çalışmasıyla eklendi) —
@@ -63,6 +64,11 @@ export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
             pistAnormalMi: true;
             pistDuyarliligi: true;
             pistUyariMesaji: true;
+            // 2026-09-17 — Race Context Invalidation (bkz. pick-display-order.ts
+            // analizCanliMi): status/staleReason olmadan `published` TEK BAŞINA canlı
+            // gösterime yetip yetmediğini söylemez.
+            status: true;
+            staleReason: true;
             picks: {
               orderBy: { rank: "asc" };
               select: {
@@ -162,6 +168,8 @@ export async function getRaceDaysByDate(
               pistAnormalMi: true,
               pistDuyarliligi: true,
               pistUyariMesaji: true,
+              status: true,
+              staleReason: true,
               picks: {
                 orderBy: { rank: "asc" },
                 select: {
@@ -323,6 +331,10 @@ export async function getActivePredictions(): Promise<PredictionListItem[]> {
   return db.prediction.findMany({
     where: {
       published: true,
+      // 2026-09-17 — Race Context Invalidation: bkz. pick-display-order.ts analizCanliMi.
+      // Bu doğrudan public bir "aktif öneriler" listesi — admin re-review ARASI YOK,
+      // STALE bir analiz burada asla görünmemeli.
+      status: { not: "STALE" },
       race: {
         result: null,
         raceDay: { date: { gte: today } },
@@ -372,7 +384,8 @@ export async function getComboCoupon(hippodromeSlug: string, dateStr: string): P
     where: { date, hippodrome: { slug: hippodromeSlug } },
     include: {
       races: {
-        where: { prediction: { published: true } },
+        // 2026-09-17 — Race Context Invalidation: bkz. pick-display-order.ts analizCanliMi.
+        where: { prediction: { published: true, status: { not: "STALE" } } },
         include: {
           prediction: {
             include: {
@@ -988,6 +1001,13 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
           result: { select: { winnerNo: true, winnerNos: true, actualOrder: true, ganyan: true, time: true, farklar: true } },
           prediction: {
             select: {
+              // 2026-09-17 bug düzeltmesi: bu seçim eskiden `published`/`status` HİÇ
+              // içermiyordu — hasAnalysis/picks yalnız "pick var mı"ya bakıyordu, taslak
+              // (published=false) bir analiz de picks taşıyorsa /program ve /altili'de
+              // YAYINLANMIŞ gibi gösteriliyordu (gerçek DB kayıtlarıyla doğrulandı).
+              // Artık analizCanliMi (published && status="FRESH") ile gate ediliyor.
+              published: true,
+              status: true,
               picks: {
                 orderBy: { rank: "asc" },
                 select: {
@@ -1157,11 +1177,15 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
         runners: mappedRunners,
         tempoSenaryosu: hesaplaRaceTempoSenaryosu(mappedRunners, r.distance),
         result: r.result,
-        hasAnalysis: pred != null && pred.picks.length > 0,
-        picks: (pred?.picks ?? []).map((p) => ({
-          ...p,
-          details: p.details,
-        })),
+        // 2026-09-17 — bkz. yukarıdaki 'select' notu: analizCanliMi (published &&
+        // status="FRESH") olmadan bir taslak/STALE analiz gerçekmiş gibi gösterilmesin.
+        hasAnalysis: analizCanliMi(pred) && (pred?.picks.length ?? 0) > 0,
+        picks: analizCanliMi(pred)
+          ? (pred?.picks ?? []).map((p) => ({
+              ...p,
+              details: p.details,
+            }))
+          : [],
       };
     }),
   }));

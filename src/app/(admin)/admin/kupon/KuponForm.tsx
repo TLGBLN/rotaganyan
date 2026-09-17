@@ -22,6 +22,11 @@ type RaceRiskInfo = {
   pistDuyarliligi: string | null;
   gecmisRiskSeviyesi: string | null;
   pistUyariMesaji: string | null;
+  // 2026-09-17 — Race Context Invalidation (bkz. race-context-invalidation.ts). true ise
+  // bu koşunun analizi artık GEÇERSİZ bir yarış bağlamı için üretilmiş (pist/mesafe/sınıf/
+  // at listesi değişti) — otomatikGroupSelections bu koşuyu TAMAMEN dışlar (bkz. aşağıda).
+  stale: boolean;
+  staleReason: string | null;
 };
 type RaceDayData = {
   hippodromeName: string;
@@ -109,7 +114,12 @@ function otomatikGroupSelections(
   tolerances: Record<Width, number> = TOLERANCES
 ): GroupSelections {
   const zorunluMinimum = anormalPistZorunluMinimumHesapla(races);
-  const legs: LegProbability[] = races.map((race) => ({
+  // 2026-09-17 — Race Context Invalidation: STALE bir koşunun picks'i artık GEÇERSİZ bir
+  // yarış bağlamına (eski pist/mesafe/at listesi) ait olabilir — otomatik doldurma bu
+  // ayağa HİÇ dokunmaz (0 at seçili kalır), admin elle yeniden analiz edip doldurmalı.
+  const legs: LegProbability[] = races
+    .filter((race) => !race.stale)
+    .map((race) => ({
     raceNo: race.raceNo,
     runners: race.runners
       .filter((r) => !r.scratched)
@@ -426,6 +436,21 @@ function KuponGrup({
           ⚠ {statikAyaklariBul(races, selections).map((n) => `${n}. Koşu`).join(", ")} ayağında Ekonomik/Normal/Geniş
           AYNI atları taşıyor — bu ayak hiç genişletilmemiş. Genişletmeden bütçe ödemek, kazananın
           başka bir atta çıktığı her senaryoda TÜM kuponu düşürür (bkz. Karma/GÜL AYALI vakası).
+        </div>
+      )}
+
+      {/* 2026-09-17 — Race Context Invalidation: bu ayaklar otomatik doldurmaya HİÇ dahil
+          edilmedi (bkz. otomatikGroupSelections'taki filtre) — admin bu koşuları yeniden
+          analiz edip elle doldurmalı, aksi halde bu ayaklar boş kalır. */}
+      {races.some((r) => r.stale) && (
+        <div className="space-y-1 rounded-md border border-red-500/50 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+          {races
+            .filter((r) => r.stale)
+            .map((r) => (
+              <div key={r.raceNo} className="font-semibold">
+                🛑 {r.raceNo}. Koşu — ANALİZ BAYAT, otomatik doldurmaya dahil edilmedi: {r.staleReason ?? "yarış bağlamı değişti, yeniden analiz gerekli."}
+              </div>
+            ))}
         </div>
       )}
 

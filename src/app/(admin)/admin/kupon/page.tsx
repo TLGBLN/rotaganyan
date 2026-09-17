@@ -215,6 +215,8 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                               pistDuyarliligi: effectivePred.pistDuyarliligi,
                               gecmisRiskSeviyesi: effectivePred.gecmisRiskSeviyesi,
                               pistUyariMesaji: effectivePred.pistUyariMesaji,
+                              status: effectivePred.status,
+                              staleReason: effectivePred.staleReason,
                             }
                           : null
                       }
