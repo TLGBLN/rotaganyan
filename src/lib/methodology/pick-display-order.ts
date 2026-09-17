@@ -25,14 +25,3 @@ export function siraliPickSatirlari<T extends { score: number | null }>(rows: T[
 function enYuksekSkor<T extends { score: number | null }>(row: T[]): number {
   return Math.max(...row.map((p) => p.score ?? 0));
 }
-
-// 2026-09-17 — Race Context Invalidation (bkz. proje hafızası project_race_context_invalidation).
-// AYNI dersin (bu dosyanın üstteki 2026-09-05 notu) bir tekrarı: "bu analiz gerçekten
-// canlıya güvenle gösterilebilir mi" sorusunun cevabı TEK yerde olmalı — published=true
-// TEK BAŞINA yeterli değil, status="STALE" (ingest sonradan pist/mesafe/sınıf/at listesi
-// gibi analiz-etkileyici bir alanı değiştirdiyse) ihracını da kontrol etmeli. Yeni bir
-// public/kupon gösterim noktası eklenirken bu fonksiyon kullanılmalı, `prediction.published`
-// doğrudan KONTROL EDİLMEMELİ.
-export function analizCanliMi(p: { published: boolean; status?: string | null } | null | undefined): boolean {
-  return !!p?.published && (p.status ?? "FRESH") === "FRESH";
-}

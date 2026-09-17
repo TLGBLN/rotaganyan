@@ -56,9 +56,6 @@ export type AdminRaceDay = Prisma.RaceDayGetPayload<{
             pistDuyarliligi: true;
             gecmisRiskSeviyesi: true;
             pistUyariMesaji: true;
-            // 2026-09-17 — Race Context Invalidation (bkz. RaceAdviceCard.tsx STALE rozeti).
-            status: true;
-            staleReason: true;
             picks: { select: { rank: true; isTarget: true; score: true; scoreExact: true; runnerLabel: true } };
           };
         };
@@ -145,8 +142,6 @@ export async function getAdminRaceDays(dateStr?: string, limit = 30): Promise<Ad
               pistDuyarliligi: true,
               gecmisRiskSeviyesi: true,
               pistUyariMesaji: true,
-              status: true,
-              staleReason: true,
               picks: { orderBy: { rank: "asc" }, select: { rank: true, isTarget: true, score: true, scoreExact: true, runnerLabel: true } },
             },
           },

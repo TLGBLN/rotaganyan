@@ -13,7 +13,7 @@ export async function createMorningHorseNotifications() {
     where: {
       race: {
         raceDay: { date: new Date(today + "T00:00:00Z") },
-        prediction: { published: true, status: { not: "STALE" } },
+        prediction: { published: true },
       },
     },
     select: {
@@ -96,7 +96,7 @@ export async function createHourlyHorseNotifications() {
       race: {
         time: targetTimeStr,
         raceDay: { date: new Date(today + "T00:00:00Z") },
-        prediction: { published: true, status: { not: "STALE" } },
+        prediction: { published: true },
       },
     },
     select: {

@@ -51,14 +51,6 @@ type PredictionInput = {
   pistDuyarliligi?: string | null;
   gecmisRiskSeviyesi?: string | null;
   pistUyariMesaji?: string | null;
-  // 2026-09-17 — Race Context Invalidation (bkz. proje hafızası
-  // project_race_context_invalidation). Bu analizin üretildiği anki yarış bağlamının
-  // özeti — ingest sonradan bunlardan biriyle çelişirse Prediction "STALE" olur (bkz.
-  // ingest/base.ts). Hepsi opsiyonel, eski çağıranlar hiç göndermez.
-  analyzedSurface?: string;
-  analyzedDistance?: number;
-  analyzedClassType?: string;
-  analyzedRunnerSignature?: string;
   picks: PickInput[];
 };
 
@@ -277,16 +269,6 @@ export async function upsertPrediction(input: PredictionInput) {
         pistDuyarliligi: input.pistDuyarliligi,
         gecmisRiskSeviyesi: input.gecmisRiskSeviyesi,
         pistUyariMesaji: input.pistUyariMesaji,
-        // 2026-09-17 — Race Context Invalidation: elle/otomatik HER kaydetme, admin'in
-        // bu yarış bağlamını ŞU AN doğru gördüğü anlamına gelir — status daima FRESH'e
-        // döner (bkz. ingest/base.ts'in bunu sonradan STALE'e düşürme mantığı).
-        analyzedSurface: input.analyzedSurface,
-        analyzedDistance: input.analyzedDistance,
-        analyzedClassType: input.analyzedClassType,
-        analyzedRunnerSignature: input.analyzedRunnerSignature,
-        status: "FRESH",
-        staleReason: null,
-        staleAt: null,
         // published/publishedAt burada YOK — aşağıda assertPublishSafe geçince ayrıca
         // set ediliyor (bkz. fonksiyonun sonu, 2026-07-26 kullanıcı talimatı: "Kaydet"
         // artık ayrı bir "Yayımla" adımı olmadan doğrudan yayınlamayı dener).
@@ -326,10 +308,6 @@ export async function upsertPrediction(input: PredictionInput) {
         pistDuyarliligi: input.pistDuyarliligi,
         gecmisRiskSeviyesi: input.gecmisRiskSeviyesi,
         pistUyariMesaji: input.pistUyariMesaji,
-        analyzedSurface: input.analyzedSurface,
-        analyzedDistance: input.analyzedDistance,
-        analyzedClassType: input.analyzedClassType,
-        analyzedRunnerSignature: input.analyzedRunnerSignature,
         picks: {
           create: completedPicks.map((p) => ({
             rank: p.rank,

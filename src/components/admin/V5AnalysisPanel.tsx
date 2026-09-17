@@ -155,15 +155,6 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
   // dolar (kayıtlı/eski kayıtlarda null) — V5.46 skoruna girmez, yalnız banko kapısını
   // besler ve admin'e detay gösterir.
   const [anormalPistRiski, setAnormalPistRiski] = useState<AnormalPistRiskSonucu | null>(null);
-  // 2026-09-17 — Race Context Invalidation: bu analizin üretildiği anki yarış bağlamının
-  // donmuş özeti (bkz. Prediction.analyzed* alanları) — ingest sonradan bunlardan biriyle
-  // ÇELİŞEN veri getirirse Prediction otomatik "STALE" olur (bkz. ingest/base.ts).
-  const [analizGirdiOzeti, setAnalizGirdiOzeti] = useState<{
-    analyzedSurface: string;
-    analyzedDistance: number;
-    analyzedClassType: string;
-    analyzedRunnerSignature: string;
-  } | null>(null);
   const [kuponlar, setKuponlar] = useState<{ narrow?: string; normal?: string; wide?: string }>(kayitliBaslangic?.kuponlar ?? {});
   const [kaynak, setKaynak] = useState<"kayitli" | "canli" | null>(kayitliBaslangic ? "kayitli" : null);
   const [acikDetay, setAcikDetay] = useState<Set<number>>(new Set());
@@ -194,7 +185,6 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
     setApplied(false);
     setBankoAdayi(null);
     setAnormalPistRiski(null);
-    setAnalizGirdiOzeti(null);
     setKaynak(null);
     setKategori(null);
     setMotorEtiketi(null);
@@ -215,10 +205,6 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         runners: Runner[];
         bankoAdayi: BankoAdayiSonuc;
         anormalPistRiski?: AnormalPistRiskSonucu;
-        analyzedSurface?: string;
-        analyzedDistance?: number;
-        analyzedClassType?: string;
-        analyzedRunnerSignature?: string;
         couponNarrow?: string;
         couponNormal?: string;
         couponWide?: string;
@@ -235,16 +221,6 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       setRunners(data.runners ?? []);
       setBankoAdayi(data.bankoAdayi ?? null);
       setAnormalPistRiski(data.anormalPistRiski ?? null);
-      setAnalizGirdiOzeti(
-        data.analyzedSurface != null && data.analyzedDistance != null && data.analyzedClassType != null && data.analyzedRunnerSignature != null
-          ? {
-              analyzedSurface: data.analyzedSurface,
-              analyzedDistance: data.analyzedDistance,
-              analyzedClassType: data.analyzedClassType,
-              analyzedRunnerSignature: data.analyzedRunnerSignature,
-            }
-          : null
-      );
       setKuponlar({ narrow: data.couponNarrow, normal: data.couponNormal, wide: data.couponWide });
       setKategori(data.kategori ?? null);
       setMotorEtiketi(data.motorEtiketi ?? null);
@@ -345,13 +321,6 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         pistDuyarliligi: anormalPistRiski?.pistDuyarliligi ?? null,
         gecmisRiskSeviyesi: anormalPistRiski?.gecmisRiskSeviyesi ?? null,
         pistUyariMesaji: anormalPistRiski?.operasyon.uyariMesaji || null,
-        // 2026-09-17 — Race Context Invalidation: bu kayıt her zaman TAZE bir analizin
-        // sonucu (kaydetmek = "bu bağlam için güncel" demek) — upsertPrediction bu alanları
-        // yazarken status'ü de otomatik "FRESH"e döndürür (bkz. prediction.actions.ts).
-        analyzedSurface: analizGirdiOzeti?.analyzedSurface,
-        analyzedDistance: analizGirdiOzeti?.analyzedDistance,
-        analyzedClassType: analizGirdiOzeti?.analyzedClassType,
-        analyzedRunnerSignature: analizGirdiOzeti?.analyzedRunnerSignature,
         picks,
       });
       if (res.publishError) {
