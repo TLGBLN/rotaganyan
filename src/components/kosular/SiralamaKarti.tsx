@@ -162,7 +162,7 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
                       AGF {agfSiraMap.get(topPick.runner.no)}.
                     </span>
                   )}
-                  <span className="text-lg font-extrabold text-brand sm:text-xl">
+                  <span className="text-lg font-extrabold font-math text-brand sm:text-xl">
                     %{puanYuzdesiMetni(topPick.score, topPick.scoreExact) ?? "—"}
                   </span>
                 </div>

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Barlow_Condensed } from "next/font/google";
+import { Geist_Mono, Barlow_Condensed } from "next/font/google";
+import localFont from "next/font/local";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,9 +19,25 @@ import { auth } from "@/lib/auth";
 import type { AppLocale } from "@/i18n/request";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+// 2026-09-17 kullanıcı kararı: 2026-09-14'teki "tüm site tek font (Geist)" kararı BİLEREK
+// geri alındı — LaTeX'in klasik ikilisi (Computer Modern Roman düz metin/rakamlar için,
+// Computer Modern Math Italic yalnız matematiksel formül/skor gösterimi için) siteye
+// eklendi. Roman = "computer-modern" npm paketinin CMU Serif ailesi (OFL lisanslı).
+// Math Italic = KaTeX'in kendi "KaTeX_Math-Italic" fontu — bu, LaTeX'in cmmi10 (Computer
+// Modern Math Italic) fontunun web'e uyarlanmış BİREBİR metrik karşılığı (MIT lisanslı).
+const cmuRoman = localFont({
+  variable: "--font-cmu-roman",
+  src: [
+    { path: "../../public/fonts/CMURoman-Regular.woff2", weight: "400", style: "normal" },
+    { path: "../../public/fonts/CMURoman-Bold.woff2", weight: "700", style: "normal" },
+    { path: "../../public/fonts/CMURoman-Italic.woff2", weight: "400", style: "italic" },
+    { path: "../../public/fonts/CMURoman-BoldItalic.woff2", weight: "700", style: "italic" },
+  ],
+});
+
+const cmMathItalic = localFont({
+  variable: "--font-cm-math-italic",
+  src: "../../public/fonts/CMMathItalic.woff2",
 });
 
 const geistMono = Geist_Mono({
@@ -92,7 +109,7 @@ export default async function RootLayout({
   return (
     <html lang={locale} suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${barlowCondensed.variable} antialiased min-h-screen bg-background text-foreground`}
+        className={`${cmuRoman.variable} ${cmMathItalic.variable} ${geistMono.variable} ${barlowCondensed.variable} antialiased min-h-screen bg-background text-foreground`}
         suppressHydrationWarning
       >
         <ThemeProvider>

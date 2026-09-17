@@ -105,7 +105,7 @@ function PuanHucre({ score, details, scoreExact }: { score: number | null; detai
   return (
     <span className="relative isolate inline-flex w-full items-center justify-center overflow-hidden rounded-sm py-px">
       <span aria-hidden className="absolute inset-y-0 left-0 -z-10 bg-current opacity-[0.16]" style={{ width: `${pct}%` }} />
-      <span>%{metin}</span>
+      <span className="font-math">%{metin}</span>
     </span>
   );
 }

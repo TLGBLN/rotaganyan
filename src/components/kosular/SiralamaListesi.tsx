@@ -206,7 +206,7 @@ export default function SiralamaListesi({
                 <Son5Yaris form={formByNo.get(primary.runner?.no ?? -1)} adet={5} />
               </span>
 
-              <span className="text-center text-sm font-bold tabular-nums">
+              <span className="text-center text-sm font-bold font-math tabular-nums">
                 {modelMetin != null ? `%${modelMetin}` : "—"}
               </span>
             </div>

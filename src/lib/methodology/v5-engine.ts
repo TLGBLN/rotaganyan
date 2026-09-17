@@ -1551,9 +1551,12 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
 // ≥2-farklı-aile bağımsız sinyal şartı, pistUzmani/kaçak-tek kapıları, negatif-sinyal
 // diskalifiye kapısı) BİLEREK eklenmedi — hiçbiri isabeti artırmadı, çoğu tetik sayısını
 // 2-6 kat düşürdü (bkz. sinyal-kutugu.service.ts).
-const BANKO_OLASILIK_ESIGI = 0.5;
+// export edildi (2026-09-17, pure additive — davranış değişikliği YOK): banko eşiği
+// kalibrasyon tanı scripti (arac-banko-esik-tanisi.mts) v5BankoAdayiTespit'in kendi
+// mantığını YENİDEN YAZMADAN aynı eşik/kural setini kullanabilsin diye.
+export const BANKO_OLASILIK_ESIGI = 0.5;
 const GUCLU_BANKO_OLASILIK_ESIGI = 0.6;
-const AGF_OZELLIK_KODLARI = new Set(["agfSirasi", "agfPayi", "agfYukselisVarMi", "agfDususVarMi"]);
+export const AGF_OZELLIK_KODLARI = new Set(["agfSirasi", "agfPayi", "agfYukselisVarMi", "agfDususVarMi"]);
 
 export type V5BankoSonuc = { bankoAdayi: boolean; gucluBanko?: boolean; sebep: string; birinci?: { no: number; ad: string; karar: string } };
 
@@ -1721,7 +1724,7 @@ export function tumOzellikleriListele(r: Faz1RunnerV5Sirali): TumOzellikDetay[] 
   }));
 }
 
-const GUCLU_ESIK = 0.3;
+export const GUCLU_ESIK = 0.3; // export: bkz. yukarıdaki BANKO_OLASILIK_ESIGI notu
 const ORTA_ESIK = 0.1;
 
 export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): PickDetailsV2 {
