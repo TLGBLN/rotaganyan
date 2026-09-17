@@ -8,6 +8,7 @@ import { siraliPickler } from "@/lib/methodology/pick-display-order";
 import { puanYuzdesiMetni, piyasaFarkiPuani } from "@/lib/methodology/muhakeme-format";
 import { KuponBlock } from "@/components/home/TahminOnerileri";
 import SiralamaListesi, { Son5Yaris } from "./SiralamaListesi";
+import { agfSiraMapOlustur } from "@/lib/agf-sira";
 
 type Race = ProgramRaceDay["races"][number];
 type Kupon = NonNullable<KuponOnerisi>;
@@ -63,6 +64,9 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
   const topPick = siraliPickler(picks)[0];
   const topModel = topPick ? topPick.scoreExact ?? topPick.score : null;
   const topAgf = topPick?.runner?.no != null ? agfByNo.get(topPick.runner.no) ?? null : null;
+  // 2026-09-17 kullanıcı talebi: AGF sırası (1., 2., ...) liste satırlarındaki gibi
+  // hero'daki 1. sıra atın adının yanında da görünsün — bkz. SiralamaListesi.tsx.
+  const agfSiraMap = agfSiraMapOlustur(race.runners);
   const fark = topModel != null ? piyasaFarkiPuani(topModel, topAgf) : null;
   const tempo = tempoByRaceId[race.id] ?? null;
 
@@ -151,6 +155,13 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
               <div className="min-w-0">
                 <div className="flex flex-wrap items-baseline gap-x-2">
                   <span className="truncate text-lg font-bold sm:text-xl">{topPick.runner?.name ?? topPick.runnerLabel ?? "—"}</span>
+                  {topPick.runner?.no != null && agfSiraMap.has(topPick.runner.no) && (
+                    // Hero'nun kendi bg/text ters-çevirme deseniyle uyumlu (bkz. "1." rozeti) —
+                    // sabit mor renk bu koyu/açık ters-dönen zeminde her temada okunaklı olmazdı.
+                    <span className="shrink-0 rounded bg-background/20 px-1.5 py-0.5 text-xs font-semibold">
+                      AGF {agfSiraMap.get(topPick.runner.no)}.
+                    </span>
+                  )}
                   <span className="text-lg font-extrabold text-brand sm:text-xl">
                     %{puanYuzdesiMetni(topPick.score, topPick.scoreExact) ?? "—"}
                   </span>

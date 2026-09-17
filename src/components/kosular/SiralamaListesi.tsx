@@ -6,6 +6,7 @@ import { finishPos } from "@/lib/race-result";
 import { kararOku, puanYuzdesiMetni } from "@/lib/methodology/muhakeme-format";
 import { ekuriRengi } from "@/lib/ekuri-colors";
 import { siraliPickSatirlari } from "@/lib/methodology/pick-display-order";
+import { agfSiraMapOlustur } from "@/lib/agf-sira";
 
 type Race = ProgramRaceDay["races"][number];
 type Pick = NonNullable<Race["prediction"]>["picks"][number];
@@ -93,6 +94,11 @@ export default function SiralamaListesi({
   const picks = race.prediction?.picks ?? [];
   if (picks.length === 0) return null;
   const rows = buildRows(picks);
+  // 2026-09-17 kullanıcı talebi: AGF sırası burada HERKESE açık gösterilsin (agf-sira.ts'teki
+  // "yalnız admin görsün" kararı ProgramView/PuanTablosu için geçerli kalıyor, bu sayfa için
+  // kullanıcı bilerek istisna istedi) — TJK'nın kendi kamuya açık AGF verisi zaten, bkz.
+  // feedback_mutfagi_acma_ilkesi.
+  const agfSiraMap = agfSiraMapOlustur(race.runners);
 
   return (
     <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
@@ -161,6 +167,11 @@ export default function SiralamaListesi({
                         <span title={`Eküri grubu ${pick.runner.ekuriGroup}`} className={cn("inline-block h-1.5 w-1.5 shrink-0 rounded-full", ekuriRengi(pick.runner.ekuriGroup).badge)} />
                       )}
                       {pick.runner?.scratched && <span className="shrink-0 text-[10px] font-semibold text-red-400">Koşmaz</span>}
+                      {pick.runner?.no != null && agfSiraMap.has(pick.runner.no) && (
+                        <span className="shrink-0 rounded bg-purple-500/15 px-1 text-[9px] font-semibold text-purple-500">
+                          AGF {agfSiraMap.get(pick.runner.no)}.
+                        </span>
+                      )}
                       {(() => {
                         const pos = finishPos(race.result?.actualOrder, pick.runner?.no, race.result?.winnerNos);
                         return pos != null ? (
