@@ -175,8 +175,8 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
           gerçek ekranda/ekran görüntüsünde neredeyse hiç okunmuyordu — %14'e çıkarıldı. */}
       <div className="isolate relative flex flex-col overflow-hidden rounded-lg border bg-card">
         <div className="pointer-events-none absolute inset-0 -z-10 flex flex-col items-center justify-center gap-2 opacity-[0.14]">
-          <Image src="/horse-icon-gold.png" alt="" width={160} height={160} />
-          <span className="text-3xl font-black leading-none tracking-tight">
+          <Image src="/horse-icon-gold.png" alt="" width={140} height={140} />
+          <span className="text-2xl font-black leading-none tracking-tight">
             <span className="text-foreground">ROTA</span>
             <span className="text-brand">GANYAN</span>
           </span>
