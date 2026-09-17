@@ -174,8 +174,9 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
           context'i veriliyor, kaçış imkansız. (2) altın rengin koyu zeminde %6-8 opaklığı
           gerçek ekranda/ekran görüntüsünde neredeyse hiç okunmuyordu — %14'e çıkarıldı. */}
       <div className="isolate relative flex flex-col overflow-hidden rounded-lg border bg-card">
-        <div className="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center">
+        <div className="pointer-events-none absolute inset-0 -z-10 flex flex-col items-center justify-center gap-1">
           <Image src="/horse-icon-gold.png" alt="" width={200} height={200} className="opacity-[0.14]" />
+          <span className="text-xl font-bold tracking-wide text-foreground opacity-[0.14]">ROTAGANYAN</span>
         </div>
         {/* 2026-09-17 kullanıcı talebi: Ekonomik/Normal/Geniş kupon kartının kendisinde de
             (yalnız paylaşım görselinde değil, sitedeki canlı widget'ta da) Rotaganyan markası
