@@ -24,11 +24,24 @@ Toplam: **skor = A-katmanı regresyon skoru + Δ_sire + Δ_zeminMesafe**, sonra 
 
 ## 2. A katmanı — 14 ortak regresyon sinyali
 
-Sıra `toFeatureVector()`'daki (v5-engine.ts:850) BİREBİR sıradır. Segment ağırlık setleri:
-- **WEIGHTS_DUSUK_SART** — kategori 1a/1b (Şartlı1/19/27 + Maiden)
-- **WEIGHTS_DIGER** — kalan tüm koşular (pooled)
-- **WEIGHTS_DIGER_HANDIKAP** — kategori 2 (Handikap), `WEIGHTS_DIGER` üzerine 3 katsayı elle sıfırlanarak kurulu
-- **Hibrit (Maiden/Satış)** — DUSUK_SART + DIGER'in %50-%50 harmanı (`harmanliSkorla`). **Doğrulandı (2026-09-18 dış denetim):** harman β_hibrit=0.5β_low+0.5β_other TEK z ile YAPILMIYOR — `harmanliSkorla` her `ws` (weight seti) için `standardize(v, ws)`'yi KENDİ ws.means/ws.stds'iyle ayrı ayrı çağırıyor (`S_hibrit = 0.5·Σ(β_low,j·z_low,j) + 0.5·Σ(β_other,j·z_other,j)`, z_low ve z_other FARKLI μ/σ ile), matematiksel olarak doğru yöntem.
+Sıra `toFeatureVector()`'daki (v5-engine.ts:850) BİREBİR sıradır. **Terminoloji düzeltmesi
+(2026-09-18 dış denetim):** "3 ayrı eğitilmiş ağırlık seti" YANLIŞ ifade — gerçekte **2
+eğitilmiş ağırlık seti + 1 Handikap override profili**:
+- **WEIGHTS_DUSUK_SART** — kategori 1a/1b (Şartlı1/19/27 + Maiden) — **eğitilmiş**
+- **WEIGHTS_DIGER** — kalan tüm koşular (pooled) — **eğitilmiş**
+- **WEIGHTS_DIGER_HANDIKAP** — kategori 2 (Handikap) — AYRI EĞİTİLMEMİŞ, `WEIGHTS_DIGER`
+  üzerine 3 katsayı (Hız Derecesi, İdman-Jokey, Yarış Gidişatı) elle sıfırlanarak türetilmiş
+  bir **override profili**
+- **Hibrit (Maiden/Satış)** — `agirlikSetleriSec`, ham classType'ta hem "MAIDEN"/"ŞARTLI 19"
+  hem "SATIŞ" geçiyorsa `[WEIGHTS_DUSUK_SART, WEIGHTS_DIGER]` döner (ikisi de CANLI/override'lı
+  halleriyle). **Doğrulandı (2026-09-18 dış denetim):** harman β_hibrit=0.5β_low+0.5β_other
+  TEK z ile YAPILMIYOR — `harmanliSkorla` her `ws` (weight seti) için `standardize(v, ws)`'yi
+  KENDİ ws.means/ws.stds'iyle ayrı ayrı çağırıyor:
+  ```
+  A_i,Hibrit = 0.5·A_i,DüşükŞart + 0.5·A_i,Diğer
+  ```
+  her taraf KENDİ μ/σ VE kendi canlı override'larıyla ÖNCE ayrı hesaplanıp SONRA
+  ortalanıyor — yanlış kısayol (`β_hibrit` tek ortak z ile) KULLANILMIYOR.
 
 | # | Sinyal | x (ham değer) | Segment davranışı | Durum |
 |---|---|---|---|---|
@@ -47,6 +60,16 @@ Sıra `toFeatureVector()`'daki (v5-engine.ts:850) BİREBİR sıradır. Segment a
 | 13 | **Yarış Gidişatı** | `yarisGidisatiSkoru` = tempo senaryosu (Accurace geçmişinden kural-tabanlı olasılık dağılımı: Rahat Liderlik/Yavaş/Dengeli/Mücadeleli/Çok Yüksek/Dağılma Riski) × at-stil uyum matrisi + zorluk-ağırlıklı Tempo Taşıma Gücü terimi (`stilUyumu + zorluk×tempoTasima×4`) × mesafe katsayısı | **Handikap'ta β=0** (Handikap DIŞI 585 koşuda GA=[0.0596,0.2775] kesin anlamlı; Handikap içi 366 koşuda ters/anlamsız GA=[-0.168,0.104] — havuzlanmış katsayı bu yüzden bıçak sırtındaydı) | Kısmen kanıtlanmış (segment-özel) — **çarpımsal alternatif form (2026-09-12) test edildi, tüm λ'larda GA sıfırı içerdi, REDDEDİLDİ, mevcut toplamsal form korundu** |
 | 14 | **KGS Gün** | `kgs` (`son-yaris-detay.actions.ts`'in `gunFarki`'si — son yarıştan bugüne HAM gün sayısı, -1=veri yok sentinel; missing satırlarda `KGS_GUN_POP_ORT_DIGER=27.95`'e impute edilir, jokeyOrani/antrenorOrani ile AYNI "population-mean fallback" deseni) | **Düşük-şart'ta β=0** (n=340 küçük, GA=[-0.1441,0.1673] sıfırı kapsıyor, signStability %66.0); diğer'de fit (β=-0.1108, uzun ara=düşük kazanma) | Kanıtlanmış (segment-özel, V5.47) — **KRİTİK kalibrasyon notu**: kgs "diğer"de ~%70 missing, means/stds[KGS_GUN_IDX] blanket `computeMeanStd` ÜZERİNE YAZILIP yalnız GEÇERLİ TRAIN satırlarından override edildi (aksi halde std ~%55'e küçülüp z-score'u ~1.8× büyütürdü) |
 
+**KGS Gün'ün segment-bazlı gerçek aktifliği (2026-09-18 dış denetim netleştirmesi) —
+"14. sinyal" olması TÜM kategorilerde aktif olduğu anlamına GELMİYOR:**
+
+| Segment | M (aktiflik) | β |
+|---|---|---|
+| Diğer (pooled) | 1 | -0,1108 |
+| Handikap | 1 (WEIGHTS_DIGER_HANDIKAP, kgsGun override listesinde YOK) | -0,1108 |
+| Düşük-şart | **0 (elle sıfırlandı)** | 0 |
+| Hibrit (Maiden/Satış) | yalnız Diğer-yarısından: `0,5×(-0,1108×z_diğer) + 0,5×0` | efektif yarım güç |
+
 **Ölü/çıkarılmış sinyaller (V5.46, 2026-09-12):** `kgsVarMi`, `kacakYalniz`, `h2hKiloDegisimi` — B=500 testinde üçü de tüm segmentlerde anlamsız çıktı, `toFeatureVector`'dan tamamen çıkarıldı. Ham alanlar `Faz1RunnerV5`'te hâlâ hesaplanıyor (maliyetsiz, `kgsVarMi` terfi penceresi gösteriminde kullanılıyor) — yalnız skora girmiyor.
 
 ---
@@ -56,7 +79,7 @@ Sıra `toFeatureVector()`'daki (v5-engine.ts:850) BİREBİR sıradır. Segment a
 | Sinyal | x (ham değer) | M (segment oranı) | z / merkezleme | β | Durum |
 |---|---|---|---|---|---|
 | **Sire Oranı** | `sireOrani` (`sire-stat.actions.ts` — aygırın ırk\|pist\|mesafe BAĞLAMSAL havuzunda kendi verimizden kazanma oranı, `shrink()` ile AYNI Bayesian formül, POP_ORT=0.14/k=20 — **birim notu (2026-09-18 dış denetim doğrulaması): `shrink()` 0-1 oran döner, `v5-engine.ts:810-811`'de `×100` ile YÜZDE-PUAN ölçeğine çevrilir, standardizasyondaki μ=11.6305 AYNI ölçekte — kod doğru, birim uyuşmazlığı YOK**) | Düşük-şart (1a/1b)=1, hibrit Maiden/Satış=0.5, diğer=0 | `(sireOrani - 11.6305) / 3.6563` (gerçek z-score, std'ye bölünüyor) | 0.0477 | **Kural istisnası, kanıtsız** — n=1060 tam testte GA=[-0.1352,0.2045] sıfırı kapsıyor, kullanıcı kararıyla (AskUserQuestion teyitli) eklendi |
-| **Zemin+Mesafe Deneyimi** | `zeminMesafeDeneyim` (`zemin-mesafe-deneyimi.actions.ts` — bugünkü pist+zemin TAM eşleşmesi [kategorik filtre, sürekli benzerlik skoru DEĞİL] + mesafe ±100m ise "tam" yoksa "kısmi"; değer=kilo-düzeltilmiş göreli pace %, min-örneklem eşiği altında "yok") | TÜM kategoriler=1 (veri yoksa, yani `zeminMesafeDeneyimSeviyesi==="yok"` ise 0) | **DÜZELTME (2026-09-18 dış denetim doğrulaması): bu bir z-score DEĞİL, saf MERKEZLEME** — `centeredContext = x - μ` (`bKatmaniUygula`, `v5-engine.ts:1434`: `B_ZEMINMESAFE_KATSAYI * (r.zeminMesafeDeneyim - B_ZEMINMESAFE_ORTALAMA)`), std'ye BÖLÜNMÜYOR. `μ=-0.515`, **2026-09-12'de eklendi**, gerçek popülasyon ortalaması (n=4482). Kod DEĞİŞTİRİLMEDİ (β zaten bu ölçeğe fit edilmiş) — yeniden standardize edilirse (÷σ) β'nın SIFIRDAN yeniden fit edilmesi gerekir, eski β yeni ölçeğe taşınamaz | 0.02 | **PROVISIONAL/deneysel** — "diğer" segmentte top3'te anlamlı iyileşme (+0.53pp, GA=[0.11,1.05]) ama kullanıcı uyarısı: tek günlük B=500 sonucu nihai kanıt sayılmasın |
+| **Zemin+Mesafe Deneyimi** | `zeminMesafeDeneyim` (`zemin-mesafe-deneyimi.actions.ts` — bugünkü pist+zemin TAM eşleşmesi [kategorik filtre, sürekli benzerlik skoru DEĞİL] + mesafe ±100m ise "tam" yoksa "kısmi"; değer=kilo-düzeltilmiş göreli pace %, min-örneklem eşiği altında "yok") | TÜM kategoriler=1 (veri yoksa, yani `zeminMesafeDeneyimSeviyesi==="yok"` ise 0) | **DÜZELTME (2026-09-18 dış denetim, PIECEWISE olarak netleştirildi): bu bir z-score DEĞİL, saf MERKEZLEME, VE missing durumu formüle x=0 olarak GİRMİYOR** (girmiş olsaydı 0.02×(0+0.515)=+0.0103 gibi sahte bir katkı doğardı) — kod `bKatmaniUygula:1434`'te açık ternary ile korunuyor:<br>`Δ_ZM = 0, veri yoksa (seviye==="yok")`<br>`Δ_ZM = 0.02·(x − (−0.515)), veri varsa`<br>std'ye BÖLÜNMÜYOR. `μ=-0.515`, **2026-09-12'de eklendi**, gerçek popülasyon ortalaması (n=4482). Kod DEĞİŞTİRİLMEDİ (β zaten bu ölçeğe fit edilmiş) — yeniden standardize edilirse (÷σ) β'nın SIFIRDAN yeniden fit edilmesi gerekir, eski β yeni ölçeğe taşınamaz | 0.02 | **PROVISIONAL/deneysel** — "diğer" segmentte top3'te anlamlı iyileşme (+0.53pp, GA=[0.11,1.05]) ama kullanıcı uyarısı: tek günlük B=500 sonucu nihai kanıt sayılmasın |
 
 Formül: `Δ = M × β × z` (Sire Oranı'nda `M` çarpanı olarak doğrudan içeri, Zemin+Mesafe'de `M` koşullu 0/geçer olarak).
 
@@ -72,11 +95,16 @@ S_i = Σ(j=1..13) M_ij × β_j × z_ij  +  Δ_sire,i  +  Δ_context,i
 
 (`Δ_context` = Zemin+Mesafe Deneyimi'nin B-katmanı terimi.)
 
-Ardından, **yalnız** lider zaten baskınsa (genel eşik %70, Handikap'ta %35 — `ASIRI_GUVEN_LIDER_ESIGI`/`_HANDIKAP`), bir **kalibrasyon** adımı uygulanır:
+Ardından bir **kalibrasyon** adımı uygulanır — **NETLEŞTİRME (2026-09-18 dış denetim):
+eşik kontrolü KALİBRASYONDAN ÖNCEKİ HAM olasılık üzerinde yapılır**, kod (`effektifSkorlar`)
+tam olarak şu sırayla çalışır:
 
 ```
-S'_i = S_i / T         (T = 1.5, yalnız eşik aşıldıysa; aksi halde T=1 / adım atlanır)
-P_i  = exp(S'_i) / Σ_k exp(S'_k)
+P_i^raw = softmax(S_i)                          (T'siz, ham)
+T       = 1.5  eğer max(P^raw) ≥ eşik (genel %70, Handikap %35)
+          1    aksi halde
+S'_i    = S_i / T
+P_i     = exp(S'_i) / Σ_k exp(S'_k)              (nihai, gösterilen olasılık)
 ```
 
 **Bu adım bir sinyal DEĞİL** — T'nin kendi bir β'sı yok, hiçbir `z` ile çarpılmıyor, `toFeatureVector`'da yer almıyor. Yalnızca SIRALAMAYI (monoton dönüşüm) değil, uç-nokta aşırı-güveni sonradan yumuşatan ayrı bir kalibrasyon kuralı. Bu yüzden 2026-08-19/26 BODUBEY/EL LEON/Handikap kalibrasyon denetimlerinin bulgusu (`v5-engine.ts` içindeki `ASIRI_GUVEN_*` sabitleri) §2/§3'teki 15 sinyalden AYRI okunmalı — "kanıtlanmış/kural istisnası" etiketleri T için geçerli değil, T tamamen farklı bir doğrulama sürecinden (kalibrasyon backtesti) geçti.
