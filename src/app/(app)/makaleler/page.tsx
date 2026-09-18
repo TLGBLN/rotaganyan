@@ -61,7 +61,10 @@ export default async function MakalelerPage({ searchParams }: PageProps) {
                 <h2 className="line-clamp-2 font-bold leading-snug group-hover:text-brand">{a.title}</h2>
                 {a.excerpt && <p className="line-clamp-2 text-sm text-muted-foreground">{a.excerpt}</p>}
                 <div className="mt-auto flex items-center justify-between pt-2 text-xs text-muted-foreground">
-                  <span>{a.author.name}</span>
+                  {/* 2026-09-18 kullanıcı talebi: gerçek admin adı yerine jenerik "Rotaganyan
+                      Editör" — author ilişkisi (admin takibi için) DEĞİŞMEDİ, yalnız herkese
+                      açık gösterim etiketi. */}
+                  <span>Rotaganyan Editör</span>
                   {a.publishedAt && <span>{format(new Date(a.publishedAt), "d MMM yyyy", { locale: tr })}</span>}
                 </div>
               </div>

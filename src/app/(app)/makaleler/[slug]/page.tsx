@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       type: "article",
       images: image ? [{ url: image }] : undefined,
       publishedTime: article.publishedAt?.toISOString(),
-      authors: [article.author.name ?? "Rotaganyan"],
+      authors: ["Rotaganyan Editör"],
     },
     twitter: {
       card: image ? "summary_large_image" : "summary",
@@ -67,7 +67,7 @@ export default async function MakaleDetayPage({ params }: PageProps) {
           <h1 className="text-3xl font-bold leading-tight sm:text-4xl">{article.title}</h1>
           <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4 text-sm text-muted-foreground">
             <span>
-              {article.author.name}
+              Rotaganyan Editör
               {article.publishedAt && <> · {format(new Date(article.publishedAt), "d MMMM yyyy", { locale: tr })}</>}
             </span>
             <ArticleShareButtons url={url} title={article.title} />
