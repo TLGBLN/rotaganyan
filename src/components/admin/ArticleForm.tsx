@@ -1,7 +1,7 @@
 "use client";
 
 import { useForm } from "react-hook-form";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { upsertArticle, publishArticle } from "@/server/actions/article.actions";
@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Globe } from "lucide-react";
+import { Loader2, Globe, Upload } from "lucide-react";
 
 const TiptapEditor = dynamic(() => import("@/components/editor/TiptapEditor"), { ssr: false });
 
@@ -41,9 +41,11 @@ export default function ArticleForm({ articleId, defaultValues, xConnected }: Pr
   const [body, setBody] = useState(defaultValues?.body ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [publishing, startPublish] = useTransition();
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
   const savedId = articleId ?? null;
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormData>({
     defaultValues: {
       type: defaultValues?.type ?? "EDUCATIONAL",
       title: defaultValues?.title ?? "",
@@ -86,6 +88,28 @@ export default function ArticleForm({ articleId, defaultValues, xConnected }: Pr
       toast.error("Kayıt hatası");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  // 2026-09-18 kullanıcı talebi ("nereye yüklemem gerek") — kapak görseli eskiden yalnız
+  // harici URL yapıştırılarak eklenebiliyordu, gerçek bir yükleme yeri yoktu.
+  async function onCoverFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadingCover(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/admin/upload-article-image", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Yükleme başarısız");
+      setValue("coverImage", data.url);
+      toast.success("Kapak görseli yüklendi");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Görsel yüklenemedi");
+    } finally {
+      setUploadingCover(false);
     }
   }
 
@@ -138,8 +162,18 @@ export default function ArticleForm({ articleId, defaultValues, xConnected }: Pr
       </div>
 
       <div className="space-y-1.5">
-        <Label>Kapak Görseli URL</Label>
-        <Input type="url" placeholder="https://…" {...register("coverImage")} />
+        <Label>Kapak Görseli</Label>
+        <div className="flex items-center gap-2">
+          <Input type="url" placeholder="https://… (veya bilgisayardan yükle)" {...register("coverImage")} />
+          <input ref={coverFileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={onCoverFileSelected} className="hidden" />
+          <Button type="button" variant="outline" size="sm" disabled={uploadingCover} onClick={() => coverFileInputRef.current?.click()}>
+            {uploadingCover ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+          </Button>
+        </div>
+        {watch("coverImage") && (
+          // eslint-disable-next-line @next/next/no-img-element -- rastgele harici URL olabilir
+          <img src={watch("coverImage")} alt="" className="mt-2 h-28 rounded-md border object-cover" />
+        )}
       </div>
 
       <div className="space-y-1.5">
