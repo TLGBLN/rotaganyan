@@ -57,6 +57,16 @@ type Row = {
   ownSurfaceStartSayisi?: number;
   yakinsama2Plus?: 0 | 1;
   zeminMesafeDeneyimSeviyesi?: "tam" | "yok";
+  galopSayisi?: number;
+  kgs?: number; // -1 = veri yok (sentinel), aksi halde son yarıştan bugüne gün sayısı
+  yas?: number | null; // Runner.age'den ayrıştırılmış tam yaş yılı, backfill: enrich-age.mts
+  takiAileEklenen?: Record<string, 0 | 1>;
+  takiAileCikarilan?: Record<string, 0 | 1>;
+  takiAileVerisiVar?: boolean; // backfill: enrich-taki-aile.mts, atın geçmiş yarışı DB önbelleğinde var mı
+  jockeyEffect?: number; // backfill: enrich-jockey-effect.mts, shrink edilmiş actual-expected (n>=5 biniş)
+  jockeyEffectVarMi?: boolean;
+  hizPeak?: number; hizTrend?: number; hizZamanAgirlikli?: number; // backfill: enrich-hiz-peak-trend.mts
+  hizPerRaceVarMi?: boolean; hizTrendVarMi?: boolean;
   [k: string]: unknown;
 };
 
@@ -80,8 +90,9 @@ function yakinsama2PlusEkle(runners: Row[]) {
  *  notu) — bKatmaniUygula'nın kendi classType parametresi yalnız bAgirlikOrani (Maiden/
  *  Şartlı1/19/27 mi) sorusu için kullanılıyor, o da kategoriden aynen türetilebilir. */
 const ZEMIN_TOLERANSI_IDX = 8; // FEATURE_NAMES: ...,agfPayi2(7),zeminToleransi(8),...
+const HIZ_DERECESI_IDX = 6; // FEATURE_NAMES: ...,h2hNetSkor(5),hizDerecesi(6),agfPayi2(7),...
 
-function hesaplaSV546(runners: Row[], kategori: string, sireHaric = false, zeminHaric = false): number[] {
+function hesaplaSV546(runners: Row[], kategori: string, sireHaric = false, zeminHaric = false, hizHaric = false): number[] {
   const setler = agirlikSetleriIcinKategori(kategori);
   // toFeatureVector yalnız 13 A-özelliğini okur (zeminMesafeDeneyimSeviyesi'ne bakmaz) —
   // ham Row doğrudan geçilebilir.
@@ -89,7 +100,10 @@ function hesaplaSV546(runners: Row[], kategori: string, sireHaric = false, zemin
   // 2026-09-17 kullanıcı talebi — H2/H3 zemin hiyerarşisi replacement testi için: eski
   // zeminToleransi'nin (A-katmanı, standardize edilmiş) katkısı skordan çıkarılabilir —
   // katkilar[ZEMIN_TOLERANSI_IDX] harmanliSkorla'nın ZATEN döndürdüğü, ayrıştırılmış katkı.
-  const skorlarHam = harmanlar.map((h) => (zeminHaric ? h.skor - h.katkilar[ZEMIN_TOLERANSI_IDX] : h.skor));
+  // 2026-09-18 — Hız Derecesi Peak/Trend/ZamanAğırlıklı adayları AYNI ham per-race verisinden
+  // türetildiği için mevcut hizDerecesi ile YÜKSEK KOLİNEER — additive test yanıltıcı
+  // olabilir (redundancy β'yı bastırır), bu yüzden hizHaric ile REPLACEMENT testi de yapılıyor.
+  const skorlarHam = harmanlar.map((h) => h.skor - (zeminHaric ? h.katkilar[ZEMIN_TOLERANSI_IDX] : 0) - (hizHaric ? h.katkilar[HIZ_DERECESI_IDX] : 0));
   // bKatmaniUygula İKİ şeye bakar: r.sireOrani (Row'da zaten var) ve
   // r.zeminMesafeDeneyimSeviyesi (Row'da YOK, ham zeminMesafeDeneyim===0 ile yaklaşıklanıyor
   // — bkz. dosya başı Row tipi notu) + classType (yalnız Maiden/Şartlı1/19/27 mi sorusu için,
@@ -326,7 +340,104 @@ const ZeminH3: Aday = {
   dahilMi: (runners) => runners.map((r) => r.zeminH3HasEvidence === true),
 };
 
-const ADAYLAR: Aday[] = [ClassDelta, PedigreeSurfaceAffinity, PedigreeSurfaceAffinity_LowExp];
+// 2026-09-18 kullanıcı talebi — "V6" tartışmasından çıkan iki UCUZ aday (SIFIR yeni
+// backfill — ikisi de model-veri-yg4.json'da ZATEN ham alan olarak var):
+//
+// IdmVarFarkliJokey — mevcut idmJokey (0/1) MISSING-VERİ SORUNU taşıyor (bkz.
+// SINYAL-FORMULLERI.md §5): "idman hiç yok" (galopSayisi=0) İLE "idman var ama jokey
+// eşleşmiyor" (galopSayisi>0, idmJokey=0) AYNI 0'a düşüyor. Bu aday yalnız İKİNCİ
+// durumu (n=8565/39877) ayrı bir 0/1 bayrakla işaretleyip mevcut idmJokey'in ÜZERİNE
+// EK bir terim olarak test ediyor — "idman var ama uyumsuz" gerçekten AYRI bir bilgi mi,
+// yoksa zaten idmJokey=0'ın kendisi yeterli mi?
+const IdmVarFarkliJokey: Aday = {
+  ad: "IdmVarFarkliJokey",
+  hesapla: (runners) => runners.map((r) => ((r.galopSayisi ?? 0) > 0 && r.idmJokey === 0 ? 1 : 0)),
+};
+
+// KgsGun — "kaç gün sonra" (son yarıştan bugüne gün sayısı). kgsVarMi (yalnız var/yok
+// bayrağı) daha önce ölü bulunup toFeatureVector'dan çıkarılmıştı — ama HAM sürekli
+// değerin kendisi (ne kadar uzun/kısa bir ara) hiç test edilmedi. -1 = veri yok (dahilMi
+// ile standardizasyon dışı tutulur, KESİN 0 alır).
+const KgsGun: Aday = {
+  ad: "KgsGun",
+  hesapla: (runners) => runners.map((r) => (r.kgs != null && r.kgs !== -1 ? r.kgs : 0)),
+  dahilMi: (runners) => runners.map((r) => r.kgs != null && r.kgs !== -1),
+};
+
+// YasSahaFarki — V6 "Age/gelişim" fikrinin operasyonel hali: ham yaş yerine, atın YAŞININ
+// SAHA ORTALAMASINA göre farkı (yıl). Yaş-şartlı koşularda (kategori "3 yaş" vb.) saha zaten
+// tek yaşlı olduğundan bu değer yapısal olarak ~0 (zararsız) — asıl bilgi yalnız yaş-serbest
+// ("Açık") karma-yaş koşularında geliyor: genç bir at deneyimli/olgun bir sahaya mı karışmış,
+// yoksa yaşlı bir at gençlere mi. Yön a priori belirsiz (gelişim eğrisi doğrusal değil,
+// standart bir ana-etki testi — WeightBurden/DrawPct ile aynı "önce doğrusal ana etki" deseni).
+const YasSahaFarki: Aday = {
+  ad: "YasSahaFarki",
+  hesapla: (runners) => {
+    const yaslar = runners.map((r) => r.yas).filter((y): y is number => y != null);
+    if (yaslar.length < 2) return runners.map(() => 0);
+    const mean = yaslar.reduce((a, b) => a + b, 0) / yaslar.length;
+    return runners.map((r) => (r.yas != null ? r.yas - mean : 0));
+  },
+  dahilMi: (runners) => runners.map((r) => r.yas != null),
+};
+
+// TakiAileFarki — V6 "ekipman-bazlı takı kodlaması" fikri: mevcut takiDegisikligi (TÜM
+// ekipman türlerini tek bayrakta topluyor) yerine, HER aileyi (Kulaklık/DB=Dil Bağı/
+// KG=Kapalı Gözlük/GKR=Göz Koruyucu) AYRI test ediyor — "dil bağı eklemek" (genelde solunum
+// sorunu göstergesi) ile "kulaklık eklemek" (genelde odaklanma/davranış amaçlı) FARKLI
+// bilgi taşıyabilir, birleşik sinyalde birbirini nötralize ediyor olabilir. Formül mevcut
+// takiDegisikligi ile AYNI kurulum: çıkarıldı(+1)-eklendi(-1). dahilMi = atın geçmiş yarış
+// verisi önbellekte var mı (backfill: enrich-taki-aile.mts, %28.8 kapsama — tjkAtId'si
+// olmayan/geçmişi önbellekte olmayan atlar dahil değil, KESİN 0 alır).
+function takiAileAdayi(aile: string): Aday {
+  return {
+    ad: `TakiAileFarki_${aile}`,
+    hesapla: (runners) =>
+      runners.map((r) => {
+        const cik = r.takiAileCikarilan?.[aile] ?? 0;
+        const ekl = r.takiAileEklenen?.[aile] ?? 0;
+        return cik - ekl;
+      }),
+    dahilMi: (runners) => runners.map((r) => r.takiAileVerisiVar === true),
+  };
+}
+const TAKI_AILE_ADAYLARI: Aday[] = ["KULAKLIK", "DB", "KG", "GKR"].map(takiAileAdayi);
+
+// JockeyEffect — V6 fikri: jokeyin BİNDİĞİ atların piyasa-beklenen kalitesine göre
+// actual-expected kazanma sapması (n>=5 geçmiş biniş, shrink k=50 — bkz. enrich-jockey-
+// effect.mts). KRİTİK: mevcut jokeyOrani (Row'da zaten var) BİLEREK sızıntılı bırakılmıştı
+// (v5-engine.ts V5.2 notu — "izole test için TJK kaynağına bırakıldı", jockeyStatSync
+// GÜNCEL yıl tablosundan okunuyor) — bu aday O SIZINTIYI MİRAS ALMAZ, sıfırdan yalnız
+// KENDİ Runner/Result verimizden, o koşudan KESİNLİKLE önceki (raceNo tie-break'li)
+// kayıtlarla hesaplandı.
+const JockeyEffect: Aday = {
+  ad: "JockeyEffect",
+  hesapla: (runners) => runners.map((r) => (typeof r.jockeyEffect === "number" ? r.jockeyEffect : 0)),
+  dahilMi: (runners) => runners.map((r) => r.jockeyEffectVarMi === true),
+};
+
+// Hız Derecesi Peak/Trend/ZamanAğırlıklı — V6 fikri: mevcut hizDerecesi son 3 (365 gün içi)
+// koşunun DÜZ ORTALAMASI (bkz. hiz-derecesi-hesapla.ts). Bu üç aday AYNI per-race
+// sapmalardan (backfill: enrich-hiz-peak-trend.mts) farklı özetler türetir — Peak (en iyi
+// performans, tutarsız ama zirvesi yüksek atları yakalar), Trend (en yeni-en eski farkı,
+// gelişim/gerileme yönü), ZamanAğırlıklı (yakın geçmişe [3,2,1] ağırlık, düz ortalama yerine).
+const HizPeak: Aday = {
+  ad: "HizPeak",
+  hesapla: (runners) => runners.map((r) => (typeof r.hizPeak === "number" ? r.hizPeak : 0)),
+  dahilMi: (runners) => runners.map((r) => r.hizPerRaceVarMi === true),
+};
+const HizTrend: Aday = {
+  ad: "HizTrend",
+  hesapla: (runners) => runners.map((r) => (typeof r.hizTrend === "number" ? r.hizTrend : 0)),
+  dahilMi: (runners) => runners.map((r) => r.hizTrendVarMi === true),
+};
+const HizZamanAgirlikli: Aday = {
+  ad: "HizZamanAgirlikli",
+  hesapla: (runners) => runners.map((r) => (typeof r.hizZamanAgirlikli === "number" ? r.hizZamanAgirlikli : 0)),
+  dahilMi: (runners) => runners.map((r) => r.hizPerRaceVarMi === true),
+};
+
+const ADAYLAR: Aday[] = [KgsGun];
 const SIRE_ORTUSME_ADAYLARI: Aday[] = [NoOp, PedigreeSurfaceAffinity, PedigreeSurfaceAffinity_LowExp];
 // H1 (mevcut, Row.zeminToleransi zaten V5.46 skoruna dahil — ayrı test gerekmez) referans
 // alınarak yalnız H2/H3, hem NORMAL V5.46 üzerinden (additive) hem zeminHaric (replacement)
@@ -370,9 +481,10 @@ async function main() {
     adaylar: Aday[] = ADAYLAR,
     sireHaric = false,
     zeminHaric = false,
-    gunKumeli = false
+    gunKumeli = false,
+    hizHaric = false
   ) {
-    const etiketEk = [sireHaric && "sireOrani ÇIKARILMIŞ", zeminHaric && "zeminToleransi ÇIKARILMIŞ", gunKumeli && "GÜN-KÜMELİ bootstrap"].filter(Boolean).join(", ");
+    const etiketEk = [sireHaric && "sireOrani ÇIKARILMIŞ", zeminHaric && "zeminToleransi ÇIKARILMIŞ", hizHaric && "hizDerecesi ÇIKARILMIŞ", gunKumeli && "GÜN-KÜMELİ bootstrap"].filter(Boolean).join(", ");
     console.log(`\n########## ${etiket} (${gruplarHam.length} koşu)${etiketEk ? ` [${etiketEk}]` : ""} ##########`);
     const splitIdx = Math.floor(gruplarHam.length * 0.75);
     const trainRaw = gruplarHam.slice(0, splitIdx);
@@ -386,7 +498,7 @@ async function main() {
       function hazirla(gruplarHam2: typeof raceGruplariHam) {
         return gruplarHam2
           .map((g) => {
-            const s0 = hesaplaSV546(g.runners, g.kategori, sireHaric, zeminHaric);
+            const s0 = hesaplaSV546(g.runners, g.kategori, sireHaric, zeminHaric, hizHaric);
             const zHam = aday.hesapla(g.runners);
             const dahil = aday.dahilMi ? aday.dahilMi(g.runners) : g.runners.map(() => true);
             const winnerIdx = g.runners.findIndex((r) => r.win === 1);
@@ -464,6 +576,16 @@ async function main() {
 
   test("ŞARTLI 1/19/27 + MAIDEN (düşük-şart)", dusukSart);
   test("DİĞER KOŞULAR", diger);
+  // 2026-09-18 kullanıcı talebi — KgsGun production'a alınmadan önce B=500 GÜN-KÜMELİ
+  // teyit (tek 75/25 bölünme + B=300 yeterli değil, proje standardı). Yalnız "diğer"
+  // segmentte (tek doğrulanan) — düşük-şart zaten reddedilmişti, tekrar test gerekmez.
+  if (process.env.KGSGUN_KONFIRMASYON === "1") {
+    test("DİĞER KOŞULAR — KgsGun B=500 GÜN-KÜMELİ TEYİT", diger, [KgsGun], false, false, true);
+  }
+  if (process.env.HIZ_REPLACEMENT_TEST === "1") {
+    test("ŞARTLI 1/19/27 + MAIDEN (düşük-şart) — hizDerecesi YERİNE (replacement)", dusukSart, ADAYLAR, false, false, false, true);
+    test("DİĞER KOŞULAR — hizDerecesi YERİNE (replacement)", diger, ADAYLAR, false, false, false, true);
+  }
 
   // 2026-09-17 kullanıcı talebi — sireOrani/PedigreeSurfaceAffinity örtüşme (redundancy)
   // audit'i: yalnız düşük-şart'ta anlamlı (sireOrani zaten yalnız o segmentte etkin,

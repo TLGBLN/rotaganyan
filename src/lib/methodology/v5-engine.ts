@@ -182,6 +182,15 @@ const FEATURE_NAMES = WEIGHTS_DIGER.featureNames; // iki set de AYNI özellik/s�
 // güvenilmezlik, farklı ham değer). HIZ_DERECESI_IDX/WEIGHTS_DIGER_HANDIKAP ile AYNI
 // desende, artık KODA gömülü — bir daha retrain'de kaybolmaz.
 const H2H_NET_SKOR_IDX = FEATURE_NAMES.indexOf("h2hNetSkor");
+// 2026-09-18 (V5.47) — KGS_GUN_IDX: kgsGun (son yarıştan bugüne gün sayısı) "diğer"
+// segmentte challenger testinde KESİN doğrulandı (B=500 gün-kümeli: TRAIN GA=
+// [-0.258,-0.021] signStability %99.2, TEST paired bootstrap GA=[-0.0134,-0.0072]
+// P(ΔLL<0)=%100.0 — arac-yeni-sinyal-challenger-test.mts, KgsGun adayı) — pooled retrain
+// (arac-model-egit-segment.mjs) bunu doğruladı: diğer β=-0.1108 GA=[-0.2553,-0.0222]
+// signStability %99.2. Düşük-şart'ta reddedildi (n=340 küçük, GA=[-0.1441,0.1673]
+// sıfırı kapsıyor, signStability %66.0) — HIZ_DERECESI_IDX/IDM_JOKEY_IDX/H2H_NET_SKOR_IDX
+// ile BİREBİR AYNI cerrahi desen: yalnız BU TEK katsayı düşük-şart'ta sıfırlandı.
+const KGS_GUN_IDX = FEATURE_NAMES.indexOf("kgsGun");
 
 // 2026-09-12 (V5.46) — kgsVarMi/kacakYalniz/h2hKiloDegisimi toFeatureVector'DAN TAMAMEN
 // ÇIKARILDI (17→13 özellik, takı birleşimiyle birlikte — bkz. toFeatureVector notu).
@@ -198,7 +207,7 @@ const H2H_NET_SKOR_IDX = FEATURE_NAMES.indexOf("h2hNetSkor");
 // logloss neredeyse anlamlı iyileşme sınırında) — hiçbir kayıp yok, model sadeleşti.
 const WEIGHTS_DUSUK_SART: AgirlikSeti = {
   ...(v5WeightsDusukSart as AgirlikSeti),
-  weights: (v5WeightsDusukSart as AgirlikSeti).weights.map((w, i) => (i === H2H_NET_SKOR_IDX ? 0 : w)),
+  weights: (v5WeightsDusukSart as AgirlikSeti).weights.map((w, i) => (i === H2H_NET_SKOR_IDX || i === KGS_GUN_IDX ? 0 : w)),
 };
 
 // 2026-08-24 kullanıcı bulgusu: Handikap (kategoriTespit==="2") yarışları KENDİ verisiyle
@@ -895,6 +904,15 @@ const ANLAMLI_PUAN_ESIGI = 1.0; // agf-trend.actions.ts'teki ANLAMLI_PUAN_ESIGI 
 // edilme gerekçesiyle aynı desen). Ham alanlar Faz1RunnerV5/arac-model-veri-olustur.mts'te
 // HÂLÂ TOPLANIYOR (maliyetsiz) — yalnız skorlamadan çıkarıldı. zeminToleransi kullanıcının
 // bilinçli istisnası olduğu için (bkz. üstteki not) KORUNDU.
+// 2026-09-18 (V5.47) — KGS_GUN_POP_ORT_DIGER: kgsGun'un (aşağıda toFeatureVector'a
+// eklendi) missing (-1) satırlarda impute edildiği "diğer" segment TRAIN popülasyon
+// ortalaması (arac-model-egit-segment.mjs'in AYNI TRAIN split'inden ölçüldü, 27.95 —
+// jokeyOrani/antrenorOrani ile AYNI "population-mean fallback" deseni). Düşük-şart'ta
+// kgsGun katsayısı ELLE sıfırlandığı (KGS_GUN_IDX, WEIGHTS_DUSUK_SART override, aşağıda)
+// için bu sabit o segmentte skora etki ETMİYOR — tek imputation değeri iki segment için
+// de güvenle kullanılabiliyor.
+const KGS_GUN_POP_ORT_DIGER = 27.95;
+
 export function toFeatureVector(r: Faz1RunnerV5): number[] {
   return [
     r.agfSirasi,
@@ -910,6 +928,7 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     r.sonIdmanSprint,
     r.takiCikarildiMi - r.takiEklendiMi,
     r.yarisGidisatiSkoru,
+    r.kgs !== -1 ? r.kgs : KGS_GUN_POP_ORT_DIGER,
   ];
 }
 
@@ -1678,6 +1697,10 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
     },
   },
   { kod: "GIDISAT", ozellikIndeksleri: [idx("yarisGidisatiSkoru")], aciklama: (r) => (r.katkilar[YARIS_GIDISATI_IDX] !== 0 ? `Bu yarışın beklenen gidişatına (kimin öne geçeceği, temponun nasıl olacağı) göre bu atın koşu tarzı ${r.katkilar[YARIS_GIDISATI_IDX] > 0 ? "uygun düşüyor" : "uygun düşmüyor"} (deneysel bir gözlem, henüz kanıtlanmamış)` : null) },
+  // 2026-09-18 (V5.47) — KGSGUN: bkz. KGS_GUN_IDX üstündeki not. Düşük-şart'ta katsayı
+  // ELLE sıfırlanmış (katkı her zaman 0) — HIZ/H2H/IDMJOK ile AYNI desen, satır yalnız
+  // "diğer" segmentte ve veri varken (kgs!==-1) görünür.
+  { kod: "KGSGUN", ozellikIndeksleri: [idx("kgsGun")], aciklama: (r) => (r.katkilar[KGS_GUN_IDX] !== 0 && r.kgs !== -1 ? `Son yarışından bu yana ${r.kgs} gün geçmiş: geçmişte ${r.katkilar[KGS_GUN_IDX] > 0 ? "olumlu" : "olumsuz"} çıkmış (kısa/uzun ara etkisi)` : null) },
 ];
 
 // 2026-08-18 kullanıcı talebi: "18 sinyalin hepsinin kontrol edildiğini bana göstermesini
@@ -1690,6 +1713,7 @@ const FEATURE_LABELS: Record<string, string> = {
   agfSirasi: "AGF Sırası", accurace: "Accurace (son yarış en hızlı kapanış)",
   formEgimi: "Form Eğimi", formEgimi2: "Form Eğimi (karesi, doğrusal-olmayan etki)",
   kgs: "KGS (dinlenme günü)", kgs2: "KGS (karesi)", kgsVarMi: "KGS Verisi Var Mı",
+  kgsGun: "KGS Gün (son yarıştan bugüne gün sayısı, V5.47)",
   pistUzmani: "Pist Uzmanlığı (bu hipodrom+pist+mesafede yıl içi galibiyet)",
   sireOrani: "Aygır Kazanma Oranı (küçültülmüş)", galop: "Keskin Galop Zinciri",
   idmJokey: "İdman Jokeyi Uyumu", jokeyOrani: "Jokey Kazanma Oranı (küçültülmüş)",
