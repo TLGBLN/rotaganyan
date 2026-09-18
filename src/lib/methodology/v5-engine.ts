@@ -167,8 +167,24 @@ type AgirlikSeti = { featureNames: string[]; weights: number[]; means: number[];
 // n=240 düşük-şart koşusu) — kullanıcı buna rağmen segment-bazlı iki-model mimarisinin
 // CANLIYA alınmasını istedi (bkz. arac-model-egit-segment.mjs). Tek bir ortak ağırlık
 // yerine, koşunun kategorisine göre İKİ TAMAMEN AYRI eğitilmiş model arasında seçim yapılır.
-const WEIGHTS_DIGER = v5WeightsDiger as AgirlikSeti;
-const FEATURE_NAMES = WEIGHTS_DIGER.featureNames; // iki set de AYNI özellik/sırayı kullanır
+const WEIGHTS_DIGER_EGITILMIS = v5WeightsDiger as AgirlikSeti;
+const FEATURE_NAMES = WEIGHTS_DIGER_EGITILMIS.featureNames; // iki set de AYNI özellik/sırayı kullanır
+// 2026-09-18 kullanıcı kararı — "V5.46'ya geri dön": bugünkü (2026-09-18) 22 koşuluk
+// tek-günlük karşılaştırmada V5.47 (KgsGun dahil) top1'de V5.46'nın gerisinde kaldı
+// (7/22 vs 9/22 — n=22 istatistiksel kanıt değil, ama kullanıcı yine de geri dönmeyi
+// tercih etti). KgsGun'u toFeatureVector'dan/FEATURE_NAMES'ten TAMAMEN ÇIKARMAK yerine
+// (bu, means/stds indekslerini kaydırıp TÜM diğer 13 katsayının z-score'unu bozardı —
+// retrain gerektirirdi) HIZ_DERECESI_IDX/H2H_NET_SKOR_IDX ile AYNI cerrahi desen
+// kullanıldı: yalnız KgsGun'un katsayısı HER segmentte (Diğer dahil, önceden yalnız
+// düşük-şart'ta sıfırdı) elle sıfırlandı — matematiksel olarak V5.46 ile BİREBİR AYNI
+// skoru üretir (14. özellik var ama katkısı her zaman 0), retrain/redeploy'a GEREK YOK.
+// Geri alınmak istenirse: bu satırı silip WEIGHTS_DIGER_EGITILMIS'i doğrudan
+// WEIGHTS_DIGER olarak kullanmak yeterli (bkz. KGS_GUN_IDX tanımı, birkaç satır aşağıda).
+const KGS_GUN_IDX = FEATURE_NAMES.indexOf("kgsGun");
+const WEIGHTS_DIGER: AgirlikSeti = {
+  ...WEIGHTS_DIGER_EGITILMIS,
+  weights: WEIGHTS_DIGER_EGITILMIS.weights.map((w, i) => (i === KGS_GUN_IDX ? 0 : w)),
+};
 
 // 2026-08-21 kullanıcı önerisi ("H2H'ı düşük segmentte kullanma diğer segmentte
 // kullanıyosun"): h2hNetSkor'un düşük-şart'taki katsayısı ham/doğal eğitimde ters yönlü
@@ -182,15 +198,13 @@ const FEATURE_NAMES = WEIGHTS_DIGER.featureNames; // iki set de AYNI özellik/s�
 // güvenilmezlik, farklı ham değer). HIZ_DERECESI_IDX/WEIGHTS_DIGER_HANDIKAP ile AYNI
 // desende, artık KODA gömülü — bir daha retrain'de kaybolmaz.
 const H2H_NET_SKOR_IDX = FEATURE_NAMES.indexOf("h2hNetSkor");
-// 2026-09-18 (V5.47) — KGS_GUN_IDX: kgsGun (son yarıştan bugüne gün sayısı) "diğer"
-// segmentte challenger testinde KESİN doğrulandı (B=500 gün-kümeli: TRAIN GA=
-// [-0.258,-0.021] signStability %99.2, TEST paired bootstrap GA=[-0.0134,-0.0072]
-// P(ΔLL<0)=%100.0 — arac-yeni-sinyal-challenger-test.mts, KgsGun adayı) — pooled retrain
-// (arac-model-egit-segment.mjs) bunu doğruladı: diğer β=-0.1108 GA=[-0.2553,-0.0222]
-// signStability %99.2. Düşük-şart'ta reddedildi (n=340 küçük, GA=[-0.1441,0.1673]
-// sıfırı kapsıyor, signStability %66.0) — HIZ_DERECESI_IDX/IDM_JOKEY_IDX/H2H_NET_SKOR_IDX
-// ile BİREBİR AYNI cerrahi desen: yalnız BU TEK katsayı düşük-şart'ta sıfırlandı.
-const KGS_GUN_IDX = FEATURE_NAMES.indexOf("kgsGun");
+// KGS_GUN_IDX artık YUKARIDA (WEIGHTS_DIGER tanımından hemen önce) tanımlı — kgsGun
+// "diğer" segmentte challenger testinde KESİN doğrulanmıştı (B=500 gün-kümeli: TRAIN
+// GA=[-0.258,-0.021] signStability %99.2, TEST paired bootstrap GA=[-0.0134,-0.0072]
+// P(ΔLL<0)=%100.0) ve pooled retrain bunu doğrulamıştı (diğer β=-0.1108), AMA
+// 2026-09-18 kullanıcı kararıyla ("V5.46'ya geri dön", bkz. yukarıdaki not) katsayı
+// artık HER segmentte (Diğer dahil) sıfırlanmış durumda — düşük-şart'ta zaten
+// kanıtlanamamıştı (n=340 küçük, GA=[-0.1441,0.1673] sıfırı kapsıyor).
 
 // 2026-09-12 (V5.46) — kgsVarMi/kacakYalniz/h2hKiloDegisimi toFeatureVector'DAN TAMAMEN
 // ÇIKARILDI (17→13 özellik, takı birleşimiyle birlikte — bkz. toFeatureVector notu).
