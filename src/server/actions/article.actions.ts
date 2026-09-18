@@ -55,7 +55,11 @@ export async function publishArticle(id: string) {
   });
 
   revalidatePath("/admin/makaleler");
-  await tweetArticlePublished(article.title, "/");
+  revalidatePath("/makaleler");
+  revalidatePath(`/makaleler/${article.slug}`);
+  // 2026-09-18 BUG DÜZELTMESİ: eskiden "/" (site kökü) gönderiyordu — herkese açık makale
+  // sayfası o zaman hiç yoktu. Artık gerçek makale URL'i tweetleniyor.
+  await tweetArticlePublished(article.title, `/makaleler/${article.slug}`);
 }
 
 export async function unpublishArticle(id: string) {

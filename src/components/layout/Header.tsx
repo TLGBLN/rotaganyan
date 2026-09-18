@@ -64,6 +64,11 @@ export default async function Header() {
           <Button asChild variant="outline" size="sm">
             <Link href="/altili" data-tour="altili"><HeaderLabel k="altiliNeVerir" /></Link>
           </Button>
+          {/* 2026-09-18 kullanıcı talebi: makale bölümü — mevcut admin CRUD akışı (ilk
+              commit'ten beri vardı, hiç bağlanmamıştı) artık herkese açık sayfaya sahip. */}
+          <Button asChild variant="outline" size="sm">
+            <Link href="/makaleler">Makaleler</Link>
+          </Button>
         </nav>
 
         {/* Actions */}

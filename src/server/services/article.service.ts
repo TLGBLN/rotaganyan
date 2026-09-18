@@ -6,11 +6,11 @@ export type ArticleCard = Prisma.ArticleGetPayload<{
 }>;
 
 export async function getPublishedArticles(
-  type: ArticleType,
+  type?: ArticleType,
   page = 1,
   perPage = 12
 ): Promise<{ items: ArticleCard[]; total: number }> {
-  const where: Prisma.ArticleWhereInput = { type, published: true };
+  const where: Prisma.ArticleWhereInput = { published: true, ...(type ? { type } : {}) };
 
   const [items, total] = await Promise.all([
     db.article.findMany({

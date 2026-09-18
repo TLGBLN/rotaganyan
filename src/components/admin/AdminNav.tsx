@@ -18,11 +18,16 @@ import {
   Gauge,
   ClipboardCheck,
   CloudRain,
+  Newspaper,
 } from "lucide-react";
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/analizler", label: "Analizler", icon: FileText },
+  // 2026-09-18 kullanıcı talebi: "makale yazabileceğim bir alan" — bu admin CRUD akışı
+  // (ArticleForm/TiptapEditor/upsertArticle) projenin İLK commit'inden (2026-06-21) beri
+  // vardı ama hiçbir zaman nav'a bağlanmamış, herkese açık sayfası hiç yazılmamıştı.
+  { href: "/admin/makaleler", label: "Makaleler", icon: Newspaper },
   { href: "/admin/pedigri", label: "Pedigriler", icon: Dna },
   { href: "/admin/accurace", label: "Accurace Database", icon: Gauge },
   { href: "/admin/derece-istatistikleri", label: "Derece İstatistikleri", icon: CloudRain },
