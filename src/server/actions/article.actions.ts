@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { articleSchema } from "@/lib/validations/article";
 import { tweetArticlePublished } from "@/lib/x";
+import { generateArticleSeo } from "@/lib/seo-generate";
 
 type ArticleInput = {
   type: "EDUCATIONAL" | "MAGAZINE";
@@ -60,6 +61,16 @@ export async function publishArticle(id: string) {
   // 2026-09-18 BUG DÜZELTMESİ: eskiden "/" (site kökü) gönderiyordu — herkese açık makale
   // sayfası o zaman hiç yoktu. Artık gerçek makale URL'i tweetleniyor.
   await tweetArticlePublished(article.title, `/makaleler/${article.slug}`);
+}
+
+// 2026-09-18 kullanıcı talebi: "SEO otomatik doldur... internette diğer kullanıcıların
+// arama yaptıklarında önlerine çıkabilecek düzeyde" — ham başlık/özet kopyası değil,
+// Claude'un ürettiği gerçek SEO metni.
+export async function generateSeoAction(title: string, excerpt: string, body: string) {
+  await requireRole("EDITOR");
+  const result = await generateArticleSeo(title, excerpt, body);
+  if (!result) return { error: "SEO metni üretilemedi, tekrar deneyin." };
+  return { success: true, ...result };
 }
 
 export async function unpublishArticle(id: string) {

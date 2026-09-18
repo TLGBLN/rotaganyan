@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { upsertArticle, publishArticle } from "@/server/actions/article.actions";
+import { upsertArticle, publishArticle, generateSeoAction } from "@/server/actions/article.actions";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,9 +12,28 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Globe, Upload } from "lucide-react";
+import { Loader2, Globe, Upload, Sparkles } from "lucide-react";
 
 const TiptapEditor = dynamic(() => import("@/components/editor/TiptapEditor"), { ssr: false });
+
+// 2026-09-18 kullanıcı bulgusu: slug alanı elle yazılıyordu, articleSchema'nın
+// /^[a-z0-9-]+$/ deseni Türkçe karakter/boşluk/büyük harf içeren bir başlık aynen
+// yapıştırılınca ham Zod hatasıyla ("Invalid string: must match pattern...") reddediyordu.
+// Artık başlıktan OTOMATİK türetiliyor (Türkçe karakterler harf çevrimiyle), slug alanı
+// manuel değiştirilirse de aynı temizleme uygulanır — geçersiz bir slug'ın forma
+// girmesi artık mümkün değil.
+function slugify(input: string): string {
+  const trMap: Record<string, string> = { ç: "c", ğ: "g", ı: "i", İ: "i", ö: "o", ş: "s", ü: "u", Ç: "c", Ğ: "g", Ö: "o", Ş: "s", Ü: "u" };
+  return input
+    .split("")
+    .map((ch) => trMap[ch] ?? ch)
+    .join("")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // kalan aksanları (â, é vb.) ayrıştırıp at
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 type ArticleType = "EDUCATIONAL" | "MAGAZINE";
 
@@ -44,6 +63,14 @@ export default function ArticleForm({ articleId, defaultValues, xConnected }: Pr
   const [uploadingCover, setUploadingCover] = useState(false);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
   const savedId = articleId ?? null;
+  // Yeni makalede slug otomatik takip eder; kullanıcı slug'ı ELLE değiştirirse (mevcut
+  // makaleyi düzenlerken zaten dolu geliyor) otomatik üzerine yazma durur.
+  const [slugAutoSync, setSlugAutoSync] = useState(!defaultValues?.slug);
+  // 2026-09-18 kullanıcı talebi: "SEO otomatik doldur burayı da" — Meta Başlık Başlık'ı,
+  // Meta Açıklama Özet'i AYNI otomatik-takip/manuel-durdurma desenini izler.
+  const [metaTitleAutoSync, setMetaTitleAutoSync] = useState(!defaultValues?.metaTitle);
+  const [metaDescAutoSync, setMetaDescAutoSync] = useState(!defaultValues?.metaDescription);
+  const [generatingSeo, setGeneratingSeo] = useState(false);
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormData>({
     defaultValues: {
@@ -62,17 +89,20 @@ export default function ArticleForm({ articleId, defaultValues, xConnected }: Pr
   async function onSubmit(data: FormData) {
     setSubmitting(true);
     try {
+      // Son güvenlik ağı: slug her ihtimalde temiz olsun (boşsa başlıktan, o da boşsa
+      // zaman damgasıyla türet) — articleSchema'nın regex'i sunucu tarafında yine kontrol eder.
+      const cleanSlug = slugify(data.slug) || slugify(data.title) || `makale-${Date.now()}`;
       const result = await upsertArticle(articleId ?? null, {
         type: data.type,
         title: data.title,
-        slug: data.slug,
+        slug: cleanSlug,
         excerpt: data.excerpt || undefined,
         body,
         coverImage: data.coverImage || undefined,
         category: data.category || undefined,
         tags: data.tags ? data.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
-        metaTitle: data.metaTitle || undefined,
-        metaDescription: data.metaDescription || undefined,
+        metaTitle: (data.metaTitle || data.title).slice(0, 70) || undefined,
+        metaDescription: (data.metaDescription || data.excerpt).slice(0, 160) || undefined,
       });
       if (result?.error) {
         toast.error(result.error);
@@ -113,6 +143,28 @@ export default function ArticleForm({ articleId, defaultValues, xConnected }: Pr
     }
   }
 
+  async function handleGenerateSeo() {
+    const title = watch("title");
+    if (!title?.trim()) return toast.error("Önce başlık girin");
+    setGeneratingSeo(true);
+    try {
+      const result = await generateSeoAction(title, watch("excerpt") ?? "", body);
+      if ("error" in result) {
+        toast.error(result.error);
+        return;
+      }
+      setMetaTitleAutoSync(false);
+      setMetaDescAutoSync(false);
+      setValue("metaTitle", result.metaTitle);
+      setValue("metaDescription", result.metaDescription);
+      toast.success("SEO metni oluşturuldu");
+    } catch {
+      toast.error("SEO metni üretilemedi");
+    } finally {
+      setGeneratingSeo(false);
+    }
+  }
+
   function handlePublish() {
     if (!savedId) return toast.error("Önce kaydedin");
     startPublish(async () => {
@@ -141,19 +193,43 @@ export default function ArticleForm({ articleId, defaultValues, xConnected }: Pr
 
       <div className="space-y-1.5">
         <Label>Başlık</Label>
-        <Input placeholder="Makale başlığı" {...register("title", { required: true })} />
+        <Input
+          placeholder="Makale başlığı"
+          {...register("title", { required: true })}
+          onChange={(e) => {
+            setValue("title", e.target.value);
+            if (slugAutoSync) setValue("slug", slugify(e.target.value));
+            if (metaTitleAutoSync) setValue("metaTitle", e.target.value.slice(0, 70));
+          }}
+        />
         {errors.title && <p className="text-xs text-miss">Başlık zorunlu</p>}
       </div>
 
       <div className="space-y-1.5">
         <Label>Slug (URL)</Label>
-        <Input placeholder="makale-basligi" {...register("slug", { required: true })} />
+        <Input
+          placeholder="makale-basligi"
+          {...register("slug", { required: true })}
+          onChange={(e) => {
+            setSlugAutoSync(false);
+            setValue("slug", slugify(e.target.value));
+          }}
+        />
+        <p className="text-[11px] text-muted-foreground">Yalnız küçük harf, rakam ve tire — başlıktan otomatik türetilir, elle de düzenlenebilir.</p>
         {errors.slug && <p className="text-xs text-miss">Slug zorunlu</p>}
       </div>
 
       <div className="space-y-1.5">
         <Label>Özet</Label>
-        <Textarea rows={2} placeholder="Kısa açıklama" {...register("excerpt")} />
+        <Textarea
+          rows={2}
+          placeholder="Kısa açıklama"
+          {...register("excerpt")}
+          onChange={(e) => {
+            setValue("excerpt", e.target.value);
+            if (metaDescAutoSync) setValue("metaDescription", e.target.value.slice(0, 160));
+          }}
+        />
       </div>
 
       <div className="space-y-1.5">
@@ -184,14 +260,33 @@ export default function ArticleForm({ articleId, defaultValues, xConnected }: Pr
       <Separator />
 
       <div className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SEO</p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SEO</p>
+          <Button type="button" variant="outline" size="sm" onClick={handleGenerateSeo} disabled={generatingSeo}>
+            {generatingSeo ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+            SEO Otomatik Doldur
+          </Button>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Başlık/özetten basit kopyalama yerine, arama motorunda gerçek görünürlük hedefleyen
+          bir meta başlık/açıklama üretir (Claude ile) — üretmeden önce başlık ve mümkünse içerik girin.
+        </p>
         <div className="space-y-1.5">
           <Label className="text-xs">Meta Başlık (max 70 karakter)</Label>
-          <Input {...register("metaTitle")} />
+          <Input
+            {...register("metaTitle")}
+            onChange={(e) => { setMetaTitleAutoSync(false); setValue("metaTitle", e.target.value); }}
+          />
+          <p className="text-[11px] text-muted-foreground">Boş bırakılırsa başlıktan otomatik türetilir.</p>
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">Meta Açıklama (max 160 karakter)</Label>
-          <Textarea rows={2} {...register("metaDescription")} />
+          <Textarea
+            rows={2}
+            {...register("metaDescription")}
+            onChange={(e) => { setMetaDescAutoSync(false); setValue("metaDescription", e.target.value); }}
+          />
+          <p className="text-[11px] text-muted-foreground">Boş bırakılırsa özetten otomatik türetilir.</p>
         </div>
       </div>
 
