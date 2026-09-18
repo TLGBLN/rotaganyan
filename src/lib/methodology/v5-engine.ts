@@ -167,24 +167,20 @@ type AgirlikSeti = { featureNames: string[]; weights: number[]; means: number[];
 // n=240 düşük-şart koşusu) — kullanıcı buna rağmen segment-bazlı iki-model mimarisinin
 // CANLIYA alınmasını istedi (bkz. arac-model-egit-segment.mjs). Tek bir ortak ağırlık
 // yerine, koşunun kategorisine göre İKİ TAMAMEN AYRI eğitilmiş model arasında seçim yapılır.
-const WEIGHTS_DIGER_EGITILMIS = v5WeightsDiger as AgirlikSeti;
-const FEATURE_NAMES = WEIGHTS_DIGER_EGITILMIS.featureNames; // iki set de AYNI özellik/sırayı kullanır
-// 2026-09-18 kullanıcı kararı — "V5.46'ya geri dön": bugünkü (2026-09-18) 22 koşuluk
-// tek-günlük karşılaştırmada V5.47 (KgsGun dahil) top1'de V5.46'nın gerisinde kaldı
-// (7/22 vs 9/22 — n=22 istatistiksel kanıt değil, ama kullanıcı yine de geri dönmeyi
-// tercih etti). KgsGun'u toFeatureVector'dan/FEATURE_NAMES'ten TAMAMEN ÇIKARMAK yerine
-// (bu, means/stds indekslerini kaydırıp TÜM diğer 13 katsayının z-score'unu bozardı —
-// retrain gerektirirdi) HIZ_DERECESI_IDX/H2H_NET_SKOR_IDX ile AYNI cerrahi desen
-// kullanıldı: yalnız KgsGun'un katsayısı HER segmentte (Diğer dahil, önceden yalnız
-// düşük-şart'ta sıfırdı) elle sıfırlandı — matematiksel olarak V5.46 ile BİREBİR AYNI
-// skoru üretir (14. özellik var ama katkısı her zaman 0), retrain/redeploy'a GEREK YOK.
-// Geri alınmak istenirse: bu satırı silip WEIGHTS_DIGER_EGITILMIS'i doğrudan
-// WEIGHTS_DIGER olarak kullanmak yeterli (bkz. KGS_GUN_IDX tanımı, birkaç satır aşağıda).
-const KGS_GUN_IDX = FEATURE_NAMES.indexOf("kgsGun");
-const WEIGHTS_DIGER: AgirlikSeti = {
-  ...WEIGHTS_DIGER_EGITILMIS,
-  weights: WEIGHTS_DIGER_EGITILMIS.weights.map((w, i) => (i === KGS_GUN_IDX ? 0 : w)),
-};
+const WEIGHTS_DIGER = v5WeightsDiger as AgirlikSeti;
+const FEATURE_NAMES = WEIGHTS_DIGER.featureNames; // iki set de AYNI özellik/sırayı kullanır
+// 2026-09-18 — KgsGun (14. özellik) V5.47'de eklenip AYNI GÜN kullanıcı kararıyla TAMAMEN
+// GERİ ALINDI: bugünkü (2026-09-18) 22 koşuluk tek-günlük karşılaştırmada V5.47 top1'de
+// V5.46'nın gerisinde kaldı (7/22 vs 9/22 — n=22 istatistiksel kanıt DEĞİL, ama kullanıcı
+// yine de geri dönmeyi tercih etti). İlk denemede yalnız katsayı sıfırlanmıştı (kod
+// altyapısı 14 özellik olarak kaldı) — ama bu, admin panelindeki CURRENT_ENGINE_LABEL'ın
+// hâlâ "V5.47, 14 özellik" göstermesine yol açtı (kullanıcı "düzelmemiş" dedi, haklıydı).
+// Bu yüzden TAM/temiz revert yapıldı: v5-weights-diger.json/v5-weights-dusuksart.json
+// commit 886c451'den (V5.46, kgsGun öncesi SON hali) BİREBİR geri getirildi (13 özellik),
+// toFeatureVector/FEATURE_NAMES/KGS_GUN_IDX apparatus'u kaldırıldı. KgsGun'un
+// challenger-test kanıtı (B=500 gün-kümeli, P(ΔLL<0)=%100.0) hâlâ geçerli/doğru — bkz.
+// proje hafızası project_v547_yeni_sinyal_arastirmasi.md — istenirse `arac-model-egit-
+// segment.mjs`'e tekrar eklenip yeniden değerlendirilebilir, yalnız ŞİMDİ canlıda değil.
 
 // 2026-08-21 kullanıcı önerisi ("H2H'ı düşük segmentte kullanma diğer segmentte
 // kullanıyosun"): h2hNetSkor'un düşük-şart'taki katsayısı ham/doğal eğitimde ters yönlü
@@ -198,13 +194,6 @@ const WEIGHTS_DIGER: AgirlikSeti = {
 // güvenilmezlik, farklı ham değer). HIZ_DERECESI_IDX/WEIGHTS_DIGER_HANDIKAP ile AYNI
 // desende, artık KODA gömülü — bir daha retrain'de kaybolmaz.
 const H2H_NET_SKOR_IDX = FEATURE_NAMES.indexOf("h2hNetSkor");
-// KGS_GUN_IDX artık YUKARIDA (WEIGHTS_DIGER tanımından hemen önce) tanımlı — kgsGun
-// "diğer" segmentte challenger testinde KESİN doğrulanmıştı (B=500 gün-kümeli: TRAIN
-// GA=[-0.258,-0.021] signStability %99.2, TEST paired bootstrap GA=[-0.0134,-0.0072]
-// P(ΔLL<0)=%100.0) ve pooled retrain bunu doğrulamıştı (diğer β=-0.1108), AMA
-// 2026-09-18 kullanıcı kararıyla ("V5.46'ya geri dön", bkz. yukarıdaki not) katsayı
-// artık HER segmentte (Diğer dahil) sıfırlanmış durumda — düşük-şart'ta zaten
-// kanıtlanamamıştı (n=340 küçük, GA=[-0.1441,0.1673] sıfırı kapsıyor).
 
 // 2026-09-12 (V5.46) — kgsVarMi/kacakYalniz/h2hKiloDegisimi toFeatureVector'DAN TAMAMEN
 // ÇIKARILDI (17→13 özellik, takı birleşimiyle birlikte — bkz. toFeatureVector notu).
@@ -221,7 +210,7 @@ const H2H_NET_SKOR_IDX = FEATURE_NAMES.indexOf("h2hNetSkor");
 // logloss neredeyse anlamlı iyileşme sınırında) — hiçbir kayıp yok, model sadeleşti.
 const WEIGHTS_DUSUK_SART: AgirlikSeti = {
   ...(v5WeightsDusukSart as AgirlikSeti),
-  weights: (v5WeightsDusukSart as AgirlikSeti).weights.map((w, i) => (i === H2H_NET_SKOR_IDX || i === KGS_GUN_IDX ? 0 : w)),
+  weights: (v5WeightsDusukSart as AgirlikSeti).weights.map((w, i) => (i === H2H_NET_SKOR_IDX ? 0 : w)),
 };
 
 // 2026-08-24 kullanıcı bulgusu: Handikap (kategoriTespit==="2") yarışları KENDİ verisiyle
@@ -918,20 +907,6 @@ const ANLAMLI_PUAN_ESIGI = 1.0; // agf-trend.actions.ts'teki ANLAMLI_PUAN_ESIGI 
 // edilme gerekçesiyle aynı desen). Ham alanlar Faz1RunnerV5/arac-model-veri-olustur.mts'te
 // HÂLÂ TOPLANIYOR (maliyetsiz) — yalnız skorlamadan çıkarıldı. zeminToleransi kullanıcının
 // bilinçli istisnası olduğu için (bkz. üstteki not) KORUNDU.
-// 2026-09-18 (V5.47) — KGS_GUN_POP_ORT_DIGER: kgsGun'un (aşağıda toFeatureVector'a
-// eklendi) missing (-1) satırlarda impute edildiği "diğer" segment TRAIN popülasyon
-// ortalaması (arac-model-egit-segment.mjs'in AYNI TRAIN split'inden ölçüldü — jokeyOrani/
-// antrenorOrani ile AYNI "population-mean fallback" deseni). Düşük-şart'ta kgsGun
-// katsayısı ELLE sıfırlandığı (KGS_GUN_IDX, WEIGHTS_DUSUK_SART override, aşağıda) için
-// bu sabit o segmentte skora etki ETMİYOR — tek imputation değeri iki segment için de
-// güvenle kullanılabiliyor.
-// 2026-09-18 dış denetim bulgusu (KRİTİK): bu değer önceden 27.95 olarak ELLE (yuvarlanmış)
-// girilmişti — gerçek eğitilmiş means[KGS_GUN_IDX]=27.948399938753635 idi. Fark z-score'da
-// ~0.0000267 (std=59.95, katkıya etkisi ~-0.000003 — pratikte önemsiz) ama TASARIM NİYETİ
-// "missing veri KESİN sıfır katkı" olduğu için artık ELLE YAZILMIYOR, doğrudan eğitilmiş
-// means dizisinden okunuyor — bir daha retrain'de veya yuvarlamada asla sapamaz.
-const KGS_GUN_POP_ORT_DIGER = WEIGHTS_DIGER.means[FEATURE_NAMES.indexOf("kgsGun")];
-
 export function toFeatureVector(r: Faz1RunnerV5): number[] {
   return [
     r.agfSirasi,
@@ -947,7 +922,6 @@ export function toFeatureVector(r: Faz1RunnerV5): number[] {
     r.sonIdmanSprint,
     r.takiCikarildiMi - r.takiEklendiMi,
     r.yarisGidisatiSkoru,
-    r.kgs !== -1 ? r.kgs : KGS_GUN_POP_ORT_DIGER,
   ];
 }
 
@@ -1716,10 +1690,6 @@ const OZELLIK_GRUPLARI: OzellikGrubu[] = [
     },
   },
   { kod: "GIDISAT", ozellikIndeksleri: [idx("yarisGidisatiSkoru")], aciklama: (r) => (r.katkilar[YARIS_GIDISATI_IDX] !== 0 ? `Bu yarışın beklenen gidişatına (kimin öne geçeceği, temponun nasıl olacağı) göre bu atın koşu tarzı ${r.katkilar[YARIS_GIDISATI_IDX] > 0 ? "uygun düşüyor" : "uygun düşmüyor"} (deneysel bir gözlem, henüz kanıtlanmamış)` : null) },
-  // 2026-09-18 (V5.47) — KGSGUN: bkz. KGS_GUN_IDX üstündeki not. Düşük-şart'ta katsayı
-  // ELLE sıfırlanmış (katkı her zaman 0) — HIZ/H2H/IDMJOK ile AYNI desen, satır yalnız
-  // "diğer" segmentte ve veri varken (kgs!==-1) görünür.
-  { kod: "KGSGUN", ozellikIndeksleri: [idx("kgsGun")], aciklama: (r) => (r.katkilar[KGS_GUN_IDX] !== 0 && r.kgs !== -1 ? `Son yarışından bu yana ${r.kgs} gün geçmiş: geçmişte ${r.katkilar[KGS_GUN_IDX] > 0 ? "olumlu" : "olumsuz"} çıkmış (kısa/uzun ara etkisi)` : null) },
 ];
 
 // 2026-08-18 kullanıcı talebi: "18 sinyalin hepsinin kontrol edildiğini bana göstermesini
@@ -1732,7 +1702,6 @@ const FEATURE_LABELS: Record<string, string> = {
   agfSirasi: "AGF Sırası", accurace: "Accurace (son yarış en hızlı kapanış)",
   formEgimi: "Form Eğimi", formEgimi2: "Form Eğimi (karesi, doğrusal-olmayan etki)",
   kgs: "KGS (dinlenme günü)", kgs2: "KGS (karesi)", kgsVarMi: "KGS Verisi Var Mı",
-  kgsGun: "KGS Gün (son yarıştan bugüne gün sayısı, V5.47)",
   pistUzmani: "Pist Uzmanlığı (bu hipodrom+pist+mesafede yıl içi galibiyet)",
   sireOrani: "Aygır Kazanma Oranı (küçültülmüş)", galop: "Keskin Galop Zinciri",
   idmJokey: "İdman Jokeyi Uyumu", jokeyOrani: "Jokey Kazanma Oranı (küçültülmüş)",

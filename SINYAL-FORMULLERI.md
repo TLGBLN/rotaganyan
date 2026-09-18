@@ -1,4 +1,4 @@
-# ROTAGANYAN — Sinyal Formülasyon Standardı (V5.47)
+# ROTAGANYAN — Sinyal Formülasyon Standardı (V5.46)
 
 Bu dosya kod-doğrulanmış bir REFERANS'tır — "böyle olmalı" değil, **şu an `src/lib/methodology/v5-engine.ts`'te gerçekten çalışan** formülleri belgeler. Öneri/gelecek fikirleri buraya yazılmaz (onlar için `sinyal-kutugu.service.ts`'teki "ADAY_SİNYALLER" listesine bakın). Her sinyal/katsayı değişikliğinde [[feedback_engine_versions_her_degisiklikte]] kuralı gereği AYNI oturumda burası da güncellenmeli.
 
@@ -22,7 +22,7 @@ Toplam: **skor = A-katmanı regresyon skoru + Δ_sire + Δ_zeminMesafe**, sonra 
 
 ---
 
-## 2. A katmanı — 14 ortak regresyon sinyali
+## 2. A katmanı — 13 ortak regresyon sinyali
 
 Sıra `toFeatureVector()`'daki (v5-engine.ts:850) BİREBİR sıradır. **Terminoloji düzeltmesi
 (2026-09-18 dış denetim):** "3 ayrı eğitilmiş ağırlık seti" YANLIŞ ifade — gerçekte **2
@@ -58,17 +58,16 @@ eğitilmiş ağırlık seti + 1 Handikap override profili**:
 | 11 | **Son İdman Sprint** | `sonIdmanSprint` (0/1 — `v5-engine.ts:743`, son idmanın TÜRÜ TJK metninde "SPRINT"/"SÜRAT" içeriyor mu, `isSprintIdman` — göreli hıza DEĞİL yalnız tür etiketine bakar) | Tüm segmentlerde fit | **Kural istisnası** (ESENYIL vakası) — backtest yönü bile doğrulamadı (n=9148, hafif negatif nokta tahmini). **Missing-veri sorunu idmJokey ile AYNI** (2026-09-12 doğrulandı): hiç idman kaydı yok (%32.4) İLE kayıt var ama sprint değil (%58.5) AYNI 0 |
 | 12 | **Takı Değişikliği** | `takiCikarildiMi - takiEklendiMi` (V5.46 birleşimi: +1=yalnız çıkarılmış, -1=yalnız eklenmiş, 0=değişiklik yok/ikisi birden) | Tüm segmentlerde fit | **Kural istisnası** (KIZIM BİNDAL vakası) — eskiden 2 ayrı sinyaldi, ikisi de anlamsızdı, V5.46'da birleştirildi |
 | 13 | **Yarış Gidişatı** | `yarisGidisatiSkoru` = tempo senaryosu (Accurace geçmişinden kural-tabanlı olasılık dağılımı: Rahat Liderlik/Yavaş/Dengeli/Mücadeleli/Çok Yüksek/Dağılma Riski) × at-stil uyum matrisi + zorluk-ağırlıklı Tempo Taşıma Gücü terimi (`stilUyumu + zorluk×tempoTasima×4`) × mesafe katsayısı | **Handikap'ta β=0** (Handikap DIŞI 585 koşuda GA=[0.0596,0.2775] kesin anlamlı; Handikap içi 366 koşuda ters/anlamsız GA=[-0.168,0.104] — havuzlanmış katsayı bu yüzden bıçak sırtındaydı) | Kısmen kanıtlanmış (segment-özel) — **çarpımsal alternatif form (2026-09-12) test edildi, tüm λ'larda GA sıfırı içerdi, REDDEDİLDİ, mevcut toplamsal form korundu** |
-| 14 | **KGS Gün** | `kgs` (`son-yaris-detay.actions.ts`'in `gunFarki`'si — son yarıştan bugüne HAM gün sayısı, -1=veri yok sentinel; missing satırlarda `KGS_GUN_POP_ORT_DIGER=27.95`'e impute edilir, jokeyOrani/antrenorOrani ile AYNI "population-mean fallback" deseni) | **Düşük-şart'ta β=0** (n=340 küçük, GA=[-0.1441,0.1673] sıfırı kapsıyor, signStability %66.0); diğer'de fit (β=-0.1108, uzun ara=düşük kazanma) | Kanıtlanmış (segment-özel, V5.47) — **KRİTİK kalibrasyon notu**: kgs "diğer"de ~%70 missing, means/stds[KGS_GUN_IDX] blanket `computeMeanStd` ÜZERİNE YAZILIP yalnız GEÇERLİ TRAIN satırlarından override edildi (aksi halde std ~%55'e küçülüp z-score'u ~1.8× büyütürdü) |
 
-**KGS Gün'ün segment-bazlı gerçek aktifliği (2026-09-18 dış denetim netleştirmesi) —
-"14. sinyal" olması TÜM kategorilerde aktif olduğu anlamına GELMİYOR:**
-
-| Segment | M (aktiflik) | β |
-|---|---|---|
-| Diğer (pooled) | 1 | -0,1108 |
-| Handikap | 1 (WEIGHTS_DIGER_HANDIKAP, kgsGun override listesinde YOK) | -0,1108 |
-| Düşük-şart | **0 (elle sıfırlandı)** | 0 |
-| Hibrit (Maiden/Satış) | yalnız Diğer-yarısından: `0,5×(-0,1108×z_diğer) + 0,5×0` | efektif yarım güç |
+**KGS Gün (V5.47'de eklenip AYNI GÜN geri alındı, 2026-09-18) — ŞU AN CANLI DEĞİL:**
+"Son yarıştan bugüne gün sayısı" 14. özellik olarak eklenip "diğer" segmentte B=500
+gün-kümeli challenger testinde KESİN doğrulanmıştı (β=-0.1108, GA=[-0.2553,-0.0222],
+P(ΔLL<0)=%100.0) — kullanıcı kararıyla (tek-günlük n=22 karşılaştırmada V5.47'nin top1'de
+geride kalması üzerine, istatistiksel kanıt olmadığı bilinerek) AYNI GÜN TAMAMEN GERİ
+ALINDI. `toFeatureVector`/`FEATURE_NAMES` tekrar 13 elemana döndü, ağırlık dosyaları
+kgsGun-öncesi (commit 886c451) haline geri getirildi. Kanıt HÂLÂ GEÇERLİ — bu bir "sinyal
+yanlıştı" reddi değil, üretimde tutma riski alınmama kararı. Tam detay + gelecekte
+yeniden eklenirse izlenecek adımlar: proje hafızası `project_v547_yeni_sinyal_arastirmasi.md`.
 
 **Ölü/çıkarılmış sinyaller (V5.46, 2026-09-12):** `kgsVarMi`, `kacakYalniz`, `h2hKiloDegisimi` — B=500 testinde üçü de tüm segmentlerde anlamsız çıktı, `toFeatureVector`'dan tamamen çıkarıldı. Ham alanlar `Faz1RunnerV5`'te hâlâ hesaplanıyor (maliyetsiz, `kgsVarMi` terfi penceresi gösteriminde kullanılıyor) — yalnız skora girmiyor.
 
@@ -111,7 +110,7 @@ P_i     = exp(S'_i) / Σ_k exp(S'_k)              (nihai, gösterilen olasılık
 
 ---
 
-## 5. Kanıt Matrisi (16 sinyal, sağlık paneli)
+## 5. Kanıt Matrisi (15 sinyal, sağlık paneli)
 
 **Okuma notu — üç FARKLI kanıt türü karıştırılmamalı:**
 - **β CI** = tek bir katsayının kendi bootstrap güven aralığı (Type B, train-resample+refit, `arac-model-egit-segment.mjs`)
@@ -142,8 +141,7 @@ Boş (—) hücreler "hiç ölçülmedi" değil, "bu oturumda BU protokolle yeni
 | Takı Değişikliği | tümü | — | — (V5.46 birleşim testinde Δtop1/top3=0.00pp) | — | — | %84.5 (değişiklik yok) | 🟡 Kural istisnası |
 | Yarış Gidişatı | diğer (Handikap-dışı) | +0.17 | [0.0596,0.2775] | — | çarpımsal alternatif REDDEDİLDİ (2026-09-12, tüm λ GA sıfırı içerdi) | %66.4 (yetersiz Accurace verisi) | 🟢 Kısmen kanıtlanmış |
 | Yarış Gidişatı | Handikap | β=0 (elle) | — (GA=[-0.168,0.104]) | — | — | aynı | 🟢 Doğru sıfırlanmış |
-| **KGS Gün** | **diğer** | **-0.1108** | [-0.2553,-0.0222] | %99.2 | **B=500 gün-kümeli paired: GA=[-0.0134,-0.0072] P(ΔLL<0)=%100.0** | %69.5 (bkz. §2 not, tjkAtId/horseRaceHistoryCache kapsamına bağlı) | 🟢 **VALIDATED, V5.47'de CANLI** |
-| KGS Gün | düşük-şart | β=0 (elle) | — (n=340 GA=[-0.1441,0.1673]) | %66.0 | — | aynı | 🟢 Doğru sıfırlanmış |
+| KGS Gün (ÇIKARILDI, bkz. §2 not) | diğer | -0.1108 (V5.47'de ölçüldü) | [-0.2553,-0.0222] | %99.2 | B=500 gün-kümeli: GA=[-0.0134,-0.0072] P(ΔLL<0)=%100.0 | %69.5 | ⚪ **Kanıt geçerli, üretimde DEĞİL (2026-09-18 geri alındı)** |
 | Sire Oranı (B) | düşük-şart | 0.0477 (sabit) | [-0.1352,0.2045] | — | — | 0% (her zaman hesaplanır) | 🟡 Kural istisnası, kanıtsız |
 | Zemin+Mesafe (B) | tümü | 0.02 (sabit) | — | — (v6-challenger testinde top3 signStability %89.6, AYNI formül DEĞİL — dikkat) | "diğer" top3 +0.53pp[0.11,1.05] (ON/OFF ablasyon) | %83.3 (tam+kısmi eşleşme yok) | 🟡 PROVISIONAL/deneysel |
 
