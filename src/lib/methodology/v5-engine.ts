@@ -906,12 +906,17 @@ const ANLAMLI_PUAN_ESIGI = 1.0; // agf-trend.actions.ts'teki ANLAMLI_PUAN_ESIGI 
 // bilinçli istisnası olduğu için (bkz. üstteki not) KORUNDU.
 // 2026-09-18 (V5.47) — KGS_GUN_POP_ORT_DIGER: kgsGun'un (aşağıda toFeatureVector'a
 // eklendi) missing (-1) satırlarda impute edildiği "diğer" segment TRAIN popülasyon
-// ortalaması (arac-model-egit-segment.mjs'in AYNI TRAIN split'inden ölçüldü, 27.95 —
-// jokeyOrani/antrenorOrani ile AYNI "population-mean fallback" deseni). Düşük-şart'ta
-// kgsGun katsayısı ELLE sıfırlandığı (KGS_GUN_IDX, WEIGHTS_DUSUK_SART override, aşağıda)
-// için bu sabit o segmentte skora etki ETMİYOR — tek imputation değeri iki segment için
-// de güvenle kullanılabiliyor.
-const KGS_GUN_POP_ORT_DIGER = 27.95;
+// ortalaması (arac-model-egit-segment.mjs'in AYNI TRAIN split'inden ölçüldü — jokeyOrani/
+// antrenorOrani ile AYNI "population-mean fallback" deseni). Düşük-şart'ta kgsGun
+// katsayısı ELLE sıfırlandığı (KGS_GUN_IDX, WEIGHTS_DUSUK_SART override, aşağıda) için
+// bu sabit o segmentte skora etki ETMİYOR — tek imputation değeri iki segment için de
+// güvenle kullanılabiliyor.
+// 2026-09-18 dış denetim bulgusu (KRİTİK): bu değer önceden 27.95 olarak ELLE (yuvarlanmış)
+// girilmişti — gerçek eğitilmiş means[KGS_GUN_IDX]=27.948399938753635 idi. Fark z-score'da
+// ~0.0000267 (std=59.95, katkıya etkisi ~-0.000003 — pratikte önemsiz) ama TASARIM NİYETİ
+// "missing veri KESİN sıfır katkı" olduğu için artık ELLE YAZILMIYOR, doğrudan eğitilmiş
+// means dizisinden okunuyor — bir daha retrain'de veya yuvarlamada asla sapamaz.
+const KGS_GUN_POP_ORT_DIGER = WEIGHTS_DIGER.means[FEATURE_NAMES.indexOf("kgsGun")];
 
 export function toFeatureVector(r: Faz1RunnerV5): number[] {
   return [
