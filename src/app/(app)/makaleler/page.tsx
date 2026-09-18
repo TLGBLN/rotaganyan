@@ -3,6 +3,8 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { getPublishedArticles } from "@/server/services/article.service";
+import { getArticleLikeStates } from "@/server/actions/article-like.actions";
+import ArticleLikeButton from "@/components/articles/ArticleLikeButton";
 
 export const revalidate = 60;
 
@@ -18,6 +20,7 @@ export default async function MakalelerPage({ searchParams }: PageProps) {
   const page = Math.max(1, parseInt(params.sayfa ?? "1", 10));
   const { items, total } = await getPublishedArticles(undefined, page, 12);
   const totalPages = Math.ceil(total / 12);
+  const likeStates = await getArticleLikeStates(items);
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10 space-y-8">
@@ -67,6 +70,12 @@ export default async function MakalelerPage({ searchParams }: PageProps) {
                   <span>Rotaganyan Editör</span>
                   {a.publishedAt && <span>{format(new Date(a.publishedAt), "d MMM yyyy", { locale: tr })}</span>}
                 </div>
+                <ArticleLikeButton
+                  articleId={a.id}
+                  slug={a.slug}
+                  initialTotal={likeStates[a.id]?.total ?? a.seedLikeCount}
+                  initialLikedByMe={likeStates[a.id]?.likedByMe ?? false}
+                />
               </div>
             </Link>
           ))}

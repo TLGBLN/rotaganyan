@@ -82,6 +82,7 @@ model User {
 
   predictions   Prediction[]
   articles      Article[]
+  articleLikes  ArticleLike[]
   notifications Notification[]
   horseFollows  HorseFollow[]
   accounts      Account[]
@@ -549,12 +550,29 @@ model Article {
   metaTitle       String?
   metaDescription String?
   ogImage         String?
+  // 2026-09-18 — başlangıç "sosyal kanıt" beğeni sayısı (5-13 arası, yayımlanınca elle
+  // seed edilir) — gerçek kullanıcı beğenileri ayrı ArticleLike tablosunda, toplam
+  // gösterilen sayı seedLikeCount + ArticleLike.count() (bkz. article-like.actions.ts).
+  seedLikeCount   Int         @default(0)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
-  author User @relation(fields: [authorId], references: [id])
+  author User          @relation(fields: [authorId], references: [id])
+  likes  ArticleLike[]
 
   @@index([type, published])
+}
+
+model ArticleLike {
+  id        String   @id @default(cuid())
+  articleId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, userId])
 }
 
 // ─── NOTIFICATIONS ────────────────────────────────────────────────────────────

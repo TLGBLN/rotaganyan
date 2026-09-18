@@ -39,9 +39,11 @@ export async function upsertArticle(id: string | null, input: ArticleInput) {
     metaDescription: input.metaDescription || null,
   };
 
+  // Yeni makalede başlangıç "sosyal kanıt" beğeni sayısı (5-13 arası) — kullanıcı talebi,
+  // gerçek kullanıcı beğenileri (ArticleLike) buna eklenir, bkz. article-like.actions.ts.
   const article = id
     ? await db.article.update({ where: { id }, data })
-    : await db.article.create({ data });
+    : await db.article.create({ data: { ...data, seedLikeCount: 5 + Math.floor(Math.random() * 9) } });
 
   revalidatePath("/admin/makaleler");
   return { success: true, id: article.id };

@@ -4,7 +4,9 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { getArticleBySlug } from "@/server/services/article.service";
+import { getArticleLikeStates } from "@/server/actions/article-like.actions";
 import ArticleShareButtons from "@/components/articles/ArticleShareButtons";
+import ArticleLikeButton from "@/components/articles/ArticleLikeButton";
 
 export const revalidate = 60;
 
@@ -50,6 +52,8 @@ export default async function MakaleDetayPage({ params }: PageProps) {
   if (!article || !article.published) notFound();
 
   const url = `${BASE_URL}/makaleler/${article.slug}`;
+  const likeStates = await getArticleLikeStates([article]);
+  const likeState = likeStates[article.id] ?? { total: article.seedLikeCount, likedByMe: false };
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
@@ -70,7 +74,15 @@ export default async function MakaleDetayPage({ params }: PageProps) {
               Rotaganyan Editör
               {article.publishedAt && <> · {format(new Date(article.publishedAt), "d MMMM yyyy", { locale: tr })}</>}
             </span>
-            <ArticleShareButtons url={url} title={article.title} />
+            <div className="flex items-center gap-2">
+              <ArticleLikeButton
+                articleId={article.id}
+                slug={article.slug}
+                initialTotal={likeState.total}
+                initialLikedByMe={likeState.likedByMe}
+              />
+              <ArticleShareButtons url={url} title={article.title} />
+            </div>
           </div>
         </header>
 
