@@ -13,7 +13,7 @@ import type { GunlukBasariOzeti } from "@/server/services/admin.service";
 // 2026-09-07 (aynı gün) kullanıcı bulgusu ("banko kısmı düzeltilmesi gerek") — 23 günde
 // toplam yalnız 13 banko tetiklendi (günde ortalama <1), bu yüzden GÜNLÜK bir banko
 // oranı/yüzdesi ("0/1"=%0, "1/1"=%100) saf gürültü, hiçbir gün için anlamlı değil. Günlük
-// sütun kaldırıldı — yalnız o gün bir banko varsa TUTTU/IŞKA işareti gösteriliyor (oran
+// sütun kaldırıldı — yalnız o gün bir banko varsa TUTTU/ISKA işareti gösteriliyor (oran
 // değil), gerçek istatistik yalnız üstteki genel özet kutusunda (n=13 birikmiş) kalıyor.
 
 function sapmaRengi(gunOrani: number, genelLo: number, genelHi: number): string {
@@ -79,7 +79,7 @@ export default function GunlukBasariPanel({ ozet }: { ozet: GunlukBasariOzeti })
                     <span className="text-muted-foreground/50">—</span>
                   ) : (
                     <span className={cn("font-semibold", g.bankoHit > 0 ? "text-hit" : "text-miss")}>
-                      {g.bankoHit > 0 ? "★ Tuttu" : "★ Işka"}
+                      {g.bankoHit > 0 ? "★ Tuttu" : "★ Iska"}
                       {g.bankoN > 1 && <span className="ml-1 font-normal text-muted-foreground">({g.bankoHit}/{g.bankoN})</span>}
                     </span>
                   )}
