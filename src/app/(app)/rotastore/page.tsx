@@ -5,7 +5,7 @@ import { getPublishedProducts } from "@/server/services/product.service";
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "RotaStore",
+  title: "RotaGanyan Store",
 };
 
 type PageProps = { searchParams: Promise<{ sayfa?: string }> };
@@ -19,7 +19,7 @@ export default async function RotaStorePage({ searchParams }: PageProps) {
   return (
     <main className="mx-auto max-w-5xl px-4 py-10 space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">RotaStore</h1>
+        <h1 className="text-3xl font-bold">RotaGanyan Store</h1>
       </div>
 
       {items.length === 0 ? (

@@ -68,8 +68,8 @@ export default async function Header() {
           <Button asChild variant="outline" size="sm">
             <Link href="/rotaganyansiralamasi" data-tour="puantablosu"><HeaderLabel k="puanTablosu" /></Link>
           </Button>
-          {/* 2026-09-20 kullanıcı talebi: Altılı Ne Verir / Makaleler / RotaStore tek tek
-              buton yerine açılır menüye toplandı — header'da yer sıkışmasını önlemek için. */}
+          {/* 2026-09-20 kullanıcı talebi: Altılı Ne Verir / Makaleler / RotaGanyan Store tek
+              tek buton yerine açılır menüye toplandı — header'da yer sıkışmasını önlemek için. */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-1" data-tour="altili">
@@ -85,7 +85,7 @@ export default async function Header() {
                 <Link href="/makaleler">Makaleler</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/rotastore">RotaStore</Link>
+                <Link href="/rotastore">RotaGanyan Store</Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

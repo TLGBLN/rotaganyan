@@ -19,7 +19,7 @@ export default async function AdminUrunlerPage({ searchParams }: PageProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold">RotaStore — Ürünler</h1>
+        <h1 className="text-lg font-bold">RotaGanyan Store — Ürünler</h1>
         <Link
           href="/admin/urunler/yeni"
           className="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand/90"
