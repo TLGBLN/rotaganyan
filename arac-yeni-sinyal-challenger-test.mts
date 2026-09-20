@@ -340,6 +340,30 @@ const ZeminH3: Aday = {
   dahilMi: (runners) => runners.map((r) => r.zeminH3HasEvidence === true),
 };
 
+// 2026-09-19 kullanıcı talebi — TEST HARNESS QA (Faz 1, model denetiminden ÖNCE): "sistem
+// gerçekten faydalı bir düzeltmeyi kabul edebilecek durumda mı" sorusuna doğrudan cevap.
+// İki kontrol, ikisi de PRODUCTION'A ASLA GİRMEZ, yalnız bu script'in kendi hassasiyetini
+// ölçmek için var:
+// - NegativeControl: sonuçla HİÇ ilişkisi olmayan saf gürültü — harness bunu REDDETMELİ
+//   (GA sıfırı kapsamalı, OOS'ta anlamlı iyileşme göstermemeli). Reddetmezse harness
+//   YANLIŞ-POZİTİF üretiyor demektir (test altyapısının kendisi bozuk).
+// - PositiveControl: `win` alanına (kazanan bilgisi) kontrollü gürültü eklenmiş "kopya
+//   çekme" sinyali — güçlü ama MÜKEMMEL DEĞİL (dejenere/sayısal patlama riski olmasın diye
+//   ±0.35 uniform gürültü eklendi). Harness bunu KESİN KABUL ETMELİ (büyük |β|, dar GA,
+//   OOS'ta ezici LogLoss iyileşmesi). Kabul etmezse sorun MODELDE değil, TEST ALTYAPISINDA.
+// Seed sabit (mulberry32, SEED+100/SEED+200) — her çalıştırmada AYNI gürültü, tekrar
+// üretilebilir.
+const negControlRng = mulberry32(SEED + 100);
+const NegativeControl: Aday = {
+  ad: "QA_NegativeControl (saf gürültü, kabul EDİLMEMELİ)",
+  hesapla: (runners) => runners.map(() => negControlRng() * 2 - 1),
+};
+const posControlRng = mulberry32(SEED + 200);
+const PositiveControl: Aday = {
+  ad: "QA_PositiveControl (win+gürültü, KESİN kabul edilmeli — PRODUCTION'A ASLA GİRMEZ)",
+  hesapla: (runners) => runners.map((r) => r.win + (posControlRng() * 0.7 - 0.35)),
+};
+
 // 2026-09-18 kullanıcı talebi — "V6" tartışmasından çıkan iki UCUZ aday (SIFIR yeni
 // backfill — ikisi de model-veri-yg4.json'da ZATEN ham alan olarak var):
 //
@@ -354,15 +378,58 @@ const IdmVarFarkliJokey: Aday = {
   hesapla: (runners) => runners.map((r) => ((r.galopSayisi ?? 0) > 0 && r.idmJokey === 0 ? 1 : 0)),
 };
 
+// 2026-09-20 kullanıcı talebi (Missingness-aware, KGS/FinalRank2 forward'da beklerken
+// öncelik #1) — IdmVarFarkliJokey'in TAMAMLAYICI YARISI: "idman hiç yok" (galopSayisi=0)
+// durumunu AYRI bir bayrakla işaretler. idmJokey/sonIdmanSprint İKİSİ DE AYNI galop
+// listesinden (gecerliGaloplar, v5-engine.ts) türediği için galopSayisi=0 durumu HER
+// İKİSİ için de AYNI ANDA "veri yok" demek — yani bu TEK candidate hem "V5.46+γ·
+// idmJokeyMissing" hem "V5.46+γ·sonIdmanSprintMissing" sorusunu AYNI ANDA cevaplıyor,
+// ikisini ayrı ayrı çalıştırmak matematiksel olarak AYNI sonucu üretir (aynı z, aynı β).
+const GalopMissing: Aday = {
+  ad: "GalopMissing (=idmJokeyMissing=sonIdmanSprintMissing, aynı galopSayisi=0 koşulu)",
+  hesapla: (runners) => runners.map((r) => ((r.galopSayisi ?? 0) === 0 ? 1 : 0)),
+};
+
 // KgsGun — "kaç gün sonra" (son yarıştan bugüne gün sayısı). kgsVarMi (yalnız var/yok
 // bayrağı) daha önce ölü bulunup toFeatureVector'dan çıkarılmıştı — ama HAM sürekli
 // değerin kendisi (ne kadar uzun/kısa bir ara) hiç test edilmedi. -1 = veri yok (dahilMi
 // ile standardizasyon dışı tutulur, KESİN 0 alır).
 const KgsGun: Aday = {
-  ad: "KgsGun",
+  ad: "A_KgsGun_dogrusal",
   hesapla: (runners) => runners.map((r) => (r.kgs != null && r.kgs !== -1 ? r.kgs : 0)),
   dahilMi: (runners) => runners.map((r) => r.kgs != null && r.kgs !== -1),
 };
+
+// 2026-09-19 kullanıcı talebi — KGS'nin "feature representation" eleştirisi: Model
+// Blind-Spot Audit'te (bkz. proje hafızası) KGS 90+ gün grubunda ciddi bir kör nokta
+// bulundu (z≈-2.1, model %6.6 tahmin ederken gerçek yalnız %2.8) — mevcut doğrusal form
+// TÜM aralığı (20→150 gün) aynı eğimle ele alıyor, ama ceza yalnız EKSTREM kuyrukta
+// yoğunlaşıyor olabilir. KRİTİK METODOLOJİK UYARI (kullanıcının kendi notu): 90 eşiği
+// AYNI OOS denetiminde keşfedildi — bu yüzden yalnız 90 değil, ÖNCEDEN BELİRLENMİŞ 3 kaba
+// yuvarlak eşik (60/90/120) TEŞHİS AMAÇLI test ediliyor; "90 en iyi çıktı" diye doğrudan
+// production seçimi YAPILMAYACAK, gerçek doğrulama yeni (gelecek) veri birikince yapılmalı.
+// B ailesi: ikili eşik (KGS>=eşik ? 1 : 0). C ailesi: hinge/piecewise (max(0, KGS-eşik)) —
+// ikisi de mevcut doğrusal formun YERİNE geçmeyi test ediyor (üretimde KGS zaten YOK,
+// hiçbiri şu an üç formdan biri lehine "ekleniyor" değil, üçü birbirine karşı kıyaslanıyor).
+function kgsEsikliIkili(esik: number): Aday {
+  return {
+    ad: `B_KGS${esik}Plus_ikili`,
+    hesapla: (runners) => runners.map((r) => (r.kgs != null && r.kgs !== -1 && r.kgs >= esik ? 1 : 0)),
+    dahilMi: (runners) => runners.map((r) => r.kgs != null && r.kgs !== -1),
+  };
+}
+function kgsHinge(esik: number): Aday {
+  return {
+    ad: `C_KGSHinge${esik}`,
+    hesapla: (runners) => runners.map((r) => (r.kgs != null && r.kgs !== -1 ? Math.max(0, r.kgs - esik) : 0)),
+    dahilMi: (runners) => runners.map((r) => r.kgs != null && r.kgs !== -1),
+  };
+}
+const KGS_ESIK_ADAYLARI: Aday[] = [
+  KgsGun,
+  kgsEsikliIkili(60), kgsEsikliIkili(90), kgsEsikliIkili(120),
+  kgsHinge(60), kgsHinge(90), kgsHinge(120),
+];
 
 // YasSahaFarki — V6 "Age/gelişim" fikrinin operasyonel hali: ham yaş yerine, atın YAŞININ
 // SAHA ORTALAMASINA göre farkı (yıl). Yaş-şartlı koşularda (kategori "3 yaş" vb.) saha zaten
@@ -437,7 +504,7 @@ const HizZamanAgirlikli: Aday = {
   dahilMi: (runners) => runners.map((r) => r.hizPerRaceVarMi === true),
 };
 
-const ADAYLAR: Aday[] = [KgsGun];
+const ADAYLAR: Aday[] = [GalopMissing];
 const SIRE_ORTUSME_ADAYLARI: Aday[] = [NoOp, PedigreeSurfaceAffinity, PedigreeSurfaceAffinity_LowExp];
 // H1 (mevcut, Row.zeminToleransi zaten V5.46 skoruna dahil — ayrı test gerekmez) referans
 // alınarak yalnız H2/H3, hem NORMAL V5.46 üzerinden (additive) hem zeminHaric (replacement)
@@ -531,6 +598,30 @@ async function main() {
 
       console.log(`  β (train, nokta) = ${beta.toFixed(4)}`);
       console.log(`  TEST LogLoss: V5.46=${llV546Test.toFixed(4)}  challenger=${llChallengerTest.toFixed(4)}  ΔLL=${deltaLL.toFixed(4)} ${deltaLL < 0 ? "(challenger DAHA İYİ)" : "(challenger DAHA KÖTÜ/eşit)"}`);
+
+      // 2026-09-20 kullanıcı talebi — bir alt-grupta "win-rate farkı" TEK BAŞINA yeterli
+      // değil, kalibrasyon residualı (E[y-p]) asıl soru: challenger zaten bu alt-gruba doğru
+      // olasılığı mı veriyor (körnokta YOK), yoksa gerçek oran challenger'ın kendi tahmininin
+      // ÜSTÜNDE mi kalıyor (actionable körnokta VAR)? Yalnız ikili (0/1) adaylarda anlamlı.
+      const tumZHamTest = testPrepared.flatMap((g) => g.zHam);
+      const ikiliMi = tumZHamTest.length > 0 && tumZHamTest.every((z) => z === 0 || z === 1);
+      if (ikiliMi) {
+        const satirlar: { flag: number; y: number; p: number }[] = [];
+        for (const g of testPrepared) {
+          const zStd2 = standardizeZ(g.zHam, g.dahil);
+          const scores = g.s0.map((s, i) => s + beta * zStd2[i]);
+          const probs = softmax(scores);
+          g.zHam.forEach((z, i) => satirlar.push({ flag: z, y: i === g.winnerIdx ? 1 : 0, p: probs[i] }));
+        }
+        for (const flagVal of [1, 0]) {
+          const subset = satirlar.filter((s) => s.flag === flagVal);
+          if (subset.length === 0) continue;
+          const n = subset.length;
+          const yMean = subset.reduce((a, s) => a + s.y, 0) / n;
+          const pMean = subset.reduce((a, s) => a + s.p, 0) / n;
+          console.log(`    [flag=${flagVal}] n=${n}  gerçek=%${(yMean * 100).toFixed(2)}  E[challenger p]=%${(pMean * 100).toFixed(2)}  residual(y-p)=${((yMean - pMean) * 100).toFixed(2)}pp`);
+        }
+      }
 
       // Train-set bootstrap: β'nın kararlılığı (CI + signStability) — B=500, seeded.
       // 2026-09-17 kullanıcı talebi (hız): keşif taramalarında B=300 (B=500'den daha hızlı,
