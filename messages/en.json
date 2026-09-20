@@ -354,6 +354,7 @@
     "ekonomik": "Economic",
     "normal": "Normal",
     "genis": "Wide",
+    "kuponAtCekildiUyari": "⚠ #{nos} scratched — coupon not updated",
     "analiziGormekIcinUye": "You must be a member to view the analysis.",
     "girisYap": "Log In",
     "kayitOl": "Sign Up",

@@ -451,6 +451,10 @@ function AnalysisPanel({
   const unpickedRunners = runners
     .filter((r) => !r.scratched && !pickedNos.has(r.no))
     .sort((a, b) => a.no - b.no);
+  // 2026-09-20 kullanıcı talebi: kupon kaydedildikten SONRA o attaki bir isim çekilirse,
+  // kaydedilen pick/kupon numarası değişmiyordu ama at artık koşmuyor. runners'ın GÜNCEL
+  // (canlı) durumundan geliyor — picks sabit kaldığı için aradaki farkı yakalayabiliyor.
+  const scratchedNos = new Set(runners.filter((r) => r.scratched).map((r) => r.no));
 
   // 2026-09-10 kullanıcı talebi: PuanTablosu.tsx'teki gibi, admin için at adının yanında
   // o koşudaki AGF sırası da görünsün — yalnız admin (bkz. agf-sira.ts'teki gerekçe).
@@ -701,18 +705,29 @@ function AnalysisPanel({
                   ...picks.slice(6).map((p) => p.runner?.no).filter((n): n is number => n != null),
                   ...unpickedRunners.map((r) => r.no),
                 ].sort((a, b) => a - b);
-                const parcalar = [ekonomikNos, normalEkNos, genisEkNos].map((g) => (g.length > 0 ? g.join("-") : null));
+                const gruplar = [ekonomikNos, normalEkNos, genisEkNos];
+                const parcalar = gruplar.map((g) => (g.length > 0 ? g.join("-") : null));
                 const tiers = [
-                  { label: t("ekonomik"), color: "text-hit", metin: parcalar.slice(0, 1).filter(Boolean).join(" / ") },
-                  { label: t("normal"), color: "text-brand", metin: parcalar.slice(0, 2).filter(Boolean).join(" / ") },
-                  { label: t("genis"), color: "text-muted-foreground", metin: parcalar.slice(0, 3).filter(Boolean).join(" / ") },
+                  { label: t("ekonomik"), color: "text-hit", metin: parcalar.slice(0, 1).filter(Boolean).join(" / "), nos: gruplar.slice(0, 1).flat() },
+                  { label: t("normal"), color: "text-brand", metin: parcalar.slice(0, 2).filter(Boolean).join(" / "), nos: gruplar.slice(0, 2).flat() },
+                  { label: t("genis"), color: "text-muted-foreground", metin: parcalar.slice(0, 3).filter(Boolean).join(" / "), nos: gruplar.slice(0, 3).flat() },
                 ];
-                return tiers.map((tier) => (
-                  <div key={tier.label} className="flex items-baseline gap-2">
-                    <span className={cn("w-14 shrink-0 text-[10px] font-bold uppercase", tier.color)}>{tier.label}</span>
-                    <span className="font-mono text-xs font-semibold tabular-nums">{tier.metin || "—"}</span>
-                  </div>
-                ));
+                return tiers.map((tier) => {
+                  const cekilenler = tier.nos.filter((no) => scratchedNos.has(no));
+                  return (
+                    <div key={tier.label}>
+                      <div className="flex items-baseline gap-2">
+                        <span className={cn("w-14 shrink-0 text-[10px] font-bold uppercase", tier.color)}>{tier.label}</span>
+                        <span className="font-mono text-xs font-semibold tabular-nums">{tier.metin || "—"}</span>
+                      </div>
+                      {cekilenler.length > 0 && (
+                        <p className="pl-16 text-[10px] font-medium text-red-400">
+                          {t("kuponAtCekildiUyari", { nos: cekilenler.join(", #") })}
+                        </p>
+                      )}
+                    </div>
+                  );
+                });
               })()}
             </div>
           </div>
@@ -732,6 +747,10 @@ function AnalysisPanel({
           const agfRanks = rowPicks
             .map((p) => (p.runner?.no != null ? agfSiraMap.get(p.runner.no) : null))
             .filter((n): n is number => n != null);
+          const cekilenler = rowPicks
+            .map((p) => p.runner?.no)
+            .filter((n): n is number => n != null)
+            .filter((no) => scratchedNos.has(no));
           return (
             <div key={first.rank} className={cn("px-3 py-2.5", isWinner && "bg-[#f5c518]/10")}>
               <div className="flex items-center gap-2 mb-1">
@@ -774,6 +793,11 @@ function AnalysisPanel({
               <div className="flex gap-3 text-[11px] text-muted-foreground mb-1">
                 <span>{t("toplamPrefix")} <span className="font-bold text-foreground">{rowPicks.map((p) => puanHucresi(p.score, p.details, p.scoreExact)).join(" / ")}</span></span>
               </div>
+              {cekilenler.length > 0 && (
+                <p className="text-[10px] font-medium text-red-400">
+                  {t("kuponAtCekildiUyari", { nos: cekilenler.join(", #") })}
+                </p>
+              )}
             </div>
           );
         })}

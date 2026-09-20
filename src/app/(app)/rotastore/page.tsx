@@ -6,7 +6,6 @@ export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "RotaStore",
-  description: "Rotaganyan ürünleri — şapka, anahtarlık, tişört ve daha fazlası.",
 };
 
 type PageProps = { searchParams: Promise<{ sayfa?: string }> };
@@ -21,7 +20,6 @@ export default async function RotaStorePage({ searchParams }: PageProps) {
     <main className="mx-auto max-w-5xl px-4 py-10 space-y-8">
       <div>
         <h1 className="text-3xl font-bold">RotaStore</h1>
-        <p className="mt-2 text-muted-foreground">Rotaganyan ürünleri — şapka, anahtarlık, tişört ve daha fazlası.</p>
       </div>
 
       {items.length === 0 ? (

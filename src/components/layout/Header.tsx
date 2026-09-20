@@ -1,9 +1,16 @@
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { isSameTurkeyDay } from "@/lib/tz";
 import { getTodaysFollowedRaces } from "@/server/actions/horse-follow";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import MobileNav from "./MobileNav";
 import HeaderUserMenu from "./HeaderUserMenu";
 import NotificationBell from "./NotificationBell";
@@ -61,17 +68,27 @@ export default async function Header() {
           <Button asChild variant="outline" size="sm">
             <Link href="/rotaganyansiralamasi" data-tour="puantablosu"><HeaderLabel k="puanTablosu" /></Link>
           </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/altili" data-tour="altili"><HeaderLabel k="altiliNeVerir" /></Link>
-          </Button>
-          {/* 2026-09-18 kullanıcı talebi: makale bölümü — mevcut admin CRUD akışı (ilk
-              commit'ten beri vardı, hiç bağlanmamıştı) artık herkese açık sayfaya sahip. */}
-          <Button asChild variant="outline" size="sm">
-            <Link href="/makaleler">Makaleler</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/rotastore">RotaStore</Link>
-          </Button>
+          {/* 2026-09-20 kullanıcı talebi: Altılı Ne Verir / Makaleler / RotaStore tek tek
+              buton yerine açılır menüye toplandı — header'da yer sıkışmasını önlemek için. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1" data-tour="altili">
+                Daha Fazla
+                <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem asChild>
+                <Link href="/altili"><HeaderLabel k="altiliNeVerir" /></Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/makaleler">Makaleler</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/rotastore">RotaStore</Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </nav>
 
         {/* Actions */}

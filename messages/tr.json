@@ -354,6 +354,7 @@
     "ekonomik": "Ekonomik",
     "normal": "Normal",
     "genis": "Geniş",
+    "kuponAtCekildiUyari": "⚠ #{nos} koşmuyor — kupon güncellenmedi",
     "analiziGormekIcinUye": "Analizi görmek için üye olmalısınız.",
     "girisYap": "Giriş Yap",
     "kayitOl": "Kayıt Ol",
