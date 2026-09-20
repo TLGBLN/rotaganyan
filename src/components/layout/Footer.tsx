@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import Wordmark from "./Wordmark";
+import SocialLinks from "./SocialLinks";
 
 export default function Footer() {
   const t = useTranslations("footer");
@@ -14,11 +15,12 @@ export default function Footer() {
             <Wordmark />
             <span className="ml-2 font-normal">{t("copyright")}</span>
           </p>
-          <nav className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+          <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
             <Link href="/hakkinda" className="hover:text-foreground hover:underline underline-offset-4">{t("hakkinda")}</Link>
             <Link href="/iletisim" className="hover:text-foreground hover:underline underline-offset-4">{t("iletisim")}</Link>
             <Link href="/gizlilik" className="hover:text-foreground hover:underline underline-offset-4">{t("gizlilik")}</Link>
             <Link href="/kullanim-kosullari" className="hover:text-foreground hover:underline underline-offset-4">{t("kullanimKosullari")}</Link>
+            <SocialLinks className="ml-1 flex items-center gap-2" />
           </nav>
         </div>
         <p className="mt-4 text-center text-xs">

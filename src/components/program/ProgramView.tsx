@@ -1706,56 +1706,60 @@ export default function ProgramView({
 
       {currentDay && (
         <>
-          {/* Koşu tab'ları */}
-          <div className="flex overflow-x-auto border-b bg-background shrink-0 print:hidden">
-            {currentDay.races.map((r) => (
-              <button
-                key={r.raceNo}
-                onClick={() => setActiveRace((prev) => ({ ...prev, [currentDay.hippodromeSlug]: r.raceNo }))}
-                className={cn(
-                  "relative shrink-0 px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap",
-                  SURFACE_TAB_BG[r.surface],
-                  selectedRaceNo(currentDay) === r.raceNo
-                    ? "ring-2 ring-inset ring-white shadow-inner"
-                    : "opacity-70 hover:opacity-100"
-                )}
-              >
-                {t("raceNoLabel", { no: r.raceNo })}
-                {r.hasAnalysis && (
-                  <span className="absolute top-1 right-0.5 w-1.5 h-1.5 rounded-full bg-[#27ae60] ring-1 ring-white" />
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Pist durumu + hava (TJK) */}
-          {((currentDay.surfaceConditions?.length ?? 0) > 0 || currentDay.weather || currentRace) && (
-            <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 bg-muted/10 border-b text-[11px]">
-              {currentDay.surfaceConditions?.map((c, i) => (
-                <span
-                  key={i}
+          {/* Koşu tab'ları + Pist durumu/hava — 2026-09-20 kullanıcı talebi: web'de (sm+)
+              aynı satırda, dar mobilde eskisi gibi alt alta. */}
+          <div className="flex flex-col border-b bg-background shrink-0 print:hidden sm:flex-row sm:items-center">
+            {/* Koşu tab'ları */}
+            <div className="flex min-w-0 overflow-x-auto shrink-0">
+              {currentDay.races.map((r) => (
+                <button
+                  key={r.raceNo}
+                  onClick={() => setActiveRace((prev) => ({ ...prev, [currentDay.hippodromeSlug]: r.raceNo }))}
                   className={cn(
-                    "rounded border px-1.5 py-0.5 font-medium",
-                    /çim/i.test(c.label) ? "border-[#009900] text-[#009900]"
-                      : /kum/i.test(c.label) ? "border-[#996633] text-[#996633]"
-                      : "border-[#D39B1E] text-[#D39B1E]"
+                    "relative shrink-0 px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap",
+                    SURFACE_TAB_BG[r.surface],
+                    selectedRaceNo(currentDay) === r.raceNo
+                      ? "ring-2 ring-inset ring-white shadow-inner"
+                      : "opacity-70 hover:opacity-100"
                   )}
                 >
-                  {c.label}: {c.detail}
-                </span>
-              ))}
-              {currentDay.weather && <span className="text-muted-foreground">{currentDay.weather}</span>}
-              {currentRace && (
-                <button
-                  onClick={() => setHipodromOzellikleriOpen(true)}
-                  data-tour="hipodrom-ozellikleri"
-                  className="sm:hidden ml-auto shrink-0 rounded border px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground whitespace-nowrap"
-                >
-                  {t("hipodromOzellikleri")} {!isLoggedIn && "🔒"}
+                  {t("raceNoLabel", { no: r.raceNo })}
+                  {r.hasAnalysis && (
+                    <span className="absolute top-1 right-0.5 w-1.5 h-1.5 rounded-full bg-[#27ae60] ring-1 ring-white" />
+                  )}
                 </button>
-              )}
+              ))}
             </div>
-          )}
+
+            {/* Pist durumu + hava (TJK) */}
+            {((currentDay.surfaceConditions?.length ?? 0) > 0 || currentDay.weather || currentRace) && (
+              <div className="flex flex-wrap items-center gap-2 border-t bg-muted/10 px-3 py-1.5 text-[11px] sm:ml-auto sm:border-t-0 sm:border-l sm:bg-transparent">
+                {currentDay.surfaceConditions?.map((c, i) => (
+                  <span
+                    key={i}
+                    className={cn(
+                      "rounded border px-1.5 py-0.5 font-medium",
+                      /çim/i.test(c.label) ? "border-[#009900] text-[#009900]"
+                        : /kum/i.test(c.label) ? "border-[#996633] text-[#996633]"
+                        : "border-[#D39B1E] text-[#D39B1E]"
+                    )}
+                  >
+                    {c.label}: {c.detail}
+                  </span>
+                ))}
+                {currentDay.weather && <span className="text-muted-foreground">{currentDay.weather}</span>}
+                {currentRace && (
+                  <button
+                    onClick={() => setHipodromOzellikleriOpen(true)}
+                    data-tour="hipodrom-ozellikleri"
+                    className="sm:hidden ml-auto shrink-0 rounded border px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground whitespace-nowrap"
+                  >
+                    {t("hipodromOzellikleri")} {!isLoggedIn && "🔒"}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Analiz + geri sayım */}
           <div className="flex items-center px-3 py-1.5 bg-muted/20 border-b text-[11px]">

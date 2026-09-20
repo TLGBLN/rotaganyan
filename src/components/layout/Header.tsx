@@ -21,7 +21,6 @@ import Wordmark from "./Wordmark";
 import LocaleToggle from "./LocaleToggle";
 import ThemeToggle from "./ThemeToggle";
 import HeaderLabel from "./HeaderLabel";
-import SocialLinks from "./SocialLinks";
 
 export default async function Header() {
   const session = await auth();
@@ -93,7 +92,6 @@ export default async function Header() {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          <SocialLinks className="hidden items-center gap-2 md:flex" />
           {user && <span data-tour="bildirim"><NotificationBell /></span>}
           {user ? (
             <span data-tour="hesap"><HeaderUserMenu name={user.name} email={user.email} role={user.role} /></span>

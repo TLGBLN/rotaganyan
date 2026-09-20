@@ -79,7 +79,7 @@ export default async function RotaganyanSiralamasiPage({ searchParams }: PagePro
   return (
     <div className="mx-auto max-w-[1400px] px-3 py-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold">Rotaganyan Sıralama Tablosu</h1>
+        <h1 className="text-lg font-bold">RotaGanyan Analiz Sıralaması</h1>
         <DateNavigator currentDate={currentDate} basePath="/rotaganyansiralamasi" />
       </div>
 
