@@ -563,6 +563,24 @@ model Article {
   @@index([type, published])
 }
 
+// ─── ROTASTORE (2026-09-20 — yalnız katalog altyapısı: sepet/ödeme YOK, kullanıcı kararı) ──
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  price       Float // TL
+  image       String?
+  category    String? // "Şapka" / "Anahtarlık" / "Tişört" vb. — serbest metin, sabit liste değil
+  stock       Int      @default(0)
+  active      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active])
+}
+
 model ArticleLike {
   id        String   @id @default(cuid())
   articleId String

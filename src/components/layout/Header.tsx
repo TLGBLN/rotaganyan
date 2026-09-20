@@ -69,6 +69,9 @@ export default async function Header() {
           <Button asChild variant="outline" size="sm">
             <Link href="/makaleler">Makaleler</Link>
           </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/rotastore">RotaStore</Link>
+          </Button>
         </nav>
 
         {/* Actions */}

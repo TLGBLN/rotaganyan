@@ -19,6 +19,7 @@ import {
   ClipboardCheck,
   CloudRain,
   Newspaper,
+  ShoppingBag,
 } from "lucide-react";
 
 const NAV = [
@@ -28,6 +29,7 @@ const NAV = [
   // (ArticleForm/TiptapEditor/upsertArticle) projenin İLK commit'inden (2026-06-21) beri
   // vardı ama hiçbir zaman nav'a bağlanmamış, herkese açık sayfası hiç yazılmamıştı.
   { href: "/admin/makaleler", label: "Makaleler", icon: Newspaper },
+  { href: "/admin/urunler", label: "RotaStore", icon: ShoppingBag },
   { href: "/admin/pedigri", label: "Pedigriler", icon: Dna },
   { href: "/admin/accurace", label: "Accurace Database", icon: Gauge },
   { href: "/admin/derece-istatistikleri", label: "Derece İstatistikleri", icon: CloudRain },
