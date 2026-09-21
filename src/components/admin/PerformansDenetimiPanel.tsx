@@ -40,10 +40,10 @@ export default function PerformansDenetimiPanel({
   const durumStil =
     ozet.durum === "dusus"
       ? "border-red-500/40 bg-red-500/10 text-red-400"
-      : ozet.durum === "yukselis"
-      ? "border-hit/40 bg-hit/10 text-hit"
+      : ozet.durum === "izle"
+      ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
       : ozet.durum === "stabil"
-      ? "border-brand/40 bg-brand/10 text-brand"
+      ? "border-hit/40 bg-hit/10 text-hit"
       : "border-muted-foreground/20 bg-muted/5 text-muted-foreground";
 
   return (
@@ -51,7 +51,9 @@ export default function PerformansDenetimiPanel({
       <div>
         <h2 className="text-lg font-bold text-foreground">Performans Denetimi</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Her 100 yayınlanmış+sonuçlanmış koşuda bir, güncel dönem bir öncekiyle otomatik kıyaslanır — yükseliş/stabil yoksa (düşüş varsa) sistem gözden geçirilmeli.
+          Her 100 yayınlanmış+sonuçlanmış koşuda bir, güncel dönem bir öncekiyle iki-oranlı z-testi
+          ile kıyaslanır (istatistiksel olarak anlamlı düşüş = DÜŞÜŞ, henüz anlamlı olmayan pratik
+          düşüş = İZLE, aksi hâlde STABİL) — yalnız gerçek anlamlı bozulmada sistem gözden geçirilmeli.
         </p>
       </div>
 
@@ -64,6 +66,11 @@ export default function PerformansDenetimiPanel({
             <GaugeKart baslik="Galibiyet (1.sıra)" deger={ozet.guncel.hitTop1Orani} alt={`n=${ozet.guncel.n}`} />
             <GaugeKart baslik="Kupon İsabeti" deger={ozet.guncel.hitInCouponOrani} alt={`n=${ozet.guncel.n}`} />
           </div>
+          <Kart
+            baslik="LogLoss (race-level, düşük=iyi)"
+            deger={ozet.guncel.logLoss != null ? ozet.guncel.logLoss.toFixed(3) : "—"}
+            alt={`kapsam ${ozet.guncel.logLossKapsam}/${ozet.guncel.n}`}
+          />
         </div>
         <div className="space-y-3">
           <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Önceki {ozet.onceki?.n ?? 100} koşu</div>
@@ -80,6 +87,11 @@ export default function PerformansDenetimiPanel({
               </>
             )}
           </div>
+          <Kart
+            baslik="LogLoss (race-level, düşük=iyi)"
+            deger={ozet.onceki?.logLoss != null ? ozet.onceki.logLoss.toFixed(3) : "—"}
+            alt={ozet.onceki ? `kapsam ${ozet.onceki.logLossKapsam}/${ozet.onceki.n}` : "henüz yok"}
+          />
         </div>
       </div>
 
