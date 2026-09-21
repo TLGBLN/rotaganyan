@@ -148,12 +148,16 @@ DEĞİŞTİRMEZ, yalnız GÖSTERİM sırasını etkiler". Bu yüzden §2/§5'tek
 istisnası" kanıt sınıflandırması bu 4 mekanizma için GEÇERLİ DEĞİL — her biri kendi ayrı
 backtest'inden (n ve kaynak aşağıda) geçti, ayrı bir doğrulama sınıfı:
 
-| Mekanizma | Ne yapar | Kanıt |
-|---|---|---|
-| `agfTrendTerfisiUygula` | AGF Trend paneli "düşüş ama hâlâ iyi pozisyon" (agfFark≤-1.0 VE agfSirasi≤4) olan atı ilk-3/ilk-6 penceresine terfi ettirebilir | n=930, %19.9 galibiyet/%55.1 top3 vs kontrol %9.3/%28.4 |
-| `agfFavoriIlk3Garantisi` | AGF favorisi (agfSirasi=1) modelin sıralamasında ilk-3 DIŞINDA kalmışsa koşulsuz ilk-3'e alınır | net +5/428 (V5.13) |
-| `derinLongshotDuzelt` | Sahadaki en olası aday AGF≥4 (derin longshot) ise, modelin AGF≤3 içindeki en güçlü adayına indirgenir | net +20/448 (V5.15) |
-| `safModelDegerTerfisiUygula` | AGF-hariç "saf model" görüşü (marketBlindProb1) belirgin yüksekse terfi | `SAF_MODEL_DEGER_ESIGI=5`/`_ILK3=8` eşikleri, `SAF_MODEL_DEGER_TERFISI_AKTIF=true` |
+**KRİTİK AYRIM (2026-09-21 dış denetim): "kodda mevcut" ≠ "production'da aktif".** Her
+mekanizma kendi `*_AKTIF` boolean sabitiyle (v5-engine.ts) açılıp kapatılıyor — aşağıdaki
+tablo bunu ayrı bir sütunda gösterir, kod-doğrulanmıştır.
+
+| Mekanizma | Durum (kod-doğrulanmış) | Ne yapar | Kanıt |
+|---|---|---|---|
+| `agfTrendTerfisiUygula` | 🟢 **AKTİF** (`AGF_TREND_TERFISI_AKTIF=true`) | AGF Trend paneli "düşüş ama hâlâ iyi pozisyon" (agfFark≤-1.0 VE agfSirasi≤4) olan atı ilk-3/ilk-6 penceresine terfi ettirebilir | n=930, %19.9 galibiyet/%55.1 top3 vs kontrol %9.3/%28.4 |
+| `safModelDegerTerfisiUygula` | 🟢 **AKTİF** (`SAF_MODEL_DEGER_TERFISI_AKTIF=true`) | AGF-hariç "saf model" görüşü (marketBlindProb1) belirgin yüksekse terfi | `SAF_MODEL_DEGER_ESIGI=5`/`_ILK3=8` eşikleri |
+| `agfFavoriIlk3Garantisi` | 🔴 **KAPALI** (`AGF_FAVORI_ILK3_GARANTISI_AKTIF=false`) | AGF favorisi (agfSirasi=1) modelin sıralamasında ilk-3 DIŞINDA kalmışsa koşulsuz ilk-3'e alınır — kod duruyor ama ÇALIŞMIYOR | net +5/428 (V5.13) — kanıt geçerli sayılıyor ama prensip gerekçesiyle uygulanmıyor (V5.24) |
+| `derinLongshotDuzelt` | 🔴 **KAPALI** (`DERIN_LONGSHOT_DUZELTMESI_AKTIF=false`) | Sahadaki en olası aday AGF≥4 (derin longshot) ise, modelin AGF≤3 içindeki en güçlü adayına indirgenir — kod duruyor ama ÇALIŞMIYOR | net +20/448 (V5.15) — güncel veriyle tekrar test edildiğinde artık istatistiksel olarak kanıtlanamıyor da (GA sıfırı içeriyor) |
 
 ---
 

@@ -17,25 +17,39 @@
  * bunun sebebi bootstrap sayısı değil örneklem büyüklüğü (n=254); daha fazla bootstrap
  * var olan veriden daha fazla bilgi çıkaramaz, yalnız o veriden GA'yı daha hassas tahmin
  * eder. Bu sinyaller veri arttıkça yeniden değerlendirilmeli.
+ *
+ * ⚠️ 2026-09-21 dış denetim (kullanıcı) — KRİTİK UYARI: bu dosya "elle senkronize edilmeli"
+ * demesine rağmen katsayılar birkaç retrain geride kalmış bulundu (ör. bu dosya agfSirasi
+ * diğer=-0.389 diyordu, gerçek production=-0.40586; hizDerecesi düşük-şart=0.492 diyordu,
+ * gerçek=0.15060 — bazı sinyallerde (sonIdmanSprint düşük-şart) İŞARET bile ters çıkmıştı).
+ * Sayılar bu oturumda `v5-weights-diger.json`/`v5-weights-dusuksart.json`/`v5-engine.ts`
+ * ile TEK TEK karşılaştırılıp düzeltildi — ama bu dosyanın DOĞASI (elle senkronize edilen bir
+ * kütük) gelecekte YİNE drift edebilir. **CANONICAL/kod-doğrulanmış kaynak HER ZAMAN
+ * `rotaganyan/SINYAL-FORMULLERI.md`'dir** — burası bir ARAŞTIRMA/KARAR KÜTÜĞÜ (hangi sinyal
+ * ne zaman/neden eklendi-çıkarıldı-reddedildi, vaka bazlı gerekçeler, B=500 kanıt tarihçesi),
+ * "şu an production'da tam olarak şu sayı çalışıyor" iddiasının TEK doğrulama noktası değil.
+ * Bir katsayı burada SINYAL-FORMULLERI.md'den farklı görünüyorsa, doğru kabul edilecek olan
+ * SINYAL-FORMULLERI.md'dir — bu dosya güncellenmesi gereken taraftır.
  */
 
 export type SinyalAnlamlilik = "anlamli" | "sinirda" | "anlamsiz" | "override" | "veri-yok";
 
-// 2026-09-01 kullanıcı kararı — kavramsal yeniden gruplama (kod/matematik DEĞİŞMEDİ,
-// yalnız raporlama/etiketleme): "A Katmanı" = istatistiksel olarak kanıtlanmış (veya en
-// azından karışık/gerçek katsayıya dayanan) 12 çekirdek sinyal; "B Katmanı" = tek başına
-// anlamsız çıkan ama MEGAFAUNA/ESENYIL/KIZIM BİNDAL türü vakalarda fark yaratabileceği
-// düşünülen, kullanıcı kararıyla eklenen 7 sinyal (zeminToleransi, yakinsama2Plus,
-// sonIdmanSprint, takiEklendiMi, takiCikarildiMi, sireOrani, zeminMesafeDeneyim).
-// Yarış Gidişatı (yarisGidisatiSkoru) B olarak eklenmişti (sınırda/run-to-run değişken
-// sonuç) — kullanıcı kararıyla (2026-09-01, aynı gün) A'ya taşındı; istatistiksel kanıt
-// durumu (durum/not alanları) DEĞİŞMEDİ, yalnız kategorizasyon güncellendi.
-// ÖNEMLİ NÜANS: B Katmanı kendi içinde MEKANİZMA olarak homojen DEĞİL — zeminToleransi/
-// yakinsama2Plus/sonIdmanSprint/takiEklendiMi/takiCikarildiMi hâlâ A'nın 17'lik ORTAK
-// regresyonunda (yarisGidisatiSkoru ile birlikte) fit ediliyor (yalnız kanıt gücü zayıf
-// olduğu için B etiketleniyor); sireOrani/zeminMesafeDeneyim ise GERÇEKTEN ayrı bir
-// mekanizma (softmax'a girmeden önce skora eklenen, bkz. v5-engine.ts bKatmaniUygula).
-// Bu ayrımı gizlememek için her B-katmanı girdisinde belirtiliyor.
+// 2026-09-21 dış denetim (kullanıcı) — DÜZELTME: A/B etiketleri artık kanıt GÜCÜNE göre
+// değil, gerçek MEKANİZMAYA göre (v5-engine.ts'teki fiili kod yapısıyla BİREBİR):
+//   A = 13 sinyalin TAMAMI, tek ortak koşullu-logit regresyonunda birlikte fit edilir
+//       (toFeatureVector) — bazılarının kanıtı güçlü (agfSirasi, agfPayi, ...), bazıları
+//       kullanıcı kararıyla eklenmiş istisna (zeminToleransi, yakinsama2Plus, sonIdmanSprint,
+//       takiDegisikligi) — HEPSİ AYNI regresyonun parçası, farklı bir mekanizma DEĞİL.
+//   B = yalnız 2 sinyal (sireOrani, zeminMesafeDeneyim) — A'nın regresyonuna hiç girmez,
+//       softmax'a girmeden HEMEN ÖNCE skora eklenen AYRI additive terimler (bkz. v5-engine.ts
+//       bKatmaniUygula). Bu, kod-seviyesinde GERÇEKTEN farklı bir hesaplama yolu.
+// ÖNCEKİ (2026-09-01→2026-09-21 arası) sürüm "A=güçlü/kanıtlanmış, B=zayıf ama vaka bazlı
+// eklenen" diye kavramsal (kanıt gücüne göre) bir ayrım kullanıyordu — bu, gerçek B-katmanı
+// mekanizmasını (sireOrani/zeminMesafeDeneyim) A'nın regresyonuna dahil zayıf sinyallerle
+// (zeminToleransi vb.) AYNI tabloda birleştirip yanıltıcı bir izlenim veriyordu (dış denetim
+// bulgusu: "B-katmanı başlığı kavramsal olarak sorunlu... hepsi gerçek B-katmanı değil").
+// Kanıt gücü artık her satırın kendi `durum`/`not` alanında ayrıca okunuyor, katman
+// alanıyla KARIŞTIRILMIYOR.
 export type SinyalKatmani = "A" | "B";
 
 export type CanliSinyal = {
@@ -55,14 +69,14 @@ export type CanliSinyal = {
 // yön aynı ama kanıtlanamadı (-0.0235, GA=[-0.0853,0.0057]). Kalan 12 özelliğin katsayıları
 // aşağıda GÜNCEL (budanmış model, deployed weight dosyası) rakamlarla.
 export const CANLI_SINYALLER: CanliSinyal[] = [
-  { ad: "AGF Sırası", kod: "agfSirasi", katman: "A", dusukSart: { katsayi: -0.359, durum: "anlamli" }, diger: { katsayi: -0.389, durum: "anlamli" }, aciklama: "Her iki segmentte de en güvenilir sinyallerden biri — piyasa favoriliği." },
-  { ad: "AGF Payı", kod: "agfPayi", katman: "A", dusukSart: { katsayi: 0.566, durum: "anlamli" }, diger: { katsayi: 0.527, durum: "anlamli" }, aciklama: "agfSirasi'ndan bağımsız: sıralamadan çok kalabalıktan ne kadar öne çıktığı. VIF BULGUSU (2026-08-31): agfPayi/agfPayi² arasında CİDDİ çoklu-doğrusal-bağlantı (VIF=12.12/7.94, diğer 10 sinyal VIF~1, r=0.90) — bireysel katsayı tahminleri güvenilmez. İKİ ayrı düzeltme denendi (agfTrend ile DEĞİŞTİRME ve EKLEME, bkz. ADAY_SİNYALLER), ikisi de gerçek performansı iyileştirmedi/kötüleştirdi — VIF kabul edildi, dokunulmadı (yüksek VIF burada tahmin gücünü değil yalnız katsayı yorumunu etkiliyor)." },
-  { ad: "Hız Derecesi", kod: "hizDerecesi", katman: "A", dusukSart: { katsayi: 0.492, durum: "anlamli" }, diger: { katsayi: 0.238, durum: "anlamli", not: "Handikap'ta elle 0'a sabitlendi (V5.10)" }, aciklama: "Son 365 gün, popülasyon ortalamasına göre göreli hız. Handikap kategorisinde katkısı istatistiksel olarak sıfır bulunduğu için override edildi. DÜZELTME (V5.33, 2026-08-31): canlı sunum ve eğitim, V5.32'nin retrain incelemesi sırasında fark edilen bir train/serve uyumsuzluğu taşıyordu (canlı yalnız BUGÜNKÜ kova/popülasyona bakıyordu, eğitim atın son 3 koşusunun HER BİRİNİ KENDİ kovasına/tarihine göre kıyaslıyordu — canlıda %43.8 sıfır dönerken eğitimde %8.2). Artık ikisi de aynı paylaşılan çekirdeği (hiz-derecesi-hesapla.ts) kullanıyor, katsayı değişmedi. Gerçek 60 sonuçlanmış koşuda kazanan/diğer Cohen's d ESKİ mantıkta 0.369, YENİ mantıkta 0.578 — düzeltme win-discrimination'ı somut biçimde güçlendirdi." },
-  { ad: "Antrenör Oranı", kod: "antrenorOrani", katman: "A", dusukSart: { katsayi: 0.313, durum: "anlamli" }, diger: { katsayi: 0.235, durum: "anlamli" }, aciklama: "Düşük-şartta belirgin daha ağır basıyor." },
-  { ad: "İdman Jokeyi Uyumu", kod: "idmJokey", katman: "A", dusukSart: { katsayi: 0.199, durum: "anlamli" }, diger: { katsayi: 0.103, durum: "anlamli", not: "Handikap'ta elle 0'a sabitlendi (V5.31, 2026-08-31) — Opus denetimi: canlı model-düzeltilmiş bakiye -5.93pp (GA=[-10.34,-1.60], sıfırı dışlıyor, n=107), üretim-sadık katsayı canlı %75 fit'te 0.1033'ten tüm veride 0.0266'ya (GA sıfırı kapsıyor) kaymış — 12 sinyalin en büyük kayması. Görülmemiş son %25'te sıfırlarsa top1 +3.95pp/top3 +2.63pp/logloss -0.0306, hepsi anlamlı iyileşme. Düşük-şart'ta katsayı sağlam pozitif (GA=[0.102,0.372]), KORUNDU — hizDerecesi/Handikap (V5.10) ile AYNI cerrahi desen." }, aciklama: "Yarıştıracak jokey, atın idmanlarından birini yaptırmış mı. Diğer 11 özellik silindikten sonra iki segmentte de netleşti." },
-  { ad: "Jokey Oranı", kod: "jokeyOrani", katman: "A", dusukSart: { katsayi: 0.182, durum: "anlamli" }, diger: { katsayi: 0.089, durum: "anlamsiz", not: "2026-08-28 zamansal kayma bulundu: Ocak-Mayıs nokta=0.162 GA=[0.110,0.225] anlamlı, Haziran-Ağustos nokta=0.114 GA=[0.044,0.186] hâlâ anlamlı — VIF artmadı (kollinearlik hipotezi doğrulanmadı), gerçek sebep belirsiz. Sıfırlanmadı, izlemede. GÜNCELLEME (2026-08-30, Opus denetimi): V5 döneminde sonuçlanmış TÜM koşularda (n=248) canlı isabet iki bağımsız ölçütte de bu 'anlamsız' etiketiyle ÇELİŞİYOR — kod-bazlı lift +3.9pp (budama sonrası +6.0pp), 4 koşu tipinin (Maiden/Şartlı/Handikap/diğer) HEPSİNDE pozitif, featureSnapshot z-farkı +0.651. Katsayı sıfırlanmadan bırakılması doğru karar çıktı, 'anlamsız' notu artık güncel canlı veriyle desteklenmiyor." }, aciklama: "Jokeyin genel kazanma yüzdesi." },
-  { ad: "AGF Payı² (kare terimi)", kod: "agfPayi2", katman: "A", dusukSart: { katsayi: -0.205, durum: "anlamsiz" }, diger: { katsayi: -0.201, durum: "anlamli" }, aciklama: "AGF payının doğrusal-olmayan (kare) terimi — güçlü favorilerin piyasada fazla değerli görülmesini düzeltir. VIF notu: bkz. agfPayi girdisi." },
-  { ad: "H2H Net Skor", kod: "h2hNetSkor", katman: "A", dusukSart: { katsayi: 0, durum: "override", not: "Ham değer ters yönlüydü, elle sıfırlandı" }, diger: { katsayi: 0.099, durum: "anlamli" }, aciklama: "Baş-başa geçmiş karşılaşmalarda net galibiyet farkı." },
+  { ad: "AGF Sırası", kod: "agfSirasi", katman: "A", dusukSart: { katsayi: -0.64230, durum: "anlamli" }, diger: { katsayi: -0.40586, durum: "anlamli" }, aciklama: "Her iki segmentte de en güvenilir sinyallerden biri — piyasa favoriliği." },
+  { ad: "AGF Payı", kod: "agfPayi", katman: "A", dusukSart: { katsayi: 0.46472, durum: "anlamli" }, diger: { katsayi: 0.53482, durum: "anlamli" }, aciklama: "agfSirasi'ndan bağımsız: sıralamadan çok kalabalıktan ne kadar öne çıktığı. VIF BULGUSU (2026-08-31): agfPayi/agfPayi² arasında CİDDİ çoklu-doğrusal-bağlantı (VIF=12.12/7.94, diğer 10 sinyal VIF~1, r=0.90) — bireysel katsayı tahminleri güvenilmez. İKİ ayrı düzeltme denendi (agfTrend ile DEĞİŞTİRME ve EKLEME, bkz. ADAY_SİNYALLER), ikisi de gerçek performansı iyileştirmedi/kötüleştirdi — VIF kabul edildi, dokunulmadı (yüksek VIF burada tahmin gücünü değil yalnız katsayı yorumunu etkiliyor)." },
+  { ad: "Hız Derecesi", kod: "hizDerecesi", katman: "A", dusukSart: { katsayi: 0.15060, durum: "sinirda", not: "🟡 UNSTABLE/VALIDATION PENDING (2026-09-12 izole profil-refit OOS'ta hem prod'dan hem 0'dan anlamlı KÖTÜ çıktı — bkz. SINYAL-FORMULLERI.md §5)." }, diger: { katsayi: 0.12197, durum: "anlamli", not: "Handikap'ta elle 0'a sabitlendi (V5.10). 🟢 VALIDATED/KEEP." }, aciklama: "Son 365 gün, popülasyon ortalamasına göre göreli hız. Handikap kategorisinde katkısı istatistiksel olarak sıfır bulunduğu için override edildi. DÜZELTME (V5.33, 2026-08-31): canlı sunum ve eğitim, V5.32'nin retrain incelemesi sırasında fark edilen bir train/serve uyumsuzluğu taşıyordu (canlı yalnız BUGÜNKÜ kova/popülasyona bakıyordu, eğitim atın son 3 koşusunun HER BİRİNİ KENDİ kovasına/tarihine göre kıyaslıyordu — canlıda %43.8 sıfır dönerken eğitimde %8.2). Artık ikisi de aynı paylaşılan çekirdeği (hiz-derecesi-hesapla.ts) kullanıyor. BİLİNEN SINIRLAMA (2026-09-21): bu düzeltmeden SONRA katsayılar hiç yeniden fit edilmedi — bkz. SINYAL-FORMULLERI.md §4b." },
+  { ad: "Antrenör Oranı", kod: "antrenorOrani", katman: "A", dusukSart: { katsayi: 0.31410, durum: "anlamli" }, diger: { katsayi: 0.22003, durum: "anlamli" }, aciklama: "Düşük-şartta belirgin daha ağır basıyor." },
+  { ad: "İdman Jokeyi Uyumu", kod: "idmJokey", katman: "A", dusukSart: { katsayi: 0.19055, durum: "anlamli" }, diger: { katsayi: 0.05892, durum: "anlamli", not: "Handikap'ta elle 0'a sabitlendi (V5.31, 2026-08-31) — Opus denetimi: canlı model-düzeltilmiş bakiye -5.93pp (GA=[-10.34,-1.60], sıfırı dışlıyor, n=107), üretim-sadık katsayı canlı %75 fit'te 0.1033'ten tüm veride 0.0266'ya (GA sıfırı kapsıyor) kaymış — 12 sinyalin en büyük kayması. Görülmemiş son %25'te sıfırlarsa top1 +3.95pp/top3 +2.63pp/logloss -0.0306, hepsi anlamlı iyileşme. Düşük-şart'ta katsayı sağlam pozitif (GA=[0.102,0.372]), KORUNDU — hizDerecesi/Handikap (V5.10) ile AYNI cerrahi desen." }, aciklama: "Yarıştıracak jokey, atın idmanlarından BİRİNİ (yalnız SON idmanı değil, gecerliGaloplar'ın HERHANGİ BİRİNİ) yaptırmış mı — bkz. isSameJockey. Diğer 11 özellik silindikten sonra iki segmentte de netleşti." },
+  { ad: "Jokey Oranı", kod: "jokeyOrani", katman: "A", dusukSart: { katsayi: 0.11672, durum: "anlamli" }, diger: { katsayi: 0.04326, durum: "anlamsiz", not: "2026-08-28 zamansal kayma bulundu: Ocak-Mayıs nokta=0.162 GA=[0.110,0.225] anlamlı, Haziran-Ağustos nokta=0.114 GA=[0.044,0.186] hâlâ anlamlı — VIF artmadı (kollinearlik hipotezi doğrulanmadı), gerçek sebep belirsiz. Sıfırlanmadı, izlemede. GÜNCELLEME (2026-08-30, Opus denetimi): V5 döneminde sonuçlanmış TÜM koşularda (n=248) canlı isabet iki bağımsız ölçütte de bu 'anlamsız' etiketiyle ÇELİŞİYOR — kod-bazlı lift +3.9pp (budama sonrası +6.0pp), 4 koşu tipinin (Maiden/Şartlı/Handikap/diğer) HEPSİNDE pozitif, featureSnapshot z-farkı +0.651. Katsayı sıfırlanmadan bırakılması doğru karar çıktı, 'anlamsız' notu artık güncel canlı veriyle desteklenmiyor." }, aciklama: "Jokeyin genel kazanma yüzdesi." },
+  { ad: "AGF Payı² (kare terimi)", kod: "agfPayi2", katman: "A", dusukSart: { katsayi: -0.18167, durum: "anlamli" }, diger: { katsayi: -0.19950, durum: "anlamli" }, aciklama: "AGF payının doğrusal-olmayan (kare) terimi — güçlü favorilerin piyasada fazla değerli görülmesini düzeltir. VIF notu: bkz. agfPayi girdisi." },
+  { ad: "H2H Net Skor", kod: "h2hNetSkor", katman: "A", dusukSart: { katsayi: 0, durum: "override", not: "Ham değer ters yönlüydü, elle sıfırlandı" }, diger: { katsayi: 0.08064, durum: "anlamli", not: "Sınırda anlamlı — ilk eklemede GA=[-0.0105,0.1603] sıfırı içeriyordu, sonraki genişletilmiş veride GA sıfırı dışlıyor. Bkz. SINYAL-FORMULLERI.md §5." }, aciklama: "Baş-başa geçmiş karşılaşmalarda HAM toplam net galibiyet farkı (recency-weighted/normalize DEĞİL)." },
   // 2026-09-12 (V5.46) — Rakipsiz Kaçak At / Kilo-Ayarlı H2H / KGS Verisi Var Mı BURADAN
   // TAMAMEN KALDIRILDI (toFeatureVector'dan çıktı) — üçü de gerçek performansı hiç
   // değiştirmiyordu (ilk ikisi zaten koda-gömülü sıfırlanmıştı, sızıntı bulgusu; kgsVarMi
@@ -75,21 +89,23 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
   // edilerek) modele eklenmesini istedi. "Önce backtest, iyi çıkmazsa ekleme" standart
   // kuralının açık bir istisnası — diğer tüm satırlardan farklı olarak. 11 sinyal silinirken
   // özellikle KORUNMASI istendi.
-  { ad: "Zemin Toleransı (İSTİSNA — anlamsız test sonucuna rağmen eklendi)", kod: "zeminToleransi", katman: "B", dusukSart: { katsayi: 0.008, durum: "anlamsiz" }, diger: { katsayi: 0.0002, durum: "anlamsiz" }, aciklama: "Atın Normal-dışı (ıslak/ağır/yumuşak) pistteki geçmiş göreli performansı (TjkDereceKaydi arşivi). At-bazlı gerçek/tekrarlanabilir bir özellik (split-half r=0.467) ama V5'in tahmin doğruluğuna ölçülebilir katkısı yok." },
-  // 2026-08-30 — B KATMANI (bkz. plan: A/B/C Sinyal Katmanlama Mimarisi). zeminToleransi
-  // ile AYNI türden bir istisna (AskUserQuestion ile teyit edildi) AMA farklı MEKANİZMA:
-  // mevcut 12-özellikli (A katmanı) doğrusal regresyona 13. terim olarak yeniden fit
-  // EDİLMEDİ (bu, aynı gece 7/8 adayda "küçük örneklemde güç kaybı" sorununa yol açmıştı)
-  // — softmax'a girmeden ÖNCE skora ayrı, bağımsız kalibre edilmiş bir terim olarak
-  // eklendi (bkz. v5-engine.ts bKatmaniUygula). Yalnız düşük-şart'ta aktif, diğer/
-  // Handikap'ta katsayısı fiilen 0 (skor birebir A katmanıyla aynı kalır).
+  { ad: "Zemin Toleransı (İSTİSNA — anlamsız test sonucuna rağmen eklendi)", kod: "zeminToleransi", katman: "A", dusukSart: { katsayi: 0.04109, durum: "anlamsiz" }, diger: { katsayi: 0.00832, durum: "anlamsiz" }, aciklama: "Atın Normal-dışı (ıslak/ağır/yumuşak) pistteki geçmiş göreli performansı (TjkDereceKaydi arşivi). At-bazlı gerçek/tekrarlanabilir bir özellik (split-half r=0.467) ama V5'in tahmin doğruluğuna ölçülebilir katkısı yok. MEKANİZMA NOTU: A-katmanının 13'lük ORTAK regresyonunda fit ediliyor — sireOrani/zeminMesafeDeneyim'in AKSİNE ayrı bir additive terim DEĞİL, yalnız kanıt gücü zayıf olduğu için istisna olarak işaretleniyor." },
+  // 2026-08-30 — GERÇEK B KATMANI (bkz. plan: A/B/C Sinyal Katmanlama Mimarisi; 2026-09-21
+  // dış denetim: yalnız Sire Oranı VE Zemin+Mesafe Deneyimi gerçek B-katmanı — mekanizma
+  // ayrımı için üstteki SinyalKatmani yorumuna bakın). zeminToleransi ile AYNI türden bir
+  // istisna (AskUserQuestion ile teyit edildi) AMA farklı MEKANİZMA: mevcut A-katmanı
+  // doğrusal regresyona yeniden fit EDİLMEDİ (bu, aynı gece 7/8 adayda "küçük örneklemde
+  // güç kaybı" sorununa yol açmıştı) — softmax'a girmeden ÖNCE skora ayrı, bağımsız
+  // kalibre edilmiş bir terim olarak eklendi (bkz. v5-engine.ts bKatmaniUygula). Yalnız
+  // düşük-şart'ta aktif, diğer/Handikap'ta katsayısı fiilen 0 (skor birebir A katmanıyla
+  // aynı kalır).
   {
     ad: "Sire Oranı (B KATMANI — düşük-şart istisnası, kanıtsız ama kullanıcı kararıyla aktif)",
     kod: "sireOrani",
     katman: "B",
-    dusukSart: { katsayi: 0.0477, durum: "anlamsiz", not: "Kalıcı araçla (n=1060, gerçek train/test) GA=[-0.1352,0.2045] — sıfırı içeriyor. Katsayı yine de bu gerçek eğitimden alındı, keyfi değil. BUG DÜZELTMESİ (2026-08-30, V5.30, Opus denetimi): 2026-08-28'deki 11-sinyal budamasında OZELLIK_GRUPLARI'ndan SIRE grubu kaldırılınca muhakemeUretV5'teki gösterim bloğu ölü koda döndü — skora katkı gerçekleşmeye devam etti ama ne gerekçe metninde ne featureSnapshot'ta hiç görünmüyordu, canlı etkisi tamamen ölçülemez durumdaydı. Düzeltildi: gerçek katkı artık r.bSireKatkisi'nde saklanıyor, hem gerekçe satırında hem featureSnapshot.bKatmani'de görünüyor." },
+    dusukSart: { katsayi: 0.0477, durum: "anlamsiz", not: "Kalıcı araçla (n=1060, gerçek train/test) GA=[-0.1352,0.2045] — sıfırı içeriyor. Katsayı yine de bu gerçek eğitimden alındı, keyfi değil. BUG DÜZELTMESİ (2026-08-30, V5.30, Opus denetimi): 2026-08-28'deki 11-sinyal budamasında OZELLIK_GRUPLARI'ndan SIRE grubu kaldırılınca muhakemeUretV5'teki gösterim bloğu ölü koda döndü — skora katkı gerçekleşmeye devam etti ama ne gerekçe metninde ne featureSnapshot'ta hiç görünmüyordu, canlı etkisi tamamen ölçülemez durumdaydı. Düzeltildi: gerçek katkı artık r.bSireKatkisi'nde saklanıyor, hem gerekçe satırında hem featureSnapshot.bKatmani'de görünüyor. Standardizasyon: (sireOrani-11.6305)/3.6563, POP=0.14/k=20 shrinkage'dan." },
     diger: { katsayi: 0, durum: "veri-yok", not: "B katmanı diğer/Handikap'ta hiç uygulanmıyor, oran=0." },
-    aciklama: "Aygırın kazanma oranı (shrink edilmiş). 5 farklı yöntemle (tek-değişkenli, VIF, model-farkı) test edildi, hiçbirinde A katmanına (12 özellik) kanıtlanmış bir katkı bulunamadı — yine de kullanıcı at yetiştiriciliğinin gerçek bir faktör olduğuna inanıyor, düşük-şart'a özel küçük bir B katmanı itmesi olarak eklendi.",
+    aciklama: "Aygırın kazanma oranı (shrink edilmiş, veri yoksa POP_ORT×0.5=%7 — jokey/antrenörden FARKLI, onlarınki düz %10). 5 farklı yöntemle (tek-değişkenli, VIF, model-farkı) test edildi, hiçbirinde A katmanına kanıtlanmış bir katkı bulunamadı — yine de kullanıcı at yetiştiriciliğinin gerçek bir faktör olduğuna inanıyor, düşük-şart'a özel küçük bir B katmanı itmesi olarak eklendi.",
   },
   // 2026-08-30 — kullanıcı KARARI: normalde bu oturumun "önce n≥250-300 gölge-koşu +
   // B=500 kanıtı, sonra canlı" kuralı geçerliyken, kullanıcı bu adayın gölge-testi HİÇ
@@ -118,9 +134,9 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
   {
     ad: "Yakınsama (İSTİSNA — anlamsız test sonucuna rağmen kullanıcı kararıyla eklendi)",
     kod: "yakinsama2Plus",
-    katman: "B",
-    dusukSart: { katsayi: -0.028, durum: "anlamsiz", not: "B=500: GA=[-0.1535,0.0756], sıfırı içeriyor. Diğer bileşenlerle (12 özellik) birlikte, YENİDEN yapılan tam retrain'den (model-veri.json tam yenilendi, düzeltilmiş sınıf-düşüşü/at-jokey tanımlarıyla)." },
-    diger: { katsayi: 0.042, durum: "anlamsiz", not: "B=500: GA=[-0.0405,0.1197], sıfırı içeriyor." },
+    katman: "A",
+    dusukSart: { katsayi: -0.01520, durum: "anlamsiz", not: "B=500: GA=[-0.1535,0.0756], sıfırı içeriyor. Diğer bileşenlerle birlikte, YENİDEN yapılan tam retrain'den (model-veri.json tam yenilendi, düzeltilmiş sınıf-düşüşü/at-jokey tanımlarıyla)." },
+    diger: { katsayi: 0.04679, durum: "anlamsiz", not: "B=500: GA=[-0.0405,0.1197], sıfırı içeriyor." },
     aciklama: "pistUzmani + sahada ilk-2 pedigri (sireOrani) + at-jokey ikilisinde geçmiş galibiyet + AGF eşik-üstü (≥1.0 puan) yükseliş + sınıf düşüşünün (bugünkü 1.ikramiye, son 3 startın ortalamasının <%80'i) EN AZ 2'sinin AYNI ATTA hizalanması. Beşi de TEK TEK ve BİRLİKTE B=500 bootstrap ile test edildi, hiçbiri istatistiksel olarak anlamlı çıkmadı — kullanıcı MEGAFAUNA vakasını (model 8./%4 verdi, at kazandı; pistUzmanı+at-jokey ikilisi+AGF yükselişi hizalanmıştı) gerekçe göstererek yine de eklenmesini istedi.",
   },
   // 2026-09-01 — ESENYIL vakası (model 9./%4.9 verdi, at kazandı; kullanıcı son idmanının
@@ -137,10 +153,10 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
   {
     ad: "Son İdman Sprint (İSTİSNA — basit kıyas yönü ters çıktı, tam regresyonda sıfıra yakın, kullanıcı kararıyla eklendi)",
     kod: "sonIdmanSprint",
-    katman: "B",
-    dusukSart: { katsayi: 0.008, durum: "anlamsiz", not: "B=500: GA=[-0.1620,0.1465], sıfırı içeriyor." },
-    diger: { katsayi: -0.019, durum: "anlamsiz", not: "B=500: GA=[-0.1063,0.0651], sıfırı içeriyor." },
-    aciklama: "Son idmanın TÜRÜ (TJK Gallop.track) Sprint/Sürat mi. Basit karşılaştırma (regresyonsuz, n=9148) YÖNÜ DOĞRULAMADI (Sprint grubu top1 %9.5, diğer %11.1) — kullanıcı ESENYIL vakasını gerekçe göstererek yine de eklenmesini istedi. Ortak regresyonda (13 kontrol değişkeniyle birlikte) katsayı iki segmentte de sıfıra çok yakın (+0.008 / -0.019), istatistiksel olarak anlamsız.",
+    katman: "A",
+    dusukSart: { katsayi: -0.01956, durum: "anlamsiz", not: "B=500: GA=[-0.1620,0.1465], sıfırı içeriyor. 2026-09-21: sonraki retrain'de katsayı 0.008'den -0.01956'ya (işaret DEĞİŞTİ, GA sıfırı içermeye devam ediyor — sınırda sinyalde beklenen run-to-run oynaklık)." },
+    diger: { katsayi: -0.03743, durum: "anlamsiz", not: "B=500: GA=[-0.1063,0.0651], sıfırı içeriyor." },
+    aciklama: "Son GEÇERLİ idmanın TÜRÜ (TJK Gallop.track) 'SPRINT'/'SÜRAT'/'SURAT' içeriyor mu (isSprintIdman) — idman kaydı yoksa 0. Basit karşılaştırma (regresyonsuz, n=9148) YÖNÜ DOĞRULAMADI (Sprint grubu top1 %9.5, diğer %11.1) — kullanıcı ESENYIL vakasını gerekçe göstererek yine de eklenmesini istedi. Ortak regresyonda katsayı iki segmentte de sıfıra çok yakın, istatistiksel olarak anlamsız.",
   },
   // 2026-09-01 — KIZIM BİNDAL vakası: kullanıcı, bir yorumcunun takı çıkarma/ekleme
   // bilgisini (KG+GKR çıkarılmış) gerçek galibiyeti öngörmede kullandığını gösterdi.
@@ -154,9 +170,9 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
   {
     ad: "Takı Değişikliği (İSTİSNA — anlamsız, kullanıcı kararıyla eklendi)",
     kod: "takiDegisikligi",
-    katman: "B",
-    dusukSart: { katsayi: 0.080, durum: "anlamsiz", not: "B=500 (13 özellik, tam geçmiş): GA sıfırı içeriyor, önceki iki-ayrı-sinyal haline göre daha güçlü/tutarlı yön." },
-    diger: { katsayi: 0.064, durum: "anlamsiz", not: "B=500 (13 özellik, tam geçmiş): GA sıfırı içeriyor." },
+    katman: "A",
+    dusukSart: { katsayi: 0.08026, durum: "anlamsiz", not: "B=500 (13 özellik, tam geçmiş): GA sıfırı içeriyor, önceki iki-ayrı-sinyal haline göre daha güçlü/tutarlı yön." },
+    diger: { katsayi: 0.06348, durum: "anlamsiz", not: "B=500 (13 özellik, tam geçmiş): GA sıfırı içeriyor." },
     aciklama: "Son yarışına göre takı çıkarılmış mı eklenmiş mi (SonYarisDetay) — KIZIM BİNDAL'ın (takı çıkarılmış, kazandı) gerekçe gösterildiği sinyal, artık tek bir yön (+ =çıkarılmış lehine) olarak ölçülüyor. Her iki segmentte de pozitif yönlü ama istatistiksel olarak anlamsız.",
   },
   // 2026-09-01 — Yarış Gidişatı (kullanıcı tasarımı): saha-geneli tempo senaryosu
@@ -175,8 +191,8 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
     ad: "Yarış Gidişatı",
     kod: "yarisGidisatiSkoru",
     katman: "A",
-    dusukSart: { katsayi: 0.1255, durum: "anlamsiz", not: "V5.45 (2026-09-11): formüle Tempo Taşıma Gücü eklendikten sonra GA=[-0.049,0.280] — hâlâ sınırda/sıfırı içeriyor ama YÖN pozitif kaldı (aynı yarisGidisatiSkoru'nun ilk kabul standardı)." },
-    diger: { katsayi: 0.0920, durum: "anlamli", not: "V5.45 (2026-09-11) — Tempo Taşıma Gücü (bkz. tempo-tasima-gucu.actions.ts, atın geçmiş Accurace yarışlarında son 800m'de en iyiye göre kalış farkı) AYRI özellik olarak denendiğinde B=500'de her iki segmentte de anlamsız/ters çıkmıştı (diğer 17 sinyal zaten aynı bilgiyi açıklıyordu) — yarisGidisatiSkoru'nun KENDİ formülüne (zorluk-ağırlıklı: yalnız MÜCADELELİ/ÇOK_YÜKSEK/DAĞILMA_RİSKİ olasılığı yüksekse devreye girer) entegre edilince pooled 'diğer' katsayısı 0.098'den 0.092'ye kaydı ama ARTIK anlamlı (GA=[0.0049,0.1835], önceden GA=[-0.0085,0.1659] idi). Handikap'ta elle 0'a sabitlenmesi (V5.44) KORUNDU — yeni formülle Handikap'a özel ayrı test HENÜZ yapılmadı, ihtiyatlı davranıldı." },
+    dusukSart: { katsayi: 0.07704, durum: "anlamsiz", not: "V5.45 (2026-09-11): formüle Tempo Taşıma Gücü eklendikten sonra GA=[-0.049,0.280] — hâlâ sınırda/sıfırı içeriyor ama YÖN pozitif kaldı (aynı yarisGidisatiSkoru'nun ilk kabul standardı)." },
+    diger: { katsayi: 0.08234, durum: "anlamli", not: "V5.45 (2026-09-11) — Tempo Taşıma Gücü (bkz. tempo-tasima-gucu.actions.ts, atın geçmiş Accurace yarışlarında son 800m'de en iyiye göre kalış farkı) AYRI özellik olarak denendiğinde B=500'de her iki segmentte de anlamsız/ters çıkmıştı (diğer sinyaller zaten aynı bilgiyi açıklıyordu) — yarisGidisatiSkoru'nun KENDİ formülüne (zorluk-ağırlıklı: yalnız MÜCADELELİ/ÇOK_YÜKSEK/DAĞILMA_RİSKİ olasılığı yüksekse devreye girer) entegre edilince katsayı ARTIK anlamlı (GA=[0.0049,0.1835], önceden GA=[-0.0085,0.1659] idi). Handikap'ta elle 0'a sabitlenmesi (V5.44) KORUNDU — Handikap DIŞI 585 koşuda GA=[0.0596,0.2775] kesin anlamlı, Handikap içi 366 koşuda ters/anlamsız GA=[-0.168,0.104]." },
     aciklama: "Sahadaki her atın (Accurace geçmişinden, sızıntısız) stil dağılımı + erken hız gücünden saha-geneli beklenen tempo senaryosu (6 sınıf, olasılık dağılımı) çıkarılır, sonra bu atın kendi stiline uygunluğu bir uyum matrisiyle skorlanır — ARTIK buna atın geçmiş Accurace yarışlarında ölçülen gerçek 'tempo taşıma gücü' de (yalnız beklenen tempo zorluysa ağırlıklı) ekleniyor (V5.45). Kapsama %74.7 (n<3 Accurace geçmişi olan atlarda 0/nötr). Handikap-dışı 'diğer'de artık net anlamlı, Handikap'ta sıfırlandı, düşük-şart'ta pozitif ama hâlâ anlamsız.",
   },
 ];

@@ -49,22 +49,35 @@ export default function SinyalKutuguPanel() {
   return (
     <section className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-foreground">V5 Sinyal Kütüğü</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Canlı skorlamaya giren 17 sinyal (12 A-Katmanı + 5 B-Katmanı ortak regresyonda, +2 B-Katmanı ayrı mekanizmada — bkz. aşağıdaki iki ayrı tablo),
-          segment bazlı katsayılarıyla (Düşük-şart = Maiden/Şartlı 1/19/27,
-          Diğer = Handikap/Şartlı 2-5/KV-Grup/Satış); sıralama kuralları; ve test edilmiş aday sinyaller.
-          Katsayı/GA her yeniden eğitimde elle güncellenir — sahadaki GERÇEK isabet oranı için aşağıdaki
-          &quot;Sinyal Bazlı Gerçek İsabet Oranı&quot; tablosuna bakın.
+        <h2 className="text-lg font-bold text-foreground">V5 Sinyal Kütüğü — Araştırma/Karar Kaydı</h2>
+        <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+          ⚠️ Bu panel elle bakımı yapılan bir ARAŞTIRMA/KARAR kütüğüdür (hangi sinyal ne zaman/neden
+          eklendi-çıkarıldı-reddedildi) — production&apos;da o an tam olarak hangi sayının çalıştığının
+          garantili canonical kaynağı DEĞİLDİR. Kesin/kod-doğrulanmış güncel katsayılar için{" "}
+          <code className="font-mono">rotaganyan/SINYAL-FORMULLERI.md</code> esas alınmalı.
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Canlı skorlamaya giren 15 sinyal — 13&apos;ü A-Katmanı&apos;nda (tek ortak koşullu-logit
+          regresyonunda birlikte fit edilir), 2&apos;si B-Katmanı&apos;nda (softmax&apos;a girmeden önce
+          skora ayrı eklenen additive mekanizma) — segment bazlı katsayılarıyla (Düşük-şart = Maiden/Şartlı
+          1/19/27, Diğer = Handikap/Şartlı 2-5/KV-Grup/Satış); sıralama kuralları; ve test edilmiş aday
+          sinyaller. Katsayı/GA her yeniden eğitimde elle güncellenir — sahadaki GERÇEK isabet oranı için
+          aşağıdaki &quot;Sinyal Bazlı Gerçek İsabet Oranı&quot; tablosuna bakın.
         </p>
       </div>
 
-      {/* ── A Katmanı: istatistiksel olarak kanıtlanmış (veya en azından karışık/gerçek
-          katsayıya dayanan) 11 çekirdek sinyal — ana koşullu-logit regresyonun omurgası. ── */}
+      {/* ── A Katmanı: 13 sinyalin TAMAMI — ortak koşullu-logit regresyonunda birlikte fit
+          edilir. Kanıt gücü satır satır DEĞİŞİR (bazıları güçlü, bazıları kullanıcı kararıyla
+          eklenmiş istisna) — bu, satırın kendi durum/not alanında okunur, "A=güçlü" gibi bir
+          toplu iddia DEĞİL (2026-09-21 düzeltmesi, bkz. dosya başı SinyalKatmani yorumu). ── */}
       <div className="space-y-2">
         <div>
-          <h3 className="text-base font-bold text-foreground">A Katmanı — Güçlü Sinyaller</h3>
-          <p className="text-xs text-muted-foreground">Ana regresyonun kanıtlanmış/çekirdek 11 sinyali.</p>
+          <h3 className="text-base font-bold text-foreground">A Katmanı — Ortak Regresyondaki Sinyaller (13)</h3>
+          <p className="text-xs text-muted-foreground">
+            Ana koşullu-logit regresyonunun TAMAMI — kanıt gücü satır satır değişir (bazıları
+            kanıtlanmış, bazıları kullanıcı kararıyla eklenmiş istisna), her satırın kendi
+            durum/not alanına bakın.
+          </p>
         </div>
         <div className="overflow-x-auto rounded-lg border border-brand/20">
           <table className="w-full min-w-[640px] border-collapse text-sm">
@@ -96,20 +109,18 @@ export default function SinyalKutuguPanel() {
         </div>
       </div>
 
-      {/* ── B Katmanı: tek başına anlamsız çıkan ama MEGAFAUNA türü vakalarda fark
-          yaratabileceği düşünülen, kullanıcı kararıyla eklenen 4 sinyal. MEKANİZMA olarak
-          homojen DEĞİL — zeminToleransi/yakinsama2Plus hâlâ A'nın 13'lük ORTAK regresyonunda
-          birlikte fit ediliyor; sireOrani/zeminMesafeDeneyim GERÇEKTEN ayrı bir mekanizma
-          (softmax'a girmeden önce skora eklenen, bkz. v5-engine.ts bKatmaniUygula). ── */}
+      {/* ── B Katmanı: GERÇEKTEN yalnız 2 sinyal — A'nın regresyonuna hiç girmeyen, softmax'a
+          girmeden önce skora AYRI eklenen additive mekanizma (bkz. v5-engine.ts bKatmaniUygula).
+          2026-09-21 düzeltmesi ÖNCESİ bu tabloda zeminToleransi/yakinsama2Plus/sonIdmanSprint/
+          takiDegisikligi de vardı — onlar MEKANİK olarak A'nın 13'lük ortak regresyonunun
+          parçası, buraya taşındılar (yukarıdaki tabloda, kendi durum/not'larıyla). ── */}
       <div className="space-y-2">
         <div>
-          <h3 className="text-base font-bold text-foreground">B Katmanı — Zayıf Ama Fark Yaratabilecek Sinyaller</h3>
+          <h3 className="text-base font-bold text-foreground">B Katmanı — Ayrı Additive Mekanizma (2)</h3>
           <p className="text-xs text-muted-foreground">
-            Dördü de tek başına (ve bazıları birlikte) test edildi, istatistiksel olarak anlamsız çıktı —
-            yine de kullanıcı kararıyla toplam puana dahil. Mekanizma homojen değil: zeminToleransi ve
-            Yakınsama hâlâ A&apos;nın ortak regresyonunda birlikte fit ediliyor (yalnız kanıt zayıf
-            olduğu için burada gruplanıyor); Sire Oranı ve Zemin+Mesafe Deneyimi gerçekten ayrı,
-            softmax&apos;a girmeden önce skora eklenen bir mekanizma.
+            A&apos;nın ortak regresyonuna hiç girmez — softmax&apos;a girmeden hemen önce skora ayrı
+            eklenen 2 terim (Sire Oranı, Zemin+Mesafe Deneyimi). İkisi de kanıtsız/kural istisnası
+            olarak eklendi, kendi durum/not alanlarında detaylı.
           </p>
         </div>
         <div className="overflow-x-auto rounded-lg border border-amber-500/20">
@@ -144,7 +155,15 @@ export default function SinyalKutuguPanel() {
 
       {/* ── Sıralama kuralları ── */}
       <div className="space-y-3 pt-2">
-        <h3 className="text-base font-bold text-foreground">Sıralama Kuralları</h3>
+        <div>
+          <h3 className="text-base font-bold text-foreground">Sıralama Kuralları (post-processing, olasılığı değiştirmez)</h3>
+          <p className="text-xs text-muted-foreground">
+            Kodda MEVCUT olmak, production&apos;da AKTİF olmak anlamına gelmez — her kartın etiketi
+            (AÇIK/GERİ AÇILDI vs KAPALI) hangi durumda olduğunu gösterir; şu an yalnız AGF Trend
+            Terfisi ve Saf Model Değer Terfisi aktif, AGF Favorisi İlk-3 Garantisi ve Derin
+            AGF-Longshot Düzeltmesi koda gömülü ama KAPALI.
+          </p>
+        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {SIRALAMA_KURALLARI.map((k) => (
             <div key={k.ad} className="rounded-lg border border-brand/20 bg-[#0d0d14] p-4 space-y-2">
