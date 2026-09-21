@@ -420,6 +420,17 @@ const PaceRetention: Aday = {
   dahilMi: (runners) => runners.map((r) => r.paceRetentionVarMi === true),
 };
 
+// 2026-09-21 kullanıcı talebi — "Sürpriz Katmanı" Faz H2 (Race Context Change), ilk aday:
+// ClassDeltaV1 = PrevClassStrength - CurrentClassStrength, YALNIZ aynı sınıf ailesinde
+// (Şartlı→Şartlı, Handikap→Handikap) — bkz. arac-yeni-sinyal-backfill-classdeltav1.mts.
+// DİKKAT: dosyada eski `ClassDelta` (RaceStrength/HP-proxy tabanlı, FARKLI bir tanım) adayı
+// hâlâ var (satır ~291) — bu YENİ, BAĞIMSIZ bir aday, isim çakışmasını önlemek için V1 eki var.
+const ClassDeltaV1: Aday = {
+  ad: "ClassDeltaV1",
+  hesapla: (runners) => runners.map((r) => (typeof r.classDeltaV1 === "number" ? r.classDeltaV1 : 0)),
+  dahilMi: (runners) => runners.map((r) => r.classDeltaV1VarMi === true),
+};
+
 // KgsGun — "kaç gün sonra" (son yarıştan bugüne gün sayısı). kgsVarMi (yalnız var/yok
 // bayrağı) daha önce ölü bulunup toFeatureVector'dan çıkarılmıştı — ama HAM sürekli
 // değerin kendisi (ne kadar uzun/kısa bir ara) hiç test edilmedi. -1 = veri yok (dahilMi
@@ -534,7 +545,7 @@ const HizZamanAgirlikli: Aday = {
   dahilMi: (runners) => runners.map((r) => r.hizPerRaceVarMi === true),
 };
 
-const ADAYLAR: Aday[] = [PaceRetention];
+const ADAYLAR: Aday[] = [ClassDeltaV1];
 const SIRE_ORTUSME_ADAYLARI: Aday[] = [NoOp, PedigreeSurfaceAffinity, PedigreeSurfaceAffinity_LowExp];
 // H1 (mevcut, Row.zeminToleransi zaten V5.46 skoruna dahil — ayrı test gerekmez) referans
 // alınarak yalnız H2/H3, hem NORMAL V5.46 üzerinden (additive) hem zeminHaric (replacement)
@@ -571,6 +582,17 @@ async function main() {
   const dusukSart = raceGruplariHam.filter((g) => g.runners[0].kategori === "1a" || g.runners[0].kategori === "1b");
   const diger = raceGruplariHam.filter((g) => !(g.runners[0].kategori === "1a" || g.runners[0].kategori === "1b"));
   console.log(`Toplam: ${raceGruplariHam.length} koşu — Düşük-şart/maiden: ${dusukSart.length}, Diğer: ${diger.length}\n`);
+
+  // 2026-09-21 kullanıcı talebi — ClassDeltaV1 ile mevcut yakinsama2Plus (5 koşuldan biri
+  // sinifDususuPoz) arasındaki örtüşme raporu: "sınıf düşüşü" bilgisinin ne kadarını zaten
+  // yakaladığımızı görmek için. Yalnız ClassDeltaV1'in dosyada olduğu çalıştırmalarda anlamlı.
+  if (raw.some((r) => typeof r.classDeltaV1 === "number")) {
+    const tumRunnerlar = raceGruplariHam.flatMap((g) => g.runners);
+    const genelYakinsama = tumRunnerlar.filter((r) => r.yakinsama2Plus === 1).length / tumRunnerlar.length;
+    const classDeltaPozitif = tumRunnerlar.filter((r) => typeof r.classDeltaV1 === "number" && r.classDeltaV1 > 0);
+    const yakinsamaVerilenAlt = classDeltaPozitif.length > 0 ? classDeltaPozitif.filter((r) => r.yakinsama2Plus === 1).length / classDeltaPozitif.length : NaN;
+    console.log(`Overlap raporu: P(yakinsama2Plus=1) genel=%${(genelYakinsama * 100).toFixed(1)}  |  P(yakinsama2Plus=1 | classDeltaV1>0)=%${(yakinsamaVerilenAlt * 100).toFixed(1)} (n=${classDeltaPozitif.length})\n`);
+  }
 
   function test(
     etiket: string,
