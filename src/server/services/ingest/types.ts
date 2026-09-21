@@ -7,6 +7,8 @@ export type IngestRunner = {
   dam?: string;
   damSire?: string;
   jockey?: string;
+  // 2026-09-21 — Jokey Kimlik Altyapısı (Faz J0): TJK'nın kendi JokeyId'si, jockey <a href>'inden.
+  tjkJokeyId?: number;
   trainer?: string;
   startNo?: number;
   // TJK program sayfasında "St" (start sayısı) sütununun yanında turuncu "DS" işareti —

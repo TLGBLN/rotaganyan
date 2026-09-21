@@ -7,6 +7,7 @@ import { request } from "undici";
 import * as cheerio from "cheerio";
 import type { IngestRaceDay, IngestRace, IngestRunner, IngestIkramiyeDetay } from "./types";
 import type { Breed, Surface } from "@prisma/client";
+import { extractJokeyId } from "./tjk-jockey-stats.adapter";
 
 const BASE = "https://www.tjk.org";
 const HEADERS = {
@@ -345,6 +346,10 @@ export async function fetchCityProgram(
           const jockey = jockeyCell
             ? (jockeyCell.attr("title") || jockeyText.replace(/\s*\(A[p]?\)/gi, "")).trim() || undefined
             : undefined;
+          // 2026-09-21 — Jokey Kimlik Altyapısı (Faz J0): AYNI anchor'ın href'i TJK'nın
+          // JokeyId'sini taşıyor (atId ile BİREBİR aynı desen) — ek istek YOK, zaten indirilen
+          // sayfadan bir alan daha. extractJokeyId (tjk-jockey-stats.adapter.ts) reuse edildi.
+          const tjkJokeyId = jockeyCell ? extractJokeyId(jockeyCell.attr("href")) : undefined;
 
           const ownerCell = iOwner !== -1 && cellEls[iOwner] ? $(cellEls[iOwner]).find("a").first() : null;
           const owner = ownerCell
@@ -416,7 +421,7 @@ export async function fetchCityProgram(
 
           const ekuriGroup = ekuriMap.get(no) ?? undefined;
 
-          runners.push({ no, name, age, startNo, disaridanStart, weight, jockey, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup, tjkAtId, equipment });
+          runners.push({ no, name, age, startNo, disaridanStart, weight, jockey, tjkJokeyId, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup, tjkAtId, equipment });
         });
       }
     }

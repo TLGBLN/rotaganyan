@@ -220,6 +220,12 @@ model Runner {
   damSire            String?
   adminNote          String?
   jockey             String?
+  // 2026-09-21 — Jokey Kimlik Altyapısı (Faz J0, bkz. proje hafızası). TJK'nın kendi
+  // JokeyId'si (program sayfasındaki jokey <a href>'inden, QueryParameter_JokeyId) —
+  // canonical kimlik, isim eşleştirmesine (soyad/kısaltma) bağımlı DEĞİL. UNIQUE DEĞİL —
+  // aynı jokey binlerce Runner satırında görünür. Additive/nullable, eski satırlar
+  // etkilenmez; geçmiş satırlar için backfill ayrı, dry-run doğrulamalı bir adımdır.
+  tjkJokeyId         Int?
   trainer            String?
   startNo            Int?
   disaridanStart     Boolean @default(false)
@@ -253,6 +259,7 @@ model Runner {
 
   @@unique([raceId, no])
   @@index([name])
+  @@index([tjkJokeyId])
 }
 
 /**
