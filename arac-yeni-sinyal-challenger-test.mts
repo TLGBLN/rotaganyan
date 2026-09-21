@@ -36,7 +36,11 @@ import {
 const DATA_PATH =
   process.env.DATA_PATH_OVERRIDE ??
   "C:\\Users\\tlgbi\\AppData\\Local\\Temp\\claude\\c--Users-tlgbi-OneDrive-Belgeler-Rota\\76598f4f-31f1-4414-a3f6-fbab0aab98d4\\scratchpad\\model-veri-yeni-adaylar-stil.json";
-const COVERAGE_START_DATE = "2026-07-01";
+// 2026-09-21 kullanıcı kararı: V2/V3/V4 dönemini (2026-07-01 → 2026-08-16) DIŞARIDA
+// bırak — V5 motoru fiilen 2026-08-16'da canlıya alındı (engine-versions.data.ts), o
+// tarihten ÖNCEki koşularda Faz1 hesaplama hattı FARKLIYDI, "V5.46 + yeni sinyal" testine
+// karışmamalı. Eskiden 2026-07-01 idi (V2 dönemini de içine alıyordu — yanlıştı).
+const COVERAGE_START_DATE = "2026-08-16";
 const SEED = 5462026;
 
 // ─── Ham satır tipi (model-veri-yeni-adaylar.json) — GERÇEK alan listesi (arac ile
@@ -390,6 +394,32 @@ const GalopMissing: Aday = {
   hesapla: (runners) => runners.map((r) => ((r.galopSayisi ?? 0) === 0 ? 1 : 0)),
 };
 
+// 2026-09-20 kullanıcı talebi — "Sürpriz Katmanı" Faz H1, ilk iki ham HiddenPerformance
+// değişkeni (bkz. hidden-performance-hesapla.ts). AYRI AYRI test ediliyor (kullanıcı: "ilk
+// turda dört özelliği birbirine karıştırmayalım") — composite YOK, her biri kendi γ'sıyla
+// frozen V5.46 üzerine tek başına eklenir. Veri yalnız model-veri-yeni-adaylar-hiddenperf.json'da
+// (DATA_PATH_OVERRIDE ile seçilir) — dahilMi, backfill script'inin *VarMi bayraklarını kullanır.
+const LatePositionGain: Aday = {
+  ad: "LatePositionGain",
+  hesapla: (runners) => runners.map((r) => (typeof r.latePositionGain === "number" ? r.latePositionGain : 0)),
+  dahilMi: (runners) => runners.map((r) => r.latePositionGainVarMi === true),
+};
+const Trajectory: Aday = {
+  ad: "Trajectory",
+  hesapla: (runners) => runners.map((r) => (typeof r.trajectory === "number" ? r.trajectory : 0)),
+  dahilMi: (runners) => runners.map((r) => r.trajectoryVarMi === true),
+};
+
+// 2026-09-21 kullanıcı talebi — LatePositionGain/Trajectory (rank-tabanlı) REDDEDİLDİ,
+// PaceRetention (hız-tabanlı) sırada. Overlap kontrolü YAPILDI: corr(yarisGidisatiSkoru)=-0.02,
+// corr(hizDerecesi)=0.38 — |r|>0.7 uyarı eşiğinin altında, örtüşme riski yok. Veri
+// model-veri-yeni-adaylar-paceretention.json'da (arac-yeni-sinyal-backfill-paceretention.mts).
+const PaceRetention: Aday = {
+  ad: "PaceRetention",
+  hesapla: (runners) => runners.map((r) => (typeof r.paceRetention === "number" ? r.paceRetention : 0)),
+  dahilMi: (runners) => runners.map((r) => r.paceRetentionVarMi === true),
+};
+
 // KgsGun — "kaç gün sonra" (son yarıştan bugüne gün sayısı). kgsVarMi (yalnız var/yok
 // bayrağı) daha önce ölü bulunup toFeatureVector'dan çıkarılmıştı — ama HAM sürekli
 // değerin kendisi (ne kadar uzun/kısa bir ara) hiç test edilmedi. -1 = veri yok (dahilMi
@@ -504,7 +534,7 @@ const HizZamanAgirlikli: Aday = {
   dahilMi: (runners) => runners.map((r) => r.hizPerRaceVarMi === true),
 };
 
-const ADAYLAR: Aday[] = [GalopMissing];
+const ADAYLAR: Aday[] = [PaceRetention];
 const SIRE_ORTUSME_ADAYLARI: Aday[] = [NoOp, PedigreeSurfaceAffinity, PedigreeSurfaceAffinity_LowExp];
 // H1 (mevcut, Row.zeminToleransi zaten V5.46 skoruna dahil — ayrı test gerekmez) referans
 // alınarak yalnız H2/H3, hem NORMAL V5.46 üzerinden (additive) hem zeminHaric (replacement)
@@ -640,6 +670,25 @@ async function main() {
       const isaretUyan = beta >= 0 ? betaBoot.filter((v) => v >= 0).length : betaBoot.filter((v) => v < 0).length;
       const signStabilityBeta = isaretUyan / betaBoot.length;
       console.log(`  β bootstrap (B=${B}, TRAIN): %95 GA=[${betaLo.toFixed(4)}, ${betaHi.toFixed(4)}] signStability=${(signStabilityBeta * 100).toFixed(1)}% ${!(betaLo < 0 && betaHi > 0) ? "✓ anlamlı" : "⚠ sıfırı içeriyor"}`);
+
+      // 2026-09-21 kullanıcı talebi — "REFIT-AWARE" ΔLL bootstrap: aşağıdaki (mevcut) TEST
+      // paired bootstrap, TEK bir sabit β'yı (nokta tahmini) alıp yalnız TEST örneklemini
+      // resample ediyor — bu yalnız örneklem gürültüsünü ölçer, β'nın TRAIN'de ne kadar
+      // KARARSIZ olduğunu YOK SAYAR (PaceRetention/diğer vakası: β signStability %51.2
+      // olmasına rağmen TEST-only bootstrap "kesin iyileşme" gösterdi — çelişkili). Bu blok
+      // YUKARIDA ZATEN hesaplanmış betaBoot'u (TRAIN resample + yeniden fit, B kez) DEĞİŞMEMİŞ
+      // testGroups'a uygulayıp ΔLL_b = LL(challenger,β_b) - LL(V5.46) hesaplar — "bu challenger'ı
+      // başka bir TRAIN örnekleminde yeniden eğitseydik TEST avantajı korunuyor muydu?" sorusuna
+      // cevap. EKSTRA hesaplama maliyeti YOK (betaBoot zaten vardı).
+      const refitAwareDeltaLL = betaBoot.map((b) => logLossOf(testGroups, b) - llV546Test);
+      const sortedRefit = [...refitAwareDeltaLL].sort((a, b) => a - b);
+      const refitLo = percentile(sortedRefit, 0.025);
+      const refitHi = percentile(sortedRefit, 0.975);
+      const refitNegatifSayisi = refitAwareDeltaLL.filter((v) => v < 0).length;
+      const refitSignStability = refitNegatifSayisi / refitAwareDeltaLL.length;
+      const refitNoktaDeltaLL = refitAwareDeltaLL.reduce((a, b) => a + b, 0) / refitAwareDeltaLL.length;
+      console.log(`  ΔLL REFIT-AWARE bootstrap (B=${B}, TRAIN yeniden fit edilip SABİT TEST'e uygulanır): %95 GA=[${refitLo.toFixed(4)}, ${refitHi.toFixed(4)}] P(ΔLL<0)=${(refitSignStability * 100).toFixed(1)}%  ort.ΔLL=${refitNoktaDeltaLL.toFixed(4)}`);
+      console.log(`  KARAR (refit-aware): ${refitHi < 0 ? "✓✓ genellenebilir iyileşme" : refitLo > 0 ? "✗ genellenebilir kötüleşme" : "sıfırı içeriyor — UNSTABLE/VALIDATION PENDING (üretime alınmaz)"}`);
 
       // Race-level (veya GÜN-KÜMELİ, bkz. gunKumeli parametresi) PAIRED bootstrap (TEST
       // setinden resample) — ΔLL'nin CI'si + signStability. 2026-09-17 kullanıcı talebi:
