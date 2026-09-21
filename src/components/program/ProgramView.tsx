@@ -1752,7 +1752,7 @@ export default function ProgramView({
                   <button
                     onClick={() => setHipodromOzellikleriOpen(true)}
                     data-tour="hipodrom-ozellikleri"
-                    className="sm:hidden ml-auto shrink-0 rounded border px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground whitespace-nowrap"
+                    className="sm:hidden shrink-0 rounded border px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground whitespace-nowrap"
                   >
                     {t("hipodromOzellikleri")} {!isLoggedIn && "🔒"}
                   </button>
