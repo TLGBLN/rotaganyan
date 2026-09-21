@@ -25,6 +25,7 @@ import {
   toFeatureVector,
   type Faz1RunnerV5,
 } from "./src/lib/methodology/v5-engine";
+import { kulvarBolgesi } from "./src/lib/hipodrom-mesafe-koordinat";
 
 // 2026-09-17 — startNo (TJK "St" kulvar no) ve ham weight (kg) yok model-veri-yg4.json'da,
 // arac-yeni-sinyal-backfill.mts ile runnerId üzerinden Runner'dan çekilip AYRI bir dosyaya
@@ -57,6 +58,13 @@ type Row = {
   hpPuani: number;
   startNo: number | null; weight: number | null;
   dagilim: { kacak: number; onGrup: number; bekleme: number; derinBekleme: number } | null;
+  // 2026-09-21 kullanıcı talebi (Kulvar Etkisi derinleştirme) — kulvarBolgesi()'nden
+  // (hipodrom-mesafe-koordinat.ts, TJK resmi start-noktası diyagramı) türetilmiş "bu
+  // koşunun start noktası ilk viraja YAKIN mı" proxy'si. main()'de virajMiEkle() ile
+  // grup-seviyesinde (hipodrom+pist+mesafe) hesaplanıp HER runner'a aynen kopyalanır —
+  // Row seviyesinde tutulmasının nedeni Aday.hesapla'nın yalnız runners: Row[] alması.
+  // null = koordinat tablosunda bu hipodrom+pist+mesafe YOK (bilinmiyor, tahmin ETMEZ).
+  virajMi?: 1 | 0 | null;
   pedigreeSurfaceAffinity?: number | null;
   ownSurfaceStartSayisi?: number;
   yakinsama2Plus?: 0 | 1;
@@ -286,6 +294,94 @@ const DrawStyleFit: Aday = {
       return D * E;
     });
   },
+};
+
+// 2026-09-21 kullanıcı talebi — Kulvar Etkisi derinleştirme (DrawPct/DrawStyleFit ana-etki
+// formunda REDDEDİLDİ, bkz. proje hafızası project_kulvar_etkisi_reddedildi.md; işaret
+// segmentler arası TERSİNE dönüyordu — kullanıcının kendi teşhisi: "tek genel katsayı riskli,
+// en az Hipodrom×Pist×Mesafe×FieldSize×KulvarPozisyonu×YarışStili etkileşimiyle ölçülmeli").
+// Aşağıdaki 4 aday, kullanıcının istediği etkileşim ailesinden ROTAGANYAN'da GERÇEKTEN
+// üretilebilir olanları test eder (drawPct×kaçan/öncü YERİNE DrawStyleFit zaten var, drawPct²
+// ayrıca eklendi). ÖNEMLİ METODOLOJİK NOT: kullanıcı "at kalitesi/AGF kontrol edilerek residual
+// etki" istiyor — bu harness'in S0=V5.46 (AGF dahil TÜM 15 sinyal) skorunu SABİT DONDURUP
+// yalnız ARTIK (residual) katkıyı ölçmesi zaten TAM OLARAK bu kontrolü sağlıyor, ayrı bir
+// "kaliteye göre düzelt" adımı GEREKMİYOR.
+
+// DrawPct² — kullanıcı formülü: uçlardaki (en iç/en dış) kulvarların ORTAdakilere göre
+// sistematik dezavantajı/avantajı olabilir mi (tek yönlü doğrusal DEĞİL, U/Ters-U şekilli).
+const DrawPct2: Aday = {
+  ad: "DrawPct2 (kulvar karesi, U-şekilli etki testi)",
+  hesapla: (runners) => {
+    const gecerli = runners.map((r) => r.startNo).filter((s): s is number => s != null);
+    if (gecerli.length < 2) return runners.map(() => 0);
+    const minS = Math.min(...gecerli), maxS = Math.max(...gecerli);
+    if (maxS === minS) return runners.map(() => 0);
+    return runners.map((r) => {
+      if (r.startNo == null) return 0;
+      const d = (r.startNo - minS) / (maxS - minS);
+      return d * d;
+    });
+  },
+};
+
+// DrawFrontRunFit — kullanıcının "drawPct × kaçan/öncü" talebi: DrawStyleFit'in (4 stilin
+// TAMAMI, negatif ağırlıklı) YERİNE yalnız ÖN pozisyon eğilimini (kaçak+önGrup, 0-1) kullanan
+// DAHA DAR/asimetrik bir versiyon — "iç kulvar öncü ata YARDIM eder mi" hipotezini bekleme/
+// derinBekleme'nin gürültüsü OLMADAN izole test eder.
+const DrawFrontRunFit: Aday = {
+  ad: "DrawFrontRunFit (kulvar×öncü-stil, yalnız pozitif ağırlık)",
+  hesapla: (runners) => {
+    const gecerli = runners.map((r) => r.startNo).filter((s): s is number => s != null);
+    if (gecerli.length < 2) return runners.map(() => 0);
+    const minS = Math.min(...gecerli), maxS = Math.max(...gecerli);
+    if (maxS === minS) return runners.map(() => 0);
+    return runners.map((r) => {
+      if (r.startNo == null || !r.dagilim) return 0;
+      const D = 2 * ((r.startNo - minS) / (maxS - minS)) - 1;
+      const frontProb = (r.dagilim.kacak + r.dagilim.onGrup) / 100;
+      return D * frontProb;
+    });
+  },
+};
+
+// DrawFieldSizeFit — kullanıcının "drawPct × fieldSize" talebi: kulvarın etkisi kalabalık
+// sahada (trafik/sıkışma riski yüksek) mi yoksa küçük sahada mı daha belirgin.
+const DrawFieldSizeFit: Aday = {
+  ad: "DrawFieldSizeFit (kulvar×saha büyüklüğü)",
+  hesapla: (runners) => {
+    const gecerli = runners.map((r) => r.startNo).filter((s): s is number => s != null);
+    if (gecerli.length < 2) return runners.map(() => 0);
+    const minS = Math.min(...gecerli), maxS = Math.max(...gecerli);
+    if (maxS === minS) return runners.map(() => 0);
+    const fieldSize = runners.length;
+    return runners.map((r) => {
+      if (r.startNo == null) return 0;
+      const D = 2 * ((r.startNo - minS) / (maxS - minS)) - 1;
+      return D * fieldSize;
+    });
+  },
+};
+
+// DrawVirajFit — kullanıcının ana mekanizma hipotezi: "starttan ilk viraja mesafe kısaysa
+// dış kulvarlar dezavantajlı". Gerçek "ilk viraja metre" TJK'da YAYINLANMIYOR (bkz. proje
+// hafızası project_kulvar_etkisi_reddedildi.md, önceki araştırma) — proxy: kulvarBolgesi()
+// (TJK resmi start-noktası diyagramından, start noktası "viraj" bölgesinde mi "düz yol" mu).
+// dahilMi: koordinat tablosunda bu hipodrom+pist+mesafe YOKSA (null) standardizasyonu
+// kirletmesin diye dışarıda bırakılır (KESİN 0 alır, "düz yol" ile KARIŞTIRILMAZ).
+const DrawVirajFit: Aday = {
+  ad: "DrawVirajFit (kulvar×kısa-ilk-viraj proxy)",
+  hesapla: (runners) => {
+    const gecerli = runners.map((r) => r.startNo).filter((s): s is number => s != null);
+    if (gecerli.length < 2) return runners.map(() => 0);
+    const minS = Math.min(...gecerli), maxS = Math.max(...gecerli);
+    if (maxS === minS) return runners.map(() => 0);
+    return runners.map((r) => {
+      if (r.startNo == null || r.virajMi == null) return 0;
+      const D = 2 * ((r.startNo - minS) / (maxS - minS)) - 1;
+      return D * r.virajMi;
+    });
+  },
+  dahilMi: (runners) => runners.map((r) => r.virajMi != null),
 };
 
 // C-ClassDelta: kullanıcı formülü RaceStrength(bugün)-RaceStrength(son yarış), proxy =
@@ -545,7 +641,7 @@ const HizZamanAgirlikli: Aday = {
   dahilMi: (runners) => runners.map((r) => r.hizPerRaceVarMi === true),
 };
 
-const ADAYLAR: Aday[] = [ClassDeltaV1];
+const ADAYLAR: Aday[] = [DrawPct2, DrawFrontRunFit, DrawFieldSizeFit, DrawVirajFit];
 const SIRE_ORTUSME_ADAYLARI: Aday[] = [NoOp, PedigreeSurfaceAffinity, PedigreeSurfaceAffinity_LowExp];
 // H1 (mevcut, Row.zeminToleransi zaten V5.46 skoruna dahil — ayrı test gerekmez) referans
 // alınarak yalnız H2/H3, hem NORMAL V5.46 üzerinden (additive) hem zeminHaric (replacement)
@@ -559,13 +655,20 @@ async function main() {
   const tumRaceIdler = [...new Set(rawAll.map((r) => r.raceId))];
   const raceDates = await db.race.findMany({
     where: { id: { in: tumRaceIdler } },
-    select: { id: true, surface: true, raceDayId: true, raceDay: { select: { date: true } } },
+    select: {
+      id: true, surface: true, raceDayId: true, distance: true,
+      raceDay: { select: { date: true, hippodrome: { select: { slug: true } } } },
+    },
   });
   const tarihByRaceId = new Map(raceDates.map((r) => [r.id, r.raceDay.date]));
   // 2026-09-17 kullanıcı talebi — Kum/Çim ayrı test + gün-kümeli (meeting/day) paired
   // bootstrap için: her koşunun pist türü ve raceDayId'si.
   const surfaceByRaceId = new Map(raceDates.map((r) => [r.id, r.surface]));
   const raceDayIdByRaceId = new Map(raceDates.map((r) => [r.id, r.raceDayId]));
+  // 2026-09-21 kullanıcı talebi (DrawVirajFit) — hipodrom slug + mesafe, kulvarBolgesi()
+  // çağrısı için (bkz. Aday tanımı üstündeki not).
+  const hippodromSlugByRaceId = new Map(raceDates.map((r) => [r.id, r.raceDay.hippodrome.slug]));
+  const distanceByRaceId = new Map(raceDates.map((r) => [r.id, r.distance]));
   const kapsamaBaslangic = new Date(COVERAGE_START_DATE + "T00:00:00.000Z");
   const raw = rawAll.filter((r) => {
     const d = tarihByRaceId.get(r.raceId);
@@ -577,7 +680,21 @@ async function main() {
     .filter((g) => g.runners.length >= 2)
     .map((g) => ({ ...g, surface: surfaceByRaceId.get(g.raceId) ?? "?", raceDayId: raceDayIdByRaceId.get(g.raceId) ?? g.raceId }));
   for (const g of raceGruplariHamTumu) yakinsama2PlusEkle(g.runners);
+  // 2026-09-21 kullanıcı talebi (DrawVirajFit) — her runner'a, kendi koşusunun start
+  // noktasının kulvarBolgesi()'ne göre "viraj"/"düz yol"/bilinmiyor sınıfını damgalar.
+  for (const g of raceGruplariHamTumu) {
+    const slug = hippodromSlugByRaceId.get(g.raceId);
+    const distance = distanceByRaceId.get(g.raceId);
+    const surface = surfaceByRaceId.get(g.raceId);
+    const bolge = slug && distance != null && (surface === "CIM" || surface === "KUM" || surface === "SENTETIK")
+      ? kulvarBolgesi(slug, surface, distance)
+      : null;
+    const virajMi: 1 | 0 | null = bolge === "viraj" ? 1 : bolge === "düz yol" ? 0 : null;
+    for (const r of g.runners) r.virajMi = virajMi;
+  }
   const raceGruplariHam = raceGruplariHamTumu;
+  const virajBilinenSayisi = raceGruplariHam.filter((g) => g.runners[0]?.virajMi != null).length;
+  console.log(`Kulvar-bölgesi (viraj/düz yol) bilinen koşu sayısı: ${virajBilinenSayisi}/${raceGruplariHam.length}`);
 
   const dusukSart = raceGruplariHam.filter((g) => g.runners[0].kategori === "1a" || g.runners[0].kategori === "1b");
   const diger = raceGruplariHam.filter((g) => !(g.runners[0].kategori === "1a" || g.runners[0].kategori === "1b"));
