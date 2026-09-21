@@ -18,6 +18,11 @@ type Props = {
     couponWide?: string | null;
     isBanko: boolean;
     bankoNote?: string | null;
+    // 2026-09-21 — Race Context Invalidation Faz 1 (admin-only, bkz. plan). status
+    // her zaman var (Prisma default "ACTIVE"); staleAt/staleReason yalnız STALE'de dolu.
+    status?: string;
+    staleAt?: Date | string | null;
+    staleReason?: string | null;
     picks: Array<{
       rank: number;
       runnerId?: string | null;

@@ -409,14 +409,42 @@ model Prediction {
   pistDuyarliligi    String? // "STABIL" | "HASSAS" | "COK_HASSAS"
   gecmisRiskSeviyesi String? // "YETERLI" | "SINIRLI" | "YETERSIZ"
   pistUyariMesaji    String? // public'e gösterilecek, sayısal detay İÇERMEYEN gerekçe
+  // 2026-09-21 — Race Context Invalidation Faz 1 (bkz. proje hafızası
+  // project_race_context_invalidation_faz1.md): admin-only STALE tespiti, public/kupon
+  // tarafına HİÇBİR otomatik davranış değişikliği getirmez (bkz. feedback_otomatik_stale_reddedildi).
+  status              String    @default("ACTIVE") // ACTIVE | STALE
+  criticalContextHash String?   // null = eski kayıt/baseline yok → cron STALE ÜRETMEZ
+  marketSnapshotHash  String?   // yalnız AGF/pay — STALE ÜRETMEZ, Faz 2 audit'i için
+  contextSnapshotJson Json?     // analizin üretildiği ANDAKİ kritik context
+  staleAt             DateTime?
+  staleReason         String?   // yapılı diff'in kısa özeti, ör. "surface: CIM→KUM"
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  race   Race   @relation(fields: [raceId], references: [id], onDelete: Cascade)
-  author User   @relation(fields: [authorId], references: [id])
-  picks  Pick[]
+  race    Race                @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  author  User                @relation(fields: [authorId], references: [id])
+  picks   Pick[]
+  history PredictionHistory[]
 
   @@index([published])
+}
+
+// 2026-09-21 — Race Context Invalidation Faz 1: supersede edilen Prediction içeriğinin
+// append-only arşivi. Yalnız İLK ACTIVE→STALE geçişinde bir satır yazılır (idempotent —
+// bkz. proje hafızası); başarılı yeniden-analiz İKİNCİ bir satır ÜRETMEZ.
+model PredictionHistory {
+  id                  String   @id @default(cuid())
+  predictionId        String
+  raceId              String
+  criticalContextHash String
+  snapshotJson        Json     // supersede edilen Prediction'ın TAM içeriği
+  changedFieldsJson   Json?    // yapılı diff ({field, oldValue, newValue}[])
+  archivedAt          DateTime @default(now())
+
+  prediction Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+
+  @@index([raceId])
+  @@index([predictionId])
 }
 
 model Pick {
@@ -788,9 +816,22 @@ model HomeKupon {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  // 2026-09-21 — Prediction-to-HomeKupon Auto Synchronization (bkz. plan). PoolKey =
+  // (hippodromeName, date, slot). manualOverrides admin'in HAM/kalıcı checkbox niyeti
+  // (asla budanmaz); sourcePredictionsHash + buildKey senkron/idempotency için.
+  manualOverrides       Json?
+  sourcePredictionsHash String?
+  buildKey              String? @unique
+
   @@index([isActive])
   @@index([slot])
 }
+
+// Prisma DSL'de ifade edilemeyen bir kısmi (partial) unique index — `prisma db push`
+// bunu OLUŞTURMAZ, bir kereye mahsus raw SQL ile eklenir (bkz. plan "Deploy checklist"):
+//   CREATE UNIQUE INDEX IF NOT EXISTS homekupon_one_active_per_pool
+//     ON "HomeKupon" ("hippodromeName", "date", "slot") WHERE "isActive" = true;
+// Aynı (hippodromeName,date,slot) için en fazla 1 isActive=true satır garantisi burada.
 
 // 2026-09-12 kullanıcı talebi — "Altılı Ne Verir?"'in AGF-tabanlı tahmini, gerçek TJK
 // ikramiyesinden büyük sapma gösterebiliyor (24 örnekte medyan %61-76, ama varyans %30-116).

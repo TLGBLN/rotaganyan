@@ -45,6 +45,14 @@
       "schedule": "*/5 11-21 * * *"
     },
     {
+      "path": "/api/cron/race-context-watch",
+      "schedule": "*/5 8-21 * * *"
+    },
+    {
+      "path": "/api/cron/homekupon-reconcile",
+      "schedule": "*/5 8-21 * * *"
+    },
+    {
       "path": "/api/cron/horse-notifications-morning",
       "schedule": "0 5 * * *"
     },

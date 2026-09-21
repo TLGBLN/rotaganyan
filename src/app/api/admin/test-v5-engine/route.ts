@@ -5,6 +5,8 @@ import { gatherFaz1V5, faz2V5Sirala, muhakemeUretV5, v5BankoAdayiTespit, tumOzel
 import { kategoriTespit } from "@/lib/methodology/v2-engine";
 import { hesaplaAnormalPistRiski } from "@/lib/methodology/anormal-pist-risk";
 import { db } from "@/lib/db";
+import { syncRaceProgramContext } from "@/server/services/race-context-sync.service";
+import { fetchCriticalContextInput, criticalContextHash } from "@/lib/methodology/race-context-hash";
 
 // 2026-08-16 — V5 motoru: Claude çağrısı YOK (yalnız DB okuma + koşullu logit skoru),
 // V4 ile aynı sebeple maxDuration/batching gerekmiyor — tek istekte döner.
@@ -18,6 +20,13 @@ async function handlePost(req: NextRequest) {
   }
   const { raceId } = (await req.json()) as Body;
   if (!raceId) return NextResponse.json({ error: "raceId gerekli" }, { status: 400 });
+
+  // Race Context Invalidation Faz 1 (bkz. plan, Düzeltme #1) — "Analiz Et" gerçek T-60/T-45
+  // operasyonunda BUGÜNKÜ, AZ ÖNCESİ TJK verisiyle çalışmalı; gatherFaz1V5 kendi içinde
+  // yalnız AGF'yi tazeliyordu (syncAgfForRace), pist/yüzey/mesafe/koşan-koşmayan/jokey/kilo
+  // gibi kritik alanlar DB'deki (olası eski) veriyle kalıyordu. Hata sessizce yutulur —
+  // TJK erişilemezse analiz DB'deki mevcut veriyle devam eder, hiçbir zaman BLOKE ETMEZ.
+  await syncRaceProgramContext(raceId).catch(() => {});
 
   const faz1 = await gatherFaz1V5(raceId);
   if (!faz1) return NextResponse.json({ error: "Koşu verisi bulunamadı" }, { status: 404 });
@@ -72,8 +81,16 @@ async function handlePost(req: NextRequest) {
   const couponNormal = nolar.slice(3, 6).join("-");
   const couponWide = nolar.slice(6).join("-");
 
+  // Fresh-sync SONRASI DB durumundan hesaplanan başlangıç hash'i — "Kaydet" anında TEKRAR
+  // hesaplanıp bununla karşılaştırılacak (bkz. upsertPrediction'daki race-condition kilidi,
+  // plan PİVOT-3 madde 3). Hesaplanamazsa (olağandışı) undefined kalır — Kaydet o zaman
+  // eski (guard'sız) davranışa düşer, analiz BLOKE OLMAZ.
+  const ctxForHash = await fetchCriticalContextInput(raceId);
+  const contextStartHash = ctxForHash ? criticalContextHash(ctxForHash) : undefined;
+
   return NextResponse.json({
     ok: true,
+    contextStartHash,
     motorEtiketi: CURRENT_ENGINE_LABEL,
     // 2026-08-26 kullanıcı bulgusu: "Maiden/Satış" hibrit koşularda panel yalnız
     // kategoriTespit'in ("MAIDEN" önce yakalayan) sonucunu ("1b") gösteriyordu — admin

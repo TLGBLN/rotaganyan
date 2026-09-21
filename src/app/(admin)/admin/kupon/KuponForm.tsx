@@ -6,29 +6,36 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ekuriRengi } from "@/lib/ekuri-colors";
 import { KAPSAM_ESIK_ILK3, KAPSAM_ESIK_ILK6 } from "@/lib/methodology/kapsam-esikleri";
-import { optimizeKuponAllocation, type LegProbability } from "@/lib/methodology/kupon-optimizer";
+import {
+  type Width,
+  WIDTHS,
+  WIDTH_LABEL,
+  ALTILI_STAKE_PER_COMBINATION,
+  YEDILI_GANYAN_STAKE_PER_COMBINATION,
+  LIMITS,
+  TOLERANCES,
+  YEDILI_LIMITS,
+  YEDILI_TOLERANCES,
+  YEDILI_GANYAN_SLOT,
+  stakeForHippodrome,
+  type RaceRunner,
+  type RaceRiskInfo,
+  type RaceDayData,
+  type GroupSelections,
+  emptySelection,
+  emptyGroupSelections,
+  chunkIntoAltili,
+  sonYediKosu,
+  otomatikGroupSelections,
+} from "@/lib/methodology/kupon-auto-fill";
+import { normalizeManualOverrides, type ManualOverridesMap } from "@/lib/methodology/kupon-dependency-hash";
 import {
   getRaceDayLegs,
   publishHomeKupon,
-  type HomeKuponLegInput,
 } from "@/server/actions/home-kupon.actions";
 
 type Hippodrome = { id: string; name: string; slug: string };
-type RaceRunner = { no: number; name: string; scratched: boolean; ekuriGroup: number | null; score: number | null; scoreExact: number | null; agfSirasi: number | null };
-// 2026-09-16 — Anormal Pist Modu v1 (bkz. anormal-pist-risk.ts). V5.46 skoruna hiç
-// girmez, yalnız otomatikGroupSelections'ın minUnitCounts zorlaması + amber uyarı için.
-type RaceRiskInfo = {
-  pistAnormalMi: boolean;
-  pistDuyarliligi: string | null;
-  gecmisRiskSeviyesi: string | null;
-  pistUyariMesaji: string | null;
-};
-type RaceDayData = {
-  hippodromeName: string;
-  races: ({ raceNo: number; runners: RaceRunner[] } & RaceRiskInfo)[];
-};
 
-type Width = "narrow" | "normal" | "wide";
 // 2026-09-05 kullanıcı bulgusu: "kuponlar birbirinden bağımsız olsun, birini
 // işaretleyince diğerleri etkileniyor" — GroupSelections eskiden TEK, tüm KuponGrup
 // örnekleri (1.Altılı/2.Altılı/7'li Ganyan) arasında raceNo bazında PAYLAŞILAN tek bir
@@ -37,138 +44,8 @@ type Width = "narrow" | "normal" | "wide";
 // için bir gruptaki işaret diğerinde de aynı at olarak görünüyordu. Artık her kupon grubu
 // kendi anahtarıyla (altili-0/altili-1/yedili-ganyan) TAMAMEN ayrı bir GroupSelections
 // tutuyor, aynı koşu numarası birden fazla grupta olsa bile birbirinden bağımsız.
-type GroupSelections = Record<number, Record<Width, Set<number>>>;
 type Selections = Record<string, GroupSelections>;
-
-const WIDTHS: Width[] = ["narrow", "normal", "wide"];
-const WIDTH_LABEL: Record<Width, string> = { narrow: "Ekonomik", normal: "Normal", wide: "Geniş" };
-const ALTILI_STAKE_PER_COMBINATION = 1.25;
-// 2026-09-12 kullanıcı talebi: Diyarbakır/Şanlıurfa/Elazığ'ın Altılı kombinasyon başı
-// ücreti diğer hipodromlardan farklı, 1₺ — race.service.ts'teki stakeForHippodromeLabel
-// ile AYNI ayrım burada da uygulanıyor (iki dosya AYRI kopyalar, admin formu ile
-// yayınlanan kuponun anasayfa gösterimi tutarlı kalsın diye).
-const DUSUK_UCRETLI_HIPODROMLAR = ["Diyarbakır", "Şanlıurfa", "Elazığ"];
-const ALTILI_STAKE_DUSUK = 1;
-function stakeForHippodrome(hippodromeName: string): number {
-  return DUSUK_UCRETLI_HIPODROMLAR.some((h) => hippodromeName.includes(h)) ? ALTILI_STAKE_DUSUK : ALTILI_STAKE_PER_COMBINATION;
-}
-// v6.111 — kullanıcı düzeltmesi 2026-08-13: 7'li Ganyan'ın kombinasyon başı ücreti
-// Altılı'dan (1.25₺) farklı, TJK'da 2₺. Pool limitleri (600/1500/3000) için gerçek
-// 7'li Ganyan rakamı henüz doğrulanmadı, Altılı'dan aynen kopyalandı — yanlışsa düzelt.
-const YEDILI_GANYAN_STAKE_PER_COMBINATION = 2;
-const LIMITS: Record<Width, number> = { narrow: 600, normal: 1500, wide: 3000 };
-const TOLERANCE = 1.10; // %10 esneme payı
-// 2026-09-05 kullanıcı talebi: Ekonomik'te esneme payı 660₺ değil 700₺'ye kadar izin
-// versin (diğer ikisi hâlâ standart +%10). Base LIMITS.narrow (600₺) hedef olarak kalır,
-// yalnız üst sınır (effectiveLimit) genişliyor.
-const TOLERANCES: Record<Width, number> = { narrow: 700 / LIMITS.narrow, normal: TOLERANCE, wide: TOLERANCE };
-// 2026-09-12 kullanıcı talebi — 7'li Ganyan da artık Ekonomik/Normal/Geniş üçünü birden
-// gösteriyor (v6.111'deki "yalnız Geniş" kararı GERİ ALINDI), kendi hedef aralıklarıyla:
-// Eko 500-700₺, Normal 1400-1500₺, Geniş 3000-3200₺ — Altılı'nın LIMITS/TOLERANCES'ından
-// BAĞIMSIZ, kendi sabitleri (kombinasyon ücreti hâlâ 2₺, YEDILI_GANYAN_STAKE_PER_COMBINATION).
-const YEDILI_LIMITS: Record<Width, number> = { narrow: 500, normal: 1400, wide: 3000 };
-const YEDILI_TOLERANCES: Record<Width, number> = { narrow: 700 / 500, normal: 1500 / 1400, wide: 3200 / 3000 };
-
-function emptySelection(): Record<Width, Set<number>> {
-  return { narrow: new Set(), normal: new Set(), wide: new Set() };
-}
-
-function emptyGroupSelections(races: { raceNo: number }[]): GroupSelections {
-  const sel: GroupSelections = {};
-  races.forEach((r) => { sel[r.raceNo] = emptySelection(); });
-  return sel;
-}
-
-// 2026-09-11 kullanıcı bulgusu ("bir 600 TL'lik kupon yaparken bu mantıkla hiç kupon
-// tutturamayız") — her ayağa kendi "güvenli" genişliğini vermek sabit bütçeye SIĞMIYOR
-// (6 ayağın hepsine 3 at bile yazsan 3⁶=729 kombinasyon, 700₺'nin üstü). Gerçek çözüm her
-// ayağı ayrı ayrı değil, sabit bütçeyi TÜM ayaklar arasında en yüksek toplam-isabet
-// olasılığını verecek şekilde DAĞITMAK — bkz. kupon-optimizer.ts. Bu fonksiyon her üç
-// kademe (Ekonomik/Normal/Geniş) için AYRI bir optimizasyon çalıştırıp TEK bir
-// GroupSelections'ta birleştiriyor.
-// 2026-09-16 — Anormal Pist Modu v1 (bkz. anormal-pist-risk.ts): HASSAS/ÇOK HASSAS
-// ayaklarda "tek at yazma, en az bir alternatif daha bırak" kuralı — kullanıcı kararı:
-// v1'de ikisi de aynı zorunlu minimuma (2) tabi, "natural pick count + 1" hesaplamak
-// (optimizer'ı önce kısıtsız çalıştırmayı gerektirir) ŞİMDİLİK basitleştirildi.
-const ANORMAL_PIST_ZORUNLU_MINIMUM = 2;
-
-function anormalPistZorunluMinimumHesapla(races: RaceDayData["races"]): Record<number, number> {
-  const zorunlu: Record<number, number> = {};
-  for (const race of races) {
-    if (race.pistDuyarliligi === "HASSAS" || race.pistDuyarliligi === "COK_HASSAS") {
-      zorunlu[race.raceNo] = ANORMAL_PIST_ZORUNLU_MINIMUM;
-    }
-  }
-  return zorunlu;
-}
-
-function otomatikGroupSelections(
-  races: RaceDayData["races"],
-  stakePerCombination: number,
-  limits: Record<Width, number> = LIMITS,
-  tolerances: Record<Width, number> = TOLERANCES
-): GroupSelections {
-  const zorunluMinimum = anormalPistZorunluMinimumHesapla(races);
-  const legs: LegProbability[] = races.map((race) => ({
-    raceNo: race.raceNo,
-    runners: race.runners
-      .filter((r) => !r.scratched)
-      // 2026-09-13 kullanıcı bulgusu (İstanbul K5) — yuvarlanmış tam sayı score (11=11)
-      // gerçekte farklı iki atı eşitmiş gibi gösterip DP'nin yanlış atı seçmesine yol
-      // açabiliyordu; varsa ham scoreExact kullanılıyor. ekuriGroup de taşınıyor —
-      // optimizer artık eküri çiftini TEK kombinasyon birimi olarak sayabiliyor (bkz.
-      // kupon-optimizer.ts, aynı bulgudan gelen ikinci düzeltme).
-      .map((r) => ({ no: r.no, olasilik: (r.scoreExact ?? r.score ?? 0) / 100, ekuriGroup: r.ekuriGroup })),
-  }));
-  const sel = emptyGroupSelections(races);
-  // 2026-09-13 kullanıcı bulgusu (Adana K1/K2) — Ekonomik/Normal/Geniş eskiden birbirinden
-  // habersiz üç bağımsız DP koşusuydu; gerçek veriyle test edilince bütçe arttıkça bir
-  // ayaktaki at sayısının MONOTON artmadığı kanıtlandı (daha pahalı kademe bazı ayaklarda
-  // daha ucuz kademeden DAHA AZ at seçebiliyordu). WIDTHS zaten ucuzdan pahalıya sıralı
-  // (narrow→normal→wide) — her kademe artık bir öncekinin seçtiği birim sayısını TABAN
-  // alıyor (yalnız üzerine ekler, hiç eksiltmez), taban bir sonraki DP çağrısına
-  // `minUnitCounts` olarak geçiyor.
-  let oncekiBirimSayilari: Record<number, number> | undefined;
-  for (const width of WIDTHS) {
-    const effectiveLimit = limits[width] * tolerances[width];
-    const maxCombinations = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
-    // Anormal Pist Modu: zorunlu minimum, bir önceki (ucuz) kademenin tabanıyla
-    // BİRLEŞTİRİLİR (ikisinin büyüğü) — HASSAS/ÇOK HASSAS bir ayak Ekonomik'te bile
-    // en az 2 at taşır; bütçeye sığmıyorsa optimizeKuponAllocation zaten boş
-    // (toplamKombinasyon=0) döner, o kademe otomatik boş kalır (bkz. buildKuponOnerisi
-    // hasNarrow/hasNormal/hasWide — boş kademe yayınlanmaz, ZORLA doldurulmaz).
-    const minUnitCounts: Record<number, number> = { ...oncekiBirimSayilari };
-    for (const [raceNoStr, min] of Object.entries(zorunluMinimum)) {
-      const raceNo = Number(raceNoStr);
-      minUnitCounts[raceNo] = Math.max(minUnitCounts[raceNo] ?? 1, min);
-    }
-    const { secimler, birimSayilari } = optimizeKuponAllocation(legs, maxCombinations, minUnitCounts);
-    oncekiBirimSayilari = birimSayilari;
-    for (const race of races) {
-      sel[race.raceNo][width] = new Set(secimler[race.raceNo] ?? []);
-    }
-  }
-  return sel;
-}
-
-/**
- * 1. Altılı her zaman ilk 6 koşu (1-6); 2. Altılı her zaman son 6 koşu.
- * Günde 9 koşu varsa: 1. Altılı = 1-6, 2. Altılı = 4-9 (4-5-6 ortak/üst üste biner).
- * 12 koşu varsa üst üste binme olmaz (1-6 / 7-12). 6 veya daha az koşu varsa tek grup.
- */
-function chunkIntoAltili<T>(races: T[]): T[][] {
-  if (races.length <= 6) return races.length > 0 ? [races] : [];
-  return [races.slice(0, 6), races.slice(races.length - 6)];
-}
-
-// v6.110 — kullanıcı talebi 2026-08-13: "7'li Ganyan" — TJK'nın gerçek bahis türü,
-// Altılı'dan farklı olarak SONDAN başlayarak 7 koşu (günün son 7 koşusu). Altılı'nın
-// aksine tek bir sabit pencere — 9 koşu olsa da 12 koşu olsa da her zaman son 7'si.
-// Günün 7'den az koşusu varsa bölüm hiç gösterilmez (7'li Ganyan oynanamaz).
-const YEDILI_GANYAN_SLOT = 7; // Altılı slotları (1, en fazla 2) ile asla çakışmaz
-function sonYediKosu<T>(races: T[]): T[] | null {
-  return races.length >= 7 ? races.slice(races.length - 7) : null;
-}
+type GroupManualOverrides = Record<string, ManualOverridesMap>;
 
 // 2026-08-31 kullanıcı bulgusu (Karma/GÜL AYALI vakası, kök-neden analiziyle KANITLANDI):
 // bir ayakta Ekonomik/Normal/Geniş'in AYNI atları taşıması ("statik ayak") — Geniş'e
@@ -465,6 +342,37 @@ function amountsForGroup(group: RaceDayData["races"], selections: GroupSelection
   }, {} as Record<Width, number>);
 }
 
+// 2026-09-21 — Prediction-to-HomeKupon Auto Synchronization (bkz. plan, "manuel override =
+// kalıcı optimizer kısıtı" onaylı karar 2): manuel niyet EKRANDAKİ son hâlin sunucudaki
+// TAZE bir DP çıktısıyla farkından TÜRETİLMEZ (bu, ekran açıkken Prediction değişirse eski
+// DP çıktısını "admin bilerek seçti" sanıp KALICILAŞTIRIRDI — İstanbul K4 vakasının AYNISI
+// başka kılıkta). Bunun yerine `autoBaseline` (son "Otomatik Doldur" ANINDAKİ, İSTEMCİDE
+// DONDURULMUŞ DP çıktısı) ile şu anki `selections` arasındaki fark alınır — bu, admin'in
+// GERÇEKTEN dokunduğu her şeyi (taban dışına ekleme→forceInclude, tabandan çıkarma→
+// forceExclude) yakalar, admin taban'a geri dönecek şekilde tekrar toggle'larsa override
+// kendiliğinden temizlenir (fark sıfırlanır).
+function diffToManualOverrides(
+  current: GroupSelections,
+  baseline: GroupSelections,
+  races: { raceNo: number }[]
+): Record<number, unknown> {
+  const raw: Record<number, unknown> = {};
+  for (const race of races) {
+    const cur = current[race.raceNo] ?? emptySelection();
+    const base = baseline[race.raceNo] ?? emptySelection();
+    const tierEntry: Record<string, { forceInclude: number[]; forceExclude: number[] }> = {};
+    for (const width of WIDTHS) {
+      const forceInclude = [...cur[width]].filter((no) => !base[width].has(no));
+      const forceExclude = [...base[width]].filter((no) => !cur[width].has(no));
+      if (forceInclude.length > 0 || forceExclude.length > 0) {
+        tierEntry[width] = { forceInclude, forceExclude };
+      }
+    }
+    if (Object.keys(tierEntry).length > 0) raw[race.raceNo] = tierEntry;
+  }
+  return raw;
+}
+
 export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }) {
   const router = useRouter();
   const [loading, startLoading] = useTransition();
@@ -474,6 +382,9 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [raceDay, setRaceDay] = useState<RaceDayData | null>(null);
   const [selections, setSelections] = useState<Selections>({});
+  // 2026-09-21 — son "Otomatik Doldur" ANINDAKİ DP çıktısının dondurulmuş kopyası —
+  // manuel override'ları BUNA göre türetiyoruz (bkz. diffToManualOverrides yorumu).
+  const [autoBaseline, setAutoBaseline] = useState<Selections>({});
 
   const altiliGroups = useMemo(
     () => (raceDay ? chunkIntoAltili(raceDay.races) : []),
@@ -513,6 +424,7 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
       const yedili = sonYediKosu(data.races);
       if (yedili) next["yedili-ganyan"] = emptyGroupSelections(yedili);
       setSelections(next);
+      setAutoBaseline(next); // yeni gün/hipodrom — taban da sıfırlanır
     });
   }
 
@@ -536,6 +448,7 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
   ) {
     const sel = otomatikGroupSelections(races, stakePerCombination, limits, tolerances);
     setSelections((prev) => ({ ...prev, [groupKey]: sel }));
+    setAutoBaseline((prev) => ({ ...prev, [groupKey]: sel })); // yeni temiz taban — override seti fiilen sıfırlanır
     toast.success("Öneri dolduruldu — gözden geçirip yayınlamadan önce düzenleyebilirsin");
   }
 
@@ -543,32 +456,40 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
     if (!raceDay) return;
 
     const groupSel = selections[key] ?? {};
-    const legs: HomeKuponLegInput[] = group
-      .map((r) => {
-        const sel = groupSel[r.raceNo] ?? emptySelection();
-        return {
-          raceNo: r.raceNo,
-          narrow: [...sel.narrow].sort((a, b) => a - b),
-          normal: [...sel.normal].sort((a, b) => a - b),
-          wide: [...sel.wide].sort((a, b) => a - b),
-        };
-      })
-      .filter((l) => l.narrow.length > 0 || l.normal.length > 0 || l.wide.length > 0);
-
-    if (legs.length === 0) {
+    const hasAnySelection = group.some((r) => {
+      const sel = groupSel[r.raceNo] ?? emptySelection();
+      return sel.narrow.size > 0 || sel.normal.size > 0 || sel.wide.size > 0;
+    });
+    if (!hasAnySelection) {
       toast.error("En az bir koşuda at seç");
       return;
     }
 
+    // Ekrandaki `groupSel` yalnız bir ÖNİZLEME — sunucuya doğrudan legs YOLLANMAZ.
+    // Yollanan şey admin'in taban'dan (autoBaseline) SAPMASI (manuel niyet); sunucu
+    // TAZE Predictionlarla kendi DP'sini bu kısıtlarla baştan çözer.
+    const raceNos = group.map((r) => r.raceNo);
+    const rawOverrides = diffToManualOverrides(groupSel, autoBaseline[key] ?? {}, group);
+    const manualOverrides = normalizeManualOverrides(rawOverrides, raceNos);
+
     setPublishingKey(key);
     try {
-      await publishHomeKupon({
+      const res = await publishHomeKupon({
         hippodromeName: `${raceDay.hippodromeName} — ${label}`,
         date,
-        legs,
         slot,
+        raceNos,
+        manualOverrides,
       });
-      toast.success(`${label} kuponu oluşturuldu ve anasayfada yayınlandı`);
+      if (res?.skipped === "POOL_STARTED") {
+        toast.warning(`${label}: havuz zaten başladı, artık değiştirilemez.`);
+      } else if (res?.skipped === "UNCHANGED") {
+        toast.info(`${label}: zaten güncel, değişiklik yayınlanmadı.`);
+      } else if (res?.ok === false) {
+        toast.error(`${label} yayınlanamadı — lütfen tekrar deneyin (context eşzamanlı değişmiş olabilir).`);
+      } else {
+        toast.success(`${label} kuponu oluşturuldu ve anasayfada yayınlandı`);
+      }
       router.refresh();
     } finally {
       setPublishingKey(null);

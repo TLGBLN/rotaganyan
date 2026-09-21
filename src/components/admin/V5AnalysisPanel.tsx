@@ -76,6 +76,10 @@ type ExistingPrediction = {
   couponWide?: string | null;
   bankoNote?: string | null;
   picks: SavedPick[];
+  // 2026-09-21 — Race Context Invalidation Faz 1 (admin-only, bkz. plan).
+  status?: string;
+  staleAt?: Date | string | null;
+  staleReason?: string | null;
 };
 
 type Props = { raceId: string; runners?: Runner[]; existingPrediction?: ExistingPrediction; onSaved?: () => void };
@@ -168,6 +172,12 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
   // değeri artık import edilen sabitten geliyor (API cevabı gelince AYNI değerle
   // üzerine yazılır, davranış değişmez, yalnız ilk render'da da doğru gösterir).
   const [motorEtiketi, setMotorEtiketi] = useState<string | null>(CURRENT_ENGINE_LABEL);
+  // 2026-09-21 — Race Context Invalidation Faz 1 (bkz. plan, PİVOT-3 madde 3): "Analiz
+  // Et" fresh-sync SONRASI hesaplanan hash'i döner — "Kaydet" bunu gönderirse sunucu
+  // Kaydet ANINDA TEKRAR fresh-sync yapıp karşılaştırır (race-condition kilidi).
+  // "kayitli" (hiç yeniden analiz edilmemiş) kaynakta undefined kalır — o zaman Kaydet
+  // eski (guard'sız) davranışa düşer, kayıt asla bloke olmaz.
+  const [contextStartHash, setContextStartHash] = useState<string | undefined>(undefined);
 
   function toggleDetay(no: number) {
     setAcikDetay((prev) => {
@@ -208,6 +218,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         couponNarrow?: string;
         couponNormal?: string;
         couponWide?: string;
+        contextStartHash?: string;
       };
       try {
         data = JSON.parse(raw);
@@ -225,6 +236,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       setKategori(data.kategori ?? null);
       setMotorEtiketi(data.motorEtiketi ?? null);
       setKaynak("canli");
+      setContextStartHash(data.contextStartHash);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Beklenmeyen hata");
     } finally {
@@ -322,7 +334,15 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         gecmisRiskSeviyesi: anormalPistRiski?.gecmisRiskSeviyesi ?? null,
         pistUyariMesaji: anormalPistRiski?.operasyon.uyariMesaji || null,
         picks,
+        contextStartHash,
       });
+      // Race Context Invalidation Faz 1 — PİVOT-3 madde 3: Kaydet anında context TEKRAR
+      // değişmişse sunucu kaydı REDDEDER (Prediction STALE'de kalır). Bu durumda "Kaydet"
+      // BAŞARISIZ sayılmalı — applied/onSaved ÇAĞRILMAZ, admin'e yeniden dene mesajı.
+      if ("contextConflict" in res && res.contextConflict) {
+        toast.error("Context tekrar değişti (ör. pist/at listesi) — analiz kaydedilmedi. Lütfen \"Yeniden Analiz Et\"e basıp tekrar deneyin.");
+        return;
+      }
       if (res.publishError) {
         toast.warning(`Kaydedildi ama yayınlanamadı: ${res.publishError}`);
       } else {
@@ -412,6 +432,23 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       {kaynak === "kayitli" && (
         <div className="rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-xs text-purple-300">
           Daha önce kaydedilmiş analiz gösteriliyor. Güncel veriyle (AGF gün içinde değişmiş olabilir) yeniden hesaplamak için &quot;Yeniden Analiz Et&quot;e bas.
+        </div>
+      )}
+
+      {existingPrediction?.status === "STALE" && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+          <p className="font-semibold">
+            🛑 Context değişti
+            {existingPrediction.staleAt
+              ? ` (${Math.max(0, Math.round((Date.now() - new Date(existingPrediction.staleAt).getTime()) / 60000))} dk önce)`
+              : ""}
+            : {existingPrediction.staleReason || "detay yok"}
+          </p>
+          <p className="mt-1 text-amber-600/80 dark:text-amber-400/80">
+            Bu analiz artık BUGÜNKÜ TJK verisiyle üretilmemiş olabilir. Public sayfada/kupon
+            optimizer&apos;da hâlâ eski (bu) analiz kullanılıyor — otomatik değişmez. Aşağıdaki
+            &quot;Yeniden Analiz Et&quot; butonuyla güncel veriyle tekrar hesaplayıp Kaydet&apos;e basın.
+          </p>
         </div>
       )}
 

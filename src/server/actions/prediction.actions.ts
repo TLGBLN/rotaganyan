@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
@@ -52,6 +53,12 @@ type PredictionInput = {
   gecmisRiskSeviyesi?: string | null;
   pistUyariMesaji?: string | null;
   picks: PickInput[];
+  // 2026-09-21 — Race Context Invalidation Faz 1 (bkz. plan, PİVOT-3 madde 3). Yalnız
+  // V5AnalysisPanel'in "Analiz Et"/"Yeniden Analizi Aç" akışı gönderir (o an fresh-sync
+  // sonrası hesaplanan criticalContextHash) — eski çağıranlar (parse-report,
+  // analysis-importer, manuel form) HİÇ göndermez, bu durumda aşağıdaki race-condition
+  // kontrolü/atomik reset ATLANIR, davranış eskisiyle BİREBİR aynı kalır.
+  contextStartHash?: string;
 };
 
 // ─── Karma Mirror Sync ────────────────────────────────────────────────────────
@@ -237,6 +244,44 @@ export async function completeFullField(raceId: string, picks: PickInput[]): Pro
 export async function upsertPrediction(input: PredictionInput) {
   const session = await requireRole("EDITOR");
 
+  // Race Context Invalidation Faz 1 — PİVOT-3 madde 3'teki KESİN lifecycle: panel açılırken
+  // (fresh sync sonrası) alınan `contextStartHash` ile Kaydet anındaki context AYNI mı?
+  // TEKRAR fresh sync yapılır (context Kaydet'e kadar bir daha değişmiş olabilir), sonra
+  // currentHash hesaplanır. Farklıysa kayıt REDDEDİLİR — Prediction (varsa) STALE'de kalır,
+  // yalnız staleReason tazelenir. Aynıysa TEK atomik update ile ACTIVE resetlenir (aşağıda).
+  let contextReset: {
+    criticalContextHash: string;
+    marketSnapshotHash: string | null;
+    contextSnapshotJson: Prisma.InputJsonValue;
+  } | null = null;
+
+  if (input.contextStartHash) {
+    const { syncRaceProgramContext } = await import("@/server/services/race-context-sync.service");
+    const { fetchCriticalContextInput, criticalContextHash, fetchMarketSnapshotInput, marketSnapshotHash } =
+      await import("@/lib/methodology/race-context-hash");
+
+    await syncRaceProgramContext(input.raceId); // hata sessizce yutulur — DB'deki en son veriyle karşılaştırmaya devam edilir
+
+    const ctx = await fetchCriticalContextInput(input.raceId);
+    if (!ctx) {
+      return { id: null as string | null, publishError: "Koşu bulunamadı — kaydedilemedi." };
+    }
+    const currentHash = criticalContextHash(ctx);
+    if (currentHash !== input.contextStartHash) {
+      await db.prediction.updateMany({
+        where: { raceId: input.raceId, status: "STALE" },
+        data: { staleReason: "Analiz sırasında context tekrar değişti — yeniden analiz gerekli" },
+      });
+      return { id: null as string | null, publishError: null, contextConflict: true };
+    }
+    const marketCtx = await fetchMarketSnapshotInput(input.raceId);
+    contextReset = {
+      criticalContextHash: currentHash,
+      marketSnapshotHash: marketCtx ? marketSnapshotHash(marketCtx) : null,
+      contextSnapshotJson: JSON.parse(JSON.stringify(ctx)) as Prisma.InputJsonValue,
+    };
+  }
+
   // 2026-07-27 canlı bulgu (Bursa 10.Koşu): form hiç doldurulmadan (0 pick) "Kaydet"e
   // basılınca completeFullField EKSİK atları (yani TÜM sahayı) start numarasına göre
   // otomatik dolduruyor — assertPublishSafe'in "hiç pick yok" kontrolü bu doldurmadan
@@ -269,6 +314,16 @@ export async function upsertPrediction(input: PredictionInput) {
         pistDuyarliligi: input.pistDuyarliligi,
         gecmisRiskSeviyesi: input.gecmisRiskSeviyesi,
         pistUyariMesaji: input.pistUyariMesaji,
+        ...(contextReset
+          ? {
+              status: "ACTIVE",
+              staleAt: null,
+              staleReason: null,
+              criticalContextHash: contextReset.criticalContextHash,
+              marketSnapshotHash: contextReset.marketSnapshotHash,
+              contextSnapshotJson: contextReset.contextSnapshotJson,
+            }
+          : {}),
         // published/publishedAt burada YOK — aşağıda assertPublishSafe geçince ayrıca
         // set ediliyor (bkz. fonksiyonun sonu, 2026-07-26 kullanıcı talimatı: "Kaydet"
         // artık ayrı bir "Yayımla" adımı olmadan doğrudan yayınlamayı dener).
@@ -308,6 +363,14 @@ export async function upsertPrediction(input: PredictionInput) {
         pistDuyarliligi: input.pistDuyarliligi,
         gecmisRiskSeviyesi: input.gecmisRiskSeviyesi,
         pistUyariMesaji: input.pistUyariMesaji,
+        ...(contextReset
+          ? {
+              status: "ACTIVE",
+              criticalContextHash: contextReset.criticalContextHash,
+              marketSnapshotHash: contextReset.marketSnapshotHash,
+              contextSnapshotJson: contextReset.contextSnapshotJson,
+            }
+          : {}),
         picks: {
           create: completedPicks.map((p) => ({
             rank: p.rank,
@@ -363,6 +426,20 @@ export async function upsertPrediction(input: PredictionInput) {
   // hitTop1/hitInCoupon'u GÜNCEL picks'e göre yeniden hesapla — bkz. recomputeHitStatsForRace
   // yorumu, kullanıcı denetimi 2026-07-27'de bu alanların bayat kalabildiği bulundu.
   recomputeHitStatsForRace(input.raceId).catch(console.error);
+
+  // 2026-09-21 — Prediction-to-HomeKupon Auto Synchronization (bkz. plan): bu raceId'yi
+  // İÇEREN tüm aktif HomeKupon havuzları (1.Altılı/2.Altılı/7'li Ganyan) TAZE veriyle
+  // yeniden senkronlanır — `after()` ile bloklamayan (mevcut ingest-tetikleme deseniyle
+  // AYNI), ANLIK bir tetik; TEK BAŞINA fail-safe sayılmaz, `homekupon-reconcile` cron'u
+  // (5dk) kaçırılan senkronları ayrıca onarır. Hata Prediction kaydını ASLA etkilemez.
+  after(async () => {
+    try {
+      const { rebuildAffectedHomeKupons } = await import("@/server/services/home-kupon-sync.service");
+      await rebuildAffectedHomeKupons(input.raceId);
+    } catch (e) {
+      console.error("[upsertPrediction] rebuildAffectedHomeKupons hata:", e);
+    }
+  });
 
   // Bildirim YALNIZ taslak→yayında GEÇİŞİNDE gönderilir (publishPrediction()'ın eski
   // davranışıyla aynı) — yoksa zaten yayında olan bir analizi her "Kaydet"te (küçük bir
@@ -588,4 +665,59 @@ export async function deletePrediction(id: string) {
   revalidatePath("/kosular");
   revalidatePath("/tahmin-onerileri");
   revalidatePath("/");
+}
+
+/**
+ * Race Context Invalidation Faz 1 (2026-09-21, bkz. plan) — İDEMPOTENT STALE geçişi.
+ * SADECE admin panelinde görünür bir uyarı üretir; public/kupon tarafında HİÇBİR
+ * otomatik davranış değişikliği YOK ([[feedback_otomatik_stale_reddedildi]] — aynı
+ * sınıf bir mekanizma 2026-09-17'de "kontrolü zor" gerekçesiyle geri alınmıştı, bu
+ * yüzden bu sefer public'e HİÇ dokunulmuyor).
+ *
+ * İdempotency (kullanıcı şartı): `race-context-watch` cron'u 5 dakikada bir çalışıyor —
+ * bir Prediction zaten STALE'deyken tekrar tekrar çağrılırsa YENİ bir PredictionHistory
+ * satırı ÜRETİLMEZ, `staleAt` DEĞİŞMEZ (ilk tespit anı olarak kalır), yalnız
+ * `staleReason` güncel context'e göre tazelenir.
+ *
+ * `criticalContextHash == null` olan (eski/baseline'ı henüz yok) Prediction'lar hiç
+ * işlenmez — cron'un deploy anında TÜM eski kayıtları sahte STALE'e düşürmesini önler.
+ *
+ * Not: bu dosyadaki diğer action'ların aksine requireRole() ÇAĞIRMAZ — cron (oturumsuz)
+ * ve admin paneli (oturumlu) tarafından paylaşılır; etkisi yalnız admin-görünür bir bayrak
+ * olduğu ve public/veri kaybı riski taşımadığı için kabul edilebilir bulundu.
+ */
+export async function markPredictionStale(
+  raceId: string,
+  currentHash: string,
+  staleReason: string,
+  changedFieldsJson?: Prisma.InputJsonValue
+): Promise<{ transitioned: boolean }> {
+  return db.$transaction(async (tx) => {
+    const prediction = await tx.prediction.findUnique({ where: { raceId } });
+    if (!prediction || prediction.criticalContextHash == null) {
+      return { transitioned: false };
+    }
+    if (prediction.status === "ACTIVE") {
+      if (currentHash === prediction.criticalContextHash) return { transitioned: false };
+      const snapshotJson = JSON.parse(JSON.stringify(prediction)) as Prisma.InputJsonValue;
+      await tx.predictionHistory.create({
+        data: {
+          predictionId: prediction.id,
+          raceId,
+          criticalContextHash: prediction.criticalContextHash,
+          snapshotJson,
+          changedFieldsJson: changedFieldsJson ?? undefined,
+        },
+      });
+      await tx.prediction.update({
+        where: { id: prediction.id },
+        data: { status: "STALE", staleAt: new Date(), staleReason },
+      });
+      return { transitioned: true };
+    }
+    if (prediction.status === "STALE") {
+      await tx.prediction.update({ where: { id: prediction.id }, data: { staleReason } });
+    }
+    return { transitioned: false };
+  });
 }
