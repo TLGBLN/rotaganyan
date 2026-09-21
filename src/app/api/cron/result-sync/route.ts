@@ -7,6 +7,8 @@ import { syncAccuraceForDate } from "@/server/services/accurace-sync.service";
 import { syncAltiliIkramiyeLog } from "@/server/services/altili-ikramiye-log.service";
 import { turkeyDateString } from "@/lib/tz";
 import { verifyCronRequest } from "@/lib/cron-auth";
+import { runRaceContextWatch } from "@/app/api/cron/race-context-watch/route";
+import { reconcileAllActiveHomeKupons } from "@/server/services/home-kupon-sync.service";
 
 export const maxDuration = 60;
 
@@ -41,6 +43,17 @@ export async function GET(req: NextRequest) {
   // AÇMADAN (bkz. proje hafızası: Vercel Cron Kayıt Bugu) mevcut çalışan cron'a eklendi.
   after(async () => {
     await syncAltiliIkramiyeLog().catch(() => {});
+  });
+
+  // 2026-09-21 — bkz. [[project_vercel_cron_kayit_bugu]]: race-context-watch VE
+  // homekupon-reconcile TAMAMEN YENİ path oldukları için Vercel'in cron kaydına hiç
+  // işlenmedi (belgeli, kalıcı platform kısıtı). Bu ikisi de zaten çalışan bu cron'a
+  // asalak eklendi — birbirinden BAĞIMSIZ, biri hata verirse diğerini etkilemez.
+  after(async () => {
+    await runRaceContextWatch().catch((e) => console.error("[result-sync piggyback] race-context-watch hata:", e));
+  });
+  after(async () => {
+    await reconcileAllActiveHomeKupons().catch((e) => console.error("[result-sync piggyback] homekupon-reconcile hata:", e));
   });
 
   return NextResponse.json({ ok: true, date: today });
