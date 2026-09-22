@@ -24,7 +24,6 @@ import {
   manualOverridesHash,
   pruneToEligible,
   buildKey as computeBuildKey,
-  poolStartTime,
   type ManualOverridesMap,
   type DependencyRaceInput,
 } from "@/lib/methodology/kupon-dependency-hash";
@@ -124,7 +123,7 @@ function toDependencyInput(legs: ScopedLeg[]): DependencyRaceInput[] {
 }
 
 export type SyncHomeKuponResult =
-  | { ok: true; skipped?: "POOL_STARTED"; homeKuponId?: string; created?: boolean }
+  | { ok: true; homeKuponId?: string; created?: boolean }
   | { ok: false; skipped?: "NO_ELIGIBLE_RUNNERS" | "RACE_CONDITION" | "CONCURRENT_GENERATION" | "POOL_NOT_FOUND" };
 
 /**
@@ -145,18 +144,13 @@ export async function syncHomeKupon(input: {
   const dateIso = input.date;
   const dateObj = new Date(dateIso + "T00:00:00.000Z");
 
-  // 0) Pool-start freeze — havuz başladıktan sonra HomeKupon değişmez bir tarihsel
-  // kayıttır (bkz. plan PİVOT-2 madde 15d). Bunu değerlendirmek için raceNos'un
-  // saatlerini DB'den okumamız gerekiyor — bu sorgu ZATEN aşağıdaki fresh-read'in
-  // parçası, burada TEKRAR ETMEMEK için tek bir okuma yapıp hem freeze hem hash için
-  // kullanıyoruz.
+  // 2026-09-22 kullanıcı kararı — "Pool-start freeze" TAMAMEN KALDIRILDI: admin (yetkili
+  // kullanıcı) sistemde HER TÜRLÜ değişikliği, havuzun koşuları başlamış/bitmiş olsa BİLE,
+  // istediği an yapabilmeli. Eskiden burada havuz başladıysa senkron tamamen reddediliyordu
+  // ("tarihsel bütünlük" gerekçesiyle) — bu kısıtlama admin'in bilinçli isteğiyle açıkça
+  // kaldırıldı, artık bu fonksiyon ASLA "POOL_STARTED" döndürmüyor.
   const scopedLegs = await getRaceDayLegsForRaceNos(baseHippodromeName, dateObj, input.raceNos);
   if (scopedLegs.length === 0) return { ok: false, skipped: "POOL_NOT_FOUND" };
-
-  const startTime = poolStartTime(dateIso, scopedLegs.map((l) => l.time));
-  if (startTime && Date.now() >= startTime.getTime()) {
-    return { ok: true, skipped: "POOL_STARTED" };
-  }
 
   const optimizerConfig = optimizerConfigFor(baseHippodromeName, input.slot);
   const startHash = dependencyHashForRace(toDependencyInput(scopedLegs), optimizerConfig);
@@ -482,34 +476,6 @@ export async function publishHomeKupon(input: HomeKuponInput): Promise<SyncHomeK
     raceNos: input.raceNos,
     manualOverrides: input.manualOverrides,
   });
-}
-
-export async function setActiveHomeKupon(id: string) {
-  await requireRole("EDITOR");
-
-  const target = await db.homeKupon.findUnique({ where: { id }, select: { slot: true, hippodromeName: true } });
-  if (!target) return;
-
-  await db.$transaction([
-    // Sadece AYNI hipodromun aynı slotu devre dışı kalır — bkz. publishHomeKupon.
-    db.homeKupon.updateMany({
-      where: { isActive: true, slot: target.slot, hippodromeName: target.hippodromeName },
-      data: { isActive: false },
-    }),
-    db.homeKupon.update({ where: { id }, data: { isActive: true } }),
-  ]);
-
-  revalidatePath("/");
-  revalidatePath("/admin/kupon");
-}
-
-export async function deactivateHomeKupon(id: string) {
-  await requireRole("EDITOR");
-
-  await db.homeKupon.update({ where: { id }, data: { isActive: false } });
-
-  revalidatePath("/");
-  revalidatePath("/admin/kupon");
 }
 
 export async function deleteHomeKupon(id: string) {
