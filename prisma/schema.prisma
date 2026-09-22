@@ -164,12 +164,32 @@ model RaceDay {
 
   hippodrome Hippodrome @relation(fields: [hippodromeId], references: [id])
   races      Race[]
+  agfSyncState AgfSyncState?
 
   @@unique([date, hippodromeId])
   // 2026-08-13 — Supabase lint uyarısı (unindexed foreign key) üzerine doğrudan
   // veritabanında (Supabase SQL editörü) eklendi; burada yalnız şemayı gerçek
   // durumla senkron tutmak için tanımlandı — prisma migrate ÇALIŞTIRILMADI.
   @@index([hippodromeId], map: "ix_RaceDay_hippodromeId")
+}
+
+// 2026-09-22 — AGF soğuma (cooldown) durumu artık BURADA takip ediliyor, AgfSnapshot'ın
+// KENDİSİNDEN değil (kullanıcı bulgusu, P0 performans+correctness düzeltmesi): eski mantık
+// "AGF DEĞİŞTİ Mİ" (yalnız değer ≥0.01 değiştiğinde AgfSnapshot yazılıyor) ile "AGF'Yİ EN
+// SON NE ZAMAN BAŞARIYLA KONTROL ETTİM" ayrımını karıştırıyordu — AGF sakin bir dönemde
+// hiçbir zaman yeni snapshot yazılmadığı için soğuma HİÇ tetiklenmiyor, her analiz TJK'ya
+// gereksiz bir ağ isteği (4-8sn) atıyordu. Artık: lastSuccessAt yalnız TJK sync GERÇEKTEN
+// başarıyla tamamlandığında ilerler (AGF değişmiş olsun olmasın) — lastAttemptAt her
+// denemede ilerler (başarısız olsa bile), böylece bir sonraki çağrı en azından DENEMENİN
+// yapıldığını görür. raceDayId bazlı (hipodrom+gün) — eski AgfSnapshot sorgusuyla AYNI kapsam.
+model AgfSyncState {
+  raceDayId     String    @id
+  lastAttemptAt DateTime?
+  lastSuccessAt DateTime?
+  lastChangeAt  DateTime? // en son AGF DEĞERİ gerçekten değiştiğinde (>=1 runner)
+  lastStatus    String?   // "ok" | "no_city_match" | "error: ..." — yalnız gözlemlenebilirlik için
+
+  raceDay RaceDay @relation(fields: [raceDayId], references: [id], onDelete: Cascade)
 }
 
 model Race {
