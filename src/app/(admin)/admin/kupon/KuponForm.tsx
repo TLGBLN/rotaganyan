@@ -77,9 +77,23 @@ function statikAyaklariBul(races: RaceDayData["races"], selections: GroupSelecti
 // burada da admin seçim yaparken görsün diye kırmızı çizgiyle işaretleniyor. `race.runners`
 // artık getRaceDayLegs'ten ZATEN puana göre (yüksekten düşüğe) sıralı geliyor — bkz.
 // home-kupon.actions.ts, 2026-09-09 düzeltmesi (eskiden Pick.rank'e göreydi, puan tablosuyla
-// tutarsızlık yaratıyordu). Çekilen (scratched) at kümülatif toplama katkı vermiyor.
+// tutarsızlık yaratıyordu).
+//
+// 2026-09-22 kullanıcı bulgusu (Ankara 1. Koşu — kupon oluşturma ekranı "İlk 3: %61"
+// gösterirken /admin/kupon analiz listesi AYNI koşu için "İlk 3: %70 ✓" gösteriyordu):
+// eski implementasyon `sirali.slice(0, n)` ile RAW (koşmaz dahil) diziliş sırasındaki
+// SABİT bir pencere alıyor, pencere içine bir koşmaz at düşerse onun katkısını 0
+// sayıyor ama pencereyi bir sonraki gerçek (koşmaz olmayan) ata GENİŞLETMİYORDU — bu
+// yüzden "İlk 3" ayracı 3. sırada koşmaz bir at varsa gerçek top-3'ü değil, yalnız 2
+// gerçek atı topluyordu (48.0+13.0=61, oysa gerçek top-3 eligible toplamı 48.0+13.0+
+// 9.4=70.4). Doğrusu: önce koşmaz atları TAMAMEN çıkar, SONRA ilk N'i topla — pencere
+// sabit pozisyon değil, sabit "eligible sayısı" olmalı (aşağıdaki JSX'teki ayraç
+// tetikleyicisi de aynı mantıkla eligible-sayaç kullanacak şekilde güncellendi).
 function kumulatifToplam(sirali: RaceRunner[], n: number): number {
-  return sirali.slice(0, n).reduce((acc, r) => acc + (r.scratched ? 0 : r.score ?? 0), 0);
+  return sirali
+    .filter((r) => !r.scratched)
+    .slice(0, n)
+    .reduce((acc, r) => acc + (r.score ?? 0), 0);
 }
 
 // 2026-09-13 kullanıcı bulgusu (İstanbul K5) — bkz. kupon-optimizer.ts'teki eküri-birimi
@@ -176,6 +190,14 @@ function KuponGrup({
                       <div className="flex flex-col gap-1">
                         {sirali.map((runner, idx) => {
                           const checked = sel[width].has(runner.no);
+                          // Ayracı RAW pozisyona (idx) değil, o satıra kadarki GERÇEK
+                          // (koşmaz olmayan) at sayısına göre yerleştir — bkz.
+                          // kumulatifToplam yorumu.
+                          const eligibleUpToHere = sirali.slice(0, idx + 1).filter((r) => !r.scratched).length;
+                          const showDivider =
+                            !runner.scratched &&
+                            (eligibleUpToHere === 3 || eligibleUpToHere === 6) &&
+                            idx + 1 < sirali.length;
                           return (
                             <div key={runner.no}>
                               <button
@@ -226,21 +248,21 @@ function KuponGrup({
                                   </span>
                                 ) : null}
                               </button>
-                              {(idx === 2 || idx === 5) && sirali.length > idx + 1 && (() => {
+                              {showDivider && (() => {
                                 // 2026-09-10 kullanıcı talebi: ayraç eşik altındaysa kırmızı,
                                 // eşik ve üstündeyse yeşil olsun — RaceAdviceCard'daki rozetle
                                 // AYNI paylaşılan eşiklerden (kapsam-esikleri.ts) besleniyor.
-                                const esik = idx === 2 ? KAPSAM_ESIK_ILK3 : KAPSAM_ESIK_ILK6;
-                                const toplam = kumulatifToplam(sirali, idx + 1);
+                                const esik = eligibleUpToHere === 3 ? KAPSAM_ESIK_ILK3 : KAPSAM_ESIK_ILK6;
+                                const toplam = kumulatifToplam(sirali, eligibleUpToHere);
                                 const yeterli = toplam >= esik;
                                 return (
                                   <div
                                     className="my-1 flex items-center gap-1.5 px-0.5"
-                                    title={`İlk ${idx + 1} atın modele göre toplam kazanma olasılığı — eşik ≥%${esik}`}
+                                    title={`İlk ${eligibleUpToHere} (koşmaz hariç) atın modele göre toplam kazanma olasılığı — eşik ≥%${esik}`}
                                   >
                                     <div className={cn("h-px flex-1", yeterli ? "bg-hit/50" : "bg-red-500/50")} />
                                     <span className={cn("shrink-0 text-[9px] font-bold tabular-nums", yeterli ? "text-hit" : "text-red-500")}>
-                                      İlk {idx + 1}: %{Math.round(toplam)} {yeterli ? "✓" : `(eşik ≥%${esik})`}
+                                      İlk {eligibleUpToHere}: %{Math.round(toplam)} {yeterli ? "✓" : `(eşik ≥%${esik})`}
                                     </span>
                                     <div className={cn("h-px flex-1", yeterli ? "bg-hit/50" : "bg-red-500/50")} />
                                   </div>
