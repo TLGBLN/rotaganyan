@@ -1719,7 +1719,7 @@ export default function ProgramView({
                   key={r.raceNo}
                   onClick={() => setActiveRace((prev) => ({ ...prev, [currentDay.hippodromeSlug]: r.raceNo }))}
                   className={cn(
-                    "relative px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap border border-background sm:border-0 sm:shrink-0",
+                    "relative px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap border border-background sm:shrink-0",
                     SURFACE_TAB_BG[r.surface],
                     selectedRaceNo(currentDay) === r.raceNo
                       ? "ring-2 ring-inset ring-white shadow-inner"
