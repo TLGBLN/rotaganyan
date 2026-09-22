@@ -230,49 +230,118 @@ export async function fetchHorseDetailedStats(atId: number): Promise<HorseDetail
  * gitmemeli") kalıcı tablolara yazar. İki önbellek AYRI AYRI taze/bayat kontrol edilir —
  * biri taze biri bayatsa yalnız bayat olan yeniden çekilir, gereksiz TJK isteği yapılmaz.
  */
+// 2026-09-22 kullanıcı kararı (V5.46 LIVE audit'te bulunan kök neden — FAZ E'de 67
+// runner'ın %94'ü CACHE_STALE çıktı): tek staleDays=3 hedefiyle TÜM at popülasyonunu
+// (4838) 3 günde bir tazelemek, günlük limit=250 bütçesiyle yapısal olarak imkânsız
+// (gereken ~1613/gün, mevcut kapasite ~6.5 kat yetersiz — ölçüldü, bkz. proje hafızası).
+// Çözüm: TÜM atları eşit önceliksiz tek kuyrukta yenilemek yerine, "yakında koşacak
+// atlar" için ÇOK daha sıkı bir tazelik hedefi, "uzun süredir koşmayan atlar" için ÇOK
+// daha gevşek bir hedef kullanmak — aynı günlük bütçeyle, modelin GERÇEKTEN önemsediği
+// atları güncel tutar (HOT tier küçük, ~50-150 at/gün — tüm 250 bütçeyle rahatça her gün
+// tazelenir), COLD tier'ın gevşetilmesi (14 gün) WARM tier'a daha fazla bütçe bırakır.
+const HOT_UPCOMING_WINDOW_MS = 2 * 86_400_000; // önümüzdeki 48 saat içinde koşacak
+const WARM_RECENT_ACTIVITY_MS = 60 * 86_400_000; // son 60 günde en az 1 koşu
+const STALE_DAYS_HOT = 1;
+const STALE_DAYS_WARM = 3;
+const STALE_DAYS_COLD = 14;
+
+type Tier = "HOT" | "WARM" | "COLD";
+
 export async function syncHorseStatsCache(
   limit = 250,
-  staleDays = 3
-): Promise<{ ok: number; fail: number; remaining: number }> {
+  _staleDaysLegacy = 3 // artık tier-bazlı hesaplanıyor, parametre geriye-uyumluluk için duruyor ama kullanılmıyor
+): Promise<{
+  ok: number; fail: number; remaining: number;
+  tierCounts: Record<Tier, number>;
+  staleBuckets: { over3d: number; over7d: number; over14d: number };
+}> {
   const { db } = await import("@/lib/db");
   const { refreshTjkAtKosuBilgileri } = await import("./tjk-at-performans.adapter");
 
-  const allRunners = await db.runner.findMany({
-    where: { tjkAtId: { not: null } },
-    select: { tjkAtId: true },
-    distinct: ["tjkAtId"],
-  });
-  const allIds = allRunners.map((r) => r.tjkAtId!).filter((id) => id != null);
-  if (allIds.length === 0) return { ok: 0, fail: 0, remaining: 0 };
+  const now = Date.now();
+  const hotCutoff = new Date(now + HOT_UPCOMING_WINDOW_MS);
+  const warmCutoff = new Date(now - WARM_RECENT_ACTIVITY_MS);
 
-  const staleCutoff = new Date(Date.now() - staleDays * 86_400_000);
+  // Her tjkAtId için TÜM runner-satırlarını (distinct DEĞİL) çekip JS'te grupla — bir
+  // fiziksel atın HOT/WARM durumu, o atın TÜM koşu geçmişine bakılarak belirlenmeli,
+  // distinct ile rastgele TEK bir satıra bakmak (ör. çok eski bir koşusu) yanlış tier verir.
+  const allRunnerRows = await db.runner.findMany({
+    where: { tjkAtId: { not: null } },
+    select: {
+      tjkAtId: true,
+      race: { select: { result: { select: { id: true } }, raceDay: { select: { date: true } } } },
+    },
+  });
+
+  const tierByHorse = new Map<number, Tier>();
+  for (const row of allRunnerRows) {
+    const id = row.tjkAtId!;
+    const raceDate = row.race.raceDay.date;
+    const sonuclanmadi = !row.race.result;
+    let tier: Tier = "COLD";
+    if (sonuclanmadi && raceDate.getTime() <= hotCutoff.getTime() && raceDate.getTime() >= now - 86_400_000) tier = "HOT";
+    else if (raceDate.getTime() >= warmCutoff.getTime()) tier = "WARM";
+    // Bir at birden fazla satırda görünebilir — en yüksek öncelikli tier kazanır (HOT>WARM>COLD)
+    const mevcut = tierByHorse.get(id);
+    if (!mevcut || tierRank(tier) > tierRank(mevcut)) tierByHorse.set(id, tier);
+  }
+  function tierRank(t: Tier): number { return t === "HOT" ? 2 : t === "WARM" ? 1 : 0; }
+
+  const allIds = [...tierByHorse.keys()];
+  if (allIds.length === 0) return { ok: 0, fail: 0, remaining: 0, tierCounts: { HOT: 0, WARM: 0, COLD: 0 }, staleBuckets: { over3d: 0, over7d: 0, over14d: 0 } };
+
+  const staleDaysByTier: Record<Tier, number> = { HOT: STALE_DAYS_HOT, WARM: STALE_DAYS_WARM, COLD: STALE_DAYS_COLD };
   const MAX_ATTEMPTS = 3;
-  const [freshStats, freshHistory, givenUp, existingStats, existingHistory] = await Promise.all([
-    db.horseStatsCache.findMany({ where: { tjkAtId: { in: allIds }, updatedAt: { gte: staleCutoff } }, select: { tjkAtId: true } }),
-    db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: allIds }, updatedAt: { gte: staleCutoff } }, select: { tjkAtId: true } }),
+  const [allStats, allHistory, givenUp] = await Promise.all([
+    db.horseStatsCache.findMany({ where: { tjkAtId: { in: allIds } }, select: { tjkAtId: true, updatedAt: true } }),
+    db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: allIds } }, select: { tjkAtId: true, updatedAt: true } }),
     db.horseSyncFailure.findMany({ where: { tjkAtId: { in: allIds }, attempts: { gte: MAX_ATTEMPTS } }, select: { tjkAtId: true } }),
-    db.horseStatsCache.findMany({ where: { tjkAtId: { in: allIds } }, select: { tjkAtId: true } }),
-    db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: allIds } }, select: { tjkAtId: true } }),
   ]);
-  const freshStatsIds = new Set(freshStats.map((h) => h.tjkAtId));
-  const freshHistoryIds = new Set(freshHistory.map((h) => h.tjkAtId));
+  const statsUpdatedById = new Map(allStats.map((h) => [h.tjkAtId, h.updatedAt]));
+  const historyUpdatedById = new Map(allHistory.map((h) => [h.tjkAtId, h.updatedAt]));
   const givenUpIds = new Set(givenUp.map((h) => h.tjkAtId));
-  const existingStatsIds = new Set(existingStats.map((h) => h.tjkAtId));
-  const existingHistoryIds = new Set(existingHistory.map((h) => h.tjkAtId));
-  // Israrla (MAX_ATTEMPTS kez) başarısız olan atlar taramadan tamamen çıkarılır — kullanıcı
-  // talimatı 2026-07-30: "ısrarla başarısız olanları atla". Sessizce değil: HorseSyncFailure
-  // tablosunda görünür kalırlar, gerçek bir TJK eksikliği mi yoksa geçici mi ayrıca incelenebilir.
-  const needsSyncAll = allIds.filter((id) => !givenUpIds.has(id) && (!freshStatsIds.has(id) || !freshHistoryIds.has(id)));
-  // 2026-08-30 kullanıcı bulgusu: /admin/veri-tamligi'de "At profil önbelleği" 2026-08-24'ten
-  // itibaren gerçek bir bozulma gösterdi (bug değil — backlog büyüklüğü). Toplam 4293 attan
-  // 3945'i "bayat" (3+ gün önce güncellenmiş, staleDays yenileme mantığı) — günde 150 işlenince
-  // bu kuyruk ~26 gün sürüyor. TAMAMEN eksik (hiç satırı olmayan, dashboard'da "eksik" sayılan)
-  // atlar, findMany'nin (orderBy yok) rastgele sırasında bu devasa bayat kuyruğunun arkasında
-  // kalıp süresiz aç kalabiliyordu. Artık aynı günlük bütçe içinde önce tamamen eksik olanlar
-  // işlenir, kalan bütçe bayat-yenilemeye gider — yük artmaz, yalnız öncelik doğru sıralanır.
-  const tamamenEksik = needsSyncAll.filter((id) => !existingStatsIds.has(id) || !existingHistoryIds.has(id));
-  const sadeceBayat = needsSyncAll.filter((id) => existingStatsIds.has(id) && existingHistoryIds.has(id));
-  const needsSync = [...tamamenEksik, ...sadeceBayat];
+
+  // Kendi tier'ının staleDays hedefine göre taze mi — sabit tek eşik yerine tier-bazlı.
+  function freshFor(id: number, updatedAt: Date | undefined, tier: Tier): boolean {
+    if (!updatedAt) return false;
+    const cutoff = now - staleDaysByTier[tier] * 86_400_000;
+    return updatedAt.getTime() >= cutoff;
+  }
+
+  const needsSyncAll = allIds.filter((id) => {
+    if (givenUpIds.has(id)) return false;
+    const tier = tierByHorse.get(id)!;
+    return !freshFor(id, statsUpdatedById.get(id), tier) || !freshFor(id, historyUpdatedById.get(id), tier);
+  });
+
+  // Öncelik sırası: 1) HOT (yakında koşacak — model için en kritik), 2) WARM (aktif),
+  // 3) COLD (uzun süredir pasif) — her katmanın İÇİNDE, hiç cache'i olmayanlar
+  // ("tamamen eksik") bayat-ama-var-olanlardan önce gelir (2026-08-30'daki mevcut
+  // önceliklendirme deseniyle AYNI, yalnız artık tier ÜSTTE bir kademe daha var).
+  function tamamenEksikMi(id: number): boolean { return !statsUpdatedById.has(id) || !historyUpdatedById.has(id); }
+  const gruplar: Record<Tier, number[]> = { HOT: [], WARM: [], COLD: [] };
+  for (const id of needsSyncAll) gruplar[tierByHorse.get(id)!].push(id);
+  const needsSync = (["HOT", "WARM", "COLD"] as Tier[]).flatMap((tier) => {
+    const ids = gruplar[tier];
+    const eksik = ids.filter(tamamenEksikMi);
+    const bayat = ids.filter((id) => !tamamenEksikMi(id));
+    return [...eksik, ...bayat];
+  });
+
+  // Self-reporting — "cron yeşil ama sistem aslında büyük ölçüde stale" durumunun bir
+  // daha sessizce gizlenmemesi için (kullanıcı talebi 2026-09-22).
+  const tierCounts: Record<Tier, number> = { HOT: gruplar.HOT.length, WARM: gruplar.WARM.length, COLD: gruplar.COLD.length };
+  const staleBuckets = { over3d: 0, over7d: 0, over14d: 0 };
+  for (const id of allIds) {
+    const oldest = [statsUpdatedById.get(id), historyUpdatedById.get(id)]
+      .filter((d): d is Date => !!d)
+      .reduce((min, d) => (d.getTime() < min.getTime() ? d : min), new Date(now));
+    const hasAny = statsUpdatedById.has(id) || historyUpdatedById.has(id);
+    const ageMs = hasAny ? now - oldest.getTime() : Infinity;
+    if (ageMs > 3 * 86_400_000) staleBuckets.over3d++;
+    if (ageMs > 7 * 86_400_000) staleBuckets.over7d++;
+    if (ageMs > 14 * 86_400_000) staleBuckets.over14d++;
+  }
 
   // At başına birden fazla TJK isteği (profil+detay+geçmiş) bazen yavaş/kararsız
   // uç noktalara denk geldiğinde tek tek işlemek çok yavaş kalıyordu (kullanıcı
@@ -286,8 +355,9 @@ export async function syncHorseStatsCache(
     const group = batch.slice(i, i + CONCURRENCY);
     const results = await Promise.allSettled(
       group.map(async (atKodu) => {
-        let statsOk = freshStatsIds.has(atKodu);
-        let historyOk = freshHistoryIds.has(atKodu);
+        const tier = tierByHorse.get(atKodu)!;
+        let statsOk = freshFor(atKodu, statsUpdatedById.get(atKodu), tier);
+        let historyOk = freshFor(atKodu, historyUpdatedById.get(atKodu), tier);
         if (!statsOk) {
           const [profile, detailedStats] = await Promise.all([fetchHorseProfile(atKodu), fetchHorseDetailedStats(atKodu)]);
           if (profile) {
@@ -334,5 +404,5 @@ export async function syncHorseStatsCache(
     }
     await new Promise((r) => setTimeout(r, 350));
   }
-  return { ok, fail, remaining: Math.max(0, needsSync.length - limit) };
+  return { ok, fail, remaining: Math.max(0, needsSync.length - limit), tierCounts, staleBuckets };
 }
