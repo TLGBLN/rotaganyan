@@ -441,6 +441,18 @@ export async function upsertPrediction(input: PredictionInput) {
     }
   });
 
+  // 2026-09-22 — V5.46 LIVE Audit Protocol FAZ sonrası: Forward Coverage Telemetry
+  // (bkz. race-coverage-telemetry.service.ts) — cache-mimarisi düzeltmesinin modele giden
+  // veriyi gerçekten iyileştirdiğini yalnız YENİ tahminlerde, sonuç bilinmeden ölçmek için.
+  after(async () => {
+    try {
+      const { captureRaceCoverageTelemetry } = await import("@/server/services/race-coverage-telemetry.service");
+      await captureRaceCoverageTelemetry(input.raceId);
+    } catch (e) {
+      console.error("[upsertPrediction] captureRaceCoverageTelemetry hata:", e);
+    }
+  });
+
   // Bildirim YALNIZ taslak→yayında GEÇİŞİNDE gönderilir (publishPrediction()'ın eski
   // davranışıyla aynı) — yoksa zaten yayında olan bir analizi her "Kaydet"te (küçük bir
   // düzeltme için bile) yeniden bildirmek kullanıcılara spam gönderirdi.

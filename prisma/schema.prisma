@@ -474,6 +474,42 @@ model PredictionHistory {
   @@index([predictionId])
 }
 
+// 2026-09-22 — V5.46 LIVE Audit Protocol, FAZ E sonrası kullanıcı kararı: cache-mimarisi
+// düzeltmesinin (HOT/WARM/COLD, bkz. syncHorseStatsCache) modele giden veriyi GERÇEKTEN
+// iyileştirip iyileştirmediği yalnız FORWARD (yayından SONRAKİ, yeni) yarışlarda, tahmin
+// anında (sonuç bilinmeden) ölçülerek kanıtlanabilir — geçmişe dönük FAZ E yeniden-ölçümü
+// bunu göstermez (bkz. proje hafızası: PRE_FIX_BASELINE dondurulmuş, tekrar hesaplanmıyor).
+// Bir Prediction YAYINLANDIĞI anda (upsertPrediction, after() ile bloklamayan) bir satır
+// yazılır — Prediction'ın kendisi DEĞİŞTİRİLMEDEN, ayrı bir gözlem kaydı.
+model RaceCoverageTelemetry {
+  id                  String   @id @default(cuid())
+  raceId              String
+  predictionCreatedAt DateTime
+  raceDate            DateTime
+  hippodrome          String
+  raceClass           String
+  classTypeGroup      String
+  fieldSize           Int
+  // Yarış Gidişatı (yarisGidisatiSkoru) coverage — HAM usableAccuraceCount>=3 üzerinden,
+  // ASLA contribution'dan (β×z) türetilmez (bkz. FAZ A.1 dersi).
+  ygActiveRunnerCount Int
+  ygCoverageRatio     Float // ygActiveRunnerCount / fieldSize — saha büyüklüğü farkını gizlemesin diye bucket'a EK
+  ygStatus            String // "NONE" | "LOW" | "PARTIAL" | "FULL"
+  // Bu yarıştaki runner'ların KENDİ cache'lerinin (HorseStatsCache/HorseRaceHistoryCache)
+  // tazelik durumu — cache-mimarisi düzeltmesinin bu SPESİFİK yarışa gerçekten ulaşıp
+  // ulaşmadığının doğrudan kanıtı.
+  cacheFreshCount     Int
+  cacheStaleCount     Int
+  // Runner bazında detay: [{horse, tjkAtId, usableAccuraceCount, cacheUpdatedAt,
+  // cacheAgeHours, sourceObserved, productionEligible}]
+  runnersJson         Json
+  createdAt           DateTime @default(now())
+
+  @@index([raceDate])
+  @@index([classTypeGroup])
+  @@index([raceId])
+}
+
 model Pick {
   id             String         @id @default(cuid())
   predictionId   String
