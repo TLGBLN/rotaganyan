@@ -483,8 +483,6 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
       });
       if (res?.skipped === "POOL_STARTED") {
         toast.warning(`${label}: havuz zaten başladı, artık değiştirilemez.`);
-      } else if (res?.skipped === "UNCHANGED") {
-        toast.info(`${label}: zaten güncel, değişiklik yayınlanmadı.`);
       } else if (res?.ok === false) {
         toast.error(`${label} yayınlanamadı — lütfen tekrar deneyin (context eşzamanlı değişmiş olabilir).`);
       } else {

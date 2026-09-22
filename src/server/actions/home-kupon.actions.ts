@@ -124,7 +124,7 @@ function toDependencyInput(legs: ScopedLeg[]): DependencyRaceInput[] {
 }
 
 export type SyncHomeKuponResult =
-  | { ok: true; skipped?: "POOL_STARTED" | "UNCHANGED"; homeKuponId?: string; reactivated?: boolean; created?: boolean }
+  | { ok: true; skipped?: "POOL_STARTED"; homeKuponId?: string; created?: boolean }
   | { ok: false; skipped?: "NO_ELIGIBLE_RUNNERS" | "RACE_CONDITION" | "CONCURRENT_GENERATION" | "POOL_NOT_FOUND" };
 
 /**
@@ -165,34 +165,13 @@ export async function syncHomeKupon(input: {
   const overridesHash = manualOverridesHash(manualOverrides);
   const key = computeBuildKey(input.hippodromeName, input.slot, dateIso, startHash, overridesHash);
 
-  // 5) Cheap idempotency ön-eleme — bu generation ZATEN üretilmiş mi?
-  const existing = await db.homeKupon.findUnique({ where: { buildKey: key } });
-  if (existing) {
-    if (existing.isActive) return { ok: true, skipped: "UNCHANGED", homeKuponId: existing.id };
-
-    // İNAKTİF bir eşleşme bulundu — reactivate'ten HEMEN ÖNCE TOCTOU kontrolü (PİVOT-2
-    // madde 15b): context bu aradan geçen sürede DEĞİŞMEDİ mi?
-    const recheckLegs = await getRaceDayLegsForRaceNos(baseHippodromeName, dateObj, input.raceNos);
-    const currentHashForReactivate = dependencyHashForRace(toDependencyInput(recheckLegs), optimizerConfig);
-    if (currentHashForReactivate !== startHash) {
-      return { ok: false, skipped: "RACE_CONDITION" };
-    }
-    try {
-      await db.$transaction([
-        db.homeKupon.updateMany({
-          where: { isActive: true, hippodromeName: input.hippodromeName, date: dateObj, slot: input.slot, id: { not: existing.id } },
-          data: { isActive: false },
-        }),
-        db.homeKupon.update({ where: { id: existing.id }, data: { isActive: true } }),
-      ]);
-    } catch (e) {
-      if (isUniqueConstraintViolation(e)) return { ok: false, skipped: "CONCURRENT_GENERATION" };
-      throw e;
-    }
-    revalidatePath("/");
-    revalidatePath("/admin/kupon");
-    return { ok: true, homeKuponId: existing.id, reactivated: true };
-  }
+  // 2026-09-22 kullanıcı kararı — idempotency ön-eleme ("buildKey zaten var, no-op say")
+  // TAMAMEN KALDIRILDI: admin manuel bir düzenleme yapıp "Kupon Oluştur"a her bastığında
+  // (aynı buildKey üretse BİLE) YENİDEN üretilip yayınlanmalı — eski "UNCHANGED" davranışı
+  // admin'in bilinçli tekrar-yayın isteğini sessizce engelliyordu. isActive/pasif kavramı
+  // da kaldırıldı — bir havuz için DAİMA yalnız TEK satır tutulur (aşağıdaki atomik
+  // transaction eski satır(lar)ı SİLER, yeni satırı oluşturur); public sorgular yalnız
+  // "bu pool için satır var mı" bakar, isActive filtresi artık biçimsel (her zaman true).
 
   // 6) effectiveOverrides — yalnız DP çağrısı için, DB'ye YAZILMAZ (PİVOT-2 madde 13).
   const eligibleNosByRaceNo: Record<number, Set<number>> = {};
@@ -252,13 +231,15 @@ export async function syncHomeKupon(input: {
     return { ok: false, skipped: "RACE_CONDITION" };
   }
 
-  // 11) Atomik swap — buildKey @unique VE homekupon_one_active_per_pool kısmi index'i
-  // (raw SQL, bkz. plan) EŞZAMANLI farklı generation'lara karşı korur.
+  // 11) Atomik swap — 2026-09-22 kullanıcı kararı: eski satır(lar) artık isActive:false
+  // olarak SAKLANMIYOR, gerçekten SİLİNİYOR (yalnız son yayınlanan kalır). buildKey @unique
+  // VE homekupon_one_active_per_pool kısmi index'i (raw SQL, bkz. plan) EŞZAMANLI farklı
+  // generation'lara karşı hâlâ korur (partial index isActive:true'ya göre kurulu, yeni
+  // satır her zaman isActive:true olduğu için koruma AYNEN geçerli).
   try {
     const created = await db.$transaction(async (tx) => {
-      await tx.homeKupon.updateMany({
-        where: { isActive: true, hippodromeName: input.hippodromeName, date: dateObj, slot: input.slot },
-        data: { isActive: false },
+      await tx.homeKupon.deleteMany({
+        where: { hippodromeName: input.hippodromeName, date: dateObj, slot: input.slot },
       });
       return tx.homeKupon.create({
         data: {
