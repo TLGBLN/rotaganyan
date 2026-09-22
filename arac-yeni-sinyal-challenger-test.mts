@@ -41,7 +41,12 @@ const DATA_PATH =
 // bırak — V5 motoru fiilen 2026-08-16'da canlıya alındı (engine-versions.data.ts), o
 // tarihten ÖNCEki koşularda Faz1 hesaplama hattı FARKLIYDI, "V5.46 + yeni sinyal" testine
 // karışmamalı. Eskiden 2026-07-01 idi (V2 dönemini de içine alıyordu — yanlıştı).
-const COVERAGE_START_DATE = "2026-08-16";
+// 2026-09-22 kullanıcı talebi — env ile override edilebilir (additive, varsayılan davranış
+// DEĞİŞMEDİ): arac-model-veri-olustur.mts eski Prediction/Pick kayıtlarından OKUMUYOR,
+// bugünkü V5.46 fonksiyonlarını ham DB verisine uygulayarak TÜM tarihleri tek tip yeniden
+// hesaplıyor — bu yüzden "eski Faz1 hattı" karışması riski taşımayan araştırma testleri
+// (ör. jokeyFormDegisimiZ) için bu sınırı genişletmek meşru olabilir, dosya elle değiştirilmeden.
+const COVERAGE_START_DATE = process.env.COVERAGE_START_OVERRIDE ?? "2026-08-16";
 const SEED = 5462026;
 
 // ─── Ham satır tipi (model-veri-yeni-adaylar.json) — GERÇEK alan listesi (arac ile
@@ -641,7 +646,23 @@ const HizZamanAgirlikli: Aday = {
   dahilMi: (runners) => runners.map((r) => r.hizPerRaceVarMi === true),
 };
 
-const ADAYLAR: Aday[] = [DrawPct2, DrawFrontRunFit, DrawFieldSizeFit, DrawVirajFit];
+// 2026-09-22 kullanıcı talebi — J1: jokeyFormDegisimiZ (bkz. arac-jokey-form-generator.mts/
+// arac-jokey-form-rapor.mts). D-1 as-of, 90/275 gün pencereli, jockey-neutral residual Z-skoru
+// — Runner.tjkJokeyId (Faz J0) üzerinden hesaplandı, isim eşleştirme YOK. QC geçmeyen (N90<30/
+// N275<60/E90<2/E275<4) satırlarda null (dahilMi=false, standardizasyonu kirletmez).
+// İki varyant: A=AGF dahil, B=market-blind (AGF katkıları da çıkarılmış).
+const JokeyFormDegisimiZ_A: Aday = {
+  ad: "JokeyFormDegisimiZ_AGFDahil",
+  hesapla: (runners) => runners.map((r) => (typeof r.jokeyFormDegisimiZ_A === "number" ? r.jokeyFormDegisimiZ_A : 0)),
+  dahilMi: (runners) => runners.map((r) => r.jokeyFormQcPass === true && typeof r.jokeyFormDegisimiZ_A === "number"),
+};
+const JokeyFormDegisimiZ_B: Aday = {
+  ad: "JokeyFormDegisimiZ_MarketBlind",
+  hesapla: (runners) => runners.map((r) => (typeof r.jokeyFormDegisimiZ_B === "number" ? r.jokeyFormDegisimiZ_B : 0)),
+  dahilMi: (runners) => runners.map((r) => r.jokeyFormQcPass === true && typeof r.jokeyFormDegisimiZ_B === "number"),
+};
+
+const ADAYLAR: Aday[] = [JokeyFormDegisimiZ_A, JokeyFormDegisimiZ_B];
 const SIRE_ORTUSME_ADAYLARI: Aday[] = [NoOp, PedigreeSurfaceAffinity, PedigreeSurfaceAffinity_LowExp];
 // H1 (mevcut, Row.zeminToleransi zaten V5.46 skoruna dahil — ayrı test gerekmez) referans
 // alınarak yalnız H2/H3, hem NORMAL V5.46 üzerinden (additive) hem zeminHaric (replacement)

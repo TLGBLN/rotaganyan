@@ -13,6 +13,10 @@ const IN_PATH =
   "C:\\Users\\tlgbi\\AppData\\Local\\Temp\\claude\\c--Users-tlgbi-OneDrive-Belgeler-Rota\\76598f4f-31f1-4414-a3f6-fbab0aab98d4\\scratchpad\\jokey-form-dataset.json";
 const OUT_PATH =
   "C:\\Users\\tlgbi\\AppData\\Local\\Temp\\claude\\c--Users-tlgbi-OneDrive-Belgeler-Rota\\76598f4f-31f1-4414-a3f6-fbab0aab98d4\\scratchpad\\jokey-form-rapor.json";
+// 2026-09-22 — challenger test'e (arac-yeni-sinyal-challenger-test.mts) beslemek için TAM
+// satır-bazlı çıktı (yalnız aggregate rapor değil) — her ride için xA/xB/qcPass.
+const ROWS_OUT_PATH =
+  "C:\\Users\\tlgbi\\AppData\\Local\\Temp\\claude\\c--Users-tlgbi-OneDrive-Belgeler-Rota\\76598f4f-31f1-4414-a3f6-fbab0aab98d4\\scratchpad\\jokey-form-rows.json";
 
 const N90_MIN = 30, N275_MIN = 60, E90_MIN = 2, E275_MIN = 4;
 const GUN_MS = 24 * 60 * 60 * 1000;
@@ -202,6 +206,15 @@ async function main() {
 
   writeFileSync(OUT_PATH, JSON.stringify(rapor, null, 2));
   console.log(`\nRapor kaydedildi: ${OUT_PATH}`);
+
+  // Tam satır-bazlı çıktı — raceId/runnerId ile challenger test verisine merge edilecek.
+  const rowsOut = sonuclar.map((s) => ({
+    raceId: s.raceId, runnerId: s.runnerId, tjkJokeyId: s.tjkJokeyId, date: s.date,
+    xA: s.qcPass ? s.xA : null, xB: s.qcPass ? s.xB : null, qcPass: s.qcPass,
+  }));
+  writeFileSync(ROWS_OUT_PATH, JSON.stringify(rowsOut));
+  console.log(`Satır-bazlı çıktı kaydedildi: ${ROWS_OUT_PATH} (${rowsOut.length} satır)`);
+
   console.log(JSON.stringify(rapor, null, 2));
 }
 main().catch((e) => { console.error(e); process.exit(1); });
