@@ -1706,9 +1706,10 @@ export default function ProgramView({
 
       {currentDay && (
         <>
-          {/* Koşu tab'ları + Pist durumu/hava — 2026-09-20 kullanıcı talebi: web'de (sm+)
-              aynı satırda, dar mobilde eskisi gibi alt alta. */}
-          <div className="flex flex-col border-b bg-background shrink-0 print:hidden sm:flex-row sm:items-center">
+          {/* Koşu tab'ları + Pist durumu/hava — 2026-09-22 kullanıcı talebi: ekran
+              boyutundan bağımsız, pist durumu/hava HER ZAMAN koşu sekmelerinin hemen
+              altında (eskiden sm+'ta aynı satırda yan yanaydı). */}
+          <div className="flex flex-col border-b bg-background shrink-0 print:hidden">
             {/* Koşu tab'ları — 2026-09-22 kullanıcı talebi: mobilde 4 sütunlu grid (satır
                 başına 4 koşu, taşan alt satıra sarar), yatay kaydırma yerine — sm+ (web)
                 eski davranışını (tek satır, gerekirse yatay kaydırma) korur. */}
@@ -1718,7 +1719,7 @@ export default function ProgramView({
                   key={r.raceNo}
                   onClick={() => setActiveRace((prev) => ({ ...prev, [currentDay.hippodromeSlug]: r.raceNo }))}
                   className={cn(
-                    "relative px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap sm:shrink-0",
+                    "relative px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap border border-background sm:border-0 sm:shrink-0",
                     SURFACE_TAB_BG[r.surface],
                     selectedRaceNo(currentDay) === r.raceNo
                       ? "ring-2 ring-inset ring-white shadow-inner"
@@ -1735,7 +1736,7 @@ export default function ProgramView({
 
             {/* Pist durumu + hava (TJK) */}
             {((currentDay.surfaceConditions?.length ?? 0) > 0 || currentDay.weather || currentRace) && (
-              <div className="flex flex-wrap items-center gap-2 border-t bg-muted/10 pl-0 pr-3 py-1.5 text-[11px] sm:border-t-0 sm:border-l sm:bg-transparent sm:pl-3">
+              <div className="flex flex-wrap items-center gap-2 border-t bg-muted/10 pl-0 pr-3 py-1.5 text-[11px]">
                 {currentDay.surfaceConditions?.map((c, i) => (
                   <span
                     key={i}
