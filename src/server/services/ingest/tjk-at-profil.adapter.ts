@@ -247,14 +247,29 @@ const STALE_DAYS_COLD = 14;
 
 type Tier = "HOT" | "WARM" | "COLD";
 
+// 2026-09-22 kullanıcı bulgusu (V5.46 LIVE audit, cron verify): limit=250 ile GERÇEK
+// production ölçümünde 739.0s sürdü — maxDuration=800s'nin yalnız %92'si altında kaldı,
+// tek yavaş bir TJK günü Vercel tarafından SERT kesilmeye (timeout) çok yakın. Limiti
+// körlemesine düşürmek yerine (gerçek TJK gecikmesi günden güne değişebilir), fonksiyon
+// kendi kendine, KENDİ ölçtüğü geçen süreye göre TEMİZ şekilde durur — her yeni
+// CONCURRENCY grubu başlamadan önce bütçe kontrolü, aşıldıysa mevcut ilerleme (tüm
+// upsert'ler zaten commit edilmiş) korunarak çıkılır. Bir sonraki cron çalışması kaldığı
+// yerden (needsSync sırası, tier önceliğiyle) devam eder — veri kaybı YOK, yalnız o
+// turda daha az at işlenir.
+const INTERNAL_RUNTIME_BUDGET_MS = 650_000; // 650s — 800s maxDuration'a 150s güvenlik payı
+
 export async function syncHorseStatsCache(
   limit = 250,
   _staleDaysLegacy = 3 // artık tier-bazlı hesaplanıyor, parametre geriye-uyumluluk için duruyor ama kullanılmıyor
 ): Promise<{
   ok: number; fail: number; remaining: number;
+  durationMs: number;
+  stoppedByTimeBudget: boolean;
   tierCounts: Record<Tier, number>;
+  tierProcessed: Record<Tier, { fresh: number; stale: number }>;
   staleBuckets: { over3d: number; over7d: number; over14d: number };
 }> {
+  const fonksiyonBaslangic = Date.now();
   const { db } = await import("@/lib/db");
   const { refreshTjkAtKosuBilgileri } = await import("./tjk-at-performans.adapter");
 
@@ -288,7 +303,14 @@ export async function syncHorseStatsCache(
   function tierRank(t: Tier): number { return t === "HOT" ? 2 : t === "WARM" ? 1 : 0; }
 
   const allIds = [...tierByHorse.keys()];
-  if (allIds.length === 0) return { ok: 0, fail: 0, remaining: 0, tierCounts: { HOT: 0, WARM: 0, COLD: 0 }, staleBuckets: { over3d: 0, over7d: 0, over14d: 0 } };
+  if (allIds.length === 0) {
+    return {
+      ok: 0, fail: 0, remaining: 0, durationMs: Date.now() - fonksiyonBaslangic, stoppedByTimeBudget: false,
+      tierCounts: { HOT: 0, WARM: 0, COLD: 0 },
+      tierProcessed: { HOT: { fresh: 0, stale: 0 }, WARM: { fresh: 0, stale: 0 }, COLD: { fresh: 0, stale: 0 } },
+      staleBuckets: { over3d: 0, over7d: 0, over14d: 0 },
+    };
+  }
 
   const staleDaysByTier: Record<Tier, number> = { HOT: STALE_DAYS_HOT, WARM: STALE_DAYS_WARM, COLD: STALE_DAYS_COLD };
   const MAX_ATTEMPTS = 3;
@@ -350,9 +372,19 @@ export async function syncHorseStatsCache(
   const CONCURRENCY = 4;
   let ok = 0;
   let fail = 0;
+  let stoppedByTimeBudget = false;
+  const tierProcessed: Record<Tier, { fresh: number; stale: number }> = { HOT: { fresh: 0, stale: 0 }, WARM: { fresh: 0, stale: 0 }, COLD: { fresh: 0, stale: 0 } };
   const batch = needsSync.slice(0, limit);
+  let islenenSayisi = 0;
   for (let i = 0; i < batch.length; i += CONCURRENCY) {
+    // Her yeni grup başlamadan ÖNCE bütçe kontrolü — grup İÇİNDE kesmiyoruz (yarım kalan
+    // bir upsert riski olmasın), yalnız BİR SONRAKİ grubu başlatmıyoruz.
+    if (Date.now() - fonksiyonBaslangic >= INTERNAL_RUNTIME_BUDGET_MS) {
+      stoppedByTimeBudget = true;
+      break;
+    }
     const group = batch.slice(i, i + CONCURRENCY);
+    islenenSayisi += group.length;
     const results = await Promise.allSettled(
       group.map(async (atKodu) => {
         const tier = tierByHorse.get(atKodu)!;
@@ -388,11 +420,14 @@ export async function syncHorseStatsCache(
     for (let j = 0; j < results.length; j++) {
       const r = results[j]!;
       const atKodu = group[j]!;
+      const tier = tierByHorse.get(atKodu)!;
       if (r.status === "fulfilled") {
         ok++;
+        tierProcessed[tier].fresh++;
         await db.horseSyncFailure.deleteMany({ where: { tjkAtId: atKodu } }).catch(() => {});
       } else {
         fail++;
+        tierProcessed[tier].stale++;
         await db.horseSyncFailure
           .upsert({
             where: { tjkAtId: atKodu },
@@ -404,5 +439,7 @@ export async function syncHorseStatsCache(
     }
     await new Promise((r) => setTimeout(r, 350));
   }
-  return { ok, fail, remaining: Math.max(0, needsSync.length - limit), tierCounts, staleBuckets };
+  const durationMs = Date.now() - fonksiyonBaslangic;
+  const remaining = Math.max(0, needsSync.length - islenenSayisi);
+  return { ok, fail, remaining, durationMs, stoppedByTimeBudget, tierCounts, tierProcessed, staleBuckets };
 }
