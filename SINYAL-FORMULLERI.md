@@ -214,6 +214,47 @@ Boş (—) hücreler "hiç ölçülmedi" değil, "bu oturumda BU protokolle yeni
 | Sire Oranı (B) | düşük-şart | 0.0477 (sabit) | [-0.1352,0.2045] | — | — | 0% (her zaman hesaplanır) | 🟡 Kural istisnası, kanıtsız |
 | Zemin+Mesafe (B) | tümü | 0.02 (sabit) | — | — (v6-challenger testinde top3 signStability %89.6, AYNI formül DEĞİL — dikkat) | "diğer" top3 +0.53pp[0.11,1.05] (ON/OFF ablasyon) | %83.3 (tam+kısmi eşleşme yok) | 🟡 PROVISIONAL/deneysel |
 
+## 5a. Source Observability Registry (FAZ A.2, V5.46 LIVE Audit Protocol, 2026-09-22)
+
+**Kanonik ayrım (bu audit'te kesinleşti, kalıcı standart):**
+```
+SOURCE OBSERVED ≠ MODEL ENABLED (productionEligible) ≠ CONTRIBUTION NONZERO
+```
+`gatherFaz1V5Core`'daki (v5-engine.ts) HER sinyalin ham hesaplama noktası tek tek izlenip
+`sourceObserved` (gerçek veri mi, fallback-default mi) sınırı koddan çıkarıldı — contribution'dan
+(β×z) ASLA türetilmedi (bkz. FAZ A.1: nonzero-μ'lü sinyallerde missing-default bile nonzero
+z-score üretiyor, contribution=0 güvenilir bir "veri yok" göstergesi DEĞİL).
+
+| # | Sinyal | `sourceObserved` kuralı (kod satırı) | `defaultUsed` değeri | `productionEligible` | Telemetriye bağlı mı? |
+|---|---|---|---|---|---|
+| 1 | agfSirasi | `r.agf != null` | `sahaOrtasi` (saha/2) | tümü | ❌ |
+| 2 | idmJokey | `gecerliGaloplar.length > 0` | 0 | Handikap'ta β=0 | ❌ |
+| 3 | jokeyOrani | `jockeyStat && jockeyStat.overall.rides > 0` | `JOKEY_POP_ORT*100` (%10) | tümü | ❌ |
+| 4 | antrenorOrani | `trainerStat && trainerStat.rides > 0` | `TRAINER_POP_ORT*100` (%10) | tümü | ❌ |
+| 5 | agfPayi | `r.agf != null` (agfSirasi ile AYNI kaynak) | 0 | tümü | ❌ |
+| 6 | h2hNetSkor | ⚠ **belirsiz** — `h2hNetSkorHesapla` yalnız `skor` döner, "0 karşılaşma" ile "eşit skor" AYNI 0'a düşer (fonksiyon count döndürmüyor, sourceObserved için kod değişikliği gerekir) | 0 | Düşük-Şart'ta β=0 (elle) | ❌ |
+| 7 | hizDerecesi | `hizByNo.has(r.no)` | 0 | Handikap'ta β=0 | ❌ |
+| 8 | agfPayi2 | agfPayi ile AYNI (`r.agf != null`) | 0 | tümü | ❌ |
+| 9 | zeminToleransi | `zeminToleransiByAd.has(r.name)` | 0 | tümü | ❌ |
+| 10 | yakinsama2Plus | ⚠ **kompozit, tek sınır YOK** — 5 alt-bileşenin (pistUzmaniPoz/agfTrendPoz/ajiPoz/sinifDususuPoz/sireTop2Poz) HER BİRİ kendi verisi eksikse sessizce `false`'a düşer, `sayi>=2` eşiği bunu ayırt etmez | 0 | tümü | ❌ |
+| 11 | sonIdmanSprint | `enSonGalop != null` (idmJokey ile AYNI kaynak: `gecerliGaloplar.length>0`) | 0 | tümü | ❌ |
+| 12 | takiDegisikligi | ⚠ **belirsiz** — `sonYaris == null` durumunda `takiEklendiMi`/`takiCikarildiMi` ikisi de sessizce 0'a düşer, "değişiklik yok" ile "veri yok" AYNI kod | 0 | tümü | ❌ |
+| 13 | yarisGidisatiSkoru | `usableAccuraceCount >= 3` (Accurace geçmişi, as-of raceDate) | 0 | Handikap'ta β=0 | ✅ (`RaceCoverageTelemetry`, 2026-09-22'den itibaren canlı) |
+| 14 | Sire (B) | `sireOzet?.kYuzde != null && sireOzet?.ornekKendiVeri != null` | `SIRE_POP_ORT*100*0.5` (%7) | yalnız Düşük-Şart/Hybrid (mask) | ❌ |
+| 15 | ZeminMesafe (B) | `zeminMesafeDeneyimSeviyesi !== "yok"` | 0 (z-score formülünden BAĞIMSIZ, doğrudan kısa devre — bkz. FAZ A.1) | tümü | ❌ |
+
+**Not — 4 sinyalde `sourceObserved` YAPISAL OLARAK belirsiz** (h2hNetSkor, yakinsama2Plus,
+takiDegisikligi + kısmen idmJokey): kod, "veri yok" ile "veri var ama sonuç sıfır/negatif"i
+AYNI dönüş değerine sıkıştırıyor. Bunları netleştirmek üretim kodunda değişiklik gerektirir
+(ör. `h2hNetSkorHesapla`'nın bir `karsilasmaSayisi` alanı da döndürmesi) — bu audit'te
+KOD DEĞİŞTİRİLMEDİ, yalnız belirsizlik tespit edilip kayıt altına alındı.
+
+**Telemetri kapsamı:** Şu an yalnız `yarisGidisatiSkoru` `RaceCoverageTelemetry`'ye canlı
+olarak bağlı (her yayınlanan tahminde otomatik yazılıyor). Diğer 14 mekanizma için
+`sourceObserved` kuralı burada belgelendi ama CANLI ölçülmüyor — DataRichness/
+MissingSignalBurden hesapları (FAZ D'nin coverage-bağımlı bölümleri) bu yüzden şimdilik
+yalnız yarisGidisatiSkoru için güvenilir, diğer 14 sinyal için PROVISIONAL sayılmalı.
+
 ## 6. Bu dosya nasıl güncel tutulur
 
 **KRİTİK DİSİPLİN (2026-09-12 kullanıcı kararı):** Yeni bir sinyal eklendiğinde veya bir katsayı değiştiğinde, YALNIZ §2/§3'teki formül satırı DEĞİL, **§5 Kanıt Matrisi'ndeki satır da AYNI ANDA güncellenmeli.** Biri güncellenip diğeri unutulursa, model zamanla büyüdükçe hangi parçanın kanıtlanmış/istisna/provisional olduğu bilgisi kaybolur — bu, [[feedback_engine_versions_her_degisiklikte]] kuralının BU dosyaya özel uzantısıdır.
