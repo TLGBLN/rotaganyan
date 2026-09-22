@@ -3,8 +3,44 @@
 import { CheckCircle2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
-import type { ProgramRunner } from "@/server/services/race.service";
-import { galopSplits, galopDate, isSameJockey, galopQuality, galopTimeClass, trainingTypeClass } from "./galop-helpers";
+import type { ProgramRunner, ProgramGallop } from "@/server/services/race.service";
+import { galopSplits, galopDate, isSameJockey, galopQuality, galopTimeClass, trainingTypeClass, isInnerTrack, galopTrend } from "./galop-helpers";
+
+type GalopT = ReturnType<typeof useTranslations<"programToolbar">>;
+
+// Galop trendi rozeti — kullanıcı talebi 2026-09-22, revize aynı gün: atın en eski/en
+// yeni 400m finiş split'i kıyaslanır. BİLİNÇLİ KISITLAMA (kullanıcı kararı): bu ham
+// süre kıyası farklı pist/gün/idman bağlamını normalize ETMİYOR — bu yüzden "form
+// yükseliyor/düşüyor" gibi güçlü bir iddia YAPILMAZ, yalnız "400m derecesi hızlanıyor/
+// yavaşlıyor" (literal, doğru) denir. Bağlama göre normalize edilmiş, gerçek "hazırlık
+// trendi" bir araştırma adayı olarak ayrıca değerlendirilecek (bkz. proje hafızası,
+// project_galop_research_v1_backlog.md) — model skoruna DAHİL DEĞİL, yalnız bilgi amaçlı.
+function GalopTrendBadge({ gallops, t }: { gallops: ProgramGallop[]; t: GalopT }) {
+  const trend = galopTrend(gallops);
+  if (!trend || trend.farkSaniye === 0) return null;
+  const hizlaniyor = trend.farkSaniye > 0;
+  const title = [
+    hizlaniyor ? t("galopTrendHizlaniyor") : t("galopTrendYavasliyor"),
+    t("galopTrendDetay", {
+      ilkTarih: trend.ilkTarih,
+      ilkSaniye: trend.ilkSaniye.toFixed(2),
+      sonTarih: trend.sonTarih,
+      sonSaniye: trend.sonSaniye.toFixed(2),
+    }),
+    t("galopTrendUyari"),
+  ].join("\n");
+  return (
+    <span
+      title={title}
+      className={cn(
+        "inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-[9px] font-mono font-semibold leading-none",
+        hizlaniyor ? "text-hit bg-hit/10" : "text-[#c0392b] bg-[#c0392b]/10"
+      )}
+    >
+      {hizlaniyor ? "▲" : "▼"}{Math.abs(trend.farkSaniye).toFixed(2)}
+    </span>
+  );
+}
 
 export default function GalopPanel({ runners, breed }: { runners: ProgramRunner[]; breed: string }) {
   const t = useTranslations("programToolbar");
@@ -20,15 +56,16 @@ export default function GalopPanel({ runners, breed }: { runners: ProgramRunner[
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4">
           {withGallops.map((r) => (
             <div key={r.id} className="px-3 py-2 border-b">
-              <div className="text-[11px] font-semibold mb-1 truncate">
-                <span className="font-mono mr-1">{r.no}</span>
-                {r.name}
+              <div className="text-[11px] font-semibold mb-1 truncate flex items-center gap-1">
+                <span className="font-mono">{r.no}</span>
+                <span className="truncate">{r.name}</span>
+                <GalopTrendBadge gallops={r.gallops} t={t} />
               </div>
               <div className="space-y-1">
                 {r.gallops.map((g, i) => {
                   const { prepDist, prepTime, finish, final200 } = galopSplits(g);
                   if (!prepDist && !finish && !final200) return null;
-                  const isInner = (g.splits["ic_dis"] ?? "").includes("İÇ") || (g.splits["ic_dis"] ?? "").toUpperCase().includes("IC");
+                  const isInner = isInnerTrack(g);
                   const prepQ = galopQuality(prepDist ?? "", prepTime, breed, isInner);
                   const finQ = galopQuality("400", finish, breed, isInner);
                   const sameJockey = isSameJockey(g.jockey, r.jockey);
@@ -74,8 +111,9 @@ export default function GalopPanel({ runners, breed }: { runners: ProgramRunner[
           ))}
         </div>
       )}
-      <div className="px-4 py-1.5 text-[10px] text-muted-foreground border-t">
-        {t("sonHazirliklarNot")}
+      <div className="px-4 py-1.5 text-[10px] text-muted-foreground border-t space-y-0.5">
+        <div>{t("sonHazirliklarNot")}</div>
+        <div>{t("galopTrendUyari")}</div>
       </div>
     </div>
   );
