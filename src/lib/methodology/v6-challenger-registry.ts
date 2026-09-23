@@ -1,4 +1,8 @@
-import { faz2V5Sirala, type Faz1RunnerV5Sirali, type Faz1SonucV5 } from "./v5-engine";
+import {
+  faz2V5Sirala, type Faz1RunnerV5Sirali, type Faz1SonucV5,
+  agirlikSetleriSec, harmanliSkorla, toFeatureVector, bKatmaniUygula, softmax, liderEsigiHesapla,
+} from "./v5-engine";
+import { kategoriTespit } from "./v2-engine";
 import { hesaplaGecmisPistleriMap } from "@/server/actions/yuzey-degisikligi.actions";
 import { ilkKezBuPisteMi } from "@/lib/yuzey-degisikligi";
 import { surfaceToPist } from "@/lib/sire-stat-match";
@@ -64,7 +68,51 @@ async function zeminMesafeDeneyimiScoreFn(faz1: Faz1SonucV5): Promise<Faz1Runner
   return baseline.map((r, i) => ({ ...r, olasilik: (r.olasilik * carpanlar[i]) / agirlikliToplam }));
 }
 
+// 2026-09-23 — V5.46-C1 / LOW-HIZ-OFF: V5.46 LIVE Audit Protocol'ün (FAZ A-I) TEK gerçek
+// production-değişikliği adayı. FAZ I (R2 refit-aware ablation) hizDerecesi'nin Düşük-Şart
+// segmentinde REMOVE_CANDIDATE çıktığını buldu — race-level CI95=[+0.001,+0.053] TAMAMEN
+// pozitif (β yeniden fit edilse bile bu segmentte gerçekten zararlı), signStability %99.3
+// (bkz. proje hafızası: project_v546_live_audit_protocol.md). Diğer segmentte (ve tüm diğer
+// 14 sinyalde) FAZ I sonucu ya KEEP_CONFIRMED (antrenorOrani/agfPayi2 — DOKUNULMUYOR) ya da
+// INCONCLUSIVE (h2hNetSkor/idmJokey/yakinsama2Plus/Sire/hizDerecesi-Diğer — DOKUNULMUYOR)
+// çıktı. Kullanıcı kararı: bunu HEMEN production'a almak yerine önce SHADOW'da forward
+// doğrulama (checkpoint: 20 yön-bakışı/50 ilk karar/100+ anlamlı/150-200 güçlü karar,
+// Düşük-Şart yarış sayısı bazında).
+//
+// Mekanizma: FAZ H/I'in TEST ETTİĞİ TAM AYNI ablation — skorlarHam'dan hizDerecesi'nin
+// A-katmanı katkısı (katkilar[HIZ_DERECESI_IDX]) çıkarılır, B-katmanı (Sire/ZeminMesafe) ve
+// kalibrasyon (softmax+liderEsigi) AYNEN yeniden uygulanır — "olasılığı sonradan yeniden
+// ağırlıklandırma" (yuzeyDegisikligi/zeminMesafeDeneyimi'nin kullandığı exp(Δ) çarpanı) DEĞİL,
+// üretim skorlama zincirinin birebir yeniden kurulması; FAZ I'in ölçtüğü mekanizmayla TAM
+// TUTARLI kalması için bilerek bu şekilde yazıldı. Yalnız Düşük-Şart'ta (kategori 1a/1b)
+// farklılaşır — Diğer/Handikap'ta baseline'la (champion) BİREBİR AYNI döner.
+const HIZ_DERECESI_IDX = 6; // toFeatureVector sırası (v5-engine.ts:910-925)
+
+async function v546C1LowHizOffScoreFn(faz1: Faz1SonucV5): Promise<Faz1RunnerV5Sirali[]> {
+  const baseline = faz2V5Sirala(faz1);
+  const kategori = kategoriTespit(faz1.race.classType);
+  if (kategori !== "1a" && kategori !== "1b") return baseline; // yalnız Düşük-Şart'ta farklılaşır
+
+  const setler = agirlikSetleriSec(faz1.race.classType);
+  const harmanlar = faz1.runners.map((r) => harmanliSkorla(toFeatureVector(r), setler));
+  const skorlarHam = harmanlar.map((h) => h.skor - h.katkilar[HIZ_DERECESI_IDX]);
+  const { skorlar } = bKatmaniUygula(skorlarHam, faz1.runners, faz1.race.classType);
+  const probs = softmax(skorlar, liderEsigiHesapla(faz1.race.classType));
+
+  const olasilikByNo = new Map(faz1.runners.map((r, i) => [r.no, probs[i]]));
+  const yenidenSirali = [...baseline].sort((a, b) => {
+    const pa = olasilikByNo.get(a.no)!, pb = olasilikByNo.get(b.no)!;
+    return pb !== pa ? pb - pa : a.no - b.no;
+  });
+  return yenidenSirali.map((r, i) => ({ ...r, olasilik: olasilikByNo.get(r.no)!, teknikSira: i + 1 }));
+}
+
 export const CHALLENGER_REGISTRY: ChallengerDef[] = [
+  {
+    key: "v546-c1-low-hiz-off",
+    label: "V5.46-C1 / LOW-HIZ-OFF (Düşük-Şart'ta hizDerecesi kaldırılmış — FAZ I production-değişikliği adayı, SHADOW)",
+    scoreFn: v546C1LowHizOffScoreFn,
+  },
   {
     // 2026-08-29 — gerçek bir aday DEĞİL: champion'ın birebir kopyası (A/A sağlık
     // testi). Amaç, gelecekte gerçek bir aday eklendiğinde güvenilecek olan bu
