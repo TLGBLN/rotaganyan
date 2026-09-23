@@ -331,6 +331,25 @@ model HotCacheWatchdogState {
   id           String   @id @default("singleton")
   lastHotIdsJson Json
   lastRunAt    DateTime @default(now()) @updatedAt
+  // 2026-09-23 — Cron Config Drift sensörü: watchdog'un GERÇEKTE ne sıklıkta çalıştığını
+  // (declared 2 saat vs. yalnız agf-sync piggyback'iyle fiilen ~6 saat) ölçebilmek için
+  // son 10 GERÇEK çalışmanın (skip edilenler DEĞİL) zaman damgası — bkz. runHotCacheWatchdogIfDue.
+  recentRunsJson Json?
+}
+
+// 2026-09-23 — AGF Sync CRON'unun kendi çalışma geçmişi. AgfSyncState (yukarıda) yalnız
+// syncAgfForRaceInner'ın (analiz-tetiklemeli, tek-koşu) yazdığı bir tablo — /api/cron/agf-sync
+// (syncAgfForDate, günde 4 kez, TÜM şehirler) HİÇ buraya yazmıyordu, yani cron'un kendi
+// sağlığı (çalıştı mı/başarılı mı/gerçek cadence nedir) hiçbir yerden ölçülemiyordu. Bu
+// singleton SADECE cron'un kendi tetiklenme/sonuç geçmişini tutar — AgfSyncState'in yerine
+// geçmez, onunla birlikte kullanılır.
+model AgfCronRunState {
+  id             String    @id @default("singleton")
+  lastAttemptAt  DateTime?
+  lastSuccessAt  DateTime?
+  lastResultJson Json? // en son syncAgfForDate() dönüşü (AgfSyncResult) — başarılı/başarısız fark etmez
+  lastError      String?
+  recentRunsJson Json? // son 10 GERÇEK tetiklenme zaman damgası (observed cadence için)
 }
 
 /**

@@ -553,6 +553,25 @@ const HOT_WATCHDOG_INTERVAL_MS = 2 * 3_600_000;
 const HOT_WATCHDOG_BATCH_LIMIT = 75;
 const HOT_WATCHDOG_RUNTIME_BUDGET_MS = 200_000; // 200s — kullanıcının önerdiği 180-240s aralığının ortası
 
+// 2026-09-23 — en fazla 10 zaman damgası tutan basit bir "recent runs" halkası. Cron Config
+// Drift sensörünün "Observed" (gerçek) cadence'ı buradan, GERÇEK tetiklenmelerden türetilir —
+// hiçbir varsayım/tahmin yok.
+const RECENT_RUNS_MAX = 10;
+function pushRecentRun(existing: unknown, now: Date): string[] {
+  const arr = Array.isArray(existing) ? (existing as string[]) : [];
+  return [...arr, now.toISOString()].slice(-RECENT_RUNS_MAX);
+}
+
+/** Ardışık zaman damgaları arasındaki ortalama boşluğu saat cinsinden döner — <2 veri noktasıyla null (ölçülemez). */
+export function observedCadenceHours(timestampsIso: string[] | undefined | null): number | null {
+  if (!timestampsIso || timestampsIso.length < 2) return null;
+  const sorted = [...timestampsIso].map((t) => new Date(t).getTime()).sort((a, b) => a - b);
+  const gaps: number[] = [];
+  for (let i = 1; i < sorted.length; i++) gaps.push(sorted[i]! - sorted[i - 1]!);
+  const avgMs = gaps.reduce((s, g) => s + g, 0) / gaps.length;
+  return avgMs / 3_600_000;
+}
+
 export async function runHotCacheWatchdogIfDue(): Promise<
   | { skipped: true; reason: string }
   | (Awaited<ReturnType<typeof syncHorseStatsCache>> & { skipped: false })
@@ -562,6 +581,14 @@ export async function runHotCacheWatchdogIfDue(): Promise<
   if (state && Date.now() - state.lastRunAt.getTime() < HOT_WATCHDOG_INTERVAL_MS) {
     return { skipped: true, reason: `son HOT kontrolü ${Math.round((Date.now() - state.lastRunAt.getTime()) / 60_000)} dk önce — 2 saat dolmadı` };
   }
+  const now = new Date();
+  await db.hotCacheWatchdogState
+    .upsert({
+      where: { id: "singleton" },
+      create: { id: "singleton", lastHotIdsJson: [], recentRunsJson: pushRecentRun(null, now) },
+      update: { recentRunsJson: pushRecentRun(state?.recentRunsJson, now) },
+    })
+    .catch(() => {}); // yalnız izleme metriği — HOT sync'i asla bloklamaz
   const result = await syncHorseStatsCache(HOT_WATCHDOG_BATCH_LIMIT, 3, {
     tierFilter: ["HOT"],
     runtimeBudgetMs: HOT_WATCHDOG_RUNTIME_BUDGET_MS,

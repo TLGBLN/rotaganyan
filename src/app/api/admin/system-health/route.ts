@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
 import type { HealthStatus, SystemModuleHealth } from "@/lib/system-anatomy/types";
+import { CRON_DECLARED, CRON_REGISTERED_SNAPSHOT } from "@/lib/system-anatomy/cron-registry";
+import type { AgfSyncResult } from "@/server/services/agf-sync";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -111,9 +113,51 @@ async function cacheHealth(): Promise<ModuleResult> {
 // gelir — Cache modülü kırmızıyken Cron da kırmızıysa kök neden neredeyse doğrudan
 // "cron çalışmıyor", Cron yeşilken Cache kırmızıysa kök neden "cron çalışıyor ama
 // yetişemiyor/başka bir şey" — ikisi BİRLİKTE teşhisi hızlandırır (kullanıcı talebi).
+// 2026-09-23 (2. tur) — kullanıcı bulgusu: kod tarafı (yukarıdaki yaş kontrolü) doğru
+// çalışıyor olsa bile, ASIL tetikleyici garanti kaynağı (kendi cron rotası) Vercel'e hiç
+// kaydolmadıysa fiili cadence "declared" (2 saat) değil, yalnız agf-sync piggyback'inin
+// (günde 4 kez) sağladığı ~6 saattir — bu da 6 saatlik URGENT SLA için sıfır güvenlik payı
+// bırakır. "DECLARE → OBSERVE → COMPARE → ALARM" sırasıyla: declared (vercel.json, elle
+// sabit), observed (recentRunsJson'dan GERÇEK ölçüm), registered (vercel crons ls'in en son
+// ELLE doğrulanan anlık görüntüsü, cron-registry.ts) karşılaştırılır. Henüz hiçbir schedule
+// DEĞİŞTİRİLMİYOR — yalnız ölçüm ve alarm.
+function evaluateCronDrift(
+  pathKey: string,
+  observedH: number | null,
+  opts: { urgentSlaHours?: number } = {}
+): { status: Status; detail: string; observedLabel: string } {
+  const declared = CRON_DECLARED[pathKey];
+  const registered = CRON_REGISTERED_SNAPSHOT[pathKey];
+  if (!declared || !registered) return { status: "unknown", detail: "Tanımsız cron", observedLabel: "-" };
+
+  const observedLabel = observedH == null ? "yetersiz veri (<2 çalışma)" : `${observedH.toFixed(1)} saat`;
+
+  let status: Status = "healthy";
+  if (registered.status === "not_deployed") status = "warning";
+  else if (registered.status === "modified") status = "warning";
+
+  if (observedH != null) {
+    if (opts.urgentSlaHours != null && observedH >= opts.urgentSlaHours) {
+      status = "critical";
+    } else if (observedH > declared.cadenceHours * 1.5) {
+      status = "warning";
+    }
+  }
+
+  const detail =
+    `Declared: ${declared.humanCadence} · Observed: ${observedLabel} · Registered: ${registered.status} ` +
+    `(${registered.checkedAt} elle doğrulandı) — ${registered.note}`;
+
+  return { status, detail, observedLabel };
+}
+
 async function cronHealth(): Promise<ModuleResult> {
   try {
-    const state = await db.hotCacheWatchdogState.findUnique({ where: { id: "singleton" } });
+    const [state, agfState] = await Promise.all([
+      db.hotCacheWatchdogState.findUnique({ where: { id: "singleton" } }),
+      db.agfCronRunState.findUnique({ where: { id: "singleton" } }),
+    ]);
+    const { observedCadenceHours } = await import("@/server/services/ingest/tjk-at-profil.adapter");
 
     if (!state) {
       return {
@@ -132,13 +176,32 @@ async function cronHealth(): Promise<ModuleResult> {
     if (ageHours > 2.5) status = "critical";
     else if (ageHours > 2) status = "warning";
 
+    const hotObservedH = observedCadenceHours(state.recentRunsJson as string[] | null);
+    const hotDrift = evaluateCronDrift("hot-cache-watchdog", hotObservedH, { urgentSlaHours: 6 });
+
+    const agfObservedH = observedCadenceHours((agfState?.recentRunsJson as string[] | null) ?? null);
+    const agfDrift = evaluateCronDrift("agf-sync", agfObservedH);
+
+    const statusWeight: Record<Status, number> = { healthy: 0, unknown: 1, warning: 2, critical: 3 };
+    if (statusWeight[hotDrift.status] > statusWeight[status]) status = hotDrift.status;
+    if (statusWeight[agfDrift.status] > statusWeight[status]) status = agfDrift.status;
+
     return {
       id: "cron",
       title: "CRON / SYNC",
       status,
-      description: "HOT Cache Watchdog cron akışı (diğer cronlar henüz bağlı değil)",
-      metrics: [{ label: "Son HOT watchdog çalışması", value: `${ageHours.toFixed(1)} saat önce` }],
-      checks: [{ id: "hot-watchdog", label: "HOT Cache Watchdog ≤2s içinde çalıştı", ok: ageHours <= 2.5, detail: state.lastRunAt.toISOString() }],
+      description: "HOT Cache Watchdog cron akışı + Cron Config Drift (declared/observed/registered)",
+      metrics: [
+        { label: "Son HOT watchdog çalışması", value: `${ageHours.toFixed(1)} saat önce` },
+        { label: "HOT watchdog — istenen cadence", value: "2 saat" },
+        { label: "HOT watchdog — gözlemlenen cadence", value: hotDrift.observedLabel },
+        { label: "AGF sync — gözlemlenen cadence", value: agfDrift.observedLabel },
+      ],
+      checks: [
+        { id: "hot-watchdog", label: "HOT Cache Watchdog ≤2s içinde çalıştı", ok: ageHours <= 2.5, detail: state.lastRunAt.toISOString() },
+        { id: "drift-hot-watchdog", label: "CRON CONFIG DRIFT — hot-cache-watchdog", ok: hotDrift.status === "healthy" ? true : hotDrift.status === "warning" ? null : false, detail: hotDrift.detail },
+        { id: "drift-agf-sync", label: "CRON CONFIG DRIFT — agf-sync", ok: agfDrift.status === "healthy" ? true : agfDrift.status === "warning" ? null : false, detail: agfDrift.detail },
+      ],
       lastCheckedAt: nowIso(),
     };
   } catch (error) {
@@ -150,6 +213,105 @@ async function cronHealth(): Promise<ModuleResult> {
       metrics: [],
       checks: [],
       errorMessage: error instanceof Error ? error.message : "Cron health error",
+      lastCheckedAt: nowIso(),
+    };
+  }
+}
+
+// 2026-09-23 (2. tur) — AGF Sync sensörü. ÖNEMLİ AYRIM: AgfSyncState (raceDay bazlı) yalnız
+// syncAgfForRaceInner'ın (analiz ekranı açılınca tetiklenen, TEK koşuluk) yazdığı tablo —
+// /api/cron/agf-sync'in (syncAgfForDate, günde 4 kez, TÜM şehirler) kendi çalışma geçmişini
+// YANSITMAZ. Bu yüzden CRON'un kendi health'i yeni AgfCronRunState singleton'ından okunuyor
+// (bkz. agf-sync.ts:recordAgfCronRun) — "hedeflenen yarış" sayısı ise DB'den bağımsız olarak
+// (bugünün sonuçlanmamış yarışları) ayrıca sorgulanıyor, cron'un kendi (muhtemelen eksik)
+// raporuna güvenilmiyor.
+async function agfSyncHealth(): Promise<ModuleResult> {
+  try {
+    const state = await db.agfCronRunState.findUnique({ where: { id: "singleton" } });
+
+    const dayStart = new Date();
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+    const targetRaceCount = await db.race.count({
+      where: { result: null, raceDay: { date: { gte: dayStart, lt: dayEnd } } },
+    });
+
+    if (!state) {
+      return {
+        id: "agf",
+        title: "AGF / PİYASA",
+        status: "warning",
+        description: "AGF Sync cron'u henüz hiç çalışmadı",
+        metrics: [{ label: "Bugün hedeflenen yarış (sonuçlanmamış)", value: targetRaceCount }],
+        checks: [{ id: "agf-availability", label: "AGF Sync cron çalıştı", ok: false, detail: "Kayıt yok" }],
+        lastCheckedAt: nowIso(),
+      };
+    }
+
+    const { observedCadenceHours } = await import("@/server/services/ingest/tjk-at-profil.adapter");
+    const observedH = observedCadenceHours((state.recentRunsJson as string[] | null) ?? null);
+    const lastResult = state.lastResultJson as AgfSyncResult | null;
+    const cities = lastResult?.cities ?? [];
+    const okCities = cities.filter((c) => c.ok);
+    const badCities = cities.filter((c) => !c.ok);
+    const racesUpdated = cities.reduce((s, c) => s + c.racesUpdated, 0);
+    const runnersUpdated = cities.reduce((s, c) => s + c.runnersUpdated, 0);
+    const lastError = state.lastError ?? badCities.find((c) => c.error)?.error ?? null;
+
+    // TJK/AGF etkinliği yalnız gün içi aktif saatlerde beklenir (declared schedule 09-18 UTC) —
+    // gece boşluğunu (18→09 UTC, ~15 saat) yanlışlıkla "arıza" saymamak için gündüz/gece ayrımı.
+    const hourUtc = new Date().getUTCHours();
+    const activeHours = hourUtc >= 8 && hourUtc <= 20;
+    const attemptAgeH = ageMinutes(state.lastAttemptAt) == null ? null : ageMinutes(state.lastAttemptAt)! / 60;
+    const successAgeH = ageMinutes(state.lastSuccessAt) == null ? null : ageMinutes(state.lastSuccessAt)! / 60;
+
+    let availabilityOk: boolean | null = null;
+    let freshnessOk: boolean | null = null;
+    let status: Status = "healthy";
+    if (activeHours) {
+      availabilityOk = attemptAgeH != null && attemptAgeH <= 8;
+      freshnessOk = successAgeH != null && successAgeH <= 4;
+      if (!availabilityOk) status = "critical";
+      else if (!freshnessOk || badCities.length > 0) status = "warning";
+    } else if (badCities.length > 0) {
+      status = "warning";
+    }
+
+    return {
+      id: "agf",
+      title: "AGF / PİYASA",
+      status,
+      description: "AGF Sync cron'u (günde 4 kez, tüm şehirler) — availability/freshness/completeness/correctness",
+      metrics: [
+        { label: "Bugün hedeflenen yarış (sonuçlanmamış)", value: targetRaceCount },
+        { label: "Son denemedeki şehir sayısı", value: cities.length },
+        { label: "Başarılı şehir", value: okCities.length },
+        { label: "Hatalı şehir", value: badCities.length },
+        { label: "Güncellenen yarış (son çalışma)", value: racesUpdated },
+        { label: "Güncellenen at/AGF (son çalışma)", value: runnersUpdated },
+        { label: "Son deneme", value: state.lastAttemptAt ? `${attemptAgeH!.toFixed(1)} saat önce` : "hiç" },
+        { label: "Son başarı", value: state.lastSuccessAt ? `${successAgeH!.toFixed(1)} saat önce` : "hiç" },
+        { label: "Gözlemlenen cadence", value: observedH == null ? "yetersiz veri" : `${observedH.toFixed(1)} saat` },
+        ...(lastError ? [{ label: "Son hata", value: lastError }] : []),
+      ],
+      checks: [
+        { id: "agf-availability", label: "Cron aktif saatlerde çalıştı (≤8s)", ok: activeHours ? availabilityOk : null, detail: activeHours ? `${attemptAgeH?.toFixed(1) ?? "-"} saat önce` : "gece modu — beklenen boşluk" },
+        { id: "agf-freshness", label: "Son başarılı sync taze (≤4s)", ok: activeHours ? freshnessOk : null, detail: activeHours ? `${successAgeH?.toFixed(1) ?? "-"} saat önce` : "gece modu — beklenen boşluk" },
+        { id: "agf-completeness", label: "Tüm şehirler başarılı", ok: cities.length === 0 ? null : badCities.length === 0, detail: `${okCities.length}/${cities.length} şehir OK` },
+        { id: "agf-correctness", label: "Son çalışmada hata yok", ok: lastError == null, detail: lastError ?? "hata yok" },
+      ],
+      lastCheckedAt: nowIso(),
+    };
+  } catch (error) {
+    return {
+      id: "agf",
+      title: "AGF / PİYASA",
+      status: "unknown",
+      description: "AGF Sync health ölçülemedi",
+      metrics: [],
+      checks: [],
+      errorMessage: error instanceof Error ? error.message : "AGF sync error",
       lastCheckedAt: nowIso(),
     };
   }
@@ -268,7 +430,7 @@ export async function GET() {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }
 
-  const results = await Promise.allSettled([databaseHealth(), cacheHealth(), challengerHealth(), predictionHealth(), cronHealth()]);
+  const results = await Promise.allSettled([databaseHealth(), cacheHealth(), challengerHealth(), predictionHealth(), cronHealth(), agfSyncHealth()]);
 
   const modules: ModuleResult[] = [];
   for (const result of results) {
@@ -278,7 +440,6 @@ export async function GET() {
   // Henüz gerçek sensörü olmayan modüller — bkz. unmeasuredModule notu.
   modules.push(unmeasuredModule("data-source", "VERİ TOPLAMA", "TJK / program / yarış verileri"));
   modules.push(unmeasuredModule("program", "PROGRAM", "Günlük yarış programı"));
-  modules.push(unmeasuredModule("agf", "AGF / PİYASA", "AGF ve piyasa verileri"));
   modules.push(unmeasuredModule("results", "SONUÇLAR", "Yarış sonuçları"));
   modules.push(unmeasuredModule("coupon", "KUPON ÜRETİMİ", "Kupon oluşturma"));
   modules.push(unmeasuredModule("calibration", "KALİBRASYON", "Probability calibration"));

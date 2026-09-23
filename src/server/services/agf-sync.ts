@@ -115,6 +115,38 @@ async function syncOneCity(city: CityInfo, tjkDate: string, d: Date): Promise<Ag
   return { name: city.sehirAdi, ok: true, racesUpdated, runnersUpdated };
 }
 
+// 2026-09-23 — Sistem Anatomisi AGF sensörü: syncAgfForDate() (bu dosyanın CRON giriş
+// noktası, günde 4 kez — 09/12/15/18 UTC) hiçbir yere kendi çalışma geçmişini yazmıyordu.
+// AgfSyncState (yukarıda) yalnız syncAgfForRaceInner'ın (analiz-tetiklemeli, tek-koşu) yazdığı
+// tablo — cron'un KENDİ availability/freshness/observed-cadence'ı bundan ÖLÇÜLEMEZ. Bu fonksiyon
+// /api/cron/agf-sync tarafından her tetiklenmede (başarılı/başarısız fark etmez) çağrılır.
+const AGF_RECENT_RUNS_MAX = 10;
+export async function recordAgfCronRun(outcome: { ok: true; result: AgfSyncResult } | { ok: false; error: string }): Promise<void> {
+  const now = new Date();
+  const prev = await db.agfCronRunState.findUnique({ where: { id: "singleton" } }).catch(() => null);
+  const prevRuns = Array.isArray(prev?.recentRunsJson) ? (prev!.recentRunsJson as string[]) : [];
+  const recentRunsJson = [...prevRuns, now.toISOString()].slice(-AGF_RECENT_RUNS_MAX);
+
+  await db.agfCronRunState
+    .upsert({
+      where: { id: "singleton" },
+      create: {
+        id: "singleton",
+        lastAttemptAt: now,
+        lastSuccessAt: outcome.ok ? now : null,
+        lastResultJson: outcome.ok ? outcome.result : (prev?.lastResultJson ?? undefined),
+        lastError: outcome.ok ? null : outcome.error,
+        recentRunsJson,
+      },
+      update: {
+        lastAttemptAt: now,
+        ...(outcome.ok ? { lastSuccessAt: now, lastResultJson: outcome.result, lastError: null } : { lastError: outcome.error }),
+        recentRunsJson,
+      },
+    })
+    .catch(() => {}); // yalnız izleme metriği — AGF senkronunu ASLA bloklamaz
+}
+
 export async function syncAgfForDate(date: Date): Promise<AgfSyncResult> {
   const d = new Date(date);
   d.setUTCHours(0, 0, 0, 0);

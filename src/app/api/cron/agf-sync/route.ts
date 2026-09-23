@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { syncAgfForDate } from "@/server/services/agf-sync";
+import { syncAgfForDate, recordAgfCronRun } from "@/server/services/agf-sync";
 import { verifyCronRequest } from "@/lib/cron-auth";
 import { runChallengerShadowLog } from "@/server/services/challenger-shadow-log.service";
 import { dereceIstatistikleriniKontrolEtVeOnar, atProfiliniKontrolEtVeOnar } from "@/server/services/veri-tamligi-onarim.service";
@@ -16,8 +16,16 @@ export async function GET(req: NextRequest) {
   const denied = verifyCronRequest(req);
   if (denied) return denied;
 
+  let result: Awaited<ReturnType<typeof syncAgfForDate>>;
   try {
-    const result = await syncAgfForDate(new Date());
+    result = await syncAgfForDate(new Date());
+  } catch (err) {
+    await recordAgfCronRun({ ok: false, error: String(err) }).catch(() => {});
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+  await recordAgfCronRun({ ok: true, result }).catch(() => {});
+
+  try {
     const total = result.cities.reduce((s, c) => s + c.runnersUpdated, 0);
 
     // 2026-08-29 — V6 Aşama 3 (bkz. plan): asalak ekleme deseni (sync-derece-ist/
