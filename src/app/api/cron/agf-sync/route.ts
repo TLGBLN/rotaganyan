@@ -3,6 +3,7 @@ import { syncAgfForDate } from "@/server/services/agf-sync";
 import { verifyCronRequest } from "@/lib/cron-auth";
 import { runChallengerShadowLog } from "@/server/services/challenger-shadow-log.service";
 import { dereceIstatistikleriniKontrolEtVeOnar, atProfiliniKontrolEtVeOnar } from "@/server/services/veri-tamligi-onarim.service";
+import { runHotCacheWatchdogIfDue } from "@/server/services/ingest/tjk-at-profil.adapter";
 
 // v6.69 — kullanıcı bulgusu 2026-08-09: çoklu şehir günlerinde (İstanbul+İzmir+Karma
 // aynı anda) sıralı işleme 60sn'yi aşıp cron'u sessizce (Vercel 504) başarısız kılıyordu —
@@ -46,6 +47,17 @@ export async function GET(req: NextRequest) {
       await atProfiliniKontrolEtVeOnar();
     } catch (e) {
       console.error("[agf-sync] at-profili-onarim piggyback hatası (AGF senkronu etkilenmedi)", e);
+    }
+
+    // 2026-09-23 — HOT Cache Watchdog (Sistem Anatomisi P0 bulgusu): agf-sync günde 4 kez
+    // (09/12/15/18 UTC) çalışıyor, bu da watchdog'un 2 saatlik kapısı için AYRI bir kayıtlı
+    // cron'a (kaydolmama riski taşıyan) bağımlı kalmadan makul bir asgari kapsama sağlıyor.
+    // `runHotCacheWatchdogIfDue` kendi 2 saatlik kapısını uyguluyor, burada TEKRAR kontrol
+    // gerekmiyor. Hata durumunda AGF senkronunu ASLA bloke etmez/başarısız kılmaz.
+    try {
+      await runHotCacheWatchdogIfDue();
+    } catch (e) {
+      console.error("[agf-sync] hot-cache-watchdog piggyback hatası (AGF senkronu etkilenmedi)", e);
     }
 
     return NextResponse.json({ ...result, totalRunnersUpdated: total });

@@ -46,52 +46,46 @@ async function databaseHealth(): Promise<ModuleResult> {
   }
 }
 
-// 2026-09-23 kullanıcı kodu — HOT tier tanımı syncHorseStatsCache (tjk-at-profil.adapter.ts)
-// ile AYNI pencere (önümüzdeki 48 saatte koşacak, sonuçlanmamış).
+// DÜZELTME (2026-09-23, kullanıcı bulgusu — panelin İLK GÜN yakaladığı P0 açık): flat
+// "HOT stale>24h" tek eşiği yanıltıcıydı — 45 saat sonra koşacak bir atın 25 saatlik
+// cache'i ile 45 dakika sonra koşacak atın 25 saatlik cache'i AYNI aciliyette değil.
+// Artık URGENT(0-6s kalan)/NEAR(6-24s)/NEXT(24-48s) üçlü kırılımı ve HER BİRİNİN KENDİ
+// SLA'sı kullanılıyor (getHotCacheHealthSnapshot — syncHorseStatsCache'in KENDİ urgency
+// tanımlarını reuse ediyor, tek kaynak). Panel 15sn'de bir yenilendiği için bu fonksiyon
+// SALT-OKUNUR — hiçbir TJK isteği/senkron TETİKLEMEZ.
 async function cacheHealth(): Promise<ModuleResult> {
   try {
-    const now = new Date();
-    const hotEnd = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    const { getHotCacheHealthSnapshot } = await import("@/server/services/ingest/tjk-at-profil.adapter");
+    const { urgency, churn } = await getHotCacheHealthSnapshot();
 
-    const hotRunners = await db.runner.findMany({
-      where: {
-        scratched: false,
-        tjkAtId: { not: null },
-        race: { result: null, raceDay: { date: { gte: now, lte: hotEnd } } },
-      },
-      select: { tjkAtId: true },
-      distinct: ["tjkAtId"],
-    });
-
-    const hotIds = hotRunners.map((x) => x.tjkAtId).filter((x): x is number => x != null);
-    const staleCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-    const freshCount = hotIds.length === 0 ? 0 : await db.horseRaceHistoryCache.count({
-      where: { tjkAtId: { in: hotIds }, updatedAt: { gte: staleCutoff } },
-    });
-
-    const total = hotIds.length;
-    const freshRate = total === 0 ? 100 : (freshCount / total) * 100;
-    const stale = total - freshCount;
+    const urgentStale = urgency.URGENT.stale;
+    const nearNextStale = urgency.NEAR.stale + urgency.NEXT.stale;
 
     let status: Status = "healthy";
-    if (freshRate < 95) status = "critical";
-    else if (freshRate < 99) status = "warning";
+    if (urgentStale > 0) status = "critical";
+    else if (nearNextStale > 0) status = "warning";
+
+    const totalHot = urgency.URGENT.total + urgency.NEAR.total + urgency.NEXT.total;
+    const totalStale = urgentStale + nearNextStale;
 
     return {
       id: "horse-cache",
       title: "AT PROFİL CACHE",
       status,
-      description: "HOT yarış atlarının cache sağlığı",
+      description: "HOT yarış atlarının cache sağlığı (URGENT/NEAR/NEXT SLA)",
       metrics: [
-        { label: "HOT At", value: total },
-        { label: "HOT Fresh", value: freshCount },
-        { label: "HOT Stale", value: stale },
-        { label: "HOT Fresh Rate", value: freshRate.toFixed(1), unit: "%" },
+        { label: "HOT toplam", value: totalHot },
+        { label: "HOT stale", value: totalStale },
+        { label: "Yeni HOT (son kontrolden beri)", value: churn.newSinceLastSync },
+        { label: "URGENT (0-6s)", value: `${urgency.URGENT.total - urgency.URGENT.stale}/${urgency.URGENT.total}` },
+        { label: "NEAR (6-24s)", value: `${urgency.NEAR.total - urgency.NEAR.stale}/${urgency.NEAR.total}` },
+        { label: "NEXT (24-48s)", value: `${urgency.NEXT.total - urgency.NEXT.stale}/${urgency.NEXT.total}` },
       ],
       checks: [
-        { id: "fresh-rate", label: "HOT freshness ≥ %99", ok: total === 0 ? null : freshRate >= 99, detail: `%${freshRate.toFixed(1)}` },
-        { id: "stale", label: "HOT stale >24h", ok: total === 0 ? null : stale === 0, detail: `${stale} at` },
+        { id: "urgent", label: "URGENT (≤6s kalan yarış) SLA ≤6s cache yaşı", ok: urgency.URGENT.total === 0 ? null : urgentStale === 0, detail: `${urgency.URGENT.stale}/${urgency.URGENT.total} stale` },
+        { id: "near", label: "NEAR (6-24s kalan) SLA ≤12s cache yaşı", ok: urgency.NEAR.total === 0 ? null : urgency.NEAR.stale === 0, detail: `${urgency.NEAR.stale}/${urgency.NEAR.total} stale` },
+        { id: "next", label: "NEXT (24-48s kalan) SLA ≤24s cache yaşı", ok: urgency.NEXT.total === 0 ? null : urgency.NEXT.stale === 0, detail: `${urgency.NEXT.stale}/${urgency.NEXT.total} stale` },
+        { id: "churn", label: "HOT churn (kök neden ipucu)", ok: null, detail: `${churn.newSinceLastSync} yeni HOT, son watchdog: ${churn.lastSyncAt ?? "hiç çalışmadı"}` },
       ],
       lastCheckedAt: nowIso(),
     };
@@ -104,6 +98,58 @@ async function cacheHealth(): Promise<ModuleResult> {
       metrics: [],
       checks: [],
       errorMessage: error instanceof Error ? error.message : "Cache health error",
+      lastCheckedAt: nowIso(),
+    };
+  }
+}
+
+// 2026-09-23 — Cron sensörü (kullanıcının 2. gerçek sensör grubu olarak erken bağlanmasını
+// istediği modül): HOT Cache Watchdog'un KENDİ `lastRunAt`'ı (HotCacheWatchdogState)
+// zaten gerçek bir "cron çalıştı mı" sinyali — hem kendi ayrı cron rotası hem agf-sync
+// piggyback'i bu alanı günceller, hangisi tetiklerse tetiklesin. 2 saatlik hedefin
+// ~%25 üzerinde (2.5s) hâlâ güncellenmemişse HİÇBİR tetikleyicinin çalışmadığı anlamına
+// gelir — Cache modülü kırmızıyken Cron da kırmızıysa kök neden neredeyse doğrudan
+// "cron çalışmıyor", Cron yeşilken Cache kırmızıysa kök neden "cron çalışıyor ama
+// yetişemiyor/başka bir şey" — ikisi BİRLİKTE teşhisi hızlandırır (kullanıcı talebi).
+async function cronHealth(): Promise<ModuleResult> {
+  try {
+    const state = await db.hotCacheWatchdogState.findUnique({ where: { id: "singleton" } });
+
+    if (!state) {
+      return {
+        id: "cron",
+        title: "CRON / SYNC",
+        status: "warning",
+        description: "HOT Cache Watchdog henüz hiç çalışmadı",
+        metrics: [],
+        checks: [{ id: "hot-watchdog", label: "HOT Cache Watchdog", ok: false, detail: "Kayıt yok" }],
+        lastCheckedAt: nowIso(),
+      };
+    }
+
+    const ageHours = ageMinutes(state.lastRunAt)! / 60;
+    let status: Status = "healthy";
+    if (ageHours > 2.5) status = "critical";
+    else if (ageHours > 2) status = "warning";
+
+    return {
+      id: "cron",
+      title: "CRON / SYNC",
+      status,
+      description: "HOT Cache Watchdog cron akışı (diğer cronlar henüz bağlı değil)",
+      metrics: [{ label: "Son HOT watchdog çalışması", value: `${ageHours.toFixed(1)} saat önce` }],
+      checks: [{ id: "hot-watchdog", label: "HOT Cache Watchdog ≤2s içinde çalıştı", ok: ageHours <= 2.5, detail: state.lastRunAt.toISOString() }],
+      lastCheckedAt: nowIso(),
+    };
+  } catch (error) {
+    return {
+      id: "cron",
+      title: "CRON / SYNC",
+      status: "unknown",
+      description: "Cron health ölçülemedi",
+      metrics: [],
+      checks: [],
+      errorMessage: error instanceof Error ? error.message : "Cron health error",
       lastCheckedAt: nowIso(),
     };
   }
@@ -222,7 +268,7 @@ export async function GET() {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }
 
-  const results = await Promise.allSettled([databaseHealth(), cacheHealth(), challengerHealth(), predictionHealth()]);
+  const results = await Promise.allSettled([databaseHealth(), cacheHealth(), challengerHealth(), predictionHealth(), cronHealth()]);
 
   const modules: ModuleResult[] = [];
   for (const result of results) {
@@ -236,7 +282,6 @@ export async function GET() {
   modules.push(unmeasuredModule("results", "SONUÇLAR", "Yarış sonuçları"));
   modules.push(unmeasuredModule("coupon", "KUPON ÜRETİMİ", "Kupon oluşturma"));
   modules.push(unmeasuredModule("calibration", "KALİBRASYON", "Probability calibration"));
-  modules.push(unmeasuredModule("cron", "CRON / SYNC", "Zamanlanmış görevler"));
   modules.push(unmeasuredModule("site", "SITE / API", "Web ve API"));
   modules.push(unmeasuredModule("model-health", "MODEL SAĞLIĞI", "Model monitoring"));
 

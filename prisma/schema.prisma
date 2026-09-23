@@ -323,6 +323,16 @@ model HorseSyncFailure {
   lastAttempt DateTime @default(now()) @updatedAt
 }
 
+// 2026-09-23 — HOT Cache Watchdog (Sistem Anatomisi P0 bulgusu): tek satırlık singleton,
+// bir önceki watchdog turunun HOT tjkAtId kümesini saklar — "newHotSinceLastSync" (churn)
+// metriğini hesaplamak için. lastHotIdsJson=number[]. Yalnız HOT-filtreli syncHorseStatsCache
+// çağrıları bu satırı günceller (günlük WARM/COLD cron'u dokunmaz).
+model HotCacheWatchdogState {
+  id           String   @id @default("singleton")
+  lastHotIdsJson Json
+  lastRunAt    DateTime @default(now()) @updatedAt
+}
+
 /**
  * TJK'nın "At Koşu Bilgileri" tam yarış geçmişi tablosunun (tjk-at-performans.adapter.ts)
  * KALICI önbelleği — kullanıcı talebi 2026-07-30: analiz (Faz1/veri-toplama.ts) ve public

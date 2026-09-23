@@ -241,11 +241,33 @@ export async function fetchHorseDetailedStats(atId: number): Promise<HorseDetail
 // tazelenir), COLD tier'ın gevşetilmesi (14 gün) WARM tier'a daha fazla bütçe bırakır.
 const HOT_UPCOMING_WINDOW_MS = 2 * 86_400_000; // önümüzdeki 48 saat içinde koşacak
 const WARM_RECENT_ACTIVITY_MS = 60 * 86_400_000; // son 60 günde en az 1 koşu
-const STALE_DAYS_HOT = 1;
+const STALE_DAYS_HOT = 1; // HOT'un fallback'i (urgency bucket belirlenemezse) — aşağıya bkz.
 const STALE_DAYS_WARM = 3;
 const STALE_DAYS_COLD = 14;
 
 type Tier = "HOT" | "WARM" | "COLD";
+
+// 2026-09-23 — HOT Cache Watchdog (Sistem Anatomisi P0 bulgusu, kullanıcı tasarımı):
+// HOT'un KENDİSİ tek parça değil — yarışa 0-6 saat kalan bir atın 20 saatlik cache'i ile
+// 45 saat kalan bir atın 20 saatlik cache'i AYNI aciliyette değil. Üç alt-dilim, her biri
+// KENDİ tazelik SLA'sıyla: URGENT (0-6s kalan yarış) ≤6s cache yaşı, NEAR (6-24s) ≤12s,
+// NEXT (24-48s, HOT'un geri kalanı) ≤24s (=STALE_DAYS_HOT ile aynı, değişmedi).
+export type HotUrgency = "URGENT" | "NEAR" | "NEXT";
+const URGENT_THRESHOLD_MS = 6 * 3_600_000;
+const NEAR_THRESHOLD_MS = 24 * 3_600_000;
+const HOT_URGENCY_SLA_MS: Record<HotUrgency, number> = {
+  URGENT: 6 * 3_600_000,
+  NEAR: 12 * 3_600_000,
+  NEXT: 24 * 3_600_000,
+};
+function hotUrgencyFor(nextRaceDate: Date | undefined, now: number): HotUrgency | null {
+  if (!nextRaceDate) return null;
+  const msToRace = nextRaceDate.getTime() - now;
+  if (msToRace < 0) return null; // beklenmez (HOT tanımı zaten gelecekteki yarış), güvenlik
+  if (msToRace < URGENT_THRESHOLD_MS) return "URGENT";
+  if (msToRace < NEAR_THRESHOLD_MS) return "NEAR";
+  return "NEXT";
+}
 
 // 2026-09-22 kullanıcı bulgusu (V5.46 LIVE audit, cron verify): limit=250 ile GERÇEK
 // production ölçümünde 739.0s sürdü — maxDuration=800s'nin yalnız %92'si altında kaldı,
@@ -260,7 +282,12 @@ const INTERNAL_RUNTIME_BUDGET_MS = 650_000; // 650s — 800s maxDuration'a 150s 
 
 export async function syncHorseStatsCache(
   limit = 250,
-  _staleDaysLegacy = 3 // artık tier-bazlı hesaplanıyor, parametre geriye-uyumluluk için duruyor ama kullanılmıyor
+  _staleDaysLegacy = 3, // artık tier-bazlı hesaplanıyor, parametre geriye-uyumluluk için duruyor ama kullanılmıyor
+  // 2026-09-23 — HOT Cache Watchdog: tierFilter verilirse yalnız o tier'ler needsSync'e
+  // girer (WARM/COLD'a hiç dokunulmaz), runtimeBudgetMs verilirse günlük 650s yerine
+  // watchdog'un kendi (daha kısa) bütçesi kullanılır. İkisi de opsiyonel — mevcut iki
+  // çağrı sitesi (günlük cron + veri-tamligi-onarim) değişmeden AYNI (tüm tier, 650s) davranır.
+  opts: { tierFilter?: Tier[]; runtimeBudgetMs?: number } = {}
 ): Promise<{
   ok: number; fail: number; remaining: number;
   durationMs: number;
@@ -268,14 +295,19 @@ export async function syncHorseStatsCache(
   tierCounts: Record<Tier, number>;
   tierProcessed: Record<Tier, { fresh: number; stale: number }>;
   staleBuckets: { over3d: number; over7d: number; over14d: number };
+  hotUrgency: Record<HotUrgency, { total: number; stale: number }>;
+  hotChurn: { newSinceLastSync: number; lastSyncAt: string | null };
 }> {
   const fonksiyonBaslangic = Date.now();
   const { db } = await import("@/lib/db");
   const { refreshTjkAtKosuBilgileri } = await import("./tjk-at-performans.adapter");
+  const { poolStartTime } = await import("@/lib/methodology/kupon-dependency-hash");
 
   const now = Date.now();
   const hotCutoff = new Date(now + HOT_UPCOMING_WINDOW_MS);
   const warmCutoff = new Date(now - WARM_RECENT_ACTIVITY_MS);
+  const runtimeBudget = opts.runtimeBudgetMs ?? INTERNAL_RUNTIME_BUDGET_MS;
+  const activeTiers: Tier[] = opts.tierFilter ?? ["HOT", "WARM", "COLD"];
 
   // Her tjkAtId için TÜM runner-satırlarını (distinct DEĞİL) çekip JS'te grupla — bir
   // fiziksel atın HOT/WARM durumu, o atın TÜM koşu geçmişine bakılarak belirlenmeli,
@@ -284,18 +316,30 @@ export async function syncHorseStatsCache(
     where: { tjkAtId: { not: null } },
     select: {
       tjkAtId: true,
-      race: { select: { result: { select: { id: true } }, raceDay: { select: { date: true } } } },
+      race: { select: { result: { select: { id: true } }, time: true, raceDay: { select: { date: true } } } },
     },
   });
 
   const tierByHorse = new Map<number, Tier>();
+  // HOT'un urgency bucket'ı için — bir atın EN YAKIN gelecekteki (henüz sonuçlanmamış,
+  // 48s içindeki) yarışının GERÇEK saati (yalnız gün değil) gerekiyor. race-context-watch/
+  // kupon-dependency-hash'teki AYNI "HH:mm Türkiye saati → UTC" dönüşümü (poolStartTime)
+  // reuse ediliyor — ayrı bir saat ayrıştırıcı YAZILMADI.
+  const nextRaceDateTimeByHorse = new Map<number, Date>();
   for (const row of allRunnerRows) {
     const id = row.tjkAtId!;
     const raceDate = row.race.raceDay.date;
     const sonuclanmadi = !row.race.result;
     let tier: Tier = "COLD";
-    if (sonuclanmadi && raceDate.getTime() <= hotCutoff.getTime() && raceDate.getTime() >= now - 86_400_000) tier = "HOT";
-    else if (raceDate.getTime() >= warmCutoff.getTime()) tier = "WARM";
+    if (sonuclanmadi && raceDate.getTime() <= hotCutoff.getTime() && raceDate.getTime() >= now - 86_400_000) {
+      tier = "HOT";
+      const dateIso = raceDate.toISOString().slice(0, 10);
+      const exact = poolStartTime(dateIso, [row.race.time]);
+      if (exact) {
+        const mevcutEnYakin = nextRaceDateTimeByHorse.get(id);
+        if (!mevcutEnYakin || exact.getTime() < mevcutEnYakin.getTime()) nextRaceDateTimeByHorse.set(id, exact);
+      }
+    } else if (raceDate.getTime() >= warmCutoff.getTime()) tier = "WARM";
     // Bir at birden fazla satırda görünebilir — en yüksek öncelikli tier kazanır (HOT>WARM>COLD)
     const mevcut = tierByHorse.get(id);
     if (!mevcut || tierRank(tier) > tierRank(mevcut)) tierByHorse.set(id, tier);
@@ -309,6 +353,8 @@ export async function syncHorseStatsCache(
       tierCounts: { HOT: 0, WARM: 0, COLD: 0 },
       tierProcessed: { HOT: { fresh: 0, stale: 0 }, WARM: { fresh: 0, stale: 0 }, COLD: { fresh: 0, stale: 0 } },
       staleBuckets: { over3d: 0, over7d: 0, over14d: 0 },
+      hotUrgency: { URGENT: { total: 0, stale: 0 }, NEAR: { total: 0, stale: 0 }, NEXT: { total: 0, stale: 0 } },
+      hotChurn: { newSinceLastSync: 0, lastSyncAt: null },
     };
   }
 
@@ -323,16 +369,24 @@ export async function syncHorseStatsCache(
   const historyUpdatedById = new Map(allHistory.map((h) => [h.tjkAtId, h.updatedAt]));
   const givenUpIds = new Set(givenUp.map((h) => h.tjkAtId));
 
-  // Kendi tier'ının staleDays hedefine göre taze mi — sabit tek eşik yerine tier-bazlı.
+  // Kendi tier'ının staleDays hedefine göre taze mi. HOT'ta artık tek sabit eşik değil —
+  // urgency bucket'ı belirlenebiliyorsa (gerçek saat verisi varsa) o SLA kullanılır,
+  // belirlenemiyorsa (ör. Race.time eksik) STALE_DAYS_HOT (24s) fallback'e düşer.
   function freshFor(id: number, updatedAt: Date | undefined, tier: Tier): boolean {
     if (!updatedAt) return false;
-    const cutoff = now - staleDaysByTier[tier] * 86_400_000;
+    let staleMs = staleDaysByTier[tier] * 86_400_000;
+    if (tier === "HOT") {
+      const urgency = hotUrgencyFor(nextRaceDateTimeByHorse.get(id), now);
+      if (urgency) staleMs = HOT_URGENCY_SLA_MS[urgency];
+    }
+    const cutoff = now - staleMs;
     return updatedAt.getTime() >= cutoff;
   }
 
   const needsSyncAll = allIds.filter((id) => {
     if (givenUpIds.has(id)) return false;
     const tier = tierByHorse.get(id)!;
+    if (!activeTiers.includes(tier)) return false;
     return !freshFor(id, statsUpdatedById.get(id), tier) || !freshFor(id, historyUpdatedById.get(id), tier);
   });
 
@@ -343,7 +397,7 @@ export async function syncHorseStatsCache(
   function tamamenEksikMi(id: number): boolean { return !statsUpdatedById.has(id) || !historyUpdatedById.has(id); }
   const gruplar: Record<Tier, number[]> = { HOT: [], WARM: [], COLD: [] };
   for (const id of needsSyncAll) gruplar[tierByHorse.get(id)!].push(id);
-  const needsSync = (["HOT", "WARM", "COLD"] as Tier[]).flatMap((tier) => {
+  const needsSync = activeTiers.flatMap((tier) => {
     const ids = gruplar[tier];
     const eksik = ids.filter(tamamenEksikMi);
     const bayat = ids.filter((id) => !tamamenEksikMi(id));
@@ -351,8 +405,14 @@ export async function syncHorseStatsCache(
   });
 
   // Self-reporting — "cron yeşil ama sistem aslında büyük ölçüde stale" durumunun bir
-  // daha sessizce gizlenmemesi için (kullanıcı talebi 2026-09-22).
-  const tierCounts: Record<Tier, number> = { HOT: gruplar.HOT.length, WARM: gruplar.WARM.length, COLD: gruplar.COLD.length };
+  // daha sessizce gizlenmemesi için (kullanıcı talebi 2026-09-22). Bu tierCounts/staleBuckets
+  // HER ZAMAN TÜM popülasyon üzerinden hesaplanır (activeTiers'tan bağımsız) — watchdog'un
+  // dar kapsamlı çalışması, dashboard'un genel görünürlüğünü daraltmasın.
+  const tierCounts: Record<Tier, number> = {
+    HOT: allIds.filter((id) => tierByHorse.get(id) === "HOT").length,
+    WARM: allIds.filter((id) => tierByHorse.get(id) === "WARM").length,
+    COLD: allIds.filter((id) => tierByHorse.get(id) === "COLD").length,
+  };
   const staleBuckets = { over3d: 0, over7d: 0, over14d: 0 };
   for (const id of allIds) {
     const oldest = [statsUpdatedById.get(id), historyUpdatedById.get(id)]
@@ -363,6 +423,43 @@ export async function syncHorseStatsCache(
     if (ageMs > 3 * 86_400_000) staleBuckets.over3d++;
     if (ageMs > 7 * 86_400_000) staleBuckets.over7d++;
     if (ageMs > 14 * 86_400_000) staleBuckets.over14d++;
+  }
+
+  // URGENT/NEAR/NEXT freshness kırılımı — TÜM HOT popülasyonu üzerinden (needsSync'e
+  // GİRİP GİRMEDİĞİNDEN bağımsız, yalnız "şu an SLA'sını karşılıyor mu" sorusu).
+  const hotUrgency: Record<HotUrgency, { total: number; stale: number }> = {
+    URGENT: { total: 0, stale: 0 }, NEAR: { total: 0, stale: 0 }, NEXT: { total: 0, stale: 0 },
+  };
+  for (const id of allIds) {
+    if (tierByHorse.get(id) !== "HOT") continue;
+    const urgency = hotUrgencyFor(nextRaceDateTimeByHorse.get(id), now) ?? "NEXT"; // saat bilinmiyorsa en gevşek varsayım
+    hotUrgency[urgency].total++;
+    const fresh = freshFor(id, statsUpdatedById.get(id), "HOT") && freshFor(id, historyUpdatedById.get(id), "HOT");
+    if (!fresh) hotUrgency[urgency].stale++;
+  }
+
+  // HOT churn — bir önceki HOT Cache Watchdog turunun kaydettiği HOT kümesiyle şimdiki
+  // HOT kümesi arasındaki fark. "Yeni HOT çok ama stale de çoksa" kök neden muhtemelen
+  // ÇOK ATIN AYNI ANDA HOT'A GİRMESİ; "yeni HOT az ama stale çoksa" kök neden muhtemelen
+  // cron'un KENDİSİNİN çalışmaması/yazamaması. YALNIZ HOT bu run'ın kapsamındaysa okunur/
+  // yazılır — hem gereksiz DB yazımından kaçınmak için hem de `lastRunAt`'ın
+  // `runHotCacheWatchdogIfDue`'nun (aşağıda, cron entegrasyonu) 2 saatlik kademe kapısı
+  // için GÜVENİLİR bir zaman damgası olarak kalması için (günlük WARM/COLD-only cron'un
+  // bunu "az önce HOT kontrol edildi" sanıp watchdog'u yanlışlıkla geciktirmemesi lazım).
+  let hotChurn = { newSinceLastSync: 0, lastSyncAt: null as string | null };
+  if (activeTiers.includes("HOT")) {
+    const currentHotIds = allIds.filter((id) => tierByHorse.get(id) === "HOT");
+    const prevState = await db.hotCacheWatchdogState.findUnique({ where: { id: "singleton" } }).catch(() => null);
+    const prevHotIds = new Set((prevState?.lastHotIdsJson as number[] | undefined) ?? []);
+    const newSinceLastSync = currentHotIds.filter((id) => !prevHotIds.has(id)).length;
+    hotChurn = { newSinceLastSync, lastSyncAt: prevState?.lastRunAt?.toISOString() ?? null };
+    await db.hotCacheWatchdogState
+      .upsert({
+        where: { id: "singleton" },
+        create: { id: "singleton", lastHotIdsJson: currentHotIds },
+        update: { lastHotIdsJson: currentHotIds },
+      })
+      .catch(() => {}); // bu yalnız bir izleme metriği — hata Prediction/cache akışını ASLA bloklamaz
   }
 
   // At başına birden fazla TJK isteği (profil+detay+geçmiş) bazen yavaş/kararsız
@@ -379,7 +476,7 @@ export async function syncHorseStatsCache(
   for (let i = 0; i < batch.length; i += CONCURRENCY) {
     // Her yeni grup başlamadan ÖNCE bütçe kontrolü — grup İÇİNDE kesmiyoruz (yarım kalan
     // bir upsert riski olmasın), yalnız BİR SONRAKİ grubu başlatmıyoruz.
-    if (Date.now() - fonksiyonBaslangic >= INTERNAL_RUNTIME_BUDGET_MS) {
+    if (Date.now() - fonksiyonBaslangic >= runtimeBudget) {
       stoppedByTimeBudget = true;
       break;
     }
@@ -441,5 +538,95 @@ export async function syncHorseStatsCache(
   }
   const durationMs = Date.now() - fonksiyonBaslangic;
   const remaining = Math.max(0, needsSync.length - islenenSayisi);
-  return { ok, fail, remaining, durationMs, stoppedByTimeBudget, tierCounts, tierProcessed, staleBuckets };
+  return { ok, fail, remaining, durationMs, stoppedByTimeBudget, tierCounts, tierProcessed, staleBuckets, hotUrgency, hotChurn };
+}
+
+// 2026-09-23 — HOT Cache Watchdog kademe kapısı: yalnız HOT'u, YALNIZ WARM/COLD'a
+// dokunmadan, günlük 03:00 cron'unu BEKLEMEDEN sık kontrol eder (kullanıcı tasarımı —
+// Sistem Anatomisi'nin ilk günden yakaladığı P0 bulgu: HOT kümesi gün içinde değişiyor
+// ama tazeleme yalnız 03:00'te). Hem KENDİ ayrı cron rotasından (her-2-saat, Vercel'e
+// kaydolma riski var — bkz. "Vercel Cron Kayıt Bugu") hem de zaten kanıtlanmış çalışan
+// cron'lara (agf-sync) asalak eklenerek çağrılır — HANGİSİ önce tetiklerse `lastRunAt`
+// kapısı diğerlerini gereksiz yere DB taramaktan bile alıkoyar (2 saatten taze ise
+// syncHorseStatsCache'e HİÇ girilmez, tek bir ucuz findUnique sorgusu yeterli).
+const HOT_WATCHDOG_INTERVAL_MS = 2 * 3_600_000;
+const HOT_WATCHDOG_BATCH_LIMIT = 75;
+const HOT_WATCHDOG_RUNTIME_BUDGET_MS = 200_000; // 200s — kullanıcının önerdiği 180-240s aralığının ortası
+
+export async function runHotCacheWatchdogIfDue(): Promise<
+  | { skipped: true; reason: string }
+  | (Awaited<ReturnType<typeof syncHorseStatsCache>> & { skipped: false })
+> {
+  const { db } = await import("@/lib/db");
+  const state = await db.hotCacheWatchdogState.findUnique({ where: { id: "singleton" } }).catch(() => null);
+  if (state && Date.now() - state.lastRunAt.getTime() < HOT_WATCHDOG_INTERVAL_MS) {
+    return { skipped: true, reason: `son HOT kontrolü ${Math.round((Date.now() - state.lastRunAt.getTime()) / 60_000)} dk önce — 2 saat dolmadı` };
+  }
+  const result = await syncHorseStatsCache(HOT_WATCHDOG_BATCH_LIMIT, 3, {
+    tierFilter: ["HOT"],
+    runtimeBudgetMs: HOT_WATCHDOG_RUNTIME_BUDGET_MS,
+  });
+  return { ...result, skipped: false };
+}
+
+// 2026-09-23 — Sistem Anatomisi paneli için SALT-OKUNUR anlık görüntü. Panel 15 saniyede
+// bir yenilendiği için `syncHorseStatsCache`'i (TJK'ya gerçek istek atan, saniyeler süren
+// fonksiyonu) ASLA çağıramaz — bu fonksiyon yalnız DB okur, hiçbir yazma/TJK isteği yapmaz.
+// Urgency bucket tanımları (URGENT/NEAR/NEXT + SLA'ları) syncHorseStatsCache ile AYNI
+// sabitleri kullanır — tek kaynak, panel ile gerçek watchdog'un eşiği asla birbirinden
+// SAPMAZ.
+export async function getHotCacheHealthSnapshot(): Promise<{
+  urgency: Record<HotUrgency, { total: number; stale: number }>;
+  churn: { newSinceLastSync: number; lastSyncAt: string | null };
+}> {
+  const { db } = await import("@/lib/db");
+  const { poolStartTime } = await import("@/lib/methodology/kupon-dependency-hash");
+
+  const now = Date.now();
+  const hotCutoff = new Date(now + HOT_UPCOMING_WINDOW_MS);
+
+  const hotRows = await db.runner.findMany({
+    where: {
+      scratched: false,
+      tjkAtId: { not: null },
+      race: { result: null, raceDay: { date: { gte: new Date(now - 86_400_000), lte: hotCutoff } } },
+    },
+    select: { tjkAtId: true, race: { select: { time: true, raceDay: { select: { date: true } } } } },
+  });
+
+  const nextRaceByHorse = new Map<number, Date>();
+  for (const row of hotRows) {
+    const id = row.tjkAtId!;
+    const dateIso = row.race.raceDay.date.toISOString().slice(0, 10);
+    const exact = poolStartTime(dateIso, [row.race.time]);
+    if (!exact) continue;
+    const mevcut = nextRaceByHorse.get(id);
+    if (!mevcut || exact.getTime() < mevcut.getTime()) nextRaceByHorse.set(id, exact);
+  }
+
+  const hotIds = [...new Set(hotRows.map((r) => r.tjkAtId!))];
+  const [statsRows, historyRows, watchdogState] = await Promise.all([
+    db.horseStatsCache.findMany({ where: { tjkAtId: { in: hotIds } }, select: { tjkAtId: true, updatedAt: true } }),
+    db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: hotIds } }, select: { tjkAtId: true, updatedAt: true } }),
+    db.hotCacheWatchdogState.findUnique({ where: { id: "singleton" } }).catch(() => null),
+  ]);
+  const statsUpdatedById = new Map(statsRows.map((h) => [h.tjkAtId, h.updatedAt]));
+  const historyUpdatedById = new Map(historyRows.map((h) => [h.tjkAtId, h.updatedAt]));
+
+  const urgency: Record<HotUrgency, { total: number; stale: number }> = {
+    URGENT: { total: 0, stale: 0 }, NEAR: { total: 0, stale: 0 }, NEXT: { total: 0, stale: 0 },
+  };
+  for (const id of hotIds) {
+    const bucket = hotUrgencyFor(nextRaceByHorse.get(id), now) ?? "NEXT";
+    urgency[bucket].total++;
+    const slaMs = HOT_URGENCY_SLA_MS[bucket];
+    const statsFresh = (statsUpdatedById.get(id)?.getTime() ?? 0) >= now - slaMs;
+    const historyFresh = (historyUpdatedById.get(id)?.getTime() ?? 0) >= now - slaMs;
+    if (!statsFresh || !historyFresh) urgency[bucket].stale++;
+  }
+
+  const prevHotIds = new Set((watchdogState?.lastHotIdsJson as number[] | undefined) ?? []);
+  const newSinceLastSync = hotIds.filter((id) => !prevHotIds.has(id)).length;
+
+  return { urgency, churn: { newSinceLastSync, lastSyncAt: watchdogState?.lastRunAt?.toISOString() ?? null } };
 }
