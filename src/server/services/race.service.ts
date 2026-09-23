@@ -10,6 +10,7 @@ import { breedToIrk, surfaceToPist, mesafeBucket, havuzAnahtari, eslestirSireSta
 import { fetchTodaysAltiliResults } from "./ingest/tjk-altili.adapter";
 import { findIkramiyeForHippodrome } from "@/lib/altili-match";
 import { hesaplaYarisGidisati, type AtTempoProfili, type TekYarisStil, type TempoSenaryosu } from "@/lib/methodology/pace-analizi";
+import { poolStartTime } from "@/lib/methodology/kupon-dependency-hash";
 
 /** Runner.raceStyle JSON alanından ("style" + "percent" + "veri" + "dagilim") ekranda
  *  gösterilecek değeri çıkarır. dagilim (2026-09-01, Yarış Gidişatı çalışmasıyla eklendi) —
@@ -1050,10 +1051,34 @@ export type ProgramDay = {
   weather: string | null;
 };
 
+// 2026-09-23 kullanıcı talebi — /program'daki hipodrom sekmeleri artık alfabetik değil,
+// o günün EN ERKEN yarış saatine göre sıralanıyor (ilk koşusu önce başlayan hipodrom
+// başta). poolStartTime (kupon-dependency-hash.ts) — HomeKupon auto-sync'te "havuz
+// başladı mı" kararı için kurulmuş AYNI "HH:mm Türkiye saati → UTC" dönüşümü — burada
+// reuse ediliyor, ayrı bir saat ayrıştırıcı YAZILMADI. Hiçbir yarışının saati
+// çözülemeyen bir hipodrom (time=null) kuyruğa (alfabetik) düşer.
+function hipodromOncelikSirala<T extends { hippodrome: { slug: string; name: string }; races: { time: string | null }[] }>(
+  gunler: T[],
+  dateStr: string
+): T[] {
+  const enErkenMs = new Map<T, number>();
+  for (const gun of gunler) {
+    const start = poolStartTime(dateStr, gun.races.map((r) => r.time));
+    if (start) enErkenMs.set(gun, start.getTime());
+  }
+  return [...gunler].sort((a, b) => {
+    const ta = enErkenMs.get(a), tb = enErkenMs.get(b);
+    if (ta != null && tb != null) return ta - tb;
+    if (ta != null) return -1;
+    if (tb != null) return 1;
+    return a.hippodrome.name.localeCompare(b.hippodrome.name, "tr");
+  });
+}
+
 export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
   const date = new Date(dateStr + "T00:00:00.000Z");
 
-  const [raceDays] = await Promise.all([
+  const [raceDaysHam] = await Promise.all([
     db.raceDay.findMany({
     where: { date: { gte: startOfDay(date), lte: endOfDay(date) } },
     // v6.105 — kullanıcı bulgusu 2026-08-24 ("mobilde çok geç açılıyor"): bu derin iç içe
@@ -1101,6 +1126,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     orderBy: { hippodrome: { name: "asc" } },
     }),
   ]);
+  const raceDays = hipodromOncelikSirala(raceDaysHam, dateStr);
 
   // "Karma" hipodromu, gerçek koşuların kombine bahis için aynadaki (mirror) kopyasıdır —
   // idman/yarış stili senkronu "karma" için hiç çalışmaz (gerçek tekil hipodrom değil), bu
