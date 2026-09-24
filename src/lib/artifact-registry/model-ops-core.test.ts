@@ -34,7 +34,7 @@ const rid = (k: number) => `race-${String(k).padStart(4, "0")}`;
 const BASE_MS = Date.UTC(2026, 8, 1, 10, 0, 0);
 const COHORT_START = "2026-09-01T00:00:00.000Z";
 
-interface RaceDef { startMs: number; winners: number[] | null; segment: string; cohort: CohortType; predAtMs: number; gitCommit: string }
+interface RaceDef { payloadCohort?: CohortType; startMs: number; winners: number[] | null; segment: string; cohort: CohortType; predAtMs: number; gitCommit: string }
 
 /** Sahte dünya: yarış tanımları + yükleme sayacı. Tahmin (probs) yarış numarasından deterministik; sonuç (winners) değiştirilebilir. */
 function makeWorld(n: number) {
@@ -53,14 +53,14 @@ function makeWorld(n: number) {
   };
   const fpOf = (d: RaceDef) => (d.winners ? `w${d.winners.join("+")}` : undefined);
   const source: ModelOpsRaceSource = {
-    listRaces: async () => [...defs.entries()].map(([raceId, d]) => ({ raceId, resultFingerprint: fpOf(d), raceStartAt: new Date(d.startMs).toISOString() })),
+    listRaces: async () => [...defs.entries()].map(([raceId, d]) => ({ raceId, resultFingerprint: fpOf(d), raceStartAt: new Date(d.startMs), cohortType: d.cohort, raceStatus: d.winners ? "COMPLETED" : "STARTED" })),
     loadRace: async (raceId) => {
       loads.push(raceId);
       const d = defs.get(raceId)!;
       if (!d.winners) return PENDING;
       const k = Number(raceId.slice(5));
       const p: ModelOpsRacePayload = {
-        predictionId: `pred-${raceId}`, cohortType: d.cohort, raceStartAt: new Date(d.startMs).toISOString(), predictionCreatedAt: new Date(d.predAtMs).toISOString(),
+        predictionId: `pred-${raceId}`, cohortType: d.payloadCohort ?? d.cohort, raceStartAt: new Date(d.startMs).toISOString(), predictionCreatedAt: new Date(d.predAtMs).toISOString(),
         gitCommit: d.gitCommit, segment: d.segment, resultFingerprint: fpOf(d)!, winnerNos: d.winners, probs: probsFor(k),
       };
       return p;
@@ -82,7 +82,7 @@ function clock() {
 }
 
 const run = (world: World, over: Partial<Parameters<typeof runRaceEvaluations>[0]> = {}) =>
-  runRaceEvaluations({ identity: identity(), source: world.source, root, log: quiet, now: clock(), ...over });
+  runRaceEvaluations({ identity: identity(), source: world.source, root, log: quiet, now: clock(), asOf: new Date(BASE_MS).toISOString(), ...over });
 
 // ── Bağımsız kaba kuvvet referansı: aggregate/ring kodunu PAYLAŞMAZ ─────────────────────────────────────────────────
 interface Ref { id: string; startMs: number; ll: number; top1: boolean; top3: boolean; rank: number; p: number; bmP: boolean; bmR: boolean; segment: string }
@@ -333,12 +333,22 @@ describe("artımlı işletim (Registry üzerinde)", () => {
     expect(r.pendingRaceIds).toEqual([rid(400)]);
   });
 
-  it("11) LIVE ve REPLAY karışmaz: kaynak/cohort uyuşmazlığı fail-closed, aggregate çapraz kabul etmez, dizinler ayrı", async () => {
+  it("11) LIVE ve REPLAY karışmaz: descriptor cohort uyuşmazlığı ADAPTER_CONTRACT_VIOLATION, payload uyuşmazlığı item hatası, aggregate çapraz kabul etmez, dizinler ayrı", async () => {
+    // (a) payload düzeyi savunma: descriptor LIVE der ama yükleme REPLAY döner → item fail-closed
+    const wp = makeWorld(10);
+    wp.defs.get(rid(3))!.payloadCohort = "REPLAY";
+    const p = await run(wp, { root: path.join(root, "payload") });
+    expect(p.job.stats.failed).toBe(1);
+    expect(Object.keys(p.job.manifest.failedItems)).toEqual([rid(3)]);
+    expect(p.windows.ALL.n).toBe(9);
+
+    // (b) descriptor düzeyi: REPLAY yarış LIVE artifact'ına listelenirse sözleşme ihlali (işlenmez, sessizce atlanmaz)
     const w = makeWorld(10);
     w.defs.get(rid(3))!.cohort = "REPLAY";
     const live = await run(w);
-    expect(live.job.stats.failed).toBe(1);
-    expect(Object.keys(live.job.manifest.failedItems)).toEqual([rid(3)]);
+    expect(live.contractViolations).toHaveLength(1);
+    expect(live.contractViolations[0].problems.join(" ")).toMatch(/LIVE ve REPLAY karışamaz/);
+    expect(w.loads.includes(rid(3))).toBe(false);
     expect(live.windows.ALL.n).toBe(9);
     expect(live.windows.cohortType).toBe("LIVE");
     expect(live.evaluations.has(rid(3))).toBe(false); // uyuşmayan kayıt HİÇ saklanmadı (yalnız aggregate'ten değil, kalıcı kayıttan da dışarıda)

@@ -44,7 +44,8 @@ function makeSource(n: number, opts: { pendingFrom?: number } = {}) {
   }
   const source: ModelOpsRaceSource = {
     listRaces: async () => [...winners.entries()].map(([raceId, w]) => ({
-      raceId, resultFingerprint: w === null ? undefined : `w${w}`, raceStartAt: hideStart.has(raceId) ? undefined : new Date(starts.get(raceId)!).toISOString(),
+      raceId, resultFingerprint: w === null ? undefined : `w${w}`, cohortType: "LIVE" as const, raceStatus: w === null ? ("STARTED" as const) : ("COMPLETED" as const),
+      raceStartAt: (hideStart.has(raceId) ? undefined : new Date(starts.get(raceId)!)) as Date,
     })),
     loadRace: async (raceId) => {
       const w = winners.get(raceId);
@@ -61,7 +62,7 @@ function makeSource(n: number, opts: { pendingFrom?: number } = {}) {
 }
 
 const evalRun = (source: ModelOpsRaceSource, over: Partial<Parameters<typeof runRaceEvaluations>[0]> = {}) =>
-  runRaceEvaluations({ identity: ident(), source, root, log: quiet, ...over });
+  runRaceEvaluations({ identity: ident(), source, root, log: quiet, asOf: new Date(BASE).toISOString(), ...over }); // asOf sabit: bekleyenler STALE sayılmaz
 
 async function snapshotOf(source: ModelOpsRaceSource, version: number, publishedAt = "2031-01-01T00:00:00.000Z"): Promise<ModelOpsSnapshot> {
   const result = await evalRun(source);
@@ -138,18 +139,19 @@ describe("snapshot üretimi (saf veri yapısı)", () => {
     expect(s.status).toBe("VALID");
     expect(s.computedThroughRaceAt).toBe(new Date(BASE + 19 * 600_000).toISOString());
     expect(s.windows.ALL.n).toBe(18);
-    expect(s.quality.excluded).toEqual({ preCohort: 1, postStart: 1 });
+    expect(s.quality.excluded).toEqual({ preCohort: 1, postStart: 1, cancelled: 0, void: 0 });
     expect(s.quality.unresolved).toBe(0);
   });
 
-  it("INCOMPLETE yalnız watermark GÜVENLE belirlenemiyorsa: çözülmemiş yarışın raceStartAt'i bilinmiyorsa", async () => {
+  it("INCOMPLETE yalnız adaptör sözleşmesi ihlal edilirse (raceStartAt yok): işlenmez, raporlanır, yayınlanmaz", async () => {
     const { source, winners, hideStart } = makeSource(30);
     winners.set(rid(10), null);
     hideStart.add(rid(10));
     const r = await evalRun(source);
     const s = buildSnapshot({ identity: ident(), result: r, snapshotVersion: 1, publishedAt: "t" });
     expect(s.status).toBe("INCOMPLETE");
-    expect(s.quality.reasons).toEqual(["UNRESOLVED_WITHOUT_START_1"]);
+    expect(s.quality.reasons).toEqual(["ADAPTER_CONTRACT_VIOLATION_1"]);
+    expect(s.quality.contractViolations).toBe(1);
     expect(s.computedThroughRaceAt).toBeNull();
     expect(publishSnapshot(new InMemorySnapshotSink(), () => s).outcome).toBe("REJECTED");
   });
@@ -239,14 +241,16 @@ describe("atomik lastGoodSnapshot semantiği", () => {
   it("watermark GERİ GİTMEZ: eski zamanlı yeni bir çözülmemiş yarış çıkarsa lastGood korunur; çözülünce yayın devam eder", async () => {
     const { source, winners, starts } = makeSource(40);
     const sink = new InMemorySnapshotSink();
-    const mk = (r: Awaited<ReturnType<typeof evalRun>>, at: string) => (v: number) => buildSnapshot({ identity: ident(), result: r, snapshotVersion: v, publishedAt: at });
+    const mk = (r: Awaited<ReturnType<typeof evalRun>>, at: string) => (v: number, active: ModelOpsSnapshot | null) => buildSnapshot({ identity: ident(), result: r, previous: active, snapshotVersion: v, publishedAt: at });
     publishSnapshot(sink, mk(await evalRun(source), "T1"));
     expect(sink.getActive()!.computedThroughRaceAt).toBe(new Date(BASE + 39 * 600_000).toISOString());
 
     winners.set("race-late", null); // sonradan listelenen, zaman olarak ESKİ ve henüz sonuçsuz yarış
     starts.set("race-late", BASE + 10 * 600_000 + 1);
     const blocked = publishSnapshot(sink, mk(await evalRun(source), "T2"));
-    expect(blocked.outcome === "REJECTED" && blocked.reasons).toContain("WATERMARK_REGRESSION");
+    expect(blocked.outcome === "REJECTED" && blocked.reasons).toContain("LATE_GAP_BEFORE_WATERMARK");
+    expect(blocked.health.lateGapBeforeWatermark).toBe(true);
+    expect(blocked.health.lateGapRaceIds).toEqual(["race-late"]);
     expect(sink.getActive()!.snapshotVersion).toBe(1); // lastGood aynen aktif
     expect(sink.getActive()!.windows.ALL.n).toBe(40);
 
