@@ -352,6 +352,22 @@ model AgfCronRunState {
   recentRunsJson Json? // son 10 GERÇEK tetiklenme zaman damgası (observed cadence için)
 }
 
+// 2026-09-24 — Program Sync sensörü: /api/cron/ingest-program (ingestDate, bugün+yarın,
+// günde 6 kez) kendi çalışma geçmişini bu singleton'a yazar. AgfCronRunState/
+// HotCacheWatchdogState ile AYNI desen — Availability+Freshness için. Completeness/
+// Correctness ise BUNDAN değil, sistem-health route'unun kendi CANLI DB sorgularından
+// (source vs stored karşılaştırması) hesaplanır — cron'un "başarılı" dediğine güvenmek
+// yerine gerçekten DB'de ne olduğu ayrıca doğrulanır.
+model ProgramCronRunState {
+  id             String    @id @default("singleton")
+  lastAttemptAt  DateTime?
+  lastSuccessAt  DateTime?
+  lastDurationMs Int?
+  lastError      String?
+  lastResultJson Json? // { today: {date, cities:[{sehirId,sehirAdi,ok,races,runners,error?}]}, tomorrow: {...} }
+  recentRunsJson Json?
+}
+
 /**
  * TJK'nın "At Koşu Bilgileri" tam yarış geçmişi tablosunun (tjk-at-performans.adapter.ts)
  * KALICI önbelleği — kullanıcı talebi 2026-07-30: analiz (Faz1/veri-toplama.ts) ve public

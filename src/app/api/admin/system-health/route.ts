@@ -4,7 +4,9 @@ import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
 import type { HealthStatus, SystemModuleHealth } from "@/lib/system-anatomy/types";
 import { CRON_DECLARED, CRON_REGISTERED_SNAPSHOT } from "@/lib/system-anatomy/cron-registry";
+import { SYSTEM_ANATOMY_NODES } from "@/lib/system-anatomy/registry";
 import type { AgfSyncResult } from "@/server/services/agf-sync";
+import type { IngestCityResult } from "@/server/services/ingest/tjk-info.adapter";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -317,6 +319,183 @@ async function agfSyncHealth(): Promise<ModuleResult> {
   }
 }
 
+// 2026-09-24 — Program Sync sensörü (kullanıcı spesifikasyonu). Dört eksen:
+// Availability (ProgramCronRunState — cron GERÇEKTEN çalıştı mı), Freshness (son başarılı
+// çalışma yaşı, cadence'e GÖRELİ eşik — sabit "6 saat" değil), Completeness (source vs
+// stored race/runner sayıları — cron'un "başarılı" demesine güvenilmez, DB'de GERÇEKTEN ne
+// var CANLI sorgulanır), Correctness (duplicate raceNo/runner, 0-runner yarış, eksik
+// startTime, eksik tjkAtId oranı). "Kaynak" sayı yalnız TÜM şehirler ok:true ise güvenilir —
+// bir şehir hata verdiyse completeness PARTIAL_OBSERVABILITY (unknown), sahte kırmızı/yeşil
+// üretilmez.
+async function programSyncHealth(): Promise<ModuleResult> {
+  try {
+    const state = await db.programCronRunState.findUnique({ where: { id: "singleton" } });
+
+    const dayStart = new Date();
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(dayStart);
+    tomorrowStart.setUTCDate(tomorrowStart.getUTCDate() + 1);
+    const dayAfterTomorrow = new Date(tomorrowStart);
+    dayAfterTomorrow.setUTCDate(dayAfterTomorrow.getUTCDate() + 1);
+
+    if (!state) {
+      return {
+        id: "program",
+        title: "PROGRAM",
+        status: "warning",
+        description: "Program Sync cron'u henüz hiç çalışmadı",
+        metrics: [],
+        checks: [{ id: "program-availability", label: "Program Sync cron çalıştı", ok: false, detail: "Kayıt yok" }],
+        lastCheckedAt: nowIso(),
+      };
+    }
+
+    const declared = CRON_DECLARED["ingest-program"]!;
+    const attemptAgeH = ageMinutes(state.lastAttemptAt) == null ? null : ageMinutes(state.lastAttemptAt)! / 60;
+    const successAgeH = ageMinutes(state.lastSuccessAt) == null ? null : ageMinutes(state.lastSuccessAt)! / 60;
+
+    // TJK program güncellemeleri yalnız gün içi (declared: 05-17 UTC) beklenir — 17→05
+    // arasındaki ~12s doğal boşluğu "arıza" saymamak için gündüz/gece ayrımı (AGF'deki
+    // AYNI desen).
+    const hourUtc = new Date().getUTCHours();
+    const activeHours = hourUtc >= 4 && hourUtc <= 19;
+    const healthyMaxH = declared.cadenceHours * 1.25;
+    const warningMaxH = declared.cadenceHours * 2;
+
+    let availabilityOk: boolean | null = null;
+    let freshnessLevel: Status = "healthy";
+    if (activeHours) {
+      availabilityOk = attemptAgeH != null && attemptAgeH <= warningMaxH;
+      if (successAgeH == null || successAgeH > warningMaxH) freshnessLevel = "critical";
+      else if (successAgeH > healthyMaxH) freshnessLevel = "warning";
+    }
+
+    // Completeness — source (son BAŞARILI ingest'in raporladığı) vs stored (DB'de CANLI).
+    const lastResult = state.lastResultJson as { today: { date: string; cities: IngestCityResult[] }; tomorrow: { date: string; cities: IngestCityResult[] } } | null;
+    const buildCompleteness = async (
+      label: "today" | "tomorrow",
+      windowStart: Date,
+      windowEnd: Date,
+      cities: IngestCityResult[] | undefined
+    ) => {
+      const [storedRaces, storedRunners, storedHippodromes] = await Promise.all([
+        db.race.count({ where: { raceDay: { date: { gte: windowStart, lt: windowEnd } } } }),
+        db.runner.count({ where: { race: { raceDay: { date: { gte: windowStart, lt: windowEnd } } } } }),
+        db.raceDay.count({ where: { date: { gte: windowStart, lt: windowEnd } } }),
+      ]);
+      if (!cities) return { label, observable: false as const, storedRaces, storedRunners, storedHippodromes };
+      const allOk = cities.every((c) => c.ok);
+      const sourceRaces = cities.reduce((s, c) => s + c.races, 0);
+      const sourceRunners = cities.reduce((s, c) => s + c.runners, 0);
+      const sourceHippodromes = cities.length;
+      return {
+        label,
+        observable: allOk as boolean,
+        sourceRaces,
+        sourceRunners,
+        sourceHippodromes,
+        storedRaces,
+        storedRunners,
+        storedHippodromes,
+        failedCities: cities.filter((c) => !c.ok).map((c) => `${c.sehirAdi}${c.error ? `: ${c.error}` : ""}`),
+      };
+    };
+
+    const [todayCompleteness, tomorrowCompleteness] = await Promise.all([
+      buildCompleteness("today", dayStart, tomorrowStart, lastResult?.today.cities),
+      buildCompleteness("tomorrow", tomorrowStart, dayAfterTomorrow, lastResult?.tomorrow.cities),
+    ]);
+
+    // Correctness — CANLI DB doğrulaması, cron'un raporuna bağımlı DEĞİL.
+    const [todayRaceRows, tomorrowRaceRows, todayRunnerCounts, tomorrowRunnerCounts, activeRunnerStats] = await Promise.all([
+      db.race.findMany({ where: { raceDay: { date: { gte: dayStart, lt: tomorrowStart } } }, select: { id: true, raceDayId: true, raceNo: true, time: true } }),
+      db.race.findMany({ where: { raceDay: { date: { gte: tomorrowStart, lt: dayAfterTomorrow } } }, select: { id: true, raceDayId: true, raceNo: true, time: true } }),
+      db.runner.groupBy({ by: ["raceId"], where: { race: { raceDay: { date: { gte: dayStart, lt: tomorrowStart } } } }, _count: { id: true } }),
+      db.runner.groupBy({ by: ["raceId"], where: { race: { raceDay: { date: { gte: tomorrowStart, lt: dayAfterTomorrow } } } }, _count: { id: true } }),
+      db.runner.aggregate({
+        where: { scratched: false, race: { raceDay: { date: { gte: dayStart, lt: dayAfterTomorrow } } } },
+        _count: { id: true },
+      }),
+    ]);
+    const missingTjkAtId = await db.runner.count({
+      where: { scratched: false, tjkAtId: null, race: { raceDay: { date: { gte: dayStart, lt: dayAfterTomorrow } } } },
+    });
+
+    const allRaces = [...todayRaceRows, ...tomorrowRaceRows];
+    const raceNoKey = (r: { raceDayId: string; raceNo: number }) => `${r.raceDayId}#${r.raceNo}`;
+    const raceNoCounts = new Map<string, number>();
+    for (const r of allRaces) raceNoCounts.set(raceNoKey(r), (raceNoCounts.get(raceNoKey(r)) ?? 0) + 1);
+    const duplicateRaceNoCount = [...raceNoCounts.values()].filter((c) => c > 1).length;
+
+    const runnerCountByRace = new Map<string, number>();
+    for (const g of [...todayRunnerCounts, ...tomorrowRunnerCounts]) runnerCountByRace.set(g.raceId, g._count.id);
+    const zeroRunnerRaces = allRaces.filter((r) => (runnerCountByRace.get(r.id) ?? 0) === 0).length;
+    const missingStartTime = allRaces.filter((r) => !r.time).length;
+
+    const activeRunnerTotal = activeRunnerStats._count.id;
+    const identityMissingRate = activeRunnerTotal > 0 ? missingTjkAtId / activeRunnerTotal : 0;
+
+    // Genel durum: freshness kritikse kritik; completeness gözlemlenebilir VE eksikse
+    // (kaynak≠depo) uyarı; correctness anomalileri (duplicate/0-runner) uyarı.
+    const completenessIssues =
+      (todayCompleteness.observable && "sourceRaces" in todayCompleteness && todayCompleteness.sourceRaces !== todayCompleteness.storedRaces) ||
+      (tomorrowCompleteness.observable && "sourceRaces" in tomorrowCompleteness && tomorrowCompleteness.sourceRaces !== tomorrowCompleteness.storedRaces);
+    const correctnessIssues = duplicateRaceNoCount > 0 || zeroRunnerRaces > 0 || missingStartTime > 0 || identityMissingRate > 0.05;
+
+    let status: Status = freshnessLevel;
+    if (activeHours && availabilityOk === false) status = "critical";
+    if (status !== "critical" && (completenessIssues || correctnessIssues)) status = "warning";
+
+    const fmtCompleteness = (c: Awaited<ReturnType<typeof buildCompleteness>>) => {
+      if (!c.observable || !("sourceRaces" in c)) return `${c.storedRaces} yarış (kaynak gözlemlenemedi)`;
+      return `${c.storedRaces}/${c.sourceRaces} yarış · ${c.storedRunners}/${c.sourceRunners} koşucu · ${c.storedHippodromes}/${c.sourceHippodromes} hipodrom`;
+    };
+
+    return {
+      id: "program",
+      title: "PROGRAM",
+      status,
+      description: "Program Sync cron'u (bugün+yarın) — availability/freshness/completeness/correctness",
+      metrics: [
+        { label: "Son deneme", value: attemptAgeH == null ? "hiç" : `${attemptAgeH.toFixed(1)} saat önce` },
+        { label: "Son başarı", value: successAgeH == null ? "hiç" : `${successAgeH.toFixed(1)} saat önce` },
+        { label: "İstenen cadence", value: declared.humanCadence },
+        { label: "Son çalışma süresi", value: state.lastDurationMs == null ? "-" : `${(state.lastDurationMs / 1000).toFixed(1)} sn` },
+        { label: "Bugün", value: fmtCompleteness(todayCompleteness) },
+        { label: "Yarın", value: fmtCompleteness(tomorrowCompleteness) },
+        { label: "Duplicate raceNo", value: duplicateRaceNoCount },
+        { label: "0-runner yarış", value: zeroRunnerRaces },
+        { label: "Eksik startTime", value: missingStartTime },
+        { label: "tjkAtId eksik oranı", value: `${missingTjkAtId}/${activeRunnerTotal} (%${(identityMissingRate * 100).toFixed(1)})` },
+        ...(state.lastError ? [{ label: "Son hata", value: state.lastError }] : []),
+      ],
+      checks: [
+        { id: "program-availability", label: "Cron aktif saatlerde çalıştı", ok: activeHours ? availabilityOk : null, detail: activeHours ? `${attemptAgeH?.toFixed(1) ?? "-"} saat önce` : "gece modu — beklenen boşluk" },
+        { id: "program-freshness-today", label: "Bugünkü program taze", ok: activeHours ? freshnessLevel === "healthy" : null, detail: successAgeH == null ? "hiç başarılı çalışma yok" : `${successAgeH.toFixed(1)} saat önce (eşik ${healthyMaxH.toFixed(1)}/${warningMaxH.toFixed(1)}s)` },
+        {
+          id: "program-completeness",
+          label: "Kaynak = Depo (yarış/koşucu/hipodrom)",
+          ok: !todayCompleteness.observable || !tomorrowCompleteness.observable ? null : !completenessIssues,
+          detail: `Bugün: ${fmtCompleteness(todayCompleteness)}${!todayCompleteness.observable ? " [PARTIAL_OBSERVABILITY]" : ""} · Yarın: ${fmtCompleteness(tomorrowCompleteness)}${!tomorrowCompleteness.observable ? " [PARTIAL_OBSERVABILITY]" : ""}`,
+        },
+        { id: "program-correctness", label: "Mantıksal bütünlük (duplicate/0-runner/eksik alan)", ok: !correctnessIssues, detail: `duplicate raceNo=${duplicateRaceNoCount}, 0-runner=${zeroRunnerRaces}, eksik startTime=${missingStartTime}, tjkAtId eksik=%${(identityMissingRate * 100).toFixed(1)}` },
+      ],
+      lastCheckedAt: nowIso(),
+    };
+  } catch (error) {
+    return {
+      id: "program",
+      title: "PROGRAM",
+      status: "unknown",
+      description: "Program Sync health ölçülemedi",
+      metrics: [],
+      checks: [],
+      errorMessage: error instanceof Error ? error.message : "Program sync error",
+      lastCheckedAt: nowIso(),
+    };
+  }
+}
+
 // DÜZELTME (2026-09-23): ChallengerRun'da `createdAt` alanı YOK — gerçek alan `computedAt`
 // (bkz. prisma/schema.prisma:564). Yanlış alan adı build'i kırardı.
 async function challengerHealth(): Promise<ModuleResult> {
@@ -424,13 +603,100 @@ function unmeasuredModule(id: string, title: string, description: string): Modul
   };
 }
 
+// 2026-09-24 — Dependency Propagation temeli (kullanıcı talebi: "Program sensörüyle birlikte
+// bu altyapının temelini şimdi kur"). registry.ts'teki `dependencies` grafiği üzerinde
+// topolojik sırayla ilerler: her modülün NİHAİ durumu, kendi sensörünün ölçtüğü `selfStatus`
+// ile bağımlılıklarının NİHAİ durumundan sızan `dependencyStatus`'un birleşimidir.
+//
+// Kasıtlı tasarım kararları:
+// - `unknown` (henüz ölçülmeyen) bağımlılıklar PROPAGATE OLMAZ — şu an çoğu modül henüz
+//   sensöre bağlı değil, "unknown" sızdırılsaydı TÜM panel gürültüyle dolardı. Yalnız
+//   warning/critical sızar.
+// - Bir bağımlılığın warning/critical olması bağımlıyı doğrudan critical YAPMAZ, yalnız
+//   "warning/DEGRADED" statüsüne çeker — "kalp çalışıyor ama kan gelmiyorsa sorun kalpte
+//   değildir" ilkesi. Yalnız modülün KENDİ sensörü critical derse nihai durum critical olur.
+function propagateDependencies(modules: ModuleResult[]): ModuleResult[] {
+  const byId = new Map(modules.map((m) => [m.id, m]));
+  const propagationWeight: Record<Status, number> = { healthy: 0, unknown: 0, warning: 1, critical: 2 };
+
+  const inDegree = new Map<string, number>();
+  const dependents = new Map<string, string[]>(); // dep id -> [modules that depend on it]
+  for (const node of SYSTEM_ANATOMY_NODES) {
+    inDegree.set(node.id, (node.dependencies ?? []).length);
+    for (const dep of node.dependencies ?? []) {
+      if (!dependents.has(dep)) dependents.set(dep, []);
+      dependents.get(dep)!.push(node.id);
+    }
+  }
+
+  const queue: string[] = [...inDegree.entries()].filter(([, d]) => d === 0).map(([id]) => id);
+  const order: string[] = [];
+  const remaining = new Map(inDegree);
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    order.push(id);
+    for (const dependent of dependents.get(id) ?? []) {
+      remaining.set(dependent, remaining.get(dependent)! - 1);
+      if (remaining.get(dependent) === 0) queue.push(dependent);
+    }
+  }
+
+  const nodesById = new Map(SYSTEM_ANATOMY_NODES.map((n) => [n.id, n]));
+  const overallById = new Map<string, Status>();
+  for (const id of order) {
+    const mod = byId.get(id);
+    const selfStatus: Status = mod?.status ?? "unknown";
+    let dependencyStatus: Status | null = null;
+    for (const dep of nodesById.get(id)?.dependencies ?? []) {
+      const depOverall = overallById.get(dep) ?? "unknown";
+      if (propagationWeight[depOverall] > 0 && (dependencyStatus == null || propagationWeight[depOverall] > propagationWeight[dependencyStatus])) {
+        dependencyStatus = depOverall;
+      }
+    }
+
+    let finalStatus: Status;
+    let degradedByDependency = false;
+    if (selfStatus === "critical") {
+      finalStatus = "critical";
+    } else if (dependencyStatus === "critical" || dependencyStatus === "warning") {
+      finalStatus = "warning";
+      degradedByDependency = true;
+    } else {
+      finalStatus = selfStatus;
+    }
+
+    overallById.set(id, finalStatus);
+    if (mod) {
+      mod.selfStatus = selfStatus;
+      mod.dependencyStatus = dependencyStatus;
+      mod.degradedByDependency = degradedByDependency;
+      mod.status = finalStatus;
+    }
+  }
+
+  // Registry'de tanımsız bir modül (olmamalı) — dokunma, yalnız selfStatus'u yansıt.
+  for (const mod of modules) {
+    if (!overallById.has(mod.id)) mod.selfStatus = mod.status;
+  }
+
+  return modules;
+}
+
 export async function GET() {
   const session = await auth();
   if (!session?.user || !hasRole(session.user.role as Role, "EDITOR")) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }
 
-  const results = await Promise.allSettled([databaseHealth(), cacheHealth(), challengerHealth(), predictionHealth(), cronHealth(), agfSyncHealth()]);
+  const results = await Promise.allSettled([
+    databaseHealth(),
+    cacheHealth(),
+    challengerHealth(),
+    predictionHealth(),
+    cronHealth(),
+    agfSyncHealth(),
+    programSyncHealth(),
+  ]);
 
   const modules: ModuleResult[] = [];
   for (const result of results) {
@@ -439,12 +705,13 @@ export async function GET() {
 
   // Henüz gerçek sensörü olmayan modüller — bkz. unmeasuredModule notu.
   modules.push(unmeasuredModule("data-source", "VERİ TOPLAMA", "TJK / program / yarış verileri"));
-  modules.push(unmeasuredModule("program", "PROGRAM", "Günlük yarış programı"));
   modules.push(unmeasuredModule("results", "SONUÇLAR", "Yarış sonuçları"));
   modules.push(unmeasuredModule("coupon", "KUPON ÜRETİMİ", "Kupon oluşturma"));
   modules.push(unmeasuredModule("calibration", "KALİBRASYON", "Probability calibration"));
   modules.push(unmeasuredModule("site", "SITE / API", "Web ve API"));
   modules.push(unmeasuredModule("model-health", "MODEL SAĞLIĞI", "Model monitoring"));
+
+  propagateDependencies(modules);
 
   const statusWeight: Record<Status, number> = { healthy: 0, unknown: 1, warning: 2, critical: 3 };
 

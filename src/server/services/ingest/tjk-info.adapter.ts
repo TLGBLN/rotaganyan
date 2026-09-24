@@ -498,3 +498,45 @@ export async function ingestDate(
 
   return { date: tjkDate, cities: results };
 }
+
+// 2026-09-24 — Sistem Anatomisi Program sensörü: /api/cron/ingest-program kendi çalışma
+// geçmişini (availability/freshness ölçümü için) bu singleton'a yazar — AgfCronRunState/
+// HotCacheWatchdogState ile AYNI desen. Completeness/correctness system-health route'unda
+// CANLI DB sorgularıyla ayrıca hesaplanır (bu kayda güvenilmez, yalnız "cron çalıştı mı"
+// sorusuna cevap verir).
+const PROGRAM_RECENT_RUNS_MAX = 10;
+export async function recordProgramCronRun(outcome: {
+  ok: boolean;
+  durationMs: number;
+  result?: { today: { date: string; cities: IngestCityResult[] }; tomorrow: { date: string; cities: IngestCityResult[] } };
+  error?: string;
+}): Promise<void> {
+  const { db } = await import("@/lib/db");
+  const now = new Date();
+  const prev = await db.programCronRunState.findUnique({ where: { id: "singleton" } }).catch(() => null);
+  const prevRuns = Array.isArray(prev?.recentRunsJson) ? (prev!.recentRunsJson as string[]) : [];
+  const recentRunsJson = [...prevRuns, now.toISOString()].slice(-PROGRAM_RECENT_RUNS_MAX);
+
+  await db.programCronRunState
+    .upsert({
+      where: { id: "singleton" },
+      create: {
+        id: "singleton",
+        lastAttemptAt: now,
+        lastSuccessAt: outcome.ok ? now : null,
+        lastDurationMs: outcome.durationMs,
+        lastResultJson: outcome.ok ? outcome.result : (prev?.lastResultJson ?? undefined),
+        lastError: outcome.ok ? null : (outcome.error ?? null),
+        recentRunsJson,
+      },
+      update: {
+        lastAttemptAt: now,
+        lastDurationMs: outcome.durationMs,
+        ...(outcome.ok
+          ? { lastSuccessAt: now, lastResultJson: outcome.result, lastError: null }
+          : { lastError: outcome.error ?? "bilinmeyen hata" }),
+        recentRunsJson,
+      },
+    })
+    .catch(() => {}); // yalnız izleme metriği — program ingest'i ASLA bloklamaz
+}

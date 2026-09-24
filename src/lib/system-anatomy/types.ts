@@ -18,7 +18,19 @@ export type SystemModuleHealth = {
   title: string;
   subtitle?: string;
 
+  // `status` = NİHAİ/overall durum (self ⊔ dependency propagation sonrası) — dashboard'un
+  // düğüm rengini boyamak için kullanması gereken alan budur.
   status: HealthStatus;
+
+  // 2026-09-24 — Dependency Propagation temeli: bir modülün KENDİ sensörünün ölçtüğü durum
+  // (`selfStatus`) ile bağımlı olduğu modüllerden sızan durum (`dependencyStatus`) ayrı
+  // tutulur — "kalp çalışıyor ama kan gelmiyorsa sorun kalpte değildir" ayrımı. Her ikisi de
+  // system-health/route.ts'teki propagateDependencies() tarafından GET() içinde, health-check
+  // fonksiyonlarının döndürdüğü ham `status` üzerinden hesaplanıp doldurulur — tek tek
+  // health-check fonksiyonları bunları BİLMEZ/hesaplamaz.
+  selfStatus?: HealthStatus;
+  dependencyStatus?: HealthStatus | null;
+  degradedByDependency?: boolean;
 
   description: string;
 

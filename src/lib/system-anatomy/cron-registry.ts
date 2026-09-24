@@ -24,6 +24,7 @@ export type CronDeclaredInfo = {
 export const CRON_DECLARED: Record<string, CronDeclaredInfo> = {
   "hot-cache-watchdog": { schedule: "0 */2 * * *", humanCadence: "2 saatte bir", cadenceHours: 2 },
   "agf-sync": { schedule: "0 9,12,15,18 * * *", humanCadence: "günde 4 kez (09/12/15/18 UTC)", cadenceHours: 3 },
+  "ingest-program": { schedule: "0 5,8,11,13,15,17 * * *", humanCadence: "günde 6 kez (05/08/11/13/15/17 UTC)", cadenceHours: 2.4 },
 };
 
 export type CronRegisteredSnapshot = {
@@ -40,8 +41,13 @@ export const CRON_REGISTERED_SNAPSHOT: Record<string, CronRegisteredSnapshot> = 
     note: "vercel.json'da tanımlı, `vercel deploy --prod` sonrasında bile Vercel'in cron kaydına hiç işlenmedi (7. bilinen örnek — bkz. proje hafızası). Fiili tetiklenme yalnız agf-sync piggyback'ine bağlı.",
   },
   "agf-sync": {
-    status: "modified",
-    checkedAt: "2026-09-23",
-    note: "Path Vercel'e kayıtlı, ama `vercel crons ls` yerel vercel.json ile Vercel'in kayıtlı saatleri arasında fark gösterdi (schedule drift, henüz araştırılmadı — result-sync'te de aynı desen var).",
+    status: "confirmed",
+    checkedAt: "2026-09-24",
+    note: "Path Vercel'e kayıtlı. `vercel crons ls` bazı saatleri 'modified' gösteriyor ama bu AYNI path'e birden fazla schedule eklendiğinde diff algoritmasının kafa karışıklığı (bilinen false-alarm deseni, bkz. proje hafızası) — ingest-program'da da aynı desen var, result-sync'teki (tek schedule, gerçek zaman farkı) ile KARIŞTIRILMAMALI.",
+  },
+  "ingest-program": {
+    status: "confirmed",
+    checkedAt: "2026-09-24",
+    note: "6 declared saatten 3'ü (05/08/11 UTC) Vercel'de birebir kayıtlı görünüyor, kalan 3'ü (13/15/17 UTC) 'modified' — bu da agf-sync'teki AYNI çok-schedule/tek-path diff false-alarm deseni, gerçek bir eksiklik değil.",
   },
 };
