@@ -220,7 +220,7 @@ export interface RaceExclusionRecord {
 export type RaceOutcomeRecord = RaceEvaluationRecord | RaceExclusionRecord;
 
 /** Saf: LIVE uygunluğu. LIVE değilse (REPLAY) her zaman uygun; LIVE'da cohort öncesi/yarış sonrası tahmin dışlanır. */
-export function classifyLiveEligibility(model: ModelIdentity, race: Pick<ModelOpsRacePayload, "predictionCreatedAt" | "raceStartAt">): ExclusionStatus | null {
+export function classifyLiveEligibility(model: Pick<ModelIdentity, "cohortType" | "cohortStartAt">, race: Pick<ModelOpsRacePayload, "predictionCreatedAt" | "raceStartAt">): ExclusionStatus | null {
   if (model.cohortType !== "LIVE") return null;
   const created = Date.parse(canonicalIso(race.predictionCreatedAt, "predictionCreatedAt")); // geçersiz zaman sessizce "uygun" sayılmaz
   const start = Date.parse(canonicalIso(race.raceStartAt, "raceStartAt"));
