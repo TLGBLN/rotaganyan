@@ -169,8 +169,18 @@ export async function runIncrementalJob<R, A = unknown>(opts: IncrementalJobOpti
       for (const rec of stored.values()) if (rec.r !== null) agg = opts.aggregate.add(agg, rec.id, rec.r);
       return agg;
     };
+    // Mantıksal commit kurtarma: items.jsonl'a append edildi ama manifest (aggregate dahil) güncellenemeden süreç öldüyse,
+    // kuyruktaki item'lar "işlendi" görünür ama aggregate'e GİRMEMİŞTİR — sessizce atlanırsa kalıcı olarak dışarıda kalırlardı.
+    // Bu durumda aggregate, COMMİT EDİLMİŞ item kayıtlarından yeniden katlanır (processItem ÇAĞRILMAZ; yalnız bellekte toplama).
+    let aggRecovery: string | null = null;
+    if (opts.aggregate && !fullRebuild && manifest) {
+      if (manifest.itemsBytes === undefined) { if (stored.size > 0) aggRecovery = "manifest'te bütünlük alanı yok (v1.0)"; }
+      else if (store.itemsSize() > manifest.itemsBytes) aggRecovery = "manifest'ten sonra append edilmiş commit edilmemiş kuyruk";
+      else if (manifest.processedItemCount !== stored.size) aggRecovery = `processedItemCount(${manifest.processedItemCount}) ≠ kayıt(${stored.size})`;
+    }
+    if (aggRecovery) log(`[registry] AGGREGATE KURTARMA — ${aggRecovery}: aggregate ${stored.size} kayıttan yeniden katlanıyor (processItem çağrılmaz).`);
     let aggState: A | undefined = opts.aggregate
-      ? (!fullRebuild && manifest?.aggregateState != null ? (manifest.aggregateState as A) : fold())
+      ? (!fullRebuild && !aggRecovery && manifest?.aggregateState != null ? (manifest.aggregateState as A) : fold())
       : undefined;
 
     const base: ArtifactManifest = manifest && !fullRebuild
@@ -225,10 +235,11 @@ export async function runIncrementalJob<R, A = unknown>(opts: IncrementalJobOpti
 
     const flush = () => {
       if (buffer.length === 0) return;
+      // Aggregate bir sonraki durumunu DİSKE dokunmadan hesaplar: hata verirse hiçbir şey append/persist edilmemiş olur.
+      if (opts.aggregate && replacedThisRun) aggState = fold(); // değiştirilen item eski katkıyı iptal eder → tam yeniden katla
       store.appendItems(buffer);
       base.checkpoint = { batchesFlushed: base.checkpoint.batchesFlushed + 1, lastFlushAt: now() };
       base.lastProcessedItem = buffer[buffer.length - 1].id;
-      if (opts.aggregate && replacedThisRun) aggState = fold(); // değiştirilen item eski katkıyı iptal eder → tam yeniden katla
       buffer = [];
       persist("RUNNING");
     };
@@ -248,15 +259,24 @@ export async function runIncrementalJob<R, A = unknown>(opts: IncrementalJobOpti
             return;
           }
           const r = out;
+          // MANTIKSAL COMMIT: item, aggregate'i ve checkpoint'i tek birim olarak ilerletir. Aggregate'in sonraki durumu ÖNCE bellekte
+          // hesaplanır; patlarsa item saklanmaz (stored/buffer/processedItemCount/checkpoint değişmez), item başarısız sayılır ve
+          // sonraki çalıştırmada YALNIZ o item yeniden denenir. (add yerinde mutasyon yapmış olabilir → commit edilmiş kayıtlardan yeniden kurulur.)
+          if (opts.aggregate && r !== null) {
+            try {
+              if (stored.has(item.id) || replacedThisRun) opts.aggregate.add(opts.aggregate.init(), item.id, r); // değişim/yeniden katlama yolu: yalnız doğrula
+              else aggState = opts.aggregate.add(aggState as A, item.id, r);
+            } catch (e) {
+              aggState = fold();
+              throw new Error(`AGGREGATE_FAILED(${item.id}): ${e instanceof Error ? e.message : String(e)}`);
+            }
+          }
           const rec: StoredItem<R> = { id: item.id, fp: item.fingerprint, r, t: now() };
           if (stored.has(item.id)) { replacedThisRun = true; stats.reprocessed++; }
           stored.set(item.id, rec);
           buffer.push(rec);
           delete failed[item.id];
-          if (r === null) stats.noResult++; else {
-            stats.processed++;
-            if (opts.aggregate && !replacedThisRun) aggState = opts.aggregate.add(aggState as A, item.id, r);
-          }
+          if (r === null) stats.noResult++; else stats.processed++;
           consecutiveFailures = 0;
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);

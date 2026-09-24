@@ -130,6 +130,11 @@ export class FileArtifactStore {
     fs.appendFileSync(this.itemsPath, recs.map((r) => JSON.stringify(r)).join("\n") + "\n");
   }
 
+  /** items.jsonl'ın diskteki bayt sayısı (yoksa 0). Manifest'in bildirdiğinden büyükse: commit edilmemiş kuyruk var. */
+  itemsSize(): number {
+    return fs.existsSync(this.itemsPath) ? fs.statSync(this.itemsPath).size : 0;
+  }
+
   /** items.jsonl'ın şu anki bayt sayısı + sha256'sı (manifest'e yazılır). */
   itemsFingerprint(): { bytes: number; sha256: string } {
     if (!fs.existsSync(this.itemsPath)) return { bytes: 0, sha256: sha256("") };

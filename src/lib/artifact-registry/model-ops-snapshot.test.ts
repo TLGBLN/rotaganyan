@@ -35,22 +35,29 @@ const ident = (over: Partial<ModelIdentity> = {}): ModelOpsIdentity => ({ model:
 
 function makeSource(n: number, opts: { pendingFrom?: number } = {}) {
   const winners = new Map<string, number | null>();
-  for (let k = 0; k < n; k++) winners.set(rid(k), opts.pendingFrom !== undefined && k >= opts.pendingFrom ? null : (k % 5) + 1);
+  const starts = new Map<string, number>(); // yarış başlangıcı (ms)
+  const hideStart = new Set<string>(); // listRaces'te raceStartAt'i vermeyen yarışlar
+  const predAt = new Map<string, number>(); // tahmin zamanı geçersiz kılma
+  for (let k = 0; k < n; k++) {
+    winners.set(rid(k), opts.pendingFrom !== undefined && k >= opts.pendingFrom ? null : (k % 5) + 1);
+    starts.set(rid(k), BASE + k * 600_000);
+  }
   const source: ModelOpsRaceSource = {
-    listRaces: async () => [...winners.entries()].map(([raceId, w]) => ({ raceId, resultFingerprint: w === null ? undefined : `w${w}` })),
+    listRaces: async () => [...winners.entries()].map(([raceId, w]) => ({
+      raceId, resultFingerprint: w === null ? undefined : `w${w}`, raceStartAt: hideStart.has(raceId) ? undefined : new Date(starts.get(raceId)!).toISOString(),
+    })),
     loadRace: async (raceId) => {
       const w = winners.get(raceId);
       if (w === null || w === undefined) return PENDING;
-      const k = Number(raceId.slice(5));
-      const start = BASE + k * 600_000;
+      const start = starts.get(raceId)!;
       const p: ModelOpsRacePayload = {
-        predictionId: `p-${raceId}`, cohortType: "LIVE", raceStartAt: new Date(start).toISOString(), predictionCreatedAt: new Date(start - 3_600_000).toISOString(),
+        predictionId: `p-${raceId}`, cohortType: "LIVE", raceStartAt: new Date(start).toISOString(), predictionCreatedAt: new Date(predAt.get(raceId) ?? start - 3_600_000).toISOString(),
         segment: "Diger", resultFingerprint: `w${w}`, winnerNos: [w], probs: { "1": 0.4, "2": 0.25, "3": 0.15, "4": 0.12, "5": 0.08 },
       };
       return p;
     },
   };
-  return { winners, source };
+  return { winners, starts, hideStart, predAt, source };
 }
 
 const evalRun = (source: ModelOpsRaceSource, over: Partial<Parameters<typeof runRaceEvaluations>[0]> = {}) =>
@@ -74,17 +81,77 @@ describe("snapshot üretimi (saf veri yapısı)", () => {
     expect(s.windows.cohortType).toBe("LIVE");
     expect(s.windows.ALL.n).toBe(110);
     expect(s.windows.RECENT_100.n).toBe(100);
-    expect(s.quality).toMatchObject({ evaluated: 110, pending: 10, failed: 0, jobStatus: "COMPLETE" });
+    expect(s.quality).toMatchObject({ evaluated: 110, evaluatedBeyondWatermark: 0, unresolved: 10, pending: 10, failed: 0, notProcessed: 0, reasons: [] });
+    expect(s.sourceArtifactIdentity.modelBehaviorHash).toMatch(/^[0-9a-f]{16}$/);
     expect(computeSnapshotContentHash(s)).toBe(s.contentHash);
     expect(JSON.stringify(s).length).toBeLessThan(5_000); // kompakt: yarış listesi/halka içermez
   });
 
-  it("yarım çalıştırma (PAUSED) veya başarısız item → INCOMPLETE, asla VALID değil", async () => {
+  it("WATERMARK: K1–K3 ✅, K4 PENDING, K5 ✅ → VALID, computedThroughRaceAt=K3, K5 snapshot DIŞI; K4 gelince ilerler", async () => {
+    const { source, winners } = makeSource(60);
+    winners.set(rid(30), null); // ortada tek PENDING
+    const r1 = await evalRun(source);
+    const s1 = buildSnapshot({ identity: ident(), result: r1, snapshotVersion: 1, publishedAt: "T1" });
+    expect(s1.status).toBe("VALID");
+    expect(s1.computedThroughRaceAt).toBe(new Date(BASE + 29 * 600_000).toISOString());
+    expect(s1.windows.ALL.n).toBe(30); // yalnız watermark'a kadar
+    expect(s1.windows.RECENT_100.n).toBe(30);
+    expect(s1.quality).toMatchObject({ evaluated: 30, evaluatedBeyondWatermark: 29, unresolved: 1, pending: 1 });
+    // watermark'a kadar olan içerik, sonrasını hiç görmemiş bir çalıştırmayla AYNI olmalı
+    const ref = makeSource(30);
+    const refSnap = buildSnapshot({ identity: ident(), result: await evalRun(ref.source, { root: path.join(root, "ref") }), snapshotVersion: 1, publishedAt: "T1" });
+    expect(s1.windows).toEqual(refSnap.windows);
+
+    winners.set(rid(30), 3); // K4 sonucu geldi
+    const r2 = await evalRun(source);
+    const s2 = buildSnapshot({ identity: ident(), result: r2, snapshotVersion: 2, publishedAt: "T2" });
+    expect(s2.computedThroughRaceAt).toBe(new Date(BASE + 59 * 600_000).toISOString());
+    expect(s2.windows.ALL.n).toBe(60);
+    expect(s2.quality).toMatchObject({ evaluatedBeyondWatermark: 0, unresolved: 0 });
+  });
+
+  it("yarım çalıştırma (PAUSED) ve başarısız yarış snapshot'ı DONDURMAZ: VALID, watermark çözülmemişin öncesinde, sayaçlar dürüst", async () => {
     const { source } = makeSource(50);
     const paused = await evalRun(source, { maxItemsThisRun: 10 });
     const s = buildSnapshot({ identity: ident(), result: paused, snapshotVersion: 1, publishedAt: "t" });
+    expect(s.status).toBe("VALID");
+    expect(s.computedThroughRaceAt).toBe(new Date(BASE + 9 * 600_000).toISOString());
+    expect(s.windows.ALL.n).toBe(10);
+    expect(s.quality).toMatchObject({ unresolved: 40, notProcessed: 40, pending: 0, failed: 0 });
+
+    // başarısız (kalıcı hata) yarış: watermark onun öncesinde kalır, gerisi bloke olmaz
+    const w = makeSource(20);
+    const flaky: ModelOpsRaceSource = { listRaces: () => w.source.listRaces(), loadRace: async (id) => { if (id === rid(7)) throw new Error("kaynak hata"); return w.source.loadRace(id); } };
+    const r = await evalRun(flaky, { root: path.join(root, "flaky") });
+    const s2 = buildSnapshot({ identity: ident(), result: r, snapshotVersion: 1, publishedAt: "t" });
+    expect(s2.status).toBe("VALID");
+    expect(s2.computedThroughRaceAt).toBe(new Date(BASE + 6 * 600_000).toISOString());
+    expect(s2.quality).toMatchObject({ failed: 1, pending: 0, unresolved: 1, evaluatedBeyondWatermark: 12, evaluated: 7 });
+  });
+
+  it("dışlanan (EXCLUDED) yarışlar çözülmüş sayılır: watermark'ı tutmaz, sayaçta görünür", async () => {
+    const { source, predAt, starts } = makeSource(20);
+    predAt.set(rid(5), starts.get(rid(5))! + 1_000); // yarıştan sonra
+    predAt.set(rid(6), Date.parse("2026-08-01T00:00:00Z")); // cohort öncesi
+    const r = await evalRun(source);
+    const s = buildSnapshot({ identity: ident(), result: r, snapshotVersion: 1, publishedAt: "t" });
+    expect(s.status).toBe("VALID");
+    expect(s.computedThroughRaceAt).toBe(new Date(BASE + 19 * 600_000).toISOString());
+    expect(s.windows.ALL.n).toBe(18);
+    expect(s.quality.excluded).toEqual({ preCohort: 1, postStart: 1 });
+    expect(s.quality.unresolved).toBe(0);
+  });
+
+  it("INCOMPLETE yalnız watermark GÜVENLE belirlenemiyorsa: çözülmemiş yarışın raceStartAt'i bilinmiyorsa", async () => {
+    const { source, winners, hideStart } = makeSource(30);
+    winners.set(rid(10), null);
+    hideStart.add(rid(10));
+    const r = await evalRun(source);
+    const s = buildSnapshot({ identity: ident(), result: r, snapshotVersion: 1, publishedAt: "t" });
     expect(s.status).toBe("INCOMPLETE");
-    expect(s.quality.reasons).toContain("JOB_PAUSED");
+    expect(s.quality.reasons).toEqual(["UNRESOLVED_WITHOUT_START_1"]);
+    expect(s.computedThroughRaceAt).toBeNull();
+    expect(publishSnapshot(new InMemorySnapshotSink(), () => s).outcome).toBe("REJECTED");
   });
 
   it("contentHash publishedAt/snapshotVersion'dan bağımsız (idempotency anahtarı), içerikten bağımlı", async () => {
@@ -145,11 +212,11 @@ describe("atomik lastGoodSnapshot semantiği", () => {
     expect(a.outcome).toBe("REJECTED");
     expect(a.outcome === "REJECTED" && a.reasons[0]).toMatch(/BUILD_FAILED/);
 
-    // (b) yarım çalıştırmadan INCOMPLETE snapshot
+    // (b) yarım çalıştırma: watermark lastGood'un GERİSİNDE → geri gitmez
     const { source: s2 } = makeSource(80);
-    const partial = await evalRun(s2, { maxItemsThisRun: 5 });
+    const partial = await evalRun(s2, { root: path.join(root, "partial"), maxItemsThisRun: 5 }); // AYRI artifact kökü: gerçekten yarım bir çalıştırma
     const b = publishSnapshot(sink, (v) => buildSnapshot({ identity: ident(), result: partial, snapshotVersion: v, publishedAt: "T2" }));
-    expect(b.outcome).toBe("REJECTED");
+    expect(b.outcome === "REJECTED" && b.reasons).toContain("WATERMARK_REGRESSION");
 
     // (c) içeriği bozulmuş (hash uyuşmuyor) aday
     const c = publishSnapshot(sink, (v) => {
@@ -167,6 +234,28 @@ describe("atomik lastGoodSnapshot semantiği", () => {
     expect(d.outcome === "REJECTED" && d.reasons[0]).toMatch(/SWAP_FAILED/);
 
     expect(JSON.stringify(sink.getActive())).toBe(before); // hiçbiri lastGood'u değiştirmedi
+  });
+
+  it("watermark GERİ GİTMEZ: eski zamanlı yeni bir çözülmemiş yarış çıkarsa lastGood korunur; çözülünce yayın devam eder", async () => {
+    const { source, winners, starts } = makeSource(40);
+    const sink = new InMemorySnapshotSink();
+    const mk = (r: Awaited<ReturnType<typeof evalRun>>, at: string) => (v: number) => buildSnapshot({ identity: ident(), result: r, snapshotVersion: v, publishedAt: at });
+    publishSnapshot(sink, mk(await evalRun(source), "T1"));
+    expect(sink.getActive()!.computedThroughRaceAt).toBe(new Date(BASE + 39 * 600_000).toISOString());
+
+    winners.set("race-late", null); // sonradan listelenen, zaman olarak ESKİ ve henüz sonuçsuz yarış
+    starts.set("race-late", BASE + 10 * 600_000 + 1);
+    const blocked = publishSnapshot(sink, mk(await evalRun(source), "T2"));
+    expect(blocked.outcome === "REJECTED" && blocked.reasons).toContain("WATERMARK_REGRESSION");
+    expect(sink.getActive()!.snapshotVersion).toBe(1); // lastGood aynen aktif
+    expect(sink.getActive()!.windows.ALL.n).toBe(40);
+
+    winners.set("race-late", 2); // sonucu geldi
+    const ok = publishSnapshot(sink, mk(await evalRun(source), "T3"));
+    expect(ok.outcome).toBe("PUBLISHED");
+    expect(sink.getActive()!.snapshotVersion).toBe(2);
+    expect(sink.getActive()!.windows.ALL.n).toBe(41);
+    expect(sink.getActive()!.computedThroughRaceAt).toBe(new Date(BASE + 39 * 600_000).toISOString());
   });
 
   it("başka model/cohort kimliğinin snapshot'ı aynı sink'i EZEMEZ", async () => {

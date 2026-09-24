@@ -8,6 +8,7 @@ import {
   RECENT_MAX,
   RegistryInvalidationError,
   evaluateRace,
+  modelBehaviorHash,
   modelIdentityKey,
   modelOpsAggregateSpec,
   modelOpsArtifactIdentity,
@@ -52,7 +53,7 @@ function makeWorld(n: number) {
   };
   const fpOf = (d: RaceDef) => (d.winners ? `w${d.winners.join("+")}` : undefined);
   const source: ModelOpsRaceSource = {
-    listRaces: async () => [...defs.entries()].map(([raceId, d]) => ({ raceId, resultFingerprint: fpOf(d) })),
+    listRaces: async () => [...defs.entries()].map(([raceId, d]) => ({ raceId, resultFingerprint: fpOf(d), raceStartAt: new Date(d.startMs).toISOString() })),
     loadRace: async (raceId) => {
       loads.push(raceId);
       const d = defs.get(raceId)!;
@@ -359,13 +360,50 @@ describe("artımlı işletim (Registry üzerinde)", () => {
     expect(live.windows.ALL.n).toBe(9); // REPLAY koşusu LIVE'ı etkilemedi
   });
 
-  it("11b) LIVE kuralları: cohortStartAt öncesi tahmin ve yarıştan SONRA üretilmiş tahmin cohort'a giremez", async () => {
+  it("11b) LIVE uygunluğu: cohort öncesi ve yarıştan sonra üretilen tahmin EXCLUDED (terminal, hata değil, aggregate dışı, yeniden denenmez)", async () => {
     const w = makeWorld(10);
     w.defs.get(rid(2))!.predAtMs = Date.parse(COHORT_START) - 1000; // cohort başlamadan önce
     w.defs.get(rid(4))!.predAtMs = w.defs.get(rid(4))!.startMs + 1000; // yarış başladıktan sonra
+    w.defs.get(rid(6))!.predAtMs = w.defs.get(rid(6))!.startMs; // TAM yarış başlangıcı: >= → post-start
     const r = await run(w);
-    expect(Object.keys(r.job.manifest.failedItems).sort()).toEqual([rid(2), rid(4)]);
-    expect(r.windows.ALL.n).toBe(8);
+    expect(r.job.stats.failed).toBe(0); // job FAILURE değil
+    expect(r.job.manifest.failedItems).toEqual({});
+    expect(r.windows.ALL.n).toBe(7); // aggregate'e girmedi
+    expect(r.evaluations.has(rid(2))).toBe(false);
+    expect(r.exclusions.get(rid(2))!.status).toBe("EXCLUDED_PRE_COHORT");
+    expect(r.exclusions.get(rid(4))!.status).toBe("EXCLUDED_POST_START");
+    expect(r.exclusions.get(rid(6))!.status).toBe("EXCLUDED_POST_START");
+    expect(r.exclusions.get(rid(4))!.reason).toMatch(/leakage/); // açıklanabilir şekilde saklanır
+    const hist = readEvaluationHistory(r.artifactDir);
+    expect(raceLifecycle(rid(2), hist).state).toBe("EXCLUDED_PRE_COHORT");
+    expect(raceLifecycle(rid(4), hist).state).toBe("EXCLUDED_POST_START");
+
+    w.loads.length = 0;
+    const again = await run(w);
+    expect(w.loads).toEqual([]); // terminal: yeniden denenmedi
+    expect(again.job.stats.processed + again.job.stats.noResult).toBe(0);
+    expect(again.exclusions.size).toBe(3);
+
+    // REPLAY cohort'unda aynı tahmin zamanları dışlama nedeni DEĞİLDİR
+    const w2 = makeWorld(10);
+    for (const d of w2.defs.values()) { d.cohort = "REPLAY"; d.predAtMs = d.startMs + 5_000; }
+    const rep = await run(w2, { identity: identity({ cohortType: "REPLAY" }) });
+    expect(rep.exclusions.size).toBe(0);
+    expect(rep.windows.ALL.n).toBe(10);
+  });
+
+  it("12c) davranış tanımlayıcıları dependencyHash'te: modelBehaviorHash yalnız davranış alanlarına duyarlı, cohort/git'e değil", async () => {
+    const w = makeWorld(5);
+    const a = await run(w);
+    const deps = a.job.manifest.dependencies;
+    for (const k of ["extra:featureSchemaVersion", "extra:dataPipelineVersion", "extra:calibrationVersion", "extra:postProcessVersion", "extra:modelBehaviorHash", "engineVersion", "trainingSnapshotId", "evaluationMethodVersion"]) {
+      expect(deps[k], k).toBeDefined();
+    }
+    const h = (over: Partial<ModelIdentity>, ev = "eval-v1") => modelBehaviorHash({ model: modelId(over), evaluationMethodVersion: ev });
+    expect(h({})).toBe(h({ cohortStartAt: "2026-05-05" })); // cohort davranış değildir
+    expect(h({})).toBe(h({ modelRole: "CHALLENGER", cohortType: "REPLAY" }));
+    for (const over of [{ engineVersion: "x" }, { featureSchemaVersion: "x" }, { dataPipelineVersion: "x" }, { calibrationVersion: "x" }, { postProcessVersion: "x" }, { trainingSnapshotId: "x" }]) expect(h(over)).not.toBe(h({}));
+    expect(h({}, "eval-v2")).not.toBe(h({}));
   });
 
   it("12) model kimliği değişirse YENİ artifact (eski korunur, reuse yok); değerlendirme yöntemi değişirse DUR", async () => {
