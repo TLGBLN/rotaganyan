@@ -117,16 +117,21 @@ export default function SystemAnatomyDashboard() {
 
       {data && (
         <div className="flight-instrument">
-          <span className={`flight-decision ${data.analysisAvailable ? "flight-decision-ok" : "flight-decision-block"}`}>
-            {data.analysisAvailable ? "🟢 ANALYSIS AVAILABLE: YES" : "⛔ ANALYSIS AVAILABLE: NO"}
+          <span className="flight-decision flight-decision-ok">
+            {data.overallDecision === "block" ? "⛔ ANALYSIS PATH: BLOCKED" : "🟢 ANALYSIS PATH: NOT BLOCKED"}
           </span>
           <span className="flight-sep">·</span>
-          <span>DECISION: {data.overallDecision.toUpperCase()}</span>
-          {data.rootCauses.length > 0 && (
+          <span className="flight-gate-disabled">Safety Gate: {data.safetyGateEnabled ? "ENABLED" : "NOT ENABLED"}</span>
+          {data.rootCauseSummary.length > 0 && (
             <>
               <span className="flight-sep">·</span>
               <span className="flight-rootcause">
-                ROOT CAUSE: {data.rootCauses.map((id) => SYSTEM_ANATOMY_NODES.find((n) => n.id === id)?.title ?? id).join(", ")}
+                {data.rootCauseSummary.map((r) => (
+                  <span key={r.moduleId}>
+                    ROOT CAUSE: {r.title}
+                    {r.downstreamCount > 0 ? ` (${r.downstreamCount} modül downstream etkilendi)` : ""}
+                  </span>
+                ))}
               </span>
             </>
           )}
@@ -171,6 +176,12 @@ export default function SystemAnatomyDashboard() {
           {SYSTEM_ANATOMY_NODES.map((node) => {
             const health = getNodeHealth(data, node.id);
             const status = getStatus(health);
+            // 2026-09-24 (kullanıcı düzeltmesi, alarm-yorgunluğu) — bu düğüm yalnız bir
+            // ÜST düğümün sorunu yüzünden sarı/kırmızıysa, "8 ayrı arıza" hissi vermesin diye
+            // GERÇEK kaynağı doğrudan kutuda göster ("↑ upstream X").
+            const upstreamReason = health?.degradedByDependency && health.rootCauseModuleIds?.length
+              ? health.rootCauseModuleIds.map((id) => SYSTEM_ANATOMY_NODES.find((n) => n.id === id)?.title ?? id).join(", ")
+              : null;
 
             return (
               <button
@@ -186,6 +197,8 @@ export default function SystemAnatomyDashboard() {
                 <strong>{node.title}</strong>
                 <small>{node.subtitle}</small>
                 {health && <div className="node-status-text">{STATUS_LABEL[status]}</div>}
+                {upstreamReason && <div className="node-upstream-reason">↑ upstream: {upstreamReason}</div>}
+                {health?.observationStatus === "attention" && <div className="node-observation-flag">🟡 izlenen sistemde alarm</div>}
               </button>
             );
           })}
@@ -204,7 +217,47 @@ export default function SystemAnatomyDashboard() {
 
               <div className={`big-status status-box-${selectedHealth.status}`}>{STATUS_LABEL[selectedHealth.status]}</div>
 
+              {/* 2026-09-24 (kullanıcı düzeltmesi) — Self Health ≠ Dependency Health ≠
+                  Observation Status: üçü AYRI satırlar, birbirine karıştırılmaz. */}
+              <div className="axis-breakdown">
+                <div className="axis-row">
+                  <span>Self Health</span>
+                  <strong className={`text-${selectedHealth.selfStatus ?? "unknown"}`}>{STATUS_LABEL[selectedHealth.selfStatus ?? "unknown"]}</strong>
+                </div>
+                <div className="axis-row">
+                  <span>Dependency Health</span>
+                  <strong className={`text-${selectedHealth.dependencyStatus ?? "healthy"}`}>
+                    {selectedHealth.dependencyStatus ? STATUS_LABEL[selectedHealth.dependencyStatus] : "—"}
+                  </strong>
+                </div>
+                {selectedHealth.observedModules && selectedHealth.observedModules.length > 0 && (
+                  <div className="axis-row">
+                    <span>Observation Status</span>
+                    <strong className={selectedHealth.observationStatus === "attention" ? "text-warning" : selectedHealth.observationStatus === "unknown" ? "text-unknown" : "text-healthy"}>
+                      {selectedHealth.observationStatus === "attention" ? "🟡 ATTENTION" : selectedHealth.observationStatus === "unknown" ? "⚪ UNKNOWN" : "🟢 NORMAL"}
+                    </strong>
+                  </div>
+                )}
+              </div>
+
               {selectedHealth.errorMessage && <div className="error-box">⚠ {selectedHealth.errorMessage}</div>}
+
+              {selectedHealth.observedModules && selectedHealth.observedModules.length > 0 && (
+                <section className="detail-section">
+                  <h3>İzlenen Sistemler</h3>
+                  <div className="check-list">
+                    {selectedHealth.observedModules.map((om) => (
+                      <div key={om.id} className="check-row">
+                        <span>{om.status === "healthy" ? "🟢" : om.status === "warning" ? "🟡" : om.status === "critical" ? "🔴" : "⚪"}</span>
+                        <div>
+                          <strong>{om.title}</strong>
+                          <small>{STATUS_LABEL[om.status]} — yalnız bilgi, bu modülün kendi rengini DEĞİŞTİRMEZ</small>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               <section className="detail-section">
                 <h3>Metrikler</h3>

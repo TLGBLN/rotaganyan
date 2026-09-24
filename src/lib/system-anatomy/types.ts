@@ -57,6 +57,16 @@ export type SystemModuleHealth = {
   // neden — kullanıcı talebi: "ROOT CAUSE: HOT CACHE" gibi tek satırda gösterilebilsin).
   rootCauseModuleIds?: string[];
 
+  // 2026-09-24 (kullanıcı düzeltmesi, chaos test bulgusu) — "İzliyor" ilişkisi (registry.ts
+  // `observes`) status/propagation'a HİÇ KATILMAZ (kullanıcı: "observes kesinlikle
+  // dependency propagation'a katılmasın") — yalnız BİLGİ amaçlı, AYRI bir eksen:
+  //   Self Health ≠ Dependency Health ≠ Observation Status
+  // "attention" = izlenen modüllerden biri warning/critical (BU modülün KENDİ status'unu
+  // DEĞİŞTİRMEZ) — Calibration NaN olduğunda Model Health'in rengi hâlâ kendi selfStatus'u,
+  // yalnız observationStatus="attention" olur.
+  observationStatus?: "normal" | "attention" | "unknown";
+  observedModules?: { id: string; title: string; status: HealthStatus }[];
+
   description: string;
 
   metrics: HealthMetric[];
@@ -76,16 +86,22 @@ export type SystemHealthResponse = {
   critical: number;
   unknown: number;
 
-  // 2026-09-24 — "Uçuş göstergesi" (kullanıcı talebi): panelin EN ÜSTÜNDE tek satırlık,
-  // yanlış-anlaşılmaya kapalı bir özet. `analysisAvailable`/`overallDecision` bugün HER ZAMAN
-  // true/"continue" döner (bkz. OperationalDecision notu, types.ts) — bu ölçülemediğimiz bir
-  // şeyi UYDURMAK değil, gerçek bir Safety Gate kuruluncaya kadar dürüst varsayılan.
-  analysisAvailable: boolean;
+  // 2026-09-24 (kullanıcı düzeltmesi) — "ANALYSIS AVAILABLE: YES" yanıltıcı bulundu: sistem
+  // henüz GERÇEK bir Safety Gate'e sahip değil, yani "güvenli" olduğunu ÖLÇMÜYOR — yalnız
+  // hiçbir modülün "block" DÖNDÜRMEDİĞİNİ biliyor (ki bunu döndürebilecek sensör de yok).
+  // Dürüst ifade: analiz yolu ENGELLENMEDİ (blocked değil) VE bunun nedeni bir Safety Gate'in
+  // "güvenli" demesi DEĞİL, henüz hiç Safety Gate OLMAMASI. Gerçek Safety Gate kurulunca bu
+  // iki alan (safetyGateEnabled:true + overallDecision gerçek block/continue) anlamlı olur.
+  safetyGateEnabled: boolean; // bugün her zaman false — dürüst varsayılan, UYDURULMADI
   overallDecision: OperationalDecision;
   // selfStatus'u (kendi sensörü) critical/warning olan modüllerin id'leri — yalnız
   // dependency'den ETKİLENEN modüller (Model Health, Forward Coverage gibi) bu listede
   // GÖRÜNMEZ, yalnız GERÇEK kaynak (ör. "horse-cache") görünür.
   rootCauses: string[];
+  // 2026-09-24 (kullanıcı düzeltmesi, alarm-yorgunluğu) — "8 kutu sarı" yerine "1 kök neden,
+  // 8 etkilenen modül" — her rootCause için kaç modülün YALNIZ ONUN YÜZÜNDEN downstream
+  // etkilendiği (kendisi hariç).
+  rootCauseSummary: { moduleId: string; title: string; downstreamCount: number }[];
 
   // Chaos Test katmanı — aktifse panelde "CHAOS TEST ACTIVE" bandı gösterilir (bkz.
   // SystemHealthTestOverride). Gerçek üretim/sensör verisini HİÇ etkilemez, yalnız GÖSTERİLEN

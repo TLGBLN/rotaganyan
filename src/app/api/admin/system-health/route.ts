@@ -1910,6 +1910,24 @@ export async function GET() {
 
   propagateDependencies(modules);
 
+  // ── Observation Status (kullanıcı düzeltmesi) — "İzliyor" (observes) ilişkisi status'a/
+  // propagation'a KESİNLİKLE KATILMAZ, yalnız BİLGİ. propagateDependencies() BİTTİKTEN
+  // SONRA (nihai status'lar hazır) ayrı bir geçişte hesaplanır ki dependency mantığını
+  // hiçbir şekilde etkilemesin. ──
+  const moduleById = new Map(modules.map((m) => [m.id, m]));
+  for (const node of SYSTEM_ANATOMY_NODES) {
+    if (!node.observes || node.observes.length === 0) continue;
+    const mod = moduleById.get(node.id);
+    if (!mod) continue;
+    const observed = node.observes.map((id) => moduleById.get(id)).filter((m): m is ModuleResult => !!m);
+    mod.observedModules = observed.map((m) => ({ id: m.id, title: m.title, status: m.status }));
+    const statuses = observed.map((m) => m.status);
+    if (statuses.length === 0) mod.observationStatus = "normal";
+    else if (statuses.some((s) => s === "critical" || s === "warning")) mod.observationStatus = "attention";
+    else if (statuses.every((s) => s === "unknown")) mod.observationStatus = "unknown";
+    else mod.observationStatus = "normal";
+  }
+
   const statusWeight: Record<Status, number> = { healthy: 0, unknown: 1, warning: 2, critical: 3 };
 
   let overallStatus: Status = "healthy";
@@ -1919,13 +1937,21 @@ export async function GET() {
 
   const count = (status: Status) => modules.filter((x) => x.status === status).length;
 
-  // ── "Uçuş göstergesi" (kullanıcı talebi) — bugün HER ZAMAN true/"continue": hiçbir
-  // sensör canlı bir "block" sinyali gözlemleyemiyor (bkz. types.ts OperationalDecision).
-  // Bu dürüst bir varsayılan, ölçülemeyen bir şeye sahte güvence VERMİYOR — yalnız "şu an
-  // hiçbir modül gerçek bir blocker bildirmedi" diyor.
+  // ── Root Cause / Downstream Impact özeti (kullanıcı düzeltmesi, alarm-yorgunluğu) —
+  // "8 kutu sarı" yerine "1 kök neden → 8 etkilenen modül" tek satırda gösterilebilsin diye.
   const rootCauses = modules.filter((m) => m.selfStatus === "critical" || m.selfStatus === "warning").map((m) => m.id);
+  const rootCauseSummary = rootCauses.map((moduleId) => ({
+    moduleId,
+    title: moduleById.get(moduleId)?.title ?? moduleId,
+    downstreamCount: modules.filter((m) => m.id !== moduleId && m.rootCauseModuleIds?.includes(moduleId)).length,
+  }));
+
+  // ── "Uçuş göstergesi" (kullanıcı düzeltmesi) — "ANALYSIS AVAILABLE: YES" yanıltıcıydı,
+  // sistemin GERÇEKTEN "güvenli" ölçtüğü izlenimini veriyordu. Dürüst hâli: henüz bir Safety
+  // Gate YOK (safetyGateEnabled:false, sabit) — overallDecision bugün HER ZAMAN "continue"
+  // (bkz. types.ts OperationalDecision notu).
   const overallDecision: OperationalDecision = "continue";
-  const analysisAvailable = true; // bkz. yukarıdaki not — bugün "block" üretebilecek bir sensör yok
+  const safetyGateEnabled = false;
 
   return NextResponse.json({
     overallStatus,
@@ -1934,9 +1960,10 @@ export async function GET() {
     warning: count("warning"),
     critical: count("critical"),
     unknown: count("unknown"),
-    analysisAvailable,
+    safetyGateEnabled,
     overallDecision,
     rootCauses,
+    rootCauseSummary,
     chaosTest: activeChaos
       ? { scenario: activeChaos.scenario, targetModuleId: activeChaos.targetModuleId, reason: activeChaos.reason, expiresAt: activeChaos.expiresAt.toISOString() }
       : null,
