@@ -19,6 +19,10 @@ import {
   ASIRI_GUVEN_SICAKLIGI,
 } from "@/lib/methodology/v5-engine";
 import { kategoriTespit } from "@/lib/methodology/v2-engine";
+import { turkeyDateString } from "@/lib/tz";
+import { buildKuponOnerisi, stakeForHippodromeLabel } from "@/server/services/race.service";
+import { chunkIntoAltili, sonYediKosu, YEDILI_GANYAN_SLOT } from "@/lib/methodology/kupon-auto-fill";
+import { optimizerConfigFor } from "@/server/services/home-kupon-sync.service";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -1489,6 +1493,217 @@ async function calibrationHealth(): Promise<ModuleResult> {
   }
 }
 
+// 2026-09-24 — Kupon sensörü (kullanıcı spesifikasyonu, SON organ). Kod doğrulaması: gerçek
+// stake/limit çözümlemesi optimizerConfigFor (home-kupon-sync.service.ts) ve
+// stakeForHippodromeLabel (race.service.ts, GERÇEK anasayfa gösterim ücreti) — İKİSİ DE
+// import edildi, sensör kendi kopyasını YAZMADI. Bu iki fonksiyon TEORİDE aynı ücreti
+// vermeli (biri generator, biri display) — sensörün en değerli correctness kontrolü tam
+// bunların DİVERGE ettiği anı yakalamak (Kocaeli 7'li Ganyan 1.25 vs 2 TL sınıfı bug).
+//
+// KRİTİK dürüstlük notu (Calibration'daki OBSERVABILITY_GAP ile AYNI desen): syncHomeKupon
+// hiçbir "son deneme/hata" durumunu KALICI olarak yazmıyor (yalnız başarılı üretimde
+// HomeKupon satırının kendisi delete+create edilir, updatedAt bunu yansıtır) — bu yüzden
+// Availability, kendi "attempt/error" geçmişinden DEĞİL, dolaylı olarak Freshness'tan
+// (stale kupon = reconciliation/generation çalışmıyor olabilir) çıkarılıyor. Bu bilinen bir
+// sınırlama, gizlenmedi.
+//
+// Scratch lifecycle: Runner modelinde scratch ZAMAN DAMGASI yok (yalnız boolean) — ama
+// syncHomeKupon'un KENDİSİ zaten yalnız `!scratched` runner'ları DP'ye veriyor (bkz.
+// getRaceDayLegsForRaceNos/pruneToEligible) — yani ÜRETİM ANINDA scratch olan bir at
+// legs'e HİÇBİR ZAMAN giremez (yapısal garanti). Bu nedenle şu an CANLI scratched görünen
+// ama legs'te hâlâ duran bir at, YAPISAL OLARAK SCRATCH_AFTER_COUPON'dur — bir zaman
+// damgasına gerek yok, generator'ın kendi invariant'ı bunu garanti ediyor. Bu yüzden
+// correctness'a DEĞİL, bilgi/lifecycle'a yazılıyor (Model Health'teki "geç scratch"
+// dersiyle AYNI).
+const COUPON_STALE_WARNING_MIN = 10;
+const COUPON_STALE_CRITICAL_MIN = 30;
+const COUPON_CACHE_MS = 60_000;
+let couponCache: { data: ModuleResult; expiresAt: number } | null = null;
+
+type HomeKuponLegRow = { raceNo: number; narrow: number[]; normal: number[]; wide: number[] };
+
+async function computeCouponHealth(): Promise<ModuleResult> {
+  const today = turkeyDateString();
+  const dayStart = new Date(today + "T00:00:00.000Z");
+
+  const activePools = await db.homeKupon.findMany({ where: { date: dayStart }, orderBy: [{ hippodromeName: "asc" }, { slot: "asc" }] });
+
+  let missingLegs = 0;
+  let emptyLegs = 0;
+  let wrongOrder = 0;
+  let invalidRunner = 0;
+  let duplicateSelection = 0;
+  let costMismatch = 0;
+  let staleWarning = 0;
+  let staleCritical = 0;
+  let lateScratchInfo = 0;
+  const poolDetails: string[] = [];
+  const costMismatchDetails: string[] = [];
+  const staleDetails: string[] = [];
+
+  for (const pool of activePools) {
+    const baseHippodromeName = pool.hippodromeName.split(" — ")[0]!;
+    const legs = Array.isArray(pool.legs) ? (pool.legs as unknown as HomeKuponLegRow[]) : [];
+    const poolLabel = `${pool.hippodromeName} (slot ${pool.slot})`;
+
+    // ── Bugünkü hipodromun GERÇEK yarış listesi — expected raceNo sırası buradan türetilir,
+    // UYDURULMAZ (chunkIntoAltili/sonYediKosu GERÇEK, export edilmiş fonksiyonlar). ──
+    const races = await db.race.findMany({
+      where: { raceDay: { date: dayStart, hippodrome: { name: baseHippodromeName } } },
+      select: { id: true, raceNo: true, runners: { select: { no: true, scratched: true } } },
+      orderBy: { raceNo: "asc" },
+    });
+
+    let expectedRaceNos: number[] | null = null;
+    if (pool.slot === YEDILI_GANYAN_SLOT) {
+      const grp = sonYediKosu(races);
+      expectedRaceNos = grp ? grp.map((r) => r.raceNo) : null;
+    } else {
+      const groups = chunkIntoAltili(races);
+      const grp = groups[pool.slot - 1];
+      expectedRaceNos = grp ? grp.map((r) => r.raceNo) : null;
+    }
+
+    // Completeness — eksik/boş ayak (expected biliniyorsa karşılaştır, bilinmiyorsa atla).
+    if (expectedRaceNos) {
+      const legRaceNos = new Set(legs.map((l) => l.raceNo));
+      const missing = expectedRaceNos.filter((rn) => !legRaceNos.has(rn));
+      if (missing.length > 0) {
+        missingLegs += missing.length;
+        poolDetails.push(`${poolLabel}: eksik ayak ${missing.join(",")}`);
+      }
+    }
+    for (const leg of legs) {
+      if (leg.narrow.length === 0) {
+        emptyLegs++;
+        poolDetails.push(`${poolLabel}: K${leg.raceNo} Ekonomik'te 0 seçim`);
+      }
+    }
+
+    // Correctness — race order (legs sırası GERÇEK raceNo artan sırasıyla eşleşmeli).
+    const legOrder = legs.map((l) => l.raceNo);
+    const sortedOrder = [...legOrder].sort((a, b) => a - b);
+    if (JSON.stringify(legOrder) !== JSON.stringify(sortedOrder)) {
+      wrongOrder++;
+      poolDetails.push(`${poolLabel}: ayak sırası bozuk (${legOrder.join(",")})`);
+    }
+
+    // Correctness — invalid runner / duplicate selection / late-scratch bilgi.
+    const runnersByRaceNo = new Map(races.map((r) => [r.raceNo, r.runners]));
+    for (const leg of legs) {
+      const validRunners = runnersByRaceNo.get(leg.raceNo) ?? [];
+      const validNos = new Set(validRunners.map((r) => r.no));
+      const scratchedNos = new Set(validRunners.filter((r) => r.scratched).map((r) => r.no));
+      for (const width of ["narrow", "normal", "wide"] as const) {
+        const nos = leg[width];
+        if (new Set(nos).size !== nos.length) {
+          duplicateSelection++;
+          poolDetails.push(`${poolLabel}: K${leg.raceNo} ${width} duplicate seçim`);
+        }
+        const invalid = nos.filter((no) => !validNos.has(no));
+        if (invalid.length > 0) {
+          invalidRunner++;
+          poolDetails.push(`${poolLabel}: K${leg.raceNo} ${width} geçersiz at no ${invalid.join(",")}`);
+        }
+        const lateScratch = nos.filter((no) => scratchedNos.has(no));
+        if (lateScratch.length > 0) lateScratchInfo += lateScratch.length;
+      }
+    }
+
+    // Correctness — cost mismatch (GERÇEK generator ücreti vs GERÇEK display ücreti).
+    const generatorStake = optimizerConfigFor(baseHippodromeName, pool.slot).stakePerCombination;
+    const displayStake = stakeForHippodromeLabel(pool.hippodromeName);
+    if (Math.abs(generatorStake - displayStake) > 1e-9) {
+      costMismatch++;
+      const onerisi = await buildKuponOnerisi(pool);
+      const displayed = onerisi?.variants.find((v) => v.filled)?.amount ?? onerisi?.variants[0]?.amount ?? null;
+      const combos = legs.reduce((acc, l) => acc * Math.max(l.narrow.length, 1), 1);
+      const expected = Math.round(combos * generatorStake * 100) / 100;
+      costMismatchDetails.push(`${poolLabel}: displayed=${displayed ?? "N/A"}₺ (stake=${displayStake}), expected=${expected}₺ (stake=${generatorStake})`);
+    }
+
+    // Freshness — bu havuzdaki yarışların en son GÜNCELLENEN Prediction'ı, kuponun kendi
+    // updatedAt'inden daha yeni mi? (yeni tahmin var ama kupon eski = STALE COUPON).
+    const raceIds = races.filter((r) => legOrder.includes(r.raceNo)).map((r) => r.id);
+    if (raceIds.length > 0) {
+      const latestPred = await db.prediction.findFirst({
+        where: { raceId: { in: raceIds } },
+        orderBy: { updatedAt: "desc" },
+        select: { updatedAt: true },
+      });
+      if (latestPred && latestPred.updatedAt > pool.updatedAt) {
+        const staleMin = (latestPred.updatedAt.getTime() - pool.updatedAt.getTime()) / 60_000;
+        if (staleMin > COUPON_STALE_CRITICAL_MIN) {
+          staleCritical++;
+          staleDetails.push(`${poolLabel}: ${staleMin.toFixed(0)} dk bayat (kritik)`);
+        } else if (staleMin > COUPON_STALE_WARNING_MIN) {
+          staleWarning++;
+          staleDetails.push(`${poolLabel}: ${staleMin.toFixed(0)} dk bayat`);
+        }
+      }
+    }
+  }
+
+  const correctnessIssues = missingLegs + emptyLegs + wrongOrder + invalidRunner + duplicateSelection + costMismatch;
+
+  let status: Status = "healthy";
+  if (correctnessIssues > 0 || staleCritical > 0) status = "critical";
+  else if (staleWarning > 0) status = "warning";
+
+  return {
+    id: "coupon",
+    title: "KUPON ÜRETİMİ",
+    status,
+    description: "Doğru yarıştan/tahminden/atlardan/maliyetle üretildi mi — GERÇEK generator+display fonksiyonlarıyla çapraz doğrulanıyor",
+    metrics: [
+      { label: "Bugün aktif kupon", value: activePools.length },
+      { label: "Eksik ayak", value: missingLegs },
+      { label: "Boş ayak (Ekonomik'te 0 seçim)", value: emptyLegs },
+      { label: "Ayak sırası bozuk", value: wrongOrder },
+      { label: "Geçersiz at no", value: invalidRunner },
+      { label: "Duplicate seçim", value: duplicateSelection },
+      { label: "Cost mismatch (generator≠display stake)", value: costMismatch },
+      { label: "Geç scratch (bilgi — üretim sonrası, yapısal garanti)", value: lateScratchInfo },
+      { label: "Stale coupon — uyarı (10-30dk)", value: staleWarning },
+      { label: "Stale coupon — kritik (>30dk)", value: staleCritical },
+      ...(costMismatchDetails.length > 0 ? [{ label: "Cost mismatch detayı", value: costMismatchDetails.join(" · ") }] : []),
+      ...(staleDetails.length > 0 ? [{ label: "Stale detayı", value: staleDetails.join(" · ") }] : []),
+    ],
+    checks: [
+      { id: "coupon-availability", label: "Aktif kupon üretim geçmişi (attempt/error kaydı YOK — bilinen sınırlama)", ok: null, detail: `${activePools.length} aktif kupon — OBSERVABILITY_GAP: syncHomeKupon kalıcı attempt/error durumu yazmıyor` },
+      { id: "coupon-freshness", label: "Kupon, ilgili Prediction'lardan daha yeni", ok: staleWarning + staleCritical === 0, detail: staleDetails.length > 0 ? staleDetails.join(" · ") : "tüm kuponlar güncel" },
+      { id: "coupon-completeness", label: "Her ayak dolu (eksik/boş yok)", ok: missingLegs === 0 && emptyLegs === 0, detail: `eksik ayak=${missingLegs}, boş ayak=${emptyLegs}` },
+      {
+        id: "coupon-correctness",
+        label: "Runner/sıra/duplicate/maliyet doğru",
+        ok: wrongOrder === 0 && invalidRunner === 0 && duplicateSelection === 0 && costMismatch === 0,
+        detail: `sıra=${wrongOrder}, geçersiz runner=${invalidRunner}, duplicate=${duplicateSelection}, cost mismatch=${costMismatch}${poolDetails.length > 0 ? " — " + poolDetails.slice(0, 5).join(" · ") : ""}`,
+      },
+    ],
+    lastCheckedAt: nowIso(),
+  };
+}
+
+async function couponHealth(): Promise<ModuleResult> {
+  if (couponCache && couponCache.expiresAt > Date.now()) return couponCache.data;
+  try {
+    const result = await computeCouponHealth();
+    couponCache = { data: result, expiresAt: Date.now() + COUPON_CACHE_MS };
+    return result;
+  } catch (error) {
+    return {
+      id: "coupon",
+      title: "KUPON ÜRETİMİ",
+      status: "unknown",
+      description: "Kupon health ölçülemedi",
+      metrics: [],
+      checks: [],
+      errorMessage: error instanceof Error ? error.message : "Coupon health error",
+      lastCheckedAt: nowIso(),
+    };
+  }
+}
+
 // DÜZELTME (2026-09-23) — kullanıcının kendi ilkesiyle çelişiyordu: "sistem ölçemediği
 // bir şeyi yeşil göstermiyor" dendi ama orijinal `simpleHealthy()` ölçülmeyen 9 modülü
 // doğrudan "healthy" (yeşil) damgalıyordu. Artık "unknown" (gri, Bağlanmadı) — sahte
@@ -1604,6 +1819,7 @@ export async function GET() {
     forwardCoverageHealth(),
     modelHealthHealth(),
     calibrationHealth(),
+    couponHealth(),
   ]);
 
   const modules: ModuleResult[] = [];
@@ -1613,7 +1829,6 @@ export async function GET() {
 
   // Henüz gerçek sensörü olmayan modüller — bkz. unmeasuredModule notu.
   modules.push(unmeasuredModule("data-source", "VERİ TOPLAMA", "TJK / program / yarış verileri"));
-  modules.push(unmeasuredModule("coupon", "KUPON ÜRETİMİ", "Kupon oluşturma"));
 
   propagateDependencies(modules);
 

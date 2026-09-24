@@ -460,7 +460,10 @@ const YEDILI_GANYAN_STAKE_PER_COMBINATION = 2;
 const DUSUK_UCRETLI_HIPODROMLAR = ["Diyarbakır", "Şanlıurfa", "Elazığ"];
 const ALTILI_STAKE_DUSUK = 1;
 
-function stakeForHippodromeLabel(hippodromeName: string): number {
+// 2026-09-24 — Sistem Anatomisi Kupon sensörü: bu, kuponun GERÇEK anasayfa gösterim
+// ücretini çözen fonksiyon — sensör bunu GENERATOR tarafının (optimizerConfigFor,
+// home-kupon-sync.service.ts) çözdüğü ücretle karşılaştırıp "cost mismatch" tespit ediyor.
+export function stakeForHippodromeLabel(hippodromeName: string): number {
   if (hippodromeName.includes("7'li Ganyan")) return YEDILI_GANYAN_STAKE_PER_COMBINATION;
   return DUSUK_UCRETLI_HIPODROMLAR.some((h) => hippodromeName.includes(h)) ? ALTILI_STAKE_DUSUK : ALTILI_STAKE_PER_COMBINATION;
 }

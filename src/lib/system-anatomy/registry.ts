@@ -37,7 +37,11 @@ export const SYSTEM_ANATOMY_NODES: AnatomyNodeDefinition[] = [
   // `dependencies`'te DEĞİL. Model Health zaten Calibration'ı gözlemliyor, ters bağlantı YOK.
   { id: "calibration", title: "KALİBRASYON", subtitle: "Probability Layer", x: 37, y: 50, side: "center", icon: "🎯", dependencies: ["engine"], observes: ["results"] },
   { id: "results", title: "SONUÇLAR", subtitle: "Gerçekleşen Yarışlar", x: 73, y: 29, side: "right", icon: "🏆", dependencies: ["program"] },
-  { id: "coupon", title: "KUPON ÜRETİMİ", subtitle: "Tahmin → Kupon", x: 73, y: 47, side: "right", icon: "🎟️", dependencies: ["engine", "calibration"] },
+  // 2026-09-24 (kod doğrulaması) — Kupon üretimi (syncHomeKupon) GERÇEKTEN üçünü de
+  // kullanıyor: Program (getRaceDayLegsForRaceNos → Race/Runner), Engine+Calibration
+  // (Pick.scoreExact — kalibre edilmiş olasılık, DP girdisi olarak) — "aynı sistemde
+  // bulunuyor diye" değil, kodda doğrulanmış gerçek veri bağımlılığı.
+  { id: "coupon", title: "KUPON ÜRETİMİ", subtitle: "Tahmin → Kupon", x: 73, y: 47, side: "right", icon: "🎟️", dependencies: ["engine", "calibration", "program"] },
   { id: "cron", title: "CRON / SYNC", subtitle: "Zamanlanmış İşler", x: 7, y: 72, side: "left", icon: "⏱️", dependencies: ["horse-cache", "agf"] },
   { id: "database", title: "VERİ OMURGASI", subtitle: "Postgres / Prisma", x: 37, y: 72, side: "center", icon: "🗃️" },
   { id: "site", title: "SITE / API", subtitle: "rotaganyan.com", x: 73, y: 68, side: "right", icon: "🌐", dependencies: ["engine", "database"] },

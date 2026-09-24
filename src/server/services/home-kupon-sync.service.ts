@@ -25,7 +25,10 @@ import {
 
 type HomeKuponLeg = { raceNo: number; narrow: number[]; normal: number[]; wide: number[] };
 
-function optimizerConfigFor(baseHippodromeName: string, slot: number) {
+// 2026-09-24 — Sistem Anatomisi Kupon sensörü: gerçek stake/limit çözümleme mantığını
+// (slot===7 mi, hangi hipodrom indirimli mi) reuse etmek için dışa açıldı — sensör kendi
+// kopyasını yazmasın diye (kullanıcı talimatı: "birim bedeli sensöre hard-code etme").
+export function optimizerConfigFor(baseHippodromeName: string, slot: number) {
   if (slot === YEDILI_GANYAN_SLOT) {
     return { stakePerCombination: YEDILI_GANYAN_STAKE_PER_COMBINATION, limits: YEDILI_LIMITS, tolerances: YEDILI_TOLERANCES };
   }
