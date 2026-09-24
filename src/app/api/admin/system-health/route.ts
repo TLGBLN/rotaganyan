@@ -645,6 +645,180 @@ async function resultSyncHealth(): Promise<ModuleResult> {
   }
 }
 
+// 2026-09-24 — Site/API sensörü (kullanıcı spesifikasyonu). KRİTİK tasarım kararı: bu bir
+// INTERNAL sensör — deployment'ın KENDİSİNDEN public alias'a (rotaganyan.com) gerçek bir
+// HTTP çağrısı yapar (DNS/TLS/edge routing dahil gerçek round-trip; handler'ları doğrudan
+// çağırmak bunu ÖLÇEMEZDİ). Platform komple down olursa bu sensör de çalışmaz — kullanıcının
+// kendi notu: "İki katman daha doğru: INTERNAL + EXTERNAL PROBE, ilk turda internal yeterli."
+// EXTERNAL PROBE (platform dışından) HENÜZ YOK — bu bilinen bir sınırlama, unmeasuredModule
+// değil ama tam kapsamlı da değil.
+//
+// Bu projede ayrı bir "Prediction API" JSON endpoint'i YOK (predictions sayfalar içinde
+// server-side render ediliyor) — kullanıcının önerdiği "Prediction read path" HTTP kontrolü
+// yerine (var olmayan bir endpoint'i test etmek yalancı olurdu) iki gerçek şey kullanıldı:
+// (1) `/tahmin-onerileri` sayfasının HTTP availability'si, (2) en son yayınlanmış
+// Prediction'ın olasılık/rank bütünlüğü DOĞRUDAN DB'den (HTTP değil) doğrulanıyor.
+const SITE_BASE_URL = "https://rotaganyan.com";
+const SITE_LATENCY_HEALTHY_MS = 1500;
+const SITE_LATENCY_WARNING_MS = 3000;
+const SITE_FETCH_TIMEOUT_MS = 8000;
+const SITE_PROBE_CACHE_MS = 60_000; // panel 15sn'de bir poll ediyor — production'a gereksiz senkron trafik binmesin diye 60sn'lik cache
+
+type SiteProbe = { ok: boolean; status: number | null; latencyMs: number | null; error?: string };
+
+async function probeSiteUrl(path: string): Promise<SiteProbe> {
+  const started = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SITE_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${SITE_BASE_URL}${path}`, { signal: controller.signal, cache: "no-store" });
+    return { ok: res.ok, status: res.status, latencyMs: Date.now() - started };
+  } catch (err) {
+    return { ok: false, status: null, latencyMs: Date.now() - started, error: err instanceof Error ? err.message : String(err) };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function latencyStatus(ms: number | null): Status {
+  if (ms == null) return "critical";
+  if (ms < SITE_LATENCY_HEALTHY_MS) return "healthy";
+  if (ms < SITE_LATENCY_WARNING_MS) return "warning";
+  return "critical";
+}
+
+let siteProbeCache: { data: ModuleResult; expiresAt: number } | null = null;
+
+async function computeSiteApiHealth(): Promise<ModuleResult> {
+  const [home, program, predictions, buildInfoProbe] = await Promise.all([
+    probeSiteUrl("/"),
+    probeSiteUrl("/program"),
+    probeSiteUrl("/tahmin-onerileri"),
+    probeSiteUrl("/api/build-info"),
+  ]);
+
+  const criticalProbes = [
+    { label: "Homepage", probe: home },
+    { label: "Program", probe: program },
+    { label: "Tahmin Önerileri", probe: predictions },
+  ];
+
+  const criticalOkCount = criticalProbes.filter((p) => p.probe.ok).length;
+  const availabilityStatus: Status = criticalProbes.some((p) => !p.probe.ok)
+    ? "critical"
+    : criticalProbes.some((p) => latencyStatus(p.probe.latencyMs) !== "healthy")
+      ? "warning"
+      : "healthy";
+
+  // Freshness — expected: BU serverless instance'ın KENDİ commit'i (env'den, HTTP YOK) vs
+  // live: public alias'ın GERÇEKTEN servis ettiği commit (build-info'ya HTTP ile sorulur).
+  // Bu iki değer, alias'ın ESKİ bir deployment'ı servis ettiği (deploy'un alias'a
+  // yansımadığı) durumu doğrudan yakalar — bu oturumda birkaç kez elle yaptığımız
+  // "curl build-info, commit eşleşiyor mu" doğrulamasının otomatikleşmiş hali.
+  const expectedCommit = process.env.VERCEL_GIT_COMMIT_SHA ?? "dev";
+  let liveCommit: string | null = null;
+  let buildInfoValid: boolean | null = null;
+  if (buildInfoProbe.ok) {
+    try {
+      const res = await fetch(`${SITE_BASE_URL}/api/build-info`, { cache: "no-store" });
+      const json = (await res.json()) as { buildId?: unknown };
+      liveCommit = typeof json.buildId === "string" ? json.buildId : null;
+      buildInfoValid = typeof json.buildId === "string" && json.buildId.length > 0;
+    } catch {
+      buildInfoValid = false;
+    }
+  }
+  const commitKnown = expectedCommit !== "dev" && liveCommit != null;
+  const commitsMatch = commitKnown && liveCommit === expectedCommit;
+  const freshnessStatus: Status = !commitKnown ? "unknown" : commitsMatch ? "healthy" : "warning";
+
+  const completenessStatus: Status =
+    criticalOkCount === criticalProbes.length ? "healthy" : criticalOkCount >= criticalProbes.length - 1 ? "warning" : "critical";
+
+  // Correctness — en son yayınlanmış Prediction'ın olasılık/rank bütünlüğü, DOĞRUDAN DB'den.
+  const latestPrediction = await db.prediction.findFirst({
+    where: { published: true },
+    orderBy: { publishedAt: "desc" },
+    select: { id: true, picks: { select: { rank: true, scoreExact: true } } },
+  });
+  let predictionValid: boolean | null = null;
+  let predictionDetail = "yayınlanmış tahmin yok";
+  if (latestPrediction) {
+    const ranks = latestPrediction.picks.map((p) => p.rank);
+    const duplicateRanks = new Set(ranks).size !== ranks.length;
+    const withScore = latestPrediction.picks.filter((p) => p.scoreExact != null);
+    const allFinite = withScore.every((p) => Number.isFinite(p.scoreExact!));
+    const sum = withScore.reduce((s, p) => s + p.scoreExact!, 0);
+    // scoreExact = olasilik*100 — tüm runner'lar toplamı ~100 olmalı (yuvarlama payı ±10).
+    const sumOk = withScore.length === 0 ? null : sum >= 90 && sum <= 110;
+    predictionValid = !duplicateRanks && allFinite && sumOk !== false;
+    predictionDetail = `${latestPrediction.picks.length} pick, duplicate rank=${duplicateRanks}, olasılık toplamı=${withScore.length > 0 ? sum.toFixed(1) : "N/A"}`;
+  }
+  const correctnessIssues = buildInfoValid === false || predictionValid === false;
+  const correctnessStatus: Status = correctnessIssues ? "warning" : "healthy";
+
+  const statusWeight: Record<Status, number> = { healthy: 0, unknown: 1, warning: 2, critical: 3 };
+  let status: Status = "healthy";
+  for (const s of [availabilityStatus, freshnessStatus, completenessStatus, correctnessStatus]) {
+    if (statusWeight[s] > statusWeight[status]) status = s;
+  }
+  if (status === "unknown") status = "healthy"; // freshness tek başına "commit bilinmiyor" TEK BAŞINA alarm sayılmaz
+
+  return {
+    id: "site",
+    title: "SITE / API",
+    status,
+    description: "Internal sensor — deployment'ın kendisinden rotaganyan.com'a HTTP çağrısı (external probe henüz yok)",
+    metrics: [
+      { label: "Homepage", value: `${home.status ?? "—"} / ${home.latencyMs ?? "—"} ms` },
+      { label: "Program", value: `${program.status ?? "—"} / ${program.latencyMs ?? "—"} ms` },
+      { label: "Tahmin Önerileri", value: `${predictions.status ?? "—"} / ${predictions.latencyMs ?? "—"} ms` },
+      { label: "Build Info", value: `${buildInfoProbe.status ?? "—"} / ${buildInfoProbe.latencyMs ?? "—"} ms` },
+      { label: "Expected commit", value: expectedCommit === "dev" ? "bilinmiyor (dev)" : expectedCommit.slice(0, 7) },
+      { label: "Live commit", value: liveCommit ? liveCommit.slice(0, 7) : "bilinmiyor" },
+      { label: "Kritik endpoint başarı", value: `${criticalOkCount}/${criticalProbes.length}` },
+      { label: "Prediction verisi (DB)", value: predictionDetail },
+    ],
+    checks: [
+      {
+        id: "site-availability",
+        label: "Kritik endpointler 200 dönüyor ve hızlı",
+        ok: availabilityStatus === "critical" ? false : availabilityStatus === "warning" ? null : true,
+        detail: criticalProbes.map((p) => `${p.label}: ${p.probe.status ?? p.probe.error ?? "?"} (${p.probe.latencyMs ?? "-"}ms)`).join(" · "),
+      },
+      {
+        id: "site-freshness",
+        label: "Alias beklenen commit'i servis ediyor",
+        ok: !commitKnown ? null : commitsMatch,
+        detail: !commitKnown ? "commit karşılaştırması yapılamadı (dev ortamı veya build-info erişilemedi)" : `expected=${expectedCommit.slice(0, 7)} live=${liveCommit!.slice(0, 7)}`,
+      },
+      { id: "site-completeness", label: "Tüm kritik endpointler sağlıklı", ok: criticalOkCount === criticalProbes.length, detail: `${criticalOkCount}/${criticalProbes.length} kritik endpoint OK` },
+      { id: "site-correctness", label: "Payload şeması geçerli (build-info + prediction)", ok: !correctnessIssues, detail: `build-info geçerli=${buildInfoValid ?? "N/A"} · ${predictionDetail}` },
+    ],
+    lastCheckedAt: nowIso(),
+  };
+}
+
+async function siteApiHealth(): Promise<ModuleResult> {
+  if (siteProbeCache && siteProbeCache.expiresAt > Date.now()) return siteProbeCache.data;
+  try {
+    const result = await computeSiteApiHealth();
+    siteProbeCache = { data: result, expiresAt: Date.now() + SITE_PROBE_CACHE_MS };
+    return result;
+  } catch (error) {
+    return {
+      id: "site",
+      title: "SITE / API",
+      status: "unknown",
+      description: "Site/API health ölçülemedi",
+      metrics: [],
+      checks: [],
+      errorMessage: error instanceof Error ? error.message : "Site health error",
+      lastCheckedAt: nowIso(),
+    };
+  }
+}
+
 // DÜZELTME (2026-09-23): ChallengerRun'da `createdAt` alanı YOK — gerçek alan `computedAt`
 // (bkz. prisma/schema.prisma:564). Yanlış alan adı build'i kırardı.
 async function challengerHealth(): Promise<ModuleResult> {
@@ -846,6 +1020,7 @@ export async function GET() {
     agfSyncHealth(),
     programSyncHealth(),
     resultSyncHealth(),
+    siteApiHealth(),
   ]);
 
   const modules: ModuleResult[] = [];
@@ -857,7 +1032,6 @@ export async function GET() {
   modules.push(unmeasuredModule("data-source", "VERİ TOPLAMA", "TJK / program / yarış verileri"));
   modules.push(unmeasuredModule("coupon", "KUPON ÜRETİMİ", "Kupon oluşturma"));
   modules.push(unmeasuredModule("calibration", "KALİBRASYON", "Probability calibration"));
-  modules.push(unmeasuredModule("site", "SITE / API", "Web ve API"));
   modules.push(unmeasuredModule("model-health", "MODEL SAĞLIĞI", "Model monitoring"));
 
   propagateDependencies(modules);
