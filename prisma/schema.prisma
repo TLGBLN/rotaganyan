@@ -352,8 +352,18 @@ model HotCacheWatchdogState {
   lastRunAt    DateTime @default(now()) @updatedAt
   // 2026-09-23 — Cron Config Drift sensörü: watchdog'un GERÇEKTE ne sıklıkta çalıştığını
   // (declared 2 saat vs. yalnız agf-sync piggyback'iyle fiilen ~6 saat) ölçebilmek için
-  // son 10 GERÇEK çalışmanın (skip edilenler DEĞİL) zaman damgası — bkz. runHotCacheWatchdogIfDue.
+  // son 10 GERÇEK çalışmanın (skip edilenler DEĞİL) zaman damgası — bkz. runHotWatchdogIfDue.
   recentRunsJson Json?
+
+  // 2026-09-24 — kullanıcı kararı: need-aware, çok-kaynaklı watchdog (agf-sync/result-sync/
+  // ingest-program HEPSİ aynı runHotWatchdogIfDue()'yu çağırabilir, ucuz due-check duplicate
+  // ağır çalışmayı engeller). Panelde "Trigger source/Processed/Skipped/Runtime/Budget hit"
+  // dürüstçe gösterilebilsin diye son GERÇEK çalışmanın özeti.
+  lastTriggerSource String?  // "agf-sync" | "result-sync" | "program-sync"
+  lastProcessed     Int?
+  lastSkipped       Int?     // syncHorseStatsCache'in "remaining" alanı — bütçe dolup işlenemeyen
+  lastRuntimeMs     Int?
+  lastBudgetHit     Boolean?
 }
 
 // 2026-09-23 — AGF Sync CRON'unun kendi çalışma geçmişi. AgfSyncState (yukarıda) yalnız

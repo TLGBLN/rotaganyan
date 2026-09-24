@@ -395,10 +395,21 @@ export async function syncHorseStatsCache(
   // ("tamamen eksik") bayat-ama-var-olanlardan önce gelir (2026-08-30'daki mevcut
   // önceliklendirme deseniyle AYNI, yalnız artık tier ÜSTTE bir kademe daha var).
   function tamamenEksikMi(id: number): boolean { return !statsUpdatedById.has(id) || !historyUpdatedById.has(id); }
+  // 2026-09-24 — kullanıcı kararı: HOT tier İÇİNDE de öncelik URGENT(0-6s) > NEAR(6-24s) >
+  // NEXT(24-48s) olmalı — bounded batch (ör. 75) sınırına takılırsa önce en yakın yarışacak
+  // atlar işlensin. Yalnız HOT için anlamlı (WARM/COLD'un urgency kavramı yok, sırası
+  // eskisi gibi tamamen-eksik-önce kalır).
+  function hotUrgencyRank(id: number): number {
+    const urgency = hotUrgencyFor(nextRaceDateTimeByHorse.get(id), now);
+    return urgency === "URGENT" ? 0 : urgency === "NEAR" ? 1 : urgency === "NEXT" ? 2 : 3;
+  }
   const gruplar: Record<Tier, number[]> = { HOT: [], WARM: [], COLD: [] };
   for (const id of needsSyncAll) gruplar[tierByHorse.get(id)!].push(id);
   const needsSync = activeTiers.flatMap((tier) => {
     const ids = gruplar[tier];
+    if (tier === "HOT") {
+      return [...ids].sort((a, b) => hotUrgencyRank(a) - hotUrgencyRank(b) || Number(tamamenEksikMi(b)) - Number(tamamenEksikMi(a)));
+    }
     const eksik = ids.filter(tamamenEksikMi);
     const bayat = ids.filter((id) => !tamamenEksikMi(id));
     return [...eksik, ...bayat];
@@ -541,17 +552,26 @@ export async function syncHorseStatsCache(
   return { ok, fail, remaining, durationMs, stoppedByTimeBudget, tierCounts, tierProcessed, staleBuckets, hotUrgency, hotChurn };
 }
 
-// 2026-09-23 — HOT Cache Watchdog kademe kapısı: yalnız HOT'u, YALNIZ WARM/COLD'a
-// dokunmadan, günlük 03:00 cron'unu BEKLEMEDEN sık kontrol eder (kullanıcı tasarımı —
-// Sistem Anatomisi'nin ilk günden yakaladığı P0 bulgu: HOT kümesi gün içinde değişiyor
-// ama tazeleme yalnız 03:00'te). Hem KENDİ ayrı cron rotasından (her-2-saat, Vercel'e
-// kaydolma riski var — bkz. "Vercel Cron Kayıt Bugu") hem de zaten kanıtlanmış çalışan
-// cron'lara (agf-sync) asalak eklenerek çağrılır — HANGİSİ önce tetiklerse `lastRunAt`
-// kapısı diğerlerini gereksiz yere DB taramaktan bile alıkoyar (2 saatten taze ise
-// syncHorseStatsCache'e HİÇ girilmez, tek bir ucuz findUnique sorgusu yeterli).
-const HOT_WATCHDOG_INTERVAL_MS = 2 * 3_600_000;
+// 2026-09-24 — HOT Cache Watchdog, NEED-AWARE çok-kaynaklı fallback (kullanıcı kararı,
+// Program Sync fallback'inin AYNI "check cheap, work only if due" ilkesiyle — ama birebir
+// KOPYASI değil). Sabit "2 saatte bir" zamanlayıcı KALDIRILDI: artık üç ayrı cron
+// (agf-sync/result-sync/ingest-program) HEPSİ aynı `runHotWatchdogIfDue({source})`'u
+// çağırabilir, gerçek karar mekanizması NEED-BASED'dir:
+//   1) Cooldown (10dk) — yalnız neredeyse eşzamanlı üç çağrının ağır işi TEKRARLAMASINI
+//      engeller, ANA karar mekanizması DEĞİL.
+//   2) Önümüzdeki 48s'te hiç HOT-uygun yarış yoksa (gece, yarış-arası boşluk) → EXIT,
+//      "sırf 2 saat geçti" diye sistemi gereksiz uyandırmaz.
+//   3) HOT popülasyonu var ama TÜMÜ zaten kendi URGENT/NEAR/NEXT SLA'sını karşılıyorsa
+//      → EXIT, gerçekten iş YOKKEN çalıştırılmaz.
+// Yalnız gerçekten need varsa (bir SLA ihlali varsa) ağır iş (syncHorseStatsCache) çalışır.
+// AGF piggyback'i BİLEREK kaldırılmadı (kullanıcı: "birkaç günlük telemetriden sonra
+// gereksiz tetikleyici varsa sadeleştiririz") — üç kaynak da aynı ucuz due-check'i paylaşır,
+// hangisi ÖNCE gerçek ihtiyacı yakalarsa o çalışır.
+const HOT_WATCHDOG_COOLDOWN_MS = 10 * 60_000;
 const HOT_WATCHDOG_BATCH_LIMIT = 75;
-const HOT_WATCHDOG_RUNTIME_BUDGET_MS = 200_000; // 200s — kullanıcının önerdiği 180-240s aralığının ortası
+const HOT_WATCHDOG_RUNTIME_BUDGET_MS = 200_000; // 200s — kullanıcının önerdiği 180-240s aralığının ortası, DEĞİŞTİRİLMEDİ
+
+export type HotWatchdogTriggerSource = "agf-sync" | "result-sync" | "program-sync" | "direct-cron";
 
 // 2026-09-23 — en fazla 10 zaman damgası tutan basit bir "recent runs" halkası. Cron Config
 // Drift sensörünün "Observed" (gerçek) cadence'ı buradan, GERÇEK tetiklenmelerden türetilir —
@@ -572,27 +592,52 @@ export function observedCadenceHours(timestampsIso: string[] | undefined | null)
   return avgMs / 3_600_000;
 }
 
-export async function runHotCacheWatchdogIfDue(): Promise<
+export async function runHotWatchdogIfDue(opts: { source: HotWatchdogTriggerSource }): Promise<
   | { skipped: true; reason: string }
   | (Awaited<ReturnType<typeof syncHorseStatsCache>> & { skipped: false })
 > {
   const { db } = await import("@/lib/db");
   const state = await db.hotCacheWatchdogState.findUnique({ where: { id: "singleton" } }).catch(() => null);
-  if (state && Date.now() - state.lastRunAt.getTime() < HOT_WATCHDOG_INTERVAL_MS) {
-    return { skipped: true, reason: `son HOT kontrolü ${Math.round((Date.now() - state.lastRunAt.getTime()) / 60_000)} dk önce — 2 saat dolmadı` };
+
+  // 1) Cooldown — yalnız neredeyse eşzamanlı çağrıların (üç kaynak) tekrarını engeller.
+  if (state && Date.now() - state.lastRunAt.getTime() < HOT_WATCHDOG_COOLDOWN_MS) {
+    return { skipped: true, reason: `${Math.round((Date.now() - state.lastRunAt.getTime()) / 1000)}sn önce başka bir kaynak zaten kontrol etti (cooldown)` };
   }
+
+  // 2+3) Need-aware — nüfus yoksa veya hepsi zaten SLA'sını karşılıyorsa çalıştırma.
+  // getHotCacheHealthSnapshot() SALT-OKUNUR (aşağıda tanımlı, hoisted) — ekstra TJK isteği
+  // atmıyor, yalnız DB okuyor.
+  const snapshot = await getHotCacheHealthSnapshot();
+  const totalHot = snapshot.urgency.URGENT.total + snapshot.urgency.NEAR.total + snapshot.urgency.NEXT.total;
+  if (totalHot === 0) {
+    return { skipped: true, reason: "önümüzdeki 48 saatte HOT-uygun yarış yok — çalıştırmaya gerek yok" };
+  }
+  const totalStale = snapshot.urgency.URGENT.stale + snapshot.urgency.NEAR.stale + snapshot.urgency.NEXT.stale;
+  if (totalStale === 0) {
+    return { skipped: true, reason: "tüm HOT atlar zaten kendi SLA'sını karşılıyor — çalıştırmaya gerek yok" };
+  }
+
   const now = new Date();
   await db.hotCacheWatchdogState
     .upsert({
       where: { id: "singleton" },
-      create: { id: "singleton", lastHotIdsJson: [], recentRunsJson: pushRecentRun(null, now) },
-      update: { recentRunsJson: pushRecentRun(state?.recentRunsJson, now) },
+      create: { id: "singleton", lastHotIdsJson: [], recentRunsJson: pushRecentRun(null, now), lastTriggerSource: opts.source },
+      update: { recentRunsJson: pushRecentRun(state?.recentRunsJson, now), lastTriggerSource: opts.source },
     })
     .catch(() => {}); // yalnız izleme metriği — HOT sync'i asla bloklamaz
+
   const result = await syncHorseStatsCache(HOT_WATCHDOG_BATCH_LIMIT, 3, {
     tierFilter: ["HOT"],
     runtimeBudgetMs: HOT_WATCHDOG_RUNTIME_BUDGET_MS,
   });
+
+  await db.hotCacheWatchdogState
+    .update({
+      where: { id: "singleton" },
+      data: { lastProcessed: result.ok, lastSkipped: result.remaining, lastRuntimeMs: result.durationMs, lastBudgetHit: result.stoppedByTimeBudget },
+    })
+    .catch(() => {}); // yalnız izleme metriği — sonuç zaten döndürülüyor, bu yalnız panel için
+
   return { ...result, skipped: false };
 }
 

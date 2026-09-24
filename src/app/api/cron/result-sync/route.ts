@@ -10,14 +10,16 @@ import { verifyCronRequest } from "@/lib/cron-auth";
 import { runRaceContextWatch } from "@/app/api/cron/race-context-watch/route";
 import { reconcileAllActiveHomeKupons } from "@/server/services/home-kupon-sync.service";
 import { runProgramSyncIfDue } from "@/server/services/ingest/tjk-info.adapter";
+import { runHotWatchdogIfDue } from "@/server/services/ingest/tjk-at-profil.adapter";
 
-// 2026-09-24 kullanıcı kararı — Program Sync fallback piggyback'i (bkz. runProgramSyncIfDue)
-// için 60sn yetersiz: gerçek bir fallback ingest ~90-120sn sürebilir (bugün+yarın, paralel,
-// her biri kendi içinde city-city SIRALI+400ms bekleme). due-check'in KENDİSİ ucuz (tek
-// findUnique) — yalnız GERÇEKTEN çalıştığı (günde en fazla birkaç kez, 11/13/15/17 UTC
-// slotlarından biri boşsa) nadir anlarda bu üst sınıra ihtiyaç var. Normal result-sync
-// turlarının süresi (birkaç saniye) DEĞİŞMİYOR — bu yalnız bir TAVAN, zorunlu bekleme değil.
-export const maxDuration = 150;
+// 2026-09-24 kullanıcı kararı — iki need-based fallback piggyback'i (runProgramSyncIfDue
+// ~90-120sn, runHotWatchdogIfDue kendi 200sn runtime budget'ı) AYNI after() penceresinde
+// EŞ ZAMANLI (I/O-bound, birbirini BLOKLAMAZ) çalışabilir — toplam duvar-saati EN BÜYÜĞÜ
+// kadar (~200sn) olabilir, TOPLAMLARI değil. 300sn (dedicated hot-cache-watchdog route'unun
+// KENDİ bütçesiyle AYNI) güvenli bir tavan. Normal result-sync turlarının süresi (birkaç
+// saniye) DEĞİŞMİYOR — bu yalnız bir TAVAN, zorunlu bekleme değil, yalnız İKİ fallback'in de
+// AYNI ANDA gerçekten due olduğu nadir anlarda devreye girer.
+export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
   const denied = verifyCronRequest(req);
@@ -78,6 +80,14 @@ export async function GET(req: NextRequest) {
   // (Program piggyback failure ≠ Result Sync failure, kullanıcı kararı).
   after(async () => {
     await runProgramSyncIfDue().catch((e) => console.error("[result-sync piggyback] program-sync-fallback hata:", e));
+  });
+
+  // 2026-09-24 — HOT Cache Watchdog need-aware fallback (bkz. runHotWatchdogIfDue) — result-sync
+  // zaten 11-21 arası sık çalışıyor, agf-sync'in kendi gece boşluğuna bağımlı KALMADAN ek bir
+  // tetikleme fırsatı sağlıyor. Ucuz due-check (cooldown+need) sayesinde GEREKSİZ ağır iş
+  // TEKRARLANMAZ. Hata durumunda Result Sync'i ASLA bloke etmez/başarısız kılmaz.
+  after(async () => {
+    await runHotWatchdogIfDue({ source: "result-sync" }).catch((e) => console.error("[result-sync piggyback] hot-watchdog hata:", e));
   });
 
   return NextResponse.json({ ok: true, date: today });

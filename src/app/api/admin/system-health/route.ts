@@ -234,9 +234,18 @@ async function cronHealth(): Promise<ModuleResult> {
     }
 
     const ageHours = ageMinutes(state.lastRunAt)! / 60;
+    // 2026-09-24 (kullanıcı kararı) — HOT Watchdog artık NEED-AWARE: uzun bir "çalışmadı"
+    // süresi ARTIK TEK BAŞINA arıza sinyali DEĞİL (gece/yarış-arası boşlukta gerçekten
+    // ihtiyaç olmayabilir, bu NORMAL). Gerçek staleness alarmı zaten `horse-cache`
+    // sensöründe (cacheHealth) ölçülüyor VE `cron`un registry.ts'teki `dependencies:
+    // ["horse-cache","agf"]` ilişkisi sayesinde propagateDependencies() bunu OTOMATİK
+    // yansıtıyor — burada AYRICA tekrar ölçmüyoruz (çift alarm/duplicate olmasın diye).
+    // Yalnız çok uzun bir sessizlik (>24s — günlük yarış temposunda beklenmeyen) yumuşak
+    // bir "warning" backstop'u, ASLA "critical" tetiklemiyor (need-based skip'i tamamen
+    // meşru bir sonuç kabul ediyoruz).
     let status: Status = "healthy";
-    if (ageHours > 2.5) status = "critical";
-    else if (ageHours > 2) status = "warning";
+    if (!state.lastTriggerSource) status = "warning"; // hiç GERÇEK (need-based) çalışma olmadı
+    else if (ageHours > 24) status = "warning";
 
     const hotObservedH = observedCadenceHours(state.recentRunsJson as string[] | null);
     const hotDrift = evaluateCronDrift("hot-cache-watchdog", hotObservedH, { urgentSlaHours: 6 });
@@ -252,15 +261,26 @@ async function cronHealth(): Promise<ModuleResult> {
       id: "cron",
       title: "CRON / SYNC",
       status,
-      description: "HOT Cache Watchdog cron akışı + Cron Config Drift (declared/observed/registered)",
+      description: "HOT Cache Watchdog (need-aware, çok-kaynaklı) + Cron Config Drift (declared/observed/registered)",
       metrics: [
-        { label: "Son HOT watchdog çalışması", value: `${ageHours.toFixed(1)} saat önce` },
-        { label: "HOT watchdog — istenen cadence", value: "2 saat" },
+        { label: "HOT Watchdog — son çalışma", value: `${ageHours.toFixed(1)} saat önce` },
+        { label: "HOT Watchdog — trigger source", value: state.lastTriggerSource ?? "hiç" },
+        { label: "HOT Watchdog — primary trigger", value: "agf-sync" },
+        { label: "HOT Watchdog — fallback triggers", value: "result-sync, ingest-program (program-sync)" },
+        { label: "HOT Watchdog — fallback coverage", value: "ACTIVE (2026-09-24'ten beri, need-aware)" },
+        { label: "HOT Watchdog — processed / skipped", value: `${state.lastProcessed ?? "-"} / ${state.lastSkipped ?? "-"}` },
+        { label: "HOT Watchdog — runtime", value: state.lastRuntimeMs == null ? "-" : `${(state.lastRuntimeMs / 1000).toFixed(1)} sn` },
+        { label: "HOT Watchdog — budget hit", value: state.lastBudgetHit == null ? "-" : state.lastBudgetHit ? "EVET (bütçe doldu)" : "hayır" },
         { label: "HOT watchdog — gözlemlenen cadence", value: hotDrift.observedLabel },
         { label: "AGF sync — gözlemlenen cadence", value: agfDrift.observedLabel },
       ],
       checks: [
-        { id: "hot-watchdog", label: "HOT Cache Watchdog ≤2s içinde çalıştı", ok: ageHours <= 2.5, detail: state.lastRunAt.toISOString() },
+        {
+          id: "hot-watchdog",
+          label: "HOT Watchdog mekanizması çalışıyor (need-based skip NORMAL sayılır)",
+          ok: state.lastTriggerSource ? (ageHours > 24 ? null : true) : null,
+          detail: state.lastTriggerSource ? `son GERÇEK çalışma: ${state.lastTriggerSource}, ${ageHours.toFixed(1)}s önce — gerçek staleness alarmı horse-cache sensöründe, dependency propagation ile buraya yansır` : "hiç GERÇEK (need-based) çalışma yok",
+        },
         { id: "drift-hot-watchdog", label: "CRON CONFIG DRIFT — hot-cache-watchdog", ok: hotDrift.status === "healthy" ? true : hotDrift.status === "warning" ? null : false, detail: hotDrift.detail },
         { id: "drift-agf-sync", label: "CRON CONFIG DRIFT — agf-sync", ok: agfDrift.status === "healthy" ? true : agfDrift.status === "warning" ? null : false, detail: agfDrift.detail },
       ],

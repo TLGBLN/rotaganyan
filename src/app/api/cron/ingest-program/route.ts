@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { toTjkDate, ingestDate, recordProgramCronRun } from "@/server/services/ingest/tjk-info.adapter";
 import { syncIdmanForDate } from "@/server/services/ingest/tjk-idman-stats.adapter";
+import { runHotWatchdogIfDue } from "@/server/services/ingest/tjk-at-profil.adapter";
 import { verifyCronRequest } from "@/lib/cron-auth";
 
 export const maxDuration = 800; // v6.90 — kullanıcı talimatı 2026-08-10: en son sınıra çekildi
@@ -35,6 +36,15 @@ export async function GET(req: NextRequest) {
     durationMs: Date.now() - startedAt,
     result: { today: todayResult, tomorrow: tomorrowResult },
   }).catch(() => {});
+
+  // 2026-09-24 — HOT Cache Watchdog need-aware fallback (bkz. runHotWatchdogIfDue) —
+  // ingest-program üçüncü bağımsız tetikleme kaynağı (agf-sync/result-sync ile birlikte).
+  // Hata durumunda program ingest'i ASLA bloke etmez/başarısız kılmaz.
+  try {
+    await runHotWatchdogIfDue({ source: "program-sync" });
+  } catch (e) {
+    console.error("[ingest-program] hot-watchdog piggyback hatası (program ingest etkilenmedi)", e);
+  }
 
   // 2. İdman (galop) sync: program yüklendikten sonra bugün + yarın
   const [todayGalop, tomorrowGalop] = await Promise.all([
