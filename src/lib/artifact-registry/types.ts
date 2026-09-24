@@ -13,6 +13,8 @@ export type InvalidationReason =
   | "DATA_SNAPSHOT_CHANGED"
   | "EVALUATION_METHOD_CHANGED"
   | "COHORT_DEFINITION_CHANGED"
+  | "BOOTSTRAP_SEED_CHANGED"
+  | "POPULATION_CHANGED" // resample edilen popülasyonun büyüklüğü (trainN/testN/gün sayısı) değişti
   | "DATA_CORRUPTION"
   | "ARTIFACT_SCHEMA_INCOMPATIBLE"
   | "EXPLICIT_MANUAL_REBUILD";

@@ -185,7 +185,19 @@ describe("kabul kriteri 2 — yarım kalan iş sıfırdan başlamaz", () => {
     await runIncrementalJob({ identity: identity(), listItems: async () => ids(10), processItem: job.process, root, log: quiet });
     expect(job.calls).toHaveLength(0);
 
+    // REGRESYON (bootstrap-series çalışmasında bulundu): torn son satırdan SONRA yeni item append edilirse bozuk parça
+    // ORTADA kalıp sonraki yüklemede yanlış DATA_CORRUPTION üretiyordu → artık append öncesi onarılır.
+    job.calls.length = 0;
+    const r = await runIncrementalJob({ identity: identity(), listItems: async () => ids(13), processItem: job.process, root, log: quiet });
+    expect(job.calls).toEqual(["r10", "r11", "r12"]);
+    expect(r.results.size).toBe(13);
+    job.calls.length = 0;
+    await runIncrementalJob({ identity: identity(), listItems: async () => ids(13), processItem: job.process, root, log: quiet }); // yeniden yükleme HATASIZ
+    expect(job.calls).toHaveLength(0);
+    fs.appendFileSync(itemsFile, '{"id":"r50","r":'); // torn parça GEÇERLİ JSON değil → kesilir; geçerli JSON olsaydı yalnız "\n" eklenirdi
+
     const lines = fs.readFileSync(itemsFile, "utf-8").split("\n").filter(Boolean);
+    lines.pop(); // torn'u çıkar; ortadaki bozuk satır testine devam
     lines[3] = "{bozuk";
     fs.writeFileSync(itemsFile, lines.join("\n") + "\n");
     await expect(
@@ -258,5 +270,72 @@ describe("dayanıklılık", () => {
     job.calls.length = 0;
     await run("Handikap");
     expect(job.calls).toHaveLength(0);
+  });
+});
+
+describe("Registry v1.1 güvenlik kuralları (merge kapısı)", () => {
+  const lockDir = () => artifactDir(root, identity());
+  const writeLock = (pid: number | undefined, ageMs: number) => {
+    fs.mkdirSync(lockDir(), { recursive: true });
+    fs.writeFileSync(path.join(lockDir(), "lock"), JSON.stringify({ ...(pid === undefined ? {} : { pid }), at: Date.now() - ageMs }));
+  };
+  const HOUR = 3_600_000;
+
+  it("kilit devralma: YAŞAYAN sahibin kilidi TTL'i (30dk) çok aşsa bile ASLA çalınmaz (uzun süren iş güvende)", () => {
+    writeLock(process.pid, 2 * HOUR);
+    expect(new FileArtifactStore(lockDir()).acquireLock(30 * 60_000)).toBe(false);
+  });
+
+  it("kilit devralma: ÖLÜ sahibin kilidi TTL beklenmeden devralınır", () => {
+    writeLock(2147483646, 1_000);
+    expect(new FileArtifactStore(lockDir()).acquireLock(30 * 60_000)).toBe(true);
+  });
+
+  it("kilit devralma: pid yeniden kullanımına karşı mutlak üst sınır (24s) — yaşayan pid bile 24s sonra bayat sayılır", () => {
+    writeLock(process.pid, 25 * HOUR);
+    expect(new FileArtifactStore(lockDir()).acquireLock(30 * 60_000)).toBe(true);
+  });
+
+  it("kilit devralma: pid'siz eski kilitler yalnız TTL ile eskir (geriye uyum)", () => {
+    writeLock(undefined, 2 * HOUR);
+    expect(new FileArtifactStore(lockDir()).acquireLock(30 * 60_000)).toBe(true);
+    fs.rmSync(path.join(lockDir(), "lock"));
+    writeLock(undefined, 1_000);
+    expect(new FileArtifactStore(lockDir()).acquireLock(30 * 60_000)).toBe(false);
+  });
+
+  it("torn-tail onarımı YALNIZ satır sonuyla bitmeyen son parçayı kapsar: satır sonuyla biten bozuk SON satır da DATA_CORRUPTION'dır", async () => {
+    const job = makeJob();
+    const run = () => runIncrementalJob({ identity: identity(), listItems: async () => ids(10), processItem: job.process, root, log: quiet });
+    await run();
+    const itemsFile = path.join(lockDir(), "items.jsonl");
+    fs.appendFileSync(itemsFile, "{bozuk-ama-satir-sonlu}\n"); // yarım yazım DEĞİL: tam satır, geçersiz içerik
+    await expect(run()).rejects.toMatchObject({ reasons: ["DATA_CORRUPTION"] });
+  });
+
+  it("torn-tail onarımı ortadaki gerçek bozulmayı MASKELEMEZ: ortada bozuk satır + sonda torn parça → hâlâ DATA_CORRUPTION", async () => {
+    const job = makeJob();
+    const run = () => runIncrementalJob({ identity: identity(), listItems: async () => ids(10), processItem: job.process, root, log: quiet });
+    await run();
+    const itemsFile = path.join(lockDir(), "items.jsonl");
+    const lines = fs.readFileSync(itemsFile, "utf-8").split("\n").filter(Boolean);
+    lines[2] = "{ortada-bozuk";
+    fs.writeFileSync(itemsFile, lines.join("\n") + "\n" + '{"id":"r77","r":'); // + torn son parça
+    await expect(run()).rejects.toMatchObject({ reasons: ["DATA_CORRUPTION"] });
+  });
+
+  it("production import graph: artifact-registry yalnız kendi klasörü ve kök research script'lerince import edilir (src/ uygulama kodu ASLA)", () => {
+    const srcRoot = path.resolve(__dirname, "../..");
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) { if (e.name !== "artifact-registry" && e.name !== "node_modules") walk(p); continue; }
+        if (!/\.(ts|tsx|mts|js|jsx)$/.test(e.name)) continue;
+        if (/artifact-registry/.test(fs.readFileSync(p, "utf-8"))) offenders.push(path.relative(srcRoot, p));
+      }
+    };
+    walk(srcRoot);
+    expect(offenders).toEqual([]);
   });
 });
