@@ -154,7 +154,7 @@
 
 .anatomy-layout {
   display: grid;
-  grid-template-columns: minmax(950px, 1fr) 330px;
+  grid-template-columns: minmax(1050px, 1fr) 330px;
   gap: 20px;
 }
 
@@ -164,7 +164,7 @@
    görünür. 950×950 civarı, hem çekirdeğe hem 14 karta rahat yer bırakıyor. */
 .system-map {
   position: relative;
-  min-height: 950px;
+  min-height: 1050px;
   border-radius: 22px;
   overflow: hidden;
   border: 1px solid rgba(67, 154, 210, 0.24);
@@ -254,9 +254,9 @@
 .anatomy-node {
   position: absolute;
   transform: translate(-50%, -50%);
-  width: 160px;
-  min-height: 100px;
-  padding: 11px;
+  width: 142px;
+  min-height: 96px;
+  padding: 10px;
   text-align: left;
   color: white;
   cursor: pointer;
@@ -273,15 +273,17 @@
 
 .anatomy-node strong {
   display: block;
-  margin-top: 7px;
-  font-size: 14px;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.25;
 }
 
 .anatomy-node small {
   display: block;
   margin-top: 4px;
   color: #9eb1c3;
-  font-size: 11px;
+  font-size: 10px;
+  line-height: 1.3;
 }
 
 .node-top {
@@ -608,12 +610,12 @@
   }
 
   .system-map {
-    min-height: 1100px;
+    min-height: 1150px;
     margin-bottom: 18px;
   }
 
   .anatomy-node {
-    width: 145px;
+    width: 130px;
   }
 
   .detail-panel {
