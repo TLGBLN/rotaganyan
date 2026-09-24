@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   MANIFEST_SCHEMA_VERSION,
+  PENDING,
   RegistryInvalidationError,
   RegistryLockedError,
   RegistryUnexpectedWorkError,
@@ -203,12 +204,13 @@ export async function runIncrementalJob<R, A = unknown>(opts: IncrementalJobOpti
       store.saveManifest(base);
     };
 
-    const stats = { processed: 0, noResult: 0, failed: 0, timedOut: 0, reprocessed: 0, durationMs: 0 };
+    const stats = { processed: 0, noResult: 0, failed: 0, timedOut: 0, reprocessed: 0, pending: 0, durationMs: 0 };
+    const pendingItems: string[] = [];
     const finish = (status: JobStatus): JobResult<R, A> => {
       stats.durationMs = Date.now() - started;
       const results = new Map<string, { fingerprint?: string; result: R | null }>();
       for (const rec of stored.values()) results.set(rec.id, { fingerprint: rec.fp, result: rec.r });
-      return { plan, status, results, aggregateState: aggState, stats, manifest: base };
+      return { plan, status, results, aggregateState: aggState, stats, pendingItems, manifest: base };
     };
 
     if (opts.dryRun) return finish(base.status);
@@ -237,7 +239,15 @@ export async function runIncrementalJob<R, A = unknown>(opts: IncrementalJobOpti
       const batch = todo.slice(i, i + concurrency);
       await Promise.all(batch.map(async ({ item, kind }) => {
         try {
-          const r = await withTimeout(opts.processItem(item), itemTimeoutMs);
+          const out = await withTimeout(opts.processItem(item), itemTimeoutMs);
+          if (out === PENDING) {
+            // Bağımlı veri henüz yok: HATA değil, deneme hakkı tüketmez, saklanmaz (önceden kayıtlıysa eski kayıt korunur).
+            stats.pending++;
+            pendingItems.push(item.id);
+            consecutiveFailures = 0;
+            return;
+          }
+          const r = out;
           const rec: StoredItem<R> = { id: item.id, fp: item.fingerprint, r, t: now() };
           if (stored.has(item.id)) { replacedThisRun = true; stats.reprocessed++; }
           stored.set(item.id, rec);
@@ -270,7 +280,7 @@ export async function runIncrementalJob<R, A = unknown>(opts: IncrementalJobOpti
     if (opts.aggregate && replacedThisRun) aggState = fold();
     persist(status);
     log(`[registry] ${status} processed=${stats.processed} noResult=${stats.noResult} failed=${stats.failed} timedOut=${stats.timedOut} reprocessed=${stats.reprocessed} ` +
-      `total=${stored.size}/${listed.length} (${((Date.now() - started) / 1000).toFixed(1)}s)`);
+      `pending=${stats.pending} total=${stored.size}/${listed.length} (${((Date.now() - started) / 1000).toFixed(1)}s)`);
     return finish(status);
   } finally {
     if (!opts.dryRun) store.releaseLock();
