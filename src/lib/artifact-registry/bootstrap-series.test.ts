@@ -320,3 +320,18 @@ describe("bozulma kuralı (merge kapısı)", () => {
     expect(() => open()).toThrowError(/DATA_CORRUPTION/);
   });
 });
+
+describe("şema sürümü (merge kapısı)", () => {
+  it("BİLİNMEYEN schemaVersion → ARTIFACT_SCHEMA_INCOMPATIBLE ile DURUR; eski v1 manifest (checksum alanlı) okunur", () => {
+    const s = open(); runTo(s, 10, []); s.release();
+    const mf = path.join(s.dir, "manifest.json");
+    const m = JSON.parse(fs.readFileSync(mf, "utf-8"));
+    m.schemaVersion = 2; fs.writeFileSync(mf, JSON.stringify(m));
+    let err: unknown; try { open(); } catch (e) { err = e; }
+    expect((err as RegistryInvalidationError).reasons).toEqual(["ARTIFACT_SCHEMA_INCOMPATIBLE"]);
+    m.schemaVersion = 1; fs.writeFileSync(mf, JSON.stringify(m));
+    const again = open();
+    expect(again.completedIterations()).toBe(10);
+    again.release();
+  });
+});

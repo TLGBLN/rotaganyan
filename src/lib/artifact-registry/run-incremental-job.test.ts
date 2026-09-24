@@ -377,3 +377,52 @@ describe("PENDING — retryable 'bağımlı veri henüz yok' (hata değil)", () 
     expect(second.results.get("a")?.result).toBe(7); // eski kayıt duruyor
   });
 });
+
+describe("artifact şema sürümü / geriye okuma (merge kapısı)", () => {
+  const manifestPath = () => path.join(artifactDir(root, identity()), "manifest.json");
+  const readManifest = () => JSON.parse(fs.readFileSync(manifestPath(), "utf-8"));
+
+  it("BİLİNMEYEN (gelecek) schemaVersion → sessizce yorumlanmaz: ARTIFACT_SCHEMA_INCOMPATIBLE ile DURUR, veri dokunulmaz", async () => {
+    const job = makeJob();
+    const run = (rebuild = false) => runIncrementalJob({ identity: identity(), listItems: async () => ids(10), processItem: job.process, root, rebuild, log: quiet });
+    await run();
+    const m = readManifest(); m.schemaVersion = 2; fs.writeFileSync(manifestPath(), JSON.stringify(m));
+    const itemsBefore = fs.readFileSync(path.join(artifactDir(root, identity()), "items.jsonl"), "utf-8");
+    job.calls.length = 0;
+    await expect(run()).rejects.toMatchObject({ reasons: ["ARTIFACT_SCHEMA_INCOMPATIBLE"] });
+    expect(job.calls).toHaveLength(0);
+    expect(fs.readFileSync(path.join(artifactDir(root, identity()), "items.jsonl"), "utf-8")).toBe(itemsBefore);
+    // bilinçli rebuild: eski items NEDENLE arşivlenir
+    await run(true);
+    expect(fs.readdirSync(artifactDir(root, identity())).some((f) => f.startsWith("items.ARTIFACT_SCHEMA_INCOMPATIBLE.") && f.endsWith(".jsonl.bak"))).toBe(true);
+  });
+
+  it("GERİYE OKUMA: v1.0-biçimli eski manifest (itemsBytes/itemsSha256 alanları YOK) doğru okunur, 0 yeniden hesaplama, sonraki yazımda alanlar eklenir", async () => {
+    const job = makeJob();
+    const run = () => runIncrementalJob({ identity: identity(), listItems: async () => ids(10), processItem: job.process, root, log: quiet });
+    await run();
+    const m = readManifest(); delete m.itemsBytes; delete m.itemsSha256; fs.writeFileSync(manifestPath(), JSON.stringify(m));
+    job.calls.length = 0;
+    const r = await run();
+    expect(job.calls).toHaveLength(0);
+    expect(r.plan.alreadyProcessed).toBe(10);
+    expect(typeof readManifest().itemsBytes).toBe("number"); // yükseltildi
+  });
+
+  it("PENDING sembolü/durumu ASLA diske yazılmaz (persist biçimi değişmedi: yalnız gerçek sonuçlar items.jsonl'de)", async () => {
+    const proc = async (it: JobItem) => (it.id === "r1" ? PENDING : 1);
+    await runIncrementalJob({ identity: identity(), listItems: async () => ids(4), processItem: proc, root, log: quiet });
+    const items = fs.readFileSync(path.join(artifactDir(root, identity()), "items.jsonl"), "utf-8");
+    expect(items.split("\n").filter(Boolean)).toHaveLength(3);
+    expect(items).not.toMatch(/pending|"r1"/i);
+    expect(JSON.stringify(readManifest())).not.toMatch(/pending/i);
+  });
+
+  it("eski çağıran sözleşmesi: yalnız değer/null döndüren/fırlatan callback'ler PENDING olmadan BİREBİR aynı sonucu verir", async () => {
+    const proc = async (it: JobItem) => { if (it.id === "r3") throw new Error("x"); return it.id === "r5" ? null : 1; };
+    const r = await runIncrementalJob({ identity: identity(), listItems: async () => ids(8), processItem: proc, root, log: quiet });
+    expect(r.stats).toMatchObject({ processed: 6, noResult: 1, failed: 1, pending: 0 });
+    expect(r.pendingItems).toEqual([]);
+    expect(r.status).toBe("COMPLETE");
+  });
+});
