@@ -154,13 +154,17 @@
 
 .anatomy-layout {
   display: grid;
-  grid-template-columns: minmax(700px, 1fr) 330px;
+  grid-template-columns: minmax(950px, 1fr) 330px;
   gap: 20px;
 }
 
+/* 2026-09-24 (kullanıcı düzeltmesi) — kareye YAKIN bir tuval: radyal düzenin (registry.ts,
+   14 düğüm tek halka, R=%37) matematiği x/y için AYNI yüzde-yarıçapı varsayıyor — container
+   çok dikdörtgen olursa halka eliipse'e döner ve kartlar bir eksende diğerinden daha sıkışık
+   görünür. 950×950 civarı, hem çekirdeğe hem 14 karta rahat yer bırakıyor. */
 .system-map {
   position: relative;
-  min-height: 820px;
+  min-height: 950px;
   border-radius: 22px;
   overflow: hidden;
   border: 1px solid rgba(67, 154, 210, 0.24);
@@ -170,16 +174,20 @@
     repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(66, 152, 215, 0.06) 40px);
 }
 
+/* 2026-09-24 (kullanıcı talebi: "rotaganyan sistem... hepsinin odak noktasında ortasında
+   görünür olsun") — tam merkeze (50,50) alındı (önceden 42% — hafif yukarıda ve TAHMİN
+   MOTORU kartıyla çakışıyordu) ve büyütüldü, gerçek görsel odak noktası olsun diye. */
 .central-core {
   position: absolute;
   left: 50%;
-  top: 42%;
+  top: 50%;
   transform: translate(-50%, -50%);
-  width: 220px;
-  height: 220px;
+  width: 260px;
+  height: 260px;
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 2;
 }
 
 .core-ring {
@@ -203,8 +211,8 @@
 .core-content {
   position: relative;
   z-index: 3;
-  width: 130px;
-  height: 130px;
+  width: 155px;
+  height: 155px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -236,12 +244,19 @@
   50% { opacity: 1; transform: scale(1.06); }
 }
 
+/* 2026-09-24 (kullanıcı düzeltmesi: "kartlar kenardan kesiliyor") — KÖK NEDEN: x/y eskiden
+   kartın SOL-ÜST köşesiydi, bu yüzden x%+tam-genişlik container sınırını kolayca aşıp
+   `.system-map`'in `overflow:hidden`'ı tarafından KESİLİYORDU. `translate(-50%,-50%)` ile
+   x/y artık kartın TAM MERKEZİ — en dışa taşan nokta yalnız yarı-genişlik kadar, registry.ts'teki
+   radyal yarıçap (R=%37) zaten bu payı hesaba katacak şekilde seçildi. Genişlik 190→160px
+   (14 kartlık tek halkada komşu kartlar çakışmasın diye küçültüldü, hâlâ tüm metin okunaklı).
+ */
 .anatomy-node {
   position: absolute;
-  transform: translate(0, 0);
-  width: 190px;
-  min-height: 106px;
-  padding: 12px;
+  transform: translate(-50%, -50%);
+  width: 160px;
+  min-height: 100px;
+  padding: 11px;
   text-align: left;
   color: white;
   cursor: pointer;
@@ -252,7 +267,8 @@
 }
 
 .anatomy-node:hover {
-  transform: translateY(-3px);
+  transform: translate(-50%, -50%) translateY(-3px);
+  z-index: 6;
 }
 
 .anatomy-node strong {
@@ -582,23 +598,26 @@
 
 /* TABLET — 2 kolonlu (harita + detay) yerine dikey akış, ama harita HÂLÂ kendi
    serbest-konumlu (absolute x%/y%) şeması ile 2D bir canvas olarak render edilir —
-   bu genişlikte hâlâ yeterli yatay alan var, düğümler üst üste binmez. */
-@media (max-width: 1050px) and (min-width: 641px) {
+   bu genişlikte hâlâ yeterli yatay alan var, düğümler üst üste binmez. Eşik 1050→1450px'e
+   çıkarıldı (kullanıcı düzeltmesi, "kartlar kesiliyor" bug'ı): harita artık min 950px genişlik
+   istiyor (radyal düzen için), 950+330(detay panel)+boşluklar ≈ 1350px altında 2 kolon
+   sığmaz, sığdırmaya zorlamak yerine (yatay scroll/kesilme riski) DAHA ERKEN dikey akışa geçilir. */
+@media (max-width: 1450px) and (min-width: 641px) {
   .anatomy-layout {
     display: block;
   }
 
   .system-map {
-    min-height: 1200px;
+    min-height: 1100px;
     margin-bottom: 18px;
+  }
+
+  .anatomy-node {
+    width: 145px;
   }
 
   .detail-panel {
     min-height: auto;
-  }
-
-  .anatomy-node {
-    width: 170px;
   }
 }
 
@@ -643,6 +662,10 @@
     min-height: 0;
     left: auto !important;
     top: auto !important;
+    /* Masaüstünde .anatomy-node artık translate(-50%,-50%) ile kart-merkezleme yapıyor —
+       position:static akışında bu gerçek bir kaymaya (yanlış yerleşim) neden olurdu, burada
+       İPTAL edilmeli (kullanıcı düzeltmesi sonrası eklendi). */
+    transform: none !important;
   }
 
   .anatomy-node:hover {

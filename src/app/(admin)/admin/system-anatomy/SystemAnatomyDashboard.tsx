@@ -325,10 +325,13 @@ function ConnectionLayer({ data }: { data: SystemHealthResponse | null }) {
           else if (states.includes("warning")) status = "warning";
           else if (states.includes("unknown")) status = "unknown";
 
-          const x1 = from.x * 10 + 75;
-          const y1 = from.y * 10 + 60;
-          const x2 = node.x * 10 + 75;
-          const y2 = node.y * 10 + 60;
+          // 2026-09-24 (kullanıcı düzeltmesi) — x/y artık kartın TAM MERKEZİ (bkz. registry.ts
+          // ve .anatomy-node'un translate(-50%,-50%)'i) — viewBox 0-1000 eşlemesi için ARTIK
+          // hiçbir empirik +75/+60 offset'e gerek yok, x%*10/y%*10 doğrudan doğru noktayı verir.
+          const x1 = from.x * 10;
+          const y1 = from.y * 10;
+          const x2 = node.x * 10;
+          const y2 = node.y * 10;
 
           return <line key={`${dependencyId}-${node.id}`} x1={x1} y1={y1} x2={x2} y2={y2} className={`connection connection-${status}`} />;
         })
