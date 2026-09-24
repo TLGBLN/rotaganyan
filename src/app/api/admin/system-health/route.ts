@@ -10,6 +10,15 @@ import type { IngestCityResult } from "@/server/services/ingest/tjk-info.adapter
 import { pencereOzeti, type SonucSatiri } from "@/server/services/analiz-performans.service";
 import { ENGINE_VERSIONS } from "@/lib/methodology/engine-versions.data";
 import { evaluateChallengerRuns } from "@/server/services/challenger-evaluation.service";
+import {
+  softmax,
+  softmaxHam,
+  liderEsigiHesapla,
+  ASIRI_GUVEN_LIDER_ESIGI,
+  ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP,
+  ASIRI_GUVEN_SICAKLIGI,
+} from "@/lib/methodology/v5-engine";
+import { kategoriTespit } from "@/lib/methodology/v2-engine";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -1350,6 +1359,136 @@ async function modelHealthHealth(): Promise<ModuleResult> {
   }
 }
 
+// 2026-09-24 — Calibration sensörü (kullanıcı spesifikasyonu). A: Operational/Mathematical
+// Health (status'u belirler) vs B: Statistical Calibration Performance (yalnız bilgi).
+// dependencies=["engine"] (registry.ts) — Calibration'ın ÇALIŞMASI Results'a bağımlı DEĞİL,
+// yalnız Engine'in ürettiği ham skora; observes=["results"] yalnız "işe yarıyor mu" sorusu
+// için (propagate ETMEZ).
+//
+// KRİTİK dürüstlük notu (bu sensörü kurarken EMPİRİK olarak doğrulandı): kullanıcı "gerçek
+// production calibration fonksiyonunu kullan, threshold/T'yi kopyalama" dedi — bu tam
+// uygulandı (ASIRI_GUVEN_LIDER_ESIGI/_HANDIKAP/_SICAKLIGI, softmax/softmaxHam hepsi
+// v5-engine.ts'ten import edildi, BURADA hiçbir sabit tekrar yazılmadı). AMA: RAW (kalibrasyon
+// öncesi) olasılık HİÇBİR YERDE saklanmıyor — yalnız kalibre edilmiş `Pick.scoreExact` DB'ye
+// yazılıyor. Softmax+sıcaklık matematiksel olarak TERS ÇEVRİLEBİLİR görünüyordu (rawProbs =
+// softmaxHam(T·log(calibratedProbs)) triggered ise) — ama gerçek 168 satırlık veride TEST
+// edildiğinde (bu sensörü kurmadan ÖNCE) %23'ü (38/168) sınır-civarı amgibü çıktı, 0'ı
+// kesin "triggered" olarak ayırt edilebildi. Güvenilmez bir tetik-kohort kırılımını GERÇEKMİŞ
+// gibi sunmak tam da kullanıcının tekrar tekrar uyardığı hata olurdu — bu yüzden trigger
+// cohort/rank-invariant/ΔLL kırılımı BİLEREK "N YETERSİZ (forward capture yok)" olarak
+// bırakıldı. Doğru kalıcı çözüm — kullanıcının kendi önerdiği CalibrationAuditSnapshot
+// (raw+calibrated'ı ANALİZ ANINDA yazan yeni bir hook, RaceCoverageTelemetry ile AYNI desen)
+// — bu turda KURULMADI (v5-engine.ts'in canlı analiz yolunu değiştirmek, "Deploy Öncesi
+// Detay İnceleme" gerektiren ayrı ve daha büyük bir iş) — sıradaki oturum için net bir
+// sonraki adım olarak bırakıldı.
+const CALIBRATION_CACHE_MS = 120_000;
+let calibrationCache: { data: ModuleResult; expiresAt: number } | null = null;
+
+async function computeCalibrationHealth(): Promise<ModuleResult> {
+  // ── Operational — Config validity (GERÇEK production sabitlerini okuyor) ──
+  const configIssues: string[] = [];
+  if (!(ASIRI_GUVEN_LIDER_ESIGI > 0 && ASIRI_GUVEN_LIDER_ESIGI < 1)) configIssues.push("general threshold (0,1) dışında");
+  if (!(ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP > 0 && ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP < 1)) configIssues.push("handikap threshold (0,1) dışında");
+  if (!(ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP < ASIRI_GUVEN_LIDER_ESIGI)) configIssues.push("handikap threshold >= general threshold (beklenmeyen sıralama)");
+  if (!(ASIRI_GUVEN_SICAKLIGI > 0)) configIssues.push("T <= 0");
+
+  // ── Operational — Transform self-test (GERÇEK softmax/softmaxHam fonksiyonlarıyla,
+  // sentetik bir kanarya vektörü üzerinde — DB'ye bağımlı değil, her zaman çalışabilmeli) ──
+  let transformIssues: string[] = [];
+  try {
+    const canary = [3, 1.2, 0.6, 0.1, -0.4, -1.5];
+    const raw = softmaxHam(canary);
+    const calibrated = softmax(canary, 0.0); // liderEsigi=0 → HER ZAMAN tetiklenir, transform'u zorla test eder
+    const sumRaw = raw.reduce((a, b) => a + b, 0);
+    const sumCal = calibrated.reduce((a, b) => a + b, 0);
+    if (!raw.every((x) => Number.isFinite(x) && x >= 0)) transformIssues.push("softmaxHam NaN/negatif üretti");
+    if (!calibrated.every((x) => Number.isFinite(x) && x >= 0)) transformIssues.push("softmax(kalibre) NaN/negatif üretti");
+    if (Math.abs(sumRaw - 1) > 1e-6) transformIssues.push(`softmaxHam toplamı 1 değil (${sumRaw})`);
+    if (Math.abs(sumCal - 1) > 1e-6) transformIssues.push(`softmax toplamı 1 değil (${sumCal})`);
+    // Sıcaklık ölçeklendirmesi MONOTON olmalı — sıralamayı asla değiştirmemeli (kullanıcının
+    // sert invariant'ı: rawRank == calibratedRank). Kanarya vektörü zaten azalan sırada.
+    const rawOrder = [...raw.keys()].sort((a, b) => raw[b]! - raw[a]!);
+    const calOrder = [...calibrated.keys()].sort((a, b) => calibrated[b]! - calibrated[a]!);
+    if (JSON.stringify(rawOrder) !== JSON.stringify(calOrder)) transformIssues.push("sıcaklık ölçeklendirmesi sıralamayı BOZDU (rank invariant ihlali)");
+  } catch (e) {
+    transformIssues = [`transform çağrısı hata verdi: ${e instanceof Error ? e.message : String(e)}`];
+  }
+
+  // ── Operational — ALL-LIVE kalibre edilmiş Pick verisinin temel geçerliliği (sum/NaN) ──
+  const predictions = await db.prediction.findMany({
+    where: { published: true, race: { conditions: null, result: { enteredAt: { gte: V546_START } } } },
+    select: { race: { select: { classType: true } }, picks: { select: { scoreExact: true } } },
+  });
+
+  let invalidSum = 0;
+  let nanOrNegative = 0;
+  let generalCount = 0;
+  let handikapCount = 0;
+  for (const p of predictions) {
+    const handikapMi = kategoriTespit(p.race.classType) === "2";
+    if (handikapMi) handikapCount++;
+    else generalCount++;
+    const scores = p.picks.map((pk) => pk.scoreExact).filter((s): s is number => s != null);
+    if (scores.length === 0) continue;
+    if (scores.some((s) => !Number.isFinite(s) || s < 0)) nanOrNegative++;
+    if (scores.length === p.picks.length) {
+      const sum = scores.reduce((a, b) => a + b, 0);
+      if (sum < 90 || sum > 110) invalidSum++;
+    }
+  }
+
+  const operationalIssues = configIssues.length + transformIssues.length + invalidSum + nanOrNegative;
+  const status: Status = operationalIssues > 0 ? "critical" : "healthy";
+
+  return {
+    id: "calibration",
+    title: "KALİBRASYON",
+    status,
+    description: "A: Operational/Mathematical Health (renk üretir) — B: Statistical Performance (yalnız bilgi, forward capture bekliyor)",
+    metrics: [
+      { label: "General threshold (ASIRI_GUVEN_LIDER_ESIGI)", value: fmtPct(ASIRI_GUVEN_LIDER_ESIGI) },
+      { label: "Handikap threshold", value: fmtPct(ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP) },
+      { label: "Temperature (T)", value: ASIRI_GUVEN_SICAKLIGI.toFixed(2) },
+      { label: "ALL-LIVE — General kategori", value: generalCount },
+      { label: "ALL-LIVE — Handikap kategori", value: handikapCount },
+      { label: "Invalid probability sum", value: invalidSum },
+      { label: "NaN/negatif olasılık", value: nanOrNegative },
+      { label: "NOT_TRIGGERED / GENERAL_TRIGGERED / HANDIKAP_TRIGGERED", value: "ölçülemiyor (forward capture yok)" },
+      { label: "Rank invariant (rawRank=calibratedRank)", value: "ölçülemiyor (raw olasılık saklanmıyor)" },
+      { label: "Statistical Performance (ΔLL, triggered cohort)", value: "N YETERSİZ — forward capture bekliyor" },
+    ],
+    checks: [
+      { id: "cal-config", label: "Config geçerli (threshold'lar + T)", ok: configIssues.length === 0, detail: configIssues.length === 0 ? `general=${fmtPct(ASIRI_GUVEN_LIDER_ESIGI)}, handikap=${fmtPct(ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP)}, T=${ASIRI_GUVEN_SICAKLIGI}` : configIssues.join("; ") },
+      { id: "cal-transform", label: "Transform geçerli (softmax self-test, kanarya vektörü)", ok: transformIssues.length === 0, detail: transformIssues.length === 0 ? "sum=1, finite, rank-preserving" : transformIssues.join("; ") },
+      { id: "cal-probability-integrity", label: "Kalibre edilmiş olasılıklar geçerli (sum≈1, NaN yok)", ok: invalidSum === 0 && nanOrNegative === 0, detail: `invalid sum=${invalidSum}, NaN/negatif=${nanOrNegative} (ALL-LIVE n=${predictions.length})` },
+      { id: "cal-trigger-cohort", label: "Trigger cohort kırılımı (NOT/GENERAL/HANDIKAP_TRIGGERED)", ok: null, detail: "Ölçülemiyor — raw olasılık hiçbir yerde saklanmıyor, yalnız kalibre edilmiş değer DB'de var. Ters-çevirme denendi, gerçek veride %23 (38/168) sınır-belirsiz çıktı — güvenilmez, GERÇEKMİŞ gibi sunulmadı." },
+      { id: "cal-rank-invariant", label: "Rank invariant (rawRank == calibratedRank)", ok: null, detail: "Ölçülemiyor — aynı sebep. Sonraki adım: CalibrationAuditSnapshot (analiz anında raw+calibrated yazan yeni hook, RaceCoverageTelemetry ile aynı desen)." },
+      { id: "cal-statistical-performance", label: "Statistical Performance (ΔLL, triggered cohort)", ok: null, detail: "N YETERSİZ — forward capture altyapısı kurulmadan güvenilir hesaplanamaz." },
+    ],
+    lastCheckedAt: nowIso(),
+  };
+}
+
+async function calibrationHealth(): Promise<ModuleResult> {
+  if (calibrationCache && calibrationCache.expiresAt > Date.now()) return calibrationCache.data;
+  try {
+    const result = await computeCalibrationHealth();
+    calibrationCache = { data: result, expiresAt: Date.now() + CALIBRATION_CACHE_MS };
+    return result;
+  } catch (error) {
+    return {
+      id: "calibration",
+      title: "KALİBRASYON",
+      status: "unknown",
+      description: "Calibration health ölçülemedi",
+      metrics: [],
+      checks: [],
+      errorMessage: error instanceof Error ? error.message : "Calibration health error",
+      lastCheckedAt: nowIso(),
+    };
+  }
+}
+
 // DÜZELTME (2026-09-23) — kullanıcının kendi ilkesiyle çelişiyordu: "sistem ölçemediği
 // bir şeyi yeşil göstermiyor" dendi ama orijinal `simpleHealthy()` ölçülmeyen 9 modülü
 // doğrudan "healthy" (yeşil) damgalıyordu. Artık "unknown" (gri, Bağlanmadı) — sahte
@@ -1464,6 +1603,7 @@ export async function GET() {
     siteApiHealth(),
     forwardCoverageHealth(),
     modelHealthHealth(),
+    calibrationHealth(),
   ]);
 
   const modules: ModuleResult[] = [];
@@ -1474,7 +1614,6 @@ export async function GET() {
   // Henüz gerçek sensörü olmayan modüller — bkz. unmeasuredModule notu.
   modules.push(unmeasuredModule("data-source", "VERİ TOPLAMA", "TJK / program / yarış verileri"));
   modules.push(unmeasuredModule("coupon", "KUPON ÜRETİMİ", "Kupon oluşturma"));
-  modules.push(unmeasuredModule("calibration", "KALİBRASYON", "Probability calibration"));
 
   propagateDependencies(modules);
 

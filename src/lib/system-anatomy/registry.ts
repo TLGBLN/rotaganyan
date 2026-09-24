@@ -31,7 +31,11 @@ export const SYSTEM_ANATOMY_NODES: AnatomyNodeDefinition[] = [
   { id: "horse-cache", title: "AT PROFİL CACHE", subtitle: "HOT / WARM / COLD", x: 7, y: 30, side: "left", icon: "🐎", dependencies: ["data-source"] },
   { id: "engine", title: "TAHMİN MOTORU", subtitle: "V5.46 Champion", x: 36, y: 29, side: "center", icon: "🧠", dependencies: ["program", "agf", "horse-cache"] },
   { id: "challenger", title: "SHADOW / CHALLENGER", subtitle: "C1 LOW-HIZ-OFF", x: 7, y: 51, side: "left", icon: "🧪", dependencies: ["engine"] },
-  { id: "calibration", title: "KALİBRASYON", subtitle: "Probability Layer", x: 37, y: 50, side: "center", icon: "🎯", dependencies: ["engine"] },
+  // 2026-09-24 (kullanıcı kararı) — Calibration'ın ÇALIŞMASI için Results gerekmez (yalnız
+  // Engine'in ürettiği ham skor gerekir); Results yalnız "kalibrasyon işe yarıyor mu?"
+  // (istatistiksel performans) değerlendirmesi için gerekir — bu yüzden `observes`'ta, gerçek
+  // `dependencies`'te DEĞİL. Model Health zaten Calibration'ı gözlemliyor, ters bağlantı YOK.
+  { id: "calibration", title: "KALİBRASYON", subtitle: "Probability Layer", x: 37, y: 50, side: "center", icon: "🎯", dependencies: ["engine"], observes: ["results"] },
   { id: "results", title: "SONUÇLAR", subtitle: "Gerçekleşen Yarışlar", x: 73, y: 29, side: "right", icon: "🏆", dependencies: ["program"] },
   { id: "coupon", title: "KUPON ÜRETİMİ", subtitle: "Tahmin → Kupon", x: 73, y: 47, side: "right", icon: "🎟️", dependencies: ["engine", "calibration"] },
   { id: "cron", title: "CRON / SYNC", subtitle: "Zamanlanmış İşler", x: 7, y: 72, side: "left", icon: "⏱️", dependencies: ["horse-cache", "agf"] },

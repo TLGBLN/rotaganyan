@@ -929,7 +929,10 @@ function standardize(v: number[], ws: AgirlikSeti): number[] {
   return v.map((x, i) => (ws.stds[i] > 1e-9 ? (x - ws.means[i]) / ws.stds[i] : 0));
 }
 
-function softmaxHam(scores: number[]): number[] {
+// 2026-09-24 — Sistem Anatomisi Calibration sensörü: gerçek production softmax'ını
+// (sıralama-koruyan, ölçekleme YOK) test/karşılaştırma için dışa açıyor — sensör kendi
+// kopyasını yazmasın diye.
+export function softmaxHam(scores: number[]): number[] {
   const max = Math.max(...scores);
   const exps = scores.map((s) => Math.exp(s - max));
   const sum = exps.reduce((a, b) => a + b, 0);
@@ -947,8 +950,12 @@ function softmaxHam(scores: number[]): number[] {
 // mutlak olasılığı yumuşatır. Backtest: sabit %80+ grubunun ort. tahmini %88.1→%70.3
 // (gerçek %67.9'a çok yakın), genel top1 DEĞİŞMEDİ (%38.9), genel logloss KÖTÜLEŞMEDİ
 // (1.7132→1.7131, hafif iyileşme). Diğer koşulara (lider <%70) hiç dokunulmuyor.
-const ASIRI_GUVEN_LIDER_ESIGI = 0.7;
-const ASIRI_GUVEN_SICAKLIGI = 1.5;
+// 2026-09-24 — Sistem Anatomisi Calibration sensörü bu üç sabiti dışa açıyor: kullanıcı
+// talimatı "threshold ve T değerlerini sensörde ayrıca kopyalayıp hard-code etme" — panel
+// GERÇEK production config'ini okur, kendi kopyasını TUTMAZ (ileride 0.70→0.65 gibi bir
+// değişiklikte panel eski kuralı ölçmeye devam etmesin diye).
+export const ASIRI_GUVEN_LIDER_ESIGI = 0.7;
+export const ASIRI_GUVEN_SICAKLIGI = 1.5;
 
 // 2026-08-26 kullanıcı bulgusu: yukarıdaki %70+ genel eşiği Handikap'ta yetersiz kalıyordu —
 // "Güçlü Aday" (>=%30) etiketi alan Handikap yarışlarında (n=22, mevcut %70 eşiğiyle) ortalama
@@ -959,7 +966,7 @@ const ASIRI_GUVEN_SICAKLIGI = 1.5;
 // Backtest (51 Handikap yarışı, yeniden inşa): "Güçlü Aday" grubu n=22→13'e düştü, kalibrasyon
 // -12.4'ten +3.7 puana geldi (n=13, gürültü sınırında ama makul). Genel top1 isabeti
 // DEĞİŞMEDİ (%21.6, 11/51 — sıcaklık sıralamayı korur, yalnız gösterilen yüzdeyi düzeltir).
-const ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP = 0.35;
+export const ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP = 0.35;
 
 // 2026-08-29 — V6 Aşama 2 (bkz. plan): softmax'ın içindeki sıcaklık-ölçeklendirme kararını
 // (lider zaten %70+/%35+ ise sıcaklığı uygula) dışarı çıkarır — SAF REFAKTOR, davranış
