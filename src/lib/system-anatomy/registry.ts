@@ -37,6 +37,11 @@ export const SYSTEM_ANATOMY_NODES: AnatomyNodeDefinition[] = [
   { id: "cron", title: "CRON / SYNC", subtitle: "Zamanlanmış İşler", x: 7, y: 72, side: "left", icon: "⏱️", dependencies: ["horse-cache", "agf"] },
   { id: "database", title: "VERİ OMURGASI", subtitle: "Postgres / Prisma", x: 37, y: 72, side: "center", icon: "🗃️" },
   { id: "site", title: "SITE / API", subtitle: "rotaganyan.com", x: 73, y: 68, side: "right", icon: "🌐", dependencies: ["engine", "database"] },
+  // 2026-09-24 (kullanıcı kararı) — "Model coverage tahmin anında gerçekten yeterli miydi?"
+  // sorusuna cevap veren düğüm. HOT Cache ve Program'dan veri BESLENİYOR (gerçek dependency,
+  // propagate olur); Engine'e KASITLI olarak dependency BAĞLANMADI — motor coverage düşükken
+  // de teknik olarak çalışır, yalnız input kalitesi düşer, bu "Engine kırıldı" değildir.
+  { id: "forward-coverage", title: "FORWARD COVERAGE", subtitle: "Point-in-Time Veri Yeterliliği", x: 73, y: 89, side: "right", icon: "📡", dependencies: ["horse-cache", "program"] },
   {
     id: "model-health",
     title: "MODEL SAĞLIĞI",
@@ -47,10 +52,11 @@ export const SYSTEM_ANATOMY_NODES: AnatomyNodeDefinition[] = [
     icon: "❤️",
     // 2026-09-24 (kullanıcı kararı) — Model Health, Challenger/Calibration/Engine için
     // upstream veri kaynağı DEĞİL; onları İZLEYEN bir gözlem katmanı — bu üçü artık
-    // `observes`'ta. Yalnız Results GERÇEKTEN veri besliyor (LogLoss/isabet hesaplamak
-    // için gerçek sonuç GEREKİR) — hem `dependencies` (besliyor, propagate olur) hem
-    // `observes`'ta (aynı zamanda Result Sync'in kendi sağlığını da izliyor) kalıyor.
-    dependencies: ["results"],
+    // `observes`'ta. Results ve Forward Coverage GERÇEKTEN veri besliyor (LogLoss/isabet
+    // hesaplamak için gerçek sonuç, coverage kalitesini değerlendirmek için telemetry
+    // GEREKİR) — ikisi de `dependencies`'te (besliyor, propagate olur); Results ayrıca
+    // `observes`'ta da kalıyor (Result Sync'in kendi sağlığını da izliyor).
+    dependencies: ["results", "forward-coverage"],
     observes: ["engine", "challenger", "calibration", "results"],
   },
 ];

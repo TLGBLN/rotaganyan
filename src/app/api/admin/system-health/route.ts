@@ -645,6 +645,220 @@ async function resultSyncHealth(): Promise<ModuleResult> {
   }
 }
 
+// 2026-09-24 — Forward Coverage sensörü (kullanıcı spesifikasyonu). EN KRİTİK kural: bu
+// sensör bugünkü DB'ye bakıp geçmişi YENİDEN YORUMLAMAZ — yalnız RaceCoverageTelemetry'nin
+// tahmin anında (upsertPrediction'ın after() kancasından, race-coverage-telemetry.service.ts)
+// ZATEN yazdığı satırları okur. Point-in-time gerçeği korunur; "bugün" yalnız hangi
+// telemetry satırlarının PENCEREYE (son 24s) girdiğini seçmek için kullanılır, herhangi bir
+// coverage değeri asla yeniden hesaplanmaz.
+//
+// DATA PIPELINE HEALTH (bu sensörün status'unu belirleyen) ile MODEL FEATURE AVAILABILITY
+// (coverage'ın kendisi) AYRI tutulur: cache-taze ama genç/az-geçmişli atlar yüzünden düşük
+// coverage (TRUE_LOW_HISTORY) bir altyapı arızası DEĞİLDİR ve status'u kırmızı yapmaz;
+// CACHE_STALE kaynaklı düşük coverage İSE gerçek bir pipeline sorunudur. Kök neden ayrımı
+// (_tmp_faz_e_v2_cache_aware.mts'teki araştırma kuralının kalıcı/canlı versiyonu) YALNIZ
+// zaten saklanmış `cacheAgeHours` alanından (yazıcının kendi 72s eşiği) türetilir — DB'ye
+// yeni bir alan eklenmedi, migration/backfill gerekmedi.
+//
+// Kullanıcının açık talimatı: istatistiksel "baseline'a göre düştü" alarmı YENİ mimaride
+// biriken veri olmadan KURULMADI — ilk 20-50 Şartlı yarışta yalnız veri hattı sağlığı
+// (writer çalışıyor mu / satır eksik mi / iç tutarlılık bozuk mu) alarm üretir.
+const FORWARD_COVERAGE_WINDOW_MS = 24 * 3_600_000;
+const FORWARD_COVERAGE_WRITER_SAMPLE = 30; // "son N tahminde çalıştı mı" örneklem büyüklüğü
+const FORWARD_COVERAGE_BACKFILL_LATENCY_MIN = 60; // telemetryCreatedAt-predictionCreatedAt bundan büyükse "forward" değil, backfill/yeniden-analiz gibi say
+
+type CoverageRunnerDetail = {
+  horse: string;
+  tjkAtId: number | null;
+  usableAccuraceCount: number;
+  cacheUpdatedAt: string | null;
+  cacheAgeHours: number | null;
+  sourceObserved: boolean;
+  productionEligible: boolean;
+};
+
+function coverageBucket(active: number): "NONE" | "LOW" | "PARTIAL" | "FULL" {
+  if (active === 0) return "NONE";
+  if (active <= 2) return "LOW";
+  if (active <= 5) return "PARTIAL";
+  return "FULL";
+}
+
+/** Bir runner'ın sourceObserved=false ÇIKMASININ kök nedeni — YALNIZ o anda zaten yazılmış
+ * cacheAgeHours/usableAccuraceCount'tan türetilir (yazıcının kendi 72s tazelik eşiğiyle
+ * tutarlı) — bugünkü cache durumuna bakmaz. */
+function coverageRootCause(r: CoverageRunnerDetail): "CACHE_STALE" | "TRUE_LOW_HISTORY" {
+  const stale = r.cacheAgeHours == null || r.cacheAgeHours > 72;
+  return stale ? "CACHE_STALE" : "TRUE_LOW_HISTORY";
+}
+
+async function forwardCoverageHealth(): Promise<ModuleResult> {
+  try {
+    const windowStart = new Date(Date.now() - FORWARD_COVERAGE_WINDOW_MS);
+
+    // KRİTİK düzeltme (gerçek veriyle doğrulandı 2026-09-24): "eligible" tanımı Karma mirror
+    // yarışlarını DIŞLAMALI — Karma, kaynak yarışın Prediction'ını mirror'lar (published/
+    // publishedAt dahil, syncKarmaMirrors ile) ama KENDİ telemetry'si asla yazılmaz (hook
+    // yalnız input.raceId — kaynak yarış — için tetiklenir), çünkü coverage zaten kaynak
+    // yarış için ölçülmüştür. `race.conditions: null` = asıl (Karma olmayan) yarış, mevcut
+    // result-sync.ts'teki AYNI filtre deseniyle tutarlı. Bu filtre olmadan sensör HER ZAMAN
+    // yanlışlıkla "eksik telemetry" (critical) raporlar — ilk denemede canlı veriyle
+    // yakalandı (6/23 Karma false-positive).
+    const [recentRows, recentPredictions, writerSample] = await Promise.all([
+      db.raceCoverageTelemetry.findMany({
+        where: { createdAt: { gte: windowStart } },
+        select: {
+          raceId: true, createdAt: true, predictionCreatedAt: true, classTypeGroup: true,
+          fieldSize: true, ygActiveRunnerCount: true, ygCoverageRatio: true, ygStatus: true,
+          cacheFreshCount: true, cacheStaleCount: true, runnersJson: true,
+        },
+      }),
+      db.prediction.findMany({
+        where: { published: true, publishedAt: { gte: windowStart }, race: { conditions: null } },
+        select: { raceId: true },
+      }),
+      db.prediction.findMany({
+        where: { race: { conditions: null } },
+        orderBy: { createdAt: "desc" },
+        take: FORWARD_COVERAGE_WRITER_SAMPLE,
+        select: { raceId: true },
+      }),
+    ]);
+
+    // ── Availability ──────────────────────────────────────────────────────
+    const eligibleRaceIds = new Set(recentPredictions.map((p) => p.raceId));
+    const telemetryRaceIds = new Set(recentRows.map((r) => r.raceId));
+    const missingRaceIds = [...eligibleRaceIds].filter((id) => !telemetryRaceIds.has(id));
+
+    const sampleRaceIds = new Set(writerSample.map((p) => p.raceId));
+    const sampleTelemetry = sampleRaceIds.size
+      ? await db.raceCoverageTelemetry.findMany({ where: { raceId: { in: [...sampleRaceIds] } }, select: { raceId: true } })
+      : [];
+    const sampleCovered = new Set(sampleTelemetry.map((r) => r.raceId)).size;
+    const writerUptimeRatio = sampleRaceIds.size > 0 ? sampleCovered / sampleRaceIds.size : null;
+
+    const lastCapture = await db.raceCoverageTelemetry.findFirst({ orderBy: { createdAt: "desc" }, select: { createdAt: true } });
+    const lastCaptureAgeMin = ageMinutes(lastCapture?.createdAt);
+
+    const availabilityBroken = eligibleRaceIds.size > 0 && missingRaceIds.length > 0;
+
+    // ── Freshness — point-in-time bütünlüğü (backfill/yeniden-analiz satırlarını ayır) ──
+    const latenciesMin = recentRows.map((r) => (r.createdAt.getTime() - r.predictionCreatedAt.getTime()) / 60_000);
+    const backfillLike = latenciesMin.filter((m) => m > FORWARD_COVERAGE_BACKFILL_LATENCY_MIN).length;
+    const avgLatencyMin = latenciesMin.length > 0 ? latenciesMin.reduce((s, x) => s + x, 0) / latenciesMin.length : null;
+
+    // ── Completeness + Correctness — SAKLANMIŞ satırların İÇ tutarlılığı ──
+    let runnerCountMismatch = 0;
+    let activeCountMismatch = 0;
+    let sourceObservedRuleViolations = 0;
+    let productionEligibleViolations = 0;
+    let bucketViolations = 0;
+    let ratioViolations = 0;
+
+    for (const row of recentRows) {
+      const runners = Array.isArray(row.runnersJson) ? (row.runnersJson as unknown as CoverageRunnerDetail[]) : [];
+      if (runners.length !== row.fieldSize) runnerCountMismatch++;
+      const recomputedActive = runners.filter((r) => r.sourceObserved).length;
+      if (recomputedActive !== row.ygActiveRunnerCount) activeCountMismatch++;
+      for (const r of runners) {
+        if (r.sourceObserved !== r.usableAccuraceCount >= 3) sourceObservedRuleViolations++;
+        const expectedEligible = row.classTypeGroup !== "Handikap Koşular";
+        if (r.productionEligible !== expectedEligible) productionEligibleViolations++;
+      }
+      if (row.ygStatus !== coverageBucket(row.ygActiveRunnerCount)) bucketViolations++;
+      const expectedRatio = row.fieldSize > 0 ? row.ygActiveRunnerCount / row.fieldSize : 0;
+      if (Math.abs(row.ygCoverageRatio - expectedRatio) > 0.01) ratioViolations++;
+    }
+    const completenessIssues = runnerCountMismatch + activeCountMismatch;
+    const correctnessIssues = sourceObservedRuleViolations + productionEligibleViolations + bucketViolations + ratioViolations;
+
+    // ── Şartlı (production-eligible) kırılımı — MODEL FEATURE AVAILABILITY, status'u
+    // TEK BAŞINA belirlemez (yalnız CACHE_STALE kök-nedenli düşük coverage belirler). ──
+    const productionRows = recentRows.filter((r) => r.classTypeGroup !== "Handikap Koşular");
+    const bucketCounts = { NONE: 0, LOW: 0, PARTIAL: 0, FULL: 0 } as Record<string, number>;
+    let eligibleRunnerSum = 0;
+    let observedRunnerSum = 0;
+    let cacheFreshSum = 0;
+    let cacheStaleSum = 0;
+    let cacheStaleCausedLowCoverage = 0;
+    let trueLowHistoryCount = 0;
+    let cacheStaleRootCauseCount = 0;
+    for (const row of productionRows) {
+      bucketCounts[row.ygStatus] = (bucketCounts[row.ygStatus] ?? 0) + 1;
+      eligibleRunnerSum += row.fieldSize;
+      observedRunnerSum += row.ygActiveRunnerCount;
+      cacheFreshSum += row.cacheFreshCount;
+      cacheStaleSum += row.cacheStaleCount;
+      if (row.ygStatus === "NONE" || row.ygStatus === "LOW") {
+        const runners = Array.isArray(row.runnersJson) ? (row.runnersJson as unknown as CoverageRunnerDetail[]) : [];
+        const notObserved = runners.filter((r) => !r.sourceObserved);
+        const anyCacheStale = notObserved.some((r) => coverageRootCause(r) === "CACHE_STALE");
+        if (anyCacheStale) cacheStaleCausedLowCoverage++;
+        for (const r of notObserved) {
+          if (coverageRootCause(r) === "CACHE_STALE") cacheStaleRootCauseCount++;
+          else trueLowHistoryCount++;
+        }
+      }
+    }
+    const meanCoverageRatio = productionRows.length > 0 ? productionRows.reduce((s, r) => s + r.ygCoverageRatio, 0) / productionRows.length : null;
+
+    // ── Genel durum — YALNIZ veri hattı sağlığı (kullanıcı talimatı: baseline/performans
+    // karşılaştırması YOK, yeni mimaride veri birikene kadar). ──
+    let status: Status = "healthy";
+    if (availabilityBroken || completenessIssues > 0 || correctnessIssues > 0 || cacheStaleCausedLowCoverage > 0) status = "critical";
+    else if (backfillLike > 0 || (writerUptimeRatio != null && writerUptimeRatio < 1)) status = "warning";
+
+    return {
+      id: "forward-coverage",
+      title: "FORWARD COVERAGE",
+      status,
+      description: "yarisGidisatiSkoru point-in-time veri yeterliliği — RaceCoverageTelemetry'den (bugünkü DB'den DEĞİL)",
+      metrics: [
+        { label: "Eligible races (24s)", value: eligibleRaceIds.size },
+        { label: "Telemetry races (24s)", value: telemetryRaceIds.size },
+        { label: "Missing telemetry", value: missingRaceIds.length },
+        { label: "Writer uptime (son 30 tahmin)", value: writerUptimeRatio == null ? "veri yok" : `%${(writerUptimeRatio * 100).toFixed(0)}` },
+        { label: "Son telemetry kaydı", value: lastCaptureAgeMin == null ? "hiç" : `${lastCaptureAgeMin.toFixed(0)} dk önce` },
+        { label: "Backfill-benzeri satır (>60dk gecikme)", value: `${backfillLike}/${recentRows.length}` },
+        { label: "Ortalama point-in-time gecikme", value: avgLatencyMin == null ? "-" : `${avgLatencyMin.toFixed(1)} dk` },
+        { label: "Şartlı — NONE", value: bucketCounts.NONE },
+        { label: "Şartlı — LOW", value: bucketCounts.LOW },
+        { label: "Şartlı — PARTIAL", value: bucketCounts.PARTIAL },
+        { label: "Şartlı — FULL", value: bucketCounts.FULL },
+        { label: "Ortalama coverage oranı (Şartlı)", value: meanCoverageRatio == null ? "-" : `%${(meanCoverageRatio * 100).toFixed(1)}` },
+        { label: "Runner eligible / sourceObserved", value: `${observedRunnerSum}/${eligibleRunnerSum}` },
+        { label: "Cache fresh/stale (at prediction)", value: `${cacheFreshSum}/${cacheStaleSum}` },
+        { label: "Kök neden — CACHE_STALE", value: cacheStaleRootCauseCount },
+        { label: "Kök neden — TRUE_LOW_HISTORY", value: trueLowHistoryCount },
+      ],
+      checks: [
+        { id: "fc-availability", label: "Her uygun tahmin için telemetry satırı var", ok: eligibleRaceIds.size === 0 ? null : !availabilityBroken, detail: missingRaceIds.length === 0 ? "eksik yok" : `${missingRaceIds.length} yarışta telemetry eksik` },
+        { id: "fc-freshness", label: "Telemetry point-in-time (backfill değil)", ok: recentRows.length === 0 ? null : backfillLike === 0, detail: `${backfillLike}/${recentRows.length} satır >${FORWARD_COVERAGE_BACKFILL_LATENCY_MIN}dk gecikmeli` },
+        { id: "fc-completeness", label: "Runner sayısı ve aktif sayım tutarlı", ok: completenessIssues === 0, detail: `runner sayısı uyuşmazlığı=${runnerCountMismatch}, aktif sayım uyuşmazlığı=${activeCountMismatch}` },
+        { id: "fc-correctness", label: "sourceObserved/productionEligible/bucket kuralları tutarlı", ok: correctnessIssues === 0, detail: `sourceObserved kuralı=${sourceObservedRuleViolations}, productionEligible=${productionEligibleViolations}, bucket=${bucketViolations}, ratio=${ratioViolations}` },
+        {
+          id: "fc-cache-driven-low-coverage",
+          label: "Düşük coverage cache kaynaklı DEĞİL (altyapı sorunu yok)",
+          ok: cacheStaleCausedLowCoverage === 0,
+          detail: cacheStaleCausedLowCoverage === 0 ? `düşük coverage varsa bile kök neden TRUE_LOW_HISTORY (${trueLowHistoryCount} runner) — altyapı sağlıklı` : `${cacheStaleCausedLowCoverage} yarışta NONE/LOW, kök neden CACHE_STALE (altyapı sorunu)`,
+        },
+      ],
+      lastCheckedAt: nowIso(),
+    };
+  } catch (error) {
+    return {
+      id: "forward-coverage",
+      title: "FORWARD COVERAGE",
+      status: "unknown",
+      description: "Forward Coverage health ölçülemedi",
+      metrics: [],
+      checks: [],
+      errorMessage: error instanceof Error ? error.message : "Forward coverage error",
+      lastCheckedAt: nowIso(),
+    };
+  }
+}
+
 // 2026-09-24 — Site/API sensörü (kullanıcı spesifikasyonu). KRİTİK tasarım kararı: bu bir
 // INTERNAL sensör — deployment'ın KENDİSİNDEN public alias'a (rotaganyan.com) gerçek bir
 // HTTP çağrısı yapar (DNS/TLS/edge routing dahil gerçek round-trip; handler'ları doğrudan
@@ -1021,6 +1235,7 @@ export async function GET() {
     programSyncHealth(),
     resultSyncHealth(),
     siteApiHealth(),
+    forwardCoverageHealth(),
   ]);
 
   const modules: ModuleResult[] = [];
