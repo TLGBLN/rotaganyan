@@ -453,11 +453,10 @@
   padding: 30px 0;
 }
 
-/* MOBİL — kullanıcının "kart görünümüne dönsün" isteği burada TAM karşılanmıyor:
-   şema aynı absolute-konumlu düğümlerle, yalnız daha uzun bir kutuda dikey akıyor.
-   Gerçek kart-listesi görünümü (her modül tam-genişlik bir satır) SONRAKİ turda
-   ayrı bir mobil bileşen olarak eklenmeli — bkz. sohbet notu. */
-@media (max-width: 1050px) {
+/* TABLET — 2 kolonlu (harita + detay) yerine dikey akış, ama harita HÂLÂ kendi
+   serbest-konumlu (absolute x%/y%) şeması ile 2D bir canvas olarak render edilir —
+   bu genişlikte hâlâ yeterli yatay alan var, düğümler üst üste binmez. */
+@media (max-width: 1050px) and (min-width: 641px) {
   .anatomy-layout {
     display: block;
   }
@@ -476,12 +475,59 @@
   }
 }
 
-@media (max-width: 480px) {
+/* TELEFON — DÜZELTME (2026-09-24, kullanıcı bulgusu: "iç içe girmiş"): x%/y% ile
+   serbest-konumlanan (position:absolute) düğümler dar ekranda üst üste biniyordu,
+   çünkü yalnız kutu daha uzatılıyor, düğümlerin KENDİSİ hâlâ 2D bir haritaymış gibi
+   yerleştiriliyordu. Telefon genişliğinde harita GERÇEK bir kart listesine döner:
+   merkez çekirdek ve SVG bağlantı çizgileri (2D şema olmadan anlamsız) gizlenir,
+   düğümler normal belge akışında (position:static) tam-genişlik kartlar olarak
+   sırayla dizilir — component/JS değişikliği GEREKMEDİ, aynı .anatomy-node
+   butonları burada yalnız akışa alınıyor. */
+@media (max-width: 640px) {
   .anatomy-page {
     padding: 14px;
   }
 
   .anatomy-header h1 {
     font-size: 24px;
+  }
+
+  .anatomy-layout {
+    display: block;
+  }
+
+  .system-map {
+    min-height: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: linear-gradient(rgba(2, 15, 26, 0.94), rgba(1, 7, 13, 0.97));
+  }
+
+  .connection-layer,
+  .central-core {
+    display: none;
+  }
+
+  .anatomy-node {
+    position: static;
+    width: 100%;
+    min-height: 0;
+    left: auto !important;
+    top: auto !important;
+  }
+
+  .anatomy-node:hover {
+    transform: none;
+  }
+
+  .detail-panel {
+    min-height: auto;
+    margin-top: 18px;
+  }
+
+  .metric-grid {
+    grid-template-columns: 1fr;
   }
 }
