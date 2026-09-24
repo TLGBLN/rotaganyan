@@ -9,8 +9,15 @@ import { turkeyDateString } from "@/lib/tz";
 import { verifyCronRequest } from "@/lib/cron-auth";
 import { runRaceContextWatch } from "@/app/api/cron/race-context-watch/route";
 import { reconcileAllActiveHomeKupons } from "@/server/services/home-kupon-sync.service";
+import { runProgramSyncIfDue } from "@/server/services/ingest/tjk-info.adapter";
 
-export const maxDuration = 60;
+// 2026-09-24 kullanıcı kararı — Program Sync fallback piggyback'i (bkz. runProgramSyncIfDue)
+// için 60sn yetersiz: gerçek bir fallback ingest ~90-120sn sürebilir (bugün+yarın, paralel,
+// her biri kendi içinde city-city SIRALI+400ms bekleme). due-check'in KENDİSİ ucuz (tek
+// findUnique) — yalnız GERÇEKTEN çalıştığı (günde en fazla birkaç kez, 11/13/15/17 UTC
+// slotlarından biri boşsa) nadir anlarda bu üst sınıra ihtiyaç var. Normal result-sync
+// turlarının süresi (birkaç saniye) DEĞİŞMİYOR — bu yalnız bir TAVAN, zorunlu bekleme değil.
+export const maxDuration = 150;
 
 export async function GET(req: NextRequest) {
   const denied = verifyCronRequest(req);
@@ -61,6 +68,16 @@ export async function GET(req: NextRequest) {
   });
   after(async () => {
     await reconcileAllActiveHomeKupons().catch((e) => console.error("[result-sync piggyback] homekupon-reconcile hata:", e));
+  });
+
+  // 2026-09-24 — Program Sync fallback (bkz. runProgramSyncIfDue, tjk-info.adapter.ts):
+  // ingest-program cron'unun Vercel'de yalnız 3/6 declared saati (05/08/11 UTC) gerçekten
+  // KAYITLI, 13/15/17 hiç tetiklenmiyordu (gerçek bulgu, agf-sync'teki diff false-alarm'ından
+  // FARKLI). Bu piggyback yalnız DUE olduğunda (ucuz bir DB kontrolü, günde en fazla birkaç
+  // kez) gerçek bir fallback ingest çalıştırır — result-sync'in KENDİSİNİ ASLA ETKİLEMEZ
+  // (Program piggyback failure ≠ Result Sync failure, kullanıcı kararı).
+  after(async () => {
+    await runProgramSyncIfDue().catch((e) => console.error("[result-sync piggyback] program-sync-fallback hata:", e));
   });
 
   return NextResponse.json({ ok: true, date: today });

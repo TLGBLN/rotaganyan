@@ -540,3 +540,59 @@ export async function recordProgramCronRun(outcome: {
     })
     .catch(() => {}); // yalnız izleme metriği — program ingest'i ASLA bloklamaz
 }
+
+// 2026-09-24 — kullanıcı bulgusu: `vercel crons ls`'in GERÇEK "Registered" bölümünde
+// ingest-program'ın 6 declared saatinden yalnız 3'ü (05/08/11 UTC) var — 13/15/17 hiç
+// kayıtlı değil (agf-sync'teki çok-schedule diff false-alarm'ından FARKLI, burada GERÇEK
+// bir eksik). Sonuç: 11:00'den ertesi gün 05:00'e kadar ~18 saatlik gerçek bir tetiklenme
+// boşluğu vardı — ProgramCronRunState bir gün boyunca hiç dolmamış olarak yakalandı.
+//
+// Çözüm — "Hafif + Incremental + Best-effort" ilkesi (kullanıcı kararı, 2026-09-24):
+// result-sync'in (zaten 11-21 arası çalışan, kayıtlı) `after()` kancasından SLOT-BAZLI bir
+// due-check ile çağrılır — HER result-sync turunda TAM ingest ÇALIŞTIRMAZ, yalnız declared
+// slot'lardan biri henüz karşılanmamışsa (ucuz bir DB okuması) devreye girer. Bu, "check
+// cheap, work only if due" prensibinin birebir uygulanması.
+const PROGRAM_SYNC_SLOTS_UTC = [5, 8, 11, 13, 15, 17];
+
+/** Şu ana kadar GEÇMİŞ olan (henüz gelmemiş slotlar hariç) en son declared slot'un başlangıcı. */
+function currentProgramSyncSlotStart(now: Date): Date | null {
+  const hour = now.getUTCHours();
+  const passed = PROGRAM_SYNC_SLOTS_UTC.filter((h) => h <= hour);
+  if (passed.length === 0) return null; // bugünün ilk slotu (05 UTC) henüz gelmedi
+  const slotHour = Math.max(...passed);
+  const slotStart = new Date(now);
+  slotStart.setUTCHours(slotHour, 0, 0, 0);
+  return slotStart;
+}
+
+/** result-sync'in after() kancasından çağrılır. Yalnız declared bir slot henüz
+ *  karşılanmamışsa (lastSuccessAt < slotStart) GERÇEK ingest'i çalıştırır — aksi halde tek
+ *  bir ucuz `findUnique` sorgusuyla çıkar. Idempotency KASITLI OLARAK basit tutuldu (tek
+ *  DB satırının lastSuccessAt'i, ayrı bir lock tablosu/unique-slot anahtarı YOK) — gerçek
+ *  eşzamanlı iki çalışma riski düşük (yalnız 11/13/15/17'de, birbirinden dakikalar sonra
+ *  tetiklenir) ve zararı da düşük (ingestDate zaten upsert-tabanlı, TJK'nın kendi genel
+ *  verisini tekrar çekip yazmak veri BOZULMASI yaratmaz, yalnız israf olur) — bu ölçekte
+ *  bir DB lock eklemek "en düşük blast-radius" ilkesine aykırı olurdu. */
+export async function runProgramSyncIfDue(): Promise<{ ran: boolean; reason: string }> {
+  const { db } = await import("@/lib/db");
+  const now = new Date();
+  const slotStart = currentProgramSyncSlotStart(now);
+  if (!slotStart) return { ran: false, reason: "bugünün ilk declared slotu (05 UTC) henüz gelmedi" };
+
+  const state = await db.programCronRunState.findUnique({ where: { id: "singleton" } }).catch(() => null);
+  if (state?.lastSuccessAt && state.lastSuccessAt >= slotStart) {
+    return { ran: false, reason: `slot ${slotStart.toISOString()} zaten karşılandı (lastSuccessAt=${state.lastSuccessAt.toISOString()})` };
+  }
+
+  const tomorrow = new Date(now);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const startedAt = Date.now();
+  try {
+    const [todayResult, tomorrowResult] = await Promise.all([ingestDate(toTjkDate(now)), ingestDate(toTjkDate(tomorrow))]);
+    await recordProgramCronRun({ ok: true, durationMs: Date.now() - startedAt, result: { today: todayResult, tomorrow: tomorrowResult } });
+    return { ran: true, reason: `slot ${slotStart.toISOString()} fallback (result-sync piggyback) ile karşılandı` };
+  } catch (err) {
+    await recordProgramCronRun({ ok: false, durationMs: Date.now() - startedAt, error: String(err) }).catch(() => {});
+    return { ran: false, reason: `hata: ${String(err)}` };
+  }
+}

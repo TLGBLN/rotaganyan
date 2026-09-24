@@ -59,7 +59,7 @@ export const CRON_REGISTERED_SNAPSHOT: Record<string, CronRegisteredSnapshot> = 
     // fiilen günde 3 kez (05/08/11 UTC) çalışıyor, 11:00'den ertesi gün 05:00'e kadar
     // ~18 saatlik GERÇEK bir tetiklenme boşluğu var. Bu, 2026-09-24 sabahı ProgramCronRunState
     // hiç dolmamış olarak yakalandı (elle tetiklenene kadar) — canlı kanıt.
-    note: "GERÇEK kısmi kayıt: yalnız 3/6 saat (05/08/11 UTC) Vercel'in 'Registered' listesinde var, 13/15/17 hiç görünmüyor (agf-sync'teki diff false-alarm'ından FARKLI — orada tüm saatler Registered'da mevcut). Sonuç: 11:00-05:00 arası ~18 saatlik gerçek tetiklenme boşluğu. Henüz düzeltilmedi (piggyback safety-net eklenip eklenmeyeceği kullanıcı kararı bekliyor).",
+    note: "GERÇEK kısmi kayıt: yalnız 3/6 saat (05/08/11 UTC) Vercel'in 'Registered' listesinde var, 13/15/17 hiç görünmüyor (agf-sync'teki diff false-alarm'ından FARKLI — orada tüm saatler Registered'da mevcut). Registered-drift KENDİSİ düzeltilmedi (Vercel platform kısıtı, elimizde değil) — ama 2026-09-24'ten beri result-sync piggyback'i (runProgramSyncIfDue, due-check'li) eksik 13/15/17 slotlarını fallback ile karşılıyor, etkin kapsama 6/6.",
   },
   "result-sync": {
     status: "modified",

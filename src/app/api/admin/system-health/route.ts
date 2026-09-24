@@ -520,6 +520,13 @@ async function programSyncHealth(): Promise<ModuleResult> {
         { label: "Son deneme", value: attemptAgeH == null ? "hiç" : `${attemptAgeH.toFixed(1)} saat önce` },
         { label: "Son başarı", value: successAgeH == null ? "hiç" : `${successAgeH.toFixed(1)} saat önce` },
         { label: "İstenen cadence", value: declared.humanCadence },
+        // 2026-09-24 — kullanıcı kararı: Vercel'de gerçekten yalnız 3/6 saat kayıtlı
+        // (05/08/11 UTC), 13/15/17 result-sync piggyback'i (runProgramSyncIfDue,
+        // due-check'li, günde en fazla birkaç kez GERÇEK ingest çalıştırır) ile
+        // güvence altına alınıyor — bu registered-drift'i GİZLEMİYOR, yalnız operasyonel
+        // sonucu (etkin kapsama 6/6) dürüstçe ayrıca gösteriyor.
+        { label: "Schedule source", value: "3 direct (05/08/11 UTC) + 3 fallback (13/15/17, result-sync piggyback due-check)" },
+        { label: "Fallback coverage", value: "ACTIVE (2026-09-24'ten beri)" },
         { label: "Son çalışma süresi", value: state.lastDurationMs == null ? "-" : `${(state.lastDurationMs / 1000).toFixed(1)} sn` },
         { label: "Bugün", value: fmtCompleteness(todayCompleteness) },
         { label: "Yarın", value: fmtCompleteness(tomorrowCompleteness) },
