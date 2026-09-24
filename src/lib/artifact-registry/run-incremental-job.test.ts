@@ -11,6 +11,7 @@ import {
   RegistryUnexpectedWorkError,
   FileArtifactStore,
   artifactDir,
+  PENDING,
   runIncrementalJob,
   type ArtifactIdentity,
   type JobItem,
@@ -337,5 +338,42 @@ describe("Registry v1.1 güvenlik kuralları (merge kapısı)", () => {
     };
     walk(srcRoot);
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("PENDING — retryable 'bağımlı veri henüz yok' (hata değil)", () => {
+  it("PENDING saklanmaz, deneme hakkı tüketmez (maxAttempts'ten çok denense de vazgeçilmez), hazır olunca YALNIZ o item işlenir", async () => {
+    const calls: string[] = [];
+    let ready = false;
+    const proc = async (it: JobItem) => { calls.push(it.id); return it.id === "r2" && !ready ? PENDING : 1; };
+    const run = () => runIncrementalJob({ identity: identity(), listItems: async () => ids(5), processItem: proc, root, maxAttempts: 2, log: quiet });
+    const a = await run();
+    expect(a.stats.pending).toBe(1);
+    expect(a.pendingItems).toEqual(["r2"]);
+    expect(a.results.size).toBe(4);
+    for (let i = 0; i < 5; i++) await run(); // maxAttempts(2)'nin çok üstünde
+    const mid = await run();
+    expect(mid.manifest.failedItems).toEqual({});
+    expect(mid.plan.givenUp).toBe(0);
+    calls.length = 0;
+    ready = true;
+    const done = await run();
+    expect(calls).toEqual(["r2"]); // yalnız o item
+    expect(done.results.size).toBe(5);
+    expect(done.pendingItems).toEqual([]);
+  });
+
+  it("zaten kayıtlı bir item yeniden işlenirken PENDING dönerse ESKİ kayıt korunur", async () => {
+    let label = "f1";
+    let pendingNow = false;
+    const list = async (): Promise<JobItem[]> => [{ id: "a", fingerprint: label }];
+    const proc = async () => (pendingNow ? PENDING : 7);
+    const run = () => runIncrementalJob({ identity: identity(), listItems: list, processItem: proc, root, log: quiet });
+    const first = await run();
+    expect(first.results.get("a")?.result).toBe(7);
+    label = "f2"; pendingNow = true; // kaynak değişti ama bağımlı veri geçici yok
+    const second = await run();
+    expect(second.stats.pending).toBe(1);
+    expect(second.results.get("a")?.result).toBe(7); // eski kayıt duruyor
   });
 });

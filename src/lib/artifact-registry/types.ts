@@ -14,6 +14,8 @@ export type InvalidationReason =
   | "EVALUATION_METHOD_CHANGED"
   | "COHORT_DEFINITION_CHANGED"
   | "BOOTSTRAP_SEED_CHANGED"
+  | "CHAMPION_VERSION_CHANGED"
+  | "CHALLENGER_CONFIG_CHANGED"
   | "POPULATION_CHANGED" // resample edilen popülasyonun büyüklüğü (trainN/testN/gün sayısı) değişti
   | "DATA_CORRUPTION"
   | "ARTIFACT_SCHEMA_INCOMPATIBLE"
@@ -78,6 +80,9 @@ export interface ArtifactManifest {
   updatedAt: string;
 }
 
+/** processItem'ın döndürebildiği retryable "henüz hazır değil" işareti (bkz. IncrementalJobOptions.processItem). */
+export const PENDING: unique symbol = Symbol.for("rotaganyan.artifact-registry.pending");
+
 export interface JobItem {
   id: string;
   /** Kaynak parmak izi (ör. Result.updatedAt). Değişirse YALNIZ o item yeniden işlenir. */
@@ -113,8 +118,12 @@ export interface IncrementalJobOptions<R, A = unknown> {
   identity: ArtifactIdentity;
   extraDependencies?: DependencyMap;
   listItems: () => Promise<JobItem[]>;
-  /** null döndürmek "işlendi ama kayda değer sonuç yok" demektir (bir daha denenmez). Hata fırlatmak "başarısız"dır (retry edilir). */
-  processItem: (item: JobItem) => Promise<R | null>;
+  /**
+   * null döndürmek "işlendi ama kayda değer sonuç yok" demektir (bir daha denenmez). Hata fırlatmak "başarısız"dır (retry edilir,
+   * maxAttempts tüketir). `PENDING` döndürmek "bağımlı veri henüz yok (ör. yarış sonucu gelmedi)" demektir: HATA DEĞİLDİR, deneme
+   * hakkı TÜKETMEZ, sonuç saklanmaz; sonraki çalıştırmada yalnız bu item tekrar denenir.
+   */
+  processItem: (item: JobItem) => Promise<R | null | typeof PENDING>;
   aggregate?: AggregateSpec<R, A>;
 
   /** Bağımlılık değişmişse VARSAYILAN DAVRANIŞ: dur ve nedenini raporla. `true` ile bilinçli full rebuild. */
@@ -142,7 +151,9 @@ export interface JobResult<R, A> {
   status: JobStatus;
   results: Map<string, { fingerprint?: string; result: R | null }>;
   aggregateState: A | undefined;
-  stats: { processed: number; noResult: number; failed: number; timedOut: number; reprocessed: number; durationMs: number };
+  stats: { processed: number; noResult: number; failed: number; timedOut: number; reprocessed: number; pending: number; durationMs: number };
+  /** Bu çalıştırmada PENDING dönen item id'leri (retryable, sonraki çalıştırmada yalnız bunlar yeniden denenir). */
+  pendingItems: string[];
   manifest: ArtifactManifest;
 }
 
