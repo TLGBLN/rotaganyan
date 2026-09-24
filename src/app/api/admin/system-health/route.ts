@@ -44,6 +44,7 @@
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { currentBuildId, shortBuildId } from "@/lib/build-id";
 import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
 import type { HealthStatus, SystemModuleHealth, OperationalDecision } from "@/lib/system-anatomy/types";
@@ -1016,7 +1017,7 @@ async function computeSiteApiHealth(): Promise<ModuleResult> {
   // Bu iki değer, alias'ın ESKİ bir deployment'ı servis ettiği (deploy'un alias'a
   // yansımadığı) durumu doğrudan yakalar — bu oturumda birkaç kez elle yaptığımız
   // "curl build-info, commit eşleşiyor mu" doğrulamasının otomatikleşmiş hali.
-  const expectedCommit = process.env.VERCEL_GIT_COMMIT_SHA ?? "dev";
+  const expectedCommit = currentBuildId();
   let liveCommit: string | null = null;
   let buildInfoValid: boolean | null = null;
   if (buildInfoProbe.ok) {
@@ -1075,8 +1076,8 @@ async function computeSiteApiHealth(): Promise<ModuleResult> {
       { label: "Program", value: `${program.status ?? "—"} / ${program.latencyMs ?? "—"} ms` },
       { label: "Tahmin Önerileri", value: `${predictions.status ?? "—"} / ${predictions.latencyMs ?? "—"} ms` },
       { label: "Build Info", value: `${buildInfoProbe.status ?? "—"} / ${buildInfoProbe.latencyMs ?? "—"} ms` },
-      { label: "Expected commit", value: expectedCommit === "dev" ? "bilinmiyor (dev)" : expectedCommit.slice(0, 7) },
-      { label: "Live commit", value: liveCommit ? liveCommit.slice(0, 7) : "bilinmiyor" },
+      { label: "Expected build", value: expectedCommit === "dev" ? "bilinmiyor (dev)" : shortBuildId(expectedCommit) },
+      { label: "Live build", value: liveCommit ? shortBuildId(liveCommit) : "bilinmiyor" },
       { label: "Kritik endpoint başarı", value: `${criticalOkCount}/${criticalProbes.length}` },
       { label: "Prediction verisi (DB)", value: predictionDetail },
     ],
@@ -1091,7 +1092,7 @@ async function computeSiteApiHealth(): Promise<ModuleResult> {
         id: "site-freshness",
         label: "Alias beklenen commit'i servis ediyor",
         ok: !commitKnown ? null : commitsMatch,
-        detail: !commitKnown ? "commit karşılaştırması yapılamadı (dev ortamı veya build-info erişilemedi)" : `expected=${expectedCommit.slice(0, 7)} live=${liveCommit!.slice(0, 7)}`,
+        detail: !commitKnown ? "commit karşılaştırması yapılamadı (dev ortamı veya build-info erişilemedi)" : `expected=${shortBuildId(expectedCommit)} live=${shortBuildId(liveCommit!)}`,
       },
       { id: "site-completeness", label: "Tüm kritik endpointler sağlıklı", ok: criticalOkCount === criticalProbes.length, detail: `${criticalOkCount}/${criticalProbes.length} kritik endpoint OK` },
       { id: "site-correctness", label: "Payload şeması geçerli (build-info + prediction)", ok: !correctnessIssues, detail: `build-info geçerli=${buildInfoValid ?? "N/A"} · ${predictionDetail}` },
@@ -1512,7 +1513,28 @@ async function computeCalibrationHealth(): Promise<ModuleResult> {
     }
   }
 
-  const operationalIssues = configIssues.length + transformIssues.length + invalidSum + nanOrNegative;
+  // ── CalibrationAuditSnapshot (analiz ANINDA yazılan raw+calibrated) — trigger cohort ve rank invariant GERÇEK veriden ──
+  const snaps = await db.calibrationAuditSnapshot.findMany({ orderBy: { createdAt: "desc" }, take: 500, select: { triggerType: true, probabilitiesJson: true } });
+  const trig: Record<string, number> = { NOT_TRIGGERED: 0, GENERAL_TRIGGERED: 0, HANDIKAP_TRIGGERED: 0 };
+  let rankViolations = 0;
+  for (const s of snaps) {
+    trig[s.triggerType] = (trig[s.triggerType] ?? 0) + 1;
+    const arr = Array.isArray(s.probabilitiesJson) ? (s.probabilitiesJson as { rawProbability?: number; calibratedProbability?: number }[]) : [];
+    let violated = false;
+    for (let i = 0; i < arr.length && !violated; i++) {
+      for (let j = 0; j < arr.length; j++) {
+        const ri = arr[i].rawProbability, rj = arr[j].rawProbability, ci = arr[i].calibratedProbability, cj = arr[j].calibratedProbability;
+        if (typeof ri !== "number" || typeof rj !== "number" || typeof ci !== "number" || typeof cj !== "number") continue;
+        if (ri > rj + 1e-12 && ci < cj - 1e-12) { violated = true; break; } // ham sıralama kalibrasyonla BOZULMAMALI
+      }
+    }
+    if (violated) rankViolations++;
+  }
+  const snapN = snaps.length;
+  const trigDetail = `n=${snapN}: NOT_TRIGGERED=${trig.NOT_TRIGGERED}, GENERAL_TRIGGERED=${trig.GENERAL_TRIGGERED}, HANDIKAP_TRIGGERED=${trig.HANDIKAP_TRIGGERED} (CalibrationAuditSnapshot — analiz anında yazılan raw+calibrated)`;
+  const triggeredN = trig.GENERAL_TRIGGERED + trig.HANDIKAP_TRIGGERED;
+
+  const operationalIssues = configIssues.length + transformIssues.length + invalidSum + nanOrNegative + rankViolations;
   const status: Status = operationalIssues > 0 ? "critical" : "healthy";
 
   return {
@@ -1528,17 +1550,17 @@ async function computeCalibrationHealth(): Promise<ModuleResult> {
       { label: "ALL-LIVE — Handikap kategori", value: handikapCount },
       { label: "Invalid probability sum", value: invalidSum },
       { label: "NaN/negatif olasılık", value: nanOrNegative },
-      { label: "NOT_TRIGGERED / GENERAL_TRIGGERED / HANDIKAP_TRIGGERED", value: "ölçülemiyor (forward capture yok)" },
-      { label: "Rank invariant (rawRank=calibratedRank)", value: "ölçülemiyor (raw olasılık saklanmıyor)" },
-      { label: "Statistical Performance (ΔLL, triggered cohort)", value: "N YETERSİZ — forward capture bekliyor" },
+      { label: "NOT_TRIGGERED / GENERAL_TRIGGERED / HANDIKAP_TRIGGERED", value: `${trig.NOT_TRIGGERED} / ${trig.GENERAL_TRIGGERED} / ${trig.HANDIKAP_TRIGGERED} (n=${snapN})` },
+      { label: "Rank invariant (rawRank=calibratedRank)", value: snapN === 0 ? "veri yok (snapshot birikiyor)" : `${snapN - rankViolations}/${snapN} snapshot uyumlu` },
+      { label: "Statistical Performance (ΔLL, triggered cohort)", value: `N YETERSİZ — triggered snapshot n=${triggeredN} (forward birikiyor)` },
     ],
     checks: [
       { id: "cal-config", label: "Config geçerli (threshold'lar + T)", ok: configIssues.length === 0, detail: configIssues.length === 0 ? `general=${fmtPct(ASIRI_GUVEN_LIDER_ESIGI)}, handikap=${fmtPct(ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP)}, T=${ASIRI_GUVEN_SICAKLIGI}` : configIssues.join("; ") },
       { id: "cal-transform", label: "Transform geçerli (softmax self-test, kanarya vektörü)", ok: transformIssues.length === 0, detail: transformIssues.length === 0 ? "sum=1, finite, rank-preserving" : transformIssues.join("; ") },
       { id: "cal-probability-integrity", label: "Kalibre edilmiş olasılıklar geçerli (sum≈1, NaN yok)", ok: invalidSum === 0 && nanOrNegative === 0, detail: `invalid sum=${invalidSum}, NaN/negatif=${nanOrNegative} (ALL-LIVE n=${predictions.length})` },
-      { id: "cal-trigger-cohort", label: "Trigger cohort kırılımı (NOT/GENERAL/HANDIKAP_TRIGGERED)", ok: null, detail: "Ölçülemiyor — raw olasılık hiçbir yerde saklanmıyor, yalnız kalibre edilmiş değer DB'de var. Ters-çevirme denendi, gerçek veride %23 (38/168) sınır-belirsiz çıktı — güvenilmez, GERÇEKMİŞ gibi sunulmadı." },
-      { id: "cal-rank-invariant", label: "Rank invariant (rawRank == calibratedRank)", ok: null, detail: "Ölçülemiyor — aynı sebep. Sonraki adım: CalibrationAuditSnapshot (analiz anında raw+calibrated yazan yeni hook, RaceCoverageTelemetry ile aynı desen)." },
-      { id: "cal-statistical-performance", label: "Statistical Performance (ΔLL, triggered cohort)", ok: null, detail: "N YETERSİZ — forward capture altyapısı kurulmadan güvenilir hesaplanamaz." },
+      { id: "cal-trigger-cohort", label: "Trigger cohort kırılımı (NOT/GENERAL/HANDIKAP_TRIGGERED)", ok: snapN === 0 ? null : true, detail: snapN === 0 ? "Henüz snapshot yok — yeni analizlerle birikiyor." : trigDetail },
+      { id: "cal-rank-invariant", label: "Rank invariant (rawRank == calibratedRank)", ok: snapN === 0 ? null : rankViolations === 0, detail: snapN === 0 ? "Henüz snapshot yok." : `${snapN} snapshot içinde ${rankViolations} ihlal (ham sıralama kalibrasyonla bozulmamalı)` },
+      { id: "cal-statistical-performance", label: "Statistical Performance (ΔLL, triggered cohort)", ok: null, detail: `N YETERSİZ — triggered snapshot n=${triggeredN}; güvenilir ΔLL için forward veri birikmeli (bilgi, alarm değil).` },
     ],
     lastCheckedAt: nowIso(),
   };
