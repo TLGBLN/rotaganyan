@@ -302,3 +302,21 @@ describe("manifest özeti", () => {
     expect(JSON.parse(fs.readFileSync(path.join(t.dir, "manifest.json"), "utf-8"))).toMatchObject({ completedIterations: 50, status: "COMPLETE" });
   });
 });
+
+describe("bozulma kuralı (merge kapısı)", () => {
+  it("satır sonuyla biten ama bozuk SON satır (yarım yazım değil) → DATA_CORRUPTION; onarım yalnız satır sonsuz torn parçayı kapsar", () => {
+    const s = open(); runTo(s, 10, []); s.release();
+    const f = path.join(s.dir, "results.jsonl");
+    fs.appendFileSync(f, "{tam-satir-ama-bozuk}\n");
+    expect(() => open()).toThrowError(/DATA_CORRUPTION/);
+  });
+
+  it("ortada bozuk satır + sonda torn parça → onarım ortadaki bozulmayı maskelemez, DATA_CORRUPTION sürer", () => {
+    const s = open(); runTo(s, 10, []); s.release();
+    const f = path.join(s.dir, "results.jsonl");
+    const lines = fs.readFileSync(f, "utf-8").split("\n").filter(Boolean);
+    lines[4] = "{ortada-bozuk";
+    fs.writeFileSync(f, lines.join("\n") + "\n" + '{"i":11,"r":');
+    expect(() => open()).toThrowError(/DATA_CORRUPTION/);
+  });
+});

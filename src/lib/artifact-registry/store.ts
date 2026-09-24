@@ -75,6 +75,8 @@ export function repairTornTail(file: string): void {
   try { JSON.parse(tail); fs.appendFileSync(file, "\n"); } catch { fs.truncateSync(file, lastNl + 1); }
 }
 
+const LOCK_HARD_CAP_MS = 24 * 60 * 60_000;
+
 function processAlive(pid: number): boolean {
   try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } // EPERM = var ama başka kullanıcıya ait
 }
@@ -104,14 +106,18 @@ export class FileArtifactStore {
   loadItems<R>(): { items: Map<string, StoredItem<R>>; corruptMiddle: boolean } {
     const items = new Map<string, StoredItem<R>>();
     if (!fs.existsSync(this.itemsPath)) return { items, corruptMiddle: false };
-    const lines = fs.readFileSync(this.itemsPath, "utf-8").split("\n").filter((l) => l.length > 0);
-    let corruptMiddle = false;
+    const text = fs.readFileSync(this.itemsPath, "utf-8");
+    // Yalnız satır sonuyla BİTMEYEN son parça "yarım yazılmış" (torn) olabilir. Satır sonuyla biten ama bozuk bir satır —
+    // son satır bile olsa — GERÇEK bozulmadır (sessizce geçilmez).
+    const tornTailPossible = text.length > 0 && !text.endsWith("\n");
+    const lines = text.split("\n").filter((l) => l.length > 0);
+    let corruptMiddle = false; // "tolere edilemeyen bozuk satır" (ad tarihsel)
     lines.forEach((line, i) => {
       try {
         const rec = JSON.parse(line) as StoredItem<R>;
         items.set(rec.id, rec);
       } catch {
-        if (i !== lines.length - 1) corruptMiddle = true; // son satır = yarım yazılmış olabilir, tolere edilir
+        if (!(tornTailPossible && i === lines.length - 1)) corruptMiddle = true;
       }
     });
     return { items, corruptMiddle };
@@ -154,9 +160,11 @@ export class FileArtifactStore {
     try { write(); return true; } catch {
       try {
         const cur = JSON.parse(fs.readFileSync(this.lockPath, "utf-8")) as { at: number; pid?: number };
-        // Kilidin sahibi ÖLMÜŞSE (Ctrl+C / taskkill / çökme) TTL beklenmez — bir sonraki çalıştırma hemen devralır.
-        const ownerDead = typeof cur.pid === "number" && !processAlive(cur.pid);
-        if (ownerDead || Date.now() - cur.at > ttlMs) { fs.rmSync(this.lockPath, { force: true }); write(); return true; }
+        const age = Date.now() - cur.at;
+        // pid'li kilit: sahip ÖLMÜŞSE (Ctrl+C / taskkill / çökme) TTL beklenmeden devralınır; YAŞIYORSA (uzun süren iş dahil)
+        // ASLA çalınmaz. Tek istisna: pid yeniden kullanımına karşı mutlak üst sınır (24s). pid'siz eski kilitler TTL ile eskir.
+        const stale = typeof cur.pid === "number" ? !processAlive(cur.pid) || age > LOCK_HARD_CAP_MS : age > ttlMs;
+        if (stale) { fs.rmSync(this.lockPath, { force: true }); write(); return true; }
       } catch { /* okunamayan/kaybolan kilit → aşağıda false */ }
       return false;
     }

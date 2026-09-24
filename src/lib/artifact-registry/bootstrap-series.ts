@@ -198,7 +198,7 @@ export class BootstrapSeries<R = unknown> {
           }
           samples.set(rec.i, rec.s);
         } catch {
-          if (i !== sl.lines.length - 1) { reasons.add("DATA_CORRUPTION"); changed.push("samples.jsonl"); }
+          if (!(!sl.endsWithNewline && i === sl.lines.length - 1)) { reasons.add("DATA_CORRUPTION"); changed.push("samples.jsonl"); }
         }
       });
       const rl = readLines(resultsPath);
@@ -207,7 +207,7 @@ export class BootstrapSeries<R = unknown> {
           const rec = JSON.parse(line) as { i: number; r: R };
           results.set(rec.i, rec.r);
         } catch {
-          if (i !== rl.lines.length - 1) { reasons.add("DATA_CORRUPTION"); changed.push("results.jsonl"); }
+          if (!(!rl.endsWithNewline && i === rl.lines.length - 1)) { reasons.add("DATA_CORRUPTION"); changed.push("results.jsonl"); }
         }
       });
 
