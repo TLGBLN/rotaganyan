@@ -1,8 +1,52 @@
+// ═══════════════════════════════════════════════════════════════════════════════════
+// KALICI İLKE (2026-09-24, kullanıcı kararı — dondurulmuş mimari kural):
+//
+//   HEALTH STATUS ≠ ANALYSIS BLOCK
+//
+// Bu dosyadaki (ve tüm Sistem Anatomisi panelinin) status'u (healthy/warning/critical/
+// unknown) SALT-GÖZLEMSELDİR — hiçbir sensör, hiçbir status değeri, canlı analiz/tahmin/
+// kupon üretim akışını (v5-engine.ts, upsertPrediction, syncHomeKupon, vb.) DURDURMAZ,
+// ENGELLEMEZ, GATE ETMEZ. Doğrulandı: bu dosyaya hiçbir live-path dosyası (server/actions,
+// lib/methodology, api/ingest) import/referans VERMİYOR — panel yalnız OKUYOR, hiçbir yere
+// YAZMIYOR/KARAR VERMİYOR. "Anatomy is observability-first, not gate-first."
+//
+// Kullanıcının önerdiği kavramsal katman (bu dosyada AYRI bir `OperationalDecision` tipi
+// olarak KODLANMADI — çünkü zaten hiçbir decision-tüketen kod yok; gelecekte biri eklenirse
+// bu yorum onun sözleşmesidir):
+//   - "healthy"/"warning" (kullanıcının "degraded"ı)  → decision: continue
+//   - "critical" (kullanıcının "alert"ı)               → decision: continue_with_warning
+//     (Result Sync gecikmesi, HOT cache %92 taze gibi — GERÇEK sorun ama analiz üretimi
+//     bunun girdisi DEĞİL, üretim durmamalı.)
+//   - "unknown"                                        → decision: continue (bilgi eksik,
+//     bu tek başına asla blocker değildir)
+//   - Yalnız aşağıdaki 6 durum teorik bir "block" gerektirir — VE bunlar zaten Sistem
+//     Anatomisi'nin İCAT ETTİĞİ bir mekanizma DEĞİL, live koddaki (v5-engine.ts, Prisma
+//     çağrıları) MEVCUT try/catch'lerin doğal sonucudur (fonksiyon zaten throw/return
+//     eder, bir "prediction" hiç üretilmez) — Sistem Anatomisi bunu yalnız GÖZLEMLER,
+//     ayrıca bir gate EKLEMEZ:
+//       1. Model hesaplama exception'ı / analiz tamamlanamıyor
+//       2. Probability NaN/Infinity
+//       3. Probability sum ciddi bozuk
+//       4. Runner-pick eşleşmesi bozuk (prediction'ın kendi runner listesiyle uyuşmuyor)
+//       5. Program/race identity yok (koşu DB'de bulunamıyor)
+//       6. Kritik DB erişimi tamamen yok
+//
+// Dependency propagation da AYNI ilkeye uyar: bir bağımlılık warning/critical olduğunda
+// dependent'ın kendi selfStatus'u DEĞİL yalnız `dependencyStatus`/`degradedByDependency`
+// alanları değişir (bkz. propagateDependencies() aşağıda) — "Model çalışıyor ama veri
+// kalitesi ideal değil" mesajı budur, "model durduruldu" DEĞİL.
+//
+// Aşağıdaki Chaos Test katmanı (SystemHealthTestOverride) da BU İLKEYE tabidir: yalnız
+// PANELİN GÖSTERDİĞİ status'u geçici olarak zorlar, gerçek sensör hesaplamasını veya canlı
+// pipeline'ı HİÇ ETKİLEMEZ — bir chaos testi aktifken bile analiz/tahmin/kupon üretimi
+// tamamen normal çalışmaya devam eder.
+// ═══════════════════════════════════════════════════════════════════════════════════
+
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
-import type { HealthStatus, SystemModuleHealth } from "@/lib/system-anatomy/types";
+import type { HealthStatus, SystemModuleHealth, OperationalDecision } from "@/lib/system-anatomy/types";
 import { CRON_DECLARED, CRON_REGISTERED_SNAPSHOT } from "@/lib/system-anatomy/cron-registry";
 import { SYSTEM_ANATOMY_NODES } from "@/lib/system-anatomy/registry";
 import type { AgfSyncResult } from "@/server/services/agf-sync";
@@ -1789,6 +1833,26 @@ function propagateDependencies(modules: ModuleResult[]): ModuleResult[] {
       mod.dependencyStatus = dependencyStatus;
       mod.degradedByDependency = degradedByDependency;
       mod.status = finalStatus;
+      // Bkz. types.ts OperationalDecision notu — bugün hiçbir sensör canlı bir "block"
+      // sinyali gözlemleyemiyor (hepsi retrospektif), bu yüzden HER ZAMAN "continue".
+      mod.operationalDecision = "continue";
+      // Root cause — bu düğüm dependency yüzünden warning'e çekildiyse, hangi ÜST düğüm(ler)ün
+      // KENDİ (self, inherited DEĞİL) sorunu bunu tetikliyor? rootCauseById zaten topolojik
+      // sırayla dolduruluyor (dependency'ler ÖNCE işlendiği için her zaman hazır).
+      if (degradedByDependency) {
+        const causes = new Set<string>();
+        for (const dep of nodesById.get(id)?.dependencies ?? []) {
+          const depMod = byId.get(dep);
+          if (!depMod) continue;
+          if (depMod.selfStatus === "critical" || depMod.selfStatus === "warning") causes.add(dep);
+          else if (depMod.rootCauseModuleIds) for (const c of depMod.rootCauseModuleIds) causes.add(c);
+        }
+        mod.rootCauseModuleIds = [...causes];
+      } else if (selfStatus === "critical" || selfStatus === "warning") {
+        mod.rootCauseModuleIds = [id]; // kendisi kaynak
+      } else {
+        mod.rootCauseModuleIds = [];
+      }
     }
   }
 
@@ -1830,6 +1894,20 @@ export async function GET() {
   // Henüz gerçek sensörü olmayan modüller — bkz. unmeasuredModule notu.
   modules.push(unmeasuredModule("data-source", "VERİ TOPLAMA", "TJK / program / yarış verileri"));
 
+  // ── Chaos Test override — GERÇEK sensör sonuçları YUKARIDA zaten hesaplandı/DEĞİŞMEDİ;
+  // burada yalnız GÖSTERİLEN status, propagation ÇALIŞMADAN ÖNCE zorlanır ki gerçek
+  // dependency grafiği gerçek bir hatadan geliyormuş gibi test edilebilsin. Süresi dolmuş
+  // satırlar her çağrıda temizlenir — unutulmuş bir test kalıcı KALAMAZ. ──
+  await db.systemHealthTestOverride.deleteMany({ where: { expiresAt: { lte: new Date() } } }).catch(() => {});
+  const activeChaos = await db.systemHealthTestOverride.findFirst({ where: { expiresAt: { gt: new Date() } }, orderBy: { createdAt: "desc" } }).catch(() => null);
+  if (activeChaos) {
+    const target = modules.find((m) => m.id === activeChaos.targetModuleId);
+    if (target) {
+      target.status = activeChaos.forcedStatus as Status;
+      target.checks = [{ id: "chaos-override", label: "🧪 CHAOS TEST ACTIVE", ok: false, detail: activeChaos.reason }, ...target.checks];
+    }
+  }
+
   propagateDependencies(modules);
 
   const statusWeight: Record<Status, number> = { healthy: 0, unknown: 1, warning: 2, critical: 3 };
@@ -1841,6 +1919,14 @@ export async function GET() {
 
   const count = (status: Status) => modules.filter((x) => x.status === status).length;
 
+  // ── "Uçuş göstergesi" (kullanıcı talebi) — bugün HER ZAMAN true/"continue": hiçbir
+  // sensör canlı bir "block" sinyali gözlemleyemiyor (bkz. types.ts OperationalDecision).
+  // Bu dürüst bir varsayılan, ölçülemeyen bir şeye sahte güvence VERMİYOR — yalnız "şu an
+  // hiçbir modül gerçek bir blocker bildirmedi" diyor.
+  const rootCauses = modules.filter((m) => m.selfStatus === "critical" || m.selfStatus === "warning").map((m) => m.id);
+  const overallDecision: OperationalDecision = "continue";
+  const analysisAvailable = true; // bkz. yukarıdaki not — bugün "block" üretebilecek bir sensör yok
+
   return NextResponse.json({
     overallStatus,
     checkedAt: nowIso(),
@@ -1848,6 +1934,12 @@ export async function GET() {
     warning: count("warning"),
     critical: count("critical"),
     unknown: count("unknown"),
+    analysisAvailable,
+    overallDecision,
+    rootCauses,
+    chaosTest: activeChaos
+      ? { scenario: activeChaos.scenario, targetModuleId: activeChaos.targetModuleId, reason: activeChaos.reason, expiresAt: activeChaos.expiresAt.toISOString() }
+      : null,
     modules,
   });
 }

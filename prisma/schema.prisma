@@ -327,6 +327,25 @@ model HorseSyncFailure {
 // bir önceki watchdog turunun HOT tjkAtId kümesini saklar — "newHotSinceLastSync" (churn)
 // metriğini hesaplamak için. lastHotIdsJson=number[]. Yalnız HOT-filtreli syncHorseStatsCache
 // çağrıları bu satırı günceller (günlük WARM/COLD cron'u dokunmaz).
+// 2026-09-24 — Fault Injection / Chaos Test katmanı (Sistem Anatomisi E2E doğrulaması).
+// Kullanıcı kararı: gerçek üretim verisini bozmak yerine (cron durdurma, DB'ye bozuk veri
+// yazma) yalnız SİSTEM ANATOMİSİ PANELİNİN OKUDUĞU sonucu geçici olarak zorlar — sensörlerin
+// KENDİ gerçek hesaplaması hiç etkilenmez/değişmez, yalnız GET() bu satırı bulunca ilgili
+// modülün `status`'unu propagateDependencies() ÇAĞRILMADAN ÖNCE zorlar, böylece gerçek
+// dependency grafiği gerçek bir hatadan geliyormuş GİBİ test edilebilir. TTL ile kendiliğinden
+// süresi dolar (varsayılan 5dk) — kalıcı bir "unutulmuş test" riski yok, GET() her çağrıda
+// süresi dolmuş satırları da temizler.
+model SystemHealthTestOverride {
+  id             String   @id @default(cuid())
+  scenario       String // CHAOS_SCENARIOS'taki key, ör. "program_missing"
+  targetModuleId String // registry.ts'teki node id, ör. "program"
+  forcedStatus   String // "critical" | "warning"
+  reason         String // panelde gösterilecek insan-okunur açıklama
+  activatedBy    String? // aktifleştiren kullanıcının e-postası (audit)
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+}
+
 model HotCacheWatchdogState {
   id           String   @id @default("singleton")
   lastHotIdsJson Json
