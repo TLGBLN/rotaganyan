@@ -185,7 +185,19 @@ describe("kabul kriteri 2 — yarım kalan iş sıfırdan başlamaz", () => {
     await runIncrementalJob({ identity: identity(), listItems: async () => ids(10), processItem: job.process, root, log: quiet });
     expect(job.calls).toHaveLength(0);
 
+    // REGRESYON (bootstrap-series çalışmasında bulundu): torn son satırdan SONRA yeni item append edilirse bozuk parça
+    // ORTADA kalıp sonraki yüklemede yanlış DATA_CORRUPTION üretiyordu → artık append öncesi onarılır.
+    job.calls.length = 0;
+    const r = await runIncrementalJob({ identity: identity(), listItems: async () => ids(13), processItem: job.process, root, log: quiet });
+    expect(job.calls).toEqual(["r10", "r11", "r12"]);
+    expect(r.results.size).toBe(13);
+    job.calls.length = 0;
+    await runIncrementalJob({ identity: identity(), listItems: async () => ids(13), processItem: job.process, root, log: quiet }); // yeniden yükleme HATASIZ
+    expect(job.calls).toHaveLength(0);
+    fs.appendFileSync(itemsFile, '{"id":"r50","r":'); // torn parça GEÇERLİ JSON değil → kesilir; geçerli JSON olsaydı yalnız "\n" eklenirdi
+
     const lines = fs.readFileSync(itemsFile, "utf-8").split("\n").filter(Boolean);
+    lines.pop(); // torn'u çıkar; ortadaki bozuk satır testine devam
     lines[3] = "{bozuk";
     fs.writeFileSync(itemsFile, lines.join("\n") + "\n");
     await expect(

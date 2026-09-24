@@ -54,11 +54,29 @@ export function dependencyHash(d: DependencyMap): string {
   return sha256(stableStringify(values));
 }
 
-function atomicWrite(file: string, content: string) {
+export function atomicWrite(file: string, content: string) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, content);
   fs.renameSync(tmp, file);
+}
+
+/**
+ * Yarım yazılmış (satır sonuyla bitmeyen) SON satırı onarır: satır geçerli JSON ise yalnız satır sonu eklenir
+ * (kayıt korunur), geçersizse (torn write) kesilip atılır. Böylece sonraki append, bozuk parçayı ORTADA bırakıp
+ * DATA_CORRUPTION üretmez. Yalnız checksum prefix doğrulamasından SONRA çağrılmalıdır.
+ */
+export function repairTornTail(file: string): void {
+  if (!fs.existsSync(file)) return;
+  const buf = fs.readFileSync(file);
+  if (buf.length === 0 || buf[buf.length - 1] === 0x0a) return;
+  const lastNl = buf.lastIndexOf(0x0a);
+  const tail = buf.subarray(lastNl + 1).toString("utf-8");
+  try { JSON.parse(tail); fs.appendFileSync(file, "\n"); } catch { fs.truncateSync(file, lastNl + 1); }
+}
+
+function processAlive(pid: number): boolean {
+  try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } // EPERM = var ama başka kullanıcıya ait
 }
 
 export type ManifestLoad = { kind: "none" } | { kind: "ok"; manifest: ArtifactManifest } | { kind: "corrupt"; error: string };
@@ -102,9 +120,8 @@ export class FileArtifactStore {
   appendItems<R>(recs: StoredItem<R>[]) {
     if (recs.length === 0) return;
     fs.mkdirSync(this.dir, { recursive: true });
-    // Önceki yazım yarım kaldıysa satır bütünlüğü için baştaki "\n" ile yeni satıra geç.
-    const needsNewline = fs.existsSync(this.itemsPath) && fs.statSync(this.itemsPath).size > 0 && !fs.readFileSync(this.itemsPath, "utf-8").endsWith("\n");
-    fs.appendFileSync(this.itemsPath, (needsNewline ? "\n" : "") + recs.map((r) => JSON.stringify(r)).join("\n") + "\n");
+    repairTornTail(this.itemsPath); // önceki yarım yazım bozuk parçayı ORTADA bırakıp sonraki yüklemede DATA_CORRUPTION üretmesin
+    fs.appendFileSync(this.itemsPath, recs.map((r) => JSON.stringify(r)).join("\n") + "\n");
   }
 
   /** items.jsonl'ın şu anki bayt sayısı + sha256'sı (manifest'e yazılır). */
@@ -136,8 +153,10 @@ export class FileArtifactStore {
     const write = () => { fs.writeFileSync(this.lockPath, JSON.stringify({ pid: process.pid, at: Date.now() }), { flag: "wx" }); };
     try { write(); return true; } catch {
       try {
-        const cur = JSON.parse(fs.readFileSync(this.lockPath, "utf-8")) as { at: number };
-        if (Date.now() - cur.at > ttlMs) { fs.rmSync(this.lockPath, { force: true }); write(); return true; }
+        const cur = JSON.parse(fs.readFileSync(this.lockPath, "utf-8")) as { at: number; pid?: number };
+        // Kilidin sahibi ÖLMÜŞSE (Ctrl+C / taskkill / çökme) TTL beklenmez — bir sonraki çalıştırma hemen devralır.
+        const ownerDead = typeof cur.pid === "number" && !processAlive(cur.pid);
+        if (ownerDead || Date.now() - cur.at > ttlMs) { fs.rmSync(this.lockPath, { force: true }); write(); return true; }
       } catch { /* okunamayan/kaybolan kilit → aşağıda false */ }
       return false;
     }
