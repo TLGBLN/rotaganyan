@@ -25,6 +25,7 @@ export const CRON_DECLARED: Record<string, CronDeclaredInfo> = {
   "hot-cache-watchdog": { schedule: "0 */2 * * *", humanCadence: "2 saatte bir", cadenceHours: 2 },
   "agf-sync": { schedule: "0 9,12,15,18 * * *", humanCadence: "günde 4 kez (09/12/15/18 UTC)", cadenceHours: 3 },
   "ingest-program": { schedule: "0 5,8,11,13,15,17 * * *", humanCadence: "günde 6 kez (05/08/11/13/15/17 UTC)", cadenceHours: 2.4 },
+  "result-sync": { schedule: "*/5 11-21 * * *", humanCadence: "5 dakikada bir (11-21 UTC)", cadenceHours: 5 / 60 },
 };
 
 export type CronRegisteredSnapshot = {
@@ -49,5 +50,10 @@ export const CRON_REGISTERED_SNAPSHOT: Record<string, CronRegisteredSnapshot> = 
     status: "confirmed",
     checkedAt: "2026-09-24",
     note: "6 declared saatten 3'ü (05/08/11 UTC) Vercel'de birebir kayıtlı görünüyor, kalan 3'ü (13/15/17 UTC) 'modified' — bu da agf-sync'teki AYNI çok-schedule/tek-path diff false-alarm deseni, gerçek bir eksiklik değil.",
+  },
+  "result-sync": {
+    status: "modified",
+    checkedAt: "2026-09-23",
+    note: "GERÇEK drift (yukarıdaki çoklu-schedule false-alarm'larıyla KARIŞTIRILMAMALI) — bu TEK bir schedule'a sahip path, Vercel'de `*/15 11-21 * * *` kayıtlıyken yerel vercel.json'da `*/5 11-21 * * *` yazıyor. Yani sonuç senkronu Vercel'in gerçekte çalıştırdığı hızda 5dk değil 15dk'da bir tetikleniyor olabilir — henüz araştırılmadı/düzeltilmedi.",
   },
 };

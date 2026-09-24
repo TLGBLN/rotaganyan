@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
-import { syncResultsForDate } from "@/server/services/result-sync";
+import { syncResultsForDate, recordResultSyncCronRun } from "@/server/services/result-sync";
 import { syncJockeyStatsFromTjk, syncTrainerStatsFromTjk } from "@/server/services/race.service";
 import { syncAccuraceForDate } from "@/server/services/accurace-sync.service";
 import { syncAltiliIkramiyeLog } from "@/server/services/altili-ikramiye-log.service";
@@ -17,7 +17,14 @@ export async function GET(req: NextRequest) {
   if (denied) return denied;
 
   const today = turkeyDateString();
-  await syncResultsForDate(today);
+  const startedAt = Date.now();
+  try {
+    await syncResultsForDate(today);
+  } catch (err) {
+    await recordResultSyncCronRun({ ok: false, durationMs: Date.now() - startedAt, error: String(err) }).catch(() => {});
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+  await recordResultSyncCronRun({ ok: true, durationMs: Date.now() - startedAt }).catch(() => {});
 
   revalidatePath("/admin");
   revalidatePath("/");

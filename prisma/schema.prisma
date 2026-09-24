@@ -368,6 +368,21 @@ model ProgramCronRunState {
   recentRunsJson Json?
 }
 
+// 2026-09-24 — Result Sync sensörü: /api/cron/result-sync (syncResultsForDate, 5dk'da bir,
+// 11-21 UTC) kendi çalışma geçmişini bu singleton'a yazar. syncResultsForDate() Promise<void>
+// döndürdüğü için (kaç yarış hedeflendi/kaçı geldi gibi bir öz-rapor YOK) — bu KASITLI olarak
+// yalnız Availability/Freshness (cron çalıştı mı) için kullanılır; Completeness/Correctness
+// system-health route'unun kendi CANLI DB sorgularından (tamamlanmış yarış vs Result satırı
+// karşılaştırması) hesaplanır. "Cron HTTP 200 = HEALTHY değil" ilkesi tam burada uygulanır.
+model ResultSyncCronRunState {
+  id             String    @id @default("singleton")
+  lastAttemptAt  DateTime?
+  lastSuccessAt  DateTime?
+  lastDurationMs Int?
+  lastError      String?
+  recentRunsJson Json?
+}
+
 /**
  * TJK'nın "At Koşu Bilgileri" tam yarış geçmişi tablosunun (tjk-at-performans.adapter.ts)
  * KALICI önbelleği — kullanıcı talebi 2026-07-30: analiz (Faz1/veri-toplama.ts) ve public

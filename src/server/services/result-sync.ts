@@ -133,3 +133,35 @@ export async function syncResultsForDate(dateStr: string): Promise<void> {
     try { await syncKarmaResultMirrors(race.id); } catch { /* bir sonraki senkronizasyona bırak */ }
   }
 }
+
+// 2026-09-24 — Sistem Anatomisi Result Sync sensörü: syncResultsForDate() KASITLI olarak
+// Promise<void> döner (kaç yarış hedeflendi/kaçı geldi gibi bir öz-rapor yok — bu fonksiyon
+// yalnız Availability/Freshness ölçer, "kaç yarışın sonucu eksik" sorusu system-health'in
+// kendi CANLI DB sorgusundan gelir, cron'un "başarılı" demesine güvenilmez).
+const RESULT_SYNC_RECENT_RUNS_MAX = 10;
+export async function recordResultSyncCronRun(outcome: { ok: boolean; durationMs: number; error?: string }): Promise<void> {
+  const now = new Date();
+  const prev = await db.resultSyncCronRunState.findUnique({ where: { id: "singleton" } }).catch(() => null);
+  const prevRuns = Array.isArray(prev?.recentRunsJson) ? (prev!.recentRunsJson as string[]) : [];
+  const recentRunsJson = [...prevRuns, now.toISOString()].slice(-RESULT_SYNC_RECENT_RUNS_MAX);
+
+  await db.resultSyncCronRunState
+    .upsert({
+      where: { id: "singleton" },
+      create: {
+        id: "singleton",
+        lastAttemptAt: now,
+        lastSuccessAt: outcome.ok ? now : null,
+        lastDurationMs: outcome.durationMs,
+        lastError: outcome.ok ? null : (outcome.error ?? "bilinmeyen hata"),
+        recentRunsJson,
+      },
+      update: {
+        lastAttemptAt: now,
+        lastDurationMs: outcome.durationMs,
+        ...(outcome.ok ? { lastSuccessAt: now, lastError: null } : { lastError: outcome.error ?? "bilinmeyen hata" }),
+        recentRunsJson,
+      },
+    })
+    .catch(() => {}); // yalnız izleme metriği — result sync'i ASLA bloklamaz
+}

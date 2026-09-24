@@ -496,6 +496,155 @@ async function programSyncHealth(): Promise<ModuleResult> {
   }
 }
 
+// 2026-09-24 — Result Sync sensörü (kullanıcı spesifikasyonu). "Cron HTTP 200 = HEALTHY
+// değil" ilkesi burada tam uygulanıyor: Availability yalnız ResultSyncCronRunState'ten
+// (cron GERÇEKTEN çalıştı mı) gelir, Completeness ise CANLI DB'den (tamamlanmış yarış vs
+// Result satırı) — cron başarıyla dönse bile 12 hedeften 9'u geldiyse Completeness KIRMIZI
+// olur, Availability'nin yeşil olması bunu MASKELEMEZ. "Tamamlanmış yarış" = raceStart +
+// RESULT_EXPECTED_BUFFER_MS (20dk — yarış süresi + jüri incelemesi + PendingResult'ın 2
+// ardışık cron turuyla doğrulanma penceresi) geçmiş yarış; bu buffer'dan ÖNCE Result
+// olmaması normaldir, alarm SAYILMAZ.
+const RESULT_EXPECTED_BUFFER_MS = 20 * 60_000;
+const RESULT_CRITICAL_MISSING_MS = 30 * 60_000; // kullanıcının kendi örneği: 20-30 dk sonra hâlâ yoksa alarm
+
+async function resultSyncHealth(): Promise<ModuleResult> {
+  try {
+    const { poolStartTime } = await import("@/lib/methodology/kupon-dependency-hash");
+    const state = await db.resultSyncCronRunState.findUnique({ where: { id: "singleton" } });
+
+    const dayStart = new Date();
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+    const dateIso = dayStart.toISOString().slice(0, 10);
+    const now = Date.now();
+
+    const races = await db.race.findMany({
+      where: { raceDay: { date: { gte: dayStart, lt: dayEnd } } },
+      select: {
+        id: true,
+        raceNo: true,
+        time: true,
+        raceDay: { select: { hippodrome: { select: { name: true } } } },
+        runners: { select: { no: true, scratched: true } },
+        result: { select: { id: true, winnerNo: true, winnerNos: true, actualOrder: true, enteredAt: true } },
+      },
+    });
+
+    type RaceRow = (typeof races)[number];
+    const raceStart = (r: RaceRow) => poolStartTime(dateIso, [r.time]);
+    const isCompleted = (r: RaceRow) => {
+      const start = raceStart(r);
+      return start != null && now - start.getTime() >= RESULT_EXPECTED_BUFFER_MS;
+    };
+
+    const completedRaces = races.filter(isCompleted);
+    const resultedRaces = completedRaces.filter((r) => r.result != null);
+    const missing = completedRaces.filter((r) => r.result == null);
+    const missingRaceIds = missing.map((r) => `${r.raceDay.hippodrome.name} K${r.raceNo}`);
+    const oldestMissingResultAgeMin =
+      missing.length === 0
+        ? 0
+        : Math.max(...missing.map((r) => (now - raceStart(r)!.getTime() - RESULT_EXPECTED_BUFFER_MS) / 60_000));
+
+    // Ortalama sonuç gecikmesi — YALNIZ zaten sonuçlanmış yarışlardan (freshness, tarihsel görünüm).
+    const lagsMin = races
+      .filter((r) => r.result != null)
+      .map((r) => {
+        const start = raceStart(r);
+        if (!start) return null;
+        return (r.result!.enteredAt.getTime() - start.getTime()) / 60_000;
+      })
+      .filter((x): x is number => x != null);
+    const avgLagMin = lagsMin.length === 0 ? null : lagsMin.reduce((s, x) => s + x, 0) / lagsMin.length;
+
+    // Correctness — CANLI doğrulama, cron'un "başarılı" dediğine bağımlı DEĞİL.
+    let winnerMissing = 0;
+    let duplicateFinishPosition = 0;
+    let invalidFinishPosition = 0;
+    let scratchedButPlaced = 0;
+    let runnerCountMismatch = 0;
+    for (const r of races) {
+      if (!r.result) continue;
+      const validNos = new Set(r.runners.map((x) => x.no));
+      const scratchedNos = new Set(r.runners.filter((x) => x.scratched).map((x) => x.no));
+      const order = Array.isArray(r.result.actualOrder) ? (r.result.actualOrder as number[]) : [];
+
+      if (r.result.winnerNo == null || r.result.winnerNos.length === 0) winnerMissing++;
+      if (new Set(order).size !== order.length) duplicateFinishPosition++;
+      if (order.some((no) => !validNos.has(no))) invalidFinishPosition++;
+      if (order.some((no) => scratchedNos.has(no)) || r.result.winnerNos.some((no) => scratchedNos.has(no))) scratchedButPlaced++;
+      const nonScratchedCount = r.runners.filter((x) => !x.scratched).length;
+      if (Math.abs(order.length - nonScratchedCount) > 2) runnerCountMismatch++;
+    }
+    const correctnessIssues = winnerMissing + duplicateFinishPosition + invalidFinishPosition + scratchedButPlaced + runnerCountMismatch > 0;
+
+    const declared = CRON_DECLARED["result-sync"]!;
+    const attemptAgeMin = ageMinutes(state?.lastAttemptAt);
+    const successAgeMin = ageMinutes(state?.lastSuccessAt);
+    const hourUtc = new Date().getUTCHours();
+    const activeHours = hourUtc >= 11 && hourUtc <= 21;
+    const availabilityOk = activeHours ? attemptAgeMin != null && attemptAgeMin <= 20 : null;
+
+    const observedH = (await import("@/server/services/ingest/tjk-at-profil.adapter")).observedCadenceHours((state?.recentRunsJson as string[] | null) ?? null);
+    const drift = evaluateCronDrift("result-sync", observedH);
+
+    let status: Status = "healthy";
+    if (activeHours && availabilityOk === false) status = "critical";
+    if (status !== "critical" && oldestMissingResultAgeMin > RESULT_CRITICAL_MISSING_MS / 60_000) status = "critical";
+    if (status !== "critical" && (missing.length > 0 || correctnessIssues)) status = "warning";
+
+    return {
+      id: "results",
+      title: "SONUÇLAR",
+      status,
+      description: "Result Sync cron'u (5dk'da bir) — availability/freshness/completeness/correctness",
+      metrics: [
+        { label: "Son deneme", value: state?.lastAttemptAt ? `${attemptAgeMin!.toFixed(0)} dk önce` : "hiç" },
+        { label: "Son başarı", value: state?.lastSuccessAt ? `${successAgeMin!.toFixed(0)} dk önce` : "hiç" },
+        { label: "Son çalışma süresi", value: state?.lastDurationMs == null ? "-" : `${(state.lastDurationMs / 1000).toFixed(1)} sn` },
+        { label: "Gözlemlenen cadence", value: drift.observedLabel },
+        { label: "Tamamlanan yarış", value: completedRaces.length },
+        { label: "Sonucu gelen", value: resultedRaces.length },
+        { label: "Eksik", value: missing.length },
+        { label: "En eski eksik sonuç", value: missing.length === 0 ? "-" : `${oldestMissingResultAgeMin.toFixed(0)} dk` },
+        ...(missingRaceIds.length > 0 ? [{ label: "Eksik yarışlar", value: missingRaceIds.join(", ") }] : []),
+        { label: "Ortalama sonuç gecikmesi", value: avgLagMin == null ? "-" : `${avgLagMin.toFixed(0)} dk` },
+        { label: "Kazanan eksik", value: winnerMissing },
+        { label: "Duplicate sıra", value: duplicateFinishPosition },
+        { label: "Geçersiz at no (sırada)", value: invalidFinishPosition },
+        { label: "Çekilmiş at sırada", value: scratchedButPlaced },
+        { label: "Koşucu sayısı uyuşmazlığı", value: runnerCountMismatch },
+        ...(state?.lastError ? [{ label: "Son hata", value: state.lastError }] : []),
+      ],
+      checks: [
+        { id: "result-availability", label: "Cron aktif saatlerde çalıştı (≤20dk)", ok: availabilityOk, detail: activeHours ? `${attemptAgeMin?.toFixed(0) ?? "-"} dk önce` : "gece modu — beklenen boşluk" },
+        {
+          id: "result-freshness",
+          label: "En eski eksik sonuç kabul edilebilir aralıkta",
+          ok: missing.length === 0 ? true : oldestMissingResultAgeMin <= RESULT_CRITICAL_MISSING_MS / 60_000 ? null : false,
+          detail: missing.length === 0 ? "eksik yok" : `${oldestMissingResultAgeMin.toFixed(0)} dk (kritik eşik 30 dk)`,
+        },
+        { id: "result-completeness", label: "Tamamlanan = Sonuçlanan", ok: missing.length === 0, detail: `${resultedRaces.length}/${completedRaces.length} yarış${missingRaceIds.length > 0 ? ` — eksik: ${missingRaceIds.join(", ")}` : ""}` },
+        { id: "result-correctness", label: "Sonuç verisi mantıksal olarak geçerli", ok: !correctnessIssues, detail: `kazanan eksik=${winnerMissing}, duplicate=${duplicateFinishPosition}, geçersiz no=${invalidFinishPosition}, çekilmiş-ama-sırada=${scratchedButPlaced}, sayı uyuşmazlığı=${runnerCountMismatch}` },
+        { id: "drift-result-sync", label: "CRON CONFIG DRIFT — result-sync", ok: drift.status === "healthy" ? true : drift.status === "warning" ? null : false, detail: drift.detail },
+      ],
+      lastCheckedAt: nowIso(),
+    };
+  } catch (error) {
+    return {
+      id: "results",
+      title: "SONUÇLAR",
+      status: "unknown",
+      description: "Result Sync health ölçülemedi",
+      metrics: [],
+      checks: [],
+      errorMessage: error instanceof Error ? error.message : "Result sync error",
+      lastCheckedAt: nowIso(),
+    };
+  }
+}
+
 // DÜZELTME (2026-09-23): ChallengerRun'da `createdAt` alanı YOK — gerçek alan `computedAt`
 // (bkz. prisma/schema.prisma:564). Yanlış alan adı build'i kırardı.
 async function challengerHealth(): Promise<ModuleResult> {
@@ -696,6 +845,7 @@ export async function GET() {
     cronHealth(),
     agfSyncHealth(),
     programSyncHealth(),
+    resultSyncHealth(),
   ]);
 
   const modules: ModuleResult[] = [];
@@ -705,7 +855,6 @@ export async function GET() {
 
   // Henüz gerçek sensörü olmayan modüller — bkz. unmeasuredModule notu.
   modules.push(unmeasuredModule("data-source", "VERİ TOPLAMA", "TJK / program / yarış verileri"));
-  modules.push(unmeasuredModule("results", "SONUÇLAR", "Yarış sonuçları"));
   modules.push(unmeasuredModule("coupon", "KUPON ÜRETİMİ", "Kupon oluşturma"));
   modules.push(unmeasuredModule("calibration", "KALİBRASYON", "Probability calibration"));
   modules.push(unmeasuredModule("site", "SITE / API", "Web ve API"));
