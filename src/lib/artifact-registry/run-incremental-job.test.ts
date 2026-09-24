@@ -108,7 +108,7 @@ describe("kabul kriteri 1 — değişmeyen hiçbir şey yeniden hesaplanmaz", ()
     expect(r.plan.reason).toBe("MODEL_FORMULA_CHANGED");
     expect(r.manifest.rebuildHistory).toHaveLength(1);
     const dir = artifactDir(root, identity());
-    expect(fs.readdirSync(dir).some((f) => f.startsWith("items.") && f.endsWith(".jsonl.bak"))).toBe(true);
+    expect(fs.readdirSync(dir).some((f) => f.startsWith("items.MODEL_FORMULA_CHANGED.") && f.endsWith(".jsonl.bak"))).toBe(true); // arşiv adı NEDENİ taşır
   });
 
   it("dryRun hiçbir şey çalıştırmaz/yazmaz, yalnız planı verir", async () => {
@@ -144,18 +144,35 @@ describe("kabul kriteri 2 — yarım kalan iş sıfırdan başlamaz", () => {
     expect(c.aggregateState).toBe((99 * 100) / 2);
   });
 
-  it("süreç ÖLÜRSE (flush edilmemiş kısım hariç) devam eder — items.jsonl tek gerçek kaynak", async () => {
+  it("süreç manifest güncellenmeden ÖLÜRSE items.jsonl tek gerçek kaynaktır: kaldığı yerden devam eder, hiçbir item tekrarlanmaz", async () => {
     const job = makeJob();
-    // 25 item işle, flushEvery=10 → 20'si diske yazıldı, 5'i "çökme" ile kaybolmuş gibi: manifest'i ve son 5 satırı sil.
-    await runIncrementalJob({ identity: identity(), listItems: async () => ids(25), processItem: job.process, root, maxItemsThisRun: 25, flushEvery: 10, log: quiet });
-    const dir = artifactDir(root, identity());
-    const itemsFile = path.join(dir, "items.jsonl");
-    const lines = fs.readFileSync(itemsFile, "utf-8").split("\n").filter(Boolean);
-    fs.writeFileSync(itemsFile, lines.slice(0, 20).join("\n") + "\n");
+    const run = (max?: number) => runIncrementalJob({ identity: identity(), listItems: async () => ids(30), processItem: job.process, root, maxItemsThisRun: max, flushEvery: 10, log: quiet });
+    await run(20);
+    const manifestPath = path.join(artifactDir(root, identity()), "manifest.json");
+    const eskiManifest = fs.readFileSync(manifestPath, "utf-8"); // 20 item'lık manifest
+    await run(5); // items.jsonl 25 satıra çıktı
+    fs.writeFileSync(manifestPath, eskiManifest); // "çökme": append oldu, manifest güncellenemedi
     job.calls.length = 0;
-    const r = await runIncrementalJob({ identity: identity(), listItems: async () => ids(25), processItem: job.process, root, log: quiet });
-    expect(job.calls).toEqual(ids(5, 20).map((x) => x.id));
-    expect(r.plan.alreadyProcessed).toBe(20);
+    const r = await run();
+    expect(r.plan.alreadyProcessed).toBe(25); // dosya manifest'ten UZUN → sorun değil, dosya gerçek
+    expect(job.calls).toEqual(ids(5, 25).map((x) => x.id));
+  });
+
+  it("items.jsonl KESİLİRSE veya içeriği sessizce değişirse checksum DATA_CORRUPTION ile DURDURUR (sessiz yeniden hesaplama yok)", async () => {
+    const job = makeJob();
+    const run = () => runIncrementalJob({ identity: identity(), listItems: async () => ids(25), processItem: job.process, root, log: quiet });
+    await run();
+    const itemsFile = path.join(artifactDir(root, identity()), "items.jsonl");
+    const orijinal = fs.readFileSync(itemsFile, "utf-8");
+    const lines = orijinal.split("\n").filter(Boolean);
+    fs.writeFileSync(itemsFile, lines.slice(0, 20).join("\n") + "\n"); // kesilme
+    await expect(run()).rejects.toMatchObject({ reasons: ["DATA_CORRUPTION"], changed: ["items.jsonl(checksum)"] });
+    fs.writeFileSync(itemsFile, orijinal.replace('"r":3,', '"r":999,')); // satır hâlâ geçerli JSON ama değer değişti
+    await expect(run()).rejects.toMatchObject({ reasons: ["DATA_CORRUPTION"] });
+    fs.writeFileSync(itemsFile, orijinal); // geri yüklenince tekrar çalışır
+    job.calls.length = 0;
+    await run();
+    expect(job.calls).toHaveLength(0);
   });
 
   it("yarım yazılmış SON satır tolere edilir; ORTADAKİ bozuk satır DATA_CORRUPTION olarak durdurur", async () => {

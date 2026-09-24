@@ -84,11 +84,16 @@ export async function runIncrementalJob<R, A = unknown>(opts: IncrementalJobOpti
         const d = diffDependencies(load.manifest.dependencies, deps);
         invalid.reasons.push(...d.reasons);
         invalid.changed.push(...d.changed);
+        if (manifest.itemsBytes !== undefined && manifest.itemsSha256 !== undefined && !store.verifyItemsPrefix(manifest.itemsBytes, manifest.itemsSha256)) {
+          invalid.reasons.push("DATA_CORRUPTION");
+          invalid.changed.push("items.jsonl(checksum)");
+        }
         const li = store.loadItems<R>();
         if (li.corruptMiddle) { invalid.reasons.push("DATA_CORRUPTION"); invalid.changed.push("items.jsonl"); }
         stored = li.items;
       }
       changed = invalid.changed;
+      invalid.reasons = [...new Set(invalid.reasons)];
       if (invalid.reasons.length > 0) {
         if (!opts.rebuild) {
           const msg = `⚠ FULL REBUILD REQUIRED — Reason: ${invalid.reasons.join(", ")} — Değişen: ${invalid.changed.join(", ")}. ` +
@@ -106,7 +111,7 @@ export async function runIncrementalJob<R, A = unknown>(opts: IncrementalJobOpti
 
     if (fullRebuild && rebuildReason !== "FIRST_BUILD") {
       log(`[registry] FULL REBUILD — Reason: ${rebuildReason} — Değişen: ${changed.join(", ") || "-"}`);
-      if (!opts.dryRun) store.archiveItems(new Date().toISOString().replace(/[:.]/g, "-"));
+      if (!opts.dryRun) store.archiveItems(rebuildReason ?? "REBUILD", new Date().toISOString().replace(/[:.]/g, "-"));
       stored = new Map();
     }
     const failed: Record<string, FailedItemInfo> = fullRebuild ? {} : { ...(manifest?.failedItems ?? {}) };
@@ -191,6 +196,9 @@ export async function runIncrementalJob<R, A = unknown>(opts: IncrementalJobOpti
       base.status = status;
       base.processedItemCount = stored.size;
       base.aggregateState = aggState === undefined ? null : aggState;
+      const fp = store.itemsFingerprint();
+      base.itemsBytes = fp.bytes;
+      base.itemsSha256 = fp.sha256;
       base.updatedAt = now();
       store.saveManifest(base);
     };

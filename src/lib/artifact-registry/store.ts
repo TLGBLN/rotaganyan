@@ -107,9 +107,28 @@ export class FileArtifactStore {
     fs.appendFileSync(this.itemsPath, (needsNewline ? "\n" : "") + recs.map((r) => JSON.stringify(r)).join("\n") + "\n");
   }
 
-  /** Eski items'ı arşivler (silmez) — bilinçli rebuild öncesi. */
-  archiveItems(tag: string) {
-    if (fs.existsSync(this.itemsPath)) fs.renameSync(this.itemsPath, path.join(this.dir, `items.${tag}.jsonl.bak`));
+  /** items.jsonl'ın şu anki bayt sayısı + sha256'sı (manifest'e yazılır). */
+  itemsFingerprint(): { bytes: number; sha256: string } {
+    if (!fs.existsSync(this.itemsPath)) return { bytes: 0, sha256: sha256("") };
+    const buf = fs.readFileSync(this.itemsPath);
+    return { bytes: buf.length, sha256: createHash("sha256").update(buf).digest("hex") };
+  }
+
+  /**
+   * Manifest'teki bayt sayısı kadar İLK baytın sha256'sı eşleşiyor mu? Dosya manifest'ten UZUNSA (çökme: append oldu, manifest güncellenmedi) sorun değil,
+   * KISAYSA veya prefix farklıysa (kesilme/elle düzenleme/disk bozulması) bozulmadır.
+   */
+  verifyItemsPrefix(bytes: number, expectedSha: string): boolean {
+    if (bytes === 0) return true;
+    if (!fs.existsSync(this.itemsPath)) return false;
+    const buf = fs.readFileSync(this.itemsPath);
+    if (buf.length < bytes) return false;
+    return createHash("sha256").update(buf.subarray(0, bytes)).digest("hex") === expectedSha;
+  }
+
+  /** Eski items'ı arşivler (silmez) — bilinçli rebuild öncesi. Dosya adı NEDENİ taşır. */
+  archiveItems(reason: string, tag: string) {
+    if (fs.existsSync(this.itemsPath)) fs.renameSync(this.itemsPath, path.join(this.dir, `items.${slug(reason)}.${tag}.jsonl.bak`));
   }
 
   acquireLock(ttlMs: number): boolean {

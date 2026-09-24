@@ -67,6 +67,9 @@ export interface ArtifactManifest {
   processedItemCount: number;
   lastProcessedItem: string | null;
   aggregateState: unknown;
+  /** items.jsonl bütünlüğü: son persist anındaki bayt sayısı + o baytların sha256'sı. Yoksa (eski manifest) doğrulama atlanır, sonraki persist'te yazılır. */
+  itemsBytes?: number;
+  itemsSha256?: string;
   failedItems: Record<string, FailedItemInfo>;
   rebuildHistory: { at: string; reason: InvalidationReason; changed: string[] }[];
   createdAt: string;
