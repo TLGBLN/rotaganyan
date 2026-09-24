@@ -130,12 +130,42 @@ export interface ModelOpsRacePayload {
   coverageRef?: string;
 }
 
+/** Kaynağın yarış durumu beyanı. CANCELLED/VOID YALNIZ kaynak AÇIKÇA bildirirse terminal dışlamaya yol açar; UNKNOWN/gecikme asla iptal sayılmaz. */
+export type RaceStatus = "SCHEDULED" | "STARTED" | "COMPLETED" | "CANCELLED" | "VOID" | "UNKNOWN";
+export const RACE_STATUSES: readonly RaceStatus[] = ["SCHEDULED", "STARTED", "COMPLETED", "CANCELLED", "VOID", "UNKNOWN"];
+
+/**
+ * Adaptör sözleşmesi: listRaces() TÜM yarışlar için (sonuçsuz olanlar dahil) bunu verir. Zorunlu alanlar eksik/geçersizse yarış SESSİZCE atlanmaz:
+ * ADAPTER_CONTRACT_VIOLATION olarak raporlanır ve snapshot INCOMPLETE olur (Model Ops durur; production V5.46 etkilenmez).
+ * `resultFingerprint` sonucu olan yarışlarda dolu (sonuç ayrı kaynaktan gelebilir); düzeltme = fingerprint değişimi.
+ */
+export interface RaceDescriptor {
+  raceId: string;
+  raceStartAt: Date;
+  cohortType: CohortType;
+  raceStatus: RaceStatus;
+  resultFingerprint?: string;
+}
+
+export interface ContractViolation {
+  raceId: string; // eksikse "(raceId yok)"
+  problems: string[];
+}
+
+/** Saf: descriptor sözleşmeye uyuyor mu. Uymuyorsa neden(ler)i döner. Artifact cohort'undan farklı cohortType da ihlaldir (LIVE≠REPLAY). */
+export function validateRaceDescriptor(d: Partial<RaceDescriptor> | null | undefined, artifactCohort: CohortType): string[] {
+  const p: string[] = [];
+  if (!d || typeof d !== "object") return ["descriptor yok"];
+  if (typeof d.raceId !== "string" || d.raceId.length === 0) p.push("raceId eksik");
+  if (!(d.raceStartAt instanceof Date) || !Number.isFinite(d.raceStartAt.getTime())) p.push("raceStartAt eksik/geçersiz (geçerli Date zorunlu)");
+  if (d.cohortType !== "LIVE" && d.cohortType !== "REPLAY") p.push("cohortType eksik/geçersiz");
+  else if (d.cohortType !== artifactCohort) p.push(`cohortType=${d.cohortType} ama artifact cohort'u ${artifactCohort} (LIVE ve REPLAY karışamaz)`);
+  if (!RACE_STATUSES.includes(d.raceStatus as RaceStatus)) p.push("raceStatus eksik/geçersiz");
+  return p;
+}
+
 export interface ModelOpsRaceSource {
-  /**
-   * Sonucu OLAN yarışlar `resultFingerprint` taşır; sonucu olmayanlarda undefined (→ PENDING_RESULT). Düzeltme = fingerprint değişimi.
-   * `raceStartAt` TÜM yarışlar için verilmelidir (sonucu olmayanlar dahil): snapshot watermark'ı çözülmemiş en erken yarışa göre belirlenir.
-   */
-  listRaces(): Promise<{ raceId: string; resultFingerprint?: string; raceStartAt?: string }[]>;
+  listRaces(): Promise<RaceDescriptor[]>;
   loadRace(raceId: string): Promise<ModelOpsRacePayload | typeof PENDING>;
 }
 
@@ -168,20 +198,22 @@ export interface RaceEvaluationRecord {
 }
 
 /**
- * LIVE'a alınmayan yarış: TERMİNAL (yeniden denenmez), hata DEĞİL, aggregate'e girmez, açıklanabilir şekilde saklanır.
- * PRE_COHORT: tahmin cohortStartAt'tan önce üretilmiş. POST_START: tahmin yarış başladıktan sonra üretilmiş (leakage riski).
+ * Performans istatistiğine girmeyen yarış: TERMİNAL (yeniden denenmez, PENDING kalmaz, watermark'ı tutmaz), hata DEĞİL, aggregate'e girmez,
+ * nedeni saklanır. PRE_COHORT: tahmin cohortStartAt'tan önce üretilmiş. POST_START: tahmin yarış başladıktan sonra üretilmiş (leakage riski).
+ * CANCELLED / VOID: YALNIZ kaynak raceStatus ile AÇIKÇA bildirirse (zaman aşımından ASLA tahmin edilmez).
  */
-export type ExclusionStatus = "EXCLUDED_PRE_COHORT" | "EXCLUDED_POST_START";
+export type ExclusionStatus = "EXCLUDED_PRE_COHORT" | "EXCLUDED_POST_START" | "EXCLUDED_CANCELLED" | "EXCLUDED_VOID";
 export interface RaceExclusionRecord {
   status: ExclusionStatus;
   raceId: string;
-  predictionId: string;
-  resultFingerprint: string;
+  predictionId?: string; // CANCELLED/VOID'de tahmin yüklenmez
+  resultFingerprint?: string;
   identityKey: string;
   cohortType: CohortType;
-  predictionCreatedAt: string;
+  predictionCreatedAt?: string;
   raceStartAt: string;
   cohortStartAt: string;
+  sourceRaceStatus?: RaceStatus; // CANCELLED/VOID: kaynağın beyan ettiği durum
   reason: string;
   evaluatedAt: string;
 }
@@ -342,20 +374,40 @@ export interface RaceEvaluationsResult {
   evaluations: Map<string, RaceEvaluationRecord>;
   /** LIVE'a alınmayan yarışlar (terminal, hata değil, aggregate dışı). */
   exclusions: Map<string, RaceExclusionRecord>;
-  /** Sonucu henüz gelmemiş yarışlar (bu çalıştırmada). Hata DEĞİL. */
+  /** Sonucu henüz gelmemiş yarışlar (bu çalıştırmada; PENDING_RESULT ve PENDING_STALE dahil). Hata DEĞİL. */
   pendingRaceIds: string[];
-  /** Kaynağın listelediği TÜM yarışlar (watermark için): raceStartAt bilinmiyorsa null. */
-  listedRaces: { raceId: string; raceStartAt: string | null }[];
+  /**
+   * PENDING_STALE: sonuç beklenen süreyi (pendingStaleAfterMs) aştı ama kaynak iptal/void BİLDİRMEDİ. Kalıcı durum DEĞİL, gözlem etiketi:
+   * sonuç sonra gelirse yarış EVALUATED olur. Hata da iptal de değildir; aggregate'e girmez, watermark'ı tutar, görünür WARNING'dir.
+   */
+  pendingStaleRaceIds: string[];
+  /** Sözleşmeye uymayan descriptor'lar (işlenmedi, sessizce atlanmadı). Boş değilse snapshot INCOMPLETE olur. */
+  contractViolations: ContractViolation[];
+  /** Sözleşmeye uyan TÜM yarışlar (watermark için). */
+  listedRaces: { raceId: string; raceStartAt: string; raceStatus: RaceStatus }[];
   job: JobResult<RaceOutcomeRecord, ModelOpsAggregate>;
 }
 
-export async function runRaceEvaluations(opts: { identity: ModelOpsIdentity; source: ModelOpsRaceSource; now?: () => string } & PassThrough): Promise<RaceEvaluationsResult> {
-  const { identity, source, now = () => new Date().toISOString(), ...rest } = opts;
+export const DEFAULT_PENDING_STALE_AFTER_MS = 24 * 3_600_000;
+
+/** Registry item parmak izi: sonuç düzeltmesi VEYA açık iptal/void durum geçişi item'ı yeniden işletir. */
+function itemFingerprint(d: RaceDescriptor): string | undefined {
+  if (d.raceStatus === "CANCELLED" || d.raceStatus === "VOID") return `status:${d.raceStatus}`; // kaynağın AÇIK beyanı sonuçtan önceliklidir
+  return d.resultFingerprint;
+}
+
+export async function runRaceEvaluations(
+  opts: { identity: ModelOpsIdentity; source: ModelOpsRaceSource; now?: () => string; asOf?: string; pendingStaleAfterMs?: number } & PassThrough
+): Promise<RaceEvaluationsResult> {
+  const { identity, source, now = () => new Date().toISOString(), asOf, pendingStaleAfterMs = DEFAULT_PENDING_STALE_AFTER_MS, ...rest } = opts;
   const model = normalizeModelIdentity(identity.model);
   const identityKey = modelIdentityKey(model);
   const artifact = modelOpsArtifactIdentity({ model, evaluationMethodVersion: identity.evaluationMethodVersion });
   const spec = modelOpsAggregateSpec(model.cohortType);
-  const listedRaces: { raceId: string; raceStartAt: string | null }[] = [];
+  const listedRaces: { raceId: string; raceStartAt: string; raceStatus: RaceStatus }[] = [];
+  const contractViolations: ContractViolation[] = [];
+  const descriptors = new Map<string, RaceDescriptor>();
+  const log = opts.log ?? ((l: string) => console.log(l));
 
   const job = await runIncrementalJob<RaceOutcomeRecord, ModelOpsAggregate>({
     ...rest,
@@ -364,11 +416,29 @@ export async function runRaceEvaluations(opts: { identity: ModelOpsIdentity; sou
     aggregate: spec,
     listItems: async () => {
       const list = await source.listRaces();
-      listedRaces.length = 0;
-      for (const r of list) listedRaces.push({ raceId: r.raceId, raceStartAt: r.raceStartAt ? canonicalIso(r.raceStartAt, `listRaces.raceStartAt(${r.raceId})`) : null });
-      return list.map((r) => ({ id: r.raceId, fingerprint: r.resultFingerprint }));
+      listedRaces.length = 0; contractViolations.length = 0; descriptors.clear();
+      for (const d of list) {
+        const problems = validateRaceDescriptor(d, model.cohortType);
+        if (problems.length > 0) { contractViolations.push({ raceId: d?.raceId || "(raceId yok)", problems }); continue; } // sessizce atlanmaz: raporlanır
+        if (descriptors.has(d.raceId)) { contractViolations.push({ raceId: d.raceId, problems: ["raceId tekrarlı"] }); continue; }
+        descriptors.set(d.raceId, d);
+        listedRaces.push({ raceId: d.raceId, raceStartAt: d.raceStartAt.toISOString(), raceStatus: d.raceStatus });
+      }
+      if (contractViolations.length > 0) {
+        log(`[model-ops] ⚠ ADAPTER_CONTRACT_VIOLATION — ${contractViolations.length} yarış: ${contractViolations.slice(0, 5).map((v) => `${v.raceId} (${v.problems.join("; ")})`).join(" | ")}. Snapshot INCOMPLETE kalır; production etkilenmez.`);
+      }
+      return [...descriptors.values()].map((d) => ({ id: d.raceId, fingerprint: itemFingerprint(d) }));
     },
     processItem: async (item) => {
+      const desc = descriptors.get(item.id)!;
+      // Açık kaynak beyanı: CANCELLED/VOID → terminal dışlama (tahmin/sonuç yüklenmez). Gecikme/UNKNOWN ASLA buraya girmez.
+      if (desc.raceStatus === "CANCELLED" || desc.raceStatus === "VOID") {
+        return {
+          status: desc.raceStatus === "CANCELLED" ? "EXCLUDED_CANCELLED" : "EXCLUDED_VOID", raceId: item.id, identityKey, cohortType: model.cohortType,
+          raceStartAt: desc.raceStartAt.toISOString(), cohortStartAt: model.cohortStartAt, sourceRaceStatus: desc.raceStatus,
+          reason: `kaynak yarışı açıkça ${desc.raceStatus} olarak bildirdi`, evaluatedAt: now(),
+        } satisfies RaceExclusionRecord;
+      }
       if (item.fingerprint === undefined) return PENDING; // listede sonuç yok → PENDING_RESULT (yükleme bile yapılmaz)
       const race = await source.loadRace(item.id);
       if (race === PENDING || race.winnerNos.length === 0) return PENDING;
@@ -395,9 +465,15 @@ export async function runRaceEvaluations(opts: { identity: ModelOpsIdentity; sou
     if (!v.result) continue;
     if (v.result.status === "EVALUATED") evaluations.set(id, v.result); else exclusions.set(id, v.result);
   }
+  // PENDING_STALE: yalnız GÖZLEM. Bu çalıştırmada PENDING dönen, iptal/void bildirilmemiş ve başlangıcından beri SLA'yı aşmış yarışlar.
+  const asOfMs = Date.parse(asOf ?? new Date().toISOString());
+  const pendingStaleRaceIds = job.pendingItems.filter((id) => {
+    const d = descriptors.get(id);
+    return d !== undefined && asOfMs - d.raceStartAt.getTime() > pendingStaleAfterMs;
+  });
   return {
     identityKey, artifactDir: artifactDir(opts.root ?? defaultRoot(), artifact), aggregate, windows: modelOpsWindows(aggregate),
-    evaluations, exclusions, pendingRaceIds: job.pendingItems, listedRaces: [...listedRaces], job,
+    evaluations, exclusions, pendingRaceIds: job.pendingItems, pendingStaleRaceIds, contractViolations: [...contractViolations], listedRaces: [...listedRaces], job,
   };
 }
 
@@ -441,4 +517,17 @@ export type RaceLifecycleState = "PENDING_RESULT" | "EVALUATED" | ExclusionStatu
 export function raceLifecycle(raceId: string, history: Map<string, EvaluationVersion[]>): { state: RaceLifecycleState; versions: EvaluationVersion[] } {
   const versions = history.get(raceId) ?? [];
   return { state: versions.length === 0 ? "PENDING_RESULT" : (versions[versions.length - 1].record.status as RaceLifecycleState), versions };
+}
+
+export type ObservedRaceState = "SCHEDULED" | "PENDING_RESULT" | "PENDING_STALE" | "EVALUATED" | ExclusionStatus;
+/**
+ * Saf gözlem: SCHEDULED → PENDING_RESULT → {EVALUATED | EXCLUDED_CANCELLED | EXCLUDED_VOID | PENDING_STALE}. Kayıt varsa onun durumu; yoksa zamana göre.
+ * PENDING_STALE kalıcı değildir (sonuç gelince EVALUATED olur) ve ASLA iptale dönüşmez.
+ */
+export function observeRaceState(d: RaceDescriptor, record: RaceOutcomeRecord | undefined, asOf: string, staleAfterMs = DEFAULT_PENDING_STALE_AFTER_MS): ObservedRaceState {
+  if (record) return record.status;
+  const asOfMs = Date.parse(asOf);
+  const startMs = d.raceStartAt.getTime();
+  if (d.raceStatus === "SCHEDULED" && startMs > asOfMs) return "SCHEDULED";
+  return asOfMs - startMs > staleAfterMs ? "PENDING_STALE" : "PENDING_RESULT";
 }
