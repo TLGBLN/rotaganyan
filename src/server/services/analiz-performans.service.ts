@@ -69,7 +69,10 @@ export type AnalizPerformansOzeti = {
   istatistik?: { zTop1: number; zKupon: number };
 };
 
-type SonucSatiri = {
+// 2026-09-24 — Model Health sensörü (Sistem Anatomisi) ALL-LIVE/RECENT-100/RECENT-300
+// pencerelerini AYNI formülle hesaplamak için bunu reuse ediyor — LogLoss/top1/top3
+// matematiği İKİ yerde ayrı ayrı bakım gerektirmesin diye export edildi.
+export type SonucSatiri = {
   hitTop1: boolean;
   hitInCoupon: boolean;
   winnerNos: number[];
@@ -87,7 +90,7 @@ function raceLogLoss(s: SonucSatiri): number | null {
   return -Math.log(kirpilmis);
 }
 
-function pencereOzeti(sonuclar: SonucSatiri[]): PerformansPenceresi {
+export function pencereOzeti(sonuclar: SonucSatiri[]): PerformansPenceresi {
   const n = sonuclar.length;
   const hitTop1 = sonuclar.filter((s) => s.hitTop1).length;
   const hitInCoupon = sonuclar.filter((s) => s.hitInCoupon).length;

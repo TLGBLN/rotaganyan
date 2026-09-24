@@ -7,6 +7,9 @@ import { CRON_DECLARED, CRON_REGISTERED_SNAPSHOT } from "@/lib/system-anatomy/cr
 import { SYSTEM_ANATOMY_NODES } from "@/lib/system-anatomy/registry";
 import type { AgfSyncResult } from "@/server/services/agf-sync";
 import type { IngestCityResult } from "@/server/services/ingest/tjk-info.adapter";
+import { pencereOzeti, type SonucSatiri } from "@/server/services/analiz-performans.service";
+import { ENGINE_VERSIONS } from "@/lib/methodology/engine-versions.data";
+import { evaluateChallengerRuns } from "@/server/services/challenger-evaluation.service";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -1123,6 +1126,230 @@ async function predictionHealth(): Promise<ModuleResult> {
   }
 }
 
+// 2026-09-24 — Model Health sensörü (kullanıcı spesifikasyonu). Model Health BAŞKA
+// modüllerin ürettiği veriyi izleyen/özetleyen bir TERMİNAL gözlem organı — kendisi veri
+// üretmiyor. `dependencies:["results","forward-coverage"]` (registry.ts) zaten GERÇEK veri
+// bağımlılığını propagateDependencies() ile taşıyor (Results/Forward Coverage kırmızıysa
+// Model Health'in KENDİ selfStatus'u yeşil kalır, overall "warning/DEGRADED" olur — "kalp
+// çalışıyor ama kan gelmiyorsa sorun kalpte değil" ilkesi, bu fonksiyonda AYRICA hiçbir şey
+// yapmaya gerek YOK, propagation zaten hallediyor).
+//
+// KRİTİK ayrım — OPERATIONAL/MATHEMATICAL HEALTH (bu fonksiyonun status'unu belirler) vs
+// STATISTICAL PERFORMANCE HEALTH (yalnız BİLGİ, asla renk üretmez): kısa vadede birkaç kötü
+// sonuç görüp kutuyu kırmızı yapmak KESİNLİKLE YAPILMAZ. Kırmızı yalnız gerçek matematiksel/
+// operasyonel bozuklukta gelir: olasılık toplamı geçersiz, duplicate rank, sonuçlanmış
+// yarışta prediction yok, runner/pick uyuşmazlığı, hiç değerlendirilebilir kohort yok.
+// Recent-100 Top1 %26 çıkması KIRMIZI YAPMAZ — örneklem/segment/LL birlikte
+// değerlendirilmeden performans yargısı verilmez (kullanıcı talimatı, istatistiksel
+// baseline yeni mimaride HENÜZ BİRİKMEDİ).
+//
+// ALL-LIVE/RECENT-100/RECENT-300 pencere semantiği Model Operations v1'in gelecekteki
+// tasarımıyla ŞİMDİDEN tutarlı (kullanıcı: "ileride yeniden yazmamak için"). LogLoss/top1/
+// top3 formülü analiz-performans.service.ts'teki (zaten canlı /admin panelinde kullanılan)
+// `pencereOzeti`'nin AYNISI — iki ayrı yerde farklı matematik BAKIMI riski yok.
+//
+// Maliyet: panel 15sn'de bir poll ediyor, bu sensör potansiyel yüzlerce Result+Pick satırı
+// okuyor — 120sn'lik in-memory cache (siteApiHealth'teki AYNI desen) ile sınırlanıyor.
+// "Panel = gözlemci, araştırma motoru değil" — bootstrap/ablation/PSI gibi ağır hesap YOK.
+const MODEL_HEALTH_CACHE_MS = 120_000;
+// DÜZELTME (gerçek veriyle yakalandı, deploy öncesi): ENGINE_VERSIONS'ta "V5.46" versiyon
+// adı BİRDEN FAZLA kez geçiyor (V5.47'ye kısa süreliğine geçilip AYNI GÜN geri dönüldü) —
+// `.find()` İLK (eski, artık `bitis` dolu) V5.46 girdisini yakalayıp ALL-LIVE kohortunu
+// yanlışlıkla ~1 hafta genişletiyordu. `bitis === null` = ŞU AN aktif olan rejim, doğru sınır.
+const V546_START =
+  ENGINE_VERSIONS.find((v) => v.versiyon === "V5.46" && v.bitis === null)?.baslangic ?? new Date("2026-09-19T00:15:00+03:00");
+const C1_CHALLENGER_KEY = "v546-c1-low-hiz-off";
+const C1_GATES = [20, 50, 100, 150] as const;
+
+/** Kullanıcının tanımladığı forward-gate bantları — YALNIZ bilgi/ilerleme etiketi, asla
+ * PASS/FAIL kararı değil (karar research gate'inden, kullanıcıdan geçer). */
+function c1GateLabel(resulted: number): string {
+  if (resulted < 20) return "COLLECTING";
+  if (resulted < 50) return "EARLY_CHECK_AVAILABLE";
+  if (resulted < 100) return "FIRST_FORWARD_REVIEW";
+  if (resulted < 150) return "STRONGER_REVIEW";
+  return "PRODUCTION_DECISION_REVIEW";
+}
+
+function c1GateProgress(resulted: number, nextGate: number | null): string {
+  return nextGate == null ? `${resulted}/150+ — tüm gate'ler geçildi` : `${resulted}/${nextGate}`;
+}
+
+function fmtPct(x: number): string {
+  return `%${(x * 100).toFixed(1)}`;
+}
+
+function fmtWindow(w: ReturnType<typeof pencereOzeti> | null, label: string): string {
+  if (!w || w.n === 0) return `${label}: veri yok`;
+  return `${label}: n=${w.n}, Top1=${fmtPct(w.hitTop1Orani / 100)}, Top3=${fmtPct(w.hitInCouponOrani / 100)}, LL=${w.logLoss ?? "N/A"} (kapsam ${w.logLossKapsam})`;
+}
+
+let modelHealthCache: { data: ModuleResult; expiresAt: number } | null = null;
+
+async function computeModelHealth(): Promise<ModuleResult> {
+  const rows = await db.result.findMany({
+    where: { race: { prediction: { published: true }, conditions: null }, enteredAt: { gte: V546_START } },
+    select: {
+      enteredAt: true,
+      hitTop1: true,
+      hitInCoupon: true,
+      winnerNos: true,
+      race: {
+        select: {
+          raceNo: true,
+          raceDay: { select: { hippodrome: { select: { name: true } } } },
+          prediction: { select: { picks: { select: { rank: true, scoreExact: true, runner: { select: { no: true, scratched: true } } } } } },
+        },
+      },
+    },
+    orderBy: { enteredAt: "desc" },
+    take: 1000, // savunmacı üst sınır — şu an ~199 satır, aylar/yıllar sonrası için
+  });
+
+  // ── Availability ──────────────────────────────────────────────────────────
+  const allLive = pencereOzeti(rows as unknown as SonucSatiri[]);
+  const recent100 = rows.length > 0 ? pencereOzeti(rows.slice(0, 100) as unknown as SonucSatiri[]) : null;
+  const recent300 = rows.length >= 300 ? pencereOzeti(rows.slice(0, 300) as unknown as SonucSatiri[]) : null;
+
+  // ── Freshness — yalnız bilgi (Result Sync sensörü zaten kendi alarmını üretiyor,
+  // burada TEKRAR alarm üretmiyoruz, mükerrer sinyal olmasın). ──
+  const lastEvaluatedAgeMin = rows.length > 0 ? ageMinutes(rows[0]!.enteredAt) : null;
+  const lastEvaluatedLabel = rows.length > 0 ? `${rows[0]!.race.raceDay.hippodrome.name} K${rows[0]!.race.raceNo}` : "-";
+
+  // ── Completeness — sonuçlanmış ama YAYINLANMIŞ tahmini olmayan yarış var mı ──
+  const missingPredictionCount = await db.race.count({
+    where: {
+      conditions: null,
+      result: { enteredAt: { gte: V546_START } },
+      OR: [{ prediction: null }, { prediction: { published: false } }],
+    },
+  });
+
+  // ── Correctness — SAKLANMIŞ pick verisinin matematiksel geçerliliği ──
+  let invalidProbSum = 0;
+  let duplicateRank = 0;
+  let nanOrNegative = 0;
+  let runnerPickMismatch = 0;
+  let scratchedInTop3 = 0;
+  for (const r of rows) {
+    const picks = r.race.prediction?.picks ?? [];
+    if (picks.length === 0) {
+      runnerPickMismatch++;
+      continue;
+    }
+    if (picks.some((p) => p.runner == null)) runnerPickMismatch++;
+    const ranks = picks.map((p) => p.rank);
+    if (new Set(ranks).size !== ranks.length) duplicateRank++;
+    const scores = picks.map((p) => p.scoreExact).filter((s): s is number => s != null);
+    if (scores.some((s) => !Number.isFinite(s) || s < 0)) nanOrNegative++;
+    if (scores.length === picks.length) {
+      const sum = scores.reduce((a, b) => a + b, 0);
+      if (sum < 90 || sum > 110) invalidProbSum++;
+    }
+    if (picks.some((p) => p.rank <= 3 && p.runner?.scratched)) scratchedInTop3++;
+  }
+  // DÜZELTME (gerçek veriyle yakalandı, deploy öncesi): "top-3'te çekilmiş at" gerçek bir
+  // vaka olarak bulundu (İstanbul K6, Ankara K7) ama bu bir MATEMATİK/pipeline bozukluğu
+  // DEĞİL — tahmin YAYINLANDIKTAN SONRA at çekildi (geç scratch), yayın anındaki prediction
+  // o an geçerliydi. Kısa vadeli/doğal bir veri yaşam döngüsü olayını "kırmızı" yapmak tam
+  // olarak kullanıcının uyardığı hata olurdu — bu yüzden yalnız BİLGİ metriği, correctness
+  // toplamına girmiyor (sonuçlanmış yarışta GERÇEKTEN çekilmiş bir atın kazanan sayılması
+  // zaten ayrı ve doğru yerde — Result Sync sensörünün scratchedButPlaced kontrolü).
+  const correctnessIssues = invalidProbSum + duplicateRank + nanOrNegative + runnerPickMismatch;
+
+  // ── Self status — YALNIZ operasyonel/matematiksel bozukluk, performans DEĞİL ──
+  let status: Status = "healthy";
+  if (allLive.n === 0) status = "critical";
+  else if (missingPredictionCount > 0 || correctnessIssues > 0) status = "critical";
+
+  // ── C1 LOW-HIZ-OFF shadow — YALNIZ bilgi, panel karar VERMEZ (research gate kullanıcıda) ──
+  let c1Section: { eligible: number; resulted: number; championDiffers: number; nextGate: number | null; gateLabel: string } | null = null;
+  try {
+    const [c1Runs, evalRapor] = await Promise.all([
+      db.challengerRun.findMany({ where: { challengerKey: C1_CHALLENGER_KEY }, select: { championSnapshot: true, challengerOutput: true } }),
+      evaluateChallengerRuns(),
+    ]);
+    type RunOzet = { no: number; olasilik: number }[];
+    const differs = c1Runs.filter((r) => {
+      if (!Array.isArray(r.championSnapshot) || !Array.isArray(r.challengerOutput)) return false;
+      const champ = (r.championSnapshot as unknown as RunOzet).slice().sort((a, b) => b.olasilik - a.olasilik)[0]?.no;
+      const chal = (r.challengerOutput as unknown as RunOzet).slice().sort((a, b) => b.olasilik - a.olasilik)[0]?.no;
+      return champ !== chal;
+    }).length;
+    const resulted = evalRapor[C1_CHALLENGER_KEY]?.n ?? 0;
+    const nextGate = C1_GATES.find((g) => resulted < g) ?? null;
+    c1Section = {
+      eligible: c1Runs.length,
+      resulted,
+      championDiffers: differs,
+      nextGate,
+      gateLabel: c1GateLabel(resulted),
+    };
+  } catch {
+    c1Section = null; // C1 bölümü opsiyonel bilgi — hatası Model Health'in genel status'unu ETKİLEMEZ
+  }
+
+  return {
+    id: "model-health",
+    title: "MODEL SAĞLIĞI",
+    status,
+    description: "Terminal gözlem organı — Operational/Mathematical Health (renk üretir) + Statistical Performance (yalnız bilgi)",
+    metrics: [
+      { label: "Champion", value: "V5.46" },
+      { label: "ALL-LIVE", value: fmtWindow(allLive, "ALL-LIVE") },
+      { label: "RECENT-100", value: fmtWindow(recent100, "RECENT-100") },
+      { label: "RECENT-300", value: recent300 ? fmtWindow(recent300, "RECENT-300") : `N YETERSİZ (henüz ${allLive.n}/300)` },
+      { label: "Son değerlendirilen", value: lastEvaluatedAgeMin == null ? "hiç" : `${lastEvaluatedLabel} (${lastEvaluatedAgeMin.toFixed(0)} dk önce)` },
+      { label: "Prediction'sız sonuçlanmış yarış", value: missingPredictionCount },
+      { label: "Invalid probability sum", value: invalidProbSum },
+      { label: "Duplicate rank", value: duplicateRank },
+      { label: "NaN/negatif olasılık", value: nanOrNegative },
+      { label: "Runner/pick uyuşmazlığı", value: runnerPickMismatch },
+      { label: "Çekilmiş at ilk-3'te (bilgi — geç scratch, alarm değil)", value: scratchedInTop3 },
+      ...(c1Section
+        ? [
+            { label: "C1 eligible (Düşük-Şart)", value: c1Section.eligible },
+            { label: "C1 sonuçlanan karşılaştırma", value: c1Section.resulted },
+            { label: "C1 Champion≠Challenger", value: c1Section.championDiffers },
+            { label: "C1 gate", value: `${c1GateProgress(c1Section.resulted, c1Section.nextGate)} — ${c1Section.gateLabel}` },
+          ]
+        : [{ label: "C1 shadow", value: "ölçülemedi" }]),
+    ],
+    checks: [
+      { id: "mh-availability", label: "Değerlendirilebilir prediction+result kohortu var", ok: allLive.n > 0, detail: `ALL-LIVE n=${allLive.n} (V5.46 başlangıcından, ${V546_START.toISOString().slice(0, 10)})` },
+      { id: "mh-freshness", label: "Son değerlendirilen yarış (bilgi — alarm Result Sync'te)", ok: null, detail: lastEvaluatedAgeMin == null ? "hiç değerlendirilmiş yarış yok" : `${lastEvaluatedLabel}, ${lastEvaluatedAgeMin.toFixed(0)} dk önce` },
+      { id: "mh-completeness", label: "Sonuçlanmış her yarışın yayınlanmış tahmini var", ok: missingPredictionCount === 0, detail: `${missingPredictionCount} yarışta sonuç var ama yayınlanmış tahmin yok` },
+      { id: "mh-correctness", label: "Prediction matematiği geçerli (sum/rank/NaN/runner)", ok: correctnessIssues === 0, detail: `sum=${invalidProbSum}, duplicate rank=${duplicateRank}, NaN/negatif=${nanOrNegative}, runner uyuşmazlığı=${runnerPickMismatch}` },
+      { id: "mh-late-scratch-info", label: "Geç scratch (bilgi — yayın sonrası çekilme, alarm değil)", ok: null, detail: `${scratchedInTop3} yayınlanmış tahminde ilk-3 pick sonradan çekildi` },
+      { id: "mh-performance-info", label: "Performans (renk üretmez — yalnız bilgi)", ok: null, detail: fmtWindow(recent100, "RECENT-100") },
+      ...(c1Section
+        ? [{ id: "mh-c1-shadow", label: "C1 LOW-HIZ-OFF shadow ilerlemesi (karar VERMEZ)", ok: null, detail: `${c1GateProgress(c1Section.resulted, c1Section.nextGate)} — ${c1Section.gateLabel}` }]
+        : []),
+    ],
+    lastCheckedAt: nowIso(),
+  };
+}
+
+async function modelHealthHealth(): Promise<ModuleResult> {
+  if (modelHealthCache && modelHealthCache.expiresAt > Date.now()) return modelHealthCache.data;
+  try {
+    const result = await computeModelHealth();
+    modelHealthCache = { data: result, expiresAt: Date.now() + MODEL_HEALTH_CACHE_MS };
+    return result;
+  } catch (error) {
+    return {
+      id: "model-health",
+      title: "MODEL SAĞLIĞI",
+      status: "unknown",
+      description: "Model Health ölçülemedi",
+      metrics: [],
+      checks: [],
+      errorMessage: error instanceof Error ? error.message : "Model health error",
+      lastCheckedAt: nowIso(),
+    };
+  }
+}
+
 // DÜZELTME (2026-09-23) — kullanıcının kendi ilkesiyle çelişiyordu: "sistem ölçemediği
 // bir şeyi yeşil göstermiyor" dendi ama orijinal `simpleHealthy()` ölçülmeyen 9 modülü
 // doğrudan "healthy" (yeşil) damgalıyordu. Artık "unknown" (gri, Bağlanmadı) — sahte
@@ -1236,6 +1463,7 @@ export async function GET() {
     resultSyncHealth(),
     siteApiHealth(),
     forwardCoverageHealth(),
+    modelHealthHealth(),
   ]);
 
   const modules: ModuleResult[] = [];
@@ -1247,7 +1475,6 @@ export async function GET() {
   modules.push(unmeasuredModule("data-source", "VERİ TOPLAMA", "TJK / program / yarış verileri"));
   modules.push(unmeasuredModule("coupon", "KUPON ÜRETİMİ", "Kupon oluşturma"));
   modules.push(unmeasuredModule("calibration", "KALİBRASYON", "Probability calibration"));
-  modules.push(unmeasuredModule("model-health", "MODEL SAĞLIĞI", "Model monitoring"));
 
   propagateDependencies(modules);
 
