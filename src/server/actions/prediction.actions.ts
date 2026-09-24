@@ -33,6 +33,13 @@ export type PickInput = {
   probTop3?: number;
   marketBlindProb1?: number;
   featureSnapshot?: Prisma.InputJsonValue;
+  // 2026-09-24 — CalibrationAuditSnapshot (bkz. proje hafızası calibration-audit-snapshot-spec):
+  // probTop2/probTop3/marketBlindProb1 ile BİREBİR AYNI round-trip deseni — test-v5-engine/route.ts'te
+  // canlı analiz anında hesaplanır, V5AnalysisPanel bunu AYNEN taşır. DB'den SONRADAN türetilmez
+  // (bkz. spec'teki Bulgu 3) — sunucu tarafında yazılmadan ÖNCE doğrulanır (rank/sum/triggerType tutarlılığı).
+  rawProbability?: number;
+  triggerType?: "NOT_TRIGGERED" | "GENERAL_TRIGGERED" | "HANDIKAP_TRIGGERED";
+  leaderRawProbability?: number;
 };
 
 type PredictionInput = {
@@ -421,6 +428,24 @@ export async function upsertPrediction(input: PredictionInput) {
   // Karma yarışlarına mirror'la (arka planda, hata login'i engellemesin) — nihai
   // published durumunu yansıtması için publish denemesinden SONRA çağrılıyor.
   syncKarmaMirrors(predictionId).catch(console.error);
+
+  // 2026-09-24 — CalibrationAuditSnapshot (bkz. proje hafızası calibration-audit-snapshot-spec):
+  // rawProbability/triggerType/leaderRawProbability zaten completedPicks içinde (client
+  // round-trip'inden) — DB'den YENİDEN TÜRETİLMEZ, ekstra hesap YOK. AMA gerçek tarayıcı
+  // E2E testinde (2026-09-24) düz fire-and-forget (.catch()) DENENDİ ve BAŞARISIZ ÇIKTI:
+  // Server Action response döndükten SONRA await edilmeyen promise'in TAMAMLANACAĞI
+  // Next.js/Vercel'de GARANTİ DEĞİL (tam olarak after()'ın var olma sebebi budur) —
+  // captureRaceCoverageTelemetry zaten bu yüzden after() kullanıyordu, biz de AYNI
+  // GÜVENİLİR deseni kullanmalıyız. Best-effort ilkesi DEĞİŞMEDİ (hata Prediction'ı asla
+  // etkilemez) — yalnız "ne zaman/nasıl çalıştığı" garantisi after()'a taşındı.
+  after(async () => {
+    try {
+      const { captureCalibrationAuditSnapshot } = await import("@/server/services/calibration-audit-snapshot.service");
+      await captureCalibrationAuditSnapshot(predictionId, input.raceId, completedPicks);
+    } catch (e) {
+      console.error("[upsertPrediction] captureCalibrationAuditSnapshot hata:", e);
+    }
+  });
 
   // Bu yarışın sonucu zaten varsa (ör. eski, sonuçlanmış bir tahmin sonradan düzeltildi),
   // hitTop1/hitInCoupon'u GÜNCEL picks'e göre yeniden hesapla — bkz. recomputeHitStatsForRace

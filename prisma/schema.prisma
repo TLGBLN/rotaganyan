@@ -599,6 +599,37 @@ model RaceCoverageTelemetry {
   @@index([raceId])
 }
 
+// 2026-09-24 — CalibrationAuditSnapshot (bkz. proje hafızası calibration-audit-snapshot-spec):
+// V5.46'nın canlı analiz anında GERÇEKTEN aldığı kalibrasyon kararını (raw/calibrated
+// olasılık + triggerType + o anki eşik/sıcaklık sabitleri) dondurur — v5-engine.ts DB'yi
+// hiç bilmez, bu satır upsertPrediction'da (predictionId oluştuktan hemen sonra,
+// RaceCoverageTelemetry ile AYNI best-effort ilkesiyle) yazılır. Audit write BAŞARISIZ
+// olursa Prediction ASLA etkilenmez. Yalnız CHAMPION production Prediction için yazılır —
+// shadow/challenger (C1 vb.) buraya KARIŞMAZ.
+model CalibrationAuditSnapshot {
+  id           String   @id @default(cuid())
+  raceId       String
+  predictionId String   @unique
+  engineVersion String
+  createdAt    DateTime @default(now())
+
+  // runnerNo VE tjkAtId anahtarlı — ForwardCoverage'daki runnersJson deseniyle tutarlı.
+  // [{runnerNo, tjkAtId, rawProbability, calibratedProbability}]
+  probabilitiesJson Json
+
+  triggerType          String // "NOT_TRIGGERED" | "GENERAL_TRIGGERED" | "HANDIKAP_TRIGGERED" — production kodunun kendi kararı
+  leaderRawProbability Float  // triggerType kararını üreten girdi
+
+  generalThreshold  Float // o ANDAKİ production sabiti (ASIRI_GUVEN_LIDER_ESIGI) — configVersion TEK BAŞINA yetersiz
+  handikapThreshold Float // ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP
+  temperature       Float // ASIRI_GUVEN_SICAKLIGI
+
+  configVersion String? // v5-engine.ts sürüm etiketi, varsa
+  gitCommit     String? // process.env.VERCEL_GIT_COMMIT_SHA — build-info route'unun kullandığı AYNI kaynak
+
+  @@index([raceId])
+}
+
 model Pick {
   id             String         @id @default(cuid())
   predictionId   String
