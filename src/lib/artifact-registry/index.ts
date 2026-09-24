@@ -4,3 +4,5 @@ export { FileArtifactStore, artifactDir, buildDependencies, dependencyHash, defa
 export { BootstrapSeries } from "./bootstrap-series";
 export type { BootstrapSeriesIdentity, BootstrapPlan, IterationRange, IterationState, OpenBootstrapSeriesOptions } from "./bootstrap-series";
 export * from "./challenger-evaluation";
+export * from "./model-ops-core";
+export * from "./model-ops-snapshot";
