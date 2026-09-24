@@ -47,9 +47,19 @@ export const CRON_REGISTERED_SNAPSHOT: Record<string, CronRegisteredSnapshot> = 
     note: "Path Vercel'e kayıtlı. `vercel crons ls` bazı saatleri 'modified' gösteriyor ama bu AYNI path'e birden fazla schedule eklendiğinde diff algoritmasının kafa karışıklığı (bilinen false-alarm deseni, bkz. proje hafızası) — ingest-program'da da aynı desen var, result-sync'teki (tek schedule, gerçek zaman farkı) ile KARIŞTIRILMAMALI.",
   },
   "ingest-program": {
-    status: "confirmed",
+    status: "modified",
     checkedAt: "2026-09-24",
-    note: "6 declared saatten 3'ü (05/08/11 UTC) Vercel'de birebir kayıtlı görünüyor, kalan 3'ü (13/15/17 UTC) 'modified' — bu da agf-sync'teki AYNI çok-schedule/tek-path diff false-alarm deseni, gerçek bir eksiklik değil.",
+    // DÜZELTME (2026-09-24, kullanıcı bulgusu — "hepsine yeşil olsun" isteği araştırılırken
+    // yakalandı): önceki not YANLIŞTI ("agf-sync'teki false-alarm deseniyle aynı" demişti).
+    // Tekrar kontrol edildi: `vercel crons ls`'in ÜST (gerçek "Registered") bölümünde
+    // agf-sync'in TÜM 4 saati birebir listeleniyor (diff uyarıları gerçekten gürültü), AMA
+    // ingest-program'ın ÜST bölümünde YALNIZ 3 saat var (05/08/11 UTC) — 13/15/17 hiçbir
+    // yerde "Registered" olarak GÖRÜNMÜYOR, yalnız alttaki "modified" diff'inde. Bu GERÇEK
+    // bir eksik kayıt — agf-sync'in false-alarm deseninden FARKLI. Sonuç: Program Sync
+    // fiilen günde 3 kez (05/08/11 UTC) çalışıyor, 11:00'den ertesi gün 05:00'e kadar
+    // ~18 saatlik GERÇEK bir tetiklenme boşluğu var. Bu, 2026-09-24 sabahı ProgramCronRunState
+    // hiç dolmamış olarak yakalandı (elle tetiklenene kadar) — canlı kanıt.
+    note: "GERÇEK kısmi kayıt: yalnız 3/6 saat (05/08/11 UTC) Vercel'in 'Registered' listesinde var, 13/15/17 hiç görünmüyor (agf-sync'teki diff false-alarm'ından FARKLI — orada tüm saatler Registered'da mevcut). Sonuç: 11:00-05:00 arası ~18 saatlik gerçek tetiklenme boşluğu. Henüz düzeltilmedi (piggyback safety-net eklenip eklenmeyeceği kullanıcı kararı bekliyor).",
   },
   "result-sync": {
     status: "modified",
