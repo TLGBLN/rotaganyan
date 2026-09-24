@@ -6,3 +6,4 @@ export type { BootstrapSeriesIdentity, BootstrapPlan, IterationRange, IterationS
 export * from "./challenger-evaluation";
 export * from "./model-ops-core";
 export * from "./model-ops-snapshot";
+export * from "./challenger-run-source";
