@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { after } from "next/server";
 import { db } from "@/lib/db";
-import { getProgramData, getKuponOnerileri, getHitPredictions, getGecmisKazananKuponlar, getJockeyStats, getTrainerStats, type JockeyStat, type TrainerStat } from "@/server/services/race.service";
+import { getProgramData, getKuponOnerileri, getHitPredictions, getGecmisKazananKuponlar, getJockeyStatsOnbellekli, getTrainerStatsOnbellekli, type JockeyStat, type TrainerStat } from "@/server/services/race.service";
 import { turkeyDateString } from "@/lib/tz";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { syncResultsForDate } from "@/server/services/result-sync";
@@ -201,8 +201,8 @@ export default async function ProgramPage({ searchParams }: PageProps) {
     days.flatMap((d) => d.races.flatMap((r) => r.runners.map((ru) => ru.trainer).filter((t): t is string => !!t)))
   )];
   const [jockeyStats, trainerStats] = await Promise.all([
-    getJockeyStats(allJockeys).catch(() => ({} as Record<string, JockeyStat>)),
-    getTrainerStats(allTrainers).catch(() => ({} as Record<string, TrainerStat>)),
+    getJockeyStatsOnbellekli(allJockeys).catch(() => ({} as Record<string, JockeyStat>)),
+    getTrainerStatsOnbellekli(allTrainers).catch(() => ({} as Record<string, TrainerStat>)),
   ]);
 
   // Üye olmayanlar için picks verisi client'a gönderilmez

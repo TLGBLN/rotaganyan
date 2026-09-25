@@ -1099,6 +1099,35 @@ function hipodromOncelikSirala<T extends { hippodrome: { slug: string; name: str
   });
 }
 
+// 2026-09-25 /program performansı (ÖLÇÜM: sayfa kabuğu 0.8sn'de geliyor ama içerik ~5sn sonra — kritik yol: ana JOIN ~3sn + [aygır/kısrak havuzları, geç-çıkış, galoplar] ~2.5-3.4sn,
+// ardından jokey/antrenör istatistikleri). Bu YAN girdiler yavaş değişen tarihsel istatistiklerdir (günlük sync) → "bir kez hesapla → ucuz oku": kısa Next veri önbelleği
+// (süre dolunca bayat değer anında servis edilir, arka planda yenilenir). ANA JOIN (tahmin/AGF/çekilme/sonuç) ÖNBELLEĞE ALINMAZ: her açılışta taze kalır.
+// unstable_cache JSON serileştirir: Map → [k,v][] ve Date → string dönüşümleri burada geri çevrilir; Next çalışma zamanı dışında (tsx araçları) doğrudan hesaplanır.
+function mapOnbellekli<A extends unknown[], K, V>(ad: string, fn: (...a: A) => Promise<Map<K, V>>, revalidate: number) {
+  const c = unstable_cache(async (...a: A) => [...(await fn(...a)).entries()], [ad], { revalidate });
+  return async (...a: A): Promise<Map<K, V>> => {
+    try { return new Map(await c(...a)); } catch { return fn(...a); }
+  };
+}
+const sireHavuzlariOnbellekli = mapOnbellekli("prog-sire-havuz-v1", getSireStatPoolsForCombos, 600);
+const damHavuzlariOnbellekli = mapOnbellekli("prog-dam-havuz-v1", getDamStatPoolsForCombos, 600);
+const gecCikisOnbellekli = mapOnbellekli("prog-gec-cikis-v1", getGecCikisOzetleriForRace, 600);
+
+type ProgramGalopSatiri = { runnerId: string; date: Date; track: string | null; form: string | null; jockey: string | null; splits: Prisma.JsonValue };
+const galoplarOnbellek = unstable_cache(
+  async (ids: string[]) =>
+    db.gallop.findMany({ where: { runnerId: { in: ids } }, orderBy: { date: "desc" }, select: { runnerId: true, date: true, track: true, form: true, jockey: true, splits: true } }),
+  ["prog-galoplar-v1"],
+  { revalidate: 300 }
+);
+async function galoplariGetir(ids: string[]): Promise<ProgramGalopSatiri[]> {
+  try {
+    return (await galoplarOnbellek(ids)).map((g) => ({ ...g, date: new Date(g.date) }));
+  } catch {
+    return db.gallop.findMany({ where: { runnerId: { in: ids } }, orderBy: { date: "desc" }, select: { runnerId: true, date: true, track: true, form: true, jockey: true, splits: true } });
+  }
+}
+
 export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
   const date = new Date(dateStr + "T00:00:00.000Z");
 
@@ -1193,14 +1222,10 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
 
   type GallopRow = { runnerId: string; date: Date; track: string | null; form: string | null; jockey: string | null; splits: Prisma.JsonValue };
   const [sirePools, damPools, gecCikisMap, allGallops] = await Promise.all([
-    getSireStatPoolsForCombos(combos).catch(() => new Map()),
-    getDamStatPoolsForCombos(combos).catch(() => new Map()),
-    getGecCikisOzetleriForRace(allHorseNames, date).catch(() => new Map()),
-    allRunnerIds.length === 0 ? Promise.resolve([] as GallopRow[]) : db.gallop.findMany({
-      where: { runnerId: { in: allRunnerIds } },
-      orderBy: { date: "desc" },
-      select: { runnerId: true, date: true, track: true, form: true, jockey: true, splits: true },
-    }).catch(() => [] as GallopRow[]),
+    sireHavuzlariOnbellekli(combos).catch(() => new Map()),
+    damHavuzlariOnbellekli(combos).catch(() => new Map()),
+    gecCikisOnbellekli(allHorseNames, date).catch(() => new Map()),
+    allRunnerIds.length === 0 ? Promise.resolve([] as GallopRow[]) : galoplariGetir(allRunnerIds).catch(() => [] as GallopRow[]),
   ]);
 
   // 2026-08-15 — kullanıcı talebi: "sadece 3 galop görmek istemiyorum, son yarış
@@ -1647,4 +1672,15 @@ export async function getAllJockeyStats(params: {
   return Object.entries(agg)
     .map(([jockey, s]) => ({ jockey, ...s, winPct: s.rides > 0 ? Math.round(s.wins / s.rides * 100) : 0 }))
     .sort((a, b) => b.winPct - a.winPct || b.rides - a.rides);
+}
+
+// 2026-09-25 — /program: jokey/antrenör yıllık istatistikleri günlük senkronla değişir (bkz. mapOnbellekli notu) → 10 dk'lık veri önbelleği. Orijinal fonksiyonlar DEĞİŞMEDİ.
+const jockeyStatsOnbellek = unstable_cache(async (names: string[]) => getJockeyStats(names), ["prog-jockey-stats-v1"], { revalidate: 600 });
+const trainerStatsOnbellek = unstable_cache(async (names: string[]) => getTrainerStats(names), ["prog-trainer-stats-v1"], { revalidate: 600 });
+
+export async function getJockeyStatsOnbellekli(names: string[]) {
+  try { return await jockeyStatsOnbellek(names); } catch { return getJockeyStats(names); }
+}
+export async function getTrainerStatsOnbellekli(names: string[]) {
+  try { return await trainerStatsOnbellek(names); } catch { return getTrainerStats(names); }
 }
