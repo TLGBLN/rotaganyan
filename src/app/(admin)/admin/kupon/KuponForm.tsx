@@ -101,6 +101,17 @@ function kumulatifToplam(sirali: RaceRunner[], n: number): number {
 // AYNI eküriden iki atı ELLE de işaretleyebilir — kombinasyon/tutar hesabı da (yalnız DP
 // değil) tutarlı olsun diye burada da aynı gruplama uygulanıyor: aynı ekuriGroup'tan
 // seçilen atlar TEK kombinasyon birimi sayılır.
+// 2026-09-25 kullanıcı bulgusu (Bursa 3. Koşu — GÜZEL HUYLUM/İHTİMAL/SIRTAŞI %5.1'lik
+// İHTİMAL'in DP tarafından %6.4'lük tekil GÜLEYCANOĞLU'na tercih edilmesi kafa karıştırdı):
+// optimizer eküri grubunu TOPLAM olasılıkla (bkz. kupon-optimizer.ts ekuriBirimleriOlustur)
+// değerlendiriyor ama ekranda yalnız bireysel yüzde görünüyordu — "%5.1 nasıl %6.4'ü geçti"
+// izlenimi veriyordu. Artık grup toplamı rozette açıkça gösteriliyor.
+function ekuriGrupToplami(sirali: RaceRunner[], ekuriGroup: number): number {
+  return sirali
+    .filter((r) => !r.scratched && r.ekuriGroup === ekuriGroup)
+    .reduce((s, r) => s + (r.scoreExact ?? r.score ?? 0), 0);
+}
+
 function secilenBirimSayisi(race: RaceDayData["races"][number], secilenNolar: Set<number>): number {
   const gruplar = new Set<number>();
   let tekilSayisi = 0;
@@ -242,9 +253,12 @@ function KuponGrup({
                                 {runner.scratched ? (
                                   <span className="ml-auto shrink-0 text-[10px] text-red-400 font-semibold">Koşmaz</span>
                                 ) : runner.ekuriGroup != null ? (
-                                  <span title={`Eküri grubu ${runner.ekuriGroup}`} className="ml-auto shrink-0 inline-flex items-center gap-0.5 text-[10px]">
+                                  <span
+                                    title={`Eküri grubu ${runner.ekuriGroup} — kombine olasılık %${ekuriGrupToplami(sirali, runner.ekuriGroup).toFixed(1)} (gruptaki HERHANGİ biri kazanırsa bilet tutar; optimizör bu grubu TOPLAM olasılıkla değerlendirir, tekil atlarla bu yüzden karşılaştırılamaz)`}
+                                    className="ml-auto shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold"
+                                  >
                                     <span className={cn("inline-block h-1.5 w-1.5 rounded-full", ekuriRengi(runner.ekuriGroup).badge)} />
-                                    🐴
+                                    🐴 %{ekuriGrupToplami(sirali, runner.ekuriGroup).toFixed(1)}
                                   </span>
                                 ) : null}
                               </button>
