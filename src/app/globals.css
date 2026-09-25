@@ -195,6 +195,17 @@ body {
    birlikte kullanılan font-semibold) CSS katman sırası gereği bunun üstüne
    yazabilsin diye; düz (katmansız) bir kural bunu FARKINDA OLMADAN ezerdi. */
 @layer base {
+  /* Mobil tarayıcıların (özellikle Android) dokunulan öğe etrafına çizdiği varsayılan turuncu/sarı
+     "tap highlight" parlaması kapatılır; dokunma geri bildirimini tasarımın kendi :active/:hover
+     durumları verir. touch-action: manipulation çift-dokunma zoom gecikmesini de kaldırır. */
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button, a, [role="button"], [role="tab"], summary, label {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading-rounded);
     font-weight: 700;
