@@ -421,9 +421,10 @@ export type KuponLeg = {
   // no'suna eşler (yalnız dolaylı/eküri yoluyla kazananlar için — gerçek kazananlar zaten
   // winnerNos'ta, burada tekrar yer almaz).
   ekuriWinnerByNo: Record<number, number>;
-  /** 2026-09-01 kullanıcı talebi — sonuç gelmeden ÖNCE de: seçili bir no'nun eküri ortağı
-   *  varsa (grup arkadaşı), sonuç bağımsız burada gösterilir (bkz. buildEkuriPartnerMap). */
-  ekuriPartnerByNo: Record<number, number>;
+  /** 2026-09-01 kullanıcı talebi — sonuç gelmeden ÖNCE de: seçili bir no'nun eküri ortak(lar)ı
+   *  varsa (grup arkadaşları, 2+ üyeli gruplarda TÜMÜ), sonuç bağımsız burada gösterilir
+   *  (bkz. buildEkuriPartnerMap). */
+  ekuriPartnerByNo: Record<number, number[]>;
 };
 export type KuponStatus = "hit" | "miss" | "pending";
 export type KuponVariant = {
@@ -473,10 +474,16 @@ export function stakeForHippodromeLabel(hippodromeName: string): number {
  * 2026-09-01 kullanıcı talebi: "kupon yayınlandığında eküri seçilmişse yanında eküri de
  * otomatik belirtilsin" — SONUÇ gelmeden ÖNCE bile, bir seçili no'nun eküri ortağı varsa
  * gösterilebilsin diye. buildEkuriWinnerMap'ten farkı: kazanan olup olmadığına bakmadan,
- * AYNI GRUPTAKİ HER atı karşılıklı eşler (grup 2+ üyeliyse ilk ortağı alır).
+ * AYNI GRUPTAKİ HER atı karşılıklı eşler.
+ *
+ * 2026-09-25 kullanıcı bulgusu (Bursa 3. Koşu — GÜZEL HUYLUM(5)/İHTİMAL(15)/SIRTAŞI(19)
+ * ÜÇLÜ eküri): eski kod `nos.find(n => n !== no)` ile yalnız İLK ortağı alıyordu — 3+
+ * üyeli bir grupta üçüncü (ve sonraki) üyeler SESSİZCE düşüyordu (15 seçilince ekranda
+ * yalnız "15-5" görünüyordu, 19 hiç görünmüyordu). Artık HER üyeye, grubun DİĞER TÜM
+ * üyelerinin listesi eşleniyor.
  */
-function buildEkuriPartnerMap(runners: { no: number; ekuriGroup: number | null }[]): Record<number, number> {
-  const map: Record<number, number> = {};
+function buildEkuriPartnerMap(runners: { no: number; ekuriGroup: number | null }[]): Record<number, number[]> {
+  const map: Record<number, number[]> = {};
   const byGroup = new Map<number, number[]>();
   for (const r of runners) {
     if (r.ekuriGroup == null || r.ekuriGroup < 1) continue;
@@ -487,7 +494,7 @@ function buildEkuriPartnerMap(runners: { no: number; ekuriGroup: number | null }
   for (const nos of byGroup.values()) {
     if (nos.length < 2) continue;
     for (const no of nos) {
-      map[no] = nos.find((n) => n !== no)!;
+      map[no] = nos.filter((n) => n !== no);
     }
   }
   return map;
