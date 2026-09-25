@@ -45,6 +45,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { currentBuildId, shortBuildId } from "@/lib/build-id";
+import { REPAIR_CLASS } from "@/lib/system-anatomy/auto-heal";
 import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
 import type { HealthStatus, SystemModuleHealth, OperationalDecision } from "@/lib/system-anatomy/types";
@@ -84,17 +85,29 @@ function ageMinutes(date?: Date | null) {
 
 async function databaseHealth(): Promise<ModuleResult> {
   try {
-    const started = Date.now();
-    await db.$queryRaw`SELECT 1`;
-    const duration = Date.now() - started;
+    // Tek ölçüm gürültülüdür (soğuk bağlantı/GC): 3 ardışık ölçümün MEDYANI. Latency rengi YALNIZ Vercel içinden ölçülünce anlamlıdır
+    // (yerel bilgisayar → uzak DB gecikmesi sistem sağlığı değildir): Vercel dışında bağlantı başarılıysa renk üretmez.
+    const samples: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      const started = Date.now();
+      await db.$queryRaw`SELECT 1`;
+      samples.push(Date.now() - started);
+    }
+    const sorted = [...samples].sort((a, b) => a - b);
+    const duration = sorted[1]!; // medyan
+    const onVercel = !!process.env.VERCEL;
 
     return {
       id: "database",
       title: "VERİ OMURGASI",
-      status: duration < 1000 ? "healthy" : "warning",
+      status: !onVercel ? "healthy" : duration < 1000 ? "healthy" : "warning",
       description: "Postgres / Prisma bağlantısı",
-      metrics: [{ label: "DB latency", value: duration, unit: "ms" }],
-      checks: [{ id: "connection", label: "Database bağlantısı", ok: true, detail: `${duration} ms` }],
+      metrics: [
+        { label: "DB latency (medyan/3)", value: duration, unit: "ms" },
+        { label: "DB latency (maks)", value: sorted[2]!, unit: "ms" },
+        { label: "Ölçüm yeri", value: onVercel ? "Vercel" : "Vercel DIŞI (renk üretmez)" },
+      ],
+      checks: [{ id: "connection", label: "Database bağlantısı", ok: true, detail: `medyan ${duration} ms (örnekler: ${samples.join("/")})${onVercel ? "" : " — Vercel dışı ölçüm, renk üretmez"}` }],
       lastCheckedAt: nowIso(),
     };
   } catch (error) {
@@ -678,9 +691,14 @@ async function resultSyncHealth(): Promise<ModuleResult> {
     const drift = evaluateCronDrift("result-sync", observedH);
 
     let status: Status = "healthy";
-    if (activeHours && availabilityOk === false) status = "critical";
-    if (status !== "critical" && oldestMissingResultAgeMin > RESULT_CRITICAL_MISSING_MS / 60_000) status = "critical";
-    if (status !== "critical" && (missing.length > 0 || correctnessIssues)) status = "warning";
+    // Kalıcı ihlal semantiği: geçici gecikme kırmızı DEĞİL. availability: 20dk aşımı SARI, 45dk (≈3 ardışık kaçırılmış */15 tetik) KIRMIZI.
+    // Eksik sonuç: kritik eşiğin (30dk) 2 katı (60dk) aşılınca KIRMIZI, arası SARI — result-sync bounded retry ile kendini tamamlar.
+    const attemptOverdueMin = attemptAgeMin ?? Infinity;
+    if (activeHours && attemptOverdueMin > 45) status = "critical";
+    else if (activeHours && availabilityOk === false) status = "warning";
+    if (status !== "critical" && oldestMissingResultAgeMin > (2 * RESULT_CRITICAL_MISSING_MS) / 60_000) status = "critical";
+    if (status !== "critical" && status !== "warning" && (missing.length > 0 || correctnessIssues)) status = "warning";
+    if (status === "healthy" && oldestMissingResultAgeMin > RESULT_CRITICAL_MISSING_MS / 60_000) status = "warning";
 
     return {
       id: "results",
@@ -752,6 +770,7 @@ async function resultSyncHealth(): Promise<ModuleResult> {
 // biriken veri olmadan KURULMADI — ilk 20-50 Şartlı yarışta yalnız veri hattı sağlığı
 // (writer çalışıyor mu / satır eksik mi / iç tutarlılık bozuk mu) alarm üretir.
 const FORWARD_COVERAGE_WINDOW_MS = 24 * 3_600_000;
+const FORWARD_COVERAGE_CURRENT_WINDOW_MS = 3 * 3_600_000; // CURRENT PIPELINE penceresi
 const FORWARD_COVERAGE_WRITER_SAMPLE = 30; // "son N tahminde çalıştı mı" örneklem büyüklüğü
 const FORWARD_COVERAGE_BACKFILL_LATENCY_MIN = 60; // telemetryCreatedAt-predictionCreatedAt bundan büyükse "forward" değil, backfill/yeniden-analiz gibi say
 
@@ -809,7 +828,7 @@ async function forwardCoverageHealth(): Promise<ModuleResult> {
         where: { race: { conditions: null } },
         orderBy: { createdAt: "desc" },
         take: FORWARD_COVERAGE_WRITER_SAMPLE,
-        select: { raceId: true },
+        select: { raceId: true, createdAt: true },
       }),
     ]);
 
@@ -822,13 +841,19 @@ async function forwardCoverageHealth(): Promise<ModuleResult> {
     const sampleTelemetry = sampleRaceIds.size
       ? await db.raceCoverageTelemetry.findMany({ where: { raceId: { in: [...sampleRaceIds] } }, select: { raceId: true } })
       : [];
-    const sampleCovered = new Set(sampleTelemetry.map((r) => r.raceId)).size;
+    const sampleTelemetryIds = new Set(sampleTelemetry.map((r) => r.raceId));
+    const sampleCovered = sampleTelemetryIds.size;
     const writerUptimeRatio = sampleRaceIds.size > 0 ? sampleCovered / sampleRaceIds.size : null;
 
     const lastCapture = await db.raceCoverageTelemetry.findFirst({ orderBy: { createdAt: "desc" }, select: { createdAt: true } });
     const lastCaptureAgeMin = ageMinutes(lastCapture?.createdAt);
 
-    const availabilityBroken = eligibleRaceIds.size > 0 && missingRaceIds.length > 0;
+    // CURRENT: son 3 saatteki tahminlerin telemetri durumu (pipeline ŞU AN sağlıklı mı). HISTORICAL: 24s pencerenin geçmiş olayları — kırmızı DEĞİL, bilgi.
+    // CURRENT penceresi: son 3 saat içindeki EN FAZLA 10 tahmin — yeni tahmin yoksa (gece/sabah) CURRENT ölçülemez (nötr); eski günün olayı kırmızı tutulmaz.
+    const currentSince = Date.now() - FORWARD_COVERAGE_CURRENT_WINDOW_MS;
+    const currentRaceIds = writerSample.filter((p) => p.createdAt.getTime() >= currentSince).slice(0, 10).map((p) => p.raceId);
+    const currentMissing = currentRaceIds.filter((id) => !sampleTelemetryIds.has(id));
+    const availabilityBroken = currentMissing.length > 0;
 
     // ── Freshness — point-in-time bütünlüğü (backfill/yeniden-analiz satırlarını ayır) ──
     const latenciesMin = recentRows.map((r) => (r.createdAt.getTime() - r.predictionCreatedAt.getTime()) / 60_000);
@@ -871,6 +896,8 @@ async function forwardCoverageHealth(): Promise<ModuleResult> {
     let cacheStaleCausedLowCoverage = 0;
     let trueLowHistoryCount = 0;
     let cacheStaleRootCauseCount = 0;
+    let currentCacheStaleLow = 0; // SON 10 telemetri satırında cache kaynaklı düşük coverage
+    const currentRowIds = new Set([...recentRows].filter((r) => r.createdAt.getTime() >= currentSince).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 10).map((r) => r.raceId));
     for (const row of productionRows) {
       bucketCounts[row.ygStatus] = (bucketCounts[row.ygStatus] ?? 0) + 1;
       eligibleRunnerSum += row.fieldSize;
@@ -881,7 +908,7 @@ async function forwardCoverageHealth(): Promise<ModuleResult> {
         const runners = Array.isArray(row.runnersJson) ? (row.runnersJson as unknown as CoverageRunnerDetail[]) : [];
         const notObserved = runners.filter((r) => !r.sourceObserved);
         const anyCacheStale = notObserved.some((r) => coverageRootCause(r) === "CACHE_STALE");
-        if (anyCacheStale) cacheStaleCausedLowCoverage++;
+        if (anyCacheStale) { cacheStaleCausedLowCoverage++; if (currentRowIds.has(row.raceId)) currentCacheStaleLow++; }
         for (const r of notObserved) {
           if (coverageRootCause(r) === "CACHE_STALE") cacheStaleRootCauseCount++;
           else trueLowHistoryCount++;
@@ -893,7 +920,7 @@ async function forwardCoverageHealth(): Promise<ModuleResult> {
     // ── Genel durum — YALNIZ veri hattı sağlığı (kullanıcı talimatı: baseline/performans
     // karşılaştırması YOK, yeni mimaride veri birikene kadar). ──
     let status: Status = "healthy";
-    if (availabilityBroken || completenessIssues > 0 || correctnessIssues > 0 || cacheStaleCausedLowCoverage > 0) status = "critical";
+    if (availabilityBroken || completenessIssues > 0 || correctnessIssues > 0 || currentCacheStaleLow > 0) status = "critical";
     else if (backfillLike > 0 || (writerUptimeRatio != null && writerUptimeRatio < 1)) status = "warning";
 
     return {
@@ -902,6 +929,9 @@ async function forwardCoverageHealth(): Promise<ModuleResult> {
       status,
       description: "yarisGidisatiSkoru point-in-time veri yeterliliği — RaceCoverageTelemetry'den (bugünkü DB'den DEĞİL)",
       metrics: [
+        { label: "CURRENT PIPELINE — son 3 saatte telemetri", value: `${currentRaceIds.length - currentMissing.length}/${currentRaceIds.length}` },
+        { label: "CURRENT — cache kaynaklı kayıp (son 3 saat)", value: currentCacheStaleLow },
+        { label: "GEÇMİŞ OLAY (son 24s) — cache kaynaklı düşük coverage", value: cacheStaleCausedLowCoverage },
         { label: "Eligible races (24s)", value: eligibleRaceIds.size },
         { label: "Telemetry races (24s)", value: telemetryRaceIds.size },
         { label: "Missing telemetry", value: missingRaceIds.length },
@@ -920,15 +950,21 @@ async function forwardCoverageHealth(): Promise<ModuleResult> {
         { label: "Kök neden — TRUE_LOW_HISTORY", value: trueLowHistoryCount },
       ],
       checks: [
-        { id: "fc-availability", label: "Her uygun tahmin için telemetry satırı var", ok: eligibleRaceIds.size === 0 ? null : !availabilityBroken, detail: missingRaceIds.length === 0 ? "eksik yok" : `${missingRaceIds.length} yarışta telemetry eksik` },
+        { id: "fc-availability", label: "CURRENT: son 3 saatteki (en fazla 10) tahminin hepsinde telemetry satırı var", ok: currentRaceIds.length === 0 ? null : !availabilityBroken, detail: currentRaceIds.length === 0 ? "son 3 saatte yeni tahmin yok — CURRENT ölçülemez (nötr); geçmiş 24s aşağıda" : currentMissing.length === 0 ? "eksik yok" : `${currentMissing.length}/${currentRaceIds.length} yarışta telemetry eksik${missingRaceIds.length > 0 ? ` (24s pencerede toplam ${missingRaceIds.length} eksik — geçmiş dahil)` : ""}` },
         { id: "fc-freshness", label: "Telemetry point-in-time (backfill değil)", ok: recentRows.length === 0 ? null : backfillLike === 0, detail: `${backfillLike}/${recentRows.length} satır >${FORWARD_COVERAGE_BACKFILL_LATENCY_MIN}dk gecikmeli` },
         { id: "fc-completeness", label: "Runner sayısı ve aktif sayım tutarlı", ok: completenessIssues === 0, detail: `runner sayısı uyuşmazlığı=${runnerCountMismatch}, aktif sayım uyuşmazlığı=${activeCountMismatch}` },
         { id: "fc-correctness", label: "sourceObserved/productionEligible/bucket kuralları tutarlı", ok: correctnessIssues === 0, detail: `sourceObserved kuralı=${sourceObservedRuleViolations}, productionEligible=${productionEligibleViolations}, bucket=${bucketViolations}, ratio=${ratioViolations}` },
         {
           id: "fc-cache-driven-low-coverage",
-          label: "Düşük coverage cache kaynaklı DEĞİL (altyapı sorunu yok)",
-          ok: cacheStaleCausedLowCoverage === 0,
-          detail: cacheStaleCausedLowCoverage === 0 ? `düşük coverage varsa bile kök neden TRUE_LOW_HISTORY (${trueLowHistoryCount} runner) — altyapı sağlıklı` : `${cacheStaleCausedLowCoverage} yarışta NONE/LOW, kök neden CACHE_STALE (altyapı sorunu)`,
+          label: "CURRENT: düşük coverage cache kaynaklı DEĞİL (altyapı şu an sağlıklı)",
+          ok: currentCacheStaleLow === 0,
+          detail: currentCacheStaleLow === 0 ? (currentRowIds.size === 0 ? "son 3 saatte yeni tahmin yok — nötr" : "yeni tahminlerde cache kaynaklı kayıp yok") : `son 3 saatteki tahminlerin ${currentCacheStaleLow} tanesinde NONE/LOW, kök neden CACHE_STALE (altyapı sorunu SÜRÜYOR)`,
+        },
+        {
+          id: "fc-historical-incident",
+          label: "GEÇMİŞ OLAY (son 24s) — tarihsel gerçek, silinmez; \"şu an bozuk\" DEĞİL",
+          ok: cacheStaleCausedLowCoverage === 0 ? true : null, // geçmiş olay: bilgi (sarı), kırmızı DEĞİL
+          detail: cacheStaleCausedLowCoverage === 0 ? "son 24s'te cache kaynaklı düşük coverage olayı yok" : `son 24s'te ${cacheStaleCausedLowCoverage} yarış cache backlog'u yüzünden düşük coverage ile tahmin edildi — nedeni: geçmiş cache backlog'u; pencereden çıkınca kapanır${currentCacheStaleLow === 0 ? " (CURRENT sağlıklı)" : ""}`,
         },
       ],
       lastCheckedAt: nowIso(),
@@ -1059,9 +1095,17 @@ async function computeSiteApiHealth(): Promise<ModuleResult> {
   const correctnessIssues = buildInfoValid === false || predictionValid === false;
   const correctnessStatus: Status = correctnessIssues ? "warning" : "healthy";
 
+  // Deployment Integrity Guard (arac-deploy-dogrula.mts) son sonucu: production target / cron pin / cron schedule / canlı build / domain hedefi.
+  // FAILED → tek kök alarm (warning); rollback/tamir OTOMATİK YAPILMAZ. 3 günden eski kontrol → bilgi (ok:null).
+  const integrity = await db.deploymentIntegrityState.findUnique({ where: { id: "singleton" } }).catch(() => null);
+  const integrityAgeMin = ageMinutes(integrity?.checkedAt);
+  const integrityStale = integrityAgeMin != null && integrityAgeMin > 3 * 24 * 60;
+  const integrityFailed = !!integrity && !integrity.ok && !integrityStale;
+
   const statusWeight: Record<Status, number> = { healthy: 0, unknown: 1, warning: 2, critical: 3 };
   let status: Status = "healthy";
-  for (const s of [availabilityStatus, freshnessStatus, completenessStatus, correctnessStatus]) {
+  const integrityStatus: Status = integrityFailed ? "warning" : "healthy";
+  for (const s of [availabilityStatus, freshnessStatus, completenessStatus, correctnessStatus, integrityStatus]) {
     if (statusWeight[s] > statusWeight[status]) status = s;
   }
   if (status === "unknown") status = "healthy"; // freshness tek başına "commit bilinmiyor" TEK BAŞINA alarm sayılmaz
@@ -1095,6 +1139,14 @@ async function computeSiteApiHealth(): Promise<ModuleResult> {
         detail: !commitKnown ? "commit karşılaştırması yapılamadı (dev ortamı veya build-info erişilemedi)" : `expected=${shortBuildId(expectedCommit)} live=${shortBuildId(liveCommit!)}`,
       },
       { id: "site-completeness", label: "Tüm kritik endpointler sağlıklı", ok: criticalOkCount === criticalProbes.length, detail: `${criticalOkCount}/${criticalProbes.length} kritik endpoint OK` },
+      {
+        id: "deployment-integrity",
+        label: "DEPLOYMENT INTEGRITY (production target + cron pin/schedule + canlı build + domain)",
+        ok: !integrity ? null : integrityStale ? null : integrity.ok,
+        detail: !integrity
+          ? "Guard henüz çalıştırılmadı (deploy sonrası: arac-deploy-dogrula.mts)"
+          : `${integrityStale ? "ESKİ KONTROL — " : ""}${integrity.ok ? "PASS" : "FAILED"} (${integrityAgeMin!.toFixed(0)} dk önce) · target=${integrity.productionTargetOk} cronPin=${integrity.cronPinOk} cronSchedule=${integrity.cronScheduleOk} liveBuild=${integrity.liveBuildOk} domain=${integrity.domainTargetOk}`,
+      },
       { id: "site-correctness", label: "Payload şeması geçerli (build-info + prediction)", ok: !correctnessIssues, detail: `build-info geçerli=${buildInfoValid ?? "N/A"} · ${predictionDetail}` },
     ],
     lastCheckedAt: nowIso(),
@@ -1620,6 +1672,8 @@ async function computeCouponHealth(): Promise<ModuleResult> {
   const dayStart = new Date(today + "T00:00:00.000Z");
 
   const activePools = await db.homeKupon.findMany({ where: { date: dayStart }, orderBy: [{ hippodromeName: "asc" }, { slot: "asc" }] });
+  const kuponRun = await db.kuponSyncRunState.findUnique({ where: { id: "singleton" } }).catch(() => null);
+  const kuponRunAgeMin = ageMinutes(kuponRun?.lastAttemptAt);
 
   let missingLegs = 0;
   let emptyLegs = 0;
@@ -1750,6 +1804,8 @@ async function computeCouponHealth(): Promise<ModuleResult> {
     description: "Doğru yarıştan/tahminden/atlardan/maliyetle üretildi mi — GERÇEK generator+display fonksiyonlarıyla çapraz doğrulanıyor",
     metrics: [
       { label: "Bugün aktif kupon", value: activePools.length },
+      { label: "Kupon sync — son deneme", value: kuponRun?.lastAttemptAt ? `${(kuponRunAgeMin ?? 0).toFixed(0)} dk önce` : "kayıt yok" },
+      { label: "Kupon sync — son başarı", value: kuponRun?.lastSuccessAt ? `${ageMinutes(kuponRun.lastSuccessAt)!.toFixed(0)} dk önce` : "kayıt yok" },
       { label: "Eksik ayak", value: missingLegs },
       { label: "Boş ayak (Ekonomik'te 0 seçim)", value: emptyLegs },
       { label: "Ayak sırası bozuk", value: wrongOrder },
@@ -1763,7 +1819,14 @@ async function computeCouponHealth(): Promise<ModuleResult> {
       ...(staleDetails.length > 0 ? [{ label: "Stale detayı", value: staleDetails.join(" · ") }] : []),
     ],
     checks: [
-      { id: "coupon-availability", label: "Aktif kupon üretim geçmişi (attempt/error kaydı YOK — bilinen sınırlama)", ok: null, detail: `${activePools.length} aktif kupon — OBSERVABILITY_GAP: syncHomeKupon kalıcı attempt/error durumu yazmıyor` },
+      {
+        id: "coupon-availability",
+        label: "Kupon sync son denemesi (KuponSyncRunState)",
+        ok: !kuponRun ? null : kuponRun.lastError && (!kuponRun.lastSuccessAt || kuponRun.lastAttemptAt! > kuponRun.lastSuccessAt) ? false : true,
+        detail: !kuponRun
+          ? `${activePools.length} aktif kupon — henüz deneme kaydı yok (telemetri yeni; reconcile/prediction tetiğiyle dolacak)`
+          : `son deneme ${kuponRunAgeMin == null ? "?" : kuponRunAgeMin.toFixed(0)} dk önce (${kuponRun.lastTriggerSource ?? "-"}), ${kuponRun.lastDurationMs ?? "-"} ms, taranan=${kuponRun.lastProcessed ?? "-"}, üretilen=${kuponRun.lastSynced ?? "-"}${kuponRun.lastError ? ` — SON HATA: ${kuponRun.lastError}` : ""}`,
+      },
       { id: "coupon-freshness", label: "Kupon, ilgili Prediction'lardan daha yeni", ok: staleWarning + staleCritical === 0, detail: staleDetails.length > 0 ? staleDetails.join(" · ") : "tüm kuponlar güncel" },
       { id: "coupon-completeness", label: "Her ayak dolu (eksik/boş yok)", ok: missingLegs === 0 && emptyLegs === 0, detail: `eksik ayak=${missingLegs}, boş ayak=${emptyLegs}` },
       {
@@ -1809,7 +1872,7 @@ function unmeasuredModule(id: string, title: string, description: string): Modul
     status: "unknown",
     description: `${description} — henüz gerçek telemetriye bağlanmadı`,
     metrics: [],
-    checks: [{ id: `${id}-base`, label: "Gerçek sensör", ok: null, detail: "Bağlanmadı" }],
+    checks: [{ id: `${id}-base`, label: "Gerçek sensör", ok: null, detail: "OBSERVABILITY PENDING — umbrella düğüm; alt modüller (Program/AGF/Sonuçlar/Cache) ayrı ölçülüyor, genel sağlık toplamına KATILMAZ" }],
     lastCheckedAt: nowIso(),
   };
 }
@@ -1979,8 +2042,11 @@ export async function GET() {
 
   const statusWeight: Record<Status, number> = { healthy: 0, unknown: 1, warning: 2, critical: 3 };
 
+  // OBSERVABILITY PENDING düğümleri (umbrella) genel sağlığı "unknown"a çekmesin — sahte yeşil verilmez ama ölçülmeyen düğüm alarm da sayılmaz.
+  const observabilityPendingIds = new Set(["data-source"]);
   let overallStatus: Status = "healthy";
   for (const mod of modules) {
+    if (observabilityPendingIds.has(mod.id)) continue;
     if (statusWeight[mod.status] > statusWeight[overallStatus]) overallStatus = mod.status;
   }
 
@@ -2016,6 +2082,6 @@ export async function GET() {
     chaosTest: activeChaos
       ? { scenario: activeChaos.scenario, targetModuleId: activeChaos.targetModuleId, reason: activeChaos.reason, expiresAt: activeChaos.expiresAt.toISOString() }
       : null,
-    modules,
+    modules: modules.map((m) => ({ ...m, repair: REPAIR_CLASS[m.id] ?? null })),
   });
 }

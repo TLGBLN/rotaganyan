@@ -1157,3 +1157,32 @@ model PageView {
   @@index([path])
   @@index([createdAt(sort: Desc)])
 }
+
+// 2026-09-25 — System Anatomy stabilizasyon katmanı (additive, telemetri; V5.46/kupon üretimini ASLA bloklamaz).
+// syncHomeKupon'un kalıcı "son deneme/hata" durumu — Kupon sensöründeki OBSERVABILITY_GAP'i kapatır.
+model KuponSyncRunState {
+  id                String    @id @default("singleton")
+  lastAttemptAt     DateTime?
+  lastSuccessAt     DateTime?
+  lastError         String?
+  lastDurationMs    Int?
+  lastProcessed     Int? // taranan havuz sayısı
+  lastSynced        Int? // yeniden üretilen havuz sayısı
+  lastTriggerSource String? // "reconcile" | "prediction-change"
+  updatedAt         DateTime  @updatedAt
+}
+
+// Deployment Integrity Guard'ın son sonucu (arac-deploy-dogrula.mts yazar, panel okur). Otomatik rollback/tamir YOK — yalnız raporlar.
+model DeploymentIntegrityState {
+  id                 String   @id @default("singleton")
+  checkedAt          DateTime
+  ok                 Boolean
+  expectedBuildId    String?
+  liveBuildId        String?
+  productionTargetOk Boolean?
+  cronPinOk          Boolean?
+  cronScheduleOk     Boolean?
+  liveBuildOk        Boolean?
+  domainTargetOk     Boolean?
+  detailsJson        Json?
+}
