@@ -357,6 +357,20 @@ function KuponGrup({
   );
 }
 
+// 2026-09-25 kullanıcı bulgusu (Bursa 7'li Ganyan) — bkz. SyncHomeKuponResult yorumu
+// (home-kupon.actions.ts): sunucu, dokunulmayan genişlikleri (ör. admin yalnız Ekonomik'i
+// elle düzenlediyse Normal/Geniş) HER publish'te taze/kısıtsız DP ile YENİDEN hesaplar —
+// bu kasıtlı, ama ekran bunu YANSITMIYORDU. Publish sonrası dönen GERÇEK `legs`'i bu
+// fonksiyonla `GroupSelections`'a çevirip ekrana geri yazıyoruz, admin tablo ile canlı
+// kupon arasında sessiz bir ayrışma kalmasın diye.
+function legsToSelections(legs: { raceNo: number; narrow: number[]; normal: number[]; wide: number[] }[]): GroupSelections {
+  const sel: GroupSelections = {};
+  for (const leg of legs) {
+    sel[leg.raceNo] = { narrow: new Set(leg.narrow), normal: new Set(leg.normal), wide: new Set(leg.wide) };
+  }
+  return sel;
+}
+
 function amountsForGroup(group: RaceDayData["races"], selections: GroupSelections, stakePerCombination: number): Record<Width, number> {
   return WIDTHS.reduce((acc, width) => {
     acc[width] = amountFor(legCounts(group, selections, width), stakePerCombination);
@@ -506,6 +520,13 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
       if (res?.ok === false) {
         toast.error(`${label} yayınlanamadı — lütfen tekrar deneyin (context eşzamanlı değişmiş olabilir).`);
       } else {
+        // Ekranı GERÇEKTEN yayınlanan hâle senkronla — sunucunun dokunulmayan
+        // genişlikler için taze hesapladığı sonuç, admin'in son gördüğü önizlemeden
+        // farklı olabilir (bkz. legsToSelections yorumu). Yeni taban da BUNA eşitlenir,
+        // bir sonraki manuel düzenleme gerçek yayınlanan hâlden fark alınsın diye.
+        const published = legsToSelections(res.legs);
+        setSelections((prev) => ({ ...prev, [key]: published }));
+        setAutoBaseline((prev) => ({ ...prev, [key]: published }));
         toast.success(`${label} kuponu oluşturuldu ve anasayfada yayınlandı`);
       }
       router.refresh();

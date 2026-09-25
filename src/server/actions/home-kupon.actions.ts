@@ -123,7 +123,18 @@ function toDependencyInput(legs: ScopedLeg[]): DependencyRaceInput[] {
 }
 
 export type SyncHomeKuponResult =
-  | { ok: true; homeKuponId?: string; created?: boolean }
+  // 2026-09-25 kullanıcı bulgusu (Bursa 7'li Ganyan) — admin ekranındaki `selections`
+  // publish sonrası HİÇ GÜNCELLENMİYORDU: sunucu manualOverrides'ı yalnız DOKUNULAN
+  // genişlikte (ör. Ekonomik) onurluyor, dokunulmayan genişlikler (Normal/Geniş) HER
+  // publish'te SIFIRDAN, kısıtsız DP ile yeniden hesaplanıyor — bu genişlik-başına
+  // "taze hesapla" davranışı KASITLI (bkz. plan), ama admin'in ekranı bunu hiç
+  // YANSITMIYORDU: "Kupon Oluştur"a bastıktan sonra tablo hâlâ publish-ÖNCESİ (ör.
+  // Ekonomik'te 7 at) durumu gösteriyor, oysa DB'ye/siteye GERÇEKTE farklı bir seçim
+  // (ör. 3 at) yazılmış oluyordu — admin ekranı ile canlı kupon SESSİZCE ayrışıyordu.
+  // Kök çözüm: `syncHomeKupon`'un GERÇEKTEN hesaplayıp kaydettiği `legs`'i sonuca
+  // ekleyip KuponForm'un bunu `selections`/`autoBaseline`'a geri yazmasını sağlamak —
+  // admin ekranı publish'ten hemen sonra HER ZAMAN gerçek yayınlanan hâli gösterir.
+  | { ok: true; homeKuponId?: string; created?: boolean; legs: HomeKuponLegInput[] }
   | { ok: false; skipped?: "NO_ELIGIBLE_RUNNERS" | "RACE_CONDITION" | "CONCURRENT_GENERATION" | "POOL_NOT_FOUND" };
 
 /**
@@ -250,7 +261,7 @@ export async function syncHomeKupon(input: {
     });
     revalidatePath("/");
     revalidatePath("/admin/kupon");
-    return { ok: true, homeKuponId: created.id, created: true };
+    return { ok: true, homeKuponId: created.id, created: true, legs };
   } catch (e) {
     if (isUniqueConstraintViolation(e)) return { ok: false, skipped: "CONCURRENT_GENERATION" };
     throw e;
