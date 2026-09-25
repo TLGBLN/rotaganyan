@@ -78,6 +78,7 @@ export async function rebuildAffectedHomeKupons(raceId: string): Promise<void> {
         slot: k.slot,
         raceNos,
         manualOverrides: k.manualOverrides ?? {},
+        source: "prediction-change",
       });
     })
   );
@@ -182,6 +183,7 @@ async function reconcileAllActiveHomeKuponsInner(): Promise<{ checked: number; s
       slot: row.slot,
       raceNos,
       manualOverrides: row.manualOverrides ?? {},
+      source: "reconcile",
     }).catch(() => { /* bir sonraki turda tekrar denenir */ });
   }
 

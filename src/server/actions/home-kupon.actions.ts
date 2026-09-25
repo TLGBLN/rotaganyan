@@ -150,6 +150,13 @@ export async function syncHomeKupon(input: {
   slot: number;
   raceNos: number[];
   manualOverrides: unknown; // HAM — normalize EDİLMEMİŞ olabilir, burada normalize edilir
+  // 2026-09-25 kullanıcı bulgusu (Bursa 7'li Ganyan, "yalnız Otomatik Doldur kullandım
+  // ama publish'te manualOverrides doluydu") — hangi TETİKLEYİCİNİN (admin'in kendi
+  // "Kupon Oluştur"u mu, arka plan rebuild'i mi, 5dk reconcile mı) hangi manualOverrides
+  // ile publish ettiğine dair HİÇBİR iz yoktu; olay sonradan yalnız DB'nin son hâlinden
+  // tahmin edilmeye çalışıldı. Artık HER çağrı, kaynağıyla birlikte loglanır (Vercel
+  // fonksiyon logları) — bir sonraki "bunu ben yapmadım" durumunda kanıt aranabilir.
+  source: "admin-publish" | "prediction-change" | "reconcile";
 }): Promise<SyncHomeKuponResult> {
   const baseHippodromeName = input.hippodromeName.split(" — ")[0];
   const dateIso = input.date;
@@ -169,6 +176,10 @@ export async function syncHomeKupon(input: {
   const manualOverrides = normalizeManualOverrides(input.manualOverrides, input.raceNos);
   const overridesHash = manualOverridesHash(manualOverrides);
   const key = computeBuildKey(input.hippodromeName, input.slot, dateIso, startHash, overridesHash);
+
+  console.log(
+    `[syncHomeKupon] ${input.source} — ${input.hippodromeName} (${dateIso}, slot ${input.slot}) manualOverrides=${JSON.stringify(manualOverrides)}`
+  );
 
   // 2026-09-22 kullanıcı kararı — idempotency ön-eleme ("buildKey zaten var, no-op say")
   // TAMAMEN KALDIRILDI: admin manuel bir düzenleme yapıp "Kupon Oluştur"a her bastığında
@@ -486,6 +497,7 @@ export async function publishHomeKupon(input: HomeKuponInput): Promise<SyncHomeK
     slot: input.slot,
     raceNos: input.raceNos,
     manualOverrides: input.manualOverrides,
+    source: "admin-publish",
   });
 }
 
