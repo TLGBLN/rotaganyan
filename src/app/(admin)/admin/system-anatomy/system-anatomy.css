@@ -683,3 +683,73 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── 2026-09-25 — sade anlatım + Veri Tamlığı (mobil uyumlu) ─────────────────────────────────────────── */
+.legend-plain {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px 18px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #234b68;
+  border-radius: 12px;
+  background: rgba(5, 16, 27, 0.7);
+  font-size: 13px;
+  line-height: 1.45;
+  color: #c9d8e6;
+}
+.legend-plain .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+.dot-healthy { background: var(--green); }
+.dot-warning { background: var(--yellow); }
+.dot-critical { background: var(--red); }
+.dot-unknown { background: var(--unknown); }
+
+.status-plain { margin: -4px 0 14px; font-size: 13px; line-height: 1.45; color: #b6c7d8; }
+.explain-box h3 { margin: 12px 0 4px; }
+.explain-box h3:first-child { margin-top: 0; }
+.explain-box p { margin: 0; font-size: 13px; line-height: 1.5; color: #d4e0ec; }
+
+.explain-section {
+  margin-top: 26px;
+  padding: 20px;
+  border: 1px solid #234b68;
+  border-radius: 16px;
+  background: rgba(3, 13, 22, 0.9);
+}
+.explain-section h2 { margin: 0 0 6px; font-size: 18px; }
+.explain-section h2 small { font-size: 12px; font-weight: 400; color: #8fa5bb; }
+.explain-lead { margin: 0 0 16px; font-size: 13px; line-height: 1.5; color: #b6c7d8; }
+.explain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+.explain-card {
+  padding: 14px;
+  border: 1px solid #234b68;
+  border-left-width: 4px;
+  border-radius: 12px;
+  background: rgba(5, 16, 27, 0.8);
+  cursor: pointer;
+}
+.explain-card.node-healthy { border-left-color: var(--green); }
+.explain-card.node-warning { border-left-color: var(--yellow); }
+.explain-card.node-critical { border-left-color: var(--red); }
+.explain-card.node-unknown { border-left-color: var(--unknown); }
+.explain-card header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.explain-card p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: #d4e0ec; }
+.pill { margin-left: auto; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-style: normal; font-weight: 700; letter-spacing: 0.04em; }
+.pill-healthy { background: var(--green-soft); color: var(--green); }
+.pill-warning { background: var(--yellow-soft); color: var(--yellow); }
+.pill-critical { background: var(--red-soft); color: var(--red); }
+.pill-unknown { background: rgba(118, 129, 151, 0.2); color: var(--unknown); }
+
+.vt-scroll { overflow-x: auto; }
+.vt-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 560px; }
+.vt-table th { text-align: left; padding: 8px 10px; color: #8fa5bb; font-weight: 600; border-bottom: 1px solid #234b68; }
+.vt-table td { padding: 9px 10px; border-bottom: 1px solid rgba(35, 75, 104, 0.5); vertical-align: top; }
+.vt-desc { color: #b6c7d8; }
+.vt-pct { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 700; }
+.vt-pct small { color: #8fa5bb; font-weight: 400; }
+.vt-note { display: block; margin-top: 10px; color: #8fa5bb; }
+
+@media (max-width: 640px) {
+  .explain-section { padding: 14px; }
+  .explain-grid { grid-template-columns: 1fr; }
+}

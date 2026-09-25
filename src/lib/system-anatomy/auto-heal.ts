@@ -51,6 +51,20 @@ export const REPAIR_CLASS: Record<string, RepairInfo> = {
     mechanism: "Deployment Integrity Guard",
     note: "Deploy sonrası guard PASS olmadan deploy başarılı sayılmaz.",
   },
+  "data-source": {
+    class: "RETRY",
+    mechanism: "veri-tamligi-onarim (agf-sync piggyback) + veri-denetimi bildirimi + ingest cron'ları",
+    note: "Doluluk düşerse kayıp alanlar sonraki turlarda tamamlanır; %70 altı admin bildirimi gider.",
+  },
+  agf: {
+    class: "RETRY",
+    mechanism: "agf-sync cron'u (günde 4) + result-sync fallback'leri",
+    note: "Geçici fetch hatasında sonraki doğal turda yeniden denenir.",
+  },
+  engine: { class: "OBSERVE_ONLY", mechanism: null, note: "Motor eldeki veriyle analiz üretir; sağlık sistemi durdurmaz." },
+  challenger: { class: "OBSERVE_ONLY", mechanism: null, note: "Gölge test; canlıyı etkilemez." },
+  "model-health": { class: "OBSERVE_ONLY", mechanism: null, note: "İzleyici katman; yalnız ölçer." },
+  database: { class: "MANUAL", mechanism: null, note: "Veritabanı erişimi kaybında müdahale gerekir; sistem yalnız haber verir." },
   coupon: {
     class: "RETRY",
     mechanism: "homekupon-reconcile (5dk) + upsertPrediction after() tetiği; durum KuponSyncRunState'e yazılır",

@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { unstable_cache } from "next/cache";
 import { startOfDay, endOfDay, subDays } from "date-fns";
 import { turkeyDateString } from "@/lib/tz";
 import type { Prisma, Confidence } from "@prisma/client";
@@ -723,7 +724,7 @@ export type KazananKupon = {
  * slot için birden fazla kayıt olabildiğinden (admin güncelledikçe eski kayıt kalıyor,
  * silinmiyor) en güncel (updatedAt) olan tercih edilerek tekilleştiriliyor.
  */
-export async function getGecmisKazananKuponlar(limit = 20): Promise<KazananKupon[]> {
+async function getGecmisKazananKuponlarHesapla(limit: number): Promise<KazananKupon[]> {
   const all = await db.homeKupon.findMany({
     orderBy: [{ date: "desc" }, { updatedAt: "desc" }],
     take: limit * 6, // her kaydın hit çıkacağı/tekil olacağı garanti değil, bolluk payı
@@ -783,6 +784,26 @@ export async function getGecmisKazananKuponlar(limit = 20): Promise<KazananKupon
   }
 
   return results.map(({ _needsIkramiye, ...r }) => r);
+}
+
+// 2026-09-25 /program performans düzeltmesi (ÖLÇÜM: TTFB ~0.5sn ama sayfa 10-16sn'de tamamlanıyordu; kuyruğu Suspense bölümlerinden "Aylık Kupon Kazancı" ~11.7sn ve
+// "İsabet Kuponlar" ~4.8sn tüketiyordu — her çağrıda YÜZLERCE kupon için ayrı DB sorgusu (buildKuponOnerisi) yeniden hesaplanıyordu). Geçmiş kuponların tuttu/tutmadı
+// sonucu nadiren değişir → "bir kez hesapla → ucuz oku": 2 dk'lık Next veri önbelleği (süre dolunca bayat değer anında servis edilir, arka planda yenilenir).
+// unstable_cache JSON serileştirir (Date → string) → dönüşte Date'e çevrilir. Next çalışma zamanı dışında (tsx araçları) önbellek yoksa doğrudan hesaplanır.
+const gecmisKazananKuponlarOnbellek = unstable_cache(
+  async (limit: number) => getGecmisKazananKuponlarHesapla(limit),
+  ["gecmis-kazanan-kuponlar-v1"],
+  { revalidate: 120, tags: ["kuponlar"] }
+);
+
+export async function getGecmisKazananKuponlar(limit = 20): Promise<KazananKupon[]> {
+  let liste: KazananKupon[];
+  try {
+    liste = await gecmisKazananKuponlarOnbellek(limit);
+  } catch {
+    return getGecmisKazananKuponlarHesapla(limit);
+  }
+  return liste.map((k) => ({ ...k, date: new Date(k.date) }));
 }
 
 /** "6'lı Ganyan 51.384,31 ₺ vermiştir." cümlesinden sayısal tutarı çıkarır (Türkçe biçim:

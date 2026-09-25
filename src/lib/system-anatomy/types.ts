@@ -29,6 +29,8 @@ export type HealthCheck = {
 };
 
 export type SystemModuleHealth = {
+  /** Bu katman bozulursa sistem kendi düzeltir mi? (auto-heal.ts) */
+  repair?: ModuleRepairInfo | null;
   id: string;
   title: string;
   subtitle?: string;
@@ -77,7 +79,22 @@ export type SystemModuleHealth = {
   errorMessage?: string | null;
 };
 
+export type VeriTamligiSatiriDto = {
+  alan: string;
+  aciklama: string;
+  yuzdeKapsam: number;
+  doluKapsam: number;
+  toplamKapsam: number;
+  yuzdeSon7: number;
+  doluSon7: number;
+  toplamSon7: number;
+};
+
+export type ModuleRepairInfo = { class: "AUTO" | "RETRY" | "OBSERVE_ONLY" | "MANUAL"; mechanism: string | null; note: string };
+
 export type SystemHealthResponse = {
+  /** Veri Tamlığı tablosu (Veri Toplama katmanının girdi kalitesi) — sensörle AYNI kaynaktan */
+  veriTamligi?: VeriTamligiSatiriDto[];
   overallStatus: HealthStatus;
   checkedAt: string;
 

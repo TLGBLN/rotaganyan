@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { SYSTEM_ANATOMY_NODES } from "@/lib/system-anatomy/registry";
 import type { HealthStatus, SystemHealthResponse, SystemModuleHealth } from "@/lib/system-anatomy/types";
+import { LAYER_EXPLANATIONS, REPAIR_PLAIN, STATUS_PLAIN } from "@/lib/system-anatomy/explanations";
 import "./system-anatomy.css";
 
 const STATUS_LABEL: Record<HealthStatus, string> = {
@@ -99,7 +100,7 @@ export default function SystemAnatomyDashboard() {
         <div>
           <div className="brand">ROTAGANYAN</div>
           <h1>Sistem Anatomisi</h1>
-          <p>Canlı sistem sağlık haritası</p>
+          <p>Sitenin ve tahmin sisteminin canlı sağlık haritası. Her kutu bir katman; ok, "hangi katmanın hangisini beslediğini" gösterir.</p>
         </div>
 
         <div className="overall-box">
@@ -118,18 +119,18 @@ export default function SystemAnatomyDashboard() {
       {data && (
         <div className="flight-instrument">
           <span className="flight-decision flight-decision-ok">
-            {data.overallDecision === "block" ? "⛔ ANALYSIS PATH: BLOCKED" : "🟢 ANALYSIS PATH: NOT BLOCKED"}
+            {data.overallDecision === "block" ? "⛔ Tahmin üretimi ENGELLENDİ" : "🟢 Tahmin üretimi AÇIK — hiçbir alarm analizi durdurmuyor"}
           </span>
-          <span className="flight-sep">·</span>
-          <span className="flight-gate-disabled">Safety Gate: {data.safetyGateEnabled ? "ENABLED" : "NOT ENABLED"}</span>
           {data.rootCauseSummary.length > 0 && (
             <>
               <span className="flight-sep">·</span>
               <span className="flight-rootcause">
-                {data.rootCauseSummary.map((r) => (
+                <b>İlgilenilmesi gereken kaynaklar:</b>{" "}
+                {data.rootCauseSummary.map((r, i) => (
                   <span key={r.moduleId}>
-                    ROOT CAUSE: {r.title}
-                    {r.downstreamCount > 0 ? ` (${r.downstreamCount} modül downstream etkilendi)` : ""}
+                    {i > 0 ? " · " : ""}
+                    {r.title}
+                    {r.downstreamCount > 0 ? ` (${r.downstreamCount} katmanı etkiliyor)` : ""}
                   </span>
                 ))}
               </span>
@@ -137,6 +138,13 @@ export default function SystemAnatomyDashboard() {
           )}
         </div>
       )}
+
+      <div className="legend-plain">
+        <span><i className="dot dot-healthy" /> <b>Sağlıklı:</b> sorun yok.</span>
+        <span><i className="dot dot-warning" /> <b>İzleniyor:</b> küçük bir aksaklık var ya da başka bir katmandan etkileniyor; sistem çalışıyor.</span>
+        <span><i className="dot dot-critical" /> <b>Alarm:</b> bu katmanın kendisinde gerçek bir sorun var.</span>
+        <span><i className="dot dot-unknown" /> <b>Bilinmiyor:</b> henüz ölçülemedi.</span>
+      </div>
 
       {data?.chaosTest && (
         <div className="chaos-banner">
@@ -216,25 +224,41 @@ export default function SystemAnatomyDashboard() {
               </div>
 
               <div className={`big-status status-box-${selectedHealth.status}`}>{STATUS_LABEL[selectedHealth.status]}</div>
+              <p className="status-plain">{STATUS_PLAIN[selectedHealth.status]}</p>
+
+              {LAYER_EXPLANATIONS[selectedHealth.id] && (
+                <section className="detail-section explain-box">
+                  <h3>Ne işe yarar?</h3>
+                  <p>{LAYER_EXPLANATIONS[selectedHealth.id].ne}</p>
+                  <h3>Bozulursa ne olur?</h3>
+                  <p>{LAYER_EXPLANATIONS[selectedHealth.id].olmazsa}</p>
+                  <h3>Kendini düzeltir mi?</h3>
+                  <p>
+                    <b>{REPAIR_PLAIN[selectedHealth.repair?.class ?? "OBSERVE_ONLY"].etiket}.</b>{" "}
+                    {REPAIR_PLAIN[selectedHealth.repair?.class ?? "OBSERVE_ONLY"].aciklama}
+                    {selectedHealth.repair?.note ? ` ${selectedHealth.repair.note}` : ""}
+                  </p>
+                </section>
+              )}
 
               {/* 2026-09-24 (kullanıcı düzeltmesi) — Self Health ≠ Dependency Health ≠
                   Observation Status: üçü AYRI satırlar, birbirine karıştırılmaz. */}
               <div className="axis-breakdown">
                 <div className="axis-row">
-                  <span>Self Health</span>
+                  <span>Kendi durumu</span>
                   <strong className={`text-${selectedHealth.selfStatus ?? "unknown"}`}>{STATUS_LABEL[selectedHealth.selfStatus ?? "unknown"]}</strong>
                 </div>
                 <div className="axis-row">
-                  <span>Dependency Health</span>
+                  <span>Beslendiği katmanlar</span>
                   <strong className={`text-${selectedHealth.dependencyStatus ?? "healthy"}`}>
                     {selectedHealth.dependencyStatus ? STATUS_LABEL[selectedHealth.dependencyStatus] : "—"}
                   </strong>
                 </div>
                 {selectedHealth.observedModules && selectedHealth.observedModules.length > 0 && (
                   <div className="axis-row">
-                    <span>Observation Status</span>
+                    <span>İzlediği sistemler</span>
                     <strong className={selectedHealth.observationStatus === "attention" ? "text-warning" : selectedHealth.observationStatus === "unknown" ? "text-unknown" : "text-healthy"}>
-                      {selectedHealth.observationStatus === "attention" ? "🟡 ATTENTION" : selectedHealth.observationStatus === "unknown" ? "⚪ UNKNOWN" : "🟢 NORMAL"}
+                      {selectedHealth.observationStatus === "attention" ? "🟡 Dikkat" : selectedHealth.observationStatus === "unknown" ? "⚪ Bilinmiyor" : "🟢 Normal"}
                     </strong>
                   </div>
                 )}
@@ -304,6 +328,63 @@ export default function SystemAnatomyDashboard() {
           )}
         </aside>
       </div>
+
+      <section className="explain-section" id="katmanlar">
+        <h2>Katmanlar ne işe yarar? Bozulursa ne olur?</h2>
+        <p className="explain-lead">Her kutunun görevi ve çalışmazsa sitede/tahminde ne değişeceği. Hiçbir katmanın bozulması, motorun elindeki veriyle tahmin üretmesini durdurmaz.</p>
+        <div className="explain-grid">
+          {SYSTEM_ANATOMY_NODES.map((node) => {
+            const ex = LAYER_EXPLANATIONS[node.id];
+            if (!ex) return null;
+            const st = getStatus(getNodeHealth(data, node.id));
+            return (
+              <article key={node.id} className={`explain-card node-${st}`} onClick={() => setSelectedId(node.id)}>
+                <header>
+                  <span className="node-icon">{node.icon}</span>
+                  <strong>{ex.ad}</strong>
+                  <em className={`pill pill-${st}`}>{STATUS_LABEL[st]}</em>
+                </header>
+                <p><b>Görevi:</b> {ex.ne}</p>
+                <p><b>Olmazsa:</b> {ex.olmazsa}</p>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="explain-section" id="veri-tamligi">
+        <h2>Veri Tamlığı <small>(Veri Toplama katmanının girdi kalitesi)</small></h2>
+        <p className="explain-lead">
+          Tahmin motorunun kullandığı bilgilerin ne kadarı dolu? &quot;Son 7 gün&quot; güncel senkron sorunlarını, &quot;Tüm kapsam&quot; geçmiş boşlukları gösterir.
+          Yüzde %70&apos;in altına düşerse yöneticiye bildirim gider ve eksikler otomatik tamamlanmaya çalışılır. Bu tablo, üstteki &quot;Veri Toplama&quot; kutusunun rengini de belirler.
+        </p>
+        <div className="vt-scroll">
+          <table className="vt-table">
+            <thead>
+              <tr>
+                <th>Bilgi</th>
+                <th>Ne demek?</th>
+                <th>Tüm kapsam</th>
+                <th>Son 7 gün</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data?.veriTamligi ?? []).map((s) => (
+                <tr key={s.alan}>
+                  <td><strong>{s.alan}</strong></td>
+                  <td className="vt-desc">{s.aciklama}</td>
+                  <td className={`vt-pct ${s.yuzdeKapsam >= 80 ? "text-healthy" : s.yuzdeKapsam >= 50 ? "text-warning" : "text-critical"}`}>%{s.yuzdeKapsam.toFixed(1)} <small>({Math.round(s.doluKapsam)}/{Math.round(s.toplamKapsam)})</small></td>
+                  <td className={`vt-pct ${s.yuzdeSon7 >= 80 ? "text-healthy" : s.yuzdeSon7 >= 50 ? "text-warning" : "text-critical"}`}>%{s.yuzdeSon7.toFixed(1)} <small>({Math.round(s.doluSon7)}/{Math.round(s.toplamSon7)})</small></td>
+                </tr>
+              ))}
+              {data && (data.veriTamligi ?? []).length === 0 && (
+                <tr><td colSpan={4} className="empty">Veri tamlığı henüz ölçülemedi.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <small className="vt-note">Renk: %80 ve üstü yeşil, %50–79 sarı, altı kırmızı.</small>
+      </section>
     </main>
   );
 }

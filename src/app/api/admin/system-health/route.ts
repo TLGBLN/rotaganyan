@@ -46,6 +46,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { currentBuildId, shortBuildId } from "@/lib/build-id";
 import { REPAIR_CLASS } from "@/lib/system-anatomy/auto-heal";
+import { getVeriTamligiRaporu, type VeriTamligiSatiri } from "@/server/services/veri-tamligi.service";
 import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
 import type { HealthStatus, SystemModuleHealth, OperationalDecision } from "@/lib/system-anatomy/types";
@@ -1860,21 +1861,60 @@ async function couponHealth(): Promise<ModuleResult> {
   }
 }
 
-// DÜZELTME (2026-09-23) — kullanıcının kendi ilkesiyle çelişiyordu: "sistem ölçemediği
-// bir şeyi yeşil göstermiyor" dendi ama orijinal `simpleHealthy()` ölçülmeyen 9 modülü
-// doğrudan "healthy" (yeşil) damgalıyordu. Artık "unknown" (gri, Bağlanmadı) — sahte
-// "her şey yolunda" ekranı kurulmuyor. Bir sonraki turda gerçek sensör bağlanınca
-// bu fonksiyonun çağrıları teker teker gerçek health-check'lerle değiştirilecek.
-function unmeasuredModule(id: string, title: string, description: string): ModuleResult {
-  return {
-    id,
-    title,
-    status: "unknown",
-    description: `${description} — henüz gerçek telemetriye bağlanmadı`,
-    metrics: [],
-    checks: [{ id: `${id}-base`, label: "Gerçek sensör", ok: null, detail: "OBSERVABILITY PENDING — umbrella düğüm; alt modüller (Program/AGF/Sonuçlar/Cache) ayrı ölçülüyor, genel sağlık toplamına KATILMAZ" }],
-    lastCheckedAt: nowIso(),
-  };
+
+
+// 2026-09-25 — VERİ TOPLAMA artık GERÇEK bir sensöre sahip: Veri Tamlığı raporu (veri-tamligi.service.ts) bu düğümün girdi-kalitesi ölçümüdür.
+// /admin/veri-tamligi sayfası bu sayfaya taşındı; iki yapı artık AYNI kaynaktan beslenir. Eşik, veri-denetimi bildirimiyle AYNI (%70, en az 10 satır).
+// Bir alan eşiğin altındaysa modül "warning" olur (ölçülen, kırmızı değil — eksik veri analizi engellemez); backfill/onarım mevcut cron'larla sürer.
+const VERI_TAMLIGI_ESIK_YUZDE = 70;
+const VERI_TAMLIGI_CACHE_MS = 120_000;
+let veriTamligiCache: { data: VeriTamligiSatiri[]; expiresAt: number } | null = null;
+
+async function readVeriTamligi(): Promise<VeriTamligiSatiri[]> {
+  if (veriTamligiCache && veriTamligiCache.expiresAt > Date.now()) return veriTamligiCache.data;
+  const data = await getVeriTamligiRaporu();
+  veriTamligiCache = { data, expiresAt: Date.now() + VERI_TAMLIGI_CACHE_MS };
+  return data;
+}
+
+async function dataSourceHealth(): Promise<ModuleResult> {
+  try {
+    const rapor = await readVeriTamligi();
+    const sorunlu = rapor.filter((r) => r.toplamSon7 >= 10 && r.yuzdeSon7 < VERI_TAMLIGI_ESIK_YUZDE);
+    const enDusuk = rapor.filter((r) => r.toplamSon7 >= 10).sort((a, b) => a.yuzdeSon7 - b.yuzdeSon7)[0];
+    return {
+      id: "data-source",
+      title: "VERİ TOPLAMA",
+      status: sorunlu.length > 0 ? "warning" : "healthy",
+      description: "TJK'dan gelen program / at / sonuç verisinin doluluğu (Veri Tamlığı)",
+      metrics: [
+        { label: "Ölçülen alan", value: rapor.length },
+        { label: "Eşiğin altındaki alan (son 7 gün)", value: sorunlu.length },
+        { label: "En düşük doluluk (son 7 gün)", value: enDusuk ? `${enDusuk.alan} %${enDusuk.yuzdeSon7.toFixed(1)}` : "-" },
+      ],
+      checks: [
+        {
+          id: "data-source-completeness",
+          label: `Tüm alanlar son 7 günde en az %${VERI_TAMLIGI_ESIK_YUZDE} dolu`,
+          ok: sorunlu.length === 0,
+          detail: sorunlu.length === 0 ? "eşiğin altında alan yok" : sorunlu.map((s) => `${s.alan}: %${s.yuzdeSon7.toFixed(1)} (${s.doluSon7}/${s.toplamSon7})`).join(" · "),
+        },
+        { id: "data-source-table", label: "Ayrıntılı tablo", ok: null, detail: 'Sayfanın altındaki "Veri Tamlığı" bölümünde (tüm kapsam + son 7 gün)' },
+      ],
+      lastCheckedAt: nowIso(),
+    };
+  } catch (error) {
+    return {
+      id: "data-source",
+      title: "VERİ TOPLAMA",
+      status: "unknown",
+      description: "Veri Tamlığı ölçülemedi",
+      metrics: [],
+      checks: [],
+      errorMessage: error instanceof Error ? error.message : "Veri tamlığı hatası",
+      lastCheckedAt: nowIso(),
+    };
+  }
 }
 
 // 2026-09-24 — Dependency Propagation temeli (kullanıcı talebi: "Program sensörüyle birlikte
@@ -2003,8 +2043,7 @@ export async function GET() {
     if (result.status === "fulfilled") modules.push(result.value);
   }
 
-  // Henüz gerçek sensörü olmayan modüller — bkz. unmeasuredModule notu.
-  modules.push(unmeasuredModule("data-source", "VERİ TOPLAMA", "TJK / program / yarış verileri"));
+  modules.push(await dataSourceHealth());
 
   // ── Chaos Test override — GERÇEK sensör sonuçları YUKARIDA zaten hesaplandı/DEĞİŞMEDİ;
   // burada yalnız GÖSTERİLEN status, propagation ÇALIŞMADAN ÖNCE zorlanır ki gerçek
@@ -2042,11 +2081,8 @@ export async function GET() {
 
   const statusWeight: Record<Status, number> = { healthy: 0, unknown: 1, warning: 2, critical: 3 };
 
-  // OBSERVABILITY PENDING düğümleri (umbrella) genel sağlığı "unknown"a çekmesin — sahte yeşil verilmez ama ölçülmeyen düğüm alarm da sayılmaz.
-  const observabilityPendingIds = new Set(["data-source"]);
   let overallStatus: Status = "healthy";
   for (const mod of modules) {
-    if (observabilityPendingIds.has(mod.id)) continue;
     if (statusWeight[mod.status] > statusWeight[overallStatus]) overallStatus = mod.status;
   }
 
@@ -2083,5 +2119,6 @@ export async function GET() {
       ? { scenario: activeChaos.scenario, targetModuleId: activeChaos.targetModuleId, reason: activeChaos.reason, expiresAt: activeChaos.expiresAt.toISOString() }
       : null,
     modules: modules.map((m) => ({ ...m, repair: REPAIR_CLASS[m.id] ?? null })),
+    veriTamligi: veriTamligiCache?.data ?? [],
   });
 }
