@@ -100,7 +100,7 @@ export default function SystemAnatomyDashboard() {
         <div>
           <div className="brand">ROTAGANYAN</div>
           <h1>Sistem Anatomisi</h1>
-          <p>Sitenin ve tahmin sisteminin canlı sağlık haritası. Her kutu bir katman; ok, "hangi katmanın hangisini beslediğini" gösterir.</p>
+          <p>Sitenin ve tahmin sisteminin canlı sağlık haritası. Her kutu bir katman; oklar hangi katmanın hangisini beslediğini gösterir.</p>
         </div>
 
         <div className="overall-box">
