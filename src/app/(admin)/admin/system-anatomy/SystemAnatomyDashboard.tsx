@@ -25,10 +25,6 @@ export default function SystemAnatomyDashboard() {
   const [data, setData] = useState<SystemHealthResponse | null>(null);
   const [selectedId, setSelectedId] = useState<string>("engine");
   const [loading, setLoading] = useState(true);
-  const [chaosScenarios, setChaosScenarios] = useState<{ key: string; label: string }[]>([]);
-  const [selectedScenario, setSelectedScenario] = useState<string>("");
-  const [chaosBusy, setChaosBusy] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
 
   async function refresh() {
     try {
@@ -46,48 +42,10 @@ export default function SystemAnatomyDashboard() {
   useEffect(() => {
     refresh();
     const timer = window.setInterval(refresh, 15_000);
-    const clock = window.setInterval(() => setNow(Date.now()), 1000);
     return () => {
       window.clearInterval(timer);
-      window.clearInterval(clock);
     };
   }, []);
-
-  useEffect(() => {
-    fetch("/api/admin/system-health/chaos", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((json) => {
-        setChaosScenarios(json.scenarios ?? []);
-        if (!selectedScenario && json.scenarios?.[0]) setSelectedScenario(json.scenarios[0].key);
-      })
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function activateChaos() {
-    if (!selectedScenario) return;
-    setChaosBusy(true);
-    try {
-      await fetch("/api/admin/system-health/chaos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scenario: selectedScenario }),
-      });
-      await refresh();
-    } finally {
-      setChaosBusy(false);
-    }
-  }
-
-  async function stopChaos() {
-    setChaosBusy(true);
-    try {
-      await fetch("/api/admin/system-health/chaos", { method: "DELETE" });
-      await refresh();
-    } finally {
-      setChaosBusy(false);
-    }
-  }
 
   const selectedHealth = useMemo(() => {
     if (!data) return null;
@@ -144,27 +102,6 @@ export default function SystemAnatomyDashboard() {
         <span><i className="dot dot-warning" /> <b>İzleniyor:</b> küçük bir aksaklık var ya da başka bir katmandan etkileniyor; sistem çalışıyor.</span>
         <span><i className="dot dot-critical" /> <b>Alarm:</b> bu katmanın kendisinde gerçek bir sorun var.</span>
         <span><i className="dot dot-unknown" /> <b>Bilinmiyor:</b> henüz ölçülemedi.</span>
-      </div>
-
-      {data?.chaosTest && (
-        <div className="chaos-banner">
-          <strong>🧪 CHAOS TEST ACTIVE</strong>
-          <span>Scenario: {data.chaosTest.scenario}</span>
-          <span>Expires in: {formatCountdown(new Date(data.chaosTest.expiresAt).getTime() - now)}</span>
-          <button onClick={stopChaos} disabled={chaosBusy}>Durdur</button>
-        </div>
-      )}
-
-      <div className="chaos-control">
-        <span className="chaos-control-label">Fault Injection / Chaos Test:</span>
-        <select value={selectedScenario} onChange={(e) => setSelectedScenario(e.target.value)} disabled={chaosBusy || !!data?.chaosTest}>
-          {chaosScenarios.map((s) => (
-            <option key={s.key} value={s.key}>{s.label}</option>
-          ))}
-        </select>
-        <button onClick={activateChaos} disabled={chaosBusy || !!data?.chaosTest || !selectedScenario}>
-          Senaryoyu Başlat (5dk)
-        </button>
       </div>
 
       <div className="anatomy-layout">
@@ -421,10 +358,3 @@ function ConnectionLayer({ data }: { data: SystemHealthResponse | null }) {
   );
 }
 
-function formatCountdown(ms: number): string {
-  if (ms <= 0) return "0s";
-  const totalSec = Math.floor(ms / 1000);
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  return min > 0 ? `${min}m ${sec}s` : `${sec}s`;
-}

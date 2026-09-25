@@ -7,7 +7,7 @@ import Gauge from "./Gauge";
 // yapmasın" — ayrı sayfa/nav girdisi kaldırıldı, içerik doğrudan ana dashboard'a
 // (admin/page.tsx) taşındı. v6.103'teki orijinal karar (100 koşuluk pencere denetimi)
 // ve AGF trend kıyaslaması korunuyor. "Analiz Motoru Versiyon Karşılaştırması" bölümü
-// 2026-08-24'te kaldırıldı (kullanıcı talebi) — yerini SinyalKutuguPanel aldı.
+// 2026-08-24'te kaldırıldı (kullanıcı talebi) — yerini Sinyal Kütüğü aldı (2026-09-25: artık ayrı sayfa, /admin/sinyal-kutugu).
 
 function Kart({ baslik, deger, alt }: { baslik: string; deger: string; alt: string }) {
   return (

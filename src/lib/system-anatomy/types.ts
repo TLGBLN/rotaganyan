@@ -120,10 +120,6 @@ export type SystemHealthResponse = {
   // etkilendiği (kendisi hariç).
   rootCauseSummary: { moduleId: string; title: string; downstreamCount: number }[];
 
-  // Chaos Test katmanı — aktifse panelde "CHAOS TEST ACTIVE" bandı gösterilir (bkz.
-  // SystemHealthTestOverride). Gerçek üretim/sensör verisini HİÇ etkilemez, yalnız GÖSTERİLEN
-  // status'u geçici olarak zorlar.
-  chaosTest: { scenario: string; targetModuleId: string; reason: string; expiresAt: string } | null;
 
   modules: SystemModuleHealth[];
 };

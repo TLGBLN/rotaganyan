@@ -35,11 +35,6 @@
 // dependent'ın kendi selfStatus'u DEĞİL yalnız `dependencyStatus`/`degradedByDependency`
 // alanları değişir (bkz. propagateDependencies() aşağıda) — "Model çalışıyor ama veri
 // kalitesi ideal değil" mesajı budur, "model durduruldu" DEĞİL.
-//
-// Aşağıdaki Chaos Test katmanı (SystemHealthTestOverride) da BU İLKEYE tabidir: yalnız
-// PANELİN GÖSTERDİĞİ status'u geçici olarak zorlar, gerçek sensör hesaplamasını veya canlı
-// pipeline'ı HİÇ ETKİLEMEZ — bir chaos testi aktifken bile analiz/tahmin/kupon üretimi
-// tamamen normal çalışmaya devam eder.
 // ═══════════════════════════════════════════════════════════════════════════════════
 
 import { NextResponse } from "next/server";
@@ -2045,20 +2040,6 @@ export async function GET() {
 
   modules.push(await dataSourceHealth());
 
-  // ── Chaos Test override — GERÇEK sensör sonuçları YUKARIDA zaten hesaplandı/DEĞİŞMEDİ;
-  // burada yalnız GÖSTERİLEN status, propagation ÇALIŞMADAN ÖNCE zorlanır ki gerçek
-  // dependency grafiği gerçek bir hatadan geliyormuş gibi test edilebilsin. Süresi dolmuş
-  // satırlar her çağrıda temizlenir — unutulmuş bir test kalıcı KALAMAZ. ──
-  await db.systemHealthTestOverride.deleteMany({ where: { expiresAt: { lte: new Date() } } }).catch(() => {});
-  const activeChaos = await db.systemHealthTestOverride.findFirst({ where: { expiresAt: { gt: new Date() } }, orderBy: { createdAt: "desc" } }).catch(() => null);
-  if (activeChaos) {
-    const target = modules.find((m) => m.id === activeChaos.targetModuleId);
-    if (target) {
-      target.status = activeChaos.forcedStatus as Status;
-      target.checks = [{ id: "chaos-override", label: "🧪 CHAOS TEST ACTIVE", ok: false, detail: activeChaos.reason }, ...target.checks];
-    }
-  }
-
   propagateDependencies(modules);
 
   // ── Observation Status (kullanıcı düzeltmesi) — "İzliyor" (observes) ilişkisi status'a/
@@ -2115,9 +2096,6 @@ export async function GET() {
     overallDecision,
     rootCauses,
     rootCauseSummary,
-    chaosTest: activeChaos
-      ? { scenario: activeChaos.scenario, targetModuleId: activeChaos.targetModuleId, reason: activeChaos.reason, expiresAt: activeChaos.expiresAt.toISOString() }
-      : null,
     modules: modules.map((m) => ({ ...m, repair: REPAIR_CLASS[m.id] ?? null })),
     veriTamligi: veriTamligiCache?.data ?? [],
   });
