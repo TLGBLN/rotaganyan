@@ -36,34 +36,8 @@ export type CronRegisteredSnapshot = {
 };
 
 export const CRON_REGISTERED_SNAPSHOT: Record<string, CronRegisteredSnapshot> = {
-  "hot-cache-watchdog": {
-    status: "not_deployed",
-    checkedAt: "2026-09-23",
-    note: "vercel.json'da tanımlı, `vercel deploy --prod` sonrasında bile Vercel'in cron kaydına hiç işlenmedi (7. bilinen örnek — bkz. proje hafızası). Fiili tetiklenme yalnız agf-sync piggyback'ine bağlı.",
-  },
-  "agf-sync": {
-    status: "confirmed",
-    checkedAt: "2026-09-24",
-    note: "Path Vercel'e kayıtlı. `vercel crons ls` bazı saatleri 'modified' gösteriyor ama bu AYNI path'e birden fazla schedule eklendiğinde diff algoritmasının kafa karışıklığı (bilinen false-alarm deseni, bkz. proje hafızası) — ingest-program'da da aynı desen var, result-sync'teki (tek schedule, gerçek zaman farkı) ile KARIŞTIRILMAMALI.",
-  },
-  "ingest-program": {
-    status: "modified",
-    checkedAt: "2026-09-24",
-    // DÜZELTME (2026-09-24, kullanıcı bulgusu — "hepsine yeşil olsun" isteği araştırılırken
-    // yakalandı): önceki not YANLIŞTI ("agf-sync'teki false-alarm deseniyle aynı" demişti).
-    // Tekrar kontrol edildi: `vercel crons ls`'in ÜST (gerçek "Registered") bölümünde
-    // agf-sync'in TÜM 4 saati birebir listeleniyor (diff uyarıları gerçekten gürültü), AMA
-    // ingest-program'ın ÜST bölümünde YALNIZ 3 saat var (05/08/11 UTC) — 13/15/17 hiçbir
-    // yerde "Registered" olarak GÖRÜNMÜYOR, yalnız alttaki "modified" diff'inde. Bu GERÇEK
-    // bir eksik kayıt — agf-sync'in false-alarm deseninden FARKLI. Sonuç: Program Sync
-    // fiilen günde 3 kez (05/08/11 UTC) çalışıyor, 11:00'den ertesi gün 05:00'e kadar
-    // ~18 saatlik GERÇEK bir tetiklenme boşluğu var. Bu, 2026-09-24 sabahı ProgramCronRunState
-    // hiç dolmamış olarak yakalandı (elle tetiklenene kadar) — canlı kanıt.
-    note: "GERÇEK kısmi kayıt: yalnız 3/6 saat (05/08/11 UTC) Vercel'in 'Registered' listesinde var, 13/15/17 hiç görünmüyor (agf-sync'teki diff false-alarm'ından FARKLI — orada tüm saatler Registered'da mevcut). Registered-drift KENDİSİ düzeltilmedi (Vercel platform kısıtı, elimizde değil) — ama 2026-09-24'ten beri result-sync piggyback'i (runProgramSyncIfDue, due-check'li) eksik 13/15/17 slotlarını fallback ile karşılıyor, etkin kapsama 6/6.",
-  },
-  "result-sync": {
-    status: "modified",
-    checkedAt: "2026-09-23",
-    note: "GERÇEK drift (yukarıdaki çoklu-schedule false-alarm'larıyla KARIŞTIRILMAMALI) — bu TEK bir schedule'a sahip path, Vercel'de `*/15 11-21 * * *` kayıtlıyken yerel vercel.json'da `*/5 11-21 * * *` yazıyor. Yani sonuç senkronu Vercel'in gerçekte çalıştırdığı hızda 5dk değil 15dk'da bir tetikleniyor olabilir — henüz araştırılmadı/düzeltilmedi.",
-  },
+  "hot-cache-watchdog": { status: "confirmed", checkedAt: "2026-09-25", note: "36/36 cron Vercel'de vercel.json ile birebir kayıtlı (`vercel crons ls`, 2026-09-25). KÖK NEDEN (2026-09-25 bulundu): projede `autoAssignCustomDomains=false` (system) ve production target 16 Ağu'daki eski bir deployment'a (arsb49cri) sabitlenmişti — cron kaydı ve cron'ların çalıştığı KOD o 39 günlük deployment'a bağlıydı; CLI `--prod` deploy'ları production target'ı ve cron kaydını güncellemiyordu (bu yüzden 'yeni path kaydolmuyor', 'modified drift', result-sync'in 60sn timeout'u ve state tablolarının hiç dolmaması). `vercel promote` ile yeni deployment production target yapıldı → auto-assign açıldı, cron kaydı güncellendi. YENİ DEPLOY KURALI: `vercel --prod` sonrası `vercel promote <url>` (veya `vercel project inspect` ile targets.production doğrula)." },
+  "agf-sync": { status: "confirmed", checkedAt: "2026-09-25", note: "36/36 cron Vercel'de vercel.json ile birebir kayıtlı (`vercel crons ls`, 2026-09-25). KÖK NEDEN (2026-09-25 bulundu): projede `autoAssignCustomDomains=false` (system) ve production target 16 Ağu'daki eski bir deployment'a (arsb49cri) sabitlenmişti — cron kaydı ve cron'ların çalıştığı KOD o 39 günlük deployment'a bağlıydı; CLI `--prod` deploy'ları production target'ı ve cron kaydını güncellemiyordu (bu yüzden 'yeni path kaydolmuyor', 'modified drift', result-sync'in 60sn timeout'u ve state tablolarının hiç dolmaması). `vercel promote` ile yeni deployment production target yapıldı → auto-assign açıldı, cron kaydı güncellendi. YENİ DEPLOY KURALI: `vercel --prod` sonrası `vercel promote <url>` (veya `vercel project inspect` ile targets.production doğrula)." },
+  "ingest-program": { status: "confirmed", checkedAt: "2026-09-25", note: "36/36 cron Vercel'de vercel.json ile birebir kayıtlı (`vercel crons ls`, 2026-09-25). KÖK NEDEN (2026-09-25 bulundu): projede `autoAssignCustomDomains=false` (system) ve production target 16 Ağu'daki eski bir deployment'a (arsb49cri) sabitlenmişti — cron kaydı ve cron'ların çalıştığı KOD o 39 günlük deployment'a bağlıydı; CLI `--prod` deploy'ları production target'ı ve cron kaydını güncellemiyordu (bu yüzden 'yeni path kaydolmuyor', 'modified drift', result-sync'in 60sn timeout'u ve state tablolarının hiç dolmaması). `vercel promote` ile yeni deployment production target yapıldı → auto-assign açıldı, cron kaydı güncellendi. YENİ DEPLOY KURALI: `vercel --prod` sonrası `vercel promote <url>` (veya `vercel project inspect` ile targets.production doğrula)." },
+  "result-sync": { status: "confirmed", checkedAt: "2026-09-25", note: "36/36 cron Vercel'de vercel.json ile birebir kayıtlı (`vercel crons ls`, 2026-09-25). KÖK NEDEN (2026-09-25 bulundu): projede `autoAssignCustomDomains=false` (system) ve production target 16 Ağu'daki eski bir deployment'a (arsb49cri) sabitlenmişti — cron kaydı ve cron'ların çalıştığı KOD o 39 günlük deployment'a bağlıydı; CLI `--prod` deploy'ları production target'ı ve cron kaydını güncellemiyordu (bu yüzden 'yeni path kaydolmuyor', 'modified drift', result-sync'in 60sn timeout'u ve state tablolarının hiç dolmaması). `vercel promote` ile yeni deployment production target yapıldı → auto-assign açıldı, cron kaydı güncellendi. YENİ DEPLOY KURALI: `vercel --prod` sonrası `vercel promote <url>` (veya `vercel project inspect` ile targets.production doğrula)." },
 };
