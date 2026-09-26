@@ -32,6 +32,17 @@
  * SINYAL-FORMULLERI.md'dir — bu dosya güncellenmesi gereken taraftır.
  */
 
+// 2026-09-26 kullanıcı denetimi: "Production Truth" ayrımı — üç farklı bilgi türü BİRBİRİNE
+// KARIŞMASIN diye admin sayfasının en üstünde açıkça gösterilir. Bu dosyadaki
+// CANLI_SINYALLER/SIRALAMA_KURALLARI'nin katsayıları BİLEREK gerçek production kodundan bir
+// kopyadır (elle senkronize edilir, drift edebilir) — anlaşmazlık olduğunda SINYAL-FORMULLERI.md
+// kazanır, bu dosya değil.
+export const PRODUKSIYON_GERCEKLIGI: { katman: string; kaynak: string; aciklama: string }[] = [
+  { katman: "Kod gerçekliği", kaynak: "SINYAL-FORMULLERI.md", aciklama: "Production'da ŞU AN gerçekten çalışan formül/katsayı/segment mantığı — bu sayfayla çelişirse doğru kabul edilecek TEK kaynak budur." },
+  { katman: "Araştırma / tarihçe", kaynak: "Sinyal Kütüğü (bu sayfa)", aciklama: "Hangi sinyal ne zaman/neden eklendi-çıkarıldı-reddedildi, vaka bazlı gerekçeler, B=500 kanıt tarihçesi — elle bakımı yapılan bir karar kütüğü, canlı sorgu değil." },
+  { katman: "Canlı performans", kaynak: "Model Ops / sahadaki gerçek isabet (aşağıdaki bölüm, v5-sinyal-performans.service.ts)", aciklama: "Yayınlanmış ve sonuçlanmış tahminlerdeki FİİLİ kazanma oranı/LogLoss — modelin kendi katsayı iddiası değil, gerçek saha sonucu." },
+];
+
 export type SinyalAnlamlilik = "anlamli" | "sinirda" | "anlamsiz" | "override" | "veri-yok";
 
 // 2026-09-21 dış denetim (kullanıcı) — DÜZELTME: A/B etiketleri artık kanıt GÜCÜNE göre
@@ -58,6 +69,11 @@ export type CanliSinyal = {
   katman: SinyalKatmani;
   dusukSart: { katsayi: number; durum: SinyalAnlamlilik; not?: string };
   diger: { katsayi: number; durum: SinyalAnlamlilik; not?: string };
+  // 2026-09-26 kullanıcı denetimi: Handikap override'ları önceden yalnız `diger.not` METNİNDE
+  // gömülüydü — okuyan "Diğer +0.122" hücresini görüp Handikap'ta da bu katsayının çalıştığını
+  // sanabilirdi. Bu alan yalnız hizDerecesi/idmJokey/yarisGidisatiSkoru'da dolu (WEIGHTS_DIGER_
+  // HANDIKAP'ın elle sıfırladığı 3 sinyal, bkz. SINYAL-FORMULLERI.md §2) — katsayı HER ZAMAN 0.
+  handikapOverride?: { katsayi: number; not?: string };
   aciklama: string;
 };
 
@@ -71,9 +87,9 @@ export type CanliSinyal = {
 export const CANLI_SINYALLER: CanliSinyal[] = [
   { ad: "AGF Sırası", kod: "agfSirasi", katman: "A", dusukSart: { katsayi: -0.64230, durum: "anlamli" }, diger: { katsayi: -0.40586, durum: "anlamli" }, aciklama: "Her iki segmentte de en güvenilir sinyallerden biri — piyasa favoriliği." },
   { ad: "AGF Payı", kod: "agfPayi", katman: "A", dusukSart: { katsayi: 0.46472, durum: "anlamli" }, diger: { katsayi: 0.53482, durum: "anlamli" }, aciklama: "agfSirasi'ndan bağımsız: sıralamadan çok kalabalıktan ne kadar öne çıktığı. VIF BULGUSU (2026-08-31): agfPayi/agfPayi² arasında CİDDİ çoklu-doğrusal-bağlantı (VIF=12.12/7.94, diğer 10 sinyal VIF~1, r=0.90) — bireysel katsayı tahminleri güvenilmez. İKİ ayrı düzeltme denendi (agfTrend ile DEĞİŞTİRME ve EKLEME, bkz. ADAY_SİNYALLER), ikisi de gerçek performansı iyileştirmedi/kötüleştirdi — VIF kabul edildi, dokunulmadı (yüksek VIF burada tahmin gücünü değil yalnız katsayı yorumunu etkiliyor)." },
-  { ad: "Hız Derecesi", kod: "hizDerecesi", katman: "A", dusukSart: { katsayi: 0.15060, durum: "sinirda", not: "🟡 UNSTABLE/VALIDATION PENDING (2026-09-12 izole profil-refit OOS'ta hem prod'dan hem 0'dan anlamlı KÖTÜ çıktı — bkz. SINYAL-FORMULLERI.md §5)." }, diger: { katsayi: 0.12197, durum: "anlamli", not: "Handikap'ta elle 0'a sabitlendi (V5.10). 🟢 VALIDATED/KEEP." }, aciklama: "Son 365 gün, popülasyon ortalamasına göre göreli hız. Handikap kategorisinde katkısı istatistiksel olarak sıfır bulunduğu için override edildi. DÜZELTME (V5.33, 2026-08-31): canlı sunum ve eğitim, V5.32'nin retrain incelemesi sırasında fark edilen bir train/serve uyumsuzluğu taşıyordu (canlı yalnız BUGÜNKÜ kova/popülasyona bakıyordu, eğitim atın son 3 koşusunun HER BİRİNİ KENDİ kovasına/tarihine göre kıyaslıyordu — canlıda %43.8 sıfır dönerken eğitimde %8.2). Artık ikisi de aynı paylaşılan çekirdeği (hiz-derecesi-hesapla.ts) kullanıyor. BİLİNEN SINIRLAMA (2026-09-21): bu düzeltmeden SONRA katsayılar hiç yeniden fit edilmedi — bkz. SINYAL-FORMULLERI.md §4b." },
+  { ad: "Hız Derecesi", kod: "hizDerecesi", katman: "A", dusukSart: { katsayi: 0.15060, durum: "sinirda", not: "🟡 UNSTABLE/VALIDATION PENDING (2026-09-12 izole profil-refit OOS'ta hem prod'dan hem 0'dan anlamlı KÖTÜ çıktı — bkz. SINYAL-FORMULLERI.md §5)." }, diger: { katsayi: 0.12197, durum: "anlamli", not: "Handikap'ta elle 0'a sabitlendi (V5.10). 🟢 VALIDATED/KEEP." }, handikapOverride: { katsayi: 0, not: "V5.10'dan beri elle sıfırlandı — soldaki 'Diğer' katsayısı (+0.12197) Handikap koşularında GEÇERLİ DEĞİL." }, aciklama: "Son 365 gün, popülasyon ortalamasına göre göreli hız. Handikap kategorisinde katkısı istatistiksel olarak sıfır bulunduğu için override edildi. DÜZELTME (V5.33, 2026-08-31): canlı sunum ve eğitim, V5.32'nin retrain incelemesi sırasında fark edilen bir train/serve uyumsuzluğu taşıyordu (canlı yalnız BUGÜNKÜ kova/popülasyona bakıyordu, eğitim atın son 3 koşusunun HER BİRİNİ KENDİ kovasına/tarihine göre kıyaslıyordu — canlıda %43.8 sıfır dönerken eğitimde %8.2). Artık ikisi de aynı paylaşılan çekirdeği (hiz-derecesi-hesapla.ts) kullanıyor. BİLİNEN SINIRLAMA (2026-09-21): bu düzeltmeden SONRA katsayılar hiç yeniden fit edilmedi — bkz. SINYAL-FORMULLERI.md §4b." },
   { ad: "Antrenör Oranı", kod: "antrenorOrani", katman: "A", dusukSart: { katsayi: 0.31410, durum: "anlamli" }, diger: { katsayi: 0.22003, durum: "anlamli" }, aciklama: "Düşük-şartta belirgin daha ağır basıyor." },
-  { ad: "İdman Jokeyi Uyumu", kod: "idmJokey", katman: "A", dusukSart: { katsayi: 0.19055, durum: "anlamli" }, diger: { katsayi: 0.05892, durum: "anlamli", not: "Handikap'ta elle 0'a sabitlendi (V5.31, 2026-08-31) — Opus denetimi: canlı model-düzeltilmiş bakiye -5.93pp (GA=[-10.34,-1.60], sıfırı dışlıyor, n=107), üretim-sadık katsayı canlı %75 fit'te 0.1033'ten tüm veride 0.0266'ya (GA sıfırı kapsıyor) kaymış — 12 sinyalin en büyük kayması. Görülmemiş son %25'te sıfırlarsa top1 +3.95pp/top3 +2.63pp/logloss -0.0306, hepsi anlamlı iyileşme. Düşük-şart'ta katsayı sağlam pozitif (GA=[0.102,0.372]), KORUNDU — hizDerecesi/Handikap (V5.10) ile AYNI cerrahi desen." }, aciklama: "Yarıştıracak jokey, atın idmanlarından BİRİNİ (yalnız SON idmanı değil, gecerliGaloplar'ın HERHANGİ BİRİNİ) yaptırmış mı — bkz. isSameJockey. Diğer 11 özellik silindikten sonra iki segmentte de netleşti." },
+  { ad: "İdman Jokeyi Uyumu", kod: "idmJokey", katman: "A", dusukSart: { katsayi: 0.19055, durum: "anlamli" }, diger: { katsayi: 0.05892, durum: "anlamli", not: "Handikap'ta elle 0'a sabitlendi (V5.31, 2026-08-31) — Opus denetimi: canlı model-düzeltilmiş bakiye -5.93pp (GA=[-10.34,-1.60], sıfırı dışlıyor, n=107), üretim-sadık katsayı canlı %75 fit'te 0.1033'ten tüm veride 0.0266'ya (GA sıfırı kapsıyor) kaymış — 12 sinyalin en büyük kayması. Görülmemiş son %25'te sıfırlarsa top1 +3.95pp/top3 +2.63pp/logloss -0.0306, hepsi anlamlı iyileşme. Düşük-şart'ta katsayı sağlam pozitif (GA=[0.102,0.372]), KORUNDU — hizDerecesi/Handikap (V5.10) ile AYNI cerrahi desen." }, handikapOverride: { katsayi: 0, not: "V5.31'den beri elle sıfırlandı — soldaki 'Diğer' katsayısı (+0.05892) Handikap koşularında GEÇERLİ DEĞİL (canlı-bakiye testinde ters/anlamsız çıkmıştı, GA=[-10.34,-1.60])." }, aciklama: "Yarıştıracak jokey, atın idmanlarından BİRİNİ (yalnız SON idmanı değil, gecerliGaloplar'ın HERHANGİ BİRİNİ) yaptırmış mı — bkz. isSameJockey. Diğer 11 özellik silindikten sonra iki segmentte de netleşti." },
   { ad: "Jokey Oranı", kod: "jokeyOrani", katman: "A", dusukSart: { katsayi: 0.11672, durum: "anlamli" }, diger: { katsayi: 0.04326, durum: "anlamsiz", not: "2026-08-28 zamansal kayma bulundu: Ocak-Mayıs nokta=0.162 GA=[0.110,0.225] anlamlı, Haziran-Ağustos nokta=0.114 GA=[0.044,0.186] hâlâ anlamlı — VIF artmadı (kollinearlik hipotezi doğrulanmadı), gerçek sebep belirsiz. Sıfırlanmadı, izlemede. GÜNCELLEME (2026-08-30, Opus denetimi): V5 döneminde sonuçlanmış TÜM koşularda (n=248) canlı isabet iki bağımsız ölçütte de bu 'anlamsız' etiketiyle ÇELİŞİYOR — kod-bazlı lift +3.9pp (budama sonrası +6.0pp), 4 koşu tipinin (Maiden/Şartlı/Handikap/diğer) HEPSİNDE pozitif, featureSnapshot z-farkı +0.651. Katsayı sıfırlanmadan bırakılması doğru karar çıktı, 'anlamsız' notu artık güncel canlı veriyle desteklenmiyor." }, aciklama: "Jokeyin genel kazanma yüzdesi." },
   { ad: "AGF Payı² (kare terimi)", kod: "agfPayi2", katman: "A", dusukSart: { katsayi: -0.18167, durum: "anlamli" }, diger: { katsayi: -0.19950, durum: "anlamli" }, aciklama: "AGF payının doğrusal-olmayan (kare) terimi — güçlü favorilerin piyasada fazla değerli görülmesini düzeltir. VIF notu: bkz. agfPayi girdisi." },
   { ad: "H2H Net Skor", kod: "h2hNetSkor", katman: "A", dusukSart: { katsayi: 0, durum: "override", not: "Ham değer ters yönlüydü, elle sıfırlandı" }, diger: { katsayi: 0.08064, durum: "anlamli", not: "Sınırda anlamlı — ilk eklemede GA=[-0.0105,0.1603] sıfırı içeriyordu, sonraki genişletilmiş veride GA sıfırı dışlıyor. Bkz. SINYAL-FORMULLERI.md §5." }, aciklama: "Baş-başa geçmiş karşılaşmalarda HAM toplam net galibiyet farkı (recency-weighted/normalize DEĞİL)." },
@@ -193,6 +209,7 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
     katman: "A",
     dusukSart: { katsayi: 0.07704, durum: "anlamsiz", not: "V5.45 (2026-09-11): formüle Tempo Taşıma Gücü eklendikten sonra GA=[-0.049,0.280] — hâlâ sınırda/sıfırı içeriyor ama YÖN pozitif kaldı (aynı yarisGidisatiSkoru'nun ilk kabul standardı)." },
     diger: { katsayi: 0.08234, durum: "anlamli", not: "V5.45 (2026-09-11) — Tempo Taşıma Gücü (bkz. tempo-tasima-gucu.actions.ts, atın geçmiş Accurace yarışlarında son 800m'de en iyiye göre kalış farkı) AYRI özellik olarak denendiğinde B=500'de her iki segmentte de anlamsız/ters çıkmıştı (diğer sinyaller zaten aynı bilgiyi açıklıyordu) — yarisGidisatiSkoru'nun KENDİ formülüne (zorluk-ağırlıklı: yalnız MÜCADELELİ/ÇOK_YÜKSEK/DAĞILMA_RİSKİ olasılığı yüksekse devreye girer) entegre edilince katsayı ARTIK anlamlı (GA=[0.0049,0.1835], önceden GA=[-0.0085,0.1659] idi). Handikap'ta elle 0'a sabitlenmesi (V5.44) KORUNDU — Handikap DIŞI 585 koşuda GA=[0.0596,0.2775] kesin anlamlı, Handikap içi 366 koşuda ters/anlamsız GA=[-0.168,0.104]." },
+    handikapOverride: { katsayi: 0, not: "V5.44'ten beri elle sıfırlandı — soldaki 'Diğer' katsayısı (+0.08234) Handikap koşularında GEÇERLİ DEĞİL (Handikap içi 366 koşuda GA=[-0.168,0.104] ters/anlamsız)." },
     aciklama: "Sahadaki her atın (Accurace geçmişinden, sızıntısız) stil dağılımı + erken hız gücünden saha-geneli beklenen tempo senaryosu (6 sınıf, olasılık dağılımı) çıkarılır, sonra bu atın kendi stiline uygunluğu bir uyum matrisiyle skorlanır — ARTIK buna atın geçmiş Accurace yarışlarında ölçülen gerçek 'tempo taşıma gücü' de (yalnız beklenen tempo zorluysa ağırlıklı) ekleniyor (V5.45). Kapsama %74.7 (n<3 Accurace geçmişi olan atlarda 0/nötr). Handikap-dışı 'diğer'de artık net anlamlı, Handikap'ta sıfırlandı, düşük-şart'ta pozitif ama hâlâ anlamsız.",
   },
 ];
@@ -215,11 +232,18 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
 // ama kalıcı araçla (n=1060, gerçek train/test) yeniden test edilince ANLAMSIZ çıktı —
 // küçük örneklemin (V5 penceresi) yanıltıcı olduğu bir örnek daha.
 
+export type KanitSeviyesi = "yuksek" | "orta" | "dusuk";
+
 export type SiralamaKurali = {
   ad: string;
   etiket: string;
   aciklama: string;
   backtestOzet: string;
+  // 2026-09-26 kullanıcı denetimi: AGF Trend Terfisi ve Saf Model Değer Terfisi (ikisi de
+  // AKTİF) aynı görsel ağırlıkta gösteriliyordu ama kanıt zincirleri FARKLI — biri düzeltilmiş
+  // bir mekanizma+eski V4 tarihçesi, diğeri "backtest'siz canlı, 5 vaka ile çapraz doğrulama".
+  // Bu alan yalnız kanıt seviyesi FARKLI olan aktif kurallarda dolu.
+  kanitSeviyesi?: { seviye: KanitSeviyesi; etiket: string };
 };
 
 // 2026-08-27: aynı gün İKİ YÖNDE değişti. Sabah "sıralamalar yüzdelere göre olacak" dendi,
@@ -241,13 +265,15 @@ export const SIRALAMA_KURALLARI: SiralamaKurali[] = [
     ad: "AGF Trend Terfisi",
     etiket: "GERİ AÇILDI (2026-08-30, V5.28+) — BUG DÜZELTİLDİ (2026-09-02, V5.38)",
     aciklama: "En çok yükselen/düşen AGF trendini taşıyan + yeterli sinyal sayısına (≥4) sahip atlar, ham sıralamada geride kalsa bile ilk-3'e/ilk-6'ya terfi eder. 2026-08-27'de diğer ikisiyle birlikte kapatılmıştı (Kocaeli 2.Koşu örneği), 2026-08-30'da geri açıldı. GERÇEK BİR BUG (2026-09-02'de bulundu, arac-tam-at-inceleme.mts ile THEATER OF WAR incelemesi sırasında): eski uygulama 'adayın olasılığı diğerleriyle yarışır' ilkesiyle çalışıyordu (terfiPenceresiV5), ama girdi ZATEN olasılığa göre sıralı geldiği için pencere dışındaki hiçbir aday hiçbir doğal sakini matematiksel olarak geçemiyordu — bu kural 2026-08-30'dan 2026-09-02'ye kadar SESSİZCE HİÇ ÇALIŞMAMIŞ, terfiEdenNolar HER ZAMAN boş dönmüş (sentetik testle doğrulandı: düzeltme öncesi/sonrası aynı senaryoda agfTerfi hep null'dan gerçek terfiye geçti). Düzeltme: agfFavoriIlk3Garantisi ile aynı ilke — en güçlü aday, pencerenin en zayıf sakinini KOŞULSUZ yerinden alır (yalnız o tek sakin değişir, güçlü sakinler asla elenmez).",
-    backtestOzet: "n=663 → %21.6 galibiyet / %53.8 top3 — bu rakam V4'ün ORİJİNAL (çalışan) mekanizmasından. V5 portundaki 2026-08-30→2026-09-02 arası GERÇEKTE UYGULANMIYORDU (yukarıya bak). 2026-09-02'den itibaren düzeltilmiş haliyle GEÇERLİ ve UYGULANIYOR — güncel veriyle toplu backtest henüz YAPILMADI (yalnız sentetik doğrulama).",
+    backtestOzet: "n=663 → %21.6 galibiyet / %53.8 top3 — bu rakam V4'ün ORİJİNAL (çalışan) mekanizmasından, yalnız TARİHÇE amaçlı, güncel kanıt olarak okunmamalı. V5 portundaki 2026-08-30→2026-09-02 arası GERÇEKTE UYGULANMIYORDU (yukarıya bak). 2026-09-02'den itibaren düzeltilmiş haliyle GEÇERLİ ve UYGULANIYOR. V5.46 üzerinde güncel, toplu bir postprocess audit MEVCUT (n=682 yarış, RAW-vs-FINAL sıra karşılaştırması, bkz. proje kök dizini _tmp_postprocess_audit.mts) — etkisi segment ve vaka bazında KARIŞIK çıktı, mekanizma bilerek açık tutuluyor. Bu kuralın KENDİSİNE izole edilmiş, güncel veriyle toplu bir backtest henüz YAPILMADI (yalnız sentetik doğrulama var).",
+    kanitSeviyesi: { seviye: "orta", etiket: "Mekanizma bug'ı düzeltildi (V5.38) ve 682 yarışlık güncel postprocess audit'i var, ama kuralın KENDİSİNE özel izole bir backtest henüz yok — n=663 rakamı eski V4 mekanizmasından." },
   },
   {
     ad: "Saf Model Değer Terfisi",
     etiket: "YENİ (2026-09-02, V5.38) — KAPISI DÜZELTİLDİ (V5.39) — İLK-3 KADEMESİ EKLENDİ (V5.41)",
     aciklama: "Saf Model (marketBlindProb1, AGF'siz) ile AGF payı arasındaki fark ≥5pp VE modelin AGF-dışı katkılarının TOPLAMI net pozitifse, at ham sıralamada geride kalsa bile ilk-6'ya KOŞULSUZ terfi eder (agfFavoriIlk3Garantisi/düzeltilmiş agfTrendTerfisi ile aynı splice ilkesi). THEATER OF WAR vakasından doğdu. İLK SÜRÜM (V5.38) ikinci koşul olarak sinyalSayisi≥4 kullanıyordu — BAY UMUT vakasıyla (İstanbul K4) yanlış çıktığı bulundu, marketBlindProb1'i üreten AYNI hesaba (AGF-dışı katkı toplamı) geçildi (V5.39). V5.41: aynı ilke, daha SIKI bir eşikle (≥8pp), ilk-3 için de eklendi — KINDBERO vakasından doğdu (İzmir K5: kazandı ama 4.sırada kaldı, Saf Model onu 2.sırada görüyordu, fark=+8.2pp — 4.sıra zaten ilk-6 içi olduğu için eski taban hiç devreye girmemişti).",
-    backtestOzet: "Kullanıcı kararıyla backtest İSTENMEDEN doğrudan canlıya alındı. Gerçek 5 koşuyla (İstanbul K1/K4/K6/K9 + İzmir K5, 2026-09-02/03) çapraz doğrulandı: K4'te BAY UMUT 8.'den 6.'ya, K5'te KINDBERO 4.'ten 3.'e terfi ediyor; K4'teki DİLAN KIZ, K6'daki ANGEL OF DEFNE, K5'teki ÇERKES ENVER (büyük fark ama AGF-dışı katkıları NET NEGATİF — yalnız AGF'nin ekstra kötümserliğinden kaynaklanan sahte bir fark) doğru şekilde DIŞLANIYOR. Aynı K5'te ARDAPAŞA (fark=+11.4pp, KINDBERO'dan büyük) da nitelik kazanıyor ama KINDBERO'nun daha yüksek ham olasılığı yüzünden slotu kazanamıyor — beklenen davranış.",
+    backtestOzet: "Kullanıcı kararıyla backtest İSTENMEDEN doğrudan canlıya alındı. Gerçek 5 koşuyla (İstanbul K1/K4/K6/K9 + İzmir K5, 2026-09-02/03) çapraz doğrulandı: K4'te BAY UMUT 8.'den 6.'ya, K5'te KINDBERO 4.'ten 3.'e terfi ediyor; K4'teki DİLAN KIZ, K6'daki ANGEL OF DEFNE, K5'teki ÇERKES ENVER (büyük fark ama AGF-dışı katkıları NET NEGATİF — yalnız AGF'nin ekstra kötümserliğinden kaynaklanan sahte bir fark) doğru şekilde DIŞLANIYOR. Aynı K5'te ARDAPAŞA (fark=+11.4pp, KINDBERO'dan büyük) da nitelik kazanıyor ama KINDBERO'nun daha yüksek ham olasılığı yüzünden slotu kazanamıyor — beklenen davranış. Bu 5 vaka DIŞINDA hiçbir toplu backtest/istatistiksel GA yok — aktif kurallar arasında en zayıf kanıt zincirine sahip.",
+    kanitSeviyesi: { seviye: "dusuk", etiket: "ACTIVE / VALIDATION INCOMPLETE — backtest'siz canlıya alındı, yalnız 5 gerçek vakayla çapraz doğrulandı. Kapatma anlamına gelmez, ama AGF Trend Terfisi ile AYNI güven seviyesinde okunmamalı." },
   },
   {
     ad: "AGF Favorisi İlk-3 Garantisi",

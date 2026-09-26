@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { CanliSinyal, SiralamaKurali, AdaySinyal, SinyalAnlamlilik, AdaySinyalDurum } from "@/server/services/sinyal-kutugu.service";
+import type { CanliSinyal, SiralamaKurali, AdaySinyal, SinyalAnlamlilik, AdaySinyalDurum, KanitSeviyesi } from "@/server/services/sinyal-kutugu.service";
 import type { AnalystBreakdown } from "@/server/services/admin.service";
 import "./sinyal-kutugu.css";
 
 type Sekme = "hepsi" | "A" | "B" | "kural" | "aday";
 type Secim = { tur: "canli"; kod: string } | { tur: "kural"; ad: string } | { tur: "aday"; ad: string } | null;
+type ProdGercek = { katman: string; kaynak: string; aciklama: string };
 
 const DURUM_ETIKET: Record<SinyalAnlamlilik, string> = { anlamli: "anlamlı", sinirda: "sınırda", anlamsiz: "anlamsız", override: "elle 0", "veri-yok": "veri yok" };
 const DURUM_ACIKLAMA: Record<SinyalAnlamlilik, string> = {
@@ -17,11 +18,15 @@ const DURUM_ACIKLAMA: Record<SinyalAnlamlilik, string> = {
   "veri-yok": "Bu segmentte uygulanmıyor ya da veri yok.",
 };
 const ADAY_ETIKET: Record<AdaySinyalDurum, string> = { acik: "AÇIK", reddedildi: "REDDEDİLDİ", beklemede: "BEKLEMEDE" };
+// Kanıt seviyesi, mevcut anlamlılık-chip renkleriyle (yeşil/sarı/kırmızı) AYNI CSS sınıflarını
+// reuse eder — yeni bir chip stili gerekmiyor (bkz. 2026-09-26 kullanıcı denetimi).
+const KANIT_CHIP: Record<KanitSeviyesi, string> = { yuksek: "sk-anlamli", orta: "sk-sinirda", dusuk: "sk-anlamsiz" };
+const KANIT_ETIKET: Record<KanitSeviyesi, string> = { yuksek: "kanıt: yüksek", orta: "kanıt: orta", dusuk: "kanıt: DÜŞÜK" };
 
 const fmt = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(3)}`;
 const kuralAktifMi = (k: SiralamaKurali) => !k.etiket.toUpperCase().startsWith("KAPALI");
 
-export default function SinyalKutuguDashboard({ canli, siralama, adaylar, isabet }: { canli: CanliSinyal[]; siralama: SiralamaKurali[]; adaylar: AdaySinyal[]; isabet: AnalystBreakdown[] }) {
+export default function SinyalKutuguDashboard({ canli, siralama, adaylar, isabet, gercekler }: { canli: CanliSinyal[]; siralama: SiralamaKurali[]; adaylar: AdaySinyal[]; isabet: AnalystBreakdown[]; gercekler: ProdGercek[] }) {
   const [sekme, setSekme] = useState<Sekme>("hepsi");
   const [ara, setAra] = useState("");
   const [secim, setSecim] = useState<Secim>({ tur: "canli", kod: canli[0]?.kod ?? "" });
@@ -75,8 +80,11 @@ export default function SinyalKutuguDashboard({ canli, siralama, adaylar, isabet
       </header>
 
       <div className="sk-warn">
-        ⚠️ Bu sayfa elle bakımı yapılan bir <b>araştırma / karar kütüğüdür</b>: production&apos;da şu an tam olarak hangi sayının çalıştığının kesin kaynağı değildir. Kod-doğrulanmış güncel katsayılar için{" "}
-        <code>rotaganyan/SINYAL-FORMULLERI.md</code> esas alınır. Aşağıdaki &quot;sahadaki gerçek isabet&quot; bölümü ise canlı veriden gelir.
+        <div className="sk-truth">
+          {gercekler.map((g) => (
+            <div key={g.katman}><b>{g.katman}:</b> <code>{g.kaynak}</code> — {g.aciklama}</div>
+          ))}
+        </div>
       </div>
 
       <div className="sk-legend">
@@ -98,7 +106,7 @@ export default function SinyalKutuguDashboard({ canli, siralama, adaylar, isabet
         <section className="sk-list">
           {gorunenCanli.length > 0 && (
             <>
-              <h2>Canlı sinyaller <small>(düşük-şart = Maiden / Şartlı 1-19-27 · diğer = Handikap / Şartlı 2-5 / KV-Grup / Satış)</small></h2>
+              <h2>Canlı sinyaller <small>(düşük-şart = Maiden / Şartlı 1-19-27 · diğer = Handikap / Şartlı 2-5 / KV-Grup / Satış · Maiden+Satış hibrit koşularda ikisi %50/%50 harmanlanır, bkz. SINYAL-FORMULLERI.md §2)</small></h2>
               <div className="sk-grid">
                 {gorunenCanli.map((s) => (
                   <button key={s.kod} className={`sk-card ${secim?.tur === "canli" && secim.kod === s.kod ? "sel" : ""}`} onClick={() => setSecim({ tur: "canli", kod: s.kod })}>
@@ -107,6 +115,9 @@ export default function SinyalKutuguDashboard({ canli, siralama, adaylar, isabet
                     <div className="sk-seg">
                       <div><small>Düşük-şart</small><b>{fmt(s.dusukSart.katsayi)}</b><i className={`sk-chip sk-${s.dusukSart.durum}`}>{DURUM_ETIKET[s.dusukSart.durum]}</i></div>
                       <div><small>Diğer</small><b>{fmt(s.diger.katsayi)}</b><i className={`sk-chip sk-${s.diger.durum}`}>{DURUM_ETIKET[s.diger.durum]}</i></div>
+                      {s.handikapOverride && (
+                        <div><small>Handikap override</small><b>{fmt(s.handikapOverride.katsayi)}</b><i className="sk-chip sk-override">elle 0</i></div>
+                      )}
                     </div>
                   </button>
                 ))}
@@ -120,7 +131,13 @@ export default function SinyalKutuguDashboard({ canli, siralama, adaylar, isabet
               <div className="sk-grid">
                 {gorunenKural.map((k) => (
                   <button key={k.ad} className={`sk-card ${secim?.tur === "kural" && secim.ad === k.ad ? "sel" : ""}`} onClick={() => setSecim({ tur: "kural", ad: k.ad })}>
-                    <div className="sk-card-top"><strong>{k.ad}</strong><span className={`sk-layer ${kuralAktifMi(k) ? "sk-on" : "sk-off"}`}>{kuralAktifMi(k) ? "AÇIK" : "KAPALI"}</span></div>
+                    <div className="sk-card-top">
+                      <strong>{k.ad}</strong>
+                      <span className="sk-badges">
+                        <span className={`sk-layer ${kuralAktifMi(k) ? "sk-on" : "sk-off"}`}>{kuralAktifMi(k) ? "AÇIK" : "KAPALI"}</span>
+                        {k.kanitSeviyesi && <i className={`sk-chip ${KANIT_CHIP[k.kanitSeviyesi.seviye]}`}>{KANIT_ETIKET[k.kanitSeviyesi.seviye]}</i>}
+                      </span>
+                    </div>
                     <p className="sk-clamp">{k.etiket}</p>
                   </button>
                 ))}
@@ -162,13 +179,25 @@ export default function SinyalKutuguDashboard({ canli, siralama, adaylar, isabet
                   </div>
                 );
               })}
+              {secili.s!.handikapOverride && (
+                <div className="sk-segdetail">
+                  <div className="sk-segtitle">Handikap override</div>
+                  <div className="sk-coef"><b>{fmt(secili.s!.handikapOverride.katsayi)}</b><i className="sk-chip sk-override">elle 0</i></div>
+                  <small className="sk-hint">&quot;Diğer&quot; segmentindeki katsayı Handikap koşularında GEÇERLİ DEĞİL — elle sıfırlandı (bkz. not).</small>
+                  {secili.s!.handikapOverride.not && <p className="sk-note">{secili.s!.handikapOverride.not}</p>}
+                </div>
+              )}
             </>
           )}
           {secili?.tur === "kural" && secili.k && (
             <>
               <h3>{secili.k.ad}</h3>
-              <span className={`sk-layer ${kuralAktifMi(secili.k) ? "sk-on" : "sk-off"}`}>{kuralAktifMi(secili.k) ? "AÇIK" : "KAPALI"}</span>
+              <span className="sk-badges">
+                <span className={`sk-layer ${kuralAktifMi(secili.k) ? "sk-on" : "sk-off"}`}>{kuralAktifMi(secili.k) ? "AÇIK" : "KAPALI"}</span>
+                {secili.k.kanitSeviyesi && <i className={`sk-chip ${KANIT_CHIP[secili.k.kanitSeviyesi.seviye]}`}>{KANIT_ETIKET[secili.k.kanitSeviyesi.seviye]}</i>}
+              </span>
               <p className="sk-note">{secili.k.etiket}</p>
+              {secili.k.kanitSeviyesi && <p className="sk-note"><b>Kanıt seviyesi notu:</b> {secili.k.kanitSeviyesi.etiket}</p>}
               <h4>Ne yapar?</h4><p className="sk-desc">{secili.k.aciklama}</p>
               <h4>Kanıt / backtest</h4><p className="sk-desc">{secili.k.backtestOzet}</p>
             </>

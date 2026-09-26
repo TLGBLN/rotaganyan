@@ -35,6 +35,8 @@
 
 .sk-warn { border: 1px solid rgba(255, 213, 65, 0.4); background: rgba(255, 213, 65, 0.08); color: #ffe89a; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.5; margin-bottom: 14px; }
 .sk-warn code { color: #fff; }
+.sk-truth { display: flex; flex-direction: column; gap: 6px; }
+.sk-truth b { color: #fff; }
 
 .sk-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 12px; color: var(--muted); margin-bottom: 16px; }
 .sk-legend span { display: inline-flex; gap: 6px; align-items: baseline; max-width: 420px; }
@@ -63,6 +65,7 @@
 .sk-card:hover { border-color: var(--muted); }
 .sk-card.sel { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
 .sk-card-top { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.sk-badges { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; flex: none; }
 .sk-card-top strong { font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
 .sk-card p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
 .sk-clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -76,7 +79,7 @@
 .sk-aday-reddedildi { color: var(--red); border-color: var(--red); }
 .sk-aday-beklemede { color: var(--unknown); border-color: var(--unknown); }
 
-.sk-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sk-seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; }
 .sk-seg > div { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
 .sk-seg small { color: var(--muted); font-size: 11px; }
 .sk-seg b { font-variant-numeric: tabular-nums; font-size: 15px; }
