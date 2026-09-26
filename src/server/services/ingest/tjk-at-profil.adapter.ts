@@ -104,7 +104,13 @@ function parseInt0(text: string): number {
   return m ? parseInt(m[0], 10) : 0;
 }
 
-async function fetchHorseProfileUncached(atId: number): Promise<HorseProfile | null> {
+// 2026-09-26 — URGENT Retry Lane (bkz. proje hafızası): HOT Cache Watchdog artık transient/
+// permanent hata ayrımı yapıyor — `fetchHorseProfile`'ın PUBLIC (cache'li, hatayı null'a
+// yutan) sarmalayıcısı bu bilgiyi TAŞIMIYOR (diğer tüketici — horse-profile.actions.ts —
+// hâlâ null-safe davranış bekliyor, o sözleşme DEĞİŞMEDİ, export SADECE eklendi). Watchdog
+// artık bu UNCACHED (ham hatayı fırlatan) varyantı DOĞRUDAN çağırıyor — kendi tek-seferlik
+// denemesi için zaten bir process-içi cache'e ihtiyacı yok.
+export async function fetchHorseProfileUncached(atId: number): Promise<HorseProfile | null> {
   const url = `${BASE}/TR/YarisSever/Query/ConnectedPage/AtKosuBilgileri?1=1&QueryParameter_AtId=${atId}&Era=today`;
   const html = await fetchHtml(url);
   const $ = cheerio.load(html);
@@ -191,7 +197,7 @@ export type HorseDetailStatSection = {
 
 const detailStatsUrl = (atId: number) => `${BASE}/TR/YarisSever/Query/AtKosuIstatistik/AtKosuIstatistik?Atkodu=${atId}`;
 
-async function fetchHorseDetailedStatsUncached(atId: number): Promise<HorseDetailStatSection[]> {
+export async function fetchHorseDetailedStatsUncached(atId: number): Promise<HorseDetailStatSection[]> {
   const html = await fetchHtml(detailStatsUrl(atId));
   const $ = cheerio.load(html);
 
@@ -269,6 +275,37 @@ function hotUrgencyFor(nextRaceDate: Date | undefined, now: number): HotUrgency 
   return "NEXT";
 }
 
+// 2026-09-26 — URGENT Retry Lane (kullanıcı tasarımı, canlı bulgu: HOT Cache alarmı
+// "büyük backlog eşiği" yüzünden DEĞİL, bazı atların TJK'dan TEKRAR TEKRAR hata almasından
+// kaynaklanıyordu — 3 normal denemeden sonra bu atlar sessizce "given up" mezarlığına
+// düşüp SLA'sı en kritik (URGENT) olsalar bile bir daha HİÇ denenmiyordu). Çözüm: normal
+// 3-deneme sınırı AYNEN kalır (WARM/COLD ve NEAR/NEXT için); yalnız HOT∩URGENT∩hâlâ-
+// yarış-başlamamış∩hata-transient atlara SINIRLI (en fazla 2), backoff'lu, race-deadline'ı
+// AŞMAYAN bir ek şans tanınır — "günde bir kez tekrar dene" gibi zaman-tabanlı bir kural
+// DEĞİL, çünkü URGENT zaten 0-6 saat demek (bir günlük bekleme o yarış için anlamsız olur).
+export type FetchErrorClass = "transient" | "permanent";
+export const MAX_ATTEMPTS = 3;
+export const URGENT_RESCUE_MAX_ATTEMPTS = 2;
+// index = o ana kadar kullanılan rescue denemesi sayısı (0 → ilk rescue'dan sonraki bekleme, vb.)
+export const URGENT_RESCUE_BACKOFF_MS = [5 * 60_000, 15 * 60_000, 30 * 60_000];
+
+/** TJK'dan gelen hatayı transient/permanent'e ayırır — SAF fonksiyon, ağ/DB yok, test edilebilir.
+ * Bilinmeyen hata TRANSIENT sayılır (fail-safe: yanlışlıkla kalıcı mezarlığa atmaktan, gereksiz
+ * bir rescue denemesi yapmak daha güvenli). */
+export function classifyFetchError(e: unknown): FetchErrorClass {
+  const msg = e instanceof Error ? e.message : String(e);
+  const httpMatch = msg.match(/^HTTP (\d{3}):/);
+  if (httpMatch) {
+    const code = parseInt(httpMatch[1]!, 10);
+    if (code === 404) return "permanent";
+    if (code === 429 || code >= 500) return "transient";
+    if (code >= 400) return "permanent"; // 401/403 vb. — istemci tarafı, tekrar denemekle düzelmez
+  }
+  if (/Şüpheli kısa yanıt/i.test(msg)) return "transient"; // TJK'nın geçici kesik gövdesi
+  if (/timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|UND_ERR|fetch failed/i.test(msg)) return "transient";
+  return "transient";
+}
+
 // 2026-09-22 kullanıcı bulgusu (V5.46 LIVE audit, cron verify): limit=250 ile GERÇEK
 // production ölçümünde 739.0s sürdü — maxDuration=800s'nin yalnız %92'si altında kaldı,
 // tek yavaş bir TJK günü Vercel tarafından SERT kesilmeye (timeout) çok yakın. Limiti
@@ -297,6 +334,8 @@ export async function syncHorseStatsCache(
   staleBuckets: { over3d: number; over7d: number; over14d: number };
   hotUrgency: Record<HotUrgency, { total: number; stale: number }>;
   hotChurn: { newSinceLastSync: number; lastSyncAt: string | null };
+  transientFailed: number;
+  permanentFailed: number;
 }> {
   const fonksiyonBaslangic = Date.now();
   const { db } = await import("@/lib/db");
@@ -355,19 +394,34 @@ export async function syncHorseStatsCache(
       staleBuckets: { over3d: 0, over7d: 0, over14d: 0 },
       hotUrgency: { URGENT: { total: 0, stale: 0 }, NEAR: { total: 0, stale: 0 }, NEXT: { total: 0, stale: 0 } },
       hotChurn: { newSinceLastSync: 0, lastSyncAt: null },
+      transientFailed: 0,
+      permanentFailed: 0,
     };
   }
 
   const staleDaysByTier: Record<Tier, number> = { HOT: STALE_DAYS_HOT, WARM: STALE_DAYS_WARM, COLD: STALE_DAYS_COLD };
-  const MAX_ATTEMPTS = 3;
-  const [allStats, allHistory, givenUp] = await Promise.all([
+  const [allStats, allHistory, allFailures] = await Promise.all([
     db.horseStatsCache.findMany({ where: { tjkAtId: { in: allIds } }, select: { tjkAtId: true, updatedAt: true } }),
     db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: allIds } }, select: { tjkAtId: true, updatedAt: true } }),
-    db.horseSyncFailure.findMany({ where: { tjkAtId: { in: allIds }, attempts: { gte: MAX_ATTEMPTS } }, select: { tjkAtId: true } }),
+    db.horseSyncFailure.findMany({ where: { tjkAtId: { in: allIds } } }),
   ]);
   const statsUpdatedById = new Map(allStats.map((h) => [h.tjkAtId, h.updatedAt]));
   const historyUpdatedById = new Map(allHistory.map((h) => [h.tjkAtId, h.updatedAt]));
-  const givenUpIds = new Set(givenUp.map((h) => h.tjkAtId));
+  const failureById = new Map(allFailures.map((f) => [f.tjkAtId, f]));
+
+  // URGENT Retry Lane uygunluğu (bkz. dosya başındaki not) — attempts>=MAX_ATTEMPTS'e
+  // ulaşmış bir at artık NORMAL akışta değil; yalnız HOT∩URGENT∩transient-hata∩backoff-
+  // dolmuş∩yarış-henüz-başlamamış∩rescue-hakkı-kalmış ise ek bir şansı olur. `PERMANENT`
+  // sınıflı bir hata (404 vb.) rescue lane'e HİÇ girmez — tekrar denemekle düzelmeyecek.
+  function eligibleDespiteExhaustion(id: number): boolean {
+    const failure = failureById.get(id);
+    if (!failure || failure.attempts < MAX_ATTEMPTS) return true; // henüz mezarlığa girmedi
+    if (failure.errorClass === "permanent") return false;
+    if (tierByHorse.get(id) !== "HOT") return false;
+    if (failure.urgentRescueAttempts >= URGENT_RESCUE_MAX_ATTEMPTS) return false;
+    if (failure.nextEligibleRetryAt && failure.nextEligibleRetryAt.getTime() > now) return false;
+    return hotUrgencyFor(nextRaceDateTimeByHorse.get(id), now) === "URGENT";
+  }
 
   // Kendi tier'ının staleDays hedefine göre taze mi. HOT'ta artık tek sabit eşik değil —
   // urgency bucket'ı belirlenebiliyorsa (gerçek saat verisi varsa) o SLA kullanılır,
@@ -384,9 +438,9 @@ export async function syncHorseStatsCache(
   }
 
   const needsSyncAll = allIds.filter((id) => {
-    if (givenUpIds.has(id)) return false;
     const tier = tierByHorse.get(id)!;
     if (!activeTiers.includes(tier)) return false;
+    if (!eligibleDespiteExhaustion(id)) return false;
     return !freshFor(id, statsUpdatedById.get(id), tier) || !freshFor(id, historyUpdatedById.get(id), tier);
   });
 
@@ -480,6 +534,8 @@ export async function syncHorseStatsCache(
   const CONCURRENCY = 4;
   let ok = 0;
   let fail = 0;
+  let transientFailed = 0;
+  let permanentFailed = 0;
   let stoppedByTimeBudget = false;
   const tierProcessed: Record<Tier, { fresh: number; stale: number }> = { HOT: { fresh: 0, stale: 0 }, WARM: { fresh: 0, stale: 0 }, COLD: { fresh: 0, stale: 0 } };
   const batch = needsSync.slice(0, limit);
@@ -493,20 +549,34 @@ export async function syncHorseStatsCache(
     }
     const group = batch.slice(i, i + CONCURRENCY);
     islenenSayisi += group.length;
-    const results = await Promise.allSettled(
-      group.map(async (atKodu) => {
+    // 2026-09-26 — URGENT Retry Lane: worker artık HİÇ throw ETMİYOR, her zaman bir sonuç
+    // nesnesi döner (errorClass dahil) — Promise.allSettled'ın rejection-reason'ından
+    // sınıflandırma bilgisi çıkarmak yerine, DOĞRUDAN taşınıyor.
+    const results = await Promise.all(
+      group.map(async (atKodu): Promise<{ atKodu: number; ok: boolean; errorClass?: FetchErrorClass }> => {
         const tier = tierByHorse.get(atKodu)!;
         let statsOk = freshFor(atKodu, statsUpdatedById.get(atKodu), tier);
         let historyOk = freshFor(atKodu, historyUpdatedById.get(atKodu), tier);
+        // Genel sınıflandırma yalnız STATS/profil tarafından belirlenir — profil kalıcı
+        // olarak yoksa (404/kunye eksik) atın tamamı için rescue anlamsızdır. History
+        // tarafındaki geçici bir hata, profil zaten tazeyse/başarılıysa hiç dikkate
+        // alınmaz (yalnız statsOk||historyOk ikisi de gerekli, ama SINIFLANDIRMA profilden).
+        let statsErrorClass: FetchErrorClass = "transient";
         if (!statsOk) {
-          const [profile, detailedStats] = await Promise.all([fetchHorseProfile(atKodu), fetchHorseDetailedStats(atKodu)]);
-          if (profile) {
-            await db.horseStatsCache.upsert({
-              where: { tjkAtId: atKodu },
-              create: { tjkAtId: atKodu, profileJson: profile, detailedStatsJson: detailedStats },
-              update: { profileJson: profile, detailedStatsJson: detailedStats },
-            });
-            statsOk = true;
+          try {
+            const [profile, detailedStats] = await Promise.all([fetchHorseProfileUncached(atKodu), fetchHorseDetailedStatsUncached(atKodu)]);
+            if (profile) {
+              await db.horseStatsCache.upsert({
+                where: { tjkAtId: atKodu },
+                create: { tjkAtId: atKodu, profileJson: profile, detailedStatsJson: detailedStats },
+                update: { profileJson: profile, detailedStatsJson: detailedStats },
+              });
+              statsOk = true;
+            } else {
+              statsErrorClass = "permanent"; // kunye-container yok — yapısal eksiklik, tekrar denemekle düzelmez
+            }
+          } catch (e) {
+            statsErrorClass = classifyFetchError(e);
           }
         }
         if (!historyOk) {
@@ -514,33 +584,43 @@ export async function syncHorseStatsCache(
             await refreshTjkAtKosuBilgileri(atKodu);
             historyOk = true;
           } catch {
-            historyOk = false;
+            // history'nin kendi hatası genel sınıflandırmayı ETKİLEMEZ (yukarıdaki not) — yalnız statsOk||historyOk eksikliği sayılır.
           }
         }
-        // "profile null" (TJK'nın kunye-container'ı hiç dönmemesi) eskiden hata FIRLATMIYORDU
-        // — bu yüzden Promise.all "başarılı" sayılıp o at hiç işaretlenmeden sonsuza kadar
-        // yeniden deneniyordu. Artık statsOk/historyOk açıkça kontrol edilip eksikse throw
-        // ediliyor ki HorseSyncFailure sayacı gerçekten artsın.
-        if (!statsOk || !historyOk) throw new Error(`Eksik kaldı: stats=${statsOk} history=${historyOk}`);
-        return atKodu;
+        if (!statsOk || !historyOk) return { atKodu, ok: false, errorClass: statsOk ? "transient" : statsErrorClass };
+        return { atKodu, ok: true };
       })
     );
-    for (let j = 0; j < results.length; j++) {
-      const r = results[j]!;
-      const atKodu = group[j]!;
+    for (const r of results) {
+      const atKodu = r.atKodu;
       const tier = tierByHorse.get(atKodu)!;
-      if (r.status === "fulfilled") {
+      if (r.ok) {
         ok++;
         tierProcessed[tier].fresh++;
         await db.horseSyncFailure.deleteMany({ where: { tjkAtId: atKodu } }).catch(() => {});
       } else {
         fail++;
         tierProcessed[tier].stale++;
+        if (r.errorClass === "permanent") permanentFailed++; else transientFailed++;
+        const existing = failureById.get(atKodu);
+        const wasExhausted = !!existing && existing.attempts >= MAX_ATTEMPTS; // bu deneme bir RESCUE denemesiydi
+        const urgentRescueAttempts = wasExhausted ? (existing!.urgentRescueAttempts ?? 0) + 1 : (existing?.urgentRescueAttempts ?? 0);
+        const nextEligibleRetryAt =
+          wasExhausted && r.errorClass === "transient"
+            ? new Date(Math.min(
+                Date.now() + (URGENT_RESCUE_BACKOFF_MS[Math.min(urgentRescueAttempts - 1, URGENT_RESCUE_BACKOFF_MS.length - 1)] ?? URGENT_RESCUE_BACKOFF_MS.at(-1)!),
+                nextRaceDateTimeByHorse.get(atKodu)?.getTime() ?? Infinity
+              ))
+            : null;
         await db.horseSyncFailure
           .upsert({
             where: { tjkAtId: atKodu },
-            create: { tjkAtId: atKodu, attempts: 1 },
-            update: { attempts: { increment: 1 } },
+            create: { tjkAtId: atKodu, attempts: 1, errorClass: r.errorClass },
+            update: {
+              attempts: { increment: 1 },
+              errorClass: r.errorClass,
+              ...(wasExhausted ? { urgentRescueAttempts, nextEligibleRetryAt } : {}),
+            },
           })
           .catch(() => {});
       }
@@ -549,7 +629,7 @@ export async function syncHorseStatsCache(
   }
   const durationMs = Date.now() - fonksiyonBaslangic;
   const remaining = Math.max(0, needsSync.length - islenenSayisi);
-  return { ok, fail, remaining, durationMs, stoppedByTimeBudget, tierCounts, tierProcessed, staleBuckets, hotUrgency, hotChurn };
+  return { ok, fail, remaining, durationMs, stoppedByTimeBudget, tierCounts, tierProcessed, staleBuckets, hotUrgency, hotChurn, transientFailed, permanentFailed };
 }
 
 // 2026-09-24 — HOT Cache Watchdog, NEED-AWARE çok-kaynaklı fallback (kullanıcı kararı,
@@ -650,6 +730,10 @@ export async function runHotWatchdogIfDue(opts: { source: HotWatchdogTriggerSour
 export async function getHotCacheHealthSnapshot(): Promise<{
   urgency: Record<HotUrgency, { total: number; stale: number }>;
   churn: { newSinceLastSync: number; lastSyncAt: string | null };
+  // 2026-09-26 — URGENT Retry Lane görünürlüğü (kullanıcı kararı): "URGENT stale: 24" tek
+  // sayısı, kırmızının GERÇEK nedenini gizliyordu (büyük backlog mu, birkaç kronik-
+  // başarısız at mı?). Bu kırılım aynı anlamı taşıyan 4 ayrık duruma böler.
+  urgentRetryBreakdown: { normalPending: number; transientRescueLane: number; permanentUnrecoverable: number; cooldownWaiting: number };
 }> {
   const { db } = await import("@/lib/db");
   const { poolStartTime } = await import("@/lib/methodology/kupon-dependency-hash");
@@ -677,28 +761,38 @@ export async function getHotCacheHealthSnapshot(): Promise<{
   }
 
   const hotIds = [...new Set(hotRows.map((r) => r.tjkAtId!))];
-  const [statsRows, historyRows, watchdogState] = await Promise.all([
+  const [statsRows, historyRows, watchdogState, failureRows] = await Promise.all([
     db.horseStatsCache.findMany({ where: { tjkAtId: { in: hotIds } }, select: { tjkAtId: true, updatedAt: true } }),
     db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: hotIds } }, select: { tjkAtId: true, updatedAt: true } }),
     db.hotCacheWatchdogState.findUnique({ where: { id: "singleton" } }).catch(() => null),
+    db.horseSyncFailure.findMany({ where: { tjkAtId: { in: hotIds } } }),
   ]);
   const statsUpdatedById = new Map(statsRows.map((h) => [h.tjkAtId, h.updatedAt]));
   const historyUpdatedById = new Map(historyRows.map((h) => [h.tjkAtId, h.updatedAt]));
+  const failureById = new Map(failureRows.map((f) => [f.tjkAtId, f]));
 
   const urgency: Record<HotUrgency, { total: number; stale: number }> = {
     URGENT: { total: 0, stale: 0 }, NEAR: { total: 0, stale: 0 }, NEXT: { total: 0, stale: 0 },
   };
+  const urgentRetryBreakdown = { normalPending: 0, transientRescueLane: 0, permanentUnrecoverable: 0, cooldownWaiting: 0 };
   for (const id of hotIds) {
     const bucket = hotUrgencyFor(nextRaceByHorse.get(id), now) ?? "NEXT";
     urgency[bucket].total++;
     const slaMs = HOT_URGENCY_SLA_MS[bucket];
     const statsFresh = (statsUpdatedById.get(id)?.getTime() ?? 0) >= now - slaMs;
     const historyFresh = (historyUpdatedById.get(id)?.getTime() ?? 0) >= now - slaMs;
-    if (!statsFresh || !historyFresh) urgency[bucket].stale++;
+    const stale = !statsFresh || !historyFresh;
+    if (stale) urgency[bucket].stale++;
+    if (bucket !== "URGENT" || !stale) continue;
+    const failure = failureById.get(id);
+    if (!failure || failure.attempts < MAX_ATTEMPTS) urgentRetryBreakdown.normalPending++;
+    else if (failure.errorClass === "permanent") urgentRetryBreakdown.permanentUnrecoverable++;
+    else if (failure.nextEligibleRetryAt && failure.nextEligibleRetryAt.getTime() > now) urgentRetryBreakdown.cooldownWaiting++;
+    else urgentRetryBreakdown.transientRescueLane++;
   }
 
   const prevHotIds = new Set((watchdogState?.lastHotIdsJson as number[] | undefined) ?? []);
   const newSinceLastSync = hotIds.filter((id) => !prevHotIds.has(id)).length;
 
-  return { urgency, churn: { newSinceLastSync, lastSyncAt: watchdogState?.lastRunAt?.toISOString() ?? null } };
+  return { urgency, churn: { newSinceLastSync, lastSyncAt: watchdogState?.lastRunAt?.toISOString() ?? null }, urgentRetryBreakdown };
 }

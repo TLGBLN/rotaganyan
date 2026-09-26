@@ -65,6 +65,7 @@ import { turkeyDateString } from "@/lib/tz";
 import { buildKuponOnerisi, stakeForHippodromeLabel } from "@/server/services/race.service";
 import { chunkIntoAltili, sonYediKosu, YEDILI_GANYAN_SLOT } from "@/lib/methodology/kupon-auto-fill";
 import { optimizerConfigFor } from "@/server/services/home-kupon-sync.service";
+import { poolStartTime } from "@/lib/methodology/kupon-dependency-hash";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -130,7 +131,7 @@ async function databaseHealth(): Promise<ModuleResult> {
 async function cacheHealth(): Promise<ModuleResult> {
   try {
     const { getHotCacheHealthSnapshot } = await import("@/server/services/ingest/tjk-at-profil.adapter");
-    const { urgency, churn } = await getHotCacheHealthSnapshot();
+    const { urgency, churn, urgentRetryBreakdown } = await getHotCacheHealthSnapshot();
 
     const urgentStale = urgency.URGENT.stale;
     const nearNextStale = urgency.NEAR.stale + urgency.NEXT.stale;
@@ -154,9 +155,16 @@ async function cacheHealth(): Promise<ModuleResult> {
         { label: "URGENT (0-6s)", value: `${urgency.URGENT.total - urgency.URGENT.stale}/${urgency.URGENT.total}` },
         { label: "NEAR (6-24s)", value: `${urgency.NEAR.total - urgency.NEAR.stale}/${urgency.NEAR.total}` },
         { label: "NEXT (24-48s)", value: `${urgency.NEXT.total - urgency.NEXT.stale}/${urgency.NEXT.total}` },
+        // 2026-09-26 kullanıcı bulgusu — "URGENT stale: 24" tek sayısı kırmızının GERÇEK
+        // nedenini gizliyordu (büyük backlog mu, birkaç kronik-başarısız at mı?). Kırılım
+        // aynı toplamı 4 ayrık duruma böler — bkz. tjk-at-profil.adapter.ts eligibleDespiteExhaustion.
+        { label: "URGENT stale — normal deneme sürüyor (<3 attempt)", value: urgentRetryBreakdown.normalPending },
+        { label: "URGENT stale — transient retry lane (rescue hakkı var)", value: urgentRetryBreakdown.transientRescueLane },
+        { label: "URGENT stale — cooldown bekliyor (backoff)", value: urgentRetryBreakdown.cooldownWaiting },
+        { label: "URGENT stale — kalıcı/kurtarılamaz (permanent hata)", value: urgentRetryBreakdown.permanentUnrecoverable },
       ],
       checks: [
-        { id: "urgent", label: "URGENT (≤6s kalan yarış) SLA ≤6s cache yaşı", ok: urgency.URGENT.total === 0 ? null : urgentStale === 0, detail: `${urgency.URGENT.stale}/${urgency.URGENT.total} stale` },
+        { id: "urgent", label: "URGENT (≤6s kalan yarış) SLA ≤6s cache yaşı", ok: urgency.URGENT.total === 0 ? null : urgentStale === 0, detail: `${urgency.URGENT.stale}/${urgency.URGENT.total} stale — normal=${urgentRetryBreakdown.normalPending}, rescue-lane=${urgentRetryBreakdown.transientRescueLane}, cooldown=${urgentRetryBreakdown.cooldownWaiting}, kalıcı=${urgentRetryBreakdown.permanentUnrecoverable}` },
         { id: "near", label: "NEAR (6-24s kalan) SLA ≤12s cache yaşı", ok: urgency.NEAR.total === 0 ? null : urgency.NEAR.stale === 0, detail: `${urgency.NEAR.stale}/${urgency.NEAR.total} stale` },
         { id: "next", label: "NEXT (24-48s kalan) SLA ≤24s cache yaşı", ok: urgency.NEXT.total === 0 ? null : urgency.NEXT.stale === 0, detail: `${urgency.NEXT.stale}/${urgency.NEXT.total} stale` },
         { id: "churn", label: "HOT churn (kök neden ipucu)", ok: null, detail: `${churn.newSinceLastSync} yeni HOT, son watchdog: ${churn.lastSyncAt ?? "hiç çalışmadı"}` },
@@ -1350,13 +1358,25 @@ async function computeModelHealth(): Promise<ModuleResult> {
   const lastEvaluatedLabel = rows.length > 0 ? `${rows[0]!.race.raceDay.hippodrome.name} K${rows[0]!.race.raceNo}` : "-";
 
   // ── Completeness — sonuçlanmış ama YAYINLANMIŞ tahmini olmayan yarış var mı ──
-  const missingPredictionCount = await db.race.count({
+  // 2026-09-26 kullanıcı bulgusu (canlı vaka: 2026-09-25 İstanbul'un 9 koşusu) — bu kontrol
+  // eskiden CURRENT (bugünün motor sağlığı) ile HISTORICAL (geçmiş, zaten bilinen bir
+  // operasyon eksikliği — o gün hiç analiz girilmemiş) ayrımı YAPMIYORDU: 2+ gün önceki bir
+  // boşluk, "V5.46 şu an bozuk" izlenimi vererek Sistem Anatomisi'ni yanıltıyordu. Kayıt
+  // SİLİNMEZ/gizlenmez — yalnız CURRENT kırmızıyı tetiklemez, ayrı bir bilgi metriği olarak durur.
+  const MODEL_HEALTH_CURRENT_WINDOW_MS = 2 * 86_400_000; // son 48 saat = "current" (bugün/aktif yarışlar)
+  const missingPredictionRows = await db.race.findMany({
     where: {
       conditions: null,
       result: { enteredAt: { gte: V546_START } },
       OR: [{ prediction: null }, { prediction: { published: false } }],
     },
+    select: { raceDay: { select: { date: true } } },
   });
+  const missingPredictionCount = missingPredictionRows.length;
+  const currentMissingPredictionCount = missingPredictionRows.filter(
+    (r) => Date.now() - r.raceDay.date.getTime() <= MODEL_HEALTH_CURRENT_WINDOW_MS
+  ).length;
+  const historicalMissingPredictionCount = missingPredictionCount - currentMissingPredictionCount;
 
   // ── Correctness — SAKLANMIŞ pick verisinin matematiksel geçerliliği ──
   let invalidProbSum = 0;
@@ -1391,9 +1411,11 @@ async function computeModelHealth(): Promise<ModuleResult> {
   const correctnessIssues = invalidProbSum + duplicateRank + nanOrNegative + runnerPickMismatch;
 
   // ── Self status — YALNIZ operasyonel/matematiksel bozukluk, performans DEĞİL ──
+  // CURRENT (son 48s) eksiklik → critical (bugünün motoru gerçekten sorunlu). HISTORICAL
+  // (daha eski, bilinen bir geçmiş boşluk) → status'u HİÇ etkilemez, yalnız bilgi metriği.
   let status: Status = "healthy";
   if (allLive.n === 0) status = "critical";
-  else if (missingPredictionCount > 0 || correctnessIssues > 0) status = "critical";
+  else if (currentMissingPredictionCount > 0 || correctnessIssues > 0) status = "critical";
 
   // ── C1 LOW-HIZ-OFF shadow — YALNIZ bilgi, panel karar VERMEZ (research gate kullanıcıda) ──
   let c1Section: { eligible: number; resulted: number; championDiffers: number; nextGate: number | null; gateLabel: string } | null = null;
@@ -1433,7 +1455,8 @@ async function computeModelHealth(): Promise<ModuleResult> {
       { label: "RECENT-100", value: fmtWindow(recent100, "RECENT-100") },
       { label: "RECENT-300", value: recent300 ? fmtWindow(recent300, "RECENT-300") : `N YETERSİZ (henüz ${allLive.n}/300)` },
       { label: "Son değerlendirilen", value: lastEvaluatedAgeMin == null ? "hiç" : `${lastEvaluatedLabel} (${lastEvaluatedAgeMin.toFixed(0)} dk önce)` },
-      { label: "Prediction'sız sonuçlanmış yarış", value: missingPredictionCount },
+      { label: "Prediction'sız sonuçlanmış yarış — CURRENT (son 48s, alarm üretir)", value: currentMissingPredictionCount },
+      { label: "Prediction'sız sonuçlanmış yarış — HISTORICAL (eski, alarm ÜRETMEZ)", value: historicalMissingPredictionCount },
       { label: "Invalid probability sum", value: invalidProbSum },
       { label: "Duplicate rank", value: duplicateRank },
       { label: "NaN/negatif olasılık", value: nanOrNegative },
@@ -1451,7 +1474,7 @@ async function computeModelHealth(): Promise<ModuleResult> {
     checks: [
       { id: "mh-availability", label: "Değerlendirilebilir prediction+result kohortu var", ok: allLive.n > 0, detail: `ALL-LIVE n=${allLive.n} (V5.46 başlangıcından, ${V546_START.toISOString().slice(0, 10)})` },
       { id: "mh-freshness", label: "Son değerlendirilen yarış (bilgi — alarm Result Sync'te)", ok: null, detail: lastEvaluatedAgeMin == null ? "hiç değerlendirilmiş yarış yok" : `${lastEvaluatedLabel}, ${lastEvaluatedAgeMin.toFixed(0)} dk önce` },
-      { id: "mh-completeness", label: "Sonuçlanmış her yarışın yayınlanmış tahmini var", ok: missingPredictionCount === 0, detail: `${missingPredictionCount} yarışta sonuç var ama yayınlanmış tahmin yok` },
+      { id: "mh-completeness", label: "Sonuçlanmış her yarışın yayınlanmış tahmini var (CURRENT, son 48s)", ok: currentMissingPredictionCount === 0, detail: `${currentMissingPredictionCount} CURRENT + ${historicalMissingPredictionCount} HISTORICAL (48s'ten eski, alarm üretmez — bkz. proje hafızası)` },
       { id: "mh-correctness", label: "Prediction matematiği geçerli (sum/rank/NaN/runner)", ok: correctnessIssues === 0, detail: `sum=${invalidProbSum}, duplicate rank=${duplicateRank}, NaN/negatif=${nanOrNegative}, runner uyuşmazlığı=${runnerPickMismatch}` },
       { id: "mh-late-scratch-info", label: "Geç scratch (bilgi — yayın sonrası çekilme, alarm değil)", ok: null, detail: `${scratchedInTop3} yayınlanmış tahminde ilk-3 pick sonradan çekildi` },
       { id: "mh-performance-info", label: "Performans (renk üretmez — yalnız bilgi)", ok: null, detail: fmtWindow(recent100, "RECENT-100") },
@@ -1680,9 +1703,11 @@ async function computeCouponHealth(): Promise<ModuleResult> {
   let staleWarning = 0;
   let staleCritical = 0;
   let lateScratchInfo = 0;
+  let frozenByPoolStart = 0;
   const poolDetails: string[] = [];
   const costMismatchDetails: string[] = [];
   const staleDetails: string[] = [];
+  const frozenDetails: string[] = [];
 
   for (const pool of activePools) {
     const baseHippodromeName = pool.hippodromeName.split(" — ")[0]!;
@@ -1693,7 +1718,7 @@ async function computeCouponHealth(): Promise<ModuleResult> {
     // UYDURULMAZ (chunkIntoAltili/sonYediKosu GERÇEK, export edilmiş fonksiyonlar). ──
     const races = await db.race.findMany({
       where: { raceDay: { date: dayStart, hippodrome: { name: baseHippodromeName } } },
-      select: { id: true, raceNo: true, runners: { select: { no: true, scratched: true } } },
+      select: { id: true, raceNo: true, time: true, runners: { select: { no: true, scratched: true } } },
       orderBy: { raceNo: "asc" },
     });
 
@@ -1765,23 +1790,40 @@ async function computeCouponHealth(): Promise<ModuleResult> {
       costMismatchDetails.push(`${poolLabel}: displayed=${displayed ?? "N/A"}₺ (stake=${displayStake}), expected=${expected}₺ (stake=${generatorStake})`);
     }
 
-    // Freshness — bu havuzdaki yarışların en son GÜNCELLENEN Prediction'ı, kuponun kendi
-    // updatedAt'inden daha yeni mi? (yeni tahmin var ama kupon eski = STALE COUPON).
-    const raceIds = races.filter((r) => legOrder.includes(r.raceNo)).map((r) => r.id);
-    if (raceIds.length > 0) {
-      const latestPred = await db.prediction.findFirst({
-        where: { raceId: { in: raceIds } },
-        orderBy: { updatedAt: "desc" },
-        select: { updatedAt: true },
-      });
-      if (latestPred && latestPred.updatedAt > pool.updatedAt) {
-        const staleMin = (latestPred.updatedAt.getTime() - pool.updatedAt.getTime()) / 60_000;
-        if (staleMin > COUPON_STALE_CRITICAL_MIN) {
-          staleCritical++;
-          staleDetails.push(`${poolLabel}: ${staleMin.toFixed(0)} dk bayat (kritik)`);
-        } else if (staleMin > COUPON_STALE_WARNING_MIN) {
-          staleWarning++;
-          staleDetails.push(`${poolLabel}: ${staleMin.toFixed(0)} dk bayat`);
+    // 2026-09-26 kullanıcı bulgusu (canlı Ankara 1.Altılı vakası) — bu kontrol eskiden
+    // havuzun ZATEN BAŞLAMIŞ olabileceğini bilmiyordu: `syncHomeKupon`/reconcile cron'u
+    // (bkz. home-kupon-sync.service.ts, PİVOT-2 madde 15d) bir havuzu ilk ayağı
+    // başladıktan SONRA KASITLI OLARAK bir daha ASLA değiştirmiyor (tarihsel bütünlük —
+    // "1. Altılı önerimiz şuydu" derken GERÇEKTE farklı bir kupon göstermemek için). Bu
+    // sensör aynı freeze'i BİLMEDİĞİ için, doğru şekilde donmuş bir havuzu "stale/kritik"
+    // diye YANLIŞ ALARM veriyordu — düzeltme, senkron ZORLAMAK değil, sensörü aynı kurala
+    // uydurmak: pool zaten başladıysa staleness hiç DEĞERLENDİRİLMEZ (reconcile'ın kendi
+    // `checked++`'ten önceki pool-start kontrolüyle BİREBİR aynı mantık).
+    const poolStart = poolStartTime(today, races.filter((r) => legOrder.includes(r.raceNo)).map((r) => r.time));
+    const alreadyStarted = poolStart != null && Date.now() >= poolStart.getTime();
+
+    if (alreadyStarted) {
+      frozenByPoolStart++;
+      frozenDetails.push(`${poolLabel}: ilk ayak ${poolStart!.toISOString()} itibariyle başladı — havuz donduruldu (kasıtlı, tarihsel bütünlük)`);
+    } else {
+      // Freshness — bu havuzdaki yarışların en son GÜNCELLENEN Prediction'ı, kuponun kendi
+      // updatedAt'inden daha yeni mi? (yeni tahmin var ama kupon eski = STALE COUPON).
+      const raceIds = races.filter((r) => legOrder.includes(r.raceNo)).map((r) => r.id);
+      if (raceIds.length > 0) {
+        const latestPred = await db.prediction.findFirst({
+          where: { raceId: { in: raceIds } },
+          orderBy: { updatedAt: "desc" },
+          select: { updatedAt: true },
+        });
+        if (latestPred && latestPred.updatedAt > pool.updatedAt) {
+          const staleMin = (latestPred.updatedAt.getTime() - pool.updatedAt.getTime()) / 60_000;
+          if (staleMin > COUPON_STALE_CRITICAL_MIN) {
+            staleCritical++;
+            staleDetails.push(`${poolLabel}: ${staleMin.toFixed(0)} dk bayat (kritik)`);
+          } else if (staleMin > COUPON_STALE_WARNING_MIN) {
+            staleWarning++;
+            staleDetails.push(`${poolLabel}: ${staleMin.toFixed(0)} dk bayat`);
+          }
         }
       }
     }
@@ -1811,8 +1853,10 @@ async function computeCouponHealth(): Promise<ModuleResult> {
       { label: "Geç scratch (bilgi — üretim sonrası, yapısal garanti)", value: lateScratchInfo },
       { label: "Stale coupon — uyarı (10-30dk)", value: staleWarning },
       { label: "Stale coupon — kritik (>30dk)", value: staleCritical },
+      { label: "Donduruldu (havuz başladı — kasıtlı, alarm DEĞİL)", value: frozenByPoolStart },
       ...(costMismatchDetails.length > 0 ? [{ label: "Cost mismatch detayı", value: costMismatchDetails.join(" · ") }] : []),
       ...(staleDetails.length > 0 ? [{ label: "Stale detayı", value: staleDetails.join(" · ") }] : []),
+      ...(frozenDetails.length > 0 ? [{ label: "Donma detayı", value: frozenDetails.join(" · ") }] : []),
     ],
     checks: [
       {
