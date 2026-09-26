@@ -2,7 +2,7 @@
 // (300-500₺) eklendi — dört kademeli (micro→narrow→normal→wide) yapının doğru
 // kurulduğunu ve otomatikGroupSelections'ın kademeli mirası (her kademe bir öncekini
 // TABAN alır) koruduğunu doğrular.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   WIDTHS,
   WIDTH_LABEL,
@@ -13,6 +13,8 @@ import {
   emptySelection,
   otomatikGroupSelections,
   tierNestingIhlalleriniBul,
+  computeTierRegret,
+  TIER_REGRET_WARN_THRESHOLD,
   type RaceDayData,
 } from "./kupon-auto-fill";
 import { optimizeKuponAllocation } from "./kupon-optimizer";
@@ -136,5 +138,41 @@ describe("tierNestingIhlalleriniBul — savunma kontrolü", () => {
       1: { micro: new Set([1]), narrow: new Set([1, 2]), normal: new Set([1, 2, 3]), wide: new Set([1, 2, 3, 4]) },
     };
     expect(tierNestingIhlalleriniBul(races, gecerliSel)).toEqual([]);
+  });
+});
+
+describe("computeTierRegret — regret guard (kullanıcı düzeltmesi, 3. tur)", () => {
+  // Ceiling zinciri "büyük tier küçüğü rehin alabilir" riskini TEORİK olarak taşır (eski
+  // sorunun ters yönü) — bu guard onu YOK ETMEZ, SÜREKLİ ÖLÇER. Eşik aşılırsa (kullanıcının
+  // örneği: %0.33 kabul edilebilir, %5.56 eski sorunun geri geldiğinin işareti) console.warn
+  // ile görünür olur; publish'i ASLA engellemez (bkz. otomatikGroupSelections'taki kullanımı).
+  const races = izmirGercekRaces();
+  const stakePerCombination = 1.25;
+
+  it("wide'ın regret'i YAPISAL olarak her zaman 0 — hiçbir kademeden ceiling almıyor (sağlama)", () => {
+    const regret = computeTierRegret(races, stakePerCombination);
+    expect(regret.wide.regretPct).toBe(0);
+    expect(regret.wide.independentCoverage).toBe(regret.wide.nestedCoverage);
+  });
+
+  it("GERÇEK İzmir verisinde tüm kademelerin regret'i eşiğin ALTINDA (mimari şu an sağlıklı)", () => {
+    const regret = computeTierRegret(races, stakePerCombination);
+    for (const width of WIDTHS) {
+      expect(regret[width].regretPct).toBeLessThanOrEqual(TIER_REGRET_WARN_THRESHOLD);
+    }
+  });
+
+  it("regret formülü doğru: independent < nested asla olamaz (ceiling yalnız KISITLAR, asla İYİLEŞTİRMEZ)", () => {
+    const regret = computeTierRegret(races, stakePerCombination);
+    for (const width of WIDTHS) {
+      expect(regret[width].nestedCoverage).toBeLessThanOrEqual(regret[width].independentCoverage + 1e-9);
+      expect(regret[width].regretPct).toBeGreaterThanOrEqual(-1e-9);
+    }
+  });
+
+  it("otomatikGroupSelections REGRET GUARD'ı loglar ama publish'i ASLA engellemez", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(() => otomatikGroupSelections(races, stakePerCombination)).not.toThrow();
+    warnSpy.mockRestore();
   });
 });

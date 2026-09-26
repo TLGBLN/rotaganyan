@@ -118,38 +118,51 @@ function anormalPistZorunluMinimumHesapla(races: RaceDayData["races"]): Record<n
  * geçirilir — bütçe bu kısıtların ETRAFINDA yeniden çözülür (bkz. kupon-optimizer.ts'teki
  * eküri/bahis-birimi seviyesi uygulama).
  */
-export function otomatikGroupSelections(
+function legsByWidthFor(races: RaceDayData["races"], width: Width, manualOverrides?: ManualOverridesMap): LegProbability[] {
+  return races.map((race) => {
+    const entry = manualOverrides?.[race.raceNo]?.[width];
+    return {
+      raceNo: race.raceNo,
+      runners: race.runners
+        .filter((r) => !r.scratched)
+        .map((r) => ({ no: r.no, olasilik: (r.scoreExact ?? r.score ?? 0) / 100, ekuriGroup: r.ekuriGroup })),
+      forced: entry ? { include: entry.forceInclude, exclude: entry.forceExclude } : undefined,
+    };
+  });
+}
+
+// 2026-09-26 kullanıcı düzeltmesi (2. tur) — İzmir 1.Altılı canlı vakası: eski (ARTAN
+// sırada, ucuzdan pahalıya, FLOOR devralan) zincir bir ucuz kademenin kendi optimal
+// tercihini pahalı kademeye TABAN olarak dayatıp onu sıkıştırabiliyordu (kanıt: %9.18→
+// %8.67). Kullanıcı haklı olarak "Ekonomik'te yazılan at Normal'de olmalı" dedi — yani
+// nesting (S⊆E⊆N⊆W) ŞART, ama floor YÖNTEMİYLE değil. Doğru çözüm: sıra TERSİNE çevrilir
+// (AZALAN — en geniş/en özgür kademe ÖNCE, tamamen bağımsız); her sonraki (daha UCUZ)
+// kademe bir ÖNCEKİNİN (daha geniş) birim sayısını bu sefer TAVAN (ceiling) olarak alır,
+// KENDİ bütçesi için o tavanın İÇİNDE serbestçe optimize eder. Tavan floor gibi bir
+// harcamayı ZORLAMAZ — yalnız aşmayı engeller (bkz. kupon-optimizer.ts başlığı). Sonuç:
+// nesting yapısal olarak GARANTİ (hepsi aynı olasılık-sıralı listenin "ilk n" öneki).
+//
+// 2026-09-26 kullanıcı düzeltmesi (3. tur, IQ200 notu) — bu zincir nesting'i KESİN garanti
+// eder ama HER kademenin mutlak matematiksel optimumunu GARANTİ ETMEZ: tavan, ALTINDAKİ
+// kademeyi kendi bütçesi için gerçekten en iyisinden DAHA AZINA mahkûm edebilir (eski
+// sorunun ters yönü — artık ucuz değil PAHALI bir kademenin şekli daha ucuza sızıp onu
+// sıkıştırabilir, teorik olarak). Mimari DEĞİŞTİRİLMEDİ (İzmir'de kanıtlanmış, sağlıklı
+// çalışıyor) — bunun yerine bu riski SÜREKLİ ÖLÇEN bir "regret guard" eklendi (bkz.
+// computeTierRegret): her kademenin nested (gerçek, yayınlanan) kapsaması, aynı bütçeyle
+// tavansız/bağımsız çözülseydi ne olacağıyla karşılaştırılır. Regret ihmal edilebilir
+// düzeydeyse (İzmir'de ölçüldü) mimari korunur; anlamlı bir regret görülürse (kullanıcının
+// eşiği: ör. %5+) bir sonraki aşama Joint Nested DP / minimum-regret optimizer olur — bkz.
+// TIER_REGRET_WARN_THRESHOLD.
+function hesaplaNestedKademeler(
   races: RaceDayData["races"],
   stakePerCombination: number,
-  limits: Record<Width, number> = LIMITS,
-  tolerances: Record<Width, number> = TOLERANCES,
+  limits: Record<Width, number>,
+  tolerances: Record<Width, number>,
   manualOverrides?: ManualOverridesMap
-): GroupSelections {
+): { sel: GroupSelections; nestedKapsama: Record<Width, number> } {
   const zorunluMinimum = anormalPistZorunluMinimumHesapla(races);
-  const legsByWidth = (width: Width): LegProbability[] =>
-    races.map((race) => {
-      const entry = manualOverrides?.[race.raceNo]?.[width];
-      return {
-        raceNo: race.raceNo,
-        runners: race.runners
-          .filter((r) => !r.scratched)
-          .map((r) => ({ no: r.no, olasilik: (r.scoreExact ?? r.score ?? 0) / 100, ekuriGroup: r.ekuriGroup })),
-        forced: entry ? { include: entry.forceInclude, exclude: entry.forceExclude } : undefined,
-      };
-    });
   const sel = emptyGroupSelections(races);
-
-  // 2026-09-26 kullanıcı düzeltmesi (2. tur) — İzmir 1.Altılı canlı vakası: eski (ARTAN
-  // sırada, ucuzdan pahalıya, FLOOR devralan) zincir bir ucuz kademenin kendi optimal
-  // tercihini pahalı kademeye TABAN olarak dayatıp onu sıkıştırabiliyordu (kanıt: %9.18→
-  // %8.67). Kullanıcı haklı olarak "Ekonomik'te yazılan at Normal'de olmalı" dedi — yani
-  // nesting (S⊆E⊆N⊆W) ŞART, ama floor YÖNTEMİYLE değil. Doğru çözüm: sıra TERSİNE çevrilir
-  // (AZALAN — en geniş/en özgür kademe ÖNCE, tamamen bağımsız); her sonraki (daha UCUZ)
-  // kademe bir ÖNCEKİNİN (daha geniş) birim sayısını bu sefer TAVAN (ceiling) olarak alır,
-  // KENDİ bütçesi için o tavanın İÇİNDE serbestçe optimize eder. Tavan floor gibi bir
-  // harcamayı ZORLAMAZ — yalnız aşmayı engeller (bkz. kupon-optimizer.ts başlığı). Sonuç:
-  // nesting yapısal olarak GARANTİ (hepsi aynı olasılık-sıralı listenin "ilk n" öneki),
-  // VE hiçbir ucuz kademe artık pahalı bir kademeyi rehin alamaz.
+  const nestedKapsama = {} as Record<Width, number>;
   const reversedWidths = [...WIDTHS].reverse(); // wide, normal, narrow, micro
   let ustSinir: Record<number, number> | undefined;
   for (const width of reversedWidths) {
@@ -159,12 +172,72 @@ export function otomatikGroupSelections(
     for (const [raceNoStr, min] of Object.entries(zorunluMinimum)) {
       minUnitCounts[Number(raceNoStr)] = min;
     }
-    const { secimler, birimSayilari } = optimizeKuponAllocation(legsByWidth(width), maxCombinations, minUnitCounts, ustSinir);
+    const { secimler, birimSayilari, kapsamaOlasiligi } = optimizeKuponAllocation(
+      legsByWidthFor(races, width, manualOverrides), maxCombinations, minUnitCounts, ustSinir
+    );
     ustSinir = birimSayilari;
+    nestedKapsama[width] = kapsamaOlasiligi;
     for (const race of races) {
       sel[race.raceNo][width] = new Set(secimler[race.raceNo] ?? []);
     }
   }
+  return { sel, nestedKapsama };
+}
+
+/** Bir kademenin AYNI bütçeyle tavansız/bağımsız çözülseydi ulaşacağı kapsama olasılığı —
+ *  regret guard'ın "independent" yarısı (bkz. hesaplaNestedKademeler başlığı). */
+function bagimsizKapsama(
+  races: RaceDayData["races"],
+  width: Width,
+  stakePerCombination: number,
+  limits: Record<Width, number>,
+  tolerances: Record<Width, number>,
+  manualOverrides?: ManualOverridesMap
+): number {
+  const zorunluMinimum = anormalPistZorunluMinimumHesapla(races);
+  const minUnitCounts: Record<number, number> = {};
+  for (const [raceNoStr, min] of Object.entries(zorunluMinimum)) minUnitCounts[Number(raceNoStr)] = min;
+  const effectiveLimit = limits[width] * tolerances[width];
+  const maxCombinations = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
+  return optimizeKuponAllocation(legsByWidthFor(races, width, manualOverrides), maxCombinations, minUnitCounts).kapsamaOlasiligi;
+}
+
+export type TierRegret = { independentCoverage: number; nestedCoverage: number; regretPct: number };
+
+// Kullanıcının örneği: %0.33 kabul edilebilir, %5.56 eski sorunun geri geldiğinin işareti.
+// Bu bir HARD LIMIT/publish-block DEĞİL — yalnız görünürlük/erken-uyarı eşiği.
+export const TIER_REGRET_WARN_THRESHOLD = 0.02;
+
+/** Her kademe için regret = (independent-nested)/independent — "büyük tier küçüğü rehin
+ *  alıyor mu" sorusunun sürekli ölçümü (bkz. hesaplaNestedKademeler başlığındaki 3. tur notu).
+ *  wide'ın regret'i YAPISAL olarak her zaman 0 olmalı (hiç ceiling almıyor) — bu doğal bir
+ *  sağlama (sanity check) sayılır. */
+export function computeTierRegret(
+  races: RaceDayData["races"],
+  stakePerCombination: number,
+  limits: Record<Width, number> = LIMITS,
+  tolerances: Record<Width, number> = TOLERANCES,
+  manualOverrides?: ManualOverridesMap
+): Record<Width, TierRegret> {
+  const { nestedKapsama } = hesaplaNestedKademeler(races, stakePerCombination, limits, tolerances, manualOverrides);
+  const result = {} as Record<Width, TierRegret>;
+  for (const width of WIDTHS) {
+    const independentCoverage = bagimsizKapsama(races, width, stakePerCombination, limits, tolerances, manualOverrides);
+    const nestedCoverage = nestedKapsama[width];
+    const regretPct = independentCoverage > 0 ? (independentCoverage - nestedCoverage) / independentCoverage : 0;
+    result[width] = { independentCoverage, nestedCoverage, regretPct };
+  }
+  return result;
+}
+
+export function otomatikGroupSelections(
+  races: RaceDayData["races"],
+  stakePerCombination: number,
+  limits: Record<Width, number> = LIMITS,
+  tolerances: Record<Width, number> = TOLERANCES,
+  manualOverrides?: ManualOverridesMap
+): GroupSelections {
+  const { sel, nestedKapsama } = hesaplaNestedKademeler(races, stakePerCombination, limits, tolerances, manualOverrides);
 
   // TIER_NESTING_VIOLATION savunma kontrolü (kullanıcı talebi) — yukarıdaki algoritma
   // nesting'i YAPISAL olarak garanti eder (manualOverrides YOKSA), bu yalnız gelecekte bir
@@ -178,6 +251,21 @@ export function otomatikGroupSelections(
       throw new Error(`TIER_NESTING_VIOLATION: ${ihlaller.join("; ")}`);
     }
     console.warn(`[otomatikGroupSelections] TIER_NESTING_VIOLATION (manualOverrides ile, publish ENGELLENMEDİ): ${ihlaller.join("; ")}`);
+  }
+
+  // REGRET GUARD (kullanıcı talebi, 3. tur) — yalnız gözlemsel: publish'i ASLA engellemez,
+  // yalnız "büyük tier küçüğü rehin alıyor mu" sorusunu her generation'da ölçüp loglar.
+  for (const width of WIDTHS) {
+    const independentCoverage = bagimsizKapsama(races, width, stakePerCombination, limits, tolerances, manualOverrides);
+    const nestedCoverage = nestedKapsama[width];
+    const regretPct = independentCoverage > 0 ? (independentCoverage - nestedCoverage) / independentCoverage : 0;
+    if (regretPct > TIER_REGRET_WARN_THRESHOLD) {
+      console.warn(
+        `[otomatikGroupSelections] REGRET GUARD: ${WIDTH_LABEL[width]} nested=%${(nestedCoverage * 100).toFixed(2)} ` +
+        `independent=%${(independentCoverage * 100).toFixed(2)} regret=%${(regretPct * 100).toFixed(2)} ` +
+        `(eşik %${(TIER_REGRET_WARN_THRESHOLD * 100).toFixed(0)}) — büyük kademe bunu sıkıştırıyor olabilir, incelenmeli.`
+      );
+    }
   }
 
   return sel;
