@@ -112,17 +112,32 @@ function ekuriBirimleriOlustur(
 // TAMAMEN BAĞIMSIZ üç DP koşusuydu (aynı kombinasyon bütçesinin farklı boyutları). Gerçek
 // veriyle test edilince bu bağımsızlığın ayak-başı at sayısını bütçeyle MONOTON artırmadığı
 // kanıtlandı — Ekonomik (560 kombinasyon) bir ayakta 7 at seçerken, 2.3× daha büyük bütçeli
-// Normal (1320 kombinasyon) AYNI ayakta yalnızca 6 at seçebiliyordu (budget 400→1400 arası
-// taranınca o ayağın at sayısı 5-6-7 arası tamamen düzensiz sıçradı, hiç monoton değildi) —
-// çarpımsal bütçe kısıtı + tam sayı kısıtı altında bu matematiksel olarak mümkün ama bir
-// admin/kullanıcı için "daha pahalı kademe daha az kapsıyor" kabul edilemez bir tutarsızlık.
-// Çözüm: her kademe, KENDİNDEN BİR ÖNCEKİ (ucuz) kademenin seçtiği at sayısını TABAN olarak
-// alır — yalnız ÜZERİNE ekler, asla eksiltmez. Taban keyfi bir eşik DEĞİL, zaten onaylanmış
-// bir önceki kademenin kendi optimal sonucu (bkz. otomatikGroupSelections'taki zincirleme).
+// Normal (1320 kombinasyon) AYNI ayakta yalnızca 6 at seçebiliyordu — bir admin/kullanıcı
+// için "daha pahalı kademe daha az kapsıyor" kabul edilemez bir tutarsızlık.
+//
+// 2026-09-26 kullanıcı bulgusu (İzmir 1.Altılı, Süper Ekonomik eklenince ORTAYA ÇIKTI) —
+// bu, İLK çözümün (ucuz kademe standalone hesaplanır, pahalı kademeler onun sayısını TABAN/
+// floor alır) KENDİ hatası: küçük bütçeli bir kademenin (Süper Ekonomik) kendi optimal
+// tercihi (ör. bir ayağa agresif 7 birim) daha pahalı bir kademeye (Ekonomik) FLOOR olarak
+// dayatılınca, o pahalı kademenin KENDİ bütçesi o ayakta kilitlenip BAŞKA bir ayağı
+// genişletemiyor — ölçülebilir biçimde daha düşük toplam kapsama (kanıt: %9.18→%8.67).
+// DOĞRU ÇÖZÜM: yön TERSİNE çevrildi — EN GENİŞ (en özgür, en pahalı) kademe ÖNCE, HİÇBİR
+// kısıt olmadan bağımsız optimize edilir; her bir sonraki (daha UCUZ) kademe, bir ÖNCEKİNİN
+// (daha geniş) seçtiği at sayısını bu sefer TAVAN (ceiling, floor DEĞİL) olarak alıp KENDİ
+// bütçesiyle o tavanın İÇİNDE en iyi ALT KÜMEYİ seçer. Tavan bir floor gibi belirli bir
+// harcamayı ZORLAMAZ — yalnız AŞMAYI engeller, bu yüzden ucuz kademe kendi bütçesi için
+// gerçekten optimal olan (daha düşük) bir sayıyı hâlâ seçebilir. Sonuç: (1) nesting KESİN
+// garanti (S⊆E⊆N⊆W, hepsi AYNI olasılık-sıralı listenin "ilk n" öneki olduğu için otomatik),
+// (2) monotonluk KESİN garanti (küçük kademe hiçbir zaman büyük kademeyi AŞAMAZ, yapısal),
+// (3) hiçbir ucuz kademe artık pahalı bir kademeyi REHİN ALAMAZ (kısıt yalnız yukarıdan
+// aşağı akar, floor'un tersi). Çağıran (otomatikGroupSelections) WIDTHS'i TERS sırada
+// (wide→normal→narrow→micro) işler ve her adımda `maxUnitCounts`'u bir ÖNCEKİ (daha geniş)
+// kademenin `birimSayilari`sından geçirir.
 export function optimizeKuponAllocation(
   legs: LegProbability[],
   maxCombinations: number,
-  minUnitCounts?: Record<number, number>
+  minUnitCounts?: Record<number, number>,
+  maxUnitCounts?: Record<number, number>
 ): OptimizeResult {
   if (legs.length === 0 || maxCombinations < 1) {
     return { secimler: {}, toplamKombinasyon: 0, kapsamaOlasiligi: 0, birimSayilari: {} };
@@ -142,7 +157,11 @@ export function optimizeKuponAllocation(
       Math.max(1, minUnitCounts?.[leg.raceNo] ?? 1, forcedUnitCount),
       Math.max(sirali.length, 1)
     );
-    return { raceNo: leg.raceNo, sirali, kumulatif, minN };
+    // maxN — bir ÖNCEKİ (daha geniş) kademenin bu ayakta seçtiği birim sayısı, verilmişse.
+    // Bu bir FLOOR değil TAVAN: DP minN..maxN arasında KENDİ bütçesi için en iyisini seçmekte
+    // TAMAMEN SERBEST, yalnız maxN'i AŞAMAZ (nesting garantisi buradan gelir).
+    const maxN = Math.min(sirali.length, maxUnitCounts?.[leg.raceNo] ?? sirali.length);
+    return { raceNo: leg.raceNo, sirali, kumulatif, minN: Math.min(minN, Math.max(maxN, 1)), maxN };
   });
 
   type Durum = { logOlasilik: number; secimSayilari: number[] };
@@ -151,7 +170,7 @@ export function optimizeKuponAllocation(
   for (const opt of legOptions) {
     const yeniDp = new Map<number, Durum>();
     for (const [c, durum] of dp) {
-      for (let n = opt.minN; n <= opt.kumulatif.length; n++) {
+      for (let n = opt.minN; n <= opt.maxN; n++) {
         const yeniC = c * n;
         if (yeniC > maxCombinations) break; // n arttıkça c*n de artar — erken kesilebilir
         const p = opt.kumulatif[n - 1];

@@ -103,10 +103,15 @@ function anormalPistZorunluMinimumHesapla(races: RaceDayData["races"]): Record<n
 
 /**
  * Sabit bütçeyi ayaklar arasında en yüksek toplam-isabet olasılığını verecek şekilde
- * dağıtır (bkz. kupon-optimizer.ts). Her üç kademe (Ekonomik/Normal/Geniş) için AYRI
- * bir optimizasyon çalıştırıp TEK bir GroupSelections'ta birleştirir; her kademe bir
- * öncekinin (ucuz) seçtiği birim sayısını TABAN alır (yalnız üzerine ekler).
+ * dağıtır (bkz. kupon-optimizer.ts). Dört kademe (Süper Ekonomik/Ekonomik/Normal/Geniş)
+ * için AYRI bir optimizasyon çalıştırıp TEK bir GroupSelections'ta birleştirir — sıra
+ * AZALAN (wide→normal→narrow→micro): en geniş kademe TAMAMEN BAĞIMSIZ optimize edilir,
+ * her sonraki (daha ucuz) kademe bir ÖNCEKİNİN (daha geniş) seçtiği birim sayısını TAVAN
+ * (ceiling, floor DEĞİL) alıp kendi bütçesiyle o tavanın içinde serbestçe optimize eder —
+ * S⊆E⊆N⊆W nesting'i yapısal olarak garanti eder, hiçbir ucuz kademe pahalı bir kademeyi
+ * rehin alamaz (bkz. 2026-09-26 notu aşağıda, kupon-optimizer.ts başlığındaki tam gerekçe).
  *
+
  * 2026-09-21 — Prediction-to-HomeKupon Auto Synchronization: `manualOverrides` verilirse
  * (admin'in HAM/kalıcı checkbox niyeti, `pruneToEligible` ile ZATEN eligible'a budanmış
  * olmalı) her (raceNo,width) için `optimizeKuponAllocation`'a `forced` kısıtı olarak
@@ -133,30 +138,66 @@ export function otomatikGroupSelections(
       };
     });
   const sel = emptyGroupSelections(races);
-  let oncekiBirimSayilari: Record<number, number> | undefined;
-  for (const width of WIDTHS) {
+
+  // 2026-09-26 kullanıcı düzeltmesi (2. tur) — İzmir 1.Altılı canlı vakası: eski (ARTAN
+  // sırada, ucuzdan pahalıya, FLOOR devralan) zincir bir ucuz kademenin kendi optimal
+  // tercihini pahalı kademeye TABAN olarak dayatıp onu sıkıştırabiliyordu (kanıt: %9.18→
+  // %8.67). Kullanıcı haklı olarak "Ekonomik'te yazılan at Normal'de olmalı" dedi — yani
+  // nesting (S⊆E⊆N⊆W) ŞART, ama floor YÖNTEMİYLE değil. Doğru çözüm: sıra TERSİNE çevrilir
+  // (AZALAN — en geniş/en özgür kademe ÖNCE, tamamen bağımsız); her sonraki (daha UCUZ)
+  // kademe bir ÖNCEKİNİN (daha geniş) birim sayısını bu sefer TAVAN (ceiling) olarak alır,
+  // KENDİ bütçesi için o tavanın İÇİNDE serbestçe optimize eder. Tavan floor gibi bir
+  // harcamayı ZORLAMAZ — yalnız aşmayı engeller (bkz. kupon-optimizer.ts başlığı). Sonuç:
+  // nesting yapısal olarak GARANTİ (hepsi aynı olasılık-sıralı listenin "ilk n" öneki),
+  // VE hiçbir ucuz kademe artık pahalı bir kademeyi rehin alamaz.
+  const reversedWidths = [...WIDTHS].reverse(); // wide, normal, narrow, micro
+  let ustSinir: Record<number, number> | undefined;
+  for (const width of reversedWidths) {
     const effectiveLimit = limits[width] * tolerances[width];
     const maxCombinations = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
-    const minUnitCounts: Record<number, number> = { ...oncekiBirimSayilari };
+    const minUnitCounts: Record<number, number> = {};
     for (const [raceNoStr, min] of Object.entries(zorunluMinimum)) {
-      const raceNo = Number(raceNoStr);
-      minUnitCounts[raceNo] = Math.max(minUnitCounts[raceNo] ?? 1, min);
+      minUnitCounts[Number(raceNoStr)] = min;
     }
-    const { secimler, birimSayilari } = optimizeKuponAllocation(legsByWidth(width), maxCombinations, minUnitCounts);
-    // 2026-09-26 kullanıcı bulgusu (İzmir 1.Altılı canlı vakası, DP ile KANITLANDI): micro
-    // (Süper Ekonomik) kendi KÜÇÜK bütçesinde bazı ayaklara (ör. spread'i yüksek bir ayak)
-    // agresif birim ayırmayı optimal buluyor — bu birim sayıları narrow'a (Ekonomik) TABAN
-    // olarak miras kalırsa, Ekonomik'in KENDİ 700-900₺ bütçesi o ayaklarda "sıkışıp" başka
-    // bir ayağı (ör. gerçek vakada 2.Koşu) genişletemiyor — DP matematiksel olarak doğru
-    // ama SONUÇ, floor'suz taze bir çözümden ÖLÇÜLEBİLİR biçimde daha düşük kapsama
-    // olasılığı üretiyor (canlı veriyle doğrulandı: %9.18 → %8.67). Süper Ekonomik bu yüzden
-    // zincirden ÇIKARILDI — narrow/normal/wide'ın TARİHİ (aylarca ayarlanmış) kademeli-miras
-    // davranışı AYNEN korunuyor, micro yalnız KENDİ bütçesiyle bağımsız hesaplanan, ayrı bir
-    // "hızlı/ucuz seçenek" kademesi (narrow'a floor VERMEZ, narrow'dan floor ALMAZ).
-    if (width !== "micro") oncekiBirimSayilari = birimSayilari;
+    const { secimler, birimSayilari } = optimizeKuponAllocation(legsByWidth(width), maxCombinations, minUnitCounts, ustSinir);
+    ustSinir = birimSayilari;
     for (const race of races) {
       sel[race.raceNo][width] = new Set(secimler[race.raceNo] ?? []);
     }
   }
+
+  // TIER_NESTING_VIOLATION savunma kontrolü (kullanıcı talebi) — yukarıdaki algoritma
+  // nesting'i YAPISAL olarak garanti eder (manualOverrides YOKSA), bu yalnız gelecekte bir
+  // refactor'ın bu garantiyi sessizce bozmasına karşı bir güvenlik ağı. manualOverrides
+  // varsa (admin'in kasıtlı per-kademe müdahalesi) nesting KESİN garanti EDİLEMEZ (forced
+  // include/exclude kademe başına farklı olabilir) — bu durumda yalnız UYARI loglanır,
+  // publish ENGELLENMEZ (admin'in müdahalesi bilinçli bir istisna, hata değil).
+  const ihlaller = tierNestingIhlalleriniBul(races, sel);
+  if (ihlaller.length > 0) {
+    if (!manualOverrides || Object.keys(manualOverrides).length === 0) {
+      throw new Error(`TIER_NESTING_VIOLATION: ${ihlaller.join("; ")}`);
+    }
+    console.warn(`[otomatikGroupSelections] TIER_NESTING_VIOLATION (manualOverrides ile, publish ENGELLENMEDİ): ${ihlaller.join("; ")}`);
+  }
+
   return sel;
+}
+
+/** S⊆E⊆N⊆W (Süper Ekonomik ⊆ Ekonomik ⊆ Normal ⊆ Geniş) her ayakta korunuyor mu — bkz.
+ *  otomatikGroupSelections başlığı. İhlal varsa okunabilir bir açıklama listesi döner. */
+export function tierNestingIhlalleriniBul(races: RaceDayData["races"], sel: GroupSelections): string[] {
+  const ihlaller: string[] = [];
+  for (const race of races) {
+    const s = sel[race.raceNo];
+    for (let i = 0; i < WIDTHS.length - 1; i++) {
+      const kucuk = WIDTHS[i];
+      const buyuk = WIDTHS[i + 1];
+      for (const no of s[kucuk]) {
+        if (!s[buyuk].has(no)) {
+          ihlaller.push(`K${race.raceNo}: #${no} ${WIDTH_LABEL[kucuk]}'te var ama ${WIDTH_LABEL[buyuk]}'te yok`);
+        }
+      }
+    }
+  }
+  return ihlaller;
 }

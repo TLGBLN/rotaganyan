@@ -12,6 +12,7 @@ import {
   YEDILI_TOLERANCES,
   emptySelection,
   otomatikGroupSelections,
+  tierNestingIhlalleriniBul,
   type RaceDayData,
 } from "./kupon-auto-fill";
 import { optimizeKuponAllocation } from "./kupon-optimizer";
@@ -47,61 +48,93 @@ describe("Width kademeleri (4'lü yapı)", () => {
   });
 });
 
-describe("otomatikGroupSelections — kademeli miras (4 seviye)", () => {
-  const races: RaceDayData["races"] = Array.from({ length: 3 }, (_, i) => ({
-    raceNo: i + 1,
-    pistAnormalMi: false,
-    pistDuyarliligi: null,
-    gecmisRiskSeviyesi: null,
-    pistUyariMesaji: null,
-    runners: Array.from({ length: 8 }, (_, j) => ({
-      no: j + 1,
-      name: `At ${j + 1}`,
-      scratched: false,
-      ekuriGroup: null,
-      score: 100 / 8,
-      scoreExact: 100 / 8,
-      agfSirasi: j + 1,
-    })),
-  }));
+// GERÇEK İzmir 1.Altılı canlı vakasının BİREBİR verisi (2026-09-26, arac-deploy-dogrula
+// öncesi canlı DB'den okundu) — sentetik/yaklaşık bir fixture DEĞİL, raporlanan hatayı
+// GERÇEKTEN üreten olasılık dağılımları. K2 güçlü tek favori (34.9%) ama anlamlı bir
+// "ikinci kademesi" var (13.1/11.5/11.5%) — eski (floor) algoritma bunu 1 ata düşürüyordu.
+function izmirGercekRaces(): RaceDayData["races"] {
+  const leg = (raceNo: number, probsPct: number[]): RaceDayData["races"][number] => ({
+    raceNo, pistAnormalMi: false, pistDuyarliligi: null, gecmisRiskSeviyesi: null, pistUyariMesaji: null,
+    runners: probsPct.map((p, j) => ({ no: j + 1, name: `At ${j + 1}`, scratched: false, ekuriGroup: null, score: p, scoreExact: p, agfSirasi: j + 1 })),
+  });
+  return [
+    leg(1, [30.5, 20.4, 18.1, 8.9, 6.2, 5.5, 2.9]),
+    leg(2, [34.9, 13.1, 11.5, 11.5, 7.4, 7.0, 4.1, 2.7, 2.0, 1.7, 1.5, 1.0, 0.9, 0.7]),
+    leg(3, [40.3, 24.5, 14.6, 11.1, 9.6]),
+    leg(4, [30.1, 13.6, 12.0, 8.7, 7.4, 7.0, 6.2, 4.3, 3.9, 3.7, 3.2]),
+    leg(5, [42.9, 12.8, 12.3, 7.1, 6.7, 4.3, 3.4, 2.4, 2.2, 2.1, 1.6, 0.8, 0.8, 0.6]),
+    leg(6, [31.0, 19.1, 14.6, 6.4, 6.2, 5.1, 4.8, 3.4, 3.4, 2.2, 2.0, 1.8]),
+  ];
+}
 
-  it("narrow/normal/wide TARİHİ kademeli mirası korur (superset) — micro ZİNCİRE DAHİL DEĞİL", () => {
-    // 2026-09-26 kullanıcı bulgusu (İzmir 1.Altılı canlı vakası) — micro (Süper Ekonomik)
-    // narrow'a floor verirse Ekonomik'in kendi bütçesi başka ayaklara "kilitlenip" ölçülebilir
-    // biçimde daha düşük kapsama olasılığı üretiyordu (kanıt: %9.18 → %8.67). Bu yüzden micro
-    // BAĞIMSIZ hesaplanır — yalnız narrow⊇normal⊇wide zinciri (tarihi, aylarca ayarlanmış
-    // davranış) korunur, micro'nun narrow'un ALT KÜMESİ olması GEREKMEZ.
-    const stakePerCombination = 1.25;
+describe("otomatikGroupSelections — JOINT nested optimizasyon (kullanıcı düzeltmesi, 2. tur)", () => {
+  const races = izmirGercekRaces();
+  const stakePerCombination = 1.25;
+
+  it("S⊆E⊆N⊆W nesting'i HER ayakta KESİN korunur (dört kademe de)", () => {
+    const sel = otomatikGroupSelections(races, stakePerCombination);
+    expect(tierNestingIhlalleriniBul(races, sel)).toEqual([]);
+  });
+
+  it("REGRESYON: Süper Ekonomik'in agresif tercihi (leg4) Ekonomik'i (leg2'de) SIKIŞTIRMAZ", () => {
+    // Bu, İzmir 1.Altılı canlı vakasının doğrudan kanıtı: eski (artan/floor) algoritma
+    // leg2'yi (güçlü tek favori) 1 ata düşürüyordu çünkü micro'nun leg4'teki agresif
+    // tercihini TABAN olarak devralıyordu. Yeni (azalan/ceiling) algoritmada Ekonomik
+    // KENDİ bütçesiyle bağımsız optimize edilir (yalnız Normal'in tavanıyla sınırlı,
+    // Normal de Geniş'in tavanıyla — Geniş TAMAMEN serbest) — leg2'de birden fazla at
+    // olmalı çünkü Ekonomik'in kendi 700-900₺ bütçesi buna yetiyor.
+    const sel = otomatikGroupSelections(races, stakePerCombination);
+    expect(sel[2].narrow.size).toBeGreaterThan(1);
+  });
+
+  it("Kapsama olasılığı monoton: Süper Ekonomik ≤ Ekonomik ≤ Normal ≤ Geniş (her ayakta birim sayısı)", () => {
     const sel = otomatikGroupSelections(races, stakePerCombination);
     for (const race of races) {
       const s = sel[race.raceNo];
-      expect(s.micro.size).toBeGreaterThan(0);
-      for (const no of s.narrow) expect(s.normal.has(no)).toBe(true);
-      for (const no of s.normal) expect(s.wide.has(no)).toBe(true);
+      expect(s.micro.size).toBeLessThanOrEqual(s.narrow.size);
+      expect(s.narrow.size).toBeLessThanOrEqual(s.normal.size);
+      expect(s.normal.size).toBeLessThanOrEqual(s.wide.size);
     }
   });
 
-  it("micro (Süper Ekonomik) narrow'un bütçesini/şeklini ETKİLEMEZ — floor'suz taze çözümle AYNI sonucu verir", () => {
-    // Bu, asıl regresyon testi: micro HİÇ hesaplanmasa bile narrow'un sonucu DEĞİŞMEMELİ
-    // (micro'nun zincire sızmadığının doğrudan kanıtı).
-    const stakePerCombination = 1.25;
-    const withMicro = otomatikGroupSelections(races, stakePerCombination);
-    // narrow'u WIDTHS zincirinin DIŞINDA, tek başına (floor yok) yeniden hesapla ve karşılaştır.
-    const effectiveLimit = LIMITS.narrow * TOLERANCES.narrow;
+  it("Geniş (wide) TAMAMEN BAĞIMSIZ optimize edilir — hiçbir ucuz kademeden kısıt almaz", () => {
+    // wide'ı WIDTHS zincirinin DIŞINDA, tek başına (ceiling yok) yeniden hesapla ve
+    // otomatikGroupSelections'ın ÜRETTİĞİ wide ile birebir aynı olduğunu doğrula.
+    const effectiveLimit = LIMITS.wide * TOLERANCES.wide;
     const maxCombinations = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
     const legsByWidth = races.map((race) => ({
       raceNo: race.raceNo,
       runners: race.runners.filter((r) => !r.scratched).map((r) => ({ no: r.no, olasilik: (r.scoreExact ?? r.score ?? 0) / 100, ekuriGroup: r.ekuriGroup })),
     }));
     const fresh = optimizeKuponAllocation(legsByWidth, maxCombinations);
+    const sel = otomatikGroupSelections(races, stakePerCombination);
     for (const race of races) {
-      expect([...withMicro[race.raceNo].narrow].sort()).toEqual([...new Set(fresh.secimler[race.raceNo] ?? [])].sort());
+      expect([...sel[race.raceNo].wide].sort((a, b) => a - b)).toEqual([...new Set(fresh.secimler[race.raceNo] ?? [])].sort((a, b) => a - b));
     }
   });
 
   it("manuel LIMITS/TOLERANCES verilirse (ör. YEDILI) onlar kullanılır, varsayılan DEĞİL", () => {
-    const stakePerCombination = 2;
-    const sel = otomatikGroupSelections(races, stakePerCombination, YEDILI_LIMITS, YEDILI_TOLERANCES);
+    const sel = otomatikGroupSelections(races, 2, YEDILI_LIMITS, YEDILI_TOLERANCES);
     expect(sel[1].micro.size).toBeGreaterThan(0);
+  });
+});
+
+describe("tierNestingIhlalleriniBul — savunma kontrolü", () => {
+  it("bozuk bir GroupSelections'ta ihlali doğru tespit eder", () => {
+    const races: RaceDayData["races"] = [{ raceNo: 1, pistAnormalMi: false, pistDuyarliligi: null, gecmisRiskSeviyesi: null, pistUyariMesaji: null, runners: [] }];
+    const bozukSel = {
+      1: { micro: new Set([5]), narrow: new Set([1, 2]), normal: new Set([1, 2]), wide: new Set([1, 2]) }, // micro'daki #5 narrow'da YOK
+    };
+    const ihlaller = tierNestingIhlalleriniBul(races, bozukSel);
+    expect(ihlaller.length).toBe(1);
+    expect(ihlaller[0]).toMatch(/#5/);
+  });
+
+  it("geçerli (nested) bir GroupSelections'ta ihlal BULMAZ", () => {
+    const races: RaceDayData["races"] = [{ raceNo: 1, pistAnormalMi: false, pistDuyarliligi: null, gecmisRiskSeviyesi: null, pistUyariMesaji: null, runners: [] }];
+    const gecerliSel = {
+      1: { micro: new Set([1]), narrow: new Set([1, 2]), normal: new Set([1, 2, 3]), wide: new Set([1, 2, 3, 4]) },
+    };
+    expect(tierNestingIhlalleriniBul(races, gecerliSel)).toEqual([]);
   });
 });
