@@ -1684,7 +1684,8 @@ const COUPON_STALE_CRITICAL_MIN = 30;
 const COUPON_CACHE_MS = 60_000;
 let couponCache: { data: ModuleResult; expiresAt: number } | null = null;
 
-type HomeKuponLegRow = { raceNo: number; narrow: number[]; normal: number[]; wide: number[] };
+// micro OPSİYONEL — Süper Ekonomik eklenmeden önce yayınlanmış eski kupon satırlarında bu alan hiç yok.
+type HomeKuponLegRow = { raceNo: number; micro?: number[]; narrow: number[]; normal: number[]; wide: number[] };
 
 async function computeCouponHealth(): Promise<ModuleResult> {
   const today = turkeyDateString();
@@ -1742,9 +1743,9 @@ async function computeCouponHealth(): Promise<ModuleResult> {
       }
     }
     for (const leg of legs) {
-      if (leg.narrow.length === 0) {
+      if ((leg.micro ?? []).length === 0) {
         emptyLegs++;
-        poolDetails.push(`${poolLabel}: K${leg.raceNo} Ekonomik'te 0 seçim`);
+        poolDetails.push(`${poolLabel}: K${leg.raceNo} Süper Ekonomik'te 0 seçim`);
       }
     }
 
@@ -1762,8 +1763,8 @@ async function computeCouponHealth(): Promise<ModuleResult> {
       const validRunners = runnersByRaceNo.get(leg.raceNo) ?? [];
       const validNos = new Set(validRunners.map((r) => r.no));
       const scratchedNos = new Set(validRunners.filter((r) => r.scratched).map((r) => r.no));
-      for (const width of ["narrow", "normal", "wide"] as const) {
-        const nos = leg[width];
+      for (const width of ["micro", "narrow", "normal", "wide"] as const) {
+        const nos = leg[width] ?? [];
         if (new Set(nos).size !== nos.length) {
           duplicateSelection++;
           poolDetails.push(`${poolLabel}: K${leg.raceNo} ${width} duplicate seçim`);
@@ -1785,7 +1786,7 @@ async function computeCouponHealth(): Promise<ModuleResult> {
       costMismatch++;
       const onerisi = await buildKuponOnerisi(pool);
       const displayed = onerisi?.variants.find((v) => v.filled)?.amount ?? onerisi?.variants[0]?.amount ?? null;
-      const combos = legs.reduce((acc, l) => acc * Math.max(l.narrow.length, 1), 1);
+      const combos = legs.reduce((acc, l) => acc * Math.max((l.micro ?? []).length, 1), 1);
       const expected = Math.round(combos * generatorStake * 100) / 100;
       costMismatchDetails.push(`${poolLabel}: displayed=${displayed ?? "N/A"}₺ (stake=${displayStake}), expected=${expected}₺ (stake=${generatorStake})`);
     }

@@ -7,9 +7,13 @@
 import { optimizeKuponAllocation, type LegProbability } from "./kupon-optimizer";
 import type { ManualOverridesMap } from "./kupon-dependency-hash";
 
-export type Width = "narrow" | "normal" | "wide";
-export const WIDTHS: Width[] = ["narrow", "normal", "wide"];
-export const WIDTH_LABEL: Record<Width, string> = { narrow: "Ekonomik", normal: "Normal", wide: "Geniş" };
+// 2026-09-26 kullanıcı talebi: Ekonomik 700-900₺'ye yeniden konumlandırıldı, altına
+// (300-500₺) yeni bir "Süper Ekonomik" (micro) kademesi eklendi — WIDTHS sırası ucuzdan
+// pahalıya (micro→narrow→normal→wide), her kademe bir ÖNCEKİNİN seçimini taban alıp
+// üzerine ekliyor (bkz. otomatikGroupSelections aşağıda) — micro artık en ucuz taban.
+export type Width = "micro" | "narrow" | "normal" | "wide";
+export const WIDTHS: Width[] = ["micro", "narrow", "normal", "wide"];
+export const WIDTH_LABEL: Record<Width, string> = { micro: "Süper Ekonomik", narrow: "Ekonomik", normal: "Normal", wide: "Geniş" };
 
 export const ALTILI_STAKE_PER_COMBINATION = 1.25;
 // 2026-09-12 kullanıcı talebi: Diyarbakır/Şanlıurfa/Elazığ'ın Altılı kombinasyon başı
@@ -21,14 +25,17 @@ export function stakeForHippodrome(hippodromeName: string): number {
 }
 // v6.111 — 7'li Ganyan'ın kombinasyon başı ücreti Altılı'dan farklı, TJK'da 2₺.
 export const YEDILI_GANYAN_STAKE_PER_COMBINATION = 2;
-export const LIMITS: Record<Width, number> = { narrow: 600, normal: 1500, wide: 3000 };
+// 2026-09-26 kullanıcı talebi: Ekonomik artık 700-900₺ (eskiden 600-700₺), Süper Ekonomik
+// (micro) 300-500₺ hedefliyor — LIMITS taban, TOLERANCES*LIMITS tavan (effectiveLimit,
+// bkz. otomatikGroupSelections) — DP bu tavanı AŞMAZ ama tam doldurmayı da GARANTİ ETMEZ
+// (sahadaki gerçek at/ayak sayısına bağlı, narrow/normal/wide'ın da tarihsel davranışı budur).
+export const LIMITS: Record<Width, number> = { micro: 300, narrow: 700, normal: 1500, wide: 3000 };
 const TOLERANCE = 1.1; // %10 esneme payı
-// 2026-09-05 kullanıcı talebi: Ekonomik'te esneme payı 660₺ değil 700₺'ye kadar.
-export const TOLERANCES: Record<Width, number> = { narrow: 700 / LIMITS.narrow, normal: TOLERANCE, wide: TOLERANCE };
-// 2026-09-12 kullanıcı talebi — 7'li Ganyan da Ekonomik/Normal/Geniş üçünü gösterir,
-// Altılı'nın LIMITS/TOLERANCES'ından BAĞIMSIZ kendi sabitleriyle.
-export const YEDILI_LIMITS: Record<Width, number> = { narrow: 500, normal: 1400, wide: 3000 };
-export const YEDILI_TOLERANCES: Record<Width, number> = { narrow: 700 / 500, normal: 1500 / 1400, wide: 3200 / 3000 };
+export const TOLERANCES: Record<Width, number> = { micro: 500 / LIMITS.micro, narrow: 900 / LIMITS.narrow, normal: TOLERANCE, wide: TOLERANCE };
+// 2026-09-12 kullanıcı talebi — 7'li Ganyan da aynı kademeleri gösterir, Altılı'nın
+// LIMITS/TOLERANCES'ından BAĞIMSIZ kendi sabitleriyle (2026-09-26: aynı ₺ hedefine hizalandı).
+export const YEDILI_LIMITS: Record<Width, number> = { micro: 300, narrow: 700, normal: 1400, wide: 3000 };
+export const YEDILI_TOLERANCES: Record<Width, number> = { micro: 500 / 300, narrow: 900 / 700, normal: 1500 / 1400, wide: 3200 / 3000 };
 
 // Altılı slotları (1, en fazla 2) ile asla çakışmaz.
 export const YEDILI_GANYAN_SLOT = 7;
@@ -56,7 +63,7 @@ export type RaceDayData = {
 export type GroupSelections = Record<number, Record<Width, Set<number>>>;
 
 export function emptySelection(): Record<Width, Set<number>> {
-  return { narrow: new Set(), normal: new Set(), wide: new Set() };
+  return { micro: new Set(), narrow: new Set(), normal: new Set(), wide: new Set() };
 }
 
 export function emptyGroupSelections(races: { raceNo: number }[]): GroupSelections {

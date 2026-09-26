@@ -55,18 +55,16 @@ type GroupManualOverrides = Record<string, ManualOverridesMap>;
 // özellik ayrı bir kullanıcı kararıyla tamamen geri alındı) — yalnız yayınlamadan ÖNCE
 // admin'i UYARAN, engellemeyen bir kontrol. Genişletmenin gerçekten MÜMKÜN olduğu
 // (sahada seçilenden daha fazla koşabilir at varken) durumlarda tetiklenir.
-function statikAyaklariBul(races: RaceDayData["races"], selections: GroupSelections): number[] {
+function statikAyaklariBul(races: RaceDayData["races"], selections: GroupSelections, widths: Width[] = WIDTHS): number[] {
   const sonuc: number[] = [];
   for (const race of races) {
     const sel = selections[race.raceNo] ?? emptySelection();
-    if (sel.narrow.size === 0) continue;
-    const ayniMi =
-      sel.narrow.size === sel.normal.size &&
-      sel.normal.size === sel.wide.size &&
-      [...sel.narrow].every((no) => sel.normal.has(no) && sel.wide.has(no));
+    const first = sel[widths[0]];
+    if (first.size === 0) continue;
+    const ayniMi = widths.every((w) => sel[w].size === first.size && [...first].every((no) => sel[w].has(no)));
     if (!ayniMi) continue;
     const musaitAtSayisi = race.runners.filter((r) => !r.scratched).length;
-    if (musaitAtSayisi > sel.narrow.size) sonuc.push(race.raceNo);
+    if (musaitAtSayisi > first.size) sonuc.push(race.raceNo);
   }
   return sonuc;
 }
@@ -350,7 +348,13 @@ function KuponGrup({
       </div>
 
       {/* Canlı özet — formül: ayaklardaki at sayıları çarpılır × kombinasyon ücreti */}
-      <div className={cn("grid gap-3", widths.length === 1 ? "grid-cols-1 max-w-xs" : "grid-cols-3")}>
+      <div
+        className={cn(
+          "grid gap-3",
+          // Tailwind JIT statik sınıf adı gerektirir — dinamik `grid-cols-${n}` derlenmez.
+          widths.length === 1 ? "grid-cols-1 max-w-xs" : widths.length === 2 ? "grid-cols-2" : widths.length === 4 ? "grid-cols-4" : "grid-cols-3"
+        )}
+      >
         {widths.map((width) => {
           const amount = amounts[width];
           const limit = limits[width];
@@ -388,9 +392,9 @@ function KuponGrup({
         </div>
       )}
 
-      {widths.length === 3 && statikAyaklariBul(races, selections).length > 0 && (
+      {widths.length > 1 && statikAyaklariBul(races, selections, widths).length > 0 && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-500">
-          ⚠ {statikAyaklariBul(races, selections).map((n) => `${n}. Koşu`).join(", ")} ayağında Ekonomik/Normal/Geniş
+          ⚠ {statikAyaklariBul(races, selections, widths).map((n) => `${n}. Koşu`).join(", ")} ayağında Süper Ekonomik/Ekonomik/Normal/Geniş
           AYNI atları taşıyor — bu ayak hiç genişletilmemiş. Genişletmeden bütçe ödemek, kazananın
           başka bir atta çıktığı her senaryoda TÜM kuponu düşürür (bkz. Karma/GÜL AYALI vakası).
         </div>
@@ -431,10 +435,10 @@ function KuponGrup({
 // bu kasıtlı, ama ekran bunu YANSITMIYORDU. Publish sonrası dönen GERÇEK `legs`'i bu
 // fonksiyonla `GroupSelections`'a çevirip ekrana geri yazıyoruz, admin tablo ile canlı
 // kupon arasında sessiz bir ayrışma kalmasın diye.
-function legsToSelections(legs: { raceNo: number; narrow: number[]; normal: number[]; wide: number[] }[]): GroupSelections {
+function legsToSelections(legs: { raceNo: number; micro?: number[]; narrow: number[]; normal: number[]; wide: number[] }[]): GroupSelections {
   const sel: GroupSelections = {};
   for (const leg of legs) {
-    sel[leg.raceNo] = { narrow: new Set(leg.narrow), normal: new Set(leg.normal), wide: new Set(leg.wide) };
+    sel[leg.raceNo] = { micro: new Set(leg.micro), narrow: new Set(leg.narrow), normal: new Set(leg.normal), wide: new Set(leg.wide) };
   }
   return sel;
 }
@@ -562,7 +566,7 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
     const groupSel = selections[key] ?? {};
     const hasAnySelection = group.some((r) => {
       const sel = groupSel[r.raceNo] ?? emptySelection();
-      return sel.narrow.size > 0 || sel.normal.size > 0 || sel.wide.size > 0;
+      return WIDTHS.some((w) => sel[w].size > 0);
     });
     if (!hasAnySelection) {
       toast.error("En az bir koşuda at seç");

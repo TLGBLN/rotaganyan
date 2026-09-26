@@ -17,6 +17,7 @@ import {
   YEDILI_TOLERANCES,
   YEDILI_GANYAN_SLOT,
   type Width,
+  emptySelection,
 } from "@/lib/methodology/kupon-auto-fill";
 import {
   dependencyHashForRace,
@@ -28,8 +29,10 @@ import {
   type DependencyRaceInput,
 } from "@/lib/methodology/kupon-dependency-hash";
 
+// micro OPSİYONEL — Süper Ekonomik eklenmeden önce yayınlanmış eski kupon satırlarında bu alan hiç yok.
 export type HomeKuponLegInput = {
   raceNo: number;
+  micro?: number[];
   narrow: number[];
   normal: number[];
   wide: number[];
@@ -229,15 +232,16 @@ export async function syncHomeKupon(input: {
   );
   const legs: HomeKuponLegInput[] = scopedLegs
     .map((l) => {
-      const sel = groupSel[l.raceNo] ?? { narrow: new Set<number>(), normal: new Set<number>(), wide: new Set<number>() };
+      const sel = groupSel[l.raceNo] ?? emptySelection();
       return {
         raceNo: l.raceNo,
+        micro: [...sel.micro].sort((a, b) => a - b),
         narrow: [...sel.narrow].sort((a, b) => a - b),
         normal: [...sel.normal].sort((a, b) => a - b),
         wide: [...sel.wide].sort((a, b) => a - b),
       };
     })
-    .filter((l) => l.narrow.length > 0 || l.normal.length > 0 || l.wide.length > 0);
+    .filter((l) => l.micro.length > 0 || l.narrow.length > 0 || l.normal.length > 0 || l.wide.length > 0);
 
   // 9) currentHash — hesaplama sırasında BAŞKA bir Prediction değişti mi? (Faz 1'deki
   // startHash/currentHash race-condition deseniyle AYNI.)

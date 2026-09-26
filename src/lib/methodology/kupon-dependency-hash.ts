@@ -64,11 +64,11 @@ export function dependencyHashForRace(races: DependencyRaceInput[], optimizerCon
   return sha256(stableStringify(canon));
 }
 
-export type TierKey = "narrow" | "normal" | "wide";
+export type TierKey = "micro" | "narrow" | "normal" | "wide";
 export type ManualOverrideEntry = { forceInclude: number[]; forceExclude: number[] };
 export type ManualOverridesMap = Record<number, Partial<Record<TierKey, ManualOverrideEntry>>>;
 
-const TIERS: TierKey[] = ["narrow", "normal", "wide"];
+const TIERS: TierKey[] = ["micro", "narrow", "normal", "wide"];
 
 function toNumberArray(v: unknown): number[] {
   return Array.isArray(v) ? v.filter((x): x is number => typeof x === "number") : [];
