@@ -70,7 +70,12 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
   // varyantları burada TEKRAR filtrelemek getKuponOnerileri'nin (race.service.ts) 20dk
   // görünür-kalma kuralını EZİYORDU — sunucu zaten doğru filtrelenmiş veriyi gönderiyor,
   // burada yalnız "filled" (admin gerçekten at girmiş mi) kontrolü yeterli.
-  const visibleVariants = data.variants.filter((v) => v.filled);
+  // 2026-09-26 kullanıcı talebi: sayfa açıldığında tutan/devam eden (hit/pending)
+  // varyantlar ÖNDE, yatan (miss) varyantlar EN ARKADA görünsün — hem sekme SIRASI hem
+  // varsayılan AÇIK sekme buna göre belirlenir (Array.sort STABIL olduğu için aynı
+  // durumdaki varyantlar arasında Ekonomik/Normal/Geniş sırası KORUNUR).
+  const STATUS_RANK: Record<KuponStatus, number> = { hit: 0, pending: 0, miss: 1 };
+  const visibleVariants = data.variants.filter((v) => v.filled).sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status]);
   const [activeKey, setActiveKey] = useState(visibleVariants[0]?.key);
   if (visibleVariants.length === 0) return null;
 
