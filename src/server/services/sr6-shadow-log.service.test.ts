@@ -1,7 +1,8 @@
 // SR6 Shadow Logger v1 — DB ve motor mock'lu (gerçek DB'ye dokunmaz). challenger-shadow-log
-// ile AYNI pre-start-freeze desenini test eder, EK OLARAK SR6'ya özgü immutability/outcome
-// sözleşmesini: repeated run → duplicate yok, post-start → hiçbir yazım yok, sonuç geldiğinde
-// yalnız outcome alanları değişir, düzeltme sessizce ezmez (audit trail).
+// ile AYNI pre-start-freeze desenini test eder, EK OLARAK SR6'ya özgü sözleşmeyi: immutable
+// yazım (repeated run → duplicate yok), post-start → hiçbir yazım yok, first-valid-snapshot
+// (AGF eksikken satır DONDURULMAZ), event-driven+cron aynı race'i İKİ KERE YAZMAZ, sonuç
+// geldiğinde yalnız outcome alanları değişir, düzeltme sessizce ezmez (audit trail).
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type Row = {
@@ -17,15 +18,22 @@ const store = vi.hoisted(() => ({
   results: {} as Record<string, { actualOrder: string[]; winnerNos: number[] }>,
   nextId: 1,
   sirali: [] as unknown[],
+  faz1Runners: [] as { no: number; agf: number | null }[],
 }));
 
 vi.mock("@/lib/db", () => ({
   db: {
-    race: { findMany: async () => store.races },
+    race: {
+      findMany: async () => store.races,
+      findFirst: async (args: { where: { id: string; result: null } }) => store.races.find((r) => r.id === args.where.id) ?? null,
+    },
     sR6ShadowObservation: {
       findFirst: async (args: { where: { raceId: string; ruleVersion: string } }) =>
         store.rows.find((r) => r.raceId === args.where.raceId && r.ruleVersion === args.where.ruleVersion) ?? null,
       create: async (args: { data: Omit<Row, "id" | "actualFinishPosition" | "isWinner" | "resultFingerprint" | "resultHistoryJson"> }) => {
+        if (store.rows.some((r) => r.raceId === args.data.raceId && r.runnerNo === args.data.runnerNo && r.ruleVersion === args.data.ruleVersion)) {
+          throw new Error("Unique constraint failed on the fields: (`raceId`,`runnerNo`,`ruleVersion`)");
+        }
         const row: Row = { id: `row${store.nextId++}`, actualFinishPosition: null, isWinner: null, resultFingerprint: null, resultHistoryJson: null, ...args.data };
         store.rows.push(row);
         return row;
@@ -54,12 +62,12 @@ const rawRunner = (no: number, teknikSira: number, opts: { agfSirasi?: number; u
 });
 
 vi.mock("@/lib/methodology/v5-engine", () => ({
-  gatherFaz1V5: async () => ({ runners: [{ no: 1 }, { no: 2 }] }),
+  gatherFaz1V5: async () => ({ runners: store.faz1Runners }),
   faz2V5Sirala: () => store.sirali,
   AGF_KATKI_INDEKSLERI: [0, 4, 7],
 }));
 
-import { runSr6ShadowLog, enrichSr6ShadowOutcomes } from "./sr6-shadow-log.service";
+import { runSr6ShadowLog, enrichSr6ShadowOutcomes, tryRecordSr6ShadowObservation } from "./sr6-shadow-log.service";
 import { raceStartAtUtc } from "@/lib/race-start";
 
 const DAY = new Date(Date.UTC(2026, 8, 25));
@@ -73,9 +81,11 @@ function setEligibleField() {
   const upsetRunner = rawRunner(50, 9, { agfSirasi: 7, upset: true });
   const others = Array.from({ length: 8 }, (_, i) => rawRunner(i + 1, i + 1));
   store.sirali = [upsetRunner, ...others];
+  store.faz1Runners = store.sirali.map((r) => ({ no: (r as { no: number }).no, agf: 5 })); // AGF gerçek/usable
 }
 function setNoCandidateField() {
   store.sirali = [rawRunner(1, 1), rawRunner(2, 2)];
+  store.faz1Runners = [{ no: 1, agf: 5 }, { no: 2, agf: 6 }];
 }
 
 beforeEach(() => { store.races = []; store.rows = []; store.results = {}; store.nextId = 1; setNoCandidateField(); });
@@ -84,7 +94,7 @@ describe("raceStartAtUtc sağlaması (challenger-shadow-log ile paylaşılan yar
   it("18:30 TR → 15:30 UTC", () => expect(raceStartAtUtc(DAY, "18:30")!.toISOString()).toBe("2026-09-25T15:30:00.000Z"));
 });
 
-describe("SR6 candidate detection + immutable yazım", () => {
+describe("SR6 candidate detection + immutable yazım (fallback cron: runSr6ShadowLog)", () => {
   it("aday yoksa satır yazılmaz (NO_CANDIDATE)", async () => {
     setNoCandidateField();
     addRace();
@@ -100,6 +110,27 @@ describe("SR6 candidate detection + immutable yazım", () => {
     expect(store.rows).toHaveLength(1);
     expect(store.rows[0]).toMatchObject({ raceId: "r1", runnerNo: 50, wouldRescueTo6: true, displacedRunnerNo: 6 });
     expect(r).toMatchObject({ candidatesFound: 1, rowsWritten: 1 });
+  });
+
+  it("FIRST-VALID-SNAPSHOT: AGF henüz eksikse (null) satır YAZILMAZ, MISSING_INPUT sayılır, DONDURULMAZ", async () => {
+    setEligibleField();
+    store.faz1Runners = store.faz1Runners.map((r, i) => (i === 0 ? { ...r, agf: null } : r)); // adayın kendi AGF'si eksik
+    addRace();
+    const r = await runSr6ShadowLog(at(-1000), () => at(-1000));
+    expect(store.rows).toEqual([]);
+    expect(r).toMatchObject({ missingInputSkipped: 1, racesProcessed: 0, rowsWritten: 0 });
+  });
+
+  it("AGF sonradan gerçek hale gelince (retry) satır yazılır — dondurma AGF eksikken YAŞANMADI", async () => {
+    setEligibleField();
+    store.faz1Runners = store.faz1Runners.map((r, i) => (i === 0 ? { ...r, agf: null } : r));
+    addRace();
+    await runSr6ShadowLog(at(-10_000), () => at(-10_000));
+    expect(store.rows).toEqual([]);
+    store.faz1Runners = store.faz1Runners.map((r) => ({ ...r, agf: 5 })); // AGF artık usable
+    const r2 = await runSr6ShadowLog(at(-5_000), () => at(-5_000));
+    expect(store.rows).toHaveLength(1);
+    expect(r2).toMatchObject({ rowsWritten: 1 });
   });
 
   it("REPEATED RUN → duplicate satır YOK (immutable, ChallengerRun'ın aksine üzerine yazılmaz)", async () => {
@@ -149,6 +180,50 @@ describe("SR6 candidate detection + immutable yazım", () => {
     expect(store.rows[0].raceId).toBe("r1");
     expect((store.rows[0] as unknown as { predictionId: string | null }).predictionId).toBeNull();
     expect(r.rowsWritten).toBe(1);
+  });
+
+  it("coveragePct: post-start hariç, değerlendirilenlerin oranı", async () => {
+    setEligibleField();
+    addRace("r1"); // değerlendirilir, aday bulunur
+    addRace("r2", "10:00"); // 13:00 TR — START(18:30 TR) döneminde zaten başlamış, coverage paydası DIŞINDA
+    const r = await runSr6ShadowLog(at(-1000), () => at(-1000));
+    expect(r.racesSkippedStarted).toBe(1);
+    expect(r.racesProcessed).toBe(1);
+    expect(r.coveragePct).toBe(100); // 1/1 değerlendirilebilir yarış işlendi
+  });
+});
+
+describe("EVENT-DRIVEN birincil yol: tryRecordSr6ShadowObservation", () => {
+  it("uygun aday varsa tek çağrıda satır yazar (upsertPrediction sonrası best-effort tetik)", async () => {
+    setEligibleField();
+    addRace();
+    const outcome = await tryRecordSr6ShadowObservation("r1", at(-1000), () => at(-1000));
+    expect(outcome.status).toBe("RECORDED");
+    expect(store.rows).toHaveLength(1);
+  });
+
+  it("race bulunamazsa/sonuçlanmışsa ASLA throw etmez, ERROR status döner (best-effort sözleşmesi)", async () => {
+    const outcome = await tryRecordSr6ShadowObservation("olmayan-race");
+    expect(outcome.status).toBe("ERROR");
+  });
+
+  it("EVENT-DRIVEN + CRON aynı race'i İKİ KERE YAZMAZ (idempotency, iki yol paylaşılan unique key)", async () => {
+    setEligibleField();
+    addRace();
+    const first = await tryRecordSr6ShadowObservation("r1", at(-1000), () => at(-1000));
+    expect(first.status).toBe("RECORDED");
+    const cronResult = await runSr6ShadowLog(at(-1000), () => at(-1000));
+    expect(store.rows).toHaveLength(1); // hâlâ tek satır
+    expect(cronResult).toMatchObject({ alreadyRecorded: 1, rowsWritten: 0 });
+  });
+
+  it("cron ÖNCE yazarsa, event-driven tetik SONRA gelirse de duplicate oluşmaz", async () => {
+    setEligibleField();
+    addRace();
+    await runSr6ShadowLog(at(-1000), () => at(-1000));
+    const second = await tryRecordSr6ShadowObservation("r1", at(-1000), () => at(-1000));
+    expect(second.status).toBe("ALREADY_RECORDED");
+    expect(store.rows).toHaveLength(1);
   });
 });
 

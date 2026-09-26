@@ -160,7 +160,16 @@ export default async function ProgramPage({ searchParams }: PageProps) {
         // kullanıcı talebiyle minimuma (1dk) çekildi — yalnız aynı dakika içindeki eşzamanlı
         // istekleri tekilleştirir, veri tazeliğini pratikte etkilemez.
         if (await tryAcquireIngestLock(`ingest:${tjkDate}`, 1)) {
-          try { await ingestDate(tjkDate); } catch { /* ignore */ }
+          try {
+            await ingestDate(tjkDate);
+            // 2026-09-26 — SR6 Shadow Logger (bkz. proje hafızası: Surprise Rescue SR6-HC):
+            // Program Sync (TJK'dan program/at değişikliği) başarıyla içeri alındıktan SONRA
+            // SR6'yı kontrol et — TJK'yı SR6 için AYRICA polling etmiyoruz, mevcut senkron
+            // pipeline'ına biniyoruz. Bulk tarama (runSr6ShadowLog) idempotent/ucuz (çoğu
+            // race zaten kayıtlı olur), hata AGF/ingest akışını ASLA etkilemez.
+            const { runSr6ShadowLog } = await import("@/server/services/sr6-shadow-log.service");
+            await runSr6ShadowLog().catch((e) => console.error("[program/page] sr6-shadow-log piggyback hatası", e));
+          } catch { /* ignore */ }
         }
       });
     }

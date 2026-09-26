@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { syncAgfForDate, recordAgfCronRun } from "@/server/services/agf-sync";
 import { verifyCronRequest } from "@/lib/cron-auth";
 import { runChallengerShadowLog } from "@/server/services/challenger-shadow-log.service";
+import { runSr6ShadowLog, enrichSr6ShadowOutcomes } from "@/server/services/sr6-shadow-log.service";
 import { dereceIstatistikleriniKontrolEtVeOnar, atProfiliniKontrolEtVeOnar } from "@/server/services/veri-tamligi-onarim.service";
 import { runHotWatchdogIfDue } from "@/server/services/ingest/tjk-at-profil.adapter";
 
@@ -36,6 +37,19 @@ export async function GET(req: NextRequest) {
       await runChallengerShadowLog();
     } catch (e) {
       console.error("[agf-sync] challenger-shadow-log piggyback hatası (AGF senkronu etkilenmedi)", e);
+    }
+
+    // 2026-09-26 — SR6 Shadow Logger (bkz. proje hafızası: Surprise Rescue SR6-HC) —
+    // AYNI piggyback deseni: AGF her senkronlandığında T3-A adayı gerçek (senkronlanmış)
+    // veriyle değerlendirilebilir hale gelir (first-valid-snapshot ön koşulu), bu yüzden
+    // AGF sync SONRASI SR6'yı kontrol etmek doğal bir tetikleyici. Ayrıca kendi ayrı
+    // cron'unun (/api/cron/sr6-shadow-log) "yeni path Vercel'e kaydolmayabiliyor" riskine
+    // karşı ikinci güvenlik ağı. Hata durumunda AGF senkronunu ASLA bloke etmez/etkilemez.
+    try {
+      await runSr6ShadowLog();
+      await enrichSr6ShadowOutcomes();
+    } catch (e) {
+      console.error("[agf-sync] sr6-shadow-log piggyback hatası (AGF senkronu etkilenmedi)", e);
     }
 
     // 2026-08-30 — kullanıcı talebi: veri-tamligi'nin kanıtlanmış-kırılgan alanı (Derece

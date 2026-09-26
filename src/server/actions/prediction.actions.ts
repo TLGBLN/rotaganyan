@@ -478,6 +478,20 @@ export async function upsertPrediction(input: PredictionInput) {
     }
   });
 
+  // 2026-09-26 — SR6 Shadow Logger (bkz. proje hafızası: Surprise Rescue SR6-HC): V5.46
+  // sıralaması bu raceId için (yeniden) hesaplanmış olabilir — T3-A adayı GERÇEK, güncel
+  // veriyle değerlendirilsin diye best-effort tetik. SHADOW_ONLY: Prediction/finalRank/
+  // olasılık/kupon'a hiç dokunmaz, kendi ayrı tablosuna yazar. Aday zaten kayıtlıysa
+  // (immutable) veya AGF henüz usable değilse no-op — hata Prediction'ı ASLA etkilemez.
+  after(async () => {
+    try {
+      const { tryRecordSr6ShadowObservation } = await import("@/server/services/sr6-shadow-log.service");
+      await tryRecordSr6ShadowObservation(input.raceId);
+    } catch (e) {
+      console.error("[upsertPrediction] tryRecordSr6ShadowObservation hata:", e);
+    }
+  });
+
   // Bildirim YALNIZ taslak→yayında GEÇİŞİNDE gönderilir (publishPrediction()'ın eski
   // davranışıyla aynı) — yoksa zaten yayında olan bir analizi her "Kaydet"te (küçük bir
   // düzeltme için bile) yeniden bildirmek kullanıcılara spam gönderirdi.

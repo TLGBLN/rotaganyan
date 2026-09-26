@@ -142,7 +142,7 @@
     },
     {
       "path": "/api/cron/sr6-shadow-log",
-      "schedule": "0 13 * * *"
+      "schedule": "45 8 * * *"
     },
     {
       "path": "/api/cron/veri-tamligi-onarim",
