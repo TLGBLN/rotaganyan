@@ -14,6 +14,7 @@ import {
   otomatikGroupSelections,
   type RaceDayData,
 } from "./kupon-auto-fill";
+import { optimizeKuponAllocation } from "./kupon-optimizer";
 
 describe("Width kademeleri (4'lü yapı)", () => {
   it("WIDTHS ucuzdan pahalıya sıralı: micro, narrow, normal, wide", () => {
@@ -64,17 +65,37 @@ describe("otomatikGroupSelections — kademeli miras (4 seviye)", () => {
     })),
   }));
 
-  it("dört kademe de üretilir, her kademe bir ÖNCEKİNİ (ucuz) kapsar (superset)", () => {
+  it("narrow/normal/wide TARİHİ kademeli mirası korur (superset) — micro ZİNCİRE DAHİL DEĞİL", () => {
+    // 2026-09-26 kullanıcı bulgusu (İzmir 1.Altılı canlı vakası) — micro (Süper Ekonomik)
+    // narrow'a floor verirse Ekonomik'in kendi bütçesi başka ayaklara "kilitlenip" ölçülebilir
+    // biçimde daha düşük kapsama olasılığı üretiyordu (kanıt: %9.18 → %8.67). Bu yüzden micro
+    // BAĞIMSIZ hesaplanır — yalnız narrow⊇normal⊇wide zinciri (tarihi, aylarca ayarlanmış
+    // davranış) korunur, micro'nun narrow'un ALT KÜMESİ olması GEREKMEZ.
     const stakePerCombination = 1.25;
     const sel = otomatikGroupSelections(races, stakePerCombination);
     for (const race of races) {
       const s = sel[race.raceNo];
       expect(s.micro.size).toBeGreaterThan(0);
-      // Kademeli miras: narrow ⊇ micro, normal ⊇ narrow, wide ⊇ normal (otomatikGroupSelections'ın
-      // "bir öncekinin seçtiği birim sayısını TABAN alır" sözleşmesi — bkz. kupon-auto-fill.ts).
-      for (const no of s.micro) expect(s.narrow.has(no)).toBe(true);
       for (const no of s.narrow) expect(s.normal.has(no)).toBe(true);
       for (const no of s.normal) expect(s.wide.has(no)).toBe(true);
+    }
+  });
+
+  it("micro (Süper Ekonomik) narrow'un bütçesini/şeklini ETKİLEMEZ — floor'suz taze çözümle AYNI sonucu verir", () => {
+    // Bu, asıl regresyon testi: micro HİÇ hesaplanmasa bile narrow'un sonucu DEĞİŞMEMELİ
+    // (micro'nun zincire sızmadığının doğrudan kanıtı).
+    const stakePerCombination = 1.25;
+    const withMicro = otomatikGroupSelections(races, stakePerCombination);
+    // narrow'u WIDTHS zincirinin DIŞINDA, tek başına (floor yok) yeniden hesapla ve karşılaştır.
+    const effectiveLimit = LIMITS.narrow * TOLERANCES.narrow;
+    const maxCombinations = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
+    const legsByWidth = races.map((race) => ({
+      raceNo: race.raceNo,
+      runners: race.runners.filter((r) => !r.scratched).map((r) => ({ no: r.no, olasilik: (r.scoreExact ?? r.score ?? 0) / 100, ekuriGroup: r.ekuriGroup })),
+    }));
+    const fresh = optimizeKuponAllocation(legsByWidth, maxCombinations);
+    for (const race of races) {
+      expect([...withMicro[race.raceNo].narrow].sort()).toEqual([...new Set(fresh.secimler[race.raceNo] ?? [])].sort());
     }
   });
 

@@ -143,7 +143,17 @@ export function otomatikGroupSelections(
       minUnitCounts[raceNo] = Math.max(minUnitCounts[raceNo] ?? 1, min);
     }
     const { secimler, birimSayilari } = optimizeKuponAllocation(legsByWidth(width), maxCombinations, minUnitCounts);
-    oncekiBirimSayilari = birimSayilari;
+    // 2026-09-26 kullanıcı bulgusu (İzmir 1.Altılı canlı vakası, DP ile KANITLANDI): micro
+    // (Süper Ekonomik) kendi KÜÇÜK bütçesinde bazı ayaklara (ör. spread'i yüksek bir ayak)
+    // agresif birim ayırmayı optimal buluyor — bu birim sayıları narrow'a (Ekonomik) TABAN
+    // olarak miras kalırsa, Ekonomik'in KENDİ 700-900₺ bütçesi o ayaklarda "sıkışıp" başka
+    // bir ayağı (ör. gerçek vakada 2.Koşu) genişletemiyor — DP matematiksel olarak doğru
+    // ama SONUÇ, floor'suz taze bir çözümden ÖLÇÜLEBİLİR biçimde daha düşük kapsama
+    // olasılığı üretiyor (canlı veriyle doğrulandı: %9.18 → %8.67). Süper Ekonomik bu yüzden
+    // zincirden ÇIKARILDI — narrow/normal/wide'ın TARİHİ (aylarca ayarlanmış) kademeli-miras
+    // davranışı AYNEN korunuyor, micro yalnız KENDİ bütçesiyle bağımsız hesaplanan, ayrı bir
+    // "hızlı/ucuz seçenek" kademesi (narrow'a floor VERMEZ, narrow'dan floor ALMAZ).
+    if (width !== "micro") oncekiBirimSayilari = birimSayilari;
     for (const race of races) {
       sel[race.raceNo][width] = new Set(secimler[race.raceNo] ?? []);
     }
