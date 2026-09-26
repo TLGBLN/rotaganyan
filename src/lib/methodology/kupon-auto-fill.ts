@@ -22,9 +22,15 @@ export function stakeForHippodrome(hippodromeName: string): number {
 // v6.111 — 7'li Ganyan'ın kombinasyon başı ücreti Altılı'dan farklı, TJK'da 2₺.
 export const YEDILI_GANYAN_STAKE_PER_COMBINATION = 2;
 export const LIMITS: Record<Width, number> = { narrow: 600, normal: 1500, wide: 3000 };
-const TOLERANCE = 1.1; // %10 esneme payı
+const TOLERANCE = 1.1; // %10 esneme payı (yalnız Geniş — bkz. altta)
 // 2026-09-05 kullanıcı talebi: Ekonomik'te esneme payı 660₺ değil 700₺'ye kadar.
-export const TOLERANCES: Record<Width, number> = { narrow: 700 / LIMITS.narrow, normal: TOLERANCE, wide: TOLERANCE };
+// 2026-09-26 kullanıcı talebi (Budget Frontier tartışması sonrası) — tavanlar yeniden
+// ayarlandı: Ekonomik 700→900₺, Normal 1650→1700₺. Geniş (3000×1.1=3300₺) DEĞİŞMEDİ —
+// zaten istenen 2000-3300₺ aralığının üst sınırıydı. KRİTİK: bu bir "harcanacak tutar"
+// DEĞİL, yalnız DP'nin arayabileceği ÜST SINIR (tavan) — gerçek yayınlanan tutar hep
+// olduğu gibi DP'nin bu tavan ALTINDA bulduğu kendi optimum durumu (bkz. arac ile
+// doğrulanan Budget Frontier/karşı-olgusal test: DP bütçeyi zorla doldurmuyor).
+export const TOLERANCES: Record<Width, number> = { narrow: 900 / LIMITS.narrow, normal: 1700 / LIMITS.normal, wide: TOLERANCE };
 // 2026-09-12 kullanıcı talebi — 7'li Ganyan da Ekonomik/Normal/Geniş üçünü gösterir,
 // Altılı'nın LIMITS/TOLERANCES'ından BAĞIMSIZ kendi sabitleriyle.
 export const YEDILI_LIMITS: Record<Width, number> = { narrow: 500, normal: 1400, wide: 3000 };
