@@ -24,7 +24,7 @@ import {
   YEDILI_GANYAN_SLOT,
 } from "@/lib/methodology/kupon-auto-fill";
 
-type HomeKuponLeg = { raceNo: number; micro: number[]; narrow: number[]; normal: number[]; wide: number[] };
+type HomeKuponLeg = { raceNo: number; narrow: number[]; normal: number[]; wide: number[] };
 
 // 2026-09-24 — Sistem Anatomisi Kupon sensörü: gerçek stake/limit çözümleme mantığını
 // (slot===7 mi, hangi hipodrom indirimli mi) reuse etmek için dışa açıldı — sensör kendi

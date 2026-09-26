@@ -10,16 +10,15 @@ import {
   shareHomeKuponOnX,
   type HomeKuponLegInput,
 } from "@/server/actions/home-kupon.actions";
-import { type Width, WIDTHS, WIDTH_LABEL } from "@/lib/methodology/kupon-auto-fill";
 
-/** Genişlik için at numaralarını seçer — boşsa bir alt seviyeye düşer (Geniş→Normal→Ekonomik→
- *  Süper Ekonomik), anasayfa mantığıyla aynı kademeli miras. */
+type Width = "narrow" | "normal" | "wide";
+const WIDTH_LABEL: Record<Width, string> = { narrow: "Ekonomik", normal: "Normal", wide: "Geniş" };
+
+/** Genişlik için at numaralarını seçer — boşsa bir alt seviyeye düşer (Geniş→Normal→Ekonomik), anasayfa mantığıyla aynı. */
 function nosForWidth(leg: HomeKuponLegInput, width: Width): number[] {
-  const micro = leg.micro ?? []; // eski (Süper Ekonomik'ten önce yayınlanmış) satırlarda bu alan yok
-  if (width === "micro") return micro;
-  if (width === "narrow") return leg.narrow.length > 0 ? leg.narrow : micro;
-  if (width === "normal") return leg.normal.length > 0 ? leg.normal : leg.narrow.length > 0 ? leg.narrow : micro;
-  return leg.wide.length > 0 ? leg.wide : leg.normal.length > 0 ? leg.normal : leg.narrow.length > 0 ? leg.narrow : micro;
+  if (width === "narrow") return leg.narrow;
+  if (width === "normal") return leg.normal.length > 0 ? leg.normal : leg.narrow;
+  return leg.wide.length > 0 ? leg.wide : leg.normal.length > 0 ? leg.normal : leg.narrow;
 }
 
 function buildShareText(hippodromeName: string, date: Date, legs: HomeKuponLegInput[], width: Width): string {
@@ -80,7 +79,7 @@ export default function KuponActions({ id, hippodromeName, date, legs }: Props) 
 
   return (
     <div className="flex flex-col items-end gap-1.5">
-      {WIDTHS.map((width) => (
+      {(["narrow", "normal", "wide"] as Width[]).map((width) => (
         <div key={width} className="flex items-center gap-1.5 text-[10px]">
           <span className="w-16 text-right text-muted-foreground">{WIDTH_LABEL[width]}</span>
           <button

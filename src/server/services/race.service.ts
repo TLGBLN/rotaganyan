@@ -428,7 +428,7 @@ export type KuponLeg = {
 };
 export type KuponStatus = "hit" | "miss" | "pending";
 export type KuponVariant = {
-  key: "superekonomik" | "ekonomik" | "normal" | "genis";
+  key: "ekonomik" | "normal" | "genis";
   label: string;
   legs: KuponLeg[];
   amount: number;
@@ -444,8 +444,7 @@ export type KuponOnerisi = {
    *  belirlemek için kullanılır (bkz. getKuponOnerileri, kullanıcı kararı 2026-09-01). */
   sonAyakSonuclandiAt: Date | null;
 } | null;
-// micro OPSİYONEL — Süper Ekonomik eklenmeden önce yayınlanmış eski kupon satırlarında bu alan hiç yok.
-export type HomeKuponLeg = { raceNo: number; micro?: number[]; narrow: number[]; normal: number[]; wide: number[] };
+export type HomeKuponLeg = { raceNo: number; narrow: number[]; normal: number[]; wide: number[] };
 
 /**
  * v6.112 — kullanıcı bulgusu 2026-08-13: bu sabit her kupon türü için 1.25 kullanıyordu,
@@ -631,21 +630,13 @@ export async function buildKuponOnerisi(active: {
     return "hit";
   }
 
-  // 2026-09-26 — Süper Ekonomik (micro) eklenmeden ÖNCE yayınlanmış eski HomeKupon.legs
-  // JSON'unda bu alan hiç YOK (undefined) — `?? []` olmadan `.length`/cascade burada
-  // ESKİ (henüz başlamamış, hâlâ aktif) kuponlarda runtime hatası fırlatırdı.
-  const microOf = (l: HomeKuponLeg) => l.micro ?? [];
-
-  // Ekonomik/Normal/Geniş için ayrıca seçim yapılmamışsa bir alt seviyeye düşer
-  // (Geniş→Normal→Ekonomik→Süper Ekonomik) — Süper Ekonomik artık en alttaki taban.
-  const microLegs = toLegs((l) => microOf(l));
-  const narrowLegs = toLegs((l) => (l.narrow.length > 0 ? l.narrow : microOf(l)));
-  const normalLegs = toLegs((l) => (l.normal.length > 0 ? l.normal : l.narrow.length > 0 ? l.narrow : microOf(l)));
-  const wideLegs = toLegs((l) => (l.wide.length > 0 ? l.wide : l.normal.length > 0 ? l.normal : l.narrow.length > 0 ? l.narrow : microOf(l)));
+  // Normal/Geniş için ayrıca seçim yapılmamışsa bir alt seviyeye düşer (Geniş→Normal→Ekonomik).
+  const narrowLegs = toLegs((l) => l.narrow);
+  const normalLegs = toLegs((l) => (l.normal.length > 0 ? l.normal : l.narrow));
+  const wideLegs = toLegs((l) => (l.wide.length > 0 ? l.wide : l.normal.length > 0 ? l.normal : l.narrow));
 
   // Admin bu kademeye en az bir ayakta gerçekten at girdi mi — girmediyse alt kademeden miras
   // alınmış (veya tamamen boş) demektir, ayrı bir kademe olarak gösterilmemeli.
-  const hasMicro = legs.some((l) => microOf(l).length > 0);
   const hasNarrow = legs.some((l) => l.narrow.length > 0);
   const hasNormal = legs.some((l) => l.normal.length > 0);
   const hasWide = legs.some((l) => l.wide.length > 0);
@@ -663,7 +654,6 @@ export async function buildKuponOnerisi(active: {
     ikramiye: active.ikramiye ?? null,
     sonAyakSonuclandiAt,
     variants: [
-      { key: "superekonomik", label: "Süper Ekonomik", legs: microLegs, amount: kuponAmount(microLegs.map((l) => l.nos), stake), status: statusFor(microLegs), filled: hasMicro },
       { key: "ekonomik", label: "Ekonomik", legs: narrowLegs, amount: kuponAmount(narrowLegs.map((l) => l.nos), stake), status: statusFor(narrowLegs), filled: hasNarrow },
       { key: "normal", label: "Normal", legs: normalLegs, amount: kuponAmount(normalLegs.map((l) => l.nos), stake), status: statusFor(normalLegs), filled: hasNormal },
       { key: "genis", label: "Geniş", legs: wideLegs, amount: kuponAmount(wideLegs.map((l) => l.nos), stake), status: statusFor(wideLegs), filled: hasWide },
