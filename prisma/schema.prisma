@@ -226,6 +226,7 @@ model Race {
   pendingResult  PendingResult?
   accuraceRace   AccuraceRace?
   challengerRuns ChallengerRun[]
+  sr6ShadowObservations SR6ShadowObservation[]
 
   @@unique([raceDayId, raceNo])
 }
@@ -692,6 +693,60 @@ model ChallengerRun {
 
   @@unique([raceId, challengerKey])
   @@index([challengerKey, evaluatedAt])
+}
+
+// 2026-09-26 — SR6 Shadow Logger v1 (bkz. proje hafızası: Surprise Rescue SR6-HC).
+// T3-A (frozen) kuralının PREDICTION TIME'da (yarış başlamadan ÖNCE) tespit ettiği aday
+// anlık görüntüsü — SHADOW_ONLY: bu tablo hiçbir üretim akışını (Prediction/finalRank/
+// olasılık/kupon/HomeKupon) OKUMAZ/DEĞİŞTİRMEZ, yalnız kendi satırına yazar.
+//
+// KRİTİK İMMUTABİLİTY KURALI: aday tespit edildiğinde (ilk pre-start çalıştırmada) satır
+// BİR KEZ yazılır ve tekrar hesaplanmaz/ezilmez (ChallengerRun'ın "her pre-start
+// çalıştırmada üzerine yaz" davranışının AKSİNE) — aksi halde sonradan hindsight/leakage
+// riski doğar. Yarış başladıktan SONRA yeni satır oluşturulmaz (post-start compute
+// yasak). Sonuç geldiğinde YALNIZ actualFinishPosition/isWinner/resultFingerprint/
+// resultHistoryJson güncellenir — agfRank/nonMarketRank/surpriseScore gibi tahmin-anı
+// alanlarına ASLA dokunulmaz. TJK sonucu sonradan düzeltirse eski kanıt sessizce
+// ezilmez — resultHistoryJson'a denetlenebilir bir kayıt eklenir.
+model SR6ShadowObservation {
+  id           String  @id @default(cuid())
+  raceId       String
+  predictionId String? // best-effort bağlantı — bu cron admin analizinden BAĞIMSIZ çalışır, yayın anında Prediction her zaman var OLMAYABİLİR
+  runnerNo     Int
+
+  raceStartAt DateTime // yarışın gerçek TJK başlangıcı (raceStartAtUtc) — pre-start kanıtı olduğunu ispatlar
+  computedAt  DateTime @default(now())
+
+  engineVersion  String // "V5.46" — ana model provenance
+  ruleVersion    String // "SR6-T3A-v1" — hangi frozen kural çalıştı
+  ruleHash       String // T3-A predicate'i sessizce değişirse bu da değişir
+  dependencyHash String // formül/versiyon bağımlılığı (bkz. sr6-shadow.ts SR6_DEPENDENCY_VERSION)
+
+  agfRank               Int // piyasa (AGF) konumu
+  rawRank               Int // postprocess (AGF-trend/saf-model terfi) ÖNCESİ, yalnız olasılığa göre sıra
+  finalRankAtPrediction Int // mevcut V5.46 yayın konumu (SR6'dan ETKİLENMEZ)
+  nonMarketRank         Int // market-blind skora göre sıra
+  surpriseScore         Float // upsetScore (7 non-market sinyalin toplamı)
+  supportCount          Int // kaç bağımsız sinyal pozitif katkı verdi
+
+  alreadyTop6       Boolean // aday zaten ilk-6'da mı (müdahaleye gerek yok)
+  wouldRescueTo6    Boolean // counterfactual: Top6-dışıysa 6.sıraya taşınsaydı ne olurdu
+  displacedRunnerNo Int? // wouldRescueTo6=true ise o anki GERÇEK 6.sıradaki at
+
+  // Sonuç geldikten SONRA doldurulur — yukarıdaki alanlar bundan ETKİLENMEZ.
+  actualFinishPosition Int?
+  isWinner             Boolean?
+  resultFingerprint    String?
+  resultHistoryJson    Json? // sonuç DÜZELTİLİRSE önceki fingerprint/pozisyon buraya eklenir, ASLA sessizce silinmez
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  race Race @relation(fields: [raceId], references: [id], onDelete: Cascade)
+
+  @@unique([raceId, runnerNo, ruleVersion])
+  @@index([predictionId])
+  @@index([ruleVersion])
 }
 
 // ─── RESULT ───────────────────────────────────────────────────────────────────

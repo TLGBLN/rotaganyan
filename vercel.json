@@ -141,6 +141,10 @@
       "schedule": "0 13 * * *"
     },
     {
+      "path": "/api/cron/sr6-shadow-log",
+      "schedule": "0 13 * * *"
+    },
+    {
       "path": "/api/cron/veri-tamligi-onarim",
       "schedule": "0 8 * * *"
     }
