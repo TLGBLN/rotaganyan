@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ekuriRengi } from "@/lib/ekuri-colors";
-import { KAPSAM_ESIK_ILK3, KAPSAM_ESIK_ILK6 } from "@/lib/methodology/kapsam-esikleri";
+import { KAPSAM_ESIK_ILK3, KAPSAM_ESIK_ILK6, KAPSAM_ESIK_ILK3_AMBER_UST } from "@/lib/methodology/kapsam-esikleri";
 import {
   type Width,
   WIDTHS,
@@ -89,11 +89,15 @@ function statikAyaklariBul(races: RaceDayData["races"], selections: GroupSelecti
 // 9.4=70.4). Doğrusu: önce koşmaz atları TAMAMEN çıkar, SONRA ilk N'i topla — pencere
 // sabit pozisyon değil, sabit "eligible sayısı" olmalı (aşağıdaki JSX'teki ayraç
 // tetikleyicisi de aynı mantıkla eligible-sayaç kullanacak şekilde güncellendi).
+// 2026-09-27 kullanıcı denetimi: eskiden yalnız `r.score` (tam sayıya yuvarlanmış)
+// toplanıyordu — coverage risk-floor artık gerçek kupon derinliğini etkilediği için
+// (kupon-auto-fill.ts) burada da `scoreExact`'i tercih ediyoruz ki ekrandaki eşik
+// kontrolü ile gerçek DP tabanı AYNI hassasiyette hesaplansın.
 function kumulatifToplam(sirali: RaceRunner[], n: number): number {
   return sirali
     .filter((r) => !r.scratched)
     .slice(0, n)
-    .reduce((acc, r) => acc + (r.score ?? 0), 0);
+    .reduce((acc, r) => acc + (r.scoreExact ?? r.score ?? 0), 0);
 }
 
 // 2026-09-13 kullanıcı bulgusu (İstanbul K5) — bkz. kupon-optimizer.ts'teki eküri-birimi
@@ -319,19 +323,28 @@ function KuponGrup({
                                 // 2026-09-10 kullanıcı talebi: ayraç eşik altındaysa kırmızı,
                                 // eşik ve üstündeyse yeşil olsun — RaceAdviceCard'daki rozetle
                                 // AYNI paylaşılan eşiklerden (kapsam-esikleri.ts) besleniyor.
+                                // 2026-09-27 kullanıcı düzeltmesi: "%65.0 ile %90 aynı yeşil
+                                // olmamalı" — İlk3'e 5 puanlık amber/sınırda tamponu eklendi.
+                                // Karşılaştırma HER ZAMAN exact (unrounded) toplamla yapılır,
+                                // Math.round yalnız GÖSTERİMDE — coverageFloorHesapla
+                                // (kupon-auto-fill.ts) de aynı ilkeyi paylaşıyor.
                                 const esik = eligibleUpToHere === 3 ? KAPSAM_ESIK_ILK3 : KAPSAM_ESIK_ILK6;
                                 const toplam = kumulatifToplam(sirali, eligibleUpToHere);
                                 const yeterli = toplam >= esik;
+                                const sinirda = eligibleUpToHere === 3 && toplam >= KAPSAM_ESIK_ILK3 && toplam < KAPSAM_ESIK_ILK3_AMBER_UST;
+                                const renk = !yeterli ? "kirmizi" : sinirda ? "amber" : "yesil";
+                                const cizgiSinifi = { kirmizi: "bg-red-500/50", amber: "bg-amber-500/50", yesil: "bg-hit/50" }[renk];
+                                const yaziSinifi = { kirmizi: "text-red-500", amber: "text-amber-500", yesil: "text-hit" }[renk];
                                 return (
                                   <div
                                     className="my-1 flex items-center gap-1.5 px-0.5"
-                                    title={`İlk ${eligibleUpToHere} (koşmaz hariç) atın modele göre toplam kazanma olasılığı — eşik ≥%${esik}`}
+                                    title={`İlk ${eligibleUpToHere} (koşmaz hariç) atın modele göre toplam kazanma olasılığı — eşik ≥%${esik}${sinirda ? ` (sınırda, ≥%${KAPSAM_ESIK_ILK3_AMBER_UST} rahat sayılır)` : ""}`}
                                   >
-                                    <div className={cn("h-px flex-1", yeterli ? "bg-hit/50" : "bg-red-500/50")} />
-                                    <span className={cn("shrink-0 text-[9px] font-bold tabular-nums", yeterli ? "text-hit" : "text-red-500")}>
-                                      İlk {eligibleUpToHere}: %{Math.round(toplam)} {yeterli ? "✓" : `(eşik ≥%${esik})`}
+                                    <div className={cn("h-px flex-1", cizgiSinifi)} />
+                                    <span className={cn("shrink-0 text-[9px] font-bold tabular-nums", yaziSinifi)}>
+                                      İlk {eligibleUpToHere}: %{Math.round(toplam)} {yeterli ? (sinirda ? "⚠" : "✓") : `(eşik ≥%${esik})`}
                                     </span>
-                                    <div className={cn("h-px flex-1", yeterli ? "bg-hit/50" : "bg-red-500/50")} />
+                                    <div className={cn("h-px flex-1", cizgiSinifi)} />
                                   </div>
                                 );
                               })()}

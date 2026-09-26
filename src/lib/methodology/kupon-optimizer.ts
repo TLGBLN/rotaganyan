@@ -53,7 +53,7 @@ export type OptimizeResult = {
 // Artık birim TEK numara taşıyor (grubun en yüksek bireysel olasılıklı üyesi) — olasılık
 // hâlâ grubun TOPLAMI (ikisinden biri kazanınca da tuttuğu için), yalnız KAĞIDA yazılan
 // numara tek.
-type Birim = { id: number; nos: number[]; memberNos: number[]; olasilik: number };
+export type Birim = { id: number; nos: number[]; memberNos: number[]; olasilik: number };
 
 /**
  * 2026-09-21 — Prediction-to-HomeKupon Auto Synchronization (bkz. plan): forceInclude/
@@ -65,7 +65,12 @@ type Birim = { id: number; nos: number[]; memberNos: number[]; olasilik: number 
  * gelemez). `memberNos` bu eşlemeyi kurmak için TÜM grup üyelerini saklar (yalnız
  * optimizer'ın iç metadata'sı — public kupon formatı hâlâ `nos` tek numara).
  */
-function ekuriBirimleriOlustur(
+// 2026-09-27 kullanıcı talebi (Coverage Risk-Floor): kupon-auto-fill.ts'in "İlk3/İlk6"
+// güvenlik eşiğini (kapsam-esikleri.ts) gerçek minUnitCounts tabanına çevirebilmesi için
+// export edildi — DP'nin KENDİSİ (optimizeKuponAllocation) hâlâ yalnız minUnitCounts/
+// maxCombinations/probabilities görüyor, coverage-floor mantığından HABERSİZ (separation
+// of concerns korunuyor, bkz. plan). Davranış DEĞİŞMEDİ, yalnız görünürlük.
+export function ekuriBirimleriOlustur(
   runners: LegProbability["runners"],
   forced?: { include: number[]; exclude: number[] }
 ): { units: Birim[]; forcedUnitCount: number } {
