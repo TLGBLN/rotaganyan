@@ -1207,7 +1207,13 @@ function terfiPenceresiV5<T extends { no: number; olasilik: number; ekuriGroup: 
  *  etkiler. Sinyal sayısı YETERSİZSE (KURUŞHAN örneği: trend var ama yalnız 2 sinyal) VE
  *  düşüş-iyi-pozisyon örüntüsü de yoksa terfi olmaz — bu KASITLI, trend TEK BAŞINA V4'ün
  *  kendi backtest'inde de ilk-3 için yeterli değildi. */
-function agfTrendTerfisiUygula<
+// 2026-09-26 — Faz 2 Signal Contribution Audit (araştırma, V5.46 dondurulmuş): kullanıcı
+// onayıyla YALNIZ `export` eklendi — fonksiyon gövdesi/koşullar/eşikler/çağrı sırası HİÇ
+// değişmedi, davranış SIFIR fark. Amaç: araştırma script'lerinin (Research → Production
+// pure functions, TERSİ ASLA değil) production'ın GERÇEK postprocess mantığını canonical
+// RaceEvidence artifact'ı üzerinde yeniden çalıştırabilmesi — 682 yarışı DB'den/motordan
+// tekrar çekmeden. Minimum public surface: yalnız bu 2 fonksiyon, hiçbir sabit export edilmedi.
+export function agfTrendTerfisiUygula<
   T extends {
     no: number; agfTrendYonu: "yükseliş" | "düşüş" | null; sinyalSayisi: number;
     agfFark: number; agfSirasi: number; olasilik: number; ekuriGroup: number | null;
@@ -1309,7 +1315,7 @@ const SAF_MODEL_DEGER_ESIGI = 5;
 // kazanamayan adaylar dahil) mevcut 5pp eşiğiyle ilk-6 denenir.
 const SAF_MODEL_DEGER_ESIGI_ILK3 = 8;
 
-function safModelDegerTerfisiUygula<
+export function safModelDegerTerfisiUygula<
   T extends {
     no: number; olasilik: number; marketBlindProb1: number; agfPayi: number; katkilar: number[];
     ekuriGroup: number | null;
