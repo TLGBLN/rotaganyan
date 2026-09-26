@@ -403,6 +403,25 @@ export const ADAY_SINYALLER: AdaySinyal[] = [
     aciklama: "MEGAFAUNA vakası (model 8./%4, gerçek kazanan) üzerinden kullanıcı hipotezi: pist uzmanlığı+sınıf düşüşü(ikramiye bazlı)+at-jokey ikilisi+AGF trend+pedigri gibi TEK TEK zayıf/anlamsız sinyaller AYNI ATTA hizalandığında gerçek ek bilgi taşıyabilir. Basit tek-geçişlik tabloda umut verici göründü (top6-dışı atlarda yakınsama≥2: %5.00 kazanma vs %2.43 baseline, ~2x) ama 13. özellik olarak tam koşullu-logit + B=500 bootstrap'a sokulunca İKİ segmentte de anlamsız çıktı — tekil çarpıcı vakalar (MEGAFAUNA) genele YANSITILAMIYOR, yakınsama grubundaki 1544 attan çoğu kazanmadı. NOT (2026-09-01): istatistiksel sonuç DEĞİŞMEDİ ama kullanıcı zeminToleransi/sireOrani ile AYNI türden bilinçli bir istisna olarak eklenmesini istedi — düzeltilmiş (isme göre, tjkAtId boşluğu giderilmiş) tanımlarla YENİDEN eğitildi, gerçek katsayılar CANLI_SİNYALLER'de.",
     metrik: "İlk test (tjkAtId'ye göre, kısmen eksik): Diğer nokta=0.0337 GA=[-0.0555,0.1146] ⚠ · Düşük-şart nokta=0.0428 GA=[-0.0996,0.1622] ⚠. Düzeltilmiş/canlı: Diğer nokta=0.0417 GA=[-0.0405,0.1197] ⚠ · Düşük-şart nokta=-0.0280 GA=[-0.1535,0.0756] ⚠ (n=10506 at, 1544'ü 2+ hizalanma)",
   },
+  // 2026-09-26 — V5.46 Surprise Winner Audit v1: kanonik 682-yarış RaceEvidence artifact'ı
+  // üzerinde (bkz. proje hafızası, v546_race_evidence.json), AGF≥7 kazananların NonMarketScore
+  // (=rawScore-MARKET_BLOCK) sırası final sıradan ortalama 2 basamak daha iyi (6.12 vs 8.10) —
+  // yani market-dışı sinyaller bu atları GÖRÜYOR ama AGF cezası bastırıyor. Faz 2 (MARKET_BLOCK/
+  // Antrenör λ-yumuşatma) REDDEDİLDİ (genel LogLoss'u bozuyor, kazanç yok) — çözüm cezayı
+  // gevşetmek değil, AYRI bir "Sürpriz Kurtarma" katmanı. Geniş Top6 eşikleri (T6-A/B/C, gevşek
+  // kriterler) hepsi NET ZARARLI çıktı (False Rescue >%95, gerçek kazananları yerinden ediyor).
+  // Sıkı T3-A tanımı (agfSirasi≥5, nonMarketRank≤2, ≥4 bağımsız pozitif sinyal, tek sinyal
+  // dominant değil) TOPLAM 50 at-girişine uyuyor: 15'i zaten Top3, 30'u Top6-içi/Top3-dışı,
+  // yalnız 5'i GERÇEK rescue fırsatı (Top6 dışı) — bunların 2'si GERÇEKTEN kazandı, 0 gerçek
+  // kazanan yerinden edilmedi (taban %3.89 kazanma oranına göre 10.3× lift). n=5 KÜÇÜK
+  // ÖRNEKLEM — üretim kanıtı SAYILMAZ, forward shadow doğrulaması ZORUNLU.
+  {
+    ad: "Sürpriz Kurtarma (Surprise Rescue) SR6-HC — PROVISIONAL / FORWARD SHADOW",
+    durum: "beklemede",
+    etiket: "682 yarış discovery cohortu · n=5 rescue fırsatı · üretim kanıtı DEĞİL",
+    aciklama: "Ana V5.46 olasılığını/sıralamasını DEĞİŞTİRMEZ (henüz). AGF sırası≥5 adaylar arasında market-dışı kanıtı (Antrenör+Yakınsama+Jokey+Zemin/Mesafe(B)+Sire(B)+Yarış Gidişatı+Hız katkıları toplamı = UpsetScore) ölçer. Geniş Top6 rescue eşikleri (gevşek kriterler) 682 yarışlık discovery cohortunda hepsi NET ZARARLI çıktı (False Rescue Rate >%95, gerçek kazananları yerinden ediyor, hedeflediği metrikte bile net kazanç yok). Sıkı T3-A tanımı doğrudan Top3'e yerleştirildiğinde genel Top3'e net katkı sağlamadı (34-35 adaydan 3 kazandı/4 gerçek kazanan yerinden edildi, net -1). AYNI T3-A tanımı yalnız Top6 dışındaki adayları 6. sıraya taşıyacak şekilde (daha az agresif yerleşim) test edildiğinde: 5 rescue fırsatının 2'si gerçek kazanan oldu, mevcut Top6 kazananı HİÇ yerinden edilmedi (Overall Top6 %90.32→%90.62). Status: PROVISIONAL. Production ranking change: NO. Forward shadow: REQUIRED.",
+    metrik: "T3-A tanımı toplam 50 uyan at-girişi (15 zaten Top3 / 30 Top6-içi / 5 Top6-dışı rescue fırsatı) · Rank6 yerleşimi: 5 rescue, 2 gerçek kazandı, 0 gerçek kazanan yerinden edildi, lift=10.3× (taban %3.89→aday havuzu %40.0) · AGF≥5 Winner Recall@6 %60.0→%61.25",
+  },
 ];
 
 // 2026-09-01 — Yukarıdaki "Yakınsama" testinin BİLEŞENLERİ (pist uzmanlığı, sınıf

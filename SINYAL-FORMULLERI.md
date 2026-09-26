@@ -263,3 +263,37 @@ yalnız yarisGidisatiSkoru için güvenilir, diğer 14 sinyal için PROVISIONAL 
 - Bir segment override'ı değişirse: hem "Segment davranışı" (§2/§3) hem "Durum" (§5) hücreleri birlikte güncellenir.
 - B=500/OOS testi tekrarlanıp sonuç değişirse: §5'teki GA/nokta tahmini/signStability GÜNCEL sayılarla değiştirilir — eski sayı silinir, "eskiden X'ti" notu tutulmaz (o tarihçe ENGINE_VERSIONS'ta kalır, burada yalnız ANLIK durum olur).
 - Bu dosya `ENGINE_VERSIONS` (`engine-versions.data.ts`) ile ÇAKIŞMAZ — orası sürüm geçmişi/tarihçe, burası YALNIZ mevcut canlı formülün VE mevcut kanıt seviyesinin anlık fotoğrafı.
+
+## 7. Shadow-Only Katmanlar (henüz V5.46'nın aktif formülüne DAHİL DEĞİL)
+
+Bu bölüm §2-§5'ten BİLEREK ayrı tutulur: aşağıdakiler V5.46'nın yayınlanan olasılığını/
+sıralamasını HİÇ etkilemiyor, yalnız gelecekte (forward shadow doğrulaması geçerse) bir
+sonraki katman adayı olarak KAYIT ALTINA alınıyor. §6'daki güncelleme disiplini bu bölüm
+için de geçerli — bir shadow katman canlıya alınırsa BURADAN silinip §2-§5'e taşınır.
+
+### SURPRISE RESCUE SR1 (2026-09-26)
+
+```
+Status: SHADOW_ONLY
+Production V5.46 probability: unchanged
+Production ranking: unchanged
+Candidate rule: T3-A (frozen) — agfSirasi≥5 AND nonMarketRank≤2 AND ≥4 bağımsız pozitif
+                UpsetScore bileşeni AND tek sinyal UpsetScore'un >%60'ını oluşturmuyor
+UpsetScore = C(antrenorOrani) + C(yakinsama2Plus) + C(jokeyOrani) + C(yarisGidisatiSkoru)
+             + C(hizDerecesi) + bZeminMesafeKatkisi + bSireKatkisi
+             (AGF ailesi — agfSirasi/agfPayi/agfPayi² — ve H2H/Takı/SonİdmanSprint/İdmJokey
+             BİLEREK dışlanıyor; ilki tanım gereği, sonuncular surprise-cohort ayrıştırma
+             testinde TUTARSIZ/zayıf çıktı)
+Proposed placement: yalnız Top6 dışı → 6. sıraya taşı (max 1 aday/yarış, Top1-2'ye dokunmaz)
+Discovery evidence (682 yarış, kanonik v546_race_evidence.json):
+  - T3-A tanımına toplam 50 at-girişi uyuyor (15 zaten Top3, 30 Top6-içi, 5 Top6-dışı rescue fırsatı)
+  - Rank6 yerleşimi: 5 rescue fırsatı, 2 gerçek kazandı, 0 gerçek kazanan yerinden edildi
+  - Taban (TÜM AGF≥5) kazanma oranı %3.89 → aday havuzu %40.0 (lift 10.3×)
+  - Overall Top6 %90.32→%90.62, Overall Top3 DEĞİŞMEDİ
+  - n=5 KÜÇÜK ÖRNEKLEM — üretim kanıtı DEĞİL, yalnız forward shadow'u haklı çıkaracak kadar güçlü
+Reddedilen alternatifler (aynı discovery turunda): geniş Top6 eşikleri (gevşek kriterler,
+  3 varyant hepsi NET ZARARLI — False Rescue >%95, hedef metrikte bile net kazanç yok);
+  T3-A'nın doğrudan Top3'e yerleştirilmesi (net -1, Overall Top3'ü bozuyor)
+Next step: shadow-log (candidate/rawRank/finalRank/nonMarketRank/surpriseScore/supportCount
+  + SR6-aware DP counterfactual kupon coverage karşılaştırması) — production'a HENÜZ ALINMADI
+```
