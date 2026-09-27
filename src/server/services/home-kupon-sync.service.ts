@@ -10,7 +10,6 @@ import {
   normalizeManualOverrides,
   manualOverridesHash,
   buildKey as computeBuildKey,
-  poolStartTime,
   type DependencyRaceInput,
 } from "@/lib/methodology/kupon-dependency-hash";
 import {
@@ -105,6 +104,7 @@ export async function reconcileAllActiveHomeKupons(): Promise<{ checked: number;
       select: {
         raceNo: true,
         time: true,
+        result: { select: { id: true } },
         runners: { select: { id: true, no: true, scratched: true, ekuriGroup: true } },
         prediction: {
           select: {
@@ -117,9 +117,10 @@ export async function reconcileAllActiveHomeKupons(): Promise<{ checked: number;
     });
     if (races.length === 0) continue;
 
-    // Pool-start freeze — yalnız gereksiz işten kaçınmak için (asıl garanti syncHomeKupon içinde).
-    const startTime = poolStartTime(dateIso, races.map((r) => r.time));
-    if (startTime && Date.now() >= startTime.getTime()) continue;
+    // Pool-start freeze — 2026-09-27: kıstas artık SAAT değil SONUÇ (bkz.
+    // home-kupon.actions.ts'teki syncHomeKupon'un aynı gerekçesi). Yalnız gereksiz
+    // işten kaçınmak için erken atlanıyor — asıl garanti syncHomeKupon içinde.
+    if (races.some((r) => r.result != null)) continue;
 
     checked++;
 

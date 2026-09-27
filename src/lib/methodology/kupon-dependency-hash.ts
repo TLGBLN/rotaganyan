@@ -189,23 +189,8 @@ export function toClientDependencyInput(races: ClientRaceSnapshotInput[]): Depen
   }));
 }
 
-/** Havuzdaki `raceNo`'ların TJK saatlerinden EN ERKENİNİ döner — `date` (yarışın GÜNÜ,
- * "yyyy-MM-dd") ZORUNLU parametre: yalnız "HH:mm" tek başına "bugün mü yarın mı"
- * belirleyemez. `race-context-watch` cron'undaki AYNI "HH:mm Türkiye saati (UTC+3,
- * DST yok) → UTC" dönüşümü kullanılır. `now >= poolStartTime` olduğunda `syncHomeKupon`
- * hiçbir şeye dokunmaz (bkz. plan PİVOT-2 madde 15d — havuz başladıktan sonra
- * `HomeKupon` değişmez bir tarihsel kayıttır). */
-export function poolStartTime(date: string, raceTimesInPool: (string | null | undefined)[]): Date | null {
-  let earliestMs: number | null = null;
-  for (const time of raceTimesInPool) {
-    if (!time) continue;
-    const cleaned = time.replace(".", ":");
-    const m = cleaned.match(/^(\d{1,2}):(\d{2})/);
-    if (!m) continue;
-    const hh = String(parseInt(m[1], 10)).padStart(2, "0");
-    const mm = m[2];
-    const utcMs = new Date(`${date}T${hh}:${mm}:00Z`).getTime() - 3 * 60 * 60 * 1000;
-    if (earliestMs == null || utcMs < earliestMs) earliestMs = utcMs;
-  }
-  return earliestMs == null ? null : new Date(earliestMs);
-}
+// 2026-09-27 kullanıcı kararı — Adana 2.Altılı vakası: pool-start freeze'in kıstası
+// SAAT'ten SONUCA çevrildi (bkz. syncHomeKupon'daki "POOL_STARTED" kontrolü, artık
+// `Race.result` varlığına bakıyor). Yalnız saatin geçmiş olması (TJK gecikmesi/erteleme
+// çok yaygın) admin'in kendi hatasını düzeltmesini gereksiz yere engelliyordu — eskiden
+// burada duran saat-bazlı `poolStartTime` fonksiyonu bu yüzden KALDIRILDI.

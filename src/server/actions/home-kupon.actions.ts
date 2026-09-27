@@ -24,7 +24,6 @@ import {
   manualOverridesHash,
   pruneToEligible,
   buildKey as computeBuildKey,
-  poolStartTime,
   type ManualOverridesMap,
   type DependencyRaceInput,
 } from "@/lib/methodology/kupon-dependency-hash";
@@ -70,6 +69,7 @@ function optimizerConfigFor(hippodromeName: string, slot: number) {
 type ScopedLeg = {
   raceNo: number;
   time: string | null;
+  hasResult: boolean;
   pistDuyarliligi: string | null;
   gecmisRiskSeviyesi: string | null;
   runners: { no: number; scratched: boolean; ekuriGroup: number | null; olasilik: number }[];
@@ -86,6 +86,7 @@ async function getRaceDayLegsForRaceNos(baseHippodromeName: string, date: Date, 
     select: {
       raceNo: true,
       time: true,
+      result: { select: { id: true } },
       runners: { select: { id: true, no: true, scratched: true, ekuriGroup: true } },
       prediction: {
         select: {
@@ -105,6 +106,7 @@ async function getRaceDayLegsForRaceNos(baseHippodromeName: string, date: Date, 
     return {
       raceNo: r.raceNo,
       time: r.time,
+      hasResult: r.result != null,
       pistDuyarliligi: r.prediction?.pistDuyarliligi ?? null,
       gecmisRiskSeviyesi: r.prediction?.gecmisRiskSeviyesi ?? null,
       runners: r.runners.map((run) => ({
@@ -149,16 +151,18 @@ export async function syncHomeKupon(input: {
   const dateIso = input.date;
   const dateObj = new Date(dateIso + "T00:00:00.000Z");
 
-  // 0) Pool-start freeze — havuz başladıktan sonra HomeKupon değişmez bir tarihsel
-  // kayıttır (bkz. plan PİVOT-2 madde 15d). Bunu değerlendirmek için raceNos'un
-  // saatlerini DB'den okumamız gerekiyor — bu sorgu ZATEN aşağıdaki fresh-read'in
-  // parçası, burada TEKRAR ETMEMEK için tek bir okuma yapıp hem freeze hem hash için
-  // kullanıyoruz.
+  // 0) Pool-start freeze — 2026-09-27 kullanıcı kararıyla GEVŞETİLDİ: eskiden yalnız
+  // SAATE bakıyordu (bkz. plan PİVOT-2 madde 15d) — bu, Adana 2.Altılı vakasında (K4
+  // saati geçmiş ama SONUÇ henüz düşmemişken) admin'in kendi bug yüzünden yanlış
+  // yayınlanmış kuponu DÜZELTMESİNİ de engelliyordu. Artık kıstas SAAT değil SONUÇ:
+  // havuzdaki HİÇBİR raceNo'nun GERÇEK sonucu (Result satırı) DB'ye düşmediyse, saat
+  // geçmiş olsa bile kupon hâlâ değiştirilebilir — "biz bunu önermiştik" tarihsel
+  // bütünlüğü yalnız SONUÇ belli olduktan SONRA bir anlam ifade eder, yalnız saatin
+  // geçmiş olması (TJK gecikmesi/erteleme çok yaygın) tek başına yeterli değil.
   const scopedLegs = await getRaceDayLegsForRaceNos(baseHippodromeName, dateObj, input.raceNos);
   if (scopedLegs.length === 0) return { ok: false, skipped: "POOL_NOT_FOUND" };
 
-  const startTime = poolStartTime(dateIso, scopedLegs.map((l) => l.time));
-  if (startTime && Date.now() >= startTime.getTime()) {
+  if (scopedLegs.some((l) => l.hasResult)) {
     return { ok: true, skipped: "POOL_STARTED" };
   }
 
