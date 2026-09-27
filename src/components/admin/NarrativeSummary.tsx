@@ -42,15 +42,26 @@ function buildNarrative(analyst: AnalystStats, pendingResults: number): { senten
   }
 
   // --- Art arda tutmama ---
+  // 2026-09-27 kullanıcı bulgusu: sabit "4 ardışık" eşiği gerçek isabet oranını hiç
+  // hesaba katmıyordu — %32 isabette 4 ardışık kaçırma olasılığı şansla bile ~%21
+  // (0.68^4), yani NADİR DEĞİL, ama panel bunu "kritik, metodoloji gözden geçirilmeli"
+  // diye damgalıyordu. Artık eşik, "bu kadar ardışık kaçırmanın rastgele şansla P<%5
+  // olasılıkla açıklanabileceği" minimum streak uzunluğu olarak GERÇEK orana göre
+  // hesaplanıyor — düşük isabetli bir model için daha uzun bir seri gerekiyor, yüksek
+  // isabetli bir model için daha kısa bir seri bile gerçekten olağandışı sayılıyor.
+  const missP = Math.max(0.01, Math.min(0.99, rate / 100));
+  let anlamliMissEsigi = 1;
+  while (Math.pow(1 - missP, anlamliMissEsigi) >= 0.05 && anlamliMissEsigi < 20) anlamliMissEsigi++;
+
   let missStreak = 0;
   for (let i = recentTrend.length - 1; i >= 0; i--) {
     if (!recentTrend[i]) missStreak++;
     else break;
   }
-  if (missStreak >= 4) {
-    sentences.push(`Dikkat: Son ${missStreak} tahmin art arda tutmadı — metodoloji gözden geçirilmeli.`);
+  if (missStreak >= anlamliMissEsigi) {
+    sentences.push(`Dikkat: Son ${missStreak} tahmin art arda tutmadı — bu, %${rate.toFixed(0)} isabet oranında rastgele şansla açıklanamayacak kadar uzun bir seri (P<%5), metodoloji gözden geçirilmeli.`);
   } else if (missStreak >= 2) {
-    sentences.push(`Son ${missStreak} tahmin tutmadı; trend yakından takip edilmeli.`);
+    sentences.push(`Son ${missStreak} tahmin tutmadı; %${rate.toFixed(0)} isabet oranında bu henüz olağan varyans sınırları içinde, ama trend takip edilmeli.`);
   } else if (missStreak === 0 && recentTrend.length > 0 && recentTrend[recentTrend.length - 1]) {
     sentences.push("En son tahmin isabetliydi.");
   }
@@ -105,7 +116,7 @@ function buildNarrative(analyst: AnalystStats, pendingResults: number): { senten
 
   // --- Genel karar ---
   const verdict: "good" | "warn" | "critical" | "neutral" =
-    missStreak >= 4 ? "critical"
+    missStreak >= anlamliMissEsigi ? "critical"
     : rate < 20 || (missStreak >= 2 && rate < 30) ? "warn"
     : rate >= 35 && missStreak === 0 ? "good"
     : "neutral";
