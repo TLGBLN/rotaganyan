@@ -158,6 +158,37 @@ export function buildKey(
   );
 }
 
+// 2026-09-27 kullanıcı bulgusu (Adana 2.Altılı) — "Otomatik Doldur dediğimde yaratılanla
+// yansıyan farklı": `syncHomeKupon` publish ANINDA DB'den TAZE veri okuyup DP'yi baştan
+// çözüyor — bu doğru davranış (İstanbul K4'ün çözümü) AMA yalnız kendi İKİ okuması
+// arasındaki (startHash/currentHash) farkı yakalıyordu. Admin'in EKRANDA gördüğü
+// `raceDay` (son "Koşuları Getir"den beri, arka planda `getRaceDayLegs`'in HER
+// çağrısında tetiklenen ingest veya bir AGF-sync/reanaliz yüzünden) BAYAT olabilir —
+// bu durumda admin'in onayladığı seçimle sunucunun yayınladığı seçim SESSİZCE
+// farklılaşıyordu, hiçbir hata/uyarı olmadan. Bu fonksiyon SAF'tır (crypto YOK) — bu
+// yüzden "use client" KuponForm.tsx içine güvenle import edilebilir; asıl hash'leme
+// (dependencyHashForRace+sha256) HER ZAMAN sunucuda kalır, istemci yalnız HAM
+// snapshot'ı gönderir, sunucu KENDİ hash'ini hesaplayıp `startHash` ile kıyaslar.
+export type ClientRaceSnapshotInput = {
+  raceNo: number;
+  runners: { no: number; score: number | null; scoreExact: number | null; scratched: boolean; ekuriGroup: number | null }[];
+  pistDuyarliligi?: string | null;
+  gecmisRiskSeviyesi?: string | null;
+};
+export function toClientDependencyInput(races: ClientRaceSnapshotInput[]): DependencyRaceInput[] {
+  return races.map((r) => ({
+    raceNo: r.raceNo,
+    runners: r.runners.map((x) => ({
+      no: x.no,
+      olasilik: (x.scoreExact ?? x.score ?? 0) / 100,
+      scratched: x.scratched,
+      ekuriGroup: x.ekuriGroup ?? null,
+    })),
+    pistDuyarliligi: r.pistDuyarliligi ?? null,
+    gecmisRiskSeviyesi: r.gecmisRiskSeviyesi ?? null,
+  }));
+}
+
 /** Havuzdaki `raceNo`'ların TJK saatlerinden EN ERKENİNİ döner — `date` (yarışın GÜNÜ,
  * "yyyy-MM-dd") ZORUNLU parametre: yalnız "HH:mm" tek başına "bugün mü yarın mı"
  * belirleyemez. `race-context-watch` cron'undaki AYNI "HH:mm Türkiye saati (UTC+3,

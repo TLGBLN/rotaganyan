@@ -28,7 +28,7 @@ import {
   sonYediKosu,
   otomatikGroupSelections,
 } from "@/lib/methodology/kupon-auto-fill";
-import { normalizeManualOverrides, type ManualOverridesMap } from "@/lib/methodology/kupon-dependency-hash";
+import { normalizeManualOverrides, toClientDependencyInput, type ManualOverridesMap } from "@/lib/methodology/kupon-dependency-hash";
 import {
   getRaceDayLegs,
   publishHomeKupon,
@@ -471,6 +471,11 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
     const raceNos = group.map((r) => r.raceNo);
     const rawOverrides = diffToManualOverrides(groupSel, autoBaseline[key] ?? {}, group);
     const manualOverrides = normalizeManualOverrides(rawOverrides, raceNos);
+    // 2026-09-27 — admin'in ŞU AN ekranda gördüğü veri (bkz. kupon-dependency-hash.ts,
+    // STALE_CLIENT_VIEW yorumu): sunucu bunu kendi TAZE okuduğuyla kıyaslayıp, arada
+    // (ingest/AGF-sync/reanaliz nedeniyle) fark varsa yayını sessizce farklılaştırmak
+    // yerine iptal eder.
+    const clientSnapshot = toClientDependencyInput(group);
 
     setPublishingKey(key);
     try {
@@ -480,11 +485,14 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
         slot,
         raceNos,
         manualOverrides,
+        clientSnapshot,
       });
       if (res?.skipped === "POOL_STARTED") {
         toast.warning(`${label}: havuz zaten başladı, artık değiştirilemez.`);
       } else if (res?.skipped === "UNCHANGED") {
         toast.info(`${label}: zaten güncel, değişiklik yayınlanmadı.`);
+      } else if (res?.skipped === "STALE_CLIENT_VIEW") {
+        toast.error(`${label}: veriler arka planda değişti (ekrandaki bayatladı) — "Koşuları Getir"i tekrar çalıştırıp yeniden doldur, hiçbir şey yayınlanmadı.`);
       } else if (res?.ok === false) {
         toast.error(`${label} yayınlanamadı — lütfen tekrar deneyin (context eşzamanlı değişmiş olabilir).`);
       } else {

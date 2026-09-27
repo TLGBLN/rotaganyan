@@ -29,6 +29,8 @@ import {
   type DependencyRaceInput,
 } from "@/lib/methodology/kupon-dependency-hash";
 
+export type { DependencyRaceInput, ClientRaceSnapshotInput } from "@/lib/methodology/kupon-dependency-hash";
+
 export type HomeKuponLegInput = {
   raceNo: number;
   narrow: number[];
@@ -45,6 +47,9 @@ export type HomeKuponInput = {
   slot: number;
   raceNos: number[];
   manualOverrides: ManualOverridesMap;
+  // 2026-09-27 — admin'in "Kupon Oluştur" ANINDA EKRANDA gördüğü veri (bkz.
+  // STALE_CLIENT_VIEW kontrolü, syncHomeKupon). Verilmezse (eski istemci) kontrol atlanır.
+  clientSnapshot?: DependencyRaceInput[];
 };
 
 function isUniqueConstraintViolation(e: unknown): boolean {
@@ -125,7 +130,7 @@ function toDependencyInput(legs: ScopedLeg[]): DependencyRaceInput[] {
 
 export type SyncHomeKuponResult =
   | { ok: true; skipped?: "POOL_STARTED" | "UNCHANGED"; homeKuponId?: string; reactivated?: boolean; created?: boolean }
-  | { ok: false; skipped?: "NO_ELIGIBLE_RUNNERS" | "RACE_CONDITION" | "CONCURRENT_GENERATION" | "POOL_NOT_FOUND" };
+  | { ok: false; skipped?: "NO_ELIGIBLE_RUNNERS" | "RACE_CONDITION" | "CONCURRENT_GENERATION" | "POOL_NOT_FOUND" | "STALE_CLIENT_VIEW" };
 
 /**
  * Prediction-to-HomeKupon Auto Synchronization ÇEKİRDEĞİ (bkz. plan) — admin'in manuel
@@ -140,6 +145,7 @@ export async function syncHomeKupon(input: {
   slot: number;
   raceNos: number[];
   manualOverrides: unknown; // HAM — normalize EDİLMEMİŞ olabilir, burada normalize edilir
+  clientSnapshot?: DependencyRaceInput[]; // bkz. HomeKuponInput yorumu — STALE_CLIENT_VIEW
 }): Promise<SyncHomeKuponResult> {
   const baseHippodromeName = input.hippodromeName.split(" — ")[0];
   const dateIso = input.date;
@@ -160,6 +166,21 @@ export async function syncHomeKupon(input: {
 
   const optimizerConfig = optimizerConfigFor(baseHippodromeName, input.slot);
   const startHash = dependencyHashForRace(toDependencyInput(scopedLegs), optimizerConfig);
+
+  // STALE_CLIENT_VIEW — 2026-09-27 kullanıcı bulgusu (Adana 2.Altılı, "Otomatik Doldur
+  // dediğimde yaratılanla yansıyan farklı"): admin'in EKRANDA onayladığı `raceDay`
+  // (son "Koşuları Getir"den beri arka planda bir ingest/AGF-sync/reanaliz yüzünden)
+  // bayatlamış olabilir. `manualOverrides` boşsa (auto-fill sonrası hiç dokunulmadıysa)
+  // sunucu bunu fark etmeden FARKLI bir DP sonucu yayınlayabiliyordu — admin ekranda
+  // gördüğünden BAŞKA bir kupon yayına çıkıyordu, sessizce. Client kendi gördüğü veriyi
+  // (ham, hash'lenmemiş) yollar; sunucu KENDİ hash'ini hesaplayıp fresh startHash'le
+  // kıyaslar — farklıysa yayınlamadan İPTAL eder (admin'e yeniden getir/doldur denir).
+  if (input.clientSnapshot) {
+    const clientHash = dependencyHashForRace(input.clientSnapshot, optimizerConfig);
+    if (clientHash !== startHash) {
+      return { ok: false, skipped: "STALE_CLIENT_VIEW" };
+    }
+  }
 
   const manualOverrides = normalizeManualOverrides(input.manualOverrides, input.raceNos);
   const overridesHash = manualOverridesHash(manualOverrides);
@@ -500,6 +521,7 @@ export async function publishHomeKupon(input: HomeKuponInput): Promise<SyncHomeK
     slot: input.slot,
     raceNos: input.raceNos,
     manualOverrides: input.manualOverrides,
+    clientSnapshot: input.clientSnapshot,
   });
 }
 
