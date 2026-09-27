@@ -974,3 +974,25 @@ model PageView {
   @@index([path])
   @@index([createdAt(sort: Desc)])
 }
+
+// ─── DEPLOY LOG ─────────────────────────────────────────────────────────────
+
+// 2026-09-27 kullanıcı talebi ("backup yapısı kurmanı istiyorum... nerede olduğumuzu son
+// güncellemenin ne olduğu kayıtlara alınsın") — tam-site-geri-alma vakasında "21.09'da
+// tam olarak hangi commit canlıydı" sorusunu yanıtlamak için SAATLER harcandı (commit
+// tarihlerini/dosya diff'lerini elle karşılaştırarak). Bu tablo HER production deploy'unda
+// TEK bir satırla şunu kalıcı hale getirir: hangi commit, ne zaman, neden. Git log zaten
+// "ne değişti"yi tutuyor — bu tablo "hangi commit NE ZAMAN CANLIYDI" sorusunu git
+// arkeolojisi olmadan anında cevaplar. arac-deploy-kaydet.mts (yaz) / arac-deploy-tarihce.mts
+// (oku) ile kullanılır — HER deploy'un SON adımı bu kayıt olmalı (CLAUDE.md'ye eklendi).
+model DeployLog {
+  id           String   @id @default(cuid())
+  deployedAt   DateTime @default(now())
+  gitSha       String // tam sha
+  gitMessage   String // commit mesajının ilk satırı
+  deploymentId String // Vercel dpl_... id
+  tur          String // "feature" | "fix" | "revert" | "config"
+  ozet         String // insan-okunur: ne değişti, neden (gelecekteki oturum için bağlam)
+
+  @@index([deployedAt(sort: Desc)])
+}

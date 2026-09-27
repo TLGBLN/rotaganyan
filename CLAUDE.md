@@ -61,7 +61,26 @@ tabloda at listesi gösterilecekse bu fonksiyonlardan biri kullanılmalı — ra
 sıralama YENİDEN YAZILMAMALI. (Admin tarafındaki `V5AnalysisPanel.tsx`/`RaceAdviceCard.tsx`
 bu kuralın DIŞINDA — admin bilerek terfi-ayarlı Sıra'yı görmeli.)
 
+## Her production deploy'unun ZORUNLU son adımı: DeployLog kaydı
+
+2026-09-27'de tam-site-geri-alma vakasında "21.09'da tam olarak hangi commit canlıydı"
+sorusunu yanıtlamak için commit tarihlerini/dosya diff'lerini elle karşılaştırıp SAATLER
+harcandı. Artık her production deploy'undan HEMEN SONRA:
+
+```
+node --env-file=.env node_modules/tsx/dist/cli.mjs arac-deploy-kaydet.mts --deployment dpl_xxx --ozet "Kısa açıklama" --tur feature|fix|revert|config
+```
+
+çalıştırılmalı (`--sha`/`--mesaj` verilmezse mevcut git HEAD'den otomatik okunur). "Şu
+tarihte/anda tam olarak ne canlıydı" sorusunu (git arkeolojisi YAPMADAN) anında cevaplamak
+için:
+
+```
+node --env-file=.env node_modules/tsx/dist/cli.mjs arac-deploy-tarihce.mts [--tarih YYYY-MM-DD]
+```
+
 ## Diğer kalıcı araçlar (silinmiyor, kök dizinde)
 - `arac-terfi-denetimi.mts` — yukarıya bakınız
+- `arac-deploy-kaydet.mts` / `arac-deploy-tarihce.mts` — yukarıya bakınız
 - `arac-model-veri-olustur.mts` — V5 eğitim verisi cache'ini üretir/günceller
 - `arac-model-egit-segment.mjs` — düşük-şart/diğer segmentlerini ayrı ayrı eğitir
