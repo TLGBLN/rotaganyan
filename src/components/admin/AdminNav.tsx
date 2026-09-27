@@ -20,6 +20,7 @@ import {
   CloudRain,
   Newspaper,
   ShoppingBag,
+  History,
 } from "lucide-react";
 
 const NAV = [
@@ -43,6 +44,7 @@ const NAV = [
   { href: "/admin/metodoloji", label: "Metodoloji", icon: Settings },
   { href: "/admin/ayarlar", label: "Site Ayarları", icon: LayoutTemplate },
   { href: "/admin/girisler", label: "Giriş Logları", icon: LogIn },
+  { href: "/admin/deploy-log", label: "Deploy Kayıtları", icon: History },
 ];
 
 export default function AdminNav({ onNavigate }: { onNavigate?: () => void }) {
