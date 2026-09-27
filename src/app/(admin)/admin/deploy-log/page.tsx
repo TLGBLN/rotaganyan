@@ -27,7 +27,7 @@ export default async function DeployLogPage() {
       <div>
         <h1 className="text-lg font-bold">Deploy Kayıtları</h1>
         <p className="text-xs text-muted-foreground mt-1">
-          Her production deploy'undan sonra kaydedilir — &quot;şu an tam olarak hangi commit
+          Her production deploy&apos;undan sonra kaydedilir — &quot;şu an tam olarak hangi commit
           canlı, ne zaman ve neden deploy edildi&quot; sorusunu git arkeolojisi yapmadan
           cevaplar (bkz. CLAUDE.md).
         </p>
