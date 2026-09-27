@@ -6,8 +6,6 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import {
-  setActiveHomeKupon,
-  deactivateHomeKupon,
   deleteHomeKupon,
   shareHomeKuponOnX,
   type HomeKuponLegInput,
@@ -34,13 +32,12 @@ function buildShareText(hippodromeName: string, date: Date, legs: HomeKuponLegIn
 
 type Props = {
   id: string;
-  isActive: boolean;
   hippodromeName: string;
   date: Date;
   legs: HomeKuponLegInput[];
 };
 
-export default function KuponActions({ id, isActive, hippodromeName, date, legs }: Props) {
+export default function KuponActions({ id, hippodromeName, date, legs }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -65,23 +62,6 @@ export default function KuponActions({ id, isActive, hippodromeName, date, legs 
       toast.error("Metin kopyalanamadı");
     }
     window.open("https://www.instagram.com/", "_blank");
-  }
-
-  function toggleActive() {
-    startTransition(async () => {
-      try {
-        if (isActive) {
-          await deactivateHomeKupon(id);
-          toast.success("Yayından kaldırıldı");
-        } else {
-          await setActiveHomeKupon(id);
-          toast.success("Anasayfada yayınlandı");
-        }
-        router.refresh();
-      } catch {
-        toast.error("İşlem başarısız oldu, tekrar deneyin.");
-      }
-    });
   }
 
   function remove() {
@@ -121,13 +101,6 @@ export default function KuponActions({ id, isActive, hippodromeName, date, legs 
       ))}
 
       <div className="mt-1 flex items-center gap-3">
-        <button
-          onClick={toggleActive}
-          disabled={pending}
-          className="text-xs text-brand hover:underline disabled:opacity-50"
-        >
-          {pending ? "…" : isActive ? "Yayından Kaldır" : "Yayınla"}
-        </button>
         <button
           onClick={remove}
           disabled={pending}

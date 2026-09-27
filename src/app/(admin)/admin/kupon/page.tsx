@@ -2,7 +2,6 @@ import { db } from "@/lib/db";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { getHippodromes, buildKuponOnerisi, type KuponStatus } from "@/server/services/race.service";
 import { getAdminRaceDays, getAnalystStats, getClassTypeAdvice, GUNCEL_MOTOR_BASLANGIC } from "@/server/services/admin.service";
@@ -240,7 +239,6 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">Hipodrom</th>
                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">Tarih</th>
                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">Ayak</th>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground">Durum</th>
                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">Sonuç</th>
                 <th className="px-3 py-2 text-right font-medium text-muted-foreground">İşlem</th>
               </tr>
@@ -264,11 +262,6 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                     </td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">{legCount} ayak</td>
                     <td className="px-3 py-2">
-                      <Badge variant={k.isActive ? "default" : "secondary"} className="text-xs">
-                        {k.isActive ? "Yayında" : "Pasif"}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2">
                       {sonuc ? (
                         <div className="flex flex-wrap gap-1">
                           {sonuc.variants.filter((v) => v.filled).map((v) => (
@@ -291,7 +284,6 @@ export default async function AdminKuponPage({ searchParams }: PageProps) {
                     <td className="px-3 py-2 text-right">
                       <KuponActions
                         id={k.id}
-                        isActive={k.isActive}
                         hippodromeName={k.hippodromeName}
                         date={k.date}
                         legs={Array.isArray(k.legs) ? (k.legs as HomeKuponLegInput[]) : []}

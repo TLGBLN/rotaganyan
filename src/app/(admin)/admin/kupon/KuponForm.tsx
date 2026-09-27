@@ -487,11 +487,7 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
         manualOverrides,
         clientSnapshot,
       });
-      if (res?.skipped === "POOL_STARTED") {
-        toast.warning(`${label}: bu havuzdaki bir ayağın SONUCU zaten alındı, artık değiştirilemez.`);
-      } else if (res?.skipped === "UNCHANGED") {
-        toast.info(`${label}: zaten güncel, değişiklik yayınlanmadı.`);
-      } else if (res?.skipped === "STALE_CLIENT_VIEW") {
+      if (res?.ok === false && res.skipped === "STALE_CLIENT_VIEW") {
         toast.error(`${label}: veriler arka planda değişti (ekrandaki bayatladı) — "Koşuları Getir"i tekrar çalıştırıp yeniden doldur, hiçbir şey yayınlanmadı.`);
       } else if (res?.ok === false) {
         toast.error(`${label} yayınlanamadı — lütfen tekrar deneyin (context eşzamanlı değişmiş olabilir).`);

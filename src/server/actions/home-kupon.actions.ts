@@ -68,8 +68,6 @@ function optimizerConfigFor(hippodromeName: string, slot: number) {
 
 type ScopedLeg = {
   raceNo: number;
-  time: string | null;
-  hasResult: boolean;
   pistDuyarliligi: string | null;
   gecmisRiskSeviyesi: string | null;
   runners: { no: number; scratched: boolean; ekuriGroup: number | null; olasilik: number }[];
@@ -85,8 +83,6 @@ async function getRaceDayLegsForRaceNos(baseHippodromeName: string, date: Date, 
     where: { raceNo: { in: raceNos }, raceDay: { date, hippodrome: { name: baseHippodromeName } } },
     select: {
       raceNo: true,
-      time: true,
-      result: { select: { id: true } },
       runners: { select: { id: true, no: true, scratched: true, ekuriGroup: true } },
       prediction: {
         select: {
@@ -105,8 +101,6 @@ async function getRaceDayLegsForRaceNos(baseHippodromeName: string, date: Date, 
     }
     return {
       raceNo: r.raceNo,
-      time: r.time,
-      hasResult: r.result != null,
       pistDuyarliligi: r.prediction?.pistDuyarliligi ?? null,
       gecmisRiskSeviyesi: r.prediction?.gecmisRiskSeviyesi ?? null,
       runners: r.runners.map((run) => ({
@@ -129,7 +123,7 @@ function toDependencyInput(legs: ScopedLeg[]): DependencyRaceInput[] {
 }
 
 export type SyncHomeKuponResult =
-  | { ok: true; skipped?: "POOL_STARTED" | "UNCHANGED"; homeKuponId?: string; reactivated?: boolean; created?: boolean }
+  | { ok: true; homeKuponId?: string; created?: boolean }
   | { ok: false; skipped?: "NO_ELIGIBLE_RUNNERS" | "RACE_CONDITION" | "CONCURRENT_GENERATION" | "POOL_NOT_FOUND" | "STALE_CLIENT_VIEW" };
 
 /**
@@ -151,20 +145,18 @@ export async function syncHomeKupon(input: {
   const dateIso = input.date;
   const dateObj = new Date(dateIso + "T00:00:00.000Z");
 
-  // 0) Pool-start freeze — 2026-09-27 kullanıcı kararıyla GEVŞETİLDİ: eskiden yalnız
-  // SAATE bakıyordu (bkz. plan PİVOT-2 madde 15d) — bu, Adana 2.Altılı vakasında (K4
-  // saati geçmiş ama SONUÇ henüz düşmemişken) admin'in kendi bug yüzünden yanlış
-  // yayınlanmış kuponu DÜZELTMESİNİ de engelliyordu. Artık kıstas SAAT değil SONUÇ:
-  // havuzdaki HİÇBİR raceNo'nun GERÇEK sonucu (Result satırı) DB'ye düşmediyse, saat
-  // geçmiş olsa bile kupon hâlâ değiştirilebilir — "biz bunu önermiştik" tarihsel
-  // bütünlüğü yalnız SONUÇ belli olduktan SONRA bir anlam ifade eder, yalnız saatin
-  // geçmiş olması (TJK gecikmesi/erteleme çok yaygın) tek başına yeterli değil.
+  // 2026-09-27 kullanıcı kararı (İKİNCİ kez — ilk kez 2026-09-22'de commit 01e5a4f ile
+  // kaldırılmıştı, 09-21'e tam site geri alımı bunu da geri getirmişti): "Pool-start
+  // freeze" TAMAMEN KALDIRILDI — önce saat bazlıydı, sonra sonuç bazlı gevşetildi, şimdi
+  // admin'in DOĞRUDAN eylemi (bu fonksiyon) için tamamen kaldırıldı. Admin (yetkili
+  // kullanıcı) sistemde her türlü değişikliği, havuzun koşuları başlamış/sonuçlanmış
+  // olsa BİLE, istediği an yapabilmeli — Adana 2.Altılı'da tam da bunu engellediği için
+  // bug'ın kendi düzeltmesini admin panelinden yapamıyordu. Reconciliation cron'undaki
+  // (arka plan, admin etkileşimi OLMAYAN otomatik yol, home-kupon-sync.service.ts)
+  // sonuç-bazlı kontrol KASITLI olarak bırakıldı — bu kaldırma yalnız admin'in doğrudan
+  // eylemlerini kapsıyor.
   const scopedLegs = await getRaceDayLegsForRaceNos(baseHippodromeName, dateObj, input.raceNos);
   if (scopedLegs.length === 0) return { ok: false, skipped: "POOL_NOT_FOUND" };
-
-  if (scopedLegs.some((l) => l.hasResult)) {
-    return { ok: true, skipped: "POOL_STARTED" };
-  }
 
   const optimizerConfig = optimizerConfigFor(baseHippodromeName, input.slot);
   const startHash = dependencyHashForRace(toDependencyInput(scopedLegs), optimizerConfig);
@@ -188,34 +180,9 @@ export async function syncHomeKupon(input: {
   const overridesHash = manualOverridesHash(manualOverrides);
   const key = computeBuildKey(input.hippodromeName, input.slot, dateIso, startHash, overridesHash);
 
-  // 5) Cheap idempotency ön-eleme — bu generation ZATEN üretilmiş mi?
-  const existing = await db.homeKupon.findUnique({ where: { buildKey: key } });
-  if (existing) {
-    if (existing.isActive) return { ok: true, skipped: "UNCHANGED", homeKuponId: existing.id };
-
-    // İNAKTİF bir eşleşme bulundu — reactivate'ten HEMEN ÖNCE TOCTOU kontrolü (PİVOT-2
-    // madde 15b): context bu aradan geçen sürede DEĞİŞMEDİ mi?
-    const recheckLegs = await getRaceDayLegsForRaceNos(baseHippodromeName, dateObj, input.raceNos);
-    const currentHashForReactivate = dependencyHashForRace(toDependencyInput(recheckLegs), optimizerConfig);
-    if (currentHashForReactivate !== startHash) {
-      return { ok: false, skipped: "RACE_CONDITION" };
-    }
-    try {
-      await db.$transaction([
-        db.homeKupon.updateMany({
-          where: { isActive: true, hippodromeName: input.hippodromeName, date: dateObj, slot: input.slot, id: { not: existing.id } },
-          data: { isActive: false },
-        }),
-        db.homeKupon.update({ where: { id: existing.id }, data: { isActive: true } }),
-      ]);
-    } catch (e) {
-      if (isUniqueConstraintViolation(e)) return { ok: false, skipped: "CONCURRENT_GENERATION" };
-      throw e;
-    }
-    revalidatePath("/");
-    revalidatePath("/admin/kupon");
-    return { ok: true, homeKuponId: existing.id, reactivated: true };
-  }
+  // 2026-09-22/27 kullanıcı kararı — idempotency no-op'u (buildKey eşleşirse "UNCHANGED"
+  // dönüp hiçbir şey yapmama) KALDIRILDI: admin "Kupon Oluştur"a her bastığında yeniden
+  // üretilip yayınlanır, "zaten aynı" diye sessizce reddedilmez.
 
   // 6) effectiveOverrides — yalnız DP çağrısı için, DB'ye YAZILMAZ (PİVOT-2 madde 13).
   const eligibleNosByRaceNo: Record<number, Set<number>> = {};
@@ -275,13 +242,15 @@ export async function syncHomeKupon(input: {
     return { ok: false, skipped: "RACE_CONDITION" };
   }
 
-  // 11) Atomik swap — buildKey @unique VE homekupon_one_active_per_pool kısmi index'i
-  // (raw SQL, bkz. plan) EŞZAMANLI farklı generation'lara karşı korur.
+  // 11) Atomik swap — 2026-09-22/27 kullanıcı kararı: isActive/pasif kavramı UI'dan
+  // tamamen kaldırıldığı için eski satır artık soft-deactivate (isActive:false) değil,
+  // HARD DELETE ediliyor — bir havuz için DB'de her zaman TEK satır olur. buildKey
+  // @unique VE homekupon_one_active_per_pool kısmi index'i (raw SQL, bkz. plan) hâlâ
+  // EŞZAMANLI farklı generation'lara karşı koruyor.
   try {
     const created = await db.$transaction(async (tx) => {
-      await tx.homeKupon.updateMany({
-        where: { isActive: true, hippodromeName: input.hippodromeName, date: dateObj, slot: input.slot },
-        data: { isActive: false },
+      await tx.homeKupon.deleteMany({
+        where: { hippodromeName: input.hippodromeName, date: dateObj, slot: input.slot },
       });
       return tx.homeKupon.create({
         data: {
@@ -527,33 +496,10 @@ export async function publishHomeKupon(input: HomeKuponInput): Promise<SyncHomeK
   });
 }
 
-export async function setActiveHomeKupon(id: string) {
-  await requireRole("EDITOR");
-
-  const target = await db.homeKupon.findUnique({ where: { id }, select: { slot: true, hippodromeName: true } });
-  if (!target) return;
-
-  await db.$transaction([
-    // Sadece AYNI hipodromun aynı slotu devre dışı kalır — bkz. publishHomeKupon.
-    db.homeKupon.updateMany({
-      where: { isActive: true, slot: target.slot, hippodromeName: target.hippodromeName },
-      data: { isActive: false },
-    }),
-    db.homeKupon.update({ where: { id }, data: { isActive: true } }),
-  ]);
-
-  revalidatePath("/");
-  revalidatePath("/admin/kupon");
-}
-
-export async function deactivateHomeKupon(id: string) {
-  await requireRole("EDITOR");
-
-  await db.homeKupon.update({ where: { id }, data: { isActive: false } });
-
-  revalidatePath("/");
-  revalidatePath("/admin/kupon");
-}
+// 2026-09-22/27 kullanıcı kararı — "kuponlarda pasif olayını istemiyorum artık
+// kaldırılsın": setActiveHomeKupon/deactivateHomeKupon (isActive toggle) kaldırıldı,
+// yalnız Sil kaldı. syncHomeKupon artık her zaman deleteMany+create ile tek satır
+// tutuyor, isActive DB'de biçimsel olarak hep true.
 
 export async function deleteHomeKupon(id: string) {
   await requireRole("EDITOR");
