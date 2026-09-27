@@ -23,14 +23,9 @@ import type { Prisma } from "@prisma/client";
 
 export const maxDuration = 300;
 
-// Kod içinde "bu yarışa ne kadar kaldı" filtresi — cron GENİŞ bir pencerede çalışır, asıl
-// daralmayı burası yapar. T-75'ten start'a kadar olan koşular izlenir (kullanıcının gerçek
-// T-60/T-45 analiz penceresini kapsayacak şekilde).
-// 2026-09-21 — GERÇEK çalışma penceresi artık `*/5 8-21 * * *` (vercel.json'daki
-// standalone giriş) DEĞİL, piggyback edildiği `result-sync`'in `*/5 11-21 * * *`'ü (bkz.
-// bu dosyanın üstündeki [[project_vercel_cron_kayit_bugu]] notu) — yani ~11:00 UTC
-// (Türkiye 14:00) ÖNCESİ başlayan koşular bu izlemeye HİÇ girmiyor (bilinen, kabul
-// edilmiş bir daralma — cron kaydı sorunu düzelirse standalone girişe geri dönülebilir).
+// Kod içinde "bu yarışa ne kadar kaldı" filtresi — cron GENİŞ bir pencerede (`*/5 8-21 * * *`,
+// bkz. vercel.json) çalışır, asıl daralmayı burası yapar. T-75'ten start'a kadar olan koşular
+// izlenir (kullanıcının gerçek T-60/T-45 analiz penceresini kapsayacak şekilde).
 const T_MINUS_75_MS = 75 * 60 * 1000;
 
 function raceStartUtc(raceDayDateIso: string, time: string | null): number | null {
@@ -44,14 +39,10 @@ function raceStartUtc(raceDayDateIso: string, time: string | null): number | nul
   return new Date(`${raceDayDateIso}T${hh}:${mm}:00Z`).getTime() - 3 * 60 * 60 * 1000;
 }
 
-// 2026-09-21 — bkz. [[project_vercel_cron_kayit_bugu]]: bu route TAMAMEN YENİ bir path
-// olduğu için Vercel'in cron kaydına HİÇ işlenmedi (proje hafızasında BELGELİ, kalıcı bir
-// platform kısıtı — CLI/dashboard denemeleri hiçbiri işe yaramıyor). Mantık burada
-// EXPORTED bir fonksiyona çıkarıldı, GERÇEK tetikleyici zaten çalışan `result-sync`
-// cron'una (`*/5 11-21 * * *`) `Promise.allSettled` ile "asalak" eklendi. Bu route
-// standalone da kalıyor (vercel.json'daki girişi silinmedi — Vercel bug'ı düzelirse
-// zararsız, yalnız fazladan/duplicate çalışabilir).
-export async function runRaceContextWatch() {
+export async function GET(req: NextRequest) {
+  const denied = verifyCronRequest(req);
+  if (denied) return denied;
+
   const now = Date.now();
   const dayStart = new Date();
   dayStart.setUTCHours(0, 0, 0, 0);
@@ -141,16 +132,9 @@ export async function runRaceContextWatch() {
     results.push({ raceId: race.id, transitioned });
   }
 
-  return {
+  return NextResponse.json({
     checked: inWindow.length,
     transitioned: results.filter((r) => r.transitioned).length,
     results,
-  };
-}
-
-export async function GET(req: NextRequest) {
-  const denied = verifyCronRequest(req);
-  if (denied) return denied;
-  const result = await runRaceContextWatch();
-  return NextResponse.json(result);
+  });
 }

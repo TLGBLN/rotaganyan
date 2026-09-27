@@ -129,20 +129,12 @@
       "schedule": "0 3 * * *"
     },
     {
-      "path": "/api/cron/hot-cache-watchdog",
-      "schedule": "0 */2 * * *"
-    },
-    {
       "path": "/api/cron/veri-denetimi",
       "schedule": "0 7 * * *"
     },
     {
       "path": "/api/cron/challenger-shadow-log",
       "schedule": "0 13 * * *"
-    },
-    {
-      "path": "/api/cron/sr6-shadow-log",
-      "schedule": "45 8 * * *"
     },
     {
       "path": "/api/cron/veri-tamligi-onarim",

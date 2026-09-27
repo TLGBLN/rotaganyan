@@ -16,17 +16,14 @@ import {
   TrendingUp,
   Dna,
   Gauge,
+  ClipboardCheck,
   CloudRain,
   Newspaper,
   ShoppingBag,
-  Activity,
-  BookMarked,
 } from "lucide-react";
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/admin/system-anatomy", label: "Sistem Anatomisi", icon: Activity },
-  { href: "/admin/sinyal-kutugu", label: "Sinyal Kütüğü", icon: BookMarked },
   { href: "/admin/analizler", label: "Analizler", icon: FileText },
   // 2026-09-18 kullanıcı talebi: "makale yazabileceğim bir alan" — bu admin CRUD akışı
   // (ArticleForm/TiptapEditor/upsertArticle) projenin İLK commit'inden (2026-06-21) beri
@@ -36,6 +33,7 @@ const NAV = [
   { href: "/admin/pedigri", label: "Pedigriler", icon: Dna },
   { href: "/admin/accurace", label: "Accurace Database", icon: Gauge },
   { href: "/admin/derece-istatistikleri", label: "Derece İstatistikleri", icon: CloudRain },
+  { href: "/admin/veri-tamligi", label: "Veri Tamlığı", icon: ClipboardCheck },
   { href: "/admin/sonuclar", label: "Sonuçlar", icon: Trophy },
   { href: "/admin/kupon", label: "Kupon Hazırla", icon: Ticket },
   { href: "/admin/jokey", label: "Jokey İstatistikleri", icon: TrendingUp },

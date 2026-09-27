@@ -164,32 +164,12 @@ model RaceDay {
 
   hippodrome Hippodrome @relation(fields: [hippodromeId], references: [id])
   races      Race[]
-  agfSyncState AgfSyncState?
 
   @@unique([date, hippodromeId])
   // 2026-08-13 — Supabase lint uyarısı (unindexed foreign key) üzerine doğrudan
   // veritabanında (Supabase SQL editörü) eklendi; burada yalnız şemayı gerçek
   // durumla senkron tutmak için tanımlandı — prisma migrate ÇALIŞTIRILMADI.
   @@index([hippodromeId], map: "ix_RaceDay_hippodromeId")
-}
-
-// 2026-09-22 — AGF soğuma (cooldown) durumu artık BURADA takip ediliyor, AgfSnapshot'ın
-// KENDİSİNDEN değil (kullanıcı bulgusu, P0 performans+correctness düzeltmesi): eski mantık
-// "AGF DEĞİŞTİ Mİ" (yalnız değer ≥0.01 değiştiğinde AgfSnapshot yazılıyor) ile "AGF'Yİ EN
-// SON NE ZAMAN BAŞARIYLA KONTROL ETTİM" ayrımını karıştırıyordu — AGF sakin bir dönemde
-// hiçbir zaman yeni snapshot yazılmadığı için soğuma HİÇ tetiklenmiyor, her analiz TJK'ya
-// gereksiz bir ağ isteği (4-8sn) atıyordu. Artık: lastSuccessAt yalnız TJK sync GERÇEKTEN
-// başarıyla tamamlandığında ilerler (AGF değişmiş olsun olmasın) — lastAttemptAt her
-// denemede ilerler (başarısız olsa bile), böylece bir sonraki çağrı en azından DENEMENİN
-// yapıldığını görür. raceDayId bazlı (hipodrom+gün) — eski AgfSnapshot sorgusuyla AYNI kapsam.
-model AgfSyncState {
-  raceDayId     String    @id
-  lastAttemptAt DateTime?
-  lastSuccessAt DateTime?
-  lastChangeAt  DateTime? // en son AGF DEĞERİ gerçekten değiştiğinde (>=1 runner)
-  lastStatus    String?   // "ok" | "no_city_match" | "error: ..." — yalnız gözlemlenebilirlik için
-
-  raceDay RaceDay @relation(fields: [raceDayId], references: [id], onDelete: Cascade)
 }
 
 model Race {
@@ -226,7 +206,6 @@ model Race {
   pendingResult  PendingResult?
   accuraceRace   AccuraceRace?
   challengerRuns ChallengerRun[]
-  sr6ShadowObservations SR6ShadowObservation[]
 
   @@unique([raceDayId, raceNo])
 }
@@ -241,12 +220,6 @@ model Runner {
   damSire            String?
   adminNote          String?
   jockey             String?
-  // 2026-09-21 — Jokey Kimlik Altyapısı (Faz J0, bkz. proje hafızası). TJK'nın kendi
-  // JokeyId'si (program sayfasındaki jokey <a href>'inden, QueryParameter_JokeyId) —
-  // canonical kimlik, isim eşleştirmesine (soyad/kısaltma) bağımlı DEĞİL. UNIQUE DEĞİL —
-  // aynı jokey binlerce Runner satırında görünür. Additive/nullable, eski satırlar
-  // etkilenmez; geçmiş satırlar için backfill ayrı, dry-run doğrulamalı bir adımdır.
-  tjkJokeyId         Int?
   trainer            String?
   startNo            Int?
   disaridanStart     Boolean @default(false)
@@ -280,7 +253,6 @@ model Runner {
 
   @@unique([raceId, no])
   @@index([name])
-  @@index([tjkJokeyId])
 }
 
 /**
@@ -322,104 +294,6 @@ model HorseSyncFailure {
   tjkAtId     Int      @id
   attempts    Int      @default(1)
   lastAttempt DateTime @default(now()) @updatedAt
-
-  // 2026-09-26 — URGENT Retry Lane (bkz. proje hafızası): attempts>=MAX_ATTEMPTS (3) artık
-  // kalıcı bir mezarlık DEĞİL — HOT∩URGENT∩transient hata alan atlara SINIRLI (en fazla
-  // URGENT_RESCUE_MAX_ATTEMPTS=2), backoff'lu bir ek şans tanınır (bkz.
-  // tjk-at-profil.adapter.ts eligibleDespiteExhaustion). errorClass=null → henüz hiç
-  // sınıflandırılmamış eski satır (rollout öncesi), "transient" muamelesi görür.
-  errorClass          String? // "transient" | "permanent"
-  urgentRescueAttempts Int     @default(0)
-  nextEligibleRetryAt DateTime?
-}
-
-// 2026-09-23 — HOT Cache Watchdog (Sistem Anatomisi P0 bulgusu): tek satırlık singleton,
-// bir önceki watchdog turunun HOT tjkAtId kümesini saklar — "newHotSinceLastSync" (churn)
-// metriğini hesaplamak için. lastHotIdsJson=number[]. Yalnız HOT-filtreli syncHorseStatsCache
-// çağrıları bu satırı günceller (günlük WARM/COLD cron'u dokunmaz).
-// 2026-09-24 — Fault Injection / Chaos Test katmanı (Sistem Anatomisi E2E doğrulaması).
-// Kullanıcı kararı: gerçek üretim verisini bozmak yerine (cron durdurma, DB'ye bozuk veri
-// yazma) yalnız SİSTEM ANATOMİSİ PANELİNİN OKUDUĞU sonucu geçici olarak zorlar — sensörlerin
-// KENDİ gerçek hesaplaması hiç etkilenmez/değişmez, yalnız GET() bu satırı bulunca ilgili
-// modülün `status`'unu propagateDependencies() ÇAĞRILMADAN ÖNCE zorlar, böylece gerçek
-// dependency grafiği gerçek bir hatadan geliyormuş GİBİ test edilebilir. TTL ile kendiliğinden
-// süresi dolar (varsayılan 5dk) — kalıcı bir "unutulmuş test" riski yok, GET() her çağrıda
-// süresi dolmuş satırları da temizler.
-model SystemHealthTestOverride {
-  id             String   @id @default(cuid())
-  scenario       String // CHAOS_SCENARIOS'taki key, ör. "program_missing"
-  targetModuleId String // registry.ts'teki node id, ör. "program"
-  forcedStatus   String // "critical" | "warning"
-  reason         String // panelde gösterilecek insan-okunur açıklama
-  activatedBy    String? // aktifleştiren kullanıcının e-postası (audit)
-  createdAt      DateTime @default(now())
-  expiresAt      DateTime
-}
-
-model HotCacheWatchdogState {
-  id           String   @id @default("singleton")
-  lastHotIdsJson Json
-  lastRunAt    DateTime @default(now()) @updatedAt
-  // 2026-09-23 — Cron Config Drift sensörü: watchdog'un GERÇEKTE ne sıklıkta çalıştığını
-  // (declared 2 saat vs. yalnız agf-sync piggyback'iyle fiilen ~6 saat) ölçebilmek için
-  // son 10 GERÇEK çalışmanın (skip edilenler DEĞİL) zaman damgası — bkz. runHotWatchdogIfDue.
-  recentRunsJson Json?
-
-  // 2026-09-24 — kullanıcı kararı: need-aware, çok-kaynaklı watchdog (agf-sync/result-sync/
-  // ingest-program HEPSİ aynı runHotWatchdogIfDue()'yu çağırabilir, ucuz due-check duplicate
-  // ağır çalışmayı engeller). Panelde "Trigger source/Processed/Skipped/Runtime/Budget hit"
-  // dürüstçe gösterilebilsin diye son GERÇEK çalışmanın özeti.
-  lastTriggerSource String?  // "agf-sync" | "result-sync" | "program-sync"
-  lastProcessed     Int?
-  lastSkipped       Int?     // syncHorseStatsCache'in "remaining" alanı — bütçe dolup işlenemeyen
-  lastRuntimeMs     Int?
-  lastBudgetHit     Boolean?
-}
-
-// 2026-09-23 — AGF Sync CRON'unun kendi çalışma geçmişi. AgfSyncState (yukarıda) yalnız
-// syncAgfForRaceInner'ın (analiz-tetiklemeli, tek-koşu) yazdığı bir tablo — /api/cron/agf-sync
-// (syncAgfForDate, günde 4 kez, TÜM şehirler) HİÇ buraya yazmıyordu, yani cron'un kendi
-// sağlığı (çalıştı mı/başarılı mı/gerçek cadence nedir) hiçbir yerden ölçülemiyordu. Bu
-// singleton SADECE cron'un kendi tetiklenme/sonuç geçmişini tutar — AgfSyncState'in yerine
-// geçmez, onunla birlikte kullanılır.
-model AgfCronRunState {
-  id             String    @id @default("singleton")
-  lastAttemptAt  DateTime?
-  lastSuccessAt  DateTime?
-  lastResultJson Json? // en son syncAgfForDate() dönüşü (AgfSyncResult) — başarılı/başarısız fark etmez
-  lastError      String?
-  recentRunsJson Json? // son 10 GERÇEK tetiklenme zaman damgası (observed cadence için)
-}
-
-// 2026-09-24 — Program Sync sensörü: /api/cron/ingest-program (ingestDate, bugün+yarın,
-// günde 6 kez) kendi çalışma geçmişini bu singleton'a yazar. AgfCronRunState/
-// HotCacheWatchdogState ile AYNI desen — Availability+Freshness için. Completeness/
-// Correctness ise BUNDAN değil, sistem-health route'unun kendi CANLI DB sorgularından
-// (source vs stored karşılaştırması) hesaplanır — cron'un "başarılı" dediğine güvenmek
-// yerine gerçekten DB'de ne olduğu ayrıca doğrulanır.
-model ProgramCronRunState {
-  id             String    @id @default("singleton")
-  lastAttemptAt  DateTime?
-  lastSuccessAt  DateTime?
-  lastDurationMs Int?
-  lastError      String?
-  lastResultJson Json? // { today: {date, cities:[{sehirId,sehirAdi,ok,races,runners,error?}]}, tomorrow: {...} }
-  recentRunsJson Json?
-}
-
-// 2026-09-24 — Result Sync sensörü: /api/cron/result-sync (syncResultsForDate, 5dk'da bir,
-// 11-21 UTC) kendi çalışma geçmişini bu singleton'a yazar. syncResultsForDate() Promise<void>
-// döndürdüğü için (kaç yarış hedeflendi/kaçı geldi gibi bir öz-rapor YOK) — bu KASITLI olarak
-// yalnız Availability/Freshness (cron çalıştı mı) için kullanılır; Completeness/Correctness
-// system-health route'unun kendi CANLI DB sorgularından (tamamlanmış yarış vs Result satırı
-// karşılaştırması) hesaplanır. "Cron HTTP 200 = HEALTHY değil" ilkesi tam burada uygulanır.
-model ResultSyncCronRunState {
-  id             String    @id @default("singleton")
-  lastAttemptAt  DateTime?
-  lastSuccessAt  DateTime?
-  lastDurationMs Int?
-  lastError      String?
-  recentRunsJson Json?
 }
 
 /**
@@ -573,73 +447,6 @@ model PredictionHistory {
   @@index([predictionId])
 }
 
-// 2026-09-22 — V5.46 LIVE Audit Protocol, FAZ E sonrası kullanıcı kararı: cache-mimarisi
-// düzeltmesinin (HOT/WARM/COLD, bkz. syncHorseStatsCache) modele giden veriyi GERÇEKTEN
-// iyileştirip iyileştirmediği yalnız FORWARD (yayından SONRAKİ, yeni) yarışlarda, tahmin
-// anında (sonuç bilinmeden) ölçülerek kanıtlanabilir — geçmişe dönük FAZ E yeniden-ölçümü
-// bunu göstermez (bkz. proje hafızası: PRE_FIX_BASELINE dondurulmuş, tekrar hesaplanmıyor).
-// Bir Prediction YAYINLANDIĞI anda (upsertPrediction, after() ile bloklamayan) bir satır
-// yazılır — Prediction'ın kendisi DEĞİŞTİRİLMEDEN, ayrı bir gözlem kaydı.
-model RaceCoverageTelemetry {
-  id                  String   @id @default(cuid())
-  raceId              String
-  predictionCreatedAt DateTime
-  raceDate            DateTime
-  hippodrome          String
-  raceClass           String
-  classTypeGroup      String
-  fieldSize           Int
-  // Yarış Gidişatı (yarisGidisatiSkoru) coverage — HAM usableAccuraceCount>=3 üzerinden,
-  // ASLA contribution'dan (β×z) türetilmez (bkz. FAZ A.1 dersi).
-  ygActiveRunnerCount Int
-  ygCoverageRatio     Float // ygActiveRunnerCount / fieldSize — saha büyüklüğü farkını gizlemesin diye bucket'a EK
-  ygStatus            String // "NONE" | "LOW" | "PARTIAL" | "FULL"
-  // Bu yarıştaki runner'ların KENDİ cache'lerinin (HorseStatsCache/HorseRaceHistoryCache)
-  // tazelik durumu — cache-mimarisi düzeltmesinin bu SPESİFİK yarışa gerçekten ulaşıp
-  // ulaşmadığının doğrudan kanıtı.
-  cacheFreshCount     Int
-  cacheStaleCount     Int
-  // Runner bazında detay: [{horse, tjkAtId, usableAccuraceCount, cacheUpdatedAt,
-  // cacheAgeHours, sourceObserved, productionEligible}]
-  runnersJson         Json
-  createdAt           DateTime @default(now())
-
-  @@index([raceDate])
-  @@index([classTypeGroup])
-  @@index([raceId])
-}
-
-// 2026-09-24 — CalibrationAuditSnapshot (bkz. proje hafızası calibration-audit-snapshot-spec):
-// V5.46'nın canlı analiz anında GERÇEKTEN aldığı kalibrasyon kararını (raw/calibrated
-// olasılık + triggerType + o anki eşik/sıcaklık sabitleri) dondurur — v5-engine.ts DB'yi
-// hiç bilmez, bu satır upsertPrediction'da (predictionId oluştuktan hemen sonra,
-// RaceCoverageTelemetry ile AYNI best-effort ilkesiyle) yazılır. Audit write BAŞARISIZ
-// olursa Prediction ASLA etkilenmez. Yalnız CHAMPION production Prediction için yazılır —
-// shadow/challenger (C1 vb.) buraya KARIŞMAZ.
-model CalibrationAuditSnapshot {
-  id           String   @id @default(cuid())
-  raceId       String
-  predictionId String   @unique
-  engineVersion String
-  createdAt    DateTime @default(now())
-
-  // runnerNo VE tjkAtId anahtarlı — ForwardCoverage'daki runnersJson deseniyle tutarlı.
-  // [{runnerNo, tjkAtId, rawProbability, calibratedProbability}]
-  probabilitiesJson Json
-
-  triggerType          String // "NOT_TRIGGERED" | "GENERAL_TRIGGERED" | "HANDIKAP_TRIGGERED" — production kodunun kendi kararı
-  leaderRawProbability Float  // triggerType kararını üreten girdi
-
-  generalThreshold  Float // o ANDAKİ production sabiti (ASIRI_GUVEN_LIDER_ESIGI) — configVersion TEK BAŞINA yetersiz
-  handikapThreshold Float // ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP
-  temperature       Float // ASIRI_GUVEN_SICAKLIGI
-
-  configVersion String? // v5-engine.ts sürüm etiketi, varsa
-  gitCommit     String? // process.env.VERCEL_GIT_COMMIT_SHA — build-info route'unun kullandığı AYNI kaynak
-
-  @@index([raceId])
-}
-
 model Pick {
   id             String         @id @default(cuid())
   predictionId   String
@@ -702,60 +509,6 @@ model ChallengerRun {
 
   @@unique([raceId, challengerKey])
   @@index([challengerKey, evaluatedAt])
-}
-
-// 2026-09-26 — SR6 Shadow Logger v1 (bkz. proje hafızası: Surprise Rescue SR6-HC).
-// T3-A (frozen) kuralının PREDICTION TIME'da (yarış başlamadan ÖNCE) tespit ettiği aday
-// anlık görüntüsü — SHADOW_ONLY: bu tablo hiçbir üretim akışını (Prediction/finalRank/
-// olasılık/kupon/HomeKupon) OKUMAZ/DEĞİŞTİRMEZ, yalnız kendi satırına yazar.
-//
-// KRİTİK İMMUTABİLİTY KURALI: aday tespit edildiğinde (ilk pre-start çalıştırmada) satır
-// BİR KEZ yazılır ve tekrar hesaplanmaz/ezilmez (ChallengerRun'ın "her pre-start
-// çalıştırmada üzerine yaz" davranışının AKSİNE) — aksi halde sonradan hindsight/leakage
-// riski doğar. Yarış başladıktan SONRA yeni satır oluşturulmaz (post-start compute
-// yasak). Sonuç geldiğinde YALNIZ actualFinishPosition/isWinner/resultFingerprint/
-// resultHistoryJson güncellenir — agfRank/nonMarketRank/surpriseScore gibi tahmin-anı
-// alanlarına ASLA dokunulmaz. TJK sonucu sonradan düzeltirse eski kanıt sessizce
-// ezilmez — resultHistoryJson'a denetlenebilir bir kayıt eklenir.
-model SR6ShadowObservation {
-  id           String  @id @default(cuid())
-  raceId       String
-  predictionId String? // best-effort bağlantı — bu cron admin analizinden BAĞIMSIZ çalışır, yayın anında Prediction her zaman var OLMAYABİLİR
-  runnerNo     Int
-
-  raceStartAt DateTime // yarışın gerçek TJK başlangıcı (raceStartAtUtc) — pre-start kanıtı olduğunu ispatlar
-  computedAt  DateTime @default(now())
-
-  engineVersion  String // "V5.46" — ana model provenance
-  ruleVersion    String // "SR6-T3A-v1" — hangi frozen kural çalıştı
-  ruleHash       String // T3-A predicate'i sessizce değişirse bu da değişir
-  dependencyHash String // formül/versiyon bağımlılığı (bkz. sr6-shadow.ts SR6_DEPENDENCY_VERSION)
-
-  agfRank               Int // piyasa (AGF) konumu
-  rawRank               Int // postprocess (AGF-trend/saf-model terfi) ÖNCESİ, yalnız olasılığa göre sıra
-  finalRankAtPrediction Int // mevcut V5.46 yayın konumu (SR6'dan ETKİLENMEZ)
-  nonMarketRank         Int // market-blind skora göre sıra
-  surpriseScore         Float // upsetScore (7 non-market sinyalin toplamı)
-  supportCount          Int // kaç bağımsız sinyal pozitif katkı verdi
-
-  alreadyTop6       Boolean // aday zaten ilk-6'da mı (müdahaleye gerek yok)
-  wouldRescueTo6    Boolean // counterfactual: Top6-dışıysa 6.sıraya taşınsaydı ne olurdu
-  displacedRunnerNo Int? // wouldRescueTo6=true ise o anki GERÇEK 6.sıradaki at
-
-  // Sonuç geldikten SONRA doldurulur — yukarıdaki alanlar bundan ETKİLENMEZ.
-  actualFinishPosition Int?
-  isWinner             Boolean?
-  resultFingerprint    String?
-  resultHistoryJson    Json? // sonuç DÜZELTİLİRSE önceki fingerprint/pozisyon buraya eklenir, ASLA sessizce silinmez
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  race Race @relation(fields: [raceId], references: [id], onDelete: Cascade)
-
-  @@unique([raceId, runnerNo, ruleVersion])
-  @@index([predictionId])
-  @@index([ruleVersion])
 }
 
 // ─── RESULT ───────────────────────────────────────────────────────────────────
@@ -1220,33 +973,4 @@ model PageView {
   @@index([userId, createdAt(sort: Desc)])
   @@index([path])
   @@index([createdAt(sort: Desc)])
-}
-
-// 2026-09-25 — System Anatomy stabilizasyon katmanı (additive, telemetri; V5.46/kupon üretimini ASLA bloklamaz).
-// syncHomeKupon'un kalıcı "son deneme/hata" durumu — Kupon sensöründeki OBSERVABILITY_GAP'i kapatır.
-model KuponSyncRunState {
-  id                String    @id @default("singleton")
-  lastAttemptAt     DateTime?
-  lastSuccessAt     DateTime?
-  lastError         String?
-  lastDurationMs    Int?
-  lastProcessed     Int? // taranan havuz sayısı
-  lastSynced        Int? // yeniden üretilen havuz sayısı
-  lastTriggerSource String? // "reconcile" | "prediction-change"
-  updatedAt         DateTime  @updatedAt
-}
-
-// Deployment Integrity Guard'ın son sonucu (arac-deploy-dogrula.mts yazar, panel okur). Otomatik rollback/tamir YOK — yalnız raporlar.
-model DeploymentIntegrityState {
-  id                 String   @id @default("singleton")
-  checkedAt          DateTime
-  ok                 Boolean
-  expectedBuildId    String?
-  liveBuildId        String?
-  productionTargetOk Boolean?
-  cronPinOk          Boolean?
-  cronScheduleOk     Boolean?
-  liveBuildOk        Boolean?
-  domainTargetOk     Boolean?
-  detailsJson        Json?
 }

@@ -368,63 +368,12 @@ async function tekKosuIsle(raceId: string) {
   console.log(`  ── Sütun sırası başlıkla eşleşir. A-Katmanı=13 skor girdisi (AGFsr..Gidşt), ayrı-mekanizmalı B-Katmanı=SireOr/ZemMsf, gösterim-amaçlı=AGFfrk/PedK/Sınıf/Takı. Satır satır tara — model sırasıyla ÇELİŞEN bir sütun varsa mutlaka belirt. ──\n`);
 }
 
-// 2026-09-22 kullanıcı talebi (V5.46 sinyal denetimi sırasında 8. koşu 55 dakika sessizce
-// askıda kaldı — bir Prisma "connection terminated" hatasından sonra retry/timeout hiç
-// yoktu, araştırma sonuçları bu yüzden güvenilmez hale geliyordu). Bu bir MODEL düzeltmesi
-// DEĞİL — yalnız bu script'in kendi çalışma biriminin (bir koşunun TAMAMI) etrafına
-// timeout+sınırlı retry+heartbeat eklendi. `gatherFaz1V5` production'da da paylaşılan
-// kod olduğu için İÇİNE dokunulmadı — yalnız bu script'teki çağrı noktası sarmalandı.
-const TEK_KOSU_TIMEOUT_MS = 5 * 60 * 1000; // 5 dk — meşru çalışma için cömert, sonsuz beklemeyi engelliyor
-const TEK_KOSU_MAX_DENEME = 3;
-const HEARTBEAT_MS = 20_000;
-
-function gecikme(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function tekKosuTimeoutlu(raceId: string): Promise<void> {
-  let heartbeatSayaci = 0;
-  const heartbeat = setInterval(() => {
-    heartbeatSayaci++;
-    console.log(`    ... (${raceId}) hâlâ çalışıyor, ${heartbeatSayaci * (HEARTBEAT_MS / 1000)}s geçti`);
-  }, HEARTBEAT_MS);
-  try {
-    let timeoutId: ReturnType<typeof setTimeout>;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => reject(new Error("TIMEOUT")), TEK_KOSU_TIMEOUT_MS);
-    });
-    try {
-      await Promise.race([tekKosuIsle(raceId), timeoutPromise]);
-    } finally {
-      clearTimeout(timeoutId!);
-    }
-  } finally {
-    clearInterval(heartbeat);
-  }
-}
-
 async function main() {
   const raceIdler = await raceIdleriBul(process.argv.slice(2));
   if (raceIdler.length === 0) { console.log("İşlenecek koşu bulunamadı."); return; }
   console.log(`${raceIdler.length} koşu işlenecek.`);
   for (const raceId of raceIdler) {
-    let basarili = false;
-    for (let deneme = 1; deneme <= TEK_KOSU_MAX_DENEME && !basarili; deneme++) {
-      try {
-        await tekKosuTimeoutlu(raceId);
-        basarili = true;
-      } catch (e) {
-        const mesaj = e instanceof Error ? e.message : String(e);
-        const sonDeneme = deneme === TEK_KOSU_MAX_DENEME;
-        console.log(
-          `  ⚠ (${raceId}) deneme ${deneme}/${TEK_KOSU_MAX_DENEME} başarısız: ${mesaj}${sonDeneme ? " — FAILED_TIMEOUT, sıradaki koşuya geçiliyor" : ""}`
-        );
-        if (!sonDeneme) {
-          const backoffMs = 2000 * 2 ** (deneme - 1); // exponential backoff: 2s, 4s, ...
-          await gecikme(backoffMs);
-        }
-      }
-    }
+    await tekKosuIsle(raceId);
   }
 }
 

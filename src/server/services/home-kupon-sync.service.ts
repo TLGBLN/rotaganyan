@@ -4,7 +4,6 @@
 // fail-safe SAYILMAZ (geçici hata/hiçbir sonraki Prediction değişikliği olmazsa kupon
 // SÜRESİZ bayat kalabilir), (2) kaçırılan HERHANGİ bir senkronu en geç 5 dakikada onarır.
 import { db } from "@/lib/db";
-import { recordKuponSyncRun } from "@/server/services/kupon-sync-state.service";
 import { syncHomeKupon } from "@/server/actions/home-kupon.actions";
 import {
   dependencyHashForRace,
@@ -26,10 +25,7 @@ import {
 
 type HomeKuponLeg = { raceNo: number; narrow: number[]; normal: number[]; wide: number[] };
 
-// 2026-09-24 — Sistem Anatomisi Kupon sensörü: gerçek stake/limit çözümleme mantığını
-// (slot===7 mi, hangi hipodrom indirimli mi) reuse etmek için dışa açıldı — sensör kendi
-// kopyasını yazmasın diye (kullanıcı talimatı: "birim bedeli sensöre hard-code etme").
-export function optimizerConfigFor(baseHippodromeName: string, slot: number) {
+function optimizerConfigFor(baseHippodromeName: string, slot: number) {
   if (slot === YEDILI_GANYAN_SLOT) {
     return { stakePerCombination: YEDILI_GANYAN_STAKE_PER_COMBINATION, limits: YEDILI_LIMITS, tolerances: YEDILI_TOLERANCES };
   }
@@ -67,8 +63,7 @@ export async function rebuildAffectedHomeKupons(raceId: string): Promise<void> {
   const affected = await findActiveHomeKuponsForRace(raceId);
   if (affected.length === 0) return;
 
-  const t0 = Date.now();
-  const settled = await Promise.allSettled(
+  await Promise.allSettled(
     affected.map((k) => {
       const legs = k.legs as unknown as HomeKuponLeg[];
       const raceNos = legs.map((l) => l.raceNo);
@@ -78,19 +73,9 @@ export async function rebuildAffectedHomeKupons(raceId: string): Promise<void> {
         slot: k.slot,
         raceNos,
         manualOverrides: k.manualOverrides ?? {},
-        source: "prediction-change",
       });
     })
   );
-  const failed = settled.filter((s) => s.status === "rejected") as PromiseRejectedResult[];
-  await recordKuponSyncRun({
-    ok: failed.length === 0,
-    durationMs: Date.now() - t0,
-    processed: affected.length,
-    synced: affected.length - failed.length,
-    error: failed.length > 0 ? String(failed[0].reason) : undefined,
-    source: "prediction-change",
-  });
 }
 
 /** 5 dakikalık reconciliation cron'unun çekirdeği — `after()`'ın kaçırdığı HERHANGİ bir
@@ -100,18 +85,6 @@ export async function rebuildAffectedHomeKupons(raceId: string): Promise<void> {
  * son düzeltmesi). Pool-start freeze BURADA da uygulanır (yalnız gereksiz iş yapmamak
  * için — asıl garanti `syncHomeKupon`'un kendi içinde). */
 export async function reconcileAllActiveHomeKupons(): Promise<{ checked: number; synced: number }> {
-  const t0 = Date.now();
-  try {
-    const result = await reconcileAllActiveHomeKuponsInner();
-    await recordKuponSyncRun({ ok: true, durationMs: Date.now() - t0, processed: result.checked, synced: result.synced, source: "reconcile" });
-    return result;
-  } catch (e) {
-    await recordKuponSyncRun({ ok: false, durationMs: Date.now() - t0, error: e instanceof Error ? e.message : String(e), source: "reconcile" });
-    throw e;
-  }
-}
-
-async function reconcileAllActiveHomeKuponsInner(): Promise<{ checked: number; synced: number }> {
   const rows = await db.homeKupon.findMany({
     where: { isActive: true, sourcePredictionsHash: { not: null } },
     select: { id: true, hippodromeName: true, date: true, slot: true, legs: true, manualOverrides: true, buildKey: true },
@@ -183,7 +156,6 @@ async function reconcileAllActiveHomeKuponsInner(): Promise<{ checked: number; s
       slot: row.slot,
       raceNos,
       manualOverrides: row.manualOverrides ?? {},
-      source: "reconcile",
     }).catch(() => { /* bir sonraki turda tekrar denenir */ });
   }
 

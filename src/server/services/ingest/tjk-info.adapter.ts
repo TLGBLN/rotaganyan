@@ -7,7 +7,6 @@ import { request } from "undici";
 import * as cheerio from "cheerio";
 import type { IngestRaceDay, IngestRace, IngestRunner, IngestIkramiyeDetay } from "./types";
 import type { Breed, Surface } from "@prisma/client";
-import { extractJokeyId } from "./tjk-jockey-stats.adapter";
 
 const BASE = "https://www.tjk.org";
 const HEADERS = {
@@ -346,10 +345,6 @@ export async function fetchCityProgram(
           const jockey = jockeyCell
             ? (jockeyCell.attr("title") || jockeyText.replace(/\s*\(A[p]?\)/gi, "")).trim() || undefined
             : undefined;
-          // 2026-09-21 — Jokey Kimlik Altyapısı (Faz J0): AYNI anchor'ın href'i TJK'nın
-          // JokeyId'sini taşıyor (atId ile BİREBİR aynı desen) — ek istek YOK, zaten indirilen
-          // sayfadan bir alan daha. extractJokeyId (tjk-jockey-stats.adapter.ts) reuse edildi.
-          const tjkJokeyId = jockeyCell ? extractJokeyId(jockeyCell.attr("href")) : undefined;
 
           const ownerCell = iOwner !== -1 && cellEls[iOwner] ? $(cellEls[iOwner]).find("a").first() : null;
           const owner = ownerCell
@@ -421,7 +416,7 @@ export async function fetchCityProgram(
 
           const ekuriGroup = ekuriMap.get(no) ?? undefined;
 
-          runners.push({ no, name, age, startNo, disaridanStart, weight, jockey, tjkJokeyId, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup, tjkAtId, equipment });
+          runners.push({ no, name, age, startNo, disaridanStart, weight, jockey, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup, tjkAtId, equipment });
         });
       }
     }
@@ -497,102 +492,4 @@ export async function ingestDate(
   }
 
   return { date: tjkDate, cities: results };
-}
-
-// 2026-09-24 — Sistem Anatomisi Program sensörü: /api/cron/ingest-program kendi çalışma
-// geçmişini (availability/freshness ölçümü için) bu singleton'a yazar — AgfCronRunState/
-// HotCacheWatchdogState ile AYNI desen. Completeness/correctness system-health route'unda
-// CANLI DB sorgularıyla ayrıca hesaplanır (bu kayda güvenilmez, yalnız "cron çalıştı mı"
-// sorusuna cevap verir).
-const PROGRAM_RECENT_RUNS_MAX = 10;
-export async function recordProgramCronRun(outcome: {
-  ok: boolean;
-  durationMs: number;
-  result?: { today: { date: string; cities: IngestCityResult[] }; tomorrow: { date: string; cities: IngestCityResult[] } };
-  error?: string;
-}): Promise<void> {
-  const { db } = await import("@/lib/db");
-  const now = new Date();
-  const prev = await db.programCronRunState.findUnique({ where: { id: "singleton" } }).catch(() => null);
-  const prevRuns = Array.isArray(prev?.recentRunsJson) ? (prev!.recentRunsJson as string[]) : [];
-  const recentRunsJson = [...prevRuns, now.toISOString()].slice(-PROGRAM_RECENT_RUNS_MAX);
-
-  await db.programCronRunState
-    .upsert({
-      where: { id: "singleton" },
-      create: {
-        id: "singleton",
-        lastAttemptAt: now,
-        lastSuccessAt: outcome.ok ? now : null,
-        lastDurationMs: outcome.durationMs,
-        lastResultJson: outcome.ok ? outcome.result : (prev?.lastResultJson ?? undefined),
-        lastError: outcome.ok ? null : (outcome.error ?? null),
-        recentRunsJson,
-      },
-      update: {
-        lastAttemptAt: now,
-        lastDurationMs: outcome.durationMs,
-        ...(outcome.ok
-          ? { lastSuccessAt: now, lastResultJson: outcome.result, lastError: null }
-          : { lastError: outcome.error ?? "bilinmeyen hata" }),
-        recentRunsJson,
-      },
-    })
-    .catch(() => {}); // yalnız izleme metriği — program ingest'i ASLA bloklamaz
-}
-
-// 2026-09-24 — kullanıcı bulgusu: `vercel crons ls`'in GERÇEK "Registered" bölümünde
-// ingest-program'ın 6 declared saatinden yalnız 3'ü (05/08/11 UTC) var — 13/15/17 hiç
-// kayıtlı değil (agf-sync'teki çok-schedule diff false-alarm'ından FARKLI, burada GERÇEK
-// bir eksik). Sonuç: 11:00'den ertesi gün 05:00'e kadar ~18 saatlik gerçek bir tetiklenme
-// boşluğu vardı — ProgramCronRunState bir gün boyunca hiç dolmamış olarak yakalandı.
-//
-// Çözüm — "Hafif + Incremental + Best-effort" ilkesi (kullanıcı kararı, 2026-09-24):
-// result-sync'in (zaten 11-21 arası çalışan, kayıtlı) `after()` kancasından SLOT-BAZLI bir
-// due-check ile çağrılır — HER result-sync turunda TAM ingest ÇALIŞTIRMAZ, yalnız declared
-// slot'lardan biri henüz karşılanmamışsa (ucuz bir DB okuması) devreye girer. Bu, "check
-// cheap, work only if due" prensibinin birebir uygulanması.
-const PROGRAM_SYNC_SLOTS_UTC = [5, 8, 11, 13, 15, 17];
-
-/** Şu ana kadar GEÇMİŞ olan (henüz gelmemiş slotlar hariç) en son declared slot'un başlangıcı. */
-function currentProgramSyncSlotStart(now: Date): Date | null {
-  const hour = now.getUTCHours();
-  const passed = PROGRAM_SYNC_SLOTS_UTC.filter((h) => h <= hour);
-  if (passed.length === 0) return null; // bugünün ilk slotu (05 UTC) henüz gelmedi
-  const slotHour = Math.max(...passed);
-  const slotStart = new Date(now);
-  slotStart.setUTCHours(slotHour, 0, 0, 0);
-  return slotStart;
-}
-
-/** result-sync'in after() kancasından çağrılır. Yalnız declared bir slot henüz
- *  karşılanmamışsa (lastSuccessAt < slotStart) GERÇEK ingest'i çalıştırır — aksi halde tek
- *  bir ucuz `findUnique` sorgusuyla çıkar. Idempotency KASITLI OLARAK basit tutuldu (tek
- *  DB satırının lastSuccessAt'i, ayrı bir lock tablosu/unique-slot anahtarı YOK) — gerçek
- *  eşzamanlı iki çalışma riski düşük (yalnız 11/13/15/17'de, birbirinden dakikalar sonra
- *  tetiklenir) ve zararı da düşük (ingestDate zaten upsert-tabanlı, TJK'nın kendi genel
- *  verisini tekrar çekip yazmak veri BOZULMASI yaratmaz, yalnız israf olur) — bu ölçekte
- *  bir DB lock eklemek "en düşük blast-radius" ilkesine aykırı olurdu. */
-export async function runProgramSyncIfDue(): Promise<{ ran: boolean; reason: string }> {
-  const { db } = await import("@/lib/db");
-  const now = new Date();
-  const slotStart = currentProgramSyncSlotStart(now);
-  if (!slotStart) return { ran: false, reason: "bugünün ilk declared slotu (05 UTC) henüz gelmedi" };
-
-  const state = await db.programCronRunState.findUnique({ where: { id: "singleton" } }).catch(() => null);
-  if (state?.lastSuccessAt && state.lastSuccessAt >= slotStart) {
-    return { ran: false, reason: `slot ${slotStart.toISOString()} zaten karşılandı (lastSuccessAt=${state.lastSuccessAt.toISOString()})` };
-  }
-
-  const tomorrow = new Date(now);
-  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-  const startedAt = Date.now();
-  try {
-    const [todayResult, tomorrowResult] = await Promise.all([ingestDate(toTjkDate(now)), ingestDate(toTjkDate(tomorrow))]);
-    await recordProgramCronRun({ ok: true, durationMs: Date.now() - startedAt, result: { today: todayResult, tomorrow: tomorrowResult } });
-    return { ran: true, reason: `slot ${slotStart.toISOString()} fallback (result-sync piggyback) ile karşılandı` };
-  } catch (err) {
-    await recordProgramCronRun({ ok: false, durationMs: Date.now() - startedAt, error: String(err) }).catch(() => {});
-    return { ran: false, reason: `hata: ${String(err)}` };
-  }
 }

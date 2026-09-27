@@ -82,13 +82,6 @@ export async function evaluateChallengerRuns(): Promise<ChallengerEvaluationRapo
     if (actualOrder.length === 0) continue;
     const championOutput = run.championSnapshot as unknown as RunOzet;
     const challengerOutput = run.challengerOutput as unknown as RunOzet;
-    // 2026-09-24 — Sistem Anatomisi Model Health sensörünü bağlarken bulundu: eski bir
-    // backfill script'inin ("anormal-pist-risk-backfill-v1") bıraktığı satırlarda bu
-    // alanlar RunOzet dizisi DEĞİL — metrikleriHesapla'nın `for...of` döngüsü bunlarla
-    // TypeError fırlatıp TÜM challengerKey'lerin raporunu (C1 dahil, ilgisiz olmasına
-    // rağmen) çökertiyordu. Şekli bozuk satırlar sessizce atlanır, geçerli veriler
-    // etkilenmez.
-    if (!Array.isArray(championOutput) || !Array.isArray(challengerOutput)) continue;
 
     if (!championGrouped.has(run.challengerKey)) championGrouped.set(run.challengerKey, []);
     if (!challengerGrouped.has(run.challengerKey)) challengerGrouped.set(run.challengerKey, []);

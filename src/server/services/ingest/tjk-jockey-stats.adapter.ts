@@ -17,11 +17,6 @@ const HEADERS = {
 
 export type TjkJockeyRow = {
   jockey: string;
-  // 2026-09-21 — Jokey Kimlik Altyapısı (Faz J0): TJK'nın kendi JokeyId'si, isim
-  // hücresindeki <a href>'ten ("...JokeyIstatistikleri?...QueryParameter_JokeyId=1504&
-  // QueryParameter_JokeyAdi=..."). Additive/opsiyonel — mevcut tüketiciler (syncJockeyStatsFromTjk)
-  // bu alanı görmezden gelmeye devam eder, hiçbir davranış değişmedi.
-  jokeyId?: number;
   races: number;
   wins: number;
   place2: number;
@@ -40,21 +35,6 @@ function num(text: string): number {
   return parseInt(text.replace(/\./g, "").trim(), 10) || 0;
 }
 
-// Deterministic URLSearchParams tabanlı çıkarım (kırılgan regex yerine, kullanıcı talebi
-// 2026-09-21) — href göreli/tam olabilir, query kısmını "?" sonrasından ayırıp parse ediyoruz.
-// export edildi: tjk-info.adapter.ts (günlük program sayfası) AYNI href deseniyle jockey
-// hücresinden ID çıkarırken bunu reuse ediyor — iki ayrı regex/parse mantığı tutulmasın diye.
-export function extractJokeyId(href: string | undefined): number | undefined {
-  if (!href) return undefined;
-  const qIdx = href.indexOf("?");
-  if (qIdx === -1) return undefined;
-  const params = new URLSearchParams(href.slice(qIdx + 1));
-  const raw = params.get("QueryParameter_JokeyId");
-  if (!raw) return undefined;
-  const id = Number(raw);
-  return Number.isInteger(id) && id > 0 ? id : undefined;
-}
-
 function parseRows(html: string): TjkJockeyRow[] {
   // Sayfa 2+ yanıtları çıplak <tbody><tr>... döner (tablosuz); cheerio bunu
   // <table> olmadan doğru ayrıştıramıyor, satırları sessizce kaybediyor.
@@ -62,13 +42,11 @@ function parseRows(html: string): TjkJockeyRow[] {
   const rows: TjkJockeyRow[] = [];
   $("tr").each((_, tr) => {
     const $tr = $(tr);
-    const anchor = $tr.find("td.sorgu-JokeyIstatistikleri-JokeyAdi a");
-    const jockey = anchor.text().trim();
+    const jockey = $tr.find("td.sorgu-JokeyIstatistikleri-JokeyAdi a").text().trim();
     if (!jockey) return;
     const cell = (cls: string) => $tr.find(`td.sorgu-JokeyIstatistikleri-${cls}`).text().trim();
     rows.push({
       jockey,
-      jokeyId: extractJokeyId(anchor.attr("href")),
       races: num(cell("KosuAdet")),
       wins: num(cell("derece1")),
       place2: num(cell("derece2")),

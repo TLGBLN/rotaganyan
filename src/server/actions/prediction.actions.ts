@@ -33,13 +33,6 @@ export type PickInput = {
   probTop3?: number;
   marketBlindProb1?: number;
   featureSnapshot?: Prisma.InputJsonValue;
-  // 2026-09-24 — CalibrationAuditSnapshot (bkz. proje hafızası calibration-audit-snapshot-spec):
-  // probTop2/probTop3/marketBlindProb1 ile BİREBİR AYNI round-trip deseni — test-v5-engine/route.ts'te
-  // canlı analiz anında hesaplanır, V5AnalysisPanel bunu AYNEN taşır. DB'den SONRADAN türetilmez
-  // (bkz. spec'teki Bulgu 3) — sunucu tarafında yazılmadan ÖNCE doğrulanır (rank/sum/triggerType tutarlılığı).
-  rawProbability?: number;
-  triggerType?: "NOT_TRIGGERED" | "GENERAL_TRIGGERED" | "HANDIKAP_TRIGGERED";
-  leaderRawProbability?: number;
 };
 
 type PredictionInput = {
@@ -429,24 +422,6 @@ export async function upsertPrediction(input: PredictionInput) {
   // published durumunu yansıtması için publish denemesinden SONRA çağrılıyor.
   syncKarmaMirrors(predictionId).catch(console.error);
 
-  // 2026-09-24 — CalibrationAuditSnapshot (bkz. proje hafızası calibration-audit-snapshot-spec):
-  // rawProbability/triggerType/leaderRawProbability zaten completedPicks içinde (client
-  // round-trip'inden) — DB'den YENİDEN TÜRETİLMEZ, ekstra hesap YOK. AMA gerçek tarayıcı
-  // E2E testinde (2026-09-24) düz fire-and-forget (.catch()) DENENDİ ve BAŞARISIZ ÇIKTI:
-  // Server Action response döndükten SONRA await edilmeyen promise'in TAMAMLANACAĞI
-  // Next.js/Vercel'de GARANTİ DEĞİL (tam olarak after()'ın var olma sebebi budur) —
-  // captureRaceCoverageTelemetry zaten bu yüzden after() kullanıyordu, biz de AYNI
-  // GÜVENİLİR deseni kullanmalıyız. Best-effort ilkesi DEĞİŞMEDİ (hata Prediction'ı asla
-  // etkilemez) — yalnız "ne zaman/nasıl çalıştığı" garantisi after()'a taşındı.
-  after(async () => {
-    try {
-      const { captureCalibrationAuditSnapshot } = await import("@/server/services/calibration-audit-snapshot.service");
-      await captureCalibrationAuditSnapshot(predictionId, input.raceId, completedPicks);
-    } catch (e) {
-      console.error("[upsertPrediction] captureCalibrationAuditSnapshot hata:", e);
-    }
-  });
-
   // Bu yarışın sonucu zaten varsa (ör. eski, sonuçlanmış bir tahmin sonradan düzeltildi),
   // hitTop1/hitInCoupon'u GÜNCEL picks'e göre yeniden hesapla — bkz. recomputeHitStatsForRace
   // yorumu, kullanıcı denetimi 2026-07-27'de bu alanların bayat kalabildiği bulundu.
@@ -463,32 +438,6 @@ export async function upsertPrediction(input: PredictionInput) {
       await rebuildAffectedHomeKupons(input.raceId);
     } catch (e) {
       console.error("[upsertPrediction] rebuildAffectedHomeKupons hata:", e);
-    }
-  });
-
-  // 2026-09-22 — V5.46 LIVE Audit Protocol FAZ sonrası: Forward Coverage Telemetry
-  // (bkz. race-coverage-telemetry.service.ts) — cache-mimarisi düzeltmesinin modele giden
-  // veriyi gerçekten iyileştirdiğini yalnız YENİ tahminlerde, sonuç bilinmeden ölçmek için.
-  after(async () => {
-    try {
-      const { captureRaceCoverageTelemetry } = await import("@/server/services/race-coverage-telemetry.service");
-      await captureRaceCoverageTelemetry(input.raceId);
-    } catch (e) {
-      console.error("[upsertPrediction] captureRaceCoverageTelemetry hata:", e);
-    }
-  });
-
-  // 2026-09-26 — SR6 Shadow Logger (bkz. proje hafızası: Surprise Rescue SR6-HC): V5.46
-  // sıralaması bu raceId için (yeniden) hesaplanmış olabilir — T3-A adayı GERÇEK, güncel
-  // veriyle değerlendirilsin diye best-effort tetik. SHADOW_ONLY: Prediction/finalRank/
-  // olasılık/kupon'a hiç dokunmaz, kendi ayrı tablosuna yazar. Aday zaten kayıtlıysa
-  // (immutable) veya AGF henüz usable değilse no-op — hata Prediction'ı ASLA etkilemez.
-  after(async () => {
-    try {
-      const { tryRecordSr6ShadowObservation } = await import("@/server/services/sr6-shadow-log.service");
-      await tryRecordSr6ShadowObservation(input.raceId);
-    } catch (e) {
-      console.error("[upsertPrediction] tryRecordSr6ShadowObservation hata:", e);
     }
   });
 

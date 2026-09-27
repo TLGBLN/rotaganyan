@@ -70,12 +70,7 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
   // varyantları burada TEKRAR filtrelemek getKuponOnerileri'nin (race.service.ts) 20dk
   // görünür-kalma kuralını EZİYORDU — sunucu zaten doğru filtrelenmiş veriyi gönderiyor,
   // burada yalnız "filled" (admin gerçekten at girmiş mi) kontrolü yeterli.
-  // 2026-09-26 kullanıcı talebi: sayfa açıldığında tutan/devam eden (hit/pending)
-  // varyantlar ÖNDE, yatan (miss) varyantlar EN ARKADA görünsün — hem sekme SIRASI hem
-  // varsayılan AÇIK sekme buna göre belirlenir (Array.sort STABIL olduğu için aynı
-  // durumdaki varyantlar arasında Ekonomik/Normal/Geniş sırası KORUNUR).
-  const STATUS_RANK: Record<KuponStatus, number> = { hit: 0, pending: 0, miss: 1 };
-  const visibleVariants = data.variants.filter((v) => v.filled).sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status]);
+  const visibleVariants = data.variants.filter((v) => v.filled);
   const [activeKey, setActiveKey] = useState(visibleVariants[0]?.key);
   if (visibleVariants.length === 0) return null;
 
@@ -232,10 +227,7 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
                   <div className="space-y-1.5 text-sm font-semibold">
                     {leg.nos.map((no) => {
                       const ekuriWinnerNo = leg.ekuriWinnerByNo[no];
-                      // 2026-09-25 kullanıcı bulgusu (Bursa 3. Koşu — 5/15/19 üçlü eküri):
-                      // bu alan artık TÜM grup ortaklarını taşıyor (bkz. buildEkuriPartnerMap),
-                      // 2 üyeli gruplarda eskisi gibi tek ortak, 3+ üyeli gruplarda hepsi görünür.
-                      const ekuriPartnerNos = leg.ekuriPartnerByNo[no];
+                      const ekuriPartnerNo = leg.ekuriPartnerByNo[no];
                       return (
                         <div key={no}>
                           {leg.winnerNos.includes(no) ? (
@@ -249,12 +241,12 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
                             <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-hit px-1.5 text-white text-xs font-bold">
                               {no}-{ekuriWinnerNo}
                             </span>
-                          ) : ekuriPartnerNos != null && ekuriPartnerNos.length > 0 ? (
+                          ) : ekuriPartnerNo != null ? (
                             // 2026-09-01 kullanıcı talebi: sonuç gelmeden ÖNCE de, kupon
                             // yayınlandığı anda eküri ortağı otomatik "no-ortak" olarak
                             // görünsün (henüz kazanmadığı için nötr renk).
                             <span className={cn("font-semibold", missed && "text-muted-foreground line-through")}>
-                              {no}-{ekuriPartnerNos.join("-")}
+                              {no}-{ekuriPartnerNo}
                             </span>
                           ) : (
                             <span className={missed ? "text-muted-foreground line-through" : undefined}>{no}</span>

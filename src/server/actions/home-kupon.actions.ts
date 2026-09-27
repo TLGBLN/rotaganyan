@@ -24,6 +24,7 @@ import {
   manualOverridesHash,
   pruneToEligible,
   buildKey as computeBuildKey,
+  poolStartTime,
   type ManualOverridesMap,
   type DependencyRaceInput,
 } from "@/lib/methodology/kupon-dependency-hash";
@@ -123,18 +124,7 @@ function toDependencyInput(legs: ScopedLeg[]): DependencyRaceInput[] {
 }
 
 export type SyncHomeKuponResult =
-  // 2026-09-25 kullanıcı bulgusu (Bursa 7'li Ganyan) — admin ekranındaki `selections`
-  // publish sonrası HİÇ GÜNCELLENMİYORDU: sunucu manualOverrides'ı yalnız DOKUNULAN
-  // genişlikte (ör. Ekonomik) onurluyor, dokunulmayan genişlikler (Normal/Geniş) HER
-  // publish'te SIFIRDAN, kısıtsız DP ile yeniden hesaplanıyor — bu genişlik-başına
-  // "taze hesapla" davranışı KASITLI (bkz. plan), ama admin'in ekranı bunu hiç
-  // YANSITMIYORDU: "Kupon Oluştur"a bastıktan sonra tablo hâlâ publish-ÖNCESİ (ör.
-  // Ekonomik'te 7 at) durumu gösteriyor, oysa DB'ye/siteye GERÇEKTE farklı bir seçim
-  // (ör. 3 at) yazılmış oluyordu — admin ekranı ile canlı kupon SESSİZCE ayrışıyordu.
-  // Kök çözüm: `syncHomeKupon`'un GERÇEKTEN hesaplayıp kaydettiği `legs`'i sonuca
-  // ekleyip KuponForm'un bunu `selections`/`autoBaseline`'a geri yazmasını sağlamak —
-  // admin ekranı publish'ten hemen sonra HER ZAMAN gerçek yayınlanan hâli gösterir.
-  | { ok: true; homeKuponId?: string; created?: boolean; legs: HomeKuponLegInput[] }
+  | { ok: true; skipped?: "POOL_STARTED" | "UNCHANGED"; homeKuponId?: string; reactivated?: boolean; created?: boolean }
   | { ok: false; skipped?: "NO_ELIGIBLE_RUNNERS" | "RACE_CONDITION" | "CONCURRENT_GENERATION" | "POOL_NOT_FOUND" };
 
 /**
@@ -150,25 +140,23 @@ export async function syncHomeKupon(input: {
   slot: number;
   raceNos: number[];
   manualOverrides: unknown; // HAM — normalize EDİLMEMİŞ olabilir, burada normalize edilir
-  // 2026-09-25 kullanıcı bulgusu (Bursa 7'li Ganyan, "yalnız Otomatik Doldur kullandım
-  // ama publish'te manualOverrides doluydu") — hangi TETİKLEYİCİNİN (admin'in kendi
-  // "Kupon Oluştur"u mu, arka plan rebuild'i mi, 5dk reconcile mı) hangi manualOverrides
-  // ile publish ettiğine dair HİÇBİR iz yoktu; olay sonradan yalnız DB'nin son hâlinden
-  // tahmin edilmeye çalışıldı. Artık HER çağrı, kaynağıyla birlikte loglanır (Vercel
-  // fonksiyon logları) — bir sonraki "bunu ben yapmadım" durumunda kanıt aranabilir.
-  source: "admin-publish" | "prediction-change" | "reconcile";
 }): Promise<SyncHomeKuponResult> {
   const baseHippodromeName = input.hippodromeName.split(" — ")[0];
   const dateIso = input.date;
   const dateObj = new Date(dateIso + "T00:00:00.000Z");
 
-  // 2026-09-22 kullanıcı kararı — "Pool-start freeze" TAMAMEN KALDIRILDI: admin (yetkili
-  // kullanıcı) sistemde HER TÜRLÜ değişikliği, havuzun koşuları başlamış/bitmiş olsa BİLE,
-  // istediği an yapabilmeli. Eskiden burada havuz başladıysa senkron tamamen reddediliyordu
-  // ("tarihsel bütünlük" gerekçesiyle) — bu kısıtlama admin'in bilinçli isteğiyle açıkça
-  // kaldırıldı, artık bu fonksiyon ASLA "POOL_STARTED" döndürmüyor.
+  // 0) Pool-start freeze — havuz başladıktan sonra HomeKupon değişmez bir tarihsel
+  // kayıttır (bkz. plan PİVOT-2 madde 15d). Bunu değerlendirmek için raceNos'un
+  // saatlerini DB'den okumamız gerekiyor — bu sorgu ZATEN aşağıdaki fresh-read'in
+  // parçası, burada TEKRAR ETMEMEK için tek bir okuma yapıp hem freeze hem hash için
+  // kullanıyoruz.
   const scopedLegs = await getRaceDayLegsForRaceNos(baseHippodromeName, dateObj, input.raceNos);
   if (scopedLegs.length === 0) return { ok: false, skipped: "POOL_NOT_FOUND" };
+
+  const startTime = poolStartTime(dateIso, scopedLegs.map((l) => l.time));
+  if (startTime && Date.now() >= startTime.getTime()) {
+    return { ok: true, skipped: "POOL_STARTED" };
+  }
 
   const optimizerConfig = optimizerConfigFor(baseHippodromeName, input.slot);
   const startHash = dependencyHashForRace(toDependencyInput(scopedLegs), optimizerConfig);
@@ -177,17 +165,34 @@ export async function syncHomeKupon(input: {
   const overridesHash = manualOverridesHash(manualOverrides);
   const key = computeBuildKey(input.hippodromeName, input.slot, dateIso, startHash, overridesHash);
 
-  console.log(
-    `[syncHomeKupon] ${input.source} — ${input.hippodromeName} (${dateIso}, slot ${input.slot}) manualOverrides=${JSON.stringify(manualOverrides)}`
-  );
+  // 5) Cheap idempotency ön-eleme — bu generation ZATEN üretilmiş mi?
+  const existing = await db.homeKupon.findUnique({ where: { buildKey: key } });
+  if (existing) {
+    if (existing.isActive) return { ok: true, skipped: "UNCHANGED", homeKuponId: existing.id };
 
-  // 2026-09-22 kullanıcı kararı — idempotency ön-eleme ("buildKey zaten var, no-op say")
-  // TAMAMEN KALDIRILDI: admin manuel bir düzenleme yapıp "Kupon Oluştur"a her bastığında
-  // (aynı buildKey üretse BİLE) YENİDEN üretilip yayınlanmalı — eski "UNCHANGED" davranışı
-  // admin'in bilinçli tekrar-yayın isteğini sessizce engelliyordu. isActive/pasif kavramı
-  // da kaldırıldı — bir havuz için DAİMA yalnız TEK satır tutulur (aşağıdaki atomik
-  // transaction eski satır(lar)ı SİLER, yeni satırı oluşturur); public sorgular yalnız
-  // "bu pool için satır var mı" bakar, isActive filtresi artık biçimsel (her zaman true).
+    // İNAKTİF bir eşleşme bulundu — reactivate'ten HEMEN ÖNCE TOCTOU kontrolü (PİVOT-2
+    // madde 15b): context bu aradan geçen sürede DEĞİŞMEDİ mi?
+    const recheckLegs = await getRaceDayLegsForRaceNos(baseHippodromeName, dateObj, input.raceNos);
+    const currentHashForReactivate = dependencyHashForRace(toDependencyInput(recheckLegs), optimizerConfig);
+    if (currentHashForReactivate !== startHash) {
+      return { ok: false, skipped: "RACE_CONDITION" };
+    }
+    try {
+      await db.$transaction([
+        db.homeKupon.updateMany({
+          where: { isActive: true, hippodromeName: input.hippodromeName, date: dateObj, slot: input.slot, id: { not: existing.id } },
+          data: { isActive: false },
+        }),
+        db.homeKupon.update({ where: { id: existing.id }, data: { isActive: true } }),
+      ]);
+    } catch (e) {
+      if (isUniqueConstraintViolation(e)) return { ok: false, skipped: "CONCURRENT_GENERATION" };
+      throw e;
+    }
+    revalidatePath("/");
+    revalidatePath("/admin/kupon");
+    return { ok: true, homeKuponId: existing.id, reactivated: true };
+  }
 
   // 6) effectiveOverrides — yalnız DP çağrısı için, DB'ye YAZILMAZ (PİVOT-2 madde 13).
   const eligibleNosByRaceNo: Record<number, Set<number>> = {};
@@ -247,15 +252,13 @@ export async function syncHomeKupon(input: {
     return { ok: false, skipped: "RACE_CONDITION" };
   }
 
-  // 11) Atomik swap — 2026-09-22 kullanıcı kararı: eski satır(lar) artık isActive:false
-  // olarak SAKLANMIYOR, gerçekten SİLİNİYOR (yalnız son yayınlanan kalır). buildKey @unique
-  // VE homekupon_one_active_per_pool kısmi index'i (raw SQL, bkz. plan) EŞZAMANLI farklı
-  // generation'lara karşı hâlâ korur (partial index isActive:true'ya göre kurulu, yeni
-  // satır her zaman isActive:true olduğu için koruma AYNEN geçerli).
+  // 11) Atomik swap — buildKey @unique VE homekupon_one_active_per_pool kısmi index'i
+  // (raw SQL, bkz. plan) EŞZAMANLI farklı generation'lara karşı korur.
   try {
     const created = await db.$transaction(async (tx) => {
-      await tx.homeKupon.deleteMany({
-        where: { hippodromeName: input.hippodromeName, date: dateObj, slot: input.slot },
+      await tx.homeKupon.updateMany({
+        where: { isActive: true, hippodromeName: input.hippodromeName, date: dateObj, slot: input.slot },
+        data: { isActive: false },
       });
       return tx.homeKupon.create({
         data: {
@@ -272,7 +275,7 @@ export async function syncHomeKupon(input: {
     });
     revalidatePath("/");
     revalidatePath("/admin/kupon");
-    return { ok: true, homeKuponId: created.id, created: true, legs };
+    return { ok: true, homeKuponId: created.id, created: true };
   } catch (e) {
     if (isUniqueConstraintViolation(e)) return { ok: false, skipped: "CONCURRENT_GENERATION" };
     throw e;
@@ -497,8 +500,35 @@ export async function publishHomeKupon(input: HomeKuponInput): Promise<SyncHomeK
     slot: input.slot,
     raceNos: input.raceNos,
     manualOverrides: input.manualOverrides,
-    source: "admin-publish",
   });
+}
+
+export async function setActiveHomeKupon(id: string) {
+  await requireRole("EDITOR");
+
+  const target = await db.homeKupon.findUnique({ where: { id }, select: { slot: true, hippodromeName: true } });
+  if (!target) return;
+
+  await db.$transaction([
+    // Sadece AYNI hipodromun aynı slotu devre dışı kalır — bkz. publishHomeKupon.
+    db.homeKupon.updateMany({
+      where: { isActive: true, slot: target.slot, hippodromeName: target.hippodromeName },
+      data: { isActive: false },
+    }),
+    db.homeKupon.update({ where: { id }, data: { isActive: true } }),
+  ]);
+
+  revalidatePath("/");
+  revalidatePath("/admin/kupon");
+}
+
+export async function deactivateHomeKupon(id: string) {
+  await requireRole("EDITOR");
+
+  await db.homeKupon.update({ where: { id }, data: { isActive: false } });
+
+  revalidatePath("/");
+  revalidatePath("/admin/kupon");
 }
 
 export async function deleteHomeKupon(id: string) {

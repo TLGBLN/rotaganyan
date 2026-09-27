@@ -37,7 +37,7 @@ export async function runVeriDenetimi(): Promise<{ sorunlu: string[]; bildirimGo
         type: "SYSTEM" as const,
         title: "Veri Tamlığı uyarısı",
         body: `Son 7 günde eşiğin (%${ESIK_YUZDE}) altına düşen ${sorunlular.length} alan var:\n${baslikliListe.join("\n")}`,
-        link: "/admin/system-anatomy#veri-tamligi",
+        link: "/admin/veri-tamligi",
       })),
     });
   }

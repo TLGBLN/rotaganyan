@@ -1,5 +1,4 @@
 import { db } from "@/lib/db";
-import { unstable_cache } from "next/cache";
 import { startOfDay, endOfDay, subDays } from "date-fns";
 import { turkeyDateString } from "@/lib/tz";
 import type { Prisma, Confidence } from "@prisma/client";
@@ -11,7 +10,6 @@ import { breedToIrk, surfaceToPist, mesafeBucket, havuzAnahtari, eslestirSireSta
 import { fetchTodaysAltiliResults } from "./ingest/tjk-altili.adapter";
 import { findIkramiyeForHippodrome } from "@/lib/altili-match";
 import { hesaplaYarisGidisati, type AtTempoProfili, type TekYarisStil, type TempoSenaryosu } from "@/lib/methodology/pace-analizi";
-import { poolStartTime } from "@/lib/methodology/kupon-dependency-hash";
 
 /** Runner.raceStyle JSON alanından ("style" + "percent" + "veri" + "dagilim") ekranda
  *  gösterilecek değeri çıkarır. dagilim (2026-09-01, Yarış Gidişatı çalışmasıyla eklendi) —
@@ -421,10 +419,9 @@ export type KuponLeg = {
   // no'suna eşler (yalnız dolaylı/eküri yoluyla kazananlar için — gerçek kazananlar zaten
   // winnerNos'ta, burada tekrar yer almaz).
   ekuriWinnerByNo: Record<number, number>;
-  /** 2026-09-01 kullanıcı talebi — sonuç gelmeden ÖNCE de: seçili bir no'nun eküri ortak(lar)ı
-   *  varsa (grup arkadaşları, 2+ üyeli gruplarda TÜMÜ), sonuç bağımsız burada gösterilir
-   *  (bkz. buildEkuriPartnerMap). */
-  ekuriPartnerByNo: Record<number, number[]>;
+  /** 2026-09-01 kullanıcı talebi — sonuç gelmeden ÖNCE de: seçili bir no'nun eküri ortağı
+   *  varsa (grup arkadaşı), sonuç bağımsız burada gösterilir (bkz. buildEkuriPartnerMap). */
+  ekuriPartnerByNo: Record<number, number>;
 };
 export type KuponStatus = "hit" | "miss" | "pending";
 export type KuponVariant = {
@@ -462,10 +459,7 @@ const YEDILI_GANYAN_STAKE_PER_COMBINATION = 2;
 const DUSUK_UCRETLI_HIPODROMLAR = ["Diyarbakır", "Şanlıurfa", "Elazığ"];
 const ALTILI_STAKE_DUSUK = 1;
 
-// 2026-09-24 — Sistem Anatomisi Kupon sensörü: bu, kuponun GERÇEK anasayfa gösterim
-// ücretini çözen fonksiyon — sensör bunu GENERATOR tarafının (optimizerConfigFor,
-// home-kupon-sync.service.ts) çözdüğü ücretle karşılaştırıp "cost mismatch" tespit ediyor.
-export function stakeForHippodromeLabel(hippodromeName: string): number {
+function stakeForHippodromeLabel(hippodromeName: string): number {
   if (hippodromeName.includes("7'li Ganyan")) return YEDILI_GANYAN_STAKE_PER_COMBINATION;
   return DUSUK_UCRETLI_HIPODROMLAR.some((h) => hippodromeName.includes(h)) ? ALTILI_STAKE_DUSUK : ALTILI_STAKE_PER_COMBINATION;
 }
@@ -474,16 +468,10 @@ export function stakeForHippodromeLabel(hippodromeName: string): number {
  * 2026-09-01 kullanıcı talebi: "kupon yayınlandığında eküri seçilmişse yanında eküri de
  * otomatik belirtilsin" — SONUÇ gelmeden ÖNCE bile, bir seçili no'nun eküri ortağı varsa
  * gösterilebilsin diye. buildEkuriWinnerMap'ten farkı: kazanan olup olmadığına bakmadan,
- * AYNI GRUPTAKİ HER atı karşılıklı eşler.
- *
- * 2026-09-25 kullanıcı bulgusu (Bursa 3. Koşu — GÜZEL HUYLUM(5)/İHTİMAL(15)/SIRTAŞI(19)
- * ÜÇLÜ eküri): eski kod `nos.find(n => n !== no)` ile yalnız İLK ortağı alıyordu — 3+
- * üyeli bir grupta üçüncü (ve sonraki) üyeler SESSİZCE düşüyordu (15 seçilince ekranda
- * yalnız "15-5" görünüyordu, 19 hiç görünmüyordu). Artık HER üyeye, grubun DİĞER TÜM
- * üyelerinin listesi eşleniyor.
+ * AYNI GRUPTAKİ HER atı karşılıklı eşler (grup 2+ üyeliyse ilk ortağı alır).
  */
-function buildEkuriPartnerMap(runners: { no: number; ekuriGroup: number | null }[]): Record<number, number[]> {
-  const map: Record<number, number[]> = {};
+function buildEkuriPartnerMap(runners: { no: number; ekuriGroup: number | null }[]): Record<number, number> {
+  const map: Record<number, number> = {};
   const byGroup = new Map<number, number[]>();
   for (const r of runners) {
     if (r.ekuriGroup == null || r.ekuriGroup < 1) continue;
@@ -494,7 +482,7 @@ function buildEkuriPartnerMap(runners: { no: number; ekuriGroup: number | null }
   for (const nos of byGroup.values()) {
     if (nos.length < 2) continue;
     for (const no of nos) {
-      map[no] = nos.filter((n) => n !== no);
+      map[no] = nos.find((n) => n !== no)!;
     }
   }
   return map;
@@ -549,7 +537,7 @@ export async function buildKuponOnerisi(active: {
   // yeşil göstermek, eşleşmeyeni (sonuç girilmiş ama kazanan seçilmemiş) "kaçtı" olarak işaretlemek için.
   // Aynı sorguda o ayağın analiz sırasını (Pick.rank) da çekiyoruz — kupondaki atlar sayı sırasına göre
   // değil, analizdeki tahmin sırasına göre dizilsin diye.
-  const resultByRaceNo = new Map<number, { winnerNo: number | null; winnerNos: number[]; resulted: boolean; ekuriWinnerByNo: Record<number, number>; ekuriPartnerByNo: Record<number, number[]> }>();
+  const resultByRaceNo = new Map<number, { winnerNo: number | null; winnerNos: number[]; resulted: boolean; ekuriWinnerByNo: Record<number, number>; ekuriPartnerByNo: Record<number, number> }>();
   const rankByRaceNo = new Map<number, Map<number, number>>();
   const races = await db.race.findMany({
     where: {
@@ -731,7 +719,7 @@ export type KazananKupon = {
  * slot için birden fazla kayıt olabildiğinden (admin güncelledikçe eski kayıt kalıyor,
  * silinmiyor) en güncel (updatedAt) olan tercih edilerek tekilleştiriliyor.
  */
-async function getGecmisKazananKuponlarHesapla(limit: number): Promise<KazananKupon[]> {
+export async function getGecmisKazananKuponlar(limit = 20): Promise<KazananKupon[]> {
   const all = await db.homeKupon.findMany({
     orderBy: [{ date: "desc" }, { updatedAt: "desc" }],
     take: limit * 6, // her kaydın hit çıkacağı/tekil olacağı garanti değil, bolluk payı
@@ -791,26 +779,6 @@ async function getGecmisKazananKuponlarHesapla(limit: number): Promise<KazananKu
   }
 
   return results.map(({ _needsIkramiye, ...r }) => r);
-}
-
-// 2026-09-25 /program performans düzeltmesi (ÖLÇÜM: TTFB ~0.5sn ama sayfa 10-16sn'de tamamlanıyordu; kuyruğu Suspense bölümlerinden "Aylık Kupon Kazancı" ~11.7sn ve
-// "İsabet Kuponlar" ~4.8sn tüketiyordu — her çağrıda YÜZLERCE kupon için ayrı DB sorgusu (buildKuponOnerisi) yeniden hesaplanıyordu). Geçmiş kuponların tuttu/tutmadı
-// sonucu nadiren değişir → "bir kez hesapla → ucuz oku": 2 dk'lık Next veri önbelleği (süre dolunca bayat değer anında servis edilir, arka planda yenilenir).
-// unstable_cache JSON serileştirir (Date → string) → dönüşte Date'e çevrilir. Next çalışma zamanı dışında (tsx araçları) önbellek yoksa doğrudan hesaplanır.
-const gecmisKazananKuponlarOnbellek = unstable_cache(
-  async (limit: number) => getGecmisKazananKuponlarHesapla(limit),
-  ["gecmis-kazanan-kuponlar-v1"],
-  { revalidate: 120, tags: ["kuponlar"] }
-);
-
-export async function getGecmisKazananKuponlar(limit = 20): Promise<KazananKupon[]> {
-  let liste: KazananKupon[];
-  try {
-    liste = await gecmisKazananKuponlarOnbellek(limit);
-  } catch {
-    return getGecmisKazananKuponlarHesapla(limit);
-  }
-  return liste.map((k) => ({ ...k, date: new Date(k.date) }));
 }
 
 /** "6'lı Ganyan 51.384,31 ₺ vermiştir." cümlesinden sayısal tutarı çıkarır (Türkçe biçim:
@@ -1082,63 +1050,10 @@ export type ProgramDay = {
   weather: string | null;
 };
 
-// 2026-09-23 kullanıcı talebi — /program'daki hipodrom sekmeleri artık alfabetik değil,
-// o günün EN ERKEN yarış saatine göre sıralanıyor (ilk koşusu önce başlayan hipodrom
-// başta). poolStartTime (kupon-dependency-hash.ts) — HomeKupon auto-sync'te "havuz
-// başladı mı" kararı için kurulmuş AYNI "HH:mm Türkiye saati → UTC" dönüşümü — burada
-// reuse ediliyor, ayrı bir saat ayrıştırıcı YAZILMADI. Hiçbir yarışının saati
-// çözülemeyen bir hipodrom (time=null) kuyruğa (alfabetik) düşer.
-function hipodromOncelikSirala<T extends { hippodrome: { slug: string; name: string }; races: { time: string | null }[] }>(
-  gunler: T[],
-  dateStr: string
-): T[] {
-  const enErkenMs = new Map<T, number>();
-  for (const gun of gunler) {
-    const start = poolStartTime(dateStr, gun.races.map((r) => r.time));
-    if (start) enErkenMs.set(gun, start.getTime());
-  }
-  return [...gunler].sort((a, b) => {
-    const ta = enErkenMs.get(a), tb = enErkenMs.get(b);
-    if (ta != null && tb != null) return ta - tb;
-    if (ta != null) return -1;
-    if (tb != null) return 1;
-    return a.hippodrome.name.localeCompare(b.hippodrome.name, "tr");
-  });
-}
-
-// 2026-09-25 /program performansı (ÖLÇÜM: sayfa kabuğu 0.8sn'de geliyor ama içerik ~5sn sonra — kritik yol: ana JOIN ~3sn + [aygır/kısrak havuzları, geç-çıkış, galoplar] ~2.5-3.4sn,
-// ardından jokey/antrenör istatistikleri). Bu YAN girdiler yavaş değişen tarihsel istatistiklerdir (günlük sync) → "bir kez hesapla → ucuz oku": kısa Next veri önbelleği
-// (süre dolunca bayat değer anında servis edilir, arka planda yenilenir). ANA JOIN (tahmin/AGF/çekilme/sonuç) ÖNBELLEĞE ALINMAZ: her açılışta taze kalır.
-// unstable_cache JSON serileştirir: Map → [k,v][] ve Date → string dönüşümleri burada geri çevrilir; Next çalışma zamanı dışında (tsx araçları) doğrudan hesaplanır.
-function mapOnbellekli<A extends unknown[], K, V>(ad: string, fn: (...a: A) => Promise<Map<K, V>>, revalidate: number) {
-  const c = unstable_cache(async (...a: A) => [...(await fn(...a)).entries()], [ad], { revalidate });
-  return async (...a: A): Promise<Map<K, V>> => {
-    try { return new Map(await c(...a)); } catch { return fn(...a); }
-  };
-}
-const sireHavuzlariOnbellekli = mapOnbellekli("prog-sire-havuz-v1", getSireStatPoolsForCombos, 600);
-const damHavuzlariOnbellekli = mapOnbellekli("prog-dam-havuz-v1", getDamStatPoolsForCombos, 600);
-const gecCikisOnbellekli = mapOnbellekli("prog-gec-cikis-v1", getGecCikisOzetleriForRace, 600);
-
-type ProgramGalopSatiri = { runnerId: string; date: Date; track: string | null; form: string | null; jockey: string | null; splits: Prisma.JsonValue };
-const galoplarOnbellek = unstable_cache(
-  async (ids: string[]) =>
-    db.gallop.findMany({ where: { runnerId: { in: ids } }, orderBy: { date: "desc" }, select: { runnerId: true, date: true, track: true, form: true, jockey: true, splits: true } }),
-  ["prog-galoplar-v1"],
-  { revalidate: 300 }
-);
-async function galoplariGetir(ids: string[]): Promise<ProgramGalopSatiri[]> {
-  try {
-    return (await galoplarOnbellek(ids)).map((g) => ({ ...g, date: new Date(g.date) }));
-  } catch {
-    return db.gallop.findMany({ where: { runnerId: { in: ids } }, orderBy: { date: "desc" }, select: { runnerId: true, date: true, track: true, form: true, jockey: true, splits: true } });
-  }
-}
-
 export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
   const date = new Date(dateStr + "T00:00:00.000Z");
 
-  const [raceDaysHam] = await Promise.all([
+  const [raceDays] = await Promise.all([
     db.raceDay.findMany({
     where: { date: { gte: startOfDay(date), lte: endOfDay(date) } },
     // v6.105 — kullanıcı bulgusu 2026-08-24 ("mobilde çok geç açılıyor"): bu derin iç içe
@@ -1186,7 +1101,6 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     orderBy: { hippodrome: { name: "asc" } },
     }),
   ]);
-  const raceDays = hipodromOncelikSirala(raceDaysHam, dateStr);
 
   // "Karma" hipodromu, gerçek koşuların kombine bahis için aynadaki (mirror) kopyasıdır —
   // idman/yarış stili senkronu "karma" için hiç çalışmaz (gerçek tekil hipodrom değil), bu
@@ -1229,10 +1143,14 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
 
   type GallopRow = { runnerId: string; date: Date; track: string | null; form: string | null; jockey: string | null; splits: Prisma.JsonValue };
   const [sirePools, damPools, gecCikisMap, allGallops] = await Promise.all([
-    sireHavuzlariOnbellekli(combos).catch(() => new Map()),
-    damHavuzlariOnbellekli(combos).catch(() => new Map()),
-    gecCikisOnbellekli(allHorseNames, date).catch(() => new Map()),
-    allRunnerIds.length === 0 ? Promise.resolve([] as GallopRow[]) : galoplariGetir(allRunnerIds).catch(() => [] as GallopRow[]),
+    getSireStatPoolsForCombos(combos).catch(() => new Map()),
+    getDamStatPoolsForCombos(combos).catch(() => new Map()),
+    getGecCikisOzetleriForRace(allHorseNames, date).catch(() => new Map()),
+    allRunnerIds.length === 0 ? Promise.resolve([] as GallopRow[]) : db.gallop.findMany({
+      where: { runnerId: { in: allRunnerIds } },
+      orderBy: { date: "desc" },
+      select: { runnerId: true, date: true, track: true, form: true, jockey: true, splits: true },
+    }).catch(() => [] as GallopRow[]),
   ]);
 
   // 2026-08-15 — kullanıcı talebi: "sadece 3 galop görmek istemiyorum, son yarış
@@ -1679,15 +1597,4 @@ export async function getAllJockeyStats(params: {
   return Object.entries(agg)
     .map(([jockey, s]) => ({ jockey, ...s, winPct: s.rides > 0 ? Math.round(s.wins / s.rides * 100) : 0 }))
     .sort((a, b) => b.winPct - a.winPct || b.rides - a.rides);
-}
-
-// 2026-09-25 — /program: jokey/antrenör yıllık istatistikleri günlük senkronla değişir (bkz. mapOnbellekli notu) → 10 dk'lık veri önbelleği. Orijinal fonksiyonlar DEĞİŞMEDİ.
-const jockeyStatsOnbellek = unstable_cache(async (names: string[]) => getJockeyStats(names), ["prog-jockey-stats-v1"], { revalidate: 600 });
-const trainerStatsOnbellek = unstable_cache(async (names: string[]) => getTrainerStats(names), ["prog-trainer-stats-v1"], { revalidate: 600 });
-
-export async function getJockeyStatsOnbellekli(names: string[]) {
-  try { return await jockeyStatsOnbellek(names); } catch { return getJockeyStats(names); }
-}
-export async function getTrainerStatsOnbellekli(names: string[]) {
-  try { return await trainerStatsOnbellek(names); } catch { return getTrainerStats(names); }
 }

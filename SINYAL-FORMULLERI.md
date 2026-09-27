@@ -29,17 +29,9 @@ Sıra `toFeatureVector()`'daki (v5-engine.ts:850) BİREBİR sıradır. **Termino
 eğitilmiş ağırlık seti + 1 Handikap override profili**:
 - **WEIGHTS_DUSUK_SART** — kategori 1a/1b (Şartlı1/19/27 + Maiden) — **eğitilmiş**
 - **WEIGHTS_DIGER** — kalan tüm koşular (pooled) — **eğitilmiş**
-- **WEIGHTS_DIGER_HANDIKAP** — kategori 2 (Handikap) — AYRI EĞİTİLMEMİŞ, AYRI bir μ/σ SETİ
-  DEĞİL: `WEIGHTS_DIGER_HANDIKAP = {...WEIGHTS_DIGER, weights: [...]}` (v5-engine.ts:270-273)
-  — `means`/`stds` WEIGHTS_DIGER'dan DEĞİŞMEDEN spread edilir, yalnız `weights` dizisinde 3
-  katsayı (Hız Derecesi, İdman-Jokey, Yarış Gidişatı) elle sıfırlanır. Yani:
-  ```
-  z_j,Handikap = (x_j − μ_j,DİĞER) / σ_j,DİĞER      (standardizasyon DİĞER'le AYNI)
-  β_j,Handikap = 0  (j ∈ {idmJokey, hizDerecesi, yarisGidisatiSkoru}), aksi halde β_j,DİĞER
-  ```
-  **2026-09-21 dış denetim düzeltmesi**: önceki metin "3 ayrı katsayı seti, segmentin
-  kendi μ/σ'sı" diyerek Handikap'ı bağımsız bir standardizasyon rejimiymiş gibi
-  gösteriyordu — YANLIŞ. Handikap = DİĞER'in μ/σ'sı + DİĞER'in β'ları + 3 cerrahi sıfırlama.
+- **WEIGHTS_DIGER_HANDIKAP** — kategori 2 (Handikap) — AYRI EĞİTİLMEMİŞ, `WEIGHTS_DIGER`
+  üzerine 3 katsayı (Hız Derecesi, İdman-Jokey, Yarış Gidişatı) elle sıfırlanarak türetilmiş
+  bir **override profili**
 - **Hibrit (Maiden/Satış)** — `agirlikSetleriSec`, ham classType'ta hem "MAIDEN"/"ŞARTLI 19"
   hem "SATIŞ" geçiyorsa `[WEIGHTS_DUSUK_SART, WEIGHTS_DIGER]` döner (ikisi de CANLI/override'lı
   halleriyle). **Doğrulandı (2026-09-18 dış denetim):** harman β_hibrit=0.5β_low+0.5β_other
@@ -54,7 +46,7 @@ eğitilmiş ağırlık seti + 1 Handikap override profili**:
 | # | Sinyal | x (ham değer) | Segment davranışı | Durum |
 |---|---|---|---|---|
 | 1 | **AGF Sırası** | `agfSirasi` (piyasa payına göre sıra) | Tüm segmentlerde fit, override yok | Kanıtlanmış (temel sinyal) |
-| 2 | **İdman-Jokey Uyumu** | `idmJokey` (0/1 — `v5-engine.ts:797`, `gecerliGaloplar.some(g => isSameJockey(g.jockey, r.jockey))` — **düzeltme (2026-09-21): "son idman"IN jokeyi DEĞİL, atın koşudan ÖNCEKİ TÜM geçerli galop kayıtlarından HERHANGİ BİRİNİN jokeyi bugünküyle SOYAD eşleşiyorsa 1** (`isSameJockey`, TR karakter normalize edilmiş soyad karşılaştırması). Eksik/hiç galop kaydı YOK veya hiçbiri eşleşmiyor → 0 (aynı davranış, iki farklı durum) | **Handikap'ta β=0** (4 bağımsız ölçütte ters/anlamsız çıktı, GA=[-10.34,-1.60] canlı-bakiye testinde; düşük-şart'ta GA=[0.102,0.372] sağlam pozitif → korunuyor) | Kanıtlanmış (segment-özel) — **AMA missing-veri sorunu** (2026-09-12 doğrulandı): hiç idman kaydı olmayan at (%32.4) İLE kaydı olup eşleşmeyen at (%55.6) AYNI 0'a düşüyor, mimari ayrım YOK |
+| 2 | **İdman-Jokey Uyumu** | `idmJokey` (0/1 — `v5-engine.ts:737`, son idman jokeyi bugünkü jokeyle SOYAD eşleşmesiyle aynı mı, `isSameJockey`) | **Handikap'ta β=0** (4 bağımsız ölçütte ters/anlamsız çıktı, GA=[-10.34,-1.60] canlı-bakiye testinde; düşük-şart'ta GA=[0.102,0.372] sağlam pozitif → korunuyor) | Kanıtlanmış (segment-özel) — **AMA missing-veri sorunu** (2026-09-12 doğrulandı): hiç idman kaydı olmayan at (%32.4) İLE kaydı olup eşleşmeyen at (%55.6) AYNI 0'a düşüyor, mimari ayrım YOK |
 | 3 | **Jokey Oranı** | `jokeyOrani` (shrinkage'lı galibiyet oranı, k=20, popülasyon ort=0.10) | Tüm segmentlerde fit | Kanıtlanmış |
 | 4 | **Antrenör Oranı** | `antrenorOrani` (aynı shrinkage, popülasyon ort=0.10) | Tüm segmentlerde fit | Kanıtlanmış |
 | 5 | **AGF Payı** | `agfPayi` (ham piyasa yüzdesi, SIRA değil BÜYÜKLÜK) | Tüm segmentlerde fit | Kanıtlanmış |
@@ -65,7 +57,7 @@ eğitilmiş ağırlık seti + 1 Handikap override profili**:
 | 10 | **Yakınsama (2+)** | `yakinsama2Plus` (0/1 — pistUzmanı + sire-top2 + at-jokey geçmiş galibiyeti + AGF-yükseliş + sınıf-düşüşünden EN AZ 2'sinin aynı atta hizalanması) | Tüm segmentlerde fit | **Kural istisnası** (MEGAFAUNA vakası) — B=500'de iki segmentte de anlamsız (nokta 0.03-0.04, GA sıfırı içeriyor) |
 | 11 | **Son İdman Sprint** | `sonIdmanSprint` (0/1 — `v5-engine.ts:743`, son idmanın TÜRÜ TJK metninde "SPRINT"/"SÜRAT" içeriyor mu, `isSprintIdman` — göreli hıza DEĞİL yalnız tür etiketine bakar) | Tüm segmentlerde fit | **Kural istisnası** (ESENYIL vakası) — backtest yönü bile doğrulamadı (n=9148, hafif negatif nokta tahmini). **Missing-veri sorunu idmJokey ile AYNI** (2026-09-12 doğrulandı): hiç idman kaydı yok (%32.4) İLE kayıt var ama sprint değil (%58.5) AYNI 0 |
 | 12 | **Takı Değişikliği** | `takiCikarildiMi - takiEklendiMi` (V5.46 birleşimi: +1=yalnız çıkarılmış, -1=yalnız eklenmiş, 0=değişiklik yok/ikisi birden) | Tüm segmentlerde fit | **Kural istisnası** (KIZIM BİNDAL vakası) — eskiden 2 ayrı sinyaldi, ikisi de anlamsızdı, V5.46'da birleştirildi |
-| 13 | **Yarış Gidişatı** | `yarisGidisatiSkoru` — **düzeltme (2026-09-21, işlem sırası netleştirildi, `pace-analizi.ts:433-437`)**: mesafe katsayısı yalnız tempo terimine değil PARANTEZİN TAMAMINA uygulanır: `x₁₃ = (stilUyumu + zorluk×tempoTasima×4) × mesafeKatsayisi`, tempoTasima verisi yoksa `x₁₃ = stilUyumu × mesafeKatsayisi`. `stilUyumu` kendisi TEK bir "stil" değil, atın stil OLASILIK DAĞILIMI (Kaçak/ÖnGrup/Bekleme/DerinBekleme) ile senaryo olasılıklarının ÇİFT toplamı: `stilUyumu = Σ_stil Σ_senaryo P(stil)×P(senaryo)×Uyum(stil,senaryo)`; `zorluk = P(MÜCADELELİ)+P(ÇOK_YÜKSEK)+P(DAĞILMA_RİSKİ)` | **Handikap'ta β=0** (Handikap DIŞI 585 koşuda GA=[0.0596,0.2775] kesin anlamlı; Handikap içi 366 koşuda ters/anlamsız GA=[-0.168,0.104] — havuzlanmış katsayı bu yüzden bıçak sırtındaydı) | Kısmen kanıtlanmış (segment-özel) — **çarpımsal alternatif form (2026-09-12) test edildi, tüm λ'larda GA sıfırı içerdi, REDDEDİLDİ, mevcut toplamsal form korundu** |
+| 13 | **Yarış Gidişatı** | `yarisGidisatiSkoru` = tempo senaryosu (Accurace geçmişinden kural-tabanlı olasılık dağılımı: Rahat Liderlik/Yavaş/Dengeli/Mücadeleli/Çok Yüksek/Dağılma Riski) × at-stil uyum matrisi + zorluk-ağırlıklı Tempo Taşıma Gücü terimi (`stilUyumu + zorluk×tempoTasima×4`) × mesafe katsayısı | **Handikap'ta β=0** (Handikap DIŞI 585 koşuda GA=[0.0596,0.2775] kesin anlamlı; Handikap içi 366 koşuda ters/anlamsız GA=[-0.168,0.104] — havuzlanmış katsayı bu yüzden bıçak sırtındaydı) | Kısmen kanıtlanmış (segment-özel) — **çarpımsal alternatif form (2026-09-12) test edildi, tüm λ'larda GA sıfırı içerdi, REDDEDİLDİ, mevcut toplamsal form korundu** |
 
 **KGS Gün (V5.47'de eklenip AYNI GÜN geri alındı, 2026-09-18) — ŞU AN CANLI DEĞİL:**
 "Son yarıştan bugüne gün sayısı" 14. özellik olarak eklenip "diğer" segmentte B=500
@@ -79,34 +71,14 @@ yeniden eklenirse izlenecek adımlar: proje hafızası `project_v547_yeni_sinyal
 
 **Ölü/çıkarılmış sinyaller (V5.46, 2026-09-12):** `kgsVarMi`, `kacakYalniz`, `h2hKiloDegisimi` — B=500 testinde üçü de tüm segmentlerde anlamsız çıktı, `toFeatureVector`'dan tamamen çıkarıldı. Ham alanlar `Faz1RunnerV5`'te hâlâ hesaplanıyor (maliyetsiz, `kgsVarMi` terfi penceresi gösteriminde kullanılıyor) — yalnız skora girmiyor.
 
-### 2a. Eksik-veri (missing) ve varsayılan kurallar (2026-09-21 dış denetim, tek yerde toplandı)
-
-Her sinyalin kodda GERÇEKTEN ne yaptığı — "tam formülasyon" bunlar olmadan eksik sayılır:
-
-| Sinyal | Eksik/varsayılan davranışı | Kaynak |
-|---|---|---|
-| `agfSirasi` | AGF verisi yoksa `sahaOrtasi = Math.ceil(runners.length/2)` (n/2, tavana yuvarlanmış) — 0 veya en kötü sıra DEĞİL, NÖTR orta sıra | v5-engine.ts:741,836 |
-| `agfPayi` | AGF verisi yoksa (`r.agf == null`) → **0** | v5-engine.ts:837 (`r.agf ?? 0`) |
-| `idmJokey` | Hiç galop kaydı yok VEYA hiçbiri eşleşmiyor → **0** (missing ile gerçek-negatif AYNI koda düşer, bkz. tablo satırı 2) | v5-engine.ts:797 |
-| `sonIdmanSprint` | En son geçerli galop kaydı yok → **0**; varsa TJK "İdman Türü" metninde `"SPRINT"`, `"SÜRAT"` veya `"SURAT"` (aksan varyantları) geçiyorsa 1 | galop-helpers.ts:95-99 (`isSprintIdman`) |
-| `zeminToleransi` | Atın Normal-dışı pist geçmişi yoksa → **0** | v5-engine.ts:864 (`?? 0`) |
-| `jokeyOrani` / `antrenorOrani` | Jokey/antrenörün hiç biniş/koşu kaydı yoksa → shrink formülü UYGULANMAZ, düz **popülasyon ortalaması ×100 = %10** | v5-engine.ts:815-822 |
-| `sireOrani` (B-katmanı) | Aygırın kendi verimizde örneklemi yoksa → shrink formülü UYGULANMAZ, ama jokey/antrenörden FARKLI olarak düz popülasyon ortalaması DEĞİL, **popülasyon ortalamasının YARISI: 0.14×100×0.5 = %7** | v5-engine.ts:811-814 |
-| `zeminMesafeDeneyim` (B-katmanı) | Bugünkü tam pist+zemin+mesafe kombinasyonunda hiç kanıt yoksa (`seviye==="yok"`) → **Δ=0** (x=0 olarak formüle GİRMEZ, ayrı bir ternary dalı) | v5-engine.ts:1434 (`bKatmaniUygula`) |
-
-**Kritik ayrım**: `sireOrani`'nin eksik-veri varsayılanı (%7, popülasyon ortalamasının YARISI)
-`jokeyOrani`/`antrenorOrani`'nin varsayılanından (%10, DÜZ popülasyon ortalaması) FARKLI —
-aynı "shrinkage" ailesinden görünen üç sinyal aslında eksik-veri durumunda İKİ FARKLI
-kural izliyor, kod-doğrulanmadan varsayılmamalı.
-
 ---
 
 ## 3. B katmanı — 2 ayrı mekanizma sinyali (softmax öncesi additive)
 
 | Sinyal | x (ham değer) | M (segment oranı) | z / merkezleme | β | Durum |
 |---|---|---|---|---|---|
-| **Sire Oranı** | `sireOrani` (`sire-stat.actions.ts` — aygırın ırk\|pist\|mesafe BAĞLAMSAL havuzunda kendi verimizden kazanma oranı, `shrink(wins, rides, POP_ORT=0.14, k=20)` — `shrink(w,r,p,k)=(w+k·p)/(r+k)` — **birim notu (2026-09-18 dış denetim doğrulaması): `shrink()` 0-1 oran döner, `v5-engine.ts:810-811`'de `×100` ile YÜZDE-PUAN ölçeğine çevrilir, standardizasyondaki μ=11.6305 AYNI ölçekte — kod doğru, birim uyuşmazlığı YOK**. **Eksik-veri (2026-09-21 eklendi): aygırın kendi verimizde HİÇ örneklemi yoksa `shrink()` formülü hiç ÇAĞRILMAZ — düz `POP_ORT×100×0.5 = %7` (popülasyon ortalamasının YARISI) atanır; bu, jokeyOrani/antrenorOrani'nin eksik-veri kuralından [düz %10, YARILANMAMIŞ] FARKLI, bkz. §2a**) | Düşük-şart (1a/1b)=1, hibrit Maiden/Satış=0.5, diğer=0 | `(sireOrani - 11.6305) / 3.6563` (gerçek z-score, std'ye bölünüyor) | 0.0477 | **Kural istisnası, kanıtsız** — n=1060 tam testte GA=[-0.1352,0.2045] sıfırı kapsıyor, kullanıcı kararıyla (AskUserQuestion teyitli) eklendi |
-| **Zemin+Mesafe Deneyimi** | `zeminMesafeDeneyim` (`zemin-mesafe-deneyimi.actions.ts` — **tam mekanizma (2026-09-21 detaylandırıldı)**: (1) atın geçmiş kayıtları önce bugünkü `pist` [CIM/KUM/SENTETIK] İLE `zeminKatsayi`'nin İKİSİNİN BİRDEN TAM (kategorik) eşleştiği kayıtlara filtrelenir (satır 239-240); (2) bu alt kümede mesafe farkı ≤`MESAFE_TOLERANS_M=100`m olanlar varsa seviye="tam" ve yalnız onlar kullanılır, yoksa seviye="kismi" ve pist+zemin eşleşen TÜM kayıtlar kullanılır; (3) her kayıt `goreliPace()` ile kilo-düzeltilmiş, ırk\|pist\|mesafe\|kategori bucket'ının popülasyon ortalamasına göre GÖRELİ pace'e çevrilir — bucket'ın kendisi `MIN_BUCKET_ORNEKLEM=5`'ten az örneklemliyse o bucket için sonuç `null` döner (goreliPace `null`); (4) değer = kullanılan kayıtların göreli pace ORTALAMASI; hiç geçerli göreli pace kalmazsa (bucket yetersiz) seviye="yok") | TÜM kategoriler=1 (veri yoksa, yani `zeminMesafeDeneyimSeviyesi==="yok"` ise 0) | **DÜZELTME (2026-09-18 dış denetim, PIECEWISE olarak netleştirildi): bu bir z-score DEĞİL, saf MERKEZLEME, VE missing durumu formüle x=0 olarak GİRMİYOR** (girmiş olsaydı 0.02×(0+0.515)=+0.0103 gibi sahte bir katkı doğardı) — kod `bKatmaniUygula:1434`'te açık ternary ile korunuyor:<br>`Δ_ZM = 0, veri yoksa (seviye==="yok")`<br>`Δ_ZM = 0.02·(x − (−0.515)), veri varsa`<br>std'ye BÖLÜNMÜYOR. `μ=-0.515`, **2026-09-12'de eklendi**, gerçek popülasyon ortalaması (n=4482). Kod DEĞİŞTİRİLMEDİ (β zaten bu ölçeğe fit edilmiş) — yeniden standardize edilirse (÷σ) β'nın SIFIRDAN yeniden fit edilmesi gerekir, eski β yeni ölçeğe taşınamaz | 0.02 | **PROVISIONAL/deneysel** — "diğer" segmentte top3'te anlamlı iyileşme (+0.53pp, GA=[0.11,1.05]) ama kullanıcı uyarısı: tek günlük B=500 sonucu nihai kanıt sayılmasın |
+| **Sire Oranı** | `sireOrani` (`sire-stat.actions.ts` — aygırın ırk\|pist\|mesafe BAĞLAMSAL havuzunda kendi verimizden kazanma oranı, `shrink()` ile AYNI Bayesian formül, POP_ORT=0.14/k=20 — **birim notu (2026-09-18 dış denetim doğrulaması): `shrink()` 0-1 oran döner, `v5-engine.ts:810-811`'de `×100` ile YÜZDE-PUAN ölçeğine çevrilir, standardizasyondaki μ=11.6305 AYNI ölçekte — kod doğru, birim uyuşmazlığı YOK**) | Düşük-şart (1a/1b)=1, hibrit Maiden/Satış=0.5, diğer=0 | `(sireOrani - 11.6305) / 3.6563` (gerçek z-score, std'ye bölünüyor) | 0.0477 | **Kural istisnası, kanıtsız** — n=1060 tam testte GA=[-0.1352,0.2045] sıfırı kapsıyor, kullanıcı kararıyla (AskUserQuestion teyitli) eklendi |
+| **Zemin+Mesafe Deneyimi** | `zeminMesafeDeneyim` (`zemin-mesafe-deneyimi.actions.ts` — bugünkü pist+zemin TAM eşleşmesi [kategorik filtre, sürekli benzerlik skoru DEĞİL] + mesafe ±100m ise "tam" yoksa "kısmi"; değer=kilo-düzeltilmiş göreli pace %, min-örneklem eşiği altında "yok") | TÜM kategoriler=1 (veri yoksa, yani `zeminMesafeDeneyimSeviyesi==="yok"` ise 0) | **DÜZELTME (2026-09-18 dış denetim, PIECEWISE olarak netleştirildi): bu bir z-score DEĞİL, saf MERKEZLEME, VE missing durumu formüle x=0 olarak GİRMİYOR** (girmiş olsaydı 0.02×(0+0.515)=+0.0103 gibi sahte bir katkı doğardı) — kod `bKatmaniUygula:1434`'te açık ternary ile korunuyor:<br>`Δ_ZM = 0, veri yoksa (seviye==="yok")`<br>`Δ_ZM = 0.02·(x − (−0.515)), veri varsa`<br>std'ye BÖLÜNMÜYOR. `μ=-0.515`, **2026-09-12'de eklendi**, gerçek popülasyon ortalaması (n=4482). Kod DEĞİŞTİRİLMEDİ (β zaten bu ölçeğe fit edilmiş) — yeniden standardize edilirse (÷σ) β'nın SIFIRDAN yeniden fit edilmesi gerekir, eski β yeni ölçeğe taşınamaz | 0.02 | **PROVISIONAL/deneysel** — "diğer" segmentte top3'te anlamlı iyileşme (+0.53pp, GA=[0.11,1.05]) ama kullanıcı uyarısı: tek günlük B=500 sonucu nihai kanıt sayılmasın |
 
 Formül: `Δ = M × β × z` (Sire Oranı'nda `M` çarpanı olarak doğrudan içeri, Zemin+Mesafe'de `M` koşullu 0/geçer olarak).
 
@@ -135,47 +107,6 @@ P_i     = exp(S'_i) / Σ_k exp(S'_k)              (nihai, gösterilen olasılık
 ```
 
 **Bu adım bir sinyal DEĞİL** — T'nin kendi bir β'sı yok, hiçbir `z` ile çarpılmıyor, `toFeatureVector`'da yer almıyor. Yalnızca SIRALAMAYI (monoton dönüşüm) değil, uç-nokta aşırı-güveni sonradan yumuşatan ayrı bir kalibrasyon kuralı. Bu yüzden 2026-08-19/26 BODUBEY/EL LEON/Handikap kalibrasyon denetimlerinin bulgusu (`v5-engine.ts` içindeki `ASIRI_GUVEN_*` sabitleri) §2/§3'teki 15 sinyalden AYRI okunmalı — "kanıtlanmış/kural istisnası" etiketleri T için geçerli değil, T tamamen farklı bir doğrulama sürecinden (kalibrasyon backtesti) geçti.
-
----
-
-## 4a. Post-processing (rank/display katmanı) — OLASILIĞA DOKUNMAZ (2026-09-21 dış denetim, eklendi)
-
-§2/§3/§4'ün ürettiği `P_i` (nihai olasılık) burada BİTER — aşağıdaki 4 fonksiyon bu
-olasılıkları hiçbir şekilde DEĞİŞTİRMEZ, yalnız `faz2V5Sirala`'nın GÖSTERİM sırasını
-(hangi at ekranda kaçıncı sırada listelenir) ve isteğe bağlı bir "terfi" etiketini
-etkiler — kod comment'i (`v5-engine.ts:1232`) bunu açıkça belirtir: "Olasılığı/skoru
-DEĞİŞTİRMEZ, yalnız GÖSTERİM sırasını etkiler". Bu yüzden §2/§5'teki "kanıtlanmış/kural
-istisnası" kanıt sınıflandırması bu 4 mekanizma için GEÇERLİ DEĞİL — her biri kendi ayrı
-backtest'inden (n ve kaynak aşağıda) geçti, ayrı bir doğrulama sınıfı:
-
-**KRİTİK AYRIM (2026-09-21 dış denetim): "kodda mevcut" ≠ "production'da aktif".** Her
-mekanizma kendi `*_AKTIF` boolean sabitiyle (v5-engine.ts) açılıp kapatılıyor — aşağıdaki
-tablo bunu ayrı bir sütunda gösterir, kod-doğrulanmıştır.
-
-| Mekanizma | Durum (kod-doğrulanmış) | Ne yapar | Kanıt |
-|---|---|---|---|
-| `agfTrendTerfisiUygula` | 🟢 **AKTİF** (`AGF_TREND_TERFISI_AKTIF=true`) | AGF Trend paneli "düşüş ama hâlâ iyi pozisyon" (agfFark≤-1.0 VE agfSirasi≤4) olan atı ilk-3/ilk-6 penceresine terfi ettirebilir | n=930, %19.9 galibiyet/%55.1 top3 vs kontrol %9.3/%28.4 |
-| `safModelDegerTerfisiUygula` | 🟢 **AKTİF** (`SAF_MODEL_DEGER_TERFISI_AKTIF=true`) | AGF-hariç "saf model" görüşü (marketBlindProb1) belirgin yüksekse terfi | `SAF_MODEL_DEGER_ESIGI=5`/`_ILK3=8` eşikleri |
-| `agfFavoriIlk3Garantisi` | 🔴 **KAPALI** (`AGF_FAVORI_ILK3_GARANTISI_AKTIF=false`) | AGF favorisi (agfSirasi=1) modelin sıralamasında ilk-3 DIŞINDA kalmışsa koşulsuz ilk-3'e alınır — kod duruyor ama ÇALIŞMIYOR | net +5/428 (V5.13) — kanıt geçerli sayılıyor ama prensip gerekçesiyle uygulanmıyor (V5.24) |
-| `derinLongshotDuzelt` | 🔴 **KAPALI** (`DERIN_LONGSHOT_DUZELTMESI_AKTIF=false`) | Sahadaki en olası aday AGF≥4 (derin longshot) ise, modelin AGF≤3 içindeki en güçlü adayına indirgenir — kod duruyor ama ÇALIŞMIYOR | net +20/448 (V5.15) — güncel veriyle tekrar test edildiğinde artık istatistiksel olarak kanıtlanamıyor da (GA sıfırı içeriyor) |
-
----
-
-## 4b. Bilinen sınırlamalar / doğrulama borcu (2026-09-21 dış denetim, konsolide)
-
-- **Hız Derecesi canlı/eğitim veri uyumsuzluğu** 2026-08-31'de düzeltildi (`hiz-derecesi-hesapla.ts`
-  train/serve ile PAYLAŞILAN tek çekirdeğe birleştirildi) — **ama düzeltmeden SONRA β'lar
-  yeniden fit EDİLMEDİ**, hâlâ düzeltme-öncesi veriyle öğrenilmiş değerler kullanılıyor. Bu
-  bir formül hatası değil, bir doğrulama borcu: düşük-şart segmentinde izole profil-refit
-  denemesi (2026-09-12) OOS'ta hem prod'dan hem sıfırdan anlamlı KÖTÜ çıktı (bkz. §5 satırı),
-  bu yüzden mevcut β KORUNUYOR ama "tam kanıtlanmış" değil, 🟡 UNSTABLE/VALIDATION PENDING
-  etiketi TAM OLARAK bu yüzden var.
-- **Düşük-şart H2H override** (β=0) ve **Handikap'ın 3 cerrahi sıfırlaması** (idmJokey/
-  hizDerecesi/yarisGidisatiSkoru) veriden ÖĞRENİLMİŞ değil, elle uygulanmış override'lar —
-  §2'deki ilgili satırlarda ayrı ayrı işaretli, burada yalnız TEK yerde toplanıyor.
-- **Eksik veri = gerçek negatif aynı koda düşme** (idmJokey, sonIdmanSprint) — §2a'da
-  detaylandırıldı, modelde bu ikisini ayırt eden bir mimari YOK (bkz. `feedback_missingness_
-  aware_idmjokey_reddedildi` — ayırt etmeyi test eden bir aday zaten reddedildi, n=1291).
 
 ---
 
@@ -214,47 +145,6 @@ Boş (—) hücreler "hiç ölçülmedi" değil, "bu oturumda BU protokolle yeni
 | Sire Oranı (B) | düşük-şart | 0.0477 (sabit) | [-0.1352,0.2045] | — | — | 0% (her zaman hesaplanır) | 🟡 Kural istisnası, kanıtsız |
 | Zemin+Mesafe (B) | tümü | 0.02 (sabit) | — | — (v6-challenger testinde top3 signStability %89.6, AYNI formül DEĞİL — dikkat) | "diğer" top3 +0.53pp[0.11,1.05] (ON/OFF ablasyon) | %83.3 (tam+kısmi eşleşme yok) | 🟡 PROVISIONAL/deneysel |
 
-## 5a. Source Observability Registry (FAZ A.2, V5.46 LIVE Audit Protocol, 2026-09-22)
-
-**Kanonik ayrım (bu audit'te kesinleşti, kalıcı standart):**
-```
-SOURCE OBSERVED ≠ MODEL ENABLED (productionEligible) ≠ CONTRIBUTION NONZERO
-```
-`gatherFaz1V5Core`'daki (v5-engine.ts) HER sinyalin ham hesaplama noktası tek tek izlenip
-`sourceObserved` (gerçek veri mi, fallback-default mi) sınırı koddan çıkarıldı — contribution'dan
-(β×z) ASLA türetilmedi (bkz. FAZ A.1: nonzero-μ'lü sinyallerde missing-default bile nonzero
-z-score üretiyor, contribution=0 güvenilir bir "veri yok" göstergesi DEĞİL).
-
-| # | Sinyal | `sourceObserved` kuralı (kod satırı) | `defaultUsed` değeri | `productionEligible` | Telemetriye bağlı mı? |
-|---|---|---|---|---|---|
-| 1 | agfSirasi | `r.agf != null` | `sahaOrtasi` (saha/2) | tümü | ❌ |
-| 2 | idmJokey | `gecerliGaloplar.length > 0` | 0 | Handikap'ta β=0 | ❌ |
-| 3 | jokeyOrani | `jockeyStat && jockeyStat.overall.rides > 0` | `JOKEY_POP_ORT*100` (%10) | tümü | ❌ |
-| 4 | antrenorOrani | `trainerStat && trainerStat.rides > 0` | `TRAINER_POP_ORT*100` (%10) | tümü | ❌ |
-| 5 | agfPayi | `r.agf != null` (agfSirasi ile AYNI kaynak) | 0 | tümü | ❌ |
-| 6 | h2hNetSkor | ⚠ **belirsiz** — `h2hNetSkorHesapla` yalnız `skor` döner, "0 karşılaşma" ile "eşit skor" AYNI 0'a düşer (fonksiyon count döndürmüyor, sourceObserved için kod değişikliği gerekir) | 0 | Düşük-Şart'ta β=0 (elle) | ❌ |
-| 7 | hizDerecesi | `hizByNo.has(r.no)` | 0 | Handikap'ta β=0 | ❌ |
-| 8 | agfPayi2 | agfPayi ile AYNI (`r.agf != null`) | 0 | tümü | ❌ |
-| 9 | zeminToleransi | `zeminToleransiByAd.has(r.name)` | 0 | tümü | ❌ |
-| 10 | yakinsama2Plus | ⚠ **kompozit, tek sınır YOK** — 5 alt-bileşenin (pistUzmaniPoz/agfTrendPoz/ajiPoz/sinifDususuPoz/sireTop2Poz) HER BİRİ kendi verisi eksikse sessizce `false`'a düşer, `sayi>=2` eşiği bunu ayırt etmez | 0 | tümü | ❌ |
-| 11 | sonIdmanSprint | `enSonGalop != null` (idmJokey ile AYNI kaynak: `gecerliGaloplar.length>0`) | 0 | tümü | ❌ |
-| 12 | takiDegisikligi | ⚠ **belirsiz** — `sonYaris == null` durumunda `takiEklendiMi`/`takiCikarildiMi` ikisi de sessizce 0'a düşer, "değişiklik yok" ile "veri yok" AYNI kod | 0 | tümü | ❌ |
-| 13 | yarisGidisatiSkoru | `usableAccuraceCount >= 3` (Accurace geçmişi, as-of raceDate) | 0 | Handikap'ta β=0 | ✅ (`RaceCoverageTelemetry`, 2026-09-22'den itibaren canlı) |
-| 14 | Sire (B) | `sireOzet?.kYuzde != null && sireOzet?.ornekKendiVeri != null` | `SIRE_POP_ORT*100*0.5` (%7) | yalnız Düşük-Şart/Hybrid (mask) | ❌ |
-| 15 | ZeminMesafe (B) | `zeminMesafeDeneyimSeviyesi !== "yok"` | 0 (z-score formülünden BAĞIMSIZ, doğrudan kısa devre — bkz. FAZ A.1) | tümü | ❌ |
-
-**Not — 4 sinyalde `sourceObserved` YAPISAL OLARAK belirsiz** (h2hNetSkor, yakinsama2Plus,
-takiDegisikligi + kısmen idmJokey): kod, "veri yok" ile "veri var ama sonuç sıfır/negatif"i
-AYNI dönüş değerine sıkıştırıyor. Bunları netleştirmek üretim kodunda değişiklik gerektirir
-(ör. `h2hNetSkorHesapla`'nın bir `karsilasmaSayisi` alanı da döndürmesi) — bu audit'te
-KOD DEĞİŞTİRİLMEDİ, yalnız belirsizlik tespit edilip kayıt altına alındı.
-
-**Telemetri kapsamı:** Şu an yalnız `yarisGidisatiSkoru` `RaceCoverageTelemetry`'ye canlı
-olarak bağlı (her yayınlanan tahminde otomatik yazılıyor). Diğer 14 mekanizma için
-`sourceObserved` kuralı burada belgelendi ama CANLI ölçülmüyor — DataRichness/
-MissingSignalBurden hesapları (FAZ D'nin coverage-bağımlı bölümleri) bu yüzden şimdilik
-yalnız yarisGidisatiSkoru için güvenilir, diğer 14 sinyal için PROVISIONAL sayılmalı.
-
 ## 6. Bu dosya nasıl güncel tutulur
 
 **KRİTİK DİSİPLİN (2026-09-12 kullanıcı kararı):** Yeni bir sinyal eklendiğinde veya bir katsayı değiştiğinde, YALNIZ §2/§3'teki formül satırı DEĞİL, **§5 Kanıt Matrisi'ndeki satır da AYNI ANDA güncellenmeli.** Biri güncellenip diğeri unutulursa, model zamanla büyüdükçe hangi parçanın kanıtlanmış/istisna/provisional olduğu bilgisi kaybolur — bu, [[feedback_engine_versions_her_degisiklikte]] kuralının BU dosyaya özel uzantısıdır.
@@ -263,37 +153,3 @@ yalnız yarisGidisatiSkoru için güvenilir, diğer 14 sinyal için PROVISIONAL 
 - Bir segment override'ı değişirse: hem "Segment davranışı" (§2/§3) hem "Durum" (§5) hücreleri birlikte güncellenir.
 - B=500/OOS testi tekrarlanıp sonuç değişirse: §5'teki GA/nokta tahmini/signStability GÜNCEL sayılarla değiştirilir — eski sayı silinir, "eskiden X'ti" notu tutulmaz (o tarihçe ENGINE_VERSIONS'ta kalır, burada yalnız ANLIK durum olur).
 - Bu dosya `ENGINE_VERSIONS` (`engine-versions.data.ts`) ile ÇAKIŞMAZ — orası sürüm geçmişi/tarihçe, burası YALNIZ mevcut canlı formülün VE mevcut kanıt seviyesinin anlık fotoğrafı.
-
-## 7. Shadow-Only Katmanlar (henüz V5.46'nın aktif formülüne DAHİL DEĞİL)
-
-Bu bölüm §2-§5'ten BİLEREK ayrı tutulur: aşağıdakiler V5.46'nın yayınlanan olasılığını/
-sıralamasını HİÇ etkilemiyor, yalnız gelecekte (forward shadow doğrulaması geçerse) bir
-sonraki katman adayı olarak KAYIT ALTINA alınıyor. §6'daki güncelleme disiplini bu bölüm
-için de geçerli — bir shadow katman canlıya alınırsa BURADAN silinip §2-§5'e taşınır.
-
-### SURPRISE RESCUE SR1 (2026-09-26)
-
-```
-Status: SHADOW_ONLY
-Production V5.46 probability: unchanged
-Production ranking: unchanged
-Candidate rule: T3-A (frozen) — agfSirasi≥5 AND nonMarketRank≤2 AND ≥4 bağımsız pozitif
-                UpsetScore bileşeni AND tek sinyal UpsetScore'un >%60'ını oluşturmuyor
-UpsetScore = C(antrenorOrani) + C(yakinsama2Plus) + C(jokeyOrani) + C(yarisGidisatiSkoru)
-             + C(hizDerecesi) + bZeminMesafeKatkisi + bSireKatkisi
-             (AGF ailesi — agfSirasi/agfPayi/agfPayi² — ve H2H/Takı/SonİdmanSprint/İdmJokey
-             BİLEREK dışlanıyor; ilki tanım gereği, sonuncular surprise-cohort ayrıştırma
-             testinde TUTARSIZ/zayıf çıktı)
-Proposed placement: yalnız Top6 dışı → 6. sıraya taşı (max 1 aday/yarış, Top1-2'ye dokunmaz)
-Discovery evidence (682 yarış, kanonik v546_race_evidence.json):
-  - T3-A tanımına toplam 50 at-girişi uyuyor (15 zaten Top3, 30 Top6-içi, 5 Top6-dışı rescue fırsatı)
-  - Rank6 yerleşimi: 5 rescue fırsatı, 2 gerçek kazandı, 0 gerçek kazanan yerinden edildi
-  - Taban (TÜM AGF≥5) kazanma oranı %3.89 → aday havuzu %40.0 (lift 10.3×)
-  - Overall Top6 %90.32→%90.62, Overall Top3 DEĞİŞMEDİ
-  - n=5 KÜÇÜK ÖRNEKLEM — üretim kanıtı DEĞİL, yalnız forward shadow'u haklı çıkaracak kadar güçlü
-Reddedilen alternatifler (aynı discovery turunda): geniş Top6 eşikleri (gevşek kriterler,
-  3 varyant hepsi NET ZARARLI — False Rescue >%95, hedef metrikte bile net kazanç yok);
-  T3-A'nın doğrudan Top3'e yerleştirilmesi (net -1, Overall Top3'ü bozuyor)
-Next step: shadow-log (candidate/rawRank/finalRank/nonMarketRank/surpriseScore/supportCount
-  + SR6-aware DP counterfactual kupon coverage karşılaştırması) — production'a HENÜZ ALINMADI
-```

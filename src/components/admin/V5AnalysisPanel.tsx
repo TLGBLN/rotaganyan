@@ -30,12 +30,6 @@ type V5At = {
   probTop2?: number;
   probTop3?: number;
   marketBlindProb1?: number;
-  // 2026-09-24 — CalibrationAuditSnapshot (bkz. proje hafızası calibration-audit-snapshot-spec):
-  // probTop2/probTop3/marketBlindProb1 ile AYNI desen — yalnız canlı API cevabında var,
-  // handleKaydet bunları AYNEN PickInput'a taşır, sunucu tarafında YENİDEN HESAPLANMAZ.
-  rawProbability?: number;
-  triggerType?: "NOT_TRIGGERED" | "GENERAL_TRIGGERED" | "HANDIKAP_TRIGGERED";
-  leaderRawProbability?: number;
   // 2026-09-01 — "Saf Model" kıyası (kullanıcı talebi, KARDAHA vakası): marketBlindProb1
   // zaten vardı ama AGF'nin kendisiyle YAN YANA kıyaslanmıyordu. agfPayi/agfSirasi bu
   // kıyası (Saf Model % vs AGF % vs nihai Piyasa-Ayarlı %) mümkün kılmak için eklendi.
@@ -294,11 +288,6 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
           probTop2: a.probTop2,
           probTop3: a.probTop3,
           marketBlindProb1: a.marketBlindProb1,
-          // 2026-09-24 — CalibrationAuditSnapshot: AYNI "yalnız canlı çalıştırmada dolu"
-          // deseni — sunucu bunları YENİDEN HESAPLAMAZ, doğrulayıp best-effort kaydeder.
-          rawProbability: a.rawProbability,
-          triggerType: a.triggerType,
-          leaderRawProbability: a.leaderRawProbability,
           // 2026-08-30 (V5.30) — Opus denetimi: tumSinyaller yalnız A katmanının 12
           // özelliğini kapsıyor, B katmanı (sireOrani/zeminMesafeDeneyim) hiç ölçülemiyordu.
           // bKatmani alanı bu boşluğu kapatıyor — canlı sonuçlar birikince B katmanı

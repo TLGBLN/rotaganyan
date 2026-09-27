@@ -81,49 +81,6 @@ export function galopTimeClass(q: GalopQuality | null): string {
   return "";
 }
 
-// İç kulvar mı — galopQuality ve galopTrend AYNI bu kontrolü kullanır (tek kaynak).
-export function isInnerTrack(g: ProgramGallop): boolean {
-  const raw = g.splits["ic_dis"] ?? "";
-  return raw.includes("İÇ") || raw.toUpperCase().includes("IC");
-}
-
-// Galop trendi — AGF Trend paneliyle AYNI mantık (kullanıcı talebi 2026-09-22): bir atın
-// en eski ve en yeni 400m finiş split'i karşılaştırılıp yükseliş/düşüş gösterilir. Yalnız
-// 400m kullanılıyor çünkü tüm galop kayıtlarında ortak/standart olan tek split bu (prep
-// mesafesi 600/800/1000 gibi kayıttan kayda değişebiliyor, doğrudan kıyaslanamaz). İç
-// kulvar telafisi (-1.0sn) galopQuality'deki AYNI kural.
-export type GalopTrend = {
-  ilkSaniye: number;
-  sonSaniye: number;
-  farkSaniye: number; // ilk - son; pozitif = hızlanıyor (yükseliş), negatif = yavaşlıyor (düşüş)
-  ilkTarih: string;
-  sonTarih: string;
-};
-
-export function galopTrend(gallops: ProgramGallop[]): GalopTrend | null {
-  // gallops sırası: en yeni ilk (mevcut ekran sıralaması) — bkz. GalopPanel.tsx.
-  const withFinish = gallops
-    .map((g) => {
-      const secs = parseGalopSec(g.splits["400"] ?? null);
-      if (secs === null) return null;
-      return { g, adjusted: isInnerTrack(g) ? secs - 1.0 : secs };
-    })
-    .filter((x): x is { g: ProgramGallop; adjusted: number } => x !== null);
-
-  if (withFinish.length < 2) return null;
-  const son = withFinish[0]!;
-  const ilk = withFinish[withFinish.length - 1]!;
-  if (son.g === ilk.g) return null;
-
-  return {
-    ilkSaniye: ilk.adjusted,
-    sonSaniye: son.adjusted,
-    farkSaniye: Math.round((ilk.adjusted - son.adjusted) * 100) / 100,
-    ilkTarih: galopDate(ilk.g),
-    sonTarih: galopDate(son.g),
-  };
-}
-
 // İdman türü (Galop/Sprint/vb., TJK "İdman Türü" alanı) — renk yalnız TÜRÜ ayırt etmek
 // için, kalite/hız anlamı TAŞIMAZ (kalite rengi yalnız galopTimeClass'ta, sürelerde).
 export function trainingTypeClass(type: string): string {

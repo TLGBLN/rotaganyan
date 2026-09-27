@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ekuriRengi } from "@/lib/ekuri-colors";
-import { KAPSAM_ESIK_ILK3, KAPSAM_ESIK_ILK6, KAPSAM_ESIK_ILK3_AMBER_UST } from "@/lib/methodology/kapsam-esikleri";
+import { KAPSAM_ESIK_ILK3, KAPSAM_ESIK_ILK6 } from "@/lib/methodology/kapsam-esikleri";
 import {
   type Width,
   WIDTHS,
@@ -77,27 +77,9 @@ function statikAyaklariBul(races: RaceDayData["races"], selections: GroupSelecti
 // burada da admin seçim yaparken görsün diye kırmızı çizgiyle işaretleniyor. `race.runners`
 // artık getRaceDayLegs'ten ZATEN puana göre (yüksekten düşüğe) sıralı geliyor — bkz.
 // home-kupon.actions.ts, 2026-09-09 düzeltmesi (eskiden Pick.rank'e göreydi, puan tablosuyla
-// tutarsızlık yaratıyordu).
-//
-// 2026-09-22 kullanıcı bulgusu (Ankara 1. Koşu — kupon oluşturma ekranı "İlk 3: %61"
-// gösterirken /admin/kupon analiz listesi AYNI koşu için "İlk 3: %70 ✓" gösteriyordu):
-// eski implementasyon `sirali.slice(0, n)` ile RAW (koşmaz dahil) diziliş sırasındaki
-// SABİT bir pencere alıyor, pencere içine bir koşmaz at düşerse onun katkısını 0
-// sayıyor ama pencereyi bir sonraki gerçek (koşmaz olmayan) ata GENİŞLETMİYORDU — bu
-// yüzden "İlk 3" ayracı 3. sırada koşmaz bir at varsa gerçek top-3'ü değil, yalnız 2
-// gerçek atı topluyordu (48.0+13.0=61, oysa gerçek top-3 eligible toplamı 48.0+13.0+
-// 9.4=70.4). Doğrusu: önce koşmaz atları TAMAMEN çıkar, SONRA ilk N'i topla — pencere
-// sabit pozisyon değil, sabit "eligible sayısı" olmalı (aşağıdaki JSX'teki ayraç
-// tetikleyicisi de aynı mantıkla eligible-sayaç kullanacak şekilde güncellendi).
-// 2026-09-27 kullanıcı denetimi: eskiden yalnız `r.score` (tam sayıya yuvarlanmış)
-// toplanıyordu — coverage risk-floor artık gerçek kupon derinliğini etkilediği için
-// (kupon-auto-fill.ts) burada da `scoreExact`'i tercih ediyoruz ki ekrandaki eşik
-// kontrolü ile gerçek DP tabanı AYNI hassasiyette hesaplansın.
+// tutarsızlık yaratıyordu). Çekilen (scratched) at kümülatif toplama katkı vermiyor.
 function kumulatifToplam(sirali: RaceRunner[], n: number): number {
-  return sirali
-    .filter((r) => !r.scratched)
-    .slice(0, n)
-    .reduce((acc, r) => acc + (r.scoreExact ?? r.score ?? 0), 0);
+  return sirali.slice(0, n).reduce((acc, r) => acc + (r.scratched ? 0 : r.score ?? 0), 0);
 }
 
 // 2026-09-13 kullanıcı bulgusu (İstanbul K5) — bkz. kupon-optimizer.ts'teki eküri-birimi
@@ -105,17 +87,6 @@ function kumulatifToplam(sirali: RaceRunner[], n: number): number {
 // AYNI eküriden iki atı ELLE de işaretleyebilir — kombinasyon/tutar hesabı da (yalnız DP
 // değil) tutarlı olsun diye burada da aynı gruplama uygulanıyor: aynı ekuriGroup'tan
 // seçilen atlar TEK kombinasyon birimi sayılır.
-// 2026-09-25 kullanıcı bulgusu (Bursa 3. Koşu — GÜZEL HUYLUM/İHTİMAL/SIRTAŞI %5.1'lik
-// İHTİMAL'in DP tarafından %6.4'lük tekil GÜLEYCANOĞLU'na tercih edilmesi kafa karıştırdı):
-// optimizer eküri grubunu TOPLAM olasılıkla (bkz. kupon-optimizer.ts ekuriBirimleriOlustur)
-// değerlendiriyor ama ekranda yalnız bireysel yüzde görünüyordu — "%5.1 nasıl %6.4'ü geçti"
-// izlenimi veriyordu. Artık grup toplamı rozette açıkça gösteriliyor.
-function ekuriGrupToplami(sirali: RaceRunner[], ekuriGroup: number): number {
-  return sirali
-    .filter((r) => !r.scratched && r.ekuriGroup === ekuriGroup)
-    .reduce((s, r) => s + (r.scoreExact ?? r.score ?? 0), 0);
-}
-
 function secilenBirimSayisi(race: RaceDayData["races"][number], secilenNolar: Set<number>): number {
   const gruplar = new Set<number>();
   let tekilSayisi = 0;
@@ -200,151 +171,78 @@ function KuponGrup({
                   <td className="px-3 py-3 align-top text-sm font-semibold whitespace-nowrap">
                     {race.raceNo}. Koşu
                   </td>
-                  {widths.map((width) => {
-                    // 2026-09-25 kullanıcı talebi (Bursa 3. Koşu vakası sonrası) — eküri grubu
-                    // üyeleri artık dağınık satırlar yerine TEK bir çerçevede yan yana gösteriliyor
-                    // (grubun ilk üyesinin sırada göründüğü YERDE, diğer üyeler o an atlanır).
-                    // Sıralama/eşik mantığına (idx, eligibleUpToHere, kumulatifToplam) HİÇ
-                    // dokunulmadı — yalnız bir grubun satırları GÖRSEL olarak birleştirildi.
-                    const renderedGroups = new Set<number>();
-                    return (
+                  {widths.map((width) => (
                     <td key={width} className="px-3 py-3 align-top">
                       <div className="flex flex-col gap-1">
                         {sirali.map((runner, idx) => {
                           const checked = sel[width].has(runner.no);
-                          // Ayracı RAW pozisyona (idx) değil, o satıra kadarki GERÇEK
-                          // (koşmaz olmayan) at sayısına göre yerleştir — bkz.
-                          // kumulatifToplam yorumu.
-                          const eligibleUpToHere = sirali.slice(0, idx + 1).filter((r) => !r.scratched).length;
-                          const showDivider =
-                            !runner.scratched &&
-                            (eligibleUpToHere === 3 || eligibleUpToHere === 6) &&
-                            idx + 1 < sirali.length;
-
-                          const isGrouped = runner.ekuriGroup != null;
-                          const alreadyRendered = isGrouped && renderedGroups.has(runner.ekuriGroup!);
-                          if (isGrouped && !alreadyRendered) renderedGroups.add(runner.ekuriGroup!);
-                          const groupMembers = isGrouped ? sirali.filter((r) => r.ekuriGroup === runner.ekuriGroup) : [runner];
-                          const groupToplam = isGrouped ? ekuriGrupToplami(sirali, runner.ekuriGroup!) : null;
-                          const temsilNolar = groupMembers.filter((m) => sel[width].has(m.no)).map((m) => m.no);
-
                           return (
                             <div key={runner.no}>
-                              {!alreadyRendered && (isGrouped ? (
-                                <div
-                                  className="flex flex-col gap-1 rounded-md border-2 border-amber-500/40 bg-amber-500/5 p-1.5"
-                                  title="Eküri — TJK kuralına göre TEK bahis birimi: gruptaki HERHANGİ biri kazanırsa bilet tutar. Optimizör bu grubu TOPLAM olasılıkla değerlendirir, tekil atlarla doğrudan karşılaştırılamaz."
-                                >
-                                  <div className="flex flex-wrap items-center gap-1 text-[9px] font-bold text-amber-600">
-                                    <span className={cn("inline-block h-1.5 w-1.5 rounded-full", ekuriRengi(runner.ekuriGroup!).badge)} />
-                                    🐴 EKÜRİ — TEK BAHİS BİRİMİ · Birim kapsaması %{groupToplam!.toFixed(1)} · 1 birim
-                                  </div>
-                                  <div className="flex flex-wrap gap-1">
-                                    {groupMembers.map((m) => {
-                                      const mChecked = sel[width].has(m.no);
-                                      return (
-                                        <button
-                                          key={m.no}
-                                          type="button"
-                                          onClick={() => !m.scratched && onToggle(race.raceNo, width, m.no)}
-                                          disabled={m.scratched}
-                                          className={cn(
-                                            "flex items-center gap-1 rounded-md border px-1.5 py-1 text-left text-xs transition-colors",
-                                            m.scratched
-                                              ? "border-muted-foreground/15 opacity-40 cursor-not-allowed"
-                                              : mChecked
-                                              ? "border-brand bg-brand text-brand-foreground"
-                                              : "border-muted-foreground/30 text-muted-foreground hover:border-brand/50 hover:text-foreground"
-                                          )}
-                                        >
-                                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-black/10 font-bold">
-                                            {m.no}
-                                          </span>
-                                          <span className={cn("truncate font-medium", m.scratched && "line-through")}>{m.name}</span>
-                                          {m.score != null && (
-                                            <span className="shrink-0 text-[10px] font-semibold tabular-nums opacity-80">
-                                              %{m.scoreExact != null ? m.scoreExact.toFixed(1) : m.score}
-                                            </span>
-                                          )}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                  <div className="text-[9px] text-muted-foreground">
-                                    Kuponda temsil: {temsilNolar.length > 0 ? temsilNolar.join(", ") : "seçilmedi"}
-                                  </div>
-                                </div>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => !runner.scratched && onToggle(race.raceNo, width, runner.no)}
-                                  disabled={runner.scratched}
-                                  className={cn(
-                                    "flex w-full items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-xs transition-colors",
-                                    runner.scratched
-                                      ? "border-muted-foreground/15 opacity-40 cursor-not-allowed"
-                                      : checked
-                                      ? "border-brand bg-brand text-brand-foreground"
-                                      : "border-muted-foreground/30 text-muted-foreground hover:border-brand/50 hover:text-foreground"
-                                  )}
-                                >
-                                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-black/10 font-bold">
-                                    {runner.no}
+                              <button
+                                type="button"
+                                onClick={() => !runner.scratched && onToggle(race.raceNo, width, runner.no)}
+                                disabled={runner.scratched}
+                                className={cn(
+                                  "flex w-full items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-xs transition-colors",
+                                  runner.scratched
+                                    ? "border-muted-foreground/15 opacity-40 cursor-not-allowed"
+                                    : checked
+                                    ? "border-brand bg-brand text-brand-foreground"
+                                    : "border-muted-foreground/30 text-muted-foreground hover:border-brand/50 hover:text-foreground"
+                                )}
+                              >
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-black/10 font-bold">
+                                  {runner.no}
+                                </span>
+                                <span className={cn("truncate font-medium", runner.scratched && "line-through")}>
+                                  {runner.name}
+                                </span>
+                                {runner.score != null && (
+                                  <span
+                                    className="shrink-0 text-[10px] font-semibold tabular-nums opacity-80"
+                                    title={runner.scoreExact != null ? "Ham (yuvarlanmamış) olasılık" : undefined}
+                                  >
+                                    {/* 2026-09-13 kullanıcı bulgusu (İstanbul K5) — yuvarlanmış
+                                        tam sayı (%11) iki farklı atı eşitmiş gibi gösterip kupon
+                                        seçiminde yanlış tercihe yol açabiliyor (gerçek: %25.6 vs
+                                        %24.8) — ondalık hane varsa göster. */}
+                                    %{runner.scoreExact != null ? runner.scoreExact.toFixed(1) : runner.score}
                                   </span>
-                                  <span className={cn("truncate font-medium", runner.scratched && "line-through")}>
-                                    {runner.name}
+                                )}
+                                {runner.agfSirasi != null && (
+                                  <span
+                                    title="AGF sırası"
+                                    className="shrink-0 rounded-sm bg-black/10 px-1 text-[9px] font-bold tabular-nums opacity-70"
+                                  >
+                                    AGF{runner.agfSirasi}
                                   </span>
-                                  {runner.score != null && (
-                                    <span
-                                      className="shrink-0 text-[10px] font-semibold tabular-nums opacity-80"
-                                      title={runner.scoreExact != null ? "Ham (yuvarlanmamış) olasılık" : undefined}
-                                    >
-                                      {/* 2026-09-13 kullanıcı bulgusu (İstanbul K5) — yuvarlanmış
-                                          tam sayı (%11) iki farklı atı eşitmiş gibi gösterip kupon
-                                          seçiminde yanlış tercihe yol açabiliyor (gerçek: %25.6 vs
-                                          %24.8) — ondalık hane varsa göster. */}
-                                      %{runner.scoreExact != null ? runner.scoreExact.toFixed(1) : runner.score}
-                                    </span>
-                                  )}
-                                  {runner.agfSirasi != null && (
-                                    <span
-                                      title="AGF sırası"
-                                      className="shrink-0 rounded-sm bg-black/10 px-1 text-[9px] font-bold tabular-nums opacity-70"
-                                    >
-                                      AGF{runner.agfSirasi}
-                                    </span>
-                                  )}
-                                  {runner.scratched && (
-                                    <span className="ml-auto shrink-0 text-[10px] text-red-400 font-semibold">Koşmaz</span>
-                                  )}
-                                </button>
-                              ))}
-                              {showDivider && (() => {
+                                )}
+                                {runner.scratched ? (
+                                  <span className="ml-auto shrink-0 text-[10px] text-red-400 font-semibold">Koşmaz</span>
+                                ) : runner.ekuriGroup != null ? (
+                                  <span title={`Eküri grubu ${runner.ekuriGroup}`} className="ml-auto shrink-0 inline-flex items-center gap-0.5 text-[10px]">
+                                    <span className={cn("inline-block h-1.5 w-1.5 rounded-full", ekuriRengi(runner.ekuriGroup).badge)} />
+                                    🐴
+                                  </span>
+                                ) : null}
+                              </button>
+                              {(idx === 2 || idx === 5) && sirali.length > idx + 1 && (() => {
                                 // 2026-09-10 kullanıcı talebi: ayraç eşik altındaysa kırmızı,
                                 // eşik ve üstündeyse yeşil olsun — RaceAdviceCard'daki rozetle
                                 // AYNI paylaşılan eşiklerden (kapsam-esikleri.ts) besleniyor.
-                                // 2026-09-27 kullanıcı düzeltmesi: "%65.0 ile %90 aynı yeşil
-                                // olmamalı" — İlk3'e 5 puanlık amber/sınırda tamponu eklendi.
-                                // Karşılaştırma HER ZAMAN exact (unrounded) toplamla yapılır,
-                                // Math.round yalnız GÖSTERİMDE — coverageFloorHesapla
-                                // (kupon-auto-fill.ts) de aynı ilkeyi paylaşıyor.
-                                const esik = eligibleUpToHere === 3 ? KAPSAM_ESIK_ILK3 : KAPSAM_ESIK_ILK6;
-                                const toplam = kumulatifToplam(sirali, eligibleUpToHere);
+                                const esik = idx === 2 ? KAPSAM_ESIK_ILK3 : KAPSAM_ESIK_ILK6;
+                                const toplam = kumulatifToplam(sirali, idx + 1);
                                 const yeterli = toplam >= esik;
-                                const sinirda = eligibleUpToHere === 3 && toplam >= KAPSAM_ESIK_ILK3 && toplam < KAPSAM_ESIK_ILK3_AMBER_UST;
-                                const renk = !yeterli ? "kirmizi" : sinirda ? "amber" : "yesil";
-                                const cizgiSinifi = { kirmizi: "bg-red-500/50", amber: "bg-amber-500/50", yesil: "bg-hit/50" }[renk];
-                                const yaziSinifi = { kirmizi: "text-red-500", amber: "text-amber-500", yesil: "text-hit" }[renk];
                                 return (
                                   <div
                                     className="my-1 flex items-center gap-1.5 px-0.5"
-                                    title={`İlk ${eligibleUpToHere} (koşmaz hariç) atın modele göre toplam kazanma olasılığı — eşik ≥%${esik}${sinirda ? ` (sınırda, ≥%${KAPSAM_ESIK_ILK3_AMBER_UST} rahat sayılır)` : ""}`}
+                                    title={`İlk ${idx + 1} atın modele göre toplam kazanma olasılığı — eşik ≥%${esik}`}
                                   >
-                                    <div className={cn("h-px flex-1", cizgiSinifi)} />
-                                    <span className={cn("shrink-0 text-[9px] font-bold tabular-nums", yaziSinifi)}>
-                                      İlk {eligibleUpToHere}: %{Math.round(toplam)} {yeterli ? (sinirda ? "⚠" : "✓") : `(eşik ≥%${esik})`}
+                                    <div className={cn("h-px flex-1", yeterli ? "bg-hit/50" : "bg-red-500/50")} />
+                                    <span className={cn("shrink-0 text-[9px] font-bold tabular-nums", yeterli ? "text-hit" : "text-red-500")}>
+                                      İlk {idx + 1}: %{Math.round(toplam)} {yeterli ? "✓" : `(eşik ≥%${esik})`}
                                     </span>
-                                    <div className={cn("h-px flex-1", cizgiSinifi)} />
+                                    <div className={cn("h-px flex-1", yeterli ? "bg-hit/50" : "bg-red-500/50")} />
                                   </div>
                                 );
                               })()}
@@ -353,8 +251,7 @@ function KuponGrup({
                         })}
                       </div>
                     </td>
-                    );
-                  })}
+                  ))}
                 </tr>
               );
             })}
@@ -436,20 +333,6 @@ function KuponGrup({
       </button>
     </div>
   );
-}
-
-// 2026-09-25 kullanıcı bulgusu (Bursa 7'li Ganyan) — bkz. SyncHomeKuponResult yorumu
-// (home-kupon.actions.ts): sunucu, dokunulmayan genişlikleri (ör. admin yalnız Ekonomik'i
-// elle düzenlediyse Normal/Geniş) HER publish'te taze/kısıtsız DP ile YENİDEN hesaplar —
-// bu kasıtlı, ama ekran bunu YANSITMIYORDU. Publish sonrası dönen GERÇEK `legs`'i bu
-// fonksiyonla `GroupSelections`'a çevirip ekrana geri yazıyoruz, admin tablo ile canlı
-// kupon arasında sessiz bir ayrışma kalmasın diye.
-function legsToSelections(legs: { raceNo: number; narrow: number[]; normal: number[]; wide: number[] }[]): GroupSelections {
-  const sel: GroupSelections = {};
-  for (const leg of legs) {
-    sel[leg.raceNo] = { narrow: new Set(leg.narrow), normal: new Set(leg.normal), wide: new Set(leg.wide) };
-  }
-  return sel;
 }
 
 function amountsForGroup(group: RaceDayData["races"], selections: GroupSelections, stakePerCombination: number): Record<Width, number> {
@@ -598,16 +481,13 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
         raceNos,
         manualOverrides,
       });
-      if (res?.ok === false) {
+      if (res?.skipped === "POOL_STARTED") {
+        toast.warning(`${label}: havuz zaten başladı, artık değiştirilemez.`);
+      } else if (res?.skipped === "UNCHANGED") {
+        toast.info(`${label}: zaten güncel, değişiklik yayınlanmadı.`);
+      } else if (res?.ok === false) {
         toast.error(`${label} yayınlanamadı — lütfen tekrar deneyin (context eşzamanlı değişmiş olabilir).`);
       } else {
-        // Ekranı GERÇEKTEN yayınlanan hâle senkronla — sunucunun dokunulmayan
-        // genişlikler için taze hesapladığı sonuç, admin'in son gördüğü önizlemeden
-        // farklı olabilir (bkz. legsToSelections yorumu). Yeni taban da BUNA eşitlenir,
-        // bir sonraki manuel düzenleme gerçek yayınlanan hâlden fark alınsın diye.
-        const published = legsToSelections(res.legs);
-        setSelections((prev) => ({ ...prev, [key]: published }));
-        setAutoBaseline((prev) => ({ ...prev, [key]: published }));
         toast.success(`${label} kuponu oluşturuldu ve anasayfada yayınlandı`);
       }
       router.refresh();

@@ -929,10 +929,7 @@ function standardize(v: number[], ws: AgirlikSeti): number[] {
   return v.map((x, i) => (ws.stds[i] > 1e-9 ? (x - ws.means[i]) / ws.stds[i] : 0));
 }
 
-// 2026-09-24 — Sistem Anatomisi Calibration sensörü: gerçek production softmax'ını
-// (sıralama-koruyan, ölçekleme YOK) test/karşılaştırma için dışa açıyor — sensör kendi
-// kopyasını yazmasın diye.
-export function softmaxHam(scores: number[]): number[] {
+function softmaxHam(scores: number[]): number[] {
   const max = Math.max(...scores);
   const exps = scores.map((s) => Math.exp(s - max));
   const sum = exps.reduce((a, b) => a + b, 0);
@@ -950,12 +947,8 @@ export function softmaxHam(scores: number[]): number[] {
 // mutlak olasılığı yumuşatır. Backtest: sabit %80+ grubunun ort. tahmini %88.1→%70.3
 // (gerçek %67.9'a çok yakın), genel top1 DEĞİŞMEDİ (%38.9), genel logloss KÖTÜLEŞMEDİ
 // (1.7132→1.7131, hafif iyileşme). Diğer koşulara (lider <%70) hiç dokunulmuyor.
-// 2026-09-24 — Sistem Anatomisi Calibration sensörü bu üç sabiti dışa açıyor: kullanıcı
-// talimatı "threshold ve T değerlerini sensörde ayrıca kopyalayıp hard-code etme" — panel
-// GERÇEK production config'ini okur, kendi kopyasını TUTMAZ (ileride 0.70→0.65 gibi bir
-// değişiklikte panel eski kuralı ölçmeye devam etmesin diye).
-export const ASIRI_GUVEN_LIDER_ESIGI = 0.7;
-export const ASIRI_GUVEN_SICAKLIGI = 1.5;
+const ASIRI_GUVEN_LIDER_ESIGI = 0.7;
+const ASIRI_GUVEN_SICAKLIGI = 1.5;
 
 // 2026-08-26 kullanıcı bulgusu: yukarıdaki %70+ genel eşiği Handikap'ta yetersiz kalıyordu —
 // "Güçlü Aday" (>=%30) etiketi alan Handikap yarışlarında (n=22, mevcut %70 eşiğiyle) ortalama
@@ -966,23 +959,16 @@ export const ASIRI_GUVEN_SICAKLIGI = 1.5;
 // Backtest (51 Handikap yarışı, yeniden inşa): "Güçlü Aday" grubu n=22→13'e düştü, kalibrasyon
 // -12.4'ten +3.7 puana geldi (n=13, gürültü sınırında ama makul). Genel top1 isabeti
 // DEĞİŞMEDİ (%21.6, 11/51 — sıcaklık sıralamayı korur, yalnız gösterilen yüzdeyi düzeltir).
-export const ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP = 0.35;
+const ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP = 0.35;
 
 // 2026-08-29 — V6 Aşama 2 (bkz. plan): softmax'ın içindeki sıcaklık-ölçeklendirme kararını
 // (lider zaten %70+/%35+ ise sıcaklığı uygula) dışarı çıkarır — SAF REFAKTOR, davranış
 // değişmedi (softmax artık bunu birebir çağırıyor). Amaç: yeni P(TOP2)/P(TOP3) hesabının
 // (plackettLuceTopKMarginals) AYNI etkin/sıcaklık-sonrası skor vektörünü kullanabilmesi —
 // yoksa k=1 durumu mevcut `olasilik`'le bit-bit eşleşmez.
-// 2026-09-24 — CalibrationAuditSnapshot control-flow analizi: bu koşulun TEK gerçek
-// kaynağı olsun diye çıkarıldı (bkz. proje hafızası calibration-audit-snapshot-spec).
-// effektifSkorlar'ın davranışı DEĞİŞMEDİ — inline ifade yerine bu adlandırılmış
-// fonksiyonu çağırıyor, audit kodu da AYNI fonksiyonu kullanacak.
-export function asiriGuvenTetiklendiMi(scores: number[], liderEsigi = ASIRI_GUVEN_LIDER_ESIGI): boolean {
-  return Math.max(...softmaxHam(scores)) >= liderEsigi;
-}
-
 function effektifSkorlar(scores: number[], liderEsigi = ASIRI_GUVEN_LIDER_ESIGI): number[] {
-  if (!asiriGuvenTetiklendiMi(scores, liderEsigi)) return scores;
+  const ham = softmaxHam(scores);
+  if (Math.max(...ham) < liderEsigi) return scores;
   return scores.map((s) => s / ASIRI_GUVEN_SICAKLIGI);
 }
 
@@ -1056,17 +1042,8 @@ export function marketBlindOlasiliklariHesapla(
   return softmaxHam(effektifSkorlar(marketBlindSkorlar, liderEsigi));
 }
 
-// 2026-09-24 — CalibrationAuditSnapshot (bkz. proje hafızası calibration-audit-snapshot-spec):
-// production'ın GERÇEKTEN aldığı kalibrasyon kararını dondurmak için — audit kendi
-// tahminini ÜRETMEZ, yalnız o anda ZATEN hesaplanmış (veya NOT_TRIGGERED'da olasilik'le
-// birebir aynı, TRIGGERED'da tek bir ek ucuz softmaxHam çağrısıyla elde edilen) değerleri taşır.
-export type TriggerType = "NOT_TRIGGERED" | "GENERAL_TRIGGERED" | "HANDIKAP_TRIGGERED";
-
 export type Faz1RunnerV5Sirali = Faz1RunnerV5 & {
   olasilik: number;
-  rawProbability: number; // softmaxHam(skorlar) — sıcaklık/kalibrasyon ÖNCESİ olasılık (audit)
-  triggerType: TriggerType; // asiriGuvenTetiklendiMi'nin bu yarış için ÜRETTİĞİ, tek gerçek kaynak
-  leaderRawProbability: number; // triggerType kararını üreten girdi — o anki lider ham olasılığı
   probTop2: number; // 2026-08-29 V6 Aşama 2 — Plackett-Luce kesin marjinal, olasilik'in basit bir çarpımı DEĞİL
   probTop3: number;
   marketBlindProb1: number; // 2026-08-29 V6 Aşama 2 — AGF-türevi katkılar çıkarılıp saha ayrıca normalize edilmiş P(WIN)
@@ -1207,13 +1184,7 @@ function terfiPenceresiV5<T extends { no: number; olasilik: number; ekuriGroup: 
  *  etkiler. Sinyal sayısı YETERSİZSE (KURUŞHAN örneği: trend var ama yalnız 2 sinyal) VE
  *  düşüş-iyi-pozisyon örüntüsü de yoksa terfi olmaz — bu KASITLI, trend TEK BAŞINA V4'ün
  *  kendi backtest'inde de ilk-3 için yeterli değildi. */
-// 2026-09-26 — Faz 2 Signal Contribution Audit (araştırma, V5.46 dondurulmuş): kullanıcı
-// onayıyla YALNIZ `export` eklendi — fonksiyon gövdesi/koşullar/eşikler/çağrı sırası HİÇ
-// değişmedi, davranış SIFIR fark. Amaç: araştırma script'lerinin (Research → Production
-// pure functions, TERSİ ASLA değil) production'ın GERÇEK postprocess mantığını canonical
-// RaceEvidence artifact'ı üzerinde yeniden çalıştırabilmesi — 682 yarışı DB'den/motordan
-// tekrar çekmeden. Minimum public surface: yalnız bu 2 fonksiyon, hiçbir sabit export edilmedi.
-export function agfTrendTerfisiUygula<
+function agfTrendTerfisiUygula<
   T extends {
     no: number; agfTrendYonu: "yükseliş" | "düşüş" | null; sinyalSayisi: number;
     agfFark: number; agfSirasi: number; olasilik: number; ekuriGroup: number | null;
@@ -1315,7 +1286,7 @@ const SAF_MODEL_DEGER_ESIGI = 5;
 // kazanamayan adaylar dahil) mevcut 5pp eşiğiyle ilk-6 denenir.
 const SAF_MODEL_DEGER_ESIGI_ILK3 = 8;
 
-export function safModelDegerTerfisiUygula<
+function safModelDegerTerfisiUygula<
   T extends {
     no: number; olasilik: number; marketBlindProb1: number; agfPayi: number; katkilar: number[];
     ekuriGroup: number | null;
@@ -1475,15 +1446,6 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
   } = bKatmaniUygula(skorlarHam, faz1.runners, faz1.race.classType);
   const probs = softmax(skorlar, liderEsigi);
   const etkinSkorlar = effektifSkorlar(skorlar, liderEsigi);
-
-  // CalibrationAuditSnapshot girdisi — NOT_TRIGGERED'da ekstra hesap YOK (raw===probs,
-  // aynı referans), TRIGGERED'da yalnız TEK ek ucuz softmaxHam çağrısı (n≤~24, ihmal
-  // edilebilir). triggerType, asiriGuvenTetiklendiMi'nin AYNI çağrısından üretilir —
-  // effektifSkorlar'ın kendi kararıyla İKİNCİ bir yorum katmanı OLUŞMAZ.
-  const tetiklendi = asiriGuvenTetiklendiMi(skorlar, liderEsigi);
-  const rawProbs = tetiklendi ? softmaxHam(skorlar) : probs;
-  const triggerType: TriggerType = !tetiklendi ? "NOT_TRIGGERED" : handikapMi ? "HANDIKAP_TRIGGERED" : "GENERAL_TRIGGERED";
-  const leaderRawProbability = Math.max(...rawProbs);
   const top2Marjinal = plackettLuceTopKMarginals(etkinSkorlar, 2);
   const top3Marjinal = plackettLuceTopKMarginals(etkinSkorlar, 3);
   const marketBlindProbs = marketBlindOlasiliklariHesapla(
@@ -1510,9 +1472,6 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
     return {
       ...r,
       olasilik: probs[i],
-      rawProbability: rawProbs[i],
-      triggerType,
-      leaderRawProbability,
       probTop2: top2Marjinal[i],
       probTop3: top3Marjinal[i],
       marketBlindProb1: marketBlindProbs[i],

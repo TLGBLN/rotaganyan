@@ -1706,23 +1706,20 @@ export default function ProgramView({
 
       {currentDay && (
         <>
-          {/* Koşu tab'ları + Pist durumu/hava — 2026-09-22 kullanıcı talebi: ekran
-              boyutundan bağımsız, pist durumu/hava HER ZAMAN koşu sekmelerinin hemen
-              altında (eskiden sm+'ta aynı satırda yan yanaydı). */}
-          <div className="flex flex-col border-b bg-background shrink-0 print:hidden">
-            {/* Koşu tab'ları — 2026-09-22 kullanıcı talebi: mobilde 4 sütunlu grid (satır
-                başına 4 koşu, taşan alt satıra sarar), yatay kaydırma yerine — sm+ (web)
-                eski davranışını (tek satır, gerekirse yatay kaydırma) korur. */}
-            <div className="grid grid-cols-4 sm:flex sm:min-w-0 sm:shrink sm:overflow-x-auto sm:flex-1">
+          {/* Koşu tab'ları + Pist durumu/hava — 2026-09-20 kullanıcı talebi: web'de (sm+)
+              aynı satırda, dar mobilde eskisi gibi alt alta. */}
+          <div className="flex flex-col border-b bg-background shrink-0 print:hidden sm:flex-row sm:items-center">
+            {/* Koşu tab'ları */}
+            <div className="flex min-w-0 shrink overflow-x-auto sm:flex-1">
               {currentDay.races.map((r) => (
                 <button
                   key={r.raceNo}
                   onClick={() => setActiveRace((prev) => ({ ...prev, [currentDay.hippodromeSlug]: r.raceNo }))}
                   className={cn(
-                    "relative px-3 py-2 text-xs font-semibold transition-opacity whitespace-nowrap border border-background select-none outline-none sm:shrink-0",
+                    "relative shrink-0 px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap",
                     SURFACE_TAB_BG[r.surface],
                     selectedRaceNo(currentDay) === r.raceNo
-                      ? "ring-2 ring-inset ring-white"
+                      ? "ring-2 ring-inset ring-white shadow-inner"
                       : "opacity-70 hover:opacity-100"
                   )}
                 >
@@ -1736,7 +1733,7 @@ export default function ProgramView({
 
             {/* Pist durumu + hava (TJK) */}
             {((currentDay.surfaceConditions?.length ?? 0) > 0 || currentDay.weather || currentRace) && (
-              <div className="flex flex-wrap items-center gap-2 border-t bg-muted/10 pl-0 pr-3 py-1.5 text-[11px]">
+              <div className="flex flex-wrap items-center gap-2 border-t bg-muted/10 px-3 py-1.5 text-[11px] sm:border-t-0 sm:border-l sm:bg-transparent">
                 {currentDay.surfaceConditions?.map((c, i) => (
                   <span
                     key={i}
@@ -1755,7 +1752,7 @@ export default function ProgramView({
                   <button
                     onClick={() => setHipodromOzellikleriOpen(true)}
                     data-tour="hipodrom-ozellikleri"
-                    className="sm:hidden shrink-0 rounded border px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground whitespace-nowrap"
+                    className="sm:hidden ml-auto shrink-0 rounded border px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground whitespace-nowrap"
                   >
                     {t("hipodromOzellikleri")} {!isLoggedIn && "🔒"}
                   </button>

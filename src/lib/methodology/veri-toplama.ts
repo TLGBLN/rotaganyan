@@ -102,70 +102,60 @@ export type AccuraceSibling = {
 // round-trip'lerin TOPLAM bekleme süresi birlikte düşüyor.
 const ACCURACE_RACE_CHUNK = 100;
 
+async function fetchAccuraceRacesByIds(
+  ids: string[]
+): Promise<Map<string, { date: Date; citySlug: string; ground: string | null; length: number | null }>> {
+  const map = new Map<string, { date: Date; citySlug: string; ground: string | null; length: number | null }>();
+  const chunkler: string[][] = [];
+  for (let i = 0; i < ids.length; i += ACCURACE_RACE_CHUNK) chunkler.push(ids.slice(i, i + ACCURACE_RACE_CHUNK));
+  const sonuclar = await Promise.all(
+    chunkler.map((chunk) =>
+      db.accuraceRace.findMany({
+        where: { id: { in: chunk } },
+        select: { id: true, date: true, citySlug: true, ground: true, length: true },
+      })
+    )
+  );
+  for (const rows of sonuclar) {
+    for (const r of rows) map.set(r.id, { date: r.date, citySlug: r.citySlug, ground: r.ground, length: r.length });
+  }
+  return map;
+}
+
 export async function fetchAccuraceGecmisKayitlari(
   runnerNames: string[],
   raceDate: Date
 ): Promise<{ son800AccuraceKayitlari: AccuraceGecmisKayit[]; son800Siblings: AccuraceSibling[] }> {
-  // Stage 1 — DEĞİŞMEDİ.
   const son800AccuraceKayitlariHam = runnerNames.length
     ? await db.accuraceHorseSplit.findMany({
         where: { horseName: { in: accuraceQueryNames(runnerNames) } },
         select: { horseName: true, accuraceRaceId: true, checkpoints: true, place: true },
       })
     : [];
+  // Tüm ilgili AccuraceRace'leri TEK seferde, küçük parçalar halinde çek — hem
+  // son800AccuraceKayitlari hem de son800Siblings bu ortak haritayı kullanır (eskiden
+  // ikisi ayrı ayrı nested-relation sorgusu yapıyordu, artık tek chunked fetch yeterli).
   const hamRaceIds = [...new Set(son800AccuraceKayitlariHam.map((k) => k.accuraceRaceId))];
-
-  // 2026-09-22 (P1, kullanıcı kararı) — eski Stage 2 (AccuraceRace detayları, TÜM hamRaceIds
-  // için) + Stage 3 (sibling split'ler, YALNIZ date<raceDate geçen raceId'ler için) TEK
-  // sorgu TÜRÜNE (JOIN) birleştirildi — SEMANTİK AYNI: eski kod da nihayetinde yalnız
-  // date<raceDate geçen raceId'lerin (son800RaceIds) sibling'lerini çekiyordu, burada tarih
-  // filtresi SQL'e taşındı ama sonuç kümesi BİREBİR aynı. EXPLAIN ANALYZE ile doğrulandı: 3
-  // sorgunun sunucu-taraflı toplam işlem süresi ~2ms, ~980ms'lik maliyetin tamamı network
-  // round-trip'i — index/query optimizasyonu değil, round-trip SAYISI asıl sorun.
-  //
-  // KRİTİK GÜVENLİK NOTU (kullanıcı buldu, 2026-09-22): nested `accuraceRace: {select}`
-  // deseni 2026-08-18'de TAM OLARAK bu yüzden terk edilmişti — Supabase pgbouncer, geniş
-  // sahalarda (400+ id) bu deseni ürettiğinde bazen askıda kalıyordu (gatherFaz1V5'te gerçek
-  // hang ile doğrulanmıştı, bkz. ACCURACE_RACE_CHUNK üstündeki tarihi not). Bu yüzden JOIN
-  // yine de ACCURACE_RACE_CHUNK (100) ile PARALEL (Promise.all) parçalanıyor — eski hang
-  // fix'i korunuyor, yalnız 3 sıralı round-trip yerine 1 paralel dalga (küçük sahalarda
-  // zaten tek chunk, davranış aynı).
-  const raceIdChunks: string[][] = [];
-  for (let i = 0; i < hamRaceIds.length; i += ACCURACE_RACE_CHUNK) raceIdChunks.push(hamRaceIds.slice(i, i + ACCURACE_RACE_CHUNK));
-  const siblingRowsChunks = await Promise.all(
-    raceIdChunks.map((chunk) =>
-      db.accuraceHorseSplit.findMany({
-        where: { accuraceRaceId: { in: chunk }, accuraceRace: { date: { lt: raceDate } } },
-        select: {
-          accuraceRaceId: true,
-          checkpoints: true,
-          accuraceRace: { select: { date: true, citySlug: true, ground: true, length: true } },
-        },
-      })
-    )
-  );
-  const siblingRows = siblingRowsChunks.flat();
-
-  // raceMap (eski fetchAccuraceRacesByIds'in çıktısıyla AYNI şekil) — ayrı sorgu YOK,
-  // veri zaten JOIN ile geldiği için siblingRows'tan türetiliyor. Yalnız date<raceDate
-  // geçen raceId'leri içerir (eski raceMap TÜM hamRaceIds'i içeriyordu ama son
-  // filtreleme AYNI kümeye indiriyordu — bkz. üstteki not).
-  const raceMap = new Map<string, { date: Date; citySlug: string; ground: string | null; length: number | null }>();
-  for (const r of siblingRows) raceMap.set(r.accuraceRaceId, r.accuraceRace);
-
+  const raceMap = await fetchAccuraceRacesByIds(hamRaceIds);
   const son800AccuraceKayitlari = son800AccuraceKayitlariHam
     .map((k): AccuraceGecmisKayit | null => {
       const accuraceRace = raceMap.get(k.accuraceRaceId);
       return accuraceRace ? { ...k, accuraceRace } : null;
     })
-    .filter((k): k is AccuraceGecmisKayit => k != null);
-
-  const son800Siblings: AccuraceSibling[] = siblingRows.map((s) => ({
-    accuraceRaceId: s.accuraceRaceId,
-    checkpoints: s.checkpoints,
-    accuraceRace: { length: s.accuraceRace.length },
-  }));
-
+    .filter((k): k is AccuraceGecmisKayit => k != null && k.accuraceRace.date < raceDate);
+  const son800RaceIds = [...new Set(son800AccuraceKayitlari.map((k) => k.accuraceRaceId))];
+  const son800SiblingsHam = son800RaceIds.length
+    ? await db.accuraceHorseSplit.findMany({
+        where: { accuraceRaceId: { in: son800RaceIds } },
+        select: { accuraceRaceId: true, checkpoints: true },
+      })
+    : [];
+  const son800Siblings = son800SiblingsHam
+    .map((s): AccuraceSibling | null => {
+      const accuraceRace = raceMap.get(s.accuraceRaceId);
+      return accuraceRace ? { ...s, accuraceRace: { length: accuraceRace.length } } : null;
+    })
+    .filter((s): s is AccuraceSibling => s != null);
   return { son800AccuraceKayitlari, son800Siblings };
 }
 

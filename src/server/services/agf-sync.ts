@@ -115,38 +115,6 @@ async function syncOneCity(city: CityInfo, tjkDate: string, d: Date): Promise<Ag
   return { name: city.sehirAdi, ok: true, racesUpdated, runnersUpdated };
 }
 
-// 2026-09-23 — Sistem Anatomisi AGF sensörü: syncAgfForDate() (bu dosyanın CRON giriş
-// noktası, günde 4 kez — 09/12/15/18 UTC) hiçbir yere kendi çalışma geçmişini yazmıyordu.
-// AgfSyncState (yukarıda) yalnız syncAgfForRaceInner'ın (analiz-tetiklemeli, tek-koşu) yazdığı
-// tablo — cron'un KENDİ availability/freshness/observed-cadence'ı bundan ÖLÇÜLEMEZ. Bu fonksiyon
-// /api/cron/agf-sync tarafından her tetiklenmede (başarılı/başarısız fark etmez) çağrılır.
-const AGF_RECENT_RUNS_MAX = 10;
-export async function recordAgfCronRun(outcome: { ok: true; result: AgfSyncResult } | { ok: false; error: string }): Promise<void> {
-  const now = new Date();
-  const prev = await db.agfCronRunState.findUnique({ where: { id: "singleton" } }).catch(() => null);
-  const prevRuns = Array.isArray(prev?.recentRunsJson) ? (prev!.recentRunsJson as string[]) : [];
-  const recentRunsJson = [...prevRuns, now.toISOString()].slice(-AGF_RECENT_RUNS_MAX);
-
-  await db.agfCronRunState
-    .upsert({
-      where: { id: "singleton" },
-      create: {
-        id: "singleton",
-        lastAttemptAt: now,
-        lastSuccessAt: outcome.ok ? now : null,
-        lastResultJson: outcome.ok ? outcome.result : (prev?.lastResultJson ?? undefined),
-        lastError: outcome.ok ? null : outcome.error,
-        recentRunsJson,
-      },
-      update: {
-        lastAttemptAt: now,
-        ...(outcome.ok ? { lastSuccessAt: now, lastResultJson: outcome.result, lastError: null } : { lastError: outcome.error }),
-        recentRunsJson,
-      },
-    })
-    .catch(() => {}); // yalnız izleme metriği — AGF senkronunu ASLA bloklamaz
-}
-
 export async function syncAgfForDate(date: Date): Promise<AgfSyncResult> {
   const d = new Date(date);
   d.setUTCHours(0, 0, 0, 0);
@@ -218,24 +186,15 @@ async function syncAgfForRaceInner(raceId: string): Promise<void> {
   // açıyordu. Sonuç girilmiş bir koşu için senkronizasyon burada kesin olarak durdurulur.
   if (race.result) return;
 
-  // 2026-09-22 kullanıcı düzeltmesi (P0 performans+correctness) — soğuma artık AgfSyncState.
-  // lastSuccessAt'e bakıyor, AgfSnapshot'ın VAR OLMASINA değil. Eski mantık "AGF DEĞİŞTİ Mİ"
-  // ile "AGF'Yİ EN SON NE ZAMAN BAŞARIYLA KONTROL ETTİM"i karıştırıyordu — AgfSnapshot yalnız
-  // değer ≥0.01 değiştiğinde yazıldığı için, AGF sakin bir dönemde soğuma HİÇ tetiklenmiyor,
-  // her çağrı TJK'ya gereksiz bir ağ isteği (ölçüldü: 4-8sn) atıyordu.
-  const syncState = await db.agfSyncState.findUnique({ where: { raceDayId: race.raceDayId } });
-  if (syncState?.lastSuccessAt && Date.now() - syncState.lastSuccessAt.getTime() < SOGUMA_MS) {
-    return; // yakın zamanda BAŞARIYLA kontrol edildi (AGF değişmiş olsun olmasın) — atla
-  }
-
-  // Deneme başladı — lastAttemptAt HEMEN ilerler (TJK isteği başarısız olsa BİLE) — bir
-  // sonraki çağrı en azından bir deneme yapıldığını görsün diye.
-  const now = new Date();
-  await db.agfSyncState.upsert({
-    where: { raceDayId: race.raceDayId },
-    create: { raceDayId: race.raceDayId, lastAttemptAt: now },
-    update: { lastAttemptAt: now },
+  // Soğuma kontrolü: bu hipodrom+gün için AGF en son ne zaman yazıldı?
+  const enYeniSnapshot = await db.agfSnapshot.findFirst({
+    where: { runner: { race: { raceDayId: race.raceDayId } } },
+    orderBy: { capturedAt: "desc" },
+    select: { capturedAt: true },
   });
+  if (enYeniSnapshot && Date.now() - enYeniSnapshot.capturedAt.getTime() < SOGUMA_MS) {
+    return; // yakın zamanda zaten tazelendi, TJK'ya tekrar gitme
+  }
 
   const d = new Date(race.raceDay.date);
   d.setUTCHours(0, 0, 0, 0);
@@ -243,27 +202,7 @@ async function syncAgfForRaceInner(raceId: string): Promise<void> {
 
   const cities = await discoverTurkishCities(tjkDate);
   const city = cities.find((c) => toSlug(c.sehirAdi) === race.raceDay.hippodrome.slug);
-  if (!city) {
-    // Başarısız (şehir eşleşmedi) — lastSuccessAt DEĞİŞMEZ, bir sonraki çağrı yine dener.
-    await db.agfSyncState.update({ where: { raceDayId: race.raceDayId }, data: { lastStatus: "no_city_match" } }).catch(() => {});
-    return;
-  }
+  if (!city) return;
 
-  const result = await syncOneCity(city, tjkDate, d);
-  if (!result.ok) {
-    // TJK sayfası boş/başarısız — lastSuccessAt DEĞİŞMEZ, eski AGF korunur.
-    await db.agfSyncState.update({ where: { raceDayId: race.raceDayId }, data: { lastStatus: `error: ${result.error ?? "bilinmiyor"}` } }).catch(() => {});
-    return;
-  }
-
-  // Başarılı — lastSuccessAt İLERLER (AGF değişmiş olsun olmasın). lastChangeAt yalnız
-  // gerçekten bir değer değiştiyse (runnersUpdated>0) ilerler.
-  await db.agfSyncState.update({
-    where: { raceDayId: race.raceDayId },
-    data: {
-      lastSuccessAt: new Date(),
-      lastStatus: "ok",
-      ...(result.runnersUpdated > 0 ? { lastChangeAt: new Date() } : {}),
-    },
-  });
+  await syncOneCity(city, tjkDate, d);
 }

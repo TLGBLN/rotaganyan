@@ -1,10 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { syncAgfForDate, recordAgfCronRun } from "@/server/services/agf-sync";
+import { syncAgfForDate } from "@/server/services/agf-sync";
 import { verifyCronRequest } from "@/lib/cron-auth";
 import { runChallengerShadowLog } from "@/server/services/challenger-shadow-log.service";
-import { runSr6ShadowLog, enrichSr6ShadowOutcomes } from "@/server/services/sr6-shadow-log.service";
 import { dereceIstatistikleriniKontrolEtVeOnar, atProfiliniKontrolEtVeOnar } from "@/server/services/veri-tamligi-onarim.service";
-import { runHotWatchdogIfDue } from "@/server/services/ingest/tjk-at-profil.adapter";
 
 // v6.69 — kullanıcı bulgusu 2026-08-09: çoklu şehir günlerinde (İstanbul+İzmir+Karma
 // aynı anda) sıralı işleme 60sn'yi aşıp cron'u sessizce (Vercel 504) başarısız kılıyordu —
@@ -17,16 +15,8 @@ export async function GET(req: NextRequest) {
   const denied = verifyCronRequest(req);
   if (denied) return denied;
 
-  let result: Awaited<ReturnType<typeof syncAgfForDate>>;
   try {
-    result = await syncAgfForDate(new Date());
-  } catch (err) {
-    await recordAgfCronRun({ ok: false, error: String(err) }).catch(() => {});
-    return NextResponse.json({ error: String(err) }, { status: 500 });
-  }
-  await recordAgfCronRun({ ok: true, result }).catch(() => {});
-
-  try {
+    const result = await syncAgfForDate(new Date());
     const total = result.cities.reduce((s, c) => s + c.runnersUpdated, 0);
 
     // 2026-08-29 — V6 Aşama 3 (bkz. plan): asalak ekleme deseni (sync-derece-ist/
@@ -37,19 +27,6 @@ export async function GET(req: NextRequest) {
       await runChallengerShadowLog();
     } catch (e) {
       console.error("[agf-sync] challenger-shadow-log piggyback hatası (AGF senkronu etkilenmedi)", e);
-    }
-
-    // 2026-09-26 — SR6 Shadow Logger (bkz. proje hafızası: Surprise Rescue SR6-HC) —
-    // AYNI piggyback deseni: AGF her senkronlandığında T3-A adayı gerçek (senkronlanmış)
-    // veriyle değerlendirilebilir hale gelir (first-valid-snapshot ön koşulu), bu yüzden
-    // AGF sync SONRASI SR6'yı kontrol etmek doğal bir tetikleyici. Ayrıca kendi ayrı
-    // cron'unun (/api/cron/sr6-shadow-log) "yeni path Vercel'e kaydolmayabiliyor" riskine
-    // karşı ikinci güvenlik ağı. Hata durumunda AGF senkronunu ASLA bloke etmez/etkilemez.
-    try {
-      await runSr6ShadowLog();
-      await enrichSr6ShadowOutcomes();
-    } catch (e) {
-      console.error("[agf-sync] sr6-shadow-log piggyback hatası (AGF senkronu etkilenmedi)", e);
     }
 
     // 2026-08-30 — kullanıcı talebi: veri-tamligi'nin kanıtlanmış-kırılgan alanı (Derece
@@ -69,16 +46,6 @@ export async function GET(req: NextRequest) {
       await atProfiliniKontrolEtVeOnar();
     } catch (e) {
       console.error("[agf-sync] at-profili-onarim piggyback hatası (AGF senkronu etkilenmedi)", e);
-    }
-
-    // 2026-09-24 — HOT Cache Watchdog need-aware fallback (bkz. runHotWatchdogIfDue) — artık
-    // agf-sync/result-sync/ingest-program ÜÇÜ de aynı ucuz due-check'i paylaşıyor, yalnız
-    // GERÇEKTEN ihtiyaç varsa (SLA ihlali) ağır iş çalışır. Hata durumunda AGF senkronunu
-    // ASLA bloke etmez/başarısız kılmaz.
-    try {
-      await runHotWatchdogIfDue({ source: "agf-sync" });
-    } catch (e) {
-      console.error("[agf-sync] hot-cache-watchdog piggyback hatası (AGF senkronu etkilenmedi)", e);
     }
 
     return NextResponse.json({ ...result, totalRunnersUpdated: total });

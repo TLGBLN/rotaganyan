@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { currentBuildId } from "@/lib/build-id";
 
-/** Yeni deploy çıktığında değişen tek güvenilir kimlik (git SHA, yoksa deployment id — bkz. lib/build-id.ts). */
-const BUILD_ID = currentBuildId();
+/** Vercel her deploy'da otomatik dolduruyor — yeni deploy çıktığında değişen tek güvenilir kimlik. */
+const BUILD_ID = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.VERCEL_DEPLOYMENT_ID ?? "dev";
 
 export async function GET() {
   return NextResponse.json({ buildId: BUILD_ID }, { headers: { "Cache-Control": "no-store" } });
 }
+// alias test 2026-08-17T17:41:35Z
