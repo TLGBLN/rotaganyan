@@ -29,8 +29,6 @@ import {
   type DependencyRaceInput,
 } from "@/lib/methodology/kupon-dependency-hash";
 
-export type { DependencyRaceInput, ClientRaceSnapshotInput } from "@/lib/methodology/kupon-dependency-hash";
-
 export type HomeKuponLegInput = {
   raceNo: number;
   narrow: number[];
