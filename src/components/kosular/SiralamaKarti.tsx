@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { Radio, ChevronUp, ChevronDown } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { ProgramRaceDay, KuponOnerisi } from "@/server/services/race.service";
 import type { TempoSenaryosu } from "@/lib/methodology/pace-analizi";
@@ -9,6 +11,7 @@ import { piyasaFarkiPuani, kararOku } from "@/lib/methodology/muhakeme-format";
 import { KuponBlock } from "@/components/home/TahminOnerileri";
 import SiralamaListesi from "./SiralamaListesi";
 import SiralamaHero from "./SiralamaHero";
+import RaceCountdown from "./RaceCountdown";
 import { agfSiraMapOlustur } from "@/lib/agf-sira";
 
 type Race = ProgramRaceDay["races"][number];
@@ -55,6 +58,10 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
       ? initialRaceNo
       : analyzed[0]?.raceNo ?? raceDay.races[0]?.raceNo ?? 1;
   const [activeRaceNo, setActiveRaceNo] = useState<number>(baslangicRaceNo);
+  // 2026-09-28 kullanıcı talebi: /program'daki "Analiz Yayında" çubuğu burada da — yeşil düğme sıralama
+  // listesini açıp kapatır (varsayılan açık), analizsiz koşuda kırmızı "Analiz Hazırlanıyor".
+  const t = useTranslations("programToolbar");
+  const [listeAcik, setListeAcik] = useState(true);
   if (analyzed.length === 0) return null;
 
   const race = raceDay.races.find((r) => r.raceNo === activeRaceNo) ?? analyzed[0];
@@ -111,6 +118,30 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
         })}
       </div>
 
+      {/* Analiz durumu çubuğu — /program'daki "Analiz + geri sayım" satırıyla AYNI görünüm (ProgramView.tsx):
+          yeşil #006D05 "Analiz Yayında" düğmesi (nabız atan yayın ikonu + aç/kapa oku), analiz yoksa kırmızı
+          "Analiz Hazırlanıyor", sağda koşuya kalan süre (sonuçlanmışsa gösterilmez). */}
+      <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#0d1018] px-3 py-1.5 text-[11px]">
+        {hasAnalysis(race) ? (
+          <button
+            type="button"
+            onClick={() => setListeAcik((v) => !v)}
+            aria-expanded={listeAcik}
+            className="flex shrink-0 items-center gap-1 rounded-md bg-[#006D05] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90"
+          >
+            <Radio className="h-3 w-3 animate-pulse motion-reduce:animate-none" /> {t("analiziGor")}{" "}
+            {listeAcik ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+        ) : (
+          <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-[#e74c3c]">{t("analizHazirlaniyor")}</span>
+        )}
+        {race.time && race.result == null && (
+          <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">
+            ⏱ <RaceCountdown date={new Date(raceDay.date).toISOString().slice(0, 10)} time={race.time} />
+          </span>
+        )}
+      </div>
+
       {/* Karar hero'su — 2026-09-14 kullanıcı bulgusu (mobil): eskiden tek satırlık
           flex-wrap, dar ekranda at adı/piyasa farkı/kupon bloklarını üst üste garip
           kırıyordu. Artık <640px'te DİKEY istiflenen, kupon ayaklarının ayrı ayrı
@@ -163,8 +194,8 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
         />
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
-        <SiralamaListesi race={race} formByNo={formByNo} />
+      <div className={cn("grid grid-cols-1 items-start gap-4", listeAcik && "lg:grid-cols-[minmax(0,1fr)_340px]")}>
+        {listeAcik && <SiralamaListesi race={race} formByNo={formByNo} />}
 
         <div className="space-y-4 lg:sticky lg:top-4">
           {kupon ? (
