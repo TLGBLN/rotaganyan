@@ -35,14 +35,21 @@ export type HomeKuponLegInput = {
   wide: number[];
 };
 
-// 2026-09-21 — Prediction-to-HomeKupon Auto Synchronization (bkz. plan): admin artık
-// hesaplanmış `legs` GÖNDERMEZ — yalnız `manualOverrides` (autoBaseline'dan sapma) +
-// hangi `raceNos`'u kapsadığı. Sunucu DB'den TAZE veriyle kendi DP'sini çalıştırır.
+// 2026-09-28 kullanıcı bulgusu (Şanlıurfa 1.Altılı, "yayınlanan ≠ ekran"): 2026-09-21
+// tasarımında admin `legs` göndermiyor, yalnız `manualOverrides` (autoBaseline'dan sapma)
+// gönderiyor, sunucu bu kısıtların etrafında DP'yi TAZE veriyle BAŞTAN çözüyordu — bu
+// yüzden admin'in ekranda gördüğüyle yayınlanan kupon farklı çıkıyordu (elle eklenen
+// atlar bütçeyi başka ayaklardan yeniden dağıtıyordu). Artık admin'in ekrandaki `legs`'i
+// (WYSIWYG) DOĞRUDAN yayınlanır; sunucu yalnız doğrular (koşmaz atları çıkarır, geçersiz
+// no'ları eler) ve STALE_CLIENT_VIEW kontrolüyle ekran bayatsa yayını reddeder.
 export type HomeKuponInput = {
   hippodromeName: string;
   date: string;
   slot: number;
   raceNos: number[];
+  /** Admin'in ekranda GÖRDÜĞÜ ve onayladığı seçim — aynen yayınlanır. */
+  legs: HomeKuponLegInput[];
+  /** Yalnız denetim kaydı için saklanır (admin neye dokundu) — yayını ETKİLEMEZ. */
   manualOverrides: ManualOverridesMap;
   // 2026-09-27 — admin'in "Kupon Oluştur" ANINDA EKRANDA gördüğü veri (bkz.
   // STALE_CLIENT_VIEW kontrolü, syncHomeKupon). Verilmezse (eski istemci) kontrol atlanır.
@@ -140,6 +147,9 @@ export async function syncHomeKupon(input: {
   raceNos: number[];
   manualOverrides: unknown; // HAM — normalize EDİLMEMİŞ olabilir, burada normalize edilir
   clientSnapshot?: DependencyRaceInput[]; // bkz. HomeKuponInput yorumu — STALE_CLIENT_VIEW
+  /** Verilirse DP ÇALIŞTIRILMAZ: admin'in ekranda onayladığı seçim aynen yayınlanır (yalnız
+   *  koşmaz/geçersiz atlar elenir). Verilmezse (otomatik rebuild/reconciliation) eski DP yolu. */
+  explicitLegs?: HomeKuponLegInput[];
 }): Promise<SyncHomeKuponResult> {
   const baseHippodromeName = input.hippodromeName.split(" — ")[0];
   const dateIso = input.date;
@@ -184,55 +194,77 @@ export async function syncHomeKupon(input: {
   // dönüp hiçbir şey yapmama) KALDIRILDI: admin "Kupon Oluştur"a her bastığında yeniden
   // üretilip yayınlanır, "zaten aynı" diye sessizce reddedilmez.
 
-  // 6) effectiveOverrides — yalnız DP çağrısı için, DB'ye YAZILMAZ (PİVOT-2 madde 13).
   const eligibleNosByRaceNo: Record<number, Set<number>> = {};
   for (const leg of scopedLegs) {
     eligibleNosByRaceNo[leg.raceNo] = new Set(leg.runners.filter((r) => !r.scratched).map((r) => r.no));
   }
-  const effectiveOverrides = pruneToEligible(manualOverrides, eligibleNosByRaceNo);
 
-  // 7) Her ayakta en az 1 eligible at yoksa (forceExclude+scratched sıfırlamış olabilir) İPTAL.
-  for (const leg of scopedLegs) {
-    if ((eligibleNosByRaceNo[leg.raceNo]?.size ?? 0) === 0) {
-      return { ok: false, skipped: "NO_ELIGIBLE_RUNNERS" };
-    }
-  }
-
-  // 8) DP — otomatikGroupSelections'ın beklediği RaceDayData şekline dönüştür.
-  const racesForDp = scopedLegs.map((l) => ({
-    raceNo: l.raceNo,
-    pistAnormalMi: false,
-    pistDuyarliligi: l.pistDuyarliligi,
-    gecmisRiskSeviyesi: l.gecmisRiskSeviyesi,
-    pistUyariMesaji: null,
-    runners: l.runners.map((r) => ({
-      no: r.no,
-      name: "",
-      scratched: r.scratched,
-      ekuriGroup: r.ekuriGroup,
-      score: Math.round(r.olasilik * 100),
-      scoreExact: r.olasilik * 100,
-      agfSirasi: null,
-    })),
-  }));
-  const groupSel = otomatikGroupSelections(
-    racesForDp,
-    optimizerConfig.stakePerCombination,
-    optimizerConfig.limits as Record<Width, number>,
-    optimizerConfig.tolerances as Record<Width, number>,
-    effectiveOverrides
-  );
-  const legs: HomeKuponLegInput[] = scopedLegs
-    .map((l) => {
-      const sel = groupSel[l.raceNo] ?? { narrow: new Set<number>(), normal: new Set<number>(), wide: new Set<number>() };
-      return {
+  let legs: HomeKuponLegInput[];
+  if (input.explicitLegs) {
+    // WYSIWYG — admin'in ekranda onayladığı seçim AYNEN yayınlanır, DP yeniden çözülmez.
+    // Sunucu yalnız doğrular: havuzda olmayan ayakları ve koşmaz/geçersiz at no'larını eler.
+    const izinliAyaklar = new Set(input.raceNos);
+    const temizle = (raceNo: number, nos: number[]) => {
+      const uygun = eligibleNosByRaceNo[raceNo] ?? new Set<number>();
+      return [...new Set(nos)].filter((no) => uygun.has(no)).sort((a, b) => a - b);
+    };
+    legs = input.explicitLegs
+      .filter((l) => izinliAyaklar.has(l.raceNo))
+      .map((l) => ({
         raceNo: l.raceNo,
-        narrow: [...sel.narrow].sort((a, b) => a - b),
-        normal: [...sel.normal].sort((a, b) => a - b),
-        wide: [...sel.wide].sort((a, b) => a - b),
-      };
-    })
-    .filter((l) => l.narrow.length > 0 || l.normal.length > 0 || l.wide.length > 0);
+        narrow: temizle(l.raceNo, l.narrow),
+        normal: temizle(l.raceNo, l.normal),
+        wide: temizle(l.raceNo, l.wide),
+      }))
+      .filter((l) => l.narrow.length > 0 || l.normal.length > 0 || l.wide.length > 0);
+    if (legs.length === 0) return { ok: false, skipped: "NO_ELIGIBLE_RUNNERS" };
+  } else {
+    // 6) effectiveOverrides — yalnız DP çağrısı için, DB'ye YAZILMAZ (PİVOT-2 madde 13).
+    const effectiveOverrides = pruneToEligible(manualOverrides, eligibleNosByRaceNo);
+
+    // 7) Her ayakta en az 1 eligible at yoksa (forceExclude+scratched sıfırlamış olabilir) İPTAL.
+    for (const leg of scopedLegs) {
+      if ((eligibleNosByRaceNo[leg.raceNo]?.size ?? 0) === 0) {
+        return { ok: false, skipped: "NO_ELIGIBLE_RUNNERS" };
+      }
+    }
+
+    // 8) DP — otomatikGroupSelections'ın beklediği RaceDayData şekline dönüştür.
+    const racesForDp = scopedLegs.map((l) => ({
+      raceNo: l.raceNo,
+      pistAnormalMi: false,
+      pistDuyarliligi: l.pistDuyarliligi,
+      gecmisRiskSeviyesi: l.gecmisRiskSeviyesi,
+      pistUyariMesaji: null,
+      runners: l.runners.map((r) => ({
+        no: r.no,
+        name: "",
+        scratched: r.scratched,
+        ekuriGroup: r.ekuriGroup,
+        score: Math.round(r.olasilik * 100),
+        scoreExact: r.olasilik * 100,
+        agfSirasi: null,
+      })),
+    }));
+    const groupSel = otomatikGroupSelections(
+      racesForDp,
+      optimizerConfig.stakePerCombination,
+      optimizerConfig.limits as Record<Width, number>,
+      optimizerConfig.tolerances as Record<Width, number>,
+      effectiveOverrides
+    );
+    legs = scopedLegs
+      .map((l) => {
+        const sel = groupSel[l.raceNo] ?? { narrow: new Set<number>(), normal: new Set<number>(), wide: new Set<number>() };
+        return {
+          raceNo: l.raceNo,
+          narrow: [...sel.narrow].sort((a, b) => a - b),
+          normal: [...sel.normal].sort((a, b) => a - b),
+          wide: [...sel.wide].sort((a, b) => a - b),
+        };
+      })
+      .filter((l) => l.narrow.length > 0 || l.normal.length > 0 || l.wide.length > 0);
+  }
 
   // 9) currentHash — hesaplama sırasında BAŞKA bir Prediction değişti mi? (Faz 1'deki
   // startHash/currentHash race-condition deseniyle AYNI.)
@@ -260,8 +292,12 @@ export async function syncHomeKupon(input: {
           legs,
           isActive: true,
           manualOverrides: manualOverrides as unknown as Prisma.InputJsonValue,
-          sourcePredictionsHash: currentHash,
-          buildKey: key,
+          // Admin'in açık (WYSIWYG) yayını: sourcePredictionsHash/buildKey BOŞ bırakılır —
+          // otomatik rebuild (upsertPrediction tetiği) ve 5 dakikalık reconciliation cron'u
+          // `sourcePredictionsHash IS NULL` satırlara dokunmaz, yani "ne yayınladıysam o
+          // kalır", arka planda sessizce başka bir kupona dönüşmez.
+          sourcePredictionsHash: input.explicitLegs ? null : currentHash,
+          buildKey: input.explicitLegs ? null : key,
         },
       });
     });
@@ -493,6 +529,7 @@ export async function publishHomeKupon(input: HomeKuponInput): Promise<SyncHomeK
     raceNos: input.raceNos,
     manualOverrides: input.manualOverrides,
     clientSnapshot: input.clientSnapshot,
+    explicitLegs: input.legs,
   });
 }
 

@@ -465,9 +465,8 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
       return;
     }
 
-    // Ekrandaki `groupSel` yalnız bir ÖNİZLEME — sunucuya doğrudan legs YOLLANMAZ.
-    // Yollanan şey admin'in taban'dan (autoBaseline) SAPMASI (manuel niyet); sunucu
-    // TAZE Predictionlarla kendi DP'sini bu kısıtlarla baştan çözer.
+    // `manualOverrides` (autoBaseline'dan sapma) yalnız denetim kaydı için gönderilir;
+    // yayınlanan şey aşağıdaki `legs` (ekrandaki seçim) — sunucu DP'yi yeniden ÇÖZMEZ.
     const raceNos = group.map((r) => r.raceNo);
     const rawOverrides = diffToManualOverrides(groupSel, autoBaseline[key] ?? {}, group);
     const manualOverrides = normalizeManualOverrides(rawOverrides, raceNos);
@@ -476,6 +475,17 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
     // (ingest/AGF-sync/reanaliz nedeniyle) fark varsa yayını sessizce farklılaştırmak
     // yerine iptal eder.
     const clientSnapshot = toClientDependencyInput(group);
+    // 2026-09-28 — WYSIWYG: ekranda gördüğün seçim AYNEN yayınlanır (sunucu DP'yi yeniden
+    // çözmüyor). Yukarıdaki "sunucu kendi DP'sini çözer" yorumu artık geçerli değil.
+    const legs = group.map((r) => {
+      const sel = groupSel[r.raceNo] ?? emptySelection();
+      return {
+        raceNo: r.raceNo,
+        narrow: [...sel.narrow].sort((a, b) => a - b),
+        normal: [...sel.normal].sort((a, b) => a - b),
+        wide: [...sel.wide].sort((a, b) => a - b),
+      };
+    });
 
     setPublishingKey(key);
     try {
@@ -484,6 +494,7 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
         date,
         slot,
         raceNos,
+        legs,
         manualOverrides,
         clientSnapshot,
       });
