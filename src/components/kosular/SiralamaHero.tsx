@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Son5Yaris, type FormInfo } from "./SiralamaListesi";
@@ -11,11 +14,34 @@ import { kararStil } from "./siralama-stil";
 
 const TEMPO_KADEME = ["Çok Yavaş", "Yavaş", "Dengeli", "Hızlı", "Çok Hızlı"];
 
-/** Kazanma olasılığı halkası — saf SVG, bağımlılık yok. `yuzde` 0-100. */
+/** 0'dan `hedef`'e doğru ease-out ile sayan değer (açılışta ve hedef değişince). Kullanıcı
+ *  işletim sisteminde "hareketi azalt" seçtiyse animasyonsuz doğrudan hedefi verir. */
+function useSayac(hedef: number, sureMs = 1100): number {
+  const [deger, setDeger] = useState(0);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setDeger(hedef);
+      return;
+    }
+    let raf = 0;
+    const t0 = performance.now();
+    const adim = (t: number) => {
+      const p = Math.min(1, (t - t0) / sureMs);
+      setDeger(hedef * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) raf = requestAnimationFrame(adim);
+    };
+    raf = requestAnimationFrame(adim);
+    return () => cancelAnimationFrame(raf);
+  }, [hedef, sureMs]);
+  return deger;
+}
+
+/** Kazanma olasılığı halkası — saf SVG, bağımlılık yok. `yuzde` 0-100; halka ve sayı birlikte dolar. */
 function Halka({ yuzde }: { yuzde: number }) {
+  const gosterilen = useSayac(yuzde);
   const r = 52;
   const c = 2 * Math.PI * r;
-  const dolu = (Math.max(0, Math.min(100, yuzde)) / 100) * c;
+  const dolu = (Math.max(0, Math.min(100, gosterilen)) / 100) * c;
   return (
     <div className="relative h-32 w-32 shrink-0" role="img" aria-label={`Kazanma olasılığı yüzde ${yuzde.toFixed(1)}`}>
       <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
@@ -26,7 +52,7 @@ function Halka({ yuzde }: { yuzde: number }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-extrabold tabular-nums text-white">%{yuzde.toFixed(1)}</span>
+        <span className="text-2xl font-extrabold tabular-nums text-white">%{gosterilen.toFixed(1)}</span>
         <span className="mt-0.5 text-[9px] font-semibold uppercase tracking-widest text-white/50">Kazanma</span>
         <span className="text-[9px] font-semibold uppercase tracking-widest text-white/50">Olasılığı</span>
       </div>

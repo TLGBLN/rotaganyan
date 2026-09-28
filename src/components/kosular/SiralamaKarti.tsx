@@ -81,7 +81,7 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
     <div className="space-y-4">
       {/* Koşu sekmesi şeridi — "Altılı" sekmeleriyle aynı stil (yuvarlatılmış köşeli, seçili
           olan altın dolgu); yeşil nokta = analiz var, alt çizgi = TJK pist rengi. */}
-      <div className="flex gap-2 overflow-x-auto px-0.5 py-1" role="tablist" aria-label="Koşu seçimi">
+      <div className="flex gap-1 overflow-x-auto px-0.5 py-1 sm:gap-2" role="tablist" aria-label="Koşu seçimi">
         {raceDay.races.map((r) => {
           const aktif = activeRaceNo === r.raceNo;
           return (
@@ -92,7 +92,9 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
               aria-selected={aktif}
               onClick={() => setActiveRaceNo(r.raceNo)}
               className={cn(
-                "relative flex h-10 min-w-[2.75rem] shrink-0 items-center justify-center overflow-hidden rounded-lg border px-3.5 text-sm font-bold transition-colors",
+                // Mobilde (<640px) tüm koşular tek satıra eşit genişlikte SIĞAR (yarış programı
+                // sekmeleri gibi), sm+'ta sabit genişlikli butonlar.
+                "relative flex h-10 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-lg border px-0 text-sm font-bold transition-colors sm:min-w-[2.75rem] sm:flex-none sm:shrink-0 sm:px-3.5",
                 aktif
                   ? "border-brand bg-brand text-brand-foreground"
                   : "border-white/15 bg-[#0d1018] text-white/70 hover:border-brand/60 hover:text-white",
@@ -147,6 +149,7 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
       {/* 2026-09-28 yeni tasarım: koyu+altın karar kartı, halka, metrikler (bkz. SiralamaHero). */}
       {topPick && (
         <SiralamaHero
+          key={race.id}
           no={topPick.runner?.no ?? null}
           ad={topPick.runner?.name ?? topPick.runnerLabel ?? "—"}
           agfSirasi={topPick.runner?.no != null ? agfSiraMap.get(topPick.runner.no) ?? null : null}
