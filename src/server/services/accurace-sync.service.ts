@@ -23,7 +23,7 @@ const COMBINING_MARKS_RE = /[̀-ͯ]/g;
 // eşleşme kaçırılıyor (141 eşleşmeyenin büyük kısmı bu yüzdendi).
 const TRAILING_COUNTRY_CODE_RE = /\s*\([A-ZİĞÜŞÖÇ]{2,4}\)\s*$/i;
 
-function normalizeName(s: string): string {
+export function normalizeName(s: string): string {
   return s
     .replace(TRAILING_COUNTRY_CODE_RE, "")
     .toLocaleUpperCase("tr-TR")
@@ -44,9 +44,36 @@ export type AccuraceSyncSonuc = { kosular: number; kaydedilen: number; atlanan: 
  * kalır; scripts/_migrate_race_style.ts'nin yaptığı tek seferlik toplu işin küçük,
  * artımlı (yalnız o gün etkilenen atlar için) eşdeğeridir.
  */
-export async function updateRaceStyleForHorseNames(horseNames: string[]): Promise<void> {
+export type RaceStyleDegeri = {
+  style: string;
+  percent: number;
+  veri: number;
+  dagilim: Record<string, number>;
+  erkenHizGucu: number | null;
+  source: "accurace";
+  updatedAt: string;
+};
+
+/** 2026-09-28 — raceStyle kaydı ESKİ ŞEMALI mı? (dagilim/erkenHizGucu alanı hiç yok.)
+ *  V5.37'de (1 Eylül) Yarış Gidişatı için eklenen bu alanlar, production hedefi 25 Eylül'e kadar
+ *  eski bir deployment'a sabit kaldığı için (bkz. Vercel cron kök nedeni) çoğu Runner'da eksik kaldı;
+ *  eksik olunca yarisGidisatiSkoru sessizce 0 hesaplanıyor. erkenHizGucu'nun DEĞERİ null olabilir
+ *  (geçerli yüzdelik yok) — bu geçerli bir yeni-şema kaydıdır; yalnız ANAHTARIN yokluğu eski şemadır. */
+export function raceStyleEskiSemaMi(rs: unknown): boolean {
+  if (!rs || typeof rs !== "object") return false; // null = stil hiç yok, "eski şema" değil
+  const o = rs as Record<string, unknown>;
+  return !o.dagilim || !("erkenHizGucu" in o);
+}
+
+/**
+ * SAF HESAP — yazma yapmaz. Verilen at isimleri için Accurace geçmişinden (n>=3) kalıcı eğilimi
+ * hesaplar; anahtar = normalizeName(atAdı). Eğilim çıkarılamayan (ham veri yok / n<3) atlar
+ * haritada YOKTUR. updateRaceStyleForHorseNames ve dry-run/hedefli backfill aynı hesabı kullanır.
+ */
+export async function hesaplaRaceStyleDegerleri(horseNames: string[]): Promise<Map<string, RaceStyleDegeri>> {
   const uniq = [...new Set(horseNames)];
-  if (uniq.length === 0) return;
+  const sonuc = new Map<string, RaceStyleDegeri>();
+  if (uniq.length === 0) return sonuc;
 
   const splits = await db.accuraceHorseSplit.findMany({
     where: { horseName: { in: uniq } },
@@ -109,18 +136,7 @@ export async function updateRaceStyleForHorseNames(horseNames: string[]): Promis
     byName.set(norm, list);
   }
 
-  const runners = await db.runner.findMany({ where: { name: { in: uniq } }, select: { id: true, name: true } });
-  const runnerIdsByNorm = new Map<string, string[]>();
-  for (const r of runners) {
-    const norm = normalizeName(r.name);
-    const list = runnerIdsByNorm.get(norm) ?? [];
-    list.push(r.id);
-    runnerIdsByNorm.set(norm, list);
-  }
-
   for (const [norm, kayitlar] of byName) {
-    const ids = runnerIdsByNorm.get(norm);
-    if (!ids || ids.length === 0) continue;
     const sonuclar = kayitlar
       .map((k) => analizEtTekYaris(k.checkpoints, k.length, k.fieldSize))
       .filter((s): s is NonNullable<typeof s> => s != null);
@@ -132,7 +148,7 @@ export async function updateRaceStyleForHorseNames(horseNames: string[]): Promis
       .map((k) => k.erkenHizYuzdelik);
     const egilim = hesaplaCokYarisEgilimi(sonuclar, yuzdelikler);
     if (!egilim) continue;
-    const value = {
+    sonuc.set(norm, {
       style: egilim.stil,
       percent: egilim.percent,
       veri: egilim.n,
@@ -140,7 +156,34 @@ export async function updateRaceStyleForHorseNames(horseNames: string[]): Promis
       erkenHizGucu: egilim.erkenHizGucu,
       source: "accurace",
       updatedAt: new Date().toISOString(),
-    };
+    });
+  }
+  return sonuc;
+}
+
+/**
+ * Hesaplanan eğilimi o isme sahip TÜM Runner satırlarına yazar (günlük Accurace senkronu).
+ * Davranış 2026-09-28 refaktöründen ÖNCEKİYLE AYNIDIR — yalnız hesap hesaplaRaceStyleDegerleri'ne taşındı.
+ */
+export async function updateRaceStyleForHorseNames(horseNames: string[]): Promise<void> {
+  const uniq = [...new Set(horseNames)];
+  if (uniq.length === 0) return;
+
+  const degerler = await hesaplaRaceStyleDegerleri(uniq);
+  if (degerler.size === 0) return;
+
+  const runners = await db.runner.findMany({ where: { name: { in: uniq } }, select: { id: true, name: true } });
+  const runnerIdsByNorm = new Map<string, string[]>();
+  for (const r of runners) {
+    const norm = normalizeName(r.name);
+    const list = runnerIdsByNorm.get(norm) ?? [];
+    list.push(r.id);
+    runnerIdsByNorm.set(norm, list);
+  }
+
+  for (const [norm, value] of degerler) {
+    const ids = runnerIdsByNorm.get(norm);
+    if (!ids || ids.length === 0) continue;
     await db.runner.updateMany({ where: { id: { in: ids } }, data: { raceStyle: value } });
   }
 }
