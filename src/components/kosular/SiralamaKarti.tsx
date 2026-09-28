@@ -79,8 +79,8 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
     null;
   return (
     <div className="space-y-4">
-      {/* Koşu sekmesi şeridi — yuvarlak koyu sekmeler, seçili olan altın; yeşil nokta =
-          analiz var, alt çizgi = TJK pist rengi. */}
+      {/* Koşu sekmesi şeridi — "Altılı" sekmeleriyle aynı stil (yuvarlatılmış köşeli, seçili
+          olan altın dolgu); yeşil nokta = analiz var, alt çizgi = TJK pist rengi. */}
       <div className="flex gap-2 overflow-x-auto px-0.5 py-1" role="tablist" aria-label="Koşu seçimi">
         {raceDay.races.map((r) => {
           const aktif = activeRaceNo === r.raceNo;
@@ -92,9 +92,9 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
               aria-selected={aktif}
               onClick={() => setActiveRaceNo(r.raceNo)}
               className={cn(
-                "relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border text-sm font-bold transition-all",
+                "relative flex h-10 min-w-[2.75rem] shrink-0 items-center justify-center overflow-hidden rounded-lg border px-3.5 text-sm font-bold transition-colors",
                 aktif
-                  ? "border-brand bg-brand text-brand-foreground shadow-[0_0_16px_-2px] shadow-brand/70"
+                  ? "border-brand bg-brand text-brand-foreground"
                   : "border-white/15 bg-[#0d1018] text-white/70 hover:border-brand/60 hover:text-white",
                 !hasAnalysis(r) && !aktif && "opacity-50"
               )}
@@ -103,7 +103,7 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
               {hasAnalysis(r) && (
                 <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[#27ae60] ring-1 ring-black/40" />
               )}
-              <span className={cn("absolute inset-x-3 bottom-0.5 h-[3px] rounded-full", SURFACE_CIZGI[r.surface] ?? "bg-white/20")} />
+              <span className={cn("absolute inset-x-2.5 bottom-0.5 h-[3px] rounded-full", SURFACE_CIZGI[r.surface] ?? "bg-white/20")} />
             </button>
           );
         })}
