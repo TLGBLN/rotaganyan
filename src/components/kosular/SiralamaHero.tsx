@@ -60,6 +60,28 @@ function Halka({ yuzde }: { yuzde: number }) {
   );
 }
 
+/** Yarış Gidişatı göstergesi — segmentler açılışta soldan sağa sırayla dolar (halka animasyonuyla
+ *  aynı sürede biter). "Hareketi azalt" ayarında animasyonsuz doğrudan dolu görünür. */
+function TempoCubugu({ kademe }: { kademe: number }) {
+  const [hazir, setHazir] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setHazir(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  return (
+    <div className="flex gap-1" aria-hidden="true">
+      {TEMPO_KADEME.map((_, i) => (
+        <span key={i} className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-white/15">
+          <span
+            className="absolute inset-0 origin-left rounded-full bg-brand transition-transform duration-500 ease-out motion-reduce:transition-none"
+            style={{ transform: hazir && i <= kademe ? "scaleX(1)" : "scaleX(0)", transitionDelay: `${i * 140}ms` }}
+          />
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function Metrik({ icon, etiket, children }: { icon: React.ReactNode; etiket: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1.5 text-sm">
@@ -141,11 +163,7 @@ export default function SiralamaHero(p: SiralamaHeroProps) {
                 <span className="text-white/60">Yarış Gidişatı</span>
                 <span className="font-bold text-white">{TEMPO_KADEME[p.tempoKademe]}</span>
               </div>
-              <div className="flex gap-1" aria-hidden="true">
-                {TEMPO_KADEME.map((_, i) => (
-                  <span key={i} className={cn("h-1.5 flex-1 rounded-full", i <= p.tempoKademe! ? "bg-brand" : "bg-white/15")} />
-                ))}
-              </div>
+              <TempoCubugu kademe={p.tempoKademe} />
             </div>
           )}
         </div>

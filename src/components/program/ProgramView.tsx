@@ -1708,9 +1708,9 @@ export default function ProgramView({
         <>
           {/* Koşu tab'ları + Pist durumu/hava — 2026-09-20 kullanıcı talebi: web'de (sm+)
               aynı satırda, dar mobilde eskisi gibi alt alta. */}
-          <div className="flex flex-col border-b bg-background shrink-0 print:hidden sm:flex-row sm:items-center">
+          <div className="flex flex-col border-b bg-background shrink-0 print:hidden lg:flex-row lg:items-center">
             {/* Koşu tab'ları */}
-            <div className="flex min-w-0 shrink overflow-x-auto sm:flex-1">
+            <div className="flex min-w-0 shrink overflow-x-auto lg:flex-1">
               {currentDay.races.map((r) => (
                 <button
                   key={r.raceNo}
@@ -1733,7 +1733,9 @@ export default function ProgramView({
 
             {/* Pist durumu + hava (TJK) */}
             {((currentDay.surfaceConditions?.length ?? 0) > 0 || currentDay.weather || currentRace) && (
-              <div className="flex flex-wrap items-center gap-2 border-t bg-muted/10 px-3 py-1.5 text-[11px] sm:border-t-0 sm:border-l sm:bg-transparent">
+              // 2026-09-28: web'de (sm+) pist/hava bilgisi sağa yaslı (koşu satırının sonuna); yan yana
+              // yalnız lg+ (≥1024px) — dar/orta genişlikte sekmeler ezilmesin diye kendi satırına iner.
+              <div className="flex flex-wrap items-center gap-2 border-t bg-muted/10 px-3 py-1.5 text-[11px] sm:justify-end sm:text-right lg:border-t-0 lg:border-l lg:bg-transparent">
                 {currentDay.surfaceConditions?.map((c, i) => (
                   <span
                     key={i}
