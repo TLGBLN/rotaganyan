@@ -4,12 +4,9 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ProgramRaceDay, KuponOnerisi } from "@/server/services/race.service";
 import type { TempoSenaryosu } from "@/lib/methodology/pace-analizi";
-import { siraliPickler } from "@/lib/methodology/pick-display-order";
-import { piyasaFarkiPuani, kararOku } from "@/lib/methodology/muhakeme-format";
 import { KuponBlock } from "@/components/home/TahminOnerileri";
-import SiralamaListesi from "./SiralamaListesi";
-import SiralamaHero from "./SiralamaHero";
-import { agfSiraMapOlustur } from "@/lib/agf-sira";
+import SiralamaRaceView from "./SiralamaRaceView";
+import { sunucuKosusuToSiralama } from "./siralama-tipleri";
 
 type Race = ProgramRaceDay["races"][number];
 type Kupon = NonNullable<KuponOnerisi>;
@@ -21,16 +18,6 @@ const SURFACE_CIZGI: Record<string, string> = {
   CIM: "bg-[#009900]",
   KUM: "bg-[#996633]",
   SENTETIK: "bg-[#D39B1E]",
-};
-
-// Tempo senaryosu → 5 kademeli "Yarış Gidişatı" göstergesi (0 = en yavaş, 4 = en hızlı).
-const TEMPO_KADEME_INDEX: Record<string, number> = {
-  RAHAT_LIDERLIK: 0,
-  YAVAS_TEMPO: 1,
-  DENGELI: 2,
-  MUCADELELI: 3,
-  COK_YUKSEK: 4,
-  DAGILMA_RISKI: 4,
 };
 
 function hasAnalysis(r: Race): boolean {
@@ -58,16 +45,6 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
   if (analyzed.length === 0) return null;
 
   const race = raceDay.races.find((r) => r.raceNo === activeRaceNo) ?? analyzed[0];
-  const picks = race.prediction?.picks ?? [];
-  const agfByNo = new Map(race.runners.map((r) => [r.no, r.agf]));
-  const formByNo = new Map(race.runners.map((r) => [r.no, { recentForm: r.recentForm, recentFormSurfaces: r.recentFormSurfaces }]));
-  const topPick = siraliPickler(picks)[0];
-  const topModel = topPick ? topPick.scoreExact ?? topPick.score : null;
-  const topAgf = topPick?.runner?.no != null ? agfByNo.get(topPick.runner.no) ?? null : null;
-  // 2026-09-17 kullanıcı talebi: AGF sırası (1., 2., ...) liste satırlarındaki gibi
-  // hero'daki 1. sıra atın adının yanında da görünsün — bkz. SiralamaListesi.tsx.
-  const agfSiraMap = agfSiraMapOlustur(race.runners);
-  const fark = topModel != null ? piyasaFarkiPuani(topModel, topAgf) : null;
   const tempo = tempoByRaceId[race.id] ?? null;
 
   // Bu hipodromun bugünkü kuponu — birden fazla aday varsa (1./2. Altılı, 7'li Ganyan)
@@ -146,36 +123,22 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
         );
       })()}
 
-      {/* 2026-09-28 yeni tasarım: koyu+altın karar kartı, halka, metrikler (bkz. SiralamaHero). */}
-      {topPick && (
-        <SiralamaHero
-          key={race.id}
-          no={topPick.runner?.no ?? null}
-          ad={topPick.runner?.name ?? topPick.runnerLabel ?? "—"}
-          agfSirasi={topPick.runner?.no != null ? agfSiraMap.get(topPick.runner.no) ?? null : null}
-          modelYuzde={topModel}
-          agfYuzde={topAgf}
-          fark={fark}
-          karar={kararOku(topPick.details)}
-          jokeyAntrenor={[topPick.runner?.jockey, topPick.runner?.trainer].filter(Boolean).join(" · ")}
-          form={formByNo.get(topPick.runner?.no ?? -1)}
-          tempoKademe={tempo != null ? TEMPO_KADEME_INDEX[tempo] ?? null : null}
-        />
-      )}
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
-        <SiralamaListesi race={race} formByNo={formByNo} />
-
-        <div className="space-y-4 lg:sticky lg:top-4">
-          {kupon ? (
+      {/* Karar hero'su + sıralama listesi + kupon: /program'daki "Analiz Yayında" paneliyle PAYLAŞILAN
+          bileşen (SiralamaRaceView) — kupon bu sayfaya özgü (yayınlanmış altılı) yan panel olarak geçilir. */}
+      <SiralamaRaceView
+        raceKey={race.id}
+        race={sunucuKosusuToSiralama(race)}
+        tempoSenaryosu={tempo}
+        yan={
+          kupon ? (
             <KuponBlock data={kupon} ikramiye={kupon.ikramiye} isAdmin={isAdmin} cityLabel="Kupon Önerisi" />
           ) : (
             <div className="rounded-2xl border border-dashed px-4 py-6 text-center text-xs text-muted-foreground">
               Bu hipodrom için kupon önerisi henüz yayınlanmadı.
             </div>
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
     </div>
   );
 }

@@ -1,25 +1,23 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import type { ProgramRaceDay } from "@/server/services/race.service";
 import { finishPos } from "@/lib/race-result";
 import { kararOku, puanYuzdesiMetni } from "@/lib/methodology/muhakeme-format";
 import { ekuriRengi } from "@/lib/ekuri-colors";
 import { siraliPickSatirlari } from "@/lib/methodology/pick-display-order";
 import { agfSiraMapOlustur } from "@/lib/agf-sira";
 import { kararStil } from "./siralama-stil";
+import type { SiralamaRace, SiralamaPick } from "./siralama-tipleri";
 
-type Race = ProgramRaceDay["races"][number];
-type Pick = NonNullable<Race["prediction"]>["picks"][number];
 
 // 2026-09-14 — Rotaganyan Sıralama Tablosu "karar katmanı": PuanTablosu.tsx'in çoklu-koşu
 // yan-yana tablo yapısını KOPYALAMAZ (bu bileşen TEK koşu, tam genişlik satırlar gösterir —
 // mockup'taki gibi), ama eküri-birleştirme/sıralama/puan-metni mantığı AYNI paylaşılan
 // yardımcılardan gelir (siraliPickSatirlari, puanYuzdesiMetni, kararOku, ekuriRengi,
 // finishPos) — PuanTablosu.tsx'teki buildPickRows ile birebir aynı birleştirme kuralı.
-function buildRows(picks: Pick[]): Pick[][] {
+function buildRows(picks: SiralamaPick[]): SiralamaPick[][] {
   const renderedNos = new Set<number>();
-  const rows: Pick[][] = [];
+  const rows: SiralamaPick[][] = [];
   for (const p of picks) {
     const no = p.runner?.no;
     if (no != null && renderedNos.has(no)) continue;
@@ -89,10 +87,10 @@ export default function SiralamaListesi({
   race,
   formByNo,
 }: {
-  race: Race;
+  race: SiralamaRace;
   formByNo: Map<number, FormInfo>;
 }) {
-  const picks = race.prediction?.picks ?? [];
+  const picks = race.picks;
   if (picks.length === 0) return null;
   const rows = buildRows(picks);
   // 2026-09-17 kullanıcı talebi: AGF sırası burada HERKESE açık gösterilsin (agf-sira.ts'teki

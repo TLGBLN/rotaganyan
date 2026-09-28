@@ -9,10 +9,9 @@ import { useLocaleSwitch } from "@/components/providers/LocaleProvider";
 import { EKURI_COLORS, ekuriRengi } from "@/lib/ekuri-colors";
 import { ChevronDown, ChevronUp, Star, Info, Radio } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
-import { kararOku, puanYuzdesiMetni } from "@/lib/methodology/muhakeme-format";
-import { siraliPickSatirlari } from "@/lib/methodology/pick-display-order";
-import { agfSiraMapOlustur } from "@/lib/agf-sira";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
+import SiralamaRaceView from "@/components/kosular/SiralamaRaceView";
+import { programKosusuToSiralama } from "@/components/kosular/siralama-tipleri";
 import HorseDetailModal from "./HorseDetailModal";
 import HipodromOzellikleriModal from "./HipodromOzellikleriModal";
 import EmailVerificationGate from "./EmailVerificationGate";
@@ -335,26 +334,9 @@ function PistMesafeInfoButton({
   );
 }
 
-function rankStyle(rank: number) {
-  if (rank <= 3) return { badge: "bg-[#27ae60] text-white", text: "text-[#27ae60]" };
-  if (rank <= 6) return { badge: "bg-brand text-brand-foreground", text: "text-brand" };
-  return { badge: "bg-muted text-muted-foreground", text: "text-muted-foreground" };
-}
-
 function pickDisplay(p: ProgramPick): { no: number | string; name: string } {
   if (p.runner) return { no: p.runner.no, name: p.runner.name };
   return { no: "—", name: p.runnerLabel ?? "—" };
-}
-
-// v6.55 — V2 motorunun (sayısal puanlama yok) picks'lerinde score her zaman null —
-// bunun yerine details'teki "karar" (Güçlü Aday/Orta Risk/...) etiketini göster,
-// PuanTablosu.tsx/InlineAnalysisPanel.tsx'teki aynı desen (bkz. puanHucresi orada).
-// v6.70 (V2.2): details artık iki farklı şekilde (eski string[] / yeni {versiyon:2,...}
-// objesi) gelebiliyor — okuma merkezi muhakeme-format.ts'teki kararOku'ya taşındı.
-function puanHucresi(score: number | null, details: unknown, scoreExact?: number | null): string {
-  const metin = puanYuzdesiMetni(score, scoreExact);
-  if (metin != null) return `%${metin}`;
-  return kararOku(details) ?? "—";
 }
 
 function XLogo({ className }: { className?: string }) {
@@ -426,8 +408,10 @@ function PanelKilitGate({
 // ── Analiz paneli ────────────────────────────────────────────────────────────
 
 function AnalysisPanel({
-  picks, runners, winnerNos, ganyan, isLoggedIn, isAdmin, isVerified, userEmail, raceNo, hippodromeName, raceId,
+  race, picks, runners, winnerNos, ganyan, isLoggedIn, isAdmin, isVerified, userEmail, raceNo, hippodromeName, raceId,
 }: {
+  /** 2026-09-28: sıralama görünümü (SiralamaRaceView) tüm koşu verisini (sonuç, tempo, runner'lar) ister. */
+  race: ProgramRace;
   picks: ProgramPick[];
   runners: ProgramRunner[];
   winnerNos?: number[] | null;
@@ -456,40 +440,6 @@ function AnalysisPanel({
   // (canlı) durumundan geliyor — picks sabit kaldığı için aradaki farkı yakalayabiliyor.
   const scratchedNos = new Set(runners.filter((r) => r.scratched).map((r) => r.no));
 
-  // 2026-09-10 kullanıcı talebi: PuanTablosu.tsx'teki gibi, admin için at adının yanında
-  // o koşudaki AGF sırası da görünsün — yalnız admin (bkz. agf-sira.ts'teki gerekçe).
-  const agfSiraMap = agfSiraMapOlustur(runners);
-
-  // 2026-09-01 kullanıcı talebi: "sıralama yaparken de yer kaplamasın, eküriler yan yana
-  // belirtilsin" — Analiz Detayları tablosunda iki eküri ortağı AYRI satır olarak iki kat
-  // yer kaplamasın, aynı satırda birlikte gösterilsin (No/At/Toplam'ın hepsi "A / B" biçiminde).
-  const ekuriGroupByNo = new Map<number, number>();
-  runners.forEach((r) => { if (r.ekuriGroup != null && r.ekuriGroup >= 1) ekuriGroupByNo.set(r.no, r.ekuriGroup); });
-  const renderedPickNos = new Set<number>();
-  const pickRows: ProgramPick[][] = [];
-  for (const p of picks) {
-    const no = p.runner?.no;
-    if (no != null && renderedPickNos.has(no)) continue;
-    const grp = no != null ? ekuriGroupByNo.get(no) : undefined;
-    const partner = grp != null
-      ? picks.find((q) => q !== p && q.runner?.no != null && !renderedPickNos.has(q.runner.no) && ekuriGroupByNo.get(q.runner.no) === grp)
-      : undefined;
-    if (no != null) renderedPickNos.add(no);
-    if (partner?.runner?.no != null) {
-      renderedPickNos.add(partner.runner.no);
-      pickRows.push([p, partner]);
-    } else {
-      pickRows.push([p]);
-    }
-  }
-
-  // 2026-09-05 kullanıcı talebi: bu tablodaki gösterim sırası artık HER ZAMAN yüzdesel
-  // (Toplam/score) yüksekten azalana göre — terfi/garanti mekanizmalarının admin tarafında
-  // tuttuğu Sıra (rank, gösterim amaçlı kasıtlı olarak ham olasılıktan sapabiliyor) burada
-  // KULLANILMIYOR. displayRank zaten aşağıda dizideki konumdan (rowIdx+1) hesaplanıyor, bu
-  // yüzden diziyi puana göre sıralamak yeterli. Bkz. pick-display-order.ts'in başındaki not
-  // — bu AYNI sıralama PuanTablosu.tsx'te de gerekiyordu, artık tek yerden.
-  const sortedPickRows = siraliPickSatirlari(pickRows);
 
   // v6.68 — kullanıcı talebi 2026-08-09: "link istemiyorum direk image üstüne
   // yerleştirilmeli" — eskiden Twitter intent'ine bir URL (link) gönderiliyordu, o da
@@ -581,6 +531,8 @@ function AnalysisPanel({
     );
   }
 
+  const kazananPick = winnerNos && winnerNos.length > 0 ? picks.find((pk) => pk.runner?.no != null && winnerNos.includes(pk.runner.no)) : undefined;
+
   return (
     <div ref={ref} className="border-t">
       {/* Başlık */}
@@ -588,116 +540,45 @@ function AnalysisPanel({
         <span className="text-sm font-bold tracking-wide text-white">Analiz Detayları</span>
       </div>
 
-      {/* Masaüstü tablo — Kilit Gerekçe sütunu kaldırıldıktan sonra "At" tek esnek sütun kaldı;
-          w-full bırakılırsa geniş ekranlarda tüm sayfa genişliğine gerip Toplam'ı sağ kenara
-          fırlatıyordu (kullanıcı ekran görüntüsü) — max-w ile tablo doğal genişliğine sabitlendi.
-          v6.59 — V2 motorunun "Düşük Risk/Yüksek Risk" gibi uzun karar etiketleri eski dar
-          sayısal Toplam sütununda (w-14) satır içi kırılıyordu; max-w de büyütülerek boşluk
-          azaltıldı (kullanıcı ekran görüntüsü, 2026-08-04). */}
-      <div className="hidden sm:flex overflow-x-auto">
-        <table className="w-full max-w-xl shrink-0 text-xs">
-          <thead>
-            <tr className="border-b bg-muted/60 text-[11px] text-muted-foreground">
-              <th className="px-2 py-2 text-center w-8">{t("sira")}</th>
-              <th className="px-2 py-2 text-center w-8">{t("no")}</th>
-              <th className="px-2 py-2 text-left">{t("at")}</th>
-              <th className="px-2 py-2 text-center w-24 font-bold whitespace-nowrap">{t("toplam")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedPickRows.map((rowPicks, rowIdx) => {
-              const first = rowPicks[0];
-              // 2026-09-01 kullanıcı talebi: eküri ortağı aynı satırda birleşince, SONRAKİ
-              // atların gösterilen sırası da yukarı kaysın (ör. 7 at → eküri birleşince 6
-              // satır, Barbuda 7.den 6.ya çıkar) — rozet/renk artık pick.rank DEĞİL, birleşmiş
-              // listedeki SIRALI konum (rowIdx+1). İyi olan ortak İLK yazılır (picks zaten
-              // rank sırasına göre taranıp eşleştiği için doğal olarak öyle geliyor).
-              const displayRank = rowIdx + 1;
-              const winnerPick = rowPicks.find((p) => p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no));
-              const isWinner = winnerPick != null;
-              const rs = rankStyle(displayRank);
-              const noText = rowPicks.map((p) => pickDisplay(p).no).join("-");
-              const nameText = rowPicks.map((p) => pickDisplay(p).name).join(" / ");
-              const agfRanks = rowPicks
-                .map((p) => (p.runner?.no != null ? agfSiraMap.get(p.runner.no) : null))
-                .filter((n): n is number => n != null);
-              return (
-                <tr key={first.rank} className={cn("border-b last:border-0", isWinner && "bg-[#f5c518]/10")}>
-                  <td className="px-2 py-2 text-center">
-                    <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold", rs.badge)}>
-                      {displayRank}
-                    </span>
-                  </td>
-                  <td className={cn("px-2 py-2 text-center font-mono font-bold whitespace-nowrap", isWinner ? "text-winner" : rs.text)}>{noText}</td>
-                  <td className={cn("px-2 py-2 font-semibold", isWinner ? "text-winner" : rs.text)}>
-                    <span className="inline-flex items-center gap-1.5">
-                      {nameText}
-                      {isAdmin && agfRanks.length > 0 && (
-                        <span className="rounded bg-purple-500/15 px-1 text-[9px] font-semibold text-purple-500">
-                          AGF {agfRanks.join("/")}.
-                        </span>
-                      )}
-                      {isWinner && ganyan != null && (
-                        <span className="text-[10px] font-semibold text-winner">Gny: {ganyan.toFixed(2)}</span>
-                      )}
-                      {isWinner && isAdmin && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => handleShare("instagram")}
-                            title={t("instagramdaPaylas")}
-                            aria-label={t("instagramdaPaylas")}
-                            className="flex items-center justify-center w-4 h-4 rounded hover:bg-foreground/15 transition-colors shrink-0 print:hidden"
-                          >
-                            <InstagramLogo className="h-3 w-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleShare("x")}
-                            title={t("xtePaylas")}
-                            aria-label={t("xtePaylas")}
-                            className="flex items-center justify-center w-4 h-4 rounded hover:bg-foreground/15 transition-colors shrink-0 print:hidden"
-                          >
-                            <XLogo className="h-3 w-3" />
-                          </button>
-                        </>
-                      )}
-                    </span>
-                  </td>
-                  <td className="px-2 py-2 text-center tabular-nums font-bold whitespace-nowrap">
-                    <span>{rowPicks.map((p) => puanHucresi(p.score, p.details, p.scoreExact)).join(" / ")}</span>
-                  </td>
-                </tr>
-              );
-            })}
-            {unpickedRunners.map((r) => (
-              <tr key={`geniş-${r.no}`} className="border-b last:border-0 opacity-60">
-                <td className="px-2 py-2 text-center text-muted-foreground">—</td>
-                <td className="px-2 py-2 text-center font-mono text-muted-foreground">{r.no}</td>
-                <td className="px-2 py-2 text-muted-foreground">{r.name}</td>
-                <td className="px-2 py-2 text-center text-muted-foreground">—</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* 2026-09-28 kullanıcı talebi: "/rotaganyansiralamasi'ndaki yapı, Analiz Yayında tıklandığında açılsın" —
+          eski Sıra/No/At/Toplam tablosu yerine o sayfayla AYNI paylaşılan bileşen (karar hero'su + sıralama
+          listesi). Yan sütunda bu koşuya özgü kademeli Kupon Önerisi (önceki paneldeki mantık aynen). */}
+      {isAdmin && kazananPick && (
+        <div className="flex flex-wrap items-center gap-2 border-b bg-[#f5c518]/10 px-4 py-1.5 text-xs print:hidden">
+          <span className="text-muted-foreground">{t("sonucLabel")}</span>
+          <span className="font-semibold text-winner">#{pickDisplay(kazananPick).no} {pickDisplay(kazananPick).name}</span>
+          {ganyan != null && <span className="text-[10px] font-semibold text-winner">Gny: {ganyan.toFixed(2)}</span>}
+          <button
+            type="button"
+            onClick={() => handleShare("instagram")}
+            title={t("instagramdaPaylas")}
+            aria-label={t("instagramdaPaylas")}
+            className="flex h-4 w-4 shrink-0 items-center justify-center rounded transition-colors hover:bg-foreground/15"
+          >
+            <InstagramLogo className="h-3 w-3" />
+          </button>
+          <button
+            type="button"
+            onClick={() => handleShare("x")}
+            title={t("xtePaylas")}
+            aria-label={t("xtePaylas")}
+            className="flex h-4 w-4 shrink-0 items-center justify-center rounded transition-colors hover:bg-foreground/15"
+          >
+            <XLogo className="h-3 w-3" />
+          </button>
+        </div>
+      )}
 
-        {/* Kupon Önerisi — kullanıcı talebi 2026-08-09: tablo max-w-xl'e sabitlendiği için
-            geniş ekranlarda sağda boş kalan alan, bu tablonun HEMEN yanında en doğal
-            tamamlayıcı bilgiyle (kademeli kupon önerisi) dolduruluyor. Kademe sınırı sabit
-            ve basit: Ekonomik ilk 3, Normal 4-5-6, Geniş 7 ve sonrası (unpickedRunners
-            dahil — Faz4 yalnız ilk 3-6 atı "pick" olarak kaydediyor, geri kalan saha zaten
-            unpickedRunners'ta). Ayrı depolanan couponNarrow/Normal/Wide string'lerine değil,
-            DOĞRUDAN bu tablodaki sırayla AYNI diziye dayanıyor — asla çelişmez.
-            v6.102 — kullanıcı talebi 2026-08-11: her kademe bir öncekini İÇERMELİ (Normal
-            = Ekonomik'in üstüne 4-5-6 ekler, Geniş = ikisinin üstüne 7+ ekler) — kademeler
-            artık ayrık dilimler değil, "/" ile ayrılmış KÜMÜLATİF gruplar halinde gösteriliyor.
-        */}
-        {(picks.length > 0 || unpickedRunners.length > 0) && (
-          <div className="flex-1 min-w-[150px] border-l px-4 py-3">
-            <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-              {t("kuponOnerisi")}
-            </div>
-            <div className="space-y-2">
+      <div className="p-3 sm:p-4">
+        <SiralamaRaceView
+          raceKey={raceId}
+          race={programKosusuToSiralama(race)}
+          tempoSenaryosu={race.tempoSenaryosu}
+          yan={
+            picks.length > 0 || unpickedRunners.length > 0 ? (
+              <div className="rounded-2xl border bg-card px-4 py-3">
+                <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{t("kuponOnerisi")}</div>
+                <div className="space-y-2">
               {(() => {
                 const ekonomikNos = picks.slice(0, 3).map((p) => p.runner?.no).filter((n): n is number => n != null);
                 const normalEkNos = picks.slice(3, 6).map((p) => p.runner?.no).filter((n): n is number => n != null);
@@ -729,87 +610,11 @@ function AnalysisPanel({
                   );
                 });
               })()}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Mobil kart listesi */}
-      <div className="sm:hidden divide-y">
-        {sortedPickRows.map((rowPicks, rowIdx) => {
-          const first = rowPicks[0];
-          const displayRank = rowIdx + 1;
-          const winnerPick = rowPicks.find((p) => p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no));
-          const isWinner = winnerPick != null;
-          const rs = rankStyle(displayRank);
-          const noText = rowPicks.map((p) => pickDisplay(p).no).join("-");
-          const nameText = rowPicks.map((p) => pickDisplay(p).name).join(" / ");
-          const agfRanks = rowPicks
-            .map((p) => (p.runner?.no != null ? agfSiraMap.get(p.runner.no) : null))
-            .filter((n): n is number => n != null);
-          const cekilenler = rowPicks
-            .map((p) => p.runner?.no)
-            .filter((n): n is number => n != null)
-            .filter((no) => scratchedNos.has(no));
-          return (
-            <div key={first.rank} className={cn("px-3 py-2.5", isWinner && "bg-[#f5c518]/10")}>
-              <div className="flex items-center gap-2 mb-1">
-                <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0", rs.badge)}>
-                  {displayRank}
-                </span>
-                <span className={cn("font-bold text-xs", isWinner ? "text-winner" : rs.text)}>#{noText}</span>
-                <span className={cn("font-semibold text-xs", isWinner ? "text-winner" : rs.text)}>{nameText}</span>
-                {isAdmin && agfRanks.length > 0 && (
-                  <span className="rounded bg-purple-500/15 px-1 text-[9px] font-semibold text-purple-500 shrink-0">
-                    AGF {agfRanks.join("/")}.
-                  </span>
-                )}
-                {isWinner && ganyan != null && (
-                  <span className="text-[10px] font-semibold text-winner">Gny: {ganyan.toFixed(2)}</span>
-                )}
-                {isWinner && isAdmin && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => handleShare("instagram")}
-                      title={t("instagramdaPaylas")}
-                      aria-label={t("instagramdaPaylas")}
-                      className="flex items-center justify-center w-4 h-4 rounded hover:bg-foreground/15 transition-colors shrink-0"
-                    >
-                      <InstagramLogo className="h-3 w-3" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleShare("x")}
-                      title={t("xtePaylas")}
-                      aria-label={t("xtePaylas")}
-                      className="flex items-center justify-center w-4 h-4 rounded hover:bg-foreground/15 transition-colors shrink-0"
-                    >
-                      <XLogo className="h-3 w-3" />
-                    </button>
-                  </>
-                )}
+                </div>
               </div>
-              <div className="flex gap-3 text-[11px] text-muted-foreground mb-1">
-                <span>{t("toplamPrefix")} <span className="font-bold text-foreground">{rowPicks.map((p) => puanHucresi(p.score, p.details, p.scoreExact)).join(" / ")}</span></span>
-              </div>
-              {cekilenler.length > 0 && (
-                <p className="text-[10px] font-medium text-red-400">
-                  {t("kuponAtCekildiUyari", { nos: cekilenler.join(", #") })}
-                </p>
-              )}
-            </div>
-          );
-        })}
-        {unpickedRunners.map((r) => (
-          <div key={`geniş-${r.no}`} className="px-3 py-2.5 opacity-60">
-            <div className="flex items-center gap-2">
-              <span className="w-5 shrink-0 text-center text-[10px] font-bold text-muted-foreground">—</span>
-              <span className="font-bold text-xs text-muted-foreground">#{r.no}</span>
-              <span className="font-semibold text-xs text-muted-foreground">{r.name}</span>
-            </div>
-          </div>
-        ))}
+            ) : null
+          }
+        />
       </div>
     </div>
   );
@@ -1476,6 +1281,7 @@ function RaceTable({
       <div id="panel-analiz" className="scroll-mt-14">
         {race.hasAnalysis && analysisOpen && (
           <AnalysisPanel
+            race={race}
             picks={race.picks}
             runners={race.runners}
             winnerNos={winnerNos}
