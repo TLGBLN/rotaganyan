@@ -5,32 +5,32 @@ import { cn } from "@/lib/utils";
 import type { ProgramRaceDay, KuponOnerisi } from "@/server/services/race.service";
 import type { TempoSenaryosu } from "@/lib/methodology/pace-analizi";
 import { siraliPickler } from "@/lib/methodology/pick-display-order";
-import { puanYuzdesiMetni, piyasaFarkiPuani } from "@/lib/methodology/muhakeme-format";
+import { puanYuzdesiMetni, piyasaFarkiPuani, kararOku } from "@/lib/methodology/muhakeme-format";
 import { KuponBlock } from "@/components/home/TahminOnerileri";
-import SiralamaListesi, { Son5Yaris } from "./SiralamaListesi";
+import SiralamaListesi from "./SiralamaListesi";
+import SiralamaHero from "./SiralamaHero";
 import { agfSiraMapOlustur } from "@/lib/agf-sira";
 
 type Race = ProgramRaceDay["races"][number];
 type Kupon = NonNullable<KuponOnerisi>;
 
-// 2026-09-14 — Koşu sekmesi pist renkleri: ProgramView.tsx'teki SURFACE_TAB_BG ile
-// AYNI kaynaktan (TJK'nın kendi Son 6 Yarış font-renkleri, bkz. proje hafızası
-// "TJK Pist Renkleri") — o dosyanın büyüklüğü/karmaşıklığı yüzünden export edip
-// import etmek yerine burada da (KuponForm.tsx'teki ALTILI_STAKE_PER_COMBINATION
-// gibi) küçük, kararlı bir sabit olarak kopyalandı.
-const SURFACE_TAB_BG: Record<string, string> = {
-  CIM: "bg-[#009900] hover:bg-[#00b300] text-white",
-  KUM: "bg-[#996633] hover:bg-[#a8754a] text-white",
-  SENTETIK: "bg-[#D39B1E] hover:bg-[#e0ab3a] text-white",
+// 2026-09-14 — Koşu sekmesi pist renkleri: TJK'nın kendi Son 6 Yarış font-renkleri
+// (bkz. proje hafızası "TJK Pist Renkleri"). 2026-09-28 yeni tasarımda sekmenin kendisi
+// koyu yuvarlak — pist bilgisi alt kenardaki ince renk çizgisiyle korunuyor.
+const SURFACE_CIZGI: Record<string, string> = {
+  CIM: "bg-[#009900]",
+  KUM: "bg-[#996633]",
+  SENTETIK: "bg-[#D39B1E]",
 };
 
-const TEMPO_LABEL: Record<string, string> = {
-  RAHAT_LIDERLIK: "Çok Yavaş",
-  YAVAS_TEMPO: "Yavaş",
-  DENGELI: "Dengeli",
-  MUCADELELI: "Hızlı",
-  COK_YUKSEK: "Çok Hızlı",
-  DAGILMA_RISKI: "Çok Hızlı",
+// Tempo senaryosu → 5 kademeli "Yarış Gidişatı" göstergesi (0 = en yavaş, 4 = en hızlı).
+const TEMPO_KADEME_INDEX: Record<string, number> = {
+  RAHAT_LIDERLIK: 0,
+  YAVAS_TEMPO: 1,
+  DENGELI: 2,
+  MUCADELELI: 3,
+  COK_YUKSEK: 4,
+  DAGILMA_RISKI: 4,
 };
 
 function hasAnalysis(r: Race): boolean {
@@ -79,25 +79,34 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
     null;
   return (
     <div className="space-y-4">
-      {/* Koşu sekmesi şeridi */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
-        {raceDay.races.map((r) => (
-          <button
-            key={r.id}
-            type="button"
-            onClick={() => setActiveRaceNo(r.raceNo)}
-            className={cn(
-              "relative shrink-0 rounded-lg px-3 py-2 text-xs font-bold transition-all",
-              SURFACE_TAB_BG[r.surface] ?? "bg-muted text-muted-foreground",
-              activeRaceNo === r.raceNo ? "ring-2 ring-inset ring-white shadow-inner" : "opacity-70 hover:opacity-100"
-            )}
-          >
-            {r.raceNo}
-            {hasAnalysis(r) && (
-              <span className="absolute top-1 right-0.5 h-1.5 w-1.5 rounded-full bg-[#27ae60] ring-1 ring-white" />
-            )}
-          </button>
-        ))}
+      {/* Koşu sekmesi şeridi — yuvarlak koyu sekmeler, seçili olan altın; yeşil nokta =
+          analiz var, alt çizgi = TJK pist rengi. */}
+      <div className="flex gap-2 overflow-x-auto px-0.5 py-1" role="tablist" aria-label="Koşu seçimi">
+        {raceDay.races.map((r) => {
+          const aktif = activeRaceNo === r.raceNo;
+          return (
+            <button
+              key={r.id}
+              type="button"
+              role="tab"
+              aria-selected={aktif}
+              onClick={() => setActiveRaceNo(r.raceNo)}
+              className={cn(
+                "relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border text-sm font-bold transition-all",
+                aktif
+                  ? "border-brand bg-brand text-brand-foreground shadow-[0_0_16px_-2px] shadow-brand/70"
+                  : "border-white/15 bg-[#0d1018] text-white/70 hover:border-brand/60 hover:text-white",
+                !hasAnalysis(r) && !aktif && "opacity-50"
+              )}
+            >
+              {r.raceNo}
+              {hasAnalysis(r) && (
+                <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[#27ae60] ring-1 ring-black/40" />
+              )}
+              <span className={cn("absolute inset-x-3 bottom-0.5 h-[3px] rounded-full", SURFACE_CIZGI[r.surface] ?? "bg-white/20")} />
+            </button>
+          );
+        })}
       </div>
 
       {/* Karar hero'su — 2026-09-14 kullanıcı bulgusu (mobil): eskiden tek satırlık
@@ -135,64 +144,21 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
         );
       })()}
 
-      {/* 2026-09-14 kullanıcı talebi: eskiden "from-foreground to-foreground/80" —
-          aynı rengin saydamlığı farklı olduğu için gözle neredeyse fark edilmiyordu.
-          Artık sitenin KENDİ marka rengine (brand, kehribar) doğru gerçek bir renk
-          geçişi var — jenerik mor/mavi gradyan değil. */}
+      {/* 2026-09-28 yeni tasarım: koyu+altın karar kartı, halka, metrikler (bkz. SiralamaHero). */}
       {topPick && (
-        <div className="rounded-2xl bg-gradient-to-br from-foreground via-foreground to-brand/25 px-4 py-4 text-background shadow-sm sm:px-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-baseline gap-2">
-              {/* 2026-09-14 kullanıcı talebi: hero'daki at, listedeki sıra rozetleriyle
-                  (1,2,3...) TUTARLI şekilde ayrıca "1." (model sırası) taşısın — bib
-                  numarasından (turuncu kutu) ayrı, ne olduğu karışmasın diye. */}
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-background/20 text-sm font-bold">
-                1.
-              </span>
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand text-lg font-extrabold text-brand-foreground">
-                {topPick.runner?.no ?? "—"}
-              </span>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="truncate text-lg font-bold sm:text-xl">{topPick.runner?.name ?? topPick.runnerLabel ?? "—"}</span>
-                  {topPick.runner?.no != null && agfSiraMap.has(topPick.runner.no) && (
-                    // Hero'nun kendi bg/text ters-çevirme deseniyle uyumlu (bkz. "1." rozeti) —
-                    // sabit mor renk bu koyu/açık ters-dönen zeminde her temada okunaklı olmazdı.
-                    <span className="shrink-0 rounded bg-background/20 px-1.5 py-0.5 text-xs font-semibold">
-                      AGF {agfSiraMap.get(topPick.runner.no)}.
-                    </span>
-                  )}
-                  <span className="text-lg font-extrabold font-math text-brand sm:text-xl">
-                    %{puanYuzdesiMetni(topPick.score, topPick.scoreExact) ?? "—"}
-                  </span>
-                </div>
-                {topAgf != null && (
-                  <div className="text-xs opacity-75">AGF %{topAgf.toFixed(1)} — piyasa {fark != null && fark > 0 ? "henüz fiyatlamıyor" : "farklı görüyor"}</div>
-                )}
-                {/* 2026-09-14 kullanıcı talebi: hero da liste satırlarıyla AYNI jokey/
-                    antrenör + Son 5 Yarış bilgisini taşısın. */}
-                {(topPick.runner?.jockey || topPick.runner?.trainer) && (
-                  <div className="text-xs opacity-75">
-                    {[topPick.runner?.jockey, topPick.runner?.trainer].filter(Boolean).join(" · ")}
-                  </div>
-                )}
-                <div className="mt-1">
-                  <Son5Yaris form={formByNo.get(topPick.runner?.no ?? -1)} adet={5} />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-              {tempo && TEMPO_LABEL[tempo] && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wide opacity-60">Yarış Gidişatı</div>
-                  <div className="font-bold">{TEMPO_LABEL[tempo]}</div>
-                </div>
-              )}
-            </div>
-
-          </div>
-        </div>
+        <SiralamaHero
+          no={topPick.runner?.no ?? null}
+          ad={topPick.runner?.name ?? topPick.runnerLabel ?? "—"}
+          agfSirasi={topPick.runner?.no != null ? agfSiraMap.get(topPick.runner.no) ?? null : null}
+          modelYuzde={topModel}
+          modelMetin={puanYuzdesiMetni(topPick.score, topPick.scoreExact)}
+          agfYuzde={topAgf}
+          fark={fark}
+          karar={kararOku(topPick.details)}
+          jokeyAntrenor={[topPick.runner?.jockey, topPick.runner?.trainer].filter(Boolean).join(" · ")}
+          form={formByNo.get(topPick.runner?.no ?? -1)}
+          tempoKademe={tempo != null ? TEMPO_KADEME_INDEX[tempo] ?? null : null}
+        />
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px] items-start">

@@ -78,8 +78,15 @@ export default async function RotaganyanSiralamasiPage({ searchParams }: PagePro
 
   return (
     <div className="mx-auto max-w-[1400px] px-3 py-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold">RotaGanyan Analiz Sıralaması</h1>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+            RotaGanyan <span className="text-brand">Analiz Sıralaması</span>
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+            Yarışları analiz ediyor, kazanç yolunuzu aydınlatıyoruz...
+          </p>
+        </div>
         <DateNavigator currentDate={currentDate} basePath="/rotaganyansiralamasi" />
       </div>
 

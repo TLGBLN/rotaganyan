@@ -7,6 +7,7 @@ import { kararOku, puanYuzdesiMetni } from "@/lib/methodology/muhakeme-format";
 import { ekuriRengi } from "@/lib/ekuri-colors";
 import { siraliPickSatirlari } from "@/lib/methodology/pick-display-order";
 import { agfSiraMapOlustur } from "@/lib/agf-sira";
+import { kararStil } from "./siralama-stil";
 
 type Race = ProgramRaceDay["races"][number];
 type Pick = NonNullable<Race["prediction"]>["picks"][number];
@@ -157,7 +158,7 @@ export default function SiralamaListesi({
                   {rowPicks.map((pick, pi) => (
                     <span key={pick.runner?.no ?? pi} className="flex items-center gap-1 min-w-0">
                       {pi > 0 && <span className="text-muted-foreground">/</span>}
-                      <span className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border text-[10px] font-bold">
+                      <span className="inline-flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded border border-current text-[10px] font-bold">
                         {pick.runner?.no ?? "—"}
                       </span>
                       <span className={cn("truncate", pick.runner?.scratched && "line-through opacity-50")}>
@@ -195,7 +196,9 @@ export default function SiralamaListesi({
                   </div>
                 )}
                 {kararOku(primary.details) && (
-                  <div className="hidden truncate text-[11px] text-muted-foreground sm:block">{kararOku(primary.details)}</div>
+                  <span className={cn("mt-0.5 inline-block rounded px-1.5 py-px text-[10px] font-semibold ring-1", kararStil(kararOku(primary.details)))}>
+                    {kararOku(primary.details)}
+                  </span>
                 )}
               </div>
 
