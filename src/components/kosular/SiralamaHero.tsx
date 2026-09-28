@@ -1,4 +1,4 @@
-import { BarChart3, Percent, ShieldCheck, TrendingDown, TrendingUp } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Son5Yaris, type FormInfo } from "./SiralamaListesi";
 import { kararStil } from "./siralama-stil";
@@ -51,7 +51,6 @@ export type SiralamaHeroProps = {
   ad: string;
   agfSirasi: number | null;
   modelYuzde: number | null;
-  modelMetin: string | null;
   agfYuzde: number | null;
   fark: number | null;
   karar: string | null;
@@ -61,7 +60,6 @@ export type SiralamaHeroProps = {
 };
 
 export default function SiralamaHero(p: SiralamaHeroProps) {
-  const FarkIkon = p.fark != null && p.fark < 0 ? TrendingDown : TrendingUp;
   return (
     <section
       className="relative overflow-hidden rounded-2xl border border-brand/50 bg-[#090b12] p-4 shadow-[0_0_40px_-12px] shadow-brand/40 sm:p-5"
@@ -104,21 +102,6 @@ export default function SiralamaHero(p: SiralamaHeroProps) {
 
         {/* Sağ: metrikler */}
         <div className="divide-y divide-white/10 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-1.5">
-          <Metrik icon={<BarChart3 className="h-4 w-4" />} etiket="AGF Oranı">
-            {p.agfYuzde != null ? `%${p.agfYuzde.toFixed(1)}` : "—"}
-          </Metrik>
-          <Metrik icon={<Percent className="h-4 w-4" />} etiket="Model Oranı">
-            {p.modelMetin != null ? `%${p.modelMetin}` : "—"}
-          </Metrik>
-          <Metrik icon={<FarkIkon className="h-4 w-4" />} etiket="Piyasa Farkı">
-            {p.fark != null ? (
-              <span className={p.fark >= 0 ? "text-emerald-300" : "text-rose-300"}>
-                {p.fark >= 0 ? "+" : "−"}%{Math.abs(p.fark).toFixed(1)}
-              </span>
-            ) : (
-              "—"
-            )}
-          </Metrik>
           <Metrik icon={<ShieldCheck className="h-4 w-4" />} etiket="Karar">
             {p.karar ? (
               <span className={cn("rounded-md px-2 py-0.5 text-xs font-bold ring-1", kararStil(p.karar, true))}>{p.karar}</span>

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import type { ProgramRaceDay, KuponOnerisi } from "@/server/services/race.service";
 import type { TempoSenaryosu } from "@/lib/methodology/pace-analizi";
 import { siraliPickler } from "@/lib/methodology/pick-display-order";
-import { puanYuzdesiMetni, piyasaFarkiPuani, kararOku } from "@/lib/methodology/muhakeme-format";
+import { piyasaFarkiPuani, kararOku } from "@/lib/methodology/muhakeme-format";
 import { KuponBlock } from "@/components/home/TahminOnerileri";
 import SiralamaListesi from "./SiralamaListesi";
 import SiralamaHero from "./SiralamaHero";
@@ -151,7 +151,6 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
           ad={topPick.runner?.name ?? topPick.runnerLabel ?? "—"}
           agfSirasi={topPick.runner?.no != null ? agfSiraMap.get(topPick.runner.no) ?? null : null}
           modelYuzde={topModel}
-          modelMetin={puanYuzdesiMetni(topPick.score, topPick.scoreExact)}
           agfYuzde={topAgf}
           fark={fark}
           karar={kararOku(topPick.details)}
