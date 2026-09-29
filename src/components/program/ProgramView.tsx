@@ -1577,7 +1577,7 @@ export default function ProgramView({
                 hipodrom sekmesi TAB tasarımıyla AYNI dil), aralarında gap — hem web HEM
                 mobilde AYNI görünüm: sabit boyut, taşarsa (mobilde kaçınılmaz) flex-wrap ile
                 ALT SATIRA iner, hiçbir zaman kırpılmaz/sıkıştırılmaz. */}
-            <div className="flex flex-wrap gap-1 lg:flex-1">
+            <div className="flex flex-wrap gap-1 p-2 lg:flex-1">
               {currentDay.races.map((r) => (
                 <button
                   key={r.raceNo}
