@@ -75,8 +75,8 @@ export async function persistRaceDays(raceDays: IngestRaceDay[]): Promise<Ingest
       // Upsert hippodrome
       const hippodrome = await db.hippodrome.upsert({
         where: { slug: rd.hippodromeSlug },
-        create: { name: rd.hippodromeName, slug: rd.hippodromeSlug },
-        update: { name: rd.hippodromeName },
+        create: { name: rd.hippodromeName, slug: rd.hippodromeSlug, isForeign: rd.isForeign ?? false, country: rd.country },
+        update: { name: rd.hippodromeName, isForeign: rd.isForeign ?? false, country: rd.country },
       });
 
       const date = new Date(rd.date);

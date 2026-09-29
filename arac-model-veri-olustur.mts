@@ -287,7 +287,10 @@ export type ModelRow = {
 
 async function main() {
   const races = await db.race.findMany({
-    where: { result: { isNot: null }, raceDay: { hippodrome: { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI } } } },
+    // 2026-09-29 — isForeign (TJK'nın yurt dışı simulcast fikstürleri, bkz. tjk.adapter.ts)
+    // de hariç: TR'ye özel sinyaller (hız/jokey/antrenör/sire oranı) yabancı at/jokey için
+    // anlamsız, eğitim verisine karışmamalı — admin.service.ts'teki AYNI desen.
+    where: { result: { isNot: null }, raceDay: { hippodrome: { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI }, isForeign: false } } },
     select: {
       id: true, classType: true, breed: true, distance: true, surface: true, ikramiyeDetay: true,
       raceDay: { select: { date: true, surfaceConditions: true } },

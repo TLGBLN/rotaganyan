@@ -55,6 +55,41 @@ const TURKISH_CITY_SLUGS: Record<string, string> = {
   KARMA: "karma",
 };
 
+// 2026-09-29 kullanıcı talebi — TJK'nın kendi sitesinde zaten listelenen yurt dışı
+// simulcast fikstürleri de programa eklendi. TJK bunları TR şehirlerinden AYRI bir
+// parantez biçimiyle işaretliyor: "Chantilly Fransa (YD 2)" — "(YD N)" TAM OLARAK bu
+// amaçla var (TR şehirlerinki "Adana (13. Y.G.)" gibi farklı biçimde), bu yüzden isim
+// eşleşmesi (kara/beyaz liste) yerine BU işarete bakmak — yeni bir ülke/hipodrom
+// eklendiğinde sessizce kaçırılmaz (TR_HIPPODROMES'daki "Selangor Malezya" dersiyle
+// AYNI risk sınıfı, bkz. tjk-info.adapter.ts).
+const YD_ETIKETI_RE = /\(\s*YD\s*\d+\s*\)\s*$/i;
+
+// Ülke adını isimden ayırmak best-effort (yalnız /program'da gösterim için, isForeign
+// KARARI YD_ETIKETI_RE'den gelir, bu listeden DEĞİL) — bulunamazsa country boş kalır,
+// tam isim (ör. "Chantilly Fransa") zaten hipodrom adı olarak yeterli bilgi taşır.
+const YABANCI_ULKELER = [
+  "Fransa", "Birleşik Krallık", "İngiltere", "İskoçya", "İrlanda", "Kanada", "ABD",
+  "Amerika Birleşik Devletleri", "Şili", "Arjantin", "Brezilya", "Almanya", "İtalya",
+  "İspanya", "Avustralya", "Yeni Zelanda", "Güney Afrika", "Japonya", "Hong Kong",
+  "Singapur", "Suudi Arabistan", "Katar", "Birleşik Arap Emirlikleri", "BAE",
+  "Malezya", "Hindistan", "Norveç", "İsveç", "Danimarka", "Belçika", "Hollanda",
+];
+
+function yabanciAdiAyristir(temizIsim: string): { hippodromeName: string; country?: string } {
+  const ulke = YABANCI_ULKELER.find((u) => temizIsim.endsWith(` ${u}`) || temizIsim === u);
+  return ulke ? { hippodromeName: temizIsim, country: ulke } : { hippodromeName: temizIsim };
+}
+
+/** Yabancı hipodrom slug'ı — TR haritası gibi elle değil, isimden otomatik (normTr ile
+ *  ASCII'ye indirgenip tireli hale getirilir). İsim zaten ülkeyi içerdiği için
+ *  ("chantilly-fransa") aynı hipodrom adının başka ülkede tekrarı pratikte çakışmaz. */
+function yabanciSlugUret(temizIsim: string): string {
+  return normTr(temizIsim)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function parseBreed(text: string): Breed {
   return text.toUpperCase().includes("ARAP") ? "ARAP" : "INGILIZ";
 }
@@ -292,17 +327,20 @@ function parseRunnersTable(
   return runners;
 }
 
-/** Discovers same-day city tabs: [{ sehirId, name }]. Filtered to Turkish hippodromes by caller. */
-async function fetchCityTabs(dmy: string): Promise<{ sehirId: string; name: string }[]> {
+/** Discovers same-day city tabs: [{ sehirId, name, isForeign }]. TR/yabancı ayrımı ve
+ *  filtreleme caller'da (fetchRaceDays) — bkz. YD_ETIKETI_RE üstündeki not. */
+async function fetchCityTabs(dmy: string): Promise<{ sehirId: string; name: string; isForeign: boolean }[]> {
   const url = `${BASE}/TR/YarisSever/Info/Page/GunlukYarisProgrami?QueryParameter_Tarih=${encodeURIComponent(dmy)}`;
   const html = await fetchHtml(url);
   const $ = cheerio.load(html);
 
-  const tabs: { sehirId: string; name: string }[] = [];
+  const tabs: { sehirId: string; name: string; isForeign: boolean }[] = [];
   $("a[data-sehir-id]").each((_, el) => {
     const sehirId = $(el).attr("data-sehir-id");
-    const name = cleanCell($(el).text()).replace(/\(.*\)\s*$/, "").trim();
-    if (sehirId && name) tabs.push({ sehirId, name });
+    const rawText = cleanCell($(el).text());
+    const isForeign = YD_ETIKETI_RE.test(rawText);
+    const name = rawText.replace(/\(.*\)\s*$/, "").trim();
+    if (sehirId && name) tabs.push({ sehirId, name, isForeign });
   });
   return tabs;
 }
@@ -361,20 +399,35 @@ export class TjkAdapter implements DataProvider {
     // normTr kullan: JS'in toUpperCase() "i"→"I" yapar ama "İ"→"İ" yapar,
     // dolayısıyla "İzmir".toUpperCase() = "İZMIR" (noktalı+normal I karışık).
     // normTr ise tüm Türkçe harfleri ASCII'ye normalize eder → "IZMIR" doğru eşleşir.
-    const turkishTabs = tabs.filter((t) => TURKISH_CITY_SLUGS[normTr(t.name)]);
-    if (turkishTabs.length === 0) return [];
+    // 2026-09-29 — TR listesindeki (isForeign=false) sekmeler ESKİ mantıkla (elle harita)
+    // işleniyor, isForeign=true olanlar (TJK'nın kendi "(YD N)" işaretiyle ayırdığı yurt
+    // dışı simulcast fikstürleri) ARTIK dışlanmıyor, otomatik slug/ülke ile işleniyor.
+    const relevantTabs = tabs.filter((t) => t.isForeign || TURKISH_CITY_SLUGS[normTr(t.name)]);
+    if (relevantTabs.length === 0) return [];
 
     const raceDays: IngestRaceDay[] = [];
-    for (const tab of turkishTabs) {
+    for (const tab of relevantTabs) {
       try {
         const races = await fetchCityProgram(tab.sehirId, tab.name, dmy);
         if (races.length === 0) continue;
-        raceDays.push({
-          date: target,
-          hippodromeSlug: TURKISH_CITY_SLUGS[normTr(tab.name)],
-          hippodromeName: tab.name,
-          races,
-        });
+        if (tab.isForeign) {
+          const { hippodromeName, country } = yabanciAdiAyristir(tab.name);
+          raceDays.push({
+            date: target,
+            hippodromeSlug: yabanciSlugUret(tab.name),
+            hippodromeName,
+            races,
+            isForeign: true,
+            country,
+          });
+        } else {
+          raceDays.push({
+            date: target,
+            hippodromeSlug: TURKISH_CITY_SLUGS[normTr(tab.name)],
+            hippodromeName: tab.name,
+            races,
+          });
+        }
       } catch {
         // One city failing shouldn't block the others.
         continue;

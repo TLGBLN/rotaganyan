@@ -133,6 +133,48 @@ export async function discoverTurkishCities(tjkDate: string): Promise<CityInfo[]
   return cities;
 }
 
+// 2026-09-29 — result-sync/agf-sync'in yurt dışı (simulcast) hipodromları da bulabilmesi
+// için: discoverTurkishCities'in AYNI sayfasını, TJK'nın "(YD N)" işaretine göre (bkz.
+// tjk.adapter.ts'teki YD_ETIKETI_RE — TR şekirlerininkinden FARKLI bir parantez biçimi,
+// isim eşleşmesi/kara-liste DEĞİL) yabancı sekmeleri toplayarak tarar. sehirAdi, ingest
+// (tjk.adapter.ts fetchCityTabs) ile AYNI kaynaktan (link metni, "(...)" temizlenmiş)
+// üretilir — slug (toSlug) bu yüzden DB'deki (ingest'in yazdığı) slug'la eşleşir.
+const YD_ETIKETI_RE = /\(\s*YD\s*\d+\s*\)\s*$/i;
+
+export async function discoverForeignCities(tjkDate: string): Promise<CityInfo[]> {
+  const url = `${BASE}/TR/YarisSever/Info/Page/GunlukYarisProgrami?QueryParameter_Tarih=${encodeURIComponent(tjkDate)}`;
+  const html = await fetchHtml(url);
+  const $ = cheerio.load(html);
+
+  const cities: CityInfo[] = [];
+  const seen = new Set<number>();
+
+  $("ul.gunluk-tabs li a[data-sehir-id]").each((_, el) => {
+    const sehirId = parseInt($(el).attr("data-sehir-id") ?? "0", 10);
+    if (!sehirId || seen.has(sehirId)) return;
+
+    const rawText = $(el).text().replace(/\s+/g, " ").trim();
+    if (!YD_ETIKETI_RE.test(rawText)) return;
+    const sehirAdi = rawText.replace(/\(.*\)\s*$/, "").trim();
+    if (!sehirAdi) return;
+
+    seen.add(sehirId);
+    cities.push({ sehirId, sehirAdi });
+  });
+
+  return cities;
+}
+
+/** result-sync/agf-sync'in tek çağrı noktası — TR + yurt dışı sekmelerinin BİRLEŞİMİ.
+ *  Aynı günün sayfası iki kez (discoverTurkishCities + discoverForeignCities) çekiliyor —
+ *  bu iki fonksiyon farklı çağıranlarca (yalnız TR isteyen kod yerleri de var) ayrı ayrı
+ *  kullanılabildiği için birleştirilmedi; maliyeti ihmal edilebilir (günlük program
+ *  sayfası küçük, cron'lar zaten dakikalar arası çalışıyor). */
+export async function discoverAllRelevantCities(tjkDate: string): Promise<CityInfo[]> {
+  const [tr, yabanci] = await Promise.all([discoverTurkishCities(tjkDate), discoverForeignCities(tjkDate)]);
+  return [...tr, ...yabanci];
+}
+
 // ── 2. Fetch & parse one city's race program ────────────────────────────────
 
 export async function fetchCityProgram(

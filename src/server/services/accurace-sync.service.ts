@@ -214,7 +214,10 @@ export async function syncAccuraceForDate(dateStr: string, matchRunners = true):
     const hippodromeName = race.raceDay.hippodrome.name;
     // Karma/uluslararası hipodromlarda gerçek bir şehir kodu yok — Accurace zaten
     // Türkiye koşularını kapsıyor, bunlar için deneme bile faydasız, sessizce atla.
-    if (hippodromeName === "Karma" || hippodromeName === "Perak Malezya") {
+    // 2026-09-29 — isForeign (TJK'nın kendi yurt dışı simulcast fikstürleri, bkz.
+    // tjk.adapter.ts) de AYNI sebeple atlanıyor: Accurace TR'ye özel bir GPS sağlayıcısı,
+    // bu koşuların hiçbirinde kaydı olmaz.
+    if (hippodromeName === "Karma" || hippodromeName === "Perak Malezya" || race.raceDay.hippodrome.isForeign) {
       atlanan++;
       continue;
     }

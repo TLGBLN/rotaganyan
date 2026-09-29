@@ -66,6 +66,11 @@ export type IngestRaceDay = {
   races: IngestRace[];
   surfaceConditions?: IngestSurfaceCondition[];
   weather?: string;
+  // 2026-09-29 — TJK'nın kendi sitesindeki yurt dışı simulcast fikstürleri (Chantilly,
+  // Bath, ...) için: true ise Hippodrome.isForeign=true yazılır. country TJK'nın verdiği
+  // ülke adı (yalnız yabancı hipodromlarda dolu).
+  isForeign?: boolean;
+  country?: string;
 };
 
 export type IngestResult = {

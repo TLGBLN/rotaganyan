@@ -280,7 +280,9 @@ const GERCEK_OLMAYAN_HIPODROM_SLUGLARI = ["karma", "perak-malezya"];
 // ettiği "gerçek zamanlı sayım, uydurma/yuvarlanmış değil" sözünü çift-sayım sessizce
 // bozuyordu (Koşu Arşivi 4.314→3.690, Arşiv Günü 561→457, Geçmiş Yarış Kaydı 42.807→
 // 36.716 — Karma hariç tutulunca). Artık HEPSİ aynı filtreyi kullanıyor.
-const GERCEK_HIPODROM_FILTRESI = { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI } };
+// 2026-09-29 — TJK'nın kendi yurt dışı simulcast fikstürleri (Hippodrome.isForeign, bkz.
+// tjk.adapter.ts) de AYNI sebeple (arşiv/istatistik gerçek TR hipodrom sayımı) hariç.
+const GERCEK_HIPODROM_FILTRESI = { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI }, isForeign: false };
 
 /** Dashboard'daki "Arşiv Kapsamı" kutusu için — hepsi gerçek DB sayımı, uydurma/yuvarlanmış değil. */
 export async function getArchiveStats() {

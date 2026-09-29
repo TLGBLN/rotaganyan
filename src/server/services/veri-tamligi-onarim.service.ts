@@ -90,7 +90,7 @@ export async function atProfiliniKontrolEtVeOnar(): Promise<VeriTamligiOnarimSon
     LEFT JOIN "HorseStatsCache" hs ON hs."tjkAtId" = r."tjkAtId"
     WHERE r.scratched = false AND r."tjkAtId" IS NOT NULL
       AND rd.date >= ${yediGunOnce} AND rd.date <= ${ikiGunSonra}
-      AND h.slug NOT IN ('karma', 'perak-malezya')
+      AND h.slug NOT IN ('karma', 'perak-malezya') AND h."isForeign" = false
       AND hs."tjkAtId" IS NULL
   `;
   const eksik = Number(rows[0]?.eksik ?? 0);

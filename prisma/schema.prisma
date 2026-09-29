@@ -151,7 +151,17 @@ model Hippodrome {
   id       String    @id @default(cuid())
   name     String    @unique
   slug     String    @unique
-  raceDays RaceDay[]
+  // 2026-09-29 kullanıcı talebi: TJK'nın kendi sitesinde zaten listelenen yurt dışı
+  // simulcast fikstürleri (Chantilly, Bath, ...) de programa eklendi — additive alanlar.
+  // isForeign: TR dışı bir hipodrom mu (program ingest'i bunu true yazar; TR hipodromları
+  // false/default). country: TJK'nın verdiği ülke adı (ör. "Fransa"), yalnız yabancı
+  // hipodromlarda dolu — /program'da başlık/etiket için. Model eğitimi/istatistik
+  // GERCEK_OLMAYAN_HIPODROM_SLUGLARI ile AYNI mantıkla bu alanı da hariç tutar (bkz.
+  // admin.service.ts, yakinsama-gecmis.ts, veri-tamligi.service.ts) — V5.46'nın TR'ye
+  // özel sinyalleri (hız/jokey/antrenör/sire oranı) yabancı at/jokey için anlamsız olur.
+  isForeign Boolean   @default(false)
+  country   String?
+  raceDays  RaceDay[]
 }
 
 model RaceDay {

@@ -1582,6 +1582,8 @@ export default function ProgramView({
                     ? <><Radio className="h-3 w-3 animate-pulse" /> {t("analiziGor")} {analysisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}</>
                     : <><Radio className="h-3 w-3 animate-pulse" /> {t("analiziGor")} 🔒</>}
                 </button>
+              ) : currentDay?.isForeign ? (
+                <span className="text-xs font-semibold text-muted-foreground shrink-0 whitespace-nowrap">{t("yurtDisiAnaliz")}</span>
               ) : (
                 <span className="text-xs font-semibold text-[#e74c3c] shrink-0 whitespace-nowrap">{t("analizHazirlaniyor")}</span>
               )}

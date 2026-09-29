@@ -210,7 +210,9 @@ export async function getHippodromes() {
   // KuponForm'un hipodrom seçicisinde seçilebilir bir seçenek olarak görünüyordu. "Karma"
   // gerçek/işlevsel (7'li Ganyan vb. için kullanılıyor) — o hariç tutulmadı, yalnız
   // Perak Malezya çıkarıldı.
-  return db.hippodrome.findMany({ where: { slug: { not: "perak-malezya" } }, orderBy: { name: "asc" } });
+  // 2026-09-29 — yurt dışı simulcast fikstürleri (isForeign) de hariç: kupon oluşturma
+  // yalnız TR koşuları için anlamlı, KuponForm'un seçicisinde görünmemeli.
+  return db.hippodrome.findMany({ where: { slug: { not: "perak-malezya" }, isForeign: false }, orderBy: { name: "asc" } });
 }
 
 export async function getRaceDetail(
@@ -928,7 +930,9 @@ export async function getCurrentRaces(dateStr: string): Promise<CurrentRace[]> {
   const date = new Date(dateStr + "T00:00:00.000Z");
 
   const raceDays = await db.raceDay.findMany({
-    where: { date: { gte: startOfDay(date), lte: endOfDay(date) } },
+    // 2026-09-29 — yurt dışı simulcast fikstürleri (Hippodrome.isForeign, bkz.
+    // tjk.adapter.ts) bu widget'a KARIŞMAZ; kullanıcı talebi yalnız /program görünümüydü.
+    where: { date: { gte: startOfDay(date), lte: endOfDay(date) }, hippodrome: { isForeign: false } },
     include: {
       hippodrome: { select: { name: true, slug: true } },
       races: {
@@ -1045,6 +1049,12 @@ export type ProgramDay = {
   id: string;
   hippodromeName: string;
   hippodromeSlug: string;
+  // 2026-09-29 — TJK'nın kendi yurt dışı simulcast fikstürleri (Chantilly, Bath, ...) de
+  // /program'a eklendi (kullanıcı talebi); isForeign=true olan günlerde hiç analiz/kupon
+  // üretilmez (V5.46'nın sinyalleri TR'ye özel), yalnız TJK'nın kendi program+sonuç+AGF
+  // verisi gösterilir — bkz. ProgramView.tsx.
+  isForeign: boolean;
+  country: string | null;
   races: ProgramRace[];
   surfaceConditions: { label: string; detail: string }[] | null;
   weather: string | null;
@@ -1063,7 +1073,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     // DEĞİŞTİRMEDEN yalnız round-trip sayısını azaltıyor — yerelde 8.3sn'den 3.4sn'ye indi.
     relationLoadStrategy: "join",
     include: {
-      hippodrome: { select: { name: true, slug: true } },
+      hippodrome: { select: { name: true, slug: true, isForeign: true, country: true } },
       races: {
         orderBy: { raceNo: "asc" },
         include: {
@@ -1199,6 +1209,8 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     id: rd.id,
     hippodromeName: rd.hippodrome.name,
     hippodromeSlug: rd.hippodrome.slug,
+    isForeign: rd.hippodrome.isForeign,
+    country: rd.hippodrome.country,
     surfaceConditions: (rd.surfaceConditions as { label: string; detail: string }[] | null) ?? null,
     weather: rd.weather,
     races: rd.races.map((r) => {

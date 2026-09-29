@@ -5,7 +5,7 @@
  */
 
 import { db } from "@/lib/db";
-import { discoverTurkishCities, fetchCityProgram, toSlug, toTjkDate, type CityInfo } from "./ingest/tjk-info.adapter";
+import { discoverAllRelevantCities, fetchCityProgram, toSlug, toTjkDate, type CityInfo } from "./ingest/tjk-info.adapter";
 
 export type AgfSyncCityResult = {
   name: string;
@@ -120,7 +120,7 @@ export async function syncAgfForDate(date: Date): Promise<AgfSyncResult> {
   d.setUTCHours(0, 0, 0, 0);
   const tjkDate = toTjkDate(d);
 
-  const cities = await discoverTurkishCities(tjkDate);
+  const cities = await discoverAllRelevantCities(tjkDate);
   const cityResults: AgfSyncCityResult[] = [];
 
   for (const city of cities) {
@@ -200,7 +200,7 @@ async function syncAgfForRaceInner(raceId: string): Promise<void> {
   d.setUTCHours(0, 0, 0, 0);
   const tjkDate = toTjkDate(d);
 
-  const cities = await discoverTurkishCities(tjkDate);
+  const cities = await discoverAllRelevantCities(tjkDate);
   const city = cities.find((c) => toSlug(c.sehirAdi) === race.raceDay.hippodrome.slug);
   if (!city) return;
 
