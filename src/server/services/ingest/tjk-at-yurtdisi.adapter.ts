@@ -84,6 +84,11 @@ export type YurtDisiAtProfil = {
   anneVeDede: string; // ham: "Miz Midtown / Exchange Rate" ("Anne / Baba" TJK etiketi kendisi yanıltıcı — aslında anne/dede)
   antrenor: string;
   sahip: string;
+  // Ülkeye göre değişir ("$" ABD/Kanada, "£" Birleşik Krallık gibi) — TJK'nın kazanç
+  // hücresindeki ham sembolden çıkarılır (ülke adına göre TAHMİN edilmez, çünkü Kanada
+  // "$" de kullanabilir) — UI'da "Toplam Kazanç" TL sembolüyle (₺) YANLIŞ gösterilmesin
+  // diye (kullanıcı bulgusu 2026-09-29: yurt dışı panelinde veri hiç görünmüyordu).
+  paraBirimi: string;
   // Satır etiketi TJK'nın kendi metni ("TOPLAM", "2025 Yılı", "Çim", "Kum", "Sentetik", vb.)
   // — sabit bir küme varsaymak yerine ham etiketle anahtarlanıyor, TJK yeni bir yıl/pist
   // eklediğinde kod değişmeden kapsar.
@@ -178,10 +183,13 @@ function parseYurtDisiAtProfil($: cheerio.CheerioAPI): YurtDisiAtProfil | null {
   }
 
   const ozet: Record<string, YurtDisiAtOzetSatiri> = {};
+  let paraBirimi = "$"; // ABD/Kanada/Birleşik Krallık'ın en yaygını — hücrede sembol bulunamazsa düşer
   kunye.find("table.tablesorter tbody tr").each((_, tr) => {
     const cells = $(tr).find("td").toArray().map((td) => $(td).text().replace(/\s+/g, " ").trim());
     const label = cells[0];
     if (!label || cells.length < 6) return;
+    const symbolMatch = cells[5].match(/[^\d.,\s]+/);
+    if (symbolMatch) paraBirimi = symbolMatch[0];
     ozet[label] = {
       starts: parseInt(cells[1], 10) || 0,
       wins: parseInt(cells[2], 10) || 0,
@@ -203,6 +211,7 @@ function parseYurtDisiAtProfil($: cheerio.CheerioAPI): YurtDisiAtProfil | null {
     anneVeDede: kimlik["Anne / Baba"] ?? "",
     antrenor: kimlik["Antrenör"] ?? "",
     sahip: kimlik["Üzerine Koşan Sahip"] ?? "",
+    paraBirimi,
     ozet,
   };
 }

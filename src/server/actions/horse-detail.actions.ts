@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { zeminDetayiBul, zeminDetayiSatirdanCikar, zeminKatsayisi } from "@/lib/methodology/mekanik-puanlama";
 import { fetchTjkAtKosuBilgileri, type TjkAtKosuRow } from "@/server/services/ingest/tjk-at-performans.adapter";
+import { fetchYurtDisiAtKosuBilgileri } from "@/server/services/ingest/tjk-at-yurtdisi.adapter";
 
 export type HorseHistoryEntry = {
   raceId: string;
@@ -35,6 +36,63 @@ function toDdMmYyyy(date: Date): string {
   return `${d}.${m}.${date.getUTCFullYear()}`;
 }
 
+function yurtDisiDmyToIso(dmy: string): string {
+  const [d, m, y] = dmy.split(".");
+  return new Date(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T00:00:00.000Z`).toISOString();
+}
+
+function yurtDisiSurfaceKodu(raw: string): string {
+  const c = raw.trim().charAt(0).toUpperCase();
+  if (c === "Ç") return "CIM";
+  if (c === "S") return "SENTETIK";
+  return "KUM";
+}
+
+function trSayi(raw: string): number | null {
+  const n = parseFloat(raw.replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * 2026-09-29 kullanıcı bulgusu ("hani hiçbir veri yok") — yurt dışı atlar (tjkAtId hiç
+ * yok, yalnız yurtDisiAtId) yukarıdaki TR akışına HİÇ girmiyordu: bizim DB'mizde henüz
+ * yalnız BUGÜNKÜ tek satır birikmiş oluyordu (özellik yeni), TJK zenginleştirmesi de
+ * tjkAtId'ye bağımlı olduğu için atlanıyordu. Bunun yerine doğrudan yurt dışı geçmiş
+ * yarış önbelleğinden (21+ satır, tjk-at-yurtdisi.adapter.ts) besleniyor — TR akışına
+ * HİÇ dokunmaz, yalnız aşağıdaki erken-dönüş dalıyla çağrılır.
+ */
+async function getYurtDisiHorseHistory(yurtDisiAtId: number): Promise<HorseHistoryEntry[]> {
+  let rows: Awaited<ReturnType<typeof fetchYurtDisiAtKosuBilgileri>> = [];
+  try {
+    rows = await fetchYurtDisiAtKosuBilgileri(yurtDisiAtId);
+  } catch {
+    rows = [];
+  }
+  return rows.slice(0, 15).map((row, idx) => {
+    const finishMatch = row.finish.match(/^(\d+)\/(\d+)$/);
+    const finishPos = finishMatch && finishMatch[1] !== "0" ? parseInt(finishMatch[1], 10) : null;
+    const raceNoMatch = row.raceNoName.match(/^(\d+)/);
+    return {
+      raceId: `yd-${yurtDisiAtId}-${row.date}-${idx}`,
+      date: yurtDisiDmyToIso(row.date),
+      hippodrome: row.city,
+      raceNo: raceNoMatch ? parseInt(raceNoMatch[1], 10) : 0,
+      distance: row.distance,
+      surface: yurtDisiSurfaceKodu(row.surface),
+      zeminEtiketi: null,
+      classType: row.classType || null,
+      equipment: null,
+      jockey: row.jockey || null,
+      weight: trSayi(row.weight),
+      hp: row.hp ? parseInt(row.hp, 10) || null : null,
+      agf: null,
+      bestTime: row.time || null,
+      scratched: false,
+      finishPos,
+    };
+  });
+}
+
 /** Bir atın (isme göre) geçmiş yarışlarını, en yeniden eskiye, en fazla 15 kayıt döner. */
 export async function getHorseHistory(name: string): Promise<HorseHistoryEntry[]> {
   const runners = await db.runner.findMany({
@@ -53,6 +111,7 @@ export async function getHorseHistory(name: string): Promise<HorseHistoryEntry[]
       bestTime: true,
       scratched: true,
       tjkAtId: true,
+      yurtDisiAtId: true,
       equipment: true,
       race: {
         select: {
@@ -73,6 +132,10 @@ export async function getHorseHistory(name: string): Promise<HorseHistoryEntry[]
       },
     },
   });
+
+  // TR akışına HİÇ girmeyen erken dönüş — bkz. getYurtDisiHorseHistory üstündeki not.
+  const yurtDisiAtId = runners.find((r) => r.tjkAtId == null && r.yurtDisiAtId != null)?.yurtDisiAtId;
+  if (yurtDisiAtId != null) return getYurtDisiHorseHistory(yurtDisiAtId);
 
   // Kendi DB'mizdeki RaceDay.surfaceConditions yalnız 2026-07-15'ten beri ve seyrek —
   // TJK'nın kendi at profili (AtKosuBilgileri) her geçmiş koşu için "Ç:Normal 3.3" gibi
