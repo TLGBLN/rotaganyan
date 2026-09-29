@@ -92,6 +92,41 @@ function kisaHipodromAdi(hippodromeName: string, country: string | null): string
   return hippodromeName.endsWith(` ${country}`) ? hippodromeName.slice(0, -(country.length + 1)) : hippodromeName;
 }
 
+// ── Gece yarısını aşan koşu saatleri (yurt dışı hipodromlar) ─────────────────────
+// 2026-09-29 kullanıcı bulgusu: Horseshoe Indianapolis'in 7./8. koşuları TR saatiyle
+// 00.16/00.47'ye denk geliyor (ABD saati TR'ye çevrilince gece yarısını aşıyor) — TJK
+// bunu "ertesi gün" işareti KOYMADAN düz "00.16" yazıyor (doğrulandı: 6. koşu 23.45,
+// 7. koşu 00.16, aynı günün devamı). RaceDay.date TEK bir gün olduğu için (TR
+// hipodromlarında hiç gün taşması olmadığından bu güne kadar hiç sorun çıkmamıştı),
+// saat bir önceki koşudan KÜÇÜLDÜĞÜNDE o koşudan itibaren geri sayım/"Başladı"
+// hesaplaması RaceDay.date+1 GÜN üzerinden yapılmalı — yoksa henüz başlamamış bir
+// koşu "Başladı" (geçmiş) sanılır. Şema DEĞİŞMEDİ (Race.time hâlâ "HH:mm" string),
+// bu SADECE gösterim/hesaplama katmanında bir düzeltme.
+function raceGunOffsetleriHesapla(races: { raceNo: number; time: string | null }[]): Map<number, number> {
+  const offsets = new Map<number, number>();
+  let prevMinutes: number | null = null;
+  let offset = 0;
+  for (const r of [...races].sort((a, b) => a.raceNo - b.raceNo)) {
+    if (r.time) {
+      const [h, m] = r.time.replace(".", ":").split(":").map(Number);
+      if (!isNaN(h) && !isNaN(m)) {
+        const minutes = h * 60 + m;
+        if (prevMinutes != null && minutes < prevMinutes) offset++;
+        prevMinutes = minutes;
+      }
+    }
+    offsets.set(r.raceNo, offset);
+  }
+  return offsets;
+}
+
+function raceEffectiveDateStr(dateStr: string, offsetGun: number): string {
+  if (offsetGun === 0) return dateStr;
+  const d = new Date(dateStr + "T00:00:00.000Z");
+  d.setUTCDate(d.getUTCDate() + offsetGun);
+  return d.toISOString().slice(0, 10);
+}
+
 // ── Geri sayım (Turkey UTC+3) ────────────────────────────────────────────────
 
 function useRaceCountdown(time: string | null, hasResult: boolean, dateStr: string) {
@@ -1509,6 +1544,9 @@ export default function ProgramView({
 
   const raceNo = selectedRaceNo(currentDay!);
   const currentRace = currentDay?.races.find((r) => r.raceNo === raceNo) ?? currentDay?.races[0];
+  // bkz. raceGunOffsetleriHesapla üstündeki not — yurt dışı hipodromlarda gece yarısını
+  // aşan koşuların geri sayımı/"Başladı" durumu bu offsetsiz YANLIŞ hesaplanır.
+  const gunOffsetleri = raceGunOffsetleriHesapla(currentDay?.races ?? []);
 
   // Yarış veya hipodrom değişince analiz/son800/galop panelini kapat
   useEffect(() => {
@@ -1664,7 +1702,7 @@ export default function ProgramView({
               )}
               {currentRace && (
                 <div className="hidden sm:block shrink-0">
-                  <RaceTimer time={currentRace.time} hasResult={currentRace.result != null} dateStr={dateStr} />
+                  <RaceTimer time={currentRace.time} hasResult={currentRace.result != null} dateStr={raceEffectiveDateStr(dateStr, gunOffsetleri.get(currentRace.raceNo) ?? 0)} />
                 </div>
               )}
             </div>
@@ -1674,7 +1712,7 @@ export default function ProgramView({
           {currentRace && (
             <RaceTable
               race={currentRace}
-              dateStr={dateStr}
+              dateStr={raceEffectiveDateStr(dateStr, gunOffsetleri.get(currentRace.raceNo) ?? 0)}
               analysisOpen={analysisOpen}
               onAnalysisToggle={() => setAnalysisOpen((v) => !v)}
               son800Open={son800Open}
