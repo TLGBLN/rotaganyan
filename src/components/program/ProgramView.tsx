@@ -53,6 +53,32 @@ const SURFACE_TAB_BG: Record<string, string> = {
   SENTETIK: "bg-[#D39B1E] hover:bg-[#e0ab3a] text-white",
 };
 
+// ── Yurt dışı hipodrom sekmesi: ülke bayrağı + kısa isim ────────────────────────
+// 2026-09-29 — tjk.adapter.ts'teki YABANCI_ULKELER listesiyle BİREBİR AYNI SIRADA
+// tutulmalı (Hippodrome.country oradan geliyor); yeni bir ülke eklenirse ikisi de
+// güncellenmeli, aksi halde o hipodromun bayrağı çıkmaz (🏳️ nötr yedeğe düşer).
+const ULKE_BAYRAGI: Record<string, string> = {
+  "Fransa": "🇫🇷", "Birleşik Krallık": "🇬🇧", "İngiltere": "🇬🇧", "İskoçya": "🏴",
+  "İrlanda": "🇮🇪", "Kanada": "🇨🇦", "ABD": "🇺🇸", "Amerika Birleşik Devletleri": "🇺🇸",
+  "Şili": "🇨🇱", "Arjantin": "🇦🇷", "Brezilya": "🇧🇷", "Almanya": "🇩🇪", "İtalya": "🇮🇹",
+  "İspanya": "🇪🇸", "Avustralya": "🇦🇺", "Yeni Zelanda": "🇳🇿", "Güney Afrika": "🇿🇦",
+  "Japonya": "🇯🇵", "Hong Kong": "🇭🇰", "Singapur": "🇸🇬", "Suudi Arabistan": "🇸🇦",
+  "Katar": "🇶🇦", "Birleşik Arap Emirlikleri": "🇦🇪", "BAE": "🇦🇪", "Malezya": "🇲🇾",
+  "Hindistan": "🇮🇳", "Norveç": "🇳🇴", "İsveç": "🇸🇪", "Danimarka": "🇩🇰", "Belçika": "🇧🇪",
+  "Hollanda": "🇳🇱",
+};
+
+function ulkeBayragi(country: string | null): string {
+  return (country && ULKE_BAYRAGI[country]) || "🏳️";
+}
+
+/** "Chantilly Fransa" → "Chantilly" (country son eki kırpılır — sekme kısa kalsın diye,
+ *  ülke zaten bayrakla gösteriliyor). country eşleşmezse (nadiren) TAM isim korunur. */
+function kisaHipodromAdi(hippodromeName: string, country: string | null): string {
+  if (!country) return hippodromeName;
+  return hippodromeName.endsWith(` ${country}`) ? hippodromeName.slice(0, -(country.length + 1)) : hippodromeName;
+}
+
 // ── Geri sayım (Turkey UTC+3) ────────────────────────────────────────────────
 
 function useRaceCountdown(time: string | null, hasResult: boolean, dateStr: string) {
@@ -1490,22 +1516,34 @@ export default function ProgramView({
     );
   }
 
+  // 2026-09-29 kullanıcı talebi: hipodrom sekmeleri (a) yatay kaydırma OLMADAN tek sayfaya
+  // sığsın — flex-wrap ile taşan sekmeler alt satıra iner, sayfa yatay kaymaz; (b) TR
+  // hipodromları önce/yan yana, yurt dışı fikstürler SONRA (isForeign'a göre kararlı sort —
+  // JS'in Array.sort'u kararlı olduğu için her iki grubun kendi içindeki [DB'den gelen
+  // alfabetik] sırası korunur); (c) yurt dışı sekmelerin başında hangi ÜLKEYE aitlerse o
+  // ülkenin bayrağı (Hippodrome.country, bkz. tjk.adapter.ts'teki YABANCI_ULKELER — bu
+  // liste ile BİREBİR aynı sırada tutulmalı) + isim ülke son eki kırpılmış kısa haliyle
+  // ("Chantilly Fransa" yerine "🇫🇷 Chantilly") — uzun isimler sekmeyi gereksiz genişletmesin.
+  const sortedDays = [...days].sort((a, b) => Number(a.isForeign) - Number(b.isForeign));
+  const ilkYabanciIndex = sortedDays.findIndex((d) => d.isForeign);
+
   return (
     <div className="flex flex-col">
       {/* Hipodrom tab'ları */}
-      <div className="flex overflow-x-auto border-b bg-muted/30 shrink-0 print:hidden">
-        {days.map((d) => (
+      <div className="flex flex-wrap gap-1 border-b bg-muted/30 px-1 py-1 shrink-0 print:hidden">
+        {sortedDays.map((d, i) => (
           <button
             key={d.hippodromeSlug}
             onClick={() => setActiveHipo(d.hippodromeSlug)}
             className={cn(
-              "shrink-0 px-4 py-2.5 text-sm font-semibold transition-colors whitespace-nowrap",
+              "rounded px-3 py-2 text-sm font-semibold transition-colors whitespace-nowrap",
+              i === ilkYabanciIndex && "ml-1 border-l pl-3.5",
               activeHipo === d.hippodromeSlug
                 ? "bg-[#c0392b] text-white"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted"
             )}
           >
-            {d.hippodromeName}
+            {d.isForeign ? `${ulkeBayragi(d.country)} ${kisaHipodromAdi(d.hippodromeName, d.country)}` : d.hippodromeName}
           </button>
         ))}
       </div>
