@@ -135,6 +135,13 @@ export default function HorseDetailContent({ name }: { name: string }) {
         <div className="px-4 py-10 text-center text-sm text-muted-foreground">Geçmiş yarış kaydı bulunamadı.</div>
       ) : (
         <div className="overflow-x-auto">
+          {(() => {
+            // 2026-09-29 kullanıcı talebi ("bu yarışların parasal değerleri gerekli...
+            // sınıf mı düşmüş sınıf mı yükselmiş") — İkramiye sütunu YALNIZ bu veriyi
+            // taşıyan (şu an yurt dışı) satırlar varken gösterilir; TR'nin tablosu (hiçbir
+            // satırda ikramiye olmadığı için) PİKSEL SEVİYESİNDE eskisiyle AYNI kalır.
+            const hasIkramiye = data.some((h) => h.ikramiye != null);
+            return (
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b bg-muted/60 text-muted-foreground">
@@ -149,6 +156,7 @@ export default function HorseDetailContent({ name }: { name: string }) {
                 <th className="px-2 py-1.5 text-center">H.P</th>
                 <th className="px-2 py-1.5 text-center">AGF</th>
                 <th className="px-2 py-1.5 text-center">Derece</th>
+                {hasIkramiye && <th className="px-2 py-1.5 text-right">İkramiye</th>}
                 <th className="px-2 py-1.5 text-center">Sonuç</th>
               </tr>
             </thead>
@@ -177,6 +185,11 @@ export default function HorseDetailContent({ name }: { name: string }) {
                     <td className="px-2 py-1.5 text-center tabular-nums font-mono">{h.hp ?? "—"}</td>
                     <td className="px-2 py-1.5 text-center tabular-nums">{h.agf != null ? `%${h.agf.toFixed(1)}` : "—"}</td>
                     <td className="px-2 py-1.5 text-center font-mono tabular-nums">{h.bestTime?.split(" - ")[0] ?? "—"}</td>
+                    {hasIkramiye && (
+                      <td className="px-2 py-1.5 text-right tabular-nums font-mono whitespace-nowrap">
+                        {h.ikramiye != null ? `${h.ikramiye.toLocaleString("tr-TR")} ${h.ikramiyeParaBirimi ?? ""}` : "—"}
+                      </td>
+                    )}
                     <td className={cn("px-2 py-1.5 text-center font-semibold", finishClass(h.finishPos))}>
                       {h.scratched ? <span className="text-red-400">Koşmadı</span> : h.finishPos != null ? `${h.finishPos}.` : "—"}
                     </td>
@@ -185,6 +198,8 @@ export default function HorseDetailContent({ name }: { name: string }) {
               })}
             </tbody>
           </table>
+            );
+          })()}
         </div>
       )}
     </>

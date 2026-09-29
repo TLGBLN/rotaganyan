@@ -22,6 +22,15 @@ export type HorseHistoryEntry = {
   bestTime: string | null;
   scratched: boolean;
   finishPos: number | null;
+  // 2026-09-29 kullanıcı talebi ("bu yarışların parasal değerleri gerekli... sınıf mı
+  // düşmüş sınıf mı yükselmiş nasıl anlayacağız") — yalnız yurt dışı atlarda dolu (TJK'nın
+  // "AtKosuBilgileri_Y" sayfası her satır için ikramiye veriyor; TR'nin normal geçmiş
+  // sayfasında bu alan yok, bu yüzden TR satırlarında hep null kalır, TR görünümü
+  // DEĞİŞMEZ). Sınıf düşüşü/yükselişi sabit bir eşikle "hesaplanmıyor" (bkz.
+  // feedback_sert_kosul_yasak) — ikramiye satır satır gösterilip yorum kullanıcıya
+  // bırakılıyor, tıpkı ekran görüntüsündeki manuel analiz örneğinde olduğu gibi.
+  ikramiye: number | null;
+  ikramiyeParaBirimi: string | null;
 };
 
 function finishPosition(actualOrder: unknown, runnerNo: number): number | null {
@@ -53,6 +62,14 @@ function trSayi(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** "14.490 $" -> { tutar: 14490, birim: "$" } (TJK binlik ayıracı "."). */
+function paraAyristir(raw: string): { tutar: number | null; birim: string | null } {
+  const tutarStr = raw.replace(/[^\d]/g, "");
+  const tutar = tutarStr ? parseInt(tutarStr, 10) : null;
+  const birimMatch = raw.match(/[^\d.,\s]+/);
+  return { tutar: Number.isFinite(tutar) ? tutar : null, birim: birimMatch ? birimMatch[0] : null };
+}
+
 /**
  * 2026-09-29 kullanıcı bulgusu ("hani hiçbir veri yok") — yurt dışı atlar (tjkAtId hiç
  * yok, yalnız yurtDisiAtId) yukarıdaki TR akışına HİÇ girmiyordu: bizim DB'mizde henüz
@@ -72,6 +89,7 @@ async function getYurtDisiHorseHistory(yurtDisiAtId: number): Promise<HorseHisto
     const finishMatch = row.finish.match(/^(\d+)\/(\d+)$/);
     const finishPos = finishMatch && finishMatch[1] !== "0" ? parseInt(finishMatch[1], 10) : null;
     const raceNoMatch = row.raceNoName.match(/^(\d+)/);
+    const { tutar: ikramiye, birim: ikramiyeParaBirimi } = paraAyristir(row.purse);
     return {
       raceId: `yd-${yurtDisiAtId}-${row.date}-${idx}`,
       date: yurtDisiDmyToIso(row.date),
@@ -89,6 +107,8 @@ async function getYurtDisiHorseHistory(yurtDisiAtId: number): Promise<HorseHisto
       bestTime: row.time || null,
       scratched: false,
       finishPos,
+      ikramiye,
+      ikramiyeParaBirimi,
     };
   });
 }
@@ -185,6 +205,9 @@ export async function getHorseHistory(name: string): Promise<HorseHistoryEntry[]
       bestTime: r.bestTime,
       scratched: r.scratched,
       finishPos: r.race.result ? finishPosition(r.race.result.actualOrder, r.no) : null,
+      // TR'nin geçmiş yarış görünümünde ikramiye şu an yok — bkz. tip tanımındaki not.
+      ikramiye: null,
+      ikramiyeParaBirimi: null,
     };
   });
 }
