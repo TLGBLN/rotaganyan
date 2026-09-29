@@ -1572,27 +1572,25 @@ export default function ProgramView({
           {/* Koşu tab'ları + Pist durumu/hava — 2026-09-20 kullanıcı talebi: web'de (sm+)
               aynı satırda, dar mobilde eskisi gibi alt alta. */}
           <div className="flex flex-col border-b bg-background shrink-0 print:hidden lg:flex-row lg:items-center">
-            {/* Koşu tab'ları — 2026-09-29 kullanıcı bulgusu: mobilde yatay kaydırma olmuş,
-                geri istendi ("önceki gibi tek sayfaya sığsın") — SiralamaKarti.tsx'teki
-                (rotaganyansiralamasi) AYNI desen: mobilde her buton eşit pay alıp (flex-1
-                min-w-0) container'a SIĞAR, sm+'ta sabit genişliğe (flex-none shrink-0)
-                dönüp taşarsa yatay kaydırılabilir. Mobilde yalnız rakam (uzun "1. Koşu"
-                metni küçük payda kırpılır/taşardı), sm+'ta tam etiket. */}
-            <div className="flex min-w-0 shrink sm:overflow-x-auto lg:flex-1">
+            {/* Koşu tab'ları — 2026-09-29 kullanıcı talebi (ikinci tur): sekmeler artık BİTİŞİK
+                DEĞİL, her biri kendi border'ı olan ayrı bir kutucuk (SiralamaKarti.tsx'teki
+                hipodrom sekmesi TAB tasarımıyla AYNI dil), aralarında gap — hem web HEM
+                mobilde AYNI görünüm: sabit boyut, taşarsa (mobilde kaçınılmaz) flex-wrap ile
+                ALT SATIRA iner, hiçbir zaman kırpılmaz/sıkıştırılmaz. */}
+            <div className="flex flex-wrap gap-1 lg:flex-1">
               {currentDay.races.map((r) => (
                 <button
                   key={r.raceNo}
                   onClick={() => setActiveRace((prev) => ({ ...prev, [currentDay.hippodromeSlug]: r.raceNo }))}
                   className={cn(
-                    "relative flex min-w-0 flex-1 items-center justify-center px-0 py-2 text-xs font-semibold transition-all sm:flex-none sm:shrink-0 sm:justify-start sm:px-3 sm:whitespace-nowrap",
+                    "relative rounded-lg border px-3 py-2 text-xs font-semibold whitespace-nowrap transition-all",
                     SURFACE_TAB_BG[r.surface],
                     selectedRaceNo(currentDay) === r.raceNo
-                      ? "ring-2 ring-inset ring-white shadow-inner"
-                      : "opacity-70 hover:opacity-100"
+                      ? "border-white shadow-inner"
+                      : "border-black/20 opacity-70 hover:opacity-100"
                   )}
                 >
-                  <span className="sm:hidden">{r.raceNo}</span>
-                  <span className="hidden sm:inline">{t("raceNoLabel", { no: r.raceNo })}</span>
+                  {t("raceNoLabel", { no: r.raceNo })}
                   {r.hasAnalysis && (
                     <span className="absolute top-1 right-0.5 w-1.5 h-1.5 rounded-full bg-[#27ae60] ring-1 ring-white" />
                   )}
