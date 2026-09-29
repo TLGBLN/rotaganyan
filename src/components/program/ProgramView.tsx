@@ -1572,18 +1572,17 @@ export default function ProgramView({
           {/* Koşu tab'ları + Pist durumu/hava — 2026-09-20 kullanıcı talebi: web'de (sm+)
               aynı satırda, dar mobilde eskisi gibi alt alta. */}
           <div className="flex flex-col border-b bg-background shrink-0 print:hidden lg:flex-row lg:items-center">
-            {/* Koşu tab'ları — 2026-09-29 kullanıcı talebi (ikinci tur): sekmeler artık BİTİŞİK
-                DEĞİL, her biri kendi border'ı olan ayrı bir kutucuk (SiralamaKarti.tsx'teki
-                hipodrom sekmesi TAB tasarımıyla AYNI dil), aralarında gap — hem web HEM
-                mobilde AYNI görünüm: sabit boyut, taşarsa (mobilde kaçınılmaz) flex-wrap ile
-                ALT SATIRA iner, hiçbir zaman kırpılmaz/sıkıştırılmaz. */}
-            <div className="flex flex-wrap gap-1 p-2 lg:flex-1">
+            {/* Koşu tab'ları — 2026-09-29 kullanıcı talebi (üçüncü tur): mobilde sabit 5 SÜTUNLU
+                grid (her satırda TAM 5 kutucuk — içerik uzunluğuna göre değişken sığdırma
+                DEĞİL, "10. Koşu" gibi uzun etiketler de aynı hücre genişliğinde sarılır).
+                sm+'ta (web) eski flex-wrap tek-satır görünümü korunuyor. */}
+            <div className="grid grid-cols-5 gap-1 p-2 sm:flex sm:flex-wrap lg:flex-1">
               {currentDay.races.map((r) => (
                 <button
                   key={r.raceNo}
                   onClick={() => setActiveRace((prev) => ({ ...prev, [currentDay.hippodromeSlug]: r.raceNo }))}
                   className={cn(
-                    "relative rounded-lg border px-3 py-2 text-xs font-semibold whitespace-nowrap transition-all",
+                    "relative rounded-lg border px-1.5 py-2 text-center text-xs font-semibold transition-all sm:px-3 sm:whitespace-nowrap",
                     SURFACE_TAB_BG[r.surface],
                     selectedRaceNo(currentDay) === r.raceNo
                       ? "border-white shadow-inner"
