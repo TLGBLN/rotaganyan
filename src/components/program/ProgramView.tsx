@@ -69,7 +69,7 @@ const ULKE_KODU: Record<string, string> = {
   "Japonya": "jp", "Hong Kong": "hk", "Singapur": "sg", "Suudi Arabistan": "sa",
   "Katar": "qa", "Birleşik Arap Emirlikleri": "ae", "BAE": "ae", "Malezya": "my",
   "Hindistan": "in", "Norveç": "no", "İsveç": "se", "Danimarka": "dk", "Belçika": "be",
-  "Hollanda": "nl",
+  "Hollanda": "nl", "Türkiye": "tr",
 };
 
 function UlkeBayragi({ country }: { country: string | null }) {
@@ -1556,13 +1556,10 @@ export default function ProgramView({
                 : "text-muted-foreground hover:text-foreground hover:bg-muted"
             )}
           >
-            {d.isForeign ? (
-              <span className="inline-flex items-center gap-1.5">
-                <UlkeBayragi country={d.country} /> {kisaHipodromAdi(d.hippodromeName, d.country)}
-              </span>
-            ) : (
-              d.hippodromeName
-            )}
+            <span className="inline-flex items-center gap-1.5">
+              <UlkeBayragi country={d.isForeign ? d.country : "Türkiye"} />{" "}
+              {d.isForeign ? kisaHipodromAdi(d.hippodromeName, d.country) : d.hippodromeName}
+            </span>
           </button>
         ))}
       </div>
