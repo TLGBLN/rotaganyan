@@ -54,22 +54,35 @@ const SURFACE_TAB_BG: Record<string, string> = {
 };
 
 // ── Yurt dışı hipodrom sekmesi: ülke bayrağı + kısa isim ────────────────────────
-// 2026-09-29 — tjk.adapter.ts'teki YABANCI_ULKELER listesiyle BİREBİR AYNI SIRADA
+// 2026-09-29 — kullanıcı bulgusu: unicode bayrak EMOJİ'leri (🇫🇷 vb.) bazı ortamlarda
+// (emoji fontu eksikse) "FR"/"GB" gibi düz harflere düşüyor, güvenilir değil. Bunun
+// yerine flagcdn.com'un (ücretsiz, API-key'siz, yaygın kullanılan) SVG bayraklarını
+// <img> ile gösteriyoruz — fonttan bağımsız, her cihazda AYNI görünür. ISO 3166-1
+// alpha-2 kodları tjk.adapter.ts'teki YABANCI_ULKELER listesiyle BİREBİR AYNI SIRADA
 // tutulmalı (Hippodrome.country oradan geliyor); yeni bir ülke eklenirse ikisi de
-// güncellenmeli, aksi halde o hipodromun bayrağı çıkmaz (🏳️ nötr yedeğe düşer).
-const ULKE_BAYRAGI: Record<string, string> = {
-  "Fransa": "🇫🇷", "Birleşik Krallık": "🇬🇧", "İngiltere": "🇬🇧", "İskoçya": "🏴",
-  "İrlanda": "🇮🇪", "Kanada": "🇨🇦", "ABD": "🇺🇸", "Amerika Birleşik Devletleri": "🇺🇸",
-  "Şili": "🇨🇱", "Arjantin": "🇦🇷", "Brezilya": "🇧🇷", "Almanya": "🇩🇪", "İtalya": "🇮🇹",
-  "İspanya": "🇪🇸", "Avustralya": "🇦🇺", "Yeni Zelanda": "🇳🇿", "Güney Afrika": "🇿🇦",
-  "Japonya": "🇯🇵", "Hong Kong": "🇭🇰", "Singapur": "🇸🇬", "Suudi Arabistan": "🇸🇦",
-  "Katar": "🇶🇦", "Birleşik Arap Emirlikleri": "🇦🇪", "BAE": "🇦🇪", "Malezya": "🇲🇾",
-  "Hindistan": "🇮🇳", "Norveç": "🇳🇴", "İsveç": "🇸🇪", "Danimarka": "🇩🇰", "Belçika": "🇧🇪",
-  "Hollanda": "🇳🇱",
+// güncellenmeli, aksi halde o hipodromun bayrağı çıkmaz (nötr 🏳 yedeğe düşer).
+const ULKE_KODU: Record<string, string> = {
+  "Fransa": "fr", "Birleşik Krallık": "gb", "İngiltere": "gb", "İskoçya": "gb",
+  "İrlanda": "ie", "Kanada": "ca", "ABD": "us", "Amerika Birleşik Devletleri": "us",
+  "Şili": "cl", "Arjantin": "ar", "Brezilya": "br", "Almanya": "de", "İtalya": "it",
+  "İspanya": "es", "Avustralya": "au", "Yeni Zelanda": "nz", "Güney Afrika": "za",
+  "Japonya": "jp", "Hong Kong": "hk", "Singapur": "sg", "Suudi Arabistan": "sa",
+  "Katar": "qa", "Birleşik Arap Emirlikleri": "ae", "BAE": "ae", "Malezya": "my",
+  "Hindistan": "in", "Norveç": "no", "İsveç": "se", "Danimarka": "dk", "Belçika": "be",
+  "Hollanda": "nl",
 };
 
-function ulkeBayragi(country: string | null): string {
-  return (country && ULKE_BAYRAGI[country]) || "🏳️";
+function UlkeBayragi({ country }: { country: string | null }) {
+  const kod = country ? ULKE_KODU[country] : undefined;
+  if (!kod) return <span aria-hidden="true">🏳</span>;
+  return (
+    <img
+      src={`https://flagcdn.com/${kod}.svg`}
+      alt={country ?? ""}
+      className="inline-block h-3 w-4 shrink-0 rounded-[1px] object-cover align-[-1px]"
+      loading="lazy"
+    />
+  );
 }
 
 /** "Chantilly Fransa" → "Chantilly" (country son eki kırpılır — sekme kısa kalsın diye,
@@ -1543,7 +1556,13 @@ export default function ProgramView({
                 : "text-muted-foreground hover:text-foreground hover:bg-muted"
             )}
           >
-            {d.isForeign ? `${ulkeBayragi(d.country)} ${kisaHipodromAdi(d.hippodromeName, d.country)}` : d.hippodromeName}
+            {d.isForeign ? (
+              <span className="inline-flex items-center gap-1.5">
+                <UlkeBayragi country={d.country} /> {kisaHipodromAdi(d.hippodromeName, d.country)}
+              </span>
+            ) : (
+              d.hippodromeName
+            )}
           </button>
         ))}
       </div>
@@ -1553,21 +1572,27 @@ export default function ProgramView({
           {/* Koşu tab'ları + Pist durumu/hava — 2026-09-20 kullanıcı talebi: web'de (sm+)
               aynı satırda, dar mobilde eskisi gibi alt alta. */}
           <div className="flex flex-col border-b bg-background shrink-0 print:hidden lg:flex-row lg:items-center">
-            {/* Koşu tab'ları */}
-            <div className="flex min-w-0 shrink overflow-x-auto lg:flex-1">
+            {/* Koşu tab'ları — 2026-09-29 kullanıcı bulgusu: mobilde yatay kaydırma olmuş,
+                geri istendi ("önceki gibi tek sayfaya sığsın") — SiralamaKarti.tsx'teki
+                (rotaganyansiralamasi) AYNI desen: mobilde her buton eşit pay alıp (flex-1
+                min-w-0) container'a SIĞAR, sm+'ta sabit genişliğe (flex-none shrink-0)
+                dönüp taşarsa yatay kaydırılabilir. Mobilde yalnız rakam (uzun "1. Koşu"
+                metni küçük payda kırpılır/taşardı), sm+'ta tam etiket. */}
+            <div className="flex min-w-0 shrink sm:overflow-x-auto lg:flex-1">
               {currentDay.races.map((r) => (
                 <button
                   key={r.raceNo}
                   onClick={() => setActiveRace((prev) => ({ ...prev, [currentDay.hippodromeSlug]: r.raceNo }))}
                   className={cn(
-                    "relative shrink-0 px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap",
+                    "relative flex min-w-0 flex-1 items-center justify-center px-0 py-2 text-xs font-semibold transition-all sm:flex-none sm:shrink-0 sm:justify-start sm:px-3 sm:whitespace-nowrap",
                     SURFACE_TAB_BG[r.surface],
                     selectedRaceNo(currentDay) === r.raceNo
                       ? "ring-2 ring-inset ring-white shadow-inner"
                       : "opacity-70 hover:opacity-100"
                   )}
                 >
-                  {t("raceNoLabel", { no: r.raceNo })}
+                  <span className="sm:hidden">{r.raceNo}</span>
+                  <span className="hidden sm:inline">{t("raceNoLabel", { no: r.raceNo })}</span>
                   {r.hasAnalysis && (
                     <span className="absolute top-1 right-0.5 w-1.5 h-1.5 rounded-full bg-[#27ae60] ring-1 ring-white" />
                   )}
