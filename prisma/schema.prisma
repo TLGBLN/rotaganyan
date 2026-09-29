@@ -323,6 +323,22 @@ model HorseRaceHistoryCache {
 }
 
 /**
+ * Yurt dışı (simulcast) atların TJK "AtKosuBilgileri_Y" sayfasından (negatif AtId —
+ * Runner.yurtDisiAtId, tjkAtId'den TAMAMEN AYRI/bağımsız) çekilen tam yarış geçmişi.
+ * HorseRaceHistoryCache'in BİREBİR aynı deseni (id+rowsJson+updatedAt) — ama KASITLI
+ * olarak AYRI bir tablo/adapter: TR akışına hiçbir şekilde karışmasın diye (bkz.
+ * tjk-at-yurtdisi.adapter.ts, kullanıcı kararı 2026-09-29 "tr yarışları ile yabancı
+ * yarışlar birbirinden ayrı olacak"). V5.46'dan TAMAMEN BAĞIMSIZ, ayrı bir yurt dışı
+ * analiz motorunun (henüz yazılmadı) ham veri temeli — bu tablo yalnız VERİYİ tutar,
+ * hiçbir skor/analiz mantığı içermez.
+ */
+model YurtDisiAtRaceHistoryCache {
+  yurtDisiAtId Int      @id
+  rowsJson     Json
+  updatedAt    DateTime @default(now()) @updatedAt
+}
+
+/**
  * AGF senkronizasyonu her çalıştığında (günde 4 kez) atılan an'lık AGF kaydı — zaman içindeki para hareketini (steam) görmek için.
  */
 model AgfSnapshot {
