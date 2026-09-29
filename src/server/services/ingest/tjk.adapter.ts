@@ -244,7 +244,7 @@ function parseRunnersTable(
     // Scratched detection
     const nameCellText = cells[iName] ?? "";
     const scratched = /ko[şs]maz/i.test(nameCellText);
-    const name = firstSegment(nameCellText)
+    let name = firstSegment(nameCellText)
       .replace(/\s*\(ko[şs]maz\)\s*/gi, "")
       .toUpperCase();
     if (isNaN(no) || !name) return;
@@ -259,6 +259,25 @@ function parseRunnersTable(
     const nameHref = $(cellEls[iName]).find("a").attr("href") ?? "";
     const ydAtIdMatch = /AtKosuBilgileri_Y[^"]*AtId=(-?\d+)/i.test(nameHref) ? nameHref.match(/AtId=(-?\d+)/i) : null;
     const yurtDisiAtId = ydAtIdMatch ? parseInt(ydAtIdMatch[1], 10) : undefined;
+
+    // BUG düzeltmesi (2026-09-29, kullanıcı bulgusu "hani hiçbir veri yok" testinde ortaya
+    // çıktı) — yukarıdaki firstSegment (2+ boşluk/satır sonuna göre ayırma) YALNIZ TR isim
+    // hücrelerinde işe yarıyor. Yurt dışı hücrelerde isim <a> etiketinin İÇİNDE bir bitiş-
+    // pozisyonu <span>'i ("(9)") taşıyor VE hemen ardından (boşluksuz) bir <sup
+    // class="tooltipp"> takı açıklaması ("DBDilinin bağlanacağını ifade eder.") geliyor —
+    // ikisi de ham hücre metnine karışıp "SHADY BAY (IRE)DBDilinin bağlanacağını ifade
+    // eder." gibi bozuk isimler üretiyordu. Yalnız BU dalda (yurtDisiAtId doluysa), isim
+    // <a> etiketinin KENDİSİNDEN (iç <span> silinerek) yeniden, temiz olarak kuruluyor —
+    // TR isim ayrıştırması (yukarıdaki satırlar) HİÇ DEĞİŞMEDİ.
+    if (yurtDisiAtId != null) {
+      const nameAnchor = $(cellEls[iName]).find("a").first();
+      if (nameAnchor.length) {
+        const clone = nameAnchor.clone();
+        clone.find("span").remove();
+        const cleanName = clone.text().replace(/\s*\(ko[şs]maz\)\s*/gi, "").trim().toUpperCase();
+        if (cleanName) name = cleanName;
+      }
+    }
 
     const age = iAge !== -1 ? cleanCell(cells[iAge] ?? "") || undefined : undefined;
     const pedigree = iOrigin !== -1 ? parsePedigree(cells[iOrigin] ?? "") : {};
