@@ -335,6 +335,11 @@ model HorseRaceHistoryCache {
 model YurtDisiAtRaceHistoryCache {
   yurtDisiAtId Int      @id
   rowsJson     Json
+  // 2026-09-29 — TR'de HorseStatsCache'in AYRI bir tablo+sayfa olarak tuttuğu kimlik/kariyer
+  // özet istatistiği (K./1.lik/2.lik/3.lük/Kazanç — TOPLAM + yıl + PİST bazlı kırılım),
+  // yurt dışı atlarda AYNI sayfada (AtKosuBilgileri_Y) geldiği için ayrı bir tabloya/isteğe
+  // gerek kalmadan buraya eklendi. Bkz. tjk-at-yurtdisi.adapter.ts.
+  profileJson  Json?
   updatedAt    DateTime @default(now()) @updatedAt
 }
 

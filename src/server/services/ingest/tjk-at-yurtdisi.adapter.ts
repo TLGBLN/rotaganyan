@@ -17,6 +17,12 @@
  *   [5]=Derece [6]=Sıklet [7]=Jokey [8]=Gny [9]=Grup(yaş/cins şartı, "3+İ" gibi)
  *   [10]=K.No-K.Adı [11]=Kcins(sınıf/tip — "Şartlı"/"Maiden" — gelecekteki sınıf düşüşü
  *   analizinin temel girdisi) [12]=Ant. [13]=Sahip [14]=HP [15]=İkramiye(ör. "14.490 $")
+ *
+ * AYNI sayfa, TR'nin HorseStatsCache'inin (tjk-at-profil.adapter.ts) AYRI bir tablo/istekle
+ * tuttuğu kimlik+kariyer özet istatistiğini de içeriyor (2026-09-29 doğrulandı — ".kunye"
+ * div'i, span.key/span.value çiftleri + bir "Özet İstatistikleri" tablosu: TOPLAM/yıl bazlı/
+ * PİST bazlı (Çim/Kum/Sentetik) K./1.lik/2.lik/3.lük/Kazanç kırılımı) — ek bir HTTP isteği
+ * gerekmediği için AYNI fetch içinde parse edilip profileJson'a yazılıyor.
  */
 
 import { request } from "undici";
@@ -60,34 +66,64 @@ export type YurtDisiAtKosuRow = {
   purse: string; // "14.490 $"
 };
 
+/** ".kunye" bloğundaki "Özet İstatistikleri" tablosunun bir satırı — hem TOPLAM/yıl
+ *  bazlı hem PİST (Çim/Kum/Sentetik) bazlı kırılım AYNI şekle sahip. */
+export type YurtDisiAtOzetSatiri = {
+  starts: number;
+  wins: number;
+  places: number;
+  shows: number;
+  earnings: number;
+};
+
+export type YurtDisiAtProfil = {
+  isim: string;
+  yas: string; // "4 y a"
+  dogumTarihi: string; // "9.04.2022"
+  baba: string;
+  anneVeDede: string; // ham: "Miz Midtown / Exchange Rate" ("Anne / Baba" TJK etiketi kendisi yanıltıcı — aslında anne/dede)
+  antrenor: string;
+  sahip: string;
+  // Satır etiketi TJK'nın kendi metni ("TOPLAM", "2025 Yılı", "Çim", "Kum", "Sentetik", vb.)
+  // — sabit bir küme varsaymak yerine ham etiketle anahtarlanıyor, TJK yeni bir yıl/pist
+  // eklediğinde kod değişmeden kapsar.
+  ozet: Record<string, YurtDisiAtOzetSatiri>;
+};
+
 /** Her zaman TJK'dan CANLI çeker ve kalıcı DB önbelleğine (YurtDisiAtRaceHistoryCache)
  *  yazar — yalnız arka plan senkronu kullanmalı, uygulama içi okumalar
  *  fetchYurtDisiAtKosuBilgileri'i (önbellek-öncelikli) kullanmalı. */
 export async function refreshYurtDisiAtKosuBilgileri(atId: number): Promise<YurtDisiAtKosuRow[]> {
-  const data = await fetchYurtDisiAtKosuBilgileriUncached(atId);
+  const { rows, profile } = await fetchYurtDisiAtKosuBilgileriUncached(atId);
   const { db } = await import("@/lib/db");
   await db.yurtDisiAtRaceHistoryCache
-    .upsert({ where: { yurtDisiAtId: atId }, create: { yurtDisiAtId: atId, rowsJson: data }, update: { rowsJson: data } })
+    .upsert({
+      where: { yurtDisiAtId: atId },
+      create: { yurtDisiAtId: atId, rowsJson: rows, profileJson: profile ?? undefined },
+      update: { rowsJson: rows, profileJson: profile ?? undefined },
+    })
     .catch(() => {});
-  return data;
+  return rows;
 }
+
+type FetchSonucu = { rows: YurtDisiAtKosuRow[]; profile: YurtDisiAtProfil | null };
 
 // TR'deki NAZİKO bulgusuyla (tjk-at-performans.adapter.ts) AYNI önlem — TJK bazen tek
 // seferlik geçici bir hata veriyor, bir hızlı tekrar deneme bu sınıfı kapatır.
-async function fetchYurtDisiAtKosuBilgileriUncached(atId: number): Promise<YurtDisiAtKosuRow[]> {
+async function fetchYurtDisiAtKosuBilgileriUncached(atId: number): Promise<FetchSonucu> {
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const rows = await fetchAndParseYurtDisiAtKosuBilgileri(atId);
-      if (rows.length > 0 || attempt === 2) return rows;
+      const result = await fetchAndParseYurtDisiAtKosuBilgileri(atId);
+      if (result.rows.length > 0 || attempt === 2) return result;
     } catch (err) {
       if (attempt === 2) throw err;
     }
     await sleep(800);
   }
-  return [];
+  return { rows: [], profile: null };
 }
 
-async function fetchAndParseYurtDisiAtKosuBilgileri(atId: number): Promise<YurtDisiAtKosuRow[]> {
+async function fetchAndParseYurtDisiAtKosuBilgileri(atId: number): Promise<FetchSonucu> {
   const url = `${BASE}/TR/YarisSever/Query/ConnectedPage/AtKosuBilgileri_Y?1=1&QueryParameter_AtId=${atId}&QueryParameter_Y=1&Era=today`;
   const html = await fetchHtml(url);
   const $ = cheerio.load(html);
@@ -120,7 +156,55 @@ async function fetchAndParseYurtDisiAtKosuBilgileri(atId: number): Promise<YurtD
     });
   });
 
-  return rows;
+  return { rows, profile: parseYurtDisiAtProfil($) };
+}
+
+/** "1.234$" / "121.250$" -> 1234 / 121250 (TJK binlik ayıracı olarak "." kullanıyor). */
+function parsePara(raw: string): number {
+  const n = parseInt(raw.replace(/[^\d]/g, ""), 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function parseYurtDisiAtProfil($: cheerio.CheerioAPI): YurtDisiAtProfil | null {
+  const kunye = $(".kunye").first();
+  if (kunye.length === 0) return null;
+
+  const kimlik: Record<string, string> = {};
+  const spans = kunye.find("span.key, span.value").toArray();
+  for (let i = 0; i < spans.length; i += 2) {
+    const key = $(spans[i]).text().replace(/\s+/g, " ").trim();
+    const val = spans[i + 1] ? $(spans[i + 1]).text().replace(/\s+/g, " ").trim() : "";
+    if (key) kimlik[key] = val;
+  }
+
+  const ozet: Record<string, YurtDisiAtOzetSatiri> = {};
+  kunye.find("table.tablesorter tbody tr").each((_, tr) => {
+    const cells = $(tr).find("td").toArray().map((td) => $(td).text().replace(/\s+/g, " ").trim());
+    const label = cells[0];
+    if (!label || cells.length < 6) return;
+    ozet[label] = {
+      starts: parseInt(cells[1], 10) || 0,
+      wins: parseInt(cells[2], 10) || 0,
+      places: parseInt(cells[3], 10) || 0,
+      shows: parseInt(cells[4], 10) || 0,
+      earnings: parsePara(cells[5]),
+    };
+  });
+
+  // "İsim" her zaman dolu olmalı — boşsa sayfa beklenen yapıda değil demektir (TJK format
+  // değişikliği vb.), bu durumda sessizce null dönmek (rows'u etkilemez) daha güvenli.
+  if (!kimlik["İsim"]) return null;
+
+  return {
+    isim: kimlik["İsim"] ?? "",
+    yas: kimlik["Yaş"] ?? "",
+    dogumTarihi: kimlik["Doğum Tarihi"] ?? "",
+    baba: kimlik["Baba"] ?? "",
+    anneVeDede: kimlik["Anne / Baba"] ?? "",
+    antrenor: kimlik["Antrenör"] ?? "",
+    sahip: kimlik["Üzerine Koşan Sahip"] ?? "",
+    ozet,
+  };
 }
 
 const memCache = new Map<number, { data: YurtDisiAtKosuRow[]; expiresAt: number }>();
@@ -143,6 +227,16 @@ export async function fetchYurtDisiAtKosuBilgileri(atId: number): Promise<YurtDi
   const data = await refreshYurtDisiAtKosuBilgileri(atId);
   memCache.set(atId, { data, expiresAt: Date.now() + CACHE_TTL_MS });
   return data;
+}
+
+/** rowsJson'un önbellek-öncelikli okuma AYNI deseni — yalnız DB'de zaten profileJson varsa
+ *  onu döner, HİÇBİR ZAMAN kendi başına TJK'ya gitmez (rows tazelemesi zaten profili de
+ *  günceller, bkz. refreshYurtDisiAtKosuBilgileri) — DB'de hiç kayıt yoksa null döner. */
+export async function fetchYurtDisiAtProfil(atId: number): Promise<YurtDisiAtProfil | null> {
+  const { db } = await import("@/lib/db");
+  const dbCached = await db.yurtDisiAtRaceHistoryCache.findUnique({ where: { yurtDisiAtId: atId } }).catch(() => null);
+  if (!dbCached?.profileJson) return null;
+  return dbCached.profileJson as unknown as YurtDisiAtProfil;
 }
 
 /**
