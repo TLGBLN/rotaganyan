@@ -80,6 +80,18 @@ function yabanciAdiAyristir(temizIsim: string): { hippodromeName: string; countr
   return ulke ? { hippodromeName: temizIsim, country: ulke } : { hippodromeName: temizIsim };
 }
 
+// 2026-09-29 kullanıcı kararı — yurt dışı fikstürlerin TÜMÜ değil, YALNIZ ABD/Birleşik
+// Krallık/Kanada ingest edilsin (Fransa/Şili/vb. HARİÇ). Bu filtre fetchCityProgram
+// ÇAĞRILMADAN ÖNCE (relevantTabs aşamasında) uygulanır — izin verilmeyen ülkelere hiç
+// TJK isteği atılmaz. YABANCI_ULKELER'in üstündeki not hâlâ geçerli: ayrıştırma TÜM
+// ülkeleri tanır, yalnız BURADAKİ küme hangisinin fiilen çekileceğine karar verir.
+const IZIN_VERILEN_YABANCI_ULKELER = new Set(["ABD", "Amerika Birleşik Devletleri", "Birleşik Krallık", "İngiltere", "İskoçya", "Kanada"]);
+
+function yabanciIngestEdilsinMi(temizIsim: string): boolean {
+  const { country } = yabanciAdiAyristir(temizIsim);
+  return country != null && IZIN_VERILEN_YABANCI_ULKELER.has(country);
+}
+
 /** Yabancı hipodrom slug'ı — TR haritası gibi elle değil, isimden otomatik (normTr ile
  *  ASCII'ye indirgenip tireli hale getirilir). İsim zaten ülkeyi içerdiği için
  *  ("chantilly-fransa") aynı hipodrom adının başka ülkede tekrarı pratikte çakışmaz. */
@@ -401,8 +413,11 @@ export class TjkAdapter implements DataProvider {
     // normTr ise tüm Türkçe harfleri ASCII'ye normalize eder → "IZMIR" doğru eşleşir.
     // 2026-09-29 — TR listesindeki (isForeign=false) sekmeler ESKİ mantıkla (elle harita)
     // işleniyor, isForeign=true olanlar (TJK'nın kendi "(YD N)" işaretiyle ayırdığı yurt
-    // dışı simulcast fikstürleri) ARTIK dışlanmıyor, otomatik slug/ülke ile işleniyor.
-    const relevantTabs = tabs.filter((t) => t.isForeign || TURKISH_CITY_SLUGS[normTr(t.name)]);
+    // dışı simulcast fikstürleri) otomatik slug/ülke ile işleniyor — AMA yalnız kullanıcı
+    // kararıyla izin verilen ülkeler (ABD/Birleşik Krallık/Kanada, bkz.
+    // IZIN_VERILEN_YABANCI_ULKELER); diğerleri (Fransa/Şili/vb.) burada elenir, onlar
+    // için fetchCityProgram HİÇ çağrılmaz.
+    const relevantTabs = tabs.filter((t) => (t.isForeign ? yabanciIngestEdilsinMi(t.name) : TURKISH_CITY_SLUGS[normTr(t.name)]));
     if (relevantTabs.length === 0) return [];
 
     const raceDays: IngestRaceDay[] = [];
