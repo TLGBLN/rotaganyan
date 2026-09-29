@@ -253,6 +253,10 @@ model Runner {
   ekuriGroup         Int?
   apprentice         Boolean @default(false)
   tjkAtId            Int?
+  // 2026-09-29 — yalnız yurt dışı (isForeign) hipodromlardaki atlarda dolu (negatif TJK
+  // ID, "AtKosuBilgileri_Y" sayfasından) — TR atları asla taşımaz, tjkAtId'den TAMAMEN
+  // AYRI ve bağımsız (downstream TR servisleri buna hiç bakmaz). Bkz. tjk.adapter.ts.
+  yurtDisiAtId       Int?
   idmanVideoUrl      String?
 
   race           Race                 @relation(fields: [raceId], references: [id], onDelete: Cascade)

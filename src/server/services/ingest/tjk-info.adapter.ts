@@ -141,6 +141,32 @@ export async function discoverTurkishCities(tjkDate: string): Promise<CityInfo[]
 // üretilir — slug (toSlug) bu yüzden DB'deki (ingest'in yazdığı) slug'la eşleşir.
 const YD_ETIKETI_RE = /\(\s*YD\s*\d+\s*\)\s*$/i;
 
+// 2026-09-29 kullanıcı kararı (bkz. tjk.adapter.ts'teki IZIN_VERILEN_YABANCI_ULKELER) —
+// yalnız ABD/Birleşik Krallık/Kanada ingest edilsin, Fransa/Şili/vb. HARİÇ. Bu adapter
+// tjk.adapter.ts'ten BAĞIMSIZ (result-sync/agf-sync'in ayrı keşif yolu) olduğu için aynı
+// kısıt burada AYRICA tanımlanmalı — tek yerde tanımlayıp import etmek iki adapter'ı
+// birbirine bağımlı kılardı (bkz. dosya başındaki "farklı çağıranlarca kullanılıyor" notu).
+// BUG (2026-09-29, kullanıcı: "burası niye karıştı yine"): bu filtre YOKTU — agf-sync
+// discoverAllRelevantCities üzerinden Chantilly/Club Hipico de Concepcion/Marseille Borely
+// gibi izin verilmeyen ülkeleri de buluyor, onlar için hippodrome/raceDay DB'de yoksa
+// (ör. daha önce elle silinmişse) persistRaceDays ile SESSİZCE yeniden yaratıyordu — HEM
+// yasak ülke ihlali HEM (aşağıdaki fetchCityProgram'ın isForeign hiç set etmemesi yüzünden)
+// yanlış Türk bayrağıyla (isForeign=false) gösterim. Bu iki düzeltme BİRLİKTE kök nedeni kapatır.
+const IZIN_VERILEN_YABANCI_ULKELER = new Set(["ABD", "Amerika Birleşik Devletleri", "Birleşik Krallık", "İngiltere", "İskoçya", "Kanada"]);
+const YABANCI_ULKELER = [
+  "Fransa", "Birleşik Krallık", "İngiltere", "İskoçya", "İrlanda", "Kanada", "ABD",
+  "Amerika Birleşik Devletleri", "Şili", "Arjantin", "Brezilya", "Almanya", "İtalya",
+  "İspanya", "Avustralya", "Yeni Zelanda", "Güney Afrika", "Japonya", "Hong Kong",
+  "Singapur", "Suudi Arabistan", "Katar", "Birleşik Arap Emirlikleri", "BAE",
+  "Malezya", "Hindistan", "Norveç", "İsveç", "Danimarka", "Belçika", "Hollanda",
+];
+
+/** Yabancı hipodrom adından ülkeyi ayırır (best-effort, tjk.adapter.ts'teki
+ *  yabanciAdiAyristir ile AYNI mantık) — bulunamazsa country undefined döner. */
+function yabanciUlkeAyristir(temizIsim: string): string | undefined {
+  return YABANCI_ULKELER.find((u) => temizIsim.endsWith(` ${u}`) || temizIsim === u);
+}
+
 export async function discoverForeignCities(tjkDate: string): Promise<CityInfo[]> {
   const url = `${BASE}/TR/YarisSever/Info/Page/GunlukYarisProgrami?QueryParameter_Tarih=${encodeURIComponent(tjkDate)}`;
   const html = await fetchHtml(url);
@@ -157,6 +183,11 @@ export async function discoverForeignCities(tjkDate: string): Promise<CityInfo[]
     if (!YD_ETIKETI_RE.test(rawText)) return;
     const sehirAdi = rawText.replace(/\(.*\)\s*$/, "").trim();
     if (!sehirAdi) return;
+
+    // Yalnız izin verilen ülkeler (bkz. yukarıdaki BUG notu) — diğerleri burada elenir,
+    // fetchCityProgram/persistRaceDays'e HİÇ ulaşmazlar.
+    const ulke = yabanciUlkeAyristir(sehirAdi);
+    if (!ulke || !IZIN_VERILEN_YABANCI_ULKELER.has(ulke)) return;
 
     seen.add(sehirId);
     cities.push({ sehirId, sehirAdi });
@@ -484,6 +515,14 @@ export async function fetchCityProgram(
   const date = parseDate(tjkDate);
   const slug = toSlug(city.sehirAdi);
 
+  // 2026-09-29 BUG düzeltmesi (bkz. discoverForeignCities üstündeki not) — bu alan
+  // ÖNCEDEN hiç set edilmiyordu, persistRaceDays'in Hippodrome upsert'i bu yüzden
+  // isForeign'i (create'te YANLIŞ false, update'te ise VAR OLAN true değerini bile
+  // SESSİZCE false'a) düşürüyordu. isTurkish zaten bu dosyada tanımlı, tekrar
+  // kullanılıyor — discoverForeignCities'in ülke filtresiyle AYNI ayrım kaynağı DEĞİL
+  // (biri TR beyaz listesi, diğeri yabancı ülke listesi) ama ikisi birbiriyle tutarlı.
+  const turkish = isTurkish(city.sehirAdi);
+
   return {
     date,
     hippodromeSlug: slug,
@@ -491,6 +530,8 @@ export async function fetchCityProgram(
     races,
     surfaceConditions: surfaceConditions.length > 0 ? surfaceConditions : undefined,
     weather,
+    isForeign: !turkish,
+    country: turkish ? undefined : yabanciUlkeAyristir(city.sehirAdi),
   };
 }
 

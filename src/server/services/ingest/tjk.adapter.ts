@@ -249,6 +249,17 @@ function parseRunnersTable(
       .toUpperCase();
     if (isNaN(no) || !name) return;
 
+    // 2026-09-29 — yurt dışı atlar (bkz. IZIN_VERILEN_YABANCI_ULKELER) TJK'nın normal
+    // "AtKosuBilgileri" sayfasında YOK (404), yalnız "AtKosuBilgileri_Y" sayfasında
+    // (negatif AtId ile) — TR atlarının linki HİÇBİR ZAMAN bu sonekle bitmez, bu yüzden
+    // isForeign kontrolüne gerek yok, href kendi kendini ayırt ediyor. Bu ID, "Son Yarışlar"
+    // rozetinin pist rengini (recentFormSurfaces TJK'nın normal Son 6 Y. hücresinde yurt
+    // dışı atlar için HİÇ gelmiyor, bkz. yurtdisi-recent-form-sync.service.ts) AYRI bir
+    // arka plan senkronuyla doldurmak için kullanılır.
+    const nameHref = $(cellEls[iName]).find("a").attr("href") ?? "";
+    const ydAtIdMatch = /AtKosuBilgileri_Y[^"]*AtId=(-?\d+)/i.test(nameHref) ? nameHref.match(/AtId=(-?\d+)/i) : null;
+    const yurtDisiAtId = ydAtIdMatch ? parseInt(ydAtIdMatch[1], 10) : undefined;
+
     const age = iAge !== -1 ? cleanCell(cells[iAge] ?? "") || undefined : undefined;
     const pedigree = iOrigin !== -1 ? parsePedigree(cells[iOrigin] ?? "") : {};
     const weight = iWeight !== -1 ? parseFloat(cleanCell(cells[iWeight] ?? "").replace(",", ".")) : undefined;
@@ -334,6 +345,7 @@ function parseRunnersTable(
       agf: agf != null && !isNaN(agf) ? agf : undefined,
       scratched,
       ekuriGroup,
+      yurtDisiAtId,
     });
   });
   return runners;
