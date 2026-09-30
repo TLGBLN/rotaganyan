@@ -1,13 +1,21 @@
 /**
- * YD Veri Bankası — kimlik çözümleme (entity resolution). TR kodundan TAMAMEN AYRI.
+ * YD Veri Bankası — kimlik çözümleme (entity resolution) V1.1. TR kodundan TAMAMEN AYRI.
  *
- * Her fonksiyon AYNI desibi izler: (1) bu kaynak+isim için zaten bir YurtDisiEntityAlias
- * var mı bak, varsa doğrudan o entityId'yi dön; (2) yoksa normalizedName'e göre MASTER
- * tabloda doğrudan bir eşleşme ara (aynı kaynaktan ilk kez farklı yazımla gelmiş olabilir);
- * (3) o da yoksa YENİ bir master kayıt oluştur; (4) her durumda (yeni veya eşleşen) bir
- * EntityAlias satırı yaz ki BİR SONRAKİ aynı ham isim doğrudan (1)'den dönsün (ucuz).
+ * Kullanıcı kararı (2026-09-30, Entity Resolution V1.1 + Unresolved Quarantine):
+ * "pedigree katmanına yanlış ForeignEquine.id bağlarsak... sonradan temizlemesi çok
+ * pahalı bir hata olur... emin olunmayan hiçbir şeyi otomatik merge etme; unresolved
+ * kayıtları ayrı kuyruğa yaz." Bu dosya BÜYÜK bir fuzzy-matching/NLP motoru DEĞİL —
+ * amaç %100 otomatik isim çözümü değil, YANLIŞ BİRLEŞTİRME YAPMAMAK ve HİÇBİR KAYDI
+ * SESSİZCE KAYBETMEMEK.
+ *
+ * Sıra (her varlık tipi için): (1) kaynak KİMLİĞİNE (yurtDisiAtId gibi stabil bir sayı —
+ * isimden ÇOK daha güvenilir) göre alias var mı; (2) yoksa ham isme göre alias; (3) yoksa
+ * normalizedName'e göre master tabloda ara — bulunursa VE ek bağlam (ülke/doğum yılı)
+ * ÇELİŞİYORSA otomatik birleştirme YAPMA, unresolved'a yaz ve YENİ kayıt aç; (4) hiç
+ * bulunamazsa yeni kayıt aç; (5) her durumda alias(lar) yaz.
  */
 
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { normalizeName, normalizeHorseName, atAdiUlkeAyristir } from "./normalize";
 
@@ -30,6 +38,31 @@ async function aliasYaz(entityType: string, entityId: string, source: string, so
     .catch(() => {}); // yarış koşullu iki eşzamanlı çağrıda ikincisi sessizce atlanır, ilkinki geçerli kalır
 }
 
+/** "Hiçbir kaydı sessizce kaybetmeyelim" — çelişki/kimliksizlik durumunda GÖRÜNÜR kalır. */
+export async function unresolvedYaz(input: {
+  entityType: string;
+  source: string;
+  sourceName: string;
+  normalizedName: string;
+  context?: Record<string, unknown>;
+  candidateEntityIds?: string[];
+  confidence?: number;
+}) {
+  await db.yurtDisiUnresolvedEntity
+    .create({
+      data: {
+        entityType: input.entityType,
+        source: input.source,
+        sourceName: input.sourceName,
+        normalizedName: input.normalizedName,
+        context: input.context as Prisma.InputJsonValue | undefined,
+        candidateEntityIds: input.candidateEntityIds as Prisma.InputJsonValue | undefined,
+        confidence: input.confidence,
+      },
+    })
+    .catch(() => {});
+}
+
 export async function resolveOrCreateTrack(rawName: string, country: string): Promise<string> {
   const existing = await aliasIleBul("TRACK", TJK_SOURCE, rawName);
   if (existing) return existing;
@@ -43,37 +76,103 @@ export async function resolveOrCreateTrack(rawName: string, country: string): Pr
   return track.id;
 }
 
-export async function resolveOrCreateEquine(
-  rawName: string,
-  opts: { yurtDisiAtId?: number; countryOfBirth?: string | null } = {}
-): Promise<string> {
-  const existing = await aliasIleBul("HORSE", TJK_SOURCE, rawName);
-  if (existing) return existing;
+export type EquineResolutionOpts = {
+  yurtDisiAtId?: number;
+  countryOfBirth?: string | null;
+  approxBirthYear?: number | null;
+  sexCode?: string | null;
+  context?: Record<string, unknown>; // unresolved kaydına eklenecek iz (raceId/hipodrom/tarih vb.)
+};
 
+function atIdAliasAdi(atId: number): string {
+  return `yurtDisiAtId:${atId}`;
+}
+
+export async function resolveOrCreateEquine(rawName: string, opts: EquineResolutionOpts = {}): Promise<string> {
+  // 1. En güvenilir yol: TJK'nın kendi stabil sayısal kimliği (isimden çok daha güçlü —
+  //    at ismi yazım hatası/tire farkı taşıyabilir, atId taşımaz).
+  if (opts.yurtDisiAtId != null) {
+    const idAlias = await aliasIleBul("HORSE", TJK_SOURCE, atIdAliasAdi(opts.yurtDisiAtId));
+    if (idAlias) {
+      await aliasYaz("HORSE", idAlias, TJK_SOURCE, rawName, normalizeHorseName(rawName)); // isim de aliaslansın (hızlı yol için)
+      return idAlias;
+    }
+  }
+
+  // 2. Ham isme göre alias (aynı isim daha önce çözülmüş olabilir — atId'siz bir çağrıdan).
+  const nameAlias = await aliasIleBul("HORSE", TJK_SOURCE, rawName);
+  if (nameAlias) {
+    if (opts.yurtDisiAtId != null) await aliasYaz("HORSE", nameAlias, TJK_SOURCE, atIdAliasAdi(opts.yurtDisiAtId), normalizeHorseName(rawName), String(opts.yurtDisiAtId));
+    return nameAlias;
+  }
+
+  // 3. normalizedName'e göre master tabloda ara — bulunursa ek bağlamla ÇAPRAZ KONTROL et.
   const normalizedName = normalizeHorseName(rawName);
   const { ulkeKodu } = atAdiUlkeAyristir(rawName);
-  let equine = await db.yurtDisiEquine.findUnique({ where: { normalizedName } });
-  if (!equine) {
-    equine = await db.yurtDisiEquine.create({
+  const countryOfBirth = opts.countryOfBirth ?? ulkeKodu ?? null;
+  const existing = await db.yurtDisiEquine.findUnique({ where: { normalizedName } });
+
+  let equineId: string;
+  if (existing) {
+    // Kullanıcının notu: "aynı isimli iki farklı at olabileceği için sadece isimle merge
+    // etme" — ülke bilgisi HER İKİ tarafta da doluysa VE ÇELİŞİYORSA otomatik birleştirme
+    // YAPILMAZ, unresolved'a yazılıp AYRI bir kayıt açılır (silent yanlış merge > görünür
+    // duplicate; ikincisi sonradan düzeltilebilir, birincisi düzeltilmesi pahalı bir hata).
+    const celisiyor = existing.countryOfBirth != null && countryOfBirth != null && existing.countryOfBirth !== countryOfBirth;
+    if (celisiyor) {
+      await unresolvedYaz({
+        entityType: "HORSE",
+        source: TJK_SOURCE,
+        sourceName: rawName,
+        normalizedName,
+        context: { ...opts.context, existingCountryOfBirth: existing.countryOfBirth, newCountryOfBirth: countryOfBirth },
+        candidateEntityIds: [existing.id],
+        confidence: 0.3,
+      });
+      const created = await db.yurtDisiEquine.create({
+        data: { canonicalName: rawName, normalizedName: `${normalizedName}#${opts.yurtDisiAtId ?? Date.now()}`, countryOfBirth, birthYear: opts.approxBirthYear ?? null, sex: opts.sexCode ?? null, sourceIds: opts.yurtDisiAtId != null ? { tjkYurtDisiAtId: opts.yurtDisiAtId } : undefined },
+      });
+      equineId = created.id;
+    } else {
+      equineId = existing.id;
+      // Eksik alanları (ülke/doğum yılı/cinsiyet/sourceIds) sessizce ZENGİNLEŞTİR — var
+      // olan dolu bir değeri ASLA üzerine yazma.
+      const guncelleme: Record<string, unknown> = {};
+      if (existing.countryOfBirth == null && countryOfBirth != null) guncelleme.countryOfBirth = countryOfBirth;
+      if (existing.birthYear == null && opts.approxBirthYear != null) guncelleme.birthYear = opts.approxBirthYear;
+      if (existing.sex == null && opts.sexCode != null) guncelleme.sex = opts.sexCode;
+      if (opts.yurtDisiAtId != null) {
+        const mevcutSourceIds = (existing.sourceIds as Record<string, unknown> | null) ?? {};
+        if (mevcutSourceIds.tjkYurtDisiAtId == null) guncelleme.sourceIds = { ...mevcutSourceIds, tjkYurtDisiAtId: opts.yurtDisiAtId };
+      }
+      if (Object.keys(guncelleme).length > 0) {
+        await db.yurtDisiEquine.update({ where: { id: existing.id }, data: guncelleme }).catch(() => {});
+      }
+    }
+  } else {
+    const created = await db.yurtDisiEquine.create({
       data: {
         canonicalName: rawName,
         normalizedName,
-        countryOfBirth: opts.countryOfBirth ?? ulkeKodu,
+        countryOfBirth,
+        birthYear: opts.approxBirthYear ?? null,
+        sex: opts.sexCode ?? null,
         sourceIds: opts.yurtDisiAtId != null ? { tjkYurtDisiAtId: opts.yurtDisiAtId } : undefined,
       },
     });
-  } else if (opts.yurtDisiAtId != null) {
-    const mevcut = (equine.sourceIds as Record<string, unknown> | null) ?? {};
-    if (mevcut.tjkYurtDisiAtId == null) {
-      await db.yurtDisiEquine.update({
-        where: { id: equine.id },
-        data: { sourceIds: { ...mevcut, tjkYurtDisiAtId: opts.yurtDisiAtId } },
-      });
-    }
+    equineId = created.id;
   }
-  await aliasYaz("HORSE", equine.id, TJK_SOURCE, rawName, normalizedName, opts.yurtDisiAtId != null ? String(opts.yurtDisiAtId) : undefined);
-  return equine.id;
+
+  await aliasYaz("HORSE", equineId, TJK_SOURCE, rawName, normalizedName, opts.yurtDisiAtId != null ? String(opts.yurtDisiAtId) : undefined);
+  if (opts.yurtDisiAtId != null) await aliasYaz("HORSE", equineId, TJK_SOURCE, atIdAliasAdi(opts.yurtDisiAtId), normalizedName, String(opts.yurtDisiAtId));
+  return equineId;
 }
+
+// Jokey/antrenör/sahip: kullanıcının notu — "sadece string similarity kullanma... emin
+// değilse PENDING_ALIAS." V1.1 kapsamında BUNLAR İÇİN fuzzy/kısaltma eşleştirmesi HİÇ
+// YOK (büyük bir NLP projesine çevirmeme kararı) — yalnız TAM normalize-isim eşleşmesi.
+// "C Appleby"/"Charlie Appleby" gibi farklı yazımlar şu an AYRI kayıt olarak kalır; bu
+// bilinçli bir sınırlama, sessiz/riskli bir birleştirmeden daha güvenli kabul edildi.
 
 export async function resolveOrCreateJockey(rawName: string, country?: string): Promise<string | null> {
   if (!rawName?.trim()) return null;

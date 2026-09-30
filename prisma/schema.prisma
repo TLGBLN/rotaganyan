@@ -1209,6 +1209,28 @@ model YurtDisiEntityAlias {
   @@index([entityType, entityId])
 }
 
+// 2026-09-30 kullanıcı kararı (Entity Resolution V1.1) — "atlanmasın; UNRESOLVED olarak
+// karantinaya alınsın... hiçbir kaydı sessizce kaybetmeyelim." Güvenilir kimlik kurulamayan
+// (ör. kaynak ID'si olmayan runner) veya çakışma şüphesi olan (aynı isim ama ülke/doğum
+// yılı uyuşmuyor) her durum burada GÖRÜNÜR kalır — otomatik/riskli bir birleştirme YAPILMAZ.
+model YurtDisiUnresolvedEntity {
+  id                 String   @id @default(cuid())
+  entityType         String // "HORSE"|"JOCKEY"|"TRAINER"|"OWNER"|"TRACK"|"RUNNER"
+  source             String
+  sourceName         String
+  normalizedName     String
+  context            Json?
+  candidateEntityIds Json?
+  confidence         Float?
+  status             String   @default("UNRESOLVED") // UNRESOLVED | REVIEWED | RESOLVED
+  resolvedEntityId   String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([entityType, status])
+  @@index([source, sourceName])
+}
+
 // ─── RACING ──────────────────────────────────────────────────────────────────
 
 model YurtDisiRace {

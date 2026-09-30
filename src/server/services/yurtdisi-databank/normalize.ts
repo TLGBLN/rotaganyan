@@ -36,3 +36,20 @@ export function normalizeHorseName(raw: string): string {
   const { isim } = atAdiUlkeAyristir(raw);
   return normalizeName(isim);
 }
+
+/**
+ * TJK'nın yurt dışı program tablosundaki "Yaş" hücresi "4y a k" gibi 3 parçalı geliyor
+ * (yaş + ırk kodu + cinsiyet kodu — TR'nin 2 parçalı "4y a" formatından FARKLI). Kesin bir
+ * doğum tarihi VERMEZ, yalnız YAKLAŞIK bir doğrulama sinyali üretir (Entity Resolution
+ * V1.1 — kullanıcının notu: "isimle merge etme; mümkünse name+country+birthYear+sex
+ * composite identity kullan"). approxBirthYear ±1 yıl yanlış olabilir (yarış takvimi
+ * ülkeye göre nominal doğum günü farklı sayabiliyor) — bu yüzden KESİN eşitlik değil,
+ * yalnız "belirgin çelişki var mı" testinde kullanılmalı.
+ */
+export function yasHucresiniAyristir(raw: string, referansYil: number): { approxBirthYear: number | null; sexCode: string | null } {
+  const m = raw.trim().match(/^(\d+)\s*y\s+\S+\s+(\S+)$/i);
+  if (!m) return { approxBirthYear: null, sexCode: null };
+  const yas = parseInt(m[1], 10);
+  if (!Number.isFinite(yas)) return { approxBirthYear: null, sexCode: null };
+  return { approxBirthYear: referansYil - yas, sexCode: m[2].toUpperCase() };
+}

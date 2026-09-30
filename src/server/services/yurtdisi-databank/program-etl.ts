@@ -23,13 +23,18 @@ import {
   resolveOrCreateJockey,
   resolveOrCreateTrainer,
   resolveOrCreateOwner,
+  unresolvedYaz,
 } from "./entity-resolution";
+import { yasHucresiniAyristir, normalizeHorseName } from "./normalize";
 
 export type ProgramEtlSonuc = {
   raceDaysProcessed: number;
   racesUpserted: number;
   runnersUpserted: number;
-  runnersSkipped: number; // yurtDisiAtId yoksa (güvenilir kimlik olmadan equine oluşturmuyoruz)
+  // 2026-09-30 Entity Resolution V1.1 — "atlanmasın; UNRESOLVED olarak karantinaya
+  // alınsın" (kullanıcı kararı). Eskiden sessizce atlanan runner'lar artık
+  // YurtDisiUnresolvedEntity'ye yazılıyor; bu sayaç yalnız GÖRÜNÜRLÜK içindir.
+  runnersUnresolved: number;
   errors: string[];
 };
 
@@ -67,8 +72,9 @@ export async function ingestYurtDisiProgramToDatabank(date: Date): Promise<Progr
 
   let racesUpserted = 0;
   let runnersUpserted = 0;
-  let runnersSkipped = 0;
+  let runnersUnresolved = 0;
   const errors: string[] = [];
+  const buYil = date.getUTCFullYear();
 
   for (const rd of raceDays) {
     try {
@@ -99,10 +105,27 @@ export async function ingestYurtDisiProgramToDatabank(date: Date): Promise<Progr
         for (const runner of race.runners) {
           // Güvenilir bir kaynak kimliği (yurtDisiAtId) olmadan equine OLUŞTURMUYORUZ —
           // isme dayalı sessiz eşleşme yanlış at'a veri karıştırabilir (kullanıcının
-          // "duplicate/alias çözümü tam oturmadan" uyarısı).
-          if (runner.yurtDisiAtId == null) { runnersSkipped++; continue; }
+          // "duplicate/alias çözümü tam oturmadan" uyarısı). AMA sessizce ATLANMIYOR —
+          // Entity Resolution V1.1: unresolved kuyruğuna yazılıp GÖRÜNÜR kalıyor.
+          if (runner.yurtDisiAtId == null) {
+            runnersUnresolved++;
+            await unresolvedYaz({
+              entityType: "RUNNER",
+              source: "TJK",
+              sourceName: runner.name,
+              normalizedName: normalizeHorseName(runner.name),
+              context: { hippodrome: rd.hippodromeName, raceNo: race.raceNo, raceDate: raceDate.toISOString() },
+            });
+            continue;
+          }
 
-          const horseId = await resolveOrCreateEquine(runner.name, { yurtDisiAtId: runner.yurtDisiAtId });
+          const { approxBirthYear, sexCode } = runner.age ? yasHucresiniAyristir(runner.age, buYil) : { approxBirthYear: null, sexCode: null };
+          const horseId = await resolveOrCreateEquine(runner.name, {
+            yurtDisiAtId: runner.yurtDisiAtId,
+            approxBirthYear,
+            sexCode,
+            context: { hippodrome: rd.hippodromeName, raceNo: race.raceNo, raceDate: raceDate.toISOString() },
+          });
           const jockeyId = runner.jockey ? await resolveOrCreateJockey(runner.jockey) : null;
           const trainerId = runner.trainer ? await resolveOrCreateTrainer(runner.trainer) : null;
           const ownerId = runner.owner ? await resolveOrCreateOwner(runner.owner) : null;
@@ -144,5 +167,5 @@ export async function ingestYurtDisiProgramToDatabank(date: Date): Promise<Progr
     }
   }
 
-  return { raceDaysProcessed: raceDays.length, racesUpserted, runnersUpserted, runnersSkipped, errors };
+  return { raceDaysProcessed: raceDays.length, racesUpserted, runnersUpserted, runnersUnresolved, errors };
 }
