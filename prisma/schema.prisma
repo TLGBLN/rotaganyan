@@ -1066,3 +1066,630 @@ model DeployLog {
 
   @@index([deployedAt(sort: Desc)])
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// YURT DIŞI VERİ BANKASI (Analiz Motoru YD V1.0'ın temeli) — 2026-09-30
+// ═══════════════════════════════════════════════════════════════════════════════
+// Kullanıcı kararı: "tr yarışları ile ilgili hiçbir şeyi bozmadan apayrı olarak
+// yabancı yarışlar için altyapı kurulacak, birbirleri ile hiçbir bağlantısı
+// olmayacak" + "hepsi tek seferde oluşturulacak". Bu bölümdeki HİÇBİR model
+// yukarıdaki TR modellerinden (Hippodrome/Race/Runner/Prediction/Pick/...) birini
+// import/relation ETMEZ — tamamen kendi kapalı grafı. HAM VERİ → KANONİK YARIŞ
+// VERİSİ → İSTATİSTİK/PEDİGRİ BANKASI üç katmanlı mimari (kullanıcının kendi
+// tasarım notu). NOT: bu bölüm ŞEMA/İSKELETTİR — her tabloyu dolduran ETL/senkron
+// kodu AYRI, sonraki bir iş (bkz. proje hafızası) — tek seferde kurulan burada
+// yalnız veri YAPISIdır, sabit ağırlıklı bir puanlama motoru DEĞİLDİR (kullanıcının
+// kendi notu: "ilk günden keyfi puan vermeyeceğim, veri biriktikçe kalibre edilir").
+
+// ─── RAW ─────────────────────────────────────────────────────────────────────
+
+model YurtDisiSourceSnapshot {
+  id           String   @id @default(cuid())
+  source       String // "TJK" | "PEDIGREEQUERY" | vb.
+  sourceKey    String // kaynağın kendi kimliği (at adı/atId/raceId vb.)
+  fetchedAt    DateTime @default(now())
+  payload      Json
+  payloadHash  String
+  parseVersion String
+  createdAt    DateTime @default(now())
+
+  @@index([source, sourceKey])
+}
+
+// ─── MASTER ──────────────────────────────────────────────────────────────────
+
+model YurtDisiEquine {
+  id             String    @id @default(cuid())
+  canonicalName  String
+  normalizedName String    @unique
+  countryOfBirth String?
+  birthDate      DateTime?
+  birthYear      Int?
+  sex            String?
+  breed          String?
+  sireId         String?
+  damId          String?
+  breederId      String?
+  ownerId        String?
+  sourceIds      Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sire          YurtDisiEquine?  @relation("YdSireOf", fields: [sireId], references: [id])
+  dam           YurtDisiEquine?  @relation("YdDamOf", fields: [damId], references: [id])
+  sireOffspring YurtDisiEquine[] @relation("YdSireOf")
+  damOffspring  YurtDisiEquine[] @relation("YdDamOf")
+  breeder       YurtDisiBreeder? @relation(fields: [breederId], references: [id])
+  owner         YurtDisiOwner?   @relation(fields: [ownerId], references: [id])
+
+  pedigreeEdgesAsChild YurtDisiPedigreeEdge[]
+  runs                 YurtDisiHorseRun[]
+  workouts             YurtDisiWorkout[]
+  dosageSnapshots      YurtDisiDosageSnapshot[]
+  linebreedingSnapshots YurtDisiLinebreedingSnapshot[]
+  horseStats           YurtDisiHorseStatSnapshot[]
+  runnerEntries        YurtDisiRunner[]
+
+  @@index([canonicalName])
+}
+
+model YurtDisiJockey {
+  id             String   @id @default(cuid())
+  canonicalName  String
+  normalizedName String   @unique
+  country        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  runnerEntries YurtDisiRunner[]
+  statSnapshots YurtDisiJockeyStatSnapshot[]
+  jtStats       YurtDisiJockeyTrainerStatSnapshot[]
+}
+
+model YurtDisiTrainer {
+  id             String   @id @default(cuid())
+  canonicalName  String
+  normalizedName String   @unique
+  country        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  runnerEntries YurtDisiRunner[]
+  statSnapshots YurtDisiTrainerStatSnapshot[]
+  jtStats       YurtDisiJockeyTrainerStatSnapshot[]
+}
+
+model YurtDisiOwner {
+  id             String   @id @default(cuid())
+  canonicalName  String
+  normalizedName String   @unique
+  createdAt      DateTime @default(now())
+
+  horses        YurtDisiEquine[]
+  runnerEntries YurtDisiRunner[]
+}
+
+model YurtDisiBreeder {
+  id             String   @id @default(cuid())
+  canonicalName  String
+  normalizedName String   @unique
+  createdAt      DateTime @default(now())
+
+  horses YurtDisiEquine[]
+}
+
+model YurtDisiTrack {
+  id             String   @id @default(cuid())
+  canonicalName  String
+  normalizedName String   @unique
+  country        String
+  surfaceTypes   Json?
+  timezone       String?
+  createdAt      DateTime @default(now())
+
+  races      YurtDisiRace[]
+  trackStats YurtDisiTrackStatSnapshot[]
+  drawStats  YurtDisiDrawStatSnapshot[]
+}
+
+// entityType: "HORSE"|"JOCKEY"|"TRAINER"|"OWNER"|"BREEDER"|"TRACK" — kasıtlı olarak
+// Prisma ilişkisi DEĞİL (polimorfik), uygulama katmanında doğrulanır. "William Buick"/
+// "W Buick"/"W. Buick" gibi aynı kişinin farklı kaynak yazımlarını TEK entityId'ye bağlar.
+model YurtDisiEntityAlias {
+  id             String   @id @default(cuid())
+  entityType     String
+  entityId       String
+  source         String
+  sourceId       String?
+  sourceName     String
+  normalizedName String
+  createdAt      DateTime @default(now())
+
+  @@unique([source, sourceName, entityType])
+  @@index([entityType, entityId])
+}
+
+// ─── RACING ──────────────────────────────────────────────────────────────────
+
+model YurtDisiRace {
+  id                 String   @id @default(cuid())
+  trackId            String
+  raceDate           DateTime
+  raceNo             Int?
+  distance           Int?
+  surface            String?
+  going              String?
+  classRaw           String?
+  classNormalized    String?
+  raceType           String?
+  purseTotal         Float?
+  currency           String?
+  purseUsdEquivalent Float?
+  pursePercentile    Float?
+  raceValueIndex     Float?
+  raceValueTier      String?
+  sourceRaceKey      String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  track     YurtDisiTrack           @relation(fields: [trackId], references: [id])
+  runners   YurtDisiRunner[]
+  classStat YurtDisiRaceClassStat?
+  result    YurtDisiResult?
+
+  @@unique([trackId, raceDate, raceNo])
+}
+
+model YurtDisiRunner {
+  id               String   @id @default(cuid())
+  raceId           String
+  horseId          String
+  draw             Int?
+  weight           Float?
+  jockeyId         String?
+  trainerId        String?
+  ownerId          String?
+  rating           Float?
+  odds             Float?
+  finishPosition   Int?
+  finishPercentile Float?
+  status           String?
+  createdAt        DateTime @default(now())
+
+  race    YurtDisiRace     @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  horse   YurtDisiEquine   @relation(fields: [horseId], references: [id])
+  jockey  YurtDisiJockey?  @relation(fields: [jockeyId], references: [id])
+  trainer YurtDisiTrainer? @relation(fields: [trainerId], references: [id])
+  owner   YurtDisiOwner?   @relation(fields: [ownerId], references: [id])
+  result  YurtDisiResult?
+  marketSnapshots YurtDisiMarketSnapshot[]
+  dataQuality     YurtDisiRunnerDataQuality?
+
+  @@unique([raceId, horseId])
+}
+
+model YurtDisiResult {
+  id             String   @id @default(cuid())
+  raceId         String   @unique
+  runnerId       String   @unique
+  finishPosition Int?
+  beatenDistance Float?
+  time           String?
+  status         String?
+  createdAt      DateTime @default(now())
+
+  race   YurtDisiRace   @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  runner YurtDisiRunner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+}
+
+// Atın TÜM ham geçmişi (kaynak ne olursa olsun) — YurtDisiRunner'dan BAĞIMSIZ, çünkü
+// bir atın geçmiş yarışları bizim henüz "kanonik" YurtDisiRace'e işlemediğimiz
+// hipodromlarda/tarihlerde de olabilir (kullanıcının notu: "at geçmiş yarışları" #1 öncelik).
+model YurtDisiHorseRun {
+  id               String   @id @default(cuid())
+  horseId          String
+  raceDate         DateTime
+  trackId          String?
+  distance         Int?
+  surface          String?
+  going            String?
+  classRaw         String?
+  draw             Int?
+  weight           Float?
+  jockeyName       String?
+  trainerName      String?
+  finishPosition   Int?
+  fieldSize        Int?
+  finishPercentile Float?
+  beatenDistance   Float?
+  raceTime         String?
+  rating           Float?
+  odds             Float?
+  source           String
+  createdAt        DateTime @default(now())
+
+  horse YurtDisiEquine @relation(fields: [horseId], references: [id], onDelete: Cascade)
+
+  @@index([horseId, raceDate])
+}
+
+model YurtDisiWorkout {
+  id            String   @id @default(cuid())
+  horseId       String
+  workoutDate   DateTime
+  trackId       String?
+  distance      Int?
+  surface       String?
+  time          String?
+  rank          Int?
+  totalWorkers  Int?
+  workoutType   String?
+  comment       String?
+  source        String
+  dataAvailable Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  horse YurtDisiEquine @relation(fields: [horseId], references: [id], onDelete: Cascade)
+
+  @@index([horseId, workoutDate])
+}
+
+model YurtDisiMarketSnapshot {
+  id          String   @id @default(cuid())
+  runnerId    String
+  capturedAt  DateTime @default(now())
+  odds        Float?
+  marketRank  Int?
+  marketShare Float?
+  source      String
+
+  runner YurtDisiRunner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+
+  @@index([runnerId, capturedAt])
+}
+
+// ─── PEDIGREE ────────────────────────────────────────────────────────────────
+
+model YurtDisiPedigreeEdge {
+  id           String   @id @default(cuid())
+  childId      String
+  parentId     String
+  relationType String // "SIRE" | "DAM"
+  createdAt    DateTime @default(now())
+
+  child YurtDisiEquine @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, relationType])
+  @@index([parentId])
+}
+
+model YurtDisiChefDeRace {
+  id            String    @id @default(cuid())
+  equineId      String
+  system        String // "ROMAN_MILLER" | "ANZ"
+  category1     String // B|I|C|S|P
+  category2     String?
+  validFrom     DateTime?
+  validTo       DateTime?
+  source        String
+  sourceVersion String
+  createdAt     DateTime  @default(now())
+
+  @@unique([equineId, system, sourceVersion])
+}
+
+// sourceDp/Di/Cd = PedigreeQuery'nin kendi gösterdiği (varsa) değer; calculatedDp/Di/Cd =
+// bizim Chef-de-Race listemiz+Roman formülüyle KENDİ hesabımız — kaynak değişirse/
+// uyuşmazsa matchesSource=false ile fark edilir, asla sessizce üzerine yazılmaz.
+model YurtDisiDosageSnapshot {
+  id                     String   @id @default(cuid())
+  horseId                String
+  asOfDate               DateTime
+  system                 String
+  chefListVersion        String
+  dpBrilliant            Float
+  dpIntermediate         Float
+  dpClassic              Float
+  dpSolid                Float
+  dpProfessional         Float
+  dosagePointsTotal      Float
+  dosageIndex            Float
+  centerOfDistribution   Float
+  sourceDp               String?
+  sourceDi               Float?
+  sourceCd               Float?
+  calculatedDp           String
+  calculatedDi           Float
+  calculatedCd           Float
+  matchesSource          Boolean?
+  pedigreeDepthAvailable Int
+  chefCount              Int
+  calculatorVersion      String
+  source                 String
+  createdAt              DateTime @default(now())
+
+  horse      YurtDisiEquine             @relation(fields: [horseId], references: [id], onDelete: Cascade)
+  components YurtDisiDosageComponent[]
+
+  @@unique([horseId, calculatorVersion, chefListVersion])
+}
+
+model YurtDisiDosageComponent {
+  id                 String @id @default(cuid())
+  dosageSnapshotId   String
+  ancestorId         String
+  generation         Int
+  pedigreePath       String
+  chefCategory1      String
+  chefCategory2      String?
+  basePoints         Float
+  brilliantPoints    Float
+  intermediatePoints Float
+  classicPoints      Float
+  solidPoints        Float
+  professionalPoints Float
+
+  dosageSnapshot YurtDisiDosageSnapshot @relation(fields: [dosageSnapshotId], references: [id], onDelete: Cascade)
+
+  @@index([dosageSnapshotId])
+}
+
+model YurtDisiLinebreedingSnapshot {
+  id           String   @id @default(cuid())
+  horseId      String
+  asOfDate     DateTime
+  ancestorId   String
+  occurrences  Int
+  paths        Json
+  nearestCross String?
+  source       String
+  createdAt    DateTime @default(now())
+
+  horse YurtDisiEquine @relation(fields: [horseId], references: [id], onDelete: Cascade)
+
+  @@index([horseId])
+}
+
+model YurtDisiPedigreeStatSnapshot {
+  id                  String   @id @default(cuid())
+  ancestorId          String
+  ancestorRole        String // SIRE|DAM|DAMSIRE|GRANDSIRE
+  asOfDate            DateTime
+  country             String?
+  surface             String?
+  goingBucket         String?
+  distanceBucket      String?
+  classBucket         String?
+  ageBucket           String?
+  uniqueProgeny       Int
+  starts              Int
+  wins                Int
+  top3                Int
+  winRate             Float
+  top3Rate            Float
+  avgFinishPercentile Float?
+  sampleSize          Int
+  shrunkWinRate       Float
+  shrunkTop3Rate      Float
+  createdAt           DateTime @default(now())
+
+  @@index([ancestorId, ancestorRole, surface, distanceBucket])
+}
+
+model YurtDisiPedigreeCrossStat {
+  id             String   @id @default(cuid())
+  sireId         String
+  damSireId      String
+  country        String?
+  surface        String?
+  distanceBucket String?
+  goingBucket    String?
+  asOfDate       DateTime
+  uniqueHorses   Int
+  starts         Int
+  wins           Int
+  top3           Int
+  winRate        Float
+  top3Rate       Float
+  sampleSize     Int
+  createdAt      DateTime @default(now())
+
+  @@index([sireId, damSireId])
+}
+
+// ─── STATISTICS (hepsi point-in-time: asOfDate'ten SONRAKİ hiçbir sonuç bu satırı etkilemez) ──
+
+model YurtDisiHorseStatSnapshot {
+  id                  String   @id @default(cuid())
+  horseId             String
+  asOfDate            DateTime
+  starts              Int
+  wins                Int
+  top3                Int
+  last30Starts        Int
+  last90Starts        Int
+  trackStarts         Int
+  trackWins           Int
+  surfaceStarts       Int
+  surfaceWins         Int
+  distanceStarts      Int
+  distanceWins        Int
+  goingStarts         Int
+  goingWins           Int
+  classStarts         Int
+  classWins           Int
+  avgFinishPercentile Float?
+  daysSinceLastRun    Int?
+  sampleSize          Int
+  createdAt           DateTime @default(now())
+
+  horse YurtDisiEquine @relation(fields: [horseId], references: [id], onDelete: Cascade)
+
+  @@index([horseId, asOfDate])
+}
+
+model YurtDisiJockeyStatSnapshot {
+  id                  String   @id @default(cuid())
+  jockeyId            String
+  asOfDate            DateTime
+  country             String?
+  trackId             String?
+  surface             String?
+  goingBucket         String?
+  distanceBucket      String?
+  classBucket         String?
+  raceType            String?
+  windowDays          Int
+  starts              Int
+  wins                Int
+  top2                Int
+  top3                Int
+  winRate             Float
+  top2Rate            Float
+  top3Rate            Float
+  avgFinishPosition   Float?
+  avgFinishPercentile Float?
+  sampleSize          Int
+  createdAt           DateTime @default(now())
+
+  jockey YurtDisiJockey @relation(fields: [jockeyId], references: [id], onDelete: Cascade)
+
+  @@index([jockeyId, asOfDate])
+}
+
+model YurtDisiTrainerStatSnapshot {
+  id                  String   @id @default(cuid())
+  trainerId           String
+  asOfDate            DateTime
+  country             String?
+  trackId             String?
+  surface             String?
+  goingBucket         String?
+  distanceBucket      String?
+  classBucket         String?
+  windowDays          Int
+  starts              Int
+  wins                Int
+  top3                Int
+  winRate             Float
+  top3Rate            Float
+  avgFinishPercentile Float?
+  sampleSize          Int
+  createdAt           DateTime @default(now())
+
+  trainer YurtDisiTrainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@index([trainerId, asOfDate])
+}
+
+model YurtDisiJockeyTrainerStatSnapshot {
+  id             String   @id @default(cuid())
+  jockeyId       String
+  trainerId      String
+  asOfDate       DateTime
+  country        String?
+  trackId        String?
+  surface        String?
+  distanceBucket String?
+  starts         Int
+  wins           Int
+  top3           Int
+  winRate        Float
+  top3Rate       Float
+  sampleSize     Int
+  createdAt      DateTime @default(now())
+
+  jockey  YurtDisiJockey  @relation(fields: [jockeyId], references: [id], onDelete: Cascade)
+  trainer YurtDisiTrainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@index([jockeyId, trainerId, asOfDate])
+}
+
+model YurtDisiTrackStatSnapshot {
+  id                 String   @id @default(cuid())
+  trackId            String
+  country            String?
+  surface            String?
+  distanceBucket     String?
+  going              String?
+  asOfDate           DateTime
+  raceCount          Int
+  avgWinningTime     Float?
+  avgFieldSize       Float?
+  insideDrawWinRate  Float?
+  middleDrawWinRate  Float?
+  outsideDrawWinRate Float?
+  frontRunnerWinRate Float?
+  closerWinRate      Float?
+  createdAt          DateTime @default(now())
+
+  track YurtDisiTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@index([trackId, asOfDate])
+}
+
+model YurtDisiDrawStatSnapshot {
+  id             String   @id @default(cuid())
+  trackId        String
+  distanceBucket String?
+  surface        String?
+  goingBucket    String?
+  drawBucket     String
+  starts         Int
+  wins           Int
+  top3           Int
+  winRate        Float
+  top3Rate       Float
+  asOfDate       DateTime
+  createdAt      DateTime @default(now())
+
+  track YurtDisiTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@index([trackId, asOfDate])
+}
+
+// raceValueIndex = Percentile(Purse | Country, RaceType, Age/Breed, Season) — kullanıcının
+// formülü. ClassMove (sınıf düşüşü/yükselişi) bu index'in geçmiş yarışlarla farkından
+// hesaplanır (ayrı bir servis, bu tablo yalnız veriyi tutar).
+model YurtDisiRaceClassStat {
+  id                 String   @id @default(cuid())
+  raceId             String   @unique
+  country            String?
+  year               Int?
+  raceTypeRaw        String?
+  raceTypeNormalized String?
+  purseTotal         Float?
+  currency           String?
+  purseUsdEquivalent Float?
+  pursePercentile    Float?
+  raceValueIndex     Float?
+  raceValueTier      String?
+  fieldMedianValue   Float?
+  createdAt          DateTime @default(now())
+
+  race YurtDisiRace @relation(fields: [raceId], references: [id], onDelete: Cascade)
+}
+
+// ─── QUALITY ─────────────────────────────────────────────────────────────────
+
+// "Bilgi yok" ile "gerçek değer 0" birbirine karışmasın diye — kullanıcının notu.
+model YurtDisiRunnerDataQuality {
+  id                String   @id @default(cuid())
+  runnerId          String   @unique
+  hasHistory        Boolean  @default(false)
+  hasPedigree       Boolean  @default(false)
+  hasJockey         Boolean  @default(false)
+  hasTrainer        Boolean  @default(false)
+  hasJockeyStats    Boolean  @default(false)
+  hasTrainerStats   Boolean  @default(false)
+  hasMarket         Boolean  @default(false)
+  hasRating         Boolean  @default(false)
+  hasDraw           Boolean  @default(false)
+  hasWorkout        Boolean  @default(false)
+  historyRaceCount  Int      @default(0)
+  completenessScore Float    @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  runner YurtDisiRunner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+}
