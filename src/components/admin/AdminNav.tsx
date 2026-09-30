@@ -55,7 +55,10 @@ const NAV: NavGroup[] = [
   },
   {
     section: "YD Yarışları",
-    items: [],
+    items: [
+      { href: "/admin/yd-databank", label: "Veri Bankası Durumu", icon: ClipboardCheck },
+      { href: "/admin/yd-unresolved", label: "Unresolved Kuyruğu", icon: History },
+    ],
   },
   {
     section: null,
