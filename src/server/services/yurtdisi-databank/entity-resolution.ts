@@ -65,12 +65,25 @@ export async function unresolvedYaz(input: {
 
 export async function resolveOrCreateTrack(rawName: string, country: string): Promise<string> {
   const existing = await aliasIleBul("TRACK", TJK_SOURCE, rawName);
-  if (existing) return existing;
+  if (existing) {
+    // 2026-09-30 bulgusu — HorseRun ETL'in "BILINMIYOR" ile oluşturduğu eski kayıtları
+    // gerçek ülke bilgisi geldiğinde sessizce zenginleştir (var olan DOĞRU bir değeri
+    // asla üzerine yazma).
+    if (country !== "BILINMIYOR") {
+      const eski = await db.yurtDisiTrack.findUnique({ where: { id: existing }, select: { country: true } });
+      if (eski?.country === "BILINMIYOR") {
+        await db.yurtDisiTrack.update({ where: { id: existing }, data: { country } }).catch(() => {});
+      }
+    }
+    return existing;
+  }
 
   const normalizedName = normalizeName(rawName);
   let track = await db.yurtDisiTrack.findUnique({ where: { normalizedName } });
   if (!track) {
     track = await db.yurtDisiTrack.create({ data: { canonicalName: rawName, normalizedName, country } });
+  } else if (track.country === "BILINMIYOR" && country !== "BILINMIYOR") {
+    await db.yurtDisiTrack.update({ where: { id: track.id }, data: { country } }).catch(() => {});
   }
   await aliasYaz("TRACK", track.id, TJK_SOURCE, rawName, normalizedName);
   return track.id;

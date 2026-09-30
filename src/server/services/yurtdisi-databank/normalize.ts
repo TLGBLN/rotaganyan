@@ -11,6 +11,21 @@
  * günden mükemmel bir isim-çözücü değil, GENİŞLETİLEBİLİR bir alias sözleşmesi kurmaktır).
  */
 
+// TJK'nın hipodrom/şehir isimlerine EKLEDİĞİ ülke soneki (ör. "Kempton Park Birleşik
+// Krallık") — tjk.adapter.ts'teki YABANCI_ULKELER ile AYNI liste, ama BİLEREK ayrı
+// tanımlandı (bu dosya TR koduna hiç import etmez, kullanıcı kararı 2026-09-30).
+const HIPODROM_ULKE_SONEKLERI = [
+  "Birleşik Krallık", "İngiltere", "İskoçya", "Kanada", "ABD", "Amerika Birleşik Devletleri",
+];
+
+/** "Kempton Park Birleşik Krallık" -> "Birleşik Krallık" — bulunamazsa null döner
+ *  (2026-09-30 bulgusu: HorseRun ETL'in bu bilgiyi ayrıştırmadan "BILINMIYOR" yazması
+ *  gereksizdi, isimde zaten var). */
+export function hipodromAdindanUlkeCikar(rawCityName: string): string | null {
+  const ulke = HIPODROM_ULKE_SONEKLERI.find((u) => rawCityName.trim().endsWith(u));
+  return ulke ?? null;
+}
+
 /** At isimlerindeki "(USA)"/"(GB)"/"(IRE)" gibi ülke sonekini ayırır. */
 export function atAdiUlkeAyristir(raw: string): { isim: string; ulkeKodu: string | null } {
   const m = raw.trim().match(/^(.*?)\s*\(([A-Z]{2,4})\)\s*$/);

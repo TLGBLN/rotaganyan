@@ -12,6 +12,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { fetchYurtDisiAtKosuBilgileri } from "@/server/services/ingest/tjk-at-yurtdisi.adapter";
 import { resolveOrCreateTrack } from "./entity-resolution";
+import { hipodromAdindanUlkeCikar } from "./normalize";
 
 export type HorseRunEtlSonuc = { equinesProcessed: number; rowsUpserted: number; errors: string[] };
 
@@ -60,7 +61,7 @@ export async function ingestYurtDisiHorseRunsToDatabank(limit = 50): Promise<Hor
         const raceDate = tarihAyristir(row.date);
         if (!raceDate) continue;
 
-        const trackId = await resolveOrCreateTrack(row.city, "BILINMIYOR");
+        const trackId = await resolveOrCreateTrack(row.city, hipodromAdindanUlkeCikar(row.city) ?? "BILINMIYOR");
         const sourceKey = `${row.date}|${row.city}|${row.raceNoName}`;
 
         const finishMatch = row.finish.match(/^(\d+)\/(\d+)$/);
