@@ -434,7 +434,14 @@ async function fetchCityProgram(
 export class TjkAdapter implements DataProvider {
   readonly name = "TJK";
 
-  async fetchRaceDays(date?: Date): Promise<IngestRaceDay[]> {
+  // 2026-09-30 kullanıcı bulgusu ("hiçbir atın bilgileri tjk dan çekilmemiş") — production
+  // cron'unun (ingest-program) TR ingest'i tjk-info.adapter.ts'teki AYRI, TR-only
+  // ingestDate()'i kullanıyor; bu sınıf (yurtDisiAtId/ülke filtresi doğru olan TEK yer)
+  // production'da HİÇ ÇAĞRILMIYORDU. Düzeltme: aynı cron'a bu sınıfı da AYRICA (yalnız
+  // yurt dışı için) ekliyoruz — onlyForeign=true, TR sekmelerini fetchCityProgram'a HİÇ
+  // göndermeyerek (gereksiz çift TJK isteği + TR'ye risk olmasın diye) yalnız yabancı
+  // hipodromları döner.
+  async fetchRaceDays(date?: Date, options?: { onlyForeign?: boolean }): Promise<IngestRaceDay[]> {
     const target = date ?? new Date();
     const dmy = toDmy(target);
 
@@ -448,7 +455,9 @@ export class TjkAdapter implements DataProvider {
     // kararıyla izin verilen ülkeler (ABD/Birleşik Krallık/Kanada, bkz.
     // IZIN_VERILEN_YABANCI_ULKELER); diğerleri (Fransa/Şili/vb.) burada elenir, onlar
     // için fetchCityProgram HİÇ çağrılmaz.
-    const relevantTabs = tabs.filter((t) => (t.isForeign ? yabanciIngestEdilsinMi(t.name) : TURKISH_CITY_SLUGS[normTr(t.name)]));
+    const relevantTabs = tabs.filter((t) =>
+      t.isForeign ? yabanciIngestEdilsinMi(t.name) : !options?.onlyForeign && TURKISH_CITY_SLUGS[normTr(t.name)]
+    );
     if (relevantTabs.length === 0) return [];
 
     const raceDays: IngestRaceDay[] = [];
