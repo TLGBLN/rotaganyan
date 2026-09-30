@@ -1222,6 +1222,13 @@ model YurtDisiRace {
   classRaw           String?
   classNormalized    String?
   raceType           String?
+  // 2026-09-30 kullanıcı notu — "Bugün ham purse kaybolursa ileride sınıf bankasını doğru
+  // kuramayız": pozisyon bazlı ikramiye kırılımı (1.-4. sıra) ham olarak saklanır, tek bir
+  // toplam alana indirgenmez — TR'deki Race.ikramiyeDetay ile AYNI fikir, ayrı alan.
+  purse1             Float?
+  purse2             Float?
+  purse3             Float?
+  purse4             Float?
   purseTotal         Float?
   currency           String?
   purseUsdEquivalent Float?
@@ -1290,6 +1297,7 @@ model YurtDisiHorseRun {
   horseId          String
   raceDate         DateTime
   trackId          String?
+  trackNameRaw     String?
   distance         Int?
   surface          String?
   going            String?
@@ -1305,11 +1313,18 @@ model YurtDisiHorseRun {
   raceTime         String?
   rating           Float?
   odds             Float?
+  purseTotal       Float?
+  currency         String?
+  // 2026-09-30 kullanıcı kararı — ETL idempotent olmalı: aynı satır tekrar çekilince
+  // yinelenmesin. TJK'nın kendi geçmiş sayfası satır başına stabil bir kimlik vermiyor,
+  // bu yüzden tarih+şehir+koşu-no/adı birleşimi kaynak-kimliği olarak kullanılıyor.
+  sourceKey        String?
   source           String
   createdAt        DateTime @default(now())
 
   horse YurtDisiEquine @relation(fields: [horseId], references: [id], onDelete: Cascade)
 
+  @@unique([horseId, sourceKey])
   @@index([horseId, raceDate])
 }
 
