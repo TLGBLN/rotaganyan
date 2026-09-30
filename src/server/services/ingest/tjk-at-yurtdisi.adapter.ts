@@ -289,3 +289,85 @@ export async function syncYurtDisiAtRaceHistory(limit = 40): Promise<{ ok: numbe
   const kalan = Math.max(0, eksikIdler.length - (ok + fail));
   return { ok, fail, kalan };
 }
+
+/** TJK'nın normal program tablosundaki "Son 6 Y." hücresi yurt dışı atlar için pist rengi
+ *  TAŞIMIYOR (yalnız çıplak rakam) — ProgramView.tsx'teki formBoxClass bu yüzden zemin
+ *  bilgisi olmayan atları pozisyona göre ANLAMSIZ bir gökkuşağı renkle gösteriyordu
+ *  (kullanıcı bulgusu 2026-09-29: "bu renkler anlamsız... kum/çim/sentetiğe göre
+ *  düzenle"). Tek harfli kod TR'nin kendi üretimiyle (tjk.adapter.ts'teki Son 6 Y. font-
+ *  color eşlemesi) AYNI sözleşmeyi kullanır: "C"=Çim, "K"=Kum, "S"=Sentetik. */
+function yurtDisiPistTekHarf(raw: string): string {
+  const c = raw.trim().charAt(0).toUpperCase();
+  if (c === "Ç") return "C";
+  if (c === "S") return "S";
+  return "K";
+}
+
+/**
+ * Zaten önbelleğe alınmış geçmiş yarış satırlarından (syncYurtDisiAtRaceHistory'nin
+ * doldurduğu YurtDisiAtRaceHistoryCache) Runner.recentForm/recentFormSurfaces'ı üretip
+ * yazar — TR'nin kendi ingest'inde bu ikisi AYNI anda dolar, yurt dışı atlarda ayrı bir
+ * adım gerekiyor çünkü kaynak veri (TJK'nın "Son 6 Y." hücresi) pist rengini hiç
+ * taşımıyor. Yeni bir TJK isteği GEREKTİRMEZ (rows zaten DB'de) — bu yüzden
+ * syncYurtDisiAtRaceHistory'den AYRI, ucuz bir ikinci geçiş olarak tasarlandı.
+ */
+export async function syncYurtDisiRecentForm(limit = 60): Promise<{ ok: number; kalan: number }> {
+  const { db } = await import("@/lib/db");
+  const bugun = new Date();
+  bugun.setUTCHours(0, 0, 0, 0);
+
+  const adaylar = await db.runner.findMany({
+    where: {
+      yurtDisiAtId: { not: null },
+      scratched: false,
+      recentFormSurfaces: null,
+      race: { raceDay: { date: { gte: bugun } } },
+    },
+    select: { id: true, yurtDisiAtId: true },
+    take: limit,
+  });
+  if (adaylar.length === 0) return { ok: 0, kalan: 0 };
+
+  const idler = [...new Set(adaylar.map((a) => a.yurtDisiAtId).filter((x): x is number => x != null))];
+  const cacheRows = await db.yurtDisiAtRaceHistoryCache.findMany({
+    where: { yurtDisiAtId: { in: idler } },
+    select: { yurtDisiAtId: true, rowsJson: true },
+  });
+  const rowsByAtId = new Map(cacheRows.map((c) => [c.yurtDisiAtId, c.rowsJson as unknown as YurtDisiAtKosuRow[]]));
+
+  let ok = 0;
+  for (const r of adaylar) {
+    const rows = rowsByAtId.get(r.yurtDisiAtId!);
+    if (!rows || rows.length === 0) continue;
+
+    const son6 = rows.slice(0, 6);
+    const posItems: { pos: string; surf: string }[] = [];
+    for (const row of son6) {
+      const finishMatch = row.finish.match(/^(\d+)\//);
+      if (!finishMatch) continue;
+      posItems.push({ pos: finishMatch[1], surf: yurtDisiPistTekHarf(row.surface) });
+    }
+    if (posItems.length === 0) continue;
+
+    await db.runner
+      .update({
+        where: { id: r.id },
+        data: {
+          recentForm: posItems.map((x) => x.pos).join(""),
+          recentFormSurfaces: posItems.map((x) => x.surf).join(""),
+        },
+      })
+      .catch(() => {});
+    ok++;
+  }
+
+  const kalan = await db.runner.count({
+    where: {
+      yurtDisiAtId: { not: null },
+      scratched: false,
+      recentFormSurfaces: null,
+      race: { raceDay: { date: { gte: bugun } } },
+    },
+  });
+  return { ok, kalan };
+}
