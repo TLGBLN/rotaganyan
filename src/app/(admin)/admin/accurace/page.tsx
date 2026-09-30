@@ -162,7 +162,9 @@ export default async function AccuraceDashboardPage({ searchParams }: PageProps)
     egilimByHorse.set(name, hesaplaCokYarisEgilimi(sonuclar));
   }
 
-  const totalKosular = await db.race.count({ where: { raceDay: { date: dateObj } } });
+  // Accurace TR'ye özgü (yurt dışı hipodromlarda hiç veri yok) — kapsam oranının
+  // paydası yurt dışı koşularla ŞİŞMESİN diye isForeign:false filtresi.
+  const totalKosular = await db.race.count({ where: { raceDay: { date: dateObj, hippodrome: { isForeign: false } } } });
 
   return (
     <div className="space-y-4">

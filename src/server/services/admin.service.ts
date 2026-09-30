@@ -166,7 +166,10 @@ export type PedigreeEntryRaceDay = Awaited<ReturnType<typeof getRaceDaysForPedig
 export async function getRaceDaysForPedigreeEntry(dateStr: string) {
   const date = new Date(dateStr);
   const raceDays = await db.raceDay.findMany({
-    where: { date: { gte: startOfDay(date), lte: endOfDay(date) } },
+    // 2026-09-30 kullanıcı bulgusu — bu TR'ye özgü bir admin aracı (pedigri elle
+    // tamamlama), yurt dışı hipodromlar (bkz. Analiz Motoru YD V1.0, tamamen ayrı bir
+    // akış) buraya HİÇ karışmamalı.
+    where: { date: { gte: startOfDay(date), lte: endOfDay(date) }, hippodrome: { isForeign: false } },
     include: {
       hippodrome: true,
       races: {
