@@ -32,6 +32,8 @@ const ComparisonPanel = dynamic(() => import("./panels/ComparisonPanel"), { load
 const H2HPanel = dynamic(() => import("./panels/H2HPanel"), { loading: () => PANEL_LOADING, ssr: false });
 const SonYarisDetayPanel = dynamic(() => import("./panels/SonYarisDetayPanel"), { loading: () => PANEL_LOADING, ssr: false });
 const AtDetaylariPanel = dynamic(() => import("./panels/AtDetaylariPanel"), { loading: () => PANEL_LOADING, ssr: false });
+// Analiz Motoru YD V1.0 — TR panellerinden AYRI dosya (bkz. panels/YdAnalysisPanel.tsx).
+const YdAnalysisPanel = dynamic(() => import("./panels/YdAnalysisPanel"), { loading: () => PANEL_LOADING, ssr: false });
 
 // Detay paneli açma/kapama butonları (Son 800/Galop/Pedigriler/H2H/Karşılaştır/Son Yarış Detayları) —
 // her biri farklı renkteyken karmaşık görünüyordu; artık hepsi tek tip, sadece açık/kapalı
@@ -1161,12 +1163,14 @@ type JockeyStatsMap = Record<string, {
 type TrainerStatsMap = Record<string, TrainerStatRow>;
 
 function RaceTable({
-  race, dateStr, analysisOpen, onAnalysisToggle, son800Open, agfTrendOpen, galopOpen, pedigreeOpen, comparisonOpen, h2hOpen, sonYarisOpen, atDetayOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, isVerified, userEmail, jockeyStats, trainerStats, hippodromeName,
+  race, dateStr, analysisOpen, onAnalysisToggle, ydAnalysisOpen, son800Open, agfTrendOpen, galopOpen, pedigreeOpen, comparisonOpen, h2hOpen, sonYarisOpen, atDetayOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, isVerified, userEmail, jockeyStats, trainerStats, hippodromeName,
 }: {
   race: ProgramRace;
   dateStr: string;
   analysisOpen: boolean;
   onAnalysisToggle: () => void;
+  // Analiz Motoru YD V1.0 — TR'nin analysisOpen'ından AYRI, bkz. üstteki state notu.
+  ydAnalysisOpen: boolean;
   son800Open: boolean;
   agfTrendOpen: boolean;
   galopOpen: boolean;
@@ -1370,6 +1374,10 @@ function RaceTable({
           />
         )}
       </div>
+      {/* Analiz Motoru YD V1.0 paneli — TR'nin AnalysisPanel'inden TAMAMEN AYRI bileşen */}
+      <div id="panel-yd-analiz" className="scroll-mt-14">
+        {ydAnalysisOpen && <YdAnalysisPanel raceId={race.id} />}
+      </div>
       <div id="panel-son-yaris-detay" className="scroll-mt-14">
         {sonYarisOpen && (
           <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
@@ -1457,6 +1465,10 @@ export default function ProgramView({
     if (activeHipo) localStorage.setItem(LAST_HIPO_STORAGE_KEY, activeHipo);
   }, [activeHipo]);
   const [analysisOpen, setAnalysisOpen] = useState(false);
+  // Analiz Motoru YD V1.0 (yurt dışı) — TR'nin analysisOpen'ından TAMAMEN AYRI state,
+  // kullanıcı kararı 2026-09-30: "V5.46 nın alt yapısına benzer bir yapı" ama TR koduyla
+  // hiç bağlantısı olmayacak.
+  const [ydAnalysisOpen, setYdAnalysisOpen] = useState(false);
   const [son800Open, setSon800Open] = useState(false);
   const [agfTrendOpen, setAgfTrendOpen] = useState(false);
   const [galopOpen, setGalopOpen] = useState(false);
@@ -1678,7 +1690,13 @@ export default function ProgramView({
                     : <><Radio className="h-3 w-3 animate-pulse" /> {t("analiziGor")} 🔒</>}
                 </button>
               ) : currentDay?.isForeign ? (
-                <span className="text-xs font-semibold text-muted-foreground shrink-0 whitespace-nowrap">{t("yurtDisiAnaliz")}</span>
+                <button
+                  onClick={() => toggleAndScroll(setYdAnalysisOpen, ydAnalysisOpen, "panel-yd-analiz")}
+                  className="flex items-center gap-1 rounded-md bg-[#006D05] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
+                >
+                  <Radio className="h-3 w-3 animate-pulse" /> Analiz Motoru YD V1.0{" "}
+                  {ydAnalysisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
               ) : (
                 <span className="text-xs font-semibold text-[#e74c3c] shrink-0 whitespace-nowrap">{t("analizHazirlaniyor")}</span>
               )}
@@ -1715,6 +1733,7 @@ export default function ProgramView({
               dateStr={raceEffectiveDateStr(dateStr, gunOffsetleri.get(currentRace.raceNo) ?? 0)}
               analysisOpen={analysisOpen}
               onAnalysisToggle={() => setAnalysisOpen((v) => !v)}
+              ydAnalysisOpen={ydAnalysisOpen}
               son800Open={son800Open}
               agfTrendOpen={agfTrendOpen}
               galopOpen={galopOpen}

@@ -216,6 +216,7 @@ model Race {
   pendingResult  PendingResult?
   accuraceRace   AccuraceRace?
   challengerRuns ChallengerRun[]
+  yurtDisiPrediction YurtDisiPrediction?
 
   @@unique([raceDayId, raceNo])
 }
@@ -264,9 +265,43 @@ model Runner {
   picks          Pick[]
   agfSnapshots   AgfSnapshot[]
   accuraceSplits AccuraceHorseSplit[]
+  yurtDisiPicks  YurtDisiPick[]
 
   @@unique([raceId, no])
   @@index([name])
+}
+
+/**
+ * Analiz Motoru YD V1.0 — yurt dışı koşular için TR'nin Prediction/Pick'inden TAMAMEN
+ * AYRI bir tahmin kaydı (kullanıcı kararı, 2026-09-30). TR'deki editoryal alanların
+ * (authorId/notes/confidence/banko/Anormal Pist Modu/Race Context Invalidation vb.)
+ * HİÇBİRİ yok — bu tamamen otomatik/algoritmik, insan editörü olmayan bir skor.
+ * Bkz. src/lib/methodology/yd-engine.ts.
+ */
+model YurtDisiPrediction {
+  id            String   @id @default(cuid())
+  raceId        String   @unique
+  engineVersion String   @default("YD-1.0")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  race  Race           @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  picks YurtDisiPick[]
+}
+
+model YurtDisiPick {
+  id           String @id @default(cuid())
+  predictionId String
+  rank         Int
+  runnerId     String
+  score        Float
+  // yd-engine.ts'in YdSinyaller şekli — şeffaflık için: hangi sinyal ne puan verdi.
+  signals      Json
+
+  prediction YurtDisiPrediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  runner     Runner             @relation(fields: [runnerId], references: [id])
+
+  @@unique([predictionId, rank])
 }
 
 /**
