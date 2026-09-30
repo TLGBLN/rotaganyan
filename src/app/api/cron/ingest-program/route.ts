@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { syncIdmanForDate } from "@/server/services/ingest/tjk-idman-stats.adapter";
 import { TjkAdapter } from "@/server/services/ingest/tjk.adapter";
-import { persistRaceDays } from "@/server/services/ingest/base";
+import { persistYurtDisiRaceDays } from "@/server/services/ingest/yurtdisi-persist";
 import { verifyCronRequest } from "@/lib/cron-auth";
 
 export const maxDuration = 800; // v6.90 — kullanıcı talimatı 2026-08-10: en son sınıra çekildi
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   async function ingestYurtDisiGunu(d: Date): Promise<string[]> {
     try {
       const raceDays = await yurtDisiAdapter.fetchRaceDays(d, { onlyForeign: true });
-      if (raceDays.length > 0) await persistRaceDays(raceDays);
+      if (raceDays.length > 0) await persistYurtDisiRaceDays(raceDays);
       return raceDays.map((rd) => `${rd.hippodromeName}: ${rd.races.reduce((s, r) => s + r.runners.length, 0)} koşucu`);
     } catch (e) {
       return [`HATA: ${String(e)}`];

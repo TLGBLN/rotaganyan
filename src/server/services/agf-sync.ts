@@ -42,8 +42,15 @@ async function syncOneCity(city: CityInfo, tjkDate: string, d: Date): Promise<Ag
 
   if (!hippodrome || !raceDay || raceDay.races.length === 0) {
     try {
-      const { persistRaceDays } = await import("./ingest/base");
-      await persistRaceDays([program]);
+      // 2026-09-30 kullanıcı kararı — TR ve yurt dışı persist fonksiyonları TAMAMEN AYRI
+      // (bkz. yurtdisi-persist.ts'in başındaki not), birbirlerine hiç bağlanmasınlar diye.
+      if (program.isForeign) {
+        const { persistYurtDisiRaceDays } = await import("./ingest/yurtdisi-persist");
+        await persistYurtDisiRaceDays([program]);
+      } else {
+        const { persistRaceDays } = await import("./ingest/base");
+        await persistRaceDays([program]);
+      }
       hippodrome = await db.hippodrome.findFirst({ where: { slug } });
       if (hippodrome) {
         raceDay = await db.raceDay.findFirst({
