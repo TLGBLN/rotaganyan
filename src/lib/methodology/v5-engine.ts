@@ -1736,6 +1736,108 @@ export function tumOzellikleriListele(r: Faz1RunnerV5Sirali): TumOzellikDetay[] 
   }));
 }
 
+// 2026-10-02 kullanıcı talebi ("tüm sinyalleri yansıtacak şekilde anlaşılır dilde
+// yayınlansın" + Signal Anatomy denetimi sonrası "kanıtlanmış/araştırma ayrımı UI'da
+// görünsün") — SINYAL-FORMULLERI.md'nin §5 Kanıt Matrisi'ndeki "Durum" sütunuyla AYNI
+// kaynak (icat edilmiş yeni bir sınıflandırma DEĞİL). Antrenör Oranı satırı, Faz A1.5/A3
+// refit-aware denetiminin (2026-10-02) bulgusunu yansıtacak şekilde GÜNCELLENDİ — bu
+// GÜNCEL olmayan sayı kalmasın diye SINYAL-FORMULLERI.md'de de AYNI ANDA güncellenmeli
+// (bkz. feedback_kanit_matrisi_birlikte_guncelle). Üretim β'ları DEĞİŞMEDİ — yalnız
+// kullanıcıya gösterilen kanıt-durumu etiketi.
+const SINYAL_KANIT_DURUMU: Record<string, string> = {
+  agfSirasi: "Kanıtlanmış",
+  agfPayi: "Kanıtlanmış",
+  agfPayi2: "Kanıtlanmış (piyasa kalibrasyon düzeltmesi — AGF Payı'nın eğriselliği, ayrı bir bilgi kaynağı değil)",
+  idmJokey: "Kanıtlanmış (segment-özel — Handikap'ta katsayı elle sıfırlanmış)",
+  jokeyOrani: "Kanıtlanmış",
+  antrenorOrani: "Araştırma — 2026-10-02 refit-aware denetiminde (Faz A1.5/A3) bağımsız katkısı doğrulanamadı; büyük skor hareketi yaratıyor ama bu henüz üretim kararına dönüşmedi",
+  h2hNetSkor: "Kanıtlanmış (segment-özel — düşük-şart'ta katsayı elle sıfırlanmış)",
+  hizDerecesi: "Kısmen doğrulanmış — 'diğer' segmentte geçerli kabul ediliyor, düşük-şart'ta belirsiz, Handikap'ta katsayı elle sıfırlanmış",
+  zeminToleransi: "Araştırma — kullanıcı kararıyla eklendi, istatistiksel kanıt (GA sıfırı içeriyor)",
+  yakinsama2Plus: "Araştırma — kullanıcı kararıyla eklendi, istatistiksel kanıt yok (GA sıfırı içeriyor)",
+  sonIdmanSprint: "Araştırma — backtest kendi yönünü bile doğrulamadı",
+  takiDegisikligi: "Araştırma — kullanıcı kararıyla eklendi, istatistiksel kanıt yok",
+  yarisGidisatiSkoru: "Kısmen kanıtlanmış (Handikap dışında); Handikap'ta katsayı elle sıfırlanmış",
+  sireOrani: "Araştırma — kanıtsız istisna, kullanıcı kararıyla eklendi",
+  zeminMesafeDeneyim: "Deneysel/provisional — sınırlı kanıt, n≥250-300 gölge-test beklenmeden eklendi",
+};
+
+/** Bir sinyalin ham/standart/katkı üçlüsünü, o sinyale ÖZGÜ anlaşılır bir Türkçe cümleye
+ *  çevirir. Katkı ~0 (ihmal edilebilir) olduğunda bile BOŞ dönmez — "bu at için belirgin
+ *  bir fark yok" türünden nötr bir cümle üretir, OZELLIK_GRUPLARI'ndaki eşik-tabanlı
+ *  satırların AKSİNE (onlar katkı sıfırsa satırı tamamen gizler). AGF üçlüsü burada
+ *  AYRI AYRI anlatılır (OZELLIK_GRUPLARI'nda tek "AGF" grubunda birleşiktirler). */
+function sinyalCumlesi(kod: string, hamDeger: number, katki: number, r: Faz1RunnerV5Sirali): string {
+  const notrMu = Math.abs(katki) < 0.01;
+  switch (kod) {
+    case "agfSirasi":
+      return `Bahis payına göre sahadaki sırası: ${hamDeger}.${hamDeger === 1 ? " (piyasa favorisi)" : ""}`;
+    case "agfPayi":
+      return `Bahis payı (AGF): toplam havuzun %${hamDeger.toFixed(1)}'i bu atta.`;
+    case "agfPayi2":
+      return notrMu
+        ? "AGF payının eğrisel (karesi alınmış) etkisinde bu at için belirgin bir düzeltme yok."
+        : `AGF payının eğrisel etkisi (aşırı-favori kalibrasyon düzeltmesi) skoru ${katki > 0 ? "yukarı" : "aşağı"} çekiyor.`;
+    case "idmJokey":
+      return katki !== 0 ? "Bugünkü jokey, bu atın idmanlarından birini bizzat yaptırmış." : "İdman-jokey uyumunda bu at için belirgin bir işaret yok (kayıt yok ya da bu segmentte bu sinyal devre dışı).";
+    case "jokeyOrani":
+      return `Jokeyin genel kazanma oranı (dengelenmiş): %${hamDeger.toFixed(1)}.`;
+    case "antrenorOrani":
+      return `Antrenörün genel kazanma oranı (dengelenmiş): %${hamDeger.toFixed(1)}.`;
+    case "h2hNetSkor":
+      return hamDeger !== 0 ? `Bugünkü rakipleriyle geçmiş karşılaşmalarda toplam ${hamDeger > 0 ? "+" : ""}${hamDeger} net ${hamDeger > 0 ? "önde" : "geride"} bitirmiş.` : "Bugünkü rakipleriyle ortak bir geçmiş karşılaşma kaydı yok.";
+    case "hizDerecesi":
+      return hamDeger !== 0 ? `Son yarışlarındaki hızı, benzer atların ortalamasına göre %${Math.abs(hamDeger).toFixed(1)} ${hamDeger > 0 ? "daha hızlı" : "daha yavaş"}.` : "Son 365 günde bu hesap için yeterli geçmiş veri yok.";
+    case "zeminToleransi":
+      return hamDeger !== 0 ? `Ağır/yağmurlu gibi normal-dışı zeminlerdeki geçmişinde diğer atlara göre %${Math.abs(hamDeger).toFixed(1)} ${hamDeger > 0 ? "daha hızlı" : "daha yavaş"}.` : "Normal-dışı zeminde geçmiş koşu kaydı yok.";
+    case "yakinsama2Plus":
+      return katki !== 0 ? "Birden fazla olumlu işaret (pist uzmanlığı, pedigri, at-jokey geçmişi, AGF yükselişi, sınıf düşüşünden en az ikisi) aynı atta bir araya gelmiş." : "Yakınsama koşulu (en az 2 olumlu işaretin aynı atta buluşması) bu atta oluşmamış.";
+    case "sonIdmanSprint":
+      return katki !== 0 ? `Son idmanını sprint/sürat çalışması olarak yapmış.` : "Son idman sprint/sürat türünde değil (ya da idman kaydı yok).";
+    case "takiDegisikligi":
+      return katki !== 0 ? `Son yarışından bu yana bir ekipman değişikliği var (${r.takiCikarildiMi ? "çıkarılmış" : r.takiEklendiMi ? "eklenmiş" : "değişmiş"}).` : "Son yarışına göre ekipman değişikliği yok.";
+    case "yarisGidisatiSkoru":
+      return katki !== 0 ? `Bu yarışın beklenen gidişatına göre koşu tarzı ${katki > 0 ? "uygun düşüyor" : "uygun düşmüyor"}.` : "Yarış gidişatı uyumu için yeterli geçmiş Accurace verisi yok (ya da bu segmentte devre dışı).";
+    case "sireOrani":
+      return `Babasının bu tip yarışlardaki kazanma oranı (dengelenmiş): %${hamDeger.toFixed(1)}.`;
+    case "zeminMesafeDeneyim":
+      return hamDeger !== 0 ? `Bugünkü pist+zemin+mesafe koşulunda geçmiş performansı diğer atlara göre %${Math.abs(hamDeger).toFixed(1)} ${hamDeger > 0 ? "daha hızlı" : "daha yavaş"} GÖZLENMİŞ.` : "Bugünkü pist+zemin+mesafe koşulunda (ya da benzerinde) geçmiş koşu kaydı yok.";
+    default:
+      return notrMu ? "Bu at için belirgin bir fark yok." : `Katkı: ${katki > 0 ? "+" : ""}${katki}.`;
+  }
+}
+
+export type OkunurSinyalSatiri = { kod: string; etiket: string; cumle: string; katki: number; kanitDurumu: string };
+
+/** tumOzellikleriListele'nin (ham teknik tablo) OKUNUR karşılığı — kullanıcı talebi
+ *  (2026-10-02): "tüm sinyaller anlaşılır dilde yansıtılsın". Eşik YOKTUR — katkısı
+ *  sıfır olan sinyal de dahil, TÜM 13 A-katmanı + 2 B-katmanı sinyali (toplam 15) kendi
+ *  cümlesiyle döner. Her satırda ayrıca kanıt durumu (SINYAL-FORMULLERI.md §5 ile AYNI
+ *  kaynak) — "model bunu hesapladı" ile "bu sinyalin gerçekten işe yaradığı kanıtlandı"
+ *  AYRI sorular, ikisi karıştırılmasın diye. */
+export function tumOzellikleriAnlasilirListele(r: Faz1RunnerV5Sirali): OkunurSinyalSatiri[] {
+  const teknik = tumOzellikleriListele(r);
+  const satirlar: OkunurSinyalSatiri[] = teknik.map((t) => ({
+    kod: t.kod, etiket: t.etiket, cumle: sinyalCumlesi(t.kod, t.hamDeger, t.katki, r), katki: t.katki,
+    kanitDurumu: SINYAL_KANIT_DURUMU[t.kod] ?? "Belirtilmemiş",
+  }));
+  if (r.bKatmaniUygulandiMi) {
+    satirlar.push({
+      kod: "sireOrani", etiket: "Aygır Kazanma Oranı (B katmanı)",
+      cumle: sinyalCumlesi("sireOrani", r.sireOrani, r.bSireKatkisi, r), katki: r.bSireKatkisi,
+      kanitDurumu: SINYAL_KANIT_DURUMU.sireOrani,
+    });
+  }
+  if (r.zeminMesafeBKatmaniUygulandiMi) {
+    satirlar.push({
+      kod: "zeminMesafeDeneyim", etiket: "Zemin+Mesafe Deneyimi (B katmanı)",
+      cumle: sinyalCumlesi("zeminMesafeDeneyim", r.zeminMesafeDeneyim, r.bZeminMesafeKatkisi, r), katki: r.bZeminMesafeKatkisi,
+      kanitDurumu: SINYAL_KANIT_DURUMU.zeminMesafeDeneyim,
+    });
+  }
+  return satirlar;
+}
+
 export const GUCLU_ESIK = 0.3; // export: bkz. yukarıdaki BANKO_OLASILIK_ESIGI notu
 const ORTA_ESIK = 0.1;
 
@@ -1780,10 +1882,15 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
       tip: r.zeminMesafeDeneyim >= 0 ? "destek" : "risk",
       guven: r.zeminMesafeDeneyimSeviyesi === "tam" ? "tam" : "orta",
       kodGarantili: true,
+      // 2026-10-02 kullanıcı düzeltmesi: "diğer atlara göre X% daha hızlı" kalıcı bir
+      // özellik gibi okunuyordu — n=1-2 gibi küçük örneklemde bu YANILTICI (tek yarışlık
+      // bir gözlemi sanki atın sabit bir niteliğiymiş gibi sunuyordu). Artık AÇIKÇA
+      // "gözlendi" diliyle, GEÇMİŞTE ÖLÇÜLEN bir şey olarak ifade ediliyor — örneklem
+      // sayısı (${r.zeminMesafeOrnekSayisi}) cümlenin İÇİNDE, atlanamaz şekilde geçiyor.
       aciklama:
         r.zeminMesafeDeneyimSeviyesi === "tam"
-          ? `Bugünkü pist, zemin ve mesafenin aynısında daha önce koşmuş (${r.zeminMesafeOrnekSayisi} koşu): o yarışlarda diğer atlara göre ${r.zeminMesafeDeneyim > 0 ? "+" : ""}${r.zeminMesafeDeneyim.toFixed(1)}% ${r.zeminMesafeDeneyim > 0 ? "daha hızlı" : "daha yavaş"} (deneysel bir gözlem, henüz kanıtlanmamış)`
-          : `Bugünkü pist ve zeminde tecrübeli ama bu mesafede ilk kez koşacak — diğer mesafelerdeki performansına bakılarak değerlendirildi (${r.zeminMesafeOrnekSayisi} koşu): diğer atlara göre ${r.zeminMesafeDeneyim > 0 ? "+" : ""}${r.zeminMesafeDeneyim.toFixed(1)}% ${r.zeminMesafeDeneyim > 0 ? "daha hızlı" : "daha yavaş"} (deneysel bir gözlem, henüz kanıtlanmamış)`,
+          ? `Bugünkü pist, zemin ve mesafenin aynısında daha önce koşmuş: bu ${r.zeminMesafeOrnekSayisi} geçmiş koşuda diğer atlara göre ortalama ${r.zeminMesafeDeneyim > 0 ? "+" : ""}${r.zeminMesafeDeneyim.toFixed(1)}% ${r.zeminMesafeDeneyim > 0 ? "daha hızlı" : "daha yavaş"} GÖZLENDİ (deneysel bir gözlem, henüz kanıtlanmamış — örneklem küçükse tek yarışlık bir sonuç olabilir)`
+          : `Bugünkü pist ve zeminde tecrübeli ama bu mesafede ilk kez koşacak — diğer mesafelerdeki ${r.zeminMesafeOrnekSayisi} geçmiş koşusuna bakılarak değerlendirildi: diğer atlara göre ortalama ${r.zeminMesafeDeneyim > 0 ? "+" : ""}${r.zeminMesafeDeneyim.toFixed(1)}% ${r.zeminMesafeDeneyim > 0 ? "daha hızlı" : "daha yavaş"} GÖZLENDİ (deneysel bir gözlem, henüz kanıtlanmamış — örneklem küçükse tek yarışlık bir sonuç olabilir)`,
     });
   }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
-import { gatherFaz1V5, faz2V5Sirala, muhakemeUretV5, v5BankoAdayiTespit, tumOzellikleriListele, CURRENT_ENGINE_LABEL, hibritMaidenSatisMi } from "@/lib/methodology/v5-engine";
+import { gatherFaz1V5, faz2V5Sirala, muhakemeUretV5, v5BankoAdayiTespit, tumOzellikleriListele, tumOzellikleriAnlasilirListele, CURRENT_ENGINE_LABEL, hibritMaidenSatisMi } from "@/lib/methodology/v5-engine";
 import { kategoriTespit } from "@/lib/methodology/v2-engine";
 import { hesaplaAnormalPistRiski } from "@/lib/methodology/anormal-pist-risk";
 import { db } from "@/lib/db";
@@ -56,6 +56,9 @@ async function handlePost(req: NextRequest) {
     zeminMesafeDeneyimSeviyesi: r.zeminMesafeDeneyimSeviyesi,
     details: muhakemeUretV5(r, sahaBuyuklugu),
     tumSinyaller: tumOzellikleriListele(r),
+    // 2026-10-02 kullanıcı talebi: ham teknik tablonun OKUNUR karşılığı — tüm 15 sinyal
+    // (eşik yok) anlaşılır Türkçe cümle + kanıt durumuyla.
+    anlasilirSinyaller: tumOzellikleriAnlasilirListele(r),
   }));
 
   const bankoAdayiHam = v5BankoAdayiTespit(sirali);
