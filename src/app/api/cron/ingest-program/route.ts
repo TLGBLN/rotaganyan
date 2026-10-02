@@ -3,6 +3,7 @@ import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter
 import { syncIdmanForDate } from "@/server/services/ingest/tjk-idman-stats.adapter";
 import { TjkAdapter } from "@/server/services/ingest/tjk.adapter";
 import { persistYurtDisiRaceDays } from "@/server/services/ingest/yurtdisi-persist";
+import { syncYurtDisiAtRaceHistory, syncYurtDisiRecentForm } from "@/server/services/ingest/tjk-at-yurtdisi.adapter";
 import { verifyCronRequest } from "@/lib/cron-auth";
 
 export const maxDuration = 800; // v6.90 — kullanıcı talimatı 2026-08-10: en son sınıra çekildi
@@ -44,6 +45,23 @@ export async function GET(req: NextRequest) {
     ingestYurtDisiGunu(tomorrow),
   ]);
 
+  // 1c. Kullanıcı bulgusu (2026-10-01, "her yarış programında bunları düzeltmek zorunda
+  // mıyız") — geçmiş yarış + Son Yarışlar pist rengi senkronu ÖNCEDEN yalnız günde 1 kez
+  // (sync-horse-stats-cache, 03:00) çalışıyordu; ingest-program günde 6 kez yeni runner
+  // ekliyor, bu yüzden gün içinde eklenen atlar ERTESİ güne kadar rengi/geçmişi eksik
+  // kalıyordu. Artık BURADA, her ingest'ten HEMEN SONRA da çalışıyor (sync-horse-stats-
+  // cache'teki çağrı KALDIRILMADI — "compute once, zaten doluysa atla" deseni sayesinde
+  // iki yerde çalışması zararsız, yalnız ek bir güvenlik katmanı).
+  const yurtDisiGecmisVeForm = await (async () => {
+    try {
+      const gecmis = await syncYurtDisiAtRaceHistory(80);
+      const form = await syncYurtDisiRecentForm(100);
+      return { gecmis, form };
+    } catch (e) {
+      return { error: String(e) };
+    }
+  })();
+
   // 2. İdman (galop) sync: program yüklendikten sonra bugün + yarın
   const [todayGalop, tomorrowGalop] = await Promise.all([
     syncIdmanForDate(toIsoDate(now)).catch((e: unknown) => ({ hippodromes: 0, rows: 0, skipped: 0, errors: [String(e)] })),
@@ -66,5 +84,6 @@ export async function GET(req: NextRequest) {
       yurtDisi: tomorrowYurtDisi,
       galop: { hippodromes: tomorrowGalop.hippodromes, rows: tomorrowGalop.rows, skipped: tomorrowGalop.skipped },
     },
+    yurtDisiGecmisVeForm,
   });
 }
