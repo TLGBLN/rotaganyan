@@ -537,10 +537,16 @@ export async function buildKuponOnerisi(active: {
 
   // Her ayağın gerçek kazananını ve sonucun girilip girilmediğini bul — kupon numaralarıyla eşleşeni
   // yeşil göstermek, eşleşmeyeni (sonuç girilmiş ama kazanan seçilmemiş) "kaçtı" olarak işaretlemek için.
-  // Aynı sorguda o ayağın analiz sırasını (Pick.rank) da çekiyoruz — kupondaki atlar sayı sırasına göre
-  // değil, analizdeki tahmin sırasına göre dizilsin diye.
+  // Aynı sorguda o ayağın analiz PUANINI (Pick.score) da çekiyoruz — kupondaki atlar sayı
+  // sırasına göre değil, analizdeki ham puana göre dizilsin diye. 2026-10-02 kullanıcı
+  // bulgusu: önceden burada Pick.rank kullanılıyordu — ama rank, terfi mekanizmalarının
+  // (agfTrendTerfisiUygula vb., bkz. v5-engine.ts) ham puanı YENİDEN DİZDİĞİ sonraki
+  // pozisyon, oysa public analiz ekranları (pick-display-order.ts) HAM PUANA göre
+  // sıralıyor — iki ekran farklı kaynaktan beslendiği için aynı at için "analizde sıra 3,
+  // kuponda pozisyon 4" gibi tutarsız bir görüntü oluşabiliyordu. Artık İKİSİ DE aynı
+  // kaynağı (ham puan) kullanıyor.
   const resultByRaceNo = new Map<number, { winnerNo: number | null; winnerNos: number[]; resulted: boolean; ekuriWinnerByNo: Record<number, number>; ekuriPartnerByNo: Record<number, number> }>();
-  const rankByRaceNo = new Map<number, Map<number, number>>();
+  const scoreByRaceNo = new Map<number, Map<number, number>>();
   const races = await db.race.findMany({
     where: {
       raceNo: { in: legs.map((l) => l.raceNo) },
@@ -551,7 +557,7 @@ export async function buildKuponOnerisi(active: {
     },
     include: {
       result: { select: { winnerNo: true, winnerNos: true, enteredAt: true } },
-      prediction: { select: { picks: { select: { rank: true, runner: { select: { no: true } } } } } },
+      prediction: { select: { picks: { select: { score: true, runner: { select: { no: true } } } } } },
       // scratched:false — çekilmiş bir at hâlâ ekuriGroup taşıyabilir, koşmayan bir atı
       // "eküri ortağı" diye göstermek yanıltıcı olurdu.
       runners: { where: { scratched: false }, select: { no: true, ekuriGroup: true } },
@@ -573,21 +579,23 @@ export async function buildKuponOnerisi(active: {
       ekuriPartnerByNo: buildEkuriPartnerMap(r.runners),
     });
     if (r.raceNo === sonAyakRaceNo) sonAyakSonuclandiAt = r.result?.enteredAt ?? null;
-    const rankByNo = new Map<number, number>();
+    const scoreByNo = new Map<number, number>();
     for (const pick of r.prediction?.picks ?? []) {
-      if (pick.runner) rankByNo.set(pick.runner.no, pick.rank);
+      if (pick.runner && pick.score != null) scoreByNo.set(pick.runner.no, pick.score);
     }
-    if (rankByNo.size > 0) rankByRaceNo.set(r.raceNo, rankByNo);
+    if (scoreByNo.size > 0) scoreByRaceNo.set(r.raceNo, scoreByNo);
   }
 
-  /** Atları sayı sırası yerine analizdeki tahmin sırasına (Pick.rank) göre dizer; analizde olmayanlar sona, kendi aralarında sayı sırasına göre eklenir. */
+  /** Atları sayı sırası yerine analizdeki ham puana (Pick.score) göre dizer — public analiz
+   *  ekranlarıyla (bkz. pick-display-order.ts) AYNI kaynak; analizde olmayanlar sona,
+   *  kendi aralarında sayı sırasına göre eklenir. */
   function sortByAnalysisRank(raceNo: number, nos: number[]): number[] {
-    const rankByNo = rankByRaceNo.get(raceNo);
-    if (!rankByNo) return nos;
+    const scoreByNo = scoreByRaceNo.get(raceNo);
+    if (!scoreByNo) return nos;
     return [...nos].sort((a, b) => {
-      const ra = rankByNo.get(a) ?? Infinity;
-      const rb = rankByNo.get(b) ?? Infinity;
-      if (ra !== rb) return ra - rb;
+      const sa = scoreByNo.get(a) ?? -Infinity;
+      const sb = scoreByNo.get(b) ?? -Infinity;
+      if (sa !== sb) return sb - sa;
       return a - b;
     });
   }
