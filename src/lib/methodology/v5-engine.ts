@@ -140,6 +140,7 @@ import { zeminDetayiBul, zeminDetayiSatirdanCikar, zeminKatsayisi } from "@/lib/
 import { getHizDerecesiForRace } from "@/server/actions/hiz-derecesi.actions";
 import { hesaplaZeminToleransiMap } from "@/server/actions/zemin-toleransi.actions";
 import { hesaplaZeminMesafeDeneyimiMap } from "@/server/actions/zemin-mesafe-deneyimi.actions";
+import { hesaplaZeminKanitTablosuMap, type ZeminKanitTablosu } from "@/server/actions/zemin-kanit-tablosu.actions";
 import { yakinsamaGecmisHesapla } from "@/lib/methodology/yakinsama-gecmis";
 import { surfaceToPist } from "@/lib/sire-stat-match";
 import { syncAgfForRace } from "@/server/services/agf-sync";
@@ -496,6 +497,14 @@ export type Faz1RunnerV5 = {
    *  zeminToleransi ile AYNI ölçek) — C katmanı challenger'ının (v6-zemin-mesafe-deneyimi)
    *  gerçek girdisi budur, tier (seviye) yalnız muhakeme metni için. Skora HENÜZ girmez. */
   zeminMesafeDeneyim: number;
+  /** 2026-10-02 — Zemin Kanıt Tablosu (bkz. zemin-kanit-tablosu.actions.ts): bugünün TAM
+   *  (pist+rejim ailesi) kombinasyonuna göre 3 kademeli (EXACT/SAME_SURFACE/ALL_ABNORMAL)
+   *  geçmiş performans dökümü + n'e göre UI güven etiketi. arac-v546-zemin-hiyerarsik-
+   *  feature-test.mts ile DOĞRULANDI: zeminToleransi'nin ağırlığı (β=0.008-0.04) o kadar
+   *  küçük ki bu ayrımın skora ölçülebilir bir etkisi YOK — bu yüzden SKORA HİÇ GİRMEZ,
+   *  yalnız şeffaflık için muhakeme metninde/admin panelinde taşınır. Bugün Normal
+   *  zeminse (ya da veri yoksa) null. */
+  zeminKanitTablosu: ZeminKanitTablosu | null;
   /** 2026-09-01 kullanıcı tasarımı — "Yarış Gidişatı": saha-geneli tempo senaryosu (Rahat
    *  Liderlik/Yavaş Tempo/Dengeli/Mücadeleli/Çok Yüksek/Dağılma Riski, Accurace geçmişinden
    *  kural-tabanlı olasılık dağılımı, bkz. pace-analizi.ts hesaplaYarisGidisati) × atın kendi
@@ -570,7 +579,12 @@ async function gatherFaz1V5Core(raceId: string): Promise<Faz1SonucV5 | null> {
 
   const bugunIkramiye1 = (race.ikramiyeDetay as { ikramiye?: number[] } | null)?.ikramiye?.[0] ?? null;
 
-  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters, hizByNo, zeminToleransiByAd, yakinsamaGecmis, tempoTasimaGucuByAd] = await Promise.all([
+  // Zemin Kanıt Tablosu (2026-10-02) için bugünün pist etiketi+rejim detayı — aşağıdaki
+  // H2H zemin-filtresiyle AYNI zeminDetayiBul çağrısı, yalnız Promise.all'dan ÖNCEYE alındı.
+  const bugunZeminDetayHam = zeminDetayiBul(race.raceDay.surfaceConditions as { label: string; detail: string }[] | null, race.surface);
+  const bugunPistEtiketi = race.surface === "CIM" ? "Çim" : race.surface === "KUM" ? "Kum" : null;
+
+  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters, hizByNo, zeminToleransiByAd, yakinsamaGecmis, tempoTasimaGucuByAd, zeminKanitTablosuByAd] = await Promise.all([
     getSonYarisDetaylariForRace(raceId).catch(() => []),
     getSireStatOzetleriForRace(runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(() =>
       runners.map(() => ({ ozet: null, ornekKendiVeri: null, kYuzde: null }))
@@ -592,6 +606,9 @@ async function gatherFaz1V5Core(raceId: string): Promise<Faz1SonucV5 | null> {
     // 2026-09-11 — Tempo Taşıma Gücü (bkz. tempo-tasima-gucu.actions.ts), artık AYRI bir
     // özellik değil — yarisGidisatiSkoru'nun KENDİ formülüne girdi (bkz. gidisatSonucu notu).
     hesaplaTempoTasimaGucuMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, number>()),
+    bugunPistEtiketi
+      ? hesaplaZeminKanitTablosuMap(runners.map((r) => r.name), race.raceDay.date, bugunPistEtiketi, bugunZeminDetayHam).catch(() => new Map<string, ZeminKanitTablosu | null>())
+      : Promise.resolve(new Map<string, ZeminKanitTablosu | null>()),
   ]);
 
   // 2026-08-30 kullanıcı talebi ("kum ıslak ise ıslak kum koşularına göre H2H yapacaksın
@@ -602,10 +619,7 @@ async function gatherFaz1V5Core(raceId: string): Promise<Faz1SonucV5 | null> {
   // kullanılır (eski davranış). Bugünün durumu biliniyor ama HİÇBİR geçmiş karşılaşma o
   // koşulla eşleşmiyorsa da yine TÜM karşılaşmalara dönülür — bilgi kaybı olmasın diye
   // (0 karşılaşmalı bir sinyal, "veri yok" ile "eşit" ayrımını bozar).
-  const bugunZeminDetay = zeminDetayiBul(
-    race.raceDay.surfaceConditions as { label: string; detail: string }[] | null,
-    race.surface
-  );
+  const bugunZeminDetay = bugunZeminDetayHam; // Promise.all'dan ÖNCE hesaplandı (bkz. yukarı), aynı değer
   // 2026-09-13 kullanıcı bulgusu (İstanbul K9, SENSEİ BAHA "yeniden analiz et" sonrası hiç
   // değişmedi) — kök neden zeminMesafeDeneyimi'nin kendi tabanı DEĞİL, buradaki null'du.
   // Gerçek veriyle doğrulandı: son 30 günün Sentetik pistli GÜNÜNÜN HİÇBİRİNDE (28/28)
@@ -865,6 +879,7 @@ async function gatherFaz1V5Core(raceId: string): Promise<Faz1SonucV5 | null> {
       zeminMesafeDeneyimSeviyesi: zeminMesafeDeneyimByAd.get(r.name)?.seviye ?? "yok",
       zeminMesafeOrnekSayisi: zeminMesafeDeneyimByAd.get(r.name)?.ornekSayisi ?? 0,
       zeminMesafeDeneyim: zeminMesafeDeneyimByAd.get(r.name)?.deger ?? 0,
+      zeminKanitTablosu: zeminKanitTablosuByAd.get(r.name) ?? null,
       yarisGidisatiSkoru: gidisatByRunnerId.get(r.id)?.finalSkor ?? 0,
     };
   });
@@ -1788,8 +1803,18 @@ function sinyalCumlesi(kod: string, hamDeger: number, katki: number, r: Faz1Runn
       return hamDeger !== 0 ? `Bugünkü rakipleriyle geçmiş karşılaşmalarda toplam ${hamDeger > 0 ? "+" : ""}${hamDeger} net ${hamDeger > 0 ? "önde" : "geride"} bitirmiş.` : "Bugünkü rakipleriyle ortak bir geçmiş karşılaşma kaydı yok.";
     case "hizDerecesi":
       return hamDeger !== 0 ? `Son yarışlarındaki hızı, benzer atların ortalamasına göre %${Math.abs(hamDeger).toFixed(1)} ${hamDeger > 0 ? "daha hızlı" : "daha yavaş"}.` : "Son 365 günde bu hesap için yeterli geçmiş veri yok.";
-    case "zeminToleransi":
-      return hamDeger !== 0 ? `Ağır/yağmurlu gibi normal-dışı zeminlerdeki geçmişinde diğer atlara göre %${Math.abs(hamDeger).toFixed(1)} ${hamDeger > 0 ? "daha hızlı" : "daha yavaş"}.` : "Normal-dışı zeminde geçmiş koşu kaydı yok.";
+    case "zeminToleransi": {
+      const temel = hamDeger !== 0 ? `Ağır/yağmurlu gibi normal-dışı zeminlerdeki geçmişinde diğer atlara göre %${Math.abs(hamDeger).toFixed(1)} ${hamDeger > 0 ? "daha hızlı" : "daha yavaş"}.` : "Normal-dışı zeminde geçmiş koşu kaydı yok.";
+      // 2026-10-02 — Zemin Kanıt Tablosu: skora GİRMEZ (arac-v546-zemin-hiyerarsik-feature-
+      // test.mts ile doğrulandı, ayrımın ölçülebilir etkisi yok), yalnız bugünün TAM zemin
+      // koşuluna göre şeffaflık ekliyor. Yalnız bugün anormal zeminse (tablo null değilse) gösterilir.
+      const kt = r.zeminKanitTablosu;
+      if (!kt) return temel;
+      const guvenMetni = { YOK: "veri yok", DUSUK: "düşük", ORTA: "orta", GUCLU: "güçlü" }[kt.guven];
+      const yuzde = (s: { n: number; performansYuzde: number | null }) =>
+        s.performansYuzde == null ? `${s.n} koşu` : `${s.n} koşu, %${Math.abs(s.performansYuzde).toFixed(1)} ${s.performansYuzde > 0 ? "daha hızlı" : "daha yavaş"}`;
+      return `${temel} Bugünkü zemin: ${kt.bugunZeminEtiketi}. Aynı zeminde: ${yuzde(kt.exact)} (kanıt güveni: ${guvenMetni}). Aynı pistte herhangi normal-dışı: ${yuzde(kt.sameSurface)}. Tüm normal-dışı geçmiş: ${yuzde(kt.allAbnormal)}.`;
+    }
     case "yakinsama2Plus":
       return katki !== 0 ? "Birden fazla olumlu işaret (pist uzmanlığı, pedigri, at-jokey geçmişi, AGF yükselişi, sınıf düşüşünden en az ikisi) aynı atta bir araya gelmiş." : "Yakınsama koşulu (en az 2 olumlu işaretin aynı atta buluşması) bu atta oluşmamış.";
     case "sonIdmanSprint":
