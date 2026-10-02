@@ -166,6 +166,9 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
   const [kuponlar, setKuponlar] = useState<{ narrow?: string; normal?: string; wide?: string }>(kayitliBaslangic?.kuponlar ?? {});
   const [kaynak, setKaynak] = useState<"kayitli" | "canli" | null>(kayitliBaslangic ? "kayitli" : null);
   const [acikDetay, setAcikDetay] = useState<Set<number>>(new Set());
+  // 2026-10-02 kullanıcı talebi: "Okunur Özet" bölümü de Ham Teknik Tablo gibi
+  // açılır/kapanır olsun — AYRI bir state (ikisi birbirinden bağımsız açılıp kapanabilsin).
+  const [acikOzet, setAcikOzet] = useState<Set<number>>(new Set());
   // 2026-08-21 kullanıcı bulgusu (Bursa/ŞENGÜL SULTAN vakası): panel hangi ağırlık
   // setinin (düşük-şart/diğer) kullanıldığını hiç göstermiyordu — şeffaflık eksikliği.
   const [kategori, setKategori] = useState<string | null>(null);
@@ -185,6 +188,15 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
 
   function toggleDetay(no: number) {
     setAcikDetay((prev) => {
+      const next = new Set(prev);
+      if (next.has(no)) next.delete(no);
+      else next.add(no);
+      return next;
+    });
+  }
+
+  function toggleOzet(no: number) {
+    setAcikOzet((prev) => {
       const next = new Set(prev);
       if (next.has(no)) next.delete(no);
       else next.add(no);
@@ -689,39 +701,44 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                   <p className="text-muted-foreground">Belirgin bir özellik katkısı yok.</p>
                 )}
 
-                {/* 2026-10-02 kullanıcı talebi: "tüm sinyaller anlaşılır dilde, ham teknik
-                    tablonun YERİNE geçecek şekilde" — okunur özet artık VARSAYILAN görünüm
-                    (toggle'a gerek yok), ham sayı tablosu altta, katlanmış, denetim amaçlı
-                    kalıyor. */}
+                {/* 2026-10-02 kullanıcı talebi: "tüm sinyaller anlaşılır dilde" eklendi,
+                    SONRA kullanıcı bunun da (Ham Teknik Tablo gibi) açılır/kapanır olmasını
+                    istedi — varsayılan KAPALI, ayrı toggle (acikOzet/toggleOzet). */}
                 {a.anlasilirSinyaller && a.anlasilirSinyaller.length > 0 && (
                   <div className="border-t border-border/60 pt-1.5">
-                    <p className="mb-1 text-[11px] font-medium text-purple-500">
+                    <button
+                      onClick={() => toggleOzet(no)}
+                      className="flex items-center gap-1 text-[11px] font-medium text-purple-500 hover:underline"
+                    >
+                      {acikOzet.has(no) ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                       Tüm {a.anlasilirSinyaller.length} Sinyal — Okunur Özet
-                    </p>
-                    <ul className="space-y-1 pl-0 text-muted-foreground">
-                      {a.anlasilirSinyaller.map((s) => {
-                        const kanitRenk = s.kanitDurumu.startsWith("Kanıtlanmış")
-                          ? "text-hit"
-                          : s.kanitDurumu.startsWith("Kısmen")
-                            ? "text-amber-600"
-                            : "text-muted-foreground/70";
-                        return (
-                          <li key={s.kod} className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 rounded border border-border/40 px-1.5 py-1">
-                            <span className="font-semibold text-foreground/90">{s.etiket}:</span>
-                            <span>{s.cumle}</span>
-                            <span
-                              className={cn("ml-auto whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9px] font-medium", kanitRenk)}
-                              title="Bu, 'model bu sinyali hesapladı mı' sorusuna DEĞİL, 'bu sinyalin gerçekten işe yaradığı kanıtlandı mı' sorusuna cevap verir — SINYAL-FORMULLERI.md §5 Kanıt Matrisi ile aynı kaynak."
-                            >
-                              {s.kanitDurumu.split(" — ")[0]}
-                            </span>
-                            {s.kanitDurumu.includes(" — ") && (
-                              <span className="basis-full text-[10px] text-muted-foreground/60">{s.kanitDurumu.split(" — ")[1]}</span>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    </button>
+                    {acikOzet.has(no) && (
+                      <ul className="mt-1.5 space-y-1 pl-0 text-muted-foreground">
+                        {a.anlasilirSinyaller.map((s) => {
+                          const kanitRenk = s.kanitDurumu.startsWith("Kanıtlanmış")
+                            ? "text-hit"
+                            : s.kanitDurumu.startsWith("Kısmen")
+                              ? "text-amber-600"
+                              : "text-muted-foreground/70";
+                          return (
+                            <li key={s.kod} className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 rounded border border-border/40 px-1.5 py-1">
+                              <span className="font-semibold text-foreground/90">{s.etiket}:</span>
+                              <span>{s.cumle}</span>
+                              <span
+                                className={cn("ml-auto whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9px] font-medium", kanitRenk)}
+                                title="Bu, 'model bu sinyali hesapladı mı' sorusuna DEĞİL, 'bu sinyalin gerçekten işe yaradığı kanıtlandı mı' sorusuna cevap verir — SINYAL-FORMULLERI.md §5 Kanıt Matrisi ile aynı kaynak."
+                              >
+                                {s.kanitDurumu.split(" — ")[0]}
+                              </span>
+                              {s.kanitDurumu.includes(" — ") && (
+                                <span className="basis-full text-[10px] text-muted-foreground/60">{s.kanitDurumu.split(" — ")[1]}</span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
                   </div>
                 )}
 
