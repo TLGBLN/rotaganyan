@@ -1682,14 +1682,15 @@ export default function ProgramView({
 
       {currentDay && (
         <>
-          {/* Koşu tab'ları */}
-          <div className="flex overflow-x-auto border-b bg-background shrink-0 print:hidden">
+          {/* Koşu tab'ları — mobilde 5'li iki satıra sığar (grid-cols-5), sm+ ekranda
+              yatay kaydırmalı tek satıra döner (flex). Aralarında hafif ayraç border var. */}
+          <div className="grid grid-cols-5 sm:flex sm:overflow-x-auto border-b bg-background shrink-0 print:hidden">
             {currentDay.races.map((r) => (
               <button
                 key={r.raceNo}
                 onClick={() => setActiveRace((prev) => ({ ...prev, [currentDay.hippodromeSlug]: r.raceNo }))}
                 className={cn(
-                  "relative shrink-0 px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap",
+                  "relative flex items-center justify-center sm:shrink-0 px-2 sm:px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap border-r border-b sm:border-b-0 border-white/20 last:border-r-0",
                   SURFACE_TAB_BG[r.surface],
                   selectedRaceNo(currentDay) === r.raceNo
                     ? "ring-2 ring-inset ring-white shadow-inner"
