@@ -5,7 +5,7 @@
   },
   "header": {
     "program": "Yarış Programı",
-    "puanTablosu": "RotaGanyan Analiz Sıralaması",
+    "puanTablosu": "Rotaganyan Sıralama Tablosu",
     "altiliNeVerir": "Altılı Ne Verir?",
     "bankoOnerileri": "Banko Önerileri",
     "girisYap": "Giriş Yap",
@@ -15,7 +15,7 @@
   "mobileNav": {
     "menu": "Menü",
     "program": "Yarış Programı",
-    "puanTablosu": "RotaGanyan Analiz Sıralaması",
+    "puanTablosu": "Rotaganyan Sıralama Tablosu",
     "altiliNeVerir": "Altılı Ne Verir?",
     "bankoOnerileri": "Banko Önerileri",
     "takipAtlarim": "Takip Atlarım",
@@ -126,7 +126,6 @@
       "sifre": "Şifre",
       "hataliGiris": "E-posta veya şifre hatalı.",
       "girisYap": "Giriş Yap",
-      "beniHatirla": "Beni hatırla",
       "sifremiUnuttum": "Şifremi Unuttum"
     },
     "kayit": {
@@ -251,8 +250,7 @@
   "programPage": {
     "title": "Yarış Programı",
     "bankolarBaslik": "İsabet Sağlayan Bankolar",
-    "kuponlarBaslik": "İsabet Sağlayan Kuponlar",
-    "tumunuGor": "Tümünü Gör"
+    "kuponlarBaslik": "İsabet Sağlayan Kuponlar"
   },
   "programToolbar": {
     "agfTrend": "AGF Trend",
@@ -354,13 +352,11 @@
     "ekonomik": "Ekonomik",
     "normal": "Normal",
     "genis": "Geniş",
-    "kuponAtCekildiUyari": "⚠ #{nos} koşmuyor — kupon güncellenmedi",
     "analiziGormekIcinUye": "Analizi görmek için üye olmalısınız.",
     "girisYap": "Giriş Yap",
     "kayitOl": "Kayıt Ol",
     "analiziGor": "Analiz Yayında",
     "analizHazirlaniyor": "Analiz Hazırlanıyor",
-    "yurtDisiAnaliz": "Yurt Dışı — Analiz Yapılmıyor",
     "sonucLabel": "SONUÇ:",
     "muddetLabel": "MÜDDET:",
     "farklarLabel": "FARKLAR:",

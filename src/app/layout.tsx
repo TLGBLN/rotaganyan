@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Geist_Mono, Barlow_Condensed } from "next/font/google";
-import localFont from "next/font/local";
+import { Geist, Geist_Mono, Barlow_Condensed } from "next/font/google";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,20 +18,9 @@ import { auth } from "@/lib/auth";
 import type { AppLocale } from "@/i18n/request";
 import "./globals.css";
 
-// 2026-09-17 kullanıcı kararı (İKİ AŞAMALI): önce Computer Modern Roman denendi (sitewide),
-// ama gerçek tarayıcıda render sorunları netleşmeden ("Georgia/Inter gibi görünüyor")
-// önce bir CSS scope bug'ı bulunup düzeltildi, sonra kullanıcı pratik/güvenilirlik
-// gerekçesiyle Roman denemesinden TAMAMEN vazgeçip Inter'e geçmeye karar verdi — yalnız
-// matematiksel formül/skor gösterimi Computer Modern Math Italic olarak KALDI (KaTeX'in
-// "KaTeX_Math-Italic" fontu, LaTeX'in cmmi10'unun web karşılığı, MIT lisanslı).
-const inter = Inter({
-  variable: "--font-inter",
+const geistSans = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
-});
-
-const cmMathItalic = localFont({
-  variable: "--font-cm-math-italic",
-  src: "../../public/fonts/CMMathItalic.woff2",
 });
 
 const geistMono = Geist_Mono({
@@ -102,21 +90,9 @@ export default async function RootLayout({
   const locale = await getLocale();
 
   return (
-    <html
-      lang={locale}
-      // 2026-09-17 BUG DÜZELTMESİ (genel next/font+Tailwind v4 kuralı, hâlâ geçerli):
-      // next/font'un ürettiği --font-* değişkenleri eskiden yalnız <body>'de tanımlıydı —
-      // ama Tailwind v4 --font-sans/--default-font-family'i :root (yani <html>) seviyesinde
-      // tanımlıyor. CSS custom property'ler TANIMLANDIĞI elementte çözümlenir: :root'taki
-      // "var(--font-...)" referansı :root'ta bu değişken YOK diye GEÇERSİZ oluyor, bu
-      // geçersizlik <body>'ye miras kalıyor — sonuç Tailwind'in kendi yedek sans-serif
-      // yığınına düşülmesi. Font değişkenleri bu yüzden <html>'de tanımlanıyor —
-      // --font-sans'ın tanımlandığı AYNI element.
-      className={`${inter.variable} ${cmMathItalic.variable} ${geistMono.variable} ${barlowCondensed.variable}`}
-      suppressHydrationWarning
-    >
+    <html lang={locale} suppressHydrationWarning>
       <body
-        className="antialiased min-h-screen bg-background text-foreground"
+        className={`${geistSans.variable} ${geistMono.variable} ${barlowCondensed.variable} antialiased min-h-screen bg-background text-foreground`}
         suppressHydrationWarning
       >
         <ThemeProvider>

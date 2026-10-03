@@ -5,7 +5,7 @@
  */
 
 import { db } from "@/lib/db";
-import { discoverAllRelevantCities, fetchCityProgram, toSlug, toTjkDate, type CityInfo } from "./ingest/tjk-info.adapter";
+import { discoverTurkishCities, fetchCityProgram, toSlug, toTjkDate, type CityInfo } from "./ingest/tjk-info.adapter";
 
 export type AgfSyncCityResult = {
   name: string;
@@ -42,15 +42,8 @@ async function syncOneCity(city: CityInfo, tjkDate: string, d: Date): Promise<Ag
 
   if (!hippodrome || !raceDay || raceDay.races.length === 0) {
     try {
-      // 2026-09-30 kullanıcı kararı — TR ve yurt dışı persist fonksiyonları TAMAMEN AYRI
-      // (bkz. yurtdisi-persist.ts'in başındaki not), birbirlerine hiç bağlanmasınlar diye.
-      if (program.isForeign) {
-        const { persistYurtDisiRaceDays } = await import("./ingest/yurtdisi-persist");
-        await persistYurtDisiRaceDays([program]);
-      } else {
-        const { persistRaceDays } = await import("./ingest/base");
-        await persistRaceDays([program]);
-      }
+      const { persistRaceDays } = await import("./ingest/base");
+      await persistRaceDays([program]);
       hippodrome = await db.hippodrome.findFirst({ where: { slug } });
       if (hippodrome) {
         raceDay = await db.raceDay.findFirst({
@@ -127,7 +120,7 @@ export async function syncAgfForDate(date: Date): Promise<AgfSyncResult> {
   d.setUTCHours(0, 0, 0, 0);
   const tjkDate = toTjkDate(d);
 
-  const cities = await discoverAllRelevantCities(tjkDate);
+  const cities = await discoverTurkishCities(tjkDate);
   const cityResults: AgfSyncCityResult[] = [];
 
   for (const city of cities) {
@@ -207,7 +200,7 @@ async function syncAgfForRaceInner(raceId: string): Promise<void> {
   d.setUTCHours(0, 0, 0, 0);
   const tjkDate = toTjkDate(d);
 
-  const cities = await discoverAllRelevantCities(tjkDate);
+  const cities = await discoverTurkishCities(tjkDate);
   const city = cities.find((c) => toSlug(c.sehirAdi) === race.raceDay.hippodrome.slug);
   if (!city) return;
 

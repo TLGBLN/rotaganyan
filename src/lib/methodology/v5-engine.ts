@@ -140,7 +140,6 @@ import { zeminDetayiBul, zeminDetayiSatirdanCikar, zeminKatsayisi } from "@/lib/
 import { getHizDerecesiForRace } from "@/server/actions/hiz-derecesi.actions";
 import { hesaplaZeminToleransiMap } from "@/server/actions/zemin-toleransi.actions";
 import { hesaplaZeminMesafeDeneyimiMap } from "@/server/actions/zemin-mesafe-deneyimi.actions";
-import { hesaplaZeminKanitTablosuMap, type ZeminKanitTablosu } from "@/server/actions/zemin-kanit-tablosu.actions";
 import { yakinsamaGecmisHesapla } from "@/lib/methodology/yakinsama-gecmis";
 import { surfaceToPist } from "@/lib/sire-stat-match";
 import { syncAgfForRace } from "@/server/services/agf-sync";
@@ -170,18 +169,6 @@ type AgirlikSeti = { featureNames: string[]; weights: number[]; means: number[];
 // yerine, koşunun kategorisine göre İKİ TAMAMEN AYRI eğitilmiş model arasında seçim yapılır.
 const WEIGHTS_DIGER = v5WeightsDiger as AgirlikSeti;
 const FEATURE_NAMES = WEIGHTS_DIGER.featureNames; // iki set de AYNI özellik/sırayı kullanır
-// 2026-09-18 — KgsGun (14. özellik) V5.47'de eklenip AYNI GÜN kullanıcı kararıyla TAMAMEN
-// GERİ ALINDI: bugünkü (2026-09-18) 22 koşuluk tek-günlük karşılaştırmada V5.47 top1'de
-// V5.46'nın gerisinde kaldı (7/22 vs 9/22 — n=22 istatistiksel kanıt DEĞİL, ama kullanıcı
-// yine de geri dönmeyi tercih etti). İlk denemede yalnız katsayı sıfırlanmıştı (kod
-// altyapısı 14 özellik olarak kaldı) — ama bu, admin panelindeki CURRENT_ENGINE_LABEL'ın
-// hâlâ "V5.47, 14 özellik" göstermesine yol açtı (kullanıcı "düzelmemiş" dedi, haklıydı).
-// Bu yüzden TAM/temiz revert yapıldı: v5-weights-diger.json/v5-weights-dusuksart.json
-// commit 886c451'den (V5.46, kgsGun öncesi SON hali) BİREBİR geri getirildi (13 özellik),
-// toFeatureVector/FEATURE_NAMES/KGS_GUN_IDX apparatus'u kaldırıldı. KgsGun'un
-// challenger-test kanıtı (B=500 gün-kümeli, P(ΔLL<0)=%100.0) hâlâ geçerli/doğru — bkz.
-// proje hafızası project_v547_yeni_sinyal_arastirmasi.md — istenirse `arac-model-egit-
-// segment.mjs`'e tekrar eklenip yeniden değerlendirilebilir, yalnız ŞİMDİ canlıda değil.
 
 // 2026-08-21 kullanıcı önerisi ("H2H'ı düşük segmentte kullanma diğer segmentte
 // kullanıyosun"): h2hNetSkor'un düşük-şart'taki katsayısı ham/doğal eğitimde ters yönlü
@@ -304,24 +291,9 @@ export function hibritMaidenSatisMi(classType: string): boolean {
   return maidenMi && satisMi;
 }
 
-// export edildi (2026-09-17, Challenger backtest altyapısı): yeni aday sinyalleri (bkz.
-// proje hafızası) mevcut V5.46 üretim skorunu (agirlikSetleriSec+harmanliSkorla+
-// bKatmaniUygula+softmax zinciri) TAMAMEN aynı şekilde yeniden kurup üzerine tek bir
-// izole β terimi eklemek için — davranış DEĞİŞMEDİ, yalnız dışa açıldı (softmax/
-// liderEsigiHesapla/gatherFaz1V5Historical ile AYNI gerekçe/desen).
-export function agirlikSetleriSec(classType: string): AgirlikSeti[] {
+function agirlikSetleriSec(classType: string): AgirlikSeti[] {
   if (hibritMaidenSatisMi(classType)) return [WEIGHTS_DUSUK_SART, WEIGHTS_DIGER];
   const kategori = kategoriTespit(classType);
-  return agirlikSetleriIcinKategori(kategori);
-}
-
-// export edildi (2026-09-17, Challenger backtest altyapısı) — arac-model-veri-olustur.mts'in
-// ürettiği model-veri*.json satırlarında HAM classType YOK, yalnız önceden hesaplanmış
-// `kategori` kodu var (kategoriTespit'in çıktısı) — bu yüzden ham metin isteyen
-// agirlikSetleriSec çağrılamıyor. Bu varyant DOĞRUDAN kategori koduyla çalışır (hibrit
-// Maiden/Satış harmanlaması HARİÇ — o yalnız ham metinden tespit edilebiliyor, n=14 gibi
-// çok küçük bir dilim olduğu için backtest'te ihmal edilebilir bir basitleştirme).
-export function agirlikSetleriIcinKategori(kategori: string): AgirlikSeti[] {
   if (kategori === "1a" || kategori === "1b") return [WEIGHTS_DUSUK_SART];
   if (kategori === "2") return [WEIGHTS_DIGER_HANDIKAP];
   return [WEIGHTS_DIGER];
@@ -329,7 +301,7 @@ export function agirlikSetleriIcinKategori(kategori: string): AgirlikSeti[] {
 
 /** Bir at için, verilen ağırlık setleri üzerinden ortalama (standardize edilmiş vektör,
  *  katkılar, toplam skor) — tek set varsa harmanlama etkisizdir, aynen önceki davranış. */
-export function harmanliSkorla(v: number[], setler: AgirlikSeti[]): { skor: number; standartVektor: number[]; katkilar: number[] } {
+function harmanliSkorla(v: number[], setler: AgirlikSeti[]): { skor: number; standartVektor: number[]; katkilar: number[] } {
   const n = v.length;
   const standartToplam = new Array(n).fill(0);
   const katkiToplam = new Array(n).fill(0);
@@ -497,14 +469,6 @@ export type Faz1RunnerV5 = {
    *  zeminToleransi ile AYNI ölçek) — C katmanı challenger'ının (v6-zemin-mesafe-deneyimi)
    *  gerçek girdisi budur, tier (seviye) yalnız muhakeme metni için. Skora HENÜZ girmez. */
   zeminMesafeDeneyim: number;
-  /** 2026-10-02 — Zemin Kanıt Tablosu (bkz. zemin-kanit-tablosu.actions.ts): bugünün TAM
-   *  (pist+rejim ailesi) kombinasyonuna göre 3 kademeli (EXACT/SAME_SURFACE/ALL_ABNORMAL)
-   *  geçmiş performans dökümü + n'e göre UI güven etiketi. arac-v546-zemin-hiyerarsik-
-   *  feature-test.mts ile DOĞRULANDI: zeminToleransi'nin ağırlığı (β=0.008-0.04) o kadar
-   *  küçük ki bu ayrımın skora ölçülebilir bir etkisi YOK — bu yüzden SKORA HİÇ GİRMEZ,
-   *  yalnız şeffaflık için muhakeme metninde/admin panelinde taşınır. Bugün Normal
-   *  zeminse (ya da veri yoksa) null. */
-  zeminKanitTablosu: ZeminKanitTablosu | null;
   /** 2026-09-01 kullanıcı tasarımı — "Yarış Gidişatı": saha-geneli tempo senaryosu (Rahat
    *  Liderlik/Yavaş Tempo/Dengeli/Mücadeleli/Çok Yüksek/Dağılma Riski, Accurace geçmişinden
    *  kural-tabanlı olasılık dağılımı, bkz. pace-analizi.ts hesaplaYarisGidisati) × atın kendi
@@ -542,21 +506,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
   // Hata durumunda sessizce yutulur (syncAgfForRace kendi içinde try/catch'li) — bu adım
   // analizi ASLA bloke etmez, DB'deki mevcut veriyle devam eder.
   await syncAgfForRace(raceId);
-  return gatherFaz1V5Core(raceId);
-}
 
-// 2026-09-16 — Anormal Pist Modu v1 backfill'i için (bkz. anormal-pist-risk.ts,
-// arac-pist-dayanikliligi-backfill.mts): gatherFaz1V5 ile TAMAMEN AYNI, sızıntısız
-// (race.raceDay.date'e göre) hesaplama zincirini kullanır — TEK fark, üstteki canlı
-// AGF senkronizasyonu (syncAgfForRace) burada YOK. O çağrı geçmiş (sonuçlanmış) bir
-// koşu için hem gereksiz hem yanlış (bugünün TJK sayfasından o günün AGF'sini "tazelemeye"
-// çalışır) olurdu — DB'deki (o günden kalma) agf/recentForm/raceStyle gibi alanlar zaten
-// puan-anındaki halleriyle saklı, yeniden senkronize edilmemeli.
-export async function gatherFaz1V5Historical(raceId: string): Promise<Faz1SonucV5 | null> {
-  return gatherFaz1V5Core(raceId);
-}
-
-async function gatherFaz1V5Core(raceId: string): Promise<Faz1SonucV5 | null> {
   const race = await db.race.findUnique({
     where: { id: raceId },
     select: {
@@ -579,12 +529,7 @@ async function gatherFaz1V5Core(raceId: string): Promise<Faz1SonucV5 | null> {
 
   const bugunIkramiye1 = (race.ikramiyeDetay as { ikramiye?: number[] } | null)?.ikramiye?.[0] ?? null;
 
-  // Zemin Kanıt Tablosu (2026-10-02) için bugünün pist etiketi+rejim detayı — aşağıdaki
-  // H2H zemin-filtresiyle AYNI zeminDetayiBul çağrısı, yalnız Promise.all'dan ÖNCEYE alındı.
-  const bugunZeminDetayHam = zeminDetayiBul(race.raceDay.surfaceConditions as { label: string; detail: string }[] | null, race.surface);
-  const bugunPistEtiketi = race.surface === "CIM" ? "Çim" : race.surface === "KUM" ? "Kum" : null;
-
-  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters, hizByNo, zeminToleransiByAd, yakinsamaGecmis, tempoTasimaGucuByAd, zeminKanitTablosuByAd] = await Promise.all([
+  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters, hizByNo, zeminToleransiByAd, yakinsamaGecmis, tempoTasimaGucuByAd] = await Promise.all([
     getSonYarisDetaylariForRace(raceId).catch(() => []),
     getSireStatOzetleriForRace(runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(() =>
       runners.map(() => ({ ozet: null, ornekKendiVeri: null, kYuzde: null }))
@@ -606,9 +551,6 @@ async function gatherFaz1V5Core(raceId: string): Promise<Faz1SonucV5 | null> {
     // 2026-09-11 — Tempo Taşıma Gücü (bkz. tempo-tasima-gucu.actions.ts), artık AYRI bir
     // özellik değil — yarisGidisatiSkoru'nun KENDİ formülüne girdi (bkz. gidisatSonucu notu).
     hesaplaTempoTasimaGucuMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, number>()),
-    bugunPistEtiketi
-      ? hesaplaZeminKanitTablosuMap(runners.map((r) => r.name), race.raceDay.date, bugunPistEtiketi, bugunZeminDetayHam).catch(() => new Map<string, ZeminKanitTablosu | null>())
-      : Promise.resolve(new Map<string, ZeminKanitTablosu | null>()),
   ]);
 
   // 2026-08-30 kullanıcı talebi ("kum ıslak ise ıslak kum koşularına göre H2H yapacaksın
@@ -619,7 +561,10 @@ async function gatherFaz1V5Core(raceId: string): Promise<Faz1SonucV5 | null> {
   // kullanılır (eski davranış). Bugünün durumu biliniyor ama HİÇBİR geçmiş karşılaşma o
   // koşulla eşleşmiyorsa da yine TÜM karşılaşmalara dönülür — bilgi kaybı olmasın diye
   // (0 karşılaşmalı bir sinyal, "veri yok" ile "eşit" ayrımını bozar).
-  const bugunZeminDetay = bugunZeminDetayHam; // Promise.all'dan ÖNCE hesaplandı (bkz. yukarı), aynı değer
+  const bugunZeminDetay = zeminDetayiBul(
+    race.raceDay.surfaceConditions as { label: string; detail: string }[] | null,
+    race.surface
+  );
   // 2026-09-13 kullanıcı bulgusu (İstanbul K9, SENSEİ BAHA "yeniden analiz et" sonrası hiç
   // değişmedi) — kök neden zeminMesafeDeneyimi'nin kendi tabanı DEĞİL, buradaki null'du.
   // Gerçek veriyle doğrulandı: son 30 günün Sentetik pistli GÜNÜNÜN HİÇBİRİNDE (28/28)
@@ -879,7 +824,6 @@ async function gatherFaz1V5Core(raceId: string): Promise<Faz1SonucV5 | null> {
       zeminMesafeDeneyimSeviyesi: zeminMesafeDeneyimByAd.get(r.name)?.seviye ?? "yok",
       zeminMesafeOrnekSayisi: zeminMesafeDeneyimByAd.get(r.name)?.ornekSayisi ?? 0,
       zeminMesafeDeneyim: zeminMesafeDeneyimByAd.get(r.name)?.deger ?? 0,
-      zeminKanitTablosu: zeminKanitTablosuByAd.get(r.name) ?? null,
       yarisGidisatiSkoru: gidisatByRunnerId.get(r.id)?.finalSkor ?? 0,
     };
   });
@@ -987,18 +931,8 @@ function effektifSkorlar(scores: number[], liderEsigi = ASIRI_GUVEN_LIDER_ESIGI)
   return scores.map((s) => s / ASIRI_GUVEN_SICAKLIGI);
 }
 
-// export edildi (2026-09-16, Anormal Pist Modu): pist-dayanikliligi.ts, zeminToleransi
-// katkısını ölçekleyip shadow senaryoları AYNI kalibrasyonla (sıcaklık dahil) yeniden
-// hesaplamak için bunu çağırıyor — davranış DEĞİŞMEDİ, yalnız dışa açıldı.
-export function softmax(scores: number[], liderEsigi = ASIRI_GUVEN_LIDER_ESIGI): number[] {
+function softmax(scores: number[], liderEsigi = ASIRI_GUVEN_LIDER_ESIGI): number[] {
   return softmaxHam(effektifSkorlar(scores, liderEsigi));
-}
-
-// export edildi (2026-09-16, Anormal Pist Modu): faz2V5Sirala'nın liderEsigi seçim
-// mantığının (handikapMi ? HANDIKAP eşiği : genel eşik) TEK kaynağı — pist-dayanikliligi.ts
-// aynı eşiği kullanmak için kendi kopyasını YAZMAK yerine bunu çağırır.
-export function liderEsigiHesapla(classType: string): number {
-  return kategoriTespit(classType) === "2" ? ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP : ASIRI_GUVEN_LIDER_ESIGI;
 }
 
 // 2026-08-29 — V6 Aşama 2: Plackett-Luce KESİN (Monte Carlo değil) top-k marjinal olasılığı.
@@ -1424,7 +1358,7 @@ const B_ZEMINMESAFE_ORTALAMA = -0.515;
  *  ÖNCE skora ekler. softmax(skor+Δ) ∝ softmax(skor)×exp(Δ) olduğu için bu, "olasılığı
  *  çarpmak" ile matematiksel olarak AYNI şey — ama A'nın kendi regresyonuna karışmadan, ayrı
  *  kalibre edilmiş terimler olarak. */
-export function bKatmaniUygula(
+function bKatmaniUygula(
   skorlar: number[],
   runners: Faz1RunnerV5[],
   classType: string
@@ -1578,12 +1512,9 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
 // ≥2-farklı-aile bağımsız sinyal şartı, pistUzmani/kaçak-tek kapıları, negatif-sinyal
 // diskalifiye kapısı) BİLEREK eklenmedi — hiçbiri isabeti artırmadı, çoğu tetik sayısını
 // 2-6 kat düşürdü (bkz. sinyal-kutugu.service.ts).
-// export edildi (2026-09-17, pure additive — davranış değişikliği YOK): banko eşiği
-// kalibrasyon tanı scripti (arac-banko-esik-tanisi.mts) v5BankoAdayiTespit'in kendi
-// mantığını YENİDEN YAZMADAN aynı eşik/kural setini kullanabilsin diye.
-export const BANKO_OLASILIK_ESIGI = 0.5;
+const BANKO_OLASILIK_ESIGI = 0.5;
 const GUCLU_BANKO_OLASILIK_ESIGI = 0.6;
-export const AGF_OZELLIK_KODLARI = new Set(["agfSirasi", "agfPayi", "agfYukselisVarMi", "agfDususVarMi"]);
+const AGF_OZELLIK_KODLARI = new Set(["agfSirasi", "agfPayi", "agfYukselisVarMi", "agfDususVarMi"]);
 
 export type V5BankoSonuc = { bankoAdayi: boolean; gucluBanko?: boolean; sebep: string; birinci?: { no: number; ad: string; karar: string } };
 
@@ -1751,119 +1682,7 @@ export function tumOzellikleriListele(r: Faz1RunnerV5Sirali): TumOzellikDetay[] 
   }));
 }
 
-// 2026-10-02 kullanıcı talebi ("tüm sinyalleri yansıtacak şekilde anlaşılır dilde
-// yayınlansın" + Signal Anatomy denetimi sonrası "kanıtlanmış/araştırma ayrımı UI'da
-// görünsün") — SINYAL-FORMULLERI.md'nin §5 Kanıt Matrisi'ndeki "Durum" sütunuyla AYNI
-// kaynak (icat edilmiş yeni bir sınıflandırma DEĞİL). Antrenör Oranı satırı, Faz A1.5/A3
-// refit-aware denetiminin (2026-10-02) bulgusunu yansıtacak şekilde GÜNCELLENDİ — bu
-// GÜNCEL olmayan sayı kalmasın diye SINYAL-FORMULLERI.md'de de AYNI ANDA güncellenmeli
-// (bkz. feedback_kanit_matrisi_birlikte_guncelle). Üretim β'ları DEĞİŞMEDİ — yalnız
-// kullanıcıya gösterilen kanıt-durumu etiketi.
-const SINYAL_KANIT_DURUMU: Record<string, string> = {
-  agfSirasi: "Kanıtlanmış",
-  agfPayi: "Kanıtlanmış",
-  agfPayi2: "Kanıtlanmış (piyasa kalibrasyon düzeltmesi — AGF Payı'nın eğriselliği, ayrı bir bilgi kaynağı değil)",
-  idmJokey: "Kanıtlanmış (segment-özel — Handikap'ta katsayı elle sıfırlanmış)",
-  jokeyOrani: "Kanıtlanmış",
-  antrenorOrani: "Araştırma — 2026-10-02 refit-aware denetiminde (Faz A1.5/A3) bağımsız katkısı doğrulanamadı; büyük skor hareketi yaratıyor ama bu henüz üretim kararına dönüşmedi",
-  h2hNetSkor: "Kanıtlanmış (segment-özel — düşük-şart'ta katsayı elle sıfırlanmış)",
-  hizDerecesi: "Kısmen doğrulanmış — 'diğer' segmentte geçerli kabul ediliyor, düşük-şart'ta belirsiz, Handikap'ta katsayı elle sıfırlanmış",
-  zeminToleransi: "Araştırma — kullanıcı kararıyla eklendi, istatistiksel kanıt (GA sıfırı içeriyor)",
-  yakinsama2Plus: "Araştırma — kullanıcı kararıyla eklendi, istatistiksel kanıt yok (GA sıfırı içeriyor)",
-  sonIdmanSprint: "Araştırma — backtest kendi yönünü bile doğrulamadı",
-  takiDegisikligi: "Araştırma — kullanıcı kararıyla eklendi, istatistiksel kanıt yok",
-  yarisGidisatiSkoru: "Kısmen kanıtlanmış (Handikap dışında); Handikap'ta katsayı elle sıfırlanmış",
-  sireOrani: "Araştırma — kanıtsız istisna, kullanıcı kararıyla eklendi",
-  zeminMesafeDeneyim: "Deneysel/provisional — sınırlı kanıt, n≥250-300 gölge-test beklenmeden eklendi",
-};
-
-/** Bir sinyalin ham/standart/katkı üçlüsünü, o sinyale ÖZGÜ anlaşılır bir Türkçe cümleye
- *  çevirir. Katkı ~0 (ihmal edilebilir) olduğunda bile BOŞ dönmez — "bu at için belirgin
- *  bir fark yok" türünden nötr bir cümle üretir, OZELLIK_GRUPLARI'ndaki eşik-tabanlı
- *  satırların AKSİNE (onlar katkı sıfırsa satırı tamamen gizler). AGF üçlüsü burada
- *  AYRI AYRI anlatılır (OZELLIK_GRUPLARI'nda tek "AGF" grubunda birleşiktirler). */
-function sinyalCumlesi(kod: string, hamDeger: number, katki: number, r: Faz1RunnerV5Sirali): string {
-  const notrMu = Math.abs(katki) < 0.01;
-  switch (kod) {
-    case "agfSirasi":
-      return `Bahis payına göre sahadaki sırası: ${hamDeger}.${hamDeger === 1 ? " (piyasa favorisi)" : ""}`;
-    case "agfPayi":
-      return `Bahis payı (AGF): toplam havuzun %${hamDeger.toFixed(1)}'i bu atta.`;
-    case "agfPayi2":
-      return notrMu
-        ? "AGF payının eğrisel (karesi alınmış) etkisinde bu at için belirgin bir düzeltme yok."
-        : `AGF payının eğrisel etkisi (aşırı-favori kalibrasyon düzeltmesi) skoru ${katki > 0 ? "yukarı" : "aşağı"} çekiyor.`;
-    case "idmJokey":
-      return katki !== 0 ? "Bugünkü jokey, bu atın idmanlarından birini bizzat yaptırmış." : "İdman-jokey uyumunda bu at için belirgin bir işaret yok (kayıt yok ya da bu segmentte bu sinyal devre dışı).";
-    case "jokeyOrani":
-      return `Jokeyin genel kazanma oranı (dengelenmiş): %${hamDeger.toFixed(1)}.`;
-    case "antrenorOrani":
-      return `Antrenörün genel kazanma oranı (dengelenmiş): %${hamDeger.toFixed(1)}.`;
-    case "h2hNetSkor":
-      return hamDeger !== 0 ? `Bugünkü rakipleriyle geçmiş karşılaşmalarda toplam ${hamDeger > 0 ? "+" : ""}${hamDeger} net ${hamDeger > 0 ? "önde" : "geride"} bitirmiş.` : "Bugünkü rakipleriyle ortak bir geçmiş karşılaşma kaydı yok.";
-    case "hizDerecesi":
-      return hamDeger !== 0 ? `Son yarışlarındaki hızı, benzer atların ortalamasına göre %${Math.abs(hamDeger).toFixed(1)} ${hamDeger > 0 ? "daha hızlı" : "daha yavaş"}.` : "Son 365 günde bu hesap için yeterli geçmiş veri yok.";
-    case "zeminToleransi": {
-      const temel = hamDeger !== 0 ? `Ağır/yağmurlu gibi normal-dışı zeminlerdeki geçmişinde diğer atlara göre %${Math.abs(hamDeger).toFixed(1)} ${hamDeger > 0 ? "daha hızlı" : "daha yavaş"}.` : "Normal-dışı zeminde geçmiş koşu kaydı yok.";
-      // 2026-10-02 — Zemin Kanıt Tablosu: skora GİRMEZ (arac-v546-zemin-hiyerarsik-feature-
-      // test.mts ile doğrulandı, ayrımın ölçülebilir etkisi yok), yalnız bugünün TAM zemin
-      // koşuluna göre şeffaflık ekliyor. Yalnız bugün anormal zeminse (tablo null değilse) gösterilir.
-      const kt = r.zeminKanitTablosu;
-      if (!kt) return temel;
-      const guvenMetni = { YOK: "veri yok", DUSUK: "düşük", ORTA: "orta", GUCLU: "güçlü" }[kt.guven];
-      const yuzde = (s: { n: number; performansYuzde: number | null }) =>
-        s.performansYuzde == null ? `${s.n} koşu` : `${s.n} koşu, %${Math.abs(s.performansYuzde).toFixed(1)} ${s.performansYuzde > 0 ? "daha hızlı" : "daha yavaş"}`;
-      return `${temel} Bugünkü zemin: ${kt.bugunZeminEtiketi}. Aynı zeminde: ${yuzde(kt.exact)} (kanıt güveni: ${guvenMetni}). Aynı pistte herhangi normal-dışı: ${yuzde(kt.sameSurface)}. Tüm normal-dışı geçmiş: ${yuzde(kt.allAbnormal)}.`;
-    }
-    case "yakinsama2Plus":
-      return katki !== 0 ? "Birden fazla olumlu işaret (pist uzmanlığı, pedigri, at-jokey geçmişi, AGF yükselişi, sınıf düşüşünden en az ikisi) aynı atta bir araya gelmiş." : "Yakınsama koşulu (en az 2 olumlu işaretin aynı atta buluşması) bu atta oluşmamış.";
-    case "sonIdmanSprint":
-      return katki !== 0 ? `Son idmanını sprint/sürat çalışması olarak yapmış.` : "Son idman sprint/sürat türünde değil (ya da idman kaydı yok).";
-    case "takiDegisikligi":
-      return katki !== 0 ? `Son yarışından bu yana bir ekipman değişikliği var (${r.takiCikarildiMi ? "çıkarılmış" : r.takiEklendiMi ? "eklenmiş" : "değişmiş"}).` : "Son yarışına göre ekipman değişikliği yok.";
-    case "yarisGidisatiSkoru":
-      return katki !== 0 ? `Bu yarışın beklenen gidişatına göre koşu tarzı ${katki > 0 ? "uygun düşüyor" : "uygun düşmüyor"}.` : "Yarış gidişatı uyumu için yeterli geçmiş Accurace verisi yok (ya da bu segmentte devre dışı).";
-    case "sireOrani":
-      return `Babasının bu tip yarışlardaki kazanma oranı (dengelenmiş): %${hamDeger.toFixed(1)}.`;
-    case "zeminMesafeDeneyim":
-      return hamDeger !== 0 ? `Bugünkü pist+zemin+mesafe koşulunda geçmiş performansı diğer atlara göre %${Math.abs(hamDeger).toFixed(1)} ${hamDeger > 0 ? "daha hızlı" : "daha yavaş"} GÖZLENMİŞ.` : "Bugünkü pist+zemin+mesafe koşulunda (ya da benzerinde) geçmiş koşu kaydı yok.";
-    default:
-      return notrMu ? "Bu at için belirgin bir fark yok." : `Katkı: ${katki > 0 ? "+" : ""}${katki}.`;
-  }
-}
-
-export type OkunurSinyalSatiri = { kod: string; etiket: string; cumle: string; katki: number; kanitDurumu: string };
-
-/** tumOzellikleriListele'nin (ham teknik tablo) OKUNUR karşılığı — kullanıcı talebi
- *  (2026-10-02): "tüm sinyaller anlaşılır dilde yansıtılsın". Eşik YOKTUR — katkısı
- *  sıfır olan sinyal de dahil, TÜM 13 A-katmanı + 2 B-katmanı sinyali (toplam 15) kendi
- *  cümlesiyle döner. Her satırda ayrıca kanıt durumu (SINYAL-FORMULLERI.md §5 ile AYNI
- *  kaynak) — "model bunu hesapladı" ile "bu sinyalin gerçekten işe yaradığı kanıtlandı"
- *  AYRI sorular, ikisi karıştırılmasın diye. */
-export function tumOzellikleriAnlasilirListele(r: Faz1RunnerV5Sirali): OkunurSinyalSatiri[] {
-  const teknik = tumOzellikleriListele(r);
-  const satirlar: OkunurSinyalSatiri[] = teknik.map((t) => ({
-    kod: t.kod, etiket: t.etiket, cumle: sinyalCumlesi(t.kod, t.hamDeger, t.katki, r), katki: t.katki,
-    kanitDurumu: SINYAL_KANIT_DURUMU[t.kod] ?? "Belirtilmemiş",
-  }));
-  if (r.bKatmaniUygulandiMi) {
-    satirlar.push({
-      kod: "sireOrani", etiket: "Aygır Kazanma Oranı (B katmanı)",
-      cumle: sinyalCumlesi("sireOrani", r.sireOrani, r.bSireKatkisi, r), katki: r.bSireKatkisi,
-      kanitDurumu: SINYAL_KANIT_DURUMU.sireOrani,
-    });
-  }
-  if (r.zeminMesafeBKatmaniUygulandiMi) {
-    satirlar.push({
-      kod: "zeminMesafeDeneyim", etiket: "Zemin+Mesafe Deneyimi (B katmanı)",
-      cumle: sinyalCumlesi("zeminMesafeDeneyim", r.zeminMesafeDeneyim, r.bZeminMesafeKatkisi, r), katki: r.bZeminMesafeKatkisi,
-      kanitDurumu: SINYAL_KANIT_DURUMU.zeminMesafeDeneyim,
-    });
-  }
-  return satirlar;
-}
-
-export const GUCLU_ESIK = 0.3; // export: bkz. yukarıdaki BANKO_OLASILIK_ESIGI notu
+const GUCLU_ESIK = 0.3;
 const ORTA_ESIK = 0.1;
 
 export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): PickDetailsV2 {
@@ -1907,15 +1726,10 @@ export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): Pi
       tip: r.zeminMesafeDeneyim >= 0 ? "destek" : "risk",
       guven: r.zeminMesafeDeneyimSeviyesi === "tam" ? "tam" : "orta",
       kodGarantili: true,
-      // 2026-10-02 kullanıcı düzeltmesi: "diğer atlara göre X% daha hızlı" kalıcı bir
-      // özellik gibi okunuyordu — n=1-2 gibi küçük örneklemde bu YANILTICI (tek yarışlık
-      // bir gözlemi sanki atın sabit bir niteliğiymiş gibi sunuyordu). Artık AÇIKÇA
-      // "gözlendi" diliyle, GEÇMİŞTE ÖLÇÜLEN bir şey olarak ifade ediliyor — örneklem
-      // sayısı (${r.zeminMesafeOrnekSayisi}) cümlenin İÇİNDE, atlanamaz şekilde geçiyor.
       aciklama:
         r.zeminMesafeDeneyimSeviyesi === "tam"
-          ? `Bugünkü pist, zemin ve mesafenin aynısında daha önce koşmuş: bu ${r.zeminMesafeOrnekSayisi} geçmiş koşuda diğer atlara göre ortalama ${r.zeminMesafeDeneyim > 0 ? "+" : ""}${r.zeminMesafeDeneyim.toFixed(1)}% ${r.zeminMesafeDeneyim > 0 ? "daha hızlı" : "daha yavaş"} GÖZLENDİ (deneysel bir gözlem, henüz kanıtlanmamış — örneklem küçükse tek yarışlık bir sonuç olabilir)`
-          : `Bugünkü pist ve zeminde tecrübeli ama bu mesafede ilk kez koşacak — diğer mesafelerdeki ${r.zeminMesafeOrnekSayisi} geçmiş koşusuna bakılarak değerlendirildi: diğer atlara göre ortalama ${r.zeminMesafeDeneyim > 0 ? "+" : ""}${r.zeminMesafeDeneyim.toFixed(1)}% ${r.zeminMesafeDeneyim > 0 ? "daha hızlı" : "daha yavaş"} GÖZLENDİ (deneysel bir gözlem, henüz kanıtlanmamış — örneklem küçükse tek yarışlık bir sonuç olabilir)`,
+          ? `Bugünkü pist, zemin ve mesafenin aynısında daha önce koşmuş (${r.zeminMesafeOrnekSayisi} koşu): o yarışlarda diğer atlara göre ${r.zeminMesafeDeneyim > 0 ? "+" : ""}${r.zeminMesafeDeneyim.toFixed(1)}% ${r.zeminMesafeDeneyim > 0 ? "daha hızlı" : "daha yavaş"} (deneysel bir gözlem, henüz kanıtlanmamış)`
+          : `Bugünkü pist ve zeminde tecrübeli ama bu mesafede ilk kez koşacak — diğer mesafelerdeki performansına bakılarak değerlendirildi (${r.zeminMesafeOrnekSayisi} koşu): diğer atlara göre ${r.zeminMesafeDeneyim > 0 ? "+" : ""}${r.zeminMesafeDeneyim.toFixed(1)}% ${r.zeminMesafeDeneyim > 0 ? "daha hızlı" : "daha yavaş"} (deneysel bir gözlem, henüz kanıtlanmamış)`,
     });
   }
 

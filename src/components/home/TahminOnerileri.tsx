@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import type { KuponOnerisi, KuponStatus } from "@/server/services/race.service";
 import type { AltiliCityResult } from "@/server/services/ingest/tjk-altili.adapter";
 import { findIkramiyeForHippodrome } from "@/lib/altili-match";
 import { cn } from "@/lib/utils";
-import Wordmark from "@/components/layout/Wordmark";
 
 type Kupon = NonNullable<KuponOnerisi>;
 
@@ -166,27 +164,7 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
       </div>
 
       {/* Tek kupon şablonu — Ekonomik/Normal/Geniş, /program'daki panel butonları gibi tıklanınca değişir */}
-      {/* 2026-09-17 kullanıcı bulgusu: ilk sürümde filigran (opacity 0.06-0.08, -z-10)
-          canlıda GÖRÜNMÜYORDU — iki olası sebep birden düzeltildi: (1) `relative` TEK
-          BAŞINA yeni bir stacking context AÇMAZ (yalnız position≠static VE z-index≠auto
-          birlikte açar) — `-z-10` alt-eleman, üst bir atanın bağlamına "kaçıp" beklenmedik
-          bir yerde kaybolabiliyordu; `isolate` eklenerek bu karta AÇIKÇA kendi stacking
-          context'i veriliyor, kaçış imkansız. (2) altın rengin koyu zeminde %6-8 opaklığı
-          gerçek ekranda/ekran görüntüsünde neredeyse hiç okunmuyordu — %14'e çıkarıldı. */}
-      <div className="isolate relative flex flex-col overflow-hidden rounded-lg border bg-card">
-        <div className="pointer-events-none absolute inset-0 -z-10 flex flex-col items-center justify-center gap-2 opacity-[0.14]">
-          <Image src="/horse-icon-gold.png" alt="" width={140} height={140} />
-          <span className="text-2xl font-black leading-none tracking-tight">
-            <span className="text-foreground">ROTA</span>
-            <span className="text-brand">GANYAN</span>
-          </span>
-        </div>
-        {/* 2026-09-17 kullanıcı talebi: Ekonomik/Normal/Geniş kupon kartının kendisinde de
-            (yalnız paylaşım görselinde değil, sitedeki canlı widget'ta da) Rotaganyan markası
-            görünsün — mevcut, tema-duyarlı Wordmark bileşeni reuse edildi. */}
-        <div className="flex items-center justify-center border-b bg-muted/20 py-2">
-          <Wordmark className="text-xs" />
-        </div>
+      <div className="flex flex-col overflow-hidden rounded-lg border bg-card">
         <div className="flex items-center justify-between gap-2 border-b bg-muted/30 px-4 py-2.5">
           {/* v6.113 — kullanıcı talebi 2026-08-13: seçilecek tek kademe varsa (7'li Ganyan'da
               yalnız "Geniş" doluyor) sekme göstermenin anlamı yok — aralarında gezinilecek
@@ -334,14 +312,8 @@ type Props = { data: KuponOnerisi[]; altiliResults?: AltiliCityResult[]; isLogge
 export default function TahminOnerileri({ data, altiliResults = [], isLoggedIn = false, isAdmin = false }: Props) {
   const t = useTranslations("home.tahminOnerileri");
   const items = data.filter((k): k is Kupon => k !== null);
-  // 2026-09-16 kullanıcı bulgusu: bu "hasVisible" kontrolü, BUGÜN TÜM hipodromların
-  // TÜM kuponları yattıysa (ör. İstanbul'un üç kuponu da) koca bölümü TAMAMEN
-  // gizliyordu — race.service.ts'teki getKuponOnerileri artık yatan kuponları da gün
-  // sonuna kadar döndürüyor (bkz. o dosyadaki 2026-09-16 notu), ama bu istemci-taraflı
-  // kontrol o kararı EZİYORDU. Kaldırıldı — her KuponBlock zaten kendi içinde
-  // (visibleVariants.length===0) boşsa kendini gizliyor, üst düzeyde yalnız hiç
-  // yayınlanmış kupon YOKSA (items.length===0) bölüm tamamen kalkar.
-  if (items.length === 0) return null;
+  const hasVisible = items.some((k) => k.variants.some((v) => v.status !== "miss"));
+  if (items.length === 0 || !hasVisible) return null;
 
   // Aynı şehrin (hippodromeName'in " — " öncesi kısmı) 1./2. Altılı'sını TEK gruba
   // topla — getKuponOnerileri zaten şehre göre sıralı döndüğü için art arda gelirler.

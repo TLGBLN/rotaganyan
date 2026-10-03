@@ -4,29 +4,7 @@ import { after } from "next/server";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
 import { postTweet } from "@/lib/x";
-import {
-  otomatikGroupSelections,
-  stakeForHippodrome,
-  ALTILI_STAKE_PER_COMBINATION,
-  YEDILI_GANYAN_STAKE_PER_COMBINATION,
-  LIMITS,
-  TOLERANCES,
-  YEDILI_LIMITS,
-  YEDILI_TOLERANCES,
-  YEDILI_GANYAN_SLOT,
-  type Width,
-} from "@/lib/methodology/kupon-auto-fill";
-import {
-  dependencyHashForRace,
-  normalizeManualOverrides,
-  manualOverridesHash,
-  pruneToEligible,
-  buildKey as computeBuildKey,
-  type ManualOverridesMap,
-  type DependencyRaceInput,
-} from "@/lib/methodology/kupon-dependency-hash";
 
 export type HomeKuponLegInput = {
   raceNo: number;
@@ -35,280 +13,12 @@ export type HomeKuponLegInput = {
   wide: number[];
 };
 
-// 2026-09-28 kullanıcı bulgusu (Şanlıurfa 1.Altılı, "yayınlanan ≠ ekran"): 2026-09-21
-// tasarımında admin `legs` göndermiyor, yalnız `manualOverrides` (autoBaseline'dan sapma)
-// gönderiyor, sunucu bu kısıtların etrafında DP'yi TAZE veriyle BAŞTAN çözüyordu — bu
-// yüzden admin'in ekranda gördüğüyle yayınlanan kupon farklı çıkıyordu (elle eklenen
-// atlar bütçeyi başka ayaklardan yeniden dağıtıyordu). Artık admin'in ekrandaki `legs`'i
-// (WYSIWYG) DOĞRUDAN yayınlanır; sunucu yalnız doğrular (koşmaz atları çıkarır, geçersiz
-// no'ları eler) ve STALE_CLIENT_VIEW kontrolüyle ekran bayatsa yayını reddeder.
 export type HomeKuponInput = {
   hippodromeName: string;
   date: string;
-  slot: number;
-  raceNos: number[];
-  /** Admin'in ekranda GÖRDÜĞÜ ve onayladığı seçim — aynen yayınlanır. */
   legs: HomeKuponLegInput[];
-  /** Yalnız denetim kaydı için saklanır (admin neye dokundu) — yayını ETKİLEMEZ. */
-  manualOverrides: ManualOverridesMap;
-  // 2026-09-27 — admin'in "Kupon Oluştur" ANINDA EKRANDA gördüğü veri (bkz.
-  // STALE_CLIENT_VIEW kontrolü, syncHomeKupon). Verilmezse (eski istemci) kontrol atlanır.
-  clientSnapshot?: DependencyRaceInput[];
-};
-
-function isUniqueConstraintViolation(e: unknown): boolean {
-  if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return true;
-  // homekupon_one_active_per_pool KISMİ index'i Prisma şemasında TANIMLI DEĞİL (raw SQL
-  // ile eklendi, bkz. plan) — bazı sürücü/versiyon kombinasyonlarında P2002 yerine ham
-  // 23505 mesajı sızabilir, ikisini de aynı şekilde ele alıyoruz.
-  return e instanceof Error && /23505|unique constraint/i.test(e.message);
-}
-
-/** (hippodromeName,slot) için doğru optimizer config'i (stake/limits/tolerances) —
- * slot=7 (7'li Ganyan) Altılı'dan BAĞIMSIZ kendi sabitlerini kullanır. */
-function optimizerConfigFor(hippodromeName: string, slot: number) {
-  if (slot === YEDILI_GANYAN_SLOT) {
-    return { stakePerCombination: YEDILI_GANYAN_STAKE_PER_COMBINATION, limits: YEDILI_LIMITS, tolerances: YEDILI_TOLERANCES };
-  }
-  return { stakePerCombination: stakeForHippodrome(hippodromeName), limits: LIMITS, tolerances: TOLERANCES };
-}
-
-type ScopedLeg = {
-  raceNo: number;
-  pistDuyarliligi: string | null;
-  gecmisRiskSeviyesi: string | null;
-  runners: { no: number; scratched: boolean; ekuriGroup: number | null; olasilik: number }[];
-};
-
-/**
- * `getRaceDayLegs`'in DAR-KAPSAMLI, TJK-tetiklemeyen (bkz. [[project_tjk_analiz_ayristirma]])
- * ve Karma-mirror KAPSAMAYAN (v1 kapsam dışı, bkz. plan) varyantı — yalnız DB'den okur.
- * `hippodromeName` BURADA baz şehir adı olmalı ("Bursa", " — 1. Altılı" SUFİKSİ OLMADAN).
- */
-async function getRaceDayLegsForRaceNos(baseHippodromeName: string, date: Date, raceNos: number[]): Promise<ScopedLeg[]> {
-  const races = await db.race.findMany({
-    where: { raceNo: { in: raceNos }, raceDay: { date, hippodrome: { name: baseHippodromeName } } },
-    select: {
-      raceNo: true,
-      runners: { select: { id: true, no: true, scratched: true, ekuriGroup: true } },
-      prediction: {
-        select: {
-          pistDuyarliligi: true,
-          gecmisRiskSeviyesi: true,
-          picks: { select: { runnerId: true, score: true, scoreExact: true } },
-        },
-      },
-    },
-  });
-
-  return races.map((r) => {
-    const scoreByRunnerId = new Map<string, number | null>();
-    for (const p of r.prediction?.picks ?? []) {
-      if (p.runnerId) scoreByRunnerId.set(p.runnerId, p.scoreExact ?? p.score ?? null);
-    }
-    return {
-      raceNo: r.raceNo,
-      pistDuyarliligi: r.prediction?.pistDuyarliligi ?? null,
-      gecmisRiskSeviyesi: r.prediction?.gecmisRiskSeviyesi ?? null,
-      runners: r.runners.map((run) => ({
-        no: run.no,
-        scratched: run.scratched,
-        ekuriGroup: run.ekuriGroup,
-        olasilik: (scoreByRunnerId.get(run.id) ?? 0) / 100,
-      })),
-    };
-  });
-}
-
-function toDependencyInput(legs: ScopedLeg[]): DependencyRaceInput[] {
-  return legs.map((l) => ({
-    raceNo: l.raceNo,
-    runners: l.runners,
-    pistDuyarliligi: l.pistDuyarliligi,
-    gecmisRiskSeviyesi: l.gecmisRiskSeviyesi,
-  }));
-}
-
-export type SyncHomeKuponResult =
-  | { ok: true; homeKuponId?: string; created?: boolean }
-  | { ok: false; skipped?: "NO_ELIGIBLE_RUNNERS" | "RACE_CONDITION" | "CONCURRENT_GENERATION" | "POOL_NOT_FOUND" | "STALE_CLIENT_VIEW" };
-
-/**
- * Prediction-to-HomeKupon Auto Synchronization ÇEKİRDEĞİ (bkz. plan) — admin'in manuel
- * "Kupon Oluştur"u, `upsertPrediction` sonrası otomatik rebuild VE reconciliation cron'u
- * HEPSİ BUNU çağırır (tek pipeline). `hippodromeName` burada SUFİKSLİ (ör. "Bursa — 1.
- * Altılı") — DB'de `HomeKupon.hippodromeName` bu formatta saklanıyor; baz şehir adı
- * `" — "`den ÖNCEKİ kısım.
- */
-export async function syncHomeKupon(input: {
-  hippodromeName: string;
-  date: string; // yyyy-MM-dd
   slot: number;
-  raceNos: number[];
-  manualOverrides: unknown; // HAM — normalize EDİLMEMİŞ olabilir, burada normalize edilir
-  clientSnapshot?: DependencyRaceInput[]; // bkz. HomeKuponInput yorumu — STALE_CLIENT_VIEW
-  /** Verilirse DP ÇALIŞTIRILMAZ: admin'in ekranda onayladığı seçim aynen yayınlanır (yalnız
-   *  koşmaz/geçersiz atlar elenir). Verilmezse (otomatik rebuild/reconciliation) eski DP yolu. */
-  explicitLegs?: HomeKuponLegInput[];
-}): Promise<SyncHomeKuponResult> {
-  const baseHippodromeName = input.hippodromeName.split(" — ")[0];
-  const dateIso = input.date;
-  const dateObj = new Date(dateIso + "T00:00:00.000Z");
-
-  // 2026-09-27 kullanıcı kararı (İKİNCİ kez — ilk kez 2026-09-22'de commit 01e5a4f ile
-  // kaldırılmıştı, 09-21'e tam site geri alımı bunu da geri getirmişti): "Pool-start
-  // freeze" TAMAMEN KALDIRILDI — önce saat bazlıydı, sonra sonuç bazlı gevşetildi, şimdi
-  // admin'in DOĞRUDAN eylemi (bu fonksiyon) için tamamen kaldırıldı. Admin (yetkili
-  // kullanıcı) sistemde her türlü değişikliği, havuzun koşuları başlamış/sonuçlanmış
-  // olsa BİLE, istediği an yapabilmeli — Adana 2.Altılı'da tam da bunu engellediği için
-  // bug'ın kendi düzeltmesini admin panelinden yapamıyordu. Reconciliation cron'undaki
-  // (arka plan, admin etkileşimi OLMAYAN otomatik yol, home-kupon-sync.service.ts)
-  // sonuç-bazlı kontrol KASITLI olarak bırakıldı — bu kaldırma yalnız admin'in doğrudan
-  // eylemlerini kapsıyor.
-  const scopedLegs = await getRaceDayLegsForRaceNos(baseHippodromeName, dateObj, input.raceNos);
-  if (scopedLegs.length === 0) return { ok: false, skipped: "POOL_NOT_FOUND" };
-
-  const optimizerConfig = optimizerConfigFor(baseHippodromeName, input.slot);
-  const startHash = dependencyHashForRace(toDependencyInput(scopedLegs), optimizerConfig);
-
-  // STALE_CLIENT_VIEW — 2026-09-27 kullanıcı bulgusu (Adana 2.Altılı, "Otomatik Doldur
-  // dediğimde yaratılanla yansıyan farklı"): admin'in EKRANDA onayladığı `raceDay`
-  // (son "Koşuları Getir"den beri arka planda bir ingest/AGF-sync/reanaliz yüzünden)
-  // bayatlamış olabilir. `manualOverrides` boşsa (auto-fill sonrası hiç dokunulmadıysa)
-  // sunucu bunu fark etmeden FARKLI bir DP sonucu yayınlayabiliyordu — admin ekranda
-  // gördüğünden BAŞKA bir kupon yayına çıkıyordu, sessizce. Client kendi gördüğü veriyi
-  // (ham, hash'lenmemiş) yollar; sunucu KENDİ hash'ini hesaplayıp fresh startHash'le
-  // kıyaslar — farklıysa yayınlamadan İPTAL eder (admin'e yeniden getir/doldur denir).
-  if (input.clientSnapshot) {
-    const clientHash = dependencyHashForRace(input.clientSnapshot, optimizerConfig);
-    if (clientHash !== startHash) {
-      return { ok: false, skipped: "STALE_CLIENT_VIEW" };
-    }
-  }
-
-  const manualOverrides = normalizeManualOverrides(input.manualOverrides, input.raceNos);
-  const overridesHash = manualOverridesHash(manualOverrides);
-  const key = computeBuildKey(input.hippodromeName, input.slot, dateIso, startHash, overridesHash);
-
-  // 2026-09-22/27 kullanıcı kararı — idempotency no-op'u (buildKey eşleşirse "UNCHANGED"
-  // dönüp hiçbir şey yapmama) KALDIRILDI: admin "Kupon Oluştur"a her bastığında yeniden
-  // üretilip yayınlanır, "zaten aynı" diye sessizce reddedilmez.
-
-  const eligibleNosByRaceNo: Record<number, Set<number>> = {};
-  for (const leg of scopedLegs) {
-    eligibleNosByRaceNo[leg.raceNo] = new Set(leg.runners.filter((r) => !r.scratched).map((r) => r.no));
-  }
-
-  let legs: HomeKuponLegInput[];
-  if (input.explicitLegs) {
-    // WYSIWYG — admin'in ekranda onayladığı seçim AYNEN yayınlanır, DP yeniden çözülmez.
-    // Sunucu yalnız doğrular: havuzda olmayan ayakları ve koşmaz/geçersiz at no'larını eler.
-    const izinliAyaklar = new Set(input.raceNos);
-    const temizle = (raceNo: number, nos: number[]) => {
-      const uygun = eligibleNosByRaceNo[raceNo] ?? new Set<number>();
-      return [...new Set(nos)].filter((no) => uygun.has(no)).sort((a, b) => a - b);
-    };
-    legs = input.explicitLegs
-      .filter((l) => izinliAyaklar.has(l.raceNo))
-      .map((l) => ({
-        raceNo: l.raceNo,
-        narrow: temizle(l.raceNo, l.narrow),
-        normal: temizle(l.raceNo, l.normal),
-        wide: temizle(l.raceNo, l.wide),
-      }))
-      .filter((l) => l.narrow.length > 0 || l.normal.length > 0 || l.wide.length > 0);
-    if (legs.length === 0) return { ok: false, skipped: "NO_ELIGIBLE_RUNNERS" };
-  } else {
-    // 6) effectiveOverrides — yalnız DP çağrısı için, DB'ye YAZILMAZ (PİVOT-2 madde 13).
-    const effectiveOverrides = pruneToEligible(manualOverrides, eligibleNosByRaceNo);
-
-    // 7) Her ayakta en az 1 eligible at yoksa (forceExclude+scratched sıfırlamış olabilir) İPTAL.
-    for (const leg of scopedLegs) {
-      if ((eligibleNosByRaceNo[leg.raceNo]?.size ?? 0) === 0) {
-        return { ok: false, skipped: "NO_ELIGIBLE_RUNNERS" };
-      }
-    }
-
-    // 8) DP — otomatikGroupSelections'ın beklediği RaceDayData şekline dönüştür.
-    const racesForDp = scopedLegs.map((l) => ({
-      raceNo: l.raceNo,
-      pistAnormalMi: false,
-      pistDuyarliligi: l.pistDuyarliligi,
-      gecmisRiskSeviyesi: l.gecmisRiskSeviyesi,
-      pistUyariMesaji: null,
-      runners: l.runners.map((r) => ({
-        no: r.no,
-        name: "",
-        scratched: r.scratched,
-        ekuriGroup: r.ekuriGroup,
-        score: Math.round(r.olasilik * 100),
-        scoreExact: r.olasilik * 100,
-        agfSirasi: null,
-      })),
-    }));
-    const groupSel = otomatikGroupSelections(
-      racesForDp,
-      optimizerConfig.stakePerCombination,
-      optimizerConfig.limits as Record<Width, number>,
-      optimizerConfig.tolerances as Record<Width, number>,
-      effectiveOverrides
-    );
-    legs = scopedLegs
-      .map((l) => {
-        const sel = groupSel[l.raceNo] ?? { narrow: new Set<number>(), normal: new Set<number>(), wide: new Set<number>() };
-        return {
-          raceNo: l.raceNo,
-          narrow: [...sel.narrow].sort((a, b) => a - b),
-          normal: [...sel.normal].sort((a, b) => a - b),
-          wide: [...sel.wide].sort((a, b) => a - b),
-        };
-      })
-      .filter((l) => l.narrow.length > 0 || l.normal.length > 0 || l.wide.length > 0);
-  }
-
-  // 9) currentHash — hesaplama sırasında BAŞKA bir Prediction değişti mi? (Faz 1'deki
-  // startHash/currentHash race-condition deseniyle AYNI.)
-  const currentLegs = await getRaceDayLegsForRaceNos(baseHippodromeName, dateObj, input.raceNos);
-  const currentHash = dependencyHashForRace(toDependencyInput(currentLegs), optimizerConfig);
-  if (currentHash !== startHash) {
-    return { ok: false, skipped: "RACE_CONDITION" };
-  }
-
-  // 11) Atomik swap — 2026-09-22/27 kullanıcı kararı: isActive/pasif kavramı UI'dan
-  // tamamen kaldırıldığı için eski satır artık soft-deactivate (isActive:false) değil,
-  // HARD DELETE ediliyor — bir havuz için DB'de her zaman TEK satır olur. buildKey
-  // @unique VE homekupon_one_active_per_pool kısmi index'i (raw SQL, bkz. plan) hâlâ
-  // EŞZAMANLI farklı generation'lara karşı koruyor.
-  try {
-    const created = await db.$transaction(async (tx) => {
-      await tx.homeKupon.deleteMany({
-        where: { hippodromeName: input.hippodromeName, date: dateObj, slot: input.slot },
-      });
-      return tx.homeKupon.create({
-        data: {
-          hippodromeName: input.hippodromeName,
-          date: dateObj,
-          slot: input.slot,
-          legs,
-          isActive: true,
-          manualOverrides: manualOverrides as unknown as Prisma.InputJsonValue,
-          // Admin'in açık (WYSIWYG) yayını: sourcePredictionsHash/buildKey BOŞ bırakılır —
-          // otomatik rebuild (upsertPrediction tetiği) ve 5 dakikalık reconciliation cron'u
-          // `sourcePredictionsHash IS NULL` satırlara dokunmaz, yani "ne yayınladıysam o
-          // kalır", arka planda sessizce başka bir kupona dönüşmez.
-          sourcePredictionsHash: input.explicitLegs ? null : currentHash,
-          buildKey: input.explicitLegs ? null : key,
-        },
-      });
-    });
-    revalidatePath("/");
-    revalidatePath("/admin/kupon");
-    return { ok: true, homeKuponId: created.id, created: true };
-  } catch (e) {
-    if (isUniqueConstraintViolation(e)) return { ok: false, skipped: "CONCURRENT_GENERATION" };
-    throw e;
-  }
-}
+};
 
 /**
  * Bir hipodrom/günün koşu+at listesini döner. Analizi olan koşularda atlar Pick.score'a
@@ -340,12 +50,6 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
               picks: {
                 select: { runnerId: true, score: true, scoreExact: true },
               },
-              // 2026-09-16 — Anormal Pist Modu v1: KuponForm'un ÇOK HASSAS/HASSAS
-              // ayaklarda minUnitCounts zorlaması + amber uyarısı için.
-              pistAnormalMi: true,
-              pistDuyarliligi: true,
-              gecmisRiskSeviyesi: true,
-              pistUyariMesaji: true,
             },
           },
         },
@@ -483,10 +187,6 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
 
       return {
         raceNo: r.raceNo,
-        pistAnormalMi: r.prediction?.pistAnormalMi ?? false,
-        pistDuyarliligi: r.prediction?.pistDuyarliligi ?? null,
-        gecmisRiskSeviyesi: r.prediction?.gecmisRiskSeviyesi ?? null,
-        pistUyariMesaji: r.prediction?.pistUyariMesaji ?? null,
         runners: runners.map((runner) => {
           const karmaMeta = metaByNoById.get(r.id)?.get(runner.no);
           return {
@@ -515,28 +215,67 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
 // ekonomik/normal 7'li Ganyan'da hiç görünmüyor") ile yakalandı: DB'de 20 Ağustos'tan
 // bugüne kadar yayınlanan HER 7'li Ganyan kuponunda narrow/normal boştu, istisnasız —
 // bu satır kaldırıldı, artık diğer slotlarla (Altılı) AYNI şekilde davranıyor.
-/**
- * Admin'in "Kupon Oluştur" butonu — artık `legs` ALMAZ, yalnız `manualOverrides` +
- * hangi `raceNos`'u kapsadığı (bkz. plan, HomeKuponInput yorumu). `syncHomeKupon`
- * çekirdeğini çağırır — otomatik rebuild/reconciliation ile AYNI pipeline.
- */
-export async function publishHomeKupon(input: HomeKuponInput): Promise<SyncHomeKuponResult> {
+export async function publishHomeKupon(input: HomeKuponInput) {
   await requireRole("EDITOR");
-  return syncHomeKupon({
-    hippodromeName: input.hippodromeName,
-    date: input.date,
-    slot: input.slot,
-    raceNos: input.raceNos,
-    manualOverrides: input.manualOverrides,
-    clientSnapshot: input.clientSnapshot,
-    explicitLegs: input.legs,
-  });
+
+  const legs = input.legs
+    .filter((l) => l.narrow.length > 0 || l.normal.length > 0 || l.wide.length > 0)
+    .map((l) => ({
+      raceNo: l.raceNo,
+      narrow: l.narrow,
+      normal: l.normal,
+      wide: l.wide,
+    }));
+
+  await db.$transaction([
+    // Sadece AYNI hipodromun aynı slotu (ör. "İzmir 1. Altılı") devre dışı kalır — farklı
+    // hipodromların kuponları (Karma, Ankara vb.) etkilenmez, hepsi aynı anda yayında kalabilir.
+    db.homeKupon.updateMany({
+      where: { isActive: true, slot: input.slot, hippodromeName: input.hippodromeName },
+      data: { isActive: false },
+    }),
+    db.homeKupon.create({
+      data: {
+        hippodromeName: input.hippodromeName,
+        date: new Date(input.date + "T00:00:00.000Z"),
+        legs,
+        slot: input.slot,
+        isActive: true,
+      },
+    }),
+  ]);
+
+  revalidatePath("/");
+  revalidatePath("/admin/kupon");
 }
 
-// 2026-09-22/27 kullanıcı kararı — "kuponlarda pasif olayını istemiyorum artık
-// kaldırılsın": setActiveHomeKupon/deactivateHomeKupon (isActive toggle) kaldırıldı,
-// yalnız Sil kaldı. syncHomeKupon artık her zaman deleteMany+create ile tek satır
-// tutuyor, isActive DB'de biçimsel olarak hep true.
+export async function setActiveHomeKupon(id: string) {
+  await requireRole("EDITOR");
+
+  const target = await db.homeKupon.findUnique({ where: { id }, select: { slot: true, hippodromeName: true } });
+  if (!target) return;
+
+  await db.$transaction([
+    // Sadece AYNI hipodromun aynı slotu devre dışı kalır — bkz. publishHomeKupon.
+    db.homeKupon.updateMany({
+      where: { isActive: true, slot: target.slot, hippodromeName: target.hippodromeName },
+      data: { isActive: false },
+    }),
+    db.homeKupon.update({ where: { id }, data: { isActive: true } }),
+  ]);
+
+  revalidatePath("/");
+  revalidatePath("/admin/kupon");
+}
+
+export async function deactivateHomeKupon(id: string) {
+  await requireRole("EDITOR");
+
+  await db.homeKupon.update({ where: { id }, data: { isActive: false } });
+
+  revalidatePath("/");
+  revalidatePath("/admin/kupon");
+}
 
 export async function deleteHomeKupon(id: string) {
   await requireRole("EDITOR");

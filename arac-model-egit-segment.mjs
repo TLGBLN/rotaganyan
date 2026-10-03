@@ -71,28 +71,13 @@ const ANLAMLI_PUAN_ESIGI = 1.0;
 // Bootstrap FARK testi (B=500, 17 vs 13 özellik, aynı chronological split): "diğer"de
 // top1/top3 farkı BİREBİR 0.00pp (GA=[-1.26,1.26]/[-1.68,1.68]), düşük-şart'ta yön
 // pozitif (anlamsız, logloss neredeyse anlamlı iyileşme sınırında) — hiçbir kayıp yok.
-// 2026-09-18 (V5.47) — "kgsGun" eklendi: son yarıştan bugüne HAM gün sayısı (kgs, -1=veri
-// yok sentinel). Challenger testinde (arac-yeni-sinyal-challenger-test.mts, KgsGun adayı)
-// "diğer" segmentte KESİN doğrulandı (B=500 gün-kümeli: TRAIN GA=[-0.258,-0.021]
-// signStability %99.2, TEST paired bootstrap GA=[-0.0134,-0.0072] P(ΔLL<0)=%100.0),
-// düşük-şart'ta reddedildi (n=340 küçük, GA sıfırı kapsıyor) — HIZ_DERECESI_IDX/IDM_JOKEY_IDX
-// ile AYNI cerrahi desen: v5-engine.ts'te yalnız düşük-şart'ta bu TEK katsayı sıfırlanacak.
-// KRİTİK kalibrasyon notu: kgs bu segmentte ~%70 missing (-1) — jokeyOrani/antrenorOrani'nin
-// "population-mean fallback" deseniyle AYNI şekilde impute ediliyor (kgsGunImpute), AMA
-// computeMeanStd'nin TÜM satırlar (imputed dahil) üzerinden hesapladığı std, yalnız GEÇERLİ
-// satırlardan hesaplanan std'nin ~%55'i çıkıyor (doğrulandı: 58.97 vs 32.58) — bu yüzden
-// egit() içinde means/stds[KGS_GUN_IDX] AYRICA, yalnız geçerli TRAIN satırlarından override
-// ediliyor (aksi halde production'daki z-score, challenger testinde validate edilenin
-// ~1.8 katı büyüklükte çıkardı, gerçek olmayan bir güçlendirme).
 const FEATURE_NAMES = [
   "agfSirasi", "idmJokey", "jokeyOrani", "antrenorOrani",
   "agfPayi", "h2hNetSkor", "hizDerecesi", "agfPayi2", "zeminToleransi",
   "yakinsama2Plus", "sonIdmanSprint", "takiDegisikligi", "yarisGidisatiSkoru",
-  "kgsGun",
 ];
-const KGS_GUN_IDX = FEATURE_NAMES.indexOf("kgsGun");
 
-function toFeatureVector(row, kgsGunImpute = 0) {
+function toFeatureVector(row) {
   return [
     row.agfSirasi,
     row.idmJokey,
@@ -107,18 +92,7 @@ function toFeatureVector(row, kgsGunImpute = 0) {
     row.sonIdmanSprint ?? 0,
     (row.takiCikarildiMi ?? 0) - (row.takiEklendiMi ?? 0),
     row.yarisGidisatiSkoru ?? 0,
-    row.kgs != null && row.kgs !== -1 ? row.kgs : kgsGunImpute,
   ];
-}
-
-/** Bir koşu grubu kümesinde kgs'nin GEÇERLİ (>-1) satırlarından ortalama+std — yalnız
- *  imputation değeri VE means/stds override'ı için, TRAIN split'e (segment'e özel) göre. */
-function kgsGunGecerliIstatistik(raceGroups) {
-  const gecerli = raceGroups.flatMap((g) => g.runners).map((r) => r.kgs).filter((k) => k != null && k !== -1);
-  if (gecerli.length === 0) return { ort: 0, std: 1, n: 0 };
-  const ort = gecerli.reduce((a, b) => a + b, 0) / gecerli.length;
-  const std = Math.sqrt(gecerli.reduce((a, b) => a + (b - ort) ** 2, 0) / gecerli.length);
-  return { ort, std, n: gecerli.length };
 }
 
 // Yakınsama'nın pedigri bileşeni saha-İÇİ göreli (sireOrani'ne göre ilk-2) — v5-engine.ts'in
@@ -144,8 +118,8 @@ function groupByRace(rows) {
   for (const r of rows) { const arr = byRace.get(r.raceId) ?? []; arr.push(r); byRace.set(r.raceId, arr); }
   return [...byRace.entries()].map(([raceId, runners]) => ({ raceId, runners }));
 }
-function standardize(rows, means, stds, kgsGunImpute = 0) {
-  return rows.map((r) => { const v = toFeatureVector(r, kgsGunImpute); return v.map((x, i) => (stds[i] > 1e-9 ? (x - means[i]) / stds[i] : 0)); });
+function standardize(rows, means, stds) {
+  return rows.map((r) => { const v = toFeatureVector(r); return v.map((x, i) => (stds[i] > 1e-9 ? (x - means[i]) / stds[i] : 0)); });
 }
 function computeMeanStd(allVectors) {
   const n = allVectors.length, dim = allVectors[0].length;
@@ -209,20 +183,7 @@ function evaluate(raceGroups, w) {
     })),
   };
 }
-// 2026-09-12 kullanıcı talebi (dış AI incelemesi) — mekanizma DEĞİŞMEDİ (hâlâ aynı
-// yarış-seviyeli, train-set resample + yeniden-fit katsayı-stabilite testi), yalnız
-// raporlama katmanı zenginleştirildi: sabit SEED (birebir tekrar üretilebilirlik) +
-// signStability (B turunun kaçında katsayı nokta-tahminle AYNI işaretli çıktı).
-const SEED = 5462026;
-function mulberry32(a) {
-  return function () {
-    a |= 0; a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-function bootstrapResample(arr, rng) { const n = arr.length, out = new Array(n); for (let i = 0; i < n; i++) out[i] = arr[Math.floor(rng() * n)]; return out; }
+function bootstrapResample(arr) { const n = arr.length, out = new Array(n); for (let i = 0; i < n; i++) out[i] = arr[Math.floor(Math.random() * n)]; return out; }
 function percentile(sorted, p) { const idx = Math.min(sorted.length - 1, Math.max(0, Math.floor(p * sorted.length))); return sorted[idx]; }
 
 function egit(etiket, raceGroupsRaw, outPath) {
@@ -232,15 +193,10 @@ function egit(etiket, raceGroupsRaw, outPath) {
   const testRaces = raceGroupsRaw.slice(splitIdx);
   console.log(`Eğitim: ${trainRaces.length} koşu, Test: ${testRaces.length} koşu`);
 
-  // KgsGun impute + means/stds override — bkz. FEATURE_NAMES üstündeki 2026-09-18 notu.
-  const kgsStat = kgsGunGecerliIstatistik(trainRaces);
-  console.log(`  kgsGun: TRAIN'de ${kgsStat.n} geçerli satır, ortalama=${kgsStat.ort.toFixed(2)} std=${kgsStat.std.toFixed(2)} (impute+override değeri)`);
-  const trainVectors = trainRaces.flatMap((g) => g.runners.map((r) => toFeatureVector(r, kgsStat.ort)));
+  const trainVectors = trainRaces.flatMap((g) => g.runners.map(toFeatureVector));
   const { means, stds } = computeMeanStd(trainVectors);
-  means[KGS_GUN_IDX] = kgsStat.ort;
-  stds[KGS_GUN_IDX] = kgsStat.std > 1e-9 ? kgsStat.std : 1;
   function toRaceGroup(g) {
-    const stdVectors = standardize(g.runners, means, stds, kgsStat.ort);
+    const stdVectors = standardize(g.runners, means, stds);
     const winnerIdx = g.runners.findIndex((r) => r.win === 1);
     return { features: stdVectors, winnerIdx };
   }
@@ -261,16 +217,13 @@ function egit(etiket, raceGroupsRaw, outPath) {
   // Varsayılan artık B=500 — güçlü sinyallerde (agfSirasi gibi) zaten fark etmiyordu,
   // sınırda sinyallerde artık güvenilir bir GA veriyor.
   const B_WEIGHTS = 500;
-  const rng = mulberry32(SEED);
   const bootWeights = [];
-  for (let b = 0; b < B_WEIGHTS; b++) bootWeights.push(trainConditionalLogit(bootstrapResample(trainGroups, rng), FEATURE_NAMES.length, { epochs: 400, lr: 0.08, l2: 0.01 }));
-  console.log(`Bootstrap B=${B_WEIGHTS} seed=${SEED} nRaces(train)=${trainGroups.length} tamamlandı.`);
+  for (let b = 0; b < B_WEIGHTS; b++) bootWeights.push(trainConditionalLogit(bootstrapResample(trainGroups), FEATURE_NAMES.length, { epochs: 400, lr: 0.08, l2: 0.01 }));
+  console.log(`Bootstrap B=${B_WEIGHTS} tamamlandı.`);
   FEATURE_NAMES.forEach((name, i) => {
     const vals = bootWeights.map((wb) => wb[i]).sort((a, b) => a - b);
     const lo = percentile(vals, 0.025), hi = percentile(vals, 0.975);
-    const isaretiUyanSayisi = w[i] >= 0 ? vals.filter((v) => v >= 0).length : vals.filter((v) => v < 0).length;
-    const signStability = isaretiUyanSayisi / vals.length;
-    console.log(`  ${name.padEnd(20)} nokta=${w[i].toFixed(4).padEnd(9)} %95 GA=[${lo.toFixed(4)}, ${hi.toFixed(4)}] signStability=${(signStability * 100).toFixed(1)}% ${!(lo < 0 && hi > 0) ? "✓ anlamlı" : "⚠ sıfırı içeriyor"}`);
+    console.log(`  ${name.padEnd(20)} nokta=${w[i].toFixed(4).padEnd(9)} %95 GA=[${lo.toFixed(4)}, ${hi.toFixed(4)}] ${!(lo < 0 && hi > 0) ? "✓ anlamlı" : "⚠ sıfırı içeriyor"}`);
   });
 
   writeFileSync(outPath, JSON.stringify({ featureNames: FEATURE_NAMES, weights: w, means, stds, testEval, trainEval }, null, 2));

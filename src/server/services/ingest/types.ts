@@ -26,10 +26,6 @@ export type IngestRunner = {
   ekuriGroup?: number;
   apprentice?: boolean;
   tjkAtId?: number;
-  // 2026-09-29 — yalnız TJK'nın yurt dışı simulcast fikstürlerindeki atlar için dolu
-  // (negatif TJK ID, "AtKosuBilgileri_Y" sayfasından) — TR atları asla bu alanı taşımaz,
-  // TR akışını HİÇ etkilemez. Bkz. yurtdisi-recent-form-sync.service.ts.
-  yurtDisiAtId?: number;
 };
 
 export type IngestGallop = {
@@ -70,11 +66,6 @@ export type IngestRaceDay = {
   races: IngestRace[];
   surfaceConditions?: IngestSurfaceCondition[];
   weather?: string;
-  // 2026-09-29 — TJK'nın kendi sitesindeki yurt dışı simulcast fikstürleri (Chantilly,
-  // Bath, ...) için: true ise Hippodrome.isForeign=true yazılır. country TJK'nın verdiği
-  // ülke adı (yalnız yabancı hipodromlarda dolu).
-  isForeign?: boolean;
-  country?: string;
 };
 
 export type IngestResult = {

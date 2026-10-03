@@ -86,7 +86,7 @@ async function tekSorgu(baslangicTarihi: string) {
         -- syncKarmaResultMirrors) ve "perak-malezya" (yabancı hipodrom) model eğitiminde
         -- de GERCEK_OLMAYAN_HIPODROM_SLUGLARI ile hariç tutuluyor — burada da hariç
         -- tutulmazsa yapısal/beklenen boşluklar gerçek eksiklik gibi görünür.
-        AND h.slug NOT IN ('karma', 'perak-malezya') AND h."isForeign" = false
+        AND h.slug NOT IN ('karma', 'perak-malezya')
     ),
     galop_kapsam AS (
       SELECT k.runner_id, count(g.id) > 0 AS var_mi

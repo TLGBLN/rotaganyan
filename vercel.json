@@ -13,18 +13,6 @@
       "schedule": "0 11 * * *"
     },
     {
-      "path": "/api/cron/ingest-program",
-      "schedule": "0 13 * * *"
-    },
-    {
-      "path": "/api/cron/ingest-program",
-      "schedule": "0 15 * * *"
-    },
-    {
-      "path": "/api/cron/ingest-program",
-      "schedule": "0 17 * * *"
-    },
-    {
       "path": "/api/cron/agf-sync",
       "schedule": "0 9 * * *"
     },
@@ -43,14 +31,6 @@
     {
       "path": "/api/cron/result-sync",
       "schedule": "*/5 11-21 * * *"
-    },
-    {
-      "path": "/api/cron/race-context-watch",
-      "schedule": "*/5 8-21 * * *"
-    },
-    {
-      "path": "/api/cron/homekupon-reconcile",
-      "schedule": "*/5 8-21 * * *"
     },
     {
       "path": "/api/cron/horse-notifications-morning",

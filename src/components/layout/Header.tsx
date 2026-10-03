@@ -1,16 +1,9 @@
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { isSameTurkeyDay } from "@/lib/tz";
 import { getTodaysFollowedRaces } from "@/server/actions/horse-follow";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import MobileNav from "./MobileNav";
 import HeaderUserMenu from "./HeaderUserMenu";
 import NotificationBell from "./NotificationBell";
@@ -21,6 +14,7 @@ import Wordmark from "./Wordmark";
 import LocaleToggle from "./LocaleToggle";
 import ThemeToggle from "./ThemeToggle";
 import HeaderLabel from "./HeaderLabel";
+import SocialLinks from "./SocialLinks";
 
 export default async function Header() {
   const session = await auth();
@@ -54,44 +48,28 @@ export default async function Header() {
             menüsünün (aşağıdaki nav, hidden md:flex) içindeydi, mobilde hiç görünmüyordu;
             mobilde nav gizlendiği için burada zaten boş yer vardı. */}
         <div className="flex min-w-0 shrink items-center gap-2.5">
-          <Link href="/program" data-tour="program" className="flex shrink-0 items-center gap-2.5">
+          <Link href="/program" className="flex shrink-0 items-center gap-2.5">
             <Wordmark />
           </Link>
           <OnlineCounter />
         </div>
 
-        {/* Hızlı erişim — 2026-09-17 kullanıcı bulgusu: "Yarış Programı" butonu kaldırıldı,
-            logo zaten /program'a gidiyor (satır 51) ve sayfa açılışta zaten program
-            gösteriyor — buton tamamen aynı hedefe giden gereksiz bir tekrardı. */}
+        {/* Hızlı erişim */}
         <nav className="hidden flex-1 items-center gap-2 md:flex">
+          <Button asChild size="sm" className="bg-brand hover:bg-brand/90 text-brand-foreground">
+            <Link href="/program" data-tour="program"><HeaderLabel k="program" /></Link>
+          </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/rotaganyansiralamasi" data-tour="puantablosu"><HeaderLabel k="puanTablosu" /></Link>
           </Button>
-          {/* 2026-09-20 kullanıcı talebi: Altılı Ne Verir / Makaleler / RotaGanyan Store tek
-              tek buton yerine açılır menüye toplandı — header'da yer sıkışmasını önlemek için. */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1" data-tour="altili">
-                Daha Fazla
-                <ChevronDown className="h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem asChild>
-                <Link href="/altili"><HeaderLabel k="altiliNeVerir" /></Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/makaleler">Makaleler</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/rotastore">RotaGanyan Store</Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/altili" data-tour="altili"><HeaderLabel k="altiliNeVerir" /></Link>
+          </Button>
         </nav>
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          <SocialLinks className="hidden items-center gap-2 md:flex" />
           {user && <span data-tour="bildirim"><NotificationBell /></span>}
           {user ? (
             <span data-tour="hesap"><HeaderUserMenu name={user.name} email={user.email} role={user.role} /></span>

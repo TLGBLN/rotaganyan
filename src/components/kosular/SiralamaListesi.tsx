@@ -1,23 +1,23 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import type { ProgramRaceDay } from "@/server/services/race.service";
 import { finishPos } from "@/lib/race-result";
 import { kararOku, puanYuzdesiMetni } from "@/lib/methodology/muhakeme-format";
 import { ekuriRengi } from "@/lib/ekuri-colors";
 import { siraliPickSatirlari } from "@/lib/methodology/pick-display-order";
-import { agfSiraMapOlustur } from "@/lib/agf-sira";
-import { kararStil } from "./siralama-stil";
-import type { SiralamaRace, SiralamaPick } from "./siralama-tipleri";
 
+type Race = ProgramRaceDay["races"][number];
+type Pick = NonNullable<Race["prediction"]>["picks"][number];
 
 // 2026-09-14 — Rotaganyan Sıralama Tablosu "karar katmanı": PuanTablosu.tsx'in çoklu-koşu
 // yan-yana tablo yapısını KOPYALAMAZ (bu bileşen TEK koşu, tam genişlik satırlar gösterir —
 // mockup'taki gibi), ama eküri-birleştirme/sıralama/puan-metni mantığı AYNI paylaşılan
 // yardımcılardan gelir (siraliPickSatirlari, puanYuzdesiMetni, kararOku, ekuriRengi,
 // finishPos) — PuanTablosu.tsx'teki buildPickRows ile birebir aynı birleştirme kuralı.
-function buildRows(picks: SiralamaPick[]): SiralamaPick[][] {
+function buildRows(picks: Pick[]): Pick[][] {
   const renderedNos = new Set<number>();
-  const rows: SiralamaPick[][] = [];
+  const rows: Pick[][] = [];
   for (const p of picks) {
     const no = p.runner?.no;
     if (no != null && renderedNos.has(no)) continue;
@@ -87,17 +87,12 @@ export default function SiralamaListesi({
   race,
   formByNo,
 }: {
-  race: SiralamaRace;
+  race: Race;
   formByNo: Map<number, FormInfo>;
 }) {
-  const picks = race.picks;
+  const picks = race.prediction?.picks ?? [];
   if (picks.length === 0) return null;
   const rows = buildRows(picks);
-  // 2026-09-17 kullanıcı talebi: AGF sırası burada HERKESE açık gösterilsin (agf-sira.ts'teki
-  // "yalnız admin görsün" kararı ProgramView/PuanTablosu için geçerli kalıyor, bu sayfa için
-  // kullanıcı bilerek istisna istedi) — TJK'nın kendi kamuya açık AGF verisi zaten, bkz.
-  // feedback_mutfagi_acma_ilkesi.
-  const agfSiraMap = agfSiraMapOlustur(race.runners);
 
   return (
     <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
@@ -156,7 +151,7 @@ export default function SiralamaListesi({
                   {rowPicks.map((pick, pi) => (
                     <span key={pick.runner?.no ?? pi} className="flex items-center gap-1 min-w-0">
                       {pi > 0 && <span className="text-muted-foreground">/</span>}
-                      <span className="inline-flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded border border-current text-[10px] font-bold">
+                      <span className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border text-[10px] font-bold">
                         {pick.runner?.no ?? "—"}
                       </span>
                       <span className={cn("truncate", pick.runner?.scratched && "line-through opacity-50")}>
@@ -166,11 +161,6 @@ export default function SiralamaListesi({
                         <span title={`Eküri grubu ${pick.runner.ekuriGroup}`} className={cn("inline-block h-1.5 w-1.5 shrink-0 rounded-full", ekuriRengi(pick.runner.ekuriGroup).badge)} />
                       )}
                       {pick.runner?.scratched && <span className="shrink-0 text-[10px] font-semibold text-red-400">Koşmaz</span>}
-                      {pick.runner?.no != null && agfSiraMap.has(pick.runner.no) && (
-                        <span className="shrink-0 rounded bg-purple-500/15 px-1 text-[9px] font-semibold text-purple-500">
-                          AGF {agfSiraMap.get(pick.runner.no)}.
-                        </span>
-                      )}
                       {(() => {
                         const pos = finishPos(race.result?.actualOrder, pick.runner?.no, race.result?.winnerNos);
                         return pos != null ? (
@@ -194,9 +184,7 @@ export default function SiralamaListesi({
                   </div>
                 )}
                 {kararOku(primary.details) && (
-                  <span className={cn("mt-0.5 inline-block rounded px-1.5 py-px text-[10px] font-semibold ring-1", kararStil(kararOku(primary.details)))}>
-                    {kararOku(primary.details)}
-                  </span>
+                  <div className="hidden truncate text-[11px] text-muted-foreground sm:block">{kararOku(primary.details)}</div>
                 )}
               </div>
 
@@ -207,7 +195,7 @@ export default function SiralamaListesi({
                 <Son5Yaris form={formByNo.get(primary.runner?.no ?? -1)} adet={5} />
               </span>
 
-              <span className="text-center text-sm font-bold font-math tabular-nums">
+              <span className="text-center text-sm font-bold tabular-nums">
                 {modelMetin != null ? `%${modelMetin}` : "—"}
               </span>
             </div>

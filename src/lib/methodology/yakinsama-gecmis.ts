@@ -16,10 +16,6 @@ import type { PrismaClient } from "@prisma/client";
  */
 
 const GERCEK_OLMAYAN_HIPODROM_SLUGLARI = ["karma", "perak-malezya"];
-// 2026-09-29 — TJK'nın kendi yurt dışı simulcast fikstürleri (Hippodrome.isForeign,
-// bkz. tjk.adapter.ts) de AYNI sebeple (V5.46'nın TR'ye özel sinyalleri yabancı at/jokey
-// için anlamsız) model eğitim/canlı hesabından hariç — admin.service.ts'teki
-// GERCEK_HIPODROM_FILTRESI ile AYNI desen.
 
 export type YakinsamaGecmisSonuc = {
   sinifDususu: boolean;
@@ -51,7 +47,7 @@ export async function yakinsamaGecmisHesapla(
     where: {
       name: { in: isimler },
       scratched: false,
-      race: { raceDay: { hippodrome: { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI }, isForeign: false } } },
+      race: { raceDay: { hippodrome: { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI } } } },
     },
     select: {
       name: true,

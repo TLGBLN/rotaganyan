@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 import { upsertPrediction, type PickInput } from "@/server/actions/prediction.actions";
 import type { PickDetailsV2 } from "@/lib/methodology/muhakeme-format";
 import { CURRENT_ENGINE_LABEL } from "@/lib/methodology/v5-engine-label";
-import type { AnormalPistRiskSonucu } from "@/lib/methodology/anormal-pist-risk";
 
 // 2026-08-16 — V5 motoru: V4'ün mekanik sinyal-sayımının YERİNE geçer (bkz.
 // SmartAnalysisEditor.tsx). Claude çağrısı YAPMAZ — koşullu logit (Plackett-Luce) modeli
@@ -18,9 +17,6 @@ import type { AnormalPistRiskSonucu } from "@/lib/methodology/anormal-pist-risk"
 // (GA %63.9-76.4). Detaylar src/lib/methodology/v5-engine.ts başlık yorumunda.
 
 type TumOzellikDetay = { kod: string; etiket: string; hamDeger: number; standartDeger: number; katki: number };
-// 2026-10-02 kullanıcı talebi: ham teknik tablonun (TumOzellikDetay) OKUNUR karşılığı —
-// eşiksiz, TÜM 15 sinyal (13 A + 2 B) kendi Türkçe cümlesi + kanıt durumuyla.
-type OkunurSinyalSatiri = { kod: string; etiket: string; cumle: string; katki: number; kanitDurumu: string };
 type V5At = {
   no: number;
   ad: string;
@@ -63,7 +59,6 @@ type V5At = {
   zeminMesafeDeneyimSeviyesi?: "tam" | "kismi" | "yok";
   details: PickDetailsV2;
   tumSinyaller?: TumOzellikDetay[];
-  anlasilirSinyaller?: OkunurSinyalSatiri[];
 };
 type Runner = { id: string; no: number; name: string };
 type BankoAdayiSonuc = { bankoAdayi: boolean; sebep: string };
@@ -80,10 +75,6 @@ type ExistingPrediction = {
   couponWide?: string | null;
   bankoNote?: string | null;
   picks: SavedPick[];
-  // 2026-09-21 — Race Context Invalidation Faz 1 (admin-only, bkz. plan).
-  status?: string;
-  staleAt?: Date | string | null;
-  staleReason?: string | null;
 };
 
 type Props = { raceId: string; runners?: Runner[]; existingPrediction?: ExistingPrediction; onSaved?: () => void };
@@ -159,16 +150,9 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
   const [manualOrder, setManualOrder] = useState<number[]>(kayitliBaslangic?.manualOrder ?? []);
   const [runners, setRunners] = useState<Runner[]>(kayitliBaslangic?.runners ?? []);
   const [bankoAdayi, setBankoAdayi] = useState<BankoAdayiSonuc | null>(kayitliBaslangic?.bankoAdayi ?? null);
-  // 2026-09-16 — Anormal Pist Modu v1 (bkz. anormal-pist-risk.ts). Yalnız CANLI analizde
-  // dolar (kayıtlı/eski kayıtlarda null) — V5.46 skoruna girmez, yalnız banko kapısını
-  // besler ve admin'e detay gösterir.
-  const [anormalPistRiski, setAnormalPistRiski] = useState<AnormalPistRiskSonucu | null>(null);
   const [kuponlar, setKuponlar] = useState<{ narrow?: string; normal?: string; wide?: string }>(kayitliBaslangic?.kuponlar ?? {});
   const [kaynak, setKaynak] = useState<"kayitli" | "canli" | null>(kayitliBaslangic ? "kayitli" : null);
   const [acikDetay, setAcikDetay] = useState<Set<number>>(new Set());
-  // 2026-10-02 kullanıcı talebi: "Okunur Özet" bölümü de Ham Teknik Tablo gibi
-  // açılır/kapanır olsun — AYRI bir state (ikisi birbirinden bağımsız açılıp kapanabilsin).
-  const [acikOzet, setAcikOzet] = useState<Set<number>>(new Set());
   // 2026-08-21 kullanıcı bulgusu (Bursa/ŞENGÜL SULTAN vakası): panel hangi ağırlık
   // setinin (düşük-şart/diğer) kullanıldığını hiç göstermiyordu — şeffaflık eksikliği.
   const [kategori, setKategori] = useState<string | null>(null);
@@ -179,24 +163,9 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
   // değeri artık import edilen sabitten geliyor (API cevabı gelince AYNI değerle
   // üzerine yazılır, davranış değişmez, yalnız ilk render'da da doğru gösterir).
   const [motorEtiketi, setMotorEtiketi] = useState<string | null>(CURRENT_ENGINE_LABEL);
-  // 2026-09-21 — Race Context Invalidation Faz 1 (bkz. plan, PİVOT-3 madde 3): "Analiz
-  // Et" fresh-sync SONRASI hesaplanan hash'i döner — "Kaydet" bunu gönderirse sunucu
-  // Kaydet ANINDA TEKRAR fresh-sync yapıp karşılaştırır (race-condition kilidi).
-  // "kayitli" (hiç yeniden analiz edilmemiş) kaynakta undefined kalır — o zaman Kaydet
-  // eski (guard'sız) davranışa düşer, kayıt asla bloke olmaz.
-  const [contextStartHash, setContextStartHash] = useState<string | undefined>(undefined);
 
   function toggleDetay(no: number) {
     setAcikDetay((prev) => {
-      const next = new Set(prev);
-      if (next.has(no)) next.delete(no);
-      else next.add(no);
-      return next;
-    });
-  }
-
-  function toggleOzet(no: number) {
-    setAcikOzet((prev) => {
       const next = new Set(prev);
       if (next.has(no)) next.delete(no);
       else next.add(no);
@@ -210,7 +179,6 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
     setManualOrder([]);
     setApplied(false);
     setBankoAdayi(null);
-    setAnormalPistRiski(null);
     setKaynak(null);
     setKategori(null);
     setMotorEtiketi(null);
@@ -230,11 +198,9 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         atlar: V5At[];
         runners: Runner[];
         bankoAdayi: BankoAdayiSonuc;
-        anormalPistRiski?: AnormalPistRiskSonucu;
         couponNarrow?: string;
         couponNormal?: string;
         couponWide?: string;
-        contextStartHash?: string;
       };
       try {
         data = JSON.parse(raw);
@@ -247,12 +213,10 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       setManualOrder([...data.atlar].sort((a, b) => a.teknikSira - b.teknikSira).map((a) => a.no));
       setRunners(data.runners ?? []);
       setBankoAdayi(data.bankoAdayi ?? null);
-      setAnormalPistRiski(data.anormalPistRiski ?? null);
       setKuponlar({ narrow: data.couponNarrow, normal: data.couponNormal, wide: data.couponWide });
       setKategori(data.kategori ?? null);
       setMotorEtiketi(data.motorEtiketi ?? null);
       setKaynak("canli");
-      setContextStartHash(data.contextStartHash);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Beklenmeyen hata");
     } finally {
@@ -345,20 +309,8 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         // güvenli.
         isBanko: bankoAdayi?.bankoAdayi ?? false,
         bankoNote: bankoAdayi?.sebep,
-        pistAnormalMi: anormalPistRiski?.pistAnormalMi ?? false,
-        pistDuyarliligi: anormalPistRiski?.pistDuyarliligi ?? null,
-        gecmisRiskSeviyesi: anormalPistRiski?.gecmisRiskSeviyesi ?? null,
-        pistUyariMesaji: anormalPistRiski?.operasyon.uyariMesaji || null,
         picks,
-        contextStartHash,
       });
-      // Race Context Invalidation Faz 1 — PİVOT-3 madde 3: Kaydet anında context TEKRAR
-      // değişmişse sunucu kaydı REDDEDER (Prediction STALE'de kalır). Bu durumda "Kaydet"
-      // BAŞARISIZ sayılmalı — applied/onSaved ÇAĞRILMAZ, admin'e yeniden dene mesajı.
-      if ("contextConflict" in res && res.contextConflict) {
-        toast.error("Context tekrar değişti (ör. pist/at listesi) — analiz kaydedilmedi. Lütfen \"Yeniden Analiz Et\"e basıp tekrar deneyin.");
-        return;
-      }
       if (res.publishError) {
         toast.warning(`Kaydedildi ama yayınlanamadı: ${res.publishError}`);
       } else {
@@ -451,23 +403,6 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         </div>
       )}
 
-      {existingPrediction?.status === "STALE" && (
-        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
-          <p className="font-semibold">
-            🛑 Context değişti
-            {existingPrediction.staleAt
-              ? ` (${Math.max(0, Math.round((Date.now() - new Date(existingPrediction.staleAt).getTime()) / 60000))} dk önce)`
-              : ""}
-            : {existingPrediction.staleReason || "detay yok"}
-          </p>
-          <p className="mt-1 text-amber-600/80 dark:text-amber-400/80">
-            Bu analiz artık BUGÜNKÜ TJK verisiyle üretilmemiş olabilir. Public sayfada/kupon
-            optimizer&apos;da hâlâ eski (bu) analiz kullanılıyor — otomatik değişmez. Aşağıdaki
-            &quot;Yeniden Analiz Et&quot; butonuyla güncel veriyle tekrar hesaplayıp Kaydet&apos;e basın.
-          </p>
-        </div>
-      )}
-
       <div className="flex gap-2">
         <Button onClick={handleCalistir} disabled={loading} size="sm" className="gap-1.5" variant="outline">
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
@@ -507,45 +442,6 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         </div>
       )}
 
-      {/* 2026-09-16 — Anormal Pist Modu v1 (bkz. anormal-pist-risk.ts). V5.46 skoruna
-          HİÇ girmez — yalnız admin'e RİSK detayını gösterir (public'te sade rozet olarak
-          görünür, bkz. feedback_mutfagi_acma_ilkesi). pistAnormalMi false ise (büyük
-          çoğunluk gün) hiçbir şey gösterilmez. */}
-      {anormalPistRiski?.pistAnormalMi && (
-        <div
-          className={cn(
-            "space-y-2 rounded-lg border px-3 py-2.5 text-xs",
-            anormalPistRiski.pistDuyarliligi === "COK_HASSAS" || anormalPistRiski.gecmisRiskSeviyesi === "YETERSIZ"
-              ? "border-miss/40 bg-miss/10"
-              : "border-amber-500/40 bg-amber-500/10"
-          )}
-        >
-          <div>
-            <span className="font-semibold">⚠ Anormal Pist ({anormalPistRiski.pistRejimi}): </span>
-            Pist Duyarlılığı <strong>{anormalPistRiski.pistDuyarliligi}</strong> · Geçmiş Riski{" "}
-            <strong>{anormalPistRiski.gecmisRiskSeviyesi}</strong>
-            {anormalPistRiski.operasyon.uyariMesaji && <> — {anormalPistRiski.operasyon.uyariMesaji}</>}
-          </div>
-          {anormalPistRiski.detay && (
-            <>
-              <div className="text-muted-foreground">
-                Lider {anormalPistRiski.detay.pistDayaniklilik.liderDegismedi ? "5 senaryoda da aynı" : "senaryoya göre DEĞİŞİYOR"} ·
-                {" "}Top3 örtüşme %{(anormalPistRiski.detay.pistDayaniklilik.top3OrtusmeOrani * 100).toFixed(0)} ·{" "}
-                Lider olasılık aralığı [%{(anormalPistRiski.detay.pistDayaniklilik.liderOlasilikAraligi[0] * 100).toFixed(1)}
-                –%{(anormalPistRiski.detay.pistDayaniklilik.liderOlasilikAraligi[1] * 100).toFixed(1)}]
-              </div>
-              <div className="text-muted-foreground">
-                Geçmiş kütlesi (P× yetersiz): %{(anormalPistRiski.detay.gecmisYeterliligi.yetersizlikKutlesi * 100).toFixed(0)} —{" "}
-                {anormalPistRiski.detay.gecmisYeterliligi.atDurumlari
-                  .slice(0, 5)
-                  .map((a) => `#${a.no}:${a.durum}`)
-                  .join(", ")}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
       {cekilenAtNotlari.length > 0 && (
         <div className="space-y-1.5">
           {cekilenAtNotlari.map((not, i) => (
@@ -568,15 +464,6 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
             const gecerliAtlar = atlar.filter((x) => x.marketBlindProb1 != null);
             const safModelSirali = [...gecerliAtlar].sort((x, y) => (y.marketBlindProb1 ?? 0) - (x.marketBlindProb1 ?? 0));
             const safModelSiraByNo = new Map(safModelSirali.map((x, idx) => [x.no, idx + 1]));
-            // 2026-10-02 kullanıcı talebi: "#3" tek başına hangi sırayı (ham puan mı,
-            // terfi-sonrası teknik sıra mı) temsil ettiğini göstermiyordu — bkz.
-            // Top1 Semantic Divergence Audit. `olasilik` kalibrasyon sıcaklığından
-            // ETKİLENMEZ (T tüm skorları aynı oranda böler, sırayı korur) — yani ham
-            // puan sırası BUNA göre güvenle çıkarılabilir. manualOrder'ın başlangıç
-            // hali (atlar'ın geldiği sıra) teknikSira'dır; admin elle taşırsa i+1 ondan
-            // sapar — bu yüzden karşılaştırma HER ZAMAN a.teknikSira'ya karşı yapılır.
-            const hamPuanSirali = [...atlar].sort((x, y) => y.olasilik - x.olasilik);
-            const hamPuanSiraByNo = new Map(hamPuanSirali.map((x, idx) => [x.no, idx + 1]));
             return manualOrder.map((no, i) => {
             const a = atlarByNo.get(no);
             if (!a) return null;
@@ -585,17 +472,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
               <div key={no} className="space-y-1 rounded-lg border border-border bg-background p-2.5 text-xs">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span
-                      className="font-mono text-muted-foreground"
-                      title="Teknik Sıra: terfi/postprocess kuralları (AGF Trend Terfisi vb.) sonrası GÖSTERİM/KUPON sırası — kaydedilince Pick.rank bu olur. Ham puan sırası (modelin softmax öncesi skoruna göre, terfiden ETKİLENMEMİŞ sırası) bundan farklıysa yanına AYRICA belirtilir."
-                    >
-                      Teknik Sıra {i + 1}.
-                    </span>
-                    {hamPuanSiraByNo.get(a.no) !== a.teknikSira && (
-                      <span className="rounded bg-sky-500/15 px-1.5 py-0.5 font-mono text-[10px] text-sky-600" title="Ham puana (softmax öncesi skor) göre sıra — terfi kurallarından ETKİLENMEMİŞ. Teknik Sıra'dan farklı olması, bir terfi kuralının bu atı yukarı/aşağı taşıdığı anlamına gelir.">
-                        Ham Puan Sırası: {hamPuanSiraByNo.get(a.no)}
-                      </span>
-                    )}
+                    <span className="font-mono text-muted-foreground">{i + 1}.</span>
                     <span className="font-semibold">
                       #{a.no} {a.ad}
                     </span>
@@ -632,8 +509,8 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                         anlaşılmadığını belirtti (2026-08-29) — artık her rakamın ne olduğu
                         tam kelimelerle, tooltip'e bakmaya gerek kalmadan yazılıyor. */}
                     {a.probTop3 != null && (
-                      <li title="Bu üçü de yalnız bilgi amaçlı — sıralamayı/kararı ETKİLEMEZ. İlk 2'ye/3'e girme olasılığı: at yarışı bitince ilk 2 ya da ilk 3 içinde olma ihtimali (yalnız kazanma değil). Ana AGF katkıları çıkarılmış model: AGF'nin ÜÇ ANA bileşeni (AGF Sırası, AGF Payı, AGF Payı²) çıkarılıp saha yeniden normalize edilirse modelin bu ata vereceği kazanma olasılığı. DİKKAT: bu TAM AGF'siz değildir — Yakınsama gibi başka bir sinyal içinde dolaylı bir AGF-trend bileşeni kalmış olabilir.">
-                        İlk 2&apos;ye girme: %{((a.probTop2 ?? 0) * 100).toFixed(0)} · İlk 3&apos;e girme: %{((a.probTop3 ?? 0) * 100).toFixed(0)} · Ana AGF katkıları çıkarılmış model: %
+                      <li title="Bu üçü de yalnız bilgi amaçlı — sıralamayı/kararı ETKİLEMEZ. İlk 2'ye/3'e girme olasılığı: at yarışı bitince ilk 2 ya da ilk 3 içinde olma ihtimali (yalnız kazanma değil). AGF'siz kazanma ihtimali: AGF (bahis payı/piyasa favorisi) bilgisi TAMAMEN çıkarılıp yeniden hesaplanırsa modelin bu ata vereceği kazanma olasılığı — yani piyasa bu atı hiç tanımasaydı model ne düşünürdü.">
+                        İlk 2&apos;ye girme: %{((a.probTop2 ?? 0) * 100).toFixed(0)} · İlk 3&apos;e girme: %{((a.probTop3 ?? 0) * 100).toFixed(0)} · AGF&apos;siz kazanma: %
                         {((a.marketBlindProb1 ?? 0) * 100).toFixed(0)}
                       </li>
                     )}
@@ -653,7 +530,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                       return (
                         <li
                           className={cn(a.degerTerfisi ? "text-hit" : fark >= 5 ? "text-amber-600" : "")}
-                          title="Saf Model: AGF'nin ÜÇ ANA bileşeni (AGF Sırası, AGF Payı, AGF Payı²) çıkarılarak hesaplanır — bu atı sahada nereye koyardı (marketBlindProb1'in sıra+yüzdesi). TAM AGF'siz değildir, başka bir sinyal (ör. Yakınsama) içinde dolaylı bir AGF-trend bileşeni kalmış olabilir. AGF: piyasanın (bahis payının) kendi sırası+yüzdesi. Fark büyük ve pozitifse, model piyasanın görmediği bağımsız bir değer buluyor. Fark>=8pp ilk-3'e, >=5pp ilk-6'ya koşulsuz taşır (modelin AGF-dışı görüşü net pozitifse) — degerTerfisi bunu gösterir."
+                          title="Saf Model: AGF bilgisi HİÇ olmasaydı model bu atı sahada nereye koyardı (marketBlindProb1'in sıra+yüzdesi). AGF: piyasanın (bahis payının) kendi sırası+yüzdesi. Fark büyük ve pozitifse, model piyasanın görmediği bağımsız bir değer buluyor. Fark>=8pp ilk-3'e, >=5pp ilk-6'ya koşulsuz taşır (modelin AGF-dışı görüşü net pozitifse) — degerTerfisi bunu gösterir."
                         >
                           Saf Model: {safSira ?? "?"}. sıra (%{safYuzde.toFixed(1)}) · AGF: {a.agfSirasi}. sıra (%{a.agfPayi.toFixed(1)}) · Fark: {fark > 0 ? "+" : ""}{fark.toFixed(1)}pp
                           {a.degerTerfisi === "ilk3" && " · ✓ İlk-3 Terfisi"}
@@ -701,52 +578,11 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                   <p className="text-muted-foreground">Belirgin bir özellik katkısı yok.</p>
                 )}
 
-                {/* 2026-10-02 kullanıcı talebi: "tüm sinyaller anlaşılır dilde" eklendi,
-                    SONRA kullanıcı bunun da (Ham Teknik Tablo gibi) açılır/kapanır olmasını
-                    istedi — varsayılan KAPALI, ayrı toggle (acikOzet/toggleOzet). */}
-                {a.anlasilirSinyaller && a.anlasilirSinyaller.length > 0 && (
-                  <div className="border-t border-border/60 pt-1.5">
-                    <button
-                      onClick={() => toggleOzet(no)}
-                      className="flex items-center gap-1 text-[11px] font-medium text-purple-500 hover:underline"
-                    >
-                      {acikOzet.has(no) ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                      Tüm {a.anlasilirSinyaller.length} Sinyal — Okunur Özet
-                    </button>
-                    {acikOzet.has(no) && (
-                      <ul className="mt-1.5 space-y-1 pl-0 text-muted-foreground">
-                        {a.anlasilirSinyaller.map((s) => {
-                          const kanitRenk = s.kanitDurumu.startsWith("Kanıtlanmış")
-                            ? "text-hit"
-                            : s.kanitDurumu.startsWith("Kısmen")
-                              ? "text-amber-600"
-                              : "text-muted-foreground/70";
-                          return (
-                            <li key={s.kod} className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 rounded border border-border/40 px-1.5 py-1">
-                              <span className="font-semibold text-foreground/90">{s.etiket}:</span>
-                              <span>{s.cumle}</span>
-                              <span
-                                className={cn("ml-auto whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9px] font-medium", kanitRenk)}
-                                title="Bu, 'model bu sinyali hesapladı mı' sorusuna DEĞİL, 'bu sinyalin gerçekten işe yaradığı kanıtlandı mı' sorusuna cevap verir — SINYAL-FORMULLERI.md §5 Kanıt Matrisi ile aynı kaynak."
-                              >
-                                {s.kanitDurumu.split(" — ")[0]}
-                              </span>
-                              {s.kanitDurumu.includes(" — ") && (
-                                <span className="basis-full text-[10px] text-muted-foreground/60">{s.kanitDurumu.split(" — ")[1]}</span>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </div>
-                )}
-
                 {a.tumSinyaller && (
                   <div className="border-t border-border/60 pt-1.5">
                     <button
                       onClick={() => toggleDetay(no)}
-                      className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground/70 hover:underline"
+                      className="flex items-center gap-1 text-[11px] font-medium text-purple-500 hover:underline"
                     >
                       {acikDetay.has(no) ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                       {(() => {
@@ -754,7 +590,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                         const ek = bSayisi > 0 ? `+${bSayisi}` : "";
                         return (
                           <>
-                            Ham Teknik Tablo — Denetim Kaydı ({a.tumSinyaller!.length}
+                            Tüm {a.tumSinyaller!.length} Sinyal{bSayisi > 0 ? ` + B Katmanı (${bSayisi})` : ""} — Denetim Kaydı ({a.tumSinyaller!.length}
                             {ek}/{a.tumSinyaller!.length}
                             {ek} hesaplandı)
                           </>

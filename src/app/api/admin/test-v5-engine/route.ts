@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
-import { gatherFaz1V5, faz2V5Sirala, muhakemeUretV5, v5BankoAdayiTespit, tumOzellikleriListele, tumOzellikleriAnlasilirListele, CURRENT_ENGINE_LABEL, hibritMaidenSatisMi } from "@/lib/methodology/v5-engine";
+import { gatherFaz1V5, faz2V5Sirala, muhakemeUretV5, v5BankoAdayiTespit, tumOzellikleriListele, CURRENT_ENGINE_LABEL, hibritMaidenSatisMi } from "@/lib/methodology/v5-engine";
 import { kategoriTespit } from "@/lib/methodology/v2-engine";
-import { hesaplaAnormalPistRiski } from "@/lib/methodology/anormal-pist-risk";
-import { db } from "@/lib/db";
-import { syncRaceProgramContext } from "@/server/services/race-context-sync.service";
-import { fetchCriticalContextInput, criticalContextHash } from "@/lib/methodology/race-context-hash";
 
 // 2026-08-16 — V5 motoru: Claude çağrısı YOK (yalnız DB okuma + koşullu logit skoru),
 // V4 ile aynı sebeple maxDuration/batching gerekmiyor — tek istekte döner.
@@ -20,13 +16,6 @@ async function handlePost(req: NextRequest) {
   }
   const { raceId } = (await req.json()) as Body;
   if (!raceId) return NextResponse.json({ error: "raceId gerekli" }, { status: 400 });
-
-  // Race Context Invalidation Faz 1 (bkz. plan, Düzeltme #1) — "Analiz Et" gerçek T-60/T-45
-  // operasyonunda BUGÜNKÜ, AZ ÖNCESİ TJK verisiyle çalışmalı; gatherFaz1V5 kendi içinde
-  // yalnız AGF'yi tazeliyordu (syncAgfForRace), pist/yüzey/mesafe/koşan-koşmayan/jokey/kilo
-  // gibi kritik alanlar DB'deki (olası eski) veriyle kalıyordu. Hata sessizce yutulur —
-  // TJK erişilemezse analiz DB'deki mevcut veriyle devam eder, hiçbir zaman BLOKE ETMEZ.
-  await syncRaceProgramContext(raceId).catch(() => {});
 
   const faz1 = await gatherFaz1V5(raceId);
   if (!faz1) return NextResponse.json({ error: "Koşu verisi bulunamadı" }, { status: 404 });
@@ -56,44 +45,17 @@ async function handlePost(req: NextRequest) {
     zeminMesafeDeneyimSeviyesi: r.zeminMesafeDeneyimSeviyesi,
     details: muhakemeUretV5(r, sahaBuyuklugu),
     tumSinyaller: tumOzellikleriListele(r),
-    // 2026-10-02 kullanıcı talebi: ham teknik tablonun OKUNUR karşılığı — tüm 15 sinyal
-    // (eşik yok) anlaşılır Türkçe cümle + kanıt durumuyla.
-    anlasilirSinyaller: tumOzellikleriAnlasilirListele(r),
   }));
 
-  const bankoAdayiHam = v5BankoAdayiTespit(sirali);
-
-  // 2026-09-16 — Anormal Pist Modu v1 (bkz. anormal-pist-risk.ts): V5.46'nın kendi
-  // banko/skor mantığına HİÇ dokunmadan, yalnız pist anormalse (Çim/Kum Normal-dışı)
-  // ek bir risk değerlendirmesi. v5BankoAdayiTespit'in SONUCU, yalnız bu değerlendirme
-  // "banko verilmesin" derse EZİLİR — kendi eşiği/mantığı değişmez.
-  const raceDayIcin = await db.race.findUnique({
-    where: { id: raceId },
-    select: { raceDay: { select: { surfaceConditions: true } } },
-  });
-  const anormalPistRiski = hesaplaAnormalPistRiski(
-    faz1,
-    raceDayIcin?.raceDay.surfaceConditions as { label: string; detail: string }[] | null
-  );
-  const bankoAdayi = anormalPistRiski.operasyon.bankoIzinVer
-    ? bankoAdayiHam
-    : { bankoAdayi: false, sebep: anormalPistRiski.operasyon.uyariMesaji || bankoAdayiHam.sebep };
+  const bankoAdayi = v5BankoAdayiTespit(sirali);
 
   const nolar = sirali.map((r) => r.no);
   const couponNarrow = nolar.slice(0, 3).join("-");
   const couponNormal = nolar.slice(3, 6).join("-");
   const couponWide = nolar.slice(6).join("-");
 
-  // Fresh-sync SONRASI DB durumundan hesaplanan başlangıç hash'i — "Kaydet" anında TEKRAR
-  // hesaplanıp bununla karşılaştırılacak (bkz. upsertPrediction'daki race-condition kilidi,
-  // plan PİVOT-3 madde 3). Hesaplanamazsa (olağandışı) undefined kalır — Kaydet o zaman
-  // eski (guard'sız) davranışa düşer, analiz BLOKE OLMAZ.
-  const ctxForHash = await fetchCriticalContextInput(raceId);
-  const contextStartHash = ctxForHash ? criticalContextHash(ctxForHash) : undefined;
-
   return NextResponse.json({
     ok: true,
-    contextStartHash,
     motorEtiketi: CURRENT_ENGINE_LABEL,
     // 2026-08-26 kullanıcı bulgusu: "Maiden/Satış" hibrit koşularda panel yalnız
     // kategoriTespit'in ("MAIDEN" önce yakalayan) sonucunu ("1b") gösteriyordu — admin
@@ -104,7 +66,6 @@ async function handlePost(req: NextRequest) {
     atlar,
     runners: faz1.runners.map((r) => ({ id: r.id, no: r.no, name: r.ad })),
     bankoAdayi,
-    anormalPistRiski,
     couponNarrow,
     couponNormal,
     couponWide,

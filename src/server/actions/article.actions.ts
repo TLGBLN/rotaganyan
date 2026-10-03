@@ -5,7 +5,6 @@ import { requireRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { articleSchema } from "@/lib/validations/article";
 import { tweetArticlePublished } from "@/lib/x";
-import { generateArticleSeo } from "@/lib/seo-generate";
 
 type ArticleInput = {
   type: "EDUCATIONAL" | "MAGAZINE";
@@ -39,11 +38,9 @@ export async function upsertArticle(id: string | null, input: ArticleInput) {
     metaDescription: input.metaDescription || null,
   };
 
-  // Yeni makalede başlangıç "sosyal kanıt" beğeni sayısı (5-13 arası) — kullanıcı talebi,
-  // gerçek kullanıcı beğenileri (ArticleLike) buna eklenir, bkz. article-like.actions.ts.
   const article = id
     ? await db.article.update({ where: { id }, data })
-    : await db.article.create({ data: { ...data, seedLikeCount: 5 + Math.floor(Math.random() * 9) } });
+    : await db.article.create({ data });
 
   revalidatePath("/admin/makaleler");
   return { success: true, id: article.id };
@@ -58,21 +55,7 @@ export async function publishArticle(id: string) {
   });
 
   revalidatePath("/admin/makaleler");
-  revalidatePath("/makaleler");
-  revalidatePath(`/makaleler/${article.slug}`);
-  // 2026-09-18 BUG DÜZELTMESİ: eskiden "/" (site kökü) gönderiyordu — herkese açık makale
-  // sayfası o zaman hiç yoktu. Artık gerçek makale URL'i tweetleniyor.
-  await tweetArticlePublished(article.title, `/makaleler/${article.slug}`);
-}
-
-// 2026-09-18 kullanıcı talebi: "SEO otomatik doldur... internette diğer kullanıcıların
-// arama yaptıklarında önlerine çıkabilecek düzeyde" — ham başlık/özet kopyası değil,
-// Claude'un ürettiği gerçek SEO metni.
-export async function generateSeoAction(title: string, excerpt: string, body: string) {
-  await requireRole("EDITOR");
-  const result = await generateArticleSeo(title, excerpt, body);
-  if (!result) return { error: "SEO metni üretilemedi, tekrar deneyin." };
-  return { success: true, ...result };
+  await tweetArticlePublished(article.title, "/");
 }
 
 export async function unpublishArticle(id: string) {

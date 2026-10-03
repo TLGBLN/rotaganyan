@@ -58,11 +58,6 @@ export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
             isBanko: true;
             couponNormal: true;
             couponWide: true;
-            // 2026-09-16 — Anormal Pist Modu v1 (bkz. anormal-pist-risk.ts): public
-            // sade rozet için ("⚠ Anormal Pist"), sayısal detay TAŞIMAZ.
-            pistAnormalMi: true;
-            pistDuyarliligi: true;
-            pistUyariMesaji: true;
             picks: {
               orderBy: { rank: "asc" };
               select: {
@@ -159,9 +154,6 @@ export async function getRaceDaysByDate(
               isBanko: true,
               couponNormal: true,
               couponWide: true,
-              pistAnormalMi: true,
-              pistDuyarliligi: true,
-              pistUyariMesaji: true,
               picks: {
                 orderBy: { rank: "asc" },
                 select: {
@@ -210,9 +202,7 @@ export async function getHippodromes() {
   // KuponForm'un hipodrom seçicisinde seçilebilir bir seçenek olarak görünüyordu. "Karma"
   // gerçek/işlevsel (7'li Ganyan vb. için kullanılıyor) — o hariç tutulmadı, yalnız
   // Perak Malezya çıkarıldı.
-  // 2026-09-29 — yurt dışı simulcast fikstürleri (isForeign) de hariç: kupon oluşturma
-  // yalnız TR koşuları için anlamlı, KuponForm'un seçicisinde görünmemeli.
-  return db.hippodrome.findMany({ where: { slug: { not: "perak-malezya" }, isForeign: false }, orderBy: { name: "asc" } });
+  return db.hippodrome.findMany({ where: { slug: { not: "perak-malezya" } }, orderBy: { name: "asc" } });
 }
 
 export async function getRaceDetail(
@@ -537,16 +527,10 @@ export async function buildKuponOnerisi(active: {
 
   // Her ayağın gerçek kazananını ve sonucun girilip girilmediğini bul — kupon numaralarıyla eşleşeni
   // yeşil göstermek, eşleşmeyeni (sonuç girilmiş ama kazanan seçilmemiş) "kaçtı" olarak işaretlemek için.
-  // Aynı sorguda o ayağın analiz PUANINI (Pick.score) da çekiyoruz — kupondaki atlar sayı
-  // sırasına göre değil, analizdeki ham puana göre dizilsin diye. 2026-10-02 kullanıcı
-  // bulgusu: önceden burada Pick.rank kullanılıyordu — ama rank, terfi mekanizmalarının
-  // (agfTrendTerfisiUygula vb., bkz. v5-engine.ts) ham puanı YENİDEN DİZDİĞİ sonraki
-  // pozisyon, oysa public analiz ekranları (pick-display-order.ts) HAM PUANA göre
-  // sıralıyor — iki ekran farklı kaynaktan beslendiği için aynı at için "analizde sıra 3,
-  // kuponda pozisyon 4" gibi tutarsız bir görüntü oluşabiliyordu. Artık İKİSİ DE aynı
-  // kaynağı (ham puan) kullanıyor.
+  // Aynı sorguda o ayağın analiz sırasını (Pick.rank) da çekiyoruz — kupondaki atlar sayı sırasına göre
+  // değil, analizdeki tahmin sırasına göre dizilsin diye.
   const resultByRaceNo = new Map<number, { winnerNo: number | null; winnerNos: number[]; resulted: boolean; ekuriWinnerByNo: Record<number, number>; ekuriPartnerByNo: Record<number, number> }>();
-  const scoreByRaceNo = new Map<number, Map<number, number>>();
+  const rankByRaceNo = new Map<number, Map<number, number>>();
   const races = await db.race.findMany({
     where: {
       raceNo: { in: legs.map((l) => l.raceNo) },
@@ -557,7 +541,7 @@ export async function buildKuponOnerisi(active: {
     },
     include: {
       result: { select: { winnerNo: true, winnerNos: true, enteredAt: true } },
-      prediction: { select: { picks: { select: { score: true, runner: { select: { no: true } } } } } },
+      prediction: { select: { picks: { select: { rank: true, runner: { select: { no: true } } } } } },
       // scratched:false — çekilmiş bir at hâlâ ekuriGroup taşıyabilir, koşmayan bir atı
       // "eküri ortağı" diye göstermek yanıltıcı olurdu.
       runners: { where: { scratched: false }, select: { no: true, ekuriGroup: true } },
@@ -579,23 +563,21 @@ export async function buildKuponOnerisi(active: {
       ekuriPartnerByNo: buildEkuriPartnerMap(r.runners),
     });
     if (r.raceNo === sonAyakRaceNo) sonAyakSonuclandiAt = r.result?.enteredAt ?? null;
-    const scoreByNo = new Map<number, number>();
+    const rankByNo = new Map<number, number>();
     for (const pick of r.prediction?.picks ?? []) {
-      if (pick.runner && pick.score != null) scoreByNo.set(pick.runner.no, pick.score);
+      if (pick.runner) rankByNo.set(pick.runner.no, pick.rank);
     }
-    if (scoreByNo.size > 0) scoreByRaceNo.set(r.raceNo, scoreByNo);
+    if (rankByNo.size > 0) rankByRaceNo.set(r.raceNo, rankByNo);
   }
 
-  /** Atları sayı sırası yerine analizdeki ham puana (Pick.score) göre dizer — public analiz
-   *  ekranlarıyla (bkz. pick-display-order.ts) AYNI kaynak; analizde olmayanlar sona,
-   *  kendi aralarında sayı sırasına göre eklenir. */
+  /** Atları sayı sırası yerine analizdeki tahmin sırasına (Pick.rank) göre dizer; analizde olmayanlar sona, kendi aralarında sayı sırasına göre eklenir. */
   function sortByAnalysisRank(raceNo: number, nos: number[]): number[] {
-    const scoreByNo = scoreByRaceNo.get(raceNo);
-    if (!scoreByNo) return nos;
+    const rankByNo = rankByRaceNo.get(raceNo);
+    if (!rankByNo) return nos;
     return [...nos].sort((a, b) => {
-      const sa = scoreByNo.get(a) ?? -Infinity;
-      const sb = scoreByNo.get(b) ?? -Infinity;
-      if (sa !== sb) return sb - sa;
+      const ra = rankByNo.get(a) ?? Infinity;
+      const rb = rankByNo.get(b) ?? Infinity;
+      if (ra !== rb) return ra - rb;
       return a - b;
     });
   }
@@ -687,20 +669,28 @@ export async function getKuponOnerileri(): Promise<KuponOnerisi[]> {
   }
 
   const results = await Promise.all(validActives.map((a) => buildKuponOnerisi(a)));
-  // 2026-09-01 kullanıcı kararı: yatan (miss) bir kupon ANINDA anasayfadan kalkmasın.
-  // 2026-09-16 kullanıcı talebi ile GENİŞLETİLDİ: eskiden yalnız son ayak sonuçlandıktan
-  // 20dk sonrasına kadar görünürdü — artık tutan/yatan/bekleyen FARK ETMEKSİZİN, günün
-  // kuponu GÜN SONUNA kadar yayında kalıyor. Ayrı bir süre sayacı gerekmiyor: yukarıdaki
-  // `validActives` filtresi (satır ~652-653) zaten kuponu YALNIZ bugünün tarihiyle
-  // sınırlıyor — ertesi gün `today` değişince kupon kendiliğinden listeden düşüyor, bu
-  // da zaten "gün sonuna kadar" kuralının doğal karşılığı. Bir hipodromun Ekonomik/
-  // Normal/Geniş varyantları birbirinden bağımsız yatabilir (ör. Ekonomik yatar ama
-  // Geniş hâlâ tutuyor olabilir) — ikisi de aynı şekilde gün sonuna kadar görünür kalır.
+  // 2026-09-01 kullanıcı kararı: yatan (miss) bir kupon ANINDA anasayfadan kalkmasın —
+  // KENDİ son ayağı (o kuponun en büyük raceNo'lu koşusu; 1. Altılı ise 1. Altılı'nın,
+  // 2. Altılı ise 2. Altılı'nın son koşusu) sonuçlandıktan 20dk sonrasına kadar görünür
+  // kalır, sonra kalkar. Tutan (hit) ve henüz sonuçlanmamış (pending) varyantlar gün
+  // boyu yayında kalmaya devam eder (DEĞİŞMEDİ). Son ayak henüz sonuçlanmadıysa
+  // (sonAyakSonuclandiAt: null) 20dk sayacı hiç başlamaz, kupon görünür kalır. Bir
+  // hipodromun Ekonomik/Normal/Geniş varyantları birbirinden bağımsız yatabilir (ör.
+  // Ekonomik yatar ama Geniş hâlâ tutuyor olabilir). Geçmiş (yatan dahil) admin
+  // panelindeki "Geçmiş Kuponlar" listesinde zaten saklanıyor — bu sadece anasayfa
+  // görünümünü filtreler, veriyi silmez.
+  const MISS_GORUNUR_KALMA_SURESI_MS = 20 * 60 * 1000;
+  const now = Date.now();
   return results
     .filter((r): r is NonNullable<typeof r> => r !== null)
     .map((r) => ({
       ...r,
-      variants: r.variants.filter((v) => v.filled),
+      variants: r.variants.filter((v) => {
+        if (!v.filled) return false;
+        if (v.status !== "miss") return true;
+        if (!r.sonAyakSonuclandiAt) return true;
+        return now - r.sonAyakSonuclandiAt.getTime() < MISS_GORUNUR_KALMA_SURESI_MS;
+      }),
     }))
     .filter((r) => r.variants.length > 0);
 }
@@ -840,88 +830,6 @@ export async function getAylikKuponKazanci(): Promise<AylikKuponKazanci[]> {
     }));
 }
 
-export type KuponRoiOzeti = {
-  toplamKuponSayisi: number;
-  hitSayisi: number;
-  harcanan: number;
-  kazanc: number;
-  netKar: number;
-  roi: number; // yüzde, harcanan üzerinden
-  // 2026-09-17 kullanıcı talebi ("bu takip edilmesi gereken bir analiz mi?" sorusuna
-  // verilen yanıt): Altılı/7'li ikramiyeleri doğası gereği "lumpy" — tek bir büyük vuruş
-  // toplam kazancın büyük kısmını oluşturabilir, çıplak ROI% başlığı yanıltıcı olur.
-  // Bu yüzden en büyük vuruş AYRIŞTIRILARAK gösteriliyor (admin kendi karar versin).
-  enBuyukVurus: { tutar: number; tarih: string; hippodrome: string } | null;
-  enBuyukVurusPayi: number; // toplam kazanç içindeki yüzdesi
-  netKarHaricEnBuyuk: number;
-  roiHaricEnBuyuk: number;
-};
-
-/**
- * "Bugüne kadar ne kadar harcadık, ne kadar kazandık" — harcanan tarafı HER yayınlanmış
- * kuponun (tutsun/tutmasın/bekliyor olsun fark etmez) en düşük tutarlı DOLU kademesi
- * üzerinden (kullanıcı kararı: "hesaplarken tutan en düşük tutarlı kupon üzerinden
- * hesapla" — aynı kural harcanan tarafına da tutarlı uygulanıyor). Kazanç tarafı
- * getGecmisKazananKuponlar'ın ZATEN doğrulanmış ikramiye toplamıyla birebir aynı mantık
- * (aynı "en düşük tutarlı tutan kademe" seçimi, TJK'nın resmi ikramiye cümlesi).
- * Yalnız admin görür (bkz. proje kararı 2026-09-17) — kamuya açık sayfalarda harcanan
- * tutar/ROI gibi rakamlar yanlış bağlamda yanıltıcı olabilir.
- */
-export async function getKuponRoiOzeti(): Promise<KuponRoiOzeti> {
-  const all = await db.homeKupon.findMany({ orderBy: [{ date: "desc" }, { updatedAt: "desc" }] });
-  const seen = new Set<string>();
-  const dedup = all.filter((k) => {
-    const key = `${k.hippodromeName}|${k.date.toISOString()}|${k.slot}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-
-  const built = await Promise.all(dedup.map((k) => buildKuponOnerisi(k)));
-
-  let harcanan = 0;
-  let kazanc = 0;
-  let hitSayisi = 0;
-  const vurus: { tutar: number; tarih: string; hippodrome: string }[] = [];
-
-  for (let i = 0; i < dedup.length; i++) {
-    const b = built[i];
-    if (!b) continue;
-    // Harcanan: en düşük tutarlı DOLU kademe (tuttu/tutmadı fark etmez — "hep en ucuz
-    // kademeyi oynasaydık" varsayımı). Kazanç: en düşük tutarlı TUTAN kademe — bu ikisi
-    // FARKLI kademeler olabilir (ör. Ekonomik yattı ama Normal tuttu) — getGecmisKazananKuponlar
-    // ile AYNI seçim mantığı (bkz. o fonksiyon), birbirine karıştırılmamalı.
-    const lowestFilled = b.variants.find((v) => v.filled);
-    if (lowestFilled) harcanan += lowestFilled.amount;
-    const hitVariant = b.variants.find((v) => v.filled && v.status === "hit");
-    if (hitVariant) {
-      hitSayisi++;
-      const tutar = parseIkramiyeTutar(dedup[i].ikramiye);
-      kazanc += tutar;
-      if (tutar > 0) vurus.push({ tutar, tarih: dedup[i].date.toISOString().slice(0, 10), hippodrome: b.hippodromeName });
-    }
-  }
-
-  vurus.sort((a, b) => b.tutar - a.tutar);
-  const enBuyukVurus = vurus[0] ?? null;
-  const enBuyukVurusPayi = enBuyukVurus && kazanc > 0 ? (enBuyukVurus.tutar / kazanc) * 100 : 0;
-  const kazancHaricEnBuyuk = kazanc - (enBuyukVurus?.tutar ?? 0);
-  const netKarHaricEnBuyuk = kazancHaricEnBuyuk - harcanan;
-
-  return {
-    toplamKuponSayisi: dedup.length,
-    hitSayisi,
-    harcanan,
-    kazanc,
-    netKar: kazanc - harcanan,
-    roi: harcanan > 0 ? (kazanc / harcanan) * 100 : 0,
-    enBuyukVurus,
-    enBuyukVurusPayi,
-    netKarHaricEnBuyuk,
-    roiHaricEnBuyuk: harcanan > 0 ? (kazancHaricEnBuyuk / harcanan) * 100 : 0,
-  };
-}
-
 // ─── Canlı Oranlar (anasayfa) ───────────────────────────────────────────────────
 
 export type CurrentRace = {
@@ -938,9 +846,7 @@ export async function getCurrentRaces(dateStr: string): Promise<CurrentRace[]> {
   const date = new Date(dateStr + "T00:00:00.000Z");
 
   const raceDays = await db.raceDay.findMany({
-    // 2026-09-29 — yurt dışı simulcast fikstürleri (Hippodrome.isForeign, bkz.
-    // tjk.adapter.ts) bu widget'a KARIŞMAZ; kullanıcı talebi yalnız /program görünümüydü.
-    where: { date: { gte: startOfDay(date), lte: endOfDay(date) }, hippodrome: { isForeign: false } },
+    where: { date: { gte: startOfDay(date), lte: endOfDay(date) } },
     include: {
       hippodrome: { select: { name: true, slug: true } },
       races: {
@@ -1057,12 +963,6 @@ export type ProgramDay = {
   id: string;
   hippodromeName: string;
   hippodromeSlug: string;
-  // 2026-09-29 — TJK'nın kendi yurt dışı simulcast fikstürleri (Chantilly, Bath, ...) de
-  // /program'a eklendi (kullanıcı talebi); isForeign=true olan günlerde hiç analiz/kupon
-  // üretilmez (V5.46'nın sinyalleri TR'ye özel), yalnız TJK'nın kendi program+sonuç+AGF
-  // verisi gösterilir — bkz. ProgramView.tsx.
-  isForeign: boolean;
-  country: string | null;
   races: ProgramRace[];
   surfaceConditions: { label: string; detail: string }[] | null;
   weather: string | null;
@@ -1081,7 +981,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     // DEĞİŞTİRMEDEN yalnız round-trip sayısını azaltıyor — yerelde 8.3sn'den 3.4sn'ye indi.
     relationLoadStrategy: "join",
     include: {
-      hippodrome: { select: { name: true, slug: true, isForeign: true, country: true } },
+      hippodrome: { select: { name: true, slug: true } },
       races: {
         orderBy: { raceNo: "asc" },
         include: {
@@ -1217,8 +1117,6 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     id: rd.id,
     hippodromeName: rd.hippodrome.name,
     hippodromeSlug: rd.hippodrome.slug,
-    isForeign: rd.hippodrome.isForeign,
-    country: rd.hippodrome.country,
     surfaceConditions: (rd.surfaceConditions as { label: string; detail: string }[] | null) ?? null,
     weather: rd.weather,
     races: rd.races.map((r) => {

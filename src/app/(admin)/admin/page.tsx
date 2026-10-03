@@ -12,15 +12,14 @@ import { getV5SinyalPerformansi, getV5SinyalPerformansiKosuTipineGore } from "@/
 import { getAnalizPerformansOzeti } from "@/server/services/analiz-performans.service";
 import { getVersiyonKarsilastirmasi } from "@/server/services/analiz-versiyon-karsilastirma.service";
 import { getAgfTrendIstatistik } from "@/server/services/agf-trend-istatistik.service";
-import { getAylikKuponKazanci, getKuponRoiOzeti } from "@/server/services/race.service";
+import { getAylikKuponKazanci } from "@/server/services/race.service";
 import v5WeightsDusukSart from "@/lib/methodology/weights/v5-weights-dusuksart.json";
 import v5WeightsDiger from "@/lib/methodology/weights/v5-weights-diger.json";
 import PerformanceBreakdown from "@/components/admin/PerformanceBreakdown";
 import CouponTierChart from "@/components/admin/CouponTierChart";
 import PerformansDenetimiPanel from "@/components/admin/PerformansDenetimiPanel";
 import SinyalKutuguPanel from "@/components/admin/SinyalKutuguPanel";
-import AylikKuponKazanciCard from "@/components/home/AylikKuponKazanciCard";
-import KuponRoiCard from "@/components/admin/KuponRoiCard";
+import AylikKuponKazanciCard from "@/components/admin/AylikKuponKazanciCard";
 import type { CouponTierBreakdown } from "@/server/services/admin.service";
 import NarrativeSummary from "@/components/admin/NarrativeSummary";
 import AgfEdgeCard from "@/components/admin/AgfEdgeCard";
@@ -37,7 +36,7 @@ export default async function AdminDashboard() {
   const [
     stats, analyst, recentPredictions, pendingPredictions, raceStyleStats,
     archiveStats, agfEdge, v5SinyalPerformansi, performansOzeti, versiyonKarsilastirmasi, agfTrendIstatistik,
-    aylikKuponKazanci, v5SinyalPerformansiKosuTipineGore, gunlukBasariOzeti, kuponRoiOzeti,
+    aylikKuponKazanci, v5SinyalPerformansiKosuTipineGore, gunlukBasariOzeti,
   ] = await Promise.all([
     getDashboardStats(),
     // 2026-08-30 kullanıcı talebi ("v5'e kilitlensin"): /admin/analizler ve /admin/kupon
@@ -59,7 +58,6 @@ export default async function AdminDashboard() {
     getAylikKuponKazanci(),
     getV5SinyalPerformansiKosuTipineGore(),
     getGunlukBasariOzeti(),
-    getKuponRoiOzeti(),
   ]);
   // V5.3 (2026-08-21): motor artık koşu kategorisine göre İKİ AYRI eğitilmiş modelden
   // birini kullanıyor (şartlı1/19/27+maiden vs diğer) — bkz. v5-engine.ts üstündeki not.
@@ -145,11 +143,6 @@ export default async function AdminDashboard() {
           2026-08-24 kullanıcı talebi: "dashboard'ta aylık kupon kazancında olsun,
           her tutan kupon ilgili ayın kazancına eklenecek". */}
       <AylikKuponKazanciCard aylar={aylikKuponKazanci} />
-
-      {/* ── Harcanan vs Kazanç (ROI) ───────────────────────────────────
-          2026-09-17 kullanıcı talebi: yalnız admin görsün (kamuya açık sayfalarda
-          bağlamsız ROI% yanıltıcı olabilir, bkz. KuponRoiCard.tsx). */}
-      <KuponRoiCard ozeti={kuponRoiOzeti} />
 
       {/* ── Performans Denetimi ──────────────────────────────────────
           2026-08-17 kullanıcı talebi: eskiden ayrı /admin/performans sayfasındaydı,

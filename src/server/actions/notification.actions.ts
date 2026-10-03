@@ -54,24 +54,6 @@ export async function notifyAdminsNewUser(userId: string) {
   });
 }
 
-export async function notifyAdminsArticleLiked(articleId: string, likerName: string) {
-  const article = await db.article.findUnique({ where: { id: articleId }, select: { title: true, slug: true } });
-  if (!article) return;
-
-  const admins = await db.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
-  if (admins.length === 0) return;
-
-  await db.notification.createMany({
-    data: admins.map((a) => ({
-      userId: a.id,
-      type: "SYSTEM" as const,
-      title: "Makale beğenildi",
-      body: `${likerName}, "${article.title}" makalesini beğendi.`,
-      link: `/makaleler/${article.slug}`,
-    })),
-  });
-}
-
 export async function notifyNewPrediction(predictionId: string) {
   const pred = await db.prediction.findUnique({
     where: { id: predictionId },

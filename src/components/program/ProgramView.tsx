@@ -9,9 +9,10 @@ import { useLocaleSwitch } from "@/components/providers/LocaleProvider";
 import { EKURI_COLORS, ekuriRengi } from "@/lib/ekuri-colors";
 import { ChevronDown, ChevronUp, Star, Info, Radio } from "lucide-react";
 import type { ProgramDay, ProgramRace, ProgramRunner, ProgramPick } from "@/server/services/race.service";
+import { kararOku, puanYuzdesiMetni } from "@/lib/methodology/muhakeme-format";
+import { siraliPickSatirlari } from "@/lib/methodology/pick-display-order";
+import { agfSiraMapOlustur } from "@/lib/agf-sira";
 import { toggleHorseFollow } from "@/server/actions/horse-follow";
-import SiralamaRaceView from "@/components/kosular/SiralamaRaceView";
-import { programKosusuToSiralama } from "@/components/kosular/siralama-tipleri";
 import HorseDetailModal from "./HorseDetailModal";
 import HipodromOzellikleriModal from "./HipodromOzellikleriModal";
 import EmailVerificationGate from "./EmailVerificationGate";
@@ -32,8 +33,6 @@ const ComparisonPanel = dynamic(() => import("./panels/ComparisonPanel"), { load
 const H2HPanel = dynamic(() => import("./panels/H2HPanel"), { loading: () => PANEL_LOADING, ssr: false });
 const SonYarisDetayPanel = dynamic(() => import("./panels/SonYarisDetayPanel"), { loading: () => PANEL_LOADING, ssr: false });
 const AtDetaylariPanel = dynamic(() => import("./panels/AtDetaylariPanel"), { loading: () => PANEL_LOADING, ssr: false });
-// Analiz Motoru YD V1.0 — TR panellerinden AYRI dosya (bkz. panels/YdAnalysisPanel.tsx).
-const YdAnalysisPanel = dynamic(() => import("./panels/YdAnalysisPanel"), { loading: () => PANEL_LOADING, ssr: false });
 
 // Detay paneli açma/kapama butonları (Son 800/Galop/Pedigriler/H2H/Karşılaştır/Son Yarış Detayları) —
 // her biri farklı renkteyken karmaşık görünüyordu; artık hepsi tek tip, sadece açık/kapalı
@@ -54,80 +53,6 @@ const SURFACE_TAB_BG: Record<string, string> = {
   KUM: "bg-[#996633] hover:bg-[#a8754a] text-white",
   SENTETIK: "bg-[#D39B1E] hover:bg-[#e0ab3a] text-white",
 };
-
-// ── Yurt dışı hipodrom sekmesi: ülke bayrağı + kısa isim ────────────────────────
-// 2026-09-29 — kullanıcı bulgusu: unicode bayrak EMOJİ'leri (🇫🇷 vb.) bazı ortamlarda
-// (emoji fontu eksikse) "FR"/"GB" gibi düz harflere düşüyor, güvenilir değil. Bunun
-// yerine flagcdn.com'un (ücretsiz, API-key'siz, yaygın kullanılan) SVG bayraklarını
-// <img> ile gösteriyoruz — fonttan bağımsız, her cihazda AYNI görünür. ISO 3166-1
-// alpha-2 kodları tjk.adapter.ts'teki YABANCI_ULKELER listesiyle BİREBİR AYNI SIRADA
-// tutulmalı (Hippodrome.country oradan geliyor); yeni bir ülke eklenirse ikisi de
-// güncellenmeli, aksi halde o hipodromun bayrağı çıkmaz (nötr 🏳 yedeğe düşer).
-const ULKE_KODU: Record<string, string> = {
-  "Fransa": "fr", "Birleşik Krallık": "gb", "İngiltere": "gb", "İskoçya": "gb",
-  "İrlanda": "ie", "Kanada": "ca", "ABD": "us", "Amerika Birleşik Devletleri": "us",
-  "Şili": "cl", "Arjantin": "ar", "Brezilya": "br", "Almanya": "de", "İtalya": "it",
-  "İspanya": "es", "Avustralya": "au", "Yeni Zelanda": "nz", "Güney Afrika": "za",
-  "Japonya": "jp", "Hong Kong": "hk", "Singapur": "sg", "Suudi Arabistan": "sa",
-  "Katar": "qa", "Birleşik Arap Emirlikleri": "ae", "BAE": "ae", "Malezya": "my",
-  "Hindistan": "in", "Norveç": "no", "İsveç": "se", "Danimarka": "dk", "Belçika": "be",
-  "Hollanda": "nl", "Türkiye": "tr",
-};
-
-function UlkeBayragi({ country }: { country: string | null }) {
-  const kod = country ? ULKE_KODU[country] : undefined;
-  if (!kod) return <span aria-hidden="true">🏳</span>;
-  return (
-    <img
-      src={`https://flagcdn.com/${kod}.svg`}
-      alt={country ?? ""}
-      className="inline-block h-3 w-4 shrink-0 rounded-[1px] object-cover align-[-1px]"
-      loading="lazy"
-    />
-  );
-}
-
-/** "Chantilly Fransa" → "Chantilly" (country son eki kırpılır — sekme kısa kalsın diye,
- *  ülke zaten bayrakla gösteriliyor). country eşleşmezse (nadiren) TAM isim korunur. */
-function kisaHipodromAdi(hippodromeName: string, country: string | null): string {
-  if (!country) return hippodromeName;
-  return hippodromeName.endsWith(` ${country}`) ? hippodromeName.slice(0, -(country.length + 1)) : hippodromeName;
-}
-
-// ── Gece yarısını aşan koşu saatleri (yurt dışı hipodromlar) ─────────────────────
-// 2026-09-29 kullanıcı bulgusu: Horseshoe Indianapolis'in 7./8. koşuları TR saatiyle
-// 00.16/00.47'ye denk geliyor (ABD saati TR'ye çevrilince gece yarısını aşıyor) — TJK
-// bunu "ertesi gün" işareti KOYMADAN düz "00.16" yazıyor (doğrulandı: 6. koşu 23.45,
-// 7. koşu 00.16, aynı günün devamı). RaceDay.date TEK bir gün olduğu için (TR
-// hipodromlarında hiç gün taşması olmadığından bu güne kadar hiç sorun çıkmamıştı),
-// saat bir önceki koşudan KÜÇÜLDÜĞÜNDE o koşudan itibaren geri sayım/"Başladı"
-// hesaplaması RaceDay.date+1 GÜN üzerinden yapılmalı — yoksa henüz başlamamış bir
-// koşu "Başladı" (geçmiş) sanılır. Şema DEĞİŞMEDİ (Race.time hâlâ "HH:mm" string),
-// bu SADECE gösterim/hesaplama katmanında bir düzeltme.
-function raceGunOffsetleriHesapla(races: { raceNo: number; time: string | null }[]): Map<number, number> {
-  const offsets = new Map<number, number>();
-  let prevMinutes: number | null = null;
-  let offset = 0;
-  for (const r of [...races].sort((a, b) => a.raceNo - b.raceNo)) {
-    if (r.time) {
-      const [h, m] = r.time.replace(".", ":").split(":").map(Number);
-      if (!isNaN(h) && !isNaN(m)) {
-        const minutes = h * 60 + m;
-        if (prevMinutes != null && minutes < prevMinutes) offset++;
-        prevMinutes = minutes;
-      }
-    }
-    offsets.set(r.raceNo, offset);
-  }
-  return offsets;
-}
-
-function raceEffectiveDateStr(dateStr: string, offsetGun: number): string {
-  if (offsetGun === 0) return dateStr;
-  const d = new Date(dateStr + "T00:00:00.000Z");
-  d.setUTCDate(d.getUTCDate() + offsetGun);
-  return d.toISOString().slice(0, 10);
-}
 
 // ── Geri sayım (Turkey UTC+3) ────────────────────────────────────────────────
 
@@ -410,9 +335,26 @@ function PistMesafeInfoButton({
   );
 }
 
+function rankStyle(rank: number) {
+  if (rank <= 3) return { badge: "bg-[#27ae60] text-white", text: "text-[#27ae60]" };
+  if (rank <= 6) return { badge: "bg-brand text-brand-foreground", text: "text-brand" };
+  return { badge: "bg-muted text-muted-foreground", text: "text-muted-foreground" };
+}
+
 function pickDisplay(p: ProgramPick): { no: number | string; name: string } {
   if (p.runner) return { no: p.runner.no, name: p.runner.name };
   return { no: "—", name: p.runnerLabel ?? "—" };
+}
+
+// v6.55 — V2 motorunun (sayısal puanlama yok) picks'lerinde score her zaman null —
+// bunun yerine details'teki "karar" (Güçlü Aday/Orta Risk/...) etiketini göster,
+// PuanTablosu.tsx/InlineAnalysisPanel.tsx'teki aynı desen (bkz. puanHucresi orada).
+// v6.70 (V2.2): details artık iki farklı şekilde (eski string[] / yeni {versiyon:2,...}
+// objesi) gelebiliyor — okuma merkezi muhakeme-format.ts'teki kararOku'ya taşındı.
+function puanHucresi(score: number | null, details: unknown, scoreExact?: number | null): string {
+  const metin = puanYuzdesiMetni(score, scoreExact);
+  if (metin != null) return `%${metin}`;
+  return kararOku(details) ?? "—";
 }
 
 function XLogo({ className }: { className?: string }) {
@@ -484,10 +426,8 @@ function PanelKilitGate({
 // ── Analiz paneli ────────────────────────────────────────────────────────────
 
 function AnalysisPanel({
-  race, picks, runners, winnerNos, ganyan, isLoggedIn, isAdmin, isVerified, userEmail, raceNo, hippodromeName, raceId,
+  picks, runners, winnerNos, ganyan, isLoggedIn, isAdmin, isVerified, userEmail, raceNo, hippodromeName, raceId,
 }: {
-  /** 2026-09-28: sıralama görünümü (SiralamaRaceView) tüm koşu verisini (sonuç, tempo, runner'lar) ister. */
-  race: ProgramRace;
   picks: ProgramPick[];
   runners: ProgramRunner[];
   winnerNos?: number[] | null;
@@ -511,11 +451,41 @@ function AnalysisPanel({
   const unpickedRunners = runners
     .filter((r) => !r.scratched && !pickedNos.has(r.no))
     .sort((a, b) => a.no - b.no);
-  // 2026-09-20 kullanıcı talebi: kupon kaydedildikten SONRA o attaki bir isim çekilirse,
-  // kaydedilen pick/kupon numarası değişmiyordu ama at artık koşmuyor. runners'ın GÜNCEL
-  // (canlı) durumundan geliyor — picks sabit kaldığı için aradaki farkı yakalayabiliyor.
-  const scratchedNos = new Set(runners.filter((r) => r.scratched).map((r) => r.no));
 
+  // 2026-09-10 kullanıcı talebi: PuanTablosu.tsx'teki gibi, admin için at adının yanında
+  // o koşudaki AGF sırası da görünsün — yalnız admin (bkz. agf-sira.ts'teki gerekçe).
+  const agfSiraMap = agfSiraMapOlustur(runners);
+
+  // 2026-09-01 kullanıcı talebi: "sıralama yaparken de yer kaplamasın, eküriler yan yana
+  // belirtilsin" — Analiz Detayları tablosunda iki eküri ortağı AYRI satır olarak iki kat
+  // yer kaplamasın, aynı satırda birlikte gösterilsin (No/At/Toplam'ın hepsi "A / B" biçiminde).
+  const ekuriGroupByNo = new Map<number, number>();
+  runners.forEach((r) => { if (r.ekuriGroup != null && r.ekuriGroup >= 1) ekuriGroupByNo.set(r.no, r.ekuriGroup); });
+  const renderedPickNos = new Set<number>();
+  const pickRows: ProgramPick[][] = [];
+  for (const p of picks) {
+    const no = p.runner?.no;
+    if (no != null && renderedPickNos.has(no)) continue;
+    const grp = no != null ? ekuriGroupByNo.get(no) : undefined;
+    const partner = grp != null
+      ? picks.find((q) => q !== p && q.runner?.no != null && !renderedPickNos.has(q.runner.no) && ekuriGroupByNo.get(q.runner.no) === grp)
+      : undefined;
+    if (no != null) renderedPickNos.add(no);
+    if (partner?.runner?.no != null) {
+      renderedPickNos.add(partner.runner.no);
+      pickRows.push([p, partner]);
+    } else {
+      pickRows.push([p]);
+    }
+  }
+
+  // 2026-09-05 kullanıcı talebi: bu tablodaki gösterim sırası artık HER ZAMAN yüzdesel
+  // (Toplam/score) yüksekten azalana göre — terfi/garanti mekanizmalarının admin tarafında
+  // tuttuğu Sıra (rank, gösterim amaçlı kasıtlı olarak ham olasılıktan sapabiliyor) burada
+  // KULLANILMIYOR. displayRank zaten aşağıda dizideki konumdan (rowIdx+1) hesaplanıyor, bu
+  // yüzden diziyi puana göre sıralamak yeterli. Bkz. pick-display-order.ts'in başındaki not
+  // — bu AYNI sıralama PuanTablosu.tsx'te de gerekiyordu, artık tek yerden.
+  const sortedPickRows = siraliPickSatirlari(pickRows);
 
   // v6.68 — kullanıcı talebi 2026-08-09: "link istemiyorum direk image üstüne
   // yerleştirilmeli" — eskiden Twitter intent'ine bir URL (link) gönderiliyordu, o da
@@ -607,8 +577,6 @@ function AnalysisPanel({
     );
   }
 
-  const kazananPick = winnerNos && winnerNos.length > 0 ? picks.find((pk) => pk.runner?.no != null && winnerNos.includes(pk.runner.no)) : undefined;
-
   return (
     <div ref={ref} className="border-t">
       {/* Başlık */}
@@ -616,45 +584,116 @@ function AnalysisPanel({
         <span className="text-sm font-bold tracking-wide text-white">Analiz Detayları</span>
       </div>
 
-      {/* 2026-09-28 kullanıcı talebi: "/rotaganyansiralamasi'ndaki yapı, Analiz Yayında tıklandığında açılsın" —
-          eski Sıra/No/At/Toplam tablosu yerine o sayfayla AYNI paylaşılan bileşen (karar hero'su + sıralama
-          listesi). Yan sütunda bu koşuya özgü kademeli Kupon Önerisi (önceki paneldeki mantık aynen). */}
-      {isAdmin && kazananPick && (
-        <div className="flex flex-wrap items-center gap-2 border-b bg-[#f5c518]/10 px-4 py-1.5 text-xs print:hidden">
-          <span className="text-muted-foreground">{t("sonucLabel")}</span>
-          <span className="font-semibold text-winner">#{pickDisplay(kazananPick).no} {pickDisplay(kazananPick).name}</span>
-          {ganyan != null && <span className="text-[10px] font-semibold text-winner">Gny: {ganyan.toFixed(2)}</span>}
-          <button
-            type="button"
-            onClick={() => handleShare("instagram")}
-            title={t("instagramdaPaylas")}
-            aria-label={t("instagramdaPaylas")}
-            className="flex h-4 w-4 shrink-0 items-center justify-center rounded transition-colors hover:bg-foreground/15"
-          >
-            <InstagramLogo className="h-3 w-3" />
-          </button>
-          <button
-            type="button"
-            onClick={() => handleShare("x")}
-            title={t("xtePaylas")}
-            aria-label={t("xtePaylas")}
-            className="flex h-4 w-4 shrink-0 items-center justify-center rounded transition-colors hover:bg-foreground/15"
-          >
-            <XLogo className="h-3 w-3" />
-          </button>
-        </div>
-      )}
+      {/* Masaüstü tablo — Kilit Gerekçe sütunu kaldırıldıktan sonra "At" tek esnek sütun kaldı;
+          w-full bırakılırsa geniş ekranlarda tüm sayfa genişliğine gerip Toplam'ı sağ kenara
+          fırlatıyordu (kullanıcı ekran görüntüsü) — max-w ile tablo doğal genişliğine sabitlendi.
+          v6.59 — V2 motorunun "Düşük Risk/Yüksek Risk" gibi uzun karar etiketleri eski dar
+          sayısal Toplam sütununda (w-14) satır içi kırılıyordu; max-w de büyütülerek boşluk
+          azaltıldı (kullanıcı ekran görüntüsü, 2026-08-04). */}
+      <div className="hidden sm:flex overflow-x-auto">
+        <table className="w-full max-w-xl shrink-0 text-xs">
+          <thead>
+            <tr className="border-b bg-muted/60 text-[11px] text-muted-foreground">
+              <th className="px-2 py-2 text-center w-8">{t("sira")}</th>
+              <th className="px-2 py-2 text-center w-8">{t("no")}</th>
+              <th className="px-2 py-2 text-left">{t("at")}</th>
+              <th className="px-2 py-2 text-center w-24 font-bold whitespace-nowrap">{t("toplam")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedPickRows.map((rowPicks, rowIdx) => {
+              const first = rowPicks[0];
+              // 2026-09-01 kullanıcı talebi: eküri ortağı aynı satırda birleşince, SONRAKİ
+              // atların gösterilen sırası da yukarı kaysın (ör. 7 at → eküri birleşince 6
+              // satır, Barbuda 7.den 6.ya çıkar) — rozet/renk artık pick.rank DEĞİL, birleşmiş
+              // listedeki SIRALI konum (rowIdx+1). İyi olan ortak İLK yazılır (picks zaten
+              // rank sırasına göre taranıp eşleştiği için doğal olarak öyle geliyor).
+              const displayRank = rowIdx + 1;
+              const winnerPick = rowPicks.find((p) => p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no));
+              const isWinner = winnerPick != null;
+              const rs = rankStyle(displayRank);
+              const noText = rowPicks.map((p) => pickDisplay(p).no).join("-");
+              const nameText = rowPicks.map((p) => pickDisplay(p).name).join(" / ");
+              const agfRanks = rowPicks
+                .map((p) => (p.runner?.no != null ? agfSiraMap.get(p.runner.no) : null))
+                .filter((n): n is number => n != null);
+              return (
+                <tr key={first.rank} className={cn("border-b last:border-0", isWinner && "bg-[#f5c518]/10")}>
+                  <td className="px-2 py-2 text-center">
+                    <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold", rs.badge)}>
+                      {displayRank}
+                    </span>
+                  </td>
+                  <td className={cn("px-2 py-2 text-center font-mono font-bold whitespace-nowrap", isWinner ? "text-winner" : rs.text)}>{noText}</td>
+                  <td className={cn("px-2 py-2 font-semibold", isWinner ? "text-winner" : rs.text)}>
+                    <span className="inline-flex items-center gap-1.5">
+                      {nameText}
+                      {isAdmin && agfRanks.length > 0 && (
+                        <span className="rounded bg-purple-500/15 px-1 text-[9px] font-semibold text-purple-500">
+                          AGF {agfRanks.join("/")}.
+                        </span>
+                      )}
+                      {isWinner && ganyan != null && (
+                        <span className="text-[10px] font-semibold text-winner">Gny: {ganyan.toFixed(2)}</span>
+                      )}
+                      {isWinner && isAdmin && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleShare("instagram")}
+                            title={t("instagramdaPaylas")}
+                            aria-label={t("instagramdaPaylas")}
+                            className="flex items-center justify-center w-4 h-4 rounded hover:bg-foreground/15 transition-colors shrink-0 print:hidden"
+                          >
+                            <InstagramLogo className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleShare("x")}
+                            title={t("xtePaylas")}
+                            aria-label={t("xtePaylas")}
+                            className="flex items-center justify-center w-4 h-4 rounded hover:bg-foreground/15 transition-colors shrink-0 print:hidden"
+                          >
+                            <XLogo className="h-3 w-3" />
+                          </button>
+                        </>
+                      )}
+                    </span>
+                  </td>
+                  <td className="px-2 py-2 text-center tabular-nums font-bold whitespace-nowrap">
+                    <span>{rowPicks.map((p) => puanHucresi(p.score, p.details, p.scoreExact)).join(" / ")}</span>
+                  </td>
+                </tr>
+              );
+            })}
+            {unpickedRunners.map((r) => (
+              <tr key={`geniş-${r.no}`} className="border-b last:border-0 opacity-60">
+                <td className="px-2 py-2 text-center text-muted-foreground">—</td>
+                <td className="px-2 py-2 text-center font-mono text-muted-foreground">{r.no}</td>
+                <td className="px-2 py-2 text-muted-foreground">{r.name}</td>
+                <td className="px-2 py-2 text-center text-muted-foreground">—</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-      <div className="p-3 sm:p-4">
-        <SiralamaRaceView
-          raceKey={raceId}
-          race={programKosusuToSiralama(race)}
-          tempoSenaryosu={race.tempoSenaryosu}
-          yan={
-            picks.length > 0 || unpickedRunners.length > 0 ? (
-              <div className="rounded-2xl border bg-card px-4 py-3">
-                <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{t("kuponOnerisi")}</div>
-                <div className="space-y-2">
+        {/* Kupon Önerisi — kullanıcı talebi 2026-08-09: tablo max-w-xl'e sabitlendiği için
+            geniş ekranlarda sağda boş kalan alan, bu tablonun HEMEN yanında en doğal
+            tamamlayıcı bilgiyle (kademeli kupon önerisi) dolduruluyor. Kademe sınırı sabit
+            ve basit: Ekonomik ilk 3, Normal 4-5-6, Geniş 7 ve sonrası (unpickedRunners
+            dahil — Faz4 yalnız ilk 3-6 atı "pick" olarak kaydediyor, geri kalan saha zaten
+            unpickedRunners'ta). Ayrı depolanan couponNarrow/Normal/Wide string'lerine değil,
+            DOĞRUDAN bu tablodaki sırayla AYNI diziye dayanıyor — asla çelişmez.
+            v6.102 — kullanıcı talebi 2026-08-11: her kademe bir öncekini İÇERMELİ (Normal
+            = Ekonomik'in üstüne 4-5-6 ekler, Geniş = ikisinin üstüne 7+ ekler) — kademeler
+            artık ayrık dilimler değil, "/" ile ayrılmış KÜMÜLATİF gruplar halinde gösteriliyor.
+        */}
+        {(picks.length > 0 || unpickedRunners.length > 0) && (
+          <div className="flex-1 min-w-[150px] border-l px-4 py-3">
+            <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              {t("kuponOnerisi")}
+            </div>
+            <div className="space-y-2">
               {(() => {
                 const ekonomikNos = picks.slice(0, 3).map((p) => p.runner?.no).filter((n): n is number => n != null);
                 const normalEkNos = picks.slice(3, 6).map((p) => p.runner?.no).filter((n): n is number => n != null);
@@ -662,35 +701,91 @@ function AnalysisPanel({
                   ...picks.slice(6).map((p) => p.runner?.no).filter((n): n is number => n != null),
                   ...unpickedRunners.map((r) => r.no),
                 ].sort((a, b) => a - b);
-                const gruplar = [ekonomikNos, normalEkNos, genisEkNos];
-                const parcalar = gruplar.map((g) => (g.length > 0 ? g.join("-") : null));
+                const parcalar = [ekonomikNos, normalEkNos, genisEkNos].map((g) => (g.length > 0 ? g.join("-") : null));
                 const tiers = [
-                  { label: t("ekonomik"), color: "text-hit", metin: parcalar.slice(0, 1).filter(Boolean).join(" / "), nos: gruplar.slice(0, 1).flat() },
-                  { label: t("normal"), color: "text-brand", metin: parcalar.slice(0, 2).filter(Boolean).join(" / "), nos: gruplar.slice(0, 2).flat() },
-                  { label: t("genis"), color: "text-muted-foreground", metin: parcalar.slice(0, 3).filter(Boolean).join(" / "), nos: gruplar.slice(0, 3).flat() },
+                  { label: t("ekonomik"), color: "text-hit", metin: parcalar.slice(0, 1).filter(Boolean).join(" / ") },
+                  { label: t("normal"), color: "text-brand", metin: parcalar.slice(0, 2).filter(Boolean).join(" / ") },
+                  { label: t("genis"), color: "text-muted-foreground", metin: parcalar.slice(0, 3).filter(Boolean).join(" / ") },
                 ];
-                return tiers.map((tier) => {
-                  const cekilenler = tier.nos.filter((no) => scratchedNos.has(no));
-                  return (
-                    <div key={tier.label}>
-                      <div className="flex items-baseline gap-2">
-                        <span className={cn("w-14 shrink-0 text-[10px] font-bold uppercase", tier.color)}>{tier.label}</span>
-                        <span className="font-mono text-xs font-semibold tabular-nums">{tier.metin || "—"}</span>
-                      </div>
-                      {cekilenler.length > 0 && (
-                        <p className="pl-16 text-[10px] font-medium text-red-400">
-                          {t("kuponAtCekildiUyari", { nos: cekilenler.join(", #") })}
-                        </p>
-                      )}
-                    </div>
-                  );
-                });
+                return tiers.map((tier) => (
+                  <div key={tier.label} className="flex items-baseline gap-2">
+                    <span className={cn("w-14 shrink-0 text-[10px] font-bold uppercase", tier.color)}>{tier.label}</span>
+                    <span className="font-mono text-xs font-semibold tabular-nums">{tier.metin || "—"}</span>
+                  </div>
+                ));
               })()}
-                </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Mobil kart listesi */}
+      <div className="sm:hidden divide-y">
+        {sortedPickRows.map((rowPicks, rowIdx) => {
+          const first = rowPicks[0];
+          const displayRank = rowIdx + 1;
+          const winnerPick = rowPicks.find((p) => p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no));
+          const isWinner = winnerPick != null;
+          const rs = rankStyle(displayRank);
+          const noText = rowPicks.map((p) => pickDisplay(p).no).join("-");
+          const nameText = rowPicks.map((p) => pickDisplay(p).name).join(" / ");
+          const agfRanks = rowPicks
+            .map((p) => (p.runner?.no != null ? agfSiraMap.get(p.runner.no) : null))
+            .filter((n): n is number => n != null);
+          return (
+            <div key={first.rank} className={cn("px-3 py-2.5", isWinner && "bg-[#f5c518]/10")}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className={cn("inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0", rs.badge)}>
+                  {displayRank}
+                </span>
+                <span className={cn("font-bold text-xs", isWinner ? "text-winner" : rs.text)}>#{noText}</span>
+                <span className={cn("font-semibold text-xs", isWinner ? "text-winner" : rs.text)}>{nameText}</span>
+                {isAdmin && agfRanks.length > 0 && (
+                  <span className="rounded bg-purple-500/15 px-1 text-[9px] font-semibold text-purple-500 shrink-0">
+                    AGF {agfRanks.join("/")}.
+                  </span>
+                )}
+                {isWinner && ganyan != null && (
+                  <span className="text-[10px] font-semibold text-winner">Gny: {ganyan.toFixed(2)}</span>
+                )}
+                {isWinner && isAdmin && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleShare("instagram")}
+                      title={t("instagramdaPaylas")}
+                      aria-label={t("instagramdaPaylas")}
+                      className="flex items-center justify-center w-4 h-4 rounded hover:bg-foreground/15 transition-colors shrink-0"
+                    >
+                      <InstagramLogo className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleShare("x")}
+                      title={t("xtePaylas")}
+                      aria-label={t("xtePaylas")}
+                      className="flex items-center justify-center w-4 h-4 rounded hover:bg-foreground/15 transition-colors shrink-0"
+                    >
+                      <XLogo className="h-3 w-3" />
+                    </button>
+                  </>
+                )}
               </div>
-            ) : null
-          }
-        />
+              <div className="flex gap-3 text-[11px] text-muted-foreground mb-1">
+                <span>{t("toplamPrefix")} <span className="font-bold text-foreground">{rowPicks.map((p) => puanHucresi(p.score, p.details, p.scoreExact)).join(" / ")}</span></span>
+              </div>
+            </div>
+          );
+        })}
+        {unpickedRunners.map((r) => (
+          <div key={`geniş-${r.no}`} className="px-3 py-2.5 opacity-60">
+            <div className="flex items-center gap-2">
+              <span className="w-5 shrink-0 text-center text-[10px] font-bold text-muted-foreground">—</span>
+              <span className="font-bold text-xs text-muted-foreground">#{r.no}</span>
+              <span className="font-semibold text-xs text-muted-foreground">{r.name}</span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1163,14 +1258,12 @@ type JockeyStatsMap = Record<string, {
 type TrainerStatsMap = Record<string, TrainerStatRow>;
 
 function RaceTable({
-  race, dateStr, analysisOpen, onAnalysisToggle, ydAnalysisOpen, son800Open, agfTrendOpen, galopOpen, pedigreeOpen, comparisonOpen, h2hOpen, sonYarisOpen, atDetayOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, isVerified, userEmail, jockeyStats, trainerStats, hippodromeName,
+  race, dateStr, analysisOpen, onAnalysisToggle, son800Open, agfTrendOpen, galopOpen, pedigreeOpen, comparisonOpen, h2hOpen, sonYarisOpen, atDetayOpen, followedSet, onToggleFollow, onSelectHorse, isLoggedIn, isAdmin, isVerified, userEmail, jockeyStats, trainerStats, hippodromeName,
 }: {
   race: ProgramRace;
   dateStr: string;
   analysisOpen: boolean;
   onAnalysisToggle: () => void;
-  // Analiz Motoru YD V1.0 — TR'nin analysisOpen'ından AYRI, bkz. üstteki state notu.
-  ydAnalysisOpen: boolean;
   son800Open: boolean;
   agfTrendOpen: boolean;
   galopOpen: boolean;
@@ -1359,7 +1452,6 @@ function RaceTable({
       <div id="panel-analiz" className="scroll-mt-14">
         {race.hasAnalysis && analysisOpen && (
           <AnalysisPanel
-            race={race}
             picks={race.picks}
             runners={race.runners}
             winnerNos={winnerNos}
@@ -1373,10 +1465,6 @@ function RaceTable({
             raceId={race.id}
           />
         )}
-      </div>
-      {/* Analiz Motoru YD V1.0 paneli — TR'nin AnalysisPanel'inden TAMAMEN AYRI bileşen */}
-      <div id="panel-yd-analiz" className="scroll-mt-14">
-        {ydAnalysisOpen && <YdAnalysisPanel raceId={race.id} />}
       </div>
       <div id="panel-son-yaris-detay" className="scroll-mt-14">
         {sonYarisOpen && (
@@ -1465,10 +1553,6 @@ export default function ProgramView({
     if (activeHipo) localStorage.setItem(LAST_HIPO_STORAGE_KEY, activeHipo);
   }, [activeHipo]);
   const [analysisOpen, setAnalysisOpen] = useState(false);
-  // Analiz Motoru YD V1.0 (yurt dışı) — TR'nin analysisOpen'ından TAMAMEN AYRI state,
-  // kullanıcı kararı 2026-09-30: "V5.46 nın alt yapısına benzer bir yapı" ama TR koduyla
-  // hiç bağlantısı olmayacak.
-  const [ydAnalysisOpen, setYdAnalysisOpen] = useState(false);
   const [son800Open, setSon800Open] = useState(false);
   const [agfTrendOpen, setAgfTrendOpen] = useState(false);
   const [galopOpen, setGalopOpen] = useState(false);
@@ -1556,9 +1640,6 @@ export default function ProgramView({
 
   const raceNo = selectedRaceNo(currentDay!);
   const currentRace = currentDay?.races.find((r) => r.raceNo === raceNo) ?? currentDay?.races[0];
-  // bkz. raceGunOffsetleriHesapla üstündeki not — yurt dışı hipodromlarda gece yarısını
-  // aşan koşuların geri sayımı/"Başladı" durumu bu offsetsiz YANLIŞ hesaplanır.
-  const gunOffsetleri = raceGunOffsetleriHesapla(currentDay?.races ?? []);
 
   // Yarış veya hipodrom değişince analiz/son800/galop panelini kapat
   useEffect(() => {
@@ -1579,102 +1660,78 @@ export default function ProgramView({
     );
   }
 
-  // 2026-09-29 kullanıcı talebi: hipodrom sekmeleri (a) yatay kaydırma OLMADAN tek sayfaya
-  // sığsın — flex-wrap ile taşan sekmeler alt satıra iner, sayfa yatay kaymaz; (b) TR
-  // hipodromları önce/yan yana, yurt dışı fikstürler SONRA (isForeign'a göre kararlı sort —
-  // JS'in Array.sort'u kararlı olduğu için her iki grubun kendi içindeki [DB'den gelen
-  // alfabetik] sırası korunur); (c) yurt dışı sekmelerin başında hangi ÜLKEYE aitlerse o
-  // ülkenin bayrağı (Hippodrome.country, bkz. tjk.adapter.ts'teki YABANCI_ULKELER — bu
-  // liste ile BİREBİR aynı sırada tutulmalı) + isim ülke son eki kırpılmış kısa haliyle
-  // ("Chantilly Fransa" yerine "🇫🇷 Chantilly") — uzun isimler sekmeyi gereksiz genişletmesin.
-  const sortedDays = [...days].sort((a, b) => Number(a.isForeign) - Number(b.isForeign));
-  const ilkYabanciIndex = sortedDays.findIndex((d) => d.isForeign);
-
   return (
     <div className="flex flex-col">
       {/* Hipodrom tab'ları */}
-      <div className="flex flex-wrap gap-1 border-b bg-muted/30 px-1 py-1 shrink-0 print:hidden">
-        {sortedDays.map((d, i) => (
+      <div className="flex overflow-x-auto border-b bg-muted/30 shrink-0 print:hidden">
+        {days.map((d) => (
           <button
             key={d.hippodromeSlug}
             onClick={() => setActiveHipo(d.hippodromeSlug)}
             className={cn(
-              "rounded px-3 py-2 text-sm font-semibold transition-colors whitespace-nowrap",
-              i === ilkYabanciIndex && "ml-1 border-l pl-3.5",
+              "shrink-0 px-4 py-2.5 text-sm font-semibold transition-colors whitespace-nowrap",
               activeHipo === d.hippodromeSlug
                 ? "bg-[#c0392b] text-white"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted"
             )}
           >
-            <span className="inline-flex items-center gap-1.5">
-              <UlkeBayragi country={d.isForeign ? d.country : "Türkiye"} />{" "}
-              {d.isForeign ? kisaHipodromAdi(d.hippodromeName, d.country) : d.hippodromeName}
-            </span>
+            {d.hippodromeName}
           </button>
         ))}
       </div>
 
       {currentDay && (
         <>
-          {/* Koşu tab'ları + Pist durumu/hava — 2026-09-20 kullanıcı talebi: web'de (sm+)
-              aynı satırda, dar mobilde eskisi gibi alt alta. */}
-          <div className="flex flex-col border-b bg-background shrink-0 print:hidden lg:flex-row lg:items-center">
-            {/* Koşu tab'ları — 2026-09-29 kullanıcı talebi (üçüncü tur): mobilde sabit 5 SÜTUNLU
-                grid (her satırda TAM 5 kutucuk — içerik uzunluğuna göre değişken sığdırma
-                DEĞİL, "10. Koşu" gibi uzun etiketler de aynı hücre genişliğinde sarılır).
-                sm+'ta (web) eski flex-wrap tek-satır görünümü korunuyor. */}
-            <div className="grid grid-cols-5 gap-1 p-2 sm:flex sm:flex-wrap lg:flex-1">
-              {currentDay.races.map((r) => (
-                <button
-                  key={r.raceNo}
-                  onClick={() => setActiveRace((prev) => ({ ...prev, [currentDay.hippodromeSlug]: r.raceNo }))}
+          {/* Koşu tab'ları */}
+          <div className="flex overflow-x-auto border-b bg-background shrink-0 print:hidden">
+            {currentDay.races.map((r) => (
+              <button
+                key={r.raceNo}
+                onClick={() => setActiveRace((prev) => ({ ...prev, [currentDay.hippodromeSlug]: r.raceNo }))}
+                className={cn(
+                  "relative shrink-0 px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap",
+                  SURFACE_TAB_BG[r.surface],
+                  selectedRaceNo(currentDay) === r.raceNo
+                    ? "ring-2 ring-inset ring-white shadow-inner"
+                    : "opacity-70 hover:opacity-100"
+                )}
+              >
+                {t("raceNoLabel", { no: r.raceNo })}
+                {r.hasAnalysis && (
+                  <span className="absolute top-1 right-0.5 w-1.5 h-1.5 rounded-full bg-[#27ae60] ring-1 ring-white" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Pist durumu + hava (TJK) */}
+          {((currentDay.surfaceConditions?.length ?? 0) > 0 || currentDay.weather || currentRace) && (
+            <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 bg-muted/10 border-b text-[11px]">
+              {currentDay.surfaceConditions?.map((c, i) => (
+                <span
+                  key={i}
                   className={cn(
-                    "relative rounded-lg border px-1.5 py-2 text-center text-xs font-semibold transition-all sm:px-3 sm:whitespace-nowrap",
-                    SURFACE_TAB_BG[r.surface],
-                    selectedRaceNo(currentDay) === r.raceNo
-                      ? "border-white shadow-inner"
-                      : "border-black/20 opacity-70 hover:opacity-100"
+                    "rounded border px-1.5 py-0.5 font-medium",
+                    /çim/i.test(c.label) ? "border-[#009900] text-[#009900]"
+                      : /kum/i.test(c.label) ? "border-[#996633] text-[#996633]"
+                      : "border-[#D39B1E] text-[#D39B1E]"
                   )}
                 >
-                  {t("raceNoLabel", { no: r.raceNo })}
-                  {r.hasAnalysis && (
-                    <span className="absolute top-1 right-0.5 w-1.5 h-1.5 rounded-full bg-[#27ae60] ring-1 ring-white" />
-                  )}
-                </button>
+                  {c.label}: {c.detail}
+                </span>
               ))}
+              {currentDay.weather && <span className="text-muted-foreground">{currentDay.weather}</span>}
+              {currentRace && (
+                <button
+                  onClick={() => setHipodromOzellikleriOpen(true)}
+                  data-tour="hipodrom-ozellikleri"
+                  className="sm:hidden ml-auto shrink-0 rounded border px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground whitespace-nowrap"
+                >
+                  {t("hipodromOzellikleri")} {!isLoggedIn && "🔒"}
+                </button>
+              )}
             </div>
-
-            {/* Pist durumu + hava (TJK) */}
-            {((currentDay.surfaceConditions?.length ?? 0) > 0 || currentDay.weather || currentRace) && (
-              // 2026-09-28: web'de (sm+) pist/hava bilgisi sağa yaslı (koşu satırının sonuna); yan yana
-              // yalnız lg+ (≥1024px) — dar/orta genişlikte sekmeler ezilmesin diye kendi satırına iner.
-              <div className="flex flex-wrap items-center gap-2 border-t bg-muted/10 px-3 py-1.5 text-[11px] sm:justify-end sm:text-right lg:border-t-0 lg:border-l lg:bg-transparent">
-                {currentDay.surfaceConditions?.map((c, i) => (
-                  <span
-                    key={i}
-                    className={cn(
-                      "rounded border px-1.5 py-0.5 font-medium",
-                      /çim/i.test(c.label) ? "border-[#009900] text-[#009900]"
-                        : /kum/i.test(c.label) ? "border-[#996633] text-[#996633]"
-                        : "border-[#D39B1E] text-[#D39B1E]"
-                    )}
-                  >
-                    {c.label}: {c.detail}
-                  </span>
-                ))}
-                {currentDay.weather && <span className="text-muted-foreground">{currentDay.weather}</span>}
-                {currentRace && (
-                  <button
-                    onClick={() => setHipodromOzellikleriOpen(true)}
-                    data-tour="hipodrom-ozellikleri"
-                    className="sm:hidden ml-auto shrink-0 rounded border px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground whitespace-nowrap"
-                  >
-                    {t("hipodromOzellikleri")} {!isLoggedIn && "🔒"}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Analiz + geri sayım */}
           <div className="flex items-center px-3 py-1.5 bg-muted/20 border-b text-[11px]">
@@ -1688,14 +1745,6 @@ export default function ProgramView({
                   {isLoggedIn
                     ? <><Radio className="h-3 w-3 animate-pulse" /> {t("analiziGor")} {analysisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}</>
                     : <><Radio className="h-3 w-3 animate-pulse" /> {t("analiziGor")} 🔒</>}
-                </button>
-              ) : currentDay?.isForeign ? (
-                <button
-                  onClick={() => toggleAndScroll(setYdAnalysisOpen, ydAnalysisOpen, "panel-yd-analiz")}
-                  className="flex items-center gap-1 rounded-md bg-[#006D05] px-2.5 py-1 text-xs font-semibold text-[#EFF2F5] transition-opacity hover:opacity-90 shrink-0"
-                >
-                  <Radio className="h-3 w-3 animate-pulse" /> Analiz Motoru YD V1.0{" "}
-                  {ydAnalysisOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 </button>
               ) : (
                 <span className="text-xs font-semibold text-[#e74c3c] shrink-0 whitespace-nowrap">{t("analizHazirlaniyor")}</span>
@@ -1720,7 +1769,7 @@ export default function ProgramView({
               )}
               {currentRace && (
                 <div className="hidden sm:block shrink-0">
-                  <RaceTimer time={currentRace.time} hasResult={currentRace.result != null} dateStr={raceEffectiveDateStr(dateStr, gunOffsetleri.get(currentRace.raceNo) ?? 0)} />
+                  <RaceTimer time={currentRace.time} hasResult={currentRace.result != null} dateStr={dateStr} />
                 </div>
               )}
             </div>
@@ -1730,10 +1779,9 @@ export default function ProgramView({
           {currentRace && (
             <RaceTable
               race={currentRace}
-              dateStr={raceEffectiveDateStr(dateStr, gunOffsetleri.get(currentRace.raceNo) ?? 0)}
+              dateStr={dateStr}
               analysisOpen={analysisOpen}
               onAnalysisToggle={() => setAnalysisOpen((v) => !v)}
-              ydAnalysisOpen={ydAnalysisOpen}
               son800Open={son800Open}
               agfTrendOpen={agfTrendOpen}
               galopOpen={galopOpen}

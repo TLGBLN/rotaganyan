@@ -287,10 +287,7 @@ export type ModelRow = {
 
 async function main() {
   const races = await db.race.findMany({
-    // 2026-09-29 — isForeign (TJK'nın yurt dışı simulcast fikstürleri, bkz. tjk.adapter.ts)
-    // de hariç: TR'ye özel sinyaller (hız/jokey/antrenör/sire oranı) yabancı at/jokey için
-    // anlamsız, eğitim verisine karışmamalı — admin.service.ts'teki AYNI desen.
-    where: { result: { isNot: null }, raceDay: { hippodrome: { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI }, isForeign: false } } },
+    where: { result: { isNot: null }, raceDay: { hippodrome: { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI } } } },
     select: {
       id: true, classType: true, breed: true, distance: true, surface: true, ikramiyeDetay: true,
       raceDay: { select: { date: true, surfaceConditions: true } },
@@ -374,37 +371,6 @@ async function main() {
       if (g.pos === 1) wins++;
     }
     return { start, wins };
-  }
-
-  // 2026-09-28 — Antrenör/Jokey oranı point-in-time (SIZINTI DÜZELTMESİ, kullanıcı onaylı veri
-  // bütünlüğü düzeltmesi — model değişikliği DEĞİL). ESKİ davranış: antrenorOrani/jokeyOrani
-  // getTrainerStats/getJockeyStats'tan (TrainerStatSync/JockeyStatSync — veri ÜRETİLDİĞİ ANKİ
-  // yıl-içi toplam) geliyordu; Temmuz'daki bir koşu Eylül ortasına kadarki sonuçları (kendi
-  // sonucu dahil) görüyordu. Ölçüm (2026-09-28): PIT'e geçince antrenör β'sı +0.244 → -0.002,
-  // AGF taban modeline ΔLL -0.023 → +0.001 (avantajın tamamı sızıntıydı). Artık her koşu için
-  // YALNIZ o koşu gününden KESİNLİKLE ÖNCEKİ sonuçlar sayılır (aynı shrink k=20, pop=%10).
-  // ESKİ davranışı yeniden üretmek gerekirse (yalnız karşılaştırma için): LEAKY_TJK_STATS=1.
-  // DİKKAT: bu yalnız GELECEKTEKİ eğitim/challenger verisini temizler — canlı V5.46 JSON
-  // ağırlıkları (v5-weights-*.json) BU DÜZELTMEYLE OTOMATİK YENİDEN ÜRETİLMEZ.
-  const PIT_ORAN = process.env.LEAKY_TJK_STATS !== "1";
-  const antrenorIndex = new Map<string, GecmisNokta[]>();
-  const jokeyIndex = new Map<string, GecmisNokta[]>();
-  if (PIT_ORAN) {
-    console.log("Antrenör/Jokey point-in-time geçmişi yükleniyor...");
-    const oranGecmisi = await db.runner.findMany({
-      where: { scratched: false, race: { result: { isNot: null } } },
-      select: {
-        no: true, trainer: true, jockey: true,
-        race: { select: { raceDay: { select: { date: true } }, result: { select: { actualOrder: true, winnerNos: true } } } },
-      },
-    });
-    for (const r of oranGecmisi) {
-      if (!r.race.result) continue;
-      const nokta: GecmisNokta = { tarih: r.race.raceDay.date, pos: finishPos(r.race.result.actualOrder, r.no, r.race.result.winnerNos) };
-      if (r.trainer) { const a = antrenorIndex.get(r.trainer) ?? []; a.push(nokta); antrenorIndex.set(r.trainer, a); }
-      if (r.jockey) { const a = jokeyIndex.get(r.jockey) ?? []; a.push(nokta); jokeyIndex.set(r.jockey, a); }
-    }
-    console.log(`PIT oran geçmişi: ${oranGecmisi.length} at satırı, ${antrenorIndex.size} antrenör, ${jokeyIndex.size} jokey`);
   }
 
   // 2026-08-21 (V5.4) — hizDerecesi: TJK "At Koşu Bilgileri"ndeki "süre" alanı AT-BAZLI
@@ -780,18 +746,10 @@ async function main() {
 
               // jokeyOrani/antrenorOrani — TJK'nın resmi (uzun-vadeli, güvenilir) kaynağına
               // GERİ alındı (2026-08-21 kararı, bkz. yukarıdaki not).
-              // 2026-09-28: PIT_ORAN açıkken (varsayılan) yalnız koşu gününden ÖNCEKİ sonuçlar —
-              // bkz. antrenorIndex/jokeyIndex üstündeki not. LEAKY_TJK_STATS=1: eski (sızıntılı) yol.
-              const pitJokey = PIT_ORAN && r.jockey ? tarihliOranHesapla(jokeyIndex, r.jockey, race.raceDay.date) : null;
-              const pitAntrenor = PIT_ORAN && r.trainer ? tarihliOranHesapla(antrenorIndex, r.trainer, race.raceDay.date) : null;
-              const jokeyOran = PIT_ORAN
-                ? pitJokey && pitJokey.start > 0 ? shrink(pitJokey.wins, pitJokey.start, jockeyPopOrt) * 100 : jockeyPopOrt * 100
-                : jockeyStat && jockeyStat.overall.rides > 0
+              const jokeyOran = jockeyStat && jockeyStat.overall.rides > 0
                 ? shrink(jockeyStat.overall.wins, jockeyStat.overall.rides, jockeyPopOrt) * 100
                 : jockeyPopOrt * 100;
-              const antrenorOran = PIT_ORAN
-                ? pitAntrenor && pitAntrenor.start > 0 ? shrink(pitAntrenor.wins, pitAntrenor.start, trainerPopOrt) * 100 : trainerPopOrt * 100
-                : trainerStat && trainerStat.rides > 0
+              const antrenorOran = trainerStat && trainerStat.rides > 0
                 ? shrink(trainerStat.wins, trainerStat.rides, trainerPopOrt) * 100
                 : trainerPopOrt * 100;
 

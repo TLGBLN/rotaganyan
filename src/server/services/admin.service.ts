@@ -50,12 +50,6 @@ export type AdminRaceDay = Prisma.RaceDayGetPayload<{
             isBanko: true;
             bankoNote: true;
             createdAt: true;
-            // 2026-09-16 — Anormal Pist Modu v1: KuponForm'un ÇOK HASSAS/HASSAS ayaklarda
-            // minUnitCounts zorlaması + amber uyarısı için (bkz. anormal-pist-risk.ts).
-            pistAnormalMi: true;
-            pistDuyarliligi: true;
-            gecmisRiskSeviyesi: true;
-            pistUyariMesaji: true;
             picks: { select: { rank: true; isTarget: true; score: true; scoreExact: true; runnerLabel: true } };
           };
         };
@@ -138,10 +132,6 @@ export async function getAdminRaceDays(dateStr?: string, limit = 30): Promise<Ad
               // 2026-09-07 — kupon/page.tsx'in modelTabanliKapsamOnerisi'ni (RaceAdviceCard.tsx)
               // yalnız GÜNCEL motor dönemindeki tahminlerde çalıştırabilmesi için.
               createdAt: true,
-              pistAnormalMi: true,
-              pistDuyarliligi: true,
-              gecmisRiskSeviyesi: true,
-              pistUyariMesaji: true,
               picks: { orderBy: { rank: "asc" }, select: { rank: true, isTarget: true, score: true, scoreExact: true, runnerLabel: true } },
             },
           },
@@ -166,10 +156,7 @@ export type PedigreeEntryRaceDay = Awaited<ReturnType<typeof getRaceDaysForPedig
 export async function getRaceDaysForPedigreeEntry(dateStr: string) {
   const date = new Date(dateStr);
   const raceDays = await db.raceDay.findMany({
-    // 2026-09-30 kullanıcı bulgusu — bu TR'ye özgü bir admin aracı (pedigri elle
-    // tamamlama), yurt dışı hipodromlar (bkz. Analiz Motoru YD V1.0, tamamen ayrı bir
-    // akış) buraya HİÇ karışmamalı.
-    where: { date: { gte: startOfDay(date), lte: endOfDay(date) }, hippodrome: { isForeign: false } },
+    where: { date: { gte: startOfDay(date), lte: endOfDay(date) } },
     include: {
       hippodrome: true,
       races: {
@@ -283,9 +270,7 @@ const GERCEK_OLMAYAN_HIPODROM_SLUGLARI = ["karma", "perak-malezya"];
 // ettiği "gerçek zamanlı sayım, uydurma/yuvarlanmış değil" sözünü çift-sayım sessizce
 // bozuyordu (Koşu Arşivi 4.314→3.690, Arşiv Günü 561→457, Geçmiş Yarış Kaydı 42.807→
 // 36.716 — Karma hariç tutulunca). Artık HEPSİ aynı filtreyi kullanıyor.
-// 2026-09-29 — TJK'nın kendi yurt dışı simulcast fikstürleri (Hippodrome.isForeign, bkz.
-// tjk.adapter.ts) de AYNI sebeple (arşiv/istatistik gerçek TR hipodrom sayımı) hariç.
-const GERCEK_HIPODROM_FILTRESI = { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI }, isForeign: false };
+const GERCEK_HIPODROM_FILTRESI = { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI } };
 
 /** Dashboard'daki "Arşiv Kapsamı" kutusu için — hepsi gerçek DB sayımı, uydurma/yuvarlanmış değil. */
 export async function getArchiveStats() {
@@ -651,17 +636,6 @@ export type AgfEdgeStats = {
   disagreeTotal: number;
   disagreeHits: number;
   disagreeRate: number;
-  // 2026-09-17 kullanıcı bulgusu: agreeRate (kolay durum — favori zaten güçlü) ile
-  // disagreeRate (zor durum — favori dışı, daha kalabalık ihtimal havuzu) doğrudan
-  // kıyaslamak adil değil, panel gereğinden fazla kötümser görünüyordu. disagreeRandomBaseline
-  // = o alt kümedeki koşularda rastgele TEK at seçseydik beklenen isabet oranı (ortalama
-  // 1/saha büyüklüğü) — disagreeRate'in gerçek karşılaştırması agreeRate değil, budur.
-  disagreeRandomBaseline: number;
-  // Sistemin favori dışı seçimi tuttuğunda ortalama ganyan (getiri çarpanı) — favoriyle
-  // aynı fikirdeyken tutan bir seçimden çok daha yüksek olması beklenir (düşük olasılık,
-  // yüksek ödeme). İsabet oranı düşük görünse de EV pozitif olabilir, bkz. kart metni.
-  agreeAvgGanyan: number | null;
-  disagreeAvgGanyan: number | null;
 };
 
 /**
@@ -689,11 +663,8 @@ export async function getAgfEdgeStats(): Promise<AgfEdgeStats> {
       picks: { where: { rank: 1 }, select: { runner: { select: { no: true } } } },
       race: {
         select: {
-          // scratched (2026-09-17 eklendi): saha büyüklüğü hesabı "gerçek start sayısı"
-          // kuralına uysun diye (bkz. proje hafızası project_saha_buyuklugu_scratched) —
-          // çekilen atlar rastgele-seçim referansına dahil edilmemeli.
-          runners: { select: { no: true, agf: true, scratched: true } },
-          result: { select: { hitTop1: true, winnerNos: true, ganyan: true } },
+          runners: { select: { no: true, agf: true } },
+          result: { select: { hitTop1: true, winnerNos: true } },
         },
       },
     },
@@ -706,22 +677,15 @@ export async function getAgfEdgeStats(): Promise<AgfEdgeStats> {
   let agreeHits = 0;
   let disagreeTotal = 0;
   let disagreeHits = 0;
-  let disagreeRandomBaselineSum = 0;
-  let agreeGanyanSum = 0;
-  let agreeGanyanN = 0;
-  let disagreeGanyanSum = 0;
-  let disagreeGanyanN = 0;
 
   for (const r of rows) {
-    const runnersWithAgf = r.race.runners.filter((x): x is { no: number; agf: number; scratched: boolean } => x.agf != null);
+    const runnersWithAgf = r.race.runners.filter((x): x is { no: number; agf: number } => x.agf != null);
     const winnerNos = r.race.result?.winnerNos ?? [];
     const systemPickNo = r.picks[0]?.runner?.no;
     if (runnersWithAgf.length === 0 || winnerNos.length === 0 || systemPickNo == null) continue;
 
     const agfFavorite = runnersWithAgf.reduce((a, b) => (b.agf > a.agf ? b : a));
     const systemWon = r.race.result?.hitTop1 ?? false;
-    const ganyan = r.race.result?.ganyan ?? null;
-    const sahaBuyuklugu = r.race.runners.filter((x) => !x.scratched).length;
 
     total++;
     if (systemWon) systemHits++;
@@ -729,17 +693,10 @@ export async function getAgfEdgeStats(): Promise<AgfEdgeStats> {
 
     if (systemPickNo === agfFavorite.no) {
       agreeTotal++;
-      if (systemWon) {
-        agreeHits++;
-        if (ganyan != null) { agreeGanyanSum += ganyan; agreeGanyanN++; }
-      }
+      if (systemWon) agreeHits++;
     } else {
       disagreeTotal++;
-      if (sahaBuyuklugu > 0) disagreeRandomBaselineSum += 100 / sahaBuyuklugu;
-      if (systemWon) {
-        disagreeHits++;
-        if (ganyan != null) { disagreeGanyanSum += ganyan; disagreeGanyanN++; }
-      }
+      if (systemWon) disagreeHits++;
     }
   }
 
@@ -760,9 +717,6 @@ export async function getAgfEdgeStats(): Promise<AgfEdgeStats> {
     disagreeTotal,
     disagreeHits,
     disagreeRate: rate(disagreeHits, disagreeTotal),
-    disagreeRandomBaseline: disagreeTotal > 0 ? disagreeRandomBaselineSum / disagreeTotal : 0,
-    agreeAvgGanyan: agreeGanyanN > 0 ? agreeGanyanSum / agreeGanyanN : null,
-    disagreeAvgGanyan: disagreeGanyanN > 0 ? disagreeGanyanSum / disagreeGanyanN : null,
   };
 }
 

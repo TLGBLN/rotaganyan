@@ -6,12 +6,10 @@ import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
-import { useRef, useState } from "react";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   Bold, Italic, Strikethrough, Heading2, Heading3,
-  List, ListOrdered, Quote, Link2, ImageIcon, Undo, Redo, Loader2,
+  List, ListOrdered, Quote, Link2, ImageIcon, Undo, Redo,
 } from "lucide-react";
 
 type Props = {
@@ -21,8 +19,6 @@ type Props = {
 };
 
 export default function TiptapEditor({ content = "", onChange, placeholder }: Props) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -49,35 +45,7 @@ export default function TiptapEditor({ content = "", onChange, placeholder }: Pr
     editor!.chain().focus().setLink({ href: url }).run();
   }
 
-  // 2026-09-18 kullanıcı talebi ("nereye yüklemem gerek") — eskiden yalnız harici bir URL
-  // yapıştırılabiliyordu (window.prompt), kullanıcının yükleyeceği bir yer YOKTU. Artık
-  // dosya seçici gerçek bir upload endpoint'ine (bkz. /api/admin/upload-article-image,
-  // upload-banner/route.ts ile AYNI desen) yüklüyor; URL yapıştırma da (harici görsel
-  // bağlantısı için) ayrı seçenek olarak KORUNUYOR.
-  function addImageFromFile() {
-    fileInputRef.current?.click();
-  }
-
-  async function onFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/admin/upload-article-image", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Yükleme başarısız");
-      editor!.chain().focus().setImage({ src: data.url }).run();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Görsel yüklenemedi");
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  function addImageFromUrl() {
+  function addImage() {
     const url = window.prompt("Görsel URL:");
     if (!url) return;
     editor!.chain().focus().setImage({ src: url }).run();
@@ -123,12 +91,8 @@ export default function TiptapEditor({ content = "", onChange, placeholder }: Pr
         <button type="button" onClick={addLink} className={btnClass(editor.isActive("link"))}>
           <Link2 className="h-3.5 w-3.5" />
         </button>
-        <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={onFileSelected} className="hidden" />
-        <button type="button" onClick={addImageFromFile} disabled={uploading} title="Bilgisayardan görsel yükle" className={btnClass(false)}>
-          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
-        </button>
-        <button type="button" onClick={addImageFromUrl} title="Görsel URL'i yapıştır" className={cn(btnClass(false), "text-[10px] font-semibold")}>
-          URL
+        <button type="button" onClick={addImage} className={btnClass(false)}>
+          <ImageIcon className="h-3.5 w-3.5" />
         </button>
         <div className="mx-1 w-px bg-border" />
         <button type="button" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} className={btnClass(false)}>

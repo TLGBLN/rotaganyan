@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { after } from "next/server";
 import { db } from "@/lib/db";
 import { getProgramData, getKuponOnerileri, getHitPredictions, getGecmisKazananKuponlar, getJockeyStats, getTrainerStats, type JockeyStat, type TrainerStat } from "@/server/services/race.service";
@@ -21,8 +20,6 @@ import HitsCarousel from "@/components/home/HitsCarousel";
 import KazananKuponlarCarousel from "@/components/home/KazananKuponlarCarousel";
 import NewsTicker from "@/components/home/NewsTicker";
 import ProgramPageLabel from "@/components/program/ProgramPageLabel";
-import AylikKuponKazanciCard from "@/components/home/AylikKuponKazanciCard";
-import { getAylikKuponKazanci } from "@/server/services/race.service";
 
 export const revalidate = 0;
 
@@ -42,20 +39,6 @@ async function TickerSection() {
   return <NewsTicker items={tickerItems} />;
 }
 
-// 2026-09-15 kullanıcı talebi: "Aylık Kupon Kazancı" (eskiden yalnız admin panelinde)
-// artık giriş yapmamış ziyaretçilere de gösteriliyor — İsabet Sağlayan Bankolar'ın
-// ÜSTÜNDE. Diğer bölümler gibi kendi <Suspense> sınırında, sayfanın geri kalanını
-// bloklamıyor.
-async function AylikKazanciSection() {
-  const aylikKuponKazanci = await getAylikKuponKazanci().catch(() => []);
-  if (aylikKuponKazanci.length === 0) return null;
-  return (
-    <section className="border-t pt-8">
-      <AylikKuponKazanciCard aylar={aylikKuponKazanci} />
-    </section>
-  );
-}
-
 async function ProofSection() {
   const [hitPredictions, kazananKuponlar] = await Promise.all([
     getHitPredictions(16).catch(() => []),
@@ -63,26 +46,6 @@ async function ProofSection() {
   ]);
   return (
     <>
-      {/* 2026-09-15 kullanıcı talebi: Kuponlar ÖNCE, Bankolar ALTINDA (eskiden tersiydi). */}
-      {kazananKuponlar.length > 0 && (
-        <section className="border-t pt-8" data-tour="isabet-kuponlar">
-          {/* 2026-09-15 kullanıcı bulgusu: "Tümünü Gör" linki justify-between ile
-              sağ uca (geniş sayfada başlıktan çok uzağa) düşüyordu — artık başlığın
-              HEMEN altında, dikey istiflenmiş. */}
-          <div className="mb-4 space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-hit" />
-              <h2 className="text-base font-semibold"><ProgramPageLabel k="kuponlarBaslik" /></h2>
-            </div>
-            {/* 2026-09-15 kullanıcı talebi: üye olmayan bir ziyaretçi merak ederse
-                diye, tüm zamanların tutan kuponlarını gösteren public sayfaya link. */}
-            <Link href="/tutan-kuponlar" className="inline-block text-xs font-semibold text-brand hover:underline">
-              <ProgramPageLabel k="tumunuGor" /> →
-            </Link>
-          </div>
-          <KazananKuponlarCarousel items={kazananKuponlar} />
-        </section>
-      )}
       {hitPredictions.length > 0 && (
         <section className="border-t pt-8" data-tour="isabet-bankolar">
           <div className="mb-4 flex items-center gap-2">
@@ -90,6 +53,15 @@ async function ProofSection() {
             <h2 className="text-base font-semibold"><ProgramPageLabel k="bankolarBaslik" /></h2>
           </div>
           <HitsCarousel items={hitPredictions} />
+        </section>
+      )}
+      {kazananKuponlar.length > 0 && (
+        <section className="border-t pt-8" data-tour="isabet-kuponlar">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-hit" />
+            <h2 className="text-base font-semibold"><ProgramPageLabel k="kuponlarBaslik" /></h2>
+          </div>
+          <KazananKuponlarCarousel items={kazananKuponlar} />
         </section>
       )}
     </>
@@ -220,17 +192,11 @@ export default async function ProgramPage({ searchParams }: PageProps) {
         <TickerSection />
       </Suspense>
 
-      {/* Aylık Kupon Kazancı + İsabet Sağlayan Bankolar/Kuponlar — yalnız giriş yapmamış
-          ziyaretçiler için üstte, bu sırayla (kazanç özeti önce). */}
+      {/* İsabet Sağlayan Bankolar/Kuponlar — yalnız giriş yapmamış ziyaretçiler için üstte */}
       {!isLoggedIn && (
-        <>
-          <Suspense fallback={null}>
-            <AylikKazanciSection />
-          </Suspense>
-          <Suspense fallback={SKELETON_ROW}>
-            <ProofSection />
-          </Suspense>
-        </>
+        <Suspense fallback={SKELETON_ROW}>
+          <ProofSection />
+        </Suspense>
       )}
 
       {/* Program */}

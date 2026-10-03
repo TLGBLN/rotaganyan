@@ -5,7 +5,7 @@
  */
 
 import { db } from "@/lib/db";
-import { discoverAllRelevantCities, toSlug, toTjkDate } from "./ingest/tjk-info.adapter";
+import { discoverTurkishCities, toSlug, toTjkDate } from "./ingest/tjk-info.adapter";
 import { fetchCityResults, type CityRaceResult } from "./ingest/tjk-result.adapter";
 import { computeHitTop1, syncKarmaResultMirrors } from "@/lib/result-utils";
 
@@ -50,7 +50,7 @@ export async function syncResultsForDate(dateStr: string): Promise<void> {
   if (racesNeeding.length === 0) return;
 
   const tjkDate = toTjkDate(date);
-  const cities = await discoverAllRelevantCities(tjkDate);
+  const cities = await discoverTurkishCities(tjkDate);
   const cityCache = new Map<string, CityRaceResult[] | null>();
 
   for (const race of racesNeeding) {

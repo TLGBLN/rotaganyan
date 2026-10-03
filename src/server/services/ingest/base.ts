@@ -46,37 +46,13 @@ export async function persistRaceDays(raceDays: IngestRaceDay[]): Promise<Ingest
     }
   }
 
-  // 2026-09-28 — ESKİ ŞEMALI raceStyle kalıcı düzeltmesi (bkz. arac-racestyle-yenile.mts).
-  // Miras alınan kayıt `dagilim`/`erkenHizGucu` taşımıyorsa (production eski bir deployment'a sabit
-  // kaldığı dönemde yazılmış) yarisGidisatiSkoru sessizce 0 hesaplanıyor. Bu yüzden eski şemalı miras
-  // adaylar için ham Accurace'ten YENİDEN üretilir. Ham veri bulunamazsa / hesap hata verirse
-  // MEVCUT davranış (eski kaydı miras alma) korunur ve yalnız UYARI loglanır — VERİ KALİTESİ UYARISI
-  // ≠ ANALİZ BLOKU, ingest hiçbir koşulda bu yüzden durmaz.
-  const tazeStyleByNorm = new Map<string, Prisma.InputJsonValue>();
-  let raceStyleNormalize: ((s: string) => string) | null = null;
-  let raceStyleEskiMi: ((rs: unknown) => boolean) | null = null;
-  try {
-    const svc = await import("../accurace-sync.service");
-    raceStyleNormalize = svc.normalizeName;
-    raceStyleEskiMi = svc.raceStyleEskiSemaMi;
-    const eskiAdlar = [...latestStyleByName.entries()].filter(([, v]) => svc.raceStyleEskiSemaMi(v)).map(([n]) => n);
-    if (eskiAdlar.length > 0) {
-      const degerler = await svc.hesaplaRaceStyleDegerleri(eskiAdlar);
-      for (const [norm, v] of degerler) tazeStyleByNorm.set(norm, v as unknown as Prisma.InputJsonValue);
-      const yenilenemeyen = eskiAdlar.filter((n) => !degerler.has(svc.normalizeName(n))).length;
-      console.warn(`[ingest] raceStyle eski şemalı miras: ${eskiAdlar.length} at, yeniden üretilen ${degerler.size}, ham veri yetersiz (eski kayıt korundu) ${yenilenemeyen}`);
-    }
-  } catch (e) {
-    console.warn("[ingest] raceStyle tazeleme atlandı (analiz/ingest etkilenmedi):", String(e).slice(0, 200));
-  }
-
   for (const rd of raceDays) {
     try {
       // Upsert hippodrome
       const hippodrome = await db.hippodrome.upsert({
         where: { slug: rd.hippodromeSlug },
-        create: { name: rd.hippodromeName, slug: rd.hippodromeSlug, isForeign: rd.isForeign ?? false, country: rd.country },
-        update: { name: rd.hippodromeName, isForeign: rd.isForeign ?? false, country: rd.country },
+        create: { name: rd.hippodromeName, slug: rd.hippodromeSlug },
+        update: { name: rd.hippodromeName },
       });
 
       const date = new Date(rd.date);
@@ -137,11 +113,7 @@ export async function persistRaceDays(raceDays: IngestRaceDay[]): Promise<Ingest
             runner.jockey != null &&
             existingJockeyClean !== runner.jockey;
 
-          const tazeStyle = raceStyleNormalize ? tazeStyleByNorm.get(raceStyleNormalize(runner.name)) : undefined;
-          const inheritedStyle = tazeStyle ?? latestStyleByName.get(runner.name);
-          // Mevcut satır eski şemalıysa VE taze (yeni şemalı) kayıt üretilebildiyse yenile;
-          // eski davranış (yalnız null ise miras yaz) aksi halde AYNEN korunur.
-          const mevcutEski = tazeStyle != null && raceStyleEskiMi != null && raceStyleEskiMi(existing?.raceStyle);
+          const inheritedStyle = latestStyleByName.get(runner.name);
 
           await db.runner.upsert({
             where: { raceId_no: { raceId: race.id, no: runner.no } },
@@ -150,7 +122,7 @@ export async function persistRaceDays(raceDays: IngestRaceDay[]): Promise<Ingest
               ...runner,
               jockeyChanged,
               previousJockey: jockeyChanged ? existingJockeyClean : null,
-              ...((existing?.raceStyle == null || mevcutEski) && inheritedStyle != null ? { raceStyle: inheritedStyle } : {}),
+              ...(existing?.raceStyle == null && inheritedStyle != null ? { raceStyle: inheritedStyle } : {}),
             },
           });
         }

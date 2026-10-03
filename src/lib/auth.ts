@@ -18,22 +18,10 @@ function clientIpFromRequest(request?: Request): string {
   );
 }
 
-// 2026-09-15 kullanıcı talebi ("beni hatırla butonu olsun, kullanıcı tekrar tekrar
-// giriş yapmasın") — Auth.js'in JWT stratejisinde çerezin gerçek Max-Age'i (tarayıcı
-// kapansa da hayatta kalıp kalmayacağı) `session.maxAge`'e göre TEK SEFERDE, sabit
-// belirlenir — sign-in başına DEĞİŞTİRİLEMEZ. Bu yüzden `session.maxAge` en UZUN
-// olası süreye (REMEMBER_ME_MAX_AGE) sabitlenip, "Beni hatırla" İŞARETLENMEMİŞSE
-// jwt() callback'inde token.exp'i daha KISA (DEFAULT_SESSION_MAX_AGE, Auth.js'in
-// zaten var olan 30 günlük varsayılanıyla AYNI) ayarlanıyor — böylece kutucuğu hiç
-// görmeyen/işaretlemeyen kullanıcının deneyimi ESKİSİYLE BİREBİR AYNI kalıyor,
-// yalnız işaretleyenler daha uzun (90 gün) hatırlanıyor.
-const REMEMBER_ME_MAX_AGE = 60 * 60 * 24 * 90; // 90 gün
-const DEFAULT_SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 gün — Auth.js'in halihazırdaki varsayılanı
-
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(db),
-  session: { strategy: "jwt", maxAge: REMEMBER_ME_MAX_AGE },
+  session: { strategy: "jwt" },
   providers: [
     Credentials({
       credentials: {
@@ -49,7 +37,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // (giris/page.tsx, headers() ile — LoginLog'un kullandığı AYNI güvenilir
         // kaynak) tarafından açıkça gizli bir alan olarak gönderiliyor.
         ip: { type: "hidden" },
-        rememberMe: { type: "hidden" },
       },
       async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) return null;
@@ -100,7 +87,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           plan: user.plan,
           image: user.image ?? undefined,
           isEmailVerified: !!user.emailVerified,
-          rememberMe: credentials.rememberMe === "true",
         };
       },
     }),
@@ -111,12 +97,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.role = user.role;
         token.plan = user.plan;
         token.isEmailVerified = user.isEmailVerified;
-        // "Beni hatırla" işaretlenmemişse token'ı Auth.js'in zaten var olan 30 günlük
-        // varsayılanına KISALT — bkz. yukarıdaki REMEMBER_ME_MAX_AGE notu. İşaretliyse
-        // hiçbir şey yapma, session.maxAge'in (90 gün) tam süresi geçerli kalsın.
-        if (!user.rememberMe) {
-          token.exp = Math.floor(Date.now() / 1000) + DEFAULT_SESSION_MAX_AGE;
-        }
       }
       // E-posta doğrulandıktan sonra client'ta useSession().update() çağrılınca
       // JWT'deki eski (doğrulanmamış) durumu DB'den taze okuyarak günceller —

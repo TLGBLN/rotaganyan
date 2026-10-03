@@ -7,9 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { cn, formatDate } from "@/lib/utils";
 import { useLocaleSwitch } from "@/components/providers/LocaleProvider";
 
-// export edildi: /tutan-kuponlar (tüm zamanlar listesi) da AYNI kart/dialog
-// çiftini kullanıyor — kopyalamak yerine tek kaynak.
-export function KazananKuponCard({ k, onOpen, className }: { k: KazananKupon; onOpen: () => void; className?: string }) {
+function Card({ k, onOpen }: { k: KazananKupon; onOpen: () => void }) {
   const t = useTranslations("home.kupon");
   const { locale } = useLocaleSwitch();
   const dateStr = formatDate(k.date, locale, "d MMM yyyy");
@@ -18,10 +16,7 @@ export function KazananKuponCard({ k, onOpen, className }: { k: KazananKupon; on
     <button
       type="button"
       onClick={onOpen}
-      className={cn(
-        "shrink-0 w-64 text-left rounded-lg border border-hit/30 bg-hit/5 p-4 transition hover:border-hit/60 hover:bg-hit/10",
-        className
-      )}
+      className="shrink-0 w-64 text-left rounded-lg border border-hit/30 bg-hit/5 p-4 transition hover:border-hit/60 hover:bg-hit/10"
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <span className="text-xs text-muted-foreground">{dateStr}</span>
@@ -45,7 +40,7 @@ export function KazananKuponCard({ k, onOpen, className }: { k: KazananKupon; on
   );
 }
 
-export function KuponDetailDialog({ k, onClose }: { k: KazananKupon | null; onClose: () => void }) {
+function KuponDetailDialog({ k, onClose }: { k: KazananKupon | null; onClose: () => void }) {
   const t = useTranslations("home.kupon");
   const { locale } = useLocaleSwitch();
   return (
@@ -169,7 +164,7 @@ export default function KazananKuponlarCarousel({ items }: { items: KazananKupon
     <div className={cn("overflow-hidden")}>
       <div ref={trackRef} className="flex gap-4 will-change-transform">
         {[...repeated, ...repeated].map((k, i) => (
-          <KazananKuponCard key={`${k.id}-${i}`} k={k} onOpen={() => setSelected(k)} />
+          <Card key={`${k.id}-${i}`} k={k} onOpen={() => setSelected(k)} />
         ))}
       </div>
       <KuponDetailDialog k={selected} onClose={() => setSelected(null)} />

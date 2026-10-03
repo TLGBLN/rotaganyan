@@ -10,7 +10,6 @@ import { db } from "@/lib/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import AuthTabs from "../AuthTabs";
@@ -40,7 +39,6 @@ async function login(formData: FormData) {
   const city = hdrs.get("x-vercel-ip-city") ?? undefined;
   const email = (formData.get("email") as string | null) ?? "";
   const password = (formData.get("password") as string | null) ?? "";
-  const rememberMe = formData.get("rememberMe") === "on";
   const callbackUrl = safeCallbackUrl(formData.get("callbackUrl") as string);
 
   // Şifreyi doğrula — log'a başarı/başarısızlık yazabilmek için signIn'den önce kontrol et
@@ -71,7 +69,7 @@ async function login(formData: FormData) {
     // v6.116 — ip burada headers() ile güvenilir şekilde okunuyor (LoginLog'un da
     // kullandığı aynı kaynak) — authorize()'a AÇIKÇA taşınıyor, çünkü signIn()'in
     // kendi request nesnesinden okunan ip "unknown" çıkıyordu (bkz. auth.ts notu).
-    await signIn("credentials", { email, password, ip, rememberMe: rememberMe ? "true" : "false", redirectTo: callbackUrl });
+    await signIn("credentials", { email, password, ip, redirectTo: callbackUrl });
   } catch (err) {
     if (err instanceof AuthError) {
       redirect(`/giris?hata=1&callbackUrl=${encodeURIComponent(callbackUrl)}`);
@@ -111,11 +109,6 @@ export default async function GirisPage({ searchParams }: Props) {
           <div className="space-y-1.5">
             <Label htmlFor="password" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("sifre")}</Label>
             <PasswordInput id="password" name="password" autoComplete="current-password" required />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Checkbox id="rememberMe" name="rememberMe" />
-            <Label htmlFor="rememberMe" className="text-sm font-normal text-muted-foreground">{t("beniHatirla")}</Label>
           </div>
 
           {hata && (
