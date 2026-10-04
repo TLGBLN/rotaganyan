@@ -88,16 +88,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ kuponId:
         >
           <div style={{ position: "absolute", width: "1200px", height: "1200px", borderRadius: "50%", border: "1px solid rgba(223,157,0,0.08)", right: "-560px", top: "-620px", display: "flex" }} />
 
-          {/* arka plan hologram: soluk logo + marka yazısı (kart içeriğinin altında) */}
-          <div style={{ position: "absolute", left: "140px", top: "200px", width: "760px", height: "760px", display: "flex", opacity: 0.1 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={horseIcon} width={760} height={760} style={{ objectFit: "contain" }} />
-          </div>
-          <div style={{ position: "absolute", left: 0, right: 0, top: "470px", display: "flex", justifyContent: "center", fontSize: 150, fontWeight: 900, opacity: 0.06 }}>
-            <span style={{ color: "#fff" }}>ROTA</span>
-            <span style={{ color: GOLD, marginLeft: "18px" }}>GANYAN</span>
-          </div>
-
           {/* üst logo */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
