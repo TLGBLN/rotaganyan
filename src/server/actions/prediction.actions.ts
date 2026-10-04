@@ -7,6 +7,7 @@ import { startOfDay, endOfDay } from "date-fns";
 import { recomputeHitStatsForRace, parseKarmaConditionsRef } from "@/lib/result-utils";
 import { kategoriTespit, KATEGORI_ADI } from "@/lib/methodology/v2-engine";
 import { detaylarBosMu, isPickDetailsV2 } from "@/lib/methodology/muhakeme-format";
+import { runResearchSnapshotHook } from "@/lib/research/snapshot-runtime";
 import type { Confidence, PedigreeRating, Prisma } from "@prisma/client";
 
 export type PickInput = {
@@ -313,6 +314,10 @@ export async function upsertPrediction(input: PredictionInput) {
     });
     predictionId = created.id;
   }
+
+  // Araştırma snapshot'ı: tahmin kaydı commit oldu; bayrak kapalıysa hiçbir DB çağrısı yok,
+  // açıksa kendi best-effort yolunda çalışır (hata tahmini etkilemez).
+  await runResearchSnapshotHook(predictionId, input.raceId);
 
   // 2026-07-26, kullanıcı talimatı: "Kaydet" artık ayrı bir "Yayımla" adımı olmadan
   // doğrudan yayınlamayı dener — iki sert güvenlik kuralı (hiç pick yok / AGF favorisi
