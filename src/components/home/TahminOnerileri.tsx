@@ -165,7 +165,7 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
 
       {/* Tek kupon şablonu — Ekonomik/Normal/Geniş, /program'daki panel butonları gibi tıklanınca değişir */}
       <div className="[container-type:inline-size]">
-      <div className="isolate relative flex flex-col overflow-hidden rounded-lg border bg-card min-h-[103.7cqw]">
+      <div className="isolate relative flex flex-col overflow-hidden rounded-lg border bg-card">
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden select-none">
           <img src="/horse-icon-gold.png" alt="" className="absolute left-[13cqw] top-[18.5cqw] w-[70cqw] h-auto opacity-10" />
           <span className="absolute inset-x-0 top-[43.5cqw] whitespace-nowrap text-center font-black leading-none text-[12cqw] opacity-[0.06]">
