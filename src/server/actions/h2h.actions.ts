@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { fetchTjkAtKosuBilgileri, type TjkAtKosuRow } from "@/server/services/ingest/tjk-at-performans.adapter";
-import { tjkTarihOncesiMi } from "@/lib/tjk-date";
+import { tjkTarihOncesiMi, tjkTarihMs } from "@/lib/tjk-date";
 
 export type H2HResult = {
   horseName: string;
@@ -26,11 +26,6 @@ export type H2HEncounter = {
   surface: string; // TJK ham metni ("Ç:Normal 3.3" gibi) — pist tipi + zemin durumu
   results: H2HResult[];
 };
-
-function parseTjkDate(d: string): number {
-  const [dd, mm, yyyy] = d.split(".").map(Number);
-  return new Date(yyyy, mm - 1, dd).getTime();
-}
 
 /**
  * Bu koşudaki atların TJK resmi yarış geçmişinden (AtKosuBilgileri), en az ikisinin aynı
@@ -113,5 +108,5 @@ export async function getH2HForRace(raceId: string): Promise<H2HEncounter[]> {
     });
   }
 
-  return encounters.sort((a, b) => parseTjkDate(b.date) - parseTjkDate(a.date)).slice(0, 15);
+  return encounters.sort((a, b) => tjkTarihMs(b.date) - tjkTarihMs(a.date)).slice(0, 15);
 }

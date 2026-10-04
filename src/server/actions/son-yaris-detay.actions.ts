@@ -4,14 +4,10 @@ import { db } from "@/lib/db";
 import { fetchTjkAtKosuBilgileri, type TjkAtKosuRow } from "@/server/services/ingest/tjk-at-performans.adapter";
 import { isSameJockey } from "@/components/program/panels/galop-helpers";
 import { familyOf, labelFor, toCodes } from "@/lib/equipment-family";
-import { tjkTarihOncesiMi } from "@/lib/tjk-date";
+import { tjkTarihOncesiMi, tjkTarihMs } from "@/lib/tjk-date";
 
-function parseTjkDate(d: string): number {
-  const [dd, mm, yyyy] = d.split(".").map(Number);
-  return new Date(yyyy, mm - 1, dd).getTime();
-}
 function mostRecent(rows: TjkAtKosuRow[]): TjkAtKosuRow | undefined {
-  return [...rows].sort((a, b) => parseTjkDate(b.date) - parseTjkDate(a.date))[0];
+  return [...rows].sort((a, b) => tjkTarihMs(b.date) - tjkTarihMs(a.date))[0];
 }
 
 // "KGS" (Kaç Gün Sonra) — atın TJK'daki en son startından bugünkü koşuya kadar geçen gün

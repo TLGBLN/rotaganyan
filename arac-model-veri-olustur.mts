@@ -18,6 +18,7 @@ import { kategoriTespit } from "./src/lib/methodology/v2-engine";
 import { galopQuality, isSameJockey, isSprintIdman } from "./src/components/program/panels/galop-helpers";
 import { breedToIrk, surfaceToPist, mesafeBucket, normalizeSireName } from "./src/lib/sire-stat-match";
 import { finishPos } from "./src/lib/race-result";
+import { parseTjkDate } from "./src/lib/tjk-date";
 import { getJockeyStats, getTrainerStats } from "./src/server/services/race.service";
 import { zeminKatsayisi, zeminDetayiBul } from "./src/lib/methodology/mekanik-puanlama";
 import { hesaplaZeminToleransiMap } from "./src/server/actions/zemin-toleransi.actions";
@@ -82,10 +83,7 @@ function surfaceFromRaw(raw: string | undefined | null): string | null {
 // henüz olmamış gelecekteki koşular da "geçmiş" sayılıyordu — veri sızıntısı (bkz.
 // kiloFarkiEnIyiKosuya/atJokeyIkiliOrani üstündeki 2026-08-20 notu).
 function parseGecmisTarih(s: string | undefined | null): Date | null {
-  if (!s) return null;
-  const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-  if (!m) return null;
-  return new Date(`${m[3]}-${m[2]}-${m[1]}T00:00:00Z`);
+  return s ? parseTjkDate(s) : null;
 }
 
 export type ModelRow = {

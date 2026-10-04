@@ -25,7 +25,14 @@ function sortableFromTjkDate(tjkDate: string): string | null {
 export function parseTjkDate(s: string): Date | null {
   const m = s.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
   if (!m) return null;
-  return new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1])));
+  const d = new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1])));
+  if (d.getUTCDate() !== Number(m[1]) || d.getUTCMonth() !== Number(m[2]) - 1) return null;
+  return d;
+}
+
+/** Sıralama için: geçersiz tarih NaN döner (önceki yerel kopyaların davranışı korunur). */
+export function tjkTarihMs(s: string): number {
+  return parseTjkDate(s)?.getTime() ?? NaN;
 }
 
 function sortableFromDate(date: Date): string {
@@ -47,4 +54,20 @@ export function tjkTarihOncesiMi(rowDateStr: string, targetDate: Date): boolean 
   const rowSortable = sortableFromTjkDate(rowDateStr);
   if (!rowSortable) return true;
   return rowSortable < sortableFromDate(targetDate);
+}
+
+/** Araştırma yolları için sıkı (fail-closed) karşılaştırma: parse edilemeyen tarih de
+ * "geçmiş" sayılmaz. Canlı tahmin yolu bunu kullanmaz (orada tjkTarihOncesiMi). */
+export function tjkTarihOncesiKatiMi(rowDateStr: string, targetDate: Date): boolean {
+  const rowSortable = sortableFromTjkDate(rowDateStr);
+  if (!rowSortable) return false;
+  return rowSortable < sortableFromDate(targetDate);
+}
+
+/** Araştırma/feature üretimi için zorunlu kapı: geçmiş satır hedef yarışın kesin önünde
+ * değilse (aynı gün dahil, bozuk tarih dahil) hata fırlatır. */
+export function assertBeforeRace(historicalDateStr: string, targetRaceDate: Date): void {
+  if (!tjkTarihOncesiKatiMi(historicalDateStr, targetRaceDate)) {
+    throw new Error(`LEAKAGE_GUARD: geçmiş tarih (${historicalDateStr}) hedef yarış tarihinden (${sortableFromDate(targetRaceDate)}) önce değil`);
+  }
 }
