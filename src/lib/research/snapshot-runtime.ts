@@ -48,22 +48,24 @@ async function captureForPrediction(predictionId: string, raceId: string) {
   // Toplu okumalar (N+1 yok): önbellek satırları + sectional splitler
   const tjkIds = [...new Set(picks.map((k) => k.runner!.tjkAtId).filter((x): x is number => x != null))];
   const names = [...new Set(picks.map((k) => k.runner!.name))];
-  const cacheRows = tjkIds.length
-    ? await db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: tjkIds } }, select: { tjkAtId: true, rowsJson: true } })
-    : [];
+  const [cacheRows, splitRows] = await Promise.all([
+    tjkIds.length
+      ? db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: tjkIds } }, select: { tjkAtId: true, rowsJson: true } })
+      : Promise.resolve([]),
+    names.length
+      ? db.accuraceHorseSplit.findMany({
+          where: { horseName: { in: names }, accuraceRace: { date: { lt: raceDate } } },
+          select: {
+            horseName: true,
+            horseNumber: true,
+            checkpoints: true,
+            finishTimeReal: true,
+            accuraceRace: { select: { date: true, length: true, _count: { select: { splits: true } } } },
+          },
+        })
+      : Promise.resolve([]),
+  ]);
   const cacheMap = new Map(cacheRows.map((c) => [c.tjkAtId, (c.rowsJson as unknown as RawHistoryRow[]) ?? []]));
-  const splitRows = names.length
-    ? await db.accuraceHorseSplit.findMany({
-        where: { horseName: { in: names }, accuraceRace: { date: { lt: raceDate } } },
-        select: {
-          horseName: true,
-          horseNumber: true,
-          checkpoints: true,
-          finishTimeReal: true,
-          accuraceRace: { select: { date: true, length: true, _count: { select: { splits: true } } } },
-        },
-      })
-    : [];
   const splitsByName = new Map<string, typeof splitRows>();
   for (const s of splitRows) {
     const arr = splitsByName.get(s.horseName) ?? [];
@@ -113,10 +115,28 @@ async function captureForPrediction(predictionId: string, raceId: string) {
   };
 
   const deps: SnapshotDeps = {
+    writeBatch: async (r, picks, f) => {
+      const runId = randomUUID();
+      const payload = JSON.stringify(
+        picks.map((p) => ({
+          id: randomUUID(),
+          pickId: p.pickId,
+          predictionId: p.predictionId,
+          runnerTjkAtId: p.runnerTjkAtId,
+          historyRowsJson: JSON.stringify(p.rowsUsed),
+          availableBeforeCutoff: p.availableBeforeCutoff,
+          sourceRefsJson: p.refsJson,
+          sourceHash: p.sourceHash,
+        })),
+      );
+      // Tek ifade = tek gidiş-dönüş ve atomik: run + tüm pick'ler birlikte yazılır veya hiçbiri yazılmaz.
+      await db.$executeRaw`WITH r AS (INSERT INTO "ResearchSnapshotRun" ("id","predictionId","captureNo","raceId","engineVersion","gitCommitHash","weightsSemanticHash","scalerSemanticHash","featureSchemaVersion","snapshotSchemaVersion","predictionAt","cutoffAt","expectedPicks","writtenPicks","expectedHistoryRows","capturedHistoryRows","status","errorCode") VALUES (${runId}, ${r.predictionId}, (SELECT COALESCE(MAX("captureNo"), 0) + 1 FROM "ResearchSnapshotRun" WHERE "predictionId" = ${r.predictionId}), ${r.raceId}, ${r.engineVersion}, ${r.gitCommitHash}, ${r.weightsSemanticHash}, ${r.scalerSemanticHash}, ${RESEARCH_SNAPSHOT_SCHEMA_VERSION}, ${SNAPSHOT_SCHEMA_VERSION}, ${r.predictionAt}, ${r.cutoffAt}, ${r.expectedPicks}, ${f.writtenPicks}, ${f.expectedHistoryRows}, ${f.capturedHistoryRows}, ${f.status}, ${f.errorCode}) RETURNING "id") INSERT INTO "ResearchPickSnapshot" ("id","runId","pickId","predictionId","runnerTjkAtId","historyRowsJson","availableBeforeCutoff","sourceRefsJson","sourceHash","featureSchemaVersion","snapshotSchemaVersion") SELECT p."id", r."id", p."pickId", p."predictionId", p."runnerTjkAtId", p."historyRowsJson"::jsonb, p."availableBeforeCutoff", p."sourceRefsJson"::jsonb, p."sourceHash", ${RESEARCH_SNAPSHOT_SCHEMA_VERSION}, ${SNAPSHOT_SCHEMA_VERSION} FROM r CROSS JOIN jsonb_to_recordset(${payload}::jsonb) AS p("id" text, "pickId" text, "predictionId" text, "runnerTjkAtId" int, "historyRowsJson" text, "availableBeforeCutoff" int, "sourceRefsJson" text, "sourceHash" text)`;
+      return runId;
+    },
     insertRun: async (r) => {
       const id = randomUUID();
       // captureNo: aynı tahminin her kaydetmesi yeni bir sürüm (tahmin pick'leri silinip yeniden yazılabiliyor)
-      await db.$executeRaw`INSERT INTO "ResearchSnapshotRun" ("id","predictionId","captureNo","raceId","engineVersion","gitCommitHash","weightsSemanticHash","scalerSemanticHash","featureSchemaVersion","snapshotSchemaVersion","predictionAt","cutoffAt","expectedPicks","writtenPicks","expectedHistoryRows","capturedHistoryRows","status","errorCode") VALUES (${id}, ${r.predictionId}, (SELECT COALESCE(MAX("captureNo"), 0) + 1 FROM "ResearchSnapshotRun" WHERE "predictionId" = ${r.predictionId}), ${r.raceId}, ${r.engineVersion}, ${r.gitCommitHash}, ${r.weightsSemanticHash}, ${r.scalerSemanticHash}, ${RESEARCH_SNAPSHOT_SCHEMA_VERSION}, ${SNAPSHOT_SCHEMA_VERSION}, ${r.predictionAt}, ${r.cutoffAt}, ${r.expectedPicks}, 0, 0, 0, ${r.status}, NULL)`;
+      await db.$executeRaw`INSERT INTO "ResearchSnapshotRun" ("id","predictionId","captureNo","raceId","engineVersion","gitCommitHash","weightsSemanticHash","scalerSemanticHash","featureSchemaVersion","snapshotSchemaVersion","predictionAt","cutoffAt","expectedPicks","writtenPicks","expectedHistoryRows","capturedHistoryRows","status","errorCode") VALUES (${id}, ${r.predictionId}, (SELECT COALESCE(MAX("captureNo"), 0) + 1 FROM "ResearchSnapshotRun" WHERE "predictionId" = ${r.predictionId}), ${r.raceId}, ${r.engineVersion}, ${r.gitCommitHash}, ${r.weightsSemanticHash}, ${r.scalerSemanticHash}, ${RESEARCH_SNAPSHOT_SCHEMA_VERSION}, ${SNAPSHOT_SCHEMA_VERSION}, ${r.predictionAt}, ${r.cutoffAt}, ${r.expectedPicks}, 0, 0, 0, ${r.status}, ${r.errorCode})`;
       return id;
     },
     insertPick: async (runId, p) => {

@@ -9,9 +9,11 @@ import {
   captureResearchSnapshotBestEffort,
   dataHoldReasons,
   decideRunStatus,
+  dbErrorCode,
   expectedHistoryRowsFor,
   historyCoverage,
   isResearchSnapshotEnabled,
+  isSystemicDbError,
   maybeCaptureResearchSnapshot,
   selectHistoryRows,
   writeCoverage,
@@ -45,6 +47,7 @@ function pick(id: string, available: number, rows = 3): PickSnapshotInput {
 
 function deps(over: Partial<SnapshotDeps> = {}): SnapshotDeps {
   return {
+    writeBatch: vi.fn(async () => { throw new Error("Raw query failed. Code: `23505`. Message: unique"); }),
     insertRun: vi.fn(async () => "run1"),
     insertPick: vi.fn(async () => undefined),
     updateRun: vi.fn(async () => undefined),
@@ -229,5 +232,53 @@ describe("fail-open write-path", () => {
     expect(r.expectedHistoryRows).toBe(0);
     expect(r.dataHold).toEqual([]);
     expect(r.status).toBe("PASS");
+  });
+});
+
+describe("batch yazım ve kontrollü fallback", () => {
+  it("batch başarılıysa tek yazım yapılır, pick-bazlı yola geçilmez", async () => {
+    const d = deps({ writeBatch: vi.fn(async () => "runB") });
+    const r = await captureResearchSnapshotBestEffort(RUN, [pick("a", 5), pick("b", 5)], d);
+    expect(d.writeBatch).toHaveBeenCalledTimes(1);
+    expect(d.insertRun).not.toHaveBeenCalled();
+    expect(d.insertPick).not.toHaveBeenCalled();
+    expect(d.updateRun).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ status: "PASS", writtenPicks: 2, expectedPicks: 2, errorCode: null });
+  });
+
+  it("bağlantı/sistemik hatada pick döngüsüne girilmez, run FAILED yazılır", async () => {
+    const d = deps({ writeBatch: vi.fn(async () => { throw new Error("Can't reach database server"); }) });
+    const r = await captureResearchSnapshotBestEffort(RUN, [pick("a", 5), pick("b", 5)], d);
+    expect(d.insertPick).not.toHaveBeenCalled();
+    expect(d.insertRun).toHaveBeenCalledTimes(1);
+    expect(d.insertRun).toHaveBeenCalledWith(expect.objectContaining({ status: "FAILED", errorCode: "SYSTEMIC_DB_ERROR" }));
+    expect(r).toMatchObject({ status: "FAILED", errorCode: "SYSTEMIC_DB_ERROR" });
+  });
+
+  it("satır bazlı hata (kısıt/tetikleyici) pick-bazlı fallback'e düşer ve PARTIAL üretir", async () => {
+    let n = 0;
+    const d = deps({
+      writeBatch: vi.fn(async () => { throw new Error("Raw query failed. Code: `P0001`. Message: IT_FAULT_PICK"); }),
+      insertPick: vi.fn(async () => { n++; if (n === 2) throw new Error("x"); }),
+    });
+    const r = await captureResearchSnapshotBestEffort(RUN, [pick("a", 5), pick("b", 5), pick("c", 5)], d);
+    expect(d.insertRun).toHaveBeenCalledWith(expect.objectContaining({ status: "PENDING" }));
+    expect(d.insertPick).toHaveBeenCalledTimes(3);
+    expect(r).toMatchObject({ status: "PARTIAL", writtenPicks: 2, errorCode: "PICK_INSERT_PARTIAL" });
+  });
+
+  it("hata kodu ayrıştırma ve sınıflandırma", () => {
+    expect(dbErrorCode(new Error("Raw query failed. Code: `23505`. Message: x"))).toBe("23505");
+    expect(dbErrorCode({ code: "22P02" })).toBe("22P02");
+    expect(dbErrorCode(new Error("boom"))).toBeNull();
+    expect(isSystemicDbError(new Error("Raw query failed. Code: `23505`"))).toBe(false);
+    expect(isSystemicDbError(new Error("Raw query failed. Code: `22001`"))).toBe(false);
+    expect(isSystemicDbError(new Error("Raw query failed. Code: `P0001`"))).toBe(false);
+    expect(isSystemicDbError(new Error("Raw query failed. Code: `42P01`"))).toBe(true);
+    expect(isSystemicDbError(new Error("Raw query failed. Code: `57014`"))).toBe(true);
+    expect(isSystemicDbError(new Error("Can't reach database"))).toBe(true);
+    const wrapped = Object.assign(new Error("Raw query failed. Code: `23505`. Message: unique"), { code: "P2010" });
+    expect(dbErrorCode(wrapped)).toBe("23505");
+    expect(isSystemicDbError(wrapped)).toBe(false);
   });
 });

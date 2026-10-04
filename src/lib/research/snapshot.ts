@@ -167,8 +167,17 @@ export type RunInput = {
   expectedPicks: number;
 };
 
+export type BatchFields = {
+  status: RunStatus;
+  writtenPicks: number;
+  expectedHistoryRows: number;
+  capturedHistoryRows: number;
+  errorCode: string | null;
+};
+
 export type SnapshotDeps = {
-  insertRun: (run: RunInput & { status: "PENDING" }) => Promise<string>;
+  writeBatch: (run: RunInput, picks: PickSnapshotInput[], fields: BatchFields) => Promise<string>;
+  insertRun: (run: RunInput & { status: RunStatus | "PENDING"; errorCode: string | null }) => Promise<string>;
   insertPick: (runId: string, pick: PickSnapshotInput) => Promise<void>;
   updateRun: (runId: string, fields: { writtenPicks: number; expectedHistoryRows: number; capturedHistoryRows: number; status: RunStatus; errorCode: string | null }) => Promise<void>;
   log: (event: string, detail: Record<string, unknown>) => void;
@@ -184,13 +193,59 @@ export type CaptureResult = {
   errorCode: string | null;
 };
 
+const ROW_LEVEL_CODE = /^(22|23)/;
+
+export function dbErrorCode(e: unknown): string | null {
+  const m = /Code: `([^`]+)`/.exec(String(e));
+  if (m) return m[1];
+  const direct = (e as { code?: unknown } | null)?.code;
+  return typeof direct === "string" ? direct : null;
+}
+
+/** Satır/pick bazlı hata (veri kısıtı, tetikleyici) → pick-bazlı fallback. Diğer her hata sistemik kabul edilir. */
+export function isSystemicDbError(e: unknown): boolean {
+  const code = dbErrorCode(e);
+  if (code === null) return true;
+  if (code === "P0001") return false;
+  return !ROW_LEVEL_CODE.test(code);
+}
+
 /** Fail-open: hiçbir koşulda throw etmez; çağıran tahmin akışı bundan etkilenmez. */
 export async function captureResearchSnapshotBestEffort(run: RunInput, picks: PickSnapshotInput[], deps: SnapshotDeps): Promise<CaptureResult> {
   const expectedHistory = picks.reduce((s, p) => s + expectedHistoryRowsFor(p.availableBeforeCutoff), 0);
   const capturedHistory = picks.reduce((s, p) => s + Math.min(p.rowsUsed.length, expectedHistoryRowsFor(p.availableBeforeCutoff)), 0);
+  try {
+    await deps.writeBatch(run, picks, {
+      status: "PASS",
+      writtenPicks: picks.length,
+      expectedHistoryRows: expectedHistory,
+      capturedHistoryRows: capturedHistory,
+      errorCode: null,
+    });
+    return {
+      status: "PASS",
+      writtenPicks: picks.length,
+      expectedPicks: picks.length,
+      capturedHistoryRows: capturedHistory,
+      expectedHistoryRows: expectedHistory,
+      dataHold: dataHoldReasons(writeCoverage(picks.length, picks.length), historyCoverage(capturedHistory, expectedHistory)),
+      errorCode: null,
+    };
+  } catch (e) {
+    if (isSystemicDbError(e)) {
+      deps.log("RESEARCH_BATCH_SYSTEMIC_ERROR", { predictionId: run.predictionId, code: dbErrorCode(e) });
+      try {
+        await deps.insertRun({ ...run, status: "FAILED", errorCode: "SYSTEMIC_DB_ERROR" });
+      } catch (e2) {
+        deps.log("RESEARCH_RUN_INSERT_FAILED", { predictionId: run.predictionId, error: String(e2) });
+      }
+      return { status: "FAILED", writtenPicks: 0, expectedPicks: picks.length, capturedHistoryRows: 0, expectedHistoryRows: expectedHistory, dataHold: [], errorCode: "SYSTEMIC_DB_ERROR" };
+    }
+    deps.log("RESEARCH_BATCH_ROW_FALLBACK", { predictionId: run.predictionId, code: dbErrorCode(e) });
+  }
   let runId: string;
   try {
-    runId = await deps.insertRun({ ...run, status: "PENDING" });
+    runId = await deps.insertRun({ ...run, status: "PENDING", errorCode: null });
   } catch (e) {
     deps.log("RESEARCH_RUN_INSERT_FAILED", { predictionId: run.predictionId, error: String(e) });
     return { status: "RUN_NOT_WRITTEN", writtenPicks: 0, expectedPicks: picks.length, capturedHistoryRows: 0, expectedHistoryRows: expectedHistory, dataHold: [], errorCode: "RUN_INSERT_FAILED" };

@@ -375,6 +375,24 @@ describe.skipIf(!RUN_IT)("research snapshot — yerel entegrasyon (rota_test)", 
     expect(outcomes.flagOn.finalPicks[0]).toBe(6);
   });
 
+  it("round-trip sayımı: flag ON bir admin save snapshot için tek yazım ifadesi kullanır", async () => {
+    setFlag(true);
+    const raw = vi.spyOn(db, "$executeRaw");
+    const reads = [
+      vi.spyOn(db.prediction, "findUnique"),
+      vi.spyOn(db.horseRaceHistoryCache, "findMany"),
+      vi.spyOn(db.accuraceHorseSplit, "findMany"),
+    ];
+    await upsertPrediction(saveInput("D"));
+    setFlag(false);
+    const snapshotWrites = raw.mock.calls.filter((c) => typeof c[0] === "object" && Array.isArray(c[0]) && c[0].join("").includes("ResearchSnapshotRun")).length;
+    const snapshotReads = reads.map((r) => r.mock.calls.length);
+    raw.mockRestore();
+    reads.forEach((r) => r.mockRestore());
+    console.log(`ROUNDTRIPS snapshotWrites=${snapshotWrites} hookReads(prediction,cache,split)=${snapshotReads.join(",")}`);
+    expect(snapshotWrites).toBe(1);
+  });
+
   it("latency: admin save süresi flag OFF vs ON (yerel DB, 10 tekrar, medyan)", async () => {
     const N = 10;
     const time = async (flag: boolean) => {
