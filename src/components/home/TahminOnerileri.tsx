@@ -164,7 +164,14 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
       </div>
 
       {/* Tek kupon şablonu — Ekonomik/Normal/Geniş, /program'daki panel butonları gibi tıklanınca değişir */}
-      <div className="flex flex-col overflow-hidden rounded-lg border bg-card">
+      <div className="isolate relative flex flex-col overflow-hidden rounded-lg border bg-card">
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center overflow-hidden select-none">
+          <img src="/horse-icon-gold.png" alt="" className="absolute top-[18%] h-[60%] w-auto opacity-10" />
+          <span className="absolute top-[55%] whitespace-nowrap text-[clamp(2.5rem,13vw,6rem)] font-black tracking-tight opacity-[0.06]">
+            <span className="text-foreground">ROTA</span>
+            <span className="ml-[0.18em] text-[#DF9D00]">GANYAN</span>
+          </span>
+        </div>
         <div className="flex items-center justify-between gap-2 border-b bg-muted/30 px-4 py-2.5">
           {/* v6.113 — kullanıcı talebi 2026-08-13: seçilecek tek kademe varsa (7'li Ganyan'da
               yalnız "Geniş" doluyor) sekme göstermenin anlamı yok — aralarında gezinilecek
