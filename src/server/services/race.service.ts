@@ -669,28 +669,13 @@ export async function getKuponOnerileri(): Promise<KuponOnerisi[]> {
   }
 
   const results = await Promise.all(validActives.map((a) => buildKuponOnerisi(a)));
-  // 2026-09-01 kullanıcı kararı: yatan (miss) bir kupon ANINDA anasayfadan kalkmasın —
-  // KENDİ son ayağı (o kuponun en büyük raceNo'lu koşusu; 1. Altılı ise 1. Altılı'nın,
-  // 2. Altılı ise 2. Altılı'nın son koşusu) sonuçlandıktan 20dk sonrasına kadar görünür
-  // kalır, sonra kalkar. Tutan (hit) ve henüz sonuçlanmamış (pending) varyantlar gün
-  // boyu yayında kalmaya devam eder (DEĞİŞMEDİ). Son ayak henüz sonuçlanmadıysa
-  // (sonAyakSonuclandiAt: null) 20dk sayacı hiç başlamaz, kupon görünür kalır. Bir
-  // hipodromun Ekonomik/Normal/Geniş varyantları birbirinden bağımsız yatabilir (ör.
-  // Ekonomik yatar ama Geniş hâlâ tutuyor olabilir). Geçmiş (yatan dahil) admin
-  // panelindeki "Geçmiş Kuponlar" listesinde zaten saklanıyor — bu sadece anasayfa
-  // görünümünü filtreler, veriyi silmez.
-  const MISS_GORUNUR_KALMA_SURESI_MS = 20 * 60 * 1000;
-  const now = Date.now();
+  // Tutan, yatan ve bekleyen varyantlar gün boyu yayında kalır; kupon yalnızca gün
+  // değişince (tarih filtresi) ve gece arşiv cron'unda birlikte kalkar.
   return results
     .filter((r): r is NonNullable<typeof r> => r !== null)
     .map((r) => ({
       ...r,
-      variants: r.variants.filter((v) => {
-        if (!v.filled) return false;
-        if (v.status !== "miss") return true;
-        if (!r.sonAyakSonuclandiAt) return true;
-        return now - r.sonAyakSonuclandiAt.getTime() < MISS_GORUNUR_KALMA_SURESI_MS;
-      }),
+      variants: r.variants.filter((v) => v.filled),
     }))
     .filter((r) => r.variants.length > 0);
 }
