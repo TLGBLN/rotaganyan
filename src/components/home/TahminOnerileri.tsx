@@ -164,10 +164,10 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
       </div>
 
       {/* Tek kupon şablonu — Ekonomik/Normal/Geniş, /program'daki panel butonları gibi tıklanınca değişir */}
-      <div className="isolate relative flex flex-col overflow-hidden rounded-lg border bg-card">
-        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center overflow-hidden select-none">
-          <img src="/horse-icon-gold.png" alt="" className="absolute top-[18%] h-[60%] w-auto opacity-10" />
-          <span className="absolute top-[55%] whitespace-nowrap text-[clamp(2.5rem,13vw,6rem)] font-black tracking-tight opacity-[0.06]">
+      <div className="isolate relative flex flex-col overflow-hidden rounded-lg border bg-card [container-type:inline-size]">
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden select-none">
+          <img src="/horse-icon-gold.png" alt="" className="absolute left-[13%] top-[18%] w-[70%] h-auto opacity-10" />
+          <span className="absolute inset-x-0 top-[42%] whitespace-nowrap text-center font-black leading-none text-[13.5cqw] opacity-[0.06]">
             <span className="text-foreground">ROTA</span>
             <span className="ml-[0.18em] text-[#DF9D00]">GANYAN</span>
           </span>
