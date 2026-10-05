@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Fragment } from "react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -19,16 +21,20 @@ import {
   ClipboardCheck,
   CloudRain,
   Activity,
+  ListChecks,
 } from "lucide-react";
 
-const NAV = [
+type NavOge = { href: string; label: string; icon: LucideIcon; exact?: boolean; grup?: string };
+
+const NAV: NavOge[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/analizler", label: "Analizler", icon: FileText },
   { href: "/admin/pedigri", label: "Pedigriler", icon: Dna },
   { href: "/admin/accurace", label: "Accurace Database", icon: Gauge },
   { href: "/admin/derece-istatistikleri", label: "Derece İstatistikleri", icon: CloudRain },
   { href: "/admin/veri-tamligi", label: "Veri Tamlığı", icon: ClipboardCheck },
-  { href: "/admin/site-anatomisi", label: "Site Anatomisi", icon: Activity },
+  { href: "/admin/site-anatomisi", label: "Site Anatomisi", icon: Activity, grup: "Teşhis" },
+  { href: "/admin/kosu-sonuclari", label: "Koşu Sonuçları Değerlendirme", icon: ListChecks, grup: "Teşhis" },
   { href: "/admin/sonuclar", label: "Sonuçlar", icon: Trophy },
   { href: "/admin/kupon", label: "Kupon Hazırla", icon: Ticket },
   { href: "/admin/jokey", label: "Jokey İstatistikleri", icon: TrendingUp },
@@ -45,11 +51,15 @@ export default function AdminNav({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <nav className="flex flex-col gap-0.5 p-3">
-      {NAV.map(({ href, label, icon: Icon, exact }) => {
+      {NAV.map(({ href, label, icon: Icon, exact, grup }, i) => {
         const active = exact ? pathname === href : pathname.startsWith(href);
+        const grupBasligi = grup && grup !== NAV[i - 1]?.grup;
         return (
+          <Fragment key={href}>
+          {grupBasligi && (
+            <p className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{grup}</p>
+          )}
           <Link
-            key={href}
             href={href}
             onClick={onNavigate}
             className={cn(
@@ -62,6 +72,7 @@ export default function AdminNav({ onNavigate }: { onNavigate?: () => void }) {
             <Icon className="h-4 w-4 shrink-0" />
             {label}
           </Link>
+          </Fragment>
         );
       })}
     </nav>
