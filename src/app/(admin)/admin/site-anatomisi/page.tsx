@@ -19,7 +19,7 @@ export default async function SiteAnatomisiPage() {
         <div>
           <h1 className="text-lg font-bold">Site Anatomisi</h1>
           <p className="text-xs text-muted-foreground">
-            Sitenin kalbi: her organ bir sistem parçasını izler. Yalnızca okuma yapar; hiçbir veriyi değiştirmez.
+            Site sağlık durumu: her sistem parçası ayrı izlenir. Yalnızca okuma yapar; hiçbir veriyi değiştirmez.
           </p>
         </div>
         <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", RENK[genel])}>
@@ -31,7 +31,6 @@ export default async function SiteAnatomisiPage() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b bg-muted/30 text-muted-foreground">
-              <th className="px-3 py-2 text-left font-medium">Organ</th>
               <th className="px-3 py-2 text-left font-medium">İşlev</th>
               <th className="px-3 py-2 text-left font-medium">Durum</th>
               <th className="px-3 py-2 text-left font-medium">Ayrıntı</th>
@@ -40,8 +39,7 @@ export default async function SiteAnatomisiPage() {
           <tbody>
             {organlar.map((o) => (
               <tr key={o.id} className="border-b last:border-0">
-                <td className="px-3 py-2 font-semibold">{o.kalpParcasi}</td>
-                <td className="px-3 py-2 text-muted-foreground">{o.islev}</td>
+                <td className="px-3 py-2 font-semibold">{o.islev}</td>
                 <td className="px-3 py-2">
                   <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", RENK[o.durum])}>{ETIKET[o.durum]}</span>
                 </td>
