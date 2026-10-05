@@ -101,7 +101,10 @@ export async function hesaplaSinyalSaglik(): Promise<SinyalOzeti> {
     b.refPayda = nRef;
   }
 
-  const yarislar: YarisDegerlendirme[] = kayitlar.map(yarisHesapla).filter((x): x is YarisDegerlendirme => x !== null);
+  // Sinyal sağlığı kupon bilgisine bağlı değil; kupon parametresi verilmez.
+  const yarislar: YarisDegerlendirme[] = kayitlar
+    .map((k) => yarisHesapla(k))
+    .filter((x): x is YarisDegerlendirme => x !== null);
   const kacanlar = yarislar.filter((y) => y.kacan);
 
   const satirlar: SinyalSatiri[] = [...birikim.keys()].sort().map((kod) => {

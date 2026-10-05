@@ -27,6 +27,7 @@ const SONUC_ETIKET: Record<SonucEtiketi, string> = {
 const KAYIP_ETIKET: Record<KayipTipi, string> = {
   MODEL_MISS: "Model kaçırdı",
   COUPON_MISS: "Kupon kaçırdı",
+  KUPON_KAPSAMI_YOK: "Kupon kapsamı yok",
   OK: "Kaybı yok",
   OLCULMEDI: "Model ölçülmedi",
 };
@@ -136,7 +137,8 @@ export default async function KosuSonuclariPage({ searchParams }: PageProps) {
           <h1 className="text-lg font-bold">Koşu Sonuçları Değerlendirme</h1>
           <p className="text-xs text-muted-foreground">
             Sistem yarışları ne kadar doğru okudu, kazananı kaçıncı gördü, ne kadar farkla kaçırdı. Yalnız okuma; hiçbir
-            skor, sıra veya kupon değiştirilmez. Model kaçırdı = kazanan model Top{KACAN_TOP_N} dışında. Kupon kaçırdı =
+            skor, sıra veya kupon değiştirilmez. Kupon üyeliği ekranda görünen kuponlardan (Ekonomik, Normal, Geniş)
+            okunur. Model kaçırdı = kazanan model Top{KACAN_TOP_N} dışında. Kupon kaçırdı =
             model Top{KACAN_TOP_N} içinde ama Ekonomik, Normal ve Geniş kuponların hiçbirinde yok; bu durumda sinyaller suçlanmaz. Sinyal farkı = kazanan − 6. at.
             Betimleyicidir, nedensel değildir.
           </p>
@@ -291,7 +293,9 @@ export default async function KosuSonuclariPage({ searchParams }: PageProps) {
                         </div>
                       </details>
                     ) : y.kayipTipi === "COUPON_MISS" ? (
-                      <span className="text-brand">Model Top{KACAN_TOP_N} içinde; kuponda yok. Kupon seçimi incelenmeli, sinyaller değil.</span>
+                      <span className="text-brand">Model Top{KACAN_TOP_N} içinde; görünen kuponların hiçbirinde yok. Kupon seçimi incelenmeli, sinyaller değil.</span>
+                    ) : y.kayipTipi === "KUPON_KAPSAMI_YOK" ? (
+                      <span className="text-muted-foreground">Model Top{KACAN_TOP_N} içinde; bu koşu için görünen kupon kaydı yok</span>
                     ) : y.kayipTipi === "OLCULMEDI" ? (
                       <span className="text-muted-foreground">Model sırası ölçülemedi (snapshot eksik)</span>
                     ) : (
