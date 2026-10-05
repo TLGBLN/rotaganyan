@@ -21,7 +21,7 @@ type PageProps = { searchParams: Promise<{ gun?: string; filtre?: string }> };
 
 const GUN_ETIKET: Record<Gun, string> = { bugun: "Bugün", "7": "Son 7 gün", tum: "Tüm V5.46" };
 const FILTRE_ETIKET: Record<Filtre, string> = {
-  tumu: "Tümü",
+  tumu: "Kaçırılanlar",
   model: "Model kaçırdı",
   kupon: "Kupon kaçırdı",
   olculemedi: "Model ölçülemedi",

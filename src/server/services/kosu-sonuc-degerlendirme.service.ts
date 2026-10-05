@@ -422,7 +422,8 @@ export async function getKosuSonuclari(opts: { gun: Gun; filtre: Filtre }): Prom
     if (opts.filtre === "model") return y.kayipTipi === "MODEL_MISS";
     if (opts.filtre === "kupon") return y.kayipTipi === "COUPON_MISS";
     if (opts.filtre === "olculemedi") return y.kayipTipi === "OLCULMEDI";
-    return true;
+    // Varsayılan (tumu): yalnız kaçırılanlar — model kaçırdı veya kupon kaçırdı.
+    return y.kayipTipi === "MODEL_MISS" || y.kayipTipi === "COUPON_MISS";
   });
   liste.sort((a, b) => oncelik(a) - oncelik(b) || (a.tarih < b.tarih ? 1 : a.tarih > b.tarih ? -1 : a.raceNo - b.raceNo));
 
