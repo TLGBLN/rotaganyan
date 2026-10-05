@@ -104,9 +104,9 @@ export default async function TahminOnerileriPage() {
                     <td className="hidden px-3 py-2 text-xs font-mono sm:table-cell">
                       {pred.couponNarrow || pred.couponNormal || pred.couponWide ? (
                         <div className="space-y-0.5">
-                          {pred.couponNarrow && <div>Ekonomik: {pred.couponNarrow}</div>}
-                          {pred.couponNormal && <div>Normal: {pred.couponNormal}</div>}
-                          {pred.couponWide && <div>Geniş: {pred.couponWide}</div>}
+                          {pred.couponNarrow && <div>Model 1–3. tercih: {pred.couponNarrow}</div>}
+                          {pred.couponNormal && <div>Model 4–6. tercih: {pred.couponNormal}</div>}
+                          {pred.couponWide && <div>Model 7+ tercih: {pred.couponWide}</div>}
                         </div>
                       ) : (
                         <span className="text-muted-foreground">—</span>

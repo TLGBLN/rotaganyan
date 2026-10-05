@@ -3,6 +3,7 @@
 import { after } from "next/server";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { kuponGenislikIhlalleri } from "@/lib/kupon-genislik";
 import { revalidatePath } from "next/cache";
 import { postTweet } from "@/lib/x";
 
@@ -226,6 +227,16 @@ export async function publishHomeKupon(input: HomeKuponInput) {
       normal: l.normal,
       wide: l.wide,
     }));
+
+  // Sözleşme denetimi (narrow ⊆ normal ⊆ wide). Yayını ENGELLEMEZ: geçmişte ihlalli kuponlar zaten
+  // yayınlandı; engellemek yayın akışını durdurur. İhlal sunucu günlüğüne yazılır.
+  const ihlal = kuponGenislikIhlalleri(legs);
+  if (ihlal.length > 0) {
+    console.error(
+      "[KUPON_TUTARSIZLIK]",
+      JSON.stringify({ hippodromeName: input.hippodromeName, date: input.date, slot: input.slot, ihlal }),
+    );
+  }
 
   await db.$transaction([
     // Sadece AYNI hipodromun aynı slotu (ör. "İzmir 1. Altılı") devre dışı kalır — farklı

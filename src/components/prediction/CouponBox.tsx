@@ -48,9 +48,9 @@ export default function CouponBox({ narrow, normal, wide, isBanko, bankoNote, co
         {/* Kupon alternatifleri */}
         <div className="grid grid-cols-3 gap-2">
           {[
-            { label: "Ekonomik", value: narrow },
-            { label: "Normal", value: normal },
-            { label: "Geniş", value: wide },
+            { label: "Model 1–3. tercih", value: narrow },
+            { label: "Model 4–6. tercih", value: normal },
+            { label: "Model 7+ tercih", value: wide },
           ].map(({ label, value }) =>
             value ? (
               <div key={label} className="rounded-md border bg-muted/30 p-2 text-center">

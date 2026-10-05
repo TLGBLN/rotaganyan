@@ -1,11 +1,10 @@
 import { db } from "@/lib/db";
 
-// Koşu Sonuçları Değerlendirme — SALT OKUMA teşhis servisi.
-// Her sonuçlanmış + yayınlanmış V5.46 koşusu için kazananın (1) yayın sırası/olasılığı, (2) model-ham
-// sırası (featureSnapshot.tumSinyaller + B katmanı), (3) kayıp tipi (MODEL_MISS / COUPON_MISS),
-// (4) model kaçırdıysa sinyal otopsisi: 6. atla farklar, sıfır/eksik katkılar, tek-sinyal ve piyasa
-// bloğu counterfactual'ı, sonuç etiketi. Hiçbir skor, sıra, katsayı veya kupon değiştirilmez.
-// Bulgular betimleyicidir; nedensel etiket için yeterli kanıt yok.
+// Koşu Sonuçları — SALT OKUMA teşhis servisi.
+// Her sonuçlanmış + yayınlanmış V5.46 koşusu için: kazananın yayın ve model sırası, Top3/Top6,
+// kayıp tipi (MODEL_MISS / COUPON_MISS / OK / OLCULMEDI / KUPON_KAPSAMI_YOK), genişlik başına kupon
+// durumu (Ekonomik = narrow, Normal = normal, Geniş = wide; kaynak HomeKupon.legs), ve model kaçırdıysa
+// sinyal otopsisi. Hiçbir skor, sıra, katsayı veya kupon değiştirilmez.
 
 export const V546_BASLANGIC = new Date("2026-09-12T00:00:00.000Z");
 export const TOP_N = 3;
@@ -13,14 +12,21 @@ export const KACAN_TOP_N = 6;
 // Bir sinyalin kazananı 6. ata göre "desteklediği" eşik (katkı farkı). Beyan edilen sabit.
 const DESTEK_ESIK = 0.05;
 export const PIYASA_KODLAR = ["agfSirasi", "agfPayi", "agfPayi2"];
-// Bağlam verisi: bu sinyallerde kazanan 0, 6. at ≠ 0 ise "bağlam verisi eksik" sayılır.
+// Bağlam verisi: kazananın bu sinyallerde 0 olması, bilginin bu koşuda eksik olabileceğini gösterir.
 export const BAGLAM_KODLAR = ["idmJokey", "hizDerecesi", "yarisGidisatiSkoru", "sonIdmanSprint", "yakinsama2Plus"];
+
+export type Gun = "bugun" | "7" | "tum";
+export type Filtre = "tumu" | "model" | "kupon" | "olculemedi";
+export type Genislik = "narrow" | "normal" | "wide";
 
 export type SonucEtiketi = "MARKET_PRESSURE" | "NO_INFORMATION" | "CONTEXT_MISSING" | "MULTI_SIGNAL";
 export type KayipTipi = "MODEL_MISS" | "COUPON_MISS" | "KUPON_KAPSAMI_YOK" | "OK" | "OLCULMEDI";
 
 export type SinyalFarki = { kod: string; winnerKatki: number; farkOrtalama: number };
 export type FarkVs6 = { kod: string; kazananKatki: number; altinciKatki: number; fark: number };
+
+// null = o genişlikte kupon kaydı yok; true/false = kazanan o genişlikte var/yok.
+export type KuponDurum = Record<Genislik, boolean | null>;
 
 export type Otopsi = {
   altinciNo: number | null;
@@ -52,8 +58,9 @@ export type YarisDegerlendirme = {
   modelTop3: boolean | null;
   modelTop6: boolean | null;
   sinirFarki: number | null;
+  kupon: KuponDurum;
   kuponda: boolean | null;
-  kuponGenislik: "narrow" | "normal" | "wide" | null;
+  kuponGenislik: Genislik | null;
   kayipTipi: KayipTipi;
   kacan: boolean;
   kuponTuttu: boolean;
@@ -76,15 +83,16 @@ export type KacanOzeti = {
   sinyalTablosu: { kod: string; ilk3Negatif: number; tekKurtaran: number; sifir: number; ortFark: number }[];
 };
 
-export type DegerlendirmeOzeti = {
+export type PencereOzeti = {
   toplam: number;
   modelOlcumlu: number;
   modelTop3: number;
   modelTop6: number;
-  yayinTop3: number;
   yayinTop6: number;
-  kacanSayi: number;
-  kuponTutan: number;
+  modelMiss: number;
+  couponMiss: number;
+  olculemeyen: number;
+  kupon: Record<Genislik, { kayip: number; degerlendirilen: number }>;
 };
 
 function sayi(x: unknown): number {
@@ -131,9 +139,6 @@ export async function kosuKayitlari() {
       result: { select: { winnerNo: true, winnerNos: true, hitInCoupon: true } },
       prediction: {
         select: {
-          couponNarrow: true,
-          couponNormal: true,
-          couponWide: true,
           picks: {
             orderBy: { rank: "asc" },
             select: {
@@ -152,20 +157,10 @@ export async function kosuKayitlari() {
 
 export type KosuKaydi = Awaited<ReturnType<typeof kosuKayitlari>>[number];
 
-type Hesap = { no: number | null; katki: Map<string, number>; S: number };
-
-// Verilen sinyalleri çıkarıp kazananın sırasını hesaplar. Eşitlikte kazanan öne geçmez (strict >).
-function siraSonrasi(hesaplar: Hesap[], kazananNo: number, cikarilan: string[]): number {
-  const skor = (h: Hesap) => h.S - cikarilan.reduce((a, k) => a + (h.katki.get(k) ?? 0), 0);
-  const kz = hesaplar.find((h) => h.no === kazananNo);
-  if (!kz) return -1;
-  const sw = skor(kz);
-  return 1 + hesaplar.filter((h) => h.no !== kazananNo && skor(h) > sw).length;
-}
-
 export type KuponKaydi = Awaited<ReturnType<typeof kuponKayitlari>>[number];
-export type KuponSatiri = { narrow: number[]; normal: number[]; wide: number[] };
+export type KuponSatiri = Record<Genislik, number[]>;
 
+// Görünen kupon kaynağı: HomeKupon. Prediction.coupon* alanları model tercihleridir, kullanılmaz.
 export async function kuponKayitlari() {
   return db.homeKupon.findMany({
     where: { date: { gte: V546_BASLANGIC } },
@@ -174,7 +169,7 @@ export async function kuponKayitlari() {
 }
 
 // HomeKupon.legs: [{ raceNo, narrow[], normal[], wide[] }]; hippodromeName "Bursa — 1. Altılı" biçiminde.
-// Bir koşu birden fazla kupon (altılı slotları, 7'li ganyan) içinde olabilir; hepsi toplanır.
+// Bir koşu birden fazla kuponda (altılı slotları, 7'li ganyan) olabilir; hepsi toplanır.
 export function kuponSatirlari(kayitlar: KuponKaydi[], hipodrom: string, tarih: string, raceNo: number): KuponSatiri[] {
   const satirlar: KuponSatiri[] = [];
   const dizi = (x: unknown) => (Array.isArray(x) ? x.map(sayi) : []);
@@ -190,6 +185,17 @@ export function kuponSatirlari(kayitlar: KuponKaydi[], hipodrom: string, tarih: 
   }
   return satirlar;
 }
+
+// Verilen sinyalleri çıkarıp kazananın sırasını hesaplar. Eşitlikte kazanan öne geçmez (strict >).
+function siraSonrasi(hesaplar: Hesap[], kazananNo: number, cikarilan: string[]): number {
+  const skor = (h: Hesap) => h.S - cikarilan.reduce((a, k) => a + (h.katki.get(k) ?? 0), 0);
+  const kz = hesaplar.find((h) => h.no === kazananNo);
+  if (!kz) return -1;
+  const sw = skor(kz);
+  return 1 + hesaplar.filter((h) => h.no !== kazananNo && skor(h) > sw).length;
+}
+
+type Hesap = { no: number | null; katki: Map<string, number>; S: number };
 
 export function yarisHesapla(r: KosuKaydi, kuponlar: KuponSatiri[] = []): YarisDegerlendirme | null {
   const kazananNo = r.result?.winnerNo ?? r.result?.winnerNos[0] ?? null;
@@ -207,18 +213,10 @@ export function yarisHesapla(r: KosuKaydi, kuponlar: KuponSatiri[] = []): YarisD
   const kazanan = satirlar.find((s) => s.no === kazananNo) ?? null;
   const yayinlananSira = kazanan?.rank ?? null;
 
-  // Ekranda görünen kupon = HomeKupon.legs (Ekonomik = narrow, Normal = normal, Geniş = wide).
-  // Prediction.coupon* alanları gösterilen kuponla eşleşmediği için kullanılmaz.
-  // Kazanan bu koşunun ayaklarında hangi en dar genişlikteyse o kaydedilir; hiçbirinde yoksa kupon kaçırılmıştır.
   const kapsam = kuponlar.length > 0;
-  const genislikVar = (ad: "narrow" | "normal" | "wide") => kuponlar.some((k) => k[ad].includes(kazananNo));
-  const kuponGenislik: "narrow" | "normal" | "wide" | null = genislikVar("narrow")
-    ? "narrow"
-    : genislikVar("normal")
-      ? "normal"
-      : genislikVar("wide")
-        ? "wide"
-        : null;
+  const genislikVar = (g: Genislik) => (kapsam ? kuponlar.some((k) => k[g].includes(kazananNo)) : null);
+  const kupon: KuponDurum = { narrow: genislikVar("narrow"), normal: genislikVar("normal"), wide: genislikVar("wide") };
+  const kuponGenislik: Genislik | null = kupon.narrow ? "narrow" : kupon.normal ? "normal" : kupon.wide ? "wide" : null;
   const kuponda = kapsam ? kuponGenislik !== null : null;
 
   const base = {
@@ -234,6 +232,7 @@ export function yarisHesapla(r: KosuKaydi, kuponlar: KuponSatiri[] = []): YarisD
     yayinlananSira,
     yayinTop3: yayinlananSira === null ? null : yayinlananSira <= TOP_N,
     yayinTop6: yayinlananSira === null ? null : yayinlananSira <= KACAN_TOP_N,
+    kupon,
     kuponda,
     kuponGenislik,
     kuponTuttu: r.result.hitInCoupon,
@@ -283,7 +282,7 @@ export function yarisHesapla(r: KosuKaydi, kuponlar: KuponSatiri[] = []): YarisD
         ? "COUPON_MISS"
         : "OK";
 
-  // Kazananın, saha ortalamasına göre farkları (genel kırılım; sinyal sağlığı bunu kullanır).
+  // Kazananın saha ortalamasına göre farkları (genel kırılım; sinyal sağlığı bunu kullanır).
   const kodlar = [...new Set(satirlar.flatMap((s) => s.snap!.tumSinyaller.map((z) => z.kod)))];
   const tumFarklar: SinyalFarki[] = kodlar.map((kod) => {
     const deger = (h: Hesap) => h.katki.get(kod) ?? 0;
@@ -307,27 +306,28 @@ export function yarisHesapla(r: KosuKaydi, kuponlar: KuponSatiri[] = []): YarisD
       .filter((t) => t.yeniSira <= KACAN_TOP_N);
     const piyasaCikar = PIYASA_KODLAR.filter((k) => kazananH.katki.has(k));
     const piyasaYeniSira = siraSonrasi(hesaplar, kazananNo, piyasaCikar);
+    const destekSayisi = farkVs6.filter((f) => f.fark > DESTEK_ESIK).length;
+    const piyasaKurtarir = piyasaYeniSira <= KACAN_TOP_N;
+    const baglamSifir = BAGLAM_KODLAR.filter((k) => kodlar.includes(k) && (kazananH.katki.get(k) ?? 0) === 0);
+    const sonuc: SonucEtiketi = piyasaKurtarir
+      ? "MARKET_PRESSURE"
+      : destekSayisi === 0
+        ? "NO_INFORMATION"
+        : baglamSifir.length > 0
+          ? "CONTEXT_MISSING"
+          : "MULTI_SIGNAL";
     otopsi = {
       altinciNo: altinci.no,
       altinciAd: altinciSatir?.ad ?? "",
       farkVs6,
       sifirKatki: kodlar.filter((k) => (kazananH.katki.get(k) ?? 0) === 0),
-      // Kazananın bağlam verisi 0: 6. atta da 0 olsa bu, bilginin bu koşuda eksik olduğu anlamına gelir.
-      baglamSifir: BAGLAM_KODLAR.filter((k) => kodlar.includes(k) && (kazananH.katki.get(k) ?? 0) === 0),
+      baglamSifir,
       tekKurtaranlar,
       piyasaYeniSira,
-      piyasaKurtarir: piyasaYeniSira <= KACAN_TOP_N,
-      destekSayisi: farkVs6.filter((f) => f.fark > DESTEK_ESIK).length,
-      sonuc: "MULTI_SIGNAL",
+      piyasaKurtarir,
+      destekSayisi,
+      sonuc,
     };
-    const sonuc: SonucEtiketi = otopsi.piyasaKurtarir
-      ? "MARKET_PRESSURE"
-      : otopsi.destekSayisi === 0
-        ? "NO_INFORMATION"
-        : otopsi.baglamSifir.length > 0
-          ? "CONTEXT_MISSING"
-          : "MULTI_SIGNAL";
-    otopsi.sonuc = sonuc;
   }
 
   return {
@@ -346,13 +346,8 @@ export function yarisHesapla(r: KosuKaydi, kuponlar: KuponSatiri[] = []): YarisD
   };
 }
 
-function oran(liste: (boolean | null)[]): number {
-  const olcum = liste.filter((x): x is boolean => x !== null);
-  return olcum.length === 0 ? 0 : olcum.filter(Boolean).length / olcum.length;
-}
-
-function ozetKacan(tum: YarisDegerlendirme[]): KacanOzeti {
-  const misses = tum.filter((y) => y.kayipTipi === "MODEL_MISS" && y.otopsi);
+function ozetKacan(liste: YarisDegerlendirme[]): KacanOzeti {
+  const misses = liste.filter((y) => y.kayipTipi === "MODEL_MISS" && y.otopsi);
   const sonuc: Record<SonucEtiketi, number> = { MARKET_PRESSURE: 0, NO_INFORMATION: 0, CONTEXT_MISSING: 0, MULTI_SIGNAL: 0 };
   for (const m of misses) sonuc[m.otopsi!.sonuc]++;
 
@@ -373,8 +368,8 @@ function ozetKacan(tum: YarisDegerlendirme[]): KacanOzeti {
   const sinirler = misses.map((m) => m.sinirFarki).filter((x): x is number => x !== null);
   return {
     modelMiss: misses.length,
-    couponMiss: tum.filter((y) => y.kayipTipi === "COUPON_MISS").length,
-    olculemeyen: tum.filter((y) => y.kayipTipi === "OLCULMEDI").length,
+    couponMiss: liste.filter((y) => y.kayipTipi === "COUPON_MISS").length,
+    olculemeyen: liste.filter((y) => y.kayipTipi === "OLCULMEDI").length,
     sonuc,
     ortSinirFarki: sinirler.length ? sinirler.reduce((a, b) => a + b, 0) / sinirler.length : null,
     tekKurtaranVaka: misses.filter((m) => m.otopsi!.tekKurtaranlar.length > 0).length,
@@ -384,15 +379,29 @@ function ozetKacan(tum: YarisDegerlendirme[]): KacanOzeti {
   };
 }
 
-export async function getKosuSonucDegerlendirme(opts: { sadeceKacan: boolean }): Promise<{
-  ozet: DegerlendirmeOzeti;
-  oranlar: { modelTop3: number; modelTop6: number; yayinTop3: number; yayinTop6: number };
+function gunEkle(tarih: string, n: number): string {
+  const d = new Date(`${tarih}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+// Ekonomik öncelikli sıra: Ekonomik'te kaçan (Top6 içinde) > model kaçırdı > kupon kaçırdı > diğerleri.
+function oncelik(y: YarisDegerlendirme): number {
+  if (y.modelTop6 === true && y.kupon.narrow === false) return 0;
+  if (y.kayipTipi === "MODEL_MISS") return 1;
+  if (y.kayipTipi === "COUPON_MISS") return 2;
+  return 3;
+}
+
+export async function getKosuSonuclari(opts: { gun: Gun; filtre: Filtre }): Promise<{
+  sonTarih: string | null;
+  pencere: PencereOzeti;
   kacanOzeti: KacanOzeti;
   yarislar: YarisDegerlendirme[];
 }> {
   const kayitlar = await kosuKayitlari();
   const kuponRows = await kuponKayitlari();
-  const tum = kayitlar
+  const tumu = kayitlar
     .map((r) =>
       yarisHesapla(
         r,
@@ -400,26 +409,43 @@ export async function getKosuSonucDegerlendirme(opts: { sadeceKacan: boolean }):
       ),
     )
     .filter((x): x is YarisDegerlendirme => x !== null);
-  const yarislar = opts.sadeceKacan ? tum.filter((y) => y.kacan) : tum;
-  const modelOlcumlu = tum.filter((y) => y.modelSira !== null).length;
+
+  const sonTarih = tumu.reduce<string | null>((m, y) => (m === null || y.tarih > m ? y.tarih : m), null);
+  const pencere = tumu.filter((y) => {
+    if (opts.gun === "tum") return true;
+    if (sonTarih === null) return false;
+    if (opts.gun === "bugun") return y.tarih === sonTarih;
+    return y.tarih >= gunEkle(sonTarih, -6);
+  });
+
+  const liste = pencere.filter((y) => {
+    if (opts.filtre === "model") return y.kayipTipi === "MODEL_MISS";
+    if (opts.filtre === "kupon") return y.kayipTipi === "COUPON_MISS";
+    if (opts.filtre === "olculemedi") return y.kayipTipi === "OLCULMEDI";
+    return true;
+  });
+  liste.sort((a, b) => oncelik(a) - oncelik(b) || (a.tarih < b.tarih ? 1 : a.tarih > b.tarih ? -1 : a.raceNo - b.raceNo));
+
+  const kupon = {} as PencereOzeti["kupon"];
+  for (const g of ["narrow", "normal", "wide"] as Genislik[]) {
+    const degerlendirilen = pencere.filter((y) => y.modelTop6 === true && y.kupon[g] !== null);
+    kupon[g] = { degerlendirilen: degerlendirilen.length, kayip: degerlendirilen.filter((y) => y.kupon[g] === false).length };
+  }
+
   return {
-    ozet: {
-      toplam: tum.length,
-      modelOlcumlu,
-      modelTop3: tum.filter((y) => y.modelTop3 === true).length,
-      modelTop6: tum.filter((y) => y.modelTop6 === true).length,
-      yayinTop3: tum.filter((y) => y.yayinTop3 === true).length,
-      yayinTop6: tum.filter((y) => y.yayinTop6 === true).length,
-      kacanSayi: tum.filter((y) => y.kacan).length,
-      kuponTutan: tum.filter((y) => y.kuponTuttu).length,
+    sonTarih,
+    pencere: {
+      toplam: pencere.length,
+      modelOlcumlu: pencere.filter((y) => y.modelSira !== null).length,
+      modelTop3: pencere.filter((y) => y.modelTop3 === true).length,
+      modelTop6: pencere.filter((y) => y.modelTop6 === true).length,
+      yayinTop6: pencere.filter((y) => y.yayinTop6 === true).length,
+      modelMiss: pencere.filter((y) => y.kayipTipi === "MODEL_MISS").length,
+      couponMiss: pencere.filter((y) => y.kayipTipi === "COUPON_MISS").length,
+      olculemeyen: pencere.filter((y) => y.kayipTipi === "OLCULMEDI").length,
+      kupon,
     },
-    oranlar: {
-      modelTop3: oran(tum.map((y) => y.modelTop3)),
-      modelTop6: oran(tum.map((y) => y.modelTop6)),
-      yayinTop3: oran(tum.map((y) => y.yayinTop3)),
-      yayinTop6: oran(tum.map((y) => y.yayinTop6)),
-    },
-    kacanOzeti: ozetKacan(tum),
-    yarislar,
+    kacanOzeti: ozetKacan(pencere),
+    yarislar: liste,
   };
 }
