@@ -53,6 +53,7 @@ export type YarisDegerlendirme = {
   modelTop6: boolean | null;
   sinirFarki: number | null;
   kuponda: boolean | null;
+  kuponGenislik: "narrow" | "normal" | "wide" | null;
   kayipTipi: KayipTipi;
   kacan: boolean;
   kuponTuttu: boolean;
@@ -130,7 +131,9 @@ export async function kosuKayitlari() {
       result: { select: { winnerNo: true, winnerNos: true, hitInCoupon: true } },
       prediction: {
         select: {
+          couponNarrow: true,
           couponNormal: true,
+          couponWide: true,
           picks: {
             orderBy: { rank: "asc" },
             select: {
@@ -176,11 +179,20 @@ export function yarisHesapla(r: KosuKaydi): YarisDegerlendirme | null {
   const kazanan = satirlar.find((s) => s.no === kazananNo) ?? null;
   const yayinlananSira = kazanan?.rank ?? null;
 
-  const kuponNos = (r.prediction?.couponNormal ?? "")
-    .split("-")
-    .map((s) => parseInt(s.trim(), 10))
-    .filter((n) => !isNaN(n));
-  const kuponda = kuponNos.length > 0 ? kuponNos.includes(kazananNo) : null;
+  // Ekonomik = couponNarrow, Normal = couponNormal, Geniş = couponWide (KuponForm / tahmin-onerileri ile aynı).
+  // Kazanan üç genişliğin HİÇBİRİNDE yoksa kupon kaçırılmıştır; hangi genişlikte olduğu ayrıca gösterilir.
+  const kuponListe = (s: string | null | undefined) =>
+    (s ?? "")
+      .split("-")
+      .map((x) => parseInt(x.trim(), 10))
+      .filter((n) => !isNaN(n));
+  const genislikler = [
+    { ad: "narrow" as const, nos: kuponListe(r.prediction?.couponNarrow) },
+    { ad: "normal" as const, nos: kuponListe(r.prediction?.couponNormal) },
+    { ad: "wide" as const, nos: kuponListe(r.prediction?.couponWide) },
+  ].filter((g) => g.nos.length > 0);
+  const kuponGenislik = genislikler.find((g) => g.nos.includes(kazananNo))?.ad ?? null;
+  const kuponda = genislikler.length > 0 ? kuponGenislik !== null : null;
 
   const base = {
     raceId: r.id,
@@ -196,6 +208,7 @@ export function yarisHesapla(r: KosuKaydi): YarisDegerlendirme | null {
     yayinTop3: yayinlananSira === null ? null : yayinlananSira <= TOP_N,
     yayinTop6: yayinlananSira === null ? null : yayinlananSira <= KACAN_TOP_N,
     kuponda,
+    kuponGenislik,
     kuponTuttu: r.result.hitInCoupon,
   };
 

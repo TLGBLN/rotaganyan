@@ -137,7 +137,7 @@ export default async function KosuSonuclariPage({ searchParams }: PageProps) {
           <p className="text-xs text-muted-foreground">
             Sistem yarışları ne kadar doğru okudu, kazananı kaçıncı gördü, ne kadar farkla kaçırdı. Yalnız okuma; hiçbir
             skor, sıra veya kupon değiştirilmez. Model kaçırdı = kazanan model Top{KACAN_TOP_N} dışında. Kupon kaçırdı =
-            model Top{KACAN_TOP_N} içinde ama kuponda yok (kupon üç attan oluşur); bu durumda sinyaller suçlanmaz. Sinyal farkı = kazanan − 6. at.
+            model Top{KACAN_TOP_N} içinde ama Ekonomik, Normal ve Geniş kuponların hiçbirinde yok; bu durumda sinyaller suçlanmaz. Sinyal farkı = kazanan − 6. at.
             Betimleyicidir, nedensel değildir.
           </p>
         </div>
@@ -295,7 +295,9 @@ export default async function KosuSonuclariPage({ searchParams }: PageProps) {
                     ) : y.kayipTipi === "OLCULMEDI" ? (
                       <span className="text-muted-foreground">Model sırası ölçülemedi (snapshot eksik)</span>
                     ) : (
-                      <span className="text-muted-foreground">Kaybı yok</span>
+                      <span className="text-muted-foreground">
+                        Kaybı yok{y.kuponGenislik ? ` · kuponda: ${{ narrow: "Ekonomik", normal: "Normal", wide: "Geniş" }[y.kuponGenislik]}` : ""}
+                      </span>
                     )}
                   </td>
                 </tr>
