@@ -8,7 +8,6 @@ import { kosuKayitlari, snapOku, yarisHesapla, type YarisDegerlendirme } from "@
 // Durum: SAĞLAM = açık sorun yok · İZLE = kapsama/sıfır/drift/kaçan baskısı var, production'dan
 // çıkarılacak kanıt yok · SORUN = değer hiç değişmiyor (ölü sinyal) · VERİ YETERSİZ = örneklem az.
 
-const TAKE = 300;
 const SON_GUN_MS = 30 * 86_400_000;
 export const SINYAL_SON_GUN = 30;
 const MIN_PICK = 100;
@@ -54,7 +53,7 @@ function ortSd(a: number[]): { ort: number; sd: number } {
 type Birikim = { son: number[]; ref: number[]; sonPayda: number; refPayda: number };
 
 export async function hesaplaSinyalSaglik(): Promise<SinyalOzeti> {
-  const kayitlar = await kosuKayitlari(TAKE);
+  const kayitlar = await kosuKayitlari();
   if (kayitlar.length === 0) {
     return { satirlar: [], sayilar: { ...BOS_SAYI }, sonTarih: null, kacanVakaSayisi: 0, pencereGun: SINYAL_SON_GUN };
   }

@@ -1,13 +1,35 @@
 import Link from "next/link";
-import { getKosuSonucDegerlendirme, KACAN_TOP_N, TOP_N, type YarisDegerlendirme } from "@/server/services/kosu-sonuc-degerlendirme.service";
+import {
+  getKosuSonucDegerlendirme,
+  KACAN_TOP_N,
+  TOP_N,
+  type KayipTipi,
+  type Otopsi,
+  type SonucEtiketi,
+  type YarisDegerlendirme,
+} from "@/server/services/kosu-sonuc-degerlendirme.service";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-// Koşu Sonuçları Değerlendirme: "Sistem yarışları ne kadar doğru okudu ve hangi kazananları
-// neden kaçırdı?" Yalnız okuma. Sistem sağlığı Site Anatomisi'nde; burada yalnız performans teşhisi.
+// Koşu Sonuçları Değerlendirme: sistem yarışları ne kadar doğru okudu, kazananı kaçıncı gördü,
+// ne kadar farkla kaçırdı, hangi sinyaller aşağı çekti, sorun sinyal mi eksik bilgi mi kupon mu.
+// Yalnız okuma. Sistem sağlığı Site Anatomisi'nde.
 
 type PageProps = { searchParams: Promise<{ kacan?: string }> };
+
+const SONUC_ETIKET: Record<SonucEtiketi, string> = {
+  MARKET_PRESSURE: "Piyasa baskısı",
+  NO_INFORMATION: "Bilgi yok",
+  CONTEXT_MISSING: "Bağlam eksik",
+  MULTI_SIGNAL: "Çoklu sinyal",
+};
+const KAYIP_ETIKET: Record<KayipTipi, string> = {
+  MODEL_MISS: "Model kaçırdı",
+  COUPON_MISS: "Kupon kaçırdı",
+  OK: "Kaybı yok",
+  OLCULMEDI: "Model ölçülmedi",
+};
 
 function yuzde(v: number): string {
   return `%${(v * 100).toFixed(0)}`;
@@ -30,40 +52,74 @@ function Chip({ aktif, etiket, tip }: { aktif: boolean | null; etiket: string; t
   );
 }
 
-function SinyalListesi({ baslik, satirlar, renk }: { baslik: string; satirlar: YarisDegerlendirme["enIyiKatkilar"]; renk: string }) {
-  if (satirlar.length === 0) return null;
+function Otopsi6({ o, kazananAgf, kazananOlasilik }: { o: Otopsi; kazananAgf: number | null; kazananOlasilik: number | null }) {
+  const negatifler = o.farkVs6.slice(0, 3);
+  const pozitifler = o.farkVs6.slice(-3).reverse().filter((f) => f.fark > 0);
+  const kurtaranlar = o.tekKurtaranlar;
   return (
-    <div>
-      <p className="font-semibold text-muted-foreground">{baslik}</p>
-      <ul className="space-y-0.5">
-        {satirlar.map((s) => (
-          <li key={s.kod} className="flex justify-between gap-3 tabular-nums">
-            <span>{s.kod}</span>
-            <span className={cn("font-semibold", renk)}>{fark(s.farkOrtalama)}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function Otopsi({ y }: { y: YarisDegerlendirme }) {
-  return (
-    <div className="space-y-2">
-      {y.sinyalVeriVar ? (
-        <>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <SinyalListesi baslik="Kazananı en çok aşağı çeken sinyaller" satirlar={y.enKotuKatkilar} renk="text-miss" />
-            <SinyalListesi baslik="Kazananı en çok destekleyen sinyaller" satirlar={y.enIyiKatkilar} renk="text-hit" />
-          </div>
-          <p>
-            Top{KACAN_TOP_N} sınırına skor farkı: <span className="font-semibold tabular-nums">{fark(y.sinirFarki)}</span>
-            <span className="text-muted-foreground"> (negatif = sınırın altında)</span>
+    <div className="space-y-3">
+      <p>
+        Kazanan AGF {kazananAgf ?? "—"} · olasılık {kazananOlasilik !== null ? `%${kazananOlasilik.toFixed(1)}` : "—"} · 6. at #{o.altinciNo ?? "—"} {o.altinciAd}
+      </p>
+      <p>
+        Sonuç: <span className="font-semibold">{SONUC_ETIKET[o.sonuc]}</span> · sinyal destekleyen {o.destekSayisi} (eşik +{0.05})
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <p className="font-semibold text-muted-foreground">En büyük negatif farklar (kazanan − 6. at)</p>
+          <ul className="space-y-0.5">
+            {negatifler.map((f) => (
+              <li key={f.kod} className="flex justify-between gap-3 tabular-nums">
+                <span>{f.kod}</span>
+                <span className="font-semibold text-miss">{fark(f.fark)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p className="font-semibold text-muted-foreground">Kazananı yukarı çeken sinyaller</p>
+          {pozitifler.length === 0 ? (
+            <p className="text-muted-foreground">Yok</p>
+          ) : (
+            <ul className="space-y-0.5">
+              {pozitifler.map((f) => (
+                <li key={f.kod} className="flex justify-between gap-3 tabular-nums">
+                  <span>{f.kod}</span>
+                  <span className="font-semibold text-hit">{fark(f.fark)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <p className="font-semibold text-muted-foreground">Sıfır/eksik katkı (kazanan)</p>
+          <p className="tabular-nums">{o.sifirKatki.length ? o.sifirKatki.join(", ") : "Yok"}</p>
+          {o.baglamSifir.length > 0 && (
+            <p className="text-miss">Bağlam verisi kazananda 0: {o.baglamSifir.join(", ")}</p>
+          )}
+        </div>
+        <div>
+          <p className="font-semibold text-muted-foreground">Tek-sinyal counterfactual</p>
+          {kurtaranlar.length === 0 ? (
+            <p className="text-muted-foreground">Tek bir sinyal çıkarılınca Top{KACAN_TOP_N}&apos;a girmiyor</p>
+          ) : (
+            <ul className="space-y-0.5">
+              {kurtaranlar.map((t) => (
+                <li key={t.kod} className="flex justify-between gap-3">
+                  <span>{t.kod} çıkarılırsa</span>
+                  <span className="font-semibold text-hit">{t.yeniSira}. sıra → Top{KACAN_TOP_N} içinde</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-1">
+            Piyasa bloğu ({["agfSirasi", "agfPayi", "agfPayi2"].join(" + ")}) çıkarılırsa: {o.piyasaYeniSira}. sıra
+            {o.piyasaKurtarir ? <span className="font-semibold text-hit"> → kurtarıyor</span> : " → kurtarmıyor"}
           </p>
-        </>
-      ) : (
-        <span className="text-muted-foreground">Sinyal verisi yok (featureSnapshot eksik veya 6&apos;dan az at)</span>
-      )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -71,7 +127,7 @@ function Otopsi({ y }: { y: YarisDegerlendirme }) {
 export default async function KosuSonuclariPage({ searchParams }: PageProps) {
   const { kacan } = await searchParams;
   const sadeceKacan = kacan === "1";
-  const { ozet, oranlar, yarislar } = await getKosuSonucDegerlendirme({ sadeceKacan });
+  const { ozet, oranlar, kacanOzeti, yarislar } = await getKosuSonucDegerlendirme({ sadeceKacan });
 
   return (
     <div className="space-y-4">
@@ -79,9 +135,10 @@ export default async function KosuSonuclariPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-lg font-bold">Koşu Sonuçları Değerlendirme</h1>
           <p className="text-xs text-muted-foreground">
-            Sistem yarışları ne kadar doğru okudu, hangi kazananları neden kaçırdı. Yalnızca okuma; hiçbir skor, sıra
-            veya kupon değiştirilmez. Kaçan = kazanan Top{KACAN_TOP_N} dışında. Sinyal farkı, kazananın katkısının saha
-            ortalamasından farkıdır; betimleyicidir, nedensel değildir.
+            Sistem yarışları ne kadar doğru okudu, kazananı kaçıncı gördü, ne kadar farkla kaçırdı. Yalnız okuma; hiçbir
+            skor, sıra veya kupon değiştirilmez. Model kaçırdı = kazanan model Top{KACAN_TOP_N} dışında. Kupon kaçırdı =
+            model Top{KACAN_TOP_N} içinde ama kuponda yok (kupon üç attan oluşur); bu durumda sinyaller suçlanmaz. Sinyal farkı = kazanan − 6. at.
+            Betimleyicidir, nedensel değildir.
           </p>
         </div>
         <div className="flex gap-2 text-xs">
@@ -95,7 +152,7 @@ export default async function KosuSonuclariPage({ searchParams }: PageProps) {
             href="/admin/kosu-sonuclari?kacan=1"
             className={cn("rounded-full px-3 py-1 font-semibold", sadeceKacan ? "bg-miss/15 text-miss" : "bg-muted/40 text-muted-foreground")}
           >
-            Sadece kaçan
+            Sadece model kaçırdı
           </Link>
         </div>
       </div>
@@ -103,9 +160,9 @@ export default async function KosuSonuclariPage({ searchParams }: PageProps) {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { etiket: "Sonuçlanmış koşu", deger: String(ozet.toplam) },
-          { etiket: `Model Top${TOP_N} isabeti`, deger: `${yuzde(oranlar.modelTop3)} (${ozet.modelOlcumlu} koşu)` },
-          { etiket: `Model Top${KACAN_TOP_N} isabeti`, deger: yuzde(oranlar.modelTop6) },
+          { etiket: `Model Top${KACAN_TOP_N} isabeti`, deger: `${yuzde(oranlar.modelTop6)} (${ozet.modelOlcumlu} koşu)` },
           { etiket: `Yayın Top${KACAN_TOP_N} isabeti`, deger: yuzde(oranlar.yayinTop6) },
+          { etiket: "Model kaçırdı / kupon kaçırdı", deger: `${kacanOzeti.modelMiss} / ${kacanOzeti.couponMiss}` },
         ].map((k) => (
           <div key={k.etiket} className="rounded-lg border p-3">
             <p className="text-[11px] text-muted-foreground">{k.etiket}</p>
@@ -113,10 +170,62 @@ export default async function KosuSonuclariPage({ searchParams }: PageProps) {
           </div>
         ))}
       </div>
-      <p className="text-[11px] text-muted-foreground">
-        Kaçan koşu: {ozet.kacanSayi} · Kupon tutan: {ozet.kuponTutan} · Yayın Top{TOP_N} isabeti {yuzde(oranlar.yayinTop3)}.
-        Model sırası, yayınlanan pick&apos;lerdeki featureSnapshot katkılarından yeniden toplanır; snapshot&apos;ı olmayan koşularda hesaplanmaz.
-      </p>
+
+      <section className="space-y-3 rounded-lg border p-3">
+        <h2 className="text-sm font-bold">Model kaçırdığı vakalarda sinyal otopsisi ({kacanOzeti.modelMiss})</h2>
+        <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+          {(Object.keys(SONUC_ETIKET) as SonucEtiketi[]).map((s) => (
+            <div key={s}>
+              <p className="text-muted-foreground">{SONUC_ETIKET[s]}</p>
+              <p className="font-semibold tabular-nums">{kacanOzeti.sonuc[s]}</p>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+          <div>
+            <p className="text-muted-foreground">Ort. Top{KACAN_TOP_N} sınır farkı</p>
+            <p className="font-semibold tabular-nums">{fark(kacanOzeti.ortSinirFarki)}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Tek sinyal kurtarıyor</p>
+            <p className="font-semibold tabular-nums">{kacanOzeti.tekKurtaranVaka} vaka</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Piyasa bloğu kurtarıyor</p>
+            <p className="font-semibold tabular-nums">{kacanOzeti.piyasaKurtaranVaka} vaka</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">En az bir sinyali 0</p>
+            <p className="font-semibold tabular-nums">{kacanOzeti.sifirKatkiliVaka} vaka</p>
+          </div>
+        </div>
+        {kacanOzeti.sinyalTablosu.length > 0 && (
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b bg-muted/30 text-muted-foreground">
+                  <th className="px-3 py-2 text-left font-medium">Sinyal</th>
+                  <th className="px-3 py-2 text-right font-medium">İlk-3 negatif</th>
+                  <th className="px-3 py-2 text-right font-medium">Tek başına kurtarıyor</th>
+                  <th className="px-3 py-2 text-right font-medium">Kazanan katkısı 0</th>
+                  <th className="px-3 py-2 text-right font-medium">Ort. fark (6. at)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {kacanOzeti.sinyalTablosu.map((s) => (
+                  <tr key={s.kod} className="border-b last:border-0">
+                    <td className="px-3 py-2 font-semibold">{s.kod}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{s.ilk3Negatif}/{kacanOzeti.modelMiss}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{s.tekKurtaran}/{kacanOzeti.modelMiss}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{s.sifir}/{kacanOzeti.modelMiss}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fark(s.ortFark)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       {yarislar.length === 0 ? (
         <p className="text-xs text-muted-foreground">Gösterilecek koşu yok.</p>
@@ -128,16 +237,15 @@ export default async function KosuSonuclariPage({ searchParams }: PageProps) {
                 <th className="px-3 py-2 text-left font-medium">Tarih</th>
                 <th className="px-3 py-2 text-left font-medium">Koşu</th>
                 <th className="px-3 py-2 text-left font-medium">Kazanan</th>
-                <th className="px-3 py-2 text-right font-medium">Olasılık</th>
                 <th className="px-3 py-2 text-left font-medium">Yayın sırası</th>
                 <th className="px-3 py-2 text-left font-medium">Model sırası</th>
                 <th className="px-3 py-2 text-right font-medium">Top{KACAN_TOP_N} sınırı farkı</th>
-                <th className="px-3 py-2 text-left font-medium">Kupon</th>
-                <th className="px-3 py-2 text-left font-medium">Otopsi</th>
+                <th className="px-3 py-2 text-left font-medium">Kayıp</th>
+                <th className="px-3 py-2 text-left font-medium">Ayrıntı</th>
               </tr>
             </thead>
             <tbody>
-              {yarislar.map((y) => (
+              {yarislar.map((y: YarisDegerlendirme) => (
                 <tr key={y.raceId} className="border-b align-top last:border-0">
                   <td className="whitespace-nowrap px-3 py-2 tabular-nums">{y.tarih}</td>
                   <td className="whitespace-nowrap px-3 py-2">
@@ -145,9 +253,7 @@ export default async function KosuSonuclariPage({ searchParams }: PageProps) {
                   </td>
                   <td className="px-3 py-2">
                     <span className="font-semibold">#{y.kazananNo}</span> {y.kazananAd}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {y.olasilikYuzde === null ? "—" : `%${y.olasilikYuzde.toFixed(1)}`}
+                    <span className="text-muted-foreground"> · AGF {y.kazananAgf ?? "—"}</span>
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap items-center gap-1">
@@ -167,18 +273,29 @@ export default async function KosuSonuclariPage({ searchParams }: PageProps) {
                     {fark(y.sinirFarki)}
                   </td>
                   <td className="px-3 py-2">
-                    <Chip aktif={y.kuponTuttu} etiket={y.kuponTuttu ? "Tuttu" : "Tutmadı"} tip="hit" />
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                        y.kayipTipi === "MODEL_MISS" ? "bg-miss/15 text-miss" : y.kayipTipi === "COUPON_MISS" ? "bg-brand/15 text-brand" : "bg-muted/40 text-muted-foreground",
+                      )}
+                    >
+                      {KAYIP_ETIKET[y.kayipTipi]}
+                    </span>
                   </td>
                   <td className="px-3 py-2">
-                    {y.kacan ? (
+                    {y.kayipTipi === "MODEL_MISS" && y.otopsi ? (
                       <details>
-                        <summary className="cursor-pointer text-miss">Kaçırıldı · otopsi</summary>
+                        <summary className="cursor-pointer text-miss">Otopsi · {SONUC_ETIKET[y.otopsi.sonuc]}</summary>
                         <div className="mt-2">
-                          <Otopsi y={y} />
+                          <Otopsi6 o={y.otopsi} kazananAgf={y.kazananAgf} kazananOlasilik={y.olasilikYuzde} />
                         </div>
                       </details>
+                    ) : y.kayipTipi === "COUPON_MISS" ? (
+                      <span className="text-brand">Model Top{KACAN_TOP_N} içinde; kuponda yok. Kupon seçimi incelenmeli, sinyaller değil.</span>
+                    ) : y.kayipTipi === "OLCULMEDI" ? (
+                      <span className="text-muted-foreground">Model sırası ölçülemedi (snapshot eksik)</span>
                     ) : (
-                      <span className="text-muted-foreground">Kaçırılmadı</span>
+                      <span className="text-muted-foreground">Kaybı yok</span>
                     )}
                   </td>
                 </tr>
@@ -189,7 +306,7 @@ export default async function KosuSonuclariPage({ searchParams }: PageProps) {
       )}
 
       <p className="text-[11px] text-muted-foreground">
-        Son 200 sonuçlanmış ve yayınlanmış koşu. Sinyal sağlığı (kapsama, drift, kaçan baskısı) için{" "}
+        V5.46 dönemi (12 Eylül 2026&apos;dan bu yana) sonuçlanmış ve yayınlanmış tüm koşular. Sinyal sağlığı için{" "}
         <Link href="/admin/site-anatomisi" className="text-brand">Site Anatomisi</Link> sayfasına bakın.
       </p>
     </div>
