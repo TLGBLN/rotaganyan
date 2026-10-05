@@ -18,6 +18,7 @@ import {
   Gauge,
   ClipboardCheck,
   CloudRain,
+  Activity,
 } from "lucide-react";
 
 const NAV = [
@@ -27,6 +28,7 @@ const NAV = [
   { href: "/admin/accurace", label: "Accurace Database", icon: Gauge },
   { href: "/admin/derece-istatistikleri", label: "Derece İstatistikleri", icon: CloudRain },
   { href: "/admin/veri-tamligi", label: "Veri Tamlığı", icon: ClipboardCheck },
+  { href: "/admin/site-anatomisi", label: "Site Anatomisi", icon: Activity },
   { href: "/admin/sonuclar", label: "Sonuçlar", icon: Trophy },
   { href: "/admin/kupon", label: "Kupon Hazırla", icon: Ticket },
   { href: "/admin/jokey", label: "Jokey İstatistikleri", icon: TrendingUp },
