@@ -312,8 +312,7 @@ type Props = { data: KuponOnerisi[]; altiliResults?: AltiliCityResult[]; isLogge
 export default function TahminOnerileri({ data, altiliResults = [], isLoggedIn = false, isAdmin = false }: Props) {
   const t = useTranslations("home.tahminOnerileri");
   const items = data.filter((k): k is Kupon => k !== null);
-  const hasVisible = items.some((k) => k.variants.some((v) => v.status !== "miss"));
-  if (items.length === 0 || !hasVisible) return null;
+  if (items.length === 0) return null;
 
   // Aynı şehrin (hippodromeName'in " — " öncesi kısmı) 1./2. Altılı'sını TEK gruba
   // topla — getKuponOnerileri zaten şehre göre sıralı döndüğü için art arda gelirler.
