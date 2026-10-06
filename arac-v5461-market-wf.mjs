@@ -16,9 +16,12 @@ const FEAT_A = ["agfSirasi", "idmJokey", "jokeyOrani", "antrenorOrani", "agfPayi
 const FEAT_B = ["marketCentered", "agfRankPct", "idmJokey", "jokeyOrani", "antrenorOrani", "h2hNetSkor",
   "hizDerecesi", "zeminToleransi", "yakinsama2Plus", "sonIdmanSprint", "takiDegisikligi", "yarisGidisatiSkoru"];
 
+// İsteğe bağlı: TEMIZ=<json> ile yalnız doğrulanmış pre-race AGF'li yarışlar (B0 kümesi).
+const TEMIZ = process.env.TEMIZ ? new Set(JSON.parse(readFileSync(process.env.TEMIZ, "utf8"))) : null;
 function grupla(seg) {
   const map = new Map();
   for (const r of rows) {
+    if (TEMIZ && !TEMIZ.has(r.raceId)) continue;
     const k = r.kategori; const dusuk = k === "1a" || k === "1b";
     if (seg === "dusuk" && !dusuk) continue;
     if (seg === "diger" && dusuk) continue;
