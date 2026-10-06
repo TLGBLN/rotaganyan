@@ -129,7 +129,7 @@ function degerlendir(test, s, w, norm) {
     const p = softmax(y.rows.map((r) => ozellik(r, s, norm)).map((f) => f.reduce((a, xi, i) => a + xi * w[i], 0)));
     const wi = y.rows.findIndex((r) => r.win === 1);
     const rank = [...p.keys()].sort((a, b) => p[b] - p[a]);
-    return { ll: -Math.log(Math.max(p[wi], 1e-15)), top1: rank[0] === wi ? 1 : 0, top3: rank.slice(0, 3).includes(wi) ? 1 : 0 };
+    return { raceId: y.raceId, tarih: y.tarih, p, wi, ll: -Math.log(Math.max(p[wi], 1e-15)), top1: rank[0] === wi ? 1 : 0, top3: rank.slice(0, 3).includes(wi) ? 1 : 0 };
   });
 }
 function bootCI(farklar, B = 300) {
@@ -138,6 +138,7 @@ function bootCI(farklar, B = 300) {
   for (let b = 0; b < B; b++) { let s = 0; for (let i = 0; i < n; i++) s += farklar[Math.floor(rnd() * n)]; out.push(s / n); }
   out.sort((a, b) => a - b); return [out[Math.floor(0.025 * B)], out[Math.floor(0.975 * B)]];
 }
+const dumpAll = [];
 function calistir(seg) {
   const yarislar = grupla(seg);
   const chunk = Math.floor(yarislar.length / 5);
@@ -149,6 +150,7 @@ function calistir(seg) {
     const nA = standartlastir(egitim, sA); a.push(...degerlendir(test, sA, egit(egitim, sA, nA), nA));
     const nB = standartlastir(egitim, sB); b.push(...degerlendir(test, sB, egit(egitim, sB, nB), nB));
   }
+  dumpAll.push({ segment: seg, A: a, B: b });
   const ort = (x, f) => x.reduce((s, e) => s + f(e), 0) / x.length;
   const fark = b.map((e, i) => e.ll - a[i].ll);
   return {
@@ -160,5 +162,6 @@ function calistir(seg) {
   };
 }
 const sonuc = ["dusuk", "diger"].map(calistir);
+if (process.env.DUMP) writeFileSync(process.env.DUMP, JSON.stringify(dumpAll));
 writeFileSync(`${SCRATCH}/v5461-adimB-sonuc.json`, JSON.stringify(sonuc, null, 2));
 console.log(JSON.stringify(sonuc, null, 2));
