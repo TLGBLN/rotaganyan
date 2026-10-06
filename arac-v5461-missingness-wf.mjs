@@ -40,6 +40,16 @@ function grupla(seg) {
     if (!map.has(r.raceId)) map.set(r.raceId, { raceId: r.raceId, tarih: tarih[r.raceId], rows: [] });
     map.get(r.raceId).rows.push(r);
   }
+  // Yakınsama (eğitim betiğiyle birebir: yakinsama2PlusEkle). Veri dosyasında alan yok; burada üretilir.
+  for (const y of map.values()) {
+    const sireSirali = [...y.rows].sort((a, b) => (b.sireOrani ?? 0) - (a.sireOrani ?? 0));
+    const sireRank = new Map(sireSirali.map((r, i) => [r, i + 1]));
+    for (const r of y.rows) {
+      const sayi = [(r.pistUzmani ?? 0) === 1, sireRank.get(r) <= 2, (r.ajiGalibiyetVarMi ?? 0) === 1,
+        (r.agfFark ?? 0) >= 1.0, (r.sinifDususu ?? 0) === 1].filter(Boolean).length;
+      r.yakinsama2Plus = sayi >= 2 ? 1 : 0;
+    }
+  }
   const yarislar = [...map.values()].filter((y) => y.rows.some((x) => x.win === 1) && y.rows.length >= 4);
   yarislar.sort((a, b) => (a.tarih < b.tarih ? -1 : a.tarih > b.tarih ? 1 : 0));
   return yarislar;
