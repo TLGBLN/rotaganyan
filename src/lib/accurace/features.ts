@@ -109,6 +109,82 @@ export function closingConsistency(runs: AccuraceRun[], target: TargetRace): Fea
   return weightedFeature(vals, "NO_USABLE_CHECKPOINTS");
 }
 
+// 1b) ClosingResidual — ACC_CLOSE'un mekanik yanlılık düzeltmesi: erken pozisyon geride olan bir
+// atın "sıra kazanma" ihtimali salt geometrik olarak daha yüksektir (11. giden 10 atı geçebilir,
+// 2. giden yalnız 1 atı). Bu yüzden ham closing değeri yerine, AYNI erken-pozisyon/saha-büyüklüğü/
+// mesafe/yüzey bağlamındaki POPÜLASYON ortalamasına göre artık (residual) kullanılır.
+export function closingRawValue(run: AccuraceRun): number | null {
+  return closingSlope(run) ?? positionGainFallback(run);
+}
+
+export function fieldSizeBucket(n: number): "S" | "M" | "L" | "XL" {
+  return n <= 6 ? "S" : n <= 10 ? "M" : n <= 14 ? "L" : "XL";
+}
+
+export function closingBaseKeys(run: AccuraceRun): { k1: string | null; k2: string | null; k3: string | null } {
+  if (run.earlyBin == null) return { k1: null, k2: null, k3: null };
+  const k3 = `${run.earlyBin}`;
+  const k2 = `${k3}|${fieldSizeBucket(run.fieldSize)}`;
+  const k1 = run.surface ? `${k2}|${bandOf(run.length)}|${run.surface}` : null;
+  return { k1, k2, k3 };
+}
+
+export function buildClosingBaseline(population: AccuraceRun[], asOf: Date): Baseline {
+  const g = new Map<string, number[]>();
+  for (const r of population) {
+    if (r.date >= asOf) continue;
+    const v = closingRawValue(r);
+    if (v == null) continue;
+    const { k1, k2, k3 } = closingBaseKeys(r);
+    for (const k of [k1, k2, k3]) {
+      if (k == null) continue;
+      const a = g.get(k);
+      if (a) a.push(v); else g.set(k, [v]);
+    }
+  }
+  const out: Baseline = new Map();
+  for (const [k, a] of g) out.set(k, { med: a.reduce((s, x) => s + x, 0) / a.length, n: a.length });
+  return out;
+}
+
+export function expectedClosing(run: AccuraceRun, table: Baseline): { v: number; level: 1 | 2 | 3 } | null {
+  const { k1, k2, k3 } = closingBaseKeys(run);
+  const b1 = k1 ? table.get(k1) : undefined;
+  if (b1 && b1.n >= AYAR.baseMinN) return { v: b1.med, level: 1 };
+  const b2 = k2 ? table.get(k2) : undefined;
+  if (b2 && b2.n >= AYAR.baseMinN) return { v: b2.med, level: 2 };
+  const b3 = k3 ? table.get(k3) : undefined;
+  if (b3 && b3.n >= AYAR.baseMinN) return { v: b3.med, level: 3 };
+  return null;
+}
+
+// Her hedef tarih için bir kez: closing baseline tablosu (speedResidual'ın baselineAt'ı ile aynı desen).
+export function makeClosingBaselineCache(population: AccuraceRun[]): (asOf: Date) => Baseline {
+  const memo = new Map<number, Baseline>();
+  return (asOf) => {
+    const t = asOf.getTime();
+    let b = memo.get(t);
+    if (!b) { b = buildClosingBaseline(population, asOf); memo.set(t, b); }
+    return b;
+  };
+}
+
+export function closingResidual(history: AccuraceRun[], target: TargetRace, baselineAt: (d: Date) => Baseline): Feature {
+  const table = baselineAt(target.date);
+  const vals: { v: number; w: number }[] = [];
+  for (const r of history) {
+    if (r.date >= target.date) continue;
+    const w = gecmisW(r, target);
+    if (w <= 0) continue;
+    const raw = closingRawValue(r);
+    if (raw == null) continue;
+    const e = expectedClosing(r, table);
+    if (!e) continue;
+    vals.push({ v: raw - e.v, w });
+  }
+  return weightedFeature(vals, "NO_CLOSING_BASELINE");
+}
+
 // 2) lateSegmentSpeed: geçmiş yarışlardaki geç-segment skorlarının ağırlıklı ortalaması.
 // Skor yalnız ORTAK race checkpoint'ten ve yeterli saha/MAD varsa vardır; yoksa o koşu atlanır.
 export function lateSegmentSpeed(runs: AccuraceRun[], target: TargetRace): Feature {

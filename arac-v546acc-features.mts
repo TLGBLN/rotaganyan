@@ -5,17 +5,19 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { accuraceKosulari, tjkAtIdOf } from "./src/lib/accurace/loader";
 import {
   closingConsistency, lateSegmentSpeed, speedResidual, styleVector, rivalPressure, makeBaselineCache,
+  closingResidual, makeClosingBaselineCache,
 } from "./src/lib/accurace/features";
 import type { Surface, TargetRace } from "./src/lib/accurace/types";
 
 const S = "C:/Users/tlgbi/AppData/Local/Temp/claude/c--Users-tlgbi-OneDrive-Belgeler-Rota/76598f4f-31f1-4414-a3f6-fbab0aab98d4/scratchpad";
-const rows: any[] = JSON.parse(readFileSync(`${S}/model-veri-yg4.json`, "utf8"));
-const tar: Record<string, string> = JSON.parse(readFileSync(`${S}/race-tarih.json`, "utf8"));
+const rows: any[] = JSON.parse(readFileSync(`${S}/model-veri.json`, "utf8"));
+const tar: Record<string, string> = JSON.parse(readFileSync(`${S}/race-tarih-v2.json`, "utf8"));
 const tjkOf = await tjkAtIdOf([...new Set(rows.map((r) => r.runnerId))]);
 const runs = await accuraceKosulari();
 const byTjk = new Map<number, typeof runs>();
 for (const r of runs) { const a = byTjk.get(r.tjk) ?? []; a.push(r); byTjk.set(r.tjk, a); }
 const baselineAt = makeBaselineCache(runs);
+const closingBaselineAt = makeClosingBaselineCache(runs);
 
 const alanByRace = new Map<string, number[]>();
 for (const r of rows) {
@@ -39,6 +41,7 @@ for (const r of rows) {
   };
   const gecmis = byTjk.get(tjk) ?? [];
   const c = closingConsistency(gecmis, target);
+  const cr = closingResidual(gecmis, target, closingBaselineAt);
   const l = lateSegmentSpeed(gecmis, target);
   const sp = speedResidual(gecmis, target, baselineAt);
   const h = styleVector(gecmis, target);
@@ -46,6 +49,7 @@ for (const r of rows) {
   const F = rivalPressure(rakip);
   cikti[`${r.raceId}|${r.runnerId}`] = {
     c: c.observed ? c.raw : null, cR: c.reliability,
+    cr: cr.observed ? cr.raw : null, crR: cr.reliability,
     l: l.observed ? l.raw : null, lR: l.reliability,
     s: sp.observed ? sp.raw : null, sR: sp.reliability,
     h: h.observed ? h.vec : null, hR: h.reliability,

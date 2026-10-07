@@ -1,0 +1,79 @@
+{
+  "version": "V5.46.1",
+  "generatedAt": "2026-10-07T07:53:00.000Z",
+  "status": "FROZEN",
+  "note": "Kanonik freeze dosyası. V5.46'dan farkı: TEMPO_ESKI (tempoTasimaGucu) çıkarıldı; ham ACC_CLOSE ve 36-parametreli ACC_PACE kullanılmıyor; ACC_CLOSE_RES, ACC_LATE, ACC_SPEED, PACE_SIMPLE eklendi; tüm β/μ/σ sıfırdan, 2026-01-01..2026-09-10 penceresinde (4539 yarış) walk-forward sonrası tüm veriyle yeniden öğrenildi. Kullanıcı kararı (2026-10-07): segment-özel override (WEIGHTS_DIGER_HANDIKAP/WEIGHTS_DUSUK_SART tarzı elle sıfırlama) İLK ETAPTA YOK — tek havuzlanmış ağırlık seti TÜM koşu kategorilerine uygulanır. Segment-bazlı analiz ayrı bir sonraki aşama.",
+  "secilenSpec": "FINAL",
+  "gruplar": ["AGF_SIRA","AGF_PAY","JOKEY","ANTRENOR","H2H","HIZ","ZEMIN","YAKINSAMA","SPRINT","TAKI","GIDISAT","SIRE","ACC_CLOSE_RES","ACC_LATE","ACC_SPEED","PACE_SIMPLE"],
+  "featureNames": [
+    "agfSirasi","agfPayi","agfPayi2","idmJokey","jokeyOrani","antrenorOrani",
+    "h2hNetSkor","hizDerecesi","zeminToleransi","zeminMesafeDeneyim",
+    "yakinsama2Plus","sonIdmanSprint","takiDegisikligi","yarisGidisatiSkoru","sireOrani",
+    "ACC_CLOSE_RES","ACC_LATE","ACC_SPEED","PS_front","PS_lone","PS_closerFit"
+  ],
+  "weights": [
+    -0.457513, 0.547928, -0.182343, 0.043803, 0.127935, 0.265100,
+    0.039641, 0.068215, 0.031767, 0.022943,
+    0.021500, -0.009328, 0.048414, 0.055383, 0.029465,
+    -0.064806, 0.076983, 0.004133, 0.043270, 0.022993, -0.140513
+  ],
+  "means": [
+    5.992225483386732, 9.521047207223447, 219.94412402930547, 0.06000044809894024, 10.387822754043505, 9.836449299206826,
+    0.007835569979241588, -0.5494500030220845, 0.06311753990152301, -0.0756898321127162,
+    0.09125534918109919, 0.1120825080254081, 0.6105348060851836, 0.08570116281675012, 11.949734323310715,
+    0.0854791986387695, -0.1831749319861908, -0.11105061634630922, 2.5298015659488904, 0.0020173977960533216, 0.9295766018903222
+  ],
+  "stds": [
+    3.665684017025664, 11.370742460680942, 565.7964348496594, 0.23748767194712725, 5.313060077349798, 3.551749009020083,
+    3.640714117941098, 3.8826563909991134, 1.2618324653354713, 1.0326211193367756,
+    0.28797189173068727, 0.3154679372299531, 0.5378369872720173, 2.959520069389143, 3.727875133575604,
+    0.5507149051159835, 0.9431881549154262, 0.6862153999210141, 1.0445053320154762, 0.015910517660655623, 0.7033911162885581
+  ],
+  "missingContract": {
+    "h2hNetSkor": { "missing": "NO_H2H_PAIR (ortak yarış yok)", "contribution": 0, "trainObservedN": 34203, "trainTotalN": 44633 },
+    "hizDerecesi": { "missing": "NO_TJK_ID veya NO_PRIOR_RUN", "contribution": 0, "trainObservedN": 39568, "trainTotalN": 44633 },
+    "sonIdmanSprint": { "missing": "NO_GALOP (son idman verisi yok)", "contribution": 0, "trainObservedN": 14641, "trainTotalN": 44633 },
+    "takiDegisikligi": { "missing": "NO_PRIOR_RUN", "contribution": 0, "trainObservedN": 44633, "trainTotalN": 44633 },
+    "diger_temel_sinyaller": "eksik = 0 (V5.46 sözleşmesi korunuyor, EKSIK0 kümesi: hizDerecesi, zeminToleransi, agfPayi, agfPayi2)"
+  },
+  "accurace": {
+    "ACC_CLOSE_RES": {
+      "tanim": "closingResidual — closingRawValue(run) eksi beklenen değer E(closing | earlyBin, fieldSizeBucket, distanceBand, surface), as-of popülasyon baseline. src/lib/accurace/features.ts: closingResidual()",
+      "contribution": "reliability * z, reliability = effectiveN/(effectiveN+2)",
+      "replaces": "ham ACC_CLOSE (closingConsistency) — erken pozisyon mekanik yanlılığı düzeltildi"
+    },
+    "ACC_LATE": {
+      "tanim": "lateSegmentSpeed — race-level ortak checkpoint, N>=5 ve MAD>20ms gerekir. src/lib/accurace/features.ts: lateSegmentSpeed()",
+      "contribution": "reliability * z"
+    },
+    "ACC_SPEED": {
+      "tanim": "speedResidual — Breed x Surface x DistanceBand [x Hippodrome x Going] baseline, n>=20. src/lib/accurace/features.ts: speedResidual()",
+      "contribution": "reliability * z"
+    },
+    "PACE_SIMPLE": {
+      "tanim": "36-parametreli ACC_PACE yerine 3 elle-tanımlı, ogrenilen-beta'lı primitif (H=styleVector, F=rivalPressure, src/lib/accurace/features.ts)",
+      "front": "F[0]+F[1] (rakip kaçak+ön kütlesi)",
+      "lone": "H[0] * max(0, 1-front) (tek lider avantajı)",
+      "closerFit": "(H[4]+H[5]) * front (derin/bekleyen stilin önde-baskılı yarışa uyumu)",
+      "contribution": "hR (H'nin reliability'si) * z, her üç bileşen için aynı hR"
+    },
+    "removed": ["ACC_CLOSE (ham, closingConsistency)", "ACC_PACE (36 interaction, H[a]*F[b])", "tempoTasimaGucu (TEMPO_ESKI)"],
+    "yuzeyModu": "SERT (aynı yüzey=1, farklı=0)",
+    "reliabilityK": 2.0
+  },
+  "overrideKurali": "YOK — tek havuzlanmış ağırlık seti tüm kategorilere (düşük-şart/handikap/diğer) uygulanır. Kullanıcı kararı 2026-10-07; eski V5.46'nın WEIGHTS_DIGER_HANDIKAP (hizDerecesi/idmJokey/yarisGidisatiSkoru=0) ve WEIGHTS_DUSUK_SART (h2hNetSkor=0) override'ları V5.46.1'de UYGULANMAZ.",
+  "trainingWindow": { "baslangic": "2026-01-01", "bitis": "2026-10-06", "yarisSayisi": 4539 },
+  "optimizasyon": { "l2": 0.01, "epoch": 800, "lr": 0.08, "momentum": 0.9 },
+  "degerlendirme": {
+    "vsFULL": { "ad": "FULL (eski V5.46 sinyal seti, TEMPO_ESKI+ham ACC_CLOSE+36-param ACC_PACE dahil, tum Accurace tutulmus)", "N": 3175, "LogLoss_FULL": 1.82946, "LogLoss_FINAL": 1.82895, "dLL": -0.0005, "CI95_race": [-0.00424, -0.00007], "CI95_gun": [-0.00376, 0.00228], "not": "race-level bootstrap sifiri disliyor (anlamli); gun-kumesi sifiri iceriyor" }
+  },
+  "dataHash": {
+    "modelVeri": "3d1cb5d974844bf4709abfc237055ba49c321ae548cbad7b1b328e086a5c2107",
+    "raceTarih": "b894b2e24cb72fa9ee6e71fc53984d0a2321ced0ae1d868050075bcd995bcbe3",
+    "accurace": "58af1cde57ee4814625f7bf23b43c836d331aa563bd7df189966b313689afbed"
+  },
+  "codeHash": {
+    "note": "git commit SHA, commit sonrasi buraya yazilacak"
+  },
+  "rollback": "Eski V5.46 (weights/v5-weights-diger.json + weights/v5-weights-dusuksart.json, src/lib/methodology/v5-engine.ts mevcut hali) DEĞİŞTİRİLMEDİ, rollback/arşiv olarak saklanıyor."
+}

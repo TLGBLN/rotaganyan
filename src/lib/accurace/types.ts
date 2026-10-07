@@ -47,7 +47,7 @@ export interface Feature {
   reliability: number; // [0,1]
   nUsed: number;
   effectiveN: number;
-  missingReason: "NO_PRIOR_RUN" | "NO_USABLE_CHECKPOINTS" | "NO_LATE_SEG" | "NO_BASELINE" | "NO_STYLE_HISTORY" | "NO_RIVAL_STYLE" | null;
+  missingReason: "NO_PRIOR_RUN" | "NO_USABLE_CHECKPOINTS" | "NO_LATE_SEG" | "NO_BASELINE" | "NO_CLOSING_BASELINE" | "NO_STYLE_HISTORY" | "NO_RIVAL_STYLE" | null;
 }
 
 // Stil vektörü sözleşmesi (6 kova olasılığı)
