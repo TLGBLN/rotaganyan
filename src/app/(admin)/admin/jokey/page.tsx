@@ -4,6 +4,7 @@ import Link from "next/link";
 import RefreshButton from "@/components/admin/RefreshButton";
 import JokeySyncButton from "@/components/admin/JokeySyncButton";
 import JokeyClearButton from "@/components/admin/JokeyClearButton";
+import { getJokeyFormTablosu } from "@/server/actions/jokey-form.actions";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,11 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
       : { _sum: { wins: "desc" } },
   });
 
+  // Son 30 Gün + (hipo filtresi varsa) hipodrom formu — JockeyStatSync KULLANMAZ, kendi
+  // PIT (as-of) geçmişimizden hesaplanır. V5.46.1 scorer'a bağlı DEĞİL, yalnız görüntüleme.
+  const hipodrom = hipo ? await db.hippodrome.findUnique({ where: { slug: hipo }, select: { id: true } }) : null;
+  const formTablosu = await getJokeyFormTablosu(new Date(), hipodrom?.id ?? null);
+
   const rows = grouped.map((g) => {
     const rides = g._sum.rides ?? 0;
     const wins = g._sum.wins ?? 0;
@@ -45,6 +51,7 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
       winRate: rides > 0 ? wins / rides : 0,
       tableRate: rides > 0 ? tableCount / rides : 0,
       performanceScore: g._avg.performanceScore,
+      form: formTablosu.get(g.jockey) ?? null,
     };
   });
 
@@ -179,6 +186,15 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
                         <th className="px-3 py-2 text-center font-medium">K%</th>
                         <th className="px-3 py-2 text-center font-medium">Tb%</th>
                         <th className="px-3 py-2 text-center font-medium">Skor</th>
+                        <th className="px-3 py-2 text-center font-medium border-l" title="Son 30 gün, PIT — JockeyStatSync değil">Son 30G</th>
+                        <th className="px-3 py-2 text-center font-medium" title="Son 30 gün kazanma % − uzun dönem kazanma %">Form Δ</th>
+                        <th className="px-3 py-2 text-center font-medium" title="Son 30 gün örneklem güveni (n/(n+8))">Güven</th>
+                        {hipodrom && (
+                          <>
+                            <th className="px-3 py-2 text-center font-medium border-l" title="Bu hipodromda shrink edilmiş kazanma %">Hipo K% (shrink)</th>
+                            <th className="px-3 py-2 text-center font-medium" title="Shrink hipo kazanma % − uzun dönem kazanma %">Hipo Δ</th>
+                          </>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -186,6 +202,8 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
                         const winPct = Math.round(r.winRate * 100);
                         const tabPct = Math.round(r.tableRate * 100);
                         const color = winPct >= 25 ? "text-hit" : winPct >= 15 ? "text-brand" : "text-muted-foreground";
+                        const g = r.form?.guncel;
+                        const h = r.form?.hipodrom;
                         return (
                           <tr key={r.jockey} className={cn("border-b last:border-0", i % 2 === 1 && "bg-muted/20")}>
                             <td className="px-3 py-2 text-muted-foreground tabular-nums">{i + 1}</td>
@@ -197,6 +215,25 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
                             <td className="px-3 py-2 text-center tabular-nums font-medium text-brand">
                               {r.performanceScore != null ? r.performanceScore.toFixed(1) : "—"}
                             </td>
+                            <td className="px-3 py-2 text-center tabular-nums border-l text-muted-foreground">
+                              {g ? `${g.son30Win}/${g.son30Start} (%${Math.round(g.son30WinRate * 100)})` : "—"}
+                            </td>
+                            <td className={cn("px-3 py-2 text-center tabular-nums font-medium", (g?.formDelta ?? 0) > 0 ? "text-hit" : (g?.formDelta ?? 0) < 0 ? "text-risk" : "text-muted-foreground")}>
+                              {g ? `${g.formDelta >= 0 ? "+" : ""}${(g.formDelta * 100).toFixed(1)}pp` : "—"}
+                            </td>
+                            <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">
+                              {g ? g.reliability.toFixed(2) : "—"}
+                            </td>
+                            {hipodrom && (
+                              <>
+                                <td className="px-3 py-2 text-center tabular-nums border-l text-muted-foreground">
+                                  {h ? `%${Math.round(h.hipoWinRateShrink * 100)} (n=${h.hipoStart})` : "—"}
+                                </td>
+                                <td className={cn("px-3 py-2 text-center tabular-nums font-medium", (h?.hippoDelta ?? 0) > 0 ? "text-hit" : (h?.hippoDelta ?? 0) < 0 ? "text-risk" : "text-muted-foreground")}>
+                                  {h ? `${h.hippoDelta >= 0 ? "+" : ""}${(h.hippoDelta * 100).toFixed(1)}pp` : "—"}
+                                </td>
+                              </>
+                            )}
                           </tr>
                         );
                       })}
@@ -204,7 +241,9 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
                   </table>
                 </div>
                 <div className="border-t px-3 py-2 text-[11px] text-muted-foreground">
-                  {rows.length} jokey · {isFiltered ? contextLabel : "Tüm setler toplandı"} · K% = kazanma oranı · Tb% = ilk 5 oranı · Skor = performans puanı
+                  {rows.length} jokey · {isFiltered ? contextLabel : "Tüm setler toplandı"} · K% = kazanma oranı · Tb% = ilk 5 oranı · Skor = performans puanı ·
+                  Son 30G/Form Δ/Güven = JockeyStatSync değil, kendi PIT (as-of) yarış geçmişimizden
+                  {hipodrom ? " · Hipo K%(shrink)/Δ: bu hipodromdaki geçmiş, düşük örneklemde jokeyin uzun-dönem oranına shrink edilmiş" : " · hipodrom filtresi seçilirse hipodrom-özel shrink'li form da görünür"}
                 </div>
               </>
             )}
