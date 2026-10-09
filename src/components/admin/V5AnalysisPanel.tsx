@@ -314,7 +314,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       if (res.publishError) {
         toast.warning(`Kaydedildi ama yayınlanamadı: ${res.publishError}`);
       } else {
-        toast.success("V5 analizi kaydedildi ve yayınlandı");
+        toast.success(`${motorEtiketi ?? "V5.46.1"} analizi kaydedildi ve yayınlandı`);
       }
       setApplied(true);
       router.refresh();

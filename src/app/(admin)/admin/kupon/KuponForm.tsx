@@ -170,6 +170,39 @@ function kumulatifToplam(sirali: RaceRunner[], n: number): number {
   return sirali.slice(0, n).reduce((acc, r) => acc + (r.scratched ? 0 : r.score ?? 0), 0);
 }
 
+// 2026-10-09 kullanıcı talebi ("kupon ekranı optimizer mantığıyla uyumlu olsun ama model
+// sırasıymış gibi göstermesin") — Bursa DOMANİÇ BEYİ/AZRAKTAY/YERİN AYRI vakası: ekrandaki
+// at sırası HER ZAMAN ham bireysel scoreExact'e göreydi (model/puan-tablosu sırası, bkz.
+// home-kupon.actions.ts getRaceDayLegs — BU SIRA DEĞİŞTİRİLMEDİ, AGF sırası da değişmedi),
+// ama kupon motorunun (kupon-optimizer.ts) KENDİ iç hesabı eküri ortaklarını TEK birim
+// sayıp olasılıklarını TOPLUYOR — ekranda bu birleşik değer hiç görünmediği için "neden bu
+// at seçildi" sorusu cevapsız kalıyordu. Bu fonksiyon YALNIZ kupon seçim ızgarasının görsel
+// SIRASINI/gruplamasını hesaplar (optimizer'ı, Set tabanlı seçim state'ini, stored narrow/
+// normal/wide dizilerini DEĞİŞTİRMEZ) — tek atlar kendi scoreExact'i, eküri çiftleri
+// üyelerinin TOPLAMI ile "kupon birimi" olarak sıralanır.
+type KuponBirimi = { uyeler: RaceRunner[]; birimOlasilik: number };
+function kuponBirimSirasi(sirali: RaceRunner[]): KuponBirimi[] {
+  const musaitler = sirali.filter((r) => !r.scratched);
+  const cekilenler = sirali.filter((r) => r.scratched);
+  const gruplu = new Map<number, RaceRunner[]>();
+  const birimler: KuponBirimi[] = [];
+  for (const r of musaitler) {
+    if (r.ekuriGroup != null && r.ekuriGroup >= 1) {
+      if (!gruplu.has(r.ekuriGroup)) gruplu.set(r.ekuriGroup, []);
+      gruplu.get(r.ekuriGroup)!.push(r);
+    } else {
+      birimler.push({ uyeler: [r], birimOlasilik: r.scoreExact ?? r.score ?? 0 });
+    }
+  }
+  for (const uyeler of gruplu.values()) {
+    birimler.push({ uyeler, birimOlasilik: uyeler.reduce((s, u) => s + (u.scoreExact ?? u.score ?? 0), 0) });
+  }
+  birimler.sort((a, b) => b.birimOlasilik - a.birimOlasilik);
+  // Çekilen (scratched) atlar kupon-birimi sıralamasına girmez — en altta, bilgi amaçlı listelenir.
+  if (cekilenler.length > 0) birimler.push(...cekilenler.map((r) => ({ uyeler: [r], birimOlasilik: -1 })));
+  return birimler;
+}
+
 // 2026-09-13 kullanıcı bulgusu (İstanbul K5) — bkz. kupon-optimizer.ts'teki eküri-birimi
 // yorumu. Otomatik doldurma artık eküri çiftini tek birim sayıyor ama admin bir ayakta
 // AYNI eküriden iki atı ELLE de işaretleyebilir — kombinasyon/tutar hesabı da (yalnız DP
@@ -253,7 +286,10 @@ function KuponGrup({
           <tbody>
             {races.map((race, i) => {
               const sel = selections[race.raceNo] ?? emptySelection();
-              const sirali = race.runners;
+              const sirali = race.runners; // MODEL sırası — AGF/model rozetleri ve İlk3/İlk6 kapsaması bundan hesaplanır, DEĞİŞMEDİ.
+              const birimler = kuponBirimSirasi(sirali); // Kupon motorunun KENDİ sırası — yalnız görsel gruplama, Set/optimizer'a dokunmaz.
+              const ilk3 = sirali.length > 3 ? kumulatifToplam(sirali, 3) : null;
+              const ilk6 = sirali.length > 6 ? kumulatifToplam(sirali, 6) : null;
               return (
                 <tr key={race.raceNo} className={cn("border-b last:border-0", i % 2 === 1 && "bg-muted/20")}>
                   <td className="px-3 py-3 align-top text-sm font-semibold whitespace-nowrap">
@@ -261,81 +297,89 @@ function KuponGrup({
                   </td>
                   {widths.map((width) => (
                     <td key={width} className="px-3 py-3 align-top">
+                      {/* Model bazlı kapsama özeti — AYRI bir bilgi, kupon birim sırasıyla KARIŞTIRILMASIN. */}
+                      {(ilk3 != null || ilk6 != null) && (
+                        <div className="mb-1.5 flex flex-wrap gap-x-3 gap-y-0.5" title="İlk 3/6 atın MODEL sırasına göre toplam kazanma olasılığı">
+                          {ilk3 != null && (
+                            <span className={cn("text-[9px] font-bold tabular-nums", ilk3 >= KAPSAM_ESIK_ILK3 ? "text-hit" : "text-red-500")}>
+                              Model İlk 3: %{Math.round(ilk3)} {ilk3 >= KAPSAM_ESIK_ILK3 ? "✓" : `(eşik ≥%${KAPSAM_ESIK_ILK3})`}
+                            </span>
+                          )}
+                          {ilk6 != null && (
+                            <span className={cn("text-[9px] font-bold tabular-nums", ilk6 >= KAPSAM_ESIK_ILK6 ? "text-hit" : "text-red-500")}>
+                              Model İlk 6: %{Math.round(ilk6)} {ilk6 >= KAPSAM_ESIK_ILK6 ? "✓" : `(eşik ≥%${KAPSAM_ESIK_ILK6})`}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       <div className="flex flex-col gap-1">
-                        {sirali.map((runner, idx) => {
-                          const checked = sel[width].has(runner.no);
-                          return (
-                            <div key={runner.no}>
-                              <button
-                                type="button"
-                                onClick={() => !runner.scratched && onToggle(race.raceNo, width, runner.no)}
-                                disabled={runner.scratched}
-                                className={cn(
-                                  "flex w-full items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-xs transition-colors",
-                                  runner.scratched
-                                    ? "border-muted-foreground/15 opacity-40 cursor-not-allowed"
-                                    : checked
-                                    ? "border-brand bg-brand text-brand-foreground"
-                                    : "border-muted-foreground/30 text-muted-foreground hover:border-brand/50 hover:text-foreground"
-                                )}
-                              >
-                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-black/10 font-bold">
-                                  {runner.no}
-                                </span>
-                                <span className={cn("truncate font-medium", runner.scratched && "line-through")}>
-                                  {runner.name}
-                                </span>
-                                {runner.score != null && (
-                                  <span
-                                    className="shrink-0 text-[10px] font-semibold tabular-nums opacity-80"
-                                    title={runner.scoreExact != null ? "Ham (yuvarlanmamış) olasılık" : undefined}
-                                  >
-                                    {/* 2026-09-13 kullanıcı bulgusu (İstanbul K5) — yuvarlanmış
-                                        tam sayı (%11) iki farklı atı eşitmiş gibi gösterip kupon
-                                        seçiminde yanlış tercihe yol açabiliyor (gerçek: %25.6 vs
-                                        %24.8) — ondalık hane varsa göster. */}
-                                    %{runner.scoreExact != null ? runner.scoreExact.toFixed(1) : runner.score}
-                                  </span>
-                                )}
-                                {runner.agfSirasi != null && (
-                                  <span
-                                    title="AGF sırası"
-                                    className="shrink-0 rounded-sm bg-black/10 px-1 text-[9px] font-bold tabular-nums opacity-70"
-                                  >
-                                    AGF{runner.agfSirasi}
-                                  </span>
-                                )}
-                                {runner.scratched ? (
-                                  <span className="ml-auto shrink-0 text-[10px] text-red-400 font-semibold">Koşmaz</span>
-                                ) : runner.ekuriGroup != null ? (
-                                  <span title={`Eküri grubu ${runner.ekuriGroup}`} className="ml-auto shrink-0 inline-flex items-center gap-0.5 text-[10px]">
-                                    <span className={cn("inline-block h-1.5 w-1.5 rounded-full", ekuriRengi(runner.ekuriGroup).badge)} />
-                                    🐴
-                                  </span>
-                                ) : null}
-                              </button>
-                              {(idx === 2 || idx === 5) && sirali.length > idx + 1 && (() => {
-                                // 2026-09-10 kullanıcı talebi: ayraç eşik altındaysa kırmızı,
-                                // eşik ve üstündeyse yeşil olsun — RaceAdviceCard'daki rozetle
-                                // AYNI paylaşılan eşiklerden (kapsam-esikleri.ts) besleniyor.
-                                const esik = idx === 2 ? KAPSAM_ESIK_ILK3 : KAPSAM_ESIK_ILK6;
-                                const toplam = kumulatifToplam(sirali, idx + 1);
-                                const yeterli = toplam >= esik;
+                        {birimler.map((birim) => {
+                          const ekuri = birim.uyeler.length > 1;
+                          const icerik = (
+                            <div className={cn("flex flex-col gap-1", ekuri && "rounded-md border border-dashed border-muted-foreground/40 p-1")}>
+                              {ekuri && (
+                                <div className="flex items-center gap-1 px-0.5 text-[9px] font-bold text-muted-foreground">
+                                  <span className={cn("inline-block h-1.5 w-1.5 rounded-full", ekuriRengi(birim.uyeler[0].ekuriGroup!).badge)} />
+                                  EKÜRİ · Kupon birimi %{birim.birimOlasilik.toFixed(1)}
+                                </div>
+                              )}
+                              {birim.uyeler.map((runner) => {
+                                const checked = sel[width].has(runner.no);
                                 return (
-                                  <div
-                                    className="my-1 flex items-center gap-1.5 px-0.5"
-                                    title={`İlk ${idx + 1} atın modele göre toplam kazanma olasılığı — eşik ≥%${esik}`}
+                                  <button
+                                    key={runner.no}
+                                    type="button"
+                                    onClick={() => !runner.scratched && onToggle(race.raceNo, width, runner.no)}
+                                    disabled={runner.scratched}
+                                    className={cn(
+                                      "flex w-full items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-xs transition-colors",
+                                      runner.scratched
+                                        ? "border-muted-foreground/15 opacity-40 cursor-not-allowed"
+                                        : checked
+                                        ? "border-brand bg-brand text-brand-foreground"
+                                        : "border-muted-foreground/30 text-muted-foreground hover:border-brand/50 hover:text-foreground"
+                                    )}
                                   >
-                                    <div className={cn("h-px flex-1", yeterli ? "bg-hit/50" : "bg-red-500/50")} />
-                                    <span className={cn("shrink-0 text-[9px] font-bold tabular-nums", yeterli ? "text-hit" : "text-red-500")}>
-                                      İlk {idx + 1}: %{Math.round(toplam)} {yeterli ? "✓" : `(eşik ≥%${esik})`}
+                                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-black/10 font-bold">
+                                      {runner.no}
                                     </span>
-                                    <div className={cn("h-px flex-1", yeterli ? "bg-hit/50" : "bg-red-500/50")} />
-                                  </div>
+                                    <span className={cn("truncate font-medium", runner.scratched && "line-through")}>
+                                      {runner.name}
+                                    </span>
+                                    {runner.score != null && (
+                                      <span
+                                        className="shrink-0 text-[10px] font-semibold tabular-nums opacity-80"
+                                        title={runner.scoreExact != null ? "Ham (yuvarlanmamış) bireysel model olasılığı" : undefined}
+                                      >
+                                        {/* 2026-09-13 kullanıcı bulgusu (İstanbul K5) — yuvarlanmış
+                                            tam sayı (%11) iki farklı atı eşitmiş gibi gösterip kupon
+                                            seçiminde yanlış tercihe yol açabiliyor (gerçek: %25.6 vs
+                                            %24.8) — ondalık hane varsa göster. */}
+                                        %{runner.scoreExact != null ? runner.scoreExact.toFixed(1) : runner.score}
+                                      </span>
+                                    )}
+                                    {runner.agfSirasi != null && (
+                                      <span
+                                        title="AGF sırası (bireysel)"
+                                        className="shrink-0 rounded-sm bg-black/10 px-1 text-[9px] font-bold tabular-nums opacity-70"
+                                      >
+                                        AGF{runner.agfSirasi}
+                                      </span>
+                                    )}
+                                    {runner.scratched ? (
+                                      <span className="ml-auto shrink-0 text-[10px] text-red-400 font-semibold">Koşmaz</span>
+                                    ) : !ekuri && runner.ekuriGroup != null ? (
+                                      <span title={`Eküri grubu ${runner.ekuriGroup}`} className="ml-auto shrink-0 inline-flex items-center gap-0.5 text-[10px]">
+                                        <span className={cn("inline-block h-1.5 w-1.5 rounded-full", ekuriRengi(runner.ekuriGroup).badge)} />
+                                        🐴
+                                      </span>
+                                    ) : null}
+                                  </button>
                                 );
-                              })()}
+                              })}
                             </div>
                           );
+                          return <div key={birim.uyeler[0].no}>{icerik}</div>;
                         })}
                       </div>
                     </td>
