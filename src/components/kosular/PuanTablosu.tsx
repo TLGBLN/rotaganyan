@@ -134,20 +134,25 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
           className="overflow-hidden rounded-2xl border"
           style={{ background: BG_GRADIENT, borderColor: CARD_BORDER }}
         >
-          {/* Marka başlığı — OG kartıyla aynı dil: logo + ROTA/GANYAN + hipodrom konum rozeti */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-5" style={{ borderColor: CARD_BORDER }}>
-            <div className="flex items-center gap-3">
+          {/* Marka başlığı — OG kartıyla aynı dil: logo + ROTA/GANYAN + hipodrom konum rozeti.
+              2026-10-10 kullanıcı talebi (mobil): dar ekranda ikon+çizgi+başlık+konum rozeti
+              AYNI satıra sıkışıp başlık (hipodrom adı dahil) truncate ile kırpılıyordu —
+              konum rozeti (başlıktaki bilgiyi zaten TEKRARLIYOR) artık yalnız sm+'ta
+              görünüyor, başlık da mobilde truncate yerine 2 satıra sarabiliyor
+              (leading-snug) — hipodrom adı/ayak bilgisi dar ekranda da hiç kırpılmıyor. */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b px-3 py-3 sm:px-5" style={{ borderColor: CARD_BORDER }}>
+            <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/horse-icon-gold.png" alt="" width={34} height={34} className="shrink-0" style={{ objectFit: "contain" }} />
-              <div className="h-7 w-px shrink-0" style={{ background: "rgba(223,157,0,0.35)" }} />
+              <img src="/horse-icon-gold.png" alt="" width={30} height={30} className="shrink-0 sm:w-[34px] sm:h-[34px]" style={{ objectFit: "contain" }} />
+              <div className="hidden h-7 w-px shrink-0 sm:block" style={{ background: "rgba(223,157,0,0.35)" }} />
               <div className="min-w-0">
-                <div className="truncate text-base font-extrabold sm:text-lg" style={{ color: INK }}>
+                <div className="text-sm font-extrabold leading-snug sm:truncate sm:text-lg" style={{ color: INK }}>
                   {hipName} — <span style={{ color: GOLD }}>{altiliLabel}</span> Puan Tablosu
                 </div>
               </div>
             </div>
             <div
-              className="flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold"
+              className="hidden shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold sm:flex"
               style={{ borderColor: "rgba(223,157,0,0.35)", color: INK }}
             >
               <MapPin className="h-3.5 w-3.5" style={{ color: GOLD }} />
@@ -155,7 +160,11 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
             </div>
           </div>
 
-          {/* Kart gridi — her ayak kendi kartı, ekrandaki referansla aynı düzen */}
+          {/* Kart gridi — her ayak kendi kartı, ekrandaki referansla aynı düzen.
+              overflow-x-auto güvenlik ağı: beklenmedik taşma olursa sessizce kırpılmak
+              yerine yatay kaydırılabilir olsun (bkz. proje kuralı: overflow-hidden yerine
+              overflow-x-auto). */}
+          <div className="overflow-x-auto">
           <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-3 xl:grid-cols-6">
             {group.map((race) => {
               const rows = buildPickRows(race.prediction!.picks);
@@ -274,6 +283,7 @@ export default async function PuanTablosu({ raceDay, isLoggedIn, currentDate, is
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
       ))}
