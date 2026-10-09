@@ -36,10 +36,10 @@ const FEATURE_CATEGORY: Record<string, RootCauseCategory> = {
   ACC_CLOSE_RES: "PRODUCER", ACC_LATE: "PRODUCER", ACC_SPEED: "PRODUCER", PS_front: "PRODUCER", PS_lone: "PRODUCER", PS_closerFit: "PRODUCER",
 };
 const CORRECTIVE_ACTION_ONERISI: Record<RootCauseCategory, string> = {
-  DATA: "Veri kaynağı denetlensin — ilgili producer'ın fill-rate'i kontrol edilsin.",
-  PRODUCER: "İlgili sinyal üretici fonksiyon salt-okuma denetlensin — hesap hatası mı, veri mi eksik ayrıştırılsın.",
-  FEATURE: "Önemli bilgi hiç temsil edilmiyor olabilir — yeni challenger sinyal adayı değerlendirilsin.",
-  MODEL: "Katsayı/ilişki bu segmentte yetersiz olabilir — segment-bazlı refit adayı (önce DEV'de OOS test).",
+  DATA: "Veri kaynağı denetlensin — ilgili verinin ne kadar sık eksik geldiği kontrol edilsin.",
+  PRODUCER: "İlgili sinyali üreten hesaplama salt-okuma denetlensin — hesap hatası mı, veri mi eksik ayrıştırılsın.",
+  FEATURE: "Önemli bilgi hiç temsil edilmiyor olabilir — yeni sinyal adayı değerlendirilsin.",
+  MODEL: "Katsayı/ilişki bu segmentte yetersiz olabilir — segment-bazlı yeniden-eğitim adayı (önce test ortamında geriye-dönük sınama).",
   CONTEXT: "Pist/mesafe/sınıf/tempo kırılımında tekrar ediyorsa segment etkisi araştırılsın.",
   UNCERTAINTY: "Aksiyon gerekmez — yarış varyansı; yalnız tekrar ederse yeniden değerlendirilsin.",
 };
@@ -202,13 +202,13 @@ export async function getRootCauseRaporu(
     const aday = patternEvidence.find((p) => p.candidate) ?? null;
     const piyasaBaskin = !aday && patternEvidence.some((p) => p.piyasaKaynakli);
     const kanit = aday && aday.piyasaKaynakli && aday.dataAnomaly?.candidate
-      ? `AGF verisi sıfır/eksik katkı enrichment=${aday.dataAnomaly.enrichment}x (CI alt=${aday.dataAnomaly.enrichmentCi[0]}), missN=${aday.missN} — bu bir VERİ KALİTESİ şüphesi, "piyasa sürprizi" yorumu DEĞİL`
-      : aday ? `enrichment=${aday.enrichment}x (CI alt=${aday.enrichmentCi[0]}), Δkatkı=${aday.meanDiff} CI=[${aday.ci[0]},${aday.ci[1]}], missN=${aday.missN}` : "";
+      ? `AGF verisinde sıfır/eksik katkı zenginleşmesi=${aday.dataAnomaly.enrichment}x (güven aralığı alt sınırı=${aday.dataAnomaly.enrichmentCi[0]}), kaçırılan sayısı=${aday.missN} — bu bir VERİ KALİTESİ şüphesi, "piyasa sürprizi" yorumu DEĞİL`
+      : aday ? `zenginleşme=${aday.enrichment}x (güven aralığı alt sınırı=${aday.enrichmentCi[0]}), Δkatkı=${aday.meanDiff} güven aralığı=[${aday.ci[0]},${aday.ci[1]}], kaçırılan sayısı=${aday.missN}` : "";
     const rootCauseHypothesis = aday ? { category: aday.category, kod: aday.kod, kanit } : null;
     const correctiveAction = rootCauseHypothesis
       ? CORRECTIVE_ACTION_ONERISI[rootCauseHypothesis.category]
       : piyasaBaskin
-        ? "Piyasa da kazananı düşük olasılıklı görmüş — muhtemelen gerçek sürpriz sonuç (CONTEXT/UNCERTAINTY). Aksiyon gerekmez; yalnız BAĞIMSIZ (piyasa-dışı) bir sinyal de tekrar ederse FEATURE/MODEL adayı değerlendirilsin."
+        ? "Piyasa da kazananı düşük olasılıklı görmüş — muhtemelen gerçek sürpriz sonuç (bağlamsal/belirsiz). Aksiyon gerekmez; yalnız piyasadan BAĞIMSIZ bir sinyal de tekrar ederse yeni sinyal/model adayı değerlendirilsin."
         : CORRECTIVE_ACTION_ONERISI.UNCERTAINTY;
     return { y, directCause, patternEvidence, rootCauseHypothesis, correctiveAction };
   });
@@ -233,22 +233,22 @@ export async function getRootCauseRaporu(
     yayinTop6IcindeOran: +rateControl.toFixed(3), yayinTop6DisindaOran: +rateMiss.toFixed(3), fark: +biasFark.toFixed(3),
     uyari: biasUyari,
     not: biasUyari
-      ? `⚠ Snapshot eksikliği, aynı RCA eşiğiyle (rank>${KACAN_TOP_N}) MISS-proxy ve CONTROL-proxy gruplarında anlamlı derecede farklı — MISS/CONTROL karşılaştırması BIAS riski taşıyabilir, pattern sonuçları ihtiyatla okunmalı.`
-      : `Snapshot eksikliği MISS-proxy (rank>${KACAN_TOP_N}) ve CONTROL-proxy (rank≤${KACAN_TOP_N}, gerçek RCA eşiğiyle AYNI) gruplarında benzer — bias riski düşük.`,
+      ? `⚠ Kayıt eksikliği, aynı eşikle (sıra>${KACAN_TOP_N}) kaçırılan ve kontrol gruplarında anlamlı derecede farklı — bu karşılaştırma yanlılık riski taşıyabilir, desen sonuçları ihtiyatla okunmalı.`
+      : `Kayıt eksikliği kaçırılan (sıra>${KACAN_TOP_N}) ve kontrol (sıra≤${KACAN_TOP_N}, gerçek eşikle AYNI) gruplarında benzer — yanlılık riski düşük.`,
   };
 
   return {
     olaylar, olculemeyenSayisi: pencere.filter((y) => !y.sinyalVeriVar).length,
     missSayisi: miss.length, controlSayisi: control.length, patternler, snapshotBias,
-    not: "SALT OKUMA. DIRECT_CAUSE yalnız score explanation'dır, ROOT_CAUSE DEĞİLDİR. ROOT_CAUSE_HYPOTHESIS yalnız PATTERN_EVIDENCE'ta candidate=true (missN≥5, enrichment-CI alt sınırı>1, katkı-CI sıfırı dışlıyor) olan kod'lar için üretilir — aksi halde UNCERTAINTY/CONTEXT. agfSirasi/agfPayi/agfPayi2 TEK BAŞINA asla MODEL/FEATURE adayı sayılmaz (piyasa da sürpriz görmüş demektir); yalnız kendi veri kalitesi (sıfır/eksik katkı anormal sıklıkta) bozulursa DATA adayı olabilir. Kaynak: stored Prediction/Pick.featureSnapshot (yarisHesapla) — canlı scoreV461 YALNIZ snapshot yoksa (OLCULMEDI) tek-olay detayında fallback olarak çağrılır.",
+    not: "SALT OKUMA. Doğrudan neden yalnız skor açıklamasıdır, kök neden DEĞİLDİR. Kök neden hipotezi yalnız desen kanıtında aday=evet (kaçırılan sayısı≥5, zenginleşme güven aralığının alt sınırı>1, katkı güven aralığı sıfırı dışlıyor) olan sinyaller için üretilir — aksi halde belirsiz/bağlamsal. AGF Sırası/AGF Payı/AGF Payı² TEK BAŞINA asla model/sinyal adayı sayılmaz (piyasa da sürpriz görmüş demektir); yalnız kendi veri kalitesi (sıfır/eksik katkı anormal sıklıkta) bozulursa veri-sorunu adayı olabilir. Kaynak: kaydedilmiş tahmin/pick verisi — canlı V5.46.1 yeniden hesap YALNIZ kayıt yoksa tek-olay detayında yedek olarak çağrılır.",
   };
 }
 
-/** Snapshot'ı olmayan (OLCULMEDI) tek bir yarış için — yalnız kullanıcı detay açtığında — canlı V5.46.1 fallback. */
+/** Kaydı olmayan tek bir yarış için — yalnız kullanıcı detay açtığında — canlı V5.46.1 yedek hesabı. */
 export async function liveFallbackIcin(raceId: string): Promise<{ picks: V461Pick[]; warning: string } | null> {
   const sonuc = await scoreV461(raceId);
   if (!sonuc) return null;
-  return { picks: sonuc.picks, warning: "Bu yarış için kaydedilmiş featureSnapshot yok — V5.46.1 İLE CANLI yeniden hesaplandı (fallback). Geçmişi bugünkü üretici koduyla açıklıyor olabilir, PATTERN_EVIDENCE istatistiklerine KATILMAZ." };
+  return { picks: sonuc.picks, warning: "Bu yarış için kaydedilmiş veri yok — V5.46.1 ile CANLI yeniden hesaplandı (yedek). Geçmişi bugünkü üretici koduyla açıklıyor olabilir, desen istatistiklerine KATILMAZ." };
 }
 
 export { V546_BASLANGIC, KACAN_TOP_N };

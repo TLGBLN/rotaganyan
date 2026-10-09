@@ -48,7 +48,7 @@ const LIVE_STATE_UYARISI = "Bu sınıflandırma runner/scratched/eküri durumunu
  *  bilinmiyorsa null, bu durumda PUBLISH_OVERRIDE_MISS kontrolü atlanır (kanıt yetersiz). */
 export async function siniflandirMiss(raceId: string, missingCount: number, publishedWidth: Width | null): Promise<MissClassification> {
   if (missingCount >= 5) {
-    return { missType: "DATA_ISSUE", modelRank: null, baseK: null, publishedWidth, missingCount, usesLiveRunnerState: true, liveStateUyarisi: LIVE_STATE_UYARISI, not: "Kazananın featureSnapshot'ında ≥5 sinyal gözlemsiz — veri sorunu ÖNCELİKLİ, model/allocator hatası sayılmadı (precedence kuralı)." };
+    return { missType: "DATA_ISSUE", modelRank: null, baseK: null, publishedWidth, missingCount, usesLiveRunnerState: true, liveStateUyarisi: LIVE_STATE_UYARISI, not: "Kazananın kayıtlı verisinde 5 veya daha fazla sinyal gözlemsiz — veri sorunu ÖNCELİKLİ, model/kupon-dağıtım hatası sayılmadı (öncelik kuralı)." };
   }
 
   const hedef = await db.race.findUnique({ where: { id: raceId }, select: { raceNo: true, raceDay: { select: { date: true, hippodromeId: true, hippodrome: { select: { name: true } } } } } });
@@ -80,7 +80,7 @@ export async function siniflandirMiss(raceId: string, missingCount: number, publ
   legler.sort((a, b) => a.raceNo - b.raceNo);
   const gruplar = chunkIntoAltili(legler);
   const grup = gruplar.find((g) => g.some((l) => l.raceId === raceId));
-  if (!grup) return { missType: "UNCERTAINTY", modelRank: null, baseK: null, publishedWidth, missingCount, usesLiveRunnerState: true, liveStateUyarisi: LIVE_STATE_UYARISI, not: "Bu yarış bir Altılı grubuna yerleştirilemedi (veri yetersiz) — allocator-seviyesi ayrım yapılamaz." };
+  if (!grup) return { missType: "UNCERTAINTY", modelRank: null, baseK: null, publishedWidth, missingCount, usesLiveRunnerState: true, liveStateUyarisi: LIVE_STATE_UYARISI, not: "Bu yarış bir Altılı grubuna yerleştirilemedi (veri yetersiz) — kupon-dağıtım-seviyesi ayrım yapılamaz." };
 
   const hedefLeg = grup.find((l) => l.raceId === raceId)!;
   const sirali = [...ekuriBirlestir(hedefLeg.runners)].sort((a, b) => b.p - a.p);
@@ -98,24 +98,26 @@ export async function siniflandirMiss(raceId: string, missingCount: number, publ
   const rWide = optimizeKuponAllocation(lp(grup), maxC("wide"), rNormal.birimSayilari);
   const baseK = { narrow: rNarrow.birimSayilari[hedefLeg.raceNo] ?? null, normal: rNormal.birimSayilari[hedefLeg.raceNo] ?? null, wide: rWide.birimSayilari[hedefLeg.raceNo] ?? null };
 
+  const WIDTH_AD: Record<Width, string> = { narrow: "Ekonomik", normal: "Normal", wide: "Geniş" };
   const temel = { modelRank: modelRank || null, baseK, publishedWidth, missingCount, usesLiveRunnerState: true as const, liveStateUyarisi: LIVE_STATE_UYARISI };
-  if (modelRank === 0) return { ...temel, missType: "UNCERTAINTY", not: "Kazanan BASE birim listesinde bulunamadı (veri tutarsızlığı) — sınıflandırılamadı." };
+  if (modelRank === 0) return { ...temel, missType: "UNCERTAINTY", not: "Kazanan mevcut kupon hesabının birim listesinde bulunamadı (veri tutarsızlığı) — sınıflandırılamadı." };
 
-  // 2) PUBLISH_OVERRIDE_MISS — GERÇEKTE yayınlanan bütçe biliniyorsa ve BASE o bütçede zaten
-  // içine alıyorduysa, sorun allocator matematiği değil, publish-süreci/elle-düzenlemedir.
+  // 2) PUBLISH_OVERRIDE_MISS — GERÇEKTE yayınlanan bütçe biliniyorsa ve mevcut kupon sistemi
+  // o bütçede zaten içine alıyorduysa, sorun kupon dağıtım hesabı değil, yayın-süreci/elle-
+  // düzenlemedir.
   if (publishedWidth) {
     const kYayin = baseK[publishedWidth];
     if (kYayin != null && modelRank <= kYayin) {
-      return { ...temel, missType: "PUBLISH_OVERRIDE_MISS", not: `Model kazananı ${modelRank}. sıraya koymuş, BASE'in KENDİ ${publishedWidth} hesabı ${kYayin} at yazardı (${modelRank}≤${kYayin}) — yine de GERÇEKTE yayınlanan kuponda yoktu. Sorun allocator matematiği DEĞİL, publish-süreci/elle-düzenleme.` };
+      return { ...temel, missType: "PUBLISH_OVERRIDE_MISS", not: `Model kazananı ${modelRank}. sıraya koymuş, mevcut kupon sisteminin KENDİ ${WIDTH_AD[publishedWidth]} hesabı ${kYayin} at yazardı (${modelRank}≤${kYayin}) — yine de GERÇEKTE yayınlanan kuponda yoktu. Sorun kupon dağıtım hesabında DEĞİL, yayın-süreci/elle-düzenleme.` };
     }
   }
-  // 3) ALLOCATOR_MISS — yayınlanan bütçede BASE'in kendisi de kaçırırdı, AMA daha geniş
-  // (wide) bütçe yakalardı — budget/allocator ayarı sorusu.
+  // 3) ALLOCATOR_MISS — yayınlanan bütçede mevcut sistem de kaçırırdı, AMA daha geniş bütçe
+  // yakalardı — bütçe/kupon-genişliği ayarı sorusu.
   if (baseK.wide != null && modelRank <= baseK.wide) {
-    return { ...temel, missType: "ALLOCATOR_MISS", not: `Model kazananı ${modelRank}. sıraya koymuş; ${publishedWidth ?? "yayınlanan"} bütçede BASE bile yakalamazdı, ama Geniş bütçe (k=${baseK.wide}) yakalardı (${modelRank}≤${baseK.wide}) — bütçe/allocator ayarı araştırılmalı, model DEĞİL.` };
+    return { ...temel, missType: "ALLOCATOR_MISS", not: `Model kazananı ${modelRank}. sıraya koymuş; ${publishedWidth ? WIDTH_AD[publishedWidth] : "yayınlanan"} bütçede mevcut sistem bile yakalamazdı, ama Geniş bütçe (k=${baseK.wide}) yakalardı (${modelRank}≤${baseK.wide}) — bütçe/kupon-genişliği ayarı araştırılmalı, model DEĞİL.` };
   }
   // 4) ANALYSIS_MISS — en geniş bütçenin bile ulaşamayacağı kadar aşağıda.
-  return { ...temel, missType: "ANALYSIS_MISS", not: `Model kazananı ${modelRank}. sıraya koymuş, en geniş (wide) bütçe bile yalnız ${baseK.wide} at yazardı (${modelRank}>${baseK.wide}) — hiçbir makul bütçe yakalamazdı, model/feature/kalibrasyon araştırılmalı.` };
+  return { ...temel, missType: "ANALYSIS_MISS", not: `Model kazananı ${modelRank}. sıraya koymuş, en geniş (Geniş) bütçe bile yalnız ${baseK.wide} at yazardı (${modelRank}>${baseK.wide}) — hiçbir makul bütçe yakalamazdı, model/sinyal/kalibrasyon araştırılmalı.` };
 }
 
 function ekuriBirlestir(runners: { no: number; p: number; ekuriGroup: number | null }[]) {
