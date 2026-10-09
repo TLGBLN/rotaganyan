@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { turkeyDateString } from "@/lib/tz";
 import { getSinyalSaglik, type SinyalOzeti } from "@/server/services/sinyal-saglik.service";
+import { ENGINE_VERSIONS } from "@/lib/methodology/engine-versions.data";
 
 // Site Anatomisi — "Sistem çalışıyor mu? Veriler sağlıklı mı? Sinyaller sağlıklı mı?" sorularına
 // tek ekranda cevap. Yalnız okuma. Model performansı (kaçan kazananlar) bu sayfada YOK; o
@@ -111,15 +112,38 @@ export async function getSiteAnatomisi(): Promise<{
     }
   }
 
-  // Tahmin motoru çıktısı (bugünkü yayınlanmış tahmin sayısı)
+  // Tahmin motoru çıktısı (bugünkü yayınlanmış tahmin sayısı) — 2026-10-10 kullanıcı talebi:
+  // yalnız "tahmin var mı" değil, "hangi MOTORLA üretilmiş" de denetlenmeli. Her Pick'in
+  // featureSnapshot.motorEtiketi'si (V5AnalysisPanel'in kaydettiği, CURRENT_ENGINE_LABEL'den
+  // türetilen etiket) o anki güncel sürümle (ENGINE_VERSIONS'ın son/bitis:null girdisi,
+  // şu an V5.46.1) karşılaştırılır. Bugün YAYINLANMIŞ bir tahmin eski/farklı bir motorla
+  // üretilmişse bu gerçek bir arıza sayılır (production tek motorda olmalı).
   {
     try {
-      const n = await db.prediction.count({ where: { published: true, race: { raceDay: { date: bugunDate } } } });
+      const guncelVersiyon = ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].versiyon;
+      const predictions = await db.prediction.findMany({
+        where: { published: true, race: { raceDay: { date: bugunDate } } },
+        select: { picks: { select: { featureSnapshot: true }, take: 1 } },
+      });
+      const n = predictions.length;
+      const eskiMotorlar = new Set<string>();
+      let etiketsiz = 0;
+      for (const p of predictions) {
+        const fs = p.picks[0]?.featureSnapshot as { motorEtiketi?: string } | null;
+        const etiket = fs?.motorEtiketi;
+        if (!etiket) { etiketsiz++; continue; }
+        if (!etiket.startsWith(guncelVersiyon)) eskiMotorlar.add(etiket.split(" —")[0]);
+      }
       organlar.push({
         id: "tahmin",
         islev: "Tahmin motoru çıktısı (bugün)",
-        durum: n === 0 ? "UYARI" : "OK",
-        detay: n === 0 ? "Bugün yayınlanmış tahmin yok" : `Bugün ${n} yayınlanmış tahmin`,
+        durum: n === 0 ? "UYARI" : eskiMotorlar.size > 0 ? "HATA" : "OK",
+        detay:
+          n === 0
+            ? "Bugün yayınlanmış tahmin yok"
+            : eskiMotorlar.size > 0
+              ? `Bugün ${n} tahmin var ama güncel olmayan motor tespit edildi: ${[...eskiMotorlar].join(", ")} (güncel: ${guncelVersiyon} olmalı)`
+              : `Bugün ${n} yayınlanmış tahmin, hepsi ${guncelVersiyon}${etiketsiz > 0 ? ` (${etiketsiz} tanesinin motor etiketi kayıtlı değil, eski/manuel kayıt olabilir)` : ""}`,
         olcumMs: null,
       });
     } catch {

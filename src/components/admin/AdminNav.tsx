@@ -21,7 +21,6 @@ import {
   ClipboardCheck,
   CloudRain,
   Activity,
-  ListChecks,
   SearchCode,
 } from "lucide-react";
 
@@ -36,7 +35,6 @@ const NAV: NavOge[] = [
   { href: "/admin/accurace", label: "Accurace Database", icon: Gauge },
   { href: "/admin/derece-istatistikleri", label: "Derece İstatistikleri", icon: CloudRain },
   { href: "/admin/site-anatomisi", label: "Site Anatomisi", icon: Activity, grup: "Teşhis" },
-  { href: "/admin/kosu-sonuclari", label: "Koşu Sonuçları Değerlendirme", icon: ListChecks, grup: "Teşhis" },
   { href: "/admin/veri-tamligi", label: "Veri Tamlığı", icon: ClipboardCheck, grup: "Teşhis" },
   { href: "/admin/sonuclar", label: "Sonuçlar", icon: Trophy },
   { href: "/admin/jokey", label: "Jokey İstatistikleri", icon: TrendingUp },

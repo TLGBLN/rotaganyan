@@ -42,13 +42,13 @@ export default async function VeriTamligiPage() {
                 <td className={cn("px-3 py-2 text-right font-mono tabular-nums", renk(satir.yuzdeKapsam))}>
                   %{satir.yuzdeKapsam.toFixed(1)}{" "}
                   <span className="text-muted-foreground">
-                    ({satir.doluKapsam}/{satir.toplamKapsam})
+                    ({satir.doluKapsam}/{satir.toplamKapsam}{satir.birim === "gun" ? " gün" : ""})
                   </span>
                 </td>
                 <td className={cn("px-3 py-2 text-right font-mono tabular-nums", renk(satir.yuzdeSon7))}>
                   %{satir.yuzdeSon7.toFixed(1)}{" "}
                   <span className="text-muted-foreground">
-                    ({satir.doluSon7}/{satir.toplamSon7})
+                    ({satir.doluSon7}/{satir.toplamSon7}{satir.birim === "gun" ? " gün" : ""})
                   </span>
                 </td>
               </tr>

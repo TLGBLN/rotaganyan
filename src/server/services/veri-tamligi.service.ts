@@ -21,6 +21,9 @@ export type VeriTamligiSatiri = {
   toplamSon7: number;
   doluSon7: number;
   yuzdeSon7: number;
+  // Çoğu satırda "kayıt" (count/count) — Derece İstatistikleri satırı istisna: "gün" (tazelik).
+  // Sayfa (dolu/toplam) parantezinin yanına birimi yazar, bir kayıt-sayısı sanılmasın diye.
+  birim?: "gun";
 };
 
 // 2026-08-30 kullanıcı bulgusu: "AGF Trend" ve "AGF (güncel)" satırları hiçbir zaman
@@ -143,7 +146,12 @@ async function tekSorgu(baslangicTarihi: string) {
 async function dereceIstTazelik(): Promise<{ toplam: number; dolu: number }> {
   const enSon = await db.tjkDereceKaydi.findFirst({ orderBy: { tarih: "desc" }, select: { tarih: true } });
   const gecikmeGun = enSon?.tarih ? (Date.now() - enSon.tarih.getTime()) / (24 * 60 * 60 * 1000) : 7;
-  return { toplam: 7, dolu: Math.max(0, 7 - gecikmeGun) };
+  // 2026-10-10 kullanıcı bulgusu: ham (yuvarlanmamış) float ("5.086305914351852/7") sayfada
+  // diğer satırlardaki TAM SAYI kayıt sayımlarıyla aynı "(dolu/toplam)" kalıbında gösteriliyor,
+  // bu da bozuk bir veri gibi görünüyor — oysa bu satır bilinçli olarak "gün cinsinden tazelik"
+  // ölçüyor (bkz. yukarıdaki 2026-08-30 notu), sayım değil. toFixed(1) ile okunabilir hale getirildi.
+  const dolu = Math.round(Math.max(0, 7 - gecikmeGun) * 10) / 10;
+  return { toplam: 7, dolu };
 }
 
 export async function getVeriTamligiRaporu(): Promise<VeriTamligiSatiri[]> {
@@ -197,13 +205,14 @@ export async function getVeriTamligiRaporu(): Promise<VeriTamligiSatiri[]> {
     satir("At yarış geçmişi önbelleği", "HorseRaceHistoryCache'de tam geçmiş önbelleklenmiş mi", "historycache_dolu"),
     {
       alan: "Derece İstatistikleri (TjkDereceKaydi)",
-      aciklama: "zeminToleransi/yüzey-değişikliği'nin TEK kaynağı — arşivdeki en güncel koşu tarihi bugüne ne kadar yakın (günlük senkron sağlığı, per-koşu kapsam değil)",
+      aciklama: "zeminToleransi/yüzey-değişikliği'nin TEK kaynağı — arşivdeki en güncel koşu tarihi bugüne ne kadar yakın (birim: gün, 7 üzerinden taze günü gösterir — per-koşu kayıt sayısı DEĞİL)",
       toplamKapsam: dereceTazelik.toplam,
       doluKapsam: dereceTazelik.dolu,
       yuzdeKapsam: Math.round((dereceTazelik.dolu / dereceTazelik.toplam) * 1000) / 10,
       toplamSon7: dereceTazelik.toplam,
       doluSon7: dereceTazelik.dolu,
       yuzdeSon7: Math.round((dereceTazelik.dolu / dereceTazelik.toplam) * 1000) / 10,
+      birim: "gun",
     },
   ];
 }

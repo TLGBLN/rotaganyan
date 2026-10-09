@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getSiteAnatomisi, type OrganDurum } from "@/server/services/site-anatomi.service";
 import { SINYAL_SON_GUN, type SinyalDurum, type SinyalOzeti } from "@/server/services/sinyal-saglik.service";
 import { cn } from "@/lib/utils";
@@ -44,9 +43,6 @@ function SinyalBolumu({ sinyal }: { sinyal: SinyalOzeti }) {
             değiştirilmez. Kaçan kazananlar, Top6 dışında kalan kazanandır.
           </p>
         </div>
-        <Link href="/admin/kosu-sonuclari" className="text-xs font-semibold text-brand">
-          Koşu Sonuçları Değerlendirme →
-        </Link>
       </div>
 
       <details className="rounded-lg border">
