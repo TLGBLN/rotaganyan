@@ -60,12 +60,40 @@ async function handlePost(req: NextRequest) {
       bZeminMesafeKatkisi: 0,
       zeminMesafeDeneyim: zmd,
       zeminMesafeDeneyimSeviyesi: Math.abs(zmd) > 1e-12 ? "var" : "yok",
-      details: [
-        `[V461] V5.46.1 teknik sira: ${p.rank}`,
-        `Kazanma olasiligi: %${(p.probability * 100).toFixed(2)}`,
-        `Model skoru: ${p.score.toFixed(5)}`,
-        ...enGuclu.map((f) => `${f.ad}: ${f.contribution >= 0 ? "+" : ""}${f.contribution.toFixed(4)}`),
-      ],
+      details: {
+        versiyon: 2,
+        karar: p.rank === 1 ? "ANA ADAY" : p.rank <= 3 ? "CIDDI RAKIP" : "ALTERNATIF",
+        satirlar: [
+          {
+            kod: ["V461"],
+            tip: "notr",
+            guven: "tam",
+            kodGarantili: true,
+            aciklama: `V5.46.1 teknik sira: ${p.rank}`,
+          },
+          {
+            kod: ["OLASILIK"],
+            tip: "notr",
+            guven: "tam",
+            kodGarantili: true,
+            aciklama: `Kazanma olasiligi: %${(p.probability * 100).toFixed(2)}`,
+          },
+          {
+            kod: ["MODEL_SKORU"],
+            tip: "notr",
+            guven: "tam",
+            kodGarantili: true,
+            aciklama: `Model skoru: ${p.score.toFixed(5)}`,
+          },
+          ...enGuclu.map((f) => ({
+            kod: [f.ad],
+            tip: f.contribution >= 0 ? "destek" : "risk",
+            guven: "tam",
+            kodGarantili: true,
+            aciklama: `${f.ad}: ${f.contribution >= 0 ? "+" : ""}${f.contribution.toFixed(4)}`,
+          })),
+        ],
+      },
       tumSinyaller: sinyaller,
     };
   });
