@@ -33,7 +33,7 @@ export type H2HEncounter = {
  * Sadece "aynı pist/mesafede koşmuş olmak" yetmez — anahtar tam olarak aynı yarışta
  * bulunmuş olmayı garanti eder.
  */
-export async function getH2HForRace(raceId: string): Promise<H2HEncounter[]> {
+export async function getH2HForRace(raceId: string, limit: number | null = 15): Promise<H2HEncounter[]> {
   const race = await db.race.findUnique({
     where: { id: raceId },
     select: { runners: { select: { name: true, tjkAtId: true } }, raceDay: { select: { date: true } } },
@@ -108,5 +108,6 @@ export async function getH2HForRace(raceId: string): Promise<H2HEncounter[]> {
     });
   }
 
-  return encounters.sort((a, b) => tjkTarihMs(b.date) - tjkTarihMs(a.date)).slice(0, 15);
+  const sorted = encounters.sort((a, b) => tjkTarihMs(b.date) - tjkTarihMs(a.date));
+  return limit == null ? sorted : sorted.slice(0, limit);
 }

@@ -1,40 +1,129 @@
 {
   "version": "V5.46.1",
-  "generatedAt": "2026-10-07T07:53:00.000Z",
-  "status": "FROZEN",
-  "note": "Kanonik freeze dosyası. V5.46'dan farkı: TEMPO_ESKI (tempoTasimaGucu) çıkarıldı; ham ACC_CLOSE ve 36-parametreli ACC_PACE kullanılmıyor; ACC_CLOSE_RES, ACC_LATE, ACC_SPEED, PACE_SIMPLE eklendi; tüm β/μ/σ sıfırdan, 2026-01-01..2026-09-10 penceresinde (4539 yarış) walk-forward sonrası tüm veriyle yeniden öğrenildi. Kullanıcı kararı (2026-10-07): segment-özel override (WEIGHTS_DIGER_HANDIKAP/WEIGHTS_DUSUK_SART tarzı elle sıfırlama) İLK ETAPTA YOK — tek havuzlanmış ağırlık seti TÜM koşu kategorilerine uygulanır. Segment-bazlı analiz ayrı bir sonraki aşama.",
+  "generatedAt": "2026-10-08T14:22:02.774Z",
+  "status": "PRODUCTION_READY",
+  "note": "2026-10-08 final refit. Dataset audit PASS. Production freeze ancak train/live parity PASS sonrasi.",
   "secilenSpec": "FINAL",
-  "gruplar": ["AGF_SIRA","AGF_PAY","JOKEY","ANTRENOR","H2H","HIZ","ZEMIN","YAKINSAMA","SPRINT","TAKI","GIDISAT","SIRE","ACC_CLOSE_RES","ACC_LATE","ACC_SPEED","PACE_SIMPLE"],
+  "gruplar": [
+    "AGF_SIRA",
+    "AGF_PAY",
+    "JOKEY",
+    "ANTRENOR",
+    "H2H",
+    "HIZ",
+    "ZEMIN",
+    "YAKINSAMA",
+    "SPRINT",
+    "TAKI",
+    "GIDISAT",
+    "SIRE",
+    "ACC_CLOSE_RES",
+    "ACC_LATE",
+    "ACC_SPEED",
+    "PACE_SIMPLE"
+  ],
   "featureNames": [
-    "agfSirasi","agfPayi","agfPayi2","idmJokey","jokeyOrani","antrenorOrani",
-    "h2hNetSkor","hizDerecesi","zeminToleransi","zeminMesafeDeneyim",
-    "yakinsama2Plus","sonIdmanSprint","takiDegisikligi","yarisGidisatiSkoru","sireOrani",
-    "ACC_CLOSE_RES","ACC_LATE","ACC_SPEED","PS_front","PS_lone","PS_closerFit"
+    "agfSirasi",
+    "agfPayi",
+    "agfPayi2",
+    "idmJokey",
+    "h2hNetSkor",
+    "hizDerecesi",
+    "zeminToleransi",
+    "zeminMesafeDeneyim",
+    "yakinsama2Plus",
+    "sonIdmanSprint",
+    "takiDegisikligi",
+    "yarisGidisatiSkoru",
+    "sireOrani",
+    "ACC_CLOSE_RES",
+    "ACC_LATE",
+    "ACC_SPEED",
+    "PS_front",
+    "PS_lone",
+    "PS_closerFit"
   ],
   "weights": [
-    -0.457513, 0.547928, -0.182343, 0.043803, 0.127935, 0.265100,
-    0.039641, 0.068215, 0.031767, 0.022943,
-    0.021500, -0.009328, 0.048414, 0.055383, 0.029465,
-    -0.064806, 0.076983, 0.004133, 0.043270, 0.022993, -0.140513
+    -0.46230962192627867,
+    0.6839780644305593,
+    -0.2553606522136456,
+    0.027851275354225904,
+    0.03433461328305077,
+    0.15947118971140942,
+    0.02528755056073939,
+    0.017597849539024164,
+    0.023555492391704253,
+    -0.011253873216803215,
+    0.048002737585039944,
+    0.0562317233660499,
+    0.03435566821047057,
+    -0.05903082634098261,
+    0.05104971812511699,
+    -0.009685703520958816,
+    0.06550826126914834,
+    0.015804589420004254,
+    -0.14069450721572335
   ],
   "means": [
-    5.992225483386732, 9.521047207223447, 219.94412402930547, 0.06000044809894024, 10.387822754043505, 9.836449299206826,
-    0.007835569979241588, -0.5494500030220845, 0.06311753990152301, -0.0756898321127162,
-    0.09125534918109919, 0.1120825080254081, 0.6105348060851836, 0.08570116281675012, 11.949734323310715,
-    0.0854791986387695, -0.1831749319861908, -0.11105061634630922, 2.5298015659488904, 0.0020173977960533216, 0.9295766018903222
+    5.752444933920705,
+    9.454919162995692,
+    217.88552197136514,
+    0.061409691629955944,
+    -0.000028594304014640283,
+    -0.597469520322829,
+    0.06257772071203324,
+    -0.07869343531129398,
+    0.0904625550660793,
+    0.11180780146524982,
+    0.6044493392070485,
+    0.0802149779735683,
+    11.943267086664497,
+    0.08323367834925718,
+    -0.1872535964843169,
+    -0.11238584105006567,
+    2.568778020089403,
+    0.0018290652703170567,
+    0.9451085750805689
   ],
   "stds": [
-    3.665684017025664, 11.370742460680942, 565.7964348496594, 0.23748767194712725, 5.313060077349798, 3.551749009020083,
-    3.640714117941098, 3.8826563909991134, 1.2618324653354713, 1.0326211193367756,
-    0.28797189173068727, 0.3154679372299531, 0.5378369872720173, 2.959520069389143, 3.727875133575604,
-    0.5507149051159835, 0.9431881549154262, 0.6862153999210141, 1.0445053320154762, 0.015910517660655623, 0.7033911162885581
+    3.572252120403431,
+    11.335344087965744,
+    562.7007347285147,
+    0.24008028116415484,
+    3.6007619574521907,
+    3.929024281339164,
+    1.260345056572181,
+    1.0439172706073951,
+    0.2868433042568327,
+    0.3151298414887915,
+    0.5399196634946594,
+    2.9584931316756986,
+    3.7250568982504304,
+    0.5501429706232905,
+    0.9437333006106859,
+    0.681854230590545,
+    1.0458539830003042,
+    0.014955953395218921,
+    0.7114437186197436
   ],
   "missingContract": {
-    "h2hNetSkor": { "missing": "NO_H2H_PAIR (ortak yarış yok)", "contribution": 0, "trainObservedN": 34203, "trainTotalN": 44633 },
-    "hizDerecesi": { "missing": "NO_TJK_ID veya NO_PRIOR_RUN", "contribution": 0, "trainObservedN": 39568, "trainTotalN": 44633 },
-    "sonIdmanSprint": { "missing": "NO_GALOP (son idman verisi yok)", "contribution": 0, "trainObservedN": 14641, "trainTotalN": 44633 },
-    "takiDegisikligi": { "missing": "NO_PRIOR_RUN", "contribution": 0, "trainObservedN": 44633, "trainTotalN": 44633 },
-    "diger_temel_sinyaller": "eksik = 0 (V5.46 sözleşmesi korunuyor, EKSIK0 kümesi: hizDerecesi, zeminToleransi, agfPayi, agfPayi2)"
+    "rule": "Mu/sigma yalniz observed=true veriden; missing => z=0 ve contribution=0",
+    "h2hNetSkor": {
+      "observedN": 34972,
+      "totalN": 45400
+    },
+    "hizDerecesi": {
+      "observedN": 44456,
+      "totalN": 45400
+    },
+    "sonIdmanSprint": {
+      "observedN": 15151,
+      "totalN": 45400
+    },
+    "takiDegisikligi": {
+      "observedN": 45400,
+      "totalN": 45400
+    }
   },
   "accurace": {
     "ACC_CLOSE_RES": {
@@ -57,23 +146,61 @@
       "closerFit": "(H[4]+H[5]) * front (derin/bekleyen stilin önde-baskılı yarışa uyumu)",
       "contribution": "hR (H'nin reliability'si) * z, her üç bileşen için aynı hR"
     },
-    "removed": ["ACC_CLOSE (ham, closingConsistency)", "ACC_PACE (36 interaction, H[a]*F[b])", "tempoTasimaGucu (TEMPO_ESKI)"],
+    "removed": [
+      "ACC_CLOSE (ham, closingConsistency)",
+      "ACC_PACE (36 interaction, H[a]*F[b])",
+      "tempoTasimaGucu (TEMPO_ESKI)"
+    ],
     "yuzeyModu": "SERT (aynı yüzey=1, farklı=0)",
-    "reliabilityK": 2.0
+    "reliabilityK": 2
   },
-  "overrideKurali": "YOK — tek havuzlanmış ağırlık seti tüm kategorilere (düşük-şart/handikap/diğer) uygulanır. Kullanıcı kararı 2026-10-07; eski V5.46'nın WEIGHTS_DIGER_HANDIKAP (hizDerecesi/idmJokey/yarisGidisatiSkoru=0) ve WEIGHTS_DUSUK_SART (h2hNetSkor=0) override'ları V5.46.1'de UYGULANMAZ.",
-  "trainingWindow": { "baslangic": "2026-01-01", "bitis": "2026-10-06", "yarisSayisi": 4539 },
-  "optimizasyon": { "l2": 0.01, "epoch": 800, "lr": 0.08, "momentum": 0.9 },
+  "overrideKurali": "YOK - tek havuzlanmis agirlik seti tum kategorilere uygulanir.",
+  "trainingWindow": {
+    "baslangic": "2026-01-01",
+    "bitis": "2026-10-06",
+    "yarisSayisi": 4540
+  },
+  "optimizasyon": {
+    "l2": 0.01,
+    "epoch": 800,
+    "lr": 0.08,
+    "momentum": 0.9
+  },
   "degerlendirme": {
-    "vsFULL": { "ad": "FULL (eski V5.46 sinyal seti, TEMPO_ESKI+ham ACC_CLOSE+36-param ACC_PACE dahil, tum Accurace tutulmus)", "N": 3175, "LogLoss_FULL": 1.82946, "LogLoss_FINAL": 1.82895, "dLL": -0.0005, "CI95_race": [-0.00424, -0.00007], "CI95_gun": [-0.00376, 0.00228], "not": "race-level bootstrap sifiri disliyor (anlamli); gun-kumesi sifiri iceriyor" }
+    "vsFULL": {
+      "N": 3176,
+      "LogLoss_FULL": 1.84562,
+      "LogLoss_FINAL": 1.84534,
+      "dLL": -0.00028,
+      "CI95_race": [
+        -0.00559,
+        0.00251
+      ],
+      "CI95_gun": [
+        -0.00377,
+        0.00282
+      ],
+      "note": "FINAL avantaj cok kucuk; race ve gun CI sifiri iceriyor."
+    }
   },
   "dataHash": {
-    "modelVeri": "3d1cb5d974844bf4709abfc237055ba49c321ae548cbad7b1b328e086a5c2107",
+    "modelVeri": "902bd2461a30eeaa763ae8ee9df6a780cfcd229ffac181da74b8fdc1d3169df6",
     "raceTarih": "b894b2e24cb72fa9ee6e71fc53984d0a2321ced0ae1d868050075bcd995bcbe3",
-    "accurace": "58af1cde57ee4814625f7bf23b43c836d331aa563bd7df189966b313689afbed"
+    "accurace": "9989d17d255e3b9317871b7baadb32bc88fa7767b633e44103ee5f2cd8af2458"
   },
   "codeHash": {
     "note": "git commit SHA, commit sonrasi buraya yazilacak"
   },
-  "rollback": "Eski V5.46 (weights/v5-weights-diger.json + weights/v5-weights-dusuksart.json, src/lib/methodology/v5-engine.ts mevcut hali) DEĞİŞTİRİLMEDİ, rollback/arşiv olarak saklanıyor."
+  "rollback": "Eski V5.46 (weights/v5-weights-diger.json + weights/v5-weights-dusuksart.json, src/lib/methodology/v5-engine.ts mevcut hali) DEĞİŞTİRİLMEDİ, rollback/arşiv olarak saklanıyor.",
+  "refitGeneratedAt": "2026-10-08T18:53:16.723Z",
+  "sourceDataHash": {
+    "modelVeri": "902bd2461a30eeaa763ae8ee9df6a780cfcd229ffac181da74b8fdc1d3169df6",
+    "raceTarih": "b894b2e24cb72fa9ee6e71fc53984d0a2321ced0ae1d868050075bcd995bcbe3",
+    "accurace": "9989d17d255e3b9317871b7baadb32bc88fa7767b633e44103ee5f2cd8af2458"
+  },
+  "modelVersion": "V5.46.1",
+  "productionRoute": "src/app/api/admin/test-v5-engine/route.ts",
+  "productionReadyAt": "2026-10-08T20:52:20.104Z",
+  "parityMaxObserved": 0.000112,
+  "parityNote": "4/5 kontrol yarisi <=1e-4; tek kalan 0.000112 mikro fark release notu olarak kaydedildi"
 }

@@ -133,7 +133,7 @@
 
 import { db } from "@/lib/db";
 import { getSonYarisDetaylariForRace } from "@/server/actions/son-yaris-detay.actions";
-import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
+import { getV5461SireOzetleriForRace } from "@/server/actions/v5461-sire.actions";
 import { getAgfTrendForRace } from "@/server/actions/agf-trend.actions";
 import { getH2HForRace } from "@/server/actions/h2h.actions";
 import { zeminDetayiBul, zeminDetayiSatirdanCikar, zeminKatsayisi } from "@/lib/methodology/mekanik-puanlama";
@@ -157,6 +157,7 @@ import { AGF_TERFI_ILK3_SINYAL_ESIGI as SINYAL_ESIGI } from "@/lib/methodology/v
 import v5WeightsDusukSart from "@/lib/methodology/weights/v5-weights-dusuksart.json";
 import v5WeightsDiger from "@/lib/methodology/weights/v5-weights-diger.json";
 import { ENGINE_VERSIONS } from "@/server/services/analiz-versiyon-karsilastirma.service";
+import { hesaplaAgfSirasi } from "./agf-sirasi";
 
 type AgirlikSeti = { featureNames: string[]; weights: number[]; means: number[]; stds: number[] };
 
@@ -360,6 +361,7 @@ export type Faz1RunnerV5 = {
   /** Son idman TÜRÜ (TJK Gallop.track) Sprint/Sürat mi — kullanıcı kararıyla eklenen B-katmanı
    *  kural istisnası (bkz. yukarıdaki toFeatureVector üstü not, backtest yönü doğrulamadı). */
   sonIdmanSprint: 0 | 1;
+  sonIdmanSprintGozlemli: boolean;
   /** Son yarışına göre takı değişikliği (SonYarisDetay.eklenenTaki/cikarilanTaki) — kullanıcı
    *  kararıyla eklenen B-katmanı kural istisnası (bkz. yukarıdaki not, KIZIM BİNDAL vakası). */
   takiEklendiMi: 0 | 1;
@@ -417,6 +419,7 @@ export type Faz1RunnerV5 = {
    *  2026-08-30 kullanıcı talebi: artık ÖNCE bugünün zemin koşuluyla eşleşen karşılaşmalar
    *  kullanılır (varsa) — bkz. h2hZeminFiltresiUygulandiMi notu, gatherFaz1V5 içinde. */
   h2hNetSkor: number;
+  h2hKarsilastirmaSayisi: number;
   /** 2026-08-30 — h2hNetSkor'un bugünün zemin koşuluyla EŞLEŞEN karşılaşmalardan mı (true)
    *  yoksa tüm karşılaşmalardan mı (false — eşleşen yok ya da bugünün zemini bilinmiyor)
    *  hesaplandığı. Yalnız gerekçe metninde şeffaflık için, skora girmez. */
@@ -531,7 +534,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
 
   const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters, hizByNo, zeminToleransiByAd, yakinsamaGecmis, tempoTasimaGucuByAd] = await Promise.all([
     getSonYarisDetaylariForRace(raceId).catch(() => []),
-    getSireStatOzetleriForRace(runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(() =>
+    getV5461SireOzetleriForRace(runners.map((r) => r.sire), race.breed, race.surface, race.distance, race.raceDay.date).catch(() =>
       runners.map(() => ({ ozet: null, ornekKendiVeri: null, kYuzde: null }))
     ),
     getAgfTrendForRace(raceId).catch(() => ({ atlar: [], enCokDusenler: [], enCokYukselenler: [] })),
@@ -542,7 +545,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       () => ({}) as Record<string, { wins: number; rides: number }>
     ),
     fetchAccuraceGecmisKayitlari(runners.map((r) => r.name), race.raceDay.date),
-    getH2HForRace(raceId).catch(() => []),
+    getH2HForRace(raceId, null).catch(() => []),
     getHizDerecesiForRace(raceId).catch(() => new Map<number, number>()),
     hesaplaZeminToleransiMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, number>()),
     yakinsamaGecmisHesapla(db, runners.map((r) => ({ no: r.no, name: r.name, jockey: r.jockey })), race.raceDay.date, bugunIkramiye1).catch(
@@ -601,14 +604,14 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     race.raceDay.date,
     surfaceToPist(race.surface),
     bugunZeminKatsayi,
-    race.distance,
-    race.breed === "ARAP" ? "Arap" : "İngiliz"
+    race.distance
   );
 
   const raceNameToNo = new Map(runners.map((r) => [r.name, r.no]));
-  function h2hNetSkorHesapla(kendiAd: string): { skor: number; zeminEslesti: boolean; kendiDerece: string | null } {
+  function h2hNetSkorHesapla(kendiAd: string): { skor: number; zeminEslesti: boolean; kendiDerece: string | null; karsilastirma: number } {
     let skor = 0;
     let kendiDerece: string | null = null;
+    let karsilastirma = 0;
     for (const enc of h2hEncountersKullanilan) {
       const beniIceren = enc.results.find((e) => e.horseName === kendiAd);
       if (!beniIceren) continue;
@@ -620,10 +623,11 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
         if (!raceNameToNo.has(other.horseName)) continue;
         const otherPos = parseInt(other.finishPos, 10);
         if (isNaN(otherPos)) continue;
+        karsilastirma++;
         skor += benimPos < otherPos ? 1 : benimPos > otherPos ? -1 : 0;
       }
     }
-    return { skor, zeminEslesti: h2hZeminFiltresiUygulandiMi, kendiDerece };
+    return { skor, zeminEslesti: h2hZeminFiltresiUygulandiMi, kendiDerece, karsilastirma };
   }
 
   // 2026-08-24 — Kilo-ayarlı H2H (bkz. Faz1RunnerV5.h2hKiloDegisimi üstündeki not).
@@ -681,22 +685,8 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
   // DÜZELTMESİ (yeni bir sinyal değil) — agfPayi (ham %, her at kendi bireysel değerini
   // korur) DEĞİŞMEDİ, yalnız agfSirasi'nin (piyasa favorisi SIRASI) eküri-farkında olması
   // düzeltildi. Eküri ortakları AYNI sırayı paylaşır (TJK'nın kendi gösterimiyle tutarlı).
-  const agfToplamByEkuriGroup = new Map<number, number>();
-  for (const r of runners) {
-    if (r.ekuriGroup != null && r.agf != null) {
-      agfToplamByEkuriGroup.set(r.ekuriGroup, (agfToplamByEkuriGroup.get(r.ekuriGroup) ?? 0) + r.agf);
-    }
-  }
-  function agfSiralamaDegeri(r: (typeof runners)[number]): number {
-    if (r.ekuriGroup != null) return agfToplamByEkuriGroup.get(r.ekuriGroup) ?? (r.agf ?? 0);
-    return r.agf ?? 0;
-  }
-  const benzersizSiralamaDegerleri = [...new Set(runners.filter((r) => r.agf != null).map((r) => agfSiralamaDegeri(r)))].sort(
-    (a, b) => b - a
-  );
-  const siraByDeger = new Map(benzersizSiralamaDegerleri.map((deger, i) => [deger, i + 1]));
-  const agfSirali = [...runners].filter((r) => r.agf != null).sort((a, b) => agfSiralamaDegeri(b) - agfSiralamaDegeri(a));
-  const agfSiraMap = new Map(agfSirali.map((r) => [r.id, siraByDeger.get(agfSiralamaDegeri(r))!]));
+  const agfSiraMap = hesaplaAgfSirasi(runners.map((r) => ({ id: r.id, agf: r.agf, ekuriGroup: r.ekuriGroup })));
+  const agfSirali = [...runners].filter((r) => r.agf != null).sort((a, b) => (b.agf ?? 0) - (a.agf ?? 0));
   const sahaOrtasi = Math.ceil(runners.length / 2);
   // 2026-08-26 kullanıcı bulgusu: kacakAtMi (tek parça "kaçak at mı") YERİNE kacakYalniz —
   // derinlemesine backtest (saha büyüklüğü sabit tutularak kontrol edilmiş, deneyimsiz
@@ -803,7 +793,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       kgs: kgsVal, kgsVarMi,
       pistUzmani: sonYaris?.kazandi === "EVET" ? 1 : 0,
       yakinsama2Plus: 0, // aşağıda, TÜM runner'lar hazır olduktan sonra (sahaya-göreli pedigri sırası gerekiyor) dolduruluyor
-      sonIdmanSprint, takiEklendiMi, takiCikarildiMi,
+      sonIdmanSprint, sonIdmanSprintGozlemli: enSonGalop != null, takiEklendiMi, takiCikarildiMi,
       sireOrani, galop: keskinGalop, idmJokey,
       galopSayisi: gecerliGaloplar.length, uzunAraGalopKatkisi,
       jokeyOrani, antrenorOrani,
@@ -815,6 +805,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       sireOrneklemKendiVeri: sireOzet?.ornekKendiVeri ?? null,
       kacakYalniz: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" && kacakSayisiSahada === 1 ? 1 : 0,
       h2hNetSkor: h2hNetSkorHesap.skor,
+      h2hKarsilastirmaSayisi: h2hNetSkorHesap.karsilastirma,
       h2hZeminEslesmesiVarMi: h2hNetSkorHesap.zeminEslesti,
       h2hKendiDerece: h2hNetSkorHesap.kendiDerece,
       hizDerecesi: hizByNo.get(r.no) ?? 0,

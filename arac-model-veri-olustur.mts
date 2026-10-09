@@ -20,12 +20,13 @@ import { breedToIrk, surfaceToPist, mesafeBucket, normalizeSireName } from "./sr
 import { finishPos } from "./src/lib/race-result";
 import { parseTjkDate } from "./src/lib/tjk-date";
 import { getJockeyStats, getTrainerStats } from "./src/server/services/race.service";
-import { zeminKatsayisi, zeminDetayiBul } from "./src/lib/methodology/mekanik-puanlama";
+import { zeminKatsayisi, zeminDetayiBul, zeminDetayiSatirdanCikar } from "./src/lib/methodology/mekanik-puanlama";
 import { hesaplaZeminToleransiMap } from "./src/server/actions/zemin-toleransi.actions";
 import { hesaplaTempoTasimaGucuMap } from "./src/server/actions/tempo-tasima-gucu.actions";
 import { hesaplaZeminMesafeDeneyimiMap } from "./src/server/actions/zemin-mesafe-deneyimi.actions";
 import { hizPaceIndexKur, hizDerecesiHesaplaOrtak, type HizGecmisSatir } from "./src/lib/methodology/hiz-derecesi-hesapla";
 import { yakinsamaGecmisHesapla } from "./src/lib/methodology/yakinsama-gecmis";
+import { hesaplaAgfSirasi } from "./src/lib/methodology/agf-sirasi";
 import { writeFileSync, existsSync, readFileSync } from "fs";
 
 const GERCEK_OLMAYAN_HIPODROM_SLUGLARI = ["karma", "perak-malezya"];
@@ -92,6 +93,7 @@ export type ModelRow = {
   no: number;
   win: 0 | 1;
   top3: 0 | 1;
+  top3Observed?: boolean;
   // ham/sürekli girdiler:
   agfFark: number; // gerçek son-ilk AGF farkı, TÜM saha (yalnız top-5 değil), veri yoksa 0
   agfSirasi: number; // 1..N, veri yoksa saha ortası
@@ -109,6 +111,8 @@ export type ModelRow = {
   // track). Backtest yönü doğrulamadı (bkz. v5-engine.ts notu), yine de B-katmanı kural
   // istisnası olarak eklendi.
   sonIdmanSprint: 0 | 1;
+  // Sinyal sözleşmesi: raw değer + gözlem bayrağı + eksik nedeni (eksik = 0 katkı, gerçek 0 ile karıştırılmaz)
+  sinyalDurum?: Record<string, { observed: boolean; reason: string | null }>;
   sireOrani: number; // küçültülmüş (shrinkage), 0-100
   galop: 0 | 1;
   idmJokey: 0 | 1;
@@ -289,13 +293,13 @@ async function main() {
     select: {
       id: true, classType: true, breed: true, distance: true, surface: true, ikramiyeDetay: true,
       raceDay: { select: { date: true, surfaceConditions: true } },
-      result: { select: { actualOrder: true } },
+      result: { select: { actualOrder: true, winnerNo: true, winnerNos: true } },
       runners: {
         where: { scratched: false },
         // 2026-08-31 — raceStyle artık BURADAN çekilmiyor (sızıntılıydı, bkz. aşağıdaki
         // stilEgilimMap notu) — kaldırıldı, yerine ham Accurace checkpoint verisinden
         // sızıntısız yeniden hesaplanıyor.
-        select: { id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true, disaridanStart: true, hp: true, tjkAtId: true, previousJockey: true, jockeyChanged: true, weight: true },
+        select: { id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true, disaridanStart: true, hp: true, tjkAtId: true, previousJockey: true, jockeyChanged: true, weight: true, ekuriGroup: true },
       },
     },
     orderBy: { raceDay: { date: "asc" } },
@@ -402,14 +406,15 @@ async function main() {
   const paceIndex = hizPaceIndexKur(paceGecmisByTjkAtId, paceIrkByTjkAtId);
   console.log(`Pace indeksi: ${paceIndex.size} kova (${paceTjkAtIdler.length} at)`);
 
-  function hizDerecesiHesapla(tjkAtId: number | null, raceBreed: string, cutoff: Date): number {
-    if (tjkAtId == null) return 0;
+  function hizDerecesiHesapla(tjkAtId: number | null, raceBreed: string, cutoff: Date): { v: number; obs: boolean; reason: string | null } {
+    if (tjkAtId == null) return { v: 0, obs: false, reason: "NO_TJK_ID" };
     const gecmis = paceGecmisByTjkAtId.get(tjkAtId) ?? [];
-    return hizDerecesiHesaplaOrtak(gecmis, breedToIrk(raceBreed), cutoff, paceIndex);
+    if (gecmis.length === 0) return { v: 0, obs: false, reason: "NO_PRIOR_RUN" };
+    return { v: hizDerecesiHesaplaOrtak(gecmis, breedToIrk(raceBreed), cutoff, paceIndex), obs: true, reason: null };
   }
 
   let processed = 0, failed = 0, timedOut = 0;
-  const CONCURRENCY = 6;
+  const CONCURRENCY = 3;
   const startTime = Date.now();
 
   for (let i = 0; i < yeniRaces.length; i += CONCURRENCY) {
@@ -418,11 +423,77 @@ async function main() {
       batch.map(async (race) => {
         try {
           await withTimeout((async () => {
-            const actualOrder = race.result?.actualOrder as number[] | undefined;
-            if (!actualOrder) return;
             const kategori = kategoriTespit(race.classType);
             const runners = race.runners;
-            if (runners.length === 0) return;
+
+            // Conditional-logit için en az iki alternatif gerekir.
+            if (runners.length < 2) {
+              console.warn(
+                `[RACE-SKIP] raceId=${race.id} sebep=RUNNER_LT_2 runners=${runners.length}`
+              );
+              return;
+            }
+
+            const runnerNoSet = new Set(runners.map((rr) => rr.no));
+
+            // Result.actualOrder tarihsel kayıtlarda farklı formatlarda olabilir:
+            // [3,1,2]
+            // ["3","1","2"]
+            // ["5 AT ADI"]
+            // ["5 AT ADI","3 DIGER AT"]
+            const rawOrder = Array.isArray(race.result?.actualOrder)
+              ? (race.result.actualOrder as unknown[])
+              : [];
+
+            const orderNos = [...new Set(
+              rawOrder
+                .map((x) => {
+                  if (typeof x === "number" && Number.isFinite(x)) return x;
+
+                  const m = String(x ?? "")
+                    .trim()
+                    .match(/^(\d+)/);
+
+                  return m ? Number(m[1]) : null;
+                })
+                .filter((x): x is number => x != null)
+            )].filter((no) => runnerNoSet.has(no));
+
+            // Dead-heat mevcut tek-kazanan conditional-logit eğitim
+            // hedefiyle uyumlu değil; yanlış negatif üretmemek için dışla.
+            const dbWinnerNos = (race.result?.winnerNos ?? [])
+              .filter((no) => Number.isFinite(no));
+
+            if (dbWinnerNos.length > 1) {
+              console.warn(
+                `[RACE-SKIP] raceId=${race.id} sebep=DEAD_HEAT winnerNos=${JSON.stringify(dbWinnerNos)}`
+              );
+              return;
+            }
+
+            // Öncelik:
+            // 1) winnerNo
+            // 2) winnerNos[0]
+            // 3) normalize edilmiş actualOrder[0]
+            const winnerNo =
+              race.result?.winnerNo ??
+              dbWinnerNos[0] ??
+              orderNos[0] ??
+              null;
+
+            if (winnerNo == null) {
+              console.warn(
+                `[RACE-SKIP] raceId=${race.id} sebep=NO_WINNER actualOrder=${JSON.stringify(rawOrder)}`
+              );
+              return;
+            }
+
+            if (!runnerNoSet.has(winnerNo)) {
+              console.warn(
+                `[RACE-SKIP] raceId=${race.id} sebep=WINNER_NOT_IN_FIELD winnerNo=${winnerNo}`
+              );
+              return;
+            }
 
             const tjkAtIdler = runners.map((r) => r.tjkAtId).filter((x): x is number => x != null);
 
@@ -476,7 +547,16 @@ async function main() {
             // mantık (tarih+şehir+koşu_no anahtarıyla ortak geçmiş yarış eşleştirme) ama
             // zaten toplu çekilmiş gecmisByTjkAtId'den — ekstra sorgu YOK, verimli.
             const raceNameToNo = new Map(runners.map((r) => [r.name, r.no]));
+            // 2026-10-07 — v5-engine.ts'teki H2H zemin-önceliği (2026-08-30) BURAYA parity
+            // için taşındı: bugünün zeminiyle eşleşen karşılaşmalar varsa YALNIZ onlar
+            // kullanılır, yoksa TÜM karşılaşmalara dönülür. Sentetik için null="Normal" (1.0)
+            // — v5-engine.ts'teki AYNI 2026-09-13 düzeltmesi.
+            const bugunZeminDetayH2H = zeminDetayiBul(race.raceDay.surfaceConditions as { label: string; detail: string }[] | null, race.surface);
+            const bugunZeminKatsayiH2H = bugunZeminDetayH2H
+              ? zeminKatsayisi(bugunZeminDetayH2H).katsayi
+              : race.surface === "SENTETIK" ? 1.0 : null;
             const h2hByAnahtar = new Map<string, { horseName: string; pos: number; weight: string | null }[]>();
+            const h2hZeminByAnahtar = new Map<string, number | null>();
             for (const r of runners) {
               if (r.tjkAtId == null) continue;
               const gecmisTumu = gecmisByTjkAtId.get(r.tjkAtId) ?? [];
@@ -490,21 +570,29 @@ async function main() {
                 const arr = h2hByAnahtar.get(anahtar) ?? [];
                 if (!arr.some((e) => e.horseName === r.name)) arr.push({ horseName: r.name, pos, weight: g.weight ?? null });
                 h2hByAnahtar.set(anahtar, arr);
+                if (!h2hZeminByAnahtar.has(anahtar)) h2hZeminByAnahtar.set(anahtar, zeminKatsayisi(zeminDetayiSatirdanCikar(g.surface)).katsayi);
               }
             }
-            function h2hNetSkorHesapla(kendiAd: string): number {
-              let skor = 0;
-              for (const arr of h2hByAnahtar.values()) {
-                if (arr.length < 2) continue;
+            const h2hZeminEslesenAnahtarlar = bugunZeminKatsayiH2H != null
+              ? new Set([...h2hZeminByAnahtar.entries()].filter(([, k]) => k === bugunZeminKatsayiH2H).map(([a]) => a))
+              : new Set<string>();
+            function h2hNetSkorHesapla(kendiAd: string): { v: number; obs: boolean; reason: string | null } {
+              const anahtarlar = h2hZeminEslesenAnahtarlar.size > 0 ? h2hZeminEslesenAnahtarlar : new Set(h2hByAnahtar.keys());
+              let skor = 0, karsilastirma = 0;
+              for (const anahtar of anahtarlar) {
+                const arr = h2hByAnahtar.get(anahtar);
+                if (!arr || arr.length < 2) continue;
                 const beni = arr.find((e) => e.horseName === kendiAd);
                 if (!beni) continue;
                 for (const other of arr) {
                   if (other.horseName === kendiAd) continue;
                   if (!raceNameToNo.has(other.horseName)) continue;
+                  karsilastirma++;
                   skor += beni.pos < other.pos ? 1 : beni.pos > other.pos ? -1 : 0;
                 }
               }
-              return skor;
+              // Ortak yarış yoksa eksik (raw=null); ortak yarış var ve denge 0 ise gerçek 0 (observed=true)
+              return karsilastirma > 0 ? { v: skor, obs: true, reason: null } : { v: 0, obs: false, reason: "NO_H2H_PAIR" };
             }
 
             // 2026-09-11 kullanıcı talebi ("h2hKiloDegisimi tamamen ölü, düzelt") — Opus
@@ -565,8 +653,12 @@ async function main() {
             const accuraceMap = hesaplaAccuraceSonYarisEnHizliKapanisMap(
               runners.map((r) => r.name), accKayitlar.son800AccuraceKayitlari, accKayitlar.son800Siblings
             );
+            // 2026-10-07 — paylasilan hesap (bkz. agf-sirasi.ts) — train/live parity icin TEK kaynak.
+            // ONCEKI (basit, ekuri-farkinda OLMAYAN) siralama V5.46.1 parity denetiminde yakalandi:
+            // canli v5-engine.ts 2026-08-30da ekuri-toplu sess rank bug-fixini almisti, bu dosya almamisti.
+            const agfSiraMap = hesaplaAgfSirasi(runners.map((r) => ({ id: r.id, agf: r.agf, ekuriGroup: r.ekuriGroup })));
+            // birinciAgf/ikinciAgf İÇİN (agfSirasi'nden AYRI amaç): bireysel AGF'ye göre ham sıralama.
             const agfSirali = [...runners].filter((r) => r.agf != null).sort((a, b) => (b.agf ?? 0) - (a.agf ?? 0));
-            const agfSiraMap = new Map(agfSirali.map((r, i2) => [r.id, i2 + 1]));
             // 2026-08-19 kullanıcı bulgusu (BODUBEY/EL LEON) — agfSirasi yalnız SIRAYI
             // yakalıyor, AGF payının BÜYÜKLÜĞÜNÜ değil (LEJUR %47 ile EL LEON %22 aynı
             // "favori" etiketini alıyordu). Ham pay + sahadaki 2.'ye göre dominans farkı.
@@ -673,8 +765,16 @@ async function main() {
             ).catch(() => new Map<string, { deger: number }>());
 
             for (const r of runners) {
-              const pos = actualOrder.indexOf(r.no) + 1;
-              if (pos <= 0) continue;
+              const win: 0 | 1 = r.no === winnerNo ? 1 : 0;
+
+              // Top3 ancak resmi sıra ilk 3'ü gerçekten kapsıyorsa gözlemlenmiştir.
+              const top3Observed =
+                orderNos.length >= Math.min(3, runners.length);
+
+              const top3: 0 | 1 =
+                top3Observed && orderNos.slice(0, 3).includes(r.no)
+                  ? 1
+                  : 0;
               const sonYaris = sonYarisByNo.get(r.no);
               const jockeyStat = r.jockey ? (jockeyStats as any)[r.jockey] : undefined;
               const trainerStat = r.trainer ? (trainerStats as any)[r.trainer] : undefined;
@@ -731,6 +831,9 @@ async function main() {
               }
               const idmJokey = myGallops.some((g) => isSameJockey(g.jockey, r.jockey)) ? 1 : 0;
               const sonIdmanSprint: 0 | 1 = sonGalop ? (isSprintIdman(sonGalop.track) ? 1 : 0) : 0;
+              const sonIdmanSprintObs = sonGalop != null;
+              const h2hRes = h2hNetSkorHesapla(r.name);
+              const hizRes = hizDerecesiHesapla(r.tjkAtId, race.breed, race.raceDay.date);
 
               // Tarihe-duyarlı (sızıntısız) sireOrani — bkz. yukarıdaki 2026-08-21 notu.
               // Veri yoksa (özellikle erken Temmuz'da, kendi takip altyapımız henüz
@@ -753,7 +856,7 @@ async function main() {
 
               rows.push({
                 raceId: race.id, runnerId: r.id, no: r.no,
-                win: pos === 1 ? 1 : 0, top3: pos <= 3 ? 1 : 0,
+                win, top3, top3Observed,
                 agfFark,
                 agfSirasi: agfSiraMap.get(r.id) ?? Math.ceil(runners.length / 2),
                 accurace: accuraceMap.get(r.name) === true ? 1 : 0,
@@ -774,6 +877,12 @@ async function main() {
                 kategori, breed: race.breed, distance: race.distance, surface: race.surface,
                 ayniJokeySurekliligi: sonYaris?.ayniJokey === true ? 1 : 0,
                 takiEklendiMi: (sonYaris?.eklenenTaki?.length ?? 0) > 0 ? 1 : 0,
+                sinyalDurum: {
+                  sonIdmanSprint: { observed: sonIdmanSprintObs, reason: sonIdmanSprintObs ? null : "NO_GALOP" },
+                  takiDegisikligi: { observed: sonYaris != null, reason: sonYaris != null ? null : "NO_PRIOR_RUN" },
+                  h2hNetSkor: { observed: h2hRes.obs, reason: h2hRes.reason },
+                  hizDerecesi: { observed: hizRes.obs, reason: hizRes.reason },
+                },
                 takiCikarildiMi: (sonYaris?.cikarilanTaki?.length ?? 0) > 0 ? 1 : 0,
                 kacakAtMi: stilEgilimMap.get(r.id)?.stil === "KACAK_AT" ? 1 : 0,
                 kacakYalniz: stilEgilimMap.get(r.id)?.stil === "KACAK_AT" && kacakSayisiSahada === 1 ? 1 : 0,
@@ -790,9 +899,9 @@ async function main() {
                 kiloFarkiEnIyiKosuya,
                 atJokeyIkiliOrani,
                 jokeyDegisimYonu,
-                h2hNetSkor: h2hNetSkorHesapla(r.name),
+                h2hNetSkor: h2hRes.v,
                 h2hKiloDegisimi: h2hKiloDegisimiHesapla(r.name, r.weight),
-                hizDerecesi: hizDerecesiHesapla(r.tjkAtId, race.breed, race.raceDay.date),
+                hizDerecesi: hizRes.v,
                 hpPuani: r.hp ?? 0,
                 zeminKatsayisi: zeminKatsayisiDeger,
                 zeminToleransi: zeminToleransiMap.get(r.name) ?? 0,
@@ -801,7 +910,7 @@ async function main() {
                 zeminMesafeDeneyim: zeminMesafeDeneyimMap.get(r.name)?.deger ?? 0,
               });
             }
-          })(), 25_000);
+          })(), 120_000);
         } catch (e) {
           failed++;
           if (e instanceof Error && e.message === "TIMEOUT") timedOut++;
@@ -824,3 +933,8 @@ async function main() {
 }
 
 main();
+
+
+
+
+

@@ -1,5 +1,5 @@
 import { ENGINE_VERSIONS } from "@/lib/methodology/engine-versions.data";
-import v5WeightsDiger from "@/lib/methodology/weights/v5-weights-diger.json";
+import v5461Weights from "@/lib/methodology/weights/v546-1-weights.json";
 
 /**
  * 2026-08-22 kullanıcı bulgusu: panel başlığındaki sürüm/özellik-sayısı METNİ daha önce
@@ -13,13 +13,11 @@ import v5WeightsDiger from "@/lib/methodology/weights/v5-weights-diger.json";
  * edilemiyordu. Bu yüzden hesaplama, db'siz bu ayrı dosyaya taşındı; v5-engine.ts ve
  * test-v5-engine/route.ts buradan re-export/import eder — tek kaynak, iki yerde tekrar yok.
  *
- * 2026-09-13 kullanıcı bulgusu: etiket yalnız A katmanını (toFeatureVector/featureNames.length)
- * sayıyordu — B katmanı (sireOrani + zeminMesafeDeneyimi, softmax'tan ÖNCE ayrı kalibre edilip
- * skora eklenen, regresyona hiç girmeyen 2 sinyal, bkz. v5-engine.ts bKatmaniUygula) hiç
- * görünmüyordu, kullanıcı "13 mü 15 mi" diye kafası karıştı. B_KATMANI_SINYAL_SAYISI elle
- * sabit (A katmanı gibi bir dosyadan türetilemiyor, yalnızca iki adet ve isim değişmiyor) —
- * bKatmaniUygula'ya yeni bir B katmanı sinyali eklenirse burada da güncellenmeli.
+ * 2026-10-09 — V5.46.1 (bkz. engine-versions.data.ts'teki aynı tarihli girdi): eski V5.46'nın
+ * A/B katman ayrımı + segment-bazlı iki model mimarisi TAMAMEN kaldırıldı (tek skor + tek
+ * softmax, src/lib/methodology/v546-1-engine.ts). Etiket artık ESKİ v5-weights-diger.json'dan
+ * DEĞİL, v546-1-weights.json'ın featureNames'inden türetiliyor — B_KATMANI_SINYAL_SAYISI ve
+ * "segment-bazlı iki model" ifadesi kaldırıldı, çünkü artık doğru değiller.
  */
-const B_KATMANI_SINYAL_SAYISI = 2; // sireOrani + zeminMesafeDeneyimi
-const A_KATMANI = v5WeightsDiger.featureNames.length;
-export const CURRENT_ENGINE_LABEL = `${ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].versiyon} — Koşullu Logit Modeli (${A_KATMANI}+${B_KATMANI_SINYAL_SAYISI} sinyal — ${A_KATMANI} A-katmanı özelliği + ${B_KATMANI_SINYAL_SAYISI} B-katmanı, segment-bazlı iki model — atları doğrudan kıyaslar, Claude yok, maliyet sıfır)`;
+const AKTIF_SINYAL_SAYISI = v5461Weights.featureNames.length;
+export const CURRENT_ENGINE_LABEL = `${ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].versiyon} — Koşullu Logit Modeli (${AKTIF_SINYAL_SAYISI} aktif sinyal — tek skor + softmax, segment override yok — atları doğrudan kıyaslar, Claude yok, maliyet sıfır)`;

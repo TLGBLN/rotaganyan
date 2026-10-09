@@ -36,7 +36,7 @@ type GecmisSatir = HizGecmisSatir;
 const ONBELLEK_TTL_MS = 6 * 60 * 60 * 1000;
 let onbellekCache: { gecmis: Map<number, GecmisSatir[]>; irk: Map<number, string>; paceIndex: PaceIndex; zaman: number } | null = null;
 
-async function tumOnbellegiGetir(): Promise<{ gecmis: Map<number, GecmisSatir[]>; irk: Map<number, string>; paceIndex: PaceIndex }> {
+export async function tumOnbellegiGetir(): Promise<{ gecmis: Map<number, GecmisSatir[]>; irk: Map<number, string>; paceIndex: PaceIndex }> {
   if (onbellekCache && Date.now() - onbellekCache.zaman < ONBELLEK_TTL_MS) return onbellekCache;
   const [tumOnbellek, atIrkKayitlari] = await Promise.all([
     db.horseRaceHistoryCache.findMany({ select: { tjkAtId: true, rowsJson: true } }),
@@ -80,6 +80,26 @@ export async function getHizDerecesiForRace(
     if (r.tjkAtId == null) { sonuc.set(r.no, 0); continue; }
     const gecmis = gecmisByTjkAtId.get(r.tjkAtId) ?? [];
     sonuc.set(r.no, hizDerecesiHesaplaOrtak(gecmis, irk, cutoff, paceIndex));
+  }
+  return sonuc;
+}
+
+/**
+ * 2026-10-07 (V5.46.1) — getHizDerecesiForRace ile AYNI girdi/koşulları kullanarak yalnız
+ * "gözlemli mi" (observed) bayrağını döner: tjkAtId yok VEYA popülasyon geçmişi boş ise
+ * false — V5.46.1'in missing≠0 sözleşmesi için (bkz. arac-model-veri-olustur.mts'teki
+ * aynı mantık, hizDerecesiHesapla). getHizDerecesiForRace'in kendisi DEĞİŞTİRİLMEDİ.
+ */
+export async function getHizDerecesiGozlemliForRace(raceId: string): Promise<Map<number, boolean>> {
+  const race = await db.race.findUnique({
+    where: { id: raceId },
+    select: { runners: { where: { scratched: false }, select: { no: true, tjkAtId: true } } },
+  });
+  if (!race) return new Map();
+  const { gecmis: gecmisByTjkAtId } = await tumOnbellegiGetir();
+  const sonuc = new Map<number, boolean>();
+  for (const r of race.runners) {
+    sonuc.set(r.no, r.tjkAtId != null && (gecmisByTjkAtId.get(r.tjkAtId)?.length ?? 0) > 0);
   }
   return sonuc;
 }

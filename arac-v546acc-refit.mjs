@@ -14,7 +14,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 
 const S = "C:/Users/tlgbi/AppData/Local/Temp/claude/c--Users-tlgbi-OneDrive-Belgeler-Rota/76598f4f-31f1-4414-a3f6-fbab0aab98d4/scratchpad";
-const DATA = `${S}/model-veri.json`; // uretici ciktisi (sinyalDurum sozlesmesi icerir)
+const DATA = `${S}/model-veri-v5461-FINAL.json`; // V5.46.1 frozen dataset
 // Gozlem maskesi: bu sinyaller eksik olabilir. Eksik -> raw=null, z=0 (gercek 0 ile karistirilmaz).
 const OBS = ["h2hNetSkor", "hizDerecesi", "sonIdmanSprint", "takiDegisikligi"];
 const obsOf = (r, c) => (OBS.includes(c) ? (r.sinyalDurum?.[c]?.observed === true) : true);
@@ -53,7 +53,7 @@ const ay = (t) => t.slice(0, 7);
 const TEMEL = {
   AGF_SIRA: ["agfSirasi"],
   AGF_PAY: ["agfPayi", "agfPayi2"],
-  JOKEY: ["idmJokey", "jokeyOrani"],
+  JOKEY: ["idmJokey"],
   ANTRENOR: ["antrenorOrani"],
   H2H: ["h2hNetSkor"],
   HIZ: ["hizDerecesi"],
@@ -105,7 +105,7 @@ function paceRaw(r) {
 }
 
 // ── Spec: hangi gruplar açık ────────────────────────────────────
-const TUM = GRUP_SIRA;
+const TUM = GRUP_SIRA.filter((g) => g !== "ANTRENOR");
 const TUM_FINAL = TUM.map((g) => (g === "ACC_CLOSE" ? "ACC_CLOSE_RES" : g === "ACC_PACE" ? "PACE_SIMPLE" : g)).filter((g) => g !== "TEMPO_ESKI");
 const SPECLER = {
   FULL: TUM,
