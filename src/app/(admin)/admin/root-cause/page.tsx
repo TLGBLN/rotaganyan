@@ -250,7 +250,7 @@ export default async function AdminRootCausePage({ searchParams }: PageProps) {
                   <span className="ml-2 rounded-sm bg-black/10 px-1.5 py-0.5 text-[10px] font-semibold">{CORRECTION_STATUS_OZET_AD[eventCauseSonucu.correctionStatus]}</span>
                   <span className="block text-[11px] text-muted-foreground mt-0.5">{eventCauseSonucu.kanit}</span>
                   {!eventCauseSonucu.marketBlindVeriVarMi && (eventCauseSonucu.eventCause === "MARKET_DRIVEN_MISS" || eventCauseSonucu.eventCause === "MODEL_BLIND_MISS") && (
-                    <span className="block text-[10px] text-amber-600 dark:text-amber-400 mt-1">⚠ Market-blind olasılık verisi bu yarışta yok (2026-10-09 V5.46.1 geçişinden beri doldurulmuyor) — bu sonuç yalnız AGF-sırası proxy'sine dayanıyor, tam market-blind testi değil.</span>
+                    <span className="block text-[10px] text-amber-600 dark:text-amber-400 mt-1">⚠ Market-blind olasılık verisi bu yarışta yok (2026-10-09 V5.46.1 geçişinden beri doldurulmuyor) — bu sonuç yalnız AGF-sırası proxy&apos;sine dayanıyor, tam market-blind testi değil.</span>
                   )}
                 </RcaAdim>
               )}
