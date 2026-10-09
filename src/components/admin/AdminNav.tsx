@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   FileText,
   Trophy,
-  Settings,
   Users,
   PackageOpen,
   Ticket,
@@ -41,7 +40,6 @@ const NAV: NavOge[] = [
   { href: "/admin/antrenor", label: "Antrenör İstatistikleri", icon: TrendingUp },
   { href: "/admin/kullanicilar", label: "Kullanıcılar", icon: Users },
   { href: "/admin/import", label: "JSON İmport", icon: PackageOpen },
-  { href: "/admin/metodoloji", label: "Metodoloji", icon: Settings },
   { href: "/admin/ayarlar", label: "Site Ayarları", icon: LayoutTemplate },
   { href: "/admin/girisler", label: "Giriş Logları", icon: LogIn },
 ];
