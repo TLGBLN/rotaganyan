@@ -94,12 +94,25 @@ export default async function AdminRootCausePage({ searchParams }: PageProps) {
   const rapor = await getRootCauseRaporu({ gun }); // snapshot-tabanlı — hızlı, scoreV461 ÇAĞIRMAZ
   const secili = raceId ? rapor.olaylar.find((o) => o.y.raceId === raceId) ?? rapor.olaylar[0] : rapor.olaylar[0];
   const taramalar = await sonRcaTaramalari(); // günlük otomatik tarama (RcaScanSnapshot) — tablo yoksa []
-  const missSiniflandirma = secili ? await siniflandirMiss(secili.y.raceId, secili.y.otopsi?.sifirKatki.length ?? 0, secili.y.kuponGenislik) : null; // yalnız SEÇİLİ olay için — liste HIZLI kalsın
-  const eventCauseSonucu = secili && missSiniflandirma ? await belirleEventCause({
-    raceId: secili.y.raceId, winnerNo: secili.y.kazananNo,
-    missType: missSiniflandirma.missType,
-    featureDrivenAday: secili.rootCauseHypothesis, piyasaDeseniVarMi: secili.piyasaBaskin,
-  }) : null;
+
+  // 2026-10-10 kullanıcı bulgusu: EVENT_CAUSE yalnız SEÇİLİ olayın detay panelinde
+  // hesaplanıyordu — sol taraftaki LİSTE hâlâ eski "Olası Neden" mantığını (çoğu olayda
+  // "Belirsizlik") gösteriyordu. Şimdi TÜM listelenen olaylar için (sınırlı eşzamanlılıkla,
+  // DB havuzunu boğmamak için 8'li gruplar halinde) hesaplanıp Map'e toplanıyor.
+  const eventCauseMap = new Map<string, Awaited<ReturnType<typeof belirleEventCause>>>();
+  const missTypeMap = new Map<string, Awaited<ReturnType<typeof siniflandirMiss>>>();
+  const PARALELLIK = 24; // ölçüldü: 67 olayda ~7s (8'de ~15s) — DB havuzunu zorlamadan makul denge
+  for (let i = 0; i < rapor.olaylar.length; i += PARALELLIK) {
+    const dilim = rapor.olaylar.slice(i, i + PARALELLIK);
+    await Promise.all(dilim.map(async (o) => {
+      const ms = await siniflandirMiss(o.y.raceId, o.y.otopsi?.sifirKatki.length ?? 0, o.y.kuponGenislik);
+      missTypeMap.set(o.y.raceId, ms);
+      const ec = await belirleEventCause({ raceId: o.y.raceId, winnerNo: o.y.kazananNo, missType: ms.missType, featureDrivenAday: o.rootCauseHypothesis, piyasaDeseniVarMi: o.piyasaBaskin });
+      eventCauseMap.set(o.y.raceId, ec);
+    }));
+  }
+  const missSiniflandirma = secili ? missTypeMap.get(secili.y.raceId) ?? null : null;
+  const eventCauseSonucu = secili ? eventCauseMap.get(secili.y.raceId) ?? null : null;
   const adaylar = await tumAdaylar(); // Düzeltme Adayları kayıt defteri — tablo yoksa []
 
   return (
@@ -197,21 +210,24 @@ export default async function AdminRootCausePage({ searchParams }: PageProps) {
                     <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Hipodrom/Koşu</th>
                     <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Kazanan</th>
                     <th className="px-2 py-2 text-center font-medium whitespace-nowrap">Model Sırası</th>
-                    <th className="px-2 py-2 text-center font-medium whitespace-nowrap">Olası Neden</th>
+                    <th className="px-2 py-2 text-center font-medium whitespace-nowrap">Olay Nedeni</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rapor.olaylar.map((o) => (
+                  {rapor.olaylar.map((o) => {
+                    const ec = eventCauseMap.get(o.y.raceId);
+                    return (
                     <tr key={o.y.raceId} className={cn("border-b last:border-0 hover:bg-muted/30", secili?.y.raceId === o.y.raceId && "bg-muted/40")}>
                       <td className="px-2 py-2 whitespace-nowrap"><Link href={`?gun=${gun}&raceId=${o.y.raceId}`} className="block">{o.y.tarih}</Link></td>
                       <td className="px-2 py-2 whitespace-nowrap">{o.y.hipodrom} #{o.y.raceNo}</td>
                       <td className="px-2 py-2 font-medium whitespace-nowrap">{o.y.kazananNo} {o.y.kazananAd}</td>
                       <td className="px-2 py-2 text-center tabular-nums font-bold text-risk whitespace-nowrap">{o.y.modelSira}.</td>
-                      <td className={cn("px-2 py-2 text-center font-medium whitespace-nowrap", o.rootCauseHypothesis ? KATEGORI_RENK[o.rootCauseHypothesis.category] : "text-muted-foreground")}>
-                        {o.rootCauseHypothesis ? KATEGORI_AD[o.rootCauseHypothesis.category] : "Belirsizlik"}
+                      <td className={cn("px-2 py-2 text-center font-medium whitespace-nowrap", ec ? EVENT_CAUSE_RENK[ec.eventCause] : "text-muted-foreground")}>
+                        {ec ? EVENT_CAUSE_AD[ec.eventCause] : "—"}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
