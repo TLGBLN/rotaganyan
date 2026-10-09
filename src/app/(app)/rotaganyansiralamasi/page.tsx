@@ -2,13 +2,13 @@ import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { getRaceDaysByDate, getKuponOnerileri, hesaplaRaceTempoSenaryosu, parseRaceStyle, type KuponOnerisi } from "@/server/services/race.service";
-import type { TempoSenaryosu } from "@/lib/methodology/pace-analizi";
+import { getRaceDaysByDate, getKuponOnerileri, type KuponOnerisi } from "@/server/services/race.service";
 import { syncResultsForDate } from "@/server/services/result-sync";
 import { turkeyDateString } from "@/lib/tz";
-import SiralamaKarti from "@/components/kosular/SiralamaKarti";
+import PuanTablosu from "@/components/kosular/PuanTablosu";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { KuponBlock } from "@/components/home/TahminOnerileri";
 
 export const revalidate = 0;
 
@@ -52,29 +52,16 @@ export default async function RotaganyanSiralamasiPage({ searchParams }: PagePro
     getKuponOnerileri(),
   ]);
   const kuponlar = kuponlarHam.filter((k): k is NonNullable<KuponOnerisi> => k !== null);
-  // SiralamaKarti (yayınlanmış+pick'li en az bir koşu yoksa null döner, bkz. o dosya) —
+  // PuanTablosu (yayınlanmış+pick'li en az bir koşu yoksa null döner, bkz. o dosya) —
   // accordion başlığı tıklanınca boş içerikle karşılaşılmasın diye aynı koşul burada da
   // uygulanıyor.
   const visibleRaceDays = raceDays.filter((rd) =>
     rd.races.some((r) => r.prediction?.published && (r.prediction.picks?.length ?? 0) > 0)
   );
-  // Yarış Gidişatı rozeti — getProgramData'nın AYNI deseni (hesaplaRaceTempoSenaryosu +
-  // parseRaceStyle), yalnız burada koşu-bazlı bir map olarak hazırlanıp SiralamaKarti'ye
-  // geçiriliyor (bu sayfanın sorgusu getProgramData'dan ayrı, kendi ham raceStyle'ını taşıyor).
-  const tempoByRaceId: Record<string, TempoSenaryosu | null> = {};
-  for (const rd of visibleRaceDays) {
-    for (const r of rd.races) {
-      tempoByRaceId[r.id] = hesaplaRaceTempoSenaryosu(
-        r.runners.map((ru) => ({ raceStyle: parseRaceStyle(ru.raceStyle) })),
-        r.distance
-      );
-    }
-  }
 
   const derinBaglantiRaceDay = params.hipodrom
     ? visibleRaceDays.find((rd) => rd.hippodrome.slug === params.hipodrom)
     : undefined;
-  const derinBaglantiKosu = params.kosu ? parseInt(params.kosu, 10) : undefined;
 
   return (
     <div className="mx-auto max-w-[1400px] px-3 py-4 space-y-4">
@@ -99,14 +86,18 @@ export default async function RotaganyanSiralamasiPage({ searchParams }: PagePro
               <AccordionTrigger className="text-sm sm:text-base font-semibold hover:no-underline">
                 {rd.hippodrome.name}
               </AccordionTrigger>
-              <AccordionContent>
-                <SiralamaKarti
-                  raceDay={rd}
-                  tempoByRaceId={tempoByRaceId}
-                  kuponlar={kuponlar}
-                  isAdmin={isAdmin}
-                  initialRaceNo={rd.id === derinBaglantiRaceDay?.id ? derinBaglantiKosu : undefined}
-                />
+              <AccordionContent className="space-y-4">
+                <PuanTablosu raceDay={rd} isLoggedIn={!!session?.user} currentDate={currentDate} isAdmin={isAdmin} />
+                {(() => {
+                  const hipoKuponlari = kuponlar.filter((k) => k.hippodromeName.split(" — ")[0] === rd.hippodrome.name);
+                  return hipoKuponlari.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {hipoKuponlari.map((k) => (
+                        <KuponBlock key={k.hippodromeName} data={k} ikramiye={k.ikramiye} isAdmin={isAdmin} cityLabel="Kupon Önerisi" />
+                      ))}
+                    </div>
+                  ) : null;
+                })()}
               </AccordionContent>
             </AccordionItem>
           ))}
