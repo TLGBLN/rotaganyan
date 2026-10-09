@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getRootCauseRaporu, type RootCauseCategory } from "@/server/services/root-cause.service";
 import { sonRcaTaramalari } from "@/server/services/rca-scan.service";
 import { siniflandirMiss, type MissType } from "@/server/services/miss-classification.service";
+import { belirleEventCause, type EventCause, type CorrectionStatusOzet } from "@/server/services/event-cause.service";
 import { tumAdaylar, type CorrectionStatus, type CorrectionType } from "@/server/services/correction-candidate.service";
 import { KACAN_TOP_N, type Gun } from "@/server/services/kosu-sonuc-degerlendirme.service";
 
@@ -13,7 +14,7 @@ const MISS_TYPE_AD: Record<MissType, string> = {
   DATA_ISSUE: "Veri Sorunu",
   PUBLISH_OVERRIDE_MISS: "Yayın Aşaması Kaçırması",
   ALLOCATOR_MISS: "Kupon Dağıtım Hatası",
-  ANALYSIS_MISS: "Model Sıralama Hatası",
+  ANALYSIS_MISS: "Model Kazananı Düşük Sıraladı",
   UNCERTAINTY: "Belirsizlik (Normal Varyans)",
 };
 const MISS_TYPE_RENK: Record<MissType, string> = {
@@ -23,6 +24,23 @@ const MISS_TYPE_RENK: Record<MissType, string> = {
   DATA_ISSUE: "text-amber-600 dark:text-amber-400",
   UNCERTAINTY: "text-muted-foreground",
 };
+const EVENT_CAUSE_AD: Record<EventCause, string> = {
+  MARKET_DRIVEN_MISS: "Piyasa da Kaçırdı (Gerçek Sürpriz)",
+  MARKET_SUPPRESSION_MISS: "Piyasa Modelin Görüşünü Bastırdı",
+  MODEL_BLIND_MISS: "Model Piyasadan Daha Kötü Gördü",
+  FEATURE_DRIVEN_MISS: "Bağımsız Sinyal Sorunu",
+  CONTEXT_MISMATCH: "Segment Uyumsuzluğu (ör. Maiden)",
+  DATA_ISSUE: "Veri Sorunu", ALLOCATOR_MISS: "Kupon Dağıtım Hatası", PUBLISH_OVERRIDE_MISS: "Yayın Aşaması Kaçırması",
+  UNRESOLVED: "Açıklanamadı (son çare)",
+};
+const EVENT_CAUSE_RENK: Record<EventCause, string> = {
+  MARKET_DRIVEN_MISS: "text-brand", MARKET_SUPPRESSION_MISS: "text-violet-600 dark:text-violet-400",
+  MODEL_BLIND_MISS: "text-risk", FEATURE_DRIVEN_MISS: "text-risk",
+  CONTEXT_MISMATCH: "text-blue-600 dark:text-blue-400",
+  DATA_ISSUE: "text-amber-600 dark:text-amber-400", ALLOCATOR_MISS: "text-violet-600 dark:text-violet-400", PUBLISH_OVERRIDE_MISS: "text-blue-600 dark:text-blue-400",
+  UNRESOLVED: "text-muted-foreground",
+};
+const CORRECTION_STATUS_OZET_AD: Record<CorrectionStatusOzet, string> = { NO_ACTION: "Aksiyon Yok", MONITOR: "İzlemede", CANDIDATE: "Düzeltme Adayı" };
 const DURUM_AD: Record<CorrectionStatus, string> = {
   DETECTED: "Tespit Edildi", NEEDS_TEST_DESIGN: "Test Tasarımı Bekliyor",
   OOS_TESTING: "Saha-Dışı Test Sürüyor", OOS_FAIL: "Saha-Dışı Test Başarısız", OOS_PASS: "Saha-Dışı Test Geçti",
@@ -77,6 +95,11 @@ export default async function AdminRootCausePage({ searchParams }: PageProps) {
   const secili = raceId ? rapor.olaylar.find((o) => o.y.raceId === raceId) ?? rapor.olaylar[0] : rapor.olaylar[0];
   const taramalar = await sonRcaTaramalari(); // günlük otomatik tarama (RcaScanSnapshot) — tablo yoksa []
   const missSiniflandirma = secili ? await siniflandirMiss(secili.y.raceId, secili.y.otopsi?.sifirKatki.length ?? 0, secili.y.kuponGenislik) : null; // yalnız SEÇİLİ olay için — liste HIZLI kalsın
+  const eventCauseSonucu = secili && missSiniflandirma ? await belirleEventCause({
+    raceId: secili.y.raceId, winnerNo: secili.y.kazananNo,
+    missType: missSiniflandirma.missType,
+    featureDrivenAday: secili.rootCauseHypothesis, piyasaDeseniVarMi: secili.piyasaBaskin,
+  }) : null;
   const adaylar = await tumAdaylar(); // Düzeltme Adayları kayıt defteri — tablo yoksa []
 
   return (
@@ -217,6 +240,20 @@ export default async function AdminRootCausePage({ searchParams }: PageProps) {
                   </>
                 ) : "—"}
               </RcaAdim>
+              {/* 2026-10-10 kullanıcı düzeltmesi — semantik hata: "kanıtlanmış düzeltme adayı
+                  yok" ile "belirsizlik/bilmiyoruz" AYNI ŞEY DEĞİL. Bu aşama HER ZAMAN mümkün
+                  olan en spesifik nedeni verir — UNRESOLVED yalnız gerçekten hiçbir ipucu
+                  yoksa, son çare olarak kullanılır. */}
+              {eventCauseSonucu && (
+                <RcaAdim etiket="OLAY NEDENİ" renk={EVENT_CAUSE_RENK[eventCauseSonucu.eventCause]}>
+                  <b>{EVENT_CAUSE_AD[eventCauseSonucu.eventCause]}</b>
+                  <span className="ml-2 rounded-sm bg-black/10 px-1.5 py-0.5 text-[10px] font-semibold">{CORRECTION_STATUS_OZET_AD[eventCauseSonucu.correctionStatus]}</span>
+                  <span className="block text-[11px] text-muted-foreground mt-0.5">{eventCauseSonucu.kanit}</span>
+                  {!eventCauseSonucu.marketBlindVeriVarMi && (eventCauseSonucu.eventCause === "MARKET_DRIVEN_MISS" || eventCauseSonucu.eventCause === "MODEL_BLIND_MISS") && (
+                    <span className="block text-[10px] text-amber-600 dark:text-amber-400 mt-1">⚠ Market-blind olasılık verisi bu yarışta yok (2026-10-09 V5.46.1 geçişinden beri doldurulmuyor) — bu sonuç yalnız AGF-sırası proxy'sine dayanıyor, tam market-blind testi değil.</span>
+                  )}
+                </RcaAdim>
+              )}
               <RcaAdim etiket="DOĞRUDAN NEDEN (skor açıklaması — kök neden DEĞİL)" renk="text-risk">
                 En negatif 3 katkı: <span className="font-mono">{secili.directCause.split(", ").map((parca) => { const [k, deger] = parca.split("("); return `${sinyalAdi(k)}(${deger ?? ""}`; }).join(", ")}</span>
               </RcaAdim>
@@ -247,7 +284,14 @@ export default async function AdminRootCausePage({ searchParams }: PageProps) {
                 )}
               </RcaAdim>
               <RcaAdim etiket="KÖK NEDEN HİPOTEZİ" renk={secili.rootCauseHypothesis ? KATEGORI_RENK[secili.rootCauseHypothesis.category] : "text-muted-foreground"}>
-                {secili.rootCauseHypothesis ? `${KATEGORI_AD[secili.rootCauseHypothesis.category]} (${sinyalAdi(secili.rootCauseHypothesis.kod)}) — ${secili.rootCauseHypothesis.kanit}` : "Belirsizlik — bu olayın en kötü 3 sinyalinden hiçbiri kontrol grubuna göre zenginleşmiş/tekrarlayan desen eşiğini geçmiyor. Tek olay kanıt sayılmaz."}
+                {secili.rootCauseHypothesis
+                  ? `${KATEGORI_AD[secili.rootCauseHypothesis.category]} (${sinyalAdi(secili.rootCauseHypothesis.kod)}) — ${secili.rootCauseHypothesis.kanit}`
+                  : secili.piyasaBaskin
+                  // 2026-10-10 kullanıcı düzeltmesi: bu durumda desen YOK değil, desen VAR ama
+                  // piyasa-kaynaklı (AGF) — kural gereği candidate sayılmıyor. "Hiçbir sinyal
+                  // eşiği geçmiyor" demek YANLIŞ olur; AGF Sırası/Payı çoğu zaman güçlü geçiyor.
+                  ? "Tekrarlayan desen VAR, ancak desen piyasa-kaynaklı (AGF Sırası/Payı) — piyasa da bu tip kazananları düşük değerlendiriyor; bağımsız bir model/sinyal arızası KANITLANMIŞ değil (MARKET_SURPRISE_PATTERN)."
+                  : "Belirsizlik — bu olayın en kötü 3 sinyalinden hiçbiri (piyasa-dışı) kontrol grubuna göre zenginleşmiş/tekrarlayan desen eşiğini geçmiyor. Tek olay kanıt sayılmaz."}
               </RcaAdim>
               <RcaAdim etiket="DÜZELTİCİ AKSİYON (öneri)" renk="text-foreground">{secili.correctiveAction}</RcaAdim>
               <RcaAdim etiket="SAHA-DIŞI TEST" renk="text-muted-foreground">Henüz çalıştırılmadı — Tut/Bırak/İzle kararından önce geriye-dönük test + yarış/gün bazlı güven aralığı zorunlu (bkz. jokey Son30/JOCKEY_PERF adaylarındaki disiplin).</RcaAdim>

@@ -71,6 +71,11 @@ export interface RcaOlay {
   directCause: string; // "score explanation" — ROOT_CAUSE DEĞİL
   patternEvidence: FeaturePattern[]; // bu yarışın bottom-3 kod'larının GLOBAL pattern istatistiği
   rootCauseHypothesis: { category: RootCauseCategory; kod: string; kanit: string } | null;
+  // 2026-10-10 kullanıcı düzeltmesi: rootCauseHypothesis=null olması "hiçbir desen yok"
+  // anlamına GELMEYEBİLİR — piyasa-kaynaklı (AGF) bir desen GERÇEKTEN güçlü (enrichment≥1.5,
+  // CI>1) olabilir ama kural gereği candidate SAYILMAZ. Bu iki durum (gerçekten desen yok /
+  // desen var ama piyasa-kaynaklı) UI'da KARIŞTIRILMASIN diye ayrı taşınıyor.
+  piyasaBaskin: boolean;
   correctiveAction: string;
 }
 
@@ -210,7 +215,7 @@ export async function getRootCauseRaporu(
       : piyasaBaskin
         ? "Piyasa da kazananı düşük olasılıklı görmüş — muhtemelen gerçek sürpriz sonuç (bağlamsal/belirsiz). Aksiyon gerekmez; yalnız piyasadan BAĞIMSIZ bir sinyal de tekrar ederse yeni sinyal/model adayı değerlendirilsin."
         : CORRECTIVE_ACTION_ONERISI.UNCERTAINTY;
-    return { y, directCause, patternEvidence, rootCauseHypothesis, correctiveAction };
+    return { y, directCause, patternEvidence, rootCauseHypothesis, piyasaBaskin, correctiveAction };
   });
 
   // ── Güvenlik kontrolü #1 (2026-10-09 düzeltme): snapshot eksikliği MISS/CONTROL'de benzer
