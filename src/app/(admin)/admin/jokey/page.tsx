@@ -219,7 +219,7 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
                               {g ? `${g.son30Win}/${g.son30Start} (%${Math.round(g.son30WinRate * 100)})` : "—"}
                             </td>
                             <td className={cn("px-3 py-2 text-center tabular-nums font-medium", (g?.formDelta ?? 0) > 0 ? "text-hit" : (g?.formDelta ?? 0) < 0 ? "text-risk" : "text-muted-foreground")}>
-                              {g ? `${g.formDelta >= 0 ? "+" : ""}${(g.formDelta * 100).toFixed(1)}pp` : "—"}
+                              {g?.formDelta != null ? `${g.formDelta >= 0 ? "+" : ""}${(g.formDelta * 100).toFixed(1)}pp` : "—"}
                             </td>
                             <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">
                               {g ? g.reliability.toFixed(2) : "—"}

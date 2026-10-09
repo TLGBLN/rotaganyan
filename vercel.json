@@ -119,6 +119,14 @@
     {
       "path": "/api/cron/veri-tamligi-onarim",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/rca-scan",
+      "schedule": "30 23 * * *"
+    },
+    {
+      "path": "/api/cron/temp-cal-shadow",
+      "schedule": "45 23 * * *"
     }
   ]
 }

@@ -13,7 +13,7 @@ export interface JokeyGuncelForm {
   son30Top3Rate: number;
   uzunDonemStart: number;
   uzunDonemWinRate: number;
-  formDelta: number; // son30WinRate - uzunDonemWinRate
+  formDelta: number | null; // son30WinRate - uzunDonemWinRate; son30Start=0 ise null (hesaplanmaz)
   reliability: number; // son30Start/(son30Start+k)
 }
 
@@ -95,7 +95,7 @@ export async function getJokeyFormTablosu(
       son30Start: s.start, son30Win: s.win, son30WinRate,
       son30Top3: s.top3, son30Top3Rate: s.start > 0 ? s.top3 / s.start : 0,
       uzunDonemStart: u.start, uzunDonemWinRate,
-      formDelta: son30WinRate - uzunDonemWinRate,
+      formDelta: s.start > 0 ? son30WinRate - uzunDonemWinRate : null,
       reliability: reliability(s.start),
     };
 

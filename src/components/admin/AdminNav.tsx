@@ -22,21 +22,23 @@ import {
   CloudRain,
   Activity,
   ListChecks,
+  SearchCode,
 } from "lucide-react";
 
 type NavOge = { href: string; label: string; icon: LucideIcon; exact?: boolean; grup?: string };
 
 const NAV: NavOge[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/admin/analizler", label: "Analizler", icon: FileText },
+  { href: "/admin/analizler", label: "Analizler", icon: FileText, grup: "Analizler" },
+  { href: "/admin/root-cause", label: "Root-Cause Analizi", icon: SearchCode, grup: "Analizler" },
+  { href: "/admin/kupon", label: "Kupon Hazırla", icon: Ticket, grup: "Analizler" },
   { href: "/admin/pedigri", label: "Pedigriler", icon: Dna },
   { href: "/admin/accurace", label: "Accurace Database", icon: Gauge },
   { href: "/admin/derece-istatistikleri", label: "Derece İstatistikleri", icon: CloudRain },
-  { href: "/admin/veri-tamligi", label: "Veri Tamlığı", icon: ClipboardCheck },
   { href: "/admin/site-anatomisi", label: "Site Anatomisi", icon: Activity, grup: "Teşhis" },
   { href: "/admin/kosu-sonuclari", label: "Koşu Sonuçları Değerlendirme", icon: ListChecks, grup: "Teşhis" },
+  { href: "/admin/veri-tamligi", label: "Veri Tamlığı", icon: ClipboardCheck, grup: "Teşhis" },
   { href: "/admin/sonuclar", label: "Sonuçlar", icon: Trophy },
-  { href: "/admin/kupon", label: "Kupon Hazırla", icon: Ticket },
   { href: "/admin/jokey", label: "Jokey İstatistikleri", icon: TrendingUp },
   { href: "/admin/antrenor", label: "Antrenör İstatistikleri", icon: TrendingUp },
   { href: "/admin/kullanicilar", label: "Kullanıcılar", icon: Users },
