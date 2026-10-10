@@ -266,6 +266,8 @@
     "sonYarisTitle": "Son Yarış Detayları",
     "sonYarisDescription": "KGS: son startından bu koşuya kadar geçen gün sayısı. Takı/kilo/jokey değişimi atın TJK'daki en son koşusuyla, Kazandı/En İyi Derecesi ise bu hipodrom + mesafe + pist tipindeki bu yılki geçmişiyle kıyaslanır.",
     "atBilgileri": "At Bilgileri",
+    "atProfilleri": "At Profilleri",
+    "veriPanelleri": "Veri Panelleri",
     "raceNoLabel": "{no}. Koşu",
     "surfaceCim": "Çim",
     "surfaceKum": "Kum",

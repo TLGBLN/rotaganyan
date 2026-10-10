@@ -266,6 +266,8 @@
     "sonYarisTitle": "Last Race Details",
     "sonYarisDescription": "KGS: number of days from the horse's last start to this race. Equipment/weight/jockey change is compared with the horse's most recent TJK race, while Won/Best Time is compared with this year's history at this hippodrome + distance + track type.",
     "atBilgileri": "Horse Info",
+    "atProfilleri": "Horse Profiles",
+    "veriPanelleri": "Data Panels",
     "raceNoLabel": "Race {no}",
     "surfaceCim": "Turf",
     "surfaceKum": "Dirt",

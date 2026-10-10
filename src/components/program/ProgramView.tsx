@@ -1643,31 +1643,13 @@ export default function ProgramView({
 
   // 2026-08-31 kullanıcı talebi ("bunların hepsini tek bir çatı altına taşısak nasıl
   // olur") — Accurace/AGF Trend/Son Hazırlıklar/Pedigriler/H2H/Karşılaştır/Son Yarış
-  // Detayları'nın yedisi de zaten koşu-bazlı (sahadaki TÜM atları kapsıyor) ama tek
-  // tek açılması gerekiyordu — bir atı (ör. MEGAFAUNA) değerlendirirken 7 ayrı panele
-  // tek tek tıklamak yerine, hepsini AYNI ANDA açan tek bir anahtar. Analizi Gör ayrı
-  // tutuldu (farklı amaç, ayrı kilit/CTA akışı).
-  const tumPanellerAcikMi = son800Open && agfTrendOpen && galopOpen && pedigreeOpen && comparisonOpen && h2hOpen && sonYarisOpen && atDetayOpen;
-  function tumPanelleriAcVeyaKapat() {
-    const hedef = !tumPanellerAcikMi;
-    setSon800Open(hedef);
-    setAgfTrendOpen(hedef);
-    setGalopOpen(hedef);
-    setPedigreeOpen(hedef);
-    setComparisonOpen(hedef);
-    setH2hOpen(hedef);
-    setSonYarisOpen(hedef);
-    setAtDetayOpen(hedef);
-    // Açılırken ilk panelin (Son Yarış Detayları) başlığına kaydır — toggleAndScroll ile aynı desen,
-    // kullanıcı butona bastıktan sonra veriyi görmek için elle aşağı kaydırmasın.
-    if (hedef) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          document.getElementById("panel-son-yaris-detay")?.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
-      });
-    }
-  }
+  // Detayları başta tek bir "Tüm Verileri Göster" anahtarı altında birleştirilmişti.
+  // 2026-10-10 kullanıcı düzeltmesi — bu yedisi tekrar ayrı başlık/düğmeye kavuştuğu
+  // için (bkz. az yukarıdaki 7 düğme) ARTIK bu toplu anahtarın altında TEKRAR
+  // listelenmemeli — eskiden "hepsi" anlamına gelen bu buton artık YALNIZ "At
+  // Profilleri" panelini (soy ağacı+sahiplik+detaylı istatistik+geçmiş tablo) açıp
+  // kapatıyor, 8. panelin kendi adıyla anılıyor.
+  const [panelMenuOpen, setPanelMenuOpen] = useState(false);
 
   function handleToggleFollow(horseName: string) {
     setFollowedSet((prev) => {
@@ -1800,21 +1782,21 @@ export default function ProgramView({
               )}
               {currentRace && (
                 <button
-                  onClick={tumPanelleriAcVeyaKapat}
+                  onClick={() => toggleAndScroll(setAtDetayOpen, atDetayOpen, "panel-at-detaylari")}
                   data-tour="tum-panelleri-ac"
-                  className={cn(PANEL_BTN_CLASS, tumPanellerAcikMi ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "font-bold")}
+                  className={cn(PANEL_BTN_CLASS, atDetayOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "font-bold")}
                 >
-                  {tumPanellerAcikMi ? "Tüm Verileri Kapat" : "Tüm Verileri Göster"} {kilitVeyaChevron(tumPanellerAcikMi)}
+                  {t("atProfilleri")} {kilitVeyaChevron(atDetayOpen)}
                 </button>
               )}
-              {/* 2026-10-10 kullanıcı talebi ("eskisi gibi ayrı başlıklar ile sergileyeceğiz")
-                  — 2026-08-31'de "Tüm Verileri Göster" tek anahtarıyla birleştirilen 7 panel
-                  (bkz. tumPanelleriAcVeyaKapat üstündeki not) yine TEK TEK açılabilir ayrı
-                  düğmelere kavuşuyor — üstteki toplu düğme KALDIRILMADI, ikisi birlikte var. */}
+              {/* 2026-10-10 kullanıcı talebi — bu 7 panel masaüstünde (sm+) kendi ayrı
+                  düğmeleriyle duruyor; mobilde (bkz. az altındaki dropdown) tek bir
+                  "Veri Panelleri" menüsüne toplanıyor — "Tüm Verileri Göster" ARTIK bunları
+                  kapsamıyor (yukarıdaki düğme "At Profilleri" adıyla yalnız o paneli açar). */}
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setSonYarisOpen, sonYarisOpen, "panel-son-yaris-detay")}
-                  className={cn(PANEL_BTN_CLASS, sonYarisOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                  className={cn(PANEL_BTN_CLASS, sonYarisOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden sm:flex")}
                 >
                   {t("sonYarisDetaylari")} {kilitVeyaChevron(sonYarisOpen)}
                 </button>
@@ -1822,7 +1804,7 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setSon800Open, son800Open, "panel-son800")}
-                  className={cn(PANEL_BTN_CLASS, son800Open ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                  className={cn(PANEL_BTN_CLASS, son800Open ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden sm:flex")}
                 >
                   {t("accuraceButon")} {kilitVeyaChevron(son800Open)}
                 </button>
@@ -1830,7 +1812,7 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setAgfTrendOpen, agfTrendOpen, "panel-agf-trend")}
-                  className={cn(PANEL_BTN_CLASS, agfTrendOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                  className={cn(PANEL_BTN_CLASS, agfTrendOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden sm:flex")}
                 >
                   {t("agfTrend")} {kilitVeyaChevron(agfTrendOpen)}
                 </button>
@@ -1838,7 +1820,7 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setGalopOpen, galopOpen, "panel-galop")}
-                  className={cn(PANEL_BTN_CLASS, galopOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                  className={cn(PANEL_BTN_CLASS, galopOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden sm:flex")}
                 >
                   {t("sonHazirliklar")} {kilitVeyaChevron(galopOpen)}
                 </button>
@@ -1846,7 +1828,7 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setPedigreeOpen, pedigreeOpen, "panel-pedigriler")}
-                  className={cn(PANEL_BTN_CLASS, pedigreeOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                  className={cn(PANEL_BTN_CLASS, pedigreeOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden sm:flex")}
                 >
                   {t("pedigriler")} {kilitVeyaChevron(pedigreeOpen)}
                 </button>
@@ -1854,7 +1836,7 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setComparisonOpen, comparisonOpen, "panel-karsilastir")}
-                  className={cn(PANEL_BTN_CLASS, comparisonOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                  className={cn(PANEL_BTN_CLASS, comparisonOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden sm:flex")}
                 >
                   {t("karsilastir")} {kilitVeyaChevron(comparisonOpen)}
                 </button>
@@ -1862,10 +1844,46 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setH2hOpen, h2hOpen, "panel-h2h")}
-                  className={cn(PANEL_BTN_CLASS, h2hOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                  className={cn(PANEL_BTN_CLASS, h2hOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden sm:flex")}
                 >
                   {t("h2hButon")} {kilitVeyaChevron(h2hOpen)}
                 </button>
+              )}
+              {/* Mobil (sm altı): yukarıdaki 7 düğme yerine tek "Veri Panelleri" dropdown'ı —
+                  her satır aynı toggleAndScroll'u çağırır, seçimden sonra menü kapanır. */}
+              {currentRace && (
+                <div className="relative shrink-0 sm:hidden">
+                  <button
+                    onClick={() => setPanelMenuOpen((v) => !v)}
+                    className={cn(PANEL_BTN_CLASS, panelMenuOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                  >
+                    {t("veriPanelleri")} {panelMenuOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  </button>
+                  {panelMenuOpen && (
+                    <div className="absolute left-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-md border bg-background shadow-lg">
+                      {([
+                        { label: t("sonYarisDetaylari"), open: sonYarisOpen, setter: setSonYarisOpen, id: "panel-son-yaris-detay" },
+                        { label: t("accuraceButon"), open: son800Open, setter: setSon800Open, id: "panel-son800" },
+                        { label: t("agfTrend"), open: agfTrendOpen, setter: setAgfTrendOpen, id: "panel-agf-trend" },
+                        { label: t("sonHazirliklar"), open: galopOpen, setter: setGalopOpen, id: "panel-galop" },
+                        { label: t("pedigriler"), open: pedigreeOpen, setter: setPedigreeOpen, id: "panel-pedigriler" },
+                        { label: t("karsilastir"), open: comparisonOpen, setter: setComparisonOpen, id: "panel-karsilastir" },
+                        { label: t("h2hButon"), open: h2hOpen, setter: setH2hOpen, id: "panel-h2h" },
+                      ] as const).map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => { toggleAndScroll(p.setter, p.open, p.id); setPanelMenuOpen(false); }}
+                          className={cn(
+                            "flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold transition-colors",
+                            p.open ? "bg-brand/10 text-brand" : "text-foreground hover:bg-muted"
+                          )}
+                        >
+                          {p.label} {p.open && <ChevronUp className="h-3 w-3" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
               {currentRace && (
                 <button
