@@ -1850,40 +1850,42 @@ export default function ProgramView({
                 </button>
               )}
               {/* Mobil (sm altı): yukarıdaki 7 düğme yerine tek "Veri Panelleri" dropdown'ı —
-                  her satır aynı toggleAndScroll'u çağırır, seçimden sonra menü kapanır. */}
+                  Popover (Radix, Portal'lı — bkz. src/components/ui/popover.tsx) kullanılıyor
+                  çünkü bu satır overflow-x-auto İÇİNDE; el-yapımı position:absolute bir
+                  içerik Portal olmadan bu satırın scroll-clip'ine takılıp GÖRÜNMEZ/tıklanamaz
+                  kalıyordu (kullanıcı bulgusu: "bişey açılmıyor") — Portal, overflow-clip'i
+                  tamamen atlayıp document.body'ye render eder, aynı bug diğer Popover
+                  kullanımlarında (ör. yarış-stili ipucu) hiç yaşanmamıştı. */}
               {currentRace && (
-                <div className="relative shrink-0 sm:hidden">
-                  <button
-                    onClick={() => setPanelMenuOpen((v) => !v)}
-                    className={cn(PANEL_BTN_CLASS, panelMenuOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
-                  >
-                    {t("veriPanelleri")} {panelMenuOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                  </button>
-                  {panelMenuOpen && (
-                    <div className="absolute left-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-md border bg-background shadow-lg">
-                      {([
-                        { label: t("sonYarisDetaylari"), open: sonYarisOpen, setter: setSonYarisOpen, id: "panel-son-yaris-detay" },
-                        { label: t("accuraceButon"), open: son800Open, setter: setSon800Open, id: "panel-son800" },
-                        { label: t("agfTrend"), open: agfTrendOpen, setter: setAgfTrendOpen, id: "panel-agf-trend" },
-                        { label: t("sonHazirliklar"), open: galopOpen, setter: setGalopOpen, id: "panel-galop" },
-                        { label: t("pedigriler"), open: pedigreeOpen, setter: setPedigreeOpen, id: "panel-pedigriler" },
-                        { label: t("karsilastir"), open: comparisonOpen, setter: setComparisonOpen, id: "panel-karsilastir" },
-                        { label: t("h2hButon"), open: h2hOpen, setter: setH2hOpen, id: "panel-h2h" },
-                      ] as const).map((p) => (
-                        <button
-                          key={p.id}
-                          onClick={() => { toggleAndScroll(p.setter, p.open, p.id); setPanelMenuOpen(false); }}
-                          className={cn(
-                            "flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold transition-colors",
-                            p.open ? "bg-brand/10 text-brand" : "text-foreground hover:bg-muted"
-                          )}
-                        >
-                          {p.label} {p.open && <ChevronUp className="h-3 w-3" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <Popover open={panelMenuOpen} onOpenChange={setPanelMenuOpen}>
+                  <PopoverTrigger asChild>
+                    <button className={cn(PANEL_BTN_CLASS, panelMenuOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "shrink-0 sm:hidden")}>
+                      {t("veriPanelleri")} {panelMenuOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-48 p-1">
+                    {([
+                      { label: t("sonYarisDetaylari"), open: sonYarisOpen, setter: setSonYarisOpen, id: "panel-son-yaris-detay" },
+                      { label: t("accuraceButon"), open: son800Open, setter: setSon800Open, id: "panel-son800" },
+                      { label: t("agfTrend"), open: agfTrendOpen, setter: setAgfTrendOpen, id: "panel-agf-trend" },
+                      { label: t("sonHazirliklar"), open: galopOpen, setter: setGalopOpen, id: "panel-galop" },
+                      { label: t("pedigriler"), open: pedigreeOpen, setter: setPedigreeOpen, id: "panel-pedigriler" },
+                      { label: t("karsilastir"), open: comparisonOpen, setter: setComparisonOpen, id: "panel-karsilastir" },
+                      { label: t("h2hButon"), open: h2hOpen, setter: setH2hOpen, id: "panel-h2h" },
+                    ] as const).map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => { toggleAndScroll(p.setter, p.open, p.id); setPanelMenuOpen(false); }}
+                        className={cn(
+                          "flex w-full items-center justify-between rounded px-2.5 py-2 text-left text-xs font-semibold transition-colors",
+                          p.open ? "bg-brand/10 text-brand" : "text-foreground hover:bg-muted"
+                        )}
+                      >
+                        {p.label} {p.open && <ChevronUp className="h-3 w-3" />}
+                      </button>
+                    ))}
+                  </PopoverContent>
+                </Popover>
               )}
               {currentRace && (
                 <button
