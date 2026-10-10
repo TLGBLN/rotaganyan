@@ -1,0 +1,34 @@
+{
+ "version": "rescue-market-v1",
+ "fitDate": "2026-10-10T08:52:50.018Z",
+ "yarisSayisi": 4540,
+ "featureCols": [
+  "AGF_SIRA.agfSirasi",
+  "AGF_PAY.agfPayi",
+  "AGF_PAY.agfPayi2"
+ ],
+ "featureKodlar": [
+  "agfSirasi",
+  "agfPayi",
+  "agfPayi2"
+ ],
+ "weights": [
+  -0.5039508965380894,
+  0.723538510551368,
+  -0.268559428262825
+ ],
+ "norm": {
+  "agfSirasi": {
+   "m": 5.752444933920705,
+   "sd": 3.572252120403431
+  },
+  "agfPayi": {
+   "m": 9.454919162995692,
+   "sd": 11.335344087965744
+  },
+  "agfPayi2": {
+   "m": 217.88552197136514,
+   "sd": 562.7007347285147
+  }
+ }
+}

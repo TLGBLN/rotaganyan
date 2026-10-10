@@ -127,6 +127,10 @@
     {
       "path": "/api/cron/temp-cal-shadow",
       "schedule": "45 23 * * *"
+    },
+    {
+      "path": "/api/cron/rescue-shadow",
+      "schedule": "50 23 * * *"
     }
   ]
 }
