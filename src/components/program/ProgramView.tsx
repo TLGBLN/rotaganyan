@@ -1807,6 +1807,66 @@ export default function ProgramView({
                   {tumPanellerAcikMi ? "Tüm Verileri Kapat" : "Tüm Verileri Göster"} {kilitVeyaChevron(tumPanellerAcikMi)}
                 </button>
               )}
+              {/* 2026-10-10 kullanıcı talebi ("eskisi gibi ayrı başlıklar ile sergileyeceğiz")
+                  — 2026-08-31'de "Tüm Verileri Göster" tek anahtarıyla birleştirilen 7 panel
+                  (bkz. tumPanelleriAcVeyaKapat üstündeki not) yine TEK TEK açılabilir ayrı
+                  düğmelere kavuşuyor — üstteki toplu düğme KALDIRILMADI, ikisi birlikte var. */}
+              {currentRace && (
+                <button
+                  onClick={() => toggleAndScroll(setSonYarisOpen, sonYarisOpen, "panel-son-yaris-detay")}
+                  className={cn(PANEL_BTN_CLASS, sonYarisOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                >
+                  {t("sonYarisDetaylari")} {kilitVeyaChevron(sonYarisOpen)}
+                </button>
+              )}
+              {currentRace && (
+                <button
+                  onClick={() => toggleAndScroll(setSon800Open, son800Open, "panel-son800")}
+                  className={cn(PANEL_BTN_CLASS, son800Open ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                >
+                  {t("accuraceButon")} {kilitVeyaChevron(son800Open)}
+                </button>
+              )}
+              {currentRace && (
+                <button
+                  onClick={() => toggleAndScroll(setAgfTrendOpen, agfTrendOpen, "panel-agf-trend")}
+                  className={cn(PANEL_BTN_CLASS, agfTrendOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                >
+                  {t("agfTrend")} {kilitVeyaChevron(agfTrendOpen)}
+                </button>
+              )}
+              {currentRace && (
+                <button
+                  onClick={() => toggleAndScroll(setGalopOpen, galopOpen, "panel-galop")}
+                  className={cn(PANEL_BTN_CLASS, galopOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                >
+                  {t("sonHazirliklar")} {kilitVeyaChevron(galopOpen)}
+                </button>
+              )}
+              {currentRace && (
+                <button
+                  onClick={() => toggleAndScroll(setPedigreeOpen, pedigreeOpen, "panel-pedigriler")}
+                  className={cn(PANEL_BTN_CLASS, pedigreeOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                >
+                  {t("pedigriler")} {kilitVeyaChevron(pedigreeOpen)}
+                </button>
+              )}
+              {currentRace && (
+                <button
+                  onClick={() => toggleAndScroll(setComparisonOpen, comparisonOpen, "panel-karsilastir")}
+                  className={cn(PANEL_BTN_CLASS, comparisonOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                >
+                  {t("karsilastir")} {kilitVeyaChevron(comparisonOpen)}
+                </button>
+              )}
+              {currentRace && (
+                <button
+                  onClick={() => toggleAndScroll(setH2hOpen, h2hOpen, "panel-h2h")}
+                  className={cn(PANEL_BTN_CLASS, h2hOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED)}
+                >
+                  {t("h2hButon")} {kilitVeyaChevron(h2hOpen)}
+                </button>
+              )}
               {currentRace && (
                 <button
                   onClick={() => setHipodromOzellikleriOpen(true)}
