@@ -28,7 +28,11 @@ export const MARKET_RANK_ESIK = 6; // marketRank > 6
 // Prospektif (gerçek ileri-doğrulama) penceresinin başlangıcı — kural dondurulduktan SONRAKİ
 // ilk gün. Bu tarihten ÖNCEKİ shadow kayıtları (varsa backfill/smoke-test) karar metriklerine
 // KATILMAZ (validationEligible=false) — TEMP_CAL shadow'daki AYNI güvenlik kilidi.
-export const VALIDATION_START_DATE = "2026-10-10";
+// 2026-10-10 kullanıcı düzeltmesi: servis bu GÜN İÇİNDE deploy edildi — o güne ait Ankara
+// yarışları (K2/K3/K6 dahil) kural dondurulmadan/shadow canlıya alınmadan ÖNCE zaten
+// koşulmuştu, geriye dönük backfill'dir, GERÇEK prospektif değildir. Bu yüzden başlangıç
+// bir gün SONRAYA (deploy'dan sonraki ilk TAM gün) çekildi.
+export const VALIDATION_START_DATE = "2026-10-11";
 
 export function hesaplaRuleHash(): string {
   const payload = `${RESCUE_VERSION}|rescue3<=${RESCUE3_FUND_ESIK}|rescue6<=${RESCUE6_FUND_ESIK}|market>${MARKET_RANK_ESIK}|marketW=${marketWeights.version}|fundW=${fundWeights.version}`;
