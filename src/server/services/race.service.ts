@@ -1098,7 +1098,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
     }
   }
 
-  return raceDays.map((rd) => ({
+  const programDays = raceDays.map((rd) => ({
     id: rd.id,
     hippodromeName: rd.hippodrome.name,
     hippodromeSlug: rd.hippodrome.slug,
@@ -1150,6 +1150,28 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
       };
     }),
   }));
+
+  // 2026-10-11 kullanıcı talebi — hipodrom sekmeleri alfabetik DEĞİL, günün en erken yarış
+  // saatine göre sıralansın (hangi hipodromda ilk koşu daha erkense o önde); "Karma" (gerçek
+  // koşuların kombine-bahis aynası, kendi programı yok) saati ne olursa olsun HER ZAMAN en sonda.
+  function enErkenYarisSaatiDakika(day: (typeof programDays)[number]): number {
+    const dakikalar = day.races
+      .map((r) => r.time)
+      .filter((t): t is string => !!t)
+      .map((t) => {
+        const [saat, dakika] = t.split(":").map(Number);
+        return Number.isFinite(saat) ? saat * 60 + (Number.isFinite(dakika) ? dakika : 0) : null;
+      })
+      .filter((d): d is number => d != null);
+    return dakikalar.length > 0 ? Math.min(...dakikalar) : Infinity; // saati bilinmeyen gün en sona düşer
+  }
+  programDays.sort((a, b) => {
+    const aKarma = a.hippodromeSlug === "karma", bKarma = b.hippodromeSlug === "karma";
+    if (aKarma !== bKarma) return aKarma ? 1 : -1; // karma her zaman en sonda
+    return enErkenYarisSaatiDakika(a) - enErkenYarisSaatiDakika(b);
+  });
+
+  return programDays;
 }
 
 // ─── Jokey İstatistikleri ─────────────────────────────────────────────────────
