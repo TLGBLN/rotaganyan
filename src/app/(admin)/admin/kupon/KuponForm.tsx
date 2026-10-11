@@ -6,7 +6,23 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ekuriRengi } from "@/lib/ekuri-colors";
 import { KAPSAM_ESIK_ILK3, KAPSAM_ESIK_ILK6 } from "@/lib/methodology/kapsam-esikleri";
-import { optimizeKuponAllocation, type LegProbability } from "@/lib/methodology/kupon-optimizer";
+import {
+  type Width,
+  type GroupSelections,
+  WIDTHS,
+  LIMITS,
+  TOLERANCES,
+  YEDILI_LIMITS,
+  YEDILI_TOLERANCES,
+  YEDILI_GANYAN_STAKE_PER_COMBINATION,
+  YEDILI_GANYAN_SLOT,
+  stakeForHippodrome,
+  chunkIntoAltili,
+  sonYediKosu,
+  otomatikGroupSelections,
+  emptySelection,
+  emptyGroupSelections,
+} from "@/lib/methodology/kupon-auto-fill";
 import {
   getRaceDayLegs,
   publishHomeKupon,
@@ -20,7 +36,6 @@ type RaceDayData = {
   races: { raceNo: number; runners: RaceRunner[] }[];
 };
 
-type Width = "narrow" | "normal" | "wide";
 // 2026-09-05 kullanıcı bulgusu: "kuponlar birbirinden bağımsız olsun, birini
 // işaretleyince diğerleri etkileniyor" — GroupSelections eskiden TEK, tüm KuponGrup
 // örnekleri (1.Altılı/2.Altılı/7'li Ganyan) arasında raceNo bazında PAYLAŞILAN tek bir
@@ -29,111 +44,14 @@ type Width = "narrow" | "normal" | "wide";
 // için bir gruptaki işaret diğerinde de aynı at olarak görünüyordu. Artık her kupon grubu
 // kendi anahtarıyla (altili-0/altili-1/yedili-ganyan) TAMAMEN ayrı bir GroupSelections
 // tutuyor, aynı koşu numarası birden fazla grupta olsa bile birbirinden bağımsız.
-type GroupSelections = Record<number, Record<Width, Set<number>>>;
 type Selections = Record<string, GroupSelections>;
 
-const WIDTHS: Width[] = ["narrow", "normal", "wide"];
 const WIDTH_LABEL: Record<Width, string> = { narrow: "Ekonomik", normal: "Normal", wide: "Geniş" };
-const ALTILI_STAKE_PER_COMBINATION = 1.25;
-// 2026-09-12 kullanıcı talebi: Diyarbakır/Şanlıurfa/Elazığ'ın Altılı kombinasyon başı
-// ücreti diğer hipodromlardan farklı, 1₺ — race.service.ts'teki stakeForHippodromeLabel
-// ile AYNI ayrım burada da uygulanıyor (iki dosya AYRI kopyalar, admin formu ile
-// yayınlanan kuponun anasayfa gösterimi tutarlı kalsın diye).
-const DUSUK_UCRETLI_HIPODROMLAR = ["Diyarbakır", "Şanlıurfa", "Elazığ"];
-const ALTILI_STAKE_DUSUK = 1;
-function stakeForHippodrome(hippodromeName: string): number {
-  return DUSUK_UCRETLI_HIPODROMLAR.some((h) => hippodromeName.includes(h)) ? ALTILI_STAKE_DUSUK : ALTILI_STAKE_PER_COMBINATION;
-}
-// v6.111 — kullanıcı düzeltmesi 2026-08-13: 7'li Ganyan'ın kombinasyon başı ücreti
-// Altılı'dan (1.25₺) farklı, TJK'da 2₺. Pool limitleri (600/1500/3000) için gerçek
-// 7'li Ganyan rakamı henüz doğrulanmadı, Altılı'dan aynen kopyalandı — yanlışsa düzelt.
-const YEDILI_GANYAN_STAKE_PER_COMBINATION = 2;
-const LIMITS: Record<Width, number> = { narrow: 600, normal: 1500, wide: 3000 };
-const TOLERANCE = 1.10; // %10 esneme payı
-// 2026-09-05 kullanıcı talebi: Ekonomik'te esneme payı 660₺ değil 700₺'ye kadar izin
-// versin (diğer ikisi hâlâ standart +%10). Base LIMITS.narrow (600₺) hedef olarak kalır,
-// yalnız üst sınır (effectiveLimit) genişliyor.
-const TOLERANCES: Record<Width, number> = { narrow: 700 / LIMITS.narrow, normal: TOLERANCE, wide: TOLERANCE };
-// 2026-09-12 kullanıcı talebi — 7'li Ganyan da artık Ekonomik/Normal/Geniş üçünü birden
-// gösteriyor (v6.111'deki "yalnız Geniş" kararı GERİ ALINDI), kendi hedef aralıklarıyla:
-// Eko 500-700₺, Normal 1400-1500₺, Geniş 3000-3200₺ — Altılı'nın LIMITS/TOLERANCES'ından
-// BAĞIMSIZ, kendi sabitleri (kombinasyon ücreti hâlâ 2₺, YEDILI_GANYAN_STAKE_PER_COMBINATION).
-const YEDILI_LIMITS: Record<Width, number> = { narrow: 500, normal: 1400, wide: 3000 };
-const YEDILI_TOLERANCES: Record<Width, number> = { narrow: 700 / 500, normal: 1500 / 1400, wide: 3200 / 3000 };
-
-function emptySelection(): Record<Width, Set<number>> {
-  return { narrow: new Set(), normal: new Set(), wide: new Set() };
-}
-
-function emptyGroupSelections(races: { raceNo: number }[]): GroupSelections {
-  const sel: GroupSelections = {};
-  races.forEach((r) => { sel[r.raceNo] = emptySelection(); });
-  return sel;
-}
-
-// 2026-09-11 kullanıcı bulgusu ("bir 600 TL'lik kupon yaparken bu mantıkla hiç kupon
-// tutturamayız") — her ayağa kendi "güvenli" genişliğini vermek sabit bütçeye SIĞMIYOR
-// (6 ayağın hepsine 3 at bile yazsan 3⁶=729 kombinasyon, 700₺'nin üstü). Gerçek çözüm her
-// ayağı ayrı ayrı değil, sabit bütçeyi TÜM ayaklar arasında en yüksek toplam-isabet
-// olasılığını verecek şekilde DAĞITMAK — bkz. kupon-optimizer.ts. Bu fonksiyon her üç
-// kademe (Ekonomik/Normal/Geniş) için AYRI bir optimizasyon çalıştırıp TEK bir
-// GroupSelections'ta birleştiriyor.
-function otomatikGroupSelections(
-  races: RaceDayData["races"],
-  stakePerCombination: number,
-  limits: Record<Width, number> = LIMITS,
-  tolerances: Record<Width, number> = TOLERANCES
-): GroupSelections {
-  const legs: LegProbability[] = races.map((race) => ({
-    raceNo: race.raceNo,
-    runners: race.runners
-      .filter((r) => !r.scratched)
-      // 2026-09-13 kullanıcı bulgusu (İstanbul K5) — yuvarlanmış tam sayı score (11=11)
-      // gerçekte farklı iki atı eşitmiş gibi gösterip DP'nin yanlış atı seçmesine yol
-      // açabiliyordu; varsa ham scoreExact kullanılıyor. ekuriGroup de taşınıyor —
-      // optimizer artık eküri çiftini TEK kombinasyon birimi olarak sayabiliyor (bkz.
-      // kupon-optimizer.ts, aynı bulgudan gelen ikinci düzeltme).
-      .map((r) => ({ no: r.no, olasilik: (r.scoreExact ?? r.score ?? 0) / 100, ekuriGroup: r.ekuriGroup })),
-  }));
-  const sel = emptyGroupSelections(races);
-  // 2026-09-13 kullanıcı bulgusu (Adana K1/K2) — Ekonomik/Normal/Geniş eskiden birbirinden
-  // habersiz üç bağımsız DP koşusuydu; gerçek veriyle test edilince bütçe arttıkça bir
-  // ayaktaki at sayısının MONOTON artmadığı kanıtlandı (daha pahalı kademe bazı ayaklarda
-  // daha ucuz kademeden DAHA AZ at seçebiliyordu). WIDTHS zaten ucuzdan pahalıya sıralı
-  // (narrow→normal→wide) — her kademe artık bir öncekinin seçtiği birim sayısını TABAN
-  // alıyor (yalnız üzerine ekler, hiç eksiltmez), taban bir sonraki DP çağrısına
-  // `minUnitCounts` olarak geçiyor.
-  let oncekiBirimSayilari: Record<number, number> | undefined;
-  for (const width of WIDTHS) {
-    const effectiveLimit = limits[width] * tolerances[width];
-    const maxCombinations = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
-    const { secimler, birimSayilari } = optimizeKuponAllocation(legs, maxCombinations, oncekiBirimSayilari);
-    oncekiBirimSayilari = birimSayilari;
-    for (const race of races) {
-      sel[race.raceNo][width] = new Set(secimler[race.raceNo] ?? []);
-    }
-  }
-  return sel;
-}
-
-/**
- * 1. Altılı her zaman ilk 6 koşu (1-6); 2. Altılı her zaman son 6 koşu.
- * Günde 9 koşu varsa: 1. Altılı = 1-6, 2. Altılı = 4-9 (4-5-6 ortak/üst üste biner).
- * 12 koşu varsa üst üste binme olmaz (1-6 / 7-12). 6 veya daha az koşu varsa tek grup.
- */
-function chunkIntoAltili<T>(races: T[]): T[][] {
-  if (races.length <= 6) return races.length > 0 ? [races] : [];
-  return [races.slice(0, 6), races.slice(races.length - 6)];
-}
-
-// v6.110 — kullanıcı talebi 2026-08-13: "7'li Ganyan" — TJK'nın gerçek bahis türü,
-// Altılı'dan farklı olarak SONDAN başlayarak 7 koşu (günün son 7 koşusu). Altılı'nın
-// aksine tek bir sabit pencere — 9 koşu olsa da 12 koşu olsa da her zaman son 7'si.
-// Günün 7'den az koşusu varsa bölüm hiç gösterilmez (7'li Ganyan oynanamaz).
-const YEDILI_GANYAN_SLOT = 7; // Altılı slotları (1, en fazla 2) ile asla çakışmaz
-function sonYediKosu<T>(races: T[]): T[] | null {
-  return races.length >= 7 ? races.slice(races.length - 7) : null;
-}
+// 2026-10-11 — LIMITS/TOLERANCES/YEDILI_*/stakeForHippodrome/chunkIntoAltili/sonYediKosu/
+// otomatikGroupSelections/emptySelection/emptyGroupSelections artık kupon-auto-fill.ts'ten
+// import ediliyor (BİREBİR AYNI sabitler/mantık) — sunucu tarafındaki publish-time RCA
+// snapshot (rca-publish-snapshot.service.ts) AYNI tek kaynağı kullanıyor, bkz. o dosyanın
+// başındaki not.
 
 // 2026-08-31 kullanıcı bulgusu (Karma/GÜL AYALI vakası, kök-neden analiziyle KANITLANDI):
 // bir ayakta Ekonomik/Normal/Geniş'in AYNI atları taşıması ("statik ayak") — Geniş'e
@@ -556,6 +474,10 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
     try {
       await publishHomeKupon({
         hippodromeName: `${raceDay.hippodromeName} — ${label}`,
+        // 2026-10-11 — publish-time RCA snapshot sunucu tarafında gerçek koşu/prediction
+        // verisini bu slug ile yeniden okuyor (hippodromeName yalnız GÖSTERİM etiketi,
+        // "İstanbul — 1. Altılı" gibi — slug'sız güvenilir şekilde geri çözülemez).
+        hippodromeSlug: slug,
         date,
         legs,
         slot,

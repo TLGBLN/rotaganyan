@@ -48,7 +48,11 @@ export default async function Header() {
             menüsünün (aşağıdaki nav, hidden md:flex) içindeydi, mobilde hiç görünmüyordu;
             mobilde nav gizlendiği için burada zaten boş yer vardı. */}
         <div className="flex min-w-0 shrink items-center gap-2.5">
-          <Link href="/program" className="flex shrink-0 items-center gap-2.5">
+          {/* 2026-10-11 kullanıcı talebi — ayrı "Yarış Programı" nav butonu kaldırıldı:
+              "/" zaten /program'a redirect ediyordu VE bu logo da hep /program'a gidiyordu
+              (aynı hedefe giden üçüncü bir yol gereksizdi). data-tour="program" (IntroTour
+              onboarding turunun bu adımı) kırılmasın diye buraya, logo linkine taşındı. */}
+          <Link href="/program" data-tour="program" className="flex shrink-0 items-center gap-2.5">
             <Wordmark />
           </Link>
           <OnlineCounter />
@@ -56,9 +60,6 @@ export default async function Header() {
 
         {/* Hızlı erişim */}
         <nav className="hidden flex-1 items-center gap-2 md:flex">
-          <Button asChild size="sm" className="bg-brand hover:bg-brand/90 text-brand-foreground">
-            <Link href="/program" data-tour="program"><HeaderLabel k="program" /></Link>
-          </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/rotaganyansiralamasi" data-tour="puantablosu"><HeaderLabel k="puanTablosu" /></Link>
           </Button>

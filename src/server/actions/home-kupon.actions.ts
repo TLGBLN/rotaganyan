@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth";
 import { kuponGenislikIhlalleri } from "@/lib/kupon-genislik";
 import { revalidatePath } from "next/cache";
 import { postTweet } from "@/lib/x";
+import { recordPublishSnapshotBestEffort } from "@/server/services/rca-publish-snapshot.service";
 
 export type HomeKuponLegInput = {
   raceNo: number;
@@ -16,6 +17,12 @@ export type HomeKuponLegInput = {
 
 export type HomeKuponInput = {
   hippodromeName: string;
+  // 2026-10-11 — publish-time RCA snapshot sunucu tarafında gerçek koşu/prediction
+  // verisini bu slug ile yeniden okur (bkz. rca-publish-snapshot.service.ts). Opsiyonel
+  // bırakıldı ki bu actions dosyasını başka bir yoldan (slug bilmeyen) çağıran varsa
+  // build kırılmasın — ama KuponForm.tsx HER ZAMAN gönderir, slug yoksa snapshot adımı
+  // sessizce atlanır (fail-open).
+  hippodromeSlug?: string;
   date: string;
   legs: HomeKuponLegInput[];
   slot: number;
@@ -238,23 +245,41 @@ export async function publishHomeKupon(input: HomeKuponInput) {
     );
   }
 
-  await db.$transaction([
-    // Sadece AYNI hipodromun aynı slotu (ör. "İzmir 1. Altılı") devre dışı kalır — farklı
-    // hipodromların kuponları (Karma, Ankara vb.) etkilenmez, hepsi aynı anda yayında kalabilir.
-    db.homeKupon.updateMany({
-      where: { isActive: true, slot: input.slot, hippodromeName: input.hippodromeName },
-      data: { isActive: false },
-    }),
-    db.homeKupon.create({
-      data: {
+  // 2026-10-11 — Publish-time RCA snapshot: hippodromeSlug varsa ÖNCE bunu dene (gerçek
+  // input + optimizer-yeniden-çalıştırma + manuel-override diff'ini HomeKupon.buildKey/
+  // manualOverrides/sourcePredictionsHash + ayrı PublishRcaSnapshot satırına ATOMİK
+  // yazar — bkz. rca-publish-snapshot.service.ts). BAŞARISIZ olursa (tablo henüz
+  // oluşturulmadı, slug yok, DB hatası vb.) FAIL-OPEN: aşağıdaki ORİJİNAL (snapshot'sız)
+  // yol değişmeden çalışır — kupon yayını BUNA BAĞLI DEĞİL.
+  const snapshotResult = input.hippodromeSlug
+    ? await recordPublishSnapshotBestEffort({
         hippodromeName: input.hippodromeName,
-        date: new Date(input.date + "T00:00:00.000Z"),
+        hippodromeSlug: input.hippodromeSlug,
+        date: input.date,
         legs,
         slot: input.slot,
-        isActive: true,
-      },
-    }),
-  ]);
+      })
+    : null;
+
+  if (!snapshotResult) {
+    await db.$transaction([
+      // Sadece AYNI hipodromun aynı slotu (ör. "İzmir 1. Altılı") devre dışı kalır — farklı
+      // hipodromların kuponları (Karma, Ankara vb.) etkilenmez, hepsi aynı anda yayında kalabilir.
+      db.homeKupon.updateMany({
+        where: { isActive: true, slot: input.slot, hippodromeName: input.hippodromeName },
+        data: { isActive: false },
+      }),
+      db.homeKupon.create({
+        data: {
+          hippodromeName: input.hippodromeName,
+          date: new Date(input.date + "T00:00:00.000Z"),
+          legs,
+          slot: input.slot,
+          isActive: true,
+        },
+      }),
+    ]);
+  }
 
   revalidatePath("/");
   revalidatePath("/admin/kupon");

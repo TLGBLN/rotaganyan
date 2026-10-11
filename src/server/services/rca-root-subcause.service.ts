@@ -13,6 +13,15 @@
 //     Alt neden: buildKey/manualOverrides/sourcePredictionsHash doluysa oradan okunur
 //     (canlı DB'de bu üç kolon VAR ama repo Prisma şemasında YOK — 2026-10-10 kullanıcı
 //     uyarısı, information_schema ile doğrulandı); boşsa UNKNOWN (kanıt yok, UYDURULMAZ).
+//
+//  2026-10-11 — Publish-time RCA snapshot (bkz. rca-publish-snapshot.service.ts) eklendi:
+//  bu HomeKupon için PublishRcaSnapshot satırı VARSA, replay/legProbs o satırın (yayın
+//  ANINDA dondurulmuş) legsJson'undan kurulur — CANLI/mutable DB'den DEĞİL (kullanıcı
+//  kuralı: "snapshot varsa current mutable state'e fallback YASAK"). YOKSA (eski kayıt,
+//  snapshot altyapısından ÖNCE yayınlanmış) aşağıdaki legleriGetir() ile CANLI DB'den
+//  yeniden kurulur — ama evidenceSource="LEGACY_RECONSTRUCTED" + confidence=0.4 ile
+//  işaretlenir (kanıt kalitesi daha düşük, UNKNOWN'a daha kolay düşer — ASLA
+//  PUBLISH_SNAPSHOT ile AYNI kanıt gücünde sunulmaz).
 //  2) REPLAY de kaçırıyorsa — ALLOCATOR KARŞI-OLGUSAL testleri:
 //     2a) Taban-mirası KAPALI (yalnız bu ayağın kendi wide bütçesiyle, önceki
 //         kademelerin "asla eksiltme" tabanı YOK) aynı TOPLAM bütçeyle yeniden çalıştır.
@@ -31,6 +40,7 @@
 import { db } from "@/lib/db";
 import { optimizeKuponAllocation, type LegProbability, type OptimizeResult } from "@/lib/methodology/kupon-optimizer";
 import { hesaplaMarketVeFundamentalSkor } from "@/lib/methodology/rescue-shadow";
+import { type EvidenceSource, evidenceConfidence, type PublishLegInput } from "@/lib/rca/publish-snapshot";
 
 export type RootSubcause =
   | "MANUAL_EDIT" | "STALE_BUILD" | "CLIENT_STATE" | "MAPPING_BUG" | "ALTERNATE_PUBLISH_PATH" | "UNKNOWN"
@@ -45,6 +55,11 @@ export interface GroupSubcauseSonucu {
   eventType: "HIT" | "PUBLISH_OVERRIDE_MISS" | "ALLOCATOR_MISS" | "ANALYSIS_MISS" | "NO_DATA";
   rootSubcause: RootSubcause;
   evidence: Record<string, unknown>;
+  // 2026-10-11 — bkz. dosya başı not: PUBLISH_SNAPSHOT (yayın anında dondurulmuş, bu
+  // HomeKupon'a ait PublishRcaSnapshot satırından) vs LEGACY_RECONSTRUCTED (snapshot
+  // yok, canlı/mutable DB'den geriye-inşa). confidence=1 vs 0.4 — kalite farkı sayısal.
+  evidenceSource: EvidenceSource;
+  confidence: number;
 }
 
 const WIDTHS = ["narrow", "normal", "wide"] as const;
@@ -102,6 +117,58 @@ async function legleriGetir(raceNos: number[], hippodrome: string, tarih: string
 
 type HomeKuponRow = { id: string; hippodromeName: string; legs: unknown; buildKey: string | null; manualOverrides: unknown; sourcePredictionsHash: string | null };
 
+type PublishSnapshotRow = { legsJson: unknown; publishJson: unknown };
+
+type ResolvedReplayInput = {
+  legProbs: LegProbability[];
+  evidenceSource: EvidenceSource;
+  confidence: number;
+  manualOverrideEvidence: Record<string, unknown> | null; // snapshot.publishJson.diff — yalnız PUBLISH_SNAPSHOT'ta dolu
+};
+
+/** PublishRcaSnapshot VARSA ondan (yayın anında dondurulmuş legsJson) kurar —
+ *  CANLI/mutable DB'ye HİÇ dokunmaz. YOKSA legleriGetir() ile geriye-inşa eder.
+ *  Bkz. dosya başı 2026-10-11 notu. */
+async function resolveReplayInput(homeKuponId: string, raceNos: number[], hippodrome: string, tarih: string): Promise<ResolvedReplayInput> {
+  let snapshotRow: PublishSnapshotRow | null = null;
+  try {
+    const rows = await db.$queryRaw<PublishSnapshotRow[]>`
+      SELECT "legsJson","publishJson" FROM "PublishRcaSnapshot" WHERE "homeKuponId" = ${homeKuponId}
+    `;
+    snapshotRow = rows[0] ?? null;
+  } catch {
+    // Tablo henüz yoksa (migration elle çalıştırılmadı) ya da başka bir okuma hatası —
+    // LEGACY_RECONSTRUCTED'a sessizce düş, RCA'yı HİÇ durdurma (fail-open — bkz. proje
+    // kuralı "Hafif+Incremental+Best-effort Mimari").
+    snapshotRow = null;
+  }
+
+  if (snapshotRow) {
+    const legs = (Array.isArray(snapshotRow.legsJson) ? snapshotRow.legsJson : []) as PublishLegInput[];
+    const legProbs: LegProbability[] = legs.map((l) => ({
+      raceNo: l.raceNo,
+      runners: l.runners
+        .filter((r) => !r.scratched && r.scoreExact != null)
+        .map((r) => ({ no: r.runnerNo, olasilik: (r.scoreExact ?? 0) / 100, ekuriGroup: r.ekuriGroup })),
+    }));
+    const publish = snapshotRow.publishJson as { diff?: { manualOverride: boolean; overrideAdded: number[]; overrideRemoved: number[]; entries: unknown[] } } | null;
+    return {
+      legProbs,
+      evidenceSource: "PUBLISH_SNAPSHOT",
+      confidence: evidenceConfidence("PUBLISH_SNAPSHOT"),
+      manualOverrideEvidence: publish?.diff ?? null,
+    };
+  }
+
+  const replayLegs = await legleriGetir(raceNos, hippodrome, tarih);
+  return {
+    legProbs: replayLegs.map((r) => ({ raceNo: r.raceNo, runners: r.runners })),
+    evidenceSource: "LEGACY_RECONSTRUCTED",
+    confidence: evidenceConfidence("LEGACY_RECONSTRUCTED"),
+    manualOverrideEvidence: null,
+  };
+}
+
 /** Bir raceId'nin kazananının, o raceId'yi İÇEREN (isActive) HER HomeKupon grubunda
  *  neden kaçırıldığını (ya da tutturduğunu) ayrı ayrı tespit eder — AYNI at/koşu farklı
  *  gruplarda FARKLI sonuç verebilir (2026-10-10 Ankara K6/PERCY JACKSON vakası: 1.Altılı
@@ -128,7 +195,9 @@ export async function tespitRootSubcause(raceId: string, winnerNo: number): Prom
 
     const yayinTier: Width | null = buLeg.narrow.includes(winnerNo) ? "narrow" : buLeg.normal.includes(winnerNo) ? "normal" : buLeg.wide.includes(winnerNo) ? "wide" : null;
     if (yayinTier) {
-      sonuclar.push({ homeKuponId: k.id, hippodromeLabel: k.hippodromeName, publishedTier: yayinTier, eventType: "HIT", rootSubcause: "NOT_APPLICABLE", evidence: {} });
+      // HIT — doğrudan yayınlanan HomeKupon.legs'ten okunuyor (replay'e hiç gerek yok,
+      // her zaman %100 kanıtlı); evidenceSource burada anlamsız, confidence=1 sabit.
+      sonuclar.push({ homeKuponId: k.id, hippodromeLabel: k.hippodromeName, publishedTier: yayinTier, eventType: "HIT", rootSubcause: "NOT_APPLICABLE", evidence: {}, evidenceSource: "LEGACY_RECONSTRUCTED", confidence: 1 });
       continue;
     }
 
@@ -137,8 +206,8 @@ export async function tespitRootSubcause(raceId: string, winnerNo: number): Prom
     const limits = yedili ? YEDILI_LIMITS : ALTILI_LIMITS;
     const tolerances = yedili ? YEDILI_TOLERANCES : ALTILI_TOLERANCES;
     const raceNos = legsJson.map((l) => l.raceNo);
-    const replayLegs = await legleriGetir(raceNos, hipName, tarih);
-    const legProbs: LegProbability[] = replayLegs.map((r) => ({ raceNo: r.raceNo, runners: r.runners }));
+    const resolved = await resolveReplayInput(k.id, raceNos, hipName, tarih);
+    const { legProbs, evidenceSource, confidence } = resolved;
 
     // Yayınlanan EN DAR genişlik (yoksa narrow, "kazanan hangi en-dar kademede YOK" referansı)
     const yayinlananEnDar: Width = buLeg.narrow.length > 0 ? "narrow" : buLeg.normal.length > 0 ? "normal" : "wide";
@@ -154,8 +223,18 @@ export async function tespitRootSubcause(raceId: string, winnerNo: number): Prom
         buildKey: k.buildKey, manualOverrides: k.manualOverrides, sourcePredictionsHash: k.sourcePredictionsHash,
         replaySecim: bulBirim(replay[yayinlananEnDar], race.raceNo), yayinlananSecim: buLeg[yayinlananEnDar],
       };
-      if (k.manualOverrides != null) subcause = "MANUAL_EDIT"; // yalnız GERÇEK kanıt varsa — şu an hiçbir kayıtta dolu değil (doğrulandı)
-      sonuclar.push({ homeKuponId: k.id, hippodromeLabel: k.hippodromeName, publishedTier: yayinTier, eventType: "PUBLISH_OVERRIDE_MISS", rootSubcause: subcause, evidence });
+      // 2026-10-11 — PUBLISH_SNAPSHOT varsa buildKey/manualOverrides/sourcePredictionsHash
+      // yerine SNAPSHOT'IN KENDİ diff'i (yayın anında, optimizer'ın GERÇEKTEN ne önerdiğiyle
+      // kıyaslanarak hesaplanmış) kanıt olarak kullanılır — bu, K6 vakasının (manualOverrides
+      // hep null olduğu için UNKNOWN kalmak zorunda kalınan) tam olarak çözdüğü boşluk.
+      if (resolved.manualOverrideEvidence) {
+        evidence.not = "BASE replay kazananı seçiyor, yayınlanan kupon seçmiyor — PublishRcaSnapshot'ın kendi diff'i kanıt olarak kullanıldı.";
+        evidence.snapshotDiff = resolved.manualOverrideEvidence;
+        if ((resolved.manualOverrideEvidence as { manualOverride?: boolean }).manualOverride) subcause = "MANUAL_EDIT";
+      } else if (k.manualOverrides != null) {
+        subcause = "MANUAL_EDIT"; // legacy yol — yalnız GERÇEK kanıt varsa
+      }
+      sonuclar.push({ homeKuponId: k.id, hippodromeLabel: k.hippodromeName, publishedTier: yayinTier, eventType: "PUBLISH_OVERRIDE_MISS", rootSubcause: subcause, evidence, evidenceSource, confidence });
       continue;
     }
 
@@ -176,6 +255,7 @@ export async function tespitRootSubcause(raceId: string, winnerNo: number): Prom
           aynıBütçeTabansızKombinasyon: tabansiz.toplamKombinasyon, aynıBütçeTabanlıKombinasyon: replay.wide.toplamKombinasyon,
           kapsamaTabansız: tabansiz.kapsamaOlasiligi, kapsamaTabanli: replay.wide.kapsamaOlasiligi,
         },
+        evidenceSource, confidence,
       });
       continue;
     }
@@ -188,12 +268,13 @@ export async function tespitRootSubcause(raceId: string, winnerNo: number): Prom
       sonuclar.push({
         homeKuponId: k.id, hippodromeLabel: k.hippodromeName, publishedTier: yayinTier, eventType: "ALLOCATOR_MISS", rootSubcause: "BUDGET_WIDTH",
         evidence: { not: "Yayınlanan kademe kaçırıyor ama daha geniş (pahalı) bir kademe, normal taban-mirası mantığıyla yakalıyordu." },
+        evidenceSource, confidence,
       });
       continue;
     }
 
     // 3) ANALYSIS_MISS — market/fundamental ayrımı (rescue-shadow.ts, GERÇEK market-blind)
-    const kazananLeg = replayLegs.find((l) => l.raceNo === race.raceNo);
+    const kazananLeg = legProbs.find((l) => l.raceNo === race.raceNo);
     const winnerFs = (await db.pick.findFirst({
       where: { prediction: { raceId }, runner: { no: winnerNo } },
       select: { featureSnapshot: true },
@@ -227,6 +308,7 @@ export async function tespitRootSubcause(raceId: string, winnerNo: number): Prom
     sonuclar.push({
       homeKuponId: k.id, hippodromeLabel: k.hippodromeName, publishedTier: yayinTier, eventType: "ANALYSIS_MISS", rootSubcause: subcause,
       evidence: { marketRank, fundamentalRank, not: winnerFs ? undefined : "featureSnapshot yok, marketRank/fundamentalRank hesaplanamadı" },
+      evidenceSource, confidence,
     });
   }
   return sonuclar;
