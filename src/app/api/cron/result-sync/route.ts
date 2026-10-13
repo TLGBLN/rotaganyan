@@ -7,18 +7,44 @@ import { syncAccuraceForDate } from "@/server/services/accurace-sync.service";
 import { syncAltiliIkramiyeLog } from "@/server/services/altili-ikramiye-log.service";
 import { turkeyDateString } from "@/lib/tz";
 import { verifyCronRequest } from "@/lib/cron-auth";
+import { syncOwnPedigreeStats } from "@/server/services/pedigri-own-stat.service";
+import { db } from "@/lib/db";
 
-export const maxDuration = 60;
+export const maxDuration = 800;
 
 export async function GET(req: NextRequest) {
   const denied = verifyCronRequest(req);
   if (denied) return denied;
 
   const today = turkeyDateString();
+  const todayDate = new Date(today + "T00:00:00.000Z");
+
+  const resultCountBefore = await db.result.count({
+    where: { race: { raceDay: { date: todayDate } } },
+  });
+
   await syncResultsForDate(today);
+
+  const resultCountAfter = await db.result.count({
+    where: { race: { raceDay: { date: todayDate } } },
+  });
 
   revalidatePath("/admin");
   revalidatePath("/");
+  revalidatePath("/admin/pedigri");
+
+  // Yeni resmi sonuç gerçekten DB'ye yazıldıysa Own pedigree istatistiklerini hemen
+  // yenile. Böylece /admin/pedigri yalnız gece cron'unu beklemez; Sire/Dam/DamSire
+  // istatistikleri yarışlar sonuçlandıkça büyür. Boş 5 dakikalık turlarda ağır yeniden
+  // hesaplama yapılmaz.
+  if (resultCountAfter > resultCountBefore) {
+    after(async () => {
+      await syncOwnPedigreeStats().catch((e) =>
+        console.error("[result-sync] pedigri own sync hata:", e)
+      );
+      revalidatePath("/admin/pedigri");
+    });
+  }
 
   // Jokey ve antrenör istatistiklerini response sonrasında arka planda güncelle
   after(async () => {
