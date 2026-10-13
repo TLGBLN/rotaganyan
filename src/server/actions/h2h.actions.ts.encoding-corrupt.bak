@@ -1,0 +1,113 @@
+"use server";
+
+import { db } from "@/lib/db";
+import { fetchTjkAtKosuBilgileri, type TjkAtKosuRow } from "@/server/services/ingest/tjk-at-performans.adapter";
+import { tjkTarihOncesiMi, tjkTarihMs } from "@/lib/tjk-date";
+
+export type H2HResult = {
+  horseName: string;
+  finishPos: string;
+  weight: string;
+  jockey: string;
+  equipment: string;
+  time: string;
+  hp: string;
+  ganyan: string;
+  classType: string;
+  group: string;
+};
+
+export type H2HEncounter = {
+  key: string;
+  date: string; // TJK formatÃ„Â±: "15.07.2026"
+  hippodrome: string;
+  raceNo: string;
+  distance: number;
+  surface: string; // TJK ham metni ("Ãƒâ€¡:Normal 3.3" gibi) Ã¢â‚¬â€ pist tipi + zemin durumu
+  results: H2HResult[];
+};
+
+/**
+ * Bu koÃ…Å¸udaki atlarÃ„Â±n TJK resmi yarÃ„Â±Ã…Å¸ geÃƒÂ§miÃ…Å¸inden (AtKosuBilgileri), en az ikisinin aynÃ„Â±
+ * tarih + hipodrom + koÃ…Å¸u numarasÃ„Â±nda birlikte koÃ…Å¸tuÃ„Å¸u geÃƒÂ§miÃ…Å¸ karÃ…Å¸Ã„Â±laÃ…Å¸malarÃ„Â± dÃƒÂ¶ner.
+ * Sadece "aynÃ„Â± pist/mesafede koÃ…Å¸muÃ…Å¸ olmak" yetmez Ã¢â‚¬â€ anahtar tam olarak aynÃ„Â± yarÃ„Â±Ã…Å¸ta
+ * bulunmuÃ…Å¸ olmayÃ„Â± garanti eder.
+ */
+export async function getH2HForRace(raceId: string, limit: number | null = 15): Promise<H2HEncounter[]> {
+  const race = await db.race.findUnique({
+    where: { id: raceId },
+    select: { runners: { select: { name: true, tjkAtId: true } }, raceDay: { select: { date: true } } },
+  });
+  if (!race) return [];
+
+  const withTjkId = race.runners.filter((r) => r.tjkAtId != null);
+  if (withTjkId.length < 2) return [];
+
+  // bkz. tjk-date.ts Ã¢â‚¬â€ bu koÃ…Å¸u bittiyse (analiz sonradan tekrar ÃƒÂ§alÃ„Â±Ã…Å¸tÃ„Â±rÃ„Â±ldÃ„Â±ysa) TJK'nÃ„Â±n
+  // az ÃƒÂ¶nce gÃƒÂ¼ncellediÃ„Å¸i profildeki BUGÃƒÅ“NKÃƒÅ“ VE SONRAKÃ„Â° satÃ„Â±rlar dÃ„Â±Ã…Å¸lanÃ„Â±r, aksi halde
+  // sahadaki tÃƒÂ¼m atlar "geÃƒÂ§miÃ…Å¸ karÃ…Å¸Ã„Â±laÃ…Å¸ma" olarak BUGÃƒÅ“NÃƒÅ“N KENDÃ„Â° KOÃ…ÂUSUNU (veya hedef
+  // yarÃ„Â±Ã…Å¸tan SONRAKÃ„Â° bir yarÃ„Â±Ã…Å¸Ã„Â±) gÃƒÂ¶rÃƒÂ¼r (kendi sonucunu bilir).
+  const histories = await Promise.all(
+    withTjkId.map(async (r) => {
+      try {
+        const rows = (await fetchTjkAtKosuBilgileri(r.tjkAtId!)).filter((row) => tjkTarihOncesiMi(row.date, race.raceDay.date));
+        return { name: r.name, rows };
+      } catch {
+        return { name: r.name, rows: [] as TjkAtKosuRow[] };
+      }
+    })
+  );
+
+  // yarÃ„Â±Ã…Å¸_anahtarÃ„Â± = tarih + Ã…Å¸ehir + koÃ…Å¸u_no Ã¢â‚¬â€ aynÃ„Â± at aynÃ„Â± anahtarda birden fazla
+  // gÃƒÂ¶rÃƒÂ¼nmesin diye horseName bazÃ„Â±nda da dedupe edilir.
+  const byKey = new Map<string, { date: string; city: string; raceNo: string; entries: { horseName: string; row: TjkAtKosuRow }[] }>();
+
+  for (const h of histories) {
+    for (const row of h.rows) {
+      if (!row.raceNo || !row.date || !row.city) continue;
+      const key = `${row.date}|${row.city}|${row.raceNo}`;
+      const entry = byKey.get(key) ?? { date: row.date, city: row.city, raceNo: row.raceNo, entries: [] };
+      if (!entry.entries.some((e) => e.horseName === h.name)) {
+        entry.entries.push({ horseName: h.name, row });
+      }
+      byKey.set(key, entry);
+    }
+  }
+
+  const encounters: H2HEncounter[] = [];
+  for (const [key, v] of byKey) {
+    if (v.entries.length < 2) continue;
+    encounters.push({
+      key,
+      date: v.date,
+      hippodrome: v.city,
+      raceNo: v.raceNo,
+      distance: v.entries[0].row.distance,
+      surface: v.entries[0].row.surface,
+      results: v.entries
+        .map((e) => ({
+          horseName: e.horseName,
+          finishPos: e.row.finishPos,
+          weight: e.row.weight,
+          jockey: e.row.jockey,
+          equipment: e.row.equipment,
+          time: e.row.time,
+          hp: e.row.hp,
+          ganyan: e.row.ganyan,
+          classType: e.row.classType,
+          group: e.row.group,
+        }))
+        .sort((a, b) => {
+          const an = parseInt(a.finishPos, 10);
+          const bn = parseInt(b.finishPos, 10);
+          if (isNaN(an) && isNaN(bn)) return 0;
+          if (isNaN(an)) return 1;
+          if (isNaN(bn)) return -1;
+          return an - bn;
+        }),
+    });
+  }
+
+  const sorted = encounters.sort((a, b) => tjkTarihMs(b.date) - tjkTarihMs(a.date));
+  return limit == null ? sorted : sorted.slice(0, limit);
+}

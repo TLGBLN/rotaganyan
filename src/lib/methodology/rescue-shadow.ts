@@ -66,6 +66,16 @@ export function hesaplaMarketVeFundamentalSkor(tumSinyaller: Sinyal[]): { market
 
   const NF = fundWeights.norm as Record<string, { m: number; sd: number } | { m: number[]; sd: number[] }>;
   const wF = fundWeights.weights as number[];
+  // 2026-10-11 — LEGACY_FROZEN_RESEARCH_ONLY: bu liste RESCUE3/6'nın DONDURULMUŞ (2026-09)
+  // tarihsel "fundamentals" tanımıdır. yakinsama2Plus burada YALNIZ reproducibility için
+  // duruyor — aktif analiz/narrative rescue (V5AnalysisPanel, route.ts) ve yeni Jokey/
+  // Kanıt-Ailesi rescue sisteminde (jokey-form.ts evaluateJokeyRescue) yakinsama2Plus ARTIK
+  // HİÇ KULLANILMIYOR (0 referans, 2026-10-11'de kaldırıldı — bkz. o dosyaların notları).
+  // BU LİSTEYİ şu an DEĞİŞTİRME — eski RESCUE3/6 deneyinin yeniden-üretilebilirliğini
+  // bozar (proje kuralı: dondurulmuş tanımlar ayrıca yeniden doğrulanmadan değiştirilmez).
+  // Yeni rescue mimarisi (independent evidence families + model rank + probability margin +
+  // jokey rescue) OOS bitip final feature seti netleşince AYRI BİR SÜRÜM olarak kurulacak;
+  // eski RESCUE3/6 o zaman yalnız karşılaştırma/champion-shadow referansı olarak kalacak.
   const temelKodlar = ["idmJokey", "h2hNetSkor", "hizDerecesi", "zeminToleransi", "zeminMesafeDeneyim", "yakinsama2Plus", "sonIdmanSprint", "takiDegisikligi", "yarisGidisatiSkoru", "sireOrani"];
   let fundamentalScore = 0;
   let idx = 0;

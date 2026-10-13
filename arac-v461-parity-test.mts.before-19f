@@ -1,0 +1,117 @@
+// V5.46.1 parity testi: offline (dondurulmuş araştırma verisi) vs canlı (scoreV461) —
+// her at için raw/observed/z/β/contribution/S/P birebir karşılaştırılır. Yalnız OKUR,
+// DB'ye yazmaz.
+import { readFileSync } from "node:fs";
+import { scoreV461 } from "./src/lib/methodology/v546-1-engine";
+import weightsJson from "./src/lib/methodology/weights/v546-1-weights.json";
+
+const RACE_ID = process.argv[2];
+if (!RACE_ID) throw new Error("kullanım: arac-v461-parity-test.mts <raceId>");
+
+const S = "C:/Users/tlgbi/AppData/Local/Temp/claude/c--Users-tlgbi-OneDrive-Belgeler-Rota/76598f4f-31f1-4414-a3f6-fbab0aab98d4/scratchpad";
+const rows: any[] = JSON.parse(readFileSync(`${S}/model-veri.json`, "utf8"));
+const acc: Record<string, any> = JSON.parse(readFileSync(`${S}/accurace-tum-ozellik.json`, "utf8"));
+const tar: Record<string, string> = JSON.parse(readFileSync(`${S}/race-tarih-v2.json`, "utf8"));
+
+const W = weightsJson as { featureNames: string[]; weights: number[]; means: number[]; stds: number[] };
+const offlineRows = rows.filter((r) => r.raceId === RACE_ID);
+if (!offlineRows.length) throw new Error(`model-veri.json'da ${RACE_ID} yok`);
+
+// Offline temel feature ham değerleri (arac-v546acc-refit.mjs ile BİREBİR AYNI mantık)
+const OBS = ["h2hNetSkor", "hizDerecesi", "sonIdmanSprint", "takiDegisikligi"];
+function temelRaw(r: any) {
+  const p = r.agfPayi ?? 0;
+  return {
+    agfSirasi: r.agfSirasi, agfPayi: p, agfPayi2: p * p, idmJokey: r.idmJokey, jokeyOrani: r.jokeyOrani, antrenorOrani: r.antrenorOrani,
+    h2hNetSkor: r.h2hNetSkor ?? 0, hizDerecesi: r.hizDerecesi ?? 0, zeminToleransi: r.zeminToleransi ?? 0, zeminMesafeDeneyim: r.zeminMesafeDeneyim ?? 0,
+    yakinsama2Plus: r.yakinsama2Plus ?? 0, sonIdmanSprint: r.sonIdmanSprint ?? 0,
+    takiDegisikligi: (r.takiCikarildiMi ?? 0) - (r.takiEklendiMi ?? 0),
+    yarisGidisatiSkoru: r.yarisGidisatiSkoru ?? 0, sireOrani: r.sireOrani ?? 0,
+  };
+}
+function obsOf(r: any, c: string) { return OBS.includes(c) ? (r.sinyalDurum?.[c]?.observed === true) : true; }
+
+function offlineFeature(ad: string, raw: number | null, observed: boolean, reliability: number) {
+  const idx = W.featureNames.indexOf(ad);
+  const beta = W.weights[idx];
+  if (!observed || raw == null) return { ad, raw: null, observed: false, reliability: 0, z: 0, beta, contribution: 0 };
+  const z = (raw - W.means[idx]) / (W.stds[idx] || 1e-9);
+  return { ad, raw, observed: true, reliability, z, beta, contribution: reliability * z * beta };
+}
+
+const offlineByRunner: Record<string, { score: number; features: any[]; ad: string; no: number }> = {};
+for (const r of offlineRows) {
+  const tv = temelRaw(r);
+  const a = acc[`${r.raceId}|${r.runnerId}`];
+  const H = a?.h as number[] | undefined;
+  const F = a?.f as number[] | undefined;
+  const front = F ? F[0] + F[1] : null;
+  const lone = F && H ? H[0] * Math.max(0, 1 - front!) : null;
+  const closerFit = F && H ? (H[4] + H[5]) * front! : null;
+  const hR = a?.hR ?? 0;
+  const paceObs = !!H && !!F;
+  const features = [
+    offlineFeature("agfSirasi", tv.agfSirasi, obsOf(r, "agfSirasi"), 1),
+    offlineFeature("agfPayi", tv.agfPayi, obsOf(r, "agfPayi"), 1),
+    offlineFeature("agfPayi2", tv.agfPayi2, obsOf(r, "agfPayi2"), 1),
+    offlineFeature("idmJokey", tv.idmJokey, obsOf(r, "idmJokey"), 1),
+    offlineFeature("jokeyOrani", tv.jokeyOrani, obsOf(r, "jokeyOrani"), 1),
+    offlineFeature("antrenorOrani", tv.antrenorOrani, obsOf(r, "antrenorOrani"), 1),
+    offlineFeature("h2hNetSkor", tv.h2hNetSkor, obsOf(r, "h2hNetSkor"), 1),
+    offlineFeature("hizDerecesi", tv.hizDerecesi, obsOf(r, "hizDerecesi"), 1),
+    offlineFeature("zeminToleransi", tv.zeminToleransi, obsOf(r, "zeminToleransi"), 1),
+    offlineFeature("zeminMesafeDeneyim", tv.zeminMesafeDeneyim, obsOf(r, "zeminMesafeDeneyim"), 1),
+    offlineFeature("yakinsama2Plus", tv.yakinsama2Plus, obsOf(r, "yakinsama2Plus"), 1),
+    offlineFeature("sonIdmanSprint", tv.sonIdmanSprint, obsOf(r, "sonIdmanSprint"), 1),
+    offlineFeature("takiDegisikligi", tv.takiDegisikligi, obsOf(r, "takiDegisikligi"), 1),
+    offlineFeature("yarisGidisatiSkoru", tv.yarisGidisatiSkoru, obsOf(r, "yarisGidisatiSkoru"), 1),
+    offlineFeature("sireOrani", tv.sireOrani, obsOf(r, "sireOrani"), 1),
+    offlineFeature("ACC_CLOSE_RES", a?.cr ?? null, a?.cr != null, a?.crR ?? 0),
+    offlineFeature("ACC_LATE", a?.l ?? null, a?.l != null, a?.lR ?? 0),
+    offlineFeature("ACC_SPEED", a?.s ?? null, a?.s != null, a?.sR ?? 0),
+    offlineFeature("PS_front", paceObs ? front : null, paceObs, hR),
+    offlineFeature("PS_lone", paceObs ? lone : null, paceObs, hR),
+    offlineFeature("PS_closerFit", paceObs ? closerFit : null, paceObs, hR),
+  ];
+  const score = features.reduce((s, f) => s + f.contribution, 0);
+  offlineByRunner[r.runnerId] = { score, features, ad: r.atAdi ?? r.ad ?? "?", no: r.no };
+}
+
+const canli = await scoreV461(RACE_ID);
+if (!canli) throw new Error("scoreV461 null döndü");
+
+console.log(`\n=== PARITY TESTİ: ${RACE_ID} (${tar[RACE_ID]}) ===`);
+console.log(`Offline satır: ${offlineRows.length}, Canlı pick: ${canli.picks.length}`);
+if (canli.warnings.length) console.log("UYARILAR:", canli.warnings.join("; "));
+
+let toplamFarkSayisi = 0;
+let maxContribFark = 0;
+for (const pick of canli.picks) {
+  const off = offlineByRunner[pick.runnerId];
+  if (!off) { console.log(`\n⚠ ${pick.ad} (no ${pick.no}): offline veri yok, atlandı`); continue; }
+  console.log(`\n--- ${pick.ad} (no ${pick.no}) --- S_offline=${off.score.toFixed(5)} S_canli=${pick.score.toFixed(5)} diff=${(pick.score - off.score).toFixed(5)}`);
+  console.log("Sinyal".padEnd(20), "off.raw".padEnd(10), "live.raw".padEnd(10), "off.obs", "live.obs", "off.z".padEnd(9), "live.z".padEnd(9), "off.contrib".padEnd(11), "live.contrib".padEnd(11), "diff");
+  for (let i = 0; i < W.featureNames.length; i++) {
+    const ofeat = off.features[i];
+    const lfeat = pick.features[i];
+    const diff = Math.abs(ofeat.contribution - lfeat.contribution);
+    if (diff > maxContribFark) maxContribFark = diff;
+    const onemli = diff > 1e-4 || ofeat.observed !== lfeat.observed;
+    if (onemli) toplamFarkSayisi++;
+    const isaret = onemli ? " <<<< FARK" : "";
+    console.log(
+      ofeat.ad.padEnd(20),
+      String(ofeat.raw?.toFixed(3) ?? "null").padEnd(10),
+      String(lfeat.raw?.toFixed(3) ?? "null").padEnd(10),
+      String(ofeat.observed).padEnd(7),
+      String(lfeat.observed).padEnd(8),
+      ofeat.z.toFixed(4).padEnd(9),
+      lfeat.z.toFixed(4).padEnd(9),
+      ofeat.contribution.toFixed(5).padEnd(11),
+      lfeat.contribution.toFixed(5).padEnd(11),
+      diff.toFixed(5) + isaret,
+    );
+  }
+}
+console.log(`\n=== ÖZET: ${toplamFarkSayisi} önemli fark (>1e-4 veya observed uyuşmazlığı), max |contribution diff|=${maxContribFark.toFixed(6)} ===`);
+process.exit(0);

@@ -1,0 +1,1834 @@
+/**
+ * ROTAGANYAN Ã¢â‚¬â€ V5 ANALÃ„Â°Z MOTORU
+ * v5-engine.ts
+ *
+ * 2026-08-16 Ã¢â‚¬â€ kullanÃ„Â±cÃ„Â± kararÃ„Â±: V4'ÃƒÂ¼n mekanik "sinyal sayÃ„Â±mÃ„Â±" (8 boolean sinyalden kaÃƒÂ§Ã„Â±
+ * taÃ…Å¸Ã„Â±nÃ„Â±yor) sisteminin YERÃ„Â°NE geÃƒÂ§er. V4'ÃƒÂ¼n temel kÃ„Â±sÃ„Â±tÃ„Â±: bir at diÃ„Å¸erinden "daha gÃƒÂ¼ÃƒÂ§lÃƒÂ¼"
+ * ise (aynÃ„Â± sinyal sayÃ„Â±sÃ„Â±, ama biri sÃ„Â±nÃ„Â±rda diÃ„Å¸eri ÃƒÂ§ok ÃƒÂ¼stÃƒÂ¼nde) ikisini AYIRT EDEMÃ„Â°YORDU
+ * (bkz. GOLD POWER vakasÃ„Â±, DiyarbakÃ„Â±r 2.KoÃ…Å¸u). V5, tÃƒÂ¼m ham/sÃƒÂ¼rekli sinyalleri TEK bir
+ * koÃ…Å¸ullu logit (Plackett-Luce / yarÃ„Â±Ã…Å¸-gruplu softmax) modelinde birleÃ…Å¸tirir Ã¢â‚¬â€ atlarÃ„Â±
+ * doÃ„Å¸rudan KIYASLAR, eÃ…Å¸iklerle kutulamaz.
+ *
+ * DoÃ„Å¸rulama (bu oturumda yapÃ„Â±ldÃ„Â±, arac-model-veri-olustur.mts + arac-model-egit.mjs):
+ *  - 830 koÃ…Å¸u (2026-07-01 sonrasÃ„Â± Ã¢â‚¬â€ Rotaganyan'Ã„Â±n kendi AGF/galop takip altyapÃ„Â±sÃ„Â±nÃ„Â±n
+ *    baÃ…Å¸ladÃ„Â±Ã„Å¸Ã„Â± tarih, ÃƒÂ¶ncesi sistematik %0 kapsamalÃ„Â±), kronolojik 622 eÃ„Å¸itim/208 test.
+ *  - Test (gÃƒÂ¶rÃƒÂ¼lmemiÃ…Å¸ veri, 18 ÃƒÂ¶zellikli son eÃ„Å¸itim Ã¢â‚¬â€ 2026-08-19): top1=%38.0 (bootstrap
+ *    %95 GA %31.7-44.2), top3=%70.2 (GA %63.9-76.4) Ã¢â‚¬â€ V4'ÃƒÂ¼n AYNI dÃƒÂ¶nemde canlÃ„Â± ÃƒÂ§alÃ„Â±Ã…Å¸tÃ„Â±rÃ„Â±lan
+ *    top1=%24.2/top3=%55.1'ini net geÃƒÂ§iyor, GA'lar V4 rakamlarÃ„Â±nÃ„Â± iÃƒÂ§ermiyor.
+ *  - GerÃƒÂ§ek KÃƒâ€“R canlÃ„Â± test (2026-08-15, Ankara+Ã„Â°zmir+DiyarbakÃ„Â±r, 23 koÃ…Å¸u, sonuÃƒÂ§lara
+ *    bakÃ„Â±lmadan tahmin ÃƒÂ¼retildi): V5 top1=%30.4/top3=%60.9 vs V4 top1=%26.1/top3=%52.2 Ã¢â‚¬â€
+ *    tek gÃƒÂ¼nlÃƒÂ¼k ÃƒÂ¶rneklem kÃƒÂ¼ÃƒÂ§ÃƒÂ¼k ama yÃƒÂ¶n backtest'le tutarlÃ„Â±.
+ *  - "SÃ„Â±nÃ„Â±f geÃƒÂ§iÃ…Å¸i" (classToSkk farkÃ„Â±) sinyali 3 formÃƒÂ¼lasyonda test edildi, ÃƒÂ¼ÃƒÂ§ÃƒÂ¼ de
+ *    bootstrap CI'da sÃ„Â±fÃ„Â±rÃ„Â± iÃƒÂ§erdi Ã¢â‚¬â€ modele DAHÃ„Â°L EDÃ„Â°LMEDÃ„Â°. 2026-08-17: kacakAtMi ve
+ *    dususAmaIyiPozisyon eklenip 16Ã¢â€ â€™18 ÃƒÂ¶zelliÃ„Å¸e ÃƒÂ§Ã„Â±karÃ„Â±ldÃ„Â±.
+ *  - 2026-08-19 (BODUBEY/EL LEON vakalarÃ„Â±, V5.1): kapsamlÃ„Â± kalibrasyon denetiminde
+ *    zayÃ„Â±f-aygÃ„Â±rlÃ„Â±-AGF-favorisi grubunda model +5.1 puan hafife alÃ„Â±yordu. "agfFavorisiMi"
+ *    (yalnÃ„Â±z SIRA, #1 mi deÃ„Å¸il mi) ÃƒÂ§Ã„Â±karÃ„Â±ldÃ„Â±, yerine "agfPayi" (ham AGF yÃƒÂ¼zdesi) eklendi Ã¢â‚¬â€
+ *    18 ÃƒÂ¶zellik aynÃ„Â± kaldÃ„Â± (biri ÃƒÂ§Ã„Â±ktÃ„Â± biri girdi). Kalibrasyon farkÃ„Â± +5.1'den +1.2 puana
+ *    dÃƒÂ¼Ã…Å¸tÃƒÂ¼. "agfFarkiIkinciye" (2.'ye dominans farkÃ„Â±) de denendi, ilk testte anlamlÃ„Â±ydÃ„Â±
+ *    ama resmi eÃ„Å¸itimde SINIRDA ÃƒÂ§Ã„Â±ktÃ„Â± ve EL LEON vakasÃ„Â±nda (dominant favoriyi CEZALANDIRDI,
+ *    sezgiye aykÃ„Â±rÃ„Â±) gerÃƒÂ§ek zarar verdiÃ„Å¸i gÃƒÂ¶rÃƒÂ¼lÃƒÂ¼nce DAHÃ„Â°L EDÃ„Â°LMEDÃ„Â° Ã¢â‚¬â€ yalnÃ„Â±z agfPayi kaldÃ„Â±,
+ *    top1 %35.6Ã¢â€ â€™%38.0, top3 %66.8Ã¢â€ â€™%68.3, log-loss 1.7828Ã¢â€ â€™1.7695 iyileÃ…Å¸ti. AyrÃ„Â±ca %80+
+ *    tahmin diliminde aÃ…Å¸Ã„Â±rÃ„Â±-gÃƒÂ¼ven bulundu (n=78, tahmin %88.1 vs gerÃƒÂ§ek %67.9) Ã¢â‚¬â€
+ *    softmax'a KOÃ…ÂULLU sÃ„Â±caklÃ„Â±k ÃƒÂ¶lÃƒÂ§eklendirmesi eklendi (bkz. softmax fonksiyonu
+ *    ÃƒÂ¼stÃƒÂ¼ndeki not), top1/top3'ÃƒÂ¼ DEÃ„ÂÃ„Â°Ã…ÂTÃ„Â°RMEDEN yalnÃ„Â±z aÃ…Å¸Ã„Â±rÃ„Â±-uÃƒÂ§taki mutlak olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â±
+ *    yumuÃ…Å¸atÃ„Â±yor.
+ *  - 2026-08-19 (SHINNY vakasÃ„Â±): "dususAmaIyiPozisyon" (agfFark<=-1.0 VE agfSirasi<=4)
+ *    yalnÃ„Â±z ilk-4'teki dÃƒÂ¼Ã…Å¸ÃƒÂ¼Ã…Å¸leri sayÃ„Â±yordu Ã¢â‚¬â€ kullanÃ„Â±cÃ„Â±, AGF Trend panelinde ilk-4 DIÃ…ÂINDA
+ *    anlamlÃ„Â± dÃƒÂ¼Ã…Å¸ÃƒÂ¼Ã…Å¸ gÃƒÂ¶steren bir atÃ„Â±n modelde hiÃƒÂ§ yakalanmadÃ„Â±Ã„Å¸Ã„Â±nÃ„Â± fark etti. Pozisyon Ã…Å¸artÃ„Â±
+ *    kaldÃ„Â±rÃ„Â±lÃ„Â±p "agfDususVarMi" (agfFark<=-1.0, agfYukselisVarMi ile simetrik) olarak
+ *    yeniden test edildi Ã¢â‚¬â€ top1 aynÃ„Â± (%38.0), top3 %68.3Ã¢â€ â€™%70.2, log-loss 1.7695Ã¢â€ â€™1.7617
+ *    iyileÃ…Å¸ti, KABUL EDÃ„Â°LDÃ„Â°. Tam liste + gerekÃƒÂ§e yorumlarÃ„Â± toFeatureVector ÃƒÂ¼zerinde (bkz.
+ *    weights/v5-weights-diger.json featureNames).
+ *  - 2026-08-21 (MR TT vakasÃ„Â±, Ã„Â°stanbul K3): AGF'de sahadaki en bÃƒÂ¼yÃƒÂ¼k hareketi (+9.52
+ *    puan) yapan at, zayÃ„Â±f aygÃ„Â±r oranÃ„Â± (%8.5) yÃƒÂ¼zÃƒÂ¼nden model'de 6.sÃ„Â±raya dÃƒÂ¼Ã…Å¸mÃƒÂ¼Ã…Å¸tÃƒÂ¼ Ã¢â‚¬â€ 7 boy
+ *    farkla kazandÃ„Â±. Ã„Â°ki hipotez test edildi: (1) AGF hareketinin BÃƒÅ“YÃƒÅ“KLÃƒÅ“Ã„ÂÃƒÅ“NE gÃƒÂ¶re doÃ„Å¸rusal
+ *    aÃ„Å¸Ã„Â±rlÃ„Â±klandÃ„Â±rma (agfYukselisMiktari/agfDususMiktari, ikili eÃ…Å¸ik yerine) Ã¢â‚¬â€ anlamsÃ„Â±z
+ *    ÃƒÂ§Ã„Â±ktÃ„Â±, top1 kÃƒÂ¶tÃƒÂ¼leÃ…Å¸ti, REDDEDÃ„Â°LDÃ„Â° (2026-08-20). (2) "Sahadaki EN BÃƒÅ“YÃƒÅ“K hareketi bu at
+ *    mÃ„Â± yaptÃ„Â±" (kategorik, uÃƒÂ§-nokta sinyali) Ã¢â‚¬â€ nokta=-0.0458, GA=[-0.1352,0.0401], anlamsÃ„Â±z
+ *    (yÃƒÂ¶n bile ters), backtest top1 hafif kÃƒÂ¶tÃƒÂ¼leÃ…Å¸ti (%35.4Ã¢â€ â€™%34.9). Ã„Â°KÃ„Â°SÃ„Â° DE DAHÃ„Â°L EDÃ„Â°LMEDÃ„Â°.
+ *    sireOrani'nin baskÃ„Â±n aÃ„Å¸Ã„Â±rlÃ„Â±Ã„Å¸Ã„Â± (+0.61, modeldeki en bÃƒÂ¼yÃƒÂ¼k katsayÃ„Â±) hiÃƒÂ§bir AGF-hareket
+ *    formÃƒÂ¼lasyonuyla dengelenemedi Ã¢â‚¬â€ bu, tek bir n=1 sÃƒÂ¼rpriz galibiyet, ÃƒÂ¼ÃƒÂ§ÃƒÂ¼ncÃƒÂ¼ bir
+ *    hipotezle kovalanmadÃ„Â± (overfitting riski).
+ *  - 2026-08-21 (V5.2): sireOrani/jokeyOrani/antrenorOrani EÃ„ÂÃ„Â°TÃ„Â°M verisinde her zaman
+ *    GÃƒÅ“NCEL (bugÃƒÂ¼ne kadarki) tablodan okunuyordu Ã¢â‚¬â€ canlÃ„Â± tahmin iÃƒÂ§in doÃ„Å¸ru ama geÃƒÂ§miÃ…Å¸
+ *    eÃ„Å¸itim satÃ„Â±rlarÃ„Â± iÃƒÂ§in gerÃƒÂ§ek bir sÃ„Â±zÃ„Â±ntÃ„Â±ydÃ„Â±. sireOrani, kendi Runner/Result verimizden
+ *    yalnÃ„Â±z o koÃ…Å¸udan KESÃ„Â°NLÃ„Â°KLE ÃƒÂ¶nceki tarihli kayÃ„Â±tlarla hesaplanacak Ã…Å¸ekilde dÃƒÂ¼zeltildi
+ *    (jokeyOrani/antrenorOrani izole test iÃƒÂ§in TJK kaynaÃ„Å¸Ã„Â±na bÃ„Â±rakÃ„Â±ldÃ„Â±). sireOrani katsayÃ„Â±sÃ„Â±
+ *    +0.608'den +0.043'e (anlamsÃ„Â±z) dÃƒÂ¼Ã…Å¸tÃƒÂ¼ Ã¢â‚¬â€ eski %35.4/%71.6 test rakamlarÃ„Â± da AYNI
+ *    sÃ„Â±zÃ„Â±ntÃ„Â±dan Ã…Å¸iÃ…Å¸miÃ…Å¸ti, yeni %30.8/%66.7 daha dÃƒÂ¼rÃƒÂ¼st bir referans.
+ *  - 2026-08-21 (V5.3): kullanÃ„Â±cÃ„Â± kararÃ„Â± Ã¢â‚¬â€ sireOrani Ã…Å¸artlÃ„Â±1/19/27+maiden koÃ…Å¸ularÃ„Â±nda,
+ *    AGF trend diÃ„Å¸er koÃ…Å¸ularda aÃ„Å¸Ã„Â±rlÃ„Â±klÃ„Â± olmalÃ„Â±. Ã„Â°ki test (etkileÃ…Å¸im terimi + seyreltmesiz
+ *    ayrÃ„Â±-model) yÃƒÂ¶nÃƒÂ¼ doÃ„Å¸ruladÃ„Â± (dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art segmentte sireOrani nokta tahmini ~2 kat daha
+ *    yÃƒÂ¼ksek) ama istatistiksel anlamlÃ„Â±lÃ„Â±Ã„Å¸a ulaÃ…Å¸madÃ„Â± (n=240 dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art koÃ…Å¸usu, GA'lar geniÃ…Å¸)
+ *    Ã¢â‚¬â€ kullanÃ„Â±cÃ„Â± buna raÃ„Å¸men segment-bazlÃ„Â± MÃ„Â°MARÃ„Â°NÃ„Â°N canlÃ„Â±ya alÃ„Â±nmasÃ„Â±nÃ„Â± istedi. Motor artÃ„Â±k
+ *    TEK bir ortak aÃ„Å¸Ã„Â±rlÃ„Â±k yerine, koÃ…Å¸unun kategorisine (kategoriTespit) gÃƒÂ¶re Ã„Â°KÃ„Â° TAMAMEN
+ *    AYRI eÃ„Å¸itilmiÃ…Å¸ model arasÃ„Â±nda seÃƒÂ§im yapÃ„Â±yor (bkz. agirlikSetleriSec Ã¢â‚¬â€ 2026-08-26'dan
+ *    itibaren "Maiden/SatÃ„Â±Ã…Å¸" gibi karma koÃ…Å¸ularda Ã„Â°KÃ„Â°SÃ„Â°NÃ„Â° BÃ„Â°RDEN harmanlÃ„Â±yor, tekil seÃƒÂ§im
+ *    deÃ„Å¸il).
+ *  - 2026-08-21 (V5.3 devamÃ„Â± Ã¢â‚¬â€ MANUEL OVERRIDE): kullanÃ„Â±cÃ„Â±, segment-ÃƒÂ¶zel ayrÃ„Â± katsayÃ„Â±nÃ„Â±n
+ *    yetersiz olduÃ„Å¸unu belirtti Ã¢â‚¬â€ "ayrÃ„Â± katsayÃ„Â±" ile "EN GÃƒÅ“Ãƒâ€¡LÃƒÅ“ sinyal" aynÃ„Â± Ã…Å¸ey deÃ„Å¸il.
+ *    Veriden ÃƒÂ¶Ã„Å¸renilen dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art sireOrani katsayÃ„Â±sÃ„Â± (+0.064) zayÃ„Â±f kaldÃ„Â±Ã„Å¸Ã„Â± iÃƒÂ§in,
+ *    `v5-weights-dusuksart.json`'da sireOrani AÃ„ÂIRLIÃ„ÂI ELLE 0.65'e YÃƒÅ“KSELTÃ„Â°LDÃ„Â° (segmentteki
+ *    en bÃƒÂ¼yÃƒÂ¼k katsayÃ„Â±, agfSirasi'nin |0.40|'Ã„Â±ndan ve antrenorOrani'nin 0.36'sÃ„Â±ndan bÃƒÂ¼yÃƒÂ¼k).
+ *    BU DEÃ„ÂER VERÃ„Â°DEN Ãƒâ€“Ã„ÂRENÃ„Â°LMEDÃ„Â° Ã¢â‚¬â€ kullanÃ„Â±cÃ„Â± talimatÃ„Â±yla manuel enjekte edildi, istatistiksel
+ *    anlamlÃ„Â±lÃ„Â±k iddiasÃ„Â± YOK.
+ *  - 2026-08-21 (V5.3 devamÃ„Â± Ã¢â‚¬â€ Ã„Â°KÃ„Â°NCÃ„Â° MANUEL OVERRIDE): kullanÃ„Â±cÃ„Â± talimatÃ„Â± netleÃ…Å¸ti Ã¢â‚¬â€
+ *    dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art/maiden segmentinde Ãƒâ€“NCELÃ„Â°KLÃ„Â° sinyaller sireOrani VE AGF trend (ikisi
+ *    birlikte), "diÃ„Å¸er" segmentte YALNIZ AGF trend ÃƒÂ¶ncelikli, geri kalan sinyaller veriden
+ *    ÃƒÂ¶Ã„Å¸renilen (gerÃƒÂ§ek baÃ…Å¸arÃ„Â± oranÃ„Â±nÃ„Â± yansÃ„Â±tan) deÃ„Å¸erlerinde bÃ„Â±rakÃ„Â±lsÃ„Â±n. Bu yÃƒÂ¼zden:
+ *    `v5-weights-dusuksart.json`'da agfYukselisVarMi VE agfDususVarMi de ELLE 0.65'e
+ *    yÃƒÂ¼kseltildi (sireOrani ile eÃ…Å¸it, ÃƒÂ¼ÃƒÂ§ÃƒÂ¼ birlikte segmentin en bÃƒÂ¼yÃƒÂ¼k ÃƒÂ¼ÃƒÂ§ katsayÃ„Â±sÃ„Â±).
+ *    `v5-weights-diger.json`'da agfYukselisVarMi/agfDususVarMi ELLE 0.7'ye yÃƒÂ¼kseltildi
+ *    (agfSirasi'nin |0.51|'inden bÃƒÂ¼yÃƒÂ¼k, segmentin tek en bÃƒÂ¼yÃƒÂ¼k katsayÃ„Â±sÃ„Â±) Ã¢â‚¬â€ o segmentteki
+ *    DÃ„Â°Ã„ÂER 16 katsayÃ„Â±ya DOKUNULMADI, hÃƒÂ¢lÃƒÂ¢ veriden ÃƒÂ¶Ã„Å¸renilen (fitted) deÃ„Å¸erlerinde.
+ *  - 2026-08-21 (V5.3 devamÃ„Â± Ã¢â‚¬â€ DÃƒÅ“Ã…ÂÃƒÅ“K-Ã…ÂART OVERRIDE GERÃ„Â° ALINDI): kullanÃ„Â±cÃ„Â±, override'lÃ„Â±
+ *    dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art backtest'inin (top1 %33.3/top3 %63.3/logloss 2.14) FÃ„Â°T edilmiÃ…Å¸ hÃƒÂ¢lden
+ *    (top1 %33.3/top3 %70.0/logloss 1.8848) belirgin Ã…Å¸ekilde KÃƒâ€“TÃƒÅ“ olduÃ„Å¸unu gÃƒÂ¶rdÃƒÂ¼kten
+ *    sonra "en verimli sonucu ver" dedi. Ãƒâ€“lÃƒÂ§ÃƒÂ¼m: dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art TAMAMEN fit deÃ„Å¸erlerine
+ *    dÃƒÂ¶nÃƒÂ¼p, diÃ„Å¸er segment AGF-trend override'Ã„Â±nda (0.7/0.7) sabit kalÃ„Â±nca birleÃ…Å¸ik
+ *    top1 %30.8 (hedeflenenle birebir) / top3 %68.4 (hedeflenen %66.7'yi de geÃƒÂ§iyor)
+ *    ÃƒÂ§Ã„Â±ktÃ„Â± Ã¢â‚¬â€ bu en iyi ÃƒÂ¶lÃƒÂ§ÃƒÂ¼len kombinasyon. `v5-weights-dusuksart.json` bu yÃƒÂ¼zden
+ *    TAMAMEN orijinal (veriden fit edilmiÃ…Å¸, hiÃƒÂ§bir manuel override YOK) hÃƒÂ¢line
+ *    dÃƒÂ¶ndÃƒÂ¼rÃƒÂ¼ldÃƒÂ¼. `v5-weights-diger.json` DEÃ„ÂÃ„Â°Ã…ÂMEDÃ„Â° (AGF-trend override'Ã„Â± hÃƒÂ¢lÃƒÂ¢ geÃƒÂ§erli).
+ *    SonuÃƒÂ§: dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art/maiden segmentinde artÃ„Â±k sireOrani/AGF-trend/antrenorOrani iÃƒÂ§in
+ *    ÃƒÂ¶zel bir ÃƒÂ¶ncelik YOK Ã¢â‚¬â€ hepsi veriden ÃƒÂ¶Ã„Å¸renilen doÃ„Å¸al aÃ„Å¸Ã„Â±rlÃ„Â±Ã„Å¸Ã„Â±nda. "DiÃ„Å¸er" segmentte
+ *    AGF trend elle en bÃƒÂ¼yÃƒÂ¼k katsayÃ„Â± yapÃ„Â±lmÃ„Â±Ã…Å¸tÃ„Â± (0.7/0.7).
+ *  - 2026-08-21 (V5.3 devamÃ„Â± Ã¢â‚¬â€ "DÃ„Â°Ã„ÂER" AGF-TREND OVERRIDE'I DA GERÃ„Â° ALINDI, KAZARA+
+ *    DOÃ„ÂRULANDI): H2H eklenirken (aÃ…Å¸aÃ„Å¸Ã„Â±daki not) resmi eÃ„Å¸itim script'inin ÃƒÂ§Ã„Â±ktÃ„Â±sÃ„Â±
+ *    doÃ„Å¸rudan kopyalanmÃ„Â±Ã…Å¸tÃ„Â± Ã¢â‚¬â€ bu, "diÃ„Å¸er" segmentteki 0.7/0.7 override'Ã„Â±nÃ„Â± farkÃ„Â±nda
+ *    olmadan fit deÃ„Å¸erlerine (agfYukselisVarMi +0.081, agfDususVarMi +0.035) geri
+ *    dÃƒÂ¶ndÃƒÂ¼rdÃƒÂ¼. KullanÃ„Â±cÃ„Â±nÃ„Â±n "AGF trend'de en ÃƒÂ§ok yÃƒÂ¼kselen/dÃƒÂ¼Ã…Å¸en ne kadar kazanÃ„Â±yor"
+ *    araÃ…Å¸tÃ„Â±rma isteÃ„Å¸i sonrasÃ„Â± (yÃƒÂ¼kselenler %18.0 galibiyet, dÃƒÂ¼Ã…Å¸enler %13.8, kontrol
+ *    %10.3 Ã¢â‚¬â€ yÃƒÂ¼kseliÃ…Å¸ gerÃƒÂ§ekten daha gÃƒÂ¼ÃƒÂ§lÃƒÂ¼) bu asimetriyi ELLE de test ettik: eÃ…Å¸it
+ *    (0.7/0.7), oranlÃ„Â±-asimetrik (0.7/0.32, 0.5/0.22) ve saf fit Ã¢â‚¬â€ SAF FÃ„Â°T ÃƒÂ¼ÃƒÂ§ÃƒÂ¼nde de
+ *    (top1/top3/logloss) en iyi veya en iyilerden ÃƒÂ§Ã„Â±ktÃ„Â±, hiÃƒÂ§bir manuel versiyon onu
+ *    geÃƒÂ§emedi. Yani kazara oluÃ…Å¸an bu geri dÃƒÂ¶nÃƒÂ¼Ã…Å¸ aslÃ„Â±nda doÃ„Å¸ruymuÃ…Å¸ Ã¢â‚¬â€ KORUNDU, "diÃ„Å¸er"
+ *    segmentte AGF trend iÃƒÂ§in de artÃ„Â±k hiÃƒÂ§bir manuel override YOK.
+ *  - 2026-08-21 (V5.3 devamÃ„Â± Ã¢â‚¬â€ H2H eklendi, 18Ã¢â€ â€™19 ÃƒÂ¶zellik): kullanÃ„Â±cÃ„Â± talebiyle yeni
+ *    sinyal araÃ…Å¸tÃ„Â±rÃ„Â±ldÃ„Â±. H2H (baÃ…Å¸-baÃ…Å¸a geÃƒÂ§miÃ…Å¸ karÃ…Å¸Ã„Â±laÃ…Å¸ma) Ã¢â‚¬â€ V1-V22'de vardÃ„Â±, V5'in
+ *    yeniden inÃ…Å¸asÃ„Â±nda hiÃƒÂ§ dahil edilmemiÃ…Å¸ti. h2hNetSkor = bugÃƒÂ¼nkÃƒÂ¼ sahadaki rakiplerle
+ *    ortak geÃƒÂ§miÃ…Å¸ yarÃ„Â±Ã…Å¸larda net galibiyet farkÃ„Â± (getH2HForRace, leak-free Ã¢â‚¬â€ yalnÃ„Â±z
+ *    o koÃ…Å¸udan Ãƒâ€“NCEKÃ„Â° TJK kayÃ„Â±tlarÃ„Â±). B=200 bootstrap'ta sÃ„Â±nÃ„Â±rda (nokta=+0.0708,
+ *    GA=[-0.0105,0.1603]) ama backtest'te top1 %30.8Ã¢â€ â€™%31.6 VE top3 %66.7Ã¢â€ â€™%67.9 Ã„Â°KÃ„Â°SÃ„Â°
+ *    BÃ„Â°RDEN iyileÃ…Å¸ti (logloss ihmal edilebilir, +0.0016) Ã¢â‚¬â€ V5.1'in agfYukselisVarMi/
+ *    agfDususVarMi'yi kabul ettiÃ„Å¸i aynÃ„Â± standartla (sÃ„Â±nÃ„Â±rda + ÃƒÂ§ok metrik birden iyileÃ…Å¸me)
+ *    KABUL EDÃ„Â°LDÃ„Â°. Her iki segment aÃ„Å¸Ã„Â±rlÃ„Â±k dosyasÃ„Â±na da veriden fit edilerek eklendi
+ *    (manuel override DEÃ„ÂÃ„Â°L).
+ *  - 2026-08-24 (H2H SEGMENT-Ãƒâ€“ZEL DÃƒÅ“ZELTME): H2H bir ara komple ÃƒÂ§Ã„Â±karÃ„Â±lmÃ„Â±Ã…Å¸, sonra
+ *    kullanÃ„Â±cÃ„Â± "dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art'ta kullanma, diÃ„Å¸erinde kullan" dedi Ã¢â‚¬â€ mimari olarak doÃ„Å¸ru
+ *    ÃƒÂ§ÃƒÂ¶zÃƒÂ¼m. "DiÃ„Å¸er" segmentte katsayÃ„Â± tutarlÃ„Â± Ã…Å¸ekilde doÃ„Å¸ru yÃƒÂ¶nde (+0.099, gÃƒÂ¼ncel veriyle
+ *    de aynÃ„Â±) Ã¢â‚¬â€ MAKE A FIRE gibi atlar bundan gerÃƒÂ§ekten faydalanÃ„Â±yor. "DÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art"ta
+ *    katsayÃ„Â± hep ters yÃƒÂ¶nde (-0.152) ve hiÃƒÂ§bir zaman gÃƒÂ¼venilir anlamlÃ„Â± olmadÃ„Â± (kÃƒÂ¼ÃƒÂ§ÃƒÂ¼k
+ *    ÃƒÂ¶rneklem, n=180). Ortak toFeatureVector KORUNDU (h2hNetSkor hesaplanmaya devam
+ *    ediyor, kod deÃ„Å¸iÃ…Å¸medi) Ã¢â‚¬â€ yalnÃ„Â±z `v5-weights-dusuksart.json`'da h2hNetSkor katsayÃ„Â±sÃ„Â±
+ *    ELLE 0'a sabitlendi (o segmentte etkisiz hale getirildi), `v5-weights-diger.json`
+ *    DEÃ„ÂÃ„Â°Ã…ÂMEDÃ„Â° (veriden fit edilmiÃ…Å¸ +0.099 kaldÃ„Â±).
+ *
+ * AÃ„Å¸Ã„Â±rlÃ„Â±klar `weights/v5-weights-dusuksart.json` (Ã…Å¸artlÃ„Â±1/19/27+maiden) ve
+ * `weights/v5-weights-diger.json` (diÃ„Å¸er tÃƒÂ¼m koÃ…Å¸ular) altÃ„Â±nda AYRI AYRI COMMIT EDÃ„Â°LMÃ„Â°Ã…Â
+ * (production'da Vercel'in scratchpad'e eriÃ…Å¸imi yok) Ã¢â‚¬â€ yeniden eÃ„Å¸itim gerekirse
+ * arac-model-egit-segment.mjs ÃƒÂ§alÃ„Â±Ã…Å¸tÃ„Â±rÃ„Â±lÃ„Â±p ÃƒÂ§Ã„Â±ktÃ„Â±larÃ„Â± bu iki dosyaya kopyalanmalÃ„Â±.
+ */
+
+import { db } from "@/lib/db";
+import { getSonYarisDetaylariForRace } from "@/server/actions/son-yaris-detay.actions";
+import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
+import { getAgfTrendForRace } from "@/server/actions/agf-trend.actions";
+import { getH2HForRace } from "@/server/actions/h2h.actions";
+import { zeminDetayiBul, zeminDetayiSatirdanCikar, zeminKatsayisi } from "@/lib/methodology/mekanik-puanlama";
+import { getHizDerecesiForRace } from "@/server/actions/hiz-derecesi.actions";
+import { hesaplaZeminToleransiMap } from "@/server/actions/zemin-toleransi.actions";
+import { hesaplaZeminMesafeDeneyimiMap } from "@/server/actions/zemin-mesafe-deneyimi.actions";
+import { yakinsamaGecmisHesapla } from "@/lib/methodology/yakinsama-gecmis";
+import { surfaceToPist } from "@/lib/sire-stat-match";
+import { syncAgfForRace } from "@/server/services/agf-sync";
+import { getJockeyStats, getTrainerStats } from "@/server/services/race.service";
+import {
+  fetchAccuraceGecmisKayitlari,
+  hesaplaAccuraceSonYarisEnHizliKapanisMap,
+} from "@/lib/methodology/veri-toplama";
+import { galopQuality, isSameJockey, isSprintIdman } from "@/components/program/panels/galop-helpers";
+import { hesaplaYarisGidisati, type AtTempoProfili, type TekYarisStil } from "@/lib/methodology/pace-analizi";
+import { hesaplaTempoTasimaGucuMap } from "@/server/actions/tempo-tasima-gucu.actions";
+import type { PickDetailsV2, MuhakemeSatiri } from "@/lib/methodology/muhakeme-format";
+import { hesaplaSinyalSayisi, kategoriTespit } from "@/lib/methodology/v2-engine";
+import { AGF_TERFI_ILK3_SINYAL_ESIGI as SINYAL_ESIGI } from "@/lib/methodology/v4-engine";
+import v5WeightsDusukSart from "@/lib/methodology/weights/v5-weights-dusuksart.json";
+import v5WeightsDiger from "@/lib/methodology/weights/v5-weights-diger.json";
+import { ENGINE_VERSIONS } from "@/server/services/analiz-versiyon-karsilastirma.service";
+import { hesaplaAgfSirasi } from "./agf-sirasi";
+
+type AgirlikSeti = { featureNames: string[]; weights: number[]; means: number[]; stds: number[] };
+
+// 2026-08-21 (V5.3) kullanÃ„Â±cÃ„Â± kararÃ„Â±: sireOrani Ã…Å¸artlÃ„Â±1/19/27+maiden (kategoriTespit
+// "1a"/"1b") koÃ…Å¸ularÃ„Â±nda, AGF trend sinyalleri (agfYukselisVarMi/agfDususVarMi) diÃ„Å¸er
+// koÃ…Å¸ularda aÃ„Å¸Ã„Â±rlÃ„Â±klÃ„Â± olmalÃ„Â±. Ã„Â°ki ayrÃ„Â± test (ortak modelde etkileÃ…Å¸im terimi, VE seyreltmesiz
+// iki-ayrÃ„Â±-model) bu yÃƒÂ¶nÃƒÂ¼ doÃ„Å¸ruladÃ„Â± ama istatistiksel anlamlÃ„Â±lÃ„Â±Ã„Å¸a ulaÃ…Å¸madÃ„Â± (kÃƒÂ¼ÃƒÂ§ÃƒÂ¼k ÃƒÂ¶rneklem,
+// n=240 dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art koÃ…Å¸usu) Ã¢â‚¬â€ kullanÃ„Â±cÃ„Â± buna raÃ„Å¸men segment-bazlÃ„Â± iki-model mimarisinin
+// CANLIYA alÃ„Â±nmasÃ„Â±nÃ„Â± istedi (bkz. arac-model-egit-segment.mjs). Tek bir ortak aÃ„Å¸Ã„Â±rlÃ„Â±k
+// yerine, koÃ…Å¸unun kategorisine gÃƒÂ¶re Ã„Â°KÃ„Â° TAMAMEN AYRI eÃ„Å¸itilmiÃ…Å¸ model arasÃ„Â±nda seÃƒÂ§im yapÃ„Â±lÃ„Â±r.
+const WEIGHTS_DIGER = v5WeightsDiger as AgirlikSeti;
+const FEATURE_NAMES = WEIGHTS_DIGER.featureNames; // iki set de AYNI ÃƒÂ¶zellik/sÃ„Â±rayÃ„Â± kullanÃ„Â±r
+
+// 2026-08-21 kullanÃ„Â±cÃ„Â± ÃƒÂ¶nerisi ("H2H'Ã„Â± dÃƒÂ¼Ã…Å¸ÃƒÂ¼k segmentte kullanma diÃ„Å¸er segmentte
+// kullanÃ„Â±yosun"): h2hNetSkor'un dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art'taki katsayÃ„Â±sÃ„Â± ham/doÃ„Å¸al eÃ„Å¸itimde ters yÃƒÂ¶nlÃƒÂ¼
+// ve GA sÃ„Â±fÃ„Â±rÃ„Â± kapsÃ„Â±yordu (bkz. ENGINE_VERSIONS V5.7 notu) Ã¢â‚¬â€ elle 0'a sabitlendi, diÃ„Å¸er
+// segmentte doÃ„Å¸al fit (+0.0994 civarÃ„Â±) korundu.
+// 2026-08-27 kullanÃ„Â±cÃ„Â± denetimi ("handikapta hÃ„Â±zÃ„Â± neden 0'ladÃ„Â±k, H2H de mi") sÃ„Â±rasÃ„Â±nda
+// bulundu: bu override YALNIZ v5-weights-dusuksart.json dosyasÃ„Â±na ELLE yazÃ„Â±lmÃ„Â±Ã…Å¸tÃ„Â±, koda
+// gÃƒÂ¶mÃƒÂ¼lÃƒÂ¼ DEÃ„ÂÃ„Â°LDÃ„Â° Ã¢â‚¬â€ 2026-08-26'da kacakYalniz iÃƒÂ§in model yeniden eÃ„Å¸itilince (arac-model-
+// egit-segment.mjs, sÃ„Â±fÃ„Â±rdan gradient descent) bu manuel dÃƒÂ¼zeltme SESSÃ„Â°ZCE KAYBOLDU
+// (yeniden eÃ„Å¸itilen dosyada h2hNetSkor=-0.141 ÃƒÂ§Ã„Â±ktÃ„Â±, GA'sÃ„Â± hÃƒÂ¢lÃƒÂ¢ sÃ„Â±fÃ„Â±rÃ„Â± kapsÃ„Â±yor Ã¢â‚¬â€ aynÃ„Â±
+// gÃƒÂ¼venilmezlik, farklÃ„Â± ham deÃ„Å¸er). HIZ_DERECESI_IDX/WEIGHTS_DIGER_HANDIKAP ile AYNI
+// desende, artÃ„Â±k KODA gÃƒÂ¶mÃƒÂ¼lÃƒÂ¼ Ã¢â‚¬â€ bir daha retrain'de kaybolmaz.
+const H2H_NET_SKOR_IDX = FEATURE_NAMES.indexOf("h2hNetSkor");
+
+// 2026-09-12 (V5.46) Ã¢â‚¬â€ kgsVarMi/kacakYalniz/h2hKiloDegisimi toFeatureVector'DAN TAMAMEN
+// Ãƒâ€¡IKARILDI (17Ã¢â€ â€™13 ÃƒÂ¶zellik, takÃ„Â± birleÃ…Å¸imiyle birlikte Ã¢â‚¬â€ bkz. toFeatureVector notu).
+// kacakYalniz (V5.32) ve h2hKiloDegisimi (V5.30) zaten TÃƒÅ“M segmentlerde koda-gÃƒÂ¶mÃƒÂ¼lÃƒÂ¼ 0
+// katsayÃ„Â±yla skorlanÃ„Â±yordu (sÃ„Â±zÃ„Â±ntÃ„Â± bulgusu) Ã¢â‚¬â€ bir daha "belki geri alÃ„Â±nÃ„Â±r" diye ayrÃ„Â±
+// override sabitleri (H2H_KILO_IDX/KACAK_YALNIZ_IDX) taÃ…Å¸Ã„Â±manÃ„Â±n anlamÃ„Â± kalmadÃ„Â±, WEIGHTS_
+// DIGER_DUZELTILMIS katmanÃ„Â± bu yÃƒÂ¼zden TAMAMEN KALDIRILDI (artÃ„Â±k WEIGHTS_DIGER'dan farksÃ„Â±z).
+// kgsVarMi ise hiÃƒÂ§ override edilmemiÃ…Å¸ti ama gerÃƒÂ§ek etkisi ÃƒÂ¶lÃƒÂ§ÃƒÂ¼lemez kÃƒÂ¼ÃƒÂ§ÃƒÂ¼ktÃƒÂ¼ (B=500 testi,
+// Ãâ€top1/top3=0.00pp) Ã¢â‚¬â€ Sinyal Budama (V5.27) ile AYNI baraj: "eklemek iÃƒÂ§in kanÃ„Â±t gerekiyorsa
+// ÃƒÂ§Ã„Â±karmak iÃƒÂ§in de yalnÃ„Â±z etkisizlik kanÃ„Â±tÃ„Â± yeterli". Ham hesaplar (Faz1RunnerV5) HÃƒâ€šLÃƒâ€š
+// TOPLANIYOR (kgsVarMi ayrÃ„Â±ca terfi penceresi gÃƒÂ¶steriminde kullanÃ„Â±lÃ„Â±yor) Ã¢â‚¬â€ yalnÃ„Â±z skordan
+// ÃƒÂ§Ã„Â±ktÃ„Â±. Retrain: B=500 bootstrap FARK testi, 17Ã¢â€ â€™13 ÃƒÂ¶zellik, top1/top3 farkÃ„Â± "diÃ„Å¸er"de
+// BÃ„Â°REBÃ„Â°R 0.00pp (GA=[-1.26,1.26]/[-1.68,1.68]), dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art'ta yÃƒÂ¶n pozitif (anlamsÃ„Â±z,
+// logloss neredeyse anlamlÃ„Â± iyileÃ…Å¸me sÃ„Â±nÃ„Â±rÃ„Â±nda) Ã¢â‚¬â€ hiÃƒÂ§bir kayÃ„Â±p yok, model sadeleÃ…Å¸ti.
+const WEIGHTS_DUSUK_SART: AgirlikSeti = {
+  ...(v5WeightsDusukSart as AgirlikSeti),
+  weights: (v5WeightsDusukSart as AgirlikSeti).weights.map((w, i) => (i === H2H_NET_SKOR_IDX ? 0 : w)),
+};
+
+// 2026-08-24 kullanÃ„Â±cÃ„Â± bulgusu: Handikap (kategoriTespit==="2") yarÃ„Â±Ã…Å¸larÃ„Â± KENDÃ„Â° verisiyle
+// (267 koÃ…Å¸u, n=200 eÃ„Å¸itim/67 test) ayrÃ„Â± eÃ„Å¸itildiÃ„Å¸inde hizDerecesi'nin gerÃƒÂ§ek katkÃ„Â±sÃ„Â±
+// istatistiksel sÃ„Â±fÃ„Â±r ÃƒÂ§Ã„Â±ktÃ„Â± (nokta=-0.0177, %95 GA=[-0.2220, 0.1782] Ã¢â‚¬â€ sÃ„Â±fÃ„Â±rÃ„Â± kapsÃ„Â±yor,
+// B=50 bootstrap). Pooled "diÃ„Å¸er" modelin bu sinyale verdiÃ„Å¸i +0.2562 (3. en gÃƒÂ¼ÃƒÂ§lÃƒÂ¼ katsayÃ„Â±)
+// Handikap'ta yanlÃ„Â±Ã…Å¸ yÃƒÂ¶nlendiriyor. H2H/dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art dÃƒÂ¼zeltmesiyle AYNI cerrahi desen
+// uygulandÃ„Â±: yalnÃ„Â±z BU TEK sinyal Handikap'ta sÃ„Â±fÃ„Â±rlandÃ„Â±, diÃ„Å¸er 19 katsayÃ„Â±ya (ve means/
+// stds'e) dokunulmadÃ„Â± Ã¢â‚¬â€ tam kategori-ÃƒÂ¶zel retrain (n=267, overfit riskli, top1=%28.4/
+// top3=%64.2) yerine bu tercih edildi ÃƒÂ§ÃƒÂ¼nkÃƒÂ¼ AYNI 67 yarÃ„Â±Ã…Å¸lÃ„Â±k test setinde top1 hiÃƒÂ§
+// bozulmadan (%26.9Ã¢â€ â€™%26.9) top3 %62.7'den %67.2'ye ÃƒÂ§Ã„Â±ktÃ„Â± Ã¢â‚¬â€ tam retrain'den bile iyi,
+// hiÃƒÂ§ overfit riski yok (yalnÃ„Â±z 1 katsayÃ„Â± sÃ„Â±fÃ„Â±rlanÃ„Â±yor).
+const HIZ_DERECESI_IDX = FEATURE_NAMES.indexOf("hizDerecesi");
+// 2026-09-12 (V5.46) Ã¢â‚¬â€ WEIGHTS_DIGER_DUZELTILMIS katmanÃ„Â± KALDIRILDI: yalnÃ„Â±z h2hKiloDegisimi/
+// kacakYalniz'Ã„Â± sÃ„Â±fÃ„Â±rlamak iÃƒÂ§in vardÃ„Â±, ikisi de artÃ„Â±k toFeatureVector'dan tamamen ÃƒÂ§Ã„Â±ktÃ„Â±Ã„Å¸Ã„Â±
+// iÃƒÂ§in WEIGHTS_DIGER'dan farksÃ„Â±z hale geldi. WEIGHTS_DIGER_HANDIKAP artÃ„Â±k DOÃ„ÂRUDAN
+// WEIGHTS_DIGER ÃƒÂ¼zerine inÃ…Å¸a ediliyor.
+// 2026-08-31 (V5.31) Ã¢â‚¬â€ Opus'un V5.30-sonrasÃ„Â± tekrar denetimi: idmJokey Handikap'ta DÃƒâ€“RT
+// baÃ„Å¸Ã„Â±msÃ„Â±z ÃƒÂ¶lÃƒÂ§ÃƒÂ¼tte de ters/anlamsÃ„Â±z ÃƒÂ§Ã„Â±ktÃ„Â± Ã¢â‚¬â€ canlÃ„Â± model-dÃƒÂ¼zeltilmiÃ…Å¸ bakiye -5.93pp
+// (GA=[-10.34,-1.60], sÃ„Â±fÃ„Â±rÃ„Â± dÃ„Â±Ã…Å¸lÃ„Â±yor, n=107 kod-lift -4.2pp ile aynÃ„Â± yÃƒÂ¶nde); ÃƒÂ¼retim-sadÃ„Â±k
+// katsayÃ„Â± kaymasÃ„Â± (canlÃ„Â± %75 fit Ã¢â€ â€™ tÃƒÂ¼m veri) 0.1033Ã¢â€ â€™0.0266 (GA=[-0.041,0.125], artÃ„Â±k
+// anlamsÃ„Â±z) Ã¢â‚¬â€ 12 sinyalin en bÃƒÂ¼yÃƒÂ¼k kaymasÃ„Â±; gÃƒÂ¶rÃƒÂ¼lmemiÃ…Å¸ son %25 (n=76) ÃƒÂ¼zerinde sÃ„Â±fÃ„Â±rlarsa
+// top1 +3.95pp/top3 +2.63pp/logloss -0.0306, hepsi anlamlÃ„Â± iyileÃ…Å¸me. DÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art'ta TERSÃ„Â°:
+// katsayÃ„Â± +0.2140 GA=[0.102,0.372] saÃ„Å¸lam pozitif, sÃ„Â±fÃ„Â±rlamak logloss'u anlamlÃ„Â± kÃƒÂ¶tÃƒÂ¼leÃ…Å¸tiriyor
+// Ã¢â‚¬â€ orasÃ„Â± KORUNDU. HIZ_DERECESI_IDX/V5.10 ile BÃ„Â°REBÃ„Â°R aynÃ„Â± cerrahi desen: yalnÃ„Â±z Handikap'ta
+// bu tek katsayÃ„Â± sÃ„Â±fÃ„Â±rlandÃ„Â±.
+const IDM_JOKEY_IDX = FEATURE_NAMES.indexOf("idmJokey");
+// 2026-09-01 Ã¢â‚¬â€ YAKINSAMA_IDX: bkz. Faz1RunnerV5.yakinsama2Plus ÃƒÂ¼stÃƒÂ¼ndeki not (MEGAFAUNA
+// vakasÃ„Â±, kural istisnasÃ„Â±). GerekÃƒÂ§e metninde diÃ„Å¸er override'lÃ„Â± sinyallerle (HIZ/KACAK/
+// IDMJOK) AYNI desen: ham boolean'a deÃ„Å¸il gerÃƒÂ§ek katkÃ„Â±ya (r.katkilar) bakÃ„Â±lÃ„Â±yor.
+const YAKINSAMA_IDX = FEATURE_NAMES.indexOf("yakinsama2Plus");
+// 2026-09-01 Ã¢â‚¬â€ SON_IDMAN_SPRINT_IDX: kullanÃ„Â±cÃ„Â± talebi (ESENYIL vakasÃ„Â±), B-katmanÃ„Â± kural
+// istisnasÃ„Â±. Backtest (n=9148, leak-free) yÃƒÂ¶nÃƒÂ¼ DOÃ„ÂRULAMADI (nokta tahmini hafif negatif,
+// GA sÃ„Â±fÃ„Â±rÃ„Â± kapsÃ„Â±yor) Ã¢â‚¬â€ GERÃƒâ€¡EK fit edilen katsayÃ„Â± kullanÃ„Â±lÃ„Â±yor, elle pozitif yapÃ„Â±lmadÃ„Â±.
+const SON_IDMAN_SPRINT_IDX = FEATURE_NAMES.indexOf("sonIdmanSprint");
+// 2026-09-01 Ã¢â‚¬â€ TAKI_DEGISIKLIGI_IDX: kullanÃ„Â±cÃ„Â± talebi (KIZIM BÃ„Â°NDAL vakasÃ„Â±, "adam takÃ„Â±
+// ÃƒÂ§Ã„Â±karmayÃ„Â± sinyal olarak gÃƒÂ¶rmÃƒÂ¼Ã…Å¸, DB/KG/K gibi takÃ„Â±lar ÃƒÂ¶nemli"). B-katmanÃ„Â± kural istisnasÃ„Â±
+// Ã¢â‚¬â€ GERÃƒâ€¡EK fit edilen katsayÃ„Â± kullanÃ„Â±lÃ„Â±yor, elle yÃƒÂ¶n verilmedi. 2026-09-12 (V5.46): eskiden
+// Ã„Â°KÃ„Â° ayrÃ„Â± ÃƒÂ¶zellikti (takiEklendiMi/takiCikarildiMi, ikisi de anlamsÃ„Â±z, GA'larÃ„Â± geniÃ…Å¸) Ã¢â‚¬â€
+// kullanÃ„Â±cÃ„Â± kararÃ„Â±yla TEK sinyale birleÃ…Å¸tirildi: takiCikarildiMi-takiEklendiMi (+1=yalnÃ„Â±z
+// ÃƒÂ§Ã„Â±karÃ„Â±lmÃ„Â±Ã…Å¸, -1=yalnÃ„Â±z eklenmiÃ…Å¸, 0=deÃ„Å¸iÃ…Å¸iklik yok VEYA ikisi birden). Ham iki alan
+// (Faz1RunnerV5) hÃƒÂ¢lÃƒÂ¢ ayrÃ„Â± ayrÃ„Â± tutuluyor (Son YarÃ„Â±Ã…Å¸ DetaylarÃ„Â± gÃƒÂ¶sterimi iÃƒÂ§in), yalnÃ„Â±z
+// skora TEK terim olarak giriyor.
+const TAKI_DEGISIKLIGI_IDX = FEATURE_NAMES.indexOf("takiDegisikligi");
+// 2026-09-01 Ã¢â‚¬â€ YARIS_GIDISATI_IDX: kullanÃ„Â±cÃ„Â± tasarÃ„Â±mÃ„Â± ("YarÃ„Â±Ã…Å¸ GidiÃ…Å¸atÃ„Â±") Ã¢â‚¬â€ bkz.
+// Faz1RunnerV5.yarisGidisatiSkoru ÃƒÂ¼stÃƒÂ¼ndeki not. SÃ„Â±nÃ„Â±rda/run-to-run deÃ„Å¸iÃ…Å¸ken sonuÃƒÂ§la
+// eklendi, aynÃ„Â± gÃƒÂ¼n kullanÃ„Â±cÃ„Â± kararÃ„Â±yla A-katmanÃ„Â±na taÃ…Å¸Ã„Â±ndÃ„Â± (sinyal-kutugu.service.ts).
+// GERÃƒâ€¡EK fit edilen katsayÃ„Â± kullanÃ„Â±lÃ„Â±yor, elle yÃƒÂ¶n verilmedi.
+const YARIS_GIDISATI_IDX = FEATURE_NAMES.indexOf("yarisGidisatiSkoru");
+// 2026-09-11 (Opus B=500 denetimi, kullanÃ„Â±cÃ„Â± kararÃ„Â±yla uygulandÃ„Â±) Ã¢â‚¬â€ HIZ_DERECESI_IDX/V5.10
+// ve IDM_JOKEY_IDX/V5.31 ile BÃ„Â°REBÃ„Â°R AYNI cerrahi desen: YarÃ„Â±Ã…Å¸ GidiÃ…Å¸atÃ„Â±, Handikap DIÃ…ÂINDA
+// (585 koÃ…Å¸u) kesin anlamlÃ„Â± (+0.1698, %95 GA=[0.0596,0.2775], P(>0)=%100), Handikap Ã„Â°Ãƒâ€¡Ã„Â°NDE
+// (366 koÃ…Å¸u) ters/anlamsÃ„Â±z (-0.0295, GA=[-0.168,0.104], P(>0)=%35) Ã¢â‚¬â€ havuzlanmÃ„Â±Ã…Å¸ "diÃ„Å¸er"
+// katsayÃ„Â±sÃ„Â±nÃ„Â±n sÃƒÂ¼rekli bÃ„Â±ÃƒÂ§ak sÃ„Â±rtÃ„Â±nda (GA=[0.0003,0.1714]) ÃƒÂ§Ã„Â±kmasÃ„Â±nÃ„Â±n sebebi Handikap'Ã„Â±n
+// sinyali seyreltmesiydi. YalnÃ„Â±z BU TEK katsayÃ„Â± Handikap'ta sÃ„Â±fÃ„Â±rlandÃ„Â±, diÃ„Å¸erlerine
+// dokunulmadÃ„Â±.
+const WEIGHTS_DIGER_HANDIKAP: AgirlikSeti = {
+  ...WEIGHTS_DIGER,
+  weights: WEIGHTS_DIGER.weights.map((w, i) => (i === HIZ_DERECESI_IDX || i === IDM_JOKEY_IDX || i === YARIS_GIDISATI_IDX ? 0 : w)),
+};
+
+// 2026-08-29 Ã¢â‚¬â€ V6 AÃ…Å¸ama 2 (bkz. plan): "market-blind" skor iÃƒÂ§in AGF-tÃƒÂ¼revi ÃƒÂ¶zelliklerin
+// katkÃ„Â±sÃ„Â±nÃ„Â± (katkilar dizisinden) ÃƒÂ§Ã„Â±karmakta kullanÃ„Â±lan indeksler Ã¢â‚¬â€ OZELLIK_GRUPLARI'ndeki
+// "AGF" grubuyla (aÃ…Å¸aÃ„Å¸Ã„Â±da) BÃ„Â°REBÃ„Â°R aynÃ„Â± ÃƒÂ¼ÃƒÂ§ ÃƒÂ¶zellik, ayrÃ„Â± bir sabitte tutuluyor ÃƒÂ§ÃƒÂ¼nkÃƒÂ¼ o grup
+// bu noktada henÃƒÂ¼z tanÃ„Â±mlÃ„Â± deÃ„Å¸il (dosyanÃ„Â±n altÃ„Â±nda).
+export const AGF_KATKI_INDEKSLERI = [
+  FEATURE_NAMES.indexOf("agfSirasi"),
+  FEATURE_NAMES.indexOf("agfPayi"),
+  FEATURE_NAMES.indexOf("agfPayi2"),
+];
+
+// 2026-08-27: CURRENT_ENGINE_LABEL artÃ„Â±k client-safe v5-engine-label.ts'te (bu dosya db
+// import ettiÃ„Å¸i iÃƒÂ§in client bileÃ…Å¸enlerinden doÃ„Å¸rudan import edilemiyordu) Ã¢â‚¬â€ buradan
+// re-export ediliyor, mevcut importlar (test-v5-engine/route.ts vb.) DEÃ„ÂÃ„Â°Ã…ÂMEDÃ„Â°.
+export { CURRENT_ENGINE_LABEL } from "@/lib/methodology/v5-engine-label";
+
+// 2026-08-26 kullanÃ„Â±cÃ„Â± talebi: "Maiden/SatÃ„Â±Ã…Å¸" gibi karma koÃ…Å¸u tipleri, kategoriTespit'in
+// MAIDEN'Ã„Â± ÃƒÂ¶nce yakalayan regex'i yÃƒÂ¼zÃƒÂ¼nden SADECE dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art (Maiden) modeliyle
+// puanlanÃ„Â±yordu Ã¢â‚¬â€ SatÃ„Â±Ã…Å¸'a ÃƒÂ¶zgÃƒÂ¼ hiÃƒÂ§bir katkÃ„Â± yoktu (kategoriTespit tek bir kategori kodu
+// dÃƒÂ¶ndÃƒÂ¼rÃƒÂ¼yor, "SATIÃ…Â N" biÃƒÂ§imi zaten "diÃ„Å¸er" segmentinin bir parÃƒÂ§asÃ„Â±, ayrÃ„Â± bir SatÃ„Â±Ã…Å¸
+// modeli hiÃƒÂ§ var olmadÃ„Â±). KullanÃ„Â±cÃ„Â± bu iki grubun kurallarÃ„Â±nÃ„Â±n AYRI AYRI, birlikte
+// uygulanmasÃ„Â±nÃ„Â± istedi. Not: n=14 (yalnÃ„Â±z "Maiden/SatÃ„Â±Ã…Å¸"+"Maiden/SatÃ„Â±Ã…Å¸/DHÃƒâ€“W") Ã¢â‚¬â€ bu
+// spesifik harmanlamayÃ„Â± kendi baÃ…Å¸Ã„Â±na doÃ„Å¸rulayacak kadar veri yok, iki tarafÃ„Â±n da (dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-
+// Ã…Å¸art n=254, diÃ„Å¸er n=737) ayrÃ„Â± ayrÃ„Â± zaten test edilmiÃ…Å¸ modelini eÃ…Å¸it aÃ„Å¸Ã„Â±rlÃ„Â±kla
+// ortalamak yapÃ„Â±sal/temkinli bir tercih, istatistiksel olarak KANITLANMIÃ…Â deÃ„Å¸il.
+export function hibritMaidenSatisMi(classType: string): boolean {
+  const t = classType.toUpperCase();
+  const maidenMi = /MAIDEN|[Ã…ÂS]ARTLI\s*19\b/.test(t);
+  const satisMi = /SAT(?:IÃ…Â|IS)/.test(t);
+  return maidenMi && satisMi;
+}
+
+function agirlikSetleriSec(classType: string): AgirlikSeti[] {
+  if (hibritMaidenSatisMi(classType)) return [WEIGHTS_DUSUK_SART, WEIGHTS_DIGER];
+  const kategori = kategoriTespit(classType);
+  if (kategori === "1a" || kategori === "1b") return [WEIGHTS_DUSUK_SART];
+  if (kategori === "2") return [WEIGHTS_DIGER_HANDIKAP];
+  return [WEIGHTS_DIGER];
+}
+
+/** Bir at iÃƒÂ§in, verilen aÃ„Å¸Ã„Â±rlÃ„Â±k setleri ÃƒÂ¼zerinden ortalama (standardize edilmiÃ…Å¸ vektÃƒÂ¶r,
+ *  katkÃ„Â±lar, toplam skor) Ã¢â‚¬â€ tek set varsa harmanlama etkisizdir, aynen ÃƒÂ¶nceki davranÃ„Â±Ã…Å¸. */
+function harmanliSkorla(v: number[], setler: AgirlikSeti[]): { skor: number; standartVektor: number[]; katkilar: number[] } {
+  const n = v.length;
+  const standartToplam = new Array(n).fill(0);
+  const katkiToplam = new Array(n).fill(0);
+  for (const ws of setler) {
+    const sv = standardize(v, ws);
+    for (let j = 0; j < n; j++) {
+      standartToplam[j] += sv[j] / setler.length;
+      katkiToplam[j] += (sv[j] * ws.weights[j]) / setler.length;
+    }
+  }
+  const skor = katkiToplam.reduce((a, b) => a + b, 0);
+  return { skor, standartVektor: standartToplam, katkilar: katkiToplam };
+}
+
+function shrink(wins: number, rides: number, populasyonOrt: number, k = 20): number {
+  return (wins + k * populasyonOrt) / (rides + k);
+}
+
+function formEgimi(recentForm: string | null): number {
+  if (!recentForm) return 0;
+  const chars = recentForm.split("").filter((c) => /[\dK]/i.test(c));
+  const nums = chars.map((c) => (c.toUpperCase() === "K" ? 12 : parseInt(c, 10)));
+  if (nums.length < 2) return 0;
+  const enYakin = nums[nums.length - 1];
+  const referans = nums[Math.max(0, nums.length - 4)];
+  return (enYakin - referans) / 2;
+}
+
+export type Faz1RunnerV5 = {
+  id: string;
+  no: number;
+  ad: string;
+  jockey: string | null;
+  trainer: string | null;
+  /** 2026-09-02 kullanÃ„Â±cÃ„Â± bulgusu (THEATER OF WAR/K6 Ã¢â‚¬â€ JAEHAERA+DAELLA ekÃƒÂ¼ri, 1. ve 4.
+   *  sÃ„Â±rada, birbirinden baÃ„Å¸Ã„Â±msÃ„Â±z iki "slot" tÃƒÂ¼ketiyordu): terfi pencerelerinin (bkz.
+   *  efektifPencereSiniri) ekÃƒÂ¼ri-farkÃ„Â±nda olmasÃ„Â± iÃƒÂ§in taÃ…Å¸Ã„Â±nÃ„Â±yor Ã¢â‚¬â€ agfSirasi'nin ekÃƒÂ¼ri
+   *  ortaklarÃ„Â±nÃ„Â± AYNI sÃ„Â±raya koyma mantÃ„Â±Ã„Å¸Ã„Â±yla (yukarÃ„Â±daki 2026-08-30 notu) AYNI ilke,
+   *  farklÃ„Â± bir uygulama noktasÃ„Â±. Skora/regresyona GÃ„Â°RMEZ. */
+  ekuriGroup: number | null;
+  agf: number | null;
+  agfFark: number;
+  agfSirasi: number;
+  accurace: 0 | 1;
+  formEgimi: number;
+  kgs: number;
+  kgsVarMi: 0 | 1;
+  pistUzmani: 0 | 1;
+  /** 2026-09-01 kullanÃ„Â±cÃ„Â± kararÃ„Â± Ã¢â‚¬â€ MEGAFAUNA vakasÃ„Â± (model 8./%4 verdi, at kazandÃ„Â±):
+   *  pistUzmani + sahada ilk-2 pedigri (sireOrani) + at-jokey ikilisinde geÃƒÂ§miÃ…Å¸
+   *  galibiyet + AGF eÃ…Å¸ik-ÃƒÂ¼stÃƒÂ¼ yÃƒÂ¼kseliÃ…Å¸ + sÃ„Â±nÃ„Â±f dÃƒÂ¼Ã…Å¸ÃƒÂ¼Ã…Å¸ÃƒÂ¼nÃƒÂ¼n EN AZ 2'sinin AYNI ATTA
+   *  hizalanmasÃ„Â±. B=500 bootstrap'ta Ã„Â°KÃ„Â° segmentte de anlamsÃ„Â±z ÃƒÂ§Ã„Â±ktÃ„Â± (nokta=0.03-0.04,
+   *  GA sÃ„Â±fÃ„Â±rÃ„Â± iÃƒÂ§eriyor Ã¢â‚¬â€ bkz. sinyal-kutugu.service.ts ADAY_SÃ„Â°NYALLER) Ã¢â‚¬â€ zeminToleransi/
+   *  sireOrani ile AYNI tÃƒÂ¼rden BÃ„Â°LÃ„Â°NÃƒâ€¡LÃ„Â° istisna, kullanÃ„Â±cÃ„Â± kararÃ„Â±yla eklendi. */
+  yakinsama2Plus: 0 | 1;
+  /** Son idman TÃƒÅ“RÃƒÅ“ (TJK Gallop.track) Sprint/SÃƒÂ¼rat mi Ã¢â‚¬â€ kullanÃ„Â±cÃ„Â± kararÃ„Â±yla eklenen B-katmanÃ„Â±
+   *  kural istisnasÃ„Â± (bkz. yukarÃ„Â±daki toFeatureVector ÃƒÂ¼stÃƒÂ¼ not, backtest yÃƒÂ¶nÃƒÂ¼ doÃ„Å¸rulamadÃ„Â±). */
+  sonIdmanSprint: 0 | 1;
+  /** 2026-10-07 (V5.46.1) Ã¢â‚¬â€ sonIdmanSprint'in gÃƒÂ¶zlemli mi (son idman verisi var mÃ„Â±) bayraÃ„Å¸Ã„Â±.
+   *  V5.46'nÃ„Â±n kendi skoruna GÃ„Â°RMEZ, yalnÃ„Â±z V5.46.1'in missingÃ¢â€°Â 0 sÃƒÂ¶zleÃ…Å¸mesi iÃƒÂ§in eklendi. */
+  sonIdmanSprintGozlemli: boolean;
+  /** Son yarÃ„Â±Ã…Å¸Ã„Â±na gÃƒÂ¶re takÃ„Â± deÃ„Å¸iÃ…Å¸ikliÃ„Å¸i (SonYarisDetay.eklenenTaki/cikarilanTaki) Ã¢â‚¬â€ kullanÃ„Â±cÃ„Â±
+   *  kararÃ„Â±yla eklenen B-katmanÃ„Â± kural istisnasÃ„Â± (bkz. yukarÃ„Â±daki not, KIZIM BÃ„Â°NDAL vakasÃ„Â±). */
+  takiEklendiMi: 0 | 1;
+  takiCikarildiMi: 0 | 1;
+  sireOrani: number;
+  galop: 0 | 1;
+  idmJokey: 0 | 1;
+  galopSayisi: number;
+  uzunAraGalopKatkisi: number;
+  jokeyOrani: number;
+  antrenorOrani: number;
+  /** "En ÃƒÂ§ok yÃƒÂ¼kselenler/dÃƒÂ¼Ã…Å¸enler" listesinden (getAgfTrendForRace) Ã¢â‚¬â€ modelin kendisi
+   *  agfFark'Ã„Â± (bkz. toFeatureVector) istatistiksel olarak anlamsÃ„Â±z bulsa da (agfSirasi
+   *  ile yÃƒÂ¼ksek korelasyon/multicollinearity yÃƒÂ¼zÃƒÂ¼nden), kullanÃ„Â±cÃ„Â± kararÃ„Â± 2026-08-16:
+   *  piyasa hareketi gerekÃƒÂ§e metninde HER ZAMAN ÃƒÂ¶n planda gÃƒÂ¶sterilsin Ã¢â‚¬â€ V4'ÃƒÂ¼n kendi
+   *  backtest'i bu sinyalin gerÃƒÂ§ek olduÃ„Å¸unu kanÃ„Â±tlamÃ„Â±Ã…Å¸tÃ„Â± (trend+4sinyal: n=663,
+   *  %21.6 galibiyet/%53.8 top3, kontrol %10.2/%30.7). Skoru/olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â± DEÃ„ÂÃ„Â°Ã…ÂTÃ„Â°RMEZ,
+   *  yalnÃ„Â±z gerekÃƒÂ§e metninin sÃ„Â±rasÃ„Â±nÃ„Â± etkiler. */
+  agfTrendYonu: "yÃƒÂ¼kseliÃ…Å¸" | "dÃƒÂ¼Ã…Å¸ÃƒÂ¼Ã…Å¸" | null;
+  agfTrendFark: number | null;
+  /** V4'ÃƒÂ¼n 8-sinyal sayÃ„Â±mÃ„Â±yla (hesaplaSinyalSayisi) uyumlu ham alanlar Ã¢â‚¬â€ SADECE terfi
+   *  kapÃ„Â±sÃ„Â± iÃƒÂ§in (bkz. AGF_TERFI_ILK3_SINYAL_ESIGI), regresyon skoruna girmez. */
+  recentForm: string | null;
+  hipodromMesafedeKazandi: "EVET" | "HAYIR" | "KOSMADI";
+  sireKazanmaOraniHam: number | null;
+  sireOrneklemKendiVeri: number | null;
+  /** 2026-08-16 kullanÃ„Â±cÃ„Â± talebi (sektÃƒÂ¶r araÃ…Å¸tÃ„Â±rmasÃ„Â±) Ã¢â‚¬â€ Runner.raceStyle (Accurace
+   *  tabanlÃ„Â±, style: "KACAK_AT"|...) Ã¢â‚¬â€ kapÃ„Â± no/kilo farkÃ„Â±/HP farkÃ„Â± AYNI ANDA test
+   *  edildi, ÃƒÂ¼ÃƒÂ§ÃƒÂ¼ de anlamsÃ„Â±z ÃƒÂ§Ã„Â±ktÃ„Â±; yalnÃ„Â±z bu anlamlÃ„Â± (+0.0878, GA [0.0290,0.1811]).
+   *  2026-08-26: bu tek-parÃƒÂ§a sinyal RAKÃ„Â°PSÃ„Â°Z (kacakYalniz, gerÃƒÂ§ek avantaj) ve RAKÃ„Â°PLÃ„Â°
+   *  (avantaj yok) olarak ikiye ayrÃ„Â±ldÃ„Â± Ã¢â‚¬â€ bkz. gatherFaz1V5'teki kacakSayisiSahada notu. */
+  kacakYalniz: 0 | 1;
+  /** 2026-08-19 kullanÃ„Â±cÃ„Â± bulgusu (BODUBEY/EL LEON vakalarÃ„Â±): agfSirasi/agfFavorisiMi
+   *  yalnÃ„Â±z SIRAYI yakalÃ„Â±yordu, AGF payÃ„Â±nÃ„Â±n BÃƒÅ“YÃƒÅ“KLÃƒÅ“Ã„ÂÃƒÅ“NÃƒÅ“ deÃ„Å¸il (LEJUR'un %47'si ile
+   *  EL LEON'un %22'si aynÃ„Â± "favori" etiketini alÃ„Â±yordu). KapsamlÃ„Â± kalibrasyon denetiminde
+   *  zayÃ„Â±f-aygÃ„Â±rlÃ„Â±-favori grubunda modelin sistematik olarak hafife aldÃ„Â±Ã„Å¸Ã„Â± (+5.1 puan
+   *  kalibrasyon farkÃ„Â±) bulundu Ã¢â‚¬â€ ÃƒÂ¼ÃƒÂ§ ayrÃ„Â± dÃƒÂ¼zeltme denemesi (aygÃ„Â±rÃƒâ€”AGF etkileÃ…Å¸imi, kare
+   *  terimler, L2 gevÃ…Å¸etme) baÃ…Å¸arÃ„Â±sÃ„Â±z oldu. Ham AGF payÃ„Â± ayrÃ„Â± ÃƒÂ¶zellik olarak eklenince
+   *  (agfPayi: +0.4578, Ãƒâ€¡OK anlamlÃ„Â±, GA[0.2095,0.6566]) kalibrasyon farkÃ„Â± +5.1'den
+   *  +1.2 puana dÃƒÂ¼Ã…Å¸tÃƒÂ¼, test top1/top3/logloss ÃƒÅ“Ãƒâ€¡ÃƒÅ“ BÃ„Â°RDEN iyileÃ…Å¸ti (bkz. arac-model-egit.mjs
+   *  ÃƒÂ¼stÃƒÂ¼ndeki not). agfFavorisiMi bu yÃƒÂ¼zden ARTIK GEREKSÃ„Â°Z hale geldi, modelden ÃƒÂ§Ã„Â±karÃ„Â±ldÃ„Â±. */
+  agfPayi: number;
+  /** Sahadaki 2. sÃ„Â±radaki ata gÃƒÂ¶re AGF dominans farkÃ„Â± Ã¢â‚¬â€ yalnÃ„Â±z AGF favorisi (1. sÃ„Â±rada
+   *  olan) at iÃƒÂ§in sÃ„Â±fÃ„Â±rdan farklÃ„Â±, diÃ„Å¸erlerinde 0. "Ne kadar EZÃ„Â°CÃ„Â° favori" sorusunu
+   *  agfPayi'den baÃ„Å¸Ã„Â±msÃ„Â±z ayrÃ„Â±ca ÃƒÂ¶lÃƒÂ§mek iÃƒÂ§in eklenmiÃ…Å¸ti, ilk testte anlamlÃ„Â±ydÃ„Â± ama resmi
+   *  eÃ„Å¸itimde SINIRDA ÃƒÂ§Ã„Â±ktÃ„Â± (GA=[-0.2370, 0.0018]). 2026-08-19 EL LEON vakasÃ„Â±nda (ElazÃ„Â±Ã„Å¸
+   *  K3) gerÃƒÂ§ek zararÃ„Â± gÃƒÂ¶rÃƒÂ¼ldÃƒÂ¼: en yakÃ„Â±n rakibinden 4.27 puan ÃƒÂ¶nde olmasÃ„Â±na raÃ„Å¸men
+   *  (dominant favori Ã¢â‚¬â€ sezgisel olarak Ã„Â°YÃ„Â° bir Ã…Å¸ey) negatif katsayÃ„Â± yÃƒÂ¼zÃƒÂ¼nden CEZA aldÃ„Â±.
+   *  toFeatureVector'DAN Ãƒâ€¡IKARILDI (agfPayi tek baÃ…Å¸Ã„Â±na kaldÃ„Â±, top1 %37.0Ã¢â€ â€™%38.0 iyileÃ…Å¸ti,
+   *  tÃƒÂ¼m katsayÃ„Â±lar net anlamlÃ„Â±/anlamsÃ„Â±z oldu, sÃ„Â±nÃ„Â±rda kalan olmadÃ„Â±) Ã¢â‚¬â€ alan yine de
+   *  toplanÃ„Â±yor, gelecekte farklÃ„Â± bir formÃƒÂ¼lasyonla tekrar test edilebilir. */
+  agfFarkiIkinciye: number;
+  /** 2026-08-21 Ã¢â‚¬â€ H2H net skoru: bugÃƒÂ¼nkÃƒÂ¼ sahadaki rakiplerle ortak geÃƒÂ§miÃ…Å¸ yarÃ„Â±Ã…Å¸larda
+   *  kaÃƒÂ§ kez ÃƒÂ¶nde bitirdi eksi kaÃƒÂ§ kez geride bitirdi (getH2HForRace, leak-free).
+   *  2026-08-30 kullanÃ„Â±cÃ„Â± talebi: artÃ„Â±k Ãƒâ€“NCE bugÃƒÂ¼nÃƒÂ¼n zemin koÃ…Å¸uluyla eÃ…Å¸leÃ…Å¸en karÃ…Å¸Ã„Â±laÃ…Å¸malar
+   *  kullanÃ„Â±lÃ„Â±r (varsa) Ã¢â‚¬â€ bkz. h2hZeminFiltresiUygulandiMi notu, gatherFaz1V5 iÃƒÂ§inde. */
+  h2hNetSkor: number;
+  /** 2026-10-07 (V5.46.1) Ã¢â‚¬â€ h2hNetSkor'u ÃƒÂ¼reten karÃ…Å¸Ã„Â±laÃ…Å¸tÃ„Â±rma sayÃ„Â±sÃ„Â± (0 ise gÃƒÂ¶zlemsiz).
+   *  V5.46'nÃ„Â±n kendi skoruna GÃ„Â°RMEZ, yalnÃ„Â±z V5.46.1'in missingÃ¢â€°Â 0 sÃƒÂ¶zleÃ…Å¸mesi iÃƒÂ§in eklendi. */
+  h2hKarsilastirmaSayisi: number;
+  /** 2026-08-30 Ã¢â‚¬â€ h2hNetSkor'un bugÃƒÂ¼nÃƒÂ¼n zemin koÃ…Å¸uluyla EÃ…ÂLEÃ…ÂEN karÃ…Å¸Ã„Â±laÃ…Å¸malardan mÃ„Â± (true)
+   *  yoksa tÃƒÂ¼m karÃ…Å¸Ã„Â±laÃ…Å¸malardan mÃ„Â± (false Ã¢â‚¬â€ eÃ…Å¸leÃ…Å¸en yok ya da bugÃƒÂ¼nÃƒÂ¼n zemini bilinmiyor)
+   *  hesaplandÃ„Â±Ã„Å¸Ã„Â±. YalnÃ„Â±z gerekÃƒÂ§e metninde Ã…Å¸effaflÃ„Â±k iÃƒÂ§in, skora girmez. */
+  h2hZeminEslesmesiVarMi: boolean;
+  /** 2026-08-30 Ã¢â‚¬â€ h2hZeminEslesmesiVarMi=true ise, o eÃ…Å¸leÃ…Å¸en karÃ…Å¸Ã„Â±laÃ…Å¸mada atÃ„Â±n kendi
+   *  derecesi (TJK "1.34.20" formatÃ„Â±) Ã¢â‚¬â€ gerekÃƒÂ§e metninde somut kanÃ„Â±t olarak gÃƒÂ¶sterilir.
+   *  Skora girmez. */
+  h2hKendiDerece: string | null;
+  /** 2026-08-21 Ã¢â‚¬â€ HÃ„Â±z derecesi (%): son 365 gÃƒÂ¼ndeki en yeni 3 koÃ…Å¸unun popÃƒÂ¼lasyon
+   *  (irk|pist|mesafe) ortalama tempo'suna gÃƒÂ¶re gÃƒÂ¶reli hÃ„Â±zÃ„Â±. B=200 bootstrap'ta HER
+   *  Ã„Â°KÃ„Â° segmentte de gÃƒÂ¼ÃƒÂ§lÃƒÂ¼ anlamlÃ„Â± (dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art +0.58 Ã¢â‚¬â€ modelin en bÃƒÂ¼yÃƒÂ¼k katsayÃ„Â±sÃ„Â±,
+   *  diÃ„Å¸er +0.26), VIF=1.02-1.10 (hiÃƒÂ§bir sinyalle ÃƒÂ§akÃ„Â±Ã…Å¸mÃ„Â±yor). */
+  hizDerecesi: number;
+  /** 2026-08-24 Ã¢â‚¬â€ Kilo-ayarlÃ„Â± H2H: bugÃƒÂ¼nkÃƒÂ¼ sahadaki rakiplere gÃƒÂ¶re kilo avantajÃ„Â±,
+   *  o rakiplerle geÃƒÂ§miÃ…Å¸ karÃ…Å¸Ã„Â±laÃ…Å¸madaki kilo avantajÃ„Â±na gÃƒÂ¶re ne kadar DEÃ„ÂÃ„Â°Ã…ÂTÃ„Â°
+   *  (pozitif = kilo pozisyonu iyileÃ…Å¸ti). SANCAR EFESÃ„Â° vakasÃ„Â± (24 AÃ„Å¸u, Bursa K1)
+   *  ile bulundu Ã¢â‚¬â€ geÃƒÂ§miÃ…Å¸te eÃ…Å¸it/dezavantajlÃ„Â± kiloyla kaybettiÃ„Å¸i rakipleri, bugÃƒÂ¼n
+   *  belirgin hafif olunca geÃƒÂ§ti. 933 yarÃ„Â±Ã…Å¸ta tam retrain+B=200 bootstrap: HER Ã„Â°KÃ„Â°
+   *  segmentte de katsayÃ„Â± POZÃ„Â°TÃ„Â°F (dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art +0.089 GA=[-0.162,0.279], diÃ„Å¸er +0.061
+   *  GA=[-0.022,0.164]) Ã¢â‚¬â€ sÃ„Â±nÃ„Â±rda/anlamsÃ„Â±z ama kullanÃ„Â±cÃ„Â± kararÃ„Â±yla KABUL EDÃ„Â°LDÃ„Â°.
+   *  (AynÃ„Â± gÃƒÂ¼n ikinci bir "yÃƒÂ¶n tutarlÃ„Â±lÃ„Â±Ã„Å¸Ã„Â±" sinyali Ã¢â‚¬â€ galopTrendFarki Ã¢â‚¬â€ de eklenmiÃ…Å¸ti
+   *  ama sÃ„Â±zÃ„Â±ntÃ„Â±lÃ„Â± veriyle test edilmiÃ…Å¸ ÃƒÂ§Ã„Â±ktÃ„Â±, TAMAMEN GERÃ„Â° ALINDI, bkz. ENGINE_VERSIONS
+   *  V5.12 notu. h2hKiloDegisimi'nin kendi hesabÃ„Â± sÃ„Â±zÃ„Â±ntÃ„Â±dan ETKÃ„Â°LENMEDÃ„Â°, ayrÃ„Â± doÃ„Å¸rulandÃ„Â±.) */
+  h2hKiloDegisimi: number;
+  /** h2hKiloDegisimi'nin toplandÃ„Â±Ã„Å¸Ã„Â± karÃ…Å¸Ã„Â±laÃ…Å¸tÃ„Â±rma (rakip) sayÃ„Â±sÃ„Â± Ã¢â‚¬â€ yalnÃ„Â±z gerekÃƒÂ§e
+   *  metninde "toplam" ifadesinin tek bir gerÃƒÂ§ek kiloymuÃ…Å¸ gibi yanlÃ„Â±Ã…Å¸ anlaÃ…Å¸Ã„Â±lmasÃ„Â±nÃ„Â±
+   *  ÃƒÂ¶nlemek iÃƒÂ§in (kullanÃ„Â±cÃ„Â± bulgusu 2026-08-24: "+27.5 toplam kilo diye belirtilmesi
+   *  kullanÃ„Â±cÃ„Â±lar tarafÃ„Â±ndan farklÃ„Â± anlaÃ…Å¸Ã„Â±labilir"). Skora girmez. */
+  h2hKiloKarsilasmaSayisi: number;
+  /** 2026-08-28 Ã¢â‚¬â€ Zemin ToleransÃ„Â±: atÃ„Â±n Normal-dÃ„Â±Ã…Å¸Ã„Â± (Ã„Â±slak/aÃ„Å¸Ã„Â±r/yumuÃ…Å¸ak) pist
+   *  koÃ…Å¸ullarÃ„Â±ndaki geÃƒÂ§miÃ…Å¸ performansÃ„Â±, TjkDereceKaydi arÃ…Å¸ivinden (hesaplaZeminToleransiMap,
+   *  leak-free, kilo-ayarlÃ„Â±, kategori bazlÃ„Â±). Split-half gÃƒÂ¼venilirlik testinde GERÃƒâ€¡EK bir
+   *  at-bazlÃ„Â± ÃƒÂ¶zellik olduÃ„Å¸u doÃ„Å¸rulandÃ„Â± (r=0.467, n=286) ama V5'in mevcut 22 ÃƒÂ¶zelliÃ„Å¸ine
+   *  eklenip test edildiÃ„Å¸inde Ã„Â°KÃ„Â° KEZ (2026-08-23 B=50, 2026-08-28 B=500/n=1059 koÃ…Å¸u)
+   *  katsayÃ„Â± %95 GA'sÃ„Â± sÃ„Â±fÃ„Â±rÃ„Â± iÃƒÂ§erdi Ã¢â‚¬â€ istatistiksel olarak ANLAMSIZ. KullanÃ„Â±cÃ„Â± bu sonucu
+   *  bilerek, aÃƒÂ§Ã„Â±k bir kural istisnasÃ„Â± olarak eklenmesini istedi (AskUserQuestion ile
+   *  teyit edildi) Ã¢â‚¬â€ normalde bu oturumun standart kuralÃ„Â± ("ÃƒÂ¶nce backtest, iyi ÃƒÂ§Ã„Â±kmazsa
+   *  ekleme") bunu dÃ„Â±Ã…Å¸lardÃ„Â±. Risk: model bu ÃƒÂ¶zelliÃ„Å¸e gereksiz aÃ„Å¸Ã„Â±rlÃ„Â±k verebilir veya
+   *  hiÃƒÂ§bir fayda saÃ„Å¸lamadan gÃƒÂ¼rÃƒÂ¼ltÃƒÂ¼ ekleyebilir. */
+  zeminToleransi: number;
+  /** 2026-08-30 Ã¢â‚¬â€ Zemin+Mesafe Deneyimi (bkz. zemin-mesafe-deneyimi.actions.ts): atÃ„Â±n
+   *  BUGÃƒÅ“NKÃƒÅ“ tam (pist, zemin koÃ…Å¸ulu, mesafe) kombinasyonunda kanÃ„Â±tlanmÃ„Â±Ã…Å¸ deneyimi.
+   *  "tam" = bu mesafede de koÃ…Å¸muÃ…Å¸, "kismi" = pist+zemin'de koÃ…Å¸muÃ…Å¸ ama baÃ…Å¸ka mesafede,
+   *  "yok" = bu pist+zemin'de hiÃƒÂ§ kaydÃ„Â± yok. HENÃƒÅ“Z CANLI SKORA GÃ„Â°RMÃ„Â°YOR (C katmanÃ„Â±/
+   *  gÃƒÂ¶lge-test adayÃ„Â±) Ã¢â‚¬â€ yalnÃ„Â±z muhakeme metninde Ã…Å¸effaflÃ„Â±k iÃƒÂ§in taÃ…Å¸Ã„Â±nÃ„Â±r. */
+  zeminMesafeDeneyimSeviyesi: "tam" | "kismi" | "yok";
+  /** zeminMesafeDeneyimSeviyesi hesaplanÃ„Â±rken kullanÃ„Â±lan geÃƒÂ§miÃ…Å¸ koÃ…Å¸u sayÃ„Â±sÃ„Â±. Skora girmez. */
+  zeminMesafeOrnekSayisi: number;
+  /** Zemin+Mesafe Deneyimi'nin HAM sayÃ„Â±sal deÃ„Å¸eri (popÃƒÂ¼lasyona gÃƒÂ¶re gÃƒÂ¶reli pace %,
+   *  zeminToleransi ile AYNI ÃƒÂ¶lÃƒÂ§ek) Ã¢â‚¬â€ C katmanÃ„Â± challenger'Ã„Â±nÃ„Â±n (v6-zemin-mesafe-deneyimi)
+   *  gerÃƒÂ§ek girdisi budur, tier (seviye) yalnÃ„Â±z muhakeme metni iÃƒÂ§in. Skora HENÃƒÅ“Z girmez. */
+  zeminMesafeDeneyim: number;
+  /** 2026-09-01 kullanÃ„Â±cÃ„Â± tasarÃ„Â±mÃ„Â± Ã¢â‚¬â€ "YarÃ„Â±Ã…Å¸ GidiÃ…Å¸atÃ„Â±": saha-geneli tempo senaryosu (Rahat
+   *  Liderlik/YavaÃ…Å¸ Tempo/Dengeli/MÃƒÂ¼cadeleli/Ãƒâ€¡ok YÃƒÂ¼ksek/DaÃ„Å¸Ã„Â±lma Riski, Accurace geÃƒÂ§miÃ…Å¸inden
+   *  kural-tabanlÃ„Â± olasÃ„Â±lÃ„Â±k daÃ„Å¸Ã„Â±lÃ„Â±mÃ„Â±, bkz. pace-analizi.ts hesaplaYarisGidisati) Ãƒâ€” atÃ„Â±n kendi
+   *  stil daÃ„Å¸Ã„Â±lÃ„Â±mÃ„Â±nÃ„Â±n uyum-matrisiyle aÃ„Å¸Ã„Â±rlÃ„Â±klÃ„Â± beklenen deÃ„Å¸eri Ãƒâ€” mesafe katsayÃ„Â±sÃ„Â±. B=500
+   *  bootstrap testi (bkz. arac-model-egit-segment.mjs'teki not) Ã„Â°KÃ„Â° segmentte de sÃ„Â±fÃ„Â±rÃ„Â±
+   *  iÃƒÂ§eren GA verdi Ã¢â‚¬â€ KANITLANMADI, ama iki segmentte de AYNI YÃƒâ€“NDE (pozitif) ve diÃ„Å¸er
+   *  segmentte neredeyse anlamlÃ„Â± (alt sÃ„Â±nÃ„Â±r sÃ„Â±fÃ„Â±ra 0.002 kala). zeminToleransi/yakÃ„Â±nsama/
+   *  sonIdmanSprint/takÃ„Â± ile AYNI tÃƒÂ¼rden BÃ„Â°LÃ„Â°NÃƒâ€¡LÃ„Â° istisna, kullanÃ„Â±cÃ„Â± kararÃ„Â±yla eklendi. */
+  yarisGidisatiSkoru: number;
+};
+
+export type Faz1SonucV5 = {
+  race: {
+    id: string;
+    hippodromeName: string;
+    raceNo: number;
+    classType: string;
+    breed: string;
+    surface: string;
+    distance: number;
+  };
+  runners: Faz1RunnerV5[];
+};
+
+const JOKEY_POP_ORT = 0.1;
+const TRAINER_POP_ORT = 0.1;
+const SIRE_POP_ORT = 0.14;
+
+export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> {
+  // 2026-08-18 kullanÃ„Â±cÃ„Â± talebi (SELLYGIRL/Kocaeli K3 vakasÃ„Â±): AGF trend, analiz anÃ„Â±ndaki
+  // en son veriyle hesaplanÃ„Â±yor Ã¢â‚¬â€ post saatinden ÃƒÂ¶nce yapÃ„Â±lan bir analizde henÃƒÂ¼z eÃ…Å¸iÃ„Å¸i
+  // geÃƒÂ§memiÃ…Å¸ bir hareket, analizden SONRA gelen bir ÃƒÂ¶lÃƒÂ§ÃƒÂ¼mle eÃ…Å¸iÃ„Å¸i geÃƒÂ§ebiliyor ve
+  // yakalanamÃ„Â±yor. Analiz baÃ…Å¸lamadan Ã„Â°LK ADIM olarak bu koÃ…Å¸unun hipodromu iÃƒÂ§in AGF'yi
+  // tazeliyoruz (3dk soÃ„Å¸uma ile Ã¢â‚¬â€ aynÃ„Â± hipodromda art arda analiz TJK'yÃ„Â± gereksiz yormaz).
+  // Hata durumunda sessizce yutulur (syncAgfForRace kendi iÃƒÂ§inde try/catch'li) Ã¢â‚¬â€ bu adÃ„Â±m
+  // analizi ASLA bloke etmez, DB'deki mevcut veriyle devam eder.
+  await syncAgfForRace(raceId);
+
+  const race = await db.race.findUnique({
+    where: { id: raceId },
+    select: {
+      id: true, raceNo: true, classType: true, breed: true, distance: true, surface: true, ikramiyeDetay: true,
+      raceDay: { select: { date: true, hippodrome: { select: { name: true } }, surfaceConditions: true } },
+      runners: {
+        where: { scratched: false },
+        orderBy: { no: "asc" },
+        select: {
+          id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true,
+          raceStyle: true, weight: true, ekuriGroup: true,
+          gallops: { select: { date: true, jockey: true, splits: true, track: true }, orderBy: { date: "desc" } },
+        },
+      },
+    },
+  });
+  if (!race) return null;
+  const runners = race.runners;
+  if (runners.length === 0) return { race: { id: race.id, hippodromeName: race.raceDay.hippodrome.name.trim(), raceNo: race.raceNo, classType: race.classType, breed: race.breed, surface: race.surface, distance: race.distance }, runners: [] };
+
+  const bugunIkramiye1 = (race.ikramiyeDetay as { ikramiye?: number[] } | null)?.ikramiye?.[0] ?? null;
+
+  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters, hizByNo, zeminToleransiByAd, yakinsamaGecmis, tempoTasimaGucuByAd] = await Promise.all([
+    getSonYarisDetaylariForRace(raceId).catch(() => []),
+    getSireStatOzetleriForRace(runners.map((r) => r.sire), race.breed, race.surface, race.distance).catch(() =>
+      runners.map(() => ({ ozet: null, ornekKendiVeri: null, kYuzde: null }))
+    ),
+    getAgfTrendForRace(raceId).catch(() => ({ atlar: [], enCokDusenler: [], enCokYukselenler: [] })),
+    getJockeyStats([...new Set(runners.map((r) => r.jockey).filter((x): x is string => !!x))]).catch(
+      () => ({}) as Record<string, { overall: { wins: number; rides: number } }>
+    ),
+    getTrainerStats([...new Set(runners.map((r) => r.trainer).filter((x): x is string => !!x))]).catch(
+      () => ({}) as Record<string, { wins: number; rides: number }>
+    ),
+    fetchAccuraceGecmisKayitlari(runners.map((r) => r.name), race.raceDay.date),
+    getH2HForRace(raceId, null).catch(() => []),
+    getHizDerecesiForRace(raceId).catch(() => new Map<number, number>()),
+    hesaplaZeminToleransiMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, number>()),
+    yakinsamaGecmisHesapla(db, runners.map((r) => ({ no: r.no, name: r.name, jockey: r.jockey })), race.raceDay.date, bugunIkramiye1).catch(
+      () => new Map<number, { sinifDususu: boolean; ajiGalibiyetVarMi: boolean }>()
+    ),
+    // 2026-09-11 Ã¢â‚¬â€ Tempo TaÃ…Å¸Ã„Â±ma GÃƒÂ¼cÃƒÂ¼ (bkz. tempo-tasima-gucu.actions.ts), artÃ„Â±k AYRI bir
+    // ÃƒÂ¶zellik deÃ„Å¸il Ã¢â‚¬â€ yarisGidisatiSkoru'nun KENDÃ„Â° formÃƒÂ¼lÃƒÂ¼ne girdi (bkz. gidisatSonucu notu).
+    hesaplaTempoTasimaGucuMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, number>()),
+  ]);
+
+  // 2026-08-30 kullanÃ„Â±cÃ„Â± talebi ("kum Ã„Â±slak ise Ã„Â±slak kum koÃ…Å¸ularÃ„Â±na gÃƒÂ¶re H2H yapacaksÃ„Â±n
+  // kilo ve H2H Net Skor yanÃ„Â±nda, dereceleri de ekleyeceksin"): H2H Net Skor/Kilo-AyarlÃ„Â±
+  // H2H artÃ„Â±k Ãƒâ€“NCE bugÃƒÂ¼nÃƒÂ¼n zemin koÃ…Å¸uluyla EÃ…ÂLEÃ…ÂEN geÃƒÂ§miÃ…Å¸ karÃ…Å¸Ã„Â±laÃ…Å¸malarÃ„Â± kullanÃ„Â±r. BugÃƒÂ¼nÃƒÂ¼n
+  // zemin durumu bilinmiyorsa (RaceDay.surfaceConditions henÃƒÂ¼z TJK'dan yayÃ„Â±mlanmadÃ„Â±ysa,
+  // "seyrek" Ã¢â‚¬â€ bkz. horse-detail.actions.ts notu) filtre uygulanmaz, tÃƒÂ¼m karÃ…Å¸Ã„Â±laÃ…Å¸malar
+  // kullanÃ„Â±lÃ„Â±r (eski davranÃ„Â±Ã…Å¸). BugÃƒÂ¼nÃƒÂ¼n durumu biliniyor ama HÃ„Â°Ãƒâ€¡BÃ„Â°R geÃƒÂ§miÃ…Å¸ karÃ…Å¸Ã„Â±laÃ…Å¸ma o
+  // koÃ…Å¸ulla eÃ…Å¸leÃ…Å¸miyorsa da yine TÃƒÅ“M karÃ…Å¸Ã„Â±laÃ…Å¸malara dÃƒÂ¶nÃƒÂ¼lÃƒÂ¼r Ã¢â‚¬â€ bilgi kaybÃ„Â± olmasÃ„Â±n diye
+  // (0 karÃ…Å¸Ã„Â±laÃ…Å¸malÃ„Â± bir sinyal, "veri yok" ile "eÃ…Å¸it" ayrÃ„Â±mÃ„Â±nÃ„Â± bozar).
+  const bugunZeminDetay = zeminDetayiBul(
+    race.raceDay.surfaceConditions as { label: string; detail: string }[] | null,
+    race.surface
+  );
+  // 2026-09-13 kullanÃ„Â±cÃ„Â± bulgusu (Ã„Â°stanbul K9, SENSEÃ„Â° BAHA "yeniden analiz et" sonrasÃ„Â± hiÃƒÂ§
+  // deÃ„Å¸iÃ…Å¸medi) Ã¢â‚¬â€ kÃƒÂ¶k neden zeminMesafeDeneyimi'nin kendi tabanÃ„Â± DEÃ„ÂÃ„Â°L, buradaki null'du.
+  // GerÃƒÂ§ek veriyle doÃ„Å¸rulandÃ„Â±: son 30 gÃƒÂ¼nÃƒÂ¼n Sentetik pistli GÃƒÅ“NÃƒÅ“NÃƒÅ“N HÃ„Â°Ãƒâ€¡BÃ„Â°RÃ„Â°NDE (28/28)
+  // RaceDay.surfaceConditions'ta "Sentetik" etiketi yok Ã¢â‚¬â€ Sentetik pist hava koÃ…Å¸ullarÃ„Â±ndan
+  // etkilenmediÃ„Å¸i iÃƒÂ§in TJK muhtemelen bu pist iÃƒÂ§in zemin durumu HÃ„Â°Ãƒâ€¡ yayÃ„Â±nlamÃ„Â±yor (Ãƒâ€¡im/Kum'un
+  // aksine, "henÃƒÂ¼z yayÃ„Â±mlanmadÃ„Â±, sonra gelir" durumu deÃ„Å¸il, YAPISAL OLARAK HÃ„Â°Ãƒâ€¡ GELMÃ„Â°YOR).
+  // Eskiden bu null, Ãƒâ€¡im/Kum'daki "TJK henÃƒÂ¼z yayÃ„Â±mlamadÃ„Â±" (geÃƒÂ§ici/"seyrek") durumuyla AYNI
+  // Ã…Å¸ekilde iÃ…Å¸leniyordu Ã¢â‚¬â€ zeminMesafeDeneyimi (ve aÃ…Å¸aÃ„Å¸Ã„Â±daki H2H zemin-filtresi) TÃƒÅ“M Sentetik
+  // koÃ…Å¸ularÃ„Â±nda baÃ…Å¸tan "yok"/filtresiz kalÃ„Â±yordu. Sentetik iÃƒÂ§in null artÃ„Â±k "bilinmiyor"
+  // deÃ„Å¸il, HER ZAMAN "Normal" (1.0) sayÃ„Â±lÃ„Â±yor Ã¢â‚¬â€ zeminKatsayisi(null) zaten aynÃ„Â± varsayÃ„Â±lanÃ„Â±
+  // dÃƒÂ¶nÃƒÂ¼yordu, yalnÃ„Â±z BURADAKÃ„Â° ternary onu gÃƒÂ¶rmeden null'a sabitliyordu. Ãƒâ€¡im/Kum'daki gerÃƒÂ§ek
+  // "seyrek" (geÃƒÂ§ici) null davranÃ„Â±Ã…Å¸Ã„Â± DEÃ„ÂÃ„Â°Ã…ÂMEDÃ„Â°.
+  const bugunZeminKatsayi = bugunZeminDetay
+    ? zeminKatsayisi(bugunZeminDetay).katsayi
+    : race.surface === "SENTETIK"
+    ? 1.0
+    : null;
+  const zeminEslesenEncounters =
+    bugunZeminKatsayi != null
+      ? h2hEncounters.filter((enc) => zeminKatsayisi(zeminDetayiSatirdanCikar(enc.surface)).katsayi === bugunZeminKatsayi)
+      : [];
+  const h2hZeminFiltresiUygulandiMi = zeminEslesenEncounters.length > 0;
+  const h2hEncountersKullanilan = h2hZeminFiltresiUygulandiMi ? zeminEslesenEncounters : h2hEncounters;
+
+  // 2026-08-30 kullanÃ„Â±cÃ„Â± talebi (H2H zemin-duyarlÃ„Â±lÃ„Â±Ã„Å¸Ã„Â±nÃ„Â±n hemen ardÃ„Â±ndan): "o pist, zemin
+  // koÃ…Å¸ul ve mesafede yarÃ„Â±Ã…Å¸ geÃƒÂ§miÃ…Å¸i olan daha tecrÃƒÂ¼beli gÃƒÂ¶rÃƒÂ¼lmeli... mesafede ilk defa
+  // koÃ…Å¸acaksa mevcut mesafelere gÃƒÂ¶re analiz yapÃ„Â±lacak" Ã¢â‚¬â€ bkz. zemin-mesafe-deneyimi.actions.ts.
+  // V5.46'dan beri CANLI skora giriyor (bKatmaniUygula, softmax ÃƒÂ¶ncesi, B=500 ile doÃ„Å¸rulandÃ„Â± Ã¢â‚¬â€
+  // bkz. engine-versions.data.ts). ÃƒÅ“stteki yorum ("henÃƒÂ¼z canlÃ„Â± skora girmiyor") artÃ„Â±k YANLIÃ…Â,
+  // bu oturumda dÃƒÂ¼zeltildi. bugunIrk (2026-09-13 eklendi): TjkDereceKaydi'de kaydÃ„Â± olmayan
+  // atlar iÃƒÂ§in HorseRaceHistoryCache'e ek kaynak olarak bakabilmesi iÃƒÂ§in gerekiyor.
+  const zeminMesafeDeneyimByAd = await hesaplaZeminMesafeDeneyimiMap(
+    runners.map((r) => r.name),
+    race.raceDay.date,
+    surfaceToPist(race.surface),
+    bugunZeminKatsayi,
+    race.distance,
+    race.breed === "ARAP" ? "Arap" : "Ã„Â°ngiliz"
+  );
+
+  const raceNameToNo = new Map(runners.map((r) => [r.name, r.no]));
+  function h2hNetSkorHesapla(kendiAd: string): { skor: number; zeminEslesti: boolean; kendiDerece: string | null; karsilastirma: number } {
+    let skor = 0;
+    let kendiDerece: string | null = null;
+    let karsilastirma = 0; // 2026-10-07 (V5.46.1) Ã¢â‚¬â€ gÃƒÂ¶zlem sayacÃ„Â±, V5.46 davranÃ„Â±Ã…Å¸Ã„Â±nÃ„Â± DEÃ„ÂÃ„Â°Ã…ÂTÃ„Â°RMEZ
+    for (const enc of h2hEncountersKullanilan) {
+      const beniIceren = enc.results.find((e) => e.horseName === kendiAd);
+      if (!beniIceren) continue;
+      const benimPos = parseInt(beniIceren.finishPos, 10);
+      if (isNaN(benimPos)) continue;
+      if (kendiDerece == null && beniIceren.time) kendiDerece = beniIceren.time;
+      for (const other of enc.results) {
+        if (other.horseName === kendiAd) continue;
+        if (!raceNameToNo.has(other.horseName)) continue;
+        const otherPos = parseInt(other.finishPos, 10);
+        if (isNaN(otherPos)) continue;
+        karsilastirma++;
+        skor += benimPos < otherPos ? 1 : benimPos > otherPos ? -1 : 0;
+      }
+    }
+    return { skor, zeminEslesti: h2hZeminFiltresiUygulandiMi, kendiDerece, karsilastirma };
+  }
+
+  // 2026-08-24 Ã¢â‚¬â€ Kilo-ayarlÃ„Â± H2H (bkz. Faz1RunnerV5.h2hKiloDegisimi ÃƒÂ¼stÃƒÂ¼ndeki not).
+  // H2HResult.weight zaten getH2HForRace'ten geliyor (TJK "At KoÃ…Å¸u Bilgileri" Ã¢â‚¬â€ ekstra
+  // istek YOK), yalnÃ„Â±z o veriyi kullanan bir hesap eksikti.
+  function parseKiloSayi(w: string | null | undefined): number | null {
+    if (!w) return null;
+    const n = parseFloat(w.replace(",", "."));
+    return isNaN(n) ? null : n;
+  }
+  const bugunKiloByNo = new Map(runners.map((r) => [r.no, r.weight]));
+  function h2hKiloDegisimiHesapla(kendiAd: string, kendiBugunKilo: number | null): { toplam: number; sayi: number } {
+    if (kendiBugunKilo == null) return { toplam: 0, sayi: 0 };
+    let toplam = 0;
+    let sayi = 0;
+    for (const enc of h2hEncountersKullanilan) {
+      const beni = enc.results.find((e) => e.horseName === kendiAd);
+      if (!beni) continue;
+      const kendiOKilo = parseKiloSayi(beni.weight);
+      if (kendiOKilo == null) continue;
+      for (const other of enc.results) {
+        if (other.horseName === kendiAd) continue;
+        const otherNo = raceNameToNo.get(other.horseName);
+        if (otherNo == null) continue;
+        const otherOKilo = parseKiloSayi(other.weight);
+        if (otherOKilo == null) continue;
+        const otherBugunKilo = bugunKiloByNo.get(otherNo);
+        if (otherBugunKilo == null) continue;
+        const todayAdvantage = otherBugunKilo - kendiBugunKilo;
+        const histAdvantage = otherOKilo - kendiOKilo;
+        toplam += todayAdvantage - histAdvantage;
+        sayi++;
+      }
+    }
+    return { toplam, sayi };
+  }
+
+  const sonYarisByNo = new Map(sonYarisDetaylari.map((d) => [d.runnerNo, d]));
+  const sireOzetByRunnerId = new Map(runners.map((r, i) => [r.id, sireOzetleri[i]]));
+  const accuraceMap = hesaplaAccuraceSonYarisEnHizliKapanisMap(
+    runners.map((r) => r.name),
+    accKayitlar.son800AccuraceKayitlari,
+    accKayitlar.son800Siblings
+  );
+  const agfFarkByNo = new Map(agfTrend.atlar.map((a) => [a.runnerNo, a.fark ?? 0]));
+  const trendYonByNo = new Map<number, "yÃƒÂ¼kseliÃ…Å¸" | "dÃƒÂ¼Ã…Å¸ÃƒÂ¼Ã…Å¸">([
+    ...agfTrend.enCokYukselenler.map((y): [number, "yÃƒÂ¼kseliÃ…Å¸"] => [y.runnerNo, "yÃƒÂ¼kseliÃ…Å¸"]),
+    ...agfTrend.enCokDusenler.map((d): [number, "dÃƒÂ¼Ã…Å¸ÃƒÂ¼Ã…Å¸"] => [d.runnerNo, "dÃƒÂ¼Ã…Å¸ÃƒÂ¼Ã…Å¸"]),
+  ]);
+  // 2026-08-30 kullanÃ„Â±cÃ„Â± bulgusu (Ã„Â°stanbul 2.KoÃ…Å¸u, MAKÃ„Â°NÃ„Â°ST+SÃƒÅ“PER HAN ekÃƒÂ¼ri): agfSirasi
+  // ekuriGroup'u hiÃƒÂ§ dikkate almÃ„Â±yordu Ã¢â‚¬â€ TJK'nÃ„Â±n kendi AGF tablosu ekÃƒÂ¼ri ortaklarÃ„Â±nÃ„Â±n
+  // paylarÃ„Â±nÃ„Â± TOPLU deÃ„Å¸erlendirip market favorisini buna gÃƒÂ¶re belirliyor (bugÃƒÂ¼nkÃƒÂ¼ ÃƒÂ¶rnek:
+  // ekÃƒÂ¼ri birleÃ…Å¸ik %36.06, DOÃ„ÂANHAN'Ã„Â±n bireysel %24.02'sinden YÃƒÅ“KSEK Ã¢â‚¬â€ TJK'nÃ„Â±n gerÃƒÂ§ek
+  // 1.favorisi ekÃƒÂ¼ri iken, eski kod yanlÃ„Â±Ã…Å¸lÃ„Â±kla DOÃ„ÂANHAN'Ã„Â± 1.sÃ„Â±raya koyuyordu). Bu bir BUG
+  // DÃƒÅ“ZELTMESÃ„Â° (yeni bir sinyal deÃ„Å¸il) Ã¢â‚¬â€ agfPayi (ham %, her at kendi bireysel deÃ„Å¸erini
+  // korur) DEÃ„ÂÃ„Â°Ã…ÂMEDÃ„Â°, yalnÃ„Â±z agfSirasi'nin (piyasa favorisi SIRASI) ekÃƒÂ¼ri-farkÃ„Â±nda olmasÃ„Â±
+  // dÃƒÂ¼zeltildi. EkÃƒÂ¼ri ortaklarÃ„Â± AYNI sÃ„Â±rayÃ„Â± paylaÃ…Å¸Ã„Â±r (TJK'nÃ„Â±n kendi gÃƒÂ¶sterimiyle tutarlÃ„Â±).
+  // 2026-10-07 Ã¢â‚¬â€ paylaÃ…Å¸Ã„Â±lan hesap (bkz. agf-sirasi.ts) Ã¢â‚¬â€ train/live parity iÃƒÂ§in TEK kaynak.
+  const agfSiraMap = hesaplaAgfSirasi(runners.map((r) => ({ id: r.id, agf: r.agf, ekuriGroup: r.ekuriGroup })));
+  // birinciAgf/ikinciAgf Ã„Â°Ãƒâ€¡Ã„Â°N (agfSirasi'nden AYRI amaÃƒÂ§): bireysel AGF'ye gÃƒÂ¶re ham sÃ„Â±ralama.
+  const agfSirali = [...runners].filter((r) => r.agf != null).sort((a, b) => (b.agf ?? 0) - (a.agf ?? 0));
+  const sahaOrtasi = Math.ceil(runners.length / 2);
+  // 2026-08-26 kullanÃ„Â±cÃ„Â± bulgusu: kacakAtMi (tek parÃƒÂ§a "kaÃƒÂ§ak at mÃ„Â±") YERÃ„Â°NE kacakYalniz Ã¢â‚¬â€
+  // derinlemesine backtest (saha bÃƒÂ¼yÃƒÂ¼klÃƒÂ¼Ã„Å¸ÃƒÂ¼ sabit tutularak kontrol edilmiÃ…Å¸, deneyimsiz
+  // atlarda bile split-half tutarlÃ„Â± +12-14 puan fark) sahada RAKÃ„Â°PSÃ„Â°Z kaÃƒÂ§ak olmanÃ„Â±n gerÃƒÂ§ek
+  // avantaj taÃ…Å¸Ã„Â±dÃ„Â±Ã„Å¸Ã„Â±nÃ„Â±, RAKÃ„Â°PLÃ„Â° kaÃƒÂ§ak olmanÃ„Â±n (birden fazla at ÃƒÂ¶ne geÃƒÂ§meye ÃƒÂ§alÃ„Â±Ã…Å¸Ã„Â±rken) taÃ…Å¸Ã„Â±madÃ„Â±Ã„Å¸Ã„Â±nÃ„Â±
+  // gÃƒÂ¶sterdi (dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art nokta=+0.145, GA=[0.031,0.266] anlamlÃ„Â±). SÃ„Â±zÃ„Â±ntÃ„Â± riski yok Ã¢â‚¬â€ bugÃƒÂ¼nkÃƒÂ¼
+  // sahanÃ„Â±n kompozisyonu zaten ÃƒÂ¶nceden bilinen bir Ã…Å¸ey.
+  const kacakSayisiSahada = runners.filter(
+    (rr) => (rr.raceStyle as { style?: string } | null)?.style === "KACAK_AT"
+  ).length;
+  // 2026-09-01 kullanÃ„Â±cÃ„Â± tasarÃ„Â±mÃ„Â± Ã¢â‚¬â€ YarÃ„Â±Ã…Å¸ GidiÃ…Å¸atÃ„Â±: kacakYalniz Ã„Â°LE AYNI kaynaktan
+  // (Runner.raceStyle, sÃ„Â±zÃ„Â±ntÃ„Â±sÃ„Â±z Ã¢â‚¬â€ accurace-sync.service.ts her atÃ„Â±n KENDÃ„Â° geÃƒÂ§miÃ…Å¸inden
+  // hesaplayÃ„Â±p yazÃ„Â±yor) ama artÃ„Â±k TÃƒÅ“M stil daÃ„Å¸Ã„Â±lÃ„Â±mÃ„Â±nÃ„Â± (dagilim) + erken hÃ„Â±z gÃƒÂ¼cÃƒÂ¼nÃƒÂ¼
+  // (erkenHizGucu) kullanÃ„Â±yor. SahanÃ„Â±n KOMPOZÃ„Â°SYONU (kaÃƒÂ§ kaÃƒÂ§ak, ne kadar gÃƒÂ¼ÃƒÂ§lÃƒÂ¼) zaten
+  // ÃƒÂ¶nceden bilinen bir Ã…Å¸ey Ã¢â‚¬â€ sÃ„Â±zÃ„Â±ntÃ„Â± riski yok, tÃ„Â±pkÃ„Â± kacakSayisiSahada gibi.
+  const tempoProfilleri: (AtTempoProfili | null)[] = runners.map((rr) => {
+    const rs = rr.raceStyle as { dagilim?: Record<TekYarisStil, number>; erkenHizGucu?: number | null; veri?: number } | null;
+    if (!rs?.dagilim) return null;
+    return { dagilim: rs.dagilim, erkenHizGucu: rs.erkenHizGucu ?? null, n: rs.veri ?? 0 };
+  });
+  // 2026-09-11 (V5.45) Ã¢â‚¬â€ Tempo TaÃ…Å¸Ã„Â±ma GÃƒÂ¼cÃƒÂ¼ artÃ„Â±k yarisGidisatiSkoru'nun Ã„Â°Ãƒâ€¡Ã„Â°NE (zorluk-
+  // aÃ„Å¸Ã„Â±rlÃ„Â±klÃ„Â±, bkz. pace-analizi.ts) giriyor; AYRI regresyon ÃƒÂ¶zelliÃ„Å¸i olarak denendiÃ„Å¸inde
+  // (B=500) her iki segmentte de anlamsÃ„Â±z/ters ÃƒÂ§Ã„Â±kmÃ„Â±Ã…Å¸tÃ„Â± (diÃ„Å¸er 17 sinyal zaten aynÃ„Â± bilgiyi
+  // aÃƒÂ§Ã„Â±klÃ„Â±yordu) Ã¢â‚¬â€ bkz. proje hafÃ„Â±zasÃ„Â±: project_accurace_tempo_yarisgidisati.md. BirleÃ…Å¸tirilmiÃ…Å¸
+  // haliyle retrain: "diÃ„Å¸er" segmentte ARTIK anlamlÃ„Â± (GA=[0.005,0.184], ÃƒÂ¶nceden GA=[-0.009,0.166]
+  // idi), dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art hÃƒÂ¢lÃƒÂ¢ sÃ„Â±nÃ„Â±rda ama TERS DEÃ„ÂÃ„Â°L (aynÃ„Â± yarisGidisatiSkoru'nun ilk kabul
+  // standardÃ„Â± Ã¢â‚¬â€ "iki segmentte de aynÃ„Â± yÃƒÂ¶nde" Ã¢â‚¬â€ karÃ…Å¸Ã„Â±lanÃ„Â±yor/aÃ…Å¸Ã„Â±lÃ„Â±yor).
+  const tempoTasimaListesi = runners.map((rr) => tempoTasimaGucuByAd.get(rr.name) ?? null);
+  const gidisatSonucu = hesaplaYarisGidisati(tempoProfilleri, race.distance, tempoTasimaListesi);
+  const gidisatByRunnerId = new Map(runners.map((rr, i) => [rr.id, gidisatSonucu.atSonuclari[i]]));
+  // 2026-08-19 kullanÃ„Â±cÃ„Â± bulgusu (BODUBEY/EL LEON) Ã¢â‚¬â€ bkz. Faz1RunnerV5.agfPayi ÃƒÂ¼stÃƒÂ¼ndeki not.
+  const birinciAgf = agfSirali[0]?.agf ?? null;
+  const ikinciAgf = agfSirali[1]?.agf ?? null;
+
+  const yakinsamaOnHesaplar = new Map<number, { pistUzmaniPoz: boolean; agfTrendPoz: boolean; ajiPoz: boolean; sinifDususuPoz: boolean }>();
+
+  const faz1Runners: Faz1RunnerV5[] = runners.map((r) => {
+    const sonYaris = sonYarisByNo.get(r.no);
+    // 2026-09-01 kullanÃ„Â±cÃ„Â± talebi (KIZIM BÃ„Â°NDAL vakasÃ„Â±) Ã¢â‚¬â€ takÃ„Â± deÃ„Å¸iÃ…Å¸ikliÃ„Å¸i (SonYarisDetay)
+    // ÃƒÂ¶nceden yalnÃ„Â±z GÃƒâ€“STERÃ„Â°M iÃƒÂ§indi (kgs/pistUzmani gibi diÃ„Å¸er alanlarÃ„Â± zaten kullanÃ„Â±yorduk,
+    // eklenenTaki/cikarilanTaki'yi hiÃƒÂ§ almamÃ„Â±Ã…Å¸tÃ„Â±k). arac-model-veri-olustur.mts'te ZATEN
+    // hesaplanÃ„Â±yordu (takiEklendiMi/takiCikarildiMi) Ã¢â‚¬â€ burada AYNI mantÃ„Â±kla ekleniyor.
+    const takiEklendiMi: 0 | 1 = (sonYaris?.eklenenTaki?.length ?? 0) > 0 ? 1 : 0;
+    const takiCikarildiMi: 0 | 1 = (sonYaris?.cikarilanTaki?.length ?? 0) > 0 ? 1 : 0;
+    const sireOzet = sireOzetByRunnerId.get(r.id);
+    const jockeyStat = r.jockey ? jockeyStats[r.jockey] : undefined;
+    const trainerStat = r.trainer ? trainerStats[r.trainer] : undefined;
+
+    const gecerliGaloplar = r.gallops.filter((g) => g.date < race.raceDay.date);
+    const enSonGalop = gecerliGaloplar[0];
+    let keskinGalop: 0 | 1 = 0;
+    if (enSonGalop) {
+      const s = (enSonGalop.splits as Record<string, string | null> | null) ?? {};
+      const q = galopQuality("400", s["400"] ?? null, race.breed, s["ic_dis"] === "Ã„Â°ÃƒÂ§");
+      keskinGalop = q === "cok_iyi" || q === "iyi" ? 1 : 0;
+    }
+    const idmJokey: 0 | 1 = gecerliGaloplar.some((g) => isSameJockey(g.jockey, r.jockey)) ? 1 : 0;
+    // 2026-09-01 kullanÃ„Â±cÃ„Â± talebi (ESENYIL vakasÃ„Â±) Ã¢â‚¬â€ son idmanÃ„Â±n TÃƒÅ“RÃƒÅ“ (TJK "Ã„Â°dman TÃƒÂ¼rÃƒÂ¼")
+    // Sprint/SÃƒÂ¼rat mi. Backtest (n=9148, karma hariÃƒÂ§, leak-free) yÃƒÂ¶nÃƒÂ¼ DOÃ„ÂRULAMADI: Sprint
+    // grubu top1 %9.5 vs diÃ„Å¸er %11.1 (fark Ã¢Ë†â€™1.5pp, GA [Ã¢Ë†â€™3.3,+0.5] sÃ„Â±fÃ„Â±rÃ„Â± kapsÃ„Â±yor, nokta
+    // tahmini HAFÃ„Â°F NEGATÃ„Â°F). KullanÃ„Â±cÃ„Â± yine de B-katmanÃ„Â± kural istisnasÃ„Â± olarak eklenmesini
+    // istedi Ã¢â‚¬â€ GERÃƒâ€¡EK (veriden fit edilen) katsayÃ„Â± kullanÃ„Â±lÃ„Â±yor, elle pozitif YAPILMADI.
+    const sonIdmanSprint: 0 | 1 = enSonGalop ? (isSprintIdman(enSonGalop.track) ? 1 : 0) : 0;
+    const h2hKiloHesap = h2hKiloDegisimiHesapla(r.name, r.weight);
+    const h2hNetSkorHesap = h2hNetSkorHesapla(r.name);
+
+    const kgsVal = sonYaris?.gunFarki ?? -1;
+    const kgsVarMi: 0 | 1 = sonYaris?.gunFarki != null ? 1 : 0;
+    const uzunAraGalopKatkisi = kgsVarMi && kgsVal > 30 ? gecerliGaloplar.length : 0;
+
+    const sireOrani =
+      sireOzet?.kYuzde != null && sireOzet?.ornekKendiVeri != null
+        ? shrink(Math.round((sireOzet.kYuzde / 100) * sireOzet.ornekKendiVeri), sireOzet.ornekKendiVeri, SIRE_POP_ORT) * 100
+        : SIRE_POP_ORT * 100 * 0.5;
+    const jokeyOrani =
+      jockeyStat && jockeyStat.overall.rides > 0
+        ? shrink(jockeyStat.overall.wins, jockeyStat.overall.rides, JOKEY_POP_ORT) * 100
+        : JOKEY_POP_ORT * 100;
+    const antrenorOrani =
+      trainerStat && trainerStat.rides > 0
+        ? shrink(trainerStat.wins, trainerStat.rides, TRAINER_POP_ORT) * 100
+        : TRAINER_POP_ORT * 100;
+
+    const yGecmis = yakinsamaGecmis.get(r.no);
+    yakinsamaOnHesaplar.set(r.no, {
+      pistUzmaniPoz: sonYaris?.kazandi === "EVET",
+      agfTrendPoz: (agfFarkByNo.get(r.no) ?? 0) >= ANLAMLI_PUAN_ESIGI,
+      ajiPoz: yGecmis?.ajiGalibiyetVarMi ?? false,
+      sinifDususuPoz: yGecmis?.sinifDususu ?? false,
+    });
+
+    return {
+      id: r.id, no: r.no, ad: r.name, jockey: r.jockey, trainer: r.trainer, agf: r.agf,
+      ekuriGroup: r.ekuriGroup,
+      agfFark: agfFarkByNo.get(r.no) ?? 0,
+      agfSirasi: agfSiraMap.get(r.id) ?? sahaOrtasi,
+      agfPayi: r.agf ?? 0,
+      agfFarkiIkinciye:
+        r.agf != null && birinciAgf != null && r.agf === birinciAgf && ikinciAgf != null
+          ? birinciAgf - ikinciAgf
+          : 0,
+      accurace: accuraceMap.get(r.name) === true ? 1 : 0,
+      formEgimi: formEgimi(r.recentForm),
+      kgs: kgsVal, kgsVarMi,
+      pistUzmani: sonYaris?.kazandi === "EVET" ? 1 : 0,
+      yakinsama2Plus: 0, // aÃ…Å¸aÃ„Å¸Ã„Â±da, TÃƒÅ“M runner'lar hazÃ„Â±r olduktan sonra (sahaya-gÃƒÂ¶reli pedigri sÃ„Â±rasÃ„Â± gerekiyor) dolduruluyor
+      sonIdmanSprint, sonIdmanSprintGozlemli: enSonGalop != null, takiEklendiMi, takiCikarildiMi,
+      sireOrani, galop: keskinGalop, idmJokey,
+      galopSayisi: gecerliGaloplar.length, uzunAraGalopKatkisi,
+      jokeyOrani, antrenorOrani,
+      agfTrendYonu: trendYonByNo.get(r.no) ?? null,
+      agfTrendFark: trendYonByNo.has(r.no) ? (agfFarkByNo.get(r.no) ?? null) : null,
+      recentForm: r.recentForm,
+      hipodromMesafedeKazandi: sonYaris?.kazandi ?? "KOSMADI",
+      sireKazanmaOraniHam: sireOzet?.kYuzde ?? null,
+      sireOrneklemKendiVeri: sireOzet?.ornekKendiVeri ?? null,
+      kacakYalniz: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" && kacakSayisiSahada === 1 ? 1 : 0,
+      h2hNetSkor: h2hNetSkorHesap.skor,
+      h2hKarsilastirmaSayisi: h2hNetSkorHesap.karsilastirma,
+      h2hZeminEslesmesiVarMi: h2hNetSkorHesap.zeminEslesti,
+      h2hKendiDerece: h2hNetSkorHesap.kendiDerece,
+      hizDerecesi: hizByNo.get(r.no) ?? 0,
+      h2hKiloDegisimi: h2hKiloHesap.toplam,
+      h2hKiloKarsilasmaSayisi: h2hKiloHesap.sayi,
+      zeminToleransi: zeminToleransiByAd.get(r.name) ?? 0,
+      zeminMesafeDeneyimSeviyesi: zeminMesafeDeneyimByAd.get(r.name)?.seviye ?? "yok",
+      zeminMesafeOrnekSayisi: zeminMesafeDeneyimByAd.get(r.name)?.ornekSayisi ?? 0,
+      zeminMesafeDeneyim: zeminMesafeDeneyimByAd.get(r.name)?.deger ?? 0,
+      yarisGidisatiSkoru: gidisatByRunnerId.get(r.id)?.finalSkor ?? 0,
+    };
+  });
+
+  // YakÃ„Â±nsama'nÃ„Â±n pedigri bileÃ…Å¸eni saha-Ã„Â°Ãƒâ€¡Ã„Â° gÃƒÂ¶reli (sireOrani'ne gÃƒÂ¶re ilk-2) Ã¢â‚¬â€ tÃƒÂ¼m
+  // runner'lar hazÃ„Â±r olmadan hesaplanamaz, bu yÃƒÂ¼zden ayrÃ„Â± bir son geÃƒÂ§iÃ…Å¸.
+  const sireSiraliYakinsama = [...faz1Runners].sort((a, b) => b.sireOrani - a.sireOrani);
+  const sireRankByNoYakinsama = new Map(sireSiraliYakinsama.map((r, i) => [r.no, i + 1]));
+  for (const r of faz1Runners) {
+    const on = yakinsamaOnHesaplar.get(r.no);
+    if (!on) continue;
+    const sirePoz = (sireRankByNoYakinsama.get(r.no) ?? 999) <= 2;
+    const sayi = [on.pistUzmaniPoz, sirePoz, on.ajiPoz, on.agfTrendPoz, on.sinifDususuPoz].filter(Boolean).length;
+    r.yakinsama2Plus = sayi >= 2 ? 1 : 0;
+  }
+
+  return {
+    race: {
+      id: race.id, hippodromeName: race.raceDay.hippodrome.name.trim(), raceNo: race.raceNo,
+      classType: race.classType, breed: race.breed, surface: race.surface, distance: race.distance,
+    },
+    runners: faz1Runners,
+  };
+}
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Faz2 Ã¢â‚¬â€ koÃ…Å¸ullu logit skoru + softmax Ã¢â€ â€™ olasÃ„Â±lÃ„Â±k, atlar BÃ„Â°RBÃ„Â°RÃ„Â°NE gÃƒÂ¶re kÃ„Â±yaslanÃ„Â±r Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+const ANLAMLI_PUAN_ESIGI = 1.0; // agf-trend.actions.ts'teki ANLAMLI_PUAN_ESIGI ile aynÃ„Â±
+
+// 2026-08-28 kullanÃ„Â±cÃ„Â± kararÃ„Â± ("faydasÃ„Â± yoksa sil, tutarlÃ„Â± ol"): projenin bugÃƒÂ¼ne kadar bir
+// sinyali EKLEMEK iÃƒÂ§in kullandÃ„Â±Ã„Å¸Ã„Â± baraj hep "kendi katkÃ„Â±sÃ„Â± B=500'de kanÃ„Â±tlandÃ„Â± mÃ„Â±" idi
+// (agfPayi2, h2hKiloDegisimi hep bÃƒÂ¶yle eklendi). AynÃ„Â± barajÃ„Â± ÃƒÂ§Ã„Â±karmaya da uyguluyoruz Ã¢â‚¬â€
+// "silmenin ayrÃ„Â±ca modelin genelini iyileÃ…Å¸tirdiÃ„Å¸ini kanÃ„Â±tla" ek Ã…Å¸artÃ„Â± tutarsÃ„Â±zdÃ„Â± (hiÃƒÂ§bir
+// eklenen sinyalden bu istenmemiÃ…Å¸ti). B=500'de Ã„Â°KÃ„Â° segmentte de %95 GA'sÃ„Â± sÃ„Â±fÃ„Â±rÃ„Â± iÃƒÂ§eren
+// 11 ÃƒÂ¶zellik (accurace, formEgimi, formEgimi2, kgs, kgs2, pistUzmani, sireOrani, galop,
+// uzunAraGalopKatkisi, agfYukselisVarMi, agfDususVarMi) toFeatureVector'DAN Ãƒâ€¡IKARILDI.
+// Ek doÃ„Å¸rulama: bootstrap FARK testi (23 vs 12 ÃƒÂ¶zellik, aynÃ„Â± resample'la ikisi de eÃ„Å¸itilip
+// kÃ„Â±yaslandÃ„Â±) top1/top3'te zarar GÃƒâ€“STERMEDÃ„Â° (ortalama fark pozitif: dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art +2.74pp,
+// diÃ„Å¸er +0.15pp Ã¢â‚¬â€ ikisi de GA sÃ„Â±fÃ„Â±rÃ„Â± iÃƒÂ§eriyor ama YÃƒâ€“N tutarlÃ„Â±, h2hKiloDegisimi'nin kabul
+// edilme gerekÃƒÂ§esiyle aynÃ„Â± desen). Ham alanlar Faz1RunnerV5/arac-model-veri-olustur.mts'te
+// HÃƒâ€šLÃƒâ€š TOPLANIYOR (maliyetsiz) Ã¢â‚¬â€ yalnÃ„Â±z skorlamadan ÃƒÂ§Ã„Â±karÃ„Â±ldÃ„Â±. zeminToleransi kullanÃ„Â±cÃ„Â±nÃ„Â±n
+// bilinÃƒÂ§li istisnasÃ„Â± olduÃ„Å¸u iÃƒÂ§in (bkz. ÃƒÂ¼stteki not) KORUNDU.
+export function toFeatureVector(r: Faz1RunnerV5): number[] {
+  return [
+    r.agfSirasi,
+    r.idmJokey,
+    r.jokeyOrani,
+    r.antrenorOrani,
+    r.agfPayi,
+    r.h2hNetSkor,
+    r.hizDerecesi,
+    r.agfPayi * r.agfPayi,
+    r.zeminToleransi,
+    r.yakinsama2Plus,
+    r.sonIdmanSprint,
+    r.takiCikarildiMi - r.takiEklendiMi,
+    r.yarisGidisatiSkoru,
+  ];
+}
+
+function standardize(v: number[], ws: AgirlikSeti): number[] {
+  return v.map((x, i) => (ws.stds[i] > 1e-9 ? (x - ws.means[i]) / ws.stds[i] : 0));
+}
+
+function softmaxHam(scores: number[]): number[] {
+  const max = Math.max(...scores);
+  const exps = scores.map((s) => Math.exp(s - max));
+  const sum = exps.reduce((a, b) => a + b, 0);
+  return exps.map((e) => e / sum);
+}
+
+// 2026-08-19 kullanÃ„Â±cÃ„Â± talebi (BODUBEY/EL LEON sonrasÃ„Â± kapsamlÃ„Â± kalibrasyon denetimi):
+// %80+ tahmin dilimi gerÃƒÂ§ek galibiyet oranÃ„Â±ndan belirgin yÃƒÂ¼ksek ÃƒÂ§Ã„Â±kÃ„Â±yordu (n=78, tahmin
+// %88.1 vs gerÃƒÂ§ek %67.9, %95 GA bunu dÃ„Â±Ã…Å¸lÃ„Â±yordu Ã¢â‚¬â€ tÃƒÂ¼m 35.453 satÃ„Â±rlÃ„Â±k veride doÃ„Å¸rulandÃ„Â±).
+// KÃƒÂ¶k neden aranÃ„Â±rken ÃƒÂ¼ÃƒÂ§ ayrÃ„Â± dÃƒÂ¼zeltme denendi (aygÃ„Â±rÃƒâ€”AGF etkileÃ…Å¸im terimi, aygÃ„Â±r/antrenÃƒÂ¶r
+// kare terimleri, L2 gevÃ…Å¸etme) Ã¢â‚¬â€ ÃƒÂ¼ÃƒÂ§ÃƒÂ¼ de sorunu ÃƒÂ§ÃƒÂ¶zmedi, kare terim durumu KÃƒâ€“TÃƒÅ“LEÃ…ÂTÃ„Â°RDÃ„Â°.
+// Bu, sorunun katsayÃ„Â±/ÃƒÂ¶zellik eksikliÃ„Å¸i deÃ„Å¸il, softmax'Ã„Â±n kendi uÃƒÂ§-nokta aÃ…Å¸Ã„Â±rÃ„Â±-gÃƒÂ¼veni
+// olduÃ„Å¸unu gÃƒÂ¶sterdi. Ãƒâ€¡ÃƒÂ¶zÃƒÂ¼m: yalnÃ„Â±z LÃ„Â°DERÃ„Â° zaten %70+ olan koÃ…Å¸ularda (T=1.5) sÃ„Â±caklÃ„Â±k
+// ÃƒÂ¶lÃƒÂ§eklendirmesi Ã¢â‚¬â€ softmax sÃ„Â±ralamayÃ„Â± KORUR (T monoton, top1/top3 hiÃƒÂ§ deÃ„Å¸iÃ…Å¸mez), yalnÃ„Â±z
+// mutlak olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â± yumuÃ…Å¸atÃ„Â±r. Backtest: sabit %80+ grubunun ort. tahmini %88.1Ã¢â€ â€™%70.3
+// (gerÃƒÂ§ek %67.9'a ÃƒÂ§ok yakÃ„Â±n), genel top1 DEÃ„ÂÃ„Â°Ã…ÂMEDÃ„Â° (%38.9), genel logloss KÃƒâ€“TÃƒÅ“LEÃ…ÂMEDÃ„Â°
+// (1.7132Ã¢â€ â€™1.7131, hafif iyileÃ…Å¸me). DiÃ„Å¸er koÃ…Å¸ulara (lider <%70) hiÃƒÂ§ dokunulmuyor.
+const ASIRI_GUVEN_LIDER_ESIGI = 0.7;
+const ASIRI_GUVEN_SICAKLIGI = 1.5;
+
+// 2026-08-26 kullanÃ„Â±cÃ„Â± bulgusu: yukarÃ„Â±daki %70+ genel eÃ…Å¸iÃ„Å¸i Handikap'ta yetersiz kalÃ„Â±yordu Ã¢â‚¬â€
+// "GÃƒÂ¼ÃƒÂ§lÃƒÂ¼ Aday" (>=%30) etiketi alan Handikap yarÃ„Â±Ã…Å¸larÃ„Â±nda (n=22, mevcut %70 eÃ…Å¸iÃ„Å¸iyle) ortalama
+// tahmin %39.7 iken gerÃƒÂ§ek isabet yalnÃ„Â±z %27.3 (-12.4 puan aÃ…Å¸Ã„Â±rÃ„Â±-gÃƒÂ¼ven). Ã„Â°ki baÃ„Å¸Ã„Â±msÃ„Â±z ÃƒÂ¶lÃƒÂ§ÃƒÂ¼m
+// (kayÃ„Â±tlÃ„Â± skorlardan n=20, yeniden inÃ…Å¸a edilen ham skordan n=15) aynÃ„Â± yÃƒÂ¶nde ama kÃƒÂ¼ÃƒÂ§ÃƒÂ¼k
+// ÃƒÂ¶rneklem yÃƒÂ¼zÃƒÂ¼nden YENÃ„Â° bir sÃ„Â±caklÃ„Â±k katsayÃ„Â±sÃ„Â± UYDURULMADI Ã¢â‚¬â€ zaten doÃ„Å¸rulanmÃ„Â±Ã…Å¸ aynÃ„Â±
+// ASIRI_GUVEN_SICAKLIGI (1.5), yalnÃ„Â±z Handikap'a ÃƒÂ¶zel DAHA DÃƒÅ“Ã…ÂÃƒÅ“K bir eÃ…Å¸ikte (0.35) tetikleniyor.
+// Backtest (51 Handikap yarÃ„Â±Ã…Å¸Ã„Â±, yeniden inÃ…Å¸a): "GÃƒÂ¼ÃƒÂ§lÃƒÂ¼ Aday" grubu n=22Ã¢â€ â€™13'e dÃƒÂ¼Ã…Å¸tÃƒÂ¼, kalibrasyon
+// -12.4'ten +3.7 puana geldi (n=13, gÃƒÂ¼rÃƒÂ¼ltÃƒÂ¼ sÃ„Â±nÃ„Â±rÃ„Â±nda ama makul). Genel top1 isabeti
+// DEÃ„ÂÃ„Â°Ã…ÂMEDÃ„Â° (%21.6, 11/51 Ã¢â‚¬â€ sÃ„Â±caklÃ„Â±k sÃ„Â±ralamayÃ„Â± korur, yalnÃ„Â±z gÃƒÂ¶sterilen yÃƒÂ¼zdeyi dÃƒÂ¼zeltir).
+const ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP = 0.35;
+
+// 2026-08-29 Ã¢â‚¬â€ V6 AÃ…Å¸ama 2 (bkz. plan): softmax'Ã„Â±n iÃƒÂ§indeki sÃ„Â±caklÃ„Â±k-ÃƒÂ¶lÃƒÂ§eklendirme kararÃ„Â±nÃ„Â±
+// (lider zaten %70+/%35+ ise sÃ„Â±caklÃ„Â±Ã„Å¸Ã„Â± uygula) dÃ„Â±Ã…Å¸arÃ„Â± ÃƒÂ§Ã„Â±karÃ„Â±r Ã¢â‚¬â€ SAF REFAKTOR, davranÃ„Â±Ã…Å¸
+// deÃ„Å¸iÃ…Å¸medi (softmax artÃ„Â±k bunu birebir ÃƒÂ§aÃ„Å¸Ã„Â±rÃ„Â±yor). AmaÃƒÂ§: yeni P(TOP2)/P(TOP3) hesabÃ„Â±nÃ„Â±n
+// (plackettLuceTopKMarginals) AYNI etkin/sÃ„Â±caklÃ„Â±k-sonrasÃ„Â± skor vektÃƒÂ¶rÃƒÂ¼nÃƒÂ¼ kullanabilmesi Ã¢â‚¬â€
+// yoksa k=1 durumu mevcut `olasilik`'le bit-bit eÃ…Å¸leÃ…Å¸mez.
+function effektifSkorlar(scores: number[], liderEsigi = ASIRI_GUVEN_LIDER_ESIGI): number[] {
+  const ham = softmaxHam(scores);
+  if (Math.max(...ham) < liderEsigi) return scores;
+  return scores.map((s) => s / ASIRI_GUVEN_SICAKLIGI);
+}
+
+function softmax(scores: number[], liderEsigi = ASIRI_GUVEN_LIDER_ESIGI): number[] {
+  return softmaxHam(effektifSkorlar(scores, liderEsigi));
+}
+
+// 2026-08-29 Ã¢â‚¬â€ V6 AÃ…Å¸ama 2: Plackett-Luce KESÃ„Â°N (Monte Carlo deÃ„Å¸il) top-k marjinal olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â±.
+// Saha kÃƒÂ¼ÃƒÂ§ÃƒÂ¼k olduÃ„Å¸u iÃƒÂ§in (Ã¢â€°Â¤~20-24 at) kÃ¢â€°Â¤3 iÃƒÂ§in maliyet n*(n-1)*(n-2) mertebesinde, ÃƒÂ¶nemsiz.
+// YÃƒÂ¶ntem: sÃ„Â±rayla "kim ÃƒÂ¶nde" olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â±nÃ„Â± daÃ„Å¸Ã„Â±t, o atÃ„Â± ÃƒÂ§Ã„Â±karÃ„Â±p kalanlarÃ„Â± yeniden normalize et
+// (ÃƒÂ¶zyinelemeli kaldÃ„Â±rma) Ã¢â‚¬â€ her atÃ„Â±n topK[i]'si, o atÃ„Â±n 1..k sÃ„Â±ralarÃ„Â±ndan HERHANGÃ„Â° birinde
+// bitirme olasÃ„Â±lÃ„Â±klarÃ„Â±nÃ„Â±n toplamÃ„Â±. k=1 iÃƒÂ§in topK[i], softmaxHam(scores)[i] ile BÃ„Â°REBÃ„Â°R aynÃ„Â±
+// ÃƒÂ§Ã„Â±kar (aynÃ„Â± aÃ„Å¸Ã„Â±rlÃ„Â±klar, tek adÃ„Â±m) Ã¢â‚¬â€ bu birim testinde doÃ„Å¸rulanÃ„Â±yor.
+export function plackettLuceTopKMarginals(scores: number[], k: number): number[] {
+  const n = scores.length;
+  const topK = new Array(n).fill(0);
+  if (n === 0 || k <= 0) return topK;
+
+  const max = Math.max(...scores);
+  const weights = scores.map((s) => Math.exp(s - max));
+  const kEtkin = Math.min(k, n);
+
+  function recurse(remaining: number[], remainingSum: number, pathProb: number, depth: number) {
+    if (depth >= kEtkin) return;
+    for (const i of remaining) {
+      const p = pathProb * (weights[i] / remainingSum);
+      topK[i] += p;
+      if (depth + 1 < kEtkin) {
+        recurse(
+          remaining.filter((j) => j !== i),
+          remainingSum - weights[i],
+          p,
+          depth + 1
+        );
+      }
+    }
+  }
+
+  recurse(
+    Array.from({ length: n }, (_, i) => i),
+    weights.reduce((a, b) => a + b, 0),
+    1,
+    0
+  );
+  return topK;
+}
+
+// 2026-08-29 Ã¢â‚¬â€ V6 AÃ…Å¸ama 2: "piyasayÃ„Â± hiÃƒÂ§ gÃƒÂ¶rmeseydi model ne derdi" skoru. harmanliSkorla
+// zaten her ÃƒÂ¶zelliÃ„Å¸in standart-vektÃƒÂ¶r katkÃ„Â±sÃ„Â±nÃ„Â± (katkilar) dÃƒÂ¶ndÃƒÂ¼rÃƒÂ¼yor Ã¢â‚¬â€ AGF-tÃƒÂ¼revi 3
+// ÃƒÂ¶zelliÃ„Å¸in (agfSirasi/agfPayi/agfPayi2) katkÃ„Â±sÃ„Â± toplam skordan ÃƒÂ§Ã„Â±karÃ„Â±lÃ„Â±p TÃƒÅ“M saha AYRICA
+// (kendi effektifSkorlarÃ¢â€ â€™softmaxHam hattÃ„Â±ndan) yeniden normalize edilir. Favori
+// deÃ„Å¸iÃ…Å¸ebileceÃ„Å¸i iÃƒÂ§in bu `olasilik`'in basit bir ÃƒÂ¶lÃƒÂ§eklemesi DEÃ„ÂÃ„Â°L, tam yeni bir softmax.
+export function marketBlindOlasiliklariHesapla(
+  skorlar: number[],
+  katkilarListesi: number[][],
+  liderEsigi: number
+): number[] {
+  const marketBlindSkorlar = skorlar.map(
+    (skor, i) => skor - AGF_KATKI_INDEKSLERI.reduce((toplam, idx) => toplam + katkilarListesi[i][idx], 0)
+  );
+  return softmaxHam(effektifSkorlar(marketBlindSkorlar, liderEsigi));
+}
+
+export type Faz1RunnerV5Sirali = Faz1RunnerV5 & {
+  olasilik: number;
+  probTop2: number; // 2026-08-29 V6 AÃ…Å¸ama 2 Ã¢â‚¬â€ Plackett-Luce kesin marjinal, olasilik'in basit bir ÃƒÂ§arpÃ„Â±mÃ„Â± DEÃ„ÂÃ„Â°L
+  probTop3: number;
+  marketBlindProb1: number; // 2026-08-29 V6 AÃ…Å¸ama 2 Ã¢â‚¬â€ AGF-tÃƒÂ¼revi katkÃ„Â±lar ÃƒÂ§Ã„Â±karÃ„Â±lÃ„Â±p saha ayrÃ„Â±ca normalize edilmiÃ…Å¸ P(WIN)
+  bKatmaniUygulandiMi: boolean; // 2026-08-30 Ã¢â‚¬â€ sireOrani/B katmanÃ„Â± bu atta uygulandÃ„Â± mÃ„Â± (yalnÃ„Â±z dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art)
+  zeminMesafeBKatmaniUygulandiMi: boolean; // 2026-08-30 Ã¢â‚¬â€ Zemin+Mesafe Deneyimi/B katmanÃ„Â± bu atta uygulandÃ„Â± mÃ„Â± (TÃƒÅ“M kategoriler)
+  // 2026-08-30 (V5.30) Ã¢â‚¬â€ Opus denetimi: bu iki B katmanÃ„Â± teriminin GERÃƒâ€¡EK sayÃ„Â±sal katkÃ„Â±sÃ„Â±
+  // ÃƒÂ¶nceden hiÃƒÂ§bir yerde saklanmÃ„Â±yordu (yalnÃ„Â±z uygulandÃ„Â±/uygulanmadÃ„Â± booleanÃ„Â±) Ã¢â‚¬â€ skoru
+  // gerÃƒÂ§ekten deÃ„Å¸iÃ…Å¸tiriyordu ama ne gerekÃƒÂ§e metninde ne featureSnapshot'ta ÃƒÂ¶lÃƒÂ§ÃƒÂ¼lebiliyordu.
+  // ArtÃ„Â±k gerÃƒÂ§ek katkÃ„Â± (softmax ÃƒÂ¶ncesi skora eklenen Ãâ€) burada tutuluyor Ã¢â‚¬â€ muhakemeUretV5
+  // VE tumOzellikleriListele'nin ikisi de bunu kullanÃ„Â±yor.
+  bSireKatkisi: number;
+  bZeminMesafeKatkisi: number;
+  standartVektor: number[];
+  katkilar: number[]; // standartVektor[i] * WEIGHTS[i], her ÃƒÂ¶zelliÃ„Å¸in bu attaki katkÃ„Â±sÃ„Â±
+  sinyalSayisi: number; // V4'ÃƒÂ¼n 8-sinyal sayÃ„Â±mÃ„Â± Ã¢â‚¬â€ terfi kapÃ„Â±sÃ„Â± VE gerekÃƒÂ§e metninde bilgi amaÃƒÂ§lÃ„Â±
+  agfTerfi: "ilk3" | "ilk6" | null;
+  agfFavoriGarantisi: boolean;
+  /** 2026-09-02/03 Ã¢â‚¬â€ Saf Model DeÃ„Å¸er Terfisi (bkz. safModelDegerTerfisiUygula): bu at,
+   *  marketBlindProb1 vs agfPayi ayrÃ„Â±Ã…Å¸masÃ„Â± + AGF-dÃ„Â±Ã…Å¸Ã„Â± katkÃ„Â± toplamÃ„Â±nÃ„Â±n net pozitif
+   *  olmasÃ„Â± yÃƒÂ¼zÃƒÂ¼nden ilk-3'e (fark>=8pp, V5.41) veya ilk-6'ya (fark>=5pp, V5.39) koÃ…Å¸ulsuz
+   *  taÃ…Å¸Ã„Â±ndÃ„Â± mÃ„Â± Ã¢â‚¬â€ agfTerfi ile AYNI iki-kademeli desen (bkz. AGF_KATKI_INDEKSLERI). */
+  degerTerfisi: "ilk3" | "ilk6" | null;
+  /** 2026-09-02 EKÃƒÅ“RÃ„Â° DÃƒÅ“ZELTMESÃ„Â° (THEATER OF WAR/K6) Ã¢â‚¬â€ bkz. efektifPencereSiniri. Bu at,
+   *  ilk-6 penceresi ekÃƒÂ¼ri ortaklarÃ„Â±nÃ„Â± TEK slot sayacak Ã…Å¸ekilde hesaplandÃ„Â±Ã„Å¸Ã„Â±nda (ham
+   *  teknikSira'dan BAÃ„ÂIMSIZ) GERÃƒâ€¡EKTE ilk-6 iÃƒÂ§inde mi. true ise karar "DÃƒÂ¼Ã…Å¸ÃƒÂ¼k Risk"e
+   *  ÃƒÂ§ekilir Ã¢â‚¬â€ teknikSira'nÃ„Â±n kendisi (ham 1..N sÃ„Â±ra) DEÃ„ÂÃ„Â°Ã…ÂMEZ. */
+  ekuriIlk6Efektif: boolean;
+  teknikSira: number;
+  karar: string;
+};
+
+function kararUret(p: number): string {
+  if (p >= 0.3) return "GÃƒÂ¼ÃƒÂ§lÃƒÂ¼ Aday";
+  if (p >= 0.15) return "DÃƒÂ¼Ã…Å¸ÃƒÂ¼k Risk";
+  if (p >= 0.05) return "Orta Risk";
+  return "YÃƒÂ¼ksek Risk";
+}
+
+// 2026-08-27 kullanÃ„Â±cÃ„Â± kararÃ„Â±: "AGF Trend Terfisi kalkmayacak" Ã¢â‚¬â€ V5.20'de AGF Favorisi
+// Ã„Â°lk-3 Garantisi ve Derin AGF-Longshot DÃƒÂ¼zeltmesi'yle BÃ„Â°RLÃ„Â°KTE kaldÃ„Â±rÃ„Â±lmÃ„Â±Ã…Å¸tÃ„Â±, ama kullanÃ„Â±cÃ„Â±
+// yalnÃ„Â±z BU ikisinin kalkmasÃ„Â±nÃ„Â± istemiÃ…Å¸, AGF Trend Terfisi'ni GERÃ„Â° istedi ("en ÃƒÂ§ok aÃ„Å¸Ã„Â±rlÃ„Â±k
+// vermeni istediÃ„Å¸im sinyaldi"). V5.21: yalnÃ„Â±z bu kural geri getirildi, diÃ„Å¸er iki kaldÃ„Â±rma
+// (AGF favori garantisi, derin longshot) hÃƒÂ¢lÃƒÂ¢ geÃƒÂ§erli.
+/** V4'ÃƒÂ¼n terfiPenceresineTasi'sinin (tek-tek-sÃ„Â±rayla-boyuta-ekle) V5 iÃƒÂ§in DÃƒÅ“ZELTÃ„Â°LMÃ„Â°Ã…Â
+ *  hÃƒÂ¢li Ã¢â‚¬â€ 2026-08-16 kullanÃ„Â±cÃ„Â± bulgusu (KING ZELAY vakasÃ„Â±, Ã„Â°zmir K4): eski mekanizma
+ *  "en zayÃ„Â±f ÃƒÂ¶nce, boyutun SON slotuna ekle" yapÃ„Â±yordu Ã¢â‚¬â€ bu, pencerede DOÃ„ÂAL OLARAK
+ *  zaten bulunan (aday bile sayÃ„Â±lmayan, i<pencereBoyu) gÃƒÂ¼ÃƒÂ§lÃƒÂ¼ bir atÃ„Â±, sonradan eklenen
+ *  daha zayÃ„Â±f bir adayla mekanik olarak dÃ„Â±Ã…Å¸arÃ„Â± itebiliyordu (KING ZELAY %14.6 ile doÃ„Å¸al
+ *  3.sÃ„Â±radaydÃ„Â±, ANGEL ON THE RIGHT'Ã„Â±n terfi eklenmesiyle 8.sÃ„Â±raya dÃƒÂ¼Ã…Å¸tÃƒÂ¼).
+ *
+ *  2026-08-16'daki DÃƒÅ“ZELTME ("doÃ„Å¸al sakinler + adaylar TEK havuzda olasÃ„Â±lÃ„Â±Ã„Å¸a gÃƒÂ¶re
+ *  sÃ„Â±ralanÃ„Â±r") YANLIÃ…Â Ãƒâ€¡IKTI Ã¢â‚¬â€ 2026-09-02'de fark edildi (arac-tam-at-inceleme.mts ile
+ *  THEATER OF WAR incelemesi sÃ„Â±rasÃ„Â±nda, sentetik bir repro ile doÃ„Å¸rulandÃ„Â±): `sirali`
+ *  bu fonksiyona HER ZAMAN zaten ham olasÃ„Â±lÃ„Â±Ã„Å¸a gÃƒÂ¶re azalan sÃ„Â±rada geliyor (faz2V5Sirala,
+ *  `const sirali = [...enriched].sort(...)`). Bu durumda pencere dÃ„Â±Ã…Å¸Ã„Â±ndaki HÃ„Â°Ãƒâ€¡BÃ„Â°R aday
+ *  havuzdaki hiÃƒÂ§bir doÃ„Å¸al sakini olasÃ„Â±lÃ„Â±kÃƒÂ§a geÃƒÂ§emez (sakinler tanÃ„Â±m gereÃ„Å¸i zaten daha
+ *  yÃƒÂ¼ksek olasÃ„Â±lÃ„Â±klÃ„Â±) Ã¢â‚¬â€ yani `terfiEdenNolar` HER ZAMAN boÃ…Å¸ dÃƒÂ¶nÃƒÂ¼yordu, mekanizma tÃƒÂ¼mÃƒÂ¼yle
+ *  etkisizdi (bkz. agfFavoriIlk3Garantisi'nin ÃƒÂ¼stÃƒÂ¼ndeki 2026-08-27 notu: "AGF Trend
+ *  Terfisi ... olasÃ„Â±lÃ„Â±Ã„Å¸a gÃƒÂ¶re YARIÃ…ÂIYOR ... olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â± zaten dÃƒÂ¼Ã…Å¸ÃƒÂ¼kse yine dÃ„Â±Ã…Å¸arÃ„Â±da kalÃ„Â±r"
+ *  Ã¢â‚¬â€ bu not sorunu betimliyordu ama kimse ekstrem sonucunu, hiÃƒÂ§ kimsenin asla terfi
+ *  edemediÃ„Å¸ini, fark etmemiÃ…Å¸). "Terfi" kavramÃ„Â±nÃ„Â±n kendisi modelin dÃƒÂ¼Ã…Å¸ÃƒÂ¼k verdiÃ„Å¸i bir atÃ„Â±
+ *  YÃƒÅ“KSELTMEK demek Ã¢â‚¬â€ dÃƒÂ¼Ã…Å¸ÃƒÂ¼k olasÃ„Â±lÃ„Â±klÃ„Â± bir adayÃ„Â±n yÃƒÂ¼ksek olasÃ„Â±lÃ„Â±klÃ„Â± bir sakinle "adil"
+ *  yarÃ„Â±Ã…Å¸masÃ„Â± matematiksel olarak imkÃƒÂ¢nsÃ„Â±z bir gÃƒÂ¶rev.
+ *
+ *  GerÃƒÂ§ek dÃƒÂ¼zeltme: agfFavoriIlk3Garantisi ile AYNI ilke (koÃ…Å¸ulsuz, tek-adaylÃ„Â±k splice) Ã¢â‚¬â€
+ *  pencere dÃ„Â±Ã…Å¸Ã„Â±ndaki adaylar arasÃ„Â±nda (kendi aralarÃ„Â±nda) EN GÃƒÅ“Ãƒâ€¡LÃƒÅ“ olanÃ„Â±, pencerenin en
+ *  zayÃ„Â±f (son) sakinini yerinden ederek pencereye TEK seferde girer. KING ZELAY'Ã„Â± koruyan
+ *  Ã…Å¸ey artÃ„Â±k "olasÃ„Â±lÃ„Â±k yarÃ„Â±Ã…Å¸Ã„Â±" deÃ„Å¸il, "aday listesindeki en iyisi, en fazla BÃ„Â°R sakinin
+ *  yerini alÃ„Â±r" sÃ„Â±nÃ„Â±rÃ„Â± Ã¢â‚¬â€ pencerenin 1. ve 2. sÃ„Â±radaki gÃƒÂ¼ÃƒÂ§lÃƒÂ¼ sakinleri hiÃƒÂ§bir zaman elenmez.
+ *
+ *  2026-09-02 EKÃƒÅ“RÃ„Â° DÃƒÅ“ZELTMESÃ„Â° (kullanÃ„Â±cÃ„Â± bulgusu, Ã„Â°stanbul K6 Ã¢â‚¬â€ THEATER OF WAR 7.sÃ„Â±rada,
+ *  ama 1. ve 4. sÃ„Â±radaki JAEHAERA+DAELLA gerÃƒÂ§ek ekÃƒÂ¼ri): pencere sÃ„Â±nÃ„Â±rÃ„Â± ham dizi indeksi
+ *  (pencereBoyu) yerine efektifPencereSiniri ile hesaplanÃ„Â±yor Ã¢â‚¬â€ bir ekÃƒÂ¼ri ÃƒÂ§ifti pencere
+ *  Ã„Â°Ãƒâ€¡Ã„Â°NDE aynÃ„Â± anda Ã„Â°KÃ„Â° ayrÃ„Â± ham pozisyon tutsa da TEK slot sayÃ„Â±lÃ„Â±r, bu da pencerenin
+ *  gerÃƒÂ§ek sÃ„Â±nÃ„Â±rÃ„Â±nÃ„Â± dÃ„Â±Ã…Å¸arÃ„Â± iter (THEATER OF WAR artÃ„Â±k pencerenin Ã„Â°Ãƒâ€¡Ã„Â°NDE sayÃ„Â±lÃ„Â±yor, dÃ„Â±Ã…Å¸arÃ„Â±daki
+ *  tek gerÃƒÂ§ek aday ANGEL OF DEFNE kalÃ„Â±yor). agfSirasi'nin ekÃƒÂ¼ri ortaklarÃ„Â±nÃ„Â± AYNI sÃ„Â±raya
+ *  koyma mantÃ„Â±Ã„Å¸Ã„Â±yla (gatherFaz1V5'teki 2026-08-30 notu) AYNI ilke, farklÃ„Â± uygulama noktasÃ„Â±. */
+function efektifPencereSiniri<T extends { ekuriGroup: number | null }>(sirali: T[], pencereBoyu: number): number {
+  let slotSayisi = 0;
+  const gorulenGruplar = new Set<number>();
+  for (let i = 0; i < sirali.length; i++) {
+    const grup = sirali[i].ekuriGroup;
+    const yeniSlotMu = grup == null || !gorulenGruplar.has(grup);
+    if (yeniSlotMu) {
+      slotSayisi++;
+      if (grup != null) gorulenGruplar.add(grup);
+    }
+    if (slotSayisi > pencereBoyu) return i;
+  }
+  return sirali.length;
+}
+
+// 2026-09-05 kullanÃ„Â±cÃ„Â± bulgusu (Ã„Â°stanbul K4, BALDER Ã¢â‚¬â€ kazandÃ„Â± ama TERCAN HAN'Ã„Â±n (%4)
+// terfisi yÃƒÂ¼zÃƒÂ¼nden ilk-6'nÃ„Â±n dÃ„Â±Ã…Å¸Ã„Â±na, 7.sÃ„Â±raya itildi Ã¢â‚¬â€ GERÃƒâ€¡EK kupon kaybÃ„Â±, hitTop1=false):
+// dÃƒÂ¶rt terfi/garanti mekanizmasÃ„Â±nÃ„Â±n (agfTrendTerfisi ilk3/ilk6, safModelDegerTerfisi
+// ilk3/ilk6) hiÃƒÂ§birinde "bu terfi kimin yerini alÃ„Â±yor, o at ne kadar gÃƒÂ¼ÃƒÂ§lÃƒÂ¼ydÃƒÂ¼" diye bir
+// kontrol yoktu Ã¢â‚¬â€ trend/deÃ„Å¸er sinyali ne kadar bÃƒÂ¼yÃƒÂ¼k olsa da, adayÃ„Â±n ham olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â± yerini
+// alacaÃ„Å¸Ã„Â± atÃ„Â±n ÃƒÂ§ok altÃ„Â±nda olsa bile (somut vaka: %4 vs %7, oran 0.57) terfi gerÃƒÂ§ekleÃ…Å¸iyordu.
+// KullanÃ„Â±cÃ„Â±nÃ„Â±n kendi ifadesiyle: "%4'lÃƒÂ¼k atÃ„Â± %10'un ÃƒÂ¶nÃƒÂ¼ne koyuyorsan bu bir problemdir".
+// Denenen Ã„Â°LK ÃƒÂ§ÃƒÂ¶zÃƒÂ¼m (adayÃ„Â±n ham olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â±nÃ„Â±n saha ortalamasÃ„Â±nÃ„Â±n altÃ„Â±nda olmasÃ„Â±nÃ„Â± engelleme)
+// arac-terfi-denetimi.mts ile test edilince Ãƒâ€¡OK KATI ÃƒÂ§Ã„Â±ktÃ„Â± Ã¢â‚¬â€ aynÃ„Â± 20 gerÃƒÂ§ek koÃ…Å¸uda terfi
+// sayÃ„Â±sÃ„Â±nÃ„Â± 28'den 3'e dÃƒÂ¼Ã…Å¸ÃƒÂ¼rdÃƒÂ¼, ÃƒÂ§ÃƒÂ¼nkÃƒÂ¼ kÃƒÂ¼ÃƒÂ§ÃƒÂ¼k/orta sahalarda favori dÃ„Â±Ã…Å¸Ã„Â± HER at zaten
+// ortalamanÃ„Â±n altÃ„Â±nda kalÃ„Â±yor (daÃ„Å¸Ã„Â±lÃ„Â±m saÃ„Å¸a ÃƒÂ§arpÃ„Â±k). Bunun yerine adayÃ„Â±n olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â± doÃ„Å¸rudan
+// YERÃ„Â°NÃ„Â° ALACAÃ„ÂI ATIN olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â±yla KIYASLANIYOR Ã¢â‚¬â€ mekanizmanÃ„Â±n kendi ilkesiyle (trend/deÃ„Å¸er
+// bulma) tutarlÃ„Â± kalÃ„Â±p yalnÃ„Â±z "bariz derecede daha zayÃ„Â±f birini terfi ettirme" durumunu
+// engelliyor. DISPLACED_ORAN_ESIGI=0.7 ile aynÃ„Â± 20 koÃ…Å¸uda doÃ„Å¸rulandÃ„Â± (bkz. commit notu).
+const DISPLACED_ORAN_ESIGI = 0.7;
+
+function terfiPenceresiV5<T extends { no: number; olasilik: number; ekuriGroup: number | null }>(
+  sirali: T[],
+  pencereBoyu: number,
+  adayMi: (r: T, index: number) => boolean
+): { sonuc: T[]; terfiEdenNolar: Set<number> } {
+  const efektifSinir = efektifPencereSiniri(sirali, pencereBoyu);
+  const disaridakiAdaylar = sirali
+    .map((r, i) => ({ r, i }))
+    .filter(({ r, i }) => i >= efektifSinir && adayMi(r, i));
+  if (disaridakiAdaylar.length === 0) return { sonuc: sirali, terfiEdenNolar: new Set() };
+
+  const enGuclusu = disaridakiAdaylar.reduce((a, b) => (b.r.olasilik > a.r.olasilik ? b : a));
+
+  const yeriAlinacakAt = sirali[efektifSinir - 1];
+  if (yeriAlinacakAt && enGuclusu.r.olasilik < yeriAlinacakAt.olasilik * DISPLACED_ORAN_ESIGI) {
+    return { sonuc: sirali, terfiEdenNolar: new Set() };
+  }
+
+  const kopya = [...sirali];
+  const [aday] = kopya.splice(enGuclusu.i, 1);
+  kopya.splice(efektifSinir - 1, 0, aday);
+  return { sonuc: kopya, terfiEdenNolar: new Set([aday.no]) };
+}
+
+/** V4'ÃƒÂ¼n kanÃ„Â±tlanmÃ„Â±Ã…Å¸ AGF-trend terfi kuralÃ„Â±nÃ„Â±n V5'e uyarlanmÃ„Â±Ã…Å¸ hÃƒÂ¢li Ã¢â‚¬â€ kullanÃ„Â±cÃ„Â± kararÃ„Â±
+ *  2026-08-16: bÃƒÂ¼yÃƒÂ¼k AGF trendi taÃ…Å¸Ã„Â±yan atlar, YETERÃ„Â°NCE baÃ…Å¸ka sinyal de taÃ…Å¸Ã„Â±yorsa
+ *  (bkz. AGF_TERFI_ILK3_SINYAL_ESIGI=4, V4'ÃƒÂ¼n backtest'i: n=663, %21.6/%53.8, kontrol
+ *  %10.2/%30.7) modelin ham olasÃ„Â±lÃ„Â±k sÃ„Â±ralamasÃ„Â±nda geride kalsa bile ilk-3'e/ilk-6'ya
+ *  taÃ…Å¸Ã„Â±nÃ„Â±r. Regresyon skorunu/olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â± DEÃ„ÂÃ„Â°Ã…ÂTÃ„Â°RMEZ Ã¢â‚¬â€ yalnÃ„Â±z GÃƒâ€“STERÃ„Â°M sÃ„Â±rasÃ„Â±nÃ„Â± ve kararÃ„Â±
+ *  etkiler. Sinyal sayÃ„Â±sÃ„Â± YETERSÃ„Â°ZSE (KURUÃ…ÂHAN ÃƒÂ¶rneÃ„Å¸i: trend var ama yalnÃ„Â±z 2 sinyal) VE
+ *  dÃƒÂ¼Ã…Å¸ÃƒÂ¼Ã…Å¸-iyi-pozisyon ÃƒÂ¶rÃƒÂ¼ntÃƒÂ¼sÃƒÂ¼ de yoksa terfi olmaz Ã¢â‚¬â€ bu KASITLI, trend TEK BAÃ…ÂINA V4'ÃƒÂ¼n
+ *  kendi backtest'inde de ilk-3 iÃƒÂ§in yeterli deÃ„Å¸ildi. */
+function agfTrendTerfisiUygula<
+  T extends {
+    no: number; agfTrendYonu: "yÃƒÂ¼kseliÃ…Å¸" | "dÃƒÂ¼Ã…Å¸ÃƒÂ¼Ã…Å¸" | null; sinyalSayisi: number;
+    agfFark: number; agfSirasi: number; olasilik: number; ekuriGroup: number | null;
+  }
+>(sirali: T[]): (T & { agfTerfi: "ilk3" | "ilk6" | null })[] {
+  const isaretli = sirali.map((r) => ({ ...r, agfTerfi: null as "ilk3" | "ilk6" | null }));
+
+  // 2026-08-16 kullanÃ„Â±cÃ„Â± bulgusu (KINDBERO/ANGEL ON THE RIGHT, Ã„Â°zmir K3/K4): "dÃƒÂ¼Ã…Å¸ÃƒÂ¼Ã…Å¸ ama
+  // hÃƒÂ¢lÃƒÂ¢ iyi AGF pozisyonu" (agfFark<=-1.0 VE agfSirasi<=4) TEK BAÃ…ÂINA (V4'ÃƒÂ¼n 4-sinyal
+  // Ã…Å¸artÃ„Â± olmadan) ilk-3 iÃƒÂ§in yeterince gÃƒÂ¼ÃƒÂ§lÃƒÂ¼ Ã¢â‚¬â€ backtest: n=930, %19.9 galibiyet/%55.1
+  // top3, kontrol grubu %9.3/%28.4 (V4'ÃƒÂ¼n kendi trend+4sinyal kuralÃ„Â±yla aynÃ„Â± seviyede).
+  // NOT Ã¢â‚¬â€ 2026-08-19: bu, SKOR ÃƒÂ¶zelliÃ„Å¸i "agfDususVarMi"dan (toFeatureVector) FARKLI Ã¢â‚¬â€
+  // o pozisyon Ã…Å¸artÃ„Â±nÃ„Â± kaldÃ„Â±rdÃ„Â±, ama bu GÃƒâ€“STERÃ„Â°M TERFÃ„Â°SÃ„Â° penceresi kendi ayrÃ„Â± backtest'i
+  // (yukarÃ„Â±daki) yalnÃ„Â±z ilk-4 iÃƒÂ§in doÃ„Å¸rulandÃ„Â±Ã„Å¸Ã„Â±ndan bilerek pozisyon Ã…Å¸artlÃ„Â± BIRAKILDI.
+  const dususAmaIyiPozisyonMu = (r: T) => r.agfFark <= -ANLAMLI_PUAN_ESIGI && r.agfSirasi <= 4;
+
+  const { sonuc: ilk3Sonrasi, terfiEdenNolar: ilk3Terfi } = terfiPenceresiV5(
+    isaretli,
+    3,
+    (r) => (r.agfTrendYonu != null && r.sinyalSayisi >= SINYAL_ESIGI) || dususAmaIyiPozisyonMu(r)
+  );
+  const ilk3Isaretli = ilk3Sonrasi.map((r) => (ilk3Terfi.has(r.no) ? { ...r, agfTerfi: "ilk3" as const } : r));
+
+  const { sonuc: ilk6Sonrasi, terfiEdenNolar: ilk6Terfi } = terfiPenceresiV5(
+    ilk3Isaretli,
+    6,
+    (r) => r.agfTrendYonu != null
+  );
+  return ilk6Sonrasi.map((r) => (ilk6Terfi.has(r.no) ? { ...r, agfTerfi: "ilk6" as const } : r));
+}
+
+// 2026-08-27 kullanÃ„Â±cÃ„Â± kararÃ„Â± ("V5.14'e dÃƒÂ¶n" Ã¢â‚¬â€ o dÃƒÂ¶nem canlÃ„Â± en yÃƒÂ¼ksek baÃ…Å¸arÃ„Â± oranÃ„Â±nÃ„Â±
+// (n=32, top1 %46.9/top3 %81.3) gÃƒÂ¶steren versiyondu, AGF Trend Terfisi + bu kural birlikte
+// aktifti): V5.20'de kaldÃ„Â±rÃ„Â±lmÃ„Â±Ã…Å¸tÃ„Â±, GÃƒÅ“NCEL (daha bÃƒÂ¼yÃƒÂ¼k, bug-dÃƒÂ¼zeltilmiÃ…Å¸) veriyle B=500
+// bootstrap-CI ile yeniden doÃ„Å¸rulanÃ„Â±p geri getirildi Ã¢â‚¬â€ bkz. ENGINE_VERSIONS V5.22 notu.
+// 2026-08-24 kullanÃ„Â±cÃ„Â± bulgusu (Bursa K10, KaÃ…Å¸mir Tay vakasÃ„Â±): AGF sÃ„Â±rasÃ„Â±=1 (favori) bir
+// at, modelin ham olasÃ„Â±lÃ„Â±k sÃ„Â±ralamasÃ„Â±nda 4.sÃ„Â±raya dÃƒÂ¼Ã…Å¸mÃƒÂ¼Ã…Å¸tÃƒÂ¼ Ã¢â‚¬â€ at kazandÃ„Â±. agfTrendTerfisiUygula
+// AGF-1'i BURADA KORUMAZ, ÃƒÂ§ÃƒÂ¼nkÃƒÂ¼ o mekanizma olasÃ„Â±lÃ„Â±Ã„Å¸a gÃƒÂ¶re YARIÃ…ÂIYOR (candidate havuzda
+// en gÃƒÂ¼ÃƒÂ§lÃƒÂ¼ N tanesi kazanÃ„Â±yor) Ã¢â‚¬â€ AGF-1'in olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â± zaten dÃƒÂ¼Ã…Å¸ÃƒÂ¼kse yine dÃ„Â±Ã…Å¸arÃ„Â±da kalÃ„Â±r.
+// Orijinal backtest (512 sonuÃƒÂ§lanmÃ„Â±Ã…Å¸ yarÃ„Â±Ã…Å¸, 2026-07-01 sonrasÃ„Â±, yayÃ„Â±nlanan Prediction.picks
+// ile): AGF-1 favorisi %33.6 kazanÃ„Â±yor (gerÃƒÂ§ek), modelin top3'ÃƒÂ¼ bunlarÃ„Â±n %91.9'unu zaten
+// yakalÃ„Â±yordu Ã¢â‚¬â€ geri kalan %8.1 (14 yarÃ„Â±Ã…Å¸) modelin top3'ÃƒÂ¼nde YOKTU. AGF-1'i KOÃ…ÂULSUZ
+// 3.sÃ„Â±raya zorlarsak (mevcut #3'ÃƒÂ¼n yerini alarak): +14 yeni galibiyet yakalanÃ„Â±r, yalnÃ„Â±z
+// 5 kez yerini aldÃ„Â±Ã„Å¸Ã„Â±mÃ„Â±z #3 zaten kazanandÃ„Â± Ã¢â‚¬â€ NET +9/512 (top3 isabeti %60.2Ã¢â€ â€™%61.9).
+// OlasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â±/skoru DEÃ„ÂÃ„Â°Ã…ÂTÃ„Â°RMEZ, yalnÃ„Â±z GÃƒâ€“STERÃ„Â°M sÃ„Â±rasÃ„Â±nÃ„Â± etkiler (agfTrendTerfisiUygula
+// ile aynÃ„Â± ilke) Ã¢â‚¬â€ ama o mekanizmadan FARKLI olarak koÃ…Å¸ulsuzdur, rekabete girmez.
+function agfFavoriIlk3Garantisi<T extends { no: number; agfSirasi: number }>(
+  sirali: T[]
+): (T & { agfFavoriGarantisi: boolean })[] {
+  const isaretsiz = sirali.map((r) => ({ ...r, agfFavoriGarantisi: false }));
+  const idx = isaretsiz.findIndex((r) => r.agfSirasi === 1);
+  if (idx < 0 || idx < 3) return isaretsiz;
+
+  const kopya = [...isaretsiz];
+  const [agf1] = kopya.splice(idx, 1);
+  kopya.splice(2, 0, { ...agf1, agfFavoriGarantisi: true });
+  return kopya;
+}
+
+// 2026-09-02 kullanÃ„Â±cÃ„Â± kararÃ„Â± (THEATER OF WAR vakasÃ„Â±, Ã„Â°stanbul Ã¢â‚¬â€ Saf Model marketBlindProb1
+// atÃ„Â± 4.sÃ„Â±raya/%10.2 koyuyordu, AGF payÃ„Â± yalnÃ„Â±z %5.0'dÃ„Â±, harmanlanan nihai skor 8.sÃ„Â±raya
+// gÃƒÂ¶mdÃƒÂ¼ Ã¢â‚¬â€ at gÃƒÂ¼nÃƒÂ¼n en iyi performanslarÃ„Â±ndan birini verdi). KullanÃ„Â±cÃ„Â±: "olumlu sinyaller
+// varken agf piyasaya gÃƒÂ¶re at aÃ…Å¸aÃ„Å¸Ã„Â±lara ÃƒÂ§ekilmemeli en azÃ„Â±ndan 6. at dÃ„Â±Ã…Å¸Ã„Â±na atÃ„Â±lmamalÃ„Â±."
+// SAF_MODEL_DEGER_ESIGI, V5AnalysisPanel'deki "Saf Model vs AGF" rozetinin Ã¢Å¡Â  eÃ…Å¸iÃ„Å¸iyle
+// (fark=marketBlindProb1*100-agfPayi>=5) AYNI Ã¢â‚¬â€ o rozet o zamana kadar "yalnÃ„Â±z bilgi
+// amaÃƒÂ§lÃ„Â±, sÃ„Â±ralamayÃ„Â± etkilemez" idi, kullanÃ„Â±cÃ„Â± bu kararla bunu tersine ÃƒÂ§evirdi.
+// pistUzmani'nin kendisi (genel yÃƒÂ¼zey/hipodrom-baÃ„Å¸Ã„Â±msÃ„Â±z kazanma oranÃ„Â±) BÃ„Â°LEREK skorlamaya
+// eklenmedi Ã¢â‚¬â€ bkz. sinyal-kutugu.service.ts "Genel Pist Tercihi (Hipodrom-BaÃ„Å¸Ã„Â±msÃ„Â±z YÃƒÂ¼zey
+// Kazanma OranÃ„Â±)": GREEN GULET vakasÃ„Â±yla (aynÃ„Â± THEATER OF WAR tÃƒÂ¼rÃƒÂ¼ tetikleyici) test
+// edilmiÃ…Å¸, leak-free B=500 bootstrap'ta iki segmentte de TAMAMEN anlamsÃ„Â±z ÃƒÂ§Ã„Â±kmÃ„Â±Ã…Å¸tÃ„Â±.
+//
+// DÃƒÅ“ZELTME (aynÃ„Â± gÃƒÂ¼n, canlÃ„Â±ya alÃ„Â±ndÃ„Â±ktan hemen sonra) Ã¢â‚¬â€ kullanÃ„Â±cÃ„Â± gerÃƒÂ§ek BAY UMUT/Ã„Â°stanbul
+// K4 vakasÃ„Â±nÃ„Â± sordu: fark=+5.1pp olmasÃ„Â±na raÃ„Å¸men terfi etmemiÃ…Å¸ti. KÃƒÂ¶k neden: ilk sÃƒÂ¼rÃƒÂ¼m
+// ikinci koÃ…Å¸ul olarak sinyalSayisi>=SINYAL_ESIGI kullanÃ„Â±yordu (agfTrendTerfisi'nden ÃƒÂ¶dÃƒÂ¼nÃƒÂ§
+// alÃ„Â±nmÃ„Â±Ã…Å¸) Ã¢â‚¬â€ ama bu, V4/V2 dÃƒÂ¶neminden kalma DAR bir 8-maddelik kontrol listesi (Accurace/
+// KGS-14-30/hipodrom-mesafe kazanma/aygÃ„Â±r-ÃƒÂ¼st-%20/galop/idman-jokeyi/AGF-trend/form) ve
+// BAY UMUT'un marketBlindProb1'ini GERÃƒâ€¡EKTE yÃƒÂ¼kselten asÃ„Â±l sinyallerle (hizDerecesi=+1.24,
+// h2hNetSkor=+1, antrenorOrani=%13.8) HÃ„Â°Ãƒâ€¡ Ãƒâ€“RTÃƒÅ“Ã…ÂMÃƒÅ“YOR Ã¢â‚¬â€ BAY UMUT'un sinyalSayisi'si 0 ÃƒÂ§Ã„Â±ktÃ„Â±,
+// yanlÃ„Â±Ã…Å¸ kapÃ„Â±dan reddedildi. GerÃƒÂ§ek Ã„Â°stanbul K4 verisiyle (12 at) doÃ„Å¸rulandÃ„Â±: doÃ„Å¸ru soru
+// "modelin AGF-hariÃƒÂ§ kendi gÃƒÂ¶rÃƒÂ¼Ã…Å¸ÃƒÂ¼ GERÃƒâ€¡EKTEN net pozitif mi" Ã¢â‚¬â€ bu zaten marketBlindProb1'in
+// KENDÃ„Â° hesaplama yÃƒÂ¶ntemiyle (AGF_KATKI_INDEKSLERI hariÃƒÂ§ tutulan katkÃ„Â±lar toplamÃ„Â±) birebir
+// ÃƒÂ¶lÃƒÂ§ÃƒÂ¼lebiliyor, ayrÃ„Â±/uyumsuz bir sinyal sayacÃ„Â± icat etmeye gerek yok. Yeni koÃ…Å¸ul: katkilar
+// dizisinin AGF-dÃ„Â±Ã…Å¸Ã„Â± toplamÃ„Â± > 0 (yani modelin AGF'siz gÃƒÂ¶rÃƒÂ¼Ã…Å¸ÃƒÂ¼ GERÃƒâ€¡EKTEN, net olarak pozitif
+// Ã¢â‚¬â€ yalnÃ„Â±z AGF'nin ortalamadan daha kÃƒÂ¶tÃƒÂ¼mser olmasÃ„Â± yÃƒÂ¼zÃƒÂ¼nden ORTAYA Ãƒâ€¡IKAN sahte bir fark
+// deÃ„Å¸il). GerÃƒÂ§ek K4/K6 verisiyle ÃƒÂ§apraz kontrol edildi: BAY UMUT (+0.27) ve K4'teki
+// Ã…ÂÃ„Â°MÃ…ÂEKKIRAN (+0.30) doÃ„Å¸ru Ã…Å¸ekilde nitelik kazanÃ„Â±yor; K4'teki DÃ„Â°LAN KIZ (toplam -0.14,
+// fark yine de +5.9pp) ve K6'daki ANGEL OF DEFNE (negatif temel sinyaller) doÃ„Å¸ru Ã…Å¸ekilde
+// DIÃ…ÂLANIYOR Ã¢â‚¬â€ ikisi de bÃƒÂ¼yÃƒÂ¼k farkÃ„Â± yalnÃ„Â±z AGF'nin ekstra kÃƒÂ¶tÃƒÂ¼mserliÃ„Å¸inden alÃ„Â±yor, modelin
+// kendi (AGF'siz) gÃƒÂ¶rÃƒÂ¼Ã…Å¸ÃƒÂ¼ onlar iÃƒÂ§in de zaten olumsuz.
+const SAF_MODEL_DEGER_ESIGI = 5;
+
+// 2026-09-03 kullanÃ„Â±cÃ„Â± bulgusu (Ã„Â°zmir K5, KINDBERO Ã¢â‚¬â€ kazandÃ„Â± ama 4.sÃ„Â±rada kaldÃ„Â±): Saf
+// Model onu 2.sÃ„Â±rada (%16.4) gÃƒÂ¶rÃƒÂ¼yordu, AGF yalnÃ„Â±z 5.sÃ„Â±raya koymuÃ…Å¸tu (fark=+8.2pp), 4.sÃ„Â±ra
+// (ilk-6 iÃƒÂ§i) Saf Model DeÃ„Å¸er Terfisi'nin hiÃƒÂ§ devreye girmesini gerektirmiyordu Ã¢â‚¬â€ ama
+// kullanÃ„Â±cÃ„Â± ilk-3 iÃƒÂ§in de aynÃ„Â± ilkeyi istedi. AYNI (koÃ…Å¸ulsuz splice) mekanizma, agfTrend
+// Terfisi'nin ilk3Ã¢â€ â€™ilk6 Ã„Â°KÃ„Â° KADEMELÃ„Â° desenIYLE (bkz. agfTrendTerfisiUygula) birebir aynÃ„Â±
+// yapÃ„Â±da: ÃƒÂ¶nce daha SIKI bir eÃ…Å¸ikle (8pp, KINDBERO'nun kendi rakamÃ„Â±yla uyumlu Ã¢â‚¬â€ ilk-3
+// daha bÃƒÂ¼yÃƒÂ¼k bir iddia, yanlÃ„Â±Ã…Å¸-pozitif riski daha yÃƒÂ¼ksek) ilk-3 denenir, sonra (ilk-3'ÃƒÂ¼
+// kazanamayan adaylar dahil) mevcut 5pp eÃ…Å¸iÃ„Å¸iyle ilk-6 denenir.
+const SAF_MODEL_DEGER_ESIGI_ILK3 = 8;
+
+function safModelDegerTerfisiUygula<
+  T extends {
+    no: number; olasilik: number; marketBlindProb1: number; agfPayi: number; katkilar: number[];
+    ekuriGroup: number | null;
+  }
+>(sirali: T[]): (T & { degerTerfisi: "ilk3" | "ilk6" | null })[] {
+  const nonAgfPozitifMi = (r: T) => {
+    const nonAgfToplam = r.katkilar.reduce((toplam, k, i) => (AGF_KATKI_INDEKSLERI.includes(i) ? toplam : toplam + k), 0);
+    return nonAgfToplam > 0;
+  };
+  const isaretsiz = sirali.map((r) => ({ ...r, degerTerfisi: null as "ilk3" | "ilk6" | null }));
+
+  const { sonuc: ilk3Sonrasi, terfiEdenNolar: ilk3Terfi } = terfiPenceresiV5(isaretsiz, 3, (r) => {
+    const fark = r.marketBlindProb1 * 100 - r.agfPayi;
+    return fark >= SAF_MODEL_DEGER_ESIGI_ILK3 && nonAgfPozitifMi(r);
+  });
+  const ilk3Isaretli = ilk3Sonrasi.map((r) => (ilk3Terfi.has(r.no) ? { ...r, degerTerfisi: "ilk3" as const } : r));
+
+  const { sonuc: ilk6Sonrasi, terfiEdenNolar: ilk6Terfi } = terfiPenceresiV5(ilk3Isaretli, 6, (r) => {
+    const fark = r.marketBlindProb1 * 100 - r.agfPayi;
+    return fark >= SAF_MODEL_DEGER_ESIGI && nonAgfPozitifMi(r);
+  });
+  return ilk6Sonrasi.map((r) => (ilk6Terfi.has(r.no) ? { ...r, degerTerfisi: "ilk6" as const } : r));
+}
+
+// 2026-08-26 kullanÃ„Â±cÃ„Â± bulgusu: "sistemin 1. seÃƒÂ§imi, AGF favorisinden daha isabetsiz"
+// (dashboard'daki Sistem vs AGF Favorisi kartÃ„Â±: -4.2 puan, n=448). KÃƒÂ¶k neden araÃ…Å¸tÃ„Â±rÃ„Â±ldÃ„Â±:
+// sorun Handikap'a ÃƒÂ¶zel deÃ„Å¸il (orada fark en KÃƒÅ“Ãƒâ€¡ÃƒÅ“K, -1.5) Ã¢â‚¬â€ asÃ„Â±l kanama, sistemin AGF
+// favorisinden FARKLI bir at seÃƒÂ§tiÃ„Å¸i durumlarda, o atÃ„Â±n AGF sÃ„Â±rasÃ„Â±na gÃƒÂ¶re keskin biÃƒÂ§imde
+// ayrÃ„Â±Ã…Å¸Ã„Â±yor. Split-half doÃ„Å¸rulandÃ„Â± (2 baÃ„Å¸Ã„Â±msÃ„Â±z dÃƒÂ¶nemde de aynÃ„Â± desen):
+//   AGF sÃ„Â±rasÃ„Â± 2. seÃƒÂ§ilince: %38.5 / %20.5 isabet (gerÃƒÂ§ek deÃ„Å¸er bulma Ã¢â‚¬â€ dokunulmadÃ„Â±)
+//   AGF sÃ„Â±rasÃ„Â± 3. seÃƒÂ§ilince: %25.0 / %15.4 isabet (hÃƒÂ¢lÃƒÂ¢ makul Ã¢â‚¬â€ dokunulmadÃ„Â±)
+//   AGF sÃ„Â±rasÃ„Â± 4.+ seÃƒÂ§ilince: %2.9 / %0.0 isabet (n=60 toplam, 1 galibiyet) Ã¢â‚¬â€ bu "deÃ„Å¸er
+//   bulma" deÃ„Å¸il, modelin derin bir longshot'a kÃƒÂ¶pÃƒÂ¼rmesi.
+// Bu atlarÃ„Â± AGF favorisine ZORLAMIYORUZ (o da yalnÃ„Â±z %35 kurtarÃ„Â±yor, kalan %65'i BAÃ…ÂKA
+// bir at kazanÃ„Â±yor Ã¢â‚¬â€ "her zaman AGF'ye gÃƒÂ¼ven" kullanÃ„Â±cÃ„Â±nÃ„Â±n reddettiÃ„Å¸i bir yaklaÃ…Å¸Ã„Â±m).
+// Bunun yerine modelin KENDÃ„Â° sÃ„Â±ralÃ„Â± listesinde AGF sÃ„Â±rasÃ„Â±<=3 olan EN ÃƒÅ“ST adayÃ„Â±na inilir
+// (ÃƒÂ§oÃ„Å¸unlukla AGF favorisiyle ÃƒÂ§akÃ„Â±Ã…Å¸Ã„Â±yor ama illa deÃ„Å¸il Ã¢â‚¬â€ model muhakemesi birincil kalÃ„Â±r).
+// Geriye dÃƒÂ¶nÃƒÂ¼k simÃƒÂ¼lasyon (448 sonuÃƒÂ§lanmÃ„Â±Ã…Å¸ yarÃ„Â±Ã…Å¸): %28.6Ã¢â€ â€™%33.0 (net +20), AGF favorisinin
+// kendi oranÃ„Â±nÃ„Â± (%32.8) hafifÃƒÂ§e geÃƒÂ§iyor. 2026-08-27'de kaldÃ„Â±rÃ„Â±lÃ„Â±p aynÃ„Â± gÃƒÂ¼n, GÃƒÅ“NCEL veride
+// walk-forward + B=500 ile yeniden doÃ„Å¸rulanÃ„Â±p GERÃ„Â° getirildi (bkz. ENGINE_VERSIONS V5.23):
+// 794 yarÃ„Â±Ã…Å¸lÃ„Â±k out-of-fold havuzda top1 net GA=[2,19] (sÃ„Â±fÃ„Â±rÃ„Â± iÃƒÂ§ermiyor), top3'e SIFIR
+// maliyet (net GA=[0,0] Ã¢â‚¬â€ hiÃƒÂ§bir bootstrap ÃƒÂ¶rneÃ„Å¸inde top3 seti deÃ„Å¸iÃ…Å¸medi).
+const DERIN_LONGSHOT_AGF_ESIGI = 3;
+
+// 2026-08-27 kullanÃ„Â±cÃ„Â± KESÃ„Â°N kararÃ„Â± (Kocaeli 2.KoÃ…Å¸u ÃƒÂ¶rneÃ„Å¸i somut kanÃ„Â±t oldu Ã¢â‚¬â€ TEYZEOÃ„ÂLU
+// %11.1 ile 1.sÃ„Â±rada, MAÃ…ÂÃ„Â°DE %23.5 ile 3.sÃ„Â±rada duruyordu): "sÃ„Â±ralama yÃƒÂ¼zdeye gÃƒÂ¶re olur,
+// 1.sÃ„Â±radaki ata %24 vermelisin." O gÃƒÂ¼n Ã„Â°KÃ„Â° YÃƒâ€“NDE de deÃ„Å¸iÃ…Å¸ti (V5.20'de kaldÃ„Â±rÃ„Â±ldÃ„Â±, V5.21-23'te
+// tek tek geri geldi, sonra KESÃ„Â°N olarak tekrar kaldÃ„Â±rÃ„Â±lmÃ„Â±Ã…Å¸tÃ„Â±) Ã¢â‚¬â€ ÃƒÂ¼ÃƒÂ§ÃƒÂ¼nÃƒÂ¼n kendi backtest kanÃ„Â±tÃ„Â±
+// (n=663/428/448) o zaman da GEÃƒâ€¡ERLÃ„Â° sayÃ„Â±lÃ„Â±yordu, yalnÃ„Â±z kullanÃ„Â±cÃ„Â± ham yÃƒÂ¼zdeden SAPMA
+// istemiyordu (prensip vetosu, istatistik deÃ„Å¸il).
+//
+// 2026-08-30 Ã¢â‚¬â€ kullanÃ„Â±cÃ„Â± bu ÃƒÂ¼ÃƒÂ§ kuralÃ„Â± tek tek yeniden deÃ„Å¸erlendirdi, TEK bir ortak
+// anahtar yerine ÃƒÅ“Ãƒâ€¡ AYRI anahtara bÃƒÂ¶lÃƒÂ¼ndÃƒÂ¼ ki karar ÃƒÂ¼ÃƒÂ§ÃƒÂ¼ iÃƒÂ§in de aynÃ„Â± olmak zorunda kalmasÃ„Â±n:
+// - AGF Trend Terfisi: GERÃ„Â° AÃƒâ€¡ILDI. Kocaeli-tipi bir ÃƒÂ§akÃ„Â±Ã…Å¸maya YOL AÃƒâ€¡MAZ (agfSirasi'na gÃƒÂ¶re
+//   koÃ…Å¸ulsuz deÃ„Å¸il, adayÃ„Â±n olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â± diÃ„Å¸er adaylarla YARIÃ…ÂIR Ã¢â‚¬â€ bkz. terfiPenceresiV5/
+//   agfTrendTerfisiUygula'nÃ„Â±n kendi notu) ve n=663 kanÃ„Â±tÃ„Â± hÃƒÂ¢lÃƒÂ¢ geÃƒÂ§erli.
+// - AGF Favorisi Ã„Â°lk-3 Garantisi: KAPALI KALDI. Tam olarak Kocaeli 2.KoÃ…Å¸u'daki gibi bir
+//   durumda (AGF favorisi ham sÃ„Â±ralamada top3 dÃ„Â±Ã…Å¸Ã„Â±na dÃƒÂ¼Ã…Å¸ÃƒÂ¼nce) modelin kendi yÃƒÂ¼zdesini
+//   YOK SAYIP o atÃ„Â± KOÃ…ÂULSUZ 3.sÃ„Â±raya ÃƒÂ§eker Ã¢â‚¬â€ kullanÃ„Â±cÃ„Â±nÃ„Â±n reddettiÃ„Å¸i davranÃ„Â±Ã…Å¸Ã„Â±n ta kendisi.
+// - Derin AGF-Longshot DÃƒÂ¼zeltmesi: KAPALI KALDI, hem aynÃ„Â± prensip gerekÃƒÂ§esiyle hem de
+//   artÃ„Â±k istatistiksel kanÃ„Â±tÃ„Â± da yok (gÃƒÂ¼ncel/tazelenmiÃ…Å¸ veride GA=[-3,11], sÃ„Â±fÃ„Â±rÃ„Â± iÃƒÂ§eriyor).
+const AGF_TREND_TERFISI_AKTIF = true;
+const AGF_FAVORI_ILK3_GARANTISI_AKTIF = false;
+const DERIN_LONGSHOT_DUZELTMESI_AKTIF = false;
+// 2026-09-02 kullanÃ„Â±cÃ„Â± kararÃ„Â± (THEATER OF WAR) Ã¢â‚¬â€ bkz. safModelDegerTerfisiUygula'nÃ„Â±n
+// ÃƒÂ¼stÃƒÂ¼ndeki not. AGF_FAVORI_ILK3_GARANTISI_AKTIF/DERIN_LONGSHOT_DUZELTMESI_AKTIF'Ã„Â±n
+// AKSÃ„Â°NE bu KAPALI DEÃ„ÂÃ„Â°L: farklÃ„Â± bir ilkeye dayanÃ„Â±yor (piyasa payÃ„Â±nÃ„Â± YOK SAYMIYOR,
+// piyasanÃ„Â±n GÃƒâ€“RMEDÃ„Â°Ã„ÂÃ„Â° baÃ„Å¸Ã„Â±msÃ„Â±z modeli deÃ„Å¸eri + ayrÃ„Â± sinyal kanÃ„Â±tÃ„Â±nÃ„Â± birlikte arÃ„Â±yor).
+const SAF_MODEL_DEGER_TERFISI_AKTIF = true;
+
+function derinLongshotDuzelt<T extends { no: number; agfSirasi: number }>(sirali: T[]): T[] {
+  if (sirali.length === 0 || sirali[0].agfSirasi <= DERIN_LONGSHOT_AGF_ESIGI) return sirali;
+  const idx = sirali.findIndex((r, i) => i > 0 && r.agfSirasi <= DERIN_LONGSHOT_AGF_ESIGI);
+  if (idx < 0) return sirali; // uygun aday yoksa (ÃƒÂ¶r. tÃƒÂ¼m sahada AGF verisi eksik) dokunma
+  const kopya = [...sirali];
+  [kopya[0], kopya[idx]] = [kopya[idx], kopya[0]];
+  return kopya;
+}
+
+// 2026-08-29/30 Ã¢â‚¬â€ "B katmanÃ„Â±" (bkz. plan: A/B/C Sinyal Katmanlama Mimarisi). sireOrani
+// bugÃƒÂ¼n 8 aday arasÃ„Â±nda en gÃƒÂ¼ÃƒÂ§lÃƒÂ¼ gÃƒÂ¶rÃƒÂ¼ndÃƒÂ¼ ama KALICI araÃƒÂ§la (n=1060, segment-bazlÃ„Â±, gerÃƒÂ§ek
+// train/test) yeniden test edilince dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art'ta da anlamsÃ„Â±z ÃƒÂ§Ã„Â±ktÃ„Â± (nokta=0.0477,
+// GA=[-0.1352,0.2045]). KullanÃ„Â±cÃ„Â± KARARIYLA (zeminToleransi emsaliyle, AYNI oturumda
+// AskUserQuestion ile teyit alÃ„Â±ndÃ„Â±) yine de dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art'a Ãƒâ€“ZEL, mevcut 12-ÃƒÂ¶zellikli A
+// katmanÃ„Â±na KARIÃ…ÂMADAN (13. terim olarak yeniden fit EDÃ„Â°LMEDEN Ã¢â‚¬â€ bu, bugÃƒÂ¼n 7/8 adayda
+// "kÃƒÂ¼ÃƒÂ§ÃƒÂ¼k ÃƒÂ¶rneklemde gÃƒÂ¼ÃƒÂ§ kaybÃ„Â±" sorununa yol aÃƒÂ§an yÃƒÂ¶ntemdi) ayrÃ„Â± bir katman olarak eklendi.
+// KatsayÃ„Â±, bugÃƒÂ¼nÃƒÂ¼n gerÃƒÂ§ek dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art eÃ„Å¸itiminden (nokta tahmini, kanÃ„Â±tsÃ„Â±z ama KEYFÃ„Â°
+// DEÃ„ÂÃ„Â°L) alÃ„Â±ndÃ„Â±. Ortalama/sapma, model-veri.json'daki dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art runner satÃ„Â±rlarÃ„Â±ndan
+// (n=10612) tek seferlik hesaplandÃ„Â± Ã¢â‚¬â€ WEIGHTS_DUSUK_SART.means/stds ile AYNI kaynak,
+// yalnÃ„Â±z sireOrani A katmanÃ„Â±nÃ„Â±n dÃ„Â±Ã…Å¸Ã„Â±nda tutulduÃ„Å¸u iÃƒÂ§in ayrÃ„Â± sabitlendi.
+const B_SIREORANI_KATSAYI = 0.0477;
+const B_SIREORANI_ORTALAMA = 11.6305;
+const B_SIREORANI_SAPMA = 3.6563;
+
+/** Bir koÃ…Å¸unun dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art aÃ„Å¸Ã„Â±rlÃ„Â±Ã„Å¸Ã„Â± Ã¢â‚¬â€ agirlikSetleriSec ile AYNI mantÃ„Â±k (saf dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art=1,
+ *  hibrit Maiden/SatÃ„Â±Ã…Å¸=0.5 [harmanliSkorla'nÃ„Â±n kendi ortalamasÃ„Â±yla tutarlÃ„Â±], diÃ„Å¸er=0). */
+function bAgirlikOrani(classType: string): number {
+  if (hibritMaidenSatisMi(classType)) return 0.5;
+  const kategori = kategoriTespit(classType);
+  return kategori === "1a" || kategori === "1b" ? 1 : 0;
+}
+
+// 2026-08-30 kullanÃ„Â±cÃ„Â± KARARI: Zemin+Mesafe Deneyimi (bkz. zemin-mesafe-deneyimi.actions.ts,
+// C katmanÃ„Â±/v6-zemin-mesafe-deneyimi challenger'Ã„Â±) nÃ¢â€°Â¥250-300 gÃƒÂ¶lge-koÃ…Å¸u/B=500 kanÃ„Â±tÃ„Â±
+// beklenmeden DERHAL canlÃ„Â±ya alÃ„Â±nmasÃ„Â± istendi Ã¢â‚¬â€ sireOrani/zeminToleransi ile AYNI tÃƒÂ¼rden
+// bilinÃƒÂ§li, kanÃ„Â±tsÃ„Â±z bir istisna (standart "ÃƒÂ¶nce backtest" kuralÃ„Â±nÃ„Â±n aÃƒÂ§Ã„Â±k ihlali, kullanÃ„Â±cÃ„Â±
+// kararÃ„Â±yla). sireOrani'nin AKSÃ„Â°NE dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art'a ÃƒÂ¶zgÃƒÂ¼ deÃ„Å¸il Ã¢â‚¬â€ kavram (bugÃƒÂ¼nkÃƒÂ¼ tam pist+zemin+
+// mesafe koÃ…Å¸ulunda kanÃ„Â±tlanmÃ„Â±Ã…Å¸ deneyim) TÃƒÅ“M kategorilerde anlamlÃ„Â±, bu yÃƒÂ¼zden oran HER ZAMAN
+// 1 (bAgirlikOrani'ye tabi deÃ„Å¸il). KatsayÃ„Â± (0.02), challenger'da test edilen AYNI
+// kanÃ„Â±tlanmamÃ„Â±Ã…Å¸ varsayÃ„Â±m.
+// 2026-09-12 DÃƒÅ“ZELTME: "doÃ„Å¸al olarak ~0 merkezli" varsayÃ„Â±mÃ„Â± hiÃƒÂ§ Ãƒâ€“LÃƒâ€¡ÃƒÅ“LMEMÃ„Â°Ã…ÂTÃ„Â° Ã¢â‚¬â€ gerÃƒÂ§ek
+// veride (n=4482 veri-olan at, model-veri-yg4.json) ortalama -0.515 (std=2.624) ÃƒÂ§Ã„Â±ktÃ„Â±,
+// yani her ata kÃƒÂ¼ÃƒÂ§ÃƒÂ¼k bir sistematik CEZA biniyordu. ArtÃ„Â±k sireOrani ile AYNI desende
+// merkezleniyor (yalnÃ„Â±z GERÃƒâ€¡EK veri olan atlarda Ã¢â‚¬â€ "veri yok" iÃƒÂ§in 0 nÃƒÂ¶tr kalmalÃ„Â±, aksi
+// halde eksik veriye sahte bir sinyal binerdi).
+const B_ZEMINMESAFE_KATSAYI = 0.02;
+const B_ZEMINMESAFE_ORTALAMA = -0.515;
+
+/** B katmanÃ„Â±nÃ„Â± (sireOrani/dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art + zeminMesafeDeneyim/TÃƒÅ“M kategoriler) softmax'a girmeden
+ *  Ãƒâ€“NCE skora ekler. softmax(skor+Ãâ€) Ã¢Ë†Â softmax(skor)Ãƒâ€”exp(Ãâ€) olduÃ„Å¸u iÃƒÂ§in bu, "olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â±
+ *  ÃƒÂ§arpmak" ile matematiksel olarak AYNI Ã…Å¸ey Ã¢â‚¬â€ ama A'nÃ„Â±n kendi regresyonuna karÃ„Â±Ã…Å¸madan, ayrÃ„Â±
+ *  kalibre edilmiÃ…Å¸ terimler olarak. */
+function bKatmaniUygula(
+  skorlar: number[],
+  runners: Faz1RunnerV5[],
+  classType: string
+): { skorlar: number[]; uygulandi: boolean[]; zeminMesafeUygulandi: boolean[]; sireKatkilar: number[]; zeminMesafeKatkilar: number[] } {
+  const sireOran = bAgirlikOrani(classType);
+  const sireKatkilar = runners.map((r) =>
+    sireOran === 0 ? 0 : sireOran * B_SIREORANI_KATSAYI * ((r.sireOrani - B_SIREORANI_ORTALAMA) / B_SIREORANI_SAPMA)
+  );
+  const zeminMesafeKatkilar = runners.map((r) =>
+    r.zeminMesafeDeneyimSeviyesi === "yok" ? 0 : B_ZEMINMESAFE_KATSAYI * (r.zeminMesafeDeneyim - B_ZEMINMESAFE_ORTALAMA)
+  );
+  const yeniSkorlar = skorlar.map((skor, i) => skor + sireKatkilar[i] + zeminMesafeKatkilar[i]);
+  return {
+    skorlar: yeniSkorlar,
+    uygulandi: runners.map(() => sireOran > 0),
+    zeminMesafeUygulandi: runners.map((r) => r.zeminMesafeDeneyim !== 0),
+    sireKatkilar,
+    zeminMesafeKatkilar,
+  };
+}
+
+export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
+  const setler = agirlikSetleriSec(faz1.race.classType);
+  const harmanlar = faz1.runners.map((r) => harmanliSkorla(toFeatureVector(r), setler));
+  const handikapMi = kategoriTespit(faz1.race.classType) === "2";
+  const liderEsigi = handikapMi ? ASIRI_GUVEN_LIDER_ESIGI_HANDIKAP : ASIRI_GUVEN_LIDER_ESIGI;
+  const skorlarHam = harmanlar.map((h) => h.skor);
+  const {
+    skorlar,
+    uygulandi: bKatmaniUygulandi,
+    zeminMesafeUygulandi,
+    sireKatkilar: bSireKatkilar,
+    zeminMesafeKatkilar: bZeminMesafeKatkilar,
+  } = bKatmaniUygula(skorlarHam, faz1.runners, faz1.race.classType);
+  const probs = softmax(skorlar, liderEsigi);
+  const etkinSkorlar = effektifSkorlar(skorlar, liderEsigi);
+  const top2Marjinal = plackettLuceTopKMarginals(etkinSkorlar, 2);
+  const top3Marjinal = plackettLuceTopKMarginals(etkinSkorlar, 3);
+  const marketBlindProbs = marketBlindOlasiliklariHesapla(
+    skorlar,
+    harmanlar.map((h) => h.katkilar),
+    liderEsigi
+  );
+
+  const enriched = faz1.runners.map((r, i) => {
+    const sinyal = hesaplaSinyalSayisi(
+      {
+        no: r.no,
+        recentForm: r.recentForm,
+        accuraceSonYarisEnHizliKapanis: r.accurace === 1,
+        gunAralik: r.kgsVarMi ? r.kgs : null,
+        hipodromMesafedeKazandi: r.hipodromMesafedeKazandi,
+        sireKazanmaOrani: r.sireKazanmaOraniHam,
+        sireOrneklemKendiVeri: r.sireOrneklemKendiVeri,
+        keskinGalopZinciri: r.galop === 1,
+        idmanJokeyiUyumu: r.idmJokey === 1,
+      },
+      r.agfTrendYonu ? { fark: r.agfTrendFark!, yon: r.agfTrendYonu } : undefined
+    );
+    return {
+      ...r,
+      olasilik: probs[i],
+      probTop2: top2Marjinal[i],
+      probTop3: top3Marjinal[i],
+      marketBlindProb1: marketBlindProbs[i],
+      bKatmaniUygulandiMi: bKatmaniUygulandi[i],
+      zeminMesafeBKatmaniUygulandiMi: zeminMesafeUygulandi[i],
+      bSireKatkisi: bSireKatkilar[i],
+      bZeminMesafeKatkisi: bZeminMesafeKatkilar[i],
+      standartVektor: harmanlar[i].standartVektor,
+      katkilar: harmanlar[i].katkilar,
+      sinyalSayisi: sinyal.sayi,
+    };
+  });
+
+  const sirali = [...enriched].sort((a, b) => (b.olasilik !== a.olasilik ? b.olasilik - a.olasilik : a.no - b.no));
+
+  const terfili = AGF_TREND_TERFISI_AKTIF
+    ? agfTrendTerfisiUygula(sirali)
+    : sirali.map((r) => ({ ...r, agfTerfi: null as "ilk3" | "ilk6" | null }));
+
+  const garantili = AGF_FAVORI_ILK3_GARANTISI_AKTIF
+    ? agfFavoriIlk3Garantisi(terfili)
+    : terfili.map((r) => ({ ...r, agfFavoriGarantisi: false }));
+
+  const duzeltilmis = DERIN_LONGSHOT_DUZELTMESI_AKTIF ? derinLongshotDuzelt(garantili) : garantili;
+
+  const degerliSiralanmis = SAF_MODEL_DEGER_TERFISI_AKTIF
+    ? safModelDegerTerfisiUygula(duzeltilmis)
+    : duzeltilmis.map((r) => ({ ...r, degerTerfisi: null as "ilk3" | "ilk6" | null }));
+
+  // 2026-09-02 EKÃƒÅ“RÃ„Â° DÃƒÅ“ZELTMESÃ„Â° (Ã„Â°stanbul K6, THEATER OF WAR) Ã¢â‚¬â€ bkz. efektifPencereSiniri
+  // ÃƒÂ¼stÃƒÂ¼ndeki not. Bir ekÃƒÂ¼ri ÃƒÂ§ifti ilk-6 iÃƒÂ§inde iki ayrÃ„Â± ham pozisyon tutuyorsa, hemen
+  // ardÃ„Â±ndan gelen at (THEATER OF WAR gibi) GERÃƒâ€¡EKTE ilk-6'nÃ„Â±n iÃƒÂ§inde sayÃ„Â±lÃ„Â±r Ã¢â‚¬â€ teknikSira
+  // (ham 1..N sÃ„Â±ra) DEÃ„ÂÃ„Â°Ã…ÂMEZ, yalnÃ„Â±z "Orta/YÃƒÂ¼ksek Risk Ã¢â€ â€™ DÃƒÂ¼Ã…Å¸ÃƒÂ¼k Risk" kararÃ„Â±, tÃ„Â±pkÃ„Â± ilk6
+  // terfisi/deÃ„Å¸er terfisi almÃ„Â±Ã…Å¸ bir at gibi, ona da uygulanÃ„Â±r.
+  const ilk6EfektifSinir = efektifPencereSiniri(degerliSiralanmis, 6);
+
+  // 2026-09-03 kullanÃ„Â±cÃ„Â± bulgusu (Ã„Â°zmir K7, PRENSES BERRÃ„Â°N): agfTrendTerfisiUygula ilk6
+  // ADIMINDA onu 6.sÃ„Â±raya taÃ…Å¸Ã„Â±mÃ„Â±Ã…Å¸tÃ„Â± (agfTerfi="ilk6" damgalandÃ„Â±) Ã¢â‚¬â€ ama HEMEN ARDINDAN
+  // ÃƒÂ§alÃ„Â±Ã…Å¸an safModelDegerTerfisiUygula, AYNI 6.slotu YURTKURAN iÃƒÂ§in kullanÃ„Â±p onu sessizce
+  // 7.sÃ„Â±raya GERÃ„Â° itti. agfTerfi/degerTerfisi bayraklarÃ„Â± o ANDAKÃ„Â° (artÃ„Â±k BAYAT) durumu
+  // taÃ…Å¸Ã„Â±maya devam etti Ã¢â‚¬â€ PRENSES BERRÃ„Â°N son halde 7.sÃ„Â±rada (ilk-6 DIÃ…ÂINDA) olmasÃ„Â±na
+  // raÃ„Å¸men "DÃƒÂ¼Ã…Å¸ÃƒÂ¼k Risk" kararÃ„Â± ve "ilk-6'ya terfi" gerekÃƒÂ§e metni GÃƒâ€“STERMEYE devam etti,
+  // bu YANILTICIYDI. DÃƒÂ¼zeltme: bayraklar burada GERÃƒâ€¡EK son pozisyona (i) gÃƒÂ¶re YENÃ„Â°DEN
+  // hesaplanÃ„Â±yor Ã¢â‚¬â€ bir terfi sonraki bir mekanizma tarafÃ„Â±ndan geri alÃ„Â±nmÃ„Â±Ã…Å¸sa (evict
+  // edilmiÃ…Å¸se) bayrak da onunla birlikte sÃ„Â±fÃ„Â±rlanÃ„Â±r (ya alt kademeye Ã¢â‚¬â€ ilk3Ã¢â€ â€™ilk6 Ã¢â‚¬â€ iner
+  // ya da tamamen null olur), muhakeme metni/karar artÃ„Â±k HER ZAMAN gerÃƒÂ§ek son durumu yansÃ„Â±tÃ„Â±r.
+  return degerliSiralanmis.map((r, i) => {
+    const gercekAgfTerfi: "ilk3" | "ilk6" | null = r.agfTerfi != null ? (i < 3 ? "ilk3" : i < 6 ? "ilk6" : null) : null;
+    const gercekDegerTerfisi: "ilk3" | "ilk6" | null = r.degerTerfisi != null ? (i < 3 ? "ilk3" : i < 6 ? "ilk6" : null) : null;
+    let karar = kararUret(r.olasilik);
+    if (gercekAgfTerfi === "ilk3" || gercekDegerTerfisi === "ilk3") karar = "GÃƒÂ¼ÃƒÂ§lÃƒÂ¼ Aday";
+    else if ((gercekAgfTerfi === "ilk6" || gercekDegerTerfisi === "ilk6") && (karar === "Orta Risk" || karar === "YÃƒÂ¼ksek Risk")) karar = "DÃƒÂ¼Ã…Å¸ÃƒÂ¼k Risk";
+    const ekuriIlk6Efektif = i < ilk6EfektifSinir;
+    if (ekuriIlk6Efektif && (karar === "Orta Risk" || karar === "YÃƒÂ¼ksek Risk")) karar = "DÃƒÂ¼Ã…Å¸ÃƒÂ¼k Risk";
+    return { ...r, teknikSira: i + 1, karar, ekuriIlk6Efektif, agfTerfi: gercekAgfTerfi, degerTerfisi: gercekDegerTerfisi };
+  });
+}
+
+// V4'ÃƒÂ¼n faz2BankoAdayiTespit'i "GÃƒÂ¼ÃƒÂ§lÃƒÂ¼ Aday" (p>=%30) metnine bakÃ„Â±yordu Ã¢â‚¬â€ 826 koÃ…Å¸uluk
+// backtest'te bu eÃ…Å¸ikte isabet oranÃ„Â± yalnÃ„Â±z %44.8 ÃƒÂ§Ã„Â±ktÃ„Â± (2026-08-16 kullanÃ„Â±cÃ„Â± bulgusu:
+// "Banko AdayÃ„Â±" dedikleri ÃƒÂ§oÃ„Å¸u gelmiyor). V5 kendi ham olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â±na gÃƒÂ¶re AYRI ve daha
+// yÃƒÂ¼ksek bir eÃ…Å¸ik (%40, backtest'te n=296/826 koÃ…Å¸uda tetiklenip %53.7 isabet) kullanmÃ„Â±Ã…Å¸tÃ„Â±.
+//
+// 2026-08-22 kullanÃ„Â±cÃ„Â± bulgusu Ã¢â‚¬â€ CANLIDA bu iddia doÃ„Å¸rulanmadÃ„Â±: yayÃ„Â±nlanan 11 bankonun
+// yalnÃ„Â±z 3'ÃƒÂ¼ isabet etti (%27.3), %53.7 backtest iddiasÃ„Â±nÃ„Â±n ÃƒÂ§ok altÃ„Â±nda. KÃƒÂ¶k neden
+// ARAÃ…ÂTIRILDI (kullanÃ„Â±cÃ„Â± talebi: "kazanan atlarda hangi sinyaller gÃƒÂ¶rÃƒÂ¼lÃƒÂ¼yor"): 8 Ã„Â±ska
+// bankonun 8'inde de ortak desen Ã¢â‚¬â€ banko seÃƒÂ§imi neredeyse SADECE AGF favorisi olmaktan
+// gÃƒÂ¼ÃƒÂ§ alÃ„Â±yordu (AGF SÃ„Â±rasÃ„Â±+PayÃ„Â± skorun en bÃƒÂ¼yÃƒÂ¼k bileÃ…Å¸eni), gerÃƒÂ§ek kazanan ise AGF
+// favorisi DEÃ„ÂÃ„Â°LDÃ„Â° ve kendi alanÃ„Â±nda baÃ„Å¸Ã„Â±msÃ„Â±z bir sinyal (hÃ„Â±z/antrenÃƒÂ¶r/jokey) taÃ…Å¸Ã„Â±yordu.
+// TÃƒÅ“M geÃƒÂ§miÃ…Å¸ veride (n=411 sonuÃƒÂ§lu tahmin) doÃ„Å¸rulandÃ„Â±: #1 seÃƒÂ§im AGF favorisi ve SADECE
+// AGF baskÃ„Â±nsa isabet %23.6 (n=106) Ã¢â‚¬â€ AGF favorisi bile OLMAYAN kontrol grubundan
+// (%20.5, n=127) neredeyse farksÃ„Â±z! AGF favorisi + EN AZ BÃ„Â°R baÃ„Å¸Ã„Â±msÃ„Â±z gÃƒÂ¼ÃƒÂ§lÃƒÂ¼ sinyal
+// (katkÃ„Â±>=0.3) varsa isabet %34.8'e (n=178) ÃƒÂ§Ã„Â±kÃ„Â±yor. Tekil sinyal kÃ„Â±rÃ„Â±lÃ„Â±mÃ„Â±nda en
+// gÃƒÂ¼venilir onaylayÃ„Â±cÃ„Â±lar (bÃƒÂ¼yÃƒÂ¼k ÃƒÂ¶rneklem): jokeyOrani %36.1 (n=61), antrenorOrani
+// %29.9 (n=167), hizDerecesi %29.1 (n=117).
+// SONUÃƒâ€¡: olasÃ„Â±lÃ„Â±k eÃ…Å¸iÃ„Å¸i TEK BAÃ…ÂINA yeterli deÃ„Å¸ilmiÃ…Å¸ Ã¢â‚¬â€ AGF baskÃ„Â±nlÃ„Â±Ã„Å¸Ã„Â± baÃ„Å¸Ã„Â±msÃ„Â±z bir
+// sinyalle DOÃ„ÂRULANMADIKÃƒâ€¡A banko sayÃ„Â±lmayacak Ã…Å¸ekilde ikinci bir koÃ…Å¸ul eklendi.
+//
+// 2026-08-31 (V5.32) Ã¢â‚¬â€ Opus'un ÃƒÂ§erÃƒÂ§eve denetimi: hafÃ„Â±zadaki "n=7, %28.6" rakamÃ„Â±
+// `isBanko`'nun 2026-08-28'e kadar hep false kaydedildiÃ„Å¸i bir kayÃ„Â±t bugunun kalÃ„Â±ntÃ„Â±sÃ„Â±ydÃ„Â±,
+// mekanizmanÃ„Â±n GERÃƒâ€¡EK performansÃ„Â± deÃ„Å¸il. Mekanizma ÃƒÂ§evrimdÃ„Â±Ã…Å¸Ã„Â± (canlÃ„Â± aÃ„Å¸Ã„Â±rlÃ„Â±klar+override'lar
+// BÃ„Â°REBÃ„Â°R) 1.060 koÃ…Å¸uda yeniden ÃƒÂ§alÃ„Â±Ã…Å¸tÃ„Â±rÃ„Â±ldÃ„Â±: n=122/1060 (%11.5) tetik, top1 %56.6 [GA
+// %48-65], top3 %90.2 Ã¢â‚¬â€ ÃƒÂ¶rneklem-dÃ„Â±Ã…Å¸Ã„Â± (son %25) %64.3, V5 dÃƒÂ¶neminde (ÃƒÂ§evrimdÃ„Â±Ã…Å¸Ã„Â±) %66.7.
+// YukarÃ„Â±daki 2026-08-22 notundaki "n=178, %34.8" ve "n=106, %23.6" rakamlarÃ„Â± BAYAT (o zamanki
+// 23-ÃƒÂ¶zellikli modelden) Ã¢â‚¬â€ gÃƒÂ¼ncel referans bu. AyrÃ„Â±ca eÃ…Å¸ik taramasÃ„Â± TEMÃ„Â°Z monoton ÃƒÂ§Ã„Â±ktÃ„Â±:
+// %55'te 78 tetik/%57.7, %60'ta 41 tetik (%3.9)/%65.9 (ÃƒÂ¶rneklem-dÃ„Â±Ã…Å¸Ã„Â± %85.7, V5'te %100 n=6).
+// Bu yÃƒÂ¼zden ayrÃ„Â±, daha gÃƒÂ¼ÃƒÂ§lÃƒÂ¼ bir "GÃƒÂ¼ÃƒÂ§lÃƒÂ¼ Banko" kademesi eklendi (mevcut %50 eÃ…Å¸iÃ„Å¸i/mantÃ„Â±Ã„Å¸Ã„Â±
+// DEÃ„ÂÃ„Â°Ã…ÂMEDÃ„Â°, ÃƒÂ¼stÃƒÂ¼ne ek bir kademe). Test edilip DESTEKLENMEYEN ÃƒÂ¶neriler (AGF-favorisi Ã…Å¸artÃ„Â±,
+// Ã¢â€°Â¥2-farklÃ„Â±-aile baÃ„Å¸Ã„Â±msÃ„Â±z sinyal Ã…Å¸artÃ„Â±, pistUzmani/kaÃƒÂ§ak-tek kapÃ„Â±larÃ„Â±, negatif-sinyal
+// diskalifiye kapÃ„Â±sÃ„Â±) BÃ„Â°LEREK eklenmedi Ã¢â‚¬â€ hiÃƒÂ§biri isabeti artÃ„Â±rmadÃ„Â±, ÃƒÂ§oÃ„Å¸u tetik sayÃ„Â±sÃ„Â±nÃ„Â±
+// 2-6 kat dÃƒÂ¼Ã…Å¸ÃƒÂ¼rdÃƒÂ¼ (bkz. sinyal-kutugu.service.ts).
+const BANKO_OLASILIK_ESIGI = 0.5;
+const GUCLU_BANKO_OLASILIK_ESIGI = 0.6;
+const AGF_OZELLIK_KODLARI = new Set(["agfSirasi", "agfPayi", "agfYukselisVarMi", "agfDususVarMi"]);
+
+export type V5BankoSonuc = { bankoAdayi: boolean; gucluBanko?: boolean; sebep: string; birinci?: { no: number; ad: string; karar: string } };
+
+export function v5BankoAdayiTespit(sirali: Faz1RunnerV5Sirali[]): V5BankoSonuc {
+  const birinci = sirali[0];
+  if (!birinci) return { bankoAdayi: false, sebep: "Veri yok." };
+
+  const bagimsizGuclu = tumOzellikleriListele(birinci).find(
+    (o) => !AGF_OZELLIK_KODLARI.has(o.kod) && o.katki >= GUCLU_ESIK
+  );
+
+  if (birinci.olasilik >= BANKO_OLASILIK_ESIGI && bagimsizGuclu) {
+    const gucluBanko = birinci.olasilik >= GUCLU_BANKO_OLASILIK_ESIGI;
+    // 2026-08-31 Ã¢â‚¬â€ "AGF favoriliÃ„Å¸i ... ile doÃ„Å¸rulanÃ„Â±yor" cÃƒÂ¼mlesi eskiden atÃ„Â±n AGF
+    // favorisi OLDUÃ„ÂUNU varsayÃ„Â±yordu, ama bu koÃ…Å¸ul yalnÃ„Â±z modelin #1 seÃƒÂ§imine (birinci)
+    // bakÃ„Â±yor Ã¢â‚¬â€ o her zaman AGF favorisi deÃ„Å¸il (Opus: pÃ¢â€°Â¥%50 havuzunda AGF favorisi
+    // OLMAYAN 9 bankonun isabeti %66.7, favori olanlardan bile YÃƒÅ“KSEK). Metin artÃ„Â±k
+    // gerÃƒÂ§ek AGF durumuna gÃƒÂ¶re deÃ„Å¸iÃ…Å¸iyor.
+    const agfCumlesi =
+      birinci.agfSirasi === 1
+        ? `AGF favoriliÃ„Å¸i "${bagimsizGuclu.etiket}" (baÃ„Å¸Ã„Â±msÃ„Â±z sinyal) ile doÃ„Å¸rulanÃ„Â±yor`
+        : `AGF favorisi olmamasÃ„Â±na raÃ„Å¸men "${bagimsizGuclu.etiket}" (baÃ„Å¸Ã„Â±msÃ„Â±z sinyal) taÃ…Å¸Ã„Â±yor`;
+    return {
+      bankoAdayi: true,
+      gucluBanko,
+      sebep: `#${birinci.no} ${birinci.ad} Ã¢â‚¬â€ model tahmini %${(birinci.olasilik * 100).toFixed(1)}, ${agfCumlesi} (bu profildeki geÃƒÂ§miÃ…Å¸ isabet: ÃƒÂ§evrimdÃ„Â±Ã…Å¸Ã„Â± n=122 koÃ…Å¸uda %56.6, V5 dÃƒÂ¶neminde canlÃ„Â± n=33'te %51.5)${gucluBanko ? ` Ã¢â‚¬â€ olasÃ„Â±lÃ„Â±k %${(GUCLU_BANKO_OLASILIK_ESIGI * 100).toFixed(0)}'Ã„Â±n da ÃƒÂ¼stÃƒÂ¼nde, GÃƒÅ“Ãƒâ€¡LÃƒÅ“ BANKO (bu eÃ…Å¸ikte isabet %60-100 arasÃ„Â±, tetik ÃƒÂ§ok daha nadir)` : ""}. YalnÃ„Â±z bir iÃ…Å¸aret Ã¢â‚¬â€ muhakeme metnindeki riskleri kendiniz teyit edin.`,
+      birinci: { no: birinci.no, ad: birinci.ad, karar: birinci.karar },
+    };
+  }
+  if (birinci.olasilik >= BANKO_OLASILIK_ESIGI && !bagimsizGuclu) {
+    return {
+      bankoAdayi: false,
+      sebep: `#${birinci.no} ${birinci.ad} olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â± yÃƒÂ¼ksek (%${(birinci.olasilik * 100).toFixed(1)}) ama SADECE AGF favoriliÃ„Å¸inden gÃƒÂ¼ÃƒÂ§ alÃ„Â±yor, baÃ„Å¸Ã„Â±msÃ„Â±z gÃƒÂ¼ÃƒÂ§lÃƒÂ¼ bir sinyal (hÃ„Â±z/antrenÃƒÂ¶r/jokey) yok Ã¢â‚¬â€ banko sayÃ„Â±lmÃ„Â±yor.`,
+      birinci: { no: birinci.no, ad: birinci.ad, karar: birinci.karar },
+    };
+  }
+  return {
+    bankoAdayi: false,
+    sebep: `#${birinci.no} ${birinci.ad} en yÃƒÂ¼ksek olasÃ„Â±lÃ„Â±klÃ„Â± ama %${(birinci.olasilik * 100).toFixed(1)}, banko eÃ…Å¸iÃ„Å¸inin (%${(BANKO_OLASILIK_ESIGI * 100).toFixed(0)}) altÃ„Â±nda Ã¢â‚¬â€ net bir banko iÃ…Å¸areti yok.`,
+    birinci: { no: birinci.no, ad: birinci.ad, karar: birinci.karar },
+  };
+}
+
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Muhakeme metni Ã¢â‚¬â€ ÃƒÂ¶zellik-katkÃ„Â± ayrÃ„Â±Ã…Å¸tÃ„Â±rmasÃ„Â±, Claude'suz Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+type OzellikGrubu = {
+  kod: string;
+  ozellikIndeksleri: number[];
+  aciklama: (r: Faz1RunnerV5Sirali) => string | null;
+};
+
+const idx = (name: string) => FEATURE_NAMES.indexOf(name);
+
+const OZELLIK_GRUPLARI: OzellikGrubu[] = [
+  { kod: "AGF", ozellikIndeksleri: [idx("agfSirasi"), idx("agfPayi"), idx("agfPayi2")], aciklama: (r) => `AGF sÃ„Â±rasÃ„Â±: ${r.agfSirasi}${r.agfSirasi === 1 ? ` (AGF favorisi, %${r.agfPayi.toFixed(1)})` : ` (%${r.agfPayi.toFixed(1)})`}` },
+  // 2026-08-28 kullanÃ„Â±cÃ„Â± kararÃ„Â± ("faydasÃ„Â± yoksa sil"): ACC/FORM/PIST/SIRE/GALOP/UZUNARA/
+  // DUSUSIYI gruplarÃ„Â± (accurace, formEgimi/2, pistUzmani, sireOrani, galop,
+  // uzunAraGalopKatkisi, agfDususVarMi) toFeatureVector'dan ÃƒÂ§Ã„Â±karÃ„Â±ldÃ„Â±Ã„Å¸Ã„Â± iÃƒÂ§in buradan da
+  // kaldÃ„Â±rÃ„Â±ldÃ„Â± Ã¢â‚¬â€ artÃ„Â±k skora katkÃ„Â±larÃ„Â± yok, gerekÃƒÂ§e metninde gÃƒÂ¶stermek yanÃ„Â±ltÃ„Â±cÃ„Â± olurdu.
+  // 2026-09-12 (V5.46) Ã¢â‚¬â€ KGS/KACAK/H2HKILO buradan da kaldÃ„Â±rÃ„Â±ldÃ„Â±: kgsVarMi/kacakYalniz/
+  // h2hKiloDegisimi toFeatureVector'dan tamamen ÃƒÂ§Ã„Â±ktÃ„Â± (bkz. dosya baÃ…Å¸Ã„Â±ndaki not), artÃ„Â±k
+  // skora hiÃƒÂ§ katkÃ„Â±larÃ„Â± yok.
+  // 2026-08-31 (V5.31) Ã¢â‚¬â€ Handikap'ta bu sinyalin katsayÃ„Â±sÃ„Â± ELLE SIFIRLANMIÃ…Â (bkz. dosya
+  // baÃ…Å¸Ã„Â±ndaki IDM_JOKEY_IDX/V5.31 notu, HIZ ile AYNI dÃƒÂ¼zeltme deseni) Ã¢â‚¬â€ eski kod ham
+  // r.idmJokey'e bakÃ„Â±yordu, Handikap'ta bile "idman jokeyi uyumu" diye yanÃ„Â±ltÃ„Â±cÃ„Â± bir satÃ„Â±r
+  // gÃƒÂ¶sterebilirdi. ArtÃ„Â±k GERÃƒâ€¡EK katkÃ„Â±ya (r.katkilar) bakÃ„Â±lÃ„Â±yor Ã¢â‚¬â€ Handikap'ta katkÃ„Â± her
+  // zaman 0 olduÃ„Å¸undan satÃ„Â±r hiÃƒÂ§ gÃƒÂ¶sterilmez, diÃ„Å¸er kategorilerde davranÃ„Â±Ã…Å¸ deÃ„Å¸iÃ…Å¸medi.
+  { kod: "IDMJOK", ozellikIndeksleri: [idx("idmJokey")], aciklama: (r) => (r.katkilar[IDM_JOKEY_IDX] !== 0 ? "BugÃƒÂ¼nkÃƒÂ¼ jokey, bu atÃ„Â±n idmanlarÃ„Â±ndan birini bizzat yaptÃ„Â±rmÃ„Â±Ã…Å¸" : null) },
+  { kod: "JOKSTAT", ozellikIndeksleri: [idx("jokeyOrani")], aciklama: (r) => `Jokeyin genel kazanma oranÃ„Â± (dengelenmiÃ…Å¸ rakam): %${r.jokeyOrani.toFixed(1)}` },
+  { kod: "ANTSTAT", ozellikIndeksleri: [idx("antrenorOrani")], aciklama: (r) => `AntrenÃƒÂ¶rÃƒÂ¼n genel kazanma oranÃ„Â± (dengelenmiÃ…Å¸ rakam): %${r.antrenorOrani.toFixed(1)}` },
+  // 2026-08-17 denetim bulgusu: kacakAtMi ve dususAmaIyiPozisyon anlamlÃ„Â± sinyaller
+  // (bkz. toFeatureVector ÃƒÂ¼stÃƒÂ¼ndeki notlar) ama hiÃƒÂ§bir OzellikGrubu'na dahil deÃ„Å¸ildi Ã¢â‚¬â€
+  // katkÃ„Â±larÃ„Â± skoru etkiliyordu ama gerekÃƒÂ§e metninde hiÃƒÂ§ gÃƒÂ¶rÃƒÂ¼nmÃƒÂ¼yordu. Eklendi.
+  // 2026-08-21 Ã¢â‚¬â€ H2H: bugÃƒÂ¼nkÃƒÂ¼ rakiplerle ortak geÃƒÂ§miÃ…Å¸ yarÃ„Â±Ã…Å¸ yoksa (h2hNetSkor=0) satÃ„Â±r
+  // hiÃƒÂ§ gÃƒÂ¶sterilmez Ã¢â‚¬â€ "0 karÃ…Å¸Ã„Â±laÃ…Å¸ma" ile "hep berabere" ayrÃ„Â±mÃ„Â± yapÃ„Â±lamadÃ„Â±Ã„Å¸Ã„Â± iÃƒÂ§in nÃƒÂ¶tr.
+  // 2026-08-27 Ã¢â‚¬â€ dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art'ta bu sinyalin katsayÃ„Â±sÃ„Â± ELLE sÃ„Â±fÃ„Â±rlanmÃ„Â±Ã…Å¸ (bkz. WEIGHTS_DUSUK_SART
+  // ÃƒÂ¼stÃƒÂ¼ndeki not) Ã¢â‚¬â€ HIZ ile aynÃ„Â± dÃƒÂ¼zeltme: ham deÃ„Å¸ere deÃ„Å¸il gerÃƒÂ§ek katkÃ„Â±ya bakÃ„Â±lÃ„Â±yor,
+  // dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art'ta satÃ„Â±r hiÃƒÂ§ gÃƒÂ¶sterilmez (puana katkÃ„Â±sÃ„Â± yok), diÃ„Å¸er'de davranÃ„Â±Ã…Å¸ deÃ„Å¸iÃ…Å¸medi.
+  // 2026-08-30 kullanÃ„Â±cÃ„Â± talebi: "zemin Ã„Â±slaksa Ã„Â±slak koÃ…Å¸ulara gÃƒÂ¶re H2H yap, dereceleri
+  // de ekle" Ã¢â‚¬â€ h2hZeminEslesmesiVarMi=true ise gerekÃƒÂ§e metni bunun BUGÃƒÅ“NÃƒÅ“N zemin koÃ…Å¸uluyla
+  // eÃ…Å¸leÃ…Å¸en karÃ…Å¸Ã„Â±laÃ…Å¸ma(lar)a dayandÃ„Â±Ã„Å¸Ã„Â±nÃ„Â± ve atÃ„Â±n o karÃ…Å¸Ã„Â±laÃ…Å¸madaki kendi derecesini aÃƒÂ§Ã„Â±kÃƒÂ§a
+  // belirtir; eÃ…Å¸leÃ…Å¸me yoksa (ya da bugÃƒÂ¼nÃƒÂ¼n zemini bilinmiyorsa) eski (tÃƒÂ¼m karÃ…Å¸Ã„Â±laÃ…Å¸malar)
+  // metin aynen kalÃ„Â±r.
+  {
+    kod: "H2H",
+    ozellikIndeksleri: [idx("h2hNetSkor")],
+    aciklama: (r) => {
+      if (r.katkilar[H2H_NET_SKOR_IDX] === 0) return null;
+      const taban = `BugÃƒÂ¼nkÃƒÂ¼ rakipleriyle daha ÃƒÂ¶nce karÃ…Å¸Ã„Â±laÃ…Å¸mÃ„Â±Ã…Å¸${r.h2hZeminEslesmesiVarMi ? " (bugÃƒÂ¼nkÃƒÂ¼ne benzer zemin koÃ…Å¸ulunda)" : ""}: toplamda ${r.h2hNetSkor > 0 ? "+" : ""}${r.h2hNetSkor} net ${r.h2hNetSkor > 0 ? "ÃƒÂ¶nde" : "geride"} bitirmiÃ…Å¸`;
+      return r.h2hZeminEslesmesiVarMi && r.h2hKendiDerece ? `${taban}, kendi derecesi: ${r.h2hKendiDerece}` : taban;
+    },
+  },
+  // 2026-08-21 Ã¢â‚¬â€ HÃ„Â±z derecesi: veri yoksa (son 365 gÃƒÂ¼nde uygun geÃƒÂ§miÃ…Å¸ yok) 0, satÃ„Â±r
+  // gÃƒÂ¶sterilmez Ã¢â‚¬â€ "hÃ„Â±zlÃ„Â± deÃ„Å¸il" ile "veri yok" karÃ„Â±Ã…Å¸masÃ„Â±n.
+  // 2026-08-27 kullanÃ„Â±cÃ„Â± denetimi ("muhakemeler doÃ„Å¸ru mu"): Handikap kategorisinde
+  // (WEIGHTS_DIGER_HANDIKAP) bu sinyalin katsayÃ„Â±sÃ„Â± ELLE SIFIRLANMIÃ…Â (bkz. dosya baÃ…Å¸Ã„Â±ndaki
+  // V5.10 notu) Ã¢â‚¬â€ yani puana HÃ„Â°Ãƒâ€¡ katkÃ„Â±sÃ„Â± yok. Eski kod ham r.hizDerecesi'ye bakÃ„Â±yordu,
+  // Handikap'ta bile "yavaÃ…Å¸/hÃ„Â±zlÃ„Â±" diye yanÃ„Â±ltÃ„Â±cÃ„Â± bir satÃ„Â±r gÃƒÂ¶steriyordu. ArtÃ„Â±k GERÃƒâ€¡EK
+  // katkÃ„Â±ya (r.katkilar) bakÃ„Â±lÃ„Â±yor Ã¢â‚¬â€ Handikap'ta katkÃ„Â± her zaman 0 olduÃ„Å¸undan satÃ„Â±r hiÃƒÂ§
+  // gÃƒÂ¶sterilmez, diÃ„Å¸er kategorilerde davranÃ„Â±Ã…Å¸ deÃ„Å¸iÃ…Å¸medi.
+  { kod: "HIZ", ozellikIndeksleri: [idx("hizDerecesi")], aciklama: (r) => (r.katkilar[HIZ_DERECESI_IDX] !== 0 ? `Son yarÃ„Â±Ã…Å¸larÃ„Â±ndaki hÃ„Â±zÃ„Â±, benzer atlarÃ„Â±n ortalamasÃ„Â±na gÃƒÂ¶re %${Math.abs(r.hizDerecesi).toFixed(1)} ${r.hizDerecesi > 0 ? "daha hÃ„Â±zlÃ„Â±" : "daha yavaÃ…Å¸"}` : null) },
+  // 2026-09-12 (V5.46) Ã¢â‚¬â€ H2HKILO buradan kaldÃ„Â±rÃ„Â±ldÃ„Â±: h2hKiloDegisimi toFeatureVector'dan
+  // tamamen ÃƒÂ§Ã„Â±ktÃ„Â±, artÃ„Â±k skora katkÃ„Â±sÃ„Â± yok (bkz. dosya baÃ…Å¸Ã„Â±ndaki not).
+  // 2026-08-28 Ã¢â‚¬â€ Zemin ToleransÃ„Â±: bkz. Faz1RunnerV5.zeminToleransi ÃƒÂ¼stÃƒÂ¼ndeki not. Veri
+  // yoksa (Normal-dÃ„Â±Ã…Å¸Ã„Â± geÃƒÂ§miÃ…Å¸ koÃ…Å¸u yok) 0, satÃ„Â±r hiÃƒÂ§ gÃƒÂ¶sterilmez.
+  { kod: "ZEMIN", ozellikIndeksleri: [idx("zeminToleransi")], aciklama: (r) => (r.zeminToleransi !== 0 ? `AÃ„Å¸Ã„Â±r/yaÃ„Å¸murlu pist gibi normal-dÃ„Â±Ã…Å¸Ã„Â± zeminlerdeki geÃƒÂ§miÃ…Å¸inde, diÃ„Å¸er atlara gÃƒÂ¶re %${Math.abs(r.zeminToleransi).toFixed(1)} ${r.zeminToleransi > 0 ? "daha hÃ„Â±zlÃ„Â±" : "daha yavaÃ…Å¸"}` : null) },
+  { kod: "YAKINSAMA", ozellikIndeksleri: [idx("yakinsama2Plus")], aciklama: (r) => (r.katkilar[YAKINSAMA_IDX] !== 0 ? "Bu atta birden fazla olumlu iÃ…Å¸aret aynÃ„Â± anda bir araya gelmiÃ…Å¸ (pist uzmanlÃ„Â±Ã„Å¸Ã„Â±, pedigri, at-jokey geÃƒÂ§miÃ…Å¸i, AGF yÃƒÂ¼kseliÃ…Å¸i, sÃ„Â±nÃ„Â±f dÃƒÂ¼Ã…Å¸ÃƒÂ¼Ã…Å¸ÃƒÂ¼nden en az ikisi) Ã¢â‚¬â€ deneysel bir gÃƒÂ¶zlem, henÃƒÂ¼z kanÃ„Â±tlanmamÃ„Â±Ã…Å¸" : null) },
+  { kod: "SPRINT", ozellikIndeksleri: [idx("sonIdmanSprint")], aciklama: (r) => (r.katkilar[SON_IDMAN_SPRINT_IDX] !== 0 ? `Son idmanÃ„Â±nÃ„Â± hÃ„Â±zlÃ„Â±/sÃƒÂ¼rat ÃƒÂ§alÃ„Â±Ã…Å¸masÃ„Â± olarak yapmÃ„Â±Ã…Å¸ (deneysel bir gÃƒÂ¶zlem, henÃƒÂ¼z kanÃ„Â±tlanmamÃ„Â±Ã…Å¸): geÃƒÂ§miÃ…Å¸te ${r.katkilar[SON_IDMAN_SPRINT_IDX] > 0 ? "olumlu" : "olumsuz"} ÃƒÂ§Ã„Â±kmÃ„Â±Ã…Å¸` : null) },
+  // 2026-09-12 (V5.46) Ã¢â‚¬â€ TAKIEK/TAKICIK TEK sinyale (takiDegisikligi) birleÃ…Å¸tirildi (bkz.
+  // TAKI_DEGISIKLIGI_IDX ÃƒÂ¼stÃƒÂ¼ndeki not) Ã¢â‚¬â€ ham iki alana (takiEklendiMi/takiCikarildiMi)
+  // bakÃ„Â±larak YÃƒâ€“N belirleniyor, katkÃ„Â± TEK indeksten okunuyor.
+  {
+    kod: "TAKIDEGISIM",
+    ozellikIndeksleri: [idx("takiDegisikligi")],
+    aciklama: (r) => {
+      if (r.katkilar[TAKI_DEGISIKLIGI_IDX] === 0) return null;
+      const yon = r.takiCikarildiMi && !r.takiEklendiMi ? "ÃƒÂ§Ã„Â±karÃ„Â±lmÃ„Â±Ã…Å¸" : r.takiEklendiMi && !r.takiCikarildiMi ? "eklenmiÃ…Å¸" : "deÃ„Å¸iÃ…Å¸miÃ…Å¸";
+      return `Son yarÃ„Â±Ã…Å¸Ã„Â±ndan bu yana bir ekipman ${yon}: geÃƒÂ§miÃ…Å¸te ${r.katkilar[TAKI_DEGISIKLIGI_IDX] > 0 ? "olumlu" : "olumsuz"} ÃƒÂ§Ã„Â±kmÃ„Â±Ã…Å¸`;
+    },
+  },
+  { kod: "GIDISAT", ozellikIndeksleri: [idx("yarisGidisatiSkoru")], aciklama: (r) => (r.katkilar[YARIS_GIDISATI_IDX] !== 0 ? `Bu yarÃ„Â±Ã…Å¸Ã„Â±n beklenen gidiÃ…Å¸atÃ„Â±na (kimin ÃƒÂ¶ne geÃƒÂ§eceÃ„Å¸i, temponun nasÃ„Â±l olacaÃ„Å¸Ã„Â±) gÃƒÂ¶re bu atÃ„Â±n koÃ…Å¸u tarzÃ„Â± ${r.katkilar[YARIS_GIDISATI_IDX] > 0 ? "uygun dÃƒÂ¼Ã…Å¸ÃƒÂ¼yor" : "uygun dÃƒÂ¼Ã…Å¸mÃƒÂ¼yor"} (deneysel bir gÃƒÂ¶zlem, henÃƒÂ¼z kanÃ„Â±tlanmamÃ„Â±Ã…Å¸)` : null) },
+];
+
+// 2026-08-18 kullanÃ„Â±cÃ„Â± talebi: "18 sinyalin hepsinin kontrol edildiÃ„Å¸ini bana gÃƒÂ¶stermesini
+// istiyorum, kanÃ„Â±tlamalÃ„Â±." Ã¢â‚¬â€ muhakemeUretV5'in gerekÃƒÂ§e satÃ„Â±rlarÃ„Â± YALNIZ en belirgin
+// katkÃ„Â±larÃ„Â± gÃƒÂ¶steriyor (ÃƒÂ¼st-5 pozitif + ÃƒÂ¼st-2 negatif, eÃ…Å¸ik altÃ„Â±ndakiler hiÃƒÂ§ gÃƒÂ¶rÃƒÂ¼nmÃƒÂ¼yor) Ã¢â‚¬â€
+// bu, "az katkÃ„Â±lÃ„Â± = hiÃƒÂ§ hesaplanmadÃ„Â±" izlenimi verebiliyordu. Bu fonksiyon FÃ„Â°LTRESÃ„Â°Z,
+// TÃƒÅ“M 18 ÃƒÂ¶zelliÃ„Å¸i (ham deÃ„Å¸er + standardize + gerÃƒÂ§ek model katkÃ„Â±sÃ„Â±) sÃ„Â±rayla dÃƒÂ¶ner Ã¢â‚¬â€
+// admin panelinde "TÃƒÂ¼m Sinyaller" aÃƒÂ§Ã„Â±lÃ„Â±r bÃƒÂ¶lÃƒÂ¼mÃƒÂ¼ iÃƒÂ§in, denetim amaÃƒÂ§lÃ„Â±.
+const FEATURE_LABELS: Record<string, string> = {
+  agfSirasi: "AGF SÃ„Â±rasÃ„Â±", accurace: "Accurace (son yarÃ„Â±Ã…Å¸ en hÃ„Â±zlÃ„Â± kapanÃ„Â±Ã…Å¸)",
+  formEgimi: "Form EÃ„Å¸imi", formEgimi2: "Form EÃ„Å¸imi (karesi, doÃ„Å¸rusal-olmayan etki)",
+  kgs: "KGS (dinlenme gÃƒÂ¼nÃƒÂ¼)", kgs2: "KGS (karesi)", kgsVarMi: "KGS Verisi Var MÃ„Â±",
+  pistUzmani: "Pist UzmanlÃ„Â±Ã„Å¸Ã„Â± (bu hipodrom+pist+mesafede yÃ„Â±l iÃƒÂ§i galibiyet)",
+  sireOrani: "AygÃ„Â±r Kazanma OranÃ„Â± (kÃƒÂ¼ÃƒÂ§ÃƒÂ¼ltÃƒÂ¼lmÃƒÂ¼Ã…Å¸)", galop: "Keskin Galop Zinciri",
+  idmJokey: "Ã„Â°dman Jokeyi Uyumu", jokeyOrani: "Jokey Kazanma OranÃ„Â± (kÃƒÂ¼ÃƒÂ§ÃƒÂ¼ltÃƒÂ¼lmÃƒÂ¼Ã…Å¸)",
+  antrenorOrani: "AntrenÃƒÂ¶r Kazanma OranÃ„Â± (kÃƒÂ¼ÃƒÂ§ÃƒÂ¼ltÃƒÂ¼lmÃƒÂ¼Ã…Å¸)",
+  uzunAraGalopKatkisi: "Uzun Aradan Sonra Galop SayÃ„Â±sÃ„Â±",
+  agfYukselisVarMi: "AGF EÃ…Å¸ik-ÃƒÅ“stÃƒÂ¼ YÃƒÂ¼kseliÃ…Å¸ Var MÃ„Â±",
+  kacakYalniz: "Rakipsiz KaÃƒÂ§ak At / Erken Tempo", agfDususVarMi: "AGF EÃ…Å¸ik-ÃƒÅ“stÃƒÂ¼ DÃƒÂ¼Ã…Å¸ÃƒÂ¼Ã…Å¸ Var MÃ„Â±",
+  agfPayi: "AGF PayÃ„Â± (ham yÃƒÂ¼zde)", agfFarkiIkinciye: "AGF Dominans FarkÃ„Â± (2.'ye gÃƒÂ¶re, yalnÃ„Â±z favoride)",
+  h2hNetSkor: "H2H Net Skoru (bugÃƒÂ¼nkÃƒÂ¼ rakiplerle geÃƒÂ§miÃ…Å¸ karÃ…Å¸Ã„Â±laÃ…Å¸ma)",
+  hizDerecesi: "HÃ„Â±z Derecesi (popÃƒÂ¼lasyona gÃƒÂ¶re gÃƒÂ¶reli tempo, son 365 gÃƒÂ¼n)",
+  h2hKiloDegisimi: "Kilo-AyarlÃ„Â± H2H (rakiplere gÃƒÂ¶re kilo pozisyonu deÃ„Å¸iÃ…Å¸imi)",
+  agfPayi2: "AGF PayÃ„Â± (karesi, piyasa kalibrasyon eÃ„Å¸riselliÃ„Å¸i)",
+  zeminToleransi: "Zemin ToleransÃ„Â± (Normal-dÃ„Â±Ã…Å¸Ã„Â± pistte geÃƒÂ§miÃ…Å¸ gÃƒÂ¶reli performans)",
+  yakinsama2Plus: "YakÃ„Â±nsama (pist uzmanlÃ„Â±Ã„Å¸Ã„Â±+pedigri+at-jokey ikilisi+AGF trend+sÃ„Â±nÃ„Â±f dÃƒÂ¼Ã…Å¸ÃƒÂ¼Ã…Å¸ÃƒÂ¼nden Ã¢â€°Â¥2'si aynÃ„Â± atta)",
+  sonIdmanSprint: "Son Ã„Â°dman TÃƒÂ¼rÃƒÂ¼ Sprint/SÃƒÂ¼rat",
+  takiEklendiMi: "TakÃ„Â± Eklendi (son yarÃ„Â±Ã…Å¸Ã„Â±na gÃƒÂ¶re)",
+  takiCikarildiMi: "TakÃ„Â± Ãƒâ€¡Ã„Â±karÃ„Â±ldÃ„Â± (son yarÃ„Â±Ã…Å¸Ã„Â±na gÃƒÂ¶re)",
+  takiDegisikligi: "TakÃ„Â± DeÃ„Å¸iÃ…Å¸ikliÃ„Å¸i (ÃƒÂ§Ã„Â±karÃ„Â±ldÃ„Â±-eklendi, V5.46 birleÃ…Å¸imi)",
+  yarisGidisatiSkoru: "YarÃ„Â±Ã…Å¸ GidiÃ…Å¸atÃ„Â± (saha-geneli tempo senaryosuna stil uygunluÃ„Å¸u)",
+};
+
+export type TumOzellikDetay = { kod: string; etiket: string; hamDeger: number; standartDeger: number; katki: number };
+
+export function tumOzellikleriListele(r: Faz1RunnerV5Sirali): TumOzellikDetay[] {
+  const ham = toFeatureVector(r);
+  return FEATURE_NAMES.map((kod, i) => ({
+    kod,
+    etiket: FEATURE_LABELS[kod] ?? kod,
+    hamDeger: Math.round(ham[i] * 1000) / 1000,
+    standartDeger: Math.round(r.standartVektor[i] * 1000) / 1000,
+    katki: Math.round(r.katkilar[i] * 10000) / 10000,
+  }));
+}
+
+const GUCLU_ESIK = 0.3;
+const ORTA_ESIK = 0.1;
+
+export function muhakemeUretV5(r: Faz1RunnerV5Sirali, sahaBuyuklugu: number): PickDetailsV2 {
+  const gruplar = OZELLIK_GRUPLARI.map((g) => ({
+    ...g,
+    katki: g.ozellikIndeksleri.reduce((s, i) => s + r.katkilar[i], 0),
+    metin: g.aciklama(r),
+  })).filter((g) => g.metin != null);
+
+  const satirlar: MuhakemeSatiri[] = [];
+
+  // 2026-08-16 kullanÃ„Â±cÃ„Â± kararÃ„Â±: AGF trendi (en ÃƒÂ§ok yÃƒÂ¼kselenler/dÃƒÂ¼Ã…Å¸enler) HER ZAMAN
+  // gerekÃƒÂ§enin en ÃƒÂ¶nÃƒÂ¼nde gÃƒÂ¶sterilir. Modelin kendi ÃƒÂ¶Ã„Å¸rendiÃ„Å¸i agfFark katsayÃ„Â±sÃ„Â± (ham/
+  // sÃƒÂ¼rekli hÃƒÂ¢liyle) istatistiksel olarak anlamsÃ„Â±z ÃƒÂ§Ã„Â±ktÃ„Â± (agfSirasi ile yÃƒÂ¼ksek
+  // korelasyon/multicollinearity yÃƒÂ¼zÃƒÂ¼nden olasÃ„Â±) Ã¢â‚¬â€ bu satÃ„Â±r o yÃƒÂ¼zden katkÃ„Â± sÃ„Â±ralamasÃ„Â±na
+  // deÃ„Å¸il, V4'ÃƒÂ¼n kendi doÃ„Å¸rulanmÃ„Â±Ã…Å¸ backtest bulgusuna dayanÃ„Â±yor (trend+4sinyal: n=663,
+  // %21.6 galibiyet/%53.8 top3, kontrol %10.2/%30.7). Skoru/olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â± DEÃ„ÂÃ„Â°Ã…ÂTÃ„Â°RMEZ Ã¢â‚¬â€
+  // yalnÃ„Â±z gerekÃƒÂ§e metninin ÃƒÂ¶nceliÃ„Å¸ini belirler, kodGarantili:true (Claude'un/modelin
+  // satÃ„Â±rÃ„Â± deÃ„Å¸il, kural-enjekte).
+  if (r.agfTrendYonu) {
+    satirlar.push({
+      kod: ["AGFTREND"],
+      tip: "destek",
+      guven: "tam",
+      kodGarantili: true,
+      aciklama: `Bahis payÃ„Â± (AGF) son saatlerde ${r.agfTrendYonu === "yÃƒÂ¼kseliÃ…Å¸" ? "yÃƒÂ¼kseliyor" : "dÃƒÂ¼Ã…Å¸ÃƒÂ¼yor"} (${r.agfTrendFark! >= 0 ? "+" : ""}${r.agfTrendFark} puan) Ã¢â‚¬â€ bu at, piyasada en ÃƒÂ§ok ${r.agfTrendYonu === "yÃƒÂ¼kseliÃ…Å¸" ? "raÃ„Å¸bet gÃƒÂ¶renler" : "terk edilenler"} arasÃ„Â±nda`,
+    });
+  }
+
+  // 2026-08-30 kullanÃ„Â±cÃ„Â± talebi ("o pist, zemin koÃ…Å¸ul ve mesafede yarÃ„Â±Ã…Å¸ geÃƒÂ§miÃ…Å¸i olan daha
+  // tecrÃƒÂ¼beli gÃƒÂ¶rÃƒÂ¼lmeli... mesafede ilk defa koÃ…Å¸acaksa mevcut mesafelere gÃƒÂ¶re analiz
+  // yapÃ„Â±lacak") Ã¢â‚¬â€ bkz. zemin-mesafe-deneyimi.actions.ts. KullanÃ„Â±cÃ„Â± KARARIYLA, nÃ¢â€°Â¥250-300
+  // gÃƒÂ¶lge-koÃ…Å¸u/B=500 kanÃ„Â±tÃ„Â± BEKLENMEDEN B katmanÃ„Â±na (TÃƒÅ“M kategoriler, bkz. bKatmaniUygula
+  // iÃƒÂ§indeki B_ZEMINMESAFE_KATSAYI notu) eklendi Ã¢â‚¬â€ sireOrani/zeminToleransi ile AYNI tÃƒÂ¼rden
+  // bilinÃƒÂ§li, kanÃ„Â±tsÃ„Â±z istisna. AGFTREND ile AYNI doÃ„Å¸rudan-enjekte deseni kullanÃ„Â±ldÃ„Â± ÃƒÂ§ÃƒÂ¼nkÃƒÂ¼
+  // bu terim OZELLIK_GRUPLARI/A katmanÃ„Â±nÃ„Â±n katkÃ„Â±-eÃ…Å¸ikli sÃ„Â±ralamasÃ„Â±nÃ„Â±n DIÃ…ÂINDA (B katmanÃ„Â±,
+  // ayrÃ„Â± kalibre edilmiÃ…Å¸ bir terim) Ã¢â‚¬â€ o mekanizmadan asla geÃƒÂ§emezdi.
+  if (r.zeminMesafeDeneyimSeviyesi !== "yok") {
+    satirlar.push({
+      kod: ["ZEMINMESAFE"],
+      tip: r.zeminMesafeDeneyim >= 0 ? "destek" : "risk",
+      guven: r.zeminMesafeDeneyimSeviyesi === "tam" ? "tam" : "orta",
+      kodGarantili: true,
+      aciklama:
+        r.zeminMesafeDeneyimSeviyesi === "tam"
+          ? `BugÃƒÂ¼nkÃƒÂ¼ pist, zemin ve mesafenin aynÃ„Â±sÃ„Â±nda daha ÃƒÂ¶nce koÃ…Å¸muÃ…Å¸ (${r.zeminMesafeOrnekSayisi} koÃ…Å¸u): o yarÃ„Â±Ã…Å¸larda diÃ„Å¸er atlara gÃƒÂ¶re ${r.zeminMesafeDeneyim > 0 ? "+" : ""}${r.zeminMesafeDeneyim.toFixed(1)}% ${r.zeminMesafeDeneyim > 0 ? "daha hÃ„Â±zlÃ„Â±" : "daha yavaÃ…Å¸"} (deneysel bir gÃƒÂ¶zlem, henÃƒÂ¼z kanÃ„Â±tlanmamÃ„Â±Ã…Å¸)`
+          : `BugÃƒÂ¼nkÃƒÂ¼ pist ve zeminde tecrÃƒÂ¼beli ama bu mesafede ilk kez koÃ…Å¸acak Ã¢â‚¬â€ diÃ„Å¸er mesafelerdeki performansÃ„Â±na bakÃ„Â±larak deÃ„Å¸erlendirildi (${r.zeminMesafeOrnekSayisi} koÃ…Å¸u): diÃ„Å¸er atlara gÃƒÂ¶re ${r.zeminMesafeDeneyim > 0 ? "+" : ""}${r.zeminMesafeDeneyim.toFixed(1)}% ${r.zeminMesafeDeneyim > 0 ? "daha hÃ„Â±zlÃ„Â±" : "daha yavaÃ…Å¸"} (deneysel bir gÃƒÂ¶zlem, henÃƒÂ¼z kanÃ„Â±tlanmamÃ„Â±Ã…Å¸)`,
+    });
+  }
+
+  // 2026-08-21 kullanÃ„Â±cÃ„Â± kararÃ„Â±: dÃƒÂ¼Ã…Å¸ÃƒÂ¼k-Ã…Å¸art/maiden segmentinde sireOrani ELLE en gÃƒÂ¼ÃƒÂ§lÃƒÂ¼
+  // katsayÃ„Â± yapÃ„Â±ldÃ„Â± (bkz. weights/v5-weights-dusuksart.json notu) Ã¢â‚¬â€ SIRE iÃ…Å¸aretine
+  // bakÃ„Â±lmaksÃ„Â±zÃ„Â±n (destek/risk) AGFTREND/ZEMINMESAFE'den hemen sonra sabit sÃ„Â±rada gÃƒÂ¶sterilir
+  // (Ã…ÂENGÃƒÅ“L SULTAN/Bursa vakasÃ„Â± Ã¢â‚¬â€ "ÃƒÂ¶ncelikli deÃ„Å¸il" diye iÃ…Å¸aretlenmemeli, katkÃ„Â±sÃ„Â± bu
+  // segmentte zaten en bÃƒÂ¼yÃƒÂ¼k).
+  // 2026-08-30 (V5.30) Ã¢â‚¬â€ Opus denetimi BUG BULDU: SIRE grubu 2026-08-28'de A katmanÃ„Â±nÃ„Â±n
+  // 12-ÃƒÂ¶zelliÃ„Å¸e kÃƒÂ¼ÃƒÂ§ÃƒÂ¼ltÃƒÂ¼lmesiyle OZELLIK_GRUPLARI'ndan TAMAMEN kaldÃ„Â±rÃ„Â±ldÃ„Â± (sireOrani zaten
+  // A'da deÃ„Å¸il, B katmanÃ„Â±nda) ama bu blok hÃƒÂ¢lÃƒÂ¢ `gruplar.find(g => g.kod === "SIRE")`
+  // arÃ„Â±yordu Ã¢â‚¬â€ HER ZAMAN undefined dÃƒÂ¶ndÃƒÂ¼, yani bu blok 2026-08-28'den beri Ãƒâ€“LÃƒÅ“ KODDU.
+  // bKatmaniUygula skoru gerÃƒÂ§ekten deÃ„Å¸iÃ…Å¸tirmeye devam etti ama gerekÃƒÂ§e metninde/
+  // pick.details'te hiÃƒÂ§ gÃƒÂ¶rÃƒÂ¼nmedi Ã¢â‚¬â€ sessizce yanlÃ„Â±Ã…Å¸ olsa fark edilemezdi. ZEMINMESAFE
+  // ile AYNI doÃ„Å¸rudan-enjekte desenine geÃƒÂ§irildi: gerÃƒÂ§ek B katmanÃ„Â± katkÃ„Â±sÃ„Â±na (r.bSireKatkisi,
+  // bkz. bKatmaniUygula) doÃ„Å¸rudan bakÃ„Â±lÃ„Â±yor, OZELLIK_GRUPLARI/gruplar'a baÃ„Å¸Ã„Â±mlÃ„Â± deÃ„Å¸il.
+  if (r.bKatmaniUygulandiMi && Math.abs(r.bSireKatkisi) >= 0.03) {
+    satirlar.push({
+      kod: ["SIRE"],
+      tip: r.bSireKatkisi >= 0 ? "destek" : "risk",
+      guven: Math.abs(r.bSireKatkisi) >= GUCLU_ESIK ? "tam" : Math.abs(r.bSireKatkisi) >= ORTA_ESIK ? "orta" : "zayif",
+      kodGarantili: true,
+      aciklama: `BabasÃ„Â±nÃ„Â±n bu tip yarÃ„Â±Ã…Å¸lardaki kazanma oranÃ„Â± (dengelenmiÃ…Å¸ rakam, deneysel bir gÃƒÂ¶zlem): %${r.sireOrani.toFixed(1)}`,
+    });
+  }
+  const gruplarSiresiz = gruplar; // SIRE zaten 2026-08-28'den beri OZELLIK_GRUPLARI'nda yok
+
+  // 2026-08-31 kullanÃ„Â±cÃ„Â± talebi ("en belirgin 5 pozitif + 2 negatif katkÃ„Â±yÃ„Â± hepsi olacak
+  // gerÃƒÂ§ek nedenleriyle sÃ„Â±ralamalar belirlenecek, her at iÃƒÂ§in"): eskiden burada yalnÃ„Â±z
+  // ÃƒÂ¼st-5 pozitif + ÃƒÂ¼st-2 negatif katkÃ„Â± gÃƒÂ¶steriliyordu, geri kalanÃ„Â± METÃ„Â°NDE hiÃƒÂ§
+  // gÃƒÂ¶rÃƒÂ¼nmÃƒÂ¼yordu (skor/sÃ„Â±ralama HÃ„Â°Ãƒâ€¡ etkilenmedi Ã¢â‚¬â€ r.katkilar zaten her zaman TÃƒÅ“M 12
+  // sinyalden hesaplanÃ„Â±yordu, bu yalnÃ„Â±z gÃƒÂ¶sterim kÃ„Â±sÃ„Â±tÃ„Â±ydÃ„Â±). ArtÃ„Â±k ihmal edilebilir
+  // olmayan (positif iÃƒÂ§in Ã¢â€°Â¥0.03, negatif iÃƒÂ§in ORTA_ESIK'i aÃ…Å¸an) TÃƒÅ“M katkÃ„Â±lar, HER at
+  // iÃƒÂ§in, hiÃƒÂ§bir ÃƒÂ¼st sÃ„Â±nÃ„Â±r olmadan gÃƒÂ¶steriliyor.
+  const pozitifSirali = gruplarSiresiz.filter((g) => g.katki > 0).sort((a, b) => b.katki - a.katki);
+  for (const g of pozitifSirali) {
+    if (g.katki < 0.03) continue; // ihmal edilebilir katkÃ„Â±, gÃƒÂ¶sterime deÃ„Å¸mez
+    satirlar.push({
+      kod: [g.kod],
+      tip: "destek",
+      guven: g.katki >= GUCLU_ESIK ? "tam" : g.katki >= ORTA_ESIK ? "orta" : "zayif",
+      aciklama: g.metin!,
+    });
+  }
+
+  const negatifSirali = gruplarSiresiz.filter((g) => g.katki < -ORTA_ESIK).sort((a, b) => a.katki - b.katki);
+  for (const g of negatifSirali) {
+    satirlar.push({
+      kod: [g.kod],
+      tip: "risk",
+      guven: g.katki <= -GUCLU_ESIK ? "tam" : "orta",
+      aciklama: g.metin!,
+    });
+  }
+
+  // AGF-trend terfi denetim satÃ„Â±rÃ„Â± Ã¢â‚¬â€ bkz. agfTrendTerfisiUygula (2026-08-16, KURUÃ…ÂHAN
+  // dersi; 2026-08-27'de kaldÃ„Â±rÃ„Â±lÃ„Â±p aynÃ„Â± gÃƒÂ¼n GERÃ„Â° getirildi, bkz. faz2V5Sirala ÃƒÂ¼stÃƒÂ¼ndeki
+  // not). kodGarantili:true, sayaca dahil deÃ„Å¸il (AGFTREND kodu zaten yukarÃ„Â±da var).
+  if (r.agfTerfi === "ilk3") {
+    const dususAmaIyiPozisyonMu = r.agfFark <= -ANLAMLI_PUAN_ESIGI && r.agfSirasi <= 4;
+    satirlar.push({
+      kod: ["AGFTERFI"],
+      tip: "destek",
+      guven: "tam",
+      kodGarantili: true,
+      aciklama: dususAmaIyiPozisyonMu
+        ? `DÃƒÂ¼Ã…Å¸ÃƒÂ¼Ã…Å¸e raÃ„Å¸men hÃƒÂ¢lÃƒÂ¢ iyi AGF pozisyonu (sÃ„Â±ra ${r.agfSirasi}) Ã¢â‚¬â€ ilk-3'e terfi (backtest: n=930, %19.9 galibiyet/%55.1 top3, kontrol %9.3/%28.4)`
+        : `AGF trend + ${r.sinyalSayisi} sinyal Ã¢â‚¬â€ ilk-3'e terfi (V4 backtest: n=663, %21.6 galibiyet/%53.8 top3)`,
+    });
+  } else if (r.agfTerfi === "ilk6") {
+    satirlar.push({
+      kod: ["AGFTERFI"],
+      tip: "destek",
+      guven: "orta",
+      kodGarantili: true,
+      aciklama: `AGF trend taÃ…Å¸Ã„Â±yor ama yalnÃ„Â±z ${r.sinyalSayisi} sinyal (ilk-3 iÃƒÂ§in en az 4 gerekir) Ã¢â‚¬â€ ilk-6'ya terfi (V4 backtest: n=3210, %16.1 galibiyet/%44.6 top3)`,
+    });
+  }
+
+  // AGF favorisi ilk-3 garantisi Ã¢â‚¬â€ bkz. agfFavoriIlk3Garantisi (2026-08-24, KaÃ…Å¸mir Tay
+  // dersi; 2026-08-27'de kaldÃ„Â±rÃ„Â±lÃ„Â±p aynÃ„Â± gÃƒÂ¼n "V5.14'e dÃƒÂ¶n" kararÃ„Â±yla GERÃ„Â° getirildi).
+  // agfTrendTerfisiUygula'dan FARKLI: koÃ…Å¸ulsuz, olasÃ„Â±lÃ„Â±kla yarÃ„Â±Ã…Å¸maz.
+  if (r.agfFavoriGarantisi) {
+    satirlar.push({
+      kod: ["AGFFAVORI"],
+      tip: "destek",
+      guven: "tam",
+      kodGarantili: true,
+      aciklama: `AGF favorisi (sÃ„Â±ra 1, %${r.agfPayi.toFixed(1)} pay) Ã¢â‚¬â€ modelin ham sÃ„Â±ralamasÃ„Â± geride bÃ„Â±raksa da ilk-3'e koÃ…Å¸ulsuz alÃ„Â±nÃ„Â±r (backtest: n=512, AGF-1 galibiyetlerinin %8.1'i top3 dÃ„Â±Ã…Å¸Ã„Â±nda kalÃ„Â±yordu, garanti net +9/512 top3 isabeti)`,
+    });
+  }
+
+  // Her zaman garanti Ã¢â‚¬â€ hem assertPublishSafe (7) hem UI Ã…Å¸effaflÃ„Â±Ã„Å¸Ã„Â± iÃƒÂ§in: modelin
+  // ham ÃƒÂ§Ã„Â±ktÃ„Â±sÃ„Â± (olasÃ„Â±lÃ„Â±k + saha iÃƒÂ§i sÃ„Â±ra), kodGarantili (Claude'un satÃ„Â±rÃ„Â± deÃ„Å¸il).
+  satirlar.push({
+    kod: ["OLASILIK"],
+    tip: "notr",
+    guven: "tam",
+    kodGarantili: true,
+    aciklama: `V5 modeli tahmini kazanma olasÃ„Â±lÃ„Â±Ã„Å¸Ã„Â±: %${(r.olasilik * 100).toFixed(1)} (${sahaBuyuklugu} atlÃ„Â±k sahada ${r.teknikSira}. sÃ„Â±ra)`,
+  });
+
+  return { versiyon: 2, karar: r.karar, satirlar };
+}

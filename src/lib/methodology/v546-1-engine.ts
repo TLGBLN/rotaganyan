@@ -182,13 +182,25 @@ export async function scoreV461(raceId: string): Promise<V461Sonuc | null> {
       bandeNoktala("idmJokey", r.idmJokey, true, 1),
       bandeNoktala("h2hNetSkor", r.h2hNetSkor, r.h2hKarsilastirmaSayisi > 0, 1),
       bandeNoktala("hizDerecesi", r.hizDerecesi, hizGozlemli.get(r.no) ?? false, 1),
-      bandeNoktala("zeminToleransi", r.zeminToleransi, true, 1),
+      Object.assign(
+        bandeNoktala("zeminToleransi", r.zeminToleransi, true, 1),
+        { evidenceObserved: r.zeminToleransiGozlemli }
+      ),
       bandeNoktala("zeminMesafeDeneyim", r.zeminMesafeDeneyim, true, 1),
       bandeNoktala("yakinsama2Plus", r.yakinsama2Plus, true, 1),
       bandeNoktala("sonIdmanSprint", r.sonIdmanSprint, r.sonIdmanSprintGozlemli, 1),
-      bandeNoktala("takiDegisikligi", taki, true, 1),
-      bandeNoktala("yarisGidisatiSkoru", gidisatByRunnerIdV461.get(r.id)?.finalSkor ?? 0, true, 1),
-      bandeNoktala("sireOrani", r.sireOrani, true, 1),
+      Object.assign(
+        bandeNoktala("takiDegisikligi", taki, true, 1),
+        { evidenceObserved: r.takiDegisikligiGozlemli }
+      ),
+      Object.assign(
+        bandeNoktala("yarisGidisatiSkoru", gidisatByRunnerIdV461.get(r.id)?.finalSkor ?? 0, true, 1),
+        { evidenceObserved: gidisatByRunnerIdV461.get(r.id)?.finalSkor != null }
+      ),
+      Object.assign(
+        bandeNoktala("sireOrani", r.sireOrani, true, 1),
+        { evidenceObserved: (r.sireOrneklemKendiVeri ?? 0) > 0 }
+      ),
       bandeNoktala("ACC_CLOSE_RES", cr.observed ? cr.raw : null, cr.observed, cr.reliability),
       bandeNoktala("ACC_LATE", la.observed ? la.raw : null, la.observed, la.reliability),
       bandeNoktala("ACC_SPEED", sp.observed ? sp.raw : null, sp.observed, sp.reliability),

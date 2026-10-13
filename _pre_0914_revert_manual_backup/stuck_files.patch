@@ -1,0 +1,689 @@
+warning: in the working copy of 'arac-challenger-degerlendir.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/server/services/ingest/tjk-idman-stats.adapter.ts', LF will be replaced by CRLF the next time Git touches it
+diff --git a/arac-challenger-degerlendir.mjs b/arac-challenger-degerlendir.mjs
+index cc84402..cd36d6c 100644
+--- a/arac-challenger-degerlendir.mjs
++++ b/arac-challenger-degerlendir.mjs
+@@ -21,6 +21,19 @@ const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.
+ const MIN_ORNEKLEM = 250;
+ const B = 500;
+ const EPS = 1e-6;
++// 2026-09-12 kullanıcı talebi (dış AI incelemesi) — mekanizma DEĞİŞMEDİ (hâlâ aynı
++// yarış-seviyeli, paired, dondurulmuş-tahmin bootstrap FARK testi), yalnız raporlama
++// katmanı zenginleştirildi: sabit SEED (birebir tekrar üretilebilirlik) + signStability
++// (B turunun kaçında challenger lehine çıktı) + medyan.
++const SEED = 5462026;
++function mulberry32(a) {
++  return function () {
++    a |= 0; a = (a + 0x6d2b79f5) | 0;
++    let t = Math.imul(a ^ (a >>> 15), 1 | a);
++    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
++    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
++  };
++}
+ 
+ function metrikleriHesapla(pairs) {
+   let top1 = 0, top3 = 0, loglossToplam = 0, brierToplam = 0, brierSayisi = 0;
+@@ -47,23 +60,30 @@ function metrikleriHesapla(pairs) {
+   };
+ }
+ 
+-function ortalamaVeGA(degerler) {
++// negatifIyi=true olan metriklerde (logloss) Δ<0 challenger lehine; false olanlarda
++// (top1/top3 pp farkı) Δ>0 challenger lehine. signStability = o yöndeki turların oranı —
++// SignStability = #(Δ_b challenger lehine) / B.
++function ozetCikar(degerler, negatifIyi) {
+   const sirali = [...degerler].sort((a, b) => a - b);
+-  const ort = degerler.reduce((a, b) => a + b, 0) / degerler.length;
+-  const altIdx = Math.floor(0.025 * sirali.length);
+-  const ustIdx = Math.ceil(0.975 * sirali.length) - 1;
+-  return { ort, alt: sirali[altIdx], ust: sirali[ustIdx] };
++  const n = sirali.length;
++  const ort = degerler.reduce((a, b) => a + b, 0) / n;
++  const medyan = n % 2 === 1 ? sirali[(n - 1) / 2] : (sirali[n / 2 - 1] + sirali[n / 2]) / 2;
++  const altIdx = Math.floor(0.025 * n);
++  const ustIdx = Math.ceil(0.975 * n) - 1;
++  const lehineSayisi = negatifIyi ? degerler.filter((d) => d < 0).length : degerler.filter((d) => d > 0).length;
++  return { ort, medyan, alt: sirali[altIdx], ust: sirali[ustIdx], signStability: lehineSayisi / n };
+ }
+ 
+ function bootstrapFarki(raceler) {
+   const n = raceler.length;
++  const rng = mulberry32(SEED); // her challengerKey için AYNI sabit seed'ten başlar — birebir tekrar üretilebilir
+   const top1Farklari = [];
+   const top3Farklari = [];
+   const loglossFarklari = [];
+ 
+   for (let b = 0; b < B; b++) {
+     const ornek = [];
+-    for (let i = 0; i < n; i++) ornek.push(raceler[Math.floor(Math.random() * n)]);
++    for (let i = 0; i < n; i++) ornek.push(raceler[Math.floor(rng() * n)]);
+ 
+     const championPairs = ornek.map((r) => ({ output: r.championOutput, actualOrder: r.actualOrder }));
+     const challengerPairs = ornek.map((r) => ({ output: r.challengerOutput, actualOrder: r.actualOrder }));
+@@ -77,9 +97,9 @@ function bootstrapFarki(raceler) {
+   }
+ 
+   return {
+-    top1: ortalamaVeGA(top1Farklari),
+-    top3: ortalamaVeGA(top3Farklari),
+-    logloss: ortalamaVeGA(loglossFarklari),
++    top1: ozetCikar(top1Farklari, false),
++    top3: ozetCikar(top3Farklari, false),
++    logloss: ozetCikar(loglossFarklari, true),
+   };
+ }
+ 
+@@ -118,7 +138,7 @@ async function main() {
+   }
+ 
+   for (const [key, raceler] of gruplu.entries()) {
+-    console.log(`\n=== ${key} (n=${raceler.length}) ===`);
++    console.log(`\n=== ${key} (n=${raceler.length}, B=${B}, seed=${SEED}) ===`);
+     if (raceler.length < MIN_ORNEKLEM) {
+       console.log(`⚠ Asgari örneklem barajının (${MIN_ORNEKLEM}) altında — B=500 testi ÇALIŞTIRILMADI, karar için erken. Yalnız birikmeye devam edilmeli.`);
+       continue;
+@@ -128,7 +148,9 @@ async function main() {
+       const iyiMi = negatifIyi ? sonuc.ust < 0 : sonuc.alt > 0;
+       const kotuMu = negatifIyi ? sonuc.alt > 0 : sonuc.ust < 0;
+       const durum = iyiMi ? "✓ challenger lehine anlamlı" : kotuMu ? "✗ challenger aleyhine anlamlı" : "⚠ sıfırı içeriyor";
+-      console.log(`${etiket}: ortalama=${sonuc.ort.toFixed(4)} GA=[${sonuc.alt.toFixed(4)},${sonuc.ust.toFixed(4)}] ${durum}`);
++      console.log(
++        `${etiket}: meanΔ=${sonuc.ort.toFixed(4)} medianΔ=${sonuc.medyan.toFixed(4)} CI95=[${sonuc.alt.toFixed(4)},${sonuc.ust.toFixed(4)}] signStability=${(sonuc.signStability * 100).toFixed(1)}% ${durum}`
++      );
+     };
+     yorumla("top1 farkı (pp)", fark.top1);
+     yorumla("top3 farkı (pp)", fark.top3);
+diff --git a/arac-yeni-sinyal-challenger-test.mts b/arac-yeni-sinyal-challenger-test.mts
+index ab4ef53..418d571 100644
+--- a/arac-yeni-sinyal-challenger-test.mts
++++ b/arac-yeni-sinyal-challenger-test.mts
+@@ -69,6 +69,12 @@ type Row = {
+   takiAileVerisiVar?: boolean; // backfill: enrich-taki-aile.mts, atın geçmiş yarışı DB önbelleğinde var mı
+   jockeyEffect?: number; // backfill: enrich-jockey-effect.mts, shrink edilmiş actual-expected (n>=5 biniş)
+   jockeyEffectVarMi?: boolean;
++  jockeyLevelMarketFree?: number; jockeyTrendMarketFree?: number; // backfill: arac-yeni-sinyal-backfill-jockeylevel-marketfree.mts — RPE CORE_4 bazlı actual-vs-expected pairwise residual, jockeyEffect'ten BAĞIMSIZ/farklı taban (2026-10-03)
++  jockeyLevelMarketFreeVarMi?: boolean;
++  accuracePerformance?: number; // backfill: arac-yeni-sinyal-backfill-accurace-performance.mts — RPE Trip/Sectional'dan BİREBİR taşınmış (2026-10-03, V5.47 AccuracePerformance adayı, hizDerecesi replacement testi)
++  accuracePerformanceVarMi?: boolean;
++  paceP1LeaderPressureExposure?: number; paceP2LeadershipCompetitionExposure?: number; paceP3RunningStyleFit?: number; // backfill: arac-yeni-sinyal-backfill-pace-components.mts — Pace V2 (2026-10-03), yarisGidisatiSkoru replacement adayı, within-race-softmax-safe per-horse etkileşim terimleri
++  paceComponentsVarMi?: boolean;
+   hizPeak?: number; hizTrend?: number; hizZamanAgirlikli?: number; // backfill: enrich-hiz-peak-trend.mts
+   hizPerRaceVarMi?: boolean; hizTrendVarMi?: boolean;
+   [k: string]: unknown;
+@@ -95,8 +101,17 @@ function yakinsama2PlusEkle(runners: Row[]) {
+  *  Şartlı1/19/27 mi) sorusu için kullanılıyor, o da kategoriden aynen türetilebilir. */
+ const ZEMIN_TOLERANSI_IDX = 8; // FEATURE_NAMES: ...,agfPayi2(7),zeminToleransi(8),...
+ const HIZ_DERECESI_IDX = 6; // FEATURE_NAMES: ...,h2hNetSkor(5),hizDerecesi(6),agfPayi2(7),...
++// 2026-10-03 kullanıcı talebi — JockeyLevelMarketFree'nin DOĞRU testi additive DEĞİL,
++// REPLACEMENT: mevcut jokeyOrani'nin (A-katmanı) katkısı çıkarılıp YERİNE yeni sinyal
++// konmalı (C = jokeyHaric+JockeyLevelMarketFree, A = mevcut baseline ile kıyaslanır) —
++// aksi halde additive β, jokeyOrani ile ÖRTÜŞEN bilgiyi bastırıp yanlışlıkla FAIL görünür.
++const JOKEY_ORANI_IDX = 2; // FEATURE_NAMES: agfSirasi(0),idmJokey(1),jokeyOrani(2),antrenorOrani(3),... (v5-weights-diger.json ile doğrulandı)
++// 2026-10-03 kullanıcı talebi — Pace V2 replacement testi: yarisGidisatiSkoru(12) çıkarılır.
++// NOT: Handikap'ta WEIGHTS_DIGER_HANDIKAP bu katsayıyı ZATEN elle sıfırlamış durumda — bu
++// flag o segmentte NO-OP'tur (0'ı tekrar 0 yapar), B segment için A'ya eşittir (beklenen).
++const YARIS_GIDISATI_IDX = 12; // FEATURE_NAMES: ...,sonIdmanSprint(10),takiDegisikligi(11),yarisGidisatiSkoru(12)
+ 
+-function hesaplaSV546(runners: Row[], kategori: string, sireHaric = false, zeminHaric = false, hizHaric = false): number[] {
++function hesaplaSV546(runners: Row[], kategori: string, sireHaric = false, zeminHaric = false, hizHaric = false, jokeyHaric = false, gidisatHaric = false): number[] {
+   const setler = agirlikSetleriIcinKategori(kategori);
+   // toFeatureVector yalnız 13 A-özelliğini okur (zeminMesafeDeneyimSeviyesi'ne bakmaz) —
+   // ham Row doğrudan geçilebilir.
+@@ -107,7 +122,7 @@ function hesaplaSV546(runners: Row[], kategori: string, sireHaric = false, zemin
+   // 2026-09-18 — Hız Derecesi Peak/Trend/ZamanAğırlıklı adayları AYNI ham per-race verisinden
+   // türetildiği için mevcut hizDerecesi ile YÜKSEK KOLİNEER — additive test yanıltıcı
+   // olabilir (redundancy β'yı bastırır), bu yüzden hizHaric ile REPLACEMENT testi de yapılıyor.
+-  const skorlarHam = harmanlar.map((h) => h.skor - (zeminHaric ? h.katkilar[ZEMIN_TOLERANSI_IDX] : 0) - (hizHaric ? h.katkilar[HIZ_DERECESI_IDX] : 0));
++  const skorlarHam = harmanlar.map((h) => h.skor - (zeminHaric ? h.katkilar[ZEMIN_TOLERANSI_IDX] : 0) - (hizHaric ? h.katkilar[HIZ_DERECESI_IDX] : 0) - (jokeyHaric ? h.katkilar[JOKEY_ORANI_IDX] : 0) - (gidisatHaric ? h.katkilar[YARIS_GIDISATI_IDX] : 0));
+   // bKatmaniUygula İKİ şeye bakar: r.sireOrani (Row'da zaten var) ve
+   // r.zeminMesafeDeneyimSeviyesi (Row'da YOK, ham zeminMesafeDeneyim===0 ile yaklaşıklanıyor
+   // — bkz. dosya başı Row tipi notu) + classType (yalnız Maiden/Şartlı1/19/27 mi sorusu için,
+@@ -124,6 +139,7 @@ function hesaplaSV546(runners: Row[], kategori: string, sireHaric = false, zemin
+ 
+ // ─── Plain softmax (liderEsigi/sıcaklık kalibrasyonu YOK) — arac-model-egit-segment.mjs'in
+ // KENDİ evaluate()'iyle AYNI konvansiyon (bkz. dosya başı notu). ─────────────────────────
++function ortalama(a: number[]): number { return a.length ? a.reduce((s, v) => s + v, 0) / a.length : NaN; }
+ function softmax(scores: number[]): number[] {
+   const max = Math.max(...scores);
+   const exps = scores.map((s) => Math.exp(s - max));
+@@ -545,7 +561,47 @@ const HizZamanAgirlikli: Aday = {
+   dahilMi: (runners) => runners.map((r) => r.hizPerRaceVarMi === true),
+ };
+ 
+-const ADAYLAR: Aday[] = [ClassDeltaV1];
++// JockeyLevelMarketFree — kullanıcı talimatı 2026-10-03: RPE v1.0'ın (piyasa/AGF
++// GÖRMEYEN) CORE_4 gücüne göre actual-vs-expected PAIRWISE rezidüel (R_r), jokey
++// bazında 365-gün ağırlıklı ortalama (H=180, K=40 — arac-rpe-eval-jockey-form.mts'te
++// zaten seçildi, BURADA YENİDEN ARANMADI). Eski JockeyEffect (yukarıda, piyasa-
++// beklenen tabanlı, DEV'de parlayıp OOS'ta tersine dönmüş/REDDEDİLMİŞ sinyal) ile
++// KARIŞTIRILMAMALI — taban tamamen farklı (piyasa değil, RPE'nin kendi market-
++// bağımsız gücü). Backfill: arac-yeni-sinyal-backfill-jockeylevel-marketfree.mts,
++// PIT: gün-başı donmuş + explicit sourceRaceDate<targetRaceDay assertion (18.8M
++// kontrol, 0 ihlal). Bu TEK BAŞINA bir production kararı DEĞİL — V5.46'nın kendi
++// challenger harness'ındaki GERÇEK OOS sonucu, RPE'nin kendi LOCKED TEST sonucuyla
++// BİRLİKTE karar matrisine göre değerlendirilecek.
++const JockeyLevelMarketFree: Aday = {
++  ad: "JockeyLevelMarketFree",
++  hesapla: (runners) => runners.map((r) => (typeof r.jockeyLevelMarketFree === "number" ? r.jockeyLevelMarketFree : 0)),
++  dahilMi: (runners) => runners.map((r) => r.jockeyLevelMarketFreeVarMi === true),
++};
++
++// AccuracePerformance — kullanıcı talimatı 2026-10-03 (V5.47 planı, öncelik #1): hizDerecesi
++// REPLACEMENT adayı. Formül RPE Trip/Sectional'dan BİREBİR taşındı (sıfırdan icat edilmedi) —
++// sibling-relative z(son-bölüm hızı) + z(pozisyon kazancı), H=60g recency-weighted. Backfill:
++// arac-yeni-sinyal-backfill-accurace-performance.mts, PIT: Race-linked GERÇEK off-time
++// (AccuraceRace.date BUG'ı düzeltilmiş), explicit sourceRaceDate<targetRaceDay assertion.
++const AccuracePerformance: Aday = {
++  ad: "AccuracePerformance",
++  hesapla: (runners) => runners.map((r) => (typeof r.accuracePerformance === "number" ? r.accuracePerformance : 0)),
++  dahilMi: (runners) => runners.map((r) => r.accuracePerformanceVarMi === true),
++};
++
++// Pace V2 — kullanıcı talimatı 2026-10-03 (V5.47 planı #2, Aşama 1): yarisGidisatiSkoru
++// REPLACEMENT adayı, 3 AYRI per-horse feature (within-race softmax'ta saha-sabiti bir
++// feature'ın matematiksel olarak sıfır etkili olacağı kullanıcıyla BİRLİKTE doğrulandı —
++// bu yüzden P1/P2 atın KENDİ KACAK_AT olasılığıyla etkileşime sokuldu, saha-sabiti HAM
++// DEĞİL). Backfill: arac-yeni-sinyal-backfill-pace-components.mts. P1-P2 korelasyonu
++// YÜKSEK çıktı (r=0.747, backfill raporunda) — kullanıcının öngördüğü gibi, bu yüzden
++// C-P1/C-P2/C-P3 ablation'ları AYRICA raporlanacak (hiçbiri körlemesine production'a
++// taşınmayacak).
++const PaceP1: Aday = { ad: "PaceP1_LeaderPressureExposure", hesapla: (runners) => runners.map((r) => (typeof r.paceP1LeaderPressureExposure === "number" ? r.paceP1LeaderPressureExposure : 0)), dahilMi: (runners) => runners.map((r) => r.paceComponentsVarMi === true) };
++const PaceP2: Aday = { ad: "PaceP2_LeadershipCompetitionExposure", hesapla: (runners) => runners.map((r) => (typeof r.paceP2LeadershipCompetitionExposure === "number" ? r.paceP2LeadershipCompetitionExposure : 0)), dahilMi: (runners) => runners.map((r) => r.paceComponentsVarMi === true) };
++const PaceP3: Aday = { ad: "PaceP3_RunningStyleFit", hesapla: (runners) => runners.map((r) => (typeof r.paceP3RunningStyleFit === "number" ? r.paceP3RunningStyleFit : 0)), dahilMi: (runners) => runners.map((r) => r.paceComponentsVarMi === true) };
++
++const ADAYLAR: Aday[] = [AccuracePerformance];
+ const SIRE_ORTUSME_ADAYLARI: Aday[] = [NoOp, PedigreeSurfaceAffinity, PedigreeSurfaceAffinity_LowExp];
+ // H1 (mevcut, Row.zeminToleransi zaten V5.46 skoruna dahil — ayrı test gerekmez) referans
+ // alınarak yalnız H2/H3, hem NORMAL V5.46 üzerinden (additive) hem zeminHaric (replacement)
+@@ -581,6 +637,12 @@ async function main() {
+ 
+   const dusukSart = raceGruplariHam.filter((g) => g.runners[0].kategori === "1a" || g.runners[0].kategori === "1b");
+   const diger = raceGruplariHam.filter((g) => !(g.runners[0].kategori === "1a" || g.runners[0].kategori === "1b"));
++  // 2026-10-03 kullanıcı talebi — Pace V2 testi Handikap'ı AYRI raporlamalı: WEIGHTS_DIGER_
++  // HANDIKAP yarisGidisatiSkoru'nu ZATEN elle sıfırlamış durumda, yani o segmentte B=A
++  // (replace edilecek bir şey yok) — C=A+P1+P2+P3 orada PUR ADDITIVE bir test, "diger"in
++  // İÇİNDE ERİTİLİRSE bu ayrım kaybolur. handikap, diger'in ALT KÜMESİDİR (mevcut diger
++  // çağrıları ETKİLENMEDİ).
++  const handikap = raceGruplariHam.filter((g) => g.runners[0].kategori === "2");
+   console.log(`Toplam: ${raceGruplariHam.length} koşu — Düşük-şart/maiden: ${dusukSart.length}, Diğer: ${diger.length}\n`);
+ 
+   // 2026-09-21 kullanıcı talebi — ClassDeltaV1 ile mevcut yakinsama2Plus (5 koşuldan biri
+@@ -601,9 +663,10 @@ async function main() {
+     sireHaric = false,
+     zeminHaric = false,
+     gunKumeli = false,
+-    hizHaric = false
++    hizHaric = false,
++    jokeyHaric = false
+   ) {
+-    const etiketEk = [sireHaric && "sireOrani ÇIKARILMIŞ", zeminHaric && "zeminToleransi ÇIKARILMIŞ", hizHaric && "hizDerecesi ÇIKARILMIŞ", gunKumeli && "GÜN-KÜMELİ bootstrap"].filter(Boolean).join(", ");
++    const etiketEk = [sireHaric && "sireOrani ÇIKARILMIŞ", zeminHaric && "zeminToleransi ÇIKARILMIŞ", hizHaric && "hizDerecesi ÇIKARILMIŞ", jokeyHaric && "jokeyOrani ÇIKARILMIŞ", gunKumeli && "GÜN-KÜMELİ bootstrap"].filter(Boolean).join(", ");
+     console.log(`\n########## ${etiket} (${gruplarHam.length} koşu)${etiketEk ? ` [${etiketEk}]` : ""} ##########`);
+     const splitIdx = Math.floor(gruplarHam.length * 0.75);
+     const trainRaw = gruplarHam.slice(0, splitIdx);
+@@ -617,7 +680,7 @@ async function main() {
+       function hazirla(gruplarHam2: typeof raceGruplariHam) {
+         return gruplarHam2
+           .map((g) => {
+-            const s0 = hesaplaSV546(g.runners, g.kategori, sireHaric, zeminHaric, hizHaric);
++            const s0 = hesaplaSV546(g.runners, g.kategori, sireHaric, zeminHaric, hizHaric, jokeyHaric);
+             const zHam = aday.hesapla(g.runners);
+             const dahil = aday.dahilMi ? aday.dahilMi(g.runners) : g.runners.map(() => true);
+             const winnerIdx = g.runners.findIndex((r) => r.win === 1);
+@@ -736,6 +799,193 @@ async function main() {
+     }
+   }
+ 
++  // 2026-10-03 kullanıcı talebi — asıl karar sorusu "C vs A" (jokeyOrani YERİNE
++  // JockeyLevelMarketFree koyarsak, mevcut V5.46'nın TAM KENDİSİNDEN daha iyi mi?),
++  // test()'in içindeki bootstrap bunu DOĞRUDAN ölçmüyor (yalnız C'yi KENDİ B baseline'ına
++  // karşı ölçüyor). Bu fonksiyon A'nın (jokeyOrani VAR, hiç değiştirilmemiş) ve C'nin
++  // (jokeyOrani ÇIKARILMIŞ + JockeyLevel, β TRAIN'de fit) TEST'teki per-race log-loss'larını
++  // PAIRED (aynı yarışlar, aynı resample indeksleri) bootstrap ile kıyaslar.
++  // 2026-10-03 — genelleştirildi (ilk hali yalnız jokeyHaric'e özgüydü): hangi mevcut
++  // sinyalin YERİNE geçildiği `haricSinyal` ile seçilir ("jokey"→jokeyOrani, "hiz"→
++  // hizDerecesi) — hesaplaSV546'nın zaten var olan sireHaric/zeminHaric/hizHaric/
++  // jokeyHaric parametrelerinden BİRİNİ devreye alır, yeni bir B-katmanı MEKANİZMASI
++  // icat edilmedi. HiddenWinner@3/@6: AGF sırası düşük (agfSirasi>6, "Lagari-tipi" —
++  // piyasanın gözden kaçırdığı ama kazanan) atlarda A/C modelin gerçek kazananı ilk-3/
++  // ilk-6'ya ne sıklıkla koyduğu — kullanıcı talebi (2026-10-03).
++  function testCvsA(etiket: string, gruplarHam: typeof raceGruplariHam, aday: Aday, haricSinyal: "jokey" | "hiz", gunKumeli = true) {
++    console.log(`\n########## ${etiket} — C(${haricSinyal === "jokey" ? "jokeyOrani" : "hizDerecesi"}→${aday.ad}) vs A(mevcut V5.46, DOKUNULMAMIŞ) (${gruplarHam.length} koşu) ##########`);
++    const splitIdx = Math.floor(gruplarHam.length * 0.75);
++    const trainRaw = gruplarHam.slice(0, splitIdx);
++    const testRaw = gruplarHam.slice(splitIdx);
++
++    function hazirla(gruplarHam2: typeof raceGruplariHam, haric: boolean) {
++      return gruplarHam2
++        .map((g) => {
++          const jokeyHaric = haric && haricSinyal === "jokey", hizHaric = haric && haricSinyal === "hiz";
++          const s0 = hesaplaSV546(g.runners, g.kategori, false, false, hizHaric, jokeyHaric);
++          const zHam = haric ? aday.hesapla(g.runners) : g.runners.map(() => 0);
++          const dahil = haric ? (aday.dahilMi ? aday.dahilMi(g.runners) : g.runners.map(() => true)) : g.runners.map(() => false);
++          const winnerIdx = g.runners.findIndex((r) => r.win === 1);
++          const winnerAgfSirasi = winnerIdx >= 0 ? g.runners[winnerIdx].agfSirasi : null;
++          return { s0, zHam, dahil, winnerIdx, raceDayId: g.raceDayId, winnerAgfSirasi };
++        })
++        .filter((g) => g.winnerIdx >= 0);
++    }
++    const trainC = hazirla(trainRaw, true);
++    const testA = hazirla(testRaw, false); // s0=A (mevcut sinyal VAR), z=0 (kullanılmaz)
++    const testC = hazirla(testRaw, true); // s0=mevcut sinyal ÇIKARILMIŞ, z=aday
++
++    const dahilZTrain = trainC.flatMap((g) => g.zHam.filter((_, i) => g.dahil[i]));
++    const zMean = dahilZTrain.length > 0 ? dahilZTrain.reduce((a, b) => a + b, 0) / dahilZTrain.length : 0;
++    const zStd = dahilZTrain.length > 0 ? Math.sqrt(dahilZTrain.reduce((a, b) => a + (b - zMean) ** 2, 0) / dahilZTrain.length) : 0;
++    function standardizeZ(zHam: number[], dahil: boolean[]): number[] { return zHam.map((z, i) => (dahil[i] && zStd > 1e-9 ? (z - zMean) / zStd : 0)); }
++    const trainCGroups = trainC.map((g) => ({ s0: g.s0, z: standardizeZ(g.zHam, g.dahil), winnerIdx: g.winnerIdx, raceDayId: g.raceDayId }));
++    const beta = trainBeta(trainCGroups, { epochs: 800, lr: 0.08, l2: 0.01, momentum: 0.9 });
++
++    // testA/testC AYNI testRaw sırasından türedi → index'e göre PAIRED.
++    const pairs = testA.map((gA, i) => {
++      const gC = testC[i];
++      const zC = standardizeZ(gC.zHam, gC.dahil);
++      return { s0A: gA.s0, winnerIdx: gA.winnerIdx, s0C: gC.s0, zC, raceDayId: gA.raceDayId, winnerAgfSirasi: gA.winnerAgfSirasi };
++    });
++    function nllA(p: (typeof pairs)[number]): number { const probs = softmax(p.s0A); return -Math.log(Math.max(probs[p.winnerIdx], 1e-12)); }
++    function nllC(p: (typeof pairs)[number]): number { const scores = p.s0C.map((s, i) => s + beta * p.zC[i]); const probs = softmax(scores); return -Math.log(Math.max(probs[p.winnerIdx], 1e-12)); }
++    const llA = pairs.reduce((a, p) => a + nllA(p), 0) / pairs.length;
++    const llC = pairs.reduce((a, p) => a + nllC(p), 0) / pairs.length;
++    console.log(`  β (C, train) = ${beta.toFixed(4)}  |  TEST n=${pairs.length}`);
++    console.log(`  LogLoss: A(mevcut V5.46)=${llA.toFixed(4)}  C(${haricSinyal}→${aday.ad})=${llC.toFixed(4)}  ΔLL(C-A)=${(llC - llA).toFixed(4)} ${llC < llA ? "(C DAHA İYİ)" : "(C DAHA KÖTÜ/eşit)"}`);
++
++    // HiddenWinner@3/@6 — yalnız AGF sırası düşük (>6, "Lagari-tipi") GERÇEK kazananlarda.
++    function rankOfWinner(scores: number[], winnerIdx: number): number { return 1 + scores.filter((s, i) => i !== winnerIdx && s > scores[winnerIdx]).length; }
++    const lagariPairs = pairs.filter((p) => p.winnerAgfSirasi != null && p.winnerAgfSirasi > 6);
++    if (lagariPairs.length > 0) {
++      const ranksA = lagariPairs.map((p) => rankOfWinner(p.s0A, p.winnerIdx));
++      const ranksC = lagariPairs.map((p) => rankOfWinner(p.s0C.map((s, i) => s + beta * p.zC[i]), p.winnerIdx));
++      const hitAt = (ranks: number[], k: number) => ranks.filter((r) => r <= k).length / ranks.length;
++      console.log(`  [HiddenWinner — AGF sırası>6, n=${lagariPairs.length}] A: Hit@3=%${(hitAt(ranksA, 3) * 100).toFixed(1)} Hit@6=%${(hitAt(ranksA, 6) * 100).toFixed(1)} MeanRank=${ortalama(ranksA).toFixed(2)}`);
++      console.log(`  [HiddenWinner — AGF sırası>6, n=${lagariPairs.length}] C: Hit@3=%${(hitAt(ranksC, 3) * 100).toFixed(1)} Hit@6=%${(hitAt(ranksC, 6) * 100).toFixed(1)} MeanRank=${ortalama(ranksC).toFixed(2)}`);
++    } else {
++      console.log(`  [HiddenWinner] bu TEST diliminde AGF sırası>6 gerçek kazanan YOK (n=0) — karşılaştırma yapılamadı.`);
++    }
++
++    const B = Number(process.env.BOOTSTRAP_B ?? 300);
++    const rng = mulberry32(SEED + 2);
++    const byDay = new Map<string, typeof pairs>();
++    for (const p of pairs) { const arr = byDay.get(p.raceDayId) ?? []; arr.push(p); byDay.set(p.raceDayId, arr); }
++    const dayClusters = [...byDay.values()];
++    const deltaBoot: number[] = [];
++    for (let b = 0; b < B; b++) {
++      const resample = gunKumeli ? bootstrapResample(dayClusters, rng).flat() : bootstrapResample(pairs, rng);
++      const rA = resample.reduce((a, p) => a + nllA(p), 0) / resample.length;
++      const rC = resample.reduce((a, p) => a + nllC(p), 0) / resample.length;
++      deltaBoot.push(rC - rA);
++    }
++    const sorted = [...deltaBoot].sort((a, b) => a - b);
++    const lo = percentile(sorted, 0.025), hi = percentile(sorted, 0.975);
++    const negCount = deltaBoot.filter((v) => v < 0).length;
++    console.log(`  ΔLL(C-A) bootstrap (B=${B}, ${gunKumeli ? "GÜN-KÜMELİ" : "race-paired"}): %95 GA=[${lo.toFixed(4)}, ${hi.toFixed(4)}]  P(ΔLL<0)=${((negCount / deltaBoot.length) * 100).toFixed(1)}%`);
++    console.log(`  KARAR (C vs A): ${hi < 0 ? "✓✓ C KESİN daha iyi (jokeyOrani'nin YERİNİ alabilir)" : lo > 0 ? "✗ C KESİN daha kötü (jokeyOrani kalır)" : "sıfırı içeriyor — C≈A, ek değer KANITLANAMADI (mevcut jokeyOrani kalır)"}`);
++  }
++
++  // 2026-10-03 kullanıcı talimatı — Pace V2 (ÇOK-FEATURE replacement, k=3: P1/P2/P3).
++  // testCvsA'nın (k=1) genelleştirilmesi: TEK β yerine β VEKTÖRÜ (TRAIN'de birlikte fit),
++  // C vs A asıl karar + her bir bileşenin tek-başına çıkarılmasıyla (C-P1/C-P2/C-P3)
++  // ablation — P1-P2 YÜKSEK korelasyonlu (backfill: r=0.747) olduğu için TEK başına hiçbiri
++  // production'a KÖRLEMESİNE taşınmaz, yalnız C (üçü birlikte) PASS ederse o KARAR verilir.
++  function trainBetaMulti(gruplar: { s0: number[]; z: number[][]; winnerIdx: number }[], k: number, opts: { epochs: number; lr: number; l2: number; momentum: number }): number[] {
++    let beta = new Array(k).fill(0), velocity = new Array(k).fill(0);
++    const { epochs, lr, l2, momentum } = opts;
++    for (let epoch = 0; epoch < epochs; epoch++) {
++      const grad = new Array(k).fill(0);
++      for (const g of gruplar) {
++        const scores = g.s0.map((s, i) => s + beta.reduce((acc, b, kk) => acc + b * g.z[i][kk], 0));
++        const probs = softmax(scores);
++        for (let i = 0; i < g.z.length; i++) for (let kk = 0; kk < k; kk++) grad[kk] += (probs[i] - (i === g.winnerIdx ? 1 : 0)) * g.z[i][kk];
++      }
++      for (let kk = 0; kk < k; kk++) { const gr = grad[kk] / gruplar.length + 2 * l2 * beta[kk]; velocity[kk] = momentum * velocity[kk] - lr * gr; beta[kk] += velocity[kk]; }
++    }
++    return beta;
++  }
++  function nllMulti(p: { s0: number[]; z: number[][]; winnerIdx: number }, beta: number[]): number {
++    const scores = p.s0.map((s, i) => s + beta.reduce((acc, b, kk) => acc + b * p.z[i][kk], 0));
++    const probs = softmax(scores);
++    return -Math.log(Math.max(probs[p.winnerIdx], 1e-12));
++  }
++
++  // NOT: şu an yalnız yarisGidisatiSkoru (gidisatHaric) replacement'ı için kullanılıyor —
++  // haricAdi yalnız log etiketi, hesaplama DOĞRUDAN hesaplaSV546'nın gidisatHaric parametresini çağırır.
++  function testCvsAMulti(etiket: string, gruplarHam: typeof raceGruplariHam, adaylar: Aday[], haricAdi: string, gunKumeli = true) {
++    console.log(`\n########## ${etiket} — C(${haricAdi}→[${adaylar.map((a) => a.ad).join("+")}]) vs A(mevcut V5.46, DOKUNULMAMIŞ) (${gruplarHam.length} koşu) ##########`);
++    const k = adaylar.length;
++    const splitIdx = Math.floor(gruplarHam.length * 0.75);
++    const trainRaw = gruplarHam.slice(0, splitIdx), testRaw = gruplarHam.slice(splitIdx);
++
++    function hazirla(gruplarHam2: typeof raceGruplariHam, haric: boolean) {
++      return gruplarHam2
++        .map((g) => {
++          const s0 = haric ? hesaplaSV546(g.runners, g.kategori, false, false, false, false, true) : hesaplaSV546(g.runners, g.kategori);
++          const zPerFeature = adaylar.map((aday) => (haric ? aday.hesapla(g.runners) : g.runners.map(() => 0)));
++          const dahilPerFeature = adaylar.map((aday) => (haric ? (aday.dahilMi ? aday.dahilMi(g.runners) : g.runners.map(() => true)) : g.runners.map(() => false)));
++          const winnerIdx = g.runners.findIndex((r) => r.win === 1);
++          return { s0, zPerFeature, dahilPerFeature, winnerIdx, raceDayId: g.raceDayId };
++        })
++        .filter((g) => g.winnerIdx >= 0);
++    }
++    const trainC = hazirla(trainRaw, true);
++    const testA = hazirla(testRaw, false);
++    const testC = hazirla(testRaw, true);
++
++    // Her feature KENDİ (dahil=true TRAIN satırlarından) μ/σ'sıyla standardize edilir.
++    const stats = adaylar.map((_, kk) => {
++      const vals = trainC.flatMap((g) => g.zPerFeature[kk].filter((_, i) => g.dahilPerFeature[kk][i]));
++      const mean = vals.length > 0 ? ortalama(vals) : 0;
++      const sd = vals.length > 0 ? Math.sqrt(vals.reduce((a, v) => a + (v - mean) ** 2, 0) / vals.length) : 0;
++      return { mean, sd };
++    });
++    function standardizeMulti(g: { zPerFeature: number[][]; dahilPerFeature: boolean[][] }): number[][] {
++      const n = g.zPerFeature[0].length;
++      return Array.from({ length: n }, (_, i) => stats.map((st, kk) => (g.dahilPerFeature[kk][i] && st.sd > 1e-9 ? (g.zPerFeature[kk][i] - st.mean) / st.sd : 0)));
++    }
++    const trainCGroups = trainC.map((g) => ({ s0: g.s0, z: standardizeMulti(g), winnerIdx: g.winnerIdx, raceDayId: g.raceDayId }));
++    const testAGroups = testA.map((g) => ({ s0: g.s0, winnerIdx: g.winnerIdx, raceDayId: g.raceDayId }));
++    const testCGroups = testC.map((g) => ({ s0: g.s0, z: standardizeMulti(g), winnerIdx: g.winnerIdx, raceDayId: g.raceDayId }));
++
++    const beta = trainBetaMulti(trainCGroups, k, { epochs: 800, lr: 0.08, l2: 0.01, momentum: 0.9 });
++    const pairs = testAGroups.map((gA, i) => ({ s0A: gA.s0, winnerIdx: gA.winnerIdx, raceDayId: gA.raceDayId, s0C: testCGroups[i].s0, zC: testCGroups[i].z }));
++    function nllA(p: (typeof pairs)[number]): number { const probs = softmax(p.s0A); return -Math.log(Math.max(probs[p.winnerIdx], 1e-12)); }
++    function nllCWithBeta(p: (typeof pairs)[number], b: number[]): number { return nllMulti({ s0: p.s0C, z: p.zC, winnerIdx: p.winnerIdx }, b); }
++    const llA = ortalama(pairs.map(nllA));
++    const llC = ortalama(pairs.map((p) => nllCWithBeta(p, beta)));
++    console.log(`  β (C, train, [${adaylar.map((a) => a.ad).join(",")}]) = [${beta.map((b) => b.toFixed(4)).join(", ")}]  |  TEST n=${pairs.length}`);
++    console.log(`  LogLoss: A(mevcut V5.46)=${llA.toFixed(4)}  C=${llC.toFixed(4)}  ΔLL(C-A)=${(llC - llA).toFixed(4)} ${llC < llA ? "(C DAHA İYİ)" : "(C DAHA KÖTÜ/eşit)"}`);
++
++    const B = Number(process.env.BOOTSTRAP_B ?? 300);
++    const rng = mulberry32(SEED + 3);
++    const byDay = new Map<string, typeof pairs>(); for (const p of pairs) { const arr = byDay.get(p.raceDayId) ?? []; arr.push(p); byDay.set(p.raceDayId, arr); }
++    const dayClusters = [...byDay.values()];
++    const deltaBoot: number[] = [];
++    for (let b = 0; b < B; b++) { const resample = gunKumeli ? bootstrapResample(dayClusters, rng).flat() : bootstrapResample(pairs, rng); deltaBoot.push(ortalama(resample.map((p) => nllCWithBeta(p, beta))) - ortalama(resample.map(nllA))); }
++    const sorted = [...deltaBoot].sort((a, b) => a - b);
++    const lo = percentile(sorted, 0.025), hi = percentile(sorted, 0.975);
++    const negCount = deltaBoot.filter((v) => v < 0).length;
++    console.log(`  ΔLL(C-A) bootstrap (B=${B}, ${gunKumeli ? "GÜN-KÜMELİ" : "race-paired"}): %95 GA=[${lo.toFixed(4)}, ${hi.toFixed(4)}]  P(ΔLL<0)=${((negCount / deltaBoot.length) * 100).toFixed(1)}%`);
++    const verdict = hi < 0 ? "✓✓ C KESİN daha iyi" : lo > 0 ? "✗ C KESİN daha kötü" : "sıfırı içeriyor — C≈A, ek değer KANITLANAMADI";
++    console.log(`  KARAR (C vs A): ${verdict}`);
++
++    // Ablation — her feature'ı TEK TEK çıkarıp (kalan k-1 ile YENİDEN fit) C'nin ne kadar
++    // bu TEK bileşene bağlı olduğunu gösterir (P1-P2 yüksek korelasyonlu olduğu için kritik).
++    if (k > 1) {
++      console.log(`  --- Ablation (her feature tek tek çıkarılıp kalanlarla yeniden fit) ---`);
++      for (let drop = 0; drop < k; drop++) {
++        const keepIdx = [...Array(k).keys()].filter((i) => i !== drop);
++        const trainSub = trainCGroups.map((g) => ({ s0: g.s0, z: g.z.map((row) => keepIdx.map((i) => row[i])), winnerIdx: g.winnerIdx }));
++        const betaSub = trainBetaMulti(trainSub, k - 1, { epochs: 800, lr: 0.08, l2: 0.01, momentum: 0.9 });
++        const llCSub = ortalama(pairs.map((p) => nllMulti({ s0: p.s0C, z: p.zC.map((row) => keepIdx.map((i) => row[i])), winnerIdx: p.winnerIdx }, betaSub)));
++        console.log(`    C − ${adaylar[drop].ad}: ΔLL(vs A)=${(llCSub - llA).toFixed(4)}  (tam C'nin ΔLL(vs A)'sı=${(llC - llA).toFixed(4)})`);
++      }
++    }
++  }
++
+   test("ŞARTLI 1/19/27 + MAIDEN (düşük-şart)", dusukSart);
+   test("DİĞER KOŞULAR", diger);
+   // 2026-09-18 kullanıcı talebi — KgsGun production'a alınmadan önce B=500 GÜN-KÜMELİ
+@@ -744,10 +994,48 @@ async function main() {
+   if (process.env.KGSGUN_KONFIRMASYON === "1") {
+     test("DİĞER KOŞULAR — KgsGun B=500 GÜN-KÜMELİ TEYİT", diger, [KgsGun], false, false, true);
+   }
++  // 2026-10-03 kullanıcı talimatı — JockeyLevelMarketFree production kararından ÖNCE
++  // zorunlu V5.46-tarafı OOS doğrulaması: BOOTSTRAP_B=500 ile ve gün-kümeli (meeting-day
++  // clustered) bootstrap, HER İKİ segmentte de (düşük-şart + diğer) — formül/hyperparametre
++  // değiştirilmedi, yalnız bu script'in zaten var olan disiplini (kronolojik 75/25 OOS,
++  // paired bootstrap) uygulanıyor. İLK deneme ADDITIVE'ti (jokeyOrani YERİNDE dururken
++  // ek β) — kullanıcı doğru itiraz etti: asıl soru "jokeyOrani'nin YERİNE JockeyLevel
++  // koyarsak daha iyi mi" sorusu, additive test redundancy varsa β'yı YANLIŞLIKLA bastırır.
++  // Bu yüzden REPLACEMENT testi: A=mevcut baseline (yukarıdaki normal çağrılarda zaten
++  // basıldı, V5.46=X.XXXX satırı), B=jokeyHaric (jokeyOrani çıkarılmış, aday YOK etkisiyle
++  // aynı — baseline=B'nin logloss'u), C=jokeyHaric+JockeyLevelMarketFree (β fit edilmiş,
++  // challenger=C'nin logloss'u). Asıl karşılaştırma C vs A.
++  if (process.env.JOCKEYLEVEL_KONFIRMASYON === "1") {
++    test("ŞARTLI 1/19/27 + MAIDEN (düşük-şart) — JockeyLevelMarketFree B=500 GÜN-KÜMELİ [ADDITIVE, referans]", dusukSart, ADAYLAR, false, false, true);
++    test("DİĞER KOŞULAR — JockeyLevelMarketFree B=500 GÜN-KÜMELİ [ADDITIVE, referans]", diger, ADAYLAR, false, false, true);
++  }
++  if (process.env.JOCKEYLEVEL_REPLACEMENT_TEST === "1") {
++    test("ŞARTLI 1/19/27 + MAIDEN (düşük-şart) — JockeyLevelMarketFree REPLACEMENT (B=jokeyOrani ÇIKARILMIŞ baseline, C=+JockeyLevel)", dusukSart, ADAYLAR, false, false, true, false, true);
++    test("DİĞER KOŞULAR — JockeyLevelMarketFree REPLACEMENT (B=jokeyOrani ÇIKARILMIŞ baseline, C=+JockeyLevel)", diger, ADAYLAR, false, false, true, false, true);
++    testCvsA("ŞARTLI 1/19/27 + MAIDEN (düşük-şart)", dusukSart, JockeyLevelMarketFree, "jokey");
++    testCvsA("DİĞER KOŞULAR", diger, JockeyLevelMarketFree, "jokey");
++  }
+   if (process.env.HIZ_REPLACEMENT_TEST === "1") {
+     test("ŞARTLI 1/19/27 + MAIDEN (düşük-şart) — hizDerecesi YERİNE (replacement)", dusukSart, ADAYLAR, false, false, false, true);
+     test("DİĞER KOŞULAR — hizDerecesi YERİNE (replacement)", diger, ADAYLAR, false, false, false, true);
+   }
++  // 2026-10-03 kullanıcı talimatı — V5.47 planı #1 öncelik: AccuracePerformance,
++  // hizDerecesi REPLACEMENT adayı. AYNI disiplin (B=500 gün-kümeli, A/B/C üçlü +
++  // C-vs-A direkt bootstrap + HiddenWinner@3/@6 Lagari-tipi kazananlarda).
++  if (process.env.ACCURACEPERF_REPLACEMENT_TEST === "1") {
++    test("ŞARTLI 1/19/27 + MAIDEN (düşük-şart) — AccuracePerformance REPLACEMENT (B=hizDerecesi ÇIKARILMIŞ baseline, C=+AccuracePerformance)", dusukSart, ADAYLAR, false, false, true, true);
++    test("DİĞER KOŞULAR — AccuracePerformance REPLACEMENT (B=hizDerecesi ÇIKARILMIŞ baseline, C=+AccuracePerformance)", diger, ADAYLAR, false, false, true, true);
++    testCvsA("ŞARTLI 1/19/27 + MAIDEN (düşük-şart)", dusukSart, AccuracePerformance, "hiz");
++    testCvsA("DİĞER KOŞULAR", diger, AccuracePerformance, "hiz");
++  }
++  // 2026-10-03 kullanıcı talimatı — V5.47 planı #2: Pace V2 (P1/P2/P3), yarisGidisatiSkoru
++  // REPLACEMENT adayı. 3 segment AYRI raporlanır (Handikap'ta yarisGidisati ZATEN elle
++  // sıfır — bu segmentte B=A, test fiilen pur additive; dusukSart/diger'de gerçek replacement).
++  if (process.env.PACEV2_REPLACEMENT_TEST === "1") {
++    testCvsAMulti("ŞARTLI 1/19/27 + MAIDEN (düşük-şart)", dusukSart, [PaceP1, PaceP2, PaceP3], "yarisGidisati");
++    testCvsAMulti("DİĞER KOŞULAR", diger, [PaceP1, PaceP2, PaceP3], "yarisGidisati");
++    testCvsAMulti("HANDİKAP (yarisGidisati zaten 0 — pur additive)", handikap, [PaceP1, PaceP2, PaceP3], "yarisGidisati");
++  }
+ 
+   // 2026-09-17 kullanıcı talebi — sireOrani/PedigreeSurfaceAffinity örtüşme (redundancy)
+   // audit'i: yalnız düşük-şart'ta anlamlı (sireOrani zaten yalnız o segmentte etkin,
+diff --git a/src/app/(admin)/admin/kupon/KuponForm.tsx b/src/app/(admin)/admin/kupon/KuponForm.tsx
+index 70a92a3..d7e9afd 100644
+--- a/src/app/(admin)/admin/kupon/KuponForm.tsx
++++ b/src/app/(admin)/admin/kupon/KuponForm.tsx
+@@ -504,6 +504,15 @@ export default function KuponForm({ hippodromes }: { hippodromes: Hippodrome[] }
+         toast.error(`${label} yayınlanamadı — lütfen tekrar deneyin (context eşzamanlı değişmiş olabilir).`);
+       } else {
+         toast.success(`${label} kuponu oluşturuldu ve anasayfada yayınlandı`);
++        // 2026-10-02 — Sessiz DP-sapması uyarısı (bkz. home-kupon.actions.ts DpDivergence
++        // yorumu): yayını ENGELLEMEZ (WYSIWYG garantisi aynen korunur), yalnız ekrandaki
++        // seçimin saf-DP optimumundan FARKLI olduğu ayakları görünür kılar.
++        if (res.ok && res.dpDivergence && res.dpDivergence.length > 0) {
++          const ozet = res.dpDivergence
++            .map((d) => `K${d.raceNo} ${WIDTH_LABEL[d.width]}: seçilen=[${d.secilen.join(",")}] saf-DP=[${d.dpOptimal.join(",")}]`)
++            .join(" | ");
++          toast.warning(`${label}: ${res.dpDivergence.length} ayak saf-DP optimumundan farklı — ${ozet}`, { duration: 15000 });
++        }
+       }
+       router.refresh();
+     } finally {
+diff --git a/src/server/actions/home-kupon.actions.ts b/src/server/actions/home-kupon.actions.ts
+index 0537713..1df8e71 100644
+--- a/src/server/actions/home-kupon.actions.ts
++++ b/src/server/actions/home-kupon.actions.ts
+@@ -129,8 +129,17 @@ function toDependencyInput(legs: ScopedLeg[]): DependencyRaceInput[] {
+   }));
+ }
+ 
++// 2026-10-02 — Sessiz DP-sapması uyarısı (bkz. arac-contiguity-forensic-ve-stratified-
++// bootstrap.mts, Bursa K5/ASLANLI OVA vakası): WYSIWYG tasarımı (2026-09-28, yukarıdaki
++// not) BİLEREK admin'in ekranda onayladığını aynen yayınlıyor — bu DOĞRU bir tasarım
++// kararı, GERİ ALINMIYOR. Ama tam tarihçe denetiminde (n=1713 ayak) %15.1'inin saf-DP
++// optimumundan SESSİZCE saptığı, hiçbir yerde görünmediği bulundu. Bu alan, yayını
++// ENGELLEMEDEN (WYSIWYG garantisi BOZULMADAN) admin'e yalnız GÖRÜNÜRLÜK katıyor — "bu
++// seçim, aynı (doğrulanmış taze) veriyle saf-DP'nin üreteceğinden farklı" bilgisini taşır.
++export type DpDivergence = { raceNo: number; width: "narrow" | "normal" | "wide"; secilen: number[]; dpOptimal: number[] };
++
+ export type SyncHomeKuponResult =
+-  | { ok: true; homeKuponId?: string; created?: boolean }
++  | { ok: true; homeKuponId?: string; created?: boolean; dpDivergence?: DpDivergence[] }
+   | { ok: false; skipped?: "NO_ELIGIBLE_RUNNERS" | "RACE_CONDITION" | "CONCURRENT_GENERATION" | "POOL_NOT_FOUND" | "STALE_CLIENT_VIEW" };
+ 
+ /**
+@@ -199,7 +208,30 @@ export async function syncHomeKupon(input: {
+     eligibleNosByRaceNo[leg.raceNo] = new Set(leg.runners.filter((r) => !r.scratched).map((r) => r.no));
+   }
+ 
++  // effectiveOverrides — yalnız DP çağrısı için (hem WYSIWYG-sapma kontrolü hem gerçek DP
++  // dalı kullanır), DB'ye YAZILMAZ (PİVOT-2 madde 13).
++  const effectiveOverrides = pruneToEligible(manualOverrides, eligibleNosByRaceNo);
++  // DP — otomatikGroupSelections'ın beklediği RaceDayData şekline dönüştür (her iki dal
++  // da AYNI veriyi kullanır — sapma kontrolünün anlamlı olması için ŞART).
++  const racesForDp = scopedLegs.map((l) => ({
++    raceNo: l.raceNo,
++    pistAnormalMi: false,
++    pistDuyarliligi: l.pistDuyarliligi,
++    gecmisRiskSeviyesi: l.gecmisRiskSeviyesi,
++    pistUyariMesaji: null,
++    runners: l.runners.map((r) => ({
++      no: r.no,
++      name: "",
++      scratched: r.scratched,
++      ekuriGroup: r.ekuriGroup,
++      score: Math.round(r.olasilik * 100),
++      scoreExact: r.olasilik * 100,
++      agfSirasi: null,
++    })),
++  }));
++
+   let legs: HomeKuponLegInput[];
++  let dpDivergence: DpDivergence[] | undefined;
+   if (input.explicitLegs) {
+     // WYSIWYG — admin'in ekranda onayladığı seçim AYNEN yayınlanır, DP yeniden çözülmez.
+     // Sunucu yalnız doğrular: havuzda olmayan ayakları ve koşmaz/geçersiz at no'larını eler.
+@@ -218,10 +250,32 @@ export async function syncHomeKupon(input: {
+       }))
+       .filter((l) => l.narrow.length > 0 || l.normal.length > 0 || l.wide.length > 0);
+     if (legs.length === 0) return { ok: false, skipped: "NO_ELIGIBLE_RUNNERS" };
+-  } else {
+-    // 6) effectiveOverrides — yalnız DP çağrısı için, DB'ye YAZILMAZ (PİVOT-2 madde 13).
+-    const effectiveOverrides = pruneToEligible(manualOverrides, eligibleNosByRaceNo);
+ 
++    // Sessiz DP-sapması uyarısı (bkz. yukarıdaki DpDivergence yorumu) — yayını ENGELLEMEZ,
++    // yalnız admin'e görünürlük katar. Aynı (doğrulanmış taze) veriyle, admin'in GERÇEKTEN
++    // dokunduğu kısıtlar (effectiveOverrides) etrafında saf-DP ne üretirdi, karşılaştırılır.
++    try {
++      const pureDp = otomatikGroupSelections(
++        racesForDp,
++        optimizerConfig.stakePerCombination,
++        optimizerConfig.limits as Record<Width, number>,
++        optimizerConfig.tolerances as Record<Width, number>,
++        effectiveOverrides
++      );
++      const farklar: DpDivergence[] = [];
++      for (const l of legs) {
++        for (const width of ["narrow", "normal", "wide"] as const) {
++          const secilen = l[width];
++          const dpOptimal = [...(pureDp[l.raceNo]?.[width] ?? new Set<number>())].sort((a, b) => a - b);
++          const ayniMi = secilen.length === dpOptimal.length && secilen.every((n, i) => n === dpOptimal[i]);
++          if (!ayniMi && (secilen.length > 0 || dpOptimal.length > 0)) farklar.push({ raceNo: l.raceNo, width, secilen, dpOptimal });
++        }
++      }
++      if (farklar.length > 0) dpDivergence = farklar;
++    } catch {
++      // Sapma kontrolü BEST-EFFORT — asla yayını engellemez/bozmaz.
++    }
++  } else {
+     // 7) Her ayakta en az 1 eligible at yoksa (forceExclude+scratched sıfırlamış olabilir) İPTAL.
+     for (const leg of scopedLegs) {
+       if ((eligibleNosByRaceNo[leg.raceNo]?.size ?? 0) === 0) {
+@@ -229,23 +283,6 @@ export async function syncHomeKupon(input: {
+       }
+     }
+ 
+-    // 8) DP — otomatikGroupSelections'ın beklediği RaceDayData şekline dönüştür.
+-    const racesForDp = scopedLegs.map((l) => ({
+-      raceNo: l.raceNo,
+-      pistAnormalMi: false,
+-      pistDuyarliligi: l.pistDuyarliligi,
+-      gecmisRiskSeviyesi: l.gecmisRiskSeviyesi,
+-      pistUyariMesaji: null,
+-      runners: l.runners.map((r) => ({
+-        no: r.no,
+-        name: "",
+-        scratched: r.scratched,
+-        ekuriGroup: r.ekuriGroup,
+-        score: Math.round(r.olasilik * 100),
+-        scoreExact: r.olasilik * 100,
+-        agfSirasi: null,
+-      })),
+-    }));
+     const groupSel = otomatikGroupSelections(
+       racesForDp,
+       optimizerConfig.stakePerCombination,
+@@ -303,7 +340,7 @@ export async function syncHomeKupon(input: {
+     });
+     revalidatePath("/");
+     revalidatePath("/admin/kupon");
+-    return { ok: true, homeKuponId: created.id, created: true };
++    return { ok: true, homeKuponId: created.id, created: true, dpDivergence };
+   } catch (e) {
+     if (isUniqueConstraintViolation(e)) return { ok: false, skipped: "CONCURRENT_GENERATION" };
+     throw e;
+diff --git a/src/server/services/ingest/tjk-idman-stats.adapter.ts b/src/server/services/ingest/tjk-idman-stats.adapter.ts
+index cd5511e..e2e1565 100644
+--- a/src/server/services/ingest/tjk-idman-stats.adapter.ts
++++ b/src/server/services/ingest/tjk-idman-stats.adapter.ts
+@@ -142,6 +142,16 @@ export async function syncIdmanForDate(dateStr: string): Promise<{
+   rows: number;
+   skipped: number;
+   errors: string[];
++  // 2026-09-22 — Data Readiness/Coverage manifest standardı (kullanıcı talebi): "script
++  // bitti" demek yetmiyor, HER tarih için created/updated/conflict ayrı görünmeli.
++  // Additive alanlar — cron'un (sync-galop/route.ts) JSON yanıtını BOZMAZ, yalnız
++  // zenginleştirir; yazma DAVRANIŞI hiç değişmedi.
++  sourceRows: number;
++  created: number;
++  updated: number;
++  /** var olan (NULL olmayan) bir alanın gelen veriyle FARKLI değere değiştiği durumlar —
++   *  "enrichment" (boşu doldurma) DEĞİL, gerçek bir değer çakışması. */
++  conflicts: number;
+ }> {
+   const { db } = await import("@/lib/db");
+ 
+@@ -155,6 +165,10 @@ export async function syncIdmanForDate(dateStr: string): Promise<{
+ 
+   let totalRows = 0;
+   let skipped = 0;
++  let sourceRowsTotal = 0;
++  let created = 0;
++  let updated = 0;
++  let conflicts = 0;
+   const errors: string[] = [];
+ 
+   for (const rd of raceDays) {
+@@ -260,6 +274,7 @@ export async function syncIdmanForDate(dateStr: string): Promise<{
+       for (const exact of results) idmanRows.push(...exact);
+       await new Promise((r) => setTimeout(r, 150));
+     }
++    sourceRowsTotal += idmanRows.length;
+ 
+     // DB yazma satır-satır SIRALI (await içinde await) yapılınca — İstanbul gibi büyük
+     // hipodromlarda yüzlerce satır × 2 round-trip (findFirst+create/update) — cron'un
+@@ -292,9 +307,21 @@ export async function syncIdmanForDate(dateStr: string): Promise<{
+               // Eski (liderform kaynaklı) kayıt aynı tarihte zaten varsa, 200m/Durum gibi
+               // ek alanları taşıyan TJK verisiyle üzerine yaz — sessizce atlamak eski,
+               // eksik veriyi kalıcı olarak koruyup TJK'nın daha zengin verisini gizliyordu.
++              // NOT: data'daki alanlar `|| undefined` ile kuruluyor — Prisma update'te
++              // undefined alan YAZILMAZ (mevcut değer korunur), yalnız gelen değer DOLU
++              // ise değişir. Yani boş gelen bir alan var olan dolu değeri ASLA silmez.
++              const existingSplits = (existing.splits as Record<string, string | null>) ?? {};
++              const yeniSplits = data.splits as Record<string, string | null>;
++              const gercekCakisma =
++                (existing.track != null && data.track !== undefined && existing.track !== data.track) ||
++                (existing.jockey != null && data.jockey !== undefined && existing.jockey !== data.jockey) ||
++                Object.keys(yeniSplits).some((k) => existingSplits[k] != null && yeniSplits[k] != null && existingSplits[k] !== yeniSplits[k]);
++              if (gercekCakisma) conflicts++;
+               await db.gallop.update({ where: { id: existing.id }, data });
++              updated++;
+             } else {
+               await db.gallop.create({ data: { runnerId, date: row.trainingDate, ...data } });
++              created++;
+             }
+             totalRows++;
+             touchedRunnerIds.add(runnerId);
+@@ -335,5 +362,5 @@ export async function syncIdmanForDate(dateStr: string): Promise<{
+     await new Promise((r) => setTimeout(r, 300));
+   }
+ 
+-  return { hippodromes: raceDays.length, rows: totalRows, skipped, errors };
++  return { hippodromes: raceDays.length, rows: totalRows, skipped, errors, sourceRows: sourceRowsTotal, created, updated, conflicts };
+ }
+\ No newline at end of file

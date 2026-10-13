@@ -1,0 +1,203 @@
+{
+  "version": "V5.46.1",
+  "generatedAt": "2026-10-08T14:22:02.774Z",
+  "status": "REFIT_PENDING_PARITY",
+  "note": "2026-10-08 final refit. Dataset audit PASS. Production freeze ancak train/live parity PASS sonrasi.",
+  "secilenSpec": "FINAL",
+  "gruplar": [
+    "AGF_SIRA",
+    "AGF_PAY",
+    "JOKEY",
+    "ANTRENOR",
+    "H2H",
+    "HIZ",
+    "ZEMIN",
+    "YAKINSAMA",
+    "SPRINT",
+    "TAKI",
+    "GIDISAT",
+    "SIRE",
+    "ACC_CLOSE_RES",
+    "ACC_LATE",
+    "ACC_SPEED",
+    "PACE_SIMPLE"
+  ],
+  "featureNames": [
+    "agfSirasi",
+    "agfPayi",
+    "agfPayi2",
+    "idmJokey",
+    "jokeyOrani",
+    "antrenorOrani",
+    "h2hNetSkor",
+    "hizDerecesi",
+    "zeminToleransi",
+    "zeminMesafeDeneyim",
+    "yakinsama2Plus",
+    "sonIdmanSprint",
+    "takiDegisikligi",
+    "yarisGidisatiSkoru",
+    "sireOrani",
+    "ACC_CLOSE_RES",
+    "ACC_LATE",
+    "ACC_SPEED",
+    "PS_front",
+    "PS_lone",
+    "PS_closerFit"
+  ],
+  "weights": [
+    -0.4033507271601437,
+    0.5902909118548955,
+    -0.21024623798987935,
+    0.04641769293402944,
+    0.13379492254586445,
+    0.264976738752447,
+    0.04309677431851244,
+    0.15701726178183242,
+    0.02731436685493119,
+    0.013564473403689874,
+    0.020172511331102955,
+    -0.008048418658921346,
+    0.05255129084075695,
+    0.05394227953464634,
+    0.029447782681391803,
+    -0.05878005012277001,
+    0.05946244482315372,
+    -0.010254260196216574,
+    0.042920602780179715,
+    0.01362591639934613,
+    -0.1444345988231987
+  ],
+  "means": [
+    5.752444933920705,
+    9.454919162995692,
+    217.88552197136514,
+    0.061409691629955944,
+    10.36759461141742,
+    9.823303044967588,
+    -0.000028594304014640283,
+    -0.597469520322829,
+    0.06257772071203324,
+    -0.07869343531129398,
+    0.0904625550660793,
+    0.11180780146524982,
+    0.6044493392070485,
+    0.0802149779735683,
+    11.943267086664497,
+    0.08323367834925718,
+    -0.1872535964843169,
+    -0.11238584105006567,
+    2.568778020089403,
+    0.0018290652703170567,
+    0.9451085750805689
+  ],
+  "stds": [
+    3.572252120403431,
+    11.335344087965744,
+    562.7007347285147,
+    0.24008028116415484,
+    5.309020385598911,
+    3.5443018136820905,
+    3.6007619574521907,
+    3.929024281339164,
+    1.260345056572181,
+    1.0439172706073951,
+    0.2868433042568327,
+    0.3151298414887915,
+    0.5399196634946594,
+    2.9584931316756986,
+    3.7250568982504304,
+    0.5501429706232905,
+    0.9437333006106859,
+    0.681854230590545,
+    1.0458539830003042,
+    0.014955953395218921,
+    0.7114437186197436
+  ],
+  "missingContract": {
+    "rule": "Mu/sigma yalniz observed=true veriden; missing => z=0 ve contribution=0",
+    "h2hNetSkor": {
+      "observedN": 34972,
+      "totalN": 45400
+    },
+    "hizDerecesi": {
+      "observedN": 44456,
+      "totalN": 45400
+    },
+    "sonIdmanSprint": {
+      "observedN": 15151,
+      "totalN": 45400
+    },
+    "takiDegisikligi": {
+      "observedN": 45400,
+      "totalN": 45400
+    }
+  },
+  "accurace": {
+    "ACC_CLOSE_RES": {
+      "tanim": "closingResidual — closingRawValue(run) eksi beklenen değer E(closing | earlyBin, fieldSizeBucket, distanceBand, surface), as-of popülasyon baseline. src/lib/accurace/features.ts: closingResidual()",
+      "contribution": "reliability * z, reliability = effectiveN/(effectiveN+2)",
+      "replaces": "ham ACC_CLOSE (closingConsistency) — erken pozisyon mekanik yanlılığı düzeltildi"
+    },
+    "ACC_LATE": {
+      "tanim": "lateSegmentSpeed — race-level ortak checkpoint, N>=5 ve MAD>20ms gerekir. src/lib/accurace/features.ts: lateSegmentSpeed()",
+      "contribution": "reliability * z"
+    },
+    "ACC_SPEED": {
+      "tanim": "speedResidual — Breed x Surface x DistanceBand [x Hippodrome x Going] baseline, n>=20. src/lib/accurace/features.ts: speedResidual()",
+      "contribution": "reliability * z"
+    },
+    "PACE_SIMPLE": {
+      "tanim": "36-parametreli ACC_PACE yerine 3 elle-tanımlı, ogrenilen-beta'lı primitif (H=styleVector, F=rivalPressure, src/lib/accurace/features.ts)",
+      "front": "F[0]+F[1] (rakip kaçak+ön kütlesi)",
+      "lone": "H[0] * max(0, 1-front) (tek lider avantajı)",
+      "closerFit": "(H[4]+H[5]) * front (derin/bekleyen stilin önde-baskılı yarışa uyumu)",
+      "contribution": "hR (H'nin reliability'si) * z, her üç bileşen için aynı hR"
+    },
+    "removed": [
+      "ACC_CLOSE (ham, closingConsistency)",
+      "ACC_PACE (36 interaction, H[a]*F[b])",
+      "tempoTasimaGucu (TEMPO_ESKI)"
+    ],
+    "yuzeyModu": "SERT (aynı yüzey=1, farklı=0)",
+    "reliabilityK": 2
+  },
+  "overrideKurali": "YOK - tek havuzlanmis agirlik seti tum kategorilere uygulanir.",
+  "trainingWindow": {
+    "baslangic": "2026-01-01",
+    "bitis": "2026-10-06",
+    "yarisSayisi": 4540
+  },
+  "optimizasyon": {
+    "l2": 0.01,
+    "epoch": 800,
+    "lr": 0.08,
+    "momentum": 0.9
+  },
+  "degerlendirme": {
+    "vsFULL": {
+      "N": 3176,
+      "LogLoss_FULL": 1.84562,
+      "LogLoss_FINAL": 1.84534,
+      "dLL": -0.00028,
+      "CI95_race": [
+        -0.00559,
+        0.00251
+      ],
+      "CI95_gun": [
+        -0.00377,
+        0.00282
+      ],
+      "note": "FINAL avantaj cok kucuk; race ve gun CI sifiri iceriyor."
+    }
+  },
+  "dataHash": {
+    "modelVeri": "902bd2461a30eeaa763ae8ee9df6a780cfcd229ffac181da74b8fdc1d3169df6",
+    "raceTarih": "b894b2e24cb72fa9ee6e71fc53984d0a2321ced0ae1d868050075bcd995bcbe3",
+    "accurace": "9989d17d255e3b9317871b7baadb32bc88fa7767b633e44103ee5f2cd8af2458"
+  },
+  "codeHash": {
+    "note": "git commit SHA, commit sonrasi buraya yazilacak"
+  },
+  "rollback": "Eski V5.46 (weights/v5-weights-diger.json + weights/v5-weights-dusuksart.json, src/lib/methodology/v5-engine.ts mevcut hali) DEĞİŞTİRİLMEDİ, rollback/arşiv olarak saklanıyor."
+}

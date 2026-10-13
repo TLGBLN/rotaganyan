@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { upsertPrediction, type PickInput } from "@/server/actions/prediction.actions";
 import type { PickDetailsV2 } from "@/lib/methodology/muhakeme-format";
+import type { HorseAnalysisSummary } from "@/lib/methodology/horse-analysis-summary";
+import type { AnalysisReadyResult } from "@/lib/methodology/analysis-ready";
 import { CURRENT_ENGINE_LABEL } from "@/lib/methodology/v5-engine-label";
 
 // 2026-08-16 — V5 motoru: V4'ün mekanik sinyal-sayımının YERİNE geçer (bkz.
 // SmartAnalysisEditor.tsx). Claude çağrısı YAPMAZ — koşullu logit (Plackett-Luce) modeli
-// 18 sürekli/ham özelliği TEK skorda birleştirip atları doğrudan kıyaslar (eşiklerle
+// 19 feature'ı TEK skorda birleştirip atları doğrudan kıyaslar (eşiklerle
 // kutulamaz). Doğrulama (V5.1, 2026-08-19): test top1=%38.0 (GA %31.7-44.2)/top3=%70.2
 // (GA %63.9-76.4). Detaylar src/lib/methodology/v5-engine.ts başlık yorumunda.
 
@@ -29,6 +31,8 @@ type V5At = {
   probTop2?: number;
   probTop3?: number;
   marketBlindProb1?: number;
+  // External pedigree snapshot; skor değildir.
+  externalPedigree?: unknown;
   // 2026-09-01 — "Saf Model" kıyası (kullanıcı talebi, KARDAHA vakası): marketBlindProb1
   // zaten vardı ama AGF'nin kendisiyle YAN YANA kıyaslanmıyordu. agfPayi/agfSirasi bu
   // kıyası (Saf Model % vs AGF % vs nihai Piyasa-Ayarlı %) mümkün kılmak için eklendi.
@@ -59,6 +63,21 @@ type V5At = {
   zeminMesafeDeneyimSeviyesi?: "tam" | "kismi" | "yok";
   details: PickDetailsV2;
   tumSinyaller?: TumOzellikDetay[];
+  // 2026-10-11 — ROTAGANYAN Jokey Son 30 Gün Performans Standardı (kullanıcı
+  // spesifikasyonu): jokey atın MODEL SKORUNU (score/olasilik/teknikSira) DEĞİŞTİRMEZ —
+  // bu alanlar yalnız ANALİZ/narrative katmanı için, /api/admin/test-v5-engine'de
+  // scoreV461 TAMAMLANDIKTAN SONRA ayrıca hesaplanıyor (bkz. o route'un dosya içi notu).
+  jockey?: string | null;
+  jokeySon30G?: {
+    son30Start: number; son30Win: number; son30WinRate: number;
+    kRef: number; kRefTier: "31-180" | "31-365" | "career-ex30" | "none"; kRefSampleN: number;
+    formDelta: number | null; reliability: number; etkinForm: number | null;
+    durum: "ÇOK GÜÇLÜ POZİTİF" | "POZİTİF" | "NÖTR" | "NEGATİF" | "ÇOK GÜÇLÜ NEGATİF" | null;
+  } | null;
+  jokeySon30GMetni?: string | null;
+  jokeyDestekliIlk6?: boolean;
+  jokeyDestekliSurpriz?: boolean;
+  analysisOzet?: HorseAnalysisSummary;
 };
 type Runner = { id: string; no: number; name: string };
 type BankoAdayiSonuc = { bankoAdayi: boolean; sebep: string };
@@ -112,6 +131,10 @@ const KATEGORI_ETIKET: Record<string, string> = {
 };
 
 const KARAR_RENK: Record<string, string> = {
+  "ANA ADAY": "text-hit",
+  "CIDDI RAKIP": "text-emerald-500",
+  "RAKIP": "text-amber-500",
+  "SÜRPRİZ": "text-purple-500",
   "Güçlü Aday": "text-hit",
   "Düşük Risk": "text-emerald-500",
   "Orta Risk": "text-amber-500",
@@ -153,6 +176,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
   const [kuponlar, setKuponlar] = useState<{ narrow?: string; normal?: string; wide?: string }>(kayitliBaslangic?.kuponlar ?? {});
   const [kaynak, setKaynak] = useState<"kayitli" | "canli" | null>(kayitliBaslangic ? "kayitli" : null);
   const [acikDetay, setAcikDetay] = useState<Set<number>>(new Set());
+  const [analysisReady, setAnalysisReady] = useState<AnalysisReadyResult | null>(null);
   // 2026-08-21 kullanıcı bulgusu (Bursa/ŞENGÜL SULTAN vakası): panel hangi ağırlık
   // setinin (düşük-şart/diğer) kullanıldığını hiç göstermiyordu — şeffaflık eksikliği.
   const [kategori, setKategori] = useState<string | null>(null);
@@ -195,6 +219,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         error?: string;
         kategori?: string;
         motorEtiketi?: string;
+        analysisReady?: AnalysisReadyResult;
         atlar: V5At[];
         runners: Runner[];
         bankoAdayi: BankoAdayiSonuc;
@@ -216,6 +241,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       setKuponlar({ narrow: data.couponNarrow, normal: data.couponNormal, wide: data.couponWide });
       setKategori(data.kategori ?? null);
       setMotorEtiketi(data.motorEtiketi ?? null);
+      setAnalysisReady(data.analysisReady ?? null);
       setKaynak("canli");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Beklenmeyen hata");
@@ -276,6 +302,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
             ? {
                 tumSinyaller: a.tumSinyaller,
                 motorEtiketi,
+                externalPedigree: a.externalPedigree ?? null,
                 bKatmani: {
                   sireUygulandiMi: a.bKatmaniUygulandiMi ?? false,
                   sireKatkisi: a.bSireKatkisi ?? 0,
@@ -295,8 +322,8 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       const res = await upsertPrediction({
         raceId,
         confidence: "ORTA",
-        notes: `Bu analiz ${motorEtiketi ?? "V5 motoruyla"} üretildi — koşullu logit (Plackett-Luce) modeli AGF trend/sıra/favori/payı, Accurace, form eğimi, KGS, pist uzmanlığı, aygır/jokey/antrenör kazanma oranı, galop, idman jokeyi uyumu, uzun-ara galop takibi, rakipsiz kaçak, H2H (net skor + kilo-ayarlı), hız derecesi sinyallerini TEK skorda birleştirip atları doğrudan kıyaslar. Claude muhakemesi kullanılmadı.`,
-        tempo: "V5 motoru koşullu logit skoruna dayanır, ayrı bir tempo/stil senaryosu üretmez.",
+        notes: `Bu analiz ${motorEtiketi ?? "V5.46.1"} ile üretildi. V5.46.1 teknik model 19 feature'ı donmuş beta/mu/sigma ile tek skorda birleştirir. ROTAGANYAN Race-Day Analysis v1 bunun üzerinde 23 atomik sinyal, 20 güncel analiz kaynağı ve 12 kanıt ailesini bağımsız aile bütünlüğüyle değerlendirir. yakinsama2Plus yalnız LEGACY_PRODUCTION_ONLY'dir; yeni analiz gerekçesi ve BANKO/İLK3/İLK6 bütünlüğünde kullanılmaz. Claude muhakemesi kullanılmadı.`,
+        tempo: "V5.46.1 teknik model yarisGidisatiSkoru ve Accurace pace/style feature'larını içerir; Race-Day Analysis v1 TEMPO_STYLE ailesini bağımsız bütünlük katmanında ayrıca değerlendirir.",
         couponNarrow: couponNarrow || undefined,
         couponNormal: couponNormal || undefined,
         couponWide: couponWide || undefined,
@@ -370,8 +397,10 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       const bul = (kod: string) => a.tumSinyaller?.find((o) => o.kod === kod);
       const hiz = bul("hizDerecesi");
       if (hiz && hiz.hamDeger > 1) destek.push(`hızDerecesi +${hiz.hamDeger.toFixed(2)}`);
-      const yakinsama = bul("yakinsama2Plus");
-      if (yakinsama && yakinsama.hamDeger === 1) destek.push("yakınsama (2+ olumlu işaret) var");
+      // 2026-10-11 — yakinsama2Plus narrative gerekçesinden ÇIKARILDI (kullanıcı talebi:
+      // DROP_BY_AUDIT_DESIGN, analiz gerekçesi YOK). Production score (a.olasilik/
+      // a.teknikSira) ETKİLENMEDİ — bu satır yalnız "Saf Model çekilen at" destek METNİNİ
+      // kısaltıyordu, skoru değil.
       const h2h = bul("h2hNetSkor");
       if (h2h && h2h.hamDeger > 0) destek.push(`H2H net ${h2h.hamDeger}`);
       const destekMetni = destek.length > 0 ? ` — ${destek.slice(0, 2).join(", ")}.` : "";
@@ -384,6 +413,22 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
 
   return (
     <div className="space-y-4 rounded-xl border border-purple-500/30 bg-purple-500/5 p-4">
+      {!analysisReady && (
+        <div className="mb-4 rounded-xl border border-violet-500/30 bg-violet-950/20 p-4">
+          <div className="flex flex-wrap items-center gap-2 font-semibold">
+            <span className="text-violet-200">ROTAGANYAN Race-Day Analysis v1 • ACTIVE</span>
+            <span className="text-slate-500">•</span>
+            <span className="text-slate-300">V5.46.1 Production Model</span>
+              <span className="text-slate-500">•</span>
+              <span className="text-[10px] text-slate-400">
+                19 teknik feature · 23 atomik sinyal · 20 güncel analiz kaynağı · 12 aile · 1 legacy composite
+              </span>
+            <span className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-300">
+              ANALYSIS_READY: ANALİZ BEKLENİYOR
+            </span>
+          </div>
+        </div>
+      )}
       <div className="flex items-start gap-2">
         <Sparkles className="h-4 w-4 shrink-0 text-purple-500 mt-0.5" />
         <h3 className="min-w-0 text-sm font-semibold break-words">
@@ -408,7 +453,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
           {loading ? "Analiz ediliyor…" : kaynak === "kayitli" ? "Yeniden Analiz Et" : "Analiz Et"}
         </Button>
-        {atlar && (
+      {atlar && (
           <Button
             onClick={handleKaydet}
             disabled={saving}
@@ -453,6 +498,39 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         </div>
       )}
 
+      {analysisReady && (
+        <div
+          className={cn(
+            "mb-3 rounded-lg border p-3 text-xs",
+            analysisReady.status === "YES"
+              ? "border-emerald-500/40 bg-emerald-500/10"
+              : "border-red-500/40 bg-red-500/10"
+          )}
+        >
+          <div className="flex flex-wrap items-center gap-2 font-semibold">
+            <span>ROTAGANYAN Race-Day Analysis v1 • ACTIVE</span>
+            <span>·</span>
+            <span>V5.46.1 Production Model</span>
+            <span>·</span>
+            <span className="text-[10px] opacity-80">
+              19 teknik feature · 23 atomik sinyal · 20 güncel analiz kaynağı · 12 aile · 1 legacy composite
+            </span>
+            <span>·</span>
+            <span>
+              ANALYSIS_READY: {analysisReady.status}
+            </span>
+          </div>
+
+          {analysisReady.status === "NO" &&
+            analysisReady.failedMandatoryLabels.length > 0 && (
+              <div className="mt-1 text-red-600">
+                Eksik zorunlu veri:{" "}
+                {analysisReady.failedMandatoryLabels.join(", ")}
+              </div>
+            )}
+        </div>
+      )}
+
       {atlar && (
         <div className="space-y-1.5">
           {(() => {
@@ -467,7 +545,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
             return manualOrder.map((no, i) => {
             const a = atlarByNo.get(no);
             if (!a) return null;
-            const kodluSatirlar = a.details.satirlar.filter((s) => s.kod.length > 0 && !s.kod.includes("OLASILIK"));
+
             return (
               <div key={no} className="space-y-1 rounded-lg border border-border bg-background p-2.5 text-xs">
                 <div className="flex items-center justify-between gap-2">
@@ -480,6 +558,20 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                     <span className="rounded-full bg-purple-500/15 px-2 py-0.5 font-mono text-[11px] text-purple-600">
                       %{(a.olasilik * 100).toFixed(1)}
                     </span>
+                    {/* 2026-10-11 — Jokey Destekli İlk-6/Sürpriz rozeti: ROTAGANYAN Jokey Son
+                        30 Gün Performans Standardı (kullanıcı spesifikasyonu madde 4) — bu
+                        rozet teknikSira'yı (model skoru) DEĞİŞTİRMEZ, yalnız analiz katmanında
+                        "bu at güçlü jokey formuyla ilk-6 havuzuna dahil edilsin" bilgisini taşır. */}
+                    {a.jokeyDestekliIlk6 && (
+                      <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 font-medium text-[11px] text-emerald-600" title="Jokey Destekli İlk-6: Atın temel performansı üst sıralar için tek başına yeterince güçlü görünmese de jokeyin son 30 günlük güçlü formu nedeniyle ilk 6 değerlendirmesine dahil edildi.">
+                        🎯 Jokey Destekli İlk-6
+                      </span>
+                    )}
+                    {a.jokeyDestekliSurpriz && (
+                      <span className="rounded-full bg-amber-500/15 px-2 py-0.5 font-medium text-[11px] text-amber-600" title="Jokey Destekli Sürpriz: Temel sıra 11+ olduğu için otomatik ilk-6'ya çekilmedi, yalnız bilgi amaçlı işaretlendi.">
+                        ⚡ Jokey Destekli Sürpriz
+                      </span>
+                    )}
                   </div>
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => moveManual(no, -1)} disabled={i === 0}>
@@ -496,6 +588,9 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                     </Button>
                   </div>
                 </div>
+                {a.jokeySon30GMetni && (
+                  <div className="text-[11px] text-muted-foreground">{a.jokeySon30GMetni}</div>
+                )}
                 {/* 2026-09-03 kullanıcı talebi ("bu kısımlarda görsel olarak kötü gözüküyor,
                     alt alta madde halinde yaz") — bu dört madde eskiden başlık satırında
                     dar rozetler (rounded-full pill) olarak yan yana sıkışıyor, dar ekranda
@@ -565,17 +660,256 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                     )}
                   </ul>
                 )}
-                {kodluSatirlar.length > 0 ? (
-                  <ul className="list-disc space-y-0.5 pl-4 text-muted-foreground">
-                    {kodluSatirlar.map((s, si) => (
-                      <li key={si}>
-                        {s.tip === "risk" ? "⚠ " : ""}
-                        {s.aciklama}
-                      </li>
-                    ))}
-                  </ul>
+                {a.analysisOzet ? (
+                  <div className="space-y-2 border-t border-border/60 pt-2">
+                    <div
+                      className={cn(
+                        "rounded-lg border p-3",
+                        a.analysisOzet.butunluk.recommendedBand === "BANKO"
+                          ? "border-emerald-500/50 bg-emerald-500/10"
+                          : a.analysisOzet.butunluk.recommendedBand === "ILK3"
+                            ? "border-sky-500/40 bg-sky-500/10"
+                            : a.analysisOzet.butunluk.recommendedBand === "ILK6"
+                              ? "border-amber-500/40 bg-amber-500/10"
+                              : "border-border bg-muted/20"
+                      )}
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold">
+                          Bütünlük:{" "}
+                          {a.analysisOzet.butunluk.level.replace(/_/g, " ")}
+                        </span>
+
+                        <span className="text-muted-foreground">•</span>
+
+                        <span
+                          className={cn(
+                            "rounded-md border px-2 py-0.5 text-[10px] font-semibold",
+                            a.analysisOzet.butunluk.recommendedBand === "BANKO"
+                              ? "border-emerald-500/50 text-emerald-600"
+                              : a.analysisOzet.butunluk.recommendedBand === "ILK3"
+                                ? "border-sky-500/50 text-sky-600"
+                                : a.analysisOzet.butunluk.recommendedBand === "ILK6"
+                                  ? "border-amber-500/50 text-amber-600"
+                                  : "border-border text-muted-foreground"
+                          )}
+                        >
+                          Önerilen Kapsam:{" "}
+                          {a.analysisOzet.butunluk.recommendedBand === "MODEL_SIRASI"
+                            ? "MODEL SIRASI"
+                            : a.analysisOzet.butunluk.recommendedBand}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-5">
+                        <div className="rounded border border-border/60 px-2 py-1.5">
+                          <div className="text-muted-foreground">
+                            Kullanılabilir Aile
+                          </div>
+                          <div className="font-semibold">
+                            {a.analysisOzet.butunluk.usedFamilyCount}
+                          </div>
+                        </div>
+
+                        <div className="rounded border border-border/60 px-2 py-1.5">
+                          <div className="text-muted-foreground">
+                            Pozitif Aile
+                          </div>
+                          <div className="font-semibold text-emerald-600">
+                            {a.analysisOzet.butunluk.positiveFamilyCount}
+                          </div>
+                        </div>
+
+                        <div className="rounded border border-border/60 px-2 py-1.5">
+                          <div className="text-muted-foreground">
+                            Negatif Aile
+                          </div>
+                          <div className="font-semibold text-red-600">
+                            {a.analysisOzet.butunluk.negativeFamilyCount}
+                          </div>
+                        </div>
+
+                        <div className="rounded border border-border/60 px-2 py-1.5">
+                          <div className="text-muted-foreground">
+                            Performans
+                          </div>
+                          <div
+                            className={cn(
+                              "font-semibold",
+                              a.analysisOzet.butunluk.performancePositive
+                                ? "text-emerald-600"
+                                : "text-red-600"
+                            )}
+                          >
+                            {a.analysisOzet.butunluk.performancePositive
+                              ? "EVET"
+                              : "HAYIR"}
+                          </div>
+                        </div>
+
+                        <div className="rounded border border-border/60 px-2 py-1.5">
+                          <div className="text-muted-foreground">
+                            Koşul / Tempo
+                          </div>
+                          <div
+                            className={cn(
+                              "font-semibold",
+                              a.analysisOzet.butunluk.contextPositive
+                                ? "text-emerald-600"
+                                : "text-red-600"
+                            )}
+                          >
+                            {a.analysisOzet.butunluk.contextPositive
+                              ? "EVET"
+                              : "HAYIR"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 space-y-1 text-[10px]">
+                        <div>
+                          <span className="font-medium text-emerald-600">
+                            Pozitif bütünlük:
+                          </span>{" "}
+                          {a.analysisOzet.butunluk.positiveFamilies.length > 0
+                            ? a.analysisOzet.butunluk.positiveFamilies
+                                .map((x) => x.replace(/_/g, "/"))
+                                .join(" · ")
+                            : "-"}
+                        </div>
+
+                        <div>
+                          <span className="font-medium text-red-600">
+                            Negatif bütünlük:
+                          </span>{" "}
+                          {a.analysisOzet.butunluk.negativeFamilies.length > 0
+                            ? a.analysisOzet.butunluk.negativeFamilies
+                                .map((x) => x.replace(/_/g, "/"))
+                                .join(" · ")
+                            : "-"}
+                        </div>
+                      </div>
+
+                      {a.analysisOzet.butunluk.marketDownVeto && (
+                        <div className="mt-2 rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] font-medium text-red-600">
+                          AGF Trend MEANINGFUL_DOWN — BANKO veto
+                        </div>
+                      )}
+
+                      {a.analysisOzet.butunluk.recommendedBand === "BANKO" && (
+                        <div className="mt-2 rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-xs font-bold text-emerald-600">
+                          BANKO BÜTÜNLÜĞÜ SAĞLANDI
+                        </div>
+                      )}
+
+                      {a.analysisOzet.butunluk.level === "BANKO_UYUMLU" &&
+                        a.analysisOzet.butunluk.recommendedBand !== "BANKO" && (
+                          <div className="mt-2 text-[10px] text-muted-foreground">
+                            BANKO seviyesinde sinyal bütünlüğü var; teknik sıra #1
+                            olmadığı için BANKO olarak işaretlenmedi.
+                          </div>
+                        )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="font-medium">Kanıt aileleri:</span>
+                      {a.analysisOzet.kanitAileleri.length > 0 ? (
+                        a.analysisOzet.kanitAileleri.map((k) => (
+                          <span
+                            key={k.family}
+                            className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
+                          >
+                            {k.label}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground">USED aile yok</span>
+                      )}
+
+                      <span className="ml-auto text-[10px] font-medium">
+                        Veri Güveni: {a.analysisOzet.veriGuvenSeviyesi}
+                      </span>
+                    </div>
+
+                    {a.analysisOzet.enGucluPozitif.length > 0 && (
+                      <div>
+                        <span className="font-medium text-emerald-600">
+                          Güçlü pozitif:
+                        </span>{" "}
+                        {a.analysisOzet.enGucluPozitif
+                          .map(
+                            (x) =>
+                              `${x.label} +${x.contributionSum.toFixed(4)}`
+                          )
+                          .join(" · ")}
+                      </div>
+                    )}
+
+                    {a.analysisOzet.enGucluNegatif.length > 0 && (
+                      <div>
+                        <span className="font-medium text-red-600">
+                          Önemli negatif:
+                        </span>{" "}
+                        {a.analysisOzet.enGucluNegatif
+                          .map(
+                            (x) =>
+                              `${x.label} ${x.contributionSum.toFixed(4)}`
+                          )
+                          .join(" · ")}
+                      </div>
+                    )}
+
+                    <div className="text-muted-foreground">
+                      <span className="font-medium text-foreground">
+                        MARKET / AGF Trend:
+                      </span>{" "}
+                      {a.analysisOzet.marketOzet.status}
+                      {a.analysisOzet.marketOzet.snapshotCount >= 2 &&
+                        a.analysisOzet.marketOzet.deltaPp != null && (
+                          <>
+                            {" "}· {a.analysisOzet.marketOzet.firstAgf} →{" "}
+                            {a.analysisOzet.marketOzet.lastAgf} · Δ{" "}
+                            {a.analysisOzet.marketOzet.deltaPp > 0 ? "+" : ""}
+                            {a.analysisOzet.marketOzet.deltaPp.toFixed(2)}pp ·{" "}
+                            {a.analysisOzet.marketOzet.snapshotCount} kayıt ·{" "}
+                            {a.analysisOzet.marketOzet.movementClass}
+                          </>
+                        )}
+                    </div>
+
+                    <div className="text-muted-foreground">
+                      <span className="font-medium text-foreground">
+                        Jokey Son30G:
+                      </span>{" "}
+                      {a.analysisOzet.jokeySon30GOzet.status}
+                      {a.analysisOzet.jokeySon30GOzet.status === "USED" && (
+                        <>
+                          {" "}· {a.analysisOzet.jokeySon30GOzet.w30}/
+                          {a.analysisOzet.jokeySon30GOzet.n30} · K30 %
+                          {a.analysisOzet.jokeySon30GOzet.k30.toFixed(1)} · Ref %
+                          {a.analysisOzet.jokeySon30GOzet.refKPct.toFixed(1)}
+                          {a.analysisOzet.jokeySon30GOzet.formDeltaPp != null &&
+                            ` · Form Δ ${a.analysisOzet.jokeySon30GOzet.formDeltaPp >= 0 ? "+" : ""}${a.analysisOzet.jokeySon30GOzet.formDeltaPp.toFixed(1)}pp`}
+                          {" · Güven "}
+                          {a.analysisOzet.jokeySon30GOzet.guven.toFixed(2)}
+                          {a.analysisOzet.jokeySon30GOzet.etkinFormPp != null &&
+                            ` · Etkin ${a.analysisOzet.jokeySon30GOzet.etkinFormPp >= 0 ? "+" : ""}${a.analysisOzet.jokeySon30GOzet.etkinFormPp.toFixed(1)}pp`}
+                        </>
+                      )}
+                    </div>
+
+                    {a.analysisOzet.eksikBlockedLegacyVeriler.length > 0 && (
+                      <div className="text-[10px] text-muted-foreground">
+                        Eksik / legacy:{" "}
+                        {a.analysisOzet.eksikBlockedLegacyVeriler
+                          .map((x) => `${x.label} [${x.status}]`)
+                          .join(" · ")}
+                      </div>
+                    )}
+                  </div>
                 ) : (
-                  <p className="text-muted-foreground">Belirgin bir özellik katkısı yok.</p>
+                  <p className="text-muted-foreground">
+                    Race-Day Analysis özeti bu kayıt için mevcut değil.
+                  </p>
                 )}
 
                 {a.tumSinyaller && (

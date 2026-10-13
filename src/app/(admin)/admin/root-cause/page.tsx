@@ -74,7 +74,12 @@ const SINYAL_AD: Record<string, string> = {
   agfSirasi: "AGF Sırası", agfPayi: "AGF Payı", agfPayi2: "AGF Payı² (kare terimi)",
   idmJokey: "İdman Jokeyi Uyumu", jokeyOrani: "Jokey Oranı", antrenorOrani: "Antrenör Oranı",
   h2hNetSkor: "H2H Net Skor", hizDerecesi: "Hız Derecesi", zeminToleransi: "Zemin Toleransı",
-  zeminMesafeDeneyim: "Zemin+Mesafe Deneyimi", yakinsama2Plus: "Yakınsama", sonIdmanSprint: "Son İdman Sprint",
+  zeminMesafeDeneyim: "Zemin+Mesafe Deneyimi",
+  // 2026-10-11 — bkz. v5-engine.ts SINYAL_ACIKLAMA'daki AYNI tarihli not: production'da
+  // hâlâ aktif (19 sinyal), ama audit/yeni mimaride DROP_BY_AUDIT_DESIGN — etiket admin'i
+  // yanıltmasın diye bilerek işaretlendi.
+  yakinsama2Plus: "yakinsama2Plus — LEGACY PRODUCTION ONLY (yeni analiz mimarisinde kullanılmıyor)",
+  sonIdmanSprint: "Son İdman Sprint",
   takiEklendiMi: "Takı Eklendi mi", takiCikarildiMi: "Takı Çıkarıldı mı", takiDegisikligi: "Takı Değişikliği",
   yarisGidisatiSkoru: "Yarış Gidişatı Skoru", sireOrani: "Sire Oranı", kgsVarMi: "KGS Verisi Var mı",
   "B:sireKatkisi": "Sire Katkısı (B Katmanı)", "B:zeminMesafeKatkisi": "Zemin+Mesafe Katkısı (B Katmanı)",

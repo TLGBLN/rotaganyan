@@ -132,13 +132,14 @@
  */
 
 import { db } from "@/lib/db";
+import { getExternalPedigreeForRace, type ExternalPedigreeRaceMatch } from "@/server/services/external-pedigree-stat.service";
 import { getSonYarisDetaylariForRace } from "@/server/actions/son-yaris-detay.actions";
 import { getV5461SireOzetleriForRace } from "@/server/actions/v5461-sire.actions";
 import { getAgfTrendForRace } from "@/server/actions/agf-trend.actions";
 import { getH2HForRace } from "@/server/actions/h2h.actions";
 import { zeminDetayiBul, zeminDetayiSatirdanCikar, zeminKatsayisi } from "@/lib/methodology/mekanik-puanlama";
 import { getHizDerecesiForRace } from "@/server/actions/hiz-derecesi.actions";
-import { hesaplaZeminToleransiMap } from "@/server/actions/zemin-toleransi.actions";
+import { hesaplaZeminToleransiDetayMap } from "@/server/actions/zemin-toleransi.actions";
 import { hesaplaZeminMesafeDeneyimiMap } from "@/server/actions/zemin-mesafe-deneyimi.actions";
 import { yakinsamaGecmisHesapla } from "@/lib/methodology/yakinsama-gecmis";
 import { surfaceToPist } from "@/lib/sire-stat-match";
@@ -366,6 +367,7 @@ export type Faz1RunnerV5 = {
    *  kararıyla eklenen B-katmanı kural istisnası (bkz. yukarıdaki not, KIZIM BİNDAL vakası). */
   takiEklendiMi: 0 | 1;
   takiCikarildiMi: 0 | 1;
+  takiDegisikligiGozlemli: boolean;
   sireOrani: number;
   galop: 0 | 1;
   idmJokey: 0 | 1;
@@ -388,6 +390,8 @@ export type Faz1RunnerV5 = {
   hipodromMesafedeKazandi: "EVET" | "HAYIR" | "KOSMADI";
   sireKazanmaOraniHam: number | null;
   sireOrneklemKendiVeri: number | null;
+  // External SIRE/DAM/DAMSIRE destek verisi. SKORA GIRMEZ.
+  externalPedigree: ExternalPedigreeRaceMatch | null;
   /** 2026-08-16 kullanıcı talebi (sektör araştırması) — Runner.raceStyle (Accurace
    *  tabanlı, style: "KACAK_AT"|...) — kapı no/kilo farkı/HP farkı AYNI ANDA test
    *  edildi, üçü de anlamsız çıktı; yalnız bu anlamlı (+0.0878, GA [0.0290,0.1811]).
@@ -460,6 +464,7 @@ export type Faz1RunnerV5 = {
    *  ekleme") bunu dışlardı. Risk: model bu özelliğe gereksiz ağırlık verebilir veya
    *  hiçbir fayda sağlamadan gürültü ekleyebilir. */
   zeminToleransi: number;
+  zeminToleransiGozlemli: boolean;
   /** 2026-08-30 — Zemin+Mesafe Deneyimi (bkz. zemin-mesafe-deneyimi.actions.ts): atın
    *  BUGÜNKÜ tam (pist, zemin koşulu, mesafe) kombinasyonunda kanıtlanmış deneyimi.
    *  "tam" = bu mesafede de koşmuş, "kismi" = pist+zemin'de koşmuş ama başka mesafede,
@@ -481,6 +486,11 @@ export type Faz1RunnerV5 = {
    *  segmentte neredeyse anlamlı (alt sınır sıfıra 0.002 kala). zeminToleransi/yakınsama/
    *  sonIdmanSprint/takı ile AYNI türden BİLİNÇLİ istisna, kullanıcı kararıyla eklendi. */
   yarisGidisatiSkoru: number;
+  /** 2026-10-11 ANALYSIS STABILITY FREEZE — yarisGidisatiSkoru'nun BU at için GERÇEKTEN
+   *  hesaplanıp hesaplanmadığı (pace-analizi.ts profil bulduysa true). Üstteki alan veri
+   *  yoksa sessizce 0'a maskelenir — bu flag o maskelemeyi downstream'e (signal-status.ts)
+   *  şeffaf şekilde taşır. Skora/weights'e SIFIR etkisi var, saf bilgi alanı. */
+  yarisGidisatiGozlemli: boolean;
 };
 
 export type Faz1SonucV5 = {
@@ -519,7 +529,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
         where: { scratched: false },
         orderBy: { no: "asc" },
         select: {
-          id: true, no: true, name: true, jockey: true, trainer: true, sire: true, agf: true, recentForm: true,
+          id: true, no: true, name: true, jockey: true, trainer: true, sire: true, dam: true, damSire: true, agf: true, recentForm: true,
           raceStyle: true, weight: true, ekuriGroup: true,
           gallops: { select: { date: true, jockey: true, splits: true, track: true }, orderBy: { date: "desc" } },
         },
@@ -532,10 +542,23 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
 
   const bugunIkramiye1 = (race.ikramiyeDetay as { ikramiye?: number[] } | null)?.ikramiye?.[0] ?? null;
 
-  const [sonYarisDetaylari, sireOzetleri, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters, hizByNo, zeminToleransiByAd, yakinsamaGecmis, tempoTasimaGucuByAd] = await Promise.all([
+  const [sonYarisDetaylari, sireOzetleri, externalPedigreeRows, agfTrend, jockeyStats, trainerStats, accKayitlar, h2hEncounters, hizByNo, zeminToleransiByAd, yakinsamaGecmis, tempoTasimaGucuByAd] = await Promise.all([
     getSonYarisDetaylariForRace(raceId).catch(() => []),
     getV5461SireOzetleriForRace(runners.map((r) => r.sire), race.breed, race.surface, race.distance, race.raceDay.date).catch(() =>
       runners.map(() => ({ ozet: null, ornekKendiVeri: null, kYuzde: null }))
+    ),
+    getExternalPedigreeForRace(
+      runners.map((r) => ({
+        sire: r.sire,
+        dam: r.dam,
+        damSire: r.damSire,
+      })),
+      race.breed,
+      race.surface,
+      race.distance,
+      2026
+    ).catch(() =>
+      runners.map(() => null)
     ),
     getAgfTrendForRace(raceId).catch(() => ({ atlar: [], enCokDusenler: [], enCokYukselenler: [] })),
     getJockeyStats([...new Set(runners.map((r) => r.jockey).filter((x): x is string => !!x))]).catch(
@@ -547,7 +570,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     fetchAccuraceGecmisKayitlari(runners.map((r) => r.name), race.raceDay.date),
     getH2HForRace(raceId, null).catch(() => []),
     getHizDerecesiForRace(raceId).catch(() => new Map<number, number>()),
-    hesaplaZeminToleransiMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, number>()),
+    hesaplaZeminToleransiDetayMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, { deger: number; observed: boolean; ornekSayisi: number }>()),
     yakinsamaGecmisHesapla(db, runners.map((r) => ({ no: r.no, name: r.name, jockey: r.jockey })), race.raceDay.date, bugunIkramiye1).catch(
       () => new Map<number, { sinifDususu: boolean; ajiGalibiyetVarMi: boolean }>()
     ),
@@ -667,6 +690,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
 
   const sonYarisByNo = new Map(sonYarisDetaylari.map((d) => [d.runnerNo, d]));
   const sireOzetByRunnerId = new Map(runners.map((r, i) => [r.id, sireOzetleri[i]]));
+  const externalPedigreeByRunnerId = new Map(runners.map((r, i) => [r.id, externalPedigreeRows[i] ?? null]));
   const accuraceMap = hesaplaAccuraceSonYarisEnHizliKapanisMap(
     runners.map((r) => r.name),
     accKayitlar.son800AccuraceKayitlari,
@@ -731,6 +755,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
     // hesaplanıyordu (takiEklendiMi/takiCikarildiMi) — burada AYNI mantıkla ekleniyor.
     const takiEklendiMi: 0 | 1 = (sonYaris?.eklenenTaki?.length ?? 0) > 0 ? 1 : 0;
     const takiCikarildiMi: 0 | 1 = (sonYaris?.cikarilanTaki?.length ?? 0) > 0 ? 1 : 0;
+    const takiDegisikligiGozlemli = sonYaris?.sonYarisTarihi != null;
     const sireOzet = sireOzetByRunnerId.get(r.id);
     const jockeyStat = r.jockey ? jockeyStats[r.jockey] : undefined;
     const trainerStat = r.trainer ? trainerStats[r.trainer] : undefined;
@@ -793,7 +818,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       kgs: kgsVal, kgsVarMi,
       pistUzmani: sonYaris?.kazandi === "EVET" ? 1 : 0,
       yakinsama2Plus: 0, // aşağıda, TÜM runner'lar hazır olduktan sonra (sahaya-göreli pedigri sırası gerekiyor) dolduruluyor
-      sonIdmanSprint, sonIdmanSprintGozlemli: enSonGalop != null, takiEklendiMi, takiCikarildiMi,
+      sonIdmanSprint, sonIdmanSprintGozlemli: enSonGalop != null, takiEklendiMi, takiCikarildiMi, takiDegisikligiGozlemli,
       sireOrani, galop: keskinGalop, idmJokey,
       galopSayisi: gecerliGaloplar.length, uzunAraGalopKatkisi,
       jokeyOrani, antrenorOrani,
@@ -803,6 +828,7 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       hipodromMesafedeKazandi: sonYaris?.kazandi ?? "KOSMADI",
       sireKazanmaOraniHam: sireOzet?.kYuzde ?? null,
       sireOrneklemKendiVeri: sireOzet?.ornekKendiVeri ?? null,
+      externalPedigree: externalPedigreeByRunnerId.get(r.id) ?? null,
       kacakYalniz: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" && kacakSayisiSahada === 1 ? 1 : 0,
       h2hNetSkor: h2hNetSkorHesap.skor,
       h2hKarsilastirmaSayisi: h2hNetSkorHesap.karsilastirma,
@@ -811,11 +837,13 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
       hizDerecesi: hizByNo.get(r.no) ?? 0,
       h2hKiloDegisimi: h2hKiloHesap.toplam,
       h2hKiloKarsilasmaSayisi: h2hKiloHesap.sayi,
-      zeminToleransi: zeminToleransiByAd.get(r.name) ?? 0,
+      zeminToleransi: zeminToleransiByAd.get(r.name)?.deger ?? 0,
+      zeminToleransiGozlemli: zeminToleransiByAd.get(r.name)?.observed ?? false,
       zeminMesafeDeneyimSeviyesi: zeminMesafeDeneyimByAd.get(r.name)?.seviye ?? "yok",
       zeminMesafeOrnekSayisi: zeminMesafeDeneyimByAd.get(r.name)?.ornekSayisi ?? 0,
       zeminMesafeDeneyim: zeminMesafeDeneyimByAd.get(r.name)?.deger ?? 0,
       yarisGidisatiSkoru: gidisatByRunnerId.get(r.id)?.finalSkor ?? 0,
+      yarisGidisatiGozlemli: gidisatByRunnerId.get(r.id)?.finalSkor != null,
     };
   });
 
@@ -1652,7 +1680,13 @@ const FEATURE_LABELS: Record<string, string> = {
   h2hKiloDegisimi: "Kilo-Ayarlı H2H (rakiplere göre kilo pozisyonu değişimi)",
   agfPayi2: "AGF Payı (karesi, piyasa kalibrasyon eğriselliği)",
   zeminToleransi: "Zemin Toleransı (Normal-dışı pistte geçmiş göreli performans)",
-  yakinsama2Plus: "Yakınsama (pist uzmanlığı+pedigri+at-jokey ikilisi+AGF trend+sınıf düşüşünden ≥2'si aynı atta)",
+  // 2026-10-11 — v5461-audit: yakinsama2Plus AUDIT_REDUCED_BASELINE_17 OOS deneyine ve yeni
+  // Kanıt Aileleri mimarisine DAHİL EDİLMEDİ (DROP_BY_AUDIT_DESIGN) — ama production'ın
+  // KENDİSİNDEN (19 sinyal, v546-1-weights.json) HENÜZ çıkarılmadı, hâlâ aktif hesaplanıyor.
+  // Etiket admin'in bunu "gelecekte kullanılacak yeni sinyal" sanmaması için bilerek
+  // açıkça işaretlendi — OOS tamamlanıp production migration'ı (μ/σ/β joint refit + version
+  // bump) yapılınca bu etiket ve production'daki feature'ın kendisi KALDIRILACAK.
+  yakinsama2Plus: "yakinsama2Plus — LEGACY PRODUCTION ONLY (yeni analiz mimarisinde kullanılmıyor; pist uzmanlığı+pedigri+at-jokey ikilisi+AGF trend+sınıf düşüşünden ≥2'si aynı atta)",
   sonIdmanSprint: "Son İdman Türü Sprint/Sürat",
   takiEklendiMi: "Takı Eklendi (son yarışına göre)",
   takiCikarildiMi: "Takı Çıkarıldı (son yarışına göre)",

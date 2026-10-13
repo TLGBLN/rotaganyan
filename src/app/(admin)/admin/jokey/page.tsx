@@ -187,8 +187,11 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
                         <th className="px-3 py-2 text-center font-medium">Tb%</th>
                         <th className="px-3 py-2 text-center font-medium">Skor</th>
                         <th className="px-3 py-2 text-center font-medium border-l" title="Son 30 gün, PIT — JockeyStatSync değil">Son 30G</th>
-                        <th className="px-3 py-2 text-center font-medium" title="Son 30 gün kazanma % − uzun dönem kazanma %">Form Δ</th>
+                        <th className="px-3 py-2 text-center font-medium" title="K_REF — son 30 gün HARİÇ, kademeli referans (31-180g → 31-365g → son-30-hariç kariyer)">Ref K%</th>
+                        <th className="px-3 py-2 text-center font-medium" title="K30 − K_REF (son 30 gün kazanma % − referans kazanma %)">Form Δ</th>
                         <th className="px-3 py-2 text-center font-medium" title="Son 30 gün örneklem güveni (n/(n+8))">Güven</th>
+                        <th className="px-3 py-2 text-center font-medium" title="Form Δ × Güven — YALNIZ gösterim/analiz heuristic'i, model feature'ı DEĞİL">Etkin Form</th>
+                        <th className="px-3 py-2 text-center font-medium">Durum</th>
                         {hipodrom && (
                           <>
                             <th className="px-3 py-2 text-center font-medium border-l" title="Bu hipodromda shrink edilmiş kazanma %">Hipo K% (shrink)</th>
@@ -218,11 +221,20 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
                             <td className="px-3 py-2 text-center tabular-nums border-l text-muted-foreground">
                               {g ? `${g.son30Win}/${g.son30Start} (%${Math.round(g.son30WinRate * 100)})` : "—"}
                             </td>
+                            <td className="px-3 py-2 text-center tabular-nums text-muted-foreground" title={g && g.kRefTier !== "none" ? `kademe=${g.kRefTier}, n=${g.kRefSampleN}` : undefined}>
+                              {g && g.kRefTier !== "none" ? `%${(g.kRef * 100).toFixed(1)}` : "—"}
+                            </td>
                             <td className={cn("px-3 py-2 text-center tabular-nums font-medium", (g?.formDelta ?? 0) > 0 ? "text-hit" : (g?.formDelta ?? 0) < 0 ? "text-risk" : "text-muted-foreground")}>
                               {g?.formDelta != null ? `${g.formDelta >= 0 ? "+" : ""}${(g.formDelta * 100).toFixed(1)}pp` : "—"}
                             </td>
                             <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">
                               {g ? g.reliability.toFixed(2) : "—"}
+                            </td>
+                            <td className={cn("px-3 py-2 text-center tabular-nums font-medium", (g?.etkinForm ?? 0) > 0 ? "text-hit" : (g?.etkinForm ?? 0) < 0 ? "text-risk" : "text-muted-foreground")}>
+                              {g?.etkinForm != null ? `${g.etkinForm >= 0 ? "+" : ""}${(g.etkinForm * 100).toFixed(2)}` : "—"}
+                            </td>
+                            <td className="px-3 py-2 text-center text-[10px] font-semibold text-muted-foreground">
+                              {g?.durum ?? "—"}
                             </td>
                             {hipodrom && (
                               <>
