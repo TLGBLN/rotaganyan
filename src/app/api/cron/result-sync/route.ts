@@ -12,7 +12,7 @@ import { reconcileAllActiveHomeKupons } from "@/server/services/home-kupon-sync.
 import { syncOwnPedigreeStats } from "@/server/services/pedigri-own-stat.service";
 import { db } from "@/lib/db";
 
-export const maxDuration = 60;
+export const maxDuration = 800;
 
 export async function GET(req: NextRequest) {
   const denied = verifyCronRequest(req);
