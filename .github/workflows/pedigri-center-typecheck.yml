@@ -28,4 +28,8 @@ jobs:
         run: npm run build
         env:
           DATABASE_URL: postgresql://user:pass@127.0.0.1:5432/rotaganyan
+          DIRECT_URL: postgresql://user:pass@127.0.0.1:5432/rotaganyan
           NEXTAUTH_SECRET: pedigree-ci-placeholder
+          AUTH_SECRET: pedigree-ci-placeholder
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
