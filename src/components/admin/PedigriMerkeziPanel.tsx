@@ -20,9 +20,9 @@ function money(value: string): string {
 }
 
 function sourceLabel(value: string): string {
-  if (value === "SIRE") return "Baba / Sire";
-  if (value === "DAM") return "Anne / Dam";
-  return "Anne Babası / DamSire";
+  if (value === "SIRE") return "Sire";
+  if (value === "DAM") return "Dam";
+  return "DamSire";
 }
 
 function surfaceLabel(value: string): string {
@@ -224,52 +224,52 @@ export default async function PedigriMerkeziPanel({
         </div>
 
         <div className="overflow-x-auto rounded-lg border bg-background">
-          <table className="w-full min-w-[980px] text-xs">
+          <table className="w-full text-[11px]">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-3 py-2 text-left">Tür</th>
-                <th className="px-3 py-2 text-left">İsim</th>
-                <th className="px-3 py-2 text-left">Pist</th>
-                <th className="px-3 py-2 text-left">Mesafe</th>
-                <th className="px-3 py-2 text-right">Start</th>
-                <th className="px-3 py-2 text-right">1.</th>
-                <th className="px-3 py-2 text-right">K%</th>
-                <th className="px-3 py-2 text-right">2.</th>
-                <th className="px-3 py-2 text-right">3.</th>
-                <th className="px-3 py-2 text-right">AEI</th>
-                <th className="px-3 py-2 text-right">Kazanç</th>
-                <th className="px-3 py-2 text-left">Durum</th>
+                <th className="px-1.5 py-1.5 text-left">Tür</th>
+                <th className="px-1.5 py-1.5 text-left">İsim</th>
+                <th className="px-1.5 py-1.5 text-left">Pist</th>
+                <th className="px-1.5 py-1.5 text-left">Mesafe</th>
+                <th className="px-1.5 py-1.5 text-right">Start</th>
+                <th className="px-1.5 py-1.5 text-right">1.</th>
+                <th className="px-1.5 py-1.5 text-right">K%</th>
+                <th className="px-1.5 py-1.5 text-right">2.</th>
+                <th className="px-1.5 py-1.5 text-right">3.</th>
+                <th className="px-1.5 py-1.5 text-right">AEI</th>
+                <th className="px-1.5 py-1.5 text-right">Kazanç</th>
+                <th className="px-1.5 py-1.5 text-left">Durum</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {data.externalRows.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-3 py-6 text-center text-muted-foreground">
+                  <td colSpan={12} className="px-1.5 py-6 text-center text-muted-foreground">
                     Bu filtrelerde external kayıt yok.
                   </td>
                 </tr>
               ) : (
                 data.externalRows.map((row, index) => (
                   <tr key={`${row.sourceType}-${row.entityName}-${row.surface}-${row.distanceBand}-${index}`}>
-                    <td className="whitespace-nowrap px-3 py-2 font-semibold">{sourceLabel(row.sourceType)}</td>
-                    <td className="min-w-[180px] px-3 py-2">
+                    <td className="px-1.5 py-1.5 font-semibold">{sourceLabel(row.sourceType)}</td>
+                    <td className="px-1.5 py-1.5">
                       <div className="font-bold">{row.entityName}</div>
                       {row.damSireName ? (
-                        <div className="text-[10px] text-muted-foreground">DamSire: {row.damSireName}</div>
+                        <div className="text-[9px] text-muted-foreground">DS: {row.damSireName}</div>
                       ) : null}
                     </td>
-                    <td className="px-3 py-2">{surfaceLabel(row.surface)}</td>
-                    <td className="px-3 py-2">{row.distanceBand}</td>
-                    <td className="px-3 py-2 text-right">{num(row.starts)}</td>
-                    <td className="px-3 py-2 text-right">{num(row.wins)}</td>
-                    <td className="px-3 py-2 text-right font-bold">%{num(row.winRatePct)}</td>
-                    <td className="px-3 py-2 text-right">{num(row.seconds)}</td>
-                    <td className="px-3 py-2 text-right">{num(row.thirds)}</td>
-                    <td className="px-3 py-2 text-right">{row.aei == null ? "—" : num(row.aei, 2)}</td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right">{money(row.earningsTRY)}</td>
-                    <td className="px-3 py-2">
-                      <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-800">
-                        Destek / audit
+                    <td className="px-1.5 py-1.5">{surfaceLabel(row.surface)}</td>
+                    <td className="px-1.5 py-1.5">{row.distanceBand}</td>
+                    <td className="px-1.5 py-1.5 text-right">{num(row.starts)}</td>
+                    <td className="px-1.5 py-1.5 text-right">{num(row.wins)}</td>
+                    <td className="px-1.5 py-1.5 text-right font-bold">%{num(row.winRatePct)}</td>
+                    <td className="px-1.5 py-1.5 text-right">{num(row.seconds)}</td>
+                    <td className="px-1.5 py-1.5 text-right">{num(row.thirds)}</td>
+                    <td className="px-1.5 py-1.5 text-right">{row.aei == null ? "—" : num(row.aei, 2)}</td>
+                    <td className="px-1.5 py-1.5 text-right">{money(row.earningsTRY)}</td>
+                    <td className="px-1.5 py-1.5">
+                      <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">
+                        Destek
                       </span>
                     </td>
                   </tr>
@@ -289,60 +289,60 @@ export default async function PedigriMerkeziPanel({
         </div>
 
         <div className="overflow-x-auto rounded-lg border bg-background">
-          <table className="w-full min-w-[900px] text-xs">
+          <table className="w-full text-[11px]">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-3 py-2 text-left">Tür</th>
-                <th className="px-3 py-2 text-left">İsim</th>
-                <th className="px-3 py-2 text-left">Pist</th>
-                <th className="px-3 py-2 text-left">Mesafe</th>
-                <th className="px-3 py-2 text-right">Start</th>
-                <th className="px-3 py-2 text-right">1.</th>
-                <th className="px-3 py-2 text-right">K%</th>
-                <th className="px-3 py-2 text-right">2.</th>
-                <th className="px-3 py-2 text-right">3.</th>
-                <th className="px-3 py-2 text-right">Yavru/Torun</th>
-                <th className="px-3 py-2 text-left">Durum</th>
+                <th className="px-1.5 py-1.5 text-left">Tür</th>
+                <th className="px-1.5 py-1.5 text-left">İsim</th>
+                <th className="px-1.5 py-1.5 text-left">Pist</th>
+                <th className="px-1.5 py-1.5 text-left">Mesafe</th>
+                <th className="px-1.5 py-1.5 text-right">Start</th>
+                <th className="px-1.5 py-1.5 text-right">1.</th>
+                <th className="px-1.5 py-1.5 text-right">K%</th>
+                <th className="px-1.5 py-1.5 text-right">2.</th>
+                <th className="px-1.5 py-1.5 text-right">3.</th>
+                <th className="px-1.5 py-1.5 text-right">Yavru/Torun</th>
+                <th className="px-1.5 py-1.5 text-left">Durum</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {data.ownRows.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-3 py-6 text-center text-muted-foreground">
+                  <td colSpan={11} className="px-1.5 py-6 text-center text-muted-foreground">
                     Bu filtrelerde Own kayıt yok.
                   </td>
                 </tr>
               ) : (
                 data.ownRows.map((row, index) => (
                   <tr key={`${row.sourceType}-${row.entityName}-${row.surface}-${row.distanceBand}-${index}`}>
-                    <td className="whitespace-nowrap px-3 py-2 font-semibold">{sourceLabel(row.sourceType)}</td>
-                    <td className="min-w-[180px] px-3 py-2">
+                    <td className="px-1.5 py-1.5 font-semibold">{sourceLabel(row.sourceType)}</td>
+                    <td className="px-1.5 py-1.5">
                       <div className="font-bold">{row.entityName}</div>
                       {row.relatedName ? (
-                        <div className="text-[10px] text-muted-foreground">DamSire: {row.relatedName}</div>
+                        <div className="text-[9px] text-muted-foreground">DS: {row.relatedName}</div>
                       ) : null}
                     </td>
-                    <td className="px-3 py-2">{row.surface}</td>
-                    <td className="px-3 py-2">{row.distanceBand}</td>
-                    <td className="px-3 py-2 text-right">{num(row.starts)}</td>
-                    <td className="px-3 py-2 text-right">{num(row.wins)}</td>
-                    <td className="px-3 py-2 text-right font-bold">%{num(row.winRatePct)}</td>
-                    <td className="px-3 py-2 text-right">{num(row.seconds)}</td>
-                    <td className="px-3 py-2 text-right">{num(row.thirds)}</td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-1.5 py-1.5">{row.surface}</td>
+                    <td className="px-1.5 py-1.5">{row.distanceBand}</td>
+                    <td className="px-1.5 py-1.5 text-right">{num(row.starts)}</td>
+                    <td className="px-1.5 py-1.5 text-right">{num(row.wins)}</td>
+                    <td className="px-1.5 py-1.5 text-right font-bold">%{num(row.winRatePct)}</td>
+                    <td className="px-1.5 py-1.5 text-right">{num(row.seconds)}</td>
+                    <td className="px-1.5 py-1.5 text-right">{num(row.thirds)}</td>
+                    <td className="px-1.5 py-1.5 text-right">
                       {row.sourceType === "SIRE"
                         ? "—"
                         : `${num(row.winningOffspringCount)}/${num(row.offspringCount)}`}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-1.5 py-1.5">
                       <span
                         className={
                           row.sourceType === "SIRE"
-                            ? "whitespace-nowrap rounded-full bg-hit/15 px-2 py-1 text-[10px] font-bold text-hit"
-                            : "whitespace-nowrap rounded-full bg-muted px-2 py-1 text-[10px] font-bold text-muted-foreground"
+                            ? "rounded-full bg-hit/15 px-1.5 py-0.5 text-[9px] font-bold text-hit"
+                            : "rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground"
                         }
                       >
-                        {row.sourceType === "SIRE" ? "V5 Sire sinyali" : "Destek"}
+                        {row.sourceType === "SIRE" ? "V5 Sire" : "Destek"}
                       </span>
                     </td>
                   </tr>
