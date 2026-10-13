@@ -149,12 +149,15 @@ export async function getPedigriMerkeziData(
     `
   );
 
-  const ownCount = ownCountRows[0] ?? { sire: 0n, dam: 0n, damSire: 0n };
+  const ownCount = ownCountRows[0];
+  const ownSire = Number(ownCount?.sire ?? 0);
+  const ownDam = Number(ownCount?.dam ?? 0);
+  const ownDamSire = Number(ownCount?.damSire ?? 0);
   const ownCounts = {
-    sire: Number(ownCount.sire),
-    dam: Number(ownCount.dam),
-    damSire: Number(ownCount.damSire),
-    total: Number(ownCount.sire + ownCount.dam + ownCount.damSire),
+    sire: ownSire,
+    dam: ownDam,
+    damSire: ownDamSire,
+    total: ownSire + ownDam + ownDamSire,
   };
 
   const ownRows = await db.$queryRaw<OwnPedigriRow[]>(
