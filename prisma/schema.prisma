@@ -63,18 +63,18 @@ enum NotificationType {
 // ─── AUTH & USERS ─────────────────────────────────────────────────────────────
 
 model User {
-  id               String    @id @default(cuid())
-  email            String    @unique
-  passwordHash     String?
-  name             String?
-  role             Role      @default(USER)
-  plan             Plan      @default(FREE)
-  emailVerified    DateTime?
-  image            String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  hasSeenIntro     Boolean   @default(false)
-  marketingConsent Boolean   @default(false)
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  passwordHash       String?
+  name               String?
+  role               Role      @default(USER)
+  plan               Plan      @default(FREE)
+  emailVerified      DateTime?
+  image              String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  hasSeenIntro       Boolean   @default(false)
+  marketingConsent   Boolean   @default(false)
   // Takip edilen atlar bugün koşuyorsa girişte açılan popup — günde en fazla 1 kez
   // gösterilir (bkz. followed-horses-popup.actions.ts). hasSeenIntro'nun aksine KALICI
   // değil, her gün yeniden gösterilebilir olması gerektiği için tarih karşılaştırılıyor.
@@ -173,23 +173,23 @@ model RaceDay {
 }
 
 model Race {
-  id          String   @id @default(cuid())
-  raceDayId   String
-  raceNo      Int
-  time        String?
-  classType   String
-  breed       Breed
-  surface     Surface
-  distance    Int
-  conditions  String?
-  ageWeight   String?
-  trackRecord String?
+  id            String   @id @default(cuid())
+  raceDayId     String
+  raceNo        Int
+  time          String?
+  classType     String
+  breed         Breed
+  surface       Surface
+  distance      Int
+  conditions    String?
+  ageWeight     String?
+  trackRecord   String?
   // 2026-08-24 kullanıcı talebi — TJK program sayfasının ".race-share" bloğu (Ikramiye/
   // Yetiştirici Primi/At Sahibi Primi, her biri 1.-5. sıra kırılımlı) — sınıf hiyerarşisi
   // ikramiye üzerinden de karşılaştırılabilsin diye. {ikramiye:number[5], yetistiriciPrimi:
   // number[5], atSahibiPrimi:number[5]} — index 0 = 1.lik. Değer yoksa null.
   ikramiyeDetay Json?
-  createdAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
 
   // v6.99 — kullanıcı kararı 2026-08-10: eşzamanlılık kilidi (analysis-concurrency-lock.ts).
   // Aynı koşu için iki paralel analiz tetiklemesi (çift tık, cron+manuel çakışması) aynı
@@ -384,42 +384,42 @@ model AccuraceHorseSplit {
 // ─── PREDICTION ───────────────────────────────────────────────────────────────
 
 model Prediction {
-  id           String     @id @default(cuid())
-  raceId       String     @unique
-  authorId     String
-  confidence   Confidence @default(ORTA)
-  notes        String
-  tempo        String?
-  couponNarrow String?
-  couponNormal String?
-  couponWide   String?
-  isBanko      Boolean    @default(false)
-  bankoNote    String?
+  id                  String     @id @default(cuid())
+  raceId              String     @unique
+  authorId            String
+  confidence          Confidence @default(ORTA)
+  notes               String
+  tempo               String?
+  couponNarrow        String?
+  couponNormal        String?
+  couponWide          String?
+  isBanko             Boolean    @default(false)
+  bankoNote           String?
   // 2026-08-23 — schema.prisma'dan silinmişti ama veritabanında hâlâ vardı (530 satır,
   // hepsi false, kodda hiç kullanılmıyor) — db push'un onu SİLMESİNİ önlemek için (ilgisiz
   // bir işlem sırasında istenmeyen veri kaybı riski) geri eklendi. Aktif olarak kullanılmıyor.
-  manualOverride Boolean  @default(false)
-  published    Boolean    @default(false)
-  publishedAt  DateTime?
+  manualOverride      Boolean    @default(false)
+  published           Boolean    @default(false)
+  publishedAt         DateTime?
   // 2026-09-16 — Anormal Pist Modu v1 (bkz. src/lib/methodology/anormal-pist-risk.ts):
   // V5.46 skoruna HİÇ girmez, yalnız yayın anında hesaplanıp SAKLANAN bir risk
   // değerlendirmesi — Banko kapısını ve public rozetini besler. pistAnormalMi false
   // (büyük çoğunluk gün) ise diğer üçü hep null.
-  pistAnormalMi      Boolean @default(false)
-  pistDuyarliligi    String? // "STABIL" | "HASSAS" | "COK_HASSAS"
-  gecmisRiskSeviyesi String? // "YETERLI" | "SINIRLI" | "YETERSIZ"
-  pistUyariMesaji    String? // public'e gösterilecek, sayısal detay İÇERMEYEN gerekçe
+  pistAnormalMi       Boolean    @default(false)
+  pistDuyarliligi     String? // "STABIL" | "HASSAS" | "COK_HASSAS"
+  gecmisRiskSeviyesi  String? // "YETERLI" | "SINIRLI" | "YETERSIZ"
+  pistUyariMesaji     String? // public'e gösterilecek, sayısal detay İÇERMEYEN gerekçe
   // 2026-09-21 — Race Context Invalidation Faz 1 (bkz. proje hafızası
   // project_race_context_invalidation_faz1.md): admin-only STALE tespiti, public/kupon
   // tarafına HİÇBİR otomatik davranış değişikliği getirmez (bkz. feedback_otomatik_stale_reddedildi).
-  status              String    @default("ACTIVE") // ACTIVE | STALE
-  criticalContextHash String?   // null = eski kayıt/baseline yok → cron STALE ÜRETMEZ
-  marketSnapshotHash  String?   // yalnız AGF/pay — STALE ÜRETMEZ, Faz 2 audit'i için
-  contextSnapshotJson Json?     // analizin üretildiği ANDAKİ kritik context
+  status              String     @default("ACTIVE") // ACTIVE | STALE
+  criticalContextHash String? // null = eski kayıt/baseline yok → cron STALE ÜRETMEZ
+  marketSnapshotHash  String? // yalnız AGF/pay — STALE ÜRETMEZ, Faz 2 audit'i için
+  contextSnapshotJson Json? // analizin üretildiği ANDAKİ kritik context
   staleAt             DateTime?
-  staleReason         String?   // yapılı diff'in kısa özeti, ör. "surface: CIM→KUM"
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  staleReason         String? // yapılı diff'in kısa özeti, ör. "surface: CIM→KUM"
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
   race    Race                @relation(fields: [raceId], references: [id], onDelete: Cascade)
   author  User                @relation(fields: [authorId], references: [id])
@@ -437,8 +437,8 @@ model PredictionHistory {
   predictionId        String
   raceId              String
   criticalContextHash String
-  snapshotJson        Json     // supersede edilen Prediction'ın TAM içeriği
-  changedFieldsJson   Json?    // yapılı diff ({field, oldValue, newValue}[])
+  snapshotJson        Json // supersede edilen Prediction'ın TAM içeriği
+  changedFieldsJson   Json? // yapılı diff ({field, oldValue, newValue}[])
   archivedAt          DateTime @default(now())
 
   prediction Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
@@ -518,7 +518,7 @@ model Result {
   raceId      String   @unique
   actualOrder Json
   winnerNo    Int? // birincil kazanan (geriye uyumluluk — beraberlikte winnerNos[0])
-  winnerNos   Int[] @default([]) // TÜM kazananlar — at başı/beraberlik (dead heat) TJK'da birden fazla at aynı SONUCNO=1 alabilir
+  winnerNos   Int[]    @default([]) // TÜM kazananlar — at başı/beraberlik (dead heat) TJK'da birden fazla at aynı SONUCNO=1 alabilir
   ganyan      Float?
   time        String? // Müddet — kazananın resmi koşu süresi (örn. "1.20.11")
   farklar     String? // Farklar — ilk sıralar arasındaki mesafe farkları, TJK sırasıyla (örn. "Baş, 1, 2, Boyun")
@@ -661,31 +661,31 @@ model HorseFollow {
 // garantisi yoktur.
 
 model ClaudeUsageLog {
-  id                       String   @id @default(cuid())
-  createdAt                DateTime @default(now())
-  raceId                   String?
-  phase                    String // "faz2" | "faz4"
-  model                    String
-  inputTokens              Int
-  outputTokens             Int
+  id                         String   @id @default(cuid())
+  createdAt                  DateTime @default(now())
+  raceId                     String?
+  phase                      String // "faz2" | "faz4"
+  model                      String
+  inputTokens                Int
+  outputTokens               Int
   // Prompt cache (Faz2/Faz4 arasında paylaşılan bağlam) devreye girdikten sonra eklendi —
   // bunlar olmadan gerçek maliyet olduğundan DÜŞÜK görünüyordu, çünkü cache yazma/okuma
   // token'ları inputTokens'a hiç dahil değil (Anthropic bunları ayrı sayaçlarda döner).
-  cacheCreationInputTokens Int      @default(0)
-  cacheReadInputTokens     Int      @default(0)
+  cacheCreationInputTokens   Int      @default(0)
+  cacheReadInputTokens       Int      @default(0)
   // cacheCreationInputTokens'ın 1 saatlik TTL'li kısmı (2x fiyat) — kalanı (toplam eksi bu)
   // 5 dakikalık TTL'li kısımdır (1.25x fiyat). Anthropic bu ikisini usage.cache_creation
   // altında ayrı ayrı döner (ephemeral_1h_input_tokens/ephemeral_5m_input_tokens) — doğru
   // maliyet hesaplamak için ayrı saklanır (v6.31, metodoloji bloğu artık 1sa cache'leniyor).
-  cacheCreation1hInputTokens Int    @default(0)
+  cacheCreation1hInputTokens Int      @default(0)
   // Claude'un ham yanıt metni (extractText sonrası) — Vercel platform zaman aşımı
   // Claude başarıyla yanıtladıktan SONRA ama istemciye ulaşmadan ÖNCE fonksiyonu
   // kesebiliyor ("boşa ödeme"). Bu alan sayesinde hemen ardından gelen "tekrar dene"
   // Claude'u yeniden çağırıp ikinci kez ücretlendirmek yerine bu kaydı kullanabilir.
-  resultText               String?  @db.Text
+  resultText                 String?  @db.Text
   // İsteğin gönderilmesinden yanıtın alınmasına kadar geçen süre (ms) — admin panelde
   // "hangi analiz kaç dakika sürdü" tablosu için (kullanıcı talebi). Eski kayıtlarda yok.
-  durationMs               Int?
+  durationMs                 Int?
 
   @@index([createdAt])
   @@index([raceId, phase, createdAt])
@@ -728,26 +728,26 @@ model SireStatOwn {
 
 // DamStatOwn — bkz. SireStatOwn yorumu, aynı mantık kısrak+kısrak babası için.
 model DamStatOwn {
-  id          String   @id @default(cuid())
-  damName     String
-  damSireName String
-  irk         String
-  pist        String
-  mesafe      String
-  start       Int
-  birinci     Int
-  ikinci      Int
-  ucuncu      Int
-  dorduncu    Int
-  besinci     Int
-  kYuzde      Float
+  id                 String   @id @default(cuid())
+  damName            String
+  damSireName        String
+  irk                String
+  pist               String
+  mesafe             String
+  start              Int
+  birinci            Int
+  ikinci             Int
+  ucuncu             Int
+  dorduncu           Int
+  besinci            Int
+  kYuzde             Float
   // 2026-07-24: kullanıcı isteği — "kazanan tay oranı" (kaç FARKLI yavrunun en az 1
   // galibiyeti var / toplam farklı yavru). start/birinci YARIŞ bazlı (aynı at birden
   // fazla start/galibiyet üretebilir) — bu ikisi ise AT (yavru) bazlı, distinct Runner.name
   // gruplamasıyla hesaplanır (yalnız kendi verimizde mümkün).
-  yavruSayisi        Int @default(0)
-  kazananYavruSayisi Int @default(0)
-  updatedAt   DateTime @updatedAt
+  yavruSayisi        Int      @default(0)
+  kazananYavruSayisi Int      @default(0)
+  updatedAt          DateTime @updatedAt
 
   @@unique([damName, damSireName, irk, pist, mesafe])
   @@index([damName])
@@ -760,24 +760,77 @@ model DamStatOwn {
 // önemli etki taşır, aygır+kısrak yanında üçüncü ayrı bir istatistik olarak izlenmeli").
 // torunSayisi/kazananTorunSayisi = DamStatOwn'daki yavru kavramının bir kuşak ötesi hali.
 model DamSireStatOwn {
-  id            String   @id @default(cuid())
-  damSireName   String
-  irk           String
-  pist          String
-  mesafe        String
-  start         Int
-  birinci       Int
-  ikinci        Int
-  ucuncu        Int
-  dorduncu      Int
-  besinci       Int
-  kYuzde        Float
-  torunSayisi        Int @default(0)
-  kazananTorunSayisi Int @default(0)
-  updatedAt     DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  damSireName        String
+  irk                String
+  pist               String
+  mesafe             String
+  start              Int
+  birinci            Int
+  ikinci             Int
+  ucuncu             Int
+  dorduncu           Int
+  besinci            Int
+  kYuzde             Float
+  torunSayisi        Int      @default(0)
+  kazananTorunSayisi Int      @default(0)
+  updatedAt          DateTime @updatedAt
 
   @@unique([damSireName, irk, pist, mesafe])
   @@index([damSireName])
+}
+
+// FAZ 2A (entegrasyon, v546-fix'ten taşındı) — HipodromX manuel pedigri snapshot'larının
+// (bkz. V547-PEDIGRI-VERI-SOZLESMESI.md) normalize edilmiş kaydı. Own istatistiklerinden
+// (SireStatOwn/DamStatOwn/DamSireStatOwn) AYRI — bunlar kendi sonuçlarımızdan, bu ise
+// dış referans kaynağından. Alan listesi production tablosuyla birebir doğrulandı.
+model ExternalPedigreeStat {
+  id        String @id @default(cuid())
+  recordKey String @unique
+
+  source        String
+  dataClass     String
+  schemaVersion String?
+  sourceType    String
+
+  year         Int
+  breed        String
+  sourceBreed  String?
+  surface      String
+  distanceBand String
+  capturedAt   String
+  sourceFile   String
+
+  entityName           String
+  entityNormalizedName String
+
+  damSireName           String?
+  damSireNormalizedName String?
+  horseCount            Int?
+
+  kkNumerator   Int?
+  kkDenominator Int?
+  kkRatePct     Float?
+  kkSemantic    String?
+
+  starts     Int
+  wins       Int
+  winRatePct Float
+  seconds    Int
+  thirds     Int
+  fourths    Int
+  fifths     Int
+
+  earningsTRY BigInt
+  aei         Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sourceType, year, breed, surface, distanceBand])
+  @@index([entityNormalizedName])
+  @@index([damSireNormalizedName])
+  @@index([capturedAt])
 }
 
 // v6.78 — kullanıcı kararı 2026-08-10 ("site genelinde kullanılmayan veri" taraması):
@@ -883,7 +936,7 @@ model BannerSlide {
 // ─── JOKEY STAT SYNC (TJK'dan çekilen) ───────────────────────────────────────
 
 model JockeyStatSync {
-  id               String    @id @default(cuid())
+  id               String   @id @default(cuid())
   jockey           String
   hippoSlug        String // "overall" veya hippodrome slug (ankara, istanbul, ...)
   year             Int
@@ -901,7 +954,7 @@ model JockeyStatSync {
   prizeTl          Int
   performanceScore Float?
   confidenceLabel  String?
-  updatedAt        DateTime  @updatedAt
+  updatedAt        DateTime @updatedAt
 
   @@unique([jockey, hippoSlug, year, breed, surface])
   @@index([hippoSlug, year, breed, surface])
@@ -921,21 +974,21 @@ model JockeyStatSync {
 // Bu yüzden benzersiz anahtar (tjkKayitId, atAdi) ikilisi — aynı koşuda aynı isimde iki at
 // olamayacağı için bu kombinasyon gerçekten benzersiz.
 model TjkDereceKaydi {
-  id          String   @id @default(cuid())
-  tjkKayitId  String
-  atAdi       String
-  tarih       DateTime?
-  kilo        String?
-  irk         String
-  cinsiyet    String
-  yil         Int
-  hipodrom    String
-  pist        String
-  pistDurumu  String
-  mesafe      String
-  derece      String?
-  cinsAdi     String
-  updatedAt   DateTime @updatedAt
+  id         String    @id @default(cuid())
+  tjkKayitId String
+  atAdi      String
+  tarih      DateTime?
+  kilo       String?
+  irk        String
+  cinsiyet   String
+  yil        Int
+  hipodrom   String
+  pist       String
+  pistDurumu String
+  mesafe     String
+  derece     String?
+  cinsAdi    String
+  updatedAt  DateTime  @updatedAt
 
   @@unique([tjkKayitId, atAdi])
   @@index([yil])

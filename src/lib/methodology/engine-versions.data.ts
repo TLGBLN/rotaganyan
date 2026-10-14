@@ -716,13 +716,36 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "V5.46",
     baslangic: new Date("2026-09-19T00:15:00+03:00"),
-    bitis: null,
+    // FAZ 2E (entegrasyon, 2026-10-14) — bitis ARTIK null DEĞİL: V5.46.1 entegrasyonu
+    // sırasında master'ın bu dosyası ile v546-fix'in V5.46.1 girdisi (bitis:null) iki
+    // AYRI "aktif sürüm" iddiası taşıyordu. v546-fix'in kendi V5.46 girdisi (2026-09-12→
+    // 2026-10-09) bu V5.47 penceresini (2026-09-18 22:30→2026-09-19 00:15) İÇERİYORDU —
+    // v546-fix'in tam dosyasını olduğu gibi almak bu GERÇEKTEN YAŞANMIŞ (~1s45dk canlı)
+    // V5.47 penceresini getVersiyonKarsilastirmasi()'nin (analiz-versiyon-karsilastirma.
+    // service.ts) tarih-aralığı sorgusunda SESSİZCE "V5.46"ya yutardı — performans-
+    // karşılaştırma istatistiklerini yanlış sınıflandırırdı. Bunun yerine master'ın
+    // GERÇEK tarihçesi (V5.47 girdisi dahil, aşağıda değişmeden duruyor) temel alındı,
+    // yalnız bu son V5.46 girdisinin bitis'i V5.46.1'in gerçek başlangıcına (aşağıdaki
+    // yeni girdi) bağlandı — iki girdi artık ÇAKIŞMIYOR/boşluk BIRAKMIYOR.
+    bitis: new Date("2026-10-09T00:00:00+03:00"),
     aciklama: "V5.47'nin (KgsGun, 14. özellik) AYNI GÜN kullanıcı kararıyla TAMAMEN GERİ ALINMASI — 'V5.46'ya geri dön'. Neden: bugünkü (2026-09-18) 22 koşuluk TEK GÜNLÜK bir karşılaştırmada (yayınlanan V5.46 tahminleri vs canlı kodla yeniden hesaplanan V5.47) V5.47 top1'de gerisinde kaldı (7/22 %31.8 vs 9/22 %40.9, top3 ikisi de 12/22 %54.5) — kullanıcı n=22'nin istatistiksel kanıt olmadığını bilerek yine de geri dönmeyi tercih etti. İlk denemede yalnız katsayı sıfırlanmıştı (kod hâlâ 14 özellik gösteriyordu, admin panelindeki CURRENT_ENGINE_LABEL 'V5.47, 14 sinyal' demeye devam etti — kullanıcı 'düzelmemiş' dedi, haklıydı) — bu yüzden TAM/temiz revert yapıldı: v5-weights-diger.json/v5-weights-dusuksart.json commit 886c451'den (V5.46'nın kgsGun-öncesi SON hali) BİREBİR geri getirildi, toFeatureVector/FEATURE_NAMES/KGS_GUN_IDX apparatus'u v5-engine.ts'ten TAMAMEN kaldırıldı — artık gerçekten 13 A-katmanı özelliği. KRİTİK EK BULGU: geri dönüşü doğrularken bugünün 22 koşusu tekrar test edildiğinde İstanbul K8/Karma K1'in HÂLÂ (KGS sıfırken bile) farklı 1.sıra verdiği görüldü — bu, o 2 koşudaki farkın KGS Gün'den KAYNAKLANMADIĞINI kanıtladı. Gerçek neden: AGF piyasası tahminin yayın anı (15:25) ile yarış anı (16:55) arasında hareket etmiş (İstanbul K8: #4 REAL TROUBLE %45.13→%41.68, #8 THE BUTCHER %29.74→%32.57) — karşılaştırma script'i yarış SONRASI çalıştığı için nihai/güncel AGF'yi çekiyordu, orijinal tahminin kullandığı yayın-anı AGF'yi DEĞİL. Bu bir model hatası değil, karşılaştırma script'inin metodoloji kusuruydu (bkz. proje hafızası project_v547_yeni_sinyal_arastirmasi.md, tam detay). KgsGun'un B=500 gün-kümeli challenger kanıtı (P(ΔLL<0)=%100.0) GEÇERLİLİĞİNİ KORUYOR — bu bir 'sinyal yanlıştı' reddi DEĞİL, kullanıcının şu an için üretimde tutma riskini almama kararı.",
     neyiAnalizEdiyor: [
       "FEATURE_NAMES/toFeatureVector 14'ten 13'e geri döndü (kgsGun çıktı, kalan 13 özelliğin sırası/katsayıları V5.46 ile BİREBİR aynı — ayrı bir retrain YAPILMADI, dosyalar git geçmişinden aynen geri getirildi). Faz1RunnerV5.kgs alanı HÂLÂ hesaplanıyor (KGS gösterimi/gerekçe metni için) — yalnız artık toFeatureVector'a beslenmiyor.",
     ],
     caprazlamalar: [
       "tsc --noEmit ve npm run build deploy öncesi çalıştırıldı. KgsGun'a ait challenger-test altyapısı (arac-yeni-sinyal-challenger-test.mts) ve tüm kanıt kayıtları SİLİNMEDİ — istenirse gelecekte yeniden değerlendirilip tekrar eklenebilir.",
+    ],
+  },
+  {
+    versiyon: "V5.46.1",
+    baslangic: new Date("2026-10-09T00:00:00+03:00"),
+    bitis: null,
+    aciklama: "V5.46'nın PARALEL koruma altındaki eski mimarisi (A/B katman ayrımı, segment-bazlı iki ayrı ağırlık seti WEIGHTS_DIGER/WEIGHTS_DUSUK_SART/WEIGHTS_DIGER_HANDIKAP, aşırı-güven sıcaklık postprocess'i) TAMAMEN KALDIRILDI — tek doğrusal skor + tek softmax (S=Σβ_j·z_j, P=softmax(S)), src/lib/methodology/v546-1-engine.ts (scoreV461). Üç sebep: (1) Accurace resmi sinyal seti eklendi — ACC_CLOSE_RES (closingConsistency'nin erken-pozisyon mekanik yanlılığı düzeltilmiş hali, gerçek veride stil-korelasyonu 0.53→0.05), ACC_LATE (lateSegmentSpeed, ortak race-checkpoint), ACC_SPEED (speedResidual, Breed×Surface×DistanceBand bağlamı), PS_front/PS_lone/PS_closerFit (36-parametreli eski ACC_PACE'in yerine 3 elle-tanımlı ama ÖĞRENİLEN-β'lı primitif). (2) jokeyOrani ve antrenorOrani ÇIKARILDI — JockeyStatSync/TrainerStatSync yıl-içi toplu istatistiklerinin PIT (point-in-time) olmadığı, gelecekteki sonuçları dolaylı taşıyan bir leakage kaynağı olduğu bulundu (sızıntılı antrenör β≈+0.244 vs gerçek as-of PIT β≈-0.002, OOS'ta iyileştirmiyor) — idmJokey (galop-jokey eşleşmesi, zaten PIT) kaldı. (3) Train/live parity denetiminde AGF_SIRA (eküri-toplu dense rank, 2026-08-30 bug-fix'i eğitim üreticisine hiç yansımamıştı), H2H (zemin-eşleşme önceliği eğitim tarafında eksikti), GIDISAT (canlı tarafın Runner.raceStyle önbelleğini okuduğu, eğitim tarafının taze hesapladığı), SIRE (mutable güncel SireStat yerine gerçek PIT üretici, src/server/actions/v5461-sire.actions.ts) ve zeminMesafeDeneyimi (generator 5, live 6 argüman kullanıyordu) için GERÇEK offline/live kod uyuşmazlıkları bulunup düzeltildi — artık TEK feature kodu hem eğitimde hem canlıda kullanılıyor. Final: 19 feature, 45.584 satır/4.568 yarış ile sıfırdan refit, walk-forward FULL(eski mimari)=1.87956 vs FINAL=1.87897 LogLoss, ΔLL≈-0.00058 (race-level CI[-0.00616,0.00200] sıfırı dışlamıyor — gün-kümesi CI[-0.00422,0.00251] da dışlamıyor, kanıt sınırda ama yönü tutarlı). Segment-özel runtime override YOK (kullanıcı kararı): tek havuzlanmış β seti tüm kategorilere uygulanıyor.",
+    neyiAnalizEdiyor: [
+      "19 aktif feature: agfSirasi, agfPayi, agfPayi2, idmJokey, h2hNetSkor, hizDerecesi, zeminToleransi, zeminMesafeDeneyim, yakinsama2Plus, sonIdmanSprint, takiDegisikligi, yarisGidisatiSkoru, sireOrani, ACC_CLOSE_RES, ACC_LATE, ACC_SPEED, PS_front, PS_lone, PS_closerFit. Eski V5.46'nın FEATURE_NAMES/weights dosyaları (v5-weights-diger.json/v5-weights-dusuksart.json) ve v5-engine.ts DEĞİŞTİRİLMEDİ — rollback/arşiv olarak duruyor, canlı skorlamada artık kullanılmıyor.",
+    ],
+    caprazlamalar: [
+      "tsc --noEmit temiz, npm run build başarılı. 5 geçmiş yarışta offline/canlı parity: 4'ünde 0 fark, 1'inde max contribution/score drift 0.000112 (eşik 0.0001, kabul edilebilir nümerik sapma). Vercel production deploy BU AŞAMADA YAPILMADI (scope yetki hatası) — kullanıcının kendi ortamından manuel deploy ve deploy-sonrası doğrulama gerekiyor. FAZ 2C/2E (entegrasyon, 2026-10-13/14) ile GERÇEKTEN production call-chain'ine bağlandı.",
     ],
   },
 ];
