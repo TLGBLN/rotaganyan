@@ -5,6 +5,12 @@ on:
     paths:
       - 'src/lib/jokey-expected-wins.ts'
       - 'src/lib/jokey-expected-wins.test.ts'
+      - 'src/lib/jokey-piyasa30.ts'
+      - 'src/lib/jokey-piyasa30.test.ts'
+      - 'src/server/services/jokey-piyasa30.service.ts'
+      - 'src/app/api/admin/test-v5-engine/route.ts'
+      - 'src/components/admin/V5AnalysisPanel.tsx'
+      - 'src/lib/methodology/signal-registry.ts'
       - 'src/server/actions/jokey-expected-wins.actions.ts'
       - 'src/app/(admin)/admin/jokey/page.tsx'
       - '.github/workflows/jokey-expected-wins-ci.yml'

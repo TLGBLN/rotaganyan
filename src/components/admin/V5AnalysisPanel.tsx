@@ -74,6 +74,13 @@ type V5At = {
     durum: "ÇOK GÜÇLÜ POZİTİF" | "POZİTİF" | "NÖTR" | "NEGATİF" | "ÇOK GÜÇLÜ NEGATİF" | null;
   } | null;
   jokeySon30GMetni?: string | null;
+  /** Purely observational; never alters technical rank, score, coupon or saved pick. */
+  jokeyPiyasa30?: {
+    jokey: string; n: number; olculen: number; olculemeyen: number;
+    w: number; e: number; r: number; se: number; z: number | null;
+    kapsam: number; durum: "PIYASA_USTU_INCELE" | "PIYASA_ALTI_INCELE" | "KANIT_YETERSIZ" | "NORMAL";
+  } | null;
+  jokeyPiyasa30Ilk6Aday?: boolean;
   jokeyDestekliIlk6?: boolean;
   jokeyDestekliSurpriz?: boolean;
   analysisOzet?: HorseAnalysisSummary;
@@ -590,6 +597,12 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                         🎯 Jokey Destekli İlk-6
                       </span>
                     )}
+                    {a.jokeyPiyasa30Ilk6Aday && (
+                      <span className="rounded-full bg-sky-500/15 px-2 py-0.5 font-medium text-[11px] text-sky-700"
+                        title="Yalnızca 7–10. sıra için keşif uyarısı. 30 günlük piyasa-üstü performans, n≥20, AGF kapsamı≥%70 ve yaklaşık z≥2. OOS ile doğrulanmadı; teknik sıra veya kupon değişmez.">
+                        🔎 Jokey Piyasa 30G — İlk 6 incele
+                      </span>
+                    )}
                     {a.jokeyDestekliSurpriz && (
                       <span className="rounded-full bg-amber-500/15 px-2 py-0.5 font-medium text-[11px] text-amber-600" title="Jokey Destekli Sürpriz: Temel sıra 11+ olduğu için otomatik ilk-6'ya çekilmedi, yalnız bilgi amaçlı işaretlendi.">
                         ⚡ Jokey Destekli Sürpriz
@@ -613,6 +626,20 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                 </div>
                 {a.jokeySon30GMetni && (
                   <div className="text-[11px] text-muted-foreground">{a.jokeySon30GMetni}</div>
+                )}
+                {a.jokeyPiyasa30 && (
+                  <div className="text-[11px] text-muted-foreground">
+                    Jokey Piyasa 30G: {a.jokeyPiyasa30.w}/{a.jokeyPiyasa30.olculen} galibiyet
+                    {" · "}Beklenen {a.jokeyPiyasa30.e.toFixed(2)}
+                    {" · "}W−E {a.jokeyPiyasa30.r >= 0 ? "+" : ""}{a.jokeyPiyasa30.r.toFixed(2)}
+                    {" · "}Z {a.jokeyPiyasa30.z != null ? a.jokeyPiyasa30.z.toFixed(2) : "—"}
+                    {" · "}Kapsam %{(a.jokeyPiyasa30.kapsam * 100).toFixed(0)}
+                    {" · "}Ölçülemedi {a.jokeyPiyasa30.olculemeyen}
+                    {" · "}{a.jokeyPiyasa30.durum === "KANIT_YETERSIZ" ? "Uyarı için veri yetersiz" :
+                      a.jokeyPiyasa30.durum === "PIYASA_USTU_INCELE" ? "Piyasa üstü (araştırma)" :
+                        a.jokeyPiyasa30.durum === "PIYASA_ALTI_INCELE" ? "Piyasa altı (araştırma)" : "Normal aralık"}
+                    {" — "}Tanısal gösterge, sıralama/kuponu etkilemez.
+                  </div>
                 )}
                 {/* 2026-09-03 kullanıcı talebi ("bu kısımlarda görsel olarak kötü gözüküyor,
                     alt alta madde halinde yaz") — bu dört madde eskiden başlık satırında
