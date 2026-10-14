@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
 import { db } from "@/lib/db";
+import { syncRaceProgramContext } from "@/server/services/race-context-sync.service";
+import { fetchCriticalContextInput, criticalContextHash } from "@/lib/methodology/race-context-hash";
+import { hesaplaV461AnormalPistRiski, hesaplaV461BankoAdayi } from "@/lib/methodology/v461-ops-risk";
+import type { SurfaceCondition } from "@/lib/methodology/pist-dayanikliligi";
 import { gatherFaz1V5, hibritMaidenSatisMi } from "@/lib/methodology/v5-engine";
 import { scoreV461 } from "@/lib/methodology/v546-1-engine";
 import { kategoriTespit } from "@/lib/methodology/v2-engine";
@@ -31,6 +35,9 @@ async function handlePost(req: NextRequest) {
   const { raceId } = (await req.json()) as Body;
   if (!raceId) return NextResponse.json({ error: "raceId gerekli" }, { status: 400 });
 
+  await syncRaceProgramContext(raceId).catch((e) => {
+    console.warn("[V461] TJK sync warning", e);
+  });
   const faz1 = await gatherFaz1V5(raceId);
   if (!faz1) return NextResponse.json({ error: "Kosu verisi bulunamadi" }, { status: 404 });
   if (faz1.runners.length === 0) return NextResponse.json({ error: "Sahada kosacak at yok" }, { status: 400 });
@@ -50,7 +57,7 @@ async function handlePost(req: NextRequest) {
   const jockeyByNo = new Map(faz1.runners.map((r) => [r.no, r.jockey]));
   const raceDayMeta = await db.race.findUnique({
     where: { id: raceId },
-    select: { raceDay: { select: { date: true, hippodromeId: true } } },
+    select: { raceDay: { select: { date: true, hippodromeId: true, surfaceConditions: true } } },
   }).catch(() => null);
   const jokeyFormMap = raceDayMeta
     ? await getJokeyFormTablosu(raceDayMeta.raceDay.date, raceDayMeta.raceDay.hippodromeId).catch(() => new Map())
@@ -205,14 +212,24 @@ async function handlePost(req: NextRequest) {
     ),
   });
 
-  const bankoAdayi = null;
+  const anormalPistRiski = hesaplaV461AnormalPistRiski(
+    sirali, faz1.runners, faz1.race.surface,
+    (raceDayMeta?.raceDay.surfaceConditions ?? null) as SurfaceCondition[] | null,
+  );
+  const bankoAdayi = hesaplaV461BankoAdayi(sirali, anormalPistRiski);
   const nolar = sirali.map((r) => r.no);
   const couponNarrow = nolar.slice(0, 3).join("-");
   const couponNormal = nolar.slice(3, 6).join("-");
   const couponWide = nolar.slice(6).join("-");
 
+  const ctxForHash = await fetchCriticalContextInput(raceId);
+  const contextStartHash = ctxForHash
+    ? criticalContextHash(ctxForHash)
+    : undefined;
+
   return NextResponse.json({
     ok: true,
+    contextStartHash,
     motorEtiketi: sonuc.engineVersion,
     // 2026-08-26 kullanıcı bulgusu: "Maiden/Satış" hibrit koşularda panel yalnız
     // kategoriTespit'in ("MAIDEN" önce yakalayan) sonucunu ("1b") gösteriyordu — admin
@@ -224,6 +241,7 @@ async function handlePost(req: NextRequest) {
     atlar,
     runners: faz1.runners.map((r) => ({ id: r.id, no: r.no, name: r.ad })),
     bankoAdayi,
+    anormalPistRiski,
     couponNarrow,
     couponNormal,
     couponWide,

@@ -7,6 +7,7 @@ import { Loader2, Sparkles, CheckCircle, ChevronUp, ChevronDown } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { upsertPrediction, type PickInput } from "@/server/actions/prediction.actions";
+import type { AnormalPistRiskSonucu } from "@/lib/methodology/anormal-pist-risk";
 import type { PickDetailsV2 } from "@/lib/methodology/muhakeme-format";
 import type { HorseAnalysisSummary } from "@/lib/methodology/horse-analysis-summary";
 import type { AnalysisReadyResult } from "@/lib/methodology/analysis-ready";
@@ -171,10 +172,12 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
   const [manualOrder, setManualOrder] = useState<number[]>(kayitliBaslangic?.manualOrder ?? []);
   const [runners, setRunners] = useState<Runner[]>(kayitliBaslangic?.runners ?? []);
   const [bankoAdayi, setBankoAdayi] = useState<BankoAdayiSonuc | null>(kayitliBaslangic?.bankoAdayi ?? null);
+  const [anormalPistRiski, setAnormalPistRiski] = useState<AnormalPistRiskSonucu | null>(null);
   const [kuponlar, setKuponlar] = useState<{ narrow?: string; normal?: string; wide?: string }>(kayitliBaslangic?.kuponlar ?? {});
   const [kaynak, setKaynak] = useState<"kayitli" | "canli" | null>(kayitliBaslangic ? "kayitli" : null);
   const [acikDetay, setAcikDetay] = useState<Set<number>>(new Set());
   const [analysisReady, setAnalysisReady] = useState<AnalysisReadyResult | null>(null);
+  const [contextStartHash, setContextStartHash] = useState<string | undefined>(undefined);
   // 2026-08-21 kullanıcı bulgusu (Bursa/ŞENGÜL SULTAN vakası): panel hangi ağırlık
   // setinin (düşük-şart/diğer) kullanıldığını hiç göstermiyordu — şeffaflık eksikliği.
   const [kategori, setKategori] = useState<string | null>(null);
@@ -201,6 +204,8 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
     setManualOrder([]);
     setApplied(false);
     setBankoAdayi(null);
+    setAnormalPistRiski(null);
+    setContextStartHash(undefined);
     setKaynak(null);
     setKategori(null);
     setMotorEtiketi(null);
@@ -218,9 +223,11 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         kategori?: string;
         motorEtiketi?: string;
         analysisReady?: AnalysisReadyResult;
+        contextStartHash?: string;
         atlar: V5At[];
         runners: Runner[];
         bankoAdayi: BankoAdayiSonuc;
+        anormalPistRiski?: AnormalPistRiskSonucu;
         couponNarrow?: string;
         couponNormal?: string;
         couponWide?: string;
@@ -236,10 +243,12 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       setManualOrder([...data.atlar].sort((a, b) => a.teknikSira - b.teknikSira).map((a) => a.no));
       setRunners(data.runners ?? []);
       setBankoAdayi(data.bankoAdayi ?? null);
+      setAnormalPistRiski(data.anormalPistRiski ?? null);
       setKuponlar({ narrow: data.couponNarrow, normal: data.couponNormal, wide: data.couponWide });
       setKategori(data.kategori ?? null);
       setMotorEtiketi(data.motorEtiketi ?? null);
       setAnalysisReady(data.analysisReady ?? null);
+      setContextStartHash(data.contextStartHash);
       setKaynak("canli");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Beklenmeyen hata");
@@ -333,8 +342,17 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         // güvenli.
         isBanko: bankoAdayi?.bankoAdayi ?? false,
         bankoNote: bankoAdayi?.sebep,
+        pistAnormalMi: anormalPistRiski?.pistAnormalMi ?? false,
+        pistDuyarliligi: anormalPistRiski?.pistDuyarliligi ?? null,
+        gecmisRiskSeviyesi: anormalPistRiski?.gecmisRiskSeviyesi ?? null,
+        pistUyariMesaji: anormalPistRiski?.operasyon.uyariMesaji || null,
+        contextStartHash,
         picks,
       });
+      if ("contextConflict" in res && res.contextConflict) {
+        toast.error("Yaris bilgileri degisti. Yeniden analiz edin.");
+        return;
+      }
       if (res.publishError) {
         toast.warning(`Kaydedildi ama yayınlanamadı: ${res.publishError}`);
       } else {
@@ -481,6 +499,14 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
             {bankoAdayi.bankoAdayi ? "★ BANKO ADAYI: " : "Banko adayı yok: "}
           </span>
           {bankoAdayi.sebep}
+        </div>
+      )}
+
+      {anormalPistRiski?.pistAnormalMi && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs">
+          <strong>⚠ Anormal Pist ({anormalPistRiski.pistRejimi}): </strong>
+          Duyarlılık: {anormalPistRiski.pistDuyarliligi} · Geçmiş: {anormalPistRiski.gecmisRiskSeviyesi}
+          {anormalPistRiski.operasyon.uyariMesaji && <> — {anormalPistRiski.operasyon.uyariMesaji}</>}
         </div>
       )}
 
