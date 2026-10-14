@@ -6,14 +6,16 @@
  */
 import {db} from "@/lib/db";
 import {finishPos} from "@/lib/race-result";
-import {scheduledRaceCutoff,lastPreRaceAgf,normalizeRaceAgf,type BinisOlasilik} from "@/lib/jokey-expected-wins";
+import {scheduledRaceCutoff,lastPreRaceAgf,normalizeRaceAgf,normalizeJockeyNameForRunner,type BinisOlasilik} from "@/lib/jokey-expected-wins";
 import {hesaplaJokeyPiyasa30,type JokeyPiyasa30} from "@/lib/jokey-piyasa30";
 
 export async function getJokeyPiyasa30ForRace(
   raceDay:Date,jockeyNames:readonly string[]
 ):Promise<Map<string,JokeyPiyasa30>> {
   if(!Number.isFinite(raceDay.getTime()))return new Map();
-  const names=[...new Set(jockeyNames.map(n=>n?.trim()).filter((n):n is string=>!!n))];
+  const requested=[...new Set(jockeyNames.map(n=>n?.trim()).filter((n):n is string=>!!n))];
+  const aliases=new Map(requested.map(name=>[name,normalizeJockeyNameForRunner(name)]));
+  const names=[...new Set(aliases.values())];
   if(!names.length)return new Map();
   const start30=new Date(raceDay.getTime()-30*86_400_000);
   const mounts=await db.runner.findMany({
@@ -88,6 +90,7 @@ export async function getJokeyPiyasa30ForRace(
     byJockey.set(m.jockey,arr);
   }
   const result=new Map<string,JokeyPiyasa30>();
-  for(const jockey of names)result.set(jockey,hesaplaJokeyPiyasa30(jockey,byJockey.get(jockey)??[]));
+  for(const [requestedName,runnerName] of aliases)
+    result.set(requestedName,hesaplaJokeyPiyasa30(requestedName,byJockey.get(runnerName)??[]));
   return result;
 }
