@@ -4,6 +4,7 @@ import Link from "next/link";
 import RefreshButton from "@/components/admin/RefreshButton";
 import JokeySyncButton from "@/components/admin/JokeySyncButton";
 import JokeyClearButton from "@/components/admin/JokeyClearButton";
+import { getJokeyExpectedWinsTablosu } from "@/server/actions/jokey-expected-wins.actions";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,18 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
       tableRate: rides > 0 ? tableCount / rides : 0,
       performanceScore: g._avg.performanceScore,
     };
+  });
+
+  const expectedReport = await getJokeyExpectedWinsTablosu(new Date(), {
+    jockeyNames: rows.map(r => r.jockey),
+    hippodromeSlug: hipo,
+    surface: pist,
+    breed: irk,
+  });
+  const expectedRows = [...expectedReport.rows].sort((a,b) => {
+    if (sort === "rides") return b.son30Start - a.son30Start || a.jockey.localeCompare(b.jockey, "tr");
+    if (sort === "score") return (b.etkinForm ?? -1000) - (a.etkinForm ?? -1000) || a.jockey.localeCompare(b.jockey, "tr");
+    return b.son30Win - a.son30Win || a.jockey.localeCompare(b.jockey, "tr");
   });
 
   // Mevcut veri setleri (filtre seçenekleri için)
@@ -118,9 +131,9 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
         <div className="flex flex-col gap-1">
           <label className="text-[11px] font-medium text-muted-foreground">Sırala</label>
           <select name="sort" defaultValue={sort} className="rounded-md border bg-background px-2 py-1.5 text-xs focus:outline-none min-w-[100px]">
-            <option value="wins">Galibiyet</option>
-            <option value="rides">Biniş sayısı</option>
-            <option value="score">Performans</option>
+            <option value="wins">30G Galibiyet</option>
+            <option value="rides">30G Biniş</option>
+            <option value="score">Beklentiye Göre Form</option>
           </select>
         </div>
         <button type="submit" className="rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground hover:bg-brand/90 transition-colors">
@@ -157,58 +170,126 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
           )}
         </div>
 
-        {/* Sağ: Ana tablo */}
-        <div className="lg:col-span-3">
-          <div className="rounded-lg border overflow-hidden">
-            {rows.length === 0 ? (
-              <div className="py-16 text-center text-sm text-muted-foreground">
-                {datasets.length === 0
-                  ? "Henüz veri yüklenmedi — sol taraftan JSON dosyası ekleyin."
-                  : "Bu filtre kombinasyonu için veri bulunamadı."}
-              </div>
+        {/* Sağ: yeni beklenti tablosu + korunan TJK ham verileri */}
+        <div className="lg:col-span-3 space-y-4">
+          <section className="rounded-lg border overflow-hidden">
+            <div className="p-3 border-b bg-muted/20 space-y-1">
+              <h2 className="text-sm font-semibold">Son 30 Gün — Jokey Beklenen Galibiyet Formu</h2>
+              <p className="text-[11px] text-muted-foreground">
+                Piyasa beklentisine göre performans farkı (W−E); jokeyin saf nedensel katkısı değildir.
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Ölçülebilen yarış: {expectedReport.pricedRaceCount}/{expectedReport.raceCount}.
+                Saati bulunmayan yarış: {expectedReport.skippedTimeCount}.
+                Son30G veya referans döneminde ölçülemeyen biniş oranı %30'u aşarsa Form/Güven gizlenir.
+              </p>
+            </div>
+            {expectedRows.length === 0 ? (
+              <p className="p-6 text-xs text-muted-foreground">
+                Bu filtre için jokey bulunamadı. Ham TJK kayıtlarını aşağıdan kontrol edin.
+              </p>
             ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b bg-muted/50 text-muted-foreground">
-                        <th className="px-3 py-2 text-left font-medium w-8">#</th>
-                        <th className="px-3 py-2 text-left font-medium">Jokey</th>
-                        <th className="px-3 py-2 text-center font-medium">Biniş</th>
-                        <th className="px-3 py-2 text-center font-medium">1.</th>
-                        <th className="px-3 py-2 text-center font-medium">K%</th>
-                        <th className="px-3 py-2 text-center font-medium">Tb%</th>
-                        <th className="px-3 py-2 text-center font-medium">Skor</th>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs whitespace-nowrap">
+                  <thead>
+                    <tr className="border-b bg-muted/50 text-muted-foreground">
+                      <th className="px-2 py-2 text-left">#</th>
+                      <th className="px-2 py-2 text-left">Jokey</th>
+                      <th className="px-2 py-2 text-center">30G Biniş</th>
+                      <th className="px-2 py-2 text-center">Ölçülen</th>
+                      <th className="px-2 py-2 text-center">Galibiyet*</th>
+                      <th className="px-2 py-2 text-center">K%*</th>
+                      <th className="px-2 py-2 text-center">Beklenen E*</th>
+                      <th className="px-2 py-2 text-center">Fark W−E*</th>
+                      <th className="px-2 py-2 text-center">Ölçülemedi</th>
+                      <th className="px-2 py-2 text-center">Form</th>
+                      <th className="px-2 py-2 text-center">Güven</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {expectedRows.map((r,i) => (
+                      <tr key={r.jockey} className={cn("border-b last:border-0",i%2===1&&"bg-muted/20")}>
+                        <td className="px-2 py-2 text-muted-foreground">{i+1}</td>
+                        <td className="px-2 py-2 font-semibold">{r.jockey}</td>
+                        <td className="px-2 py-2 text-center tabular-nums">{r.son30Start}</td>
+                        <td className="px-2 py-2 text-center tabular-nums">{r.son30Olculen}</td>
+                        <td className="px-2 py-2 text-center tabular-nums">
+                          {r.son30Olculen>0?r.son30Win:"—"}
+                        </td>
+                        <td className="px-2 py-2 text-center tabular-nums">
+                          {r.son30Olculen>0?("%"+(100*r.son30Win/r.son30Olculen).toFixed(1)):"—"}
+                        </td>
+                        <td className="px-2 py-2 text-center tabular-nums">
+                          {r.son30Olculen>0?r.son30Expected.toFixed(2):"—"}
+                        </td>
+                        <td className={cn("px-2 py-2 text-center tabular-nums font-semibold",
+                          r.son30Residual>0?"text-hit":r.son30Residual<0?"text-destructive":"text-muted-foreground")}>
+                          {r.son30Olculen>0?((r.son30Residual>0?"+":"")+r.son30Residual.toFixed(2)):"—"}
+                        </td>
+                        <td className="px-2 py-2 text-center tabular-nums">
+                          {r.son30Olculemeyen} {r.son30Start?"(%"+(100*r.olculemeyenOrani).toFixed(0)+")":""}
+                        </td>
+                        <td className="px-2 py-2 text-center" title={"Ref: "+r.refTier+", ölçülemeyen: "+r.refOlculemeyen+", z="+(r.z?.toFixed(2)??"—")}>
+                          {r.guvenGosterilebilirMi && r.durum?r.durum:"—"}
+                        </td>
+                        <td className="px-2 py-2 text-center tabular-nums">
+                          {r.guvenGosterilebilirMi?"%"+(100*r.reliability).toFixed(0):"—"}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((r, i) => {
-                        const winPct = Math.round(r.winRate * 100);
-                        const tabPct = Math.round(r.tableRate * 100);
-                        const color = winPct >= 25 ? "text-hit" : winPct >= 15 ? "text-brand" : "text-muted-foreground";
-                        return (
-                          <tr key={r.jockey} className={cn("border-b last:border-0", i % 2 === 1 && "bg-muted/20")}>
-                            <td className="px-3 py-2 text-muted-foreground tabular-nums">{i + 1}</td>
-                            <td className="px-3 py-2 font-semibold">{r.jockey}</td>
-                            <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{r.rides}</td>
-                            <td className="px-3 py-2 text-center tabular-nums font-medium">{r.wins}</td>
-                            <td className={cn("px-3 py-2 text-center tabular-nums font-bold", color)}>%{winPct}</td>
-                            <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">%{tabPct}</td>
-                            <td className="px-3 py-2 text-center tabular-nums font-medium text-brand">
-                              {r.performanceScore != null ? r.performanceScore.toFixed(1) : "—"}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="border-t px-3 py-2 text-[11px] text-muted-foreground">
-                  {rows.length} jokey · {isFiltered ? contextLabel : "Tüm setler toplandı"} · K% = kazanma oranı · Tb% = ilk 5 oranı · Skor = performans puanı
-                </div>
-              </>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
-          </div>
+            <div className="p-3 border-t text-[11px] text-muted-foreground space-y-1">
+              <p>*W, E ve K% yalnız AGF'si ölçülebilen binişlerden hesaplanır. Toplam Biniş/Ölçülemedi bütün binişlerdir.</p>
+              <p>Form = [Son30G (W−E)/N − Referans (W−E)/N] × N30/(N30+8). N ölçülen biniş sayısıdır.
+                Güven, doğruluk olasılığı değil örneklem düzeltme katsayısıdır.</p>
+              <p>{expectedReport.note}</p>
+            </div>
+          </section>
+
+          <section className="rounded-lg border overflow-hidden">
+            <h2 className="px-3 py-2 text-xs font-semibold border-b bg-muted/20">
+              Ham TJK Verisi — Yıllık İstatistikler (Korundu)
+            </h2>
+            {rows.length===0?(
+              <p className="p-4 text-xs text-muted-foreground">Yıllık ham istatistik bulunamadı.</p>
+            ):(
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs whitespace-nowrap">
+                  <thead>
+                    <tr className="border-b bg-muted/50 text-muted-foreground">
+                      <th className="px-3 py-2 text-left">Jokey</th>
+                      <th className="px-3 py-2 text-center">Biniş</th>
+                      <th className="px-3 py-2 text-center">1.</th>
+                      <th className="px-3 py-2 text-center">K%</th>
+                      <th className="px-3 py-2 text-center">Tb%</th>
+                      <th className="px-3 py-2 text-center">Skor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(r=>(
+                      <tr key={r.jockey} className="border-b last:border-0">
+                        <td className="px-3 py-2 font-semibold">{r.jockey}</td>
+                        <td className="px-3 py-2 text-center tabular-nums">{r.rides}</td>
+                        <td className="px-3 py-2 text-center tabular-nums">{r.wins}</td>
+                        <td className="px-3 py-2 text-center tabular-nums">%{(r.winRate*100).toFixed(1)}</td>
+                        <td className="px-3 py-2 text-center tabular-nums">%{(r.tableRate*100).toFixed(1)}</td>
+                        <td className="px-3 py-2 text-center tabular-nums">
+                          {r.performanceScore!=null?r.performanceScore.toFixed(1):"—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="p-3 border-t text-[11px] text-muted-foreground">
+              Kaynak: JockeyStatSync (yıllık TJK setleri). Ayrı veri kümesidir; Form Endeksi hesabına eklenmez.
+              Hipodrom veri setleri örtüşebileceğinden toplulaştırma kapsamı ayrıca kontrol edilmelidir.
+            </p>
+          </section>
         </div>
       </div>
     </div>
