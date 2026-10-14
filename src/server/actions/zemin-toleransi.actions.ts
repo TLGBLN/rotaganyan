@@ -124,7 +124,10 @@ function parseKilo(kilo: string | null): number | null {
  * hızlı, negatif=yavaş). Geçmişte hiç Normal-dışı koşusu olmayan/eşleşmeyen atlar için 0
  * döner (nötr, "veri yok").
  */
-export async function hesaplaZeminToleransiMap(atIsimleri: string[], cutoffTarihi: Date): Promise<Map<string, number>> {
+export async function hesaplaZeminToleransiDetayMap(
+  atIsimleri: string[],
+  cutoffTarihi: Date
+): Promise<Map<string, { deger: number; observed: boolean; ornekSayisi: number }>> {
   const arsiv = await tumArsiviGetir();
   const atSeti = new Set(atIsimleri);
 
@@ -210,10 +213,25 @@ export async function hesaplaZeminToleransiMap(atIsimleri: string[], cutoffTarih
     atToplam.set(s.atAdi, e);
   }
 
-  const sonuc = new Map<string, number>();
+  const sonuc = new Map<string, { deger: number; observed: boolean; ornekSayisi: number }>();
   for (const ad of atIsimleri) {
     const e = atToplam.get(ad);
-    sonuc.set(ad, e ? e.toplam / e.sayi : 0);
+    sonuc.set(ad, {
+      deger: e ? e.toplam / e.sayi : 0,
+      observed: e != null && e.sayi > 0,
+      ornekSayisi: e?.sayi ?? 0,
+    });
   }
   return sonuc;
+}
+
+/** FAZ 2A (entegrasyon) öncesi davranışla BİREBİR UYUMLULUK — eski çağrıların (varsa)
+ *  kırılmaması için hesaplaZeminToleransiDetayMap'in ince sarmalayıcısı. Davranış
+ *  DEĞİŞMEDİ, yalnız observed/ornekSayisi bilgisini isteyenler Detay versiyonunu kullanır. */
+export async function hesaplaZeminToleransiMap(
+  atIsimleri: string[],
+  cutoffTarihi: Date
+): Promise<Map<string, number>> {
+  const detay = await hesaplaZeminToleransiDetayMap(atIsimleri, cutoffTarihi);
+  return new Map([...detay.entries()].map(([ad, d]) => [ad, d.deger]));
 }

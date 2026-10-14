@@ -138,7 +138,7 @@ import { getAgfTrendForRace } from "@/server/actions/agf-trend.actions";
 import { getH2HForRace } from "@/server/actions/h2h.actions";
 import { zeminDetayiBul, zeminDetayiSatirdanCikar, zeminKatsayisi } from "@/lib/methodology/mekanik-puanlama";
 import { getHizDerecesiForRace } from "@/server/actions/hiz-derecesi.actions";
-import { hesaplaZeminToleransiMap } from "@/server/actions/zemin-toleransi.actions";
+import { hesaplaZeminToleransiDetayMap } from "@/server/actions/zemin-toleransi.actions";
 import { hesaplaZeminMesafeDeneyimiMap } from "@/server/actions/zemin-mesafe-deneyimi.actions";
 import { yakinsamaGecmisHesapla } from "@/lib/methodology/yakinsama-gecmis";
 import { surfaceToPist } from "@/lib/sire-stat-match";
@@ -387,10 +387,17 @@ export type Faz1RunnerV5 = {
   /** Son idman TÜRÜ (TJK Gallop.track) Sprint/Sürat mi — kullanıcı kararıyla eklenen B-katmanı
    *  kural istisnası (bkz. yukarıdaki toFeatureVector üstü not, backtest yönü doğrulamadı). */
   sonIdmanSprint: 0 | 1;
+  /** FAZ 2A (entegrasyon) — sonIdmanSprint'in BU at için gerçekten gözlemlendiği mi
+   *  (enSonGalop != null), yoksa galop yoksa sessizce 0'a mı düştüğü. V5.46.1'in
+   *  missing≠0 sözleşmesi için — eski V5.46 skoruna/β'sına SIFIR etkisi var. */
+  sonIdmanSprintGozlemli: boolean;
   /** Son yarışına göre takı değişikliği (SonYarisDetay.eklenenTaki/cikarilanTaki) — kullanıcı
    *  kararıyla eklenen B-katmanı kural istisnası (bkz. yukarıdaki not, KIZIM BİNDAL vakası). */
   takiEklendiMi: 0 | 1;
   takiCikarildiMi: 0 | 1;
+  /** FAZ 2A (entegrasyon) — bu atın son yarış tarihi (dolayısıyla takı bilgisi) gerçekten
+   *  bilinip bilinmediği (sonYaris?.sonYarisTarihi != null). Skora etkisi YOK, metadata. */
+  takiDegisikligiGozlemli: boolean;
   sireOrani: number;
   galop: 0 | 1;
   idmJokey: 0 | 1;
@@ -444,6 +451,10 @@ export type Faz1RunnerV5 = {
    *  2026-08-30 kullanıcı talebi: artık ÖNCE bugünün zemin koşuluyla eşleşen karşılaşmalar
    *  kullanılır (varsa) — bkz. h2hZeminFiltresiUygulandiMi notu, gatherFaz1V5 içinde. */
   h2hNetSkor: number;
+  /** FAZ 2A (entegrasyon) — h2hNetSkor'un toplandığı rakip-karşılaştırma sayısı
+   *  (h2hNetSkorHesapla'nın kendi `karsilastirma` sayacı). V5.46.1'in observed=0 ayrımı
+   *  için (karsilastirma>0 ⇔ gerçekten gözlemli). Skora etkisi YOK. */
+  h2hKarsilastirmaSayisi: number;
   /** 2026-08-30 — h2hNetSkor'un bugünün zemin koşuluyla EŞLEŞEN karşılaşmalardan mı (true)
    *  yoksa tüm karşılaşmalardan mı (false — eşleşen yok ya da bugünün zemini bilinmiyor)
    *  hesaplandığı. Yalnız gerekçe metninde şeffaflık için, skora girmez. */
@@ -484,6 +495,10 @@ export type Faz1RunnerV5 = {
    *  ekleme") bunu dışlardı. Risk: model bu özelliğe gereksiz ağırlık verebilir veya
    *  hiçbir fayda sağlamadan gürültü ekleyebilir. */
   zeminToleransi: number;
+  /** FAZ 2A (entegrasyon) — zeminToleransi'nin BU at için gerçekten hesaplanıp
+   *  hesaplanmadığı (hesaplaZeminToleransiDetayMap'in observed bayrağı — eşleşme yoksa
+   *  sessizce 0'a düşen durumdan ayırt eder). Skora/β'ya etkisi YOK. */
+  zeminToleransiGozlemli: boolean;
   /** 2026-08-30 — Zemin+Mesafe Deneyimi (bkz. zemin-mesafe-deneyimi.actions.ts): atın
    *  BUGÜNKÜ tam (pist, zemin koşulu, mesafe) kombinasyonunda kanıtlanmış deneyimi.
    *  "tam" = bu mesafede de koşmuş, "kismi" = pist+zemin'de koşmuş ama başka mesafede,
@@ -585,7 +600,7 @@ async function gatherFaz1V5Core(raceId: string): Promise<Faz1SonucV5 | null> {
     fetchAccuraceGecmisKayitlari(runners.map((r) => r.name), race.raceDay.date),
     getH2HForRace(raceId).catch(() => []),
     getHizDerecesiForRace(raceId).catch(() => new Map<number, number>()),
-    hesaplaZeminToleransiMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, number>()),
+    hesaplaZeminToleransiDetayMap(runners.map((r) => r.name), race.raceDay.date).catch(() => new Map<string, { deger: number; observed: boolean; ornekSayisi: number }>()),
     yakinsamaGecmisHesapla(db, runners.map((r) => ({ no: r.no, name: r.name, jockey: r.jockey })), race.raceDay.date, bugunIkramiye1).catch(
       () => new Map<number, { sinifDususu: boolean; ajiGalibiyetVarMi: boolean }>()
     ),
@@ -647,9 +662,10 @@ async function gatherFaz1V5Core(raceId: string): Promise<Faz1SonucV5 | null> {
   );
 
   const raceNameToNo = new Map(runners.map((r) => [r.name, r.no]));
-  function h2hNetSkorHesapla(kendiAd: string): { skor: number; zeminEslesti: boolean; kendiDerece: string | null } {
+  function h2hNetSkorHesapla(kendiAd: string): { skor: number; zeminEslesti: boolean; kendiDerece: string | null; karsilastirma: number } {
     let skor = 0;
     let kendiDerece: string | null = null;
+    let karsilastirma = 0;
     for (const enc of h2hEncountersKullanilan) {
       const beniIceren = enc.results.find((e) => e.horseName === kendiAd);
       if (!beniIceren) continue;
@@ -661,10 +677,11 @@ async function gatherFaz1V5Core(raceId: string): Promise<Faz1SonucV5 | null> {
         if (!raceNameToNo.has(other.horseName)) continue;
         const otherPos = parseInt(other.finishPos, 10);
         if (isNaN(otherPos)) continue;
+        karsilastirma++;
         skor += benimPos < otherPos ? 1 : benimPos > otherPos ? -1 : 0;
       }
     }
-    return { skor, zeminEslesti: h2hZeminFiltresiUygulandiMi, kendiDerece };
+    return { skor, zeminEslesti: h2hZeminFiltresiUygulandiMi, kendiDerece, karsilastirma };
   }
 
   // 2026-08-24 — Kilo-ayarlı H2H (bkz. Faz1RunnerV5.h2hKiloDegisimi üstündeki not).
@@ -782,6 +799,8 @@ async function gatherFaz1V5Core(raceId: string): Promise<Faz1SonucV5 | null> {
     // hesaplanıyordu (takiEklendiMi/takiCikarildiMi) — burada AYNI mantıkla ekleniyor.
     const takiEklendiMi: 0 | 1 = (sonYaris?.eklenenTaki?.length ?? 0) > 0 ? 1 : 0;
     const takiCikarildiMi: 0 | 1 = (sonYaris?.cikarilanTaki?.length ?? 0) > 0 ? 1 : 0;
+    // FAZ 2A (entegrasyon) — bu atın son yarış tarihi gerçekten bilinip bilinmediği.
+    const takiDegisikligiGozlemli = sonYaris?.sonYarisTarihi != null;
     const sireOzet = sireOzetByRunnerId.get(r.id);
     const jockeyStat = r.jockey ? jockeyStats[r.jockey] : undefined;
     const trainerStat = r.trainer ? trainerStats[r.trainer] : undefined;
@@ -844,7 +863,7 @@ async function gatherFaz1V5Core(raceId: string): Promise<Faz1SonucV5 | null> {
       kgs: kgsVal, kgsVarMi,
       pistUzmani: sonYaris?.kazandi === "EVET" ? 1 : 0,
       yakinsama2Plus: 0, // aşağıda, TÜM runner'lar hazır olduktan sonra (sahaya-göreli pedigri sırası gerekiyor) dolduruluyor
-      sonIdmanSprint, takiEklendiMi, takiCikarildiMi,
+      sonIdmanSprint, sonIdmanSprintGozlemli: enSonGalop != null, takiEklendiMi, takiCikarildiMi, takiDegisikligiGozlemli,
       sireOrani, galop: keskinGalop, idmJokey,
       galopSayisi: gecerliGaloplar.length, uzunAraGalopKatkisi,
       jokeyOrani, antrenorOrani,
@@ -856,12 +875,14 @@ async function gatherFaz1V5Core(raceId: string): Promise<Faz1SonucV5 | null> {
       sireOrneklemKendiVeri: sireOzet?.ornekKendiVeri ?? null,
       kacakYalniz: (r.raceStyle as { style?: string } | null)?.style === "KACAK_AT" && kacakSayisiSahada === 1 ? 1 : 0,
       h2hNetSkor: h2hNetSkorHesap.skor,
+      h2hKarsilastirmaSayisi: h2hNetSkorHesap.karsilastirma,
       h2hZeminEslesmesiVarMi: h2hNetSkorHesap.zeminEslesti,
       h2hKendiDerece: h2hNetSkorHesap.kendiDerece,
       hizDerecesi: hizByNo.get(r.no) ?? 0,
       h2hKiloDegisimi: h2hKiloHesap.toplam,
       h2hKiloKarsilasmaSayisi: h2hKiloHesap.sayi,
-      zeminToleransi: zeminToleransiByAd.get(r.name) ?? 0,
+      zeminToleransi: zeminToleransiByAd.get(r.name)?.deger ?? 0,
+      zeminToleransiGozlemli: zeminToleransiByAd.get(r.name)?.observed ?? false,
       zeminMesafeDeneyimSeviyesi: zeminMesafeDeneyimByAd.get(r.name)?.seviye ?? "yok",
       zeminMesafeOrnekSayisi: zeminMesafeDeneyimByAd.get(r.name)?.ornekSayisi ?? 0,
       zeminMesafeDeneyim: zeminMesafeDeneyimByAd.get(r.name)?.deger ?? 0,

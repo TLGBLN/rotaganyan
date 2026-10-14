@@ -20,11 +20,15 @@ import {
   CloudRain,
   Newspaper,
   ShoppingBag,
+  SearchCode,
+  Activity,
 } from "lucide-react";
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/analizler", label: "Analizler", icon: FileText },
+  // FAZ 2C (entegrasyon, v546-fix'ten) — Root-Cause Analizi.
+  { href: "/admin/root-cause", label: "Root-Cause Analizi", icon: SearchCode },
   // 2026-09-18 kullanıcı talebi: "makale yazabileceğim bir alan" — bu admin CRUD akışı
   // (ArticleForm/TiptapEditor/upsertArticle) projenin İLK commit'inden (2026-06-21) beri
   // vardı ama hiçbir zaman nav'a bağlanmamış, herkese açık sayfası hiç yazılmamıştı.
@@ -33,6 +37,8 @@ const NAV = [
   { href: "/admin/pedigri", label: "Pedigriler", icon: Dna },
   { href: "/admin/accurace", label: "Accurace Database", icon: Gauge },
   { href: "/admin/derece-istatistikleri", label: "Derece İstatistikleri", icon: CloudRain },
+  // FAZ 2C (entegrasyon, v546-fix'ten) — Site Anatomisi.
+  { href: "/admin/site-anatomisi", label: "Site Anatomisi", icon: Activity },
   { href: "/admin/veri-tamligi", label: "Veri Tamlığı", icon: ClipboardCheck },
   { href: "/admin/sonuclar", label: "Sonuçlar", icon: Trophy },
   { href: "/admin/kupon", label: "Kupon Hazırla", icon: Ticket },
