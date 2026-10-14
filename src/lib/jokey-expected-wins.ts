@@ -1,5 +1,11 @@
 /** Read-only AGF-based expected jockey wins, for admin only. Not a causal skill estimate. */
 import {classifyEtkinFormDurum,reliability,K_REF_MIN_SAMPLE,type EtkinFormDurum} from "./jokey-form";
+/** Normalize TJK JockeyStatSync label to Runner.jockey casing using Turkish locale.
+ * This intentionally DOES NOT invent aliases (e.g. abbreviations); audit those separately. */
+export function normalizeJockeyNameForRunner(name:string):string {
+  return name.normalize("NFC").trim().replace(/\s+/g," ").toLocaleUpperCase("tr-TR");
+}
+
 export type BinisOlasilik={raceDate:Date;p:number|null;won:boolean;observed:boolean};
 export type HamBeklenti={N:number;NOlculen:number;NOlculemeyen:number;W:number;E:number;R:number;SE:number};
 export type ReferansKademesi="31-180"|"31-365"|"career-ex30"|"none";

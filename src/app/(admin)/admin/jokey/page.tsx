@@ -5,6 +5,7 @@ import RefreshButton from "@/components/admin/RefreshButton";
 import JokeySyncButton from "@/components/admin/JokeySyncButton";
 import JokeyClearButton from "@/components/admin/JokeyClearButton";
 import { getJokeyExpectedWinsTablosu } from "@/server/actions/jokey-expected-wins.actions";
+import { normalizeJockeyNameForRunner } from "@/lib/jokey-expected-wins";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,7 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
   });
 
   const expectedReport = await getJokeyExpectedWinsTablosu(new Date(), {
-    jockeyNames: rows.map(r => r.jockey),
+    jockeyNames: rows.map(r => normalizeJockeyNameForRunner(r.jockey)),
     hippodromeSlug: hipo,
     surface: pist,
     breed: irk,
@@ -181,6 +182,7 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
               <p className="text-[11px] text-muted-foreground">
                 Ölçülebilen yarış: {expectedReport.pricedRaceCount}/{expectedReport.raceCount}.
                 Saati bulunmayan yarış: {expectedReport.skippedTimeCount}.
+                İsim eşleşmesi bulunmayan jokeylerde sıfır biniş yerine eksik eşleşme olasılığı araştırılmalıdır.
                 Son30G veya referans döneminde ölçülemeyen biniş oranı %30'u aşarsa Form/Güven gizlenir.
               </p>
             </div>
