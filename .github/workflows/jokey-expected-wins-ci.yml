@@ -24,6 +24,8 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci
+      # Existing master package-lock is missing @swc/helpers@0.5.23.
+      # Only this ephemeral CI runner resolves fresh deps; no lockfile committed.
+      - run: npm install --no-save --package-lock=false --no-audit --no-fund
       - run: npm run typecheck
       - run: npm test
