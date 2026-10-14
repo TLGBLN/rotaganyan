@@ -11,7 +11,7 @@ describe("PIT AGF Expected-Wins / Jokey Form",()=>{
   it("Turkish locale normalizes Title Case TJK names to uppercase Runner.jockey",()=>{
     expect(normalizeJockeyNameForRunner("Vedat Abiş")).toBe("VEDAT ABİŞ");
     expect(normalizeJockeyNameForRunner("Muhammed Mir Bilgin")).toBe("MUHAMMED MİR BİLGİN");
-    expect(normalizeJockeyNameForRunner("Nevzat Avcı")).toBe("NEVZAT AVCI");
+    expect(normalizeJockeyNameForRunner("Nevzat Avcı")).toBe("NEVZAT AVCİ");
     expect(normalizeJockeyNameForRunner("  Gökhan  Kocakaya ")).toBe("GÖKHAN KOCAKAYA");
   });
   it("W/E/R/SE bilinen örneği; missing mount hem N hem NÖlçülemeyen",()=>{

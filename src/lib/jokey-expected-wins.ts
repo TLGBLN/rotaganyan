@@ -3,7 +3,12 @@ import {classifyEtkinFormDurum,reliability,K_REF_MIN_SAMPLE,type EtkinFormDurum}
 /** Normalize TJK JockeyStatSync label to Runner.jockey casing using Turkish locale.
  * This intentionally DOES NOT invent aliases (e.g. abbreviations); audit those separately. */
 export function normalizeJockeyNameForRunner(name:string):string {
-  return name.normalize("NFC").trim().replace(/\s+/g," ").toLocaleUpperCase("tr-TR");
+  const normalized = name.normalize("NFC").trim().replace(/\s+/g," ").toLocaleUpperCase("tr-TR");
+  // Verified Runner spelling differs from the JockeyStatSync public name:
+  // "Nevzat Avcı" -> "NEVZAT AVCI", historical Runner uses "NEVZAT AVCİ".
+  // Do NOT map abbreviated "N.AVCİ" without verified identity.
+  if (normalized === "NEVZAT AVCI") return "NEVZAT AVCİ";
+  return normalized;
 }
 
 export type BinisOlasilik={raceDate:Date;p:number|null;won:boolean;observed:boolean};
