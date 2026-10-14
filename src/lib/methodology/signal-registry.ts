@@ -56,7 +56,6 @@ export const SIGNAL_REGISTRY: readonly SignalRegistryEntry[] = [
   { code: "sireOrani", family: "PEDIGRI", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Gerçek sire örneklemi fallback'ten ayrılıyor; fakat kanıt zayıf olduğu için placement bütünlüğüne oy vermez." },
 
   { code: "jokeySon30G", family: "JOKEY", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: true, note: "Model score dışı güncel jokey desteği." },
-  { code: "jokeyPiyasa30G", family: "JOKEY", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: false, note: "30G W-E piyasa beklentisi; OOS yapılmadı. Bütünlükte ikinci JOKEY oyu veya skor katkısı yok." },
 
   { code: "atJokeyUyumu", family: "AT_JOKEY", lifecycle: "FUTURE_CANDIDATE", productionFeature: false, integrityEligible: false, note: "Residualized pair uplift + shrinkage/recency; OOS bekliyor." },
 
