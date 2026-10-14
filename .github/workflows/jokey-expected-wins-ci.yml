@@ -1,0 +1,29 @@
+name: Jokey Expected Wins CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/lib/jokey-expected-wins.ts'
+      - 'src/lib/jokey-expected-wins.test.ts'
+      - 'src/server/actions/jokey-expected-wins.actions.ts'
+      - 'src/app/(admin)/admin/jokey/page.tsx'
+      - '.github/workflows/jokey-expected-wins-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Typecheck and Vitest (no database connection)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
