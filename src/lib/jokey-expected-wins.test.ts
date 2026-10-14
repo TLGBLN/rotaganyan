@@ -1,69 +1,84 @@
-import { describe, expect, it } from "vitest";
+import {describe,expect,it} from "vitest";
 import {
-  hesaplaResidualIstatistik, normalizeRaceAgf, scheduledRaceCutoff,
-  secReferansBinisleri, hesaplaJokeyBeklentiFormu, type BinisOlasilik,
+  hesaplaResidualIstatistik,normalizeRaceAgf,lastPreRaceAgf,scheduledRaceCutoff,
+  secReferansBinisleri,hesaplaJokeyBeklentiFormu,type BinisOlasilik,
 } from "./jokey-expected-wins";
-
-const cutoff = new Date("2026-10-14T00:00:00.000Z");
-const ride = (age: number, p = 0.2, won = false): BinisOlasilik => ({
-  raceDate: new Date(cutoff.getTime() - age * 86400000), p, won,
+const asOf=new Date("2026-10-14T00:00:00.000Z");
+const ride=(days:number,p:number|null=.2,won=false,observed=true):BinisOlasilik=>({
+  raceDate:new Date(asOf.getTime()-days*86400000),p,won,observed,
 });
-
-describe("Jokey Beklenen Galibiyet — matematik ve veri güvenliği", () => {
-  it("W, E, R ve Poisson-binomial SE doğru", () => {
-    const s = hesaplaResidualIstatistik([{p:0.2, won:true}, {p:0.3, won:false}]);
-    expect(s.N).toBe(2); expect(s.W).toBe(1);
-    expect(s.E).toBeCloseTo(.5, 10);
-    expect(s.R).toBeCloseTo(.5, 10);
-    expect(s.SE).toBeCloseTo(Math.sqrt(.16+.21), 10);
+describe("PIT AGF Expected-Wins / Jokey Form",()=>{
+  it("W/E/R/SE bilinen örneği; missing mount hem N hem NÖlçülemeyen",()=>{
+    const s=hesaplaResidualIstatistik([
+      {p:.2,won:true,observed:true},
+      {p:null,won:true,observed:false},
+      {p:.3,won:false,observed:true},
+    ]);
+    expect(s.N).toBe(3);expect(s.NOlculen).toBe(2);expect(s.NOlculemeyen).toBe(1);
+    expect(s.W).toBe(1);expect(s.E).toBeCloseTo(.5,9);
+    expect(s.R).toBeCloseTo(.5,9);expect(s.SE).toBeCloseTo(Math.sqrt(.16+.21),9);
   });
-  it("geçersiz AGF olasılığını sessizce kabul etmez", () => {
-    expect(() => hesaplaResidualIstatistik([{p:2,won:false}])).toThrow();
+  it("observed true ancak p=null veya geçersiz olursa hata",()=>{
+    expect(()=>hesaplaResidualIstatistik([{p:null,won:false,observed:true}])).toThrow();
+    expect(()=>hesaplaResidualIstatistik([{p:1.2,won:false,observed:true}])).toThrow();
   });
-  it("tam snapshot AGF toplamını 1'e normalize eder", () => {
-    const a = normalizeRaceAgf([{runnerId:"a",agf:40},{runnerId:"b",agf:35},{runnerId:"c",agf:25}])!;
-    expect([...a.values()].reduce((x,y)=>x+y,0)).toBeCloseTo(1, 9);
-    expect(a.get("a")).toBeCloseTo(.4, 9);
-  });
-  it("eksik/yetersiz AGF alanını ölçülemedi olarak tutar", () => {
+  it("Tüm alan sağlıklıysa Σp=1, eksik alan normalizasyonu yasak",()=>{
+    const p=normalizeRaceAgf([
+      {runnerId:"a",agf:40},{runnerId:"b",agf:35},{runnerId:"c",agf:25}
+    ])!;
+    expect([...p.values()].reduce((a,b)=>a+b,0)).toBeCloseTo(1,9);
+    expect(p.get("a")).toBeCloseTo(.4,9);
     expect(normalizeRaceAgf([{runnerId:"a",agf:70},{runnerId:"b",agf:null}])).toBeNull();
     expect(normalizeRaceAgf([{runnerId:"a",agf:20},{runnerId:"b",agf:20}])).toBeNull();
-    expect(normalizeRaceAgf([{runnerId:"a",agf:40},{runnerId:"a",agf:60}])).toBeNull();
+    expect(normalizeRaceAgf([{runnerId:"x",agf:50},{runnerId:"x",agf:50}])).toBeNull();
   });
-  it("İstanbul saatini UTC'ye doğru çevirir ve bilinmeyen saati reddeder", () => {
-    expect(scheduledRaceCutoff(new Date("2026-10-14T00:00:00Z"),"15:30")!.toISOString())
+  it("PIT: start-a EŞİT veya sonraki snapshot ASLA kullanılmaz",()=>{
+    const cutoff=new Date("2026-10-14T12:30:00.000Z");
+    const records=[
+      {capturedAt:new Date("2026-10-14T12:31:00Z"),agf:99},
+      {capturedAt:cutoff,agf:88},
+      {capturedAt:new Date("2026-10-14T12:25:00Z"),agf:15},
+      {capturedAt:new Date("2026-10-14T12:29:00Z"),agf:21},
+    ];
+    expect(lastPreRaceAgf(records,cutoff)).toBe(21);
+    expect(lastPreRaceAgf(records.slice(0,2),cutoff)).toBeNull();
+    expect(scheduledRaceCutoff(new Date("2026-10-14T00:00:00Z"),"15:30")?.toISOString())
       .toBe("2026-10-14T12:30:00.000Z");
-    expect(scheduledRaceCutoff(new Date("2026-10-14T00:00:00Z"),null)).toBeNull();
+    expect(scheduledRaceCutoff(asOf,null)).toBeNull();
   });
-  it("önce 31-180 dönemi >=20 seçilir", () => {
-    const r=secReferansBinisleri(Array.from({length:20},()=>ride(50)),cutoff);
-    expect(r.tier).toBe("31-180"); expect(r.mounts).toHaveLength(20);
+  it("K_REF basamakları 31-180 -> 31-365 -> career-ex30 -> none",()=>{
+    expect(secReferansBinisleri(Array.from({length:20},()=>ride(50)),asOf).tier).toBe("31-180");
+    const older=[...Array.from({length:9},()=>ride(50)),...Array.from({length:13},()=>ride(240))];
+    expect(secReferansBinisleri(older,asOf).tier).toBe("31-365");
+    expect(secReferansBinisleri([ride(500)],asOf).tier).toBe("career-ex30");
+    expect(secReferansBinisleri([ride(8)],asOf).tier).toBe("none");
   });
-  it("yetersiz 180 gün için 31-365 dönemine genişler", () => {
-    const rides=[...Array.from({length:9},()=>ride(60)),...Array.from({length:13},()=>ride(240))];
-    const r=secReferansBinisleri(rides,cutoff);
-    expect(r.tier).toBe("31-365"); expect(r.mounts).toHaveLength(22);
+  it("K_REF >=20 sayımına observed=false girdileri eklenmez",()=>{
+    const items=[...Array.from({length:18},()=>ride(60)),...Array.from({length:5},()=>ride(60,null,false,false))];
+    expect(secReferansBinisleri(items,asOf).tier).toBe("career-ex30");
   });
-  it("365 gün de yetersizse career-ex30; veri yoksa none", () => {
-    expect(secReferansBinisleri([ride(500),ride(40)],cutoff).tier).toBe("career-ex30");
-    expect(secReferansBinisleri([ride(8)],cutoff).tier).toBe("none");
+  it("son30 >%30 missing => Form/Güven -",()=>{
+    const items=[ride(2,.2,true),ride(3,.3,false),ride(4,null,true,false),
+      ...Array.from({length:20},()=>ride(50,.2,false))];
+    const s=hesaplaJokeyBeklentiFormu("A",items,asOf);
+    expect(s.son30Start).toBe(3);expect(s.son30Olculen).toBe(2);
+    expect(s.son30Olculemeyen).toBe(1);
+    expect(s.olculemeyenOrani).toBeCloseTo(1/3,9);
+    expect(s.durum).toBeNull();expect(s.guvenGosterilebilirMi).toBe(false);
   });
-  it("kapsam eksikse R yalnız AGF'li binislerden hesaplanır; referans yoksa form yok", () => {
-    const r=hesaplaJokeyBeklentiFormu("J", [ride(3,.2,true)],cutoff,3);
-    expect(r.son30Start).toBe(1); expect(r.total30Start).toBe(3);
-    expect(r.coverage30).toBeCloseTo(1/3,8);
-    expect(r.son30Residual).toBeCloseTo(.8,8);
-    expect(r.formDelta).toBeNull(); expect(r.durum).toBeNull();
+  it("referans da >%30 missing ise Form kapalı",()=>{
+    const items=[...Array.from({length:10},()=>ride(3,.2,true)),
+      ...Array.from({length:7},()=>ride(50,.2,false)),
+      ...Array.from({length:4},()=>ride(50,null,false,false))];
+    expect(hesaplaJokeyBeklentiFormu("A",items,asOf).etkinForm).toBeNull();
   });
-  it("gerçek referans ile EtkinForm ve Z hesaplanır", () => {
-    const rides=[...Array.from({length:12},()=>ride(10,.2,true)),
-      ...Array.from({length:20},()=>ride(60,.2,false))];
-    const r=hesaplaJokeyBeklentiFormu("J",rides,cutoff,12);
-    expect(r.refTier).toBe("31-180");
-    expect(r.refStart).toBe(20);
-    expect(r.formDelta).toBeCloseTo(1,9);
-    expect(r.reliability).toBeCloseTo(12/20,9);
-    expect(r.etkinForm).toBeCloseTo(.6,9);
-    expect(r.z).not.toBeNull();
+  it("güvenilir kapsamda form, z ve shrinkage",()=>{
+    const items=[...Array.from({length:12},()=>ride(10,.2,true)),
+      ...Array.from({length:20},()=>ride(50,.2,false))];
+    const s=hesaplaJokeyBeklentiFormu("J",items,asOf);
+    expect(s.refTier).toBe("31-180");
+    expect(s.formDelta).toBeCloseTo(1,9);
+    expect(s.reliability).toBeCloseTo(12/20,9);
+    expect(s.etkinForm).toBeCloseTo(.6,9);expect(s.z).not.toBeNull();
   });
 });
