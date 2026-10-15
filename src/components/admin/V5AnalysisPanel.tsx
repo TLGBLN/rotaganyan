@@ -74,6 +74,13 @@ type V5At = {
     durum: "ÇOK GÜÇLÜ POZİTİF" | "POZİTİF" | "NÖTR" | "NEGATİF" | "ÇOK GÜÇLÜ NEGATİF" | null;
   } | null;
   jokeySon30GMetni?: string | null;
+  /** Purely observational; never alters technical rank, score, coupon or saved pick. */
+  jokeyPiyasa30?: {
+    jokey: string; n: number; olculen: number; olculemeyen: number;
+    w: number; e: number; r: number; se: number; z: number | null;
+    kapsam: number; durum: "PIYASA_USTU_INCELE" | "PIYASA_ALTI_INCELE" | "KANIT_YETERSIZ" | "NORMAL";
+  } | null;
+  jokeyPiyasa30Ilk6Aday?: boolean;
   jokeyDestekliIlk6?: boolean;
   jokeyDestekliSurpriz?: boolean;
   analysisOzet?: HorseAnalysisSummary;
@@ -590,6 +597,12 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                         🎯 Jokey Destekli İlk-6
                       </span>
                     )}
+                    {a.jokeyPiyasa30Ilk6Aday && (
+                      <span className="rounded-full bg-sky-500/15 px-2 py-0.5 font-medium text-[11px] text-sky-700"
+                        title="Yalnızca 7–10. sıra için keşif uyarısı. 30 günlük piyasa-üstü performans, n≥20, AGF kapsamı≥%70 ve yaklaşık z≥2. OOS ile doğrulanmadı; teknik sıra veya kupon değişmez.">
+                        🔎 Jokey Piyasa 30G — İlk 6 incele
+                      </span>
+                    )}
                     {a.jokeyDestekliSurpriz && (
                       <span className="rounded-full bg-amber-500/15 px-2 py-0.5 font-medium text-[11px] text-amber-600" title="Jokey Destekli Sürpriz: Temel sıra 11+ olduğu için otomatik ilk-6'ya çekilmedi, yalnız bilgi amaçlı işaretlendi.">
                         ⚡ Jokey Destekli Sürpriz
@@ -848,6 +861,12 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                         <span className="text-muted-foreground">USED aile yok</span>
                       )}
 
+                      {a.analysisOzet.jokeyPiyasa30Sinyal?.veri && (
+                        <span className="rounded-full border border-sky-400/40 bg-sky-500/10 px-2 py-0.5 text-[10px] text-sky-700"
+                          title="JOKEY alt sinyali: yalnız analizde gösterilir, mevcut bağımsız kanıt ailelerine/pozitif destek sayısına oy vermez.">
+                          JOKEY / Tier-1 (analiz sinyali · oy dışı)
+                        </span>
+                      )}
                       <span className="ml-auto text-[10px] font-medium">
                         Veri Güveni: {a.analysisOzet.veriGuvenSeviyesi}
                       </span>
@@ -920,6 +939,35 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                       )}
                     </div>
 
+                    {a.analysisOzet.jokeyPiyasa30Sinyal && (
+                      <div className="rounded-md border border-sky-500/20 bg-sky-500/5 p-2 text-[11px]">
+                        <div className="flex flex-wrap gap-2 font-medium">
+                          <span>JOKEY / Tier-1: Son 30G Piyasa Performansı</span>
+                          <span className="text-muted-foreground">ANALYSIS_ONLY · skor katkısı 0 · bütünlük oyu yok</span>
+                        </div>
+                        {a.analysisOzet.jokeyPiyasa30Sinyal.veri ? (() => {
+                          const j = a.analysisOzet!.jokeyPiyasa30Sinyal.veri!;
+                          return (
+                            <div className="mt-1 text-muted-foreground">
+                              Ölçülen {j.olculen}/{j.n} · W {j.w} · E {j.e.toFixed(2)}
+                              {" · "}W−E {j.r >= 0 ? "+" : ""}{j.r.toFixed(2)}
+                              {" · "}Z {j.z == null ? "—" : j.z.toFixed(2)}
+                              {" · "}AGF kapsamı %{(j.kapsam * 100).toFixed(0)}
+                              {" · "}Ölçülemedi {j.olculemeyen}
+                              {" · "}{j.durum === "KANIT_YETERSIZ" ? "Uyarı için veri yetersiz" :
+                                j.durum === "PIYASA_USTU_INCELE" ? "Piyasa üstü (araştırma)" :
+                                  j.durum === "PIYASA_ALTI_INCELE" ? "Piyasa altı (araştırma)" : "Normal aralık"}
+                            </div>
+                          );
+                        })() : (
+                          <div className="mt-1 text-muted-foreground">Ölçülebilir jokey kaydı yok; sinyal kullanılmadı.</div>
+                        )}
+                        <div className="mt-1 text-[10px] text-muted-foreground">
+                          Geçmiş RCA pilotunda 25 pozitif uyarıda 0 kazanan bulundu; sinyal henüz bağımsız OOS ile doğrulanmadı.
+                          Teknik sıralama, BANKO/İLK3/İLK6, olasılık ve kupon değişmez.
+                        </div>
+                      </div>
+                    )}
                     {a.analysisOzet.eksikBlockedLegacyVeriler.length > 0 && (
                       <div className="text-[10px] text-muted-foreground">
                         Eksik / legacy:{" "}

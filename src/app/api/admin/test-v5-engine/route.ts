@@ -10,6 +10,8 @@ import { gatherFaz1V5, hibritMaidenSatisMi } from "@/lib/methodology/v5-engine";
 import { scoreV461 } from "@/lib/methodology/v546-1-engine";
 import { kategoriTespit } from "@/lib/methodology/v2-engine";
 import { getJokeyFormTablosu } from "@/server/actions/jokey-form.actions";
+import { getJokeyPiyasa30ForRace } from "@/server/services/jokey-piyasa30.service";
+import { jokeyPiyasa30Ilk6Incele } from "@/lib/jokey-piyasa30";
 import { evaluateJokeyRescue, buildJokeySon30GMetni } from "@/lib/jokey-form";
 import { getAgfTrendForRace } from "@/server/actions/agf-trend.actions";
 import { classifyAllSignals } from "@/lib/methodology/signal-status";
@@ -63,6 +65,18 @@ async function handlePost(req: NextRequest) {
     ? await getJokeyFormTablosu(raceDayMeta.raceDay.date, raceDayMeta.raceDay.hippodromeId).catch(() => new Map())
     : new Map();
 
+  // 30G expected-vs-actual market evidence: retrospective prior days only.
+  // Analysis-overlay ONLY. scoreV461 has already completed; never reorder picks.
+  const jokeyPiyasa30Map = raceDayMeta
+    ? await getJokeyPiyasa30ForRace(
+        raceDayMeta.raceDay.date,
+        [...new Set([...jockeyByNo.values()].filter((s): s is string => !!s))]
+      ).catch((error) => {
+        console.warn("[V461-JOKEY-P30] read-only evidence unavailable", error);
+        return new Map();
+      })
+    : new Map();
+
   // 2026-10-11 — ANALYSIS STABILITY FREEZE: AGF Trend zaten var olan, read-only
   // getAgfTrendForRace'ten (production'da AgfTrendPanel'in de kullandığı AYNI fonksiyon)
   // alınır — yeni hesap/eşik YOK.
@@ -103,6 +117,8 @@ async function handlePost(req: NextRequest) {
     const jockeyAdi = jockeyByNo.get(p.no) ?? null;
     const jokeyGuncel = jockeyAdi ? jokeyFormMap.get(jockeyAdi)?.guncel ?? null : null;
     const jokeySon30GMetni = jockeyAdi && jokeyGuncel ? buildJokeySon30GMetni(jockeyAdi, jokeyGuncel) : null;
+    const jokeyPiyasa30 = jockeyAdi ? jokeyPiyasa30Map.get(jockeyAdi) ?? null : null;
+    const jokeyPiyasa30Ilk6Aday = jokeyPiyasa30Ilk6Incele(p.rank, jokeyPiyasa30);
     const jokeyRescue =
       jockeyAdi && jokeyGuncel && jokeyGuncel.etkinForm != null
         ? evaluateJokeyRescue(p.rank, jokeyGuncel.etkinForm * 100, jokeyGuncel.reliability)
@@ -120,6 +136,7 @@ async function handlePost(req: NextRequest) {
       agfTrendItem: agfTrendByNo.get(p.no) ?? null,
       jokeySon30G: jokeyGuncel,
       jokeySon30GMetni,
+      jokeyPiyasa30,
       jokeyDestekliSurpriz: jokeyRescue?.JOKEY_DESTEKLI_SURPRIZ ?? false,
     });
 
@@ -132,6 +149,8 @@ async function handlePost(req: NextRequest) {
       jockey: jockeyAdi,
       jokeySon30G: jokeyGuncel,
       jokeySon30GMetni,
+      jokeyPiyasa30,
+      jokeyPiyasa30Ilk6Aday,
       jokeyDestekliIlk6: jokeyRescue?.JOKEY_DESTEKLI_ILK6 ?? false,
       jokeyDestekliSurpriz: jokeyRescue?.JOKEY_DESTEKLI_SURPRIZ ?? false,
       karar,

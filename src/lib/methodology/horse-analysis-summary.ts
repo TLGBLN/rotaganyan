@@ -6,6 +6,7 @@ import { evaluateSignalIntegrity, type SignalIntegrityResult } from "./signal-in
 import { isIntegrityEligibleSignal } from "./signal-registry";
 import type { AgfTrendItem } from "@/server/actions/agf-trend.actions";
 import type { JokeyGuncelForm } from "@/lib/jokey-form";
+import type { JokeyPiyasa30 } from "@/lib/jokey-piyasa30";
 
 export type HorseClass = "ANA ADAY" | "CIDDI RAKIP" | "RAKIP" | "SÜRPRİZ";
 
@@ -54,6 +55,15 @@ export interface HorseAnalysisSummary {
   enGucluNegatif: EvidenceFamilyLine[];
   marketOzet: MarketOzet;
   jokeySon30GOzet: JokeySon30GOzet;
+  /** Additional JOKEY Tier-1 signal, observation only. Never enters family rollup or the integrity vote. */
+  jokeyPiyasa30Sinyal: {
+    kod: "jokeyPiyasa30G";
+    family: "JOKEY";
+    lifecycle: "ANALYSIS_ONLY";
+    integrityEligible: false;
+    scoreContribution: 0;
+    veri: JokeyPiyasa30 | null;
+  };
   eksikBlockedLegacyVeriler: MissingDataEntry[];
   veriGuvenSeviyesi: "YÜKSEK" | "ORTA" | "DÜŞÜK";
   butunluk: SignalIntegrityResult;
@@ -105,6 +115,7 @@ export function buildHorseAnalysisSummary(params: {
   agfTrendItem: AgfTrendItem | null;
   jokeySon30G: JokeyGuncelForm | null;
   jokeySon30GMetni: string | null;
+  jokeyPiyasa30?: JokeyPiyasa30 | null;
   jokeyDestekliSurpriz: boolean;
 }): HorseAnalysisSummary {
   const sinif = classifyHorseKategori(params.rank, params.jokeyDestekliSurpriz);
@@ -186,6 +197,16 @@ export function buildHorseAnalysisSummary(params: {
     enGucluNegatif,
     marketOzet,
     jokeySon30GOzet,
+    // Explicit signal representation; deliberately excluded from allFamilyLines,
+    // evaluateSignalIntegrity, strength counts and the frozen score contribution.
+    jokeyPiyasa30Sinyal: {
+      kod: "jokeyPiyasa30G",
+      family: "JOKEY",
+      lifecycle: "ANALYSIS_ONLY",
+      integrityEligible: false,
+      scoreContribution: 0,
+      veri: params.jokeyPiyasa30 ?? null,
+    },
     eksikBlockedLegacyVeriler,
     veriGuvenSeviyesi,
     butunluk,
