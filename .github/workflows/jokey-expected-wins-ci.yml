@@ -1,0 +1,44 @@
+name: Jokey Expected Wins CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/lib/jokey-expected-wins.ts'
+      - 'src/lib/jokey-expected-wins.test.ts'
+      - 'src/server/actions/jokey-expected-wins.actions.ts'
+      - 'src/app/(admin)/admin/jokey/page.tsx'
+      - '.github/workflows/jokey-expected-wins-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Typecheck and Vitest (no database connection)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      # Existing master package-lock is missing @swc/helpers@0.5.23.
+      # Only this ephemeral CI runner resolves fresh deps; no lockfile committed.
+      - run: rm package-lock.json && npm install --legacy-peer-deps --no-save --package-lock=false --no-audit --no-fund
+      - name: Typecheck
+        id: typecheck
+        run: npm run typecheck
+        continue-on-error: true
+      - name: Vitest
+        run: npm test
+      - name: Enforce typecheck
+        if: always()
+        env:
+          TYPECHECK_OUTCOME: ${{ steps.typecheck.outcome }}
+        run: |
+          if [ "$TYPECHECK_OUTCOME" != "success" ]; then
+            echo "::error::Typecheck failed; see Typecheck step. Do not merge."
+            exit 1
+          fi
