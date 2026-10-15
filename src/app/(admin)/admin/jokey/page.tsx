@@ -183,7 +183,7 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
                 Ölçülebilen yarış: {expectedReport.pricedRaceCount}/{expectedReport.raceCount}.
                 Saati bulunmayan yarış: {expectedReport.skippedTimeCount}.
                 İsim eşleşmesi bulunmayan jokeylerde sıfır biniş yerine eksik eşleşme olasılığı araştırılmalıdır.
-                Son30G veya referans döneminde ölçülemeyen biniş oranı %30'u aşarsa Form/Güven gizlenir.
+                Son30G veya referans döneminde ölçülemeyen biniş oranı %30’u aşarsa Form/Güven gizlenir.
               </p>
             </div>
             {expectedRows.length === 0 ? (
@@ -244,7 +244,7 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
               </div>
             )}
             <div className="p-3 border-t text-[11px] text-muted-foreground space-y-1">
-              <p>*W, E ve K% yalnız AGF'si ölçülebilen binişlerden hesaplanır. Toplam Biniş/Ölçülemedi bütün binişlerdir.</p>
+              <p>*W, E ve K% yalnız AGF’si ölçülebilen binişlerden hesaplanır. Toplam Biniş/Ölçülemedi bütün binişlerdir.</p>
               <p>Form = [Son30G (W−E)/N − Referans (W−E)/N] × N30/(N30+8). N ölçülen biniş sayısıdır.
                 Güven, doğruluk olasılığı değil örneklem düzeltme katsayısıdır.</p>
               <p>{expectedReport.note}</p>
