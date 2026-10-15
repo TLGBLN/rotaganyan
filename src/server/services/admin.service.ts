@@ -292,7 +292,12 @@ export async function getArchiveStats() {
       db.race.count({ where: { raceDay: { hippodrome: GERCEK_HIPODROM_FILTRESI } } }),
       db.raceDay.count({ where: { hippodrome: GERCEK_HIPODROM_FILTRESI } }),
       db.hippodrome.count({ where: GERCEK_HIPODROM_FILTRESI }),
-      db.runner.count({ where: { sire: { not: null }, race: { raceDay: { hippodrome: GERCEK_HIPODROM_FILTRESI } } } }),
+      // 2026-10-15 düzeltme: eskiden Runner.sire (ham baba-adı metni, TJK'dan her at için
+      // otomatik gelir, %99.9 dolu) sayılıyordu — bu "pedigri arşivi" DEĞİL, fiilen toplam
+      // at sayısıydı, kutunun kendi "uydurma/yuvarlanmış değil" iddiasını yanıltıcı kılıyordu.
+      // Gerçek ölçüt: HorsePedigree (tam soy ağacı önbelleği, tjkAtId başına TEK kayıt,
+      // hipodrom-bağımsız at-niteliği — Karma çift-sayım riski YOK, ek filtre gerekmiyor).
+      db.horsePedigree.count(),
       db.gallop.count({ where: { runner: { race: { raceDay: { hippodrome: GERCEK_HIPODROM_FILTRESI } } } } }),
       db.raceDay.findFirst({ where: { hippodrome: GERCEK_HIPODROM_FILTRESI }, orderBy: { date: "asc" }, select: { date: true } }),
     ]);
