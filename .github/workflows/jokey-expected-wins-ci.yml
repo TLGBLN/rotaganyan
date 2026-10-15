@@ -11,6 +11,8 @@ on:
       - 'src/app/api/admin/test-v5-engine/route.ts'
       - 'src/components/admin/V5AnalysisPanel.tsx'
       - 'src/lib/methodology/signal-registry.ts'
+      - 'src/lib/methodology/horse-analysis-summary.ts'
+      - 'src/lib/methodology/horse-analysis-summary.test.ts'
       - 'src/server/actions/jokey-expected-wins.actions.ts'
       - 'src/app/(admin)/admin/jokey/page.tsx'
       - '.github/workflows/jokey-expected-wins-ci.yml'

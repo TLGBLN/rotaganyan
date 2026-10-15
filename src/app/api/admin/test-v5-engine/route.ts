@@ -136,6 +136,7 @@ async function handlePost(req: NextRequest) {
       agfTrendItem: agfTrendByNo.get(p.no) ?? null,
       jokeySon30G: jokeyGuncel,
       jokeySon30GMetni,
+      jokeyPiyasa30,
       jokeyDestekliSurpriz: jokeyRescue?.JOKEY_DESTEKLI_SURPRIZ ?? false,
     });
 
