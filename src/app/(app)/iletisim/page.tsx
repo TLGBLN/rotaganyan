@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import IletisimForm from "./IletisimForm";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("iletisim");
@@ -15,7 +16,7 @@ export default async function IletisimPage() {
         {t("intro")}
       </p>
 
-      <div className="space-y-6">
+      <div className="mb-8 grid gap-4 sm:grid-cols-2">
         <div className="rounded-lg border p-6">
           <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{t("eposta")}</p>
           <a
@@ -36,8 +37,9 @@ export default async function IletisimPage() {
             {t("yanitSuresiDetay")}
           </p>
         </div>
-
       </div>
+
+      <IletisimForm />
     </main>
   );
 }
