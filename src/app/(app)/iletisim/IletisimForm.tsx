@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
+import Image from "next/image";
 import { Loader2, Send } from "lucide-react";
 import { contactFormSchema, type ContactFormInput } from "@/lib/validations/contact";
 import { sendContactMessage } from "@/server/actions/contact.actions";
@@ -34,12 +35,24 @@ export default function IletisimForm() {
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="relative overflow-hidden">
+      {/* Kullanıcı talebi: formun arkasında opak bir görsel olsun — markanın kendi
+          at ikonu (horse-icon-gold.png, auth/splash ekranlarında zaten kullanılıyor)
+          çok düşük opaklıkla kart köşesinde, salt dekoratif (aria-hidden, tıklanamaz,
+          form içeriğinin ÜSTÜNDE değil ARKASINDA — metin okunabilirliği etkilenmez). */}
+      <Image
+        src="/horse-icon-gold.png"
+        alt=""
+        width={320}
+        height={320}
+        aria-hidden
+        className="pointer-events-none absolute -bottom-10 -right-10 select-none opacity-[0.05] sm:-bottom-14 sm:-right-14"
+      />
+      <CardHeader className="relative">
         <CardTitle>{t("formBaslik")}</CardTitle>
         <CardDescription>{t("formAciklama")}</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="relative">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
