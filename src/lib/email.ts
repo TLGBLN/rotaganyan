@@ -138,6 +138,50 @@ export async function sendVerificationCodeEmail(email: string, name: string, cod
   );
 }
 
+// Kullanıcıdan gelen serbest metni (ad/konu/mesaj) HTML'e gömmeden önce kaçışlar —
+// e-posta istemcisinde bozuk markup/istenmeyen HTML enjeksiyonunu önlemek için.
+function kacir(metin: string): string {
+  return metin
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * /iletisim formundan gelen mesajı destek kutusuna iletir. `replyTo` göndereni
+ * ayarlıyor — destek@rotaganyan.com'dan "Yanıtla"ya basınca doğrudan kullanıcıya gider,
+ * ekstra bir adım gerekmez.
+ */
+export async function sendContactFormEmail(
+  name: string,
+  email: string,
+  subject: string,
+  message: string
+): Promise<boolean> {
+  return gonder(
+    {
+      from: FROM,
+      to: "destek@rotaganyan.com",
+      replyTo: email,
+      subject: `[İletişim Formu] ${subject}`,
+      html: `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto">
+        <h2 style="color:#15803d">Yeni iletişim formu mesajı</h2>
+        <p><strong>Ad Soyad:</strong> ${kacir(name)}</p>
+        <p><strong>E-posta:</strong> ${kacir(email)}</p>
+        <p><strong>Konu:</strong> ${kacir(subject)}</p>
+        <div style="margin-top:16px;padding:16px;background:#f9fafb;border-radius:8px;white-space:pre-wrap">${kacir(message)}</div>
+        <p style="margin-top:16px;color:#6b7280;font-size:12px">
+          Bu mesaja doğrudan "Yanıtla" ile cevap verebilirsiniz — ${kacir(email)} adresine gider.
+        </p>
+      </div>
+    `,
+    },
+    "iletişim formu e-postası"
+  );
+}
+
 export async function sendWelcomeEmail(email: string, name: string): Promise<boolean> {
   return gonder(
     {
