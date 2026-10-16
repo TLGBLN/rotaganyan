@@ -45,6 +45,10 @@ export const registrationCodeVerifyLimiter = createRateLimiter(10, "10 m");
 // tarayan bir scraper'ı hızla 429'a düşürür. bkz. middleware.ts.
 export const publicContentLimiter = createRateLimiter(40, "10 s");
 
+// İletişim formu gönderimi — saatte 5, IP başına. Formun spam/toplu-gönderim aracı
+// olarak kötüye kullanılmasını (destek@ kutusunu doldurmayı) engeller.
+export const contactFormLimiter = createRateLimiter(5, "1 h");
+
 export async function checkRateLimit(
   limiter: ReturnType<typeof createRateLimiter>,
   identifier: string
