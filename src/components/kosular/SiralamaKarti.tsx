@@ -4,10 +4,25 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ProgramRaceDay, KuponOnerisi } from "@/server/services/race.service";
 import type { TempoSenaryosu } from "@/lib/methodology/pace-analizi";
+import { Crown } from "lucide-react";
 import { siraliPickler } from "@/lib/methodology/pick-display-order";
 import { puanYuzdesiMetni, piyasaFarkiPuani } from "@/lib/methodology/muhakeme-format";
+import { agfSiraMapOlustur } from "@/lib/agf-sira";
+import { surfaceLabel, breedLabel } from "@/lib/utils";
 import { KuponBlock } from "@/components/home/TahminOnerileri";
 import SiralamaListesi, { Son5Yaris } from "./SiralamaListesi";
+
+/** Oval pist şeması — ekrandaki referansın "pist ikonu", markaya özgü basit bir SVG
+ *  (dışarıdan illüstrasyon yerine — bkz. proje kuralı: AI-jenerik görsel yerine konuya
+ *  özgü, kesin bir şekil). */
+function PistIkonu({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 20" className={className} fill="none" aria-hidden="true">
+      <rect x="1" y="1" width="30" height="18" rx="9" stroke="currentColor" strokeWidth="2" />
+      <rect x="5" y="5" width="22" height="10" rx="5" stroke="currentColor" strokeWidth="1.5" opacity="0.5" />
+    </svg>
+  );
+}
 
 type Race = ProgramRaceDay["races"][number];
 type Kupon = NonNullable<KuponOnerisi>;
@@ -59,10 +74,15 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
   const race = raceDay.races.find((r) => r.raceNo === activeRaceNo) ?? analyzed[0];
   const picks = race.prediction?.picks ?? [];
   const agfByNo = new Map(race.runners.map((r) => [r.no, r.agf]));
+  const agfSiraByNo = agfSiraMapOlustur(race.runners);
   const formByNo = new Map(race.runners.map((r) => [r.no, { recentForm: r.recentForm, recentFormSurfaces: r.recentFormSurfaces }]));
   const topPick = siraliPickler(picks)[0];
   const topModel = topPick ? topPick.scoreExact ?? topPick.score : null;
   const topAgf = topPick?.runner?.no != null ? agfByNo.get(topPick.runner.no) ?? null : null;
+  // AGF SIRASI (1./2./3. rozeti) agf-sira.ts'in KENDİ kuralıyla ADMIN'E ÖZELDİR ("piyasa
+  // bilgisini önceden bilmek avantaj sağlayabilir") — ham AGF YÜZDESİ (topAgf) zaten
+  // herkese açıktı, bu DEĞİŞMEDİ; yalnız SIRA rozeti (taçlı "1.") isAdmin'e bağlı kaldı.
+  const topAgfSira = isAdmin && topPick?.runner?.no != null ? agfSiraByNo.get(topPick.runner.no) ?? null : null;
   const fark = topModel != null ? piyasaFarkiPuani(topModel, topAgf) : null;
   const tempo = tempoByRaceId[race.id] ?? null;
 
@@ -96,6 +116,20 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
         ))}
       </div>
 
+      {/* Koşu bilgi şeridi — şart/yaş-cins/mesafe/pist, ekrandaki referansla aynı sırada. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl border bg-muted/30 px-3.5 py-2 text-xs">
+        <div className="font-bold">
+          {race.raceNo}. Koşu{race.time ? ` · ${race.time}` : ""}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
+          {race.classType && <span>Şartlı {race.classType}</span>}
+          <span>{breedLabel(race.breed)}</span>
+          <span>{race.distance} Metre</span>
+          <span>{surfaceLabel(race.surface)} Pist</span>
+          <PistIkonu className="h-4 w-6 text-brand" />
+        </div>
+      </div>
+
       {/* Karar hero'su — 2026-09-14 kullanıcı bulgusu (mobil): eskiden tek satırlık
           flex-wrap, dar ekranda at adı/piyasa farkı/kupon bloklarını üst üste garip
           kırıyordu. Artık <640px'te DİKEY istiflenen, kupon ayaklarının ayrı ayrı
@@ -106,24 +140,29 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
           Artık sitenin KENDİ marka rengine (brand, kehribar) doğru gerçek bir renk
           geçişi var — jenerik mor/mavi gradyan değil. */}
       {topPick && (
-        <div className="rounded-2xl bg-gradient-to-br from-foreground via-foreground to-brand/25 px-4 py-4 text-background shadow-sm sm:px-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-baseline gap-2">
-              {/* 2026-09-14 kullanıcı talebi: hero'daki at, listedeki sıra rozetleriyle
-                  (1,2,3...) TUTARLI şekilde ayrıca "1." (model sırası) taşısın — bib
-                  numarasından (turuncu kutu) ayrı, ne olduğu karışmasın diye. */}
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-background/20 text-sm font-bold">
-                1.
-              </span>
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand text-lg font-extrabold text-brand-foreground">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-foreground via-foreground to-brand/25 px-4 py-4 text-background shadow-sm sm:px-5">
+          {/* Marka filigranı — mevcut altın at ikonu, dekoratif/düşük opaklık (yeni bir
+              illüstrasyon UYDURULMADI, sitenin kendi varlığı tekrar kullanıldı). */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/horse-icon-gold.png" alt="" aria-hidden="true" className="pointer-events-none absolute -right-4 -bottom-6 h-28 w-28 opacity-[0.12] sm:h-36 sm:w-36" />
+
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-2.5">
+              {/* AGF sırası — referans ekrandaki taçlı "1" rozeti, piyasanın favorisini
+                  ayırt eder (model sırasından BAĞIMSIZ bir bilgi — ikisi FARKLI olabilir,
+                  bu yüzden ikisi de ayrı ayrı gösterilir). */}
+              {topAgfSira != null && (
+                <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-brand text-brand-foreground">
+                  {topAgfSira === 1 && <Crown className="h-3.5 w-3.5 fill-current" />}
+                  <span className="text-base font-extrabold leading-none">{topAgfSira}</span>
+                </span>
+              )}
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background/20 text-lg font-extrabold">
                 {topPick.runner?.no ?? "—"}
               </span>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-baseline gap-x-2">
                   <span className="truncate text-lg font-bold sm:text-xl">{topPick.runner?.name ?? topPick.runnerLabel ?? "—"}</span>
-                  <span className="text-lg font-extrabold text-brand sm:text-xl">
-                    %{puanYuzdesiMetni(topPick.score, topPick.scoreExact) ?? "—"}
-                  </span>
                 </div>
                 {topAgf != null && (
                   <div className="text-xs opacity-75">AGF %{topAgf.toFixed(1)} — piyasa {fark != null && fark > 0 ? "henüz fiyatlamıyor" : "farklı görüyor"}</div>
@@ -141,10 +180,21 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-3 text-sm">
+              {/* Model tahmini — büyük yüzde + oran çubuğu, referans ekrandaki gibi. */}
+              <div className="min-w-[140px]">
+                <div className="text-[10px] font-semibold uppercase tracking-wide opacity-60">Model Tahmini</div>
+                <div className="text-xl font-extrabold text-brand">%{puanYuzdesiMetni(topPick.score, topPick.scoreExact) ?? "—"}</div>
+                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-background/20">
+                  <div
+                    className="h-full rounded-full bg-brand"
+                    style={{ width: `${Math.max(0, Math.min(100, topPick.scoreExact ?? topPick.score ?? 0))}%` }}
+                  />
+                </div>
+              </div>
               {tempo && TEMPO_LABEL[tempo] && (
                 <div>
-                  <div className="text-[10px] uppercase tracking-wide opacity-60">Yarış Gidişatı</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide opacity-60">Yarış Gidişatı</div>
                   <div className="font-bold">{TEMPO_LABEL[tempo]}</div>
                 </div>
               )}
@@ -155,7 +205,7 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
-        <SiralamaListesi race={race} formByNo={formByNo} />
+        <SiralamaListesi race={race} formByNo={formByNo} agfByNo={agfByNo} agfSiraByNo={isAdmin ? agfSiraByNo : new Map()} />
 
         <div className="space-y-4 lg:sticky lg:top-4">
           {kupon ? (

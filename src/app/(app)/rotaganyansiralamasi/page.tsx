@@ -2,13 +2,12 @@ import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { getRaceDaysByDate, getKuponOnerileri, type KuponOnerisi } from "@/server/services/race.service";
+import { getRaceDaysByDate, getKuponOnerileri, hesaplaRaceTempoSenaryosu, parseRaceStyle, type KuponOnerisi } from "@/server/services/race.service";
 import { syncResultsForDate } from "@/server/services/result-sync";
 import { turkeyDateString } from "@/lib/tz";
-import PuanTablosu from "@/components/kosular/PuanTablosu";
+import SiralamaKarti from "@/components/kosular/SiralamaKarti";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { KuponBlock } from "@/components/home/TahminOnerileri";
 
 export const revalidate = 0;
 
@@ -62,6 +61,20 @@ export default async function RotaganyanSiralamasiPage({ searchParams }: PagePro
   const derinBaglantiRaceDay = params.hipodrom
     ? visibleRaceDays.find((rd) => rd.hippodrome.slug === params.hipodrom)
     : undefined;
+  const derinBaglantiRaceNo = params.kosu ? parseInt(params.kosu, 10) : undefined;
+
+  // Yarış Gidişatı rozeti (SiralamaKarti hero'su) — getRaceDaysByDate zaten her koşucunun
+  // ham raceStyle'ını seçiyor, hesaplaRaceTempoSenaryosu burada (getProgramData'nın AYNI
+  // deseniyle) çağrılır (bkz. race.service.ts'teki ilgili yorum).
+  const tempoByRaceId: Record<string, ReturnType<typeof hesaplaRaceTempoSenaryosu>> = {};
+  for (const rd of visibleRaceDays) {
+    for (const r of rd.races) {
+      tempoByRaceId[r.id] = hesaplaRaceTempoSenaryosu(
+        r.runners.map((ru) => ({ raceStyle: parseRaceStyle(ru.raceStyle) })),
+        r.distance
+      );
+    }
+  }
 
   return (
     <div className="mx-auto max-w-[1400px] px-3 py-4 space-y-4">
@@ -87,17 +100,13 @@ export default async function RotaganyanSiralamasiPage({ searchParams }: PagePro
                 {rd.hippodrome.name}
               </AccordionTrigger>
               <AccordionContent className="space-y-4">
-                <PuanTablosu raceDay={rd} isLoggedIn={!!session?.user} currentDate={currentDate} isAdmin={isAdmin} />
-                {(() => {
-                  const hipoKuponlari = kuponlar.filter((k) => k.hippodromeName.split(" — ")[0] === rd.hippodrome.name);
-                  return hipoKuponlari.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {hipoKuponlari.map((k) => (
-                        <KuponBlock key={k.hippodromeName} data={k} ikramiye={k.ikramiye} isAdmin={isAdmin} cityLabel="Kupon Önerisi" />
-                      ))}
-                    </div>
-                  ) : null;
-                })()}
+                <SiralamaKarti
+                  raceDay={rd}
+                  tempoByRaceId={tempoByRaceId}
+                  kuponlar={kuponlar}
+                  isAdmin={isAdmin}
+                  initialRaceNo={rd.id === derinBaglantiRaceDay?.id ? derinBaglantiRaceNo : undefined}
+                />
               </AccordionContent>
             </AccordionItem>
           ))}

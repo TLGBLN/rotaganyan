@@ -6,6 +6,7 @@ import { finishPos } from "@/lib/race-result";
 import { kararOku, puanYuzdesiMetni } from "@/lib/methodology/muhakeme-format";
 import { ekuriRengi } from "@/lib/ekuri-colors";
 import { siraliPickSatirlari } from "@/lib/methodology/pick-display-order";
+import { Badge } from "@/components/ui/badge";
 
 type Race = ProgramRaceDay["races"][number];
 type Pick = NonNullable<Race["prediction"]>["picks"][number];
@@ -83,12 +84,40 @@ export function Son5Yaris({ form, adet }: { form: FormInfo | undefined; adet: nu
   );
 }
 
+/** FORM sütunu — Son5Yaris'in AYNI verisinden (yeniden veri çekilmedi), tek bakışta
+ *  eğilim görmek için küçük bir çubuk grafik: 1.lik en uzun çubuk, geriye gidince kısalır. */
+function FormSparkline({ form }: { form: FormInfo | undefined }) {
+  const chars = (form?.recentForm ?? "").split("").filter((c) => /[\dK]/i.test(c)).slice(-5);
+  if (chars.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
+  return (
+    <div className="flex h-5 items-end gap-0.5">
+      {chars.map((c, i) => {
+        const pos = c === "K" ? 9 : parseInt(c, 10);
+        const h = c === "K" ? 15 : Math.max(15, 100 - (pos - 1) * 14);
+        return <span key={i} className={cn("w-1 rounded-sm", pos === 1 ? "bg-winner" : "bg-brand/60")} style={{ height: `${h}%` }} />;
+      })}
+    </div>
+  );
+}
+
+/** Rakip etiketi — referans ekrandaki "CİDDİ RAKİP"/"RAKİP" rozetleri. Modelin KENDİ
+ *  sırasına göre (AGF'ye göre DEĞİL — bu sayfanın kendi otoritesi model sıralamasıdır). */
+function rakipEtiketi(displayRank: number): { text: string; className: string } {
+  if (displayRank <= 3) return { text: "Ciddi Rakip", className: "border-brand/40 text-brand" };
+  return { text: "Rakip", className: "border-muted-foreground/30 text-muted-foreground" };
+}
+
 export default function SiralamaListesi({
   race,
   formByNo,
+  agfByNo,
+  agfSiraByNo,
 }: {
   race: Race;
   formByNo: Map<number, FormInfo>;
+  agfByNo: Map<number, number | null>;
+  /** Boş Map = AGF sırası gösterilmez (admin-dışı görünüm) — bkz. agf-sira.ts başlığı. */
+  agfSiraByNo: Map<number, number>;
 }) {
   const picks = race.prediction?.picks ?? [];
   if (picks.length === 0) return null;
@@ -104,11 +133,13 @@ export default function SiralamaListesi({
       {/* 2026-09-14 kullanıcı bulgusu: jokey/antrenör ve Son 5 Yarış isim altında ALT
           ALTA duruyordu, geniş masaüstü ekranda çok boş yatay alan bırakıyordu. sm+'ta
           artık kendi sütunları var (yan yana), dar mobilde eskisi gibi isim altında kalır. */}
-      <div className="hidden sm:grid grid-cols-[28px_1fr_170px_140px_70px] gap-2 px-4 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+      <div className="hidden sm:grid grid-cols-[28px_1fr_160px_60px_120px_50px_100px] gap-2 px-4 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
         <span>#</span>
         <span>At</span>
         <span>Jokey / Antrenör</span>
+        <span className="text-center">AGF</span>
         <span>Son 5 Koşu</span>
+        <span className="text-center">Form</span>
         <span className="text-center">Model</span>
       </div>
 
@@ -128,12 +159,16 @@ export default function SiralamaListesi({
           const textColor = isWinner ? "text-winner" : rankColor(displayRank);
 
           const jokeyAntrenor = [primary.runner?.jockey, primary.runner?.trainer].filter(Boolean).join(" · ");
+          const agf = primary.runner?.no != null ? agfByNo.get(primary.runner.no) : null;
+          const agfSira = primary.runner?.no != null ? agfSiraByNo.get(primary.runner.no) : undefined;
+          const etiket = rakipEtiketi(displayRank);
+          const modelPct = Math.max(0, Math.min(100, primary.scoreExact ?? primary.score ?? 0));
 
           return (
             <div
               key={rowIdx}
               className={cn(
-                "grid grid-cols-[24px_1fr_50px] items-center gap-2 px-3 py-1.5 sm:grid-cols-[28px_1fr_170px_140px_70px] sm:px-4 sm:py-2.5",
+                "grid grid-cols-[24px_1fr_50px] items-center gap-2 px-3 py-1.5 sm:grid-cols-[28px_1fr_160px_60px_120px_50px_100px] sm:px-4 sm:py-2.5",
                 displayRank === 1 && "bg-brand/10"
               )}
             >
@@ -171,6 +206,14 @@ export default function SiralamaListesi({
                       })()}
                     </span>
                   ))}
+                  {agfSira != null && (
+                    <span className="shrink-0 rounded px-1 text-[9px] font-semibold text-purple-600 dark:text-purple-400" title="AGF sırası">
+                      AGF {agfSira}.
+                    </span>
+                  )}
+                  <Badge variant="outline" className={cn("hidden shrink-0 text-[10px] font-semibold sm:inline-flex", etiket.className)}>
+                    {etiket.text}
+                  </Badge>
                 </div>
                 {/* Jokey/Antrenör + Son 5 Yarış: sm+'ta kendi sütunlarına taşındığı için
                     burada yalnız mobilde (<640px) isim altında, TEK satırda (yan yana,
@@ -190,14 +233,28 @@ export default function SiralamaListesi({
 
               {/* sm+: Jokey/Antrenör kendi sütununda */}
               <span className="hidden truncate text-xs text-muted-foreground sm:block">{jokeyAntrenor || "—"}</span>
+              {/* sm+: AGF kendi sütununda — ham yüzde (TJK'nın kamuya açık verisi,
+                  bkz. feedback_mutfagi_acma_ilkesi); SIRA rozeti değil, herkese açık. */}
+              <span className="hidden text-center text-xs font-semibold tabular-nums text-muted-foreground sm:block">
+                {agf != null ? `%${agf.toFixed(1)}` : "—"}
+              </span>
               {/* sm+: Son 5 Koşu kendi sütununda */}
               <span className="hidden sm:block">
                 <Son5Yaris form={formByNo.get(primary.runner?.no ?? -1)} adet={5} />
               </span>
-
-              <span className="text-center text-sm font-bold tabular-nums">
-                {modelMetin != null ? `%${modelMetin}` : "—"}
+              {/* sm+: Form (küçük eğilim çubuğu) kendi sütununda */}
+              <span className="hidden justify-center sm:flex">
+                <FormSparkline form={formByNo.get(primary.runner?.no ?? -1)} />
               </span>
+
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-sm font-bold tabular-nums">
+                  {modelMetin != null ? `%${modelMetin}` : "—"}
+                </span>
+                <div className="hidden h-1 w-full max-w-16 overflow-hidden rounded-full bg-muted sm:block">
+                  <div className="h-full rounded-full bg-brand" style={{ width: `${modelPct}%` }} />
+                </div>
+              </div>
             </div>
           );
         })}
