@@ -1,5 +1,6 @@
 "use client";
 
+import { Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ProgramRaceDay } from "@/server/services/race.service";
 import { finishPos } from "@/lib/race-result";
@@ -99,26 +100,14 @@ function FormSparkline({ form }: { form: FormInfo | undefined }) {
   );
 }
 
-/** Rakip etiketi — referans ekrandaki "CİDDİ RAKİP"/"RAKİP" rozetleri. Modelin KENDİ
- *  sırasına göre (AGF'ye göre DEĞİL — bu sayfanın kendi otoritesi model sıralamasıdır).
- *  Tema-bağımlı Badge varyantı YERİNE açık renkler — kart koyu zeminde her zaman OKUNAKLI
- *  kalsın diye (kullanıcı bulgusu: ilk sürümün renk uyumu zayıftı). */
-function rakipEtiketi(displayRank: number): { text: string; className: string } {
-  if (displayRank <= 3) return { text: "Ciddi Rakip", className: "bg-brand/15 text-brand border-brand/30" };
-  return { text: "Rakip", className: "bg-muted-foreground/10 text-muted-foreground border-transparent" };
-}
-
 export default function SiralamaListesi({
   race,
   formByNo,
   agfByNo,
-  agfSiraByNo,
 }: {
   race: Race;
   formByNo: Map<number, FormInfo>;
   agfByNo: Map<number, number | null>;
-  /** Boş Map = AGF sırası gösterilmez (admin-dışı görünüm) — bkz. agf-sira.ts başlığı. */
-  agfSiraByNo: Map<number, number>;
 }) {
   const picks = race.prediction?.picks ?? [];
   if (picks.length === 0) return null;
@@ -161,8 +150,6 @@ export default function SiralamaListesi({
 
           const jokeyAntrenor = [primary.runner?.jockey, primary.runner?.trainer].filter(Boolean).join(" · ");
           const agf = primary.runner?.no != null ? agfByNo.get(primary.runner.no) : null;
-          const agfSira = primary.runner?.no != null ? agfSiraByNo.get(primary.runner.no) : undefined;
-          const etiket = rakipEtiketi(displayRank);
           const modelPct = Math.max(0, Math.min(100, primary.scoreExact ?? primary.score ?? 0));
 
           return (
@@ -170,7 +157,9 @@ export default function SiralamaListesi({
               key={rowIdx}
               className={cn(
                 "grid grid-cols-[24px_1fr_50px] items-center gap-2 px-3 py-1.5 sm:grid-cols-[28px_1fr_160px_60px_120px_50px_100px] sm:px-4 sm:py-2.5",
-                displayRank === 1 && "bg-brand/10"
+                // 2026-10-19 kullanıcı talebi: "kazanan atlar daha belirginleştirilsin" —
+                // sıralama rozeti yerine GERÇEK sonuç (isWinner) satırı vurgular.
+                isWinner && "bg-winner/10"
               )}
             >
               <span
@@ -207,14 +196,13 @@ export default function SiralamaListesi({
                       })()}
                     </span>
                   ))}
-                  {agfSira != null && (
-                    <span className="shrink-0 rounded border border-muted-foreground/25 px-1 text-[9px] font-semibold text-muted-foreground" title="AGF sırası">
-                      AGF {agfSira}.
+                  {/* Gerçek kazanan — kullanıcı talebi: "kazanan atlar daha
+                      belirginleştirilsin" (AGF/rakip rozetleri yerine). */}
+                  {isWinner && (
+                    <span className="flex shrink-0 items-center gap-1 rounded-full bg-winner px-2 py-0.5 text-[10px] font-bold text-background">
+                      <Trophy className="h-3 w-3" /> Kazanan
                     </span>
                   )}
-                  <span className={cn("hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:inline-flex", etiket.className)}>
-                    {etiket.text}
-                  </span>
                 </div>
                 {/* Jokey/Antrenör + Son 5 Yarış: sm+'ta kendi sütunlarına taşındığı için
                     burada yalnız mobilde (<640px) isim altında, TEK satırda (yan yana,

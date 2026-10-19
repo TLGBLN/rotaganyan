@@ -4,10 +4,9 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ProgramRaceDay, KuponOnerisi } from "@/server/services/race.service";
 import type { TempoSenaryosu } from "@/lib/methodology/pace-analizi";
-import { Crown } from "lucide-react";
+import { Trophy } from "lucide-react";
 import { siraliPickler } from "@/lib/methodology/pick-display-order";
 import { puanYuzdesiMetni, piyasaFarkiPuani } from "@/lib/methodology/muhakeme-format";
-import { agfSiraMapOlustur } from "@/lib/agf-sira";
 import { surfaceLabel, breedLabel } from "@/lib/utils";
 import { KuponBlock } from "@/components/home/TahminOnerileri";
 import SiralamaListesi, { Son5Yaris } from "./SiralamaListesi";
@@ -74,16 +73,15 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
   const race = raceDay.races.find((r) => r.raceNo === activeRaceNo) ?? analyzed[0];
   const picks = race.prediction?.picks ?? [];
   const agfByNo = new Map(race.runners.map((r) => [r.no, r.agf]));
-  const agfSiraByNo = agfSiraMapOlustur(race.runners);
   const formByNo = new Map(race.runners.map((r) => [r.no, { recentForm: r.recentForm, recentFormSurfaces: r.recentFormSurfaces }]));
   const topPick = siraliPickler(picks)[0];
   const topModel = topPick ? topPick.scoreExact ?? topPick.score : null;
   const topAgf = topPick?.runner?.no != null ? agfByNo.get(topPick.runner.no) ?? null : null;
-  // AGF SIRASI (1./2./3. rozeti) agf-sira.ts'in KENDİ kuralıyla ADMIN'E ÖZELDİR ("piyasa
-  // bilgisini önceden bilmek avantaj sağlayabilir") — ham AGF YÜZDESİ (topAgf) zaten
-  // herkese açıktı, bu DEĞİŞMEDİ; yalnız SIRA rozeti (taçlı "1.") isAdmin'e bağlı kaldı.
-  const topAgfSira = isAdmin && topPick?.runner?.no != null ? agfSiraByNo.get(topPick.runner.no) ?? null : null;
   const fark = topModel != null ? piyasaFarkiPuani(topModel, topAgf) : null;
+  // 2026-10-19 kullanıcı talebi: "1. sıradaki at bu şekilde belirtilmesin, mütevazı
+  // görünüm istiyorum diğer atlar gibi" — taçlı AGF-sırası rozeti KALDIRILDI. Gerçek
+  // kazanan ise (sonuç varsa) TERSİNE belirginleştirilir (Trophy rozeti).
+  const topIsWinner = topPick?.runner?.no != null && (race.result?.winnerNos ?? []).includes(topPick.runner.no);
   const tempo = tempoByRaceId[race.id] ?? null;
 
   // Bu hipodromun bugünkü kuponu — birden fazla aday varsa (1./2. Altılı, 7'li Ganyan)
@@ -143,21 +141,24 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-foreground to-foreground/85 px-4 py-4 text-background shadow-sm sm:px-5">
           <div className="relative flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-2.5">
-              {/* AGF sırası — referans ekrandaki taçlı "1" rozeti, piyasanın favorisini
-                  ayırt eder (model sırasından BAĞIMSIZ bir bilgi — ikisi FARKLI olabilir,
-                  bu yüzden ikisi de ayrı ayrı gösterilir). */}
-              {topAgfSira != null && (
-                <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-brand text-brand-foreground">
-                  {topAgfSira === 1 && <Crown className="h-3.5 w-3.5 fill-current" />}
-                  <span className="text-base font-extrabold leading-none">{topAgfSira}</span>
-                </span>
-              )}
+              {/* Model sırası — diğer atlarla TUTARLI, mütevazu bir rozet (kullanıcı
+                  talebi: "1. sıradaki at diğer atlar gibi, mütevazı görünsün"). */}
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-background/20 text-sm font-bold">
+                1.
+              </span>
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background/20 text-lg font-extrabold">
                 {topPick.runner?.no ?? "—"}
               </span>
               <div className="min-w-0">
-                <div className="flex flex-wrap items-baseline gap-x-2">
+                <div className="flex flex-wrap items-center gap-x-2">
                   <span className="truncate text-lg font-bold sm:text-xl">{topPick.runner?.name ?? topPick.runnerLabel ?? "—"}</span>
+                  {/* Gerçek kazanan (sonuç varsa) — AGF/model favorisinden FARKLI bir
+                      bilgi, kullanıcı talebiyle BELİRGİNLEŞTİRİLDİ. */}
+                  {topIsWinner && (
+                    <span className="flex shrink-0 items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold text-brand-foreground">
+                      <Trophy className="h-3 w-3" /> Kazanan
+                    </span>
+                  )}
                 </div>
                 {topAgf != null && (
                   <div className="text-xs opacity-75">AGF %{topAgf.toFixed(1)} — piyasa {fark != null && fark > 0 ? "henüz fiyatlamıyor" : "farklı görüyor"}</div>
@@ -200,7 +201,7 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
-        <SiralamaListesi race={race} formByNo={formByNo} agfByNo={agfByNo} agfSiraByNo={isAdmin ? agfSiraByNo : new Map()} />
+        <SiralamaListesi race={race} formByNo={formByNo} agfByNo={agfByNo} />
 
         <div className="space-y-4 lg:sticky lg:top-4">
           {kupon ? (
