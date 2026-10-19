@@ -140,12 +140,7 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
           Artık sitenin KENDİ marka rengine (brand, kehribar) doğru gerçek bir renk
           geçişi var — jenerik mor/mavi gradyan değil. */}
       {topPick && (
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-foreground via-foreground to-brand/25 px-4 py-4 text-background shadow-sm sm:px-5">
-          {/* Marka filigranı — mevcut altın at ikonu, dekoratif/düşük opaklık (yeni bir
-              illüstrasyon UYDURULMADI, sitenin kendi varlığı tekrar kullanıldı). */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/horse-icon-gold.png" alt="" aria-hidden="true" className="pointer-events-none absolute -right-4 -bottom-6 h-28 w-28 opacity-[0.12] sm:h-36 sm:w-36" />
-
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-foreground to-foreground/85 px-4 py-4 text-background shadow-sm sm:px-5">
           <div className="relative flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-2.5">
               {/* AGF sırası — referans ekrandaki taçlı "1" rozeti, piyasanın favorisini

@@ -6,7 +6,6 @@ import { finishPos } from "@/lib/race-result";
 import { kararOku, puanYuzdesiMetni } from "@/lib/methodology/muhakeme-format";
 import { ekuriRengi } from "@/lib/ekuri-colors";
 import { siraliPickSatirlari } from "@/lib/methodology/pick-display-order";
-import { Badge } from "@/components/ui/badge";
 
 type Race = ProgramRaceDay["races"][number];
 type Pick = NonNullable<Race["prediction"]>["picks"][number];
@@ -101,10 +100,12 @@ function FormSparkline({ form }: { form: FormInfo | undefined }) {
 }
 
 /** Rakip etiketi — referans ekrandaki "CİDDİ RAKİP"/"RAKİP" rozetleri. Modelin KENDİ
- *  sırasına göre (AGF'ye göre DEĞİL — bu sayfanın kendi otoritesi model sıralamasıdır). */
+ *  sırasına göre (AGF'ye göre DEĞİL — bu sayfanın kendi otoritesi model sıralamasıdır).
+ *  Tema-bağımlı Badge varyantı YERİNE açık renkler — kart koyu zeminde her zaman OKUNAKLI
+ *  kalsın diye (kullanıcı bulgusu: ilk sürümün renk uyumu zayıftı). */
 function rakipEtiketi(displayRank: number): { text: string; className: string } {
-  if (displayRank <= 3) return { text: "Ciddi Rakip", className: "border-brand/40 text-brand" };
-  return { text: "Rakip", className: "border-muted-foreground/30 text-muted-foreground" };
+  if (displayRank <= 3) return { text: "Ciddi Rakip", className: "bg-brand/15 text-brand border-brand/30" };
+  return { text: "Rakip", className: "bg-muted-foreground/10 text-muted-foreground border-transparent" };
 }
 
 export default function SiralamaListesi({
@@ -207,13 +208,13 @@ export default function SiralamaListesi({
                     </span>
                   ))}
                   {agfSira != null && (
-                    <span className="shrink-0 rounded px-1 text-[9px] font-semibold text-purple-600 dark:text-purple-400" title="AGF sırası">
+                    <span className="shrink-0 rounded border border-muted-foreground/25 px-1 text-[9px] font-semibold text-muted-foreground" title="AGF sırası">
                       AGF {agfSira}.
                     </span>
                   )}
-                  <Badge variant="outline" className={cn("hidden shrink-0 text-[10px] font-semibold sm:inline-flex", etiket.className)}>
+                  <span className={cn("hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:inline-flex", etiket.className)}>
                     {etiket.text}
-                  </Badge>
+                  </span>
                 </div>
                 {/* Jokey/Antrenör + Son 5 Yarış: sm+'ta kendi sütunlarına taşındığı için
                     burada yalnız mobilde (<640px) isim altında, TEK satırda (yan yana,
