@@ -167,7 +167,7 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
       <div className="[container-type:inline-size]">
       <div className="isolate relative flex flex-col overflow-hidden rounded-lg border bg-card">
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden select-none">
-          <img src="/rotaganyan-filigran-logo.png" alt="" className="absolute left-[24cqw] top-[13cqw] w-[51.5cqw] h-auto opacity-[0.08]" />
+          <img src="/rotaganyan-filigran-logo.png" alt="" className="absolute left-[24cqw] top-[7cqw] w-[51.5cqw] h-auto opacity-[0.08]" />
         </div>
         <div className="flex items-center justify-between gap-2 border-b bg-muted/30 px-4 py-2.5">
           {/* v6.113 — kullanıcı talebi 2026-08-13: seçilecek tek kademe varsa (7'li Ganyan'da
