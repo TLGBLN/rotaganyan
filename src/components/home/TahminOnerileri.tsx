@@ -167,8 +167,8 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
       <div className="[container-type:inline-size]">
       <div className="isolate relative flex flex-col overflow-hidden rounded-lg border bg-card">
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden select-none">
-          <img src="/horse-icon-gold.png" alt="" className="absolute left-[13cqw] top-[18.5cqw] w-[70cqw] h-auto opacity-10" />
-          <span className="absolute inset-x-0 top-[43.5cqw] whitespace-nowrap text-center font-black leading-none text-[12cqw] opacity-[0.06]">
+          <img src="/horse-icon-gold.png" alt="" className="absolute left-[28cqw] top-[22cqw] w-[45cqw] h-auto opacity-10" />
+          <span className="absolute inset-x-0 top-[40cqw] whitespace-nowrap text-center font-black leading-none text-[8cqw] opacity-[0.06]">
             <span className="text-foreground">ROTA</span>
             <span className="ml-[0.18em] text-[#DF9D00]">GANYAN</span>
           </span>
