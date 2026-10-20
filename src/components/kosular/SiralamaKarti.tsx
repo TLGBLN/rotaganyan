@@ -93,6 +93,17 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
     null;
   return (
     <div className="space-y-4">
+      {/* Marka rozeti — eski PuanTablosu.tsx'in (bu sayfanın önceki görünümü) at-ikonu +
+          ROTA/GANYAN logosu, SiralamaKarti'ye geçişte kaybolmuştu (kullanıcı bulgusu,
+          2026-10-20) — geri eklendi, OG paylaşım kartıyla (api/og/kupon) AYNI varlık. */}
+      <div className="flex items-center gap-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/horse-icon-gold.png" alt="" width={22} height={22} style={{ objectFit: "contain" }} />
+        <span className="text-xs font-extrabold tracking-wide">
+          <span>ROTA</span><span className="text-brand">GANYAN</span>
+        </span>
+      </div>
+
       {/* Koşu sekmesi şeridi */}
       <div className="flex gap-1.5 overflow-x-auto pb-1">
         {raceDay.races.map((r) => (
