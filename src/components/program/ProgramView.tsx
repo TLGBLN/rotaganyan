@@ -439,7 +439,9 @@ const AP_HIT = "#2ecc71";
 const AP_MID = "#e0a72e";
 const AP_FLOOR = "#4a6fa5";
 function apBandRenk(rank: number, isWinner: boolean): string {
-  if (isWinner || rank === 1) return AP_GOLD;
+  // 2026-10-21 kullanıcı düzeltmesi: "yanlış anladın sadece kazanan gösterilsin" — altın
+  // renk ARTIK yalnız GERÇEK kazanana ait, modelin 1. sırası otomatik altın OLMAZ.
+  if (isWinner) return AP_GOLD;
   if (rank <= 3) return AP_HIT;
   if (rank <= 6) return AP_MID;
   return AP_FLOOR;
@@ -646,10 +648,10 @@ export function AnalysisPanel({
               const winnerPick = rowPicks.find((p) => p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no));
               const isWinner = winnerPick != null;
               const renk = apBandRenk(displayRank, isWinner);
-              // 2026-10-21 kullanıcı talebi: "kazananlar DAKAPO gibi gösterilsin" — altın
-              // rozet/satır arka planı artık yalnız modelin 1. sırası değil, GERÇEK yarış
-              // kazananı için de uygulanıyor (ikisi farklı atsa bile ikisi de altın olur).
-              const isGoldRow = displayRank === 1 || isWinner;
+              // 2026-10-21 kullanıcı düzeltmesi: "yanlış anladın sadece kazanan gösterilsin"
+              // — altın rozet/satır arka planı YALNIZ gerçek yarış kazananına ait, modelin
+              // 1. sırası (displayRank===1) artık ayrıca altın OLMAZ.
+              const isGoldRow = isWinner;
               const noText = rowPicks.map((p) => pickDisplay(p).no).join("-");
               const nameText = rowPicks.map((p) => pickDisplay(p).name).join(" / ");
               const agfRanks = rowPicks
@@ -781,8 +783,8 @@ export function AnalysisPanel({
           const winnerPick = rowPicks.find((p) => p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no));
           const isWinner = winnerPick != null;
           const renk = apBandRenk(displayRank, isWinner);
-          // bkz. masaüstü tablodaki aynı not — kazanan at da altın rozet/arka plan alır.
-          const isGoldRow = displayRank === 1 || isWinner;
+          // bkz. masaüstü tablodaki aynı not — altın rozet/arka plan YALNIZ gerçek kazanana ait.
+          const isGoldRow = isWinner;
           const noText = rowPicks.map((p) => pickDisplay(p).no).join("-");
           const nameText = rowPicks.map((p) => pickDisplay(p).name).join(" / ");
           const agfRanks = rowPicks
