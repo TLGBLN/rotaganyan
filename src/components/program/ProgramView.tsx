@@ -432,7 +432,7 @@ function PanelKilitGate({
 // da davranış mantığı değişmedi. Paylaşılan `rankStyle` (başka panellerde de kullanılıyor)
 // kasıtlı olarak DOKUNULMADI — bu paneле özel, yerel bir renk fonksiyonu eklendi.
 const AP_GOLD = "#DF9D00";
-const AP_BG_GRADIENT = "linear-gradient(165deg, #0a1524 0%, #0d1b2e 55%, #050b16 100%)";
+const AP_BG_GRADIENT = "#000712";
 const AP_INK = "#eef2f7";
 const AP_INK_DIM = "#8592a6";
 const AP_HIT = "#2ecc71";
