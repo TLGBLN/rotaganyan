@@ -445,11 +445,18 @@ function apBandRenk(rank: number, isWinner: boolean): string {
   return AP_FLOOR;
 }
 
-function AnalysisPanel({
-  picks, runners, winnerNos, ganyan, isLoggedIn, isAdmin, isVerified, userEmail, raceNo, hippodromeName, raceId,
+// 2026-10-21 — SiralamaKarti.tsx (Rotaganyan Sıralama Tablosu) BU paneli tekrar kullanıyor,
+// ama o sayfanın sorgusu ProgramRunner'ın TÜM alanlarını taşımıyor (jokey/antrenör/kilo gibi
+// bu panelde HİÇ kullanılmayan alanlar). AnalysisPanel GERÇEKTE yalnız bu 5 alanı okuyor —
+// dar bir tip, iki sayfanın da KENDİ sorgusuna uygun minimal veriyle çağırabilmesi için
+// (ProgramRunner yapısal olarak zaten bunu karşılıyor, mevcut /program kullanımı DEĞİŞMEDİ).
+export type AnalysisPanelRunner = { no: number; name: string; scratched: boolean; ekuriGroup: number | null; agf: number | null };
+
+export function AnalysisPanel({
+  picks, runners, winnerNos, ganyan, isLoggedIn, isAdmin, isVerified, userEmail, raceNo, hippodromeName, raceId, autoScroll = true,
 }: {
   picks: ProgramPick[];
-  runners: ProgramRunner[];
+  runners: AnalysisPanelRunner[];
   winnerNos?: number[] | null;
   ganyan?: number | null;
   isLoggedIn: boolean;
@@ -459,6 +466,10 @@ function AnalysisPanel({
   raceNo: number;
   hippodromeName?: string;
   raceId: string;
+  /** 2026-10-21 — Rotaganyan Sıralama Tablosu'nda (SiralamaKarti.tsx) bu panel buton-tetiklemeli
+   *  değil, sayfanın HER ZAMAN görünen ana içeriği — /program'daki "tıklanınca aç + otomatik
+   *  yukarı kaydır" davranışı burada YANLIŞ (sayfa her açıldığında istenmeden kaydırırdı). */
+  autoScroll?: boolean;
 }) {
   const t = useTranslations("programToolbar");
   const ref = useRef<HTMLDivElement>(null);
@@ -550,7 +561,7 @@ function AnalysisPanel({
   }
 
   useEffect(() => {
-    if (!ref.current) return;
+    if (!autoScroll || !ref.current) return;
     const el = ref.current;
     const start = window.scrollY;
     const target = start + el.getBoundingClientRect().top - 80;
@@ -565,7 +576,8 @@ function AnalysisPanel({
       if (elapsed < 1) requestAnimationFrame(step);
     }
     requestAnimationFrame(step);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoScroll]);
 
   if (!isLoggedIn) {
     return (

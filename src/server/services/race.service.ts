@@ -7,8 +7,8 @@ import { getSireStatPoolsForCombos } from "@/server/actions/sire-stat.actions";
 import { getDamStatPoolsForCombos } from "@/server/actions/dam-stat.actions";
 import { getGecCikisOzetleriForRace } from "@/server/actions/gec-cikis.actions";
 import { breedToIrk, surfaceToPist, mesafeBucket, havuzAnahtari, eslestirSireStatOzetleri, eslestirDamStatOzetleri } from "@/lib/sire-stat-match";
-import { fetchTodaysAltiliResults } from "./ingest/tjk-altili.adapter";
-import { findIkramiyeForHippodrome } from "@/lib/altili-match";
+import { fetchTodaysAltiliResults, fetchTodaysYediliGanyanSonuclari } from "./ingest/tjk-altili.adapter";
+import { findIkramiyeForHippodrome, findYediliIkramiyeForHippodrome } from "@/lib/altili-match";
 import { hesaplaYarisGidisati, type AtTempoProfili, type TekYarisStil, type TempoSenaryosu } from "@/lib/methodology/pace-analizi";
 
 /** Runner.raceStyle JSON alanından ("style" + "percent" + "veri" + "dagilim") ekranda
@@ -84,7 +84,11 @@ export type ProgramRaceDay = Prisma.RaceDayGetPayload<{
         // ile aynı desen (bkz. getProgramData), yalnız bu sayfanın sayfasında (page.tsx) çağrılır.
         // recentForm/recentFormSurfaces (2026-09-14 eklendi): Son 5 Yarış rozeti — TJK'nın
         // kamuya açık geçmiş sonuç verisi, bkz. feedback_mutfagi_acma_ilkesi.
-        runners: { where: { scratched: false }; select: { no: true; agf: true; raceStyle: true; recentForm: true; recentFormSurfaces: true } };
+        // name/ekuriGroup (2026-10-21 eklendi): AnalysisPanel'in (ProgramView.tsx, bu dosyadaki
+        // SiralamaKarti.tsx'te YENİDEN KULLANILIYOR) kalan-atlar ("Geniş" satırları) ve eküri
+        // birleştirme mantığı için gerekli — picks.runner zaten bu alanları taşıyordu, runners'a
+        // da eklendi (yeni bir veri kaynağı DEĞİL, aynı tablo, ek sütun).
+        runners: { where: { scratched: false }; select: { no: true; name: true; agf: true; raceStyle: true; recentForm: true; recentFormSurfaces: true; ekuriGroup: true } };
       };
     };
   };
@@ -753,9 +757,14 @@ export async function getGecmisKazananKuponlar(limit = 20): Promise<KazananKupon
   // her sayfa yüklemesinde tekrar TJK'ya gidilmesin.
   const bugunNeedsIkramiye = results.filter((r) => r._needsIkramiye && r.date.toISOString().slice(0, 10) === turkeyDateString());
   if (bugunNeedsIkramiye.length > 0) {
-    const altiliResults = await fetchTodaysAltiliResults().catch(() => []);
+    const [altiliResults, yediliResults] = await Promise.all([
+      fetchTodaysAltiliResults().catch(() => []),
+      fetchTodaysYediliGanyanSonuclari().catch(() => []),
+    ]);
     for (const r of bugunNeedsIkramiye) {
-      const ikramiye = findIkramiyeForHippodrome(r.hippodromeName, altiliResults);
+      // 2026-10-17 düzeltme: "7'li Ganyan" etiketli kuponlar Altılı eşleşmesinde HİÇ
+      // bulunamıyordu (bkz. findYediliIkramiyeForHippodrome yorumu) — şimdi AYRICA denenir.
+      const ikramiye = findIkramiyeForHippodrome(r.hippodromeName, altiliResults) ?? findYediliIkramiyeForHippodrome(r.hippodromeName, yediliResults);
       if (ikramiye) {
         r.ikramiye = ikramiye;
         await db.homeKupon.update({ where: { id: r.id }, data: { ikramiye } }).catch(() => {});
