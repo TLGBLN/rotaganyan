@@ -1,0 +1,60 @@
+﻿=== ROTAGANYAN V1 SINYAL HAZIRLIK RAPORU ===
+Tarih: 2026-10-17 21:44:58
+Beklenen sinyal sayisi: 20
+
+=== 27 YARISLIK ONBELLEK ===
+Bulunan sinyal vektoru: 292
+
+=== SINYAL KAPSAMA ===
+FORM_01          249/292  %85,3  unique=247  OK min=0 max=1
+FORM_02          178/292  %61    unique=176  KISMI_KAPSAMA min=-0.819444444444445 max=0.743055555555555
+FORM_03          251/292  %86    unique=95   OK min=1.79175946922805 max=6.13772705408623
+HIZ_01           251/292  %86    unique=248  OK min=-22.6884224818372 max=7.51362873497382
+SINIF_01         240/292  %82,2  unique=240  OK min=-4.66885112697573 max=2.30592282389525
+PMZ_01           140/292  %47,9  unique=140  DUSUK_KAPSAMA min=-2.49043752478058 max=2.68862829319255
+PMZ_02           249/292  %85,3  unique=232  OK min=-0.933180343944359 max=0.924547946555201
+FORM_x_ZEMIN     216/292  %74    unique=211  OK min=0 max=1
+TEMPO_01         267/292  %91,4  unique=264  OK min=0.0191236254725086 max=0.788048911109159
+TEMPO_02         284/292  %97,3  unique=276  OK min=0.629249596303814 max=5.49663271908543
+TEMPO_03         267/292  %91,4  unique=266  OK min=0.000879164314928809 max=0.40932154568028
+TEMPO_04         267/292  %91,4  unique=266  OK min=0.0353618414550756 max=4.1494244467991
+JOKEY_01         292/292  %100   unique=292  OK min=-0.0858965595807701 max=0.151618945570558
+JOKEY_02         292/292  %100   unique=274  OK min=-0.086414627039627 max=0.155934109869778
+JOKEY_03           1/292  %0,3   unique=1    KRITIK_ORNEKLEM min=0.0346561290904201 max=0.0346561290904201
+JOKEY_04         267/292  %91,4  unique=266  OK min=-0.0920164030458148 max=0.180780308343585
+KILO_01          292/292  %100   unique=42   OK min=-7 max=9
+KILO_02          251/292  %86    unique=234  OK min=-6 max=7.30389205158063
+KILO_03          292/292  %100   unique=96   OK min=-9500 max=13775
+KILO_04          292/292  %100   unique=33   OK min=-7 max=9
+
+=== SINYAL CAKISMA TARAMASI ===
+KILO_01 x KILO_03 : r=0.982 n=292
+FORM_01 x FORM_03 : r=-0.102 n=249
+JOKEY_01 x JOKEY_02 : r=0.535 n=292
+TEMPO_01 x TEMPO_03 : r=0.801 n=267
+PMZ_01 x FORM_x_ZEMIN : r=-0.042 n=140
+
+=== PILOT MODEL BUTUNLUGU ===
+SHA256: D9FD3985B94DB69EDADA367E4B15FD57498F1659211F942C5E29A1E8F7114EAB
+Eski kabul edilen pilot ile ayni: True
+
+=== PIST_DURUM_01 ===
+Parser dosyasi: True
+Test dosyasi: True
+src/lib/motor-v1/engine/training.ts : sinyal kodu referansi=False
+src/lib/motor-v1/engine/feature-vector.ts : sinyal kodu referansi=False
+NOT: Kod referansi tek basina calisan entegrasyonu kanitlamaz.
+
+=== AYLIK VERI HAZIRLAMA ===
+Tamamlanan aylik ornek: 10
+Islem basariyla tamamlandi: True
+V1_PROBE_RACE {"month":"2026-08","horses":6,"elapsedMs":37832,"coverage":{"FORM_01":6,"FORM_02":5,"HIZ_01":6,"PMZ_01":4,"JOKEY_03":0,"TEMPO_01":6}}
+V1_PROBE_RACE {"month":"2026-09","horses":8,"elapsedMs":23430,"coverage":{"FORM_01":8,"FORM_02":4,"HIZ_01":8,"PMZ_01":5,"JOKEY_03":0,"TEMPO_01":8}}
+V1_PROBE_RACE {"month":"2026-10","horses":11,"elapsedMs":27451,"coverage":{"FORM_01":7,"FORM_02":3,"HIZ_01":7,"PMZ_01":6,"JOKEY_03":0,"TEMPO_01":9}}
+
+=== DEGERLENDIRME NOTLARI ===
+Kapsama basarili tahmin anlamina gelmez.
+Korelasyon sinyalin gereksiz oldugunu tek basina kanitlamaz.
+PIST sinyali icin yaris oncesi veri zamani dogrulanmali.
+JOKEY_03, PMZ_01, KILO_03 ve JOKEY_02 ayri incelenmeli.
+Genis OOS ve ablasyon testleri henuz bu raporun parcasi degil.

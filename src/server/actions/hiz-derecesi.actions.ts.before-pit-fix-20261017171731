@@ -1,0 +1,138 @@
+"use server";
+
+import { db } from "@/lib/db";
+import { breedToIrk } from "@/lib/sire-stat-match";
+import { hizPaceIndexKur, hizDerecesiHesaplaOrtak, type HizGecmisSatir, type PaceIndex } from "@/lib/methodology/hiz-derecesi-hesapla";
+
+/**
+ * 2026-08-21 kullanıcı talebi — hız derecesi. TJK "At Koşu Bilgileri"ndeki "süre" alanı
+ * AT-BAZLI (kendi bitiriş süresi, "1.16.30" formatı). Popülasyon (irk|pist|mesafe kovası)
+ * ortalama tempo'suna göre atın göreli hızı — B=200 bootstrap'ta HER İKİ segmentte de
+ * güçlü anlamlı çıktı (düşük-şart +0.58, diğer +0.26 — modelin en büyük katsayılarından),
+ * VIF=1.02-1.10 (hiçbir sinyalle çakışmıyor). Yalnız son 365 GÜN içindeki koşular "güncel
+ * form" sayılır — uzun aradan (sakatlık/mola) dönen bir atın yıllar önceki "en iyi dönemi"
+ * güncelmiş gibi kullanılmasın diye (bkz. v5-engine.ts başlık notu).
+ *
+ * 2026-08-31 düzeltmesi (Opus bulgusu): bu dosyadaki hesaplama, eğitimin
+ * (arac-model-veri-olustur.mts) kullandığı mantıktan TAMAMEN FARKLIYDI — burada yalnız
+ * BUGÜNKÜ kovayla (irk|pist|mesafe) eşleşen geçmiş koşular sayılıp hepsi BUGÜNKÜ
+ * popülasyon ortalamasına vuruluyordu; eğitim ise atın son 3 koşusunun HER BİRİNİ KENDİ
+ * kovasına ve KENDİ tarihine göre kıyaslıyordu. Sonuç: canlı atların %43.8'i sıfır
+ * dönerken eğitimde yalnız %8.2'si sıfırdı, ortalama mutlak fark ~2.86 puan (~0.8 SD) —
+ * modelin en büyük katsayılarından birinin canlıda neredeyse rastgele bir girdiyle
+ * çalıştığı anlamına geliyordu. Artık hesaplama çekirdeği (hiz-derecesi-hesapla.ts)
+ * eğitimle BİREBİR PAYLAŞILIYOR — katsayı DEĞİŞMEDİ (retrain yapılmadı), yalnız canlı
+ * girdi artık katsayının fit edildiği dağılımla eşleşiyor.
+ */
+
+type GecmisSatir = HizGecmisSatir;
+
+// 2026-08-21 performans notu: HorseRaceHistoryCache'in TAMAMINI (~4000 at, büyük JSON
+// blokları) her "Analiz Et" isteğinde yeniden çekmek ~10 saniye sürüyordu — canlı analiz
+// için kabul edilemez. Popülasyon ortalamaları gün içinde neredeyse hiç değişmediği için
+// modül-seviyesi 6 saatlik TTL'li bellek-içi önbellek: aynı sunucu süreci (Vercel warm
+// instance) içindeki tekrar eden istekler artık anında dönüyor, yalnız ilk istek/TTL
+// dolduğunda tekrar 10sn'lik tam çekim gerekiyor.
+const ONBELLEK_TTL_MS = 6 * 60 * 60 * 1000;
+let onbellekCache: { gecmis: Map<number, GecmisSatir[]>; irk: Map<number, string>; paceIndex: PaceIndex; zaman: number } | null = null;
+
+async function loadHizOnbellekRaw(): Promise<{ gecmis: Map<number, GecmisSatir[]>; irk: Map<number, string>; paceIndex: PaceIndex }> {
+  if (onbellekCache && Date.now() - onbellekCache.zaman < ONBELLEK_TTL_MS) return onbellekCache;
+  const [tumOnbellek, atIrkKayitlari] = await Promise.all([
+    db.horseRaceHistoryCache.findMany({ select: { tjkAtId: true, rowsJson: true } }),
+    db.runner.findMany({
+      where: { scratched: false, tjkAtId: { not: null } },
+      select: { tjkAtId: true, race: { select: { breed: true } } },
+      distinct: ["tjkAtId"],
+    }),
+  ]);
+  const gecmis = new Map(tumOnbellek.map((g) => [g.tjkAtId, g.rowsJson as unknown as GecmisSatir[]]));
+  const irk = new Map(atIrkKayitlari.map((r) => [r.tjkAtId!, breedToIrk(r.race.breed)]));
+  const paceIndex = hizPaceIndexKur(gecmis, irk);
+  onbellekCache = { gecmis, irk, paceIndex, zaman: Date.now() };
+  return onbellekCache;
+}
+
+
+let hizOnbellekPending:
+  ReturnType<typeof loadHizOnbellekRaw> | null = null;
+
+export async function tumOnbellegiGetir():
+  ReturnType<typeof loadHizOnbellekRaw> {
+
+  // Alti saatlik mevcut onbellek davranisi korunur.
+  if (
+    onbellekCache &&
+    Date.now() - onbellekCache.zaman < ONBELLEK_TTL_MS
+  ) {
+    return onbellekCache;
+  }
+
+  // Ilk yukleme devam ediyorsa ayni Promise paylasilir.
+  if (hizOnbellekPending) {
+    return hizOnbellekPending;
+  }
+
+  const work = loadHizOnbellekRaw();
+  hizOnbellekPending = work;
+
+  try {
+    return await work;
+  } finally {
+    // Basarili veya hatali yukleme sonrasi kilidi kaldir.
+    if (hizOnbellekPending === work) {
+      hizOnbellekPending = null;
+    }
+  }
+}
+
+/**
+ * Bugünkü sahadaki atların hızDerecesini (%) döner — runnerNo -> değer. Popülasyon
+ * indeksi HorseRaceHistoryCache'in TAMAMINDAN (küçük tablo, ~4000 at) canlı kurulur —
+ * SireStatOwn gibi ayrı bir önbellek tablosu/cron GEREKMEZ.
+ */
+export async function getHizDerecesiForRace(
+  raceId: string
+): Promise<Map<number, number>> {
+  const race = await db.race.findUnique({
+    where: { id: raceId },
+    select: {
+      breed: true,
+      raceDay: { select: { date: true } },
+      runners: { where: { scratched: false }, select: { no: true, tjkAtId: true } },
+    },
+  });
+  if (!race) return new Map();
+
+  const irk = breedToIrk(race.breed);
+  const cutoff = race.raceDay.date;
+  const { gecmis: gecmisByTjkAtId, paceIndex } = await tumOnbellegiGetir();
+
+  const sonuc = new Map<number, number>();
+  for (const r of race.runners) {
+    if (r.tjkAtId == null) { sonuc.set(r.no, 0); continue; }
+    const gecmis = gecmisByTjkAtId.get(r.tjkAtId) ?? [];
+    sonuc.set(r.no, hizDerecesiHesaplaOrtak(gecmis, irk, cutoff, paceIndex));
+  }
+  return sonuc;
+}
+
+/**
+ * FAZ 2A (entegrasyon, v546-fix'ten taşındı, 2026-10-07 V5.46.1) — getHizDerecesiForRace
+ * ile AYNI girdi/koşulları kullanarak yalnız "gözlemli mi" (observed) bayrağını döner:
+ * tjkAtId yok VEYA popülasyon geçmişi boş ise false — V5.46.1'in missing≠0 sözleşmesi
+ * için. getHizDerecesiForRace'in kendisi DEĞİŞTİRİLMEDİ.
+ */
+export async function getHizDerecesiGozlemliForRace(raceId: string): Promise<Map<number, boolean>> {
+  const race = await db.race.findUnique({
+    where: { id: raceId },
+    select: { runners: { where: { scratched: false }, select: { no: true, tjkAtId: true } } },
+  });
+  if (!race) return new Map();
+  const { gecmis: gecmisByTjkAtId } = await tumOnbellegiGetir();
+  const sonuc = new Map<number, boolean>();
+  for (const r of race.runners) {
+    sonuc.set(r.no, r.tjkAtId != null && (gecmisByTjkAtId.get(r.tjkAtId)?.length ?? 0) > 0);
+  }
+  return sonuc;
+}

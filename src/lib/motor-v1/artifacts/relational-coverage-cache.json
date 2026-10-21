@@ -1,0 +1,18 @@
+{
+  "sampleSize": 24,
+  "kohortSize": 452,
+  "nRacesProcessed": 24,
+  "counters": {
+    "nRunners": 234,
+    "genSireObs": 230,
+    "genDamObs": 196,
+    "genDamSireObs": 227,
+    "genInteractionObs": 121,
+    "jokeyFormTempoObs": 128,
+    "formGalopDinlenmeObs": 193,
+    "idmanObs": 201,
+    "jokeyTrendObs": 200,
+    "kulvarObs": 234,
+    "tempoStilKulvarObs": 219
+  }
+}

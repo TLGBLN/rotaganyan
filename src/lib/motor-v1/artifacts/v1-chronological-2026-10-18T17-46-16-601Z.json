@@ -1,0 +1,21 @@
+{
+  "status": "PROVISIONAL_RESEARCH",
+  "trainedOn": "2026-01 to 2026-06",
+  "validatedOn": "2026-07 to 2026-08",
+  "finalHoldout": "2026-09 to 2026-10-17",
+  "trainingRaces": 120,
+  "validationRaces": 30,
+  "model": {
+    "top1": 0.13333333333333333,
+    "logLoss": 2.309431645145162
+  },
+  "uniformBaseline": {
+    "top1": 0.12434463684463684,
+    "logLoss": 2.158588754337914
+  },
+  "notes": [
+    "Not production-ready",
+    "Point-in-time source audit incomplete",
+    "No final holdout used"
+  ]
+}

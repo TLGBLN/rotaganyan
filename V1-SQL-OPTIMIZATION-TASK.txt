@@ -1,0 +1,44 @@
+ROTAGANYAN v1.0 - SQL PERFORMANCE OPTIMIZATION
+
+Worktree: C:\tmp\rotaganyan-v1
+
+MEASURED BASELINE:
+- Control A: 65.16 seconds
+- 167 Prisma SQL queries
+- Runner id IN: 43
+- Runner raceId: 31
+- Race relation queries: 40
+- Race hippodrome joins: 15
+- TypeScript: PASS
+- Vitest: 164/164 PASS
+
+TASK:
+1. Find the actual source functions generating repeated SQL.
+2. Optimize the largest bottlenecks using batching,
+   request-scoped caching or safe query reuse.
+3. Preserve all FORM/HIZ/SINIF/PMZ/TEMPO/JOKEY/KILO math.
+4. Preserve point-in-time cutoff semantics.
+5. Preserve JOKEY_04 three-style-group classification.
+6. Do not change coefficients or use AGF.
+7. Capture baseline raw feature vectors before edits.
+8. Compare raw feature values before/after optimization.
+9. Run npx tsc --noEmit and npx vitest run.
+10. Re-run Control A and measure SQL count and duration.
+
+IMPORTANT:
+- Modify only this worktree.
+- No production changes.
+- No commit, push or deploy.
+- Do not silently accept feature parity differences.
+- If parity cannot be established, explicitly report NOT VERIFIED.
+- Do not perform destructive database operations.
+
+FINAL REPORT:
+- SQL before/after
+- Runtime before/after
+- Feature parity
+- Tests
+- Changed files
+- Remaining bottlenecks
+
+Implement directly. Avoid unnecessary planning or new phases.

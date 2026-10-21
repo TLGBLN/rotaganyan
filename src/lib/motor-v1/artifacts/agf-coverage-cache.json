@@ -1,0 +1,4522 @@
+{
+  "cmr32kvhg004904jp7ui0602i": {
+    "raceId": "cmr32kvhg004904jp7ui0602i",
+    "cutoff": "2026-07-03T16:44:00.718Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 0,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmr673hs200d604l2s1cf8pmd": {
+    "raceId": "cmr673hs200d604l2s1cf8pmd",
+    "cutoff": "2026-07-04T15:06:36.172Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmr9brr7e003t04jrn4c2ihyh": {
+    "raceId": "cmr9brr7e003t04jrn4c2ihyh",
+    "cutoff": "2026-07-07T16:16:49.499Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Kocaeli",
+    "month": "2026-07"
+  },
+  "cmr9bs0rr004r04jr4fkg4oil": {
+    "raceId": "cmr9bs0rr004r04jr4fkg4oil",
+    "cutoff": "2026-07-07T16:18:39.107Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 11,
+    "hippodrome": "Kocaeli",
+    "month": "2026-07"
+  },
+  "cmreiktbn004104jq2b4ua81t": {
+    "raceId": "cmreiktbn004104jq2b4ua81t",
+    "cutoff": "2026-07-11T16:32:59.485Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 14,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmreikl0m002f04jq5wm6ob2d": {
+    "raceId": "cmreikl0m002f04jq5wm6ob2d",
+    "cutoff": "2026-07-11T15:41:49.807Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmrfwqso2003i04kve3hyr9ke": {
+    "raceId": "cmrfwqso2003i04kve3hyr9ke",
+    "cutoff": "2026-07-12T16:41:34.396Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmrhdhsj1004204jiizmygrug": {
+    "raceId": "cmrhdhsj1004204jiizmygrug",
+    "cutoff": "2026-07-13T10:27:57.849Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 0,
+    "hippodrome": "Bursa",
+    "month": "2026-07"
+  },
+  "cmrfwqjt8001v04kv25aubgku": {
+    "raceId": "cmrfwqjt8001v04kv25aubgku",
+    "cutoff": "2026-07-12T15:26:44.039Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmrhdi0sa005l04jiwh0zvz6l": {
+    "raceId": "cmrhdi0sa005l04jiwh0zvz6l",
+    "cutoff": "2026-07-13T11:29:00.630Z",
+    "raceQuality": "OK",
+    "nRunners": 20,
+    "nAgf01Observed": 20,
+    "nAgf02Observed": 0,
+    "hippodrome": "Bursa",
+    "month": "2026-07"
+  },
+  "cmsr1w114007104jo0alysl0x": {
+    "raceId": "cmsr1w114007104jo0alysl0x",
+    "cutoff": "2026-08-14T13:46:25.864Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmrjct41x005o04l77ow9vyx5": {
+    "raceId": "cmrjct41x005o04l77ow9vyx5",
+    "cutoff": "2026-07-15T12:07:39.201Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 0,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrirmk6m009p04jrzvpptx3e": {
+    "raceId": "cmrirmk6m009p04jrzvpptx3e",
+    "cutoff": "2026-07-14T16:42:55.914Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Kocaeli",
+    "month": "2026-07"
+  },
+  "cmrjcsv5q002m04l78jyk1v5c": {
+    "raceId": "cmrjcsv5q002m04l78jyk1v5c",
+    "cutoff": "2026-07-15T11:06:19.846Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 0,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmsr1w76e008704jovyup3k6b": {
+    "raceId": "cmsr1w76e008704jovyup3k6b",
+    "cutoff": "2026-08-14T13:38:46.907Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsr1w9yv008q04jobk0p8gpn": {
+    "raceId": "cmsr1w9yv008q04jobk0p8gpn",
+    "cutoff": "2026-08-14T13:39:24.886Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsr1wch5009704jovemp6ylc": {
+    "raceId": "cmsr1wch5009704jovemp6ylc",
+    "cutoff": "2026-08-14T13:39:45.443Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsr1wh7z00a304jodx4lkv4b": {
+    "raceId": "cmsr1wh7z00a304jodx4lkv4b",
+    "cutoff": "2026-08-14T13:40:24.894Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsr1vjd3004d04joutimy27f": {
+    "raceId": "cmsr1vjd3004d04joutimy27f",
+    "cutoff": "2026-08-14T13:50:15.667Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmsr1vqfq005d04jo0atd05hb": {
+    "raceId": "cmsr1vqfq005d04jo0atd05hb",
+    "cutoff": "2026-08-14T13:50:58.131Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmsshd5lt006i04jxyghcf8vo": {
+    "raceId": "cmsshd5lt006i04jxyghcf8vo",
+    "cutoff": "2026-08-15T13:51:02.545Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmsshcaoc001904jx9aku1221": {
+    "raceId": "cmsshcaoc001904jx9aku1221",
+    "cutoff": "2026-08-15T09:22:43.643Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmsshcccv001k04jxarm0av0z": {
+    "raceId": "cmsshcccv001k04jxarm0av0z",
+    "cutoff": "2026-08-15T09:22:58.819Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmsshdz2m00bj04jxzaf1y8k9": {
+    "raceId": "cmsshdz2m00bj04jxzaf1y8k9",
+    "cutoff": "2026-08-15T16:55:25.533Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmsshe1v400c204jxdcar0uzx": {
+    "raceId": "cmsshe1v400c204jxdcar0uzx",
+    "cutoff": "2026-08-15T16:55:37.107Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmstwscvz000k04l0kyztdrs7": {
+    "raceId": "cmstwscvz000k04l0kyztdrs7",
+    "cutoff": "2026-08-16T09:46:58.224Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmstwsjzm001v04l0c0qa7g1t": {
+    "raceId": "cmstwsjzm001v04l0c0qa7g1t",
+    "cutoff": "2026-08-16T09:47:28.957Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmstwslom002604l04t3t3llr": {
+    "raceId": "cmstwslom002604l04t3t3llr",
+    "cutoff": "2026-08-16T09:47:47.910Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmstwssqk003i04l0f1qiusqt": {
+    "raceId": "cmstwssqk003i04l0f1qiusqt",
+    "cutoff": "2026-08-16T09:48:37.393Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmstwsxta004g04l0xwzgspbt": {
+    "raceId": "cmstwsxta004g04l0xwzgspbt",
+    "cutoff": "2026-08-16T09:49:33.383Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmstwt02j004s04l0janpv2z8": {
+    "raceId": "cmstwt02j004s04l0janpv2z8",
+    "cutoff": "2026-08-16T09:49:56.528Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmstwt7qf005p04l016ob8ir9": {
+    "raceId": "cmstwt7qf005p04l016ob8ir9",
+    "cutoff": "2026-08-16T14:26:14.786Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmstwtcjb006k04l05t83e9ah": {
+    "raceId": "cmstwtcjb006k04l05t83e9ah",
+    "cutoff": "2026-08-16T14:26:53.529Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmstwtfcq007304l0vl4h6lti": {
+    "raceId": "cmstwtfcq007304l0vl4h6lti",
+    "cutoff": "2026-08-16T14:27:08.853Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmstwtkfp008104l0pyyvzijl": {
+    "raceId": "cmstwtkfp008104l0pyyvzijl",
+    "cutoff": "2026-08-16T14:27:43.857Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmstwtnj6008m04l027xfx22r": {
+    "raceId": "cmstwtnj6008m04l027xfx22r",
+    "cutoff": "2026-08-16T14:27:58.044Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmsvc6c61000704joof2kugee": {
+    "raceId": "cmsvc6c61000704joof2kugee",
+    "cutoff": "2026-08-17T09:02:32.113Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmsvc6eqe000o04jo3359vfnc": {
+    "raceId": "cmsvc6eqe000o04jo3359vfnc",
+    "cutoff": "2026-08-17T09:02:55.243Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmsvc6l87001w04jommksqg15": {
+    "raceId": "cmsvc6l87001w04jommksqg15",
+    "cutoff": "2026-08-17T09:03:39.935Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmsvc6ome002j04jotmoo8377": {
+    "raceId": "cmsvc6ome002j04jotmoo8377",
+    "cutoff": "2026-08-17T09:04:02.886Z",
+    "raceQuality": "OK",
+    "nRunners": 4,
+    "nAgf01Observed": 4,
+    "nAgf02Observed": 4,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmsvc6q12002s04jooocolf4v": {
+    "raceId": "cmsvc6q12002s04jooocolf4v",
+    "cutoff": "2026-08-17T09:04:29.776Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmsvc6yid004d04joveb0o82z": {
+    "raceId": "cmsvc6yid004d04joveb0o82z",
+    "cutoff": "2026-08-17T09:05:14.190Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmsvc711t004u04jokqrgk8go": {
+    "raceId": "cmsvc711t004u04jokqrgk8go",
+    "cutoff": "2026-08-17T09:05:34.567Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmsvc76gg005q04joi2zcftkl": {
+    "raceId": "cmsvc76gg005q04joi2zcftkl",
+    "cutoff": "2026-08-17T09:06:26.531Z",
+    "raceQuality": "OK",
+    "nRunners": 17,
+    "nAgf01Observed": 17,
+    "nAgf02Observed": 17,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmsvc85ih00bp04jokgi9mznk": {
+    "raceId": "cmsvc85ih00bp04jokgi9mznk",
+    "cutoff": "2026-08-17T18:04:29.728Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmswrnoxc000304jscyyuow9f": {
+    "raceId": "cmswrnoxc000304jscyyuow9f",
+    "cutoff": "2026-08-18T10:37:09.868Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmswrnt6v000v04jsm8dlnuay": {
+    "raceId": "cmswrnt6v000v04jsm8dlnuay",
+    "cutoff": "2026-08-18T10:38:00.528Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmswrnvqc001c04js342j2m1q": {
+    "raceId": "cmswrnvqc001c04js342j2m1q",
+    "cutoff": "2026-08-18T10:38:30.801Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmswro0iw002a04js44crk58w": {
+    "raceId": "cmswro0iw002a04js44crk58w",
+    "cutoff": "2026-08-18T10:39:13.582Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmswro2i1002n04jsqrdruuej": {
+    "raceId": "cmswro2i1002n04jsqrdruuej",
+    "cutoff": "2026-08-18T10:39:36.090Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmswro51f003404jsxuxl9yv3": {
+    "raceId": "cmswro51f003404jsxuxl9yv3",
+    "cutoff": "2026-08-18T10:39:57.794Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmswrofjw004s04jsuvhknqow": {
+    "raceId": "cmswrofjw004s04jsuvhknqow",
+    "cutoff": "2026-08-18T14:09:07.058Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmswroqp5006p04jsp1elvxbi": {
+    "raceId": "cmswroqp5006p04jsp1elvxbi",
+    "cutoff": "2026-08-18T14:10:22.830Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmswrohiu005504jsewnkpufb": {
+    "raceId": "cmswrohiu005504jsewnkpufb",
+    "cutoff": "2026-08-18T14:09:27.629Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmswrot8g007304jslttvqc6i": {
+    "raceId": "cmswrot8g007304jslttvqc6i",
+    "cutoff": "2026-08-18T14:11:14.069Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmswroxqc007y04jsk6lb3278": {
+    "raceId": "cmswroxqc007y04jsk6lb3278",
+    "cutoff": "2026-08-18T14:12:13.041Z",
+    "raceQuality": "OK",
+    "nRunners": 16,
+    "nAgf01Observed": 16,
+    "nAgf02Observed": 16,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmsy73i9u000304jsxe1g20os": {
+    "raceId": "cmsy73i9u000304jsxe1g20os",
+    "cutoff": "2026-08-19T10:45:01.038Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsy73o3y001704js7q24okyn": {
+    "raceId": "cmsy73o3y001704js7q24okyn",
+    "cutoff": "2026-08-19T10:45:39.967Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsy73z5t003904js76bdhcig": {
+    "raceId": "cmsy73z5t003904js76bdhcig",
+    "cutoff": "2026-08-19T10:46:32.232Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsy744ku004204jszrz7y6kd": {
+    "raceId": "cmsy744ku004204jszrz7y6kd",
+    "cutoff": "2026-08-19T10:47:09.947Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsy74com005904js8czu4oan": {
+    "raceId": "cmsy74com005904js8czu4oan",
+    "cutoff": "2026-08-19T14:02:47.167Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmsy74j1x006h04jszvnqhdhk": {
+    "raceId": "cmsy74j1x006h04jszvnqhdhk",
+    "cutoff": "2026-08-19T14:03:26.555Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmsy74mdv007404jsvxvyu5cc": {
+    "raceId": "cmsy74mdv007404jsvxvyu5cc",
+    "cutoff": "2026-08-19T14:03:50.112Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmsy74ttt008j04jsvme2gyfc": {
+    "raceId": "cmsy74ttt008j04jsvme2gyfc",
+    "cutoff": "2026-08-19T14:04:26.093Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmsy74x5z008x04jsjyhyein9": {
+    "raceId": "cmsy74x5z008x04jsjyhyein9",
+    "cutoff": "2026-08-19T14:04:59.511Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmsy7507d009f04jso4tqftev": {
+    "raceId": "cmsy7507d009f04jso4tqftev",
+    "cutoff": "2026-08-19T14:05:37.001Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmt12182d00bo04i9nxk8a5f7": {
+    "raceId": "cmt12182d00bo04i9nxk8a5f7",
+    "cutoff": "2026-08-21T12:38:10.879Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt11zcwj000304i9y33lq11g": {
+    "raceId": "cmt11zcwj000304i9y33lq11g",
+    "cutoff": "2026-08-21T09:18:09.432Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt11zi93001304i98lkgdmsp": {
+    "raceId": "cmt11zi93001304i98lkgdmsp",
+    "cutoff": "2026-08-21T09:18:46.762Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt11zllw001q04i9q3mi5s2o": {
+    "raceId": "cmt11zllw001q04i9q3mi5s2o",
+    "cutoff": "2026-08-21T09:19:04.583Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt11zpiw002f04i9flofwe33": {
+    "raceId": "cmt11zpiw002f04i9flofwe33",
+    "cutoff": "2026-08-21T09:19:44.045Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt1200fv004i04i9i5pd4712": {
+    "raceId": "cmt1200fv004i04i9i5pd4712",
+    "cutoff": "2026-08-21T09:20:37.992Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt97yfup002104jgp7q0beo7": {
+    "raceId": "cmt97yfup002104jgp7q0beo7",
+    "cutoff": "2026-08-27T12:51:03.156Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmtb22aqg007v04li9u8qx2kz": {
+    "raceId": "cmtb22aqg007v04li9u8qx2kz",
+    "cutoff": "2026-08-28T15:16:59.419Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt875xx7003r04kwabio5xmz": {
+    "raceId": "cmt875xx7003r04kwabio5xmz",
+    "cutoff": "2026-08-26T11:17:51.108Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt8763ro004u04kwpg18crhv": {
+    "raceId": "cmt8763ro004u04kwpg18crhv",
+    "cutoff": "2026-08-26T11:18:19.283Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtb21shj004r04li0v65nt49": {
+    "raceId": "cmtb21shj004r04li0v65nt49",
+    "cutoff": "2026-08-28T11:48:01.314Z",
+    "raceQuality": "OK",
+    "nRunners": 16,
+    "nAgf01Observed": 16,
+    "nAgf02Observed": 16,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmrlo6svi001f05l85ox8upsm": {
+    "raceId": "cmrlo6svi001f05l85ox8upsm",
+    "cutoff": "2026-07-16T09:22:59.235Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 0,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmt11zswd003304i9vvvatznf": {
+    "raceId": "cmt11zswd003304i9vvvatznf",
+    "cutoff": "2026-08-21T09:20:01.711Z",
+    "raceQuality": "OK",
+    "nRunners": 17,
+    "nAgf01Observed": 17,
+    "nAgf02Observed": 17,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt5c9qzg000s04l7vgpkg1s1": {
+    "raceId": "cmt5c9qzg000s04l7vgpkg1s1",
+    "cutoff": "2026-08-24T10:05:35.149Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt5caprn006i04l7683vra0b": {
+    "raceId": "cmt5caprn006i04l7683vra0b",
+    "cutoff": "2026-08-24T14:26:30.079Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmt5caw5b007o04l7prqcp7j2": {
+    "raceId": "cmt5caw5b007o04l7prqcp7j2",
+    "cutoff": "2026-08-24T15:05:34.364Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmrlo6vnf001x05l8shdh1052": {
+    "raceId": "cmrlo6vnf001x05l8shdh1052",
+    "cutoff": "2026-07-16T09:46:24.343Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmroi4siu008b04l3mgieb8sa": {
+    "raceId": "cmroi4siu008b04l3mgieb8sa",
+    "cutoff": "2026-07-18T08:10:24.070Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 0,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmroi4156003j04l3wq6ej2ul": {
+    "raceId": "cmroi4156003j04l3wq6ej2ul",
+    "cutoff": "2026-07-18T11:12:50.186Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmroi3sf8001x04l3wmp791rj": {
+    "raceId": "cmroi3sf8001x04l3wmp791rj",
+    "cutoff": "2026-07-18T10:30:55.031Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmroi4jsi006p04l39k7k6f25": {
+    "raceId": "cmroi4jsi006p04l39k7k6f25",
+    "cutoff": "2026-07-18T07:28:24.351Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 0,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmrlo6z9n002m05l8mkny13bx": {
+    "raceId": "cmrlo6z9n002m05l8mkny13bx",
+    "cutoff": "2026-07-16T10:11:12.278Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmt1202oc004y04i9zxg94mtn": {
+    "raceId": "cmt1202oc004y04i9zxg94mtn",
+    "cutoff": "2026-08-21T09:20:55.821Z",
+    "raceQuality": "OK",
+    "nRunners": 16,
+    "nAgf01Observed": 16,
+    "nAgf02Observed": 16,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt1lm4of00vu04l1hn8xaxl4": {
+    "raceId": "cmt1lm4of00vu04l1hn8xaxl4",
+    "cutoff": "2026-08-22T17:22:55.286Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmt5cam01005t04l7oc88pzgg": {
+    "raceId": "cmt5cam01005t04l7oc88pzgg",
+    "cutoff": "2026-08-24T14:26:18.474Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmt5casdx007004l7362m6bys": {
+    "raceId": "cmt5casdx007004l7362m6bys",
+    "cutoff": "2026-08-24T15:05:25.868Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmt6rtcnf001b04i9sp441w0o": {
+    "raceId": "cmt6rtcnf001b04i9sp441w0o",
+    "cutoff": "2026-08-25T10:27:21.276Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt6rteci001n04i9at63mkk5": {
+    "raceId": "cmt6rteci001n04i9at63mkk5",
+    "cutoff": "2026-08-25T12:11:19.856Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt97z8hq004o04jghfxr0si0": {
+    "raceId": "cmt97z8hq004o04jghfxr0si0",
+    "cutoff": "2026-08-27T15:31:14.709Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmtdwxxsc007b04kwei26bx9a": {
+    "raceId": "cmtdwxxsc007b04kwei26bx9a",
+    "cutoff": "2026-08-30T15:21:00.340Z",
+    "raceQuality": "OK",
+    "nRunners": 18,
+    "nAgf01Observed": 18,
+    "nAgf02Observed": 18,
+    "hippodrome": "Adana",
+    "month": "2026-08"
+  },
+  "cmt6rtmj2003604i9b1fklk16": {
+    "raceId": "cmt6rtmj2003604i9b1fklk16",
+    "cutoff": "2026-08-25T12:11:50.889Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt8777gq00b804kwcnuca3iq": {
+    "raceId": "cmt8777gq00b804kwcnuca3iq",
+    "cutoff": "2026-08-26T15:31:48.281Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmt875qm5002e04kwu8gattj7": {
+    "raceId": "cmt875qm5002e04kwu8gattj7",
+    "cutoff": "2026-08-26T11:17:18.931Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt8760ud004a04kwle9grhp7": {
+    "raceId": "cmt8760ud004a04kwle9grhp7",
+    "cutoff": "2026-08-26T11:18:03.443Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt6rtszs004e04i9agazu6ue": {
+    "raceId": "cmt6rtszs004e04i9agazu6ue",
+    "cutoff": "2026-08-25T12:12:25.463Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt876sv1008r04kw9oqsnb57": {
+    "raceId": "cmt876sv1008r04kw9oqsnb57",
+    "cutoff": "2026-08-26T15:30:31.693Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmt875oke002104kwalzbj1ql": {
+    "raceId": "cmt875oke002104kwalzbj1ql",
+    "cutoff": "2026-08-26T09:35:57.930Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt8773nz00aj04kw9o8kvpwc": {
+    "raceId": "cmt8773nz00aj04kw9o8kvpwc",
+    "cutoff": "2026-08-26T15:31:21.982Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmt6rtohw003j04i9ckvgcum8": {
+    "raceId": "cmt6rtohw003j04i9ckvgcum8",
+    "cutoff": "2026-08-25T12:12:02.077Z",
+    "raceQuality": "OK",
+    "nRunners": 4,
+    "nAgf01Observed": 4,
+    "nAgf02Observed": 4,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmrx3981k00al04l8tnb60v70": {
+    "raceId": "cmrx3981k00al04l8tnb60v70",
+    "cutoff": "2026-07-24T16:43:46.733Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmryhyb0800ac04l750rrme0g": {
+    "raceId": "cmryhyb0800ac04l750rrme0g",
+    "cutoff": "2026-07-25T19:19:19.731Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-07"
+  },
+  "cmryhyd0a00ap04l71jru7v3p": {
+    "raceId": "cmryhyd0a00ap04l71jru7v3p",
+    "cutoff": "2026-07-25T19:26:34.231Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-07"
+  },
+  "cmryhyfkt00b704l79i4dr9sd": {
+    "raceId": "cmryhyfkt00b704l79i4dr9sd",
+    "cutoff": "2026-07-25T19:34:36.504Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-07"
+  },
+  "cmt877aod00bt04kwia7ihh2u": {
+    "raceId": "cmt877aod00bt04kwia7ihh2u",
+    "cutoff": "2026-08-26T15:32:06.615Z",
+    "raceQuality": "OK",
+    "nRunners": 16,
+    "nAgf01Observed": 16,
+    "nAgf02Observed": 16,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmt875dzo000304kwe305tfzu": {
+    "raceId": "cmt875dzo000304kwe305tfzu",
+    "cutoff": "2026-08-26T09:35:08.544Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt8768n0005h04kwca8od1kl": {
+    "raceId": "cmt8768n0005h04kwca8od1kl",
+    "cutoff": "2026-08-26T11:18:31.742Z",
+    "raceQuality": "OK",
+    "nRunners": 18,
+    "nAgf01Observed": 18,
+    "nAgf02Observed": 18,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmrzxbfsm004j04l2e2rfd1b6": {
+    "raceId": "cmrzxbfsm004j04l2e2rfd1b6",
+    "cutoff": "2026-07-26T10:30:36.798Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrzxb69r003404l2vmqmxrhq": {
+    "raceId": "cmrzxb69r003404l2vmqmxrhq",
+    "cutoff": "2026-07-26T10:01:13.704Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 10,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrzxbs0e006j04l22sbwt2mc": {
+    "raceId": "cmrzxbs0e006j04l22sbwt2mc",
+    "cutoff": "2026-07-26T13:14:19.806Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmrzxatpf000q04l2idp8d4ec": {
+    "raceId": "cmrzxatpf000q04l2idp8d4ec",
+    "cutoff": "2026-07-26T09:21:58.601Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cms2s3pnd008a04jrl24hz179": {
+    "raceId": "cms2s3pnd008a04jrl24hz179",
+    "cutoff": "2026-07-28T18:29:35.795Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Kocaeli",
+    "month": "2026-07"
+  },
+  "cmrzxb0oo002204l2kjli9d1v": {
+    "raceId": "cmrzxb0oo002204l2kjli9d1v",
+    "cutoff": "2026-07-26T09:42:56.093Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cms8hxv9t000o04l7l40pwklw": {
+    "raceId": "cms8hxv9t000o04l7l40pwklw",
+    "cutoff": "2026-08-01T10:53:57.270Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cms8hz00o007r04l7s5ybq0qq": {
+    "raceId": "cms8hz00o007r04l7s5ybq0qq",
+    "cutoff": "2026-08-01T14:31:32.118Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cms9wlhyf004q04l8p9g9c05w": {
+    "raceId": "cms9wlhyf004q04l8p9g9c05w",
+    "cutoff": "2026-08-02T11:28:40.026Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cms9wl8ye003204l899tfxn8o": {
+    "raceId": "cms9wl8ye003204l899tfxn8o",
+    "cutoff": "2026-08-02T11:07:48.015Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cms9wlw9u006r04l8ssfttcx8": {
+    "raceId": "cms9wlw9u006r04l8ssfttcx8",
+    "cutoff": "2026-08-02T12:11:27.956Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cms9wm4po008c04l8wkc8mv9b": {
+    "raceId": "cms9wm4po008c04l8wkc8mv9b",
+    "cutoff": "2026-08-02T12:41:52.868Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmscri3kf007z04l2i68xbnjh": {
+    "raceId": "cmscri3kf007z04l2i68xbnjh",
+    "cutoff": "2026-08-04T17:21:11.581Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmsfmd6oq007r04jl5p78x0ws": {
+    "raceId": "cmsfmd6oq007r04jl5p78x0ws",
+    "cutoff": "2026-08-06T17:54:15.869Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmsh1uk0g007x04jpm9jieqxy": {
+    "raceId": "cmsh1uk0g007x04jpm9jieqxy",
+    "cutoff": "2026-08-07T13:18:14.884Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsih7ssf000m04jiiq53h490": {
+    "raceId": "cmsih7ssf000m04jiiq53h490",
+    "cutoff": "2026-08-08T10:13:48.029Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmsih83fb002l04jix4yv39xv": {
+    "raceId": "cmsih83fb002l04jix4yv39xv",
+    "cutoff": "2026-08-08T10:40:16.662Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmsh1u6qb005e04jptgm46l62": {
+    "raceId": "cmsh1u6qb005e04jptgm46l62",
+    "cutoff": "2026-08-07T12:49:03.191Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmslc43f1002904jvvxfo9ek4": {
+    "raceId": "cmslc43f1002904jvvxfo9ek4",
+    "cutoff": "2026-08-10T11:36:29.240Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmsjwnxsf003404jk1win1u0h": {
+    "raceId": "cmsjwnxsf003404jk1win1u0h",
+    "cutoff": "2026-08-09T10:05:18.692Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsjwoon7007n04jk9phq0ier": {
+    "raceId": "cmsjwoon7007n04jk9phq0ier",
+    "cutoff": "2026-08-09T13:08:47.231Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmsjwobb2005504jkmdongyjz": {
+    "raceId": "cmsjwobb2005504jkmdongyjz",
+    "cutoff": "2026-08-09T12:41:24.790Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmsjwnzhg003g04jkgm5t0d0w": {
+    "raceId": "cmsjwnzhg003g04jkgm5t0d0w",
+    "cutoff": "2026-08-09T10:15:53.783Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsr1w3jq007i04joz2px7yld": {
+    "raceId": "cmsr1w3jq007i04joz2px7yld",
+    "cutoff": "2026-08-14T13:38:27.246Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsr1wezp009o04joy5q0dgay": {
+    "raceId": "cmsr1wezp009o04joy5q0dgay",
+    "cutoff": "2026-08-14T13:40:04.212Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsr1vllg004t04jogmerhav5": {
+    "raceId": "cmsr1vllg004t04jogmerhav5",
+    "cutoff": "2026-08-14T13:50:37.717Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmsshcfq3002604jxzmc14nh6": {
+    "raceId": "cmsshcfq3002604jxzmc14nh6",
+    "cutoff": "2026-08-15T09:23:15.811Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmsshd2ds006504jx1yc4hme6": {
+    "raceId": "cmsshd2ds006504jx1yc4hme6",
+    "cutoff": "2026-08-15T13:50:45.380Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmsshd9j1007604jxn67v5u8b": {
+    "raceId": "cmsshd9j1007604jxn67v5u8b",
+    "cutoff": "2026-08-15T13:51:12.949Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmsshdbrl007k04jxygbl8gud": {
+    "raceId": "cmsshdbrl007k04jxygbl8gud",
+    "cutoff": "2026-08-15T13:51:39.745Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmsshdea3008204jx88ojrbwu": {
+    "raceId": "cmsshdea3008204jx88ojrbwu",
+    "cutoff": "2026-08-15T13:52:03.635Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmsshdhmw008p04jxjlr1it13": {
+    "raceId": "cmsshdhmw008p04jxjlr1it13",
+    "cutoff": "2026-08-15T13:52:15.793Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmsshcnu7003q04jx37s51jim": {
+    "raceId": "cmsshcnu7003q04jx37s51jim",
+    "cutoff": "2026-08-15T09:24:03.890Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmsshchym002l04jxc1z2ai9j": {
+    "raceId": "cmsshchym002l04jxc1z2ai9j",
+    "cutoff": "2026-08-15T09:23:33.069Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmsshdsqg00aj04jxil3avhuu": {
+    "raceId": "cmsshdsqg00aj04jxil3avhuu",
+    "cutoff": "2026-08-15T16:54:58.761Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmsshclbj003804jx1ehnrid4": {
+    "raceId": "cmsshclbj003804jx1ehnrid4",
+    "cutoff": "2026-08-15T09:23:45.393Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmsshcpsm004304jxl5rihswr": {
+    "raceId": "cmsshcpsm004304jxl5rihswr",
+    "cutoff": "2026-08-15T09:24:19.816Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmsshdpdg009w04jxmax6w3c8": {
+    "raceId": "cmsshdpdg009w04jxmax6w3c8",
+    "cutoff": "2026-08-15T16:54:42.526Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmsvc6iel001d04jojv91hj0f": {
+    "raceId": "cmsvc6iel001d04jojv91hj0f",
+    "cutoff": "2026-08-17T09:03:17.342Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmsvc6tpb003h04joakvsftxx": {
+    "raceId": "cmsvc6tpb003h04joakvsftxx",
+    "cutoff": "2026-08-17T09:04:53.939Z",
+    "raceQuality": "OK",
+    "nRunners": 16,
+    "nAgf01Observed": 16,
+    "nAgf02Observed": 16,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmstwsv9x003z04l0ppv1ie5c": {
+    "raceId": "cmstwsv9x003z04l0ppv1ie5c",
+    "cutoff": "2026-08-16T09:49:01.980Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmstwtaa5006504l05ikpwace": {
+    "raceId": "cmstwtaa5006504l05ikpwace",
+    "cutoff": "2026-08-16T14:26:34.278Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmsvc7310005804joapz1mkqx": {
+    "raceId": "cmsvc7310005804joapz1mkqx",
+    "cutoff": "2026-08-17T09:05:57.529Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmsshe43j00ci04jx4dlb8dwi": {
+    "raceId": "cmsshe43j00ci04jx4dlb8dwi",
+    "cutoff": "2026-08-15T16:55:48.628Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmstwti69007m04l0gj3dvvux": {
+    "raceId": "cmstwti69007m04l0gj3dvvux",
+    "cutoff": "2026-08-16T14:27:26.126Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmstwtqcl009604l0xgizjzql": {
+    "raceId": "cmstwtqcl009604l0xgizjzql",
+    "cutoff": "2026-08-16T14:28:15.372Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmsr1vyir006k04jov61vp46u": {
+    "raceId": "cmsr1vyir006k04jov61vp46u",
+    "cutoff": "2026-08-14T13:34:31.018Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsshdwjz00b204jx5ewlf6bc": {
+    "raceId": "cmsshdwjz00b204jx5ewlf6bc",
+    "cutoff": "2026-08-15T16:55:10.695Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmstwsaao000304l0wjeyeb1u": {
+    "raceId": "cmstwsaao000304l0wjeyeb1u",
+    "cutoff": "2026-08-16T09:46:33.545Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmswrnyk0001v04js6563dm2a": {
+    "raceId": "cmswrnyk0001v04js6563dm2a",
+    "cutoff": "2026-08-18T10:38:52.529Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmswrov7b007h04jsltdmr5on": {
+    "raceId": "cmswrov7b007h04jsltdmr5on",
+    "cutoff": "2026-08-18T14:11:51.133Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmswrobwa004304js7e37ukgl": {
+    "raceId": "cmswrobwa004304js7e37ukgl",
+    "cutoff": "2026-08-18T14:08:11.941Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmswrnrhr000k04js7dl6408n": {
+    "raceId": "cmswrnrhr000k04js7dl6408n",
+    "cutoff": "2026-08-18T10:37:37.280Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmswrolgx005w04jsgflfxfe0": {
+    "raceId": "cmswrolgx005w04jsgflfxfe0",
+    "cutoff": "2026-08-18T14:09:55.573Z",
+    "raceQuality": "OK",
+    "nRunners": 16,
+    "nAgf01Observed": 16,
+    "nAgf02Observed": 16,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmstwsgvs001a04l0o3gzxt3x": {
+    "raceId": "cmstwsgvs001a04l0o3gzxt3x",
+    "cutoff": "2026-08-16T09:47:12.552Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmstwsoib002p04l0kqjf01fh": {
+    "raceId": "cmstwsoib002p04l0kqjf01fh",
+    "cutoff": "2026-08-16T09:48:11.255Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsy73lm8000q04jszdcysz28": {
+    "raceId": "cmsy73lm8000q04jszdcysz28",
+    "cutoff": "2026-08-19T10:45:20.502Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsy742d5003r04js0o71c0ix": {
+    "raceId": "cmsy742d5003r04js0o71c0ix",
+    "cutoff": "2026-08-19T10:46:52.823Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsy74g9n005y04js4lm3gniz": {
+    "raceId": "cmsy74g9n005y04js4lm3gniz",
+    "cutoff": "2026-08-19T14:03:08.082Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmsy74q8s007t04js6z51ezja": {
+    "raceId": "cmsy74q8s007t04js6z51ezja",
+    "cutoff": "2026-08-19T14:05:18.939Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmsy73rp9001v04jsiyfekiyo": {
+    "raceId": "cmsy73rp9001v04jsiyfekiyo",
+    "cutoff": "2026-08-19T10:45:56.983Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmszmjpv9002c04k0w7c9z6p3": {
+    "raceId": "cmszmjpv9002c04k0w7c9z6p3",
+    "cutoff": "2026-08-20T11:18:44.087Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmszmjtro003304k0phxoy590": {
+    "raceId": "cmszmjtro003304k0phxoy590",
+    "cutoff": "2026-08-20T11:19:00.384Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmszmjwak003k04k0oozrri3s": {
+    "raceId": "cmszmjwak003k04k0oozrri3s",
+    "cutoff": "2026-08-20T11:19:16.941Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmszmjyso004104k0qur46fuc": {
+    "raceId": "cmszmjyso004104k0qur46fuc",
+    "cutoff": "2026-08-20T11:19:35.836Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmszmk82r005604k0liqvhunk": {
+    "raceId": "cmszmk82r005604k0liqvhunk",
+    "cutoff": "2026-08-20T13:37:10.206Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmszmkb3m005r04k0hhh2arhv": {
+    "raceId": "cmszmkb3m005r04k0hhh2arhv",
+    "cutoff": "2026-08-20T13:37:23.061Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmszmkfht006l04k02v37pzby": {
+    "raceId": "cmszmkfht006l04k02v37pzby",
+    "cutoff": "2026-08-20T13:37:39.714Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmszmkhf2006z04k06upl7xus": {
+    "raceId": "cmszmkhf2006z04k06upl7xus",
+    "cutoff": "2026-08-20T13:37:54.795Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmszmkxcr00a104k02n6vcxiq": {
+    "raceId": "cmszmkxcr00a104k02n6vcxiq",
+    "cutoff": "2026-08-20T13:39:32.959Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmsy73vag002j04js3322yf04": {
+    "raceId": "cmsy73vag002j04js3322yf04",
+    "cutoff": "2026-08-19T10:46:13.971Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt120hq4007004i9uhtxrjpa": {
+    "raceId": "cmt120hq4007004i9uhtxrjpa",
+    "cutoff": "2026-08-21T12:35:29.179Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt120ksq007m04i9kn4ih8hk": {
+    "raceId": "cmt120ksq007m04i9kn4ih8hk",
+    "cutoff": "2026-08-21T12:35:48.836Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt120nvg008704i90ychrib7": {
+    "raceId": "cmt120nvg008704i90ychrib7",
+    "cutoff": "2026-08-21T12:36:08.175Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt120q3w008l04i9pumenfdj": {
+    "raceId": "cmt120q3w008l04i9pumenfdj",
+    "cutoff": "2026-08-21T12:36:23.349Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt120rs8008x04i9dnji4wk8": {
+    "raceId": "cmt120rs8008x04i9dnji4wk8",
+    "cutoff": "2026-08-21T12:36:40.968Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt120v4s009k04i912t6sb1y": {
+    "raceId": "cmt120v4s009k04i912t6sb1y",
+    "cutoff": "2026-08-21T12:37:00.071Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt120zbe00ac04i9ok6ms4e1": {
+    "raceId": "cmt120zbe00ac04i9ok6ms4e1",
+    "cutoff": "2026-08-21T12:37:16.509Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt1211tv00au04i9jq85uzys": {
+    "raceId": "cmt1211tv00au04i9jq85uzys",
+    "cutoff": "2026-08-21T12:37:37.433Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt1214zy00b504i90dtd77eu": {
+    "raceId": "cmt1214zy00b504i90dtd77eu",
+    "cutoff": "2026-08-21T12:37:55.648Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt11zgac000p04i9otehye57": {
+    "raceId": "cmt11zgac000p04i9otehye57",
+    "cutoff": "2026-08-21T09:18:27.701Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt11znaa002104i9brvr56jw": {
+    "raceId": "cmt11znaa002104i9brvr56jw",
+    "cutoff": "2026-08-21T09:19:22.329Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt11zxxg004104i92845sdt1": {
+    "raceId": "cmt11zxxg004104i92845sdt1",
+    "cutoff": "2026-08-21T09:20:18.171Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt1207xd005j04i9raram05i": {
+    "raceId": "cmt1207xd005j04i9raram05i",
+    "cutoff": "2026-08-21T09:21:23.239Z",
+    "raceQuality": "OK",
+    "nRunners": 18,
+    "nAgf01Observed": 18,
+    "nAgf02Observed": 18,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmszmjgzn000n04k0jxtv0vom": {
+    "raceId": "cmszmjgzn000n04k0jxtv0vom",
+    "cutoff": "2026-08-20T11:17:57.781Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmszmjk1m001704k0ob3eu8w0": {
+    "raceId": "cmszmjk1m001704k0ob3eu8w0",
+    "cutoff": "2026-08-20T11:18:11.709Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmszmjmte001r04k0znlwi8lx": {
+    "raceId": "cmszmjmte001r04k0znlwi8lx",
+    "cutoff": "2026-08-20T11:18:26.900Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmszmkl9k007p04k04gqw6bd6": {
+    "raceId": "cmszmkl9k007p04k04gqw6bd6",
+    "cutoff": "2026-08-20T13:38:10.141Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmszmkpo2008j04k0x1xpax0l": {
+    "raceId": "cmszmkpo2008j04k0x1xpax0l",
+    "cutoff": "2026-08-20T13:38:39.220Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmszmksex009304k0aldcib3x": {
+    "raceId": "cmszmksex009304k0aldcib3x",
+    "cutoff": "2026-08-20T13:38:54.499Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmszmkv5r009m04k0nky4idgq": {
+    "raceId": "cmszmkv5r009m04k0nky4idgq",
+    "cutoff": "2026-08-20T13:39:11.475Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmszmje5u000304k05wmzijh6": {
+    "raceId": "cmszmje5u000304k05wmzijh6",
+    "cutoff": "2026-08-20T11:17:41.945Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt3wvnfn005004ibntmjm9u0": {
+    "raceId": "cmt3wvnfn005004ibntmjm9u0",
+    "cutoff": "2026-08-23T13:11:08.202Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmt3wvqzs005o04ibk5o2slti": {
+    "raceId": "cmt3wvqzs005o04ibk5o2slti",
+    "cutoff": "2026-08-23T13:11:26.485Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmt3wvutu006e04ibc0nodlo5": {
+    "raceId": "cmt3wvutu006e04ibc0nodlo5",
+    "cutoff": "2026-08-23T13:11:43.743Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmt3wvy46007004ibw6z1tj35": {
+    "raceId": "cmt3wvy46007004ibw6z1tj35",
+    "cutoff": "2026-08-23T13:11:56.001Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmt3ww1g6007e04ibu9dbk26m": {
+    "raceId": "cmt3ww1g6007e04ibu9dbk26m",
+    "cutoff": "2026-08-23T13:12:08.364Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmt3ww4gi007v04ibt4m60n4n": {
+    "raceId": "cmt3ww4gi007v04ibt4m60n4n",
+    "cutoff": "2026-08-23T13:12:21.751Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmt3wuuah000404ibwr4r60aw": {
+    "raceId": "cmt3wuuah000404ibwr4r60aw",
+    "cutoff": "2026-08-23T10:00:59.462Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt3wuwsf000l04ibw5bqzouo": {
+    "raceId": "cmt3wuwsf000l04ibw5bqzouo",
+    "cutoff": "2026-08-23T10:01:20.599Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt3wuz9l001104ibfwlo1uou": {
+    "raceId": "cmt3wuz9l001104ibfwlo1uou",
+    "cutoff": "2026-08-23T10:01:39.441Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt3wv16z001f04ibuihge9xl": {
+    "raceId": "cmt3wv16z001f04ibuihge9xl",
+    "cutoff": "2026-08-23T11:32:47.268Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt3wv3xw001x04ib8iliyvyx": {
+    "raceId": "cmt3wv3xw001x04ib8iliyvyx",
+    "cutoff": "2026-08-23T11:33:06.549Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt3wv6ev002d04ibuft12quz": {
+    "raceId": "cmt3wv6ev002d04ibuft12quz",
+    "cutoff": "2026-08-23T11:33:24.558Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt3wv95b002w04ibnd67ybny": {
+    "raceId": "cmt3wv95b002w04ibnd67ybny",
+    "cutoff": "2026-08-23T11:33:52.181Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt3wvbm2003c04ibjya5m24s": {
+    "raceId": "cmt3wvbm2003c04ibjya5m24s",
+    "cutoff": "2026-08-23T11:34:12.122Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt3wvele003o04ib05fvet7y": {
+    "raceId": "cmt3wvele003o04ib05fvet7y",
+    "cutoff": "2026-08-23T11:34:39.519Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt1llwof00s904l1fc9l06b9": {
+    "raceId": "cmt1llwof00s904l1fc9l06b9",
+    "cutoff": "2026-08-22T17:22:09.995Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmt1lm77q00xb04l15qct0rxv": {
+    "raceId": "cmt1lm77q00xb04l15qct0rxv",
+    "cutoff": "2026-08-22T17:23:15.787Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmt1ljd1r00b504l1lni98o60": {
+    "raceId": "cmt1ljd1r00b504l1lni98o60",
+    "cutoff": "2026-08-22T11:44:07.569Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt1ljm4100bn04l1peunjxxj": {
+    "raceId": "cmt1ljm4100bn04l1peunjxxj",
+    "cutoff": "2026-08-22T11:44:29.737Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt1ljzms00cc04l11s16rad4": {
+    "raceId": "cmt1ljzms00cc04l11s16rad4",
+    "cutoff": "2026-08-22T11:44:45.446Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt1llpcs00o704l1czj9mfr8": {
+    "raceId": "cmt1llpcs00o704l1czj9mfr8",
+    "cutoff": "2026-08-22T17:21:17.339Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmt1llsqf00q104l13pee5cgi": {
+    "raceId": "cmt1llsqf00q104l13pee5cgi",
+    "cutoff": "2026-08-22T17:21:42.517Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmt1lm1eu00ug04l1jc8n0e7e": {
+    "raceId": "cmt1lm1eu00ug04l1jc8n0e7e",
+    "cutoff": "2026-08-22T17:22:28.200Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmt1lixal00fp04iegopjdzj2": {
+    "raceId": "cmt1lixal00fp04iegopjdzj2",
+    "cutoff": "2026-08-22T13:33:25.446Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmt1ljfzg00gr04ien34f7ydw": {
+    "raceId": "cmt1ljfzg00gr04ien34f7ydw",
+    "cutoff": "2026-08-22T13:33:43.518Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmt1lk3dv00i404ieto7y83v8": {
+    "raceId": "cmt1lk3dv00i404ieto7y83v8",
+    "cutoff": "2026-08-22T13:33:59.678Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmt1lkle800j504iek5xyak7e": {
+    "raceId": "cmt1lkle800j504iek5xyak7e",
+    "cutoff": "2026-08-22T13:34:14.312Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmt1lkwsr00jv04ieai2qr94r": {
+    "raceId": "cmt1lkwsr00jv04ieai2qr94r",
+    "cutoff": "2026-08-22T13:35:17.356Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmt1llb6a00kv04iemwpz60gl": {
+    "raceId": "cmt1llb6a00kv04iemwpz60gl",
+    "cutoff": "2026-08-22T13:35:41.540Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmt1lhzr300ei04iemdufsib9": {
+    "raceId": "cmt1lhzr300ei04iemdufsib9",
+    "cutoff": "2026-08-22T11:43:15.844Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt1lioq300a004l1az14u9t7": {
+    "raceId": "cmt1lioq300a004l1az14u9t7",
+    "cutoff": "2026-08-22T11:43:36.866Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt6rtae9000w04i9lg9juvkd": {
+    "raceId": "cmt6rtae9000w04i9lg9juvkd",
+    "cutoff": "2026-08-25T10:27:10.729Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt5c9y8u002304l7pm1uq46c": {
+    "raceId": "cmt5c9y8u002304l7pm1uq46c",
+    "cutoff": "2026-08-24T11:28:41.972Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt5ca8nx003z04l7t29o8dda": {
+    "raceId": "cmt5ca8nx003z04l7t29o8dda",
+    "cutoff": "2026-08-24T11:29:23.377Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt1lj41q00ap04l1nbgp8ykm": {
+    "raceId": "cmt1lj41q00ap04l1nbgp8ykm",
+    "cutoff": "2026-08-22T11:43:49.338Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt6rti0e002b04i9gyxdjl9x": {
+    "raceId": "cmt6rti0e002b04i9gyxdjl9x",
+    "cutoff": "2026-08-25T12:11:37.151Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt6rt5vm000304i9lvpdfims": {
+    "raceId": "cmt6rt5vm000304i9lvpdfims",
+    "cutoff": "2026-08-25T10:26:57.819Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt5cb9x2009x04l7im76zats": {
+    "raceId": "cmt5cb9x2009x04l7im76zats",
+    "cutoff": "2026-08-24T15:06:33.746Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmt5ca20e002s04l7m2e3lojj": {
+    "raceId": "cmt5ca20e002s04l7m2e3lojj",
+    "cutoff": "2026-08-24T11:28:54.051Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt5c9vxh001o04l7v5ip6tah": {
+    "raceId": "cmt5c9vxh001o04l7v5ip6tah",
+    "cutoff": "2026-08-24T10:06:20.602Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt5c9n6a000304l7jti7b9r1": {
+    "raceId": "cmt5c9n6a000304l7jti7b9r1",
+    "cutoff": "2026-08-24T10:05:20.416Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt5caaou004d04l7i830w7k7": {
+    "raceId": "cmt5caaou004d04l7i830w7k7",
+    "cutoff": "2026-08-24T11:29:36.756Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt5ca5he003e04l77g8fay4o": {
+    "raceId": "cmt5ca5he003e04l77g8fay4o",
+    "cutoff": "2026-08-24T11:29:09.348Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt5cadu8004q04l7dxug6cx1": {
+    "raceId": "cmt5cadu8004q04l7dxug6cx1",
+    "cutoff": "2026-08-24T11:29:49.858Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt5cb7m0009h04l7buk338h5": {
+    "raceId": "cmt5cb7m0009h04l7buk338h5",
+    "cutoff": "2026-08-24T15:06:21.555Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmt5c9tll001904l7y28kl8n8": {
+    "raceId": "cmt5c9tll001904l7y28kl8n8",
+    "cutoff": "2026-08-24T10:05:55.555Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmt5cazm2008b04l7kaotwrwd": {
+    "raceId": "cmt5cazm2008b04l7kaotwrwd",
+    "cutoff": "2026-08-24T15:05:47.473Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmr32kpoq003504jpcx6q314d": {
+    "raceId": "cmr32kpoq003504jpcx6q314d",
+    "cutoff": "2026-07-03T16:42:49.380Z",
+    "raceQuality": "SUSPECT_UNIFORM_AGF",
+    "nRunners": 13,
+    "nAgf01Observed": 0,
+    "nAgf02Observed": 0,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmr32ktjx003w04jpaa1w3jyt": {
+    "raceId": "cmr32ktjx003w04jpaa1w3jyt",
+    "cutoff": "2026-07-03T16:48:37.948Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 0,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmr32kxp8004p04jpc39ty1q2": {
+    "raceId": "cmr32kxp8004p04jpc39ty1q2",
+    "cutoff": "2026-07-03T16:44:36.203Z",
+    "raceQuality": "OK",
+    "nRunners": 18,
+    "nAgf01Observed": 18,
+    "nAgf02Observed": 0,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmr673lr400ea04l25cboocz7": {
+    "raceId": "cmr673lr400ea04l25cboocz7",
+    "cutoff": "2026-07-04T14:48:38.513Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 0,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmr673nge00es04l21e6pzz9r": {
+    "raceId": "cmr673nge00es04l21e6pzz9r",
+    "cutoff": "2026-07-04T15:03:02.573Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmr673pq000ff04l2nc6o7p39": {
+    "raceId": "cmr673pq000ff04l2nc6o7p39",
+    "cutoff": "2026-07-04T15:16:40.673Z",
+    "raceQuality": "OK",
+    "nRunners": 21,
+    "nAgf01Observed": 21,
+    "nAgf02Observed": 20,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmr6k9rl1001eusdpmf8p9vn7": {
+    "raceId": "cmr6k9rl1001eusdpmf8p9vn7",
+    "cutoff": "2026-07-05T16:52:12.841Z",
+    "raceQuality": "SUSPECT_UNIFORM_AGF",
+    "nRunners": 9,
+    "nAgf01Observed": 0,
+    "nAgf02Observed": 0,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmrjct2fe005204l7im467a5k": {
+    "raceId": "cmrjct2fe005204l7im467a5k",
+    "cutoff": "2026-07-15T16:41:58.255Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 0,
+    "hippodrome": "Elazığ",
+    "month": "2026-07"
+  },
+  "cmrlo6ltk000305l8710ifhv9": {
+    "raceId": "cmrlo6ltk000305l8710ifhv9",
+    "cutoff": "2026-07-16T08:05:16.205Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 0,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmrlo6nsl000g05l8ygq0dj9w": {
+    "raceId": "cmrlo6nsl000g05l8ygq0dj9w",
+    "cutoff": "2026-07-16T08:29:41.035Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 0,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmrlo6ptg000t05l8ktxfi01q": {
+    "raceId": "cmrlo6ptg000t05l8ktxfi01q",
+    "cutoff": "2026-07-16T09:04:27.283Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 0,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmrlo71hl003205l8oam84msn": {
+    "raceId": "cmrlo71hl003205l8oam84msn",
+    "cutoff": "2026-07-16T10:23:55.101Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmrlo735l003c05l86zq5yfpl": {
+    "raceId": "cmrlo735l003c05l86zq5yfpl",
+    "cutoff": "2026-07-16T10:49:29.003Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmr9brtg9004104jrms5k6s1d": {
+    "raceId": "cmr9brtg9004104jrms5k6s1d",
+    "cutoff": "2026-07-07T16:17:44.891Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Kocaeli",
+    "month": "2026-07"
+  },
+  "cmr9brx46004e04jruwetzalo": {
+    "raceId": "cmr9brx46004e04jruwetzalo",
+    "cutoff": "2026-07-07T16:18:13.253Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 9,
+    "hippodrome": "Kocaeli",
+    "month": "2026-07"
+  },
+  "cmreiknb0002v04jqq7vy9zzd": {
+    "raceId": "cmreiknb0002v04jqq7vy9zzd",
+    "cutoff": "2026-07-11T15:57:39.947Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmreikq66003f04jqb0zzs6j2": {
+    "raceId": "cmreikq66003f04jqb0zzs6j2",
+    "cutoff": "2026-07-11T16:16:04.222Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 8,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmrfwqmur002f04kvwbhvphlh": {
+    "raceId": "cmrfwqmur002f04kvwbhvphlh",
+    "cutoff": "2026-07-12T15:47:22.454Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmrfwqpce002w04kvzr1ntx9z": {
+    "raceId": "cmrfwqpce002w04kvzr1ntx9z",
+    "cutoff": "2026-07-12T16:15:30.297Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmrhdhnej003304jizj7dw43r": {
+    "raceId": "cmrhdhnej003304jizj7dw43r",
+    "cutoff": "2026-07-13T09:15:30.142Z",
+    "raceQuality": "OK",
+    "nRunners": 17,
+    "nAgf01Observed": 17,
+    "nAgf02Observed": 0,
+    "hippodrome": "Bursa",
+    "month": "2026-07"
+  },
+  "cmrhdhvy0004p04ji9jxzxq1b": {
+    "raceId": "cmrhdhvy0004p04ji9jxzxq1b",
+    "cutoff": "2026-07-13T10:48:08.847Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 0,
+    "hippodrome": "Bursa",
+    "month": "2026-07"
+  },
+  "cmrhdhyi9005604ji7yhsujxe": {
+    "raceId": "cmrhdhyi9005604ji7yhsujxe",
+    "cutoff": "2026-07-13T10:59:49.080Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 0,
+    "hippodrome": "Bursa",
+    "month": "2026-07"
+  },
+  "cmrirmdq9008f04jrxxh911cs": {
+    "raceId": "cmrirmdq9008f04jrxxh911cs",
+    "cutoff": "2026-07-14T16:03:24.142Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 0,
+    "hippodrome": "Kocaeli",
+    "month": "2026-07"
+  },
+  "cmrirmh3j009404jrpycxy948": {
+    "raceId": "cmrirmh3j009404jrpycxy948",
+    "cutoff": "2026-07-14T16:24:31.747Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 8,
+    "hippodrome": "Kocaeli",
+    "month": "2026-07"
+  },
+  "cmrirmn9q00aa04jrxuziw7h8": {
+    "raceId": "cmrirmn9q00aa04jrxuziw7h8",
+    "cutoff": "2026-07-14T17:00:14.294Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 11,
+    "hippodrome": "Kocaeli",
+    "month": "2026-07"
+  },
+  "cmrjcsrkj001t04l71px9g9st": {
+    "raceId": "cmrjcsrkj001t04l71px9g9st",
+    "cutoff": "2026-07-15T10:40:35.605Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 0,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrjcszad003v04l71l05nh19": {
+    "raceId": "cmrjcszad003v04l71l05nh19",
+    "cutoff": "2026-07-15T11:21:00.293Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 0,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrjct1t7004t04l7rb4ino74": {
+    "raceId": "cmrjct1t7004t04l7rb4ino74",
+    "cutoff": "2026-07-15T11:46:54.293Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 0,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrjct6ar006j04l7cogrl5jr": {
+    "raceId": "cmrjct6ar006j04l7cogrl5jr",
+    "cutoff": "2026-07-15T12:29:26.519Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 0,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrlo7om0007105l8v4pk9ulh": {
+    "raceId": "cmrlo7om0007105l8v4pk9ulh",
+    "cutoff": "2026-07-16T16:18:15.581Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 0,
+    "hippodrome": "Kocaeli",
+    "month": "2026-07"
+  },
+  "cmrlo7ryr007o05l8pmoa93qc": {
+    "raceId": "cmrlo7ryr007o05l8pmoa93qc",
+    "cutoff": "2026-07-16T16:56:13.799Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Kocaeli",
+    "month": "2026-07"
+  },
+  "cmroi3ij8000304l3yn9sndbr": {
+    "raceId": "cmroi3ij8000304l3yn9sndbr",
+    "cutoff": "2026-07-18T09:53:15.416Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmroi3lxu000q04l3jgoo0dnc": {
+    "raceId": "cmroi3lxu000q04l3jgoo0dnc",
+    "cutoff": "2026-07-18T10:08:10.255Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmroi3q63001i04l3rqp7wszg": {
+    "raceId": "cmroi3q63001i04l3rqp7wszg",
+    "cutoff": "2026-07-18T10:15:55.496Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmroi3w35002l04l3jq4meuaj": {
+    "raceId": "cmroi3w35002l04l3jq4meuaj",
+    "cutoff": "2026-07-18T10:39:34.832Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmroi3z6e003604l3oha6lwnc": {
+    "raceId": "cmroi3z6e003604l3oha6lwnc",
+    "cutoff": "2026-07-18T10:46:13.707Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmroi448f004404l3wj6qkfjh": {
+    "raceId": "cmroi448f004404l3wj6qkfjh",
+    "cutoff": "2026-07-18T11:19:19.142Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmroi4epu005t04l3dclpqi8v": {
+    "raceId": "cmroi4epu005t04l3dclpqi8v",
+    "cutoff": "2026-07-18T08:52:00.150Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 0,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmroi4hje006a04l3v7qdrnsy": {
+    "raceId": "cmroi4hje006a04l3v7qdrnsy",
+    "cutoff": "2026-07-18T07:18:11.883Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 0,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmroi4mwi007904l31uelaawp": {
+    "raceId": "cmroi4mwi007904l31uelaawp",
+    "cutoff": "2026-07-18T07:42:22.930Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 0,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmroi4vc0008u04l3lr56xjb2": {
+    "raceId": "cmroi4vc0008u04l3lr56xjb2",
+    "cutoff": "2026-07-18T08:38:46.529Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 0,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmroi4xky009904l36dts11nl": {
+    "raceId": "cmroi4xky009904l36dts11nl",
+    "cutoff": "2026-07-18T08:24:50.755Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 0,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmrzxavxz001604l2co3suxyz": {
+    "raceId": "cmrzxavxz001604l2co3suxyz",
+    "cutoff": "2026-07-26T09:28:56.440Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrzxaxm9001h04l25xeix46t": {
+    "raceId": "cmrzxaxm9001h04l25xeix46t",
+    "cutoff": "2026-07-26T09:36:44.800Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrzxb3ra002n04l2or7xjiy6": {
+    "raceId": "cmrzxb3ra002n04l2or7xjiy6",
+    "cutoff": "2026-07-26T11:06:45.735Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrzxb9mi003r04l2vd3tcbj4": {
+    "raceId": "cmrzxb9mi003r04l2vd3tcbj4",
+    "cutoff": "2026-07-26T10:13:55.180Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrzxbcov004604l2625spg46": {
+    "raceId": "cmrzxbcov004604l2625spg46",
+    "cutoff": "2026-07-26T10:20:35.372Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrsslisv000304l71gh4vyqu": {
+    "raceId": "cmrsslisv000304l71gh4vyqu",
+    "cutoff": "2026-07-21T09:41:11.335Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 0,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmrx39hya00c304l8p0898pz8": {
+    "raceId": "cmrx39hya00c304l8p0898pz8",
+    "cutoff": "2026-07-24T17:31:34.769Z",
+    "raceQuality": "OK",
+    "nRunners": 16,
+    "nAgf01Observed": 16,
+    "nAgf02Observed": 16,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrx37qbf001904l84ckvt80u": {
+    "raceId": "cmrx37qbf001904l84ckvt80u",
+    "cutoff": "2026-07-24T10:51:00.736Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Bursa",
+    "month": "2026-07"
+  },
+  "cmrx39192009b04l8wno79mga": {
+    "raceId": "cmrx39192009b04l8wno79mga",
+    "cutoff": "2026-07-24T14:12:09.044Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrx3942x009u04l8nn847aex": {
+    "raceId": "cmrx3942x009u04l8nn847aex",
+    "cutoff": "2026-07-24T14:57:13.702Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrx39c0700bb04l8h9m3a8td": {
+    "raceId": "cmrx39c0700bb04l8h9m3a8td",
+    "cutoff": "2026-07-24T16:47:51.730Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrx39dzi00bp04l8r6am1lo6": {
+    "raceId": "cmrx39dzi00bp04l8r6am1lo6",
+    "cutoff": "2026-07-24T16:55:51.098Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 12,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmryhx1it002k04l7sedkeq23": {
+    "raceId": "cmryhx1it002k04l7sedkeq23",
+    "cutoff": "2026-07-25T06:44:22.977Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 0,
+    "hippodrome": "Ankara",
+    "month": "2026-07"
+  },
+  "cmt5cb3ni009304l7ic85zpsd": {
+    "raceId": "cmt5cb3ni009304l7ic85zpsd",
+    "cutoff": "2026-08-24T15:06:05.729Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmrzxaqbz000304l2ve5sieq5": {
+    "raceId": "cmrzxaqbz000304l2ve5sieq5",
+    "cutoff": "2026-07-26T09:16:18.942Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cmrzxbp6z006004l2extsdvmi": {
+    "raceId": "cmrzxbp6z006004l2extsdvmi",
+    "cutoff": "2026-07-26T13:01:25.199Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmrzxbwh5007d04l2wcr9cpdb": {
+    "raceId": "cmrzxbwh5007d04l2wcr9cpdb",
+    "cutoff": "2026-07-26T13:27:17.339Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmrzxbypk007t04l2tawvnjky": {
+    "raceId": "cmrzxbypk007t04l2tawvnjky",
+    "cutoff": "2026-07-26T13:36:17.612Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmrzxc0nz008704l2dvcl9rqb": {
+    "raceId": "cmrzxc0nz008704l2dvcl9rqb",
+    "cutoff": "2026-07-26T13:47:01.487Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İzmir",
+    "month": "2026-07"
+  },
+  "cmsih80pa002204jiadzmpfxi": {
+    "raceId": "cmsih80pa002204jiadzmpfxi",
+    "cutoff": "2026-08-08T10:34:38.213Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmsih85vb003104jiaywnrju1": {
+    "raceId": "cmsih85vb003104jiaywnrju1",
+    "cutoff": "2026-08-08T10:47:38.420Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmsih881s003g04jing3xzrdw": {
+    "raceId": "cmsih881s003g04jing3xzrdw",
+    "cutoff": "2026-08-08T10:57:44.457Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cms7a7jol008m04l5jxe7e79v": {
+    "raceId": "cms7a7jol008m04l5jxe7e79v",
+    "cutoff": "2026-07-31T16:24:21.625Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cms7a7mtt009704l5il68zub7": {
+    "raceId": "cms7a7mtt009704l5il68zub7",
+    "cutoff": "2026-07-31T16:34:15.833Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cms8hytnb006u04l7g4iinyos": {
+    "raceId": "cms8hytnb006u04l7g4iinyos",
+    "cutoff": "2026-08-01T14:11:59.686Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cms8hyx0f007604l76hrggydd": {
+    "raceId": "cms8hyx0f007604l76hrggydd",
+    "cutoff": "2026-08-01T14:22:51.330Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cms8hz2ht008804l7kjit9lxo": {
+    "raceId": "cms8hz2ht008804l7kjit9lxo",
+    "cutoff": "2026-08-01T14:42:34.178Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cms8hz5ru008v04l7ho9ccrxu": {
+    "raceId": "cms8hz5ru008v04l7ho9ccrxu",
+    "cutoff": "2026-08-01T14:57:54.103Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cms8hxykn001b04l7a6n6bxk5": {
+    "raceId": "cms8hxykn001b04l7a6n6bxk5",
+    "cutoff": "2026-08-01T11:20:15.947Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cms7a7sts00ab04l5p7vlkn06": {
+    "raceId": "cms7a7sts00ab04l5p7vlkn06",
+    "cutoff": "2026-07-31T17:27:40.980Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cms7a7wjl00b004l59dkrkkdo": {
+    "raceId": "cms7a7wjl00b004l59dkrkkdo",
+    "cutoff": "2026-07-31T16:52:35.171Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 10,
+    "hippodrome": "İstanbul",
+    "month": "2026-07"
+  },
+  "cms8hykbl005504l7d363n6d0": {
+    "raceId": "cms8hykbl005504l7d363n6d0",
+    "cutoff": "2026-08-01T13:25:28.819Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cms8hynbv005q04l77r3nviic": {
+    "raceId": "cms8hynbv005q04l77r3nviic",
+    "cutoff": "2026-08-01T13:51:42.259Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cms8hyqcx006b04l7l37imm17": {
+    "raceId": "cms8hyqcx006b04l7l37imm17",
+    "cutoff": "2026-08-01T14:00:15.256Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmscrhsot005x04l2q575vgcb": {
+    "raceId": "cmscrhsot005x04l2q575vgcb",
+    "cutoff": "2026-08-04T15:36:47.523Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cms9wl5yg002i04l8kl7849am": {
+    "raceId": "cms9wl5yg002i04l8kl7849am",
+    "cutoff": "2026-08-02T10:57:20.398Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cms9wld1h003t04l835zedsmq": {
+    "raceId": "cms9wld1h003t04l835zedsmq",
+    "cutoff": "2026-08-02T11:17:46.155Z",
+    "raceQuality": "OK",
+    "nRunners": 17,
+    "nAgf01Observed": 17,
+    "nAgf02Observed": 17,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cms9wlkoj005504l89oh6m82l": {
+    "raceId": "cms9wlkoj005504l89oh6m82l",
+    "cutoff": "2026-08-02T11:39:17.575Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cms9wlo1i005j04l8j8stalz0": {
+    "raceId": "cms9wlo1i005j04l8j8stalz0",
+    "cutoff": "2026-08-02T11:47:32.376Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cms9wlyzw007904l8q60qq0s4": {
+    "raceId": "cms9wlyzw007904l8q60qq0s4",
+    "cutoff": "2026-08-02T12:19:36.710Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cms9wm1zr007u04l8y7339z0s": {
+    "raceId": "cms9wm1zr007u04l8y7339z0s",
+    "cutoff": "2026-08-02T12:30:24.582Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cms9wm7fj008u04l8rkdnxuin": {
+    "raceId": "cms9wm7fj008u04l8rkdnxuin",
+    "cutoff": "2026-08-02T12:51:23.630Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 7,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cms9wm9vs009b04l8apsh473e": {
+    "raceId": "cms9wm9vs009b04l8apsh473e",
+    "cutoff": "2026-08-02T13:04:28.574Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 10,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmscri62i008h04l297czbx15": {
+    "raceId": "cmscri62i008h04l297czbx15",
+    "cutoff": "2026-08-04T17:32:41.605Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmsih7yij001o04jitlbcfw2l": {
+    "raceId": "cmsih7yij001o04jitlbcfw2l",
+    "cutoff": "2026-08-08T10:31:22.002Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmsjwnhl2000304jkts601fn2": {
+    "raceId": "cmsjwnhl2000304jkts601fn2",
+    "cutoff": "2026-08-09T09:06:05.219Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsjwnjvb000j04jk7v3ag2cg": {
+    "raceId": "cmsjwnjvb000j04jk7v3ag2cg",
+    "cutoff": "2026-08-09T09:14:47.510Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsjwnpl6001l04jk3946xtyz": {
+    "raceId": "cmsjwnpl6001l04jk3946xtyz",
+    "cutoff": "2026-08-09T09:30:49.215Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsjwnsp6002504jk0u49ev93": {
+    "raceId": "cmsjwnsp6002504jk0u49ev93",
+    "cutoff": "2026-08-09T09:38:11.383Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsjwnvj2002p04jkp339k6jk": {
+    "raceId": "cmsjwnvj2002p04jkp339k6jk",
+    "cutoff": "2026-08-09T10:00:06.542Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsjwo6va004d04jkxzs20m5r": {
+    "raceId": "cmsjwo6va004d04jkxzs20m5r",
+    "cutoff": "2026-08-09T12:28:53.302Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmscri1m7007m04l2e3hqv3qt": {
+    "raceId": "cmscri1m7007m04l2e3hqv3qt",
+    "cutoff": "2026-08-04T17:14:14.180Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmsfmd1sm006t04jlleqb2obb": {
+    "raceId": "cmsfmd1sm006t04jlleqb2obb",
+    "cutoff": "2026-08-06T17:00:15.907Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmsfmd3yz007804jlphhds0oh": {
+    "raceId": "cmsfmd3yz007804jlphhds0oh",
+    "cutoff": "2026-08-06T17:06:31.190Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmsh1u97x005v04jpw03ov7mg": {
+    "raceId": "cmsh1u97x005v04jpw03ov7mg",
+    "cutoff": "2026-08-07T12:56:00.172Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsh1udnn006q04jpn8rans80": {
+    "raceId": "cmsh1udnn006q04jpn8rans80",
+    "cutoff": "2026-08-07T13:30:31.832Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsh1ufl8007304jpplrfupm3": {
+    "raceId": "cmsh1ufl8007304jpplrfupm3",
+    "cutoff": "2026-08-07T13:09:39.463Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsh1uofm008r04jpt0rxvvvl": {
+    "raceId": "cmsh1uofm008r04jpt0rxvvvl",
+    "cutoff": "2026-08-07T13:25:29.784Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt97y7c9001604jg1t6anfvo": {
+    "raceId": "cmt97y7c9001604jg1t6anfvo",
+    "cutoff": "2026-08-27T12:50:19.243Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 9,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt6rtq6o003v04i90khj18fw": {
+    "raceId": "cmt6rtq6o003v04i90khj18fw",
+    "cutoff": "2026-08-25T12:12:14.048Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt875lmq001i04kwvxpctdmv": {
+    "raceId": "cmt875lmq001i04kwvxpctdmv",
+    "cutoff": "2026-08-26T09:35:41.215Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt875h8d000p04kwa8zzcp8f": {
+    "raceId": "cmt875h8d000p04kwa8zzcp8f",
+    "cutoff": "2026-08-26T09:35:23.589Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt97yca8001o04jgy2ns6mg9": {
+    "raceId": "cmt97yca8001o04jgy2ns6mg9",
+    "cutoff": "2026-08-27T12:50:45.051Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmtdwx4qc002i04kwpqtfmlub": {
+    "raceId": "cmtdwx4qc002i04kwpqtfmlub",
+    "cutoff": "2026-08-30T10:30:03.997Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmsih7q1b000304jie7zi3zqx": {
+    "raceId": "cmsih7q1b000304jie7zi3zqx",
+    "cutoff": "2026-08-08T09:37:01.212Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmsih7up8000y04jit0r8rkyg": {
+    "raceId": "cmsih7up8000y04jit0r8rkyg",
+    "cutoff": "2026-08-08T10:20:09.580Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmsjwo8t1004o04jkrd5drg8x": {
+    "raceId": "cmsjwo8t1004o04jkrd5drg8x",
+    "cutoff": "2026-08-09T12:33:21.342Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmsjwoe41005o04jkjzukveeu": {
+    "raceId": "cmsjwoe41005o04jkjzukveeu",
+    "cutoff": "2026-08-09T12:51:46.649Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmsjwoijz006i04jkm2ed8ypd": {
+    "raceId": "cmsjwoijz006i04jkm2ed8ypd",
+    "cutoff": "2026-08-09T12:57:18.978Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmsjwom5n007604jkgxnzz5ta": {
+    "raceId": "cmsjwom5n007604jkgxnzz5ta",
+    "cutoff": "2026-08-09T13:03:18.765Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmsjwor4q008404jk3b8n67br": {
+    "raceId": "cmsjwor4q008404jk3b8n67br",
+    "cutoff": "2026-08-09T13:20:50.613Z",
+    "raceQuality": "OK",
+    "nRunners": 16,
+    "nAgf01Observed": 16,
+    "nAgf02Observed": 16,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmslc47y1003304jv8d0l79b9": {
+    "raceId": "cmslc47y1003304jv8d0l79b9",
+    "cutoff": "2026-08-10T11:49:17.365Z",
+    "raceQuality": "OK",
+    "nRunners": 18,
+    "nAgf01Observed": 18,
+    "nAgf02Observed": 18,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmslc4dll004504jvesc3e8rq": {
+    "raceId": "cmslc4dll004504jvesc3e8rq",
+    "cutoff": "2026-08-10T11:58:33.482Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmslc5ksw00b904jv83pyp8yu": {
+    "raceId": "cmslc5ksw00b904jv83pyp8yu",
+    "cutoff": "2026-08-10T17:57:57.126Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmt97yzgn003r04jg6rmzshbp": {
+    "raceId": "cmt97yzgn003r04jg6rmzshbp",
+    "cutoff": "2026-08-27T15:30:42.546Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmt97ymae002f04jgob897ygr": {
+    "raceId": "cmt97ymae002f04jgob897ygr",
+    "cutoff": "2026-08-27T14:05:07.288Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmt97yacr001h04jgkxihq6vn": {
+    "raceId": "cmt97yacr001h04jgkxihq6vn",
+    "cutoff": "2026-08-27T12:50:35.677Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt97yter003504jgh4rspykj": {
+    "raceId": "cmt97yter003504jgh4rspykj",
+    "cutoff": "2026-08-27T14:06:18.293Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmt97ypay002q04jgtfsn3m9o": {
+    "raceId": "cmt97ypay002q04jgtfsn3m9o",
+    "cutoff": "2026-08-27T14:06:03.861Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmt97z3kf004604jg1y0h32l8": {
+    "raceId": "cmt97z3kf004604jg1y0h32l8",
+    "cutoff": "2026-08-27T15:30:53.656Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmt97z612004f04jgqk1flfs2": {
+    "raceId": "cmt97z612004f04jgqk1flfs2",
+    "cutoff": "2026-08-27T15:31:03.687Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmt97yvli003d04jgrt2h3h13": {
+    "raceId": "cmt97yvli003d04jgrt2h3h13",
+    "cutoff": "2026-08-27T15:30:27.489Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmt876x8v009l04kwjrjjy0d3": {
+    "raceId": "cmt876x8v009l04kwjrjjy0d3",
+    "cutoff": "2026-08-26T15:30:45.582Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmt876zvf00a204kwii678x41": {
+    "raceId": "cmt876zvf00a204kwii678x41",
+    "cutoff": "2026-08-26T15:31:02.845Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmt875uzx003804kw0dm6l2st": {
+    "raceId": "cmt875uzx003804kw0dm6l2st",
+    "cutoff": "2026-08-26T11:17:36.610Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtb21fu6002p04li5ot5rybb": {
+    "raceId": "cmtb21fu6002p04li5ot5rybb",
+    "cutoff": "2026-08-28T11:47:08.567Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtb22ijf009b04li3ttq59cd": {
+    "raceId": "cmtb22ijf009b04li3ttq59cd",
+    "cutoff": "2026-08-28T15:17:34.817Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtb21n3e004104liyg66kj8t": {
+    "raceId": "cmtb21n3e004104liyg66kj8t",
+    "cutoff": "2026-08-28T11:47:34.345Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtb2176j001204liibmzm1nm": {
+    "raceId": "cmtb2176j001204liibmzm1nm",
+    "cutoff": "2026-08-28T09:47:58.118Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtb21kau003i04liryvp5qy0": {
+    "raceId": "cmtb21kau003i04liryvp5qy0",
+    "cutoff": "2026-08-28T11:47:21.577Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtb21243000304li2qvah6qt": {
+    "raceId": "cmtb21243000304li2qvah6qt",
+    "cutoff": "2026-08-28T09:47:26.315Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtb214nb000k04lii3c8q9x5": {
+    "raceId": "cmtb214nb000k04lii3c8q9x5",
+    "cutoff": "2026-08-28T09:47:39.403Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtb21bne001w04lify546va5": {
+    "raceId": "cmtb21bne001w04lify546va5",
+    "cutoff": "2026-08-28T11:46:53.366Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtb21pbs004g04lin6vhxvm0": {
+    "raceId": "cmtb21pbs004g04lin6vhxvm0",
+    "cutoff": "2026-08-28T11:47:47.159Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtb22mfx00a204lixram46u7": {
+    "raceId": "cmtb22mfx00a204lixram46u7",
+    "cutoff": "2026-08-28T15:18:08.586Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtb22q7y00af04lioeoepol9": {
+    "raceId": "cmtb22q7y00af04lioeoepol9",
+    "cutoff": "2026-08-28T15:18:22.938Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmt97zaeo004v04jgcdghz29o": {
+    "raceId": "cmt97zaeo004v04jgcdghz29o",
+    "cutoff": "2026-08-27T15:31:25.681Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "Kocaeli",
+    "month": "2026-08"
+  },
+  "cmtb220yw005z04li0r62k4ts": {
+    "raceId": "cmtb220yw005z04li0r62k4ts",
+    "cutoff": "2026-08-28T13:50:02.953Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtb224bj006m04limu1icx5v": {
+    "raceId": "cmtb224bj006m04limu1icx5v",
+    "cutoff": "2026-08-28T13:50:17.951Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtb227y1007b04lipxr9o8kk": {
+    "raceId": "cmtb227y1007b04lipxr9o8kk",
+    "cutoff": "2026-08-28T13:50:33.083Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtb22emz008l04lilc0hgrrn": {
+    "raceId": "cmtb22emz008l04lilc0hgrrn",
+    "cutoff": "2026-08-28T15:17:17.323Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtb22krl009r04lic45hwwr7": {
+    "raceId": "cmtb22krl009r04lic45hwwr7",
+    "cutoff": "2026-08-28T15:17:53.246Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtc0jvvh005204l1jnk7mnzy": {
+    "raceId": "cmtc0jvvh005204l1jnk7mnzy",
+    "cutoff": "2026-08-29T10:16:31.616Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmt97ye7j001v04jguojnyqnk": {
+    "raceId": "cmt97ye7j001v04jguojnyqnk",
+    "cutoff": "2026-08-27T12:50:53.847Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmtc0k8at007f04l17b5m1rtj": {
+    "raceId": "cmtc0k8at007f04l17b5m1rtj",
+    "cutoff": "2026-08-29T12:00:24.541Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmtc0jt1m004i04l1va8zybwg": {
+    "raceId": "cmtc0jt1m004i04l1va8zybwg",
+    "cutoff": "2026-08-29T10:16:17.382Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmtc0k9zr007l04l1w0bhx032": {
+    "raceId": "cmtc0k9zr007l04l1w0bhx032",
+    "cutoff": "2026-08-29T12:00:37.246Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmtc0jyet005j04l1j8tdcj2o": {
+    "raceId": "cmtc0jyet005j04l1j8tdcj2o",
+    "cutoff": "2026-08-29T10:16:45.220Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmtc0kboo007r04l17a1870vg": {
+    "raceId": "cmtc0kboo007r04l17a1870vg",
+    "cutoff": "2026-08-29T12:00:49.585Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmtc0k1ir006304l1oxwepk3k": {
+    "raceId": "cmtc0k1ir006304l1oxwepk3k",
+    "cutoff": "2026-08-29T10:16:57.466Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmtc0kpan008f04l142i38f96": {
+    "raceId": "cmtc0kpan008f04l142i38f96",
+    "cutoff": "2026-08-29T14:21:03.170Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmtc0k4wx006q04l16p170v05": {
+    "raceId": "cmtc0k4wx006q04l16p170v05",
+    "cutoff": "2026-08-29T10:17:09.249Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmtc0lcgm00ag04l1t4tai8zq": {
+    "raceId": "cmtc0lcgm00ag04l1t4tai8zq",
+    "cutoff": "2026-08-29T17:22:35.991Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmtc0lgf700au04l15aa5gpb5": {
+    "raceId": "cmtc0lgf700au04l15aa5gpb5",
+    "cutoff": "2026-08-29T17:22:50.014Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmtc0ln6100bi04l1uwuo9slw": {
+    "raceId": "cmtc0ln6100bi04l1uwuo9slw",
+    "cutoff": "2026-08-29T17:23:20.450Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmtc0ks96008p04l1m6zwohaf": {
+    "raceId": "cmtc0ks96008p04l1m6zwohaf",
+    "cutoff": "2026-08-29T14:21:21.353Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmtc0kvce009004l1nwpr5mqd": {
+    "raceId": "cmtc0kvce009004l1nwpr5mqd",
+    "cutoff": "2026-08-29T14:21:30.754Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmtc0kzuk009g04l18ngncenw": {
+    "raceId": "cmtc0kzuk009g04l18ngncenw",
+    "cutoff": "2026-08-29T14:21:55.841Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmtc0l23u009o04l1mu01zrm4": {
+    "raceId": "cmtc0l23u009o04l1mu01zrm4",
+    "cutoff": "2026-08-29T14:22:09.129Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmtc0kxvc009904l1z56vsb39": {
+    "raceId": "cmtc0kxvc009904l1z56vsb39",
+    "cutoff": "2026-08-29T14:21:43.492Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "İzmir",
+    "month": "2026-08"
+  },
+  "cmtb219p1001j04lis2m3qi8y": {
+    "raceId": "cmtb219p1001j04lis2m3qi8y",
+    "cutoff": "2026-08-28T09:48:18.013Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtc0lk2s00b704l1olhg0fik": {
+    "raceId": "cmtc0lk2s00b704l1olhg0fik",
+    "cutoff": "2026-08-29T17:23:02.152Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmtc0lpp600br04l1wpda2m09": {
+    "raceId": "cmtc0lpp600br04l1wpda2m09",
+    "cutoff": "2026-08-29T17:23:35.403Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmtc0jpxt003x04l1sm10xvb0": {
+    "raceId": "cmtc0jpxt003x04l1sm10xvb0",
+    "cutoff": "2026-08-29T10:16:00.596Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Ankara",
+    "month": "2026-08"
+  },
+  "cmtc0l88m00a104l1hp69l93q": {
+    "raceId": "cmtc0l88m00a104l1hp69l93q",
+    "cutoff": "2026-08-29T17:22:20.343Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "Diyarbakır",
+    "month": "2026-08"
+  },
+  "cmtdwx2tm002604kw49d6uhi6": {
+    "raceId": "cmtdwx2tm002604kw49d6uhi6",
+    "cutoff": "2026-08-30T10:23:32.712Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtdwx6n3002w04kwnxepe9y9": {
+    "raceId": "cmtdwx6n3002w04kwnxepe9y9",
+    "cutoff": "2026-08-30T11:59:56.937Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtdwwxlb001604kww1u7fued": {
+    "raceId": "cmtdwwxlb001604kww1u7fued",
+    "cutoff": "2026-08-30T10:22:46.391Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtdwyd2q009x04kwm39kgbpo": {
+    "raceId": "cmtdwyd2q009x04kwm39kgbpo",
+    "cutoff": "2026-08-30T15:21:40.182Z",
+    "raceQuality": "OK",
+    "nRunners": 18,
+    "nAgf01Observed": 18,
+    "nAgf02Observed": 18,
+    "hippodrome": "Adana",
+    "month": "2026-08"
+  },
+  "cmtdwx8js003904kwp87tjar1": {
+    "raceId": "cmtdwx8js003904kwp87tjar1",
+    "cutoff": "2026-08-30T12:00:08.224Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtdwxude006o04kwzadx2u3p": {
+    "raceId": "cmtdwxude006o04kwzadx2u3p",
+    "cutoff": "2026-08-30T15:20:49.483Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Adana",
+    "month": "2026-08"
+  },
+  "cmtdwy6jb008n04kw7sehh0wc": {
+    "raceId": "cmtdwy6jb008n04kw7sehh0wc",
+    "cutoff": "2026-08-30T15:21:20.801Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Adana",
+    "month": "2026-08"
+  },
+  "cmtdwxkmy004u04kwxhv9x35a": {
+    "raceId": "cmtdwxkmy004u04kwxhv9x35a",
+    "cutoff": "2026-08-30T13:40:11.107Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "Adana",
+    "month": "2026-08"
+  },
+  "cmtdwxs2r006904kw2cmi6f3e": {
+    "raceId": "cmtdwxs2r006904kw2cmi6f3e",
+    "cutoff": "2026-08-30T13:40:44.949Z",
+    "raceQuality": "OK",
+    "nRunners": 7,
+    "nAgf01Observed": 7,
+    "nAgf02Observed": 7,
+    "hippodrome": "Adana",
+    "month": "2026-08"
+  },
+  "cmtdwy36m008a04kwym3viasj": {
+    "raceId": "cmtdwy36m008a04kwym3viasj",
+    "cutoff": "2026-08-30T15:21:09.412Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Adana",
+    "month": "2026-08"
+  },
+  "cmtdwy9y3009c04kwzxha6xjx": {
+    "raceId": "cmtdwy9y3009c04kwzxha6xjx",
+    "cutoff": "2026-08-30T15:21:28.970Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Adana",
+    "month": "2026-08"
+  },
+  "cmtdwws3c000404kwyxicq0fo": {
+    "raceId": "cmtdwws3c000404kwyxicq0fo",
+    "cutoff": "2026-08-30T10:21:22.889Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtdwxbjx003t04kwi5ukdxlj": {
+    "raceId": "cmtdwxbjx003t04kwi5ukdxlj",
+    "cutoff": "2026-08-30T12:00:23.635Z",
+    "raceQuality": "OK",
+    "nRunners": 16,
+    "nAgf01Observed": 16,
+    "nAgf02Observed": 16,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtfcdt8u000704jrd2z5n0nx": {
+    "raceId": "cmtfcdt8u000704jrd2z5n0nx",
+    "cutoff": "2026-08-31T10:03:22.142Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtfcdxe7000z04jrnqulmraz": {
+    "raceId": "cmtfcdxe7000z04jrnqulmraz",
+    "cutoff": "2026-08-31T10:03:37.916Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtdwxnrt005f04kw1j0p55xd": {
+    "raceId": "cmtdwxnrt005f04kw1j0p55xd",
+    "cutoff": "2026-08-30T13:40:27.747Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "Adana",
+    "month": "2026-08"
+  },
+  "cmtdwwuul000n04kw8tm36yuv": {
+    "raceId": "cmtdwwuul000n04kw8tm36yuv",
+    "cutoff": "2026-08-30T10:21:56.450Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtdwwzjl001j04kwny6gsfkh": {
+    "raceId": "cmtdwwzjl001j04kwny6gsfkh",
+    "cutoff": "2026-08-30T10:23:11.397Z",
+    "raceQuality": "OK",
+    "nRunners": 10,
+    "nAgf01Observed": 10,
+    "nAgf02Observed": 10,
+    "hippodrome": "İstanbul",
+    "month": "2026-08"
+  },
+  "cmtfiu2po009k04l6ijsq6xau": {
+    "raceId": "cmtfiu2po009k04l6ijsq6xau",
+    "cutoff": "2026-08-31T13:30:09.532Z",
+    "raceQuality": "OK",
+    "nRunners": 6,
+    "nAgf01Observed": 6,
+    "nAgf02Observed": 6,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmtfitr1x007c04l6bhil5vdy": {
+    "raceId": "cmtfitr1x007c04l6bhil5vdy",
+    "cutoff": "2026-08-31T13:29:30.811Z",
+    "raceQuality": "OK",
+    "nRunners": 8,
+    "nAgf01Observed": 8,
+    "nAgf02Observed": 8,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmtfce8m4003004jr5li8bmx7": {
+    "raceId": "cmtfce8m4003004jr5li8bmx7",
+    "cutoff": "2026-08-31T11:24:33.177Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtfcegkr004h04jrqbqsrrn7": {
+    "raceId": "cmtfcegkr004h04jrqbqsrrn7",
+    "cutoff": "2026-08-31T11:24:52.552Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtfceq4n005s04jr782yg6ow": {
+    "raceId": "cmtfceq4n005s04jr782yg6ow",
+    "cutoff": "2026-08-31T11:25:24.818Z",
+    "raceQuality": "OK",
+    "nRunners": 18,
+    "nAgf01Observed": 18,
+    "nAgf02Observed": 18,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtfcdz5w001a04jrnfff7ntr": {
+    "raceId": "cmtfcdz5w001a04jrnfff7ntr",
+    "cutoff": "2026-08-31T10:03:54.339Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtfce3wd002504jrjp9tjha9": {
+    "raceId": "cmtfce3wd002504jrjp9tjha9",
+    "cutoff": "2026-08-31T10:04:11.485Z",
+    "raceQuality": "OK",
+    "nRunners": 15,
+    "nAgf01Observed": 15,
+    "nAgf02Observed": 15,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtfitniq006o04l6ze56090q": {
+    "raceId": "cmtfitniq006o04l6ze56090q",
+    "cutoff": "2026-08-31T13:28:53.404Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmtfitti0007t04l6py5zpoie": {
+    "raceId": "cmtfitti0007t04l6py5zpoie",
+    "cutoff": "2026-08-31T13:29:18.419Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmtfitwr7008g04l6auu2kph6": {
+    "raceId": "cmtfitwr7008g04l6auu2kph6",
+    "cutoff": "2026-08-31T13:29:44.746Z",
+    "raceQuality": "OK",
+    "nRunners": 11,
+    "nAgf01Observed": 11,
+    "nAgf02Observed": 11,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmtfcec5k003m04jrukxi8gfc": {
+    "raceId": "cmtfcec5k003m04jrukxi8gfc",
+    "cutoff": "2026-08-31T11:24:42.411Z",
+    "raceQuality": "OK",
+    "nRunners": 14,
+    "nAgf01Observed": 14,
+    "nAgf02Observed": 14,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtfcejxq004r04jr53jyeqa9": {
+    "raceId": "cmtfcejxq004r04jr53jyeqa9",
+    "cutoff": "2026-08-31T11:25:02.826Z",
+    "raceQuality": "OK",
+    "nRunners": 5,
+    "nAgf01Observed": 5,
+    "nAgf02Observed": 5,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  },
+  "cmtfiu84t00am04l63tqoowre": {
+    "raceId": "cmtfiu84t00am04l63tqoowre",
+    "cutoff": "2026-08-31T13:30:40.699Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmtfiu002009204l64ongcclv": {
+    "raceId": "cmtfiu002009204l64ongcclv",
+    "cutoff": "2026-08-31T13:29:56.935Z",
+    "raceQuality": "OK",
+    "nRunners": 9,
+    "nAgf01Observed": 9,
+    "nAgf02Observed": 9,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmtfiu4m3009y04l6mfhto7tz": {
+    "raceId": "cmtfiu4m3009y04l6mfhto7tz",
+    "cutoff": "2026-08-31T13:30:27.164Z",
+    "raceQuality": "OK",
+    "nRunners": 12,
+    "nAgf01Observed": 12,
+    "nAgf02Observed": 12,
+    "hippodrome": "Elazığ",
+    "month": "2026-08"
+  },
+  "cmtfcelpd004z04jr2dw2epzn": {
+    "raceId": "cmtfcelpd004z04jr2dw2epzn",
+    "cutoff": "2026-08-31T11:25:12.595Z",
+    "raceQuality": "OK",
+    "nRunners": 13,
+    "nAgf01Observed": 13,
+    "nAgf02Observed": 13,
+    "hippodrome": "Bursa",
+    "month": "2026-08"
+  }
+}

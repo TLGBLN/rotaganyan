@@ -1,0 +1,391 @@
+{
+  "fitOpts": {
+    "lambda": 1,
+    "learningRate": 0.05,
+    "iterations": 300
+  },
+  "trainN": 120,
+  "holdoutN": 30,
+  "modelA": {
+    "nRacesUsed": 120,
+    "top1": 0.23333333333333334,
+    "top3": 0.4666666666666667,
+    "logLoss": 2.162607579013867
+  },
+  "modelB": {
+    "nRacesUsed": 120,
+    "top1": 0.26666666666666666,
+    "top3": 0.5,
+    "logLoss": 2.211399245262517
+  },
+  "agfMissedCount": 8,
+  "agfMissed_aTop3": 1,
+  "agfMissed_bTop3": 2,
+  "aFoundBMissed": [],
+  "bFoundAMissed": [
+    "cmt8760ud004a04kwle9grhp7"
+  ],
+  "aTop3FoundBMissed": [
+    "cmszmlmkc00eb04k029g7ox68"
+  ],
+  "bTop3FoundAMissed": [
+    "cms9wm7fj008u04l8rkdnxuin",
+    "cmtfiu84t00am04l63tqoowre"
+  ],
+  "ablation": {
+    "GEN_SIRE_PMZ_01": {
+      "beta_z": -0.06668598177018178,
+      "nRacesUsed": 120
+    },
+    "INT_JOKEY_FORM_TEMPO_01": {
+      "beta_z": -0.12409507519901965,
+      "nRacesUsed": 120
+    },
+    "INT_FORM_GALOP_DINLENME_01": {
+      "beta_z": -0.049280220067785194,
+      "nRacesUsed": 120
+    },
+    "INT_TEMPO_STIL_KULVAR_01": {
+      "beta_z": -0.08595275890603159,
+      "nRacesUsed": 120
+    }
+  },
+  "modelB_betas": {
+    "GEN_SIRE_PMZ_01": -0.055968327381871213,
+    "INT_JOKEY_FORM_TEMPO_01": -0.11253774815471311,
+    "INT_FORM_GALOP_DINLENME_01": -0.046869714053722956,
+    "INT_TEMPO_STIL_KULVAR_01": -0.06807464952389053
+  },
+  "evals": [
+    {
+      "raceId": "cmru6rr5b002a04lbtj7i1egf",
+      "winnerNo": 5,
+      "aTop1": false,
+      "aTop3": true,
+      "bTop1": false,
+      "bTop3": true,
+      "aWinP": 0.17403040389309768,
+      "bWinP": 0.17774380477395113,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmrx38hmi006204l82bx85gfj",
+      "winnerNo": 8,
+      "aTop1": false,
+      "aTop3": false,
+      "bTop1": false,
+      "bTop3": false,
+      "aWinP": 0.08432580670227438,
+      "bWinP": 0.089663715489704,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cms0pboub003a04l75psdtpr8",
+      "winnerNo": 3,
+      "aTop1": true,
+      "aTop3": true,
+      "bTop1": true,
+      "bTop3": true,
+      "aWinP": 0.31046729638406745,
+      "bWinP": 0.34577669951528295,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cms5noy5m00bd04ky91v6nymx",
+      "winnerNo": 11,
+      "aTop1": true,
+      "aTop3": true,
+      "bTop1": true,
+      "bTop3": true,
+      "aWinP": 0.12276629855521434,
+      "bWinP": 0.11591764816145507,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cms9wm7fj008u04l8rkdnxuin",
+      "winnerNo": 3,
+      "aTop1": false,
+      "aTop3": false,
+      "bTop1": false,
+      "bTop3": true,
+      "aWinP": 0.11539749282128854,
+      "bWinP": 0.12154564595101124,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmse6xwem006a04l487jngqzu",
+      "winnerNo": 3,
+      "aTop1": false,
+      "aTop3": false,
+      "bTop1": false,
+      "bTop3": false,
+      "aWinP": 0.06711059391494056,
+      "bWinP": 0.05468621706207026,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmsih9667008w04jig50thx70",
+      "winnerNo": 2,
+      "aTop1": true,
+      "aTop3": true,
+      "bTop1": true,
+      "bTop3": true,
+      "aWinP": 0.3018093002486727,
+      "bWinP": 0.36295663531029265,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmsmrkifp006t04juwnmfgta9",
+      "winnerNo": 5,
+      "aTop1": false,
+      "aTop3": false,
+      "bTop1": false,
+      "bTop3": false,
+      "aWinP": 0.07048283825710155,
+      "bWinP": 0.07265163452860643,
+      "agfTop3": false
+    },
+    {
+      "raceId": "cmsr1wh7z00a304jodx4lkv4b",
+      "winnerNo": 8,
+      "aTop1": false,
+      "aTop3": false,
+      "bTop1": false,
+      "bTop3": false,
+      "aWinP": 0.033005669961187936,
+      "bWinP": 0.031118055643502195,
+      "agfTop3": false
+    },
+    {
+      "raceId": "cmsvc8ifa00da04jouc2hihrr",
+      "winnerNo": 2,
+      "aTop1": false,
+      "aTop3": false,
+      "bTop1": false,
+      "bTop3": false,
+      "aWinP": 0.11037186217482409,
+      "bWinP": 0.04872643634027265,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmszmlmkc00eb04k029g7ox68",
+      "winnerNo": 3,
+      "aTop1": false,
+      "aTop3": true,
+      "bTop1": false,
+      "bTop3": false,
+      "aWinP": 0.20948121004876913,
+      "bWinP": 0.14065189806648284,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmt3wwfy3009n04ibzpli8dh7",
+      "winnerNo": 7,
+      "aTop1": false,
+      "aTop3": true,
+      "bTop1": false,
+      "bTop3": true,
+      "aWinP": 0.15271632985627137,
+      "bWinP": 0.14176425378315083,
+      "agfTop3": false
+    },
+    {
+      "raceId": "cmt8760ud004a04kwle9grhp7",
+      "winnerNo": 7,
+      "aTop1": false,
+      "aTop3": true,
+      "bTop1": true,
+      "bTop3": true,
+      "aWinP": 0.22418036668086003,
+      "bWinP": 0.2380577128868445,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmtc0kboo007r04l17a1870vg",
+      "winnerNo": 1,
+      "aTop1": false,
+      "aTop3": true,
+      "bTop1": false,
+      "bTop3": true,
+      "aWinP": 0.20531052028565472,
+      "bWinP": 0.18303373119019958,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmtfiu84t00am04l63tqoowre",
+      "winnerNo": 10,
+      "aTop1": false,
+      "aTop3": false,
+      "bTop1": false,
+      "bTop3": true,
+      "aWinP": 0.12907446877691856,
+      "bWinP": 0.14357829915897105,
+      "agfTop3": false
+    },
+    {
+      "raceId": "cmtl2440q000r04l2g5pynvbs",
+      "winnerNo": 9,
+      "aTop1": false,
+      "aTop3": false,
+      "bTop1": false,
+      "bTop3": false,
+      "aWinP": 0.12445270599619339,
+      "bWinP": 0.12301875349462074,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmtpcfr9w001b04jmxwkvbkgq",
+      "winnerNo": 14,
+      "aTop1": false,
+      "aTop3": true,
+      "bTop1": false,
+      "bTop3": true,
+      "aWinP": 0.15099220396553514,
+      "bWinP": 0.1668166860190805,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmttmr4xt000404l648loyfoh",
+      "winnerNo": 3,
+      "aTop1": true,
+      "aTop3": true,
+      "bTop1": true,
+      "bTop3": true,
+      "aWinP": 0.3191741261260313,
+      "bWinP": 0.32460234196965815,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmtwhndqi003s04l59g8wnjf4",
+      "winnerNo": 1,
+      "aTop1": false,
+      "aTop3": false,
+      "bTop1": false,
+      "bTop3": false,
+      "aWinP": 0.12102549243796491,
+      "bWinP": 0.11035071968703085,
+      "agfTop3": false
+    },
+    {
+      "raceId": "cmu0rzw0y009g04jp28popuxm",
+      "winnerNo": 4,
+      "aTop1": false,
+      "aTop3": false,
+      "bTop1": false,
+      "bTop3": false,
+      "aWinP": 0.08282963480364468,
+      "bWinP": 0.08465275289754032,
+      "agfTop3": false
+    },
+    {
+      "raceId": "cmu60zh6i00tb04l00w70xauy",
+      "winnerNo": 3,
+      "aTop1": false,
+      "aTop3": true,
+      "bTop1": false,
+      "bTop3": true,
+      "aWinP": 0.22619871976309672,
+      "bWinP": 0.22346825872824944,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmu9cng4a00bp04jygpzvq9tl",
+      "winnerNo": 4,
+      "aTop1": true,
+      "aTop3": true,
+      "bTop1": true,
+      "bTop3": true,
+      "aWinP": 0.2546885016539526,
+      "bWinP": 0.23597988552264873,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmudmxle5003t04ifoururzfg",
+      "winnerNo": 9,
+      "aTop1": false,
+      "aTop3": false,
+      "bTop1": false,
+      "bTop3": false,
+      "aWinP": 0.029897013999261767,
+      "bWinP": 0.02847891830236515,
+      "agfTop3": false
+    },
+    {
+      "raceId": "cmuhxaatu00bt04le4impz23d",
+      "winnerNo": 10,
+      "aTop1": true,
+      "aTop3": true,
+      "bTop1": true,
+      "bTop3": true,
+      "aWinP": 0.2031665077354019,
+      "bWinP": 0.19035969359905716,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmunn07g4002p04lbld7cukhi",
+      "winnerNo": 5,
+      "aTop1": false,
+      "aTop3": false,
+      "bTop1": false,
+      "bTop3": false,
+      "aWinP": 0.03616901102089742,
+      "bWinP": 0.03492530594707036,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmuqhxkxc00cc04jqmsi15gj7",
+      "winnerNo": 8,
+      "aTop1": false,
+      "aTop3": false,
+      "bTop1": false,
+      "bTop3": false,
+      "aWinP": 0.027261122328963237,
+      "bWinP": 0.026179371265905627,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmuus8ggo009b04jtwzu0klhk",
+      "winnerNo": 1,
+      "aTop1": false,
+      "aTop3": false,
+      "bTop1": false,
+      "bTop3": false,
+      "aWinP": 0.09681106475052087,
+      "bWinP": 0.0968927329384031,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmuz2k528009p04lbbu9sfj21",
+      "winnerNo": 8,
+      "aTop1": false,
+      "aTop3": false,
+      "bTop1": false,
+      "bTop3": false,
+      "aWinP": 0.06764879271592804,
+      "bWinP": 0.06142019019605974,
+      "agfTop3": false
+    },
+    {
+      "raceId": "cmv3cvbfk006q06kuq9e8zry5",
+      "winnerNo": 7,
+      "aTop1": true,
+      "aTop3": true,
+      "bTop1": true,
+      "bTop3": true,
+      "aWinP": 0.34519057229167527,
+      "bWinP": 0.34534311602502127,
+      "agfTop3": true
+    },
+    {
+      "raceId": "cmv7n6slh006r06jk4ukyg3b9",
+      "winnerNo": 9,
+      "aTop1": false,
+      "aTop3": false,
+      "bTop1": false,
+      "bTop3": false,
+      "aWinP": 0.02227307830153369,
+      "bWinP": 0.021780063705203134,
+      "agfTop3": true
+    }
+  ]
+}

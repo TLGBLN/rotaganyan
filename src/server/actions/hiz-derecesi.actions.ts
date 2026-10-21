@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/db";
 import { breedToIrk } from "@/lib/sire-stat-match";
+import { parseTjkDate } from "@/lib/motor-v1/features/history-source";
 import { hizPaceIndexKur, hizDerecesiHesaplaOrtak, type HizGecmisSatir, type PaceIndex } from "@/lib/methodology/hiz-derecesi-hesapla";
 
 /**
@@ -36,7 +37,7 @@ type GecmisSatir = HizGecmisSatir;
 const ONBELLEK_TTL_MS = 6 * 60 * 60 * 1000;
 let onbellekCache: { gecmis: Map<number, GecmisSatir[]>; irk: Map<number, string>; paceIndex: PaceIndex; zaman: number } | null = null;
 
-export async function tumOnbellegiGetir(): Promise<{ gecmis: Map<number, GecmisSatir[]>; irk: Map<number, string>; paceIndex: PaceIndex }> {
+async function loadHizOnbellekRaw(): Promise<{ gecmis: Map<number, GecmisSatir[]>; irk: Map<number, string>; paceIndex: PaceIndex }> {
   if (onbellekCache && Date.now() - onbellekCache.zaman < ONBELLEK_TTL_MS) return onbellekCache;
   const [tumOnbellek, atIrkKayitlari] = await Promise.all([
     db.horseRaceHistoryCache.findMany({ select: { tjkAtId: true, rowsJson: true } }),
@@ -51,6 +52,39 @@ export async function tumOnbellegiGetir(): Promise<{ gecmis: Map<number, GecmisS
   const paceIndex = hizPaceIndexKur(gecmis, irk);
   onbellekCache = { gecmis, irk, paceIndex, zaman: Date.now() };
   return onbellekCache;
+}
+
+
+let hizOnbellekPending:
+  ReturnType<typeof loadHizOnbellekRaw> | null = null;
+
+export async function tumOnbellegiGetir():
+  ReturnType<typeof loadHizOnbellekRaw> {
+
+  // Alti saatlik mevcut onbellek davranisi korunur.
+  if (
+    onbellekCache &&
+    Date.now() - onbellekCache.zaman < ONBELLEK_TTL_MS
+  ) {
+    return onbellekCache;
+  }
+
+  // Ilk yukleme devam ediyorsa ayni Promise paylasilir.
+  if (hizOnbellekPending) {
+    return hizOnbellekPending;
+  }
+
+  const work = loadHizOnbellekRaw();
+  hizOnbellekPending = work;
+
+  try {
+    return await work;
+  } finally {
+    // Basarili veya hatali yukleme sonrasi kilidi kaldir.
+    if (hizOnbellekPending === work) {
+      hizOnbellekPending = null;
+    }
+  }
 }
 
 /**
@@ -93,13 +127,23 @@ export async function getHizDerecesiForRace(
 export async function getHizDerecesiGozlemliForRace(raceId: string): Promise<Map<number, boolean>> {
   const race = await db.race.findUnique({
     where: { id: raceId },
-    select: { runners: { where: { scratched: false }, select: { no: true, tjkAtId: true } } },
+    select: { raceDay: { select: { date: true } }, runners: { where: { scratched: false }, select: { no: true, tjkAtId: true } } },
   });
   if (!race) return new Map();
   const { gecmis: gecmisByTjkAtId } = await tumOnbellegiGetir();
   const sonuc = new Map<number, boolean>();
+  const cutoff = race.raceDay.date.getTime();
   for (const r of race.runners) {
-    sonuc.set(r.no, r.tjkAtId != null && (gecmisByTjkAtId.get(r.tjkAtId)?.length ?? 0) > 0);
+    const history = r.tjkAtId != null
+      ? gecmisByTjkAtId.get(r.tjkAtId)
+      : undefined;
+
+    const hasPriorHistory = history?.some(g => {
+      const date = parseTjkDate(g.date);
+      return date != null && date.getTime() < cutoff;
+    }) ?? false;
+
+    sonuc.set(r.no, hasPriorHistory);
   }
   return sonuc;
 }

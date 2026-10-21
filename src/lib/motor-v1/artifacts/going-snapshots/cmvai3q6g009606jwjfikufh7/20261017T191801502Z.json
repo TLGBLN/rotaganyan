@@ -1,0 +1,16 @@
+{
+  "payload": {
+    "version": 1,
+    "raceId": "cmvai3q6g009606jwjfikufh7",
+    "raceNo": 6,
+    "hippodrome": "Diyarbakır",
+    "surface": "KUM",
+    "rawGoing": "Normal",
+    "regime": "NORMAL",
+    "capturedAt": "2026-10-17T19:18:01.502Z",
+    "scheduledRaceStartUtc": "2026-10-17T20:30:00.000Z",
+    "source": "RaceDay.surfaceConditions",
+    "sourceOriginalTimestampAvailable": false
+  },
+  "sha256": "a413d39835afa26da3816051eca57f999a0020af689358de37b49cd6e9b34a58"
+}
