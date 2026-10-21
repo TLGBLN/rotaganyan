@@ -646,6 +646,10 @@ export function AnalysisPanel({
               const winnerPick = rowPicks.find((p) => p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no));
               const isWinner = winnerPick != null;
               const renk = apBandRenk(displayRank, isWinner);
+              // 2026-10-21 kullanıcı talebi: "kazananlar DAKAPO gibi gösterilsin" — altın
+              // rozet/satır arka planı artık yalnız modelin 1. sırası değil, GERÇEK yarış
+              // kazananı için de uygulanıyor (ikisi farklı atsa bile ikisi de altın olur).
+              const isGoldRow = displayRank === 1 || isWinner;
               const noText = rowPicks.map((p) => pickDisplay(p).no).join("-");
               const nameText = rowPicks.map((p) => pickDisplay(p).name).join(" / ");
               const agfRanks = rowPicks
@@ -656,12 +660,12 @@ export function AnalysisPanel({
                 <tr
                   key={first.rank}
                   className="border-b last:border-0"
-                  style={{ borderColor: "rgba(255,255,255,0.06)", background: displayRank === 1 ? "rgba(223,157,0,0.1)" : "transparent" }}
+                  style={{ borderColor: "rgba(255,255,255,0.06)", background: isGoldRow ? "rgba(223,157,0,0.1)" : "transparent" }}
                 >
                   <td className="px-2 py-2 text-center">
                     <span
                       className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold"
-                      style={{ background: displayRank === 1 ? AP_GOLD : "rgba(255,255,255,0.1)", color: displayRank === 1 ? "#1a1206" : AP_INK }}
+                      style={{ background: isGoldRow ? AP_GOLD : "rgba(255,255,255,0.1)", color: isGoldRow ? "#1a1206" : AP_INK }}
                     >
                       {displayRank}
                     </span>
@@ -777,6 +781,8 @@ export function AnalysisPanel({
           const winnerPick = rowPicks.find((p) => p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no));
           const isWinner = winnerPick != null;
           const renk = apBandRenk(displayRank, isWinner);
+          // bkz. masaüstü tablodaki aynı not — kazanan at da altın rozet/arka plan alır.
+          const isGoldRow = displayRank === 1 || isWinner;
           const noText = rowPicks.map((p) => pickDisplay(p).no).join("-");
           const nameText = rowPicks.map((p) => pickDisplay(p).name).join(" / ");
           const agfRanks = rowPicks
@@ -784,11 +790,11 @@ export function AnalysisPanel({
             .filter((n): n is number => n != null);
           const pct = Math.max(0, Math.min(100, first.score ?? Math.round(first.scoreExact ?? 0)));
           return (
-            <div key={first.rank} className="px-3 py-2.5" style={{ background: displayRank === 1 ? "rgba(223,157,0,0.1)" : "transparent" }}>
+            <div key={first.rank} className="px-3 py-2.5" style={{ background: isGoldRow ? "rgba(223,157,0,0.1)" : "transparent" }}>
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 <span
                   className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0"
-                  style={{ background: displayRank === 1 ? AP_GOLD : "rgba(255,255,255,0.1)", color: displayRank === 1 ? "#1a1206" : AP_INK }}
+                  style={{ background: isGoldRow ? AP_GOLD : "rgba(255,255,255,0.1)", color: isGoldRow ? "#1a1206" : AP_INK }}
                 >
                   {displayRank}
                 </span>
