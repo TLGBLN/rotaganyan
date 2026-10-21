@@ -9,7 +9,8 @@ import { siraliPickler } from "@/lib/methodology/pick-display-order";
 import { puanYuzdesiMetni, piyasaFarkiPuani } from "@/lib/methodology/muhakeme-format";
 import { surfaceLabel, breedLabel } from "@/lib/utils";
 import { KuponBlock } from "@/components/home/TahminOnerileri";
-import SiralamaListesi, { Son5Yaris } from "./SiralamaListesi";
+import { AnalysisPanel } from "@/components/program/ProgramView";
+import { Son5Yaris } from "./SiralamaListesi";
 
 /** Oval pist şeması — ekrandaki referansın "pist ikonu", markaya özgü basit bir SVG
  *  (dışarıdan illüstrasyon yerine — bkz. proje kuralı: AI-jenerik görsel yerine konuya
@@ -212,7 +213,20 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
-        <SiralamaListesi race={race} formByNo={formByNo} agfByNo={agfByNo} />
+        <AnalysisPanel
+          picks={picks}
+          runners={race.runners.map((r) => ({ no: r.no, name: r.name, scratched: false, ekuriGroup: r.ekuriGroup, agf: r.agf }))}
+          winnerNos={race.result?.winnerNos}
+          ganyan={race.result?.ganyan}
+          isLoggedIn={true}
+          isAdmin={isAdmin}
+          isVerified={true}
+          userEmail=""
+          raceNo={race.raceNo}
+          hippodromeName={raceDay.hippodrome.name}
+          raceId={race.id}
+          autoScroll={false}
+        />
 
         <div className="space-y-4 lg:sticky lg:top-4">
           {kupon ? (
