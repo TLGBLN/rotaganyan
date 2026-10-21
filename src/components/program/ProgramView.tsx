@@ -1801,14 +1801,17 @@ export default function ProgramView({
                   {t("atProfilleri")} {kilitVeyaChevron(atDetayOpen)}
                 </button>
               )}
-              {/* 2026-10-10 kullanıcı talebi — bu 7 panel masaüstünde (sm+) kendi ayrı
+              {/* 2026-10-10 kullanıcı talebi — bu 7 panel masaüstünde (md+) kendi ayrı
                   düğmeleriyle duruyor; mobilde (bkz. az altındaki dropdown) tek bir
                   "Veri Panelleri" menüsüne toplanıyor — "Tüm Verileri Göster" ARTIK bunları
-                  kapsamıyor (yukarıdaki düğme "At Profilleri" adıyla yalnız o paneli açar). */}
+                  kapsamıyor (yukarıdaki düğme "At Profilleri" adıyla yalnız o paneli açar).
+                  2026-10-21 kullanıcı bulgusu: sm (640px) eşiği geniş telefonlarda YETERSİZDİ,
+                  10 düğme tek satıra sığmayıp son düğme kesiliyordu — eşik md (768px)'ye
+                  çekildi, böylece daha geniş telefonlar da dropdown'a düşer. */}
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setSonYarisOpen, sonYarisOpen, "panel-son-yaris-detay")}
-                  className={cn(PANEL_BTN_CLASS, sonYarisOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden sm:flex")}
+                  className={cn(PANEL_BTN_CLASS, sonYarisOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden md:flex")}
                 >
                   {t("sonYarisDetaylari")} {kilitVeyaChevron(sonYarisOpen)}
                 </button>
@@ -1816,7 +1819,7 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setSon800Open, son800Open, "panel-son800")}
-                  className={cn(PANEL_BTN_CLASS, son800Open ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden sm:flex")}
+                  className={cn(PANEL_BTN_CLASS, son800Open ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden md:flex")}
                 >
                   {t("accuraceButon")} {kilitVeyaChevron(son800Open)}
                 </button>
@@ -1824,7 +1827,7 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setAgfTrendOpen, agfTrendOpen, "panel-agf-trend")}
-                  className={cn(PANEL_BTN_CLASS, agfTrendOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden sm:flex")}
+                  className={cn(PANEL_BTN_CLASS, agfTrendOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden md:flex")}
                 >
                   {t("agfTrend")} {kilitVeyaChevron(agfTrendOpen)}
                 </button>
@@ -1832,7 +1835,7 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setGalopOpen, galopOpen, "panel-galop")}
-                  className={cn(PANEL_BTN_CLASS, galopOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden sm:flex")}
+                  className={cn(PANEL_BTN_CLASS, galopOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden md:flex")}
                 >
                   {t("sonHazirliklar")} {kilitVeyaChevron(galopOpen)}
                 </button>
@@ -1840,7 +1843,7 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setPedigreeOpen, pedigreeOpen, "panel-pedigriler")}
-                  className={cn(PANEL_BTN_CLASS, pedigreeOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden sm:flex")}
+                  className={cn(PANEL_BTN_CLASS, pedigreeOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden md:flex")}
                 >
                   {t("pedigriler")} {kilitVeyaChevron(pedigreeOpen)}
                 </button>
@@ -1848,7 +1851,7 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setComparisonOpen, comparisonOpen, "panel-karsilastir")}
-                  className={cn(PANEL_BTN_CLASS, comparisonOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden sm:flex")}
+                  className={cn(PANEL_BTN_CLASS, comparisonOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden md:flex")}
                 >
                   {t("karsilastir")} {kilitVeyaChevron(comparisonOpen)}
                 </button>
@@ -1856,7 +1859,7 @@ export default function ProgramView({
               {currentRace && (
                 <button
                   onClick={() => toggleAndScroll(setH2hOpen, h2hOpen, "panel-h2h")}
-                  className={cn(PANEL_BTN_CLASS, h2hOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden sm:flex")}
+                  className={cn(PANEL_BTN_CLASS, h2hOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "hidden md:flex")}
                 >
                   {t("h2hButon")} {kilitVeyaChevron(h2hOpen)}
                 </button>
@@ -1871,7 +1874,7 @@ export default function ProgramView({
               {currentRace && (
                 <Popover open={panelMenuOpen} onOpenChange={setPanelMenuOpen}>
                   <PopoverTrigger asChild>
-                    <button className={cn(PANEL_BTN_CLASS, panelMenuOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "shrink-0 sm:hidden")}>
+                    <button className={cn(PANEL_BTN_CLASS, panelMenuOpen ? PANEL_BTN_OPEN : PANEL_BTN_CLOSED, "shrink-0 md:hidden")}>
                       {t("veriPanelleri")} {panelMenuOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                     </button>
                   </PopoverTrigger>
@@ -1903,13 +1906,13 @@ export default function ProgramView({
                 <button
                   onClick={() => setHipodromOzellikleriOpen(true)}
                   data-tour="hipodrom-ozellikleri"
-                  className={cn(PANEL_BTN_CLASS, PANEL_BTN_CLOSED, "hidden sm:flex")}
+                  className={cn(PANEL_BTN_CLASS, PANEL_BTN_CLOSED, "hidden md:flex")}
                 >
                   {t("hipodromOzellikleri")} {!isLoggedIn && "🔒"}
                 </button>
               )}
               {currentRace && (
-                <div className="hidden sm:block shrink-0">
+                <div className="hidden md:block shrink-0">
                   <RaceTimer time={currentRace.time} hasResult={currentRace.result != null} dateStr={dateStr} />
                 </div>
               )}
