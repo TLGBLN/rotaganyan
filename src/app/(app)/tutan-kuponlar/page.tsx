@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getGecmisKazananKuponlar } from "@/server/services/race.service";
+import { getGecmisKazananKuponlar, getAylikKuponKazanci } from "@/server/services/race.service";
 import TutanKuponlarListesi from "@/components/home/TutanKuponlarListesi";
+import AylikKuponKazanciCard from "@/components/home/AylikKuponKazanciCard";
 
 export const revalidate = 0;
 
@@ -15,10 +16,13 @@ export const metadata: Metadata = {
 // döndüğü için ek bir sıralama gerekmiyor — 500 limiti getAylikKuponKazanci'nin de
 // kullandığı, bu kod tabanında yerleşik "pratikte tüm zamanlar" sınırı.
 export default async function TutanKuponlarPage() {
-  const items = await getGecmisKazananKuponlar(500).catch(() => []);
+  const [items, aylikKuponKazanci] = await Promise.all([
+    getGecmisKazananKuponlar(500).catch(() => []),
+    getAylikKuponKazanci().catch(() => []),
+  ]);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 px-3 py-4">
+    <div className="mx-auto max-w-5xl space-y-6 px-3 py-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold">İsabet Sağlayan Kuponlar — Tüm Zamanlar</h1>
@@ -30,6 +34,8 @@ export default async function TutanKuponlarPage() {
           ← Programa Dön
         </Link>
       </div>
+
+      <AylikKuponKazanciCard aylar={aylikKuponKazanci} />
 
       <TutanKuponlarListesi items={items} />
     </div>
