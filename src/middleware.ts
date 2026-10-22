@@ -34,18 +34,31 @@ function clientIp(req: NextRequest): string {
 
 export default async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
+  const isRateLimited = RATE_LIMITED_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
 
-  if (RATE_LIMITED_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) {
-    const { success } = await checkRateLimit(publicContentLimiter, clientIp(req));
-    if (!success) {
-      return NextResponse.json(
-        { error: "Çok fazla istek gönderildi. Lütfen biraz sonra tekrar deneyin." },
-        { status: 429 }
-      );
-    }
+  // PERF (kullanıcı bulgusu, 2026-10-22): rate-limit kontrolü (Upstash Redis'e ağ çağrısı)
+  // ve auth kontrolü birbirinden BAĞIMSIZ — eskiden sırayla await ediliyordu (her sayfa
+  // geçişine +1 ağ gidiş-dönüşü). authMiddleware burada HEMEN başlatılır (await edilmeden),
+  // rate-limited bir yolda Promise.all ile ikisi birlikte beklenir. Karar mantığı BİREBİR
+  // aynı: rate limit aşılırsa authMiddleware'in sonucu KULLANILMAZ (429 döner), aksi halde
+  // authMiddleware'in sonucu döner — tek fark, ikisinin eşzamanlı başlaması.
+  const authPromise = (authMiddleware as unknown as (req: NextRequest) => Promise<Response>)(req);
+
+  if (!isRateLimited) {
+    return authPromise;
   }
 
-  return (authMiddleware as unknown as (req: NextRequest) => Promise<Response>)(req);
+  const [{ success }, authResult] = await Promise.all([
+    checkRateLimit(publicContentLimiter, clientIp(req)),
+    authPromise,
+  ]);
+  if (!success) {
+    return NextResponse.json(
+      { error: "Çok fazla istek gönderildi. Lütfen biraz sonra tekrar deneyin." },
+      { status: 429 }
+    );
+  }
+  return authResult;
 }
 
 export const config = {
