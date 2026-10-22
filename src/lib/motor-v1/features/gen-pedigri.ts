@@ -54,13 +54,17 @@ type LineOzet = { ornekKendiVeri: number | null; kYuzde: number | null };
  * HİÇBİR önceden-biriktirilmiş tabloya (DamStatOwn/DamSireStatOwn) dokunmaz. `cutoffTarih`'ten
  * SONRAKİ hiçbir yarış sayıma KATILMAZ.
  */
+/** GEN SELF-CONTAMINATION DUZELTMESI (2026-10-22) — AYNI mantik getV5461SireOzetleriForRace
+ *  ile: hedef atin KENDI gecmis startlari, kendi dam/damSire istatistigine KARISMAZ.
+ *  `excludeTjkAtIds`, `names` ile AYNI sirada, HER hedef icin kendi tjkAtId'si. */
 async function getOwnLineOzetleriForRace(
   names: (string | null)[],
   field: "dam" | "damSire",
   breed: string,
   surface: string,
   distance: number,
-  cutoffTarih: Date
+  cutoffTarih: Date,
+  excludeTjkAtIds: (number | null)[] = []
 ): Promise<LineOzet[]> {
   const irk = breedToIrk(breed);
   const pist = surfaceToPist(surface);
@@ -76,6 +80,7 @@ async function getOwnLineOzetleriForRace(
       dam: true,
       damSire: true,
       no: true,
+      tjkAtId: true,
       race: {
         select: {
           breed: true, surface: true, distance: true,
@@ -87,6 +92,7 @@ async function getOwnLineOzetleriForRace(
   });
 
   const sayim = new Map<string, { start: number; wins: number }>();
+  const kendiKatki = new Map<string, Map<number, { start: number; wins: number }>>();
   const cutoffMs = cutoffTarih.getTime();
   for (const r of rows) {
     const rawName = field === "dam" ? r.dam : r.damSire;
@@ -98,21 +104,39 @@ async function getOwnLineOzetleriForRace(
     const name = normalizeSireName(rawName);
     if (!hedefIsimler.has(name)) continue;
     const pos = finishPos(r.race.result.actualOrder, r.no, r.race.result.winnerNos);
+    const win = pos === 1 ? 1 : 0;
     const cur = sayim.get(name) ?? { start: 0, wins: 0 };
     cur.start++;
-    if (pos === 1) cur.wins++;
+    cur.wins += win;
     sayim.set(name, cur);
+
+    if (r.tjkAtId != null) {
+      const bySire = kendiKatki.get(name) ?? new Map<number, { start: number; wins: number }>();
+      const own = bySire.get(r.tjkAtId) ?? { start: 0, wins: 0 };
+      own.start++;
+      own.wins += win;
+      bySire.set(r.tjkAtId, own);
+      kendiKatki.set(name, bySire);
+    }
   }
 
-  return names.map((name) => {
+  return names.map((name, i) => {
     if (!name) return { ornekKendiVeri: null, kYuzde: null };
-    const cur = sayim.get(normalizeSireName(name));
+    const norm = normalizeSireName(name);
+    const cur = sayim.get(norm);
     if (!cur || cur.start === 0) return { ornekKendiVeri: null, kYuzde: null };
-    return { ornekKendiVeri: cur.start, kYuzde: (cur.wins / cur.start) * 100 };
+    let start = cur.start, wins = cur.wins;
+    const excludeId = excludeTjkAtIds[i];
+    if (excludeId != null) {
+      const own = kendiKatki.get(norm)?.get(excludeId);
+      if (own) { start -= own.start; wins -= own.wins; }
+    }
+    if (start <= 0) return { ornekKendiVeri: null, kYuzde: null };
+    return { ornekKendiVeri: start, kYuzde: (wins / start) * 100 };
   });
 }
 
-export type GenPedigriRunnerInput = { no: number; sire: string | null; dam: string | null; damSire: string | null };
+export type GenPedigriRunnerInput = { no: number; sire: string | null; dam: string | null; damSire: string | null; tjkAtId: number | null };
 
 export type GenPedigriRaceResult = {
   no: number;
@@ -148,10 +172,11 @@ export async function computeGenPedigriForRace(
   cutoff: Date,
   pmzHam: Map<number, number | null> // runner no -> PMZ_01 ham değeri (çağıran taraftan, YENİDEN HESAPLANMAZ)
 ): Promise<GenPedigriRaceResult[]> {
+  const excludeIds = runners.map((r) => r.tjkAtId);
   const [sireOzet, damOzet, damSireOzet] = await Promise.all([
-    getV5461SireOzetleriForRace(runners.map((r) => r.sire), breed, surface, distance, cutoff),
-    getOwnLineOzetleriForRace(runners.map((r) => r.dam), "dam", breed, surface, distance, cutoff),
-    getOwnLineOzetleriForRace(runners.map((r) => r.damSire), "damSire", breed, surface, distance, cutoff),
+    getV5461SireOzetleriForRace(runners.map((r) => r.sire), breed, surface, distance, cutoff, excludeIds),
+    getOwnLineOzetleriForRace(runners.map((r) => r.dam), "dam", breed, surface, distance, cutoff, excludeIds),
+    getOwnLineOzetleriForRace(runners.map((r) => r.damSire), "damSire", breed, surface, distance, cutoff, excludeIds),
   ]);
 
   return runners.map((r, i) => {

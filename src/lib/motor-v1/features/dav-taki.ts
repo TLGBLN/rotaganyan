@@ -36,16 +36,34 @@ export type DavResult = {
  * Bugünkü Runner.equipment ile, HorseRaceHistoryCache'teki (hedef tarihten ÖNCEKİ) EN SON
  * yarışın equipment'ı AİLE bazında (K/SK aynı aile — equipment-family.ts) karşılaştırılır.
  * Hiç geçmiş yarış yoksa (ilk-start) "gözlemsiz" — 0 (değişiklik yok) İLE KARIŞTIRILMAZ.
+ *
+ * BACKFILL BOŞLUĞU DÜZELTMESİ (kullanıcı talebi, 2026-10-22, "%96 pozitif gerçek mi?" —
+ * HAM VERİDEN doğrulandı): TRAIN+HOLDOUT'un 150 yarışının 116'sında (%77.3) o yarışın
+ * HİÇBİR koşucusunda equipment hiç backfill edilmemiş (tüm alan BOŞ) — bu "takı yok"
+ * DEĞİL, "bu tarihli yarış için equipment verisi hiç toplanmadı" anlamına geliyor (en son
+ * ~500 runner'da %97.4 dolu — equipment yalnız YENİ tarihli yarışlarda kaydediliyor).
+ * Eski kod bu boşluğu sessizce "bugün equipment yok" diye yorumluyordu — bu da
+ * DAV_TAKI_CIKARILDI'nin SAHTE şekilde ~%96-99 "pozitif" çıkmasına yol açıyordu (gerçek bir
+ * davranış sinyali DEĞİL, bir veri-boşluğu artefaktı). Düzeltme: `raceEquipmentBackfilled`
+ * (çağıran taraf, yarış başına BİR KEZ: "bu yarışta EN AZ BİR koşucunun equipment'ı dolu
+ * mu" diye hesaplar) false ise, DAV ikisi de observed=false döner — sahte "0" veya "1"
+ * ÜRETİLMEZ.
  */
 export function computeDavTakiDegisikligi(
   currentEquipmentRaw: string | null,
   tjkAtId: number | null,
   rowsJson: unknown,
-  cutoff: Date
+  cutoff: Date,
+  raceEquipmentBackfilled: boolean = true
 ): DavResult {
   const entry = (code: DavSignalCode, rawValue: 0 | 1 | null, observed: boolean, coverageState: CoverageState | null, missingReason: string | null): DavEntry => ({
     code, family: "DAV", rawValue, observed, coverageState, asOfSafe: true, missingReason,
   });
+
+  if (!raceEquipmentBackfilled) {
+    const miss = "bu yarış tarihinde equipment verisi hiç backfill edilmemiş (saha-çapında boş)";
+    return { signals: [entry("DAV_TAKI_EKLENDI", null, false, "HISTORICAL_COVERAGE_GAP", miss), entry("DAV_TAKI_CIKARILDI", null, false, "HISTORICAL_COVERAGE_GAP", miss)], eklenenKodlar: [], cikarilanKodlar: [], sonYarisTarihi: null };
+  }
 
   if (tjkAtId == null) {
     const miss = "at kimliği (tjkAtId) bilinmiyor";

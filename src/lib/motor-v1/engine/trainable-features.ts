@@ -125,7 +125,7 @@ export async function computeTrainableFeaturesForRace(
     return [r.no, pmz?.observed ? pmz.rawValue : null] as const;
   }));
   const genResults = await computeGenPedigriForRace(
-    race.runners.map((r) => ({ no: r.no, sire: r.sire, dam: r.dam, damSire: r.damSire })),
+    race.runners.map((r) => ({ no: r.no, sire: r.sire, dam: r.dam, damSire: r.damSire, tjkAtId: r.tjkAtId })),
     race.breed, race.surface, race.distance, cutoff, pmzHam
   );
   const genByNo = new Map(genResults.map((g) => [g.no, g.signals]));
@@ -142,6 +142,19 @@ export async function computeTrainableFeaturesForRace(
       return { no: r.no, hiz01: h?.rawValue ?? null, hiz01Observed: !!h?.observed, sinif01: s?.rawValue ?? null, sinif01Observed: !!s?.observed };
     })
   );
+
+  // PERF (kullanıcı bulgusu, 2026-10-22): bu ikisi öncesinde runner-bazında SIRAYLA await
+  // ediliyordu (10-18 at × 2 ayrı DB gidiş-dönüşü = yarış başına 20-36 ardışık round-trip,
+  // yavaşlığın asıl kaynağı — PC değil). Davranış/sonuç AYNI, yalnız eşzamanlı çekiliyor.
+  const jokeyTrendPairs = await Promise.all(race.runners.map(async (r) => [r.no, await computeJokeyTrend30(r.jockey, cutoff)] as const));
+  const jokeyTrendByNo = new Map(jokeyTrendPairs);
+  const antTrendPairs = await Promise.all(race.runners.map(async (r) => [r.no, await computeAntrenorTrend30(r.trainer, cutoff)] as const));
+  const antTrendByNo = new Map(antTrendPairs);
+
+  // DAV BACKFILL BOSLUGU DUZELTMESI (2026-10-22): yarisin HICBIR kosucusunda equipment
+  // doldurulmamissa (ham veride dogrulandi: TRAIN+HOLDOUT'un %77.3'u bu durumda), DAV
+  // "0/1" degil observed=false dondurmeli — bkz. dav-taki.ts.
+  const raceEquipmentBackfilled = race.runners.some((r) => r.equipment != null && r.equipment.trim() !== "");
 
   const out: TrainableRaceResult["runners"] = [];
   for (const r of race.runners) {
@@ -164,13 +177,13 @@ export async function computeTrainableFeaturesForRace(
 
     const kulvar = computeKulvar01(r.startNo, race.runners.length);
 
-    const jokeyTrend = await computeJokeyTrend30(r.jockey, cutoff);
+    const jokeyTrend = jokeyTrendByNo.get(r.no)!;
     const jokeyTrendEntry = entry("JOKEY_TREND30", "JOK", jokeyTrend.value, jokeyTrend.observed, jokeyTrend.missingReason);
 
-    const antTrend = await computeAntrenorTrend30(r.trainer, cutoff);
+    const antTrend = antTrendByNo.get(r.no)!;
     const antEntry = entry("ANT_TREND30", "ANT", antTrend.value, antTrend.observed, antTrend.missingReason);
 
-    const dav = computeDavTakiDegisikligi(r.equipment, r.tjkAtId, rowsJson, cutoff);
+    const dav = computeDavTakiDegisikligi(r.equipment, r.tjkAtId, rowsJson, cutoff, raceEquipmentBackfilled);
 
     const rak = rakByNo.get(r.no)!;
     const rakGap = rakGapByNo.get(r.no)!;

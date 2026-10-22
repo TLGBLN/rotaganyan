@@ -14,7 +14,11 @@ type ArtifactShape = {
   names: string[];
   muSigma: Record<string, { mu: number; sigma: number; nObserved: number }>;
   nTrainRaces: number;
+  nHoldoutRaces: number;
   fitOpts: { lambda: number; learningRate: number; iterations: number };
+  candidateCodeCount: number;
+  trainedCodeCount: number;
+  excludedCodes: { code: string; observedRate: number | undefined }[];
 };
 
 let cached: FittedModel<string> | null = null;
@@ -38,4 +42,19 @@ export function loadTrainedV1Model(): FittedModel<string> {
 
 export function trainedModelVersion(): string {
   return (trainedArtifact as unknown as ArtifactShape).modelVersion;
+}
+
+/** Eğitim artefaktının meta bilgisi (kaç yarışla eğitildi, kaç kod kapsam-yetersizliği
+ *  nedeniyle dışarıda kaldı ve hangileri) — AnalysisPanel'in "model bilgilendirmesi"
+ *  bölümü için, artefaktın KENDİSİNDEN okunur, uydurulmaz. */
+export function trainedModelMeta() {
+  const a = trainedArtifact as unknown as ArtifactShape;
+  return {
+    modelVersion: a.modelVersion,
+    nTrainRaces: a.nTrainRaces,
+    nHoldoutRaces: a.nHoldoutRaces,
+    candidateCodeCount: a.candidateCodeCount,
+    trainedCodeCount: a.trainedCodeCount,
+    excludedCodes: a.excludedCodes,
+  };
 }

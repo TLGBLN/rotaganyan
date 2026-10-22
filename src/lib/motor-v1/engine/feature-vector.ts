@@ -205,9 +205,11 @@ export async function buildFeatureVectorForRunner(
   return { raceId: ctx.raceId, no: runner.no, name: runner.name, tjkAtId: runner.tjkAtId, jockey: runner.jockey, signals };
 }
 
+// PERF (kullanıcı bulgusu, 2026-10-22): runner-bazında SIRAYLA await ediliyordu (10-18 at
+// × kendi DB gidiş-dönüşleri = yarış başına onlarca ardışık round-trip — yavaşlığın asıl
+// kaynağı, PC değil). Hem bu dosya hem unified-family-engine.ts (CANLI admin motoru) bu
+// fonksiyonu kullanıyor — davranış/sonuç AYNI, yalnız eşzamanlı çekiliyor.
 export async function buildFeatureVectorsForRace(raceId: string, tempoCtx?: TempoContext): Promise<RunnerFeatureVector[]> {
   const ctx = await loadRaceBatchContext(raceId, tempoCtx);
-  const out: RunnerFeatureVector[] = [];
-  for (const r of ctx.runners) out.push(await buildFeatureVectorForRunner(ctx, r));
-  return out;
+  return Promise.all(ctx.runners.map((r) => buildFeatureVectorForRunner(ctx, r)));
 }

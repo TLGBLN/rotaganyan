@@ -89,7 +89,7 @@ export async function computeUnifiedFamiliesForRace<C extends string = string>(
     return [r.no, pmz?.observed ? pmz.rawValue : null] as const;
   }));
   const genResults = await computeGenPedigriForRace(
-    race.runners.map((r) => ({ no: r.no, sire: r.sire, dam: r.dam, damSire: r.damSire })),
+    race.runners.map((r) => ({ no: r.no, sire: r.sire, dam: r.dam, damSire: r.damSire, tjkAtId: r.tjkAtId })),
     race.breed, race.surface, race.distance, cutoff, pmzHam
   );
   const genByNo = new Map(genResults.map((g) => [g.no, g.signals]));
@@ -111,6 +111,10 @@ export async function computeUnifiedFamiliesForRace<C extends string = string>(
   // NOT: result==null (canli/henuz kosulmamis) oldugunda bile loadPistDurumContext zaten
   // immutablePreRaceSnapshot=true kurar - gercek PIT durumu asagida HER KOSUCU icin
   // computePistDurumForRunner'in DONDUGU reason'a gore ayrica degerlendirilir.
+
+  // DAV BACKFILL BOSLUGU DUZELTMESI (2026-10-22, bkz. dav-taki.ts): yarisin HICBIR
+  // kosucusunda equipment doldurulmamissa, DAV observed=false dondurmeli (sahte "0/1" degil).
+  const raceEquipmentBackfilled = race.runners.some((r) => r.equipment != null && r.equipment.trim() !== "");
 
   const results: UnifiedRunnerResult[] = [];
   for (const r of race.runners) {
@@ -210,7 +214,7 @@ export async function computeUnifiedFamiliesForRace<C extends string = string>(
     );
 
     // --- DAV (takı + start riski) ---
-    const dav = computeDavTakiDegisikligi(r.equipment, r.tjkAtId, rowsJson, cutoff);
+    const dav = computeDavTakiDegisikligi(r.equipment, r.tjkAtId, rowsJson, cutoff, raceEquipmentBackfilled);
     const startRisk = await computeStartRisk(r.tjkAtId, cutoff);
     // KULLANICI TALİMATI (2026-10-19, 2. tur): seçilim-yanlılığı uyarısı DEĞER GÖZLEMLİ OLSA
     // BİLE kaybolmaz — missingReason YALNIZ eksik-veri için değil, bu DAİMA-geçerli kısıt

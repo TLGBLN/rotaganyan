@@ -1,0 +1,628 @@
+{
+  "modelVersion": "rotaganyan-v1.0-EXPERIMENTAL-winsorized-2026-10-21",
+  "note": "SALT DENEYSEL — production'da KULLANILMAZ, v1-trained-model.json DEĞİŞTİRİLMEDİ. Yalnız sürekli/çok-değerli (ikili olmayan, TRAIN'de >=10 farklı değeri olan) sinyaller TRAIN %1-%99 sınırına kırpıldı; ikili ve düşük-kardinaliteli sinyaller DOKUNULMADI.",
+  "beta": [
+    0.2525940596308179,
+    -0.04066366895074247,
+    0.10733718137500008,
+    0.07005907256106872,
+    -0.00032657008230882066,
+    -0.026186999047420115,
+    -0.007805431545994392,
+    -0.026186999047420115,
+    0.5731430063581334,
+    -0.20095802684379024,
+    -0.042409132729263166,
+    0.025484820419860867,
+    -0.08083908713359764,
+    -0.045634987358113034,
+    0.2787692456340566,
+    -0.3093308182976625,
+    -0.16839089461472972,
+    0.09505118297844223,
+    0.0751333140544771,
+    3.493457772084656e-18,
+    -0.02837845581036068,
+    0.09505118297844223,
+    0.02571020706553717,
+    0.09505118297844223,
+    0.30965146672571275,
+    -0.06911695684871515,
+    0.03502311283326273,
+    -0.10913482672914258,
+    -0.08108060327759294,
+    -0.16268645008120586,
+    0.16390550761998074,
+    -0.015677695658966657,
+    -0.20395439508439042,
+    -0.026186999047420115,
+    0.14554350333816782,
+    -0.015677695658966657,
+    -0.09343080915225846,
+    -0.015677695658966657,
+    -0.06664012245843312,
+    0.16212979265334,
+    0.17218060086232742,
+    -0.005981966842031589,
+    -0.07637790777628736,
+    -0.08862123079123368,
+    -0.16063168085553747,
+    0.23176688137218154,
+    0.12162627226522618,
+    -0.015677695658966657,
+    -0.016427040530376327,
+    -0.2534625261847469,
+    -0.05045646324672926,
+    -0.2101953587422421,
+    -0.17852633830213718,
+    -0.026186999047420115,
+    0.08780516600851729,
+    -0.026186999047420115,
+    0.3822041349857735,
+    0.032776134970254056,
+    0.24084232306742845,
+    -0.21565598294419858,
+    0.32779959844115986,
+    0.23176688137218154,
+    0.043354921989557614,
+    0.025484820419860867,
+    0.2633252762765842,
+    -0.04652211271931376,
+    0.26292710797004754,
+    0.0629922072954777,
+    -0.09253145361399907,
+    0.09505118297844223,
+    -0.010818577708398855,
+    -0.19139861544617526,
+    0.2447105343444333,
+    0.025484820419860867,
+    -0.1345264108806403,
+    -0.1463891300592001
+  ],
+  "names": [
+    "FORM_01_z",
+    "FORM_01_missing",
+    "FORM_02_z",
+    "FORM_02_missing",
+    "FORM_03_z",
+    "FORM_03_missing",
+    "HIZ_01_z",
+    "HIZ_01_missing",
+    "SINIF_01_z",
+    "SINIF_01_missing",
+    "PMZ_01_z",
+    "PMZ_01_missing",
+    "PMZ_02_z",
+    "PMZ_02_missing",
+    "FORM_x_ZEMIN_z",
+    "FORM_x_ZEMIN_missing",
+    "TEMPO_01_z",
+    "TEMPO_01_missing",
+    "TEMPO_02_z",
+    "TEMPO_02_missing",
+    "TEMPO_03_z",
+    "TEMPO_03_missing",
+    "TEMPO_04_z",
+    "TEMPO_04_missing",
+    "JOKEY_01_z",
+    "JOKEY_01_missing",
+    "JOKEY_02_z",
+    "JOKEY_02_missing",
+    "JOKEY_04_z",
+    "JOKEY_04_missing",
+    "KILO_01_z",
+    "KILO_01_missing",
+    "KILO_02_z",
+    "KILO_02_missing",
+    "KILO_03_z",
+    "KILO_03_missing",
+    "KILO_04_z",
+    "KILO_04_missing",
+    "GEN_SIRE_01_z",
+    "GEN_SIRE_01_missing",
+    "GEN_DAM_01_z",
+    "GEN_DAM_01_missing",
+    "GEN_DAMSIRE_01_z",
+    "GEN_DAMSIRE_01_missing",
+    "GEN_SIRE_PMZ_01_z",
+    "GEN_SIRE_PMZ_01_missing",
+    "KULVAR_01_HAM_z",
+    "KULVAR_01_HAM_missing",
+    "JOKEY_TREND30_z",
+    "JOKEY_TREND30_missing",
+    "ANT_TREND30_z",
+    "ANT_TREND30_missing",
+    "DAV_TAKI_EKLENDI_z",
+    "DAV_TAKI_EKLENDI_missing",
+    "DAV_TAKI_CIKARILDI_z",
+    "DAV_TAKI_CIKARILDI_missing",
+    "RAK_H2H_01_z",
+    "RAK_H2H_01_missing",
+    "RAK_GAP_01_z",
+    "RAK_GAP_01_missing",
+    "GEN_PMZ_YET_01_z",
+    "GEN_PMZ_YET_01_missing",
+    "YET_PMZ_01_z",
+    "YET_PMZ_01_missing",
+    "FRM_GEN_01_z",
+    "FRM_GEN_01_missing",
+    "ANT_FRM_01_z",
+    "ANT_FRM_01_missing",
+    "TMP_DAV_01_z",
+    "TMP_DAV_01_missing",
+    "YET_PMZ_RAK_01_z",
+    "YET_PMZ_RAK_01_missing",
+    "KIL_PMZ_YET_01_z",
+    "KIL_PMZ_YET_01_missing",
+    "RAK_YET_TMP_01_z",
+    "RAK_YET_TMP_01_missing"
+  ],
+  "muSigma": {
+    "FORM_01": {
+      "mu": 0.5151602789867413,
+      "sigma": 0.22072192859736892,
+      "nObserved": 1018
+    },
+    "FORM_02": {
+      "mu": 0.005782227002170855,
+      "sigma": 0.2702128683652865,
+      "nObserved": 424
+    },
+    "FORM_03": {
+      "mu": 2.978774343396422,
+      "sigma": 0.7726729738690876,
+      "nObserved": 1161
+    },
+    "HIZ_01": {
+      "mu": -0.4502263505500044,
+      "sigma": 3.746526535600157,
+      "nObserved": 1161
+    },
+    "SINIF_01": {
+      "mu": -0.08105090075820917,
+      "sigma": 1.1604497017529483,
+      "nObserved": 988
+    },
+    "PMZ_01": {
+      "mu": -0.10591320102838257,
+      "sigma": 0.6929520537039746,
+      "nObserved": 340
+    },
+    "PMZ_02": {
+      "mu": 0.0006081668315560131,
+      "sigma": 0.17704267858743228,
+      "nObserved": 1016
+    },
+    "FORM_x_ZEMIN": {
+      "mu": 0.5355806737510765,
+      "sigma": 0.235811434528148,
+      "nObserved": 887
+    },
+    "TEMPO_01": {
+      "mu": 0.12499964584878147,
+      "sigma": 0.12037156166865484,
+      "nObserved": 1009
+    },
+    "TEMPO_02": {
+      "mu": 2.456437234145737,
+      "sigma": 1.0051212243024565,
+      "nObserved": 1153
+    },
+    "TEMPO_03": {
+      "mu": 0.041125046563721075,
+      "sigma": 0.0518871260672,
+      "nObserved": 1009
+    },
+    "TEMPO_04": {
+      "mu": 0.9433020111314924,
+      "sigma": 0.6878760378543676,
+      "nObserved": 1009
+    },
+    "JOKEY_01": {
+      "mu": 0.003214220397445233,
+      "sigma": 0.057411958572302066,
+      "nObserved": 1179
+    },
+    "JOKEY_02": {
+      "mu": -0.0001260744523330131,
+      "sigma": 0.05706834431141062,
+      "nObserved": 977
+    },
+    "JOKEY_04": {
+      "mu": 0.004878827818679856,
+      "sigma": 0.06122617976669825,
+      "nObserved": 971
+    },
+    "KILO_01": {
+      "mu": -0.010560519902518278,
+      "sigma": 2.650810723623752,
+      "nObserved": 1231
+    },
+    "KILO_02": {
+      "mu": -0.009730020322113361,
+      "sigma": 2.7598232051275624,
+      "nObserved": 1161
+    },
+    "KILO_03": {
+      "mu": 13.200649878147988,
+      "sigma": 4209.174391400427,
+      "nObserved": 1231
+    },
+    "KILO_04": {
+      "mu": 0.07412672623883022,
+      "sigma": 2.0801708664569,
+      "nObserved": 1231
+    },
+    "GEN_SIRE_01": {
+      "mu": 9.826623468257047,
+      "sigma": 9.999359218269582,
+      "nObserved": 1124
+    },
+    "GEN_DAM_01": {
+      "mu": 11.704343534669292,
+      "sigma": 23.72247207446565,
+      "nObserved": 753
+    },
+    "GEN_DAMSIRE_01": {
+      "mu": 9.902686516605147,
+      "sigma": 11.143202083345853,
+      "nObserved": 1064
+    },
+    "GEN_SIRE_PMZ_01": {
+      "mu": -0.8360372971547029,
+      "sigma": 9.523203593732504,
+      "nObserved": 329
+    },
+    "KULVAR_01_HAM": {
+      "mu": 0.5080362147623453,
+      "sigma": 0.3251886455163177,
+      "nObserved": 1194
+    },
+    "JOKEY_TREND30": {
+      "mu": -0.023162719740148843,
+      "sigma": 0.44448953320219714,
+      "nObserved": 893
+    },
+    "ANT_TREND30": {
+      "mu": -0.03524403421126849,
+      "sigma": 0.3942410722402528,
+      "nObserved": 1022
+    },
+    "DAV_TAKI_EKLENDI": {
+      "mu": 0.00516795865633075,
+      "sigma": 0.0717025164109127,
+      "nObserved": 1161
+    },
+    "DAV_TAKI_CIKARILDI": {
+      "mu": 0.9638242894056848,
+      "sigma": 0.1867271500272837,
+      "nObserved": 1161
+    },
+    "RAK_H2H_01": {
+      "mu": -0.004804804804804987,
+      "sigma": 3.291415250509767,
+      "nObserved": 999
+    },
+    "RAK_GAP_01": {
+      "mu": -3.280483539542305,
+      "sigma": 3.122508562835758,
+      "nObserved": 986
+    },
+    "GEN_PMZ_YET_01": {
+      "mu": -0.2120697568935198,
+      "sigma": 6.716892887813085,
+      "nObserved": 329
+    },
+    "YET_PMZ_01": {
+      "mu": 0.20306317962027515,
+      "sigma": 2.260533893111452,
+      "nObserved": 340
+    },
+    "FRM_GEN_01": {
+      "mu": 0.26658325917681364,
+      "sigma": 3.4626823239018893,
+      "nObserved": 413
+    },
+    "ANT_FRM_01": {
+      "mu": 0.00038387384717813696,
+      "sigma": 0.1059772711959502,
+      "nObserved": 403
+    },
+    "TMP_DAV_01": {
+      "mu": 0.0008840171117364958,
+      "sigma": 0.01537790054413334,
+      "nObserved": 1009
+    },
+    "YET_PMZ_RAK_01": {
+      "mu": -1.1126693816762803,
+      "sigma": 6.121089355798826,
+      "nObserved": 301
+    },
+    "KIL_PMZ_YET_01": {
+      "mu": -0.35495751506144685,
+      "sigma": 3.6913025706673497,
+      "nObserved": 340
+    },
+    "RAK_YET_TMP_01": {
+      "mu": 0.3260801836545205,
+      "sigma": 1.6517533036872671,
+      "nObserved": 874
+    }
+  },
+  "nTrainRaces": 120,
+  "nRacesSkipped": 0,
+  "fitOpts": {
+    "lambda": 1,
+    "learningRate": 0.05,
+    "iterations": 300
+  },
+  "distinctThreshold": 10,
+  "clippedCodes": [
+    {
+      "code": "FORM_01",
+      "p1": 0,
+      "p99": 0.9397839371047008,
+      "nClippedInTrain": 14,
+      "nObservedInTrain": 1018
+    },
+    {
+      "code": "FORM_02",
+      "p1": -0.6509295519295519,
+      "p99": 0.6241481481481479,
+      "nClippedInTrain": 13,
+      "nObservedInTrain": 424
+    },
+    {
+      "code": "FORM_03",
+      "p1": 1.791759469228055,
+      "p99": 5.450818622905152,
+      "nClippedInTrain": 13,
+      "nObservedInTrain": 1161
+    },
+    {
+      "code": "HIZ_01",
+      "p1": -13.701221979789208,
+      "p99": 5.5423078197003655,
+      "nClippedInTrain": 27,
+      "nObservedInTrain": 1161
+    },
+    {
+      "code": "SINIF_01",
+      "p1": -3.4207741377700573,
+      "p99": 1.9901666223085728,
+      "nClippedInTrain": 28,
+      "nObservedInTrain": 988
+    },
+    {
+      "code": "PMZ_01",
+      "p1": -2.584679269969826,
+      "p99": 1.5091720976446514,
+      "nClippedInTrain": 18,
+      "nObservedInTrain": 340
+    },
+    {
+      "code": "PMZ_02",
+      "p1": -0.6655270139001704,
+      "p99": 0.538736654296324,
+      "nClippedInTrain": 30,
+      "nObservedInTrain": 1016
+    },
+    {
+      "code": "FORM_x_ZEMIN",
+      "p1": 0,
+      "p99": 1,
+      "nClippedInTrain": 0,
+      "nObservedInTrain": 887
+    },
+    {
+      "code": "TEMPO_01",
+      "p1": 0.027152451521719606,
+      "p99": 0.6169482403662684,
+      "nClippedInTrain": 34,
+      "nObservedInTrain": 1009
+    },
+    {
+      "code": "TEMPO_02",
+      "p1": 0.5977116253088638,
+      "p99": 5.839851451287975,
+      "nClippedInTrain": 24,
+      "nObservedInTrain": 1153
+    },
+    {
+      "code": "TEMPO_03",
+      "p1": 0.0023456052249694755,
+      "p99": 0.3003786288859395,
+      "nClippedInTrain": 30,
+      "nObservedInTrain": 1009
+    },
+    {
+      "code": "TEMPO_04",
+      "p1": 0.09798126544234807,
+      "p99": 2.953339485662994,
+      "nClippedInTrain": 26,
+      "nObservedInTrain": 1009
+    },
+    {
+      "code": "JOKEY_01",
+      "p1": -0.08105922056016931,
+      "p99": 0.17124964760042174,
+      "nClippedInTrain": 29,
+      "nObservedInTrain": 1179
+    },
+    {
+      "code": "JOKEY_02",
+      "p1": -0.08422951408057792,
+      "p99": 0.16496300872628566,
+      "nClippedInTrain": 20,
+      "nObservedInTrain": 977
+    },
+    {
+      "code": "JOKEY_04",
+      "p1": -0.07974512860876498,
+      "p99": 0.21482000583838795,
+      "nClippedInTrain": 25,
+      "nObservedInTrain": 971
+    },
+    {
+      "code": "KILO_01",
+      "p1": -7.25,
+      "p99": 8,
+      "nClippedInTrain": 21,
+      "nObservedInTrain": 1231
+    },
+    {
+      "code": "KILO_02",
+      "p1": -6.908423559114707,
+      "p99": 6.510756694552117,
+      "nClippedInTrain": 27,
+      "nObservedInTrain": 1161
+    },
+    {
+      "code": "KILO_03",
+      "p1": -11250,
+      "p99": 12525.000000000011,
+      "nClippedInTrain": 28,
+      "nObservedInTrain": 1231
+    },
+    {
+      "code": "KILO_04",
+      "p1": -6.75,
+      "p99": 8,
+      "nClippedInTrain": 24,
+      "nObservedInTrain": 1231
+    },
+    {
+      "code": "GEN_SIRE_01",
+      "p1": 0,
+      "p99": 50,
+      "nClippedInTrain": 4,
+      "nObservedInTrain": 1124
+    },
+    {
+      "code": "GEN_DAM_01",
+      "p1": 0,
+      "p99": 100,
+      "nClippedInTrain": 0,
+      "nObservedInTrain": 753
+    },
+    {
+      "code": "GEN_DAMSIRE_01",
+      "p1": 0,
+      "p99": 50,
+      "nClippedInTrain": 13,
+      "nObservedInTrain": 1064
+    },
+    {
+      "code": "GEN_SIRE_PMZ_01",
+      "p1": -33.454313517034166,
+      "p99": 36.03789277713498,
+      "nClippedInTrain": 13,
+      "nObservedInTrain": 329
+    },
+    {
+      "code": "KULVAR_01_HAM",
+      "p1": 0,
+      "p99": 1.091545454545454,
+      "nClippedInTrain": 24,
+      "nObservedInTrain": 1194
+    },
+    {
+      "code": "JOKEY_TREND30",
+      "p1": -1.2079529866881762,
+      "p99": 1.1109443578743898,
+      "nClippedInTrain": 26,
+      "nObservedInTrain": 893
+    },
+    {
+      "code": "ANT_TREND30",
+      "p1": -0.9878400041855674,
+      "p99": 0.9786092120775681,
+      "nClippedInTrain": 33,
+      "nObservedInTrain": 1022
+    },
+    {
+      "code": "RAK_H2H_01",
+      "p1": -10,
+      "p99": 9.019999999999982,
+      "nClippedInTrain": 23,
+      "nObservedInTrain": 999
+    },
+    {
+      "code": "RAK_GAP_01",
+      "p1": -14.656021039982386,
+      "p99": 2.5606057884906313,
+      "nClippedInTrain": 25,
+      "nObservedInTrain": 986
+    },
+    {
+      "code": "GEN_PMZ_YET_01",
+      "p1": -28.602459329572554,
+      "p99": 24.13794067701427,
+      "nClippedInTrain": 14,
+      "nObservedInTrain": 329
+    },
+    {
+      "code": "YET_PMZ_01",
+      "p1": -6.350995373276621,
+      "p99": 12.417746573394233,
+      "nClippedInTrain": 13,
+      "nObservedInTrain": 340
+    },
+    {
+      "code": "FRM_GEN_01",
+      "p1": -8.100266336837764,
+      "p99": 11.662254901960782,
+      "nClippedInTrain": 13,
+      "nObservedInTrain": 413
+    },
+    {
+      "code": "ANT_FRM_01",
+      "p1": -0.2955005833594546,
+      "p99": 0.3925108245528927,
+      "nClippedInTrain": 16,
+      "nObservedInTrain": 403
+    },
+    {
+      "code": "YET_PMZ_RAK_01",
+      "p1": -41.9803063722555,
+      "p99": 8.824465900697673,
+      "nClippedInTrain": 13,
+      "nObservedInTrain": 301
+    },
+    {
+      "code": "KIL_PMZ_YET_01",
+      "p1": -18.516633537015945,
+      "p99": 15.644734441624633,
+      "nClippedInTrain": 16,
+      "nObservedInTrain": 340
+    },
+    {
+      "code": "RAK_YET_TMP_01",
+      "p1": -4.714004722774071,
+      "p99": 9.075359079014058,
+      "nClippedInTrain": 20,
+      "nObservedInTrain": 874
+    }
+  ],
+  "excludedFromClipping": [
+    {
+      "code": "DAV_TAKI_EKLENDI",
+      "gerekce": "ikili (gözlemlenen değerler yalnız {0,1}, n=1161)"
+    },
+    {
+      "code": "DAV_TAKI_CIKARILDI",
+      "gerekce": "ikili (gözlemlenen değerler yalnız {0,1}, n=1161)"
+    },
+    {
+      "code": "TMP_DAV_01",
+      "gerekce": "düşük kardinalite (7 farklı değer < eşik=10)"
+    }
+  ],
+  "holdoutEvaluation": {
+    "nEval": 30,
+    "currentLogLoss": 2.402349008468877,
+    "experimentalLogLoss": 2.288369795395917,
+    "currentTop1": 8,
+    "experimentalTop1": 9
+  }
+}
