@@ -13,6 +13,29 @@ import { toCodes, familyOf } from "@/lib/equipment-family";
 import { parseHistoryRows, rowsBeforeCutoff, parseTjkDate, type HistoryRow } from "./history-source";
 import { classifyCoverage, type CoverageState } from "./common";
 
+/**
+ * TARIHSEL KURTARMA (kullanici talebi, 2026-10-23, "Temmuz oncesi 100 yarisin taki
+ * bilgileri guvenilir kaynaklarda mevcutsa geri kazan"): HAM VERIYLE dogrulandi — bugunku
+ * Runner.equipment (canli gosterim alani) bos olsa da, O ATIN KENDI gelecekteki bir
+ * yarisindan sonra olusan HorseRaceHistoryCache.rowsJson, BU GECMIS yarisi (sehir+tarih+
+ * yarisNo anahtariyla) KENDI equipment ani-goruntusuyle tasiyabilir — 1084 kosucudan 847'si
+ * (%78.1) bu yolla kurtarildi (diag-v1-dav-tarihsel-kurtarma-testi.mts ile olculdu).
+ * Point-in-time ihlali YOK: DAV her zaman "o GUNKU equipment neydi" sorusunu sorar, bu
+ * bilginin HANGI TARIHTE kayda gectigi (bugun mu, atin sonraki bir yarisindan sonra mi)
+ * onemli degildir — sorulan soru hep aynidir, yalniz KAYNAK farklidir.
+ */
+export function ortakYarisAnahtari(city: string, date: string, raceNo: string): string {
+  return `${city}|${date}|${raceNo}`;
+}
+
+/** Bugunku yarisin KENDI kimlik anahtarina (hedefRaceKey) esit bir satir, atin KENDI
+ *  gelecekteki rowsJson'unda var mi — varsa ve equipment doluysa, o degeri doner. */
+export function recoverTodayEquipmentFromOwnHistory(targetRaceKey: string, rowsJson: unknown): string | null {
+  const allRows = parseHistoryRows(rowsJson);
+  const match = allRows.find((row) => ortakYarisAnahtari(row.city, row.date, row.raceNo) === targetRaceKey);
+  return match?.equipment && match.equipment.trim() !== "" ? match.equipment : null;
+}
+
 export type DavSignalCode = "DAV_TAKI_EKLENDI" | "DAV_TAKI_CIKARILDI";
 
 export type DavEntry = {
@@ -48,20 +71,28 @@ export type DavResult = {
  * (çağıran taraf, yarış başına BİR KEZ: "bu yarışta EN AZ BİR koşucunun equipment'ı dolu
  * mu" diye hesaplar) false ise, DAV ikisi de observed=false döner — sahte "0" veya "1"
  * ÜRETİLMEZ.
+ *
+ * DÜZELTME #2 (2026-10-23): eski `raceEquipmentBackfilled` YARIŞ-ÇAPINDA bir bayraktı —
+ * bu, kurtarılabilir (tarihsel kaynaktan geri kazanılmış) koşucuları da gereksiz yere
+ * GÖZLEMSİZ bırakıyordu. Artık ÇAĞIRAN TARAF (trainable-features.ts/unified-family-
+ * engine.ts), her koşucu için AYRI AYRI "bugünkü equipment'ı GERÇEKTEN biliyor muyuz"
+ * sorusunu cevaplar (canlı alan VEYA tarihsel kurtarma) ve `currentEquipmentRaw`'ı buna
+ * göre EFEKTİF değerle besler; `equipmentKnownForRunner=false` ise (ne canlı ne kurtarma
+ * başarılı), DAV observed=false döner — GÖZLEMSİZ ile "takı değişmedi" ASLA karıştırılmaz.
  */
 export function computeDavTakiDegisikligi(
   currentEquipmentRaw: string | null,
   tjkAtId: number | null,
   rowsJson: unknown,
   cutoff: Date,
-  raceEquipmentBackfilled: boolean = true
+  equipmentKnownForRunner: boolean = true
 ): DavResult {
   const entry = (code: DavSignalCode, rawValue: 0 | 1 | null, observed: boolean, coverageState: CoverageState | null, missingReason: string | null): DavEntry => ({
     code, family: "DAV", rawValue, observed, coverageState, asOfSafe: true, missingReason,
   });
 
-  if (!raceEquipmentBackfilled) {
-    const miss = "bu yarış tarihinde equipment verisi hiç backfill edilmemiş (saha-çapında boş)";
+  if (!equipmentKnownForRunner) {
+    const miss = "bu koşucu için bugünkü equipment ne canlı alanda ne tarihsel kurtarmada bulunabildi";
     return { signals: [entry("DAV_TAKI_EKLENDI", null, false, "HISTORICAL_COVERAGE_GAP", miss), entry("DAV_TAKI_CIKARILDI", null, false, "HISTORICAL_COVERAGE_GAP", miss)], eklenenKodlar: [], cikarilanKodlar: [], sonYarisTarihi: null };
   }
 

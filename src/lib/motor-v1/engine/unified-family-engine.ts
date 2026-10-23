@@ -19,7 +19,7 @@ import { computeGenPedigriForRace } from "../features/gen-pedigri";
 import { loadGalopPaceIndex, computeIdman01 } from "../features/idman-galop";
 import { computeJokeyTrend30 } from "../features/int-jokey-trend";
 import { computeAntrenorTrend30 } from "../features/ant-trainer";
-import { computeDavTakiDegisikligi } from "../features/dav-taki";
+import { computeDavTakiDegisikligi, recoverTodayEquipmentFromOwnHistory, ortakYarisAnahtari } from "../features/dav-taki";
 import { computeRakH2HForRace, computeRakGapForRace } from "../features/rak-rakip-gucu";
 import { computeStartRisk } from "../features/dav-start-risk";
 import { loadPistDurumContext, computePistDurumForRunner } from "../features/pist-durum-wiring";
@@ -58,8 +58,8 @@ export async function computeUnifiedFamiliesForRace<C extends string = string>(
   const race = await db.race.findUnique({
     where: { id: raceId },
     select: {
-      breed: true, surface: true, distance: true,
-      raceDay: { select: { date: true } },
+      breed: true, surface: true, distance: true, raceNo: true,
+      raceDay: { select: { date: true, hippodrome: { select: { name: true } } } },
       result: { select: { id: true } },
       runners: {
         where: { scratched: false },
@@ -69,6 +69,7 @@ export async function computeUnifiedFamiliesForRace<C extends string = string>(
   });
   if (!race) return [];
   const cutoff = race.raceDay.date;
+  const davRaceKey = ortakYarisAnahtari(race.raceDay.hippodrome.name, `${String(cutoff.getUTCDate()).padStart(2,"0")}.${String(cutoff.getUTCMonth()+1).padStart(2,"0")}.${cutoff.getUTCFullYear()}`, String(race.raceNo));
 
   const [tempoCtx, galopPaceIndex, pistCtxOrNull] = await Promise.all([loadTempoContext(), loadGalopPaceIndex(), loadPistDurumContext(raceId)]);
   if (!pistCtxOrNull) return []; // race zaten yukarida dogrulandi, bu pratikte olusmaz
@@ -112,9 +113,9 @@ export async function computeUnifiedFamiliesForRace<C extends string = string>(
   // immutablePreRaceSnapshot=true kurar - gercek PIT durumu asagida HER KOSUCU icin
   // computePistDurumForRunner'in DONDUGU reason'a gore ayrica degerlendirilir.
 
-  // DAV BACKFILL BOSLUGU DUZELTMESI (2026-10-22, bkz. dav-taki.ts): yarisin HICBIR
-  // kosucusunda equipment doldurulmamissa, DAV observed=false dondurmeli (sahte "0/1" degil).
-  const raceEquipmentBackfilled = race.runners.some((r) => r.equipment != null && r.equipment.trim() !== "");
+  // DAV TARIHSEL KURTARMA (2026-10-23, bkz. dav-taki.ts): canli alan bossa atin KENDI
+  // gelecekteki HorseRaceHistoryCache kaydindan kurtarma denenir; ikisi de basarisizsa
+  // DAV observed=false (GOZLEMSIZ ile "degismedi" KARISTIRILMAZ).
 
   const results: UnifiedRunnerResult[] = [];
   for (const r of race.runners) {
@@ -214,7 +215,11 @@ export async function computeUnifiedFamiliesForRace<C extends string = string>(
     );
 
     // --- DAV (takı + start riski) ---
-    const dav = computeDavTakiDegisikligi(r.equipment, r.tjkAtId, rowsJson, cutoff, raceEquipmentBackfilled);
+    const liveEquipmentKnown = r.equipment != null && r.equipment.trim() !== "";
+    const recoveredEquipment = !liveEquipmentKnown ? recoverTodayEquipmentFromOwnHistory(davRaceKey, rowsJson) : null;
+    const effectiveEquipment = liveEquipmentKnown ? r.equipment : recoveredEquipment;
+    const equipmentKnownForRunner = liveEquipmentKnown || recoveredEquipment != null;
+    const dav = computeDavTakiDegisikligi(effectiveEquipment, r.tjkAtId, rowsJson, cutoff, equipmentKnownForRunner);
     const startRisk = await computeStartRisk(r.tjkAtId, cutoff);
     // KULLANICI TALİMATI (2026-10-19, 2. tur): seçilim-yanlılığı uyarısı DEĞER GÖZLEMLİ OLSA
     // BİLE kaybolmaz — missingReason YALNIZ eksik-veri için değil, bu DAİMA-geçerli kısıt

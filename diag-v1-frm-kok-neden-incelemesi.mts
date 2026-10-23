@@ -1,0 +1,104 @@
+// ROTAGANYAN V1.0 — FRM (Form, Kondisyon, Idman) KOK NEDEN INCELEMESI (SALT-OKUNUR).
+// ONEMLI ON-BULGU: v1-trained-model.json'un excludedCodes listesi dogrulandi — IDMAN_01
+// (observedRate=%5.99), FRM_IDMAN_DINLENME_01 ve FRM_GALOP_ANT_01 EGITIMLI MODELDE YOK
+// (yetersiz gozlem orani nedeniyle egitim disinda tutulmus) — yani bu uc kod SU ANDA
+// HICBIR skora katki VEREMEZ. FRM'nin aktif/egitilmis dogrudan kodlari yalniz FORM_01-03.
+// FRM 2 iliskisel kodda yer alir (esit-bolustur, cift sayim yok): FRM_GEN_01(1/2), ANT_FRM_01(1/2).
+import fs from "node:fs";
+import { explainRunner } from "./src/lib/motor-v1/engine/training";
+import { softmax } from "./src/lib/v5461/math";
+import { loadTrainedV1Model } from "./src/lib/motor-v1/engine/load-trained-model";
+import type { RunnerFeatureVector, SignalEntry } from "./src/lib/motor-v1/engine/feature-vector";
+
+type CacheRace = { raceId: string; date: string; winnerNo: number | null; runners: { no: number; name: string; vectors: SignalEntry[] }[] };
+function logLoss(p: number): number { return -Math.log(Math.max(p, 1e-9)); }
+
+const RACE_PREFIXES_15 = [
+  "cmt875dz", "cmtfiu84", "cmt5caao", "cmu52aat", "cmrx3813", "cmudmxle", "cmup2gg0",
+  "cmu60zh6", "cmrl0m3t", "cmr5xihb", "cmsh1uys", "cmrpxdmb", "cmunn07g", "cmsr1wh7", "cmunn1bq",
+];
+const FRM_DIRECT = ["FORM_01", "FORM_02", "FORM_03"];
+
+async function main() {
+  const cache = JSON.parse(fs.readFileSync("C:/tmp/existing-600-full-feature-cache.json", "utf8")) as Record<string, CacheRace>;
+  const lock = JSON.parse(fs.readFileSync("src/lib/motor-v1/artifacts/ab-split-locked.json", "utf8")) as { trainRaceIds: string[]; holdoutRaceIds: string[] };
+  const trainSet = new Set(lock.trainRaceIds), holdoutSet = new Set(lock.holdoutRaceIds);
+  const model = loadTrainedV1Model();
+  const trainedCodes = new Set([...model.stats.keys()]);
+  console.log(`DOGRULAMA: IDMAN_01 egitimli modelde var mi? ${trainedCodes.has("IDMAN_01" as never)} (HAYIR beklenir — excludedCodes'ta observedRate=%5.99 ile disarida)`);
+  const allIds = Object.keys(cache);
+  const matched = RACE_PREFIXES_15.map((p) => allIds.find((id) => id.startsWith(p))!).filter(Boolean);
+
+  function frmBreakdown(fv: RunnerFeatureVector) {
+    const { rows } = explainRunner(fv, model);
+    const perCode: Record<string, { raw: number | null; obs: boolean; contrib: number }> = {};
+    let direct = 0, iliski = 0;
+    for (const code of FRM_DIRECT) {
+      const r = rows.find((x) => x.code === code);
+      const c = r ? r.scoreContribution + r.missingIndicatorContribution : 0;
+      perCode[code] = { raw: r?.rawValue ?? null, obs: !!r?.observed, contrib: c };
+      direct += c;
+    }
+    for (const r of rows) {
+      if (!trainedCodes.has(r.code)) continue;
+      const contrib = r.scoreContribution + r.missingIndicatorContribution;
+      if (r.code === "FRM_GEN_01") iliski += contrib / 2;
+      else if (r.code === "ANT_FRM_01") iliski += contrib / 2;
+    }
+    return { perCode, direct, iliski, total: direct + iliski };
+  }
+
+  const summaryRows: { set: string; winner: string; direct: number; iliski: number; total: number; tani: string }[] = [];
+
+  for (const raceId of matched) {
+    const race = cache[raceId];
+    const vectors: RunnerFeatureVector[] = race.runners.map((r) => ({ raceId: race.raceId, no: r.no, name: r.name, tjkAtId: null, jockey: null, signals: r.vectors }));
+    const explains = vectors.map((v) => explainRunner(v, model));
+    const probs = softmax(explains.map((e) => e.totalScore));
+    const winIdx = vectors.findIndex((v) => v.no === race.winnerNo);
+    if (winIdx < 0) continue;
+    const ranked = vectors.map((v, i) => ({ no: v.no, name: v.name, p: probs[i] })).sort((a, b) => b.p - a.p);
+    const fav = ranked[0];
+    const favIdx = vectors.findIndex((v) => v.no === fav.no);
+    const winnerRankOld = ranked.findIndex((r) => r.no === race.winnerNo) + 1;
+    const set = trainSet.has(raceId) ? "TRAIN" : holdoutSet.has(raceId) ? "HOLDOUT" : "EK";
+    const isFocus = raceId.startsWith("cmunn07g") || raceId.startsWith("cmr5xihb") || raceId.startsWith("cmrpxdmb");
+
+    const winnerFrm = frmBreakdown(vectors[winIdx]);
+    const favFrm = frmBreakdown(vectors[favIdx]);
+    const fark = favFrm.total - winnerFrm.total;
+
+    console.log(`\n========== ${race.date.slice(0,10)} ${raceId.slice(0,8)} [${set}]${isFocus ? " *** OZEL ODAK ***" : ""} ==========`);
+    console.log(`Kazanan: ${race.runners.find((r)=>r.no===race.winnerNo)?.name}(#${race.winnerNo})  Yanlis favori: ${fav.name}(#${fav.no})`);
+    for (const code of FRM_DIRECT) {
+      const w = winnerFrm.perCode[code], f = favFrm.perCode[code];
+      console.log(`  ${code}: Kazanan ham=${w.obs ? w.raw!.toFixed(3) : "GOZLEMSIZ"} katki=${w.contrib.toFixed(3)}  |  Favori ham=${f.obs ? f.raw!.toFixed(3) : "GOZLEMSIZ"} katki=${f.contrib.toFixed(3)}`);
+    }
+    console.log(`  FRM DOGRUDAN — Kazanan: ${winnerFrm.direct.toFixed(3)}  Favori: ${favFrm.direct.toFixed(3)}  Fark: ${(favFrm.direct-winnerFrm.direct).toFixed(3)}`);
+    console.log(`  FRM ILISKISEL PAYI (FRM_GEN_01/2+ANT_FRM_01/2) — Kazanan: ${winnerFrm.iliski.toFixed(3)}  Favori: ${favFrm.iliski.toFixed(3)}  Fark: ${(favFrm.iliski-winnerFrm.iliski).toFixed(3)}`);
+    console.log(`  TOPLAM FRM — Fark: ${fark.toFixed(3)}`);
+
+    const adjScores = explains.map((e, i) => {
+      if (i === winIdx) return e.totalScore - winnerFrm.total;
+      if (i === favIdx) return e.totalScore - favFrm.total;
+      return e.totalScore;
+    });
+    const adjProbs = softmax(adjScores);
+    const adjRanked = vectors.map((v, i) => ({ no: v.no, p: adjProbs[i] })).sort((a, b) => b.p - a.p);
+    const winnerRankNew = adjRanked.findIndex((r) => r.no === race.winnerNo) + 1;
+    console.log(`  FRM CIKARILINCA (yalniz K/F ayarlandi, digerleri SABIT): Sira ${winnerRankOld}.->${winnerRankNew}.  Olasilik %${(probs[winIdx]*100).toFixed(2)}->%${(adjProbs[winIdx]*100).toFixed(2)}`);
+
+    let tani: string;
+    const kazananGozlemsizSayisi = FRM_DIRECT.filter((c) => !winnerFrm.perCode[c].obs).length;
+    if (Math.abs(fark) < 0.1) tani = "ETKISIZ";
+    else if (fark < -0.1) tani = "FRM KAZANANI DESTEKLIYOR (favoriye gore DAHA IYI katki, hatanin nedeni DEGIL)";
+    else if (kazananGozlemsizSayisi >= 2) tani = "HAM VERI EKSIKLIGI (kazananin FORM kodlarinin cogu gozlemsiz)";
+    else tani = "OGRENILMIS KATKI (veri mevcut, FRM kazanani geriye itiyor)";
+    console.log(`  TANI: ${tani}`);
+    summaryRows.push({ set, winner: race.runners.find((r)=>r.no===race.winnerNo)?.name ?? "?", direct: favFrm.direct-winnerFrm.direct, iliski: favFrm.iliski-winnerFrm.iliski, total: fark, tani });
+  }
+
+  console.log(`\n\n=== OZET (15 yaris) ===`);
+  for (const r of summaryRows) console.log(`  [${r.set}] ${r.winner}: dogrudan=${r.direct.toFixed(2)} iliskisel=${r.iliski.toFixed(2)} toplam=${r.total.toFixed(2)} -> ${r.tani}`);
+}
+main().then(() => process.exit(0)).catch((e) => { console.error("HATA:", e); process.exit(1); });

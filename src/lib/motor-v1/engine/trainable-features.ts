@@ -16,7 +16,7 @@ import { computeGenPedigriForRace } from "../features/gen-pedigri";
 import { computeIdman01, groupKey, splitsToT200Points } from "../features/idman-galop";
 import { computeJokeyTrend30 } from "../features/int-jokey-trend";
 import { computeAntrenorTrend30 } from "../features/ant-trainer";
-import { computeDavTakiDegisikligi } from "../features/dav-taki";
+import { computeDavTakiDegisikligi, recoverTodayEquipmentFromOwnHistory, ortakYarisAnahtari } from "../features/dav-taki";
 import { computeRakH2HForRace, computeRakGapForRace } from "../features/rak-rakip-gucu";
 import { computeKulvar01, computeTempoStilKulvarInteraction } from "../features/int-tempo-stil-kulvar";
 import { computeFormGalopDinlenmeInteraction } from "../features/int-form-galop-dinlenme";
@@ -97,8 +97,8 @@ export async function computeTrainableFeaturesForRace(
   const race = await db.race.findUnique({
     where: { id: raceId },
     select: {
-      breed: true, surface: true, distance: true,
-      raceDay: { select: { date: true } },
+      breed: true, surface: true, distance: true, raceNo: true,
+      raceDay: { select: { date: true, hippodrome: { select: { name: true } } } },
       result: { select: { actualOrder: true, winnerNos: true } },
       runners: {
         where: { scratched: false },
@@ -108,6 +108,7 @@ export async function computeTrainableFeaturesForRace(
   });
   if (!race || race.runners.length === 0) return null;
   const cutoff = race.raceDay.date;
+  const davRaceKey = ortakYarisAnahtari(race.raceDay.hippodrome.name, `${String(cutoff.getUTCDate()).padStart(2,"0")}.${String(cutoff.getUTCMonth()+1).padStart(2,"0")}.${cutoff.getUTCFullYear()}`, String(race.raceNo));
   const winnerNo = race.result?.winnerNos?.[0] ?? (Array.isArray(race.result?.actualOrder) ? Number(race.result!.actualOrder[0]) : null);
 
   const safVectors = await buildFeatureVectorsForRace(raceId, tempoCtx);
@@ -151,10 +152,11 @@ export async function computeTrainableFeaturesForRace(
   const antTrendPairs = await Promise.all(race.runners.map(async (r) => [r.no, await computeAntrenorTrend30(r.trainer, cutoff)] as const));
   const antTrendByNo = new Map(antTrendPairs);
 
-  // DAV BACKFILL BOSLUGU DUZELTMESI (2026-10-22): yarisin HICBIR kosucusunda equipment
-  // doldurulmamissa (ham veride dogrulandi: TRAIN+HOLDOUT'un %77.3'u bu durumda), DAV
-  // "0/1" degil observed=false dondurmeli — bkz. dav-taki.ts.
-  const raceEquipmentBackfilled = race.runners.some((r) => r.equipment != null && r.equipment.trim() !== "");
+  // DAV TARIHSEL KURTARMA (2026-10-23): canli Runner.equipment bossa, atin KENDI gelecekteki
+  // HorseRaceHistoryCache kaydindan bu AYNI yarisi (sehir+tarih+yarisNo) kurtarmayi dene —
+  // ham veride dogrulandi: %78.1 kosucu bu yolla kurtarilabiliyor (bkz. dav-taki.ts basligi).
+  // Kurtarma da basarisizsa (ne canli alan ne kurtarma) equipmentKnownForRunner=false — DAV
+  // "0/1" degil observed=false dondurur (GOZLEMSIZ ile "degismedi" KARISTIRILMAZ).
 
   const out: TrainableRaceResult["runners"] = [];
   for (const r of race.runners) {
@@ -183,7 +185,11 @@ export async function computeTrainableFeaturesForRace(
     const antTrend = antTrendByNo.get(r.no)!;
     const antEntry = entry("ANT_TREND30", "ANT", antTrend.value, antTrend.observed, antTrend.missingReason);
 
-    const dav = computeDavTakiDegisikligi(r.equipment, r.tjkAtId, rowsJson, cutoff, raceEquipmentBackfilled);
+    const liveEquipmentKnown = r.equipment != null && r.equipment.trim() !== "";
+    const recoveredEquipment = !liveEquipmentKnown ? recoverTodayEquipmentFromOwnHistory(davRaceKey, rowsJson) : null;
+    const effectiveEquipment = liveEquipmentKnown ? r.equipment : recoveredEquipment;
+    const equipmentKnownForRunner = liveEquipmentKnown || recoveredEquipment != null;
+    const dav = computeDavTakiDegisikligi(effectiveEquipment, r.tjkAtId, rowsJson, cutoff, equipmentKnownForRunner);
 
     const rak = rakByNo.get(r.no)!;
     const rakGap = rakGapByNo.get(r.no)!;
