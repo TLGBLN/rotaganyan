@@ -13,6 +13,16 @@ import { db } from "@/lib/db";
 import { median, timeDecayWeight, weightedAverage, classifyCoverage, type CoverageState } from "./common";
 import { parseHistoryRows, parseTjkDate, rowsBeforeCutoff, type HistoryRow } from "./history-source";
 
+// KILO_02 SHRINKAGE DENEYI (kullanici talebi, 2026-10-23): SINIF_01/PMZ_01 ile AYNI
+// shrinkageFactor disiplini TRAIN-ici kronolojik CV ile test edildi (diag-v1-kil-
+// iyilestirme-E-F.mts). SONUC DEJENERE: val LogLoss, K=2'den K=1000'e KADAR MONOTONIK
+// iyilesiyor, bir platoya ULASMIYOR — CV "sinirli bir shrinkage K'si" bulamiyor, yalnizca
+// "K->sonsuz" (yani sinyali neredeyse SIFIRLA) yonunu tercih ediyor. Bu, az-orneklemli
+// gurultuyu notrlemeye calisan GERCEK bir shrinkage kalibrasyonu DEGIL — sinyalin
+// KENDISININ ongoru degeri tasiyip tasimadigi sorusu (ayri bir ablation testi gerektirir,
+// "kucuk etki -> otomatik kaldirma YOK" kuralina gore burada YAPILMADI). Deger HAM
+// (shrink'siz) kaliyor — bkz. kok neden takip tablosu, "Henuz cozulmedi" kategorisi.
+
 function parseWeightKg(raw: string | null | undefined): number | null {
   if (!raw) return null;
   const n = Number(raw.trim().replace(",", "."));
@@ -31,7 +41,7 @@ export function computeKiloSahaGoreli(ownWeight: number | null, fieldWeights: (n
 
 export type Kilo02Result = {
   rawValue: number | null; // ΔW = W_today - w-avg(W_history)
-  value: number | null; // GEÇİCİ: KILO_01 ile AYNI shrink ilkesi henüz UYGULANMADI — ham değer (açık iş, aşağıda not edildi)
+  value: number | null; // CV-TEST EDİLDİ (2026-10-23): shrinkage fayda sağlamadı, ham değer korunuyor
   observationCount: number;
   totalHistoryRows: number;
   coverageState: CoverageState;
@@ -73,11 +83,10 @@ export function computeKiloGecmiseGore(
   }
   const histAvg = weightedAverage(points);
   const rawValue = histAvg == null ? null : ownWeight - histAvg;
+  const value = rawValue;
   return {
     rawValue,
-    // GEÇİCİ: shrinkage henüz uygulanmadı (bu turun kapsamı: ham hesaplama + veri doğrulaması) —
-    // SINIF_01/PMZ_01 ile AYNI shrink disiplini eğitim aşamasında eklenecek, AÇIK İŞ.
-    value: rawValue,
+    value,
     observationCount: points.length,
     totalHistoryRows: allRows.length,
     coverageState: classifyCoverage(true, allRows.length, points.length),
