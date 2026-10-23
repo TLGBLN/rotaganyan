@@ -13,7 +13,18 @@
 // çıktısını buraya REFERANS verir).
 
 import { parseHistoryRows, rowsBeforeCutoff, finishPosToPosition, type HistoryRow } from "./history-source";
-import { classifyCoverage, type CoverageState } from "./common";
+import { classifyCoverage, shrinkageFactor, type CoverageState } from "./common";
+
+/**
+ * RAK_H2H_01 DUZELTMESI (kullanici talebi, 2026-10-23, kok neden incelemesinde bulundu):
+ * eski formul HAM net (kazanma-kaybetme farki, SINIRSIZ buyuyebilir — JIMDEMA/STASERA'da
+ * 11, LAST MOMENT/RIDE THE LIGHTNING'de 12 gozlendi) donduruyordu — bu, "gercek rakip
+ * ustunlugu" ile "sadece cok sayida ortak gecmis karsilasma" arasini AYIRMIYORDU. Duzeltme:
+ * SINIF_01/PMZ_01 ile AYNI disiplin (common.ts::shrinkageFactor) — net/karsilastirma (dogal
+ * olarak [-1,1] araliginda SINIRLI bir ORAN) hesaplanir, az karsilastirmada 0'a (notr) dogru
+ * kucultulur. K, TRAIN-ici kronolojik CV ile SECILIR (varsayilani degil).
+ */
+export const RAK_H2H_SHRINKAGE_K_DEFAULT = 4; // GECICI — CV ile dogrulanana kadar (diger *_K sabitleriyle AYNI durustluk ilkesi)
 
 export type RakSignalCode = "RAK_H2H_01" | "RAK_GAP_01";
 
@@ -39,7 +50,7 @@ function ortakYarisAnahtari(row: HistoryRow): string {
  * sayısı) - (rakipten geride bitirdiği sayısı), SAHADAKİ TÜM rakiplerle toplanır.
  * Ortak yarış yoksa (çoğu durumda) observed=false, 0 UYDURULMAZ.
  */
-export function computeRakH2HForRace(runners: RakRunnerInput[], cutoff: Date): Map<number, RakEntry> {
+export function computeRakH2HForRace(runners: RakRunnerInput[], cutoff: Date, shrinkageK: number = RAK_H2H_SHRINKAGE_K_DEFAULT): Map<number, RakEntry> {
   // 1) Her atın KENDİ, cutoff'tan önceki geçmiş satırlarını hazırla.
   const historyByNo = new Map<number, { row: HistoryRow; key: string; pos: number | null }[]>();
   for (const r of runners) {
@@ -72,7 +83,13 @@ export function computeRakH2HForRace(runners: RakRunnerInput[], cutoff: Date): M
     if (karsilastirma === 0) {
       out.set(r.no, { code: "RAK_H2H_01", family: "RAK", rawValue: null, observed: false, coverageState: classifyCoverage(true, myRows.length, 0, 1), asOfSafe: true, missingReason: "bugünkü rakiplerle hiç ortak geçmiş yarış yok" });
     } else {
-      out.set(r.no, { code: "RAK_H2H_01", family: "RAK", rawValue: net, observed: true, coverageState: classifyCoverage(true, myRows.length, karsilastirma, 1), asOfSafe: true, missingReason: null });
+      // DUZELTME: ham net (sinirsiz) YERINE, az karsilastirmada 0'a kucultulen, dogal olarak
+      // [-1,1] ile sinirli bir ORAN. Karsilastirma sayisi arttikca (shrinkageFactor->1)
+      // gercek ortalama ustunluge yaklasir — ama artik "cok karsilasma = otomatik buyuk puan"
+      // DEGIL.
+      const oran = net / karsilastirma;
+      const value = shrinkageFactor(karsilastirma, shrinkageK) * oran;
+      out.set(r.no, { code: "RAK_H2H_01", family: "RAK", rawValue: value, observed: true, coverageState: classifyCoverage(true, myRows.length, karsilastirma, 1), asOfSafe: true, missingReason: null });
     }
   }
   return out;
