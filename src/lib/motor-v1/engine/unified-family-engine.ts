@@ -117,6 +117,15 @@ export async function computeUnifiedFamiliesForRace<C extends string = string>(
   // gelecekteki HorseRaceHistoryCache kaydindan kurtarma denenir; ikisi de basarisizsa
   // DAV observed=false (GOZLEMSIZ ile "degismedi" KARISTIRILMAZ).
 
+  // 2026-10-24 PERF duzeltmesi — trainable-features.ts'te 2026-10-22'de bulunan/duzeltilen
+  // AYNI sorun burada hic duzeltilmemisti: JOKEY_TREND30/ANT_TREND30 her kosucu icin
+  // DONGU ICINDE SIRAYLA await ediliyordu (yaris basina 10-15 at x 2 = 20-30 ardisik DB
+  // gidis-donusu, tek yaris 50-220 saniye). Davranis/sonuc AYNI, yalniz esanli cekiliyor.
+  const jokeyTrendPairs = await Promise.all(race.runners.map(async (r) => [r.no, await computeJokeyTrend30(r.jockey, cutoff)] as const));
+  const jokeyTrendByNo = new Map(jokeyTrendPairs);
+  const antTrendPairs = await Promise.all(race.runners.map(async (r) => [r.no, await computeAntrenorTrend30(r.trainer, cutoff)] as const));
+  const antTrendByNo = new Map(antTrendPairs);
+
   const results: UnifiedRunnerResult[] = [];
   for (const r of race.runners) {
     const sv = safByNo.get(r.no);
@@ -185,7 +194,7 @@ export async function computeUnifiedFamiliesForRace<C extends string = string>(
 
     // --- JOK ---
     const jokey01 = sig("JOKEY_01"), jokey02 = sig("JOKEY_02"), jokey03 = sig("JOKEY_03"), jokey04 = sig("JOKEY_04");
-    const jokeyTrend = await computeJokeyTrend30(r.jockey, cutoff);
+    const jokeyTrend = jokeyTrendByNo.get(r.no)!;
     const jokeyTrendEntry = entry("JOKEY_TREND30", "JOK", jokeyTrend.value, jokeyTrend.observed, jokeyTrend.missingReason);
     const jokBlock = familyBlock(
       "JOK",
@@ -196,7 +205,7 @@ export async function computeUnifiedFamiliesForRace<C extends string = string>(
     );
 
     // --- ANT ---
-    const antTrend = await computeAntrenorTrend30(r.trainer, cutoff);
+    const antTrend = antTrendByNo.get(r.no)!;
     const antEntry = entry("ANT_TREND30", "ANT", antTrend.value, antTrend.observed, antTrend.missingReason);
     const antBlock = familyBlock(
       "ANT",

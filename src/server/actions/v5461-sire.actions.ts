@@ -20,6 +20,27 @@ export type V5461SireOzet = {
  * eklendi — her hedef icin KENDI tjkAtId'sinin katkisi, O HEDEFE ozel olarak cikarilir (ayni
  * babadan gelen DIGER bir at ayni ragalardan HARIC TUTULMAZ, yalniz tam KENDI tjkAtId'si).
  */
+let cachedSireRowsPromise: ReturnType<typeof fetchAllSireRows> | null = null;
+function fetchAllSireRows() {
+  return db.runner.findMany({
+    where: { scratched: false, sire: { not: null }, race: { result: { isNot: null } } },
+    select: {
+      sire: true,
+      no: true,
+      tjkAtId: true,
+      race: {
+        select: {
+          breed: true,
+          surface: true,
+          distance: true,
+          raceDay: { select: { date: true } },
+          result: { select: { actualOrder: true, winnerNos: true } },
+        },
+      },
+    },
+  });
+}
+
 export async function getV5461SireOzetleriForRace(
   sireNames: (string | null)[],
   breed: string,
@@ -39,23 +60,12 @@ export async function getV5461SireOzetleriForRace(
     return sireNames.map(() => ({ ornekKendiVeri: null, kYuzde: null }));
   }
 
-  const rows = await db.runner.findMany({
-    where: { scratched: false, sire: { not: null }, race: { result: { isNot: null } } },
-    select: {
-      sire: true,
-      no: true,
-      tjkAtId: true,
-      race: {
-        select: {
-          breed: true,
-          surface: true,
-          distance: true,
-          raceDay: { select: { date: true } },
-          result: { select: { actualOrder: true, winnerNos: true } },
-        },
-      },
-    },
-  });
+  // 2026-10-24 — PERF: ayni duzeltme gen-pedigri.ts::getOwnLineOzetleriForRace ile AYNI —
+  // bu taban satir kumesi hicbir parametreye gore DB-seviyesinde filtrelenmiyordu, toplu
+  // Faz1 toplamasinda yaris basina tekrar tekrar ayni binlerce satir cekiliyordu (0.01
+  // yaris/sn'ye dustu). TEK SEFERDE cek, surec boyunca PAYLAS — filtre/sonuc mantigi DEGISMEDI.
+  if (!cachedSireRowsPromise) cachedSireRowsPromise = fetchAllSireRows();
+  const rows = await cachedSireRowsPromise;
 
   const sayim = new Map<string, { start: number; wins: number }>();
   // sire -> tjkAtId -> bu atin KENDI katkisi (hedef-bazli cikarim icin)

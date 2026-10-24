@@ -57,6 +57,32 @@ type LineOzet = { ornekKendiVeri: number | null; kYuzde: number | null };
 /** GEN SELF-CONTAMINATION DUZELTMESI (2026-10-22) — AYNI mantik getV5461SireOzetleriForRace
  *  ile: hedef atin KENDI gecmis startlari, kendi dam/damSire istatistigine KARISMAZ.
  *  `excludeTjkAtIds`, `names` ile AYNI sirada, HER hedef icin kendi tjkAtId'si. */
+// 2026-10-24 — PERF: bu temel satir kumesi (scratched=false, sonuclanmis, dam/damSire dolu)
+// HICBIR parametreye (breed/surface/distance/cutoff) gore DB-seviyesinde filtrelenmiyordu —
+// her cagri TAM AYNI binlerce satiri yeniden cekiyordu (toplu Faz1 toplamasinda yaris basina
+// 2 kez = 1140 yaris x 2 = 2280 tam tablo taramasi, 0.01 yaris/sn'ye dustu). Proje genelindeki
+// "tumArsiviGetir" deseniyle AYNI: TEK SEFERDE cek, surec boyunca PAYLAS. Sonuc/filtre mantigi
+// DEGISMEDI, yalniz DB gidis-donusu tekillestirildi.
+let cachedRowsPromise: ReturnType<typeof fetchAllDamRows> | null = null;
+function fetchAllDamRows() {
+  return db.runner.findMany({
+    where: { scratched: false, race: { result: { isNot: null } }, OR: [{ dam: { not: null } }, { damSire: { not: null } }] },
+    select: {
+      dam: true,
+      damSire: true,
+      no: true,
+      tjkAtId: true,
+      race: {
+        select: {
+          breed: true, surface: true, distance: true,
+          raceDay: { select: { date: true } },
+          result: { select: { actualOrder: true, winnerNos: true } },
+        },
+      },
+    },
+  });
+}
+
 async function getOwnLineOzetleriForRace(
   names: (string | null)[],
   field: "dam" | "damSire",
@@ -74,22 +100,8 @@ async function getOwnLineOzetleriForRace(
 
   // field dinamik olduğu için (dam|damSire) Prisma select'te computed-key KULLANILMAZ
   // (tip daralması bozuluyor) — her iki alan da her zaman seçilir, ilgili olan JS'te seçilir.
-  const rows = await db.runner.findMany({
-    where: { scratched: false, race: { result: { isNot: null } }, OR: [{ dam: { not: null } }, { damSire: { not: null } }] },
-    select: {
-      dam: true,
-      damSire: true,
-      no: true,
-      tjkAtId: true,
-      race: {
-        select: {
-          breed: true, surface: true, distance: true,
-          raceDay: { select: { date: true } },
-          result: { select: { actualOrder: true, winnerNos: true } },
-        },
-      },
-    },
-  });
+  if (!cachedRowsPromise) cachedRowsPromise = fetchAllDamRows();
+  const rows = await cachedRowsPromise;
 
   const sayim = new Map<string, { start: number; wins: number }>();
   const kendiKatki = new Map<string, Map<number, { start: number; wins: number }>>();

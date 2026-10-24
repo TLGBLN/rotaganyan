@@ -39,8 +39,38 @@ export type TempoContext = { byTjk: Map<number, AccuraceRun[]> };
 
 /** TÜM Accurace arşivini BİR KEZ yükler (pahalı) — çağıran taraf bir yarış/toplu eğitim
  *  turu boyunca AYNI context'i paylaşmalı (history-source.ts'teki resolver deseniyle AYNI
- *  N+1 önleme disiplini). */
+ *  N+1 önleme disiplini).
+ *  2026-10-24 — PERF: computeUnifiedFamiliesForRace (predictRaceV1'in gerçek yolu) bu
+ *  fonksiyonu HER YARIŞ icin YENIDEN cagiriyordu, parametre olarak paylasilan context KABUL
+ *  ETMIYORDU (trainable-features.ts'in disk-onbellekli yolunun aksine) — tek yarislik
+ *  predictRaceV1 cagrisi 150-300 saniye suruyordu (toplu 1140 yaris testinde 0.01 yaris/sn).
+ *  Surec-omurlu modul-seviyesi onbellek: DAVRANIS/SONUC DEGISMEZ, yalniz DB gidis-donusu
+ *  TEKILLESTIRILIR (tumArsiviGetir/tumOnbellegiGetir ile AYNI proje deseni). */
+let cachedTempoContext: Promise<TempoContext> | null = null;
 export async function loadTempoContext(): Promise<TempoContext> {
+  if (cachedTempoContext) return cachedTempoContext;
+  cachedTempoContext = loadTempoContextUncached();
+  return cachedTempoContext;
+}
+const ACCURACE_SNAPSHOT_PATH = "src/lib/motor-v1/artifacts/accurace-archive-snapshot.json";
+async function loadTempoContextUncached(): Promise<TempoContext> {
+  // 2026-10-24 — PERF duzeltmesinin devami: trainable-features.ts'in KENDI disk onbellegi
+  // zaten vardi (bu oturumda daha once kurulmus), ben bunu KULLANMIYORDUM. Varsa disk'ten
+  // (aninda), yoksa (ilk kurulum/snapshot eksikse) canli DB'den oku — davranis/kapsam AYNI,
+  // yalniz kaynak hizli ise onu tercih eder.
+  const fsMod = await import("node:fs");
+  if (fsMod.existsSync(ACCURACE_SNAPSHOT_PATH)) {
+    const snap = JSON.parse(fsMod.readFileSync(ACCURACE_SNAPSHOT_PATH, "utf8")) as { builtAt: string; runs: (Omit<AccuraceRun, "date"> & { date: string })[] };
+    const byTjk = new Map<number, AccuraceRun[]>();
+    for (const r of snap.runs) {
+      const run: AccuraceRun = { ...r, date: new Date(r.date) } as AccuraceRun;
+      const arr = byTjk.get(run.tjk);
+      if (arr) arr.push(run); else byTjk.set(run.tjk, [run]);
+    }
+    console.log(`[loadTempoContext] DISK onbellekten yuklendi (builtAt=${snap.builtAt}), ${snap.runs.length} kayit.`);
+    return { byTjk };
+  }
+  console.log(`[loadTempoContext] Disk onbellegi yok, canli DB'den cekiliyor (yavas)...`);
   const runs = await accuraceKosulari();
   const byTjk = new Map<number, AccuraceRun[]>();
   for (const r of runs) {
