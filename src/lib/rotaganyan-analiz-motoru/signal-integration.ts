@@ -127,9 +127,9 @@ export const SIGNAL_SPECS: readonly SignalSpec[] = [
     "source": "D",
     "code": "PS_lone",
     "canonical": "SINGLE_LEADER",
-    "decision": "ALTERNATIVE",
+    "decision": "PRIMARY",
     "family": "TMP",
-    "note": "Eski kırpılmış PS_lone yerine V1 TEMPO_03 tercih edildi."
+    "note": "D'nin düzeltilmiş çarpımsal tek lider sürümü; V1 TEMPO_03 ile çift sayılmaz."
   },
   {
     "source": "D",
@@ -255,9 +255,9 @@ export const SIGNAL_SPECS: readonly SignalSpec[] = [
     "source": "V1",
     "code": "TEMPO_03",
     "canonical": "SINGLE_LEADER",
-    "decision": "PRIMARY",
+    "decision": "ALTERNATIVE",
     "family": "TMP",
-    "note": "V1 çarpımsal tek lider; PS_lone eski kırpma hatasını önler."
+    "note": "D PS_lone düzeltmesiyle alternatif çarpımsal hesap; karşılaştırmadan birlikte açılmaz."
   },
   {
     "source": "V1",
