@@ -461,6 +461,14 @@ export const SIGNAL_SPECS: readonly SignalSpec[] = [
   },
   {
     "source": "V1",
+    "code": "TMP_DAV_KULVAR_01",
+    "canonical": "TMP_DAV_KULVAR_01",
+    "decision": "BLOCKED",
+    "family": "INT",
+    "note": "DAV_START_RISK kullanan etkileşim; seçim yanlılığı nedeniyle dışlanmış."
+  },
+  {
+    "source": "V1",
     "code": "FRM_IDMAN_DINLENME_01",
     "canonical": "FRM_IDMAN_DINLENME_01",
     "decision": "BLOCKED",
@@ -509,8 +517,16 @@ export const SIGNAL_SPECS: readonly SignalSpec[] = [
   },
   {
     "source": "V1",
-    "code": "ANT_01/02",
-    "canonical": "ANT_01/02",
+    "code": "ANT_01",
+    "canonical": "ANT_01",
+    "decision": "BLOCKED",
+    "family": "ANT",
+    "note": "Yalnız tasarım; somut hesaplayıcı yok."
+  },
+  {
+    "source": "V1",
+    "code": "ANT_02",
+    "canonical": "ANT_02",
     "decision": "BLOCKED",
     "family": "ANT",
     "note": "Yalnız tasarım; somut hesaplayıcı yok."
