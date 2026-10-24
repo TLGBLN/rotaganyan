@@ -8,8 +8,8 @@ const input = (source: SignalObservation["source"], code: string, raw: number | 
 describe("ROTAGANYAN stage-1 unified signal integration", () => {
   it("documents all Saf D and V1 codes with no repeated source key", () => {
     expect(SIGNAL_SPECS.filter(s => s.source === "D")).toHaveLength(15);
-    expect(SIGNAL_SPECS.filter(s => s.source === "V1")).toHaveLength(47);
-    expect(new Set(SIGNAL_SPECS.map(s => s.source + ":" + s.code)).size).toBe(62);
+    expect(SIGNAL_SPECS.filter(s => s.source === "V1")).toHaveLength(49);
+    expect(new Set(SIGNAL_SPECS.map(s => s.source + ":" + s.code)).size).toBe(64);
   });
 
   it("never double-counts Saf speed and V1 speed", () => {
@@ -18,6 +18,22 @@ describe("ROTAGANYAN stage-1 unified signal integration", () => {
     expect(result.features[0].canonical).toBe("SPEED");
     expect(result.features[0].sourceCode).toBe("hizDerecesi");
     expect(result.diagnostics).toHaveLength(1);
+  });
+
+  it("never double-counts competing pace primitives", () => {
+    const result = buildUnifiedSignalVector([
+      input("D", "PS_front", 0.2),
+      input("V1", "TEMPO_02", 2.5),
+      input("D", "PS_lone", 0.0),
+      input("V1", "TEMPO_03", 0.2),
+      input("D", "PS_closerFit", 0.4),
+      input("V1", "TEMPO_04", 0.9),
+    ]);
+    expect(result.features.map(f => f.canonical)).toEqual([
+      "RIVAL_FRONT_PRESSURE", "SINGLE_LEADER", "CLOSER_PRESSURE_FIT",
+    ]);
+    expect(result.features.find(f => f.canonical === "SINGLE_LEADER")?.sourceCode).toBe("TEMPO_03");
+    expect(result.diagnostics).toHaveLength(3);
   });
 
   it("retains independent jockey and weight information", () => {
