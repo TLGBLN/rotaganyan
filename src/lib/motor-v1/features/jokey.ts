@@ -1,0 +1,545 @@
+// ROTAGANYAN ANALİZ MOTORU v1.0 — JOKEY ailesi (registry: JOKEY_01 son-30-gün performans,
+// JOKEY_02 uzun-dönem yetenek, JOKEY_03 at-jokey uyumu, JOKEY_04 jokey×yarış-stili).
+//
+// KRİTİK MİMARİ KARAR (kullanıcı talimatı, 2026-10-17 — araştırma ajanı raporuyla doğrulandı):
+// mevcut src/lib/jokey-expected-wins.ts TAMAMEN AGF/piyasa-oranı TABANLI (E_30=Σ(AGF payı));
+// bu, AGF'siz "temel model" sinyali için KULLANILAMAZ (dairesel referans olurdu). Bu dosya,
+// AYNI istatistiksel İSKELETİ (residual=gerçekleşen-beklenen, SE, zaman-pencereli referans
+// kademeleri) kullanır ama "beklenen" (p) için AGF YERİNE NAİF bir saha-büyüklüğü referansı
+// (p=1/N) kullanır — bu, kullanıcının istediği "FORM/HIZ/SINIF/PMZ/TEMPO'dan out-of-fold
+// üretilmiş model-tabanlı beklenti" DEĞİLDİR (o HENÜZ YOK, birleşik eğitim yapılmadı) — bu
+// yüzden modelBasedExpectedWins alanı HER ZAMAN null + missingReason taşır, SESSİZCE AGF'ye
+// veya sahte bir sayıya KAYMAZ (kullanıcı talimatı: "Henüz bu beklenti üretilemiyorsa ilgili
+// temel-model sinyali eksik olarak işaretlensin").
+//
+// KİMLİK EŞLEŞTİRME: tjkJokeyId şemada YOK (doğrulandı) — jokey kimliği yalnız isim string'i.
+// JOKEY_01/02 kendi İÇİNDE (Runner tablosu, TEK ingestion kaynağı) TAM STRING eşitliği
+// kullanır — normalizeJockeyNameForRunner'ın çözdüğü sorun (JockeyStatSync gibi HARİCİ bir
+// kaynakla eşleştirme) burada YOK. JOKEY_03/04 ise HorseRaceHistoryCache'in KISALTILMIŞ
+// ("N.AVCİ") formatını bugünkü TAM ada ("NEVZAT AVCI") eşlemek için race.service.ts'in
+// ZATEN VAR OLAN _norm() fonksiyonunu import eder (yeniden icat edilmez), soyad+baş-harf
+// eşleşmesi AYNI stratejinin dar bir uygulamasıdır.
+//
+// SİNYAL BÜTÜNLÜĞÜ (kullanıcı talimatı §D): JOKEY_01-04 kısmen ORTAK veri kaynağı (Runner
+// tablosundaki jokey mount geçmişi) paylaşır — bütünlük sisteminde bağımsızlıkları AYRI
+// değerlendirilmeli, otomatik 4 bağımsız oy SAYILMAMALI.
+
+import { db } from "@/lib/db";
+import { finishPos } from "@/lib/race-result";
+import { _norm } from "@/server/services/race.service";
+import { secReferansBinisleri, type BinisOlasilik, type ReferansKademesi } from "@/lib/jokey-expected-wins";
+import { finishRatio, timeDecayWeight, shrinkageFactor, classifyCoverage, type CoverageState } from "./common";
+import {
+  parseHistoryRows,
+  parseTjkDate,
+  rowsBeforeCutoff,
+  rowToOutcome,
+  createFieldSizeResolver,
+  type HistoryRow,
+  type FieldSizeResolverFn,
+} from "./history-source";
+import { styleVector } from "@/lib/accurace/features";
+import type { TempoContext } from "./tempo";
+import type { TargetRace } from "@/lib/accurace/types";
+
+// GEÇİCİ — doğrulama setinden ÖĞRENİLMEDİ (bkz. common.ts PLACEHOLDER_HALF_LIFE_DAYS ile AYNI ilke).
+export const JOKEY_SHRINKAGE_K_PLACEHOLDER = 8;
+
+export type MissingModelBasedExpectation = {
+  value: null;
+  missingReason: "FORM/HIZ/SINIF/PMZ/TEMPO'dan out-of-fold üretilmiş birleşik model HENÜZ eğitilmedi — AGF'siz yarış-öncesi beklenti üretilemiyor.";
+};
+export const MODEL_BASED_EXPECTATION_MISSING: MissingModelBasedExpectation = {
+  value: null,
+  missingReason:
+    "FORM/HIZ/SINIF/PMZ/TEMPO'dan out-of-fold üretilmiş birleşik model HENÜZ eğitilmedi — AGF'siz yarış-öncesi beklenti üretilemiyor.",
+};
+
+type JokeyMount = {
+  raceId: string; no: number; tjkAtId: number | null; date: Date; fieldSize: number; position: number | null;
+  distance: number; surface: "CIM" | "KUM" | "SENTETIK";
+};
+
+const inFlightJockeyMounts =
+  new Map<string, Promise<JokeyMount[]>>();
+
+async function queryJockeyMounts(
+  jockeyName: string,
+  windowStart: Date,
+  cutoffExclusive: Date
+): Promise<JokeyMount[]> {
+  const rows = await db.runner.findMany({
+    where: {
+      jockey: jockeyName,
+      scratched: false,
+      race: {
+        raceDay: {
+          date: { gte: windowStart, lt: cutoffExclusive }
+        }
+      }
+    },
+    select: {
+      no: true,
+      raceId: true,
+      tjkAtId: true,
+      race: {
+        select: {
+          distance: true,
+          surface: true,
+          raceDay: { select: { date: true } },
+          result: {
+            select: {
+              actualOrder: true,
+              winnerNos: true
+            }
+          },
+          runners: {
+            where: { scratched: false },
+            select: { id: true }
+          }
+        }
+      }
+    }
+  });
+
+  return rows.map(r => ({
+    raceId: r.raceId,
+    no: r.no,
+    tjkAtId: r.tjkAtId,
+    date: r.race.raceDay.date,
+    fieldSize: r.race.runners.length,
+    distance: r.race.distance,
+    surface: r.race.surface,
+    position: finishPos(
+      r.race.result?.actualOrder ?? null,
+      r.no,
+      r.race.result?.winnerNos ?? null
+    )
+  }));
+}
+
+async function loadJockeyMounts(
+  jockeyName: string,
+  windowStart: Date,
+  cutoffExclusive: Date
+): Promise<JokeyMount[]> {
+  const fullStart = new Date(
+    cutoffExclusive.getTime() - 5 * 365 * 86_400_000
+  );
+
+  // Bes yildan eski ozel araliklar eski davranisi korur.
+  if (windowStart.getTime() < fullStart.getTime()) {
+    return queryJockeyMounts(
+      jockeyName, windowStart, cutoffExclusive
+    );
+  }
+
+  const key = JSON.stringify([
+    jockeyName, cutoffExclusive.toISOString()
+  ]);
+
+  let request = inFlightJockeyMounts.get(key);
+
+  if (!request) {
+    request = queryJockeyMounts(
+      jockeyName, fullStart, cutoffExclusive
+    );
+
+    inFlightJockeyMounts.set(key, request);
+
+    const current = request;
+
+    // Yalniz eszamanli sorgulari paylas.
+    // Kalici cache tutma; sonraki okumalar taze veri alsin.
+    void current.then(
+      () => {
+        if (inFlightJockeyMounts.get(key) === current)
+          inFlightJockeyMounts.delete(key);
+      },
+      () => {
+        if (inFlightJockeyMounts.get(key) === current)
+          inFlightJockeyMounts.delete(key);
+      }
+    );
+  }
+
+  const allMounts = await request;
+
+  // Her sinyalin kendi PIT penceresi korunur.
+  return allMounts.filter(m =>
+    m.date.getTime() >= windowStart.getTime() &&
+    m.date.getTime() < cutoffExclusive.getTime()
+  );
+}
+
+type NotrSansGozlem = { date: Date; p: number | null; won: boolean; observed: boolean; top3: boolean; top5: boolean };
+
+function mountToObservation(m: JokeyMount): NotrSansGozlem {
+  // NAİF referans: p=1/N (şans düzeyinde beklenen galibiyet) — AGF DEĞİL. fieldSize<2 veya
+  // bitiriş bilinmiyorsa (DNF/DQ/derecesiz) observed=false — sahte 0/1 İLE DOLDURULMAZ.
+  const observed = m.fieldSize >= 2 && m.position != null;
+  return {
+    date: m.date,
+    p: m.fieldSize >= 2 ? 1 / m.fieldSize : null,
+    won: m.position === 1,
+    top3: m.position != null && m.position <= 3,
+    top5: m.position != null && m.position <= 5,
+    observed,
+  };
+}
+
+/** Saf W/E/R/SE istatistiği — jokey-expected-wins.ts'teki hesaplaResidualIstatistik İLE AYNI
+ *  MATEMATİK ama BİLİNÇLİ OLARAK YENİDEN YAZILDI (ithal edilmedi): o fonksiyon "AGF probability"
+ *  doğrulaması ve hata mesajı taşıyor — AGF'siz bu motorda p'nin kaynağının YANLIŞ anlaşılmasını
+ *  (ya da gelecekte sessizce AGF'ye bağlanmasını) önlemek için sınır KASITLI OLARAK netleştirildi. */
+function hesaplaNotrSansIstatistik(gozlemler: readonly NotrSansGozlem[]): {
+  n: number; nGozlemli: number; W: number; top3: number; top5: number; E: number; R: number; SE: number;
+} {
+  let W = 0, top3 = 0, top5 = 0, E = 0, V = 0, nGozlemli = 0;
+  for (const g of gozlemler) {
+    if (!g.observed || g.p == null) continue;
+    nGozlemli++;
+    if (g.won) W++;
+    if (g.top3) top3++;
+    if (g.top5) top5++;
+    E += g.p;
+    V += g.p * (1 - g.p);
+  }
+  return { n: gozlemler.length, nGozlemli, W, top3, top5, E, R: W - E, SE: Math.sqrt(V) };
+}
+
+export type JokeyFormResult = {
+  windowStart: Date;
+  windowEnd: Date;
+  startCount: number;
+  observedCount: number;
+  wins: number;
+  top3: number;
+  top5: number;
+  expectedWinsNaive: number; // NAİF 1/N referansıyla beklenen galibiyet — AGF DEĞİL
+  residual: number; // gerçekleşen - beklenen (naif referansa göre)
+  standardError: number;
+  shrunkResidualPerMount: number | null; // (R/n)·shrink(n,k) — az örneklemde 0'a küçültülür
+  modelBasedExpectedWins: MissingModelBasedExpectation; // AÇIKÇA eksik — bkz. dosya başı
+  coverageState: CoverageState;
+  dataSource: "Runner+Result, naif 1/N saha-büyüklüğü referansı (AGF DEĞİL)";
+};
+
+function buildFormResult(windowStart: Date, windowEnd: Date, mounts: JokeyMount[]): JokeyFormResult {
+  const stat = hesaplaNotrSansIstatistik(mounts.map(mountToObservation));
+  const shrink = shrinkageFactor(stat.nGozlemli, JOKEY_SHRINKAGE_K_PLACEHOLDER);
+  const coverageState = classifyCoverage(true, stat.n, stat.nGozlemli);
+  return {
+    windowStart,
+    windowEnd,
+    startCount: stat.n,
+    observedCount: stat.nGozlemli,
+    wins: stat.W,
+    top3: stat.top3,
+    top5: stat.top5,
+    expectedWinsNaive: stat.E,
+    residual: stat.R,
+    standardError: stat.SE,
+    shrunkResidualPerMount: stat.nGozlemli > 0 ? shrink * (stat.R / stat.nGozlemli) : null,
+    modelBasedExpectedWins: MODEL_BASED_EXPECTATION_MISSING,
+    coverageState,
+    dataSource: "Runner+Result, naif 1/N saha-büyüklüğü referansı (AGF DEĞİL)",
+  };
+}
+
+/** JOKEY_01 — son 30 gün. Hedef yarışın KENDİSİ ve SONRASI asla dahil edilmez (windowEnd
+ *  hedef yarışın cutoff'u, exclusive). */
+export async function computeJokeySon30Form(jockeyName: string | null, cutoff: Date): Promise<JokeyFormResult | null> {
+  if (jockeyName == null) return null;
+  const windowStart = new Date(cutoff.getTime() - 30 * 86_400_000);
+  const mounts = await loadJockeyMounts(jockeyName, windowStart, cutoff);
+  return buildFormResult(windowStart, cutoff, mounts);
+}
+
+export type JokeyUzunDonemResult = JokeyFormResult & {
+  refTier: ReferansKademesi;
+  overlapWithSon30: false; // YAPISAL garanti: secReferansBinisleri age>30 filtresiyle 30-günlük pencereyi HARİÇ tutar
+  bySurface: Record<"CIM" | "KUM" | "SENTETIK", { n: number; wins: number; residual: number } | null>;
+};
+
+/**
+ * JOKEY_02 — uzun dönem yetenek. jokey-expected-wins.ts'teki secReferansBinisleri() (31-180 →
+ * 31-365 → career-ex30 kademeli düşüş, K_REF_MIN_SAMPLE=20) DOĞRUDAN kullanılır — bu fonksiyon
+ * yalnız tarih/gözlem bayrağına bakar, p'nin AGF olup olmamasından TAMAMEN bağımsızdır, bu
+ * yüzden AGF'siz p ile güvenle yeniden kullanılabilir (aynı bilgiyi iki kez hesaplamamak için).
+ * age>30 filtresi YAPISAL olarak JOKEY_01'in 30-günlük penceresiyle örtüşmeyi ENGELLER —
+ * "örtüşme kayıt altına alınsın" talimatı overlapWithSon30=false alanıyla AÇIKÇA belgelenir.
+ */
+export async function computeJokeyUzunDonem(
+  jockeyName: string | null,
+  cutoff: Date,
+  careerStart: Date = new Date(cutoff.getTime() - 5 * 365 * 86_400_000)
+): Promise<JokeyUzunDonemResult | null> {
+  if (jockeyName == null) return null;
+  const allMounts = await loadJockeyMounts(jockeyName, careerStart, cutoff);
+  const asBinisOlasilik: (BinisOlasilik & { mount: JokeyMount })[] = allMounts.map((m) => {
+    const o = mountToObservation(m);
+    return { raceDate: m.date, p: o.p, won: o.won, observed: o.observed, mount: m };
+  });
+  const { tier, mounts: refMounts } = secReferansBinisleri(asBinisOlasilik, cutoff);
+  const refJokeyMounts = (refMounts as (BinisOlasilik & { mount: JokeyMount })[]).map((r) => r.mount);
+  const base = buildFormResult(careerStart, cutoff, refJokeyMounts);
+
+  const bySurfaceRaw = new Map<string, JokeyMount[]>();
+  const surfaceByRaceId = new Map<string, "CIM" | "KUM" | "SENTETIK">();
+  if (refJokeyMounts.length > 0) {
+    const races = await db.race.findMany({ where: { id: { in: refJokeyMounts.map((m) => m.raceId) } }, select: { id: true, surface: true } });
+    for (const r of races) surfaceByRaceId.set(r.id, r.surface);
+  }
+  for (const m of refJokeyMounts) {
+    const s = surfaceByRaceId.get(m.raceId);
+    if (!s) continue;
+    const arr = bySurfaceRaw.get(s);
+    if (arr) arr.push(m);
+    else bySurfaceRaw.set(s, [m]);
+  }
+  const bySurface: JokeyUzunDonemResult["bySurface"] = { CIM: null, KUM: null, SENTETIK: null };
+  for (const surf of ["CIM", "KUM", "SENTETIK"] as const) {
+    const ms = bySurfaceRaw.get(surf);
+    if (!ms || ms.length === 0) continue;
+    const stat = hesaplaNotrSansIstatistik(ms.map(mountToObservation));
+    bySurface[surf] = { n: stat.n, wins: stat.W, residual: stat.R };
+  }
+
+  return { ...base, refTier: tier, overlapWithSon30: false, bySurface };
+}
+
+function orderedPastRows(rows: HistoryRow[], cutoff: Date): HistoryRow[] {
+  return rowsBeforeCutoff(rows, cutoff)
+    .map((r) => ({ row: r, date: parseTjkDate(r.date)! }))
+    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .map((x) => x.row);
+}
+
+function jockeySurnameAndInitials(norm: string): { surname: string; initials: string[] } {
+  const parts = norm.split(/[\s.]+/).filter(Boolean);
+  return { surname: parts.at(-1) ?? norm, initials: parts.slice(0, -1) };
+}
+
+/**
+ * Geçmiş yarış satırındaki KISALTILMIŞ jokey adının ("N.AVCİ") bugünkü Runner.jockey TAM
+ * adıyla ("NEVZAT AVCI") AYNI kişiyi gösterip göstermediğini soyad+baş-harf eşleşmesiyle
+ * denetler — race.service.ts'in getJockeyStats() içindeki AYNI stratejinin (resolveByInitials)
+ * dar/ikili bir uygulamasıdır; _norm() YENİDEN YAZILMADI, DOĞRUDAN import edildi.
+ */
+export function jockeyAbbrevMatchesFullName(abbrevOrFull: string, fullName: string): boolean {
+  const a = jockeySurnameAndInitials(_norm(abbrevOrFull));
+  const b = jockeySurnameAndInitials(_norm(fullName));
+  if (a.surname !== b.surname || a.surname === "") return false;
+  if (a.initials.length === 0) return true;
+  return a.initials.every((init, i) => (b.initials[i] ?? "").startsWith(init));
+}
+
+export type JockeyMatchConfidence = "HIGH" | "AMBIGUOUS" | "NO_MATCH";
+
+/**
+ * 2026-10-17 kullanıcı düzeltmesi: "Soyadı + baş harf eşleştirmesi yanlış kişileri
+ * birleştirebilir; kimlik güveni eklenmeli, belirsiz eşleşme kullanılmamalı." —
+ * jockeyAbbrevMatchesFullName TEK BAŞINA bunu göremez (yalnız hedefle karşılaştırır). Bu
+ * fonksiyon, Runner tablosundaki TÜM BİLİNEN jokey adları içinde HEDEF DIŞINDA AYNI
+ * soyad+baş-harf kalıbına uyan BAŞKA gerçek bir jokey var mı diye kontrol eder — varsa
+ * AMBIGUOUS döner ve çağıran taraf bu eşleşmeyi KULLANMAMALIDIR.
+ */
+export function resolveJockeyMatchConfidence(
+  abbrevOrFull: string,
+  targetFullName: string,
+  allKnownFullNames: readonly string[]
+): JockeyMatchConfidence {
+  if (!jockeyAbbrevMatchesFullName(abbrevOrFull, targetFullName)) return "NO_MATCH";
+  const a = jockeySurnameAndInitials(_norm(abbrevOrFull));
+  const targetNorm = _norm(targetFullName);
+  const otherCandidates = allKnownFullNames.filter((name) => {
+    if (_norm(name) === targetNorm) return false; // hedefin kendisi
+    const b = jockeySurnameAndInitials(_norm(name));
+    if (b.surname !== a.surname) return false;
+    if (a.initials.length === 0) return true;
+    return a.initials.every((init, i) => (b.initials[i] ?? "").startsWith(init));
+  });
+  return otherCandidates.length > 0 ? "AMBIGUOUS" : "HIGH";
+}
+
+let knownJockeyNamesCache: Promise<string[]> | null = null;
+/** Runner.jockey'deki TÜM distinct adlar — belirsizlik denetimi için BİR KEZ yüklenir. */
+async function loadKnownJockeyNames(): Promise<string[]> {
+  if (!knownJockeyNamesCache) {
+    knownJockeyNamesCache = db.runner
+      .findMany({ where: { jockey: { not: null } }, select: { jockey: true }, distinct: ["jockey"] })
+      .then((rows) => rows.map((r) => r.jockey!).filter(Boolean));
+  }
+  return knownJockeyNamesCache;
+}
+
+export type JokeyAtUyumuResult = {
+  pairRawR: number | null;
+  pairObservationCount: number;
+  baselineOtherJockeysR: number | null;
+  baselineObservationCount: number;
+  ambiguousExcludedCount: number; // belirsiz (AMBIGUOUS) eşleşme nedeniyle NE PAIR NE BASELINE'a katılan satır sayısı
+  rawDelta: number | null;
+  value: number | null; // shrink(n_pair,k)·rawDelta — AZ ORTAK YARIŞTA 0'a (yapay uyum avantajı YOK)
+  totalHistoryRows: number;
+  coverageState: CoverageState;
+};
+
+/**
+ * JOKEY_03 — at-jokey uyumu. Atın bu jokeyle ortak yarışlarındaki ağırlıklı R'si İLE AYNI
+ * dönemde DİĞER jokeylerle ürettiği ağırlıklı R'si arasındaki fark, ortak-yarış sayısına göre
+ * 0'a küçültülür (kullanıcı uyarısı: "az sayıda ortak yarış nedeniyle yapay uyum avantajı
+ * oluşturulmayacak"). Model-tabanlı "ayrı ayrı beklenen performans" (FORM/HIZ/SINIF/PMZ/TEMPO
+ * birleşik eğitiminden) HENÜZ YOK — bu yüzden baseline atın KENDİ diğer-jokey geçmişidir,
+ * jokeyin KENDİ genel beklentisi (JOKEY_01/02) burada AYRICA KARIŞTIRILMAZ.
+ *
+ * 2026-10-17 kullanıcı düzeltmesi: BELİRSİZ eşleşmeler (AYNI soyad+baş-harf kalıbına uyan
+ * BİRDEN FAZLA gerçek jokey varsa) ne "ortak yarış" (pair) ne "diğer jokey" (baseline)
+ * grubuna EKLENMEZ — resolveJockeyMatchConfidence()==="AMBIGUOUS" olan satırlar TAMAMEN
+ * dışlanır (yanlış kişi birleştirme riskinden kaçınmak, veriyi uydurmaktan daha önemli).
+ */
+export async function computeJokeyAtUyumu(
+  tjkAtId: number | null,
+  todayJockeyFullName: string | null,
+  rowsJson: unknown,
+  cutoff: Date,
+  halfLifeDays: number,
+  resolver: FieldSizeResolverFn = createFieldSizeResolver()
+): Promise<JokeyAtUyumuResult> {
+  const allRows = orderedPastRows(parseHistoryRows(rowsJson), cutoff);
+  const empty = (coverageState: CoverageState): JokeyAtUyumuResult => ({
+    pairRawR: null, pairObservationCount: 0, baselineOtherJockeysR: null, baselineObservationCount: 0,
+    ambiguousExcludedCount: 0, rawDelta: null, value: null, totalHistoryRows: allRows.length, coverageState,
+  });
+  if (tjkAtId == null || todayJockeyFullName == null) return empty("IDENTITY_UNRESOLVED");
+  if (allRows.length === 0) return empty("TRUE_DEBUTANT");
+
+  const knownNames = await loadKnownJockeyNames();
+  const pairPoints: { value: number; weight: number }[] = [];
+  const basePoints: { value: number; weight: number }[] = [];
+  let ambiguousExcludedCount = 0;
+  for (const row of allRows) {
+    const outcome = await rowToOutcome(row, resolver);
+    const r = finishRatio(outcome);
+    if (r == null) continue;
+    const rowDate = parseTjkDate(row.date)!;
+    const deltaDays = (cutoff.getTime() - rowDate.getTime()) / 86_400_000;
+    const w = timeDecayWeight(deltaDays, halfLifeDays);
+    if (w == null) continue;
+    if (!row.jockey) { basePoints.push({ value: r, weight: w }); continue; }
+    const confidence = resolveJockeyMatchConfidence(row.jockey, todayJockeyFullName, knownNames);
+    if (confidence === "AMBIGUOUS") { ambiguousExcludedCount++; continue; }
+    const isPair = confidence === "HIGH";
+    (isPair ? pairPoints : basePoints).push({ value: r, weight: w });
+  }
+
+  const wavg = (pts: { value: number; weight: number }[]) => {
+    const sw = pts.reduce((s, p) => s + p.weight, 0);
+    if (sw <= 0) return null;
+    return pts.reduce((s, p) => s + p.weight * p.value, 0) / sw;
+  };
+  const pairR = wavg(pairPoints);
+  const baseR = wavg(basePoints);
+  const rawDelta = pairR != null && baseR != null ? pairR - baseR : null;
+  const shrink = shrinkageFactor(pairPoints.length, JOKEY_SHRINKAGE_K_PLACEHOLDER);
+  const coverageState = classifyCoverage(true, allRows.length, pairPoints.length);
+
+  return {
+    pairRawR: pairR,
+    pairObservationCount: pairPoints.length,
+    baselineOtherJockeysR: baseR,
+    baselineObservationCount: basePoints.length,
+    ambiguousExcludedCount,
+    rawDelta,
+    value: rawDelta == null ? null : shrink * rawDelta,
+    totalHistoryRows: allRows.length,
+    coverageState,
+  };
+}
+
+export type JokeyStilUyumuBucket = { n: number; wins: number; residual: number; shrunkResidualPerMount: number | null };
+export type JokeyStilUyumuResult = {
+  onGrupBucket: JokeyStilUyumuBucket | null; // jokeyin ÖNDEN-GİDEN atlarla geçmişi
+  ortaBucket: JokeyStilUyumuBucket | null;
+  geriBucket: JokeyStilUyumuBucket | null; // jokeyin BEKLE/GERİ atlarla geçmişi
+  todayHorseStyleBucket: "ON_GRUP" | "ORTA" | "GERI" | "BELIRSIZ"; // bugünkü atın KENDİ stili (TEMPO_01'den)
+  coverageState: CoverageState;
+};
+
+function toBucket(stat: ReturnType<typeof hesaplaNotrSansIstatistik>): JokeyStilUyumuBucket | null {
+  if (stat.n === 0) return null;
+  const shrink = shrinkageFactor(stat.nGozlemli, JOKEY_SHRINKAGE_K_PLACEHOLDER);
+  return { n: stat.n, wins: stat.W, residual: stat.R, shrunkResidualPerMount: stat.nGozlemli > 0 ? shrink * (stat.R / stat.nGozlemli) : null };
+}
+
+/**
+ * JOKEY_04 — jokey×yarış-stili. Jokeyin geçmiş mount'ları, HER mount'un KENDİ yarış tarihindeki
+ * (point-in-time) atının TEMPO_01 stiline göre İKİ kovaya ayrılır (önden-giden vs bekle/geri) —
+ * SERT KOŞUL YOK: bu yalnız BETİMSEL bir kırılım, "jokey X stilde kazanıyor diye otomatik
+ * avantaj" ÜRETİLMEZ (kullanıcı uyarısı) — nihai karar öğrenilmiş katsayılara bırakılır.
+ * TEMPO ailesiyle BAĞLANTI, styleVector()'ın AYNI (yeniden hesaplanmamış) çağrısıyla kurulur.
+ */
+function classifyJokeyStyleBucket(
+  vec: readonly number[]
+): JokeyStilUyumuResult["todayHorseStyleBucket"] {
+  const front = vec[0] + vec[1];
+  const middle = vec[2] + vec[3];
+  const back = vec[4] + vec[5];
+  const values = [front, middle, back];
+
+  if (!values.every(Number.isFinite)) return "BELIRSIZ";
+
+  const best = Math.max(...values);
+  if (values.filter(v => Math.abs(v - best) < 1e-9).length !== 1) {
+    return "BELIRSIZ";
+  }
+
+  return front === best ? "ON_GRUP"
+    : middle === best ? "ORTA" : "GERI";
+}
+export async function computeJokeyStilUyumu(
+  jockeyName: string | null,
+  todayHorseTjkAtId: number | null,
+  today: TargetRace,
+  tempoCtx: TempoContext,
+  careerStart: Date = new Date(today.date.getTime() - 5 * 365 * 86_400_000)
+): Promise<JokeyStilUyumuResult> {
+  if (jockeyName == null) {
+    return { onGrupBucket: null, ortaBucket: null, geriBucket: null, todayHorseStyleBucket: "BELIRSIZ", coverageState: "IDENTITY_UNRESOLVED" };
+  }
+  const mounts = await loadJockeyMounts(jockeyName, careerStart, today.date);
+
+  const onGrupObs: NotrSansGozlem[] = [];
+  const ortaObs: NotrSansGozlem[] = [];
+  const geriObs: NotrSansGozlem[] = [];
+  for (const m of mounts) {
+    if (m.tjkAtId == null) continue;
+    // Her mount'un KENDİ yarışının mesafe/zemini "target" olarak kullanılır — o atın O YARIŞA
+    // girerken sahip olduğu stil tahmini, O YARIŞIN bağlamına göre ağırlıklandırılmalı (SINIF'ın
+    // computeRaceClassStrength'inin her geçmiş yarışı KENDİ bağlamıyla değerlendirmesiyle AYNI disiplin).
+    const mountTarget: TargetRace = { date: m.date, length: m.distance, surface: m.surface };
+    const sf = styleVector(tempoCtx.byTjk.get(m.tjkAtId) ?? [], mountTarget);
+    if (!sf.observed || !sf.vec) continue;
+    const bucket = classifyJokeyStyleBucket(sf.vec);
+    if (bucket === "ON_GRUP") onGrupObs.push(mountToObservation(m));
+    else if (bucket === "ORTA") ortaObs.push(mountToObservation(m));
+    else if (bucket === "GERI") geriObs.push(mountToObservation(m));
+  }
+
+  let todayHorseStyleBucket: JokeyStilUyumuResult["todayHorseStyleBucket"] = "BELIRSIZ";
+  if (todayHorseTjkAtId != null) {
+    const todaySf = styleVector(tempoCtx.byTjk.get(todayHorseTjkAtId) ?? [], today);
+    if (todaySf.observed && todaySf.vec) {
+      todayHorseStyleBucket = classifyJokeyStyleBucket(todaySf.vec);
+    }
+  }
+
+  const onGrupBucket = toBucket(hesaplaNotrSansIstatistik(onGrupObs));
+  const ortaBucket = toBucket(hesaplaNotrSansIstatistik(ortaObs));
+  const geriBucket = toBucket(hesaplaNotrSansIstatistik(geriObs));
+  const totalObserved = onGrupObs.filter((o) => o.observed).length + ortaObs.filter((o) => o.observed).length + geriObs.filter((o) => o.observed).length;
+  const coverageState = classifyCoverage(true, mounts.length, totalObserved);
+
+  return { onGrupBucket, ortaBucket, geriBucket, todayHorseStyleBucket, coverageState };
+}
