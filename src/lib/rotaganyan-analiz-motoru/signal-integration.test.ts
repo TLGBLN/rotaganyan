@@ -32,7 +32,7 @@ describe("ROTAGANYAN stage-1 unified signal integration", () => {
     expect(result.features.map(f => f.canonical)).toEqual([
       "RIVAL_FRONT_PRESSURE", "SINGLE_LEADER", "CLOSER_PRESSURE_FIT",
     ]);
-    expect(result.features.find(f => f.canonical === "SINGLE_LEADER")?.sourceCode).toBe("TEMPO_03");
+    expect(result.features.find(f => f.canonical === "SINGLE_LEADER")?.sourceCode).toBe("PS_lone");
     expect(result.diagnostics).toHaveLength(3);
   });
 
