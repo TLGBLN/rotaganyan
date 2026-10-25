@@ -23,6 +23,7 @@ import { computeDavTakiDegisikligi, recoverTodayEquipmentFromOwnHistory, ortakYa
 import { computeRakH2HForRace, computeRakGapForRace } from "../features/rak-rakip-gucu";
 import { computeStartRisk } from "../features/dav-start-risk";
 import { loadPistDurumContext, computePistDurumForRunner } from "../features/pist-durum-wiring";
+import type { FieldSizeResolverFn } from "../features/history-source";
 import { familyBlock, interactionStatus, upgradeStatusWithModelScore, type FamilyBlock, type PitStatus, type SignalStatus } from "./family-contract";
 import type { FittedModel } from "./training";
 
@@ -76,23 +77,25 @@ export function clearUnifiedFamiliesCache(): void {
 
 export async function computeUnifiedFamiliesForRace<C extends string = string>(
   raceId: string,
-  fittedModel?: FittedModel<C>
+  fittedModel?: FittedModel<C>,
+  sharedFieldSizeResolver?: FieldSizeResolverFn
 ): Promise<UnifiedRunnerResult[]> {
   if (fittedModel === undefined) {
     const cached = modellessResultCache.get(raceId);
     if (cached) return cached;
-    const promise = computeUnifiedFamiliesForRaceUncached(raceId, undefined);
+    const promise = computeUnifiedFamiliesForRaceUncached(raceId, undefined, sharedFieldSizeResolver);
     modellessResultCache.set(raceId, promise);
     // Hata durumunda cache'te BAŞARISIZ bir promise KALMASIN — bir sonraki çağrı yeniden denesin.
     promise.catch(() => modellessResultCache.delete(raceId));
     return promise;
   }
-  return computeUnifiedFamiliesForRaceUncached(raceId, fittedModel);
+  return computeUnifiedFamiliesForRaceUncached(raceId, fittedModel, sharedFieldSizeResolver);
 }
 
 async function computeUnifiedFamiliesForRaceUncached<C extends string = string>(
   raceId: string,
-  fittedModel?: FittedModel<C>
+  fittedModel?: FittedModel<C>,
+  sharedFieldSizeResolver?: FieldSizeResolverFn
 ): Promise<UnifiedRunnerResult[]> {
   const race = await db.race.findUnique({
     where: { id: raceId },
@@ -110,10 +113,10 @@ async function computeUnifiedFamiliesForRaceUncached<C extends string = string>(
   const cutoff = race.raceDay.date;
   const davRaceKey = ortakYarisAnahtari(race.raceDay.hippodrome.name, `${String(cutoff.getUTCDate()).padStart(2,"0")}.${String(cutoff.getUTCMonth()+1).padStart(2,"0")}.${cutoff.getUTCFullYear()}`, String(race.raceNo));
 
-  const [tempoCtx, galopPaceIndex, pistCtxOrNull] = await Promise.all([loadTempoContext(), loadGalopPaceIndex(), loadPistDurumContext(raceId)]);
+  const [tempoCtx, galopPaceIndex, pistCtxOrNull] = await Promise.all([loadTempoContext(), loadGalopPaceIndex(), loadPistDurumContext(raceId, sharedFieldSizeResolver)]);
   if (!pistCtxOrNull) return []; // race zaten yukarida dogrulandi, bu pratikte olusmaz
   const pistCtx = pistCtxOrNull;
-  const safVectors = await buildFeatureVectorsForRace(raceId, tempoCtx); // SAF 20 - DEĞİŞTİRİLMEDİ
+  const safVectors = await buildFeatureVectorsForRace(raceId, tempoCtx, sharedFieldSizeResolver); // SAF 20 - hesaplama DEĞİŞTİRİLMEDİ
   const safByNo = new Map(safVectors.map((v) => [v.no, v]));
 
   // --- rowsJson gerekiyor (HorseRaceHistoryCache) - DAV/RAK icin, FORM ile AYNI kaynak ---
