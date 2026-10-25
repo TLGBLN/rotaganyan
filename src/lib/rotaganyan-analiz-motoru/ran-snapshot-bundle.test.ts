@@ -16,14 +16,14 @@ function leg(raceNo: number, weights: [number, number] = [0.65, 0.35]): RanBundl
       const signals: RanSignalSnapshotEntry[] = UNIFIED_MODEL_CODES.map((code) => ({
         code, family: "TEST", raw: no, observed: true, reliability: 1,
         coverageState: null, modelVersion: "v1", standardizedValue: 1,
-        learnedCoefficient: 0, scoreContribution: 0,
+        learnedCoefficient: 0, scoreContribution: code===UNIFIED_MODEL_CODES[0] ? Math.log(p) : 0,
         missingIndicatorCoefficient: 0, missingIndicatorContribution: 0,
       }));
       return {
         raceId, no, name: "Horse " + no, runnerId: "runner-" + raceNo + "-" + no,
         engineVersion: "1.0", weightsFingerprint: "same-model",
         generatedAt: ts, originalRank: no, publishedRank: no, winProbability: p,
-        finalScore: 0, featureCodeOrder: UNIFIED_MODEL_CODES,
+        finalScore: Math.log(p), featureCodeOrder: UNIFIED_MODEL_CODES,
         preRaceDataSnapshotId: computePreRaceDataSnapshotId(raceId, signals),
         signals, ekuriGroup: null,
       };
