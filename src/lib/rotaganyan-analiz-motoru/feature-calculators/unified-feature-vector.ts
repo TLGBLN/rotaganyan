@@ -127,15 +127,25 @@ export async function buildUnifiedFeatureVectorsForRace(
     for (const d of runnerDiag) diagnostics.push({ no, ...d });
 
     const meta = metaByNo.get(no)!;
-    const signals: SignalEntry[] = features.map((f) => ({
-      code: f.canonical,
-      family: familyBySourceCode.get(`${f.source}:${f.sourceCode}`) ?? "UNKNOWN",
-      rawValue: f.raw,
-      observed: f.observed,
-      coverageState: null,
-      asOfSafe: true,
-      missingReason: f.observed ? null : `gözlemsiz (${f.source}:${f.sourceCode})`,
-    }));
+    const signals: SignalEntry[] = features.map((f) => {
+      // Keep source provenance and PIT evidence strength separate from MODEL inputs.
+      // sampleCount is not a score feature; scoring still sees the SAME rawValue/observed.
+      const original = f.source === "D"
+        ? safRunner.signals.find(s=>s.code===f.sourceCode)
+        : v1Runner.unifiedVector.find(s=>s.code===f.sourceCode);
+      return {
+        code: f.canonical,
+        family: familyBySourceCode.get(`${f.source}:${f.sourceCode}`) ?? "UNKNOWN",
+        rawValue: f.raw,
+        observed: f.observed,
+        coverageState:f.source==="V1"
+          ? (v1Runner.unifiedVector.find(s=>s.code===f.sourceCode)?.coverageState ?? null)
+          : null,
+        sampleCount: original?.sampleCount ?? null,
+        asOfSafe: true,
+        missingReason: f.observed ? null : `gözlemsiz (${f.source}:${f.sourceCode})`,
+      };
+    });
 
     vectors.push({
       raceId,
