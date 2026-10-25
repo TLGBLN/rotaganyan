@@ -6,6 +6,8 @@ on:
       - feature/rotaganyan-analiz-motoru-sinyal-birlestirme
     paths:
       - 'arac-ran-pg-ci-smoke.mts'
+      - 'arac-ran-db-onkontrol.cjs'
+      - 'arac-ran-pit-kohort-yenile-ve-egit.ps1'
       - 'src/lib/rotaganyan-analiz-motoru/**'
       - 'src/server/services/ran-snapshot-bundle.service*'
       - 'prisma/schema.prisma'
@@ -64,7 +66,8 @@ jobs:
             src/server/services/ran-snapshot-bundle.service.test.ts \
             src/lib/rotaganyan-analiz-motoru/isolated-db-guard.test.ts \
             src/lib/rotaganyan-analiz-motoru/rca/signal-complementarity-audit.test.ts \
-            src/lib/rotaganyan-analiz-motoru/feature-calculators/pit-sire-speed.test.ts
+            src/lib/rotaganyan-analiz-motoru/feature-calculators/pit-sire-speed.test.ts \
+            src/lib/rotaganyan-analiz-motoru/rca/ran-db-preflight.test.ts
 
       - name: Real PostgreSQL transaction, readback and cleanup
         env:
