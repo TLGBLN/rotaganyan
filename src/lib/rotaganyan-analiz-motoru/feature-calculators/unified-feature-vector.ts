@@ -20,6 +20,7 @@ import { buildUnifiedSignalVector, SIGNAL_SPECS, type SignalObservation, type Si
 import type { AccuraceRun } from "@/lib/accurace/types";
 import type { RunnerFeatureVector, SignalEntry } from "@/lib/motor-v1/engine/feature-vector";
 import type { Faz1SonucV5 } from "@/lib/methodology/v5-engine";
+import type { FieldSizeResolverFn } from "@/lib/motor-v1/features/history-source";
 
 /** V1 unifiedVector'dan, bu entegrasyonda GERÇEKTEN kullanılacak (BLOCKED/ALTERNATIVE/
  *  interaction DIŞINDA) 20 kod — signal-integration.ts::SIGNAL_SPECS'teki "V1" + "INCLUDE"
@@ -80,11 +81,12 @@ export async function buildUnifiedFeatureVectorsForRace(
   // raceId başına BİR KEZ gatherFaz1V5Historical çağırıp buraya taşır, bu fonksiyon KENDİ
   // tekrar sorgusunu YAPMAZ. Verilmezse (ör. eğitim veri toplama script'leri) davranış AYNI:
   // computeSafModelSignalsForRace kendi taze çağrısını yapar.
-  preloadedFaz1?: Faz1SonucV5 | null
+  preloadedFaz1?: Faz1SonucV5 | null,
+  sharedFieldSizeResolver?: FieldSizeResolverFn
 ): Promise<UnifiedFeatureBuildResult> {
   const [safResult, v1Results, runnerMeta] = await Promise.all([
     computeSafModelSignalsForRace(raceId, preloadedAccuraceRuns, preloadedFaz1),
-    computeUnifiedFamiliesForRace(raceId),
+    computeUnifiedFamiliesForRace(raceId, undefined, sharedFieldSizeResolver),
     db.runner.findMany({ where: { raceId, scratched: false }, select: { id: true, no: true, name: true, tjkAtId: true, jockey: true } }),
   ]);
   if (!safResult || v1Results.length === 0) return { vectors: [], diagnostics: [], runnerIdByNo: new Map() };
