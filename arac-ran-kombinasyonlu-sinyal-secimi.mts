@@ -227,11 +227,34 @@ async function main(){
       " => selectedSize="+current.codes.length+" Top1="+current.top1Hits+" Top3="+current.top3Hits);
     saveAtomic(cpPath,state);
   }
-  const familyModel=(codes:string[])=>evalCached(codes);
-  const dOnly=familyModel(all.filter(x=>d.has(x)));
-  const v1Only=familyModel(all.filter(x=>v1.has(x)));
-  const full=familyModel(all);
-  const joint= current.codes.some(x=>d.has(x))&&current.codes.some(x=>v1.has(x));
+  // Refit the SHORTLIST at the original full 2500 iterations. Pair rankings
+  // from fast 500-iteration search are screening-only, NOT final evidence.
+  const fastSelected=current;
+  const fastPairs=pairResults.map(p=>p.pair).sort(rankCombination);
+  const bestCrossPair=fastPairs.find(r=>
+    r.codes.some(x=>d.has(x))&&r.codes.some(x=>v1.has(x)));
+  const shortlistInput=[
+    fastSelected,best, ...(bestCrossPair?[bestCrossPair]:[]),
+    ...fastPairs.slice(0,6),
+    ...Object.values(state.results).filter(x=>!x.id.startsWith("INT:"))
+      .sort(rankCombination).slice(0,8),
+  ];
+  const shortlist=new Map<string,string[]>();
+  for(const r of shortlistInput)shortlist.set(key(r.codes),r.codes);
+  for(const codes of [all,all.filter(x=>d.has(x)),all.filter(x=>v1.has(x))])
+    shortlist.set(key(codes),codes);
+  console.log("[RAN_COMBO] Final confirmation: "+shortlist.size+" candidates x 3 folds with 2500 iterations.");
+  const confirmed=[...shortlist.values()].map(codes=>
+    evaluateCombination(folds,codes,{lambda:90,learningRate:0.25,iterations:2500}));
+  const confirmedMap=new Map(confirmed.map(x=>[key(x.codes),x]));
+  const dOnly=confirmedMap.get(key(all.filter(x=>d.has(x))))!;
+  const v1Only=confirmedMap.get(key(all.filter(x=>v1.has(x))))!;
+  const full=confirmedMap.get(key(all))!;
+  const mixed=confirmed.filter(r=>
+    r.codes.some(x=>d.has(x))&&r.codes.some(x=>v1.has(x))).sort(rankCombination);
+  if(mixed.length===0)throw new Error("RAN_COMBO_NO_MIXED_CONFIRMATION");
+  current=mixed[0];
+  const joint=true;
   // Inner-fold selection is only a candidate, never a released motor.
   const improvesD=joint && current.top1Hits>=dOnly.top1Hits &&
     current.top3Hits>=dOnly.top3Hits && current.logLoss<=dOnly.logLoss+0.02 &&
@@ -246,7 +269,9 @@ async function main(){
   const fullReport={
     reportVersion:1,source:SOURCE,sourceHash:sha,trainingRaces:238,developmentUsedForSelection:0,
     acceptanceUsedForSelection:0,trainRange:["2026-08-16","2026-08-25"],
-    fitOptions:opts,innerFolds:folds.map(f=>({id:f.id,train:f.train.length,validation:f.validation.length,
+    fitOptions:opts,confirmationFitOptions:{lambda:90,learningRate:0.25,iterations:2500},
+    screeningBest:compact(fastSelected),confirmedShortlist:confirmed.sort(rankCombination).map(compact),
+    innerFolds:folds.map(f=>({id:f.id,train:f.train.length,validation:f.validation.length,
       trainEnd:f.train[f.train.length-1]?.tarih,validationStart:f.validation[0]?.tarih})),
     objective:"2*Top1 + Top3 - 0.12*LogLoss - 0.003*featureCount; includes 3 chronological folds; research-only",
     singleCount:singles.size,pairCount:pairTable.length,totalRefits:Object.keys(state.results).length,
@@ -304,7 +329,10 @@ async function main(){
     "Eğitim: 238 yarış. Seçimde kullanılan DEV: 0; eski kabul: 0.",
     "Üç kronolojik katlama, eğitim geçmişi daima doğrulama tarihinden önce.",
     "",
-    "## Çapraz kaynak karşılaştırması",
+    "## Çapraz kaynak karşılaştırması (tam 2.500 iterasyonla doğrulanan kısa liste)",
+    "- Hızlı tarama adayı: "+fastSelected.codes.join(", "),
+    "- Tam eğitimli kısa liste adedi: "+confirmed.length,
+    "- Screening iterasyonları: "+ITER+" (yayın kanıtı değildir); onay iterasyonları: 2500.",
     "- D sinyalleri: "+money(dOnly),
     "- V1 sinyalleri: "+money(v1Only),
     "- 36'lı birleşik: "+money(full),
