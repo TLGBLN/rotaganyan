@@ -174,7 +174,7 @@ export async function computePmzZeminUyumu(
         const key = `${sr.raceId}:${tjkAtId}`;
         let pending = classStrengthCache.get(key);
         if (!pending) {
-          pending = computeRaceClassStrength(sr.raceId, tjkAtId);
+          pending = computeRaceClassStrength(sr.raceId, tjkAtId, classStrengthCache);
           classStrengthCache.set(key, pending);
         }
         return pending;
@@ -489,7 +489,7 @@ export async function computeSinifMesafeEtkilesimi(
     const key = `${resolved.raceId}:${tjkAtId}`;
     let pending = classStrengthCache.get(key);
     if (!pending) {
-      pending = computeRaceClassStrength(resolved.raceId, tjkAtId);
+      pending = computeRaceClassStrength(resolved.raceId, tjkAtId, classStrengthCache);
       classStrengthCache.set(key, pending);
     }
     const strength = await pending;
