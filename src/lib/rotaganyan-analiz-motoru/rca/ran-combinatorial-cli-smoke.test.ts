@@ -27,7 +27,8 @@ describe("RAN 36 singles + 630 exhaustive pairs CLI integration",()=>{
       });
       writeFileSync(input,JSON.stringify(fixture));
       const env={...process.env,NODE_ENV:"test",RAN_COMBO_DATA:input,RAN_COMBO_OUT:out,
-        RAN_COMBO_ITERATIONS:"5",RAN_COMBO_BEAM_WIDTH:"1",RAN_COMBO_MAX_SIGNALS:"3"};
+        RAN_COMBO_ITERATIONS:"5",RAN_COMBO_BEAM_WIDTH:"1",RAN_COMBO_MAX_SIGNALS:"3",
+        RAN_COMBO_INTERACTIONS:"top50"};
       delete env.DATABASE_URL;
       const run=spawnSync(process.execPath,["node_modules/tsx/dist/cli.mjs","arac-ran-kombinasyonlu-sinyal-secimi.mts"],{
         cwd:process.cwd(),env,encoding:"utf8",timeout:120000,maxBuffer:1_000_000,
@@ -42,6 +43,8 @@ describe("RAN 36 singles + 630 exhaustive pairs CLI integration",()=>{
       expect(report.acceptanceUsedForSelection).toBe(0);
       expect(report.pairCount).toBe(630);
       expect(report.singleCount).toBe(36);
+      expect(report.interactionTrials).toBe(50);
+      expect(report.interactionResults).toHaveLength(50);
       expect(report.innerFolds).toHaveLength(3);
       expect(report.publicationGate).toBe("BLOCKED");
       expect(candidate.artifactType).toContain("SHADOW");
