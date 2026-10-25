@@ -173,6 +173,26 @@ async function main(){
     console.log("[RAN_COMBO] localSWAP winner="+current.id+" Top1="+current.top1Hits+" Top3="+current.top3Hits);
     saveAtomic(cpPath,state);
   }
+  // Actual redundancy elimination IN THE SELECTED CONTEXT:
+  // removing a weaker feature must preserve BOTH winner metrics and not spoil
+  // logloss materially. This prevents keeping copies solely for being present.
+  let pruned=0;
+  while(current.codes.length>2){
+    const removals=current.codes.map(drop=>{
+      const codes=all.filter(x=>current.codes.includes(x) && x!==drop);
+      return {drop,result:evalCached(codes)};
+    }).filter(x=>
+      x.result.top1Hits>=current.top1Hits &&
+      x.result.top3Hits>=current.top3Hits &&
+      x.result.logLoss<=current.logLoss+0.01 &&
+      rankCombination(x.result,current)<0).sort((a,b)=>rankCombination(a.result,b.result));
+    if(removals.length===0)break;
+    current=removals[0].result;
+    pruned++;
+    console.log("[RAN_COMBO] REMOVE_REDUNDANT "+removals[0].drop+
+      " => selectedSize="+current.codes.length+" Top1="+current.top1Hits+" Top3="+current.top3Hits);
+    saveAtomic(cpPath,state);
+  }
   const familyModel=(codes:string[])=>evalCached(codes);
   const dOnly=familyModel(all.filter(x=>d.has(x)));
   const v1Only=familyModel(all.filter(x=>v1.has(x)));
@@ -196,6 +216,7 @@ async function main(){
       trainEnd:f.train[f.train.length-1]?.tarih,validationStart:f.validation[0]?.tarih})),
     objective:"2*Top1 + Top3 - 0.12*LogLoss - 0.003*featureCount; includes 3 chronological folds; research-only",
     singleCount:singles.size,pairCount:pairTable.length,totalRefits:Object.keys(state.results).length,
+    contextPrunedSignalCount:pruned,
     singles:[...singles.values()].sort(rankCombination).map(compact),
     pairs:pairTable, highCorrelation:pairTable.filter(p=>p.correlation&&Math.abs(p.correlation.rho)>=0.8),
     full36:compact(full),dOnly:compact(dOnly),v1Only:compact(v1Only),
