@@ -15,6 +15,8 @@ on:
       - 'arac-ran-pit-dataset-check.cjs'
       - 'arac-ran-kombinasyonlu-sinyal-secimi.mts'
       - 'src/lib/rotaganyan-analiz-motoru/rca/combinatorial-signal-selection.ts'
+      - 'src/lib/rotaganyan-analiz-motoru/rca/score-inflation-audit.ts'
+      - 'src/lib/rotaganyan-analiz-motoru/rca/score-inflation-audit.test.ts'
       - 'src/lib/rotaganyan-analiz-motoru/rca/combinatorial-signal-selection.test.ts'
       - 'src/lib/rotaganyan-analiz-motoru/rca/ran-combinatorial-cli-smoke.test.ts'
       - 'src/lib/rotaganyan-analiz-motoru/rca/ran-pit-dataset-check.test.ts'
@@ -84,6 +86,7 @@ jobs:
             src/lib/rotaganyan-analiz-motoru/rca/ran-offline-train-smoke.test.ts \
             src/lib/rotaganyan-analiz-motoru/rca/ran-pit-dataset-check.test.ts \
             src/lib/rotaganyan-analiz-motoru/rca/combinatorial-signal-selection.test.ts \
+            src/lib/rotaganyan-analiz-motoru/rca/score-inflation-audit.test.ts \
             src/lib/rotaganyan-analiz-motoru/rca/ran-combinatorial-cli-smoke.test.ts
 
       - name: Real PostgreSQL transaction, readback and cleanup
