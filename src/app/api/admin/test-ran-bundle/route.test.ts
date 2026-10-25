@@ -15,15 +15,16 @@ import {GET,POST} from "./route";
 const ts="2026-10-25T10:00:00.000Z";
 function engineRows(raceId:string) {
   return [1,2].map(no=>{
+    const p=no===1?0.65:0.35;
     const signals:RanSignalSnapshotEntry[]=UNIFIED_MODEL_CODES.map(code=>({
       code,family:"TEST",raw:no,observed:true,reliability:1,coverageState:null,
       modelVersion:"v1",standardizedValue:0,learnedCoefficient:0,
-      scoreContribution:0,missingIndicatorCoefficient:0,missingIndicatorContribution:0,
+      scoreContribution:code===UNIFIED_MODEL_CODES[0]?Math.log(p):0,missingIndicatorCoefficient:0,missingIndicatorContribution:0,
     }));
     return {
       raceId,no,name:"At "+no,runnerId:"runner-"+no,engineVersion:"1.0",
       weightsFingerprint:"fp",generatedAt:ts,originalRank:no,publishedRank:no,
-      winProbability:no===1?0.65:0.35,finalScore:0,featureCodeOrder:UNIFIED_MODEL_CODES,
+      winProbability:p,finalScore:Math.log(p),featureCodeOrder:UNIFIED_MODEL_CODES,
       preRaceDataSnapshotId:computePreRaceDataSnapshotId(raceId,signals),signals,
     };
   });
