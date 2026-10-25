@@ -17,6 +17,7 @@ import { getCurrentRanEngineVersion } from "../engine-versions";
 import { crosscheckAlternativeSignals } from "./alt-signal-crosscheck";
 import { computeDemotionDrivers, classifyDemotion, type DemotionDriver, type RootCauseCategory } from "./root-cause-classifier";
 import type { AccuraceRun } from "@/lib/accurace/types";
+import { createFieldSizeResolver, type FieldSizeResolverFn } from "@/lib/motor-v1/features/history-source";
 import { pedigreeEffects, comparePedigreeEffects, type PedigreeEffect, type PedigreeComparison } from "./pedigree-breakdown";
 
 export type MissAnalysis = {
@@ -81,7 +82,9 @@ export async function analyzeRaceDemotion(
   raceId: string,
   model: FittedModel<string>,
   winnerNo: number,
-  preloadedAccuraceRuns?: AccuraceRun[]
+  preloadedAccuraceRuns?: AccuraceRun[],
+  /** RCA çalışması boyunca paylaşılan; verilmezse yalnız bu yarışa özel. */
+  sharedFieldSizeResolver: FieldSizeResolverFn = createFieldSizeResolver()
 ): Promise<RaceRcaResult> {
   // FAZ 3 PERF (teslim raporu madde 1 — GERÇEK profiling bulgusu): gatherFaz1V5Historical
   // (v5-engine.ts, 11 paralel alt-sorgu/hesaplamalı AĞIR fonksiyon) ÖNCEDEN BU OTURUMDA
@@ -92,7 +95,7 @@ export async function analyzeRaceDemotion(
   // içindeki tekrar ELENİR.
   const faz1 = await gatherFaz1V5Historical(raceId);
 
-  const { vectors } = await buildUnifiedFeatureVectorsForRace(raceId, preloadedAccuraceRuns, faz1);
+  const { vectors } = await buildUnifiedFeatureVectorsForRace(raceId, preloadedAccuraceRuns, faz1, sharedFieldSizeResolver);
   if (vectors.length === 0) return { status: "NO_DATA", raceId };
 
   // --- FAZ 1 KAPISI: STALE ise hiçbir şey işlenmez (eski RCA'nın OLCULMEDI disiplini) ---
