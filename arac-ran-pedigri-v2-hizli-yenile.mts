@@ -9,7 +9,7 @@ import {dirname} from "node:path";
 import {getThreeLineagePedigreeForRace} from "./src/lib/rotaganyan-analiz-motoru/pedigree-v2/lineage-source";
 import {
   PEDIGREE_V2_VERSION,PEDIGREE_V2_CONFIG,LINEAGES,replaceThreeLineages,
-  assertPedigreeVersionAndProvenance,
+  assertPedigreeVersionAndProvenance,type AdjustedLineage,
 } from "./src/lib/rotaganyan-analiz-motoru/pedigree-v2/lineage-score";
 import {UNIFIED_MODEL_CODES} from "./src/lib/rotaganyan-analiz-motoru/unified-model-codes";
 import type {RunnerFeatureVector} from "./src/lib/motor-v1/engine/feature-vector";
@@ -19,12 +19,10 @@ type OriginalRace={
 type RefreshedRace=OriginalRace & {
   pedigreeV2:{
     version:typeof PEDIGREE_V2_VERSION;
-    lines:Record<number,ReturnType<typeof replacePedigreeForOneHorse>["lines"]>;
+    lines:Record<number,AdjustedLineage[]>;
   };
 };
-function replacePedigreeForOneHorse(v:RunnerFeatureVector,lines:ReturnType<
-  typeof getThreeLineagePedigreeForRace> extends Promise<infer T>
-  ? T["lineages"] extends Map<number,infer U>?U:never:never) {
+function replacePedigreeForOneHorse(v:RunnerFeatureVector,lines:AdjustedLineage[]){
   return {vector:replaceThreeLineages(v,lines),lines};
 }
 const source=process.env.RAN_PED_V2_IN??"C:/tmp/ran-pit-20261025-train-dev.json";
@@ -73,7 +71,7 @@ async function main(){
        v.signals.length!==UNIFIED_MODEL_CODES.length ||
        v.signals.some((s,i)=>s.code!==UNIFIED_MODEL_CODES[i])))
       throw new Error("RAN_PED_V2_NONCANONICAL_FROZEN_VECTORS:"+row.raceId);
-    const pedigreeLines:Record<number,ReturnType<typeof replacePedigreeForOneHorse>["lines"]>={};
+    const pedigreeLines:Record<number,AdjustedLineage[]>={};
     const vectors=row.vectors.map(v=>{
       const l=data.lineages.get(v.no);
       if(!l || l.length!==LINEAGES.length)
