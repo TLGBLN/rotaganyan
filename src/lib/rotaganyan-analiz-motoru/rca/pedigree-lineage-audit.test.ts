@@ -41,6 +41,24 @@ describe("RAN separate SIRE + DAM + DAMSIRE PIT lineage ablation",()=>{
     expect(dam.countOfHistoricalStartsAvailableInVector).toBe(false);
     expect(dam.caveat).toContain("one start");
   });
+  it("separates raw 100% lineage evidence from sparse-one-start reliability once PIT start-count metadata exists",()=>{
+    const a=train();
+    const dam=a[0].vectors[0].signals.find(s=>s.code==="DAM_HISTORY")!;
+    expect(dam.rawValue).toBe(100);
+    dam.sampleCount=1;
+    const sire=a[0].vectors[0].signals.find(s=>s.code==="SIRE_HISTORY")!;
+    sire.sampleCount=30;
+    const c=pedigreeCoverage(a);
+    const damC=c.find(x=>x.code==="DAM_HISTORY")!;
+    const sireC=c.find(x=>x.code==="SIRE_HISTORY")!;
+    expect(damC.documentedStartSamples).toBe(1);
+    expect(damC.observedWithAtMost2Starts).toBe(1);
+    expect(damC.minHistoricalStarts).toBe(1);
+    expect(damC.countOfHistoricalStartsAvailableInVector).toBe(false);
+    expect(sireC.documentedStartSamples).toBe(1);
+    expect(sireC.minHistoricalStarts).toBe(30);
+    expect(sireC.observedWithAtMost2Starts).toBe(0);
+  });
   it("fits 8 hereditary subsets across 4 contexts on chronological folds, no known future dev",()=>{
     const report=auditPedigreeLineages(train(),5);
     expect(report.publicationGate).toBe("BLOCKED");
