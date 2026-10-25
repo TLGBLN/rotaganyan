@@ -149,13 +149,120 @@ export function rowsBeforeCutoff(rows: HistoryRow[], cutoff: Date): HistoryRow[]
  * sorgulanır. Çağıran taraf (FORM/SINIF) bir tur başında createFieldSizeResolver()
  * çağırıp aynı resolver'ı tüm o turda yeniden kullanmalı.
  */
-export function createFieldSizeResolver() {
+/**
+ * Varsayılan davranış: her anahtar için mevcut findFirst çağrısı (production ile aynı).
+ * RCA komutu `batchSize` verirse yalnız kendi resolver ömrü boyunca farklı tarih/
+ * hipodrom/koşu anahtarlarını findMany OR sorgusunda toplar. Model sinyalleri değişmez.
+ * Aynı tarih/hipodrom/koşu için birden çok eşleşmede mevcut findFirst'e geri döner;
+ * belirsiz kayıtta farklı bir yarış seçilmez.
+ */
+export function createFieldSizeResolver(options: { batchSize?: number } = {}) {
   const cache = new Map<string, Promise<FieldSizeResolution | null>>();
+  const batchSize = options.batchSize != null && Number.isInteger(options.batchSize) && options.batchSize >= 2
+    ? Math.min(options.batchSize, 50)
+    : null;
+
+  type Request = {
+    row: HistoryRow;
+    raceNo: number;
+    dayStart: Date;
+    dayEnd: Date;
+    resolve: (value: FieldSizeResolution | null) => void;
+    reject: (error: unknown) => void;
+  };
+  const queue: Request[] = [];
+  let scheduled = false;
+
+  const schedule = () => {
+    if (scheduled) return;
+    scheduled = true;
+    queueMicrotask(() => { void flush(); });
+  };
+
+  const flush = async () => {
+    scheduled = false;
+    const batch = queue.splice(0, batchSize ?? 1);
+    if (queue.length > 0) schedule();
+    if (batch.length === 0) return;
+
+    try {
+      // Her koşu tanımı, tekli resolveFieldSize ile BİREBİR aynı filtreyi kullanır.
+      const races = await db.race.findMany({
+        where: {
+          OR: batch.map(({ row, raceNo, dayStart, dayEnd }) => ({
+            raceNo,
+            raceDay: {
+              date: { gte: dayStart, lt: dayEnd },
+              hippodrome: { name: row.city },
+            },
+          })),
+        },
+        select: {
+          id: true,
+          raceNo: true,
+          raceDay: { select: { date: true, hippodrome: { select: { name: true } } } },
+          result: { select: { actualOrder: true } },
+          runners: { where: { scratched: false }, select: { id: true } },
+        },
+      });
+
+      // Birleştirilmiş OR sonucu farklı filtrelerin eşleşmelerini de taşır:
+      // her isteği KENDİ şehir/tarih/koşu anahtarıyla kesin olarak eşleştir.
+      await Promise.all(batch.map(async (request) => {
+        try {
+          const candidates = races.filter((race) =>
+            race.raceNo === request.raceNo &&
+            race.raceDay.hippodrome.name === request.row.city &&
+            race.raceDay.date.getTime() >= request.dayStart.getTime() &&
+            race.raceDay.date.getTime() < request.dayEnd.getTime()
+          );
+          if (candidates.length > 1) {
+            // Önceki findFirst davranışını koru; findMany sırası seçimi etkilemesin.
+            request.resolve(await resolveFieldSize(request.row));
+            return;
+          }
+          const race = candidates[0];
+          if (!race || race.runners.length === 0) {
+            request.resolve(null);
+            return;
+          }
+          const runnerCount = race.runners.length;
+          const actualOrder = race.result?.actualOrder;
+          request.resolve({
+            fieldSize: runnerCount,
+            confidence: Array.isArray(actualOrder) && actualOrder.length > 0 && actualOrder.length === runnerCount ? "high" : "low",
+            raceId: race.id,
+          });
+        } catch (error) {
+          request.reject(error);
+        }
+      }));
+    } catch (error) {
+      for (const request of batch) request.reject(error);
+    }
+  };
+
   return (row: HistoryRow): Promise<FieldSizeResolution | null> => {
     const key = `${row.city}|${row.date}|${row.raceNo}`;
     let pending = cache.get(key);
     if (!pending) {
-      pending = resolveFieldSize(row);
+      if (batchSize == null) {
+        // Var olan bütün çağıranlar için production davranışı aynen korunur.
+        pending = resolveFieldSize(row);
+      } else {
+        const date = parseTjkDate(row.date);
+        const raceNo = parseInt(row.raceNo, 10);
+        if (!date || !Number.isFinite(raceNo)) {
+          pending = Promise.resolve(null);
+        } else {
+          const dayStart = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+          const dayEnd = new Date(dayStart.getTime() + 24 * 3600 * 1000);
+          pending = new Promise<FieldSizeResolution | null>((resolve, reject) => {
+            queue.push({ row, raceNo, dayStart, dayEnd, resolve, reject });
+            schedule();
+          });
+        }
+      }
       cache.set(key, pending);
     }
     return pending;
