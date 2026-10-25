@@ -50,10 +50,10 @@ describe("RAN signal complementarity — fail closed and paired metrics",()=>{
     const base=evals([4,1,5,2,3]);
     const cand=evals([2,4,1,4,1]);
     const r=compareAuditRaces("TEST",UNIFIED_MODEL_CODES,base,cand);
-    expect(r.rescue).toEqual({top1:2,top3:1});
+    expect(r.rescue).toEqual({top1:2,top3:2});
     expect(r.harm).toEqual({top1:1,top3:2});
     expect(r.delta.top1Hits).toBe(1);
-    expect(r.delta.top3Hits).toBe(-1);
+    expect(r.delta.top3Hits).toBe(0);
   });
   it("never permits lowering independent acceptance below 60",()=>{
     const training=trainDays.map((d,i)=>race("t"+i,d));
