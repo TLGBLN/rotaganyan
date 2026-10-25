@@ -4,12 +4,16 @@
  * The evaluation unit is ALWAYS a jointly re-fitted subset (basket), NEVER a
  * standalone feature ranking. Single/pair results are diagnostics, not deletion
  * gates. Search is heuristic: 2^36−1 sets cannot be searched exhaustively.
- * No D/V1 mixing quota; no pedigree quota; do not force source representation.
+ * No D/V1 mixing quota or artificial positive contribution. Every candidate
+ * MUST cover ancestry (SIRE/DAM/DAMSIRE), race pace and surface/distance,
+ * alongside the other major racing domains. Weak singleton metrics do not veto
+ * features and missing raw lineage observations do not get fictitious points.
  *
  * 238 original PIT train races only. Results from repeatedly searched 3 folds
  * are discovery evidence, NOT unbiased performance. Publication BLOCKED.
  */
 import {UNIFIED_MODEL_CODES} from "../unified-model-codes";
+import {basketDomainCheck} from "./basket-domain-coverage";
 import {candidateObjective,rankCombination,selectionKey,
   type CombinationResult} from "./combinatorial-signal-selection";
 
@@ -163,22 +167,25 @@ export function chooseBasketFromConfirmation(
     "RESEARCH_BASKET_TRADEOFF";reason:string} {
   if(!confirmed.length||!confirmed.every(r=>r.n===fullBasket.n))
     throw new Error("RAN_BASKET_DIFFERENT_VALIDATION_COHORT");
+  if(!basketDomainCheck(fullBasket.codes).complete)
+    throw new Error("RAN_BASKET_FULL_REFERENCE_MISSING_DOMAINS");
   const front=basketParetoFront(confirmed);
   // Never force lineage/source representation. A shortlist winner must remain
   // on Pareto frontier. Both TOP1 and TOP3 are independent non-tradeoff guards
   // to avoid optimizing one at the expense of the other.
-  const eligible=front.filter(x=>x.top1Hits>=fullBasket.top1Hits &&
+  const eligible=front.filter(x=>basketDomainCheck(x.codes).complete &&
+      x.top1Hits>=fullBasket.top1Hits &&
       x.top3Hits>=fullBasket.top3Hits &&
       x.logLoss<=fullBasket.logLoss+0.02);
   const strongest=eligible.sort(rankCombination)[0];
   if(strongest && selectionKey(strongest.codes)!==selectionKey(fullBasket.codes))
     return {selected:strongest,front,
       status:"RESEARCH_BASKET_BEATS_FULL",
-      reason:"Equal/greater TOP1 and TOP3, within 0.02 LogLoss of full-36, 2500-iteration confirmation. Still inner-fold selection only."};
+      reason:"Includes all required racing evidence domains; equal/greater TOP1 and TOP3 within 0.02 LogLoss of full-36. Still inner-fold selection only."};
   if(strongest)return {selected:fullBasket,front,status:"RESEARCH_FULL36_RETAINED",
     reason:"Full-36 is not strictly beaten by a basket in both guarded winner metrics."};
   return {selected:fullBasket,front,status:"RESEARCH_BASKET_TRADEOFF",
-    reason:"No subset passes joint TOP1/TOP3 and LogLoss guard; do not force a basket winner from searched folds."};
+    reason:"No racing-domain-complete subset passes TOP1/TOP3 and LogLoss guards; do not promote a speed/form-only basket."};
 }
 export function sourceBlindWinnerSelection(
   results:readonly CombinationResult[],
