@@ -7,7 +7,7 @@ import type { RunnerFeatureVector } from "@/lib/motor-v1/engine/feature-vector";
 import { scoreRace, explainRunner, type FittedModel } from "@/lib/motor-v1/engine/training";
 import { computeDemotionDrivers, classifyDemotion } from "./root-cause-classifier";
 import { pedigreeEffects, comparePedigreeEffects } from "./pedigree-breakdown";
-import { UNIFIED_MODEL_CODES } from "../feature-calculators/unified-feature-vector";
+import { UNIFIED_MODEL_CODES } from "../unified-model-codes";
 import type { RaceRcaResult, MissAnalysis, WinnerPositiveSignal } from "./analyze-race";
 
 export type StoredRcaResult =
