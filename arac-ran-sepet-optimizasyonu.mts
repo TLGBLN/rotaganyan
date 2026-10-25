@@ -56,6 +56,21 @@ if(path.resolve(OUT).startsWith(path.resolve(process.cwd())+path.sep))
   throw new Error("RAN_BASKET_OUTPUT_MUST_STAY_OUTSIDE_REPOSITORY");
 const read=():{train:OriginalRace[];fingerprint:string}=>{
   const bytes=fs.readFileSync(DATA);
+  const sourceHash=createHash("sha256").update(bytes).digest("hex");
+  const manifestPath=DATA+".manifest.json";
+  if(!fs.existsSync(manifestPath))
+    throw new Error("RAN_BASKET_V3_VERIFIED_SOURCE_MANIFEST_REQUIRED");
+  const manifest=JSON.parse(fs.readFileSync(manifestPath,"utf8")) as {
+    version?:string;sourceSha?:string;outputSha?:string;races?:number;
+    trainingRaces?:number;developmentRaces?:number;
+    everyHorseHasThreeLineages?:boolean;
+  };
+  if(manifest.version!==SOURCE_VERSION || manifest.outputSha!==sourceHash ||
+     !/^[0-9a-f]{64}$/.test(manifest.sourceSha??"")||
+     manifest.races!==300||manifest.trainingRaces!==238||
+     manifest.developmentRaces!==62||
+     manifest.everyHorseHasThreeLineages!==true)
+    throw new Error("RAN_BASKET_V3_SOURCE_MANIFEST_SHA_OR_COUNT_MISMATCH");
   const rows:unknown=JSON.parse(bytes.toString("utf8"));
   if(!Array.isArray(rows)||rows.length!==300)
     throw new Error("RAN_BASKET_REQUIRES_COMPLETED_V3_300");
@@ -67,7 +82,7 @@ const read=():{train:OriginalRace[];fingerprint:string}=>{
     throw new Error("RAN_BASKET_COHORT_SPLIT_OR_DUPLICATE");
   validateTrainingOnly(train);
   for(const r of all){
-    if(r.pedigreeV3?.version!==SOURCE_VERSION && r.pedigreeV2?.version!==SOURCE_VERSION)
+    if(r.pedigreeV3?.version!==SOURCE_VERSION)
       throw new Error("RAN_BASKET_LINEAGE_SOURCE_VERSION_MISMATCH");
     for(const v of r.vectors){
       if(v.pedigreeScoringVersion!==SOURCE_VERSION)
