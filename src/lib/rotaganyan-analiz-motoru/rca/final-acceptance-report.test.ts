@@ -1,4 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
 import type { FittedModel } from "@/lib/motor-v1/engine/training";
 import type { RunnerFeatureVector } from "@/lib/motor-v1/engine/feature-vector";
 import { UNIFIED_MODEL_CODES } from "../feature-calculators/unified-feature-vector";
@@ -100,5 +105,35 @@ describe("RAN final acceptance — fail closed / no live DB", () => {
     expect(report.input.rejected).toBe(1);
     expect(report.rejected[0].reason).toBe("MALFORMED_RUNNER_RECORD");
   });
+
+  it("offline final report CLI runs without DATABASE_URL and writes BLOCKED audit files", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "ran-offline-final-"));
+    try {
+      const input = path.join(dir, "one-race.json");
+      const out = path.join(dir, "report");
+      writeFileSync(input, JSON.stringify([row(1, 1)]));
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        RAN_ACCEPT_DATA: input,
+        RAN_FINAL_OUT: out,
+        RAN_FINAL_MIN_RACES: "60",
+      };
+      delete env.DATABASE_URL;
+      const result = spawnSync(process.execPath, [
+        "node_modules/tsx/dist/cli.mjs", "arac-ran-final-kabul-raporu.mts",
+      ], {
+        cwd: process.cwd(), env, encoding: "utf8", timeout: 20000,
+      });
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(2); // data gate intentionally BLOCKED for one race
+      expect(result.stdout).toContain("[RAN_FINAL] input=1 valid=1 rejected=0 minimum=60");
+      expect(result.stderr).not.toContain("DATABASE_URL");
+      const report = JSON.parse(readFileSync(out + ".json", "utf8"));
+      expect(report.dataGate).toBe("BLOCKED");
+      expect(report.publicationGate).toBe("NOT_VERIFIED");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 25000);
 
 });
