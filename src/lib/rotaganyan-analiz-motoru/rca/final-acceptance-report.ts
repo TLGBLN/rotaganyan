@@ -116,7 +116,7 @@ export function computeFinalAcceptanceReport(
   meta: AcceptanceModelMeta,
   minRaces = 60
 ): FinalAcceptanceReport {
-  if (!Number.isSafeInteger(minRaces) || minRaces < 1) throw new Error("RAN_FINAL_MIN_RACES_INVALID");
+  if (!Number.isSafeInteger(minRaces) || minRaces < 60) throw new Error("RAN_FINAL_MIN_RACES_MUST_BE_AT_LEAST_60");
   const cutoff = acceptanceDay(meta.holdoutDateRange[1] ?? "");
   if (!cutoff) throw new Error("RAN_FINAL_MODEL_HOLDOUT_END_INVALID");
   const rejected: FinalAcceptanceReport["rejected"] = [];
@@ -139,11 +139,18 @@ export function computeFinalAcceptanceReport(
     const raceId = typeof row?.raceId === "string" ? row.raceId : "(missing-raceId)";
     const date = acceptanceDay(row?.tarih ?? "");
     let reason: string | null = null;
-    if (!date) reason = "INVALID_DATE";
+    if (!raceId || raceId === "(missing-raceId)") reason = "INVALID_RACE_ID";
+    else if (!date) reason = "INVALID_DATE";
     else if (date <= cutoff) reason = "NOT_AFTER_DEV_HOLDOUT";
     else if (seen.has(raceId)) reason = "DUPLICATE_RACE_ID";
     else if (!Number.isSafeInteger(row?.winnerNo) || (row.winnerNo ?? 0) < 1) reason = "WINNER_NOT_VERIFIED";
     else if (!Array.isArray(row?.vectors) || row.vectors.length < 3) reason = "FIELD_TOO_SMALL";
+    else if (!row.vectors.every((v) => v != null && typeof v === "object" &&
+        typeof v.raceId === "string" && typeof v.name === "string" &&
+        Array.isArray(v.signals) && v.signals.every((sig) =>
+          sig != null && typeof sig === "object" && typeof sig.code === "string"))) {
+      reason = "MALFORMED_RUNNER_RECORD";
+    }
     seen.add(raceId);
     if (reason) { rejected.push({ raceId, reason }); continue; }
     const result = analyzeStoredAcceptanceRace(raceId, row.winnerNo!, row.vectors, model);
@@ -248,7 +255,8 @@ export function computeFinalAcceptanceReport(
       trainingRaces: meta.nRacesTrain, developmentHoldoutRaces: meta.nRacesHoldout,
     },
     verification: {
-      modelVsAcceptanceChronology: rejected.some((r) => r.reason === "NOT_AFTER_DEV_HOLDOUT") ? "FAILED" : "PASS",
+      modelVsAcceptanceChronology: rejected.some((r) =>
+        r.reason === "NOT_AFTER_DEV_HOLDOUT" || r.reason === "INVALID_DATE") ? "FAILED" : "PASS",
       preRaceSnapshotProvenance: "NOT_VERIFIED",
       dataCollectionIndependence: "NOT_VERIFIED",
       liveRecomputeParity: "NOT_VERIFIED",
