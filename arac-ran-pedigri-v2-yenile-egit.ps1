@@ -49,6 +49,12 @@ try {
      $manifest.originalCanonicalModelUnmodified -ne $true){
     throw "RAN_PED_V2_CANDIDATE_MANIFEST_FAIL"
   }
+  # Prevent silently training from a revised/corrupted original snapshot.
+  $sourceSha=(Get-FileHash -LiteralPath $original -Algorithm SHA256).Hash.ToLowerInvariant()
+  $revisedSha=(Get-FileHash -LiteralPath $revised -Algorithm SHA256).Hash.ToLowerInvariant()
+  if($sourceSha -ne $manifest.sourceSha -or $revisedSha -ne $manifest.outputSha){
+    throw "RAN_PED_V2_SOURCE_OR_OUTPUT_SHA_MISMATCH: no model training"
+  }
   [Environment]::SetEnvironmentVariable("RAN_IN",$revised,"Process")
   [Environment]::SetEnvironmentVariable("RAN_MODEL_OUT",$model,"Process")
   [Environment]::SetEnvironmentVariable("RAN_SPLIT_DATE","2026-08-26","Process")
