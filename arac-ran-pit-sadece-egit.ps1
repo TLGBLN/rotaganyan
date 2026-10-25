@@ -11,19 +11,10 @@ if(-not(Test-Path -LiteralPath $dataset -PathType Leaf)){
 if(Test-Path -LiteralPath $model){
   throw "RAN_PIT_MODEL_EXISTS: Will not overwrite existing diagnostic output: $model"
 }
-$rows=@(Get-Content -LiteralPath $dataset -Raw -Encoding UTF8 | ConvertFrom-Json)
-$train=@($rows | Where-Object {$_.tarih -ge "2026-08-16" -and $_.tarih -le "2026-08-25"})
-$dev=@($rows | Where-Object {$_.tarih -ge "2026-08-26" -and $_.tarih -le "2026-08-28"})
-if($rows.Count -ne 300 -or $train.Count -ne 238 -or $dev.Count -ne 62){
-  throw "RAN_PIT_DATASET_SPLIT_FAIL: expected total=300 train=238 dev=62; observed total=$($rows.Count) train=$($train.Count) dev=$($dev.Count)"
-}
-$ids=@($rows | ForEach-Object {$_.raceId})
-if((@($ids | Sort-Object -Unique)).Count -ne 300){
-  throw "RAN_PIT_DUPLICATE_RACE_IDS: original 300-race cohort must be unique"
-}
-if(@($rows | Where-Object {$_.winnerNo -eq $null -or $_.vectors.Count -lt 3}).Count -gt 0){
-  throw "RAN_PIT_MISSING_WINNER_OR_FIELD"
-}
+# PowerShell 5.1 wraps ConvertFrom-Json arrays as ONE pipeline object.
+# Validate all 300 rows with Node JSON.parse; never use @(...).Count here.
+& node ./arac-ran-pit-dataset-check.cjs $dataset
+if($LASTEXITCODE -ne 0){throw "RAN_PIT_DATASET_PREFLIGHT_FAILED: no training started"}
 $names=@("RAN_IN","RAN_MODEL_OUT","RAN_SPLIT_DATE","RAN_LAMBDA","RAN_LR","RAN_ITER","DATABASE_URL")
 $original=@{}
 foreach($name in $names){$original[$name]=[Environment]::GetEnvironmentVariable($name,"Process")}
