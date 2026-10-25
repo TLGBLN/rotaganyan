@@ -2,7 +2,7 @@ import {describe,it,expect} from "vitest";
 import type {RunnerFeatureVector} from "@/lib/motor-v1/engine/feature-vector";
 import { UNIFIED_MODEL_CODES } from "../unified-model-codes";
 import {
-  allPairs,buildWalkFolds,validateTrainingOnly,evaluateCombination,
+  allPairs,buildWalkFolds,validateTrainingOnly,evaluateCombination,evaluatePairInteraction,
   classifyPair,sourceAlternativeLimitations,selectionKey,candidateObjective,
   type FeatureRace,type CombinationResult,
 } from "./combinatorial-signal-selection";
@@ -73,6 +73,20 @@ describe("RAN v1.0 ALL signal combinations — chronological research only",()=>
     expect(a.top3Hits).toBeGreaterThanOrEqual(a.top1Hits);
     expect(b.logLoss).toBeGreaterThan(0);
     expect(b.codes).toHaveLength(2);
+  });
+  it("measures an actual multiplicative interaction separately from the additive two-feature fit",()=>{
+    const folds=buildWalkFolds(data());
+    const a=UNIFIED_MODEL_CODES[0],b=UNIFIED_MODEL_CODES[1];
+    const opts={lambda:90,learningRate:.25,iterations:5};
+    const regular=evaluateCombination(folds,[a,b],opts);
+    const interaction=evaluatePairInteraction(folds,a,b,opts);
+    expect(interaction.id).toBe("INT:"+selectionKey([a,b]));
+    expect(interaction.codes).toHaveLength(3);
+    expect(interaction.codes[2]).toContain("INTERACTION__");
+    expect(interaction.n).toBe(regular.n);
+    expect(interaction.foldResults.map(x=>x.fold))
+      .toEqual(regular.foldResults.map(x=>x.fold));
+    expect(interaction.logLoss).toBeGreaterThan(0);
   });
   it("marks a weaker overlapping signal redundant ONLY after joint vs stronger alone",()=>{
     const a=UNIFIED_MODEL_CODES[0],b=UNIFIED_MODEL_CODES[1];
