@@ -92,7 +92,7 @@ export function replaceThreeLineages(
   });
   if(!signals.every((s,i)=> s.code===vector.signals[i].code))
     throw new Error("RAN_PED_V2_SIGNAL_ORDER_MUTATION");
-  return {...vector,signals};
+  return {...vector,signals,pedigreeScoringVersion:PEDIGREE_V2_VERSION};
 }
 export function assertPedigreeVersionAndProvenance(
   version:string,
@@ -100,6 +100,8 @@ export function assertPedigreeVersionAndProvenance(
 ):void {
   if(version!==PEDIGREE_V2_VERSION)throw new Error("RAN_PED_V2_MODEL_FINGERPRINT_MISMATCH");
   for(const v of candidateVectors){
+    if(v.pedigreeScoringVersion!==PEDIGREE_V2_VERSION)
+      throw new Error("RAN_PED_V2_INPUT_VERSION_MISMATCH");
     if(LINEAGES.some(l=>v.signals.filter(s=>s.code===l.code).length!==1))
       throw new Error("RAN_PED_V2_MISSING_LINEAGE");
     if(LINEAGES.some(l=>{
