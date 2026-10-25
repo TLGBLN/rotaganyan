@@ -26,6 +26,8 @@ import {
   type BasketSearchOptions,DEFAULT_BASKET_SEARCH,
 } from "./src/lib/rotaganyan-analiz-motoru/rca/basket-search";
 import {PEDIGREE_V3_VERSION} from "./src/lib/rotaganyan-analiz-motoru/pedigree-v3/lineage-weighted";
+import {BASKET_DOMAIN_RULES,basketDomainCheck,assertBasketDomainCoverage,
+  completeBasketDomains} from "./src/lib/rotaganyan-analiz-motoru/rca/basket-domain-coverage";
 type OriginalRace=FeatureRace&{pedigreeV2?:{version:string};pedigreeV3?:{version:string}};
 function setting(name:string,def:number,min:number,max:number):number{
   const x=Number(process.env[name]??def);
@@ -34,7 +36,7 @@ function setting(name:string,def:number,min:number,max:number):number{
   return x;
 }
 const DATA=process.env.RAN_BASKET_IN??"C:/tmp/ran-pit-20261025-pedigri-v3-300.json";
-const OUT=process.env.RAN_BASKET_OUT??"C:/tmp/ran-pit-20261025-optimum-sinyal-sepeti";
+const OUT=process.env.RAN_BASKET_OUT??"C:/tmp/ran-pit-20261025-kapsamli-sinyal-sepeti-v2";
 const SEARCH:BasketSearchOptions={
   ...DEFAULT_BASKET_SEARCH,
   seed:setting("RAN_BASKET_SEED",20261025,0,2147483647),
@@ -91,7 +93,7 @@ const read=():{train:OriginalRace[];fingerprint:string}=>{
   }
   return {train,fingerprint:createHash("sha256").update(bytes).digest("hex")};
 };
-type Checkpoint={schema:2;sha:string;optionsFingerprint:string;
+type Checkpoint={schema:3;sha:string;optionsFingerprint:string;
   results:Record<string,CombinationResult>};
 function write(p:string,obj:unknown){
   fs.mkdirSync(path.dirname(p),{recursive:true});
@@ -105,7 +107,9 @@ function print(r:CombinationResult){
 }
 function shortlistForFullFit(results:CombinationResult[],
   full:CombinationResult,limit:number):CombinationResult[]{
-  const sorted=[...results].sort(rankCombination);
+  // Singletons, pairs, and domain-incomplete baskets are DIAGNOSTICS ONLY.
+  // Never let their high retrospective score qualify for a full race engine.
+  const sorted=results.filter(r=>basketDomainCheck(r.codes).complete).sort(rankCombination);
   const pick=new Map<string,CombinationResult>();
   const add=(r:CombinationResult)=>pick.set(selectionKey(r.codes),r);
   add(full);
@@ -126,6 +130,7 @@ async function main(){
   const optionsFingerprint=createHash("sha256").update(JSON.stringify({
     search:SEARCH,iterations:ITER,budget:BUDGET,finalists:FINALISTS,
     version:SOURCE_VERSION,registry:UNIFIED_MODEL_CODES,lambda:90,lr:.25,
+    coverage:BASKET_DOMAIN_RULES,coverageVersion:"RACING_DOMAIN_COVERAGE_V2",
   })).digest("hex");
   const cpPath=OUT+".checkpoint.json";
   if(fs.existsSync(OUT+".candidate-model.json")||fs.existsSync(OUT+".report.json"))
@@ -133,9 +138,9 @@ async function main(){
   let cp:Checkpoint;
   if(fs.existsSync(cpPath)){
     cp=JSON.parse(fs.readFileSync(cpPath,"utf8"));
-    if(cp.schema!==2||cp.sha!==fingerprint||cp.optionsFingerprint!==optionsFingerprint)
+    if(cp.schema!==3||cp.sha!==fingerprint||cp.optionsFingerprint!==optionsFingerprint)
       throw new Error("RAN_BASKET_CHECKPOINT_DATA_OR_OPTIONS_MISMATCH");
-  }else cp={schema:2,sha:fingerprint,optionsFingerprint,results:{}};
+  }else cp={schema:3,sha:fingerprint,optionsFingerprint,results:{}};
   const folds=buildWalkFolds(train);
   const completed=()=>Object.keys(cp.results).length;
   let newFits=0,limitReached=false;
@@ -161,13 +166,24 @@ async function main(){
   const all=UNIFIED_MODEL_CODES,full=requireBasket(all);
   console.log("[RAN_BASKET] Original 238 PIT TRAIN, 3 chronological inner folds. 62 DEV not used.");
   console.log("[RAN_BASKET] 36 independent singles and 630 pairs for DIAGNOSIS ONLY: they NEVER veto a feature.");
+  console.log("[RAN_BASKET] Candidate selection requires ALL "+BASKET_DOMAIN_RULES.length+
+    " racing evidence domains; all 3 pedigree lines mandatory, no forced positive beta.");
   console.log("[RAN_BASKET] All-source full36, leave-one-out, random global baskets, block-add/remove/swap.");
   console.log("[RAN_BASKET] Using version="+SOURCE_VERSION+" | resume="+completed()+
     " | max fits="+BUDGET+" | simulation ROI NOT VERIFIED; publication=BLOCKED");
   for(const code of all)requireBasket([code]);
   for(const pair of allPairs(all))requireBasket(pair);
   console.log("[RAN_BASKET] 36 singles and 630 pairs completed. No single-feature elimination decisions.");
-  const seeds=createDiverseBasketSeeds(all,SEARCH);
+  const rawSeeds=createDiverseBasketSeeds(all,SEARCH);
+  const uniqueSeeds=new Map<string,string[]>();
+  for(let i=0;i<rawSeeds.length;i++){
+    const s=completeBasketDomains(rawSeeds[i],SEARCH.seed+i);
+    if(s.length>SEARCH.maxSize)continue;
+    uniqueSeeds.set(selectionKey(s),s);
+  }
+  const seeds=[...uniqueSeeds.values()];
+  if(!seeds.some(s=>s.length===all.length))
+    throw new Error("RAN_BASKET_MANDATORY_FULL36_SEED_MISSING");
   for(const s of seeds){if(limitReached)break;evalBasket(s);}
   write(cpPath,cp);
   // Search variable basket sizes; frontier is diversified by size. A basket
@@ -191,7 +207,10 @@ async function main(){
       visited.add(parentKey);
       const moves=basketNeighbours(parent.codes,SEARCH,
         (SEARCH.seed+round*7919+parent.codes.length*997)>>>0);
-      for(const move of moves){
+      for(let i=0;i<moves.length;i++){
+        const move=completeBasketDomains(moves[i],
+          (SEARCH.seed+round*7919+i*97+parent.codes.length*997)>>>0);
+        if(move.length>SEARCH.maxSize)continue;
         const r=evalBasket(move);
         if(r)newCandidates.push(r);
         if(limitReached)break;
@@ -217,12 +236,16 @@ async function main(){
   const fullConfirmed=confirmed.find(r=>r.codes.length===36)!;
   const chosen=chooseBasketFromConfirmation(confirmed,fullConfirmed);
   const candidate=chosen.selected;
+  assertBasketDomainCoverage(candidate.codes);
   const selectedScoreAudit=auditScoreInflation(
     folds,candidate.codes,{lambda:90,learningRate:0.25,iterations:2500});
   const fullScoreAudit=auditScoreInflation(
     folds,all,{lambda:90,learningRate:0.25,iterations:2500});
   const report={
-    version:"RAN_SIGNAL_BASKET_DISCOVERY_V1",engineInputVersion:SOURCE_VERSION,
+    version:"RAN_SIGNAL_BASKET_DISCOVERY_V2_RACING_COVERAGE",engineInputVersion:SOURCE_VERSION,
+    requiredRacingDomains:BASKET_DOMAIN_RULES,
+    selectedDomainCoverage:basketDomainCheck(candidate.codes),
+    domainIncompleteScreened:Object.values(cp.results).filter(r=>!basketDomainCheck(r.codes).complete).length,
     sourceFile:DATA,sourceSHA256:fingerprint,optionsFingerprint,config:SEARCH,
     screeningIterations:ITER,fullConfirmationIterations:2500,
     trainingRaces:238,validationRaces:folds.reduce((n,f)=>n+f.validation.length,0),
@@ -239,9 +262,10 @@ async function main(){
     pareto:chosen.front,
     chosen: candidate,
     selectedScoreInflation:selectedScoreAudit,fullScoreInflation:fullScoreAudit,
-    scoringRule:"Joint refit per basket; 2*Top1+Top3 - 0.12*LogLoss - 0.003*size; joint no-regression TOP1/TOP3 plus LogLoss<=full+0.02",
+    scoringRule:"Joint refit per basket; required full racing-domain coverage, then TOP1/TOP3 no-regression and LogLoss<=full+0.02. Fast rank penalty 0.003 per feature is diagnostic, not an efficiency proof.",
     roiStatus:"NOT_VERIFIED_NO_IMMUTABLE_PRE_RACE_MARKET_AND_PAYOUT_EVIDENCE",
     modelSelectionBias:"HIGH: same 3 inner folds used for many baskets; re-fit 2500 on SAME folds. Needs an entirely unseen prospective chronological cohort.",
+    oldSixSignalBasketStatus:"REJECTED_INCOMPLETE_RACING_EVIDENCE_DOMAINS",
     publicationGate:"BLOCKED",
     limitations:[
       "Only 36 PIT-audited canonical features exist in this source. Alternative/blocked signal variants are NOT tested.",
@@ -249,6 +273,8 @@ async function main(){
       "All winners used for selection are the original 238 TRAIN race period only; published TOP1/TOP3 require a future unseen holdout.",
       "Payout/ROI model-selection is not possible without trustworthy timestamped pre-race odds, coupon costs and payout/settlement records.",
       "A positive historical combination search score does not prove independent out-of-sample efficiency.",
+      "ALL active race runners must have three individually calculated PIT pedigree lines; data absent means missingness, never artificial positive score.",
+      "The old six-feature subset omitted pedigree, tempo and track/distance; it is ineligible as a unified motor even if a retrospective search ranks it highly.",
     ],
   };
   const stats=computeFeatureStats(train.flatMap(r=>r.vectors),candidate.codes);
@@ -260,7 +286,9 @@ async function main(){
     model.beta.length!==2*candidate.codes.length||model.beta.some(x=>!Number.isFinite(x)))
     throw new Error("RAN_BASKET_FINAL_FIT_INVALID");
   const artifact={
-    artifactType:"RAN_BASKET_SHADOW_UNPUBLISHED",modelVersion:"RAN_SIGNAL_BASKET_DISCOVERY_V1",
+    artifactType:"RAN_BASKET_SHADOW_UNPUBLISHED",modelVersion:"RAN_SIGNAL_BASKET_DISCOVERY_V2_RACING_COVERAGE",
+    requiredDomainIds:BASKET_DOMAIN_RULES.map(g=>g.id),
+    domainCoverage:basketDomainCheck(candidate.codes),
     publicationGate:"BLOCKED",engineInputVersion:SOURCE_VERSION,
     sourceSHA256:fingerprint,configSHA256:optionsFingerprint,
     selectedBy:"MULTI_START_MULTI_SIZE_JOINT_BASKET_RETRAIN_238_INNER_WALK_FORWARD",
@@ -273,14 +301,16 @@ async function main(){
   write(OUT+".report.json",report);
   write(OUT+".candidate-model.json",artifact);
   fs.writeFileSync(OUT+".md",[
-    "# ROTAGANYAN — EN VERİMLİ SİNYAL SEPETİ ARAŞTIRMASI",
+    "# ROTAGANYAN — YARIŞ KAPSAMI TAM SİNYAL SEPETİ ARAŞTIRMASI",
     "","**Yayın: BLOCKED.** Sinyal tekli sıralaması motor seçimi değildir.",
     "Kaynak: "+DATA,
     "Veri SHA256: "+fingerprint,
     "Veri: 238 PIT eğitim yarışı, 3 ileri kronolojik iç doğrulama; 62 DEV ve eski Ekim sonuçları seçime katılmadı.",
     "İncelenen 36 sinyalin "+(2n**36n-1n).toString()+" olası dolu alt kümesinin "+completed()+
       " adedi tarandı. Bu **tüm kombinasyonların eksiksiz taranması değildir.**",
-    "36 tekli + 630 çift, bütünlenmiş model + 35'li çıkarmalar + çoklu random/boyut/ikili blok mutasyonları.",
+    "36 tekli + 630 çift SADECE TANISAL. Gerçek sepetler 14 temel yarış kanıt grubunu temsil etmek zorundadır.",
+    "SIRE + DAM + DAMSIRE, atın kendi temposu, rakip baskısı, pist/mesafe, hız, form, jokey, kilo, sınıf, idman, ekipman, kulvar ayrı denetlenir.",
+    "36 tam model + geniş sepetlerden çıkarma + farklı büyüklükte/ikili blok mutasyonları.",
     "Hızlı tarama: "+ITER+" iterasyon; son "+confirmed.length+" sepet: 2500 iterasyon.",
     "","## Tam sepet kıyası",
     "- 36 sinyal birden: "+print(fullConfirmed),
@@ -288,6 +318,8 @@ async function main(){
     "- Durum: "+chosen.status,
     "- Sebep: "+chosen.reason,
     "- Son sepet: "+candidate.codes.join(", "),
+    "- Kapsanan yarış aileleri: "+basketDomainCheck(candidate.codes).satisfied.join(", "),
+    "- Eksik aileler: "+(basketDomainCheck(candidate.codes).missing.join(", ")||"YOK"),
     "","## Çapraz doğrulama / aşırı iyimser olasılık",
     "- Seçilen sepet ECE: "+(100*selectedScoreAudit.ece).toFixed(2)+" yüzde puanı",
     "- Tam model ECE: "+(100*fullScoreAudit.ece).toFixed(2)+" yüzde puanı",
