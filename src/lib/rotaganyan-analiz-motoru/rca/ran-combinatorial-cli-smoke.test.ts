@@ -45,6 +45,10 @@ describe("RAN 36 singles + 630 exhaustive pairs CLI integration",()=>{
       expect(report.singleCount).toBe(36);
       expect(report.interactionTrials).toBe(50);
       expect(report.interactionResults).toHaveLength(50);
+      expect(report.scoreInflation.selected.nRaces).toBeGreaterThan(0);
+      expect(report.scoreInflation.selected.publicationGate).toBe("BLOCKED");
+      expect(report.scoreInflation.selected.bins).toHaveLength(5);
+      expect(report.scoreInflation.selected.multiClassBrierMean).toBeGreaterThanOrEqual(0);
       expect(report.innerFolds).toHaveLength(3);
       expect(report.publicationGate).toBe("BLOCKED");
       expect(candidate.artifactType).toContain("SHADOW");
