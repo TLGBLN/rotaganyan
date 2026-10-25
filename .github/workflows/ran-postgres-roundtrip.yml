@@ -1,0 +1,72 @@
+name: RAN Isolated PostgreSQL Roundtrip
+
+on:
+  push:
+    branches:
+      - feature/rotaganyan-analiz-motoru-sinyal-birlestirme
+    paths:
+      - 'arac-ran-pg-ci-smoke.mts'
+      - 'src/lib/rotaganyan-analiz-motoru/**'
+      - 'src/server/services/ran-snapshot-bundle.service*'
+      - 'prisma/schema.prisma'
+      - 'prisma/migrations/20261025160000_add_ran_snapshot_bundle/migration.sql'
+      - '.github/workflows/ran-postgres-roundtrip.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-postgres:
+    name: Real PostgreSQL / canonical snapshot roundtrip (shadow only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ran_shadow
+          POSTGRES_PASSWORD: ci_ephemeral_postgres_only
+          POSTGRES_DB: ran_shadow_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ran_shadow -d ran_shadow_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies on ephemeral runner
+        run: |
+          rm -f package-lock.json
+          npm install --legacy-peer-deps --no-save --package-lock=false --no-audit --no-fund
+
+      - name: Generate isolated Prisma client
+        run: npx prisma generate
+
+      - name: Verify TypeScript
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Snapshot and isolation tests (no production DB)
+        run: |
+          npx vitest run \
+            src/lib/rotaganyan-analiz-motoru/ran-snapshot-bundle.test.ts \
+            src/server/services/ran-snapshot-bundle.service.test.ts \
+            src/lib/rotaganyan-analiz-motoru/isolated-db-guard.test.ts
+
+      - name: Real PostgreSQL transaction, readback and cleanup
+        env:
+          NODE_ENV: test
+          RAN_TEST_DATABASE_URL: postgresql://ran_shadow:ci_ephemeral_postgres_only@127.0.0.1:5432/ran_shadow_test
+          RAN_TEST_LOCAL_DB_ACK: ran_shadow_test
+          DATABASE_URL: postgresql://ran_shadow:ci_ephemeral_postgres_only@127.0.0.1:5432/ran_shadow_test
+          RAN_SHADOW_SNAPSHOT_WRITES: isolated-test-only
+        run: node node_modules/tsx/dist/cli.mjs ./arac-ran-pg-ci-smoke.mts
