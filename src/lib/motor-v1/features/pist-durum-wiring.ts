@@ -81,6 +81,17 @@ export async function computePistDurumForRunner(
   if (tjkAtId == null) {
     return { value: null, reason: "IDENTITY_UNRESOLVED", regime: null, sameCount: 0, otherCount: 0, rawDelta: null };
   }
+  // Kök performans düzeltmesi: PIT geçersiz/going bilinmiyor/half-life hatalı ise
+  // computePistDurum01 geçmişe BAKMADAN aynı sonucu döndürüyor. Backtest RCA'da
+  // result mevcutken immutable snapshot yok; bütün atların geçmişi gereksiz yere
+  // sorgulanıyordu. Önce saf fonksiyonla hedef koşulunu doğrula, uygun değilse bitir.
+  const preflight = computePistDurum01(ctx.target, [], halfLifeDays);
+  if (
+    preflight.reason === "TARGET_NOT_PIT_VERIFIED" ||
+    preflight.reason === "TARGET_GOING_UNKNOWN" ||
+    preflight.reason === "INVALID_HALF_LIFE"
+  ) return preflight;
+
   prefetchRecentFieldSizes(ctx.resolver, rowsJson, cutoff);
   const { history } = await buildGoingHistory(rowsJson, cutoff, ctx.resolver);
   return computePistDurum01(ctx.target, history, halfLifeDays);
