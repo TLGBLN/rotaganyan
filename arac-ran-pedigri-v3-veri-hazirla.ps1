@@ -26,8 +26,14 @@ if(-not(Test-Path -LiteralPath $out -PathType Leaf)){
   & node @nodeEnvArgs .\arac-ran-db-onkontrol.cjs
   if($LASTEXITCODE -ne 0){throw "RAN_BASKET_READ_ONLY_DB_PREFLIGHT_FAILED"}
   Write-Host "[RAN_BASKET] PIT V3 SIRE/DAM/DAMSIRE source reads only; original 33 signals frozen."
-  & node @nodeEnvArgs node_modules/tsx/dist/cli.mjs .\arac-ran-pedigri-v3-hizli-yenile.mts
-  if($LASTEXITCODE -ne 0){throw "RAN_BASKET_V3_SOURCE_FAIL (checkpoint preserved)"}
+  $originalQuiet=[Environment]::GetEnvironmentVariable("RAN_PIT_QUIET_DB_LOG","Process")
+  try{
+    [Environment]::SetEnvironmentVariable("RAN_PIT_QUIET_DB_LOG","1","Process")
+    & node @nodeEnvArgs node_modules/tsx/dist/cli.mjs .\arac-ran-pedigri-v3-hizli-yenile.mts
+    if($LASTEXITCODE -ne 0){throw "RAN_BASKET_V3_SOURCE_FAIL (checkpoint preserved)"}
+  }finally{
+    [Environment]::SetEnvironmentVariable("RAN_PIT_QUIET_DB_LOG",$originalQuiet,"Process")
+  }
 }else{
   Write-Host "[RAN_BASKET] Complete V3 data found; skip DB reads, verify hashes."
 }
