@@ -88,4 +88,17 @@ describe("RAN final acceptance — fail closed / no live DB", () => {
     expect(report.rejected.map((r) => r.reason)).toContain("WINNER_NOT_VERIFIED");
     expect(report.verification.modelVsAcceptanceChronology).toBe("FAILED");
   });
+  it("cannot lower the required race count to disguise a partial checkpoint", () => {
+    expect(() => computeFinalAcceptanceReport([row(1, 1)], mockModel(), META, 1))
+      .toThrow("RAN_FINAL_MIN_RACES_MUST_BE_AT_LEAST_60");
+  });
+
+  it("malformed runner data is rejected instead of crashing the RCA", () => {
+    const bad = row(1, 1);
+    bad.vectors[1] = null as unknown as RunnerFeatureVector;
+    const report = computeFinalAcceptanceReport([bad], mockModel(), META);
+    expect(report.input.rejected).toBe(1);
+    expect(report.rejected[0].reason).toBe("MALFORMED_RUNNER_RECORD");
+  });
+
 });
