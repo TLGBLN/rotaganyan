@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { computePreRaceDataSnapshotId, type RanSignalSnapshotEntry } from "./snapshot-integrity";
 import { UNIFIED_MODEL_CODES } from "./unified-model-codes";
 import {
-  buildRanSnapshotBundle, verifyRanSnapshotBundle, readRanSnapshotBundle,
+  buildRanSnapshotBundle, verifyRanSnapshotBundle, readRanSnapshotBundle, auditRanBundleCouponBoundary,
   type RanBundleLeg, type RanSnapshotBundle,
 } from "./ran-snapshot-bundle";
 
@@ -100,4 +100,24 @@ describe("RAN immutable analysis/ranking/coupon bundle", () => {
     expect(a.ranked[0].originalRank).toBe(2);
     expect(a.ranked[1].originalRank).toBe(1);
   });
+  it("calculates normal-only boundary insurance from verified bundle without changing published coupon",()=>{
+    const original=buildRanSnapshotBundle(six(),20,ts);
+    const oldKey=original.bundleKey;
+    const report=auditRanBundleCouponBoundary(original,64);
+    expect(report.bundleKey).toBe(oldKey);
+    expect(report.baseline).toEqual(original.coupon);
+    expect(report.normalOnly.length).toBeGreaterThan(0);
+    expect(report.selectionGate).toBe("NOT_VERIFIED");
+    expect(report.proposals.every(p=>p.result.toplamKombinasyon<=20)).toBe(true);
+    expect(report.proposals.every(p=>p.actuallyAddsAll)).toBe(true);
+    verifyRanSnapshotBundle(original);
+    expect(original.bundleKey).toBe(oldKey);
+  });
+  it("rejects altered snapshot instead of auditing fabricated odds",()=>{
+    const b=buildRanSnapshotBundle(six(),20,ts);
+    const bad=JSON.parse(JSON.stringify(b)) as RanSnapshotBundle;
+    bad.legs[0].runners[0].winProbability=.42;
+    expect(()=>auditRanBundleCouponBoundary(bad,64)).toThrow(/RAN_BUNDLE_INTEGRITY/);
+  });
+
 });
