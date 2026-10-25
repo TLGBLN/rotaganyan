@@ -15,6 +15,7 @@
 import { db } from "@/lib/db";
 import { computeSafModelSignalsForRace, type SafModelRaceSignals } from "./saf-model-signals";
 import { computeUnifiedFamiliesForRace, type UnifiedRunnerResult } from "@/lib/motor-v1/engine/unified-family-engine";
+import { tempoContextFromRuns } from "@/lib/motor-v1/features/tempo";
 import { EXCLUDED_FROM_SCORING } from "@/lib/motor-v1/engine/predict-v1";
 import { buildUnifiedSignalVector, SIGNAL_SPECS, type SignalObservation, type SignalSource } from "../signal-integration";
 import type { AccuraceRun } from "@/lib/accurace/types";
@@ -89,9 +90,14 @@ export async function buildUnifiedFeatureVectorsForRace(
   sharedFieldSizeResolver?: FieldSizeResolverFn,
   captureRcaRawSources = false
 ): Promise<UnifiedFeatureBuildResult> {
+  // RCA-only: D ve V1 TEMPO aynı Accurace snapshot dizisini kullanır; prefetching
+  // dışında canlı/production çağrılarında eski loadTempoContext davranışı korunur.
+  const rcaTempo = captureRcaRawSources && preloadedAccuraceRuns
+    ? tempoContextFromRuns(preloadedAccuraceRuns)
+    : undefined;
   const [safResult, v1Results, runnerMeta] = await Promise.all([
     computeSafModelSignalsForRace(raceId, preloadedAccuraceRuns, preloadedFaz1),
-    computeUnifiedFamiliesForRace(raceId, undefined, sharedFieldSizeResolver),
+    computeUnifiedFamiliesForRace(raceId, undefined, sharedFieldSizeResolver, rcaTempo),
     db.runner.findMany({ where: { raceId, scratched: false }, select: { id: true, no: true, name: true, tjkAtId: true, jockey: true } }),
   ]);
   const extra = captureRcaRawSources ? { rawSources: { safResult, v1Results } } : {};
