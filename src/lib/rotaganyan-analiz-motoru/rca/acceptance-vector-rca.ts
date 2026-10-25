@@ -29,10 +29,10 @@ export function validateAcceptanceVectors(raceId: string, vectors: readonly Runn
     if (!Number.isSafeInteger(v.no) || v.no < 1 || nos.has(v.no)) reasons.push(`At ${v.no}: numara geçersiz/tekrar`);
     nos.add(v.no);
     if (!Array.isArray(v.signals)) { reasons.push(`At ${v.no}: signals yok`); continue; }
-    const codes = v.signals.map((s) => s.code);
+    const codes: string[] = v.signals.map((s: RunnerFeatureVector["signals"][number]) => s.code);
     const found = new Set(codes);
     if (codes.length !== wanted.size || found.size !== wanted.size ||
-        codes.some((c) => !wanted.has(c)) || [...wanted].some((c) => !found.has(c))) {
+        codes.some((c: string) => !wanted.has(c)) || [...wanted].some((c) => !found.has(c))) {
       reasons.push(`At ${v.no}: model kod kümesi eksik/fazla/tekrarlı`);
     }
     for (const s of v.signals) {
