@@ -156,7 +156,7 @@ export function rowsBeforeCutoff(rows: HistoryRow[], cutoff: Date): HistoryRow[]
  * Aynı tarih/hipodrom/koşu için birden çok eşleşmede mevcut findFirst'e geri döner;
  * belirsiz kayıtta farklı bir yarış seçilmez.
  */
-export function createFieldSizeResolver(options: { batchSize?: number } = {}) {
+export function createFieldSizeResolver(options: { batchSize?: number } = {}): FieldSizeResolverFn {
   const cache = new Map<string, Promise<FieldSizeResolution | null>>();
   const batchSize = options.batchSize != null && Number.isInteger(options.batchSize) && options.batchSize >= 2
     ? Math.min(options.batchSize, 50)
@@ -242,7 +242,7 @@ export function createFieldSizeResolver(options: { batchSize?: number } = {}) {
     }
   };
 
-  return (row: HistoryRow): Promise<FieldSizeResolution | null> => {
+  const resolver: FieldSizeResolverFn = (row: HistoryRow): Promise<FieldSizeResolution | null> => {
     const key = `${row.city}|${row.date}|${row.raceNo}`;
     let pending = cache.get(key);
     if (!pending) {
@@ -267,9 +267,35 @@ export function createFieldSizeResolver(options: { batchSize?: number } = {}) {
     }
     return pending;
   };
+
+  // Yalnız RCA batch resolver: geçmiş yarışlar eşzamanlı kuyruğa alınır.
+  // Promise sonuçları önceden çözülse de tüketici döngülerinin sırası değişmez.
+  if (batchSize != null) {
+    resolver.prefetch = (rows: readonly HistoryRow[]) => {
+      const pending = rows.slice(0, 24).map((row) => resolver(row));
+      // Önceden çağrılıp daha sonra tüketilmeyen bir satırın sorgusu hata verirse
+      // unhandled rejection üretme; gerçekten tüketilen satırda aynı hata iletilir.
+      void Promise.allSettled(pending);
+    };
+  }
+  return resolver;
 }
 
-export type FieldSizeResolverFn = ReturnType<typeof createFieldSizeResolver>;
+export type FieldSizeResolverFn = ((row: HistoryRow) => Promise<FieldSizeResolution | null>) & {
+  prefetch?: (rows: readonly HistoryRow[]) => void;
+};
+
+/** Yalnız RCA batch resolver için erken, sınırlı ve PIT-safe veri ön yükleme.
+ * Normal resolverda prefetch yoktur ve ekstra ayrıştırma / SQL yapılmaz.
+ * Son 24 bitiriş kaydı tercih edilir; hesaplama döngüleri eski sırayla devam eder.
+ */
+export function prefetchRecentFieldSizes(resolver: FieldSizeResolverFn, rowsJson: unknown, cutoff: Date): void {
+  if (!resolver.prefetch) return;
+  const rows = rowsBeforeCutoff(parseHistoryRows(rowsJson), cutoff)
+    .filter((row) => finishPosToPosition(row.finishPos) != null)
+    .sort((a, b) => parseTjkDate(b.date)!.getTime() - parseTjkDate(a.date)!.getTime());
+  resolver.prefetch(rows);
+}
 
 export async function rowToOutcome(row: HistoryRow, resolver: FieldSizeResolverFn = resolveFieldSize): Promise<RaceOutcome> {
   const position = finishPosToPosition(row.finishPos);
