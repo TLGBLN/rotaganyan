@@ -105,6 +105,22 @@ export type PmzResult = {
 
 type SurfaceRow = { row: HistoryRow; family: SurfaceFamily; raceId: string; date: Date };
 
+// Uzak DB'de bağımsız geçmiş yarış sorgularını sınırlı sayıda eşzamanlı yürüt.
+// Promise.all girdi sırasını korur; toplama/ağırlık hesapları eski sırada yapılır.
+// Sınır, hem sunucu max:10 pool'u hem diğer atların eşzamanlı hesabını gözetir.
+export async function mapHistoricalRowsOrdered<T, U>(
+  items: readonly T[],
+  fn: (item: T) => Promise<U>,
+  batchSize = 4
+): Promise<U[]> {
+  const results: U[] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const chunk = await Promise.all(items.slice(i, i + batchSize).map(fn));
+    results.push(...chunk);
+  }
+  return results;
+}
+
 async function resolveSurfaceRows(
   allRows: HistoryRow[],
   resolver: FieldSizeResolverFn
@@ -112,19 +128,16 @@ async function resolveSurfaceRows(
   const rows: SurfaceRow[] = [];
   let skippedUnknownSurface = 0;
   let skippedUnresolvedRace = 0;
-  for (const row of allRows) {
-    const parsed = parseSurface(row.surface);
-    if (parsed.surfaceFamily == null) {
-      skippedUnknownSurface++;
-      continue;
-    }
-    const resolved = await resolver(row);
-    if (resolved == null) {
-      skippedUnresolvedRace++;
-      continue;
-    }
+  const parsedRows = allRows.map((row) => ({ row, parsed: parseSurface(row.surface) }));
+  skippedUnknownSurface = parsedRows.filter((x) => x.parsed.surfaceFamily == null).length;
+  const candidates = parsedRows.filter((x) => x.parsed.surfaceFamily != null);
+  const resolvedRows = await mapHistoricalRowsOrdered(candidates, async ({ row, parsed }) => ({
+    row, family: parsed.surfaceFamily!, resolved: await resolver(row),
+  }));
+  for (const { row, family, resolved } of resolvedRows) {
+    if (resolved == null) { skippedUnresolvedRace++; continue; }
     const date = parseTjkDate(row.date)!;
-    rows.push({ row, family: parsed.surfaceFamily, raceId: resolved.raceId, date });
+    rows.push({ row, family, raceId: resolved.raceId, date });
   }
   return { rows, skippedUnknownSurface, skippedUnresolvedRace };
 }
@@ -167,7 +180,7 @@ export async function computePmzZeminUyumu(
   const sameClassVals: number[] = [];
   const otherClassVals: number[] = [];
 
-  for (const sr of rows) {
+  const historical = await mapHistoricalRowsOrdered(rows, async (sr) => {
     const [ownHiz, strength] = await Promise.all([
       getOwnHiz(sr.raceId, tjkAtId, raceContextCache),
       (async () => {
@@ -180,6 +193,9 @@ export async function computePmzZeminUyumu(
         return pending;
       })(),
     ]);
+    return { sr, ownHiz, strength };
+  });
+  for (const { sr, ownHiz, strength } of historical) {
     if (ownHiz == null) continue;
     const deltaDays = (cutoff.getTime() - sr.date.getTime()) / 86_400_000;
     const w = timeDecayWeight(deltaDays, halfLifeDays);
@@ -255,11 +271,13 @@ export async function computePmzMesafeUyumu(
   const allPoints: { value: number | null; weight: number | null }[] = [];
   const nearWeightsOnly: number[] = [];
 
-  for (const row of allRows) {
+  const historical = await mapHistoricalRowsOrdered(allRows, async (row) => {
     const resolved = await resolver(row);
-    if (resolved == null) continue;
-    const ownHiz = await getOwnHiz(resolved.raceId, tjkAtId, raceContextCache);
-    if (ownHiz == null) continue;
+    const ownHiz = resolved == null ? null : await getOwnHiz(resolved.raceId, tjkAtId, raceContextCache);
+    return { row, resolved, ownHiz };
+  });
+  for (const { row, resolved, ownHiz } of historical) {
+    if (resolved == null || ownHiz == null) continue;
     const rowDate = parseTjkDate(row.date)!;
     const deltaDays = (cutoff.getTime() - rowDate.getTime()) / 86_400_000;
     const timeW = timeDecayWeight(deltaDays, halfLifeDays);
