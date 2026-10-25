@@ -33,6 +33,9 @@ try {
   [Environment]::SetEnvironmentVariable("RAN_DATE_FROM","2026-08-16","Process")
   [Environment]::SetEnvironmentVariable("RAN_DATE_TO","2026-08-28","Process")
   [Environment]::SetEnvironmentVariable("RAN_DATASET_TAG","RAN_PIT_20261025_SIRE_SPEED","Process")
+  Write-Host "[RAN_PIT] Checking TypeScript before any real DB reads..."
+  & npx tsc --noEmit -p tsconfig.json
+  if($LASTEXITCODE -ne 0){throw "RAN_PIT_TYPESCRIPT_FAIL"}
   Write-Host "[RAN_PIT] Recalculating exact original 238 TRAIN + 62 DEV race IDs with repaired SIRE/SPEED"
   & node node_modules/tsx/dist/cli.mjs ./arac-ran-egitim-veri-topla.mts
   if($LASTEXITCODE -ne 0){throw "RAN_PIT_RECOLLECTION_FAILED: source checkpoint preserved"}
