@@ -63,6 +63,8 @@ export type SignalAuditReport = {
   baseline: ScoreMetrics;
   correlations: CorrelationPair[];
   experiments: ComparedRun[];
+  unifiedVsDFeaturesOnly: ComparedRun;
+  unifiedVsV1FeaturesOnly: ComparedRun;
   conclusions: string[];
 };
 function assert(condition: unknown, msg: string): asserts condition {
@@ -185,9 +187,12 @@ export function auditSignalComplementarity(
   const v1=new Set(specs.filter(s=>s.source==="V1").map(s=>s.canonical));
   assert(d.size===D_INCLUDED_CODES.length&&v1.size===V1_INCLUDED_CODES.length,"model source family count mismatch");
   const experiments:ComparedRun[]=[];
+  const subsetEvaluations=new Map<string,ReturnType<typeof evaluateAuditRows>>();
   const tryFit=(name:string,codes:readonly string[])=>{
     const refit=fit(training,codes,canonical.opts);
-    experiments.push(compareAuditRaces(name,codes,base,evaluateAuditRows(acceptance,refit)));
+    const evaluated=evaluateAuditRows(acceptance,refit);
+    subsetEvaluations.set(name,evaluated);
+    experiments.push(compareAuditRaces(name,codes,base,evaluated));
   };
   tryFit("D_ONLY",UNIFIED_MODEL_CODES.filter(c=>d.has(c)));
   tryFit("V1_ONLY",UNIFIED_MODEL_CODES.filter(c=>v1.has(c)));
@@ -208,7 +213,10 @@ export function auditSignalComplementarity(
     blockers:KNOWN_SOURCE_BLOCKERS,
     baseline:base.metrics,correlations:auditCorrelations(training),
     experiments,
-    conclusions:["Rank and probability deltas use the same locked acceptance race IDs and winners; all candidate models are refitted on TRAIN ONLY.",
+    unifiedVsDFeaturesOnly:compareAuditRaces("UNIFIED_VS_D_FEATURES_ONLY",UNIFIED_MODEL_CODES,subsetEvaluations.get("D_ONLY")!,base),
+    unifiedVsV1FeaturesOnly:compareAuditRaces("UNIFIED_VS_V1_FEATURES_ONLY",UNIFIED_MODEL_CODES,subsetEvaluations.get("V1_ONLY")!,base),
+    conclusions:["D_ONLY and V1_ONLY are newly REFITTED subset models, NOT historical predictions from the old Saf Model D or old V1.0.",
+      "Rank and probability deltas use the same locked acceptance race IDs and winners; all candidate models are refitted on TRAIN ONLY.",
       "No signal is removed, weights artifact is unchanged, and publication is BLOCKED until source PIT fixes plus independent new holdout verification."],
   };
 }
