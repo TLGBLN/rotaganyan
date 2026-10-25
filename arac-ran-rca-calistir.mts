@@ -33,6 +33,15 @@ function loadModel(): FittedModel<string> {
   return { beta: saved.model.beta, names: saved.model.names, stats, nRacesUsed: saved.model.nRacesUsed, nRacesSkipped: saved.model.nRacesSkipped, opts: saved.opts };
 }
 
+
+// Yalnız teşhis çağrısında: stdout/Prisma logu kapalı olsa veya işlem kesilse
+// bile her aşamayı senkron dosyaya yazar; yarış/model hesapları etkilenmez.
+function rcaProbeMark(phase: string): void {
+  const out = process.env.RAN_RCA_DIAG_FILE;
+  if (!out) return;
+  fs.appendFileSync(out, `[${new Date().toISOString()}] ${phase}\n`);
+}
+
 const LIMIT = Number(process.env.RAN_RCA_LIMIT ?? "3"); // her yarış ~3 tam hesaplama (buildUnified+crosscheck+faz1) gerektiriyor, her biri gözlemsel olarak ~2-3dk sürüyor (bkz. arac-ran-egitim-canli-parite-dogrulama.mts çalıştırma süresi) — GERÇEK DB'ye karşı, tam 60'lık seti çalıştırmak saatler sürer; bu bir performans sınırı, sonuçların GEÇERLİLİĞİNİ etkilemez (hâlâ GERÇEK, hiç eğitimde kullanılmamış yarışlar)
 
 function loadRows(): RanEgitimSatiri[] {
@@ -63,8 +72,10 @@ function yazPedigriFark(rows: readonly PedigreeComparison[], label: string) {
 }
 
 async function main() {
+  rcaProbeMark("RCA_SCRIPT_MAIN_STARTED");
   const model = loadModel();
   const rows = loadRows();
+  rcaProbeMark(`MODEL_AND_INPUT_READY races=${rows.length}`);
   console.log(`Model: ${MODEL_PATH ?? "repo canonical artifact (artifacts/ran-trained-model.json)"}`);
   console.log(`Veri: ${DATA_PATH} — ${rows.length} yarış\n`);
 
@@ -83,7 +94,11 @@ async function main() {
   console.log("=== 1) Gerçek yarışlar — analyzeRaceDemotion ===");
   console.log("(Accurace arşivi BİR KEZ önceden çekiliyor, tüm yarışlar arasında paylaşılıyor — her yarışta tekrar tekrar tam-arşiv sorgusu YAPILMAZ.)\n");
   const t0 = Date.now();
+  rcaProbeMark("ACCURACE_ARCHIVE_LOAD_STARTED");
   const preloadedRuns = await accuraceKosulari();
+  rcaProbeMark(`ACCURACE_ARCHIVE_LOAD_FINISHED runs=${preloadedRuns.length} elapsedMs=${Date.now() - t0}`);
+  // Probe: startup ve tüm-Accurace yüklemesini ölç; hiçbir gerçek yarış RCA başlatma.
+  if (process.env.RAN_RCA_PROBE_ONLY === "1") return;
   console.log(`Accurace arşivi çekildi: ${preloadedRuns.length} koşu, ${((Date.now() - t0) / 1000).toFixed(1)}s\n`);
 
   // Yalnız bu RCA komutu: eşzamanlı geçmiş-yarış sorgularını 32'li toplu OR
@@ -95,9 +110,11 @@ async function main() {
 
   for (const [index, row] of rows.entries()) {
     const raceStartedAt = Date.now();
+    rcaProbeMark(`RACE_STARTED id=${row.raceId}`);
     console.log(`[RCA BASLADI] ${index + 1}/${rows.length} raceId=${row.raceId}`);
     const result = await analyzeRaceDemotion(row.raceId, model, row.winnerNo!, preloadedRuns, sharedFieldSizeResolver);
     console.log(`[RCA TAMAMLANDI] ${index + 1}/${rows.length} raceId=${row.raceId} sure=${((Date.now() - raceStartedAt) / 1000).toFixed(1)}s status=${result.status}`);
+    rcaProbeMark(`RACE_FINISHED id=${row.raceId} status=${result.status} elapsedMs=${Date.now() - raceStartedAt}`);
     if (result.status === "STALE") {
       staleCount++;
       console.log(`[STALE] raceId=${row.raceId} — ${result.reasons.join(" | ")}`);
