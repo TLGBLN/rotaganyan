@@ -14,7 +14,7 @@ import { PLACEHOLDER_HALF_LIFE_DAYS, type CoverageState } from "../features/comm
 import { computeFormLevel, computeFormTrend, computeLayoff } from "../features/form";
 import { computeSpeedRatingForRace } from "../features/hiz";
 import { computeSinifLevel } from "../features/sinif";
-import { createFieldSizeResolver, type FieldSizeResolverFn } from "../features/history-source";
+import { createFieldSizeResolver, prefetchRecentFieldSizes, type FieldSizeResolverFn } from "../features/history-source";
 import {
   computePmzZeminUyumu,
   computePmzMesafeUyumu,
@@ -128,6 +128,9 @@ export async function buildFeatureVectorForRunner(
 ): Promise<RunnerFeatureVector> {
   const cache = runner.tjkAtId != null ? await db.horseRaceHistoryCache.findUnique({ where: { tjkAtId: runner.tjkAtId } }) : null;
   const rowsJson = cache?.rowsJson ?? [];
+  // RCA batch resolver varsa yakın geçmiş yarışlarını eşzamanlı kuyruğa al;
+  // FORM/SINIF/PMZ/JOKEY matematiği ve satır işleme sırası değişmez.
+  prefetchRecentFieldSizes(ctx.resolver, rowsJson, ctx.cutoff);
   const target: TargetRace = { date: ctx.cutoff, length: ctx.distance, surface: ctx.surface };
   const rivals = ctx.runners.filter((r) => r.no !== runner.no).map((r) => r.tjkAtId);
 
