@@ -43,7 +43,7 @@ describe("RAN paired pedigree RCA — rescue + new misses without winner-based f
   });
   it("rejects reuse of a validation race across folds",()=>{
     const f=buildWalkFolds(races());
-    f[1].validation.push(f[0].validation[0]);
+    f[1].validation.push(f[1].validation[0]);
     expect(()=>pairedPedigreeRca(f,{lambda:90,learningRate:.25,iterations:5}))
       .toThrow("REPEATED_RACE");
   });
