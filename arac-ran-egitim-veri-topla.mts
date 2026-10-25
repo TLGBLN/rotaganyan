@@ -8,6 +8,7 @@
 //
 // GUNCEL_MOTOR_BASLANGIC sonrası (2026-08-15+) sonuçlu yarışlar, kronolojik sırayla.
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import { db } from "./src/lib/db";
 import { GUNCEL_MOTOR_BASLANGIC } from "./src/server/services/admin.service";
 import { accuraceKosulari } from "./src/lib/accurace/loader";
@@ -23,6 +24,7 @@ const MAX_RETRY = 3;
 const DATE_FROM = process.env.RAN_DATE_FROM ?? null;
 const DATE_TO = process.env.RAN_DATE_TO ?? null;
 const DATASET_TAG = process.env.RAN_DATASET_TAG ?? null;
+const COHORT_PATH = process.env.RAN_COHORT_FILE ?? null;
 function parseDay(day: string | null, name: string): Date | null {
   if (!day) return null;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error(name + " must be YYYY-MM-DD");
@@ -70,7 +72,18 @@ async function main() {
     throw new Error("RAN_DATASET_TAG requires explicit RAN_DATE_FROM/TO, RAN_OUT and RAN_CHECKPOINT");
   }
   const stampPath = CHECKPOINT_PATH + ".source.json";
-  const stamp = DATASET_TAG ? JSON.stringify({tag:DATASET_TAG,from:DATE_FROM,to:DATE_TO,engine:"RAN_PIT_SIRE_SPEED_20261025"}) : null;
+  // Read only immutable cohort race IDs/dates. NEVER reuse its old feature vectors.
+  const originalCohortBytes = COHORT_PATH ? fs.readFileSync(COHORT_PATH,"utf8") : null;
+  const originalCohort = originalCohortBytes ? JSON.parse(originalCohortBytes) as
+    {raceId:string;tarih:string}[] : null;
+  if (originalCohort && (!Array.isArray(originalCohort) ||
+      originalCohort.length<20 ||
+      originalCohort.some(r=>!r || typeof r.raceId!=="string" || typeof r.tarih!=="string") ||
+      new Set(originalCohort.map(r=>r.raceId)).size!==originalCohort.length)) {
+    throw new Error("RAN_PIT_COHORT_INVALID: expected unique race IDs and dates in array");
+  }
+  const cohortSha=originalCohortBytes ? createHash("sha256").update(originalCohortBytes).digest("hex") : null;
+  const stamp = DATASET_TAG ? JSON.stringify({tag:DATASET_TAG,from:DATE_FROM,to:DATE_TO,cohortSha,engine:"RAN_PIT_SIRE_SPEED_20261025"}) : null;
   if (stamp) {
     if (fs.existsSync(CHECKPOINT_PATH) && !fs.existsSync(stampPath)) {
       throw new Error("RAN_PIT_UNSTAMPED_CHECKPOINT: will not replay old vectors from " + CHECKPOINT_PATH);
@@ -93,6 +106,15 @@ async function main() {
   });
   let eligible = races.filter((r) => r.runners.length >= 3);
   eligible.sort((a, b) => a.raceDay.date.getTime() - b.raceDay.date.getTime());
+  if (originalCohort) {
+    const expected=new Map(originalCohort.map(r=>[r.raceId,r.tarih]));
+    eligible=eligible.filter(r=>expected.has(r.id));
+    if (eligible.length!==expected.size ||
+        eligible.some(r=>r.raceDay.date.toISOString().slice(0,10)!==expected.get(r.id))) {
+      throw new Error("RAN_PIT_COHORT_MISMATCH: original train+dev 300 raceIds/dates must match; refuse silently different sample");
+    }
+  }
+  if (LIMIT && originalCohort) throw new Error("RAN_PIT_COHORT_DISALLOWS_LIMIT: requires all original races");
   if (LIMIT) eligible = eligible.slice(0, LIMIT);
   console.log(`Toplam ${eligible.length} uygun yarış (saha>=3, LIMIT=${LIMIT ?? "yok"}, tarih=${min.toISOString().slice(0,10)}..${DATE_TO ?? "acik"}).`);
 
