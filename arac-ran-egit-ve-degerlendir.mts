@@ -13,6 +13,9 @@
 // Gün-sınırlı (day-boundary) kronolojik TRAIN/HOLDOUT ayrımı: aynı günün yarışları AYNI
 // tarafta kalır (sızıntı önleme). μ/σ SADECE train bölümünden hesaplanır.
 import fs from "node:fs";
+import {createHash} from "node:crypto";
+import {PEDIGREE_V2_VERSION,assertPedigreeVersionAndProvenance}
+  from "./src/lib/rotaganyan-analiz-motoru/pedigree-v2/lineage-score";
 import { computeFeatureStats, fitModel, scoreRace, explainRunner, type FittedModel } from "./src/lib/motor-v1/engine/training";
 import { UNIFIED_MODEL_CODES } from "./src/lib/rotaganyan-analiz-motoru/unified-model-codes";
 import type { RunnerFeatureVector } from "./src/lib/motor-v1/engine/feature-vector";
@@ -20,6 +23,9 @@ import type { RunnerFeatureVector } from "./src/lib/motor-v1/engine/feature-vect
 type RanEgitimSatiri = { raceId: string; tarih: string; winnerNo: number | null; vectors: RunnerFeatureVector[] };
 
 const IN_PATH = process.env.RAN_IN ?? "C:/tmp/ran-egitim-verisi.json";
+const MODEL_VERSION=process.env.RAN_MODEL_VERSION ?? "RAN_36_LEGACY";
+if(MODEL_VERSION!=="RAN_36_LEGACY"&&MODEL_VERSION!==PEDIGREE_V2_VERSION)
+  throw new Error("RAN_MODEL_VERSION_UNSUPPORTED");
 const HOLDOUT_FRACTION = Number(process.env.RAN_HOLDOUT_FRACTION ?? "0.2");
 const OPTS = {
   lambda: Number(process.env.RAN_LAMBDA ?? "0.6"),
@@ -33,6 +39,14 @@ function loadRows(): Row[] {
   const raw: RanEgitimSatiri[] = JSON.parse(fs.readFileSync(IN_PATH, "utf8"));
   // checkpoint formatı (obje, raceId->satır) ile final-liste formatını (dizi) ikisini de kabul et
   const list = Array.isArray(raw) ? raw : Object.values(raw as unknown as Record<string, RanEgitimSatiri>);
+  if(MODEL_VERSION===PEDIGREE_V2_VERSION){
+    if(list.length!==300 ||
+       list.some(r=>(r as RanEgitimSatiri & {
+         pedigreeV2?:{version:string}
+       }).pedigreeV2?.version!==PEDIGREE_V2_VERSION))
+      throw new Error("RAN_PED_V2_MODEL_MUST_HAVE_300_VERIFIED_LINEAGE_ROWS");
+    list.forEach(r=>assertPedigreeVersionAndProvenance(PEDIGREE_V2_VERSION,r.vectors));
+  }
   return list
     .filter((r) => r.winnerNo != null && r.vectors.length >= 3)
     .map((r) => ({ ...r, date: new Date(r.tarih) }))
@@ -204,6 +218,9 @@ async function main() {
     JSON.stringify(
       {
         trainedAt: new Date().toISOString(),
+        engineVersion:MODEL_VERSION,
+        sourceDatasetSHA256:createHash("sha256").update(fs.readFileSync(IN_PATH)).digest("hex"),
+        publicationGate:"BLOCKED",
         opts: OPTS,
         splitDate,
         nTrainRaces: train.length,
