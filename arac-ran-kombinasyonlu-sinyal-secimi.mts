@@ -208,7 +208,29 @@ async function main(){
       "No source feature archive has independently verifiable as-of capture timestamps; live prospective parity unverified.",
     ],
   };
+  // Fit an entirely NEW shadow model with the selected feature subset using
+  // ALL 238 TRAIN races. Do not use any DEV/acceptance race for weights.
+  const finalStats=computeFeatureStats(rows.flatMap(r=>r.vectors),current.codes);
+  const finalModel=fitModel(rows.map(r=>({
+    raceId:r.raceId,date:new Date(r.tarih+"T00:00:00.000Z"),
+    winnerNo:r.winnerNo,vectors:r.vectors,
+  })),finalStats,{lambda:90,learningRate:0.25,iterations:2500});
+  if(finalModel.nRacesUsed!==238 || finalModel.nRacesSkipped!==0 ||
+     finalModel.beta.some(x=>!Number.isFinite(x)))
+    throw new Error("RAN_COMBO_FINAL_FIT_INCOMPLETE");
+  const shadowArtifact={
+    artifactType:"RAN_COMBINATORIAL_SHADOW_NOT_FOR_PUBLICATION",
+    status,publicationGate:"BLOCKED",provenanceGate:"NOT_VERIFIED",
+    trainRaces:238,devRacesUsed:0,acceptanceRacesUsed:0,
+    sourceHash:sha,selectionConfigHash:cfg,
+    codes:[...current.codes],names:finalModel.names,beta:finalModel.beta,
+    stats:[...finalModel.stats.entries()],
+    nRacesUsed:finalModel.nRacesUsed,nRacesSkipped:finalModel.nRacesSkipped,
+    opts:finalModel.opts,
+    warning:"Research candidate only. Never replace canonical ran-trained-model.json. No fresh untouched forward results.",
+  };
   saveAtomic(cpPath,state);
+  saveAtomic(PREFIX+".candidate-model.json",shadowArtifact);
   saveAtomic(PREFIX+".json",fullReport);
   const money= (r:CombinationResult)=>"Top1 "+r.top1Hits+"/"+r.n+" ("+(100*r.top1).toFixed(2)+"%); Top3 "+r.top3Hits+"/"+r.n+" ("+(100*r.top3).toFixed(2)+"%); LL "+r.logLoss.toFixed(5);
   fs.writeFileSync(PREFIX+".md",[
@@ -254,7 +276,7 @@ async function main(){
   console.log("[RAN_COMBO] D_ONLY "+money(dOnly));
   console.log("[RAN_COMBO] FULL_36 "+money(full));
   console.log("[RAN_COMBO] SELECTED "+current.codes.join(",")+" => "+money(current));
-  console.log("[RAN_COMBO] report="+PREFIX+".md + .json; original weights untouched");
+  console.log("[RAN_COMBO] report="+PREFIX+".md + .json + .candidate-model.json; original weights untouched");
 }
 main().catch(e=>{
   console.error("[RAN_COMBO] FAIL: "+(e instanceof Error?e.message:String(e)));
