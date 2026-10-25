@@ -38,27 +38,21 @@ function bundle(){
 }
 
 describe("RAN isolated immutable transaction",()=>{
-  const oldFlag=process.env.RAN_SHADOW_SNAPSHOT_WRITES;
-  const oldNode=process.env.NODE_ENV;
   beforeEach(()=>{
     mocked.upsert.mockReset();
     mocked.tx.mockReset();
     mocked.findUnique.mockReset();
+    vi.stubEnv("NODE_ENV","test");
+    vi.stubEnv("RAN_SHADOW_SNAPSHOT_WRITES", undefined);
   });
-  afterEach(()=>{
-    if(oldFlag===undefined) delete process.env.RAN_SHADOW_SNAPSHOT_WRITES;
-    else process.env.RAN_SHADOW_SNAPSHOT_WRITES=oldFlag;
-    if(oldNode===undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV=oldNode;
-  });
+  afterEach(()=>vi.unstubAllEnvs());
   it("write guard fails closed with no flag; no transaction is started",async()=>{
-    delete process.env.RAN_SHADOW_SNAPSHOT_WRITES;
+    vi.stubEnv("RAN_SHADOW_SNAPSHOT_WRITES", undefined);
     await expect(persistRanSnapshotBundle(bundle())).rejects.toThrow("RAN_SHADOW_WRITES_DISABLED");
     expect(mocked.tx).not.toHaveBeenCalled();
   });
   it("only explicitly isolated test writes use one idempotent upsert and immutable update={}",async()=>{
-    process.env.NODE_ENV="test";
-    process.env.RAN_SHADOW_SNAPSHOT_WRITES="isolated-test-only";
+    vi.stubEnv("RAN_SHADOW_SNAPSHOT_WRITES","isolated-test-only");
     const b=bundle();
     mocked.tx.mockImplementation(async(fn: (t:unknown)=>Promise<unknown>)=>
       fn({ranSnapshotBundle:{upsert:mocked.upsert}}));
