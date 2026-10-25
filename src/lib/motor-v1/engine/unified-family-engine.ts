@@ -14,7 +14,7 @@
 
 import { db } from "@/lib/db";
 import { buildFeatureVectorsForRace, type RunnerFeatureVector, type SignalEntry } from "./feature-vector";
-import { loadTempoContext } from "../features/tempo";
+import { loadTempoContext, type TempoContext } from "../features/tempo";
 import { computeGenPedigriForRace } from "../features/gen-pedigri";
 import { loadGalopPaceIndex, computeIdman01 } from "../features/idman-galop";
 import { computeJokeyTrend30 } from "../features/int-jokey-trend";
@@ -78,9 +78,12 @@ export function clearUnifiedFamiliesCache(): void {
 export async function computeUnifiedFamiliesForRace<C extends string = string>(
   raceId: string,
   fittedModel?: FittedModel<C>,
-  sharedFieldSizeResolver?: FieldSizeResolverFn
+  sharedFieldSizeResolver?: FieldSizeResolverFn,
+  suppliedTempoContext?: TempoContext
 ): Promise<UnifiedRunnerResult[]> {
-  if (fittedModel === undefined) {
+  // RCA, kendi frozen Accurace kaynaklı contextini verdiğinde raceId-only memoization
+  // kullanılamaz: başka tarihli arşivden kalmış sonuçla karışma riski olur.
+  if (fittedModel === undefined && suppliedTempoContext === undefined) {
     const cached = modellessResultCache.get(raceId);
     if (cached) return cached;
     const promise = computeUnifiedFamiliesForRaceUncached(raceId, undefined, sharedFieldSizeResolver);
@@ -89,13 +92,14 @@ export async function computeUnifiedFamiliesForRace<C extends string = string>(
     promise.catch(() => modellessResultCache.delete(raceId));
     return promise;
   }
-  return computeUnifiedFamiliesForRaceUncached(raceId, fittedModel, sharedFieldSizeResolver);
+  return computeUnifiedFamiliesForRaceUncached(raceId, fittedModel, sharedFieldSizeResolver, suppliedTempoContext);
 }
 
 async function computeUnifiedFamiliesForRaceUncached<C extends string = string>(
   raceId: string,
   fittedModel?: FittedModel<C>,
-  sharedFieldSizeResolver?: FieldSizeResolverFn
+  sharedFieldSizeResolver?: FieldSizeResolverFn,
+  suppliedTempoContext?: TempoContext
 ): Promise<UnifiedRunnerResult[]> {
   const race = await db.race.findUnique({
     where: { id: raceId },
@@ -113,7 +117,7 @@ async function computeUnifiedFamiliesForRaceUncached<C extends string = string>(
   const cutoff = race.raceDay.date;
   const davRaceKey = ortakYarisAnahtari(race.raceDay.hippodrome.name, `${String(cutoff.getUTCDate()).padStart(2,"0")}.${String(cutoff.getUTCMonth()+1).padStart(2,"0")}.${cutoff.getUTCFullYear()}`, String(race.raceNo));
 
-  const [tempoCtx, galopPaceIndex, pistCtxOrNull] = await Promise.all([loadTempoContext(), loadGalopPaceIndex(), loadPistDurumContext(raceId, sharedFieldSizeResolver)]);
+  const [tempoCtx, galopPaceIndex, pistCtxOrNull] = await Promise.all([suppliedTempoContext ?? loadTempoContext(), loadGalopPaceIndex(), loadPistDurumContext(raceId, sharedFieldSizeResolver)]);
   if (!pistCtxOrNull) return []; // race zaten yukarida dogrulandi, bu pratikte olusmaz
   const pistCtx = pistCtxOrNull;
   const safVectors = await buildFeatureVectorsForRace(raceId, tempoCtx, sharedFieldSizeResolver); // SAF 20 - hesaplama DEĞİŞTİRİLMEDİ
