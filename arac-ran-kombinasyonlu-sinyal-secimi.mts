@@ -1,0 +1,413 @@
+// RAN v1.0 — full 36 singles + 630 pairs + bounded multi-feature combination search.
+// Uses ONLY 238 PIT-recomputed TRAIN races, with 3 strictly chronological inner folds.
+// NEVER reads development=62, previous acceptance=60, DB, AGF or production artifacts.
+// Result is a DIAGNOSTIC/SHADOW model, NOT a deployable winner-tuned artifact.
+import fs from "node:fs";
+import { createHash } from "node:crypto";
+import { auditScoreInflation } from "./src/lib/rotaganyan-analiz-motoru/rca/score-inflation-audit";
+import { dirname } from "node:path";
+import { computeFeatureStats, fitModel } from "./src/lib/motor-v1/engine/training";
+import { UNIFIED_MODEL_CODES } from "./src/lib/rotaganyan-analiz-motoru/unified-model-codes";
+import { SIGNAL_SPECS } from "./src/lib/rotaganyan-analiz-motoru/signal-integration";
+import {
+  allPairs, buildWalkFolds, classifyPair, evaluateCombination, evaluatePairInteraction, rankCombination,
+  selectionKey, sourceAlternativeLimitations, validateTrainingOnly,
+  type CombinationResult, type PairResult, type FeatureRace,
+} from "./src/lib/rotaganyan-analiz-motoru/rca/combinatorial-signal-selection";
+
+const SOURCE=process.env.RAN_COMBO_DATA ?? "C:/tmp/ran-pit-20261025-train-dev.json";
+const PREFIX=process.env.RAN_COMBO_OUT ?? "C:/tmp/ran-pit-20261025-kombinasyon";
+const ITER=positiveInt("RAN_COMBO_ITERATIONS",500,5,2500);
+const WIDTH=positiveInt("RAN_COMBO_BEAM_WIDTH",4,1,12);
+const MAX_SIZE=positiveInt("RAN_COMBO_MAX_SIGNALS",10,3,36);
+const INTERACTION_MODE=process.env.RAN_COMBO_INTERACTIONS ?? "all";
+if(!["all","top50","off"].includes(INTERACTION_MODE))
+  throw new Error("RAN_COMBO_INTERACTIONS must be all, top50 or off");
+const opts={lambda:90,learningRate:0.25,iterations:ITER};
+const key=(codes:readonly string[])=>selectionKey(codes);
+type Checkpoint = {
+  schema:1;sourceHash:string;configHash:string;
+  results:Record<string,CombinationResult>;
+};
+function positiveInt(name:string,fallback:number,min:number,max:number) {
+  const n=Number(process.env[name]??fallback);
+  if(!Number.isSafeInteger(n)||n<min||n>max)throw new Error("RAN_COMBO_INVALID_OPTION "+name);
+  return n;
+}
+function saveAtomic(p:string,obj:unknown) {
+  fs.mkdirSync(dirname(p),{recursive:true});
+  const temp=p+".tmp-"+process.pid;
+  fs.writeFileSync(temp,JSON.stringify(obj,null,2));
+  fs.renameSync(temp,p);
+}
+function readData(): {rows:FeatureRace[];sha:string} {
+  const bytes=fs.readFileSync(SOURCE,"utf8");
+  const all:unknown=JSON.parse(bytes);
+  if(!Array.isArray(all) || all.length!==300)throw new Error("RAN_COMBO_ORIGINAL_300_REQUIRED");
+  const full=all as FeatureRace[];
+  const train=full.filter(r=>r.tarih>="2026-08-16"&&r.tarih<="2026-08-25")
+    .sort((a,b)=>a.tarih.localeCompare(b.tarih)||a.raceId.localeCompare(b.raceId));
+  const dev=full.filter(r=>r.tarih>="2026-08-26"&&r.tarih<="2026-08-28");
+  if(train.length!==238||dev.length!==62||new Set(all.map(x=>(x as FeatureRace)?.raceId)).size!==300)
+    throw new Error("RAN_COMBO_SPLIT_OR_DUPLICATE: only original 238/62 300-race set");
+  validateTrainingOnly(train);
+  return {rows:train,sha:createHash("sha256").update(bytes).digest("hex")};
+}
+function correlations(rows:readonly FeatureRace[],codes:readonly string[]) {
+  const r=rows.flatMap(x=>x.vectors),map=new Map<string,{rho:number,n:number}>();
+  for(const [a,b] of allPairs(codes)){
+    const xs:number[]=[],ys:number[]=[];
+    for(const v of r){
+      const aa=v.signals.find(s=>s.code===a),bb=v.signals.find(s=>s.code===b);
+      if(aa?.observed&&bb?.observed&&aa.rawValue!==null&&bb.rawValue!==null){
+        xs.push(aa.rawValue);ys.push(bb.rawValue);
+      }
+    }
+    if(xs.length<30)continue;
+    let sx=0,sy=0,sxx=0,syy=0,sxy=0;
+    for(let i=0;i<xs.length;i++){sx+=xs[i];sy+=ys[i];sxx+=xs[i]*xs[i];syy+=ys[i]*ys[i];sxy+=xs[i]*ys[i];}
+    const d=Math.sqrt(Math.max(0,xs.length*sxx-sx*sx)*Math.max(0,xs.length*syy-sy*sy));
+    if(d>1e-12){
+      const rho=(xs.length*sxy-sx*sy)/d;
+      map.set(key([a,b]),{rho,n:xs.length});
+    }
+  }
+  return map;
+}
+function compact(r:CombinationResult) {
+  return {codes:r.codes,top1:r.top1,top3:r.top3,top1Hits:r.top1Hits,top3Hits:r.top3Hits,
+    n:r.n,logLoss:r.logLoss,score:r.score,folds:r.foldResults.map(f=>({id:f.fold,top1Hits:f.top1Hits,top3Hits:f.top3Hits,n:f.n}))};
+}
+async function main(){
+  const {rows,sha}=readData();
+  const folds=buildWalkFolds(rows);
+  const optsString=JSON.stringify({schema:1,sha,opts,width:WIDTH,maxSize:MAX_SIZE,
+    interactionMode:INTERACTION_MODE,codes:UNIFIED_MODEL_CODES});
+  const cfg=createHash("sha256").update(optsString).digest("hex");
+  const cpPath=PREFIX+".checkpoint.json";
+  let state:Checkpoint;
+  if(fs.existsSync(cpPath)){
+    state=JSON.parse(fs.readFileSync(cpPath,"utf8")) as Checkpoint;
+    if(state.schema!==1||state.sourceHash!==sha||state.configHash!==cfg)
+      throw new Error("RAN_COMBO_CHECKPOINT_MISMATCH: choose a NEW RAN_COMBO_OUT; never combine results from different datasets/options");
+  }else state={schema:1,sourceHash:sha,configHash:cfg,results:{}};
+  console.log("[RAN_COMBO] PIT TRAIN=238, chronology=3 folds; 62 DEV and 60 acceptance NEVER read for selection.");
+  console.log("[RAN_COMBO] 36 singles + 630 exhaustive additive pairs + "+INTERACTION_MODE+
+    " multiplicative interactions + beam multi-feature search.");
+  console.log("[RAN_COMBO] iter="+ITER+" width="+WIDTH+" maxSize="+MAX_SIZE+" resume="+Object.keys(state.results).length+" saved. Publication=BLOCKED.");
+  const corr=correlations(rows,UNIFIED_MODEL_CODES);
+  let newly=0;
+  const evalCached=(codes:readonly string[])=>{
+    const id=key(codes),ex=state.results[id];
+    if(ex)return ex;
+    const result=evaluateCombination(folds,codes,opts);
+    state.results[id]=result;
+    newly++;
+    if(newly%20===0){
+      saveAtomic(cpPath,state);
+      console.log("[RAN_COMBO] complete="+Object.keys(state.results).length+" last="+id);
+    }
+    return result;
+  };
+  const all=UNIFIED_MODEL_CODES;
+  const singles=new Map(all.map(x=>[x,evalCached([x])]));
+  saveAtomic(cpPath,state);
+  console.log("[RAN_COMBO] singles=36 complete. Starting ALL 630 pair refits.");
+  const pairResults:PairResult[]=[];
+  for(const [a,b] of allPairs(all)){
+    const both=evalCached([a,b]);
+    const c=corr.get(key([a,b]));
+    const structural=([
+      "FIELD_WEIGHT_DELTA+WEIGHT_DISTANCE",
+      "FIELD_WEIGHT_DELTA+WEIGHT_HANDICAP",
+      "FORM_LEVEL+SURFACE_FORM",
+      "SPEED+RIVAL_GAP",
+      "SPEED+ACC_SPEED",
+      "JOCKEY_OE30+JOCKEY_TREND30",
+    ] as string[]).includes(key([a,b]))?"shared source / interaction (review)":null;
+    pairResults.push(classifyPair(both,singles.get(a)!,singles.get(b)!,
+      c!=null&&Math.abs(c.rho)>=0.80,structural));
+  }
+  saveAtomic(cpPath,state);
+  console.log("[RAN_COMBO] all 630 pairs complete. Testing ACTUAL zA*zB interactions (PIT fold normalization).");
+  const interactionPairs=INTERACTION_MODE==="off"?[]:
+    INTERACTION_MODE==="top50"?
+      pairResults.map(x=>x.pair).sort(rankCombination).slice(0,50).map(x=>x.codes):
+      allPairs(all);
+  const interactions: {a:string;b:string;additive:CombinationResult;interaction:CombinationResult;
+    deltaTop1:number;deltaTop3:number;deltaLogLoss:number;verdict:string}[]=[];
+  for(const codes of interactionPairs){
+    const [a,b]=codes,interactionId="INT:"+key([a,b]);
+    let interaction=state.results[interactionId];
+    if(!interaction){
+      interaction=evaluatePairInteraction(folds,a,b,opts);
+      state.results[interactionId]=interaction;
+      newly++;
+      if(newly%20===0){
+        saveAtomic(cpPath,state);
+        console.log("[RAN_COMBO] complete="+Object.keys(state.results).length+" interaction="+interactionId);
+      }
+    }
+    const additive=state.results[key([a,b])];
+    const deltaTop1=interaction.top1Hits-additive.top1Hits;
+    const deltaTop3=interaction.top3Hits-additive.top3Hits;
+    const deltaLogLoss=interaction.logLoss-additive.logLoss;
+    const better=(deltaTop1>=2||deltaTop3>=2) && deltaTop1>=-1 &&
+      deltaTop3>=-1 && deltaLogLoss<=0.035;
+    interactions.push({a,b,additive,interaction,deltaTop1,deltaTop3,deltaLogLoss,
+      verdict:better?"INTERACTION_RESEARCH_CANDIDATE":"NOT_CONFIRMED"});
+  }
+  saveAtomic(cpPath,state);
+  console.log("[RAN_COMBO] interactions="+interactions.length+" complete. Starting selected triple+ expansions.");
+  const allPairsRanked=pairResults.map(p=>p.pair).sort(rankCombination);
+  const v1=new Set(SIGNAL_SPECS.filter(s=>s.source==="V1" &&
+      (s.decision==="INCLUDE"||s.decision==="PRIMARY")).map(s=>s.canonical));
+  const d=new Set(SIGNAL_SPECS.filter(s=>s.source==="D" &&
+      (s.decision==="INCLUDE"||s.decision==="PRIMARY")).map(s=>s.canonical));
+  // Search over both D and V1 source groups; if no complement proves value,
+  // report no approved merged model rather than silently promoting a D-only win.
+  let beam=allPairsRanked.slice(0,WIDTH);
+  let best=beam[0];
+  let stagnant=0;
+  for(let size=3;size<=MAX_SIZE;size++){
+    const proposals=new Map<string,string[]>();
+    for(const parent of beam){
+      for(const code of all){
+        if(parent.codes.includes(code))continue;
+        const codes=all.filter(x=>parent.codes.includes(x)||x===code);
+        proposals.set(key(codes),codes);
+      }
+    }
+    const candidates=[...proposals.values()].map(evalCached).sort(rankCombination);
+    const next=candidates.slice(0,WIDTH);
+    if(next.length===0)break;
+    beam=next;
+    if(rankCombination(next[0],best)<0){best=next[0];stagnant=0;}
+    else stagnant++;
+    console.log("[RAN_COMBO] beam size="+size+" winner="+best.id+
+      " Top1="+best.top1Hits+"/"+best.n+" Top3="+best.top3Hits+"/"+best.n+
+      " patience="+stagnant);
+    saveAtomic(cpPath,state);
+    if(stagnant>=2)break;
+  }
+  // Search local replacements: weaker overlapping features can be SWAPPED OUT.
+  let current=best;
+  for(let iter=0;iter<2;iter++){
+    const alternatives=new Map<string,string[]>();
+    for(const drop of current.codes){
+      for(const incoming of all){
+        if(current.codes.includes(incoming))continue;
+        const codes=all.filter(x=>x!==drop&&(current.codes.includes(x)||x===incoming));
+        alternatives.set(key(codes),codes);
+      }
+    }
+    if(alternatives.size===0)break;
+    const next=[...alternatives.values()].map(evalCached).sort(rankCombination)[0];
+    if(!next || rankCombination(next,current)>=0)break;
+    current=next;
+    console.log("[RAN_COMBO] localSWAP winner="+current.id+" Top1="+current.top1Hits+" Top3="+current.top3Hits);
+    saveAtomic(cpPath,state);
+  }
+  // Actual redundancy elimination IN THE SELECTED CONTEXT:
+  // removing a weaker feature must preserve BOTH winner metrics and not spoil
+  // logloss materially. This prevents keeping copies solely for being present.
+  let pruned=0;
+  while(current.codes.length>2){
+    const removals=current.codes.map(drop=>{
+      const codes=all.filter(x=>current.codes.includes(x) && x!==drop);
+      return {drop,result:evalCached(codes)};
+    }).filter(x=>
+      x.result.top1Hits>=current.top1Hits &&
+      x.result.top3Hits>=current.top3Hits &&
+      x.result.logLoss<=current.logLoss+0.01 &&
+      rankCombination(x.result,current)<0).sort((a,b)=>rankCombination(a.result,b.result));
+    if(removals.length===0)break;
+    current=removals[0].result;
+    pruned++;
+    console.log("[RAN_COMBO] REMOVE_REDUNDANT "+removals[0].drop+
+      " => selectedSize="+current.codes.length+" Top1="+current.top1Hits+" Top3="+current.top3Hits);
+    saveAtomic(cpPath,state);
+  }
+  // Refit the SHORTLIST at the original full 2500 iterations. Pair rankings
+  // from fast 500-iteration search are screening-only, NOT final evidence.
+  const fastSelected=current;
+  const fastPairs=pairResults.map(p=>p.pair).sort(rankCombination);
+  const bestCrossPair=fastPairs.find(r=>
+    r.codes.some(x=>d.has(x))&&r.codes.some(x=>v1.has(x)));
+  const shortlistInput=[
+    fastSelected,best, ...(bestCrossPair?[bestCrossPair]:[]),
+    ...fastPairs.slice(0,6),
+    ...Object.values(state.results).filter(x=>!x.id.startsWith("INT:"))
+      .sort(rankCombination).slice(0,8),
+  ];
+  const shortlist=new Map<string,string[]>();
+  for(const r of shortlistInput)shortlist.set(key(r.codes),r.codes);
+  for(const codes of [all,all.filter(x=>d.has(x)),all.filter(x=>v1.has(x))])
+    shortlist.set(key(codes),codes);
+  console.log("[RAN_COMBO] Final confirmation: "+shortlist.size+" candidates x 3 folds with 2500 iterations.");
+  const confirmed=[...shortlist.values()].map(codes=>
+    evaluateCombination(folds,codes,{lambda:90,learningRate:0.25,iterations:2500}));
+  const confirmedMap=new Map(confirmed.map(x=>[key(x.codes),x]));
+  const dOnly=confirmedMap.get(key(all.filter(x=>d.has(x))))!;
+  const v1Only=confirmedMap.get(key(all.filter(x=>v1.has(x))))!;
+  const full=confirmedMap.get(key(all))!;
+  const mixed=confirmed.filter(r=>
+    r.codes.some(x=>d.has(x))&&r.codes.some(x=>v1.has(x))).sort(rankCombination);
+  if(mixed.length===0)throw new Error("RAN_COMBO_NO_MIXED_CONFIRMATION");
+  current=mixed[0];
+  const joint=true;
+  // Inner-fold selection is only a candidate, never a released motor.
+  const improvesD=joint && current.top1Hits>=dOnly.top1Hits &&
+    current.top3Hits>=dOnly.top3Hits && current.logLoss<=dOnly.logLoss+0.02 &&
+    (current.top1Hits>dOnly.top1Hits || current.top3Hits>dOnly.top3Hits ||
+     current.logLoss<dOnly.logLoss-0.01);
+  const status=improvesD?"COMBINED_RESEARCH_CANDIDATE":"NO_VERIFIED_D_V1_COMPLEMENT";
+  // Independent of ranking and softmax-sum checks: diagnose false-certainty,
+  // extreme standardized evidence and favorite calibration in EXACT SAME folds.
+  const confidenceOpts={lambda:90,learningRate:0.25,iterations:2500};
+  const scoreInflation={
+    selected:auditScoreInflation(folds,current.codes,confidenceOpts),
+    dOnly:auditScoreInflation(folds,dOnly.codes,confidenceOpts),
+    full36:auditScoreInflation(folds,full.codes,confidenceOpts),
+  };
+  console.log("[RAN_SCORE_AUDIT] selected meanFavorite="+
+    scoreInflation.selected.meanFavouriteProbability.toFixed(4)+
+    " actualTop1="+scoreInflation.selected.realizedTop1Rate.toFixed(4)+
+    " ECE="+scoreInflation.selected.ece.toFixed(4)+
+    " wrong80="+scoreInflation.selected.highConfidence80.incorrect+
+    " extremeZ="+scoreInflation.selected.extremeRawZ.absZAbove4);
+  const pairTable=pairResults.map(p=>({
+    a:p.a,b:p.b,correlation:corr.get(key([p.a,p.b]))??null,
+    stronger:p.stronger,weaker:p.weaker,status:p.status,
+    bothVersusBest:p.bothVersusBest,metrics:compact(p.pair),
+  })).sort((a,b)=>rankCombination(state.results[key([a.a,a.b])],state.results[key([b.a,b.b])]));
+  const fullReport={
+    reportVersion:1,source:SOURCE,sourceHash:sha,trainingRaces:238,developmentUsedForSelection:0,
+    acceptanceUsedForSelection:0,trainRange:["2026-08-16","2026-08-25"],
+    fitOptions:opts,confirmationFitOptions:{lambda:90,learningRate:0.25,iterations:2500},
+    screeningBest:compact(fastSelected),confirmedShortlist:confirmed.sort(rankCombination).map(compact),
+    innerFolds:folds.map(f=>({id:f.id,train:f.train.length,validation:f.validation.length,
+      trainEnd:f.train[f.train.length-1]?.tarih,validationStart:f.validation[0]?.tarih})),
+    objective:"2*Top1 + Top3 - 0.12*LogLoss - 0.003*featureCount; includes 3 chronological folds; research-only",
+    singleCount:singles.size,pairCount:pairTable.length,totalRefits:Object.keys(state.results).length,
+    contextPrunedSignalCount:pruned,
+    singles:[...singles.values()].sort(rankCombination).map(compact),
+    pairs:pairTable, highCorrelation:pairTable.filter(p=>p.correlation&&Math.abs(p.correlation.rho)>=0.8),
+    interactionsMode:INTERACTION_MODE,interactionTrials:interactions.length,
+    interactionResults:interactions.map(x=>({a:x.a,b:x.b,deltaTop1:x.deltaTop1,
+      deltaTop3:x.deltaTop3,deltaLogLoss:x.deltaLogLoss,verdict:x.verdict,
+      additive:compact(x.additive),withProduct:compact(x.interaction)}))
+      .sort((a,b)=>b.deltaTop1-a.deltaTop1||b.deltaTop3-a.deltaTop3||a.deltaLogLoss-b.deltaLogLoss),
+    full36:compact(full),dOnly:compact(dOnly),v1Only:compact(v1Only),
+    scoreInflation,
+    selected:compact(current),sourceMix:{d:current.codes.filter(x=>d.has(x)),v1:current.codes.filter(x=>v1.has(x))},
+    combinedGate:status,publicationGate:"BLOCKED",evidence:"INTERNAL_WALK_FORWARD_DIAGNOSTIC_ONLY",
+    unavailableSignals:sourceAlternativeLimitations(),blockedReasons:[
+      "Source roster contains alternatives/blocked formulas not present in the 36-signal JSON; do not claim evaluated.",
+      "All selections are made on chronological inner TRAIN folds, but reusing these folds for beam search risks overfitting.",
+      "August DEV-62 and previous October acceptance-60 have been inspected; neither is a fresh untouched publication test.",
+      "No source feature archive has independently verifiable as-of capture timestamps; live prospective parity unverified.",
+      "Multiplicative interaction candidates are separately diagnosed; they are NOT silently added to the fitted additive shadow model or the production feature calculator.",
+      "Raw logit score has no bounded absolute scale. Softmax normalization does NOT prove forecast calibration. Treat 80/90% incorrect favorites and extreme standardized features as risk flags.",
+      "The 2500-iteration re-fit uses the SAME internal folds used for search: selection bias remains. New unseen prospective races are required for publication approval.",
+    ],
+  };
+  // Fit an entirely NEW shadow model with the selected feature subset using
+  // ALL 238 TRAIN races. Do not use any DEV/acceptance race for weights.
+  const finalStats=computeFeatureStats(rows.flatMap(r=>r.vectors),current.codes);
+  const finalModel=fitModel(rows.map(r=>({
+    raceId:r.raceId,date:new Date(r.tarih+"T00:00:00.000Z"),
+    winnerNo:r.winnerNo,vectors:r.vectors,
+  })),finalStats,{lambda:90,learningRate:0.25,iterations:2500});
+  if(finalModel.nRacesUsed!==238 || finalModel.nRacesSkipped!==0 ||
+     finalModel.beta.some(x=>!Number.isFinite(x)))
+    throw new Error("RAN_COMBO_FINAL_FIT_INCOMPLETE");
+  const shadowArtifact={
+    artifactType:"RAN_COMBINATORIAL_SHADOW_NOT_FOR_PUBLICATION",
+    status,publicationGate:"BLOCKED",provenanceGate:"NOT_VERIFIED",
+    trainRaces:238,devRacesUsed:0,acceptanceRacesUsed:0,
+    sourceHash:sha,selectionConfigHash:cfg,
+    codes:[...current.codes],names:finalModel.names,beta:finalModel.beta,
+    stats:[...finalModel.stats.entries()],
+    nRacesUsed:finalModel.nRacesUsed,nRacesSkipped:finalModel.nRacesSkipped,
+    opts:finalModel.opts,
+    warning:"Research candidate only. Never replace canonical ran-trained-model.json. No fresh untouched forward results.",
+  };
+  saveAtomic(cpPath,state);
+  saveAtomic(PREFIX+".candidate-model.json",shadowArtifact);
+  saveAtomic(PREFIX+".json",fullReport);
+  const money= (r:CombinationResult)=>"Top1 "+r.top1Hits+"/"+r.n+" ("+(100*r.top1).toFixed(2)+"%); Top3 "+r.top3Hits+"/"+r.n+" ("+(100*r.top3).toFixed(2)+"%); LL "+r.logLoss.toFixed(5);
+  fs.writeFileSync(PREFIX+".md",[
+    "# RAN v1.0 — Her sinyal + tüm ikili + çoklu kombinasyon denetimi",
+    "",
+    "**Yayın: BLOCKED.** Bu yalnız iç kronolojik seçim taramasıdır.",
+    "",
+    "Kaynak: "+SOURCE,
+    "SHA256: "+sha,
+    "Eğitim: 238 yarış. Seçimde kullanılan DEV: 0; eski kabul: 0.",
+    "Üç kronolojik katlama, eğitim geçmişi daima doğrulama tarihinden önce.",
+    "",
+    "## Çapraz kaynak karşılaştırması (tam 2.500 iterasyonla doğrulanan kısa liste)",
+    "- Hızlı tarama adayı: "+fastSelected.codes.join(", "),
+    "- Tam eğitimli kısa liste adedi: "+confirmed.length,
+    "- Screening iterasyonları: "+ITER+" (yayın kanıtı değildir); onay iterasyonları: 2500.",
+    "- D sinyalleri: "+money(dOnly),
+    "- V1 sinyalleri: "+money(v1Only),
+    "- 36'lı birleşik: "+money(full),
+    "- Kombinasyon araması: "+money(current),
+    "- Karar: "+status,
+    "- Seçilen (yalnız aday) "+current.codes.length+" sinyal: "+current.codes.join(", "),
+    "",
+    "## Yüksek örtüşmeli çiftler (silme kararı DEĞİL)",
+    "| A | B | Pearson | Daha güçlü tekli | İkilinin ek TOP1 | İkilinin ek TOP3 | Karar |",
+    "|---|---|---:|---|---:|---:|---|",
+    ...pairTable.filter(x=>x.correlation&&Math.abs(x.correlation.rho)>=0.8).map(p=>
+      "| "+p.a+" | "+p.b+" | "+p.correlation!.rho.toFixed(3)+
+      " | "+p.stronger+" | "+p.bothVersusBest.top1Hits+" | "+p.bothVersusBest.top3Hits+" | "+p.status+" |"),
+    "",
+    "## Şişirilmiş skor / sahte kesinlik denetimi",
+    "- En yüksek aday favori olasılığı: "+(scoreInflation.selected.highestFavouriteProbability*100).toFixed(2)+"%",
+    "- Ortalama favori olasılığı: "+(scoreInflation.selected.meanFavouriteProbability*100).toFixed(2)+"%; gerçek TOP1: "+(scoreInflation.selected.realizedTop1Rate*100).toFixed(2)+"%",
+    "- Favoride aşırı iyimserlik farkı: "+(scoreInflation.selected.overconfidenceGap*100).toFixed(2)+" yüzde puanı",
+    "- TOP1 kalibrasyon ECE: "+(scoreInflation.selected.ece*100).toFixed(2)+"%",
+    "- >=80% güvenle yanlış favori: "+scoreInflation.selected.highConfidence80.incorrect+"/"+scoreInflation.selected.highConfidence80.races,
+    "- >=90% güvenle yanlış favori: "+scoreInflation.selected.highConfidence90.incorrect+"/"+scoreInflation.selected.highConfidence90.races,
+    "- >4σ uç ana özellik gözlemi: "+scoreInflation.selected.extremeRawZ.absZAbove4+"/"+scoreInflation.selected.extremeRawZ.observed,
+    "- En büyük ham skor farkı: "+scoreInflation.selected.highMargin.maxScoreGap.toFixed(4),
+    ...scoreInflation.selected.warnings.map(x=>"- UYARI: "+x),
+    "",
+    "## Gerçek çarpımsal etkileşim denemeleri",
+    "İkili sinyalleri birlikte kullanmaktan AYRI olarak zA × zB terimi öğrenildi; z değerleri yalnız ilgili katlamanın geçmiş eğitim yarışlarından.",
+    "Denenen etkileşim: "+interactions.length+" / 630. Bu terimler gölge modelin içine sessizce eklenmez.",
+    "| A | B | ΔTop1 | ΔTop3 | ΔLogLoss | Karar |",
+    "|---|---|---:|---:|---:|---|",
+    ...interactions.filter(x=>x.verdict==="INTERACTION_RESEARCH_CANDIDATE")
+      .sort((a,b)=>b.deltaTop1-a.deltaTop1||b.deltaTop3-a.deltaTop3||a.deltaLogLoss-b.deltaLogLoss)
+      .slice(0,40).map(x=>"| "+x.a+" | "+x.b+" | "+x.deltaTop1+" | "+x.deltaTop3+
+        " | "+x.deltaLogLoss.toFixed(5)+" | "+x.verdict+" |"),
+    "",
+    "## Tüm tekli deneyler (iç kronolojik doğrulama)",
+    "| Sinyal | TOP1 | TOP3 | LogLoss |",
+    "|---|---:|---:|---:|",
+    ...[...singles.values()].sort(rankCombination).map(r=>
+      "| "+r.codes[0]+" | "+r.top1Hits+"/"+r.n+" | "+r.top3Hits+"/"+r.n+" | "+r.logLoss.toFixed(4)+" |"),
+    "",
+    "## Eksik alternatifler / kısıtlar",
+    ...fullReport.blockedReasons.map(x=>"- "+x),
+    "",
+    "Tüm 630 çiftin detayları JSON raporunda. 2^36 kombinasyonun tamamını denemek pratik değildir;",
+    "tüm ikililerden sonra üst kombinasyonlar beam + çıkarma/yerine koyma ile araştırıldı.",
+    "Bu tarama yeni motoru otomatik yayına almaz veya kanonik model dosyasını değiştirmez.",
+  ].join("\n")+"\n");
+  console.log("[RAN_COMBO] COMPLETE singles="+singles.size+" pairs="+pairTable.length+
+    " interactions="+interactions.length+
+    " refits="+Object.keys(state.results).length+" gate="+status+" publication=BLOCKED");
+  console.log("[RAN_COMBO] D_ONLY "+money(dOnly));
+  console.log("[RAN_COMBO] FULL_36 "+money(full));
+  console.log("[RAN_COMBO] SELECTED "+current.codes.join(",")+" => "+money(current));
+  console.log("[RAN_COMBO] report="+PREFIX+".md + .json + .candidate-model.json; original weights untouched");
+}
+main().catch(e=>{
+  console.error("[RAN_COMBO] FAIL: "+(e instanceof Error?e.message:String(e)));
+  process.exitCode=1;
+});
