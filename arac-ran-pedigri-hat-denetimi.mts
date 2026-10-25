@@ -37,15 +37,16 @@ function main(){
     "# ROTAGANYAN — SIRE / DAM / DAMSIRE ayrı ve kombinasyonlu denetim",
     "","**Yayın: BLOCKED.** 238 PIT yarışının 3 kronolojik iç katlaması. 62 DEV ve 60 kabul yarışının kazananları kullanılmadı.",
     "Kaynak SHA256: "+sha,"","## Mevcut pedigree sinyallerinin gerçekte gözlenen kapsamı",
-    "| Soy | Gözlem | Kapsam | 0% ham | 100% ham | Açıklama |",
-    "|---|---:|---:|---:|---:|---|",
+    "| Soy | Gözlem | Kapsam | n-start bilinen | <=2 start | 0% ham | 100% ham | Açıklama |",
+    "|---|---:|---:|---:|---:|---:|---:|---|",
     ...result.lineCoverage.map(x=>"| "+x.code+" | "+x.observed+"/"+x.runnerCount+
-      " | "+(100*x.observedFraction).toFixed(1)+"% | "+x.rawZeroCount+
+      " | "+(100*x.observedFraction).toFixed(1)+"% | "+x.documentedStartSamples+
+      " | "+x.observedWithAtMost2Starts+" | "+x.rawZeroCount+
       " | "+x.rawHundredCount+" | "+x.caveat+" |"),
     "","## Tam 3 hat ve ikili/tekli alt kümelerin 4 bağlamda karşılaştırması",
   ];
-  for(const context of Object.keys(result.grouped.map(x=>x.context).reduce((a,x)=>({...a,[x]:true}),{} as Record<string,boolean>))){
-    const group=result.grouped.find(x=>x.context===context)!;
+  for(const group of result.grouped){
+    const context=group.context;
     lines.push("### "+context,"",
       "Soy hatları YOK: "+summary(group.noPedigree),
       "Üç soy hattı BİRLİKTE: "+summary(group.allThree),
@@ -62,7 +63,7 @@ function main(){
         " | "+x.relativeToNoPedigree.top3Hits+" |"),"");
   }
   lines.push("## Güvenlik notları",...result.warnings.map(x=>"- "+x),"",
-    "**Önemli:** Mevcut PIT JSON ham DAM/DAMSIRE başarı yüzdesinin dayandığı start sayısını saklamıyor.",
+    "**Önemli:** 25 Ekim'de toplanan mevcut PIT JSON, DAM/DAMSIRE başarı yüzdesinin dayandığı start sayısını saklamıyor. Sonraki yeni PIT vektörlerinde metadata korunacak; eski dosyada mevcut DEĞİL.",
     "Bu nedenle soy hattı yüzdesi güvenilirlik katsayısı değil; gerçek n-start yeniden üretilmeden güvenli soy düzeltmesi tamamlanamaz.",
     "DI/CD, genetik test, linebreeding verisi üretildiği iddia edilmemiştir.");
   fs.writeFileSync(prefix+".md",lines.join("\n")+"\n");
