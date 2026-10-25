@@ -65,7 +65,7 @@ export function lineagesAsOf(
     }),
   ]));
 }
-let archivePromise:ReturnType<typeof fetchPedigreeArchive>|null=null;
+let archivePromise:Promise<LineageHistoricRun[]>|null=null;
 function fetchPedigreeArchive(){
   return db.runner.findMany({
     where:{
@@ -96,16 +96,15 @@ export async function getThreeLineagePedigreeForRace(raceId:string):Promise<{
     },
   });
   if(!race)throw new Error("RAN_PED_V2_TARGET_RACE_MISSING");
-  if(!archivePromise)archivePromise=fetchPedigreeArchive();
-  const all=await archivePromise;
-  const target={cutoff:race.raceDay.date,breed:race.breed,
-    surface:race.surface,distance:race.distance,horses:race.runners};
-  const rows:LineageHistoricRun[]=all.map(r=>({
+  if(!archivePromise)archivePromise=fetchPedigreeArchive().then(all=>all.map(r=>({
     date:r.race.raceDay.date,breed:r.race.breed,surface:r.race.surface,
     distance:r.race.distance,sire:r.sire,dam:r.dam,damSire:r.damSire,
     tjkAtId:r.tjkAtId,no:r.no,actualOrder:r.race.result?.actualOrder??null,
     winnerNos:r.race.result?.winnerNos??null,
-  }));
+  })));
+  const rows=await archivePromise;
+  const target={cutoff:race.raceDay.date,breed:race.breed,
+    surface:race.surface,distance:race.distance,horses:race.runners};
   return {horses:race.runners,cutoff:race.raceDay.date,
     lineages:lineagesAsOf(target,rows)};
 }
