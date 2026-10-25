@@ -5,14 +5,26 @@
 // training.ts::scoreRace/explainRunner (AYNI paylasilan fonksiyonlar) ile puanlama.
 import fs from "node:fs";
 import { scoreRace, type FittedModel } from "./src/lib/motor-v1/engine/training";
+import { loadTrainedModel } from "./src/lib/rotaganyan-analiz-motoru/load-trained-model";
 import type { RunnerFeatureVector } from "./src/lib/motor-v1/engine/feature-vector";
 
 type RanEgitimSatiri = { raceId: string; tarih: string; winnerNo: number | null; vectors: RunnerFeatureVector[] };
 
-const MODEL_PATH = process.env.RAN_MODEL ?? "C:/tmp/ran-trained-model-FINAL.json";
+// DÜZELTME (2026-10-25): bu script'in ESKİ varsayılanı C:/tmp/ran-trained-model-FINAL.json'a
+// (93 yarış/λ=60, yanıltıcı "FINAL" adlı KÜÇÜK ÖRNEKLEM) SESSİZCE düşüyordu — kullanıcı
+// talimatı madde 2/4: bu artık YASAK. RAN_MODEL verilmezse, repodaki TEK canonical artifact
+// (artifacts/ran-trained-model.json, loadTrainedModel() — engineVersion/codes/fingerprint
+// doğrulamalı, kendi içinde THROW eder) kullanılır. RAN_MODEL AÇIKÇA verilirse (ad-hoc
+// diagnostic/lambda-sweep dosyaları için) o ham dosya okunur — bu YALNIZ diagnostic amaçlı,
+// loadTrainedModel()'in disiplinine tabi DEĞİLDİR.
+const MODEL_PATH = process.env.RAN_MODEL ?? null;
 const DATA_PATH = process.env.RAN_ACCEPT_DATA ?? "C:/tmp/ran-egitim-verisi-SON-checkpoint.json";
 
 function loadModel(): FittedModel<string> {
+  if (MODEL_PATH == null) {
+    console.log("RAN_MODEL verilmedi → repodaki TEK canonical artifact kullanılıyor: src/lib/rotaganyan-analiz-motoru/artifacts/ran-trained-model.json (loadTrainedModel()).");
+    return loadTrainedModel();
+  }
   const saved = JSON.parse(fs.readFileSync(MODEL_PATH, "utf8"));
   const stats = new Map<string, { mu: number; sigma: number; nObserved: number }>(saved.model.stats);
   return { beta: saved.model.beta, names: saved.model.names, stats, nRacesUsed: saved.model.nRacesUsed, nRacesSkipped: saved.model.nRacesSkipped, opts: saved.opts };
@@ -28,7 +40,7 @@ function main() {
   const model = loadModel();
   const rows = loadRows();
   rows.sort((a, b) => (a.tarih < b.tarih ? -1 : a.tarih > b.tarih ? 1 : 0));
-  console.log(`Model: ${MODEL_PATH} (trainedAt bilgisi hariç — eğitimde ${model.nRacesUsed} yarış kullanıldı)`);
+  console.log(`Model: ${MODEL_PATH ?? "repo canonical artifact (artifacts/ran-trained-model.json)"} (eğitimde ${model.nRacesUsed} yarış kullanıldı)`);
   console.log(`Bağımsız kabul seti: ${DATA_PATH} — ${rows.length} yarış, tarih aralığı ${rows[0]?.tarih}..${rows[rows.length - 1]?.tarih}`);
   console.log(`(Bu yarışların HİÇBİRİ modelin eğitiminde veya lambda/dev-holdout seçiminde kullanılmadı.)\n`);
 

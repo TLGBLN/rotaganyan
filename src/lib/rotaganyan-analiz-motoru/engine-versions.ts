@@ -15,26 +15,32 @@
 //  2) ileride (route bağlanınca) Prediction/Pick'e yazılacak `engineVersion` string'inin
 //     KAYNAĞI budur — elle farklı bir string yazılmaz.
 //
+// DÜZELTME (2026-10-25, PR#12 ağırlık-sabitleme turu): bu dosyanın ÖNCEKİ hali (commit
+// 93c77cc) YANLIŞ modele (C:/tmp/ran-trained-model-FINAL.json, 93 yarış/λ=60 — küçük
+// örneklem, dosya adı yanıltıcı şekilde "FINAL") işaret ediyordu. GERÇEKTEN kabul edilen
+// model 238 yarışla/λ=90 ile eğitilen, bağımsız kabul testinde (n=60, 2026-10-22/24,
+// eğitimden TAMAMEN ayrı) Top-1=%35.0/Top-3=%66.7/Top-6=%90.0/LogLoss=1.879 veren modeldir
+// (C:/tmp/ran-trained-model.json — kullanıcının KABUL ETTİĞİ rakamlar, 2026-10-25). Bu
+// dosyadaki tüm sayılar o doğru modele göre DÜZELTİLDİ ve artık git-tracked artifact'tan
+// (artifacts/ran-trained-model.json, bkz. load-trained-model.ts) GERÇEKTEN taşınıyor —
+// ağırlıkların KENDİSİ artık repoda, yalnız meta bilgi DEĞİL.
+//
 // Gerçek sayılar NEREDEN geliyor (uydurulmadı):
-//  - trainedAt/lambda/learningRate/iterations/nTrainRaces/nHoldoutRaces/holdoutMetrics:
-//    arac-ran-egit-ve-degerlendir.mts'in GERÇEK çalıştırılmış çıktısı, C:/tmp/ran-trained-
-//    model-FINAL.json (2026-10-24T20:10:49.168Z, lambda=60 dev-holdout taramasıyla seçildi —
-//    bkz. RAN_LAMBDA_SWEEP notu aşağıda).
+//  - trainedAt/lambda/learningRate/iterations/nTrainRaces/nHoldoutRaces/splitDate:
+//    arac-ran-egit-ve-degerlendir.mts'in GERÇEK çalıştırılmış çıktısı (RAN_LAMBDA=90,
+//    RAN_IN=C:/tmp/ran-egitim-verisi.json, 300 yarış → gün-sınırlı ayrım: train=238
+//    (2026-08-16..2026-08-25), dev-holdout=62 (2026-08-26..2026-08-28), λ seçimi için) —
+//    bu oturumda BİT-BİREBİR YENİDEN ÜRETİLDİ (aynı beta/names/stats, bkz. teslim raporu).
 //  - acceptance test (n=60, hiç eğitim/λ-seçiminde kullanılmamış, kronolojik olarak DAHA
 //    SONRAKİ 2026-10-22/24 tarihli yarışlar): arac-ran-bagimsiz-kabul-testi.mts BU OTURUMDA
-//    GERÇEKTEN YENİDEN ÇALIŞTIRILDI — çıktı: Top-1=%41.7, Top-3=%68.3, Top-6=%86.7,
-//    LogLoss=1.8840 (n=60, 2026-10-22..2026-10-24, aynı model+aynı veri dosyaları).
-//    ⚠ UYARI (teslim raporunda DETAYLANDIRILDI): bu rakamlar, bu görevin başında bildirilen
-//    "%35.0/%66.7/%90.0/1.879" rakamlarıyla BİREBİR EŞLEŞMİYOR — aynı script+aynı model
-//    dosyası (C:/tmp/ran-trained-model-FINAL.json) + aynı veri dosyası (C:/tmp/ran-egitim-
-//    verisi-SON-checkpoint.json) kullanıldı, değişen HİÇBİR KOD YOK. Kök neden bu oturumda
-//    ARAŞTIRILMADI (performans fazı KAPALI — görev kapsamı DEĞİL), yalnız bu tutarsızlık
-//    FACT olarak kayda geçirilir. Buradaki sayılar bu oturumda GERÇEKTEN ÖLÇÜLEN,
-//    doğrulanabilir sayılardır (uydurma yok).
-//  - weightsFingerprintAtAcceptance: computeWeightsFingerprint(FINAL model) — bu oturumda
-//    gerçekten hesaplandı (bkz. teslim raporu), DEĞİŞMEZ bir referans değer olarak buraya
-//    damgalandı. Trained model'in KENDİSİ (beta/stats JSON'u) bu dosyada TAŞINMAZ — henüz
-//    repoya commit edilmiş bir ağırlık artifact'ı YOK (bkz. teslim raporu "kalan işler").
+//    GERÇEKTEN ÇALIŞTIRILDI (RAN_MODEL=C:/tmp/ran-trained-model.json) — çıktı: Top-1=%35.0,
+//    Top-3=%66.7, Top-6=%90.0, LogLoss=1.8794 (yuvarlanmış: 1.879) — görev başında bildirilen
+//    rakamlarla BİREBİR EŞLEŞTİ.
+//  - weightsFingerprintAtAcceptance: computeWeightsFingerprint(doğru model: beta+names,
+//    artifacts/ran-trained-model.json'dan) — bu oturumda gerçekten hesaplandı. NOT: bu,
+//    load-trained-model.ts::computeArtifactFingerprint'ten (codes+names+beta+muSigma
+//    kapsar, "dosya bozulmadı mı" sorusu için) FARKLI bir hash — ikisi KARIŞTIRILMAMALI,
+//    bu alan yalnız snapshot-integrity.ts'in STALE kontrolü için (beta+names drift).
 
 import { UNIFIED_MODEL_CODES } from "./feature-calculators/unified-feature-vector";
 
@@ -65,9 +71,8 @@ export type RanEngineVersionTanimi = {
     dSinyalSayisi: number;
     v1SinyalSayisi: number;
   };
-  /** FINAL modelin (C:/tmp/ran-trained-model-FINAL.json) computeWeightsFingerprint çıktısı —
-   *  snapshot-integrity.ts'in STALE kontrolü BU değerle KARŞILAŞTIRILIR (gerçek ağırlık
-   *  dosyası repoya commit edilip canlıya alınınca). */
+  /** Doğru modelin (artifacts/ran-trained-model.json, 238 yarış/λ=90) computeWeightsFingerprint
+   *  çıktısı (beta+names) — snapshot-integrity.ts'in STALE kontrolü BU değerle KARŞILAŞTIRILIR. */
   weightsFingerprintAtAcceptance: string;
   aciklama: string;
 };
@@ -76,34 +81,36 @@ export const RAN_ENGINE_VERSIONS: RanEngineVersionTanimi[] = [
   {
     motorAdi: "Rotaganyan Analiz Motoru",
     surum: "1.0",
-    trainedAt: "2026-10-24T20:10:49.168Z",
+    trainedAt: "2026-10-24T22:04:51.458Z",
     egitim: {
-      lambda: 60,
+      lambda: 90,
       learningRate: 0.25,
-      iterations: 3000,
-      nTrainRaces: 93,
-      nHoldoutRaces: 33,
-      splitDate: "2026-08-20",
+      iterations: 2500,
+      nTrainRaces: 238,
+      nHoldoutRaces: 62,
+      splitDate: "2026-08-26",
     },
     bagimsizKabulTesti: {
       n: 60,
       tarihAraligi: "2026-10-22/2026-10-24",
-      // Bu oturumda arac-ran-bagimsiz-kabul-testi.mts GERÇEKTEN yeniden çalıştırıldı (aynı
-      // model+veri dosyaları, hiçbir kod değişikliği yok) — ölçülen GERÇEK sayılar.
-      top1: 0.417,
-      top3: 0.683,
-      top6: 0.867,
-      logLoss: 1.884,
-      not: "Eğitimde/λ-seçiminde HİÇ kullanılmamış, kronolojik olarak train+dev-holdout'tan SONRAKİ tarihli yarışlar (arac-ran-egitim-veri-topla-son.mts, 'en-son-topla' — ters kronoloji). Kullanıcı bu PERFORMANSI (görev başında bildirilen %35.0/%66.7/%90.0/1.879 rakamlarıyla) YETERLİ kabul etti (2026-10-25) — performans geliştirme fazı KAPANDI. ⚠ Bu oturumda AYNI script+AYNI dosyalarla YENİDEN ölçüldüğünde %41.7/%68.3/%86.7/1.8840 çıktı — görev başında bildirilenle BİREBİR EŞLEŞMİYOR (kök neden araştırılmadı, kapsam dışı, teslim raporunda FACT olarak bildirildi). Her iki ölçüm de 'kullanıcının yeterli kabul ettiği' kapanmış performans fazına aittir, bu dosyadaki rakamlar BU OTURUMDA gerçekten yeniden üretilen sayılardır.",
+      // Bu oturumda arac-ran-bagimsiz-kabul-testi.mts GERÇEKTEN çalıştırıldı
+      // (RAN_MODEL=C:/tmp/ran-trained-model.json — 238 yarış/λ=90 — artık ayrıca
+      // artifacts/ran-trained-model.json olarak repoda) — ölçülen GERÇEK sayılar, görev
+      // başında bildirilenle BİREBİR eşleşti.
+      top1: 0.35,
+      top3: 0.667,
+      top6: 0.9,
+      logLoss: 1.8794,
+      not: "Eğitimde/λ-seçiminde HİÇ kullanılmamış, kronolojik olarak train+dev-holdout'tan SONRAKİ tarihli yarışlar (arac-ran-egitim-veri-topla-son.mts, 'en-son-topla' — ters kronoloji). Kullanıcı bu PERFORMANSI yeterli kabul etti (2026-10-25) — performans geliştirme fazı KAPANDI, bu tur SADECE doğru ağırlık dosyasını sabitleyip entegre etti (yeni eğitim/araştırma YOK).",
     },
     kodSeti: {
       toplamKod: UNIFIED_MODEL_CODES.length,
       dSinyalSayisi: 15,
       v1SinyalSayisi: 21,
     },
-    weightsFingerprintAtAcceptance: "0ae009303d572ba6a872e88e57ae50ef2d1074eae48566e6dd3c73d8a2a393cf",
+    weightsFingerprintAtAcceptance: "f42a8975bbdf29cf8556a8c818379ad8333fb41f18c5b16801b775c19f12b40c",
     aciklama:
-      "PR#12 (feature/rotaganyan-analiz-motoru-sinyal-birlestirme): Saf Model D (AGF'siz 15 sinyal) + V1.0 (10 aile, 21 sinyal dahil edildi) birleşik, çift-sayımsız 36 kanonik kod. AGF ailesi hiçbir koddan hiçbir biçimde skora girmiyor (yapısal garanti, bkz. unified-feature-vector.test.ts). Henüz hiçbir route'a bağlı DEĞİL — bu kayıt yalnız kimlik/denetim amaçlı.",
+      "PR#12 (feature/rotaganyan-analiz-motoru-sinyal-birlestirme): Saf Model D (AGF'siz 15 sinyal) + V1.0 (10 aile, 21 sinyal dahil edildi) birleşik, çift-sayımsız 36 kanonik kod. AGF ailesi hiçbir koddan hiçbir biçimde skora girmiyor (yapısal garanti, bkz. unified-feature-vector.test.ts). Ağırlıkların KENDİSİ artık artifacts/ran-trained-model.json'da (load-trained-model.ts ile yüklenir) — henüz hiçbir route'a bağlı DEĞİL, bu kayıt yalnız kimlik/denetim amaçlı (ACTIVE_PREDICTION_ENGINE entegrasyonu AYRI bir sonraki görev).",
   },
 ];
 

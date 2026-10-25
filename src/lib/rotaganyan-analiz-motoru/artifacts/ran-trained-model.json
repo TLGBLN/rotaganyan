@@ -1,0 +1,393 @@
+{
+  "engineVersion": "1.0",
+  "trainedAt": "2026-10-24T22:04:51.458Z",
+  "lambda": 90,
+  "learningRate": 0.25,
+  "iterations": 2500,
+  "nRacesTrain": 238,
+  "nRacesHoldout": 62,
+  "trainDateRange": [
+    "2026-08-16",
+    "2026-08-25"
+  ],
+  "holdoutDateRange": [
+    "2026-08-26",
+    "2026-08-28"
+  ],
+  "devHoldoutMetrics": {
+    "top1": 0.1935483870967742,
+    "top3": 0.5967741935483871,
+    "top6": 0.8387096774193549,
+    "logLoss": 2.0331004101873122,
+    "avgFieldSize": 9.85483870967742
+  },
+  "codes": [
+    "IDMAN_JOCKEY",
+    "H2H",
+    "SPEED",
+    "GROUND_TOLERANCE",
+    "GROUND_DISTANCE_EXPERIENCE",
+    "WORKOUT_SPRINT",
+    "EQUIPMENT_CHANGE",
+    "RACE_PACE_FIT",
+    "SIRE_HISTORY",
+    "ACC_CLOSE_RES",
+    "ACC_LATE",
+    "ACC_SPEED",
+    "RIVAL_FRONT_PRESSURE",
+    "SINGLE_LEADER",
+    "CLOSER_PRESSURE_FIT",
+    "DAM_HISTORY",
+    "DAMSIRE_HISTORY",
+    "RIVAL_GAP",
+    "TRAINER_TREND30",
+    "JOCKEY_OE30",
+    "JOCKEY_LONG_TERM",
+    "JOCKEY_STYLE",
+    "JOCKEY_TREND30",
+    "OWN_LEAD_TENDENCY",
+    "DRAW",
+    "FORM_LEVEL",
+    "FORM_TREND",
+    "LAYOFF_DAYS",
+    "SURFACE_SPEED_DELTA",
+    "DISTANCE_SPEED_DELTA",
+    "SURFACE_FORM",
+    "RIVAL_CLASS",
+    "FIELD_WEIGHT_DELTA",
+    "HIST_WEIGHT_DELTA",
+    "WEIGHT_DISTANCE",
+    "WEIGHT_HANDICAP"
+  ],
+  "names": [
+    "IDMAN_JOCKEY_z",
+    "IDMAN_JOCKEY_missing",
+    "H2H_z",
+    "H2H_missing",
+    "SPEED_z",
+    "SPEED_missing",
+    "GROUND_TOLERANCE_z",
+    "GROUND_TOLERANCE_missing",
+    "GROUND_DISTANCE_EXPERIENCE_z",
+    "GROUND_DISTANCE_EXPERIENCE_missing",
+    "WORKOUT_SPRINT_z",
+    "WORKOUT_SPRINT_missing",
+    "EQUIPMENT_CHANGE_z",
+    "EQUIPMENT_CHANGE_missing",
+    "RACE_PACE_FIT_z",
+    "RACE_PACE_FIT_missing",
+    "SIRE_HISTORY_z",
+    "SIRE_HISTORY_missing",
+    "ACC_CLOSE_RES_z",
+    "ACC_CLOSE_RES_missing",
+    "ACC_LATE_z",
+    "ACC_LATE_missing",
+    "ACC_SPEED_z",
+    "ACC_SPEED_missing",
+    "RIVAL_FRONT_PRESSURE_z",
+    "RIVAL_FRONT_PRESSURE_missing",
+    "SINGLE_LEADER_z",
+    "SINGLE_LEADER_missing",
+    "CLOSER_PRESSURE_FIT_z",
+    "CLOSER_PRESSURE_FIT_missing",
+    "DAM_HISTORY_z",
+    "DAM_HISTORY_missing",
+    "DAMSIRE_HISTORY_z",
+    "DAMSIRE_HISTORY_missing",
+    "RIVAL_GAP_z",
+    "RIVAL_GAP_missing",
+    "TRAINER_TREND30_z",
+    "TRAINER_TREND30_missing",
+    "JOCKEY_OE30_z",
+    "JOCKEY_OE30_missing",
+    "JOCKEY_LONG_TERM_z",
+    "JOCKEY_LONG_TERM_missing",
+    "JOCKEY_STYLE_z",
+    "JOCKEY_STYLE_missing",
+    "JOCKEY_TREND30_z",
+    "JOCKEY_TREND30_missing",
+    "OWN_LEAD_TENDENCY_z",
+    "OWN_LEAD_TENDENCY_missing",
+    "DRAW_z",
+    "DRAW_missing",
+    "FORM_LEVEL_z",
+    "FORM_LEVEL_missing",
+    "FORM_TREND_z",
+    "FORM_TREND_missing",
+    "LAYOFF_DAYS_z",
+    "LAYOFF_DAYS_missing",
+    "SURFACE_SPEED_DELTA_z",
+    "SURFACE_SPEED_DELTA_missing",
+    "DISTANCE_SPEED_DELTA_z",
+    "DISTANCE_SPEED_DELTA_missing",
+    "SURFACE_FORM_z",
+    "SURFACE_FORM_missing",
+    "RIVAL_CLASS_z",
+    "RIVAL_CLASS_missing",
+    "FIELD_WEIGHT_DELTA_z",
+    "FIELD_WEIGHT_DELTA_missing",
+    "HIST_WEIGHT_DELTA_z",
+    "HIST_WEIGHT_DELTA_missing",
+    "WEIGHT_DISTANCE_z",
+    "WEIGHT_DISTANCE_missing",
+    "WEIGHT_HANDICAP_z",
+    "WEIGHT_HANDICAP_missing"
+  ],
+  "beta": [
+    -0.030586288562710787,
+    -0.022387360598955203,
+    0.07249697464525334,
+    -0.03370013902807023,
+    0.11835831660672233,
+    -0.010462513245412534,
+    -0.0035682734275352644,
+    -0.023154522282332404,
+    0.07135816106675155,
+    0.00255747974298869,
+    -0.035933387062262706,
+    -0.022387360598955203,
+    0.06449765228432668,
+    -0.016794682435304,
+    0.013011503148226043,
+    0.018177559549220127,
+    0.3129280709529005,
+    0,
+    0.06791994139732792,
+    0.0026383123165348936,
+    0.03551683433839926,
+    0.0019870540341940645,
+    0.04295144878207653,
+    0.0026383123165348936,
+    0.0002650877444882474,
+    -0.012224951594830644,
+    0.020719465324256277,
+    -0.012224951594830644,
+    -0.07344029121299153,
+    -0.012224951594830644,
+    -0.020805359801127948,
+    -0.03575622155773608,
+    -0.02510120409475041,
+    0.007015819270575908,
+    0.16321465979032368,
+    -0.013874186775105393,
+    0.058440249219293215,
+    -0.01246219204095897,
+    0.07285532852006364,
+    -0.0011926217883913757,
+    0.0935923947374238,
+    -0.001131176498707349,
+    0.0297069182448443,
+    -0.014314125871265944,
+    -0.03755213254597651,
+    -0.01455078760676044,
+    0.013888113392480458,
+    -0.012224951594830644,
+    -0.03759202220222327,
+    0,
+    0.1546058823532367,
+    -0.013874186775105393,
+    0.10031419542304332,
+    0.02978718332652973,
+    -0.0661142196387223,
+    -0.016794682435304,
+    -0.10798151776094553,
+    -0.029171966861308993,
+    -0.014866392186659435,
+    -0.013874186775105393,
+    0.121643469243299,
+    -0.0022440384337394995,
+    0.015380070881823941,
+    -0.013874186775105393,
+    -0.02836861612596979,
+    0,
+    -0.015290601368164552,
+    -0.016794682435304,
+    -0.04963771805362608,
+    0,
+    -0.027180926899879745,
+    0
+  ],
+  "muSigma": {
+    "IDMAN_JOCKEY": {
+      "mu": 0.19635890767230169,
+      "sigma": 0.397243108247384,
+      "nObserved": 1538
+    },
+    "H2H": {
+      "mu": 0,
+      "sigma": 2.848439830408152,
+      "nObserved": 1690
+    },
+    "SPEED": {
+      "mu": -0.6712784820176352,
+      "sigma": 3.8748569404763695,
+      "nObserved": 2234
+    },
+    "GROUND_TOLERANCE": {
+      "mu": 0.2528247814846309,
+      "sigma": 2.9016961360989404,
+      "nObserved": 476
+    },
+    "GROUND_DISTANCE_EXPERIENCE": {
+      "mu": -1.6135993506366049,
+      "sigma": 3.593890455261837,
+      "nObserved": 1512
+    },
+    "WORKOUT_SPRINT": {
+      "mu": 0.1046814044213264,
+      "sigma": 0.3061424635520288,
+      "nObserved": 1538
+    },
+    "EQUIPMENT_CHANGE": {
+      "mu": -0.040976058931860036,
+      "sigma": 0.3611886522590995,
+      "nObserved": 2172
+    },
+    "RACE_PACE_FIT": {
+      "mu": -0.12496935933147586,
+      "sigma": 3.93121256629567,
+      "nObserved": 1795
+    },
+    "SIRE_HISTORY": {
+      "mu": 11.25898504938487,
+      "sigma": 3.58037655282391,
+      "nObserved": 2328
+    },
+    "ACC_CLOSE_RES": {
+      "mu": 0.09424203838248318,
+      "sigma": 0.5030483071713404,
+      "nObserved": 1993
+    },
+    "ACC_LATE": {
+      "mu": -0.16386116746500706,
+      "sigma": 0.8911223338550499,
+      "nObserved": 1991
+    },
+    "ACC_SPEED": {
+      "mu": -0.10463419271542727,
+      "sigma": 0.27357652434517765,
+      "nObserved": 1993
+    },
+    "RIVAL_FRONT_PRESSURE": {
+      "mu": 0.2788814770258858,
+      "sigma": 0.07168023004400449,
+      "nObserved": 2150
+    },
+    "SINGLE_LEADER": {
+      "mu": 0.019142004466345695,
+      "sigma": 0.03562864626389344,
+      "nObserved": 2150
+    },
+    "CLOSER_PRESSURE_FIT": {
+      "mu": 0.1019343648039856,
+      "sigma": 0.06763706836949356,
+      "nObserved": 2150
+    },
+    "DAM_HISTORY": {
+      "mu": 9.222543796073209,
+      "sigma": 21.16800030780986,
+      "nObserved": 695
+    },
+    "DAMSIRE_HISTORY": {
+      "mu": 9.484962468870387,
+      "sigma": 9.93751282061888,
+      "nObserved": 2072
+    },
+    "RIVAL_GAP": {
+      "mu": -3.6670780571986494,
+      "sigma": 3.6276619772431915,
+      "nObserved": 2152
+    },
+    "TRAINER_TREND30": {
+      "mu": 0.058844631072393155,
+      "sigma": 0.4755450401921817,
+      "nObserved": 2183
+    },
+    "JOCKEY_OE30": {
+      "mu": 0.006168387351048524,
+      "sigma": 0.056348727545341364,
+      "nObserved": 2325
+    },
+    "JOCKEY_LONG_TERM": {
+      "mu": 0.006899234604922373,
+      "sigma": 0.055625413433574224,
+      "nObserved": 2324
+    },
+    "JOCKEY_STYLE": {
+      "mu": 0.008590813248040405,
+      "sigma": 0.06085190585532995,
+      "nObserved": 2143
+    },
+    "JOCKEY_TREND30": {
+      "mu": -0.0913290728976507,
+      "sigma": 0.48854370304545597,
+      "nObserved": 2258
+    },
+    "OWN_LEAD_TENDENCY": {
+      "mu": 0.13001690208468974,
+      "sigma": 0.1410949262616624,
+      "nObserved": 2150
+    },
+    "DRAW": {
+      "mu": 0.5178627927111855,
+      "sigma": 0.3337889416054801,
+      "nObserved": 2328
+    },
+    "FORM_LEVEL": {
+      "mu": 0.5323892672013388,
+      "sigma": 0.2109530059819862,
+      "nObserved": 2152
+    },
+    "FORM_TREND": {
+      "mu": -0.007002135052636822,
+      "sigma": 0.2664554532314166,
+      "nObserved": 1474
+    },
+    "LAYOFF_DAYS": {
+      "mu": 2.9463331132183526,
+      "sigma": 0.7175982703372537,
+      "nObserved": 2172
+    },
+    "SURFACE_SPEED_DELTA": {
+      "mu": -0.07676527522372223,
+      "sigma": 0.8818576283495738,
+      "nObserved": 1227
+    },
+    "DISTANCE_SPEED_DELTA": {
+      "mu": 0.0017132746189357777,
+      "sigma": 0.22460237969282923,
+      "nObserved": 2152
+    },
+    "SURFACE_FORM": {
+      "mu": 0.5528778640280055,
+      "sigma": 0.2213973337893669,
+      "nObserved": 1999
+    },
+    "RIVAL_CLASS": {
+      "mu": -0.07638516409465165,
+      "sigma": 1.1925789040812378,
+      "nObserved": 2152
+    },
+    "FIELD_WEIGHT_DELTA": {
+      "mu": 0.09471649484536082,
+      "sigma": 2.541197495953288,
+      "nObserved": 2328
+    },
+    "HIST_WEIGHT_DELTA": {
+      "mu": 0.095968428754907,
+      "sigma": 2.4817065458329046,
+      "nObserved": 2172
+    },
+    "WEIGHT_DISTANCE": {
+      "mu": 172.35824742268042,
+      "sigma": 4209.377571264714,
+      "nObserved": 2328
+    },
+    "WEIGHT_HANDICAP": {
+      "mu": 0.07538659793814433,
+      "sigma": 1.5558605882692984,
+      "nObserved": 2328
+    }
+  },
+  "weightsFingerprint": "b39bff65243855f52a8e0e4f62645dd1500d3715518f3e1fa27b7d38f9261cdd"
+}

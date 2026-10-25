@@ -7,16 +7,25 @@ import fs from "node:fs";
 import { analyzeRaceDemotion } from "./src/lib/rotaganyan-analiz-motoru/rca/analyze-race";
 import { validateSnapshot, computeWeightsFingerprint } from "./src/lib/rotaganyan-analiz-motoru/snapshot-integrity";
 import { UNIFIED_MODEL_CODES } from "./src/lib/rotaganyan-analiz-motoru/feature-calculators/unified-feature-vector";
+import { loadTrainedModel } from "./src/lib/rotaganyan-analiz-motoru/load-trained-model";
 import { accuraceKosulari } from "./src/lib/accurace/loader";
 import type { RunnerFeatureVector } from "./src/lib/motor-v1/engine/feature-vector";
 import type { FittedModel } from "./src/lib/motor-v1/engine/training";
 
-const MODEL_PATH = process.env.RAN_MODEL ?? "C:/tmp/ran-trained-model-FINAL.json";
+// DÜZELTME (2026-10-25): ESKİ varsayılan C:/tmp/ran-trained-model-FINAL.json'a (93 yarış/λ=60,
+// yanıltıcı "FINAL" adlı KÜÇÜK ÖRNEKLEM) SESSİZCE düşüyordu — kullanıcı talimatı madde 2/4:
+// bu artık YASAK. RAN_MODEL verilmezse repodaki TEK canonical artifact (loadTrainedModel())
+// kullanılır; RAN_MODEL AÇIKÇA verilirse (ad-hoc diagnostic) o ham dosya okunur.
+const MODEL_PATH = process.env.RAN_MODEL ?? null;
 const DATA_PATH = process.env.RAN_ACCEPT_DATA ?? "C:/tmp/ran-egitim-verisi-SON-checkpoint.json";
 
 type RanEgitimSatiri = { raceId: string; tarih: string; winnerNo: number | null; vectors: RunnerFeatureVector[] };
 
 function loadModel(): FittedModel<string> {
+  if (MODEL_PATH == null) {
+    console.log("RAN_MODEL verilmedi → repodaki TEK canonical artifact kullanılıyor: src/lib/rotaganyan-analiz-motoru/artifacts/ran-trained-model.json (loadTrainedModel()).");
+    return loadTrainedModel();
+  }
   const saved = JSON.parse(fs.readFileSync(MODEL_PATH, "utf8"));
   const stats = new Map<string, { mu: number; sigma: number; nObserved: number }>(saved.model.stats);
   return { beta: saved.model.beta, names: saved.model.names, stats, nRacesUsed: saved.model.nRacesUsed, nRacesSkipped: saved.model.nRacesSkipped, opts: saved.opts };
@@ -33,7 +42,7 @@ function loadRows(): RanEgitimSatiri[] {
 async function main() {
   const model = loadModel();
   const rows = loadRows();
-  console.log(`Model: ${MODEL_PATH}`);
+  console.log(`Model: ${MODEL_PATH ?? "repo canonical artifact (artifacts/ran-trained-model.json)"}`);
   console.log(`Veri: ${DATA_PATH} — ${rows.length} yarış\n`);
 
   // --- 0) Faz 1 STALE KAPISI — GERÇEKTEN ÇAĞRILDIĞININ kanıtı (bozuk bir snapshot'la) ---
