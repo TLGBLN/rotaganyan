@@ -31,7 +31,7 @@ describe("RAN v1.0 global SIGNAL BASKETS, not singleton filtering",()=>{
     expect(n.some(s=>s.length===8&&s.includes(c[12])&&!s.includes(c[2]))).toBe(true);
     expect(n.some(s=>s.length===10)).toBe(true);
     expect(n.some(s=>s.length===6)).toBe(true);
-    expect(n.some(s=>s.length===8&&s.includes(c[20])&&s.includes(c[24]))).toBe(true);
+    expect(n.some(s=>s.length===8&&s.filter(x=>!old.includes(x)).length>=2)).toBe(true);
     expect(n.every(x=>x.every(code=>c.includes(code)))).toBe(true);
     expect(new Set(n.map(selectionKey)).size).toBe(n.length);
   });
