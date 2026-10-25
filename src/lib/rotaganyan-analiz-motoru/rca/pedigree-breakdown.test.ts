@@ -44,7 +44,10 @@ describe("RAN RCA pedagojik üçlü pedigri görünümü", () => {
     const w = pedigreeEffects([row("SIRE_HISTORY", 8, -0.0024), row("DAM_HISTORY", 10, -0.01), row("DAMSIRE_HISTORY", null, 0, 0.02, false)]);
     const r = pedigreeEffects([row("SIRE_HISTORY", 11, 0.3444), row("DAM_HISTORY", 10, 0.02), row("DAMSIRE_HISTORY", null, 0, -0.01, false)]);
     const compared = comparePedigreeEffects(w, r);
-    expect(compared.map((x) => x.delta)).toEqual([0.3468, 0.03, -0.03]);
+    expect(compared).toHaveLength(3);
+    expect(compared[0].delta).toBeCloseTo(0.3468, 8);
+    expect(compared[1].delta).toBeCloseTo(0.03, 8);
+    expect(compared[2].delta).toBeCloseTo(-0.03, 8);
   });
 
   it("bir tarafta sinyal tamamen yoksa farkı hesaplanamaz olarak işaretler", () => {
