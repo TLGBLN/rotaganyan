@@ -99,7 +99,7 @@ export async function analyzeRaceDemotion(
   onPhase?.("FAZ1_FINISHED");
 
   onPhase?.("FEATURE_VECTORS_STARTED");
-  const { vectors, rawSources } = await buildUnifiedFeatureVectorsForRace(raceId, preloadedAccuraceRuns, faz1, sharedFieldSizeResolver, true);
+  const { vectors, rawSources } = await buildUnifiedFeatureVectorsForRace(raceId, preloadedAccuraceRuns, faz1, sharedFieldSizeResolver, true, onPhase);
   onPhase?.("FEATURE_VECTORS_FINISHED");
   if (vectors.length === 0) return { status: "NO_DATA", raceId };
 
