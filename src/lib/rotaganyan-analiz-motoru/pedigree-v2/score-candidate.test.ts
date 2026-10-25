@@ -13,6 +13,7 @@ const artifact=():PedigreeV2Artifact=>({
 });
 const vectors=():RunnerFeatureVector[]=>[1,2,3].map(no=>({
   raceId:"RACE",no,name:"horse "+no,tjkAtId:no,jockey:null,
+  pedigreeScoringVersion:PEDIGREE_V2_VERSION,
   signals:UNIFIED_MODEL_CODES.map(code=>({
     code,family:"PIT",rawValue:14,observed:true,coverageState:null,
     asOfSafe:true,missingReason:null,
@@ -31,6 +32,10 @@ describe("RAN-PED-v2 scorer: fail-closed model/source version matching",()=>{
   it("rejects canonical old weights despite same 36 signal names",()=>{
     const old=artifact();old.engineVersion="RAN_36_LEGACY";
     expect(()=>scorePedigreeV2Candidates(vectors(),old)).toThrow("INVALID_VERSIONED_MODEL");
+  });
+  it("rejects legacy vectors with original three raw percentages, even if they have sample metadata",()=>{
+    const legacy=vectors();delete legacy[0].pedigreeScoringVersion;
+    expect(()=>scorePedigreeV2Candidates(legacy,artifact())).toThrow("INPUT_VERSION_MISMATCH");
   });
   it("rejects 1, 2, or 3 lines without PIT count and missing input evidence",()=>{
     const v=vectors();delete v[0].signals.find(s=>s.code==="DAM_HISTORY")!.sampleCount;
