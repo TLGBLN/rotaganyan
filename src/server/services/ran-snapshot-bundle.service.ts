@@ -36,7 +36,9 @@ export async function persistRanSnapshotBundle(
   });
   const persisted = saved.payload as unknown as RanSnapshotBundle;
   verifyRanSnapshotBundle(persisted);
-  if (persisted.bundleKey !== snapshot.bundleKey || JSON.stringify(persisted) !== JSON.stringify(snapshot)) {
+  // JSONB alan sirasi Postgres tarafindan degistirilebilir. Paket hash'i tum
+  // semantik icerigi zaten dogruladigi icin stringification-sirasi karsilastirilmaz.
+  if (persisted.bundleKey !== snapshot.bundleKey) {
     throw new Error("RAN_SHADOW_STORED_MISMATCH: stored snapshot differs from approved immutable input");
   }
   return { id: saved.id, bundleKey: saved.bundleKey };
