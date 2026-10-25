@@ -88,16 +88,29 @@ export async function buildUnifiedFeatureVectorsForRace(
   // computeSafModelSignalsForRace kendi taze çağrısını yapar.
   preloadedFaz1?: Faz1SonucV5 | null,
   sharedFieldSizeResolver?: FieldSizeResolverFn,
-  captureRcaRawSources = false
+  captureRcaRawSources = false,
+  onRcaPhase?: (stage: string) => void
 ): Promise<UnifiedFeatureBuildResult> {
   // RCA-only: D ve V1 TEMPO aynı Accurace snapshot dizisini kullanır; prefetching
   // dışında canlı/production çağrılarında eski loadTempoContext davranışı korunur.
   const rcaTempo = captureRcaRawSources && preloadedAccuraceRuns
     ? tempoContextFromRuns(preloadedAccuraceRuns)
     : undefined;
+  // RCA profil aşamaları asıl paralel iki hesaplayıcıyı birbirinden ayırır.
+  // Her ikisi eskisi gibi Promise.all içinde eşzamanlı çalışır.
   const [safResult, v1Results, runnerMeta] = await Promise.all([
-    computeSafModelSignalsForRace(raceId, preloadedAccuraceRuns, preloadedFaz1),
-    computeUnifiedFamiliesForRace(raceId, undefined, sharedFieldSizeResolver, rcaTempo),
+    (async () => {
+      onRcaPhase?.("D_SIGNALS_STARTED");
+      const result = await computeSafModelSignalsForRace(raceId, preloadedAccuraceRuns, preloadedFaz1);
+      onRcaPhase?.("D_SIGNALS_FINISHED");
+      return result;
+    })(),
+    (async () => {
+      onRcaPhase?.("V1_FAMILIES_STARTED");
+      const result = await computeUnifiedFamiliesForRace(raceId, undefined, sharedFieldSizeResolver, rcaTempo);
+      onRcaPhase?.("V1_FAMILIES_FINISHED");
+      return result;
+    })(),
     db.runner.findMany({ where: { raceId, scratched: false }, select: { id: true, no: true, name: true, tjkAtId: true, jockey: true } }),
   ]);
   const extra = captureRcaRawSources ? { rawSources: { safResult, v1Results } } : {};
