@@ -19,17 +19,18 @@ function bundle(){
   return buildRanSnapshotBundle(Array.from({length:6},(_,k)=>{
     const raceId="race-"+(k+1);
     return {raceId,raceNo:k+1,runners:[1,2].map((no)=>{
+      const p=no===1?0.6:0.4;
       const signals: RanSignalSnapshotEntry[]=UNIFIED_MODEL_CODES.map(code=>({
         code, family:"TEST",raw:no,observed:true,reliability:1,
         coverageState:null,modelVersion:"1.0",standardizedValue:0,
-        learnedCoefficient:0,scoreContribution:0,
+        learnedCoefficient:0,scoreContribution:code===UNIFIED_MODEL_CODES[0]?Math.log(p):0,
         missingIndicatorCoefficient:0,missingIndicatorContribution:0,
       }));
       return {
         raceId,no,name:"Horse-"+no,runnerId:"runner-"+no,
         engineVersion:"1.0",weightsFingerprint:"model-hash",generatedAt:when,
-        originalRank:no,publishedRank:no,winProbability:no===1?0.6:0.4,
-        finalScore:0,featureCodeOrder:UNIFIED_MODEL_CODES,
+        originalRank:no,publishedRank:no,winProbability:p,
+        finalScore:Math.log(p),featureCodeOrder:UNIFIED_MODEL_CODES,
         preRaceDataSnapshotId:computePreRaceDataSnapshotId(raceId,signals),signals,
       };
     })};
