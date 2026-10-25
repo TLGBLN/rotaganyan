@@ -5,7 +5,7 @@ import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { runRanEngineForRace } from "@/app/api/admin/test-ran-engine/route";
-import { buildRanSnapshotBundle, readRanSnapshotBundle, type RanBundleLeg } from "@/lib/rotaganyan-analiz-motoru/ran-snapshot-bundle";
+import { buildRanSnapshotBundle, readRanSnapshotBundle, auditRanBundleCouponBoundary, type RanBundleLeg } from "@/lib/rotaganyan-analiz-motoru/ran-snapshot-bundle";
 import { persistRanSnapshotBundle, loadRanSnapshotBundle } from "@/server/services/ran-snapshot-bundle.service";
 
 async function authorized(): Promise<boolean> {
@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
 type Input = {
   legs: {raceId: string; raceNo: number}[];
   maxCombinations: number;
+  normalMaxCombinations?: number; // optional shadow-only boundary audit using identical frozen odds
   persist?: boolean;
 };
 export async function POST(req: NextRequest) {
@@ -43,7 +44,10 @@ export async function POST(req: NextRequest) {
   if (!Array.isArray(input.legs) || input.legs.length !== 6 ||
       !input.legs.every((r)=>r && typeof r.raceId==="string" && r.raceId.length>0 && Number.isSafeInteger(r.raceNo)) ||
       !Number.isSafeInteger(input.maxCombinations) || input.maxCombinations < 1 ||
-      (input.persist != null && typeof input.persist !== "boolean")) {
+      (input.persist != null && typeof input.persist !== "boolean") ||
+      (input.normalMaxCombinations != null &&
+       (!Number.isSafeInteger(input.normalMaxCombinations) ||
+        input.normalMaxCombinations < input.maxCombinations || input.normalMaxCombinations > 10000))) {
     return NextResponse.json({error:"Tam 6 ayak, raceId/raceNo ve maxCombinations gerekli"}, {status:400});
   }
   if (input.persist === true && process.env.RAN_SHADOW_SNAPSHOT_WRITES !== "isolated-test-only") {
@@ -77,7 +81,9 @@ export async function POST(req: NextRequest) {
     const bundle=buildRanSnapshotBundle(legs,input.maxCombinations,new Date().toISOString());
     const view=readRanSnapshotBundle(bundle);
     const stored=input.persist ? await persistRanSnapshotBundle(bundle):null;
-    return NextResponse.json({...view, storage: stored ?? "NOT_PERSISTED", publication:"DISABLED"});
+    const boundaryAudit=input.normalMaxCombinations == null ? null :
+      auditRanBundleCouponBoundary(bundle,input.normalMaxCombinations);
+    return NextResponse.json({...view, boundaryAudit, storage: stored ?? "NOT_PERSISTED", publication:"DISABLED"});
   } catch(e) {
     console.error("[test-ran-bundle][POST]",e);
     return NextResponse.json({error: e instanceof Error ? e.message:"RAN bundle olusturulamadi"}, {status:422});
