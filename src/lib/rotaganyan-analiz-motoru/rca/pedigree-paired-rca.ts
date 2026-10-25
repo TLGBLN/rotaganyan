@@ -42,7 +42,6 @@ type RankRow={raceId:string;date:string;fold:string;winnerNo:number;rank:number;
   winnerProbability:number;topNo:number;topProbability:number;
   sireObserved:boolean;damObserved:boolean;damsireObserved:boolean;
   sireN:number|null;damN:number|null;damsireN:number|null};
-const all=new Set<string>();
 function canonical(setup:RcaSetupName):string[]{
   const s=RCA_SETUPS[setup];
   const chosen=new Set<string>([...s.base,...s.extra]);
