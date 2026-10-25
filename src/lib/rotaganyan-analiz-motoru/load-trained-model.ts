@@ -20,7 +20,7 @@
 // fonksiyona verip THROW davranışını doğrudan sınar.
 import { createHash } from "node:crypto";
 import type { FittedModel, FeatureStats } from "../motor-v1/engine/training";
-import { UNIFIED_MODEL_CODES } from "./feature-calculators/unified-feature-vector";
+import { UNIFIED_MODEL_CODES } from "./unified-model-codes";
 import { getCurrentRanEngineVersion } from "./engine-versions";
 import rawArtifact from "./artifacts/ran-trained-model.json";
 
