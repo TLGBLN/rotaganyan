@@ -75,6 +75,8 @@ export type SafModelRawSignal = {
   reliability: number;
   dataSource: string;
   missingReason: string | null;
+  /** Target horse excluded, cutoff-limited historical source starts; diagnostic only. */
+  sampleCount?: number | null;
 };
 
 export type SafModelRunnerSignals = {
@@ -99,13 +101,15 @@ function sig(
   observed: boolean,
   reliability: number,
   dataSource: string,
-  missingReason: string | null = null
+  missingReason: string | null = null,
+  sampleCount: number | null = null
 ): SafModelRawSignal {
   if (!observed) return { code, raw: null, observed: false, reliability: 0, dataSource, missingReason: missingReason ?? "gözlem yok" };
   if (raw == null || !Number.isFinite(raw)) {
     return { code, raw: null, observed: false, reliability: 0, dataSource, missingReason: "gözlemli ama raw geçersiz (NaN/null) — güvenlik için gözlemsiz işaretlendi" };
   }
-  return { code, raw, observed: true, reliability, dataSource, missingReason: null };
+  return { code, raw, observed: true, reliability, dataSource, missingReason: null,
+    sampleCount:Number.isSafeInteger(sampleCount) && sampleCount! > 0 ? sampleCount : null };
 }
 
 /**
@@ -184,6 +188,7 @@ export async function computeSafModelSignalsForRace(
   );
   if (pitSire.length !== faz1.runners.length) throw new Error("RAN_PIT_SIRE_LENGTH_MISMATCH");
   const sirePctById = new Map(faz1.runners.map((r,i)=>[r.id,pitSirePercent(pitSire[i])]));
+  const sireSampleCountById = new Map(faz1.runners.map((r,i)=>[r.id,pitSire[i].ornekKendiVeri]));
   const speedBreed = breedToIrk(faz1.race.breed);
   const hizGozlemli = new Map(faz1.runners.map(r=>{
     const id=pitById.get(r.id)!.tjkAtId;
@@ -275,7 +280,7 @@ export async function computeSafModelSignalsForRace(
       sig("sonIdmanSprint", r.sonIdmanSprint, r.sonIdmanSprintGozlemli, 1, "v5-engine.ts (Gallop.track, en son galop)", r.sonIdmanSprintGozlemli ? null : "son galop kaydı yok"),
       sig("takiDegisikligi", taki, r.takiDegisikligiGozlemli, 1, "v5-engine.ts (SonYarisDetay.eklenenTaki/cikarilanTaki)", r.takiDegisikligiGozlemli ? null : "son yarış tarihi/takı bilgisi bilinmiyor"),
       sig("yarisGidisatiSkoru", gidisat?.finalSkor ?? null, gidisat?.finalSkor != null, 1, "pace-analizi.ts::hesaplaYarisGidisati (Accurace geçmişi, taze hesap)", gidisat?.finalSkor != null ? null : "yeterli Accurace geçmişi yok"),
-      sig("sireOrani", sirePctById.get(r.id) ?? null, sirePctById.get(r.id) != null, 1, "RAN-only PIT getV5461SireOzetleriForRace (exclude own horse; shrink)", sirePctById.get(r.id) != null ? null : "yarış öncesi, kendi startları hariç aygır örneklemi yok"),
+      sig("sireOrani", sirePctById.get(r.id) ?? null, sirePctById.get(r.id) != null, 1, "RAN-only PIT getV5461SireOzetleriForRace (exclude own horse; shrink)", sirePctById.get(r.id) != null ? null : "yarış öncesi, kendi startları hariç aygır örneklemi yok", sireSampleCountById.get(r.id) ?? null),
       sig("ACC_CLOSE_RES", cr.observed ? cr.raw : null, cr.observed, cr.reliability, "accurace/features.ts::closingResidual"),
       sig("ACC_LATE", la.observed ? la.raw : null, la.observed, la.reliability, "accurace/features.ts::lateSegmentSpeed"),
       sig("ACC_SPEED", sp.observed ? sp.raw : null, sp.observed, sp.reliability, "accurace/features.ts::speedResidual"),
