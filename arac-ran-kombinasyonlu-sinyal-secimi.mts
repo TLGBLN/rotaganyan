@@ -9,7 +9,7 @@ import { computeFeatureStats, fitModel } from "./src/lib/motor-v1/engine/trainin
 import { UNIFIED_MODEL_CODES } from "./src/lib/rotaganyan-analiz-motoru/unified-model-codes";
 import { SIGNAL_SPECS } from "./src/lib/rotaganyan-analiz-motoru/signal-integration";
 import {
-  allPairs, buildWalkFolds, classifyPair, evaluateCombination, rankCombination,
+  allPairs, buildWalkFolds, classifyPair, evaluateCombination, evaluatePairInteraction, rankCombination,
   selectionKey, sourceAlternativeLimitations, validateTrainingOnly,
   type CombinationResult, type PairResult, type FeatureRace,
 } from "./src/lib/rotaganyan-analiz-motoru/rca/combinatorial-signal-selection";
@@ -19,6 +19,9 @@ const PREFIX=process.env.RAN_COMBO_OUT ?? "C:/tmp/ran-pit-20261025-kombinasyon";
 const ITER=positiveInt("RAN_COMBO_ITERATIONS",500,5,2500);
 const WIDTH=positiveInt("RAN_COMBO_BEAM_WIDTH",4,1,12);
 const MAX_SIZE=positiveInt("RAN_COMBO_MAX_SIGNALS",10,3,36);
+const INTERACTION_MODE=process.env.RAN_COMBO_INTERACTIONS ?? "all";
+if(!["all","top50","off"].includes(INTERACTION_MODE))
+  throw new Error("RAN_COMBO_INTERACTIONS must be all, top50 or off");
 const opts={lambda:90,learningRate:0.25,iterations:ITER};
 const key=(codes:readonly string[])=>selectionKey(codes);
 type Checkpoint = {
@@ -77,7 +80,8 @@ function compact(r:CombinationResult) {
 async function main(){
   const {rows,sha}=readData();
   const folds=buildWalkFolds(rows);
-  const optsString=JSON.stringify({schema:1,sha,opts,width:WIDTH,maxSize:MAX_SIZE,codes:UNIFIED_MODEL_CODES});
+  const optsString=JSON.stringify({schema:1,sha,opts,width:WIDTH,maxSize:MAX_SIZE,
+    interactionMode:INTERACTION_MODE,codes:UNIFIED_MODEL_CODES});
   const cfg=createHash("sha256").update(optsString).digest("hex");
   const cpPath=PREFIX+".checkpoint.json";
   let state:Checkpoint;
@@ -87,7 +91,8 @@ async function main(){
       throw new Error("RAN_COMBO_CHECKPOINT_MISMATCH: choose a NEW RAN_COMBO_OUT; never combine results from different datasets/options");
   }else state={schema:1,sourceHash:sha,configHash:cfg,results:{}};
   console.log("[RAN_COMBO] PIT TRAIN=238, chronology=3 folds; 62 DEV and 60 acceptance NEVER read for selection.");
-  console.log("[RAN_COMBO] 36 singles + 630 exhaustive pairs + beam multi-feature forward/backward swaps.");
+  console.log("[RAN_COMBO] 36 singles + 630 exhaustive additive pairs + "+INTERACTION_MODE+
+    " multiplicative interactions + beam multi-feature search.");
   console.log("[RAN_COMBO] iter="+ITER+" width="+WIDTH+" maxSize="+MAX_SIZE+" resume="+Object.keys(state.results).length+" saved. Publication=BLOCKED.");
   const corr=correlations(rows,UNIFIED_MODEL_CODES);
   let newly=0;
@@ -123,7 +128,36 @@ async function main(){
       c!=null&&Math.abs(c.rho)>=0.80,structural));
   }
   saveAtomic(cpPath,state);
-  console.log("[RAN_COMBO] all 630 pairs complete. Starting selected triple+ expansions.");
+  console.log("[RAN_COMBO] all 630 pairs complete. Testing ACTUAL zA*zB interactions (PIT fold normalization).");
+  const interactionPairs=INTERACTION_MODE==="off"?[]:
+    INTERACTION_MODE==="top50"?
+      pairResults.map(x=>x.pair).sort(rankCombination).slice(0,50).map(x=>x.codes):
+      allPairs(all);
+  const interactions: {a:string;b:string;additive:CombinationResult;interaction:CombinationResult;
+    deltaTop1:number;deltaTop3:number;deltaLogLoss:number;verdict:string}[]=[];
+  for(const codes of interactionPairs){
+    const [a,b]=codes,interactionId="INT:"+key([a,b]);
+    let interaction=state.results[interactionId];
+    if(!interaction){
+      interaction=evaluatePairInteraction(folds,a,b,opts);
+      state.results[interactionId]=interaction;
+      newly++;
+      if(newly%20===0){
+        saveAtomic(cpPath,state);
+        console.log("[RAN_COMBO] complete="+Object.keys(state.results).length+" interaction="+interactionId);
+      }
+    }
+    const additive=state.results[key([a,b])];
+    const deltaTop1=interaction.top1Hits-additive.top1Hits;
+    const deltaTop3=interaction.top3Hits-additive.top3Hits;
+    const deltaLogLoss=interaction.logLoss-additive.logLoss;
+    const better=(deltaTop1>=2||deltaTop3>=2) && deltaTop1>=-1 &&
+      deltaTop3>=-1 && deltaLogLoss<=0.035;
+    interactions.push({a,b,additive,interaction,deltaTop1,deltaTop3,deltaLogLoss,
+      verdict:better?"INTERACTION_RESEARCH_CANDIDATE":"NOT_CONFIRMED"});
+  }
+  saveAtomic(cpPath,state);
+  console.log("[RAN_COMBO] interactions="+interactions.length+" complete. Starting selected triple+ expansions.");
   const allPairsRanked=pairResults.map(p=>p.pair).sort(rankCombination);
   const v1=new Set(SIGNAL_SPECS.filter(s=>s.source==="V1" &&
       (s.decision==="INCLUDE"||s.decision==="PRIMARY")).map(s=>s.canonical));
@@ -219,6 +253,11 @@ async function main(){
     contextPrunedSignalCount:pruned,
     singles:[...singles.values()].sort(rankCombination).map(compact),
     pairs:pairTable, highCorrelation:pairTable.filter(p=>p.correlation&&Math.abs(p.correlation.rho)>=0.8),
+    interactionsMode:INTERACTION_MODE,interactionTrials:interactions.length,
+    interactionResults:interactions.map(x=>({a:x.a,b:x.b,deltaTop1:x.deltaTop1,
+      deltaTop3:x.deltaTop3,deltaLogLoss:x.deltaLogLoss,verdict:x.verdict,
+      additive:compact(x.additive),withProduct:compact(x.interaction)}))
+      .sort((a,b)=>b.deltaTop1-a.deltaTop1||b.deltaTop3-a.deltaTop3||a.deltaLogLoss-b.deltaLogLoss),
     full36:compact(full),dOnly:compact(dOnly),v1Only:compact(v1Only),
     selected:compact(current),sourceMix:{d:current.codes.filter(x=>d.has(x)),v1:current.codes.filter(x=>v1.has(x))},
     combinedGate:status,publicationGate:"BLOCKED",evidence:"INTERNAL_WALK_FORWARD_DIAGNOSTIC_ONLY",
@@ -227,6 +266,7 @@ async function main(){
       "All selections are made on chronological inner TRAIN folds, but reusing these folds for beam search risks overfitting.",
       "August DEV-62 and previous October acceptance-60 have been inspected; neither is a fresh untouched publication test.",
       "No source feature archive has independently verifiable as-of capture timestamps; live prospective parity unverified.",
+      "Multiplicative interaction candidates are separately diagnosed; they are NOT silently added to the fitted additive shadow model or the production feature calculator.",
     ],
   };
   // Fit an entirely NEW shadow model with the selected feature subset using
@@ -279,6 +319,16 @@ async function main(){
       "| "+p.a+" | "+p.b+" | "+p.correlation!.rho.toFixed(3)+
       " | "+p.stronger+" | "+p.bothVersusBest.top1Hits+" | "+p.bothVersusBest.top3Hits+" | "+p.status+" |"),
     "",
+    "## Gerçek çarpımsal etkileşim denemeleri",
+    "İkili sinyalleri birlikte kullanmaktan AYRI olarak zA × zB terimi öğrenildi; z değerleri yalnız ilgili katlamanın geçmiş eğitim yarışlarından.",
+    "Denenen etkileşim: "+interactions.length+" / 630. Bu terimler gölge modelin içine sessizce eklenmez.",
+    "| A | B | ΔTop1 | ΔTop3 | ΔLogLoss | Karar |",
+    "|---|---|---:|---:|---:|---|",
+    ...interactions.filter(x=>x.verdict==="INTERACTION_RESEARCH_CANDIDATE")
+      .sort((a,b)=>b.deltaTop1-a.deltaTop1||b.deltaTop3-a.deltaTop3||a.deltaLogLoss-b.deltaLogLoss)
+      .slice(0,40).map(x=>"| "+x.a+" | "+x.b+" | "+x.deltaTop1+" | "+x.deltaTop3+
+        " | "+x.deltaLogLoss.toFixed(5)+" | "+x.verdict+" |"),
+    "",
     "## Tüm tekli deneyler (iç kronolojik doğrulama)",
     "| Sinyal | TOP1 | TOP3 | LogLoss |",
     "|---|---:|---:|---:|",
@@ -293,6 +343,7 @@ async function main(){
     "Bu tarama yeni motoru otomatik yayına almaz veya kanonik model dosyasını değiştirmez.",
   ].join("\n")+"\n");
   console.log("[RAN_COMBO] COMPLETE singles="+singles.size+" pairs="+pairTable.length+
+    " interactions="+interactions.length+
     " refits="+Object.keys(state.results).length+" gate="+status+" publication=BLOCKED");
   console.log("[RAN_COMBO] D_ONLY "+money(dOnly));
   console.log("[RAN_COMBO] FULL_36 "+money(full));
