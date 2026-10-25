@@ -41,14 +41,53 @@ export type RaceClassStrength = {
  * normal (hariç tutmasız) medyan döner — ama bu durum çağıran tarafça (confidence
  * düşürülerek) işaretlenmeli, burada SESSİZCE geçilmez.
  */
-export async function computeRaceClassStrength(raceId: string, excludeTjkAtId?: number | null): Promise<RaceClassStrength> {
-  const [values, observed, runners] = await Promise.all([
+type ClassStrengthInputs = {
+  values: Map<number, number>;
+  observed: Map<number, boolean>;
+  runners: { no: number; tjkAtId: number | null }[];
+};
+
+// Paylaşım yalnız çağıranın verdiği classStrengthCache'in ömrü kadardır.
+// Farklı yarış analizleri ve production'ın doğrudan computeRaceClassStrength
+// çağrıları arasında süresiz/işlem-geneli veri tutulmaz (WeakMap key GC olabilir).
+const scopedRaceInputs = new WeakMap<
+  Map<string, Promise<RaceClassStrength>>,
+  Map<string, Promise<ClassStrengthInputs>>
+>();
+
+function loadClassStrengthInputs(raceId: string, includeRunners: boolean): Promise<ClassStrengthInputs> {
+  return Promise.all([
     getHizDerecesiForRace(raceId),
     getHizDerecesiGozlemliForRace(raceId),
-    excludeTjkAtId != null
+    includeRunners
       ? db.runner.findMany({ where: { raceId, scratched: false }, select: { no: true, tjkAtId: true } })
       : Promise.resolve([] as { no: number; tjkAtId: number | null }[]),
-  ]);
+  ]).then(([values, observed, runners]) => ({ values, observed, runners }));
+}
+
+export async function computeRaceClassStrength(
+  raceId: string,
+  excludeTjkAtId?: number | null,
+  classStrengthCache?: Map<string, Promise<RaceClassStrength>>
+): Promise<RaceClassStrength> {
+  let inputs: ClassStrengthInputs;
+  if (classStrengthCache != null && excludeTjkAtId != null) {
+    let scoped = scopedRaceInputs.get(classStrengthCache);
+    if (!scoped) {
+      scoped = new Map();
+      scopedRaceInputs.set(classStrengthCache, scoped);
+    }
+    let pending = scoped.get(raceId);
+    if (!pending) {
+      pending = loadClassStrengthInputs(raceId, true);
+      scoped.set(raceId, pending);
+    }
+    inputs = await pending;
+  } else {
+    // Önceki bağımsız/doğrudan çağrılar için aynı sorgu ve sonuç davranışı.
+    inputs = await loadClassStrengthInputs(raceId, excludeTjkAtId != null);
+  }
+  const { values, observed, runners } = inputs;
   const excludeNo = excludeTjkAtId != null ? runners.find((r) => r.tjkAtId === excludeTjkAtId)?.no : undefined;
 
   const observedValues: number[] = [];
@@ -109,7 +148,7 @@ export async function computeSinifLevel(
     const cacheKey = `${resolved.raceId}:${tjkAtId}`;
     let pending = classStrengthCache.get(cacheKey);
     if (!pending) {
-      pending = computeRaceClassStrength(resolved.raceId, tjkAtId);
+      pending = computeRaceClassStrength(resolved.raceId, tjkAtId, classStrengthCache);
       classStrengthCache.set(cacheKey, pending);
     }
     const strength = await pending;
