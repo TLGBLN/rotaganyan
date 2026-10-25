@@ -42,7 +42,7 @@
 //    kapsar, "dosya bozulmadı mı" sorusu için) FARKLI bir hash — ikisi KARIŞTIRILMAMALI,
 //    bu alan yalnız snapshot-integrity.ts'in STALE kontrolü için (beta+names drift).
 
-import { UNIFIED_MODEL_CODES } from "./feature-calculators/unified-feature-vector";
+import { UNIFIED_MODEL_CODES } from "./unified-model-codes";
 
 export type RanEngineVersionTanimi = {
   /** Kullanıcı kararı: motor adı KASITLI OLARAK V'siz. `surum` yalnız İÇ referans/damga. */
