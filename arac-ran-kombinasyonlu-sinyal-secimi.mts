@@ -4,6 +4,7 @@
 // Result is a DIAGNOSTIC/SHADOW model, NOT a deployable winner-tuned artifact.
 import fs from "node:fs";
 import { createHash } from "node:crypto";
+import { auditScoreInflation } from "./src/lib/rotaganyan-analiz-motoru/rca/score-inflation-audit";
 import { dirname } from "node:path";
 import { computeFeatureStats, fitModel } from "./src/lib/motor-v1/engine/training";
 import { UNIFIED_MODEL_CODES } from "./src/lib/rotaganyan-analiz-motoru/unified-model-codes";
@@ -261,6 +262,20 @@ async function main(){
     (current.top1Hits>dOnly.top1Hits || current.top3Hits>dOnly.top3Hits ||
      current.logLoss<dOnly.logLoss-0.01);
   const status=improvesD?"COMBINED_RESEARCH_CANDIDATE":"NO_VERIFIED_D_V1_COMPLEMENT";
+  // Independent of ranking and softmax-sum checks: diagnose false-certainty,
+  // extreme standardized evidence and favorite calibration in EXACT SAME folds.
+  const confidenceOpts={lambda:90,learningRate:0.25,iterations:2500};
+  const scoreInflation={
+    selected:auditScoreInflation(folds,current.codes,confidenceOpts),
+    dOnly:auditScoreInflation(folds,dOnly.codes,confidenceOpts),
+    full36:auditScoreInflation(folds,full.codes,confidenceOpts),
+  };
+  console.log("[RAN_SCORE_AUDIT] selected meanFavorite="+
+    scoreInflation.selected.meanFavouriteProbability.toFixed(4)+
+    " actualTop1="+scoreInflation.selected.realizedTop1Rate.toFixed(4)+
+    " ECE="+scoreInflation.selected.ece.toFixed(4)+
+    " wrong80="+scoreInflation.selected.highConfidence80.incorrect+
+    " extremeZ="+scoreInflation.selected.extremeRawZ.absZAbove4);
   const pairTable=pairResults.map(p=>({
     a:p.a,b:p.b,correlation:corr.get(key([p.a,p.b]))??null,
     stronger:p.stronger,weaker:p.weaker,status:p.status,
@@ -284,6 +299,7 @@ async function main(){
       additive:compact(x.additive),withProduct:compact(x.interaction)}))
       .sort((a,b)=>b.deltaTop1-a.deltaTop1||b.deltaTop3-a.deltaTop3||a.deltaLogLoss-b.deltaLogLoss),
     full36:compact(full),dOnly:compact(dOnly),v1Only:compact(v1Only),
+    scoreInflation,
     selected:compact(current),sourceMix:{d:current.codes.filter(x=>d.has(x)),v1:current.codes.filter(x=>v1.has(x))},
     combinedGate:status,publicationGate:"BLOCKED",evidence:"INTERNAL_WALK_FORWARD_DIAGNOSTIC_ONLY",
     unavailableSignals:sourceAlternativeLimitations(),blockedReasons:[
@@ -292,6 +308,8 @@ async function main(){
       "August DEV-62 and previous October acceptance-60 have been inspected; neither is a fresh untouched publication test.",
       "No source feature archive has independently verifiable as-of capture timestamps; live prospective parity unverified.",
       "Multiplicative interaction candidates are separately diagnosed; they are NOT silently added to the fitted additive shadow model or the production feature calculator.",
+      "Raw logit score has no bounded absolute scale. Softmax normalization does NOT prove forecast calibration. Treat 80/90% incorrect favorites and extreme standardized features as risk flags.",
+      "The 2500-iteration re-fit uses the SAME internal folds used for search: selection bias remains. New unseen prospective races are required for publication approval.",
     ],
   };
   // Fit an entirely NEW shadow model with the selected feature subset using
@@ -346,6 +364,17 @@ async function main(){
     ...pairTable.filter(x=>x.correlation&&Math.abs(x.correlation.rho)>=0.8).map(p=>
       "| "+p.a+" | "+p.b+" | "+p.correlation!.rho.toFixed(3)+
       " | "+p.stronger+" | "+p.bothVersusBest.top1Hits+" | "+p.bothVersusBest.top3Hits+" | "+p.status+" |"),
+    "",
+    "## Şişirilmiş skor / sahte kesinlik denetimi",
+    "- En yüksek aday favori olasılığı: "+(scoreInflation.selected.highestFavouriteProbability*100).toFixed(2)+"%",
+    "- Ortalama favori olasılığı: "+(scoreInflation.selected.meanFavouriteProbability*100).toFixed(2)+"%; gerçek TOP1: "+(scoreInflation.selected.realizedTop1Rate*100).toFixed(2)+"%",
+    "- Favoride aşırı iyimserlik farkı: "+(scoreInflation.selected.overconfidenceGap*100).toFixed(2)+" yüzde puanı",
+    "- TOP1 kalibrasyon ECE: "+(scoreInflation.selected.ece*100).toFixed(2)+"%",
+    "- >=80% güvenle yanlış favori: "+scoreInflation.selected.highConfidence80.incorrect+"/"+scoreInflation.selected.highConfidence80.races,
+    "- >=90% güvenle yanlış favori: "+scoreInflation.selected.highConfidence90.incorrect+"/"+scoreInflation.selected.highConfidence90.races,
+    "- >4σ uç ana özellik gözlemi: "+scoreInflation.selected.extremeRawZ.absZAbove4+"/"+scoreInflation.selected.extremeRawZ.observed,
+    "- En büyük ham skor farkı: "+scoreInflation.selected.highMargin.maxScoreGap.toFixed(4),
+    ...scoreInflation.selected.warnings.map(x=>"- UYARI: "+x),
     "",
     "## Gerçek çarpımsal etkileşim denemeleri",
     "İkili sinyalleri birlikte kullanmaktan AYRI olarak zA × zB terimi öğrenildi; z değerleri yalnız ilgili katlamanın geçmiş eğitim yarışlarından.",
