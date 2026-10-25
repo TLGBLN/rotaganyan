@@ -105,6 +105,7 @@ jobs:
             src/lib/rotaganyan-analiz-motoru/pedigree-v2/lineage-score.test.ts \
             src/lib/rotaganyan-analiz-motoru/pedigree-v2/lineage-source.test.ts \
             src/lib/rotaganyan-analiz-motoru/pedigree-v2/score-candidate.test.ts \
+            src/lib/rotaganyan-analiz-motoru/pedigree-v2/candidate-build.test.ts \
             src/lib/rotaganyan-analiz-motoru/rca/ran-combinatorial-cli-smoke.test.ts
 
       - name: Real PostgreSQL transaction, readback and cleanup
