@@ -36,8 +36,42 @@ try {
   Write-Host "[RAN_PIT] Checking TypeScript before any real DB reads..."
   & npx tsc --noEmit -p tsconfig.json
   if($LASTEXITCODE -ne 0){throw "RAN_PIT_TYPESCRIPT_FAIL"}
+  # Node/tsx does not load .env.local automatically (unlike Next.js). Load
+  # explicitly in the CHILD process so no DB secret is printed or copied to files.
+  # Existing process DATABASE_URL takes priority over files.
+  $dbEnvArgs=@()
+  $explicitEnv=[Environment]::GetEnvironmentVariable("RAN_ENV_FILE","Process")
+  if($explicitEnv){
+    if(-not(Test-Path -LiteralPath $explicitEnv -PathType Leaf)){
+      throw "RAN_DB_ENV_FILE_NOT_FOUND: RAN_ENV_FILE yolunda dosya bulunamadi"
+    }
+    $resolvedEnv=(Resolve-Path -LiteralPath $explicitEnv).Path
+    $dbEnvArgs+=("--env-file=$resolvedEnv")
+  } else {
+    foreach($file in @(".env",".env.local")){
+      if(Test-Path -LiteralPath $file -PathType Leaf){
+        $dbEnvArgs+=("--env-file=$file")
+      }
+    }
+  }
+  # Fail before loading Prisma/starting a 300-race collection. Never echo URL,
+  # passwords or entire env file contents.
+  $dbPreflight=@'
+const raw=process.env.DATABASE_URL;
+if(!raw){console.error("[RAN_DB_CONFIG_MISSING] DATABASE_URL yok. .env.local veya .env dosyasina ekleyin; alternatif: RAN_ENV_FILE ile mevcut guvenli env dosyanizin yolunu verin.");process.exit(2);}
+try {
+  const url=new URL(raw);
+  if(!["postgresql:","postgres:"].includes(url.protocol) || !url.hostname || !url.pathname || url.pathname==="/"){
+    throw new Error("not a PostgreSQL connection URL");
+  }
+} catch {console.error("[RAN_DB_CONFIG_INVALID] DATABASE_URL gecerli bir PostgreSQL URL degil (icerik gizlendi).");process.exit(3);}
+console.log("[RAN_DB_CONFIG] PostgreSQL baglanti ayari bulundu; sifre gizli. Yalniz okuma.");
+'@
+  & node @dbEnvArgs -e $dbPreflight
+  if($LASTEXITCODE -ne 0){throw "RAN_PIT_DATABASE_CONFIG_FAIL: veri toplama baslatilmadi"}
+
   Write-Host "[RAN_PIT] Recalculating exact original 238 TRAIN + 62 DEV race IDs with repaired SIRE/SPEED"
-  & node node_modules/tsx/dist/cli.mjs ./arac-ran-egitim-veri-topla.mts
+  & node @dbEnvArgs node_modules/tsx/dist/cli.mjs ./arac-ran-egitim-veri-topla.mts
   if($LASTEXITCODE -ne 0){throw "RAN_PIT_RECOLLECTION_FAILED: source checkpoint preserved"}
   if(-not(Test-Path $dataset)){throw "RAN_PIT_DATASET_MISSING"}
   [Environment]::SetEnvironmentVariable("RAN_IN",$dataset,"Process")
