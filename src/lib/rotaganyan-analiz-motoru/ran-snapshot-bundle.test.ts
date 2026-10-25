@@ -55,6 +55,19 @@ describe("RAN immutable analysis/ranking/coupon bundle", () => {
     expect(b.legs[0].runners[0].winProbability).toBe(0.65);
     verifyRanSnapshotBundle(b);
   });
+  it("PostgreSQL JSONB key reordering leaves stable hash and exact coupon intact", () => {
+    const bundle=buildRanSnapshotBundle(six(),20,ts);
+    const reordered=(value: unknown): unknown => {
+      if (Array.isArray(value)) return value.map(reordered);
+      if (value !== null && typeof value === "object") {
+        const src=value as Record<string, unknown>;
+        return Object.fromEntries(Object.keys(src).reverse().map(k=>[k,reordered(src[k])]));
+      }
+      return value;
+    };
+    const fromJsonb=reordered(bundle) as RanSnapshotBundle;
+    expect(readRanSnapshotBundle(fromJsonb).coupon).toEqual(bundle.coupon);
+  });
   it("tampered coupon or score fails closed, never silently recalculated", () => {
     const b=buildRanSnapshotBundle(six(),20,ts);
     const tampered=JSON.parse(JSON.stringify(b)) as RanSnapshotBundle;
