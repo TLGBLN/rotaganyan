@@ -9,6 +9,9 @@ on:
       - 'arac-ran-db-onkontrol.cjs'
       - 'src/lib/methodology/kupon-boundary-risk-audit.ts'
       - 'src/lib/motor-v1/features/gen-pedigri.ts'
+      - 'src/lib/rotaganyan-analiz-motoru/pedigree-v2/**'
+      - 'arac-ran-pedigri-v2-hizli-yenile.mts'
+      - 'arac-ran-pedigri-v2-yenile-egit.ps1'
       - 'src/lib/motor-v1/engine/feature-vector.ts'
       - 'src/lib/methodology/kupon-boundary-risk-audit.test.ts'
       - 'src/app/api/admin/test-ran-bundle/route.ts'
@@ -99,6 +102,9 @@ jobs:
             src/lib/rotaganyan-analiz-motoru/rca/pedigree-lineage-audit.test.ts \
             src/lib/rotaganyan-analiz-motoru/rca/pedigree-lineage-cli-smoke.test.ts \
             src/lib/rotaganyan-analiz-motoru/rca/pedigree-paired-rca.test.ts \
+            src/lib/rotaganyan-analiz-motoru/pedigree-v2/lineage-score.test.ts \
+            src/lib/rotaganyan-analiz-motoru/pedigree-v2/lineage-source.test.ts \
+            src/lib/rotaganyan-analiz-motoru/pedigree-v2/score-candidate.test.ts \
             src/lib/rotaganyan-analiz-motoru/rca/ran-combinatorial-cli-smoke.test.ts
 
       - name: Real PostgreSQL transaction, readback and cleanup
