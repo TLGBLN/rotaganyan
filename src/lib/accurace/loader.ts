@@ -34,8 +34,11 @@ export function earlyBinOf(place: number, n: number, cps: Checkpoint[], L: numbe
 // Tüm Accurace yarışları → AccuraceRun (tjkAtId'li olanlar).
 // LateSegment: yarışın TÜM atları için ortak checkpoint CP_r (aralarındaki kesişim) seçilir;
 // hedef = L − min(800, 0.5L)'ye en yakın ortak nokta. Ortak nokta yoksa geç skor yok (NO_COMMON_CHECKPOINT).
-export async function accuraceKosulari(): Promise<AccuraceRun[]> {
+export async function accuraceKosulari(options: { fromDate?: Date } = {}): Promise<AccuraceRun[]> {
+  // Varsayılan tam-arşiv okuyucu birebir korunur. RCA yenilemesi yalnız eski
+  // snapshot gününden sonraki yarışları yeniden oluşturmak için filtre verir.
   const arsiv = await db.accuraceRace.findMany({
+    ...(options.fromDate ? { where: { date: { gte: options.fromDate } } } : {}),
     select: {
       id: true, date: true, length: true, ground: true, hippodrome: true,
       race: { select: { breed: true } },
