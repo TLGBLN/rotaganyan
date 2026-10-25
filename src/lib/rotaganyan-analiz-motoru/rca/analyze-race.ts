@@ -84,7 +84,8 @@ export async function analyzeRaceDemotion(
   winnerNo: number,
   preloadedAccuraceRuns?: AccuraceRun[],
   /** RCA çalışması boyunca paylaşılan; verilmezse yalnız bu yarışa özel. */
-  sharedFieldSizeResolver: FieldSizeResolverFn = createFieldSizeResolver()
+  sharedFieldSizeResolver: FieldSizeResolverFn = createFieldSizeResolver(),
+  onPhase?: (stage: string) => void
 ): Promise<RaceRcaResult> {
   // FAZ 3 PERF (teslim raporu madde 1 — GERÇEK profiling bulgusu): gatherFaz1V5Historical
   // (v5-engine.ts, 11 paralel alt-sorgu/hesaplamalı AĞIR fonksiyon) ÖNCEDEN BU OTURUMDA
@@ -93,9 +94,13 @@ export async function analyzeRaceDemotion(
   // DOĞRUDAN). Burada BİR KEZ çekilip HER ÜÇ kullanım noktasına taşınır — v5-engine.ts'in
   // KENDİSİ DEĞİŞMEDİ (V5.46.1 BİREBİR aynı davranır), yalnız RAN'ın KENDİ çağrı grafiği
   // içindeki tekrar ELENİR.
+  onPhase?.("FAZ1_STARTED");
   const faz1 = await gatherFaz1V5Historical(raceId);
+  onPhase?.("FAZ1_FINISHED");
 
+  onPhase?.("FEATURE_VECTORS_STARTED");
   const { vectors, rawSources } = await buildUnifiedFeatureVectorsForRace(raceId, preloadedAccuraceRuns, faz1, sharedFieldSizeResolver, true);
+  onPhase?.("FEATURE_VECTORS_FINISHED");
   if (vectors.length === 0) return { status: "NO_DATA", raceId };
 
   // --- FAZ 1 KAPISI: STALE ise hiçbir şey işlenmez (eski RCA'nın OLCULMEDI disiplini) ---
@@ -131,9 +136,11 @@ export async function analyzeRaceDemotion(
   // Alternatif formüller yalnız TOP-1 kaçırmalarında kök-neden sınıflandırmasında
   // kullanılır. TOP-1 doğruysa teşhis gereksiz; yanlışsa AYNI skorlamada elde
   // edilmiş D/V1 ham sinyalleri kullanılır (sıfır ek model/DB yeniden hesaplama).
+  onPhase?.("CROSSCHECK_STARTED");
   const altRowsForWinner = winnerRank > 1
     ? (await crosscheckAlternativeSignals(raceId, preloadedAccuraceRuns, faz1, rawSources)).get(winnerNo) ?? []
     : [];
+  onPhase?.("CROSSCHECK_FINISHED");
 
   async function miss(rivalNo: number): Promise<MissAnalysis> {
     const rivalVec = vectors.find((v) => v.no === rivalNo)!;
