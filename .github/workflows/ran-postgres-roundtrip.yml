@@ -9,6 +9,7 @@ on:
       - 'arac-ran-db-onkontrol.cjs'
       - 'src/lib/methodology/kupon-boundary-risk-audit.ts'
       - 'src/lib/methodology/kupon-boundary-risk-audit.test.ts'
+      - 'src/app/api/admin/test-ran-bundle/route.ts'
       - 'arac-ran-pit-kohort-yenile-ve-egit.ps1'
       - 'src/lib/rotaganyan-analiz-motoru/**'
       - 'src/server/services/ran-snapshot-bundle.service*'
