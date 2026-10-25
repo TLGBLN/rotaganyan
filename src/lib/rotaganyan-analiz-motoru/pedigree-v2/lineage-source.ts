@@ -9,7 +9,7 @@
 import {db} from "@/lib/db";
 import {finishPos} from "@/lib/race-result";
 import {breedToIrk,mesafeBucket,normalizeSireName,surfaceToPist} from "@/lib/sire-stat-match";
-import {LINEAGES,adjustLineage,type AdjustedLineage} from "./lineage-score";
+import {LINEAGES,adjustLineage,type AdjustedLineage,type LineageInput} from "./lineage-score";
 
 export type LineageHistoricRun={
   date:Date;breed:string;surface:string;distance:number;
@@ -27,6 +27,7 @@ export type TargetPedigreeRace={
 export function lineagesAsOf(
   target:TargetPedigreeRace,
   rows:readonly LineageHistoricRun[],
+  adjuster:(input:LineageInput)=>AdjustedLineage=adjustLineage,
 ):Map<number,AdjustedLineage[]> {
   if(!Number.isFinite(target.cutoff.getTime())||target.horses.length===0||
      new Set(target.horses.map(x=>x.no)).size!==target.horses.length)
@@ -61,7 +62,7 @@ export function lineagesAsOf(
       const siblings=name?.trim()?
         [...(lineMap.get(l.code+"|"+normalizeSireName(name))??new Map()).entries()]
           .map(([tjkAtId,value])=>({tjkAtId,...value})):[];
-      return adjustLineage({code:l.code,ancestorName:name,progeny:siblings,targetId:h.tjkAtId});
+      return adjuster({code:l.code,ancestorName:name,progeny:siblings,targetId:h.tjkAtId});
     }),
   ]));
 }
@@ -82,7 +83,9 @@ function fetchPedigreeArchive(){
     },
   });
 }
-export async function getThreeLineagePedigreeForRace(raceId:string):Promise<{
+export async function getThreeLineagePedigreeForRace(
+  raceId:string,adjuster:(input:LineageInput)=>AdjustedLineage=adjustLineage,
+):Promise<{
   horses:TargetPedigreeHorse[];cutoff:Date;lineages:Map<number,AdjustedLineage[]>;
 }> {
   const race=await db.race.findUnique({
@@ -106,5 +109,5 @@ export async function getThreeLineagePedigreeForRace(raceId:string):Promise<{
   const target={cutoff:race.raceDay.date,breed:race.breed,
     surface:race.surface,distance:race.distance,horses:race.runners};
   return {horses:race.runners,cutoff:race.raceDay.date,
-    lineages:lineagesAsOf(target,rows)};
+    lineages:lineagesAsOf(target,rows,adjuster)};
 }
