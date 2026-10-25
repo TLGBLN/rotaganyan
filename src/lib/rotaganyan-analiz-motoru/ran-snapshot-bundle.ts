@@ -28,8 +28,19 @@ export type RanSnapshotBundle = {
 function ensure(ok: unknown, message: string): asserts ok {
   if (!ok) throw new Error("RAN_BUNDLE_INTEGRITY: " + message);
 }
+// PostgreSQL JSONB anahtar siralarini degistirebilir. JSON.stringify(object)
+// hash'i bu nedenle sabit degildir; her seviyede anahtar sirasi normalize edilir.
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return "[" + value.map((v) => stableJson(v ?? null)).join(",") + "]";
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return "{" + Object.keys(record).filter((k) => record[k] !== undefined).sort()
+      .map((k) => JSON.stringify(k) + ":" + stableJson(record[k])).join(",") + "}";
+  }
+  return JSON.stringify(value);
+}
 function hash(value: unknown): string {
-  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+  return createHash("sha256").update(stableJson(value)).digest("hex");
 }
 function isExactPermutation(values: number[], n: number): boolean {
   return values.length === n && [...values].sort((a,b) => a-b).every((v,i) => v === i+1);
