@@ -6,7 +6,7 @@ const cutoff=new Date("2026-08-20T00:00:00.000Z");
 const past={date:"15.08.2026",time:"1.20.00",distance:1000,surface:"Kum"};
 const future={date:"21.08.2026",time:"1.20.00",distance:1000,surface:"Kum"};
 const index: PaceIndex =new Map([
-  ["ARAP|KUM|1000", Array.from({length:20},()=>({tarih:new Date("2026-08-01T00:00:00.000Z"),pace:12.5}))],
+  ["ARAP|Kum|800-1400", Array.from({length:20},()=>({tarih:new Date("2026-08-01T00:00:00.000Z"),pace:12.5}))],
 ]);
 describe("RAN-only PIT sire and SPEED source contract",()=>{
   it("returns no sire observation when cutoff-filtered sample absent",()=>{
@@ -26,7 +26,7 @@ describe("RAN-only PIT sire and SPEED source contract",()=>{
   it("marks false when there is no usable population baseline",()=>{
     expect(speedObservedAsOf([past],"ARAP",cutoff,new Map())).toBe(false);
     expect(speedObservedAsOf([past],"ARAP",cutoff,new Map([
-      ["ARAP|KUM|1000",Array.from({length:19},()=>({tarih:new Date("2026-08-01T00:00:00Z"),pace:12.5}))],
+      ["ARAP|Kum|800-1400",Array.from({length:19},()=>({tarih:new Date("2026-08-01T00:00:00Z"),pace:12.5}))],
     ]))).toBe(false);
   });
   it("rejects stale (365+ days), malformed time, and missing speed",()=>{
