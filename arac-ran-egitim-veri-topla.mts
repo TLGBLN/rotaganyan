@@ -19,6 +19,19 @@ const OUT_PATH = process.env.RAN_OUT ?? "C:/tmp/ran-egitim-verisi.json";
 const LIMIT = Number(process.env.RAN_LIMIT ?? "0") || undefined;
 const CONCURRENCY = Number(process.env.RAN_CONCURRENCY ?? "10");
 const MAX_RETRY = 3;
+// Explicit PIT rebuild window. Defaults preserve the existing collector behavior.
+const DATE_FROM = process.env.RAN_DATE_FROM ?? null;
+const DATE_TO = process.env.RAN_DATE_TO ?? null;
+const DATASET_TAG = process.env.RAN_DATASET_TAG ?? null;
+function parseDay(day: string | null, name: string): Date | null {
+  if (!day) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error(name + " must be YYYY-MM-DD");
+  const date = new Date(day + "T00:00:00.000Z");
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0,10) !== day) {
+    throw new Error(name + " is not a valid calendar day");
+  }
+  return date;
+}
 
 export type RanEgitimSatiri = {
   raceId: string;
@@ -47,9 +60,32 @@ async function main() {
   const preloadedRuns = await accuraceKosulari();
   console.log(`Accurace arşivi hazır: ${preloadedRuns.length} kayıt, ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
+  const from = parseDay(DATE_FROM, "RAN_DATE_FROM");
+  const to = parseDay(DATE_TO, "RAN_DATE_TO");
+  if (from && to && from > to) throw new Error("RAN_DATE_FROM after RAN_DATE_TO");
+  const min = from && from > GUNCEL_MOTOR_BASLANGIC ? from : GUNCEL_MOTOR_BASLANGIC;
+  const range = { gte: min, ...(to ? { lte: to } : {}) };
+  if (to && to < min) throw new Error("RAN_DATE_TO predates GUNCEL_MOTOR_BASLANGIC");
+  if (DATASET_TAG && (!DATE_FROM || !DATE_TO || !process.env.RAN_OUT || !process.env.RAN_CHECKPOINT)) {
+    throw new Error("RAN_DATASET_TAG requires explicit RAN_DATE_FROM/TO, RAN_OUT and RAN_CHECKPOINT");
+  }
+  const stampPath = CHECKPOINT_PATH + ".source.json";
+  const stamp = DATASET_TAG ? JSON.stringify({tag:DATASET_TAG,from:DATE_FROM,to:DATE_TO,engine:"RAN_PIT_SIRE_SPEED_20261025"}) : null;
+  if (stamp) {
+    if (fs.existsSync(CHECKPOINT_PATH) && !fs.existsSync(stampPath)) {
+      throw new Error("RAN_PIT_UNSTAMPED_CHECKPOINT: will not replay old vectors from " + CHECKPOINT_PATH);
+    }
+    if (fs.existsSync(stampPath) && fs.readFileSync(stampPath,"utf8") !== stamp) {
+      throw new Error("RAN_PIT_CHECKPOINT_SOURCE_MISMATCH: remove nothing; choose new paths");
+    }
+    if (!fs.existsSync(stampPath)) fs.writeFileSync(stampPath,stamp,{flag:"wx"});
+    if (fs.existsSync(OUT_PATH) && !fs.existsSync(CHECKPOINT_PATH)) {
+      throw new Error("RAN_PIT_OUTPUT_EXISTS_WITHOUT_CHECKPOINT: refusing overwrite");
+    }
+  }
   const races = await db.race.findMany({
     where: {
-      raceDay: { date: { gte: GUNCEL_MOTOR_BASLANGIC } },
+      raceDay: { date: range },
       result: { isNot: null },
       runners: { some: { scratched: false } },
     },
@@ -58,7 +94,7 @@ async function main() {
   let eligible = races.filter((r) => r.runners.length >= 3);
   eligible.sort((a, b) => a.raceDay.date.getTime() - b.raceDay.date.getTime());
   if (LIMIT) eligible = eligible.slice(0, LIMIT);
-  console.log(`Toplam ${eligible.length} uygun yarış (saha>=3, LIMIT=${LIMIT ?? "yok"}).`);
+  console.log(`Toplam ${eligible.length} uygun yarış (saha>=3, LIMIT=${LIMIT ?? "yok"}, tarih=${min.toISOString().slice(0,10)}..${DATE_TO ?? "acik"}).`);
 
   let checkpoint: Record<string, RanEgitimSatiri> = {};
   if (fs.existsSync(CHECKPOINT_PATH)) {
