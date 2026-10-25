@@ -14,6 +14,18 @@ const legs:LegProbability[] = [
   })),
 ];
 describe("Adana-style normal-only boundary audit (SHADOW, never winner-driven)",()=>{
+  it("checks exact Adana screenshot economics before advocating boundary insurance",()=>{
+    // Screenshots: Economy 3x5x2x3x3x2=540x1.25=675 TL.
+    // Normal 4x6x3x3x3x2=1296x1.25=1620 TL.
+    const econ=[3,5,2,3,3,2].reduce((a,b)=>a*b,1);
+    const normal=[4,6,3,3,3,2].reduce((a,b)=>a*b,1);
+    const naiveAdd=[4,6,2,3,3,2].reduce((a,b)=>a*b,1);
+    expect(econ*1.25).toBe(675);
+    expect(normal*1.25).toBe(1620);
+    expect(naiveAdd*1.25).toBe(1080);
+    // One strictly budget-feasible example; NOT an odds-based recommendation:
+    expect([4,6,2,3,3,1].reduce((a,b)=>a*b,1)*1.25).toBe(540);
+  });
   it("recognizes TWO immediately adjacent normal-only candidates in separate legs",()=>{
     const result=auditKuponBoundary(legs,4,9);
     expect(result.baseline.secimler[1]).toEqual([3,6]);
