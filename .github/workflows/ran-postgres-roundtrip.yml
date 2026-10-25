@@ -19,6 +19,12 @@ on:
       - 'arac-ran-pit-sadece-egit.ps1'
       - 'arac-ran-pit-dataset-check.cjs'
       - 'arac-ran-kombinasyonlu-sinyal-secimi.mts'
+      - 'arac-ran-sepet-optimizasyonu.mts'
+      - 'src/lib/rotaganyan-analiz-motoru/rca/basket-search.ts'
+      - 'src/lib/rotaganyan-analiz-motoru/rca/basket-search.test.ts'
+      - 'src/lib/rotaganyan-analiz-motoru/rca/ran-basket-cli-smoke.test.ts'
+      - 'src/lib/rotaganyan-analiz-motoru/pedigree-v3/**'
+      - 'arac-ran-pedigri-v3-hizli-yenile.mts'
       - 'src/lib/rotaganyan-analiz-motoru/rca/combinatorial-signal-selection.ts'
       - 'src/lib/rotaganyan-analiz-motoru/rca/score-inflation-audit.ts'
       - 'src/lib/rotaganyan-analiz-motoru/rca/score-inflation-audit.test.ts'
@@ -107,7 +113,9 @@ jobs:
             src/lib/rotaganyan-analiz-motoru/pedigree-v2/score-candidate.test.ts \
             src/lib/rotaganyan-analiz-motoru/pedigree-v2/candidate-build.test.ts \
             src/lib/rotaganyan-analiz-motoru/pedigree-v2/three-lineage-train-smoke.test.ts \
-            src/lib/rotaganyan-analiz-motoru/rca/ran-combinatorial-cli-smoke.test.ts
+            src/lib/rotaganyan-analiz-motoru/rca/ran-combinatorial-cli-smoke.test.ts \
+            src/lib/rotaganyan-analiz-motoru/rca/basket-search.test.ts \
+            src/lib/rotaganyan-analiz-motoru/rca/ran-basket-cli-smoke.test.ts
 
       - name: Real PostgreSQL transaction, readback and cleanup
         env:
