@@ -17,6 +17,7 @@ export type RanFrozenLeg = {
 };
 export type RanSnapshotBundle = {
   schemaVersion: 1;
+  sourceProvenance: "NOT_VERIFIED"; // generatedAt or hash alone is not proof of pre-race collection
   bundleKey: string;
   bundleGeneratedAt: string;
   engineVersion: string;
@@ -105,6 +106,7 @@ export function buildRanSnapshotBundle(
   }
   const unsigned = {
     schemaVersion: 1 as const,
+    sourceProvenance: "NOT_VERIFIED" as const,
     bundleGeneratedAt, engineVersion: legs[0].runners[0].engineVersion,
     weightsFingerprint: legs[0].runners[0].weightsFingerprint,
     couponMaxCombinations: maxCombinations, legs, coupon,
@@ -113,6 +115,7 @@ export function buildRanSnapshotBundle(
 }
 export function verifyRanSnapshotBundle(bundle: RanSnapshotBundle): void {
   ensure(bundle.schemaVersion === 1, "schemaVersion mismatch");
+  ensure(bundle.sourceProvenance === "NOT_VERIFIED", "unknown provenance claim");
   const {bundleKey, ...rest}=bundle;
   ensure(hash(rest) === bundleKey, "bundle mutated after generation");
   const rebuilt=buildRanSnapshotBundle(bundle.legs, bundle.couponMaxCombinations, bundle.bundleGeneratedAt);
@@ -125,6 +128,7 @@ export function readRanSnapshotBundle(bundle: RanSnapshotBundle) {
     bundleKey: bundle.bundleKey,
     engineVersion: bundle.engineVersion,
     generatedAt: bundle.bundleGeneratedAt,
+    sourceProvenance: bundle.sourceProvenance,
     analyses: bundle.legs.map(leg=>({
       raceId: leg.raceId, raceNo: leg.raceNo,
       ranked: [...leg.runners].sort((a,b)=>a.publishedRank-b.publishedRank),
