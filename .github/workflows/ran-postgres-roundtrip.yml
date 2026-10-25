@@ -63,7 +63,8 @@ jobs:
             src/lib/rotaganyan-analiz-motoru/ran-snapshot-bundle.test.ts \
             src/server/services/ran-snapshot-bundle.service.test.ts \
             src/lib/rotaganyan-analiz-motoru/isolated-db-guard.test.ts \
-            src/lib/rotaganyan-analiz-motoru/rca/signal-complementarity-audit.test.ts
+            src/lib/rotaganyan-analiz-motoru/rca/signal-complementarity-audit.test.ts \
+            src/lib/rotaganyan-analiz-motoru/feature-calculators/pit-sire-speed.test.ts
 
       - name: Real PostgreSQL transaction, readback and cleanup
         env:
