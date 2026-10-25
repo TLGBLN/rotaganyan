@@ -94,6 +94,23 @@ async function main(){
   if(Object.keys(saved).length!==300)throw new Error("RAN_PED_V2_INCOMPLETE_COHORT");
   const updated=all.map(r=>saved[r.raceId]);
   if(updated.some(r=>!r||r.vectors.length<3))throw new Error("RAN_PED_V2_MISSING_SAVED_RACE");
+  const transformCodes=new Set(LINEAGES.map(l=>l.code));
+  for(let i=0;i<updated.length;i++){
+    const r=updated[i],reference=all[i];
+    if(r.raceId!==reference.raceId || r.tarih!==reference.tarih ||
+       r.winnerNo!==reference.winnerNo ||
+       r.pedigreeV2?.version!==PEDIGREE_V2_VERSION ||
+       r.vectors.length!==reference.vectors.length)
+      throw new Error("RAN_PED_V2_COHORT_OR_RESULT_CHANGED");
+    assertPedigreeVersionAndProvenance(PEDIGREE_V2_VERSION,r.vectors);
+    for(let j=0;j<r.vectors.length;j++){
+      const v=r.vectors[j],old=reference.vectors[j];
+      if(v.no!==old.no||v.raceId!==old.raceId ||
+         v.signals.some((sig,k)=>!transformCodes.has(sig.code)&&
+           JSON.stringify(sig)!==JSON.stringify(old.signals[k])))
+        throw new Error("RAN_PED_V2_CHECKPOINT_NONPEDIGREE_MODIFICATION");
+    }
+  }
   atomic(out,updated);
   const diagnostics={
     ...manifest,outputSha:createHash("sha256").update(fs.readFileSync(out)).digest("hex"),
