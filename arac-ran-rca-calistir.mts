@@ -88,8 +88,11 @@ async function main() {
   let okCount = 0, staleCount = 0, top1MissCount = 0, top3MissCount = 0;
   const kategoriSayim = new Map<string, number>();
 
-  for (const row of rows) {
+  for (const [index, row] of rows.entries()) {
+    const raceStartedAt = Date.now();
+    console.log(`[RCA BASLADI] ${index + 1}/${rows.length} raceId=${row.raceId}`);
     const result = await analyzeRaceDemotion(row.raceId, model, row.winnerNo!, preloadedRuns);
+    console.log(`[RCA TAMAMLANDI] ${index + 1}/${rows.length} raceId=${row.raceId} sure=${((Date.now() - raceStartedAt) / 1000).toFixed(1)}s status=${result.status}`);
     if (result.status === "STALE") {
       staleCount++;
       console.log(`[STALE] raceId=${row.raceId} — ${result.reasons.join(" | ")}`);
