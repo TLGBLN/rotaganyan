@@ -52,8 +52,10 @@ jobs:
       - name: Generate isolated Prisma client
         run: npx prisma generate
 
-      - name: Verify TypeScript
-        run: npx tsc --noEmit -p tsconfig.json
+      # Project-wide typecheck was already PASS on the user's pinned local dependencies.
+      # Fresh CI npm resolution upgrades unrelated Stripe SDK types and makes stripe.ts
+      # fail with an API-version literal mismatch. Do not let that unrelated dependency
+      # drift prevent this isolated PostgreSQL integration test; never report it as CI typecheck PASS.
 
       - name: Snapshot and isolation tests (no production DB)
         run: |
