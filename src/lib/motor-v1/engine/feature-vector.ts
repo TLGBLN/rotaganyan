@@ -76,7 +76,7 @@ export type RaceBatchContext = {
   runners: { no: number; name: string; tjkAtId: number | null; jockey: string | null }[];
 };
 
-export async function loadRaceBatchContext(raceId: string, tempoCtx?: TempoContext): Promise<RaceBatchContext> {
+export async function loadRaceBatchContext(raceId: string, tempoCtx?: TempoContext, sharedFieldSizeResolver?: FieldSizeResolverFn): Promise<RaceBatchContext> {
   const race = await db.race.findUnique({
     where: { id: raceId },
     select: { distance: true, surface: true, classType: true, raceDay: { select: { date: true, hippodrome: { select: { name: true } } } } },
@@ -101,7 +101,7 @@ export async function loadRaceBatchContext(raceId: string, tempoCtx?: TempoConte
     surface: race.surface,
     city: race.raceDay.hippodrome.name,
     isHandicapStyle: parsedClass.isHandicapStyle,
-    resolver: createFieldSizeResolver(),
+    resolver: sharedFieldSizeResolver ?? createFieldSizeResolver(),
     raceContextCache: createRaceContextCache(),
     classStrengthCache: new Map(),
     tempoCtx: resolvedTempoCtx,
@@ -209,7 +209,7 @@ export async function buildFeatureVectorForRunner(
 // × kendi DB gidiş-dönüşleri = yarış başına onlarca ardışık round-trip — yavaşlığın asıl
 // kaynağı, PC değil). Hem bu dosya hem unified-family-engine.ts (CANLI admin motoru) bu
 // fonksiyonu kullanıyor — davranış/sonuç AYNI, yalnız eşzamanlı çekiliyor.
-export async function buildFeatureVectorsForRace(raceId: string, tempoCtx?: TempoContext): Promise<RunnerFeatureVector[]> {
-  const ctx = await loadRaceBatchContext(raceId, tempoCtx);
+export async function buildFeatureVectorsForRace(raceId: string, tempoCtx?: TempoContext, sharedFieldSizeResolver?: FieldSizeResolverFn): Promise<RunnerFeatureVector[]> {
+  const ctx = await loadRaceBatchContext(raceId, tempoCtx, sharedFieldSizeResolver);
   return Promise.all(ctx.runners.map((r) => buildFeatureVectorForRunner(ctx, r)));
 }
