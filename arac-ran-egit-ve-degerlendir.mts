@@ -14,7 +14,7 @@
 // tarafta kalır (sızıntı önleme). μ/σ SADECE train bölümünden hesaplanır.
 import fs from "node:fs";
 import { computeFeatureStats, fitModel, scoreRace, explainRunner, type FittedModel } from "./src/lib/motor-v1/engine/training";
-import { UNIFIED_MODEL_CODES } from "./src/lib/rotaganyan-analiz-motoru/feature-calculators/unified-feature-vector";
+import { UNIFIED_MODEL_CODES } from "./src/lib/rotaganyan-analiz-motoru/unified-model-codes";
 import type { RunnerFeatureVector } from "./src/lib/motor-v1/engine/feature-vector";
 
 type RanEgitimSatiri = { raceId: string; tarih: string; winnerNo: number | null; vectors: RunnerFeatureVector[] };
