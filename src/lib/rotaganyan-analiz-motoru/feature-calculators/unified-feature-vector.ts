@@ -107,7 +107,7 @@ export async function buildUnifiedFeatureVectorsForRace(
     })(),
     (async () => {
       onRcaPhase?.("V1_FAMILIES_STARTED");
-      const result = await computeUnifiedFamiliesForRace(raceId, undefined, sharedFieldSizeResolver, rcaTempo);
+      const result = await computeUnifiedFamiliesForRace(raceId, undefined, sharedFieldSizeResolver, rcaTempo, onRcaPhase);
       onRcaPhase?.("V1_FAMILIES_FINISHED");
       return result;
     })(),
