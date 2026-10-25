@@ -20,7 +20,7 @@
 // kayıtları, immutable) — bu yüzden `buildGoingHistory` burada SERBESTÇE kullanılır.
 
 import { db } from "@/lib/db";
-import { createFieldSizeResolver, type FieldSizeResolverFn } from "./history-source";
+import { createFieldSizeResolver, prefetchRecentFieldSizes, type FieldSizeResolverFn } from "./history-source";
 import { buildGoingHistory } from "./pist-durum-history";
 import { computePistDurum01, type GoingTarget, type GoingScoreResult } from "./pist-durum-score";
 import type { PistYuzeyi } from "./pist-durum-01";
@@ -81,6 +81,7 @@ export async function computePistDurumForRunner(
   if (tjkAtId == null) {
     return { value: null, reason: "IDENTITY_UNRESOLVED", regime: null, sameCount: 0, otherCount: 0, rawDelta: null };
   }
+  prefetchRecentFieldSizes(ctx.resolver, rowsJson, cutoff);
   const { history } = await buildGoingHistory(rowsJson, cutoff, ctx.resolver);
   return computePistDurum01(ctx.target, history, halfLifeDays);
 }
