@@ -16,9 +16,23 @@ type DbClient = Client;
 const migrationPath = "prisma/migrations/20261025160000_add_ran_snapshot_bundle/migration.sql";
 
 async function connectLocal(url: URL): Promise<DbClient> {
-  const client = new Client({ connectionString: url.toString(), connectionTimeoutMillis: 4000, ssl: false });
-  await client.connect();
-  return client;
+  let lastError: unknown = null;
+  // Docker reports container "healthy" before Windows port forwarding is fully ready
+  // in some environments. Retry connection-refused/timeouts only; never retry auth errors.
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const client = new Client({ connectionString: url.toString(), connectionTimeoutMillis: 4000, ssl: false });
+    try {
+      await client.connect();
+      return client;
+    } catch (error) {
+      lastError = error;
+      await client.end().catch(() => undefined);
+      const code = (error as { code?: string }).code;
+      if (code !== "ECONNREFUSED" && code !== "ETIMEDOUT" && code !== "EHOSTUNREACH") break;
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
+  }
+  throw lastError;
 }
 
 async function ensureDedicatedLocalDatabase(url: URL): Promise<DbClient> {
@@ -27,7 +41,12 @@ async function ensureDedicatedLocalDatabase(url: URL): Promise<DbClient> {
   } catch (error) {
     const reason = error as Error & { code?: string };
     if (reason.code !== "3D000") {
-      throw new Error("LOCAL_POSTGRES_CONNECTION_FAILED: " + reason.message);
+      throw new Error(
+        "LOCAL_POSTGRES_CONNECTION_FAILED: host=" + url.hostname +
+        " port=" + url.port +
+        " code=" + (reason.code ?? "NO_CODE") +
+        " detail=" + (reason.message || String(error) || "NO_DETAIL")
+      );
     }
   }
   // Var olmayan test DB'sini SADECE localhost postgres uzerinde olustur.
