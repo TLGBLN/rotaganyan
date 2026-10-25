@@ -17,11 +17,14 @@ import { getCurrentRanEngineVersion } from "../engine-versions";
 import { crosscheckAlternativeSignals } from "./alt-signal-crosscheck";
 import { computeDemotionDrivers, classifyDemotion, type DemotionDriver, type RootCauseCategory } from "./root-cause-classifier";
 import type { AccuraceRun } from "@/lib/accurace/types";
+import { pedigreeEffects, comparePedigreeEffects, type PedigreeEffect, type PedigreeComparison } from "./pedigree-breakdown";
 
 export type MissAnalysis = {
   rivalNo: number;
   rivalName: string;
   demotionDrivers: DemotionDriver[]; // en büyük 5 (rakibi öne çıkaran fark, azalan)
+  /** TOP-5 sınırından bağımsız: baba, anne, anne babası; gerçek katkı ve eksiklik bilgisi. */
+  pedigreeComparison: PedigreeComparison[];
   category: RootCauseCategory;
   evidence: string[];
 };
@@ -58,6 +61,8 @@ export type RaceRcaResult =
       top1Miss: MissAnalysis | null; // winnerRank>1 ise dolu
       top3Miss: MissAnalysis | null; // winnerRank>3 ise dolu (top1Miss'ten BAĞIMSIZ, farklı rakip: 3.sıradaki)
       winnerPositiveSignals: WinnerPositiveSignal[] | null; // winnerRank>1 ise dolu (bkz. WinnerPositiveSignal)
+      /** Her durumda üç soy hattı: SIRE, DAM, DAMSIRE (TOP-5 filtresine tabi değil). */
+      winnerPedigree: PedigreeEffect[];
       agfComparison: AgfComparison | null;
     };
 
@@ -115,6 +120,10 @@ export async function analyzeRaceDemotion(
 
   const winnerVec = vectors.find((v) => v.no === winnerNo)!;
   const winnerExplain = explainRunner(winnerVec, model);
+  const winnerPedigree = pedigreeEffects(
+    winnerExplain.rows,
+    new Map(winnerVec.signals.map((s) => [s.code, s.missingReason]))
+  );
 
   const altRowsForRace = await crosscheckAlternativeSignals(raceId, preloadedAccuraceRuns, faz1);
   const altRowsForWinner = altRowsForRace.get(winnerNo) ?? [];
@@ -122,6 +131,10 @@ export async function analyzeRaceDemotion(
   async function miss(rivalNo: number): Promise<MissAnalysis> {
     const rivalVec = vectors.find((v) => v.no === rivalNo)!;
     const rivalExplain = explainRunner(rivalVec, model);
+    const pedigreeComparison = comparePedigreeEffects(
+      winnerPedigree,
+      pedigreeEffects(rivalExplain.rows, new Map(rivalVec.signals.map((s) => [s.code, s.missingReason])))
+    );
     const drivers = computeDemotionDrivers(winnerExplain.rows, rivalExplain.rows);
     const topCode = drivers[0]?.code ?? null;
     const altDisagreement = topCode ? !!altRowsForWinner.find((r) => r.canonical === topCode)?.rankDisagreement : false;
@@ -132,7 +145,7 @@ export async function analyzeRaceDemotion(
       fieldProbabilitySpread,
       topDriverHasAltDisagreement: altDisagreement,
     });
-    return { rivalNo, rivalName: rivalVec.name, demotionDrivers: drivers.slice(0, 5), category: classification.category, evidence: classification.evidence };
+    return { rivalNo, rivalName: rivalVec.name, demotionDrivers: drivers.slice(0, 5), pedigreeComparison, category: classification.category, evidence: classification.evidence };
   }
 
   const top1Miss = winnerRank > 1 ? await miss(ranked[0].no) : null;
@@ -171,6 +184,7 @@ export async function analyzeRaceDemotion(
     top1Miss,
     top3Miss,
     winnerPositiveSignals,
+    winnerPedigree,
     agfComparison,
   };
 }
