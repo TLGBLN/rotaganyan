@@ -76,4 +76,13 @@ describe("computeUnifiedFamiliesForRace — memoize cache (Faz 3 perf, davranı�
     expect(result).toEqual([]);
     expect(findUniqueMock).toHaveBeenCalledTimes(2);
   });
+  it("RCA explicit TEMPO baglami raceId-only process cache'inden YALITILIR", async () => {
+    const ctx = { byTjk: new Map() };
+    await computeUnifiedFamiliesForRace("race-RCA");
+    await computeUnifiedFamiliesForRace("race-RCA", undefined, undefined, ctx);
+    await computeUnifiedFamiliesForRace("race-RCA", undefined, undefined, ctx);
+    await computeUnifiedFamiliesForRace("race-RCA");
+    expect(findUniqueMock).toHaveBeenCalledTimes(3);
+  });
+
 });
