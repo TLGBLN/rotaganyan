@@ -86,8 +86,10 @@ async function main() {
   const preloadedRuns = await accuraceKosulari();
   console.log(`Accurace arşivi çekildi: ${preloadedRuns.length} koşu, ${((Date.now() - t0) / 1000).toFixed(1)}s\n`);
 
-  // Yalnız bu RCA komutunun ömrü boyunca paylaşılır; canlı/production tahmin önbelleği değildir.
-  const sharedFieldSizeResolver = createFieldSizeResolver();
+  // Yalnız bu RCA komutu: eşzamanlı geçmiş-yarış sorgularını 32'li toplu OR
+  // sorgusuna çevirir. Canlı/production resolver varsayılanı DEĞİŞMEZ.
+  const sharedFieldSizeResolver = createFieldSizeResolver({ batchSize: 32 });
+  console.log("RCA saha büyüklüğü sorgulama: scoped batchSize=32 (yalnız RCA)");
   let okCount = 0, staleCount = 0, top1MissCount = 0, top3MissCount = 0;
   const kategoriSayim = new Map<string, number>();
 
