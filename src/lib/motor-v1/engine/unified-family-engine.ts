@@ -168,6 +168,22 @@ async function computeUnifiedFamiliesForRaceUncached<C extends string = string>(
   const antTrendPairs = await Promise.all(race.runners.map(async (r) => [r.no, await computeAntrenorTrend30(r.trainer, cutoff)] as const));
   const antTrendByNo = new Map(antTrendPairs);
 
+  // Kök N+1 düzeltmesi: eski kod her atın pist durumu/başlangıç riskini
+  // 13 at için TEK TEK bekliyordu. Hesaplayıcıların kendileri ve değerler
+  // DEĞİŞMEDİ; bağımsız at sorguları eşzamanlı başlatılıp sırayla okunur.
+  const [pistPairs, startRiskPairs] = await Promise.all([
+    Promise.all(race.runners.map(async (r) => [
+      r.no,
+      await computePistDurumForRunner(pistCtx, r.tjkAtId, rowsJsonByTjk.get(r.tjkAtId ?? -1) ?? [], cutoff),
+    ] as const)),
+    Promise.all(race.runners.map(async (r) => [
+      r.no,
+      await computeStartRisk(r.tjkAtId, cutoff),
+    ] as const)),
+  ]);
+  const pistByNo = new Map(pistPairs);
+  const startRiskByNo = new Map(startRiskPairs);
+
   const results: UnifiedRunnerResult[] = [];
   for (const r of race.runners) {
     const sv = safByNo.get(r.no);
@@ -208,7 +224,7 @@ async function computeUnifiedFamiliesForRaceUncached<C extends string = string>(
 
     // --- PMZ (+ pist durumu) ---
     const pmz01 = sig("PMZ_01"), pmz02 = sig("PMZ_02"), formZemin = sig("FORM_x_ZEMIN");
-    const pistScore = await computePistDurumForRunner(pistCtx, r.tjkAtId, rowsJson, cutoff);
+    const pistScore = pistByNo.get(r.no)!;
     const pistEntry = entry("PIST_DURUM_01", "PMZ", pistScore.value, pistScore.value != null, `pist durumu: ${pistScore.reason}`);
     const pmzBlock = familyBlock(
       "PMZ",
@@ -271,7 +287,7 @@ async function computeUnifiedFamiliesForRaceUncached<C extends string = string>(
     const effectiveEquipment = liveEquipmentKnown ? r.equipment : recoveredEquipment;
     const equipmentKnownForRunner = liveEquipmentKnown || recoveredEquipment != null;
     const dav = computeDavTakiDegisikligi(effectiveEquipment, r.tjkAtId, rowsJson, cutoff, equipmentKnownForRunner);
-    const startRisk = await computeStartRisk(r.tjkAtId, cutoff);
+    const startRisk = startRiskByNo.get(r.no)!;
     // KULLANICI TALİMATI (2026-10-19, 2. tur): seçilim-yanlılığı uyarısı DEĞER GÖZLEMLİ OLSA
     // BİLE kaybolmaz — missingReason YALNIZ eksik-veri için değil, bu DAİMA-geçerli kısıt
     // için de taşıyıcı olarak kullanılır (SignalEntry'de ayrı bir "caveat" alanı yok).
