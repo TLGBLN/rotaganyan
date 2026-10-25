@@ -65,7 +65,22 @@ try {
     throw new Error("not a PostgreSQL connection URL");
   }
 } catch {console.error("[RAN_DB_CONFIG_INVALID] DATABASE_URL gecerli bir PostgreSQL URL degil (icerik gizlendi).");process.exit(3);}
-console.log("[RAN_DB_CONFIG] PostgreSQL baglanti ayari bulundu; sifre gizli. Yalniz okuma.");
+(async()=>{
+  const { Client }=require("pg");
+  const client=new Client({connectionString:raw,connectionTimeoutMillis:7000,query_timeout:7000});
+  try {
+    await client.connect();
+    const result=await client.query("SELECT 1 AS ready");
+    if(result.rows[0]?.ready!==1)throw new Error("unexpected result");
+    console.log("[RAN_DB_CONFIG] Gercek PostgreSQL baglantisi OK (SELECT 1). Yalniz okuma; sifre gizli.");
+  } catch(error) {
+    console.error("[RAN_DB_CONNECT_FAIL] Sunucuya baglanilamadi. Hata kodu: "+(error?.code??"NO_CODE")+
+      ". Baglanti dosyasi, ag/VPN, kullanici ve parola kontrol edilmeli. Kimlik bilgileri gizli.");
+    process.exitCode=4;
+  } finally {
+    await client.end().catch(()=>undefined);
+  }
+})();
 '@
   & node @dbEnvArgs -e $dbPreflight
   if($LASTEXITCODE -ne 0){throw "RAN_PIT_DATABASE_CONFIG_FAIL: veri toplama baslatilmadi"}
