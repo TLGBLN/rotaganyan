@@ -19,6 +19,14 @@ foreach($name in $envNames){$previous[$name]=[Environment]::GetEnvironmentVariab
 try {
   if(-not(Test-Path $old)){throw "RAN_OLD_COHORT_NOT_FOUND: $old"}
   if(Test-Path $model){throw "RAN_PIT_MODEL_EXISTS: Existing PIT model will not be overwritten: $model"}
+  # Completed PIT data must NOT be recollected on a retry. Delegate to
+  # independent offline trainer, no Prisma/DB/Accurace initialization.
+  if(Test-Path -LiteralPath $dataset -PathType Leaf){
+    Write-Host "[RAN_PIT] Refreshed 300-race dataset found. SKIPPING database collector."
+    & powershell -NoProfile -ExecutionPolicy Bypass -File .\arac-ran-pit-sadece-egit.ps1
+    if($LASTEXITCODE -ne 0){throw "RAN_PIT_TRAIN_ONLY_FAILED"}
+    return
+  }
   $reference=Get-Content $old -Raw -Encoding UTF8 | ConvertFrom-Json
   if($reference.Count -ne 300){throw "RAN_OLD_COHORT_COUNT: expected exactly 300 original train+dev race IDs, got $($reference.Count)"}
   $trainCount=@($reference | Where-Object {$_.tarih -ge "2026-08-16" -and $_.tarih -le "2026-08-25"}).Count
