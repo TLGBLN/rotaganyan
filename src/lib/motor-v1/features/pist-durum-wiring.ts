@@ -36,7 +36,7 @@ export type PistDurumContext = {
  * güvenli), false ise (backtest/geçmiş yarış) DAİMA `immutablePreRaceSnapshot=false` —
  * UYDURULMAZ.
  */
-export async function loadPistDurumContext(raceId: string): Promise<PistDurumContext | null> {
+export async function loadPistDurumContext(raceId: string, sharedFieldSizeResolver?: FieldSizeResolverFn): Promise<PistDurumContext | null> {
   const race = await db.race.findUnique({
     where: { id: raceId },
     select: {
@@ -66,7 +66,7 @@ export async function loadPistDurumContext(raceId: string): Promise<PistDurumCon
     immutablePreRaceSnapshot: isLiveUpcoming,
   };
 
-  return { target, resolver: createFieldSizeResolver() };
+  return { target, resolver: sharedFieldSizeResolver ?? createFieldSizeResolver() };
 }
 
 export type PistDurumRunnerResult = { no: number; score: GoingScoreResult };
