@@ -11,7 +11,7 @@ describe("RAN isolated local Postgres guard",()=>{
     expect(parse("postgresql://postgres@127.0.0.1:54329/ran_shadow_test").hostname).toBe("127.0.0.1");
   });
   it("blocks missing acknowledgement and production environment",()=>{
-    expect(()=>parse(LOCAL,undefined)).toThrow("ACK_REQUIRED");
+    expect(()=>isolatedRanDatabaseUrl(LOCAL,undefined,"test")).toThrow("ACK_REQUIRED");
     expect(()=>parse(LOCAL,"ran_shadow_test","production")).toThrow("PRODUCTION_FORBIDDEN");
   });
   it("rejects production, remote host, database mismatch, URL host overrides and missing port",()=>{
