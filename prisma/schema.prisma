@@ -1027,3 +1027,18 @@ model PageView {
   @@index([path])
   @@index([createdAt(sort: Desc)])
 }
+
+// RAN v1.0 — AYRI / shadow snapshot deposu. Prediction/Pick/HomeKupon'e DOKUNMAZ.
+// Bu modelin satiri bir yarış havuzu için analiz+sıralama+kuponu TEK JSON paketinde
+// saklar; eski satırlar guncellenmez. Yayin/aktiflik semantigi YOKTUR.
+model RanSnapshotBundle {
+  id                String   @id @default(cuid())
+  bundleKey         String   @unique
+  engineVersion     String
+  weightsFingerprint String
+  bundleGeneratedAt DateTime
+  payload           Json
+  createdAt         DateTime @default(now())
+
+  @@index([createdAt])
+}
