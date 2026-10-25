@@ -11,6 +11,7 @@ import { loadTrainedModel } from "./src/lib/rotaganyan-analiz-motoru/load-traine
 import { accuraceKosulari } from "./src/lib/accurace/loader";
 import type { RunnerFeatureVector } from "./src/lib/motor-v1/engine/feature-vector";
 import type { FittedModel } from "./src/lib/motor-v1/engine/training";
+import type { PedigreeEffect, PedigreeComparison } from "./src/lib/rotaganyan-analiz-motoru/rca/pedigree-breakdown";
 
 // DÜZELTME (2026-10-25): ESKİ varsayılan C:/tmp/ran-trained-model-FINAL.json'a (93 yarış/λ=60,
 // yanıltıcı "FINAL" adlı KÜÇÜK ÖRNEKLEM) SESSİZCE düşüyordu — kullanıcı talimatı madde 2/4:
@@ -37,6 +38,27 @@ function loadRows(): RanEgitimSatiri[] {
   const raw = JSON.parse(fs.readFileSync(DATA_PATH, "utf8"));
   const list: RanEgitimSatiri[] = Array.isArray(raw) ? raw : Object.values(raw);
   return list.filter((r) => r.winnerNo != null && r.vectors.length >= 3).slice(0, LIMIT);
+}
+
+
+const fmt = (x: number | null, digits = 4) => x == null ? "YOK" : x.toFixed(digits);
+const durum = (p: PedigreeEffect) => !p.present ? "SINYAL_YOK" : p.observed ? "GOZLEMLI" : "VERI_YOK";
+
+function yazPedigriKazanan(rows: readonly PedigreeEffect[]) {
+  console.log("  -- PEDIGRI: BABA / ANNE / ANNE BABASI (her zaman, ilk 5 filtresinden bağımsız) --");
+  for (const p of rows) {
+    console.log(`    ${p.label.padEnd(25)} durum=${durum(p).padEnd(11)} ham=${fmt(p.raw, 3).padStart(8)} beta=${fmt(p.coefficient).padStart(8)} katkı=${fmt(p.contribution).padStart(8)}`);
+    if (!p.observed) console.log(`      eksiklik: ${p.missingReason ?? "veri yok"}; eksiklik-göstergesi katkısı=${fmt(p.missingIndicatorContribution)}`);
+  }
+}
+function yazPedigriFark(rows: readonly PedigreeComparison[], label: string) {
+  console.log(`  -- PEDIGRI KARŞILAŞTIRMASI: KAZANAN vs ${label} --`);
+  for (const p of rows) {
+    console.log(`    ${p.label.padEnd(25)} kazanan=${fmt(p.winner.contribution).padStart(8)} (${durum(p.winner)}) rakip=${fmt(p.rival.contribution).padStart(8)} (${durum(p.rival)}) Δ=${fmt(p.delta).padStart(8)}`);
+    if (!p.winner.observed) console.log(`      kazanan eksik: ${p.winner.missingReason ?? "veri yok"}`);
+    if (!p.rival.observed) console.log(`      rakip eksik: ${p.rival.missingReason ?? "veri yok"}`);
+  }
+  console.log("    Δ pozitif: rakip lehine, negatif: kazanan lehine; verisizlik 0 gibi gösterilmez.");
 }
 
 async function main() {
@@ -81,9 +103,11 @@ async function main() {
     const satir = `raceId=${row.raceId} (${row.tarih}) kazanan=${result.winnerName}(No${result.winnerNo}) rank=${result.winnerRank}/${result.fieldSize}`;
     if (result.winnerRank === 1) {
       console.log(`[OK, TOP1] ${satir}`);
+      yazPedigriKazanan(result.winnerPedigree);
       continue;
     }
     console.log(`[OK, MISS] ${satir}`);
+    yazPedigriKazanan(result.winnerPedigree);
     if (result.top1Miss) {
       top1MissCount++;
       kategoriSayim.set(result.top1Miss.category, (kategoriSayim.get(result.top1Miss.category) ?? 0) + 1);
@@ -94,6 +118,7 @@ async function main() {
       for (const d of result.top1Miss.demotionDrivers) {
         console.log(`    ${d.code.padEnd(26)} kazanan=${d.winnerTotal.toFixed(4).padStart(8)} rakip=${d.rivalTotal.toFixed(4).padStart(8)} Δ=${d.delta.toFixed(4).padStart(8)}`);
       }
+      yazPedigriFark(result.top1Miss.pedigreeComparison, "TOP-1 rakibi");
     }
     if (result.winnerPositiveSignals && result.winnerPositiveSignals.length > 0) {
       console.log(`  -- KAZANANIN OLUMLU SİNYALLERİ (güçlü yönleri vardı ama yetmedi) --`);
@@ -106,6 +131,7 @@ async function main() {
       console.log(`  -- TOP3 KAÇIRMA ANALİZİ (rakip: 3.sıradaki ${result.top3Miss.rivalName}, No${result.top3Miss.rivalNo}) --`);
       console.log(`  Kategori: ${result.top3Miss.category}`);
       for (const e of result.top3Miss.evidence) console.log(`    ${e}`);
+      yazPedigriFark(result.top3Miss.pedigreeComparison, "TOP-3 sınırındaki rakip");
     }
     if (result.agfComparison) {
       console.log(`  AGF (yalnız karşılaştırma, skora GİRMEDİ): kazananın AGF sırası=${result.agfComparison.winnerAgfSirasi.toFixed(1)}, AGF payı=${result.agfComparison.winnerAgfPayi.toFixed(2)}% — ${result.agfComparison.not}`);
