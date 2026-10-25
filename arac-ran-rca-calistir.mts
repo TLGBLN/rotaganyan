@@ -124,7 +124,7 @@ async function main() {
     const raceStartedAt = Date.now();
     rcaProbeMark(`RACE_STARTED id=${row.raceId}`);
     console.log(`[RCA BASLADI] ${index + 1}/${rows.length} raceId=${row.raceId}`);
-    const result = await analyzeRaceDemotion(row.raceId, model, row.winnerNo!, preloadedRuns, sharedFieldSizeResolver);
+    const result = await analyzeRaceDemotion(row.raceId, model, row.winnerNo!, preloadedRuns, sharedFieldSizeResolver, (stage) => rcaProbeMark(`RACE_PHASE id=${row.raceId} phase=${stage} elapsedMs=${Date.now() - raceStartedAt}`));
     console.log(`[RCA TAMAMLANDI] ${index + 1}/${rows.length} raceId=${row.raceId} sure=${((Date.now() - raceStartedAt) / 1000).toFixed(1)}s status=${result.status}`);
     rcaProbeMark(`RACE_FINISHED id=${row.raceId} status=${result.status} elapsedMs=${Date.now() - raceStartedAt}`);
     if (result.status === "STALE") {
