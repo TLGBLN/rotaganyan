@@ -79,7 +79,8 @@ export async function computeUnifiedFamiliesForRace<C extends string = string>(
   raceId: string,
   fittedModel?: FittedModel<C>,
   sharedFieldSizeResolver?: FieldSizeResolverFn,
-  suppliedTempoContext?: TempoContext
+  suppliedTempoContext?: TempoContext,
+  onRcaPhase?: (stage: string) => void
 ): Promise<UnifiedRunnerResult[]> {
   // RCA, kendi frozen Accurace kaynaklı contextini verdiğinde raceId-only memoization
   // kullanılamaz: başka tarihli arşivden kalmış sonuçla karışma riski olur.
@@ -92,14 +93,15 @@ export async function computeUnifiedFamiliesForRace<C extends string = string>(
     promise.catch(() => modellessResultCache.delete(raceId));
     return promise;
   }
-  return computeUnifiedFamiliesForRaceUncached(raceId, fittedModel, sharedFieldSizeResolver, suppliedTempoContext);
+  return computeUnifiedFamiliesForRaceUncached(raceId, fittedModel, sharedFieldSizeResolver, suppliedTempoContext, onRcaPhase);
 }
 
 async function computeUnifiedFamiliesForRaceUncached<C extends string = string>(
   raceId: string,
   fittedModel?: FittedModel<C>,
   sharedFieldSizeResolver?: FieldSizeResolverFn,
-  suppliedTempoContext?: TempoContext
+  suppliedTempoContext?: TempoContext,
+  onRcaPhase?: (stage: string) => void
 ): Promise<UnifiedRunnerResult[]> {
   const race = await db.race.findUnique({
     where: { id: raceId },
@@ -114,13 +116,16 @@ async function computeUnifiedFamiliesForRaceUncached<C extends string = string>(
     },
   });
   if (!race) return [];
+  onRcaPhase?.("V1_RACE_LOADED");
   const cutoff = race.raceDay.date;
   const davRaceKey = ortakYarisAnahtari(race.raceDay.hippodrome.name, `${String(cutoff.getUTCDate()).padStart(2,"0")}.${String(cutoff.getUTCMonth()+1).padStart(2,"0")}.${cutoff.getUTCFullYear()}`, String(race.raceNo));
 
   const [tempoCtx, galopPaceIndex, pistCtxOrNull] = await Promise.all([suppliedTempoContext ?? loadTempoContext(), loadGalopPaceIndex(), loadPistDurumContext(raceId, sharedFieldSizeResolver)]);
+  onRcaPhase?.("V1_CONTEXT_LOADED");
   if (!pistCtxOrNull) return []; // race zaten yukarida dogrulandi, bu pratikte olusmaz
   const pistCtx = pistCtxOrNull;
   const safVectors = await buildFeatureVectorsForRace(raceId, tempoCtx, sharedFieldSizeResolver); // SAF 20 - hesaplama DEĞİŞTİRİLMEDİ
+  onRcaPhase?.("V1_20_SIGNALS_FINISHED");
   const safByNo = new Map(safVectors.map((v) => [v.no, v]));
 
   // --- rowsJson gerekiyor (HorseRaceHistoryCache) - DAV/RAK icin, FORM ile AYNI kaynak ---
@@ -129,6 +134,7 @@ async function computeUnifiedFamiliesForRaceUncached<C extends string = string>(
     ? await db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: tjkIds } }, select: { tjkAtId: true, rowsJson: true } })
     : [];
   const rowsJsonByTjk = new Map(cacheRows.map((c) => [c.tjkAtId, c.rowsJson]));
+  onRcaPhase?.("V1_HISTORY_LOADED");
 
   const pmzHam = new Map(race.runners.map((r) => {
     const v = safByNo.get(r.no);
@@ -140,6 +146,7 @@ async function computeUnifiedFamiliesForRaceUncached<C extends string = string>(
     race.breed, race.surface, race.distance, cutoff, pmzHam
   );
   const genByNo = new Map(genResults.map((g) => [g.no, g.signals]));
+  onRcaPhase?.("V1_PEDIGREE_FINISHED");
 
   const rakByNo = computeRakH2HForRace(
     race.runners.map((r) => ({ no: r.no, name: r.name, tjkAtId: r.tjkAtId, rowsJson: rowsJsonByTjk.get(r.tjkAtId ?? -1) ?? [] })),
@@ -171,6 +178,7 @@ async function computeUnifiedFamiliesForRaceUncached<C extends string = string>(
   const jokeyTrendByNo = new Map(jokeyTrendPairs);
   const antTrendPairs = await Promise.all(race.runners.map(async (r) => [r.no, await computeAntrenorTrend30(r.trainer, cutoff)] as const));
   const antTrendByNo = new Map(antTrendPairs);
+  onRcaPhase?.("V1_TRENDS_FINISHED");
 
   // Kök N+1 düzeltmesi: eski kod her atın pist durumu/başlangıç riskini
   // 13 at için TEK TEK bekliyordu. Hesaplayıcıların kendileri ve değerler
@@ -187,6 +195,7 @@ async function computeUnifiedFamiliesForRaceUncached<C extends string = string>(
   ]);
   const pistByNo = new Map(pistPairs);
   const startRiskByNo = new Map(startRiskPairs);
+  onRcaPhase?.("V1_START_RISK_FINISHED");
 
   const results: UnifiedRunnerResult[] = [];
   for (const r of race.runners) {
