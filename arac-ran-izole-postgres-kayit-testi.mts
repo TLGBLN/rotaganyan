@@ -6,6 +6,8 @@
 // BASLATMA: RAN_TEST_DATABASE_URL=postgresql://postgres@localhost:54329/ran_shadow_test
 //             RAN_TEST_LOCAL_DB_ACK=ran_shadow_test
 import fs from "node:fs";
+import { isDeepStrictEqual } from "node:util";
+import type { RanBundleLeg } from "./src/lib/rotaganyan-analiz-motoru/ran-snapshot-bundle";
 import { Client } from "pg";
 import { isolatedRanDatabaseUrl } from "./src/lib/rotaganyan-analiz-motoru/isolated-db-guard";
 
@@ -93,10 +95,10 @@ async function main() {
     if (picked.length !== 6) throw new Error("RAN_TEST_NEEDS_SIX_DISTINCT_VALID_ACCEPTANCE_RACES");
 
     const model = modelModule.loadTrainedModel();
-    const engineVersion = "1.0";
+    const engineVersion = (await import("./src/lib/rotaganyan-analiz-motoru/engine-versions")).getCurrentRanEngineVersion().surum;
     const fp = integrityModule.computeWeightsFingerprint(model);
     const generatedAt = new Date().toISOString();
-    const legs: bundleModule.RanBundleLeg[] = picked.map((race, idx) => {
+    const legs: RanBundleLeg[] = picked.map((race, idx) => {
       const ranked = trainingModule.scoreRace(race.vectors, model).sort((a, b) => b.probability - a.probability);
       const vectorsByNo = new Map(race.vectors.map((v) => [v.no, v]));
       return {
@@ -129,7 +131,7 @@ async function main() {
     const read = await store.loadRanSnapshotBundle(a.id);
     if (!read || read.bundleKey !== snapshot.bundleKey ||
         read.analyses.length !== 6 ||
-        JSON.stringify(read.coupon) !== JSON.stringify(snapshot.coupon)) {
+        !isDeepStrictEqual(read.coupon, snapshot.coupon)) {
       throw new Error("RAN_REAL_DB_READBACK_MISMATCH");
     }
     for (let i = 0; i < 6; i++) {
