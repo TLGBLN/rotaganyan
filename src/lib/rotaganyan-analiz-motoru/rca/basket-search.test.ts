@@ -50,12 +50,14 @@ describe("RAN v1.0 global SIGNAL BASKETS, not singleton filtering",()=>{
     expect(front).toContain(stronger);
     expect(front).toContain(tradeoff);
   });
-  it("does not REQUIRE both Saf Model D and V1 source tags in winning basket",()=>{
+  it("does not promote a speed/form-only contender despite attractive TOP1/TOP3",()=>{
     const full=result([...c],20,65,2.14);
-    const contender=result(c.slice(0,5),24,69,2.10);
-    const decision=chooseBasketFromConfirmation([full,contender],full);
-    expect(decision.selected).toBe(contender);
-    expect(decision.status).toBe("RESEARCH_BASKET_BEATS_FULL");
+    const incomplete=result(["SPEED","ACC_SPEED","RIVAL_GAP",
+      "JOCKEY_LONG_TERM","FORM_LEVEL","WEIGHT_DISTANCE"],24,69,2.10);
+    const decision=chooseBasketFromConfirmation([full,incomplete],full);
+    expect(decision.selected).toBe(full);
+    expect(decision.status).toBe("RESEARCH_FULL36_RETAINED");
+    expect(decision.front).not.toContain(incomplete);
   });
   it("returns original full basket if TOP1 gain requires TOP3 regression or bad LogLoss",()=>{
     const full=result([...c],20,65,2.1);
