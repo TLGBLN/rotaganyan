@@ -42,7 +42,13 @@ function loadRows(): Row[] {
 function dayBoundarySplit(rows: Row[], holdoutFraction: number): { train: Row[]; holdout: Row[]; splitDate: string } {
   const dates = [...new Set(rows.map((r) => r.tarih))].sort();
   const splitIdx = Math.max(1, Math.floor(dates.length * (1 - holdoutFraction)));
-  const splitDate = dates[splitIdx] ?? dates[dates.length - 1];
+  // Pinned original chronology for PIT rebuild: training 16–25 August and
+  // development 26–28 August. No tuning on the old October acceptance races.
+  const splitDate = process.env.RAN_SPLIT_DATE ?? (dates[splitIdx] ?? dates[dates.length - 1]);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(splitDate) ||
+      splitDate<=dates[0] || splitDate>dates[dates.length-1]) {
+    throw new Error("RAN_SPLIT_DATE invalid/outside actual dataset");
+  }
   const train = rows.filter((r) => r.tarih < splitDate);
   const holdout = rows.filter((r) => r.tarih >= splitDate);
   return { train, holdout, splitDate };
@@ -117,6 +123,9 @@ async function main() {
   }
 
   const { train, holdout, splitDate } = dayBoundarySplit(rows, HOLDOUT_FRACTION);
+  if (train.length<30 || holdout.length<10) {
+    throw new Error("RAN_PIT_SPLIT_INCOMPLETE: expected >=30 train and >=10 development races");
+  }
   console.log(`Gün-sınırlı ayrım: splitDate=${splitDate} → train=${train.length} yarış (${train[0]?.tarih}..${train[train.length - 1]?.tarih}), holdout=${holdout.length} yarış (${holdout[0]?.tarih}..${holdout[holdout.length - 1]?.tarih})`);
 
   const trainVectors = train.flatMap((r) => r.vectors);
