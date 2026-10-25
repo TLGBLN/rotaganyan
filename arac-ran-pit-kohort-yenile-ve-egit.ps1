@@ -12,7 +12,8 @@ $dataset="$prefix-train-dev.json"
 $model="$prefix-trained-model.json"
 $envNames=@("RAN_COHORT_FILE","RAN_CHECKPOINT","RAN_OUT","RAN_LIMIT","RAN_CONCURRENCY",
             "RAN_DATE_FROM","RAN_DATE_TO","RAN_DATASET_TAG",
-            "RAN_IN","RAN_MODEL_OUT","RAN_SPLIT_DATE","RAN_LAMBDA","RAN_LR","RAN_ITER")
+            "RAN_IN","RAN_MODEL_OUT","RAN_SPLIT_DATE","RAN_LAMBDA","RAN_LR","RAN_ITER",
+            "RAN_PIT_QUIET_DB_LOG")
 $previous=@{}
 foreach($name in $envNames){$previous[$name]=[Environment]::GetEnvironmentVariable($name,"Process")}
 try {
@@ -33,6 +34,9 @@ try {
   [Environment]::SetEnvironmentVariable("RAN_DATE_FROM","2026-08-16","Process")
   [Environment]::SetEnvironmentVariable("RAN_DATE_TO","2026-08-28","Process")
   [Environment]::SetEnvironmentVariable("RAN_DATASET_TAG","RAN_PIT_20261025_SIRE_SPEED","Process")
+  # Offline 300-race run can execute thousands of Prisma queries. SQL text does
+  # not help diagnose progress and causes enormous terminal output; errors stay.
+  [Environment]::SetEnvironmentVariable("RAN_PIT_QUIET_DB_LOG","1","Process")
   Write-Host "[RAN_PIT] Checking TypeScript before any real DB reads..."
   & npx tsc --noEmit -p tsconfig.json
   if($LASTEXITCODE -ne 0){throw "RAN_PIT_TYPESCRIPT_FAIL"}
