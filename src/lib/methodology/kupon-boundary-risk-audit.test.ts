@@ -35,6 +35,29 @@ describe("Adana-style normal-only boundary audit (SHADOW, never winner-driven)",
     expect(result.normalOnly).toEqual([{raceNo:1,no:10},{raceNo:2,no:5}]);
     expect(result.selectionGate).toBe("NOT_VERIFIED");
   });
+  it("swaps two immediately excluded marginal horses without changing ANY leg count or economic cost",()=>{
+    const a=auditKuponBoundary(legs,4,9);
+    const sameCost=a.fixedBudgetSwaps.find(p=>p.forcedBoundary.length===2);
+    expect(sameCost).toBeDefined();
+    expect(sameCost!.result.secimler[1]).toEqual([3,10]);
+    expect(sameCost!.result.secimler[2]).toEqual([4,5]);
+    expect(sameCost!.result.toplamKombinasyon).toBe(a.baseline.toplamKombinasyon);
+    expect(sameCost!.result.birimSayilari).toEqual(a.baseline.birimSayilari);
+    expect(sameCost!.changes).toEqual([
+      {raceNo:1,added:[10],removed:[6]},
+      {raceNo:2,added:[5],removed:[3]},
+    ]);
+    expect(sameCost!.modeledCoverageDelta).toBeLessThanOrEqual(1e-10);
+    expect(sameCost!.actuallyAddsAll).toBe(true);
+  });
+  it("does not swap out admin-forced selections, and respects same price for horse units",()=>{
+    const guarded=legs.map((l,i)=>i===0?{...l,forced:{include:[6],exclude:[]}}:l);
+    const a=auditKuponBoundary(guarded,4,9);
+    expect(a.fixedBudgetSwaps.every(p=>
+      p.changes.every(c=>c.raceNo!==1||!c.removed.includes(6)))).toBe(true);
+    expect(a.fixedBudgetSwaps.every(p=>
+      p.result.toplamKombinasyon===a.baseline.toplamKombinasyon)).toBe(true);
+  });
   it("can force both near-boundary candidates ONLY by removing other choices at same budget",()=>{
     const result=auditKuponBoundary(legs,4,9);
     const insured=result.proposals.find(p=>p.forcedBoundary.length===2);
