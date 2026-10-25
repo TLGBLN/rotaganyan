@@ -1,6 +1,11 @@
 // RAN'a özel, izole/salt-okuma RCA önizlemesi.
 // Eski /admin/root-cause (V5.46.1) ve production tahmin akışları değiştirilmez.
 // Yönetici layout'u auth()+EDITOR eşiğini uygular; yarış analizi ancak geçerli query ile başlar.
+// Yalnız RAN RCA önizleme sayfası: hesaplamayı Supabase'in Seul (ap-northeast-2)
+// bölgesiyle aynı Vercel bölgesine yönlendir. Diğer production rotaları ETKİLENMEZ.
+// Gerçek region, ancak preview deployment Function metadata/loglarından doğrulanır.
+export const preferredRegion = "icn1";
+
 import { loadTrainedModel } from "@/lib/rotaganyan-analiz-motoru/load-trained-model";
 import { analyzeRaceDemotion, type MissAnalysis } from "@/lib/rotaganyan-analiz-motoru/rca/analyze-race";
 import type { PedigreeComparison, PedigreeEffect } from "@/lib/rotaganyan-analiz-motoru/rca/pedigree-breakdown";
