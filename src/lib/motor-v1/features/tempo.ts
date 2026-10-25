@@ -37,6 +37,24 @@ import { classifyCoverage, type CoverageState } from "./common";
 
 export type TempoContext = { byTjk: Map<number, AccuraceRun[]> };
 
+// RAN RCA aynı sabit Accurace snapshot'ını hem D hem V1 TEMPO'da kullanır.
+// Yalnız çağıran açıkça runs verdiğinde çalışır; mevcut disk/production yolu değişmez.
+// Tarih kısıtlamasını styleVector(r.date < target.date) aynen uygular.
+const suppliedTempoContexts = new WeakMap<AccuraceRun[], TempoContext>();
+export function tempoContextFromRuns(runs: AccuraceRun[]): TempoContext {
+  const cached = suppliedTempoContexts.get(runs);
+  if (cached) return cached;
+  const byTjk = new Map<number, AccuraceRun[]>();
+  for (const r of runs) {
+    const existing = byTjk.get(r.tjk);
+    if (existing) existing.push(r);
+    else byTjk.set(r.tjk, [r]);
+  }
+  const ctx = { byTjk };
+  suppliedTempoContexts.set(runs, ctx);
+  return ctx;
+}
+
 /** TÜM Accurace arşivini BİR KEZ yükler (pahalı) — çağıran taraf bir yarış/toplu eğitim
  *  turu boyunca AYNI context'i paylaşmalı (history-source.ts'teki resolver deseniyle AYNI
  *  N+1 önleme disiplini).
