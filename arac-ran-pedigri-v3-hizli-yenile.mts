@@ -17,7 +17,7 @@ type OriginalRace={
   raceId:string;tarih:string;winnerNo:number;vectors:RunnerFeatureVector[];
 };
 type RefreshedRace=OriginalRace & {
-  pedigreeV2:{
+  pedigreeV3:{
     version:typeof PEDIGREE_V3_VERSION;
     lines:Record<number,AdjustedLineage[]>;
   };
@@ -85,7 +85,7 @@ async function main(){
     if(vectors.some((v,j)=>v.signals.some((s,k)=>!diff.has(s.code) &&
        JSON.stringify(s)!==JSON.stringify(row.vectors[j].signals[k]))))
       throw new Error("RAN_PED_V3_NONPEDIGREE_INPUT_CHANGED");
-    saved[row.raceId]={...row,vectors,pedigreeV2:{version:PEDIGREE_V3_VERSION,lines:pedigreeLines}};
+    saved[row.raceId]={...row,vectors,pedigreeV3:{version:PEDIGREE_V3_VERSION,lines:pedigreeLines}};
     // One race at a time; no completed race is recollected if interrupted.
     atomic(cp,saved);
     console.log("[RAN_PED_V3] "+Object.keys(saved).length+"/300 "+row.raceId+
@@ -99,7 +99,7 @@ async function main(){
     const r=updated[i],reference=all[i];
     if(r.raceId!==reference.raceId || r.tarih!==reference.tarih ||
        r.winnerNo!==reference.winnerNo ||
-       r.pedigreeV2?.version!==PEDIGREE_V3_VERSION ||
+       r.pedigreeV3?.version!==PEDIGREE_V3_VERSION ||
        r.vectors.length!==reference.vectors.length)
       throw new Error("RAN_PED_V3_COHORT_OR_RESULT_CHANGED");
     assertWeightedPedigreeVectors(r.vectors);
@@ -124,7 +124,7 @@ async function main(){
         !v.signals.find(s=>s.code===l.code)?.observed).length,0),
     }])),
     originalCanonicalModelUnmodified:true,publicationGate:"BLOCKED",
-    warning:"V2 transforms inputs. Old 36-feature betas CANNOT be applied; MUST retrain a separate V2 model.",
+    warning:"V3 corrects offspring-weighted pedigree inputs. Neither V2 nor legacy 36-feature betas are valid; fit a NEW basket model.",
   };
   atomic(out+".manifest.json",diagnostics);
   console.log("[RAN_PED_V3] PASS 300/300, 3 ancestry lines EACH horse, 33 other features untouched.");
