@@ -2,6 +2,7 @@
 // DB bagimliligi yoktur; canli AGF degisimi veya re-analysis bu paketi degistirmez.
 import { createHash } from "node:crypto";
 import { optimizeKuponAllocation, type OptimizeResult, type LegProbability } from "@/lib/methodology/kupon-optimizer";
+import { auditKuponBoundary } from "@/lib/methodology/kupon-boundary-risk-audit";
 import { computePreRaceDataSnapshotId, sumSnapshotSignalContributions, type RanPredictionSnapshot } from "./snapshot-integrity";
 import { UNIFIED_MODEL_CODES } from "./unified-model-codes";
 
@@ -142,4 +143,23 @@ export function readRanSnapshotBundle(bundle: RanSnapshotBundle) {
     })),
     coupon: bundle.coupon,
   };
+}
+
+/**
+ * SHADOW ONLY: run budget-neutral Normal-only boundary rescues using exactly
+ * the SAME verified frozen snapshot as analysis/ranking/coupon.
+ * No result is written, no live AGF is read, no published coupon is changed.
+ */
+export function auditRanBundleCouponBoundary(bundle: RanSnapshotBundle, normalMaxCombinations: number) {
+  verifyRanSnapshotBundle(bundle);
+  const legs: LegProbability[]=bundle.legs.map(leg=>({
+    raceNo:leg.raceNo,
+    runners:leg.runners.map(r=>({
+      no:r.no,olasilik:r.winProbability,ekuriGroup:r.ekuriGroup??null,
+    })),
+  }));
+  const report=auditKuponBoundary(legs,bundle.couponMaxCombinations,normalMaxCombinations);
+  ensure(JSON.stringify(report.baseline)===JSON.stringify(bundle.coupon),
+    "boundary baseline differs from frozen coupon");
+  return {bundleKey:bundle.bundleKey,engineVersion:bundle.engineVersion,generatedAt:bundle.bundleGeneratedAt,...report};
 }
