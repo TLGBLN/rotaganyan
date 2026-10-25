@@ -11,6 +11,7 @@ import { loadTrainedModel } from "./src/lib/rotaganyan-analiz-motoru/load-traine
 import { accuraceKosulari } from "./src/lib/accurace/loader";
 import type { RunnerFeatureVector } from "./src/lib/motor-v1/engine/feature-vector";
 import type { FittedModel } from "./src/lib/motor-v1/engine/training";
+import { createFieldSizeResolver } from "./src/lib/motor-v1/features/history-source";
 import type { PedigreeEffect, PedigreeComparison } from "./src/lib/rotaganyan-analiz-motoru/rca/pedigree-breakdown";
 
 // DÜZELTME (2026-10-25): ESKİ varsayılan C:/tmp/ran-trained-model-FINAL.json'a (93 yarış/λ=60,
@@ -85,13 +86,15 @@ async function main() {
   const preloadedRuns = await accuraceKosulari();
   console.log(`Accurace arşivi çekildi: ${preloadedRuns.length} koşu, ${((Date.now() - t0) / 1000).toFixed(1)}s\n`);
 
+  // Yalnız bu RCA komutunun ömrü boyunca paylaşılır; canlı/production tahmin önbelleği değildir.
+  const sharedFieldSizeResolver = createFieldSizeResolver();
   let okCount = 0, staleCount = 0, top1MissCount = 0, top3MissCount = 0;
   const kategoriSayim = new Map<string, number>();
 
   for (const [index, row] of rows.entries()) {
     const raceStartedAt = Date.now();
     console.log(`[RCA BASLADI] ${index + 1}/${rows.length} raceId=${row.raceId}`);
-    const result = await analyzeRaceDemotion(row.raceId, model, row.winnerNo!, preloadedRuns);
+    const result = await analyzeRaceDemotion(row.raceId, model, row.winnerNo!, preloadedRuns, sharedFieldSizeResolver);
     console.log(`[RCA TAMAMLANDI] ${index + 1}/${rows.length} raceId=${row.raceId} sure=${((Date.now() - raceStartedAt) / 1000).toFixed(1)}s status=${result.status}`);
     if (result.status === "STALE") {
       staleCount++;
