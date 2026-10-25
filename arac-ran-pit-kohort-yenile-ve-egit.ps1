@@ -56,33 +56,7 @@ try {
   }
   # Fail before loading Prisma/starting a 300-race collection. Never echo URL,
   # passwords or entire env file contents.
-  $dbPreflight=@'
-const raw=process.env.DATABASE_URL;
-if(!raw){console.error("[RAN_DB_CONFIG_MISSING] DATABASE_URL yok. .env.local veya .env dosyasina ekleyin; alternatif: RAN_ENV_FILE ile mevcut guvenli env dosyanizin yolunu verin.");process.exit(2);}
-try {
-  const url=new URL(raw);
-  if(!["postgresql:","postgres:"].includes(url.protocol) || !url.hostname || !url.pathname || url.pathname==="/"){
-    throw new Error("not a PostgreSQL connection URL");
-  }
-} catch {console.error("[RAN_DB_CONFIG_INVALID] DATABASE_URL gecerli bir PostgreSQL URL degil (icerik gizlendi).");process.exit(3);}
-(async()=>{
-  const { Client }=require("pg");
-  const client=new Client({connectionString:raw,connectionTimeoutMillis:7000,query_timeout:7000});
-  try {
-    await client.connect();
-    const result=await client.query("SELECT 1 AS ready");
-    if(result.rows[0]?.ready!==1)throw new Error("unexpected result");
-    console.log("[RAN_DB_CONFIG] Gercek PostgreSQL baglantisi OK (SELECT 1). Yalniz okuma; sifre gizli.");
-  } catch(error) {
-    console.error("[RAN_DB_CONNECT_FAIL] Sunucuya baglanilamadi. Hata kodu: "+(error?.code??"NO_CODE")+
-      ". Baglanti dosyasi, ag/VPN, kullanici ve parola kontrol edilmeli. Kimlik bilgileri gizli.");
-    process.exitCode=4;
-  } finally {
-    await client.end().catch(()=>undefined);
-  }
-})();
-'@
-  & node @dbEnvArgs -e $dbPreflight
+  & node @dbEnvArgs ./arac-ran-db-onkontrol.cjs
   if($LASTEXITCODE -ne 0){throw "RAN_PIT_DATABASE_CONFIG_FAIL: veri toplama baslatilmadi"}
 
   Write-Host "[RAN_PIT] Recalculating exact original 238 TRAIN + 62 DEV race IDs with repaired SIRE/SPEED"
