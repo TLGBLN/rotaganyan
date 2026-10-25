@@ -79,6 +79,13 @@ function frozenLegs(input: readonly RanBundleLeg[]): RanFrozenLeg[] {
       pSum += r.winProbability;
     }
     ensure(Math.abs(pSum-1) < 1e-9, "probability sum !=1");
+    // Model softmax'i ile kayitli olasilik ayni olmalı; yalnız toplamin 1 olmasi yetmez.
+    const maxScore=Math.max(...leg.runners.map(r=>r.finalScore));
+    const expScores=leg.runners.map(r=>Math.exp(r.finalScore-maxScore));
+    const expSum=expScores.reduce((a,b)=>a+b,0);
+    ensure(Number.isFinite(expSum) && expSum>0, "invalid score distribution");
+    ensure(leg.runners.every((r,i)=>Math.abs(r.winProbability-expScores[i]/expSum)<=1e-9),
+      "softmax score/probability mismatch");
     ensure(isExactPermutation(leg.runners.map(r=>r.originalRank), leg.runners.length), "originalRank not permutation");
     ensure(isExactPermutation(leg.runners.map(r=>r.publishedRank), leg.runners.length), "publishedRank not permutation");
   }
