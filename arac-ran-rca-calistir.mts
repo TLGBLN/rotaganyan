@@ -243,7 +243,7 @@ async function main() {
 }
 
 main()
-  .then(() => process.exit(0))
+  .then(() => process.exit(process.exitCode ?? 0))
   .catch((e) => {
     console.error("HATA:", e);
     process.exit(1);
