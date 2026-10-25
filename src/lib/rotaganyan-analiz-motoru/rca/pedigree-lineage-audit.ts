@@ -18,6 +18,7 @@ export type PedigreeEvidence = {
   rawMean:number|null; rawMin:number|null; rawMax:number|null;
   countOfHistoricalStartsAvailableInVector:boolean;
   documentedStartSamples:number;observedWithAtMost2Starts:number;
+  observedWithoutHorseId:number;
   minHistoricalStarts:number|null;maxHistoricalStarts:number|null;
   caveat:string;
 };
@@ -43,11 +44,13 @@ export function pedigreeCoverage(rows:readonly FeatureRace[]):PedigreeEvidence[]
     let observed=0,missing=0,rawZeroCount=0,rawHundredCount=0;
     let sum=0,min=Infinity,max=-Infinity;
     let documentedStartSamples=0,observedWithAtMost2Starts=0;
+    let observedWithoutHorseId=0;
     let minHistoricalStarts=Infinity,maxHistoricalStarts=0;
     for(const v of all){
       const s=v.signals.find(x=>x.code===code);
       if(!s || !s.observed || s.rawValue==null || !Number.isFinite(s.rawValue)){missing++;continue;}
       observed++;sum+=s.rawValue;
+      if(v.tjkAtId==null)observedWithoutHorseId++;
       min=Math.min(min,s.rawValue);max=Math.max(max,s.rawValue);
       if(s.sampleCount!=null && Number.isSafeInteger(s.sampleCount) && s.sampleCount>0){
         documentedStartSamples++;
@@ -63,7 +66,7 @@ export function pedigreeCoverage(rows:readonly FeatureRace[]):PedigreeEvidence[]
       rawZeroCount,rawHundredCount,
       rawMean:observed?sum/observed:null,rawMin:observed?min:null,rawMax:observed?max:null,
       countOfHistoricalStartsAvailableInVector:observed>0&&documentedStartSamples===observed,
-      documentedStartSamples,observedWithAtMost2Starts,
+      documentedStartSamples,observedWithAtMost2Starts,observedWithoutHorseId,
       minHistoricalStarts:documentedStartSamples?minHistoricalStarts:null,
       maxHistoricalStarts:documentedStartSamples?maxHistoricalStarts:null,
       caveat:code==="SIRE_HISTORY"?
@@ -87,6 +90,8 @@ export type PedigreeDiagnosticReport = {
 };
 export function auditPedigreeLineages(
   rows:readonly FeatureRace[],iterations=2500,
+  onProgress?:(completed:number,total:number,context:string,codes:readonly PedigreeCode[],
+    result:CombinationResult)=>void,
 ):PedigreeDiagnosticReport {
   if(rows.length!==238 || !Number.isSafeInteger(iterations) ||
      iterations<5 || iterations>2500)throw new Error("RAN_PEDIGREE_REQUIRES_238_PIT_TRAIN");
@@ -94,11 +99,15 @@ export function auditPedigreeLineages(
   const opts={lambda:90,learningRate:0.25,iterations};
   const experiments:PedigreeExperiment[]=[];
   const grouped:PedigreeDiagnosticReport["grouped"]=[];
+  let completed=0;
   for(const [context,base] of Object.entries(PEDIGREE_CONTEXTS)){
     const fits=PEDIGREE_SUBSETS.map(subset=>{
       const chosen=new Set([...base,...subset]);
       const codes=UNIFIED_MODEL_CODES.filter(c=>chosen.has(c));
-      return {subset,fit:evaluateCombination(folds,codes,opts)};
+      const fit=evaluateCombination(folds,codes,opts);
+      completed++;
+      onProgress?.(completed,32,context,subset,fit);
+      return {subset,fit};
     });
     const no=fits[0].fit;
     for(const {subset,fit} of fits){
@@ -120,7 +129,8 @@ export function auditPedigreeLineages(
     warnings:[
       "SIRE/DAM/DAMSIRE must remain distinct lineage candidates. Ranking alone never authorizes dropping a lineage.",
       "PIT sire uses shrinkage; PIT dam/damsire still expose unshrunk historical percentages. Do not compare raw coefficients as if they had identical reliability.",
-      "Historical sample size per lineage is not present in existing feature vectors: 0%/100% DAM/DAMSIRE observations may come from just one start.",
+      "Old 2026-10-25 PIT feature vectors have no pedigree historical-start counts: 0%/100% DAM/DAMSIRE may come from just one start. Future newly collected vectors can retain sampleCount.",
+      "When target horse tjkAtId is null, own-history exclusion cannot be independently guaranteed by this audit; see observedWithoutHorseId counts.",
       "This is a 238-race INTERNAL chronological selection audit. August 62 and October 60 were not used; a new independent prospective period is required.",
       "The same 3 chronological folds are reused across 32 pedigree combinations. Best folds are research candidates, not unbiased confirmation.",
     ]};
