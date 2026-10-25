@@ -25,7 +25,12 @@ function main(){
     throw new Error("RAN_PEDIGREE_REPORT_EXISTS: use a new RAN_PEDIGREE_OUT, no overwrite");
   console.log("[RAN_PEDIGREE] Three SEPARATE PIT lineages SIRE/DAM/DAMSIRE; 4 contexts x 8 subsets = 32 refits × 3 chrono folds.");
   console.log("[RAN_PEDIGREE] 238 training only; DEV-62/October-60 not used for selection. Iterations="+iterations+" Publication=BLOCKED.");
-  const result=auditPedigreeLineages(train,iterations);
+  const result=auditPedigreeLineages(train,iterations,(done,total,context,codes,model)=>{
+    console.log("[RAN_PEDIGREE] "+done+"/"+total+" "+context+
+      " lines="+(codes.join("+")||"NONE")+
+      " Top1="+model.top1Hits+"/"+model.n+" Top3="+model.top3Hits+"/"+model.n+
+      " LogLoss="+model.logLoss.toFixed(4));
+  });
   const sha=createHash("sha256").update(input).digest("hex");
   fs.mkdirSync(dirname(prefix),{recursive:true});
   fs.writeFileSync(prefix+".json",JSON.stringify({...result,sourceHash:sha,
@@ -37,11 +42,11 @@ function main(){
     "# ROTAGANYAN — SIRE / DAM / DAMSIRE ayrı ve kombinasyonlu denetim",
     "","**Yayın: BLOCKED.** 238 PIT yarışının 3 kronolojik iç katlaması. 62 DEV ve 60 kabul yarışının kazananları kullanılmadı.",
     "Kaynak SHA256: "+sha,"","## Mevcut pedigree sinyallerinin gerçekte gözlenen kapsamı",
-    "| Soy | Gözlem | Kapsam | n-start bilinen | <=2 start | 0% ham | 100% ham | Açıklama |",
-    "|---|---:|---:|---:|---:|---:|---:|---|",
+    "| Soy | Gözlem | Kapsam | n-start bilinen | <=2 start | Kimliği eksik/hesaplanmış | 0% ham | 100% ham | Açıklama |",
+    "|---|---:|---:|---:|---:|---:|---:|---:|---|",
     ...result.lineCoverage.map(x=>"| "+x.code+" | "+x.observed+"/"+x.runnerCount+
       " | "+(100*x.observedFraction).toFixed(1)+"% | "+x.documentedStartSamples+
-      " | "+x.observedWithAtMost2Starts+" | "+x.rawZeroCount+
+      " | "+x.observedWithAtMost2Starts+" | "+x.observedWithoutHorseId+" | "+x.rawZeroCount+
       " | "+x.rawHundredCount+" | "+x.caveat+" |"),
     "","## Tam 3 hat ve ikili/tekli alt kümelerin 4 bağlamda karşılaştırması",
   ];
