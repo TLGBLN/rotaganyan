@@ -132,7 +132,10 @@ export async function computeSafModelSignalsForRace(
   if (!faz1 || faz1.runners.length === 0) return null;
 
   const raceMeta = await db.race.findUnique({ where: { id: raceId }, select: { raceDay: { select: { date: true } } } });
-  const raceDate = raceMeta?.raceDay.date ?? new Date();
+  if (!raceMeta || !Number.isFinite(raceMeta.raceDay.date.getTime())) {
+    throw new Error("RAN_PIT_TARGET_RACE_DATE_REQUIRED: cannot use current date for historical signals");
+  }
+  const raceDate = raceMeta.raceDay.date;
   const target: TargetRace = {
     date: raceDate,
     length: faz1.race.distance,
