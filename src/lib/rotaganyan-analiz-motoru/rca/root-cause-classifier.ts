@@ -15,6 +15,20 @@
 // her classifyDemotion çağrısı `evidence` dizisinde HER kuralı bu sırayla etiketler —
 // "Fact: ..." (doğrudan ölçülen), "Interpretation: ..." (yorum, KESİN DEĞİL), "Action: ..."
 // (öneri). Hiçbir kategori "kesin kanıtlanmış hata" İDDİA ETMEZ, yalnız en uygun açıklama.
+//
+// DIRECT_CAUSE ≠ ROOT_CAUSE DİSİPLİNİ (eski root-cause.service.ts'in SMS/8D zincirinden —
+// bkz. o dosyanın başlık yorumu "EVENT → DIRECT_CAUSE(score explanation) → ... →
+// ROOT_CAUSE_HYPOTHESIS", madde 2: "'En negatif 3 katkı' ROOT_CAUSE DEĞİLDİR — bu yalnız
+// DIRECT_CAUSE/score explanation'dır." KOD KOPYALANMADI, AYNI İLKE burada yeniden uygulandı):
+// classifyDemotion'ın ürettiği 5 kategori (GORULMEDI/YANLIS_OKUNDU/EZILDI/GOLGELENDI/
+// AYIRT_EDILEMEDI) TEK bir yarışın TEK bir skor-açıklamasından türetilir — bunlar DIRECT_CAUSE
+// SEVİYESİNDEDİR, istatistiksel-doğrulanmış bir ROOT_CAUSE İDDİASI DEĞİLDİR. Eski RCA'da bu
+// ayrım MISS-vs-CONTROL global pattern + bootstrap CI (root-cause.service.ts::FeaturePattern)
+// ile sağlanıyordu; RAN'ın bu Faz 2 sürümünde HENÜZ çoklu-yarış istatistiksel doğrulama
+// katmanı YOK (bkz. teslim raporu "kalan sorunlar") — bu yüzden HER kategorinin `evidence`
+// dizisindeki "Action" satırı AÇIKÇA "tekrar ederse desen istatistiğine yükseltilmesi
+// düşünülsün" der, HİÇBİRİ "bu kesin bir model kusuru" İDDİA ETMEZ. Bir kategori, aynı kod
+// birden çok yarışta ısrarla en büyük sürücü çıkmadan ROOT_CAUSE'a YÜKSELTİLEMEZ.
 
 export type SignalEffectRowLike = {
   code: string;

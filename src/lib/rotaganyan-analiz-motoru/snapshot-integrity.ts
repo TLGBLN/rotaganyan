@@ -20,17 +20,90 @@
 // Bu dosya DB/network İMPORT ETMEZ — hem canlı koddan hem testten sorunsuz çağrılabilir.
 
 import { createHash } from "node:crypto";
+import type { SignalEffectRow } from "../motor-v1/engine/training";
 
+// FAZ 3 AŞAMA 1 GENİŞLETMESİ (2026-10-25, kullanıcı talimatı — kritik bulgu): BU DOSYANIN
+// ÖNCEKİ hali (RanSignalSnapshotEntry: {code, raw, observed, reliability}) explainRunner'ın
+// GERÇEK ürettiği standardizedValue/learnedCoefficient/scoreContribution/missingIndicator*
+// alanlarını HİÇ taşımıyordu. Bu eksikle RCA, bir snapshot'ı GERİYE dönüp açıklamak
+// istediğinde (ör. "bu at neden geride kaldı, hangi katsayı ne kadar etki etti") eski ham
+// veriden/eski model ağırlıklarından YENİDEN HESAPLAMA yapmak ZORUNDA kalırdı — ama o anki
+// canlı veri (Accurace arşivi, galop, jokey/antrenör trend pencereleri) ZAMANLA DEĞİŞTİĞİ
+// için yeniden hesaplama birebir AYNI sonucu vermeyebilir (point-in-time garantisi snapshot
+// ANINDA sağlanır, GERİYE dönük yeniden kurulamaz). Şimdi explainRunner'ın ürettiği HER
+// satır (SignalEffectRow) KAYIPSIZ taşınıyor — snapshot kendi kendine yeten bir kanıt.
 export type RanSignalSnapshotEntry = {
   code: string;
+  family: string | null;
   raw: number | null;
   observed: boolean;
   reliability: number;
+  coverageState: string | null;
+  /** explainRunner'ın modelVersion'u — training.ts::MODEL_VERSION, weightsFingerprint'ten
+   *  FARKLI bir kavram (hesaplama FORMÜLÜNÜN sürümü, ağırlıkların KENDİSİ değil). */
+  modelVersion: string;
+  standardizedValue: number;
+  learnedCoefficient: number;
+  scoreContribution: number;
+  missingIndicatorCoefficient: number;
+  missingIndicatorContribution: number;
 };
+
+/** explainRunner'ın ürettiği SignalEffectRow'dan, kayıpsız bire bir RanSignalSnapshotEntry'e
+ *  çevirir — route/test/RCA'nın HEPSİ bu TEK dönüşümü kullanır, elle alan kopyalayan ikinci
+ *  bir yer OLMAMALI (senkronizasyon dışı kalma riskini yapısal olarak kapatır). */
+export function toRanSignalSnapshotEntry(row: SignalEffectRow<string>): RanSignalSnapshotEntry {
+  return {
+    code: row.code,
+    family: row.family,
+    raw: row.rawValue,
+    observed: row.observed,
+    // NOT (reliability alanı): paylaşılan SignalEntry/SignalEffectRow sürekli bir reliability
+    // DEĞERİ taşımıyor — yalnız `observed` boolean'ı var. Burada 1/0 eşlemesi UYDURULMUŞ bir
+    // ara değer DEĞİL, eldeki TEK gerçek veri (gözlem durumu) doğrudan yansıtılıyor (route.ts'teki
+    // ÖNCEKİ davranışla AYNI, bkz. test-ran-engine/route.ts).
+    reliability: row.observed ? 1 : 0,
+    coverageState: row.coverageState,
+    modelVersion: row.modelVersion,
+    standardizedValue: row.standardizedValue,
+    learnedCoefficient: row.learnedCoefficient,
+    scoreContribution: row.scoreContribution,
+    missingIndicatorCoefficient: row.missingIndicatorCoefficient,
+    missingIndicatorContribution: row.missingIndicatorContribution,
+  };
+}
+
+/** Bütünlük testi (teslim raporu madde 4, Σkatkı=totalScore): snapshot'a YAZILMIŞ
+ *  değerlerden (explainRunner'ı TEKRAR ÇAĞIRMADAN, salt kayıtlı veriden) toplam skoru
+ *  yeniden kurar. explainRunner'ın KENDİ totalScore hesabıyla (training.ts satır ~245)
+ *  AYNI formül — kasıtlı olarak kopyalanmış TEK yer, iki formülün SESSİZCE AYRIŞMASI riski
+ *  yapısal olarak ortadan kalkar. */
+export function sumSnapshotSignalContributions(signals: readonly RanSignalSnapshotEntry[]): number {
+  return signals.reduce((acc, s) => acc + s.scoreContribution + s.missingIndicatorContribution, 0);
+}
+
+/** Yarış-öncesi-veri snapshot kimliği: HANGİ ham sinyal DEĞERLERİNİN (raw) bu tahmine girdiğinin
+ *  deterministik parmak izi — weightsFingerprint'ten BAĞIMSIZ bir kavram (o modelin/ağırlıkların
+ *  kimliği, bu VERİNİN kimliği). Aynı yarış için aynı ham veri → aynı id; Accurace/galop/jokey-trend
+ *  gibi ZAMANLA DEĞİŞEN kaynaklardan biri snapshot alındıktan SONRA güncellenirse (ör. backfill),
+ *  bu id farklı çıkar — "bu snapshot HALA o anki veriyi mi yansıtıyor" sorusuna snapshot'ın
+ *  KENDİSİNDEN (DB'ye geri gitmeden) kısmi bir cevap verir. code sırası da DAHİL edilir (kullanılan
+ *  özellik sırası değişirse id de değişir — "Kullanılan özellik sırası" teslim maddesiyle tutarlı). */
+export function computePreRaceDataSnapshotId(raceId: string, signals: readonly RanSignalSnapshotEntry[]): string {
+  const payload = JSON.stringify({
+    raceId,
+    signals: signals.map((s) => ({ code: s.code, raw: s.raw == null ? null : Number(s.raw.toFixed(10)), observed: s.observed })),
+  });
+  return createHash("sha256").update(payload).digest("hex");
+}
 
 export type RanPredictionSnapshot = {
   raceId: string;
   no: number;
+  /** Runner.id (Prisma cuid) — Pick.runnerId ile AYNI alan/tip, DB'ye yazılacağında doğrudan
+   *  eşlenir. tjkAtId'den FARKLI (TJK'nın dış kimliği, bu alan DEĞİL). Bazı runner'larda eşleşen
+   *  Runner satırı/tjkAtId olmayabilir — null, UYDURULMAZ. */
+  runnerId: string | null;
   engineVersion: string;
   weightsFingerprint: string;
   generatedAt: string; // ISO zaman damgası — üretim anı
@@ -40,6 +113,21 @@ export type RanPredictionSnapshot = {
   /** Yayınlanan/elle değiştirilmiş sıra — başlangıçta originalRank'e eşit, elle müdahale
    *  SADECE bunu değiştirir. "Kullanıcı ne gösterdi?" sorusunun cevabı. */
   publishedRank: number;
+  /** softmax'tan gelen kazanma olasılığı (training.ts::scoreRace) — saha İÇİNDE toplamı
+   *  matematiksel garantiyle 1.0. */
+  winProbability: number;
+  /** explainRunner'ın totalScore'u (= bu snapshot'taki signals'ın scoreContribution+
+   *  missingIndicatorContribution toplamı, bkz. sumSnapshotSignalContributions) — scoreRace'in
+   *  KENDİ score'uyla (dot(vector,beta), etkileşim terimi YOK, bkz. training.ts) BİREBİR aynı
+   *  değer, İKİ BAĞIMSIZ hesap yolundan (madde 3 testinin konusu). */
+  finalScore: number;
+  /** Bu snapshot'ın üretildiği anda kullanılan kanonik kod sırası (UNIFIED_MODEL_CODES) —
+   *  signals dizisinin SIRASI/kapsamı buna göre doğrulanabilir (validateSnapshot zaten bunu
+   *  yapıyor, bu alan o karşılaştırmanın GİRDİSİNİ snapshot'ın kendisine taşır). */
+  featureCodeOrder: readonly string[];
+  /** bkz. computePreRaceDataSnapshotId — null İSE henüz hesaplanmamış/taşınmamış (eski
+   *  snapshot'lardan geriye dönük uyumluluk, UYDURULMAZ). */
+  preRaceDataSnapshotId: string | null;
   signals: RanSignalSnapshotEntry[];
 };
 
@@ -69,7 +157,13 @@ export type SnapshotValidation = { status: "OK" | "STALE"; reasons: string[] };
  * durmaz), teşhis için.
  */
 export function validateSnapshot(
-  snapshot: Pick<RanPredictionSnapshot, "engineVersion" | "weightsFingerprint" | "signals">,
+  snapshot: Pick<RanPredictionSnapshot, "engineVersion" | "weightsFingerprint"> & {
+    // SADECE `code` okunur (aşağıya bakınız) — tam RanSignalSnapshotEntry[] İSTEMEK
+    // çağıranları (ör. analyze-race.ts'in STALE kapısı) ihtiyaç DUYMADIĞI standardizedValue/
+    // learnedCoefficient/... gibi alanları UYDURMAYA zorlardı. Bu daralmış tip, gerçek
+    // kullanımla (yalnız kod kümesi karşılaştırması) BİREBİR örtüşüyor.
+    signals: readonly Pick<RanSignalSnapshotEntry, "code">[];
+  },
   opts: { expectedCodes: readonly string[]; expectedFingerprint: string; expectedEngineVersion?: string }
 ): SnapshotValidation {
   const reasons: string[] = [];

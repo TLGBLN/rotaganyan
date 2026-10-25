@@ -95,6 +95,12 @@ async function main() {
         console.log(`    ${d.code.padEnd(26)} kazanan=${d.winnerTotal.toFixed(4).padStart(8)} rakip=${d.rivalTotal.toFixed(4).padStart(8)} Δ=${d.delta.toFixed(4).padStart(8)}`);
       }
     }
+    if (result.winnerPositiveSignals && result.winnerPositiveSignals.length > 0) {
+      console.log(`  -- KAZANANIN OLUMLU SİNYALLERİ (güçlü yönleri vardı ama yetmedi) --`);
+      for (const p of result.winnerPositiveSignals) {
+        console.log(`    ${p.code.padEnd(26)} raw=${p.rawValue?.toFixed(3) ?? "null"} toplamKatki=${p.totalContribution.toFixed(4)}`);
+      }
+    }
     if (result.top3Miss) {
       top3MissCount++;
       console.log(`  -- TOP3 KAÇIRMA ANALİZİ (rakip: 3.sıradaki ${result.top3Miss.rivalName}, No${result.top3Miss.rivalNo}) --`);

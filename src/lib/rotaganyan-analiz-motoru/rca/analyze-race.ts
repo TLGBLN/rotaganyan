@@ -26,6 +26,17 @@ export type MissAnalysis = {
   evidence: string[];
 };
 
+/** Kazananın GÜÇLÜ yönü — "neden kaybetti" (demotionDrivers, rakip-göreli) SORUSUNUN
+ *  TERSİ: bu at için TEK BAŞINA (rakipsiz) en olumlu katkı yapan sinyaller. Teslim raporu
+ *  Faz 2 madde 3: "sadece neden kaybetti değil, hangi güçlü yönleri vardı ama yetmedi" —
+ *  yalnız winnerRank>1 olduğunda dolu (winnerRank===1 ise açıklanacak bir "yetmedi" yok). */
+export type WinnerPositiveSignal = {
+  code: string;
+  rawValue: number | null;
+  /** scoreContribution + missingIndicatorContribution — explainRunner'ın SATIR TOPLAMI. */
+  totalContribution: number;
+};
+
 export type AgfComparison = {
   winnerAgfSirasi: number;
   winnerAgfPayi: number;
@@ -46,6 +57,7 @@ export type RaceRcaResult =
       ranked: { no: number; name: string; probability: number }[];
       top1Miss: MissAnalysis | null; // winnerRank>1 ise dolu
       top3Miss: MissAnalysis | null; // winnerRank>3 ise dolu (top1Miss'ten BAĞIMSIZ, farklı rakip: 3.sıradaki)
+      winnerPositiveSignals: WinnerPositiveSignal[] | null; // winnerRank>1 ise dolu (bkz. WinnerPositiveSignal)
       agfComparison: AgfComparison | null;
     };
 
@@ -56,6 +68,9 @@ export type RaceRcaResult =
  * arac-ran-rca-calistir.mts) accuraceKosulari()'nin HER yarış için (hatta aynı yarış içinde
  * HEM buildUnifiedFeatureVectorsForRace HEM crosscheckAlternativeSignals tarafından) tekrar
  * tekrar çağrılmasını önler — tek bir üst-seviye fetch, tüm raceId'ler arasında paylaşılır.
+ * AYNI disiplin gatherFaz1V5Historical için de BU fonksiyon içinde uygulanır (bkz. aşağıdaki
+ * `faz1` değişkeni, Faz 3 PERF yorumu) — raceId başına BİR KEZ çekilir, üç kullanım noktasına
+ * (feature build + alt-signal crosscheck + AGF karşılaştırması) PAYLAŞILIR.
  */
 export async function analyzeRaceDemotion(
   raceId: string,
@@ -63,7 +78,16 @@ export async function analyzeRaceDemotion(
   winnerNo: number,
   preloadedAccuraceRuns?: AccuraceRun[]
 ): Promise<RaceRcaResult> {
-  const { vectors } = await buildUnifiedFeatureVectorsForRace(raceId, preloadedAccuraceRuns);
+  // FAZ 3 PERF (teslim raporu madde 1 — GERÇEK profiling bulgusu): gatherFaz1V5Historical
+  // (v5-engine.ts, 11 paralel alt-sorgu/hesaplamalı AĞIR fonksiyon) ÖNCEDEN BU OTURUMDA
+  // raceId başına ÜÇ KEZ çağrılıyordu (buildUnifiedFeatureVectorsForRace içinde, SONRA
+  // crosscheckAlternativeSignals içinde TEKRAR, SONRA aşağıdaki AGF karşılaştırması için
+  // DOĞRUDAN). Burada BİR KEZ çekilip HER ÜÇ kullanım noktasına taşınır — v5-engine.ts'in
+  // KENDİSİ DEĞİŞMEDİ (V5.46.1 BİREBİR aynı davranır), yalnız RAN'ın KENDİ çağrı grafiği
+  // içindeki tekrar ELENİR.
+  const faz1 = await gatherFaz1V5Historical(raceId);
+
+  const { vectors } = await buildUnifiedFeatureVectorsForRace(raceId, preloadedAccuraceRuns, faz1);
   if (vectors.length === 0) return { status: "NO_DATA", raceId };
 
   // --- FAZ 1 KAPISI: STALE ise hiçbir şey işlenmez (eski RCA'nın OLCULMEDI disiplini) ---
@@ -92,7 +116,7 @@ export async function analyzeRaceDemotion(
   const winnerVec = vectors.find((v) => v.no === winnerNo)!;
   const winnerExplain = explainRunner(winnerVec, model);
 
-  const altRowsForRace = await crosscheckAlternativeSignals(raceId, preloadedAccuraceRuns);
+  const altRowsForRace = await crosscheckAlternativeSignals(raceId, preloadedAccuraceRuns, faz1);
   const altRowsForWinner = altRowsForRace.get(winnerNo) ?? [];
 
   async function miss(rivalNo: number): Promise<MissAnalysis> {
@@ -114,8 +138,19 @@ export async function analyzeRaceDemotion(
   const top1Miss = winnerRank > 1 ? await miss(ranked[0].no) : null;
   const top3Miss = winnerRank > 3 ? await miss(ranked[2].no) : null;
 
+  // Faz 2 madde 3: kazananın rakipsiz, TEK BAŞINA en olumlu katkılı sinyalleri — "güçlü
+  // yönleri vardı ama yetmedi" sorusunun cevabı. demotionDrivers'tan BAĞIMSIZ (orada rakip-
+  // göreli fark sıralanır, burada kazananın KENDİ satırları, yalnız pozitif katkı > 0).
+  const winnerPositiveSignals: WinnerPositiveSignal[] | null =
+    winnerRank > 1
+      ? winnerExplain.rows
+          .map((r) => ({ code: r.code, rawValue: r.rawValue, totalContribution: r.scoreContribution + r.missingIndicatorContribution }))
+          .filter((r) => r.totalContribution > 0)
+          .sort((a, b) => b.totalContribution - a.totalContribution)
+          .slice(0, 5)
+      : null;
+
   let agfComparison: AgfComparison | null = null;
-  const faz1 = await gatherFaz1V5Historical(raceId);
   const winnerFaz1 = faz1?.runners.find((r) => r.no === winnerNo);
   if (winnerFaz1) {
     agfComparison = {
@@ -135,6 +170,7 @@ export async function analyzeRaceDemotion(
     ranked: ranked.map((r) => ({ no: r.no, name: r.name, probability: r.probability })),
     top1Miss,
     top3Miss,
+    winnerPositiveSignals,
     agfComparison,
   };
 }

@@ -19,6 +19,7 @@ import { EXCLUDED_FROM_SCORING } from "@/lib/motor-v1/engine/predict-v1";
 import { buildUnifiedSignalVector, SIGNAL_SPECS, type SignalObservation, type SignalSource } from "../signal-integration";
 import type { AccuraceRun } from "@/lib/accurace/types";
 import type { RunnerFeatureVector, SignalEntry } from "@/lib/motor-v1/engine/feature-vector";
+import type { Faz1SonucV5 } from "@/lib/methodology/v5-engine";
 
 /** V1 unifiedVector'dan, bu entegrasyonda GERÇEKTEN kullanılacak (BLOCKED/ALTERNATIVE/
  *  interaction DIŞINDA) 20 kod — signal-integration.ts::SIGNAL_SPECS'teki "V1" + "INCLUDE"
@@ -59,6 +60,12 @@ for (const code of V1_INCLUDED_CODES) {
 export type UnifiedFeatureBuildResult = {
   vectors: RunnerFeatureVector[];
   diagnostics: { no: number; source: SignalSource; code: string; reason: string }[];
+  /** Runner.id (Prisma cuid, Pick.runnerId ile AYNI alan/tip) — no'ya göre. RunnerFeatureVector
+   *  (motor-v1'in paylaşılan, eğitim/V1.0 ile ORTAK tipi) tjkAtId taşır ama Runner.id'yi KASITLI
+   *  OLARAK taşımaz (o tip genişletilirse eğitim JSON cache'leri/diğer çağıranlar etkilenir) —
+   *  bu yüzden snapshot'ın runnerId alanını doldurmak isteyen çağıranlar (route.ts) AYRI bir DB
+   *  sorgusu YAPMADAN burada taşınan haritayı kullanır. */
+  runnerIdByNo: Map<number, string | null>;
 };
 
 /**
@@ -68,14 +75,19 @@ export type UnifiedFeatureBuildResult = {
  */
 export async function buildUnifiedFeatureVectorsForRace(
   raceId: string,
-  preloadedAccuraceRuns?: AccuraceRun[]
+  preloadedAccuraceRuns?: AccuraceRun[],
+  // FAZ 3 PERF (bkz. saf-model-signals.ts'teki AYNI isimli parametrenin yorumu) — analyze-race.ts
+  // raceId başına BİR KEZ gatherFaz1V5Historical çağırıp buraya taşır, bu fonksiyon KENDİ
+  // tekrar sorgusunu YAPMAZ. Verilmezse (ör. eğitim veri toplama script'leri) davranış AYNI:
+  // computeSafModelSignalsForRace kendi taze çağrısını yapar.
+  preloadedFaz1?: Faz1SonucV5 | null
 ): Promise<UnifiedFeatureBuildResult> {
   const [safResult, v1Results, runnerMeta] = await Promise.all([
-    computeSafModelSignalsForRace(raceId, preloadedAccuraceRuns),
+    computeSafModelSignalsForRace(raceId, preloadedAccuraceRuns, preloadedFaz1),
     computeUnifiedFamiliesForRace(raceId),
-    db.runner.findMany({ where: { raceId, scratched: false }, select: { no: true, name: true, tjkAtId: true, jockey: true } }),
+    db.runner.findMany({ where: { raceId, scratched: false }, select: { id: true, no: true, name: true, tjkAtId: true, jockey: true } }),
   ]);
-  if (!safResult || v1Results.length === 0) return { vectors: [], diagnostics: [] };
+  if (!safResult || v1Results.length === 0) return { vectors: [], diagnostics: [], runnerIdByNo: new Map() };
 
   const safByNo = new Map(safResult.runners.map((r) => [r.no, r]));
   const v1ByNo = new Map(v1Results.map((r) => [r.no, r]));
@@ -126,7 +138,8 @@ export async function buildUnifiedFeatureVectorsForRace(
     });
   }
 
-  return { vectors, diagnostics };
+  const runnerIdByNo = new Map(runnerMeta.map((r) => [r.no, r.id]));
+  return { vectors, diagnostics, runnerIdByNo };
 }
 
 /** Bu entegrasyonda GERÇEKTEN eğitime sunulan canonical kod listesi (35 kod) — training.ts'in

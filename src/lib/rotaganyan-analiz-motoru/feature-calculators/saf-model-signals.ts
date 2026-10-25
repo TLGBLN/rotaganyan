@@ -112,9 +112,20 @@ function sig(
  */
 export async function computeSafModelSignalsForRace(
   raceId: string,
-  preloadedRuns?: AccuraceRun[]
+  preloadedRuns?: AccuraceRun[],
+  // FAZ 3 PERF (2026-10-25, teslim raporu madde 1): gatherFaz1V5Historical (v5-engine.ts,
+  // V5.46.1'in KENDİSİNİN de kullandığı AĞIR fonksiyon — 11 paralel alt-sorgu/hesap) tek bir
+  // analyzeRaceDemotion çağrısı içinde (buildUnifiedFeatureVectorsForRace → BU fonksiyon,
+  // crosscheckAlternativeSignals → BU fonksiyon TEKRAR, + analyze-race.ts'in AGF karşılaştırması
+  // için DOĞRUDAN) ÜÇ KEZ çağrılıyordu — GERÇEK profiling bunu doğruladı (bkz. teslim raporu).
+  // v5-engine.ts'in KENDİSİNE (V5.46.1'in production dosyası, DOKUNULMAYAN) hiçbir cache
+  // EKLENMEDİ — risk burada SADECE RAN'ın KENDİ çağrı grafiğinde (bu dosya + analyze-race.ts +
+  // alt-signal-crosscheck.ts, hiçbiri V5.46.1 tarafından kullanılmıyor) bir ÇAĞIRANIN sonucu
+  // PAYLAŞMASI/yeniden kullanması — v5-engine.ts'in KENDİ davranışı/performansı BİREBİR aynı
+  // kalır (hâlâ her çağrıda kendi taze sorgularını yapar).
+  preloadedFaz1?: Faz1SonucV5 | null
 ): Promise<SafModelRaceSignals | null> {
-  const faz1 = await gatherFaz1V5Historical(raceId);
+  const faz1 = preloadedFaz1 !== undefined ? preloadedFaz1 : await gatherFaz1V5Historical(raceId);
   if (!faz1 || faz1.runners.length === 0) return null;
 
   const raceMeta = await db.race.findUnique({ where: { id: raceId }, select: { raceDay: { select: { date: true } } } });

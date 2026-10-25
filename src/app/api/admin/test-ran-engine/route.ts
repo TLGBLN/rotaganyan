@@ -6,9 +6,11 @@ import { loadTrainedModel } from "@/lib/rotaganyan-analiz-motoru/load-trained-mo
 import { getCurrentRanEngineVersion } from "@/lib/rotaganyan-analiz-motoru/engine-versions";
 import {
   computeWeightsFingerprint,
+  computePreRaceDataSnapshotId,
+  toRanSignalSnapshotEntry,
   type RanPredictionSnapshot,
-  type RanSignalSnapshotEntry,
 } from "@/lib/rotaganyan-analiz-motoru/snapshot-integrity";
+import { UNIFIED_MODEL_CODES } from "@/lib/rotaganyan-analiz-motoru/feature-calculators/unified-feature-vector";
 import { scoreRace, explainRunner } from "@/lib/motor-v1/engine/training";
 
 // ROTAGANYAN ANALİZ MOTORU — İZOLE TEST ROUTE'U (kullanıcı talimatı madde 2, PR#12).
@@ -73,7 +75,7 @@ export class RanEngineModelLoadError extends Error {}
  *  build) + loadTrainedModel() + scoreRace/explainRunner. HİÇBİR DB YAZMA yapmaz, HİÇBİR
  *  auth/HTTP bağımlılığı YOK — route handler'ı VE testler/scriptler bunu DOĞRUDAN çağırır. */
 export async function runRanEngineForRace(raceId: string): Promise<RanEngineRunResult> {
-  const { vectors, diagnostics } = await buildUnifiedFeatureVectorsForRace(raceId);
+  const { vectors, diagnostics, runnerIdByNo } = await buildUnifiedFeatureVectorsForRace(raceId);
   if (vectors.length === 0) {
     throw new RanEngineRaceNotFoundError(
       "Koşu verisi bulunamadı veya sahada koşacak at yok (ROTAGANYAN ANALİZ MOTORU)."
@@ -98,6 +100,10 @@ export async function runRanEngineForRace(raceId: string): Promise<RanEngineRunR
   const weightsFingerprint = computeWeightsFingerprint(model);
   const generatedAt = new Date().toISOString();
 
+  // madde 1 (Faz 1 Aşama 1 genişletmesi): Pick.runnerId ile AYNI anlamdaki Runner.id (cuid)
+  // — AYRI bir DB sorgusu AÇILMADAN, buildUnifiedFeatureVectorsForRace'in ZATEN çektiği
+  // runnerMeta'dan (unified-feature-vector.ts::runnerIdByNo) taşınır (Faz 3 perf disiplini —
+  // yeni bir N+1/duplicate sorgu EKLEMEMEK).
   const vectorByNo = new Map(vectors.map((v) => [v.no, v]));
   const scored = scoreRace(vectors, model);
   const ranked = [...scored].sort((a, b) => b.probability - a.probability);
@@ -107,22 +113,15 @@ export async function runRanEngineForRace(raceId: string): Promise<RanEngineRunR
     const vec = vectorByNo.get(r.no)!;
     const explained = explainRunner(vec, model);
 
-    // NOT (reliability alanı): SignalEntry (eğitimle paylaşılan, codes-agnostic generic tip)
-    // sürekli bir reliability DEĞERİ taşımıyor — yalnız `observed` boolean'ı var
-    // (signal-integration.ts'teki UnifiedSignal.reliability, buildUnifiedFeatureVectorsForRace
-    // içinde RunnerFeatureVector'a ÇEVRİLİRKEN kasıtlı olarak taşınmıyor, çünkü training.ts'in
-    // paylaşılan SignalEntry tipi bunu beklemiyor). Burada 1/0 eşlemesi UYDURULMUŞ bir ara
-    // değer DEĞİL — eldeki TEK gerçek veri (gözlem durumu) doğrudan yansıtılıyor.
-    const signals: RanSignalSnapshotEntry[] = explained.rows.map((row) => ({
-      code: row.code,
-      raw: row.rawValue,
-      observed: row.observed,
-      reliability: row.observed ? 1 : 0,
-    }));
+    // madde 2 (Faz 1 Aşama 1): explainRunner'ın HER satırı (raw/observed/standardizedValue/
+    // learnedCoefficient/scoreContribution/missingIndicator*) TEK dönüşüm noktasından
+    // (toRanSignalSnapshotEntry) KAYIPSIZ taşınıyor — elle alan kopyalayan ikinci bir yer YOK.
+    const signals: RanPredictionSnapshot["signals"] = explained.rows.map(toRanSignalSnapshotEntry);
 
     const snapshot: RanPredictionSnapshot = {
       raceId,
       no: r.no,
+      runnerId: runnerIdByNo.get(r.no) ?? null,
       engineVersion,
       weightsFingerprint,
       generatedAt,
@@ -130,6 +129,10 @@ export async function runRanEngineForRace(raceId: string): Promise<RanEngineRunR
       // applyManualOverride'ın GİRDİ ŞEKLİYLE uyumlu (snapshot-integrity.ts).
       originalRank: rank,
       publishedRank: rank,
+      winProbability: r.probability,
+      finalScore: explained.totalScore,
+      featureCodeOrder: UNIFIED_MODEL_CODES,
+      preRaceDataSnapshotId: computePreRaceDataSnapshotId(raceId, signals),
       signals,
     };
 

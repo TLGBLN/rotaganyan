@@ -51,7 +51,46 @@ function hamCarpim(code: string, family: string, parcalar: { value: number | nul
   return entry(code, family, value, true, null);
 }
 
+// FAZ 3 PERF (2026-10-25, ROTAGANYAN ANALİZ MOTORU RCA teslim raporu madde 3): GERÇEK
+// profiling (bkz. teslim raporu) kanıtladı ki analyzeRaceDemotion TEK bir yarış için bu
+// fonksiyonu İKİ KEZ tetikliyordu — bir kez buildUnifiedFeatureVectorsForRace üzerinden
+// (unified-feature-vector.ts), bir kez de crosscheckAlternativeSignals üzerinden
+// (alt-signal-crosscheck.ts) — HER ikisi de fittedModel GEÇMEDEN (yalnız raceId). Bu, 10
+// ailenin TÜM DB sorgularının (Race+Runner+HorseRaceHistoryCache+jokey/antrenör trend... )
+// yarış başına İKİ KEZ çalışması demekti. loadTempoContext() zaten process-ömürlü
+// memoize'liydi (bkz. tempo.ts, 2026-10-24) ama BU fonksiyonun KENDİSİ değildi.
+//
+// Çözüm: raceId'ye göre process-ömürlü bir Promise cache — AMA SADECE fittedModel
+// VERİLMEDİĞİNDE (modelsiz çağrı, featureStatus'un MODELIN_SKORUNDA alanı model'e bağlı
+// DEĞİL, bu yüzden modelsiz sonuç raceId'ye göre deterministik — tempoCtx/galopPaceIndex/
+// pistCtx gibi diğer ÖNBELLEKLİ bağımlılıklar da zaten process-ömürlü). predict-v1.ts'in
+// fittedModel GEÇEN çağrısı (production/V5.46.1'e YAKIN deneysel yol, bu motor DEĞİL) bu
+// cache'i HİÇ GÖRMEZ/kullanmaz — davranışı bu değişiklikten ÖNCE/SONRA BİREBİR aynı kalır
+// (bkz. unified-family-engine.test.ts regresyon testi).
+const modellessResultCache = new Map<string, Promise<UnifiedRunnerResult[]>>();
+
+/** Testler arası sızıntıyı önlemek için — yalnız test dosyaları çağırır. */
+export function clearUnifiedFamiliesCache(): void {
+  modellessResultCache.clear();
+}
+
 export async function computeUnifiedFamiliesForRace<C extends string = string>(
+  raceId: string,
+  fittedModel?: FittedModel<C>
+): Promise<UnifiedRunnerResult[]> {
+  if (fittedModel === undefined) {
+    const cached = modellessResultCache.get(raceId);
+    if (cached) return cached;
+    const promise = computeUnifiedFamiliesForRaceUncached(raceId, undefined);
+    modellessResultCache.set(raceId, promise);
+    // Hata durumunda cache'te BAŞARISIZ bir promise KALMASIN — bir sonraki çağrı yeniden denesin.
+    promise.catch(() => modellessResultCache.delete(raceId));
+    return promise;
+  }
+  return computeUnifiedFamiliesForRaceUncached(raceId, fittedModel);
+}
+
+async function computeUnifiedFamiliesForRaceUncached<C extends string = string>(
   raceId: string,
   fittedModel?: FittedModel<C>
 ): Promise<UnifiedRunnerResult[]> {

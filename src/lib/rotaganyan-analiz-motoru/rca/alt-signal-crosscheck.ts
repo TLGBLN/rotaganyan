@@ -24,6 +24,7 @@ import { computeSafModelSignalsForRace, type SafModelSignalCode } from "../featu
 import { computeUnifiedFamiliesForRace } from "@/lib/motor-v1/engine/unified-family-engine";
 import { SIGNAL_SPECS } from "../signal-integration";
 import type { AccuraceRun } from "@/lib/accurace/types";
+import type { Faz1SonucV5 } from "@/lib/methodology/v5-engine";
 
 /** SIGNAL_SPECS'ten TÜRETİLİR (elle kopyalanmış ikinci bir liste DEĞİL): aynı canonical'a
  *  sahip, biri PRIMARY/INCLUDE (gerçekten skora giren) biri ALTERNATIVE (hesaplanıyor ama
@@ -80,10 +81,12 @@ function rankWithinField(valuesByNo: Map<number, number | null>): Map<number, nu
  */
 export async function crosscheckAlternativeSignals(
   raceId: string,
-  preloadedAccuraceRuns?: AccuraceRun[]
+  preloadedAccuraceRuns?: AccuraceRun[],
+  // FAZ 3 PERF — bkz. saf-model-signals.ts'teki AYNI isimli parametrenin yorumu.
+  preloadedFaz1?: Faz1SonucV5 | null
 ): Promise<Map<number, AltCrosscheckRow[]>> {
   const [safResult, v1Results] = await Promise.all([
-    computeSafModelSignalsForRace(raceId, preloadedAccuraceRuns),
+    computeSafModelSignalsForRace(raceId, preloadedAccuraceRuns, preloadedFaz1),
     computeUnifiedFamiliesForRace(raceId),
   ]);
   const result = new Map<number, AltCrosscheckRow[]>();

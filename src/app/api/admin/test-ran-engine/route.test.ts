@@ -48,7 +48,7 @@ import { auth } from "@/lib/auth";
 import { buildUnifiedFeatureVectorsForRace, UNIFIED_MODEL_CODES } from "@/lib/rotaganyan-analiz-motoru/feature-calculators/unified-feature-vector";
 import { loadTrainedModel } from "@/lib/rotaganyan-analiz-motoru/load-trained-model";
 import { scoreRace, explainRunner } from "@/lib/motor-v1/engine/training";
-import { computeWeightsFingerprint } from "@/lib/rotaganyan-analiz-motoru/snapshot-integrity";
+import { computeWeightsFingerprint, sumSnapshotSignalContributions } from "@/lib/rotaganyan-analiz-motoru/snapshot-integrity";
 import { getCurrentRanEngineVersion } from "@/lib/rotaganyan-analiz-motoru/engine-versions";
 import type { RunnerFeatureVector, SignalEntry } from "@/lib/motor-v1/engine/feature-vector";
 
@@ -72,7 +72,8 @@ function buildVector(no: number): RunnerFeatureVector {
 }
 
 const FIXED_VECTORS: RunnerFeatureVector[] = [1, 2, 3, 4, 5, 6].map(buildVector);
-const FIXED_RESULT = { vectors: FIXED_VECTORS, diagnostics: [] };
+const FIXED_RUNNER_ID_BY_NO = new Map(FIXED_VECTORS.map((v) => [v.no, `runner-cuid-${v.no}`]));
+const FIXED_RESULT = { vectors: FIXED_VECTORS, diagnostics: [], runnerIdByNo: FIXED_RUNNER_ID_BY_NO };
 
 function makeRequest(raceId: string | undefined = RACE_ID) {
   return new NextRequest("http://localhost/api/admin/test-ran-engine", {
@@ -108,10 +109,35 @@ describe("POST /api/admin/test-ran-engine", () => {
       expect(pick.probability).toBe(d.probability);
       expect(pick.originalRank).toBe(idx + 1);
       expect(pick.publishedRank).toBe(idx + 1); // madde 7: henüz override yok
+      expect(pick.runnerId).toBe(FIXED_RUNNER_ID_BY_NO.get(d.no)); // Faz 1 genişletmesi: AYRI DB sorgusu olmadan taşınır
+      expect(pick.winProbability).toBe(d.probability);
+      expect(pick.featureCodeOrder).toEqual(UNIFIED_MODEL_CODES);
+      expect(typeof pick.preRaceDataSnapshotId).toBe("string");
+      expect(pick.preRaceDataSnapshotId.length).toBeGreaterThan(0);
     });
 
     expect(body.engineVersion).toBe(getCurrentRanEngineVersion().surum);
     expect(body.weightsFingerprint).toBe(computeWeightsFingerprint(model));
+  });
+
+  it("Faz 4 madde 3 — TEK yarış için TÜM atlar AYNI weightsFingerprint+generatedAt+engineVersion+featureCodeOrder'ı taşır (tek kaynak-of-truth, analiz/sıralama/kupon AYNI snapshot'tan beslenir)", async () => {
+    const { POST } = await import("./route");
+    const res = await POST(makeRequest());
+    const body = await res.json();
+
+    const fingerprints = new Set(body.atlar.map((a: { weightsFingerprint: string }) => a.weightsFingerprint));
+    const generatedAts = new Set(body.atlar.map((a: { generatedAt: string }) => a.generatedAt));
+    const engineVersions = new Set(body.atlar.map((a: { engineVersion: string }) => a.engineVersion));
+    const featureCodeOrders = new Set(body.atlar.map((a: { featureCodeOrder: string[] }) => JSON.stringify(a.featureCodeOrder)));
+
+    expect(fingerprints.size).toBe(1); // TEK değer — çakışma/sapma YOK
+    expect(generatedAts.size).toBe(1);
+    expect(engineVersions.size).toBe(1);
+    expect(featureCodeOrders.size).toBe(1);
+    // Üst-seviye body alanlarıyla da BİREBİR aynı (race-level ile pick-level AYRIŞMADI):
+    expect([...fingerprints][0]).toBe(body.weightsFingerprint);
+    expect([...generatedAts][0]).toBe(body.generatedAt);
+    expect([...engineVersions][0]).toBe(body.engineVersion);
   });
 
   it("explainRunner izlenebilirliği (signals[].raw/observed) route yanıtına BİREBİR taşınır", async () => {
@@ -128,8 +154,28 @@ describe("POST /api/admin/test-ran-engine", () => {
         expect(pick.signals[i].code).toBe(row.code);
         expect(pick.signals[i].raw).toBe(row.rawValue);
         expect(pick.signals[i].observed).toBe(row.observed);
+        // Faz 1 Aşama 1 genişletmesi — KAYIPSIZ taşınan alanlar (önceden route yanıtında YOKTU).
+        // toBeCloseTo kullanılıyor (toBe DEĞİL): JSON round-trip (res.json()) -0'ı 0'a
+        // normalize edebiliyor — bu float serileştirmenin BİLİNEN bir özelliği, KAYIP DEĞİL
+        // (sayısal değer aynı, Object.is ayrımı gerçek bir veri kaybı GÖSTERMİYOR).
+        expect(pick.signals[i].standardizedValue).toBeCloseTo(row.standardizedValue, 12);
+        expect(pick.signals[i].learnedCoefficient).toBeCloseTo(row.learnedCoefficient, 12);
+        expect(pick.signals[i].scoreContribution).toBeCloseTo(row.scoreContribution, 12);
+        expect(pick.signals[i].missingIndicatorCoefficient).toBeCloseTo(row.missingIndicatorCoefficient, 12);
+        expect(pick.signals[i].missingIndicatorContribution).toBeCloseTo(row.missingIndicatorContribution, 12);
       });
       expect(pick.explainTotalScore).toBe(explained.totalScore);
+    }
+  });
+
+  it("Σ(scoreContribution+missingIndicatorContribution) üzerinden snapshot'tan YENİDEN KURULAN toplam, explainTotalScore'a ≈ eşittir (HER at için) — teslim raporu madde 3/4", async () => {
+    const { POST } = await import("./route");
+    const res = await POST(makeRequest());
+    const body = await res.json();
+    for (const pick of body.atlar) {
+      const reconstructed = sumSnapshotSignalContributions(pick.signals);
+      expect(reconstructed).toBeCloseTo(pick.explainTotalScore, 10);
+      expect(reconstructed).toBeCloseTo(pick.finalScore, 10);
     }
   });
 
@@ -174,7 +220,7 @@ describe("POST /api/admin/test-ran-engine", () => {
   });
 
   it("feature-build boş vektör dönerse (yarış/koşucu bulunamadı) 404 döner", async () => {
-    vi.mocked(buildUnifiedFeatureVectorsForRace).mockResolvedValue({ vectors: [], diagnostics: [] });
+    vi.mocked(buildUnifiedFeatureVectorsForRace).mockResolvedValue({ vectors: [], diagnostics: [], runnerIdByNo: new Map() });
     const { POST } = await import("./route");
     const res = await POST(makeRequest());
     expect(res.status).toBe(404);
