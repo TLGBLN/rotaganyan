@@ -143,6 +143,10 @@ export function evaluatePairInteraction(
     throw new Error("RAN_COMBO_INVALID_INTERACTION_PAIR");
   const pair=[a,b];
   const derived="INTERACTION__"+a+"__"+b;
+  // PIT-only interaction guard: even a valid extreme speed/pace reading can
+  // yield enormous zA*zB and artificial pseudo-certainty on small samples.
+  // Clamp each TRAIN-standardized input only for the research interaction.
+  const clipZ=(z:number)=>Math.max(-4,Math.min(4,z));
   const codes=[a,b,derived];
   const results:FoldMetrics[]=[];
   for(const fold of folds){
@@ -153,7 +157,8 @@ export function evaluatePairInteraction(
         const x=v.signals.find(s=>s.code===a),y=v.signals.find(s=>s.code===b);
         const observed=!!x?.observed&&!!y?.observed&&x.rawValue!==null&&
           y.rawValue!==null&&Number.isFinite(x.rawValue)&&Number.isFinite(y.rawValue);
-        const rawValue=observed?((x!.rawValue!-ax.mu)/ax.sigma)*((y!.rawValue!-bx.mu)/bx.sigma):null;
+        const rawValue=observed?
+          clipZ((x!.rawValue!-ax.mu)/ax.sigma)*clipZ((y!.rawValue!-bx.mu)/bx.sigma):null;
         return {...v,signals:[...v.signals,{
           code:derived,family:"COMBINATORIAL_INTERACTION",
           rawValue,observed,asOfSafe:true as const,coverageState:null,
