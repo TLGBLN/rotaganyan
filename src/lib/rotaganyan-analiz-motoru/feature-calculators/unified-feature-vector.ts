@@ -13,8 +13,8 @@
 // verisi toplama script'i VE (ileride) canlı tahmin AYNI fonksiyonu çağırır — iki ayrı kopya YOK.
 
 import { db } from "@/lib/db";
-import { computeSafModelSignalsForRace } from "./saf-model-signals";
-import { computeUnifiedFamiliesForRace } from "@/lib/motor-v1/engine/unified-family-engine";
+import { computeSafModelSignalsForRace, type SafModelRaceSignals } from "./saf-model-signals";
+import { computeUnifiedFamiliesForRace, type UnifiedRunnerResult } from "@/lib/motor-v1/engine/unified-family-engine";
 import { EXCLUDED_FROM_SCORING } from "@/lib/motor-v1/engine/predict-v1";
 import { buildUnifiedSignalVector, SIGNAL_SPECS, type SignalObservation, type SignalSource } from "../signal-integration";
 import type { AccuraceRun } from "@/lib/accurace/types";
@@ -58,7 +58,11 @@ for (const code of V1_INCLUDED_CODES) {
   }
 }
 
+export type UnifiedRawSources = { safResult: SafModelRaceSignals | null; v1Results: UnifiedRunnerResult[] };
+
 export type UnifiedFeatureBuildResult = {
+  /** Sadece RCA açıkça istediğinde: karşılaştırma için ikinci hesaplamayı önler. */
+  rawSources?: UnifiedRawSources;
   vectors: RunnerFeatureVector[];
   diagnostics: { no: number; source: SignalSource; code: string; reason: string }[];
   /** Runner.id (Prisma cuid, Pick.runnerId ile AYNI alan/tip) — no'ya göre. RunnerFeatureVector
@@ -82,14 +86,16 @@ export async function buildUnifiedFeatureVectorsForRace(
   // tekrar sorgusunu YAPMAZ. Verilmezse (ör. eğitim veri toplama script'leri) davranış AYNI:
   // computeSafModelSignalsForRace kendi taze çağrısını yapar.
   preloadedFaz1?: Faz1SonucV5 | null,
-  sharedFieldSizeResolver?: FieldSizeResolverFn
+  sharedFieldSizeResolver?: FieldSizeResolverFn,
+  captureRcaRawSources = false
 ): Promise<UnifiedFeatureBuildResult> {
   const [safResult, v1Results, runnerMeta] = await Promise.all([
     computeSafModelSignalsForRace(raceId, preloadedAccuraceRuns, preloadedFaz1),
     computeUnifiedFamiliesForRace(raceId, undefined, sharedFieldSizeResolver),
     db.runner.findMany({ where: { raceId, scratched: false }, select: { id: true, no: true, name: true, tjkAtId: true, jockey: true } }),
   ]);
-  if (!safResult || v1Results.length === 0) return { vectors: [], diagnostics: [], runnerIdByNo: new Map() };
+  const extra = captureRcaRawSources ? { rawSources: { safResult, v1Results } } : {};
+  if (!safResult || v1Results.length === 0) return { vectors: [], diagnostics: [], runnerIdByNo: new Map(), ...extra };
 
   const safByNo = new Map(safResult.runners.map((r) => [r.no, r]));
   const v1ByNo = new Map(v1Results.map((r) => [r.no, r]));
@@ -141,7 +147,7 @@ export async function buildUnifiedFeatureVectorsForRace(
   }
 
   const runnerIdByNo = new Map(runnerMeta.map((r) => [r.no, r.id]));
-  return { vectors, diagnostics, runnerIdByNo };
+  return { vectors, diagnostics, runnerIdByNo, ...extra };
 }
 
 /** Bu entegrasyonda GERÇEKTEN eğitime sunulan canonical kod listesi (35 kod) — training.ts'in
