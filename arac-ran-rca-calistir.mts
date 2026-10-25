@@ -8,7 +8,7 @@ import { analyzeRaceDemotion } from "./src/lib/rotaganyan-analiz-motoru/rca/anal
 import { validateSnapshot, computeWeightsFingerprint } from "./src/lib/rotaganyan-analiz-motoru/snapshot-integrity";
 import { UNIFIED_MODEL_CODES } from "./src/lib/rotaganyan-analiz-motoru/feature-calculators/unified-feature-vector";
 import { loadTrainedModel } from "./src/lib/rotaganyan-analiz-motoru/load-trained-model";
-import { accuraceKosulari } from "./src/lib/accurace/loader";
+import { loadRcaAccuraceSnapshot } from "./src/lib/rotaganyan-analiz-motoru/rca/accurace-snapshot";
 import type { RunnerFeatureVector } from "./src/lib/motor-v1/engine/feature-vector";
 import type { FittedModel } from "./src/lib/motor-v1/engine/training";
 import { createFieldSizeResolver } from "./src/lib/motor-v1/features/history-source";
@@ -43,6 +43,16 @@ function rcaProbeMark(phase: string): void {
 }
 
 const LIMIT = Number(process.env.RAN_RCA_LIMIT ?? "3"); // her yarış ~3 tam hesaplama (buildUnified+crosscheck+faz1) gerektiriyor, her biri gözlemsel olarak ~2-3dk sürüyor (bkz. arac-ran-egitim-canli-parite-dogrulama.mts çalıştırma süresi) — GERÇEK DB'ye karşı, tam 60'lık seti çalıştırmak saatler sürer; bu bir performans sınırı, sonuçların GEÇERLİLİĞİNİ etkilemez (hâlâ GERÇEK, hiç eğitimde kullanılmamış yarışlar)
+
+function parseAcceptanceDate(raw: string): Date {
+  const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(raw);
+  const date = match
+    ? new Date(Date.UTC(Number(match[3]), Number(match[2]) - 1, Number(match[1])))
+    : new Date(raw);
+  if (!Number.isFinite(date.getTime())) throw new Error(`RCA_ACCEPT_DATE_INVALID: ${raw}`);
+  if (match && (date.getUTCDate() !== Number(match[1]) || date.getUTCMonth() !== Number(match[2]) - 1)) throw new Error(`RCA_ACCEPT_DATE_INVALID: ${raw}`);
+  return date;
+}
 
 function loadRows(): RanEgitimSatiri[] {
   const raw = JSON.parse(fs.readFileSync(DATA_PATH, "utf8"));
@@ -92,14 +102,16 @@ async function main() {
 
   // --- 1) Gerçek yarışlar üzerinde analyzeRaceDemotion ---
   console.log("=== 1) Gerçek yarışlar — analyzeRaceDemotion ===");
-  console.log("(Accurace arşivi BİR KEZ önceden çekiliyor, tüm yarışlar arasında paylaşılıyor — her yarışta tekrar tekrar tam-arşiv sorgusu YAPILMAZ.)\n");
+  console.log("(Accurace arşivi yerel, sabit V1 tempo snapshot kaynağından okunur; uzak veritabanının tam arşiv SQL sorgusu kullanılmaz.)\n");
   const t0 = Date.now();
-  rcaProbeMark("ACCURACE_ARCHIVE_LOAD_STARTED");
-  const preloadedRuns = await accuraceKosulari();
-  rcaProbeMark(`ACCURACE_ARCHIVE_LOAD_FINISHED runs=${preloadedRuns.length} elapsedMs=${Date.now() - t0}`);
+  rcaProbeMark("ACCURACE_SNAPSHOT_LOAD_STARTED");
+  const snapshot = loadRcaAccuraceSnapshot(rows.map((r) => parseAcceptanceDate(r.tarih)));
+  const preloadedRuns = snapshot.runs;
+  rcaProbeMark(`ACCURACE_SNAPSHOT_LOAD_FINISHED runs=${preloadedRuns.length} elapsedMs=${Date.now() - t0} sha256=${snapshot.sha256.slice(0, 16)} builtAt=${snapshot.builtAt}`);
+  console.log(`RCA Accurace snapshot: builtAt=${snapshot.builtAt} sha256=${snapshot.sha256.slice(0, 16)} runs=${preloadedRuns.length}`);
   // Probe: startup ve tüm-Accurace yüklemesini ölç; hiçbir gerçek yarış RCA başlatma.
   if (process.env.RAN_RCA_PROBE_ONLY === "1") return;
-  console.log(`Accurace arşivi çekildi: ${preloadedRuns.length} koşu, ${((Date.now() - t0) / 1000).toFixed(1)}s\n`);
+  console.log(`Accurace arşivi disk snapshot okundu: ${preloadedRuns.length} koşu, ${((Date.now() - t0) / 1000).toFixed(1)}s\n`);
 
   // Yalnız bu RCA komutu: eşzamanlı geçmiş-yarış sorgularını 32'li toplu OR
   // sorgusuna çevirir. Canlı/production resolver varsayılanı DEĞİŞMEZ.
