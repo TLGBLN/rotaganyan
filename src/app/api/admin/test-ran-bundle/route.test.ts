@@ -34,8 +34,6 @@ function req(body:unknown) {
   return new NextRequest("http://localhost/api/admin/test-ran-bundle",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
 }
 describe("ADMIN-only RAN snapshot preview",()=>{
-  const prevNode=process.env.NODE_ENV;
-  const prevFlag=process.env.RAN_SHADOW_SNAPSHOT_WRITES;
   beforeEach(()=>{
     mocks.auth.mockResolvedValue({user:{role:"EDITOR"}});
     mocks.hasRole.mockReturnValue(true);
@@ -44,17 +42,15 @@ describe("ADMIN-only RAN snapshot preview",()=>{
       return {raceNo,raceDay:{date:new Date(ts),hippodrome:{name:"Adana"}},
         runners:[{no:1,ekuriGroup:null},{no:2,ekuriGroup:null}]};
     });
+    mocks.run.mockReset();
     mocks.run.mockImplementation(async(raceId:string)=>({atlar:engineRows(raceId)}));
     mocks.persist.mockReset();mocks.load.mockReset();
-    process.env.NODE_ENV="test";
-    delete process.env.RAN_SHADOW_SNAPSHOT_WRITES;
+    vi.stubEnv("NODE_ENV","test");
+    vi.stubEnv("RAN_SHADOW_SNAPSHOT_WRITES", undefined);
   });
-  afterEach(()=>{
-    if(prevNode===undefined) delete process.env.NODE_ENV;else process.env.NODE_ENV=prevNode;
-    if(prevFlag===undefined) delete process.env.RAN_SHADOW_SNAPSHOT_WRITES;else process.env.RAN_SHADOW_SNAPSHOT_WRITES=prevFlag;
-  });
+  afterEach(()=>vi.unstubAllEnvs());
   it("rejects production calls without invoking engine or writes",async()=>{
-    process.env.NODE_ENV="production";
+    vi.stubEnv("NODE_ENV","production");
     const res=await POST(req(input));
     expect(res.status).toBe(404);
     expect(mocks.run).not.toHaveBeenCalled();
