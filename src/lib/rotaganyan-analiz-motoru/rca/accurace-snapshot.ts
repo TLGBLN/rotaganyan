@@ -3,10 +3,47 @@
 // This is a read-only, RCA-only loader. No production call sites are changed.
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { createHash } from "node:crypto";
 import type { AccuraceRun } from "@/lib/accurace/types";
 
 export const RCA_ACCURACE_SNAPSHOT = "src/lib/motor-v1/artifacts/accurace-archive-snapshot.json";
+
+// Yalnız RCA komutu tarafından yenilenen, repoya/production dosyalarına yazılmayan
+// yerel arşiv. Worktree yolu hashlenir: başka bir repo yanlışlıkla kullanamaz.
+export function rcaAccuraceRefreshedPath(): string {
+  const key = createHash("sha256").update(path.resolve(process.cwd())).digest("hex").slice(0, 12);
+  return path.join(os.tmpdir(), `ran-rca-accurace-${key}.json`);
+}
+
+export function rcaAccuraceSnapshotPath(): string {
+  if (process.env.RAN_RCA_SNAPSHOT_PATH) return path.resolve(process.env.RAN_RCA_SNAPSHOT_PATH);
+  const refreshed = rcaAccuraceRefreshedPath();
+  return fs.existsSync(refreshed) ? refreshed : path.resolve(process.cwd(), RCA_ACCURACE_SNAPSHOT);
+}
+
+/** Aynı takvim gününü yeniden çekerek sınırdaki yarışların çift sayılmasını önler. */
+export function rcaAccuraceRefreshDay(builtAt: string): Date {
+  const d = new Date(builtAt);
+  if (!Number.isFinite(d.getTime())) throw new Error("RCA_ACCURACE_REFRESH_INVALID_BUILT_AT");
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+/** Eski, dondurulmuş kayıtlar korunur; overlap penceresi DB kaynağıyla yeniden üretilir.
+ * Üretim loaderındaki tarih/PIT filtreleri bu fonksiyonla değişmez.
+ */
+export function mergeRcaAccuraceRuns(
+  previous: readonly AccuraceRun[],
+  refreshed: readonly AccuraceRun[],
+  startDay: Date
+): AccuraceRun[] {
+  if (!Number.isFinite(startDay.getTime())) throw new Error("RCA_ACCURACE_INVALID_REFRESH_DAY");
+  if (refreshed.some((r) => !Number.isFinite(r.date.getTime()) || r.date.getTime() < startDay.getTime())) {
+    throw new Error("RCA_ACCURACE_REFRESH_WINDOW_VIOLATION");
+  }
+  return [...previous.filter((r) => r.date.getTime() < startDay.getTime()), ...refreshed];
+}
+
 
 export type RcaAccuraceSnapshot = {
   runs: AccuraceRun[];
@@ -16,7 +53,7 @@ export type RcaAccuraceSnapshot = {
 
 export function loadRcaAccuraceSnapshot(
   targetDates: readonly Date[],
-  snapshotPath: string = path.resolve(process.cwd(), RCA_ACCURACE_SNAPSHOT)
+  snapshotPath: string = rcaAccuraceSnapshotPath()
 ): RcaAccuraceSnapshot {
   if (!fs.existsSync(snapshotPath)) {
     throw new Error(`RCA_ACCURACE_SNAPSHOT_MISSING: ${snapshotPath}; database fallback disabled`);
