@@ -18,6 +18,9 @@ import { computeUnifiedFamiliesForRace, type UnifiedRunnerResult } from "@/lib/m
 import { tempoContextFromRuns } from "@/lib/motor-v1/features/tempo";
 import { EXCLUDED_FROM_SCORING } from "@/lib/motor-v1/engine/predict-v1";
 import { buildUnifiedSignalVector, SIGNAL_SPECS, type SignalObservation, type SignalSource } from "../signal-integration";
+import { D_INCLUDED_CODES, V1_INCLUDED_CODES, UNIFIED_MODEL_CODES } from "../unified-model-codes";
+export { UNIFIED_MODEL_CODES } from "../unified-model-codes";
+
 import type { AccuraceRun } from "@/lib/accurace/types";
 import type { RunnerFeatureVector, SignalEntry } from "@/lib/motor-v1/engine/feature-vector";
 import type { Faz1SonucV5 } from "@/lib/methodology/v5-engine";
@@ -27,27 +30,6 @@ import type { FieldSizeResolverFn } from "@/lib/motor-v1/features/history-source
  *  interaction DIŞINDA) 20 kod — signal-integration.ts::SIGNAL_SPECS'teki "V1" + "INCLUDE"
  *  kayıtlarıyla BİREBİR (GEN_SIRE_01/RAK_H2H_01/HIZ_01/TEMPO_02-04 kasıtlı olarak YOK —
  *  bunlar ALTERNATIVE, D'nin eşdeğer PRIMARY sinyali seçildi). */
-const V1_INCLUDED_CODES = [
-  "GEN_DAM_01", "GEN_DAMSIRE_01",
-  "RAK_GAP_01",
-  "ANT_TREND30",
-  "JOKEY_01", "JOKEY_02", "JOKEY_04", "JOKEY_TREND30",
-  "TEMPO_01",
-  "KULVAR_01_HAM",
-  "FORM_01", "FORM_02", "FORM_03",
-  "PMZ_01", "PMZ_02", "FORM_x_ZEMIN",
-  "SINIF_01",
-  "KILO_01", "KILO_02", "KILO_03", "KILO_04",
-] as const;
-
-/** D (Saf Model)'den gelen 15 kod — registry'de HEPSİ PRIMARY/INCLUDE (hiç ALTERNATIVE/BLOCKED
- *  yok), bu yüzden tamamı doğrudan beslenir. */
-const D_INCLUDED_CODES = [
-  "idmJokey", "h2hNetSkor", "hizDerecesi", "zeminToleransi", "zeminMesafeDeneyim",
-  "sonIdmanSprint", "takiDegisikligi", "yarisGidisatiSkoru", "sireOrani",
-  "ACC_CLOSE_RES", "ACC_LATE", "ACC_SPEED", "PS_front", "PS_lone", "PS_closerFit",
-] as const;
-
 const familyBySourceCode = new Map(SIGNAL_SPECS.map((s) => [`${s.source}:${s.code}`, s.family]));
 
 // SAVUNMA HATTI (modül yükleme zamanında, runtime'da bir kere): PIT-güvensiz/seçilim-yanlılıklı
@@ -172,21 +154,3 @@ export async function buildUnifiedFeatureVectorsForRace(
 /** Bu entegrasyonda GERÇEKTEN eğitime sunulan canonical kod listesi (35 kod) — training.ts'in
  *  generic `codes` argümanına verilir. SIGNAL_SPECS'ten TÜRETİLİR (elle kopyalanmış, senkronizasyon
  *  dışı kalabilecek ikinci bir liste DEĞİL). */
-export const UNIFIED_MODEL_CODES: readonly string[] = (() => {
-  const wanted = new Set<string>([
-    ...D_INCLUDED_CODES.map((c) => `D:${c}`),
-    ...V1_INCLUDED_CODES.map((c) => `V1:${c}`),
-  ]);
-  const canonical: string[] = [];
-  const seen = new Set<string>();
-  for (const spec of SIGNAL_SPECS) {
-    if (!wanted.has(`${spec.source}:${spec.code}`)) continue;
-    if (spec.decision !== "PRIMARY" && spec.decision !== "INCLUDE") {
-      throw new Error(`UNIFIED_MODEL_CODES: ${spec.source}:${spec.code} PRIMARY/INCLUDE değil (${spec.decision})`);
-    }
-    if (seen.has(spec.canonical)) throw new Error(`UNIFIED_MODEL_CODES: canonical çift sayım: ${spec.canonical}`);
-    seen.add(spec.canonical);
-    canonical.push(spec.canonical);
-  }
-  return canonical;
-})();
