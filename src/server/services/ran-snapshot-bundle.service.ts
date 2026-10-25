@@ -3,6 +3,7 @@
 // Tek satir = 1 bundle = ilgili tum yarislarin analiz, siralama ve kuponu.
 import { db } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
+import { isolatedRanDatabaseUrl } from "@/lib/rotaganyan-analiz-motoru/isolated-db-guard";
 import {
   readRanSnapshotBundle, verifyRanSnapshotBundle,
   type RanSnapshotBundle,
@@ -12,6 +13,9 @@ function requireIsolatedWrite(env: NodeJS.ProcessEnv = process.env): void {
   if (env.NODE_ENV === "production" || env.RAN_SHADOW_SNAPSHOT_WRITES !== "isolated-test-only") {
     throw new Error("RAN_SHADOW_WRITES_DISABLED: production and unapproved writes forbidden");
   }
+  // Additional mandatory guard in the write service itself, not just in callers:
+  // a dev process pointing to production DATABASE_URL must NEVER write there.
+  isolatedRanDatabaseUrl(env.DATABASE_URL, env.RAN_TEST_LOCAL_DB_ACK, env.NODE_ENV);
 }
 export async function persistRanSnapshotBundle(
   snapshot: RanSnapshotBundle
