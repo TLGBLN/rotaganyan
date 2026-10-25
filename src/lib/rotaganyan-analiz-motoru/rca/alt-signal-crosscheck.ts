@@ -25,6 +25,7 @@ import { computeUnifiedFamiliesForRace } from "@/lib/motor-v1/engine/unified-fam
 import { SIGNAL_SPECS } from "../signal-integration";
 import type { AccuraceRun } from "@/lib/accurace/types";
 import type { Faz1SonucV5 } from "@/lib/methodology/v5-engine";
+import type { UnifiedRawSources } from "../feature-calculators/unified-feature-vector";
 
 /** SIGNAL_SPECS'ten TÜRETİLİR (elle kopyalanmış ikinci bir liste DEĞİL): aynı canonical'a
  *  sahip, biri PRIMARY/INCLUDE (gerçekten skora giren) biri ALTERNATIVE (hesaplanıyor ama
@@ -83,12 +84,17 @@ export async function crosscheckAlternativeSignals(
   raceId: string,
   preloadedAccuraceRuns?: AccuraceRun[],
   // FAZ 3 PERF — bkz. saf-model-signals.ts'teki AYNI isimli parametrenin yorumu.
-  preloadedFaz1?: Faz1SonucV5 | null
+  preloadedFaz1?: Faz1SonucV5 | null,
+  precomputed?: UnifiedRawSources
 ): Promise<Map<number, AltCrosscheckRow[]>> {
-  const [safResult, v1Results] = await Promise.all([
-    computeSafModelSignalsForRace(raceId, preloadedAccuraceRuns, preloadedFaz1),
-    computeUnifiedFamiliesForRace(raceId),
-  ]);
+  // RCA scorunu üreten D/V1 ham sinyalleri zaten hesaplandı; yalnız RCA tarafından
+  // verilen aynı kaynakları kullan. Doğrudan/bağımsız çağrılarda eski davranış korunur.
+  const [safResult, v1Results] = precomputed
+    ? [precomputed.safResult, precomputed.v1Results]
+    : await Promise.all([
+        computeSafModelSignalsForRace(raceId, preloadedAccuraceRuns, preloadedFaz1),
+        computeUnifiedFamiliesForRace(raceId),
+      ]);
   const result = new Map<number, AltCrosscheckRow[]>();
   if (!safResult || v1Results.length === 0) return result;
 
