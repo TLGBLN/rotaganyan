@@ -135,6 +135,11 @@ async function main() {
       if (result.top3Miss) {
         console.log(`[TOP3 MISS] category=${result.top3Miss.category} rival=${result.top3Miss.rivalName} drivers=${result.top3Miss.demotionDrivers.map((d) => `${d.code}:${d.delta.toFixed(4)}`).join(",")}`);
       }
+      if (result.winnerPositiveSignals?.length) {
+        console.log(`[KAZANAN GUCLU SINYALLER] ${result.winnerPositiveSignals.map((x) => `${x.code}:${x.totalContribution.toFixed(4)}`).join(",")}`);
+      }
+      for (const line of result.top1Miss?.evidence ?? []) console.log(`[TOP1 KANIT/YORUM] ${line}`);
+      for (const line of result.top3Miss?.evidence ?? []) console.log(`[TOP3 KANIT/YORUM] ${line}`);
       yazPedigriKazanan(result.winnerPedigree);
       if (result.top1Miss) yazPedigriFark(result.top1Miss.pedigreeComparison, "TOP1 rakibi");
       if (result.top3Miss) yazPedigriFark(result.top3Miss.pedigreeComparison, "TOP3 rakibi");
