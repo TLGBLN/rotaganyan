@@ -169,6 +169,10 @@ async function main() {
   console.log(`\nSONUÇ: ${Object.keys(checkpoint).length}/${eligible.length} başarılı, ${failed.length} başarısız.`);
   if (failed.length > 0) console.log(`Başarısız (ilk 20): ${JSON.stringify(failed.slice(0, 20))}`);
   const out = Object.values(checkpoint).sort((a, b) => (a.tarih < b.tarih ? -1 : a.tarih > b.tarih ? 1 : 0));
+  if (originalCohort && out.length !== originalCohort.length) {
+    throw new Error("RAN_PIT_INCOMPLETE_COHORT: " + out.length + "/" + originalCohort.length +
+      " computed; checkpoint retained for safe resume, output/model NOT written");
+  }
   fs.writeFileSync(OUT_PATH, JSON.stringify(out));
   console.log(`YAZILDI: ${OUT_PATH} (${out.length} yarış), toplam süre ${((Date.now() - t0) / 60000).toFixed(1)} dk`);
 }
