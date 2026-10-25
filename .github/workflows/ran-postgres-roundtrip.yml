@@ -11,6 +11,9 @@ on:
       - 'src/lib/methodology/kupon-boundary-risk-audit.test.ts'
       - 'src/app/api/admin/test-ran-bundle/route.ts'
       - 'arac-ran-pit-kohort-yenile-ve-egit.ps1'
+      - 'arac-ran-pit-sadece-egit.ps1'
+      - 'arac-ran-egit-ve-degerlendir.mts'
+      - 'src/lib/rotaganyan-analiz-motoru/rca/ran-offline-train-smoke.test.ts'
       - 'src/lib/rotaganyan-analiz-motoru/**'
       - 'src/server/services/ran-snapshot-bundle.service*'
       - 'prisma/schema.prisma'
@@ -71,7 +74,8 @@ jobs:
             src/lib/rotaganyan-analiz-motoru/rca/signal-complementarity-audit.test.ts \
             src/lib/rotaganyan-analiz-motoru/feature-calculators/pit-sire-speed.test.ts \
             src/lib/rotaganyan-analiz-motoru/rca/ran-db-preflight.test.ts \
-            src/lib/methodology/kupon-boundary-risk-audit.test.ts
+            src/lib/methodology/kupon-boundary-risk-audit.test.ts \
+            src/lib/rotaganyan-analiz-motoru/rca/ran-offline-train-smoke.test.ts
 
       - name: Real PostgreSQL transaction, readback and cleanup
         env:
