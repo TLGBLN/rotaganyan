@@ -23,7 +23,10 @@
 
 import { db } from "@/lib/db";
 import { gatherFaz1V5Historical, type Faz1RunnerV5, type Faz1SonucV5 } from "@/lib/methodology/v5-engine";
-import { getHizDerecesiGozlemliForRace } from "@/server/actions/hiz-derecesi.actions";
+import { tumOnbellegiGetir } from "@/server/actions/hiz-derecesi.actions";
+import { getV5461SireOzetleriForRace } from "@/server/actions/v5461-sire.actions";
+import { breedToIrk } from "@/lib/sire-stat-match";
+import { pitSirePercent, speedObservedAsOf } from "./pit-sire-speed";
 import { fetchAccuraceGecmisKayitlari, normalizeHorseName } from "@/lib/methodology/veri-toplama";
 import {
   analizEtTekYaris,
@@ -156,7 +159,36 @@ export async function computeSafModelSignalsForRace(
   const styleOf = new Map<string, StyleFeature>();
   for (const r of faz1.runners) styleOf.set(r.id, styleVector(gecmisOf(r.id), target));
 
-  const hizGozlemli = await getHizDerecesiGozlemliForRace(raceId);
+  // RAN-only source repair. Production V5 engine is unchanged.
+  // SIRE_HISTORY: only pre-race Runner/Result, exclude target horse's own starts.
+  // SPEED: observed only if a usable population comparison existed before cutoff.
+  const [pitMeta, speedHistory] = await Promise.all([
+    db.runner.findMany({
+      where: { id: { in: runnerIds } },
+      select: { id: true, sire: true, tjkAtId: true },
+    }),
+    tumOnbellegiGetir(),
+  ]);
+  const pitById = new Map(pitMeta.map(r => [r.id, r]));
+  if (faz1.runners.some(r => !pitById.has(r.id))) {
+    throw new Error("RAN_PIT_INCOMPLETE_RUNNER_META");
+  }
+  const pitSire = await getV5461SireOzetleriForRace(
+    faz1.runners.map(r => pitById.get(r.id)!.sire),
+    faz1.race.breed, faz1.race.surface, faz1.race.distance,
+    raceDate,
+    faz1.runners.map(r => pitById.get(r.id)!.tjkAtId),
+  );
+  if (pitSire.length !== faz1.runners.length) throw new Error("RAN_PIT_SIRE_LENGTH_MISMATCH");
+  const sirePctById = new Map(faz1.runners.map((r,i)=>[r.id,pitSirePercent(pitSire[i])]));
+  const speedBreed = breedToIrk(faz1.race.breed);
+  const hizGozlemli = new Map(faz1.runners.map(r=>{
+    const id=pitById.get(r.id)!.tjkAtId;
+    const observed=id != null && speedObservedAsOf(
+      speedHistory.gecmis.get(id) ?? [], speedBreed, raceDate, speedHistory.paceIndex
+    );
+    return [r.no,observed] as const;
+  }));
 
   const accGecmis = await fetchAccuraceGecmisKayitlari(faz1.runners.map((r) => r.ad), raceDate).catch(() => ({
     son800AccuraceKayitlari: [],
@@ -233,14 +265,14 @@ export async function computeSafModelSignalsForRace(
       // "sahte 0" değil — galop yoksa idmJokey=0 İDMAN-JOKEY UYUMSUZLUĞU değil, VERİ EKSİKLİĞİ.
       sig("idmJokey", r.idmJokey, r.galopSayisi > 0, 1, "v5-engine.ts::gatherFaz1V5Historical (Gallop, cutoff'lu)", r.galopSayisi > 0 ? null : "bu at için hiç galop kaydı yok"),
       sig("h2hNetSkor", r.h2hNetSkor, r.h2hKarsilastirmaSayisi > 0, 1, "v5-engine.ts::h2hNetSkorHesapla (bugünkü rakiplerle ortak geçmiş, leak-free)", r.h2hKarsilastirmaSayisi > 0 ? null : "bugünkü rakiplerle ortak geçmiş yarış yok"),
-      sig("hizDerecesi", r.hizDerecesi, hizGozlemli.get(r.no) ?? false, 1, "hiz-derecesi.actions.ts::getHizDerecesiGozlemliForRace"),
+      sig("hizDerecesi", r.hizDerecesi, hizGozlemli.get(r.no) ?? false, 1, "RAN-only speedObservedAsOf (cutoff, true historical pace reference)"),
       sig("zeminToleransi", r.zeminToleransi, r.zeminToleransiGozlemli, 1, "v5-engine.ts::hesaplaZeminToleransiMap (TjkDereceKaydi, leak-free)"),
       // DÜZELTME 2/6: zeminMesafeDeneyim observed artık zeminMesafeOrnekSayisi>0.
       sig("zeminMesafeDeneyim", r.zeminMesafeDeneyim, r.zeminMesafeOrnekSayisi > 0, 1, "v5-engine.ts (zemin+mesafe deneyimi, kategori bazlı)", r.zeminMesafeOrnekSayisi > 0 ? null : "aynı pist+zemin+mesafe kombinasyonunda geçmiş koşu yok"),
       sig("sonIdmanSprint", r.sonIdmanSprint, r.sonIdmanSprintGozlemli, 1, "v5-engine.ts (Gallop.track, en son galop)", r.sonIdmanSprintGozlemli ? null : "son galop kaydı yok"),
       sig("takiDegisikligi", taki, r.takiDegisikligiGozlemli, 1, "v5-engine.ts (SonYarisDetay.eklenenTaki/cikarilanTaki)", r.takiDegisikligiGozlemli ? null : "son yarış tarihi/takı bilgisi bilinmiyor"),
       sig("yarisGidisatiSkoru", gidisat?.finalSkor ?? null, gidisat?.finalSkor != null, 1, "pace-analizi.ts::hesaplaYarisGidisati (Accurace geçmişi, taze hesap)", gidisat?.finalSkor != null ? null : "yeterli Accurace geçmişi yok"),
-      sig("sireOrani", r.sireOrani, (r.sireOrneklemKendiVeri ?? 0) > 0, 1, "v5-engine.ts (sire kazanma oranı, kendi örneklemi)", (r.sireOrneklemKendiVeri ?? 0) > 0 ? null : "sire için kendi örneklem verisi yok (yalnız fallback yüzde)"),
+      sig("sireOrani", sirePctById.get(r.id) ?? null, sirePctById.get(r.id) != null, 1, "RAN-only PIT getV5461SireOzetleriForRace (exclude own horse; shrink)", sirePctById.get(r.id) != null ? null : "yarış öncesi, kendi startları hariç aygır örneklemi yok"),
       sig("ACC_CLOSE_RES", cr.observed ? cr.raw : null, cr.observed, cr.reliability, "accurace/features.ts::closingResidual"),
       sig("ACC_LATE", la.observed ? la.raw : null, la.observed, la.reliability, "accurace/features.ts::lateSegmentSpeed"),
       sig("ACC_SPEED", sp.observed ? sp.raw : null, sp.observed, sp.reliability, "accurace/features.ts::speedResidual"),
