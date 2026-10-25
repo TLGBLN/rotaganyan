@@ -95,7 +95,7 @@ export async function analyzeRaceDemotion(
   // içindeki tekrar ELENİR.
   const faz1 = await gatherFaz1V5Historical(raceId);
 
-  const { vectors } = await buildUnifiedFeatureVectorsForRace(raceId, preloadedAccuraceRuns, faz1, sharedFieldSizeResolver);
+  const { vectors, rawSources } = await buildUnifiedFeatureVectorsForRace(raceId, preloadedAccuraceRuns, faz1, sharedFieldSizeResolver, true);
   if (vectors.length === 0) return { status: "NO_DATA", raceId };
 
   // --- FAZ 1 KAPISI: STALE ise hiçbir şey işlenmez (eski RCA'nın OLCULMEDI disiplini) ---
@@ -128,8 +128,12 @@ export async function analyzeRaceDemotion(
     new Map(winnerVec.signals.map((s) => [s.code, s.missingReason]))
   );
 
-  const altRowsForRace = await crosscheckAlternativeSignals(raceId, preloadedAccuraceRuns, faz1);
-  const altRowsForWinner = altRowsForRace.get(winnerNo) ?? [];
+  // Alternatif formüller yalnız TOP-1 kaçırmalarında kök-neden sınıflandırmasında
+  // kullanılır. TOP-1 doğruysa teşhis gereksiz; yanlışsa AYNI skorlamada elde
+  // edilmiş D/V1 ham sinyalleri kullanılır (sıfır ek model/DB yeniden hesaplama).
+  const altRowsForWinner = winnerRank > 1
+    ? (await crosscheckAlternativeSignals(raceId, preloadedAccuraceRuns, faz1, rawSources)).get(winnerNo) ?? []
+    : [];
 
   async function miss(rivalNo: number): Promise<MissAnalysis> {
     const rivalVec = vectors.find((v) => v.no === rivalNo)!;
