@@ -61,6 +61,8 @@ export type RunnerFeatureVector = {
   tjkAtId: number | null;
   jockey: string | null;
   signals: SignalEntry[];
+  /** Explicit model-input transformation identity. Undefined = legacy source. */
+  pedigreeScoringVersion?: string;
 };
 
 export type RaceBatchContext = {
