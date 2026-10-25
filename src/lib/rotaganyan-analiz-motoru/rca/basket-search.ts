@@ -169,7 +169,11 @@ export function chooseBasketFromConfirmation(
     throw new Error("RAN_BASKET_DIFFERENT_VALIDATION_COHORT");
   if(!basketDomainCheck(fullBasket.codes).complete)
     throw new Error("RAN_BASKET_FULL_REFERENCE_MISSING_DOMAINS");
-  const front=basketParetoFront(confirmed);
+  // A domain-incomplete high-TOP1 subset may dominate numerically in the
+  // exploratory metrics, but it is not an eligible unified racing engine.
+  // Remove invalid selections BEFORE Pareto so they cannot mask real baskets.
+  const front=basketParetoFront(
+    confirmed.filter(x=>basketDomainCheck(x.codes).complete));
   // Never force lineage/source representation. A shortlist winner must remain
   // on Pareto frontier. Both TOP1 and TOP3 are independent non-tradeoff guards
   // to avoid optimizing one at the expense of the other.
