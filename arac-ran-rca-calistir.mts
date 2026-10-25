@@ -10,7 +10,7 @@ import { UNIFIED_MODEL_CODES } from "./src/lib/rotaganyan-analiz-motoru/feature-
 import { loadTrainedModel } from "./src/lib/rotaganyan-analiz-motoru/load-trained-model";
 import { loadRcaAccuraceSnapshot } from "./src/lib/rotaganyan-analiz-motoru/rca/accurace-snapshot";
 import type { RunnerFeatureVector } from "./src/lib/motor-v1/engine/feature-vector";
-import type { FittedModel } from "./src/lib/motor-v1/engine/training";
+import { scoreRace, type FittedModel } from "./src/lib/motor-v1/engine/training";
 import { createFieldSizeResolver } from "./src/lib/motor-v1/features/history-source";
 import type { PedigreeEffect, PedigreeComparison } from "./src/lib/rotaganyan-analiz-motoru/rca/pedigree-breakdown";
 
@@ -137,6 +137,19 @@ async function main() {
       continue;
     }
     okCount++;
+    // Kabul-setindeki eski dondurulmuş vektörlerle aynı modelin kazanan sırası
+    // ve tüm saha olasılıkları karşılaştırılır. Snapshot/live kaynak farkı varsa
+    // gizlenmez; yeni performans metrikleri eşit kabul edilmez.
+    const savedRanked = scoreRace(row.vectors, model).sort((a, b) => b.probability - a.probability);
+    const referenceRank = savedRanked.findIndex((x) => x.no === row.winnerNo) + 1;
+    const currentByNo = new Map(result.ranked.map((x) => [x.no, x.probability]));
+    const sameField = savedRanked.length === result.ranked.length && savedRanked.every((x) => currentByNo.has(x.no));
+    const maxProbabilityDelta = sameField
+      ? Math.max(...savedRanked.map((x) => Math.abs(x.probability - currentByNo.get(x.no)!)))
+      : null;
+    const parity = sameField && referenceRank === result.winnerRank && maxProbabilityDelta != null && maxProbabilityDelta <= 1e-10;
+    console.log(`[RCA_ACCEPTANCE_PARITY] raceId=${row.raceId} ${parity ? "EXACT" : "DIFF"} savedRank=${referenceRank} freshRank=${result.winnerRank} maxProbDelta=${maxProbabilityDelta ?? "FIELD_MISMATCH"}`);
+    rcaProbeMark(`ACCEPTANCE_PARITY id=${row.raceId} status=${parity ? "EXACT" : "DIFF"} savedRank=${referenceRank} freshRank=${result.winnerRank}`);
     const satir = `raceId=${row.raceId} (${row.tarih}) kazanan=${result.winnerName}(No${result.winnerNo}) rank=${result.winnerRank}/${result.fieldSize}`;
     if (result.winnerRank === 1) {
       console.log(`[OK, TOP1] ${satir}`);
