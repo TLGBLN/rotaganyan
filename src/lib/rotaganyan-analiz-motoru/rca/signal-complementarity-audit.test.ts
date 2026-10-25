@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import type { AcceptanceRaceRow } from "./final-acceptance-report";
 import type { RunnerFeatureVector } from "@/lib/motor-v1/engine/feature-vector";
 import { computeFeatureStats, fitModel } from "@/lib/motor-v1/engine/training";
@@ -80,4 +84,30 @@ describe("RAN signal complementarity — fail closed and paired metrics",()=>{
   it("identifies fixed pre-race source blockers instead of declaring publication safe",()=>{
     expect(KNOWN_SOURCE_BLOCKERS.map(x=>x.code)).toEqual(["SIRE_HISTORY","SPEED"]);
   });
+  it("runs standalone audit CLI without DB, fails closed when locked train archive is absent",()=>{
+    const dir=mkdtempSync(path.join(tmpdir(),"ran-audit-cli-"));
+    try {
+      const dest=path.join(dir,"report");
+      const result=spawnSync(process.execPath,[
+        "node_modules/tsx/dist/cli.mjs","arac-ran-sinyal-tamamlayicilik-denetimi.mts",
+      ],{cwd:process.cwd(),encoding:"utf8",timeout:20000,env:{
+        ...process.env,
+        RAN_AUDIT_TRAIN:path.join(dir,"not-here-train.json"),
+        RAN_AUDIT_ACCEPT:path.join(dir,"not-here-accept.json"),
+        RAN_AUDIT_OUT:dest,
+        DATABASE_URL:"",
+      }});
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("[RAN_SIGNAL_AUDIT] BLOCKED");
+      expect(result.stderr).not.toContain("DATABASE_URL");
+      const output=JSON.parse(readFileSync(dest+".json","utf8"));
+      expect(output.publicationGate).toBe("BLOCKED");
+      expect(output.status).toBe("INCOMPLETE");
+      expect(output.originalModelUnchanged).toBe(true);
+    } finally {
+      rmSync(dir,{recursive:true,force:true});
+    }
+  },25000);
+
 });
