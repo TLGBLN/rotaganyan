@@ -1,4 +1,5 @@
 import {describe,it,expect} from "vitest";
+import {createHash} from "node:crypto";
 import {spawnSync} from "node:child_process";
 import {mkdtempSync,rmSync,writeFileSync,readFileSync} from "node:fs";
 import path from "node:path";
@@ -28,7 +29,15 @@ describe("RAN BASKET research CLI (all 36 signal families jointly refitted)",()=
           })),
         };
       });
-      writeFileSync(input,JSON.stringify(rows));
+      const bytes=JSON.stringify(rows);
+      writeFileSync(input,bytes);
+      writeFileSync(input+".manifest.json",JSON.stringify({
+        version:PEDIGREE_V3_VERSION,
+        sourceSha:"0".repeat(64),
+        outputSha:createHash("sha256").update(bytes).digest("hex"),
+        races:300,trainingRaces:238,developmentRaces:62,
+        everyHorseHasThreeLineages:true,
+      }));
       const env={...process.env,NODE_ENV:"test",RAN_BASKET_IN:input,
         RAN_BASKET_OUT:out,RAN_BASKET_SCREEN_ITER:"5",
         RAN_BASKET_MAX_FITS:"750",RAN_BASKET_RESTARTS:"4",
