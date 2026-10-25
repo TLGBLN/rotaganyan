@@ -44,6 +44,8 @@ describe("RAN isolated immutable transaction",()=>{
     mocked.findUnique.mockReset();
     vi.stubEnv("NODE_ENV","test");
     vi.stubEnv("RAN_SHADOW_SNAPSHOT_WRITES", undefined);
+    vi.stubEnv("DATABASE_URL","postgresql://postgres@localhost:54329/ran_shadow_test");
+    vi.stubEnv("RAN_TEST_LOCAL_DB_ACK","ran_shadow_test");
   });
   afterEach(()=>vi.unstubAllEnvs());
   it("write guard fails closed with no flag; no transaction is started",async()=>{
@@ -65,6 +67,12 @@ describe("RAN isolated immutable transaction",()=>{
     expect(args.where.bundleKey).toBe(b.bundleKey);
     expect(args.create.payload.coupon).toEqual(b.coupon);
     expect(args.create.payload.legs).toHaveLength(6);
+  });
+  it("even with write flag, cloud or production database URL is rejected before transaction",async()=>{
+    vi.stubEnv("RAN_SHADOW_SNAPSHOT_WRITES","isolated-test-only");
+    vi.stubEnv("DATABASE_URL","postgresql://postgres@prod.example.com:5432/ran_shadow_test");
+    await expect(persistRanSnapshotBundle(bundle())).rejects.toThrow("RAN_TEST_DATABASE_MUST_BE_LOCAL");
+    expect(mocked.tx).not.toHaveBeenCalled();
   });
   it("reads same stored bundle and never recalculates from a live model",async()=>{
     const b=bundle();
