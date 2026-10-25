@@ -69,6 +69,21 @@ function markdown(report:SignalAuditReport, files:{train:string;accept:string;tr
     ...report.correlations.filter(c=>c.highOverlap||c.structuralNote!==null)
       .map(c=>"| "+c.codeA+" | "+c.codeB+" | "+c.nBothObserved+" | "+(c.pearson==null?"N/A":format(c.pearson))+" | "+(c.structuralNote??"Sayısal örtüşme")+" |"),
     "",
+    "## Birleşik modelin D/V1 altkümeleri karşısındaki asıl tamamlayıcılığı",
+    "",
+    "D_ONLY / V1_ONLY: mevcut 36 sinyalden yeniden eğitilmiş altküme modelleridir; eski bağımsız modellerin yayımlanmış tahminleri DEĞİLDİR.",
+    ...[report.unifiedVsDFeaturesOnly,report.unifiedVsV1FeaturesOnly].flatMap(x=>[
+      "### "+x.name,
+      "- TOP1: "+x.metrics.top1Hits+"/"+x.metrics.n+"; TOP3: "+x.metrics.top3Hits+"/"+x.metrics.n+
+        "; ΔTOP1: "+x.delta.top1Hits+"; ΔTOP3: "+x.delta.top3Hits+"; ΔLogLoss: "+format(x.delta.logLoss),
+      "- Birleşik modelin kurtardığı kazanan TOP1/TOP3: "+x.rescue.top1+"/"+x.rescue.top3,
+      "- Birleşik modelin yeni kaçırdığı kazanan TOP1/TOP3: "+x.harm.top1+"/"+x.harm.top3,
+      ...x.changed.filter(r=>r.rescuedTop1||r.rescuedTop3||r.lostTop1||r.lostTop3).map(r=>
+        "- "+r.raceId+" #"+r.winnerNo+" altküme "+r.baselineRank+
+        " → birleşik "+r.candidateRank+
+        (r.rescuedTop3?" [TOP3 KURTARMA]":r.lostTop3?" [TOP3 YENİ KAYIP]":"")),
+      "",
+    ]),
     "## Yarış düzeyinde D/V1 kurtarma-kayıp örnekleri",
     "",
     ...e.filter(x=>x.name==="D_ONLY"||x.name==="V1_ONLY").flatMap(x=>[
