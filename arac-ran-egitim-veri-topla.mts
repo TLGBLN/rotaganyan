@@ -137,9 +137,12 @@ async function main() {
 
   for (let i = 0; i < remaining.length; i += CONCURRENCY) {
     const batch = remaining.slice(i, i + CONCURRENCY);
+    if (DATASET_TAG) console.log(`[RAN_PIT_BATCH_START] ${done + 1}..${done + batch.length}/${eligible.length}, checkpoint=${Object.keys(checkpoint).length} races`);
     const results = await Promise.all(
       batch.map(async (race) => {
+        const raceStart = Date.now();
         const r = await withRetry(() => buildUnifiedFeatureVectorsForRace(race.id, preloadedRuns), race.id);
+        if (DATASET_TAG) console.log(`[RAN_PIT_RACE] id=${race.id} seconds=${((Date.now() - raceStart) / 1000).toFixed(1)} success=${!!r?.vectors.length}`);
         if (!r || r.vectors.length === 0) return null;
         const dbRace = await db.race.findUnique({
           where: { id: race.id },
