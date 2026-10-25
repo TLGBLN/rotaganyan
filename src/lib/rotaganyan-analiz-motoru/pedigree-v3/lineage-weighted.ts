@@ -62,8 +62,11 @@ export function adjustWeightedLineage(
 }
 /** Changes only canonical SIRE/DAM/DAMSIRE, stamps explicit V3 lineage source. */
 export function replaceWeightedThreeLineages(
-  vector:RunnerFeatureVector,lines:readonly WeightedLineage[],
+  vector:RunnerFeatureVector,lines:readonly AdjustedLineage[],
 ):RunnerFeatureVector {
+  if(lines.length!==LINEAGES.length ||
+    lines.some(x=>(x as WeightedLineage).evidenceMethod!=="EQUAL_FOAL_CAPPED_STARTS_V3"))
+    throw new Error("RAN_PED_V3_REJECTS_UNWEIGHTED_LINEAGE");
   const adjusted=replaceThreeLineages(vector,lines);
   return {...adjusted,pedigreeScoringVersion:PEDIGREE_V3_VERSION};
 }
