@@ -40,10 +40,13 @@ export type GenPedigriEntry = {
   coverageState: CoverageState | null;
   asOfSafe: true;
   missingReason: string | null;
+  /** Number of pre-race source starts for this specific lineage, TARGET horse excluded. */
+  sampleCount: number | null;
 };
 
-function entry(code: GenPedigriSignalCode, rawValue: number | null, observed: boolean, coverageState: CoverageState | null, missingReason: string | null): GenPedigriEntry {
-  return { code, family: "GEN_PEDIGRI", rawValue, observed, coverageState, asOfSafe: true, missingReason };
+function entry(code: GenPedigriSignalCode, rawValue: number | null, observed: boolean, coverageState: CoverageState | null, missingReason: string | null, sampleCount: number | null = null): GenPedigriEntry {
+  return { code, family: "GEN_PEDIGRI", rawValue, observed, coverageState, asOfSafe: true, missingReason,
+    sampleCount:observed && sampleCount!=null && Number.isSafeInteger(sampleCount) && sampleCount>0 ? sampleCount : null };
 }
 
 type LineOzet = { ornekKendiVeri: number | null; kYuzde: number | null };
@@ -200,7 +203,8 @@ export async function computeGenPedigriForRace(
       return entry(
         code, observed ? o.kYuzde : null, observed,
         classifyCoverage(has, o.ornekKendiVeri ?? 0, observed ? 1 : 0, 1),
-        !has ? `${label} adı bilinmiyor` : !observed ? `bu ${label}+ırk+pist+mesafe kovasında hedef tarihten önce hiç start yok` : null
+        !has ? `${label} adı bilinmiyor` : !observed ? `bu ${label}+ırk+pist+mesafe kovasında hedef tarihten önce hiç start yok` : null,
+        o.ornekKendiVeri ?? null
       );
     };
 
@@ -215,7 +219,8 @@ export async function computeGenPedigriForRace(
       interactionObserved ? so.kYuzde! * pmz! : null,
       interactionObserved,
       gen01.coverageState,
-      !gen01.observed ? gen01.missingReason : pmz == null ? "PMZ_01 bu at için gözlemsiz" : null
+      !gen01.observed ? gen01.missingReason : pmz == null ? "PMZ_01 bu at için gözlemsiz" : null,
+      gen01.sampleCount
     );
 
     return { no: r.no, signals: [gen01, genDam, genDamSire, genPmz] };
