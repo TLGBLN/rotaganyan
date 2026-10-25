@@ -16,7 +16,9 @@ export type PedigreeEvidence = {
   code:PedigreeCode; runnerCount:number; observed:number; missing:number;
   observedFraction:number; rawZeroCount:number; rawHundredCount:number;
   rawMean:number|null; rawMin:number|null; rawMax:number|null;
-  countOfHistoricalStartsAvailableInVector:false;
+  countOfHistoricalStartsAvailableInVector:boolean;
+  documentedStartSamples:number;observedWithAtMost2Starts:number;
+  minHistoricalStarts:number|null;maxHistoricalStarts:number|null;
   caveat:string;
 };
 export const PEDIGREE_CONTEXTS: Record<string,readonly string[]> = {
@@ -40,11 +42,19 @@ export function pedigreeCoverage(rows:readonly FeatureRace[]):PedigreeEvidence[]
   return PEDIGREE_CODES.map(code=>{
     let observed=0,missing=0,rawZeroCount=0,rawHundredCount=0;
     let sum=0,min=Infinity,max=-Infinity;
+    let documentedStartSamples=0,observedWithAtMost2Starts=0;
+    let minHistoricalStarts=Infinity,maxHistoricalStarts=0;
     for(const v of all){
       const s=v.signals.find(x=>x.code===code);
       if(!s || !s.observed || s.rawValue==null || !Number.isFinite(s.rawValue)){missing++;continue;}
       observed++;sum+=s.rawValue;
       min=Math.min(min,s.rawValue);max=Math.max(max,s.rawValue);
+      if(s.sampleCount!=null && Number.isSafeInteger(s.sampleCount) && s.sampleCount>0){
+        documentedStartSamples++;
+        minHistoricalStarts=Math.min(minHistoricalStarts,s.sampleCount);
+        maxHistoricalStarts=Math.max(maxHistoricalStarts,s.sampleCount);
+        if(s.sampleCount<=2)observedWithAtMost2Starts++;
+      }
       if(s.rawValue===0)rawZeroCount++;
       if(s.rawValue===100)rawHundredCount++;
     }
@@ -52,10 +62,13 @@ export function pedigreeCoverage(rows:readonly FeatureRace[]):PedigreeEvidence[]
       observedFraction:all.length?observed/all.length:0,
       rawZeroCount,rawHundredCount,
       rawMean:observed?sum/observed:null,rawMin:observed?min:null,rawMax:observed?max:null,
-      countOfHistoricalStartsAvailableInVector:false,
+      countOfHistoricalStartsAvailableInVector:observed>0&&documentedStartSamples===observed,
+      documentedStartSamples,observedWithAtMost2Starts,
+      minHistoricalStarts:documentedStartSamples?minHistoricalStarts:null,
+      maxHistoricalStarts:documentedStartSamples?maxHistoricalStarts:null,
       caveat:code==="SIRE_HISTORY"?
-        "RAN PIT sire is prior-shrunk (20 starts / 14%); exact prior-year evidence count is lost from existing 36-vector.":
-        "DAM/DAMSIRE is a raw historical win percentage; one start may produce 0% or 100%. Existing 36-vector does NOT record sample count. Must not infer data reliability from raw % alone.",
+        "RAN PIT sire is prior-shrunk (20 starts / 14%). Evidence n is available only on regenerated vectors.":
+        "DAM/DAMSIRE is a raw historical win percentage; one start can produce 0% or 100%. Source n must be checked. For old PIT vectors with no n, reliability is UNKNOWN.",
     };
   });
 }
@@ -65,7 +78,7 @@ export type PedigreeExperiment = {
 };
 export type PedigreeDiagnosticReport = {
   publicationGate:"BLOCKED";source:"ORIGINAL_PIT_238_TRAIN_ONLY";
-  pedigreeCodes:readonly PedigreeCode[];confidenceHasSampleCounts:false;
+  pedigreeCodes:readonly PedigreeCode[];confidenceHasSampleCounts:boolean;
   lineCoverage:PedigreeEvidence[];
   experiments:PedigreeExperiment[];
   grouped: {context:string;noPedigree:CombinationResult;
@@ -99,9 +112,11 @@ export function auditPedigreeLineages(
       bestResearchCandidate:[...fits].sort((a,b)=>rankCombination(a.fit,b.fit))[0].fit,
       allThree:fits[7].fit});
   }
+  const lineCoverage=pedigreeCoverage(rows);
   return {publicationGate:"BLOCKED",source:"ORIGINAL_PIT_238_TRAIN_ONLY",
-    pedigreeCodes:PEDIGREE_CODES,confidenceHasSampleCounts:false,
-    lineCoverage:pedigreeCoverage(rows),experiments,grouped,
+    pedigreeCodes:PEDIGREE_CODES,
+    confidenceHasSampleCounts:lineCoverage.every(l=>l.countOfHistoricalStartsAvailableInVector),
+    lineCoverage,experiments,grouped,
     warnings:[
       "SIRE/DAM/DAMSIRE must remain distinct lineage candidates. Ranking alone never authorizes dropping a lineage.",
       "PIT sire uses shrinkage; PIT dam/damsire still expose unshrunk historical percentages. Do not compare raw coefficients as if they had identical reliability.",
