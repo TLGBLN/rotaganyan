@@ -49,6 +49,9 @@ export type SignalEntry = {
   coverageState: CoverageState | null; // veri kapsamı (uygulanabiliyorsa)
   asOfSafe: true; // zaman güvenliği — bu katmandaki TÜM fonksiyonlar point-in-time (AÇIKÇA taşınır, denetlenebilirlik için)
   missingReason: string | null;
+  /** Optional point-in-time support count for lineage / evidence audit.
+   * Pure metadata, never used as a hidden learned feature or beta input. */
+  sampleCount?: number | null;
 };
 
 export type RunnerFeatureVector = {
