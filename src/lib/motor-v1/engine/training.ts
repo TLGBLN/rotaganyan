@@ -19,10 +19,9 @@
 // hiperparametreler elle seçildi, interaction terimleri (γ_m·I_im) bu ilk sürümde YOK — yalnız
 // ana etkiler Σβ_k·z_ik). MODEL_VERSION alanı bu durumu her raporda AÇIKÇA taşır.
 
-import { db } from "@/lib/db";
 import { dot, fitConditionalLogit, type TrainingRunner } from "@/lib/v5461/conditional-logit";
 import { softmax } from "@/lib/v5461/math";
-import { buildFeatureVectorsForRace, type RunnerFeatureVector } from "./feature-vector";
+import type { RunnerFeatureVector } from "./feature-vector";
 import type { TempoContext } from "../features/tempo";
 
 export const MODEL_VERSION = "rotaganyan-v1.0-preliminary-smallsample-2026-10-17";
@@ -108,6 +107,7 @@ export type TrainingRace = { raceId: string; date: Date; vectors: RunnerFeatureV
  *  sonuçlu yarışlar. `beforeDate` ile hedef yarışın tarihinden SONRAKİ hiçbir yarış örnekleme
  *  giremez (point-in-time eğitim/test ayrımı — kullanıcı kuralı: "zaman sıralı"). */
 export async function selectTrainingRaces(limit: number, beforeDate: Date): Promise<{ raceId: string; date: Date }[]> {
+  const { db } = await import("@/lib/db");
   const races = await db.race.findMany({
     where: { raceDay: { date: { lt: beforeDate } }, result: { isNot: null } },
     select: { id: true, raceDay: { select: { date: true } }, runners: { where: { scratched: false }, select: { id: true } } },
@@ -133,6 +133,11 @@ function resolveWinnerNo(actualOrder: unknown, winnerNos: number[] | null | unde
  *  inşa eder — buildFeatureVectorsForRace'in kendisi zaten her ailenin point-in-time
  *  garantisini miras alır, burada EK bir cutoff mantığı UYGULANMAZ (zaten doğru). */
 export async function buildTrainingSet(raceStubs: { raceId: string; date: Date }[], tempoCtx: TempoContext): Promise<TrainingRace[]> {
+  // Pure scoreRace/explainRunner may run without DATABASE_URL. DB dependencies are
+  // loaded only when the explicit training-data collection workflow is invoked.
+  const [{ db }, { buildFeatureVectorsForRace }] = await Promise.all([
+    import("@/lib/db"), import("./feature-vector"),
+  ]);
   const out: TrainingRace[] = [];
   for (const stub of raceStubs) {
     const [vectors, result] = await Promise.all([
