@@ -129,6 +129,67 @@ export function evaluateCombination(
     top1:top1Hits/n,top3:top3Hits/n,logLoss,
     score:candidateObjective({n,top1Hits,top3Hits,logLoss},codes.length)};
 }
+/**
+ * GENUINE multiplicative pair interaction, not merely putting two additive
+ * predictors side by side. Each z-score is computed using only the historical
+ * TRAIN side of that walk-forward fold. Interaction observed only when BOTH
+ * source features are known; missingness is modeled as a separate indicator.
+ * Research only until the same derivation exists in the live feature pipeline.
+ */
+export function evaluatePairInteraction(
+  folds:readonly WalkFold[],a:string,b:string,opts:FitOptions,
+):CombinationResult {
+  if(a===b || !UNIFIED_MODEL_CODES.includes(a) || !UNIFIED_MODEL_CODES.includes(b))
+    throw new Error("RAN_COMBO_INVALID_INTERACTION_PAIR");
+  const pair=[a,b];
+  const derived="INTERACTION__"+a+"__"+b;
+  const codes=[a,b,derived];
+  const results:FoldMetrics[]=[];
+  for(const fold of folds){
+    const baseStats=computeFeatureStats(fold.train.flatMap(x=>x.vectors),pair);
+    const ax=baseStats.get(a)!,bx=baseStats.get(b)!;
+    const append=(r:FeatureRace):FeatureRace=>({
+      ...r,vectors:r.vectors.map(v=>{
+        const x=v.signals.find(s=>s.code===a),y=v.signals.find(s=>s.code===b);
+        const observed=!!x?.observed&&!!y?.observed&&x.rawValue!==null&&
+          y.rawValue!==null&&Number.isFinite(x.rawValue)&&Number.isFinite(y.rawValue);
+        const rawValue=observed?((x!.rawValue!-ax.mu)/ax.sigma)*((y!.rawValue!-bx.mu)/bx.sigma):null;
+        return {...v,signals:[...v.signals,{
+          code:derived,family:"COMBINATORIAL_INTERACTION",
+          rawValue,observed,asOfSafe:true as const,coverageState:null,
+          missingReason:observed?null:"one-or-both-source-signals-unobserved",
+        }]};
+      }),
+    });
+    const training=fold.train.map(append),testing=fold.validation.map(append);
+    const stats=computeFeatureStats(training.flatMap(r=>r.vectors),codes);
+    const model=fitModel(training.map(r=>({
+      raceId:r.raceId,date:new Date(r.tarih+"T00:00:00.000Z"),
+      winnerNo:r.winnerNo,vectors:r.vectors,
+    })),stats,opts);
+    if(model.nRacesUsed!==training.length || model.beta.some(x=>!Number.isFinite(x)))
+      throw new Error("RAN_COMBO_INTERACTION_FIT_INCOMPLETE");
+    let top1Hits=0,top3Hits=0,logLossSum=0;
+    for(const race of testing){
+      const rank=scoreRace(race.vectors,model).sort((x,y)=>
+        y.probability-x.probability||x.no-y.no);
+      const idx=rank.findIndex(x=>x.no===race.winnerNo);
+      if(idx<0)throw new Error("RAN_COMBO_INTERACTION_WINNER_MISSING");
+      const prob=rank[idx].probability;
+      if(!(prob>0)||!Number.isFinite(prob))throw new Error("RAN_COMBO_INTERACTION_BAD_PROB");
+      top1Hits+=Number(idx===0);top3Hits+=Number(idx<3);logLossSum-=Math.log(prob);
+    }
+    results.push({fold:fold.id,n:testing.length,top1Hits,top3Hits,logLossSum});
+  }
+  const n=results.reduce((s,r)=>s+r.n,0);
+  const top1Hits=results.reduce((s,r)=>s+r.top1Hits,0);
+  const top3Hits=results.reduce((s,r)=>s+r.top3Hits,0);
+  const logLoss=results.reduce((s,r)=>s+r.logLossSum,0)/n;
+  return {id:"INT:"+selectionKey(pair),codes,foldResults:results,
+    n,top1Hits,top3Hits,top1:top1Hits/n,top3:top3Hits/n,logLoss,
+    score:candidateObjective({n,top1Hits,top3Hits,logLoss},codes.length)};
+}
+
 /** Pair can be synergistic despite low singleton value, and highly correlated
  * sources can still complement. Never delete on Pearson alone. */
 export function classifyPair(
