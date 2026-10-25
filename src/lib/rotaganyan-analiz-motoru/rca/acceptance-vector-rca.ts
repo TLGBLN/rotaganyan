@@ -51,6 +51,16 @@ export function analyzeStoredAcceptanceRace(
   model: FittedModel<string>
 ): StoredRcaResult {
   const reasons = validateAcceptanceVectors(raceId, vectors);
+  const statsCodes = [...model.stats.keys()];
+  if (statsCodes.length !== UNIFIED_MODEL_CODES.length ||
+      statsCodes.some((code, index) => code !== UNIFIED_MODEL_CODES[index])) {
+    reasons.push("Kabul vektörleri ile model.stats kanonik kod sırası uyuşmuyor");
+  }
+  const wantedNames = UNIFIED_MODEL_CODES.flatMap((code) => [`${code}_z`, `${code}_missing`]);
+  if (model.beta.length !== wantedNames.length || model.names.length !== wantedNames.length ||
+      model.names.some((name, index) => name !== wantedNames[index]) || model.beta.some((b) => !Number.isFinite(b))) {
+    reasons.push("Model names/beta sırası veya değerleri kanonik değil");
+  }
   if (reasons.length) return { status: "INVALID_RECORD", raceId, reasons };
 
   const ranked = scoreRace(vectors, model).sort((a, b) => b.probability - a.probability);
