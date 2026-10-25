@@ -5,6 +5,7 @@
 // Çalıştırma: node --env-file=.env node_modules/tsx/dist/cli.mjs arac-ran-rca-calistir.mts
 import fs from "node:fs";
 import { analyzeRaceDemotion } from "./src/lib/rotaganyan-analiz-motoru/rca/analyze-race";
+import { analyzeStoredAcceptanceRace } from "./src/lib/rotaganyan-analiz-motoru/rca/acceptance-vector-rca";
 import { validateSnapshot, computeWeightsFingerprint } from "./src/lib/rotaganyan-analiz-motoru/snapshot-integrity";
 import { UNIFIED_MODEL_CODES } from "./src/lib/rotaganyan-analiz-motoru/feature-calculators/unified-feature-vector";
 import { loadTrainedModel } from "./src/lib/rotaganyan-analiz-motoru/load-trained-model";
@@ -99,6 +100,51 @@ async function main() {
   console.log(`  Kasıtlı bozuk engineVersion ("0.1-eski-bir-surum" vs beklenen "1.0") → status=${bozukSonuc.status}`);
   console.log(`  reasons: ${JSON.stringify(bozukSonuc.reasons)}`);
   console.log(`  (analyzeRaceDemotion'ın her çağrıda AYNI validateSnapshot fonksiyonunu GERÇEKTEN çağırdığı — analyze-race.ts satır ~60-70 — bu yüzden bu kapı canlı akışta da işliyor.)\n`);
+
+  // KÖK DÜZELTME: normal RCA'da kabul kaydındaki sabit sinyalleri kullan.
+  // Bu bir yeniden-üretim / canlı parity testi DEĞİLDİR. Eski pahalı yol ancak
+  // RAN_RCA_MODE=FRESH_AUDIT ile özellikle istendiğinde çağrılır.
+  const mode = process.env.RAN_RCA_MODE ?? "ACCEPTANCE";
+  if (mode !== "ACCEPTANCE" && mode !== "FRESH_AUDIT") {
+    throw new Error(`RAN_RCA_MODE_INVALID: ${mode}`);
+  }
+  if (mode === "ACCEPTANCE") {
+    console.log("=== 1) KAYITLI KABUL VEKTORLERINDEN RCA (DB sorgusu yok) ===");
+    console.log("KAYNAK: kabul veri dosyasi; kayitlarin gercek yaris-oncesi uretim zamani / model fingerprint kaniti YOK.");
+    console.log("AGF ve D/V1 ALTERNATIF formül çapraz testi NOT_VERIFIED. Canli parity yeniden hesaplama YAPILMADI.\n");
+    rcaProbeMark("STORED_ACCEPTANCE_RCA_STARTED");
+    let ok = 0, invalid = 0, top1 = 0, top3 = 0, miss1 = 0, miss3 = 0;
+    for (const [index, row] of rows.entries()) {
+      const t = Date.now();
+      const result = analyzeStoredAcceptanceRace(row.raceId, row.winnerNo!, row.vectors, model);
+      if (result.status !== "OK") {
+        invalid++;
+        console.log(`[RCA KAYIT RED] ${index + 1}/${rows.length} raceId=${row.raceId} status=${result.status} ${result.status === "INVALID_RECORD" ? result.reasons.join(" | ") : ""}`);
+        continue;
+      }
+      ok++;
+      if (result.winnerRank === 1) top1++;
+      if (result.winnerRank <= 3) top3++;
+      if (result.top1Miss) miss1++;
+      if (result.top3Miss) miss3++;
+      console.log(`[RCA TAMAMLANDI] ${index + 1}/${rows.length} raceId=${row.raceId} sureMs=${Date.now() - t} status=OK source=ACCEPTANCE_VECTORS provenance=UNVERIFIED`);
+      console.log(`[RCA KAZANAN] ${row.tarih} ${result.winnerName} No${result.winnerNo} rank=${result.winnerRank}/${result.fieldSize} p=${(result.ranked.find((r) => r.no === result.winnerNo)?.probability ?? 0).toFixed(5)}`);
+      if (result.top1Miss) {
+        console.log(`[TOP1 MISS] category=${result.top1Miss.category} rival=${result.top1Miss.rivalName} drivers=${result.top1Miss.demotionDrivers.map((d) => `${d.code}:${d.delta.toFixed(4)}`).join(",")}`);
+      }
+      if (result.top3Miss) {
+        console.log(`[TOP3 MISS] category=${result.top3Miss.category} rival=${result.top3Miss.rivalName} drivers=${result.top3Miss.demotionDrivers.map((d) => `${d.code}:${d.delta.toFixed(4)}`).join(",")}`);
+      }
+      yazPedigriKazanan(result.winnerPedigree);
+      if (result.top1Miss) yazPedigriFark(result.top1Miss.pedigreeComparison, "TOP1 rakibi");
+      if (result.top3Miss) yazPedigriFark(result.top3Miss.pedigreeComparison, "TOP3 rakibi");
+    }
+    console.log(`[RCA KABUL OZET] toplam=${rows.length} OK=${ok} REJECTED=${invalid} TOP1=${top1} TOP3=${top3} TOP1_MISS=${miss1} TOP3_MISS=${miss3}`);
+    console.log("[RCA KANIT] Kayitli kabul vektorleri canonical modelle yeniden skorlandi. Pre-race provenance, AGF, alternatif sinyal uyumu ve fresh parity NOT_VERIFIED.");
+    rcaProbeMark(`STORED_ACCEPTANCE_RCA_FINISHED ok=${ok} rejected=${invalid}`);
+    if (invalid > 0) process.exitCode = 2;
+    return;
+  }
 
   // --- 1) Gerçek yarışlar üzerinde analyzeRaceDemotion ---
   console.log("=== 1) Gerçek yarışlar — analyzeRaceDemotion ===");
