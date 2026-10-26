@@ -20,7 +20,7 @@ const PACE = ["PACE_DUEL_SELF","PACE_STALK_DUEL","PACE_DRAW_LEAD_PRESS"] as cons
 const BLOCKED_REASONS = raw.blockers;
 
 export function loadD23StagingModel(): FittedModel<string> {
-  if (process.env.NODE_ENV === "production") throw Error("D23_STAGING_DISABLED_IN_PRODUCTION");
+  if ((process.env.VERCEL_ENV === "production" || (!process.env.VERCEL_ENV && process.env.NODE_ENV === "production"))) throw Error("D23_STAGING_DISABLED_IN_PRODUCTION");
   if (raw.releaseStatus !== "BLOCKED_PENDING_LIVE_PARITY_AND_PIT_PROVENANCE" ||
       data.deploymentReady !== false || raw.independentHoldoutValidated !== false ||
       CODES.length !== 23 || new Set(CODES).size !== 23 ||
