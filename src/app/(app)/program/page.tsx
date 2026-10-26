@@ -8,7 +8,6 @@ import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter
 import { syncResultsForDate } from "@/server/services/result-sync";
 import { tryAcquireIngestLock } from "@/lib/ingest-lock";
 import { fetchTodaysAltiliResults, type AltiliCityResult } from "@/server/services/ingest/tjk-altili.adapter";
-import { fetchTjkTicker } from "@/lib/tjk-ticker";
 import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
 import { getFollowedHorses } from "@/server/actions/horse-follow";
@@ -19,7 +18,6 @@ import AltiliGanyanResults from "@/components/home/AltiliGanyanResults";
 import TahminOnerileri from "@/components/home/TahminOnerileri";
 import HitsCarousel from "@/components/home/HitsCarousel";
 import KazananKuponlarCarousel from "@/components/home/KazananKuponlarCarousel";
-import NewsTicker from "@/components/home/NewsTicker";
 import ProgramPageLabel from "@/components/program/ProgramPageLabel";
 import AylikKuponKazanciCard from "@/components/home/AylikKuponKazanciCard";
 import { getAylikKuponKazanci } from "@/server/services/race.service";
@@ -28,18 +26,38 @@ export const revalidate = 0;
 
 type PageProps = { searchParams: Promise<{ tarih?: string }> };
 
-// v2026-07-31, kullanıcı talebi ("siteyi hızlandır... boş dönmemeli"): bu üç bölüm
-// (haber akışı, kanıt kartları, kupon önerileri+altılı sonuçları) ana yarış programının
-// kendi verisinden BAĞIMSIZ — eskiden hepsi TEK BİR Promise.all'da, sayfanın geri kalanıyla
-// birlikte bloklayarak bekleniyordu (TJK ticker/altılı gibi canlı çağrılar yavaşsa TÜM
-// sayfa beklerdi). Artık her biri kendi <Suspense> sınırında, ana program tablosundan
-// BAĞIMSIZ akıyor (streaming SSR) — yavaş olan yalnız kendi bölümünü geciktirir, sayfanın
-// geri kalanını değil. Veri kaynakları/içerik DEĞİŞMEDİ, yalnız NE ZAMAN bloklamaya izin
-// verdiği değişti.
-async function TickerSection() {
-  const tickerItems = await fetchTjkTicker().catch(() => []);
-  if (tickerItems.length === 0) return null;
-  return <NewsTicker items={tickerItems} />;
+// v2026-07-31, kullanıcı talebi ("siteyi hızlandır... boş dönmemeli"): bu bölümler
+// ana yarış programının kendi verisinden BAĞIMSIZ — eskiden hepsi TEK BİR Promise.all'da,
+// sayfanın geri kalanıyla birlikte bloklayarak bekleniyordu. Artık her biri kendi
+// <Suspense> sınırında, ana program tablosundan BAĞIMSIZ akıyor (streaming SSR) — yavaş
+// olan yalnız kendi bölümünü geciktirir, sayfanın geri kalanını değil.
+
+// 2026-10-26 kullanıcı talebi: eski haber akışı (TickerSection/NewsTicker) kaldırıldı,
+// yerine "İsabet Sağlayan Kuponlar" sayfanın EN ÜSTÜNDE, giriş durumu fark etmeksizin
+// HERKESE gösteriliyor — bu yüzden KuponlarSection artık ProofSection'dan AYRIŞTIRILDI
+// (aşağıda), aynı kuponlar sayfada İKİ KEZ görünmesin diye.
+async function KuponlarSection() {
+  const kazananKuponlar = await getGecmisKazananKuponlar(16).catch(() => []);
+  if (kazananKuponlar.length === 0) return null;
+  return (
+    <section data-tour="isabet-kuponlar">
+      {/* 2026-09-15 kullanıcı bulgusu: "Tümünü Gör" linki justify-between ile
+          sağ uca (geniş sayfada başlıktan çok uzağa) düşüyordu — artık başlığın
+          HEMEN altında, dikey istiflenmiş. */}
+      <div className="mb-4 space-y-1">
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-hit" />
+          <h2 className="text-base font-semibold"><ProgramPageLabel k="kuponlarBaslik" /></h2>
+        </div>
+        {/* 2026-09-15 kullanıcı talebi: üye olmayan bir ziyaretçi merak ederse
+            diye, tüm zamanların tutan kuponlarını gösteren public sayfaya link. */}
+        <Link href="/tutan-kuponlar" className="inline-block text-xs font-semibold text-brand hover:underline">
+          <ProgramPageLabel k="tumunuGor" /> →
+        </Link>
+      </div>
+      <KazananKuponlarCarousel items={kazananKuponlar} />
+    </section>
+  );
 }
 
 // 2026-09-15 kullanıcı talebi: "Aylık Kupon Kazancı" (eskiden yalnız admin panelinde)
@@ -56,43 +74,19 @@ async function AylikKazanciSection() {
   );
 }
 
-async function ProofSection() {
-  const [hitPredictions, kazananKuponlar] = await Promise.all([
-    getHitPredictions(16).catch(() => []),
-    getGecmisKazananKuponlar(16).catch(() => []),
-  ]);
+// 2026-10-26: Kuponlar bölümü yukarıdaki KuponlarSection'a taşındı (herkese, en üstte) —
+// bu bölüm artık yalnız "İsabet Sağlayan Bankolar"ı taşıyor, çift gösterim YOK.
+async function BankolarSection() {
+  const hitPredictions = await getHitPredictions(16).catch(() => []);
+  if (hitPredictions.length === 0) return null;
   return (
-    <>
-      {/* 2026-09-15 kullanıcı talebi: Kuponlar ÖNCE, Bankolar ALTINDA (eskiden tersiydi). */}
-      {kazananKuponlar.length > 0 && (
-        <section className="border-t pt-8" data-tour="isabet-kuponlar">
-          {/* 2026-09-15 kullanıcı bulgusu: "Tümünü Gör" linki justify-between ile
-              sağ uca (geniş sayfada başlıktan çok uzağa) düşüyordu — artık başlığın
-              HEMEN altında, dikey istiflenmiş. */}
-          <div className="mb-4 space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-hit" />
-              <h2 className="text-base font-semibold"><ProgramPageLabel k="kuponlarBaslik" /></h2>
-            </div>
-            {/* 2026-09-15 kullanıcı talebi: üye olmayan bir ziyaretçi merak ederse
-                diye, tüm zamanların tutan kuponlarını gösteren public sayfaya link. */}
-            <Link href="/tutan-kuponlar" className="inline-block text-xs font-semibold text-brand hover:underline">
-              <ProgramPageLabel k="tumunuGor" /> →
-            </Link>
-          </div>
-          <KazananKuponlarCarousel items={kazananKuponlar} />
-        </section>
-      )}
-      {hitPredictions.length > 0 && (
-        <section className="border-t pt-8" data-tour="isabet-bankolar">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-hit" />
-            <h2 className="text-base font-semibold"><ProgramPageLabel k="bankolarBaslik" /></h2>
-          </div>
-          <HitsCarousel items={hitPredictions} />
-        </section>
-      )}
-    </>
+    <section className="border-t pt-8" data-tour="isabet-bankolar">
+      <div className="mb-4 flex items-center gap-2">
+        <span className="h-2 w-2 rounded-full bg-hit" />
+        <h2 className="text-base font-semibold"><ProgramPageLabel k="bankolarBaslik" /></h2>
+      </div>
+      <HitsCarousel items={hitPredictions} />
+    </section>
   );
 }
 
@@ -215,12 +209,13 @@ export default async function ProgramPage({ searchParams }: PageProps) {
 
   return (
     <div className="mx-auto max-w-[1400px] px-3 py-4 space-y-6">
-      {/* Haber Akışı */}
+      {/* İsabet Sağlayan Kuponlar — eski haber akışının yerinde, giriş durumu fark
+          etmeksizin HERKESE en üstte gösterilir (2026-10-26 kullanıcı talebi). */}
       <Suspense fallback={null}>
-        <TickerSection />
+        <KuponlarSection />
       </Suspense>
 
-      {/* Aylık Kupon Kazancı + İsabet Sağlayan Bankolar/Kuponlar — yalnız giriş yapmamış
+      {/* Aylık Kupon Kazancı + İsabet Sağlayan Bankolar — yalnız giriş yapmamış
           ziyaretçiler için üstte, bu sırayla (kazanç özeti önce). */}
       {!isLoggedIn && (
         <>
@@ -228,7 +223,7 @@ export default async function ProgramPage({ searchParams }: PageProps) {
             <AylikKazanciSection />
           </Suspense>
           <Suspense fallback={SKELETON_ROW}>
-            <ProofSection />
+            <BankolarSection />
           </Suspense>
         </>
       )}
@@ -252,10 +247,10 @@ export default async function ProgramPage({ searchParams }: PageProps) {
         <CouponsAndResults isLoggedIn={isLoggedIn} isAdmin={isAdmin} />
       </Suspense>
 
-      {/* İsabet Sağlayan Bankolar/Kuponlar — giriş yapmış kullanıcılar için altta (mevcut yer) */}
+      {/* İsabet Sağlayan Bankolar — giriş yapmış kullanıcılar için altta (mevcut yer) */}
       {isLoggedIn && (
         <Suspense fallback={SKELETON_ROW}>
-          <ProofSection />
+          <BankolarSection />
         </Suspense>
       )}
     </div>
