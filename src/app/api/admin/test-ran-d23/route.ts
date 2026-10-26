@@ -9,7 +9,7 @@ export const runtime = "nodejs";
  * engine until a separate release passes full train/live, PIT and coupon parity.
  */
 export async function POST(req:NextRequest) {
-  if (process.env.NODE_ENV === "production")
+  if ((process.env.VERCEL_ENV === "production" || (!process.env.VERCEL_ENV && process.env.NODE_ENV === "production")))
     return NextResponse.json({error:"D23 production release is blocked pending verification"},{status:404});
   const session=await auth();
   if(!session?.user || !hasRole(session.user.role as Role,"EDITOR"))
