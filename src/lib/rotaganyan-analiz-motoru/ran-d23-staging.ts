@@ -79,7 +79,17 @@ export async function runD23StagingRace(raceId:string) {
     if(!row)throw Error("D23_PACE_RUNNER_MISMATCH");
     const set=new Map([...v.signals,...row.signals].map(s=>[s.code,s]));
     if(CODES.some(code=>!set.has(code)))throw Error("D23_REQUIRED_FEATURE_MISSING");
-    const signals=CODES.map(code=>set.get(code)!);
+    const signals=CODES.map(code=>{
+      const s=set.get(code)!;
+      if((code==="DAM_HISTORY" || code==="DAMSIRE_HISTORY") && s.observed) {
+        const n=s.sampleCount, value=s.rawValue;
+        if(typeof value!=="number" || !Number.isFinite(value) || value<0 || value>100 ||
+           typeof n!=="number" || !Number.isSafeInteger(n) || n<=0)
+          throw Error("D23_PEDIGREE_PIT_SAMPLE_REQUIRED");
+        return {...s,rawValue:(Math.round(value*n/100)+20*0.14)/(n+20)*100};
+      }
+      return s;
+    });
     if(signals.some(s=>s.observed && (s.rawValue===null || !Number.isFinite(s.rawValue))))
       throw Error("D23_BAD_OBSERVED_VALUE");
     return {...v,signals};
