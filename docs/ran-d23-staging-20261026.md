@@ -13,7 +13,7 @@ This branch stages the **uploaded** D20+3 (23 features / 46 coefficients) model 
 ## Development-only endpoint
 `POST /api/admin/test-ran-d23` with JSON `{"raceId":"..."}` can compute a *non-persistent* model preview on development builds, using 20 existing canonical live signals and the uploaded exact `pace-scenario.ts` extension for 3 signals. It uses the model's exact 23-code order and verifies artifact fingerprints. It does not create Prediction, Pick, coupons or DB writes, and does not publish model outputs.
 
-The route rejects **all** requests with 404 when `NODE_ENV=production`; it additionally requires an authenticated `EDITOR` session for development use. It is not intended as a public API.
+The route rejects **all** requests with 404 when `VERCEL_ENV=production` (or in a local production build without `VERCEL_ENV`); it additionally requires an authenticated `EDITOR` session for development use. It is not intended as a public API.
 
 ## Mandatory production blockers (not yet resolved)
 1. `SURFACE_FORM`: 358 of 1755 PIT observations differ from today's source recomputation. Retraining against the current source has not been independently PIT-verified.
