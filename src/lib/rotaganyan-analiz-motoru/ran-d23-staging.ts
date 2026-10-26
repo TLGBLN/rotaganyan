@@ -82,7 +82,7 @@ export async function runD23StagingRace(raceId:string) {
     const signals=CODES.map(code=>{
       const s=set.get(code)!;
       if((code==="DAM_HISTORY" || code==="DAMSIRE_HISTORY") && s.observed) {
-        const n=s.sampleCount, value=s.rawValue;
+        const n=("sampleCount" in s ? s.sampleCount : null), value=s.rawValue;
         if(typeof value!=="number" || !Number.isFinite(value) || value<0 || value>100 ||
            typeof n!=="number" || !Number.isSafeInteger(n) || n<=0)
           throw Error("D23_PEDIGREE_PIT_SAMPLE_REQUIRED");
