@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import IletisimForm from "./IletisimForm";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("iletisim");
@@ -15,29 +16,7 @@ export default async function IletisimPage() {
         {t("intro")}
       </p>
 
-      <div className="space-y-6">
-        <div className="rounded-lg border p-6">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{t("eposta")}</p>
-          <a
-            href="mailto:destek@rotaganyan.com"
-            className="text-lg font-medium text-brand hover:underline underline-offset-4"
-          >
-            destek@rotaganyan.com
-          </a>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t("epostaDetay")}
-          </p>
-        </div>
-
-        <div className="rounded-lg border p-6">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{t("yanitSuresi")}</p>
-          <p className="text-lg font-medium">{t("yanitSuresiDeger")}</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t("yanitSuresiDetay")}
-          </p>
-        </div>
-
-      </div>
+      <IletisimForm />
     </main>
   );
 }

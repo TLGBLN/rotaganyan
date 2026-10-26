@@ -1,5 +1,8 @@
 import { Check, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import PedigriMerkeziPanel, {
+  type PedigriMerkeziSearchParams,
+} from "@/components/admin/PedigriMerkeziPanel";
 import RacePedigreeTable from "@/components/admin/RacePedigreeTable";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import { getRaceDaysForPedigreeEntry } from "@/server/services/admin.service";
@@ -7,29 +10,30 @@ import { turkeyDateString } from "@/lib/tz";
 
 export const dynamic = "force-dynamic";
 
-type PageProps = { searchParams: Promise<{ tarih?: string }> };
+type PageProps = {
+  searchParams: Promise<{ tarih?: string } & PedigriMerkeziSearchParams>;
+};
 
 export default async function PedigriPage({ searchParams }: PageProps) {
-  const { tarih } = await searchParams;
-  const currentDate = tarih ?? turkeyDateString();
+  const params = await searchParams;
+  const currentDate = params.tarih ?? turkeyDateString();
 
   const raceDays = await getRaceDaysForPedigreeEntry(currentDate);
 
   return (
     <div className="space-y-8">
-      <div>
-        <div className="flex items-center justify-between">
+      <PedigriMerkeziPanel searchParams={params} currentDate={currentDate} />
+
+      <section className="border-t pt-8">
+        <div className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-lg font-bold">At Pedigrileri &amp; Eksik Veri</h1>
-            <p className="text-xs text-muted-foreground">
-              O günün koşan atlarına baba (sire), anne (dam) ve anne babası (damsire) girin. TJK
-              programında zaten varsa otomatik dolu gelir, siz üzerine yazabilirsiniz. Aygır
-              İstatistik veritabanında (İngiliz/Arap × pist × mesafe) eşleşme varsa, babanın o
-              kombinasyondaki yavru performansı &quot;Baba&quot; alanının altında OTOMATİK gösterilir
-              ve analiz motoru bunu doğrudan kullanır — elle pedigri notu girmenize gerek yok.
-              Ayrıca her atın yanındaki &quot;Genel Not&quot; alanına pedigri dışında herhangi bir eksik
-              veriyi (sakatlık haberi, antrenman gözlemi, pist notu vb.) girebilirsiniz — otomatik
-              analiz motoru bu notu okur ve değerlendirmesine dahil eder.
+            <h2 className="text-lg font-bold">Günlük Pedigri Girişi &amp; Eksik Veri</h2>
+            <p className="mt-1 max-w-5xl text-xs leading-relaxed text-muted-foreground">
+              O gün koşan atların baba (Sire), anne (Dam) ve anne babası (DamSire) bilgileri TJK
+              programında varsa otomatik gelir; eksik veya hatalıysa buradan düzeltebilirsiniz.
+              Rotaganyan Own Sire eşleşmesi mevcut V5 sire sinyalinin veri kaynağıdır. Dam ve
+              DamSire Own istatistikleri destek verisi olarak gösterilir. Genel Not alanı manuel
+              kayıt/gösterim içindir; güncel V5 analiz motoru bu alanı otomatik olarak skora dahil etmez.
             </p>
           </div>
           <DateNavigator currentDate={currentDate} basePath="/admin/pedigri" />
@@ -45,25 +49,31 @@ export default async function PedigriPage({ searchParams }: PageProps) {
           {raceDays.map((rd) => (
             <details key={rd.id} className="group rounded-lg border">
               <summary className="flex cursor-pointer list-none items-center justify-between border-b bg-muted/30 px-4 py-2 [&::-webkit-details-marker]:hidden">
-                <h2 className="text-sm font-semibold">{rd.hippodrome.name}</h2>
+                <h3 className="text-sm font-semibold">{rd.hippodrome.name}</h3>
                 <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
               </summary>
               <div className="divide-y">
                 {rd.races.map((race) => {
-                  // sire/dam/damSire TJK'dan otomatik gelir (neredeyse her atta zaten dolu) —
-                  // eksikse admin buradan elle tamamlayabilir. Aygır istatistiği (varsa) sire
-                  // doluysa OTOMATİK eşleşir, ayrıca giriş gerekmez.
                   const pedigriDolu = race.runners.filter((r) => r.sire).length;
-                  const tamamlandi = race.runners.length > 0 && pedigriDolu === race.runners.length;
+                  const tamamlandi =
+                    race.runners.length > 0 && pedigriDolu === race.runners.length;
+
                   return (
                     <details key={race.id} className="group/race">
                       <summary className="flex cursor-pointer list-none items-center justify-between bg-muted/10 px-4 py-1.5 text-xs font-medium [&::-webkit-details-marker]:hidden">
                         <span className="flex items-center gap-2">
-                          {race.raceNo}. Koşu <span className="font-normal text-muted-foreground">({race.runners.length} at)</span>
+                          {race.raceNo}. Koşu{" "}
+                          <span className="font-normal text-muted-foreground">
+                            ({race.runners.length} at)
+                          </span>
                           <span
                             className={cn(
                               "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
-                              tamamlandi ? "bg-hit/15 text-hit" : pedigriDolu > 0 ? "bg-muted text-muted-foreground" : "bg-miss/10 text-miss"
+                              tamamlandi
+                                ? "bg-hit/15 text-hit"
+                                : pedigriDolu > 0
+                                  ? "bg-muted text-muted-foreground"
+                                  : "bg-miss/10 text-miss"
                             )}
                           >
                             {tamamlandi && <Check className="h-3 w-3" />}
@@ -80,7 +90,7 @@ export default async function PedigriPage({ searchParams }: PageProps) {
             </details>
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

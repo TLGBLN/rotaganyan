@@ -69,7 +69,11 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
   // görünür-kalma kuralını EZİYORDU — sunucu zaten doğru filtrelenmiş veriyi gönderiyor,
   // burada yalnız "filled" (admin gerçekten at girmiş mi) kontrolü yeterli.
   const visibleVariants = data.variants.filter((v) => v.filled);
-  const [activeKey, setActiveKey] = useState(visibleVariants[0]?.key);
+  // 2026-10-22 kullanıcı talebi: "site açıldığında tutan kupon direkt açılsın" —
+  // varsayılan sekme artık ilk kademe değil, TUTAN (hit) kademe; tutan yoksa ilk kademe.
+  const [activeKey, setActiveKey] = useState(
+    visibleVariants.find((v) => v.status === "hit")?.key ?? visibleVariants[0]?.key
+  );
   if (visibleVariants.length === 0) return null;
 
   const active = visibleVariants.find((v) => v.key === activeKey) ?? visibleVariants[0];
@@ -164,7 +168,11 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
       </div>
 
       {/* Tek kupon şablonu — Ekonomik/Normal/Geniş, /program'daki panel butonları gibi tıklanınca değişir */}
-      <div className="flex flex-col overflow-hidden rounded-lg border bg-card">
+      <div className="[container-type:inline-size]">
+      <div className="isolate relative flex flex-col overflow-hidden rounded-lg border bg-card">
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center overflow-hidden select-none">
+          <img src="/rotaganyan-filigran-logo.png" alt="" className="w-[51.5cqw] h-auto -translate-y-[6cqw] opacity-[0.08]" />
+        </div>
         <div className="flex items-center justify-between gap-2 border-b bg-muted/30 px-4 py-2.5">
           {/* v6.113 — kullanıcı talebi 2026-08-13: seçilecek tek kademe varsa (7'li Ganyan'da
               yalnız "Geniş" doluyor) sekme göstermenin anlamı yok — aralarında gezinilecek
@@ -255,6 +263,7 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
           {ikramiye && <div className="mt-1.5 text-xs font-medium text-hit">{ikramiye}</div>}
         </div>
       </div>
+      </div>
     </div>
   );
 }
@@ -265,7 +274,10 @@ export function KuponBlock({ data, ikramiye, isAdmin, cityLabel }: { data: Kupon
 // değiştirilebilir hale getirildi — hippodromeName "Şehir — N. Altılı" formatını
 // zaten taşıyor (bkz. KuponForm.tsx slotLabel), burada ayrıştırılıyor.
 function KuponGroup({ kuponlar, altiliResults, isAdmin }: { kuponlar: Kupon[]; altiliResults: AltiliCityResult[]; isAdmin: boolean }) {
-  const [secili, setSecili] = useState(0);
+  // 2026-10-22 kullanıcı talebi: "site açıldığında tutan kupon direkt açılsın" —
+  // 1./2. Altılı arasında da varsayılan, herhangi bir kademesi tutan ilk kupon; yoksa ilki.
+  const tutanIndex = kuponlar.findIndex((k) => k.variants.some((v) => v.filled && v.status === "hit"));
+  const [secili, setSecili] = useState(tutanIndex >= 0 ? tutanIndex : 0);
   const parcala = (ad: string) => {
     const [sehir, slot] = ad.split(" — ");
     return { sehir, slot: slot ?? null };

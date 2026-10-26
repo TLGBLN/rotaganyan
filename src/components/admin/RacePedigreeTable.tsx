@@ -225,9 +225,10 @@ export default function RacePedigreeTable({ runners }: { runners: Runner[] }) {
       {noteBulkOpen && (
         <div className="border-b bg-muted/10 px-3 py-3 space-y-2">
           <p className="text-[11px] text-muted-foreground">
-            Pedigri dışında herhangi bir eksik veriyi buradan girebilirsiniz (sakatlık haberi, antrenman
-            gözlemi, pist/hava notu vb.) — otomatik analiz motoru bu notu okur ve dikkate alır. &quot;At Adı: not&quot;
-            ya da &quot;AT ADI&quot; satırından sonra serbest paragraf — numara şart değil, isme göre eşleşir ve kaydedilir.
+            Pedigri dışında herhangi bir eksik veriyi buradan kaydedebilirsiniz (sakatlık haberi, antrenman
+            gözlemi, pist/hava notu vb.). Bu alan manuel kayıt/gösterim içindir; güncel V5 analiz motoru
+            Genel Not alanını otomatik olarak skora dahil etmez. &quot;At Adı: not&quot; ya da &quot;AT ADI&quot;
+            satırından sonra serbest paragraf — numara şart değil, isme göre eşleşir ve kaydedilir.
           </p>
           <textarea
             value={noteBulkText}
