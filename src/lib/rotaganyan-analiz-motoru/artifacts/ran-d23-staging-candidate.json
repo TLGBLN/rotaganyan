@@ -1,0 +1,286 @@
+{
+  "releaseStatus": "BLOCKED_PENDING_LIVE_PARITY_AND_PIT_PROVENANCE",
+  "intendedName": "Rotaganyan Analiz Motoru",
+  "targetSignalCount": 23,
+  "independentHoldoutValidated": false,
+  "productionWired": false,
+  "reference109": {
+    "n": 109,
+    "top1": 30,
+    "top3": 60,
+    "top6": 87,
+    "logLoss": 2.0839666066701152
+  },
+  "training178": {
+    "nRaces": 178,
+    "nRunnerStarts": 1755
+  },
+  "source": {
+    "file": "C:\\tmp\\ran-d20-tempo-entegrasyon-20261026-230152-91726c-train-physical-23.json",
+    "sha256": "496f83de35ea0bdc499038de4783175201f2be5be1a90c8da24811594839e99d",
+    "calculator": "src/lib/rotaganyan-analiz-motoru/pace-scenario.ts",
+    "calculatorSha256": "fb0c430f504ad046326d4d054cccf8f36fbdc9e923881450b010ab9aaaffa265"
+  },
+  "blockers": [
+    "SURFACE_FORM historical PIT source mismatch unresolved (358 historical starts)",
+    "Historical field size N coverage incomplete",
+    "PIT snapshot immutability not established",
+    "23-code train/live feature parity and prediction/coupon snapshot contract not proven",
+    "Production Git branch differs from research branch; 36-code artifact cannot be relabeled to 23"
+  ],
+  "modelArtifact": {
+    "engineVersion": "RAN-D20PLUS3-RESEARCH-CANDIDATE",
+    "motorAdi": "Rotaganyan Analiz Motoru",
+    "deploymentReady": false,
+    "trainedAt": "2026-10-26T20:52:01.204Z",
+    "lambda": 90,
+    "learningRate": 0.25,
+    "iterations": 2500,
+    "nRacesTrain": 178,
+    "nRacesHoldout": 0,
+    "trainDateRange": [
+      "2026-08-16",
+      "2026-08-25"
+    ],
+    "devHoldoutMetrics": null,
+    "codes": [
+      "IDMAN_JOCKEY",
+      "H2H",
+      "SPEED",
+      "GROUND_TOLERANCE",
+      "GROUND_DISTANCE_EXPERIENCE",
+      "WORKOUT_SPRINT",
+      "EQUIPMENT_CHANGE",
+      "RACE_PACE_FIT",
+      "SIRE_HISTORY",
+      "ACC_CLOSE_RES",
+      "ACC_LATE",
+      "ACC_SPEED",
+      "RIVAL_FRONT_PRESSURE",
+      "SINGLE_LEADER",
+      "CLOSER_PRESSURE_FIT",
+      "DAM_HISTORY",
+      "DAMSIRE_HISTORY",
+      "JOCKEY_OE30",
+      "SURFACE_FORM",
+      "RIVAL_GAP",
+      "PACE_DUEL_SELF",
+      "PACE_STALK_DUEL",
+      "PACE_DRAW_LEAD_PRESS"
+    ],
+    "names": [
+      "IDMAN_JOCKEY_z",
+      "IDMAN_JOCKEY_missing",
+      "H2H_z",
+      "H2H_missing",
+      "SPEED_z",
+      "SPEED_missing",
+      "GROUND_TOLERANCE_z",
+      "GROUND_TOLERANCE_missing",
+      "GROUND_DISTANCE_EXPERIENCE_z",
+      "GROUND_DISTANCE_EXPERIENCE_missing",
+      "WORKOUT_SPRINT_z",
+      "WORKOUT_SPRINT_missing",
+      "EQUIPMENT_CHANGE_z",
+      "EQUIPMENT_CHANGE_missing",
+      "RACE_PACE_FIT_z",
+      "RACE_PACE_FIT_missing",
+      "SIRE_HISTORY_z",
+      "SIRE_HISTORY_missing",
+      "ACC_CLOSE_RES_z",
+      "ACC_CLOSE_RES_missing",
+      "ACC_LATE_z",
+      "ACC_LATE_missing",
+      "ACC_SPEED_z",
+      "ACC_SPEED_missing",
+      "RIVAL_FRONT_PRESSURE_z",
+      "RIVAL_FRONT_PRESSURE_missing",
+      "SINGLE_LEADER_z",
+      "SINGLE_LEADER_missing",
+      "CLOSER_PRESSURE_FIT_z",
+      "CLOSER_PRESSURE_FIT_missing",
+      "DAM_HISTORY_z",
+      "DAM_HISTORY_missing",
+      "DAMSIRE_HISTORY_z",
+      "DAMSIRE_HISTORY_missing",
+      "JOCKEY_OE30_z",
+      "JOCKEY_OE30_missing",
+      "SURFACE_FORM_z",
+      "SURFACE_FORM_missing",
+      "RIVAL_GAP_z",
+      "RIVAL_GAP_missing",
+      "PACE_DUEL_SELF_z",
+      "PACE_DUEL_SELF_missing",
+      "PACE_STALK_DUEL_z",
+      "PACE_STALK_DUEL_missing",
+      "PACE_DRAW_LEAD_PRESS_z",
+      "PACE_DRAW_LEAD_PRESS_missing"
+    ],
+    "beta": [
+      -0.04107605557750499,
+      -0.017637413822454123,
+      0.08080561055996553,
+      -0.01646842321040297,
+      0.11282584726551385,
+      -0.0144250910498999,
+      0.0016943265352082307,
+      -0.009620339693479463,
+      0.08008642570254691,
+      -0.001345452149771711,
+      -0.02918324628500025,
+      -0.017637413822454123,
+      0.04303143179892088,
+      -0.01301947406445995,
+      0.043447626152422494,
+      0.020559282494444983,
+      0.02670811450280546,
+      -0.008749024179501387,
+      0.10769023588235886,
+      0.003035382720755641,
+      0.0644509555279574,
+      0.002584052943939611,
+      0.04341230496113694,
+      0.003035382720755641,
+      -0.008821634421258932,
+      -0.006503065760276886,
+      0.02612661016670115,
+      -0.006503065760276886,
+      -0.07945358558085196,
+      -0.006503065760276886,
+      -0.044699482580139005,
+      -0.0372135381642944,
+      -0.050513987971876596,
+      0.0020640315748834165,
+      0.10709766564163183,
+      -0.0019423870657838576,
+      0.1736157089999315,
+      -0.004175529441510433,
+      0.15382257270460323,
+      -0.009544342601152632,
+      0.0485504357667768,
+      -0.006503065760276886,
+      0.03220170316113082,
+      -0.006503065760276886,
+      0.006446714768750602,
+      -0.0037336875369500416
+    ],
+    "muSigma": {
+      "IDMAN_JOCKEY": {
+        "mu": 0.19635890767230169,
+        "sigma": 0.397243108247384,
+        "nObserved": 1538
+      },
+      "H2H": {
+        "mu": 0,
+        "sigma": 2.836469930275557,
+        "nObserved": 1273
+      },
+      "SPEED": {
+        "mu": -0.7353083874660175,
+        "sigma": 3.9720963553022335,
+        "nObserved": 1632
+      },
+      "GROUND_TOLERANCE": {
+        "mu": 0.26488185637905604,
+        "sigma": 2.9274540187266576,
+        "nObserved": 351
+      },
+      "GROUND_DISTANCE_EXPERIENCE": {
+        "mu": -1.6145859438791033,
+        "sigma": 3.631749279932684,
+        "nObserved": 1464
+      },
+      "WORKOUT_SPRINT": {
+        "mu": 0.1046814044213264,
+        "sigma": 0.3061424635520288,
+        "nObserved": 1538
+      },
+      "EQUIPMENT_CHANGE": {
+        "mu": -0.03730886850152905,
+        "sigma": 0.362394482393651,
+        "nObserved": 1635
+      },
+      "RACE_PACE_FIT": {
+        "mu": -0.13636634400595654,
+        "sigma": 4.030318481782886,
+        "nObserved": 1343
+      },
+      "SIRE_HISTORY": {
+        "mu": 11.572867189264674,
+        "sigma": 3.6821333344775784,
+        "nObserved": 1629
+      },
+      "ACC_CLOSE_RES": {
+        "mu": 0.09425886675402173,
+        "sigma": 0.5034067198985501,
+        "nObserved": 1492
+      },
+      "ACC_LATE": {
+        "mu": -0.16831514170450962,
+        "sigma": 0.8913082255535869,
+        "nObserved": 1491
+      },
+      "ACC_SPEED": {
+        "mu": -0.10801897196932818,
+        "sigma": 0.279469727616644,
+        "nObserved": 1492
+      },
+      "RIVAL_FRONT_PRESSURE": {
+        "mu": 0.28304819443093326,
+        "sigma": 0.07136398253075008,
+        "nObserved": 1616
+      },
+      "SINGLE_LEADER": {
+        "mu": 0.018273784627030918,
+        "sigma": 0.03561304325617168,
+        "nObserved": 1616
+      },
+      "CLOSER_PRESSURE_FIT": {
+        "mu": 0.10279468906331216,
+        "sigma": 0.06851191823298083,
+        "nObserved": 1616
+      },
+      "DAM_HISTORY": {
+        "mu": 13.535906936010063,
+        "sigma": 2.974850650381494,
+        "nObserved": 523
+      },
+      "DAMSIRE_HISTORY": {
+        "mu": 11.70251035683641,
+        "sigma": 3.6794033134530872,
+        "nObserved": 1565
+      },
+      "JOCKEY_OE30": {
+        "mu": 0.007600178373775001,
+        "sigma": 0.0525774286559895,
+        "nObserved": 1752
+      },
+      "SURFACE_FORM": {
+        "mu": 0.554278415934342,
+        "sigma": 0.2209777956580463,
+        "nObserved": 1499
+      },
+      "RIVAL_GAP": {
+        "mu": -3.7250814285354257,
+        "sigma": 3.63739796093594,
+        "nObserved": 1620
+      },
+      "PACE_DUEL_SELF": {
+        "mu": 0.0183293239710192,
+        "sigma": 0.024604404998062022,
+        "nObserved": 1616
+      },
+      "PACE_STALK_DUEL": {
+        "mu": 0.04724385885039879,
+        "sigma": 0.03216481826107686,
+        "nObserved": 1616
+      },
+      "PACE_DRAW_LEAD_PRESS": {
+        "mu": -0.0006104596437569026,
+        "sigma": 0.07199137732160163,
+        "nObserved": 1580
+      }
+    },
+    "weightsFingerprint": "7c69fbf03899bc67d0fa5060ecf876f0e893ee99add6ee492af89dc8f9d3baa3"
+  }
+}
