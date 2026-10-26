@@ -28,7 +28,6 @@ const STEPS: Step[] = [
   { selector: '[data-tour="son-yaris-panel"]', title: "Son Yarış Detayları", text: "Her atın bir önceki yarışındaki kilosunu, takısını, jokeyini ve derecesini — bugünküyle karşılaştırmalı olarak — burada görürsünüz." },
   { selector: '[data-tour="hipodrom-ozellikleri"]', title: "Hipodrom Özellikleri", text: "Kulvarların start noktasına, viraja ve düzlüğe olan konumu gibi hipodroma özgü geometrik bilgileri burada inceleyebilirsiniz — iç/dış kulvar avantajını değerlendirmek için kullanışlıdır." },
   { selector: '[data-tour="altili-sonuclari"]', title: "Altılı Ganyan Sonuçları", text: "Geçmiş altılı ganyan sonuçlarını, dağıtılan toplam tutarları ve kazanan kombinasyonları hipodrom bazında burada bulabilirsiniz." },
-  { selector: '[data-tour="isabet-bankolar"]', title: "İsabet Sağlayan Bankolar", text: "Rotaganyan'ın geçmişte verdiği banko önerilerinin gerçek isabet kaydını — hiçbirini gizlemeden, tamamını — burada şeffafça görebilirsiniz." },
   { selector: '[data-tour="isabet-kuponlar"]', title: "İsabet Sağlayan Kuponlar", text: "Ekonomik, Normal ve Geniş kuponlarımızın gerçekten tutmuş örneklerini, dağıttıkları tutarlarla birlikte burada inceleyebilirsiniz." },
 ];
 

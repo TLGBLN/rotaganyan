@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { after } from "next/server";
 import { db } from "@/lib/db";
-import { getProgramData, getKuponOnerileri, getHitPredictions, getGecmisKazananKuponlar, getJockeyStats, getTrainerStats, type JockeyStat, type TrainerStat } from "@/server/services/race.service";
+import { getProgramData, getKuponOnerileri, getGecmisKazananKuponlar, getJockeyStats, getTrainerStats, type JockeyStat, type TrainerStat } from "@/server/services/race.service";
 import { turkeyDateString } from "@/lib/tz";
 import { toTjkDate, ingestDate } from "@/server/services/ingest/tjk-info.adapter";
 import { syncResultsForDate } from "@/server/services/result-sync";
@@ -16,7 +16,6 @@ import AutoRefresh from "@/components/program/AutoRefresh";
 import DateNavigator from "@/components/kosular/DateNavigator";
 import AltiliGanyanResults from "@/components/home/AltiliGanyanResults";
 import TahminOnerileri from "@/components/home/TahminOnerileri";
-import HitsCarousel from "@/components/home/HitsCarousel";
 import KazananKuponlarCarousel from "@/components/home/KazananKuponlarCarousel";
 import ProgramPageLabel from "@/components/program/ProgramPageLabel";
 import AylikKuponKazanciCard from "@/components/home/AylikKuponKazanciCard";
@@ -61,31 +60,14 @@ async function KuponlarSection() {
 }
 
 // 2026-09-15 kullanıcı talebi: "Aylık Kupon Kazancı" (eskiden yalnız admin panelinde)
-// artık giriş yapmamış ziyaretçilere de gösteriliyor — İsabet Sağlayan Bankolar'ın
-// ÜSTÜNDE. Diğer bölümler gibi kendi <Suspense> sınırında, sayfanın geri kalanını
-// bloklamıyor.
+// artık giriş yapmamış ziyaretçilere de gösteriliyor. Diğer bölümler gibi kendi
+// <Suspense> sınırında, sayfanın geri kalanını bloklamıyor.
 async function AylikKazanciSection() {
   const aylikKuponKazanci = await getAylikKuponKazanci().catch(() => []);
   if (aylikKuponKazanci.length === 0) return null;
   return (
     <section className="border-t pt-8">
       <AylikKuponKazanciCard aylar={aylikKuponKazanci} />
-    </section>
-  );
-}
-
-// 2026-10-26: Kuponlar bölümü yukarıdaki KuponlarSection'a taşındı (herkese, en üstte) —
-// bu bölüm artık yalnız "İsabet Sağlayan Bankolar"ı taşıyor, çift gösterim YOK.
-async function BankolarSection() {
-  const hitPredictions = await getHitPredictions(16).catch(() => []);
-  if (hitPredictions.length === 0) return null;
-  return (
-    <section className="border-t pt-8" data-tour="isabet-bankolar">
-      <div className="mb-4 flex items-center gap-2">
-        <span className="h-2 w-2 rounded-full bg-hit" />
-        <h2 className="text-base font-semibold"><ProgramPageLabel k="bankolarBaslik" /></h2>
-      </div>
-      <HitsCarousel items={hitPredictions} />
     </section>
   );
 }
@@ -215,17 +197,11 @@ export default async function ProgramPage({ searchParams }: PageProps) {
         <KuponlarSection />
       </Suspense>
 
-      {/* Aylık Kupon Kazancı + İsabet Sağlayan Bankolar — yalnız giriş yapmamış
-          ziyaretçiler için üstte, bu sırayla (kazanç özeti önce). */}
+      {/* Aylık Kupon Kazancı — yalnız giriş yapmamış ziyaretçiler için üstte. */}
       {!isLoggedIn && (
-        <>
-          <Suspense fallback={null}>
-            <AylikKazanciSection />
-          </Suspense>
-          <Suspense fallback={SKELETON_ROW}>
-            <BankolarSection />
-          </Suspense>
-        </>
+        <Suspense fallback={null}>
+          <AylikKazanciSection />
+        </Suspense>
       )}
 
       {/* Program */}
@@ -246,13 +222,6 @@ export default async function ProgramPage({ searchParams }: PageProps) {
       <Suspense fallback={SKELETON_ROW}>
         <CouponsAndResults isLoggedIn={isLoggedIn} isAdmin={isAdmin} />
       </Suspense>
-
-      {/* İsabet Sağlayan Bankolar — giriş yapmış kullanıcılar için altta (mevcut yer) */}
-      {isLoggedIn && (
-        <Suspense fallback={SKELETON_ROW}>
-          <BankolarSection />
-        </Suspense>
-      )}
     </div>
   );
 }
