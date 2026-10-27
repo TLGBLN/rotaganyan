@@ -41,14 +41,31 @@ function validateSet(a:FeatureRace[]) {
     ids.add(r.raceId);
     ok(r.vectors.length>=3 && Number.isInteger(r.winnerNo) &&
        r.vectors.some(v=>v.no===r.winnerNo),"BAD_TRAIN_WINNER "+r.raceId);
-    let nos=new Set<number>();
+    const nos=new Set<number>();
     for(const v of r.vectors){
       ok(!nos.has(v.no) && v.raceId===r.raceId,"DUP_OR_FOREIGN_RUNNER "+r.raceId);
       nos.add(v.no);
-      ok(v.signals.length===23 && codes.every((code,i)=>v.signals[i].code===code &&
-        (!v.signals[i].observed ||
-          (v.signals[i].rawValue!==null && Number.isFinite(v.signals[i].rawValue)))),
-        "INVALID_23_SIGNAL_ORDER "+r.raceId+"/"+v.no);
+      // Original SHA-pinned D23 physical dataset contains the exact 23 signals,
+      // but did not promise model-column order. The first parity tool correctly
+      // compared signals by their code. Validate BY CODE before reordering
+      // IN MEMORY only; NEVER change frozen input bytes or impute values.
+      ok(Array.isArray(v.signals) && v.signals.length===codes.length,
+        "INVALID_23_SIGNAL_COUNT "+r.raceId+"/"+v.no);
+      const byCode=new Map(v.signals.map(s=>[s.code,s]));
+      ok(byCode.size===codes.length &&
+        codes.every(code=>byCode.has(code)),
+        "INVALID_23_SIGNAL_SET_OR_DUPLICATE "+r.raceId+"/"+v.no);
+      for(const code of codes) {
+        const s=byCode.get(code)!;
+        ok(typeof s.observed==="boolean" &&
+           (s.rawValue===null ||
+             (typeof s.rawValue==="number" && Number.isFinite(s.rawValue))) &&
+           (!s.observed || s.rawValue!==null),
+          "INVALID_23_SIGNAL_VALUE "+r.raceId+"/"+v.no+"/"+code);
+      }
+      // Training/scoring use the exact same model feature order. Code-based
+      // reordering is not a change to any score input or feature value.
+      v.signals=codes.map(code=>byCode.get(code)!);
     }
     n+=r.vectors.length;
   }
