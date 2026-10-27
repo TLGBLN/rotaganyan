@@ -14,6 +14,7 @@
 import "dotenv/config";
 import fs from "node:fs";
 import crypto from "node:crypto";
+import { selectD23Signals } from "./src/lib/rotaganyan-analiz-motoru/d23-select-feature-codes";
 import { captureD23LiveVectors, smoothD23Pedigree } from "./src/lib/rotaganyan-analiz-motoru/d23-feature-capture";
 import { computeFeatureStats, fitModel, scoreRace, type FitOptions } from "./src/lib/motor-v1/engine/training";
 import { buildWalkFolds, type FeatureRace } from "./src/lib/rotaganyan-analiz-motoru/rca/combinatorial-signal-selection";
@@ -45,35 +46,10 @@ function validateSet(a:FeatureRace[]) {
     for(const v of r.vectors){
       ok(!nos.has(v.no) && v.raceId===r.raceId,"DUP_OR_FOREIGN_RUNNER "+r.raceId);
       nos.add(v.no);
-      // Original SHA-pinned D23 physical dataset contains the exact 23 signals,
-      // but did not promise model-column order. The first parity tool correctly
-      // compared signals by their code. Validate BY CODE before reordering
-      // IN MEMORY only; NEVER change frozen input bytes or impute values.
-      // The SHA-pinned original dataset contains EXTRA research signals
-      // beyond these 23 model columns. An exact 23-count guard was WRONG.
-      // Check ONLY chosen codes, once each, and discard other features
-      // from the in-memory training view; original file is never rewritten.
-      ok(Array.isArray(v.signals) && v.signals.length>=codes.length,
-        "INVALID_MODEL_SIGNAL_INPUT "+r.raceId+"/"+v.no);
-      const selected=v.signals.filter(s=>codes.includes(s.code));
-      ok(selected.length===codes.length,
-        "MISSING_OR_DUPLICATE_CHOSEN_SIGNAL "+r.raceId+"/"+v.no+
-        " selected="+selected.length+" all="+v.signals.length);
-      const byCode=new Map(selected.map(s=>[s.code,s]));
-      ok(byCode.size===codes.length &&
-        codes.every(code=>byCode.has(code)),
-        "INVALID_SELECTED_CODES "+r.raceId+"/"+v.no);
-      for(const code of codes) {
-        const s=byCode.get(code)!;
-        ok(typeof s.observed==="boolean" &&
-           (s.rawValue===null ||
-             (typeof s.rawValue==="number" && Number.isFinite(s.rawValue))) &&
-           (!s.observed || s.rawValue!==null),
-          "INVALID_23_SIGNAL_VALUE "+r.raceId+"/"+v.no+"/"+code);
-      }
-      // Training/scoring use the exact same model feature order. Code-based
-      // reordering is not a change to any score input or feature value.
-      v.signals=codes.map(code=>byCode.get(code)!);
+      // The frozen dataset contains more research signals than the selected
+      // 23. The helper enforces selected code uniqueness, valid observations,
+      // and model order without altering the SHA-pinned original file.
+      v.signals=selectD23Signals(v.signals,codes);
     }
     n+=r.vectors.length;
   }
