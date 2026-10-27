@@ -140,7 +140,7 @@ async function collect(old:FeatureRace[]) {
   const result:FeatureRace[]=[];
   // Recoverable diagnostics: preserve every completed race, NEVER silently skip a
   // missing feature or a failed calculation. Newly created journal is research only.
-  const journal=prefix+".journal.ndjson";
+  const journal=prefix+".journal-"+mode+".ndjson";
   const fd=fs.openSync(journal,"wx");
   fs.closeSync(fd);
   for(let i=0;i<old.length;i++){
