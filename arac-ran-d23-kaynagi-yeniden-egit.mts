@@ -14,7 +14,6 @@
 import "dotenv/config";
 import fs from "node:fs";
 import crypto from "node:crypto";
-import { selectD23Signals } from "./src/lib/rotaganyan-analiz-motoru/d23-select-feature-codes";
 import { captureD23LiveVectors, smoothD23Pedigree } from "./src/lib/rotaganyan-analiz-motoru/d23-feature-capture";
 import { computeFeatureStats, fitModel, scoreRace, type FitOptions } from "./src/lib/motor-v1/engine/training";
 import { buildWalkFolds, type FeatureRace } from "./src/lib/rotaganyan-analiz-motoru/rca/combinatorial-signal-selection";
@@ -32,6 +31,31 @@ function ok(x:unknown,s:string):asserts x {if(!x)fail(s)}
 function writeNew(file:string,content:string) {
   ok(!fs.existsSync(file) && !fs.existsSync(file+".part"),"OUTPUT_EXISTS "+file);
   fs.writeFileSync(file+".part",content,"utf8");fs.renameSync(file+".part",file);
+}
+/** Exact same code-based selection as the first successful parity tool.
+ * Inline because the user's existing PowerShell bootstrap installs only this
+ * file plus the capture adapter and model artifact. Do NOT add imports.
+ */
+function selectD23Signals<T extends {code:string; observed:boolean;rawValue:number|null}>(
+  source: readonly T[], wanted: readonly string[]
+): T[] {
+  if(!Array.isArray(source) || wanted.length!==23 ||
+     new Set(wanted).size!==23)fail("INVALID_MODEL_INPUT");
+  const byCode=new Map<string,T>(), allowed=new Set(wanted);
+  for(const s of source) {
+    if(!allowed.has(s.code))continue;
+    if(byCode.has(s.code))fail("DUPLICATE_MODEL_SIGNAL "+s.code);
+    ok(typeof s.observed==="boolean" &&
+      (s.rawValue===null ||
+        (typeof s.rawValue==="number" && Number.isFinite(s.rawValue))) &&
+      (!s.observed || s.rawValue!==null) &&
+      (s.observed || s.rawValue===null),
+      "INVALID_MODEL_SIGNAL_VALUE "+s.code);
+    byCode.set(s.code,s);
+  }
+  if(byCode.size!==wanted.length)
+    fail("MISSING_MODEL_SIGNAL "+wanted.filter(code=>!byCode.has(code)).join(","));
+  return wanted.map(code=>byCode.get(code)!);
 }
 function validateSet(a:FeatureRace[]) {
   ok(a.length===178,"REQUIRES_EXACT_178_TRAIN_RACES");
