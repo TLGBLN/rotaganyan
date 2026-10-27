@@ -32,6 +32,7 @@ export async function captureD23LiveVectors(raceId:string):Promise<{
   vectors:RunnerFeatureVector[];
   sourceStatus:"CURRENT_DB_PIT_NOT_PROVEN";
   diagnostics:{no:number;source:"D"|"V1";code:string;reason:string}[];
+  paceMap:ReturnType<typeof calculatePaceScenario>;
 }> {
   if(!raceId || typeof raceId!=="string")throw Error("D23_RACE_ID_REQUIRED");
   const [base,race,ctx]=await Promise.all([
@@ -73,6 +74,6 @@ export async function captureD23LiveVectors(raceId:string):Promise<{
      vectors.some(v=>!physicalNos.has(v.no))) throw Error("D23_FIELD_INTEGRITY_FAILED");
   return {
     raceId,date:race.raceDay.date.toISOString().slice(0,10),
-    vectors,sourceStatus:"CURRENT_DB_PIT_NOT_PROVEN",diagnostics:base.diagnostics
+    vectors,sourceStatus:"CURRENT_DB_PIT_NOT_PROVEN",diagnostics:base.diagnostics,paceMap:pace
   };
 }
