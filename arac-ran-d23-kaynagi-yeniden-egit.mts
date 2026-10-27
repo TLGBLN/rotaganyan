@@ -49,12 +49,20 @@ function validateSet(a:FeatureRace[]) {
       // but did not promise model-column order. The first parity tool correctly
       // compared signals by their code. Validate BY CODE before reordering
       // IN MEMORY only; NEVER change frozen input bytes or impute values.
-      ok(Array.isArray(v.signals) && v.signals.length===codes.length,
-        "INVALID_23_SIGNAL_COUNT "+r.raceId+"/"+v.no);
-      const byCode=new Map(v.signals.map(s=>[s.code,s]));
+      // The SHA-pinned original dataset contains EXTRA research signals
+      // beyond these 23 model columns. An exact 23-count guard was WRONG.
+      // Check ONLY chosen codes, once each, and discard other features
+      // from the in-memory training view; original file is never rewritten.
+      ok(Array.isArray(v.signals) && v.signals.length>=codes.length,
+        "INVALID_MODEL_SIGNAL_INPUT "+r.raceId+"/"+v.no);
+      const selected=v.signals.filter(s=>codes.includes(s.code));
+      ok(selected.length===codes.length,
+        "MISSING_OR_DUPLICATE_CHOSEN_SIGNAL "+r.raceId+"/"+v.no+
+        " selected="+selected.length+" all="+v.signals.length);
+      const byCode=new Map(selected.map(s=>[s.code,s]));
       ok(byCode.size===codes.length &&
         codes.every(code=>byCode.has(code)),
-        "INVALID_23_SIGNAL_SET_OR_DUPLICATE "+r.raceId+"/"+v.no);
+        "INVALID_SELECTED_CODES "+r.raceId+"/"+v.no);
       for(const code of codes) {
         const s=byCode.get(code)!;
         ok(typeof s.observed==="boolean" &&
