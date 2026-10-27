@@ -138,16 +138,38 @@ function fitAndEvaluate(a:FeatureRace[]) {
 }
 async function collect(old:FeatureRace[]) {
   const result:FeatureRace[]=[];
+  // Recoverable diagnostics: preserve every completed race, NEVER silently skip a
+  // missing feature or a failed calculation. Newly created journal is research only.
+  const journal=prefix+".journal.ndjson";
+  const fd=fs.openSync(journal,"wx");
+  fs.closeSync(fd);
   for(let i=0;i<old.length;i++){
     const r=old[i];
-    const calc=await captureD23LiveVectors(r.raceId);
-    ok(calc.date===r.tarih,"DATE_CHANGED "+r.raceId);
-    const phys=new Set(r.vectors.map(v=>v.no));
-    ok(calc.vectors.length===r.vectors.length &&
-       calc.vectors.every(v=>phys.has(v.no)),"PHYSICAL_FIELD_CHANGED "+r.raceId);
-    result.push({...r,vectors:calc.vectors});
-    if((i+1)%10===0 || i===old.length-1)
-      console.log("[D23-FIX] SOURCE "+(i+1)+"/"+old.length);
+    console.log("[D23-FIX] BEGIN="+(i+1)+"/"+old.length+" RACE="+r.raceId);
+    try {
+      const calc=await captureD23LiveVectors(r.raceId);
+      ok(calc.date===r.tarih,"DATE_CHANGED "+r.raceId);
+      const phys=new Set(r.vectors.map(v=>v.no));
+      ok(calc.vectors.length===r.vectors.length &&
+        calc.vectors.every(v=>phys.has(v.no)),"PHYSICAL_FIELD_CHANGED "+r.raceId);
+      const captured={...r,vectors:calc.vectors};
+      result.push(captured);
+      fs.appendFileSync(journal,JSON.stringify(captured)+"\n","utf8");
+      console.log("[D23-FIX] OK="+(i+1)+"/"+old.length+" RACE="+r.raceId);
+    } catch(e) {
+      const err=e instanceof Error?e.stack??e.message:String(e);
+      const failure={
+        status:"CAPTURE_STOPPED_NO_MODEL_FIT",mode,
+        failedIndex:i+1,total:old.length,raceId:r.raceId,date:r.tarih,
+        completed:result.length,source:"CURRENT_DB_HISTORICAL_PIT_NOT_PROVEN",
+        failure:err,partialJournal:journal,releaseAllowed:false,
+      };
+      writeNew(prefix+".failure.json",JSON.stringify(failure,null,2));
+      console.error("[D23-FIX] FAILED_RACE="+r.raceId+" INDEX="+(i+1));
+      console.error("[D23-FIX] ROOT_ERROR="+err);
+      console.error("[D23-FIX] FAILURE_REPORT="+prefix+".failure.json");
+      throw Error("D23_CAPTURE_FAILURE_AT_"+(i+1)+"_RACE_"+r.raceId);
+    }
   }
   return result;
 }
@@ -162,7 +184,14 @@ async function run(){
   validateSet(old);
   const {db}=await import("./src/lib/db");
   try {
-    if(mode==="capture"){
+    if(mode==="probe"){
+      const first=await collect(old.slice(0,3));
+      writeNew(prefix+".probe.json",JSON.stringify({
+        status:"PROBE_OK_NO_MODEL_FIT",races:first.length,
+        sourceStatus:"CURRENT_DB_HISTORICAL_PIT_NOT_PROVEN",releaseAllowed:false
+      },null,2));
+      console.log("[D23-FIX] PROBE_OK="+first.length);
+    }else if(mode==="capture"){
       const recaptured=normalize(await collect(old));validateSet(recaptured);
       const sourceText=JSON.stringify(recaptured);
       const differences=rawDiff(old,recaptured);
