@@ -198,7 +198,23 @@ async function collect(old:FeatureRace[]) {
   }
   return result;
 }
+function test23OfManySelector():void {
+  const raw=[{code:"EXTRA_UNUSED_A",observed:true,rawValue:777},
+    ...codes.map((code,i)=>({code,observed:true,rawValue:i+1})).reverse(),
+    {code:"EXTRA_UNUSED_B",observed:false,rawValue:null}];
+  const selected=selectD23Signals(raw,codes);
+  ok(selected.length===23 &&
+     selected.every((s,i)=>s.code===codes[i]&&s.rawValue===i+1),
+     "SELFTEST_23_OF_MANY_BROKEN");
+  // Refuse duplicated model inputs even when extra unused signal is present.
+  let rejected=false;
+  try{selectD23Signals([...raw,raw[1]],codes);}
+  catch{rejected=true;}
+  ok(rejected,"SELFTEST_DUPLICATE_NOT_REJECTED");
+  console.log("[D23-FIX] SELFTEST_23_OF_MANY_PASS");
+}
 async function run(){
+  test23OfManySelector();
   ok(codes.length===23&&raw.modelArtifact.deploymentReady===false,
       "MODEL_RESEARCH_CONTRACT");
   ok(prefix.startsWith("C:\\tmp\\") && !prefix.includes(".."),
