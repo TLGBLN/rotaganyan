@@ -250,7 +250,7 @@ function finishCapture(old:FeatureRace[], recaptured:FeatureRace[]) {
 function recoverJournal(old:FeatureRace[]):FeatureRace[] {
   const journal=prefix+".journal-capture.ndjson";
   ok(fs.existsSync(journal),"CAPTURE_JOURNAL_MISSING "+journal);
-  const contents=fs.readFileSync(journal,"utf8").split(/\\r?\\n/).filter(Boolean);
+  const contents=fs.readFileSync(journal,"utf8").split(/\r?\n/).filter(Boolean);
   console.log("[D23-RECOVER] JOURNAL_LINES="+contents.length);
   ok(contents.length===178,"JOURNAL_INCOMPLETE "+contents.length+"/178; USE_FAILURE_REPORT_NO_RECALC");
   const recaptured=contents.map((line,i)=>{
@@ -322,7 +322,7 @@ run().catch(e=>{
   const message=e instanceof Error?e.stack??e.message:String(e);
   console.error("[D23-FIX] ROOT_ERROR="+message);
   try {
-    if(prefix.startsWith("C:\\\\tmp\\\\") && !fs.existsSync(prefix+".failure.json")) {
+    if(prefix.replaceAll(String.fromCharCode(92),"/").startsWith("C:/tmp/") && !fs.existsSync(prefix+".failure.json")) {
       fs.writeFileSync(prefix+".fatal.json",JSON.stringify({
         status:"FAILED_OUTSIDE_RACE_LOOP",mode,rootError:message,
         releaseAllowed:false,journal:prefix+".journal-capture.ndjson"
