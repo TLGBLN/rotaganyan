@@ -3,7 +3,7 @@
  * Never publishes a prediction or coupon. Production access hard-blocked above.
  */
 import { createHash } from "node:crypto";
-import { scoreRace, type FittedModel, type FeatureStats } from "@/lib/motor-v1/engine/training";
+import { scoreRace, explainRunner, type FittedModel, type FeatureStats } from "@/lib/motor-v1/engine/training";
 import { captureD23LiveVectors, smoothD23Pedigree } from "./d23-feature-capture";
 import { buildD23SnapshotCandidate } from "./d23-snapshot-candidate";
 import raw from "./artifacts/ran-d23-staging-candidate.json";
@@ -53,7 +53,12 @@ export function loadD23StagingModel(): FittedModel<string> {
 export async function runD23StagingRace(raceId:string) {
   const model = loadD23StagingModel();
   const capture = await captureD23LiveVectors(raceId);
-  const scored=scoreRace(capture.vectors.map(smoothD23Pedigree),model);
+  const smoothed=capture.vectors.map(smoothD23Pedigree);
+  const scored=scoreRace(smoothed,model);
+  const signalEffectsByNo=new Map(smoothed.map(v=>[v.no,
+    explainRunner(v,model).rows.map(r=>({code:r.code,rawValue:r.rawValue,
+      observed:r.observed,contribution:r.scoreContribution+r.missingIndicatorContribution}))
+  ]));
   const snapshotCandidate=buildD23SnapshotCandidate(raceId,scored,data.weightsFingerprint);
   const ranked=scored.sort((a,b)=>
     b.probability-a.probability || a.no-b.no).map((x,i)=>({...x,rank:i+1}));
@@ -63,5 +68,6 @@ export async function runD23StagingRace(raceId:string) {
   return {engineName:data.motorAdi,engineVersion:data.engineVersion,
     status:"STAGING_ONLY_NOT_PUBLISHED",sourceStatus:capture.sourceStatus,
     sourceBlockers:BLOCKED_REASONS,weightsFingerprint:data.weightsFingerprint,
-    raceId,generatedAt:new Date().toISOString(),scores:ranked,paceMap:capture.paceMap,snapshotCandidate};
+    raceId,generatedAt:new Date().toISOString(),scores:ranked,signalEffectsByNo:Object.fromEntries(signalEffectsByNo),
+    paceMap:capture.paceMap,snapshotCandidate};
 }
