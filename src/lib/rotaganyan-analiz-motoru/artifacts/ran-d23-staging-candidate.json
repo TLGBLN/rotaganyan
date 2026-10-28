@@ -12,7 +12,11 @@
       "2026-08-16",
       "2026-08-25"
     ],
-    "sourceType": "completed NDJSON journal, historical PIT unproven"
+    "sourceType": "completed NDJSON journal, historical PIT unproven",
+    "file": "C:\\tmp\\ran-d20-tempo-entegrasyon-20261026-230152-91726c-train-physical-23.json",
+    "sha256": "496f83de35ea0bdc499038de4783175201f2be5be1a90c8da24811594839e99d",
+    "calculator": "src/lib/rotaganyan-analiz-motoru/pace-scenario.ts",
+    "calculatorSha256": "fb0c430f504ad046326d4d054cccf8f36fbdc9e923881450b010ab9aaaffa265"
   },
   "blockers": [
     "Independent holdout 60-race results not yet independently verified",
