@@ -8,6 +8,7 @@
  * 29 chronological dev races are used across four models. NO model deployment,
  * no prediction/coupon writes, and NO claimed six-leg ROI.
  */
+import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import {createHash} from "node:crypto";
@@ -167,15 +168,6 @@ function evaluate(ds:TrainingRace[],model:FittedModel<string>):
   return {metric:{races:n,top1,top3,top6,logLoss:loss/n,
     raceBrier:brier/n,ece,meanWinningRank:rankSum/n},outcomes:outs};
 }
-function coefficientShifts(ref:FittedModel<string>,test:FittedModel<string>){
-  const changes=rawCodes.map((code,i)=>({
-    code,baselineZ:ref.beta[2*i],candidateZ:test.beta[2*i],
-    absDelta:Math.abs(ref.beta[2*i]-test.beta[2*i]),
-    missingDelta:Math.abs(ref.beta[2*i+1]-test.beta[2*i+1])
-  })).sort((a,b)=>b.absDelta-a.absDelta);
-  return {sumAbsZDelta:changes.reduce((sum,x)=>sum+x.absDelta,0),
-    topChanges:changes.slice(0,8)};
-}
 function coverage(sc:Sidecar,races:FrozenRow[]){
   let observed=0,winnerObserved=0,up=0,down=0,flat=0;
   const reasons:Record<string,number>={};
@@ -231,6 +223,10 @@ async function main(){
     console.log("[D23-AGF-PIT] "+variant.name+" "+JSON.stringify(x.metric));
   }
   const reference=evaluated[0];
+  const baselineParity=reference.metrics.top1===8 && reference.metrics.top3===17;
+  console.log("[D23-AGF-PIT] BASELINE_DEV_PARITY="+(baselineParity?"PASS":"MISMATCH")+
+    " expectedTop1=8 expectedTop3=17 observedTop1="+reference.metrics.top1+
+    " observedTop3="+reference.metrics.top3);
   const comparison=evaluated.map((x,i)=>{
     const refOut=new Map(reference.outcomes.map(y=>[y.raceId,y]));
     const rescued=x.outcomes.filter(y=>y.winnerRank<=3 &&
@@ -256,7 +252,8 @@ async function main(){
         topChangedSignals:shifts.slice(0,8)},rescued,lost,
       top1Changed:x.outcomes.filter(o=>o.scores[0].no!==refOut.get(o.raceId)!.scores[0].no).length};
   });
-  const report={status:sufficient?"EXPLORATORY_DEV_ONLY":"INSUFFICIENT_PRE_RACE_AGF_COVERAGE",
+  const report={status:!baselineParity?"BASELINE_DEV_PARITY_MISMATCH":
+      sufficient?"EXPLORATORY_DEV_ONLY":"INSUFFICIENT_PRE_RACE_AGF_COVERAGE",
     releaseAllowed:false,independentHoldoutValidated:false,
     pointInTimeLimitations:[
       "CapturedAt cutoffs filter timestamps but cannot independently certify that records were not backfilled",
@@ -265,7 +262,7 @@ async function main(){
       "No pre-race payout odds or six-leg payout data in the frozen journal; ROI NOT MEASURED",
       "86 race train vs 29 race dev; small and vulnerable to chance. This is NOT deployment approval"
     ],journalSha256:SOURCE_SHA,weightsSha256:WEIGHTS_SHA,sidecarPath,
-    cutoffMinutes:CUTOFF_MIN,trainRaces:86,devRaces:29,
+    cutoffMinutes:CUTOFF_MIN,trainRaces:86,devRaces:29,baselineParity,
     thresholds:threshold,coverage:cov,comparison,
     rca:reference.outcomes.map(o=>({
       raceId:o.raceId,winnerNo:o.winnerNo,
