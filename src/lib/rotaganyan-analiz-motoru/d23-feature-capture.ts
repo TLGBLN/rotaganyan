@@ -126,9 +126,14 @@ export async function captureD23LiveVectors(raceId:string):Promise<{
       hist,breed,race.raceDay.date,stableSpeed.index);
     return [r.no,{
       value,
+      // P0 FIX (2026-10-28): RIVAL_GAP (RAK_GAP_01) MUST use the EXACT same observation
+      // gate as SPEED. hizDerecesiHesaplaOrtak() silently returns 0 (sentinel, not a real
+      // pace) when there is no usable population comparison (sayi===0) -- a bare
+      // "hist.length>0" gate (the old v1Observed) let that fabricated 0 pass through as an
+      // "observed" average-pace horse whenever history existed but was stale/out-of-window/
+      // below the 20-sample population bucket floor. Proven in rak-rakip-gucu.test.ts.
       observed:r.tjkAtId!==null && !ambiguous &&
-        speedObservedAsOf(hist,breed,race.raceDay.date,stableSpeed.index),
-      v1Observed:r.tjkAtId!==null&&!ambiguous&&hist.length>0
+        speedObservedAsOf(hist,breed,race.raceDay.date,stableSpeed.index)
     }] as const;
   }));
   const v1ByNo=new Map((base.rawSources?.v1Results??[]).map(v=>[v.no,v]));
@@ -138,7 +143,7 @@ export async function captureD23LiveVectors(raceId:string):Promise<{
     const speed=stableByNo.get(r.no);
     const cls=v1ByNo.get(r.no)?.unifiedVector.find(s=>s.code==="SINIF_01");
     if(!speed||!cls)throw Error("D23_SINIF_SOURCE_MISSING");
-    return {no:r.no,hiz01:speed.value,hiz01Observed:speed.v1Observed,
+    return {no:r.no,hiz01:speed.value,hiz01Observed:speed.observed,
       sinif01:cls.rawValue,sinif01Observed:cls.observed};
   }));
 

@@ -8,7 +8,7 @@ function fingerprint() {
   const a=raw.modelArtifact;
   const payload=JSON.stringify({
     codes:a.codes,names:a.names,beta:a.beta.map(b=>Number(b.toFixed(10))),
-    muSigma:Object.fromEntries(Object.entries(a.muSigma).sort(([x],[y])=>x<y?-1:x>y?1:0)
+    muSigma:Object.fromEntries(Object.entries(a.muSigma).sort(([x],[y])=>x.localeCompare(y))
       .map(([k,v])=>[k,{mu:Number(v.mu.toFixed(10)),
         sigma:Number(v.sigma.toFixed(10)),nObserved:v.nObserved}]))
   });
@@ -20,11 +20,13 @@ describe("D23 research candidate integrity (NOT publication approval)",()=>{
     expect(m.codes).toHaveLength(23);
     expect(new Set(m.codes).size).toBe(23);
     expect(m.beta).toHaveLength(46);
+    expect(m.nRacesTrain).toBe(115);
+    expect(raw.source.frozenJournalSha256).toBe("311d2bdea8fded3ae08b0c4edb02dab5e5f3469d1b1ad5befaaa78c25437d50f");
     expect(m.names).toEqual(m.codes.flatMap(c=>[c+"_z",c+"_missing"]));
-    expect(fingerprint()).toBe("7c69fbf03899bc67d0fa5060ecf876f0e893ee99add6ee492af89dc8f9d3baa3");
+    expect(fingerprint()).toBe("fafebc0daf6734b193b05389a07b5192e775a7afd799373684e12e4e859e816c");
   });
   it("preserves explicit release blockade and absent independent holdout",()=>{
-    expect(raw.releaseStatus).toBe("BLOCKED_PENDING_LIVE_PARITY_AND_PIT_PROVENANCE");
+    expect(raw.releaseStatus).toBe("BLOCKED_PENDING_PIT_HOLDOUT_ROI_SNAPSHOT");
     expect(raw.independentHoldoutValidated).toBe(false);
     expect(raw.productionWired).toBe(false);
     expect(raw.modelArtifact.deploymentReady).toBe(false);
