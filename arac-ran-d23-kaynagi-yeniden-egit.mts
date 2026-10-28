@@ -227,10 +227,19 @@ async function run(){
   try {
     if(mode==="probe"){
       const first=await collect(old.slice(0,3));
+      const speedAndGap=first.flatMap(r=>r.vectors.map(v=>({
+        raceId:r.raceId,no:v.no,
+        speed:v.signals.find(s=>s.code==="SPEED"),
+        gap:v.signals.find(s=>s.code==="RIVAL_GAP")
+      }))).sort((a,b)=>a.raceId.localeCompare(b.raceId)||a.no-b.no);
+      const speedGapSha=sha(JSON.stringify(speedAndGap));
       writeNew(prefix+".probe.json",JSON.stringify({
         status:"PROBE_OK_NO_MODEL_FIT",races:first.length,
+        speedGapSha256:speedGapSha,checkedStarts:speedAndGap.length,
+        speedAndGap,
         sourceStatus:"CURRENT_DB_HISTORICAL_PIT_NOT_PROVEN",releaseAllowed:false
       },null,2));
+      console.log("[D23-FIX] SPEED_GAP_SHA256="+speedGapSha);
       console.log("[D23-FIX] PROBE_OK="+first.length);
     }else if(mode==="capture"){
       const recaptured=normalize(await collect(old));validateSet(recaptured);
