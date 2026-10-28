@@ -1,48 +1,37 @@
 {
-  "releaseStatus": "BLOCKED_PENDING_LIVE_PARITY_AND_PIT_PROVENANCE",
-  "intendedName": "Rotaganyan Analiz Motoru",
+  "releaseStatus": "BLOCKED_PENDING_PIT_HOLDOUT_ROI_SNAPSHOT",
+  "intendedName": "RotaGanyan Analiz Motoru",
   "targetSignalCount": 23,
   "independentHoldoutValidated": false,
   "productionWired": false,
-  "reference109": {
-    "n": 109,
-    "top1": 30,
-    "top3": 60,
-    "top6": 87,
-    "logLoss": 2.0839666066701152
-  },
-  "training178": {
-    "nRaces": 178,
-    "nRunnerStarts": 1755
-  },
   "source": {
-    "file": "C:\\tmp\\ran-d20-tempo-entegrasyon-20261026-230152-91726c-train-physical-23.json",
-    "sha256": "496f83de35ea0bdc499038de4783175201f2be5be1a90c8da24811594839e99d",
-    "calculator": "src/lib/rotaganyan-analiz-motoru/pace-scenario.ts",
-    "calculatorSha256": "fb0c430f504ad046326d4d054cccf8f36fbdc9e923881450b010ab9aaaffa265"
-  },
-  "blockers": [
-    "SURFACE_FORM historical PIT source mismatch unresolved (358 historical starts)",
-    "Historical field size N coverage incomplete",
-    "PIT snapshot immutability not established",
-    "23-code train/live feature parity and prediction/coupon snapshot contract not proven",
-    "Production Git branch differs from research branch; 36-code artifact cannot be relabeled to 23"
-  ],
-  "modelArtifact": {
-    "engineVersion": "RAN-D20PLUS3-RESEARCH-CANDIDATE",
-    "motorAdi": "Rotaganyan Analiz Motoru",
-    "deploymentReady": false,
-    "trainedAt": "2026-10-26T20:52:01.204Z",
-    "lambda": 90,
-    "learningRate": 0.25,
-    "iterations": 2500,
-    "nRacesTrain": 178,
-    "nRacesHoldout": 0,
-    "trainDateRange": [
+    "frozenJournalSha256": "311d2bdea8fded3ae08b0c4edb02dab5e5f3469d1b1ad5befaaa78c25437d50f",
+    "sourceRaces": 115,
+    "starts": 1126,
+    "capturePeriod": [
       "2026-08-16",
       "2026-08-25"
     ],
-    "devHoldoutMetrics": null,
+    "sourceType": "completed NDJSON journal, historical PIT unproven"
+  },
+  "blockers": [
+    "Independent holdout 60-race results not yet independently verified",
+    "Historical point-in-time feature provenance unproven",
+    "Coupon return/ROI and atomic versioned publication not verified",
+    "Train/live 23-signal parity not proven"
+  ],
+  "modelArtifact": {
+    "engineVersion": "RAN-D23-SAVED-RESEARCH-ONLY",
+    "motorAdi": "RotaGanyan Analiz Motoru",
+    "releaseStatus": "BLOCKED_PIT_HOLDOUT_ROI_ATOMIC_SNAPSHOT",
+    "deploymentReady": false,
+    "independentHoldoutValidated": false,
+    "trainedAt": "2026-10-28T08:50:11.550Z",
+    "nRacesTrain": 115,
+    "nRacesHoldout": 0,
+    "lambda": 90,
+    "learningRate": 0.25,
+    "iterations": 2500,
     "codes": [
       "IDMAN_JOCKEY",
       "H2H",
@@ -117,170 +106,170 @@
       "PACE_DRAW_LEAD_PRESS_missing"
     ],
     "beta": [
-      -0.04107605557750499,
-      -0.017637413822454123,
-      0.08080561055996553,
-      -0.01646842321040297,
-      0.11282584726551385,
-      -0.0144250910498999,
-      0.0016943265352082307,
-      -0.009620339693479463,
-      0.08008642570254691,
-      -0.001345452149771711,
-      -0.02918324628500025,
-      -0.017637413822454123,
-      0.04303143179892088,
-      -0.01301947406445995,
-      0.043447626152422494,
-      0.020559282494444983,
-      0.02670811450280546,
-      -0.008749024179501387,
-      0.10769023588235886,
-      0.003035382720755641,
-      0.0644509555279574,
-      0.002584052943939611,
-      0.04341230496113694,
-      0.003035382720755641,
-      -0.008821634421258932,
-      -0.006503065760276886,
-      0.02612661016670115,
-      -0.006503065760276886,
-      -0.07945358558085196,
-      -0.006503065760276886,
-      -0.044699482580139005,
-      -0.0372135381642944,
-      -0.050513987971876596,
-      0.0020640315748834165,
-      0.10709766564163183,
-      -0.0019423870657838576,
-      0.1736157089999315,
-      -0.004175529441510433,
-      0.15382257270460323,
-      -0.009544342601152632,
-      0.0485504357667768,
-      -0.006503065760276886,
-      0.03220170316113082,
-      -0.006503065760276886,
-      0.006446714768750602,
-      -0.0037336875369500416
+      -0.04700473588802017,
+      -0.004705198341015655,
+      0.06774710224697644,
+      -0.001189158810607974,
+      0.0860772094855589,
+      -0.008388819546116923,
+      0.014009106013745156,
+      -0.010901555921411657,
+      0.07868004956029835,
+      -0.01000699866390396,
+      -0.025098456259621673,
+      -0.004705198341015655,
+      0.039922619916360216,
+      -0.003945125358730873,
+      0.028460194423161164,
+      0.00031128931462503986,
+      0.027837064475643394,
+      -0.006839895996022112,
+      0.11058952617402477,
+      0.0002803403852359838,
+      0.08010146716315762,
+      0.0002803403852359838,
+      0.047548887294656776,
+      0.0002803403852359838,
+      -0.006712362417163401,
+      0.004681360318128695,
+      -0.01475307189271994,
+      0.004681360318128695,
+      -0.07700421535214709,
+      0.004681360318128695,
+      -0.018473218502567064,
+      -0.026415636961929972,
+      -0.026685275009588706,
+      -0.0008534835376019646,
+      0.11530442073159602,
+      -0.0013900304301837578,
+      0.13817107996517175,
+      -0.007569916945554758,
+      0.11131829494572079,
+      -0.0024145841754333246,
+      0.06389703507811907,
+      0.004681360318128695,
+      0.024825045617530562,
+      0.004681360318128695,
+      0.032243370426016375,
+      0.0024513300390584507
     ],
     "muSigma": {
       "IDMAN_JOCKEY": {
-        "mu": 0.19635890767230169,
-        "sigma": 0.397243108247384,
-        "nObserved": 1538
+        "mu": 0.20366598778004075,
+        "sigma": 0.40272342022984053,
+        "nObserved": 982
       },
       "H2H": {
         "mu": 0,
-        "sigma": 2.836469930275557,
-        "nObserved": 1273
+        "sigma": 2.8297444082724272,
+        "nObserved": 805
       },
       "SPEED": {
-        "mu": -0.7353083874660175,
-        "sigma": 3.9720963553022335,
-        "nObserved": 1632
+        "mu": -0.704623417674125,
+        "sigma": 3.8931853448984577,
+        "nObserved": 1025
       },
       "GROUND_TOLERANCE": {
-        "mu": 0.26488185637905604,
-        "sigma": 2.9274540187266576,
-        "nObserved": 351
+        "mu": 0.01910983410576637,
+        "sigma": 2.912426136447418,
+        "nObserved": 225
       },
       "GROUND_DISTANCE_EXPERIENCE": {
-        "mu": -1.6145859438791033,
-        "sigma": 3.631749279932684,
-        "nObserved": 1464
+        "mu": -1.6738598403573985,
+        "sigma": 3.5556841819583487,
+        "nObserved": 963
       },
       "WORKOUT_SPRINT": {
-        "mu": 0.1046814044213264,
-        "sigma": 0.3061424635520288,
-        "nObserved": 1538
+        "mu": 0.10183299389002037,
+        "sigma": 0.3024285622182776,
+        "nObserved": 982
       },
       "EQUIPMENT_CHANGE": {
-        "mu": -0.03730886850152905,
-        "sigma": 0.362394482393651,
-        "nObserved": 1635
+        "mu": -0.03085824493731919,
+        "sigma": 0.36348858305533704,
+        "nObserved": 1037
       },
       "RACE_PACE_FIT": {
-        "mu": -0.13636634400595654,
-        "sigma": 4.030318481782886,
-        "nObserved": 1343
+        "mu": -0.19684769775678834,
+        "sigma": 4.14678855890275,
+        "nObserved": 847
       },
       "SIRE_HISTORY": {
-        "mu": 11.572867189264674,
-        "sigma": 3.6821333344775784,
-        "nObserved": 1629
+        "mu": 11.472725287981595,
+        "sigma": 3.523124354422839,
+        "nObserved": 1046
       },
       "ACC_CLOSE_RES": {
-        "mu": 0.09425886675402173,
-        "sigma": 0.5034067198985501,
-        "nObserved": 1492
+        "mu": 0.10815721567961072,
+        "sigma": 0.515591359950494,
+        "nObserved": 932
       },
       "ACC_LATE": {
-        "mu": -0.16831514170450962,
-        "sigma": 0.8913082255535869,
-        "nObserved": 1491
+        "mu": -0.1597004827318923,
+        "sigma": 0.9156162784439033,
+        "nObserved": 932
       },
       "ACC_SPEED": {
-        "mu": -0.10801897196932818,
-        "sigma": 0.279469727616644,
-        "nObserved": 1492
+        "mu": -0.10357825549436463,
+        "sigma": 0.2731283838156428,
+        "nObserved": 932
       },
       "RIVAL_FRONT_PRESSURE": {
-        "mu": 0.28304819443093326,
-        "sigma": 0.07136398253075008,
-        "nObserved": 1616
+        "mu": 0.2833989244342755,
+        "sigma": 0.07301723891322257,
+        "nObserved": 1024
       },
       "SINGLE_LEADER": {
-        "mu": 0.018273784627030918,
-        "sigma": 0.03561304325617168,
-        "nObserved": 1616
+        "mu": 0.01838121034809576,
+        "sigma": 0.03641685669752107,
+        "nObserved": 1024
       },
       "CLOSER_PRESSURE_FIT": {
-        "mu": 0.10279468906331216,
-        "sigma": 0.06851191823298083,
-        "nObserved": 1616
+        "mu": 0.10203549829362892,
+        "sigma": 0.06872510013938803,
+        "nObserved": 1024
       },
       "DAM_HISTORY": {
-        "mu": 13.535906936010063,
-        "sigma": 2.974850650381494,
-        "nObserved": 523
+        "mu": 13.596205273343177,
+        "sigma": 2.9728201865920556,
+        "nObserved": 320
       },
       "DAMSIRE_HISTORY": {
-        "mu": 11.70251035683641,
-        "sigma": 3.6794033134530872,
-        "nObserved": 1565
+        "mu": 11.68340013030994,
+        "sigma": 3.7184189188195407,
+        "nObserved": 1000
       },
       "JOCKEY_OE30": {
-        "mu": 0.007600178373775001,
-        "sigma": 0.0525774286559895,
-        "nObserved": 1752
+        "mu": 0.007758897566197492,
+        "sigma": 0.05849027825066463,
+        "nObserved": 1124
       },
       "SURFACE_FORM": {
-        "mu": 0.554278415934342,
-        "sigma": 0.2209777956580463,
-        "nObserved": 1499
+        "mu": 0.55752325397755,
+        "sigma": 0.22511535557013002,
+        "nObserved": 936
       },
       "RIVAL_GAP": {
-        "mu": -3.7250814285354257,
-        "sigma": 3.63739796093594,
-        "nObserved": 1620
+        "mu": -3.5668216236864674,
+        "sigma": 3.466013161628686,
+        "nObserved": 1016
       },
       "PACE_DUEL_SELF": {
-        "mu": 0.0183293239710192,
-        "sigma": 0.024604404998062022,
-        "nObserved": 1616
+        "mu": 0.01840920690757811,
+        "sigma": 0.025332908804674495,
+        "nObserved": 1024
       },
       "PACE_STALK_DUEL": {
-        "mu": 0.04724385885039879,
-        "sigma": 0.03216481826107686,
-        "nObserved": 1616
+        "mu": 0.04743186781071355,
+        "sigma": 0.031874589735776386,
+        "nObserved": 1024
       },
       "PACE_DRAW_LEAD_PRESS": {
-        "mu": -0.0006104596437569026,
-        "sigma": 0.07199137732160163,
-        "nObserved": 1580
+        "mu": -0.0022411872192803764,
+        "sigma": 0.07283876967081784,
+        "nObserved": 1000
       }
     },
-    "weightsFingerprint": "7c69fbf03899bc67d0fa5060ecf876f0e893ee99add6ee492af89dc8f9d3baa3"
+    "weightsFingerprint": "fafebc0daf6734b193b05389a07b5192e775a7afd799373684e12e4e859e816c"
   }
 }
