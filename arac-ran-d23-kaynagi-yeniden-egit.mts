@@ -161,25 +161,86 @@ function fitAndEvaluate(a:FeatureRace[]) {
   return {model,fold109:{n:metrics.n,top1:metrics.top1,top3:metrics.top3,
     top6:metrics.top6,logLoss:metrics.loss/metrics.n}};
 }
-async function collect(old:FeatureRace[]) {
-  const result:FeatureRace[]=[];
-  // Recoverable diagnostics: preserve every completed race, NEVER silently skip a
-  // missing feature or a failed calculation. Newly created journal is research only.
-  const journal=prefix+".journal-"+mode+".ndjson";
-  const fd=fs.openSync(journal,"wx");
-  fs.closeSync(fd);
-  for(let i=0;i<old.length;i++){
+/**
+ * Resume the SAME physical 178-race training cohort from a durable completed
+ * journal. Never refetch a completed row, reorder it, or substitute a race.
+ * Strict checkpoint guard: all prior labels, runner IDs and model columns
+ * must match the frozen original physical cohort.
+ */
+function readCaptureCheckpoint(old:FeatureRace[],journal:string):FeatureRace[] {
+  ok(fs.existsSync(journal),"RESUME_JOURNAL_NOT_FOUND "+journal);
+  const content=fs.readFileSync(journal,"utf8");
+  ok(content.length===0 || content.endsWith("\n"),"JOURNAL_TRUNCATED_LAST_LINE");
+  const lines=content.split(/\r?\n/).filter(line=>line.length>0);
+  ok(lines.length<=old.length,"JOURNAL_TOO_LONG "+lines.length);
+  const completed:FeatureRace[]=[];
+  for(let i=0;i<lines.length;i++){
+    let entry:FeatureRace;
+    try{entry=JSON.parse(lines[i]) as FeatureRace;}
+    catch{fail("JOURNAL_INVALID_JSON_ROW "+(i+1))}
+    const expected=old[i];
+    ok(entry.raceId===expected.raceId &&
+      entry.tarih===expected.tarih &&
+      entry.winnerNo===expected.winnerNo &&
+      entry.vectors.length===expected.vectors.length,
+      "RESUME_FROZEN_COHORT_MISMATCH row="+(i+1));
+    const expectedNos=new Set(expected.vectors.map(v=>v.no));
+    const seen=new Set<number>();
+    for(const vector of entry.vectors){
+      ok(vector.raceId===entry.raceId &&
+        expectedNos.has(vector.no) && !seen.has(vector.no),
+        "RESUME_RUNNER_ID_MISMATCH row="+(i+1));
+      seen.add(vector.no);
+      // Source journal already contains only selected D23 signals.
+      const selected=selectD23Signals(vector.signals,codes);
+      ok(vector.signals.length===codes.length &&
+        selected.every((s,j)=>s.code===vector.signals[j].code),
+        "RESUME_SIGNAL_ORDER_INVALID row="+(i+1));
+    }
+    completed.push(entry);
+  }
+  console.log("[D23-RESUME] CHECKPOINT_VALIDATED="+completed.length+"/"+old.length);
+  console.log("[D23-RESUME] NEXT_INDEX="+(completed.length+1));
+  return completed;
+}
+function transientDatabaseError(e:unknown):boolean {
+  const message=e instanceof Error?e.stack??e.message:String(e);
+  return /Connection terminated unexpectedly|ECONNRESET|EPIPE|server closed the connection unexpectedly|connection reset by peer|P1001|P1002|57P01|57P02|57P03|ETIMEDOUT/i.test(message);
+}
+async function captureWithRetry(raceId:string) {
+  for(let attempt=1;attempt<=3;attempt++) {
+    try {return await captureD23LiveVectors(raceId);}
+    catch(e) {
+      if(attempt===3 || !transientDatabaseError(e))throw e;
+      console.warn("[D23-RESUME] TRANSIENT_DATABASE_FAILURE race="+raceId+
+        " retry="+attempt+"/2");
+      await new Promise(resolve=>setTimeout(resolve,1500*attempt));
+    }
+  }
+  throw Error("D23_RETRY_EXHAUSTED "+raceId);
+}
+async function collect(old:FeatureRace[],resume=false) {
+  // The resume journal is ALWAYS the same original capture journal.
+  const journal=prefix+".journal-"+(resume?"capture":mode)+".ndjson";
+  const result:FeatureRace[]=resume?readCaptureCheckpoint(old,journal):[];
+  if(!resume){
+    const fd=fs.openSync(journal,"wx");
+    fs.closeSync(fd);
+  }
+  for(let i=result.length;i<old.length;i++){
     const r=old[i];
     console.log("[D23-FIX] BEGIN="+(i+1)+"/"+old.length+" RACE="+r.raceId);
     try {
-      const calc=await captureD23LiveVectors(r.raceId);
+      // For *new* captures too, retry transient pool terminations in-process.
+      const calc=await captureWithRetry(r.raceId);
       ok(calc.date===r.tarih,"DATE_CHANGED "+r.raceId);
       const phys=new Set(r.vectors.map(v=>v.no));
       ok(calc.vectors.length===r.vectors.length &&
         calc.vectors.every(v=>phys.has(v.no)),"PHYSICAL_FIELD_CHANGED "+r.raceId);
       const captured={...r,vectors:calc.vectors};
-      result.push(captured);
+      // Write and flush the durable journal BEFORE acknowledging completion.
       fs.appendFileSync(journal,JSON.stringify(captured)+"\n","utf8");
+      result.push(captured);
       console.log("[D23-FIX] OK="+(i+1)+"/"+old.length+" RACE="+r.raceId);
     } catch(e) {
       const err=e instanceof Error?e.stack??e.message:String(e);
@@ -189,10 +250,14 @@ async function collect(old:FeatureRace[]) {
         completed:result.length,source:"CURRENT_DB_HISTORICAL_PIT_NOT_PROVEN",
         failure:err,partialJournal:journal,releaseAllowed:false,
       };
-      writeNew(prefix+".failure.json",JSON.stringify(failure,null,2));
+      const report=prefix+(resume?".resume.failure.json":".failure.json");
+      try {writeNew(report,JSON.stringify(failure,null,2));}
+      catch(reportError) {
+        console.error("[D23-FIX] FAILURE_REPORT_WRITE_ERROR="+String(reportError));
+      }
       console.error("[D23-FIX] FAILED_RACE="+r.raceId+" INDEX="+(i+1));
       console.error("[D23-FIX] ROOT_ERROR="+err);
-      console.error("[D23-FIX] FAILURE_REPORT="+prefix+".failure.json");
+      console.error("[D23-FIX] FAILURE_REPORT="+report);
       throw Error("D23_CAPTURE_FAILURE_AT_"+(i+1)+"_RACE_"+r.raceId);
     }
   }
@@ -292,6 +357,10 @@ async function run(){
       console.log("[D23-FIX] PROBE_OK="+first.length);
     }else if(mode==="capture"){
       finishCapture(old,await collect(old));
+    }else if(mode==="resume"){
+      console.log("[D23-RESUME] CONTINUE_EXISTING_CAPTURE_ONLY_NO_RESTART");
+      finishCapture(old,await collect(old,true));
+      console.log("[D23-RESUME] COMPLETED_178_FROM_EXISTING_JOURNAL");
     }else if(mode==="recover"){
       console.log("[D23-RECOVER] OFFLINE_ONLY_NO_DB_QUERY");
       finishCapture(old,recoverJournal(old));
