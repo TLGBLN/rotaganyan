@@ -213,6 +213,55 @@ function test23OfManySelector():void {
   ok(rejected,"SELFTEST_DUPLICATE_NOT_REJECTED");
   console.log("[D23-FIX] SELFTEST_23_OF_MANY_PASS");
 }
+/** Offline recovery from a COMPLETED original journal only.
+ * No DB queries; incomplete physical sets fail closed, no imaginary rows.
+ * The original journal bytes are never overwritten or relabelled as PIT safe.
+ */
+function finishCapture(old:FeatureRace[], recaptured:FeatureRace[]) {
+  recaptured=normalize(recaptured);
+  validateSet(recaptured);
+  const sourceText=JSON.stringify(recaptured);
+  const differences=rawDiff(old,recaptured);
+  const trained=fitAndEvaluate(recaptured);
+  const sourceHash=sha(sourceText);
+  writeNew(prefix+".source.json",sourceText);
+  writeNew(prefix+".drift.csv",csv(differences.rows));
+  writeNew(prefix+".candidate.json",JSON.stringify({
+    status:"NEW_CANDIDATE_RESEARCH_ONLY_PIT_NOT_PROVEN",
+    frozenSourceSha256:sourceHash,
+    modelArtifact:trained.model,
+    performance:trained.fold109,
+    originalReference109:raw.reference109,
+    releaseAllowed:false
+  },null,2));
+  writeNew(prefix+".capture-report.json",JSON.stringify({
+    status:"RETRAINED_CURRENT_SOURCE_PIT_NOT_PROVEN",
+    sourceSha256:sourceHash,sourceStatus:"CURRENT_DB_NOT_HISTORICAL_IMMUTABLE",
+    races:178,starts:1755,diffsAgainstOriginal:differences.rows.length,
+    diffByCode:differences.byCode,fold109:trained.fold109,
+    previousFold109:raw.reference109,releaseAllowed:false,
+    nextStep:"RUN_FRESH_PROCESS_VERIFY_THEN_SEPARATE_INDEPENDENT_HOLDOUT"
+  },null,2));
+  console.log("[D23-FIX] ORIGINAL_DIFFS="+differences.rows.length);
+  console.log("[D23-FIX] NEW_FOLD109="+JSON.stringify(trained.fold109));
+  console.log("[D23-FIX] SOURCE_SHA="+sourceHash);
+  console.log("[D23-FIX] RELEASE_ALLOWED=FALSE PIT_NOT_PROVEN");
+}
+function recoverJournal(old:FeatureRace[]):FeatureRace[] {
+  const journal=prefix+".journal-capture.ndjson";
+  ok(fs.existsSync(journal),"CAPTURE_JOURNAL_MISSING "+journal);
+  const contents=fs.readFileSync(journal,"utf8").split(/\\r?\\n/).filter(Boolean);
+  console.log("[D23-RECOVER] JOURNAL_LINES="+contents.length);
+  ok(contents.length===178,"JOURNAL_INCOMPLETE "+contents.length+"/178; USE_FAILURE_REPORT_NO_RECALC");
+  const recaptured=contents.map((line,i)=>{
+    try{return JSON.parse(line) as FeatureRace;}
+    catch{fail("JOURNAL_ROW_UNREADABLE "+(i+1))}
+  });
+  // Exact physical race identifiers are mandatory; no substituted labels.
+  const idSet=new Set(old.map(r=>r.raceId));
+  ok(recaptured.every(r=>idSet.has(r.raceId)),"JOURNAL_UNEXPECTED_RACE");
+  return recaptured;
+}
 async function run(){
   test23OfManySelector();
   ok(codes.length===23&&raw.modelArtifact.deploymentReady===false,
@@ -242,33 +291,11 @@ async function run(){
       console.log("[D23-FIX] SPEED_GAP_SHA256="+speedGapSha);
       console.log("[D23-FIX] PROBE_OK="+first.length);
     }else if(mode==="capture"){
-      const recaptured=normalize(await collect(old));validateSet(recaptured);
-      const sourceText=JSON.stringify(recaptured);
-      const differences=rawDiff(old,recaptured);
-      const trained=fitAndEvaluate(recaptured);
-      const sourceHash=sha(sourceText);
-      writeNew(prefix+".source.json",sourceText);
-      writeNew(prefix+".drift.csv",csv(differences.rows));
-      writeNew(prefix+".candidate.json",JSON.stringify({
-        status:"NEW_CANDIDATE_RESEARCH_ONLY_PIT_NOT_PROVEN",
-        frozenSourceSha256:sourceHash,
-        modelArtifact:trained.model,
-        performance:trained.fold109,
-        originalReference109:raw.reference109,
-        releaseAllowed:false
-      },null,2));
-      writeNew(prefix+".capture-report.json",JSON.stringify({
-        status:"RETRAINED_CURRENT_SOURCE_PIT_NOT_PROVEN",
-        sourceSha256:sourceHash,sourceStatus:"CURRENT_DB_NOT_HISTORICAL_IMMUTABLE",
-        races:178,starts:1755,diffsAgainstOriginal:differences.rows.length,
-        diffByCode:differences.byCode,fold109:trained.fold109,
-        previousFold109:raw.reference109,releaseAllowed:false,
-        nextStep:"RUN_FRESH_PROCESS_VERIFY_THEN_SEPARATE_INDEPENDENT_HOLDOUT"
-      },null,2));
-      console.log("[D23-FIX] ORIGINAL_DIFFS="+differences.rows.length);
-      console.log("[D23-FIX] NEW_FOLD109="+JSON.stringify(trained.fold109));
-      console.log("[D23-FIX] SOURCE_SHA="+sourceHash);
-      console.log("[D23-FIX] RELEASE_ALLOWED=FALSE PIT_NOT_PROVEN");
+      finishCapture(old,await collect(old));
+    }else if(mode==="recover"){
+      console.log("[D23-RECOVER] OFFLINE_ONLY_NO_DB_QUERY");
+      finishCapture(old,recoverJournal(old));
+      console.log("[D23-RECOVER] CAPTURE_RECONSTRUCTED_FROM_178_JOURNAL_ROWS");
     }else if(mode==="verify"){
       const capturedFile=prefix+".source.json";
       ok(fs.existsSync(capturedFile),"CAPTURE_NOT_FOUND");
@@ -291,4 +318,19 @@ async function run(){
     }else fail("UNKNOWN_MODE "+mode);
   }finally{await db.$disconnect()}
 }
-run().catch(e=>{console.error(e instanceof Error?e.stack:String(e));process.exitCode=1});
+run().catch(e=>{
+  const message=e instanceof Error?e.stack??e.message:String(e);
+  console.error("[D23-FIX] ROOT_ERROR="+message);
+  try {
+    if(prefix.startsWith("C:\\\\tmp\\\\") && !fs.existsSync(prefix+".failure.json")) {
+      fs.writeFileSync(prefix+".fatal.json",JSON.stringify({
+        status:"FAILED_OUTSIDE_RACE_LOOP",mode,rootError:message,
+        releaseAllowed:false,journal:prefix+".journal-capture.ndjson"
+      },null,2),"utf8");
+      console.error("[D23-FIX] FATAL_REPORT="+prefix+".fatal.json");
+    }
+  }catch(reportError) {
+    console.error("[D23-FIX] FATAL_REPORT_WRITE_FAILED="+String(reportError));
+  }
+  process.exitCode=1;
+});
