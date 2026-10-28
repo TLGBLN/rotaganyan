@@ -5,6 +5,7 @@
  * training or publishing any future model.
  */
 import { db } from "@/lib/db";
+import { createHash } from "node:crypto";
 import { breedToIrk } from "@/lib/sire-stat-match";
 import { hizPaceIndexKur, hizDerecesiHesaplaOrtak, type HizGecmisSatir, type PaceIndex } from "@/lib/methodology/hiz-derecesi-hesapla";
 import { speedObservedAsOf } from "./feature-calculators/pit-sire-speed";
@@ -54,9 +55,20 @@ export function loadD23StableSpeed():Promise<StableSpeed> {
         conflicts.add(id);
       }else breedById.set(id,breed);
     }
+    const sourceHasher=createHash("sha256");
+    for(const row of historyRows) {
+      sourceHasher.update(JSON.stringify([row.tjkAtId,row.rowsJson]));
+      sourceHasher.update("\n");
+    }
+    for(const [id,breed] of [...breedById].sort((a,b)=>a[0]-b[0])) {
+      sourceHasher.update(JSON.stringify([id,breed]));
+      sourceHasher.update("\n");
+    }
+    const sourceSha256=sourceHasher.digest("hex");
     const index=hizPaceIndexKur(history,breedById);
     console.log("[D23_SPEED_SOURCE] version=2 excludedAmbiguous="+conflicts.size+
-      " uniqueBreedIds="+breedById.size+" buckets="+index.size);
+      " uniqueBreedIds="+breedById.size+" buckets="+index.size+
+      " SOURCE_SHA256="+sourceSha256);
     return {history,index,ambiguous:conflicts.size,ambiguousIds:conflicts};
   })();
   speedContext=p;
