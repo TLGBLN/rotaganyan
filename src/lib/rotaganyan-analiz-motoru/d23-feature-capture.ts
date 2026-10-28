@@ -85,15 +85,15 @@ export async function captureD23LiveVectors(raceId:string):Promise<{
   paceMap:ReturnType<typeof calculatePaceScenario>;
 }> {
   if(!raceId || typeof raceId!=="string")throw Error("D23_RACE_ID_REQUIRED");
-  const [base,race,ctx]=await Promise.all([
-    buildUnifiedFeatureVectorsForRace(raceId),
+  const [base,race,ctx,stableSpeed]=await Promise.all([
+    buildUnifiedFeatureVectorsForRace(raceId,undefined,undefined,undefined,true),
     db.race.findUnique({where:{id:raceId},select:{
-      distance:true,surface:true,raceDay:{select:{date:true}},
+      distance:true,surface:true,breed:true,raceDay:{select:{date:true}},
       runners:{where:{scratched:false},select:{
         no:true,name:true,startNo:true,tjkAtId:true
       }}
     }}),
-    loadTempoContext()
+    loadTempoContext(),loadD23StableSpeed()
   ]);
   if(!race || !base.vectors.length || base.vectors.length!==race.runners.length)
     throw Error("D23_SOURCE_RACE_OR_RUNNER_COUNT_MISMATCH");
@@ -105,6 +105,30 @@ export async function captureD23LiveVectors(raceId:string):Promise<{
   }));
   const paceByNo=new Map(pace.horses.map(h=>[h.no,h]));
   const physicalNos=new Set(race.runners.map(r=>r.no));
+
+  const stableByNo=new Map(race.runners.map(r=>{
+    const hist=r.tjkAtId==null?[]:stableSpeed.history.get(r.tjkAtId)??[];
+    const breed=breedToIrk(race.breed);
+    const value=r.tjkAtId===null?0:hizDerecesiHesaplaOrtak(
+      hist,breed,race.raceDay.date,stableSpeed.index);
+    return [r.no,{
+      value,
+      observed:r.tjkAtId!==null &&
+        speedObservedAsOf(hist,breed,race.raceDay.date,stableSpeed.index),
+      v1Observed:r.tjkAtId!==null&&hist.length>0
+    }] as const;
+  }));
+  const v1ByNo=new Map((base.rawSources?.v1Results??[]).map(v=>[v.no,v]));
+  if(v1ByNo.size!==race.runners.length)
+    throw Error("D23_V1_RIVAL_SOURCE_MISSING");
+  const gaps=computeRakGapForRace(race.runners.map(r=>{
+    const speed=stableByNo.get(r.no);
+    const cls=v1ByNo.get(r.no)?.unifiedVector.find(s=>s.code==="SINIF_01");
+    if(!speed||!cls)throw Error("D23_SINIF_SOURCE_MISSING");
+    return {no:r.no,hiz01:speed.value,hiz01Observed:speed.v1Observed,
+      sinif01:cls.rawValue,sinif01Observed:cls.observed};
+  }));
+
   if(physicalNos.size!==race.runners.length)throw Error("D23_DUPLICATE_RUNNER_NUMBER");
   const vectors:RunnerFeatureVector[]=base.vectors.map(v=>{
     const p=paceByNo.get(v.no);
@@ -114,6 +138,18 @@ export async function captureD23LiveVectors(raceId:string):Promise<{
       const matches=pool.filter(s=>s.code===code);
       if(matches.length!==1)throw Error("D23_REQUIRED_FEATURE_MISSING_OR_DUPLICATE "+code);
       const s=matches[0];
+      if(code==="SPEED") {
+        const speed=stableByNo.get(v.no);
+        if(!speed)throw Error("D23_SPEED_NO_RUNNER");
+        return {...s,rawValue:speed.observed?speed.value:null,observed:speed.observed,
+          missingReason:speed.observed?null:"NO_AS_OF_PACE_COMPARISON"};
+      }
+      if(code==="RIVAL_GAP") {
+        const gap=gaps.get(v.no);
+        if(!gap)throw Error("D23_GAP_NO_RUNNER");
+        return {...s,rawValue:gap.rawValue,observed:gap.observed,
+          missingReason:gap.missingReason,coverageState:gap.coverageState};
+      }
       if(s.observed && (s.rawValue==null || !Number.isFinite(s.rawValue)) ||
         !s.observed && s.rawValue!=null)throw Error("D23_INVALID_OBSERVATION "+code);
       return {...s};
