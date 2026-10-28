@@ -26,7 +26,7 @@ const CODES: readonly string[] = raw.modelArtifact.codes;
  * every horse's reference speed and therefore RIVAL_GAP.
  * Exclude mixed-breed identity IDs from benchmark, rather than guess a breed.
  */
-type StableSpeed = {history:Map<number,HizGecmisSatir[]>;index:PaceIndex;ambiguous:number};
+type StableSpeed = {history:Map<number,HizGecmisSatir[]>;index:PaceIndex;ambiguous:number;ambiguousIds:Set<number>};
 let speedContext:Promise<StableSpeed>|null=null;
 export function loadD23StableSpeed():Promise<StableSpeed> {
   if(speedContext)return speedContext;
@@ -57,7 +57,7 @@ export function loadD23StableSpeed():Promise<StableSpeed> {
     const index=hizPaceIndexKur(history,breedById);
     console.log("[D23_SPEED_SOURCE] version=2 excludedAmbiguous="+conflicts.size+
       " uniqueBreedIds="+breedById.size+" buckets="+index.size);
-    return {history,index,ambiguous:conflicts.size};
+    return {history,index,ambiguous:conflicts.size,ambiguousIds:conflicts};
   })();
   speedContext=p;
   p.catch(()=>{if(speedContext===p)speedContext=null;});
@@ -109,13 +109,14 @@ export async function captureD23LiveVectors(raceId:string):Promise<{
   const stableByNo=new Map(race.runners.map(r=>{
     const hist=r.tjkAtId==null?[]:stableSpeed.history.get(r.tjkAtId)??[];
     const breed=breedToIrk(race.breed);
-    const value=r.tjkAtId===null?0:hizDerecesiHesaplaOrtak(
+    const ambiguous=r.tjkAtId!==null&&stableSpeed.ambiguousIds.has(r.tjkAtId);
+    const value=r.tjkAtId===null||ambiguous?0:hizDerecesiHesaplaOrtak(
       hist,breed,race.raceDay.date,stableSpeed.index);
     return [r.no,{
       value,
-      observed:r.tjkAtId!==null &&
+      observed:r.tjkAtId!==null && !ambiguous &&
         speedObservedAsOf(hist,breed,race.raceDay.date,stableSpeed.index),
-      v1Observed:r.tjkAtId!==null&&hist.length>0
+      v1Observed:r.tjkAtId!==null&&!ambiguous&&hist.length>0
     }] as const;
   }));
   const v1ByNo=new Map((base.rawSources?.v1Results??[]).map(v=>[v.no,v]));
