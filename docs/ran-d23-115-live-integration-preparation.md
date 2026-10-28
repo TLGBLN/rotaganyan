@@ -13,7 +13,8 @@
 2. `ran-d23-staging.ts` reads the frozen 115-race weights, computes scores and exposes `snapshotCandidate` for a private read-only preview.
 3. `d23-snapshot-candidate.ts` deterministically binds probability/rank and coupon rank bands to one SHA256 checksum. It never writes to the DB.
 4. `d23-snapshot-candidate.test.ts` checks deterministic signatures, no duplicate runners, summed probabilities and tamper rejection.
-5. Existing `/api/admin/test-ran-d23` remains **404 in production**, EDITOR-only in preview, no persistent writes.
+5. `SmartAnalysisEditor` on this isolated branch now renders `D23AnalysisPanel`: actual 23-signal D23 ranking and per-signal contributions are visible; Save/Publish is intentionally absent. Existing published predictions are unchanged.
+6. Existing `/api/admin/test-ran-d23` remains **404 in production**, EDITOR-only in preview, no persistent writes.
 
 ## Release gates — must all be green before modifying the real analysis flow
 - Complete and validate the frozen October 22–24 external holdout: 60 eligible race IDs, paired AGF coverage, TOP-1, TOP-3, log loss, calibration and ROI; absence of test evidence is a hard blocker.
@@ -24,4 +25,4 @@
 - Review staging versus current production branch divergence. Stage a production build without alias, verify end-to-end, then promote; have known rollback ready.
 
 ## This is a preparation branch
-No Vercel production promotion, no merge to production, no DB migrations, no change to existing published predictions. The private preview and candidate checks alone **do not** constitute D23 live integration.
+No Vercel production promotion, no merge to production, no DB migrations, no change to existing published predictions. The V5 panel remains in the production branch but is no longer mounted by SmartAnalysisEditor in this preview branch. The private preview and candidate checks alone **do not** constitute D23 live integration.
