@@ -1,6 +1,6 @@
 "use client";
 
-import V5AnalysisPanel from "./V5AnalysisPanel";
+import D23AnalysisPanel from "./D23AnalysisPanel";
 import type { PedigreeRating, Prisma } from "@prisma/client";
 
 type Runner = Prisma.RunnerGetPayload<{ include: { gallops: true } }>;
@@ -36,10 +36,10 @@ type Props = {
   onSaved?: () => void;
 };
 
-export default function SmartAnalysisEditor({ raceId, runners, existingPrediction, onSaved }: Props) {
+export default function SmartAnalysisEditor({ raceId }: Props) {
   return (
     <div className="space-y-6">
-      <V5AnalysisPanel raceId={raceId} runners={runners} existingPrediction={existingPrediction} onSaved={onSaved} />
+      <D23AnalysisPanel raceId={raceId} />
     </div>
   );
 }
