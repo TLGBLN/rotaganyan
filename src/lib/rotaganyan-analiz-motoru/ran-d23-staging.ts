@@ -15,10 +15,10 @@ const BLOCKED_REASONS = raw.blockers;
 
 export function loadD23StagingModel(): FittedModel<string> {
   if ((process.env.VERCEL_ENV === "production" || (!process.env.VERCEL_ENV && process.env.NODE_ENV === "production"))) throw Error("D23_STAGING_DISABLED_IN_PRODUCTION");
-  if (raw.releaseStatus !== "BLOCKED_PENDING_LIVE_PARITY_AND_PIT_PROVENANCE" ||
+  if (raw.releaseStatus !== "BLOCKED_PENDING_PIT_HOLDOUT_ROI_SNAPSHOT" ||
       data.deploymentReady !== false || raw.independentHoldoutValidated !== false ||
       CODES.length !== 23 || new Set(CODES).size !== 23 ||
-      data.beta.length !== 46 || data.names.length !== 46 || data.nRacesTrain !== 178 ||
+      data.beta.length !== 46 || data.names.length !== 46 || data.nRacesTrain !== 115 ||
       CODES.includes("AGF") || !PACE.every(c => CODES.includes(c))) {
     throw Error("D23_INVALID_RESEARCH_ARTIFACT_CONTRACT");
   }
@@ -32,16 +32,19 @@ export function loadD23StagingModel(): FittedModel<string> {
   const payload = JSON.stringify({
     codes:CODES, names:data.names,
     beta:data.beta.map(b=>Number(b.toFixed(10))),
-    muSigma:Object.fromEntries(Object.entries(data.muSigma).sort(([a],[b])=>a<b?-1:a>b?1:0)
+    muSigma:Object.fromEntries(Object.entries(data.muSigma).sort(([a],[b])=>a.localeCompare(b))
       .map(([code,v])=>[code,{mu:Number(v.mu.toFixed(10)),
         sigma:Number(v.sigma.toFixed(10)),nObserved:v.nObserved}]))
   });
   const recomputed = createHash("sha256").update(payload).digest("hex");
-  if (recomputed !== data.weightsFingerprint) throw Error("D23_FINGERPRINT_MISMATCH");
+  if (recomputed !== data.weightsFingerprint ||
+      data.weightsFingerprint !== "fafebc0daf6734b193b05389a07b5192e775a7afd799373684e12e4e859e816c" ||
+      raw.source.frozenJournalSha256 !== "311d2bdea8fded3ae08b0c4edb02dab5e5f3469d1b1ad5befaaa78c25437d50f")
+    throw Error("D23_115_FINGERPRINT_OR_SOURCE_MISMATCH");
   const stats:FeatureStats<string> = new Map(CODES.map(code =>
     [code,data.muSigma[code as keyof typeof data.muSigma] as Stats]));
   return {beta:data.beta,names:data.names as FittedModel<string>["names"],
-    stats,nRacesUsed:178,nRacesSkipped:0,
+    stats,nRacesUsed:115,nRacesSkipped:0,
     opts:{lambda:data.lambda,learningRate:data.learningRate,iterations:data.iterations}};
 }
 
