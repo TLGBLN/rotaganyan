@@ -188,6 +188,34 @@ function coverage(sc:Sidecar,races:FrozenRow[]){
     observedShare:observed/count,winnersCovered:winnerObserved,
     winnerCoverage:winnerObserved/races.length,up,down,flat,reasons};
 }
+function stratifiedAGF(sc:Sidecar,races:FrozenRow[]){
+  const all:{first:number;delta:number}[]=[];
+  const cells:Record<string,{n:number;wins:number}>={};
+  for(const r of races){
+    for(const v of r.vectors){
+      const o=sc.races[r.raceId].runners[String(v.no)];
+      if(o.status!=="OBSERVED"||o.first===null||o.deltaPp===null)continue;
+      all.push({first:o.first,delta:o.deltaPp});
+      const band=o.first<5?"LOW_LT5":o.first<15?"MID_5_15":"HIGH_GE15";
+      const movement=o.deltaPp>=1?"UP":o.deltaPp<=-1?"DOWN":"FLAT";
+      const key=band+"_"+movement;
+      const cell=cells[key]??{n:0,wins:0};
+      cell.n++;cell.wins+=+(v.no===r.winnerNo);cells[key]=cell;
+    }
+  }
+  const n=all.length;
+  const muX=n?all.reduce((s,x)=>s+x.first,0)/n:0;
+  const muY=n?all.reduce((s,x)=>s+x.delta,0)/n:0;
+  let covariance=0,varX=0,varY=0;
+  for(const x of all){
+    covariance+=(x.first-muX)*(x.delta-muY);
+    varX+=(x.first-muX)**2;varY+=(x.delta-muY)**2;
+  }
+  return {n,pearsonStartVsDelta:varX>0&&varY>0?
+    covariance/Math.sqrt(varX*varY):null,
+    cells:Object.fromEntries(Object.entries(cells).map(([key,v])=>
+      [key,{...v,winRate:v.wins/v.n}]))};
+}
 async function main(){
   const sc=await getSidecar();
   const cov={train:coverage(sc,trainRows),dev:coverage(sc,devRows),
@@ -263,7 +291,9 @@ async function main(){
       "86 race train vs 29 race dev; small and vulnerable to chance. This is NOT deployment approval"
     ],journalSha256:SOURCE_SHA,weightsSha256:WEIGHTS_SHA,sidecarPath,
     cutoffMinutes:CUTOFF_MIN,trainRaces:86,devRaces:29,baselineParity,
-    thresholds:threshold,coverage:cov,comparison,
+    thresholds:threshold,coverage:cov,
+    agfStartStrata:{train:stratifiedAGF(sc,trainRows),dev:stratifiedAGF(sc,devRows),
+      all:stratifiedAGF(sc,rows)},comparison,
     rca:reference.outcomes.map(o=>({
       raceId:o.raceId,winnerNo:o.winnerNo,
       ranks:Object.fromEntries(evaluated.map(m=>
