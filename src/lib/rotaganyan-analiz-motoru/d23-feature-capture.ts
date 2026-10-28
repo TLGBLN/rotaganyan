@@ -5,6 +5,11 @@
  * training or publishing any future model.
  */
 import { db } from "@/lib/db";
+import { breedToIrk } from "@/lib/sire-stat-match";
+import { hizPaceIndexKur, hizDerecesiHesaplaOrtak, type HizGecmisSatir, type PaceIndex } from "@/lib/methodology/hiz-derecesi-hesapla";
+import { speedObservedAsOf } from "./feature-calculators/pit-sire-speed";
+import { computeRakGapForRace } from "@/lib/motor-v1/features/rak-rakip-gucu";
+
 import { buildUnifiedFeatureVectorsForRace } from "./feature-calculators/unified-feature-vector";
 import { calculatePaceScenario } from "./pace-scenario";
 import { loadTempoContext } from "@/lib/motor-v1/features/tempo";
@@ -14,6 +19,51 @@ import type { RunnerFeatureVector, SignalEntry } from "@/lib/motor-v1/engine/fea
 import raw from "./artifacts/ran-d23-staging-candidate.json";
 
 const CODES: readonly string[] = raw.modelArtifact.codes;
+
+/** Deterministic D23-only population, never touches V5 production source.
+ * Old source uses distinct tjkAtId without ordering; 42 identity IDs in the
+ * real database have conflicting breed. Arbitrary selection can alter almost
+ * every horse's reference speed and therefore RIVAL_GAP.
+ * Exclude mixed-breed identity IDs from benchmark, rather than guess a breed.
+ */
+type StableSpeed = {history:Map<number,HizGecmisSatir[]>;index:PaceIndex;ambiguous:number};
+let speedContext:Promise<StableSpeed>|null=null;
+export function loadD23StableSpeed():Promise<StableSpeed> {
+  if(speedContext)return speedContext;
+  const p=(async()=>{
+    const [historyRows,breedRows]=await Promise.all([
+      db.horseRaceHistoryCache.findMany({
+        select:{tjkAtId:true,rowsJson:true},orderBy:{tjkAtId:"asc"}
+      }),
+      db.runner.findMany({
+        where:{scratched:false,tjkAtId:{not:null}},
+        select:{tjkAtId:true,race:{select:{breed:true}}},orderBy:{id:"asc"}
+      })
+    ]);
+    const history=new Map<number,HizGecmisSatir[]>(
+      historyRows.map(r=>[r.tjkAtId,r.rowsJson as unknown as HizGecmisSatir[]]));
+    const breedById=new Map<number,string>();
+    const conflicts=new Set<number>();
+    for(const row of breedRows) {
+      const id=row.tjkAtId;
+      if(id==null || conflicts.has(id))continue;
+      const breed=breedToIrk(row.race.breed);
+      const prior=breedById.get(id);
+      if(prior!==undefined && prior!==breed){
+        breedById.delete(id);
+        conflicts.add(id);
+      }else breedById.set(id,breed);
+    }
+    const index=hizPaceIndexKur(history,breedById);
+    console.log("[D23_SPEED_SOURCE] version=2 excludedAmbiguous="+conflicts.size+
+      " uniqueBreedIds="+breedById.size+" buckets="+index.size);
+    return {history,index,ambiguous:conflicts.size};
+  })();
+  speedContext=p;
+  p.catch(()=>{if(speedContext===p)speedContext=null;});
+  return p;
+}
+
 
 export function smoothD23Pedigree(v:RunnerFeatureVector):RunnerFeatureVector {
   return {...v, signals:v.signals.map(s=>{
