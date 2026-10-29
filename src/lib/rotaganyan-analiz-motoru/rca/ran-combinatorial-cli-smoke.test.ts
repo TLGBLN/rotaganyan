@@ -26,7 +26,7 @@ describe("RAN 36 singles + 630 exhaustive pairs CLI integration",()=>{
         };
       });
       writeFileSync(input,JSON.stringify(fixture));
-      const env={...process.env,NODE_ENV:"test",RAN_COMBO_DATA:input,RAN_COMBO_OUT:out,
+      const env: NodeJS.ProcessEnv={...process.env,NODE_ENV:"test",RAN_COMBO_DATA:input,RAN_COMBO_OUT:out,
         RAN_COMBO_ITERATIONS:"5",RAN_COMBO_BEAM_WIDTH:"1",RAN_COMBO_MAX_SIGNALS:"3",
         RAN_COMBO_INTERACTIONS:"top50"};
       delete env.DATABASE_URL;
