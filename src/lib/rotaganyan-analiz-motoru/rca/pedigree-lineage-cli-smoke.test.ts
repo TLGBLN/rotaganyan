@@ -25,7 +25,7 @@ describe("RAN pedigree lineage CLI no-DB smoke",()=>{
         };
       });
       writeFileSync(input,JSON.stringify(rows));
-      const env={...process.env,NODE_ENV:"test",RAN_PEDIGREE_DATA:input,
+      const env: NodeJS.ProcessEnv={...process.env,NODE_ENV:"test",RAN_PEDIGREE_DATA:input,
         RAN_PEDIGREE_OUT:out,RAN_PEDIGREE_ITERATIONS:"5"};
       delete env.DATABASE_URL;
       const run=spawnSync(process.execPath,
