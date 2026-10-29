@@ -28,7 +28,7 @@ export type D23MarketObservation={
   capturedAt:string; // timestamp with explicit timezone
 };
 export type D23MarketSnapshot={
-  pool:"AGF1"|"AGF2";
+  pool:"AGF1"|"AGF2"|"POOL_UNVERIFIED";
   raceStartAt:string;
   cutoffAt:string;
   observations:D23MarketObservation[];
@@ -90,7 +90,7 @@ export function prepareD23MarketRace(race:D23MarketRace):Prepared {
   if(!race || typeof race.raceId!=="string" || !race.raceId ||
      !/^\d{4}-\d{2}-\d{2}$/.test(race.tarih) ||
      !Array.isArray(race.vectors) || race.vectors.length<2 ||
-     !race.market || !["AGF1","AGF2"].includes(race.market.pool) ||
+     !race.market || !["AGF1","AGF2","POOL_UNVERIFIED"].includes(race.market.pool) ||
      !Array.isArray(race.market.observations))
     throw Error("D23_MARKET_RACE_INVALID");
   const start=timestamp(race.market.raceStartAt,"start");
@@ -99,19 +99,24 @@ export function prepareD23MarketRace(race:D23MarketRace):Prepared {
      new Date(start+3*60*60*1000).toISOString().slice(0,10)!==race.tarih)
     throw Error("D23_MARKET_CUTOFF_OR_RACE_DAY_INVALID");
   const obs=new Map<number,D23MarketObservation>();
-  let snapshotTime:number|null=null;
+  let snapshotMin:number|null=null;
+  let snapshotMax:number|null=null;
   for(const o of race.market.observations) {
     if(!o || !Number.isSafeInteger(o.no) || o.no<=0 ||
        !Number.isFinite(o.agfPercent) || o.agfPercent<0 || o.agfPercent>100 ||
        obs.has(o.no))throw Error("D23_MARKET_OBSERVATION_INVALID_OR_DUPLICATE");
     const t=timestamp(o.capturedAt,"snapshot");
     if(t>cutoff || t>=start)throw Error("D23_MARKET_POST_CUTOFF_LEAKAGE");
-    if(snapshotTime!==null && t!==snapshotTime)
+    if(snapshotMin!==null && (Math.floor(t/60000)!==Math.floor(snapshotMin/60000)))
       throw Error("D23_MARKET_NONATOMIC_SNAPSHOT");
-    snapshotTime=t;
+    snapshotMin=snapshotMin===null?t:Math.min(snapshotMin,t);
+    snapshotMax=snapshotMax===null?t:Math.max(snapshotMax,t);
+    // Existing snapshot rows are inserted per runner, milliseconds apart.
+    // 3s is an ingestion-consistency tolerance, NEVER a betting threshold.
+    if(snapshotMax-snapshotMin>3000)throw Error("D23_MARKET_NONATOMIC_SNAPSHOT");
     obs.set(o.no,o);
   }
-  if(obs.size!==race.vectors.length || snapshotTime===null)
+  if(obs.size!==race.vectors.length || snapshotMin===null)
     throw Error("D23_MARKET_MISSING_SNAPSHOT_RUNNER");
   const ids=new Set<number>();
   const agfPercent=race.vectors.map(v=>{
