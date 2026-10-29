@@ -99,7 +99,7 @@ describe("RAN basket already-inspected DEV62 — frozen paired audit",()=>{
         chosen:{codes:a.artifact.codes},
         confirmedBaskets:[{codes:a.artifact.codes}],
       }));
-      const env={...process.env,NODE_ENV:"test",
+      const env: NodeJS.ProcessEnv={...process.env,NODE_ENV:"test",
         RAN_DEV_AUDIT_IN:source,RAN_DEV_AUDIT_BASKET_PREFIX:prefix,
         RAN_DEV_AUDIT_OUT:out};
       delete env.DATABASE_URL;
