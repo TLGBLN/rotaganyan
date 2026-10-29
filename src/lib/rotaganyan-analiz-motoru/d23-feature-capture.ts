@@ -162,6 +162,23 @@ export async function captureD23LiveVectors(raceId:string):Promise<{
         return {...s,rawValue:speed.observed?speed.value:null,observed:speed.observed,
           missingReason:speed.observed?null:"NO_AS_OF_PACE_COMPARISON"};
       }
+      if(code==="EQUIPMENT_CHANGE") {
+        // D23 V2: four nominal states. The training encoder MUST use three
+        // one-hot columns; old signed-difference coefficients are incompatible.
+        if(!s.observed) {
+          if(s.rawValue!==null)throw Error("D23_EQUIPMENT_MISSING_RAW_NOT_NULL");
+          return {...s};
+        }
+        const state="equipmentState" in s ? s.equipmentState : undefined;
+        if(state!==0 && state!==1 && state!==2 && state!==3)
+          throw Error("D23_EQUIPMENT_FOUR_STATE_EVIDENCE_REQUIRED");
+        return {...s,rawValue:state,equipmentState:state};
+      }
+      if(code==="PACE_DUEL_SELF" || code==="PACE_STALK_DUEL" || code==="PACE_DRAW_LEAD_PRESS") {
+        // Partial rivals are observed subsets, NOT complete field evidence.
+        // Do not scale the physical pace formula by an arbitrary constant.
+        return {...s,paceRivalCoverage:{observed:p.rivalsObserved,total:physicalNos.size-1}};
+      }
       if(code==="RIVAL_GAP") {
         const gap=gaps.get(v.no);
         if(!gap)throw Error("D23_GAP_NO_RUNNER");
@@ -172,7 +189,7 @@ export async function captureD23LiveVectors(raceId:string):Promise<{
         !s.observed && s.rawValue!=null)throw Error("D23_INVALID_OBSERVATION "+code);
       return {...s};
     });
-    return {...v,signals};
+    return {...v,signals,d23FormulaVersion:"D23_FORMULAS_V2" as const};
   }).sort((a,b)=>a.no-b.no);
   if(vectors.length!==physicalNos.size ||
      vectors.some(v=>!physicalNos.has(v.no))) throw Error("D23_FIELD_INTEGRITY_FAILED");

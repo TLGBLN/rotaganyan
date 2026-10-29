@@ -76,7 +76,10 @@ export function computeFeatureStats<C extends string = SignalCode>(
   return stats;
 }
 
-export type ModelFeatureName<C extends string = SignalCode> = `${C}_z` | `${C}_missing`;
+/** Legacy encoding remains the default for V1 and all existing artifacts. */
+export type FeatureEncoding = "LEGACY_Z_MISSING" | "D23_EQUIPMENT_ONEHOT_V2";
+export type ModelFeatureName<C extends string = SignalCode> =
+  `${C}_z` | `${C}_missing` | `${C}_added` | `${C}_removed` | `${C}_both`;
 
 /** Her sinyal → [z (gözlemsizse 0), missing (0/1)]. EĞİTİM ve SKORLAMA bu fonksiyonu AYNI
  *  şekilde çağırır — iki ayrı kod yolu YOK, sözleşme sapması YAPISAL olarak İMKANSIZ.
@@ -86,13 +89,36 @@ export type ModelFeatureName<C extends string = SignalCode> = `${C}_z` | `${C}_m
  *  listesi geçmek) YAPISAL olarak İMKANSIZ hâle gelir. */
 export function toModelVector<C extends string = SignalCode>(
   fv: RunnerFeatureVector,
-  stats: FeatureStats<C>
+  stats: FeatureStats<C>,
+  encoding: FeatureEncoding = "LEGACY_Z_MISSING"
 ): { vector: number[]; names: ModelFeatureName<C>[] } {
+  // A frozen 46-coefficient D23 artifact MUST NOT silently score a new
+  // 4-state equipment vector, nor vice versa.
+  if (fv.d23FormulaVersion === "D23_FORMULAS_V2" && encoding !== "D23_EQUIPMENT_ONEHOT_V2")
+    throw new Error("D23_V2_REQUIRES_CATEGORICAL_ENCODER");
+  if (encoding === "D23_EQUIPMENT_ONEHOT_V2" && fv.d23FormulaVersion !== "D23_FORMULAS_V2")
+    throw new Error("D23_V2_REQUIRES_RECAPTURED_SOURCE");
   const vector: number[] = [];
   const names: ModelFeatureName<C>[] = [];
   for (const [code, { mu, sigma }] of stats) {
     const s = fv.signals.find((x) => x.code === code);
     const observed = !!s?.observed && s.rawValue != null && Number.isFinite(s.rawValue);
+    if (code === "EQUIPMENT_CHANGE" && encoding === "D23_EQUIPMENT_ONEHOT_V2") {
+      const state = s?.rawValue;
+      if (observed && state !== 0 && state !== 1 && state !== 2 && state !== 3)
+        throw new Error("D23_EQUIPMENT_STATE_OUT_OF_RANGE");
+      // Four states: 0=none (reference), 1=added, 2=removed, 3=both.
+      // They are NOMINAL, not ordinal! A continuous z-score is invalid.
+      vector.push(observed && state === 1 ? 1 : 0);
+      vector.push(observed && state === 2 ? 1 : 0);
+      vector.push(observed && state === 3 ? 1 : 0);
+      vector.push(observed ? 0 : 1);
+      names.push(`${code}_added` as ModelFeatureName<C>);
+      names.push(`${code}_removed` as ModelFeatureName<C>);
+      names.push(`${code}_both` as ModelFeatureName<C>);
+      names.push(`${code}_missing` as ModelFeatureName<C>);
+      continue;
+    }
     vector.push(observed ? (s!.rawValue! - mu) / (sigma || 1) : 0);
     names.push(`${code}_z` as ModelFeatureName<C>);
     vector.push(observed ? 0 : 1);
@@ -155,6 +181,8 @@ export const DEFAULT_FIT_OPTIONS: FitOptions = { lambda: 1, learningRate: 0.05, 
 
 export type FittedModel<C extends string = SignalCode> = {
   beta: number[]; names: ModelFeatureName<C>[]; stats: FeatureStats<C>; nRacesUsed: number; nRacesSkipped: number; opts: FitOptions;
+  /** Undefined means legacy encoding, retaining compatibility with saved V1 models. */
+  featureEncoding?: FeatureEncoding;
 };
 
 /** Kazananı bilinmeyen veya saha<2 olan yarışlar eğitime KATILMAZ (raceGradient bir kazanan
@@ -162,7 +190,8 @@ export type FittedModel<C extends string = SignalCode> = {
 export function fitModel<C extends string = SignalCode>(
   trainingSet: TrainingRace[],
   stats: FeatureStats<C>,
-  opts: FitOptions = DEFAULT_FIT_OPTIONS
+  opts: FitOptions = DEFAULT_FIT_OPTIONS,
+  featureEncoding: FeatureEncoding = "LEGACY_Z_MISSING"
 ): FittedModel<C> {
   let names: ModelFeatureName<C>[] = [];
   let nSkipped = 0;
@@ -173,7 +202,7 @@ export function fitModel<C extends string = SignalCode>(
       continue;
     }
     const race: TrainingRunner[] = t.vectors.map((v) => {
-      const { vector, names: n } = toModelVector(v, stats);
+      const { vector, names: n } = toModelVector(v, stats, featureEncoding);
       names = n;
       return { raceId: t.raceId, runnerId: String(v.no), winner: v.no === t.winnerNo, features: vector };
     });
@@ -185,7 +214,7 @@ export function fitModel<C extends string = SignalCode>(
   }
   const featureCount = names.length;
   const beta = races.length > 0 ? fitConditionalLogit(races, featureCount, opts) : Array(featureCount).fill(0);
-  return { beta, names, stats, nRacesUsed: races.length, nRacesSkipped: nSkipped, opts };
+  return { beta, names, stats, nRacesUsed: races.length, nRacesSkipped: nSkipped, opts, featureEncoding };
 }
 
 export type ScoredRunner = { no: number; name: string; score: number; probability: number };
@@ -195,7 +224,8 @@ export type ScoredRunner = { no: number; name: string; score: number; probabilit
  *  %100 olmalı"). */
 export function scoreRace<C extends string = SignalCode>(vectors: RunnerFeatureVector[], model: FittedModel<C>): ScoredRunner[] {
   const scored = vectors.map((v) => {
-    const { vector } = toModelVector(v, model.stats);
+    const { vector } = toModelVector(v, model.stats, model.featureEncoding ?? "LEGACY_Z_MISSING");
+    if (vector.length !== model.beta.length) throw new Error("D23_MODEL_VECTOR_DIMENSION_MISMATCH");
     return { no: v.no, name: v.name, score: dot(vector, model.beta) };
   });
   const probs = softmax(scored.map((s) => s.score));
@@ -227,19 +257,30 @@ export function explainRunner<C extends string = SignalCode>(
   fv: RunnerFeatureVector,
   model: FittedModel<C>
 ): { rows: SignalEffectRow<C>[]; totalScore: number; interactionContribution: null } {
-  const { vector } = toModelVector(fv, model.stats);
+  const { vector } = toModelVector(fv, model.stats, model.featureEncoding ?? "LEGACY_Z_MISSING");
+  if (vector.length !== model.beta.length) throw new Error("D23_EXPLAIN_DIMENSION_MISMATCH");
   const codes = [...model.stats.keys()];
-  const rows: SignalEffectRow<C>[] = codes.map((code, i) => {
-    const zIdx = i * 2;
-    const missIdx = i * 2 + 1;
+  let offset = 0;
+  const rows: SignalEffectRow<C>[] = codes.map((code) => {
+    const categorical = code === "EQUIPMENT_CHANGE" && model.featureEncoding === "D23_EQUIPMENT_ONEHOT_V2";
+    const idx = offset;
+    const missIdx = offset + (categorical ? 3 : 1);
+    offset += categorical ? 4 : 2;
     const s = fv.signals.find((x) => x.code === code);
+    const contribution = categorical
+      ? [0, 1, 2].reduce((a, j) => a + model.beta[idx + j] * vector[idx + j], 0)
+      : model.beta[idx] * vector[idx];
+    const activeCoefficient = categorical
+      ? (s?.observed && s.rawValue != null && s.rawValue >= 1 && s.rawValue <= 3
+        ? model.beta[idx + s.rawValue - 1] : 0)
+      : model.beta[idx];
     return {
       code,
       family: s?.family ?? null,
       rawValue: s?.rawValue ?? null,
-      standardizedValue: vector[zIdx],
-      learnedCoefficient: model.beta[zIdx],
-      scoreContribution: model.beta[zIdx] * vector[zIdx],
+      standardizedValue: categorical ? Number(!!s?.observed && s.rawValue !== 0) : vector[idx],
+      learnedCoefficient: activeCoefficient,
+      scoreContribution: contribution,
       missingIndicatorCoefficient: model.beta[missIdx],
       missingIndicatorContribution: model.beta[missIdx] * vector[missIdx],
       observed: !!s?.observed,

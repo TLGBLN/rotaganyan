@@ -52,6 +52,10 @@ export type SignalEntry = {
   /** Optional point-in-time support count for lineage / evidence audit.
    * Pure metadata, never used as a hidden learned feature or beta input. */
   sampleCount?: number | null;
+  /** Optional categorical equipment state; only D23 research encoder consumes this. */
+  equipmentState?: 0 | 1 | 2 | 3;
+  /** Tactical tempo rival-style evidence coverage; diagnostic, not a score. */
+  paceRivalCoverage?: { observed: number; total: number };
 };
 
 export type RunnerFeatureVector = {
@@ -63,6 +67,8 @@ export type RunnerFeatureVector = {
   signals: SignalEntry[];
   /** Explicit model-input transformation identity. Undefined = legacy source. */
   pedigreeScoringVersion?: string;
+  /** Non-legacy D23 raw formulas require matching one-hot feature encoding. */
+  d23FormulaVersion?: "D23_FORMULAS_V2";
 };
 
 export type RaceBatchContext = {

@@ -77,6 +77,8 @@ export type SafModelRawSignal = {
   missingReason: string | null;
   /** Target horse excluded, cutoff-limited historical source starts; diagnostic only. */
   sampleCount?: number | null;
+  /** D23 research only; 0=no change, 1=added, 2=removed, 3=both. V5 numeric raw unchanged. */
+  equipmentState?: 0 | 1 | 2 | 3;
 };
 
 export type SafModelRunnerSignals = {
@@ -278,7 +280,8 @@ export async function computeSafModelSignalsForRace(
       // DÜZELTME 2/6: zeminMesafeDeneyim observed artık zeminMesafeOrnekSayisi>0.
       sig("zeminMesafeDeneyim", r.zeminMesafeDeneyim, r.zeminMesafeOrnekSayisi > 0, 1, "v5-engine.ts (zemin+mesafe deneyimi, kategori bazlı)", r.zeminMesafeOrnekSayisi > 0 ? null : "aynı pist+zemin+mesafe kombinasyonunda geçmiş koşu yok"),
       sig("sonIdmanSprint", r.sonIdmanSprint, r.sonIdmanSprintGozlemli, 1, "v5-engine.ts (Gallop.track, en son galop)", r.sonIdmanSprintGozlemli ? null : "son galop kaydı yok"),
-      sig("takiDegisikligi", taki, r.takiDegisikligiGozlemli, 1, "v5-engine.ts (SonYarisDetay.eklenenTaki/cikarilanTaki)", r.takiDegisikligiGozlemli ? null : "son yarış tarihi/takı bilgisi bilinmiyor"),
+      {...sig("takiDegisikligi", taki, r.takiDegisikligiGozlemli, 1, "v5-engine.ts (SonYarisDetay.eklenenTaki/cikarilanTaki)", r.takiDegisikligiGozlemli ? null : "son yarış tarihi/takı bilgisi bilinmiyor"),
+        ...(r.takiDegisikligiGozlemli ? { equipmentState: (r.takiEklendiMi + 2 * r.takiCikarildiMi) as 0 | 1 | 2 | 3 } : {})},
       sig("yarisGidisatiSkoru", gidisat?.finalSkor ?? null, gidisat?.finalSkor != null, 1, "pace-analizi.ts::hesaplaYarisGidisati (Accurace geçmişi, taze hesap)", gidisat?.finalSkor != null ? null : "yeterli Accurace geçmişi yok"),
       sig("sireOrani", sirePctById.get(r.id) ?? null, sirePctById.get(r.id) != null, 1, "RAN-only PIT getV5461SireOzetleriForRace (exclude own horse; shrink)", sirePctById.get(r.id) != null ? null : "yarış öncesi, kendi startları hariç aygır örneklemi yok", sireSampleCountById.get(r.id) ?? null),
       sig("ACC_CLOSE_RES", cr.observed ? cr.raw : null, cr.observed, cr.reliability, "accurace/features.ts::closingResidual"),
