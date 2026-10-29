@@ -2,7 +2,8 @@ import {describe,it,expect} from "vitest";
 import type {RunnerFeatureVector} from "@/lib/motor-v1/engine/feature-vector";
 import {
   D23_CODES,fitD23Market,scoreD23Market,prepareD23MarketRace,
-  assertD23MarketModel,evaluateD23Market,type D23MarketRace,
+  assertD23MarketModel,evaluateD23Market,d23ModelFingerprint,
+  validateD23MarketArtifact,explainD23MarketRunner,type D23MarketRace,
 } from "./d23-market-model";
 
 const TS="2026-08-21T11:00:00+03:00";
@@ -57,6 +58,23 @@ describe("D23: 23 strength signals × time-frozen AGF, no hard favorite logic",(
     expect(new Set(pred.map(x=>x.regime)).size).toBeGreaterThan(0);
     expect(pred.filter(x=>x.leadingCandidate)).toHaveLength(1);
     expect(evaluateD23Market(r,model).n).toBe(3);
+    const explanation=explainD23MarketRunner(r[0],model,3);
+    const avgLog=r[0].market.observations.map(x=>Math.log(x.agfPercent));
+    const centered=avgLog[2]-avgLog.reduce((a,b)=>a+b,0)/3;
+    const score=explanation.totalScore;
+    expect(explanation.signalContributions).toHaveLength(23);
+    expect(score).toBeCloseTo(explanation.marketContribution+
+      explanation.signalContributions.reduce((a,b)=>a+b.contribution,0),12);
+    expect(explanation.marketContribution).toBeCloseTo(centered*model.combinedBeta[0],10);
+    const bundle={
+      releaseStatus:"RESEARCH_ONLY_PIT_AND_INDEPENDENT_HOLDOUT_NOT_VERIFIED",
+      model,modelFingerprint:d23ModelFingerprint(model)
+    };
+    expect(validateD23MarketArtifact(bundle)).toBe(model);
+    expect(()=>validateD23MarketArtifact({...bundle,
+      model:{...model,marketAlpha:model.marketAlpha+0.01}}))
+      .toThrow("D23_MARKET_ARTIFACT_FINGERPRINT_MISMATCH");
+
     expect(()=>scoreD23Market(r[0],{...model,combinedBeta:[...model.combinedBeta.slice(1)]}))
       .toThrow("D23_MARKET_MODEL_DIMENSION_OR_VALUE_INVALID");
   });
