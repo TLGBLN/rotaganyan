@@ -24,7 +24,7 @@ describe("RAN training recovery — offline smoke", () => {
         };
       });
       writeFileSync(input,JSON.stringify(rows));
-      const env={...process.env,
+      const env: NodeJS.ProcessEnv={...process.env,
         RAN_IN:input,RAN_MODEL_OUT:output,RAN_SPLIT_DATE:"2026-08-26",
         RAN_LAMBDA:"90",RAN_LR:"0.25",RAN_ITER:"5",NODE_ENV:"test"};
       delete env.DATABASE_URL;
