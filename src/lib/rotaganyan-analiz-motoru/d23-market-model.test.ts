@@ -94,4 +94,36 @@ describe("D23: 23 strength signals × time-frozen AGF, no hard favorite logic",(
     expect(()=>assertD23MarketModel({...model,encoding:"LEGACY_Z_MISSING" as never}))
       .toThrow("D23_MARKET_MODEL_VERSION_INVALID");
   });
+  it("expresses all four regimes without changing learned probability order",()=>{
+    const r=race("four");
+    r.vectors=[
+      vector("four",1,2,0),vector("four",2,1,0),
+      vector("four",3,0,0),vector("four",4,-2,0),
+    ];
+    r.market.observations=[
+      {no:1,agfPercent:35,capturedAt:TS},
+      {no:2,agfPercent:10,capturedAt:TS},
+      {no:3,agfPercent:40,capturedAt:TS},
+      {no:4,agfPercent:15,capturedAt:TS},
+    ];
+    const r2={...r,raceId:"four-two",vectors:r.vectors.map(v=>({...v,raceId:"four-two"}))};
+    const model=fitD23Market([r,r2],
+      {lambda:0.2,learningRate:0.02,iterations:10});
+    const idx=model.names.indexOf("SPEED_z");
+    const beta=Array(48).fill(0);
+    beta[idx]=0.6;
+    const final=Array(49).fill(0);
+    final[1+idx]=0.6;
+    const m={...model,strengthBeta:beta,marketAlpha:1,combinedBeta:final};
+    const rows=scoreD23Market(r,m);
+    const byNo=new Map(rows.map(x=>[x.no,x]));
+    expect(byNo.get(1)?.regime).toBe("BANKO_POTANSIYELI");
+    expect(byNo.get(2)?.regime).toBe("SURPRIZ_ADAYI");
+    expect(byNo.get(3)?.regime).toBe("PIYASA_FAZLA_DESTEKLIYOR");
+    expect(byNo.get(4)?.regime).toBe("NORMAL");
+    const adjusted=scoreD23Market(r,{...m,combinedBeta:[10,...Array(48).fill(0)]});
+    expect(new Map(adjusted.map(x=>[x.no,x.regime]))).toEqual(
+      new Map(rows.map(x=>[x.no,x.regime])));
+    expect(adjusted.find(x=>x.rank===1)?.no).toBe(3); // final score changes legitimately
+  });
 });
