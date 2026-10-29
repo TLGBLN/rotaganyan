@@ -1,9 +1,9 @@
 /**
  * D23 FORMULAS V2 recapture: historical mutable-DB research ONLY.
- * The 115 frozen rows are used exclusively for cohort race IDs + optional dates.
+ * The supplied frozen source is used exclusively for cohort race IDs + optional dates.
  * NEVER reuse their old signal vectors, winners, AGF, or old 46-coefficient artifact.
  *
- * RAN_D23_V2_COHORT = exact frozen journal .ndjson or JSON (115 races)
+ * RAN_D23_V2_COHORT = frozen source .ndjson or JSON (any non-empty set of unique races)
  * RAN_D23_V2_OUT = output filename, must not already exist.
  * RAN_D23_V2_CHECKPOINT = optional private progress state.
  * No DB writes. Immutable final output is SHA256-stamped. Fail closed.
@@ -21,7 +21,7 @@ type Cohort = {raceId:string; date:string|null};
 type OutputRow = {raceId:string; tarih:string; winnerNo:number; vectors:RunnerFeatureVector[]; sourceStatus:"CURRENT_DB_PIT_NOT_PROVEN"};
 const CODES=rawArtifact.modelArtifact.codes as readonly string[];
 const VERSION="D23_FORMULAS_V2";
-const OUT=process.env.RAN_D23_V2_OUT ?? "C:/tmp/ran-d23-v2-recapture-115.json";
+const OUT=process.env.RAN_D23_V2_OUT ?? "C:/tmp/ran-d23-v2-recapture.json";
 const IN=process.env.RAN_D23_V2_COHORT;
 const CK=process.env.RAN_D23_V2_CHECKPOINT ?? OUT+".checkpoint.json";
 const sha=(s:string|Buffer)=>createHash("sha256").update(s).digest("hex");
@@ -40,7 +40,7 @@ function objectsFromSource(raw:string):unknown[] {
     for(const key of ["races","rows","journal","items","data","records","samples"]) {
       if(Array.isArray(v[key]))return v[key] as unknown[];
     }
-    if(Object.values(v).length>=115 && Object.values(v).every(x=>x && typeof x==="object")) {
+    if(Object.values(v).length>=1 && Object.values(v).every(x=>x && typeof x==="object")) {
       return Object.entries(v).map(([key,value])=>({...(value as Record<string,unknown>),raceId:(value as Record<string,unknown>).raceId??key}));
     }
   }
@@ -65,7 +65,7 @@ function cohortFromSource(raw:string):Cohort[] {
       if(prior===null && normalized!==null)byId.set(id,normalized);
     } else byId.set(id,normalized);
   }
-  if(byId.size!==115)throw Error("D23_V2_COHORT_MUST_BE_EXACT_115 unique="+byId.size+" records="+records.length);
+  if(byId.size<1)throw Error("D23_V2_COHORT_EMPTY");
   return [...byId].map(([raceId,date])=>({raceId,date})).sort((a,b)=>(a.date??"").localeCompare(b.date??"")||a.raceId.localeCompare(b.raceId));
 }
 function atomicWrite(file:string,contents:string) {
@@ -94,7 +94,7 @@ function verifyVectors(raceId:string,vectors:RunnerFeatureVector[],realNos:numbe
   if(expected.size)throw Error("D23_V2_MISSING_RUNNER "+raceId);
 }
 async function main(){
-  if(!IN||!fs.existsSync(IN))throw Error("RAN_D23_V2_COHORT_REQUIRED: set RAN_D23_V2_COHORT to 115 frozen journal path");
+  if(!IN||!fs.existsSync(IN))throw Error("RAN_D23_V2_COHORT_REQUIRED: set RAN_D23_V2_COHORT to an existing frozen source path");
   if(fs.existsSync(OUT))throw Error("D23_V2_OUTPUT_ALREADY_EXISTS: choose a new filename, never overwrite");
   if(CODES.length!==23 || new Set(CODES).size!==23)throw Error("D23_V2_CANONICAL_23_FAIL");
   const sourceBytes=fs.readFileSync(IN);
@@ -123,7 +123,7 @@ async function main(){
   const failures:Record<string,string>={};
   for(let i=0;i<cohort.length;i++) {
     const {raceId,date}=cohort[i];
-    if(done[raceId]){console.log("[REUSE_CHECKPOINT] "+(i+1)+"/115 "+raceId);continue;}
+    if(done[raceId]){console.log("[REUSE_CHECKPOINT] "+(i+1)+"/"+cohort.length+" "+raceId);continue;}
     try {
       const dbRace=await db.race.findUnique({where:{id:raceId},select:{
         raceDay:{select:{date:true}},result:{select:{winnerNos:true}},
@@ -147,18 +147,18 @@ async function main(){
     }
   }
   const rows=cohort.map(x=>done[x.raceId]).filter((r):r is OutputRow=>!!r);
-  if(rows.length!==115) {
-    console.error("[BLOCK] RECAPTURE_INCOMPLETE "+rows.length+"/115 failureSummary="+JSON.stringify(failures));
-    throw Error("D23_V2_INCOMPLETE_115_CHECKPOINT_SAVED_FINAL_NOT_WRITTEN");
+  if(rows.length!==cohort.length) {
+    console.error("[BLOCK] RECAPTURE_INCOMPLETE "+rows.length+"/"+cohort.length+" failureSummary="+JSON.stringify(failures));
+    throw Error("D23_V2_INCOMPLETE_COHORT_CHECKPOINT_SAVED_FINAL_NOT_WRITTEN");
   }
   const dataset={meta:{formulaVersion:VERSION,featureEncoding:"D23_EQUIPMENT_ONEHOT_V2",
     sourceStatus:"CURRENT_DB_PIT_NOT_PROVEN",PIT:"NOT_VERIFIED",release:"BLOCKED",
-    originalCohortSha256:sourceSha,cohortCount:115,codes:CODES},races:rows};
+    originalCohortSha256:sourceSha,cohortCount:cohort.length,codes:CODES},races:rows};
   const bytes=JSON.stringify(dataset);
   fs.mkdirSync(path.dirname(OUT),{recursive:true});
   fs.writeFileSync(OUT,bytes,{flag:"wx"});
   fs.writeFileSync(OUT+".sha256",sha(bytes)+"  "+path.basename(OUT)+"\n",{flag:"wx"});
-  console.log("[DONE] RECAPTURE=115/115 SIGNALS=23 ENCODING=48 SHA256="+sha(bytes));
+  console.log("[DONE] RECAPTURE="+cohort.length+"/"+cohort.length+" SIGNALS=23 ENCODING=48 SHA256="+sha(bytes));
   console.log("[OUTPUT] "+OUT+" [RESEARCH_ONLY] [PIT_NOT_VERIFIED] [NO_DB_WRITE]");
 }
 main().catch(e=>{console.error("[RAN_D23_V2_FAIL]",e instanceof Error?e.message:String(e));process.exitCode=1;})
