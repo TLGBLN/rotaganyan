@@ -27,6 +27,7 @@
 - `src/lib/rotaganyan-analiz-motoru/d23-market-model.ts`: sabit sürüm kontrolü, veri doğrulama, yeniden kullanılan conditional logit, final skor, dört açıklama durumu, eşleştirilmiş performans ölçümü.
 - `src/lib/rotaganyan-analiz-motoru/d23-market-model.test.ts`: rakip sırası, düşük-AGF liderin birinci olabilmesi, tek anlık görüntü, sızıntı, eski sürüm engeli.
 - `arac-ran-d23-market-train.mts`: JSON'lar üzerinde salt-okunur eğitim, yarış günü bazlı train/dev ayrımı, üç referansın Top1/Top3/LogLoss kıyası, çıktıda SHA256.
+- `arac-ran-d23-market-score.mts`: eğitimden çıkan modelin fingerprint'ini doğrular, tek yarışa skor ve AGF + 23 kaynak sinyal katkısını JSON'a yazar (araştırma, kaydet/yayınla yok).
 - `BASLAT-D23-MODEL.ps1`: TypeScript ve testlerden sonra eğitim.
 - `arac-ran-d23-v2-recapture.mts`: **eski 46 katsayı / eski journal özelliklerini kullanmaksızın** D23 formül V2 ham veri yeniden üretimi.
 
