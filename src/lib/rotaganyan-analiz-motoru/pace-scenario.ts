@@ -51,7 +51,16 @@ export function calculatePaceScenario(horses: readonly PaceHorse[]): {
   const n=horses.length;
   const cleaned=horses.map(h=>({...h,style:validStyle(h.style)?h.style:null}));
   const observed=cleaned.filter(h=>h.style);
-  const observedDraws=cleaned.filter(h=>Number.isInteger(h.startNo) && h.startNo!>=1 && h.startNo!<=n).length;
+  // Scratched horses leave gaps in the start-gate numbering. A valid gate can
+  // exceed active field size: never mistake it for missing evidence.
+  const gates=cleaned.map(h=>h.startNo).filter((x):x is number=>
+    typeof x==="number" && Number.isSafeInteger(x) && x>=1);
+  if(new Set(gates).size!==gates.length)throw Error("PACE_DUPLICATE_START_GATE");
+  const observedDraws=gates.length;
+  // Relative layout of the OBSERVED start gates, not a claimed physical
+  // first-turn geometry or a synthetic consecutive n-horse stall assignment.
+  const maxGate=gates.length>=2?Math.max(...gates):null;
+  const gateScale=maxGate!==null && maxGate>1?maxGate-1:null;
   const top=observed.map(h=>h.style![0]).sort((a,b)=>b-a);
   const k=observed.length;
   // Structural indices only; not calibrated probabilities or assumed real pace outcomes.
@@ -63,8 +72,8 @@ export function calculatePaceScenario(horses: readonly PaceHorse[]): {
     const s=h.style;
     const rivals=cleaned.filter(x=>x.no!==h.no && x.style);
     const mean=rivals.length?rivals.reduce((a,x)=>a+x.style![0],0)/rivals.length:null;
-    const draw=Number.isInteger(h.startNo) && h.startNo!>=1 && h.startNo!<=n
-      ?(h.startNo!-1)/(n-1):null;
+    const draw=gateScale!==null && Number.isSafeInteger(h.startNo) && h.startNo!>=1
+      ?(h.startNo!-1)/gateScale:null;
     const duelSelf=s && mean!==null?s[0]*mean:null;
     const stalk=s && mean!==null?(s[2]+s[3])*mean:null;
     const drawInteraction=s && mean!==null && draw!==null
@@ -87,6 +96,7 @@ export function calculatePaceScenario(horses: readonly PaceHorse[]): {
     limitations:[
       'styleVector returns tendencies, not calibrated position probabilities',
       'No verified first-turn distance, rail position, or track geometry: no geometry penalty is applied',
+      'Start-gate fraction uses max observed valid gate, not count of active runners; unknown high scratched gates may limit accuracy',
       'Historical early-quarter position cannot guarantee future race tactics',
       'Scenario scores are non-probabilistic descriptors; not direct betting or model scoring inputs',
       ...(k<n?['Missing style information for '+(n-k)+' runners; indicators use observed subset']:[]),
