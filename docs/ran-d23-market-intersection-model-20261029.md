@@ -28,6 +28,7 @@
 - `src/lib/rotaganyan-analiz-motoru/d23-market-model.test.ts`: rakip sırası, düşük-AGF liderin birinci olabilmesi, tek anlık görüntü, sızıntı, eski sürüm engeli.
 - `arac-ran-d23-market-train.mts`: JSON'lar üzerinde salt-okunur eğitim, yarış günü bazlı train/dev ayrımı, üç referansın Top1/Top3/LogLoss kıyası, çıktıda SHA256.
 - `arac-ran-d23-market-score.mts`: eğitimden çıkan modelin fingerprint'ini doğrular, tek yarışa skor ve AGF + 23 kaynak sinyal katkısını JSON'a yazar (araştırma, kaydet/yayınla yok).
+- `arac-ran-d23-market-export.mts`: veritabanındaki önceden kaydedilmiş `AgfSnapshot` değerlerini salt-okunur toplar; eksik sahaları ve AGF1/AGF2 havuz belirsizliğini açık raporlar.
 - `BASLAT-D23-MODEL.ps1`: TypeScript ve testlerden sonra eğitim.
 - `arac-ran-d23-v2-recapture.mts`: **eski 46 katsayı / eski journal özelliklerini kullanmaksızın** D23 formül V2 ham veri yeniden üretimi.
 
@@ -55,7 +56,9 @@
 ]
 ```
 
-Kurallar: tüm koşan atlar, aynı AGF havuzu, aynı zaman damgası, kesin `capturedAt <= cutoffAt < raceStartAt`; farklı havuz, canlı `Runner.agf`, eksik tarih, eksik at veya yarış sonrası zaman damgası KABUL EDİLMEZ. Girdi eksikse eğitim BAŞARISIZ olur; veri uydurulmaz.
+Kurallar: tüm koşan atlar, aynı AGF havuzu, aynı dakika içinde kayıt süresi farkı en fazla 3 saniye, kesin `capturedAt <= cutoffAt < raceStartAt`; farklı havuz, canlı `Runner.agf`, eksik tarih, eksik at veya yarış sonrası zaman damgası KABUL EDİLMEZ.
+
+**Veritabanı bulgusu (salt-okunur):** `AgfSnapshot` tablosunda tarihsel kayıtlar var. 16–29 Ağustos 2026 tarihinde 340 yarıştan 308'inde aynı dakikada tüm koşan atları kapsayan kayıt grupları saptandı (tam batch aralığı en fazla 1,688 s). Ancak şema **AGF1 veya AGF2 havuzunu kaydetmiyor**. Exporter bu nedenle `POOL_UNVERIFIED` yazıyor ve eksik kapsamda hata veriyor; bu kayıtları kesin AGF1 diye etiketlemiyor. Kullanılmadan önce havuz kaynağı doğrulanmalı. Kayıt zaman damgası tek başına PIT kanıtı değildir. Girdi eksikse eğitim BAŞARISIZ olur; veri uydurulmaz.
 
 Çalıştırma (iki dosya gerçekten mevcutsa):
 
