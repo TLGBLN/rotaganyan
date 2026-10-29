@@ -142,6 +142,8 @@ export async function buildUnifiedFeatureVectorsForRace(
           ? (v1Runner.unifiedVector.find(s=>s.code===f.sourceCode)?.coverageState ?? null)
           : null,
         sampleCount: original?.sampleCount ?? null,
+        ...(f.canonical === "EQUIPMENT_CHANGE" && original && "equipmentState" in original && original.equipmentState !== undefined
+          ? { equipmentState: original.equipmentState } : {}),
         asOfSafe: true,
         missingReason: f.observed ? null : `gözlemsiz (${f.source}:${f.sourceCode})`,
       };
