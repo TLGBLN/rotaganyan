@@ -29,7 +29,7 @@ describe("RAN v2 original 300-row archive -> offline fit -> versioned score pari
           vectors,pedigreeV2:{version:PEDIGREE_V2_VERSION,lines:{}}};
       });
       writeFileSync(source,JSON.stringify(rows));
-      const env={...process.env,NODE_ENV:"test",RAN_IN:source,RAN_MODEL_OUT:out,
+      const env: NodeJS.ProcessEnv={...process.env,NODE_ENV:"test",RAN_IN:source,RAN_MODEL_OUT:out,
         RAN_MODEL_VERSION:PEDIGREE_V2_VERSION,RAN_SPLIT_DATE:"2026-08-26",
         RAN_LAMBDA:"90",RAN_LR:"0.25",RAN_ITER:"5"};
       delete env.DATABASE_URL;
