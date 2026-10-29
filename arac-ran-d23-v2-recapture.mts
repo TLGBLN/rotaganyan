@@ -102,7 +102,9 @@ async function main(){
   const cohort=cohortFromSource(sourceBytes.toString("utf8"));
   const stamp=sha(JSON.stringify({sourceSha,cohort,version:VERSION,model:"RESEARCH_ONLY"}));
   const statePath=CK+".source.json";
-  if(fs.existsSync(CK)!==fs.existsSync(statePath))throw Error("D23_V2_UNSTAMPED_CHECKPOINT_REFUSED");
+  // A stamp may exist before the first successful race; that is safe to resume.
+  // A checkpoint without a matching stamp is NOT safe.
+  if(fs.existsSync(CK) && !fs.existsSync(statePath))throw Error("D23_V2_UNSTAMPED_CHECKPOINT_REFUSED");
   if(fs.existsSync(statePath) && fs.readFileSync(statePath,"utf8")!==stamp)
     throw Error("D23_V2_CHECKPOINT_SOURCE_MISMATCH");
   if(!fs.existsSync(statePath)) {
