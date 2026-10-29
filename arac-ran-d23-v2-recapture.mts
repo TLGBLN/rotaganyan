@@ -140,10 +140,10 @@ async function main(){
       verifyVectors(raceId,captured.vectors,noSet);
       done[raceId]={raceId,tarih:targetDate,winnerNo:winner,vectors:captured.vectors,sourceStatus:captured.sourceStatus};
       atomicWrite(CK,JSON.stringify(done));
-      console.log("[CAPTURE] "+(i+1)+"/115 OK "+targetDate+" "+raceId+" horses="+noSet.length);
+      console.log("[CAPTURE] "+(i+1)+"/"+cohort.length+" OK "+targetDate+" "+raceId+" horses="+noSet.length);
     }catch(e){
       failures[raceId]=e instanceof Error?e.message:String(e);
-      console.error("[CAPTURE] "+(i+1)+"/115 FAIL "+raceId+" "+failures[raceId].slice(0,260));
+      console.error("[CAPTURE] "+(i+1)+"/"+cohort.length+" FAIL "+raceId+" "+failures[raceId].slice(0,260));
     }
   }
   const rows=cohort.map(x=>done[x.raceId]).filter((r):r is OutputRow=>!!r);
