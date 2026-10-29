@@ -257,3 +257,39 @@ export function d23ModelFingerprint(m:D23MarketModel):string{
   assertD23MarketModel(m);
   return createHash("sha256").update(JSON.stringify(m)).digest("hex");
 }
+
+/** Fail-closed artifact reader; cannot silently load a stale/edited 46-column model. */
+export function validateD23MarketArtifact(bundle:unknown):D23MarketModel {
+  if(!bundle || typeof bundle!=="object")throw Error("D23_MARKET_ARTIFACT_INVALID");
+  const r=bundle as {releaseStatus?:string;model?:D23MarketModel;modelFingerprint?:string};
+  if(r.releaseStatus!=="RESEARCH_ONLY_PIT_AND_INDEPENDENT_HOLDOUT_NOT_VERIFIED" ||
+     !r.model || typeof r.modelFingerprint!=="string")
+    throw Error("D23_MARKET_ARTIFACT_NOT_RESEARCH_BUNDLE");
+  assertD23MarketModel(r.model);
+  if(d23ModelFingerprint(r.model)!==r.modelFingerprint)
+    throw Error("D23_MARKET_ARTIFACT_FINGERPRINT_MISMATCH");
+  return r.model;
+}
+/** Direct conditional-logit feature contributions; labels cannot alter model scoring. */
+export function explainD23MarketRunner(
+  race:D23MarketRace,m:D23MarketModel,no:number
+):{marketContribution:number;signalContributions:{code:string;contribution:number}[];
+   totalScore:number}{
+  assertD23MarketModel(m);
+  const p=prepareD23MarketRace(race);
+  const i=race.vectors.findIndex(x=>x.no===no);
+  if(i<0)throw Error("D23_MARKET_EXPLAIN_HORSE_MISSING");
+  const vec=modelVector(race.vectors[i],statsFrom(m));
+  let offset=0;
+  const signalContributions=m.codes.map(code=>{
+    const size=code==="EQUIPMENT_CHANGE"?4:2;
+    let sum=0;
+    for(let j=0;j<size;j++)sum+=vec[offset+j]*m.combinedBeta[1+offset+j];
+    offset+=size;
+    return {code,contribution:sum};
+  });
+  if(offset!==48)throw Error("D23_MARKET_EXPLAIN_DIMENSION_MISMATCH");
+  const marketContribution=p.logMarket[i]*m.combinedBeta[0];
+  const totalScore=marketContribution+signalContributions.reduce((a,b)=>a+b.contribution,0);
+  return {marketContribution,signalContributions,totalScore};
+}
