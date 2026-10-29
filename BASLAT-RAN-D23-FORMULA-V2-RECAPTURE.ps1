@@ -1,6 +1,6 @@
 param(
   [string]$SourceJournal = "",
-  [string]$Output = "C:\tmp\ran-d23-v2-recapture-115.json"
+  [string]$Output = "C:\tmp\ran-d23-v2-recapture.json"
 )
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
@@ -14,7 +14,7 @@ if (-not $SourceJournal) {
   $SourceJournal = $candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
 }
 if (-not $SourceJournal -or -not (Test-Path -LiteralPath $SourceJournal -PathType Leaf)) {
-  throw "D23 115-race original frozen journal not found. Re-run with -SourceJournal <exact path>."
+  throw "No frozen cohort found. Re-run with -SourceJournal <path to frozen JSON/NDJSON cohort of any size>."
 }
 if (-not $env:DATABASE_URL) {
   foreach ($candidate in @(
