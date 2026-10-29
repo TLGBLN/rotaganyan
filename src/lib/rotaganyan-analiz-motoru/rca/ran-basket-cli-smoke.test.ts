@@ -38,7 +38,7 @@ describe("RAN BASKET research CLI (all 36 signal families jointly refitted)",()=
         races:300,trainingRaces:238,developmentRaces:62,
         everyHorseHasThreeLineages:true,
       }));
-      const env={...process.env,NODE_ENV:"test",RAN_BASKET_IN:input,
+      const env: NodeJS.ProcessEnv={...process.env,NODE_ENV:"test",RAN_BASKET_IN:input,
         RAN_BASKET_OUT:out,RAN_BASKET_SCREEN_ITER:"5",
         RAN_BASKET_MAX_FITS:"750",RAN_BASKET_RESTARTS:"4",
         RAN_BASKET_ROUNDS:"1",RAN_BASKET_BEAM:"2",
