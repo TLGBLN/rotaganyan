@@ -8,6 +8,7 @@
  * RAN_D23_V2_CHECKPOINT = optional private progress state.
  * No DB writes. Immutable final output is SHA256-stamped. Fail closed.
  */
+import "dotenv/config";
 import fs from "node:fs";
 import {createHash} from "node:crypto";
 import path from "node:path";
