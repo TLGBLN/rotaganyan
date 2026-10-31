@@ -109,7 +109,7 @@ function ozetle(rows: Satir[]): Ozet[] {
     else entry.disinda++;
     map.set(r.tip, entry);
   }
-  return [...map.values()].sort((a, b) => b.total - a.total);
+  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, "tr"));
 }
 
 function pct(n: number, total: number): string {
