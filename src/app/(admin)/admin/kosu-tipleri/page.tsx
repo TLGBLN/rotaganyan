@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
-import { GUNCEL_MOTOR_BASLANGIC } from "@/server/services/admin.service";
+import { GUNCEL_MOTOR_BASLANGIC, normalizeClassType } from "@/server/services/admin.service";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -13,12 +13,18 @@ export const dynamic = "force-dynamic";
 // çekip hem özet tabloyu HEM de filtrelenebilir koşu listesini ondan türetir — iki farklı
 // sorgu kullanılsaydı sayılar arasında uyuşmazlık riski olurdu.
 //
-// 2026-10-31 kullanıcı düzeltmesi (2. tur): kendi normalize ettiğim/kısalttığım kategoriler
-// ("Handikap 16" gibi) İSTENMEDİ — "yarış programlarında yazan koşu tiplerine göre ayır"
-// dedi, ekran görüntüsüyle (ör. "Handikap 16/Dişi /H1") doğruladı. Artık HİÇBİR normalize/
-// gruplama yok — race.classType ham hâliyle (DB'de ve programda aynen nasıl duruyorsa) tek
-// başına ayrım anahtarı. Bu yüzden her koşu KENDİ tam tipine göre sayılır, hiçbir satır
-// "Diğer"e düşmez (ham değerin kendisi zaten bir satır).
+// 2026-10-31 kullanıcı düzeltmeleri (3 tur):
+// 1) "alt grup üst grup diye ayrım yapma kendince" — classTypeGroup (Handikap Koşuları/
+//    Şartlı Koşuları gibi aile-seviyesi üst grup) KULLANILMIYOR.
+// 2) "yarış programlarında yazan koşu tiplerine göre ayır" (ekran görüntüsü: "Handikap
+//    16/Dişi /H1") — tamamen ham classType'a geçildi, ama bu 194 ayrı satır üretti.
+// 3) "çok dağınık geldi... grup grup olsun tek başlıkta toplamıyorum" — tamamen ham
+//    (suffix'li) liste ÇOK DAĞINIK bulundu; "tek başlık" (=aile-seviyesi tek grup) da
+//    istenmiyor. Çözüm: normalizeClassType (yalnız "/Dişi", "/DHÖW", "/H1" gibi ekleri
+//    atar — "Handikap 16/Dişi /H1" → "Handikap 16") TEK SEVİYELİ anahtar olarak kullanılıyor.
+//    Her temel tip (Handikap 16, Şartlı 4, Maiden, Kısa Vade Handikap 24, KV-8, ...) kendi
+//    satırında, aile bazında BİRLEŞTİRİLMİYOR. Ham (tam) classType, filtrelenmiş koşu
+//    listesinde her satırda ayrıca gösteriliyor — "yazıldığı gibi" bilgisi kaybolmuyor.
 
 type Tier = "rank1" | "rank2_3" | "rank4_6" | "miss";
 
@@ -77,7 +83,8 @@ async function getVeri() {
       tarih: p.race.raceDay.date,
       hipodrom: p.race.raceDay.hippodrome.name,
       raceNo: p.race.raceNo,
-      tip: p.race.classType,
+      tip: normalizeClassType(p.race.classType),
+      classTypeRaw: p.race.classType,
       mesafe: p.race.distance,
       pist: SURFACE_LABEL[p.race.surface] ?? p.race.surface,
       ganyan: p.race.result?.ganyan ?? null,
@@ -141,8 +148,9 @@ export default async function KosuTipleriPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-lg font-bold">Koşu Tiplerine Göre Performans</h1>
           <p className="text-xs text-muted-foreground">
-            Güncel motor dönemi, yayınlanmış + sonuçlanmış {rows.length} tahmin — yarış
-            programında yazdığı HAM haliyle koşu tipine göre ayrılmış isabet dağılımı.
+            Güncel motor dönemi, yayınlanmış + sonuçlanmış {rows.length} tahmin — temel koşu
+            tipine göre ayrılmış isabet dağılımı (Dişi/DHÖW/H1-H2-H3 gibi ekler birleştirildi,
+            her satırın tam/ham tipi aşağıdaki koşu listesinde görünür).
           </p>
         </div>
       </div>
@@ -212,7 +220,7 @@ export default async function KosuTipleriPage({ searchParams }: PageProps) {
                         {r.hipodrom}
                         <span className="text-muted-foreground font-normal"> · {r.raceNo}. Koşu</span>
                       </span>
-                      <span className="text-xs text-muted-foreground">{r.pist} · {r.mesafe}m</span>
+                      <span className="text-xs text-muted-foreground">{r.classTypeRaw} · {r.pist} · {r.mesafe}m</span>
                     </div>
                     <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold shrink-0", TIER[r.tier].className)}>
                       {TIER[r.tier].label}
