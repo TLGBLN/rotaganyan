@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useTransition } from "react";
 import dynamic from "next/dynamic";
+import { useTheme } from "next-themes";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { cn, raceTimeForLocale } from "@/lib/utils";
@@ -432,19 +433,45 @@ function PanelKilitGate({
 // da davranış mantığı değişmedi. Paylaşılan `rankStyle` (başka panellerde de kullanılıyor)
 // kasıtlı olarak DOKUNULMADI — bu paneле özel, yerel bir renk fonksiyonu eklendi.
 const AP_GOLD = "#DF9D00";
+const AP_WINNER_LIGHT = "#C98C00";
 const AP_BG_GRADIENT = "#000712";
+const AP_BG_LIGHT = "#ffffff";
 const AP_INK = "#eef2f7";
+const AP_INK_LIGHT = "#15202b";
 const AP_INK_DIM = "#8592a6";
+const AP_INK_DIM_LIGHT = "#5b6472";
 const AP_HIT = "#2ecc71";
 const AP_MID = "#e0a72e";
 const AP_FLOOR = "#4a6fa5";
-function apBandRenk(rank: number, isWinner: boolean): string {
+function apBandRenk(rank: number, isWinner: boolean, winnerColor: string): string {
   // 2026-10-21 kullanıcı düzeltmesi: "yanlış anladın sadece kazanan gösterilsin" — altın
   // renk ARTIK yalnız GERÇEK kazanana ait, modelin 1. sırası otomatik altın OLMAZ.
-  if (isWinner) return AP_GOLD;
+  if (isWinner) return winnerColor;
   if (rank <= 3) return AP_HIT;
   if (rank <= 6) return AP_MID;
   return AP_FLOOR;
+}
+
+// 2026-11-01 kullanıcı talebi — panel artık site temasını (Açık/Koyu) takip ediyor;
+// kazanan vurgusu koyu temada #DF9D00, açık temada #C98C00. `mounted` deseni ThemeToggle.tsx
+// ile AYNI — next-themes SSR'da temayı bilemez, hydration mismatch'i önlemek için ilk
+// render'da defaultTheme ("dark") varsayılıyor.
+function useApPalette() {
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const isLight = mounted && resolvedTheme === "light";
+  return {
+    bg: isLight ? AP_BG_LIGHT : AP_BG_GRADIENT,
+    ink: isLight ? AP_INK_LIGHT : AP_INK,
+    inkDim: isLight ? AP_INK_DIM_LIGHT : AP_INK_DIM,
+    winner: isLight ? AP_WINNER_LIGHT : AP_GOLD,
+    winnerFg: "#1a1206",
+    border: isLight ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.08)",
+    borderSoft: isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)",
+    neutralBadgeBg: isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.1)",
+    winnerWash: isLight ? "rgba(201,140,0,0.14)" : "rgba(223,157,0,0.1)",
+  };
 }
 
 // 2026-10-21 — SiralamaKarti.tsx (Rotaganyan Sıralama Tablosu) BU paneli tekrar kullanıyor,
@@ -475,6 +502,7 @@ export function AnalysisPanel({
 }) {
   const t = useTranslations("programToolbar");
   const ref = useRef<HTMLDivElement>(null);
+  const pal = useApPalette();
 
   // Faz 4 yalnız en iyi 3-6 atı sıralayıp "pick" olarak kaydediyor — geri kalanı
   // (Geniş kupon) yalnız couponWide metninde numara olarak geçiyor, ayrı satır
@@ -583,7 +611,7 @@ export function AnalysisPanel({
 
   if (!isLoggedIn) {
     return (
-      <div ref={ref} className="border-t px-4 py-10 text-center" style={{ background: AP_BG_GRADIENT, color: AP_INK }}>
+      <div ref={ref} className="border-t px-4 py-10 text-center" style={{ background: pal.bg, color: pal.ink }}>
         <div className="flex flex-col items-center gap-3 text-sm">
           <span className="text-2xl">🔒</span>
           <p className="font-medium">{t("analiziGormekIcinUye")}</p>
@@ -602,10 +630,10 @@ export function AnalysisPanel({
 
   if (!isVerified) {
     return (
-      <div ref={ref} className="border-t" style={{ background: AP_BG_GRADIENT }}>
+      <div ref={ref} className="border-t" style={{ background: pal.bg }}>
         <div className="px-4 py-2.5 border-b flex items-center gap-2" style={{ borderColor: "rgba(223,157,0,0.22)" }}>
           <BarChart3 className="h-4 w-4" style={{ color: AP_GOLD }} />
-          <span className="text-sm font-bold tracking-wide" style={{ color: AP_INK }}>{t("analizDetaylari")}</span>
+          <span className="text-sm font-bold tracking-wide" style={{ color: pal.ink }}>{t("analizDetaylari")}</span>
         </div>
         <EmailVerificationGate email={userEmail} />
       </div>
@@ -613,11 +641,11 @@ export function AnalysisPanel({
   }
 
   return (
-    <div ref={ref} className="border-t overflow-hidden" style={{ background: AP_BG_GRADIENT }}>
+    <div ref={ref} className="border-t overflow-hidden" style={{ background: pal.bg }}>
       {/* Başlık — PuanTablosu.tsx ile aynı marka dili */}
       <div className="px-4 py-2.5 border-b flex items-center gap-2" style={{ borderColor: "rgba(223,157,0,0.22)" }}>
         <BarChart3 className="h-4 w-4" style={{ color: AP_GOLD }} />
-        <span className="text-sm font-bold tracking-wide" style={{ color: AP_INK }}>Analiz Detayları</span>
+        <span className="text-sm font-bold tracking-wide" style={{ color: pal.ink }}>Analiz Detayları</span>
       </div>
 
       {/* Masaüstü tablo — Kilit Gerekçe sütunu kaldırıldıktan sonra "At" tek esnek sütun kaldı;
@@ -629,7 +657,7 @@ export function AnalysisPanel({
       <div className="hidden sm:flex overflow-x-auto">
         <table className="w-full max-w-xl shrink-0 text-xs">
           <thead>
-            <tr className="border-b text-[11px]" style={{ borderColor: "rgba(255,255,255,0.08)", color: AP_INK_DIM }}>
+            <tr className="border-b text-[11px]" style={{ borderColor: pal.border, color: pal.inkDim }}>
               <th className="px-2 py-2 text-center w-8">{t("sira")}</th>
               <th className="px-2 py-2 text-center w-8">{t("no")}</th>
               <th className="px-2 py-2 text-left">{t("at")}</th>
@@ -647,7 +675,7 @@ export function AnalysisPanel({
               const displayRank = rowIdx + 1;
               const winnerPick = rowPicks.find((p) => p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no));
               const isWinner = winnerPick != null;
-              const renk = apBandRenk(displayRank, isWinner);
+              const renk = apBandRenk(displayRank, isWinner, pal.winner);
               // 2026-10-21 kullanıcı düzeltmesi: "yanlış anladın sadece kazanan gösterilsin"
               // — altın rozet/satır arka planı YALNIZ gerçek yarış kazananına ait, modelin
               // 1. sırası (displayRank===1) artık ayrıca altın OLMAZ.
@@ -662,28 +690,28 @@ export function AnalysisPanel({
                 <tr
                   key={first.rank}
                   className="border-b last:border-0"
-                  style={{ borderColor: "rgba(255,255,255,0.06)", background: isGoldRow ? "rgba(223,157,0,0.1)" : "transparent" }}
+                  style={{ borderColor: pal.borderSoft, background: isGoldRow ? pal.winnerWash : "transparent" }}
                 >
                   <td className="px-2 py-2 text-center">
                     <span
                       className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold"
-                      style={{ background: isGoldRow ? AP_GOLD : "rgba(255,255,255,0.1)", color: isGoldRow ? "#1a1206" : AP_INK }}
+                      style={{ background: isGoldRow ? pal.winner : pal.neutralBadgeBg, color: isGoldRow ? pal.winnerFg : pal.ink }}
                     >
                       {displayRank}
                     </span>
                   </td>
                   <td className="px-2 py-2 text-center font-mono font-bold whitespace-nowrap" style={{ color: renk }}>{noText}</td>
-                  <td className="px-2 py-2 font-semibold" style={{ color: isWinner ? AP_INK : AP_INK_DIM }}>
+                  <td className="px-2 py-2 font-semibold" style={{ color: isWinner ? pal.ink : pal.inkDim }}>
                     <span className="inline-flex items-center gap-1.5">
                       {nameText}
                       {isAdmin && agfRanks.length > 0 && (
-                        <span className="rounded bg-purple-500/20 px-1 text-[9px] font-semibold text-purple-300">
+                        <span className="rounded bg-purple-600 px-1 text-[9px] font-semibold text-white">
                           AGF {agfRanks.join("/")}.
                         </span>
                       )}
-                      {isWinner && <Trophy className="h-3 w-3 shrink-0" style={{ color: AP_GOLD }} />}
+                      {isWinner && <Trophy className="h-3 w-3 shrink-0" style={{ color: pal.winner }} />}
                       {isWinner && ganyan != null && (
-                        <span className="text-[10px] font-semibold" style={{ color: AP_GOLD }}>Gny: {ganyan.toFixed(2)}</span>
+                        <span className="text-[10px] font-semibold" style={{ color: pal.winner }}>Gny: {ganyan.toFixed(2)}</span>
                       )}
                       {isWinner && isAdmin && (
                         <>
@@ -711,7 +739,7 @@ export function AnalysisPanel({
                   </td>
                   <td className="px-2 py-2 whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
-                      <div className="relative h-1.5 w-12 shrink-0 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+                      <div className="relative h-1.5 w-12 shrink-0 overflow-hidden rounded-full" style={{ background: pal.border }}>
                         <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pct}%`, background: renk }} />
                       </div>
                       <span className="font-mono text-xs font-extrabold tabular-nums" style={{ color: renk }}>
@@ -723,11 +751,11 @@ export function AnalysisPanel({
               );
             })}
             {unpickedRunners.map((r) => (
-              <tr key={`geniş-${r.no}`} className="border-b last:border-0 opacity-50" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-                <td className="px-2 py-2 text-center" style={{ color: AP_INK_DIM }}>—</td>
-                <td className="px-2 py-2 text-center font-mono" style={{ color: AP_INK_DIM }}>{r.no}</td>
-                <td className="px-2 py-2" style={{ color: AP_INK_DIM }}>{r.name}</td>
-                <td className="px-2 py-2 text-center" style={{ color: AP_INK_DIM }}>—</td>
+              <tr key={`geniş-${r.no}`} className="border-b last:border-0 opacity-50" style={{ borderColor: pal.borderSoft }}>
+                <td className="px-2 py-2 text-center" style={{ color: pal.inkDim }}>—</td>
+                <td className="px-2 py-2 text-center font-mono" style={{ color: pal.inkDim }}>{r.no}</td>
+                <td className="px-2 py-2" style={{ color: pal.inkDim }}>{r.name}</td>
+                <td className="px-2 py-2 text-center" style={{ color: pal.inkDim }}>—</td>
               </tr>
             ))}
           </tbody>
@@ -745,8 +773,8 @@ export function AnalysisPanel({
             artık ayrık dilimler değil, "/" ile ayrılmış KÜMÜLATİF gruplar halinde gösteriliyor.
         */}
         {(picks.length > 0 || unpickedRunners.length > 0) && (
-          <div className="flex-1 min-w-[150px] border-l px-4 py-3" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-            <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: AP_INK_DIM }}>
+          <div className="flex-1 min-w-[150px] border-l px-4 py-3" style={{ borderColor: pal.border }}>
+            <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: pal.inkDim }}>
               {t("kuponOnerisi")}
             </div>
             <div className="space-y-2">
@@ -761,12 +789,12 @@ export function AnalysisPanel({
                 const tiers = [
                   { label: t("ekonomik"), color: AP_HIT, metin: parcalar.slice(0, 1).filter(Boolean).join(" / ") },
                   { label: t("normal"), color: AP_MID, metin: parcalar.slice(0, 2).filter(Boolean).join(" / ") },
-                  { label: t("genis"), color: AP_INK_DIM, metin: parcalar.slice(0, 3).filter(Boolean).join(" / ") },
+                  { label: t("genis"), color: pal.inkDim, metin: parcalar.slice(0, 3).filter(Boolean).join(" / ") },
                 ];
                 return tiers.map((tier) => (
                   <div key={tier.label} className="flex items-baseline gap-2">
                     <span className="w-14 shrink-0 text-[10px] font-bold uppercase" style={{ color: tier.color }}>{tier.label}</span>
-                    <span className="font-mono text-xs font-semibold tabular-nums" style={{ color: AP_INK }}>{tier.metin || "—"}</span>
+                    <span className="font-mono text-xs font-semibold tabular-nums" style={{ color: pal.ink }}>{tier.metin || "—"}</span>
                   </div>
                 ));
               })()}
@@ -776,13 +804,13 @@ export function AnalysisPanel({
       </div>
 
       {/* Mobil kart listesi */}
-      <div className="sm:hidden divide-y" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+      <div className="sm:hidden divide-y" style={{ borderColor: pal.border }}>
         {sortedPickRows.map((rowPicks, rowIdx) => {
           const first = rowPicks[0];
           const displayRank = rowIdx + 1;
           const winnerPick = rowPicks.find((p) => p.runner?.no != null && (winnerNos ?? []).includes(p.runner.no));
           const isWinner = winnerPick != null;
-          const renk = apBandRenk(displayRank, isWinner);
+          const renk = apBandRenk(displayRank, isWinner, pal.winner);
           // bkz. masaüstü tablodaki aynı not — altın rozet/arka plan YALNIZ gerçek kazanana ait.
           const isGoldRow = isWinner;
           const noText = rowPicks.map((p) => pickDisplay(p).no).join("-");
@@ -792,24 +820,24 @@ export function AnalysisPanel({
             .filter((n): n is number => n != null);
           const pct = Math.max(0, Math.min(100, first.score ?? Math.round(first.scoreExact ?? 0)));
           return (
-            <div key={first.rank} className="px-3 py-2.5" style={{ background: isGoldRow ? "rgba(223,157,0,0.1)" : "transparent" }}>
+            <div key={first.rank} className="px-3 py-2.5" style={{ background: isGoldRow ? pal.winnerWash : "transparent" }}>
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 <span
                   className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0"
-                  style={{ background: isGoldRow ? AP_GOLD : "rgba(255,255,255,0.1)", color: isGoldRow ? "#1a1206" : AP_INK }}
+                  style={{ background: isGoldRow ? pal.winner : pal.neutralBadgeBg, color: isGoldRow ? pal.winnerFg : pal.ink }}
                 >
                   {displayRank}
                 </span>
                 <span className="font-bold text-xs" style={{ color: renk }}>#{noText}</span>
-                <span className="font-semibold text-xs" style={{ color: isWinner ? AP_INK : AP_INK_DIM }}>{nameText}</span>
-                {isWinner && <Trophy className="h-3 w-3 shrink-0" style={{ color: AP_GOLD }} />}
+                <span className="font-semibold text-xs" style={{ color: isWinner ? pal.ink : pal.inkDim }}>{nameText}</span>
+                {isWinner && <Trophy className="h-3 w-3 shrink-0" style={{ color: pal.winner }} />}
                 {isAdmin && agfRanks.length > 0 && (
-                  <span className="rounded bg-purple-500/20 px-1 text-[9px] font-semibold text-purple-300 shrink-0">
+                  <span className="rounded bg-purple-600 px-1 text-[9px] font-semibold text-white shrink-0">
                     AGF {agfRanks.join("/")}.
                   </span>
                 )}
                 {isWinner && ganyan != null && (
-                  <span className="text-[10px] font-semibold" style={{ color: AP_GOLD }}>Gny: {ganyan.toFixed(2)}</span>
+                  <span className="text-[10px] font-semibold" style={{ color: pal.winner }}>Gny: {ganyan.toFixed(2)}</span>
                 )}
                 {isWinner && isAdmin && (
                   <>
@@ -835,7 +863,7 @@ export function AnalysisPanel({
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <div className="relative h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+                <div className="relative h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: pal.border }}>
                   <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pct}%`, background: renk }} />
                 </div>
                 <span className="shrink-0 font-mono text-xs font-extrabold tabular-nums" style={{ color: renk }}>
@@ -848,9 +876,9 @@ export function AnalysisPanel({
         {unpickedRunners.map((r) => (
           <div key={`geniş-${r.no}`} className="px-3 py-2.5 opacity-50">
             <div className="flex items-center gap-2">
-              <span className="w-5 shrink-0 text-center text-[10px] font-bold" style={{ color: AP_INK_DIM }}>—</span>
-              <span className="font-bold text-xs" style={{ color: AP_INK_DIM }}>#{r.no}</span>
-              <span className="font-semibold text-xs" style={{ color: AP_INK_DIM }}>{r.name}</span>
+              <span className="w-5 shrink-0 text-center text-[10px] font-bold" style={{ color: pal.inkDim }}>—</span>
+              <span className="font-bold text-xs" style={{ color: pal.inkDim }}>#{r.no}</span>
+              <span className="font-semibold text-xs" style={{ color: pal.inkDim }}>{r.name}</span>
             </div>
           </div>
         ))}
