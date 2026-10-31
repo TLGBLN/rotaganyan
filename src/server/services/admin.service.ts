@@ -378,7 +378,7 @@ const CONFIDENCE_LABEL: Record<string, string> = { DUSUK: "Düşük Güven", ORT
  * (her biri n=1 olan onlarca benzersiz etiket). "/" öncesindeki temel sınıfı
  * alarak gruplama ve geçmiş-eşleştirme anlamlı kalabilsin diye sadeleştirir.
  */
-function normalizeClassType(classType: string): string {
+export function normalizeClassType(classType: string): string {
   return classType.split("/")[0].trim();
 }
 
