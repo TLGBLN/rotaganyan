@@ -151,7 +151,11 @@ export async function getSiteAnatomisi(): Promise<{
     }
   }
 
-  // Sonuç senkronu (son girilen sonuç yaşı)
+  // Sonuç senkronu (son girilen sonuç yaşı) — /api/cron/result-sync yalnız TR 14:00-24:00
+  // (UTC 11-21) arası çalışıyor (vercel.json); bu pencere dışındaki saatlerde "X saat önce"
+  // tamamen beklenen bir durum, 12 saatlik sabit eşik gündüz erken saatlerde yanlış UYARI
+  // üretiyordu. Pencere kapalıyken eşik gevşetilir, yalnız gerçekten günler süren bir
+  // tıkanma (>24 saat) UYARI olarak işaretlenir.
   {
     try {
       const r = await db.result.aggregate({ _max: { enteredAt: true } });
@@ -160,11 +164,14 @@ export async function getSiteAnatomisi(): Promise<{
         organlar.push({ id: "sonuc", islev: "Sonuç senkronu", durum: "UYARI", detay: "Hiç sonuç kaydı yok", olcumMs: null });
       } else {
         const yas = Date.now() - son.getTime();
+        const utcSaat = new Date().getUTCHours();
+        const pencereAcik = utcSaat >= 11 && utcSaat <= 21;
+        const esik = pencereAcik ? 12 * SAAT : 24 * SAAT;
         organlar.push({
           id: "sonuc",
           islev: "Sonuç senkronu",
-          durum: yas > 12 * SAAT ? "UYARI" : "OK",
-          detay: `Son sonuç ${Math.round(yas / SAAT)} saat önce girildi`,
+          durum: yas > esik ? "UYARI" : "OK",
+          detay: `Son sonuç ${Math.round(yas / SAAT)} saat önce girildi${pencereAcik ? "" : " (senkron penceresi TR 14:00-24:00, şu an kapalı)"}`,
           olcumMs: null,
         });
       }
