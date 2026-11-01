@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { turkeyDateString } from "@/lib/tz";
-import { fetchTodaysAltiliResults } from "@/server/services/ingest/tjk-altili.adapter";
-import { findIkramiyeForHippodrome } from "@/lib/altili-match";
+import { fetchTodaysAltiliResults, fetchTodaysYediliGanyanSonuclari } from "@/server/services/ingest/tjk-altili.adapter";
+import { findIkramiyeForHippodrome, findYediliIkramiyeForHippodrome } from "@/lib/altili-match";
 import { verifyCronRequest } from "@/lib/cron-auth";
 
 // Gün sonunda (Türkiye saatiyle) o güne ait tüm HomeKupon kayıtlarını arşivler
@@ -24,10 +24,13 @@ export async function GET(req: NextRequest) {
 
   const activeKuponlar = await db.homeKupon.findMany({ where: { isActive: true, date } });
   const altiliResults = await fetchTodaysAltiliResults().catch(() => []);
+  const yediliResults = await fetchTodaysYediliGanyanSonuclari().catch(() => []);
 
   let archived = 0;
   for (const k of activeKuponlar) {
-    const ikramiye = findIkramiyeForHippodrome(k.hippodromeName, altiliResults);
+    const ikramiye =
+      findIkramiyeForHippodrome(k.hippodromeName, altiliResults) ??
+      findYediliIkramiyeForHippodrome(k.hippodromeName, yediliResults);
     await db.homeKupon.update({ where: { id: k.id }, data: { isActive: false, ikramiye } });
     archived++;
   }

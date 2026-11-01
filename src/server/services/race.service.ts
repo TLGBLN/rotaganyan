@@ -7,8 +7,8 @@ import { getSireStatPoolsForCombos } from "@/server/actions/sire-stat.actions";
 import { getDamStatPoolsForCombos } from "@/server/actions/dam-stat.actions";
 import { getGecCikisOzetleriForRace } from "@/server/actions/gec-cikis.actions";
 import { breedToIrk, surfaceToPist, mesafeBucket, havuzAnahtari, eslestirSireStatOzetleri, eslestirDamStatOzetleri } from "@/lib/sire-stat-match";
-import { fetchTodaysAltiliResults } from "./ingest/tjk-altili.adapter";
-import { findIkramiyeForHippodrome } from "@/lib/altili-match";
+import { fetchTodaysAltiliResults, fetchTodaysYediliGanyanSonuclari } from "./ingest/tjk-altili.adapter";
+import { findIkramiyeForHippodrome, findYediliIkramiyeForHippodrome } from "@/lib/altili-match";
 import { hesaplaYarisGidisati, type AtTempoProfili, type TekYarisStil, type TempoSenaryosu } from "@/lib/methodology/pace-analizi";
 
 /** Runner.raceStyle JSON alanından ("style" + "percent" + "veri" + "dagilim") ekranda
@@ -758,8 +758,11 @@ export async function getGecmisKazananKuponlar(limit = 20): Promise<KazananKupon
   const bugunNeedsIkramiye = results.filter((r) => r._needsIkramiye && r.date.toISOString().slice(0, 10) === turkeyDateString());
   if (bugunNeedsIkramiye.length > 0) {
     const altiliResults = await fetchTodaysAltiliResults().catch(() => []);
+    const yediliResults = await fetchTodaysYediliGanyanSonuclari().catch(() => []);
     for (const r of bugunNeedsIkramiye) {
-      const ikramiye = findIkramiyeForHippodrome(r.hippodromeName, altiliResults);
+      const ikramiye =
+        findIkramiyeForHippodrome(r.hippodromeName, altiliResults) ??
+        findYediliIkramiyeForHippodrome(r.hippodromeName, yediliResults);
       if (ikramiye) {
         r.ikramiye = ikramiye;
         await db.homeKupon.update({ where: { id: r.id }, data: { ikramiye } }).catch(() => {});
