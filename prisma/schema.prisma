@@ -774,6 +774,26 @@ model AltiliIkramiyeLog {
   @@unique([hippodromeName, date, slot])
 }
 
+// 2026-10-17 kullanıcı talebi — "Ankara 7'li ganyan 2.641,40 ₺ vermiş, bunu da yansıt sisteme".
+// Yedili Ganyan'ın gerçek (sonuçlanmış) ikramiyesi AltiliIkramiyeLog'daki ile AYNI amaçla
+// (ileride gerçek ikramiye verisi birikince kalibrasyon) ama AYRI bir modelde tutulur — Yedili
+// günde yalnız TEK pool (Altılı'nın "1./2." slotu YOK), ve havuzBuyuklugu/katsayi şimdilik
+// toplanmıyor (yalnız gerçek ikramiye — kapsam kullanıcı talebiyle sınırlı tutuldu).
+model YediliIkramiyeLog {
+  id             String   @id @default(cuid())
+  hippodromeName String // TJK'nın sehirAdi'si (ör. "Ankara")
+  date           DateTime
+  // Kazanan 7'li Ganyan kombinasyonu, TJK'nın kendi gösterim formatında (ör.
+  // "1/2,3,5,6,9/6/8/8/1,3/7" — ayak başına kazanan at no'ları, virgülle ayrılmış beraberlikler).
+  kombinasyon    String
+  // TJK'nın "7'Lİ GANYAN ... X ₺" kartından ayrıştırılan GERÇEK kombinasyon-başı ödeme.
+  gercekIkramiye Float
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([hippodromeName, date])
+}
+
 // ─── SITE SETTINGS ───────────────────────────────────────────────────────────
 
 model SiteSetting {

@@ -5,6 +5,7 @@ import { syncResultsForDate } from "@/server/services/result-sync";
 import { syncJockeyStatsFromTjk, syncTrainerStatsFromTjk } from "@/server/services/race.service";
 import { syncAccuraceForDate } from "@/server/services/accurace-sync.service";
 import { syncAltiliIkramiyeLog } from "@/server/services/altili-ikramiye-log.service";
+import { syncYediliIkramiyeLog } from "@/server/services/yedili-ikramiye-log.service";
 import { turkeyDateString } from "@/lib/tz";
 import { verifyCronRequest } from "@/lib/cron-auth";
 import { syncOwnPedigreeStats } from "@/server/services/pedigri-own-stat.service";
@@ -67,6 +68,12 @@ export async function GET(req: NextRequest) {
   // AÇMADAN (bkz. proje hafızası: Vercel Cron Kayıt Bugu) mevcut çalışan cron'a eklendi.
   after(async () => {
     await syncAltiliIkramiyeLog().catch(() => {});
+  });
+
+  // 2026-10-17 kullanıcı talebi — 7'Lİ GANYAN'ın gerçek ikramiyesi de AYNI cron'a eklendi
+  // (Vercel Cron Kayıt Bugu notuyla AYNI disiplin: yeni cron kaydı AÇILMADI).
+  after(async () => {
+    await syncYediliIkramiyeLog().catch(() => {});
   });
 
   return NextResponse.json({ ok: true, date: today });

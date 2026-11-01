@@ -233,3 +233,63 @@ export async function fetchGunlukTevziTutarlariByHipodrom(): Promise<Map<string,
   tevziCache.set(tjkDate, { data: map, expiresAt: Date.now() + TEVZI_CACHE_TTL_MS });
   return map;
 }
+
+// ─── 7'Lİ GANYAN — GERÇEK (sonuçlanmış) ikramiye (2026-10-17 kullanıcı talebi) ─────────────
+// Yedili Ganyan'ın "X ₺ vermiştir" cümlesi Altılı'nınkinden FARKLI bir sayfada/formatta:
+// AltiliSonuc sayfasında (fetchAltiliSonuc) HİÇ yok — canlı doğrulamayla bulundu (2026-10-17):
+// aynı GunlukYarisSonuclari/Sehir sayfasının (tevzi-grid'in bulunduğu sayfanın AYNISI, Era=today
+// ile) ".bahisSonucCard" kartları arasında, Yedili'nin SON ayağı olan koşunun grid'inde
+// "7'Lİ GANYAN <kombinasyon> <tutar> ₺" metni olarak geliyor (ör. "7'Lİ GANYAN
+// 1/2,3,5,6,9/6/8/8/1,3/7 2.641,40 ₺"). "7'Lİ PLASE" AYRI bir bahis türü — regex "GANYAN"
+// kelimesini ZORUNLU tutarak bunu dışlar.
+export type YediliGanyanSonuc = { sehirAdi: string; kombinasyon: string; gercekIkramiye: number };
+
+function parseYediliGanyanCard(raw: string): { kombinasyon: string; tutar: number } | null {
+  const m = raw.match(/7'L[İI]\s+GANYAN\s+(\S+)\s+([\d.,]+)\s*₺/i);
+  if (!m) return null;
+  const tutar = parseFloat(m[2].replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(tutar) ? { kombinasyon: m[1], tutar } : null;
+}
+
+async function fetchYediliGanyanSonucUncached(sehirId: number, sehirAdi: string, tjkDate: string): Promise<YediliGanyanSonuc | null> {
+  const [dd, mm, yyyy] = tjkDate.split("/");
+  const url = `${BASE}/TR/YarisSever/Info/Sehir/GunlukYarisSonuclari?SehirId=${sehirId}&QueryParameter_Tarih=${dd}%2F${mm}%2F${yyyy}&SehirAdi=${encodeURIComponent(sehirAdi)}&Era=today`;
+
+  let html: string;
+  try {
+    html = await fetchHtml(url);
+  } catch {
+    return null;
+  }
+
+  const $ = cheerio.load(html);
+  const matches: { kombinasyon: string; tutar: number }[] = [];
+  $(".bahisSonucCard").each((_, el) => {
+    const parsed = parseYediliGanyanCard(cleanText($(el).text()));
+    if (parsed) matches.push(parsed);
+  });
+  const found = matches[0] ?? null;
+  return found ? { sehirAdi, kombinasyon: found.kombinasyon, gercekIkramiye: found.tutar } : null;
+}
+
+const yediliCache = new Map<string, { data: YediliGanyanSonuc[]; expiresAt: number }>();
+const YEDILI_CACHE_TTL_MS = 120_000;
+
+/** Bugün aktif Türk hipodromları arasında 7'Lİ GANYAN'ı SONUÇLANMIŞ (gerçek ikramiyesi
+ *  açıklanmış) olanların listesini döner — koşmayan/henüz sonuçlanmamış hipodromlar listede
+ *  YER ALMAZ (uydurulmaz). */
+export async function fetchTodaysYediliGanyanSonuclari(): Promise<YediliGanyanSonuc[]> {
+  const { toTjkDate, discoverTurkishCities } = await import("./tjk-info.adapter");
+  const tjkDate = toTjkDate(new Date());
+  const cached = yediliCache.get(tjkDate);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+  const cities = await discoverTurkishCities(tjkDate);
+  const settled = await Promise.allSettled(cities.map((c) => fetchYediliGanyanSonucUncached(c.sehirId, c.sehirAdi, tjkDate)));
+  const data = settled
+    .filter((r): r is PromiseFulfilledResult<YediliGanyanSonuc | null> => r.status === "fulfilled")
+    .map((r) => r.value)
+    .filter((v): v is YediliGanyanSonuc => v !== null);
+  yediliCache.set(tjkDate, { data, expiresAt: Date.now() + YEDILI_CACHE_TTL_MS });
+  return data;
+}
