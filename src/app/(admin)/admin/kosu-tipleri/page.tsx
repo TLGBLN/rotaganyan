@@ -98,6 +98,19 @@ type Satir = Awaited<ReturnType<typeof getVeri>>[number];
 
 type Ozet = { label: string; total: number; top1: number; top3: number; top6: number; disinda: number };
 
+// 2026-11-02 kullanıcı talebi ("Şartlı 19 u maiden altına şartlı 27 yi şartlı 1 altına
+// gelecek şekilde diz") — saf alfabetik sıra "ŞARTLI 19"u ŞARTLI 1/2 arasına, "ŞARTLI 27"yi
+// ŞARTLI 2/3 arasına düşürüyordu. Bu iki tip akraba oldukları temel tipin (Maiden/ŞARTLI 1)
+// hemen altında görünmeli; geri kalan tüm tipler alfabetik sırada kalır.
+const SIRALAMA_ISTISNALARI: Record<string, string> = {
+  "ŞARTLI 19": "Maiden",
+  "ŞARTLI 27": "ŞARTLI 1",
+};
+
+function siralamaAnahtari(label: string): string {
+  return SIRALAMA_ISTISNALARI[label.toUpperCase()] ?? label;
+}
+
 function ozetle(rows: Satir[]): Ozet[] {
   const map = new Map<string, Ozet>();
   for (const r of rows) {
@@ -109,7 +122,14 @@ function ozetle(rows: Satir[]): Ozet[] {
     else entry.disinda++;
     map.set(r.tip, entry);
   }
-  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, "tr"));
+  return [...map.values()].sort((a, b) => {
+    const cmp = siralamaAnahtari(a.label).localeCompare(siralamaAnahtari(b.label), "tr");
+    if (cmp !== 0) return cmp;
+    const aExc = a.label.toUpperCase() in SIRALAMA_ISTISNALARI;
+    const bExc = b.label.toUpperCase() in SIRALAMA_ISTISNALARI;
+    if (aExc !== bExc) return aExc ? 1 : -1;
+    return a.label.localeCompare(b.label, "tr");
+  });
 }
 
 function pct(n: number, total: number): string {
