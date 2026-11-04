@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { otomatikGroupSelections, computeAllocatorTiers, zayifTipTabanlari, ZAYIF_TIP_MIN_SECIM, type AutoFillRace, LIMITS, TOLERANCES, WIDTHS } from "./kupon-auto-fill";
+import { otomatikGroupSelections, computeAllocatorTiers, zayifTipTabanlari, ZAYIF_TIP_MIN_SECIM_BY_WIDTH, type AutoFillRace, LIMITS, TOLERANCES, WIDTHS } from "./kupon-auto-fill";
 
 // 2026-10-11 — bu dosya KuponForm.tsx'ten BİREBİR aynı mantıkla taşındı (davranış
 // değişmedi); bu test hem taşımanın hem de computeAllocatorTiers'ın (publish-time RCA
@@ -51,8 +51,10 @@ describe("computeAllocatorTiers ↔ otomatikGroupSelections tutarlılığı", ()
 });
 
 // 2026-11-04 — "kaybedilen kazananlar" araştırmasının kupon optimizörüne bağlanması:
-// zayıf-10 tipte (bkz. project_kaybedilen_kazananlar_hedef_listesi) Ekonomik kademe bile
-// en az ZAYIF_TIP_MIN_SECIM at seçmeli, güçlü/bilinmeyen tiplerde davranış DEĞİŞMEMELİ.
+// zayıf-10 tipte (bkz. project_kaybedilen_kazananlar_hedef_listesi) her kademe en az
+// ZAYIF_TIP_MIN_SECIM_BY_WIDTH[width] at seçmeli, güçlü/bilinmeyen tiplerde davranış
+// DEĞİŞMEMELİ. Taban kademeyle BİRLİKTE büyür (narrow=4 < normal=6 < wide=8) — bkz.
+// aşağıdaki "kademeyle birlikte büyür" testi (gerçek canlı vaka: Handikap 17, 5. Koşu).
 describe("zayıf-tip tabanı (kaybedilen kazananlar -> optimizör köprüsü)", () => {
   // Gerçekçi 6 ayaklı (Altılı) senaryo, dar Ekonomik bütçe altında — favori-ağırlıklı
   // dağılım, tek ayaklık testlerde bütçe bolluğundan tabanın hiç tetiklenmediği
@@ -68,18 +70,33 @@ describe("zayıf-tip tabanı (kaybedilen kazananlar -> optimizör köprüsü)", 
   const classTypeOlmayanRaces: AutoFillRace[] = zayifRaces.map(({ classType: _classType, ...rest }) => rest);
 
   it("zayifTipTabanlari yalnız bilinen zayıf tipler için taban döner, classType eksikse boş", () => {
-    expect(zayifTipTabanlari(zayifRaces)).toEqual({ 1: ZAYIF_TIP_MIN_SECIM });
-    expect(zayifTipTabanlari(classTypeOlmayanRaces)).toEqual({});
+    expect(zayifTipTabanlari(zayifRaces, "narrow")).toEqual({ 1: ZAYIF_TIP_MIN_SECIM_BY_WIDTH.narrow });
+    expect(zayifTipTabanlari(zayifRaces, "wide")).toEqual({ 1: ZAYIF_TIP_MIN_SECIM_BY_WIDTH.wide });
+    expect(zayifTipTabanlari(classTypeOlmayanRaces, "narrow")).toEqual({});
   });
 
-  it("Ekonomik kademede zayıf tip en az ZAYIF_TIP_MIN_SECIM at seçer, AYNI dağılımlı güçlü tip (G1) kendi doğal (daha dar) seçimini korur", () => {
+  it("Ekonomik kademede zayıf tip en az narrow-tabanı kadar at seçer, AYNI dağılımlı güçlü tip (G1) kendi doğal (daha dar) seçimini korur", () => {
     const groupSel = otomatikGroupSelections(zayifRaces, 1.25, LIMITS, TOLERANCES);
-    expect(groupSel[1].narrow.size).toBeGreaterThanOrEqual(ZAYIF_TIP_MIN_SECIM);
+    expect(groupSel[1].narrow.size).toBeGreaterThanOrEqual(ZAYIF_TIP_MIN_SECIM_BY_WIDTH.narrow);
     // Diğer 5 ayak (G1, aynı olasılık şekli, taban YOK) paylaşımlı bütçe altında
     // tabandan daha dar seçmeli — aksi halde test anlamsız olurdu.
     for (const raceNo of [2, 3, 4, 5, 6]) {
-      expect(groupSel[raceNo].narrow.size).toBeLessThan(ZAYIF_TIP_MIN_SECIM);
+      expect(groupSel[raceNo].narrow.size).toBeLessThan(ZAYIF_TIP_MIN_SECIM_BY_WIDTH.narrow);
     }
+  });
+
+  // 2026-11-04 CANLIDA yakalanan gerçek vaka (Handikap 17, 5. Koşu, ekran görüntüsüyle
+  // bildirildi): taban TEK sabit değerken (eskiden 4, üç kademede de aynı), paylaşımlı
+  // bütçe rekabeti yüzünden Normal/Geniş'in çok daha büyük bütçesi olsa bile zayıf ayak
+  // tam tabanda DONUP KALIYORDU (ARAM SAMSAM gibi 5.+ atlar hiçbir kademede giremiyordu).
+  // Artık taban kademeyle BİRLİKTE büyüdüğü için (narrow=4 < normal=6 < wide=8), Geniş
+  // kademe en az kendi (daha yüksek) tabanını garanti etmeli — narrow'un tabanında donup
+  // kalmamalı.
+  it("zayıf tipte taban kademeyle BİRLİKTE büyür — Geniş, Ekonomik'in tabanında donup kalmaz", () => {
+    const groupSel = otomatikGroupSelections(zayifRaces, 1.25, LIMITS, TOLERANCES);
+    expect(groupSel[1].narrow.size).toBeGreaterThanOrEqual(ZAYIF_TIP_MIN_SECIM_BY_WIDTH.narrow);
+    expect(groupSel[1].normal.size).toBeGreaterThanOrEqual(ZAYIF_TIP_MIN_SECIM_BY_WIDTH.normal);
+    expect(groupSel[1].wide.size).toBeGreaterThanOrEqual(ZAYIF_TIP_MIN_SECIM_BY_WIDTH.wide);
   });
 
   // 2026-11-04 CANLIDA yakalanan gerçek bug: bir Altılı grubunda BİRDEN FAZLA ayak
@@ -109,7 +126,7 @@ describe("zayıf-tip tabanı (kaybedilen kazananlar -> optimizör köprüsü)", 
     // ortak optimizasyonun doğal sonucu. Asıl garanti edilmesi gereken: classType hiç
     // verilmezse 1. ayak için taban HİÇ uygulanmaz (zayifTipTabanlari zaten {} döner).
     const withoutClassType = otomatikGroupSelections(classTypeOlmayanRaces, 1.25, LIMITS, TOLERANCES);
-    expect(zayifTipTabanlari(classTypeOlmayanRaces)).toEqual({});
-    expect(withoutClassType[1].narrow.size).toBeLessThan(ZAYIF_TIP_MIN_SECIM);
+    expect(zayifTipTabanlari(classTypeOlmayanRaces, "narrow")).toEqual({});
+    expect(withoutClassType[1].narrow.size).toBeLessThan(ZAYIF_TIP_MIN_SECIM_BY_WIDTH.narrow);
   });
 });

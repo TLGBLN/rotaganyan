@@ -62,18 +62,26 @@ const ZAYIF_TIPLER = new Set([
   "MAIDEN", "ŞARTLI 4", "HANDIKAP 15", "HANDIKAP 16", "ŞARTLI 19",
   "HANDIKAP 14", "KV-6", "KV-7", "HANDIKAP 17", "HANDIKAP 21",
 ]);
-export const ZAYIF_TIP_MIN_SECIM = 4;
+// 2026-11-04 kullanıcı düzeltmesi (gerçek vaka: Handikap 17, 5. Koşu) — TEK sabit taban
+// (eskiden 4, üç kademede de AYNI) paylaşımlı bütçe rekabetinde "tavan" gibi davranıyordu:
+// Normal/Geniş'in çok daha büyük bütçesi olsa bile, zayıf ayak tam tabanda donup kalıyordu
+// (ARAM SAMSAM gibi 5.+ atlar hiçbir kademede giremiyordu) — kullanıcı: "her kupon tipini
+// birbirinden bağımsız hareket etmesini istiyorum, o koşu tipi riskli ise at sayısı
+// artmalı." Çözüm: taban artık kademeyle BİRLİKTE büyüyor — Ekonomik'te 4, Normal'de 6,
+// Geniş'te 8. Zincirleme (bir öncekini asla eksiltmeme) mantığı KORUNUYOR, yalnız her
+// kademenin KENDİ zayıf-tip tabanı da ayrıca her seferinde yeniden uygulanıyor.
+export const ZAYIF_TIP_MIN_SECIM_BY_WIDTH: Record<Width, number> = { narrow: 4, normal: 6, wide: 8 };
 
-/** Zayıf tiplerde Ekonomik kademenin bile en az ZAYIF_TIP_MIN_SECIM at seçmesini zorunlu
- *  kılan başlangıç tabanı — optimizeKuponAllocation'ın zaten var olan minUnitCounts
- *  girdisine (bkz. kupon-optimizer.ts) İLK kademeden itibaren uygulanır. classType
- *  verilmeyen (undefined) yarışlar hiç etkilenmez — geriye dönük tam uyumlu. */
-export function zayifTipTabanlari(races: AutoFillRace[]): Record<number, number> {
+/** Zayıf tiplerde bu kademenin en az ZAYIF_TIP_MIN_SECIM_BY_WIDTH[width] at seçmesini
+ *  zorunlu kılan taban — optimizeKuponAllocation'ın zaten var olan minUnitCounts girdisine
+ *  (bkz. kupon-optimizer.ts) HER kademede ayrı ayrı uygulanır. classType verilmeyen
+ *  (undefined) yarışlar hiç etkilenmez — geriye dönük tam uyumlu. */
+export function zayifTipTabanlari(races: AutoFillRace[], width: Width): Record<number, number> {
   const taban: Record<number, number> = {};
   for (const race of races) {
     if (!race.classType) continue;
     if (ZAYIF_TIPLER.has(normalizeClassTypeLocal(race.classType).toUpperCase())) {
-      taban[race.raceNo] = ZAYIF_TIP_MIN_SECIM;
+      taban[race.raceNo] = ZAYIF_TIP_MIN_SECIM_BY_WIDTH[width];
     }
   }
   return taban;
@@ -140,12 +148,11 @@ export function otomatikGroupSelections(
       .map((r) => ({ no: r.no, olasilik: (r.scoreExact ?? r.score ?? 0) / 100, ekuriGroup: r.ekuriGroup })),
   }));
   const sel = emptyGroupSelections(races);
-  const zayifTaban = zayifTipTabanlari(races);
   let oncekiBirimSayilari: Record<number, number> | undefined;
   for (const width of WIDTHS) {
     const effectiveLimit = limits[width] * tolerances[width];
     const maxCombinations = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
-    const girdiTaban = tabanlariBirlestir(zayifTaban, oncekiBirimSayilari);
+    const girdiTaban = tabanlariBirlestir(zayifTipTabanlari(races, width), oncekiBirimSayilari);
     const { secimler, birimSayilari } = optimizeKuponAllocation(legs, maxCombinations, girdiTaban);
     oncekiBirimSayilari = birimSayilari;
     for (const race of races) {
@@ -186,12 +193,11 @@ export function computeAllocatorTiers(
       .map((r) => ({ no: r.no, olasilik: (r.scoreExact ?? r.score ?? 0) / 100, ekuriGroup: r.ekuriGroup })),
   }));
   const tiers: AllocatorTierResult[] = [];
-  const zayifTaban = zayifTipTabanlari(races);
   let oncekiBirimSayilari: Record<number, number> | undefined;
   for (const width of WIDTHS) {
     const effectiveLimit = limits[width] * tolerances[width];
     const combinationLimit = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
-    const girdiTaban = tabanlariBirlestir(zayifTaban, oncekiBirimSayilari);
+    const girdiTaban = tabanlariBirlestir(zayifTipTabanlari(races, width), oncekiBirimSayilari);
     const result: OptimizeResult = optimizeKuponAllocation(legs, combinationLimit, girdiTaban);
     oncekiBirimSayilari = result.birimSayilari;
     tiers.push({
