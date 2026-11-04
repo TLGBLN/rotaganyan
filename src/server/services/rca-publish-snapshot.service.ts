@@ -63,7 +63,7 @@ type FetchedRunner = {
   scoreExact: number | null;
   tumSinyaller: { kod: string; hamDeger: number }[] | null;
 };
-type FetchedRace = { raceNo: number; raceId: string; runners: FetchedRunner[] };
+type FetchedRace = { raceNo: number; raceId: string; classType: string; runners: FetchedRunner[] };
 
 /** getRaceDayLegs (home-kupon.actions.ts) ile AYNI karma-aynası mantığı — bkz. yukarıdaki
  *  not. Yalnız publish'te GERÇEKTEN kapsanan raceNos için veri çeker. */
@@ -137,6 +137,7 @@ async function fetchPublishRaceData(hippodromeSlug: string, dateStr: string, rac
     return {
       raceNo: r.raceNo,
       raceId: r.id,
+      classType: r.classType,
       runners: r.runners.map((ru) => {
         const v = byRunnerId?.get(ru.id) ?? byNo?.get(ru.no) ?? null;
         return {
@@ -173,6 +174,7 @@ export async function buildPublishSnapshot(args: PublishSnapshotBuildArgs): Prom
 
   const autoFillRaces: AutoFillRace[] = races.map((r) => ({
     raceNo: r.raceNo,
+    classType: r.classType,
     runners: r.runners.map((ru) => ({ no: ru.no, scratched: ru.scratched, ekuriGroup: ru.ekuriGroup, score: null, scoreExact: ru.scoreExact })),
   }));
 

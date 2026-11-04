@@ -33,8 +33,51 @@ export const YEDILI_LIMITS: Record<Width, number> = { narrow: 500, normal: 1400,
 export const YEDILI_TOLERANCES: Record<Width, number> = { narrow: 700 / 500, normal: 1500 / 1400, wide: 3200 / 3000 };
 
 export type AutoFillRunner = { no: number; scratched: boolean; ekuriGroup: number | null; score: number | null; scoreExact: number | null };
-export type AutoFillRace = { raceNo: number; runners: AutoFillRunner[] };
+export type AutoFillRace = { raceNo: number; runners: AutoFillRunner[]; classType?: string };
 export type GroupSelections = Record<number, Record<Width, Set<number>>>;
+
+// 2026-11-04 kullanıcı kararı — "kaybedilen kazananlar" araştırması (bkz. proje hafızası:
+// zayıf-10 tipte Top3 kaçırma oranı %29-62, genel ortalamanın belirgin üstünde). Mevcut
+// ClassTypeAdviceCard bunu admin'e GÖRSEL olarak zaten gösteriyordu, ama "⚡ Otomatik
+// Doldur" optimizörü (kupon-optimizer.ts) bu bilgiyi hiç kullanmıyordu — ham model
+// olasılığını her tipte eşit güvenilir sayıp Ekonomik kademede bile çok dar seçim
+// yapabiliyordu. Bu, optimizöre YENİ bir formül eklemiyor — zaten var olan taban/zincirleme
+// mekanizmasını (bkz. kupon-optimizer.ts başındaki not, minUnitCounts) yeni bir girdiyle
+// besliyor: zayıf tiplerde Ekonomik kademe bile en az ZAYIF_TIP_MIN_SECIM at seçmek zorunda,
+// Normal/Geniş zaten bunun üzerine ekler (mevcut mantık, asla eksiltmez).
+//
+// normalizeClassType (admin.service.ts) buraya İTHAL EDİLMİYOR — o dosya `db` import eden
+// server-only bir modülün parçası; bu dosya ise hem client (KuponForm.tsx) hem server
+// (rca-publish-snapshot.service.ts) tarafından DB'siz güvenle import edilmek ÜZERE
+// tasarlanmış (bkz. dosya başı notu). Aynı tek-satırlık ayrıştırma mantığı burada
+// bağımsız olarak tekrarlanıyor.
+function normalizeClassTypeLocal(classType: string): string {
+  return classType.split("/")[0].trim();
+}
+
+// Liste [[project_hibrit_analiz_motoru_2026_11_02]]'deki NİHAİ zayıf-10 — Handikap
+// 21/14/15/16/17, Şartlı 19/4, KV-6/7, Maiden. Büyük/küçük harf farkını (TJK ham
+// verisinde tutarsız olabiliyor) ortadan kaldırmak için karşılaştırma .toUpperCase() ile.
+const ZAYIF_TIPLER = new Set([
+  "MAIDEN", "ŞARTLI 4", "HANDIKAP 15", "HANDIKAP 16", "ŞARTLI 19",
+  "HANDIKAP 14", "KV-6", "KV-7", "HANDIKAP 17", "HANDIKAP 21",
+]);
+export const ZAYIF_TIP_MIN_SECIM = 4;
+
+/** Zayıf tiplerde Ekonomik kademenin bile en az ZAYIF_TIP_MIN_SECIM at seçmesini zorunlu
+ *  kılan başlangıç tabanı — optimizeKuponAllocation'ın zaten var olan minUnitCounts
+ *  girdisine (bkz. kupon-optimizer.ts) İLK kademeden itibaren uygulanır. classType
+ *  verilmeyen (undefined) yarışlar hiç etkilenmez — geriye dönük tam uyumlu. */
+export function zayifTipTabanlari(races: AutoFillRace[]): Record<number, number> {
+  const taban: Record<number, number> = {};
+  for (const race of races) {
+    if (!race.classType) continue;
+    if (ZAYIF_TIPLER.has(normalizeClassTypeLocal(race.classType).toUpperCase())) {
+      taban[race.raceNo] = ZAYIF_TIP_MIN_SECIM;
+    }
+  }
+  return taban;
+}
 
 export function emptySelection(): Record<Width, Set<number>> {
   return { narrow: new Set(), normal: new Set(), wide: new Set() };
@@ -80,7 +123,7 @@ export function otomatikGroupSelections(
       .map((r) => ({ no: r.no, olasilik: (r.scoreExact ?? r.score ?? 0) / 100, ekuriGroup: r.ekuriGroup })),
   }));
   const sel = emptyGroupSelections(races);
-  let oncekiBirimSayilari: Record<number, number> | undefined;
+  let oncekiBirimSayilari: Record<number, number> | undefined = zayifTipTabanlari(races);
   for (const width of WIDTHS) {
     const effectiveLimit = limits[width] * tolerances[width];
     const maxCombinations = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
@@ -124,7 +167,7 @@ export function computeAllocatorTiers(
       .map((r) => ({ no: r.no, olasilik: (r.scoreExact ?? r.score ?? 0) / 100, ekuriGroup: r.ekuriGroup })),
   }));
   const tiers: AllocatorTierResult[] = [];
-  let oncekiBirimSayilari: Record<number, number> | undefined;
+  let oncekiBirimSayilari: Record<number, number> | undefined = zayifTipTabanlari(races);
   for (const width of WIDTHS) {
     const effectiveLimit = limits[width] * tolerances[width];
     const combinationLimit = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));

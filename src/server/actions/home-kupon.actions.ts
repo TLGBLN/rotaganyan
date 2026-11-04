@@ -195,6 +195,12 @@ export async function getRaceDayLegs(hippodromeSlug: string, dateStr: string) {
 
       return {
         raceNo: r.raceNo,
+        // 2026-11-04 — KuponForm'un "⚡ Otomatik Doldur"unun zayıf-tip tabanını (bkz.
+        // kupon-auto-fill.ts: zayifTipTabanlari) besleyebilmesi için eklendi. Karma
+        // yarışlarda kaynak yarışın classType'ı DEĞİL, karma yarışın kendi ham classType'ı
+        // kullanılıyor (sayfa.tsx'teki effectiveClassType mantığından farklı — burada yalnız
+        // kupon optimizörü için kaba bir tip sinyali yeterli, "—" ise zaten eşleşmeyip pas geçilir).
+        classType: r.classType,
         runners: runners.map((runner) => {
           const karmaMeta = metaByNoById.get(r.id)?.get(runner.no);
           return {

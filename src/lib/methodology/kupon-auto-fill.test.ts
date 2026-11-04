@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { otomatikGroupSelections, computeAllocatorTiers, type AutoFillRace, LIMITS, TOLERANCES, WIDTHS } from "./kupon-auto-fill";
+import { otomatikGroupSelections, computeAllocatorTiers, zayifTipTabanlari, ZAYIF_TIP_MIN_SECIM, type AutoFillRace, LIMITS, TOLERANCES, WIDTHS } from "./kupon-auto-fill";
 
 // 2026-10-11 — bu dosya KuponForm.tsx'ten BİREBİR aynı mantıkla taşındı (davranış
 // değişmedi); bu test hem taşımanın hem de computeAllocatorTiers'ın (publish-time RCA
@@ -47,5 +47,49 @@ describe("computeAllocatorTiers ↔ otomatikGroupSelections tutarlılığı", ()
       expect(normalN).toBeGreaterThanOrEqual(narrowN);
       expect(wideN).toBeGreaterThanOrEqual(normalN);
     }
+  });
+});
+
+// 2026-11-04 — "kaybedilen kazananlar" araştırmasının kupon optimizörüne bağlanması:
+// zayıf-10 tipte (bkz. project_kaybedilen_kazananlar_hedef_listesi) Ekonomik kademe bile
+// en az ZAYIF_TIP_MIN_SECIM at seçmeli, güçlü/bilinmeyen tiplerde davranış DEĞİŞMEMELİ.
+describe("zayıf-tip tabanı (kaybedilen kazananlar -> optimizör köprüsü)", () => {
+  // Gerçekçi 6 ayaklı (Altılı) senaryo, dar Ekonomik bütçe altında — favori-ağırlıklı
+  // dağılım, tek ayaklık testlerde bütçe bolluğundan tabanın hiç tetiklenmediği
+  // (yanlış-negatif) bir ilk deneme düzeltildi: 6 ayak PAYLAŞIMLI bütçe için rekabet
+  // etmeli ki taban gerçekten bir şey DEĞİŞTİRSİN.
+  const favoriAgirlikli = [80, 8, 5, 3, 2, 1, 0.6, 0.4];
+  const mkRunners = () => favoriAgirlikli.map((p, i) => ({ no: i + 1, scratched: false, ekuriGroup: null, score: null, scoreExact: p }));
+  const zayifRaces: AutoFillRace[] = [1, 2, 3, 4, 5, 6].map((raceNo) => ({
+    raceNo,
+    classType: raceNo === 1 ? "Handikap 21" : "G 1", // yalnız 1. ayak zayıf tip (ZAYIF_TIPLER'de)
+    runners: mkRunners(),
+  }));
+  const classTypeOlmayanRaces: AutoFillRace[] = zayifRaces.map(({ classType: _classType, ...rest }) => rest);
+
+  it("zayifTipTabanlari yalnız bilinen zayıf tipler için taban döner, classType eksikse boş", () => {
+    expect(zayifTipTabanlari(zayifRaces)).toEqual({ 1: ZAYIF_TIP_MIN_SECIM });
+    expect(zayifTipTabanlari(classTypeOlmayanRaces)).toEqual({});
+  });
+
+  it("Ekonomik kademede zayıf tip en az ZAYIF_TIP_MIN_SECIM at seçer, AYNI dağılımlı güçlü tip (G1) kendi doğal (daha dar) seçimini korur", () => {
+    const groupSel = otomatikGroupSelections(zayifRaces, 1.25, LIMITS, TOLERANCES);
+    expect(groupSel[1].narrow.size).toBeGreaterThanOrEqual(ZAYIF_TIP_MIN_SECIM);
+    // Diğer 5 ayak (G1, aynı olasılık şekli, taban YOK) paylaşımlı bütçe altında
+    // tabandan daha dar seçmeli — aksi halde test anlamsız olurdu.
+    for (const raceNo of [2, 3, 4, 5, 6]) {
+      expect(groupSel[raceNo].narrow.size).toBeLessThan(ZAYIF_TIP_MIN_SECIM);
+    }
+  });
+
+  it("classType verilmeyen (eski/eksik veri) senaryoda zayıf-tip tabanı HİÇ tetiklenmez", () => {
+    // DP ORTAK bütçeyi optimize ettiği için (bkz. kupon-optimizer.ts başı) bir ayağın
+    // tabanı genişleyince PAYLAŞILAN bütçeden diğer ayaklara az kalır — yani G1 ayakları
+    // (2-6) classType'lı/classType'sız senaryoda BİREBİR aynı kalmayabilir, bu bug değil,
+    // ortak optimizasyonun doğal sonucu. Asıl garanti edilmesi gereken: classType hiç
+    // verilmezse 1. ayak için taban HİÇ uygulanmaz (zayifTipTabanlari zaten {} döner).
+    const withoutClassType = otomatikGroupSelections(classTypeOlmayanRaces, 1.25, LIMITS, TOLERANCES);
+    expect(zayifTipTabanlari(classTypeOlmayanRaces)).toEqual({});
+    expect(withoutClassType[1].narrow.size).toBeLessThan(ZAYIF_TIP_MIN_SECIM);
   });
 });

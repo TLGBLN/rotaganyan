@@ -33,7 +33,9 @@ type Hippodrome = { id: string; name: string; slug: string };
 type RaceRunner = { no: number; name: string; scratched: boolean; ekuriGroup: number | null; score: number | null; scoreExact: number | null; agfSirasi: number | null };
 type RaceDayData = {
   hippodromeName: string;
-  races: { raceNo: number; runners: RaceRunner[] }[];
+  // 2026-11-04 — "⚡ Otomatik Doldur"un zayıf-tip tabanını uygulayabilmesi için eklendi
+  // (bkz. kupon-auto-fill.ts: zayifTipTabanlari). Optional: eski/eksik veri kırmaz.
+  races: { raceNo: number; runners: RaceRunner[]; classType?: string }[];
 };
 
 // 2026-09-05 kullanıcı bulgusu: "kuponlar birbirinden bağımsız olsun, birini
@@ -212,6 +214,14 @@ function KuponGrup({
                 <tr key={race.raceNo} className={cn("border-b last:border-0", i % 2 === 1 && "bg-muted/20")}>
                   <td className="px-3 py-3 align-top text-sm font-semibold whitespace-nowrap">
                     {race.raceNo}. Koşu
+                    {/* 2026-11-04 kullanıcı talebi ("koşuların altlarına da belirtilsin koşu
+                        tipi açıkça görülsün") — classType artık veri akışında (bkz.
+                        zayifTipTabanlari) var, burada da görünür kılındı. */}
+                    {race.classType && (
+                      <div className="mt-0.5 text-[10px] font-normal text-muted-foreground">
+                        {race.classType}
+                      </div>
+                    )}
                   </td>
                   {widths.map((width) => (
                     <td key={width} className="px-3 py-3 align-top">
