@@ -22,7 +22,6 @@ import {
   SearchCode,
   Shapes,
   BookOpen,
-  FlaskConical,
 } from "lucide-react";
 
 type NavOge = { href: string; label: string; icon: LucideIcon; exact?: boolean; grup?: string };
@@ -40,7 +39,6 @@ const NAV: NavOge[] = [
   { href: "/admin/sonuclar", label: "Sonuçlar", icon: Trophy },
   { href: "/admin/kosu-tipleri", label: "Koşu Tipleri", icon: Shapes },
   { href: "/admin/sinyal-kutugu", label: "Sinyal Kütüğü", icon: BookOpen },
-  { href: "/admin/aday-sinyaller", label: "Aday Sinyaller", icon: FlaskConical },
   { href: "/admin/jokey", label: "Jokey İstatistikleri", icon: TrendingUp },
   { href: "/admin/antrenor", label: "Antrenör İstatistikleri", icon: TrendingUp },
   { href: "/admin/kullanicilar", label: "Kullanıcılar", icon: Users },
