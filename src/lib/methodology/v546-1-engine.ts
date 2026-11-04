@@ -66,22 +66,40 @@ export interface V461Sonuc {
   warnings: string[];
 }
 
-function bandeNoktala(ad: string, raw: number | null, observed: boolean, reliability: number): V461FeatureDetay {
-  const idx = W.featureNames.indexOf(ad);
+function bandeNoktala(weights: FrozenWeights, ad: string, raw: number | null, observed: boolean, reliability: number): V461FeatureDetay {
+  const idx = weights.featureNames.indexOf(ad);
   if (idx < 0) throw new Error(`V5.46.1: bilinmeyen feature adı '${ad}' (weights.json'da yok)`);
-  const beta = W.weights[idx];
+  const beta = weights.weights[idx];
   if (!observed || raw == null) return { ad, raw: null, observed: false, reliability: 0, z: 0, beta, contribution: 0 };
-  const sd = W.stds[idx] || 1e-9;
-  const z = (raw - W.means[idx]) / sd;
+  const sd = weights.stds[idx] || 1e-9;
+  const z = (raw - weights.means[idx]) / sd;
   const contribution = reliability * z * beta;
   return { ad, raw, observed: true, reliability, z, beta, contribution };
 }
 
-const yuzeyKoduFromSurface = (s: string): Surface | null => (s === "CIM" || s === "KUM" || s === "SENTETIK" ? (s as Surface) : null);
-const breedKoduFromBreed = (b: string): Breed | null => (b === "ARAP" || b === "INGILIZ" ? (b as Breed) : null);
+// 2026-10-23 P1 düzeltmesi (kullanıcı talebi — Saf Model'i GERÇEK, bağımsız eğitilmiş bir
+// 16-özellikli model yapmak): ham sinyal toplama mantığı scoreV461'den AYRIŞTIRILDI ki hem
+// scoreV461 (19 özellik, frozen W) hem yeni scoreV461Saf (16 özellik, AGF'siz, KENDİ W'si)
+// AYNI üretim-doğrulanmış ham veriyi kullansın — kopya/sürüklenme riski YOK. scoreV461'in
+// DAVRANIŞI bu refaktörle DEĞİŞMEDİ (aynı hesap, yalnız iki fonksiyona bölündü).
+export type RawSinyalGirdi = { ad: string; raw: number | null; observed: boolean; reliability: number; evidenceObserved?: boolean };
+// 2026-10-24 — styleDebug: PS ailesi (front/lone/closerFit) formul DENEYLERI icin HAM
+// stil vektorlerini (atin kendisi + rakiplerin toplami) tasir. Salt-ekleme: mevcut PS_*
+// hesaplamasini/davranisini DEGISTIRMEZ, yalnizca zaten hesaplanmis h/F degerlerini disari
+// acar (arac-*.mts deney script'leri icin) — scoreV461/A modeli bu alani hic OKUMAZ.
+export type V461RawRunner = {
+  r: Faz1RunnerV5;
+  rawSinyaller: RawSinyalGirdi[];
+  styleDebug?: { ownVec: number[] | null; rivalVec: number[] | null; ownObserved: boolean; rivalObservedCount: number; rivalMissingCount: number };
+};
+export type V461RawSonuc = { raceId: string; race: Faz1SonucV5["race"]; runners: V461RawRunner[]; warnings: string[] };
 
-/** V5.46.1 skorunu üretir. Production yazmaz, yalnız hesaplayıp döner (çağıran karar verir). */
-export async function scoreV461(raceId: string): Promise<V461Sonuc | null> {
+// 2026-10-23 P1 performans notu: accuraceKosulari() TÜM Accurace arşivini (binlerce yarış)
+// sorgular, hiç önbelleklemez — tek yarışlık canlı skorlama için kabul edilebilir ama TOPLU
+// eğitimde (yüzlerce yarış) her çağrıda yeniden çekilirse dakikalar/saatler sürer. `preloadedRuns`
+// verilirse (eğitim script'i TEK SEFERDE çeker, tüm yarışlara PAYLAŞTIRIR) bu adım atlanır —
+// VARSAYILAN (undefined) canlı/live-route davranışını AYNEN korur, geriye dönük UYUMLU.
+export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: AccuraceRun[]): Promise<V461RawSonuc | null> {
   const warnings: string[] = [];
   const faz1 = await gatherFaz1V5(raceId);
   if (!faz1 || faz1.runners.length === 0) return null;
@@ -101,10 +119,9 @@ export async function scoreV461(raceId: string): Promise<V461Sonuc | null> {
   if (!target.surface) warnings.push(`Bilinmeyen yüzey: ${faz1.race.surface}`);
   if (!raceBreed) warnings.push(`Bilinmeyen ırk: ${faz1.race.breed}`);
 
-  // Canlı Accurace: aynı offline pipeline fonksiyonları (as-of, tjkAtId ile birleştirilmiş)
   const runnerIds = faz1.runners.map((r) => r.id);
   const tjkOf = await tjkAtIdOf(runnerIds);
-  const runs = await accuraceKosulari();
+  const runs = preloadedRuns ?? (await accuraceKosulari());
   const byTjk = new Map<number, AccuraceRun[]>();
   for (const r of runs) { const a = byTjk.get(r.tjk) ?? []; a.push(r); byTjk.set(r.tjk, a); }
   const baselineAt = makeBaselineCache(runs);
@@ -116,13 +133,8 @@ export async function scoreV461(raceId: string): Promise<V461Sonuc | null> {
   };
   const styleOf = new Map<string, StyleFeature>();
   for (const r of faz1.runners) styleOf.set(r.id, styleVector(gecmisOf(r.id), target));
-  const hizGozlemli = await getHizDerecesiGozlemliForRace(raceId); // no -> boolean, V5.46'nın kendi hizByNo'suyla AYNI koşul
+  const hizGozlemli = await getHizDerecesiGozlemliForRace(raceId);
 
-  // GIDISAT: 2026-10-07 parity denetiminde bulundu — V5.46'nın canlı yolu (gatherFaz1V5)
-  // Runner.raceStyle ÖNBELLEĞİNİ okuyor (ayrı bir cron'un ürettiği, bu çağrıyla eşleşmesi
-  // GARANTİ DEĞİL); offline eğitim verisi (arac-model-veri-olustur.mts) HER SEFERİNDE TAZE
-  // hesaplıyor (fetchAccuraceGecmisKayitlari + analizEtTekYaris + hesaplaCokYarisEgilimi).
-  // V5.46.1 burada offline ile AYNI taze hesabı kullanır — V5.46/v5-engine.ts'e DOKUNULMADI.
   const accGecmis = await fetchAccuraceGecmisKayitlari(faz1.runners.map((r) => r.ad), raceDate).catch(
     () => ({ son800AccuraceKayitlari: [], son800Siblings: [] }),
   );
@@ -160,7 +172,7 @@ export async function scoreV461(raceId: string): Promise<V461Sonuc | null> {
   const gidisatSonucuV461 = hesaplaYarisGidisati(tempoProfilleri, faz1.race.distance, tempoTasimaListesi);
   const gidisatByRunnerIdV461 = new Map(faz1.runners.map((r, i) => [r.id, gidisatSonucuV461.atSonuclari[i]]));
 
-  const satirlar = faz1.runners.map((r: Faz1RunnerV5) => {
+  const runners: V461RawRunner[] = faz1.runners.map((r: Faz1RunnerV5) => {
     const gecmis = gecmisOf(r.id);
     const cr = closingResidual(gecmis, target, closingBaselineAt);
     const la = lateSegmentSpeed(gecmis, target);
@@ -175,58 +187,103 @@ export async function scoreV461(raceId: string): Promise<V461Sonuc | null> {
     const paceObserved = h.observed && F.vec != null;
 
     const taki = r.takiCikarildiMi - r.takiEklendiMi;
-    const features: V461FeatureDetay[] = [
-      bandeNoktala("agfSirasi", r.agfSirasi, true, 1),
-      bandeNoktala("agfPayi", r.agfPayi, true, 1),
-      bandeNoktala("agfPayi2", r.agfPayi * r.agfPayi, true, 1),
-      bandeNoktala("idmJokey", r.idmJokey, true, 1),
-      bandeNoktala("h2hNetSkor", r.h2hNetSkor, r.h2hKarsilastirmaSayisi > 0, 1),
-      bandeNoktala("hizDerecesi", r.hizDerecesi, hizGozlemli.get(r.no) ?? false, 1),
-      Object.assign(
-        bandeNoktala("zeminToleransi", r.zeminToleransi, true, 1),
-        { evidenceObserved: r.zeminToleransiGozlemli }
-      ),
-      bandeNoktala("zeminMesafeDeneyim", r.zeminMesafeDeneyim, true, 1),
-      bandeNoktala("yakinsama2Plus", r.yakinsama2Plus, true, 1),
-      bandeNoktala("sonIdmanSprint", r.sonIdmanSprint, r.sonIdmanSprintGozlemli, 1),
-      Object.assign(
-        bandeNoktala("takiDegisikligi", taki, true, 1),
-        { evidenceObserved: r.takiDegisikligiGozlemli }
-      ),
-      Object.assign(
-        bandeNoktala("yarisGidisatiSkoru", gidisatByRunnerIdV461.get(r.id)?.finalSkor ?? 0, true, 1),
-        { evidenceObserved: gidisatByRunnerIdV461.get(r.id)?.finalSkor != null }
-      ),
-      Object.assign(
-        bandeNoktala("sireOrani", r.sireOrani, true, 1),
-        { evidenceObserved: (r.sireOrneklemKendiVeri ?? 0) > 0 }
-      ),
-      bandeNoktala("ACC_CLOSE_RES", cr.observed ? cr.raw : null, cr.observed, cr.reliability),
-      bandeNoktala("ACC_LATE", la.observed ? la.raw : null, la.observed, la.reliability),
-      bandeNoktala("ACC_SPEED", sp.observed ? sp.raw : null, sp.observed, sp.reliability),
-      bandeNoktala("PS_front", paceObserved ? front : null, paceObserved, hR),
-      bandeNoktala("PS_lone", paceObserved ? lone : null, paceObserved, hR),
-      bandeNoktala("PS_closerFit", paceObserved ? closerFit : null, paceObserved, hR),
+    const rawSinyaller: RawSinyalGirdi[] = [
+      { ad: "agfSirasi", raw: r.agfSirasi, observed: true, reliability: 1 },
+      { ad: "agfPayi", raw: r.agfPayi, observed: true, reliability: 1 },
+      { ad: "agfPayi2", raw: r.agfPayi * r.agfPayi, observed: true, reliability: 1 },
+      { ad: "idmJokey", raw: r.idmJokey, observed: true, reliability: 1, evidenceObserved: r.galopSayisi > 0 },
+      { ad: "h2hNetSkor", raw: r.h2hNetSkor, observed: r.h2hKarsilastirmaSayisi > 0, reliability: 1 },
+      { ad: "hizDerecesi", raw: r.hizDerecesi, observed: hizGozlemli.get(r.no) ?? false, reliability: 1 },
+      { ad: "zeminToleransi", raw: r.zeminToleransi, observed: true, reliability: 1, evidenceObserved: r.zeminToleransiGozlemli },
+      { ad: "zeminMesafeDeneyim", raw: r.zeminMesafeDeneyim, observed: true, reliability: 1, evidenceObserved: r.zeminMesafeDeneyimSeviyesi !== "yok" },
+      { ad: "yakinsama2Plus", raw: r.yakinsama2Plus, observed: true, reliability: 1 },
+      { ad: "sonIdmanSprint", raw: r.sonIdmanSprint, observed: r.sonIdmanSprintGozlemli, reliability: 1 },
+      { ad: "takiDegisikligi", raw: taki, observed: true, reliability: 1, evidenceObserved: r.takiDegisikligiGozlemli },
+      { ad: "yarisGidisatiSkoru", raw: gidisatByRunnerIdV461.get(r.id)?.finalSkor ?? 0, observed: true, reliability: 1, evidenceObserved: gidisatByRunnerIdV461.get(r.id)?.finalSkor != null },
+      { ad: "sireOrani", raw: r.sireOrani, observed: true, reliability: 1, evidenceObserved: (r.sireOrneklemKendiVeri ?? 0) > 0 },
+      { ad: "ACC_CLOSE_RES", raw: cr.observed ? cr.raw : null, observed: cr.observed, reliability: cr.reliability },
+      { ad: "ACC_LATE", raw: la.observed ? la.raw : null, observed: la.observed, reliability: la.reliability },
+      { ad: "ACC_SPEED", raw: sp.observed ? sp.raw : null, observed: sp.observed, reliability: sp.reliability },
+      { ad: "PS_front", raw: paceObserved ? front : null, observed: paceObserved, reliability: hR },
+      { ad: "PS_lone", raw: paceObserved ? lone : null, observed: paceObserved, reliability: hR },
+      { ad: "PS_closerFit", raw: paceObserved ? closerFit : null, observed: paceObserved, reliability: hR },
     ];
+    return {
+      r,
+      rawSinyaller,
+      styleDebug: { ownVec: h.vec, rivalVec: F.vec, ownObserved: h.observed, rivalObservedCount: F.nObserved, rivalMissingCount: F.nMissing },
+    };
+  });
+
+  return { raceId, race: faz1.race, runners, warnings };
+}
+
+/** Ham sinyallerden (gatherV461RawSinyaller çıktısı) softmax olasılıkları + sıralı pick listesi
+ *  üretir — scoreV461 VE scoreV461Saf'ın PAYLAŞTIĞI ortak adım (kopya/sürüklenme riski yok). */
+function puanlaVeSirala(
+  weights: FrozenWeights,
+  runners: V461RawRunner[],
+  filtrele?: (ad: string) => boolean
+): { r: Faz1RunnerV5; features: V461FeatureDetay[]; score: number; probability: number; rank: number }[] {
+  const satirlar = runners.map(({ r, rawSinyaller }) => {
+    const girdi = filtrele ? rawSinyaller.filter((s) => filtrele(s.ad)) : rawSinyaller;
+    const features: V461FeatureDetay[] = girdi.map((s) => {
+      const f = bandeNoktala(weights, s.ad, s.raw, s.observed, s.reliability);
+      return s.evidenceObserved !== undefined ? Object.assign(f, { evidenceObserved: s.evidenceObserved }) : f;
+    });
     const score = features.reduce((s, f) => s + f.contribution, 0);
     return { r, features, score };
   });
-
   const max = Math.max(...satirlar.map((s) => s.score));
   const exps = satirlar.map((s) => Math.exp(s.score - max));
   const toplam = exps.reduce((a, b) => a + b, 0);
   const probs = exps.map((e) => e / toplam);
-
   const siraliIdx = satirlar.map((_, i) => i).sort((a, b) => probs[b] - probs[a]);
   const rankOf = new Map<number, number>();
   siraliIdx.forEach((idx, sira) => rankOf.set(idx, sira + 1));
+  return satirlar.map((s, i) => ({ ...s, probability: probs[i], rank: rankOf.get(i)! }));
+}
 
-  const picks: V461Pick[] = satirlar.map((s, i) => ({
-    runnerId: s.r.id, no: s.r.no, ad: s.r.ad,
-    score: s.score, probability: probs[i], rank: rankOf.get(i)!,
-    features: s.features,
-  })).sort((a, b) => a.rank - b.rank);
+const yuzeyKoduFromSurface = (s: string): Surface | null => (s === "CIM" || s === "KUM" || s === "SENTETIK" ? (s as Surface) : null);
+const breedKoduFromBreed = (b: string): Breed | null => (b === "ARAP" || b === "INGILIZ" ? (b as Breed) : null);
 
-  return { raceId, engineVersion: "V5.46.1", generatedAt: new Date().toISOString(), race: faz1.race, picks, warnings };
+/** V5.46.1 skorunu üretir. Production yazmaz, yalnız hesaplayıp döner (çağıran karar verir).
+ *  2026-10-23 refaktör: ham sinyal toplama gatherV461RawSinyaller'a taşındı, softmax/sıralama
+ *  puanlaVeSirala'ya taşındı — DAVRANIŞ DEĞİŞMEDİ (aynı girdi aynı çıktıyı üretir, parity testiyle
+ *  doğrulanmalı), yalnız Saf Model'in (scoreV461Saf) AYNI ham veriyi yeniden kullanabilmesi için
+ *  bölündü. */
+export async function scoreV461(raceId: string): Promise<V461Sonuc | null> {
+  const rawSonuc = await gatherV461RawSinyaller(raceId);
+  if (!rawSonuc) return null;
+
+  const sirali = puanlaVeSirala(W, rawSonuc.runners);
+  const picks: V461Pick[] = sirali
+    .map((s) => ({ runnerId: s.r.id, no: s.r.no, ad: s.r.ad, score: s.score, probability: s.probability, rank: s.rank, features: s.features }))
+    .sort((a, b) => a.rank - b.rank);
+
+  return { raceId, engineVersion: "V5.46.1", generatedAt: new Date().toISOString(), race: rawSonuc.race, picks, warnings: rawSonuc.warnings };
+}
+
+// 2026-10-23 P1 (kullanıcı talebi — "Gerçek Saf Model", AGF'siz BAĞIMSIZ eğitilmiş 16 özellik):
+// agfSirasi/agfPayi/agfPayi2 ham sinyal listesine HİÇ GİRMİYOR (yalnız contribution'ı
+// çıkarılmıyor — kendisi vektöre hiç dahil edilmiyor), bu yüzden Saf Model çıktısı AGF
+// değerlerinden MATEMATİKSEL OLARAK bağımsızdır (bkz. v546-1-saf-engine.test.ts). Katsayılar
+// AYRI bir dosyada (v546-1-saf-weights.json), AYRI eğitilmiş — eski 19-özellik β'ları
+// KULLANILMIYOR.
+export const SAF_MODEL_AGF_KODLARI = new Set(["agfSirasi", "agfPayi", "agfPayi2"]);
+
+export type V461SafPick = { runnerId: string; no: number; ad: string; score: number; probability: number; rank: number; features: V461FeatureDetay[] };
+export type V461SafSonuc = { raceId: string; engineVersion: string; generatedAt: string; race: Faz1SonucV5["race"]; picks: V461SafPick[]; warnings: string[] };
+
+export async function scoreV461Saf(raceId: string, safWeights: FrozenWeights): Promise<V461SafSonuc | null> {
+  const rawSonuc = await gatherV461RawSinyaller(raceId);
+  if (!rawSonuc) return null;
+
+  const sirali = puanlaVeSirala(safWeights, rawSonuc.runners, (ad) => !SAF_MODEL_AGF_KODLARI.has(ad));
+  const picks: V461SafPick[] = sirali
+    .map((s) => ({ runnerId: s.r.id, no: s.r.no, ad: s.r.ad, score: s.score, probability: s.probability, rank: s.rank, features: s.features }))
+    .sort((a, b) => a.rank - b.rank);
+
+  return { raceId, engineVersion: safWeights.version, generatedAt: new Date().toISOString(), race: rawSonuc.race, picks, warnings: rawSonuc.warnings };
 }
 

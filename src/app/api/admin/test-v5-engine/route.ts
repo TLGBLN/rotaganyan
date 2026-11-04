@@ -3,7 +3,24 @@ import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { gatherFaz1V5, hibritMaidenSatisMi } from "@/lib/methodology/v5-engine";
-import { scoreV461 } from "@/lib/methodology/v546-1-engine";
+import { scoreV461, scoreV461Saf } from "@/lib/methodology/v546-1-engine";
+import safWeightsJson from "@/lib/methodology/weights/v546-1-saf-weights.json";
+
+// 2026-10-23 P1 düzeltmesi (kullanıcı talebi — "Gerçek Saf Model"): 9 Ekim'de (commit
+// 400ec22) marketBlindProb1 hesaplaması sessizce `undefined`'a düşürülmüştü. Artık GERÇEK,
+// bağımsız eğitilmiş 16-özellik modelden (agfSirasi/agfPayi/agfPayi2 YOK — bkz.
+// arac-v5461-saf-egit-ve-karsilastir.mts) geliyor; eski 19-özellik β'larının AGF'siz
+// yeniden kullanımı DEĞİL.
+//
+// KİLİT DERLEME AŞAMASINDA DEĞİL, TAHMİN AŞAMASINDA (kullanıcı düzeltmesi, 2026-10-23):
+// weights dosyası HER ZAMAN var olur (placeholder, status="NOT_READY" iken boş dizilerle) —
+// proje bu yüzden ASLA derlenemez hale gelmez, V5.46.1 (A modeli) HER ZAMAN çalışmaya devam
+// eder. Eğitim tamamlanıp bu dosyanın ÜZERİNE status="READY" + gerçek weights/means/stds
+// yazılana kadar Saf Model aşağıda SAF_READY=false ile açıkça devre dışı kalır —
+// marketBlindProb1 sahte/eski bir değer DEĞİL, net `null` döner.
+type SafWeights = { status?: string; featureNames: string[]; weights: number[]; means: number[]; stds: number[]; version: string };
+const SAF_W = safWeightsJson as SafWeights;
+const SAF_READY = SAF_W.status === "READY" && SAF_W.featureNames.length > 0;
 import { kategoriTespit } from "@/lib/methodology/v2-engine";
 import { getJokeyFormTablosu } from "@/server/actions/jokey-form.actions";
 import { evaluateJokeyRescue, buildJokeySon30GMetni } from "@/lib/jokey-form";
@@ -31,6 +48,14 @@ async function handlePost(req: NextRequest) {
 
   const sonuc = await scoreV461(raceId);
   if (!sonuc) return NextResponse.json({ error: "V5.46.1 skor sonucu uretilemedi" }, { status: 500 });
+
+  // 2026-10-23 P1: Saf Model (AGF'siz) — scoreV461'in SKORUNU/SIRASINI hiç ETKİLEMEZ, ayrı
+  // bir çağrı. SAF_READY=false iken (eğitim tamamlanmadıysa) HİÇ ÇAĞRILMAZ — eski/sahte bir
+  // değer DÖNDÜRÜLMEZ, marketBlindProb1 aşağıda açıkça null kalır. Çağrılsa bile başarısız
+  // olursa (örn. ham sinyal eksikse) null'a düşer, production skoru/sırası ASLA buna bağımlı
+  // değildir.
+  const safSonuc = SAF_READY ? await scoreV461Saf(raceId, SAF_W as Required<SafWeights>).catch(() => null) : null;
+  const safByRunnerId = new Map((safSonuc?.picks ?? []).map((p) => [p.runnerId, p]));
 
   const sirali = [...sonuc.picks].sort((a, b) => a.rank - b.rank);
   const featureRaw = (p: (typeof sirali)[number], ad: string): number | null => p.features.find((f) => f.ad === ad)?.raw ?? null;
@@ -129,7 +154,17 @@ karar,
       olasilik: p.probability,
       probTop2: undefined,
       probTop3: undefined,
-      marketBlindProb1: undefined,
+      // 2026-10-23 P1 düzeltmesi: artık GERÇEK, bağımsız eğitilmiş Saf Model'den (bkz. SAF_W
+      // yukarıda) geliyor — undefined DEĞİL. SAF_READY=false (eğitim bitmedi) VEYA
+      // safByRunnerId.get(p.runnerId) yoksa (örn. o atın ham sinyalleri hiç gözlemsizse) null
+      // — uydurulmaz, eski/sahte değer DÖNMEZ.
+      marketBlindProb1: safByRunnerId.get(p.runnerId)?.probability ?? null,
+      safModelSirasi: safByRunnerId.get(p.runnerId)?.rank ?? null,
+      safModelVersiyon: SAF_READY ? (safSonuc?.engineVersion ?? null) : "NOT_READY",
+      safModelHesaplamaZamani: safSonuc?.generatedAt ?? null,
+      safTumSinyaller: (safByRunnerId.get(p.runnerId)?.features ?? []).map((f) => ({
+        kod: f.ad, hamDeger: f.raw, standartDeger: f.z, katki: f.contribution, observed: f.observed,
+      })),
       agfPayi: featureRaw(p, "agfPayi") ?? 0,
       agfSirasi: featureRaw(p, "agfSirasi") ?? 999,
       degerTerfisi: false,
