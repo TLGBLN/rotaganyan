@@ -79,6 +79,23 @@ export function zayifTipTabanlari(races: AutoFillRace[]): Record<number, number>
   return taban;
 }
 
+/** 2026-11-04 canlıda yakalanan bug — zayıf-tip tabanı yalnız İLK (Ekonomik) kademeye
+ *  tohum olarak veriliyordu; Ekonomik bütçe (birden fazla zayıf ayağın tabanı aynı anda
+ *  tetiklenince) bunu karşılayamayınca `oncekiBirimSayilari` sonraki kademeye Ekonomik'in
+ *  GERÇEK (düşük/boş) sonucunu taşıyordu, taban Normal/Geniş'te de kayboluyordu. Artık
+ *  HER kademede zayıf-tip tabanı, o kademenin DOĞAL zincirleme tabanıyla (bir önceki
+ *  genişliğin seçtiği miktar) birleştiriliyor — ikisinin BÜYÜK OLANI kullanılır, hiçbiri
+ *  kaybolmaz. (kupon-optimizer.ts'teki ayrı düzeltme, tek bir kademe içinde tabanların
+ *  TOPLAM bütçeyi aşmasını da ayrıca engelliyor — bu ikisi birbirini tamamlıyor.) */
+function tabanlariBirlestir(zayifTaban: Record<number, number>, zincirTaban?: Record<number, number>): Record<number, number> {
+  const birlesik: Record<number, number> = { ...zincirTaban };
+  for (const [raceNoStr, deger] of Object.entries(zayifTaban)) {
+    const raceNo = Number(raceNoStr);
+    birlesik[raceNo] = Math.max(birlesik[raceNo] ?? 0, deger);
+  }
+  return birlesik;
+}
+
 export function emptySelection(): Record<Width, Set<number>> {
   return { narrow: new Set(), normal: new Set(), wide: new Set() };
 }
@@ -123,11 +140,13 @@ export function otomatikGroupSelections(
       .map((r) => ({ no: r.no, olasilik: (r.scoreExact ?? r.score ?? 0) / 100, ekuriGroup: r.ekuriGroup })),
   }));
   const sel = emptyGroupSelections(races);
-  let oncekiBirimSayilari: Record<number, number> | undefined = zayifTipTabanlari(races);
+  const zayifTaban = zayifTipTabanlari(races);
+  let oncekiBirimSayilari: Record<number, number> | undefined;
   for (const width of WIDTHS) {
     const effectiveLimit = limits[width] * tolerances[width];
     const maxCombinations = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
-    const { secimler, birimSayilari } = optimizeKuponAllocation(legs, maxCombinations, oncekiBirimSayilari);
+    const girdiTaban = tabanlariBirlestir(zayifTaban, oncekiBirimSayilari);
+    const { secimler, birimSayilari } = optimizeKuponAllocation(legs, maxCombinations, girdiTaban);
     oncekiBirimSayilari = birimSayilari;
     for (const race of races) {
       sel[race.raceNo][width] = new Set(secimler[race.raceNo] ?? []);
@@ -167,11 +186,13 @@ export function computeAllocatorTiers(
       .map((r) => ({ no: r.no, olasilik: (r.scoreExact ?? r.score ?? 0) / 100, ekuriGroup: r.ekuriGroup })),
   }));
   const tiers: AllocatorTierResult[] = [];
-  let oncekiBirimSayilari: Record<number, number> | undefined = zayifTipTabanlari(races);
+  const zayifTaban = zayifTipTabanlari(races);
+  let oncekiBirimSayilari: Record<number, number> | undefined;
   for (const width of WIDTHS) {
     const effectiveLimit = limits[width] * tolerances[width];
     const combinationLimit = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
-    const result: OptimizeResult = optimizeKuponAllocation(legs, combinationLimit, oncekiBirimSayilari);
+    const girdiTaban = tabanlariBirlestir(zayifTaban, oncekiBirimSayilari);
+    const result: OptimizeResult = optimizeKuponAllocation(legs, combinationLimit, girdiTaban);
     oncekiBirimSayilari = result.birimSayilari;
     tiers.push({
       width,

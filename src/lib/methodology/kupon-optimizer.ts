@@ -101,6 +101,23 @@ export function optimizeKuponAllocation(
     return { raceNo: leg.raceNo, sirali, kumulatif, minN };
   });
 
+  // 2026-11-04 canlıda yakalanan bug — tabanların (minUnitCounts) HEP BİRLİKTE
+  // uygulanması bütçeyi aşarsa, DP'nin devlet uzayı daha BAŞLAMADAN boşalır (ilk ayaktan
+  // itibaren her c*n > maxCombinations olur) ve TÜM kupon boş döner — tek bir ayağın
+  // (ör. zayıf-tip tabanı birden fazla ayakta aynı anda tetiklendiğinde) yüzünden DİĞER
+  // TÜM ayaklar da seçimsiz kalıyordu. Taban bir TERCİHTİR, bütçeyi İMKANSIZ kılan bir
+  // KISIT olmamalı — bütçeye sığmayan taban ürünü, en büyük tabandan başlanarak kademeli
+  // küçültülür (hiçbiri 1'in altına inmez, DP'nin HER ZAMAN en az bir geçerli başlangıç
+  // durumu olması garanti edilir).
+  let tabanUrunu = legOptions.reduce((p, o) => p * o.minN, 1);
+  while (tabanUrunu > maxCombinations) {
+    const enBuyukTaban = legOptions.reduce((a, b) => (b.minN > a.minN ? b : a));
+    if (enBuyukTaban.minN <= 1) break; // tümü zaten 1 — bütçe ayak sayısına bile yetmiyor, ayrı bir sorun
+    tabanUrunu = Math.floor(tabanUrunu / enBuyukTaban.minN);
+    enBuyukTaban.minN -= 1;
+    tabanUrunu *= enBuyukTaban.minN;
+  }
+
   type Durum = { logOlasilik: number; secimSayilari: number[] };
   let dp = new Map<number, Durum>([[1, { logOlasilik: 0, secimSayilari: [] }]]);
 

@@ -82,6 +82,26 @@ describe("zayıf-tip tabanı (kaybedilen kazananlar -> optimizör köprüsü)", 
     }
   });
 
+  // 2026-11-04 CANLIDA yakalanan gerçek bug: bir Altılı grubunda BİRDEN FAZLA ayak
+  // zayıf tipse (ör. hepsi Maiden), tabanların çarpımı (4^6) Ekonomik bütçeyi aşıyor
+  // ve DP TÜM kuponu BOŞ döndürüyordu (bir ayağın tabanı yüzünden diğer TÜM ayaklar da
+  // seçimsiz kalıyordu) — kullanıcı ekran görüntüsüyle bildirdi ("neden ekonomik kupon
+  // hazırlamıyor"). kupon-optimizer.ts'teki taban-ürünü-kademeli-küçültme düzeltmesi
+  // bunu önlüyor: hiçbir kademe asla tamamen boş dönmemeli.
+  it("TÜM ayaklar zayıf tipse (en kötü senaryo), Ekonomik kademe ASLA tamamen boş dönmez", () => {
+    const hepsiZayif: AutoFillRace[] = [1, 2, 3, 4, 5, 6].map((raceNo) => ({
+      raceNo,
+      classType: "Maiden",
+      runners: mkRunners(),
+    }));
+    const groupSel = otomatikGroupSelections(hepsiZayif, 1.25, LIMITS, TOLERANCES);
+    for (const raceNo of [1, 2, 3, 4, 5, 6]) {
+      expect(groupSel[raceNo].narrow.size).toBeGreaterThan(0);
+      // Geniş genişlik asla dardan dar olamaz (mevcut zincirleme garantisi korunmalı).
+      expect(groupSel[raceNo].wide.size).toBeGreaterThanOrEqual(groupSel[raceNo].narrow.size);
+    }
+  });
+
   it("classType verilmeyen (eski/eksik veri) senaryoda zayıf-tip tabanı HİÇ tetiklenmez", () => {
     // DP ORTAK bütçeyi optimize ettiği için (bkz. kupon-optimizer.ts başı) bir ayağın
     // tabanı genişleyince PAYLAŞILAN bütçeden diğer ayaklara az kalır — yani G1 ayakları
