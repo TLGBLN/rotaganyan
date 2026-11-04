@@ -207,6 +207,10 @@ export type SiralamaKurali = {
   etiket: string;
   aciklama: string;
   backtestOzet: string;
+  // 2026-11-04 — "/admin/sinyal-kutugu" sayfasının yalnız V5.46.1'de GERÇEKTEN aktif olan
+  // kuralları göstermesi için eklendi (bkz. v5-engine.ts: AGF_TREND_TERFISI_AKTIF=true,
+  // AGF_FAVORI_ILK3_GARANTISI_AKTIF=false, DERIN_LONGSHOT_DUZELTMESI_AKTIF=false).
+  aktif: boolean;
 };
 
 // 2026-08-27: aynı gün İKİ YÖNDE değişti. Sabah "sıralamalar yüzdelere göre olacak" dendi,
@@ -229,24 +233,28 @@ export const SIRALAMA_KURALLARI: SiralamaKurali[] = [
     etiket: "GERİ AÇILDI (2026-08-30, V5.28+) — BUG DÜZELTİLDİ (2026-09-02, V5.38)",
     aciklama: "En çok yükselen/düşen AGF trendini taşıyan + yeterli sinyal sayısına (≥4) sahip atlar, ham sıralamada geride kalsa bile ilk-3'e/ilk-6'ya terfi eder. 2026-08-27'de diğer ikisiyle birlikte kapatılmıştı (Kocaeli 2.Koşu örneği), 2026-08-30'da geri açıldı. GERÇEK BİR BUG (2026-09-02'de bulundu, arac-tam-at-inceleme.mts ile THEATER OF WAR incelemesi sırasında): eski uygulama 'adayın olasılığı diğerleriyle yarışır' ilkesiyle çalışıyordu (terfiPenceresiV5), ama girdi ZATEN olasılığa göre sıralı geldiği için pencere dışındaki hiçbir aday hiçbir doğal sakini matematiksel olarak geçemiyordu — bu kural 2026-08-30'dan 2026-09-02'ye kadar SESSİZCE HİÇ ÇALIŞMAMIŞ, terfiEdenNolar HER ZAMAN boş dönmüş (sentetik testle doğrulandı: düzeltme öncesi/sonrası aynı senaryoda agfTerfi hep null'dan gerçek terfiye geçti). Düzeltme: agfFavoriIlk3Garantisi ile aynı ilke — en güçlü aday, pencerenin en zayıf sakinini KOŞULSUZ yerinden alır (yalnız o tek sakin değişir, güçlü sakinler asla elenmez).",
     backtestOzet: "n=663 → %21.6 galibiyet / %53.8 top3 — bu rakam V4'ün ORİJİNAL (çalışan) mekanizmasından. V5 portundaki 2026-08-30→2026-09-02 arası GERÇEKTE UYGULANMIYORDU (yukarıya bak). 2026-09-02'den itibaren düzeltilmiş haliyle GEÇERLİ ve UYGULANIYOR — güncel veriyle toplu backtest henüz YAPILMADI (yalnız sentetik doğrulama).",
+    aktif: true, // v5-engine.ts: AGF_TREND_TERFISI_AKTIF
   },
   {
     ad: "Saf Model Değer Terfisi",
     etiket: "YENİ (2026-09-02, V5.38) — KAPISI DÜZELTİLDİ (V5.39) — İLK-3 KADEMESİ EKLENDİ (V5.41)",
     aciklama: "Saf Model (marketBlindProb1, AGF'siz) ile AGF payı arasındaki fark ≥5pp VE modelin AGF-dışı katkılarının TOPLAMI net pozitifse, at ham sıralamada geride kalsa bile ilk-6'ya KOŞULSUZ terfi eder (agfFavoriIlk3Garantisi/düzeltilmiş agfTrendTerfisi ile aynı splice ilkesi). THEATER OF WAR vakasından doğdu. İLK SÜRÜM (V5.38) ikinci koşul olarak sinyalSayisi≥4 kullanıyordu — BAY UMUT vakasıyla (İstanbul K4) yanlış çıktığı bulundu, marketBlindProb1'i üreten AYNI hesaba (AGF-dışı katkı toplamı) geçildi (V5.39). V5.41: aynı ilke, daha SIKI bir eşikle (≥8pp), ilk-3 için de eklendi — KINDBERO vakasından doğdu (İzmir K5: kazandı ama 4.sırada kaldı, Saf Model onu 2.sırada görüyordu, fark=+8.2pp — 4.sıra zaten ilk-6 içi olduğu için eski taban hiç devreye girmemişti).",
     backtestOzet: "Kullanıcı kararıyla backtest İSTENMEDEN doğrudan canlıya alındı. Gerçek 5 koşuyla (İstanbul K1/K4/K6/K9 + İzmir K5, 2026-09-02/03) çapraz doğrulandı: K4'te BAY UMUT 8.'den 6.'ya, K5'te KINDBERO 4.'ten 3.'e terfi ediyor; K4'teki DİLAN KIZ, K6'daki ANGEL OF DEFNE, K5'teki ÇERKES ENVER (büyük fark ama AGF-dışı katkıları NET NEGATİF — yalnız AGF'nin ekstra kötümserliğinden kaynaklanan sahte bir fark) doğru şekilde DIŞLANIYOR. Aynı K5'te ARDAPAŞA (fark=+11.4pp, KINDBERO'dan büyük) da nitelik kazanıyor ama KINDBERO'nun daha yüksek ham olasılığı yüzünden slotu kazanamıyor — beklenen davranış.",
+    aktif: true, // v5-engine.ts: SAF_MODEL_DEGER_TERFISI_AKTIF
   },
   {
     ad: "AGF Favorisi İlk-3 Garantisi",
     etiket: "KAPALI (2026-08-27, V5.24, kesin karar — 2026-08-30'da yeniden değerlendirilip KORUNDU)",
     aciklama: "AGF sırası=1 olan at, ham olasılık sıralamasında top3 dışında kalsa bile KOŞULSUZ 3.sıraya alınıyordu. Kocaeli 2.Koşu örneğiyle kullanıcı kesin karar verdi: sıralama İSTİSNASIZ yüzdeye göre. 2026-08-30'da AGF Trend Terfisi'yle birlikte yeniden gündeme geldi ama BİLEREK kapalı bırakıldı — bu, Kocaeli'deki (AGF favorisini modelin yüzdesine bakmadan koşulsuz zorlama) davranışın ta kendisi.",
     backtestOzet: "n=428 → net +5 yarış (top3 %60.0→%61.2). Kanıt hâlâ geçerli sayılıyor, ama prensip gerekçesiyle uygulanmıyor.",
+    aktif: false, // v5-engine.ts: AGF_FAVORI_ILK3_GARANTISI_AKTIF
   },
   {
     ad: "Derin AGF-Longshot Düzeltmesi",
     etiket: "KAPALI (2026-08-27, V5.24, kesin karar — 2026-08-30'da istatistiksel kanıt da geçersiz bulundu)",
     aciklama: "Sistemin ham #1'i AGF sırası≥4 (piyasanın neredeyse hiç güvenmediği bir at) olduğunda, modelin kendi AGF≤3 içindeki en iyi adayıyla yer değiştiriyordu. Bu KURAL, Kocaeli 2.Koşu'da MAŞİDE'yi (ham #1, %23.5) TEYZEOĞLU (%11.1) ile yer değiştirmişti — kullanıcı bunu somut örnekte görüp KESİN reddetti.",
     backtestOzet: "Orijinal: n=448 → net +20 yarış. Güncel/tazelenmiş veriyle (1042 yarış) tekrar test edildiğinde net etki artık istatistiksel olarak kanıtlanamıyor (GA=[-3,11], sıfırı içeriyor) — hem prensip hem artık kanıt da yok, uygulanmıyor.",
+    aktif: false, // v5-engine.ts: DERIN_LONGSHOT_DUZELTMESI_AKTIF
   },
 ];
 

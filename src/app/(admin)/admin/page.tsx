@@ -18,7 +18,6 @@ import v5WeightsDiger from "@/lib/methodology/weights/v5-weights-diger.json";
 import PerformanceBreakdown from "@/components/admin/PerformanceBreakdown";
 import CouponTierChart from "@/components/admin/CouponTierChart";
 import PerformansDenetimiPanel from "@/components/admin/PerformansDenetimiPanel";
-import SinyalKutuguPanel from "@/components/admin/SinyalKutuguPanel";
 import AylikKuponKazanciCard from "@/components/home/AylikKuponKazanciCard";
 import type { CouponTierBreakdown } from "@/server/services/admin.service";
 import NarrativeSummary from "@/components/admin/NarrativeSummary";
@@ -150,10 +149,9 @@ export default async function AdminDashboard() {
           ayrı route/nav girdisi kaldırıldı. */}
       <PerformansDenetimiPanel ozet={performansOzeti} agfTrendIstatistik={agfTrendIstatistik} />
 
-      {/* ── V5 Sinyal Kütüğü ───────────────────────────────────────────
-          2026-08-24 kullanıcı talebi: eski "Analiz Motoru Versiyon Karşılaştırması"
-          bölümünün yerine geçti — "sinyalleri burda takip edicez başarılarını". */}
-      <SinyalKutuguPanel />
+      {/* 2026-11-04 kullanıcı talebi: "V5 Sinyal Kütüğü" buradan kaldırılıp
+          /admin/sinyal-kutugu adında ayrı bir sayfaya, sol menüye taşındı
+          (bkz. AdminNav.tsx, src/app/(admin)/admin/sinyal-kutugu/page.tsx). */}
 
       {/* ── Trend + Bekleyen ───────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

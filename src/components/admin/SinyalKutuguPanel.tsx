@@ -1,9 +1,7 @@
 import {
   CANLI_SINYALLER,
   SIRALAMA_KURALLARI,
-  ADAY_SINYALLER,
   type SinyalAnlamlilik,
-  type AdaySinyalDurum,
 } from "@/server/services/sinyal-kutugu.service";
 
 const DURUM_STIL: Record<SinyalAnlamlilik, string> = {
@@ -39,23 +37,24 @@ function KatsayiHucre({ katsayi, durum, not: notMetni }: { katsayi: number; duru
   );
 }
 
-const ADAY_STIL: Record<AdaySinyalDurum, { rail: string; tag: string; etiketRengi: string }> = {
-  acik: { rail: "border-l-amber-500/70", tag: "border-amber-500/40 bg-amber-500/10 text-amber-400", etiketRengi: "" },
-  reddedildi: { rail: "border-l-[#c0392b]/70", tag: "border-[#c0392b]/40 bg-[#c0392b]/10 text-[#e57368]", etiketRengi: "" },
-  beklemede: { rail: "border-l-muted-foreground/40", tag: "border-muted-foreground/30 bg-muted/10 text-muted-foreground", etiketRengi: "" },
-};
-
 export default function SinyalKutuguPanel() {
+  // 2026-11-04 kullanıcı talebi — bu sayfa artık yalnız V5.46.1'de GERÇEKTEN canlı olan
+  // sinyal/kuralları gösteriyor. Reddedilen/kapalı/aday sinyaller (eskiden "Aday / Test
+  // Edilmiş Sinyaller" bölümü) kasıtlı olarak buradan ÇIKARILDI — araştırma geçmişi olarak
+  // proje hafızasında/memory dosyalarında kalmaya devam ediyor, bu sayfa yalnız "şu an ne
+  // çalışıyor" sorusuna cevap veriyor.
+  const aktifSiralamaKurallari = SIRALAMA_KURALLARI.filter((k) => k.aktif);
   return (
     <section className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-foreground">V5 Sinyal Kütüğü</h2>
+        <h2 className="text-lg font-bold text-foreground">V5.46.1 Sinyal Kütüğü</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Canlı skorlamaya giren 17 sinyal (12 A-Katmanı + 5 B-Katmanı ortak regresyonda, +2 B-Katmanı ayrı mekanizmada — bkz. aşağıdaki iki ayrı tablo),
           segment bazlı katsayılarıyla (Düşük-şart = Maiden/Şartlı 1/19/27,
-          Diğer = Handikap/Şartlı 2-5/KV-Grup/Satış); sıralama kuralları; ve test edilmiş aday sinyaller.
-          Katsayı/GA her yeniden eğitimde elle güncellenir — sahadaki GERÇEK isabet oranı için aşağıdaki
-          &quot;Sinyal Bazlı Gerçek İsabet Oranı&quot; tablosuna bakın.
+          Diğer = Handikap/Şartlı 2-5/KV-Grup/Satış) ve aktif sıralama kuralları — yalnız ŞU AN
+          üretimde çalışanlar. Katsayı/GA her yeniden eğitimde elle güncellenir — sahadaki
+          GERÇEK isabet oranı için aşağıdaki &quot;Sinyal Bazlı Gerçek İsabet Oranı&quot;
+          tablosuna bakın.
         </p>
       </div>
 
@@ -142,11 +141,11 @@ export default function SinyalKutuguPanel() {
         </div>
       </div>
 
-      {/* ── Sıralama kuralları ── */}
+      {/* ── Sıralama kuralları (yalnız aktif olanlar — bkz. k.aktif) ── */}
       <div className="space-y-3 pt-2">
         <h3 className="text-base font-bold text-foreground">Sıralama Kuralları</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {SIRALAMA_KURALLARI.map((k) => (
+          {aktifSiralamaKurallari.map((k) => (
             <div key={k.ad} className="rounded-lg border border-brand/20 bg-[#0d0d14] p-4 space-y-2">
               <div className="flex items-baseline justify-between gap-2">
                 <div className="font-semibold text-foreground">{k.ad}</div>
@@ -154,26 +153,6 @@ export default function SinyalKutuguPanel() {
               </div>
               <p className="text-xs text-muted-foreground">{k.aciklama}</p>
               <div className="border-t border-brand/10 pt-2 font-mono text-[11px] text-foreground/80">{k.backtestOzet}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Aday sinyaller ── */}
-      <div className="space-y-3 pt-2">
-        <h3 className="text-base font-bold text-foreground">Aday / Test Edilmiş Sinyaller</h3>
-        <p className="text-sm text-muted-foreground">Canlıda değil — reddedildi, yetersiz güçte kaldı, ya da veri/karar eksikliğiyle beklemede.</p>
-        <div className="space-y-2.5">
-          {ADAY_SINYALLER.map((a) => (
-            <div key={a.ad} className={`rounded-lg border border-brand/20 border-l-4 bg-[#0d0d14] p-4 ${ADAY_STIL[a.durum].rail}`}>
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="font-semibold text-foreground">{a.ad}</div>
-                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${ADAY_STIL[a.durum].tag}`}>
-                  {a.etiket}
-                </span>
-              </div>
-              <p className="mt-1.5 text-xs text-muted-foreground">{a.aciklama}</p>
-              {a.metrik && <div className="mt-1.5 font-mono text-[10.5px] text-foreground/70">{a.metrik}</div>}
             </div>
           ))}
         </div>
