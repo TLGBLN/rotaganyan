@@ -114,8 +114,37 @@ describe("zayıf-tip tabanı (kaybedilen kazananlar -> optimizör köprüsü)", 
     const groupSel = otomatikGroupSelections(hepsiZayif, 1.25, LIMITS, TOLERANCES);
     for (const raceNo of [1, 2, 3, 4, 5, 6]) {
       expect(groupSel[raceNo].narrow.size).toBeGreaterThan(0);
-      // Geniş genişlik asla dardan dar olamaz (mevcut zincirleme garantisi korunmalı).
-      expect(groupSel[raceNo].wide.size).toBeGreaterThanOrEqual(groupSel[raceNo].narrow.size);
+      // Hiçbir kademe bir öncekinden DAR olamaz (zincirleme garantisi korunmalı).
+      expect(groupSel[raceNo].normal.size).toBeGreaterThanOrEqual(groupSel[raceNo].narrow.size);
+      expect(groupSel[raceNo].wide.size).toBeGreaterThanOrEqual(groupSel[raceNo].normal.size);
+    }
+  });
+
+  // 2026-11-04 CANLIDA yakalanan ÜÇÜNCÜ bug (gerçek vaka, İstanbul 04.11.2026 1. Altılı —
+  // 5/6 ayak AYNI ANDA zayıf tip: Maiden/Şartlı4/Handikap15/Şartlı4/Handikap17): yukarıdaki
+  // "taban ürünü küçültme" düzeltmesi TÜM tabanları eşit indirilebilir sayıyordu — bu,
+  // ÖNCEKİ (dar) kademenin ZATEN elde ettiği sonucu da indirip Normal'in Ekonomik'ten
+  // DAHA DAR çıkmasına sebep oluyordu (kullanıcı ekran görüntüsüyle bildirdi: narrow=5,
+  // normal=4). optimizeKuponAllocation'a eklenen minHardFloor (önceki kademenin sonucu,
+  // ASLA indirilemez) + minUnitCounts (zayıf-tip hedefi, ESNEK) ayrımı bunu çözüyor.
+  it("5/6 ayak aynı anda zayıf tipse bile hiçbir kademe bir öncekinden DAR olmaz (gerçek vaka)", () => {
+    const mkRace = (raceNo: number, classType: string, probs: number[]): AutoFillRace => ({
+      raceNo, classType,
+      runners: probs.map((p, i) => ({ no: i + 1, scratched: false, ekuriGroup: null, score: null, scoreExact: p })),
+    });
+    const cokZayifRaces: AutoFillRace[] = [
+      mkRace(1, "Maiden", [25, 18, 15, 12, 10, 8, 5, 4, 2, 1]),
+      mkRace(2, "ŞARTLI 4", [30, 20, 15, 10, 8, 7, 5, 3, 2]),
+      mkRace(3, "Handikap 15", [63.1, 15.2, 9.3, 6.3, 6.0]),
+      mkRace(4, "ŞARTLI 4", [21.7, 19.2, 15.7, 12.5, 8.6, 5.7, 5.7, 4.9, 3.5, 2.6]),
+      mkRace(5, "Handikap 17", [18.6, 17.9, 13.8, 8.2, 7.1, 6.2, 5.0, 4.5, 4.1, 3.8, 3.5, 3.0, 2.5, 2.0, 1.1]),
+      mkRace(6, "SATIŞ 3", [40, 20, 12, 8, 6, 5, 4, 3, 1, 1]), // tek güçlü/zayıf-olmayan ayak
+    ];
+    const groupSel = otomatikGroupSelections(cokZayifRaces, 1.25, LIMITS, TOLERANCES);
+    for (const race of cokZayifRaces) {
+      const s = groupSel[race.raceNo];
+      expect(s.normal.size).toBeGreaterThanOrEqual(s.narrow.size);
+      expect(s.wide.size).toBeGreaterThanOrEqual(s.normal.size);
     }
   });
 

@@ -83,7 +83,17 @@ function ekuriBirimleriOlustur(runners: LegProbability["runners"]): Birim[] {
 export function optimizeKuponAllocation(
   legs: LegProbability[],
   maxCombinations: number,
-  minUnitCounts?: Record<number, number>
+  minUnitCounts?: Record<number, number>,
+  // 2026-11-04 canlıda yakalanan İKİNCİ bug (gerçek vaka, Handikap 17/Şartlı 4 ayakları) —
+  // aşağıdaki "taban ürünü küçültme" düzeltmesi, minUnitCounts içindeki TÜM değerleri
+  // eşit derecede indirilebilir sayıyordu — bu, ÖNCEKİ (dar) kademenin ZATEN elde ettiği
+  // (ve otomatikGroupSelections'ın zincirleme ile buraya taban olarak geçirdiği) sonucu
+  // da indirip Normal'in Ekonomik'ten DAHA DAR çıkmasına sebep oluyordu ("hiçbir kademe
+  // bir öncekini eksiltmez" garantisini bozan gerçek bir regresyon). Çözüm: iki AYRI taban
+  // katmanı. `minHardFloor` — bir önceki (dar) kademenin ZATEN ulaştığı sonuç, SERT taban,
+  // darlaştırma ASLA bunun altına inmez. `minUnitCounts` — zayıf-tip HEDEFİ (bu kademenin
+  // kendi isteği), ESNEK taban, bütçe yetmezse kademeli iner ama hardFloor'un altına asla.
+  minHardFloor?: Record<number, number>
 ): OptimizeResult {
   if (legs.length === 0 || maxCombinations < 1) {
     return { secimler: {}, toplamKombinasyon: 0, kapsamaOlasiligi: 0, birimSayilari: {} };
@@ -97,22 +107,24 @@ export function optimizeKuponAllocation(
       toplam += r.olasilik;
       kumulatif.push(toplam);
     }
-    const minN = Math.min(Math.max(1, minUnitCounts?.[leg.raceNo] ?? 1), Math.max(sirali.length, 1));
-    return { raceNo: leg.raceNo, sirali, kumulatif, minN };
+    const kapasite = Math.max(sirali.length, 1);
+    const hardFloor = Math.min(Math.max(1, minHardFloor?.[leg.raceNo] ?? 1), kapasite);
+    const minN = Math.max(hardFloor, Math.min(Math.max(1, minUnitCounts?.[leg.raceNo] ?? 1), kapasite));
+    return { raceNo: leg.raceNo, sirali, kumulatif, minN, hardFloor };
   });
 
-  // 2026-11-04 canlıda yakalanan bug — tabanların (minUnitCounts) HEP BİRLİKTE
+  // 2026-11-04 canlıda yakalanan İLK bug — tabanların (minUnitCounts) HEP BİRLİKTE
   // uygulanması bütçeyi aşarsa, DP'nin devlet uzayı daha BAŞLAMADAN boşalır (ilk ayaktan
   // itibaren her c*n > maxCombinations olur) ve TÜM kupon boş döner — tek bir ayağın
   // (ör. zayıf-tip tabanı birden fazla ayakta aynı anda tetiklendiğinde) yüzünden DİĞER
   // TÜM ayaklar da seçimsiz kalıyordu. Taban bir TERCİHTİR, bütçeyi İMKANSIZ kılan bir
-  // KISIT olmamalı — bütçeye sığmayan taban ürünü, en büyük tabandan başlanarak kademeli
-  // küçültülür (hiçbiri 1'in altına inmez, DP'nin HER ZAMAN en az bir geçerli başlangıç
-  // durumu olması garanti edilir).
+  // KISIT olmamalı — bütçeye sığmayan taban ürünü, en büyük (ve hardFloor'unun ÜSTÜNDE
+  // kalan, yani indirilebilir) tabandan başlanarak kademeli küçültülür.
   let tabanUrunu = legOptions.reduce((p, o) => p * o.minN, 1);
   while (tabanUrunu > maxCombinations) {
-    const enBuyukTaban = legOptions.reduce((a, b) => (b.minN > a.minN ? b : a));
-    if (enBuyukTaban.minN <= 1) break; // tümü zaten 1 — bütçe ayak sayısına bile yetmiyor, ayrı bir sorun
+    const indirilebilir = legOptions.filter((o) => o.minN > o.hardFloor);
+    if (indirilebilir.length === 0) break; // hepsi zaten kendi sert tabanında — daha fazla indirilemez
+    const enBuyukTaban = indirilebilir.reduce((a, b) => (b.minN > a.minN ? b : a));
     tabanUrunu = Math.floor(tabanUrunu / enBuyukTaban.minN);
     enBuyukTaban.minN -= 1;
     tabanUrunu *= enBuyukTaban.minN;

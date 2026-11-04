@@ -153,7 +153,7 @@ export function otomatikGroupSelections(
     const effectiveLimit = limits[width] * tolerances[width];
     const maxCombinations = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
     const girdiTaban = tabanlariBirlestir(zayifTipTabanlari(races, width), oncekiBirimSayilari);
-    const { secimler, birimSayilari } = optimizeKuponAllocation(legs, maxCombinations, girdiTaban);
+    const { secimler, birimSayilari } = optimizeKuponAllocation(legs, maxCombinations, girdiTaban, oncekiBirimSayilari);
     oncekiBirimSayilari = birimSayilari;
     for (const race of races) {
       sel[race.raceNo][width] = new Set(secimler[race.raceNo] ?? []);
@@ -198,7 +198,7 @@ export function computeAllocatorTiers(
     const effectiveLimit = limits[width] * tolerances[width];
     const combinationLimit = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
     const girdiTaban = tabanlariBirlestir(zayifTipTabanlari(races, width), oncekiBirimSayilari);
-    const result: OptimizeResult = optimizeKuponAllocation(legs, combinationLimit, girdiTaban);
+    const result: OptimizeResult = optimizeKuponAllocation(legs, combinationLimit, girdiTaban, oncekiBirimSayilari);
     oncekiBirimSayilari = result.birimSayilari;
     tiers.push({
       width,
