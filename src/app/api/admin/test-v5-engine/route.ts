@@ -240,9 +240,18 @@ karar,
 
   const bankoAdayi = null;
   const nolar = sirali.map((r) => r.no);
-  const couponNarrow = nolar.slice(0, 3).join("-");
-  const couponNormal = nolar.slice(3, 6).join("-");
-  const couponWide = nolar.slice(6).join("-");
+  // 2026-11-06 — AGF Destek Katmanı atları artık yalnız gösterim değil, GERÇEKTEN kupona
+  // (couponNarrow) ekleniyor — kullanıcı talebi ("sistemin görüp kupona koyması gerek").
+  // EKLE tasarımı korunuyor: V5.46.1'in ilk-3'ünden HİÇBİR at çıkarılmıyor, yalnız AGF
+  // Destek atları narrow'a EKLENİYOR; aynı at normal/wide'da da görünüp çift sayılmasın
+  // diye tam-alan bölünmesi (nolar) bu eklemeden SONRA yeniden kuruluyor.
+  const agfDestekOnerisi = safSonuc?.agfDestekOnerisi ?? [];
+  const agfDestekNolar = agfDestekOnerisi.map((o) => o.no).filter((no) => !nolar.slice(0, 3).includes(no));
+  const couponNarrowNolar = [...nolar.slice(0, 3), ...agfDestekNolar];
+  const kalanNolar = nolar.filter((no) => !couponNarrowNolar.includes(no));
+  const couponNarrow = couponNarrowNolar.join("-");
+  const couponNormal = kalanNolar.slice(0, 3).join("-");
+  const couponWide = kalanNolar.slice(3).join("-");
 
   return NextResponse.json({
     ok: true,
@@ -265,7 +274,7 @@ karar,
     // Saf Model'in dışarıda bıraktığı atları EK öneri olarak taşır. 2026-11-05 araştırması
     // (140-yarış nihai holdout, B500 bootstrap) doğruladı: yapısal olarak kayıp üretmez,
     // yalnız kurtarma potansiyeli ekler.
-    agfDestekOnerisi: safSonuc?.agfDestekOnerisi ?? [],
+    agfDestekOnerisi,
   });
 }
 
