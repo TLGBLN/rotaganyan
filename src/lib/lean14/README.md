@@ -19,7 +19,7 @@ Local Windows PowerShell, on this branch:
 ```powershell
 npm ci
 npx tsc --noEmit --pretty false
-npx tsx --test src/lib/lean14/lean14-three-signal-audit.test.ts
+npx vitest run src/lib/lean14/lean14-three-signal-audit.test.ts
 git diff master --name-status
 ```
 
