@@ -81,6 +81,10 @@ type V5At = {
 };
 type Runner = { id: string; no: number; name: string };
 type BankoAdayiSonuc = { bankoAdayi: boolean; sebep: string };
+// 2026-11-06 — AGF Destek Katmanı: Saf Model'in (AGF'siz) ilk-3'üne dokunmadan, AGF'nin
+// kuvvetle favori gördüğü ama dışarıda kalan atları EK öneri olarak taşır. Bkz.
+// v546-1-engine.ts::agfDestekOnerisiHesapla, 2026-11-05 araştırmasıyla kalibre/doğrulandı.
+type AgfDestekOneri = { runnerId: string; no: number; ad: string; agfSirasi: number; agfPayi: number; safSirasi: number };
 
 type SavedPick = {
   rank: number;
@@ -173,6 +177,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
   const [manualOrder, setManualOrder] = useState<number[]>(kayitliBaslangic?.manualOrder ?? []);
   const [runners, setRunners] = useState<Runner[]>(kayitliBaslangic?.runners ?? []);
   const [bankoAdayi, setBankoAdayi] = useState<BankoAdayiSonuc | null>(kayitliBaslangic?.bankoAdayi ?? null);
+  const [agfDestekOnerisi, setAgfDestekOnerisi] = useState<AgfDestekOneri[]>([]);
   const [kuponlar, setKuponlar] = useState<{ narrow?: string; normal?: string; wide?: string }>(kayitliBaslangic?.kuponlar ?? {});
   const [kaynak, setKaynak] = useState<"kayitli" | "canli" | null>(kayitliBaslangic ? "kayitli" : null);
   const [acikDetay, setAcikDetay] = useState<Set<number>>(new Set());
@@ -226,6 +231,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
         couponNarrow?: string;
         couponNormal?: string;
         couponWide?: string;
+        agfDestekOnerisi?: AgfDestekOneri[];
       };
       try {
         data = JSON.parse(raw);
@@ -242,6 +248,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       setKategori(data.kategori ?? null);
       setMotorEtiketi(data.motorEtiketi ?? null);
       setAnalysisReady(data.analysisReady ?? null);
+      setAgfDestekOnerisi(data.agfDestekOnerisi ?? []);
       setKaynak("canli");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Beklenmeyen hata");
@@ -421,7 +428,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
             <span className="text-slate-300">V5.46.1 Production Model</span>
               <span className="text-slate-500">•</span>
               <span className="text-[10px] text-slate-400">
-                19 teknik feature · 23 atomik sinyal · 20 güncel analiz kaynağı · 12 aile · 1 legacy composite
+                V5.46.1'in 19 teknik feature'ı · 23 atomik sinyal · 20 güncel analiz kaynağı · 12 aile · 1 legacy composite
               </span>
             <span className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-300">
               ANALYSIS_READY: ANALİZ BEKLENİYOR
@@ -439,6 +446,25 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       {kategori && (
         <div className="inline-block rounded-full border border-purple-500/40 bg-purple-500/10 px-2.5 py-1 text-[11px] font-medium text-purple-300">
           Bu koşuda kullanılan model: {KATEGORI_ETIKET[kategori] ?? "Genel (diğer koşular) ağırlık seti"}
+        </div>
+      )}
+
+      {agfDestekOnerisi.length > 0 && (
+        <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/5 px-3 py-2 text-xs text-cyan-200">
+          <div className="font-semibold text-cyan-300">AGF Destek Önerisi</div>
+          <div className="mt-1 text-cyan-200/90">
+            Saf Model (AGF&apos;siz) ilk-3&apos;ünde yok ama AGF kuvvetle favori görüyor — ek değerlendirmeye değer:
+          </div>
+          <ul className="mt-1.5 space-y-0.5">
+            {agfDestekOnerisi.map((o) => (
+              <li key={o.runnerId}>
+                #{o.no} {o.ad} — AGF {o.agfSirasi}. sıra (%{o.agfPayi.toFixed(1)}), Saf Model {o.safSirasi}. sıra
+              </li>
+            ))}
+          </ul>
+          <div className="mt-1 text-[10px] text-cyan-200/60">
+            2026-11-05 araştırması: 140-yarış nihai holdout&apos;ta Net=+39 kurtarma, 0 kayıp (B500 bootstrap %95 GA tamamen pozitif). Saf Model&apos;in kendi seçimine dokunmaz, yalnız ek öneridir.
+          </div>
         </div>
       )}
 
@@ -513,7 +539,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
             <span>V5.46.1 Production Model</span>
             <span>·</span>
             <span className="text-[10px] opacity-80">
-              19 teknik feature · 23 atomik sinyal · 20 güncel analiz kaynağı · 12 aile · 1 legacy composite
+              V5.46.1'in 19 teknik feature'ı · 23 atomik sinyal · 20 güncel analiz kaynağı · 12 aile · 1 legacy composite
             </span>
             <span>·</span>
             <span>

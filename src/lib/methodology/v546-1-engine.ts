@@ -22,11 +22,6 @@ import {
 } from "@/lib/accurace/features";
 import type { AccuraceRun, Breed, Surface, StyleFeature, TargetRace } from "@/lib/accurace/types";
 import weightsJson from "./weights/v546-1-weights.json";
-// 2026-11-05 — Saf Model 19-özellik genişlemesi: LEAN14'ün salt-okunur, AGF'siz sinyal
-// toplayıcısı (src/lib/lean14/) ile AYNI isimli ama TAMAMEN FARKLI bir fonksiyon — burada
-// alias'lanarak içe aktarılıyor, karıştırılmamalı. scoreV461/gatherV461RawSinyaller (bu
-// dosyanın kendi fonksiyonları, V5.46.1 "dondurulmuş" skoru) BU IMPORT'TAN HİÇ ETKİLENMEZ.
-import { gatherV461RawSinyaller as gatherLean14UcSinyal } from "@/lib/lean14/gather-v461-raw-sinyaller";
 
 type FrozenWeights = {
   version: string;
@@ -278,39 +273,55 @@ export async function scoreV461(raceId: string): Promise<V461Sonuc | null> {
 export const SAF_MODEL_AGF_KODLARI = new Set(["agfSirasi", "agfPayi", "agfPayi2"]);
 
 export type V461SafPick = { runnerId: string; no: number; ad: string; score: number; probability: number; rank: number; features: V461FeatureDetay[] };
-export type V461SafSonuc = { raceId: string; engineVersion: string; generatedAt: string; race: Faz1SonucV5["race"]; picks: V461SafPick[]; warnings: string[] };
+export type AgfDestekOneri = { runnerId: string; no: number; ad: string; agfSirasi: number; agfPayi: number; safSirasi: number };
+export type V461SafSonuc = {
+  raceId: string; engineVersion: string; generatedAt: string; race: Faz1SonucV5["race"];
+  picks: V461SafPick[]; warnings: string[]; agfDestekOnerisi: AgfDestekOneri[];
+};
 
-// 2026-11-05 — LEAN14 3-sinyal genişlemesi (RIVAL_GAP/JOCKEY_OE30/SURFACE_FORM): B500
-// bootstrap + CatBoost çapraz-doğrulamasıyla katkısı kanıtlandı. scoreV461'in kendi
-// gatherV461RawSinyaller çıktısı DEĞİŞTİRİLMEDİ (scoreV461 davranışı etkilenmez) — yalnız
-// Saf Model'in ihtiyaç duyduğu ek ham sinyaller, LEAN14'ün ayrı/salt-okunur toplayıcısından
-// çekilip Saf Model'e ÖZEL bir runner listesine EKLENİYOR.
-const LEAN14_SINYAL_KODLARI = ["RIVAL_GAP", "JOCKEY_OE30", "SURFACE_FORM"] as const;
+// 2026-11-06 — AGF Destek Katmanı ("EKLE" tasarımı, 2026-11-05 araştırmasında kalibre/
+// doğrulandı: pencere=3, agfSirasiEsigi=4, 140-yarışlık nihai holdout'ta Net=+39, kayıp=0,
+// B500 bootstrap %95 GA=[28,49] tamamen pozitif). Saf Model'in (AGF'siz) ilk-N'ine HİÇBİR
+// at ÇIKARILMADAN — yalnız AGF'nin kuvvetle favori gördüğü (agfSirasi<=esigi) ve Saf
+// Model'in dışında kalan atlar EK ÖNERİ olarak eklenir. Yapısal olarak kayıp üretemez
+// (Saf Model'in kendi seçimi hiç dokunulmuyor), yalnız kurtarma potansiyeli ekler. AGF'nin
+// ağırlık olarak değil, AYRI bir destek katmanı olarak kullanılması — bkz. kullanıcı kararı
+// "agf modeli sinyallerden ayrılmalı destek olmalı".
+const AGF_DESTEK_PENCERE_BOYU = 3;
+const AGF_DESTEK_AGF_SIRASI_ESIGI = 4;
+
+export function agfDestekOnerisiHesapla(picks: V461SafPick[], rawRunners: V461RawRunner[]): AgfDestekOneri[] {
+  const safTopSet = new Set(picks.filter((p) => p.rank <= AGF_DESTEK_PENCERE_BOYU).map((p) => p.runnerId));
+  const agfByRunnerId = new Map(
+    rawRunners.map((rr) => {
+      const agfSirasiSig = rr.rawSinyaller.find((s) => s.ad === "agfSirasi");
+      const agfPayiSig = rr.rawSinyaller.find((s) => s.ad === "agfPayi");
+      return [rr.r.id, { agfSirasi: agfSirasiSig?.raw ?? null, agfPayi: agfPayiSig?.raw ?? null }];
+    })
+  );
+  const oneriler: AgfDestekOneri[] = [];
+  for (const pick of picks) {
+    if (safTopSet.has(pick.runnerId)) continue;
+    const agf = agfByRunnerId.get(pick.runnerId);
+    if (!agf || agf.agfSirasi == null || agf.agfPayi == null) continue;
+    if (agf.agfSirasi <= AGF_DESTEK_AGF_SIRASI_ESIGI) {
+      oneriler.push({ runnerId: pick.runnerId, no: pick.no, ad: pick.ad, agfSirasi: agf.agfSirasi, agfPayi: agf.agfPayi, safSirasi: pick.rank });
+    }
+  }
+  return oneriler.sort((a, b) => a.agfSirasi - b.agfSirasi);
+}
 
 export async function scoreV461Saf(raceId: string, safWeights: FrozenWeights): Promise<V461SafSonuc | null> {
   const rawSonuc = await gatherV461RawSinyaller(raceId);
   if (!rawSonuc) return null;
 
-  let safRunners = rawSonuc.runners;
-  const lean14Gerekli = LEAN14_SINYAL_KODLARI.some((kod) => safWeights.featureNames.includes(kod));
-  if (lean14Gerekli) {
-    const lean14 = await gatherLean14UcSinyal(raceId).catch(() => null);
-    const lean14ByNo = new Map(lean14?.horses.map((h) => [h.no, h.signals]) ?? []);
-    safRunners = rawSonuc.runners.map((rr) => {
-      const ekstra = lean14ByNo.get(rr.r.no);
-      const ekSinyaller: RawSinyalGirdi[] = LEAN14_SINYAL_KODLARI.map((kod) => {
-        const s = ekstra?.[kod];
-        return { ad: kod, raw: s?.observed ? s.rawValue : null, observed: s?.observed ?? false, reliability: 1 };
-      });
-      return { ...rr, rawSinyaller: [...rr.rawSinyaller, ...ekSinyaller] };
-    });
-  }
-
-  const sirali = puanlaVeSirala(safWeights, safRunners, (ad) => !SAF_MODEL_AGF_KODLARI.has(ad));
+  const sirali = puanlaVeSirala(safWeights, rawSonuc.runners, (ad) => !SAF_MODEL_AGF_KODLARI.has(ad));
   const picks: V461SafPick[] = sirali
     .map((s) => ({ runnerId: s.r.id, no: s.r.no, ad: s.r.ad, score: s.score, probability: s.probability, rank: s.rank, features: s.features }))
     .sort((a, b) => a.rank - b.rank);
 
-  return { raceId, engineVersion: safWeights.version, generatedAt: new Date().toISOString(), race: rawSonuc.race, picks, warnings: rawSonuc.warnings };
+  const agfDestekOnerisi = agfDestekOnerisiHesapla(picks, rawSonuc.runners);
+
+  return { raceId, engineVersion: safWeights.version, generatedAt: new Date().toISOString(), race: rawSonuc.race, picks, warnings: rawSonuc.warnings, agfDestekOnerisi };
 }
 

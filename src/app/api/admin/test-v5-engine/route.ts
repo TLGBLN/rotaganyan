@@ -260,6 +260,12 @@ karar,
     couponNarrow,
     couponNormal,
     couponWide,
+    // 2026-11-06 — AGF Destek Katmanı (bkz. v546-1-engine.ts::agfDestekOnerisiHesapla):
+    // Saf Model'in (AGF'siz) ilk-3'üne dokunmadan, AGF'nin kuvvetle favori gördüğü ama
+    // Saf Model'in dışarıda bıraktığı atları EK öneri olarak taşır. 2026-11-05 araştırması
+    // (140-yarış nihai holdout, B500 bootstrap) doğruladı: yapısal olarak kayıp üretmez,
+    // yalnız kurtarma potansiyeli ekler.
+    agfDestekOnerisi: safSonuc?.agfDestekOnerisi ?? [],
   });
 }
 
