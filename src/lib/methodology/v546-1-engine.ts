@@ -22,6 +22,11 @@ import {
 } from "@/lib/accurace/features";
 import type { AccuraceRun, Breed, Surface, StyleFeature, TargetRace } from "@/lib/accurace/types";
 import weightsJson from "./weights/v546-1-weights.json";
+// 2026-11-05 — Saf Model 19-özellik genişlemesi: LEAN14'ün salt-okunur, AGF'siz sinyal
+// toplayıcısı (src/lib/lean14/) ile AYNI isimli ama TAMAMEN FARKLI bir fonksiyon — burada
+// alias'lanarak içe aktarılıyor, karıştırılmamalı. scoreV461/gatherV461RawSinyaller (bu
+// dosyanın kendi fonksiyonları, V5.46.1 "dondurulmuş" skoru) BU IMPORT'TAN HİÇ ETKİLENMEZ.
+import { gatherV461RawSinyaller as gatherLean14UcSinyal } from "@/lib/lean14/gather-v461-raw-sinyaller";
 
 type FrozenWeights = {
   version: string;
@@ -275,11 +280,33 @@ export const SAF_MODEL_AGF_KODLARI = new Set(["agfSirasi", "agfPayi", "agfPayi2"
 export type V461SafPick = { runnerId: string; no: number; ad: string; score: number; probability: number; rank: number; features: V461FeatureDetay[] };
 export type V461SafSonuc = { raceId: string; engineVersion: string; generatedAt: string; race: Faz1SonucV5["race"]; picks: V461SafPick[]; warnings: string[] };
 
+// 2026-11-05 — LEAN14 3-sinyal genişlemesi (RIVAL_GAP/JOCKEY_OE30/SURFACE_FORM): B500
+// bootstrap + CatBoost çapraz-doğrulamasıyla katkısı kanıtlandı. scoreV461'in kendi
+// gatherV461RawSinyaller çıktısı DEĞİŞTİRİLMEDİ (scoreV461 davranışı etkilenmez) — yalnız
+// Saf Model'in ihtiyaç duyduğu ek ham sinyaller, LEAN14'ün ayrı/salt-okunur toplayıcısından
+// çekilip Saf Model'e ÖZEL bir runner listesine EKLENİYOR.
+const LEAN14_SINYAL_KODLARI = ["RIVAL_GAP", "JOCKEY_OE30", "SURFACE_FORM"] as const;
+
 export async function scoreV461Saf(raceId: string, safWeights: FrozenWeights): Promise<V461SafSonuc | null> {
   const rawSonuc = await gatherV461RawSinyaller(raceId);
   if (!rawSonuc) return null;
 
-  const sirali = puanlaVeSirala(safWeights, rawSonuc.runners, (ad) => !SAF_MODEL_AGF_KODLARI.has(ad));
+  let safRunners = rawSonuc.runners;
+  const lean14Gerekli = LEAN14_SINYAL_KODLARI.some((kod) => safWeights.featureNames.includes(kod));
+  if (lean14Gerekli) {
+    const lean14 = await gatherLean14UcSinyal(raceId).catch(() => null);
+    const lean14ByNo = new Map(lean14?.horses.map((h) => [h.no, h.signals]) ?? []);
+    safRunners = rawSonuc.runners.map((rr) => {
+      const ekstra = lean14ByNo.get(rr.r.no);
+      const ekSinyaller: RawSinyalGirdi[] = LEAN14_SINYAL_KODLARI.map((kod) => {
+        const s = ekstra?.[kod];
+        return { ad: kod, raw: s?.observed ? s.rawValue : null, observed: s?.observed ?? false, reliability: 1 };
+      });
+      return { ...rr, rawSinyaller: [...rr.rawSinyaller, ...ekSinyaller] };
+    });
+  }
+
+  const sirali = puanlaVeSirala(safWeights, safRunners, (ad) => !SAF_MODEL_AGF_KODLARI.has(ad));
   const picks: V461SafPick[] = sirali
     .map((s) => ({ runnerId: s.r.id, no: s.r.no, ad: s.r.ad, score: s.score, probability: s.probability, rank: s.rank, features: s.features }))
     .sort((a, b) => a.rank - b.rank);
