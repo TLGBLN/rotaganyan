@@ -428,7 +428,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
             <span className="text-slate-300">V5.46.1 Production Model</span>
               <span className="text-slate-500">•</span>
               <span className="text-[10px] text-slate-400">
-                V5.46.1'in 19 teknik feature'ı · 23 atomik sinyal · 20 güncel analiz kaynağı · 12 aile · 1 legacy composite
+                V5.46.1&apos;in 19 teknik feature&apos;ı · 23 atomik sinyal · 20 güncel analiz kaynağı · 12 aile · 1 legacy composite
               </span>
             <span className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-300">
               ANALYSIS_READY: ANALİZ BEKLENİYOR
@@ -539,7 +539,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
             <span>V5.46.1 Production Model</span>
             <span>·</span>
             <span className="text-[10px] opacity-80">
-              V5.46.1'in 19 teknik feature'ı · 23 atomik sinyal · 20 güncel analiz kaynağı · 12 aile · 1 legacy composite
+              V5.46.1&apos;in 19 teknik feature&apos;ı · 23 atomik sinyal · 20 güncel analiz kaynağı · 12 aile · 1 legacy composite
             </span>
             <span>·</span>
             <span>
