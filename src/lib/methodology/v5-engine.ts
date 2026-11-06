@@ -1307,6 +1307,41 @@ function safModelDegerTerfisiUygula<
   return ilk6Sonrasi.map((r) => (ilk6Terfi.has(r.no) ? { ...r, degerTerfisi: "ilk6" as const } : r));
 }
 
+// 2026-11-06 kullanıcı KESİN kararı — İSTATİSTİKSEL KANITA RAĞMEN (sireOrani/zeminToleransi/
+// agfPayi-ham-yüzde ile AYNI "prensip vetosu" deseni, bkz. o kuralların üstündeki notlar):
+// "hangisi (Saf Model ya da AGF) bir atı daha İYİ sıraya koyuyorsa O sıra kullanılacak" —
+// min(safSira, agfSira). Kullanıcı bunu üç ayrı oturumda, somut örneklerle (4.+5.→4.,
+// 2.+7.→2.) tekrarladı; aynı gün yerel backtest'te (n=461, B500 bootstrap) bu TAM kuralın
+// tüm sahayı min-sıraya göre yeniden sıralaması Net=-11 (mevcut sistemden DAHA KÖTÜ, sıfırı
+// kapsamayan negatif GA) çıkmıştı — iki ayrı sıralamanın "min"ini alıp TÜM sahayı yeniden
+// dizmek, her iki sistemin de KENDİ İÇİNDE tutarlı olan sırasını rank-çakışmalarıyla
+// bozabiliyor (iki sistem aynı anda farklı atları "benim 2.'m" sayabiliyor). Kullanıcı bu
+// sonucu GÖRDÜ ve yine de istedi — istatistik değil, kullanıcı kararı. ROLLBACK: gerçek
+// canlı sonuçlar kötüleşirse SAF_AGF_MIN_SIRA_AKTIF=false yapmak yeterli, fonksiyon ayrı.
+const SAF_AGF_MIN_SIRA_AKTIF = true;
+
+function safAgfMinSiraUygula<T extends { no: number; marketBlindProb1: number; agfPayi: number }>(
+  sirali: T[]
+): T[] {
+  const safSiraByNo = new Map(
+    [...sirali].sort((a, b) => b.marketBlindProb1 - a.marketBlindProb1).map((r, i) => [r.no, i + 1] as const)
+  );
+  const agfSiraByNo = new Map(
+    [...sirali].sort((a, b) => b.agfPayi - a.agfPayi).map((r, i) => [r.no, i + 1] as const)
+  );
+  const adaylar = sirali.map((r) => {
+    const safSira = safSiraByNo.get(r.no)!;
+    const agfSira = agfSiraByNo.get(r.no)!;
+    const effRank = Math.min(safSira, agfSira);
+    // Çakışma çözümü: aynı effRank'i birden fazla at paylaşıyorsa, o sırayı VEREN sistemin
+    // büyüklüğü (olasılık/pay) yüksek olan önce gelir — hibrit-min-sira-test.mjs'nin AYNISI.
+    const kaynakDeger = safSira <= agfSira ? r.marketBlindProb1 : r.agfPayi / 100;
+    return { r, effRank, kaynakDeger };
+  });
+  adaylar.sort((a, b) => a.effRank - b.effRank || b.kaynakDeger - a.kaynakDeger || a.r.no - b.r.no);
+  return adaylar.map((a) => a.r);
+}
+
 // 2026-08-26 kullanıcı bulgusu: "sistemin 1. seçimi, AGF favorisinden daha isabetsiz"
 // (dashboard'daki Sistem vs AGF Favorisi kartı: -4.2 puan, n=448). Kök neden araştırıldı:
 // sorun Handikap'a özel değil (orada fark en KÜÇÜK, -1.5) — asıl kanama, sistemin AGF
@@ -1497,12 +1532,19 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
     ? safModelDegerTerfisiUygula(duzeltilmis)
     : duzeltilmis.map((r) => ({ ...r, degerTerfisi: null as "ilk3" | "ilk6" | null }));
 
+  // 2026-11-06 — min(safSira, agfSira) kuralı, bkz. safAgfMinSiraUygula üstündeki not. Bu,
+  // önceki terfi adımlarının (agfTrend/agfFavori/derinLongshot/değerTerfisi) ürettiği sırayı
+  // TAMAMEN geçersiz kılar — kullanıcı kararı budur, iki sistemden hangisi daha iyi görüyorsa
+  // o sıra kesin kullanılır. agfTerfi/degerTerfisi bayrakları SADECE gerekçe metni için
+  // aşağıda gerçek son pozisyona göre yeniden hesaplanır (PRENSES BERRİN deseniyle aynı).
+  const minSiraliSiralanmis = SAF_AGF_MIN_SIRA_AKTIF ? safAgfMinSiraUygula(degerliSiralanmis) : degerliSiralanmis;
+
   // 2026-09-02 EKÜRİ DÜZELTMESİ (İstanbul K6, THEATER OF WAR) — bkz. efektifPencereSiniri
   // üstündeki not. Bir eküri çifti ilk-6 içinde iki ayrı ham pozisyon tutuyorsa, hemen
   // ardından gelen at (THEATER OF WAR gibi) GERÇEKTE ilk-6'nın içinde sayılır — teknikSira
   // (ham 1..N sıra) DEĞİŞMEZ, yalnız "Orta/Yüksek Risk → Düşük Risk" kararı, tıpkı ilk6
   // terfisi/değer terfisi almış bir at gibi, ona da uygulanır.
-  const ilk6EfektifSinir = efektifPencereSiniri(degerliSiralanmis, 6);
+  const ilk6EfektifSinir = efektifPencereSiniri(minSiraliSiralanmis, 6);
 
   // 2026-09-03 kullanıcı bulgusu (İzmir K7, PRENSES BERRİN): agfTrendTerfisiUygula ilk6
   // ADIMINDA onu 6.sıraya taşımıştı (agfTerfi="ilk6" damgalandı) — ama HEMEN ARDINDAN
@@ -1514,7 +1556,7 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
   // hesaplanıyor — bir terfi sonraki bir mekanizma tarafından geri alınmışsa (evict
   // edilmişse) bayrak da onunla birlikte sıfırlanır (ya alt kademeye — ilk3→ilk6 — iner
   // ya da tamamen null olur), muhakeme metni/karar artık HER ZAMAN gerçek son durumu yansıtır.
-  return degerliSiralanmis.map((r, i) => {
+  return minSiraliSiralanmis.map((r, i) => {
     const gercekAgfTerfi: "ilk3" | "ilk6" | null = r.agfTerfi != null ? (i < 3 ? "ilk3" : i < 6 ? "ilk6" : null) : null;
     const gercekDegerTerfisi: "ilk3" | "ilk6" | null = r.degerTerfisi != null ? (i < 3 ? "ilk3" : i < 6 ? "ilk6" : null) : null;
     let karar = kararUret(r.olasilik);
