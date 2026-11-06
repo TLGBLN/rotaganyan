@@ -251,8 +251,8 @@ export async function syncHorseStatsCache(
     db.horseStatsCache.findMany({ where: { tjkAtId: { in: allIds }, updatedAt: { gte: staleCutoff } }, select: { tjkAtId: true } }),
     db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: allIds }, updatedAt: { gte: staleCutoff } }, select: { tjkAtId: true } }),
     db.horseSyncFailure.findMany({ where: { tjkAtId: { in: allIds }, attempts: { gte: MAX_ATTEMPTS } }, select: { tjkAtId: true } }),
-    db.horseStatsCache.findMany({ where: { tjkAtId: { in: allIds } }, select: { tjkAtId: true } }),
-    db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: allIds } }, select: { tjkAtId: true } }),
+    db.horseStatsCache.findMany({ where: { tjkAtId: { in: allIds } }, select: { tjkAtId: true, updatedAt: true } }),
+    db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: allIds } }, select: { tjkAtId: true, updatedAt: true } }),
   ]);
   const freshStatsIds = new Set(freshStats.map((h) => h.tjkAtId));
   const freshHistoryIds = new Set(freshHistory.map((h) => h.tjkAtId));
@@ -270,8 +270,24 @@ export async function syncHorseStatsCache(
   // atlar, findMany'nin (orderBy yok) rastgele sırasında bu devasa bayat kuyruğunun arkasında
   // kalıp süresiz aç kalabiliyordu. Artık aynı günlük bütçe içinde önce tamamen eksik olanlar
   // işlenir, kalan bütçe bayat-yenilemeye gider — yük artmaz, yalnız öncelik doğru sıralanır.
+  //
+  // 2026-11-07 kullanıcı bulgusu (CEZZAR BEY, Ankara K1): "sadece bayat" grubunun KENDİ İÇİNDE
+  // hiç eskilik sırası yoktu (findMany orderBy'sız) — bu at ~55 gün boyunca (3 koşusu atlanarak)
+  // hiç yeniden çekilmeden kalmış, çünkü bu kovadaki konumu Postgres'in döndürdüğü rastgele
+  // sırayla sabitti. Sonuç: gunFarki/kiloDegisimi/ayniJokey (canlı skorlamada "uzun ara" kuralı)
+  // yanlış hesaplandı. Artık "sadece bayat" grubu da en-eski-önce sıralanıyor (iki önbellekten
+  // hangisi daha eskiyse ona göre), böylece hiçbir at süresiz aç kalamaz.
+  const guncellemeZamani = new Map<number, number>();
+  for (const h of existingStats) guncellemeZamani.set(h.tjkAtId, h.updatedAt.getTime());
+  for (const h of existingHistory) {
+    const mevcut = guncellemeZamani.get(h.tjkAtId);
+    const t = h.updatedAt.getTime();
+    if (mevcut === undefined || t < mevcut) guncellemeZamani.set(h.tjkAtId, t);
+  }
   const tamamenEksik = needsSyncAll.filter((id) => !existingStatsIds.has(id) || !existingHistoryIds.has(id));
-  const sadeceBayat = needsSyncAll.filter((id) => existingStatsIds.has(id) && existingHistoryIds.has(id));
+  const sadeceBayat = needsSyncAll
+    .filter((id) => existingStatsIds.has(id) && existingHistoryIds.has(id))
+    .sort((a, b) => (guncellemeZamani.get(a) ?? 0) - (guncellemeZamani.get(b) ?? 0));
   const needsSync = [...tamamenEksik, ...sadeceBayat];
 
   // At başına birden fazla TJK isteği (profil+detay+geçmiş) bazen yavaş/kararsız
