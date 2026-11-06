@@ -32,6 +32,37 @@ import { evaluateAnalysisReady } from "@/lib/methodology/analysis-ready";
 // 2026-08-16 — V5 motoru: Claude çağrısı YOK (yalnız DB okuma + koşullu logit skoru),
 // V4 ile aynı sebeple maxDuration/batching gerekmiyor — tek istekte döner.
 
+// 2026-11-06 kullanıcı KESİN kararı — İSTATİSTİKSEL KANITA RAĞMEN (sireOrani/zeminToleransi/
+// agfPayi-ham-yüzde ile AYNI "prensip vetosu" deseni): "hangisi (Saf Model ya da AGF) bir
+// atı daha İYİ sıraya koyuyorsa O sıra kullanılacak" — min(safSira, agfSira). Yerel
+// backtest'te (v5-engine.ts'in paralel kopyasında, n=461, B500) bu kural Net=-11 (mevcut
+// sistemden DAHA KÖTÜ) çıkmıştı; kullanıcı bunu GÖRDÜ ve yine de istedi.
+//
+// KRİTİK DÜZELTME (aynı gün, ikinci deploy): bu kural İLK ÖNCE `v5-engine.ts`'e (faz2V5Sirala)
+// eklenmişti — ama bu ekranın GERÇEK skor kaynağı `scoreV461`/`scoreV461Saf` (v546-1-engine.ts,
+// "V5.46.1"), faz2V5Sirala'nın çıktısı burada HİÇ KULLANILMIYOR (yalnız gatherFaz1V5
+// metadata için çağrılıyor). O yüzden ilk deploy canlı ekranı hiç etkilemedi — kullanıcı
+// bunu yakaladı. Doğru yer burası.
+function minSiraReorder<
+  T extends { no: number; teknikSira: number; safModelSirasi: number | null; agfSirasi: number; marketBlindProb1: number | null; agfPayi: number }
+>(list: T[]): T[] {
+  const adaylar = list.map((r) => {
+    // safModelSirasi null ise (Saf Model henüz hazır değil/bu at için gözlemsiz) kendi
+    // (AGF-dahil) teknikSira'sı fallback olur — min() o zaman etkisiz kalır, davranış
+    // DEĞİŞMEZ.
+    const safSira = r.safModelSirasi ?? r.teknikSira;
+    const agfSira = r.agfSirasi;
+    const effRank = Math.min(safSira, agfSira);
+    // Çakışma çözümü: aynı effRank'i birden fazla at paylaşıyorsa, o sırayı VEREN sistemin
+    // büyüklüğü (olasılık/pay) yüksek olan önce gelir — v5-engine.ts'teki safAgfMinSiraUygula
+    // ile AYNI mantık/tie-break.
+    const kaynakDeger = safSira <= agfSira ? (r.marketBlindProb1 ?? 0) : r.agfPayi / 100;
+    return { r, effRank, kaynakDeger };
+  });
+  adaylar.sort((a, b) => a.effRank - b.effRank || b.kaynakDeger - a.kaynakDeger || a.r.no - b.r.no);
+  return adaylar.map((a) => a.r);
+}
+
 type Body = { raceId: string };
 
 async function handlePost(req: NextRequest) {
@@ -238,8 +269,13 @@ karar,
     ),
   });
 
+  // 2026-11-06 — min(safSira, agfSira) kuralı burada uygulanır, atlar'ın GÖSTERİM sırasını
+  // (teknikSira) ve dolayısıyla nolar/kupon bölünmesini belirler. Üstteki minSiraReorder'ın
+  // notuna bkz.
+  const atlarMinSirali = minSiraReorder(atlar).map((a, i) => ({ ...a, teknikSira: i + 1 }));
+
   const bankoAdayi = null;
-  const nolar = sirali.map((r) => r.no);
+  const nolar = atlarMinSirali.map((r) => r.no);
   // 2026-11-06 — AGF Destek Katmanı atları artık yalnız gösterim değil, GERÇEKTEN kupona
   // (couponNarrow) ekleniyor — kullanıcı talebi ("sistemin görüp kupona koyması gerek").
   // EKLE tasarımı korunuyor: V5.46.1'in ilk-3'ünden HİÇBİR at çıkarılmıyor, yalnız AGF
@@ -263,7 +299,7 @@ karar,
     kategori: hibritMaidenSatisMi(faz1.race.classType) ? "hibrit" : kategoriTespit(faz1.race.classType),
     kosuBaslik: `${faz1.race.hippodromeName} — ${faz1.race.raceNo}.Koşu | ${faz1.race.classType} | ${faz1.race.breed} | ${faz1.race.distance}m ${faz1.race.surface} | ${faz1.runners.length} at`,
     analysisReady,
-    atlar,
+    atlar: atlarMinSirali,
     runners: faz1.runners.map((r) => ({ id: r.id, no: r.no, name: r.ad })),
     bankoAdayi,
     couponNarrow,
