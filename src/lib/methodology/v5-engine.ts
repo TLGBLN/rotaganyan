@@ -1144,6 +1144,34 @@ function terfiPenceresiV5<T extends { no: number; olasilik: number; ekuriGroup: 
   return { sonuc: kopya, terfiEdenNolar: new Set([aday.no]) };
 }
 
+// 2026-11-06 kullanıcı bulgusu (TILO GIRL vakası, canlı admin ekranı): safModelDegerTerfisiUygula
+// terfiPenceresiV5'in TEK-ADAY/TEK-SLOT tasarımını kullanıyor — bir yarışta BİRDEN FAZLA at
+// kendi eşiğini (fark>=8pp/5pp + nonAgfPozitif) aşsa bile, pencereye SADECE bunlardan en
+// güçlüsü giriyor, diğerleri eşiği geçmiş olsalar da dışarıda kalıyor (2026-11-05'teki LOSTRA
+// bulgusuyla AYNI kök neden). terfiPenceresiV5'in KENDİSİ değiştirilmedi (agfTrendTerfisiUygula
+// onu hâlâ kullanıyor, o mekanizmanın n=663 doğrulaması tek-slot varsayımıyla yapıldı ve
+// ilk6 adaylık şartı ÇOK geniş — agfTrendYonu!=null — çoklu terfi orada pencereyi taşırabilir).
+// Bunun yerine, safModelDegerTerfisiUygula'nın KENDİ (dar, yüksek-eşikli) adaylığı için AYRI
+// bir çoklu-terfi varyantı: aynı tek-adım mantığını (en zayıf sakini TEK seferde yerinden etme,
+// DISPLACED_ORAN_ESIGI koruması) ardışık turlarda, eşiği aşan aday kalmayana veya pencere boyu
+// kadar tur geçene dek tekrarlar — KING ZELAY tipi "doğal güçlü sakini sil" riski YOK (her tur
+// yalnız o anki en zayıf sakini değiştirir, 1./2. sıradaki sakinler asla hedef olmaz).
+function terfiPenceresiCokluV5<T extends { no: number; olasilik: number; ekuriGroup: number | null }>(
+  sirali: T[],
+  pencereBoyu: number,
+  adayMi: (r: T, index: number) => boolean
+): { sonuc: T[]; terfiEdenNolar: Set<number> } {
+  let mevcut = sirali;
+  const terfiEdenNolar = new Set<number>();
+  for (let tur = 0; tur < pencereBoyu; tur++) {
+    const { sonuc, terfiEdenNolar: buTurTerfi } = terfiPenceresiV5(mevcut, pencereBoyu, adayMi);
+    if (buTurTerfi.size === 0) break;
+    mevcut = sonuc;
+    for (const no of buTurTerfi) terfiEdenNolar.add(no);
+  }
+  return { sonuc: mevcut, terfiEdenNolar };
+}
+
 /** V4'ün kanıtlanmış AGF-trend terfi kuralının V5'e uyarlanmış hâli — kullanıcı kararı
  *  2026-08-16: büyük AGF trendi taşıyan atlar, YETERİNCE başka sinyal de taşıyorsa
  *  (bkz. AGF_TERFI_ILK3_SINYAL_ESIGI=4, V4'ün backtest'i: n=663, %21.6/%53.8, kontrol
@@ -1266,13 +1294,13 @@ function safModelDegerTerfisiUygula<
   };
   const isaretsiz = sirali.map((r) => ({ ...r, degerTerfisi: null as "ilk3" | "ilk6" | null }));
 
-  const { sonuc: ilk3Sonrasi, terfiEdenNolar: ilk3Terfi } = terfiPenceresiV5(isaretsiz, 3, (r) => {
+  const { sonuc: ilk3Sonrasi, terfiEdenNolar: ilk3Terfi } = terfiPenceresiCokluV5(isaretsiz, 3, (r) => {
     const fark = r.marketBlindProb1 * 100 - r.agfPayi;
     return fark >= SAF_MODEL_DEGER_ESIGI_ILK3 && nonAgfPozitifMi(r);
   });
   const ilk3Isaretli = ilk3Sonrasi.map((r) => (ilk3Terfi.has(r.no) ? { ...r, degerTerfisi: "ilk3" as const } : r));
 
-  const { sonuc: ilk6Sonrasi, terfiEdenNolar: ilk6Terfi } = terfiPenceresiV5(ilk3Isaretli, 6, (r) => {
+  const { sonuc: ilk6Sonrasi, terfiEdenNolar: ilk6Terfi } = terfiPenceresiCokluV5(ilk3Isaretli, 6, (r) => {
     const fark = r.marketBlindProb1 * 100 - r.agfPayi;
     return fark >= SAF_MODEL_DEGER_ESIGI && nonAgfPozitifMi(r);
   });
