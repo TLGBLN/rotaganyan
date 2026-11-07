@@ -207,9 +207,32 @@ export async function syncDereceIstatistikleri(yil: number): Promise<DereceIstSy
     await bekle(300);
   }
 
+  // 2026-11-07 kullanıcı bulgusu: "eksikleri tespit edip sadece eksikleri çekseydin" —
+  // fetch tarafında (hangi sayfanın eksik olduğunu önceden bilemediğimiz için) tam
+  // şehir taraması zaten gerekli, ama YAZMA tarafında zaten DEĞİŞMEMİŞ kayıtları tekrar
+  // tekrar upsert etmenin anlamı yok. Mevcut kayıtları tjkKayitId+atAdi'ye göre TEK bir
+  // toplu sorguyla çekip, içerik birebir aynıysa upsert'ten tamamen çıkarıyoruz —
+  // Supabase'e yazma yükü yalnızca GERÇEKTEN yeni/değişmiş kayıtlar kadar oluyor.
+  const mevcutlar = await db.tjkDereceKaydi.findMany({
+    where: { tjkKayitId: { in: tumKayitlar.map((k) => k.tjkKayitId) } },
+    select: { tjkKayitId: true, atAdi: true, tarih: true, kilo: true, irk: true, cinsiyet: true, yil: true, hipodrom: true, pist: true, pistDurumu: true, mesafe: true, derece: true, cinsAdi: true },
+  });
+  const mevcutByKey = new Map(mevcutlar.map((m) => [`${m.tjkKayitId}|${m.atAdi}`, m]));
+  const yeniVeyaDegisen = tumKayitlar.filter((k) => {
+    const mevcut = mevcutByKey.get(`${k.tjkKayitId}|${k.atAdi}`);
+    if (!mevcut) return true;
+    return (
+      mevcut.tarih?.getTime() !== k.tarih?.getTime() ||
+      mevcut.kilo !== k.kilo || mevcut.irk !== k.irk || mevcut.cinsiyet !== k.cinsiyet ||
+      mevcut.yil !== k.yil || mevcut.hipodrom !== k.hipodrom || mevcut.pist !== k.pist ||
+      mevcut.pistDurumu !== k.pistDurumu || mevcut.mesafe !== k.mesafe ||
+      mevcut.derece !== k.derece || mevcut.cinsAdi !== k.cinsAdi
+    );
+  });
+
   const BATCH = 500;
-  for (let i = 0; i < tumKayitlar.length; i += BATCH) {
-    const dilim = tumKayitlar.slice(i, i + BATCH);
+  for (let i = 0; i < yeniVeyaDegisen.length; i += BATCH) {
+    const dilim = yeniVeyaDegisen.slice(i, i + BATCH);
     await Promise.all(
       dilim.map((k) =>
         db.tjkDereceKaydi.upsert({
