@@ -243,6 +243,12 @@ model Runner {
   apprentice         Boolean @default(false)
   tjkAtId            Int?
   idmanVideoUrl      String?
+  // 2026-11-07 — TJK'nın program sayfasındaki "KGS" (koşmadığı gün sayısı) sütunu, kendi
+  // AtKosuBilgileri geçmiş-önbelleğimizden TÜRETMEK yerine doğrudan TJK'dan okunur — o
+  // önbellek bayatlayabiliyor (bkz. tjk-at-profil.adapter.ts syncHorseStatsCache), bu alan
+  // aynı program isteğiyle geldiği için bayatlama riski taşımaz. son-yaris-detay.actions.ts
+  // bunu mevcutsa türetilmiş hesaba TERCİH EDER.
+  tjkKgs             Int?
 
   race           Race                 @relation(fields: [raceId], references: [id], onDelete: Cascade)
   gallops        Gallop[]

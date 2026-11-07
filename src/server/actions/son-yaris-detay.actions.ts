@@ -91,7 +91,7 @@ export async function getSonYarisDetaylariForRace(raceId: string): Promise<SonYa
       surface: true,
       classType: true,
       raceDay: { select: { date: true, hippodrome: { select: { name: true } } } },
-      runners: { select: { no: true, name: true, weight: true, jockey: true, equipment: true, tjkAtId: true } },
+      runners: { select: { no: true, name: true, weight: true, jockey: true, equipment: true, tjkAtId: true, tjkKgs: true } },
     },
   });
   if (!race) return [];
@@ -110,7 +110,7 @@ export async function getSonYarisDetaylariForRace(raceId: string): Promise<SonYa
         return {
           runnerNo: r.no, horseName: r.name, hasTjkId: false,
           eklenenTaki: [], cikarilanTaki: [], kiloDegisimi: null, ayniJokey: null,
-          hipodromMesafeEtiket, kazandi: "KOSMADI", enIyiDerecesi: null, sonYarisTarihi: null, gunFarki: null,
+          hipodromMesafeEtiket, kazandi: "KOSMADI", enIyiDerecesi: null, sonYarisTarihi: null, gunFarki: r.tjkKgs ?? null,
           sonYarisSinifi: null, simdikiSinif,
         };
       }
@@ -164,14 +164,18 @@ export async function getSonYarisDetaylariForRace(raceId: string): Promise<SonYa
           runnerNo: r.no, horseName: r.name, hasTjkId: true,
           eklenenTaki, cikarilanTaki, kiloDegisimi, ayniJokey,
           hipodromMesafeEtiket, kazandi, enIyiDerecesi, sonYarisTarihi,
-          gunFarki: gunFarkiHesapla(sonYarisTarihi, race.raceDay.date),
+          // 2026-11-07 — TJK'nın kendi program sayfasındaki KGS (Runner.tjkKgs) varsa ONA
+          // güvenilir, çünkü aynı program isteğiyle gelir ve AtKosuBilgileri geçmiş-önbelleği
+          // bayatladığında (bkz. tjk-at-profil.adapter.ts) yanlış kalmaz. O alan henüz
+          // doldurulmamış eski/backfill koşularda türetilmiş hesaba geri dönülür.
+          gunFarki: r.tjkKgs ?? gunFarkiHesapla(sonYarisTarihi, race.raceDay.date),
           sonYarisSinifi: last?.classType ?? null, simdikiSinif,
         };
       } catch {
         return {
           runnerNo: r.no, horseName: r.name, hasTjkId: true,
           eklenenTaki: [], cikarilanTaki: [], kiloDegisimi: null, ayniJokey: null,
-          hipodromMesafeEtiket, kazandi: "KOSMADI", enIyiDerecesi: null, sonYarisTarihi: null, gunFarki: null,
+          hipodromMesafeEtiket, kazandi: "KOSMADI", enIyiDerecesi: null, sonYarisTarihi: null, gunFarki: r.tjkKgs ?? null,
           sonYarisSinifi: null, simdikiSinif,
         };
       }

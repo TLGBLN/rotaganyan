@@ -1,0 +1,1 @@
+ALTER TABLE "Runner" ADD COLUMN "tjkKgs" INTEGER;

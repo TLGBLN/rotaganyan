@@ -288,7 +288,30 @@ export async function syncHorseStatsCache(
   const sadeceBayat = needsSyncAll
     .filter((id) => existingStatsIds.has(id) && existingHistoryIds.has(id))
     .sort((a, b) => (guncellemeZamani.get(a) ?? 0) - (guncellemeZamani.get(b) ?? 0));
-  const needsSync = [...tamamenEksik, ...sadeceBayat];
+  const siraliTumIhtiyac = [...tamamenEksik, ...sadeceBayat];
+
+  // 2026-11-07 kullanıcı bulgusu (MOON ROCK, Ankara K4): yalnız "en-eski-önce" sıralaması,
+  // hiç koşmayan/pasif bir atı YARIN koşacak bir atın önüne koyabiliyordu — günlük 250'lik
+  // bütçe ~4300 attık genel kuyrukta haftalarca sürdüğü için, "yarın koşuyor" olmak kuyruktaki
+  // konumu hiç etkilemiyordu. Artık bugün/yarın programında koşacak atlar (henüz
+  // sonuçlanmamış) ayrıca tespit edilip kuyruğun EN BAŞINA alınıyor — bir at yarışa
+  // çıkmadan önce profil/geçmiş önbelleği taze olacağı garanti ediliyor, genel bayat
+  // kuyruğunun büyüklüğünden bağımsız olarak.
+  const yakinTarih = new Date(Date.now() + 2 * 86_400_000);
+  const yakinKosacaklar = await db.runner.findMany({
+    where: {
+      tjkAtId: { in: siraliTumIhtiyac },
+      scratched: false,
+      race: { raceDay: { date: { lte: yakinTarih } }, result: { is: null } },
+    },
+    select: { tjkAtId: true },
+    distinct: ["tjkAtId"],
+  });
+  const yakinKosacakSet = new Set(yakinKosacaklar.map((r) => r.tjkAtId!));
+  const needsSync = [
+    ...siraliTumIhtiyac.filter((id) => yakinKosacakSet.has(id)),
+    ...siraliTumIhtiyac.filter((id) => !yakinKosacakSet.has(id)),
+  ];
 
   // At başına birden fazla TJK isteği (profil+detay+geçmiş) bazen yavaş/kararsız
   // uç noktalara denk geldiğinde tek tek işlemek çok yavaş kalıyordu (kullanıcı

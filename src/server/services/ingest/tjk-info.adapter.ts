@@ -270,6 +270,7 @@ export async function fetchCityProgram(
       const iSon6    = col((h) => (h.includes("SON") && h.includes("6")) || h === "SON 6 Y.");
       const iBest    = col((h) => h.includes("EN IYI") || h.includes("E.I.D") || h.includes("ENIYI"));
       const iAgf     = col((h) => h === "AGF");
+      const iKgs     = col((h) => h === "KGS");
 
       if (iNo !== -1 && iName !== -1) {
         table.find("tbody tr").each((_, row) => {
@@ -414,9 +415,12 @@ export async function fetchCityProgram(
             agf = agfMatch ? parseFloat(agfMatch[1].replace(",", ".")) || undefined : undefined;
           }
 
+          const kgsRaw = (cells[iKgs] ?? "").replace(/[^\d]/g, "");
+          const tjkKgs = kgsRaw !== "" ? parseInt(kgsRaw, 10) : undefined;
+
           const ekuriGroup = ekuriMap.get(no) ?? undefined;
 
-          runners.push({ no, name, age, startNo, disaridanStart, weight, jockey, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup, tjkAtId, equipment });
+          runners.push({ no, name, age, startNo, disaridanStart, weight, jockey, apprentice, owner, trainer, sire, dam, damSire, agf, recentForm, recentFormSurfaces, hp, bestTime, scratched, ekuriGroup, tjkAtId, equipment, tjkKgs });
         });
       }
     }

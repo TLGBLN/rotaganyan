@@ -26,6 +26,8 @@ export type IngestRunner = {
   ekuriGroup?: number;
   apprentice?: boolean;
   tjkAtId?: number;
+  // TJK program sayfasının kendi "KGS" (koşmadığı gün sayısı) sütunu — bkz. Runner.tjkKgs.
+  tjkKgs?: number;
 };
 
 export type IngestGallop = {
