@@ -1307,17 +1307,27 @@ export async function syncJockeyStatsFromTjk(
   // Runner verimizdeki isimlerle karşılaştırıp eksik kalanları soyadına göre
   // tek tek TJK'dan sorgulayarak tamamlıyoruz.
   if (opts.includeMissing) {
-    const bulkSurnames = new Set(rows.map((r) => _surname(_norm(r.jockey))));
+    // 2026-11-07 kullanıcı bulgusu (İSMAİL YILDIRIM, Ankara K1): bu kontrol eskiden
+    // SOYAD seviyesindeydi ("YILDIRIM" soyadı zaten toplu listede var mı?") — aynı
+    // soyadı paylaşan birden fazla jokeyden biri (ör. CANER/MEHMET/ÖZCAN YILDIRIM)
+    // toplu listede görününce, TJK'nın kaçırdığı AYNI SOYADLI başka bir jokey (İSMAİL
+    // YILDIRIM) hiç aranmıyordu — "kısmi kapsama" "tam kapsama" sanılıyordu. Artık
+    // TAM (normalize edilmiş) isim üzerinden kontrol ediliyor; TJK sorgusu yine
+    // soyadla yapılıyor (motor öyle çalışıyor), ama bir soyadın toplu listede KISMEN
+    // bulunması o soyadı aramayı artık engellemiyor.
+    const bulkFullNames = new Set(rows.map((r) => _norm(r.jockey)));
     const ourRunners = await db.runner.findMany({
       where: { jockey: { not: null }, race: { raceDay: { date: { gte: new Date(`${year}-01-01T00:00:00Z`) } } } },
       select: { jockey: true },
       distinct: ["jockey"],
     });
-    const missingSurnames = new Map<string, string>(); // normalized → orijinal (TJK araması için)
+    const missingSurnames = new Map<string, string>(); // normalized soyad → orijinal soyad (TJK araması için)
     for (const r of ourRunners) {
       if (!r.jockey || r.jockey.includes("*")) continue;
-      const sur = _surname(_norm(r.jockey));
-      if (sur.length >= 2 && !bulkSurnames.has(sur)) missingSurnames.set(sur, _surnameOriginal(r.jockey));
+      const fullNorm = _norm(r.jockey);
+      if (bulkFullNames.has(fullNorm)) continue;
+      const sur = _surname(fullNorm);
+      if (sur.length >= 2) missingSurnames.set(sur, _surnameOriginal(r.jockey));
     }
 
     const foundJockeys = new Set(rows.map((r) => r.jockey));
