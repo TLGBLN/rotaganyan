@@ -11,10 +11,21 @@
  * doğru parse ETMİYOR (tbody, table dışında geçersiz sayılıp tr'ler kayboluyor), o yüzden
  * sarmalanarak yükleniyor. Her satırın "AtAdi" linkinde TJK'nın kendi kayıt kimliği
  * (#224900 gibi bir fragment) var — bu, tjkKayitId olarak doğal benzersiz anahtar.
+ *
+ * 2026-11-07 KÖK NEDEN DÜZELTMESİ (kullanıcı bulgusu, FENNAN — sonra TÜM atların ortalama
+ * %27.8'e düştüğü görüldü): QueryParameter_SehirId'siz (ya da -1 ile) sorgu "ülke çapında
+ * TÜMÜ" DEĞİL, TJK'nın sessizce ~10.650 sonuçta KESTİĞİ dar bir görünüm döndürüyormuş —
+ * tek tek şehir ID'siyle (1=Adana, 2=İzmir... bkz. IDMAN_SEHIR_ID) sorgulayınca HER şehir
+ * TEK BAŞINA bu sayıya yakın/daha fazla sonuç veriyor (10 şehrin toplamı gerçek rakamın
+ * kat kat üstünde). Aynı kalıp daha önce İdman İstatistikleri'nde de yaşanmıştı (bkz.
+ * tjk-idman-stats.adapter.ts başlık notu: "Liderform'un ana galop sayfası sadece o an öne
+ * çıkan şehri listeliyordu") — bu adaptör o dersi uygulamamıştı. Artık senkron HER şehir
+ * ID'si için AYRI AYRI tam sayfalanıyor, sonuçlar birleştiriliyor.
  */
 import * as cheerio from "cheerio";
 import { db } from "@/lib/db";
 import { parseTjkDate } from "@/lib/tjk-date";
+import { IDMAN_SEHIR_ID } from "./tjk-idman-stats.adapter";
 
 const BASE = "https://www.tjk.org/TR/YarisSever/Query/DataRows/DetayliDereceIst";
 const HEADERS = {
@@ -41,8 +52,8 @@ type Kayit = {
   cinsAdi: string;
 };
 
-async function fetchSayfa(yil: number, sayfaNo: number): Promise<Kayit[]> {
-  const url = `${BASE}?QueryParameter_Yil=${yil}&PageNumber=${sayfaNo}`;
+async function fetchSayfa(yil: number, sehirId: number, sayfaNo: number): Promise<Kayit[]> {
+  const url = `${BASE}?QueryParameter_Yil=${yil}&QueryParameter_SehirId=${sehirId}&PageNumber=${sayfaNo}`;
   const res = await fetch(url, { headers: HEADERS });
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`);
   const html = await res.text();
@@ -94,11 +105,11 @@ function bekle(ms: number): Promise<void> {
 // çıktı (41-43/159) — tesadüfi ağ gürültüsü değil, TJK'nın 8 eşzamanlı isteğe karşı
 // hız sınırlaması/kısıtlaması olabilir. Başarısız sayfalar artık 3 kez, aralarda kısa
 // bir bekleme ile yeniden deneniyor.
-async function fetchSayfaRetryli(yil: number, sayfaNo: number, deneme = 3): Promise<Kayit[]> {
+async function fetchSayfaRetryli(yil: number, sehirId: number, sayfaNo: number, deneme = 3): Promise<Kayit[]> {
   let sonHata: unknown;
   for (let i = 0; i < deneme; i++) {
     try {
-      return await fetchSayfa(yil, sayfaNo);
+      return await fetchSayfa(yil, sehirId, sayfaNo);
     } catch (e) {
       sonHata = e;
       if (i < deneme - 1) await bekle(500 * (i + 1));
@@ -120,6 +131,7 @@ async function fetchSayfaRetryli(yil: number, sayfaNo: number, deneme = 3): Prom
  */
 async function basarisizSayfalariTekrarDene(
   yil: number,
+  sehirId: number,
   sayfaNolar: number[],
   tumKayitlar: Kayit[]
 ): Promise<number[]> {
@@ -132,7 +144,7 @@ async function basarisizSayfalariTekrarDene(
       const sonuclar = await Promise.all(
         dilim.map(async (sayfaNo) => {
           try {
-            return await fetchSayfaRetryli(yil, sayfaNo);
+            return await fetchSayfaRetryli(yil, sehirId, sayfaNo);
           } catch {
             yeniKalanlar.push(sayfaNo);
             return [] as Kayit[];
@@ -146,32 +158,54 @@ async function basarisizSayfalariTekrarDene(
   return kalanlar;
 }
 
-/** Verilen yıl için TÜM sayfaları çekip TjkDereceKaydi'ne upsert eder. */
-export async function syncDereceIstatistikleri(yil: number): Promise<DereceIstSyncSonuc> {
-  const ilkSayfa = await fetchSayfaRetryli(yil, 1);
-  const ilkHtml = await (await fetch(`${BASE}?QueryParameter_Yil=${yil}`, { headers: HEADERS })).text();
+/** Tek bir şehir için (verilen yıl) TÜM sayfaları çeker — TjkDereceKaydi'ye yazmaz. */
+async function senkronizeEtSehir(yil: number, sehirId: number): Promise<{ kayitlar: Kayit[]; toplamSayfa: number; hataSayfaSayisi: number }> {
+  const ilkSayfa = await fetchSayfaRetryli(yil, sehirId, 1);
+  const ilkHtml = await (
+    await fetch(`${BASE}?QueryParameter_Yil=${yil}&QueryParameter_SehirId=${sehirId}`, { headers: HEADERS })
+  ).text();
   const toplamMatch = /(\d+)\s*sonu[cç]/i.exec(ilkHtml);
   const toplamSonuc = toplamMatch ? parseInt(toplamMatch[1], 10) : ilkSayfa.length;
   const toplamSayfa = Math.max(1, Math.ceil(toplamSonuc / SAYFA_BOYU));
 
-  const tumKayitlar: Kayit[] = [...ilkSayfa];
+  const kayitlar: Kayit[] = [...ilkSayfa];
   const basarisizSayfaNolar: number[] = [];
 
   for (let i = 2; i <= toplamSayfa; i += CONCURRENCY) {
     const dilim = Array.from({ length: Math.min(CONCURRENCY, toplamSayfa - i + 1) }, (_, j) => i + j);
     const sonuclar = await Promise.all(
       dilim.map((sayfaNo) =>
-        fetchSayfaRetryli(yil, sayfaNo).catch(() => {
+        fetchSayfaRetryli(yil, sehirId, sayfaNo).catch(() => {
           basarisizSayfaNolar.push(sayfaNo);
           return [] as Kayit[];
         })
       )
     );
-    for (const s of sonuclar) tumKayitlar.push(...s);
+    for (const s of sonuclar) kayitlar.push(...s);
   }
 
-  const halaBasarisiz = await basarisizSayfalariTekrarDene(yil, basarisizSayfaNolar, tumKayitlar);
-  const hataSayfaSayisi = halaBasarisiz.length;
+  const halaBasarisiz = await basarisizSayfalariTekrarDene(yil, sehirId, basarisizSayfaNolar, kayitlar);
+  return { kayitlar, toplamSayfa, hataSayfaSayisi: halaBasarisiz.length };
+}
+
+/**
+ * Verilen yıl için TÜM şehirleri (IDMAN_SEHIR_ID'deki 10 hipodrom) TEK TEK tam sayfalayıp
+ * TjkDereceKaydi'ne upsert eder. ŞehirId'siz/-1 sorgu TJK tarafında sessizce ~10.650
+ * sonuçta kesiliyor — bkz. dosya başlığındaki 2026-11-07 notu.
+ */
+export async function syncDereceIstatistikleri(yil: number): Promise<DereceIstSyncSonuc> {
+  const sehirIdler = Object.values(IDMAN_SEHIR_ID);
+  const tumKayitlar: Kayit[] = [];
+  let toplamSayfa = 0;
+  let hataSayfaSayisi = 0;
+
+  for (const sehirId of sehirIdler) {
+    const sonuc = await senkronizeEtSehir(yil, sehirId);
+    tumKayitlar.push(...sonuc.kayitlar);
+    toplamSayfa += sonuc.toplamSayfa;
+    hataSayfaSayisi += sonuc.hataSayfaSayisi;
+    await bekle(300);
+  }
 
   const BATCH = 500;
   for (let i = 0; i < tumKayitlar.length; i += BATCH) {
