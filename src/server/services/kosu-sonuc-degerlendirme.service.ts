@@ -46,6 +46,7 @@ export type YarisDegerlendirme = {
   tarih: string;
   hipodrom: string;
   raceNo: number;
+  classType: string;
   n: number;
   kazananNo: number;
   kazananAd: string;
@@ -135,6 +136,7 @@ export async function kosuKayitlari() {
     select: {
       id: true,
       raceNo: true,
+      classType: true,
       raceDay: { select: { date: true, hippodrome: { select: { name: true } } } },
       result: { select: { winnerNo: true, winnerNos: true, hitInCoupon: true } },
       prediction: {
@@ -224,6 +226,7 @@ export function yarisHesapla(r: KosuKaydi, kuponlar: KuponSatiri[] = []): YarisD
     tarih: r.raceDay.date.toISOString().slice(0, 10),
     hipodrom: r.raceDay.hippodrome.name,
     raceNo: r.raceNo,
+    classType: r.classType,
     n: picks.length,
     kazananNo,
     kazananAd: kazanan?.ad ?? `#${kazananNo} (yayınlanan listede yok)`,

@@ -213,6 +213,7 @@ export default async function AdminRootCausePage({ searchParams }: PageProps) {
                   <tr className="border-b bg-muted/50 text-muted-foreground">
                     <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Tarih</th>
                     <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Hipodrom/Koşu</th>
+                    <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Koşu Tipi</th>
                     <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Kazanan</th>
                     <th className="px-2 py-2 text-center font-medium whitespace-nowrap">Model Sırası</th>
                     <th className="px-2 py-2 text-center font-medium whitespace-nowrap">Olay Nedeni</th>
@@ -225,6 +226,7 @@ export default async function AdminRootCausePage({ searchParams }: PageProps) {
                     <tr key={o.y.raceId} className={cn("border-b last:border-0 hover:bg-muted/30", secili?.y.raceId === o.y.raceId && "bg-muted/40")}>
                       <td className="px-2 py-2 whitespace-nowrap"><Link href={`?gun=${gun}&raceId=${o.y.raceId}`} className="block">{o.y.tarih}</Link></td>
                       <td className="px-2 py-2 whitespace-nowrap">{o.y.hipodrom} #{o.y.raceNo}</td>
+                      <td className="px-2 py-2 whitespace-nowrap text-muted-foreground">{o.y.classType}</td>
                       <td className="px-2 py-2 font-medium whitespace-nowrap">{o.y.kazananNo} {o.y.kazananAd}</td>
                       <td className="px-2 py-2 text-center tabular-nums font-bold text-risk whitespace-nowrap">{o.y.modelSira}.</td>
                       <td className={cn("px-2 py-2 text-center font-medium whitespace-nowrap", ec ? EVENT_CAUSE_RENK[ec.eventCause] : "text-muted-foreground")}>
@@ -245,7 +247,7 @@ export default async function AdminRootCausePage({ searchParams }: PageProps) {
 
           {secili && (
             <div className="rounded-lg border p-4 space-y-3">
-              <h3 className="text-sm font-bold">{secili.y.hipodrom} #{secili.y.raceNo} · {secili.y.tarih}</h3>
+              <h3 className="text-sm font-bold">{secili.y.hipodrom} #{secili.y.raceNo} · {secili.y.tarih} <span className="text-muted-foreground font-normal">· {secili.y.classType}</span></h3>
               <RcaAdim etiket="OLAY" renk="text-foreground">
                 Kazanan: <b>{secili.y.kazananNo} {secili.y.kazananAd}</b> — model sırası <b className="text-risk">{secili.y.modelSira}.</b> (yayınlanan sıra: {secili.y.yayinlananSira ?? "—"})
               </RcaAdim>
