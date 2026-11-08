@@ -32,10 +32,18 @@ function pozisyonaGoreArttir(s: Sayac, pos: number | null): void {
   else if (pos === 5) s.besinci++;
 }
 
+// 2026-11-08 kullanıcı bulgusu (LION HEART (USA) damsire karşılaştırması): "karma"
+// hipodromu GERÇEK yarışların bahis-kombinasyonu MIRROR'ı — aynı sonucu TEKRAR sayıyordu,
+// SireStatOwn/DamStatOwn/DamSireStatOwn'ı sistematik olarak şişiriyordu (LION HEART
+// damsire örneğinde 638 start → 107'si karma → gerçek 531, dış referans 528'e neredeyse
+// birebir eşleşti). Projenin geri kalanında zaten standart olan Karma Çift Sayım Kontrolü
+// burada da uygulandı (bkz. feedback_karma_cift_sayim_kontrolu).
+const GERCEK_OLMAYAN_HIPODROM_SLUGLARI = ["karma", "perak-malezya"];
+
 export async function syncOwnPedigreeStats(): Promise<{ sireRows: number; damRows: number; damSireRows: number }> {
   // ── Aygır (sire) ──
   const sireRunners = await db.runner.findMany({
-    where: { sire: { not: null }, race: { result: { isNot: null } } },
+    where: { sire: { not: null }, race: { result: { isNot: null }, raceDay: { hippodrome: { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI } } } } },
     select: {
       sire: true,
       no: true,
@@ -87,7 +95,7 @@ export async function syncOwnPedigreeStats(): Promise<{ sireRows: number; damRow
 
   // ── Kısrak (dam + dam babası) — ikisi birlikte anahtar ──
   const damRunners = await db.runner.findMany({
-    where: { dam: { not: null }, damSire: { not: null }, race: { result: { isNot: null } } },
+    where: { dam: { not: null }, damSire: { not: null }, race: { result: { isNot: null }, raceDay: { hippodrome: { slug: { notIn: GERCEK_OLMAYAN_HIPODROM_SLUGLARI } } } } },
     select: {
       dam: true,
       damSire: true,

@@ -38,8 +38,12 @@ export async function getJokeyFormTablosu(
   const ref180Baslangic = new Date(asOfDate.getTime() - 180 * 86400000);
   const ref365Baslangic = new Date(asOfDate.getTime() - 365 * 86400000);
 
+  // 2026-11-08 kullanıcı bulgusu (LION HEART (USA) damsire karşılaştırması, bkz.
+  // pedigri-own-stat.service.ts'teki aynı tarihli not) — "karma" hipodromu GERÇEK
+  // yarışların bahis-kombinasyonu MIRROR'ı, aynı sonucu TEKRAR sayıyor. Burada da
+  // (jokey formu) aynı çift-sayım riski vardı — düzeltildi.
   const runners = await db.runner.findMany({
-    where: { scratched: false, jockey: { not: null }, race: { result: { isNot: null }, raceDay: { date: { lt: asOfDate } } } },
+    where: { scratched: false, jockey: { not: null }, race: { result: { isNot: null }, raceDay: { date: { lt: asOfDate }, hippodrome: { slug: { notIn: ["karma", "perak-malezya"] } } } } },
     select: {
       no: true,
       jockey: true,
