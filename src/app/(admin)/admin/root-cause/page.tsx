@@ -259,7 +259,6 @@ export default async function AdminRootCausePage({ searchParams }: PageProps) {
                     {missSiniflandirma.missType === "PUBLISH_OVERRIDE_MISS" && <span className="block text-[11px] text-muted-foreground mt-0.5">Sorun kupon dağıtım hesabında değil — yayın süreci/elle düzenleme araştırılır.</span>}
                     {missSiniflandirma.missType === "ALLOCATOR_MISS" && <span className="block text-[11px] text-muted-foreground mt-0.5">Sorun modelde değil — bütçe/kupon genişliği ayarı (farklı genişlik yakalardı) araştırılır.</span>}
                     {missSiniflandirma.missType === "ANALYSIS_MISS" && <span className="block text-[11px] text-muted-foreground mt-0.5">Hiçbir makul bütçe yakalamazdı — model/sinyal/kalibrasyon araştırılır.</span>}
-                    <span className="block text-[10px] text-amber-600 dark:text-amber-400 mt-1">⚠ {missSiniflandirma.liveStateUyarisi}</span>
                   </>
                 ) : "—"}
               </RcaAdim>
