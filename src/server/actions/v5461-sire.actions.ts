@@ -9,6 +9,46 @@ export type V5461SireOzet = {
   kYuzde: number | null;
 };
 
+type SireHamSatir = {
+  sire: string | null; no: number;
+  race: { breed: string; surface: string; distance: number; raceDay: { date: Date }; result: { actualOrder: unknown; winnerNos: number[] } | null };
+};
+
+// 2026-10-23 performans düzeltmesi (kullanıcı bulgusu — "4557 yarışlık veri toplama neden
+// yavaş"): bu sorgu sireNames/breed/surface/distance/cutoff'tan BAĞIMSIZ olarak HER ÇAĞRIDA
+// TÜM soy geçmişini (binlerce Runner satırı) yeniden çekiyordu — filtreler yalnız BELLEK
+// İÇİNDE uygulanıyordu. Hem canlı scoreV461 (her admin analizinde) hem toplu eğitim
+// script'lerinde (yüzlerce/binlerce yarış) bu AYNI ham veriyi tekrar tekrar çekmek gereksiz
+// — tumOnbellegiGetir/tumFarklariGetir (hiz-derecesi.actions.ts, tempo-tasima-gucu.actions.ts)
+// ile AYNI desen: modül-seviyesi TTL'li önbellek. FİLTRELEME MANTIĞI DEĞİŞMEDİ, yalnız ham
+// `rows` artık tekrar tekrar sorgulanmıyor.
+const SIRE_ONBELLEK_TTL_MS = 30 * 60 * 1000;
+let sireOnbellek: { rows: SireHamSatir[]; zaman: number } | null = null;
+async function tumSireSatirlariniGetir(): Promise<SireHamSatir[]> {
+  if (sireOnbellek && Date.now() - sireOnbellek.zaman < SIRE_ONBELLEK_TTL_MS) return sireOnbellek.rows;
+  // 2026-11-09 — "karma" hipodromu GERÇEK yarışların bahis-kombinasyonu MIRROR'ı, aynı
+  // sonucu TEKRAR sayıyor (bkz. pedigri-own-stat.service.ts/jokey-form.actions.ts'teki
+  // 2026-11-08 LION HEART (USA) bulgusu — aynı çift-sayım burada da vardı, düzeltildi).
+  const rows = await db.runner.findMany({
+    where: { scratched: false, sire: { not: null }, race: { result: { isNot: null }, raceDay: { hippodrome: { slug: { notIn: ["karma", "perak-malezya"] } } } } },
+    select: {
+      sire: true,
+      no: true,
+      race: {
+        select: {
+          breed: true,
+          surface: true,
+          distance: true,
+          raceDay: { select: { date: true } },
+          result: { select: { actualOrder: true, winnerNos: true } },
+        },
+      },
+    },
+  });
+  sireOnbellek = { rows, zaman: Date.now() };
+  return rows;
+}
+
 export async function getV5461SireOzetleriForRace(
   sireNames: (string | null)[],
   breed: string,
@@ -27,22 +67,7 @@ export async function getV5461SireOzetleriForRace(
     return sireNames.map(() => ({ ornekKendiVeri: null, kYuzde: null }));
   }
 
-  const rows = await db.runner.findMany({
-    where: { scratched: false, sire: { not: null }, race: { result: { isNot: null } } },
-    select: {
-      sire: true,
-      no: true,
-      race: {
-        select: {
-          breed: true,
-          surface: true,
-          distance: true,
-          raceDay: { select: { date: true } },
-          result: { select: { actualOrder: true, winnerNos: true } },
-        },
-      },
-    },
-  });
+  const rows = await tumSireSatirlariniGetir();
 
   const sayim = new Map<string, { start: number; wins: number }>();
   const cutoffMs = cutoffTarih.getTime();

@@ -31,6 +31,7 @@
 import { db } from "@/lib/db";
 import { gatherV461RawSinyaller, type RawSinyalGirdi } from "./v546-1-engine";
 import { getJokeyFormTablosu } from "@/server/actions/jokey-form.actions";
+import { getV5461DamOzetleriForRace, getV5461DamsireOzetleriForRace, type V5461DamlineOzet } from "@/server/actions/v5461-damline.actions";
 import type { Faz1RunnerV5 } from "./v5-engine";
 import type { AccuraceRun } from "@/lib/accurace/types";
 
@@ -83,12 +84,12 @@ const VARSAYILAN_5: PillarKodu[] = ["acc", "tempo", "jokey", "pedigri", "kgs"];
 const KATEGORI_PILLAR_SETI: Record<string, PillarKodu[]> = {
   "Handikap": ["pedigri", "zeminMesafe"],
   "Grup (G1/G2/G3)": ["pedigri", "zeminMesafe"],
-  // 2026-11-08 kullanıcı talebi — Antrenör Oranı, İstanbul K1 Şartlı 1 vaka incelemesinde
-  // en ayırt edici sinyaldi (bkz. proje hafızası); kullanıcı B300 testini BEKLEMEDEN
-  // doğrudan eklenmesini istedi ("direk ekle, teste gerek yok") — standart "yenilik önce
-  // backtest" disiplininden BİLİNÇLİ, açık bir istisna, yalnız Düşük Deneyim'e (asıl
-  // tartışılan Şartlı 1/27 dahil) uygulandı.
-  "Düşük Deneyim": ["acc", "pedigri", "kgs", "antrenor"],
+  // 2026-11-08 kullanıcı KİLİTLİ talimatı (verbatim): "Şartlı 1/27 gibi (Accurace'siz)
+  // koşularda tek tek değil, Pedigri+Jokey+Galop+Antrenör'ü BİRLİKTE okumak lazım... Bunları
+  // kilitle bunlara." — Acc/Tempo bu kategoride KULLANILMAZ (bu atların Accurace geçmişi
+  // zaten yok/anlamsız — kategori adı da bundan). Önceki sürümde yanlışlıkla "acc" buradaydı,
+  // "jokey" eksikti — düzeltildi.
+  "Düşük Deneyim": ["pedigri", "jokey", "kgs", "antrenor"],
   "Orta Deneyim": ["acc", "tempo", "jokey", "pedigri", "kgs", "zeminMesafe"],
   "Kanıtlanmış": VARSAYILAN_5,
   "Diğer": VARSAYILAN_5,
@@ -118,14 +119,28 @@ function kgsSkoru(r: Faz1RunnerV5, breed: string): number | null {
 // RAN v2 bu YANLIŞ (statik) kaynağı kullanıyordu — düzeltildi: artık Faz1RunnerV5'in
 // ZATEN hesapladığı sireKazanmaOraniHam (= SireStatOwn.kYuzde, ekstra sorgu GEREKMİYOR)
 // + sireOrneklemKendiVeri (örneklem büyüklüğü) kullanılıyor — "Own Sire", V5'in canlı
-// skorunda kullandığı TEK pedigri sinyaliyle AYNI kaynak. Dam/DamSire (DamStatOwn)
-// V5'te yalnız audit/destek verisi (skora girmiyor) — RAN v2'ye de HENÜZ eklenmedi,
-// ayrı test edilmeden eklenmeyecek (bkz. feedback_yenilik_once_backtest).
+// skorunda kullandığı TEK pedigri sinyaliyle AYNI kaynak.
+// 2026-11-09 kullanıcı talebi ("V5.46.1'i unut, Dam/DamSire ekle") — RAN v2 V5.46.1'den
+// BAĞIMSIZ bir motor, V5'in "yalnız Own Sire" kısıtlamasına uymak ZORUNDA değil. Dam/DamSire
+// artık getV5461DamOzetleriForRace/getV5461DamsireOzetleriForRace (point-in-time güvenli,
+// v5461-sire.actions.ts ile AYNI desen) ile çekiliyor ve Sire ile birlikte ortalanıyor — her
+// biri kendi örneklem eşiğinden (PEDIGRI_MIN_ORNEK) bağımsız geçmeli, eksik olan atlanır
+// (0'a çekilmez). Henüz B300 ile AYRI doğrulanmadı (kullanıcı testsiz eklenmesini istedi,
+// Antrenör pillar'ında olduğu gibi bilinçli bir istisna).
 const PEDIGRI_MIN_ORNEK = 3;
-function pedigriSkoru(r: Faz1RunnerV5): number | null {
-  if (r.sireKazanmaOraniHam == null || r.sireOrneklemKendiVeri == null) return null;
-  if (r.sireOrneklemKendiVeri < PEDIGRI_MIN_ORNEK) return null;
-  return r.sireKazanmaOraniHam;
+function pedigriSkoru(r: Faz1RunnerV5, damOzet: V5461DamlineOzet, damSireOzet: V5461DamlineOzet): number | null {
+  const parcalar: number[] = [];
+  if (r.sireKazanmaOraniHam != null && r.sireOrneklemKendiVeri != null && r.sireOrneklemKendiVeri >= PEDIGRI_MIN_ORNEK) {
+    parcalar.push(r.sireKazanmaOraniHam);
+  }
+  if (damOzet.kYuzde != null && damOzet.ornekKendiVeri != null && damOzet.ornekKendiVeri >= PEDIGRI_MIN_ORNEK) {
+    parcalar.push(damOzet.kYuzde);
+  }
+  if (damSireOzet.kYuzde != null && damSireOzet.ornekKendiVeri != null && damSireOzet.ornekKendiVeri >= PEDIGRI_MIN_ORNEK) {
+    parcalar.push(damSireOzet.kYuzde);
+  }
+  if (parcalar.length === 0) return null;
+  return parcalar.reduce((a, b) => a + b, 0) / parcalar.length;
 }
 
 function bul(ad: string, sinyaller: RawSinyalGirdi[]): RawSinyalGirdi | undefined {
@@ -186,6 +201,21 @@ export async function hesaplaRanV2(raceId: string, preloadedRuns?: AccuraceRun[]
     : [];
   const ayniYuzeydeGecmisiOlanSet = new Set(ayniYuzeydeGecmisiOlanlar.map((x) => x.tjkAtId));
 
+  // Dam/DamSire isimleri Faz1RunnerV5'te YOK (yalnız sireKazanmaOraniHam taşıyor) — ayrı,
+  // tek seferlik bir sorguyla çekilip raw.runners SIRASIYLA hizalanıyor.
+  const damDamSireRows = await db.runner.findMany({ where: { id: { in: runnerIds } }, select: { id: true, dam: true, damSire: true } });
+  const damDamSireByRunnerId = new Map(damDamSireRows.map((x) => [x.id, x]));
+  const damNamesOrdered = raw.runners.map(({ r }) => damDamSireByRunnerId.get(r.id)?.dam ?? null);
+  const damSireNamesOrdered = raw.runners.map(({ r }) => damDamSireByRunnerId.get(r.id)?.damSire ?? null);
+  const [damOzetleri, damSireOzetleri] = await Promise.all([
+    getV5461DamOzetleriForRace(damNamesOrdered, raw.race.breed, raw.race.surface, raw.race.distance, raceDate).catch(
+      () => damNamesOrdered.map(() => ({ ornekKendiVeri: null, kYuzde: null }) as V5461DamlineOzet)
+    ),
+    getV5461DamsireOzetleriForRace(damSireNamesOrdered, raw.race.breed, raw.race.surface, raw.race.distance, raceDate).catch(
+      () => damSireNamesOrdered.map(() => ({ ornekKendiVeri: null, kYuzde: null }) as V5461DamlineOzet)
+    ),
+  ]);
+
   const accHam: (number | null)[] = [];
   const tempoHam: (number | null)[] = [];
   const jokeyHam: (number | null)[] = [];
@@ -194,7 +224,7 @@ export async function hesaplaRanV2(raceId: string, preloadedRuns?: AccuraceRun[]
   const zeminMesafeHam: (number | null)[] = [];
   const antrenorHam: (number | null)[] = [];
 
-  for (const { r, rawSinyaller } of raw.runners) {
+  for (const [i, { r, rawSinyaller }] of raw.runners.entries()) {
     // Accurace pillar: ACC_CLOSE_RES + ACC_SPEED ortalaması. ACC_LATE bilerek HARİÇ —
     // zaten yarisGidisatiSkoru'nun "tempo taşıma gücü" girdisi üzerinden Tempo pillar'ına
     // giriyor (çift sayım riski).
@@ -214,8 +244,9 @@ export async function hesaplaRanV2(raceId: string, preloadedRuns?: AccuraceRun[]
     const jokeyForm = r.jockey ? jokeyTablosu.get(r.jockey)?.guncel : undefined;
     jokeyHam.push(jokeyForm?.etkinForm ?? null);
 
-    // Pedigri pillar: soy hattının aynı mesafe-bandındaki kazanma oranı.
-    pedigriHam.push(pedigriSkoru(r));
+    // Pedigri pillar: Sire+Dam+DamSire'ın aynı ırk/pist/mesafe-bandındaki kazanma oranı
+    // ortalaması (eksik olan atlanır, 0'a çekilmez).
+    pedigriHam.push(pedigriSkoru(r, damOzetleri[i], damSireOzetleri[i]));
 
     // KGS (koşu aralığı) pillar.
     kgsHam.push(kgsSkoru(r, raw.race.breed));
