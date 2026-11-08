@@ -22,6 +22,42 @@ import { reliability, K_REF_MIN_SAMPLE, classifyEtkinFormDurum, type JokeyGuncel
 // topluyor) — bu yüzden type'lar BURADA HİÇ re-export edilmiyor. Admin sayfası/
 // V5AnalysisPanel/testler DOĞRUDAN @/lib/jokey-form'dan import eder.
 
+type JokeyHamSatir = {
+  no: number; jockey: string;
+  race: { raceDay: { date: Date; hippodromeId: string }; result: { actualOrder: unknown; winnerNos: number[] } };
+};
+
+// 2026-11-09 kullanıcı talebi ("Supabase kesinlikle zorlanmayacak") — bu fonksiyon asOfDate
+// başına TÜM Runner geçmişini (tarih üst sınırı yok) yeniden çekiyordu, önbelleksiz. B300+
+// ölçekli export'larda (her koşu farklı asOfDate ile çağrılır) bu, AYNI tam-tablo taramasının
+// onlarca/yüzlerce kez tekrarı demekti — v5461-sire.actions.ts/v5461-damline.actions.ts'teki
+// 30-dakikalık "ham satırları bir kere çek, sonrasını bellekte filtrele" deseniyle AYNI
+// düzeltme burada da uygulandı. Davranış DEĞİŞMEDİ, yalnız DB'ye gidiş sayısı azaldı.
+const JOKEY_ONBELLEK_TTL_MS = 30 * 60 * 1000;
+let jokeyOnbellek: { rows: JokeyHamSatir[]; zaman: number } | null = null;
+async function tumJokeySatirlariniGetir(): Promise<JokeyHamSatir[]> {
+  if (jokeyOnbellek && Date.now() - jokeyOnbellek.zaman < JOKEY_ONBELLEK_TTL_MS) return jokeyOnbellek.rows;
+  // 2026-11-08 kullanıcı bulgusu (LION HEART (USA) damsire karşılaştırması, bkz.
+  // pedigri-own-stat.service.ts'teki aynı tarihli not) — "karma" hipodromu GERÇEK
+  // yarışların bahis-kombinasyonu MIRROR'ı, aynı sonucu TEKRAR sayıyor. Burada da
+  // (jokey formu) aynı çift-sayım riski vardı — düzeltildi.
+  const rows = await db.runner.findMany({
+    where: { scratched: false, jockey: { not: null }, race: { result: { isNot: null }, raceDay: { hippodrome: { slug: { notIn: ["karma", "perak-malezya"] } } } } },
+    select: {
+      no: true,
+      jockey: true,
+      race: {
+        select: {
+          raceDay: { select: { date: true, hippodromeId: true } },
+          result: { select: { actualOrder: true, winnerNos: true } },
+        },
+      },
+    },
+  }) as JokeyHamSatir[];
+  jokeyOnbellek = { rows, zaman: Date.now() };
+  return rows;
+}
+
 /**
  * TÜM jokeyler için tek bulk sorgudan Son 30 Gün + (varsa) hipodrom formu üretir.
  * asOfDate: yalnız bundan KESİNLİKLE ÖNCEKİ yarışlar kullanılır (PIT). K_REF, son 30 günü
@@ -38,23 +74,10 @@ export async function getJokeyFormTablosu(
   const ref180Baslangic = new Date(asOfDate.getTime() - 180 * 86400000);
   const ref365Baslangic = new Date(asOfDate.getTime() - 365 * 86400000);
 
-  // 2026-11-08 kullanıcı bulgusu (LION HEART (USA) damsire karşılaştırması, bkz.
-  // pedigri-own-stat.service.ts'teki aynı tarihli not) — "karma" hipodromu GERÇEK
-  // yarışların bahis-kombinasyonu MIRROR'ı, aynı sonucu TEKRAR sayıyor. Burada da
-  // (jokey formu) aynı çift-sayım riski vardı — düzeltildi.
-  const runners = await db.runner.findMany({
-    where: { scratched: false, jockey: { not: null }, race: { result: { isNot: null }, raceDay: { date: { lt: asOfDate }, hippodrome: { slug: { notIn: ["karma", "perak-malezya"] } } } } },
-    select: {
-      no: true,
-      jockey: true,
-      race: {
-        select: {
-          raceDay: { select: { date: true, hippodromeId: true } },
-          result: { select: { actualOrder: true, winnerNos: true } },
-        },
-      },
-    },
-  });
+  const tumSatirlar = await tumJokeySatirlariniGetir();
+  // PIT: asOfDate'ten SONRAKİ (veya eşit) kayıtlar bu çağrı için hiç görülmemeli — ham
+  // önbellek tüm tarihleri taşıdığı için filtre burada, bellekte uygulanıyor.
+  const runners = tumSatirlar.filter((r) => r.race.raceDay.date.getTime() < asOfDate.getTime());
 
   type Toplam = { start: number; win: number; top3: number };
   const son30ByJokey = new Map<string, Toplam>();
