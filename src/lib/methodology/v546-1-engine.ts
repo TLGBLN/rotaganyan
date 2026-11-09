@@ -315,7 +315,15 @@ export async function scoreV461Saf(raceId: string, safWeights: FrozenWeights): P
   const rawSonuc = await gatherV461RawSinyaller(raceId);
   if (!rawSonuc) return null;
 
-  const sirali = puanlaVeSirala(safWeights, rawSonuc.runners, (ad) => !SAF_MODEL_AGF_KODLARI.has(ad));
+  // 2026-11-10 BUG DÜZELTMESİ (kullanıcı bulgusu — "bilinmeyen feature adı 'yakinsama2Plus'"
+  // çökmesi): filtre önceden SABİT SAF_MODEL_AGF_KODLARI'ydı (yalnız 3 AGF kodu) — Saf Model
+  // 16'dan 15 özelliğe (yakinsama2Plus de çıkarılarak) indirildiğinde bu filtre GÜNCELLENMEMİŞTİ,
+  // gatherV461RawSinyaller'ın ürettiği yakinsama2Plus ham sinyali hâlâ puanlaVeSirala'ya
+  // geçiyor ama weights.json'da (artık 15 özellik) karşılığı YOK — bandeNoktala çöküyordu.
+  // Artık filtre safWeights'in KENDİ featureNames'inden türetiliyor — özellik sayısı ileride
+  // tekrar değişirse bu hata sınıfı BİR DAHA oluşmaz.
+  const safFeatureSet = new Set(safWeights.featureNames);
+  const sirali = puanlaVeSirala(safWeights, rawSonuc.runners, (ad) => safFeatureSet.has(ad));
   const picks: V461SafPick[] = sirali
     .map((s) => ({ runnerId: s.r.id, no: s.r.no, ad: s.r.ad, score: s.score, probability: s.probability, rank: s.rank, features: s.features }))
     .sort((a, b) => a.rank - b.rank);

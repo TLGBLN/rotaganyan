@@ -1,6 +1,6 @@
 {
   "status": "READY",
-  "version": "V5.46.1-SAF-15",
+  "version": "RotaGanyan Analiz Motoru",
   "generatedAt": "2026-11-09T22:09:46.511Z",
   "note": "AGF'siz (agfSirasi/agfPayi/agfPayi2 HARIÇ) + yakinsama2Plus HARIÇ (2026-11-10 kullanıcı kararı — legacy/en zayıf sinyal) bağımsız eğitilmiş 15-özellik model — V5.46.1'in 19-özellik β'larını KULLANMAZ, TRAIN'den sıfırdan öğrenildi.",
   "baseModel": "V5.46.1 (gatherV461RawSinyaller ile AYNI ham veri kaynağı)",
