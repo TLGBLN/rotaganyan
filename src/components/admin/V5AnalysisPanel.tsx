@@ -329,8 +329,8 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       const res = await upsertPrediction({
         raceId,
         confidence: "ORTA",
-        notes: `Bu analiz ${motorEtiketi ?? "V5.46.1"} ile üretildi. V5.46.1 teknik model 19 feature'ı donmuş beta/mu/sigma ile tek skorda birleştirir. ROTAGANYAN Race-Day Analysis v1 bunun üzerinde 23 atomik sinyal, 20 güncel analiz kaynağı ve 12 kanıt ailesini bağımsız aile bütünlüğüyle değerlendirir. yakinsama2Plus yalnız LEGACY_PRODUCTION_ONLY'dir; yeni analiz gerekçesi ve BANKO/İLK3/İLK6 bütünlüğünde kullanılmaz. Claude muhakemesi kullanılmadı.`,
-        tempo: "V5.46.1 teknik model yarisGidisatiSkoru ve Accurace pace/style feature'larını içerir; Race-Day Analysis v1 TEMPO_STYLE ailesini bağımsız bütünlük katmanında ayrıca değerlendirir.",
+        notes: `Bu analiz ${motorEtiketi ?? CURRENT_ENGINE_LABEL} ile üretildi — AGF'siz, bağımsız eğitilmiş Saf Model donmuş beta/mu/sigma ile tek skorda birleştirir (agfSirasi/agfPayi/agfPayi2/yakinsama2Plus modelde YOK). ROTAGANYAN Race-Day Analysis v1 bunun üzerinde atomik sinyalleri, güncel analiz kaynaklarını ve kanıt ailelerini bağımsız aile bütünlüğüyle değerlendirir. Claude muhakemesi kullanılmadı.`,
+        tempo: "Saf Model yarisGidisatiSkoru ve Accurace pace/style feature'larını içerir; Race-Day Analysis v1 TEMPO_STYLE ailesini bağımsız bütünlük katmanında ayrıca değerlendirir.",
         couponNarrow: couponNarrow || undefined,
         couponNormal: couponNormal || undefined,
         couponWide: couponWide || undefined,
@@ -348,7 +348,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
       if (res.publishError) {
         toast.warning(`Kaydedildi ama yayınlanamadı: ${res.publishError}`);
       } else {
-        toast.success(`${motorEtiketi ?? "V5.46.1"} analizi kaydedildi ve yayınlandı`);
+        toast.success(`${motorEtiketi ?? CURRENT_ENGINE_LABEL} analizi kaydedildi ve yayınlandı`);
       }
       setApplied(true);
       router.refresh();
@@ -425,11 +425,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
           <div className="flex flex-wrap items-center gap-2 font-semibold">
             <span className="text-violet-200">ROTAGANYAN Race-Day Analysis v1 • ACTIVE</span>
             <span className="text-slate-500">•</span>
-            <span className="text-slate-300">V5.46.1 Production Model</span>
-              <span className="text-slate-500">•</span>
-              <span className="text-[10px] text-slate-400">
-                V5.46.1&apos;in 19 teknik feature&apos;ı · 23 atomik sinyal · 20 güncel analiz kaynağı · 12 aile · 1 legacy composite
-              </span>
+            <span className="text-slate-300">{CURRENT_ENGINE_LABEL}</span>
             <span className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-300">
               ANALYSIS_READY: ANALİZ BEKLENİYOR
             </span>
@@ -536,11 +532,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
           <div className="flex flex-wrap items-center gap-2 font-semibold">
             <span>ROTAGANYAN Race-Day Analysis v1 • ACTIVE</span>
             <span>·</span>
-            <span>V5.46.1 Production Model</span>
-            <span>·</span>
-            <span className="text-[10px] opacity-80">
-              V5.46.1&apos;in 19 teknik feature&apos;ı · 23 atomik sinyal · 20 güncel analiz kaynağı · 12 aile · 1 legacy composite
-            </span>
+            <span>{CURRENT_ENGINE_LABEL}</span>
             <span>·</span>
             <span>
               ANALYSIS_READY: {analysisReady.status}
@@ -635,30 +627,10 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
                         {((a.marketBlindProb1 ?? 0) * 100).toFixed(0)}
                       </li>
                     )}
-                    {/* 2026-09-01 — "Saf Model" kıyası (kullanıcı talebi, KARDAHA vakası):
-                        Saf Model (AGF'siz, marketBlindProb1) / AGF (piyasa) / Piyasa-Ayarlı
-                        (nihai olasilik) sıra+yüzde YAN YANA — piyasanın görmediği ama modelin
-                        bağımsız olarak bulduğu değeri göstermek için. Fark = Saf Model% - AGF%.
-                        2026-09-02 GÜNCELLEME (THEATER OF WAR vakası, kullanıcı kararı): bu
-                        artık YALNIZ bilgi amaçlı DEĞİL — fark>=5pp VE AGF-dışı katkı toplamı
-                        net pozitifse safModelDegerTerfisiUygula bu atı koşulsuz ilk-6'ya
-                        taşıyor (bkz. v5-engine.ts). degerTerfisi="ilk3"/"ilk6" ise madde bunu belirtir
-                        (V5.41 — ilk-3 için daha sıkı bir eşik, fark>=8pp, kullanılır). */}
-                    {a.marketBlindProb1 != null && a.agfPayi != null && a.agfSirasi != null && (() => {
-                      const safYuzde = a.marketBlindProb1 * 100;
-                      const fark = safYuzde - a.agfPayi;
-                      const safSira = safModelSiraByNo.get(a.no);
-                      return (
-                        <li
-                          className={cn(a.degerTerfisi ? "text-hit" : fark >= 5 ? "text-amber-600" : "")}
-                          title="Saf Model: AGF bilgisi HİÇ olmasaydı model bu atı sahada nereye koyardı (marketBlindProb1'in sıra+yüzdesi). AGF: piyasanın (bahis payının) kendi sırası+yüzdesi. Fark büyük ve pozitifse, model piyasanın görmediği bağımsız bir değer buluyor. Fark>=8pp ilk-3'e, >=5pp ilk-6'ya koşulsuz taşır (modelin AGF-dışı görüşü net pozitifse) — degerTerfisi bunu gösterir."
-                        >
-                          Saf Model: {safSira ?? "?"}. sıra (%{safYuzde.toFixed(1)}) · AGF: {a.agfSirasi}. sıra (%{a.agfPayi.toFixed(1)}) · Fark: {fark > 0 ? "+" : ""}{fark.toFixed(1)}pp
-                          {a.degerTerfisi === "ilk3" && " · ✓ İlk-3 Terfisi"}
-                          {a.degerTerfisi === "ilk6" && " · ✓ İlk-6 Terfisi"}
-                        </li>
-                      );
-                    })()}
+                    {/* 2026-11-10 — "Saf Model vs AGF" kıyas rozeti KALDIRILDI: AGF komple
+                        çıkarıldığı için (agfPayi/agfSirasi artık sabit 0/999 placeholder)
+                        bu kıyas anlamsız/yanıltıcı hale gelirdi — bkz. engine-versions.data.ts
+                        V5.46.1-SAF15 girdisi. */}
                     {/* 2026-08-30 — B katmanı görünürlüğü: "Tüm N Sinyal" paneli B
                         katmanını içermiyor, bu yüzden ayrı bir madde gerekiyor.
                         2026-09-05 kullanıcı bulgusu: bu iki title metni hâlâ "mevcut 12

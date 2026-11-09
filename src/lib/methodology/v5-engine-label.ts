@@ -1,5 +1,5 @@
 import { ENGINE_VERSIONS } from "@/lib/methodology/engine-versions.data";
-import v5461Weights from "@/lib/methodology/weights/v546-1-weights.json";
+import safWeights from "@/lib/methodology/weights/v546-1-saf-weights.json";
 
 /**
  * 2026-08-22 kullanıcı bulgusu: panel başlığındaki sürüm/özellik-sayısı METNİ daha önce
@@ -18,6 +18,12 @@ import v5461Weights from "@/lib/methodology/weights/v546-1-weights.json";
  * softmax, src/lib/methodology/v546-1-engine.ts). Etiket artık ESKİ v5-weights-diger.json'dan
  * DEĞİL, v546-1-weights.json'ın featureNames'inden türetiliyor — B_KATMANI_SINYAL_SAYISI ve
  * "segment-bazlı iki model" ifadesi kaldırıldı, çünkü artık doğru değiller.
+ *
+ * 2026-11-10 — V5.46.1-SAF15 (bkz. engine-versions.data.ts'teki aynı tarihli girdi): V5.46.1
+ * (19 özellik, AGF dahil) TAMAMEN KALDIRILDI, resmi motor artık scoreV461Saf (AGF'siz, 15
+ * özellik). Etiket artık v546-1-weights.json'dan DEĞİL, v546-1-saf-weights.json'ın
+ * featureNames'inden türetiliyor — bu dosyanın KENDİ geçmişinde bu etiketin ikinci kez
+ * güncellenmeyi unutulduğu not düşülmüştü (2026-08-22), üçüncü kez olmasın diye.
  */
-const AKTIF_SINYAL_SAYISI = v5461Weights.featureNames.length;
-export const CURRENT_ENGINE_LABEL = `${ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].versiyon} — Koşullu Logit Modeli (${AKTIF_SINYAL_SAYISI} aktif sinyal — tek skor + softmax, segment override yok — atları doğrudan kıyaslar, Claude yok, maliyet sıfır)`;
+const AKTIF_SINYAL_SAYISI = safWeights.featureNames.length;
+export const CURRENT_ENGINE_LABEL = `${ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].versiyon} — Koşullu Logit Modeli (${AKTIF_SINYAL_SAYISI} aktif sinyal, AGF'siz — tek skor + softmax, segment override yok — atları doğrudan kıyaslar, Claude yok, maliyet sıfır)`;
