@@ -113,11 +113,27 @@ async function atinAccuraceGecmisi(atAdi: string): Promise<string[]> {
   });
   if (kayitlar.length === 0) return ["  Accurace geçmişi: kayıt yok"];
 
+  // 2026-11-09 BUG DÜZELTMESİ (kullanıcı bulgusu, KONNICHIWA vakası — "stil" etiketi her
+  // zaman "Ön Grup Arkası" basıyordu): fieldSize SABİT 1 geçiriliyordu, stilFor() içinde
+  // "fieldSize<=1 → ON_GRUP_ARKASI" erken-dönüşüne her seferinde düşüyordu — atın gerçek
+  // erken pozisyonu hiç değerlendirilmiyordu. v546-1-engine.ts'in GERÇEK skorlamada
+  // kullandığı AYNI desen (accuraceRaceId başına AccuraceHorseSplit satır sayısı = saha
+  // büyüklüğü) burada da uygulandı. YALNIZ bu script'in GÖSTERİM metnini etkiler — gerçek
+  // Tempo/Yarış Gidişatı skoru zaten v546-1-engine.ts'teki doğru siblingSayisiMap'i kullanıyordu,
+  // bu satır hiç skora girmiyordu.
+  const raceIds = [...new Set(kayitlar.map((k) => k.accuraceRaceId))];
+  const sibling = await db.accuraceHorseSplit.groupBy({
+    by: ["accuraceRaceId"],
+    where: { accuraceRaceId: { in: raceIds } },
+    _count: { _all: true },
+  });
+  const fieldSizeByRaceId = new Map(sibling.map((s) => [s.accuraceRaceId, s._count._all]));
+
   const satirlar: string[] = [];
   for (const k of kayitlar) {
     const length = k.accuraceRace.length ?? 0;
     const checkpoints = k.checkpoints as unknown as PaceCheckpoint[];
-    const sonuc = analizEtTekYaris(checkpoints, length, 1);
+    const sonuc = analizEtTekYaris(checkpoints, length, fieldSizeByRaceId.get(k.accuraceRaceId) ?? 1);
     const cols = checkpointCols(length);
     const splitMetni = cols
       .map((c) => {

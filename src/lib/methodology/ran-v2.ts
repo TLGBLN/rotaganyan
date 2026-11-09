@@ -34,8 +34,24 @@ import { getJokeyFormTablosu } from "@/server/actions/jokey-form.actions";
 import { getV5461DamOzetleriForRace, getV5461DamsireOzetleriForRace, type V5461DamlineOzet } from "@/server/actions/v5461-damline.actions";
 import type { Faz1RunnerV5 } from "./v5-engine";
 import type { AccuraceRun } from "@/lib/accurace/types";
+import { getSonYarisDetaylariForRace, type SonYarisDetay } from "@/server/actions/son-yaris-detay.actions";
 
-type PillarKodu = "acc" | "tempo" | "jokey" | "pedigri" | "kgs" | "zeminMesafe" | "antrenor";
+// 2026-11-09 kullanıcı talebi — race-level 30 dk TTL (sire/dam/jokey ile AYNI desen).
+// getSonYarisDetaylariForRace zaten at-başına fetchTjkAtKosuBilgileri üzerinden 3 saatlik
+// in-process + kalıcı DB (HorseRaceHistoryCache) önbelleğinden geçiyor — bu, ÜSTÜNE ikinci,
+// race-bazlı bir katman (aynı koşu için hesaplaRanV2 kısa sürede tekrar çağrılırsa TJK
+// zincirine hiç girmeden döner).
+const SON_YARIS_DETAY_ONBELLEK_TTL_MS = 30 * 60 * 1000;
+const sonYarisDetayOnbellek = new Map<string, { data: SonYarisDetay[]; zaman: number }>();
+async function sonYarisDetayGetirOnbellekli(raceId: string): Promise<SonYarisDetay[]> {
+  const cached = sonYarisDetayOnbellek.get(raceId);
+  if (cached && Date.now() - cached.zaman < SON_YARIS_DETAY_ONBELLEK_TTL_MS) return cached.data;
+  const data = await getSonYarisDetaylariForRace(raceId).catch(() => [] as SonYarisDetay[]);
+  sonYarisDetayOnbellek.set(raceId, { data, zaman: Date.now() });
+  return data;
+}
+
+type PillarKodu = "acc" | "tempo" | "jokey" | "pedigri" | "kgs" | "zeminMesafe" | "antrenor" | "kilo" | "taki";
 
 export type RanV2AtSonucu = {
   runnerId: string;
@@ -49,6 +65,15 @@ export type RanV2AtSonucu = {
   kgsPillar: number | null;
   zeminMesafePillar: number | null;
   antrenorPillar: number | null;
+  kiloPillar: number | null;
+  // takiPillar: z-skorlu, yalnız TEŞHİS/gösterim amaçlı — ranV2Skor'a GİRMEZ (bkz. takiBonus).
+  takiPillar: number | null;
+  // takiBonus: ranV2Skor'a GERÇEKTEN eklenen sabit katkı (0, TAKI_DEGISIM_BONUS veya null).
+  takiBonus: number | null;
+  // Açıklanabilirlik — skora girmez, yalnız hangi kodun değiştiğini göstermek için
+  // (kullanıcı talebi 2026-11-09: "+KG, -SKG gibi gerçek değişiklik kodları korunsun").
+  takiEklenenKodlar: string[];
+  takiCikarilanKodlar: string[];
   ranV2Skor: number | null;
   sira: number;
 };
@@ -64,7 +89,12 @@ export type RanV2Sonuc = {
 // kelimeyle eşleşmeyenler — fallback olarak mevcut 5 pillar kullanılır, en nötr/güvenli seçim).
 function kategoriBelirle(classType: string): string {
   const c = classType.toUpperCase();
-  if (c.includes("MAIDEN") || c.includes("ŞARTLI 1") || c.includes("ŞARTLI 19") || c.includes("ŞARTLI 27")) return "Düşük Deneyim";
+  // 2026-11-09 kullanıcı düzeltmesi: MAIDEN ve ŞARTLI 19 ŞARTLI 1/27'den AYRILDI — bu
+  // atların (kazanmamış ama koşmuş / orta-kıdemli şart basamağı) genellikle gerçek bir
+  // Accurace geçmişi VAR, ŞARTLI 1/27'nin (en taze, Accurace'siz) tersine. Acc bu ikisine
+  // GERİ eklendi, ŞARTLI 1/27'nin kilitli (Acc'siz) seti DOKUNULMADI.
+  if (c.includes("MAIDEN") || c.includes("ŞARTLI 19")) return "Düşük Deneyim (Acc)";
+  if (c.includes("ŞARTLI 1") || c.includes("ŞARTLI 27")) return "Düşük Deneyim";
   if (c.includes("ŞARTLI 2") || c.includes("ŞARTLI 3") || c.includes("ŞARTLI 4") || c.includes("ŞARTLI 5")) return "Orta Deneyim";
   if (c.includes("ŞARTLI 6") || c.includes("ŞARTLI 7") || c.includes("ŞARTLI 8") || c.includes("ŞARTLI 9")) return "Kanıtlanmış";
   if (c.includes("HANDİKAP") || c.includes("HANDIKAP")) return "Handikap";
@@ -90,6 +120,24 @@ const KATEGORI_PILLAR_SETI: Record<string, PillarKodu[]> = {
   // zaten yok/anlamsız — kategori adı da bundan). Önceki sürümde yanlışlıkla "acc" buradaydı,
   // "jokey" eksikti — düzeltildi.
   "Düşük Deneyim": ["pedigri", "jokey", "kgs", "antrenor"],
+  // 2026-11-09 kullanıcı talebi — Maiden/ŞARTLI 19'un gerçek Accurace geçmişi olabileceği
+  // için Acc geri eklendi. Kilo Değişimi de eklendi (O PAPATYA vakası). ŞARTLI 1/27'nin
+  // kilitli seti DOKUNULMADI. NOT: "taki" burada YOK — Takı Değişikliği artık z-skorlu
+  // pillar DEĞİL, doğrudan toplam skora eklenen sabit bir katkı (bkz. TAKI_DEGISIM_BONUS).
+  //
+  // 2026-11-09 — Tempo SONRADAN eklendi (O PAPATYA kök-neden incelemesi, bkz. proje
+  // hafızası): V5.46.1'in ham dökümü onu net bir kapanışçı (Accurace sektörel geçmişi, son
+  // 200m'de sıra 1'e çıkıyor) olarak gösteriyordu, "yarisGidisatiSkoru"=+1.26 — RAN v2'nin
+  // Tempo pillar'ı bunu zaten hesaplıyordu ama kategori setine girmiyordu, bu yüzden
+  // kazanan atın en güçlü sinyallerinden biri skora hiç yansımıyordu.
+  // 2026-11-09 kullanıcı düzeltmesi — "kilo" BURADAN ÇIKARILDI. Kullanıcının ilk talimatı
+  // zaten netti: "Kilo değişimini işaretli sayısal değer olarak sakla... SABİT OLUMLU/
+  // OLUMSUZ PUAN VERME." Zero-center fix (0kg=nötr) tek sorunu çözmüyordu — kilo FAZLASI
+  // da otomatik ödül sayılmamalı (ör. +3kg'nin -3kg'den "daha iyi" sayılması da yön
+  // varsayımı). Kilo artık YALNIZ açıklama/gösterim alanı (kiloPillar hâlâ hesaplanıp
+  // RanV2AtSonucu'nda dönüyor) — Takı'nın eklenen/çıkarılan kod listesiyle AYNI mantık,
+  // skora hiç girmiyor.
+  "Düşük Deneyim (Acc)": ["acc", "tempo", "pedigri", "jokey", "kgs", "antrenor"],
   "Orta Deneyim": ["acc", "tempo", "jokey", "pedigri", "kgs", "zeminMesafe"],
   "Kanıtlanmış": VARSAYILAN_5,
   "Diğer": VARSAYILAN_5,
@@ -127,7 +175,22 @@ function kgsSkoru(r: Faz1RunnerV5, breed: string): number | null {
 // biri kendi örneklem eşiğinden (PEDIGRI_MIN_ORNEK) bağımsız geçmeli, eksik olan atlanır
 // (0'a çekilmez). Henüz B300 ile AYRI doğrulanmadı (kullanıcı testsiz eklenmesini istedi,
 // Antrenör pillar'ında olduğu gibi bilinçli bir istisna).
-const PEDIGRI_MIN_ORNEK = 3;
+// 2026-11-09 kullanıcı bulgusu (İstanbul K1 Şartlı 1, 2026-11-08 — IRON ANGEL vakası):
+// n=3 eşiği çok düşük — n=4'te 0/4 veya n=6'da 0/6 gibi sonuçlar sahadaki tipik kazanma
+// oranında (ör. %12-19) TESADÜFEN bile >%50 ihtimalle görülür, ama kod bunu n=22/27/82
+// gibi güçlü örneklemlerle AYNI güvenilirlikte (ağırlıksız ortalama) kullanıyordu — saf
+// şans eseri "sert sıfır" saha z-skorunun en uç noktası olup atı anlamsızca cezalandırdı.
+// Shrink katmanı/yeni sorgu EKLENMEDİ (kullanıcı talebi) — yalnız eşik yükseltildi, yetersiz
+// örneklem hâlâ null (0'a çekilmiyor), pedigriSkoru mantığı DEĞİŞMEDİ.
+const PEDIGRI_MIN_ORNEK = 8;
+
+// 2026-11-09 kullanıcı KARARI (sabit katsayı — RAN v2'nin "katsayısız" ilkesine bilinçli bir
+// İSTİSNA, kullanıcı ek test beklemeden uygulanmasını istedi): Takı Değişikliği VARSA toplam
+// skora doğrudan eklenen sabit katkı. Gerekçe (kullanıcı, verbatim yakın): "antrenör bir şey
+// değiştiriyorsa bunun bir nedeni var, görmezden gelmek istemiyorum." Diğer pillar'ların
+// aksine z-skorlanmaz, backtest'le TÜRETİLMEMİŞTİR — doğrudan, tartışılmadan atanmış bir
+// sayı. B300+ ile doğrulanmadı.
+const TAKI_DEGISIM_BONUS = 0.20;
 function pedigriSkoru(r: Faz1RunnerV5, damOzet: V5461DamlineOzet, damSireOzet: V5461DamlineOzet): number | null {
   const parcalar: number[] = [];
   if (r.sireKazanmaOraniHam != null && r.sireOrneklemKendiVeri != null && r.sireOrneklemKendiVeri >= PEDIGRI_MIN_ORNEK) {
@@ -157,6 +220,26 @@ function zSkorlar(values: (number | null)[]): (number | null)[] {
   const sd = Math.sqrt(varyans);
   if (sd < 1e-9) return values.map((v) => (v == null ? null : 0));
   return values.map((v) => (v == null ? null : (v - ort) / sd));
+}
+
+// 2026-11-09 kullanıcı bulgusu (KONNICHIWA vakası, Adana K2) — Kilo Değişimi normal
+// zSkorlar() ile saha ORTALAMASINA göre merkezleniyordu: saha genelinde çoğu at kilo
+// ALDIYSA (ör. ortalama +1kg), "değişmedi" (0kg) ortalamanın ALTINDA kalıp YAPAY NEGATİF
+// bir z üretiyordu — "değişmemek" kendi başına ne iyi ne kötü, bunun field'ın ne yaptığına
+// göre cezalandırılması/ödüllendirilmesi YANLIŞ. Kilo'nun TEK pillar'ı budur: "0 kg" mutlak
+// bir referans noktası taşır (diğer pillar'ların aksine — Jokey/Pedigri/KGS/Antrenör'de
+// "0" böyle bir anlam taşımaz). Bu yüzden Kilo'ya ÖZEL, sahanın KENDİ ortalaması yerine
+// SABİT 0 etrafında merkezlenen bir z-skor kullanılıyor — ölçek (yayılım) hâlâ sahanın
+// kendi varyansından, ama merkez her zaman "değişiklik yok" oluyor. Diğer pillar'lar
+// DEĞİŞMEDİ, yalnız Kilo bu varyantı kullanıyor.
+function sifirMerkezliZSkorlar(values: (number | null)[]): (number | null)[] {
+  const gecerli = values.filter((v): v is number => v != null);
+  if (gecerli.length < 2) return values.map(() => null);
+  const ort = gecerli.reduce((s, v) => s + v, 0) / gecerli.length;
+  const varyans = gecerli.reduce((s, v) => s + (v - ort) ** 2, 0) / gecerli.length;
+  const sd = Math.sqrt(varyans);
+  if (sd < 1e-9) return values.map((v) => (v == null ? null : 0));
+  return values.map((v) => (v == null ? null : v / sd));
 }
 
 // preloadedRuns: BÜYÜK ÖLÇEKLİ (B300+) doğrulama/export script'leri için — Accurace
@@ -216,6 +299,21 @@ export async function hesaplaRanV2(raceId: string, preloadedRuns?: AccuraceRun[]
     ),
   ]);
 
+  // Takı Değişikliği + Kilo Değişimi — 2026-11-09 kullanıcı talebi (O PAPATYA vakası,
+  // Adana K9 ŞARTLI 19, 2026-11-08: gerçek kazanan hem takı değiştirmiş hem -3kg vermiş).
+  // SADECE "Düşük Deneyim (Acc)" kategorisinde çekilir — getSonYarisDetaylariForRace atın TJK
+  // CANLI profiline (fetchTjkAtKosuBilgileri) at başına ayrı bir HTTP isteği atıyor, DB sorgusu
+  // DEĞİL — gereksiz koşularda bu maliyete girilmez.
+  // 2026-11-09 BUG DÜZELTMESİ (kullanıcı bulgusu — O PAPATYA'nın takiBonus'u sessizce null
+  // olmuştu): bu koşul eskiden kullanilanPillarlar.includes("kilo"||"taki") idi — Kilo'yu
+  // skorlanan pillar setinden ÇIKARDIĞIMIZDA (yalnız gösterim alanı oldu) bu koşul HİÇ
+  // tetiklenmez olmuştu, Takı bonusu da (ayrı bir mekanizma olmasına rağmen) sessizce
+  // devre dışı kalmıştı. Artık doğrudan KATEGORİYE bağlı — pillar seti neyi İÇERDİĞİNDEN
+  // bağımsız.
+  const takiKiloGerekli = kategori === "Düşük Deneyim (Acc)";
+  const sonYarisDetaylari = takiKiloGerekli ? await sonYarisDetayGetirOnbellekli(raceId) : [];
+  const sonYarisDetayByNo = new Map(sonYarisDetaylari.map((d) => [d.runnerNo, d]));
+
   const accHam: (number | null)[] = [];
   const tempoHam: (number | null)[] = [];
   const jokeyHam: (number | null)[] = [];
@@ -223,6 +321,9 @@ export async function hesaplaRanV2(raceId: string, preloadedRuns?: AccuraceRun[]
   const kgsHam: (number | null)[] = [];
   const zeminMesafeHam: (number | null)[] = [];
   const antrenorHam: (number | null)[] = [];
+  const kiloHam: (number | null)[] = [];
+  const takiHam: (number | null)[] = [];
+  const takiBonusHam: (number | null)[] = [];
 
   for (const [i, { r, rawSinyaller }] of raw.runners.entries()) {
     // Accurace pillar: ACC_CLOSE_RES + ACC_SPEED ortalaması. ACC_LATE bilerek HARİÇ —
@@ -263,6 +364,32 @@ export async function hesaplaRanV2(raceId: string, preloadedRuns?: AccuraceRun[]
     // ilkesiyle TAM uyumlu değil (veri-yok ile gerçek-ortalama ayırt edilemiyor). Pedigri
     // için yapılan ayrı örneklem-sayısı düzeltmesi (sireOrneklemKendiVeri) burada YOK.
     antrenorHam.push(r.antrenorOrani);
+
+    // Kilo Değişimi: HAM işaretli kg (2026-11-09 kullanıcı düzeltmesi — "-3 ve +3 ayrı
+    // saklansın, mutlak değişim büyüklüğü otomatik avantaj sayılmasın", yön varsayımı
+    // YAPILMAZ) — diğer pillar'larla birlikte z-skorlanıp ortalamaya girer.
+    //
+    // Takı Değişikliği: 2026-11-09 kullanıcı KARARI — artık z-skorlu pillar DEĞİL. "Antrenör
+    // bir şey değiştiriyorsa bunun bir nedeni var, tamamen görmezden gelmek istemiyorum"
+    // gerekçesiyle, değişiklik VARSA toplam skora DOĞRUDAN sabit +0.20 eklenir (bkz. aşağıda
+    // takiBonusHam + ranV2Skor hesaplaması). takiHam (0/1, z-skorlu) yalnız takiPillar
+    // alanında GÖSTERİM/teşhis amaçlı tutulur, ranV2Skor'a bu haliyle GİRMEZ — çift sayımı
+    // önlemek için KATEGORI_PILLAR_SETI'nden "taki" ÇIKARILDI.
+    //
+    // Önceki koşu karşılaştırması YAPILAMAYAN atlarda (ilk start / TJK verisi yok →
+    // kiloDegisimi null) kilo/taki/takiBonus HEPSİ null kalır — "değişiklik yok" ile
+    // "karşılaştırılamadı" KARIŞTIRILMAZ, null ASLA pozitif/negatif etki üretmez.
+    const syd = sonYarisDetayByNo.get(r.no);
+    if (syd && syd.kiloDegisimi != null) {
+      const degisti = syd.eklenenTaki.length > 0 || syd.cikarilanTaki.length > 0;
+      kiloHam.push(syd.kiloDegisimi);
+      takiHam.push(degisti ? 1 : 0);
+      takiBonusHam.push(degisti ? TAKI_DEGISIM_BONUS : 0);
+    } else {
+      kiloHam.push(null);
+      takiHam.push(null);
+      takiBonusHam.push(null);
+    }
   }
 
   const pillarZHaritasi: Record<PillarKodu, (number | null)[]> = {
@@ -273,15 +400,24 @@ export async function hesaplaRanV2(raceId: string, preloadedRuns?: AccuraceRun[]
     kgs: zSkorlar(kgsHam),
     zeminMesafe: zSkorlar(zeminMesafeHam),
     antrenor: zSkorlar(antrenorHam),
+    kilo: sifirMerkezliZSkorlar(kiloHam),
+    taki: zSkorlar(takiHam),
   };
 
   const atlar: RanV2AtSonucu[] = raw.runners.map(({ r }, i) => {
     const pillarlar = kullanilanPillarlar.map((p) => pillarZHaritasi[p][i]).filter((v): v is number => v != null);
-    const ranV2Skor = pillarlar.length > 0 ? pillarlar.reduce((a, b) => a + b, 0) / pillarlar.length : null;
+    const pillarOrtalamasi = pillarlar.length > 0 ? pillarlar.reduce((a, b) => a + b, 0) / pillarlar.length : null;
+    // Takı bonusu — z-skorlu pillar ortalamasının DIŞINDA, TEK SEFER toplam skora eklenir
+    // (bkz. TAKI_DEGISIM_BONUS). Karşılaştırma yapılamayan atlarda (null) hiçbir etki YOK.
+    // Başka bir pillar bu sinyali tekrar SAYMIYOR — "taki" KATEGORI_PILLAR_SETI'nde yok.
+    const ranV2Skor = pillarOrtalamasi != null ? pillarOrtalamasi + (takiBonusHam[i] ?? 0) : null;
     return {
       runnerId: r.id, no: r.no, ad: r.ad, jockey: r.jockey,
       accPillar: pillarZHaritasi.acc[i], tempoPillar: pillarZHaritasi.tempo[i], jokeyPillar: pillarZHaritasi.jokey[i],
       pedigriPillar: pillarZHaritasi.pedigri[i], kgsPillar: pillarZHaritasi.kgs[i], zeminMesafePillar: pillarZHaritasi.zeminMesafe[i],
+      kiloPillar: pillarZHaritasi.kilo[i], takiPillar: pillarZHaritasi.taki[i], takiBonus: takiBonusHam[i],
+      takiEklenenKodlar: sonYarisDetayByNo.get(r.no)?.eklenenTaki.map((e) => e.code) ?? [],
+      takiCikarilanKodlar: sonYarisDetayByNo.get(r.no)?.cikarilanTaki.map((e) => e.code) ?? [],
       antrenorPillar: pillarZHaritasi.antrenor[i],
       ranV2Skor, sira: 0,
     };
