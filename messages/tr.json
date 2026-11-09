@@ -205,16 +205,7 @@
     "epostaDetay": "Genel sorular, analiz talepleri ve geri bildirim için.",
     "yanitSuresi": "Yanıt Süresi",
     "yanitSuresiDeger": "1–2 iş günü",
-    "yanitSuresiDetay": "Tüm mesajlara mümkün olan en kısa sürede dönüş yapılmaktadır.",
-    "formBaslik": "Bizimle İletişime Geçin",
-    "formAciklama": "Herhangi bir sorunuz, öneriniz veya projeniz varsa, ekibimiz size yardımcı olmaktan mutluluk duyacaktır.",
-    "formAdSoyad": "Adınız ve Soyadınız",
-    "formEposta": "E-posta Adresiniz",
-    "formKonu": "Konu",
-    "formMesaj": "Mesajınız",
-    "formGonder": "Gönder",
-    "formOrtalamaYanit": "Ortalama Yanıt Süremiz: 1–2 iş günü",
-    "formBasarili": "Mesajınız gönderildi — en kısa sürede dönüş yapacağız."
+    "yanitSuresiDetay": "Tüm mesajlara mümkün olan en kısa sürede dönüş yapılmaktadır."
   },
   "gizlilik": {
     "metaTitle": "Gizlilik Politikası",
@@ -265,7 +256,7 @@
   },
   "programToolbar": {
     "agfTrend": "AGF Trend",
-    "sonHazirliklar": "Son Hazırlıklar",
+    "sonHazirliklar": "Galop",
     "pedigriler": "Pedigriler",
     "karsilastir": "Karşılaştır",
     "sonYarisDetaylari": "Son Yarış Detayları",

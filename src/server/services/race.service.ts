@@ -7,8 +7,8 @@ import { getSireStatPoolsForCombos } from "@/server/actions/sire-stat.actions";
 import { getDamStatPoolsForCombos } from "@/server/actions/dam-stat.actions";
 import { getGecCikisOzetleriForRace } from "@/server/actions/gec-cikis.actions";
 import { breedToIrk, surfaceToPist, mesafeBucket, havuzAnahtari, eslestirSireStatOzetleri, eslestirDamStatOzetleri } from "@/lib/sire-stat-match";
-import { fetchTodaysAltiliResults, fetchTodaysYediliGanyanSonuclari } from "./ingest/tjk-altili.adapter";
-import { findIkramiyeForHippodrome, findYediliIkramiyeForHippodrome } from "@/lib/altili-match";
+import { fetchTodaysAltiliResults } from "./ingest/tjk-altili.adapter";
+import { findIkramiyeForHippodrome } from "@/lib/altili-match";
 import { hesaplaYarisGidisati, type AtTempoProfili, type TekYarisStil, type TempoSenaryosu } from "@/lib/methodology/pace-analizi";
 
 /** Runner.raceStyle JSON alanından ("style" + "percent" + "veri" + "dagilim") ekranda
@@ -758,11 +758,8 @@ export async function getGecmisKazananKuponlar(limit = 20): Promise<KazananKupon
   const bugunNeedsIkramiye = results.filter((r) => r._needsIkramiye && r.date.toISOString().slice(0, 10) === turkeyDateString());
   if (bugunNeedsIkramiye.length > 0) {
     const altiliResults = await fetchTodaysAltiliResults().catch(() => []);
-    const yediliResults = await fetchTodaysYediliGanyanSonuclari().catch(() => []);
     for (const r of bugunNeedsIkramiye) {
-      const ikramiye =
-        findIkramiyeForHippodrome(r.hippodromeName, altiliResults) ??
-        findYediliIkramiyeForHippodrome(r.hippodromeName, yediliResults);
+      const ikramiye = findIkramiyeForHippodrome(r.hippodromeName, altiliResults);
       if (ikramiye) {
         r.ikramiye = ikramiye;
         await db.homeKupon.update({ where: { id: r.id }, data: { ikramiye } }).catch(() => {});
@@ -918,6 +915,8 @@ export type ProgramRunner = {
   // tespitine göre: true=tekrarlayan (2+) geç çıkış geçmişi var, false=veri var ama sorun
   // yok, null=yeterli örneklem (3+ sonuçlu start) yok, "—" gösterilir (bkz. gec-cikis.actions.ts).
   startSorunu: boolean | null;
+  // Galop panelinde gösterim için — bu yarıştan ÖNCEKİ en son koşu tarihi (yoksa ilk start).
+  sonKosuTarihi: Date | null;
 };
 
 export type ProgramPick = {
@@ -1052,7 +1051,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
   const allRunnerIds = racesWithRunners.flatMap((r) => r.runners.map((ru) => ru.id));
 
   type GallopRow = { runnerId: string; date: Date; track: string | null; form: string | null; jockey: string | null; splits: Prisma.JsonValue };
-  const [sirePools, damPools, gecCikisMap, allGallops] = await Promise.all([
+  const [sirePools, damPools, gecCikisMap, allGallops, pastRaces] = await Promise.all([
     getSireStatPoolsForCombos(combos).catch(() => new Map()),
     getDamStatPoolsForCombos(combos).catch(() => new Map()),
     getGecCikisOzetleriForRace(allHorseNames, date).catch(() => new Map()),
@@ -1061,7 +1060,21 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
       orderBy: { date: "desc" },
       select: { runnerId: true, date: true, track: true, form: true, jockey: true, splits: true },
     }).catch(() => [] as GallopRow[]),
+    // Galop panelinde "atın son koşu tarihi" gösterimi için (2026-11-09 kullanıcı talebi) —
+    // tjk-idman-stats.adapter.ts'teki lastRaceDateByName ile aynı mantık (bu yarıştan ÖNCEKİ
+    // en son koşu), at adına göre toplu sorgulanıyor.
+    allHorseNames.length === 0 ? Promise.resolve([] as { name: string; race: { raceDay: { date: Date } } }[]) : db.runner.findMany({
+      where: { name: { in: allHorseNames }, race: { raceDay: { date: { lt: date } } } },
+      select: { name: true, race: { select: { raceDay: { select: { date: true } } } } },
+    }).catch(() => [] as { name: string; race: { raceDay: { date: Date } } }[]),
   ]);
+
+  const sonKosuTarihiByName = new Map<string, Date>();
+  for (const pr of pastRaces) {
+    const d = pr.race.raceDay.date;
+    const cur = sonKosuTarihiByName.get(pr.name);
+    if (!cur || d > cur) sonKosuTarihiByName.set(pr.name, d);
+  }
 
   // 2026-08-15 — kullanıcı talebi: "sadece 3 galop görmek istemiyorum, son yarış
   // tarihinden sonra kaç galop çalışması yaptıysa çekilsin" — eskiden burada 3'e
@@ -1130,6 +1143,7 @@ export async function getProgramData(dateStr: string): Promise<ProgramDay[]> {
           sireStatOzet: sireStatByRunnerId.get(ru.id) ?? null,
           damStatOzet: damStatByRunnerId.get(ru.id) ?? null,
           startSorunu: startSorunuByRunnerId.get(ru.id) ?? null,
+          sonKosuTarihi: sonKosuTarihiByName.get(ru.name) ?? null,
           raceStyle: parseRaceStyle(raceStyle),
           gallops: gallops.map((g) => ({
             ...g,
