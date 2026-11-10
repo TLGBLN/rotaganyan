@@ -6,6 +6,7 @@ import type { ProgramRaceDay, KuponOnerisi } from "@/server/services/race.servic
 import type { TempoSenaryosu } from "@/lib/methodology/pace-analizi";
 import { KuponBlock } from "@/components/home/TahminOnerileri";
 import { puanYuzdesiMetni } from "@/lib/methodology/muhakeme-format";
+import { agfSiraMapOlustur } from "@/lib/agf-sira";
 
 type Race = ProgramRaceDay["races"][number];
 type Kupon = NonNullable<KuponOnerisi>;
@@ -93,16 +94,20 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
         ))}
       </div>
 
-      {/* 2026-11-10 kullanıcı talebi ("yan yana buna benzer olsun sadece şekil olarak",
-          referans görsel: dar sütunlar, At No + Puan, renk kodlu) — her analiz edilmiş koşu
-          kendi dar sütununda, hepsi YATAY olarak yan yana (gerekirse yatay kaydırmalı). Zengin
-          panel (AGF rozetleri, paylaşım ikonları) burada YOK — hızlı tarama için sade tablo.
-          Kupon Önerisi artık sütunların DEĞİL, sayfanın bir parçası (aşağıda, hipodrom başına). */}
-      <div className="flex gap-3 overflow-x-auto pb-2">
+      {/* 2026-11-10 kullanıcı talebi ("yan yana buna benzer olsun sadece şekil olarak", sonra
+          "hepsi tam sayfaya sığsın ve at isimleri ile agf sıraları da yazsın") — her analiz
+          edilmiş koşu kendi dar sütununda, hepsi aynı anda YATAY yan yana; grid'in kendisi
+          (auto-fit) mevcut genişliğe göre kaç sütun sığacağını kendi hesaplıyor, yatay kaydırma
+          YOK — dar ekranda fazla koşu varsa yeni satıra sarar (mobil-uyumlu). AGF sırası YALNIZ
+          admin'e gösterilir (bkz. agf-sira.ts'teki gerekçe — piyasa bilgisini önceden bilmek
+          normal kullanıcıya haksız avantaj sayılır), agfSiraMapOlustur ile AYNI paylaşılan
+          kaynaktan (ProgramView.tsx'teki "AGF X." rozetiyle TUTARLI). */}
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
         {analyzed.map((race) => {
           const picks = [...(race.prediction?.picks ?? [])].sort((a, b) => a.rank - b.rank);
+          const agfSiraMap = agfSiraMapOlustur(race.runners.map((r) => ({ no: r.no, agf: r.agf })));
           return (
-            <div key={race.id} id={`kosu-${race.id}`} className="scroll-mt-20 w-[170px] shrink-0 rounded-xl border overflow-hidden">
+            <div key={race.id} id={`kosu-${race.id}`} className="scroll-mt-20 rounded-xl border overflow-hidden">
               <div className="bg-muted/50 px-2 py-1.5 text-center">
                 <div className="text-xs font-bold">{race.raceNo}. Koşu</div>
                 <div className="text-[10px] text-muted-foreground">{race.time ?? ""} · {race.distance}m</div>
@@ -110,7 +115,9 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b text-[10px] text-muted-foreground">
-                    <th className="py-1 pl-2 text-left font-medium">At No</th>
+                    <th className="py-1 pl-2 text-left font-medium">No</th>
+                    <th className="py-1 text-left font-medium">At</th>
+                    {isAdmin && <th className="py-1 text-right font-medium">AGF</th>}
                     <th className="py-1 pr-2 text-right font-medium">Puan</th>
                   </tr>
                 </thead>
@@ -118,6 +125,14 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
                   {picks.map((p) => (
                     <tr key={p.id} className="border-b last:border-0">
                       <td className="py-1 pl-2 font-mono">{p.runner?.no ?? "—"}</td>
+                      <td className="py-1 truncate max-w-[110px]" title={p.runner?.name ?? p.runnerLabel ?? undefined}>
+                        {p.runner?.name ?? p.runnerLabel ?? "—"}
+                      </td>
+                      {isAdmin && (
+                        <td className="py-1 text-right tabular-nums text-muted-foreground">
+                          {p.runner?.no != null ? (agfSiraMap.get(p.runner.no) ?? "—") : "—"}
+                        </td>
+                      )}
                       <td className={cn("py-1 pr-2 text-right tabular-nums", puanRengi(p.rank))}>
                         {puanYuzdesiMetni(p.score, p.scoreExact) != null ? `%${puanYuzdesiMetni(p.score, p.scoreExact)}` : "—"}
                       </td>
