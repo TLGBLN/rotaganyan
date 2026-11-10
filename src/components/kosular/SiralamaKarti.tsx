@@ -106,11 +106,20 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
         {analyzed.map((race) => {
           const picks = [...(race.prediction?.picks ?? [])].sort((a, b) => a.rank - b.rank);
           const agfSiraMap = agfSiraMapOlustur(race.runners.map((r) => ({ no: r.no, agf: r.agf })));
+          // 2026-11-10 kullanıcı talebi ("kazananlar vurgulanacak ganyanı ile birlikte") —
+          // sonuç girilmişse (race.result), kazanan at(lar)ın satırı vurgulanır + ganyan yazısı
+          // başlıkta gösterilir (at başı/beraberlikte winnerNos birden fazla olabilir).
+          const winnerNos = race.result?.winnerNos ?? [];
           return (
             <div key={race.id} id={`kosu-${race.id}`} className="scroll-mt-20 rounded-xl border overflow-hidden">
               <div className="bg-muted/50 px-2 py-1.5 text-center">
                 <div className="text-xs font-bold">{race.raceNo}. Koşu</div>
-                <div className="text-[10px] text-muted-foreground">{race.time ?? ""} · {race.distance}m</div>
+                <div className="text-[10px] text-muted-foreground">
+                  {race.time ?? ""} · {race.classType} · {race.distance}m
+                </div>
+                {race.result?.ganyan != null && (
+                  <div className="text-[10px] font-semibold text-amber-500">Ganyan: {race.result.ganyan.toFixed(2)}</div>
+                )}
               </div>
               <table className="w-full text-xs">
                 <thead>
@@ -122,22 +131,25 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
                   </tr>
                 </thead>
                 <tbody>
-                  {picks.map((p) => (
-                    <tr key={p.id} className="border-b last:border-0">
-                      <td className="py-1 pl-2 font-mono">{p.runner?.no ?? "—"}</td>
-                      <td className="py-1 truncate max-w-[110px]" title={p.runner?.name ?? p.runnerLabel ?? undefined}>
-                        {p.runner?.name ?? p.runnerLabel ?? "—"}
-                      </td>
-                      {isAdmin && (
-                        <td className="py-1 text-right tabular-nums text-muted-foreground">
-                          {p.runner?.no != null ? (agfSiraMap.get(p.runner.no) ?? "—") : "—"}
+                  {picks.map((p) => {
+                    const kazandiMi = p.runner?.no != null && winnerNos.includes(p.runner.no);
+                    return (
+                      <tr key={p.id} className={cn("border-b last:border-0", kazandiMi && "bg-amber-500/15")}>
+                        <td className="py-1 pl-2 font-mono">{p.runner?.no ?? "—"}</td>
+                        <td className={cn("py-1 truncate max-w-[110px]", kazandiMi && "font-bold text-amber-600 dark:text-amber-400")} title={p.runner?.name ?? p.runnerLabel ?? undefined}>
+                          {kazandiMi && "🏆 "}{p.runner?.name ?? p.runnerLabel ?? "—"}
                         </td>
-                      )}
-                      <td className={cn("py-1 pr-2 text-right tabular-nums", puanRengi(p.rank))}>
-                        {puanYuzdesiMetni(p.score, p.scoreExact) != null ? `%${puanYuzdesiMetni(p.score, p.scoreExact)}` : "—"}
-                      </td>
-                    </tr>
-                  ))}
+                        {isAdmin && (
+                          <td className="py-1 text-right tabular-nums text-muted-foreground">
+                            {p.runner?.no != null ? (agfSiraMap.get(p.runner.no) ?? "—") : "—"}
+                          </td>
+                        )}
+                        <td className={cn("py-1 pr-2 text-right tabular-nums", puanRengi(p.rank))}>
+                          {puanYuzdesiMetni(p.score, p.scoreExact) != null ? `%${puanYuzdesiMetni(p.score, p.scoreExact)}` : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
