@@ -4,21 +4,8 @@ import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import type { ProgramRaceDay, KuponOnerisi } from "@/server/services/race.service";
 import type { TempoSenaryosu } from "@/lib/methodology/pace-analizi";
-import { surfaceLabel, breedLabel } from "@/lib/utils";
 import { KuponBlock } from "@/components/home/TahminOnerileri";
-import { AnalysisPanel } from "@/components/program/ProgramView";
-
-/** Oval pist şeması — ekrandaki referansın "pist ikonu", markaya özgü basit bir SVG
- *  (dışarıdan illüstrasyon yerine — bkz. proje kuralı: AI-jenerik görsel yerine konuya
- *  özgü, kesin bir şekil). */
-function PistIkonu({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 32 20" className={className} fill="none" aria-hidden="true">
-      <rect x="1" y="1" width="30" height="18" rx="9" stroke="currentColor" strokeWidth="2" />
-      <rect x="5" y="5" width="22" height="10" rx="5" stroke="currentColor" strokeWidth="1.5" opacity="0.5" />
-    </svg>
-  );
-}
+import { puanYuzdesiMetni } from "@/lib/methodology/muhakeme-format";
 
 type Race = ProgramRaceDay["races"][number];
 type Kupon = NonNullable<KuponOnerisi>;
@@ -38,6 +25,15 @@ function hasAnalysis(r: Race): boolean {
   return !!r.prediction?.published && (r.prediction.picks?.length ?? 0) > 0;
 }
 
+// Referans görseldeki "yan yana sütun" rengi — ProgramView.tsx'teki rankStyle ile AYNI eşik
+// (rank<=3 yeşil/güçlü, rank<=6 marka rengi/orta, kalanı soluk) — sıraya göre, ham puana göre
+// DEĞİL (sahanın büyüklüğüne göre anlamı değişmeyen, zaten kurulu bir kural).
+function puanRengi(rank: number): string {
+  if (rank <= 3) return "text-[#27ae60] font-bold";
+  if (rank <= 6) return "text-brand font-semibold";
+  return "text-muted-foreground";
+}
+
 type Props = {
   raceDay: ProgramRaceDay;
   tempoByRaceId: Record<string, TempoSenaryosu | null>;
@@ -53,12 +49,12 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
   const analyzed = raceDay.races.filter(hasAnalysis);
   if (analyzed.length === 0) return null;
 
-  // 2026-11-10 kullanıcı talebi ("tüm koşular yan yana açık olarak gözüksün") — eskiden
-  // sekmeye tıklayınca YALNIZ o koşu görünüyordu (activeRaceNo state'i, tek render). Artık
-  // HER analiz edilmiş koşu kendi TAM panelini (bilgi şeridi + analiz + kupon) ayrı ayrı,
-  // hepsi aynı anda, alt alta gösteriyor — hiçbiri gizlenmiyor. Üstteki sekme şeridi artık
-  // bir "seç/gizle" kontrolü değil, sayfa içi hızlı atlama (anchor link) — tıklanınca o
-  // koşunun bloğuna kaydırır, initialRaceNo (derin bağlantı) hâlâ o koşuya otomatik kaydırır.
+  // 2026-11-10 kullanıcı talebi ("tüm koşular yan yana açık olarak gözüksün", sonra görsel
+  // referansla netleşti: dar sütunlar, At No + Puan) — eskiden sekmeye tıklayınca YALNIZ o
+  // koşu görünüyordu (activeRaceNo state'i, tek render). Artık HER analiz edilmiş koşu kendi
+  // dar sütununda, hepsi aynı anda YATAY olarak yan yana — hiçbiri gizlenmiyor. Üstteki sekme
+  // şeridi artık bir "seç/gizle" kontrolü değil, sayfa içi hızlı atlama (anchor link) —
+  // tıklanınca o koşunun sütununa kaydırır, initialRaceNo (derin bağlantı) da aynısını yapar.
   const ilkYuklemeRaceNo =
     initialRaceNo != null && analyzed.some((r) => r.raceNo === initialRaceNo)
       ? initialRaceNo
@@ -97,63 +93,55 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
         ))}
       </div>
 
-      {/* Her analiz edilmiş koşu — TAM panel, hepsi aynı anda açık. */}
-      <div className="space-y-8 divide-y">
+      {/* 2026-11-10 kullanıcı talebi ("yan yana buna benzer olsun sadece şekil olarak",
+          referans görsel: dar sütunlar, At No + Puan, renk kodlu) — her analiz edilmiş koşu
+          kendi dar sütununda, hepsi YATAY olarak yan yana (gerekirse yatay kaydırmalı). Zengin
+          panel (AGF rozetleri, paylaşım ikonları) burada YOK — hızlı tarama için sade tablo.
+          Kupon Önerisi artık sütunların DEĞİL, sayfanın bir parçası (aşağıda, hipodrom başına). */}
+      <div className="flex gap-3 overflow-x-auto pb-2">
         {analyzed.map((race) => {
-          const picks = race.prediction?.picks ?? [];
-          // Bu hipodromun bugünkü kuponu — birden fazla aday varsa (1./2. Altılı, 7'li Ganyan)
-          // BU koşuyu KAPSAYANI tercih et, yoksa ilk eşleşen.
-          const hipoKuponlari = kuponlar.filter((k) => k.hippodromeName.split(" — ")[0] === raceDay.hippodrome.name);
-          const kupon =
-            hipoKuponlari.find((k) => k.variants.some((v) => v.legs.some((l) => l.raceNo === race.raceNo))) ??
-            hipoKuponlari[0] ??
-            null;
+          const picks = [...(race.prediction?.picks ?? [])].sort((a, b) => a.rank - b.rank);
           return (
-            <div key={race.id} id={`kosu-${race.id}`} className="scroll-mt-20 pt-8 first:pt-0 space-y-4">
-              {/* Koşu bilgi şeridi — şart/yaş-cins/mesafe/pist, ekrandaki referansla aynı sırada. */}
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl border bg-muted/30 px-3.5 py-2 text-xs">
-                <div className="font-bold">
-                  {race.raceNo}. Koşu{race.time ? ` · ${race.time}` : ""}
-                </div>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
-                  {race.classType && <span>Şartlı {race.classType}</span>}
-                  <span>{breedLabel(race.breed)}</span>
-                  <span>{race.distance} Metre</span>
-                  <span>{surfaceLabel(race.surface)} Pist</span>
-                  <PistIkonu className="h-4 w-6 text-brand" />
-                </div>
+            <div key={race.id} id={`kosu-${race.id}`} className="scroll-mt-20 w-[170px] shrink-0 rounded-xl border overflow-hidden">
+              <div className="bg-muted/50 px-2 py-1.5 text-center">
+                <div className="text-xs font-bold">{race.raceNo}. Koşu</div>
+                <div className="text-[10px] text-muted-foreground">{race.time ?? ""} · {race.distance}m</div>
               </div>
-
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
-                <AnalysisPanel
-                  picks={picks}
-                  runners={race.runners.map((r) => ({ no: r.no, name: r.name, scratched: false, ekuriGroup: r.ekuriGroup, agf: r.agf }))}
-                  winnerNos={race.result?.winnerNos}
-                  ganyan={race.result?.ganyan}
-                  isLoggedIn={true}
-                  isAdmin={isAdmin}
-                  isVerified={true}
-                  userEmail=""
-                  raceNo={race.raceNo}
-                  hippodromeName={raceDay.hippodrome.name}
-                  raceId={race.id}
-                  autoScroll={false}
-                />
-
-                <div className="space-y-4 lg:sticky lg:top-4">
-                  {kupon ? (
-                    <KuponBlock data={kupon} ikramiye={kupon.ikramiye} isAdmin={isAdmin} cityLabel="Kupon Önerisi" />
-                  ) : (
-                    <div className="rounded-2xl border border-dashed px-4 py-6 text-center text-xs text-muted-foreground">
-                      Bu hipodrom için kupon önerisi henüz yayınlanmadı.
-                    </div>
-                  )}
-                </div>
-              </div>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b text-[10px] text-muted-foreground">
+                    <th className="py-1 pl-2 text-left font-medium">At No</th>
+                    <th className="py-1 pr-2 text-right font-medium">Puan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {picks.map((p) => (
+                    <tr key={p.id} className="border-b last:border-0">
+                      <td className="py-1 pl-2 font-mono">{p.runner?.no ?? "—"}</td>
+                      <td className={cn("py-1 pr-2 text-right tabular-nums", puanRengi(p.rank))}>
+                        {puanYuzdesiMetni(p.score, p.scoreExact) != null ? `%${puanYuzdesiMetni(p.score, p.scoreExact)}` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           );
         })}
       </div>
+
+      {/* Kupon Önerisi — hipodrom başına, sütunların altında (bkz. yukarıdaki not). */}
+      {(() => {
+        const hipoKuponlari = kuponlar.filter((k) => k.hippodromeName.split(" — ")[0] === raceDay.hippodrome.name);
+        if (hipoKuponlari.length === 0) return null;
+        return (
+          <div className="space-y-3">
+            {hipoKuponlari.map((k) => (
+              <KuponBlock key={k.hippodromeName + k.variants.map((v) => v.legs.map((l) => l.raceNo).join("-")).join("|")} data={k} ikramiye={k.ikramiye} isAdmin={isAdmin} cityLabel="Kupon Önerisi" />
+            ))}
+          </div>
+        );
+      })()}
 
       {ilkYuklemeRaceNo != null && <OtomatikKaydir raceId={analyzed.find((r) => r.raceNo === ilkYuklemeRaceNo)?.id} />}
     </div>
