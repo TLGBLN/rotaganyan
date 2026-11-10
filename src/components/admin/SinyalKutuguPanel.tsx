@@ -1,162 +1,65 @@
-import {
-  CANLI_SINYALLER,
-  SIRALAMA_KURALLARI,
-  type SinyalAnlamlilik,
-} from "@/server/services/sinyal-kutugu.service";
+import { CURRENT_ENGINE_LABEL } from "@/lib/methodology/v5-engine-label";
+import safWeightsJson from "@/lib/methodology/weights/v546-1-saf-weights.json";
 
-const DURUM_STIL: Record<SinyalAnlamlilik, string> = {
-  anlamli: "border-hit/40 bg-hit/10 text-hit",
-  sinirda: "border-amber-500/40 bg-amber-500/10 text-amber-400",
-  anlamsiz: "border-muted-foreground/20 bg-muted/10 text-muted-foreground",
-  override: "border-[#c0392b]/40 bg-[#c0392b]/10 text-[#e57368]",
-  "veri-yok": "border-muted-foreground/10 bg-muted/5 text-muted-foreground/70",
+// 2026-11-10 kullanıcı talebi ("v5.46.1 kalksın mevcut motor yansıtılsın sadece") — bu panel
+// eskiden sinyal-kutugu.service.ts'teki EL İLE BAKIMLANAN CANLI_SINYALLER kataloğunu
+// gösteriyordu (A/B Katmanı, Düşük-şart/Diğer segment katsayıları) — o mimari (segment-bazlı
+// iki ağırlık seti) Ekim'de TAMAMEN kaldırıldı, bugün de V5.46.1'in kendisi (19 özellik, AGF
+// dahil) tamamen kaldırıldı. Panel artık CANLI ağırlık dosyasından (v546-1-saf-weights.json)
+// DOĞRUDAN okuyor — featureNames/weights/means/stds değiştikçe bu panel KENDİLİĞİNDEN
+// güncellenir, elle senkronize edilen ikinci bir kopya YOK (bugün üçüncü kez yaşanan
+// "stale catalog" hatasının bir daha olmaması için — bkz. v5-engine-label.ts'teki aynı ilke).
+type SafWeights = { featureNames: string[]; weights: number[]; means: number[]; stds: number[]; generatedAt: string; note: string };
+const SAF_W = safWeightsJson as unknown as SafWeights;
+
+const SINYAL_AD: Record<string, string> = {
+  idmJokey: "İdman Jokeyi Uyumu", h2hNetSkor: "H2H Net Skor", hizDerecesi: "Hız Derecesi",
+  zeminToleransi: "Zemin Toleransı", zeminMesafeDeneyim: "Zemin+Mesafe Deneyimi",
+  sonIdmanSprint: "Son İdman Sprint", takiDegisikligi: "Takı Değişikliği",
+  yarisGidisatiSkoru: "Yarış Gidişatı Skoru (Tempo)", sireOrani: "Pedigri (Sire+Dam+DamSire)",
+  ACC_CLOSE_RES: "Kapanış Artığı (Accurace)", ACC_LATE: "Geç Segment Hızı (Accurace)",
+  ACC_SPEED: "Hız Artığı (Accurace)", PS_front: "Öne Çıkma Uyumu", PS_lone: "Yalnız Kaçak Uyumu",
+  PS_closerFit: "Kapanışçı Uyumu", antrenorOraniGenel: "Antrenör Oranı",
+  jokeyFormuGenel: "Jokey Formu (Son 30 Gün)", galopKalite: "Galop Kalitesi",
 };
-
-const DURUM_ETIKET: Record<SinyalAnlamlilik, string> = {
-  anlamli: "anlamlı",
-  sinirda: "sınırda",
-  anlamsiz: "anlamsız",
-  override: "override",
-  "veri-yok": "veri yok",
-};
-
-function KatsayiHucre({ katsayi, durum, not: notMetni }: { katsayi: number; durum: SinyalAnlamlilik; not?: string }) {
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-2">
-        <span className="font-mono text-sm font-bold tabular-nums text-foreground">
-          {katsayi >= 0 ? "+" : ""}
-          {katsayi.toFixed(3)}
-        </span>
-        <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${DURUM_STIL[durum]}`}>
-          {DURUM_ETIKET[durum]}
-        </span>
-      </div>
-      {notMetni && <div className="text-[10.5px] text-muted-foreground">{notMetni}</div>}
-    </div>
-  );
-}
+function sinyalAdi(kod: string): string { return SINYAL_AD[kod] ?? kod; }
 
 export default function SinyalKutuguPanel() {
-  // 2026-11-04 kullanıcı talebi — bu sayfa artık yalnız V5.46.1'de GERÇEKTEN canlı olan
-  // sinyal/kuralları gösteriyor. Reddedilen/kapalı/aday sinyaller (eskiden "Aday / Test
-  // Edilmiş Sinyaller" bölümü) kasıtlı olarak buradan ÇIKARILDI — araştırma geçmişi olarak
-  // proje hafızasında/memory dosyalarında kalmaya devam ediyor, bu sayfa yalnız "şu an ne
-  // çalışıyor" sorusuna cevap veriyor.
-  const aktifSiralamaKurallari = SIRALAMA_KURALLARI.filter((k) => k.aktif);
+  const satirlar = SAF_W.featureNames.map((ad, i) => ({ ad, katsayi: SAF_W.weights[i], mean: SAF_W.means[i], std: SAF_W.stds[i] }))
+    .sort((a, b) => Math.abs(b.katsayi) - Math.abs(a.katsayi));
   return (
-    <section className="space-y-6">
+    <section className="space-y-4">
       <div>
-        <h2 className="text-lg font-bold text-foreground">V5.46.1 Sinyal Kütüğü</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Canlı skorlamaya giren 17 sinyal (12 A-Katmanı + 5 B-Katmanı ortak regresyonda, +2 B-Katmanı ayrı mekanizmada — bkz. aşağıdaki iki ayrı tablo),
-          segment bazlı katsayılarıyla (Düşük-şart = Maiden/Şartlı 1/19/27,
-          Diğer = Handikap/Şartlı 2-5/KV-Grup/Satış) ve aktif sıralama kuralları — yalnız ŞU AN
-          üretimde çalışanlar. Katsayı/GA her yeniden eğitimde elle güncellenir — sahadaki
-          GERÇEK isabet oranı için aşağıdaki &quot;Sinyal Bazlı Gerçek İsabet Oranı&quot;
-          tablosuna bakın.
-        </p>
+        <h2 className="text-lg font-bold text-foreground">Sinyal Kütüğü</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{CURRENT_ENGINE_LABEL}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{SAF_W.note}</p>
       </div>
-
-      {/* ── A Katmanı: istatistiksel olarak kanıtlanmış (veya en azından karışık/gerçek
-          katsayıya dayanan) 11 çekirdek sinyal — ana koşullu-logit regresyonun omurgası. ── */}
-      <div className="space-y-2">
-        <div>
-          <h3 className="text-base font-bold text-foreground">A Katmanı — Güçlü Sinyaller</h3>
-          <p className="text-xs text-muted-foreground">Ana regresyonun kanıtlanmış/çekirdek 11 sinyali.</p>
-        </div>
-        <div className="overflow-x-auto rounded-lg border border-brand/20">
-          <table className="w-full min-w-[640px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-brand/20 bg-[#0d0d14] text-left text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <th className="px-3 py-2">Sinyal</th>
-                <th className="px-3 py-2">Düşük-şart</th>
-                <th className="px-3 py-2">Diğer</th>
+      <div className="overflow-x-auto rounded-lg border border-brand/20">
+        <table className="w-full min-w-[520px] border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-brand/20 bg-[#0d0d14] text-left text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <th className="px-3 py-2">Sinyal</th>
+              <th className="px-3 py-2">Kod</th>
+              <th className="px-3 py-2">Katsayı (β)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {satirlar.map((s) => (
+              <tr key={s.ad} className="border-b border-brand/10 last:border-0 hover:bg-[#0d0d14]/60">
+                <td className="px-3 py-2.5 align-top font-semibold text-foreground">{sinyalAdi(s.ad)}</td>
+                <td className="px-3 py-2.5 align-top font-mono text-[10.5px] text-muted-foreground">{s.ad}</td>
+                <td className={`px-3 py-2.5 align-top font-mono text-sm font-bold tabular-nums ${s.katsayi >= 0 ? "text-hit" : "text-[#e57368]"}`}>
+                  {s.katsayi >= 0 ? "+" : ""}{s.katsayi.toFixed(3)}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {CANLI_SINYALLER.filter((s) => s.katman === "A").map((s) => (
-                <tr key={s.kod} className="border-b border-brand/10 last:border-0 hover:bg-[#0d0d14]/60">
-                  <td className="px-3 py-2.5 align-top">
-                    <div className="font-semibold text-foreground">{s.ad}</div>
-                    <div className="font-mono text-[10.5px] text-muted-foreground">{s.kod}</div>
-                    <div className="mt-1 max-w-xs text-[11px] leading-snug text-muted-foreground">{s.aciklama}</div>
-                  </td>
-                  <td className="px-3 py-2.5 align-top">
-                    <KatsayiHucre {...s.dusukSart} />
-                  </td>
-                  <td className="px-3 py-2.5 align-top">
-                    <KatsayiHucre {...s.diger} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
-
-      {/* ── B Katmanı: tek başına anlamsız çıkan ama MEGAFAUNA türü vakalarda fark
-          yaratabileceği düşünülen, kullanıcı kararıyla eklenen 4 sinyal. MEKANİZMA olarak
-          homojen DEĞİL — zeminToleransi/yakinsama2Plus hâlâ A'nın 13'lük ORTAK regresyonunda
-          birlikte fit ediliyor; sireOrani/zeminMesafeDeneyim GERÇEKTEN ayrı bir mekanizma
-          (softmax'a girmeden önce skora eklenen, bkz. v5-engine.ts bKatmaniUygula). ── */}
-      <div className="space-y-2">
-        <div>
-          <h3 className="text-base font-bold text-foreground">B Katmanı — Zayıf Ama Fark Yaratabilecek Sinyaller</h3>
-          <p className="text-xs text-muted-foreground">
-            Dördü de tek başına (ve bazıları birlikte) test edildi, istatistiksel olarak anlamsız çıktı —
-            yine de kullanıcı kararıyla toplam puana dahil. Mekanizma homojen değil: zeminToleransi ve
-            Yakınsama hâlâ A&apos;nın ortak regresyonunda birlikte fit ediliyor (yalnız kanıt zayıf
-            olduğu için burada gruplanıyor); Sire Oranı ve Zemin+Mesafe Deneyimi gerçekten ayrı,
-            softmax&apos;a girmeden önce skora eklenen bir mekanizma.
-          </p>
-        </div>
-        <div className="overflow-x-auto rounded-lg border border-amber-500/20">
-          <table className="w-full min-w-[640px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-amber-500/20 bg-[#0d0d14] text-left text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <th className="px-3 py-2">Sinyal</th>
-                <th className="px-3 py-2">Düşük-şart</th>
-                <th className="px-3 py-2">Diğer</th>
-              </tr>
-            </thead>
-            <tbody>
-              {CANLI_SINYALLER.filter((s) => s.katman === "B").map((s) => (
-                <tr key={s.kod} className="border-b border-amber-500/10 last:border-0 hover:bg-[#0d0d14]/60">
-                  <td className="px-3 py-2.5 align-top">
-                    <div className="font-semibold text-foreground">{s.ad}</div>
-                    <div className="font-mono text-[10.5px] text-muted-foreground">{s.kod}</div>
-                    <div className="mt-1 max-w-xs text-[11px] leading-snug text-muted-foreground">{s.aciklama}</div>
-                  </td>
-                  <td className="px-3 py-2.5 align-top">
-                    <KatsayiHucre {...s.dusukSart} />
-                  </td>
-                  <td className="px-3 py-2.5 align-top">
-                    <KatsayiHucre {...s.diger} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* ── Sıralama kuralları (yalnız aktif olanlar — bkz. k.aktif) ── */}
-      <div className="space-y-3 pt-2">
-        <h3 className="text-base font-bold text-foreground">Sıralama Kuralları</h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {aktifSiralamaKurallari.map((k) => (
-            <div key={k.ad} className="rounded-lg border border-brand/20 bg-[#0d0d14] p-4 space-y-2">
-              <div className="flex items-baseline justify-between gap-2">
-                <div className="font-semibold text-foreground">{k.ad}</div>
-                <span className="font-mono text-[10px] text-amber-400">{k.etiket}</span>
-              </div>
-              <p className="text-xs text-muted-foreground">{k.aciklama}</p>
-              <div className="border-t border-brand/10 pt-2 font-mono text-[11px] text-foreground/80">{k.backtestOzet}</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Tüm sinyaller AGF&apos;siz, tek doğrusal skor + softmax ile birleştirilir — segment-bazlı ayrı katsayı seti YOK, her koşuda aynı β&apos;lar kullanılır.
+        Üretildi: {new Date(SAF_W.generatedAt).toLocaleString("tr-TR")}.
+      </p>
     </section>
   );
 }

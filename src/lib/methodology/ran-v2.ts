@@ -35,6 +35,7 @@ import { getV5461DamOzetleriForRace, getV5461DamsireOzetleriForRace, type V5461D
 import type { Faz1RunnerV5 } from "./v5-engine";
 import type { AccuraceRun } from "@/lib/accurace/types";
 import { getSonYarisDetaylariForRace, type SonYarisDetay } from "@/server/actions/son-yaris-detay.actions";
+import { galopSkoru, pedigriSkoru } from "./pedigri-galop-ortak";
 
 // 2026-11-09 kullanıcı talebi — race-level 30 dk TTL (sire/dam/jokey ile AYNI desen).
 // getSonYarisDetaylariForRace zaten at-başına fetchTjkAtKosuBilgileri üzerinden 3 saatlik
@@ -51,7 +52,7 @@ async function sonYarisDetayGetirOnbellekli(raceId: string): Promise<SonYarisDet
   return data;
 }
 
-type PillarKodu = "acc" | "tempo" | "jokey" | "pedigri" | "kgs" | "zeminMesafe" | "antrenor" | "kilo" | "taki";
+type PillarKodu = "acc" | "tempo" | "jokey" | "pedigri" | "kgs" | "zeminMesafe" | "antrenor" | "kilo" | "taki" | "galop" | "idmJokey";
 
 export type RanV2AtSonucu = {
   runnerId: string;
@@ -65,6 +66,8 @@ export type RanV2AtSonucu = {
   kgsPillar: number | null;
   zeminMesafePillar: number | null;
   antrenorPillar: number | null;
+  galopPillar: number | null;
+  idmJokeyPillar: number | null;
   kiloPillar: number | null;
   // takiPillar: z-skorlu, yalnız TEŞHİS/gösterim amaçlı — ranV2Skor'a GİRMEZ (bkz. takiBonus).
   takiPillar: number | null;
@@ -119,11 +122,19 @@ const KATEGORI_PILLAR_SETI: Record<string, PillarKodu[]> = {
   // kilitle bunlara." — Acc/Tempo bu kategoride KULLANILMAZ (bu atların Accurace geçmişi
   // zaten yok/anlamsız — kategori adı da bundan). Önceki sürümde yanlışlıkla "acc" buradaydı,
   // "jokey" eksikti — düzeltildi.
-  "Düşük Deneyim": ["pedigri", "jokey", "kgs", "antrenor"],
+  // 2026-11-09 kullanıcı talebi (TEST, henüz deploy edilmedi) — KGS çıkarıldı, Galop
+  // eklendi: "Galop, pedigri, jokey ve antrenör olacak sadece." Pedigri eşiği (n>=8)
+  // DOKUNULMADI (kullanıcı bu mesajda yalnız pillar bileşimini belirtti, eşiği değil).
+  // 2026-11-10 kullanıcı talebi (TEST) — "İdman Jokeyi" eklendi: "pedigri ve galop ve jokey
+  // ve idman jokeyi ve antrenör test edilsin." idmJokey, V5.46.1/Saf Model'in ZATEN canlıda
+  // kullandığı ham sinyal (gatherV461RawSinyaller→"idmJokey") — RAN v2'ye YENİ pillar olarak
+  // eklendi, icat edilmedi.
+  "Düşük Deneyim": ["pedigri", "jokey", "antrenor", "galop", "idmJokey"],
   // 2026-11-09 kullanıcı talebi — Maiden/ŞARTLI 19'un gerçek Accurace geçmişi olabileceği
   // için Acc geri eklendi. Kilo Değişimi de eklendi (O PAPATYA vakası). ŞARTLI 1/27'nin
   // kilitli seti DOKUNULMADI. NOT: "taki" burada YOK — Takı Değişikliği artık z-skorlu
-  // pillar DEĞİL, doğrudan toplam skora eklenen sabit bir katkı (bkz. TAKI_DEGISIM_BONUS).
+  // pillar DEĞİL, doğrudan toplam skora eklenen sabit bir katkı (bkz. TAKI_DEGISIM_BONUS,
+  // takiKiloGerekli zaten bu kategoriye bağlı — Takı bu kategoride dolaylı olarak HÂLÂ var).
   //
   // 2026-11-09 — Tempo SONRADAN eklendi (O PAPATYA kök-neden incelemesi, bkz. proje
   // hafızası): V5.46.1'in ham dökümü onu net bir kapanışçı (Accurace sektörel geçmişi, son
@@ -137,7 +148,14 @@ const KATEGORI_PILLAR_SETI: Record<string, PillarKodu[]> = {
   // varsayımı). Kilo artık YALNIZ açıklama/gösterim alanı (kiloPillar hâlâ hesaplanıp
   // RanV2AtSonucu'nda dönüyor) — Takı'nın eklenen/çıkarılan kod listesiyle AYNI mantık,
   // skora hiç girmiyor.
-  "Düşük Deneyim (Acc)": ["acc", "tempo", "pedigri", "jokey", "kgs", "antrenor"],
+  // 2026-11-10 kullanıcı talebi (TEST) — "Maiden ve ŞARTLI 19... pedigri galop jokey idman
+  // jokeyi antrenör accurace tempo Takı Değişiklikleri test edilsin." KGS kullanıcının
+  // listesinde YOK — çıkarıldı. Galop + idmJokey eklendi (ikisi de bu kategoride ilk kez
+  // çekiliyor, bkz. galopGerekli/idmJokey extraction güncellemeleri). Takı zaten
+  // takiKiloGerekli ile bu kategoride dolaylı (+0.20 bonus) var, AYRICA z-skorlu pillar
+  // olarak eklenmedi — çift sayım riski (bkz. ranV2Skor hesaplaması, bonus HER ZAMAN
+  // pillarOrtalamasi'nın dışında eklenir).
+  "Düşük Deneyim (Acc)": ["acc", "tempo", "pedigri", "jokey", "antrenor", "galop", "idmJokey"],
   "Orta Deneyim": ["acc", "tempo", "jokey", "pedigri", "kgs", "zeminMesafe"],
   "Kanıtlanmış": VARSAYILAN_5,
   "Diğer": VARSAYILAN_5,
@@ -159,30 +177,9 @@ function kgsSkoru(r: Faz1RunnerV5, breed: string): number | null {
   return null;
 }
 
-// 2026-11-08 DÜZELTME (kullanıcı bulgusu, "Pedigri Merkezi" ekranı): externalPedigree
-// (ExternalPedigreeStat) STATİK bir dış anlık görüntü — "HipodromX/manual snapshots",
-// kendi koşu sonuçlarımıza göre GÜNCELLENMİYOR, kodda hiçbir yazma yolu yok. Oysa
-// V5.46.1'in zaten CANLI skorunda kullandığı doğru kaynak SireStatOwn — "kendi verimiz",
-// sonuçlardan DİNAMİK üretiliyor (bkz. sire-stat.actions.ts, pedigri-own-stat.service.ts).
-// RAN v2 bu YANLIŞ (statik) kaynağı kullanıyordu — düzeltildi: artık Faz1RunnerV5'in
-// ZATEN hesapladığı sireKazanmaOraniHam (= SireStatOwn.kYuzde, ekstra sorgu GEREKMİYOR)
-// + sireOrneklemKendiVeri (örneklem büyüklüğü) kullanılıyor — "Own Sire", V5'in canlı
-// skorunda kullandığı TEK pedigri sinyaliyle AYNI kaynak.
-// 2026-11-09 kullanıcı talebi ("V5.46.1'i unut, Dam/DamSire ekle") — RAN v2 V5.46.1'den
-// BAĞIMSIZ bir motor, V5'in "yalnız Own Sire" kısıtlamasına uymak ZORUNDA değil. Dam/DamSire
-// artık getV5461DamOzetleriForRace/getV5461DamsireOzetleriForRace (point-in-time güvenli,
-// v5461-sire.actions.ts ile AYNI desen) ile çekiliyor ve Sire ile birlikte ortalanıyor — her
-// biri kendi örneklem eşiğinden (PEDIGRI_MIN_ORNEK) bağımsız geçmeli, eksik olan atlanır
-// (0'a çekilmez). Henüz B300 ile AYRI doğrulanmadı (kullanıcı testsiz eklenmesini istedi,
-// Antrenör pillar'ında olduğu gibi bilinçli bir istisna).
-// 2026-11-09 kullanıcı bulgusu (İstanbul K1 Şartlı 1, 2026-11-08 — IRON ANGEL vakası):
-// n=3 eşiği çok düşük — n=4'te 0/4 veya n=6'da 0/6 gibi sonuçlar sahadaki tipik kazanma
-// oranında (ör. %12-19) TESADÜFEN bile >%50 ihtimalle görülür, ama kod bunu n=22/27/82
-// gibi güçlü örneklemlerle AYNI güvenilirlikte (ağırlıksız ortalama) kullanıyordu — saf
-// şans eseri "sert sıfır" saha z-skorunun en uç noktası olup atı anlamsızca cezalandırdı.
-// Shrink katmanı/yeni sorgu EKLENMEDİ (kullanıcı talebi) — yalnız eşik yükseltildi, yetersiz
-// örneklem hâlâ null (0'a çekilmiyor), pedigriSkoru mantığı DEĞİŞMEDİ.
-const PEDIGRI_MIN_ORNEK = 8;
+// galopSkoru ve pedigriSkoru artık ./pedigri-galop-ortak.ts'de — v546-1-engine.ts de bunları
+// kullanmaya başladığı için (18-sinyal aday model) döngüsel import'u önlemek adına oraya
+// taşındı, bu dosya yalnız import ediyor (bkz. yukarıdaki import satırı).
 
 // 2026-11-09 kullanıcı KARARI (sabit katsayı — RAN v2'nin "katsayısız" ilkesine bilinçli bir
 // İSTİSNA, kullanıcı ek test beklemeden uygulanmasını istedi): Takı Değişikliği VARSA toplam
@@ -191,20 +188,6 @@ const PEDIGRI_MIN_ORNEK = 8;
 // aksine z-skorlanmaz, backtest'le TÜRETİLMEMİŞTİR — doğrudan, tartışılmadan atanmış bir
 // sayı. B300+ ile doğrulanmadı.
 const TAKI_DEGISIM_BONUS = 0.20;
-function pedigriSkoru(r: Faz1RunnerV5, damOzet: V5461DamlineOzet, damSireOzet: V5461DamlineOzet): number | null {
-  const parcalar: number[] = [];
-  if (r.sireKazanmaOraniHam != null && r.sireOrneklemKendiVeri != null && r.sireOrneklemKendiVeri >= PEDIGRI_MIN_ORNEK) {
-    parcalar.push(r.sireKazanmaOraniHam);
-  }
-  if (damOzet.kYuzde != null && damOzet.ornekKendiVeri != null && damOzet.ornekKendiVeri >= PEDIGRI_MIN_ORNEK) {
-    parcalar.push(damOzet.kYuzde);
-  }
-  if (damSireOzet.kYuzde != null && damSireOzet.ornekKendiVeri != null && damSireOzet.ornekKendiVeri >= PEDIGRI_MIN_ORNEK) {
-    parcalar.push(damSireOzet.kYuzde);
-  }
-  if (parcalar.length === 0) return null;
-  return parcalar.reduce((a, b) => a + b, 0) / parcalar.length;
-}
 
 function bul(ad: string, sinyaller: RawSinyalGirdi[]): RawSinyalGirdi | undefined {
   return sinyaller.find((s) => s.ad === ad);
@@ -314,6 +297,21 @@ export async function hesaplaRanV2(raceId: string, preloadedRuns?: AccuraceRun[]
   const sonYarisDetaylari = takiKiloGerekli ? await sonYarisDetayGetirOnbellekli(raceId) : [];
   const sonYarisDetayByNo = new Map(sonYarisDetaylari.map((d) => [d.runnerNo, d]));
 
+  // 2026-11-09 kullanıcı talebi — ŞARTLI 1/27'ye Galop (TEST, henüz deploy edilmedi).
+  // 2026-11-10 kullanıcı talebi — Maiden/ŞARTLI 19'a da Galop eklendi (TEST) — bkz.
+  // KATEGORI_PILLAR_SETI'ndeki aynı tarihli not. SADECE bu iki kategoride çekilir
+  // (gereksiz DB sorgusu önlenir).
+  const galopGerekli = kategori === "Düşük Deneyim" || kategori === "Düşük Deneyim (Acc)";
+  const galopRows = galopGerekli
+    ? await db.gallop.findMany({ where: { runnerId: { in: runnerIds } }, orderBy: { date: "desc" }, select: { runnerId: true, date: true, splits: true, form: true, jockey: true } })
+    : [];
+  const galopByRunnerId = new Map<string, { date: Date; splits: unknown; form: string | null; jockey: string | null }[]>();
+  for (const g of galopRows) {
+    const arr = galopByRunnerId.get(g.runnerId) ?? [];
+    arr.push(g);
+    galopByRunnerId.set(g.runnerId, arr);
+  }
+
   const accHam: (number | null)[] = [];
   const tempoHam: (number | null)[] = [];
   const jokeyHam: (number | null)[] = [];
@@ -324,6 +322,8 @@ export async function hesaplaRanV2(raceId: string, preloadedRuns?: AccuraceRun[]
   const kiloHam: (number | null)[] = [];
   const takiHam: (number | null)[] = [];
   const takiBonusHam: (number | null)[] = [];
+  const galopHam: (number | null)[] = [];
+  const idmJokeyHam: (number | null)[] = [];
 
   for (const [i, { r, rawSinyaller }] of raw.runners.entries()) {
     // Accurace pillar: ACC_CLOSE_RES + ACC_SPEED ortalaması. ACC_LATE bilerek HARİÇ —
@@ -351,6 +351,15 @@ export async function hesaplaRanV2(raceId: string, preloadedRuns?: AccuraceRun[]
 
     // KGS (koşu aralığı) pillar.
     kgsHam.push(kgsSkoru(r, raw.race.breed));
+
+    // Galop (idman kalitesi) pillar — TEST, bkz. galopSkoru üstündeki uyarı notu.
+    galopHam.push(galopGerekli ? galopSkoru(galopByRunnerId.get(r.id) ?? [], raw.race.breed, r.jockey) : null);
+
+    // İdman Jokeyi Uyumu — V5.46.1/Saf Model'in ZATEN canlıda kullandığı ham sinyal
+    // (gatherV461RawSinyaller→"idmJokey", evidenceObserved=r.galopSayisi>0) — 2026-11-10
+    // kullanıcı talebi (TEST), bkz. KATEGORI_PILLAR_SETI'ndeki aynı tarihli not.
+    const idm = bul("idmJokey", rawSinyaller);
+    idmJokeyHam.push(idm?.evidenceObserved ? idm.raw : null);
 
     // Zemin+Mesafe Deneyimi — atın BUGÜNKÜ (pist, zemin koşulu, mesafe) kombinasyonunda
     // kanıtlanmış deneyimi (zaten Faz1RunnerV5 içinde hesaplanıyor). Örneklem yoksa null.
@@ -398,6 +407,8 @@ export async function hesaplaRanV2(raceId: string, preloadedRuns?: AccuraceRun[]
     jokey: zSkorlar(jokeyHam),
     pedigri: zSkorlar(pedigriHam),
     kgs: zSkorlar(kgsHam),
+    galop: zSkorlar(galopHam),
+    idmJokey: zSkorlar(idmJokeyHam),
     zeminMesafe: zSkorlar(zeminMesafeHam),
     antrenor: zSkorlar(antrenorHam),
     kilo: sifirMerkezliZSkorlar(kiloHam),
@@ -419,6 +430,8 @@ export async function hesaplaRanV2(raceId: string, preloadedRuns?: AccuraceRun[]
       takiEklenenKodlar: sonYarisDetayByNo.get(r.no)?.eklenenTaki.map((e) => e.code) ?? [],
       takiCikarilanKodlar: sonYarisDetayByNo.get(r.no)?.cikarilanTaki.map((e) => e.code) ?? [],
       antrenorPillar: pillarZHaritasi.antrenor[i],
+      galopPillar: pillarZHaritasi.galop[i],
+      idmJokeyPillar: pillarZHaritasi.idmJokey[i],
       ranV2Skor, sira: 0,
     };
   });

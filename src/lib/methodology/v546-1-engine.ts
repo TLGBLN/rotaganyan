@@ -22,6 +22,12 @@ import {
 } from "@/lib/accurace/features";
 import type { AccuraceRun, Breed, Surface, StyleFeature, TargetRace } from "@/lib/accurace/types";
 import weightsJson from "./weights/v546-1-weights.json";
+// 2026-11-10 kullanıcı kararı ("18 sinyal yapacağız bunları da ekleyerek") — Antrenör Oranı/
+// Jokey Formu/Galop Kalitesi + Dam/DamSire'ın sireOrani'ye eklenmesi. galopSkoru/pedigriSkoru
+// ./pedigri-galop-ortak.ts'de (ran-v2.ts ile PAYLAŞILAN, döngüsel import'suz tek kaynak).
+import { galopSkoru, pedigriSkoru } from "./pedigri-galop-ortak";
+import { getJokeyFormTablosu } from "@/server/actions/jokey-form.actions";
+import { getV5461DamOzetleriForRace, getV5461DamsireOzetleriForRace, type V5461DamlineOzet } from "@/server/actions/v5461-damline.actions";
 
 type FrozenWeights = {
   version: string;
@@ -106,9 +112,10 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
 
   const raceMeta = await db.race.findUnique({
     where: { id: raceId },
-    select: { raceDay: { select: { date: true } } },
+    select: { raceDay: { select: { date: true, hippodromeId: true } } },
   });
   const raceDate = raceMeta?.raceDay.date ?? new Date();
+  const hippodromeId = raceMeta?.raceDay.hippodromeId ?? null;
 
   const target: TargetRace = {
     date: raceDate,
@@ -172,6 +179,34 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
   const gidisatSonucuV461 = hesaplaYarisGidisati(tempoProfilleri, faz1.race.distance, tempoTasimaListesi);
   const gidisatByRunnerIdV461 = new Map(faz1.runners.map((r, i) => [r.id, gidisatSonucuV461.atSonuclari[i]]));
 
+  // 2026-11-10 kullanıcı kararı ("18 sinyal yapacağız") — Antrenör Oranı/Jokey Formu/Galop
+  // Kalitesi (3 YENİ sinyal) + Dam/DamSire'ın sireOrani'ye eklenmesi (mevcut sinyal, yeniden
+  // tanımlandı) için gereken ham veri — ran-v2.ts'in hesaplaRanV2'siyle AYNI kaynak/desen.
+  const runnerIdsHepsi = faz1.runners.map((r) => r.id);
+  const damDamSireRows = await db.runner.findMany({ where: { id: { in: runnerIdsHepsi } }, select: { id: true, dam: true, damSire: true } });
+  const damDamSireByRunnerId = new Map(damDamSireRows.map((x) => [x.id, x]));
+  const damNamesOrdered = faz1.runners.map((r) => damDamSireByRunnerId.get(r.id)?.dam ?? null);
+  const damSireNamesOrdered = faz1.runners.map((r) => damDamSireByRunnerId.get(r.id)?.damSire ?? null);
+  const [jokeyTablosu18, galopRows18, damOzetleri18, damSireOzetleri18] = await Promise.all([
+    getJokeyFormTablosu(raceDate, hippodromeId).catch(() => new Map<string, { guncel: { etkinForm: number | null } }>()),
+    db.gallop.findMany({ where: { runnerId: { in: runnerIdsHepsi } }, orderBy: { date: "desc" }, select: { runnerId: true, date: true, splits: true, form: true, jockey: true } }).catch(() => []),
+    getV5461DamOzetleriForRace(damNamesOrdered, faz1.race.breed, faz1.race.surface, faz1.race.distance, raceDate).catch(
+      () => damNamesOrdered.map(() => ({ ornekKendiVeri: null, kYuzde: null }) as V5461DamlineOzet)
+    ),
+    getV5461DamsireOzetleriForRace(damSireNamesOrdered, faz1.race.breed, faz1.race.surface, faz1.race.distance, raceDate).catch(
+      () => damSireNamesOrdered.map(() => ({ ornekKendiVeri: null, kYuzde: null }) as V5461DamlineOzet)
+    ),
+  ]);
+  const galop18ByRunnerId = new Map<string, { date: Date; splits: unknown; form: string | null; jockey: string | null }[]>();
+  for (const g of galopRows18) {
+    const arr = galop18ByRunnerId.get(g.runnerId) ?? [];
+    arr.push(g);
+    galop18ByRunnerId.set(g.runnerId, arr);
+  }
+  const pedigriBirlesikByRunnerId = new Map(
+    faz1.runners.map((r, i) => [r.id, pedigriSkoru(r, damOzetleri18[i], damSireOzetleri18[i])])
+  );
+
   const runners: V461RawRunner[] = faz1.runners.map((r: Faz1RunnerV5) => {
     const gecmis = gecmisOf(r.id);
     const cr = closingResidual(gecmis, target, closingBaselineAt);
@@ -201,12 +236,25 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
       { ad: "takiDegisikligi", raw: taki, observed: true, reliability: 1, evidenceObserved: r.takiDegisikligiGozlemli },
       { ad: "yarisGidisatiSkoru", raw: gidisatByRunnerIdV461.get(r.id)?.finalSkor ?? 0, observed: true, reliability: 1, evidenceObserved: gidisatByRunnerIdV461.get(r.id)?.finalSkor != null },
       { ad: "sireOrani", raw: r.sireOrani, observed: true, reliability: 1, evidenceObserved: (r.sireOrneklemKendiVeri ?? 0) > 0 },
+      // 2026-11-10 kullanıcı kararı ("dam ve damsire ı var olan sire sinyaline eklenecek", sonra
+      // "ŞARTLI1/27 ve Maiden/19 DIŞINDA değişmesin") — AYRI bir sinyal olarak eklendi (sireOrani
+      // DEĞİŞTİRİLMEDİ, kanıtlanmış 15-özellik modelin train/serve tutarlılığı korunuyor).
+      // pedigriSkoru (Sire+Dam+DamSire, her biri kendi örneklem eşiğinden bağımsız geçmeli) —
+      // yalnız segment-bazlı modellerin featureNames'inde var, varsayılan modelde YOK.
+      { ad: "sireOraniBirlesik", raw: pedigriBirlesikByRunnerId.get(r.id) ?? null, observed: true, reliability: 1, evidenceObserved: pedigriBirlesikByRunnerId.get(r.id) != null },
       { ad: "ACC_CLOSE_RES", raw: cr.observed ? cr.raw : null, observed: cr.observed, reliability: cr.reliability },
       { ad: "ACC_LATE", raw: la.observed ? la.raw : null, observed: la.observed, reliability: la.reliability },
       { ad: "ACC_SPEED", raw: sp.observed ? sp.raw : null, observed: sp.observed, reliability: sp.reliability },
       { ad: "PS_front", raw: paceObserved ? front : null, observed: paceObserved, reliability: hR },
       { ad: "PS_lone", raw: paceObserved ? lone : null, observed: paceObserved, reliability: hR },
       { ad: "PS_closerFit", raw: paceObserved ? closerFit : null, observed: paceObserved, reliability: hR },
+      // 2026-11-10 kullanıcı kararı ("18 sinyal yapacağız bunları da ekleyerek") — 3 YENİ aday
+      // sinyal: Antrenör Oranı (r.antrenorOrani, Faz1RunnerV5 içinde zaten hesaplı), Jokey
+      // Formu (son 30 gün etkin form, getJokeyFormTablosu — RAN v2 ile AYNI kaynak), Galop
+      // Kalitesi (galopSkoru, pedigri-galop-ortak.ts — RAN v2 ile AYNI fonksiyon).
+      { ad: "antrenorOraniGenel", raw: r.antrenorOrani, observed: true, reliability: 1, evidenceObserved: r.antrenorOrani != null },
+      { ad: "jokeyFormuGenel", raw: (r.jockey ? jokeyTablosu18.get(r.jockey)?.guncel.etkinForm : null) ?? null, observed: true, reliability: 1, evidenceObserved: (r.jockey ? jokeyTablosu18.get(r.jockey)?.guncel.etkinForm : null) != null },
+      { ad: "galopKalite", raw: galopSkoru(galop18ByRunnerId.get(r.id) ?? [], faz1.race.breed, r.jockey), observed: true, reliability: 1, evidenceObserved: galopSkoru(galop18ByRunnerId.get(r.id) ?? [], faz1.race.breed, r.jockey) != null },
     ];
     return {
       r,
@@ -227,6 +275,14 @@ function puanlaVeSirala(
 ): { r: Faz1RunnerV5; features: V461FeatureDetay[]; score: number; probability: number; rank: number }[] {
   const satirlar = runners.map(({ r, rawSinyaller }) => {
     const girdi = filtrele ? rawSinyaller.filter((s) => filtrele(s.ad)) : rawSinyaller;
+    // 2026-11-10 — evidenceObserved bug düzeltmesi (idmJokey/zeminToleransi/zeminMesafeDeneyim/
+    // takiDegisikligi/yarisGidisatiSkoru/sireOrani'nin gerçekte "sahte %100 gözlem" taşıdığı
+    // bulgusu, bkz. v546-1-saf-weights-v3.json) KODLANDI ama SKORLAMAYA BAĞLANMADI bırakıldı —
+    // bu değişiklik hiçbir modelle izole test edilmeden kanıtlanmış 15-özellik Saf Model'in
+    // davranışını etkileyemez (2026-10-24'teki deneyde de net/tutarlı bir kazanç yoktu, AGF4+
+    // sürprizlerde net hafif KÖTÜ çıkmıştı). bandeNoktala hâlâ eski s.observed'i okuyor — HİÇBİR
+    // kategori/segment için davranış değişmedi. evidenceObserved alanı yalnız gösterim/teşhis
+    // amaçlı feature detayına EKLENİYOR (UI'da kullanılabilir), skoru ETKİLEMİYOR.
     const features: V461FeatureDetay[] = girdi.map((s) => {
       const f = bandeNoktala(weights, s.ad, s.raw, s.observed, s.reliability);
       return s.evidenceObserved !== undefined ? Object.assign(f, { evidenceObserved: s.evidenceObserved }) : f;
@@ -311,9 +367,28 @@ export function agfDestekOnerisiHesapla(picks: V461SafPick[], rawRunners: V461Ra
   return oneriler.sort((a, b) => a.agfSirasi - b.agfSirasi);
 }
 
-export async function scoreV461Saf(raceId: string, safWeights: FrozenWeights): Promise<V461SafSonuc | null> {
+// 2026-11-10 kullanıcı kararı — ŞARTLI 1/27 ve Maiden/ŞARTLI 19'da varsayılan 15-özellik
+// modelin GENEL (global) 18-özellik denemesi KÖTÜLEŞTİĞİ için (bkz. proje hafızası aynı
+// tarihli not) yalnız bu İKİ segment için AYRI, küçük modeller eğitildi — geri kalan TÜM
+// koşu tipleri varsayılan (çağıranın verdiği) ağırlığı DEĞİŞMEDEN kullanır. Sıra MAIDEN/
+// ŞARTLI 19'un ÖNCE kontrol edilmesi (ŞARTLI 1'in "ŞARTLI 19" alt-string'ini yanlışlıkla
+// yakalamaması için) — ran-v2.ts'teki kategoriBelirle ile AYNI mantık/sıra.
+import segmentDusukDeneyimJson from "./weights/v546-1-saf-segment-dusuk-deneyim.json";
+import segmentDusukDeneyimAccJson from "./weights/v546-1-saf-segment-dusuk-deneyim-acc.json";
+const SEGMENT_DUSUK_DENEYIM_W = segmentDusukDeneyimJson as unknown as FrozenWeights;
+const SEGMENT_DUSUK_DENEYIM_ACC_W = segmentDusukDeneyimAccJson as unknown as FrozenWeights;
+function segmentAgirligiSec(classType: string, varsayilan: FrozenWeights): FrozenWeights {
+  const c = classType.toUpperCase();
+  if (c.includes("MAIDEN") || c.includes("ŞARTLI 19")) return SEGMENT_DUSUK_DENEYIM_ACC_W;
+  if (c.includes("ŞARTLI 1") || c.includes("ŞARTLI 27")) return SEGMENT_DUSUK_DENEYIM_W;
+  return varsayilan;
+}
+
+export async function scoreV461Saf(raceId: string, safWeightsVarsayilan: FrozenWeights): Promise<V461SafSonuc | null> {
   const rawSonuc = await gatherV461RawSinyaller(raceId);
   if (!rawSonuc) return null;
+
+  const safWeights = segmentAgirligiSec(rawSonuc.race.classType, safWeightsVarsayilan);
 
   // 2026-11-10 BUG DÜZELTMESİ (kullanıcı bulgusu — "bilinmeyen feature adı 'yakinsama2Plus'"
   // çökmesi): filtre önceden SABİT SAF_MODEL_AGF_KODLARI'ydı (yalnız 3 AGF kodu) — Saf Model

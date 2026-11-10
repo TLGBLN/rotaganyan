@@ -18,7 +18,14 @@ import {
   kosuKayitlari, kuponKayitlari, kuponSatirlari, yarisHesapla, V546_BASLANGIC, KACAN_TOP_N, PIYASA_KODLAR,
   type YarisDegerlendirme, type Gun,
 } from "./kosu-sonuc-degerlendirme.service";
-import { scoreV461, type V461Pick } from "@/lib/methodology/v546-1-engine";
+// 2026-11-10 BUG DÜZELTMESİ (kullanıcı talebi "yeni motoru da ekle") — bu dosya ÖLÜ V5.46.1'i
+// (scoreV461, AGF dahil 19 özellik, bugün TAMAMEN kaldırıldı) çağırıyordu; arac-tam-at-
+// inceleme.mts'teki AYNI bug sınıfı. Artık canlı motor scoreV461Saf (RotaGanyan Analiz
+// Motoru, v546-1-saf-weights.json) çağrılıyor — test-v5-engine/route.ts ile AYNI kaynak.
+import { scoreV461Saf, type V461SafPick as V461Pick } from "@/lib/methodology/v546-1-engine";
+import safWeightsJson from "@/lib/methodology/weights/v546-1-saf-weights.json";
+type SafWeights = { status?: string; featureNames: string[]; weights: number[]; means: number[]; stds: number[]; version: string };
+const SAF_W = safWeightsJson as unknown as SafWeights;
 
 // RCA mantık sürümü — root-cause.service.ts'in karar kuralları (candidate eşiği, piyasa
 // istisnası, dataAnomaly vb.) değiştikçe elle artırılır. RcaScanSnapshot'a damgalanır ki
@@ -245,15 +252,15 @@ export async function getRootCauseRaporu(
   return {
     olaylar, olculemeyenSayisi: pencere.filter((y) => !y.sinyalVeriVar).length,
     missSayisi: miss.length, controlSayisi: control.length, patternler, snapshotBias,
-    not: "SALT OKUMA. Doğrudan neden yalnız skor açıklamasıdır, kök neden DEĞİLDİR. Kök neden hipotezi yalnız desen kanıtında aday=evet (kaçırılan sayısı≥5, zenginleşme güven aralığının alt sınırı>1, katkı güven aralığı sıfırı dışlıyor) olan sinyaller için üretilir — aksi halde belirsiz/bağlamsal. AGF Sırası/AGF Payı/AGF Payı² TEK BAŞINA asla model/sinyal adayı sayılmaz (piyasa da sürpriz görmüş demektir); yalnız kendi veri kalitesi (sıfır/eksik katkı anormal sıklıkta) bozulursa veri-sorunu adayı olabilir. Kaynak: kaydedilmiş tahmin/pick verisi — canlı V5.46.1 yeniden hesap YALNIZ kayıt yoksa tek-olay detayında yedek olarak çağrılır.",
+    not: "SALT OKUMA. Doğrudan neden yalnız skor açıklamasıdır, kök neden DEĞİLDİR. Kök neden hipotezi yalnız desen kanıtında aday=evet (kaçırılan sayısı≥5, zenginleşme güven aralığının alt sınırı>1, katkı güven aralığı sıfırı dışlıyor) olan sinyaller için üretilir — aksi halde belirsiz/bağlamsal. AGF Sırası/AGF Payı/AGF Payı² TEK BAŞINA asla model/sinyal adayı sayılmaz (piyasa da sürpriz görmüş demektir); yalnız kendi veri kalitesi (sıfır/eksik katkı anormal sıklıkta) bozulursa veri-sorunu adayı olabilir. Kaynak: kaydedilmiş tahmin/pick verisi — canlı motor yeniden hesap YALNIZ kayıt yoksa tek-olay detayında yedek olarak çağrılır.",
   };
 }
 
-/** Kaydı olmayan tek bir yarış için — yalnız kullanıcı detay açtığında — canlı V5.46.1 yedek hesabı. */
+/** Kaydı olmayan tek bir yarış için — yalnız kullanıcı detay açtığında — canlı motor yedek hesabı. */
 export async function liveFallbackIcin(raceId: string): Promise<{ picks: V461Pick[]; warning: string } | null> {
-  const sonuc = await scoreV461(raceId);
+  const sonuc = await scoreV461Saf(raceId, SAF_W as unknown as Parameters<typeof scoreV461Saf>[1]);
   if (!sonuc) return null;
-  return { picks: sonuc.picks, warning: "Bu yarış için kaydedilmiş veri yok — V5.46.1 ile CANLI yeniden hesaplandı (yedek). Geçmişi bugünkü üretici koduyla açıklıyor olabilir, desen istatistiklerine KATILMAZ." };
+  return { picks: sonuc.picks, warning: "Bu yarış için kaydedilmiş veri yok — RotaGanyan Analiz Motoru ile CANLI yeniden hesaplandı (yedek). Geçmişi bugünkü üretici koduyla açıklıyor olabilir, desen istatistiklerine KATILMAZ." };
 }
 
 export { V546_BASLANGIC, KACAN_TOP_N };

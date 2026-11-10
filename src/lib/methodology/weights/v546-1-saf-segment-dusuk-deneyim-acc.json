@@ -1,0 +1,66 @@
+{
+  "status": "READY",
+  "version": "RotaGanyan Analiz Motoru — Segment: Maiden/ŞARTLI 19",
+  "generatedAt": "2026-11-10T10:10:31.258Z",
+  "note": "2026-11-10 kullanıcı kararı — SADECE Maiden/ŞARTLI 19 koşularında kullanılır. 18 özellik (15 mevcut + antrenör + jokey formu + galop kalitesi).",
+  "featureNames": [
+    "ACC_CLOSE_RES",
+    "ACC_SPEED",
+    "yarisGidisatiSkoru",
+    "sireOraniBirlesik",
+    "jokeyFormuGenel",
+    "antrenorOraniGenel",
+    "galopKalite",
+    "idmJokey"
+  ],
+  "weights": [
+    1.419197963683156,
+    0.677016732811808,
+    0.35686796336350496,
+    0.05356542640343056,
+    0.0076412239301215535,
+    0.3589060383574671,
+    0.21822338307382258,
+    0.07330885987367255
+  ],
+  "means": [
+    -0.048209328964671526,
+    -0.26078710567321883,
+    -0.17459321525067542,
+    9.61679013955337,
+    -0.0027676976448432994,
+    9.112633043198732,
+    0.3183953740513191,
+    0.17862503752626838
+  ],
+  "stds": [
+    0.49513773241932885,
+    0.3398065255593171,
+    2.905471361384269,
+    5.097057124051757,
+    0.04016346112748517,
+    3.295965630711702,
+    0.8736585412178116,
+    0.3830380313950589
+  ],
+  "trainingWindow": {
+    "yarisSayisi": 292
+  },
+  "holdoutWindow": {
+    "yarisSayisi": 79
+  },
+  "holdoutDegerlendirme": {
+    "oncekiCanli15BuSegmentte": {
+      "n": 79,
+      "top1": 0.17721518987341772,
+      "top3": 0.4810126582278481,
+      "logLoss": 2.296889303958444
+    },
+    "yeniSegmentModeli": {
+      "n": 79,
+      "top1": 0.16455696202531644,
+      "top3": 0.46835443037974683,
+      "logLoss": 2.3323839413221803
+    }
+  }
+}

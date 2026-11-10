@@ -2,7 +2,10 @@
 
 import { useRouter } from "next/navigation";
 
-type Props = { sayfa: number; sonSayfa: number };
+// 2026-11-10 kullanıcı talebi ("sonuçlar ile koşu tipleri birleştirilsin") — basePath/extraParams
+// eklendi ki bu paginator /admin/kosu-tipleri'nde de (tip filtresini KORUYARAK) kullanılabilsin.
+// Varsayılanlar eski /admin/sonuclar davranışını AYNEN korur, geriye dönük uyumlu.
+type Props = { sayfa: number; sonSayfa: number; basePath?: string; extraParams?: Record<string, string> };
 
 // Kompakt sayfa numarası listesi: ilk, son, mevcut ±2 — aradakiler "…" ile kısaltılır.
 function sayfaNumaralari(sayfa: number, sonSayfa: number): (number | "…")[] {
@@ -16,12 +19,17 @@ function sayfaNumaralari(sayfa: number, sonSayfa: number): (number | "…")[] {
   return out;
 }
 
-export default function SonuclarPaginator({ sayfa, sonSayfa }: Props) {
+export default function SonuclarPaginator({ sayfa, sonSayfa, basePath = "/admin/sonuclar", extraParams }: Props) {
   const router = useRouter();
   // scroll:false + client-side router.push — sekme yeniden yüklenmez, sayfa kaymaz,
   // yalnız içerik (RSC) yerinde güncellenir (kullanıcı talebi 2026-08-24: "sayfa
   // değişmesin, aynı sayfada tıklanınca yansısın").
-  const go = (n: number) => router.push(`/admin/sonuclar${n > 0 ? `?sayfa=${n}` : ""}`, { scroll: false });
+  const go = (n: number) => {
+    const params = new URLSearchParams(extraParams);
+    if (n > 0) params.set("sayfa", String(n));
+    const qs = params.toString();
+    router.push(`${basePath}${qs ? `?${qs}` : ""}`, { scroll: false });
+  };
 
   if (sonSayfa === 0) return null;
 

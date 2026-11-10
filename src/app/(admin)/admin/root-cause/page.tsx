@@ -125,7 +125,7 @@ export default async function AdminRootCausePage({ searchParams }: PageProps) {
       <div>
         <h1 className="text-lg font-bold">Kök Neden Analizi (RCA)</h1>
         <p className="text-xs text-muted-foreground mt-0.5">
-          SALT OKUMA · kaynak: kaydedilmiş tahmin/pick verisi (hızlı) · V5.46.1 ile canlı yeniden hesaplama yalnız kaydı olmayan tek bir yarışın detayı açıldığında yedek olarak çalışır ·
+          SALT OKUMA · kaynak: kaydedilmiş tahmin/pick verisi (hızlı) · canlı motor ile yeniden hesaplama yalnız kaydı olmayan tek bir yarışın detayı açıldığında yedek olarak çalışır ·
           {" "}{rapor.missSayisi} kaçırılan (model kazananı ilk {KACAN_TOP_N} dışına attı) · {rapor.controlSayisi} isabetli kontrol · {rapor.olculemeyenSayisi} ölçülemeyen (kayıt yok)
         </p>
       </div>
@@ -150,7 +150,7 @@ export default async function AdminRootCausePage({ searchParams }: PageProps) {
         <div className="flex flex-col gap-1">
           <label className="text-[11px] font-medium text-muted-foreground">Pencere</label>
           <select name="gun" defaultValue={gun} className="rounded-md border bg-background px-2 py-1.5 text-xs min-w-[110px]">
-            <option value="tum">Tüm V5.46.1 dönemi</option>
+            <option value="tum">Tüm dönem</option>
             <option value="7">Son 7 gün</option>
             <option value="bugun">Bugün</option>
           </select>
@@ -240,7 +240,7 @@ export default async function AdminRootCausePage({ searchParams }: PageProps) {
             </div>
             {rapor.olculemeyenSayisi > 0 && (
               <div className="border-t px-3 py-2 text-[11px] text-muted-foreground">
-                + {rapor.olculemeyenSayisi} yarış ölçülemedi (kayıt yok) — desen istatistiğine katılmadı. Tek tek detaylı bakmak için canlı V5.46.1 yedek hesabı gerekir (bu sürümde listelenmiyor, performans nedeniyle).
+                + {rapor.olculemeyenSayisi} yarış ölçülemedi (kayıt yok) — desen istatistiğine katılmadı. Tek tek detaylı bakmak için canlı motor yedek hesabı gerekir (bu sürümde listelenmiyor, performans nedeniyle).
               </div>
             )}
           </div>

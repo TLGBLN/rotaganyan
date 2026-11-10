@@ -1,0 +1,50 @@
+{
+  "status": "READY",
+  "version": "RotaGanyan Analiz Motoru — Segment: ŞARTLI 1/27",
+  "generatedAt": "2026-11-10T10:10:31.255Z",
+  "note": "2026-11-10 kullanıcı kararı — SADECE ŞARTLI 1/27 koşularında kullanılır. 4 özellik: pedigri (Sire+Dam+DamSire), galop kalitesi, jokey formu (son 30 gün), antrenör oranı.",
+  "featureNames": [
+    "sireOraniBirlesik",
+    "galopKalite",
+    "jokeyFormuGenel",
+    "antrenorOraniGenel"
+  ],
+  "weights": [
+    -0.04764184382688118,
+    0.27773408714664793,
+    0.004520500822800618,
+    0.25793025585675977
+  ],
+  "means": [
+    10.25550826724019,
+    0.5172413793103449,
+    -0.004497732160599104,
+    10.241672404204474
+  ],
+  "stds": [
+    5.848466262168326,
+    0.8928138260258558,
+    0.04305322056979659,
+    4.179168940322737
+  ],
+  "trainingWindow": {
+    "yarisSayisi": 51
+  },
+  "holdoutWindow": {
+    "yarisSayisi": 12
+  },
+  "holdoutDegerlendirme": {
+    "oncekiCanli15BuSegmentte": {
+      "n": 12,
+      "top1": 0.08333333333333333,
+      "top3": 0.3333333333333333,
+      "logLoss": 1.9961138021492546
+    },
+    "yeniSegmentModeli": {
+      "n": 12,
+      "top1": 0.16666666666666666,
+      "top3": 0.6666666666666666,
+      "logLoss": 1.8492887933839557
+    }
+  }
+}

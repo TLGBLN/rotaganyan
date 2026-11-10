@@ -20,7 +20,6 @@ import {
   CloudRain,
   Activity,
   SearchCode,
-  Shapes,
   BookOpen,
 } from "lucide-react";
 
@@ -36,8 +35,9 @@ const NAV: NavOge[] = [
   { href: "/admin/derece-istatistikleri", label: "Derece İstatistikleri", icon: CloudRain },
   { href: "/admin/site-anatomisi", label: "Site Anatomisi", icon: Activity, grup: "Teşhis" },
   { href: "/admin/veri-tamligi", label: "Veri Tamlığı", icon: ClipboardCheck, grup: "Teşhis" },
-  { href: "/admin/sonuclar", label: "Sonuçlar", icon: Trophy },
-  { href: "/admin/kosu-tipleri", label: "Koşu Tipleri", icon: Shapes },
+  // 2026-11-10 kullanıcı talebi ("sonuçlar ile koşu tipleri birleştirilsin") — /admin/sonuclar
+  // artık /admin/kosu-tipleri'ne yönlendiren bir redirect, iki ayrı nav girdisine gerek yok.
+  { href: "/admin/kosu-tipleri", label: "Sonuçlar / Koşu Tipleri", icon: Trophy },
   { href: "/admin/sinyal-kutugu", label: "Sinyal Kütüğü", icon: BookOpen },
   { href: "/admin/jokey", label: "Jokey İstatistikleri", icon: TrendingUp },
   { href: "/admin/antrenor", label: "Antrenör İstatistikleri", icon: TrendingUp },

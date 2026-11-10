@@ -20,14 +20,24 @@ import { mesafeBucket } from "@/lib/sire-stat-match";
 // bu yüzden EN SON kaydın kendi başlangıcı yerine, aynı ANA sürüme ("V5.1" → "V5")
 // ait EN ERKEN kaydın başlangıcı kullanılıyor. V6 gibi yeni bir ana sürüm eklendiğinde
 // otomatik olarak o sürümün kendi başlangıcına geçer.
-const GUNCEL_SURUM = ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].versiyon;
-const GUNCEL_ANA_SURUM = GUNCEL_SURUM.split(".")[0];
+// 2026-11-10 BUG DÜZELTMESİ (kullanıcı bulgusu, "/admin/kosu-tipleri neden boş" — AYNI bug
+// sınıfının 2026-08-20'den sonraki İKİNCİ oluşumu): "ana sürüm" eskiden SADECE versiyon
+// string'inin "." öncesi kısmından ("V5.46.1"→"V5") çıkarılıyordu — "RotaGanyan Analiz
+// Motoru" gibi "." içermeyen bir isme geçildiğinde bu zincir kopuyor, GUNCEL_MOTOR_BASLANGIC
+// YANLIŞLIKLA o kaydın kendi (bugünkü) başlangıcına sabitleniyor, tüm "güncel motor dönemi"
+// istatistikleri boşalıyor. Artık ENGINE_VERSIONS kaydının opsiyonel `ana` alanı VARSA o
+// kullanılıyor (engine-versions.data.ts'teki aynı tarihli tip notuna bakınız), yoksa eski
+// string-split davranışı (geriye dönük uyumlu) korunuyor.
+function anaSurumOf(v: { versiyon: string; ana?: string }): string {
+  return v.ana ?? v.versiyon.split(".")[0];
+}
+const GUNCEL_ANA_SURUM = anaSurumOf(ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1]);
 // 2026-09-07 kullanıcı bulgusu ("v5 dönemi dimi? geçmiş veriler olmamalı") — /admin/kupon'daki
 // modelTabanliKapsamOnerisi (RaceAdviceCard.tsx) bu SINIRI kullanabilsin diye export edildi;
 // eski motorların (V1-V22/V2/V3/V4) Pick.score'u gerçek bir olasılık DEĞİL (bkz. bu oturumdaki
 // model sağlık kontrolü notu) — o dönem tahminleri kapsam hesabına ASLA girmemeli.
 export const GUNCEL_MOTOR_BASLANGIC =
-  ENGINE_VERSIONS.find((v) => v.versiyon.split(".")[0] === GUNCEL_ANA_SURUM)?.baslangic ??
+  ENGINE_VERSIONS.find((v) => anaSurumOf(v) === GUNCEL_ANA_SURUM)?.baslangic ??
   ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].baslangic;
 
 export type AdminPrediction = Prisma.PredictionGetPayload<{
@@ -282,12 +292,7 @@ export async function getArchiveStats() {
       db.race.count({ where: { raceDay: { hippodrome: GERCEK_HIPODROM_FILTRESI } } }),
       db.raceDay.count({ where: { hippodrome: GERCEK_HIPODROM_FILTRESI } }),
       db.hippodrome.count({ where: GERCEK_HIPODROM_FILTRESI }),
-      // 2026-10-15 düzeltme: eskiden Runner.sire (ham baba-adı metni, TJK'dan her at için
-      // otomatik gelir, %99.9 dolu) sayılıyordu — bu "pedigri arşivi" DEĞİL, fiilen toplam
-      // at sayısıydı, kutunun kendi "uydurma/yuvarlanmış değil" iddiasını yanıltıcı kılıyordu.
-      // Gerçek ölçüt: HorsePedigree (tam soy ağacı önbelleği, tjkAtId başına TEK kayıt,
-      // hipodrom-bağımsız at-niteliği — Karma çift-sayım riski YOK, ek filtre gerekmiyor).
-      db.horsePedigree.count(),
+      db.runner.count({ where: { sire: { not: null }, race: { raceDay: { hippodrome: GERCEK_HIPODROM_FILTRESI } } } }),
       db.gallop.count({ where: { runner: { race: { raceDay: { hippodrome: GERCEK_HIPODROM_FILTRESI } } } } }),
       db.raceDay.findFirst({ where: { hippodrome: GERCEK_HIPODROM_FILTRESI }, orderBy: { date: "asc" }, select: { date: true } }),
     ]);

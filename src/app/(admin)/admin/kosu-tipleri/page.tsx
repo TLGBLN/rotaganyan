@@ -3,28 +3,20 @@ import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { GUNCEL_MOTOR_BASLANGIC, normalizeClassType } from "@/server/services/admin.service";
 import { cn } from "@/lib/utils";
+import SonuclarPaginator from "@/components/admin/SonuclarPaginator";
 
 export const dynamic = "force-dynamic";
 
-// 2026-10-31 kullanıcı talebi ("Toplam 1266 sonuçlanmış tahmin. bir sayfa oluştur adminde
-// bu koşuları tiplerine göre ayır") — dashboard'daki "1266 sonuçlanmış" sayısı tam olarak
-// getAnalystStats(undefined, true).overall.total ile doğrulandı (güncel motor dönemi,
-// published+sonuçlanmış). Bu sayfa AYNI popülasyonu (aynı where koşulu) TEK bir sorguyla
-// çekip hem özet tabloyu HEM de filtrelenebilir koşu listesini ondan türetir — iki farklı
-// sorgu kullanılsaydı sayılar arasında uyuşmazlık riski olurdu.
-//
-// 2026-10-31 kullanıcı düzeltmeleri (3 tur):
-// 1) "alt grup üst grup diye ayrım yapma kendince" — classTypeGroup (Handikap Koşuları/
-//    Şartlı Koşuları gibi aile-seviyesi üst grup) KULLANILMIYOR.
-// 2) "yarış programlarında yazan koşu tiplerine göre ayır" (ekran görüntüsü: "Handikap
-//    16/Dişi /H1") — tamamen ham classType'a geçildi, ama bu 194 ayrı satır üretti.
-// 3) "çok dağınık geldi... grup grup olsun tek başlıkta toplamıyorum" — tamamen ham
-//    (suffix'li) liste ÇOK DAĞINIK bulundu; "tek başlık" (=aile-seviyesi tek grup) da
-//    istenmiyor. Çözüm: normalizeClassType (yalnız "/Dişi", "/DHÖW", "/H1" gibi ekleri
-//    atar — "Handikap 16/Dişi /H1" → "Handikap 16") TEK SEVİYELİ anahtar olarak kullanılıyor.
-//    Her temel tip (Handikap 16, Şartlı 4, Maiden, Kısa Vade Handikap 24, KV-8, ...) kendi
-//    satırında, aile bazında BİRLEŞTİRİLMİYOR. Ham (tam) classType, filtrelenmiş koşu
-//    listesinde her satırda ayrıca gösteriliyor — "yazıldığı gibi" bilgisi kaybolmuyor.
+// 2026-11-10 kullanıcı talebi ("https://rotaganyan.com/admin/sonuclar ile .../kosu-tipleri
+// bu sayfa birleştirilsin, hangi koşu tiplerinde kaç yarış olduğunu ve bunların sonuçlarını
+// istiyorum") — iki ayrı sayfa (kosu-tipleri'nin tip-bazlı özet tablosu + sonuclar'ın zengin
+// tek-tek sonuç satırları: hitTop1/hitInCoupon'dan türeyen kesin tier, ganyan, errorTag,
+// "en yüksek puan" rozeti) TEK sayfada birleştirildi. /admin/sonuclar artık buraya yönlendirir
+// (bkz. o dizindeki redirect). Tier hesabı artık Result.hitTop1/hitInCoupon'dan (DAHA KESİN,
+// sonuclar'ın kullandığı kaynak) geliyor — eskiden kosu-tipleri kendi basit picks-türevi
+// getTier'ını kullanıyordu, iki sayfa farklı sayı üretebiliyordu. GUNCEL_MOTOR_BASLANGIC filtresi
+// KORUNDU (sonuclar'da hiç yoktu — ama eski V1-V22 dönem skorları gerçek olasılık değil, bkz.
+// admin.service.ts'teki aynı tarihli not; kapsam hesaplarına hiç girmemeli).
 
 type Tier = "rank1" | "rank2_3" | "rank4_6" | "miss";
 
@@ -32,81 +24,67 @@ const TIER: Record<Tier, { label: string; className: string }> = {
   rank1: { label: "1. Sıra", className: "bg-[#27ae60]/15 text-[#27ae60] border border-[#27ae60]/30" },
   rank2_3: { label: "2-3. Sıra", className: "bg-[#2980b9]/15 text-[#2980b9] border border-[#2980b9]/30" },
   rank4_6: { label: "4-6. Sıra", className: "bg-brand/15 text-brand border border-brand/30" },
-  miss: { label: "6. Dışında/Yok", className: "bg-[#c0392b]/15 text-[#c0392b] border border-[#c0392b]/30" },
+  miss: { label: "Listede Yok", className: "bg-[#c0392b]/15 text-[#c0392b] border border-[#c0392b]/30" },
 };
 
 const SURFACE_LABEL: Record<string, string> = { CIM: "Çim", KUM: "Kum", SENTETIK: "Sentetik" };
 
-function getTier(winnerNos: number[], picks: { rank: number; runnerNo: number | null }[]): Tier {
-  const matched = picks
-    .filter((p) => p.runnerNo != null && winnerNos.includes(p.runnerNo))
-    .sort((a, b) => a.rank - b.rank)[0];
-  if (!matched) return "miss";
-  if (matched.rank === 1) return "rank1";
-  if (matched.rank <= 3) return "rank2_3";
-  if (matched.rank <= 6) return "rank4_6";
+function getTier(r: { hitTop1: boolean; hitInCoupon: boolean; winnerNos: number[]; picks: { rank: number; runnerNo: number | null }[] }): Tier {
+  if (r.hitTop1) return "rank1";
+  if (r.hitInCoupon) return "rank2_3";
+  const pick = r.picks.filter((p) => p.runnerNo != null && r.winnerNos.includes(p.runnerNo)).sort((a, b) => a.rank - b.rank)[0];
+  if (pick && pick.rank >= 4 && pick.rank <= 6) return "rank4_6";
   return "miss";
 }
 
 async function getVeri() {
-  const rows = await db.prediction.findMany({
-    where: {
-      published: true,
-      createdAt: { gte: GUNCEL_MOTOR_BASLANGIC },
-      race: { result: { isNot: null }, conditions: null },
-    },
+  const results = await db.result.findMany({
+    where: { race: { prediction: { published: true, createdAt: { gte: GUNCEL_MOTOR_BASLANGIC } }, conditions: null } },
     select: {
-      id: true,
-      picks: { select: { rank: true, runner: { select: { no: true } } } },
+      id: true, hitTop1: true, hitInCoupon: true, winnerNos: true, ganyan: true, errorTag: true, cikan: true,
       race: {
         select: {
-          id: true,
-          raceNo: true,
-          classType: true,
-          distance: true,
-          surface: true,
+          id: true, raceNo: true, classType: true, distance: true, surface: true,
           raceDay: { select: { date: true, hippodrome: { select: { name: true } } } },
-          result: { select: { winnerNos: true, ganyan: true } },
+          prediction: { select: { picks: { select: { rank: true, score: true, runner: { select: { no: true } } } } } },
         },
       },
     },
     orderBy: { race: { raceDay: { date: "desc" } } },
   });
 
-  return rows.map((p) => {
-    const winnerNos = p.race.result?.winnerNos ?? [];
-    const picks = p.picks.map((pk) => ({ rank: pk.rank, runnerNo: pk.runner?.no ?? null }));
-    const tier = getTier(winnerNos, picks);
+  return results.map((r) => {
+    const picks = r.race.prediction?.picks ?? [];
+    const picksBasit = picks.map((p) => ({ rank: p.rank, runnerNo: p.runner?.no ?? null }));
+    const tier = getTier({ hitTop1: r.hitTop1, hitInCoupon: r.hitInCoupon, winnerNos: r.winnerNos, picks: picksBasit });
+    const winnerPick = picks.filter((p) => p.runner?.no != null && r.winnerNos.includes(p.runner.no)).sort((a, b) => a.rank - b.rank)[0];
+    const topScoredPick = [...picks].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
+    const topScoredIsWinner = topScoredPick?.runner?.no != null && r.winnerNos.includes(topScoredPick.runner.no);
     return {
-      predictionId: p.id,
-      raceId: p.race.id,
-      tarih: p.race.raceDay.date,
-      hipodrom: p.race.raceDay.hippodrome.name,
-      raceNo: p.race.raceNo,
-      tip: normalizeClassType(p.race.classType),
-      classTypeRaw: p.race.classType,
-      mesafe: p.race.distance,
-      pist: SURFACE_LABEL[p.race.surface] ?? p.race.surface,
-      ganyan: p.race.result?.ganyan ?? null,
-      winnerNos,
+      resultId: r.id,
+      raceId: r.race.id,
+      tarih: r.race.raceDay.date,
+      hipodrom: r.race.raceDay.hippodrome.name,
+      raceNo: r.race.raceNo,
+      tip: normalizeClassType(r.race.classType),
+      classTypeRaw: r.race.classType,
+      mesafe: r.race.distance,
+      pist: SURFACE_LABEL[r.race.surface] ?? r.race.surface,
+      ganyan: r.ganyan,
+      winnerNos: r.winnerNos,
+      winnerRank: winnerPick?.rank ?? null,
+      errorTag: r.errorTag,
+      cikan: r.cikan,
+      topScoredIsWinner,
       tier,
     };
   });
 }
 
 type Satir = Awaited<ReturnType<typeof getVeri>>[number];
-
 type Ozet = { label: string; total: number; top1: number; top3: number; top6: number; disinda: number };
 
-// 2026-11-02 kullanıcı talebi ("Şartlı 19 u maiden altına şartlı 27 yi şartlı 1 altına
-// gelecek şekilde diz") — saf alfabetik sıra "ŞARTLI 19"u ŞARTLI 1/2 arasına, "ŞARTLI 27"yi
-// ŞARTLI 2/3 arasına düşürüyordu. Bu iki tip akraba oldukları temel tipin (Maiden/ŞARTLI 1)
-// hemen altında görünmeli; geri kalan tüm tipler alfabetik sırada kalır.
-const SIRALAMA_ISTISNALARI: Record<string, string> = {
-  "ŞARTLI 19": "Maiden",
-  "ŞARTLI 27": "ŞARTLI 1",
-};
-
+const SIRALAMA_ISTISNALARI: Record<string, string> = { "ŞARTLI 19": "Maiden", "ŞARTLI 27": "ŞARTLI 1" };
 function siralamaAnahtari(label: string): string {
   return SIRALAMA_ISTISNALARI[label.toUpperCase()] ?? label;
 }
@@ -137,7 +115,6 @@ function pct(n: number, total: number): string {
 }
 
 type PageProps = { searchParams: Promise<{ tip?: string; sayfa?: string }> };
-
 const SAYFA_BOYU = 50;
 
 export default async function KosuTipleriPage({ searchParams }: PageProps) {
@@ -145,36 +122,54 @@ export default async function KosuTipleriPage({ searchParams }: PageProps) {
   const rows = await getVeri();
   const ozet = ozetle(rows);
 
-  const filtreliSatirlar = sp.tip ? rows.filter((r) => r.tip === sp.tip) : [];
+  const listeSatirlari = sp.tip ? rows.filter((r) => r.tip === sp.tip) : rows;
   const sayfa = Math.max(0, parseInt(sp.sayfa ?? "0", 10) || 0);
   const skip = sayfa * SAYFA_BOYU;
-  const sayfalikListe = filtreliSatirlar.slice(skip, skip + SAYFA_BOYU);
-  const sonSayfa = Math.max(0, Math.ceil(filtreliSatirlar.length / SAYFA_BOYU) - 1);
+  const sayfalikListe = listeSatirlari.slice(skip, skip + SAYFA_BOYU);
+  const sonSayfa = Math.max(0, Math.ceil(listeSatirlari.length / SAYFA_BOYU) - 1);
 
   const temizleLink = "/admin/kosu-tipleri";
   const tipLink = (t: string) => `/admin/kosu-tipleri?tip=${encodeURIComponent(t)}`;
 
-  const toplam = {
+  const genelToplam = {
     total: rows.length,
     top1: ozet.reduce((s, o) => s + o.top1, 0),
     top3: ozet.reduce((s, o) => s + o.top3, 0),
     top6: ozet.reduce((s, o) => s + o.top6, 0),
     disinda: ozet.reduce((s, o) => s + o.disinda, 0),
   };
+  const ganyanHits = rows.filter((r) => r.tier === "rank1" && r.ganyan != null);
+  const avgGanyan = ganyanHits.length > 0 ? (ganyanHits.reduce((s, r) => s + r.ganyan!, 0) / ganyanHits.length).toFixed(2) : null;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-lg font-bold">Koşu Tiplerine Göre Performans</h1>
-          <p className="text-xs text-muted-foreground">
-            Güncel motor dönemi, yayınlanmış + sonuçlanmış {rows.length} tahmin — temel koşu
-            tipine göre ayrılmış isabet dağılımı (Dişi/DHÖW/H1-H2-H3 gibi ekler birleştirildi,
-            her satırın tam/ham tipi aşağıdaki koşu listesinde görünür).
-          </p>
-        </div>
+      <div>
+        <h1 className="text-lg font-bold">Koşu Tiplerine Göre Sonuçlar</h1>
+        <p className="text-xs text-muted-foreground">
+          Güncel motor dönemi, yayınlanmış + sonuçlanmış {rows.length} yarış — temel koşu tipine göre
+          ayrılmış isabet dağılımı (Dişi/DHÖW/H1-H2-H3 gibi ekler birleştirildi, tam/ham tip ve
+          detaylı sonuç aşağıdaki listede görünür).
+        </p>
       </div>
 
+      {/* Genel özet kartlar (TÜM satırlardan, sayfa/filtre etkilemez) */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {(["rank1", "rank2_3", "rank4_6", "miss"] as Tier[]).map((tier) => (
+          <div key={tier} className="rounded-lg border p-4 space-y-1">
+            <div className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-semibold", TIER[tier].className)}>
+              {TIER[tier].label}
+            </div>
+            <div className="text-2xl font-bold">
+              {{ rank1: genelToplam.top1, rank2_3: genelToplam.top3 - genelToplam.top1, rank4_6: genelToplam.top6 - genelToplam.top3, miss: genelToplam.disinda }[tier]}
+            </div>
+          </div>
+        ))}
+      </div>
+      {avgGanyan && (
+        <p className="text-xs text-muted-foreground">Ort. ganyan (1. sıra isabetle): <strong className="text-foreground">{avgGanyan}</strong></p>
+      )}
+
+      {/* Koşu tipi özet tablosu */}
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-xs">
           <thead>
@@ -184,7 +179,7 @@ export default async function KosuTipleriPage({ searchParams }: PageProps) {
               <th className="px-3 py-2 text-right font-medium">1. Sıra</th>
               <th className="px-3 py-2 text-right font-medium">İlk 3</th>
               <th className="px-3 py-2 text-right font-medium">İlk 6</th>
-              <th className="px-3 py-2 text-right font-medium">6. Dışında/Yok</th>
+              <th className="px-3 py-2 text-right font-medium">Listede Yok</th>
             </tr>
           </thead>
           <tbody>
@@ -204,84 +199,82 @@ export default async function KosuTipleriPage({ searchParams }: PageProps) {
             ))}
             <tr className="border-t-2 font-semibold">
               <td className="px-3 py-2">Toplam</td>
-              <td className="px-3 py-2 text-right tabular-nums">{toplam.total}</td>
-              <td className="px-3 py-2 text-right tabular-nums">{toplam.top1} ({pct(toplam.top1, toplam.total)})</td>
-              <td className="px-3 py-2 text-right tabular-nums">{toplam.top3} ({pct(toplam.top3, toplam.total)})</td>
-              <td className="px-3 py-2 text-right tabular-nums">{toplam.top6} ({pct(toplam.top6, toplam.total)})</td>
-              <td className="px-3 py-2 text-right tabular-nums text-[#c0392b]">{toplam.disinda} ({pct(toplam.disinda, toplam.total)})</td>
+              <td className="px-3 py-2 text-right tabular-nums">{genelToplam.total}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{genelToplam.top1} ({pct(genelToplam.top1, genelToplam.total)})</td>
+              <td className="px-3 py-2 text-right tabular-nums">{genelToplam.top3} ({pct(genelToplam.top3, genelToplam.total)})</td>
+              <td className="px-3 py-2 text-right tabular-nums">{genelToplam.top6} ({pct(genelToplam.top6, genelToplam.total)})</td>
+              <td className="px-3 py-2 text-right tabular-nums text-[#c0392b]">{genelToplam.disinda} ({pct(genelToplam.disinda, genelToplam.total)})</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      {/* Filtrelenmiş koşu listesi */}
-      {sp.tip && (
-        <div>
-          <div className="mb-2 flex items-center justify-between gap-3 flex-wrap">
-            <p className="text-sm font-semibold">
-              {sp.tip} <span className="text-muted-foreground font-normal">({filtreliSatirlar.length} koşu)</span>
-            </p>
-            <a href={temizleLink} className="text-xs text-muted-foreground underline">Filtreyi temizle</a>
-          </div>
-          {filtreliSatirlar.length === 0 ? (
-            <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
-              Bu tipte sonuçlanmış koşu yok.
-            </div>
-          ) : (
-            <div className="rounded-lg border divide-y">
-              {sayfalikListe.map((r) => (
-                <div key={r.predictionId} className="px-3 py-2.5 hover:bg-muted/20 transition-colors">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2 flex-wrap min-w-0">
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {format(r.tarih, "d MMM yy", { locale: tr })}
-                      </span>
-                      <span className="font-medium text-sm whitespace-nowrap">
-                        {r.hipodrom}
-                        <span className="text-muted-foreground font-normal"> · {r.raceNo}. Koşu</span>
-                      </span>
-                      <span className="text-xs text-muted-foreground">{r.classTypeRaw} · {r.pist} · {r.mesafe}m</span>
-                    </div>
-                    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold shrink-0", TIER[r.tier].className)}>
+      {/* Sonuç listesi — tip seçiliyse filtreli, değilse TÜMÜ (eski /admin/sonuclar davranışı) */}
+      <div>
+        <div className="mb-2 flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-sm font-semibold">
+            {sp.tip ?? "Tüm koşular"} <span className="text-muted-foreground font-normal">({listeSatirlari.length} koşu)</span>
+          </p>
+          {sp.tip && <a href={temizleLink} className="text-xs text-muted-foreground underline">Filtreyi temizle</a>}
+        </div>
+        {sayfalikListe.length === 0 ? (
+          <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">Bu tipte sonuçlanmış koşu yok.</div>
+        ) : (
+          <div className="rounded-lg border divide-y">
+            {sayfalikListe.map((r) => (
+              <div key={r.resultId} className="px-3 py-2.5 hover:bg-muted/20 transition-colors">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">{format(r.tarih, "d MMM yy", { locale: tr })}</span>
+                    <span className="font-medium text-sm whitespace-nowrap">
+                      {r.hipodrom}
+                      <span className="text-muted-foreground font-normal"> · {r.raceNo}. Koşu</span>
+                    </span>
+                    <span className="text-xs text-muted-foreground">{r.classTypeRaw} · {r.pist} · {r.mesafe}m</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold", TIER[r.tier].className)}>
                       {TIER[r.tier].label}
                     </span>
-                  </div>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
-                    {r.winnerNos.length > 0 && (
-                      <span>
-                        Kazanan: <span className="font-mono font-bold text-foreground">{r.winnerNos.map((n) => `#${n}`).join(", ")}</span>
-                      </span>
-                    )}
-                    {r.ganyan != null && (
-                      <span>
-                        Ganyan:{" "}
-                        <span className={cn("font-semibold", r.ganyan < 5 ? "text-foreground" : r.ganyan < 15 ? "text-brand" : "text-[#c0392b]")}>
-                          {r.ganyan.toFixed(2)}
-                        </span>
+                    {r.topScoredIsWinner && (
+                      <span className="hidden sm:inline-flex items-center rounded-full bg-yellow-500/15 px-2 py-0.5 text-xs font-semibold text-yellow-600 border border-yellow-500/30">
+                        En yüksek puan
                       </span>
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-          {sonSayfa > 0 && (
-            <div className="mt-3 flex items-center justify-center gap-2 text-xs">
-              {sayfa > 0 && (
-                <a className="rounded-md border px-2.5 py-1 hover:bg-muted" href={`?${new URLSearchParams({ ...sp, sayfa: String(sayfa - 1) }).toString()}`}>
-                  ← Önceki
-                </a>
-              )}
-              <span className="text-muted-foreground">Sayfa {sayfa + 1} / {sonSayfa + 1}</span>
-              {sayfa < sonSayfa && (
-                <a className="rounded-md border px-2.5 py-1 hover:bg-muted" href={`?${new URLSearchParams({ ...sp, sayfa: String(sayfa + 1) }).toString()}`}>
-                  Sonraki →
-                </a>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                  {r.winnerNos.length > 0 && (
+                    <span>
+                      Kazanan: <span className="font-mono font-bold text-foreground">{r.winnerNos.map((n) => `#${n}`).join(", ")}</span>
+                      {r.cikan && <span className="ml-1">{r.cikan}</span>}
+                    </span>
+                  )}
+                  {r.winnerRank != null ? (
+                    <span>Sıra: <span className="font-semibold text-foreground">{r.winnerRank}.</span></span>
+                  ) : r.winnerNos.length > 0 ? (
+                    <span className="text-[#c0392b]">listede yok</span>
+                  ) : null}
+                  {r.ganyan != null && (
+                    <span>
+                      Ganyan:{" "}
+                      <span className={cn("font-semibold", r.ganyan < 5 ? "text-foreground" : r.ganyan < 15 ? "text-brand" : "text-[#c0392b]")}>
+                        {r.ganyan.toFixed(2)}
+                      </span>
+                    </span>
+                  )}
+                  {r.errorTag && <span className="text-[#c0392b]">{r.errorTag}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {sonSayfa > 0 && (
+          <div className="mt-3 flex justify-center">
+            <SonuclarPaginator sayfa={sayfa} sonSayfa={sonSayfa} basePath="/admin/kosu-tipleri" extraParams={sp.tip ? { tip: sp.tip } : undefined} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
