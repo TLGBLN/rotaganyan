@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import type { ProgramRaceDay, KuponOnerisi } from "@/server/services/race.service";
 import type { TempoSenaryosu } from "@/lib/methodology/pace-analizi";
@@ -51,23 +51,19 @@ type Props = {
 
 export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmin, initialRaceNo }: Props) {
   const analyzed = raceDay.races.filter(hasAnalysis);
-  const baslangicRaceNo =
-    initialRaceNo != null && analyzed.some((r) => r.raceNo === initialRaceNo)
-      ? initialRaceNo
-      : analyzed[0]?.raceNo ?? raceDay.races[0]?.raceNo ?? 1;
-  const [activeRaceNo, setActiveRaceNo] = useState<number>(baslangicRaceNo);
   if (analyzed.length === 0) return null;
 
-  const race = raceDay.races.find((r) => r.raceNo === activeRaceNo) ?? analyzed[0];
-  const picks = race.prediction?.picks ?? [];
+  // 2026-11-10 kullanıcı talebi ("tüm koşular yan yana açık olarak gözüksün") — eskiden
+  // sekmeye tıklayınca YALNIZ o koşu görünüyordu (activeRaceNo state'i, tek render). Artık
+  // HER analiz edilmiş koşu kendi TAM panelini (bilgi şeridi + analiz + kupon) ayrı ayrı,
+  // hepsi aynı anda, alt alta gösteriyor — hiçbiri gizlenmiyor. Üstteki sekme şeridi artık
+  // bir "seç/gizle" kontrolü değil, sayfa içi hızlı atlama (anchor link) — tıklanınca o
+  // koşunun bloğuna kaydırır, initialRaceNo (derin bağlantı) hâlâ o koşuya otomatik kaydırır.
+  const ilkYuklemeRaceNo =
+    initialRaceNo != null && analyzed.some((r) => r.raceNo === initialRaceNo)
+      ? initialRaceNo
+      : undefined;
 
-  // Bu hipodromun bugünkü kuponu — birden fazla aday varsa (1./2. Altılı, 7'li Ganyan)
-  // seçili koşuyu KAPSAYANI tercih et, yoksa ilk eşleşen.
-  const hipoKuponlari = kuponlar.filter((k) => k.hippodromeName.split(" — ")[0] === raceDay.hippodrome.name);
-  const kupon =
-    hipoKuponlari.find((k) => k.variants.some((v) => v.legs.some((l) => l.raceNo === activeRaceNo))) ??
-    hipoKuponlari[0] ??
-    null;
   return (
     <div className="space-y-4">
       {/* Marka rozeti — eski PuanTablosu.tsx'in (bu sayfanın önceki görünümü) at-ikonu +
@@ -81,67 +77,96 @@ export default function SiralamaKarti({ raceDay, tempoByRaceId, kuponlar, isAdmi
         </span>
       </div>
 
-      {/* Koşu sekmesi şeridi */}
+      {/* Koşu sekmesi şeridi — artık hızlı atlama (anchor), gizleme/seçme DEĞİL. */}
       <div className="flex gap-1.5 overflow-x-auto pb-1">
         {raceDay.races.map((r) => (
-          <button
+          <a
             key={r.id}
-            type="button"
-            onClick={() => setActiveRaceNo(r.raceNo)}
+            href={hasAnalysis(r) ? `#kosu-${r.id}` : undefined}
             className={cn(
               "relative shrink-0 rounded-lg px-3 py-2 text-xs font-bold transition-all",
               SURFACE_TAB_BG[r.surface] ?? "bg-muted text-muted-foreground",
-              activeRaceNo === r.raceNo ? "ring-2 ring-inset ring-white shadow-inner" : "opacity-70 hover:opacity-100"
+              hasAnalysis(r) ? "opacity-70 hover:opacity-100" : "pointer-events-none opacity-30"
             )}
           >
             {r.raceNo}
             {hasAnalysis(r) && (
               <span className="absolute top-1 right-0.5 h-1.5 w-1.5 rounded-full bg-[#27ae60] ring-1 ring-white" />
             )}
-          </button>
+          </a>
         ))}
       </div>
 
-      {/* Koşu bilgi şeridi — şart/yaş-cins/mesafe/pist, ekrandaki referansla aynı sırada. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl border bg-muted/30 px-3.5 py-2 text-xs">
-        <div className="font-bold">
-          {race.raceNo}. Koşu{race.time ? ` · ${race.time}` : ""}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
-          {race.classType && <span>Şartlı {race.classType}</span>}
-          <span>{breedLabel(race.breed)}</span>
-          <span>{race.distance} Metre</span>
-          <span>{surfaceLabel(race.surface)} Pist</span>
-          <PistIkonu className="h-4 w-6 text-brand" />
-        </div>
-      </div>
+      {/* Her analiz edilmiş koşu — TAM panel, hepsi aynı anda açık. */}
+      <div className="space-y-8 divide-y">
+        {analyzed.map((race) => {
+          const picks = race.prediction?.picks ?? [];
+          // Bu hipodromun bugünkü kuponu — birden fazla aday varsa (1./2. Altılı, 7'li Ganyan)
+          // BU koşuyu KAPSAYANI tercih et, yoksa ilk eşleşen.
+          const hipoKuponlari = kuponlar.filter((k) => k.hippodromeName.split(" — ")[0] === raceDay.hippodrome.name);
+          const kupon =
+            hipoKuponlari.find((k) => k.variants.some((v) => v.legs.some((l) => l.raceNo === race.raceNo))) ??
+            hipoKuponlari[0] ??
+            null;
+          return (
+            <div key={race.id} id={`kosu-${race.id}`} className="scroll-mt-20 pt-8 first:pt-0 space-y-4">
+              {/* Koşu bilgi şeridi — şart/yaş-cins/mesafe/pist, ekrandaki referansla aynı sırada. */}
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl border bg-muted/30 px-3.5 py-2 text-xs">
+                <div className="font-bold">
+                  {race.raceNo}. Koşu{race.time ? ` · ${race.time}` : ""}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
+                  {race.classType && <span>Şartlı {race.classType}</span>}
+                  <span>{breedLabel(race.breed)}</span>
+                  <span>{race.distance} Metre</span>
+                  <span>{surfaceLabel(race.surface)} Pist</span>
+                  <PistIkonu className="h-4 w-6 text-brand" />
+                </div>
+              </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
-        <AnalysisPanel
-          picks={picks}
-          runners={race.runners.map((r) => ({ no: r.no, name: r.name, scratched: false, ekuriGroup: r.ekuriGroup, agf: r.agf }))}
-          winnerNos={race.result?.winnerNos}
-          ganyan={race.result?.ganyan}
-          isLoggedIn={true}
-          isAdmin={isAdmin}
-          isVerified={true}
-          userEmail=""
-          raceNo={race.raceNo}
-          hippodromeName={raceDay.hippodrome.name}
-          raceId={race.id}
-          autoScroll={false}
-        />
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
+                <AnalysisPanel
+                  picks={picks}
+                  runners={race.runners.map((r) => ({ no: r.no, name: r.name, scratched: false, ekuriGroup: r.ekuriGroup, agf: r.agf }))}
+                  winnerNos={race.result?.winnerNos}
+                  ganyan={race.result?.ganyan}
+                  isLoggedIn={true}
+                  isAdmin={isAdmin}
+                  isVerified={true}
+                  userEmail=""
+                  raceNo={race.raceNo}
+                  hippodromeName={raceDay.hippodrome.name}
+                  raceId={race.id}
+                  autoScroll={false}
+                />
 
-        <div className="space-y-4 lg:sticky lg:top-4">
-          {kupon ? (
-            <KuponBlock data={kupon} ikramiye={kupon.ikramiye} isAdmin={isAdmin} cityLabel="Kupon Önerisi" />
-          ) : (
-            <div className="rounded-2xl border border-dashed px-4 py-6 text-center text-xs text-muted-foreground">
-              Bu hipodrom için kupon önerisi henüz yayınlanmadı.
+                <div className="space-y-4 lg:sticky lg:top-4">
+                  {kupon ? (
+                    <KuponBlock data={kupon} ikramiye={kupon.ikramiye} isAdmin={isAdmin} cityLabel="Kupon Önerisi" />
+                  ) : (
+                    <div className="rounded-2xl border border-dashed px-4 py-6 text-center text-xs text-muted-foreground">
+                      Bu hipodrom için kupon önerisi henüz yayınlanmadı.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+          );
+        })}
       </div>
+
+      {ilkYuklemeRaceNo != null && <OtomatikKaydir raceId={analyzed.find((r) => r.raceNo === ilkYuklemeRaceNo)?.id} />}
     </div>
   );
+}
+
+// Derin bağlantı (hipodrom/kosu query param) — sayfa ilk yüklenince o koşunun bloğuna
+// otomatik kaydırır (eskiden initialRaceNo tab seçimi yapıyordu, artık hepsi zaten açık
+// olduğu için yalnız kaydırma gerekiyor).
+function OtomatikKaydir({ raceId }: { raceId?: string }) {
+  useEffect(() => {
+    if (!raceId) return;
+    document.getElementById(`kosu-${raceId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [raceId]);
+  return null;
 }
