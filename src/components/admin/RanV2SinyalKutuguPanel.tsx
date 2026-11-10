@@ -19,9 +19,17 @@ export default function RanV2SinyalKutuguPanel() {
   return (
     <section className="space-y-6 border-t border-brand/20 pt-6">
       <div>
-        <h2 className="text-lg font-bold text-foreground">RotaGanyan Analiz Motoru — Sinyal Kütüğü</h2>
+        {/* 2026-11-10 BUG DÜZELTMESİ (kullanıcı bulgusu, "RAN v2 neden hala bu isim") — bu
+            başlık eskiden "RotaGanyan Analiz Motoru — Sinyal Kütüğü" idi; 2026-11-10'da
+            PRODUCTION motoru da TAM OLARAK bu adı aldı (bkz. engine-versions.data.ts) —
+            aynı sayfada (/admin/sinyal-kutugu) iki ayrı bölüm AYNI başlığı taşıyordu, biri
+            gerçek canlı motor, diğeri hiç deploy edilmemiş bir araştırma prototipi. Artık
+            net ayrışıyor: "RAN v2" adı KORUNUYOR ama "(Araştırma Prototipi — PRODUCTION
+            DEĞİL)" ibaresiyle, karışıklık önleniyor. */}
+        <h2 className="text-lg font-bold text-foreground">RAN v2 <span className="text-sm font-normal text-amber-500">(Araştırma Prototipi — PRODUCTION DEĞİL)</span></h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          V5.46.1&apos;den TAMAMEN BAĞIMSIZ, ayrı bir sistem (<code className="font-mono text-[11px]">ran-v2.ts</code>, <code className="font-mono text-[11px]">hesaplaRanV2</code>) —
+          <strong className="text-amber-500">Bu, canlı &quot;RotaGanyan Analiz Motoru&quot; (yukarıdaki bölüm) DEĞİLDİR</strong> — tamamen ayrı, izole bir araştırma sistemi
+          (<code className="font-mono text-[11px]">ran-v2.ts</code>, <code className="font-mono text-[11px]">hesaplaRanV2</code>), hiçbir route bunu çağırmaz, &quot;Analiz Et&quot; butonu bunu KULLANMAZ.
           AGF/piyasa hiç girmez, katsayısız (saha-içi z-skor ortalaması), koşu tipine göre farklı pillar alt-kümesi kullanır.
           Rakamlar 2026-11-08 B300 (n=295) + G1/G2/G3 (n=124) yerel önbellek testlerinden — izole, production&apos;a bağlı değil.
           Bir karta tıklayın, detayı açılır pencerede görün.
