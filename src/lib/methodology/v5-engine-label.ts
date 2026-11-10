@@ -1,5 +1,7 @@
 import { ENGINE_VERSIONS } from "@/lib/methodology/engine-versions.data";
 import safWeights from "@/lib/methodology/weights/v546-1-saf-weights.json";
+import segmentDusukDeneyimJson from "@/lib/methodology/weights/v546-1-saf-segment-dusuk-deneyim.json";
+import segmentDusukDeneyimAccJson from "@/lib/methodology/weights/v546-1-saf-segment-dusuk-deneyim-acc.json";
 
 /**
  * 2026-08-22 kullanıcı bulgusu: panel başlığındaki sürüm/özellik-sayısı METNİ daha önce
@@ -27,3 +29,24 @@ import safWeights from "@/lib/methodology/weights/v546-1-saf-weights.json";
  */
 const AKTIF_SINYAL_SAYISI = safWeights.featureNames.length;
 export const CURRENT_ENGINE_LABEL = `${ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].versiyon} — Koşullu Logit Modeli (${AKTIF_SINYAL_SAYISI} aktif sinyal, AGF'siz — tek skor + softmax, segment override yok — atları doğrudan kıyaslar, Claude yok, maliyet sıfır)`;
+
+/**
+ * 2026-11-10 kullanıcı bulgusu (ekran görüntüsü, Adana K2 Maiden/DHÖW) — "Analiz Et"e
+ * basmadan ÖNCE gösterilen etiket HER ZAMAN CURRENT_ENGINE_LABEL'i (sabit, 15 sinyal,
+ * "segment override yok") gösteriyordu — ama o gün deploy edilen segment-routing (bkz.
+ * v546-1-engine.ts::segmentAgirligiSec) ŞARTLI1/27 ve Maiden/ŞARTLI19'da GERÇEKTEN farklı
+ * (4/8 sinyal) bir ağırlık kullanıyor, "segment override yok" ifadesi bu koşularda
+ * YANLIŞ. Gerçek analiz sonrası (route.ts motorEtiketi: safSonuc.engineVersion) zaten
+ * doğru/dinamikti — yalnız ÖN etiket statikti. Bu fonksiyon, v546-1-engine.ts'teki
+ * segmentAgirligiSec ile AYNI sınıflandırma mantığını (DB'siz, client-safe) kullanarak
+ * doğru ÖN etiketi üretir — tek kaynak, iki yerde tekrar yok.
+ */
+export function getEngineLabelForClassType(classType?: string | null): string {
+  if (!classType) return CURRENT_ENGINE_LABEL;
+  const c = classType.toUpperCase();
+  const ekle = (ozellikSayisi: number, segmentAdi: string) =>
+    `${ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].versiyon} — Segment: ${segmentAdi} — Koşullu Logit Modeli (${ozellikSayisi} aktif sinyal, AGF'siz — tek skor + softmax, bu koşu tipine özel ağırlık — atları doğrudan kıyaslar, Claude yok, maliyet sıfır)`;
+  if (c.includes("MAIDEN") || c.includes("ŞARTLI 19")) return ekle(segmentDusukDeneyimAccJson.featureNames.length, "Maiden/ŞARTLI 19");
+  if (c.includes("ŞARTLI 1") || c.includes("ŞARTLI 27")) return ekle(segmentDusukDeneyimJson.featureNames.length, "ŞARTLI 1/27");
+  return CURRENT_ENGINE_LABEL;
+}

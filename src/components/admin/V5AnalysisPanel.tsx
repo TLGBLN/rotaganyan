@@ -10,7 +10,7 @@ import { upsertPrediction, type PickInput } from "@/server/actions/prediction.ac
 import type { PickDetailsV2 } from "@/lib/methodology/muhakeme-format";
 import type { HorseAnalysisSummary } from "@/lib/methodology/horse-analysis-summary";
 import type { AnalysisReadyResult } from "@/lib/methodology/analysis-ready";
-import { CURRENT_ENGINE_LABEL } from "@/lib/methodology/v5-engine-label";
+import { CURRENT_ENGINE_LABEL, getEngineLabelForClassType } from "@/lib/methodology/v5-engine-label";
 
 // 2026-08-16 — V5 motoru: V4'ün mekanik sinyal-sayımının YERİNE geçer (bkz.
 // SmartAnalysisEditor.tsx). Claude çağrısı YAPMAZ — koşullu logit (Plackett-Luce) modeli
@@ -100,7 +100,7 @@ type ExistingPrediction = {
   picks: SavedPick[];
 };
 
-type Props = { raceId: string; runners?: Runner[]; existingPrediction?: ExistingPrediction; onSaved?: () => void };
+type Props = { raceId: string; classType?: string; runners?: Runner[]; existingPrediction?: ExistingPrediction; onSaved?: () => void };
 
 /** Kaydedilmiş bir Pick.details'ten (PickDetailsV2) V5At'e yakın bir görünüm türetir —
  *  motoru yeniden ÇALIŞTIRMAZ. Olasılık, kod-garantili OLASILIK satırının metninden
@@ -145,7 +145,7 @@ const KARAR_RENK: Record<string, string> = {
   "Yüksek Risk": "text-muted-foreground",
 };
 
-export default function V5AnalysisPanel({ raceId, runners: raceRunners, existingPrediction, onSaved }: Props) {
+export default function V5AnalysisPanel({ raceId, classType, runners: raceRunners, existingPrediction, onSaved }: Props) {
   const router = useRouter();
 
   const kayitliBaslangic = (() => {
@@ -191,7 +191,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
   // 2026-08-27 kullanıcı talebi: "Analiz Et"e basmadan ÖNCE de görünsün — başlangıç
   // değeri artık import edilen sabitten geliyor (API cevabı gelince AYNI değerle
   // üzerine yazılır, davranış değişmez, yalnız ilk render'da da doğru gösterir).
-  const [motorEtiketi, setMotorEtiketi] = useState<string | null>(CURRENT_ENGINE_LABEL);
+  const [motorEtiketi, setMotorEtiketi] = useState<string | null>(getEngineLabelForClassType(classType));
 
   function toggleDetay(no: number) {
     setAcikDetay((prev) => {
@@ -425,7 +425,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
           <div className="flex flex-wrap items-center gap-2 font-semibold">
             <span className="text-violet-200">ROTAGANYAN Race-Day Analysis v1 • ACTIVE</span>
             <span className="text-slate-500">•</span>
-            <span className="text-slate-300">{CURRENT_ENGINE_LABEL}</span>
+            <span className="text-slate-300">{motorEtiketi ?? getEngineLabelForClassType(classType)}</span>
             <span className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-300">
               ANALYSIS_READY: ANALİZ BEKLENİYOR
             </span>
@@ -532,7 +532,7 @@ export default function V5AnalysisPanel({ raceId, runners: raceRunners, existing
           <div className="flex flex-wrap items-center gap-2 font-semibold">
             <span>ROTAGANYAN Race-Day Analysis v1 • ACTIVE</span>
             <span>·</span>
-            <span>{CURRENT_ENGINE_LABEL}</span>
+            <span>{motorEtiketi ?? getEngineLabelForClassType(classType)}</span>
             <span>·</span>
             <span>
               ANALYSIS_READY: {analysisReady.status}

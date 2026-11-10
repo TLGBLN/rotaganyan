@@ -7,6 +7,7 @@ type Runner = Prisma.RunnerGetPayload<{ include: { gallops: true } }>;
 
 type Props = {
   raceId: string;
+  classType?: string;
   runners: Runner[];
   existingPrediction?: {
     id: string;
@@ -31,10 +32,10 @@ type Props = {
   onSaved?: () => void;
 };
 
-export default function SmartAnalysisEditor({ raceId, runners, existingPrediction, onSaved }: Props) {
+export default function SmartAnalysisEditor({ raceId, classType, runners, existingPrediction, onSaved }: Props) {
   return (
     <div className="space-y-6">
-      <V5AnalysisPanel raceId={raceId} runners={runners} existingPrediction={existingPrediction} onSaved={onSaved} />
+      <V5AnalysisPanel raceId={raceId} classType={classType} runners={runners} existingPrediction={existingPrediction} onSaved={onSaved} />
     </div>
   );
 }

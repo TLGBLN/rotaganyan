@@ -70,6 +70,7 @@ export default async function EditAnalizPage({ params }: PageProps) {
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
         <SmartAnalysisEditor
           raceId={race.id}
+          classType={race.classType}
           runners={race.runners}
           existingPrediction={pred}
         />

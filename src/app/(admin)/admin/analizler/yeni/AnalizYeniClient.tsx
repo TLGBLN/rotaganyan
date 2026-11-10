@@ -204,6 +204,7 @@ export default function AnalizYeniClient({ gunler: gunlerBaslangic, selectedDate
             <SmartAnalysisEditor
               key={raceData.id}
               raceId={raceData.id}
+              classType={raceData.classType}
               runners={raceData.runners}
               existingPrediction={raceData.prediction ?? undefined}
               onSaved={handleSaved}
