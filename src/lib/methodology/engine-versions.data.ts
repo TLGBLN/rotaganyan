@@ -726,13 +726,26 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
     versiyon: "RotaGanyan Analiz Motoru",
     ana: "V5", // bkz. yukarıdaki tip tanımındaki 2026-11-10 bug notu — GUNCEL_MOTOR_BASLANGIC zinciri kopmasın
     baslangic: new Date("2026-11-10T00:00:00+03:00"),
-    bitis: null,
+    bitis: new Date("2026-11-11T20:45:00+03:00"), // jokeyFormuGenel 16. özellik olarak eklendi
     aciklama: "Kullanıcı KESİN kararı — V5.46.1 (19 özellik, AGF dahil) TAMAMEN KALDIRILDI, resmi motor artık scoreV461Saf (AGF'siz, bağımsız eğitilmiş, yakinsama2Plus çıkarılmış 15 özellik). Gerekçe: arac-model-vs-naif-agf-favori.mts (n=1392, gerçek sonuçlanmış yarışlar) — 19-özellik V5.46.1'in Top1 isabeti (%32.8), 'her zaman AGF favorisini seç' NAİF stratejisinden (agfSirasi=1 seçimi, %32.8) ölçülebilir farksız çıktı; ham AGF Payı'nı doğrudan kriter almak (%33.0) modeli hafifçe GEÇTİ bile. AGF-dışı 16 sinyalin TOPLAMDA piyasaya net değer katmadığı kanıtlandı. Ek bulgu: arac-sinyal-korelasyon-tanisi.mts, ACC_CLOSE_RES'in AGF ile güçlü korelasyonu (agfPayi ile r=0.398) yüzünden 19-özellik ortak eğitiminde işaretinin TERSİNE döndüğünü (-0.059, sezgisel olarak yanlış yönde) gösterdi — AGF'siz 15-özellik yeniden eğitiminde aynı sinyal +0.076 (doğru yönde) çıktı; bu, AGF'nin diğer sinyalleri bastırdığının somut kanıtı. 'V5.46.1-SAF' (16 özellik, arac-v5461-saf-egit-ve-karsilastir.mts) üzerinden yakinsama2Plus de çıkarılıp (kodda zaten 'LEGACY PRODUCTION ONLY' işaretliydi, RAN v2'de de bilerek alınmamıştı) arac-v5461-saf-15ozellik-egit.mts ile 15 özelliğe indirildi. AGF Payı/Sırası ekrandan da TAMAMEN kaldırıldı (kullanıcı talebi) — min(safSira,agfSira) tie-break'i ve AGF Destek/terfi katmanları bu yüzden kaldırıldı, artık kıyaslanacak ikinci bir sistem yok. NOT (bilinçli, test EDİLMEDİ): bu kararın kendisi n=46 geçmiş ölçümle (AGF çıkınca Top1 %41.3→%17.4) ÇELİŞİYOR — kullanıcı bu çelişkiyi GÖRDÜ ve yine de istedi (prensip vetosu, zeminToleransi/sireOrani ile aynı desen). ROLLBACK: eski route.ts (scoreV461 + minSiraReorder + AGF Destek) git geçmişinde duruyor, geri alınabilir.",
     neyiAnalizEdiyor: [
       "15 aktif feature: idmJokey, h2hNetSkor, hizDerecesi, zeminToleransi, zeminMesafeDeneyim, sonIdmanSprint, takiDegisikligi, yarisGidisatiSkoru, sireOrani, ACC_CLOSE_RES, ACC_LATE, ACC_SPEED, PS_front, PS_lone, PS_closerFit. agfSirasi/agfPayi/agfPayi2/yakinsama2Plus artık YOK. V5.46.1'in dosyaları (v546-1-weights.json, v5-engine.ts, v5-weights-*.json) DEĞİŞTİRİLMEDİ — rollback/arşiv/challenger-registry baseline olarak duruyor, canlı skorlamada artık kullanılmıyor.",
     ],
     caprazlamalar: [
       "tsc --noEmit temiz, npm run build başarılı. Deploy edildi (commit 63502d9, origin/v546-fix), rotaganyan.com Age:0 ile doğrulandı. Ayrı bir offline/canlı parity denetimi veya yeni bir forward-holdout YAPILMADI — bu, az önceki 'NOT' maddesindeki bilinçli risk kabulünün bir parçası.",
+    ],
+  },
+  {
+    versiyon: "RotaGanyan Analiz Motoru",
+    ana: "V5",
+    baslangic: new Date("2026-11-11T20:45:00+03:00"),
+    bitis: null,
+    aciklama: "jokeyFormuGenel (jokeyin son 30 gün güvenilirlik-ağırlıklı etkin formu, getJokeyFormTablosu) varsayılan modele 16. özellik olarak GLOBAL (tüm koşu tipleri) eklendi — önceden yalnız ŞARTLI1/27 ve Maiden/ŞARTLI19 segment modellerinde vardı. 2026-11-11 kullanıcı kararı: ilk izole test (farklı/daha büyük, published-filtresiz veri kümesinde) ΔTop1≈0/β≈0 gösterdi ve kullanıcıya bildirildi; kullanıcı yine de eklenmesini istedi (prensip vetosu). Canlı modelin GERÇEK eğitim kümesiyle (published=true+GUNCEL_MOTOR_BASLANGIC, 1392 yarış, arac-saf15-jokeyform-enrich.mts ile jokeyFormuGenel sonradan eklendi) yeniden yapılan doğru kıyasta sonuç hafif POZİTİF çıktı: ΔTop1=+0.4pp (%18.6→%19.0), ΔTop3=+0.7pp (%52.4→%53.2), aynı gün-sınırlı 1123/269 train/holdout bölmesiyle (arac-saf16-jokeyform-deploy.mts). NOT: bu süreçte önceki raporlardaki 'canlı Top1=%32.7' referansının yanlış okunduğu da ortaya çıktı — o rakam dosyadaki eski-19-özellik AGF'li karşılaştırma alanı (A), Saf-15 modelin KENDİ gerçek holdout performansı her zaman C alanındaydı (%18.6).",
+    neyiAnalizEdiyor: [
+      "16 aktif feature: idmJokey, h2hNetSkor, hizDerecesi, zeminToleransi, zeminMesafeDeneyim, sonIdmanSprint, takiDegisikligi, yarisGidisatiSkoru, sireOrani, ACC_CLOSE_RES, ACC_LATE, ACC_SPEED, PS_front, PS_lone, PS_closerFit, jokeyFormuGenel. Segment modelleri (ŞARTLI1/27, Maiden/ŞARTLI19) DEĞİŞMEDİ, kendi ayrı dosyalarını kullanıyor.",
+    ],
+    caprazlamalar: [
+      "tsc --noEmit temiz. jokeyFormuGenel katsayısı: -0.0043 (neredeyse sıfır, modelin en zayıf katsayısı) — kanıt zayıf ama kullanıcı kararıyla deploy edildi.",
     ],
   },
 ];
