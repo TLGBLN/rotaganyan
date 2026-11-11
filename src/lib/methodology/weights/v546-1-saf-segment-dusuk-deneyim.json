@@ -38,13 +38,13 @@
     "yarisSayisi": 23
   },
   "holdoutDegerlendirme": {
-    "eskiSegmentA4ozellik": {
+    "oncekiSegmentA5ozellikIdmJokeyDahil": {
       "n": 23,
       "top1": 0.17391304347826086,
       "top3": 0.6521739130434783,
       "logLoss": 2.24873365945434
     },
-    "yeniSegmentA5ozellik": {
+    "buDosyaninKendi4ozellikSonucu": {
       "n": 23,
       "top1": 0.21739130434782608,
       "top3": 0.6086956521739131,
