@@ -1,31 +1,27 @@
 {
   "status": "READY",
   "version": "RotaGanyan Analiz Motoru — Segment: ŞARTLI 1/27",
-  "generatedAt": "2026-11-11T18:06:04.281Z",
-  "note": "2026-11-11 kullanıcı kararı — eski 4-özellik set (sireOraniBirlesik dahil) yerine YENİ 5-özellik: idmJokey + sireOrani (Sire-only) + jokeyFormuGenel + galopKalite + antrenorOraniGenel. SADECE ŞARTLI 1/27 koşularında kullanılır.",
+  "generatedAt": "2026-11-11T18:48:24.802Z",
+  "note": "2026-11-11 kullanıcı kararı — bağımsız AUC ölçümü (Şartlı1 n=183/Şartlı27 n=11, kazanan-rakip ikili karşılaştırma) idmJokey'in bu segmentte sinyal taşımadığını (0.494/0.381, rastgele=0.50) gösterince idmJokey çıkarıldı. 4 özellik: sireOrani (Sire-only, BİRLEŞİK DEĞİL) + jokeyFormuGenel + galopKalite + antrenorOraniGenel. SADECE ŞARTLI 1/27 koşularında kullanılır.",
   "featureNames": [
-    "idmJokey",
     "sireOrani",
     "jokeyFormuGenel",
     "galopKalite",
     "antrenorOraniGenel"
   ],
   "weights": [
-    -0.13277896934786143,
-    0.10673417151232104,
-    0.05952408254796156,
-    0.22655172303551918,
-    0.2777055702280176
+    0.10282454767413374,
+    0.054887748090740644,
+    0.18108006518596148,
+    0.2758539210097101
   ],
   "means": [
-    0.20272727272727273,
     10.132953808587517,
     -0.0035796517315265187,
     0.516566265060241,
     9.63374991208963
   ],
   "stds": [
-    0.4020310008193809,
     5.537461529789796,
     0.040983391520188484,
     0.8546334007192858,
@@ -44,15 +40,15 @@
   "holdoutDegerlendirme": {
     "eskiSegmentA4ozellik": {
       "n": 23,
-      "top1": 0.13043478260869565,
-      "top3": 0.5652173913043478,
-      "logLoss": 2.2444017178263103
-    },
-    "yeniSegmentA5ozellik": {
-      "n": 23,
       "top1": 0.17391304347826086,
       "top3": 0.6521739130434783,
       "logLoss": 2.24873365945434
+    },
+    "yeniSegmentA5ozellik": {
+      "n": 23,
+      "top1": 0.21739130434782608,
+      "top3": 0.6086956521739131,
+      "logLoss": 2.2633126586662486
     }
   }
 }
