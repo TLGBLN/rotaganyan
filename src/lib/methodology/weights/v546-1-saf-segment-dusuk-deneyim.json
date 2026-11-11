@@ -1,50 +1,58 @@
 {
   "status": "READY",
   "version": "RotaGanyan Analiz Motoru — Segment: ŞARTLI 1/27",
-  "generatedAt": "2026-11-10T10:10:31.255Z",
-  "note": "2026-11-10 kullanıcı kararı — SADECE ŞARTLI 1/27 koşularında kullanılır. 4 özellik: pedigri (Sire+Dam+DamSire), galop kalitesi, jokey formu (son 30 gün), antrenör oranı.",
+  "generatedAt": "2026-11-11T18:06:04.281Z",
+  "note": "2026-11-11 kullanıcı kararı — eski 4-özellik set (sireOraniBirlesik dahil) yerine YENİ 5-özellik: idmJokey + sireOrani (Sire-only) + jokeyFormuGenel + galopKalite + antrenorOraniGenel. SADECE ŞARTLI 1/27 koşularında kullanılır.",
   "featureNames": [
-    "sireOraniBirlesik",
-    "galopKalite",
+    "idmJokey",
+    "sireOrani",
     "jokeyFormuGenel",
+    "galopKalite",
     "antrenorOraniGenel"
   ],
   "weights": [
-    -0.04764184382688118,
-    0.27773408714664793,
-    0.004520500822800618,
-    0.25793025585675977
+    -0.13277896934786143,
+    0.10673417151232104,
+    0.05952408254796156,
+    0.22655172303551918,
+    0.2777055702280176
   ],
   "means": [
-    10.25550826724019,
-    0.5172413793103449,
-    -0.004497732160599104,
-    10.241672404204474
+    0.20272727272727273,
+    10.132953808587517,
+    -0.0035796517315265187,
+    0.516566265060241,
+    9.63374991208963
   ],
   "stds": [
-    5.848466262168326,
-    0.8928138260258558,
-    0.04305322056979659,
-    4.179168940322737
+    0.4020310008193809,
+    5.537461529789796,
+    0.040983391520188484,
+    0.8546334007192858,
+    3.7940678950144013
   ],
   "trainingWindow": {
-    "yarisSayisi": 51
+    "baslangic": "2026-08-16",
+    "bitis": "2026-10-24",
+    "yarisSayisi": 101
   },
   "holdoutWindow": {
-    "yarisSayisi": 12
+    "baslangic": "2026-10-25",
+    "bitis": "2026-11-09",
+    "yarisSayisi": 23
   },
   "holdoutDegerlendirme": {
-    "oncekiCanli15BuSegmentte": {
-      "n": 12,
-      "top1": 0.08333333333333333,
-      "top3": 0.3333333333333333,
-      "logLoss": 1.9961138021492546
+    "eskiSegmentA4ozellik": {
+      "n": 23,
+      "top1": 0.13043478260869565,
+      "top3": 0.5652173913043478,
+      "logLoss": 2.2444017178263103
     },
-    "yeniSegmentModeli": {
-      "n": 12,
-      "top1": 0.16666666666666666,
-      "top3": 0.6666666666666666,
-      "logLoss": 1.8492887933839557
+    "yeniSegmentA5ozellik": {
+      "n": 23,
+      "top1": 0.17391304347826086,
+      "top3": 0.6521739130434783,
+      "logLoss": 2.24873365945434
     }
   }
 }
