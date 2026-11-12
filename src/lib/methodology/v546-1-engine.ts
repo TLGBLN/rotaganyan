@@ -27,6 +27,7 @@ import weightsJson from "./weights/v546-1-weights.json";
 // ./pedigri-galop-ortak.ts'de (ran-v2.ts ile PAYLAŞILAN, döngüsel import'suz tek kaynak).
 import { galopSkoru, pedigriSkoru } from "./pedigri-galop-ortak";
 import { getJokeyFormTablosu } from "@/server/actions/jokey-form.actions";
+import { getPitSeviyeSinyalleri, type PitSeviye } from "@/server/actions/pit-seviye.actions";
 import { getV5461DamOzetleriForRace, getV5461DamsireOzetleriForRace, type V5461DamlineOzet } from "@/server/actions/v5461-damline.actions";
 
 type FrozenWeights = {
@@ -187,7 +188,7 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
   const damDamSireByRunnerId = new Map(damDamSireRows.map((x) => [x.id, x]));
   const damNamesOrdered = faz1.runners.map((r) => damDamSireByRunnerId.get(r.id)?.dam ?? null);
   const damSireNamesOrdered = faz1.runners.map((r) => damDamSireByRunnerId.get(r.id)?.damSire ?? null);
-  const [jokeyTablosu18, galopRows18, damOzetleri18, damSireOzetleri18] = await Promise.all([
+  const [jokeyTablosu18, galopRows18, damOzetleri18, damSireOzetleri18, pitByRunnerId] = await Promise.all([
     getJokeyFormTablosu(raceDate, hippodromeId).catch(() => new Map<string, { guncel: { etkinForm: number | null } }>()),
     db.gallop.findMany({ where: { runnerId: { in: runnerIdsHepsi } }, orderBy: { date: "desc" }, select: { runnerId: true, date: true, splits: true, form: true, jockey: true } }).catch(() => []),
     getV5461DamOzetleriForRace(damNamesOrdered, faz1.race.breed, faz1.race.surface, faz1.race.distance, raceDate).catch(
@@ -196,6 +197,7 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
     getV5461DamsireOzetleriForRace(damSireNamesOrdered, faz1.race.breed, faz1.race.surface, faz1.race.distance, raceDate).catch(
       () => damSireNamesOrdered.map(() => ({ ornekKendiVeri: null, kYuzde: null }) as V5461DamlineOzet)
     ),
+    getPitSeviyeSinyalleri(raceDate, runnerIdsHepsi).catch(() => new Map<string, PitSeviye>()),
   ]);
   const galop18ByRunnerId = new Map<string, { date: Date; splits: unknown; form: string | null; jockey: string | null }[]>();
   for (const g of galopRows18) {
@@ -255,6 +257,11 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
       { ad: "antrenorOraniGenel", raw: r.antrenorOrani, observed: true, reliability: 1, evidenceObserved: r.antrenorOrani != null },
       { ad: "jokeyFormuGenel", raw: (r.jockey ? jokeyTablosu18.get(r.jockey)?.guncel.etkinForm : null) ?? null, observed: true, reliability: 1, evidenceObserved: (r.jockey ? jokeyTablosu18.get(r.jockey)?.guncel.etkinForm : null) != null },
       { ad: "galopKalite", raw: galopSkoru(galop18ByRunnerId.get(r.id) ?? [], faz1.race.breed, r.jockey), observed: true, reliability: 1, evidenceObserved: galopSkoru(galop18ByRunnerId.get(r.id) ?? [], faz1.race.breed, r.jockey) != null },
+      // 2026-11-12 — jokey/antrenör SEVİYESİ + son yarış galibiyeti (pit-seviye.actions.ts). Veri yoksa
+      // (hiç geçmiş sürüş / önceki yarış) observed=false → gerçek "veri yok", sıfır katkı.
+      { ad: "jokeyPIT", raw: pitByRunnerId.get(r.id)?.jokeyPIT ?? null, observed: pitByRunnerId.get(r.id)?.jokeyPIT != null, reliability: 1 },
+      { ad: "antrenorPIT", raw: pitByRunnerId.get(r.id)?.antrenorPIT ?? null, observed: pitByRunnerId.get(r.id)?.antrenorPIT != null, reliability: 1 },
+      { ad: "lastWon", raw: pitByRunnerId.get(r.id)?.lastWon ?? null, observed: pitByRunnerId.get(r.id)?.lastWon != null, reliability: 1 },
     ];
     return {
       r,

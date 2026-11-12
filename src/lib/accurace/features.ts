@@ -14,8 +14,11 @@ export const AYAR = {
   baseMinN: 20, // beklenen pace tabanı için asgari kayıt sayısı
   stilAlpha: 1, // stil vektörü Dirichlet benzeri prior gücü (düzgün dağılıma çekim)
   stilErkenOran: 0.25, // stil ölçümü: yarışın bu oranındaki checkpoint
-  // Yüzey: "SERT" → sameSurface=1, differentSurface=0 (ilk temiz sürüm). "YUMUSAK" yalnız duyarlılık için.
-  yuzeyModu: "SERT" as "SERT" | "YUMUSAK",
+  // Yüzey: 2026-11-12 kullanıcı kararı — kayıtlı Accurace varsa pist uyuşmasa da değerlendirilir.
+  // Eskiden "SERT" (farklı yüzey = ağırlık 0) idi; yalnız Sentetik'te koşmuş at Çim'de tüm
+  // kanıtını kaybediyordu (DERBY WARRIOR, Ankara K8). Residual/z sinyalleri zaten kendi koşusunun
+  // yüzeyine göre normalize ediliyor (taban tablosu yüzey anahtarlı), farklı yüzey yarım ağırlık.
+  yuzeyModu: "YUMUSAK" as "SERT" | "YUMUSAK",
   yuzeyYumusakW: 0.5,
 } as const;
 

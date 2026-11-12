@@ -1,0 +1,165 @@
+{
+  "status": "READY",
+  "version": "RotaGanyan Analiz Motoru",
+  "generatedAt": "2026-11-11T17:42:44.517Z",
+  "note": "16-özellik (önceki 15 + jokeyFormuGenel, TÜM koşu tiplerinde GLOBAL) — 2026-11-11 kullanıcı kararı: izole test (daha büyük/farklı kümede) ΔTop1≈0 ve β≈0 gösterdi ama kullanıcı bilerek ekletti (prensip vetosu). Eğitim AYNI canlı-model kümesiyle (published=true+GUNCEL_MOTOR_BASLANGIC, 1392 yarış) + jokeyFormuGenel sonradan enrich edildi (arac-saf15-jokeyform-enrich.mts).",
+  "baseModel": "V5.46.1 (gatherV461RawSinyaller ile AYNI ham veri kaynağı)",
+  "featureNames": [
+    "idmJokey",
+    "h2hNetSkor",
+    "hizDerecesi",
+    "zeminToleransi",
+    "zeminMesafeDeneyim",
+    "sonIdmanSprint",
+    "takiDegisikligi",
+    "yarisGidisatiSkoru",
+    "sireOrani",
+    "ACC_CLOSE_RES",
+    "ACC_LATE",
+    "ACC_SPEED",
+    "PS_front",
+    "PS_lone",
+    "PS_closerFit",
+    "jokeyFormuGenel"
+  ],
+  "weights": [
+    -0.043987767493713255,
+    0.1948114887419927,
+    0.45513490174817045,
+    -0.019906196901426948,
+    0.0008044451184977012,
+    0.014395295141555074,
+    0.05077835882890104,
+    0.04797339475503462,
+    0.1078503867217139,
+    0.5700696488040446,
+    0.5136328116800707,
+    -0.07457759621436477,
+    0.0791241223255366,
+    0.07513571115385254,
+    -0.38994689594090987,
+    -0.004265134164178881
+  ],
+  "means": [
+    0.15029852037726055,
+    0,
+    -0.9818941748693734,
+    0.04592521893165445,
+    -0.2589085168388541,
+    0.11188882126191925,
+    -0.038331746993164315,
+    -0.01710305442588915,
+    11.655519311867602,
+    0.09408169010921173,
+    -0.18624774198815766,
+    -0.13647391373942694,
+    2.6912691638990047,
+    0.0007547344759901474,
+    1.0025450016797242,
+    -0.0028104692939416795
+  ],
+  "stds": [
+    0.3573637854479103,
+    3.24431612895892,
+    4.177582113051465,
+    1.2666165192206884,
+    1.8057077974828943,
+    0.3152296193864933,
+    0.36716715398479904,
+    3.2649995824047977,
+    3.8396094416673225,
+    0.5020115071976556,
+    0.88981016639406,
+    0.6027322980379073,
+    0.9985376846929728,
+    0.008801415344546953,
+    0.7318508566317091,
+    0.040888231031542814
+  ],
+  "optimizasyon": {
+    "l2": 0.01,
+    "epoch": 800,
+    "lr": 0.08,
+    "momentum": 0.9
+  },
+  "trainingWindow": {
+    "baslangic": "2026-08-16",
+    "bitis": "2026-10-22",
+    "yarisSayisi": 1123
+  },
+  "holdoutWindow": {
+    "baslangic": "2026-10-23",
+    "bitis": "2026-11-09",
+    "yarisSayisi": 269
+  },
+  "holdoutDegerlendirme": {
+    "A": {
+      "n": 269,
+      "top1": 0.18587360594795538,
+      "top3": 0.5241635687732342,
+      "logLoss": 2.138886209682944,
+      "brier": 0.09598369124644063,
+      "kalibrasyon": [
+        {
+          "n": 1670,
+          "tahminOrt": 0.058,
+          "gercekOrt": 0.056
+        },
+        {
+          "n": 928,
+          "tahminOrt": 0.139,
+          "gercekOrt": 0.141
+        },
+        {
+          "n": 144,
+          "tahminOrt": 0.234,
+          "gercekOrt": 0.25
+        },
+        {
+          "n": 22,
+          "tahminOrt": 0.345,
+          "gercekOrt": 0.273
+        },
+        {
+          "n": 4,
+          "tahminOrt": 0.439,
+          "gercekOrt": 0.75
+        }
+      ]
+    },
+    "C": {
+      "n": 269,
+      "top1": 0.1895910780669145,
+      "top3": 0.5315985130111525,
+      "logLoss": 2.1390175097612,
+      "brier": 0.09599098775081724,
+      "kalibrasyon": [
+        {
+          "n": 1668,
+          "tahminOrt": 0.058,
+          "gercekOrt": 0.055
+        },
+        {
+          "n": 929,
+          "tahminOrt": 0.139,
+          "gercekOrt": 0.142
+        },
+        {
+          "n": 144,
+          "tahminOrt": 0.234,
+          "gercekOrt": 0.25
+        },
+        {
+          "n": 23,
+          "tahminOrt": 0.344,
+          "gercekOrt": 0.261
+        },
+        {
+          "n": 4,
+          "tahminOrt": 0.439,
+          "gercekOrt": 0.75
+        }
+      ]
+    }
+  }
+}

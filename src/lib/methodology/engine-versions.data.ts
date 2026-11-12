@@ -739,13 +739,27 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
     versiyon: "RotaGanyan Analiz Motoru",
     ana: "V5",
     baslangic: new Date("2026-11-11T20:45:00+03:00"),
-    bitis: null,
+    bitis: new Date("2026-11-12T20:30:00+03:00"), // 20 özellik + yumuşak yüzey kuralı
     aciklama: "jokeyFormuGenel (jokeyin son 30 gün güvenilirlik-ağırlıklı etkin formu, getJokeyFormTablosu) varsayılan modele 16. özellik olarak GLOBAL (tüm koşu tipleri) eklendi — önceden yalnız ŞARTLI1/27 ve Maiden/ŞARTLI19 segment modellerinde vardı. 2026-11-11 kullanıcı kararı: ilk izole test (farklı/daha büyük, published-filtresiz veri kümesinde) ΔTop1≈0/β≈0 gösterdi ve kullanıcıya bildirildi; kullanıcı yine de eklenmesini istedi (prensip vetosu). Canlı modelin GERÇEK eğitim kümesiyle (published=true+GUNCEL_MOTOR_BASLANGIC, 1392 yarış, arac-saf15-jokeyform-enrich.mts ile jokeyFormuGenel sonradan eklendi) yeniden yapılan doğru kıyasta sonuç hafif POZİTİF çıktı: ΔTop1=+0.4pp (%18.6→%19.0), ΔTop3=+0.7pp (%52.4→%53.2), aynı gün-sınırlı 1123/269 train/holdout bölmesiyle (arac-saf16-jokeyform-deploy.mts). NOT: bu süreçte önceki raporlardaki 'canlı Top1=%32.7' referansının yanlış okunduğu da ortaya çıktı — o rakam dosyadaki eski-19-özellik AGF'li karşılaştırma alanı (A), Saf-15 modelin KENDİ gerçek holdout performansı her zaman C alanındaydı (%18.6).",
     neyiAnalizEdiyor: [
       "16 aktif feature: idmJokey, h2hNetSkor, hizDerecesi, zeminToleransi, zeminMesafeDeneyim, sonIdmanSprint, takiDegisikligi, yarisGidisatiSkoru, sireOrani, ACC_CLOSE_RES, ACC_LATE, ACC_SPEED, PS_front, PS_lone, PS_closerFit, jokeyFormuGenel. Segment modelleri (ŞARTLI1/27, Maiden/ŞARTLI19) DEĞİŞMEDİ, kendi ayrı dosyalarını kullanıyor.",
     ],
     caprazlamalar: [
       "tsc --noEmit temiz. jokeyFormuGenel katsayısı: -0.0043 (neredeyse sıfır, modelin en zayıf katsayısı) — kanıt zayıf ama kullanıcı kararıyla deploy edildi.",
+    ],
+  },
+  {
+    versiyon: "RotaGanyan Analiz Motoru",
+    ana: "V5",
+    baslangic: new Date("2026-11-12T20:30:00+03:00"),
+    bitis: null,
+    aciklama: "Ankara 12.11 K8 (DERBY WARRIOR, AGF %75, model 7./9.) vakasından tetiklenen eksik-sinyal denetimi. (1) Accurace yüzey kuralı: eskiden pist uyuşmayan geçmiş koşu ağırlık 0 alıyordu (yalnız Sentetik'te koşmuş at Çim'de tüm Accurace kanıtını kaybediyordu); artık farklı yüzey yarım ağırlık (AYAR.yuzeyModu YUMUSAK) — residual/z sinyalleri zaten kendi yüzeylerine göre normalize. (2) Varsayılan modele 4 yeni sinyal: jokeyPIT (jokey seviyesi), antrenorPIT (antrenör seviyesi), galopKalite, lastWon (son yarışını kazandı mı). Jokey/antrenör seviyesi point-in-time: yalnız yarış tarihinden önceki, kendi Runner/Result kayıtlarından, son 365 gün, k=20 shrink, karma/yurt dışı hariç (pit-seviye.actions.ts, 30 dk önbellek). TrainerStatSync/JockeyStatSync bilerek KULLANILMADI: üzerine yazılan anlık görüntü, geçmiş yarışlar için hindsight sızıntısı (sızıntılı antrenör sürümü ΔLogLoss -0.086, PIT sürümü -0.028 verdi).",
+    neyiAnalizEdiyor: [
+      "20 aktif feature (varsayılan model): idmJokey, h2hNetSkor, hizDerecesi, zeminToleransi, zeminMesafeDeneyim, sonIdmanSprint, takiDegisikligi, yarisGidisatiSkoru, sireOrani, ACC_CLOSE_RES, ACC_LATE, ACC_SPEED, PS_front, PS_lone, PS_closerFit, jokeyFormuGenel, jokeyPIT, antrenorPIT, galopKalite, lastWon. ŞARTLI1/27 (4) ve Maiden/ŞARTLI19 (8) segment modelleri DEĞİŞMEDİ (Maiden: yeni yüzey kuralıyla eski katsayılar holdout'ta LogLoss 2.3324→2.3179, yeniden eğitim 2.3314 — eğitim gerekmedi).",
+    ],
+    caprazlamalar: [
+      "5 kat genişleyen-pencereli zaman CV (827 havuzlanmış test yarışı, 1392 yarışlık canlı popülasyon): eski 16 özellik Top1 %19.1 / Top3 %50.7 / LogLoss 2.1708; yalnız yumuşak yüzey: %20.1 / %52.8 / 2.1584 (Δ -0.012 [-0.021,-0.004]); 20 özellik: %23.2 / %57.8 / 2.0748 (Δ -0.096 [-0.121,-0.073], eşleştirilmiş bootstrap). Tek tek: jokeyPIT Δ -0.069 (5/5 kat), antrenorPIT -0.028 (5/5), galopKalite -0.003 (anlamsız), lastWon -0.007 (sınırda); sireBirlesik +0.002 (eklenmedi).",
+      "Canlı bağımsız kontrol (12.11 Ankara, eğitim dışı): K8 kazanan 7.→1., K9 kazanan 7.→3., K7 3.→3., K10 5.→8. (kötüleşti). Yalnız 4 koşu — kanıt değil, sağlık kontrolü. Bilinen kalan sınırlar: ACC_LATE 5'ten az atlı sahada yok; Maiden/ŞARTLI1-27 segmentlerinde jokey/antrenör seviyesi henüz yok; v546-1-saf-engine.test.ts 10 Kasım'dan beri db.runner mock'u yüzünden başarısız (bu değişiklikten bağımsız).",
     ],
   },
 ];
