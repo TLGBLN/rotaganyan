@@ -21,7 +21,7 @@ const SINYAL_AD: Record<string, string> = {
   jokeyPIT: "Jokey Seviyesi (son 365 gün)", antrenorPIT: "Antrenör Seviyesi (son 365 gün)", lastWon: "Son Yarışını Kazandı",
   ACC_CLOSE_RES: "Kapanış Artığı (Accurace)", ACC_LATE: "Geç Segment Hızı (Accurace)",
   ACC_SPEED: "Hız Artığı (Accurace)", PS_front: "Öne Çıkma Uyumu", PS_lone: "Yalnız Kaçak Uyumu",
-  PS_closerFit: "Kapanışçı Uyumu", antrenorOraniGenel: "Antrenör Oranı",
+  PS_closerFit: "Kapanışçı Uyumu (NEGATİF katsayı: geriden gelen profil geçmişte daha az kazandı)", antrenorOraniGenel: "Antrenör Oranı",
   jokeyFormuGenel: "Jokey Formu (Son 30 Gün)", galopKalite: "Galop Kalitesi",
 };
 function sinyalAdi(kod: string): string { return SINYAL_AD[kod] ?? kod; }

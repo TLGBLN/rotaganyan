@@ -84,7 +84,7 @@ const SINYAL_AD: Record<string, string> = {
   yarisGidisatiSkoru: "Yarış Gidişatı Skoru", sireOrani: "Sire Oranı", kgsVarMi: "KGS Verisi Var mı",
   "B:sireKatkisi": "Sire Katkısı (B Katmanı)", "B:zeminMesafeKatkisi": "Zemin+Mesafe Katkısı (B Katmanı)",
   ACC_CLOSE_RES: "Kapanış Artığı (Accurace)", ACC_LATE: "Geç Segment Hızı (Accurace)", ACC_SPEED: "Hız Artığı (Accurace)",
-  PS_front: "Öne Çıkma Uyumu", PS_lone: "Yalnız Kaçak Uyumu", PS_closerFit: "Kapanışçı Uyumu",
+  PS_front: "Öne Çıkma Uyumu", PS_lone: "Yalnız Kaçak Uyumu", PS_closerFit: "Kapanışçı Uyumu (NEGATİF katsayı: geriden gelen profil geçmişte daha az kazandı)",
 };
 function sinyalAdi(kod: string): string { return SINYAL_AD[kod] ?? kod; }
 
