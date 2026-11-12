@@ -9,7 +9,8 @@ export const AYAR = {
   kapanisBitis: 0.999, // bu eşiğin üstündeki checkpoint'ler atılır, finiş bir kez eklenir
   eps: 1e-6,
   lateKirp: 3, // lateSegScore son koruma kırpması (|z| ≤ 3)
-  lateMinN: 5, // geç segment robust z için asgari gözlemli at sayısı
+  // 2026-11-13 kullanıcı kararı ("her koşuda hesaplanacak", DERBY WARRIOR vakası: tek Accurace kaydı 4 atlık sahada olduğu için ACC_LATE hiç kullanılamıyordu). 5 → 2: CV nötr (lateMinN 5/4/3 hepsi LogLoss 2.0409). DİKKAT: 2 atlık sahada robust z her zaman ±0.67 çıkar (yalnız hangisinin hızlı olduğunu söyler, farkı değil); skor ±3 kırpılır ve reliability(n)=n/(n+2) ile küçültülür. MAD ≤ lateMadMinMs (hepsi aynı süre) yine hesaplanmaz.
+  lateMinN: 2, // geç segment robust z için asgari gözlemli at sayısı
   lateMadMinMs: 20, // MAD bu eşiğin (ms) altındaysa robust z hesaplanmaz → NO_LATE_SCALE
   baseMinN: 20, // beklenen pace tabanı için asgari kayıt sayısı
   stilAlpha: 1, // stil vektörü Dirichlet benzeri prior gücü (düzgün dağılıma çekim)

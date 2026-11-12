@@ -25,26 +25,32 @@ const GALOP_COK_RAHAT_KODLARI = new Set(["ÇR", "ÇOK RAHAT"]);
 const GALOP_HAFIF_TESVIKLI_KODLARI = new Set(["HÇ", "HAFİF ÇALIŞARAK"]);
 const GALOP_TESVIKLI_KODLARI = new Set(["Ç", "ÇALIŞARAK"]);
 export function galopSkoru(galoplar: { date: Date; splits: unknown; form: string | null; jockey: string | null }[], breed: string, bugunkuJokey: string | null): number | null {
-  for (const g of galoplar) {
-    const splits = g.splits as Record<string, string | null> | null;
-    const finish = splits?.["400"];
-    if (!finish) continue;
-    const formKodu = g.form?.toUpperCase().trim() ?? "";
-    if (GALOP_COK_RAHAT_KODLARI.has(formKodu)) continue; // derece güvenilir sinyal değil, atla
+  // 2026-11-13 kullanıcı kararı ("her gerekli bilgi her koşulda hesaplanacak"): önce 400m (eski, eğitimde kullanılan
+  // davranış AYNEN korunur); atın kullanılabilir hiçbir 400m kaydı yoksa YEDEK olarak 600/800/1000m süresi aynı
+  // kalite eşikleriyle (GALOP_BENCHMARKS) değerlendirilir. Böylece 400m olanlar için değer DEĞİŞMEZ, yalnız eskiden
+  // gözlemsiz kalanlar gözlemli olur.
+  for (const mesafe of ["400", "600", "800", "1000"]) {
+    for (const g of galoplar) {
+      const splits = g.splits as Record<string, string | null> | null;
+      const finish = splits?.[mesafe];
+      if (!finish) continue;
+      const formKodu = g.form?.toUpperCase().trim() ?? "";
+      if (GALOP_COK_RAHAT_KODLARI.has(formKodu)) continue; // derece güvenilir sinyal değil, atla
 
-    const kalite = galopQuality("400", finish, breed, false); // "cok_iyi" | "iyi" | null
-    let puan: number;
-    if (GALOP_RAHAT_KODLARI.has(formKodu)) {
-      puan = kalite === "cok_iyi" ? 2 : kalite === "iyi" ? 1 : 0;
-    } else if (GALOP_HAFIF_TESVIKLI_KODLARI.has(formKodu)) {
-      puan = kalite === "cok_iyi" ? 2 : kalite === "iyi" ? -0.5 : -1;
-    } else if (GALOP_TESVIKLI_KODLARI.has(formKodu)) {
-      puan = kalite === "cok_iyi" ? 0.5 : kalite === "iyi" ? -1 : -1.5;
-    } else {
-      continue; // Kenter/Galop/bilinmeyen — güvenilir değil, sonraki kayda bak
+      const kalite = galopQuality(mesafe, finish, breed, false); // "cok_iyi" | "iyi" | null
+      let puan: number;
+      if (GALOP_RAHAT_KODLARI.has(formKodu)) {
+        puan = kalite === "cok_iyi" ? 2 : kalite === "iyi" ? 1 : 0;
+      } else if (GALOP_HAFIF_TESVIKLI_KODLARI.has(formKodu)) {
+        puan = kalite === "cok_iyi" ? 2 : kalite === "iyi" ? -0.5 : -1;
+      } else if (GALOP_TESVIKLI_KODLARI.has(formKodu)) {
+        puan = kalite === "cok_iyi" ? 0.5 : kalite === "iyi" ? -1 : -1.5;
+      } else {
+        continue; // Kenter/Galop/bilinmeyen — güvenilir değil, sonraki kayda bak
+      }
+      if (isSameJockey(g.jockey, bugunkuJokey)) puan += 0.5;
+      return puan;
     }
-    if (isSameJockey(g.jockey, bugunkuJokey)) puan += 0.5;
-    return puan;
   }
   return null;
 }
