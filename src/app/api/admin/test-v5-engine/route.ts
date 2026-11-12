@@ -3,6 +3,7 @@ import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { gatherFaz1V5, hibritMaidenSatisMi } from "@/lib/methodology/v5-engine";
+import { bankoAdayiTespit } from "@/lib/methodology/banko-adayi";
 import { scoreV461Saf } from "@/lib/methodology/v546-1-engine";
 import safWeightsJson from "@/lib/methodology/weights/v546-1-saf-weights.json";
 import { kategoriTespit } from "@/lib/methodology/v2-engine";
@@ -203,7 +204,8 @@ async function handlePost(req: NextRequest) {
     ),
   });
 
-  const bankoAdayi = null;
+  // Banko adayı: tip-bazlı KALİBRE olasılığa göre (banko-adayi.ts) — Handikap/segment modellerinde kanıtsız banko verilmez.
+  const bankoAdayi = bankoAdayiTespit(faz1.race.classType, sirali);
   const nolar = atlar.map((r) => r.no);
   // AGF Destek Katmanı KALDIRILDI (kullanıcı kararı — AGF komple çıkarılacak) — kupon
   // bölünmesi artık doğrudan Saf Model sırasına göre (ilk 3 / sonraki 3 / kalan).
