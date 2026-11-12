@@ -17,6 +17,7 @@ const SINYAL_AD: Record<string, string> = {
   zeminToleransi: "Zemin Toleransı", zeminMesafeDeneyim: "Zemin+Mesafe Deneyimi",
   sonIdmanSprint: "Son İdman Sprint", takiDegisikligi: "Takı Değişikliği",
   yarisGidisatiSkoru: "Yarış Gidişatı Skoru (Tempo)", sireOrani: "Pedigri (Baba)", sireOraniBirlesik: "Pedigri (Baba+Anne+Anne Babası)",
+  hpRel: "Handikap Puanı (sahaya göre)", kiloRel: "Taşınan Kilo (sahaya göre)",
   jokeyPIT: "Jokey Seviyesi (son 365 gün)", antrenorPIT: "Antrenör Seviyesi (son 365 gün)", lastWon: "Son Yarışını Kazandı",
   ACC_CLOSE_RES: "Kapanış Artığı (Accurace)", ACC_LATE: "Geç Segment Hızı (Accurace)",
   ACC_SPEED: "Hız Artığı (Accurace)", PS_front: "Öne Çıkma Uyumu", PS_lone: "Yalnız Kaçak Uyumu",

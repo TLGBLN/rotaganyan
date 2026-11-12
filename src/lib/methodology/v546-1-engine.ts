@@ -184,8 +184,13 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
   // Kalitesi (3 YENİ sinyal) + Dam/DamSire'ın sireOrani'ye eklenmesi (mevcut sinyal, yeniden
   // tanımlandı) için gereken ham veri — ran-v2.ts'in hesaplaRanV2'siyle AYNI kaynak/desen.
   const runnerIdsHepsi = faz1.runners.map((r) => r.id);
-  const damDamSireRows = await db.runner.findMany({ where: { id: { in: runnerIdsHepsi } }, select: { id: true, dam: true, damSire: true } });
+  const damDamSireRows = await db.runner.findMany({ where: { id: { in: runnerIdsHepsi } }, select: { id: true, dam: true, damSire: true, hp: true, weight: true } });
   const damDamSireByRunnerId = new Map(damDamSireRows.map((x) => [x.id, x]));
+  // 2026-11-12 — TJK handikap puanı (HP) ve taşınan kilo, SAHAYA GÖRE (saha ortalamasından fark).
+  // HP, TJK'nın her ata verdiği genel yetenek derecesi (yalnız Handikap koşularında değil, atların
+  // %86'sında dolu); ölçümde hpRel+kiloRel ΔLogLoss -0.034 [-0.048,-0.019], kazanç Handikap-dışında.
+  const ortalama = (a: (number | null | undefined)[]) => { const v = a.filter((x): x is number => x != null); return v.length ? v.reduce((p, q) => p + q, 0) / v.length : null; };
+  const hpOrt = ortalama(damDamSireRows.map((x) => x.hp)), kiloOrt = ortalama(damDamSireRows.map((x) => x.weight));
   const damNamesOrdered = faz1.runners.map((r) => damDamSireByRunnerId.get(r.id)?.dam ?? null);
   const damSireNamesOrdered = faz1.runners.map((r) => damDamSireByRunnerId.get(r.id)?.damSire ?? null);
   const [jokeyTablosu18, galopRows18, damOzetleri18, damSireOzetleri18, pitByRunnerId] = await Promise.all([
@@ -262,6 +267,8 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
       { ad: "jokeyPIT", raw: pitByRunnerId.get(r.id)?.jokeyPIT ?? null, observed: pitByRunnerId.get(r.id)?.jokeyPIT != null, reliability: 1 },
       { ad: "antrenorPIT", raw: pitByRunnerId.get(r.id)?.antrenorPIT ?? null, observed: pitByRunnerId.get(r.id)?.antrenorPIT != null, reliability: 1 },
       { ad: "lastWon", raw: pitByRunnerId.get(r.id)?.lastWon ?? null, observed: pitByRunnerId.get(r.id)?.lastWon != null, reliability: 1 },
+      { ad: "hpRel", raw: damDamSireByRunnerId.get(r.id)?.hp != null && hpOrt != null ? damDamSireByRunnerId.get(r.id)!.hp! - hpOrt : null, observed: damDamSireByRunnerId.get(r.id)?.hp != null && hpOrt != null, reliability: 1 },
+      { ad: "kiloRel", raw: damDamSireByRunnerId.get(r.id)?.weight != null && kiloOrt != null ? damDamSireByRunnerId.get(r.id)!.weight! - kiloOrt : null, observed: damDamSireByRunnerId.get(r.id)?.weight != null && kiloOrt != null, reliability: 1 },
     ];
     return {
       r,
