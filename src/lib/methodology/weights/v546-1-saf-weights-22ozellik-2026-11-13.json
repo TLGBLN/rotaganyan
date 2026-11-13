@@ -1,0 +1,150 @@
+{
+  "status": "READY",
+  "version": "RotaGanyan Analiz Motoru",
+  "generatedAt": "2026-11-12T17:30:22.448Z",
+  "note": "2026-11-12: 20 özellik + hpRel (TJK handikap puanı, sahaya göre) + kiloRel (taşınan kilo, sahaya göre) = 22. HP/kilo Runner tablosundan, yarış öncesi program değeri (hpDelta tek başına etkisiz çıktığı için yarış sonucundan sızma işareti yok). hp yoksa observed=false (sıfır katkı). ACC özellikleri YUMUŞAK yüzey kuralıyla; jokeyPIT/antrenorPIT point-in-time. Nihai katsayılar tüm 1392 yarışla; doğrulama 5 kat genişleyen-pencereli CV. Önceki sürümler: v546-1-saf-weights-20ozellik-2026-11-12.json, v546-1-saf-weights-16ozellik-2026-11-11.json.",
+  "baseModel": "V5.46.1 (gatherV461RawSinyaller ile AYNI ham veri kaynağı)",
+  "featureNames": [
+    "idmJokey",
+    "h2hNetSkor",
+    "hizDerecesi",
+    "zeminToleransi",
+    "zeminMesafeDeneyim",
+    "sonIdmanSprint",
+    "takiDegisikligi",
+    "yarisGidisatiSkoru",
+    "sireOrani",
+    "ACC_CLOSE_RES",
+    "ACC_LATE",
+    "ACC_SPEED",
+    "PS_front",
+    "PS_lone",
+    "PS_closerFit",
+    "jokeyFormuGenel",
+    "jokeyPIT",
+    "antrenorPIT",
+    "galopKalite",
+    "lastWon",
+    "hpRel",
+    "kiloRel"
+  ],
+  "weights": [
+    0.023998283165697847,
+    0.09522094551905218,
+    0.2651836302264333,
+    -0.015971973337557944,
+    0.01982246790566871,
+    0.011775776903462522,
+    0.036421651420492425,
+    0.04778759090536863,
+    0.08525215790300494,
+    0.3889933292973564,
+    0.401488585402453,
+    -0.03512846472248322,
+    -0.06260947718350184,
+    0.07280605465572067,
+    -0.29693047010367457,
+    0.008773078971928937,
+    0.3386034394845184,
+    0.1379177083938695,
+    0.11529464192462353,
+    0.08909798138024479,
+    0.37940160246475585,
+    -0.14487601012923623
+  ],
+  "means": [
+    0.14715532286212915,
+    0,
+    -0.8911688604206487,
+    0.05158723729234425,
+    -0.24068923603546324,
+    0.10993865030674847,
+    -0.04111692844677138,
+    0.013019895287958001,
+    11.658734769537991,
+    0.05347708919490392,
+    -0.250119264451246,
+    -0.13467845668256848,
+    2.6886779716484517,
+    0.0007093644691853017,
+    1.0042800500373168,
+    -0.0022887720689636635,
+    10.476221071881605,
+    9.969930932974645,
+    0.4630455285947012,
+    0.10241588854305618,
+    -5.692241323018869e-17,
+    3.968126971086074e-18
+  ],
+  "stds": [
+    0.3542606862403551,
+    3.2374737378225182,
+    4.109585081641901,
+    1.2920662548481103,
+    1.788363435924004,
+    0.3128132725372682,
+    0.36864755693177637,
+    3.268766531262952,
+    3.7914508260967854,
+    0.4544710617185719,
+    0.8247087373561603,
+    0.4555455082884644,
+    0.9912874712389479,
+    0.00864199257396359,
+    0.7344305659330581,
+    0.040634723626464496,
+    5.374473166531718,
+    3.8141715763408075,
+    0.7914472845060778,
+    0.3031944496804061,
+    10.459660798147612,
+    2.326969702949585
+  ],
+  "optimizasyon": {
+    "l2": 0.01,
+    "epoch": 800,
+    "lr": 0.08,
+    "momentum": 0.9
+  },
+  "trainingWindow": {
+    "baslangic": "2026-08-16",
+    "bitis": "2026-11-09",
+    "yarisSayisi": 1392
+  },
+  "holdoutDegerlendirme": {
+    "cv5": {
+      "YENİ 20 (baz)": {
+        "n": 827,
+        "top1": 0.23216444981862153,
+        "top3": 0.5779927448609432,
+        "logLoss": 2.074816848271837
+      },
+      "YENİ 22 (+hpRel+kiloRel)": {
+        "n": 827,
+        "top1": 0.24909310761789602,
+        "top3": 0.5840386940749698,
+        "logLoss": 2.040856919186889
+      }
+    },
+    "onceki20ozellikDosyasi": {
+      "MEVCUT canlı (16, SERT ACC)": {
+        "n": 827,
+        "top1": 0.19105199516324062,
+        "top3": 0.5066505441354293,
+        "logLoss": 2.1707960241776907
+      },
+      "16 + YUMUŞAK ACC": {
+        "n": 827,
+        "top1": 0.2007255139056832,
+        "top3": 0.528415961305925,
+        "logLoss": 2.158409385817359
+      },
+      "YENİ (20: +jokeyPIT+antrenorPIT+galop+lastWon, YUMUŞAK ACC)": {
+        "n": 827,
+        "top1": 0.23216444981862153,
+        "top3": 0.5779927448609432,
+        "logLoss": 2.074816302855979
+      }
+    }
+  }
+}

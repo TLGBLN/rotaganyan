@@ -29,6 +29,7 @@ import { galopSkoru, pedigriSkoru } from "./pedigri-galop-ortak";
 import { getJokeyFormTablosu } from "@/server/actions/jokey-form.actions";
 import { getPitSeviyeSinyalleri, type PitSeviye } from "@/server/actions/pit-seviye.actions";
 import { getV5461DamOzetleriForRace, getV5461DamsireOzetleriForRace, type V5461DamlineOzet } from "@/server/actions/v5461-damline.actions";
+import { formOrtalamasi, kgsLog, cinsE } from "./ham-alan-sinyalleri";
 
 type FrozenWeights = {
   version: string;
@@ -184,7 +185,7 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
   // Kalitesi (3 YENİ sinyal) + Dam/DamSire'ın sireOrani'ye eklenmesi (mevcut sinyal, yeniden
   // tanımlandı) için gereken ham veri — ran-v2.ts'in hesaplaRanV2'siyle AYNI kaynak/desen.
   const runnerIdsHepsi = faz1.runners.map((r) => r.id);
-  const damDamSireRows = await db.runner.findMany({ where: { id: { in: runnerIdsHepsi } }, select: { id: true, dam: true, damSire: true, hp: true, weight: true } });
+  const damDamSireRows = await db.runner.findMany({ where: { id: { in: runnerIdsHepsi } }, select: { id: true, dam: true, damSire: true, hp: true, weight: true, recentForm: true, tjkKgs: true, age: true } });
   const damDamSireByRunnerId = new Map(damDamSireRows.map((x) => [x.id, x]));
   // 2026-11-12 — TJK handikap puanı (HP) ve taşınan kilo, SAHAYA GÖRE (saha ortalamasından fark).
   // HP, TJK'nın her ata verdiği genel yetenek derecesi (yalnız Handikap koşularında değil, atların
@@ -269,6 +270,12 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
       { ad: "lastWon", raw: pitByRunnerId.get(r.id)?.lastWon ?? null, observed: pitByRunnerId.get(r.id)?.lastWon != null, reliability: 1 },
       { ad: "hpRel", raw: damDamSireByRunnerId.get(r.id)?.hp != null && hpOrt != null ? damDamSireByRunnerId.get(r.id)!.hp! - hpOrt : null, observed: damDamSireByRunnerId.get(r.id)?.hp != null && hpOrt != null, reliability: 1 },
       { ad: "kiloRel", raw: damDamSireByRunnerId.get(r.id)?.weight != null && kiloOrt != null ? damDamSireByRunnerId.get(r.id)!.weight! - kiloOrt : null, observed: damDamSireByRunnerId.get(r.id)?.weight != null && kiloOrt != null, reliability: 1 },
+      // 2026-11-13 — program ham alanlarından 3 sinyal (tanım: ham-alan-sinyalleri.ts, eğitimle AYNI).
+      // fMean = recentForm son 6 derece ortalaması, kgsLog = log(1+KGS), sexE = cins. Yalnız varsayılan
+      // modelin featureNames'inde var; segment modelleri (Maiden/ŞARTLI 19, ŞARTLI 1/27) kullanmaz.
+      { ad: "fMean", raw: formOrtalamasi(damDamSireByRunnerId.get(r.id)?.recentForm), observed: formOrtalamasi(damDamSireByRunnerId.get(r.id)?.recentForm) != null, reliability: 1 },
+      { ad: "kgsLog", raw: kgsLog(damDamSireByRunnerId.get(r.id)?.tjkKgs), observed: kgsLog(damDamSireByRunnerId.get(r.id)?.tjkKgs) != null, reliability: 1 },
+      { ad: "sexE", raw: cinsE(damDamSireByRunnerId.get(r.id)?.age), observed: cinsE(damDamSireByRunnerId.get(r.id)?.age) != null, reliability: 1 },
     ];
     return {
       r,

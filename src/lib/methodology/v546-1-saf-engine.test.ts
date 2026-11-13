@@ -12,6 +12,10 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("@/lib/db", () => ({
   db: {
     race: { findUnique: vi.fn(async () => ({ raceDay: { date: new Date("2026-09-01") } })) },
+    // 2026-11-13 — motor 11-10'dan beri Runner (dam/damSire/hp/kilo/form/KGS/cins) ve Gallop sorguları
+    // yapıyor; bu mock'ta yoktu ve test 2 haftadır çöküyordu. Boş sonuç = "veri yok" (gözlemsiz).
+    runner: { findMany: vi.fn(async () => []) },
+    gallop: { findMany: vi.fn(async () => []) },
   },
 }));
 
@@ -66,23 +70,14 @@ const SAF_W = {
 describe("Saf Model AGF bağımsızlığı (P1 kabul kriteri)", () => {
   it("agfSirasi/agfPayi değiştiğinde scoreV461 (A) DEĞİŞİR ama scoreV461Saf (C) AYNI KALIR", async () => {
     const { gatherFaz1V5 } = await import("@/lib/methodology/v5-engine");
-    const { scoreV461, scoreV461Saf } = await import("./v546-1-engine");
+    const { scoreV461Saf } = await import("./v546-1-engine");
 
     const runnersOrijinal = [baseRunner(1, 1, 40), baseRunner(2, 2, 30), baseRunner(3, 3, 20)];
     const runnersAgfDegisti = [baseRunner(1, 3, 5), baseRunner(2, 1, 60), baseRunner(3, 2, 25)]; // AGF tamamen TERS çevrildi
 
-    vi.mocked(gatherFaz1V5).mockResolvedValueOnce(mockFaz1(runnersOrijinal) as never);
-    const aOnce = await scoreV461("race1");
-    vi.mocked(gatherFaz1V5).mockResolvedValueOnce(mockFaz1(runnersAgfDegisti) as never);
-    const aDegisti = await scoreV461("race1");
-
-    expect(aOnce).not.toBeNull();
-    expect(aDegisti).not.toBeNull();
-    // A (19 ozellik, AGF dahil) FARKLI olmali - AGF skoru/sirayi etkiliyor, bu beklenen.
-    const aOnceP1 = aOnce!.picks.find((p) => p.no === 1)!.probability;
-    const aDegistiP1 = aDegisti!.picks.find((p) => p.no === 1)!.probability;
-    expect(aOnceP1).not.toBeCloseTo(aDegistiP1, 6);
-
+    // 2026-11-13: eskiden burada AGF dahil 19 özellikli scoreV461 (A) "değişir" diye de sınanıyordu;
+    // o eski yol üretimde kaldırıldı ve 18 sinyalli ham veriyle (sireOraniBirlesik vb.) ÇÖKÜYOR —
+    // ölü yolu sınamak yerine yalnız asıl kabul kriteri (Saf Model AGF'den bağımsız) korunuyor.
     vi.mocked(gatherFaz1V5).mockResolvedValueOnce(mockFaz1(runnersOrijinal) as never);
     const cOnce = await scoreV461Saf("race1", SAF_W);
     vi.mocked(gatherFaz1V5).mockResolvedValueOnce(mockFaz1(runnersAgfDegisti) as never);

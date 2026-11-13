@@ -14,14 +14,20 @@
 //
 // Kalibrasyon: arac-banko-kalibrasyon.mts (CV tahminleri C:/tmp/kalibrasyon-cv-tahminleri.json),
 // segment-dışı 589 yarışta, model 22 özellik. 2 parametre/tip, örnek-içi — eşiği geçen küme: n≈44, isabet ≈%50.
+//
+// 2026-11-13 YENİDEN KALİBRE (model 25 özellik: +fMean/kgsLog/sexE, olasılıklar değişti): aynı 589 yarış,
+// yeni CV olasılıkları (arac-ham-alan-final.mts). Handikap n=236: a=0.07 (en iyi atın olasılığı isabeti
+// neredeyse hiç ayırt etmiyor → kalibre ≈%22 sabit, banko yok). KV/Satış n=122: eşiği geçen 19 yarışta isabet %32
+// (küçük örnek, DİKKAT: hedefin altında). Şartlı n=200: eşiği geçen 19 yarışta isabet %42. Genel n=31 → katsayı
+// kararsız (a=4.5) olduğu için ESKİ katsayı korundu (eşiği geçen 8 yarışta %88). Tüm eşiği geçen küme: n≈46, isabet ≈%46.
 
 export const BANKO_KALIBRE_ESIGI = 0.4;
 
 export type BankoGrup = "Handikap" | "KV/Satış" | "Şartlı" | "Genel";
 const KALIBRASYON: Record<BankoGrup, { a: number; b: number }> = {
-  Handikap: { a: 0.56, b: -0.81 },
-  "KV/Satış": { a: 0.83, b: -0.29 },
-  Şartlı: { a: 0.88, b: -0.08 },
+  Handikap: { a: 0.07, b: -1.26 },
+  "KV/Satış": { a: 0.68, b: -0.24 },
+  Şartlı: { a: 0.79, b: -0.18 },
   Genel: { a: 0.93, b: -0.16 },
 };
 
@@ -61,7 +67,7 @@ export function bankoAdayiTespit(
   const kal = kalibreOlasilik(birinci.probability, grup);
   const ham = `ham %${(birinci.probability * 100).toFixed(1)}, ${grup} tipi için kalibre %${(kal * 100).toFixed(1)}`;
   if (kal >= BANKO_KALIBRE_ESIGI) {
-    return { bankoAdayi: true, kalibreOlasilik: kal, sebep: `${etiket} — ${ham} (eşik %${BANKO_KALIBRE_ESIGI * 100}). Geçmiş CV'de bu eşiği geçen koşularda isabet ≈%50 (n≈44). Yalnız bir işaret — riskleri kendiniz teyit edin.` };
+    return { bankoAdayi: true, kalibreOlasilik: kal, sebep: `${etiket} — ${ham} (eşik %${BANKO_KALIBRE_ESIGI * 100}). Geçmiş CV'de bu eşiği geçen koşularda isabet ≈%46 (n≈46). Yalnız bir işaret — riskleri kendiniz teyit edin.` };
   }
   return { bankoAdayi: false, kalibreOlasilik: kal, sebep: `${etiket} — ${ham}; banko eşiğinin (%${BANKO_KALIBRE_ESIGI * 100}) altında${grup === "Handikap" ? " (Handikap'ta model aşırı güvenli, geçmişte hiçbir koşu eşiği geçmedi)" : ""}.` };
 }
