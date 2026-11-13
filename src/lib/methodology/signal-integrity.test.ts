@@ -126,3 +126,22 @@ describe("signal integrity policy", () => {
     expect(r.recommendedBand).toBe("MODEL_SIRASI");
   });
 });
+
+describe("kalibre banko kapısı (bankoIzinli)", () => {
+  const guclu = [
+    line("HIZ", 0.3), line("RACE_FORM", 0.2), line("PIST_MESAFE_ZEMIN", 0.1), line("TEMPO_STYLE", 0.1),
+    line("H2H", 0.1), line("IDMAN", 0.1), line("JOKEY", 0.1),
+  ];
+  const base = { rank: 1, familyLines: guclu, marketMovementClass: null, jokeyEtkinFormPp: 1 } as const;
+
+  it("izin verilmezse işaret-sayımı güçlü olsa bile BANKO verilmez (ILK3'e düşer)", () => {
+    const acik = evaluateSignalIntegrity({ ...base });
+    expect(acik.level).toBe("BANKO_UYUMLU"); expect(acik.recommendedBand).toBe("BANKO");
+    const kapali = evaluateSignalIntegrity({ ...base, bankoIzinli: false });
+    expect(kapali.level).not.toBe("BANKO_UYUMLU"); expect(kapali.recommendedBand).not.toBe("BANKO");
+    expect(kapali.reasons.join(" ")).toContain("banko eşiğinin");
+  });
+  it("izin açık (veya verilmemiş) ise eski davranış korunur", () => {
+    expect(evaluateSignalIntegrity({ ...base, bankoIzinli: true }).level).toBe("BANKO_UYUMLU");
+  });
+});

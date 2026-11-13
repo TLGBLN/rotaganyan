@@ -70,3 +70,26 @@ describe("horse-analysis-summary", () => {
     expect(r.enGucluNegatif).toHaveLength(0);
   });
 });
+
+describe("saha-sabit sinyaller (idman artefaktı)", () => {
+  const sinyaller = [
+    { ad: "hizDerecesi", status: "USED" as const, raw: 4, contribution: 0.3 },
+    { ad: "idmJokey", status: "USED" as const, raw: 0, contribution: -0.0141 },
+    { ad: "hpRel", status: "USED" as const, raw: 5, contribution: 0.2 },
+  ];
+  const ortak = { rank: 3, agfTrendItem: null, jokeySon30G: null, jokeySon30GMetni: null, jokeyDestekliSurpriz: false } as const;
+
+  it("saha-sabit idmJokey verilmezse İDMAN ailesi negatif listede çıkar (eski hata)", () => {
+    const r = buildHorseAnalysisSummary({ ...ortak, signals: sinyaller });
+    expect(r.enGucluNegatif.some((l) => l.family === "IDMAN")).toBe(true);
+  });
+  it("saha-sabit olarak işaretlenince İDMAN negatif kanıt sayılmaz", () => {
+    const r = buildHorseAnalysisSummary({ ...ortak, signals: sinyaller, sabitSinyaller: new Set(["idmJokey"]) });
+    expect(r.enGucluNegatif.some((l) => l.family === "IDMAN")).toBe(false);
+    expect(r.butunluk.negativeFamilies).not.toContain("IDMAN");
+  });
+  it("yeni sinyaller (hpRel) ailelere girer ve güçlü pozitifte görünür", () => {
+    const r = buildHorseAnalysisSummary({ ...ortak, signals: sinyaller });
+    expect(r.enGucluPozitif.map((l) => l.family)).toContain("HANDIKAP_KILO");
+  });
+});

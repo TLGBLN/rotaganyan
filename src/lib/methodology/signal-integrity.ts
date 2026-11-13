@@ -34,9 +34,9 @@ export interface SignalIntegrityResult {
   reasons: string[];
 }
 
-const PERFORMANCE = new Set<EvidenceFamily>(["HIZ", "RACE_FORM"]);
+const PERFORMANCE = new Set<EvidenceFamily>(["HIZ", "RACE_FORM", "SON_FORM"]);
 const CONTEXT = new Set<EvidenceFamily>(["PIST_MESAFE_ZEMIN", "TEMPO_STYLE"]);
-const SUPPORT = new Set<EvidenceFamily>(["H2H", "IDMAN", "TAKI", "PEDIGRI", "JOKEY"]);
+const SUPPORT = new Set<EvidenceFamily>(["H2H", "IDMAN", "TAKI", "PEDIGRI", "JOKEY", "HANDIKAP_KILO", "DINLENME", "SEVIYE", "CINS"]);
 
 const CURRENT_ELIGIBLE_FAMILIES = new Set<EvidenceFamily>(
   SIGNAL_REGISTRY
@@ -96,6 +96,9 @@ export function evaluateSignalIntegrity(params: {
     | "STABLE"
     | null;
   jokeyEtkinFormPp: number | null;
+  /** 2026-11-13: BANKO seviyesi YALNIZ kalibre olasılık eşiğini (%40, tip-bazlı Platt) geçen 1. ata verilir. İşaret-sayımı tek başına
+   *  banko üretemez (Bursa K1: %6.6 olasılıklı at "BANKO UYUMLU" çıkıyordu). Verilmezse (eski çağrılar) kapı açık sayılır. */
+  bankoIzinli?: boolean;
 }): SignalIntegrityResult {
   const usable = params.familyLines.filter(
     (line) =>
@@ -140,7 +143,9 @@ export function evaluateSignalIntegrity(params: {
   const positiveFamilyCount = positiveFamilies.length;
   const negativeFamilyCount = negativeFamilies.length;
 
+  const bankoKapisiAcik = params.bankoIzinli !== false;
   const bankoUyumlu =
+    bankoKapisiAcik &&
     usedFamilyCount >= 6 &&
     positiveFamilyCount >= 5 &&
     performancePositive &&
@@ -199,6 +204,9 @@ export function evaluateSignalIntegrity(params: {
 
   if (marketDownVeto) {
     reasons.push("AGF Trend: MEANINGFUL_DOWN — BANKO veto");
+  }
+  if (!bankoKapisiAcik) {
+    reasons.push("Kalibre olasılık banko eşiğinin (%40) altında veya 1. sıra/uygun tip değil — işaret sayımı tek başına BANKO vermez");
   }
 
   return {

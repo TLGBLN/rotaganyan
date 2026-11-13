@@ -106,9 +106,17 @@ export function buildHorseAnalysisSummary(params: {
   jokeySon30G: JokeyGuncelForm | null;
   jokeySon30GMetni: string | null;
   jokeyDestekliSurpriz: boolean;
+  /** 2026-11-13: SAHA-SABİT sinyaller (sahadaki tüm atlarda aynı ham değer — ör. idmJokey hepsinde 0). Ayırt edici bilgi taşımazlar; z-skor
+   *  sıfırı hafif negatif katkıya çevirdiği için "Negatif bütünlük: İDMAN" gibi sahte kanıt üretiyordu. Katkıları anlatı/bütünlükte NÖTR (0) sayılır. */
+  sabitSinyaller?: ReadonlySet<string>;
+  /** Kalibre banko kapısı (bkz. signal-integrity.ts): verilmezse eski davranış. */
+  bankoIzinli?: boolean;
 }): HorseAnalysisSummary {
   const sinif = classifyHorseKategori(params.rank, params.jokeyDestekliSurpriz);
-  const familyLines = rollupEvidenceFamilies(params.signals);
+  const anlatiSinyalleri = params.sabitSinyaller && params.sabitSinyaller.size > 0
+    ? params.signals.map((s) => (params.sabitSinyaller!.has(s.ad) ? { ...s, contribution: 0 } : s))
+    : params.signals;
+  const familyLines = rollupEvidenceFamilies(anlatiSinyalleri);
   const marketOzet = buildMarketOzet(params.agfTrendItem);
   const jokeySon30GOzet = buildJokeyOzet(params.jokeySon30G, params.jokeySon30GMetni);
 
@@ -177,6 +185,7 @@ export function buildHorseAnalysisSummary(params: {
     familyLines: allFamilyLines,
     marketMovementClass: marketOzet.movementClass,
     jokeyEtkinFormPp: jokeySon30GOzet.etkinFormPp,
+    bankoIzinli: params.bankoIzinli,
   });
 
   return {

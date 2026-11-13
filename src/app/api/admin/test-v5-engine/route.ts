@@ -3,7 +3,7 @@ import { auth, hasRole } from "@/lib/auth";
 import type { Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { gatherFaz1V5, hibritMaidenSatisMi } from "@/lib/methodology/v5-engine";
-import { bankoAdayiTespit } from "@/lib/methodology/banko-adayi";
+import { bankoAdayiTespit, bankoGrubu, kalibreOlasilik, segmentModeliMi, BANKO_KALIBRE_ESIGI } from "@/lib/methodology/banko-adayi";
 import { scoreV461Saf } from "@/lib/methodology/v546-1-engine";
 import safWeightsJson from "@/lib/methodology/weights/v546-1-saf-weights.json";
 import { kategoriTespit } from "@/lib/methodology/v2-engine";
@@ -47,6 +47,13 @@ async function handlePost(req: NextRequest) {
 
   const sirali = [...safSonuc.picks].sort((a, b) => a.rank - b.rank);
   const featureRaw = (p: (typeof sirali)[number], ad: string): number | null => p.features.find((f) => f.ad === ad)?.raw ?? null;
+  // 2026-11-13 — SAHA-SABİT sinyaller: gözlemli ≥3 atta HEPSİ aynı ham değer → ayırt edici bilgi yok (bkz. horse-analysis-summary.ts).
+  const sabitSinyaller = new Set<string>();
+  for (const kod of sirali[0]?.features.map((f) => f.ad) ?? []) {
+    const v = sirali.map((q) => q.features.find((f) => f.ad === kod)).filter((f) => f?.observed && f.raw != null).map((f) => f!.raw as number);
+    if (v.length >= 3 && Math.max(...v) - Math.min(...v) < 1e-9) sabitSinyaller.add(kod);
+  }
+  const bankoTipUygun = !segmentModeliMi(faz1.race.classType);
 
   const jockeyByNo = new Map(faz1.runners.map((r) => [r.no, r.jockey]));
   const raceDayMeta = await db.race.findUnique({
@@ -105,6 +112,9 @@ async function handlePost(req: NextRequest) {
       jokeySon30G: jokeyGuncel,
       jokeySon30GMetni,
       jokeyDestekliSurpriz: jokeyRescue?.JOKEY_DESTEKLI_SURPRIZ ?? false,
+      sabitSinyaller,
+      // BANKO yalnız 1. ata ve yalnız KALİBRE olasılık eşiğini geçerse (işaret-sayımı tek başına banko üretemez)
+      bankoIzinli: p.rank === 1 && bankoTipUygun && kalibreOlasilik(p.probability, bankoGrubu(faz1.race.classType)) >= BANKO_KALIBRE_ESIGI,
     });
 
     const karar = analysisOzet.sinif;

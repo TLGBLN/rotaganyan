@@ -16,7 +16,13 @@ export type EvidenceFamily =
   | "PEDIGRI"
   | "JOKEY"
   | "AT_JOKEY"
-  | "SINIF_ZORLUK";
+  | "SINIF_ZORLUK"
+  // 2026-11-13 — canlı Saf Model'in (25 özellik) en güçlü sürücüleri aile haritasında YOKTU (harita 2026-10-11'de donmuştu):
+  | "HANDIKAP_KILO"
+  | "SON_FORM"
+  | "DINLENME"
+  | "SEVIYE"
+  | "CINS";
 
 export const FAMILY_LABEL: Record<EvidenceFamily, string> = {
   MARKET: "Piyasa (AGF)",
@@ -24,13 +30,19 @@ export const FAMILY_LABEL: Record<EvidenceFamily, string> = {
   H2H: "Baş Başa (H2H)",
   PIST_MESAFE_ZEMIN: "Pist/Mesafe/Zemin",
   TEMPO_STYLE: "Tempo/Stil",
-  RACE_FORM: "Yarış Formu",
+  // 2026-11-13: bu aile Accurace kapanış/geç segment artığıdır — son yarış FORMU değil (o SON_FORM ailesi). Etiket yanıltıcıydı.
+  RACE_FORM: "Kapanış Gücü (Accurace)",
   IDMAN: "İdman",
   TAKI: "Takı",
   PEDIGRI: "Pedigri",
   JOKEY: "Jokey Son 30G",
   AT_JOKEY: "At-Jokey Uyumu",
   SINIF_ZORLUK: "Sınıf/İkramiye Zorluğu",
+  HANDIKAP_KILO: "Handikap Puanı / Kilo",
+  SON_FORM: "Son Yarış Formu",
+  DINLENME: "Dinlenme (KGS)",
+  SEVIYE: "Jokey / Antrenör Seviyesi",
+  CINS: "Cins",
 };
 
 /** agfTrend gerçek bir V461FeatureDetay kodu DEĞİL — route.ts bunu sentetik bir kod olarak ekler. */
@@ -41,12 +53,17 @@ export const EVIDENCE_FAMILY_MAP: Record<EvidenceFamily, string[]> = {
   PIST_MESAFE_ZEMIN: ["zeminToleransi", "zeminMesafeDeneyim", "pistUzmaniSkoru"],
   TEMPO_STYLE: ["yarisGidisatiSkoru", "PS_front", "PS_lone", "PS_closerFit"],
   RACE_FORM: ["ACC_CLOSE_RES", "ACC_LATE"],
-  IDMAN: ["idmJokey", "sonIdmanSprint"],
+  IDMAN: ["idmJokey", "sonIdmanSprint", "galopKalite"],
   TAKI: ["takiDegisikligi"],
-  PEDIGRI: ["sireOrani"],
+  PEDIGRI: ["sireOrani", "sireOraniBirlesik"],
   JOKEY: ["jokeySon30G"], // ayrı kaynaktan gelir; canonical registry'de gerçek üye
   AT_JOKEY: ["atJokeyUyumu"], // FUTURE_CANDIDATE
   SINIF_ZORLUK: ["ikramiyeZorlukDegisimi"], // FUTURE_CANDIDATE
+  HANDIKAP_KILO: ["hpRel", "kiloRel"],
+  SON_FORM: ["fMean", "lastWon"],
+  DINLENME: ["kgsLog"],
+  SEVIYE: ["jokeyPIT", "antrenorPIT", "jokeyFormuGenel", "antrenorOraniGenel"],
+  CINS: ["sexE"],
 };
 
 /** Henüz hiçbir canlı veri kaynağı olmayan aileler — veri güveni denominator'ına,

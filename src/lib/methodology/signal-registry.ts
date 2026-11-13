@@ -55,6 +55,19 @@ export const SIGNAL_REGISTRY: readonly SignalRegistryEntry[] = [
 
   { code: "sireOrani", family: "PEDIGRI", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Gerçek sire örneklemi fallback'ten ayrılıyor; fakat kanıt zayıf olduğu için placement bütünlüğüne oy vermez." },
 
+  // 2026-11-13 — canlı Saf Model'in yeni sinyalleri (eğitim bootstrap |z| ile): güvenilir olanlar integrityEligible.
+  { code: "hpRel", family: "HANDIKAP_KILO", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "TJK handikap puanı, sahaya göre (|z|=9.0, modelin en güçlü sinyali)." },
+  { code: "kiloRel", family: "HANDIKAP_KILO", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Taşınan kilo, sahaya göre (|z|=6.0)." },
+  { code: "fMean", family: "SON_FORM", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Son 6 yarış derece ortalaması (|z|=7.9)." },
+  { code: "lastWon", family: "SON_FORM", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Son yarışını kazandı mı (|z|=2.5)." },
+  { code: "kgsLog", family: "DINLENME", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "log(1+KGS) (|z|=8.0)." },
+  { code: "jokeyPIT", family: "SEVIYE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Jokey seviyesi, son 365 gün (|z|=7.8) — modelin gerçek jokey sinyali." },
+  { code: "antrenorPIT", family: "SEVIYE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Antrenör seviyesi, son 365 gün (|z|=5.2)." },
+  { code: "jokeyFormuGenel", family: "SEVIYE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Son 30 gün jokey formu; katsayı belirsiz (|z|=0.4) — aile oyu değil." },
+  { code: "antrenorOraniGenel", family: "SEVIYE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Yalnız segment modellerinde." },
+  { code: "sexE", family: "CINS", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Cins (yaş alanının 3. kelimesi e) (|z|=5.2)." },
+  { code: "galopKalite", family: "IDMAN", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Son galop kalitesi (|z|=2.9); ordinal, çoğu at 1.0." },
+  { code: "sireOraniBirlesik", family: "PEDIGRI", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Yalnız segment modellerinde." },
   { code: "jokeySon30G", family: "JOKEY", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: true, note: "Model score dışı güncel jokey desteği." },
 
   { code: "atJokeyUyumu", family: "AT_JOKEY", lifecycle: "FUTURE_CANDIDATE", productionFeature: false, integrityEligible: false, note: "Residualized pair uplift + shrinkage/recency; OOS bekliyor." },

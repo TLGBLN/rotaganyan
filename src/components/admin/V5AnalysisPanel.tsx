@@ -883,7 +883,7 @@ export default function V5AnalysisPanel({ raceId, classType, runners: raceRunner
                         <>
                           {" "}· {a.analysisOzet.jokeySon30GOzet.w30}/
                           {a.analysisOzet.jokeySon30GOzet.n30} · K30 %
-                          {a.analysisOzet.jokeySon30GOzet.k30.toFixed(1)} · Ref %
+                          {(a.analysisOzet.jokeySon30GOzet.k30 * 100).toFixed(1)} · Ref %
                           {a.analysisOzet.jokeySon30GOzet.refKPct.toFixed(1)}
                           {a.analysisOzet.jokeySon30GOzet.formDeltaPp != null &&
                             ` · Form Δ ${a.analysisOzet.jokeySon30GOzet.formDeltaPp >= 0 ? "+" : ""}${a.analysisOzet.jokeySon30GOzet.formDeltaPp.toFixed(1)}pp`}
