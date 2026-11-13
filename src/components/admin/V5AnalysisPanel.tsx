@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { upsertPrediction, type PickInput } from "@/server/actions/prediction.actions";
 import type { PickDetailsV2 } from "@/lib/methodology/muhakeme-format";
 import type { HorseAnalysisSummary } from "@/lib/methodology/horse-analysis-summary";
+import { kayitliOzetleriKur } from "@/lib/methodology/kayitli-ozet";
 import type { AnalysisReadyResult } from "@/lib/methodology/analysis-ready";
 import { CURRENT_ENGINE_LABEL, getEngineLabelForClassType } from "@/lib/methodology/v5-engine-label";
 
@@ -91,6 +92,8 @@ type SavedPick = {
   runnerId?: string | null;
   runnerLabel: string;
   details: unknown;
+  /** Kaydedilen sinyal anlık görüntüsü (Pick.featureSnapshot) — Race-Day Analysis özetini yeniden kurmak için. */
+  featureSnapshot?: unknown;
 };
 type ExistingPrediction = {
   couponNarrow?: string | null;
@@ -114,6 +117,7 @@ function savedPickToV5At(pick: SavedPick, runnersByNo: Map<number, Runner>): V5A
   const noMatch = pick.runnerLabel.match(/^#(\d+)/);
   const no = noMatch ? parseInt(noMatch[1], 10) : 0;
   const runner = runnersByNo.get(no);
+  const snap = pick.featureSnapshot as { tumSinyaller?: (TumOzellikDetay & { observed?: boolean; reliability?: number; beta?: number })[] } | null | undefined;
   return {
     no,
     ad: runner?.name ?? pick.runnerLabel.replace(/^#\d+\s*/, ""),
@@ -121,6 +125,7 @@ function savedPickToV5At(pick: SavedPick, runnersByNo: Map<number, Runner>): V5A
     karar: d.karar ?? "—",
     olasilik,
     details: d as PickDetailsV2,
+    tumSinyaller: Array.isArray(snap?.tumSinyaller) ? snap!.tumSinyaller : undefined,
   };
 }
 
@@ -156,8 +161,9 @@ export default function V5AnalysisPanel({ raceId, classType, runners: raceRunner
       .filter((a): a is V5At => !!a)
       .sort((a, b) => a.teknikSira - b.teknikSira);
     if (atlar.length === 0) return null;
+    const atlarOzetli = kayitliOzetleriKur(atlar, classType);
     return {
-      atlar,
+      atlar: atlarOzetli,
       manualOrder: atlar.map((a) => a.no),
       runners: raceRunners.map((r) => ({ id: r.id, no: r.no, name: r.name })),
       bankoAdayi: existingPrediction.bankoNote ? { bankoAdayi: false, sebep: existingPrediction.bankoNote } : null,
@@ -305,7 +311,8 @@ export default function V5AnalysisPanel({ raceId, classType, runners: raceRunner
           // özelliğini kapsıyor, B katmanı (sireOrani/zeminMesafeDeneyim) hiç ölçülemiyordu.
           // bKatmani alanı bu boşluğu kapatıyor — canlı sonuçlar birikince B katmanı
           // sinyalleri de featureSnapshot z-skoru yöntemiyle denetlenebilecek.
-          featureSnapshot: a.tumSinyaller
+          // Kayıtlı kaynaktan gelen atlarda (kaynak !== "canli") motorEtiketi bilinmez — eski davranış korunur: anlık görüntü yeniden yazılmaz.
+          featureSnapshot: a.tumSinyaller && kaynak === "canli"
             ? {
                 tumSinyaller: a.tumSinyaller,
                 motorEtiketi,
