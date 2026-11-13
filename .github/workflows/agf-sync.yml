@@ -3,14 +3,22 @@ name: AGF Sync
 on:
   schedule:
     # 06:00-19:00 Türkiye saati (UTC+3) arası her 15 dakikada bir = 03:00-16:00 UTC
+    # NOT: GitHub zamanlanmış iş akışlarını garanti etmez (yük altında geciktirir/atlar) — pratikte saatlik civarı çalışır.
     - cron: "*/15 3-16 * * *"
   workflow_dispatch: {}
+
+# 2026-11-13: üst üste binen çalışmaları engelle (eskiden uç nokta 13+ dk sürüp birbirinin üstüne biniyordu)
+concurrency:
+  group: agf-sync
+  cancel-in-progress: false
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    # AGF senkronu hızlı olmalı (dakikalar değil, saniyeler). Eskiden zaman aşımı yoktu: uç nokta 800 sn'de öldürülene kadar 13 dk bekleniyordu.
+    timeout-minutes: 6
     steps:
       - name: Call AGF sync endpoint
         run: |
-          curl -sf -X GET "https://rotaganyan.com/api/cron/agf-sync" \
+          curl -sSf --max-time 240 --retry 2 --retry-delay 15 -X GET "https://rotaganyan.com/api/cron/agf-sync" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

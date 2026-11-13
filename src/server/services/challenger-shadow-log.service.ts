@@ -14,6 +14,10 @@ export type ChallengerShadowLogResult = {
   racesProcessed: number;
   runsWritten: number;
   errors: { raceId: string; error: string }[];
+  /** yakın zamanda zaten çalıştığı için atlandı (aralık kapısı) */
+  atlandi?: string;
+  /** süre bütçesi dolduğu için döngü erken bırakıldı */
+  sureAsimi?: boolean;
 };
 
 function ozetle(sirali: Faz1RunnerV5Sirali[]) {
@@ -27,7 +31,19 @@ function ozetle(sirali: Faz1RunnerV5Sirali[]) {
   }));
 }
 
-export async function runChallengerShadowLog(now: Date = new Date()): Promise<ChallengerShadowLogResult> {
+/**
+ * 2026-11-13 — AGF cron'una EKLENEN çağrı her 15 dakikada bir, sonucu gelmemiş TÜM koşular (ayrı gün programları dahil, ~50 koşu) için
+ * sırayla tam gatherFaz1V5 + dev JSON snapshot yazımı yapıyordu (~3 dk, AGF çağrısını şişiriyor). Artık çağıran taraf
+ * `minAralikDk` (son yazımdan bu yana en az bu kadar dakika geçmediyse atla) ve `maksMs` (süre bütçesi) verebilir.
+ */
+export async function runChallengerShadowLog(now: Date = new Date(), opts: { maksMs?: number; minAralikDk?: number } = {}): Promise<ChallengerShadowLogResult> {
+  const t0 = Date.now();
+  if (opts.minAralikDk) {
+    const son = await db.challengerRun.findFirst({ orderBy: { computedAt: "desc" }, select: { computedAt: true } });
+    if (son && now.getTime() - son.computedAt.getTime() < opts.minAralikDk * 60_000) {
+      return { racesChecked: 0, racesProcessed: 0, runsWritten: 0, errors: [], atlandi: `son yazım ${Math.round((now.getTime() - son.computedAt.getTime()) / 60_000)} dk önce (< ${opts.minAralikDk} dk)` };
+    }
+  }
   const races = await db.race.findMany({
     where: {
       result: null,
@@ -40,6 +56,7 @@ export async function runChallengerShadowLog(now: Date = new Date()): Promise<Ch
   const sonuc: ChallengerShadowLogResult = { racesChecked: races.length, racesProcessed: 0, runsWritten: 0, errors: [] };
 
   for (const race of races) {
+    if (opts.maksMs && Date.now() - t0 > opts.maksMs) { sonuc.sureAsimi = true; break; }
     try {
       const faz1 = await gatherFaz1V5(race.id);
       if (!faz1 || faz1.runners.length < 2) continue;

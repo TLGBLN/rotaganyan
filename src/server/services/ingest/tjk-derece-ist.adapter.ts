@@ -95,7 +95,7 @@ async function fetchSayfa(yil: number, sehirId: number, sayfaNo: number): Promis
   return kayitlar;
 }
 
-export type DereceIstSyncSonuc = { yil: number; toplamSayfa: number; kayitSayisi: number; hataSayfaSayisi: number };
+export type DereceIstSyncSonuc = { yil: number; toplamSayfa: number; kayitSayisi: number; hataSayfaSayisi: number; islenenSehirSayisi?: number; atlananSehirSayisi?: number };
 
 function bekle(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -193,26 +193,42 @@ async function senkronizeEtSehir(yil: number, sehirId: number): Promise<{ kayitl
  * TjkDereceKaydi'ne upsert eder. ŞehirId'siz/-1 sorgu TJK tarafında sessizce ~10.650
  * sonuçta kesiliyor — bkz. dosya başlığındaki 2026-11-07 notu.
  */
-export async function syncDereceIstatistikleri(yil: number): Promise<DereceIstSyncSonuc> {
-  const sehirIdler = Object.values(IDMAN_SEHIR_ID);
-  const tumKayitlar: Kayit[] = [];
+/**
+ * 2026-11-13 KÖK NEDEN DÜZELTMESİ — eski sürüm TÜM şehirleri belleğe çekip YAZMAYI EN SONA bırakıyordu (10 şehir × ~210 sayfa ≈ 2.100+ istek +
+ * ~100 bin kimlikli tek IN sorgusu). Bu, tek bir çağrının 800 sn sınırına sığmıyordu: fonksiyon öldürülünce HİÇBİR kayıt yazılmıyor, arşiv
+ * 06 Kasım'da takılı kalıyor, 'arşiv 2 günden eski' koşulu sürekli onarımı tetikliyordu (AGF cron'unu da 13 dk'da düşürüyordu).
+ * Artık: (1) her şehir TAMAMLANIR TAMAMLANMAZ yazılır (kısmi ilerleme kaybolmaz), (2) süre bütçesi (varsayılan 540 sn) dolunca yeni şehre
+ * başlanmaz, (3) başlangıç şehri günlük dönüşümlüdür — bir çağrıya sığmayan şehirler ertesi günlerde sırayla yakalanır.
+ */
+export async function syncDereceIstatistikleri(yil: number, opts: { maksMs?: number } = {}): Promise<DereceIstSyncSonuc> {
+  const t0 = Date.now();
+  const maksMs = opts.maksMs ?? 540_000;
+  const tumSehirler = Object.values(IDMAN_SEHIR_ID);
+  const kayma = Math.floor(Date.now() / 86_400_000) % tumSehirler.length;
+  const sehirIdler = [...tumSehirler.slice(kayma), ...tumSehirler.slice(0, kayma)];
   let toplamSayfa = 0;
   let hataSayfaSayisi = 0;
+  let kayitSayisi = 0;
+  let islenen = 0;
+  let atlanan = 0;
 
   for (const sehirId of sehirIdler) {
+    if (Date.now() - t0 > maksMs) { atlanan++; continue; }
     const sonuc = await senkronizeEtSehir(yil, sehirId);
-    tumKayitlar.push(...sonuc.kayitlar);
+    await kayitlariYaz(sonuc.kayitlar);
+    kayitSayisi += sonuc.kayitlar.length;
     toplamSayfa += sonuc.toplamSayfa;
     hataSayfaSayisi += sonuc.hataSayfaSayisi;
+    islenen++;
     await bekle(300);
   }
 
-  // 2026-11-07 kullanıcı bulgusu: "eksikleri tespit edip sadece eksikleri çekseydin" —
-  // fetch tarafında (hangi sayfanın eksik olduğunu önceden bilemediğimiz için) tam
-  // şehir taraması zaten gerekli, ama YAZMA tarafında zaten DEĞİŞMEMİŞ kayıtları tekrar
-  // tekrar upsert etmenin anlamı yok. Mevcut kayıtları tjkKayitId+atAdi'ye göre TEK bir
-  // toplu sorguyla çekip, içerik birebir aynıysa upsert'ten tamamen çıkarıyoruz —
-  // Supabase'e yazma yükü yalnızca GERÇEKTEN yeni/değişmiş kayıtlar kadar oluyor.
+  return { yil, toplamSayfa, kayitSayisi, hataSayfaSayisi, islenenSehirSayisi: islenen, atlananSehirSayisi: atlanan };
+}
+
+/** Bir şehrin kayıtlarını DEĞİŞENLERİ ayıklayarak yazar (2026-11-07: aynı içerikli kayıtlar tekrar upsert edilmez). */
+async function kayitlariYaz(tumKayitlar: Kayit[]): Promise<void> {
+  if (tumKayitlar.length === 0) return;
   const mevcutlar = await db.tjkDereceKaydi.findMany({
     where: { tjkKayitId: { in: tumKayitlar.map((k) => k.tjkKayitId) } },
     select: { tjkKayitId: true, atAdi: true, tarih: true, kilo: true, irk: true, cinsiyet: true, yil: true, hipodrom: true, pist: true, pistDurumu: true, mesafe: true, derece: true, cinsAdi: true },
@@ -243,6 +259,4 @@ export async function syncDereceIstatistikleri(yil: number): Promise<DereceIstSy
       )
     );
   }
-
-  return { yil, toplamSayfa, kayitSayisi: tumKayitlar.length, hataSayfaSayisi };
 }
