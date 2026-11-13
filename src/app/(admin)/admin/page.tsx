@@ -23,8 +23,8 @@ import PendingList from "@/components/admin/PendingList";
 import AdminRefresh from "@/components/admin/AdminRefresh";
 import ArchiveStatsWidget from "@/components/admin/ArchiveStatsWidget";
 import GunlukBasariPanel from "@/components/admin/GunlukBasariPanel";
-import { ModelGenelGorunumu, SurumKarsilastirma, TipPerformansi, KalibrasyonKarti, BankoKarti, KuponPerformansi, SinyalSagligi, VeriGuncelligi } from "@/components/admin/izleme/IzlemeBolumleri";
-import { Bolum, IcgoruBandi } from "@/components/admin/izleme/ui";
+import { DurumOzeti, modelIsigi, kuponIsigi, veriIsigi, ModelGenelGorunumu, SurumKarsilastirma, TipPerformansi, KalibrasyonKarti, BankoKarti, KuponPerformansi, SinyalSagligi, VeriGuncelligi } from "@/components/admin/izleme/IzlemeBolumleri";
+import { Bolum, IcgoruBandi, KatlanirGrup } from "@/components/admin/izleme/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -91,36 +91,44 @@ export default async function AdminDashboard() {
         </span>
       </div>
 
-      {/* ── 1-2) Model durumu ve canlı performans (gerçek, güncel veri) ─────────────── */}
-      {izleme ? (
-        <>
-          <ModelGenelGorunumu v={izleme} />
-          <SurumKarsilastirma v={izleme} />
-          <TipPerformansi v={izleme} />
-          <KalibrasyonKarti v={izleme} />
-          <BankoKarti v={izleme} />
-        </>
-      ) : (
-        <Bolum baslik="Model İzleme" aciklama="Canlı izleme verisi şu anda hesaplanamadı.">
-          <IcgoruBandi ton="kirmizi">İzleme servisi hata verdi (sunucu günlüğüne yazıldı). Sayfanın geri kalanı çalışıyor; birkaç dakika sonra yenileyin.</IcgoruBandi>
-        </Bolum>
-      )}
+      {/* ── 0) Tek bakışta durum: üç trafik ışığı ───────────────────────── */}
+      <DurumOzeti v={izleme} k={kuponTutma} />
 
-      {/* ── 3) Kupon ─────────────────────────────────────────────────── */}
-      {kuponTutma && <KuponPerformansi k={kuponTutma} />}
-      <AylikKuponKazanciCard aylar={aylikKuponKazanci} />
-      <GunlukBasariPanel ozet={gunlukBasariOzeti} />
+      {/* ── Detay grupları (kapalı gelir; ışığı yeşil/altın olmayan alanı açıp bakın) ── */}
+      <KatlanirGrup baslik="Model Detayı" aciklama="Genel görünüm, sürüm karşılaştırması, koşu tipi, kalibrasyon, banko" ton={modelIsigi(izleme).ton}>
+        {izleme ? (
+          <>
+            <ModelGenelGorunumu v={izleme} />
+            <SurumKarsilastirma v={izleme} />
+            <TipPerformansi v={izleme} />
+            <KalibrasyonKarti v={izleme} />
+            <BankoKarti v={izleme} />
+          </>
+        ) : (
+          <Bolum baslik="Model İzleme" aciklama="Canlı izleme verisi şu anda hesaplanamadı.">
+            <IcgoruBandi ton="kirmizi">İzleme servisi hata verdi (sunucu günlüğüne yazıldı). Sayfanın geri kalanı çalışıyor; birkaç dakika sonra yenileyin.</IcgoruBandi>
+          </Bolum>
+        )}
+      </KatlanirGrup>
 
-      {/* ── 4) Sinyal sağlığı + veri güncelliği ───────────────────────── */}
-      {izleme && <SinyalSagligi v={izleme} />}
-      {izleme && <VeriGuncelligi v={izleme} />}
+      <KatlanirGrup baslik="Kupon Detayı" aciklama="Son 30 gün tutma oranı ve kazanç, aylık kupon kazancı, günlük başarı" ton={kuponIsigi(kuponTutma).ton}>
+        {kuponTutma && <KuponPerformansi k={kuponTutma} />}
+        <AylikKuponKazanciCard aylar={aylikKuponKazanci} />
+        <GunlukBasariPanel ozet={gunlukBasariOzeti} />
+      </KatlanirGrup>
 
-      {/* ── 5) Operasyon ─────────────────────────────────────────────── */}
-      <ArchiveStatsWidget {...archiveStats} />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2"><RecentFeed predictions={recentPredictions} /></div>
-        <PendingList pending={pendingPredictions} />
-      </div>
+      <KatlanirGrup baslik="Sinyal ve Veri Sağlığı" aciklama="Her sinyalin canlı gözlem oranı, AGF/sonuç/tahmin güncelliği" ton={veriIsigi(izleme).ton}>
+        {izleme && <SinyalSagligi v={izleme} />}
+        {izleme && <VeriGuncelligi v={izleme} />}
+      </KatlanirGrup>
+
+      <KatlanirGrup baslik="Operasyon" aciklama="Arşiv kapsamı, son tahminler, sonuç bekleyenler">
+        <ArchiveStatsWidget {...archiveStats} />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2"><RecentFeed predictions={recentPredictions} /></div>
+          <PendingList pending={pendingPredictions} />
+        </div>
+      </KatlanirGrup>
 
       {/* ── 6) Geçmiş dönem (V5, farklı modeller karışık) — kapalı ───────────────── */}
       <details className="group rounded-2xl border bg-card p-4 shadow-sm sm:p-5">

@@ -144,3 +144,24 @@ export function SatirDeger({ etiket, deger, alt, ton }: { etiket: string; deger:
     </div>
   );
 }
+
+/** Kapalı gelen detay grubu: başlık kartı (altın şerit + durum noktası) tıklanınca içindeki bölümler açılır. JS gerektirmez (<details>). */
+export function KatlanirGrup({ baslik, aciklama, ton, children, acik }: { baslik: string; aciklama?: string; ton?: Ton; children: ReactNode; acik?: boolean }) {
+  return (
+    <details className="group" open={acik}>
+      <summary className="flex cursor-pointer list-none items-center gap-3 rounded-2xl border bg-card px-4 py-3 shadow-sm marker:hidden sm:px-5 [&::-webkit-details-marker]:hidden">
+        <span aria-hidden className="inline-block h-4 w-1 shrink-0 rounded-full bg-brand sm:h-5" />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2 text-base font-bold sm:text-lg">
+            {baslik}
+            {ton && <span aria-hidden className={cn("h-2.5 w-2.5 rounded-full", TON_NOKTA[ton])} />}
+          </span>
+          {aciklama && <span className="mt-0.5 block text-xs text-muted-foreground">{aciklama}</span>}
+        </span>
+        <span aria-hidden className="shrink-0 text-xs text-muted-foreground group-open:hidden">aç ▾</span>
+        <span aria-hidden className="hidden shrink-0 text-xs text-muted-foreground group-open:inline">kapat ▴</span>
+      </summary>
+      <div className="mt-3 space-y-5">{children}</div>
+    </details>
+  );
+}

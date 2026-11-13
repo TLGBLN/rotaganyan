@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement, type FunctionComponent } from "react";
-import { ModelGenelGorunumu, SurumKarsilastirma, TipPerformansi, KalibrasyonKarti, BankoKarti, KuponPerformansi, SinyalSagligi, VeriGuncelligi } from "./IzlemeBolumleri";
+import { DurumOzeti, modelIsigi, kuponIsigi, veriIsigi, ModelGenelGorunumu, SurumKarsilastirma, TipPerformansi, KalibrasyonKarti, BankoKarti, KuponPerformansi, SinyalSagligi, VeriGuncelligi } from "./IzlemeBolumleri";
 import { dilimOzeti, kalibrasyon, bankoOzeti, normalize, tipGrubu, TIP_GRUPLARI, type YarisKaydi } from "@/lib/izleme/metrikler";
 import { MODEL_SURUMLERI } from "@/lib/izleme/model-surumleri";
 import type { IzlemeVerisi } from "@/server/services/izleme.service";
@@ -67,5 +67,38 @@ describe("izleme bölümleri — render", () => {
   it("kupon performansı: kademe kartları, boş kademede NaN sızmaz", () => {
     const s = html(KuponPerformansi, { k: kupon });
     expect(s).toContain("Ekonomik"); expect(s).toContain("12/99"); expect(s).toContain("kayıtsız"); temiz(s);
+  });
+});
+
+
+describe("durum özeti — ışık kuralları", () => {
+  const simdi = Date.now();
+  const saglikliSinyaller = [{ kod: "hpRel", beta: 0.38, egitimZ: 9, n7: 100, obs7: 90, n30: 400, obs30: 380, katki7: 0.4 }];
+
+  it("model: güncel sürümde az koşu → altın 'Henüz erken'; veri yoksa gri", () => {
+    expect(modelIsigi(ornek(0, 30))).toMatchObject({ ton: "altin", etiket: "Henüz erken" });
+    expect(modelIsigi(null)).toMatchObject({ ton: "gri" });
+  });
+  it("kupon: geçmişle uyumlu → yeşil; geçmişin çok altı → kırmızı; az kupon → altın; veri yok → gri", () => {
+    expect(kuponIsigi(kupon)).toMatchObject({ ton: "yesil" });
+    const kotu: KuponTutma = { ...kupon, kademeler: kupon.kademeler.map((x) => (x.anahtar === "ekonomik" ? { ...x, tuttu: 1, aralik: { oran: 0.01, lo: 0.0, hi: 0.055 } } : x)) };
+    expect(kuponIsigi(kotu)).toMatchObject({ ton: "kirmizi" });
+    const az: KuponTutma = { ...kupon, kademeler: kupon.kademeler.map((x) => ({ ...x, n: 5 })) };
+    expect(kuponIsigi(az)).toMatchObject({ ton: "altin" });
+    expect(kuponIsigi(null)).toMatchObject({ ton: "gri" });
+  });
+  it("veri: taze AGF + sağlıklı sinyal → yeşil; 5 saatlik AGF → altın; 13 saatlik AGF → kırmızı; 3 sinyal düşüşü → kırmızı", () => {
+    const v = (agfDk: number, sinyaller = saglikliSinyaller): IzlemeVerisi => ({ ...ornek(0, 0), sinyaller, veri: { ...ornek(0, 0).veri, sonAgf: new Date(simdi - agfDk * 60_000).toISOString() } });
+    expect(veriIsigi(v(10)).ton).toBe("yesil");
+    expect(veriIsigi(v(300)).ton).toBe("altin");
+    expect(veriIsigi(v(13 * 60)).ton).toBe("kirmizi");
+    const dusus = (kod: string) => ({ kod, beta: 0.1, egitimZ: 5, n7: 100, obs7: 50, n30: 400, obs30: 380, katki7: 0.1 });
+    expect(veriIsigi(v(10, [dusus("hpRel"), dusus("kgsLog"), dusus("fMean")])).ton).toBe("kirmizi");
+    expect(veriIsigi(v(10, [dusus("hpRel")])).ton).toBe("altin");
+  });
+  it("DurumOzeti: üç kart + genel bant render olur, boş veride de çöker değil", () => {
+    const s = html(DurumOzeti, { v: ornek(0, 30), k: kupon });
+    expect(s).toContain("Model"); expect(s).toContain("Kuponlar"); expect(s).toContain("Veri ve Sistem"); expect(s).toContain("Ayrıntı"); temiz(s);
+    temiz(html(DurumOzeti, { v: null, k: null }));
   });
 });

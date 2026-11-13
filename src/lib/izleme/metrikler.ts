@@ -143,3 +143,12 @@ export function degerlendir(fark: { m: number; lo: number; hi: number } | null, 
   if (fark.hi < cvFark) return "iyi";
   return "beklenen";
 }
+
+export type SinyalDurumu = "ok" | "dusus" | "veriYok" | "yediGunYok";
+/** Bir sinyalin canlı gözlem durumu: son 30 günde hiç kayıt yok → veriYok; son 7 günde yok → yediGunYok; 7 günlük gözlem oranı
+ *  30 günlüğün 10+ puan altındaysa → dusus (veri kaynağı bozulmuş olabilir). Tablo ve Durum Özeti AYNI kuralı kullanır. */
+export function sinyalDurumu(s: { n7: number; obs7: number; n30: number; obs30: number } | undefined): SinyalDurumu {
+  if (!s || s.n30 === 0) return "veriYok";
+  if (s.n7 === 0) return "yediGunYok";
+  return s.obs7 / s.n7 < s.obs30 / s.n30 - 0.1 ? "dusus" : "ok";
+}

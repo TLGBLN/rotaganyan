@@ -3,8 +3,10 @@ import safW from "@/lib/methodology/weights/v546-1-saf-weights.json";
 import type { IzlemeVerisi } from "@/server/services/izleme.service";
 import type { KuponTutma } from "@/server/services/kupon-tutma.service";
 import { EGITIM_Z } from "@/lib/izleme/model-surumleri";
-import { degerlendir, type DilimOzeti, type Aralik, type KalibrasyonKutusu } from "@/lib/izleme/metrikler";
-import { Bolum, KpiIzgara, KpiKaro, Cip, HuniSatiri, IcgoruBandi, RenkliBaslikKarti, SatirDeger, yuzde, sayi, isaretli, para, zamanOnce, type Ton } from "./ui";
+import { degerlendir, sinyalDurumu, type DilimOzeti, type Aralik, type KalibrasyonKutusu } from "@/lib/izleme/metrikler";
+import { Bolum, KpiIzgara, KpiKaro, Cip, HuniSatiri, IcgoruBandi, RenkliBaslikKarti, SatirDeger, TON_NOKTA, TON_METIN, yuzde, sayi, isaretli, para, zamanOnce, type Ton } from "./ui";
+import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
 import SiralanabilirTablo, { type TabloSatiri, type Sutun, type Hucre } from "./SiralanabilirTablo";
 
 const PIYASA_CV_LL = 1.877; // piyasa (son AGF) zaman-CV LogLoss'u — modelin CV farkı bununla hesaplanır
@@ -216,10 +218,11 @@ export function SinyalSagligi({ v }: { v: IzlemeVerisi }) {
   const satirlar: TabloSatiri[] = kodlar.map((kod) => {
     const s = harita.get(kod); const segmentOnly = !modelKodlari.includes(kod);
     const o7 = s && s.n7 ? s.obs7 / s.n7 : null, o30 = s && s.n30 ? s.obs30 / s.n30 : null;
+    const sd = sinyalDurumu(s);
     let durum: { m: string; t: Ton };
-    if (!s || s.n30 === 0) { durum = { m: "Veri yok", t: "gri" }; if (!segmentOnly) veriYok.push(kod); }
-    else if (o7 == null) durum = { m: "7g yok", t: "gri" };
-    else if (o30 != null && o7 < o30 - 0.1) { durum = { m: "Düşüş", t: "kirmizi" }; dusus++; }
+    if (sd === "veriYok") { durum = { m: "Veri yok", t: "gri" }; if (!segmentOnly) veriYok.push(kod); }
+    else if (sd === "yediGunYok") durum = { m: "7g yok", t: "gri" };
+    else if (sd === "dusus") { durum = { m: "Düşüş", t: "kirmizi" }; dusus++; }
     else durum = { m: "OK", t: "yesil" };
     const z = EGITIM_Z[kod] ?? null;
     return {
@@ -261,3 +264,86 @@ export function VeriGuncelligi({ v }: { v: IzlemeVerisi }) {
   );
 }
 
+
+/* ───────────────────────── 0) DURUM ÖZETİ (üç trafik ışığı) ───────────────────────── */
+/** Kupon tutma oranı referansı: 2026 Temmuz–Kasım, 340 sonuçlanmış Altılı kupon (HomeKupon geçmişi). Yeni kupon mantığı gelirse güncelle. */
+export const KUPON_REFERANS = { ekonomik: 0.088, normal: 0.141, genis: 0.179 } as const;
+
+type Isik = { ton: Ton; etiket: string; cumle: ReactNode; ayrinti: string };
+
+export function modelIsigi(v: IzlemeVerisi | null): Isik {
+  if (!v) return { ton: "gri", etiket: "Hesaplanamadı", cumle: "Canlı izleme verisi şu an alınamadı.", ayrinti: "Model Detayı" };
+  const guncel = v.surumler[v.surumler.length - 1];
+  const k = guncel.ozet.n >= 20 ? guncel.ozet : v.eraToplam;
+  const cv = guncel.cv;
+  const cvFark = cv ? cv.logLoss - PIYASA_CV_LL : NaN;
+  const durum = degerlendir(k.fark, k.nPiyasa, cvFark);
+  const sayilar = <>İlk 3: <b>{yuzde(k.model?.top3)}</b> (eğitim beklentisi {yuzde(cv?.top3)}); piyasa farkı <b>{isaretli(k.fark?.m)}</b> (beklenti {isaretli(cvFark)}).</>;
+  if (durum === "yetersiz") return { ton: "altin", etiket: "Henüz erken", cumle: <>Piyasa karşılaştırmalı <b>{k.nPiyasa}</b> koşu var, hüküm için ~150 gerekiyor (≈{Math.ceil(Math.max(0, 150 - k.nPiyasa) / 25)} gün). {sayilar}</>, ayrinti: "Model Detayı" };
+  if (durum === "kotu") return { ton: "kirmizi", etiket: "Beklentinin altında", cumle: <>Canlı performans eğitimdekinden belirgin kötü; veri kayması araştırılmalı. {sayilar}</>, ayrinti: "Model Detayı" };
+  if (durum === "iyi") return { ton: "yesil", etiket: "Beklentiden iyi", cumle: sayilar, ayrinti: "Model Detayı" };
+  return { ton: "yesil", etiket: "Beklenen gibi", cumle: sayilar, ayrinti: "Model Detayı" };
+}
+
+export function kuponIsigi(k: KuponTutma | null): Isik {
+  if (!k) return { ton: "gri", etiket: "Hesaplanamadı", cumle: "Kupon verisi şu an alınamadı.", ayrinti: "Kupon Detayı" };
+  const ref = [KUPON_REFERANS.ekonomik, KUPON_REFERANS.normal, KUPON_REFERANS.genis];
+  const satir = k.kademeler.map((x) => `${x.ad} ${x.tuttu}/${x.n} (${yuzde(x.aralik.oran, 0)})`).join(" · ");
+  const cumle = <>Son {k.gunSayisi} gün: {satir}. Geçmiş ortalama {yuzde(ref[0])} / {yuzde(ref[1])} / {yuzde(ref[2])}. Net&apos;in eksi olması beklenir (piyasa payı); tutma oranına bakın.</>;
+  const yeterli = k.kademeler.map((x) => x.n >= 20 && Number.isFinite(x.aralik.lo));
+  if (!yeterli.some(Boolean)) return { ton: "altin", etiket: "Henüz erken", cumle, ayrinti: "Kupon Detayı" };
+  const kotu = k.kademeler.some((x, i) => yeterli[i] && x.aralik.hi < ref[i]);
+  const iyi = k.kademeler.some((x, i) => yeterli[i] && x.aralik.lo > ref[i]);
+  if (kotu) return { ton: "kirmizi", etiket: "Geçmiş ortalamanın altında", cumle, ayrinti: "Kupon Detayı" };
+  return { ton: "yesil", etiket: iyi ? "Geçmişten iyi" : "Geçmişle uyumlu", cumle, ayrinti: "Kupon Detayı" };
+}
+
+export function veriIsigi(v: IzlemeVerisi | null): Isik {
+  if (!v) return { ton: "gri", etiket: "Hesaplanamadı", cumle: "Veri sağlığı şu an hesaplanamadı.", ayrinti: "Sinyal ve Veri Sağlığı" };
+  const agf = zamanOnce(v.veri.sonAgf);
+  const modelKodlari = (safW as { featureNames: string[] }).featureNames;
+  const harita = new Map(v.sinyaller.map((s) => [s.kod, s]));
+  const dusenler = modelKodlari.filter((kod) => sinyalDurumu(harita.get(kod)) === "dusus");
+  const henuzYok = modelKodlari.filter((kod) => sinyalDurumu(harita.get(kod)) === "veriYok").length;
+  const agfKotu = agf.dakika == null || agf.dakika > 720, agfOrta = agf.dakika != null && agf.dakika > 180 && agf.dakika <= 720;
+  const ton: Ton = agfKotu || dusenler.length >= 3 ? "kirmizi" : agfOrta || dusenler.length >= 1 ? "altin" : "yesil";
+  const etiket = ton === "kirmizi" ? "Dikkat gerekiyor" : ton === "altin" ? "Küçük sapma" : "Sağlıklı";
+  return {
+    ton, etiket, ayrinti: "Sinyal ve Veri Sağlığı",
+    cumle: <>AGF senkronu <b>{agf.metin}</b>; {dusenler.length ? <><b>{dusenler.length}</b> sinyalde gözlem oranı düştü ({dusenler.slice(0, 3).join(", ")}{dusenler.length > 3 ? "…" : ""})</> : "sinyal gözlem oranlarında düşüş yok"}{henuzYok > 0 ? <> · {henuzYok} model sinyali henüz canlı kayıtta görülmedi (yeni sürümün ilk tahminleriyle dolar)</> : null}.</>,
+  };
+}
+
+function IsikKarti({ baslik, isik }: { baslik: string; isik: Isik }) {
+  return (
+    <div className="min-w-0 rounded-xl border bg-card p-4">
+      <div className="flex items-center gap-3">
+        <span aria-hidden className={cn("h-5 w-5 shrink-0 rounded-full ring-4 ring-offset-0", TON_NOKTA[isik.ton], isik.ton === "yesil" && "ring-hit/20", isik.ton === "altin" && "ring-brand/25", isik.ton === "kirmizi" && "ring-miss/20", isik.ton === "gri" && "ring-muted")} />
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{baslik}</div>
+          <div className={cn("text-lg font-bold leading-tight", TON_METIN[isik.ton])}>{isik.etiket}</div>
+        </div>
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-foreground/90 [&_b]:font-bold">{isik.cumle}</p>
+      <p className="mt-2 text-[11px] text-muted-foreground">Ayrıntı: aşağıda “{isik.ayrinti}” ▾</p>
+    </div>
+  );
+}
+
+export function DurumOzeti({ v, k }: { v: IzlemeVerisi | null; k: KuponTutma | null }) {
+  const m = modelIsigi(v), p = kuponIsigi(k), d = veriIsigi(v);
+  const hepsi = [m, p, d];
+  const kirmizi = hepsi.filter((x) => x.ton === "kirmizi").length, altin = hepsi.filter((x) => x.ton === "altin").length;
+  return (
+    <Bolum baslik="Durum Özeti" aciklama="Üç soru: model piyasaya göre beklendiği gibi mi, kuponlar geçmişle uyumlu mu, veri hattı sağlıklı mı? Yeşil = iyi, altın = erken ya da küçük sapma, kırmızı = bakılması gerekir.">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <IsikKarti baslik="Model" isik={m} />
+        <IsikKarti baslik="Kuponlar" isik={p} />
+        <IsikKarti baslik="Veri ve Sistem" isik={d} />
+      </div>
+      {kirmizi > 0 ? <IcgoruBandi ton="kirmizi"><b>{kirmizi} alanda uyarı var</b> — kırmızı kartın altındaki detay grubunu açın.</IcgoruBandi>
+        : altin > 0 ? <IcgoruBandi ton="altin">Şu an kırmızı bir uyarı yok. Altın kartlar &ldquo;henüz hüküm için erken&rdquo; ya da küçük sapma demek; yeni model sürümüyle veri biriktikçe netleşir.</IcgoruBandi>
+        : <IcgoruBandi ton="yesil"><b>Her şey beklendiği gibi.</b> Model, kuponlar ve veri hattı normal aralıkta.</IcgoruBandi>}
+    </Bolum>
+  );
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalize, yarisMetrik, wilson, bootstrapAralik, dilimOzeti, kalibrasyon, tipGrubu, alanBuyuklugu, bankoOzeti, degerlendir, type YarisKaydi } from "./metrikler";
+import { normalize, yarisMetrik, wilson, bootstrapAralik, dilimOzeti, kalibrasyon, tipGrubu, alanBuyuklugu, bankoOzeti, degerlendir, sinyalDurumu, type YarisKaydi } from "./metrikler";
 
 const kayit = (kaz: number, model: Record<string, number>, piyasa: Record<string, number> | null = null, extra: Partial<YarisKaydi> = {}): YarisKaydi => ({
   raceId: "r" + Math.random(), tarih: "2026-11-13", hip: "Test", raceNo: 1, classType: "Handikap 15", surum: "S", alanBuyuklugu: Object.keys(model).length,
@@ -78,5 +78,15 @@ describe("yardımcılar", () => {
     expect(degerlendir({ m: 0.0, lo: -0.1, hi: 0.1 }, 200, 0.128)).toBe("iyi");
     expect(degerlendir({ m: 0.12, lo: 0.05, hi: 0.2 }, 200, 0.128)).toBe("beklenen");
     expect(degerlendir(null, 500, 0.128)).toBe("yetersiz");
+  });
+});
+
+describe("sinyalDurumu", () => {
+  it("veri yok / 7 gün yok / düşüş / ok", () => {
+    expect(sinyalDurumu(undefined)).toBe("veriYok");
+    expect(sinyalDurumu({ n7: 0, obs7: 0, n30: 0, obs30: 0 })).toBe("veriYok");
+    expect(sinyalDurumu({ n7: 0, obs7: 0, n30: 100, obs30: 90 })).toBe("yediGunYok");
+    expect(sinyalDurumu({ n7: 100, obs7: 70, n30: 400, obs30: 380 })).toBe("dusus");
+    expect(sinyalDurumu({ n7: 100, obs7: 90, n30: 400, obs30: 380 })).toBe("ok");
   });
 });
