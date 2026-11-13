@@ -752,7 +752,7 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
     versiyon: "RotaGanyan Analiz Motoru",
     ana: "V5",
     baslangic: new Date("2026-11-12T20:30:00+03:00"),
-    bitis: new Date("2026-11-13T11:02:56+03:00"), // 22 özellik + lateMinN 2
+    bitis: new Date("2026-11-13T11:39:14+03:00"), // 22 özellik + lateMinN 2
     aciklama: "Ankara 12.11 K8 (DERBY WARRIOR, AGF %75, model 7./9.) vakasından tetiklenen eksik-sinyal denetimi. (1) Accurace yüzey kuralı: eskiden pist uyuşmayan geçmiş koşu ağırlık 0 alıyordu (yalnız Sentetik'te koşmuş at Çim'de tüm Accurace kanıtını kaybediyordu); artık farklı yüzey yarım ağırlık (AYAR.yuzeyModu YUMUSAK) — residual/z sinyalleri zaten kendi yüzeylerine göre normalize. (2) Varsayılan modele 6 yeni sinyal: jokeyPIT (jokey seviyesi), antrenorPIT (antrenör seviyesi), galopKalite, lastWon (son yarışını kazandı mı), hpRel (TJK handikap puanı, sahaya göre), kiloRel (taşınan kilo, sahaya göre). Jokey/antrenör seviyesi point-in-time: yalnız yarış tarihinden önceki, kendi Runner/Result kayıtlarından, son 365 gün, k=20 shrink, karma/yurt dışı hariç (pit-seviye.actions.ts, 30 dk önbellek). TrainerStatSync/JockeyStatSync bilerek KULLANILMADI: üzerine yazılan anlık görüntü, geçmiş yarışlar için hindsight sızıntısı (sızıntılı antrenör sürümü ΔLogLoss -0.086, PIT sürümü -0.028 verdi).",
     neyiAnalizEdiyor: [
       "Banko adayı (otomatik, banko-adayi.ts): tip-bazlı KALİBRE olasılık ≥%40. Handikap kalibre olasılığı CV'de hiç eşiğe ulaşmadı (model aşırı güvenli); Maiden/ŞARTLI 1/19/27 segment modellerinde kalibrasyon ölçülmediği için banko verilmez. CV: eşiği geçen küme n≈44, isabet ≈%50.",
@@ -768,7 +768,7 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "RotaGanyan Analiz Motoru",
     ana: "V5",
-    baslangic: new Date("2026-11-13T11:02:56+03:00"),
+    baslangic: new Date("2026-11-13T11:39:14+03:00"),
     bitis: null,
     aciklama: "Saf Model'e (varsayılan model) 3 ham program alanı sinyali eklendi → 25 özellik: fMean (Runner.recentForm son 6 yarış derecesinin ortalaması; '0' hanesi 10 sayılır), kgsLog (log(1+TJK KGS)), sexE (yaş alanının 3. kelimesi 'e' mi). Tetikleyen bulgu: 'piyasa ne görüyor' testi — kitle atın son 6 yarıştaki derecesini fiyatlıyor (piyasa görüşünün açıklanabilen kısmında en büyük payı form satırı aldı: çıkarınca R² -0.111), 22 sinyalde karşılığı yoktu (yalnız lastWon). Maiden/ŞARTLI 19 ve ŞARTLI 1/27 segment modelleri DEĞİŞMEDİ; yeni sinyaller yalnız varsayılan modelin featureNames'inde. Banko Platt katsayıları yeni olasılıklara göre yeniden fit edildi (banko-adayi.ts).",
     neyiAnalizEdiyor: [

@@ -150,7 +150,7 @@ async function handlePost(req: NextRequest) {
             tip: "notr",
             guven: "tam",
             kodGarantili: true,
-            aciklama: `Saf Model (15 özellik, resmi motor) teknik sıra: ${p.rank}`,
+            aciklama: `Saf Model (${p.features.length} özellik, resmi motor) teknik sıra: ${p.rank}`,
           },
           {
             kod: ["OLASILIK"],

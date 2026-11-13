@@ -5,6 +5,8 @@ import { defineConfig } from "vitest/config";
 // birlikte eklendi. tsconfig.json'daki "@/*" -> "./src/*" alias'ını vitest'e de tanıtır,
 // yoksa src içindeki modüller (v5-engine.ts gibi) "@/..." importlarında çözülemiyor.
 export default defineConfig({
+  // tsconfig jsx="preserve" (Next için) — vitest'te bileşen render testleri otomatik JSX dönüşümü ister.
+  oxc: { jsx: { runtime: "automatic" } },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
