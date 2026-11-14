@@ -31,7 +31,12 @@
 //   ...arac-tam-at-inceleme.mts --hipodrom bursa --tarih 2026-08-31 --kosu 4   (tek koşu)
 //   ...arac-tam-at-inceleme.mts --hipodrom bursa --tarih 2026-08-31            (o günün TÜM sonuçlanmamış koşuları)
 import { db } from "./src/lib/db";
-import { gatherFaz1V5, faz2V5Sirala, toFeatureVector, tumOzellikleriListele } from "./src/lib/methodology/v5-engine";
+// 2026-11-14 — SKOR KAYNAĞI GERÇEK CANLI MOTOR: scoreV461Saf (AGF'siz Koşullu Logit, segment-routing
+// dahil: ŞARTLI 1/27=4 sinyal, Maiden/ŞARTLI 19=8 sinyal, diğerleri=25 sinyal). Eskiden bu araç ölü
+// v5-engine.ts'i (AGF'li 13 girdi) çağırıyordu (2026-11-11 bulgusu) ve sitenin hiç kullanmadığı bir
+// skoru döküyordu. Pedigri/sahiplik/istatistik/Accurace/galop bölümleri motordan bağımsız, aynen duruyor.
+import { scoreV461Saf } from "./src/lib/methodology/v546-1-engine";
+import safW from "./src/lib/methodology/weights/v546-1-saf-weights.json";
 import { getHizliOzet } from "./src/server/actions/hizli-ozet.actions";
 import { getSonYarisDetaylariForRace } from "./src/server/actions/son-yaris-detay.actions";
 import { getHorseHistory } from "./src/server/actions/horse-detail.actions";
@@ -61,16 +66,6 @@ function raceStyleToTempoProfili(raw: unknown): AtTempoProfili | null {
   if (!r?.dagilim) return null;
   return { dagilim: r.dagilim, erkenHizGucu: r.erkenHizGucu ?? null, n: r.veri ?? 0 };
 }
-
-// 2026-09-12 (V5.46) — kgsVarMi/kacakYalniz/h2hKiloDegisimi toFeatureVector'dan çıktı,
-// takiEklendiMi+takiCikarildiMi tek sinyale (takiDegisikligi) birleşti — bu liste
-// v5-engine.ts'in GERÇEK toFeatureVector sırasıyla BİREBİR eşleşmeli, yoksa aşağıdaki
-// tablo yanlış isim/sütuna yanlış değer eşler (ya da "undefined" basar).
-const A_KATMANI_ADLARI = [
-  "agfSirasi", "idmJokey", "jokeyOrani", "antrenorOrani",
-  "agfPayi", "h2hNetSkor", "hizDerecesi", "agfPayi2", "zeminToleransi",
-  "yakinsama2Plus", "sonIdmanSprint", "takiDegisikligi", "yarisGidisatiSkoru",
-];
 
 function get(argv: string[], bayrak: string) {
   const i = argv.indexOf(bayrak);
@@ -166,10 +161,9 @@ async function atinGalopSplitleri(runnerId: string): Promise<string[]> {
 }
 
 async function tekKosuIsle(raceId: string) {
-  const faz1 = await gatherFaz1V5(raceId);
-  if (!faz1) { console.log(`(${raceId}) Faz1 verisi alınamadı — atlanıyor.`); return; }
-  const sirali = faz2V5Sirala(faz1);
-  if (sirali.length === 0) { console.log(`(${raceId}) At yok — atlanıyor.`); return; }
+  const saf = await scoreV461Saf(raceId, safW as unknown as Parameters<typeof scoreV461Saf>[1]);
+  if (!saf) { console.log(`(${raceId}) Motor verisi alınamadı — atlanıyor.`); return; }
+  if (saf.picks.length === 0) { console.log(`(${raceId}) At yok — atlanıyor.`); return; }
 
   const ozetSatirlari = await getHizliOzet(raceId).catch(() => []);
   const ozetByName = new Map(ozetSatirlari.map((o) => [o.name, o]));
@@ -184,11 +178,23 @@ async function tekKosuIsle(raceId: string) {
     select: {
       distance: true,
       raceDay: { select: { weather: true, surfaceConditions: true } },
-      runners: { where: { scratched: false }, select: { id: true, no: true, raceStyle: true } },
+      result: { select: { actualOrder: true } },
+      runners: { where: { scratched: false }, select: { id: true, no: true, raceStyle: true, jockey: true, trainer: true } },
     },
   });
   const runnerIdByNo = new Map((raceMeta?.runners ?? []).map((r) => [r.no, r.id]));
   const tempoProfilByNo = new Map((raceMeta?.runners ?? []).map((r) => [r.no, raceStyleToTempoProfili(r.raceStyle)]));
+  const metaByNo = new Map((raceMeta?.runners ?? []).map((r) => [r.no, r]));
+  const bitisSirasi = (raceMeta?.result?.actualOrder as number[] | null | undefined) ?? null;
+  const bitisByNo = (no: number) => (bitisSirasi && bitisSirasi.indexOf(no) >= 0 ? bitisSirasi.indexOf(no) + 1 : null);
+
+  // Motor çıktısı (rank sırasına göre) — eski kodun "sirali" şekline uyarlanır.
+  const sirali = saf.picks.map((p) => ({
+    no: p.no, ad: p.ad, olasilik: p.probability, features: p.features,
+    jockey: metaByNo.get(p.no)?.jockey ?? null, trainer: metaByNo.get(p.no)?.trainer ?? null,
+    yarisGidisatiSkoru: p.features.find((f) => f.ad === "yarisGidisatiSkoru")?.raw ?? 0,
+  }));
+  const faz1 = { race: saf.race };
 
   // Yarış Gidişatı (17. A-Katmanı sinyali — bkz. pace-analizi.ts): sirali ile AYNI SIRADA
   // profil listesi kurup TEK pipeline çağrısıyla hem saha-geneli tempo senaryosunu hem her
@@ -202,6 +208,7 @@ async function tekKosuIsle(raceId: string) {
 
   console.log(`\n\n═══════════════════════════════════════════════════════════`);
   console.log(`${faz1.race.hippodromeName} — Koşu ${faz1.race.raceNo} (${faz1.race.classType ?? "?"}, ${faz1.race.breed}, ${faz1.race.surface} ${faz1.race.distance}m) — ${sirali.length} at`);
+  console.log(`Motor: ${saf.engineVersion} | ${sirali[0].features.length} sinyal (segment-routing dahil) | uyarılar: ${saf.warnings.length ? saf.warnings.join(" ; ") : "yok"}`);
   console.log(`Hava/Zemin: ${raceMeta?.raceDay.weather ?? "?"} | ${JSON.stringify(raceMeta?.raceDay.surfaceConditions ?? [])}`);
   console.log(`═══════════════════════════════════════════════════════════`);
   console.log(`  Yarış Gidişatı (saha-geneli): baskın senaryo = ${TEMPO_SENARYO_ETIKET[gidisat.baskinSenaryo]}`);
@@ -214,51 +221,25 @@ async function tekKosuIsle(raceId: string) {
     `    Saha değişkenleri: liderlikTalebi=${d.liderlikTalebi.toFixed(0)} erkenHizYogunlugu(ort)=${d.erkenHizYogunlugu.toFixed(0)} enGucluKacakBaskisi=${d.enGucluKacakBaskisi.toFixed(0)} liderlerArasiDenge=${d.liderlerArasiDenge.toFixed(0)} arkadanGelmeYogunlugu=${d.arkadanGelmeYogunlugu.toFixed(0)} (${d.gecerliAtSayisi}/${sirali.length} atta yeterli Accurace verisi var)`
   );
 
-  // 2026-09-01 — "Saf Model" kıyası (kullanıcı talebi, KARDAHA vakası): marketBlindProb1
-  // (AGF bilgisi hiç yokmuş gibi yeniden normalize edilmiş kazanma olasılığı) zaten
-  // Faz1RunnerV5Sirali'de vardı, yalnız AGF'nin kendi sırasıyla YAN YANA gösterilmiyordu.
-  // Büyük pozitif fark = "model piyasadan bağımsız gerçek değer buldu ama nihai skor AGF
-  // ile harmanlandığı için sönümlendi" — tam bu tür durumları YAKALAMAK için var.
-  const safModelSirali = [...sirali].sort((a, b) => b.marketBlindProb1 - a.marketBlindProb1);
-  const safModelSiraByNo = new Map(safModelSirali.map((r, i) => [r.no, i + 1]));
-
   for (const r of sirali) {
     const sira = sirali.indexOf(r) + 1;
     const ozet = ozetByName.get(r.ad);
-    const vektor = toFeatureVector(r);
     const runnerId = runnerIdByNo.get(r.no);
 
     console.log(`\n──────────────────────────────────────────────────────────`);
     console.log(`#${r.no} ${r.ad} — Model sırası: ${sira}/${sirali.length}, olasılık=%${(r.olasilik * 100).toFixed(1)}`);
-    const safYuzde = r.marketBlindProb1 * 100;
-    const safFark = safYuzde - r.agfPayi;
-    console.log(
-      `  Saf Model (AGF'siz): ${safModelSiraByNo.get(r.no)}. sıra (%${safYuzde.toFixed(1)}) | AGF: ${r.agfSirasi}. sıra (%${r.agfPayi.toFixed(1)}) | Fark: ${safFark > 0 ? "+" : ""}${safFark.toFixed(1)}pp${safFark >= 5 ? "  ⚠ model piyasadan bağımsız değer buluyor, nihai skorda sönümlenmiş olabilir" : ""}`
-    );
-
-    console.log(`  A-Katmanı (13 skor girdisinin TAMAMI, ham/standart değer):`);
-    A_KATMANI_ADLARI.forEach((ad, i) => console.log(`    ${ad.padEnd(18)} = ${vektor[i]}`));
-
-    // 2026-09-13 kullanıcı talebi — "Model Etki Dökümü": yukarıdaki ham/standart değerler
-    // yerine (ya da yanında) motorun GERÇEKTEN kullandığı katkı (β_j·z_ij) değerlerini göster.
-    // Amaç: manuel analizde "at'ın idmanı iyi, +1 sıra yükselteyim" gibi bir sinyali motor
-    // ZATEN saymışsa bunu İKİNCİ KEZ hesaba katmayı (double-counting) önlemek — gerekçe
-    // yazarken burada 0.00'a yakın çıkan bir sinyali "güçlü pozitif" diye anlatmak yanlış
-    // olur. tumOzellikleriListele zaten canlı skorun/featureSnapshot'ın kullandığı AYNI
-    // fonksiyon (v5-engine.ts) — burada YENİDEN hesaplama yapılmıyor, yalnız gösteriliyor.
-    const etkiDokumu = tumOzellikleriListele(r);
-    console.log(`  Model Etki Dökümü (A-katmanı katkısı = β_j·z_ij, motorun GERÇEKTEN kullandığı):`);
-    for (const s of etkiDokumu) {
-      const isaret = s.katki > 0 ? "+" : "";
-      console.log(`    ${s.etiket.padEnd(45)} katki=${isaret}${s.katki.toFixed(4)}`);
+    const bitis = bitisByNo(r.no);
+    if (bitis != null) console.log(`  GERÇEK BİTİŞ: ${bitis}.${bitis === 1 ? "  🏆 KAZANAN" : ""}`);
+    console.log(`  Motor sinyalleri (${r.features.length}; ham, z, β, katkı = motorun GERÇEKTEN kullandığı):`);
+    for (const f of r.features) {
+      const isaret = f.contribution > 0 ? "+" : "";
+      console.log(`    ${f.ad.padEnd(22)} ham=${f.raw == null ? "—" : Number(f.raw).toFixed(3)} z=${f.z.toFixed(2)} β=${f.beta.toFixed(4)} katki=${isaret}${f.contribution.toFixed(4)}${f.observed ? "" : "  [GÖZLEMSİZ]"}`);
     }
-    const aToplam = etkiDokumu.reduce((sum, s) => sum + s.katki, 0);
-    const sireD = (r as unknown as { bSireKatkisi?: number }).bSireKatkisi ?? 0;
-    const zeminMesafeD = (r as unknown as { bZeminMesafeKatkisi?: number }).bZeminMesafeKatkisi ?? 0;
-    console.log(`    ── A toplamı=${aToplam.toFixed(4)} | Sire Δ=${sireD >= 0 ? "+" : ""}${sireD.toFixed(4)} | ZeminMesafe Δ=${zeminMesafeD >= 0 ? "+" : ""}${zeminMesafeD.toFixed(4)} | Final skor=${(aToplam + sireD + zeminMesafeD).toFixed(4)} | P(win)=%${(r.olasilik * 100).toFixed(1)}`);
+    const aToplam = r.features.reduce((sum, f) => sum + f.contribution, 0);
+    console.log(`    ── Toplam katkı=${aToplam.toFixed(4)} | P(win)=%${(r.olasilik * 100).toFixed(1)}`);
 
     if (ozet) {
-      console.log(`  Hızlı Özet: pistUzmani=${ozet.pistUzmani} sinifDurumu=${ozet.sinifDurumu} atJokeyIkilisi=${JSON.stringify(ozet.atJokeyIkilisi)} agfFark=${ozet.agfFark} pedigriK=${ozet.pedigriKYuzde} pedigriOzet="${ozet.pedigriOzet ?? "-"}"`);
+      console.log(`  Hızlı Özet: pistUzmani=${ozet.pistUzmani} sinifDurumu=${ozet.sinifDurumu} atJokeyIkilisi=${JSON.stringify(ozet.atJokeyIkilisi)} pedigriK=${ozet.pedigriKYuzde} pedigriOzet="${ozet.pedigriOzet ?? "-"}"`);
     }
     const tempoProfil = tempoProfilByNo.get(r.no);
     const gidisatSonuc = gidisatByNo.get(r.no);
@@ -343,45 +324,32 @@ async function tekKosuIsle(raceId: string) {
     }
   }
 
-  // 2026-09-01 — KIZIM BİNDAL vakası: veri EKSİK değildi (yukarıdaki döngü zaten TÜM
-  // atları tek tek dökmüştü), asıl hata SENTEZ hatasıydı — uzun at-at okuma sırasında
-  // 2-3 ata takılıp TÜM sahayı yan yana kıyaslamayı atlamak. Bu tablo, o kıyası ELLE
-  // yapmaya güvenmek yerine OTOMATİK ve ZORUNLU hale getiriyor — okuması gereken tek şey.
-  // Aynı gün kullanıcı talebi: yalnız birkaç seçili alan değil, A-Katmanı'nın 14
-  // özelliğinin TAMAMI + ayrı-mekanizmalı B-Katmanı sinyalleri (sireOrani,
-  // zeminMesafeDeneyim — bkz. v5-engine.ts bKatmaniUygula) tabloya eklendi.
-  const KISA_ETIKET: Record<string, string> = {
-    agfSirasi: "AGFsr", idmJokey: "İdmJk", jokeyOrani: "JokOr",
-    antrenorOrani: "AntOr", agfPayi: "AGF%", h2hNetSkor: "H2H",
-    hizDerecesi: "HızDr", agfPayi2: "AGF%²",
-    zeminToleransi: "ZemTol", yakinsama2Plus: "Yaknsm", sonIdmanSprint: "Sprint",
-    takiDegisikligi: "TakıDğ", yarisGidisatiSkoru: "Gidşt",
-  };
-  const basliklar = [
-    "No", "At", "Sıra", "Olsk",
-    ...A_KATMANI_ADLARI.map((a) => KISA_ETIKET[a] ?? a),
-    "SireOr", "ZemMsf", "AGFfrk", "PedK", "Sınıf", "Takı",
-  ];
-  console.log(`\n  ── ÖZET KIYAS TABLOSU (${sirali.length} at, TÜM A+B katmanı sinyalleri, model sırasına göre) ──`);
+  // Özet kıyas tablosu: motorun GERÇEK sinyalleri (koşu tipine göre 25/8/4), hücre = KATKI
+  // (β·z·güvenilirlik; ham değerlerin ölçekleri farklı olduğu için katkı kıyaslanabilir tek birimdir).
+  // Satır satır tara — model sırasıyla ÇELİŞEN bir sütun varsa mutlaka belirt. Eski sürümdeki
+  // AGF/Yaknsm/Gidşt sütunları ölü motorun parçasıydı; artık yok.
+  const sinyalAdlari = sirali[0].features.map((f) => f.ad);
+  const basliklar = ["No", "At", "Sıra", "Olsk", ...(bitisSirasi ? ["Bitiş"] : []), ...sinyalAdlari.map((a) => a.slice(0, 7)), "PedK", "Sınıf", "Takı"];
+  console.log(`
+  ── ÖZET KIYAS TABLOSU (${sirali.length} at, ${sinyalAdlari.length} motor sinyali, hücre=katkı, model sırasına göre) ──`);
   console.log("  " + basliklar.map((b) => b.padEnd(8)).join(""));
   sirali.forEach((r, i) => {
-    const sira = i + 1;
     const ozet = ozetByName.get(r.ad);
     const sonYaris = sonYarisByName.get(r.ad);
-    const vektor = toFeatureVector(r);
     const takiMetni = sonYaris
       ? [...sonYaris.eklenenTaki.map((t) => `+${t.code}`), ...sonYaris.cikarilanTaki.map((t) => `-${t.code}`)].join(" ") || "∅"
       : "?";
-    const yuvarla = (x: number) => (Number.isInteger(x) ? String(x) : x.toFixed(1));
+    const katkiByAd = new Map(r.features.map((f) => [f.ad, f]));
     const hucreler = [
-      String(r.no), r.ad.length > 6 ? r.ad.slice(0, 6) : r.ad, String(sira), `%${(r.olasilik * 100).toFixed(1)}`,
-      ...vektor.map((v) => yuvarla(v)),
-      yuvarla(r.sireOrani), yuvarla(r.zeminMesafeDeneyim),
-      String(ozet?.agfFark ?? "?"), String(ozet?.pedigriKYuzde ?? "?"), String(ozet?.sinifDurumu ?? "?"), takiMetni,
+      String(r.no), r.ad.length > 6 ? r.ad.slice(0, 6) : r.ad, String(i + 1), `%${(r.olasilik * 100).toFixed(1)}`,
+      ...(bitisSirasi ? [String(bitisByNo(r.no) ?? "?")] : []),
+      ...sinyalAdlari.map((a) => { const f = katkiByAd.get(a); return f ? (f.observed ? f.contribution.toFixed(2) : "·") : "?"; }),
+      String(ozet?.pedigriKYuzde ?? "?"), String(ozet?.sinifDurumu ?? "?"), takiMetni,
     ];
     console.log("  " + hucreler.map((h) => h.padEnd(8)).join(""));
   });
-  console.log(`  ── Sütun sırası başlıkla eşleşir. A-Katmanı=13 skor girdisi (AGFsr..Gidşt), ayrı-mekanizmalı B-Katmanı=SireOr/ZemMsf, gösterim-amaçlı=AGFfrk/PedK/Sınıf/Takı. Satır satır tara — model sırasıyla ÇELİŞEN bir sütun varsa mutlaka belirt. ──\n`);
+  console.log(`  ── "·" = gözlemsiz sinyal. Sütun sırası başlıkla eşleşir. ──
+`);
 }
 
 async function main() {
