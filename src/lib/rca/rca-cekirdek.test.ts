@@ -1,15 +1,22 @@
 import { describe, it, expect } from "vitest";
-import { ayakNedeniBelirle, kuponNedenOzeti, sorunlariSirala, type OldurenAyak, type RcaSorun } from "./rca-cekirdek";
+import { ayakNedeniBelirle, MUDAHALE_EDILEBILIR, kuponNedenOzeti, sorunlariSirala, type OldurenAyak, type RcaSorun } from "./rca-cekirdek";
 import { SINYAL_KAYNAGI } from "./rca-cekirdek";
 import safW from "@/lib/methodology/weights/v546-1-saf-weights.json";
 
 const g = (o: Partial<Parameters<typeof ayakNedeniBelirle>[0]> = {}) => ({ modelSira: 9, piyasaSira: 8, ayagaYazilan: 4, ganyan: 25, eksikSinyal: 0, ...o });
 
 describe("ayakNedeniBelirle (sıralı kurallar)", () => {
-  it("model ilk 4'e koymuşsa → kupon dağıtımı (veri/piyasa ne olursa olsun)", () => {
-    expect(ayakNedeniBelirle(g({ modelSira: 3, eksikSinyal: 5, piyasaSira: 1 })).neden).toBe("KUPON_DAGILIMI");
-    expect(ayakNedeniBelirle(g({ modelSira: 4 })).neden).toBe("KUPON_DAGILIMI");
+  it("model ilk 4'e koymuş VE sırası ≤ yazılan at sayısı → gerçek kupon dağıtım hatası (veri/piyasa ne olursa olsun)", () => {
+    expect(ayakNedeniBelirle(g({ modelSira: 3, ayagaYazilan: 3, eksikSinyal: 5, piyasaSira: 1 })).neden).toBe("KUPON_DAGILIMI");
+    expect(ayakNedeniBelirle(g({ modelSira: 4, ayagaYazilan: 4 })).neden).toBe("KUPON_DAGILIMI");
+    expect(ayakNedeniBelirle(g({ modelSira: 2, ayagaYazilan: 4 })).neden).toBe("KUPON_DAGILIMI");
     expect(ayakNedeniBelirle(g({ modelSira: 5 })).neden).not.toBe("KUPON_DAGILIMI");
+  });
+  it("model ilk 4'e koymuş ama sırası > yazılan at sayısı → bütçe sınırı (beklenen, müdahale edilebilir DEĞİL)", () => {
+    expect(ayakNedeniBelirle(g({ modelSira: 2, ayagaYazilan: 1 })).neden).toBe("KUPON_BUTCE_SINIRI");
+    expect(ayakNedeniBelirle(g({ modelSira: 4, ayagaYazilan: 2 })).neden).toBe("KUPON_BUTCE_SINIRI");
+    expect(MUDAHALE_EDILEBILIR.has("KUPON_BUTCE_SINIRI")).toBe(false);
+    expect(MUDAHALE_EDILEBILIR.has("KUPON_DAGILIMI")).toBe(true);
   });
   it("model 7+ ve ≥3 gözlemsiz sinyal → veri eksikliği", () => {
     expect(ayakNedeniBelirle(g({ modelSira: 8, eksikSinyal: 3 })).neden).toBe("VERI_EKSIK");

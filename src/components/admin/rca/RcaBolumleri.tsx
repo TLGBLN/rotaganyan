@@ -5,7 +5,7 @@ import type { KayitDetay } from "@/server/services/rca-kayit.service";
 import { CozButonu } from "./CozButonu";
 
 const SIDDET_TON: Record<Siddet, Ton> = { KRITIK: "kirmizi", YUKSEK: "altin", ORTA: "mavi", DUSUK: "gri" };
-const NEDEN_TON: Record<AyakNedeni, Ton> = { KUPON_DAGILIMI: "mor", VERI_EKSIK: "altin", MODEL_PIYASA_GERI: "kirmizi", ONGORULEMEZ: "gri", BELIRSIZ: "gri" };
+const NEDEN_TON: Record<AyakNedeni, Ton> = { KUPON_DAGILIMI: "mor", KUPON_BUTCE_SINIRI: "gri", VERI_EKSIK: "altin", MODEL_PIYASA_GERI: "kirmizi", ONGORULEMEZ: "gri", BELIRSIZ: "gri" };
 
 export function OzetSeridi({ sorunlar, kayitlar, kupon }: { sorunlar: RcaSorun[]; kayitlar: KayitDetay[]; kupon: KuponRcaSonuc | null }) {
   const acik = sorunlar.filter((s) => s.durum === "SORUN");

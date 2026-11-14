@@ -52,9 +52,10 @@ export function sorunlariSirala(s: RcaSorun[]): RcaSorun[] {
 
 /* ───────────── Kuponu öldüren ayak: kök neden kuralları ───────────── */
 
-export type AyakNedeni = "KUPON_DAGILIMI" | "VERI_EKSIK" | "MODEL_PIYASA_GERI" | "ONGORULEMEZ" | "BELIRSIZ";
+export type AyakNedeni = "KUPON_DAGILIMI" | "KUPON_BUTCE_SINIRI" | "VERI_EKSIK" | "MODEL_PIYASA_GERI" | "ONGORULEMEZ" | "BELIRSIZ";
 export const AYAK_NEDENI_AD: Record<AyakNedeni, string> = {
-  KUPON_DAGILIMI: "Kupon dağıtımı (model görmüştü, kupona girmedi)",
+  KUPON_DAGILIMI: "Kupon dağıtım hatası (model sırasına göre kupona girmesi gerekirdi)",
+  KUPON_BUTCE_SINIRI: "Bütçe sınırı (model ilk 4'te görmüştü, kupon bütçesi o kadar ata yetmedi — tasarım gereği)",
   VERI_EKSIK: "Veri eksikliği (kazananın sinyalleri gözlemsizdi)",
   MODEL_PIYASA_GERI: "Piyasa görmüştü, model göremedi",
   ONGORULEMEZ: "Öngörülemez (piyasa da görmedi)",
@@ -78,13 +79,21 @@ export type AyakGirdi = {
 
 /**
  * Sıralı kurallar (ilk eşleşen kazanır — sıra önemli):
- * 1) Model kazananı ilk 4'e koymuştu → sorun modelde değil, kupona girmemesinde (kupon dağıtımı / elle düzenleme).
+ * 1) Model kazananı ilk 4'e koymuştu → sorun modelde değil, kupona girmemesinde. İKİYE AYRILIR (2026-11-14):
+ *    a) kazananın model sırası ≤ ayağa yazılan at sayısı → model sırasıyla kupona girmesi GEREKİRDİ: gerçek dağıtım hatası
+ *       / elle düzenleme / farklı sıralama kullanılmış (KUPON_DAGILIMI, müdahale edilebilir).
+ *    b) model sırası > yazılan at sayısı → kupon bütçesi o ata yetmedi; dinamik programlama bütçe altında bunu BİLEREK yapar
+ *       (arac-kupon-test/deger logları: kuponun iddia ettiği kapsama ≈ gerçek kapsama, k=1 ayaklar %48.6 kapsar). Beklenen
+ *       değişkenlik, aksiyon yok (KUPON_BUTCE_SINIRI, müdahale edilebilir DEĞİL).
  * 2) Kazananın ≥3 sinyali gözlemsizdi → veri eksikliği düşük sıranın makul nedeni.
  * 3) Piyasa ilk 3'te görmüştü, model ilk 6 dışında → model piyasadan kötü gördü (müdahale edilebilir).
  * 4) Piyasa da görmedi (piyasa ≥6. sıra veya ganyan ≥ 10) → öngörülemez, aksiyon yok.
  * 5) Aksi hâlde belirsiz.
  */
 export function ayakNedeniBelirle(g: AyakGirdi): { neden: AyakNedeni; aciklama: string } {
+  if (g.modelSira != null && g.modelSira <= 4 && g.modelSira > g.ayagaYazilan) {
+    return { neden: "KUPON_BUTCE_SINIRI", aciklama: `Model kazananı ${g.modelSira}. sıraya koymuştu; ayağa ${g.ayagaYazilan} at yazılabildi (bütçe sınırı)` };
+  }
   if (g.modelSira != null && g.modelSira <= 4) {
     return { neden: "KUPON_DAGILIMI", aciklama: `Model kazananı ${g.modelSira}. sıraya koymuştu ama ayağa yalnız ${g.ayagaYazilan} at yazılmıştı` };
   }
