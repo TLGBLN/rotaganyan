@@ -769,7 +769,7 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
     versiyon: "RotaGanyan Analiz Motoru",
     ana: "V5",
     baslangic: new Date("2026-11-13T11:39:14+03:00"),
-    bitis: null,
+    bitis: new Date("2026-11-14T12:20:35+03:00"), // 25 özellik (tüm tipler)
     aciklama: "Saf Model'e (varsayılan model) 3 ham program alanı sinyali eklendi → 25 özellik: fMean (Runner.recentForm son 6 yarış derecesinin ortalaması; '0' hanesi 10 sayılır), kgsLog (log(1+TJK KGS)), sexE (yaş alanının 3. kelimesi 'e' mi). Tetikleyen bulgu: 'piyasa ne görüyor' testi — kitle atın son 6 yarıştaki derecesini fiyatlıyor (piyasa görüşünün açıklanabilen kısmında en büyük payı form satırı aldı: çıkarınca R² -0.111), 22 sinyalde karşılığı yoktu (yalnız lastWon). Maiden/ŞARTLI 19 ve ŞARTLI 1/27 segment modelleri DEĞİŞMEDİ; yeni sinyaller yalnız varsayılan modelin featureNames'inde. Banko Platt katsayıları yeni olasılıklara göre yeniden fit edildi (banko-adayi.ts).",
     neyiAnalizEdiyor: [
       "25 aktif feature (varsayılan model): önceki 22 + fMean, kgsLog, sexE. Tanımlar tek yerde: src/lib/methodology/ham-alan-sinyalleri.ts (eğitim ve canlı aynı fonksiyonları kullanır, birim testli). Eksik veri (form satırı yok, KGS yok, cins yok) → gözlemsiz, sıfır katkı.",
@@ -780,6 +780,19 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
       "5 kat genişleyen-pencereli zaman CV (827 test yarışı; seçim DEV katlarını da içerdiği için İYİMSER): Top1 %24.9→26.2, Top3 %58.4→61.4, LogLoss 2.0409→2.0052 (Δ -0.0356 [-0.0515,-0.0194]). Varsayılan modele giden tipler (Handikap/ŞARTLI 2-5/KV-Satış-Grup-Diğer, n=589): Top3 %59.6→64.7, Δ -0.0408 [-0.0587,-0.0215]. Her 5 katta da LogLoss iyileşti (-0.014..-0.057).",
       "TEMİZ sınama — son 2 kat (seçimde kullanılmadı): varsayılan tipler (n=226) Δ -0.0457 [-0.0761,-0.0133], Top3 %58.4→65.9; tüm tipler (n=319) Δ -0.0281 [-0.0556,-0.0004]. Tip kırılımı (5 kat): Handikap Top3 %49.6→58.9 (Δ -0.055 [-0.085,-0.026]), ŞARTLI 2-5 %62.0→67.0 (Δ -0.053 [-0.085,-0.024]), KV/Satış/Grup/Diğer nötr (Δ -0.002 [-0.039,+0.034]; Top3 %71.9→70.6).",
       "Sınırlar: (1) 25 özellikli AGF-siz model piyasanın hâlâ altında (piyasa Top3 ≈%67, LogLoss 1.877; bu model ≈%61, 2.005). (2) 5 kat rakamları seçim yanlılığı taşır — temiz sınama son 2 kat. (3) sexE'nin katkısı sınırda. (4) KV/Satış/Grup/Diğer'de kazanç yok. (5) Katsayılar: fMean -0.348 (düşük derece ortalaması = iyi), kgsLog -0.201, sexE +0.215. (6) Canlı uçtan uca kontrol (worktree motoru, gerçek DB): 25 koşu / 247 at için yeni 3 sinyalin motor ham değeri DB alanlarından yeniden hesaplananla BİREBİR aynı (uyumsuzluk 0); 12.11 Ankara 10 koşuda (eğitim dışı) kazananın ort. sırası 3.9→3.7 (tek koşuda kötüleşme: K9 2→4) — yalnız sağlık kontrolü, kanıt değil. Test paketi 151 test geçti; ayrıca v546-1-saf-engine.test.ts mock'u (runner/gallop) güncellendi — 11-10'dan beri çöküyordu, eski scoreV461 yolu ölü olduğu için testten çıkarıldı.",
+    ],
+  },
+  {
+    versiyon: "RotaGanyan Analiz Motoru",
+    ana: "V5",
+    baslangic: new Date("2026-11-14T12:20:35+03:00"),
+    bitis: null,
+    aciklama: "Handikap koşularında hpRel ve kiloRel çıkarıldı (25 → 23 sinyal; ayrı Handikap segment ağırlık dosyası). Kullanıcı kararı + veri: kazananın saha-içi yüzdelik sırası (0.50=ayırt etmez) Handikap'ta HP 0.53 [0.48,0.58], kilo 0.51 [0.46,0.56]; ŞARTLI 2-5/KV/Maiden'de HP 0.65/0.69/0.65, kilo 0.63/0.60/0.61 (anlamlı). Motorun 13 Kasım notu da hpRel için 'Handikap'te etkisiz' demişti. Diğer tipler ve kalan 23 katsayı DEĞİŞMEDİ.",
+    neyiAnalizEdiyor: [
+      "Handikap: 23 aktif feature (varsayılan 25'ten hpRel, kiloRel çıkarıldı). Diğer tipler: 25 (varsayılan), ŞARTLI1/27: 4, Maiden/ŞARTLI19: 8 — segment-routing: v546-1-engine.ts segmentAgirligiSec.",
+    ],
+    caprazlamalar: [
+      "SINIRLAR (önce): (1) Katsayılar YENİDEN EĞİTİLMEDİ — 23 sinyal varsayılan modelin katsayılarıyla (hpRel/kiloRel bırakılarak) çalışıyor; 25 sinyalli eğitim verisi saklanmadığı için Handikap-özel CV yapılmadı. (2) Kanıt 134 Handikap koşusu (son 30 gün, 16/20 sinyalli kayıtlı anlık görüntü) — küçük örnek. (3) Handikap banko zaten yok (kalibre olasılık eşiğe ulaşmıyor), banko etkilenmez.",
     ],
   },
 ];

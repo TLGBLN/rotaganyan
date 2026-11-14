@@ -396,12 +396,16 @@ export function agfDestekOnerisiHesapla(picks: V461SafPick[], rawRunners: V461Ra
 // yakalamaması için) — ran-v2.ts'teki kategoriBelirle ile AYNI mantık/sıra.
 import segmentDusukDeneyimJson from "./weights/v546-1-saf-segment-dusuk-deneyim.json";
 import segmentDusukDeneyimAccJson from "./weights/v546-1-saf-segment-dusuk-deneyim-acc.json";
+import segmentHandikapJson from "./weights/v546-1-saf-segment-handikap.json";
 const SEGMENT_DUSUK_DENEYIM_W = segmentDusukDeneyimJson as unknown as FrozenWeights;
 const SEGMENT_DUSUK_DENEYIM_ACC_W = segmentDusukDeneyimAccJson as unknown as FrozenWeights;
+// 2026-11-14 — Handikap: hpRel/kiloRel çıkarıldı (23 sinyal), bkz. weights/v546-1-saf-segment-handikap.json notu.
+const SEGMENT_HANDIKAP_W = segmentHandikapJson as unknown as FrozenWeights;
 function segmentAgirligiSec(classType: string, varsayilan: FrozenWeights): FrozenWeights {
   const c = classType.toUpperCase();
   if (c.includes("MAIDEN") || c.includes("ŞARTLI 19")) return SEGMENT_DUSUK_DENEYIM_ACC_W;
   if (c.includes("ŞARTLI 1") || c.includes("ŞARTLI 27")) return SEGMENT_DUSUK_DENEYIM_W;
+  if (c.includes("HANDIKAP")) return SEGMENT_HANDIKAP_W;
   return varsayilan;
 }
 
