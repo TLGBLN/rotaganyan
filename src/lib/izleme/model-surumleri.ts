@@ -21,7 +21,7 @@ export const MODEL_SURUMLERI: ModelSurumu[] = [
   { baslangic: "2026-11-13T11:39:14+03:00", ad: "Saf Model 25 özellik", ozellikSayisi: 25, cv: { n: 827, top1: 0.262, top3: 0.614, logLoss: 2.0052 } },
   // 2026-11-14 sinyal kütüğü son hali: fiilen ölü 4 sinyal çıkarıldı (25→21), katsayılar AYNI, YENİDEN EĞİTİM/CV YOK.
   // cv = 25 sinyalli modelin CV'sinden MİRAS (çıkarılan sinyallerin ort. |katkısı| 0.009, kayıtlı koşularda sıralama değişmedi) — yeni bir ölçüm DEĞİL.
-  { baslangic: "2026-11-14T14:10:00+03:00", ad: "Saf Model 21 özellik", ozellikSayisi: 21, cv: { n: 827, top1: 0.262, top3: 0.614, logLoss: 2.0052 } },
+  { baslangic: "2026-11-14T14:26:00+03:00", ad: "Saf Model 21 özellik", ozellikSayisi: 21, cv: { n: 827, top1: 0.262, top3: 0.614, logLoss: 2.0052 } },
 ];
 
 /** Saf (AGF'siz) resmi motor dönemi — 2026-11-10 kullanıcı kararı. */

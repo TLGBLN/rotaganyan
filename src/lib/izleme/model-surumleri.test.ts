@@ -25,7 +25,7 @@ describe("modelSurumuAt", () => {
     expect(modelSurumuAt(new Date("2026-11-12T21:00:00+03:00"))!.ozellikSayisi).toBe(22);
     expect(modelSurumuAt(new Date("2026-11-13T11:39:13+03:00"))!.ozellikSayisi).toBe(22);
     expect(modelSurumuAt(new Date("2026-11-13T11:39:14+03:00"))!.ozellikSayisi).toBe(25);
-    expect(modelSurumuAt(new Date("2026-11-14T14:09:59+03:00"))!.ozellikSayisi).toBe(25);
-    expect(modelSurumuAt(new Date("2026-11-14T14:10:00+03:00"))!.ozellikSayisi).toBe(21);
+    expect(modelSurumuAt(new Date("2026-11-14T14:25:59+03:00"))!.ozellikSayisi).toBe(25);
+    expect(modelSurumuAt(new Date("2026-11-14T14:26:00+03:00"))!.ozellikSayisi).toBe(21);
   });
 });
