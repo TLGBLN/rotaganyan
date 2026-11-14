@@ -136,9 +136,9 @@ describe("zayıf-tip tabanı (kaybedilen kazananlar -> optimizör köprüsü)", 
     });
     const cokZayifRaces: AutoFillRace[] = [
       mkRace(1, "Maiden", [25, 18, 15, 12, 10, 8, 5, 4, 2, 1]),
-      mkRace(2, "ŞARTLI 4", [30, 20, 15, 10, 8, 7, 5, 3, 2]),
+      mkRace(2, "ŞARTLI 3", [30, 20, 15, 10, 8, 7, 5, 3, 2]),
       mkRace(3, "Handikap 15", [63.1, 15.2, 9.3, 6.3, 6.0]),
-      mkRace(4, "ŞARTLI 4", [21.7, 19.2, 15.7, 12.5, 8.6, 5.7, 5.7, 4.9, 3.5, 2.6]),
+      mkRace(4, "ŞARTLI 3", [21.7, 19.2, 15.7, 12.5, 8.6, 5.7, 5.7, 4.9, 3.5, 2.6]),
       mkRace(5, "Handikap 17", [18.6, 17.9, 13.8, 8.2, 7.1, 6.2, 5.0, 4.5, 4.1, 3.8, 3.5, 3.0, 2.5, 2.0, 1.1]),
       mkRace(6, "SATIŞ 3", [40, 20, 12, 8, 6, 5, 4, 3, 1, 1]), // tek güçlü/zayıf-olmayan ayak
     ];
@@ -216,5 +216,16 @@ describe("zayıf-tip tabanı — kapsama-hedefi tavanı (zayifTipTabanlariSinirl
     const k4 = (w: string) => (t.find((x) => x.width === w)!.selections[4] ?? []).length;
     expect(k1("wide")).toBeGreaterThanOrEqual(3);
     expect(k4("wide")).toBeLessThan(7); // eskiden %47'lik favorili Handikap 21'e 7 at yazılıyordu
+  });
+});
+
+// 2026-11-15: zayıf-tip listesi güncel AGF'siz motorun tip tablosuna göre yeniden kuruldu (bkz. ZAYIF_TIPLER notu).
+describe("zayıf-tip listesi (2026-11-15 güncellemesi)", () => {
+  const mk = (classType: string): AutoFillRace[] => [{ raceNo: 1, classType, runners: [20, 18, 15, 12, 10, 8, 7, 6, 4].map((p, i) => ({ no: i + 1, scratched: false, ekuriGroup: null, score: null, scoreExact: p })) }];
+  it("ŞARTLI 3 ve Handikap 14/15/16/17/21, ŞARTLI 19, Maiden zayıf tip (taban oluşur)", () => {
+    for (const t of ["ŞARTLI 3", "Handikap 14", "Handikap 15", "Handikap 16", "Handikap 17", "Handikap 21", "ŞARTLI 19", "Maiden"]) expect(zayifTipTabanlari(mk(t), "narrow")[1], t).toBeDefined();
+  });
+  it("KV-6, KV-7, ŞARTLI 4 ve güçlü tipler zayıf tip DEĞİL (taban yok)", () => {
+    for (const t of ["KV-6", "KV-7", "ŞARTLI 4", "ŞARTLI 5", "KV-8", "G 1"]) expect(zayifTipTabanlari(mk(t), "narrow")[1], t).toBeUndefined();
   });
 });

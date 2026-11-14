@@ -58,9 +58,13 @@ function normalizeClassTypeLocal(classType: string): string {
 // Liste [[project_hibrit_analiz_motoru_2026_11_02]]'deki NİHAİ zayıf-10 — Handikap
 // 21/14/15/16/17, Şartlı 19/4, KV-6/7, Maiden. Büyük/küçük harf farkını (TJK ham
 // verisinde tutarsız olabiliyor) ortadan kaldırmak için karşılaştırma .toUpperCase() ile.
+// 2026-11-15 GÜNCELLEME (kullanıcı onayı "hemen hallet"): liste 4 Kasım'daki AGF'Lİ dönemin "kaybedilen kazananlar" çalışmasından geliyordu — güncel
+// AGF'SİZ motorun 1470 yarışlık tip tablosuna (arac-tip-tablosu.mts, çıkış-dışı) göre yeniden kuruldu: ilk-3 isabeti KV-6 %70.5, KV-7 %61.3,
+// ŞARTLI 4 %63.7 (güçlü/ortalama) → ÇIKARILDI; ŞARTLI 3 %56.6 (1. sıra %20.5, 83 yarış) → EKLENDİ. Handikap 17 (%58.5, n=41) ve Handikap 21
+// (%38.9, n=18) sınırda/az örnekli ama her iki dönemde de zayıf olduğundan KORUNDU.
 const ZAYIF_TIPLER = new Set([
-  "MAIDEN", "ŞARTLI 4", "HANDIKAP 15", "HANDIKAP 16", "ŞARTLI 19",
-  "HANDIKAP 14", "KV-6", "KV-7", "HANDIKAP 17", "HANDIKAP 21",
+  "MAIDEN", "ŞARTLI 3", "HANDIKAP 15", "HANDIKAP 16", "ŞARTLI 19",
+  "HANDIKAP 14", "HANDIKAP 17", "HANDIKAP 21",
 ]);
 // 2026-11-04 kullanıcı düzeltmesi (gerçek vaka: Handikap 17, 5. Koşu) — TEK sabit taban
 // (eskiden 4, üç kademede de AYNI) paylaşımlı bütçe rekabetinde "tavan" gibi davranıyordu:
