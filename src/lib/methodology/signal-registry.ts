@@ -26,9 +26,9 @@ export interface SignalRegistryEntry {
  * - feature henüz future candidate ise
  */
 export const SIGNAL_REGISTRY: readonly SignalRegistryEntry[] = [
-  { code: "agfSirasi", family: "MARKET", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "AGF ailesi; bağımsız aile oyu değildir." },
-  { code: "agfPayi", family: "MARKET", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "AGF ham pay." },
-  { code: "agfPayi2", family: "MARKET", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "agfPayi'nin nonlinear dönüşümü; yeni veri değildir." },
+  { code: "agfSirasi", family: "MARKET", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: true, note: "[2026-11-10 AGF resmi motordan kaldırıldı; yalnız analiz/izleme] AGF ailesi; bağımsız aile oyu değildir." },
+  { code: "agfPayi", family: "MARKET", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: true, note: "[2026-11-10 AGF resmi motordan kaldırıldı; yalnız analiz/izleme] AGF ham pay." },
+  { code: "agfPayi2", family: "MARKET", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: true, note: "[2026-11-10 AGF resmi motordan kaldırıldı; yalnız analiz/izleme] agfPayi'nin nonlinear dönüşümü; yeni veri değildir." },
   { code: "agfTrend", family: "MARKET", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: true, note: "Pre-race snapshot trendi; MARKET ailesinde tek oy." },
 
   { code: "hizDerecesi", family: "HIZ", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "365g göreli hız." },
@@ -42,16 +42,16 @@ export const SIGNAL_REGISTRY: readonly SignalRegistryEntry[] = [
 
   { code: "yarisGidisatiSkoru", family: "TEMPO_STYLE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "TEMPO_STYLE ana evidence kaynağı." },
   { code: "PS_front", family: "TEMPO_STYLE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "PS-v2/OOS bekliyor; field-size ölçek etkisi." },
-  { code: "PS_lone", family: "TEMPO_STYLE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "PS-v2/OOS bekliyor; 1-front kırpma sorunu." },
+  { code: "PS_lone", family: "TEMPO_STYLE", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: false, note: "[2026-11-14 canlı modellerden ÇIKARILDI — ölü (%99 sıfır) + σ=0.0086 uç değer riski (z≈16)] PS-v2/OOS bekliyor; 1-front kırpma sorunu." },
   { code: "PS_closerFit", family: "TEMPO_STYLE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "PS-v2/OOS bekliyor; pressure ölçek sorunu." },
 
   { code: "ACC_CLOSE_RES", family: "RACE_FORM", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Closing residual." },
   { code: "ACC_LATE", family: "RACE_FORM", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Late segment form." },
 
-  { code: "idmJokey", family: "IDMAN", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Galop verisi varsa kullanılabilir." },
-  { code: "sonIdmanSprint", family: "IDMAN", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Backtest yönü doğrulamadı; narrative/audit görünür ama placement bütünlüğüne oy vermez." },
+  { code: "idmJokey", family: "IDMAN", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: true, note: "[2026-11-14 canlı modellerden ÇIKARILDI — ölü (%92 sıfır)] Galop verisi varsa kullanılabilir." },
+  { code: "sonIdmanSprint", family: "IDMAN", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: false, note: "[2026-11-14 canlı modellerden ÇIKARILDI — ölü (%91 sıfır, 2 değer)] Backtest yönü doğrulamadı; narrative/audit görünür ama placement bütünlüğüne oy vermez." },
 
-  { code: "takiDegisikligi", family: "TAKI", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Gerçek previous-race comparison artık biliniyor; katsayı kanıtı zayıf olduğu için placement bütünlüğüne oy vermez." },
+  { code: "takiDegisikligi", family: "TAKI", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: false, note: "[2026-11-14 canlı modellerden ÇIKARILDI — ölü (%94 sıfır)] Gerçek previous-race comparison artık biliniyor; katsayı kanıtı zayıf olduğu için placement bütünlüğüne oy vermez." },
 
   { code: "sireOrani", family: "PEDIGRI", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Gerçek sire örneklemi fallback'ten ayrılıyor; fakat kanıt zayıf olduğu için placement bütünlüğüne oy vermez." },
 
@@ -77,27 +77,12 @@ export const SIGNAL_REGISTRY: readonly SignalRegistryEntry[] = [
 
 export const LEGACY_COMPOSITES = ["yakinsama2Plus"] as const;
 
-export const PRODUCTION_FEATURE_CODES = [
-  "agfSirasi",
-  "agfPayi",
-  "agfPayi2",
-  "idmJokey",
-  "h2hNetSkor",
-  "hizDerecesi",
-  "zeminToleransi",
-  "zeminMesafeDeneyim",
-  "yakinsama2Plus",
-  "sonIdmanSprint",
-  "takiDegisikligi",
-  "yarisGidisatiSkoru",
-  "sireOrani",
-  "ACC_CLOSE_RES",
-  "ACC_LATE",
-  "ACC_SPEED",
-  "PS_front",
-  "PS_lone",
-  "PS_closerFit",
-] as const;
+/**
+ * CANLI üretim sinyalleri = kayıt defterinde productionFeature=true olanlar = canlı modellerin (varsayılan, Handikap, Maiden/ŞARTLI 19,
+ * ŞARTLI 1/27) featureNames BİRLEŞİMİ — bu eşitlik signal-registry.test.ts'te korunur (2026-11-14 "sinyal kütüğü son hali").
+ * Eskiden burada V5.46.1'in 19 teknik feature'ı (AGF dahil) donmuş bir liste olarak duruyordu; artık kayıt defterinden türetilir.
+ */
+export const PRODUCTION_FEATURE_CODES: readonly string[] = SIGNAL_REGISTRY.filter((s) => s.productionFeature).map((s) => s.code);
 
 export const CURRENT_ANALYSIS_SOURCE_CODES =
   SIGNAL_REGISTRY

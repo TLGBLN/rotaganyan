@@ -11,10 +11,9 @@ describe("MODEL_SURUMLERI — güncellik korumaları", () => {
     const saatler = new Set(ENGINE_VERSIONS.map((v) => v.baslangic.getTime()));
     for (const s of MODEL_SURUMLERI.slice(1)) expect(saatler.has(new Date(s.baslangic).getTime()), s.ad).toBe(true);
   });
-  it("sürümler zaman sırasında ve özellik sayısı azalmıyor", () => {
+  it("sürümler zaman sırasında (özellik sayısı 2026-11-14'te ölü sinyaller çıkarılınca BİLEREK 25→21 azaldı)", () => {
     for (let i = 1; i < MODEL_SURUMLERI.length; i++) {
       expect(new Date(MODEL_SURUMLERI[i].baslangic).getTime()).toBeGreaterThan(new Date(MODEL_SURUMLERI[i - 1].baslangic).getTime());
-      expect(MODEL_SURUMLERI[i].ozellikSayisi).toBeGreaterThanOrEqual(MODEL_SURUMLERI[i - 1].ozellikSayisi);
     }
   });
 });
@@ -26,5 +25,7 @@ describe("modelSurumuAt", () => {
     expect(modelSurumuAt(new Date("2026-11-12T21:00:00+03:00"))!.ozellikSayisi).toBe(22);
     expect(modelSurumuAt(new Date("2026-11-13T11:39:13+03:00"))!.ozellikSayisi).toBe(22);
     expect(modelSurumuAt(new Date("2026-11-13T11:39:14+03:00"))!.ozellikSayisi).toBe(25);
+    expect(modelSurumuAt(new Date("2026-11-14T14:09:59+03:00"))!.ozellikSayisi).toBe(25);
+    expect(modelSurumuAt(new Date("2026-11-14T14:10:00+03:00"))!.ozellikSayisi).toBe(21);
   });
 });

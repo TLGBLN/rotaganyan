@@ -769,7 +769,7 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
     versiyon: "RotaGanyan Analiz Motoru",
     ana: "V5",
     baslangic: new Date("2026-11-13T11:39:14+03:00"),
-    bitis: new Date("2026-11-14T12:20:35+03:00"), // 25 özellik (tüm tipler)
+    bitis: new Date("2026-11-14T12:42:26+03:00"), // 25 özellik (tüm tipler)
     aciklama: "Saf Model'e (varsayılan model) 3 ham program alanı sinyali eklendi → 25 özellik: fMean (Runner.recentForm son 6 yarış derecesinin ortalaması; '0' hanesi 10 sayılır), kgsLog (log(1+TJK KGS)), sexE (yaş alanının 3. kelimesi 'e' mi). Tetikleyen bulgu: 'piyasa ne görüyor' testi — kitle atın son 6 yarıştaki derecesini fiyatlıyor (piyasa görüşünün açıklanabilen kısmında en büyük payı form satırı aldı: çıkarınca R² -0.111), 22 sinyalde karşılığı yoktu (yalnız lastWon). Maiden/ŞARTLI 19 ve ŞARTLI 1/27 segment modelleri DEĞİŞMEDİ; yeni sinyaller yalnız varsayılan modelin featureNames'inde. Banko Platt katsayıları yeni olasılıklara göre yeniden fit edildi (banko-adayi.ts).",
     neyiAnalizEdiyor: [
       "25 aktif feature (varsayılan model): önceki 22 + fMean, kgsLog, sexE. Tanımlar tek yerde: src/lib/methodology/ham-alan-sinyalleri.ts (eğitim ve canlı aynı fonksiyonları kullanır, birim testli). Eksik veri (form satırı yok, KGS yok, cins yok) → gözlemsiz, sıfır katkı.",
@@ -785,14 +785,27 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "RotaGanyan Analiz Motoru",
     ana: "V5",
-    baslangic: new Date("2026-11-14T12:20:35+03:00"),
-    bitis: null,
+    baslangic: new Date("2026-11-14T12:42:26+03:00"), // gerçek Vercel deploy saati (kod commit'i 12:20'de hazırdı)
+    bitis: new Date("2026-11-14T14:10:00+03:00"), // Handikap 23 özellik dönemi
     aciklama: "Handikap koşularında hpRel ve kiloRel çıkarıldı (25 → 23 sinyal; ayrı Handikap segment ağırlık dosyası). Kullanıcı kararı + veri: kazananın saha-içi yüzdelik sırası (0.50=ayırt etmez) Handikap'ta HP 0.53 [0.48,0.58], kilo 0.51 [0.46,0.56]; ŞARTLI 2-5/KV/Maiden'de HP 0.65/0.69/0.65, kilo 0.63/0.60/0.61 (anlamlı). Motorun 13 Kasım notu da hpRel için 'Handikap'te etkisiz' demişti. Diğer tipler ve kalan 23 katsayı DEĞİŞMEDİ.",
     neyiAnalizEdiyor: [
       "Handikap: 23 aktif feature (varsayılan 25'ten hpRel, kiloRel çıkarıldı). Diğer tipler: 25 (varsayılan), ŞARTLI1/27: 4, Maiden/ŞARTLI19: 8 — segment-routing: v546-1-engine.ts segmentAgirligiSec.",
     ],
     caprazlamalar: [
       "SINIRLAR (önce): (1) Katsayılar YENİDEN EĞİTİLMEDİ — 23 sinyal varsayılan modelin katsayılarıyla (hpRel/kiloRel bırakılarak) çalışıyor; 25 sinyalli eğitim verisi saklanmadığı için Handikap-özel CV yapılmadı. (2) Kanıt 134 Handikap koşusu (son 30 gün, 16/20 sinyalli kayıtlı anlık görüntü) — küçük örnek. (3) Handikap banko zaten yok (kalibre olasılık eşiğe ulaşmıyor), banko etkilenmez.",
+    ],
+  },
+  {
+    versiyon: "RotaGanyan Analiz Motoru",
+    ana: "V5",
+    baslangic: new Date("2026-11-14T14:10:00+03:00"),
+    bitis: null,
+    aciklama: "SİNYAL KÜTÜĞÜ SON HALİ — fiilen ölü 4 sinyal canlı modellerden çıkarıldı: sonIdmanSprint (%91 sıfır, 2 değer), idmJokey (%92 sıfır), takiDegisikligi (%94 sıfır), PS_lone (%99 sıfır; σ=0.0086 yüzünden sıfır dışı bir değerde z≈16, katkı ±2'ye çıkabiliyordu, motorun z hesabında kırpma yok). Eğitim bootstrap |z| hepsi ≤1.5 (zaten anlamsızdı). Kayıt defteri (signal-registry.ts) artık canlı modellerin birleşimiyle birebir eşleşir ve bu bir testle korunur.",
+    neyiAnalizEdiyor: [
+      "21 aktif feature (varsayılan model): h2hNetSkor, hizDerecesi, zeminToleransi, zeminMesafeDeneyim, yarisGidisatiSkoru, sireOrani, ACC_CLOSE_RES, ACC_LATE, ACC_SPEED, PS_front, PS_closerFit, jokeyFormuGenel, galopKalite, jokeyPIT, antrenorPIT, lastWon, hpRel, kiloRel, fMean, kgsLog, sexE. Handikap segmenti 19 (hpRel/kiloRel de yok), Maiden/ŞARTLI 19 segmenti 7 (idmJokey çıkarıldı), ŞARTLI 1/27 4 (değişmedi). Canlı modellerin sinyal birleşimi = 23.",
+    ],
+    caprazlamalar: [
+      "SINIRLAR (önce): (1) Katsayılar YENİDEN EĞİTİLMEDİ — kalan sinyallerin β'ları aynı; yeniden eğitim/CV yapılmadı (25 sinyalli eğitim verisi saklanmıyordu; arac-sinyal-veri-aktar.mts ile birikmeye başladı). (2) Nötrlük ölçümü yalnız 14 kayıtlı 25 sinyalli koşuda: 1. seçim değişen 0, ilk-3 kümesi değişen 0, ortalama olasılık farkı 0.09 puan (en büyük 1.5). (3) MODEL_SURUMLERI'ndeki cv değeri 25 sinyalli modelin CV'sinden MİRAS alındı (yeni ölçüm değil).",
     ],
   },
 ];

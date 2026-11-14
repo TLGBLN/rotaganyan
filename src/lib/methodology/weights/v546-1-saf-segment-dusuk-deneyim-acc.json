@@ -1,8 +1,8 @@
 {
   "status": "READY",
   "version": "RotaGanyan Analiz Motoru — Segment: Maiden/ŞARTLI 19",
-  "generatedAt": "2026-11-10T10:10:31.258Z",
-  "note": "2026-11-10 kullanıcı kararı — SADECE Maiden/ŞARTLI 19 koşularında kullanılır. 18 özellik (15 mevcut + antrenör + jokey formu + galop kalitesi).",
+  "generatedAt": "2026-11-14T14:03:29+03:00",
+  "note": "2026-11-10 kullanıcı kararı — SADECE Maiden/ŞARTLI 19 koşularında kullanılır. 18 özellik (15 mevcut + antrenör + jokey formu + galop kalitesi). | 2026-11-14 KULLANICI KARARI (sinyal kütüğü son hali): fiilen ölü sinyaller çıkarıldı — sonIdmanSprint (%91 sıfır, 2 değer), idmJokey (%92 sıfır), takiDegisikligi (%94 sıfır) ve PS_lone (%99 sıfır; σ=0.0086 ile sıfır dışı bir değerde z≈16, katkı ±2'ye çıkabiliyordu). Eğitim bootstrap |z| hepsi ≤1.5. Kalan katsayılar DEĞİŞMEDİ (yeniden eğitim yok); 14 kayıtlı 25 sinyalli koşuda 1. seçim/ilk-3 kümesi değişmedi, ort. olasılık farkı 0.09 puan.",
   "featureNames": [
     "ACC_CLOSE_RES",
     "ACC_SPEED",
@@ -10,8 +10,7 @@
     "sireOraniBirlesik",
     "jokeyFormuGenel",
     "antrenorOraniGenel",
-    "galopKalite",
-    "idmJokey"
+    "galopKalite"
   ],
   "weights": [
     1.419197963683156,
@@ -20,8 +19,7 @@
     0.05356542640343056,
     0.0076412239301215535,
     0.3589060383574671,
-    0.21822338307382258,
-    0.07330885987367255
+    0.21822338307382258
   ],
   "means": [
     -0.048209328964671526,
@@ -30,8 +28,7 @@
     9.61679013955337,
     -0.0027676976448432994,
     9.112633043198732,
-    0.3183953740513191,
-    0.17862503752626838
+    0.3183953740513191
   ],
   "stds": [
     0.49513773241932885,
@@ -40,8 +37,7 @@
     5.097057124051757,
     0.04016346112748517,
     3.295965630711702,
-    0.8736585412178116,
-    0.3830380313950589
+    0.8736585412178116
   ],
   "trainingWindow": {
     "yarisSayisi": 292
