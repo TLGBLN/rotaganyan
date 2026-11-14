@@ -87,6 +87,38 @@ export function zayifTipTabanlari(races: AutoFillRace[], width: Width): Record<n
   return taban;
 }
 
+/**
+ * 2026-11-14 kullanıcı bulgusu (Ankara 1. Altılı, K1 DEJAME / K2 ETMAN): zayıf-tip tabanı (4/6/8) ayağın ZATEN ne kadar
+ * öngörülebilir olduğuna bakmadan uygulanıyordu. K2 Maiden'de %35'lik favori ETMAN varken 4/5/6 at, K4 Handikap 21'de %47'lik
+ * favoriyle 7 at yazılırken, düz dağılımlı (%24/%23/%17/%17) K1'e yalnız 2 at kaldı ve DEJAME üç kuponda da dışarıda kalıp
+ * ilk ayakta yattı. Çözüm: taban, o ayağın KENDİ olasılıklarıyla "bu kademenin kapsama hedefine yetecek at sayısı"nı AŞAMAZ.
+ * Hedef: Ekonomik %65 / Normal %75 / Geniş %85 (model olasılıkları normalize edilmiş toplam kümülatif). Güçlü favorili ayakta
+ * taban küçülür, boşalan bütçe düz ayaklara gider. Geriye dönük test (183 altılı): ham-tabana göre kalibre-beklenen tutma
+ * +0.33/+0.50/+0.72 puan [GA sıfırı dışlar], eğri-beklenen +0.04/+0.10/+0.22 puan; gerçek tutan 11/16/22 ↔ 12/19/22 (gürültü içi).
+ */
+export const KAPSAMA_HEDEFI_TAVAN: Record<Width, number> = { narrow: 0.65, normal: 0.75, wide: 0.85 };
+
+function hedefeYetenAtSayisi(race: AutoFillRace, hedef: number): number | null {
+  const p = race.runners.filter((r) => !r.scratched).map((r) => Math.max(0, (r.scoreExact ?? r.score ?? 0) / 100)).sort((a, b) => b - a);
+  const toplam = p.reduce((a, b) => a + b, 0);
+  if (!(toplam > 0)) return null;
+  let kum = 0;
+  for (let i = 0; i < p.length; i++) { kum += p[i] / toplam; if (kum >= hedef - 1e-9) return i + 1; }
+  return p.length;
+}
+
+/** zayifTipTabanlari + ayağın kendi olasılığına göre kapsama-hedefi tavanı (bkz. KAPSAMA_HEDEFI_TAVAN notu). Olasılığı olmayan
+ *  ayakta (toplam 0) ham taban aynen korunur. */
+export function zayifTipTabanlariSinirli(races: AutoFillRace[], width: Width): Record<number, number> {
+  const taban = zayifTipTabanlari(races, width);
+  for (const race of races) {
+    if (taban[race.raceNo] == null) continue;
+    const k = hedefeYetenAtSayisi(race, KAPSAMA_HEDEFI_TAVAN[width]);
+    if (k != null) taban[race.raceNo] = Math.max(1, Math.min(taban[race.raceNo], k));
+  }
+  return taban;
+}
+
 /** 2026-11-04 canlıda yakalanan bug — zayıf-tip tabanı yalnız İLK (Ekonomik) kademeye
  *  tohum olarak veriliyordu; Ekonomik bütçe (birden fazla zayıf ayağın tabanı aynı anda
  *  tetiklenince) bunu karşılayamayınca `oncekiBirimSayilari` sonraki kademeye Ekonomik'in
@@ -152,7 +184,7 @@ export function otomatikGroupSelections(
   for (const width of WIDTHS) {
     const effectiveLimit = limits[width] * tolerances[width];
     const maxCombinations = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
-    const girdiTaban = tabanlariBirlestir(zayifTipTabanlari(races, width), oncekiBirimSayilari);
+    const girdiTaban = tabanlariBirlestir(zayifTipTabanlariSinirli(races, width), oncekiBirimSayilari);
     const { secimler, birimSayilari } = optimizeKuponAllocation(legs, maxCombinations, girdiTaban, oncekiBirimSayilari);
     oncekiBirimSayilari = birimSayilari;
     for (const race of races) {
@@ -197,7 +229,7 @@ export function computeAllocatorTiers(
   for (const width of WIDTHS) {
     const effectiveLimit = limits[width] * tolerances[width];
     const combinationLimit = Math.max(1, Math.floor(effectiveLimit / stakePerCombination));
-    const girdiTaban = tabanlariBirlestir(zayifTipTabanlari(races, width), oncekiBirimSayilari);
+    const girdiTaban = tabanlariBirlestir(zayifTipTabanlariSinirli(races, width), oncekiBirimSayilari);
     const result: OptimizeResult = optimizeKuponAllocation(legs, combinationLimit, girdiTaban, oncekiBirimSayilari);
     oncekiBirimSayilari = result.birimSayilari;
     tiers.push({

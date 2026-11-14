@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { otomatikGroupSelections, computeAllocatorTiers, zayifTipTabanlari, ZAYIF_TIP_MIN_SECIM_BY_WIDTH, type AutoFillRace, LIMITS, TOLERANCES, WIDTHS } from "./kupon-auto-fill";
+import { otomatikGroupSelections, computeAllocatorTiers, zayifTipTabanlari, zayifTipTabanlariSinirli, ZAYIF_TIP_MIN_SECIM_BY_WIDTH, type AutoFillRace, LIMITS, TOLERANCES, WIDTHS } from "./kupon-auto-fill";
 
 // 2026-10-11 — bu dosya KuponForm.tsx'ten BİREBİR aynı mantıkla taşındı (davranış
 // değişmedi); bu test hem taşımanın hem de computeAllocatorTiers'ın (publish-time RCA
@@ -65,7 +65,9 @@ describe("zayıf-tip tabanı (kaybedilen kazananlar -> optimizör köprüsü)", 
   const zayifRaces: AutoFillRace[] = [1, 2, 3, 4, 5, 6].map((raceNo) => ({
     raceNo,
     classType: raceNo === 1 ? "Handikap 21" : "G 1", // yalnız 1. ayak zayıf tip (ZAYIF_TIPLER'de)
-    runners: mkRunners(),
+    // 1. ayak (zayıf tip) DÜZ dağılımlı: taban, kapsama-hedefi tavanına (2026-11-14) takılmadan tam uygulansın.
+    // (%80'lik tek favorili zayıf ayakta taban artık bilerek küçülür — aşağıdaki "kapsama-hedefi tavanı" testlerine bak.)
+    runners: raceNo === 1 ? Array.from({ length: 10 }, (_, i) => ({ no: i + 1, scratched: false, ekuriGroup: null, score: null, scoreExact: 10 })) : mkRunners(),
   }));
   const classTypeOlmayanRaces: AutoFillRace[] = zayifRaces.map(({ classType: _classType, ...rest }) => rest);
 
@@ -156,6 +158,63 @@ describe("zayıf-tip tabanı (kaybedilen kazananlar -> optimizör köprüsü)", 
     // verilmezse 1. ayak için taban HİÇ uygulanmaz (zayifTipTabanlari zaten {} döner).
     const withoutClassType = otomatikGroupSelections(classTypeOlmayanRaces, 1.25, LIMITS, TOLERANCES);
     expect(zayifTipTabanlari(classTypeOlmayanRaces, "narrow")).toEqual({});
-    expect(withoutClassType[1].narrow.size).toBeLessThan(ZAYIF_TIP_MIN_SECIM_BY_WIDTH.narrow);
+    // (Düz dağılımlı 1. ayakta DP zaten doğal olarak çok at seçebilir; asıl garanti tabanın hiç OLUŞMAMASI.)
+    expect(zayifTipTabanlariSinirli(classTypeOlmayanRaces, "narrow")).toEqual({});
+    expect(withoutClassType[1].narrow.size).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// 2026-11-14 (Ankara 1. Altılı: K2 Maiden'de %35'lik favori ETMAN varken 4/5/6 at, K4 Handikap 21'de %47'lik favoriyle 7 at
+// yazılırken düz dağılımlı K1'e 2 at kaldı → DEJAME dışarıda, ilk ayakta yattı): zayıf-tip tabanı ayağın kendi olasılığına göre
+// kapsama-hedefi tavanıyla sınırlanır.
+describe("zayıf-tip tabanı — kapsama-hedefi tavanı (zayifTipTabanlariSinirli)", () => {
+  const mk = (raceNo: number, classType: string, ps: number[]): AutoFillRace => ({ raceNo, classType, runners: ps.map((p, i) => ({ no: i + 1, scratched: false, ekuriGroup: null, score: null, scoreExact: p })) });
+
+  it("güçlü favorili zayıf-tip ayakta taban KÜÇÜLÜR (%80 favori → Ekonomik/Normal'de 1, Geniş'te 2 at yeter)", () => {
+    const r = [mk(1, "Handikap 21", [80, 8, 5, 3, 2, 1, 0.6, 0.4])];
+    expect(zayifTipTabanlari(r, "wide")[1]).toBe(ZAYIF_TIP_MIN_SECIM_BY_WIDTH.wide);
+    expect(zayifTipTabanlariSinirli(r, "narrow")[1]).toBe(1);
+    expect(zayifTipTabanlariSinirli(r, "normal")[1]).toBe(1);
+    expect(zayifTipTabanlariSinirli(r, "wide")[1]).toBe(2);
+  });
+
+  it("düz dağılımlı zayıf-tip ayakta taban AYNEN korunur", () => {
+    const r = [mk(1, "Handikap 16", Array.from({ length: 10 }, () => 10))];
+    expect(zayifTipTabanlariSinirli(r, "narrow")[1]).toBe(4);
+    expect(zayifTipTabanlariSinirli(r, "normal")[1]).toBe(6);
+    expect(zayifTipTabanlariSinirli(r, "wide")[1]).toBe(8);
+  });
+
+  it("Ankara K2 Maiden (ETMAN %34.9 ...) → taban 4/5/5 (eskiden 4/6/8)", () => {
+    const r = [mk(2, "Maiden/DHÖW", [34.9, 16.1, 11.6, 11.5, 11.5, 7.7, 2.6, 1.5, 1.4, 1.2])];
+    expect(zayifTipTabanlariSinirli(r, "narrow")[2]).toBe(4);
+    expect(zayifTipTabanlariSinirli(r, "normal")[2]).toBe(5);
+    expect(zayifTipTabanlariSinirli(r, "wide")[2]).toBe(5);
+  });
+
+  it("zayıf olmayan tipte taban hiç oluşmaz, olasılığı olmayan zayıf ayakta ham taban korunur", () => {
+    expect(zayifTipTabanlariSinirli([mk(1, "ŞARTLI 5", [24, 23, 17, 17, 8, 6, 5])], "wide")).toEqual({});
+    expect(zayifTipTabanlariSinirli([mk(1, "Handikap 16", [0, 0, 0, 0])], "normal")[1]).toBe(6);
+  });
+
+  it("taban tavanı ASLA ham tabanı AŞMAZ ve en az 1'dir", () => {
+    const r = [mk(1, "Handikap 16", Array.from({ length: 20 }, () => 5))];
+    for (const w of ["narrow", "normal", "wide"] as const) { const t = zayifTipTabanlariSinirli(r, w)[1]; expect(t).toBeLessThanOrEqual(ZAYIF_TIP_MIN_SECIM_BY_WIDTH[w]); expect(t).toBeGreaterThanOrEqual(1); }
+  });
+
+  it("Ankara 1. Altılı vakası: favorili zayıf ayaklar (K2/K4) küçülen tabanla bütçeyi düz K1'e bırakır — K1'e Geniş'te en az 3 at", () => {
+    const ayaklar: AutoFillRace[] = [
+      mk(1, "ŞARTLI 5", [24.2, 23.4, 16.8, 16.7, 8.1, 6.3, 4.5]),
+      mk(2, "Maiden/DHÖW", [34.9, 16.1, 11.6, 11.5, 11.5, 7.7, 2.6, 1.5, 1.4, 1.2]),
+      mk(3, "SATIŞ 3", [34.1, 32.3, 14.6, 13.9, 5.1]),
+      mk(4, "Handikap 21 /H1", [47.4, 15.4, 12.8, 9.8, 7.8, 3.5, 3.3]),
+      mk(5, "Handikap 16 /H1", [23.5, 12.5, 11.5, 10, 8.2, 6.6, 6, 5.5, 5, 4.2, 3]),
+      mk(6, "G 2/ULS", [26.1, 23.9, 16.1, 10.8, 7.5, 6.1, 5, 4.5]),
+    ];
+    const t = computeAllocatorTiers(ayaklar, 1.25);
+    const k1 = (w: string) => (t.find((x) => x.width === w)!.selections[1] ?? []).length;
+    const k4 = (w: string) => (t.find((x) => x.width === w)!.selections[4] ?? []).length;
+    expect(k1("wide")).toBeGreaterThanOrEqual(3);
+    expect(k4("wide")).toBeLessThan(7); // eskiden %47'lik favorili Handikap 21'e 7 at yazılıyordu
   });
 });
