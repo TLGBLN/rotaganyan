@@ -65,3 +65,6 @@ bu kuralın DIŞINDA — admin bilerek terfi-ayarlı Sıra'yı görmeli.)
 - `arac-terfi-denetimi.mts` — yukarıya bakınız
 - `arac-model-veri-olustur.mts` — V5 eğitim verisi cache'ini üretir/günceller
 - `arac-model-egit-segment.mjs` — düşük-şart/diğer segmentlerini ayrı ayrı eğitir
+- `arac-sinyal-veri-aktar.mts` (`npm run sinyal-veri`) — canlı motorun KAYITLI sinyal anlık görüntülerini + gerçek sonuçları `.sinyal-veri/anlik.ndjson`'a biriktirir (idempotent, SALT-OKUMA, gün gün; yarış saatinde çalıştırma). 25 sinyalli eğitim/CV verisinin TEK kaynağı — motor değişikliklerini (Handikap yeniden eğitimi vb.) sınamak için her gün/oturum çalıştır.
+- `arac-tam-at-inceleme.mts` artık CANLI motoru (`scoreV461Saf`, segment-routing dahil) gösterir; eski v5-engine değil. `arac-gercek-motor-tek-kosu.mts` / `arac-coklu-kosu-gercek-motor.mts` hızlı katkı dökümü içindir.
+- `npm test` Windows'ta küçük harfli sürücü harfi tuzağını (`c:\` → vitest "reading 'config'" hatası) kendisi düzeltir (`scripts/vitest-calistir.mjs`). Doğrudan `npx vitest` kullanırsan dizini büyük harfli `C:\...` aç.

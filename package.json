@@ -15,7 +15,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset --force && tsx prisma/seed.ts",
-    "test": "vitest run",
+    "test": "node scripts/vitest-calistir.mjs",
+    "sinyal-veri": "node --env-file=.env node_modules/tsx/dist/cli.mjs arac-sinyal-veri-aktar.mts",
     "test:watch": "vitest"
   },
   "dependencies": {
