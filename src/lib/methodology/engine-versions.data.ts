@@ -786,7 +786,7 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
     versiyon: "RotaGanyan Analiz Motoru",
     ana: "V5",
     baslangic: new Date("2026-11-14T12:42:26+03:00"), // gerçek Vercel deploy saati (kod commit'i 12:20'de hazırdı)
-    bitis: new Date("2026-11-14T14:26:00+03:00"), // Handikap 23 özellik dönemi
+    bitis: new Date("2026-11-14T14:19:50+03:00"), // Handikap 23 özellik dönemi
     aciklama: "Handikap koşularında hpRel ve kiloRel çıkarıldı (25 → 23 sinyal; ayrı Handikap segment ağırlık dosyası). Kullanıcı kararı + veri: kazananın saha-içi yüzdelik sırası (0.50=ayırt etmez) Handikap'ta HP 0.53 [0.48,0.58], kilo 0.51 [0.46,0.56]; ŞARTLI 2-5/KV/Maiden'de HP 0.65/0.69/0.65, kilo 0.63/0.60/0.61 (anlamlı). Motorun 13 Kasım notu da hpRel için 'Handikap'te etkisiz' demişti. Diğer tipler ve kalan 23 katsayı DEĞİŞMEDİ.",
     neyiAnalizEdiyor: [
       "Handikap: 23 aktif feature (varsayılan 25'ten hpRel, kiloRel çıkarıldı). Diğer tipler: 25 (varsayılan), ŞARTLI1/27: 4, Maiden/ŞARTLI19: 8 — segment-routing: v546-1-engine.ts segmentAgirligiSec.",
@@ -798,7 +798,7 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
   {
     versiyon: "RotaGanyan Analiz Motoru",
     ana: "V5",
-    baslangic: new Date("2026-11-14T14:26:00+03:00"),
+    baslangic: new Date("2026-11-14T14:19:50+03:00"),
     bitis: null,
     aciklama: "SİNYAL KÜTÜĞÜ SON HALİ — fiilen ölü 4 sinyal canlı modellerden çıkarıldı: sonIdmanSprint (%91 sıfır, 2 değer), idmJokey (%92 sıfır), takiDegisikligi (%94 sıfır), PS_lone (%99 sıfır; σ=0.0086 yüzünden sıfır dışı bir değerde z≈16, katkı ±2'ye çıkabiliyordu, motorun z hesabında kırpma yok). Eğitim bootstrap |z| hepsi ≤1.5 (zaten anlamsızdı). Kayıt defteri (signal-registry.ts) artık canlı modellerin birleşimiyle birebir eşleşir ve bu bir testle korunur.",
     neyiAnalizEdiyor: [
