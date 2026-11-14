@@ -1,7 +1,6 @@
 import { ENGINE_VERSIONS } from "@/lib/methodology/engine-versions.data";
 import safWeights from "@/lib/methodology/weights/v546-1-saf-weights.json";
 import segmentDusukDeneyimJson from "@/lib/methodology/weights/v546-1-saf-segment-dusuk-deneyim.json";
-import segmentDusukDeneyimAccJson from "@/lib/methodology/weights/v546-1-saf-segment-dusuk-deneyim-acc.json";
 import segmentHandikapJson from "@/lib/methodology/weights/v546-1-saf-segment-handikap.json";
 
 /**
@@ -47,7 +46,7 @@ export function getEngineLabelForClassType(classType?: string | null): string {
   const c = classType.toUpperCase();
   const ekle = (ozellikSayisi: number, segmentAdi: string) =>
     `${ENGINE_VERSIONS[ENGINE_VERSIONS.length - 1].versiyon} — Segment: ${segmentAdi} — Koşullu Logit Modeli (${ozellikSayisi} aktif sinyal, AGF'siz — tek skor + softmax, bu koşu tipine özel ağırlık — atları doğrudan kıyaslar, Claude yok, maliyet sıfır)`;
-  if (c.includes("MAIDEN") || c.includes("ŞARTLI 19")) return ekle(segmentDusukDeneyimAccJson.featureNames.length, "Maiden/ŞARTLI 19");
+  if (c.includes("MAIDEN") || c.includes("ŞARTLI 19")) return CURRENT_ENGINE_LABEL; // 2026-11-15: segmentten çıkarıldı
   if (c.includes("ŞARTLI 1") || c.includes("ŞARTLI 27")) return ekle(segmentDusukDeneyimJson.featureNames.length, "ŞARTLI 1/27");
   if (c.includes("HANDIKAP")) return ekle(segmentHandikapJson.featureNames.length, "Handikap");
   return CURRENT_ENGINE_LABEL;

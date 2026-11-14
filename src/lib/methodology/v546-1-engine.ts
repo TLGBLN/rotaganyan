@@ -395,15 +395,16 @@ export function agfDestekOnerisiHesapla(picks: V461SafPick[], rawRunners: V461Ra
 // ŞARTLI 19'un ÖNCE kontrol edilmesi (ŞARTLI 1'in "ŞARTLI 19" alt-string'ini yanlışlıkla
 // yakalamaması için) — ran-v2.ts'teki kategoriBelirle ile AYNI mantık/sıra.
 import segmentDusukDeneyimJson from "./weights/v546-1-saf-segment-dusuk-deneyim.json";
-import segmentDusukDeneyimAccJson from "./weights/v546-1-saf-segment-dusuk-deneyim-acc.json";
 import segmentHandikapJson from "./weights/v546-1-saf-segment-handikap.json";
 const SEGMENT_DUSUK_DENEYIM_W = segmentDusukDeneyimJson as unknown as FrozenWeights;
-const SEGMENT_DUSUK_DENEYIM_ACC_W = segmentDusukDeneyimAccJson as unknown as FrozenWeights;
 // 2026-11-14 — Handikap: hpRel/kiloRel çıkarıldı (23 sinyal), bkz. weights/v546-1-saf-segment-handikap.json notu.
 const SEGMENT_HANDIKAP_W = segmentHandikapJson as unknown as FrozenWeights;
 function segmentAgirligiSec(classType: string, varsayilan: FrozenWeights): FrozenWeights {
   const c = classType.toUpperCase();
-  if (c.includes("MAIDEN") || c.includes("ŞARTLI 19")) return SEGMENT_DUSUK_DENEYIM_ACC_W;
+  // 2026-11-15 — Maiden/ŞARTLI 19 segmentten ÇIKARILDI (varsayılan 21 sinyal): 334 yarış blok-CV'de
+  // segment (7 sinyal, formsuz) varsayılana göre ΔLL +0.071 kötüydü (GA sıfırı dışlıyor). Bu dal,
+  // "ŞARTLI 1" alt-string'ine düşmemesi için KORUNUR (ŞARTLI 19 ⊃ "ŞARTLI 1").
+  if (c.includes("MAIDEN") || c.includes("ŞARTLI 19")) return varsayilan;
   if (c.includes("ŞARTLI 1") || c.includes("ŞARTLI 27")) return SEGMENT_DUSUK_DENEYIM_W;
   if (c.includes("HANDIKAP")) return SEGMENT_HANDIKAP_W;
   return varsayilan;
