@@ -20,7 +20,7 @@ const SINYAL_AD: Record<string, string> = {
   idmJokey: "İdman Jokeyi Uyumu", h2hNetSkor: "H2H Net Skor", hizDerecesi: "Hız Derecesi",
   zeminToleransi: "Zemin Toleransı", zeminMesafeDeneyim: "Zemin+Mesafe Deneyimi",
   sonIdmanSprint: "Son İdman Sprint", takiDegisikligi: "Takı Değişikliği",
-  yarisGidisatiSkoru: "Yarış Gidişatı Skoru (Tempo)", sireOrani: "Pedigri (Baba)", sireOraniBirlesik: "Pedigri (Baba+Anne+Anne Babası)",
+  yarisGidisatiSkoru: "Yarış Gidişatı Skoru (Tempo)", sireOrani: "Pedigri", sireOraniBirlesik: "Pedigri (Baba+Anne+Anne Babası)",
   hpRel: "Handikap Puanı (sahaya göre)", kiloRel: "Taşınan Kilo (sahaya göre)",
   fMean: "Son 6 Yarış Derece Ortalaması (düşük = iyi form)", kgsLog: "Koşmadığı Gün Sayısı (KGS, log)", sexE: "Cins (e)", dususDelta: "Sınıf Düşüşü (önceki yarış sınıfı − bugünkü; + = düşüş)",
   jokeyPIT: "Jokey Seviyesi (son 365 gün)", antrenorPIT: "Antrenör Seviyesi (son 365 gün)", lastWon: "Son Yarışını Kazandı",

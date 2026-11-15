@@ -1738,7 +1738,7 @@ const FEATURE_LABELS: Record<string, string> = {
   formEgimi: "Form Eğimi", formEgimi2: "Form Eğimi (karesi, doğrusal-olmayan etki)",
   kgs: "KGS (dinlenme günü)", kgs2: "KGS (karesi)", kgsVarMi: "KGS Verisi Var Mı",
   pistUzmani: "Pist Uzmanlığı (bu hipodrom+pist+mesafede yıl içi galibiyet)",
-  sireOrani: "Aygır Kazanma Oranı (küçültülmüş)", galop: "Keskin Galop Zinciri",
+  sireOrani: "Pedigri (küçültülmüş)", galop: "Keskin Galop Zinciri",
   idmJokey: "İdman Jokeyi Uyumu", jokeyOrani: "Jokey Kazanma Oranı (küçültülmüş)",
   antrenorOrani: "Antrenör Kazanma Oranı (küçültülmüş)",
   uzunAraGalopKatkisi: "Uzun Aradan Sonra Galop Sayısı",

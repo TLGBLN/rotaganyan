@@ -19,7 +19,7 @@ export const SINYAL_BILGI: Record<string, { ad: string; ham?: (v: number) => str
   zeminToleransi: { ad: "Zemin toleransı" },
   zeminMesafeDeneyim: { ad: "Zemin+mesafe deneyimi" },
   yarisGidisatiSkoru: { ad: "Yarış gidişatı (tempo uyumu)" },
-  sireOrani: { ad: "Pedigri (baba)" },
+  sireOrani: { ad: "Pedigri" },
   ACC_CLOSE_RES: { ad: "Kapanış gücü (Accurace)" },
   ACC_LATE: { ad: "Geç segment hızı (Accurace)" },
   ACC_SPEED: { ad: "Hız artığı (Accurace)" },

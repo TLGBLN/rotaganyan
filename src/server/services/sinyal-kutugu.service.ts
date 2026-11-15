@@ -87,7 +87,7 @@ export const CANLI_SINYALLER: CanliSinyal[] = [
   // eklendi (bkz. v5-engine.ts bKatmaniUygula). Yalnız düşük-şart'ta aktif, diğer/
   // Handikap'ta katsayısı fiilen 0 (skor birebir A katmanıyla aynı kalır).
   {
-    ad: "Sire Oranı (B KATMANI — düşük-şart istisnası, kanıtsız ama kullanıcı kararıyla aktif)",
+    ad: "Pedigri (B KATMANI — düşük-şart istisnası, kanıtsız ama kullanıcı kararıyla aktif)",
     kod: "sireOrani",
     katman: "B",
     dusukSart: { katsayi: 0.0477, durum: "anlamsiz", not: "Kalıcı araçla (n=1060, gerçek train/test) GA=[-0.1352,0.2045] — sıfırı içeriyor. Katsayı yine de bu gerçek eğitimden alındı, keyfi değil. BUG DÜZELTMESİ (2026-08-30, V5.30, Opus denetimi): 2026-08-28'deki 11-sinyal budamasında OZELLIK_GRUPLARI'ndan SIRE grubu kaldırılınca muhakemeUretV5'teki gösterim bloğu ölü koda döndü — skora katkı gerçekleşmeye devam etti ama ne gerekçe metninde ne featureSnapshot'ta hiç görünmüyordu, canlı etkisi tamamen ölçülemez durumdaydı. Düzeltildi: gerçek katkı artık r.bSireKatkisi'nde saklanıyor, hem gerekçe satırında hem featureSnapshot.bKatmani'de görünüyor." },

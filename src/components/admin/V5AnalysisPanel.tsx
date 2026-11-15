@@ -1032,7 +1032,7 @@ export default function V5AnalysisPanel({ raceId, classType, runners: raceRunner
                                 hesaplanıp doğrudan taşınıyor, burada yeniden türetilmiyor. */}
                             {a.bKatmaniUygulandiMi && (
                               <tr className="border-t border-amber-500/30 bg-amber-500/5">
-                                <td className="py-1 pr-2 text-amber-600">Sire Oranı (B katmanı)</td>
+                                <td className="py-1 pr-2 text-amber-600">Pedigri (B katmanı)</td>
                                 <td className="py-1 pr-2 font-mono text-amber-600/80">{(a.sireOrani ?? 0).toFixed(2)}</td>
                                 <td className="py-1 pr-2 font-mono text-amber-600/80">—</td>
                                 <td className="py-1 font-mono text-amber-600">
