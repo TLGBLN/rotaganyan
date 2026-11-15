@@ -24,7 +24,7 @@ const KOD_ETIKET: Record<string, string> = {
   FORM: "Form Eğimi",
   KGS: "KGS (dinlenme günü)",
   PIST: "Pist Uzmanlığı",
-  SIRE: "Aygır Kazanma Oranı",
+  SIRE: "Pedigri",
   GALOP: "Keskin Galop Zinciri",
   IDMJOK: "İdman Jokeyi Uyumu",
   JOKSTAT: "Jokey Kazanma Oranı",
