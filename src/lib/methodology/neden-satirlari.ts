@@ -13,7 +13,7 @@ export const SINYAL_BILGI: Record<string, { ad: string; ham?: (v: number) => str
   hpRel: { ad: "Handikap puanı (sahaya göre)", ham: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(0)} HP` },
   kiloRel: { ad: "Taşıdığı kilo (sahaya göre)", ham: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)} kg` },
   kgsLog: { ad: "Dinlenme süresi (KGS)", ham: (v) => `${Math.round(Math.expm1(v))} gün` },
-  sexE: { ad: "Cins (erkek)", ham: (v) => (v >= 1 ? "erkek" : "dişi/kısrak") },
+  sexE: { ad: "Cins", ham: (v) => (v >= 1 ? "erkek (e)" : "e dışı (dişi, iğdiş vb.)") },
   hizDerecesi: { ad: "Hız derecesi" },
   h2hNetSkor: { ad: "Baş başa (rakiplerle ortak yarış)" },
   zeminToleransi: { ad: "Zemin toleransı" },
