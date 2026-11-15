@@ -29,7 +29,16 @@ export type PedigriDevreye = {
   kullan: boolean;
   nedenler: string[];
 };
-export const YENI_MESAFE_FARKI_M = 200;
+/** MESAFE BANTLARI (kullanıcı kararı 2026-11-15, hibrit kural): 1 = 1000–1300 (sprint), 2 = 1400–1600 (orta/mil), 3 = 1700–2000 (orta-uzun), 4 = 2100+ (stayer).
+ *  "Eşdeğer geçmiş mesafe": aynı bant içindeyse ±200 m, bant atlıyorsa yalnız ±100 m tolere edilir. Geçmişinde bugünkü mesafeye eşdeğer hiç koşusu yoksa "ilk defa bu mesafede". */
+export const MESAFE_TOLERANS_AYNI_BANT_M = 200;
+export const MESAFE_TOLERANS_BANT_ATLAR_M = 100;
+export function mesafeBandi(m: number): 1 | 2 | 3 | 4 { return m <= 1300 ? 1 : m <= 1600 ? 2 : m <= 2000 ? 3 : 4; }
+/** Geçmiş koşu mesafesi (onc) bugünkü mesafeye (bugun) eşdeğer mi? (sınırlar DAHİL: 1400↔1600 aynı bantta 200 m → eşdeğer; 1600↔1800 bant atlar, 200 m > 100 → eşdeğer değil) */
+export function mesafeEsdeger(onc: number, bugun: number): boolean {
+  const tol = mesafeBandi(onc) === mesafeBandi(bugun) ? MESAFE_TOLERANS_AYNI_BANT_M : MESAFE_TOLERANS_BANT_ATLAR_M;
+  return Math.abs(onc - bugun) <= tol;
+}
 
 export type PedigriAtAnalizi = { no: number; name: string; yas: number | null; grupId: number | null; pistId: number | null; devreye: PedigriDevreye; sire: AtaAnalizi; dam: AtaAnalizi; damSire: AtaAnalizi };
 
@@ -98,14 +107,18 @@ export async function pedigriAnaliziKosu(girdi: PedigriKosuGirdi): Promise<Pedig
     const bilgi = tjkAtId != null && g !== undefined; // geçmiş önbelleği var mı
     const ilkStart = bilgi ? g!.length === 0 : false;
     const yeniPist = bilgi && g!.length > 0 && bugunPist != null && !g!.some((x) => x.pist === bugunPist);
-    const yeniMesafe = bilgi && g!.length > 0 && girdi.distance != null && !g!.some((x) => x.mesafe != null && Math.abs(x.mesafe - girdi.distance!) < YENI_MESAFE_FARKI_M);
+    const yeniMesafe = bilgi && g!.length > 0 && girdi.distance != null && !g!.some((x) => x.mesafe != null && mesafeEsdeger(x.mesafe, girdi.distance!));
     const gecmisDurumu: PedigriDevreye["gecmisDurumu"] = !bilgi ? "bilinmiyor" : g!.length === 0 ? "ilk-start" : "var";
     const nedenler: string[] = [];
     if (dusukSinif) nedenler.push("Maiden/Şartlı 1-19-27 yarışı");
     if (gecmisDurumu === "bilinmiyor") nedenler.push("GEÇMİŞ BİLİNMİYOR — atın profiline/geçmiş yarışlarına elle bakılmalı");
     if (ilkStart) nedenler.push("ilk start");
     if (yeniPist) nedenler.push("ilk defa bu pistte");
-    if (yeniMesafe) nedenler.push("ilk defa bu mesafede");
+    if (yeniMesafe) {
+      const mesafeler = g!.map((x) => x.mesafe).filter((x): x is number => x != null);
+      const en = mesafeler.length ? mesafeler.reduce((a, b) => (Math.abs(b - girdi.distance!) < Math.abs(a - girdi.distance!) ? b : a)) : null;
+      nedenler.push(en != null ? `ilk defa bu mesafede (en yakın geçmiş ${en} m → ${girdi.distance} m, ${mesafeBandi(en) === mesafeBandi(girdi.distance!) ? "aynı bant" : "bant atlıyor"})` : "ilk defa bu mesafede");
+    }
     return { dusukSinifYarisi: dusukSinif, ilkStart, yeniPist, yeniMesafe, gecmisDurumu, sonYarislar: (g ?? []).slice(0, 6).map(({ tarih, pist, mesafe, sinif, derece }) => ({ tarih, pist, mesafe, sinif, derece })), kullan: nedenler.length > 0, nedenler };
   };
 
