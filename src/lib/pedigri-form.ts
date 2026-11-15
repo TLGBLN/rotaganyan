@@ -48,6 +48,7 @@ export const ESIK_BAGLAM: Record<PedigriBaglamTur, Esik> = {
 export function pedigriAdNormalize(ad: string): string {
   return ad
     .replace(/\s*\([^)]*\)\s*$/g, "")
+    .replace(/\*/g, "") // program adlarında "STREET SENSE* (USA)" gibi yıldız var; TJK satırlarında da bazen var → iki tarafta da atılır
     .toLocaleUpperCase("tr")
     .replace(/İ/g, "I").replace(/Ş/g, "S").replace(/Ğ/g, "G").replace(/Ü/g, "U").replace(/Ö/g, "O").replace(/Ç/g, "C")
     .replace(/\s+/g, " ")
