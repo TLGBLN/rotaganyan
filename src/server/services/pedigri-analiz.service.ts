@@ -1,6 +1,7 @@
 // PEDİGRİ ANALİZİ (koşu bazlı) — bir koşunun atları için baba / anne / anne babası SEVİYE + BAĞLAM (grup × pist) analizi.
-// Veri: TjkPedigriStat (resmî TJK, 2026). Yöntem ve sabitler: src/lib/pedigri-form.ts. SKORA/KUPONA GİRMEZ — yalnız analiz gösterimi.
+// Veri: TjkPedigriStat (resmî TJK; seviye için 2023'ten itibaren yıllar BİRLEŞİK — annenin eski yavruları da sayılır). Yöntem ve sabitler: src/lib/pedigri-form.ts. SKORA/KUPONA GİRMEZ — yalnız analiz gösterimi.
 import { db } from "@/lib/db";
+import { breedToIrk, normalizeSireName } from "@/lib/sire-stat-match";
 import { sinifSeviyesi } from "@/lib/methodology/ham-alan-sinyalleri";
 import { mesafeBandi, mesafeEsdeger } from "@/lib/pedigri-form";
 import {
@@ -16,7 +17,14 @@ export type AtaAnalizi = {
   tjkId: number | null;
   seviye: PedigriSeviye | null;
   baglamlar: AtaBaglamSatiri[];
+  /** Verinin kaynağı: "TJK" (resmî tablo) | "OWN" (TJK'da yok → kendi sonuçlarımızdan, örnek küçük olabilir) | null (VERİ YOK). */
+  kaynak: "TJK" | "OWN" | null;
+  yillar: number[]; // seviye hangi yılların toplamı
+  /** Eksik/yedek durumu açıkça yazılır — eksik bileşen ASLA sessizce nötr sayılmaz. */
+  not: string | null;
 };
+/** Üç bileşenin (baba, anne, anne babası) hangisi analiz edilebildi. tam=false ise sonuç EKSİK pedigriyle üretilmiştir. */
+export type PedigriTamlik = { sire: boolean; dam: boolean; damSire: boolean; tam: boolean; eksikler: string[] };
 /** Pedigrinin NE ZAMAN kullanılacağı (kullanıcı kararı 2026-11-15): (a) yarış Maiden / Şartlı 1 / Şartlı 19 / Şartlı 27 (sınıf seviyesi 1) VEYA
  *  (b) at İLK DEFA farklı bir PİSTE ya da farklı bir MESAFEYE çıkıyor. Ek olarak ilk start (geçmişi hiç yok) da bayraklanır — pedigrinin tek bilgi olduğu uç durum. */
 export type PedigriDevreye = {
@@ -30,7 +38,7 @@ export type PedigriDevreye = {
   kullan: boolean;
   nedenler: string[];
 };
-export type PedigriAtAnalizi = { no: number; name: string; yas: number | null; grupId: number | null; pistId: number | null; devreye: PedigriDevreye; sire: AtaAnalizi; dam: AtaAnalizi; damSire: AtaAnalizi };
+export type PedigriAtAnalizi = { no: number; name: string; yas: number | null; grupId: number | null; pistId: number | null; devreye: PedigriDevreye; tamlik: PedigriTamlik; sire: AtaAnalizi; dam: AtaAnalizi; damSire: AtaAnalizi };
 
 export type PedigriKosuGirdi = {
   breed: "INGILIZ" | "ARAP";
@@ -43,30 +51,60 @@ export type PedigriKosuGirdi = {
   runners: { no: number; name: string; sire: string | null; dam: string | null; damSire: string | null; age: string | null; tjkAtId?: number | null }[];
 };
 
+/** Seviye sayımı için en eski TJK yılı. Tek yıl (2026) yetmiyordu: annenin 2026'da yalnız bu at koşmuşsa başka bilgi kalmıyordu. */
+export const TJK_ILK_YIL = 2023;
+
+type OwnSum = Map<string, Sayim>;
+let ownOnbellek: { t: number; irk: string; DAM: OwnSum; DAMSIRE: OwnSum } | null = null;
+/** TJK'da OLMAYAN atalar (özellikle yurt dışı doğumlu atların anne babası) için kendi sonuçlarımızdan toplam (DamStatOwn/DamSireStatOwn; pist×mesafe hücreleri toplanır). */
+async function ownYukle(breed: "INGILIZ" | "ARAP") {
+  const irk = breedToIrk(breed);
+  if (ownOnbellek && ownOnbellek.irk === irk && Date.now() - ownOnbellek.t < 10 * 60_000) return ownOnbellek;
+  const topla = (rows: { ad: string; start: number; birinci: number }[]): OwnSum => { const m: OwnSum = new Map(); for (const r of rows) { const k = normalizeSireName(r.ad); const e = m.get(k) ?? { starts: 0, wins: 0 }; e.starts += r.start; e.wins += r.birinci; m.set(k, e); } return m; };
+  const [d, ds] = await Promise.all([
+    db.damStatOwn.findMany({ where: { irk }, select: { damName: true, start: true, birinci: true } }),
+    db.damSireStatOwn.findMany({ where: { irk }, select: { damSireName: true, start: true, birinci: true } }),
+  ]);
+  ownOnbellek = { t: Date.now(), irk, DAM: topla(d.map((x) => ({ ad: x.damName, start: x.start, birinci: x.birinci }))), DAMSIRE: topla(ds.map((x) => ({ ad: x.damSireName, start: x.start, birinci: x.birinci }))) };
+  return ownOnbellek;
+}
+
 const GRUP_AD: Record<number, string> = { 1: "2 yaşlı İng.", 3: "3 yaşlı İng.", 5: "4+ İng.", 6: "3 yaşlı Arap", 8: "4 yaşlı Arap", 10: "5+ Arap" };
 const PIST_AD: Record<number, string> = { 1: "Çim", 2: "Kum", 4: "Sentetik" };
 
 export async function pedigriAnaliziKosu(girdi: PedigriKosuGirdi): Promise<PedigriAtAnalizi[]> {
-  const year = girdi.year ?? 2026;
   const pistId = tjkPistId(girdi.surface);
   const adlar = [...new Set(girdi.runners.flatMap((r) => [r.sire, r.dam, r.damSire]).filter((x): x is string => !!x).map(pedigriAdNormalize))];
-  const rows = adlar.length ? await db.tjkPedigriStat.findMany({ where: { year, normalizedName: { in: adlar } }, select: { kind: true, tjkId: true, groupId: true, pistId: true, normalizedName: true, breed: true, starts: true, wins: true } }) : [];
+  const rows = adlar.length ? await db.tjkPedigriStat.findMany({ where: { year: { gte: TJK_ILK_YIL }, normalizedName: { in: adlar } }, select: { kind: true, tjkId: true, year: true, groupId: true, pistId: true, normalizedName: true, breed: true, starts: true, wins: true } }) : [];
   // (tür, ad) → aday kimlikler
   const adaylar = new Map<string, Set<number>>(); const breedOf = new Map<string, string>();
   for (const r of rows) { const k = `${r.kind}|${r.normalizedName}`; (adaylar.get(k) ?? adaylar.set(k, new Set()).get(k)!).add(r.tjkId); breedOf.set(`${r.kind}|${r.tjkId}`, r.breed); }
-  const sayimOf = (kind: string, tjkId: number, g: number, p: number): Sayim | null => { const r = rows.find((x) => x.kind === kind && x.tjkId === tjkId && x.groupId === g && x.pistId === p); return r ? { starts: r.starts, wins: r.wins } : null; };
+  /** Seçilen (grup, pist) satırlarının YIL TOPLAMI. Grup/pist kırılımı yalnız 2026'da var (diğer yıllarda yalnız (-1,-1)). */
+  const sayimOf = (kind: string, tjkId: number, g: number, p: number, yillar?: number[]): { say: Sayim | null; yillar: number[] } => {
+    const sec = rows.filter((x) => x.kind === kind && x.tjkId === tjkId && x.groupId === g && x.pistId === p && (!yillar || yillar.includes(x.year)));
+    return sec.length ? { say: { starts: sec.reduce((s, x) => s + x.starts, 0), wins: sec.reduce((s, x) => s + x.wins, 0) }, yillar: sec.map((x) => x.year).sort() } : { say: null, yillar: [] };
+  };
+  const own = await ownYukle(girdi.breed);
 
   const ata = (tur: PedigriTur, ad: string | null, grupId: number | null): AtaAnalizi => {
-    const bos: AtaAnalizi = { tur, ad, eslesme: "yok", tjkId: null, seviye: null, baglamlar: [] };
+    const bos: AtaAnalizi = { tur, ad, eslesme: "yok", tjkId: null, seviye: null, baglamlar: [], kaynak: null, yillar: [], not: ad ? "VERİ YOK — TJK'da kayıt yok" : "VERİ YOK — programda adı boş" };
+    const ownYedek = (): AtaAnalizi => {
+      if (!ad || tur === "SIRE") return bos;
+      const s = own[tur].get(normalizeSireName(ad));
+      if (!s || s.starts <= 0) return { ...bos, not: "VERİ YOK — ne TJK'da ne kendi sonuçlarımızda" };
+      return { ...bos, eslesme: "var", kaynak: "OWN", seviye: hesaplaSeviye(tur, s), not: "TJK'da yok (yurt dışı doğumlu olabilir) — kendi sonuçlarımızdan hesaplandı, örnek küçük/yanlı olabilir" };
+    };
     if (!ad) return bos;
-    const set = adaylar.get(`${tur}|${pedigriAdNormalize(ad)}`); if (!set || set.size === 0) return bos;
+    const set = adaylar.get(`${tur}|${pedigriAdNormalize(ad)}`); if (!set || set.size === 0) return ownYedek();
     let tjkId: number | null = null;
     if (set.size === 1) tjkId = [...set][0];
     else { const ayni = [...set].filter((id) => breedOf.get(`${tur}|${id}`) === girdi.breed); if (ayni.length === 1) tjkId = ayni[0]; }
-    if (tjkId == null) return { ...bos, eslesme: "belirsiz" };
-    const toplam = sayimOf(tur, tjkId, -1, -1); if (!toplam) return bos;
-    const out: AtaAnalizi = { tur, ad, eslesme: "var", tjkId, seviye: hesaplaSeviye(tur, toplam), baglamlar: [] };
-    const ekle = (etiket: string, btur: PedigriBaglamTur, g: number, p: number) => { const c = sayimOf(tur, tjkId!, g, p); out.baglamlar.push({ etiket, tur: btur, ctx: c, sonuc: c ? hesaplaBaglam(btur, c, toplam) : null }); };
+    if (tjkId == null) return { ...bos, eslesme: "belirsiz", not: "VERİ YOK — aynı ad TJK'da birden çok kayda uyuyor" };
+    const toplam = sayimOf(tur, tjkId, -1, -1); if (!toplam.say) return ownYedek();
+    const out: AtaAnalizi = { tur, ad, eslesme: "var", tjkId, seviye: hesaplaSeviye(tur, toplam.say), baglamlar: [], kaynak: "TJK", yillar: toplam.yillar, not: null };
+    // Bağlam (grup×pist) yalnız 2026'da var → referansı da 2026 toplamından alınır (yıllar karışmasın)
+    const toplam26 = sayimOf(tur, tjkId, -1, -1, [2026]).say;
+    const ekle = (etiket: string, btur: PedigriBaglamTur, g: number, pp: number) => { const c = sayimOf(tur, tjkId!, g, pp, [2026]).say; out.baglamlar.push({ etiket, tur: btur, ctx: c, sonuc: c && toplam26 ? hesaplaBaglam(btur, c, toplam26) : null }); };
     if (tur === "SIRE") {
       if (grupId != null && pistId != null) ekle(`${GRUP_AD[grupId] ?? "grup"} + ${PIST_AD[pistId]}`, "SIRE_GRUP_PIST", grupId, pistId);
       if (grupId != null) ekle(`${GRUP_AD[grupId] ?? "grup"}`, "SIRE_GRUP", grupId, -1);
@@ -115,6 +153,9 @@ export async function pedigriAnaliziKosu(girdi: PedigriKosuGirdi): Promise<Pedig
   return girdi.runners.map((r) => {
     const yas = parseInt((r.age ?? "").trim()); const yasN = Number.isFinite(yas) ? yas : null;
     const grupId = yasN != null ? tjkGrupId(girdi.breed, yasN) : null;
-    return { no: r.no, name: r.name, yas: yasN, grupId, pistId, devreye: devreyeOf(r.tjkAtId), sire: ata("SIRE", r.sire, grupId), dam: ata("DAM", r.dam, grupId), damSire: ata("DAMSIRE", r.damSire, grupId) };
+    const sire = ata("SIRE", r.sire, grupId), dam = ata("DAM", r.dam, grupId), damSire = ata("DAMSIRE", r.damSire, grupId);
+    const ok = (x: AtaAnalizi) => x.seviye != null;
+    const eksikler = [!ok(sire) ? "baba" : null, !ok(dam) ? "anne" : null, !ok(damSire) ? "anne babası" : null].filter((x): x is string => x != null);
+    return { no: r.no, name: r.name, yas: yasN, grupId, pistId, devreye: devreyeOf(r.tjkAtId), tamlik: { sire: ok(sire), dam: ok(dam), damSire: ok(damSire), tam: eksikler.length === 0, eksikler }, sire, dam, damSire };
   });
 }

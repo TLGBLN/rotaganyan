@@ -5,9 +5,10 @@ const arg = (a: string, d: string) => { const i = process.argv.indexOf("--" + a)
 const f = (x: number, d = 1) => `${x >= 0 ? "+" : ""}${x.toFixed(d)}`;
 function satir(a: AtaAnalizi): string[] {
   const out: string[] = [];
-  if (a.eslesme !== "var") { out.push(`    ${a.ad ?? "—"}: TJK'da ${a.eslesme === "belirsiz" ? "BELİRSİZ (aynı ad, birden çok kayıt)" : "kayıt yok"}`); return out; }
+  if (a.seviye == null) { out.push(`    ${a.ad ?? "—"}: ${a.not}`); return out; }
   const s = a.seviye!;
-  out.push(`    ${a.ad} SEVİYE: ${s.win}/${s.start} (%${(s.k * 100).toFixed(1)}) · Pop %${(s.refK * 100).toFixed(1)} · Δ ${f(s.delta * 100)} pp · Güven %${Math.round(s.guven * 100)} · Etkin ${f(s.etkinPp, 2)} · ${s.durum}`);
+  if (a.not) out.push(`    ⚠ ${a.not}`);
+  out.push(`    ${a.ad} [${a.kaynak}${a.yillar.length ? " " + a.yillar.join("+") : ""}] SEVİYE: ${s.win}/${s.start} (%${(s.k * 100).toFixed(1)}) · Pop %${(s.refK * 100).toFixed(1)} · Δ ${f(s.delta * 100)} pp · Güven %${Math.round(s.guven * 100)} · Etkin ${f(s.etkinPp, 2)} · ${s.durum}`);
   for (const b of a.baglamlar) {
     if (!b.ctx) out.push(`      └ ${b.etiket}: bu bağlamda koşu yok`);
     else if (!b.sonuc) out.push(`      └ ${b.etiket}: ${b.ctx.wins}/${b.ctx.starts} (%${(b.ctx.wins / b.ctx.starts * 100).toFixed(1)}) — referans (bağlam dışı) örneği yetersiz`);
@@ -27,6 +28,7 @@ async function main() {
     console.log(`${r.no}. ${r.name} (yaş ${r.yas}, TJK grup ${r.grupId}, pist ${r.pistId})`);
     // 1) ÖNCE atın geçmiş yarışları — "ilk defa" kararı bunlara dayanır
     console.log(`  GEÇMİŞ (${r.devreye.gecmisDurumu}): ` + (r.devreye.sonYarislar.length ? r.devreye.sonYarislar.map((s) => `${s.tarih} ${s.pist}${s.mesafe ?? "?"}m ${s.sinif} ${s.derece}.`).join(" | ") : "—"));
+    console.log(`  PEDİGRİ TAMLIĞI: ${r.tamlik.tam ? "3/3 bileşen analiz edildi" : "EKSİK — " + r.tamlik.eksikler.join(", ") + " için VERİ YOK (nötr sayılmadı)"}`);
     console.log(`  DEVREYE: ${r.devreye.kullan ? "EVET — " + r.devreye.nedenler.join("; ") : "hayır (pedigri gösterilmez)"}`);
     if (!r.devreye.kullan) { console.log(); continue; }
     for (const [e, a] of [["BABA", r.sire], ["ANNE", r.dam], ["ANNE BABASI", r.damSire]] as const) { console.log(`  ${e}`); for (const l of satir(a)) console.log(l); }
