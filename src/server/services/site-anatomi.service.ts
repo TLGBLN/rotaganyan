@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { turkeyDateString } from "@/lib/tz";
+import { sinyalKapsami } from "@/lib/methodology/signal-registry";
 import { getSinyalSaglik, type SinyalOzeti } from "@/server/services/sinyal-saglik.service";
 import { ENGINE_VERSIONS } from "@/lib/methodology/engine-versions.data";
 
@@ -217,7 +218,7 @@ export async function getSiteAnatomisi(): Promise<{
       durum: s.SORUN > 0 ? "HATA" : s.IZLE > 0 || s.DATA_HOLD > 0 ? "UYARI" : "OK",
       detay: toplam === 0
         ? "Ölçülecek sinyal verisi yok"
-        : `${toplam} sinyal · ${s.SAGLAM} sağlam · ${s.IZLE} izle · ${s.SORUN} sorun · ${s.DATA_HOLD} veri yetersiz`,
+        : `${toplam} kayıtlı sinyal (canlı motorda ${sinyalKapsami(sinyal.satirlar.map((x) => x.kod)).canli} · yalnız analiz/emekli ${sinyalKapsami(sinyal.satirlar.map((x) => x.kod)).yalnizAnalizEmekli}) · ${s.SAGLAM} sağlam · ${s.IZLE} izle · ${s.SORUN} sorun · ${s.DATA_HOLD} veri yetersiz`,
       olcumMs: null,
     });
   } catch {

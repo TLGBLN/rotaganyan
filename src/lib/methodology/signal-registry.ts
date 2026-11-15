@@ -111,3 +111,10 @@ export function isIntegrityEligibleSignal(code: string): boolean {
 export function registryFamilyOf(code: string): EvidenceFamily | null {
   return SIGNAL_REGISTRY.find((s) => s.code === code)?.family ?? null;
 }
+/** Sinyal sağlığı tablosundaki kodları canlı motora göre sınıflar: "27 sinyal" ≠ "27 canlı sinyal".
+ *  canli = canlı 4 modelin birleşimindeki (PRODUCTION_FEATURE_CODES) sinyaller; geri kalanı yalnız analiz / emekli / aday kayıtlarıdır. */
+export function sinyalKapsami(kodlar: string[]): { toplam: number; canli: number; yalnizAnalizEmekli: number; canliEksik: string[] } {
+  const set = new Set(kodlar);
+  const canli = kodlar.filter((k) => PRODUCTION_FEATURE_CODES.includes(k)).length;
+  return { toplam: kodlar.length, canli, yalnizAnalizEmekli: kodlar.length - canli, canliEksik: PRODUCTION_FEATURE_CODES.filter((k) => !set.has(k)) };
+}

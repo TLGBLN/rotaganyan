@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { GUNCEL_MOTOR_BASLANGIC, normalizeClassType } from "@/server/services/admin.service";
 import { cn } from "@/lib/utils";
+import KazananProfiliBolumu from "@/components/admin/KazananProfiliBolumu";
 import SonuclarPaginator from "@/components/admin/SonuclarPaginator";
 
 export const dynamic = "force-dynamic";
@@ -168,6 +169,8 @@ export default async function KosuTipleriPage({ searchParams }: PageProps) {
       {avgGanyan && (
         <p className="text-xs text-muted-foreground">Ort. ganyan (1. sıra isabetle): <strong className="text-foreground">{avgGanyan}</strong></p>
       )}
+
+      <KazananProfiliBolumu />
 
       {/* Koşu tipi özet tablosu */}
       <div className="overflow-x-auto rounded-lg border">

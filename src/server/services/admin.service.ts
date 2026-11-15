@@ -1221,3 +1221,49 @@ export function getClassTypeAdvice(
   const n = breakdown?.total ?? 0;
   return { level: "warn", text: n > 0 ? `${n} koşu — yeterli geçmiş veri yok` : "Geçmiş veri yok" };
 }
+
+/** Son N SONUÇLANMIŞ + YAYINDAKİ analizin isabet özeti — Top1 / Top3 / Top6 AYRI (bkz. lib/izleme/kazanan-sirasi.ts). */
+export async function getAnalizIsabetOzeti(limit = 200) {
+  const { isabetOzeti } = await import("@/lib/izleme/kazanan-sirasi");
+  const rows = await db.prediction.findMany({
+    where: { published: true, createdAt: { gte: GUNCEL_MOTOR_BASLANGIC }, race: { result: { isNot: null } } },
+    orderBy: { updatedAt: "desc" },
+    take: limit,
+    select: { race: { select: { result: { select: { winnerNos: true } } } }, picks: { select: { runnerLabel: true, rank: true } } },
+  });
+  return isabetOzeti(rows.map((r) => ({ winnerNos: r.race.result?.winnerNos ?? [], picks: r.picks })));
+}
+
+const profilGrubu = (c: string | null): string => {
+  const u = (c ?? "").toUpperCase();
+  if (u.includes("HANDIKAP")) return "Handikap";
+  if (u.includes("MAIDEN") || u.includes("ŞARTLI 19")) return "Maiden/ŞARTLI 19";
+  if (u.includes("ŞARTLI 1") || u.includes("ŞARTLI 27")) return "ŞARTLI 1/27";
+  if (u.includes("ŞARTLI")) return "ŞARTLI 2-5";
+  return "KV/Satış/Grup/Diğer";
+};
+
+/** Kazanan at profili + saha büyüklüğüne göre isabet — kayıtlı tahmin sinyallerinden (lib/izleme/kazanan-profili.ts). */
+export async function getKazananProfili(limit = 800) {
+  const { kazananProfiliHesapla } = await import("@/lib/izleme/kazanan-profili");
+  const rows = await db.prediction.findMany({
+    where: { published: true, createdAt: { gte: GUNCEL_MOTOR_BASLANGIC }, race: { result: { isNot: null }, conditions: null, raceDay: { hippodrome: { name: { not: "Karma" } } } } },
+    orderBy: { updatedAt: "desc" },
+    take: limit,
+    select: {
+      race: { select: { classType: true, result: { select: { winnerNos: true } } } },
+      picks: { select: { rank: true, featureSnapshot: true, runner: { select: { no: true } } } },
+    },
+  });
+  const kosular = rows.map((r) => ({
+    grup: profilGrubu(r.race.classType),
+    kazananNolar: r.race.result?.winnerNos ?? [],
+    atlar: r.picks.filter((p) => p.runner?.no != null).map((p) => {
+      const sn = p.featureSnapshot as { tumSinyaller?: { kod: string; hamDeger: number; observed: boolean }[] } | null;
+      const sinyal: Record<string, number | null> = {};
+      for (const s of sn?.tumSinyaller ?? []) sinyal[s.kod] = s.observed ? s.hamDeger : null;
+      return { no: p.runner!.no, rank: p.rank, sinyal };
+    }),
+  }));
+  return { ...kazananProfiliHesapla(kosular), toplamKosu: rows.length };
+}
