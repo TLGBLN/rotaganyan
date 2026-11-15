@@ -94,6 +94,10 @@ export default function ClassTypeAdviceCard({
       )}
       {advice.tierYuzdeler && <TierCubugu t={advice.tierYuzdeler} />}
       <p className={cn("leading-snug", advice.oneri ? "mt-1 text-[10px] opacity-75" : "text-[11px]")}>{advice.text}</p>
+      {/* 2026-11-15: yanlış anlaşılmaya karşı — tip yüzdeleri saha büyüklüğünden arındırılmamış ham geçmiş oranıdır. */}
+      <p className="mt-1 text-[9px] leading-snug text-muted-foreground">
+        Not: Bu yüzdeler koşu tipinin ham geçmişidir; tip farkının büyük kısmı saha büyüklüğünden gelir (modelin ilk-3 kaçırması ≤7 atta %26, 13+ atta %49; tip etkisi saha arındırılınca anlamsız). Ayak genişliğini asıl saha büyüklüğü belirler: 12+ aktif atlı ayakta Otomatik Doldur zorunlu taban uygular.
+      </p>
     </div>
   );
 }
