@@ -716,7 +716,7 @@ export default function V5AnalysisPanel({ raceId, classType, runners: raceRunner
                           </div>
                           {dusukSayisi >= 2 && (
                             <div className="mt-1 text-amber-700">
-                              ⚠ Son {sy.length} yarışın {dusukSayisi}'i bugünkü sınıftan ≥3 basamak daha düşük sınıfta — derece ortalaması bugünkü yarışa göre dikkatle yorumlanmalı.
+                              ⚠ Son {sy.length} yarışın {dusukSayisi}&apos;i bugünkü sınıftan ≥3 basamak daha düşük sınıfta — derece ortalaması bugünkü yarışa göre dikkatle yorumlanmalı.
                             </div>
                           )}
                         </div>
@@ -729,7 +729,7 @@ export default function V5AnalysisPanel({ raceId, classType, runners: raceRunner
                     <summary className="cursor-pointer text-[11px] font-medium text-purple-500 hover:underline">Teknik ayrıntı (bütünlük, kanıt aileleri, jokey, piyasa)</summary>
                   <div className="space-y-2 pt-2">
                     <p className="text-[10px] text-muted-foreground">
-                      Not: "Bütünlük/Önerilen Kapsam" işaret sayımıdır (+0.0003'lük katkı da "pozitif" sayılır); kayıtlı sonuçlarda 1. sıradaki atın kazanma oranını ayırt etmediği ölçüldü (BANKO/İLK3/İLK6/YETERSİZ ≈ %30/%36/%33/%30). Karar için yukarıdaki sıra ve olasılık esastır.
+                      Not: &quot;Bütünlük/Önerilen Kapsam&quot; işaret sayımıdır (+0.0003&apos;lük katkı da &quot;pozitif&quot; sayılır); kayıtlı sonuçlarda 1. sıradaki atın kazanma oranını ayırt etmediği ölçüldü (BANKO/İLK3/İLK6/YETERSİZ ≈ %30/%36/%33/%30). Karar için yukarıdaki sıra ve olasılık esastır.
                     </p>
                     <div
                       className={cn(
