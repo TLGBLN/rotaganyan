@@ -64,6 +64,7 @@ const DENENEN: { ad: string; sonuc: string; durum: "cikarildi" | "reddedildi" }[
   { ad: "Accurace terimi, 13+ atlı sahada", sonuc: "ΔLL −0.019 ama GA sıfırı içeriyor, isabet değişmedi (Top1 %19→%19, Top3 %50.6→%51.8); alınmadı.", durum: "reddedildi" },
   { ad: "Önceki yarışla aynı jokey, sınıf düşüşü/yükselişi, bu sınıfta kazandı", sonuc: "Eşiği geçen yok.", durum: "reddedildi" },
   { ad: "HP / kilo / mesafe değişimi, ekipman değişimi, dinlenme düzeni", sonuc: "Eşiği geçen yok (ΔLL ±0.003 içinde).", durum: "reddedildi" },
+  { ad: "Sınıf-ayarlı form (son 6 yarışın sınıf farkı, form×sınıf yükselişi, bu seviyede deneyim, fMean'in yerine ayarlı sürüm)", sonuc: "10 aday, hiçbiri geçmedi (ΔLL ±0.005 içinde, sınama katlarında işaret tutmuyor); ayarlı formu fMean'in yerine koymak anlamlı ZARARLI (+0.010 ✘). Sezgi makul ama sınıf düzeyi HP ortalamasıyla ölçülünce veride karşılığı yok (15 Kas).", durum: "reddedildi" },
   { ad: "Antrenör değişimi", sonuc: "Hafif zararlı (+0.0015 ✘).", durum: "reddedildi" },
   { ad: "Önceki yarışların ganyanı (piyasa türevi)", sonuc: "ΔLL −0.005, eşiği geçmedi; ayrıca AGF'siz ilkesi gereği motora girmez.", durum: "reddedildi" },
 ];
