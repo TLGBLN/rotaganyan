@@ -112,3 +112,14 @@ export function buildPedigriBaglamMetni(ad: string, etiket: string, b: PedigriBa
   const f = (x: number) => `${x >= 0 ? "+" : ""}${x.toFixed(1)}`;
   return `${ad} ${etiket}: ${b.ctxWin}/${b.ctxStart} (%${(b.ctxK * 100).toFixed(1)}) · Ref %${(b.refK * 100).toFixed(1)} · Δ ${f(b.delta * 100)} pp · Güven %${Math.round(b.guven * 100)} · Etkin ${f(b.etkinPp)} · ${b.durum}`;
 }
+
+/** MESAFE BANTLARI (kullanıcı kararı 2026-11-15, hibrit kural): 1 = 1000–1300 (sprint), 2 = 1400–1600 (orta/mil), 3 = 1700–2000 (orta-uzun), 4 = 2100+ (stayer).
+ *  "Eşdeğer geçmiş mesafe": aynı bant içindeyse ±200 m, bant atlıyorsa yalnız ±100 m tolere edilir. Geçmişinde bugünkü mesafeye eşdeğer hiç koşusu yoksa "ilk defa bu mesafede". */
+export const MESAFE_TOLERANS_AYNI_BANT_M = 200;
+export const MESAFE_TOLERANS_BANT_ATLAR_M = 100;
+export function mesafeBandi(m: number): 1 | 2 | 3 | 4 { return m <= 1300 ? 1 : m <= 1600 ? 2 : m <= 2000 ? 3 : 4; }
+/** Geçmiş koşu mesafesi (onc) bugünkü mesafeye (bugun) eşdeğer mi? (sınırlar DAHİL: 1400↔1600 aynı bantta 200 m → eşdeğer; 1600↔1800 bant atlar, 200 m > 100 → eşdeğer değil) */
+export function mesafeEsdeger(onc: number, bugun: number): boolean {
+  const tol = mesafeBandi(onc) === mesafeBandi(bugun) ? MESAFE_TOLERANS_AYNI_BANT_M : MESAFE_TOLERANS_BANT_ATLAR_M;
+  return Math.abs(onc - bugun) <= tol;
+}

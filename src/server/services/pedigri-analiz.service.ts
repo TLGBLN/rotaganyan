@@ -2,6 +2,7 @@
 // Veri: TjkPedigriStat (resmî TJK, 2026). Yöntem ve sabitler: src/lib/pedigri-form.ts. SKORA/KUPONA GİRMEZ — yalnız analiz gösterimi.
 import { db } from "@/lib/db";
 import { sinifSeviyesi } from "@/lib/methodology/ham-alan-sinyalleri";
+import { mesafeBandi, mesafeEsdeger } from "@/lib/pedigri-form";
 import {
   hesaplaBaglam, hesaplaSeviye, pedigriAdNormalize, tjkGrupId, tjkPistId,
   type PedigriBaglam, type PedigriBaglamTur, type PedigriSeviye, type PedigriTur, type Sayim,
@@ -29,17 +30,6 @@ export type PedigriDevreye = {
   kullan: boolean;
   nedenler: string[];
 };
-/** MESAFE BANTLARI (kullanıcı kararı 2026-11-15, hibrit kural): 1 = 1000–1300 (sprint), 2 = 1400–1600 (orta/mil), 3 = 1700–2000 (orta-uzun), 4 = 2100+ (stayer).
- *  "Eşdeğer geçmiş mesafe": aynı bant içindeyse ±200 m, bant atlıyorsa yalnız ±100 m tolere edilir. Geçmişinde bugünkü mesafeye eşdeğer hiç koşusu yoksa "ilk defa bu mesafede". */
-export const MESAFE_TOLERANS_AYNI_BANT_M = 200;
-export const MESAFE_TOLERANS_BANT_ATLAR_M = 100;
-export function mesafeBandi(m: number): 1 | 2 | 3 | 4 { return m <= 1300 ? 1 : m <= 1600 ? 2 : m <= 2000 ? 3 : 4; }
-/** Geçmiş koşu mesafesi (onc) bugünkü mesafeye (bugun) eşdeğer mi? (sınırlar DAHİL: 1400↔1600 aynı bantta 200 m → eşdeğer; 1600↔1800 bant atlar, 200 m > 100 → eşdeğer değil) */
-export function mesafeEsdeger(onc: number, bugun: number): boolean {
-  const tol = mesafeBandi(onc) === mesafeBandi(bugun) ? MESAFE_TOLERANS_AYNI_BANT_M : MESAFE_TOLERANS_BANT_ATLAR_M;
-  return Math.abs(onc - bugun) <= tol;
-}
-
 export type PedigriAtAnalizi = { no: number; name: string; yas: number | null; grupId: number | null; pistId: number | null; devreye: PedigriDevreye; sire: AtaAnalizi; dam: AtaAnalizi; damSire: AtaAnalizi };
 
 export type PedigriKosuGirdi = {
