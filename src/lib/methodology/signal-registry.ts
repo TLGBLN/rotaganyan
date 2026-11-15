@@ -68,7 +68,7 @@ export const SIGNAL_REGISTRY: readonly SignalRegistryEntry[] = [
   { code: "dususDelta", family: "SINIF_DEGISIMI", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Sınıf düşüşü = önceki yarışın sınıf seviyesi − bugünkü seviye (TJK 13 basamaklı hiyerarşi; + düşüş, − yükseliş). Maiden/Şartlı 1-19-27 yarışlarında uygulanmaz. 15 Kas kullanıcı kararı; CV: sınama katlarında ΔLL −0.012, tüm katlarda −0.004 (anlamsız) — izlemede." },
   { code: "sexE", family: "CINS", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Cins (yaş alanının 3. kelimesi e) (|z|=5.2)." },
   { code: "galopKalite", family: "IDMAN", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Son galop kalitesi (|z|=2.9); ordinal, çoğu at 1.0." },
-  { code: "sireOraniBirlesik", family: "PEDIGRI", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Yalnız segment modellerinde." },
+  { code: "sireOraniBirlesik", family: "PEDIGRI", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: false, note: "[15 Kas: Maiden/Şartlı 19 segmenti yönlendirmeden çıkarıldı; yalnız eski segment ağırlık dosyasında, hiçbir canlı model kullanmıyor] Pedigri (baba+anne+anne babası)." },
   { code: "jokeySon30G", family: "JOKEY", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: true, note: "Model score dışı güncel jokey desteği." },
 
   { code: "atJokeyUyumu", family: "AT_JOKEY", lifecycle: "FUTURE_CANDIDATE", productionFeature: false, integrityEligible: false, note: "Residualized pair uplift + shrinkage/recency; OOS bekliyor." },

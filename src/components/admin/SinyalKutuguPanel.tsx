@@ -103,7 +103,7 @@ export default function SinyalKutuguPanel() {
       </div>
       <p className="text-[11px] text-muted-foreground">
         Tüm sinyaller AGF&apos;siz, tek doğrusal skor + softmax ile birleştirilir. Handikap ve ŞARTLI 1/27 için ayrı segment katsayı seti vardır; diğer tiplerde (Maiden dahil) varsayılan β&apos;lar kullanılır.
-        Sinyal sağlığı sayfasındaki &quot;kayıtlı sinyal&quot; sayısı bu üç modelin birleşiminden (24) büyük olabilir: kayıtlı olup canlı modelde olmayanlar yalnız analiz/emekli sinyallerdir.
+        Sinyal sağlığı sayfasındaki &quot;kayıtlı sinyal&quot; sayısı bu üç modelin birleşiminden (23) büyük olabilir: kayıtlı olup canlı modelde olmayanlar yalnız analiz/emekli sinyallerdir.
         Üretildi: {new Date(SAF_W.generatedAt).toLocaleString("tr-TR")}.
       </p>
     </section>

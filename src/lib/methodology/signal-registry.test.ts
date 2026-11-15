@@ -14,8 +14,8 @@ describe("canonical signal registry", () => {
     expect(new Set(SIGNAL_REGISTRY.map((s) => s.code)).size).toBe(36);
   });
 
-  it("üretim sinyalleri = canlı modellerin birleşimi: 24 sinyal (2026-11-15 +dususDelta)", () => {
-    expect(PRODUCTION_FEATURE_CODES).toHaveLength(24);
+  it("üretim sinyalleri = canlı (yönlendirilen) modellerin birleşimi: 23 sinyal (2026-11-15 +dususDelta; eski Maiden segmenti çıkarıldı)", () => {
+    expect(PRODUCTION_FEATURE_CODES).toHaveLength(23);
   });
 
   it("has 33 current analysis sources and 3 future candidates", () => {
@@ -49,9 +49,10 @@ import segH from "@/lib/methodology/weights/v546-1-saf-segment-handikap.json";
 import { familyOfSignal } from "./evidence-families";
 
 describe("KORUMA: kayıt defterinin üretim kümesi canlı modellerin gerçek birleşimiyle AYNI olmalı", () => {
-  it("productionFeature=true olanlar ↔ 4 canlı modelin featureNames birleşimi (kayıt defteri sessizce bayatlayamaz)", () => {
+  it("productionFeature=true olanlar ↔ YÖNLENDİRİLEN 3 canlı modelin (varsayılan, ŞARTLI 1/27, Handikap) featureNames birleşimi (kayıt defteri sessizce bayatlayamaz)", () => {
     const canli = new Set<string>();
-    for (const w of [safW, segA, segB, segH]) for (const f of (w as { featureNames: string[] }).featureNames) canli.add(f);
+    // segB (Maiden/ŞARTLI 19 ACC segmenti) 15 Kas'ta yönlendirmeden çıkarıldı — canlı değil.
+    for (const w of [safW, segA, segH]) for (const f of (w as { featureNames: string[] }).featureNames) canli.add(f);
     const kayit = new Set(PRODUCTION_FEATURE_CODES);
     expect([...canli].filter((f) => !kayit.has(f)).sort(), "canlı modelde olup kayıtta üretim olmayanlar").toEqual([]);
     expect([...kayit].filter((f) => !canli.has(f)).sort(), "kayıtta üretim görünüp hiçbir canlı modelde olmayanlar").toEqual([]);
