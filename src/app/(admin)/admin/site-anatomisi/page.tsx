@@ -1,5 +1,6 @@
 import { getSiteAnatomisi, type OrganDurum } from "@/server/services/site-anatomi.service";
-import { sinyalKapsami } from "@/lib/methodology/signal-registry";
+import { PRODUCTION_FEATURE_CODES } from "@/lib/methodology/signal-registry";
+import { sinyalOzetMetni } from "@/lib/izleme/sinyal-ozet";
 import { SINYAL_SON_GUN, type SinyalDurum, type SinyalOzeti } from "@/server/services/sinyal-saglik.service";
 import { cn } from "@/lib/utils";
 
@@ -48,7 +49,7 @@ function SinyalBolumu({ sinyal }: { sinyal: SinyalOzeti }) {
 
       <details className="rounded-lg border">
         <summary className="cursor-pointer px-3 py-2 text-xs font-semibold">
-          Ayrıntı: {sinyal.satirlar.length} kayıtlı sinyal (canlı motorda {sinyalKapsami(sinyal.satirlar.map((x) => x.kod)).canli} · yalnız analiz/emekli {sinyalKapsami(sinyal.satirlar.map((x) => x.kod)).yalnizAnalizEmekli}) · {s.SAGLAM} sağlam · {s.IZLE} izle · {s.SORUN} sorun · {s.DATA_HOLD} veri yetersiz
+          Ayrıntı: {sinyalOzetMetni(sinyal.satirlar)}
           {sinyal.sonTarih ? ` · son koşu ${sinyal.sonTarih}` : ""} · kaçan vaka {sinyal.kacanVakaSayisi}
         </summary>
         {sinyal.satirlar.length === 0 ? (
@@ -73,7 +74,7 @@ function SinyalBolumu({ sinyal }: { sinyal: SinyalOzeti }) {
               <tbody>
                 {sinyal.satirlar.map((r) => (
                   <tr key={r.kod} className="border-b align-top last:border-0">
-                    <td className="whitespace-nowrap px-3 py-2 font-semibold">{r.kod}</td>
+                    <td className="whitespace-nowrap px-3 py-2 font-semibold">{r.kod}{!PRODUCTION_FEATURE_CODES.includes(r.kod) && <span className="ml-1.5 rounded border px-1 text-[9px] font-normal text-muted-foreground">canlı modelde değil</span>}</td>
                     <td className="px-3 py-2">
                       <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", SINYAL_RENK[r.durum])}>
                         {SINYAL_ETIKET[r.durum]}
