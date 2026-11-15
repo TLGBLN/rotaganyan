@@ -17,12 +17,18 @@ function satir(a: AtaAnalizi): string[] {
 }
 async function main() {
   const tarih = arg("tarih", "2026-11-15"), kosu = Number(arg("kosu", "6")), hip = arg("hipodrom", "adana");
-  const race = await db.race.findFirst({ where: { raceNo: kosu, raceDay: { date: { gte: new Date(tarih + "T00:00:00Z"), lte: new Date(tarih + "T23:59:59Z") }, hippodrome: { slug: hip } } }, select: { raceNo: true, time: true, breed: true, surface: true, distance: true, classType: true, runners: { where: { scratched: false }, orderBy: { no: "asc" }, select: { no: true, name: true, sire: true, dam: true, damSire: true, age: true } } } });
+  const race = await db.race.findFirst({ where: { raceNo: kosu, raceDay: { date: { gte: new Date(tarih + "T00:00:00Z"), lte: new Date(tarih + "T23:59:59Z") }, hippodrome: { slug: hip } } }, select: { raceNo: true, time: true, breed: true, surface: true, distance: true, classType: true, runners: { where: { scratched: false }, orderBy: { no: "asc" }, select: { no: true, name: true, sire: true, dam: true, damSire: true, age: true, tjkAtId: true } } } });
   if (!race) { console.log("koşu bulunamadı"); return; }
   console.log(`${hip} ${tarih} ${race.raceNo}. koşu ${race.time} | ${race.breed} ${race.surface} ${race.distance}m ${race.classType}\n`);
-  const sonuc = await pedigriAnaliziKosu({ breed: race.breed as "INGILIZ" | "ARAP", surface: race.surface, runners: race.runners });
+  const sonuc = await pedigriAnaliziKosu({ breed: race.breed as "INGILIZ" | "ARAP", surface: race.surface, classType: race.classType, distance: race.distance, tarih, runners: race.runners });
+  console.log(`devreye girecek at: ${sonuc.filter((r) => r.devreye.kullan).length}/${sonuc.length} (yarış tipi düşük sınıf: ${sonuc[0]?.devreye.dusukSinifYarisi ? "EVET" : "hayır"})
+`);
   for (const r of sonuc) {
     console.log(`${r.no}. ${r.name} (yaş ${r.yas}, TJK grup ${r.grupId}, pist ${r.pistId})`);
+    // 1) ÖNCE atın geçmiş yarışları — "ilk defa" kararı bunlara dayanır
+    console.log(`  GEÇMİŞ (${r.devreye.gecmisDurumu}): ` + (r.devreye.sonYarislar.length ? r.devreye.sonYarislar.map((s) => `${s.tarih} ${s.pist}${s.mesafe ?? "?"}m ${s.sinif} ${s.derece}.`).join(" | ") : "—"));
+    console.log(`  DEVREYE: ${r.devreye.kullan ? "EVET — " + r.devreye.nedenler.join("; ") : "hayır (pedigri gösterilmez)"}`);
+    if (!r.devreye.kullan) { console.log(); continue; }
     for (const [e, a] of [["BABA", r.sire], ["ANNE", r.dam], ["ANNE BABASI", r.damSire]] as const) { console.log(`  ${e}`); for (const l of satir(a)) console.log(l); }
     console.log();
   }

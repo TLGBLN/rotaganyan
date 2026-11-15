@@ -1,6 +1,7 @@
 // PEDİGRİ ANALİZİ (koşu bazlı) — bir koşunun atları için baba / anne / anne babası SEVİYE + BAĞLAM (grup × pist) analizi.
 // Veri: TjkPedigriStat (resmî TJK, 2026). Yöntem ve sabitler: src/lib/pedigri-form.ts. SKORA/KUPONA GİRMEZ — yalnız analiz gösterimi.
 import { db } from "@/lib/db";
+import { sinifSeviyesi } from "@/lib/methodology/ham-alan-sinyalleri";
 import {
   hesaplaBaglam, hesaplaSeviye, pedigriAdNormalize, tjkGrupId, tjkPistId,
   type PedigriBaglam, type PedigriBaglamTur, type PedigriSeviye, type PedigriTur, type Sayim,
@@ -15,13 +16,32 @@ export type AtaAnalizi = {
   seviye: PedigriSeviye | null;
   baglamlar: AtaBaglamSatiri[];
 };
-export type PedigriAtAnalizi = { no: number; name: string; yas: number | null; grupId: number | null; pistId: number | null; sire: AtaAnalizi; dam: AtaAnalizi; damSire: AtaAnalizi };
+/** Pedigrinin NE ZAMAN kullanılacağı (kullanıcı kararı 2026-11-15): (a) yarış Maiden / Şartlı 1 / Şartlı 19 / Şartlı 27 (sınıf seviyesi 1) VEYA
+ *  (b) at İLK DEFA farklı bir PİSTE ya da farklı bir MESAFEYE çıkıyor. Ek olarak ilk start (geçmişi hiç yok) da bayraklanır — pedigrinin tek bilgi olduğu uç durum. */
+export type PedigriDevreye = {
+  dusukSinifYarisi: boolean; // Maiden/Şartlı 1/19/27
+  ilkStart: boolean; // geçmiş koşusu yok
+  yeniPist: boolean; // geçmişte bu pistte hiç koşmadı (geçmişi varsa)
+  yeniMesafe: boolean; // geçmişte bu mesafeye ±200 m içinde hiç koşmadı (geçmişi varsa)
+  /** "ilk defa" kararı atın GEÇMİŞ YARIŞLARINA bağlıdır → analizden önce geçmiş okunmuş olmalı. "bilinmiyor" = geçmiş yüklenemedi: kural "değil" DİYEMEZ, atın profiline elle bakılmalı. */
+  gecmisDurumu: "var" | "ilk-start" | "bilinmiyor";
+  sonYarislar: { tarih: string; pist: string; mesafe: number | null; sinif: string; derece: string }[]; // en yeni 6, karar bunlara dayanır
+  kullan: boolean;
+  nedenler: string[];
+};
+export const YENI_MESAFE_FARKI_M = 200;
+
+export type PedigriAtAnalizi = { no: number; name: string; yas: number | null; grupId: number | null; pistId: number | null; devreye: PedigriDevreye; sire: AtaAnalizi; dam: AtaAnalizi; damSire: AtaAnalizi };
 
 export type PedigriKosuGirdi = {
   breed: "INGILIZ" | "ARAP";
   surface: string;
   year?: number;
-  runners: { no: number; name: string; sire: string | null; dam: string | null; damSire: string | null; age: string | null }[];
+  /** Yarış künyesi: sınıf ("Maiden", "ŞARTLI 19/Dişi"…), mesafe (m) ve yarış günü (YYYY-MM-DD) — devreye girme kuralı için. */
+  classType?: string | null;
+  distance?: number | null;
+  tarih?: string | null;
+  runners: { no: number; name: string; sire: string | null; dam: string | null; damSire: string | null; age: string | null; tjkAtId?: number | null }[];
 };
 
 const GRUP_AD: Record<number, string> = { 1: "2 yaşlı İng.", 3: "3 yaşlı İng.", 5: "4+ İng.", 6: "3 yaşlı Arap", 8: "4 yaşlı Arap", 10: "5+ Arap" };
@@ -56,9 +76,42 @@ export async function pedigriAnaliziKosu(girdi: PedigriKosuGirdi): Promise<Pedig
     return out;
   };
 
+  // ── Devreye girme: atın geçmiş pist/mesafeleri (HorseRaceHistoryCache; yarış gününden ÖNCEKİ koşular) ──
+  const dusukSinif = sinifSeviyesi(girdi.classType) === 1;
+  const yarisMs = girdi.tarih ? Date.parse(girdi.tarih + "T00:00:00Z") : null;
+  const idler = [...new Set(girdi.runners.map((r) => r.tjkAtId).filter((x): x is number => x != null))];
+  type GecmisSatir = { t: number; tarih: string; pist: string; mesafe: number | null; sinif: string; derece: string };
+  const gecmis = new Map<number, GecmisSatir[]>();
+  if (idler.length) {
+    for (const h of await db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: idler } }, select: { tjkAtId: true, rowsJson: true } })) {
+      const satirlar: GecmisSatir[] = (h.rowsJson as { date?: string; surface?: string; distance?: number | string; classType?: string; finishPos?: string }[])
+        .filter((q) => q.date)
+        .map((q) => { const [g, a, y] = q.date!.split("."); return { t: Date.UTC(+y, +a - 1, +g), tarih: q.date!, pist: String(q.surface ?? "").trim().charAt(0).toUpperCase(), mesafe: q.distance != null && Number.isFinite(Number(q.distance)) ? Number(q.distance) : null, sinif: String(q.classType ?? "").split("/")[0].trim(), derece: String(q.finishPos ?? "").trim() }; })
+        .filter((q) => yarisMs == null || q.t < yarisMs)
+        .sort((x, z) => z.t - x.t); // en yeni başta
+      gecmis.set(h.tjkAtId, satirlar);
+    }
+  }
+  const bugunPist = girdi.surface === "CIM" ? "Ç" : girdi.surface === "KUM" ? "K" : girdi.surface === "SENTETIK" ? "S" : null;
+  const devreyeOf = (tjkAtId: number | null | undefined): PedigriDevreye => {
+    const g = tjkAtId != null ? gecmis.get(tjkAtId) : undefined;
+    const bilgi = tjkAtId != null && g !== undefined; // geçmiş önbelleği var mı
+    const ilkStart = bilgi ? g!.length === 0 : false;
+    const yeniPist = bilgi && g!.length > 0 && bugunPist != null && !g!.some((x) => x.pist === bugunPist);
+    const yeniMesafe = bilgi && g!.length > 0 && girdi.distance != null && !g!.some((x) => x.mesafe != null && Math.abs(x.mesafe - girdi.distance!) < YENI_MESAFE_FARKI_M);
+    const gecmisDurumu: PedigriDevreye["gecmisDurumu"] = !bilgi ? "bilinmiyor" : g!.length === 0 ? "ilk-start" : "var";
+    const nedenler: string[] = [];
+    if (dusukSinif) nedenler.push("Maiden/Şartlı 1-19-27 yarışı");
+    if (gecmisDurumu === "bilinmiyor") nedenler.push("GEÇMİŞ BİLİNMİYOR — atın profiline/geçmiş yarışlarına elle bakılmalı");
+    if (ilkStart) nedenler.push("ilk start");
+    if (yeniPist) nedenler.push("ilk defa bu pistte");
+    if (yeniMesafe) nedenler.push("ilk defa bu mesafede");
+    return { dusukSinifYarisi: dusukSinif, ilkStart, yeniPist, yeniMesafe, gecmisDurumu, sonYarislar: (g ?? []).slice(0, 6).map(({ tarih, pist, mesafe, sinif, derece }) => ({ tarih, pist, mesafe, sinif, derece })), kullan: nedenler.length > 0, nedenler };
+  };
+
   return girdi.runners.map((r) => {
     const yas = parseInt((r.age ?? "").trim()); const yasN = Number.isFinite(yas) ? yas : null;
     const grupId = yasN != null ? tjkGrupId(girdi.breed, yasN) : null;
-    return { no: r.no, name: r.name, yas: yasN, grupId, pistId, sire: ata("SIRE", r.sire, grupId), dam: ata("DAM", r.dam, grupId), damSire: ata("DAMSIRE", r.damSire, grupId) };
+    return { no: r.no, name: r.name, yas: yasN, grupId, pistId, devreye: devreyeOf(r.tjkAtId), sire: ata("SIRE", r.sire, grupId), dam: ata("DAM", r.dam, grupId), damSire: ata("DAMSIRE", r.damSire, grupId) };
   });
 }
