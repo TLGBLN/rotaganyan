@@ -71,3 +71,27 @@ export function oncekiYarisSinifi(rows: { date?: string; classType?: string }[] 
   }
   return en ? en.c : null;
 }
+
+/** Son yarışların SINIF BAĞLAMLI özeti (admin kartında "Son 6 derece ort." yanında gösterilir): derece tek başına yanıltıcıdır —
+ *  Maiden/Şartlı 1'de 1. olmak, G2'de 1. olmakla aynı şey değildir (kullanıcı bulgusu 2026-11-15). En yeni → en eski. */
+export type SonYarisOzeti = { tarih: string; sinif: string; seviye: number | null; derece: number | null; fark: number | null };
+export function sonYarislarOzeti(
+  rows: { date?: string; classType?: string; finishPos?: string }[] | null | undefined,
+  yarisGunuUtcMs: number,
+  bugunkuSinif: string | null | undefined,
+  n = 6,
+): SonYarisOzeti[] {
+  const cur = sinifSeviyesi(bugunkuSinif);
+  const liste: { t: number; o: SonYarisOzeti }[] = [];
+  for (const q of rows ?? []) {
+    if (!q.date) continue;
+    const [g, a, y] = q.date.split(".");
+    const t = Date.UTC(+y, +a - 1, +g);
+    if (!Number.isFinite(t) || t >= yarisGunuUtcMs) continue;
+    const sinif = String(q.classType ?? "").split("/")[0].replace(/\s+/g, " ").trim();
+    const sev = sinifSeviyesi(sinif);
+    const m = String(q.finishPos ?? "").replace(",", ".").match(/\d+/);
+    liste.push({ t, o: { tarih: `${g}.${a}`, sinif, seviye: sev, derece: m ? +m[0] : null, fark: cur != null && sev != null ? cur - sev : null } });
+  }
+  return liste.sort((a, b) => b.t - a.t).slice(0, n).map((x) => x.o);
+}

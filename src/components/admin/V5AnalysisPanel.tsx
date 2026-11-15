@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Loader2, Sparkles, CheckCircle, ChevronUp, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { nedenSatirlari } from "@/lib/methodology/neden-satirlari";
 import { upsertPrediction, type PickInput } from "@/server/actions/prediction.actions";
 import type { PickDetailsV2 } from "@/lib/methodology/muhakeme-format";
 import type { HorseAnalysisSummary } from "@/lib/methodology/horse-analysis-summary";
@@ -76,6 +77,8 @@ type V5At = {
     durum: "ÇOK GÜÇLÜ POZİTİF" | "POZİTİF" | "NÖTR" | "NEGATİF" | "ÇOK GÜÇLÜ NEGATİF" | null;
   } | null;
   jokeySon30GMetni?: string | null;
+  /** Son yarışlar sınıf bağlamıyla (en yeni önce) — bilgi amaçlı. */
+  sonYarislar?: { tarih: string; sinif: string; seviye: number | null; derece: number | null; fark: number | null }[];
   jokeyDestekliIlk6?: boolean;
   jokeyDestekliSurpriz?: boolean;
   analysisOzet?: HorseAnalysisSummary;
@@ -117,7 +120,7 @@ function savedPickToV5At(pick: SavedPick, runnersByNo: Map<number, Runner>): V5A
   const noMatch = pick.runnerLabel.match(/^#(\d+)/);
   const no = noMatch ? parseInt(noMatch[1], 10) : 0;
   const runner = runnersByNo.get(no);
-  const snap = pick.featureSnapshot as { tumSinyaller?: (TumOzellikDetay & { observed?: boolean; reliability?: number; beta?: number })[] } | null | undefined;
+  const snap = pick.featureSnapshot as { tumSinyaller?: (TumOzellikDetay & { observed?: boolean; reliability?: number; beta?: number })[]; sonYarislar?: V5At["sonYarislar"] } | null | undefined;
   return {
     no,
     ad: runner?.name ?? pick.runnerLabel.replace(/^#\d+\s*/, ""),
@@ -126,6 +129,7 @@ function savedPickToV5At(pick: SavedPick, runnersByNo: Map<number, Runner>): V5A
     olasilik,
     details: d as PickDetailsV2,
     tumSinyaller: Array.isArray(snap?.tumSinyaller) ? snap!.tumSinyaller : undefined,
+    sonYarislar: Array.isArray(snap?.sonYarislar) ? snap!.sonYarislar : undefined,
   };
 }
 
@@ -315,6 +319,7 @@ export default function V5AnalysisPanel({ raceId, classType, runners: raceRunner
           featureSnapshot: a.tumSinyaller && kaynak === "canli"
             ? {
                 tumSinyaller: a.tumSinyaller,
+                sonYarislar: a.sonYarislar ?? [],
                 motorEtiketi,
                 externalPedigree: a.externalPedigree ?? null,
                 bKatmani: {
@@ -665,8 +670,67 @@ export default function V5AnalysisPanel({ raceId, classType, runners: raceRunner
                     )}
                   </ul>
                 )}
+                {/* 2026-11-15 kullanıcı talebi ("çok karışık, anlaşılır net olsun"): önce NEDEN bu sırada (tekil sinyal katkıları) + son yarışlar
+                    SINIF BAĞLAMIYLA; bütünlük/aile/AGF-trend/denetim ayrıntıları aşağıda katlanır "Teknik ayrıntı"da. */}
+                {(() => {
+                  const n = nedenSatirlari(a.tumSinyaller);
+                  const sy = a.sonYarislar ?? [];
+                  const dusukSayisi = sy.filter((x) => x.fark != null && x.fark >= 3).length;
+                  const satir = (x: { kod: string; ad: string; katki: number; ham: string | null }) => (
+                    <li key={x.kod} className="flex items-baseline justify-between gap-2">
+                      <span>{x.ad}{x.ham && <span className="text-muted-foreground"> · {x.ham}</span>}</span>
+                      <span className={cn("font-mono font-semibold tabular-nums", x.katki > 0 ? "text-emerald-600" : "text-red-600")}>{x.katki > 0 ? "+" : ""}{x.katki.toFixed(2)}</span>
+                    </li>
+                  );
+                  if (!n.arti.length && !n.eksi.length && !sy.length) return null;
+                  return (
+                    <div className="space-y-2 border-t border-border/60 pt-2 text-[11px]">
+                      {(n.arti.length > 0 || n.eksi.length > 0) && (
+                        <div className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+                          <div>
+                            <div className="mb-0.5 font-semibold text-emerald-600">Sırayı yukarı çeken</div>
+                            <ul className="space-y-0.5">{n.arti.length ? n.arti.map(satir) : <li className="text-muted-foreground">belirgin yok</li>}</ul>
+                          </div>
+                          <div>
+                            <div className="mb-0.5 font-semibold text-red-600">Sırayı aşağı çeken</div>
+                            <ul className="space-y-0.5">{n.eksi.length ? n.eksi.map(satir) : <li className="text-muted-foreground">belirgin yok</li>}</ul>
+                          </div>
+                        </div>
+                      )}
+                      {sy.length > 0 && (
+                        <div>
+                          <div className="mb-0.5 font-semibold">Son yarışlar <span className="font-normal text-muted-foreground">(sınıfı ve derecesi · en yeni solda)</span></div>
+                          <div className="flex flex-wrap gap-1">
+                            {sy.map((x, i) => (
+                              <span
+                                key={i}
+                                title={x.fark != null ? (x.fark >= 3 ? `Bugünkü sınıftan ${x.fark} basamak DÜŞÜK sınıfta` : x.fark <= -1 ? `Bugünkü sınıftan ${-x.fark} basamak ÜST sınıfta` : "Bugünkü sınıfa yakın") : "Sınıf seviyesi bilinmiyor"}
+                                className={cn(
+                                  "rounded border px-1.5 py-0.5",
+                                  x.fark != null && x.fark >= 3 ? "border-amber-500/50 bg-amber-500/10 text-amber-700" : x.fark != null && x.fark <= -1 ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700" : "border-border text-muted-foreground"
+                                )}
+                              >
+                                {x.sinif || "?"} · <b>{x.derece != null ? `${x.derece}.` : "—"}</b>
+                              </span>
+                            ))}
+                          </div>
+                          {dusukSayisi >= 2 && (
+                            <div className="mt-1 text-amber-700">
+                              ⚠ Son {sy.length} yarışın {dusukSayisi}'i bugünkü sınıftan ≥3 basamak daha düşük sınıfta — derece ortalaması bugünkü yarışa göre dikkatle yorumlanmalı.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 {a.analysisOzet ? (
-                  <div className="space-y-2 border-t border-border/60 pt-2">
+                  <details className="border-t border-border/60 pt-1.5">
+                    <summary className="cursor-pointer text-[11px] font-medium text-purple-500 hover:underline">Teknik ayrıntı (bütünlük, kanıt aileleri, jokey, piyasa)</summary>
+                  <div className="space-y-2 pt-2">
+                    <p className="text-[10px] text-muted-foreground">
+                      Not: "Bütünlük/Önerilen Kapsam" işaret sayımıdır (+0.0003'lük katkı da "pozitif" sayılır); kayıtlı sonuçlarda 1. sıradaki atın kazanma oranını ayırt etmediği ölçüldü (BANKO/İLK3/İLK6/YETERSİZ ≈ %30/%36/%33/%30). Karar için yukarıdaki sıra ve olasılık esastır.
+                    </p>
                     <div
                       className={cn(
                         "rounded-lg border p-3",
@@ -911,6 +975,7 @@ export default function V5AnalysisPanel({ raceId, classType, runners: raceRunner
                       </div>
                     )}
                   </div>
+                  </details>
                 ) : (
                   <p className="text-muted-foreground">
                     Race-Day Analysis özeti bu kayıt için mevcut değil.

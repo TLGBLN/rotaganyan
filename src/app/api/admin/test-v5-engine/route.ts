@@ -12,6 +12,8 @@ import { evaluateJokeyRescue, buildJokeySon30GMetni } from "@/lib/jokey-form";
 import { classifyAllSignals } from "@/lib/methodology/signal-status";
 import { buildHorseAnalysisSummary } from "@/lib/methodology/horse-analysis-summary";
 import { evaluateAnalysisReady } from "@/lib/methodology/analysis-ready";
+import { tjkAtIdOf } from "@/lib/accurace/loader";
+import { sonYarislarOzeti } from "@/lib/methodology/ham-alan-sinyalleri";
 
 // 2026-11-10 kullanıcı KESİN kararı — "V5.46.1 kaldır, 15 sinyalli Saf Model resmi motor
 // olacak, AGF komple kalkacak": bu ekranın skor kaynağı artık YALNIZ scoreV461Saf (AGF'siz,
@@ -76,6 +78,14 @@ async function handlePost(req: NextRequest) {
     faz1.runners.map((r) => [r.no, r.zeminMesafeDeneyimSeviyesi !== "yok"])
   );
 
+  // Son yarışlar SINIF BAĞLAMIYLA (derece tek başına yanıltıcı: Maiden'daki 1. ile G2'deki 1. aynı değil) — kart bilgi amaçlı, skoru etkilemez.
+  const tjkOfRoute = await tjkAtIdOf(faz1.runners.map((r) => r.id)).catch(() => new Map<string, number>());
+  const tjkListe = [...new Set([...tjkOfRoute.values()])];
+  const gecmisRows = tjkListe.length ? await db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: tjkListe } }, select: { tjkAtId: true, rowsJson: true } }).catch(() => []) : [];
+  const gunMs = raceDayMeta?.raceDay.date.getTime() ?? Date.now();
+  const sonYarislarByTjk = new Map(gecmisRows.map((g) => [g.tjkAtId, sonYarislarOzeti(g.rowsJson as { date?: string; classType?: string; finishPos?: string }[], gunMs, faz1.race.classType, 6)]));
+  const runnerIdByNo = new Map(faz1.runners.map((r) => [r.no, r.id]));
+
   const atlar = sirali.map((p) => {
     const sinyaller = p.features.map((f) => ({
       kod: f.ad,
@@ -127,6 +137,7 @@ async function handlePost(req: NextRequest) {
       jockey: jockeyAdi,
       jokeySon30G: jokeyGuncel,
       jokeySon30GMetni,
+      sonYarislar: sonYarislarByTjk.get(tjkOfRoute.get(runnerIdByNo.get(p.no) ?? "") ?? -1) ?? [],
       jokeyDestekliIlk6: jokeyRescue?.JOKEY_DESTEKLI_ILK6 ?? false,
       jokeyDestekliSurpriz: jokeyRescue?.JOKEY_DESTEKLI_SURPRIZ ?? false,
       karar,
