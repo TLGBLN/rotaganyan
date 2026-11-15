@@ -1,9 +1,10 @@
 import { db } from "@/lib/db";
-import { format } from "date-fns";
+import { format, startOfWeek } from "date-fns";
 import { tr } from "date-fns/locale";
 import { GUNCEL_MOTOR_BASLANGIC, normalizeClassType } from "@/server/services/admin.service";
 import { cn } from "@/lib/utils";
 import KazananProfiliBolumu from "@/components/admin/KazananProfiliBolumu";
+import { sahaKovasi, SAHA_KOVALARI } from "@/lib/izleme/kazanan-profili";
 import SonuclarPaginator from "@/components/admin/SonuclarPaginator";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +70,7 @@ async function getVeri() {
       raceNo: r.race.raceNo,
       tip: normalizeClassType(r.race.classType),
       classTypeRaw: r.race.classType,
+      saha: picks.length,
       mesafe: r.race.distance,
       pist: SURFACE_LABEL[r.race.surface] ?? r.race.surface,
       ganyan: r.ganyan,
@@ -83,18 +85,30 @@ async function getVeri() {
 }
 
 type Satir = Awaited<ReturnType<typeof getVeri>>[number];
-type Ozet = { label: string; total: number; top1: number; top3: number; top6: number; disinda: number };
+type Ozet = { label: string; total: number; top1: number; top3: number; top6: number; disinda: number; sahaToplam: number; bek1: number; bek3: number };
+type Beklenen = { t1: number[]; t3: number[] };
+
+/** Saha büyüklüğü kovası başına GENEL Top1/Top3 oranı = "bu kalabalıkta ortalama ne beklenir". Tip farkı bunun ÜSTÜ/ALTI olarak okunmalı. */
+function beklenenHesapla(rows: Satir[]): Beklenen {
+  const k = SAHA_KOVALARI.map(() => ({ n: 0, a: 0, b: 0 }));
+  for (const r of rows) {
+    if (r.saha < 4) continue;
+    const e = k[sahaKovasi(r.saha)]; e.n++; if (r.tier === "rank1") e.a++; if (r.tier === "rank1" || r.tier === "rank2_3") e.b++;
+  }
+  return { t1: k.map((e) => (e.n ? e.a / e.n : 0)), t3: k.map((e) => (e.n ? e.b / e.n : 0)) };
+}
 
 const SIRALAMA_ISTISNALARI: Record<string, string> = { "ŞARTLI 19": "Maiden", "ŞARTLI 27": "ŞARTLI 1" };
 function siralamaAnahtari(label: string): string {
   return SIRALAMA_ISTISNALARI[label.toUpperCase()] ?? label;
 }
 
-function ozetle(rows: Satir[]): Ozet[] {
+function ozetle(rows: Satir[], bek: Beklenen): Ozet[] {
   const map = new Map<string, Ozet>();
   for (const r of rows) {
-    const entry = map.get(r.tip) ?? { label: r.tip, total: 0, top1: 0, top3: 0, top6: 0, disinda: 0 };
-    entry.total++;
+    const entry = map.get(r.tip) ?? { label: r.tip, total: 0, top1: 0, top3: 0, top6: 0, disinda: 0, sahaToplam: 0, bek1: 0, bek3: 0 };
+    entry.total++; entry.sahaToplam += r.saha;
+    if (r.saha >= 4) { const kv = sahaKovasi(r.saha); entry.bek1 += bek.t1[kv]; entry.bek3 += bek.t3[kv]; }
     if (r.tier === "rank1") { entry.top1++; entry.top3++; entry.top6++; }
     else if (r.tier === "rank2_3") { entry.top3++; entry.top6++; }
     else if (r.tier === "rank4_6") { entry.top6++; }
@@ -121,7 +135,9 @@ const SAYFA_BOYU = 50;
 export default async function KosuTipleriPage({ searchParams }: PageProps) {
   const sp = await searchParams;
   const rows = await getVeri();
-  const ozet = ozetle(rows);
+  const beklenen = beklenenHesapla(rows);
+  const ozet = ozetle(rows, beklenen);
+  const AZ_ORNEK = 30;
 
   const listeSatirlari = sp.tip ? rows.filter((r) => r.tip === sp.tip) : rows;
   const sayfa = Math.max(0, parseInt(sp.sayfa ?? "0", 10) || 0);
@@ -142,6 +158,15 @@ export default async function KosuTipleriPage({ searchParams }: PageProps) {
   const ganyanHits = rows.filter((r) => r.tier === "rank1" && r.ganyan != null);
   const avgGanyan = ganyanHits.length > 0 ? (ganyanHits.reduce((s, r) => s + r.ganyan!, 0) / ganyanHits.length).toFixed(2) : null;
 
+  const haftalar = new Map<number, { t: Date; n: number; a: number; b: number; c: number }>();
+  for (const r of rows) {
+    const w = startOfWeek(r.tarih, { weekStartsOn: 1 }); const key = w.getTime();
+    const e = haftalar.get(key) ?? { t: w, n: 0, a: 0, b: 0, c: 0 };
+    e.n++; if (r.tier === "rank1") e.a++; if (r.tier === "rank1" || r.tier === "rank2_3") e.b++; if (r.tier !== "miss") e.c++;
+    haftalar.set(key, e);
+  }
+  const haftaListe = [...haftalar.values()].sort((x, y) => y.t.getTime() - x.t.getTime()).slice(0, 8);
+
   return (
     <div className="space-y-6">
       <div>
@@ -149,7 +174,7 @@ export default async function KosuTipleriPage({ searchParams }: PageProps) {
         <p className="text-xs text-muted-foreground">
           Güncel motor dönemi, yayınlanmış + sonuçlanmış {rows.length} yarış — temel koşu tipine göre
           ayrılmış isabet dağılımı (Dişi/DHÖW/H1-H2-H3 gibi ekler birleştirildi, tam/ham tip ve
-          detaylı sonuç aşağıdaki listede görünür).
+          detaylı sonuç aşağıdaki listede görünür). <b>Top1</b> = 1. seçim kazandı · <b>Top3</b> = kazanan ilk 3 seçimde · <b>Top6</b> = ilk 6 seçimde. Kalabalık sahada isabet doğal olarak düşer; tip karşılaştırması için <b>“Saha beklentisine göre”</b> sütununa bakın.
         </p>
       </div>
 
@@ -162,13 +187,40 @@ export default async function KosuTipleriPage({ searchParams }: PageProps) {
             </div>
             <div className="text-2xl font-bold">
               {{ rank1: genelToplam.top1, rank2_3: genelToplam.top3 - genelToplam.top1, rank4_6: genelToplam.top6 - genelToplam.top3, miss: genelToplam.disinda }[tier]}
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground">{pct({ rank1: genelToplam.top1, rank2_3: genelToplam.top3 - genelToplam.top1, rank4_6: genelToplam.top6 - genelToplam.top3, miss: genelToplam.disinda }[tier], genelToplam.total)}</span>
             </div>
           </div>
         ))}
       </div>
+      <p className="text-xs text-muted-foreground">
+        Kümülatif: <b className="text-foreground">Top1 {pct(genelToplam.top1, genelToplam.total)}</b> · <b className="text-foreground">Top3 {pct(genelToplam.top3, genelToplam.total)}</b> · <b className="text-foreground">Top6 {pct(genelToplam.top6, genelToplam.total)}</b> ({genelToplam.total} yarış).
+      </p>
       {avgGanyan && (
         <p className="text-xs text-muted-foreground">Ort. ganyan (1. sıra isabetle): <strong className="text-foreground">{avgGanyan}</strong></p>
       )}
+
+      <div>
+        <h3 className="mb-1 text-sm font-bold">Haftalık gidişat <span className="text-xs font-normal text-muted-foreground">(son 8 hafta — motor/kural değişikliği işe yaradı mı?)</span></h3>
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="w-full text-xs">
+            <thead><tr className="border-b bg-muted/30 text-muted-foreground">
+              <th className="px-3 py-2 text-left font-medium">Hafta (Pzt)</th><th className="px-3 py-2 text-right font-medium">Koşu</th>
+              <th className="px-3 py-2 text-right font-medium">Top1</th><th className="px-3 py-2 text-right font-medium">Top3</th><th className="px-3 py-2 text-right font-medium">Top6</th>
+            </tr></thead>
+            <tbody>
+              {haftaListe.map((h) => (
+                <tr key={h.t.getTime()} className="border-b last:border-0">
+                  <td className="px-3 py-1.5">{format(h.t, "d MMM", { locale: tr })}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{h.n}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{pct(h.a, h.n)}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{pct(h.b, h.n)}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{pct(h.c, h.n)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       <KazananProfiliBolumu />
 
@@ -179,38 +231,55 @@ export default async function KosuTipleriPage({ searchParams }: PageProps) {
             <tr className="border-b bg-muted/30 text-muted-foreground">
               <th className="px-3 py-2 text-left font-medium">Koşu Tipi</th>
               <th className="px-3 py-2 text-right font-medium">Koşu</th>
+              <th className="px-3 py-2 text-right font-medium">Ort. saha</th>
               <th className="px-3 py-2 text-right font-medium">1. Sıra</th>
               <th className="px-3 py-2 text-right font-medium">İlk 3</th>
               <th className="px-3 py-2 text-right font-medium">İlk 6</th>
               <th className="px-3 py-2 text-right font-medium">Listede Yok</th>
+              <th className="px-3 py-2 text-right font-medium" title="Gerçek oran eksi, aynı saha büyüklüklerindeki genel oran. + = tip beklentinin üstünde">Saha beklentisine göre (Top1 / Top3)</th>
             </tr>
           </thead>
           <tbody>
             {ozet.map((o) => (
-              <tr key={o.label} className="border-b last:border-0 hover:bg-muted/20">
+              <tr key={o.label} className={cn("border-b last:border-0 hover:bg-muted/20", o.total < AZ_ORNEK && "opacity-60")}>
                 <td className="px-3 py-2 font-medium">
                   <a href={tipLink(o.label)} className={cn("underline-offset-2 hover:underline", sp.tip === o.label && "text-brand")}>
                     {o.label}
                   </a>
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums">{o.total}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{o.total}{o.total < AZ_ORNEK && <span className="block text-[9px] text-muted-foreground">az örnek</span>}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{(o.sahaToplam / o.total).toFixed(1)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{o.top1} ({pct(o.top1, o.total)})</td>
                 <td className="px-3 py-2 text-right tabular-nums">{o.top3} ({pct(o.top3, o.total)})</td>
                 <td className="px-3 py-2 text-right tabular-nums">{o.top6} ({pct(o.top6, o.total)})</td>
                 <td className="px-3 py-2 text-right tabular-nums text-[#c0392b]">{o.disinda} ({pct(o.disinda, o.total)})</td>
+                <td className="px-3 py-2 text-right tabular-nums">
+                  {o.total < AZ_ORNEK ? <span className="text-muted-foreground">—</span> : (() => {
+                    const d1 = ((o.top1 - o.bek1) / o.total) * 100, d3 = ((o.top3 - o.bek3) / o.total) * 100;
+                    const renk = (d: number) => (d >= 5 ? "text-hit font-semibold" : d <= -5 ? "text-[#e57368] font-semibold" : "text-muted-foreground");
+                    const f = (d: number) => (d >= 0 ? "+" : "") + d.toFixed(1);
+                    return <><span className={renk(d1)}>{f(d1)}</span> / <span className={renk(d3)}>{f(d3)}</span> <span className="text-[9px] text-muted-foreground">puan</span></>;
+                  })()}
+                </td>
               </tr>
             ))}
             <tr className="border-t-2 font-semibold">
               <td className="px-3 py-2">Toplam</td>
               <td className="px-3 py-2 text-right tabular-nums">{genelToplam.total}</td>
+              <td className="px-3 py-2" />
               <td className="px-3 py-2 text-right tabular-nums">{genelToplam.top1} ({pct(genelToplam.top1, genelToplam.total)})</td>
               <td className="px-3 py-2 text-right tabular-nums">{genelToplam.top3} ({pct(genelToplam.top3, genelToplam.total)})</td>
               <td className="px-3 py-2 text-right tabular-nums">{genelToplam.top6} ({pct(genelToplam.top6, genelToplam.total)})</td>
               <td className="px-3 py-2 text-right tabular-nums text-[#c0392b]">{genelToplam.disinda} ({pct(genelToplam.disinda, genelToplam.total)})</td>
+              <td className="px-3 py-2" />
             </tr>
           </tbody>
         </table>
       </div>
+
+      <p className="text-[11px] text-muted-foreground">
+        Tip farkı çoğunlukla saha büyüklüğünden gelir (ör. 8 atlı KV ile 14 atlı Handikap kıyaslanamaz). “Saha beklentisine göre” sütunu bunu ayıklar; ±5 puan altı gürültü sayılır, {AZ_ORNEK} koşudan az satırlarda gösterilmez.
+      </p>
 
       {/* Sonuç listesi — tip seçiliyse filtreli, değilse TÜMÜ (eski /admin/sonuclar davranışı) */}
       <div>

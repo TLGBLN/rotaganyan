@@ -10,7 +10,7 @@ export const PROFIL_SINYALLERI: [string, 1 | -1, string][] = [
   ["fMean", -1, "Son 6 derece ort."], ["hizDerecesi", 1, "Hız derecesi"], ["h2hNetSkor", 1, "H2H net skor"],
   ["ACC_LATE", 1, "Accurace geç segment"], ["ACC_CLOSE_RES", 1, "Accurace kapanış"], ["ACC_SPEED", 1, "Accurace hız"],
   ["yarisGidisatiSkoru", 1, "Yarış gidişatı"], ["PS_front", -1, "Tempo: öne çıkma"], ["PS_closerFit", -1, "Tempo: arkadan gelme"],
-  ["jokeyPIT", 1, "Jokey seviyesi"], ["antrenorPIT", 1, "Antrenör seviyesi"], ["hpRel", 1, "HP (sahaya göre)"], ["kiloRel", 1, "Kilo (sahaya göre)"],
+  ["jokeyPIT", 1, "Jokey seviyesi"], ["antrenorPIT", 1, "Antrenör seviyesi"], ["hpRel", 1, "HP (yüksek = yüksek HP)"], ["kiloRel", 1, "Kilo (yüksek = ağır)"],
   ["kgsLog", -1, "Dinlenme (KGS)"], ["sireOrani", 1, "Pedigri (baba)"], ["galopKalite", 1, "Galop kalitesi"],
 ];
 
@@ -22,6 +22,9 @@ function yonluYuzdelik(vals: (number | null)[], i: number, yon: 1 | -1): number 
   const p = (lo + (eq - 1) / 2) / (v.length - 1);
   return yon > 0 ? p : 1 - p;
 }
+
+/** Bir hücrenin değeri gösterilebilmesi için asgari koşu sayısı (altı gürültü: 30 koşuluk ortalama ±0.05'ten fazla oynar). */
+export const MIN_N_GOSTER = 60;
 
 export const SAHA_KOVALARI = ["≤7 at", "8-9 at", "10-11 at", "12-13 at", "14+ at"] as const;
 export const sahaKovasi = (n: number) => (n <= 7 ? 0 : n <= 9 ? 1 : n <= 11 ? 2 : n <= 13 ? 3 : 4);
@@ -59,7 +62,7 @@ export function kazananProfiliHesapla(kosular: ProfilKosu[]): { gruplar: GrupPro
   }
   const gruplar: GrupProfili[] = [...toplam.entries()].map(([grup, e]) => ({
     grup, kosu: e.kosu, ortKazananSirasi: e.sira.length ? e.sira.reduce((a, c) => a + c, 0) / e.sira.length : null,
-    sinyaller: PROFIL_SINYALLERI.map(([kod, , ad]) => { const v = e.s.get(kod) ?? []; return { kod, ad, n: v.length, ort: v.length >= 15 ? v.reduce((a, c) => a + c, 0) / v.length : null }; }),
+    sinyaller: PROFIL_SINYALLERI.map(([kod, , ad]) => { const v = e.s.get(kod) ?? []; return { kod, ad, n: v.length, ort: v.length >= MIN_N_GOSTER ? v.reduce((a, c) => a + c, 0) / v.length : null }; }),
   })).sort((a, b) => (a.grup === "TÜMÜ" ? -1 : b.grup === "TÜMÜ" ? 1 : b.kosu - a.kosu));
   return { gruplar, saha: SAHA_KOVALARI.map((kova, i) => ({ kova, kosu: saha[i].kosu, top1: saha[i].top1, top3: saha[i].top3, rastgeleTop3: saha[i].kosu ? saha[i].rast / saha[i].kosu : 0 })), egitimeHazirKosu: hazir };
 }

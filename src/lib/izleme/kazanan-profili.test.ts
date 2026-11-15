@@ -6,15 +6,15 @@ const kosu = (kazanan: number, g = "Handikap"): ProfilKosu => ({ grup: g, kazana
 
 describe("kazananProfiliHesapla", () => {
   it("fMean düşük=iyi: en düşük fMean'li kazanan → yüzdelik 1.0", () => {
-    const o = kazananProfiliHesapla(Array.from({ length: 20 }, () => kosu(1)));
+    const o = kazananProfiliHesapla(Array.from({ length: 60 }, () => kosu(1)));
     const f = o.gruplar.find((g) => g.grup === "TÜMÜ")!.sinyaller.find((s) => s.kod === "fMean")!;
     expect(f.ort).toBe(1);
   });
   it("en kötü fMean'li kazanan → 0", () => {
-    const o = kazananProfiliHesapla(Array.from({ length: 20 }, () => kosu(5)));
+    const o = kazananProfiliHesapla(Array.from({ length: 60 }, () => kosu(5)));
     expect(o.gruplar[0].sinyaller.find((s) => s.kod === "fMean")!.ort).toBe(0);
   });
-  it("15'ten az örnekte ortalama gösterilmez (null)", () => {
+  it("60'tan az örnekte ortalama gösterilmez (null)", () => {
     expect(kazananProfiliHesapla([kosu(1)]).gruplar[0].sinyaller.find((s) => s.kod === "fMean")!.ort).toBeNull();
   });
   it("saha kovası ve Top1/Top3 sayımı", () => {
