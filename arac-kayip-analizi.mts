@@ -273,12 +273,12 @@ async function main() {
   const LIVE21 = [...F22, "fMean", "kgsLog", "sexE"].filter((x) => !OLU.includes(x));
   const sirala = [...veriYum].sort((a, b) => a.tarih.localeCompare(b.tarih));
   const NB = 5, bsz = Math.ceil(sirala.length / NB);
-  type Rec = { g: number; blok: number; kz: number; s: number[]; runners: (typeof veriYum)[number]["runners"] };
+  type Rec = { tip?: string; g: number; blok: number; kz: number; s: number[]; runners: (typeof veriYum)[number]["runners"] };
   const kayit: Rec[] = [];
   for (let b = 0; b < NB; b++) {
     const test = sirala.slice(b * bsz, (b + 1) * bsz), train = [...sirala.slice(0, b * bsz), ...sirala.slice((b + 1) * bsz)];
     const ms: MS = new Map(LIVE21.map((x) => [x, muSigma(train, x)])); const w = egit(train, LIVE21, ms);
-    for (const r of test) { const kz = r.runners.findIndex((x) => x.kazandi); if (kz < 0) continue; kayit.push({ g: grupOf(r.raceId), blok: b, kz, runners: r.runners, s: r.runners.map((x) => { const v = vek(x, LIVE21, ms); let t = 0; for (let i = 0; i < v.length; i++) t += v[i] * w[i]; return t; }) }); }
+    for (const r of test) { const kz = r.runners.findIndex((x) => x.kazandi); if (kz < 0) continue; kayit.push({ tip: String(raceMeta.get(r.raceId)?.classType ?? "?"), g: grupOf(r.raceId), blok: b, kz, runners: r.runners, s: r.runners.map((x) => { const v = vek(x, LIVE21, ms); let t = 0; for (let i = 0; i < v.length; i++) t += v[i] * w[i]; return t; }) }); }
   }
   console.log("çıkış-dışı model puanı: " + kayit.length + " yarış");
   // ── yönlü yüzdelikler ──
@@ -326,6 +326,38 @@ async function main() {
     const mm = (q: number[]) => (q.reduce((s, v) => s + v, 0) / Math.max(q.length, 1)).toFixed(3);
     console.log(ad.padEnd(46) + mm(a).padStart(8) + "      | " + (mm(k) + " (n=" + k.length + ")").padStart(26) + "         | " + (mm(l) + " (n=" + l.length + ")").padStart(14) + "      | " + mm(w) + " (n=" + w.length + ")");
   }
+  // ═══════════ SAHA BÜYÜKLÜĞÜ DAHİL YENİDEN İNCELEME ═══════════
+  const SB = (n: number) => (n <= 9 ? 0 : n <= 12 ? 1 : 2); const SBN = ["≤9 at", "10-12 at", "13+ at"];
+  const idx = (f: (r: Rec) => boolean) => kayit.map((r, i) => ({ r, i })).filter((q) => f(q.r));
+  console.log("\n######## SAHA BÜYÜKLÜĞÜ DAHİL ########\nYarış sayısı: " + SBN.map((nm, b) => nm + " " + kayit.filter((r) => SB(r.runners.length) === b).length).join(" | "));
+  // B) kalibrasyon: modelin puanı saha büyüklüğüne göre doğru ölçekli mi? (s → s·(1+b); b>0 model az-emin, b<0 aşırı-emin)
+  console.log("\n=== B) MODEL KALİBRASYONU (çıkış-dışı puan, saha bazında ölçek b: >0 az-emin, <0 aşırı-emin) ===");
+  for (let b = 0; b < 3; b++) { const q = idx((r) => SB(r.runners.length) === b); const RS = q.map(({ r }) => { const m = r.s.reduce((a, c) => a + c, 0) / r.s.length; return { s: r.s, x: r.s.map((v) => v - m), kz: r.kz }; }); const bb = fitBeta(RS); const d = RS.map((r) => nll(r.s.map((v, i) => v + bb * r.x[i]), r.kz) - nll(r.s, r.kz)); const [lo, hi] = ciM(d); console.log(SBN[b].padEnd(10) + "n=" + String(q.length).padStart(4) + " | ölçek b=" + (bb >= 0 ? "+" : "") + bb.toFixed(2) + " | ΔLL(örnek-içi) " + (d.reduce((a, c) => a + c, 0) / d.length).toFixed(4) + " [" + lo.toFixed(4) + "," + hi.toFixed(4) + "]"); }
+  // C) aile ekleme ΔLL — saha bazında
+  console.log("\n=== C) AİLE EKLEME ΔLL (blok-CV β) — SAHA BÜYÜKLÜĞÜNE GÖRE (negatif=iyileşme; ✔ GA sıfırı dışlıyor) ===");
+  console.log("aile".padEnd(46) + SBN.map((s) => s.padEnd(22)).join(""));
+  for (const [ad] of Object.entries(FAM)) {
+    const X = FX.get(ad)!; const per: number[][] = [[], [], []];
+    for (let b = 0; b < NB; b++) { const tr = kayit.map((r, i) => ({ r, i })).filter((q) => q.r.blok !== b), te = kayit.map((r, i) => ({ r, i })).filter((q) => q.r.blok === b); const beta = fitBeta(tr.map((q) => ({ s: q.r.s, x: X[q.i], kz: q.r.kz }))); for (const q of te) per[SB(q.r.runners.length)].push(nll(q.r.s.map((v, i) => v + beta * X[q.i][i]), q.r.kz) - nll(q.r.s, q.r.kz)); }
+    console.log(ad.padEnd(46) + per.map((a) => { const m = a.reduce((x, y) => x + y, 0) / a.length; const [l, h] = ciM(a); return ((m >= 0 ? "+" : "") + m.toFixed(4) + (h < 0 ? "✔" : l > 0 ? "✘" : "")).padEnd(22); }).join(""));
+  }
+  // D) tekil faktörlerde kazananın yönlü yüzdeliği — saha bazında (0.50 = ayırt etmez)
+  console.log("\n=== D) KAZANANIN YÖNLÜ YÜZDELİĞİ (tek faktör) — SAHA BÜYÜKLÜĞÜNE GÖRE (0.50=ayırt etmez) ===");
+  const TEK: [string, string, 1 | -1][] = [["Son 6 derece ort.", "fMean", -1], ["Son yarış derecesi", "tSon", -1], ["Kariyer kazanma%", "tWinRate", 1], ["Kariyer ilk-3%", "tTop3Rate", 1], ["HP", "hpRel", 1], ["Kilo", "kiloRel", 1], ["Hız derecesi", "hizDerecesi", 1], ["H2H net skor", "h2hNetSkor", 1], ["Accurace GEÇ", "ACC_LATE", 1], ["Accurace kapanış", "ACC_CLOSE_RES", 1], ["Accurace hız", "ACC_SPEED", 1], ["Tempo: öne çıkma", "PS_front", -1], ["Tempo: arkadan gelme", "PS_closerFit", -1], ["Yarış gidişatı", "yarisGidisatiSkoru", 1], ["Jokey PIT", "jokeyPIT", 1], ["Antrenör PIT", "antrenorPIT", 1], ["Bu jokeyle kazanma", "tAjW", 1]];
+  console.log("faktör".padEnd(26) + SBN.map((s) => s.padEnd(18)).join("") + "| MODEL kazanan yüzdeliği (≤9/10-12/13+)");
+  for (const [ad, kod, y] of TEK) {
+    const v: number[][] = [[], [], []]; const mv: number[][] = [[], [], []];
+    for (const r of kayit) { const p = pctOf(r, kod, y)[r.kz]; if (p != null) v[SB(r.runners.length)].push(p); }
+    console.log(ad.padEnd(26) + v.map((a) => (a.length < 30 ? "–" : a.reduce((x, z) => x + z, 0) / a.length).toString().slice(0, 5).padEnd(8) + ("n=" + a.length).padEnd(10)).join(""));
+  }
+  { const mv: number[][] = [[], [], []]; for (const r of kayit) { const rank = r.s.filter((v) => v > r.s[r.kz]).length; mv[SB(r.runners.length)].push(1 - rank / (r.runners.length - 1)); } console.log("MODEL (kazananın model yüzdeliği)".padEnd(26) + mv.map((a) => (a.reduce((x, z) => x + z, 0) / a.length).toFixed(3).padEnd(18)).join("")); }
+  // E) tip etkisi, saha büyüklüğünden ARINDIRILMIŞ: gözlenen ilk-3 − (saha-grubu taban oranı)
+  console.log("\n=== E) KOŞU TİPİ — SAHA ARINDIRILMIŞ (gözlenen ilk-3 isabeti − aynı büyüklükteki sahaların genel oranı; + iyi, − kötü) ===");
+  const SB5 = (n: number) => Math.min(Math.floor((n - 5) / 2), 5); const taban = new Map<number, [number, number]>(); const t3of = (r: Rec) => (r.s.filter((v) => v > r.s[r.kz]).length < 3 ? 1 : 0);
+  for (const r of kayit) { const k = SB5(r.runners.length), c = taban.get(k) ?? [0, 0]; c[0] += t3of(r); c[1]++; taban.set(k, c); }
+  const grT = new Map<string, Rec[]>(); for (const r of kayit) { const t = (r.tip ?? "?").split("/")[0].replace(/s+/g, " ").trim().toUpperCase(); const a = grT.get(t) ?? []; a.push(r); grT.set(t, a); }
+  console.log("tip".padEnd(20) + "n   | ham ilk3 | beklenen(saha) | FARK(puan) [GA]");
+  for (const [t, a] of [...grT.entries()].filter(([, a]) => a.length >= 40).sort((x, y) => y[1].length - x[1].length)) { const d = a.map((r) => t3of(r) - taban.get(SB5(r.runners.length))![0] / taban.get(SB5(r.runners.length))![1]); const m = d.reduce((x, y) => x + y, 0) / d.length; const [l, h] = ciM(d); const ham = a.reduce((x, r) => x + t3of(r), 0) / a.length; console.log(t.padEnd(20) + String(a.length).padStart(4) + " | %" + (ham * 100).toFixed(1).padStart(5) + "    | %" + ((ham - m) * 100).toFixed(1).padStart(5) + "        | " + (m >= 0 ? "+" : "") + (m * 100).toFixed(1) + " [" + (l * 100).toFixed(1) + "," + (h * 100).toFixed(1) + "]" + (h < 0 ? " ✘ GERÇEKTEN KÖTÜ" : l > 0 ? " ✔ GERÇEKTEN İYİ" : " (saha etkisiyle açıklanır)")); }
   process.exit(0);
 }
 main().catch((e) => { console.error("HATA:", e); process.exit(1); });

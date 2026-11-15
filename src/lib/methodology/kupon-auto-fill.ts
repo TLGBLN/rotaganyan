@@ -62,6 +62,10 @@ function normalizeClassTypeLocal(classType: string): string {
 // AGF'SİZ motorun 1470 yarışlık tip tablosuna (arac-tip-tablosu.mts, çıkış-dışı) göre yeniden kuruldu: ilk-3 isabeti KV-6 %70.5, KV-7 %61.3,
 // ŞARTLI 4 %63.7 (güçlü/ortalama) → ÇIKARILDI; ŞARTLI 3 %56.6 (1. sıra %20.5, 83 yarış) → EKLENDİ. Handikap 17 (%58.5, n=41) ve Handikap 21
 // (%38.9, n=18) sınırda/az örnekli ama her iki dönemde de zayıf olduğundan KORUNDU.
+/** 12+ atlık sahada modelin ilk-3 isabeti ~%51 (≤9 atta %68); kaçırma %26→%49 saha büyüklüğüyle artıyor (1392 yarış, çıkış-dışı). */
+export const KALABALIK_SAHA_ESIGI = 12;
+/** Eski tip-bazlı liste saha arındırılınca anlamsız (tüm GA sıfırı içeriyor) → kapalı; liste referans için duruyor. */
+const ZAYIF_TIP_LISTESI_AKTIF = false;
 const ZAYIF_TIPLER = new Set([
   "MAIDEN", "ŞARTLI 3", "HANDIKAP 15", "HANDIKAP 16", "ŞARTLI 19",
   "HANDIKAP 14", "HANDIKAP 17", "HANDIKAP 21",
@@ -83,8 +87,9 @@ export const ZAYIF_TIP_MIN_SECIM_BY_WIDTH: Record<Width, number> = { narrow: 4, 
 export function zayifTipTabanlari(races: AutoFillRace[], width: Width): Record<number, number> {
   const taban: Record<number, number> = {};
   for (const race of races) {
-    if (!race.classType) continue;
-    if (ZAYIF_TIPLER.has(normalizeClassTypeLocal(race.classType).toUpperCase())) {
+    const aktifAt = race.runners.filter((r) => !r.scratched).length;
+    // 2026-11-15: KRİTER SAHA BÜYÜKLÜĞÜ (aktif at >= KALABALIK_SAHA_ESIGI). Tip etkisi saha büyüklüğünden arındırılınca anlamsız çıktı (arac-kayip-analizi E bölümü).
+    if (aktifAt >= KALABALIK_SAHA_ESIGI || (race.classType != null && ZAYIF_TIPLER.has(normalizeClassTypeLocal(race.classType).toUpperCase()) && ZAYIF_TIP_LISTESI_AKTIF)) {
       taban[race.raceNo] = ZAYIF_TIP_MIN_SECIM_BY_WIDTH[width];
     }
   }

@@ -272,6 +272,17 @@ async function main() {
   for (const [k, s] of [...gr.entries()].sort((a, b) => a[0].localeCompare(b[0], "tr"))) { T.n += s.n; T.r1 += s.r1; T.r3 += s.r3; T.r6 += s.r6; console.log(k.padEnd(28) + String(s.n).padStart(4) + " | " + yz(s.r1, s.n) + " | " + yz(s.r3, s.n) + " | " + yz(s.r6, s.n) + " | " + yz(s.n - s.r6, s.n)); }
   console.log("Toplam".padEnd(28) + String(T.n).padStart(4) + " | " + yz(T.r1, T.n) + " | " + yz(T.r3, T.n) + " | " + yz(T.r6, T.n) + " | " + yz(T.n - T.r6, T.n));
   console.log("\n(karşılaştırma — yönetim tablosu, AGF'li eski motorlar ağırlıklı 1470 yarış: 1. sıra %31.6 | ilk 3 %63.0 | ilk 6 %86.9 | listede yok %13.1)");
+  // ── SAHA BÜYÜKLÜĞÜNE GÖRE (rastgele taban: 1/n ve min(3,n)/n) ──
+  const bin = (n: number) => (n <= 7 ? "≤7 at" : n <= 9 ? "8-9 at" : n <= 11 ? "10-11 at" : n <= 13 ? "12-13 at" : "14+ at");
+  const grp = (t: string) => { const u = t.toUpperCase(); return u.includes("HANDIKAP") ? "Handikap" : u.includes("MAIDEN") || u.includes("ŞARTLI 19") ? "Maiden/Ş19" : "Diğer"; };
+  const satir = (ad: string, a: typeof kayit) => { if (a.length < 25) return; const m = (f: (x: (typeof kayit)[number]) => number) => a.reduce((s, x) => s + f(x), 0) / a.length * 100; const t1 = m((x) => (x.rank <= 1 ? 1 : 0)), t3 = m((x) => (x.rank <= 3 ? 1 : 0)), r1 = m((x) => 1 / x.n), r3 = m((x) => Math.min(3, x.n) / x.n); console.log(ad.padEnd(24) + String(a.length).padStart(4) + " | ilk1 %" + t1.toFixed(1).padStart(5) + " (rastg. %" + r1.toFixed(1).padStart(4) + ", ×" + (t1 / r1).toFixed(2) + ") | ilk3 %" + t3.toFixed(1).padStart(5) + " (rastg. %" + r3.toFixed(1).padStart(4) + ", ×" + (t3 / r3).toFixed(2) + ") | kaçırma %" + (100 - t3).toFixed(0)); };
+  const BINS = ["≤7 at", "8-9 at", "10-11 at", "12-13 at", "14+ at"];
+  console.log("\n=== SAHA BÜYÜKLÜĞÜNE GÖRE ===");
+  for (const b of BINS) satir(b, kayit.filter((x) => bin(x.n) === b));
+  for (const g of ["Handikap", "Maiden/Ş19", "Diğer"]) { console.log("\n-- " + g + " --"); for (const b of BINS) satir(b, kayit.filter((x) => grp(x.tip) === g && bin(x.n) === b)); }
+  console.log("\nSaha dağılımı: " + BINS.map((b) => b + " " + kayit.filter((x) => bin(x.n) === b).length).join(" | "));
+  console.log("=== KAPSAMA: modelin ilk k atı kazananı içeriyor mu (saha bazında) ===");
+  for (const [ad, f] of [["≤9", (n: number) => n <= 9], ["10-11", (n: number) => n >= 10 && n <= 11], ["12-13", (n: number) => n >= 12 && n <= 13], ["14+", (n: number) => n >= 14]] as [string, (n: number) => boolean][]) { const a = kayit.filter((x) => f(x.n)); console.log("KAPS " + ad.padEnd(6) + "n=" + String(a.length).padStart(4) + " | " + [1, 2, 3, 4, 5, 6, 7, 8].map((k) => "k" + k + " %" + (a.filter((x) => x.rank <= k).length / a.length * 100).toFixed(0)).join(" | ")); }
   process.exit(0);
 }
 main().catch((e) => { console.error("HATA:", e); process.exit(1); });

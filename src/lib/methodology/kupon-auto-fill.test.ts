@@ -67,14 +67,14 @@ describe("zayıf-tip tabanı (kaybedilen kazananlar -> optimizör köprüsü)", 
     classType: raceNo === 1 ? "Handikap 21" : "G 1", // yalnız 1. ayak zayıf tip (ZAYIF_TIPLER'de)
     // 1. ayak (zayıf tip) DÜZ dağılımlı: taban, kapsama-hedefi tavanına (2026-11-14) takılmadan tam uygulansın.
     // (%80'lik tek favorili zayıf ayakta taban artık bilerek küçülür — aşağıdaki "kapsama-hedefi tavanı" testlerine bak.)
-    runners: raceNo === 1 ? Array.from({ length: 10 }, (_, i) => ({ no: i + 1, scratched: false, ekuriGroup: null, score: null, scoreExact: 10 })) : mkRunners(),
+    runners: raceNo === 1 ? Array.from({ length: 12 }, (_, i) => ({ no: i + 1, scratched: false, ekuriGroup: null, score: null, scoreExact: 10 })) : mkRunners(),
   }));
   const classTypeOlmayanRaces: AutoFillRace[] = zayifRaces.map(({ classType: _classType, ...rest }) => rest);
 
-  it("zayifTipTabanlari yalnız bilinen zayıf tipler için taban döner, classType eksikse boş", () => {
+  it("zayifTipTabanlari yalnız bilinen zayıf tipler için taban döner, classType eksikse de saha büyüklüğüne bakar (12+ at)", () => {
     expect(zayifTipTabanlari(zayifRaces, "narrow")).toEqual({ 1: ZAYIF_TIP_MIN_SECIM_BY_WIDTH.narrow });
     expect(zayifTipTabanlari(zayifRaces, "wide")).toEqual({ 1: ZAYIF_TIP_MIN_SECIM_BY_WIDTH.wide });
-    expect(zayifTipTabanlari(classTypeOlmayanRaces, "narrow")).toEqual({});
+    expect(zayifTipTabanlari(classTypeOlmayanRaces, "narrow")).toEqual({ 1: ZAYIF_TIP_MIN_SECIM_BY_WIDTH.narrow }); // 2026-11-15: kriter saha büyüklüğü
   });
 
   it("Ekonomik kademede zayıf tip en az narrow-tabanı kadar at seçer, AYNI dağılımlı güçlü tip (G1) kendi doğal (daha dar) seçimini korur", () => {
@@ -83,7 +83,7 @@ describe("zayıf-tip tabanı (kaybedilen kazananlar -> optimizör köprüsü)", 
     // Diğer 5 ayak (G1, aynı olasılık şekli, taban YOK) paylaşımlı bütçe altında
     // tabandan daha dar seçmeli — aksi halde test anlamsız olurdu.
     for (const raceNo of [2, 3, 4, 5, 6]) {
-      expect(groupSel[raceNo].narrow.size).toBeLessThan(ZAYIF_TIP_MIN_SECIM_BY_WIDTH.narrow);
+      expect(groupSel[raceNo].narrow.size).toBeLessThanOrEqual(groupSel[1].narrow.size); // 2026-11-15: 12 atlı (kalabalık) ayak en az onlar kadar geniş
     }
   });
 
@@ -157,9 +157,9 @@ describe("zayıf-tip tabanı (kaybedilen kazananlar -> optimizör köprüsü)", 
     // ortak optimizasyonun doğal sonucu. Asıl garanti edilmesi gereken: classType hiç
     // verilmezse 1. ayak için taban HİÇ uygulanmaz (zayifTipTabanlari zaten {} döner).
     const withoutClassType = otomatikGroupSelections(classTypeOlmayanRaces, 1.25, LIMITS, TOLERANCES);
-    expect(zayifTipTabanlari(classTypeOlmayanRaces, "narrow")).toEqual({});
+    expect(zayifTipTabanlari(classTypeOlmayanRaces, "narrow")).toEqual({ 1: ZAYIF_TIP_MIN_SECIM_BY_WIDTH.narrow }); // 2026-11-15: kriter saha büyüklüğü, classType gerekmez
     // (Düz dağılımlı 1. ayakta DP zaten doğal olarak çok at seçebilir; asıl garanti tabanın hiç OLUŞMAMASI.)
-    expect(zayifTipTabanlariSinirli(classTypeOlmayanRaces, "narrow")).toEqual({});
+    expect(zayifTipTabanlariSinirli(classTypeOlmayanRaces, "narrow")[1]).toBeGreaterThanOrEqual(1);
     expect(withoutClassType[1].narrow.size).toBeGreaterThanOrEqual(1);
   });
 });
@@ -168,7 +168,7 @@ describe("zayıf-tip tabanı (kaybedilen kazananlar -> optimizör köprüsü)", 
 // yazılırken düz dağılımlı K1'e 2 at kaldı → DEJAME dışarıda, ilk ayakta yattı): zayıf-tip tabanı ayağın kendi olasılığına göre
 // kapsama-hedefi tavanıyla sınırlanır.
 describe("zayıf-tip tabanı — kapsama-hedefi tavanı (zayifTipTabanlariSinirli)", () => {
-  const mk = (raceNo: number, classType: string, ps: number[]): AutoFillRace => ({ raceNo, classType, runners: ps.map((p, i) => ({ no: i + 1, scratched: false, ekuriGroup: null, score: null, scoreExact: p })) });
+  const mk = (raceNo: number, classType: string, ps0: number[]): AutoFillRace => { const ps = ps0.length >= 12 ? ps0 : [...ps0, ...Array.from({ length: 12 - ps0.length }, () => 0.0001)]; return { raceNo, classType, runners: ps.map((p, i) => ({ no: i + 1, scratched: false, ekuriGroup: null, score: null, scoreExact: p })) }; };
 
   it("güçlü favorili zayıf-tip ayakta taban KÜÇÜLÜR (%80 favori → Ekonomik/Normal'de 1, Geniş'te 2 at yeter)", () => {
     const r = [mk(1, "Handikap 21", [80, 8, 5, 3, 2, 1, 0.6, 0.4])];
@@ -193,7 +193,7 @@ describe("zayıf-tip tabanı — kapsama-hedefi tavanı (zayifTipTabanlariSinirl
   });
 
   it("zayıf olmayan tipte taban hiç oluşmaz, olasılığı olmayan zayıf ayakta ham taban korunur", () => {
-    expect(zayifTipTabanlariSinirli([mk(1, "ŞARTLI 5", [24, 23, 17, 17, 8, 6, 5])], "wide")).toEqual({});
+    expect(zayifTipTabanlariSinirli([{ raceNo: 1, classType: "ŞARTLI 5", runners: [24, 23, 17, 17, 8, 6, 5].map((p, i) => ({ no: i + 1, scratched: false, ekuriGroup: null, score: null, scoreExact: p })) }], "wide")).toEqual({}); // <12 at → taban yok
     expect(zayifTipTabanlariSinirli([mk(1, "Handikap 16", [0, 0, 0, 0])], "normal")[1]).toBe(6);
   });
 
@@ -219,13 +219,17 @@ describe("zayıf-tip tabanı — kapsama-hedefi tavanı (zayifTipTabanlariSinirl
   });
 });
 
-// 2026-11-15: zayıf-tip listesi güncel AGF'siz motorun tip tablosuna göre yeniden kuruldu (bkz. ZAYIF_TIPLER notu).
-describe("zayıf-tip listesi (2026-11-15 güncellemesi)", () => {
-  const mk = (classType: string): AutoFillRace[] => [{ raceNo: 1, classType, runners: [20, 18, 15, 12, 10, 8, 7, 6, 4].map((p, i) => ({ no: i + 1, scratched: false, ekuriGroup: null, score: null, scoreExact: p })) }];
-  it("ŞARTLI 3 ve Handikap 14/15/16/17/21, ŞARTLI 19, Maiden zayıf tip (taban oluşur)", () => {
-    for (const t of ["ŞARTLI 3", "Handikap 14", "Handikap 15", "Handikap 16", "Handikap 17", "Handikap 21", "ŞARTLI 19", "Maiden"]) expect(zayifTipTabanlari(mk(t), "narrow")[1], t).toBeDefined();
+// 2026-11-15: kriter SAHA BÜYÜKLÜĞÜ (12+ aktif at); tip-bazlı liste kapalı (saha arındırılınca tip etkisi anlamsız).
+describe("zayıf ayak = kalabalık saha (2026-11-15)", () => {
+  const mk = (classType: string, n: number, kacYok = 0): AutoFillRace[] => [{ raceNo: 1, classType, runners: Array.from({ length: n }, (_, i) => ({ no: i + 1, scratched: i < kacYok, ekuriGroup: null, score: null, scoreExact: 10 })) }];
+  it("12+ aktif at → taban oluşur (tipten bağımsız)", () => {
+    for (const t of ["Maiden", "KV-6", "ŞARTLI 4", "G 1", "Handikap 15"]) expect(zayifTipTabanlari(mk(t, 12), "narrow")[1], t).toBeDefined();
   });
-  it("KV-6, KV-7, ŞARTLI 4 ve güçlü tipler zayıf tip DEĞİL (taban yok)", () => {
-    for (const t of ["KV-6", "KV-7", "ŞARTLI 4", "ŞARTLI 5", "KV-8", "G 1"]) expect(zayifTipTabanlari(mk(t), "narrow")[1], t).toBeUndefined();
+  it("11 ve altı → taban yok (Handikap/Maiden olsa bile)", () => {
+    for (const t of ["Maiden", "Handikap 15", "ŞARTLI 3", "ŞARTLI 19"]) expect(zayifTipTabanlari(mk(t, 11), "narrow")[1], t).toBeUndefined();
+  });
+  it("koşmayan (scratched) atlar sayılmaz", () => {
+    expect(zayifTipTabanlari(mk("Maiden", 13, 2), "narrow")[1]).toBeUndefined();
+    expect(zayifTipTabanlari(mk("Maiden", 14, 2), "narrow")[1]).toBeDefined();
   });
 });
