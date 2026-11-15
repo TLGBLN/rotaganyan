@@ -29,7 +29,7 @@ import { galopSkoru, pedigriSkoru } from "./pedigri-galop-ortak";
 import { getJokeyFormTablosu } from "@/server/actions/jokey-form.actions";
 import { getPitSeviyeSinyalleri, type PitSeviye } from "@/server/actions/pit-seviye.actions";
 import { getV5461DamOzetleriForRace, getV5461DamsireOzetleriForRace, type V5461DamlineOzet } from "@/server/actions/v5461-damline.actions";
-import { formOrtalamasi, kgsLog, cinsE } from "./ham-alan-sinyalleri";
+import { formOrtalamasi, kgsLog, cinsE, sinifDususu, oncekiYarisSinifi } from "./ham-alan-sinyalleri";
 
 type FrozenWeights = {
   version: string;
@@ -185,6 +185,10 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
   // Kalitesi (3 YENİ sinyal) + Dam/DamSire'ın sireOrani'ye eklenmesi (mevcut sinyal, yeniden
   // tanımlandı) için gereken ham veri — ran-v2.ts'in hesaplaRanV2'siyle AYNI kaynak/desen.
   const runnerIdsHepsi = faz1.runners.map((r) => r.id);
+  // 2026-11-15 — dususDelta: önceki yarışın sınıfı (HorseRaceHistoryCache; eğitimle AYNI kaynak/tanım, bkz. ham-alan-sinyalleri.ts).
+  const tjkIdListesi = [...new Set(runnerIdsHepsi.map((id) => tjkOf.get(id)).filter((v): v is number => v != null))];
+  const gecmisSatirlari = tjkIdListesi.length ? await db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: tjkIdListesi } }, select: { tjkAtId: true, rowsJson: true } }).catch(() => []) : [];
+  const oncekiSinifByTjk = new Map(gecmisSatirlari.map((g) => [g.tjkAtId, oncekiYarisSinifi(g.rowsJson as { date?: string; classType?: string }[], raceDate.getTime())]));
   const damDamSireRows = await db.runner.findMany({ where: { id: { in: runnerIdsHepsi } }, select: { id: true, dam: true, damSire: true, hp: true, weight: true, recentForm: true, tjkKgs: true, age: true } });
   const damDamSireByRunnerId = new Map(damDamSireRows.map((x) => [x.id, x]));
   // 2026-11-12 — TJK handikap puanı (HP) ve taşınan kilo, SAHAYA GÖRE (saha ortalamasından fark).
@@ -276,6 +280,8 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
       { ad: "fMean", raw: formOrtalamasi(damDamSireByRunnerId.get(r.id)?.recentForm), observed: formOrtalamasi(damDamSireByRunnerId.get(r.id)?.recentForm) != null, reliability: 1 },
       { ad: "kgsLog", raw: kgsLog(damDamSireByRunnerId.get(r.id)?.tjkKgs), observed: kgsLog(damDamSireByRunnerId.get(r.id)?.tjkKgs) != null, reliability: 1 },
       { ad: "sexE", raw: cinsE(damDamSireByRunnerId.get(r.id)?.age), observed: cinsE(damDamSireByRunnerId.get(r.id)?.age) != null, reliability: 1 },
+      // 2026-11-15 kullanıcı kararı: sınıf düşüşü (önceki yarış seviyesi − bugünkü seviye; Maiden/Şartlı 1-19-27 yarışlarında null).
+      { ad: "dususDelta", raw: sinifDususu(oncekiSinifByTjk.get(tjkOf.get(r.id) ?? -1) ?? null, faz1.race.classType), observed: sinifDususu(oncekiSinifByTjk.get(tjkOf.get(r.id) ?? -1) ?? null, faz1.race.classType) != null, reliability: 1 },
     ];
     return {
       r,

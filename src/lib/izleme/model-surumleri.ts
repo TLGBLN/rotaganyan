@@ -22,6 +22,9 @@ export const MODEL_SURUMLERI: ModelSurumu[] = [
   // 2026-11-14 sinyal kütüğü son hali: fiilen ölü 4 sinyal çıkarıldı (25→21), katsayılar AYNI, YENİDEN EĞİTİM/CV YOK.
   // cv = 25 sinyalli modelin CV'sinden MİRAS (çıkarılan sinyallerin ort. |katkısı| 0.009, kayıtlı koşularda sıralama değişmedi) — yeni bir ölçüm DEĞİL.
   { baslangic: "2026-11-14T14:19:50+03:00", ad: "Saf Model 21 özellik", ozellikSayisi: 21, cv: { n: 827, top1: 0.262, top3: 0.614, logLoss: 2.0052 } },
+  // 2026-11-15 KULLANICI KARARI: +dususDelta (sınıf düşüşü) → 22 sinyal, TÜM yarışlarla YENİDEN EĞİTİM (21'li katsayılar da güncellendi).
+  // cv = 21'li yeniden eğitimin CV'si (Top1 .254 / Top3 .617 / LL 2.0033) + dususDelta farkı (Top1 +0.5, Top3 +0.4 puan, LL −0.004) — protokol eşiği (DEV ≤ −0.003) GEÇİLMEDEN kullanıcı kararıyla alındı; canlı sonuçla doğrulanacak.
+  { baslangic: "2026-11-15T15:58:00+03:00", ad: "Saf Model 22 özellik (+sınıf düşüşü)", ozellikSayisi: 22, cv: { n: 827, top1: 0.259, top3: 0.621, logLoss: 1.9993 } },
 ];
 
 /** Saf (AGF'siz) resmi motor dönemi — 2026-11-10 kullanıcı kararı. */

@@ -175,6 +175,7 @@ export const SINYAL_KAYNAGI: Record<string, { kaynak: string; cozum: string }> =
   kiloRel: { kaynak: "Program ingest (Runner.weight)", cozum: "ingest-program cron'unu kontrol et" },
   fMean: { kaynak: "Program ingest (Runner.recentForm)", cozum: "ingest-program cron'unu kontrol et (son 6 yarış sütunu)" },
   sexE: { kaynak: "Program ingest (Runner.age)", cozum: "ingest-program cron'unu kontrol et" },
+  dususDelta: { kaynak: "At geçmişi (HorseRaceHistoryCache) + koşu sınıfı", cozum: "sync-horse-stats-cache cron'unu kontrol et" },
   jokeyPIT: { kaynak: "Sonuç geçmişi (Result/Runner)", cozum: "result-sync cron'unu kontrol et" },
   antrenorPIT: { kaynak: "Sonuç geçmişi (Result/Runner)", cozum: "result-sync cron'unu kontrol et" },
   lastWon: { kaynak: "At geçmişi (HorseRaceHistoryCache)", cozum: "sync-horse-stats-cache cron'unu kontrol et" },

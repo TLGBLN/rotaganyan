@@ -266,7 +266,7 @@ async function main() {
           S("fMeanAdj", bil.length >= 2 ? avg(bil.map((z) => z.q.fin! + 0.3 * z.d)) : null);
           S("fMeanAdj1", bil.length >= 2 ? avg(bil.map((z) => z.q.fin! + 0.6 * z.d)) : null);
           S("fMeanXup", kn.length && fu != null ? avg(kn) * fu : null);
-          { const pl = son ? sev[son.cls] : undefined; const dd = curLv != null && pl != null ? pl - curLv : null; // + = SINIF DÜŞÜŞÜ (önceki yarıştan)
+          { const pl = son ? sev[son.cls] : undefined; const dd = curLv != null && pl != null && curLv !== 1 ? Math.max(-5, Math.min(5, pl - curLv)) : null; // + = SINIF DÜŞÜŞÜ (önceki yarıştan)
             S("dususDelta", dd); S("dusus", dd != null ? Math.max(0, dd) : null); S("yukselisSon", dd != null ? Math.max(0, -dd) : null);
             S("dusus2", dd != null ? (dd >= 2 ? 1 : 0) : null); S("dusus4", dd != null ? (dd >= 4 ? 1 : 0) : null);
             S("sonFin", son?.fin ?? null);

@@ -65,6 +65,7 @@ export const SIGNAL_REGISTRY: readonly SignalRegistryEntry[] = [
   { code: "antrenorPIT", family: "SEVIYE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Antrenör seviyesi, son 365 gün (|z|=5.2)." },
   { code: "jokeyFormuGenel", family: "SEVIYE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Son 30 gün jokey formu; katsayı belirsiz (|z|=0.4) — aile oyu değil." },
   { code: "antrenorOraniGenel", family: "SEVIYE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Yalnız segment modellerinde." },
+  { code: "dususDelta", family: "SINIF_DEGISIMI", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Sınıf düşüşü = önceki yarışın sınıf seviyesi − bugünkü seviye (TJK 13 basamaklı hiyerarşi; + düşüş, − yükseliş). Maiden/Şartlı 1-19-27 yarışlarında uygulanmaz. 15 Kas kullanıcı kararı; CV: sınama katlarında ΔLL −0.012, tüm katlarda −0.004 (anlamsız) — izlemede." },
   { code: "sexE", family: "CINS", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Cins (yaş alanının 3. kelimesi e) (|z|=5.2)." },
   { code: "galopKalite", family: "IDMAN", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Son galop kalitesi (|z|=2.9); ordinal, çoğu at 1.0." },
   { code: "sireOraniBirlesik", family: "PEDIGRI", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Yalnız segment modellerinde." },

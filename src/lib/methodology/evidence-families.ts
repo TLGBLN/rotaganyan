@@ -22,7 +22,9 @@ export type EvidenceFamily =
   | "SON_FORM"
   | "DINLENME"
   | "SEVIYE"
-  | "CINS";
+  | "CINS"
+  // 2026-11-15 — önceki yarışa göre sınıf düşüşü/yükselişi (TJK hiyerarşisi; ham-alan-sinyalleri.ts)
+  | "SINIF_DEGISIMI";
 
 export const FAMILY_LABEL: Record<EvidenceFamily, string> = {
   MARKET: "Piyasa (AGF)",
@@ -43,6 +45,7 @@ export const FAMILY_LABEL: Record<EvidenceFamily, string> = {
   DINLENME: "Dinlenme (KGS)",
   SEVIYE: "Jokey / Antrenör Seviyesi",
   CINS: "Cins",
+  SINIF_DEGISIMI: "Sınıf Değişimi (önceki yarışa göre)",
 };
 
 /** agfTrend gerçek bir V461FeatureDetay kodu DEĞİL — route.ts bunu sentetik bir kod olarak ekler. */
@@ -64,6 +67,7 @@ export const EVIDENCE_FAMILY_MAP: Record<EvidenceFamily, string[]> = {
   DINLENME: ["kgsLog"],
   SEVIYE: ["jokeyPIT", "antrenorPIT", "jokeyFormuGenel", "antrenorOraniGenel"],
   CINS: ["sexE"],
+  SINIF_DEGISIMI: ["dususDelta"],
 };
 
 /** Henüz hiçbir canlı veri kaynağı olmayan aileler — veri güveni denominator'ına,

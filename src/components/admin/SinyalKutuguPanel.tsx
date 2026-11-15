@@ -22,7 +22,7 @@ const SINYAL_AD: Record<string, string> = {
   sonIdmanSprint: "Son İdman Sprint", takiDegisikligi: "Takı Değişikliği",
   yarisGidisatiSkoru: "Yarış Gidişatı Skoru (Tempo)", sireOrani: "Pedigri (Baba)", sireOraniBirlesik: "Pedigri (Baba+Anne+Anne Babası)",
   hpRel: "Handikap Puanı (sahaya göre)", kiloRel: "Taşınan Kilo (sahaya göre)",
-  fMean: "Son 6 Yarış Derece Ortalaması (düşük = iyi form)", kgsLog: "Koşmadığı Gün Sayısı (KGS, log)", sexE: "Cins (e)",
+  fMean: "Son 6 Yarış Derece Ortalaması (düşük = iyi form)", kgsLog: "Koşmadığı Gün Sayısı (KGS, log)", sexE: "Cins (e)", dususDelta: "Sınıf Düşüşü (önceki yarış sınıfı − bugünkü; + = düşüş)",
   jokeyPIT: "Jokey Seviyesi (son 365 gün)", antrenorPIT: "Antrenör Seviyesi (son 365 gün)", lastWon: "Son Yarışını Kazandı",
   ACC_CLOSE_RES: "Kapanış Artığı (Accurace)", ACC_LATE: "Geç Segment Hızı (Accurace)",
   ACC_SPEED: "Hız Artığı (Accurace)", PS_front: "Öne Çıkma Uyumu", PS_lone: "Yalnız Kaçak Uyumu",
@@ -102,7 +102,7 @@ export default function SinyalKutuguPanel() {
       </div>
       <p className="text-[11px] text-muted-foreground">
         Tüm sinyaller AGF&apos;siz, tek doğrusal skor + softmax ile birleştirilir. Handikap ve ŞARTLI 1/27 için ayrı segment katsayı seti vardır; diğer tiplerde (Maiden dahil) varsayılan β&apos;lar kullanılır.
-        Sinyal sağlığı sayfasındaki &quot;kayıtlı sinyal&quot; sayısı bu üç modelin birleşiminden (23) büyük olabilir: kayıtlı olup canlı modelde olmayanlar yalnız analiz/emekli sinyallerdir.
+        Sinyal sağlığı sayfasındaki &quot;kayıtlı sinyal&quot; sayısı bu üç modelin birleşiminden (24) büyük olabilir: kayıtlı olup canlı modelde olmayanlar yalnız analiz/emekli sinyallerdir.
         Üretildi: {new Date(SAF_W.generatedAt).toLocaleString("tr-TR")}.
       </p>
     </section>

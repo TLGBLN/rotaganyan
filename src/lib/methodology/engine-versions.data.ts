@@ -812,13 +812,26 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
     versiyon: "RotaGanyan Analiz Motoru",
     ana: "V5",
     baslangic: new Date("2026-11-15T02:21:15+03:00"),
-    bitis: null,
+    bitis: new Date("2026-11-15T15:58:00+03:00"), // sınıf düşüşü (22 sinyal) dönemi başlangıcı
     aciklama: "Maiden/ŞARTLI 19 segment modelinden ÇIKARILDI — artık varsayılan 21 sinyalli modeli kullanır. Gerekçe (arac-segment-maiden-cv.mts): 334 yarışta 5 ardışık blok çıkış-dışı CV'de eski 7 sinyalli segment (form sinyali yok), varsayılan 21'e göre log-loss +0.071 kötüydü (güven aralığı sıfırı dışlıyor); segmente ACC_LATE eklemek anlamsız (−0.005), fMean eklemek −0.049 ✔ ama segmentsiz yol −0.071 ile en iyisiydi. Aynı gün kupon tarafında zayıf-ayak kriteri tip listesinden saha büyüklüğüne (12+ aktif at) geçti (kupon-auto-fill.ts; motor skoru değil).",
     neyiAnalizEdiyor: [
       "Varsayılan (ŞARTLI 2-5, KV/Satış/Grup/Diğer, Maiden, ŞARTLI 19): 21 aktif feature. Handikap segmenti: 19 (hpRel/kiloRel yok). ŞARTLI 1/27 segmenti: 4. Segment-routing: v546-1-engine.ts segmentAgirligiSec (ŞARTLI 19 dalı, 'ŞARTLI 1' alt-string'ine düşmemesi için varsayılana açıkça yönlendirilir).",
     ],
     caprazlamalar: [
       "SINIRLAR: (1) Katsayı yeniden eğitimi yok, yalnız yönlendirme değişti. (2) Top1 biraz düştü (%26.9 → %24.3), Top3 benzer (%55.7 → %56.9); kazanç log-loss'ta. (3) Canlı sonuçla henüz doğrulanmadı. Denenip alınmayanlar: Accurace 13+ atlı terimi (ΔLL −0.019, GA sıfırı içeriyor, isabet değişmedi), geçmiş tablosu alanları (HP/kilo/mesafe/ekipman/antrenör değişimi, dinlenme düzeni): eşiği geçen yok.",
+    ],
+  },
+  {
+    versiyon: "RotaGanyan Analiz Motoru",
+    ana: "V5",
+    baslangic: new Date("2026-11-15T15:58:00+03:00"),
+    bitis: null,
+    aciklama: "SINIF DÜŞÜŞÜ sinyali (dususDelta) eklendi — varsayılan model 21 → 22 sinyal, katsayılar TÜM yarışlarla yeniden eğitildi. Tanım: önceki yarışın sınıf seviyesi − bugünkü sınıf seviyesi (TJK 13 basamaklı hiyerarşi; + = düşüş, − = yükseliş); Maiden/Şartlı 1-19-27 yarışlarında uygulanmaz (kullanıcı kararı). Gerekçe: 7220 atlık arşivde ≥4 basamak düşenler %19.9 kazanıyor (aynı sınıf %12.6), piyasa bunu yalnız ~%7 eksik fiyatlıyor; modelin CV tahmininde ≥4 basamak düşenler %32 az (%11.2 ↔ %14.8), ≥2 basamak yükselenler %16 fazla tahmin ediliyordu. KULLANICI KARARIYLA canlıya alındı.",
+    neyiAnalizEdiyor: [
+      "Varsayılan (ŞARTLI 2-5, KV/Satış/Grup/Diğer, Maiden, ŞARTLI 19): 22 aktif feature (21 + dususDelta; Maiden/ŞARTLI 19'da dususDelta uygulanmaz = sıfır katkı). Handikap segmenti: 19 (dususDelta yok, değişmedi). ŞARTLI 1/27 segmenti: 4 (değişmedi). Kaynak: HorseRaceHistoryCache (önceki yarışın classType'ı) + bugünkü classType; tanım ham-alan-sinyalleri.ts (eğitimle AYNI).",
+    ],
+    caprazlamalar: [
+      "SINIRLAR: (1) Kendi koyduğum protokol eşiği (geliştirme katlarında ΔLL ≤ −0.003) GEÇİLMEDİ: geliştirme katlarında +0.0013, bağımsız sınama katlarında −0.0124 [−0.024,−0.0003] ✔, 5 katın tümünde −0.0040 [−0.0117,+0.0038] (anlamsız); ilk katta (eğitim verisi en az) ters. Top1/Top3 farkı yalnız +0.5/+0.4 puan. Kullanıcı kararıyla alındı, canlı sonuçla doğrulanacak. (2) Yeniden eğitim 21'li katsayıları da kaydırdı (lastWon 0.072→0.119, hpRel 0.387→0.328, PS_front −0.032→−0.052; 14 Kas'ta ölü sinyaller çıkarılırken yeniden eğitim yapılmamıştı) — bu fark dususDelta'dan DEĞİL, eğitimin güncellenmesinden. (3) Banko Platt kalibrasyonu yeniden yapılmadı (olasılık dağılımı çok az kaydı). (4) Denenip alınmayanlar: sınıf-ayarlı form (fMean yerine), form×yükseliş, Maiden→üst sınıf sıçrama bayrağı (n=26, modeli sınamaya yetmez). Araçlar: arac-sinif-dusus-cv.mts, arac-sinif-dusus-arsiv.mts, arac-sinif-dususu-egit.mts.",
     ],
   },
 ];
