@@ -1222,18 +1222,6 @@ export function getClassTypeAdvice(
   return { level: "warn", text: n > 0 ? `${n} koşu — yeterli geçmiş veri yok` : "Geçmiş veri yok" };
 }
 
-/** Son N SONUÇLANMIŞ + YAYINDAKİ analizin isabet özeti — Top1 / Top3 / Top6 AYRI (bkz. lib/izleme/kazanan-sirasi.ts). */
-export async function getAnalizIsabetOzeti(limit = 200) {
-  const { isabetOzeti } = await import("@/lib/izleme/kazanan-sirasi");
-  const rows = await db.prediction.findMany({
-    where: { published: true, createdAt: { gte: GUNCEL_MOTOR_BASLANGIC }, race: { result: { isNot: null } } },
-    orderBy: { updatedAt: "desc" },
-    take: limit,
-    select: { race: { select: { result: { select: { winnerNos: true } } } }, picks: { select: { runnerLabel: true, rank: true } } },
-  });
-  return isabetOzeti(rows.map((r) => ({ winnerNos: r.race.result?.winnerNos ?? [], picks: r.picks })));
-}
-
 const profilGrubu = (c: string | null): string => {
   const u = (c ?? "").toUpperCase();
   if (u.includes("HANDIKAP")) return "Handikap";

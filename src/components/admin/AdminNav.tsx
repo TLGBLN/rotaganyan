@@ -28,7 +28,6 @@ type NavOge = { href: string; label: string; icon: LucideIcon; exact?: boolean; 
 const NAV: NavOge[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/analizler", label: "Analizler", icon: FileText, grup: "Analizler" },
-  { href: "/admin/analizler/gecmis", label: "Geçmiş Analizler (Top1/Top3)", icon: FileText, grup: "Analizler" },
   { href: "/admin/root-cause", label: "Root-Cause Analizi", icon: SearchCode, grup: "Analizler" },
   { href: "/admin/kupon", label: "Kupon Hazırla", icon: Ticket, grup: "Analizler" },
   { href: "/admin/pedigri", label: "Pedigriler", icon: Dna },
