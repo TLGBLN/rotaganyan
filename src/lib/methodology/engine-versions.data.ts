@@ -799,13 +799,26 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
     versiyon: "RotaGanyan Analiz Motoru",
     ana: "V5",
     baslangic: new Date("2026-11-14T14:19:50+03:00"),
-    bitis: null,
+    bitis: new Date("2026-11-15T02:21:15+03:00"), // Maiden/ŞARTLI 19 segmentsiz dönem başlangıcı
     aciklama: "SİNYAL KÜTÜĞÜ SON HALİ — fiilen ölü 4 sinyal canlı modellerden çıkarıldı: sonIdmanSprint (%91 sıfır, 2 değer), idmJokey (%92 sıfır), takiDegisikligi (%94 sıfır), PS_lone (%99 sıfır; σ=0.0086 yüzünden sıfır dışı bir değerde z≈16, katkı ±2'ye çıkabiliyordu, motorun z hesabında kırpma yok). Eğitim bootstrap |z| hepsi ≤1.5 (zaten anlamsızdı). Kayıt defteri (signal-registry.ts) artık canlı modellerin birleşimiyle birebir eşleşir ve bu bir testle korunur.",
     neyiAnalizEdiyor: [
       "21 aktif feature (varsayılan model): h2hNetSkor, hizDerecesi, zeminToleransi, zeminMesafeDeneyim, yarisGidisatiSkoru, sireOrani, ACC_CLOSE_RES, ACC_LATE, ACC_SPEED, PS_front, PS_closerFit, jokeyFormuGenel, galopKalite, jokeyPIT, antrenorPIT, lastWon, hpRel, kiloRel, fMean, kgsLog, sexE. Handikap segmenti 19 (hpRel/kiloRel de yok), Maiden/ŞARTLI 19 segmenti 7 (idmJokey çıkarıldı), ŞARTLI 1/27 4 (değişmedi). Canlı modellerin sinyal birleşimi = 23.",
     ],
     caprazlamalar: [
       "SINIRLAR (önce): (1) Katsayılar YENİDEN EĞİTİLMEDİ — kalan sinyallerin β'ları aynı; yeniden eğitim/CV yapılmadı (25 sinyalli eğitim verisi saklanmıyordu; arac-sinyal-veri-aktar.mts ile birikmeye başladı). (2) Nötrlük ölçümü yalnız 14 kayıtlı 25 sinyalli koşuda: 1. seçim değişen 0, ilk-3 kümesi değişen 0, ortalama olasılık farkı 0.09 puan (en büyük 1.5). (3) MODEL_SURUMLERI'ndeki cv değeri 25 sinyalli modelin CV'sinden MİRAS alındı (yeni ölçüm değil).",
+    ],
+  },
+  {
+    versiyon: "RotaGanyan Analiz Motoru",
+    ana: "V5",
+    baslangic: new Date("2026-11-15T02:21:15+03:00"),
+    bitis: null,
+    aciklama: "Maiden/ŞARTLI 19 segment modelinden ÇIKARILDI — artık varsayılan 21 sinyalli modeli kullanır. Gerekçe (arac-segment-maiden-cv.mts): 334 yarışta 5 ardışık blok çıkış-dışı CV'de eski 7 sinyalli segment (form sinyali yok), varsayılan 21'e göre log-loss +0.071 kötüydü (güven aralığı sıfırı dışlıyor); segmente ACC_LATE eklemek anlamsız (−0.005), fMean eklemek −0.049 ✔ ama segmentsiz yol −0.071 ile en iyisiydi. Aynı gün kupon tarafında zayıf-ayak kriteri tip listesinden saha büyüklüğüne (12+ aktif at) geçti (kupon-auto-fill.ts; motor skoru değil).",
+    neyiAnalizEdiyor: [
+      "Varsayılan (ŞARTLI 2-5, KV/Satış/Grup/Diğer, Maiden, ŞARTLI 19): 21 aktif feature. Handikap segmenti: 19 (hpRel/kiloRel yok). ŞARTLI 1/27 segmenti: 4. Segment-routing: v546-1-engine.ts segmentAgirligiSec (ŞARTLI 19 dalı, 'ŞARTLI 1' alt-string'ine düşmemesi için varsayılana açıkça yönlendirilir).",
+    ],
+    caprazlamalar: [
+      "SINIRLAR: (1) Katsayı yeniden eğitimi yok, yalnız yönlendirme değişti. (2) Top1 biraz düştü (%26.9 → %24.3), Top3 benzer (%55.7 → %56.9); kazanç log-loss'ta. (3) Canlı sonuçla henüz doğrulanmadı. Denenip alınmayanlar: Accurace 13+ atlı terimi (ΔLL −0.019, GA sıfırı içeriyor, isabet değişmedi), geçmiş tablosu alanları (HP/kilo/mesafe/ekipman/antrenör değişimi, dinlenme düzeni): eşiği geçen yok.",
     ],
   },
 ];

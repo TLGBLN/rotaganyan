@@ -60,7 +60,7 @@ export default function SinyalKutuguPanel() {
         </table>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        Tüm sinyaller AGF&apos;siz, tek doğrusal skor + softmax ile birleştirilir — segment-bazlı ayrı katsayı seti YOK, her koşuda aynı β&apos;lar kullanılır.
+        Tüm sinyaller AGF&apos;siz, tek doğrusal skor + softmax ile birleştirilir — Handikap ve ŞARTLI 1/27 için ayrı segment katsayı seti vardır, diğer tiplerde (Maiden dahil) varsayılan βsegment-bazlı ayrı katsayı seti YOK, her koşuda aynı β&apos;lar kullanılırapos;lar kullanılır.
         Üretildi: {new Date(SAF_W.generatedAt).toLocaleString("tr-TR")}.
       </p>
     </section>
