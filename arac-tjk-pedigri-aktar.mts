@@ -1,9 +1,9 @@
 // TJK resmî Aygır/Kısrak/Kısrak Babası istatistiklerini TjkPedigriStat tablosuna aktarır (Pedigri Merkezi kaynağı).
 // Kullanım: node --env-file=.env node_modules/tsx/dist/cli.mjs arac-tjk-pedigri-aktar.mts [--tur SIRE,DAM,DAMSIRE] [--yil 2026] [--grup -1,1,3,5,6,8,10] [--pist -1,1,2,4]
-// -1 = "Tümü". Grup/Pist yalnız Aygır (SIRE) sayfasında var; diğer türler yalnız (-1,-1) ile çekilir. Her (tür×yıl×grup×pist) bitince hemen yazılır;
+// -1 = "Tümü". Aygır (SIRE): grup + pist; Kısrak Babası (DAMSIRE): yalnız grup (pist yok); Kısrak (DAM): ikisi de yok → yalnız (-1,-1). Her (tür×yıl×grup×pist) bitince hemen yazılır;
 // eksik (TJK "Toplam"ından az) varsa mevcut kayıtlar SİLİNMEZ. TJK yavaş ve paralel yükte GEÇİCİ 404 verir → tek süreç çalıştır.
 import { db } from "./src/lib/db";
-import { AYGIR_GRUPLARI, AYGIR_PISTLERI, cekimUyarilari, fetchTjkPedigriStats, type PedigriKind } from "./src/server/services/ingest/tjk-pedigri-stats.adapter";
+import { AYGIR_GRUPLARI, AYGIR_PISTLERI, KISRAK_BABASI_GRUPLARI, cekimUyarilari, fetchTjkPedigriStats, type PedigriKind } from "./src/server/services/ingest/tjk-pedigri-stats.adapter";
 
 const arg = (ad: string, varsayilan: string) => { const i = process.argv.indexOf("--" + ad); return i >= 0 ? process.argv[i + 1] : varsayilan; };
 
@@ -14,7 +14,9 @@ async function main() {
   const pistler = arg("pist", AYGIR_PISTLERI.join(",")).split(",").map(Number);
   for (const yil of yillar) for (const kind of turler) {
     const combos: { grup: number; pist: number }[] = [];
-    if (kind === "SIRE") { for (const grup of gruplar) for (const pist of pistler) combos.push({ grup, pist }); } else combos.push({ grup: -1, pist: -1 });
+    if (kind === "SIRE") { for (const grup of gruplar) for (const pist of pistler) combos.push({ grup, pist }); }
+    else if (kind === "DAMSIRE") { for (const grup of (process.argv.includes("--grup") ? gruplar : KISRAK_BABASI_GRUPLARI)) combos.push({ grup, pist: -1 }); } // Kısrak Babası: grup var, pist yok
+    else combos.push({ grup: -1, pist: -1 });
     for (const gp of combos) {
       const t0 = Date.now(); const etiket = `${kind} ${yil} grup=${gp.grup} pist=${gp.pist}`;
       const s = await fetchTjkPedigriStats(kind, yil, gp);

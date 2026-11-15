@@ -14,8 +14,8 @@ function parse(sp: TjkPedigriSearchParams): TjkFilters {
   const g = Number(sp.grup), ps = Number(sp.pist);
   const grup = GRUPLAR.some(([k]) => k === g) && sp.grup != null && sp.grup !== "" ? g : -1;
   const pist = PISTLER.some(([k]) => k === ps) && sp.pist != null && sp.pist !== "" ? ps : -1;
-  // Grup/Pist yalnız Aygır sayfasında vardır → seçiliyse tür Aygır'a kilitlenir.
-  const kind: TjkKindFilter = grup !== -1 || pist !== -1 ? "SIRE" : sp.tur === "SIRE" || sp.tur === "DAM" || sp.tur === "DAMSIRE" ? sp.tur : "ALL";
+  // Pist yalnız Aygır sayfasında vardır → pist seçiliyse tür Aygır'a kilitlenir. Grup Aygır ve Kısrak Babası sayfalarında vardır (Kısrak'ta yok).
+  const kind: TjkKindFilter = pist !== -1 ? "SIRE" : sp.tur === "SIRE" || sp.tur === "DAM" || sp.tur === "DAMSIRE" ? sp.tur : "ALL";
   const y = Number(sp.yil); const year = Number.isFinite(y) && sp.yil != null && sp.yil !== "" ? y : 2026;
   return { breed, kind, year, q: (sp.q ?? "").trim(), grup, pist };
 }
@@ -56,7 +56,7 @@ export default async function TjkPedigriMerkeziPanel({ searchParams, currentDate
           <Ozet baslik="Kısrak Babası" deger={data.sayilar.DAMSIRE} />
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-          {filters.grup !== -1 || filters.pist !== -1 ? "Grup/Pist süzgeci yalnız Aygır için vardır. " : ""}Son güncelleme: {data.sonGuncelleme ? new Date(data.sonGuncelleme).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" }) : "henüz çekilmedi"}.
+          {filters.pist !== -1 ? "Pist süzgeci yalnız Aygır için vardır. " : filters.grup !== -1 ? "Grup süzgeci Aygır ve Kısrak Babası için vardır (Kısrak’ta yok). " : ""}Son güncelleme: {data.sonGuncelleme ? new Date(data.sonGuncelleme).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" }) : "henüz çekilmedi"}.
         </p>
       </div>
 

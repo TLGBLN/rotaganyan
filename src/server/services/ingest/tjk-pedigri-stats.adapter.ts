@@ -60,7 +60,7 @@ const CFG: Record<PedigriKind, Cfg> = {
   },
   DAMSIRE: {
     sayfa: "KisrakBabasi",
-    qs: (y, irk, ad = "") => `QueryParameter_YIL=${y}&QueryParameter_IrkId=${irk}&QueryParameter_GrupId=-1&QueryParameter_KisrakBabaAdi=${encodeURIComponent(ad)}`,
+    qs: (y, irk, ad = "", grup = -1) => `QueryParameter_YIL=${y}&QueryParameter_IrkId=${irk}&QueryParameter_GrupId=${grup}&QueryParameter_KisrakBabaAdi=${encodeURIComponent(ad)}`,
     sorts: ["KisrakBabaAdi ASC", "KisrakBabaAdi DESC", "KosuAdet DESC", "derece1 DESC", "KosanTayAdet DESC", "KAZANC DESC", "derece2 DESC", "derece3 DESC"],
   },
 };
@@ -144,6 +144,8 @@ function satirlariAyristir(html: string, kind: PedigriKind, year: number, gp: Gr
 export type GrupPist = { grup: number; pist: number };
 export const AYGIR_GRUPLARI = [-1, 1, 3, 5, 6, 8, 10];
 export const AYGIR_PISTLERI = [-1, 1, 2, 4];
+/** Kısrak Babası sayfasının GrupId listesi. Formda ayrıca 14 (1 yaşlı İngilizler) ve 15 (2 yaşlı Araplar) var ama 2025 ve 2026 için TJK tutarlı olarak 0 satır veriyor (2026-11-15 doğrulandı, kontrol grubu 1 = 259) → çekilmez. Pist süzgeci YOK. */
+export const KISRAK_BABASI_GRUPLARI = [-1, 1, 6, 3, 5, 8, 10];
 
 export type PedigriCekimSonucu = { rows: TjkPedigriRow[]; toplamTjk: number; eksik: number; gecisSayisi: number };
 
