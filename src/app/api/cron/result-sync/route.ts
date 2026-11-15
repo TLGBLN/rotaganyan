@@ -32,10 +32,10 @@ export async function GET(req: NextRequest) {
 
   revalidatePath("/admin");
   revalidatePath("/");
-  revalidatePath("/admin/pedigri");
+  revalidatePath("/admin/pedigri-merkezi");
 
   // Yeni resmi sonuç gerçekten DB'ye yazıldıysa Own pedigree istatistiklerini hemen
-  // yenile. Böylece /admin/pedigri yalnız gece cron'unu beklemez; Sire/Dam/DamSire
+  // yenile. Böylece /admin/pedigri-merkezi yalnız gece cron'unu beklemez; Sire/Dam/DamSire
   // istatistikleri yarışlar sonuçlandıkça büyür. Boş 5 dakikalık turlarda ağır yeniden
   // hesaplama yapılmaz.
   if (resultCountAfter > resultCountBefore) {
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       await syncOwnPedigreeStats().catch((e) =>
         console.error("[result-sync] pedigri own sync hata:", e)
       );
-      revalidatePath("/admin/pedigri");
+      revalidatePath("/admin/pedigri-merkezi");
     });
   }
 

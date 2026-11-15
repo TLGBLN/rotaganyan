@@ -30,7 +30,7 @@ const NAV: NavOge[] = [
   { href: "/admin/analizler", label: "Analizler", icon: FileText, grup: "Analizler" },
   { href: "/admin/root-cause", label: "Root-Cause Analizi", icon: SearchCode, grup: "Analizler" },
   { href: "/admin/kupon", label: "Kupon Hazırla", icon: Ticket, grup: "Analizler" },
-  { href: "/admin/pedigri", label: "Pedigriler", icon: Dna },
+  { href: "/admin/pedigri-merkezi", label: "Pedigriler", icon: Dna },
   { href: "/admin/accurace", label: "Accurace Database", icon: Gauge },
   { href: "/admin/derece-istatistikleri", label: "Derece İstatistikleri", icon: CloudRain },
   { href: "/admin/site-anatomisi", label: "Site Anatomisi", icon: Activity, grup: "Teşhis" },

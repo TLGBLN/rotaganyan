@@ -149,7 +149,7 @@ export async function updateRunnerPedigree(runnerId: string, input: PedigreeInpu
     },
   });
 
-  revalidatePath("/admin/pedigri");
+  revalidatePath("/admin/pedigri-merkezi");
   revalidatePath("/program");
   return runner;
 }

@@ -969,3 +969,34 @@ model ExternalPedigreeStat {
   @@index([damSireNormalizedName])
   @@index([capturedAt])
 }
+
+// ─── TJK RESMÎ PEDİGRİ İSTATİSTİKLERİ (Pedigri Merkezi) ──────────────────────────────
+// 2026-11-15 kullanıcı kararı: HipodromX anlık görüntüsü (ExternalPedigreeStat) yerine HEP GÜNCEL resmî TJK verisi.
+// Kaynak sayfalar: AygirIstatistikleri (SIRE), KisrakIstatistikleri (DAM), KisrakBabasi (DAMSIRE).
+// tjkId = TJK'nın kalıcı kimliği (BabaId / AnneId / KisrakBabaKodu) — ad eşleştirme hatalarından bağımsız.
+// year = -1 → "Tüm Yıllar" (kariyer toplamı); aksi halde o yılın değeri. Mesafe/pist kırılımı TJK'da yok (HipodromX'ten ID eşleştirmeyle taşınacak).
+model TjkPedigriStat {
+  id             String   @id @default(cuid())
+  kind           String // SIRE | DAM | DAMSIRE
+  tjkId          Int
+  year           Int
+  name           String
+  normalizedName String
+  country        String?
+  breed          String // ARAP | INGILIZ
+  runnerCount    Int // Koşan Tay Adet
+  winnerCount    Int? // Kazanan Yavru Adet (yalnız aygır sayfasında var)
+  starts         Int // Koşu
+  wins           Int
+  seconds        Int
+  thirds         Int
+  fourths        Int
+  fifths         Int
+  earningsTRY    Float
+  capturedAt     DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([kind, tjkId, year])
+  @@index([kind, year, breed])
+  @@index([normalizedName, kind])
+}

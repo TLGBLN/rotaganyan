@@ -1,0 +1,94 @@
+import { Check, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+import TjkPedigriMerkeziPanel, { type TjkPedigriSearchParams } from "@/components/admin/TjkPedigriMerkeziPanel";
+import RacePedigreeTable from "@/components/admin/RacePedigreeTable";
+import DateNavigator from "@/components/kosular/DateNavigator";
+import { getRaceDaysForPedigreeEntry } from "@/server/services/admin.service";
+import { turkeyDateString } from "@/lib/tz";
+
+export const dynamic = "force-dynamic";
+
+type PageProps = {
+  searchParams: Promise<{ tarih?: string } & TjkPedigriSearchParams>;
+};
+
+export default async function PedigriMerkeziPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const currentDate = params.tarih ?? turkeyDateString();
+
+  const raceDays = await getRaceDaysForPedigreeEntry(currentDate);
+
+  return (
+    <div className="space-y-8">
+      <TjkPedigriMerkeziPanel searchParams={params} currentDate={currentDate} />
+
+      <section className="border-t pt-8">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold">Günlük Pedigri Girişi &amp; Eksik Veri</h2>
+            <p className="mt-1 max-w-5xl text-xs leading-relaxed text-muted-foreground">
+              O gün koşan atların baba (Sire), anne (Dam) ve anne babası (DamSire) bilgileri TJK
+              programında varsa otomatik gelir; eksik veya hatalıysa buradan düzeltebilirsiniz.
+              Rotaganyan Own Sire eşleşmesi mevcut V5 sire sinyalinin veri kaynağıdır. Dam ve
+              DamSire Own istatistikleri destek verisi olarak gösterilir. Genel Not alanı manuel
+              kayıt/gösterim içindir; güncel V5 analiz motoru bu alanı otomatik olarak skora dahil etmez.
+            </p>
+          </div>
+          <DateNavigator currentDate={currentDate} basePath="/admin/pedigri-merkezi" />
+        </div>
+
+        {raceDays.length === 0 && (
+          <div className="mt-4 rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
+            Bu tarih için koşu programı bulunamadı.
+          </div>
+        )}
+
+        <div className="mt-4 space-y-4">
+          {raceDays.map((rd) => (
+            <details key={rd.id} className="group rounded-lg border">
+              <summary className="flex cursor-pointer list-none items-center justify-between border-b bg-muted/30 px-4 py-2 [&::-webkit-details-marker]:hidden">
+                <h3 className="text-sm font-semibold">{rd.hippodrome.name}</h3>
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
+              </summary>
+              <div className="divide-y">
+                {rd.races.map((race) => {
+                  const pedigriDolu = race.runners.filter((r) => r.sire).length;
+                  const tamamlandi =
+                    race.runners.length > 0 && pedigriDolu === race.runners.length;
+
+                  return (
+                    <details key={race.id} className="group/race">
+                      <summary className="flex cursor-pointer list-none items-center justify-between bg-muted/10 px-4 py-1.5 text-xs font-medium [&::-webkit-details-marker]:hidden">
+                        <span className="flex items-center gap-2">
+                          {race.raceNo}. Koşu{" "}
+                          <span className="font-normal text-muted-foreground">
+                            ({race.runners.length} at)
+                          </span>
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                              tamamlandi
+                                ? "bg-hit/15 text-hit"
+                                : pedigriDolu > 0
+                                  ? "bg-muted text-muted-foreground"
+                                  : "bg-miss/10 text-miss"
+                            )}
+                          >
+                            {tamamlandi && <Check className="h-3 w-3" />}
+                            {pedigriDolu}/{race.runners.length} pedigri
+                          </span>
+                        </span>
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-open/race:rotate-90" />
+                      </summary>
+                      <RacePedigreeTable runners={race.runners} />
+                    </details>
+                  );
+                })}
+              </div>
+            </details>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
