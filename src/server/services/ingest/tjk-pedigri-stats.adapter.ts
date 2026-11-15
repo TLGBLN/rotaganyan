@@ -29,6 +29,8 @@ export type TjkPedigriRow = {
   kind: PedigriKind;
   tjkId: number;
   year: number; // -1 = tüm yıllar
+  groupId: number; // Aygır sayfası GrupId (-1 = tüm gruplar)
+  pistId: number; // Aygır sayfası PistId (-1 = tüm pistler)
   name: string;
   normalizedName: string;
   country: string | null;
@@ -44,11 +46,11 @@ export type TjkPedigriRow = {
   earningsTRY: number;
 };
 
-type Cfg = { sayfa: string; qs: (year: number, irk: number, ad?: string) => string; sorts: string[] };
+type Cfg = { sayfa: string; qs: (year: number, irk: number, ad?: string, grup?: number, pist?: number) => string; sorts: string[] };
 const CFG: Record<PedigriKind, Cfg> = {
   SIRE: {
     sayfa: "AygirIstatistikleri",
-    qs: (y, irk, ad = "") => `QueryParameter_YIL=${y}&QueryParameter_IrkId=${irk}&QueryParameter_GrupId=-1&QueryParameter_PistId=-1&QueryParameter_AygirAdi=${encodeURIComponent(ad)}`,
+    qs: (y, irk, ad = "", grup = -1, pist = -1) => `QueryParameter_YIL=${y}&QueryParameter_IrkId=${irk}&QueryParameter_GrupId=${grup}&QueryParameter_PistId=${pist}&QueryParameter_AygirAdi=${encodeURIComponent(ad)}`,
     sorts: ["AygirAdi ASC", "AygirAdi DESC", "KosuAdet DESC", "derece1 DESC", "KosanTayAdet DESC", "ToplamKazanc DESC", "derece2 DESC", "derece3 DESC"],
   },
   DAM: {
@@ -108,7 +110,7 @@ export function pedigriAdNormalize(ad: string): string {
     .trim();
 }
 
-function satirlariAyristir(html: string, kind: PedigriKind, year: number): TjkPedigriRow[] {
+function satirlariAyristir(html: string, kind: PedigriKind, year: number, gp: GrupPist): TjkPedigriRow[] {
   // DataRows yanıtı çıplak <tr>'lerdir; cheerio tablosuz bunları sessizce kaybeder.
   const $ = cheerio.load(`<table>${html}</table>`);
   const out: TjkPedigriRow[] = [];
@@ -125,7 +127,7 @@ function satirlariAyristir(html: string, kind: PedigriKind, year: number): TjkPe
     const breed: PedigriBreed = /arap/i.test(irk) ? "ARAP" : "INGILIZ";
     const kazanc = hucre("ToplamKazanc").text() || hucre("KAZANC").text();
     out.push({
-      kind, tjkId: Number(idM), year, name, normalizedName: pedigriAdNormalize(name),
+      kind, tjkId: Number(idM), year, groupId: gp.grup, pistId: gp.pist, name, normalizedName: pedigriAdNormalize(name),
       country: hucre("ULKEADi").text().trim() || null, breed,
       runnerCount: sayi(hucre("KosanTayAdet").text()),
       winnerCount: kind === "SIRE" ? sayi(hucre("KazananYavruAdet").text()) : null,
@@ -137,6 +139,11 @@ function satirlariAyristir(html: string, kind: PedigriKind, year: number): TjkPe
   });
   return out;
 }
+
+/** Aygır sayfası süzgeçleri (-1 = tümü). GrupId: 1=2y İng, 3=3y İng, 5=4+ İng, 6=3y Arap, 8=4y Arap, 10=5+ Arap. PistId: 1=Çim, 2=Kum, 4=Sentetik. */
+export type GrupPist = { grup: number; pist: number };
+export const AYGIR_GRUPLARI = [-1, 1, 3, 5, 6, 8, 10];
+export const AYGIR_PISTLERI = [-1, 1, 2, 4];
 
 export type PedigriCekimSonucu = { rows: TjkPedigriRow[]; toplamTjk: number; eksik: number; gecisSayisi: number };
 
@@ -150,17 +157,17 @@ async function fetchHtmlTekrarli(url: string): Promise<string | null> {
 export const cekimUyarilari: string[] = [];
 
 /** TJK "Toplam X sonuç" sayısı (ad süzgeciyle). Sonuç yoksa 0. Bir sayım isteğinin 404'ü ASLA sessizce "0 sonuç" sayılmaz (dal düşerdi): 4 denemeden sonra uyarı yazılır. */
-async function toplamAl(kind: PedigriKind, year: number, breed: PedigriBreed, ad: string): Promise<number> {
+async function toplamAl(kind: PedigriKind, year: number, irk: number, ad: string, gp: GrupPist): Promise<number> {
   const cfg = CFG[kind];
-  const url = `${BASE}/Data/${cfg.sayfa}?${cfg.qs(year, IRK_ID[breed], ad)}`;
+  const url = `${BASE}/Data/${cfg.sayfa}?${cfg.qs(year, irk, ad, gp.grup, gp.pist)}`;
   const ilk = await fetchHtmlTekrarli(url);
-  if (ilk == null) { cekimUyarilari.push(`sayım alınamadı (4 deneme): ${kind} ${year} ${breed} ad="${ad}"`); return 0; }
+  if (ilk == null) { cekimUyarilari.push(`sayım alınamadı (4 deneme): ${kind} ${year} irk=${irk} grup=${gp.grup} pist=${gp.pist} ad="${ad}"`); return 0; }
   return parseInt((ilk.match(/Toplam ([\d.]+) sonuç/)?.[1] ?? "0").replace(/\./g, ""), 10);
 }
 
 /** Tek bir sorguyu (ad süzgeci dahil) tam çeker: tek sorguda en çok ~3050 satır gelir → isme göre A→Z ve Z→A (+ diğer sıralamalar) birleştirilir. */
-async function siraliCek(kind: PedigriKind, year: number, breed: PedigriBreed, ad: string, hedef: number): Promise<{ rows: Map<number, TjkPedigriRow>; gecis: number }> {
-  const cfg = CFG[kind]; const qs = cfg.qs(year, IRK_ID[breed], ad);
+async function siraliCek(kind: PedigriKind, year: number, irk: number, ad: string, hedef: number, gp: GrupPist): Promise<{ rows: Map<number, TjkPedigriRow>; gecis: number }> {
+  const cfg = CFG[kind]; const qs = cfg.qs(year, irk, ad, gp.grup, gp.pist);
   const byId = new Map<number, TjkPedigriRow>(); let gecis = 0;
   for (const sort of cfg.sorts) {
     if (byId.size >= hedef) break;
@@ -170,7 +177,7 @@ async function siraliCek(kind: PedigriKind, year: number, breed: PedigriBreed, a
       // Beklenen satır sayısına henüz ulaşılmadıysa 404 muhtemelen GEÇİCİ → yeniden dene; ulaşıldıysa 404 normal "son sayfa"dır.
       const html = byId.size < hedef ? await fetchHtmlTekrarli(url) : await fetchHtml(url);
       if (html == null) break;
-      const rows = satirlariAyristir(html, kind, year);
+      const rows = satirlariAyristir(html, kind, year, gp);
       for (const r of rows) byId.set(r.tjkId, r);
       if (rows.length < 50) break;
       await sleep(150);
@@ -185,13 +192,13 @@ const AD_HARFLERI = "ABCDEFGHIJKLMNOPQRSTUVWXYZÇĞİÖŞÜ0123456789.".split(""
 
 /** İsim-kapsama: TJK ad süzgeci "İÇERİR" mantığında. Her isim bir harf içerir → harf sorgularının birleşimi tüm listeyi kapsar. Bir sorgu eşiği aşarsa
  *  harf çiftleriyle (q+c ve c+q — q'yu içeren her isim q'nun solunda ya da sağında bir karakter taşır) özyinelemeli bölünür; sonuçlar kimliğe göre birleşir. */
-async function adKapsama(kind: PedigriKind, year: number, breed: PedigriBreed): Promise<{ rows: Map<number, TjkPedigriRow>; sorguSayisi: number }> {
+async function adKapsama(kind: PedigriKind, year: number, irk: number, gp: GrupPist): Promise<{ rows: Map<number, TjkPedigriRow>; sorguSayisi: number }> {
   const out = new Map<number, TjkPedigriRow>(); const gorulen = new Set<string>();
   const rec = async (q: string): Promise<void> => {
     if (gorulen.has(q)) return; gorulen.add(q);
-    const t = await toplamAl(kind, year, breed, q);
+    const t = await toplamAl(kind, year, irk, q, gp);
     if (t === 0) return;
-    if (t <= TEK_SORGU_ESIGI || q.length >= 4) { const s = await siraliCek(kind, year, breed, q, t); for (const [id, r] of s.rows) out.set(id, r); return; }
+    if (t <= TEK_SORGU_ESIGI || q.length >= 4) { const s = await siraliCek(kind, year, irk, q, t, gp); for (const [id, r] of s.rows) out.set(id, r); return; }
     const cocuk: string[] = [];
     for (const c of AD_HARFLERI) { cocuk.push(q + c); cocuk.push(c + q); }
     await Promise.all(cocuk.map(rec));
@@ -200,22 +207,24 @@ async function adKapsama(kind: PedigriKind, year: number, breed: PedigriBreed): 
   return { rows: out, sorguSayisi: gorulen.size };
 }
 
-/** Tek sorgu (kind × yıl × ırk): toplam eşik altındaysa sıralı çekim, değilse isim-kapsama. */
-export async function sorguCek(kind: PedigriKind, year: number, breed: PedigriBreed): Promise<PedigriCekimSonucu> {
-  const toplamTjk = await toplamAl(kind, year, breed, "");
+/** Tek sorgu (kind × yıl × ırk-kimliği × grup/pist): toplam eşik altındaysa sıralı çekim, değilse isim-kapsama. */
+export async function sorguCek(kind: PedigriKind, year: number, irk: number, gp: GrupPist = { grup: -1, pist: -1 }): Promise<PedigriCekimSonucu> {
+  const toplamTjk = await toplamAl(kind, year, irk, "", gp);
+  if (toplamTjk === 0) return { rows: [], toplamTjk: 0, eksik: 0, gecisSayisi: 0 };
   if (toplamTjk > TEK_SORGU_ESIGI) {
-    const k = await adKapsama(kind, year, breed);
+    const k = await adKapsama(kind, year, irk, gp);
     return { rows: [...k.rows.values()], toplamTjk, eksik: Math.max(0, toplamTjk - k.rows.size), gecisSayisi: k.sorguSayisi };
   }
-  const s = await siraliCek(kind, year, breed, "", toplamTjk);
+  const s = await siraliCek(kind, year, irk, "", toplamTjk, gp);
   return { rows: [...s.rows.values()], toplamTjk, eksik: Math.max(0, toplamTjk - s.rows.size), gecisSayisi: s.gecis };
 }
 
-/** Bir tür (SIRE/DAM/DAMSIRE) için bir yılın (-1 = tüm yıllar) TÜM satırları; Arap + İngiliz ayrı sorgulanıp birleştirilir. */
-export async function fetchTjkPedigriStats(kind: PedigriKind, year: number): Promise<PedigriCekimSonucu> {
+/** Bir tür için bir yılın (-1 = tüm yıllar) TÜM satırları. Grup seçiliyse grup ırkı zaten belirler → tek sorgu (ırk -1); aksi halde Arap + İngiliz ayrı sorgulanıp birleştirilir. */
+export async function fetchTjkPedigriStats(kind: PedigriKind, year: number, gp: GrupPist = { grup: -1, pist: -1 }): Promise<PedigriCekimSonucu> {
   const sonuc: PedigriCekimSonucu = { rows: [], toplamTjk: 0, eksik: 0, gecisSayisi: 0 };
-  for (const breed of ["ARAP", "INGILIZ"] as const) {
-    const s = await sorguCek(kind, year, breed);
+  const irkler = gp.grup !== -1 ? [-1] : [IRK_ID.ARAP, IRK_ID.INGILIZ];
+  for (const irk of irkler) {
+    const s = await sorguCek(kind, year, irk, gp);
     sonuc.rows.push(...s.rows); sonuc.toplamTjk += s.toplamTjk; sonuc.eksik += s.eksik; sonuc.gecisSayisi += s.gecisSayisi;
     await sleep(300);
   }

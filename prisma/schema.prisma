@@ -980,6 +980,9 @@ model TjkPedigriStat {
   kind           String // SIRE | DAM | DAMSIRE
   tjkId          Int
   year           Int
+  // Aygır sayfasının TJK süzgeçleri: groupId (GrupId: -1 tümü, 1=2y İng, 3=3y İng, 5=4+ İng, 6=3y Arap, 8=4y Arap, 10=5+ Arap), pistId (PistId: -1 tümü, 1=Çim, 2=Kum, 4=Sentetik).
+  groupId        Int      @default(-1)
+  pistId         Int      @default(-1)
   name           String
   normalizedName String
   country        String?
@@ -996,7 +999,7 @@ model TjkPedigriStat {
   capturedAt     DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  @@unique([kind, tjkId, year])
-  @@index([kind, year, breed])
+  @@unique([kind, tjkId, year, groupId, pistId])
+  @@index([kind, year, groupId, pistId, breed])
   @@index([normalizedName, kind])
 }

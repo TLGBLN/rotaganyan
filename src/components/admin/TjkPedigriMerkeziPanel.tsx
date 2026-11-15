@@ -1,15 +1,23 @@
 import { getTjkMerkeziData, type TjkBreed, type TjkFilters, type TjkKindFilter } from "@/server/services/tjk-pedigri-merkezi.service";
 
-export type TjkPedigriSearchParams = { irk?: string; q?: string; tur?: string; yil?: string };
+export type TjkPedigriSearchParams = { irk?: string; q?: string; tur?: string; yil?: string; grup?: string; pist?: string };
+
+// TJK Aygır sayfasının süzgeç seçenekleri (kimlikler TJK formundan).
+const GRUPLAR: [number, string][] = [[-1, "Tüm gruplar"], [1, "2 Yaşlı İngilizler"], [6, "3 Yaşlı Araplar"], [3, "3 Yaşlı İngilizler"], [5, "4 ve Yukarı İngilizler"], [8, "4 Yaşlı Araplar"], [10, "5 ve Yukarı Araplar"]];
+const PISTLER: [number, string][] = [[-1, "Tüm pistler"], [1, "Çim"], [2, "Kum"], [4, "Sentetik"]];
 
 const num = (v: number, d = 0) => v.toLocaleString("tr-TR", { minimumFractionDigits: d, maximumFractionDigits: d });
 const kindAd = (k: string) => (k === "SIRE" ? "Aygır" : k === "DAM" ? "Kısrak" : "Kısrak Babası");
 
 function parse(sp: TjkPedigriSearchParams): TjkFilters {
   const breed: TjkBreed = sp.irk === "ARAP" ? "ARAP" : "INGILIZ";
-  const kind: TjkKindFilter = sp.tur === "SIRE" || sp.tur === "DAM" || sp.tur === "DAMSIRE" ? sp.tur : "ALL";
+  const g = Number(sp.grup), ps = Number(sp.pist);
+  const grup = GRUPLAR.some(([k]) => k === g) && sp.grup != null && sp.grup !== "" ? g : -1;
+  const pist = PISTLER.some(([k]) => k === ps) && sp.pist != null && sp.pist !== "" ? ps : -1;
+  // Grup/Pist yalnız Aygır sayfasında vardır → seçiliyse tür Aygır'a kilitlenir.
+  const kind: TjkKindFilter = grup !== -1 || pist !== -1 ? "SIRE" : sp.tur === "SIRE" || sp.tur === "DAM" || sp.tur === "DAMSIRE" ? sp.tur : "ALL";
   const y = Number(sp.yil); const year = Number.isFinite(y) && sp.yil != null && sp.yil !== "" ? y : 2026;
-  return { breed, kind, year, q: (sp.q ?? "").trim() };
+  return { breed, kind, year, q: (sp.q ?? "").trim(), grup, pist };
 }
 
 function Ozet({ baslik, deger }: { baslik: string; deger: number }) {
@@ -48,11 +56,11 @@ export default async function TjkPedigriMerkeziPanel({ searchParams, currentDate
           <Ozet baslik="Kısrak Babası" deger={data.sayilar.DAMSIRE} />
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-          Son güncelleme: {data.sonGuncelleme ? new Date(data.sonGuncelleme).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" }) : "henüz çekilmedi"}.
+          {filters.grup !== -1 || filters.pist !== -1 ? "Grup/Pist süzgeci yalnız Aygır için vardır. " : ""}Son güncelleme: {data.sonGuncelleme ? new Date(data.sonGuncelleme).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" }) : "henüz çekilmedi"}.
         </p>
       </div>
 
-      <form method="get" className="grid gap-2 lg:grid-cols-5">
+      <form method="get" className="grid gap-2 lg:grid-cols-7">
         <input type="hidden" name="tarih" value={currentDate} />
         <select name="irk" defaultValue={filters.breed} className="rounded-md border bg-background px-2 py-2 text-xs">
           <option value="INGILIZ">İngiliz</option>
@@ -64,6 +72,12 @@ export default async function TjkPedigriMerkeziPanel({ searchParams, currentDate
           <option value="SIRE">Aygır</option>
           <option value="DAM">Kısrak</option>
           <option value="DAMSIRE">Kısrak Babası</option>
+        </select>
+        <select name="grup" defaultValue={String(filters.grup)} className="rounded-md border bg-background px-2 py-2 text-xs" title="Yalnız Aygır">
+          {GRUPLAR.map(([k, ad]) => <option key={k} value={k}>{ad}</option>)}
+        </select>
+        <select name="pist" defaultValue={String(filters.pist)} className="rounded-md border bg-background px-2 py-2 text-xs" title="Yalnız Aygır">
+          {PISTLER.map(([k, ad]) => <option key={k} value={k}>{ad}</option>)}
         </select>
         <div className="flex gap-2">
           <select name="yil" defaultValue={String(filters.year)} className="min-w-0 flex-1 rounded-md border bg-background px-2 py-2 text-xs">

@@ -7,7 +7,8 @@ export type TjkKind = "SIRE" | "DAM" | "DAMSIRE";
 export type TjkBreed = "INGILIZ" | "ARAP";
 export type TjkKindFilter = TjkKind | "ALL";
 
-export type TjkFilters = { breed: TjkBreed; q: string; kind: TjkKindFilter; year: number };
+/** grup/pist: Aygır sayfasının TJK süzgeçleri (-1 = tümü). Yalnız Aygır (SIRE) için çekilir. */
+export type TjkFilters = { breed: TjkBreed; q: string; kind: TjkKindFilter; year: number; grup: number; pist: number };
 
 export type TjkSatir = {
   kind: TjkKind; tjkId: number; name: string; country: string | null;
@@ -26,13 +27,13 @@ const MAX = 150;
 
 export async function getTjkMerkeziData(filters: TjkFilters): Promise<TjkMerkeziData> {
   const where: Prisma.TjkPedigriStatWhereInput = {
-    year: filters.year, breed: filters.breed,
+    year: filters.year, breed: filters.breed, groupId: filters.grup, pistId: filters.pist,
     ...(filters.kind === "ALL" ? {} : { kind: filters.kind }),
     ...(filters.q ? { OR: [{ name: { contains: filters.q, mode: "insensitive" } }, { normalizedName: { contains: filters.q.toLocaleUpperCase("tr"), mode: "insensitive" } }] } : {}),
   };
   const [satirlar, sayiGrup, yillarGrup, son] = await Promise.all([
     db.tjkPedigriStat.findMany({ where, orderBy: [{ starts: "desc" }, { wins: "desc" }, { name: "asc" }], take: MAX }),
-    db.tjkPedigriStat.groupBy({ by: ["kind"], where: { year: filters.year, breed: filters.breed }, _count: { _all: true } }),
+    db.tjkPedigriStat.groupBy({ by: ["kind"], where: { year: filters.year, breed: filters.breed, groupId: filters.grup, pistId: filters.pist }, _count: { _all: true } }),
     db.tjkPedigriStat.groupBy({ by: ["year"], _count: { _all: true }, orderBy: { year: "desc" } }),
     db.tjkPedigriStat.aggregate({ _max: { updatedAt: true } }),
   ]);
