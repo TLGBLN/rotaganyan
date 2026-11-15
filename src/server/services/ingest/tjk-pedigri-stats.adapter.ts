@@ -14,6 +14,7 @@
  */
 import { request } from "undici";
 import * as cheerio from "cheerio";
+import { pedigriAdNormalize } from "../../../lib/pedigri-form";
 
 const BASE = "https://www.tjk.org/TR/YarisSever/Query";
 const HEADERS = {
@@ -100,15 +101,8 @@ const sayi = (t: string): number => parseInt(t.replace(/\./g, "").trim(), 10) ||
 /** "724.223.720,64" → 724223720.64 */
 const para = (t: string): number => parseFloat(t.replace(/\./g, "").replace(",", ".").trim()) || 0;
 
-/** Ülke eki ve noktalama atılmış, TR-duyarsız karşılaştırma anahtarı. HipodromX'in entityNormalizedName'i de ülke ekini atıyordu ("LION HEART (USA)" → "LION HEART"). */
-export function pedigriAdNormalize(ad: string): string {
-  return ad
-    .replace(/\s*\([^)]*\)\s*$/g, "")
-    .toLocaleUpperCase("tr")
-    .replace(/İ/g, "I").replace(/Ş/g, "S").replace(/Ğ/g, "G").replace(/Ü/g, "U").replace(/Ö/g, "O").replace(/Ç/g, "C")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+// Ad normalizasyonu çekici ve analiz servisi arasında TEK kaynaktan (src/lib/pedigri-form.ts).
+export { pedigriAdNormalize };
 
 function satirlariAyristir(html: string, kind: PedigriKind, year: number, gp: GrupPist): TjkPedigriRow[] {
   // DataRows yanıtı çıplak <tr>'lerdir; cheerio tablosuz bunları sessizce kaybeder.
