@@ -3,7 +3,7 @@
 // -1 = "Tüm Yıllar" (kariyer toplamı). Her (tür×yıl) bitince hemen yazılır; eksik (TJK "Toplam"ından az) varsa mevcut kayıtlar SİLİNMEZ.
 // TJK yavaş (≈1 istek/sn): yarış saatinde ÇALIŞTIRMA gerekmez (TJK'ya hafif yük) ama uzun sürer → arka planda çalıştır.
 import { db } from "./src/lib/db";
-import { fetchTjkPedigriStats, type PedigriKind } from "./src/server/services/ingest/tjk-pedigri-stats.adapter";
+import { cekimUyarilari, fetchTjkPedigriStats, type PedigriKind } from "./src/server/services/ingest/tjk-pedigri-stats.adapter";
 
 const arg = (ad: string, varsayilan: string) => { const i = process.argv.indexOf("--" + ad); return i >= 0 ? process.argv[i + 1] : varsayilan; };
 
@@ -14,6 +14,7 @@ async function main() {
     const t0 = Date.now();
     const s = await fetchTjkPedigriStats(kind, yil);
     if (!s.rows.length) { console.log(`[${kind} ${yil}] HİÇ SATIR GELMEDİ (TJK toplam ${s.toplamTjk}) — yazılmadı`); continue; }
+    if (cekimUyarilari.length) { console.log(`[${kind} ${yil}] UYARI (${cekimUyarilari.length}): ` + cekimUyarilari.slice(0, 5).join(" | ")); cekimUyarilari.length = 0; }
     const veri = s.rows.map((r) => ({ ...r }));
     if (s.eksik === 0) {
       // İşlem bloğu (transaction) yok: havuz/pgbouncer "işlem başlatılamadı" (P2028) verdi. Veri TAM çekildikten SONRA silinip parça parça yazılır; yarıda kalırsa betik yeniden çalıştırılır.
