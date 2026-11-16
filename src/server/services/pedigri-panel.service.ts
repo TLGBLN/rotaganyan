@@ -65,7 +65,8 @@ const akranlarAnne = (breed: "INGILIZ" | "ARAP") => async (): Promise<Akran[]> =
 type Own = { starts: number; wins: number };
 const bos = (rol: AtaRol, ad: string | null, not: string): AtaSatiri => ({ rol, ad, durum: "VERI_YOK", kategori: null, wins: null, starts: null, yavru: null, ham: null, uzmanlasma: null, kalite: null, veriGuveni: null, nEtkin: null, akranSayisi: null, kategoriOrtalama: null, kategoriK: null, ayrintilar: [], kendiKosuCikarildi: null, yarisSonrasiVeri: false, veriAlinmaZamani: null, not });
 
-export async function pedigriPanelKosu(raceId: string): Promise<PedigriPanelSonuc | null> {
+/** tumKendiKayit: GERİYE DÖNÜK TEST için — atın yarış sonrası dahil TÜM kendi koşuları ata istatistiğinden çıkarılır (TJK görüntüsü sonradan alındığı için kendi sonuçları içeride; sızıntıyı önler). Canlı gösterimde KAPALI. */
+export async function pedigriPanelKosu(raceId: string, secenek?: { tumKendiKayit?: boolean }): Promise<PedigriPanelSonuc | null> {
   const race = await db.race.findUnique({ where: { id: raceId }, select: { breed: true, surface: true, time: true, raceDay: { select: { date: true } }, runners: { orderBy: { no: "asc" }, select: { no: true, name: true, sire: true, dam: true, damSire: true, age: true, tjkAtId: true } } } });
   if (!race) return null;
   const breed = race.breed as "INGILIZ" | "ARAP";
@@ -85,7 +86,7 @@ export async function pedigriPanelKosu(raceId: string): Promise<PedigriPanelSonu
   type Kayit = { yil: number; pist: string; kazandi: boolean };
   const kendi = new Map<number, Kayit[]>();
   if (idler.length) for (const h of await db.horseRaceHistoryCache.findMany({ where: { tjkAtId: { in: idler } }, select: { tjkAtId: true, rowsJson: true } })) {
-    kendi.set(h.tjkAtId, (h.rowsJson as { date?: string; surface?: string; finishPos?: string }[]).filter((q) => q.date).map((q) => { const [g, a, y] = q.date!.split("."); return { t: Date.UTC(+y, +a - 1, +g), yil: +y, pist: String(q.surface ?? "").trim().charAt(0).toUpperCase(), fin: String(q.finishPos ?? "").trim().replace(/\D.*/, "") }; }).filter((q) => q.t < gunMs && q.fin !== "").map((q) => ({ yil: q.yil, pist: q.pist, kazandi: q.fin === "1" })));
+    kendi.set(h.tjkAtId, (h.rowsJson as { date?: string; surface?: string; finishPos?: string }[]).filter((q) => q.date).map((q) => { const [g, a, y] = q.date!.split("."); return { t: Date.UTC(+y, +a - 1, +g), yil: +y, pist: String(q.surface ?? "").trim().charAt(0).toUpperCase(), fin: String(q.finishPos ?? "").trim().replace(/\D.*/, "") }; }).filter((q) => (secenek?.tumKendiKayit || q.t < gunMs) && q.fin !== "").map((q) => ({ yil: q.yil, pist: q.pist, kazandi: q.fin === "1" })));
   }
   const pistHarf = pistId === 1 ? "Ç" : pistId === 2 ? "K" : pistId === 4 ? "S" : null;
   const ownSay = (tjkAtId: number | null | undefined, uygun: (k: Kayit) => boolean): Own => { const l = tjkAtId != null ? kendi.get(tjkAtId) ?? [] : []; const s = l.filter(uygun); return { starts: s.length, wins: s.filter((x) => x.kazandi).length }; };
