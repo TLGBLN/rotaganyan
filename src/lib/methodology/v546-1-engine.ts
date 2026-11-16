@@ -27,6 +27,7 @@ import weightsJson from "./weights/v546-1-weights.json";
 // ./pedigri-galop-ortak.ts'de (ran-v2.ts ile PAYLAŞILAN, döngüsel import'suz tek kaynak).
 import { pedigriSkoru } from "./pedigri-galop-ortak";
 import { galopKalitesiV1, type GalopHam } from "./galop-motor";
+import { pedigriPanelKosu } from "@/server/services/pedigri-panel.service";
 import { getJokeyFormTablosu } from "@/server/actions/jokey-form.actions";
 import { getPitSeviyeSinyalleri, type PitSeviye } from "@/server/actions/pit-seviye.actions";
 import { getV5461DamOzetleriForRace, getV5461DamsireOzetleriForRace, type V5461DamlineOzet } from "@/server/actions/v5461-damline.actions";
@@ -222,6 +223,13 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
     faz1.runners.map((r, i) => [r.id, pedigriSkoru(r, damOzetleri18[i], damSireOzetleri18[i])])
   );
 
+  // 2026-11-16 KULLANICI KARARI: Maiden/ŞARTLI 19'da galop girdisi B80 = 0.8·GALOP_KALITE + 0.2·PEDIGRI_KALITE ('galopPedigri'; biri eksikse yalnız mevcut olan, eksik SIFIR sayılmaz).
+  // Bu iki sınıfta 'galopKaliteV1' null (galop iki kez sayılmasın); ŞARTLI 1/27 (segment) ve diğer sınıflarda galop TEK BAŞINA 'galopKaliteV1' olarak kalır, 'galopPedigri' null.
+  const maidenSartli19 = /MAIDEN|ŞARTLI 19/.test(faz1.race.classType.toUpperCase());
+  const pedigriKaliteByNo = maidenSartli19
+    ? await pedigriPanelKosu(raceId).then((s) => new Map((s?.atlar ?? []).map((a) => [a.no, a.pedigriKalite] as [number, number | null]))).catch(() => new Map<number, number | null>())
+    : new Map<number, number | null>();
+  const galopPedigriHesapla = (runnerId: string, no: number): number | null => { const g = galopV1Hesapla(runnerId), p = pedigriKaliteByNo.get(no) ?? null; return g != null && p != null ? 0.8 * g + 0.2 * p : (g ?? p); };
   // yalnız yarış gününden ÖNCEKİ galoplar (yarış sonrası yeniden puanlamada sızıntı olmasın)
   const galopV1Hesapla = (runnerId: string): number | null => galopKalitesiV1((galop18ByRunnerId.get(runnerId) ?? []).filter((g) => g.date.getTime() < raceDate.getTime()).map((g) => ({ date: g.date, track: g.track, form: g.form, splits: (g.splits ?? {}) as GalopHam["splits"] })), faz1.race.breed).kalite;
 
@@ -272,7 +280,8 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
       // Kalitesi — 2026-11-16'dan itibaren GALOP ANALİZ MOTORU v1.0 (galop-motor.ts), sinyal adı 'galopKaliteV1'.
       { ad: "antrenorOraniGenel", raw: r.antrenorOrani, observed: true, reliability: 1, evidenceObserved: r.antrenorOrani != null },
       { ad: "jokeyFormuGenel", raw: (r.jockey ? jokeyTablosu18.get(r.jockey)?.guncel.etkinForm : null) ?? null, observed: true, reliability: 1, evidenceObserved: (r.jockey ? jokeyTablosu18.get(r.jockey)?.guncel.etkinForm : null) != null },
-      { ad: "galopKaliteV1", raw: galopV1Hesapla(r.id), observed: true, reliability: 1, evidenceObserved: galopV1Hesapla(r.id) != null },
+      { ad: "galopKaliteV1", raw: maidenSartli19 ? null : galopV1Hesapla(r.id), observed: true, reliability: 1, evidenceObserved: !maidenSartli19 && galopV1Hesapla(r.id) != null },
+      { ad: "galopPedigri", raw: maidenSartli19 ? galopPedigriHesapla(r.id, r.no) : null, observed: true, reliability: 1, evidenceObserved: maidenSartli19 && galopPedigriHesapla(r.id, r.no) != null },
       // 2026-11-12 — jokey/antrenör SEVİYESİ + son yarış galibiyeti (pit-seviye.actions.ts). Veri yoksa
       // (hiç geçmiş sürüş / önceki yarış) observed=false → gerçek "veri yok", sıfır katkı.
       { ad: "jokeyPIT", raw: pitByRunnerId.get(r.id)?.jokeyPIT ?? null, observed: pitByRunnerId.get(r.id)?.jokeyPIT != null, reliability: 1 },

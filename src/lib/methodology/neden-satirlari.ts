@@ -27,6 +27,7 @@ export const SINYAL_BILGI: Record<string, { ad: string; ham?: (v: number) => str
   PS_closerFit: { ad: "Kapanışçı uyumu (geriden gelen profil)" },
   jokeyFormuGenel: { ad: "Jokey formu (son 30 gün)" },
   galopKaliteV1: { ad: "Galop kalitesi (Galop Analiz Motoru v1.0)" },
+  galopPedigri: { ad: "Galop + pedigri (B80)" },
   antrenorOraniGenel: { ad: "Antrenör oranı" },
   sireOraniBirlesik: { ad: "Pedigri (baba+anne+anne babası)" },
 };

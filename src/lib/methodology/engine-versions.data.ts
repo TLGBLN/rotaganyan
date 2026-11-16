@@ -838,13 +838,26 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
     versiyon: "RotaGanyan Analiz Motoru",
     ana: "V5",
     baslangic: new Date("2026-11-16T19:00:00+03:00"),
-    bitis: null,
+    bitis: new Date("2026-11-16T21:00:00+03:00"), // Maiden/ŞARTLI 19 galop+pedigri (B80) dönemi başlangıcı
     aciklama: "GALOP ANALİZ MOTORU v1.0 — kullanıcı formülü (16 Kasım 2026): eski galopSkoru tabanlı 'galopKalite' sinyali KALDIRILDI, yerine TÜM sınıflarda 'galopKaliteV1' (0-100) geldi. Tek galop kalitesi Q = (0.50·hız + 0.25·kapanış + 0.15·efor)/mevcut ağırlıklar; hız = 100·Φ((medyan−T)/σ) (ırk × galop mesafesi × pist × tür × iç/dış grubuna göre, σ = 1.4826·MAD); kapanış = toplam dereceye göre beklenen son 400'e göre artık; efor ÇR 90/R 85/HR 80/HÇ 65/Ç 55; son 3 kullanılabilir galop 0.5/0.3/0.2, ≥2 galopta 0.9·Q_ort + 0.1·trend, tek galopta Q1 (ceza yok). Bugünkü yarışın mesafesi hesaba girmez. Referans dağılım 73.635 gerçek galop kaydından (galop-referans.json, arac-galop-referans-uret.mts). Sitede BAŞKA galop analizi kalmadı: galop panelindeki iyi/çok iyi renk barajları, Hızlı Özet'teki 'keskin galop zinciri' etiketi, V4/V5/veri-toplama'daki keskin galop bayrakları ve galop sınıflandırma özeti kaldırıldı; galop paneli artık tek galop kalitesini (Q) ve atın Galop Kalitesi'ni bu motorla gösterir; RAN v2 galop sütunu da bu motorun galopKaliteV1 değerini kullanır.",
     neyiAnalizEdiyor: [
       "Varsayılan model 22 feature (galopKalite → galopKaliteV1, diğer 21 aynı; katsayılar TÜM yarışlarla yeniden eğitildi, galopKaliteV1 β=0.193). Handikap segmenti: yalnız galop girdisi galopKaliteV1 (β/ortalama/σ varsayılan modelden; diğer katsayılar aynı). ŞARTLI 1/27 segmenti: 4 sinyal, galopKaliteV1 β=1.018 (63 yarışta, diğer 3 katsayı dondurulmuş). Hazırlık (GALOP_HAZIRLIK) ve güven (GALOP_GUVEN) puanları modele BAĞLANMADI.",
     ],
     caprazlamalar: [
       "KANIT: 5 kat zaman-CV (827 test yarışı), canlı 22'ye göre ΔLL: geliştirme −0.0116 [−0.0192,−0.0047] ✔, bağımsız sınama −0.0030 [−0.0144,+0.0085], 5 kat −0.0083 [−0.0145,−0.0022] ✔; protokol (DEV ≤ −0.003 ve SINAMA ≤ 0) geçti. Düşük sınıf alt kümesinde ayrı ayrı anlamsız (DEV −0.0038, SINAMA +0.0058, GA sıfırı içeriyor); asıl kazanç diğer sınıflarda. SINIRLAR: (1) Hipodrom alanı Gallop tablosunda yok → hipodrom normalizasyonu yapılamadı; 200m derecesi neredeyse hep boş. (2) ŞARTLI 1/27 segment katsayısı yalnız 63 yarışa dayanıyor, örnek-içi (LL 2.0875 → 1.9497). (3) Tek başına galop sıralaması Maiden/Şartlı 1/19/27'de (675 yarış) Top1 %14.8 / Top3 %41.6 (tesadüf %10.1 / %30.4); Şartlı 19'da (47 yarış) tesadüfün altında. (4) Galop kayıtları yalnız Ağustos 2026'dan itibaren var. Önceki sürüm ağırlıkları: weights/*-galopv1-oncesi-2026-11-16.json.",
+    ],
+  },
+  {
+    versiyon: "RotaGanyan Analiz Motoru",
+    ana: "V5",
+    baslangic: new Date("2026-11-16T21:00:00+03:00"),
+    bitis: null,
+    aciklama: "MAIDEN / ŞARTLI 19: galop girdisi B80 = 0.8·GALOP_KALITE + 0.2·PEDIGRI_KALITE ('galopPedigri') ile değiştirildi; 'galopKaliteV1' bu iki sınıfta null (çift sayım yok), diğer sınıflarda galop tek başına 'galopKaliteV1' olarak kalır. ŞARTLI 1/27 segmenti (galop tek başına) ve Handikap DEĞİŞMEDİ. PEDIGRI_KALITE: TJK verisi, baba (2 yaş grubu + pist), anne (diğer yavrular), kısrak babası (yaş grubu); kategori içi yüzdelik, tek Bayes düzeltmesi, atın kendi koşuları çıkarılmış (pedigri-panel.service.ts, pedigri-puan.ts). Varsayılan model 22 → 23 sinyal, tüm yarışlarda yeniden eğitildi (galopKaliteV1 β=0.185, galopPedigri β=0.096).",
+    neyiAnalizEdiyor: [
+      "Varsayılan model 23 feature: önceki 21 sinyal aynı + galopKaliteV1 (Maiden/ŞARTLI 19 DIŞI) + galopPedigri (yalnız Maiden/ŞARTLI 19). Handikap: 19 segment, ŞARTLI 1/27: 4 (galop tek başına).",
+    ],
+    caprazlamalar: [
+      "KANIT (protokol GEÇİLMEDİ): 5 kat zaman-CV (827 test yarışı), Maiden/ŞARTLI 19 alt kümesinde (210 yarış) canlı 22'ye göre ΔLL: geliştirme +0.0083, sınama +0.0101 (kötüleşme, güven aralıkları sıfırı içeriyor), Top1 +1.0 / Top3 +1.4 puan. Örnek-içi (334 yarış): LL 2.0930 → 2.0984, Top1 %23.7 → %24.6, Top3 %56.0 → %57.8. Kullanıcı kararıyla alındı. SINIRLAR: (1) B80 ağırlığı B50/B70/B80/B90 denenerek seçildi, seçim yanlılığı var. (2) Pedigri testi sızıntıya açık (TJK görüntüsü 15 Kasım; kardeşlerin sonradan koşuları içeride). (3) Tek başına sıralama testinde B80 Maiden'de Top1 %15.7 / Top3 %41.0, Şartlı 19'da %8.2 / %31.5 (galop tek başına %15.0/%40.3 ve %4.1/%31.5). Önceki sürüm ağırlıkları: weights/*-galoppedigri-oncesi-2026-11-16.json.",
     ],
   },
 ];

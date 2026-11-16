@@ -25,6 +25,7 @@ export const MODEL_SURUMLERI: ModelSurumu[] = [
   // 2026-11-15 KULLANICI KARARI: +dususDelta (sınıf düşüşü) → 22 sinyal, TÜM yarışlarla YENİDEN EĞİTİM (21'li katsayılar da güncellendi).
   // cv = 21'li yeniden eğitimin CV'si (Top1 .254 / Top3 .617 / LL 2.0033) + dususDelta farkı (Top1 +0.5, Top3 +0.4 puan, LL −0.004) — protokol eşiği (DEV ≤ −0.003) GEÇİLMEDEN kullanıcı kararıyla alındı; canlı sonuçla doğrulanacak.
   { baslangic: "2026-11-15T15:58:00+03:00", ad: "Saf Model 22 özellik (+sınıf düşüşü)", ozellikSayisi: 22, cv: { n: 827, top1: 0.259, top3: 0.621, logLoss: 1.9993 } },
+  { baslangic: "2026-11-16T21:00:00+03:00", ad: "Saf Model 23 özellik (galop v1.0 + Maiden/ŞARTLI 19 B80)", ozellikSayisi: 23, cv: { n: 827, top1: 0.268, top3: 0.624, logLoss: 1.9930 } },
 ];
 
 /** Saf (AGF'siz) resmi motor dönemi — 2026-11-10 kullanıcı kararı. */
