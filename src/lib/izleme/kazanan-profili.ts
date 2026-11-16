@@ -11,7 +11,7 @@ export const PROFIL_SINYALLERI: [string, 1 | -1, string][] = [
   ["ACC_LATE", 1, "Accurace geç segment"], ["ACC_CLOSE_RES", 1, "Accurace kapanış"], ["ACC_SPEED", 1, "Accurace hız"],
   ["yarisGidisatiSkoru", 1, "Yarış gidişatı"], ["PS_front", -1, "Tempo: öne çıkma"], ["PS_closerFit", -1, "Tempo: arkadan gelme"],
   ["jokeyPIT", 1, "Jokey seviyesi"], ["antrenorPIT", 1, "Antrenör seviyesi"], ["hpRel", 1, "HP (yüksek = yüksek HP)"], ["kiloRel", 1, "Kilo (yüksek = ağır)"],
-  ["kgsLog", -1, "Dinlenme (KGS)"], ["sireOrani", 1, "Pedigri"], ["galopKalite", 1, "Galop kalitesi"],
+  ["kgsLog", -1, "Dinlenme (KGS)"], ["sireOrani", 1, "Pedigri"], ["galopKaliteV1", 1, "Galop kalitesi"],
 ];
 
 function yonluYuzdelik(vals: (number | null)[], i: number, yon: 1 | -1): number | null {

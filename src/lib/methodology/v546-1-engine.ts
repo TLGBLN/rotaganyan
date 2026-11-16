@@ -25,7 +25,8 @@ import weightsJson from "./weights/v546-1-weights.json";
 // 2026-11-10 kullanıcı kararı ("18 sinyal yapacağız bunları da ekleyerek") — Antrenör Oranı/
 // Jokey Formu/Galop Kalitesi + Dam/DamSire'ın sireOrani'ye eklenmesi. galopSkoru/pedigriSkoru
 // ./pedigri-galop-ortak.ts'de (ran-v2.ts ile PAYLAŞILAN, döngüsel import'suz tek kaynak).
-import { galopSkoru, pedigriSkoru } from "./pedigri-galop-ortak";
+import { pedigriSkoru } from "./pedigri-galop-ortak";
+import { galopKalitesiV1, type GalopHam } from "./galop-motor";
 import { getJokeyFormTablosu } from "@/server/actions/jokey-form.actions";
 import { getPitSeviyeSinyalleri, type PitSeviye } from "@/server/actions/pit-seviye.actions";
 import { getV5461DamOzetleriForRace, getV5461DamsireOzetleriForRace, type V5461DamlineOzet } from "@/server/actions/v5461-damline.actions";
@@ -200,7 +201,7 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
   const damSireNamesOrdered = faz1.runners.map((r) => damDamSireByRunnerId.get(r.id)?.damSire ?? null);
   const [jokeyTablosu18, galopRows18, damOzetleri18, damSireOzetleri18, pitByRunnerId] = await Promise.all([
     getJokeyFormTablosu(raceDate, hippodromeId).catch(() => new Map<string, { guncel: { etkinForm: number | null } }>()),
-    db.gallop.findMany({ where: { runnerId: { in: runnerIdsHepsi } }, orderBy: { date: "desc" }, select: { runnerId: true, date: true, splits: true, form: true, jockey: true } }).catch(() => []),
+    db.gallop.findMany({ where: { runnerId: { in: runnerIdsHepsi } }, orderBy: { date: "desc" }, select: { runnerId: true, date: true, track: true, splits: true, form: true, jockey: true } }).catch(() => []),
     getV5461DamOzetleriForRace(damNamesOrdered, faz1.race.breed, faz1.race.surface, faz1.race.distance, raceDate).catch(
       () => damNamesOrdered.map(() => ({ ornekKendiVeri: null, kYuzde: null }) as V5461DamlineOzet)
     ),
@@ -209,7 +210,9 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
     ),
     getPitSeviyeSinyalleri(raceDate, runnerIdsHepsi).catch(() => new Map<string, PitSeviye>()),
   ]);
-  const galop18ByRunnerId = new Map<string, { date: Date; splits: unknown; form: string | null; jockey: string | null }[]>();
+  const galop18ByRunnerId = new Map<string, { date: Date; track: string | null; splits: unknown; form: string | null; jockey: string | null }[]>();
+  // 2026-11-16 KULLANICI KARARI — "eski galop modeli kaldırılsın, benim verdiğim kullanılacak": GALOP ANALİZ MOTORU v1.0
+  // (galop-motor.ts, 0-100) TÜM sınıflarda TEK galop değerlendirmesi; eski galopSkoru tabanlı 'galopKalite' sinyali artık ÜRETİLMİYOR.
   for (const g of galopRows18) {
     const arr = galop18ByRunnerId.get(g.runnerId) ?? [];
     arr.push(g);
@@ -218,6 +221,9 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
   const pedigriBirlesikByRunnerId = new Map(
     faz1.runners.map((r, i) => [r.id, pedigriSkoru(r, damOzetleri18[i], damSireOzetleri18[i])])
   );
+
+  // yalnız yarış gününden ÖNCEKİ galoplar (yarış sonrası yeniden puanlamada sızıntı olmasın)
+  const galopV1Hesapla = (runnerId: string): number | null => galopKalitesiV1((galop18ByRunnerId.get(runnerId) ?? []).filter((g) => g.date.getTime() < raceDate.getTime()).map((g) => ({ date: g.date, track: g.track, form: g.form, splits: (g.splits ?? {}) as GalopHam["splits"] })), faz1.race.breed).kalite;
 
   const runners: V461RawRunner[] = faz1.runners.map((r: Faz1RunnerV5) => {
     const gecmis = gecmisOf(r.id);
@@ -263,10 +269,10 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
       // 2026-11-10 kullanıcı kararı ("18 sinyal yapacağız bunları da ekleyerek") — 3 YENİ aday
       // sinyal: Antrenör Oranı (r.antrenorOrani, Faz1RunnerV5 içinde zaten hesaplı), Jokey
       // Formu (son 30 gün etkin form, getJokeyFormTablosu — RAN v2 ile AYNI kaynak), Galop
-      // Kalitesi (galopSkoru, pedigri-galop-ortak.ts — RAN v2 ile AYNI fonksiyon).
+      // Kalitesi — 2026-11-16'dan itibaren GALOP ANALİZ MOTORU v1.0 (galop-motor.ts), sinyal adı 'galopKaliteV1'.
       { ad: "antrenorOraniGenel", raw: r.antrenorOrani, observed: true, reliability: 1, evidenceObserved: r.antrenorOrani != null },
       { ad: "jokeyFormuGenel", raw: (r.jockey ? jokeyTablosu18.get(r.jockey)?.guncel.etkinForm : null) ?? null, observed: true, reliability: 1, evidenceObserved: (r.jockey ? jokeyTablosu18.get(r.jockey)?.guncel.etkinForm : null) != null },
-      { ad: "galopKalite", raw: galopSkoru(galop18ByRunnerId.get(r.id) ?? [], faz1.race.breed, r.jockey), observed: true, reliability: 1, evidenceObserved: galopSkoru(galop18ByRunnerId.get(r.id) ?? [], faz1.race.breed, r.jockey) != null },
+      { ad: "galopKaliteV1", raw: galopV1Hesapla(r.id), observed: true, reliability: 1, evidenceObserved: galopV1Hesapla(r.id) != null },
       // 2026-11-12 — jokey/antrenör SEVİYESİ + son yarış galibiyeti (pit-seviye.actions.ts). Veri yoksa
       // (hiç geçmiş sürüş / önceki yarış) observed=false → gerçek "veri yok", sıfır katkı.
       { ad: "jokeyPIT", raw: pitByRunnerId.get(r.id)?.jokeyPIT ?? null, observed: pitByRunnerId.get(r.id)?.jokeyPIT != null, reliability: 1 },

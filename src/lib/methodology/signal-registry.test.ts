@@ -9,17 +9,17 @@ import {
 } from "./signal-registry";
 
 describe("canonical signal registry", () => {
-  it("has exactly 36 atomic signals (23 donmuş + 13 canlı Saf Model sinyali, 2026-11-15 +dususDelta)", () => {
-    expect(SIGNAL_REGISTRY).toHaveLength(36);
-    expect(new Set(SIGNAL_REGISTRY.map((s) => s.code)).size).toBe(36);
+  it("has exactly 37 atomic signals (23 donmuş + 13 canlı Saf Model sinyali, 2026-11-15 +dususDelta; 2026-11-16 +galopKalite emekli kaydı, galopKaliteV1 canlı)", () => {
+    expect(SIGNAL_REGISTRY).toHaveLength(37);
+    expect(new Set(SIGNAL_REGISTRY.map((s) => s.code)).size).toBe(37);
   });
 
   it("üretim sinyalleri = canlı (yönlendirilen) modellerin birleşimi: 23 sinyal (2026-11-15 +dususDelta; eski Maiden segmenti çıkarıldı)", () => {
     expect(PRODUCTION_FEATURE_CODES).toHaveLength(23);
   });
 
-  it("has 33 current analysis sources and 3 future candidates", () => {
-    expect(CURRENT_ANALYSIS_SOURCE_CODES).toHaveLength(33);
+  it("has 34 current analysis sources and 3 future candidates", () => {
+    expect(CURRENT_ANALYSIS_SOURCE_CODES).toHaveLength(34);
     expect(FUTURE_CANDIDATE_CODES).toHaveLength(3);
   });
 

@@ -160,7 +160,7 @@ export function kuponNedenOzeti(ayaklar: OldurenAyak[]): KuponNedenOzeti {
 
 /** Sinyalin veri kaynağı (sinyal doluluğu düştüğünde kök nedeni bu kaynağa bağlar). */
 export const SINYAL_KAYNAGI: Record<string, { kaynak: string; cozum: string }> = {
-  galopKalite: { kaynak: "Galop verisi (sync-galop)", cozum: "sync-galop cron'unu ve TJK galop sayfasını kontrol et" },
+  galopKaliteV1: { kaynak: "Galop verisi (sync-galop)", cozum: "sync-galop cron'unu ve TJK galop sayfasını kontrol et" },
   idmJokey: { kaynak: "Galop verisi (sync-galop)", cozum: "sync-galop cron'unu kontrol et" },
   sonIdmanSprint: { kaynak: "Galop verisi (sync-galop)", cozum: "sync-galop cron'unu kontrol et" },
   ACC_CLOSE_RES: { kaynak: "Accurace arşivi (sync-accurace-daily)", cozum: "sync-accurace-daily cron'unu kontrol et" },

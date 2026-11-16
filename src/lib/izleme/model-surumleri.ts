@@ -41,6 +41,6 @@ export function modelSurumuAt(t: Date): ModelSurumu | null {
 /** Eğitim sırasındaki bootstrap z (25 özellikli model, 2026-11-13, 30 yeniden örnekleme) — model yeniden eğitilince GÜNCELLE. */
 export const EGITIM_Z: Record<string, number> = {
   hpRel: 9.0, kgsLog: -8.0, fMean: -7.9, jokeyPIT: 7.8, kiloRel: -6.0, antrenorPIT: 5.2, sexE: 5.2, hizDerecesi: 3.9, sireOrani: 3.9, PS_closerFit: -3.7,
-  galopKalite: 2.9, lastWon: 2.5, h2hNetSkor: 2.4, ACC_CLOSE_RES: 2.4, ACC_LATE: 2.3, zeminMesafeDeneyim: 1.6, PS_lone: 1.5, takiDegisikligi: 1.4,
+  galopKaliteV1: 2.9, lastWon: 2.5, h2hNetSkor: 2.4, ACC_CLOSE_RES: 2.4, ACC_LATE: 2.3, zeminMesafeDeneyim: 1.6, PS_lone: 1.5, takiDegisikligi: 1.4,
   idmJokey: 1.2, yarisGidisatiSkoru: 0.7, jokeyFormuGenel: 0.4, PS_front: -0.3, ACC_SPEED: -0.3, zeminToleransi: -0.2, sonIdmanSprint: -0.1,
 };

@@ -1,0 +1,216 @@
+{
+  "status": "READY",
+  "version": "RotaGanyan Analiz Motoru",
+  "generatedAt": "2026-11-15T12:44:59.490+00:00",
+  "note": "2026-11-15 KULLANICI KARARI: 21 sinyale 'dususDelta' eklendi (22 sinyal) = ÖNCEKİ yarışın sınıf seviyesi − bugünkü sınıf seviyesi (TJK 13 basamaklı hiyerarşi, ham-alan-sinyalleri.ts; + = sınıf düşüşü, − = yükseliş; ±5 ile sınırlı; Maiden/Şartlı 1-19-27 yarışlarında uygulanmaz). Tüm 1392 yarışta yeniden eğitildi (l2=0.02, 800 devir, ölü 4 sinyal çıkarılmış 21'li taban + dususDelta). CV (5 kat zaman-CV, 827 test yarışı): bağımsız sınama katlarında ΔLL −0.0158 [−0.030,−0.001] ✔, ama geliştirme katlarında +0.003 ve 5 katın tümünde −0.0043 (GA sıfırı içeriyor) — kullanıcı kararıyla (protokol eşiği geçilmeden) canlıya alındı; geriye dönük izlenecek. Önceki sürüm: v546-1-saf-weights-21ozellik-2026-11-14.json. | ÖNCEKİ NOT: 2026-11-13: 22 özellik + ham program alanları [fMean, kgsLog, sexE] = 25. fMean = Runner.recentForm'daki son 6 yarış derecesinin ortalaması (0 hanesi 10 sayılır), fp6 = o satırın son hanesi, kgsLog = log(1+TJK KGS), sexE = yaş alanının 3. kelimesi 'e' mi. Alan seçimi YALNIZ ilk 3 katta (DEV) yapıldı, son 2 katta (CONFIRM) sınandı; bırak-bir kuralı 5 kat havuzlanmış, varsayılan modele giden tiplerde. Maiden/ŞARTLI 19 ve ŞARTLI 1/27 ayrı segment modeliyle puanlanır — bu dosya onları ETKİLEMEZ. Eğitim l2=0.02 (önceki dosyalardaki 0.01 etiketi yanlıştı). Önceki sürüm: v546-1-saf-weights-22ozellik-2026-11-13.json. | 2026-11-14 KULLANICI KARARI (sinyal kütüğü son hali): fiilen ölü sinyaller çıkarıldı — sonIdmanSprint (%91 sıfır, 2 değer), idmJokey (%92 sıfır), takiDegisikligi (%94 sıfır) ve PS_lone (%99 sıfır; σ=0.0086 ile sıfır dışı bir değerde z≈16, katkı ±2'ye çıkabiliyordu). Eğitim bootstrap |z| hepsi ≤1.5. Kalan katsayılar DEĞİŞMEDİ (yeniden eğitim yok); 14 kayıtlı 25 sinyalli koşuda 1. seçim/ilk-3 kümesi değişmedi, ort. olasılık farkı 0.09 puan.",
+  "baseModel": "V5.46.1 (gatherV461RawSinyaller ile AYNI ham veri kaynağı)",
+  "featureNames": [
+    "h2hNetSkor",
+    "hizDerecesi",
+    "zeminToleransi",
+    "zeminMesafeDeneyim",
+    "yarisGidisatiSkoru",
+    "sireOrani",
+    "ACC_CLOSE_RES",
+    "ACC_LATE",
+    "ACC_SPEED",
+    "PS_front",
+    "PS_closerFit",
+    "jokeyFormuGenel",
+    "jokeyPIT",
+    "antrenorPIT",
+    "galopKalite",
+    "lastWon",
+    "hpRel",
+    "kiloRel",
+    "fMean",
+    "kgsLog",
+    "sexE",
+    "dususDelta"
+  ],
+  "weights": [
+    0.07330612955593346,
+    0.17441025491173565,
+    -0.009049898541757069,
+    0.057858855138857,
+    0.04130206060963937,
+    0.08817328461170088,
+    0.225801702337605,
+    0.22338379195774125,
+    -0.04513533727897163,
+    -0.05253650960970874,
+    -0.23483059174427295,
+    0.010802914003866496,
+    0.30409811333452585,
+    0.13096929403339624,
+    0.10525246065821461,
+    0.11914192983627736,
+    0.3308164322678938,
+    -0.2054736200368415,
+    -0.35999032241286544,
+    -0.2023848440660818,
+    0.21186273104823242,
+    0.1992994605553521
+  ],
+  "means": [
+    0,
+    -0.8911688604206487,
+    0.05158723729234425,
+    -0.24068923603546324,
+    0.013019895287958001,
+    11.658734769537991,
+    0.05347708919490392,
+    -0.2504294611843949,
+    -0.13470730705145212,
+    2.6886779716484517,
+    1.0042800500373168,
+    -0.0022887720689636635,
+    10.476318050719277,
+    9.970166531138437,
+    0.4630455285947012,
+    0.10241588854305618,
+    -5.692241323018869e-17,
+    3.968126971086074e-18,
+    5.403051625896451,
+    2.9361578391502707,
+    0.3115532286212914,
+    -0.3496969696969697
+  ],
+  "stds": [
+    3.2374737378225182,
+    4.109585081641901,
+    1.2920662548481103,
+    1.788363435924004,
+    3.268766531262952,
+    3.7914508260967854,
+    0.4544710617185719,
+    0.8235583000529306,
+    0.4555489925008795,
+    0.9912874712389479,
+    0.7344305659330581,
+    0.040634723626464496,
+    5.374436531036747,
+    3.814181740642527,
+    0.7914472845060778,
+    0.3031944496804061,
+    10.459660798147612,
+    2.326969702949585,
+    1.9868307524294218,
+    0.7163535829472099,
+    0.4631282914667509,
+    2.0016495493151933
+  ],
+  "optimizasyon": {
+    "l2": 0.02,
+    "epoch": 800,
+    "lr": 0.08,
+    "momentum": 0.9
+  },
+  "trainingWindow": {
+    "baslangic": "2026-08-16",
+    "bitis": "2026-11-09",
+    "yarisSayisi": 1392
+  },
+  "holdoutDegerlendirme": {
+    "alanSecimi": {
+      "devKatlar": [
+        0,
+        1,
+        2
+      ],
+      "confirmKatlar": [
+        3,
+        4
+      ],
+      "adayGreedy": [
+        "fMean",
+        "kgsLog",
+        "sexE",
+        "fp6"
+      ],
+      "nihai": [
+        "fMean",
+        "kgsLog",
+        "sexE"
+      ]
+    },
+    "cv5_tumTipler": {
+      "n": 827,
+      "top1Baz": 0.24909310761789602,
+      "top1": 0.2623941958887545,
+      "top3Baz": 0.5840386940749698,
+      "top3": 0.6142684401451027,
+      "logLossBaz": 2.0408575843974153,
+      "logLoss": 2.005240480023161,
+      "dLL": -0.03561710437425235,
+      "ci95": [
+        -0.05260517619140447,
+        -0.018766534539106296
+      ]
+    },
+    "cv5_varsayilanTipler": {
+      "n": 589,
+      "top1Baz": 0.2597623089983022,
+      "top1": 0.2733446519524618,
+      "top3Baz": 0.5959252971137521,
+      "top3": 0.6468590831918506,
+      "logLossBaz": 2.0007794839972504,
+      "logLoss": 1.960024101870674,
+      "dLL": -0.04075538212657326,
+      "ci95": [
+        -0.05837590083472657,
+        -0.02233675515374402
+      ]
+    },
+    "confirm34_varsayilanTipler": {
+      "n": 226,
+      "top1Baz": 0.24778761061946902,
+      "top1": 0.25663716814159293,
+      "top3Baz": 0.584070796460177,
+      "top3": 0.6592920353982301,
+      "logLossBaz": 1.9816988349566773,
+      "logLoss": 1.9360463158644665,
+      "dLL": -0.04565251909221207,
+      "ci95": [
+        -0.07590818033001305,
+        -0.014385176441774013
+      ]
+    },
+    "confirm34_tumTipler": {
+      "n": 319,
+      "top1Baz": 0.23197492163009403,
+      "top1": 0.2507836990595611,
+      "top3Baz": 0.5736677115987461,
+      "top3": 0.6081504702194357,
+      "logLossBaz": 2.043705952767056,
+      "logLoss": 2.0156260648385054,
+      "dLL": -0.028079887928550585,
+      "ci95": [
+        -0.05576057935380855,
+        -0.0007981592896848564
+      ]
+    },
+    "bankoPlatt": {
+      "Handikap": {
+        "a": 0.07001731791856503,
+        "b": -1.2617430890416466,
+        "n": 236
+      },
+      "KV/Satış": {
+        "a": 0.6750466968682458,
+        "b": -0.23749149936265335,
+        "n": 122
+      },
+      "Şartlı": {
+        "a": 0.7929660916186473,
+        "b": -0.17752936951864914,
+        "n": 200
+      },
+      "Genel": {
+        "a": 4.543699060244236,
+        "b": 2.6547663195954687,
+        "n": 31
+      }
+    }
+  }
+}

@@ -31,7 +31,7 @@ const TAZELIK: TazelikTanim[] = [
   },
   {
     kod: "veri.galop-bayat", baslik: "Galop verisi bayat", kaynakAd: "TJK galop (idman)", cron: "sync-galop", esikGun: 3, kritikGun: 7, cozum: null,
-    etkilenen: "galopKalite, idmJokey ve sonIdmanSprint sinyalleri gözlemsiz kalır / bayat okunur",
+    etkilenen: "galopKaliteV1, idmJokey ve sonIdmanSprint sinyalleri gözlemsiz kalır / bayat okunur",
     sorgu: async () => (await db.$queryRaw<{ t: Date | null }[]>`SELECT max("date") AS t FROM "Gallop" WHERE "date" <= now()`)[0]?.t ?? null,
   },
   {

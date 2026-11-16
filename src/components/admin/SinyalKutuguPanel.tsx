@@ -27,7 +27,7 @@ const SINYAL_AD: Record<string, string> = {
   ACC_CLOSE_RES: "Kapanış Artığı (Accurace)", ACC_LATE: "Geç Segment Hızı (Accurace)",
   ACC_SPEED: "Hız Artığı (Accurace)", PS_front: "Öne Çıkma Uyumu", PS_lone: "Yalnız Kaçak Uyumu",
   PS_closerFit: "Kapanışçı Uyumu (NEGATİF katsayı: geriden gelen profil geçmişte daha az kazandı)", antrenorOraniGenel: "Antrenör Oranı",
-  jokeyFormuGenel: "Jokey Formu (Son 30 Gün)", galopKalite: "Galop Kalitesi",
+  jokeyFormuGenel: "Jokey Formu (Son 30 Gün)", galopKaliteV1: "Galop Kalitesi (v1.0)", galopKalite: "Galop Kalitesi (eski)",
 };
 function sinyalAdi(kod: string): string { return SINYAL_AD[kod] ?? kod; }
 

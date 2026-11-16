@@ -56,7 +56,7 @@ export const EVIDENCE_FAMILY_MAP: Record<EvidenceFamily, string[]> = {
   PIST_MESAFE_ZEMIN: ["zeminToleransi", "zeminMesafeDeneyim", "pistUzmaniSkoru"],
   TEMPO_STYLE: ["yarisGidisatiSkoru", "PS_front", "PS_lone", "PS_closerFit"],
   RACE_FORM: ["ACC_CLOSE_RES", "ACC_LATE"],
-  IDMAN: ["idmJokey", "sonIdmanSprint", "galopKalite"],
+  IDMAN: ["idmJokey", "sonIdmanSprint", "galopKaliteV1", "galopKalite"],
   TAKI: ["takiDegisikligi"],
   PEDIGRI: ["sireOrani", "sireOraniBirlesik"],
   JOKEY: ["jokeySon30G"], // ayrı kaynaktan gelir; canonical registry'de gerçek üye
