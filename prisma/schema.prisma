@@ -1003,3 +1003,37 @@ model TjkPedigriStat {
   @@index([kind, year, groupId, pistId, breed])
   @@index([normalizedName, kind])
 }
+
+// 2026-11-16 — TJK pedigri istatistiklerinin GÜNLÜK YENİLEME kuyruğu (parçalı; TJK yavaş ve Vercel işlevi ~800 sn ile sınırlı).
+// Her gün için (tür × yıl × grup × pist) birimleri üretilir, cron her çalışmada sıradaki birimleri çeker (bkz. tjk-pedigri-sync.service.ts).
+model TjkPedigriSyncUnit {
+  id         String    @id @default(cuid())
+  day        String // Türkiye günü YYYY-MM-DD
+  kind       String // SIRE | DAM | DAMSIRE
+  year       Int
+  groupId    Int
+  pistId     Int
+  status     String // PENDING | RUNNING | DONE | EKSIK | HATA
+  attempts   Int       @default(0)
+  rowCount   Int?
+  eksik      Int? // TJK toplamından eksik kalan satır
+  startedAt  DateTime?
+  finishedAt DateTime?
+  error      String?
+
+  @@unique([day, kind, year, groupId, pistId])
+  @@index([day, status])
+}
+
+// TJK pedigri istatistiklerinin GÜNLÜK GÖRÜNTÜSÜ (sıkıştırılmış JSON, günde tek satır) — "yarış öncesi veri" için: geçmiş bir yarış, o günkü
+// görüntüyle (yarış sonucunu içermeyen veriyle) analiz edilebilir. TjkPedigriStat'ın cari yıl satırlarının kopyasıdır.
+model TjkPedigriSnapshot {
+  id           String   @id @default(cuid())
+  snapshotDate String   @unique // Türkiye günü YYYY-MM-DD (görüntü o günün sabahı alınır → o günkü yarışlar için yarış ÖNCESİ)
+  year         Int
+  capturedAt   DateTime // görüntüdeki en geç satır alım zamanı
+  rowCount     Int
+  notlar       String?
+  payload      Bytes // gzip(JSON): [[kind,tjkId,year,groupId,pistId,normalizedName,breed,runnerCount,starts,wins], ...]
+  createdAt    DateTime @default(now())
+}

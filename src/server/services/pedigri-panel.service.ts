@@ -8,6 +8,7 @@
 // Yarış öncesi veri: istatistiğin alındığı an (capturedAt) yarış başlangıcından SONRAYSA "yarış sonrası alınmış veri" bayrağı döner.
 import { db } from "@/lib/db";
 import { tjkGrupId, tjkPistId, pedigriAdNormalize } from "@/lib/pedigri-form";
+import { snapshotCoz, type SnapSatir } from "@/lib/tjk-pedigri-snapshot";
 import { GENEL_YEDEK_CARPAN, akranDagilimi, duzelt, ebKestir, pedigriGuven, pedigriKalite, uzmanlasma, yuzdelikPuan, type Akran, type AkranDagilim, type EbSonuc } from "@/lib/pedigri-puan";
 
 export const PANEL_ILK_YIL = 2023;
@@ -41,7 +42,7 @@ export type AtaSatiri = {
   not: string | null;
 };
 export type PedigriPanelAt = { no: number; name: string; yas: number | null; baba: AtaSatiri; anne: AtaSatiri; kisrakBabasi: AtaSatiri; pedigriKalite: number | null; pedigriGuven: number; eksik: string[] };
-export type PedigriPanelSonuc = { raceId: string; breed: string; surface: string; atlar: PedigriPanelAt[]; uyari: string | null };
+export type PedigriPanelSonuc = { raceId: string; breed: string; surface: string; atlar: PedigriPanelAt[]; uyari: string | null; /** Veri kaynağı: canlı tablo mu, yarış öncesi günlük görüntü mü. */ kaynak: { tur: "CANLI" | "GORUNTU"; gorunumTarihi: string | null; alinma: string | null } };
 
 type Row = { kind: string; tjkId: number; year: number; groupId: number; pistId: number; normalizedName: string; breed: string; starts: number; wins: number; runnerCount: number; capturedAt: Date };
 
@@ -54,10 +55,15 @@ async function kategoriDagilimi(anahtar: string, yukle: () => Promise<Akran[]>):
   const yeni: KatOnbellek = { t: Date.now(), eb, dagilim: eb ? akranDagilimi(akranlar, eb) : [] };
   katCache.set(anahtar, yeni); return yeni;
 }
-const akranlarYil = (year: number, g: number, p: number, breed: "INGILIZ" | "ARAP", kind: "SIRE" | "DAMSIRE") => async (): Promise<Akran[]> =>
-  (await db.tjkPedigriStat.findMany({ where: { kind, year, groupId: g, pistId: p, breed, starts: { gt: 0 } }, select: { starts: true, wins: true, runnerCount: true } })).map((r) => ({ starts: r.starts, wins: r.wins, yavru: r.runnerCount }));
-const akranlarAnne = (breed: "INGILIZ" | "ARAP") => async (): Promise<Akran[]> => {
-  const rows = await db.tjkPedigriStat.findMany({ where: { kind: "DAM", year: { gte: PANEL_ILK_YIL }, groupId: -1, pistId: -1, breed, starts: { gt: 0 } }, select: { tjkId: true, starts: true, wins: true, runnerCount: true } });
+/** Günlük görüntü kaynağı (varsa): cari yıl satırları bellekten okunur; yoksa canlı tablo. */
+type Gorunum = { satirlar: SnapSatir[]; yil: number; tarih: string; alinma: Date } | null;
+const akranlarYil = (year: number, g: number, p: number, breed: "INGILIZ" | "ARAP", kind: "SIRE" | "DAMSIRE", gv: Gorunum) => async (): Promise<Akran[]> => {
+  if (gv && gv.yil === year) return gv.satirlar.filter((s) => s[0] === kind && s[2] === year && s[3] === g && s[4] === p && s[6] === breed && s[8] > 0).map((s) => ({ starts: s[8], wins: s[9], yavru: s[7] }));
+  return (await db.tjkPedigriStat.findMany({ where: { kind, year, groupId: g, pistId: p, breed, starts: { gt: 0 } }, select: { starts: true, wins: true, runnerCount: true } })).map((r) => ({ starts: r.starts, wins: r.wins, yavru: r.runnerCount }));
+};
+const akranlarAnne = (breed: "INGILIZ" | "ARAP", gv: Gorunum) => async (): Promise<Akran[]> => {
+  const rows = await db.tjkPedigriStat.findMany({ where: { kind: "DAM", year: gv ? { gte: PANEL_ILK_YIL, lt: gv.yil } : { gte: PANEL_ILK_YIL }, groupId: -1, pistId: -1, breed, starts: { gt: 0 } }, select: { tjkId: true, starts: true, wins: true, runnerCount: true } });
+  if (gv) for (const s of gv.satirlar) if (s[0] === "DAM" && s[3] === -1 && s[4] === -1 && s[6] === breed && s[8] > 0) rows.push({ tjkId: s[1], starts: s[8], wins: s[9], runnerCount: s[7] });
   const m = new Map<number, Akran>(); for (const r of rows) { const e = m.get(r.tjkId) ?? { starts: 0, wins: 0, yavru: 0 }; e.starts += r.starts; e.wins += r.wins; e.yavru += r.runnerCount; m.set(r.tjkId, e); }
   return [...m.values()]; // yavru = yavru-yılı toplamı (aynı yavru farklı yıllarda ayrı sayılır — hafif iyimser etkin örnek)
 };
@@ -76,8 +82,22 @@ export async function pedigriPanelKosu(raceId: string, secenek?: { tumKendiKayit
   const baslangicMs = gunMs + ((hh ?? 0) * 60 + (mm ?? 0)) * 60_000 - 3 * 3600_000; // TR saati (UTC+3) → UTC
   const buYil = race.raceDay.date.getUTCFullYear();
 
+  // Yarış ÖNCESİ veri: canlı tablonun cari yıl satırları yarıştan SONRA alınmışsa, yarıştan önceki en son günlük görüntü kullanılır (varsa).
+  const canliSon = (await db.tjkPedigriStat.aggregate({ where: { year: buYil }, _max: { capturedAt: true } }))._max.capturedAt;
+  let gv: Gorunum = null;
+  if (canliSon && canliSon.getTime() > baslangicMs) {
+    const sn = await db.tjkPedigriSnapshot.findFirst({ where: { year: buYil, capturedAt: { lt: new Date(baslangicMs) } }, orderBy: { capturedAt: "desc" }, select: { snapshotDate: true, capturedAt: true, payload: true } });
+    if (sn) gv = { satirlar: snapshotCoz(sn.payload), yil: buYil, tarih: sn.snapshotDate, alinma: sn.capturedAt };
+  }
+  const gvKey = gv ? "G" + gv.tarih : "C";
   const adlar = [...new Set(race.runners.flatMap((r) => [r.sire, r.dam, r.damSire]).filter((x): x is string => !!x).map(pedigriAdNormalize))];
-  const rows: Row[] = adlar.length ? await db.tjkPedigriStat.findMany({ where: { year: { gte: PANEL_ILK_YIL }, normalizedName: { in: adlar } }, select: { kind: true, tjkId: true, year: true, groupId: true, pistId: true, normalizedName: true, breed: true, starts: true, wins: true, runnerCount: true, capturedAt: true } }) : [];
+  const adSet = new Set(adlar);
+  // Geçmiş yılların satırları kapanmış veridir (yarış sonucu sızmaz) → alınma zamanı 0 sayılır; cari yıl satırları canlı tablodan YA DA günlük görüntüden gelir.
+  const canliRows = adlar.length ? await db.tjkPedigriStat.findMany({ where: { year: gv ? { gte: PANEL_ILK_YIL, lt: gv.yil } : { gte: PANEL_ILK_YIL }, normalizedName: { in: adlar } }, select: { kind: true, tjkId: true, year: true, groupId: true, pistId: true, normalizedName: true, breed: true, starts: true, wins: true, runnerCount: true, capturedAt: true } }) : [];
+  const rows: Row[] = [
+    ...canliRows.map((r) => ({ ...r, capturedAt: r.year < buYil ? new Date(0) : r.capturedAt })),
+    ...(gv ? gv.satirlar.filter((s) => adSet.has(s[5])).map((s): Row => ({ kind: s[0], tjkId: s[1], year: s[2], groupId: s[3], pistId: s[4], normalizedName: s[5], breed: s[6], runnerCount: s[7], starts: s[8], wins: s[9], capturedAt: gv!.alinma })) : []),
+  ];
   const adaylar = new Map<string, Set<number>>(); const breedOf = new Map<string, string>();
   for (const r of rows) { const k = `${r.kind}|${r.normalizedName}`; (adaylar.get(k) ?? adaylar.set(k, new Set()).get(k)!).add(r.tjkId); breedOf.set(`${r.kind}|${r.tjkId}`, r.breed); }
 
@@ -119,7 +139,7 @@ export async function pedigriPanelKosu(raceId: string, secenek?: { tumKendiKayit
       if (ctx && ctx.starts > 0) {
         const own = ownSay(r.tjkAtId, (k) => ownYil(k) && k.pist === pistHarf);
         const ownGenel = ownSay(r.tjkAtId, ownYil);
-        const dag = await kategoriDagilimi(`SIRE|${buYil}|${g}|${pistId}|${breed}`, akranlarYil(buYil, g!, pistId!, breed, "SIRE"));
+        const dag = await kategoriDagilimi(`SIRE|${buYil}|${g}|${pistId}|${breed}|${gvKey}`, akranlarYil(buYil, g!, pistId!, breed, "SIRE", gv));
         const uzm = genel ? uzmanlasma({ starts: Math.max(0, ctx.starts - own.starts), wins: Math.max(0, ctx.wins - own.wins) }, { starts: Math.max(0, genel.starts - ownGenel.starts), wins: Math.max(0, genel.wins - ownGenel.wins) }) : null;
         return bitir("BABA", ad, { kategori: `${GRUP_AD[g!]} + ${PIST_AD[pistId!]}`, say: ctx, own, ownYavruDus: own.starts > 0 ? 1 : 0, dag, carpan: 1, alinma: ctx.alinma, uzm, durum: "TAM" });
       }
@@ -129,7 +149,7 @@ export async function pedigriPanelKosu(raceId: string, secenek?: { tumKendiKayit
       const gy = g != null ? satir("SIRE", id, g, -1, [buYil]) : null; const py = pistId != null ? satir("SIRE", id, -1, pistId, [buYil]) : null;
       if (gy && gy.starts > 0) ayr.push({ etiket: GRUP_AD[g!]!, wins: gy.wins, starts: gy.starts }); if (py && py.starts > 0) ayr.push({ etiket: PIST_AD[pistId!]!, wins: py.wins, starts: py.starts });
       const own = ownSay(r.tjkAtId, ownYil);
-      const dag = await kategoriDagilimi(`SIRE|${buYil}|-1|-1|${breed}`, akranlarYil(buYil, -1, -1, breed, "SIRE"));
+      const dag = await kategoriDagilimi(`SIRE|${buYil}|-1|-1|${breed}|${gvKey}`, akranlarYil(buYil, -1, -1, breed, "SIRE", gv));
       return bitir("BABA", ad, { kategori: `Genel (${buYil})`, say: genel, own, ownYavruDus: own.starts > 0 ? 1 : 0, dag, carpan: GENEL_YEDEK_CARPAN, alinma: genel.alinma, uzm: null, ayr, durum: "GENEL_YEDEK", not: `${g != null ? GRUP_AD[g] : "yaş"} + ${pistId != null ? PIST_AD[pistId] : "pist"} birleşik verisi yok — genel istatistik kullanıldı, veri güveni düşürüldü` });
     })();
 
@@ -142,13 +162,13 @@ export async function pedigriPanelKosu(raceId: string, secenek?: { tumKendiKayit
       const ownYil = (k: Kayit) => k.yil === buYil;
       if (ctx && ctx.starts > 0) {
         const own = ownSay(r.tjkAtId, ownYil);
-        const dag = await kategoriDagilimi(`DAMSIRE|${buYil}|${g}|-1|${breed}`, akranlarYil(buYil, g!, -1, breed, "DAMSIRE"));
+        const dag = await kategoriDagilimi(`DAMSIRE|${buYil}|${g}|-1|${breed}|${gvKey}`, akranlarYil(buYil, g!, -1, breed, "DAMSIRE", gv));
         const uzm = genel ? uzmanlasma({ starts: Math.max(0, ctx.starts - own.starts), wins: Math.max(0, ctx.wins - own.wins) }, { starts: Math.max(0, genel.starts - own.starts), wins: Math.max(0, genel.wins - own.wins) }) : null;
         return bitir("KISRAK_BABASI", ad, { kategori: GRUP_AD[g!]!, say: ctx, own, ownYavruDus: own.starts > 0 ? 1 : 0, dag, carpan: 1, alinma: ctx.alinma, uzm, durum: "TAM" });
       }
       if (!genel || genel.starts <= 0) return bos("KISRAK_BABASI", ad, `VERİ YOK — ${buYil}'da koşan torunu yok`);
       const own = ownSay(r.tjkAtId, ownYil);
-      const dag = await kategoriDagilimi(`DAMSIRE|${buYil}|-1|-1|${breed}`, akranlarYil(buYil, -1, -1, breed, "DAMSIRE"));
+      const dag = await kategoriDagilimi(`DAMSIRE|${buYil}|-1|-1|${breed}|${gvKey}`, akranlarYil(buYil, -1, -1, breed, "DAMSIRE", gv));
       return bitir("KISRAK_BABASI", ad, { kategori: `Genel (${buYil})`, say: genel, own, ownYavruDus: own.starts > 0 ? 1 : 0, dag, carpan: GENEL_YEDEK_CARPAN, alinma: genel.alinma, uzm: null, durum: "GENEL_YEDEK", not: `${g != null ? GRUP_AD[g] : "yaş grubu"} verisi yok — genel istatistik kullanıldı, veri güveni düşürüldü` });
     })();
 
@@ -162,7 +182,7 @@ export async function pedigriPanelKosu(raceId: string, secenek?: { tumKendiKayit
       const ownYil = new Set((r.tjkAtId != null ? kendi.get(r.tjkAtId) ?? [] : []).map((k) => k.yil).filter((y) => yillik.some((x) => x.year === y)));
       const ownYarisYillari = (r.tjkAtId != null ? kendi.get(r.tjkAtId) ?? [] : []).filter((k) => yillik.some((x) => x.year === k.yil));
       const ownKapsam: Own = { starts: ownYarisYillari.length, wins: ownYarisYillari.filter((k) => k.kazandi).length };
-      const dag = await kategoriDagilimi(`DAM|${PANEL_ILK_YIL}|${breed}`, akranlarAnne(breed));
+      const dag = await kategoriDagilimi(`DAM|${PANEL_ILK_YIL}|${breed}|${gvKey}`, akranlarAnne(breed, gv));
       return bitir("ANNE", ad, { kategori: `Diğer yavrular (${PANEL_ILK_YIL}–${buYil})`, say, own: ownKapsam, ownYavruDus: ownYil.size, dag, carpan: 1, alinma: new Date(Math.max(...yillik.map((x) => x.capturedAt.getTime()))), uzm: null, durum: "TAM" });
     })();
 
@@ -171,5 +191,5 @@ export async function pedigriPanelKosu(raceId: string, secenek?: { tumKendiKayit
     atlar.push({ no: r.no, name: r.name, yas: yasN, baba, anne, kisrakBabasi, pedigriKalite: pedigriKalite(hatlar.map((h) => h.kalite)), pedigriGuven: pedigriGuven(hatlar.map((h) => (h.veriGuveni != null ? h.veriGuveni / 100 : null))), eksik });
   }
   const sonra = atlar.some((a) => [a.baba, a.anne, a.kisrakBabasi].some((h) => h.yarisSonrasiVeri));
-  return { raceId, breed, surface: race.surface, atlar, uyari: sonra ? "Bu istatistikler yarıştan SONRA alınmış — yarış sonucunu içerebilir; geçmişe dönük analizde kullanılamaz." : null };
+  return { raceId, breed, surface: race.surface, atlar, uyari: sonra ? "Bu istatistikler yarıştan SONRA alınmış — yarış sonucunu içerebilir; geçmişe dönük analizde kullanılamaz." : null, kaynak: gv ? { tur: "GORUNTU", gorunumTarihi: gv.tarih, alinma: gv.alinma.toISOString() } : { tur: "CANLI", gorunumTarihi: null, alinma: canliSon ? canliSon.toISOString() : null } };
 }

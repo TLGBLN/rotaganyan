@@ -73,6 +73,7 @@ export default function PedigreePanel({ runners, raceId }: { runners: ProgramRun
       {veri === undefined && <div className="px-4 py-3 text-xs text-muted-foreground">Pedigri verisi yükleniyor…</div>}
       {veri === null && <div className="px-4 py-3 text-xs text-muted-foreground">Pedigri istatistikleri şu an alınamadı.</div>}
       {veri?.uyari && <div className="px-4 py-2 text-[11px] text-miss border-b">{veri.uyari}</div>}
+      {veri?.kaynak.tur === "GORUNTU" && <div className="px-4 py-1.5 text-[10px] text-muted-foreground border-b">Yarış öncesi veri: TJK istatistiklerinin {veri.kaynak.gorunumTarihi} tarihli günlük görüntüsü kullanıldı (yarış sonucu içermez).</div>}
       <div className="grid grid-cols-1 sm:grid-cols-2">
         {runners.map((r, idx) => {
           const p = atOf(r.no);
