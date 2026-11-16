@@ -258,7 +258,7 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
                 </div>
                 <div className="border-t px-3 py-2 text-[11px] text-muted-foreground">
                   {rows.length} jokey · {isFiltered ? contextLabel : "Tüm setler toplandı"} · K% = kazanma oranı · Tb% = ilk 5 oranı · Skor = performans puanı ·
-                  Örnek ağırlığı = n/(n+8) (güven değil) · Z = referansa göre standartlaştırılmış sapma (Durum Z'ye göre: |Z|≥2 çok güçlü, 1–2 pozitif/negatif, altı nötr) · Son 30G/Form Δ/Z = JockeyStatSync değil, kendi PIT (as-of) yarış geçmişimizden
+                  Örnek ağırlığı = n/(n+8) (güven değil) · Z = referansa göre standartlaştırılmış sapma (Durum Z değerine göre: |Z|≥2 çok güçlü, 1–2 pozitif/negatif, altı nötr) · Son 30G/Form Δ/Z = JockeyStatSync değil, kendi PIT (as-of) yarış geçmişimizden
                   {hipodrom ? " · Hipo K%(shrink)/Δ: bu hipodromdaki geçmiş, düşük örneklemde jokeyin uzun-dönem oranına shrink edilmiş" : " · hipodrom filtresi seçilirse hipodrom-özel shrink'li form da görünür"}
                 </div>
               </>
