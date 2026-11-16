@@ -35,7 +35,7 @@ import { getV5461DamOzetleriForRace, getV5461DamsireOzetleriForRace, type V5461D
 import type { Faz1RunnerV5 } from "./v5-engine";
 import type { AccuraceRun } from "@/lib/accurace/types";
 import { getSonYarisDetaylariForRace, type SonYarisDetay } from "@/server/actions/son-yaris-detay.actions";
-import { galopSkoru, pedigriSkoru } from "./pedigri-galop-ortak";
+import { pedigriSkoru } from "./pedigri-galop-ortak";
 
 // 2026-11-09 kullanıcı talebi — race-level 30 dk TTL (sire/dam/jokey ile AYNI desen).
 // getSonYarisDetaylariForRace zaten at-başına fetchTjkAtKosuBilgileri üzerinden 3 saatlik
@@ -302,15 +302,8 @@ export async function hesaplaRanV2(raceId: string, preloadedRuns?: AccuraceRun[]
   // KATEGORI_PILLAR_SETI'ndeki aynı tarihli not. SADECE bu iki kategoride çekilir
   // (gereksiz DB sorgusu önlenir).
   const galopGerekli = kategori === "Düşük Deneyim" || kategori === "Düşük Deneyim (Acc)";
-  const galopRows = galopGerekli
-    ? await db.gallop.findMany({ where: { runnerId: { in: runnerIds } }, orderBy: { date: "desc" }, select: { runnerId: true, date: true, splits: true, form: true, jockey: true } })
-    : [];
-  const galopByRunnerId = new Map<string, { date: Date; splits: unknown; form: string | null; jockey: string | null }[]>();
-  for (const g of galopRows) {
-    const arr = galopByRunnerId.get(g.runnerId) ?? [];
-    arr.push(g);
-    galopByRunnerId.set(g.runnerId, arr);
-  }
+  // 2026-11-16 KULLANICI KARARI: galop bu dört sınıfta (Maiden/ŞARTLI 1/19/27) GALOP ANALİZ MOTORU v1.0 ile değerlendirilir —
+  // canlı motorun ham sinyali 'galopKaliteV1' doğrudan kullanılır (tek kaynak, ayrı galop sorgusu/eski galopSkoru YOK).
 
   const accHam: (number | null)[] = [];
   const tempoHam: (number | null)[] = [];
@@ -352,8 +345,9 @@ export async function hesaplaRanV2(raceId: string, preloadedRuns?: AccuraceRun[]
     // KGS (koşu aralığı) pillar.
     kgsHam.push(kgsSkoru(r, raw.race.breed));
 
-    // Galop (idman kalitesi) pillar — TEST, bkz. galopSkoru üstündeki uyarı notu.
-    galopHam.push(galopGerekli ? galopSkoru(galopByRunnerId.get(r.id) ?? [], raw.race.breed, r.jockey) : null);
+    // Galop (idman kalitesi) pillar — Galop Analiz Motoru v1.0 (galopKaliteV1, 0-100; alan içi z-skoru zSkorlar'da alınır).
+    const galopV1 = bul("galopKaliteV1", rawSinyaller);
+    galopHam.push(galopGerekli && galopV1?.observed && galopV1.raw != null ? galopV1.raw : null);
 
     // İdman Jokeyi Uyumu — V5.46.1/Saf Model'in ZATEN canlıda kullandığı ham sinyal
     // (gatherV461RawSinyaller→"idmJokey", evidenceObserved=r.galopSayisi>0) — 2026-11-10

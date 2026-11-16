@@ -49,7 +49,7 @@ import {
   hesaplaSinyalSayisi,
   type SinyalSonuc,
 } from "@/lib/methodology/v2-engine";
-import { galopQuality, isSameJockey } from "@/components/program/panels/galop-helpers";
+import { isSameJockey } from "@/components/program/panels/galop-helpers";
 import type { PickDetailsV2, MuhakemeSatiri } from "@/lib/methodology/muhakeme-format";
 
 export type Faz1RunnerV4 = {
@@ -69,8 +69,6 @@ export type Faz1RunnerV4 = {
   sireKazanmaOrani: number | null;
   sireOrneklemKendiVeri: number | null;
   accuraceSonYarisEnHizliKapanis: boolean | null;
-  /** 7. sinyal (2026-08-14) — son idmanın 400m split'i "çok iyi"/"iyi" barajında. */
-  keskinGalopZinciri: boolean;
   /** 8. sinyal (2026-08-14) — bugün binecek jokey, atın idmanlarından herhangi
    *  birini yaptırmış mı ("sarı üçgen"). */
   idmanJokeyiUyumu: boolean;
@@ -163,12 +161,6 @@ export async function gatherFaz1V4(raceId: string): Promise<Faz1SonucV4 | null> 
     // hep böyledir, backtest'te de aynı filtre kullanıldı).
     const gecerliGaloplar = r.gallops.filter((g) => g.date < race.raceDay.date);
     const enSonGalop = gecerliGaloplar[0]; // zaten date desc sıralı
-    let keskinGalopZinciri = false;
-    if (enSonGalop) {
-      const s = (enSonGalop.splits as Record<string, string | null> | null) ?? {};
-      const q = galopQuality("400", s["400"] ?? null, race.breed, s["ic_dis"] === "İç");
-      keskinGalopZinciri = q === "cok_iyi" || q === "iyi";
-    }
     const idmanJokeyiUyumu = gecerliGaloplar.some((g) => isSameJockey(g.jockey, r.jockey));
 
     return {
@@ -185,7 +177,6 @@ export async function gatherFaz1V4(raceId: string): Promise<Faz1SonucV4 | null> 
       sonYarisAyniJokey: sonYaris?.ayniJokey ?? null,
       sireKazanmaOrani: sireOzet?.kYuzde ?? null,
       sireOrneklemKendiVeri: sireOzet?.ornekKendiVeri ?? null,
-      keskinGalopZinciri,
       idmanJokeyiUyumu,
       accuraceSonYarisEnHizliKapanis: accuraceMap.get(r.name) ?? null,
       jockeyWinPct:
@@ -406,9 +397,6 @@ export function muhakemeUretV4(r: Faz1RunnerV4Sirali): PickDetailsV2 {
       guven: "tam",
       aciklama: `Aygır üst %20 (K% ${r.sireKazanmaOrani}, n=${r.sireOrneklemKendiVeri})`,
     });
-  }
-  if (r.keskinGalopZinciri) {
-    satirlar.push({ kod: ["GALOP"], tip: "destek", guven: "tam", aciklama: "Keskin galop zinciri (son idman 400m barajı)" });
   }
   if (r.idmanJokeyiUyumu) {
     satirlar.push({ kod: ["IDMJOK"], tip: "destek", guven: "tam", aciklama: "İdman jokeyi uyumu (sarı üçgen) — bugünkü jokey idmanlardan birini yaptırmış" });

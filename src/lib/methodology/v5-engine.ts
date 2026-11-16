@@ -149,7 +149,7 @@ import {
   fetchAccuraceGecmisKayitlari,
   hesaplaAccuraceSonYarisEnHizliKapanisMap,
 } from "@/lib/methodology/veri-toplama";
-import { galopQuality, isSameJockey, isSprintIdman } from "@/components/program/panels/galop-helpers";
+import { isSameJockey, isSprintIdman } from "@/components/program/panels/galop-helpers";
 import { hesaplaYarisGidisati, type AtTempoProfili, type TekYarisStil } from "@/lib/methodology/pace-analizi";
 import { hesaplaTempoTasimaGucuMap } from "@/server/actions/tempo-tasima-gucu.actions";
 import type { PickDetailsV2, MuhakemeSatiri } from "@/lib/methodology/muhakeme-format";
@@ -762,12 +762,8 @@ export async function gatherFaz1V5(raceId: string): Promise<Faz1SonucV5 | null> 
 
     const gecerliGaloplar = r.gallops.filter((g) => g.date < race.raceDay.date);
     const enSonGalop = gecerliGaloplar[0];
-    let keskinGalop: 0 | 1 = 0;
-    if (enSonGalop) {
-      const s = (enSonGalop.splits as Record<string, string | null> | null) ?? {};
-      const q = galopQuality("400", s["400"] ?? null, race.breed, s["ic_dis"] === "İç");
-      keskinGalop = q === "cok_iyi" || q === "iyi" ? 1 : 0;
-    }
+    // 2026-11-16: eski "keskin galop" (iyi/çok iyi barajı) analizi KALDIRILDI — sitede tek galop analizi Galop Analiz Motoru v1.0 (galop-motor.ts). Bu legacy alan her zaman 0.
+    const keskinGalop: 0 | 1 = 0;
     const idmJokey: 0 | 1 = gecerliGaloplar.some((g) => isSameJockey(g.jockey, r.jockey)) ? 1 : 0;
     // 2026-09-01 kullanıcı talebi (ESENYIL vakası) — son idmanın TÜRÜ (TJK "İdman Türü")
     // Sprint/Sürat mi. Backtest (n=9148, karma hariç, leak-free) yönü DOĞRULAMADI: Sprint
@@ -1495,7 +1491,6 @@ export function faz2V5Sirala(faz1: Faz1SonucV5): Faz1RunnerV5Sirali[] {
         hipodromMesafedeKazandi: r.hipodromMesafedeKazandi,
         sireKazanmaOrani: r.sireKazanmaOraniHam,
         sireOrneklemKendiVeri: r.sireOrneklemKendiVeri,
-        keskinGalopZinciri: r.galop === 1,
         idmanJokeyiUyumu: r.idmJokey === 1,
       },
       r.agfTrendYonu ? { fark: r.agfTrendFark!, yon: r.agfTrendYonu } : undefined

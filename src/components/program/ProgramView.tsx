@@ -1586,7 +1586,7 @@ function RaceTable({
       <div id="panel-galop">
         {galopOpen && (
           <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
-            <GalopPanel runners={race.runners} breed={race.breed} />
+            <GalopPanel runners={race.runners} breed={race.breed} dateStr={dateStr} />
           </PanelKilitGate>
         )}
       </div>

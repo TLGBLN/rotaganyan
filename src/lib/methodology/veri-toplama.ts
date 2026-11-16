@@ -15,14 +15,14 @@
 
 import { db } from "@/lib/db";
 import { fetchTjkAtKosuBilgileri } from "@/server/services/ingest/tjk-at-performans.adapter";
-import { galopQuality, isSameJockey } from "@/components/program/panels/galop-helpers";
+import { isSameJockey } from "@/components/program/panels/galop-helpers";
 import { getAtPerformansForRace } from "@/server/actions/at-performans.actions";
 import { getH2HForRace } from "@/server/actions/h2h.actions";
 import { getSireStatOzetleriForRace } from "@/server/actions/sire-stat.actions";
 import { getDamStatOzetleriForRace, getDamSireOwnStatForRace } from "@/server/actions/dam-stat.actions";
 import {
-  hpKalitesiYildizi, sinifGecisBonusu, galopSiniflandirmasi, tempoGuvenSeviyesi,
-  kacakHaritasi, zeminKatsayisi, zeminDetayiBul, zeminDetayiSatirdanCikar, type GalopZinciriSonuc, type TempoGuven,
+  hpKalitesiYildizi, sinifGecisBonusu, tempoGuvenSeviyesi,
+  kacakHaritasi, zeminKatsayisi, zeminDetayiBul, zeminDetayiSatirdanCikar, type TempoGuven,
 } from "@/lib/methodology/mekanik-puanlama";
 import { analizEtTekYaris, hesaplaCokYarisEgilimi, type PaceCheckpoint, type CokYarisEgilim } from "@/lib/methodology/pace-analizi";
 import { kulvarBolgesi } from "@/lib/hipodrom-mesafe-koordinat";
@@ -406,7 +406,6 @@ export type Faz1Runner = {
   bitirisIyilesiyor: boolean | null;
   sonSonucZayif: boolean;
   kondisyonZinciriVar: boolean;
-  keskinGalopZinciri: boolean;
   /** Bugün binecek jokey, atın idmanlarından (herhangi birinden) HERHANGİ birini
    *  yaptırmış mı — "sarı üçgen" (bkz. topics.ts). Geçmiş veride backtest edildi
    *  (2026-08-14, n=933, %12.3 galibiyet/%33.9 top3 — kontrol %10.3/%30.8'e karşı,
@@ -478,7 +477,6 @@ export type Faz1Runner = {
   // Faz 2'nin bunları yeniden hesaplaması istenmez.
   hpKalitesiYildizi: 2 | 3 | 4 | 5 | null;
   sinifGecisBonusuPuan: number | null;
-  galopSiniflandirma: GalopZinciriSonuc;
   tempoGuven: TempoGuven | null;
 
   // Accurace (GPS/sektörel zamanlama) geçmişinden türetilmiş, birden fazla yarışın
@@ -940,15 +938,7 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         const s = (g.splits as Record<string, string | null> | null) ?? {};
         return !!(s["800"] || s["1000"] || s["1200"]);
       });
-      const enSonGalop = r.gallops[0];
-      let keskinGalopZinciri = false;
-      if (enSonGalop) {
-        const s = (enSonGalop.splits as Record<string, string | null> | null) ?? {};
-        const finish = s["400"] ?? null;
-        // §VI "İç pist: ~1sn daha yavaş değerlendir" — bkz. mekanik-puanlama.ts galopSiniflandirmasi yorumu.
-        const q = galopQuality("400", finish, race.breed, s["ic_dis"] === "İç");
-        keskinGalopZinciri = q === "cok_iyi" || q === "iyi";
-      }
+      // 2026-11-16: eski "keskin galop zinciri" (iyi/çok iyi barajı) analizi KALDIRILDI — sitede tek galop analizi Galop Analiz Motoru v1.0 (galop-motor.ts).
 
       const kiloAvantaji = r.weight != null && ortKilo != null ? r.weight <= ortKilo - 1 : false;
 
@@ -1026,10 +1016,6 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         bitirisIyilesiyor: yonHesap.iyilesiyor, bitirisGeriliyor: yonHesap.geriliyor,
       });
       const sinifBonusu = sinifGecisBonusu(sinifSkkOnceki, bugunSkk);
-      const galopSinif = galopSiniflandirmasi(
-        r.gallops.map((g) => ({ splits: g.splits as Record<string, string | null> | null })),
-        race.breed
-      );
       // Runner.raceStyle DB alanı yalnız o at KENDİ Accurace verisi geldiğinde yazılıyor —
       // yeni girilen (henüz koşulmamış) bir at için bu alan neredeyse hep null'du (bkz.
       // ingest/base.ts'teki kalıcı düzeltme notu). accuraceEgilimMap yukarıda ZATEN aynı
@@ -1093,14 +1079,14 @@ export async function gatherFaz1(raceId: string): Promise<Faz1Sonuc | null> {
         sinifOnceki, sinifSkkOnceki, sinifSkkBugun: bugunSkk, sinifDususu,
         bitirisGeriliyor: yonHesap.geriliyor, bitirisIyilesiyor: yonHesap.iyilesiyor,
         sonSonucZayif: sonSonucZayifMi(r.recentForm),
-        kondisyonZinciriVar, keskinGalopZinciri, idmanJokeyiUyumu,
+        kondisyonZinciriVar, idmanJokeyiUyumu,
         kiloAvantaji, hpAlanIciUst: hpAlanIciUstHesap,
         son800BenzerKosuN, son800Medyan,
         son800TumOzet: son800TumOzetByRunnerName.get(r.name) ?? null,
         son800TumToplamKayit: son800TumToplamByRunnerName.get(r.name) ?? 0,
         aynıPistMesafeOzet, aynıPistMesafeToplamKayit: aynıPistMesafeKayitlari.length, h2hOzet: h2hOzetFor(r.name),
         hpKalitesiYildizi: hpKalitesi, sinifGecisBonusuPuan: sinifBonusu,
-        galopSiniflandirma: galopSinif, tempoGuven: tempoGuvenHesap,
+        tempoGuven: tempoGuvenHesap,
         accuraceEgilim: accuraceEgilimMap.get(r.id) ?? null,
         accuraceSonYarisEnHizliKapanis: accuraceSonYarisEnHizliKapanisByRunnerName.get(r.name) ?? null,
         detayliIstatistikOzet: r.tjkAtId != null

@@ -10,7 +10,6 @@
  * tipinin ağırlık matrisine göre nihai A(0-60)/B+C(0-40) sentezi.
  */
 
-import { galopQuality } from "@/components/program/panels/galop-helpers";
 
 // ── §V — HP Kalitesi Okuma ──────────────────────────────────────────────────
 // Tablo yalnız HP YÜKSELİRKEN tanımlı; diğer kombinasyonlar (alt sınıf + form
@@ -41,42 +40,6 @@ export function sinifGecisBonusu(sinifSkkOnceki: number | null, sinifSkkBugun: n
   if (kademe === 0) return 0;
   const buyukluk = Math.min(Math.abs(kademe), 3);
   return kademe > 0 ? buyukluk : -buyukluk;
-}
-
-// ── §VI — Galop Analizi ─────────────────────────────────────────────────────
-// "Galop zinciri okunur, tek derece değil" — elimizdeki TÜM galop kayıtlarının
-// TÜM split'lerini (barem tablosu yalnız 400/600/800/1000m için tanımlı)
-// galopQuality() ile sınıflandırır, zincir boyunca özet çıkarır.
-export type GalopZinciriSonuc = { cokIyi: number; iyi: number; toplam: number; ozet: string };
-
-const GALOP_BAREM_DISTS = ["1000", "800", "600", "400"] as const;
-
-export function galopSiniflandirmasi(
-  gallops: { splits: Record<string, string | null> | null }[],
-  breed: string
-): GalopZinciriSonuc {
-  let cokIyi = 0;
-  let iyi = 0;
-  let toplam = 0;
-  for (const g of gallops) {
-    const splits = g.splits ?? {};
-    // TJK idman verisi iç/dış pist bilgisini splits içinde "ic_dis" alanında taşır
-    // ("İç" / "Dış" ya da boş). Ansiklopedi §VI: "İç pist: ~1sn daha yavaş değerlendir" —
-    // galopQuality() bunu zaten destekliyordu ama buradan hiç iletilmiyordu, tüm iç pist
-    // galopları haksız yere daha yavaş görünüp barem tablosunda daha düşük sınıflanıyordu.
-    const isInner = splits["ic_dis"] === "İç";
-    for (const dist of GALOP_BAREM_DISTS) {
-      const t = splits[dist];
-      if (!t) continue;
-      const q = galopQuality(dist, t, breed, isInner);
-      if (q == null) continue;
-      toplam += 1;
-      if (q === "cok_iyi") cokIyi += 1;
-      else iyi += 1;
-    }
-  }
-  const ozet = toplam === 0 ? "sınıflandırılabilir split yok" : `${cokIyi}/${toplam} çok iyi, ${iyi}/${toplam} iyi`;
-  return { cokIyi, iyi, toplam, ozet };
 }
 
 // ── §VIII — Tempo Örneklem Kuralı ───────────────────────────────────────────

@@ -24,6 +24,8 @@ const GALOP_RAHAT_KODLARI = new Set(["R", "RAHAT", "HR"]);
 const GALOP_COK_RAHAT_KODLARI = new Set(["ÇR", "ÇOK RAHAT"]);
 const GALOP_HAFIF_TESVIKLI_KODLARI = new Set(["HÇ", "HAFİF ÇALIŞARAK"]);
 const GALOP_TESVIKLI_KODLARI = new Set(["Ç", "ÇALIŞARAK"]);
+// 2026-11-16 EMEKLİ — canlı motorun hiçbir yolunda KULLANILMIYOR (motor + RAN v2 artık galop-motor.ts / galopKaliteV1). Yalnız eski-yeni karşılaştırma araçları (arac-galop-*.mts) için tutuluyor.
+/** @deprecated Galop Analiz Motoru v1.0 (galop-motor.ts → galopKalitesiV1) kullanın. */
 export function galopSkoru(galoplar: { date: Date; splits: unknown; form: string | null; jockey: string | null }[], breed: string, bugunkuJokey: string | null): number | null {
   for (const g of galoplar) {
     const splits = g.splits as Record<string, string | null> | null;
