@@ -851,13 +851,26 @@ export const ENGINE_VERSIONS: EngineVersionTanimi[] = [
     versiyon: "RotaGanyan Analiz Motoru",
     ana: "V5",
     baslangic: new Date("2026-11-16T21:00:00+03:00"),
-    bitis: null,
+    bitis: new Date("2026-11-16T22:40:00+03:00"), // Accurace v2 + Tempo v2 dönemi başlangıcı
     aciklama: "MAIDEN / ŞARTLI 19: galop girdisi B80 = 0.8·GALOP_KALITE + 0.2·PEDIGRI_KALITE ('galopPedigri') ile değiştirildi; 'galopKaliteV1' bu iki sınıfta null (çift sayım yok), diğer sınıflarda galop tek başına 'galopKaliteV1' olarak kalır. ŞARTLI 1/27 segmenti (galop tek başına) ve Handikap DEĞİŞMEDİ. PEDIGRI_KALITE: TJK verisi, baba (2 yaş grubu + pist), anne (diğer yavrular), kısrak babası (yaş grubu); kategori içi yüzdelik, tek Bayes düzeltmesi, atın kendi koşuları çıkarılmış (pedigri-panel.service.ts, pedigri-puan.ts). Varsayılan model 22 → 23 sinyal, tüm yarışlarda yeniden eğitildi (galopKaliteV1 β=0.185, galopPedigri β=0.096).",
     neyiAnalizEdiyor: [
       "Varsayılan model 23 feature: önceki 21 sinyal aynı + galopKaliteV1 (Maiden/ŞARTLI 19 DIŞI) + galopPedigri (yalnız Maiden/ŞARTLI 19). Handikap: 19 segment, ŞARTLI 1/27: 4 (galop tek başına).",
     ],
     caprazlamalar: [
       "KANIT (protokol GEÇİLMEDİ): 5 kat zaman-CV (827 test yarışı), Maiden/ŞARTLI 19 alt kümesinde (210 yarış) canlı 22'ye göre ΔLL: geliştirme +0.0083, sınama +0.0101 (kötüleşme, güven aralıkları sıfırı içeriyor), Top1 +1.0 / Top3 +1.4 puan. Örnek-içi (334 yarış): LL 2.0930 → 2.0984, Top1 %23.7 → %24.6, Top3 %56.0 → %57.8. Kullanıcı kararıyla alındı. SINIRLAR: (1) B80 ağırlığı B50/B70/B80/B90 denenerek seçildi, seçim yanlılığı var. (2) Pedigri testi sızıntıya açık (TJK görüntüsü 15 Kasım; kardeşlerin sonradan koşuları içeride). (3) Tek başına sıralama testinde B80 Maiden'de Top1 %15.7 / Top3 %41.0, Şartlı 19'da %8.2 / %31.5 (galop tek başına %15.0/%40.3 ve %4.1/%31.5). Önceki sürüm ağırlıkları: weights/*-galoppedigri-oncesi-2026-11-16.json.",
+    ],
+  },
+  {
+    versiyon: "RotaGanyan Analiz Motoru",
+    ana: "V5",
+    baslangic: new Date("2026-11-16T22:40:00+03:00"),
+    bitis: null,
+    aciklama: "ACCURACE v2 + TEMPO v2 (kullanıcı önerisi): ACC_SPEED yerine 'accHizFormu' (geçmiş koşuların hız z'si, 45 gün yarı ömür, son 5 koşu, N_eff güveni); PS_front / PS_closerFit / yarisGidisatiSkoru yerine dört Tempo sinyali — tempoOnOran (400 m sırasından öne bulunma oranı), tempoErkenHiz (ilk 400 m hız z'si, sahaya göre), tempoOnBaski ve tempoGeriBaski (stil × sahadaki liderlik baskısı). ACC_CLOSE_RES ve ACC_LATE DEĞİŞMEDİ. Ham 100 m checkpoint'lerden hesaplanır, eksik checkpoint için bölüm uydurulmaz. Varsayılan model ve Handikap segmenti; ŞARTLI 1/27 segmenti DEĞİŞMEDİ.",
+    neyiAnalizEdiyor: [
+      "Varsayılan model 24 feature (23 → 24: ACC_SPEED, PS_front, PS_closerFit, yarisGidisatiSkoru çıktı; accHizFormu + dört tempo sinyali girdi). Handikap segmenti: aynı değişiklik (yeni sinyallerin katsayıları varsayılan modelden, diğerleri aynı). Referans dağılım: accurace/v2-referans.json (arac-accurace-v2-referans-uret.mts; tüm Accurace arşivi, sonuç bilgisi içermez).",
+    ],
+    caprazlamalar: [
+      "KANIT (protokol GEÇTİ): 5 kat zaman-CV (827 test yarışı), canlı 23'e göre ΔLL: geliştirme −0.0055, bağımsız sınama −0.0157 [−0.0276,−0.0044] ✔, 5 kat −0.0095 [−0.0168,−0.0019] ✔. Genel CV: Top1 %26.5 (önceki %26.8), Top3 %62.6 (%62.4), logloss 1.9836 (1.9930). Kazanç olasılıkların kalibrasyonunda; Top1/Top3 hemen hemen aynı. SINIRLAR: (1) Accurace + Tempo için ~15 aday denendi → seçim yanlılığı var. (2) accHizFormu katsayısı NEGATİF (−0.113; eski ACC_SPEED de negatifti) — hızlı geçmiş derece, yüksek sınıf koşulardan geldiği için veri yönünü böyle öğrendi. (3) Günlük pist hızı düzeltmesi yapılmadı. (4) Diyarbakır'da Accurace verisi yok → bu sinyaller orada boş. Önceki sürüm ağırlıkları: weights/*-acctempo-oncesi-2026-11-17.json.",
     ],
   },
 ];

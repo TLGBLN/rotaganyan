@@ -10,7 +10,7 @@ const CODE_BY_FAMILY: Partial<Record<EvidenceFamily, string>> = {
   HIZ: "hizDerecesi",
   H2H: "h2hNetSkor",
   PIST_MESAFE_ZEMIN: "zeminMesafeDeneyim",
-  TEMPO_STYLE: "yarisGidisatiSkoru",
+  TEMPO_STYLE: "tempoOnOran",
   RACE_FORM: "ACC_LATE",
   IDMAN: "idmJokey",
   JOKEY: "jokeySon30G",

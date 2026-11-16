@@ -1,0 +1,1272 @@
+{
+ "surum": "2.0",
+ "uretim": "2026-11-16T19:26:33.249Z",
+ "kosuSayisi": 48496,
+ "hesaplananKosu": 48382,
+ "not": "Hız: sn/100 m; ESP: ilk 400 m hızı / ortalama hız ×100. baskiOrt: eğitim kümesindeki ortalama liderlik baskısı (arac-accurace-tempo-egit.mts).",
+ "baskiOrt": 1.304811,
+ "pace": {
+  "ARAP|KUM|M|75. Yıl Hipodromu|?": {
+   "m": 7.3273,
+   "s": 0.25575,
+   "n": 341
+  },
+  "ARAP|KUM|M|*": {
+   "m": 7.46947,
+   "s": 0.41176,
+   "n": 5446
+  },
+  "ARAP|KUM|2000|*": {
+   "m": 7.4414,
+   "s": 0.33974,
+   "n": 1289
+  },
+  "ARAP|KUM|M|75. Yıl Hipodromu|Normal": {
+   "m": 7.13147,
+   "s": 0.16278,
+   "n": 88
+  },
+  "INGILIZ|KUM|S|75. Yıl Hipodromu|Normal": {
+   "m": 6.32791,
+   "s": 0.09496,
+   "n": 132
+  },
+  "INGILIZ|KUM|S|*": {
+   "m": 6.51875,
+   "s": 0.25813,
+   "n": 7821
+  },
+  "INGILIZ|KUM|1300|*": {
+   "m": 6.51254,
+   "s": 0.21372,
+   "n": 990
+  },
+  "INGILIZ|KUM|S|75. Yıl Hipodromu|?": {
+   "m": 6.47479,
+   "s": 0.18866,
+   "n": 460
+  },
+  "INGILIZ|CIM|S|75. Yıl Hipodromu|Normal": {
+   "m": 6.01079,
+   "s": 0.08172,
+   "n": 174
+  },
+  "INGILIZ|CIM|S|*": {
+   "m": 6.10736,
+   "s": 0.15991,
+   "n": 3007
+  },
+  "INGILIZ|CIM|1200|*": {
+   "m": 6.09125,
+   "s": 0.15123,
+   "n": 885
+  },
+  "INGILIZ|CIM|S|75. Yıl Hipodromu|?": {
+   "m": 6.12408,
+   "s": 0.15388,
+   "n": 763
+  },
+  "INGILIZ|CIM|1300|*": {
+   "m": 6.14123,
+   "s": 0.17882,
+   "n": 757
+  },
+  "ARAP|KUM|1500|*": {
+   "m": 7.26287,
+   "s": 0.28545,
+   "n": 757
+  },
+  "ARAP|KUM|S|Şirinyer Hipodromu|?": {
+   "m": 7.20358,
+   "s": 0.2402,
+   "n": 1285
+  },
+  "ARAP|KUM|S|*": {
+   "m": 7.306,
+   "s": 0.37337,
+   "n": 7955
+  },
+  "ARAP|KUM|1200|*": {
+   "m": 7.34492,
+   "s": 0.42378,
+   "n": 3121
+  },
+  "ARAP|KUM|S|Şirinyer Hipodromu|Normal": {
+   "m": 6.98071,
+   "s": 0.12459,
+   "n": 247
+  },
+  "ARAP|KUM|L|Şirinyer Hipodromu|?": {
+   "m": 7.36755,
+   "s": 0.13995,
+   "n": 142
+  },
+  "ARAP|KUM|L|*": {
+   "m": 7.40733,
+   "s": 0.22486,
+   "n": 630
+  },
+  "ARAP|KUM|2200|*": {
+   "m": 7.36664,
+   "s": 0.13633,
+   "n": 175
+  },
+  "ARAP|KUM|1400|*": {
+   "m": 7.24339,
+   "s": 0.30595,
+   "n": 3302
+  },
+  "INGILIZ|KUM|L|Şirinyer Hipodromu|?": {
+   "m": 6.68814,
+   "s": 0.13781,
+   "n": 145
+  },
+  "INGILIZ|KUM|L|*": {
+   "m": 6.69619,
+   "s": 0.20319,
+   "n": 751
+  },
+  "INGILIZ|KUM|2100|*": {
+   "m": 6.71262,
+   "s": 0.2172,
+   "n": 616
+  },
+  "INGILIZ|KUM|L|Şirinyer Hipodromu|Normal": {
+   "m": 6.57512,
+   "s": 0.07214,
+   "n": 46
+  },
+  "ARAP|KUM|M|Şirinyer Hipodromu|?": {
+   "m": 7.33704,
+   "s": 0.22322,
+   "n": 1108
+  },
+  "ARAP|KUM|1600|*": {
+   "m": 7.28794,
+   "s": 0.32534,
+   "n": 761
+  },
+  "ARAP|KUM|M|Şirinyer Hipodromu|Normal": {
+   "m": 7.1533,
+   "s": 0.13958,
+   "n": 188
+  },
+  "INGILIZ|KUM|M|Şirinyer Hipodromu|?": {
+   "m": 6.65647,
+   "s": 0.19074,
+   "n": 1213
+  },
+  "INGILIZ|KUM|M|*": {
+   "m": 6.74597,
+   "s": 0.31234,
+   "n": 6044
+  },
+  "INGILIZ|KUM|1900|*": {
+   "m": 6.76268,
+   "s": 0.27709,
+   "n": 1759
+  },
+  "INGILIZ|KUM|M|Şirinyer Hipodromu|Normal": {
+   "m": 6.51713,
+   "s": 0.13922,
+   "n": 264
+  },
+  "INGILIZ|KUM|S|Şirinyer Hipodromu|Normal": {
+   "m": 6.31472,
+   "s": 0.09901,
+   "n": 296
+  },
+  "INGILIZ|KUM|1400|*": {
+   "m": 6.49075,
+   "s": 0.22059,
+   "n": 3644
+  },
+  "INGILIZ|KUM|S|Şirinyer Hipodromu|?": {
+   "m": 6.46225,
+   "s": 0.17828,
+   "n": 1301
+  },
+  "INGILIZ|KUM|S|Yeşiloba Hipodromu|Normal": {
+   "m": 6.39533,
+   "s": 0.09811,
+   "n": 168
+  },
+  "INGILIZ|KUM|S|Yeşiloba Hipodromu|?": {
+   "m": 6.54708,
+   "s": 0.17126,
+   "n": 885
+  },
+  "ARAP|KUM|M|Yeşiloba Hipodromu|?": {
+   "m": 7.49258,
+   "s": 0.29237,
+   "n": 480
+  },
+  "ARAP|KUM|1900|*": {
+   "m": 7.47063,
+   "s": 0.3403,
+   "n": 1518
+  },
+  "ARAP|KUM|M|Yeşiloba Hipodromu|Normal": {
+   "m": 7.26507,
+   "s": 0.17403,
+   "n": 92
+  },
+  "ARAP|KUM|S|Yeşiloba Hipodromu|?": {
+   "m": 7.34441,
+   "s": 0.2625,
+   "n": 800
+  },
+  "ARAP|KUM|S|Yeşiloba Hipodromu|Normal": {
+   "m": 7.11496,
+   "s": 0.11232,
+   "n": 118
+  },
+  "INGILIZ|KUM|1600|*": {
+   "m": 6.6355,
+   "s": 0.29939,
+   "n": 963
+  },
+  "INGILIZ|KUM|M|Yeşiloba Hipodromu|?": {
+   "m": 6.74739,
+   "s": 0.17214,
+   "n": 504
+  },
+  "INGILIZ|KUM|M|Yeşiloba Hipodromu|Normal": {
+   "m": 6.61343,
+   "s": 0.10799,
+   "n": 118
+  },
+  "ARAP|SENTETIK|S|Veliefendi Hipodromu|?": {
+   "m": 6.9185,
+   "s": 0.20101,
+   "n": 1085
+  },
+  "ARAP|SENTETIK|S|*": {
+   "m": 6.884,
+   "s": 0.20368,
+   "n": 1916
+  },
+  "ARAP|SENTETIK|1400|*": {
+   "m": 6.85068,
+   "s": 0.18924,
+   "n": 800
+  },
+  "ARAP|SENTETIK|S|Veliefendi Hipodromu|Normal": {
+   "m": 6.73957,
+   "s": 0.11393,
+   "n": 233
+  },
+  "INGILIZ|SENTETIK|M|Veliefendi Hipodromu|?": {
+   "m": 6.28807,
+   "s": 0.16842,
+   "n": 1045
+  },
+  "INGILIZ|SENTETIK|M|*": {
+   "m": 6.27308,
+   "s": 0.16894,
+   "n": 1794
+  },
+  "INGILIZ|SENTETIK|1500|*": {
+   "m": 6.18207,
+   "s": 0.14806,
+   "n": 889
+  },
+  "INGILIZ|SENTETIK|M|Veliefendi Hipodromu|Normal": {
+   "m": 6.18287,
+   "s": 0.14885,
+   "n": 277
+  },
+  "INGILIZ|SENTETIK|S|Veliefendi Hipodromu|?": {
+   "m": 6.17029,
+   "s": 0.14515,
+   "n": 876
+  },
+  "INGILIZ|SENTETIK|S|*": {
+   "m": 6.16021,
+   "s": 0.15547,
+   "n": 1681
+  },
+  "INGILIZ|SENTETIK|1300|*": {
+   "m": 6.15308,
+   "s": 0.16366,
+   "n": 378
+  },
+  "INGILIZ|SENTETIK|S|Veliefendi Hipodromu|Normal": {
+   "m": 6.04854,
+   "s": 0.0922,
+   "n": 246
+  },
+  "ARAP|SENTETIK|M|Veliefendi Hipodromu|?": {
+   "m": 6.95545,
+   "s": 0.2089,
+   "n": 905
+  },
+  "ARAP|SENTETIK|M|*": {
+   "m": 6.95153,
+   "s": 0.22066,
+   "n": 1566
+  },
+  "ARAP|SENTETIK|2000|*": {
+   "m": 7.05285,
+   "s": 0.18125,
+   "n": 594
+  },
+  "ARAP|SENTETIK|M|Veliefendi Hipodromu|Normal": {
+   "m": 6.8258,
+   "s": 0.14832,
+   "n": 188
+  },
+  "INGILIZ|SENTETIK|2000|*": {
+   "m": 6.34755,
+   "s": 0.12539,
+   "n": 696
+  },
+  "ARAP|SENTETIK|1500|*": {
+   "m": 6.85077,
+   "s": 0.17717,
+   "n": 768
+  },
+  "INGILIZ|KUM|1700|*": {
+   "m": 7.00162,
+   "s": 0.386,
+   "n": 356
+  },
+  "INGILIZ|KUM|M|Hipodromu|?": {
+   "m": 7.23505,
+   "s": 0.34954,
+   "n": 1536
+  },
+  "ARAP|KUM|S|Hipodromu|Sulu": {
+   "m": 7.37754,
+   "s": 0.28477,
+   "n": 30
+  },
+  "ARAP|KUM|S|Hipodromu|?": {
+   "m": 7.841,
+   "s": 0.5236,
+   "n": 1949
+  },
+  "INGILIZ|KUM|1800|*": {
+   "m": 6.82783,
+   "s": 0.31456,
+   "n": 733
+  },
+  "ARAP|KUM|M|Hipodromu|?": {
+   "m": 8.10574,
+   "s": 0.49979,
+   "n": 1417
+  },
+  "ARAP|KUM|1800|*": {
+   "m": 7.7365,
+   "s": 0.51792,
+   "n": 627
+  },
+  "ARAP|KUM|M|Hipodromu|Sulu": {
+   "m": 7.44101,
+   "s": 0.23983,
+   "n": 30
+  },
+  "INGILIZ|KUM|2000|*": {
+   "m": 6.74698,
+   "s": 0.2331,
+   "n": 1506
+  },
+  "INGILIZ|KUM|1200|*": {
+   "m": 6.55288,
+   "s": 0.32308,
+   "n": 2938
+  },
+  "INGILIZ|KUM|1500|*": {
+   "m": 6.5342,
+   "s": 0.28753,
+   "n": 727
+  },
+  "ARAP|KUM|1300|*": {
+   "m": 7.37504,
+   "s": 0.39352,
+   "n": 1098
+  },
+  "INGILIZ|KUM|S|Hipodromu|?": {
+   "m": 6.90383,
+   "s": 0.3423,
+   "n": 1793
+  },
+  "ARAP|KUM|L|Hipodromu|?": {
+   "m": 8.09036,
+   "s": 0.43038,
+   "n": 86
+  },
+  "ARAP|KUM|2100|*": {
+   "m": 7.43074,
+   "s": 0.29165,
+   "n": 446
+  },
+  "INGILIZ|KUM|S|Osmangazi Hipodromu|?": {
+   "m": 6.44977,
+   "s": 0.1781,
+   "n": 805
+  },
+  "INGILIZ|KUM|S|Osmangazi Hipodromu|Normal": {
+   "m": 6.29025,
+   "s": 0.12574,
+   "n": 178
+  },
+  "INGILIZ|KUM|M|Osmangazi Hipodromu|Normal": {
+   "m": 6.49968,
+   "s": 0.08213,
+   "n": 86
+  },
+  "INGILIZ|KUM|M|Osmangazi Hipodromu|?": {
+   "m": 6.66008,
+   "s": 0.1583,
+   "n": 394
+  },
+  "ARAP|KUM|S|Osmangazi Hipodromu|Normal": {
+   "m": 6.9635,
+   "s": 0.15281,
+   "n": 158
+  },
+  "ARAP|KUM|S|Osmangazi Hipodromu|?": {
+   "m": 7.21906,
+   "s": 0.27959,
+   "n": 988
+  },
+  "ARAP|KUM|M|Osmangazi Hipodromu|?": {
+   "m": 7.36026,
+   "s": 0.25196,
+   "n": 355
+  },
+  "ARAP|KUM|M|Osmangazi Hipodromu|Normal": {
+   "m": 7.1445,
+   "s": 0.09867,
+   "n": 52
+  },
+  "INGILIZ|KUM|S|Veliefendi Hipodromu|?": {
+   "m": 6.40707,
+   "s": 0.1727,
+   "n": 192
+  },
+  "INGILIZ|KUM|S|Veliefendi Hipodromu|Normal": {
+   "m": 6.28845,
+   "s": 0.09284,
+   "n": 36
+  },
+  "INGILIZ|SENTETIK|1400|*": {
+   "m": 6.14671,
+   "s": 0.13068,
+   "n": 886
+  },
+  "INGILIZ|SENTETIK|L|Veliefendi Hipodromu|Normal": {
+   "m": 6.28559,
+   "s": 0.06991,
+   "n": 72
+  },
+  "INGILIZ|SENTETIK|L|*": {
+   "m": 6.36031,
+   "s": 0.12323,
+   "n": 558
+  },
+  "INGILIZ|SENTETIK|2100|*": {
+   "m": 6.36429,
+   "s": 0.13922,
+   "n": 408
+  },
+  "INGILIZ|SENTETIK|L|Veliefendi Hipodromu|?": {
+   "m": 6.37128,
+   "s": 0.11805,
+   "n": 260
+  },
+  "ARAP|KUM|M|Veliefendi Hipodromu|?": {
+   "m": 7.46305,
+   "s": 0.3198,
+   "n": 41
+  },
+  "ARAP|KUM|1700|*": {
+   "m": 7.934,
+   "s": 0.64223,
+   "n": 494
+  },
+  "INGILIZ|KUM|M|Şirinyer Hipodromu|Sulu": {
+   "m": 6.44941,
+   "s": 0.10817,
+   "n": 42
+  },
+  "INGILIZ|CIM|1400|*": {
+   "m": 6.11293,
+   "s": 0.15228,
+   "n": 1162
+  },
+  "ARAP|SENTETIK|1200|*": {
+   "m": 6.934,
+   "s": 0.21584,
+   "n": 567
+  },
+  "ARAP|SENTETIK|L|Veliefendi Hipodromu|?": {
+   "m": 7.05977,
+   "s": 0.13862,
+   "n": 240
+  },
+  "ARAP|SENTETIK|L|*": {
+   "m": 7.03364,
+   "s": 0.12521,
+   "n": 437
+  },
+  "ARAP|SENTETIK|2200|*": {
+   "m": 7.04386,
+   "s": 0.10712,
+   "n": 124
+  },
+  "ARAP|SENTETIK|L|Veliefendi Hipodromu|Normal": {
+   "m": 6.96119,
+   "s": 0.07508,
+   "n": 56
+  },
+  "ARAP|KUM|S|Yeşiloba Hipodromu|Sulu": {
+   "m": 7.14712,
+   "s": 0.22259,
+   "n": 42
+  },
+  "INGILIZ|CIM|S|Osmangazi Hipodromu|?": {
+   "m": 6.15071,
+   "s": 0.18173,
+   "n": 706
+  },
+  "INGILIZ|CIM|S|Osmangazi Hipodromu|Normal": {
+   "m": 5.99554,
+   "s": 0.10545,
+   "n": 143
+  },
+  "INGILIZ|KUM|L|Hipodromu|?": {
+   "m": 7.05338,
+   "s": 0.51573,
+   "n": 113
+  },
+  "ARAP|KUM|S|Veliefendi Hipodromu|?": {
+   "m": 7.16846,
+   "s": 0.24919,
+   "n": 182
+  },
+  "INGILIZ|KUM|M|Veliefendi Hipodromu|?": {
+   "m": 6.6953,
+   "s": 0.1513,
+   "n": 62
+  },
+  "INGILIZ|KUM|S|Hipodromu|Normal": {
+   "m": 6.6415,
+   "s": 0.24895,
+   "n": 331
+  },
+  "INGILIZ|KUM|M|Hipodromu|Normal": {
+   "m": 6.95404,
+   "s": 0.18631,
+   "n": 286
+  },
+  "ARAP|KUM|M|Hipodromu|Normal": {
+   "m": 7.73029,
+   "s": 0.21022,
+   "n": 271
+  },
+  "INGILIZ|KUM|L|Yeşiloba Hipodromu|?": {
+   "m": 6.75686,
+   "s": 0.14515,
+   "n": 75
+  },
+  "ARAP|KUM|L|Yeşiloba Hipodromu|?": {
+   "m": 7.52155,
+   "s": 0.21088,
+   "n": 84
+  },
+  "ARAP|KUM|S|Hipodromu|Normal": {
+   "m": 7.42412,
+   "s": 0.26082,
+   "n": 316
+  },
+  "INGILIZ|KUM|S|Şirinyer Hipodromu|Nemli": {
+   "m": 6.27725,
+   "s": 0.10085,
+   "n": 64
+  },
+  "ARAP|KUM|S|Şirinyer Hipodromu|Nemli": {
+   "m": 7.02229,
+   "s": 0.14069,
+   "n": 46
+  },
+  "ARAP|KUM|M|Şirinyer Hipodromu|Nemli": {
+   "m": 7.16005,
+   "s": 0.13765,
+   "n": 54
+  },
+  "INGILIZ|KUM|M|Şirinyer Hipodromu|Nemli": {
+   "m": 6.48515,
+   "s": 0.12094,
+   "n": 52
+  },
+  "INGILIZ|SENTETIK|S|Hipodromu|?": {
+   "m": 6.16766,
+   "s": 0.10619,
+   "n": 178
+  },
+  "INGILIZ|SENTETIK|1200|*": {
+   "m": 6.19758,
+   "s": 0.19076,
+   "n": 381
+  },
+  "ARAP|SENTETIK|M|Hipodromu|?": {
+   "m": 7.04885,
+   "s": 0.28556,
+   "n": 178
+  },
+  "ARAP|SENTETIK|S|Hipodromu|?": {
+   "m": 6.84623,
+   "s": 0.15081,
+   "n": 206
+  },
+  "INGILIZ|KUM|S|Hipodromu|Islak": {
+   "m": 6.49911,
+   "s": 0.27418,
+   "n": 42
+  },
+  "INGILIZ|SENTETIK|1600|*": {
+   "m": 6.18019,
+   "s": 0.14483,
+   "n": 41
+  },
+  "INGILIZ|SENTETIK|M|Hipodromu|?": {
+   "m": 6.27494,
+   "s": 0.16466,
+   "n": 211
+  },
+  "INGILIZ|SENTETIK|L|Hipodromu|?": {
+   "m": 6.35048,
+   "s": 0.10186,
+   "n": 109
+  },
+  "ARAP|SENTETIK|1700|*": {
+   "m": 6.97688,
+   "s": 0.18864,
+   "n": 80
+  },
+  "INGILIZ|SENTETIK|1700|*": {
+   "m": 6.20624,
+   "s": 0.10649,
+   "n": 83
+  },
+  "ARAP|SENTETIK|L|Hipodromu|?": {
+   "m": 7.06602,
+   "s": 0.11921,
+   "n": 98
+  },
+  "ARAP|SENTETIK|2100|*": {
+   "m": 7.02731,
+   "s": 0.13548,
+   "n": 282
+  },
+  "INGILIZ|KUM|S|Yeşiloba Hipodromu|Sulu": {
+   "m": 6.37146,
+   "s": 0.15017,
+   "n": 36
+  },
+  "ARAP|SENTETIK|M|Hipodromu|Normal": {
+   "m": 6.83197,
+   "s": 0.16353,
+   "n": 30
+  },
+  "ARAP|SENTETIK|1300|*": {
+   "m": 6.87835,
+   "s": 0.18949,
+   "n": 430
+  },
+  "ARAP|SENTETIK|S|Hipodromu|Normal": {
+   "m": 6.70546,
+   "s": 0.06245,
+   "n": 36
+  },
+  "INGILIZ|SENTETIK|M|Hipodromu|Normal": {
+   "m": 6.1863,
+   "s": 0.17341,
+   "n": 50
+  },
+  "ARAP|KUM|S|Hipodromu|Islak": {
+   "m": 7.21954,
+   "s": 0.19206,
+   "n": 34
+  },
+  "ARAP|KUM|1000|*": {
+   "m": 7.394,
+   "s": 0.38933,
+   "n": 215
+  },
+  "INGILIZ|KUM|2200|*": {
+   "m": 6.66214,
+   "s": 0.13195,
+   "n": 135
+  },
+  "INGILIZ|KUM|M|Kartepe Hipodromu|Normal": {
+   "m": 6.59111,
+   "s": 0.13845,
+   "n": 156
+  },
+  "INGILIZ|KUM|M|Kartepe Hipodromu|?": {
+   "m": 6.72321,
+   "s": 0.17879,
+   "n": 627
+  },
+  "INGILIZ|KUM|L|Osmangazi Hipodromu|?": {
+   "m": 6.65057,
+   "s": 0.1484,
+   "n": 79
+  },
+  "INGILIZ|SENTETIK|2200|*": {
+   "m": 6.33975,
+   "s": 0.08175,
+   "n": 128
+  },
+  "ARAP|KUM|L|Osmangazi Hipodromu|?": {
+   "m": 7.29731,
+   "s": 0.18008,
+   "n": 48
+  },
+  "INGILIZ|CIM|M|Yeşiloba Hipodromu|?": {
+   "m": 6.34456,
+   "s": 0.10868,
+   "n": 123
+  },
+  "INGILIZ|CIM|M|*": {
+   "m": 6.22461,
+   "s": 0.16546,
+   "n": 2485
+  },
+  "INGILIZ|CIM|1800|*": {
+   "m": 6.27572,
+   "s": 0.16642,
+   "n": 328
+  },
+  "INGILIZ|CIM|S|Yeşiloba Hipodromu|?": {
+   "m": 6.12022,
+   "s": 0.13497,
+   "n": 158
+  },
+  "INGILIZ|CIM|S|Yeşiloba Hipodromu|Normal": {
+   "m": 6.01815,
+   "s": 0.0861,
+   "n": 31
+  },
+  "ARAP|CIM|S|Yeşiloba Hipodromu|?": {
+   "m": 6.80854,
+   "s": 0.30222,
+   "n": 129
+  },
+  "ARAP|CIM|S|*": {
+   "m": 6.77179,
+   "s": 0.20664,
+   "n": 3050
+  },
+  "ARAP|CIM|1200|*": {
+   "m": 6.77804,
+   "s": 0.21207,
+   "n": 1000
+  },
+  "INGILIZ|CIM|2000|*": {
+   "m": 6.32695,
+   "s": 0.14492,
+   "n": 327
+  },
+  "ARAP|CIM|M|Yeşiloba Hipodromu|?": {
+   "m": 7.07335,
+   "s": 0.19927,
+   "n": 75
+  },
+  "ARAP|CIM|M|*": {
+   "m": 6.8664,
+   "s": 0.18842,
+   "n": 1925
+  },
+  "ARAP|CIM|1800|*": {
+   "m": 6.92244,
+   "s": 0.20015,
+   "n": 197
+  },
+  "ARAP|CIM|2000|*": {
+   "m": 7.00615,
+   "s": 0.20289,
+   "n": 152
+  },
+  "INGILIZ|CIM|M|75. Yıl Hipodromu|?": {
+   "m": 6.22856,
+   "s": 0.15265,
+   "n": 488
+  },
+  "INGILIZ|CIM|1900|*": {
+   "m": 6.24853,
+   "s": 0.11354,
+   "n": 635
+  },
+  "INGILIZ|CIM|M|75. Yıl Hipodromu|Normal": {
+   "m": 6.09582,
+   "s": 0.09922,
+   "n": 96
+  },
+  "INGILIZ|KUM|S|Kartepe Hipodromu|Normal": {
+   "m": 6.37363,
+   "s": 0.09931,
+   "n": 162
+  },
+  "INGILIZ|KUM|S|Kartepe Hipodromu|?": {
+   "m": 6.54633,
+   "s": 0.18635,
+   "n": 699
+  },
+  "ARAP|KUM|S|Kartepe Hipodromu|?": {
+   "m": 7.30017,
+   "s": 0.24895,
+   "n": 751
+  },
+  "ARAP|KUM|S|Kartepe Hipodromu|Normal": {
+   "m": 7.07491,
+   "s": 0.13633,
+   "n": 156
+  },
+  "INGILIZ|CIM|1600|*": {
+   "m": 6.14494,
+   "s": 0.14743,
+   "n": 796
+  },
+  "INGILIZ|CIM|M|Şirinyer Hipodromu|?": {
+   "m": 6.34975,
+   "s": 0.1921,
+   "n": 76
+  },
+  "INGILIZ|CIM|1700|*": {
+   "m": 6.21024,
+   "s": 0.12681,
+   "n": 151
+  },
+  "ARAP|CIM|1300|*": {
+   "m": 6.79885,
+   "s": 0.23551,
+   "n": 787
+  },
+  "INGILIZ|CIM|L|Yeşiloba Hipodromu|?": {
+   "m": 6.43836,
+   "s": 0.05454,
+   "n": 30
+  },
+  "INGILIZ|CIM|L|*": {
+   "m": 6.32696,
+   "s": 0.10762,
+   "n": 796
+  },
+  "INGILIZ|CIM|2100|*": {
+   "m": 6.31686,
+   "s": 0.11091,
+   "n": 259
+  },
+  "INGILIZ|CIM|2200|*": {
+   "m": 6.32248,
+   "s": 0.09364,
+   "n": 368
+  },
+  "INGILIZ|CIM|L|Osmangazi Hipodromu|?": {
+   "m": 6.41186,
+   "s": 0.16956,
+   "n": 83
+  },
+  "ARAP|CIM|L|*": {
+   "m": 6.99625,
+   "s": 0.14974,
+   "n": 520
+  },
+  "ARAP|CIM|2200|*": {
+   "m": 6.98205,
+   "s": 0.13593,
+   "n": 339
+  },
+  "ARAP|CIM|L|Osmangazi Hipodromu|?": {
+   "m": 7.00868,
+   "s": 0.18142,
+   "n": 117
+  },
+  "INGILIZ|CIM|M|Osmangazi Hipodromu|?": {
+   "m": 6.24725,
+   "s": 0.18052,
+   "n": 626
+  },
+  "INGILIZ|CIM|M|Osmangazi Hipodromu|Normal": {
+   "m": 6.10641,
+   "s": 0.12051,
+   "n": 108
+  },
+  "ARAP|CIM|S|Şirinyer Hipodromu|?": {
+   "m": 6.74208,
+   "s": 0.22514,
+   "n": 99
+  },
+  "ARAP|CIM|1900|*": {
+   "m": 6.87034,
+   "s": 0.13421,
+   "n": 472
+  },
+  "ARAP|CIM|M|Şirinyer Hipodromu|?": {
+   "m": 6.90733,
+   "s": 0.17079,
+   "n": 43
+  },
+  "INGILIZ|KUM|1000|*": {
+   "m": 6.5909,
+   "s": 0.33373,
+   "n": 109
+  },
+  "ARAP|KUM|M|Kartepe Hipodromu|?": {
+   "m": 7.41739,
+   "s": 0.24244,
+   "n": 643
+  },
+  "ARAP|KUM|M|Kartepe Hipodromu|Normal": {
+   "m": 7.24118,
+   "s": 0.12187,
+   "n": 116
+  },
+  "ARAP|SENTETIK|1000|*": {
+   "m": 6.9266,
+   "s": 0.18043,
+   "n": 103
+  },
+  "INGILIZ|CIM|M|Veliefendi Hipodromu|?": {
+   "m": 6.2375,
+   "s": 0.16267,
+   "n": 662
+  },
+  "INGILIZ|CIM|M|Veliefendi Hipodromu|Normal": {
+   "m": 6.09661,
+   "s": 0.11166,
+   "n": 128
+  },
+  "INGILIZ|CIM|S|Veliefendi Hipodromu|?": {
+   "m": 6.12829,
+   "s": 0.18048,
+   "n": 674
+  },
+  "INGILIZ|CIM|S|Veliefendi Hipodromu|Normal": {
+   "m": 5.99567,
+   "s": 0.11408,
+   "n": 144
+  },
+  "INGILIZ|KUM|M|75. Yıl Hipodromu|?": {
+   "m": 6.6504,
+   "s": 0.22893,
+   "n": 345
+  },
+  "INGILIZ|KUM|M|75. Yıl Hipodromu|Normal": {
+   "m": 6.4585,
+   "s": 0.21802,
+   "n": 92
+  },
+  "ARAP|KUM|S|75. Yıl Hipodromu|?": {
+   "m": 7.23915,
+   "s": 0.25847,
+   "n": 539
+  },
+  "ARAP|KUM|1100|*": {
+   "m": 7.45673,
+   "s": 0.41297,
+   "n": 219
+  },
+  "ARAP|KUM|S|75. Yıl Hipodromu|Normal": {
+   "m": 7.04107,
+   "s": 0.12946,
+   "n": 118
+  },
+  "ARAP|CIM|S|75. Yıl Hipodromu|?": {
+   "m": 6.80608,
+   "s": 0.20251,
+   "n": 674
+  },
+  "ARAP|CIM|1400|*": {
+   "m": 6.76871,
+   "s": 0.18331,
+   "n": 1107
+  },
+  "ARAP|CIM|S|75. Yıl Hipodromu|Normal": {
+   "m": 6.63106,
+   "s": 0.07054,
+   "n": 120
+  },
+  "ARAP|CIM|M|Veliefendi Hipodromu|?": {
+   "m": 6.88258,
+   "s": 0.17713,
+   "n": 523
+  },
+  "ARAP|CIM|1600|*": {
+   "m": 6.8345,
+   "s": 0.18542,
+   "n": 735
+  },
+  "ARAP|CIM|M|Veliefendi Hipodromu|Normal": {
+   "m": 6.73232,
+   "s": 0.09231,
+   "n": 79
+  },
+  "INGILIZ|CIM|S|Şirinyer Hipodromu|?": {
+   "m": 6.18827,
+   "s": 0.19855,
+   "n": 74
+  },
+  "ARAP|CIM|M|75. Yıl Hipodromu|?": {
+   "m": 6.88216,
+   "s": 0.17422,
+   "n": 432
+  },
+  "ARAP|CIM|M|Osmangazi Hipodromu|?": {
+   "m": 6.90306,
+   "s": 0.21415,
+   "n": 520
+  },
+  "ARAP|CIM|1500|*": {
+   "m": 6.83687,
+   "s": 0.23731,
+   "n": 207
+  },
+  "ARAP|CIM|M|Osmangazi Hipodromu|Normal": {
+   "m": 6.70797,
+   "s": 0.08683,
+   "n": 70
+  },
+  "INGILIZ|CIM|1500|*": {
+   "m": 6.0948,
+   "s": 0.14846,
+   "n": 248
+  },
+  "ARAP|CIM|1700|*": {
+   "m": 6.82491,
+   "s": 0.1507,
+   "n": 162
+  },
+  "INGILIZ|CIM|S|75. Yıl Hipodromu|Yumuşak": {
+   "m": 6.09495,
+   "s": 0.09298,
+   "n": 30
+  },
+  "INGILIZ|CIM|L|75. Yıl Hipodromu|?": {
+   "m": 6.34457,
+   "s": 0.10284,
+   "n": 176
+  },
+  "ARAP|CIM|S|Veliefendi Hipodromu|?": {
+   "m": 6.8278,
+   "s": 0.21615,
+   "n": 766
+  },
+  "ARAP|KUM|L|75. Yıl Hipodromu|?": {
+   "m": 7.44234,
+   "s": 0.18693,
+   "n": 122
+  },
+  "INGILIZ|CIM|L|Veliefendi Hipodromu|?": {
+   "m": 6.3422,
+   "s": 0.11134,
+   "n": 318
+  },
+  "INGILIZ|KUM|L|75. Yıl Hipodromu|?": {
+   "m": 6.78976,
+   "s": 0.16944,
+   "n": 135
+  },
+  "INGILIZ|KUM|L|75. Yıl Hipodromu|Normal": {
+   "m": 6.63419,
+   "s": 0.14671,
+   "n": 48
+  },
+  "INGILIZ|CIM|1000|*": {
+   "m": 5.9573,
+   "s": 0.13195,
+   "n": 137
+  },
+  "ARAP|CIM|1000|*": {
+   "m": 6.67855,
+   "s": 0.16679,
+   "n": 144
+  },
+  "ARAP|CIM|S|Veliefendi Hipodromu|Normal": {
+   "m": 6.61982,
+   "s": 0.11657,
+   "n": 124
+  },
+  "INGILIZ|CIM|L|Veliefendi Hipodromu|Normal": {
+   "m": 6.26036,
+   "s": 0.05222,
+   "n": 77
+  },
+  "ARAP|CIM|L|75. Yıl Hipodromu|?": {
+   "m": 7.04959,
+   "s": 0.15267,
+   "n": 132
+  },
+  "ARAP|CIM|L|75. Yıl Hipodromu|Normal": {
+   "m": 6.89423,
+   "s": 0.08508,
+   "n": 32
+  },
+  "INGILIZ|KUM|1100|*": {
+   "m": 6.62918,
+   "s": 0.20797,
+   "n": 140
+  },
+  "INGILIZ|SENTETIK|1000|*": {
+   "m": 6.27445,
+   "s": 0.094,
+   "n": 36
+  },
+  "ARAP|CIM|M|75. Yıl Hipodromu|Normal": {
+   "m": 6.72053,
+   "s": 0.09733,
+   "n": 81
+  },
+  "ARAP|CIM|S|Osmangazi Hipodromu|?": {
+   "m": 6.80875,
+   "s": 0.22812,
+   "n": 835
+  },
+  "ARAP|CIM|S|Osmangazi Hipodromu|Normal": {
+   "m": 6.60244,
+   "s": 0.11396,
+   "n": 124
+  },
+  "ARAP|KUM|L|75. Yıl Hipodromu|Normal": {
+   "m": 7.29948,
+   "s": 0.06146,
+   "n": 34
+  },
+  "INGILIZ|CIM|L|75. Yıl Hipodromu|Normal": {
+   "m": 6.2638,
+   "s": 0.05264,
+   "n": 48
+  },
+  "INGILIZ|CIM|1100|*": {
+   "m": 6.09118,
+   "s": 0.15951,
+   "n": 66
+  },
+  "ARAP|CIM|2100|*": {
+   "m": 6.98514,
+   "s": 0.15355,
+   "n": 99
+  },
+  "INGILIZ|CIM|2400|*": {
+   "m": 6.37787,
+   "s": 0.14184,
+   "n": 137
+  },
+  "ARAP|CIM|L|Veliefendi Hipodromu|?": {
+   "m": 7.01557,
+   "s": 0.13131,
+   "n": 160
+  },
+  "ARAP|CIM|2400|*": {
+   "m": 7.07988,
+   "s": 0.2214,
+   "n": 73
+  },
+  "INGILIZ|SENTETIK|S|Yeşiloba Hipodromu|?": {
+   "m": 6.33714,
+   "s": 0.24676,
+   "n": 269
+  },
+  "INGILIZ|SENTETIK|S|Yeşiloba Hipodromu|Normal": {
+   "m": 6.20211,
+   "s": 0.18214,
+   "n": 58
+  },
+  "ARAP|SENTETIK|M|Yeşiloba Hipodromu|?": {
+   "m": 7.09084,
+   "s": 0.27678,
+   "n": 204
+  },
+  "ARAP|SENTETIK|S|Yeşiloba Hipodromu|?": {
+   "m": 7.02817,
+   "s": 0.23365,
+   "n": 294
+  },
+  "ARAP|SENTETIK|S|Yeşiloba Hipodromu|Normal": {
+   "m": 6.83146,
+   "s": 0.16138,
+   "n": 52
+  },
+  "INGILIZ|SENTETIK|M|Yeşiloba Hipodromu|?": {
+   "m": 6.34895,
+   "s": 0.18447,
+   "n": 159
+  },
+  "INGILIZ|SENTETIK|M|Yeşiloba Hipodromu|Normal": {
+   "m": 6.27457,
+   "s": 0.11111,
+   "n": 30
+  },
+  "ARAP|SENTETIK|1900|*": {
+   "m": 7.11905,
+   "s": 0.24065,
+   "n": 96
+  },
+  "INGILIZ|SENTETIK|L|Yeşiloba Hipodromu|?": {
+   "m": 6.51238,
+   "s": 0.16033,
+   "n": 69
+  },
+  "INGILIZ|SENTETIK|1900|*": {
+   "m": 6.34532,
+   "s": 0.07944,
+   "n": 85
+  },
+  "ARAP|SENTETIK|2400|*": {
+   "m": 7.05071,
+   "s": 0.11706,
+   "n": 31
+  }
+ },
+ "esp": {
+  "KUM|M": {
+   "m": 99.29551,
+   "s": 4.75096,
+   "n": 11490
+  },
+  "KUM|S": {
+   "m": 102.49032,
+   "s": 4.7305,
+   "n": 15776
+  },
+  "CIM|S": {
+   "m": 97.13338,
+   "s": 3.31684,
+   "n": 6057
+  },
+  "KUM|L": {
+   "m": 100.43648,
+   "s": 3.89283,
+   "n": 1381
+  },
+  "SENTETIK|S": {
+   "m": 97.93717,
+   "s": 3.5288,
+   "n": 3597
+  },
+  "SENTETIK|M": {
+   "m": 95.77989,
+   "s": 4.42433,
+   "n": 3360
+  },
+  "SENTETIK|L": {
+   "m": 93.5777,
+   "s": 3.91663,
+   "n": 995
+  },
+  "CIM|M": {
+   "m": 95.52944,
+   "s": 4.50636,
+   "n": 4410
+  },
+  "CIM|L": {
+   "m": 92.64171,
+   "s": 4.65516,
+   "n": 1316
+  }
+ }
+}

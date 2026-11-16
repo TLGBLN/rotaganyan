@@ -32,7 +32,7 @@ export const SIGNAL_REGISTRY: readonly SignalRegistryEntry[] = [
   { code: "agfTrend", family: "MARKET", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: true, note: "Pre-race snapshot trendi; MARKET ailesinde tek oy." },
 
   { code: "hizDerecesi", family: "HIZ", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "365g göreli hız." },
-  { code: "ACC_SPEED", family: "HIZ", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Accurace speed residual." },
+  { code: "ACC_SPEED", family: "HIZ", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: false, note: "[17 Kas 2026: modelden ÇIKARILDI — yerini Accurace v2 / Tempo v2 sinyalleri aldı; ham sinyal analiz için hesaplanmaya devam eder.] Accurace speed residual." },
 
   { code: "h2hNetSkor", family: "H2H", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Rakiplerle doğrudan geçmiş karşılaşma." },
 
@@ -40,10 +40,10 @@ export const SIGNAL_REGISTRY: readonly SignalRegistryEntry[] = [
   { code: "zeminMesafeDeneyim", family: "PIST_MESAFE_ZEMIN", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "tam/kısmi/yok seviyesiyle gerçek availability biliniyor." },
   { code: "pistUzmaniSkoru", family: "PIST_MESAFE_ZEMIN", lifecycle: "FUTURE_CANDIDATE", productionFeature: false, integrityEligible: false, note: "Continuous residual + recency + distance/surface reliability; OOS bekliyor." },
 
-  { code: "yarisGidisatiSkoru", family: "TEMPO_STYLE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "TEMPO_STYLE ana evidence kaynağı." },
-  { code: "PS_front", family: "TEMPO_STYLE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "PS-v2/OOS bekliyor; field-size ölçek etkisi." },
+  { code: "yarisGidisatiSkoru", family: "TEMPO_STYLE", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: false, note: "[17 Kas 2026: modelden ÇIKARILDI — yerini Accurace v2 / Tempo v2 sinyalleri aldı; ham sinyal analiz için hesaplanmaya devam eder.] TEMPO_STYLE ana evidence kaynağı." },
+  { code: "PS_front", family: "TEMPO_STYLE", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: false, note: "[17 Kas 2026: modelden ÇIKARILDI — yerini Accurace v2 / Tempo v2 sinyalleri aldı; ham sinyal analiz için hesaplanmaya devam eder.] PS-v2/OOS bekliyor; field-size ölçek etkisi." },
   { code: "PS_lone", family: "TEMPO_STYLE", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: false, note: "[2026-11-14 canlı modellerden ÇIKARILDI — ölü (%99 sıfır) + σ=0.0086 uç değer riski (z≈16)] PS-v2/OOS bekliyor; 1-front kırpma sorunu." },
-  { code: "PS_closerFit", family: "TEMPO_STYLE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "PS-v2/OOS bekliyor; pressure ölçek sorunu." },
+  { code: "PS_closerFit", family: "TEMPO_STYLE", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: false, note: "[17 Kas 2026: modelden ÇIKARILDI — yerini Accurace v2 / Tempo v2 sinyalleri aldı; ham sinyal analiz için hesaplanmaya devam eder.] PS-v2/OOS bekliyor; pressure ölçek sorunu." },
 
   { code: "ACC_CLOSE_RES", family: "RACE_FORM", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Closing residual." },
   { code: "ACC_LATE", family: "RACE_FORM", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Late segment form." },
@@ -70,6 +70,11 @@ export const SIGNAL_REGISTRY: readonly SignalRegistryEntry[] = [
   { code: "galopKaliteV1", family: "IDMAN", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "GALOP ANALİZ MOTORU v1.0 (16 Kas 2026, kullanıcı formülü): son 3 galop, hız z-puanı %50 + kapanış %25 + efor %15 (0-100), trend; eski galopKalite sinyalinin yerini aldı." },
   { code: "galopPedigri", family: "IDMAN", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Maiden/ŞARTLI 19: galop girdisi B80 = 0.8·galop kalitesi + 0.2·pedigri kalitesi (16 Kas 2026 kullanıcı kararı; protokol geçilmedi). Diğer sınıflarda null." },
   { code: "galopKalite", family: "IDMAN", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: false, note: "[16 Kas 2026: eski galopSkoru tabanlı sinyal EMEKLİ — yerini galopKaliteV1 (Galop Analiz Motoru v1.0) aldı; yalnız yönlendirilmeyen eski Maiden/Şartlı 19 segment ağırlık dosyasında ve geçmiş kayıtlı anlık görüntülerde kalır.]" },
+  { code: "accHizFormu", family: "HIZ", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Accurace v2 hız formu: geçmiş koşuların hız z'si (ırk×yüzey×mesafe bandı×hipodrom/zemin), 45 gün yarı ömür, son 5 koşu, N_eff güveni. ACC_SPEED yerine (17 Kas 2026, protokol geçti)." },
+  { code: "tempoOnOran", family: "TEMPO_STYLE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: true, note: "Tempo v2: 400 m sırasından öne bulunma oranı (geçmiş koşular, 0.5'e doğru küçültülmüş)." },
+  { code: "tempoErkenHiz", family: "TEMPO_STYLE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Tempo v2: erken hız (ilk 400 m / ortalama hız) z'si, sahadaki ortalamaya göre fark." },
+  { code: "tempoOnBaski", family: "TEMPO_STYLE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Tempo v2: öne bulunma oranı × (sahadaki liderlik baskısı − ortalama)." },
+  { code: "tempoGeriBaski", family: "TEMPO_STYLE", lifecycle: "PRODUCTION_ACTIVE", productionFeature: true, integrityEligible: false, note: "Tempo v2: (1 − öne bulunma oranı) × (sahadaki liderlik baskısı − ortalama)." },
   { code: "sireOraniBirlesik", family: "PEDIGRI", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: false, note: "[15 Kas: Maiden/Şartlı 19 segmenti yönlendirmeden çıkarıldı; yalnız eski segment ağırlık dosyasında, hiçbir canlı model kullanmıyor] Pedigri (baba+anne+anne babası)." },
   { code: "jokeySon30G", family: "JOKEY", lifecycle: "ANALYSIS_ONLY", productionFeature: false, integrityEligible: true, note: "Model score dışı güncel jokey desteği." },
 

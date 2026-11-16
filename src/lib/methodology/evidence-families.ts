@@ -51,10 +51,10 @@ export const FAMILY_LABEL: Record<EvidenceFamily, string> = {
 /** agfTrend gerçek bir V461FeatureDetay kodu DEĞİL — route.ts bunu sentetik bir kod olarak ekler. */
 export const EVIDENCE_FAMILY_MAP: Record<EvidenceFamily, string[]> = {
   MARKET: ["agfSirasi", "agfPayi", "agfPayi2", "agfTrend"],
-  HIZ: ["hizDerecesi", "ACC_SPEED"],
+  HIZ: ["hizDerecesi", "ACC_SPEED", "accHizFormu"],
   H2H: ["h2hNetSkor"],
   PIST_MESAFE_ZEMIN: ["zeminToleransi", "zeminMesafeDeneyim", "pistUzmaniSkoru"],
-  TEMPO_STYLE: ["yarisGidisatiSkoru", "PS_front", "PS_lone", "PS_closerFit"],
+  TEMPO_STYLE: ["yarisGidisatiSkoru", "PS_front", "PS_lone", "PS_closerFit", "tempoOnOran", "tempoErkenHiz", "tempoOnBaski", "tempoGeriBaski"],
   RACE_FORM: ["ACC_CLOSE_RES", "ACC_LATE"],
   IDMAN: ["idmJokey", "sonIdmanSprint", "galopKaliteV1", "galopPedigri", "galopKalite"],
   TAKI: ["takiDegisikligi"],

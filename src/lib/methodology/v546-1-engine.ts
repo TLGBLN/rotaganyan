@@ -27,6 +27,7 @@ import weightsJson from "./weights/v546-1-weights.json";
 // ./pedigri-galop-ortak.ts'de (ran-v2.ts ile PAYLAŞILAN, döngüsel import'suz tek kaynak).
 import { pedigriSkoru } from "./pedigri-galop-ortak";
 import { galopKalitesiV1, type GalopHam } from "./galop-motor";
+import { hizFormu, erkenProfil, yarisTempo } from "@/lib/accurace/v2";
 import { pedigriPanelKosu } from "@/server/services/pedigri-panel.service";
 import { getJokeyFormTablosu } from "@/server/actions/jokey-form.actions";
 import { getPitSeviyeSinyalleri, type PitSeviye } from "@/server/actions/pit-seviye.actions";
@@ -144,6 +145,10 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
   };
   const styleOf = new Map<string, StyleFeature>();
   for (const r of faz1.runners) styleOf.set(r.id, styleVector(gecmisOf(r.id), target));
+  // 2026-11-17 KULLANICI KARARI — ACCURACE v2 + TEMPO v2 (accurace/v2.ts): ACC_SPEED yerine 'accHizFormu'; PS_front/PS_closerFit/yarisGidisatiSkoru yerine dört tempo sinyali
+  // (tempoOnOran, tempoErkenHiz, tempoOnBaski, tempoGeriBaski). Eski ham sinyaller analiz/gösterim için hesaplanmaya devam eder ama modellerin featureNames'inde YOK.
+  const yarisTempoV2 = yarisTempo(faz1.runners.map((r) => erkenProfil(gecmisOf(r.id), target)));
+  const tempoV2ByRunnerId = new Map(faz1.runners.map((r, i) => [r.id, yarisTempoV2.atlar[i]!]));
   const hizGozlemli = await getHizDerecesiGozlemliForRace(raceId);
 
   const accGecmis = await fetchAccuraceGecmisKayitlari(faz1.runners.map((r) => r.ad), raceDate).catch(
@@ -271,6 +276,11 @@ export async function gatherV461RawSinyaller(raceId: string, preloadedRuns?: Acc
       { ad: "ACC_CLOSE_RES", raw: cr.observed ? cr.raw : null, observed: cr.observed, reliability: cr.reliability },
       { ad: "ACC_LATE", raw: la.observed ? la.raw : null, observed: la.observed, reliability: la.reliability },
       { ad: "ACC_SPEED", raw: sp.observed ? sp.raw : null, observed: sp.observed, reliability: sp.reliability },
+      { ad: "accHizFormu", raw: hizFormu(gecmisOf(r.id), target), observed: true, reliability: 1, evidenceObserved: hizFormu(gecmisOf(r.id), target) != null },
+      { ad: "tempoOnOran", raw: tempoV2ByRunnerId.get(r.id)!.tempoOnOran, observed: true, reliability: 1, evidenceObserved: tempoV2ByRunnerId.get(r.id)!.tempoOnOran != null },
+      { ad: "tempoErkenHiz", raw: tempoV2ByRunnerId.get(r.id)!.tempoErkenHiz, observed: true, reliability: 1, evidenceObserved: tempoV2ByRunnerId.get(r.id)!.tempoErkenHiz != null },
+      { ad: "tempoOnBaski", raw: tempoV2ByRunnerId.get(r.id)!.tempoOnBaski, observed: true, reliability: 1, evidenceObserved: tempoV2ByRunnerId.get(r.id)!.tempoOnBaski != null },
+      { ad: "tempoGeriBaski", raw: tempoV2ByRunnerId.get(r.id)!.tempoGeriBaski, observed: true, reliability: 1, evidenceObserved: tempoV2ByRunnerId.get(r.id)!.tempoGeriBaski != null },
       { ad: "PS_front", raw: paceObserved ? front : null, observed: paceObserved, reliability: hR },
       { ad: "PS_lone", raw: paceObserved ? lone : null, observed: paceObserved, reliability: hR },
       { ad: "PS_closerFit", raw: paceObserved ? closerFit : null, observed: paceObserved, reliability: hR },

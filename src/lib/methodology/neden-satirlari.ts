@@ -28,6 +28,11 @@ export const SINYAL_BILGI: Record<string, { ad: string; ham?: (v: number) => str
   jokeyFormuGenel: { ad: "Jokey formu (son 30 gün)" },
   galopKaliteV1: { ad: "Galop kalitesi (Galop Analiz Motoru v1.0)" },
   galopPedigri: { ad: "Galop + pedigri (B80)" },
+  accHizFormu: { ad: "Hız formu (Accurace v2)" },
+  tempoOnOran: { ad: "Öne bulunma oranı (tempo)" },
+  tempoErkenHiz: { ad: "Erken hız (tempo)" },
+  tempoOnBaski: { ad: "Öne giden × liderlik baskısı" },
+  tempoGeriBaski: { ad: "Geride bekleyen × liderlik baskısı" },
   antrenorOraniGenel: { ad: "Antrenör oranı" },
   sireOraniBirlesik: { ad: "Pedigri (baba+anne+anne babası)" },
 };

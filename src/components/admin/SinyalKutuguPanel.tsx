@@ -25,7 +25,7 @@ const SINYAL_AD: Record<string, string> = {
   fMean: "Son 6 Yarış Derece Ortalaması (düşük = iyi form)", kgsLog: "Koşmadığı Gün Sayısı (KGS, log)", sexE: "Cins (e)", dususDelta: "Sınıf Düşüşü (önceki yarış sınıfı − bugünkü; + = düşüş)",
   jokeyPIT: "Jokey Seviyesi (son 365 gün)", antrenorPIT: "Antrenör Seviyesi (son 365 gün)", lastWon: "Son Yarışını Kazandı",
   ACC_CLOSE_RES: "Kapanış Artığı (Accurace)", ACC_LATE: "Geç Segment Hızı (Accurace)",
-  ACC_SPEED: "Hız Artığı (Accurace)", PS_front: "Öne Çıkma Uyumu", PS_lone: "Yalnız Kaçak Uyumu",
+  ACC_SPEED: "Hız Artığı (Accurace, eski)", accHizFormu: "Hız Formu (Accurace v2)", tempoOnOran: "Öne Bulunma Oranı (Tempo v2)", tempoErkenHiz: "Erken Hız (Tempo v2)", tempoOnBaski: "Öne Giden × Baskı (Tempo v2)", tempoGeriBaski: "Geride Bekleyen × Baskı (Tempo v2)", PS_front: "Öne Çıkma Uyumu", PS_lone: "Yalnız Kaçak Uyumu",
   PS_closerFit: "Kapanışçı Uyumu (NEGATİF katsayı: geriden gelen profil geçmişte daha az kazandı)", antrenorOraniGenel: "Antrenör Oranı",
   jokeyFormuGenel: "Jokey Formu (Son 30 Gün)", galopKaliteV1: "Galop Kalitesi (v1.0)", galopPedigri: "Galop + Pedigri (B80)", galopKalite: "Galop Kalitesi (eski)",
 };
