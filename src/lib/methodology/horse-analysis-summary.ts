@@ -37,7 +37,8 @@ export interface JokeySon30GOzet {
   k30: number;
   refKPct: number;
   formDeltaPp: number | null;
-  guven: number;
+  guven: number; // örnek ağırlığı n/(n+8) — güven DEĞİL
+  z: number | null; // referansa göre standartlaştırılmış sapma (kanıt gücü)
   etkinFormPp: number | null;
   metni: string | null;
 }
@@ -84,7 +85,7 @@ function buildMarketOzet(agfTrendItem: AgfTrendItem | null): MarketOzet {
 
 function buildJokeyOzet(g: JokeyGuncelForm | null, metni: string | null): JokeySon30GOzet {
   if (!g || g.son30Start === 0) {
-    return { status: "INSUFFICIENT_DATA", w30: g?.son30Win ?? 0, n30: g?.son30Start ?? 0, k30: g?.son30WinRate ?? 0, refKPct: g ? g.kRef * 100 : 0, formDeltaPp: null, guven: g?.reliability ?? 0, etkinFormPp: null, metni };
+    return { status: "INSUFFICIENT_DATA", w30: g?.son30Win ?? 0, n30: g?.son30Start ?? 0, k30: g?.son30WinRate ?? 0, refKPct: g ? g.kRef * 100 : 0, formDeltaPp: null, guven: g?.reliability ?? 0, z: null, etkinFormPp: null, metni };
   }
   return {
     status: "USED",
@@ -94,6 +95,7 @@ function buildJokeyOzet(g: JokeyGuncelForm | null, metni: string | null): JokeyS
     refKPct: g.kRef * 100,
     formDeltaPp: g.formDelta != null ? g.formDelta * 100 : null,
     guven: g.reliability,
+    z: g.formZ,
     etkinFormPp: g.etkinForm != null ? g.etkinForm * 100 : null,
     metni,
   };

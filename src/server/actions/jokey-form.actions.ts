@@ -13,7 +13,7 @@
 // kaydı düşülür).
 import { db } from "@/lib/db";
 import { finishPos } from "@/lib/race-result";
-import { reliability, K_REF_MIN_SAMPLE, classifyEtkinFormDurum, type JokeyGuncelForm, type JokeyHipodromForm } from "@/lib/jokey-form";
+import { reliability, K_REF_MIN_SAMPLE, formZ, classifyFormZDurum, type JokeyGuncelForm, type JokeyHipodromForm } from "@/lib/jokey-form";
 
 // Saf tipler/sabitler/sınıflandırma/metin-üretimi src/lib/jokey-form.ts'e taşındı ("use
 // server" dosyaları YALNIZ ASYNC fonksiyon export edebilir. DÜZELTME (build'de yakalandı):
@@ -133,6 +133,7 @@ export async function getJokeyFormTablosu(
     const formDelta = s.start > 0 && tier !== "none" ? son30WinRate - kRef : null;
     const rel = reliability(s.start);
     const etkinForm = formDelta != null ? formDelta * rel : null;
+    const z = s.start > 0 && tier !== "none" ? formZ(s.win, s.start, kRef) : null;
 
     const guncel: JokeyGuncelForm = {
       son30Start: s.start, son30Win: s.win, son30WinRate,
@@ -141,7 +142,8 @@ export async function getJokeyFormTablosu(
       formDelta,
       reliability: rel,
       etkinForm,
-      durum: etkinForm != null ? classifyEtkinFormDurum(etkinForm * 100) : null,
+      formZ: z,
+      durum: z != null ? classifyFormZDurum(z) : null, // 2026-11-16: Durum KANIT GÜCÜNE (Z) göre; eski pp-eşikleri küçük örnekte aşırı agresifti
       uzunDonemStart: career.start, uzunDonemWinRate: careerWinRate,
     };
 

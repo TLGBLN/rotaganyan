@@ -189,8 +189,9 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
                         <th className="px-3 py-2 text-center font-medium border-l" title="Son 30 gün, PIT — JockeyStatSync değil">Son 30G</th>
                         <th className="px-3 py-2 text-center font-medium" title="K_REF — son 30 gün HARİÇ, kademeli referans (31-180g → 31-365g → son-30-hariç kariyer)">Ref K%</th>
                         <th className="px-3 py-2 text-center font-medium" title="K30 − K_REF (son 30 gün kazanma % − referans kazanma %)">Form Δ</th>
-                        <th className="px-3 py-2 text-center font-medium" title="Son 30 gün örneklem güveni (n/(n+8))">Güven</th>
-                        <th className="px-3 py-2 text-center font-medium" title="Form Δ × Güven — YALNIZ gösterim/analiz heuristic'i, model feature'ı DEĞİL">Etkin Form</th>
+                        <th className="px-3 py-2 text-center font-medium" title="Örnek ağırlığı: n/(n+8) — güven DEĞİL, yalnız örnek büyüklüğü (küçük örnekte Form Δ'yı küçültür)">Örnek ağırlığı</th>
+                        <th className="px-3 py-2 text-center font-medium" title="Form Δ × Örnek ağırlığı — YALNIZ gösterim/analiz heuristic'i, model feature'ı DEĞİL">Etkin Form</th>
+                        <th className="px-3 py-2 text-center font-medium" title="Z = (W − N·p0)/√(N·p0·(1−p0)): son 30 gün sonucu referans oranına göre kaç standart sapma. Kanıt gücü göstergesi (kesin hüküm değil). Durum buna göre.">Z</th>
                         <th className="px-3 py-2 text-center font-medium">Durum</th>
                         {hipodrom && (
                           <>
@@ -233,6 +234,9 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
                             <td className={cn("px-3 py-2 text-center tabular-nums font-medium", (g?.etkinForm ?? 0) > 0 ? "text-hit" : (g?.etkinForm ?? 0) < 0 ? "text-risk" : "text-muted-foreground")}>
                               {g?.etkinForm != null ? `${g.etkinForm >= 0 ? "+" : ""}${(g.etkinForm * 100).toFixed(2)}` : "—"}
                             </td>
+                            <td className={cn("px-3 py-2 text-center tabular-nums font-medium", (g?.formZ ?? 0) >= 1 ? "text-hit" : (g?.formZ ?? 0) <= -1 ? "text-risk" : "text-muted-foreground")}>
+                              {g?.formZ != null ? `${g.formZ >= 0 ? "+" : ""}${g.formZ.toFixed(2)}` : "—"}
+                            </td>
                             <td className="px-3 py-2 text-center text-[10px] font-semibold text-muted-foreground">
                               {g?.durum ?? "—"}
                             </td>
@@ -254,7 +258,7 @@ export default async function AdminJokeyPage({ searchParams }: PageProps) {
                 </div>
                 <div className="border-t px-3 py-2 text-[11px] text-muted-foreground">
                   {rows.length} jokey · {isFiltered ? contextLabel : "Tüm setler toplandı"} · K% = kazanma oranı · Tb% = ilk 5 oranı · Skor = performans puanı ·
-                  Son 30G/Form Δ/Güven = JockeyStatSync değil, kendi PIT (as-of) yarış geçmişimizden
+                  Örnek ağırlığı = n/(n+8) (güven değil) · Z = referansa göre standartlaştırılmış sapma (Durum Z'ye göre: |Z|≥2 çok güçlü, 1–2 pozitif/negatif, altı nötr) · Son 30G/Form Δ/Z = JockeyStatSync değil, kendi PIT (as-of) yarış geçmişimizden
                   {hipodrom ? " · Hipo K%(shrink)/Δ: bu hipodromdaki geçmiş, düşük örneklemde jokeyin uzun-dönem oranına shrink edilmiş" : " · hipodrom filtresi seçilirse hipodrom-özel shrink'li form da görünür"}
                 </div>
               </>

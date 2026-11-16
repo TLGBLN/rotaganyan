@@ -958,8 +958,9 @@ export default function V5AnalysisPanel({ raceId, classType, runners: raceRunner
                           {a.analysisOzet.jokeySon30GOzet.refKPct.toFixed(1)}
                           {a.analysisOzet.jokeySon30GOzet.formDeltaPp != null &&
                             ` · Form Δ ${a.analysisOzet.jokeySon30GOzet.formDeltaPp >= 0 ? "+" : ""}${a.analysisOzet.jokeySon30GOzet.formDeltaPp.toFixed(1)}pp`}
-                          {" · Güven "}
+                          {" · Örnek ağırlığı "}
                           {a.analysisOzet.jokeySon30GOzet.guven.toFixed(2)}
+                          {a.analysisOzet.jokeySon30GOzet.z != null && ` · Z ${a.analysisOzet.jokeySon30GOzet.z >= 0 ? "+" : ""}${a.analysisOzet.jokeySon30GOzet.z.toFixed(2)}`}
                           {a.analysisOzet.jokeySon30GOzet.etkinFormPp != null &&
                             ` · Etkin ${a.analysisOzet.jokeySon30GOzet.etkinFormPp >= 0 ? "+" : ""}${a.analysisOzet.jokeySon30GOzet.etkinFormPp.toFixed(1)}pp`}
                         </>

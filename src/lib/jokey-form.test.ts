@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyEtkinFormDurum, evaluateJokeyRescue, buildJokeySon30GMetni, type JokeyGuncelForm } from "./jokey-form";
+import { classifyEtkinFormDurum, evaluateJokeyRescue, buildJokeySon30GMetni, type JokeyGuncelForm, formZ, classifyFormZDurum } from "./jokey-form";
 
 // 2026-10-11 — ROTAGANYAN Jokey Son 30 Gün Performans Standardı (kullanıcı spesifikasyonu)
 // doğrulama senaryoları A-F.
@@ -80,6 +80,7 @@ describe("buildJokeySon30GMetni", () => {
     formDelta: 49 / 201 - 0.212,
     reliability: 201 / (201 + 8),
     etkinForm: (49 / 201 - 0.212) * (201 / (201 + 8)),
+    formZ: (49 - 201 * 0.212) / Math.sqrt(201 * 0.212 * (1 - 0.212)),
     durum: "ÇOK GÜÇLÜ POZİTİF",
     uzunDonemStart: 400, uzunDonemWinRate: 0.2,
   };
@@ -91,7 +92,8 @@ describe("buildJokeySon30GMetni", () => {
     expect(metin).toContain("%24.4");
     expect(metin).toContain("Ref %21.2");
     expect(metin).toContain("+3.2 pp");
-    expect(metin).toContain("Güven %96");
+    expect(metin).toContain("Örnek ağırlığı %96");
+    expect(metin).toContain("Z +1.1"); // (49 − 201·0.212)/√(201·0.212·0.788) = 1.10
     expect(metin).toContain("ÇOK GÜÇLÜ POZİTİF");
   });
 
@@ -99,8 +101,35 @@ describe("buildJokeySon30GMetni", () => {
     const bos: JokeyGuncelForm = {
       son30Start: 0, son30Win: 0, son30WinRate: 0, son30Top3: 0, son30Top3Rate: 0,
       kRef: 0, kRefTier: "none", kRefSampleN: 0, formDelta: null, reliability: 0,
-      etkinForm: null, durum: null, uzunDonemStart: 0, uzunDonemWinRate: 0,
+      etkinForm: null, formZ: null, durum: null, uzunDonemStart: 0, uzunDonemWinRate: 0,
     };
     expect(buildJokeySon30GMetni("Test Jokey", bos)).toBe("Jokey Son 30G: Test Jokey — bu dönemde biniş kaydı yok.");
+  });
+});
+
+describe("formZ / classifyFormZDurum — kanıt gücüne göre durum", () => {
+  // Kullanıcının tablosundaki gerçek satırlar (son 30G galibiyet/biniş, Ref K%)
+  const satirlar: [string, number, number, number, number, string][] = [
+    ["AHMET ÇELİK", 10, 34, 0.137, 2.66, "ÇOK GÜÇLÜ POZİTİF"],
+    ["İSA AKYAVUZ", 25, 101, 0.157, 2.5, "ÇOK GÜÇLÜ POZİTİF"],
+    ["HIŞMAN ÇİZİK", 20, 104, 0.122, 2.19, "ÇOK GÜÇLÜ POZİTİF"],
+    ["MEHMET KAYA", 9, 105, 0.134, -1.45, "NEGATİF"],
+    ["NEVZAT AVCİ", 8, 52, 0.22, -1.15, "NEGATİF"],
+    ["GÖKHAN KOCAKAYA", 10, 48, 0.252, -0.7, "NÖTR"], // eski sistem: ÇOK GÜÇLÜ NEGATİF (48 binişte beklenenden yalnız 2 galibiyet az)
+    ["ERCAN ÇANKAYA", 3, 45, 0.094, -0.63, "NÖTR"],
+  ];
+  for (const [ad, w, n, p0, zBeklenen, durum] of satirlar) {
+    it(ad + ": Z ≈ " + zBeklenen + " → " + durum, () => {
+      const z = formZ(w, n, p0)!;
+      expect(z).toBeCloseTo(zBeklenen, 1);
+      expect(classifyFormZDurum(z)).toBe(durum);
+    });
+  }
+  it("sınırlar: |Z|=2 çok güçlü, |Z|=1 pozitif/negatif", () => {
+    expect(classifyFormZDurum(2)).toBe("ÇOK GÜÇLÜ POZİTİF"); expect(classifyFormZDurum(1)).toBe("POZİTİF"); expect(classifyFormZDurum(0.99)).toBe("NÖTR");
+    expect(classifyFormZDurum(-0.99)).toBe("NÖTR"); expect(classifyFormZDurum(-1)).toBe("NEGATİF"); expect(classifyFormZDurum(-2)).toBe("ÇOK GÜÇLÜ NEGATİF");
+  });
+  it("varyans 0 (referans %0/%100) veya biniş yok → null (sessiz sayı üretilmez)", () => {
+    expect(formZ(3, 10, 0)).toBeNull(); expect(formZ(3, 10, 1)).toBeNull(); expect(formZ(0, 0, 0.2)).toBeNull();
   });
 });
