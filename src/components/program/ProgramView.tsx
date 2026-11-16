@@ -1593,7 +1593,7 @@ function RaceTable({
       <div id="panel-pedigriler">
         {pedigreeOpen && (
           <PanelKilitGate isLoggedIn={isLoggedIn} isVerified={isVerified} userEmail={userEmail}>
-            <PedigreePanel runners={race.runners} />
+            <PedigreePanel runners={race.runners} raceId={race.id} />
           </PanelKilitGate>
         )}
       </div>
