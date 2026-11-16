@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { ProgramRunner } from "@/server/services/race.service";
 import { galopDate, isSameJockey, trainingTypeClass } from "./galop-helpers";
-import { galopKalitesiV1, tekGalopKalitesi, type GalopHam } from "@/lib/methodology/galop-motor";
+import { galopKalitesiV1, type GalopHam } from "@/lib/methodology/galop-motor";
 
 const SPLIT_SIRASI = ["1400", "1200", "1000", "800", "600", "400", "200"] as const;
 
@@ -56,14 +56,12 @@ export default function GalopPanel({ runners, breed, dateStr }: { runners: Progr
                 <th className="px-2 py-1.5 text-left font-medium">Pist</th>
                 <th className="px-2 py-1.5 text-left font-medium">İ.Türü</th>
                 <th className="px-2 py-1.5 text-left font-medium">İ.Jokeyi</th>
-                <th className="px-2 py-1.5 text-right font-medium" title="Galop Analiz Motoru v1.0: tek galobun kalite puanı (0–100)">Kalite</th>
                 <th className="px-2 py-1.5 text-right font-medium" title="Galop Analiz Motoru v1.0: son 3 kullanılabilir galop + trend (0–100)">Galop Kalitesi</th>
               </tr>
             </thead>
             <tbody>
               {withGallops.map((r) =>
                 r.gallops.map((g, i) => {
-                  const q = tekGalopKalitesi(galopHamOf(g), breed).q;
                   const sameJockey = isSameJockey(g.jockey, r.jockey);
                   return (
                     <tr key={`${r.id}-${i}`} className="border-b last:border-0 hover:bg-muted/20">
@@ -107,7 +105,6 @@ export default function GalopPanel({ runners, breed, dateStr }: { runners: Progr
                           <span className={cn(sameJockey ? "font-semibold text-foreground" : "text-muted-foreground")}>{g.jockey ?? "—"}</span>
                         </span>
                       </td>
-                      <td className="px-2 py-1.5 text-right tabular-nums font-mono text-muted-foreground">{q != null ? q.toFixed(0) : "—"}</td>
                       <td className="px-2 py-1.5 text-right tabular-nums font-mono font-bold">{i === 0 ? (kaliteOf(r) != null ? kaliteOf(r)!.toFixed(0) : "—") : ""}</td>
                     </tr>
                   );
@@ -118,7 +115,7 @@ export default function GalopPanel({ runners, breed, dateStr }: { runners: Progr
         </div>
       )}
       <div className="px-4 py-1.5 text-[10px] text-muted-foreground border-t">
-        {t("sonHazirliklarNot")} &quot;Cins.&quot; ve &quot;İ.Hip.&quot; sütunları henüz kaydımızda tutulmuyor. Kalite: Galop Analiz Motoru v1.0 (hız %50 · kapanış %25 · efor %15); Galop Kalitesi: son 3 kullanılabilir galop + gelişim.
+        {t("sonHazirliklarNot")} &quot;Cins.&quot; ve &quot;İ.Hip.&quot; sütunları henüz kaydımızda tutulmuyor. Galop Kalitesi (0–100): Galop Analiz Motoru v1.0 — son 3 kullanılabilir galop (hız %50 · kapanış %25 · efor %15) + gelişim; atın ilk satırında gösterilir.
       </div>
     </div>
   );
