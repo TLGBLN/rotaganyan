@@ -1037,3 +1037,30 @@ model TjkPedigriSnapshot {
   payload      Bytes // gzip(JSON): [[kind,tjkId,year,groupId,pistId,normalizedName,breed,runnerCount,starts,wins], ...]
   createdAt    DateTime @default(now())
 }
+
+// S2 gölge kıyas (2026-11-17): canlı varsayılan model (24 sinyal) ile S2 (17 sinyal, GÖLGE) aynı yarış-öncesi snapshot üzerinde
+// yeniden puanlanır; sonuç + geçerlilik durumu BURADA kalıcı tutulur (yerel dosyaya bağımlılık yok). Canlı tahminleri DEĞİŞTİRMEZ.
+// durum: GECERLI | GECERSIZ (neden: ESKI_SINYAL_KAYDI/RELIABILITY_BILINMIYOR/OLASILIK_UYUSMUYOR/...) | KAPSAM_DISI (Handikap, ŞARTLI 1/27).
+model S2GolgeKiyas {
+  id         String   @id @default(cuid())
+  raceId     String   @unique
+  tarih      String // YYYY-MM-DD
+  hipodrom   String
+  kosuNo     Int
+  sinif      String
+  durum      String
+  neden      String?
+  ayrinti    String?
+  maxFarkPp  Float? // yeniden hesaplanan canlı olasılık ile kayıtlı olasılık arasındaki EN BÜYÜK mutlak fark (yüzde puan; TÜM atlar)
+  kazananNo  Int?
+  canliSira  Int?
+  s2Sira     Int?
+  canliP     Float? // kazananın canlı modeldeki olasılığı (%)
+  s2P        Float? // kazananın S2'deki olasılığı (%)
+  atlarJson  Json? // [{no, kayitliP, canliP, s2P}]
+  agirlikS2  String // S2 ağırlık dosyası generatedAt (sürüm izi)
+  hesaplandi DateTime @default(now())
+
+  @@index([tarih])
+  @@index([durum])
+}

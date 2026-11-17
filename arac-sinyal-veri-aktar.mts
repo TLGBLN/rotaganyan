@@ -54,7 +54,7 @@ for (let d = new Date(from); d <= to; d = new Date(d.getTime() + 86400000)) {
         jokey: rn?.jockey ?? null, antrenor: rn?.trainer ?? null, sahip: rn?.owner ?? null, sire: rn?.sire ?? null, dam: rn?.dam ?? null, damSire: rn?.damSire ?? null,
         ayniJokey: rn?.sameJockey ?? null, jokeyDeg: rn?.jockeyChanged ?? null, apprentice: rn?.apprentice ?? null, startNo: rn?.startNo ?? null, disari: rn?.disaridanStart ?? null,
         form: rn?.recentForm ?? null, takiEk: rn?.equipmentAdded ?? null, takiCik: rn?.equipmentRemoved ?? null, kosmadi: rn?.scratched ?? false,
-        sig: (snap?.tumSinyaller ?? []).map((s) => [s.kod, s.hamDeger, s.observed, s.reliability ?? 1]),
+        sig: (snap?.tumSinyaller ?? []).map((s) => [s.kod, s.hamDeger, s.observed, typeof s.reliability === "number" ? s.reliability : null]), // bilinmiyorsa null (TAM GÜVEN SAYILMAZ)
         ped: snap?.externalPedigree ?? null,
       };
     });
