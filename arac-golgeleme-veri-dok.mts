@@ -71,8 +71,8 @@ const evKur = (list: { t: number; won: number }[]): Ev => { list.sort((a, b) => 
 const bisect = (a: number[], x: number) => { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >> 1; if (a[m] < x) lo = m + 1; else hi = m; } return lo; };
 
 async function main() {
-  const d16 = JSON.parse(fs.readFileSync("C:/tmp/saf-model-egitim-verisi-16ozellik.json", "utf8")) as Satir[];
-  const d18 = JSON.parse(fs.readFileSync("C:/tmp/saf18-model-egitim-verisi.json", "utf8")) as Satir[];
+  const d16 = JSON.parse(fs.readFileSync(process.env.DOK_GIRDI ?? "C:/tmp/saf-model-egitim-verisi-16ozellik.json", "utf8")) as Satir[];
+  const d18 = JSON.parse(fs.readFileSync(process.env.DOK_GIRDI ?? "C:/tmp/saf18-model-egitim-verisi.json", "utf8")) as Satir[];
 
   // ── Meta: runner → tjk/jokey/antrenör; yarış → mesafe/pist/sınıf ──
   const tumRunnerId = [...new Set(d18.flatMap((r) => r.runners.map((x) => x.runnerId)))];
@@ -443,8 +443,8 @@ async function main() {
   const yarislar = veriYum.map((r) => { const rm1 = raceMeta.get(r.raceId); return { raceId: r.raceId, tarih: r.tarih, sinif: rm1?.classType ?? null, grup: grupOf(r.raceId), mesafe: rm1?.distance ?? null, yuzey: rm1?.surface ?? null,
     runners: r.runners.map((x) => ({ no: x.no, k: x.kazandi ? 1 : 0, f: FC2.map((n) => { const g = bul(x, n); return g?.observed && g.raw != null && Number.isFinite(g.raw) ? [+g.raw.toFixed(6), +((g.reliability ?? 1)).toFixed(4), g.evidenceObserved === undefined ? -1 : g.evidenceObserved ? 1 : 0] : null; }) })) }; });
   fs.mkdirSync(".sinyal-veri", { recursive: true });
-  fs.writeFileSync(".sinyal-veri/golgeleme-matris.json", JSON.stringify({ uretim: new Date().toISOString(), ozellik: FC2.map(AD), ic: FC2, kesim, yarislar }));
-  console.log("YAZILDI .sinyal-veri/golgeleme-matris.json | yarış " + yarislar.length + " | at " + yarislar.reduce((p, r) => p + r.runners.length, 0) + " | özellik " + FC2.length + " | kesim " + kesim.join(","));
+  fs.writeFileSync(process.env.DOK_CIKTI ?? ".sinyal-veri/golgeleme-matris.json", JSON.stringify({ uretim: new Date().toISOString(), ozellik: FC2.map(AD), ic: FC2, kesim, yarislar }));
+  console.log("YAZILDI " + (process.env.DOK_CIKTI ?? ".sinyal-veri/golgeleme-matris.json") + " | yarış " + yarislar.length + " | at " + yarislar.reduce((p, r) => p + r.runners.length, 0) + " | özellik " + FC2.length + " | kesim " + kesim.join(","));
   process.exit(0);
 }
 main().catch((e) => { console.error("HATA:", e); process.exit(1); });
