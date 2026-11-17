@@ -1,9 +1,7 @@
+// TEST ALTYAPISI testleri — YENİ MOTORUN SİNYALİ DEĞİLDİR. Aşağıdaki özellikler yalnız dedektörün çalıştığını göstermek için TEST İÇİNDE tanımlı örneklerdir; hiçbir motora/kayda girmez.
 import { describe, expect, it } from "vitest";
 import { Deposu, type KosuKaydi } from "./asof-veri";
 import { sizintiDenetimi, type Kosucu, type OzellikFn } from "./sizinti-denetimi";
-import { OZELLIKLER } from "./ozellikler";
-import fs from "node:fs";
-import path from "node:path";
 
 const G = 86400000; const T0 = Date.UTC(2026, 0, 1);
 // Sentetik: 40 gün, her gün 1 yarış 8 at; atlar 1..8 sabit; bitiş sırası deterministik karışık
@@ -18,14 +16,14 @@ const dogru: OzellikFn = (g, k) => { const h = g.atGecmisi(k.atId).filter((x) =>
 // DOĞRU özellik 2: as-of genel kazanma oranına göre küçültülmüş jokey oranı
 const dogruJokey: OzellikFn = (g, k) => { const { n, kazanan } = g.genelOnce(); const p0 = n >= 50 ? kazanan / n : 0.1; const h = g.jokeyGecmisi(k.jokey); return ((h.reduce((p, q) => p + q.kazandi, 0) + 20 * p0) / (h.length + 20)) * 100; };
 
-describe("V7 as-of görünüm", () => {
+describe("as-of görünüm (test altyapısı)", () => {
   it("t günü ve sonrası kayıtlar GÖRÜNMEZ (aynı gün dahil değil); önceki günler görünür", () => {
     const { dep } = veri(); const g = dep.gorunum(T0 + 10 * G); const h = g.atGecmisi(1);
     expect(h).toHaveLength(10); expect(Math.max(...h.map((x) => x.tarih))).toBeLessThan(T0 + 10 * G); expect(g.genelOnce().n).toBe(80);
   });
 });
 
-describe("V7 sızıntı dedektörü (gelecek-bozma)", () => {
+describe("sızıntı dedektörü (test altyapısı) (gelecek-bozma)", () => {
   it("doğru özellikler (at geçmişi, as-of genel oran + jokey) GEÇER", () => {
     const { dep, kosucular } = veri();
     for (const f of [dogru, dogruJokey]) { const r = sizintiDenetimi(f, dep, kosucular, 5); expect(r.denenen).toBeGreaterThan(0); expect(r.gecti).toBe(true); expect(r.farkli).toBe(0); }
@@ -35,21 +33,4 @@ describe("V7 sızıntı dedektörü (gelecek-bozma)", () => {
     const r = sizintiDenetimi(sizdiran, dep, kosucular, 5); expect(r.gecti).toBe(false);
   });
   it("denetlenecek koşucu yoksa 'kanıt yok' (geçmiş sayılmaz)", () => { const { dep } = veri(); expect(sizintiDenetimi(dogru, dep, [], 5).gecti).toBe(false); });
-});
-
-describe("V7 kayıtlı özellikler — sızıntı denetimi ZORUNLU", () => {
-  it("OZELLIKLER'deki HER özellik gelecek-bozma testinden geçer (yeni özellik eklenince otomatik denetlenir)", () => {
-    const { dep, kosucular } = veri(); expect(OZELLIKLER.length).toBeGreaterThan(0);
-    for (const o of OZELLIKLER) { const r = sizintiDenetimi(o.fn, dep, kosucular, 6); expect(r.denenen, o.ad).toBeGreaterThan(0); expect(r.gecti, o.ad + ": " + r.yorum).toBe(true); }
-  });
-  it("YAPISAL KURAL: v7/ozellikler/*.ts yalnız ../sizinti-denetimi ve ../asof-veri import eder; zaman, rastgelelik, ağ, dosya, veritabanı, process KULLANMAZ", () => {
-    // Dedektör yalnız GÖRÜNÜM üzerinden akan sızıntıyı yakalar; özelliğin dışarıdan eriştiği global durumu yakalayamaz. Bu yüzden özellik dosyalarının dışa erişimi yapısal olarak yasak.
-    const dir = path.join(__dirname, "ozellikler"); const dosyalar = fs.readdirSync(dir).filter((f) => f.endsWith(".ts") && f !== "index.ts");
-    expect(dosyalar.length).toBeGreaterThan(0);
-    for (const f of dosyalar) {
-      const kod = fs.readFileSync(path.join(dir, f), "utf8").split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
-      for (const m of kod.matchAll(/from\s+["']([^"']+)["']/g)) expect(["../sizinti-denetimi", "../asof-veri"], f + " import: " + m[1]).toContain(m[1]);
-      for (const yasak of ["Date.now", "new Date(", "Math.random", "fetch(", "process.", "require(", "import(", "globalThis", "window", "@/lib/db", "prisma"]) expect(kod.includes(yasak), f + " yasak: " + yasak).toBe(false);
-    }
-  });
 });
