@@ -31,20 +31,34 @@ export function galopOzellik(g: { track: string | null; splits: Record<string, s
 /** Karşılaştırma grubu anahtarı; lv 0 = en ayrıntılı, 3 = yalnız ırk×mesafe. */
 export const galopGrupAnahtari = (irk: string, o: Pick<GalopOzellik, "d" | "pist" | "ic" | "tur">, lv: number) => [irk, o.d, lv <= 2 ? o.pist : "*", lv <= 1 ? o.tur : "*", lv <= 0 ? o.ic : "*"].join("|");
 
-const GRUP = referans.gruplar as Record<string, { n: number; m: number; s: number }>;
-const REG = referans.regresyon as Record<string, { n: number; a: number; b: number; s: number }>;
+export type GalopReferans = { gruplar: Record<string, { n: number; m: number; s: number }>; regresyon: Record<string, { n: number; a: number; b: number; s: number }> };
+/** Üretimdeki STATİK referans (galop-referans.json, TÜM kayıtlardan). Tarihsel yeniden hesapta (as-of) bunun yerine galopReferansKur(kesim öncesi kayıtlar) verilmeli. */
+export const STATIK_GALOP_REF: GalopReferans = { gruplar: referans.gruplar as GalopReferans["gruplar"], regresyon: referans.regresyon as GalopReferans["regresyon"] };
+
+const medyan = (v: number[]) => { const s = [...v].sort((p, q) => p - q); const n = s.length; return n % 2 ? s[(n - 1) / 2]! : (s[n / 2 - 1]! + s[n / 2]!) / 2; };
+/** SAF referans kurucu: verilen galop kayıtlarından (çağıran TARİH KESİMİNİ uygular) grup medyan/sağlam σ ve toplam→son400 regresyonu. arac-galop-referans-uret.mts ile AYNI hesap. */
+export function galopReferansKur(kayitlar: { breed: string; track: string | null; splits: Record<string, string | null> }[]): GalopReferans {
+  const refT = new Map<string, number[]>(); const refXY = new Map<string, { x: number[]; y: number[] }>();
+  for (const g of kayitlar) { const o = galopOzellik(g); if (!o) continue;
+    for (let lv = 0; lv <= 3; lv++) { const k = galopGrupAnahtari(g.breed, o, lv); const a = refT.get(k); if (a) a.push(o.T); else refT.set(k, [o.T]); }
+    if (o.d !== "400" && o.t4 != null) { const k = galopGrupAnahtari(g.breed, o, 2); const e = refXY.get(k) ?? { x: [], y: [] }; e.x.push(o.T); e.y.push(o.t4); refXY.set(k, e); } }
+  const gruplar: GalopReferans["gruplar"] = {}; for (const [k, v] of refT) { if (v.length < GALOP_MIN_REF) continue; const m = medyan(v); const mad = 1.4826 * medyan(v.map((z) => Math.abs(z - m))); gruplar[k] = { n: v.length, m: +m.toFixed(4), s: +Math.max(mad, galopSigmaTaban(k.split("|")[1]!)).toFixed(4) }; }
+  const regresyon: GalopReferans["regresyon"] = {};
+  for (const [k, e] of refXY) { if (e.x.length < GALOP_MIN_REF) continue; const n = e.x.length; const mx = e.x.reduce((p, z) => p + z, 0) / n, my = e.y.reduce((p, z) => p + z, 0) / n; let sxy = 0, sxx = 0; for (let i = 0; i < n; i++) { sxy += (e.x[i]! - mx) * (e.y[i]! - my); sxx += (e.x[i]! - mx) ** 2; } const b = sxx > 0 ? sxy / sxx : 0; const a = my - b * mx; const res = e.x.map((xx, i) => e.y[i]! - (a + b * xx)); const mr = medyan(res); regresyon[k] = { n, a: +a.toFixed(5), b: +b.toFixed(5), s: +Math.max(1.4826 * medyan(res.map((z) => Math.abs(z - mr))), 0.15).toFixed(4) }; }
+  return { gruplar, regresyon };
+}
 
 export type TekGalopDetay = { q: number | null; pHiz: number | null; pKapanis: number | null; pEfor: number | null; refN: number };
 /** Tek galobun kalite puanı Q (0–100). Kenter / çözülemeyen / referanssız galop → q=null. */
-export function tekGalopKalitesi(g: GalopHam, irk: string): TekGalopDetay {
+export function tekGalopKalitesi(g: GalopHam, irk: string, ref: GalopReferans = STATIK_GALOP_REF): TekGalopDetay {
   const bos: TekGalopDetay = { q: null, pHiz: null, pKapanis: null, pEfor: null, refN: 0 };
   if ((g.track ?? "").toUpperCase().includes("KENTER")) return bos;
   const o = galopOzellik(g); if (!o) return bos;
-  let st: { n: number; m: number; s: number } | undefined; for (let lv = 0; lv <= 3 && !st; lv++) st = GRUP[galopGrupAnahtari(irk, o, lv)];
+  let st: { n: number; m: number; s: number } | undefined; for (let lv = 0; lv <= 3 && !st; lv++) st = ref.gruplar[galopGrupAnahtari(irk, o, lv)];
   if (!st) return bos;
   const pHiz = 100 * Phi((st.m - o.T) / st.s);
   let pKapanis: number | null = null;
-  if (o.d !== "400" && o.t4 != null) { const r = REG[galopGrupAnahtari(irk, o, 2)]; if (r) pKapanis = 100 * Phi(((r.a + r.b * o.T) - o.t4) / r.s); }
+  if (o.d !== "400" && o.t4 != null) { const r = ref.regresyon[galopGrupAnahtari(irk, o, 2)]; if (r) pKapanis = 100 * Phi(((r.a + r.b * o.T) - o.t4) / r.s); }
   const pEfor = EFOR[(g.form ?? "").toUpperCase().trim()] ?? null;
   let sw = 0.5, sum = 0.5 * pHiz;
   if (pKapanis != null) { sw += 0.25; sum += 0.25 * pKapanis; }
@@ -54,10 +68,10 @@ export function tekGalopKalitesi(g: GalopHam, irk: string): TekGalopDetay {
 
 export type GalopKaliteSonuc = { kalite: number | null; qler: number[]; qOrtalama: number | null; trend: number | null };
 /** GALOP_KALITE (0–100). `galoplar` YARIŞ GÜNÜNDEN ÖNCEKİ kayıtlar olmalı; sıra önemli değil (yeniden en yeniye sıralanır). */
-export function galopKalitesiV1(galoplar: GalopHam[], irk: string): GalopKaliteSonuc {
+export function galopKalitesiV1(galoplar: GalopHam[], irk: string, ref: GalopReferans = STATIK_GALOP_REF): GalopKaliteSonuc {
   const sirali = [...galoplar].sort((a, b) => b.date.getTime() - a.date.getTime());
   const qler: number[] = [];
-  for (const g of sirali) { const q = tekGalopKalitesi(g, irk).q; if (q != null) qler.push(q); if (qler.length >= 3) break; }
+  for (const g of sirali) { const q = tekGalopKalitesi(g, irk, ref).q; if (q != null) qler.push(q); if (qler.length >= 3) break; }
   if (!qler.length) return { kalite: null, qler, qOrtalama: null, trend: null };
   const w = [0.5, 0.3, 0.2].slice(0, qler.length);
   const qOrt = qler.reduce((p, q, i) => p + q * w[i]!, 0) / w.reduce((p, q) => p + q, 0);

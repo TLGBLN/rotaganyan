@@ -10,6 +10,12 @@ import fs from "node:fs";
 type Cell = [number, number, number?] | null;
 type Race = { raceId: string; tarih: string; runners: { no: number; k: number; f: Cell[] }[] };
 const M = JSON.parse(fs.readFileSync(process.env.GOLGELEME_MATRIS ?? ".sinyal-veri/golgeleme-matris.json", "utf8")) as { ozellik: string[]; kesim: string[]; yarislar: Race[] };
+{ // doluluğu düşük (varsayılan <%5) sinyal sütunlarını at: tümüyle boş sütunlar eğitimi yavaşlatır ve seçim kuralını anlamsızlaştırır
+  const nAt = M.yarislar.reduce((p, r) => p + r.runners.length, 0);
+  const keep = M.ozellik.map((_, i) => i).filter((i) => M.yarislar.reduce((p, r) => p + r.runners.filter((x) => x.f[i]).length, 0) / nAt >= Number(process.env.MIN_DOLULUK ?? 0.05));
+  M.yarislar.forEach((r) => r.runners.forEach((x) => { x.f = keep.map((i) => x.f[i]!); }));
+  console.log("kullanılan sinyal (doluluk >= %5): " + keep.map((i) => M.ozellik[i]).join(", ")); M.ozellik = keep.map((i) => M.ozellik[i]!);
+}
 const NAMES = M.ozellik, D = NAMES.length;
 const races = [...M.yarislar].sort((a, b) => a.tarih.localeCompare(b.tarih)).filter((r) => r.runners.some((x) => x.k === 1));
 const kesim = M.kesim; const softmax = (s: number[]) => { const m = Math.max(...s); const e = s.map((x) => Math.exp(x - m)); const z = e.reduce((a, b) => a + b, 0); return e.map((x) => x / z); };

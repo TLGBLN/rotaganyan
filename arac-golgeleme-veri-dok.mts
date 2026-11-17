@@ -18,8 +18,11 @@ import { closingResidual, lateSegmentSpeed, speedResidual, makeBaselineCache, ma
 import type { Surface } from "./src/lib/accurace/types";
 import { sinifSeviyesi } from "./src/lib/methodology/ham-alan-sinyalleri";
 import { galopSkoru } from "./src/lib/methodology/pedigri-galop-ortak";
-import { galopKalitesiV1 } from "./src/lib/methodology/galop-motor";
-import { hizFormu, erkenProfil } from "./src/lib/accurace/v2";
+import { galopKalitesiV1, galopReferansKur } from "./src/lib/methodology/galop-motor";
+import { hizFormu, erkenProfil, referansKur } from "./src/lib/accurace/v2";
+// AS_OF=1: referanslar (Accurace v2, galop), PIT genel oranı ve tempo basınç ortalaması YALNIZ ilgili ayın başından ÖNCEKİ veriyle üretilir; as-olmayan pedigri puanı (pedk) devre dışı.
+const AS_OF = process.env.AS_OF === "1";
+const ayBasi = (tarih: string) => new Date(tarih.slice(0, 7) + "-01T00:00:00.000Z");
 import { parseGalopSec } from "./src/components/program/panels/galop-helpers";
 
 type Sig = { ad: string; raw: number | null; observed: boolean; reliability: number; evidenceObserved?: boolean };
@@ -114,6 +117,11 @@ async function main() {
   // ── ACC özelliklerini YUMUŞAK yüzey kuralıyla arşivden yeniden üret (canlı motorla AYNI çağrılar) ──
   console.log("Accurace arşivi yükleniyor...");
   const runs = await accuraceKosulari();
+  // ── AS_OF referans önbellekleri (ay başı kesimi) ──
+  const v2Memo = new Map<string, ReturnType<typeof referansKur>>(); const v2RefAy = (tarih: string) => { const k = tarih.slice(0, 7); let r = v2Memo.get(k); if (!r) { const kes = ayBasi(tarih).getTime(); r = referansKur(runs.filter((q) => q.date.getTime() < kes)); v2Memo.set(k, r); } return r; };
+  const galopTum: { date: number; breed: string; track: string | null; splits: Record<string, string | null> }[] = [];
+  if (AS_OF) { let cur: string | undefined; for (;;) { await new Promise((q) => setTimeout(q, 300)); const bt = await db.gallop.findMany({ take: 20000, orderBy: { id: "asc" }, ...(cur ? { skip: 1, cursor: { id: cur } } : {}), select: { id: true, date: true, track: true, splits: true, runner: { select: { race: { select: { breed: true, raceDay: { select: { date: true } } } } } } } }); if (!bt.length) break; cur = bt[bt.length - 1]!.id; for (const g of bt) if (g.date.getTime() <= g.runner.race.raceDay.date.getTime()) galopTum.push({ date: g.date.getTime(), breed: g.runner.race.breed, track: g.track, splits: (g.splits ?? {}) as Record<string, string | null> }); } console.log("AS_OF galop kaydı (galop tarihi ≤ yarış günü):", galopTum.length); }
+  const gMemo = new Map<string, ReturnType<typeof galopReferansKur>>(); const galopRefAy = (tarih: string) => { const k = tarih.slice(0, 7); let r = gMemo.get(k); if (!r) { const kes = ayBasi(tarih).getTime(); r = galopReferansKur(galopTum.filter((q) => q.date < kes)); gMemo.set(k, r); } return r; };
   const byTjk = new Map<number, typeof runs>();
   for (const r of runs) { const a = byTjk.get(r.tjk) ?? []; a.push(r); byTjk.set(r.tjk, a); }
   const baselineAt = makeBaselineCache(runs), closingBaselineAt = makeClosingBaselineCache(runs);
@@ -138,7 +146,7 @@ async function main() {
   const jL = new Map<string, { t: number; won: number }[]>(), tL = new Map<string, { t: number; won: number }[]>(), hL = new Map<number, { t: number; won: number }[]>();
   const hpL = new Map<number, { t: number; hp: number | null; kilo: number | null }[]>();
   const ajL = new Map<string, { t: number; won: number }[]>();
-  let toplam = 0, kaz = 0, cursor: string | undefined;
+  const gL: { t: number; won: number }[] = []; let toplam = 0, kaz = 0, cursor: string | undefined;
   for (;;) {
     const batch = await db.runner.findMany({
       where: { scratched: false, race: { result: { isNot: null }, raceDay: { hippodrome: { slug: { notIn: ["karma", "perak-malezya"] } } } } },
@@ -147,7 +155,7 @@ async function main() {
     });
     if (!batch.length) break;
     for (const b of batch) {
-      const t = b.race.raceDay.date.getTime(), won = b.race.result?.winnerNos.includes(b.no) ? 1 : 0; toplam++; kaz += won;
+      const t = b.race.raceDay.date.getTime(), won = b.race.result?.winnerNos.includes(b.no) ? 1 : 0; toplam++; kaz += won; gL.push({ t, won });
       if (b.jockey) (jL.get(b.jockey) ?? jL.set(b.jockey, []).get(b.jockey)!).push({ t, won });
       if (b.trainer) (tL.get(b.trainer) ?? tL.set(b.trainer, []).get(b.trainer)!).push({ t, won });
       if (b.tjkAtId != null) (hL.get(b.tjkAtId) ?? hL.set(b.tjkAtId, []).get(b.tjkAtId)!).push({ t, won });
@@ -166,8 +174,8 @@ async function main() {
   };
   const ajEv = new Map([...ajL].map(([k, v]) => [k, evKur(v)]));
   const jEv = new Map([...jL].map(([k, v]) => [k, evKur(v)])), tEv = new Map([...tL].map(([k, v]) => [k, evKur(v)])), hEv = new Map([...hL].map(([k, v]) => [k, evKur(v)]));
-  const genel = kaz / toplam;
-  const seviye = (ev: Ev | undefined, t: number): number | null => { if (!ev) return null; const hi = bisect(ev.t, t), lo = bisect(ev.t, t - 365 * 86400000); const rd = hi - lo; return rd <= 0 ? null : (((ev.cum[hi] - ev.cum[lo]) + 20 * genel) / (rd + 20)) * 100; };
+  const gEv = evKur(gL); const genelAt = (t: number) => { if (!AS_OF) return kaz / toplam; const n = bisect(gEv.t, t); return n >= 200 ? gEv.cum[n]! / n : 0.1; };
+  const seviye = (ev: Ev | undefined, t: number): number | null => { if (!ev) return null; const hi = bisect(ev.t, t), lo = bisect(ev.t, t - 365 * 86400000); const rd = hi - lo; return rd <= 0 ? null : (((ev.cum[hi] - ev.cum[lo]) + 20 * genelAt(t)) / (rd + 20)) * 100; };
 
   const galopOf = new Map<string, Sig | undefined>();
   for (const r of d18) for (const x of r.runners) galopOf.set(x.runnerId, bul(x, "galopKalite"));
@@ -352,7 +360,7 @@ async function main() {
       mk("gBest", son14.length ? -Math.min(...son14) : null);
       mk("gN14", gl.length ? Math.log1p(gl.filter((g) => gun - g.date.getTime() <= 14 * 864e5 && (g.form ?? "").toUpperCase().trim() !== "ÇR").length) : null);
       // ── GALOP_KALITE v1.0 (CANLI MOTORLA AYNI KÖD: src/lib/methodology/galop-motor.ts) ──
-      const gkS = galopKalitesiV1(gl.map((g) => ({ date: g.date, track: g.track, form: g.form, splits: g.splits })), irk); const gk = gkS.kalite;
+      const gkS = galopKalitesiV1(gl.map((g) => ({ date: g.date, track: g.track, form: g.form, splits: g.splits })), irk, AS_OF ? galopRefAy(r.tarih) : undefined); const gk = gkS.kalite;
       // ── GALOP HAZIRLIK: 0.35Y + 0.30D + 0.20C + 0.15S (z'ler, eksik bileşen yeniden normalize) ──
       const h = hz.get(x.runnerId); let hh: number | null = null, y: number | null = null, d: number | null = null, c: number | null = null, s: number | null = null;
       if (h) { y = h.kgs != null ? (h.n14 - (yA + yB * h.kgs)) / yS : null; d = (h.bins - stD.m) / stD.s; c = (h.cesit - stC.m) / stC.s; s = (-h.gunS - stS.m) / stS.s;
@@ -411,11 +419,11 @@ async function main() {
   const rm = (...x: string[]) => L22.filter((s) => !x.includes(s));
   // ── PEDİGRİ PUANLAMASI (PED_KALITE) adayları: yalnız düşük sınıf yarışlarında dolu (C:/tmp/pedk.json, arac-pedigri-puan-test.mts çıktısı) ──
   const pedk = JSON.parse(fs.readFileSync("C:/tmp/pedk.json", "utf8")) as Record<string, { k: number | null; b: number | null; a: number | null; kb: number | null; g: number }>;
-  for (const r of veriYum) { const dusuk = sinifSeviyesi(raceMeta.get(r.raceId)?.classType) === 1; for (const x of r.runners) { const p = pedk[r.raceId + "|" + x.no]; const mk2 = (ad: string, v: number | null | undefined) => setSig(x, { ad, raw: dusuk && v != null ? v : null, observed: dusuk && v != null, reliability: 1 }); mk2("pedK", p?.k); mk2("pedB", p?.b); mk2("pedA", p?.a); mk2("pedKB", p?.kb); } }
+  for (const r of veriYum) { const dusuk = sinifSeviyesi(raceMeta.get(r.raceId)?.classType) === 1; for (const x of r.runners) { const p = AS_OF ? undefined : pedk[r.raceId + "|" + x.no]; const mk2 = (ad: string, v: number | null | undefined) => setSig(x, { ad, raw: dusuk && v != null ? v : null, observed: dusuk && v != null, reliability: 1 }); mk2("pedK", p?.k); mk2("pedB", p?.b); mk2("pedA", p?.a); mk2("pedKB", p?.kb); } }
   { const lowRows = veriYum.filter((r) => sinifSeviyesi(raceMeta.get(r.raceId)?.classType) === 1).flatMap((r) => r.runners); console.log("DÜŞÜK SINIF doluluk (n=" + lowRows.length + "): " + ["pedK", "pedB", "pedA", "pedKB"].map((k) => k + " %" + (lowRows.filter((x) => bul(x, k)?.observed).length / lowRows.length * 100).toFixed(0)).join(" | ")); }
   // ── CANLI model tabanı (bugünkü): Maiden/ŞARTLI 19'da galopPedigri (B80), diğerlerinde galopKaliteV1 ──
   const isM = (id: string) => grupOf(id) === 3;
-  for (const r of veriYum) { const m = isM(r.raceId); for (const x of r.runners) { const g = bul(x, "gKA"), p = bul(x, "pedK"); const gv = g?.observed && g.raw != null ? g.raw : null, pv = p?.observed && p.raw != null ? p.raw : null; const b = gv != null && pv != null ? 0.8 * gv + 0.2 * pv : (gv ?? pv); setSig(x, { ad: "gB80", raw: m ? b : null, observed: m && b != null, reliability: 1 }); setSig(x, { ad: "gKB", raw: m ? null : gv, observed: !m && gv != null, reliability: g?.reliability ?? 1 }); } }
+  for (const r of veriYum) { const m = isM(r.raceId); for (const x of r.runners) { const g = bul(x, "gKA"), p = bul(x, "pedK"); const gv = g?.observed && g.raw != null ? g.raw : null, pv = p?.observed && p.raw != null ? p.raw : null; const b = gv != null && pv != null ? 0.8 * gv + 0.2 * pv : (gv ?? pv); const mm = m && !AS_OF; setSig(x, { ad: "gB80", raw: mm ? b : null, observed: mm && b != null, reliability: 1 }); setSig(x, { ad: "gKB", raw: mm ? null : gv, observed: !mm && gv != null, reliability: g?.reliability ?? 1 }); } }
   const F23 = L22.map((x) => (x === "galopKalite" ? "gKA" : x));
   const FN = [...F23.map((x) => (x === "gKA" ? "gKB" : x)), "gB80"];
 
@@ -424,16 +432,17 @@ async function main() {
   const profiller = new Map<string, { o: number | null; e: number | null }>(); const hizMap = new Map<string, number | null>(); const baskiMap = new Map<string, number>();
   for (const r of veriYum) { const T = new Date(r.tarih + "T00:00:00.000Z"); const rm0 = raceMeta.get(r.raceId); const L = rm0?.distance ?? 1400; const surf = rm0?.surface === "CIM" || rm0?.surface === "KUM" || rm0?.surface === "SENTETIK" ? rm0.surface : null; const hedef = { date: T, length: L, surface: surf };
     let pres = 0, nObs = 0;
-    for (const x of r.runners) { const tjk = meta.get(x.runnerId)?.tjk; const g = (tjk != null ? (byTjk.get(tjk) ?? []) : []) as Run[]; const pr = erkenProfil(g, hedef); profiller.set(x.runnerId, pr); hizMap.set(x.runnerId, hizFormu(g, hedef)); if (pr.o != null) { pres += Math.max(0, pr.o - 0.5) * 2; nObs++; } }
+    for (const x of r.runners) { const tjk = meta.get(x.runnerId)?.tjk; const g = (tjk != null ? (byTjk.get(tjk) ?? []) : []) as Run[]; const rf = AS_OF ? v2RefAy(r.tarih) : undefined; const pr = erkenProfil(g, hedef, rf); profiller.set(x.runnerId, pr); hizMap.set(x.runnerId, hizFormu(g, hedef, rf)); if (pr.o != null) { pres += Math.max(0, pr.o - 0.5) * 2; nObs++; } }
     baskiMap.set(r.raceId, nObs >= 3 ? pres : NaN); }
-  const pAll = [...baskiMap.values()].filter((v) => Number.isFinite(v)); const pMean = pAll.reduce((p, q) => p + q, 0) / pAll.length;
-  for (const r of veriYum) { const P = baskiMap.get(r.raceId)!; const okP = Number.isFinite(P); const eList = r.runners.map((x) => profiller.get(x.runnerId)!.e).filter((v): v is number => v != null); const eMean = eList.length ? eList.reduce((p, q) => p + q, 0) / eList.length : 0;
+  const pAll = [...baskiMap.values()].filter((v) => Number.isFinite(v)); const pMeanGlobal = pAll.reduce((p, q) => p + q, 0) / pAll.length;
+  const tarihOf = new Map(veriYum.map((r) => [r.raceId, r.tarih])); const pAy = new Map<string, number>(); const pMeanAt = (tarih: string) => { if (!AS_OF) return pMeanGlobal; const k = tarih.slice(0, 7); let v = pAy.get(k); if (v == null) { const onceki = [...baskiMap].filter(([id, b]) => Number.isFinite(b) && tarihOf.get(id)! < k + "-01").map(([, b]) => b); v = onceki.length >= 30 ? onceki.reduce((p, q) => p + q, 0) / onceki.length : 1.30; pAy.set(k, v); } return v; }; const pMean = pMeanGlobal;
+  for (const r of veriYum) { const P = baskiMap.get(r.raceId)!; const okP = Number.isFinite(P); const pMeanR = pMeanAt(r.tarih); const eList = r.runners.map((x) => profiller.get(x.runnerId)!.e).filter((v): v is number => v != null); const eMean = eList.length ? eList.reduce((p, q) => p + q, 0) / eList.length : 0;
     for (const x of r.runners) { const pr = profiller.get(x.runnerId)!; const o = pr.o, e = pr.e, hz = hizMap.get(x.runnerId) ?? null;
       setSig(x, { ad: "aS", raw: hz, observed: hz != null, reliability: 1 });
       setSig(x, { ad: "tO", raw: o, observed: o != null, reliability: 1 });
       setSig(x, { ad: "tE", raw: e != null ? e - eMean : null, observed: e != null, reliability: 1 });
-      setSig(x, { ad: "tFront", raw: o != null && okP ? o * (P - pMean) : null, observed: o != null && okP, reliability: 1 });
-      setSig(x, { ad: "tBack", raw: o != null && okP ? (1 - o) * (P - pMean) : null, observed: o != null && okP, reliability: 1 }); } }
+      setSig(x, { ad: "tFront", raw: o != null && okP ? o * (P - pMeanR) : null, observed: o != null && okP, reliability: 1 });
+      setSig(x, { ad: "tBack", raw: o != null && okP ? (1 - o) * (P - pMeanR) : null, observed: o != null && okP, reliability: 1 }); } }
   console.log("baskiOrt (eğitim kümesi, " + pAll.length + " yarış) = " + pMean.toFixed(6));
   const tempoCanli = ["PS_front", "PS_closerFit", "yarisGidisatiSkoru"];
   const FC2 = [...FN.filter((x) => !tempoCanli.includes(x)).map((x) => (x === "ACC_SPEED" ? "aS" : x)), "tO", "tE", "tFront", "tBack"];

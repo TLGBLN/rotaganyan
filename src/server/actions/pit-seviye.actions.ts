@@ -5,7 +5,8 @@
 // ΔLogLoss=-0.069 [-0.090,-0.048], antrenör seviyesi -0.028 [-0.038,-0.018] verdi (5/5 kat).
 //
 // POINT-IN-TIME: yalnız asOfDate'ten KESİNLİKLE önceki, kendi Runner/Result kayıtlarımızdan
-// hesaplanır. TrainerStatSync/JockeyStatSync KULLANILMAZ — onlar üzerine yazılan anlık görüntü
+// hesaplanır (2026-11-17 düzeltme: küçük örnek düzeltmesinin önsel "genel oran"ı da artık YALNIZ asOfDate öncesi binişlerden;
+// önceden TÜM sonuçlanmış yarışlardan hesaplanıyordu = geçmiş tarihli yeniden hesapta gelecek sonuç sızıntısı). TrainerStatSync/JockeyStatSync KULLANILMAZ — onlar üzerine yazılan anlık görüntü
 // (geçmiş yarışlar için bugünkü sezon toplamı = hindsight sızıntısı; ölçümde sızıntılı antrenör
 // sürümü -0.086 gösterip PIT sürümünün -0.028'ini şişirdi). "karma"/"perak-malezya" hariç
 // (karma, gerçek yarışların AYNI sonucunu tekrar sayan mirror — jokey-form.actions.ts ile aynı).
@@ -14,7 +15,7 @@
 import { db } from "@/lib/db";
 
 type Ev = { t: number[]; cum: number[] };
-type Endeks = { jEv: Map<string, Ev>; tEv: Map<string, Ev>; hEv: Map<number, Ev>; genelOran: number };
+type Endeks = { jEv: Map<string, Ev>; tEv: Map<string, Ev>; hEv: Map<number, Ev>; gEv: Ev }; // gEv: TÜM sonuçlanmış binişler (zaman sıralı, kümülatif kazanma) — genel oran YALNIZ hedef tarihten ÖNCEKİ binişlerle (as-of)
 
 const TTL_MS = 30 * 60 * 1000;
 const PENCERE_GUN = 365;
@@ -39,7 +40,7 @@ async function endeksGetir(): Promise<Endeks> {
   const jL = new Map<string, { t: number; won: number }[]>();
   const tL = new Map<string, { t: number; won: number }[]>();
   const hL = new Map<number, { t: number; won: number }[]>();
-  let toplam = 0, kazanan = 0;
+  const gL: { t: number; won: number }[] = [];
   let cursor: string | undefined;
   for (;;) {
     const batch = await db.runner.findMany({
@@ -51,7 +52,7 @@ async function endeksGetir(): Promise<Endeks> {
     for (const b of batch) {
       const t = b.race.raceDay.date.getTime();
       const won = b.race.result?.winnerNos.includes(b.no) ? 1 : 0;
-      toplam++; kazanan += won;
+      gL.push({ t, won });
       if (b.jockey) (jL.get(b.jockey) ?? jL.set(b.jockey, []).get(b.jockey)!).push({ t, won });
       if (b.trainer) (tL.get(b.trainer) ?? tL.set(b.trainer, []).get(b.trainer)!).push({ t, won });
       if (b.tjkAtId != null) (hL.get(b.tjkAtId) ?? hL.set(b.tjkAtId, []).get(b.tjkAtId)!).push({ t, won });
@@ -62,10 +63,17 @@ async function endeksGetir(): Promise<Endeks> {
     jEv: new Map([...jL].map(([k, v]) => [k, evKur(v)])),
     tEv: new Map([...tL].map(([k, v]) => [k, evKur(v)])),
     hEv: new Map([...hL].map(([k, v]) => [k, evKur(v)])),
-    genelOran: toplam > 0 ? kazanan / toplam : 0.1,
+    gEv: evKur(gL),
   };
   onbellek = { endeks, zaman: Date.now() };
   return endeks;
+}
+
+/** Küçük örnek düzeltmesinin önsel değeri: t'den KESİNLİKLE önceki tüm binişlerin kazanma oranı (as-of; gelecek sonuç sızmaz). Yeterli örnek yoksa 0.1. */
+const GENEL_MIN_ORNEK = 200;
+function genelOranAt(gEv: Ev, t: number): number {
+  const n = bisect(gEv.t, t);
+  return n >= GENEL_MIN_ORNEK ? gEv.cum[n] / n : 0.1;
 }
 
 function seviye(ev: Ev | undefined, t: number, genelOran: number): number | null {
@@ -88,6 +96,7 @@ export async function getPitSeviyeSinyalleri(asOfDate: Date, runnerIds: string[]
     db.runner.findMany({ where: { id: { in: runnerIds } }, select: { id: true, jockey: true, trainer: true, tjkAtId: true } }),
   ]);
   const t = asOfDate.getTime();
+  const genelOran = genelOranAt(endeks.gEv, t);
   for (const m of meta) {
     let lastWon: 0 | 1 | null = null;
     const hev = m.tjkAtId != null ? endeks.hEv.get(m.tjkAtId) : undefined;
@@ -96,8 +105,8 @@ export async function getPitSeviyeSinyalleri(asOfDate: Date, runnerIds: string[]
       if (hi > 0) lastWon = (hev.cum[hi] - hev.cum[hi - 1]) as 0 | 1;
     }
     out.set(m.id, {
-      jokeyPIT: seviye(m.jockey ? endeks.jEv.get(m.jockey) : undefined, t, endeks.genelOran),
-      antrenorPIT: seviye(m.trainer ? endeks.tEv.get(m.trainer) : undefined, t, endeks.genelOran),
+      jokeyPIT: seviye(m.jockey ? endeks.jEv.get(m.jockey) : undefined, t, genelOran),
+      antrenorPIT: seviye(m.trainer ? endeks.tEv.get(m.trainer) : undefined, t, genelOran),
       lastWon,
     });
   }

@@ -6,7 +6,7 @@
 import fs from "node:fs";
 type Cell = [number, number, number?] | null;
 type Race = { raceId: string; tarih: string; runners: { no: number; k: number; f: Cell[] }[] };
-const M = JSON.parse(fs.readFileSync(".sinyal-veri/golgeleme-matris.json", "utf8")) as { ozellik: string[]; kesim: string[]; yarislar: Race[] };
+const M = JSON.parse(fs.readFileSync(process.env.GOLGELEME_MATRIS ?? ".sinyal-veri/golgeleme-matris.json", "utf8")) as { ozellik: string[]; kesim: string[]; yarislar: Race[] };
 const CANLI = JSON.parse(fs.readFileSync("src/lib/methodology/weights/v546-1-saf-weights.json", "utf8")) as { featureNames: string[]; means: number[]; stds: number[] };
 const YON = (JSON.parse(fs.readFileSync("src/lib/methodology/weights/banko-sinyal-yonleri.json", "utf8")) as { yonler: Record<string, { yon: 1 | -1 | null }> }).yonler;
 const AILE: Record<string, string> = { ACC_CLOSE_RES: "ACC", ACC_LATE: "ACC", accHizFormu: "ACC", hizDerecesi: "ACC", tempoOnOran: "TEMPO", tempoErkenHiz: "TEMPO", tempoOnBaski: "TEMPO", tempoGeriBaski: "TEMPO", jokeyPIT: "JOKEY", jokeyFormuGenel: "JOKEY", antrenorPIT: "ANTRENOR", galopKaliteV1: "GALOP", galopPedigri: "GALOP", fMean: "FORM", lastWon: "FORM", kgsLog: "FORM", hpRel: "HCAP", kiloRel: "HCAP", dususDelta: "HCAP", h2hNetSkor: "HCAP", zeminToleransi: "PIST", zeminMesafeDeneyim: "PIST", sireOrani: "PEDIGRI", sexE: "DIGER" };
