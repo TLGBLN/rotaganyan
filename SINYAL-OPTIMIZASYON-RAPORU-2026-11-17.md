@@ -68,3 +68,26 @@ Kurtarılan 69, yeni kaçırılan 89; Top3'te 86 / 83. Seçim kuralı düşük d
 
 ## YAPILMAYANLAR (açıkça)
 (1) Ağaç tabanlı model karşılaştırması · (2) L1/grup düzenlileştirme ile sade küme seçimi · (3) 7 ölçülemeyen sinyalin as-of yeniden üretimi (yaklaşık 4 saatlik motor yeniden çalıştırması gerekir) · (4) Handikap ve ŞARTLI 1/27 segmentleri · (5) kulvar sinyali (canlı sette yok) · (6) kupon net getiri (aynı bütçe) testi · (7) bağımsız dokunulmamış son test dönemi (şu an tüm 5 kat geliştirmede görüldü; yeni gelen yarışlar bu işi görecek).
+
+---
+# EK BULGULAR (şartname bölüm 4, 5 ve 12 maddeleri; aynı as-of, ileri, 3331 test yarışı)
+
+## A. "Sinyaller birbirini engelliyor mu?" — üç bağımsız test (ÖLÇÜLDÜ)
+| Test | Sonuç |
+|---|---|
+| **Tam ortogonalleştirilmiş model** (17 sinyal sırayla birbirinden arındırıldı, ridge 0,02) vs orijinal | LL 1,9977 vs 1,9973; ΔLL +0,0004 [−0,0006; +0,0014] → **fark yok**. Ridgesiz orijinal ise +0,0076 [0,0046; 0,0108] daha kötü: düzenlileştirme korelasyonu zaten idare ediyor. |
+| **Ağaç tabanlı model** (GBM, derinlik 3, 120 tur, hiperparametreler önceden sabit; sinyal z + eksik bayrakları) vs doğrusal | LL 1,9960 vs 1,9973; ΔLL −0,0013 [−0,0253; +0,0170] → **fark yok** (Top1 %27,3 / %27,8, Top3 %61,2 / %61,3; kurtarılan 190 / yeni kaçırılan 195). Güç sınırlı (aralık geniş). |
+| **Şartname 1-SE seçimi** (eşleştirilmiş SE, seçim yalnız eğitim penceresinde) vs tam | ortalama 11,8 kolon; ΔLL +0,0078 [+0,0028; +0,0126] → **seçilen anlamlı daha kötü** (Top1 %27,1 / %27,8; Top1'de kurtarılan 89 / yeni kaçırılan 114). |
+**Okuma:** sinyalleri birbirinden arındırmak, doğrusal olmayan modelle birleştirmek ya da çıkarmak ölçülen tahmin gücünü iyileştirmedi. Bu 17 ölçülebilir sinyalde "birbirini engelleme"den kurtarılacak ölçülebilir kayıp yok. (Ölçülemeyen 7 sinyal bu testlerin dışında.)
+
+## B. Piyasa etkisi ayrımı (AGF YALNIZ değerlendirme ölçüsü; AGF'si tam 3189 yarış; ÖLÇÜLDÜ)
+- Log-loss: model 1,9958, piyasa 1,8566 → model − piyasa +0,1392 [0,1124; 0,1690] (model piyasadan zayıf). AGF favorisi isabeti %32,8, model favorisi %28,0 (aynı yarışlar).
+- Harman (a·log p_model + b·log p_agf, a,b yalnız önceki katlardan): a=0,10, b=0,88; harman 1,8576, yalnız piyasa 1,8595 → model piyasanın üstüne ~hiçbir bilgi eklemiyor.
+- Hiçbir sinyal piyasaya ek bilgi kanıtı vermedi (17/17 GA sıfırı kapsıyor). Piyasayı en çok tekrar eden: fMean (ρ −0,69), hpRel (0,59), jokeyPIT (0,52), ACC_LATE/ACC_CLOSE_RES (0,50/0,49).
+- **Uyarı (DOĞRULANAMADI):** `Runner.agf` alanının zamanı (kapanış mı, sonradan güncellenmiş mi) bilinmiyor; piyasa sonuçları bu belirsizlikle okunmalı.
+
+## C. Aynı bütçede net getiri (düz 1 TL; ikramiye = 1 TL'ye toplam dönüş; ÖLÇÜLDÜ)
+Model favorisi −%20,5 [−26,6; −13,8]; AGF favorisi (aynı yarışlar) −%28,6 [−32,3; −24,5]; aynı-N banko seçimleri (p ve p+GAP, N=100…1000) −%19 ile −%31 arasında. **Hiçbir seçim pozitif net getiri vermedi.**
+
+## Şartnameden hâlâ yapılmayanlar
+Hibrit model (şartnamede tanımı yok) · L1/grup düzenlileştirme (ayrı yöntem olarak) · 7 ölçülemeyen sinyalin as-of yeniden üretimi · Handikap/ŞARTLI 1/27 segmentleri · bağımsız dokunulmamış son test dönemi (yeni gelen yarışlar bu işi görecek).
