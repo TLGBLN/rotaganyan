@@ -36,7 +36,7 @@ P("# BANKO POZİTİFLİK — TARİHSEL TEST — " + new Date().toISOString().sli
 P("Favori sayısı (kronolojik dışarıdan, 5 dış kat): " + favs.length + " | favori kazanma oranı %" + (avg(favs.map((f) => f.y)) * 100).toFixed(1) + " | ort. favori p %" + (avg(favs.map((f) => f.p)) * 100).toFixed(1) + " | yönü kararlı sinyal sayısı: " + NAMES.filter((n) => YON[n]?.yon != null).length + "/" + D);
 P("Ölçü ortalamaları: RAW " + avg(favs.map((f) => f.raw)).toFixed(1) + " | STRONG " + avg(favs.map((f) => f.strong)).toFixed(1) + " | FAM " + avg(favs.map((f) => f.fam)).toFixed(1) + " | DESTEK " + avg(favs.map((f) => f.destek)).toFixed(2));
 let sd0 = 7; const rn = () => (sd0 = (sd0 * 1664525 + 1013904223) % 4294967296) / 4294967296;
-const bootCI = (n: number, f: (idx: number[]) => number) => { const bs: number[] = []; for (let t = 0; t < 1000; t++) bs.push(f(Array.from({ length: n }, () => Math.floor(rn() * n)))); bs.sort((a, b) => a - b); return [bs[24]!, bs[974]!]; };
+const bootCI = (n: number, f: (idx: number[]) => number) => { const bs: number[] = []; for (let t = 0; t < 400; t++) bs.push(f(Array.from({ length: n }, () => Math.floor(rn() * n)))); bs.sort((a, b) => a - b); return [bs[Math.floor(0.025 * 400)]!, bs[Math.floor(0.975 * 400)]!]; };
 const OLC: { ad: string; f: (x: Fav) => number }[] = [{ ad: "RAW", f: (x) => x.raw }, { ad: "STRONG", f: (x) => x.strong }, { ad: "FAM", f: (x) => x.fam }, { ad: "DESTEK", f: (x) => x.destek }];
 // A) olasılık dilimi içinde lift
 P("\n## A) AYNI olasılık diliminde: ölçü yüksek yarı vs düşük yarı (dilim içi medyan bölme) — kazanma oranı farkı (yüksek − düşük), bootstrap %95 GA");
@@ -47,8 +47,19 @@ for (const o of OLC) { let top = 0, topW = 0; const dil = [[0, kes[0]!], [kes[0]
     P("| " + o.ad + " | " + ["düşük", "orta", "yüksek"][di] + " (" + (a * 100).toFixed(0) + "–" + (Math.min(b, 1) * 100).toFixed(0) + "%) | " + S.length + " | %" + (avg(lo.map((f) => f.y)) * 100).toFixed(1) + " (n=" + lo.length + ") | %" + (avg(hi.map((f) => f.y)) * 100).toFixed(1) + " (n=" + hi.length + ") | " + (d >= 0 ? "+" : "") + (d * 100).toFixed(1) + " puan [" + (ci[0]! * 100).toFixed(1) + ", " + (ci[1]! * 100).toFixed(1) + "] |"); farklar.push({ lo: 0, hi: d }); void top; void topW; }); }
 // B) lojistik katsayı + blok-CV ΔLL
 const sig = (x: number) => 1 / (1 + Math.exp(-x)); const logit = (p: number) => Math.log(Math.max(p, 1e-6) / Math.max(1 - p, 1e-6));
-function lojistik(S: Fav[], f: ((x: Fav) => number) | null): number[] { const d = f ? 3 : 2; const w = new Array(d).fill(0); const sd = f ? Math.sqrt(avg(S.map((x) => (f(x) - avg(S.map(f))) ** 2))) || 1 : 1; const mu = f ? avg(S.map(f)) : 0; const X = S.map((x) => (f ? [1, logit(x.p), (f(x) - mu) / sd] : [1, logit(x.p)])); w[1] = 1;
-  for (let it = 0; it < 4000; it++) { const g = new Array(d).fill(0); for (let i = 0; i < S.length; i++) { const e = sig(X[i]!.reduce((s, v, j) => s + v * w[j]!, 0)) - S[i]!.y; for (let j = 0; j < d; j++) g[j]! += e * X[i]![j]!; } for (let j = 0; j < d; j++) w[j]! -= 0.3 * (g[j]! / S.length + 0.001 * w[j]!); } return [...w, mu, sd]; }
+function lojistik(S: Fav[], f: ((x: Fav) => number) | null): number[] {
+  // Newton-Raphson (IRLS), ridge 1e-4. Parametreler: [kesen, logit(p) eğimi, (ölçü katsayısı)], sonra [ölçü ort., ölçü σ].
+  const d = f ? 3 : 2; const mu = f ? avg(S.map(f)) : 0; const sd = f ? Math.sqrt(avg(S.map((x) => (f(x) - mu) ** 2))) || 1 : 1;
+  const X = S.map((x) => (f ? [1, logit(x.p), (f(x) - mu) / sd] : [1, logit(x.p)])); const w = new Array(d).fill(0); w[1] = 1;
+  for (let it = 0; it < 30; it++) {
+    const g = new Array(d).fill(0); const H = Array.from({ length: d }, () => new Array(d).fill(0));
+    for (let i = 0; i < S.length; i++) { const p = sig(X[i]!.reduce((s2, v, j) => s2 + v * w[j]!, 0)); const e = p - S[i]!.y, q = p * (1 - p); for (let j = 0; j < d; j++) { g[j]! += e * X[i]![j]!; for (let k = 0; k < d; k++) H[j]![k]! += q * X[i]![j]! * X[i]![k]!; } }
+    for (let j = 0; j < d; j++) { g[j]! += 1e-4 * w[j]!; H[j]![j]! += 1e-4; }
+    const A = H.map((r, i) => [...r, g[i]!]); for (let i = 0; i < d; i++) { let pv = i; for (let k = i + 1; k < d; k++) if (Math.abs(A[k]![i]!) > Math.abs(A[pv]![i]!)) pv = k; [A[i], A[pv]] = [A[pv]!, A[i]!]; const dv = A[i]![i]! || 1e-12; for (let j = i; j <= d; j++) A[i]![j]! /= dv; for (let k = 0; k < d; k++) if (k !== i) { const m = A[k]![i]!; for (let j = i; j <= d; j++) A[k]![j]! -= m * A[i]![j]!; } }
+    let adim = 0; for (let j = 0; j < d; j++) { const st = A[j]![d]!; w[j]! -= st; adim = Math.max(adim, Math.abs(st)); } if (adim < 1e-9) break;
+  }
+  return [...w, mu, sd];
+}
 const nll = (S: Fav[], w: number[], f: ((x: Fav) => number) | null) => avg(S.map((x) => { const z = w[0]! + w[1]! * logit(x.p) + (f ? w[2]! * (f(x) - w[3]!) / w[4]! : 0); const p = sig(z); return -(x.y ? Math.log(Math.max(p, 1e-9)) : Math.log(Math.max(1 - p, 1e-9))); }));
 P("\n## B) Lojistik: kazandı ~ logit(p) + ölçü (standartlaştırılmış). Katsayı = ölçünün +1 σ'sının log-odds etkisi (bootstrap %95 GA). ΔLL = blok-CV (5 ardışık blok) ikili log-loss, p-yalnız modele göre (negatif = ölçü yardım ediyor)");
 P("| Ölçü | katsayı [GA] | blok-CV ΔLL (ölçülü − p yalnız) |"); P("|---|---|---|");

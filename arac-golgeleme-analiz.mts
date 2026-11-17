@@ -14,6 +14,7 @@ type Cell = [number, number, number?] | null; // [ham, güven, gerçekGözlem: 1
 type Race = { raceId: string; tarih: string; sinif: string | null; grup: number; runners: { no: number; k: number; f: Cell[] }[] };
 const GIRDI = process.env.GOLGELEME_MATRIS ?? ".sinyal-veri/golgeleme-matris.json";
 const M = JSON.parse(fs.readFileSync(GIRDI, "utf8")) as { uretim: string; ozellik: string[]; kesim: string[]; yarislar: Race[] };
+{ const nAt = M.yarislar.reduce((p, r) => p + r.runners.length, 0); const keep = M.ozellik.map((_, i) => i).filter((i) => M.yarislar.reduce((p, r) => p + r.runners.filter((x) => x.f[i]).length, 0) / nAt >= Number(process.env.MIN_DOLULUK ?? 0.05)); M.yarislar.forEach((r) => r.runners.forEach((x) => { x.f = keep.map((i) => x.f[i]!); })); console.log("kullanılan sinyal (doluluk >= %5): " + keep.map((i) => M.ozellik[i]).join(", ")); M.ozellik = keep.map((i) => M.ozellik[i]!); }
 const NAMES = M.ozellik, D = NAMES.length;
 const races = [...M.yarislar].sort((a, b) => a.tarih.localeCompare(b.tarih)).filter((r) => r.runners.some((x) => x.k === 1));
 const kesim = M.kesim, ALL5 = [0, 1, 2, 3, 4];
@@ -41,11 +42,19 @@ const folds: Fold[] = ALL5.map((k) => {
 type Spec = { cols: number[]; prods?: [number, number][] };
 const colsOf = (v: Float64Array, s: Spec) => { const o = new Float64Array(s.cols.length + (s.prods?.length ?? 0)); s.cols.forEach((c, j) => (o[j] = v[c]!)); s.prods?.forEach(([a, b], j) => (o[s.cols.length + j] = v[a]! * v[b]!)); return o; };
 function egit(rows: { x: Float64Array[]; w: number }[], d: number): Float64Array {
-  const w = new Float64Array(d), vel = new Float64Array(d); if (!d) return w;
-  for (let ep = 0; ep < 800; ep++) {
-    const g = new Float64Array(d);
-    for (const q of rows) { const sc = q.x.map((v) => { let s = 0; for (let i = 0; i < d; i++) s += v[i]! * w[i]!; return s; }); const p = softmax(sc); for (let i = 0; i < q.x.length; i++) { const c = p[i]! - (i === q.w ? 1 : 0); for (let k = 0; k < d; k++) g[k]! += c * q.x[i]![k]!; } }
-    for (let k = 0; k < d; k++) { const gk = g[k]! / rows.length + 0.02 * w[k]!; vel[k] = 0.9 * vel[k]! + -0.08 * gk; w[k]! += vel[k]!; }
+  // Newton-Raphson (dışbükey hedef): ortalama negatif log-olabilirlik + 0.01·||w||² (motorun ridge'i 0.02 ile aynı hedef), tam Hessian, ≤25 adım.
+  const w = new Float64Array(d); if (!d) return w;
+  for (let it = 0; it < 25; it++) {
+    const g = new Float64Array(d), H = new Float64Array(d * d);
+    for (const q of rows) { const p = softmax(q.x.map((v) => { let t = 0; for (let i = 0; i < d; i++) t += v[i]! * w[i]!; return t; })); const m1 = new Float64Array(d);
+      for (let i = 0; i < q.x.length; i++) for (let k = 0; k < d; k++) m1[k]! += p[i]! * q.x[i]![k]!;
+      for (let k = 0; k < d; k++) g[k]! += m1[k]! - q.x[q.w]![k]!;
+      for (let i = 0; i < q.x.length; i++) { const v = q.x[i]!, pi = p[i]!; for (let a2 = 0; a2 < d; a2++) { const va = v[a2]! * pi; for (let b2 = 0; b2 <= a2; b2++) H[a2 * d + b2]! += va * v[b2]!; } }
+      for (let a2 = 0; a2 < d; a2++) for (let b2 = 0; b2 <= a2; b2++) H[a2 * d + b2]! -= m1[a2]! * m1[b2]!; }
+    const N = rows.length; for (let a2 = 0; a2 < d; a2++) { g[a2] = g[a2]! / N + 0.02 * w[a2]!; for (let b2 = 0; b2 <= a2; b2++) { const v = H[a2 * d + b2]! / N + (a2 === b2 ? 0.02 : 0); H[a2 * d + b2] = v; H[b2 * d + a2] = v; } }
+    const A = Array.from({ length: d }, (_, i) => [...Array.from({ length: d }, (_, j) => H[i * d + j]!), g[i]!]);
+    for (let i = 0; i < d; i++) { let pv = i; for (let k = i + 1; k < d; k++) if (Math.abs(A[k]![i]!) > Math.abs(A[pv]![i]!)) pv = k; [A[i], A[pv]] = [A[pv]!, A[i]!]; const dv = A[i]![i]! || 1e-12; for (let j = i; j <= d; j++) A[i]![j]! /= dv; for (let k = 0; k < d; k++) if (k !== i) { const mm = A[k]![i]!; for (let j = i; j <= d; j++) A[k]![j]! -= mm * A[i]![j]!; } }
+    let adim = 0; for (let i = 0; i < d; i++) { const st = A[i]![d]!; w[i]! -= st; adim = Math.max(adim, Math.abs(st)); } if (adim < 1e-7) break;
   }
   return w;
 }

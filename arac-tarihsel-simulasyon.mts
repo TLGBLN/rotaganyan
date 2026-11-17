@@ -33,9 +33,21 @@ function kurZ(train: Race[], test: Race[]) {
 type Kolon = { ad: string; kaynak: number[] };
 const kolonDeger = (r: Row, j: number, k: Kolon) => { if (k.kaynak.length === 1) return r.z[j]![k.kaynak[0]!]!; let s = 0, n = 0; for (const i of k.kaynak) if (r.ok[j]![i]) { s += r.z[j]![i]!; n++; } return n ? s / n : 0; };
 function egit(rows: Row[], kol: Kolon[]): Float64Array {
-  const d = kol.length, w = new Float64Array(d), vel = new Float64Array(d); if (!d) return w;
+  // Newton-Raphson (dışbükey hedef): ortalama negatif log-olabilirlik + 0.01·||w||² (motorun ridge'i 0.02 ile aynı hedef). Tam Hessian, ≤25 adım.
+  const d = kol.length, w = new Float64Array(d); if (!d) return w;
   const X = rows.map((r) => ({ w: r.w, x: r.z.map((_, j) => Float64Array.from(kol, (k) => kolonDeger(r, j, k))) }));
-  for (let ep = 0; ep < 800; ep++) { const g = new Float64Array(d); for (const q of X) { const p = softmax(q.x.map((v) => { let s = 0; for (let i = 0; i < d; i++) s += v[i]! * w[i]!; return s; })); for (let i = 0; i < q.x.length; i++) { const c = p[i]! - (i === q.w ? 1 : 0); for (let k = 0; k < d; k++) g[k]! += c * q.x[i]![k]!; } } for (let k = 0; k < d; k++) { const gk = g[k]! / X.length + 0.02 * w[k]!; vel[k] = 0.9 * vel[k]! - 0.08 * gk; w[k]! += vel[k]!; } }
+  for (let it = 0; it < 25; it++) {
+    const g = new Float64Array(d), H = new Float64Array(d * d);
+    for (const q of X) { const sc = q.x.map((v) => { let t = 0; for (let i = 0; i < d; i++) t += v[i]! * w[i]!; return t; }); const p = softmax(sc); const m1 = new Float64Array(d);
+      for (let i = 0; i < q.x.length; i++) for (let k = 0; k < d; k++) m1[k]! += p[i]! * q.x[i]![k]!;
+      for (let k = 0; k < d; k++) g[k]! += m1[k]! - q.x[q.w]![k]!;
+      for (let i = 0; i < q.x.length; i++) { const v = q.x[i]!, pi = p[i]!; for (let a2 = 0; a2 < d; a2++) { const va = v[a2]! * pi; for (let b2 = 0; b2 <= a2; b2++) H[a2 * d + b2]! += va * v[b2]!; } }
+      for (let a2 = 0; a2 < d; a2++) for (let b2 = 0; b2 <= a2; b2++) H[a2 * d + b2]! -= m1[a2]! * m1[b2]!; }
+    const N = X.length; for (let a2 = 0; a2 < d; a2++) { g[a2] = g[a2]! / N + 0.02 * w[a2]!; for (let b2 = 0; b2 <= a2; b2++) { const v = H[a2 * d + b2]! / N + (a2 === b2 ? 0.02 : 0); H[a2 * d + b2] = v; H[b2 * d + a2] = v; } }
+    const A = Array.from({ length: d }, (_, i) => [...Array.from({ length: d }, (_, j) => H[i * d + j]!), g[i]!]);
+    for (let i = 0; i < d; i++) { let pv = i; for (let k = i + 1; k < d; k++) if (Math.abs(A[k]![i]!) > Math.abs(A[pv]![i]!)) pv = k; [A[i], A[pv]] = [A[pv]!, A[i]!]; const dv = A[i]![i]! || 1e-12; for (let j = i; j <= d; j++) A[i]![j]! /= dv; for (let k = 0; k < d; k++) if (k !== i) { const mm = A[k]![i]!; for (let j = i; j <= d; j++) A[k]![j]! -= mm * A[i]![j]!; } }
+    let adim = 0; for (let i = 0; i < d; i++) { const st = A[i]![d]!; w[i]! -= st; adim = Math.max(adim, Math.abs(st)); } if (adim < 1e-7) break;
+  }
   return w;
 }
 type Cikti = { id: string; ll: number; t1: number; t3: number; sira: number; p: number[]; w: number };

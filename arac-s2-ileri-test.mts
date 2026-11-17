@@ -14,12 +14,15 @@ const avg = (a: number[]) => a.reduce((p, q) => p + q, 0) / Math.max(1, a.length
 const U = ["ACC_CLOSE_RES", "ACC_LATE", "accHizFormu", "tempoOnOran", "tempoErkenHiz", "tempoOnBaski", "tempoGeriBaski", "jokeyPIT", "antrenorPIT", "lastWon", "hpRel", "kiloRel", "fMean", "sexE", "dususDelta"];
 const AYNA = ["tempoOnBaski", "tempoGeriBaski"], ACC = ["ACC_CLOSE_RES", "ACC_LATE"];
 const SETLER: { ad: string; adlar: string[] }[] = [
+  // (kümeler aşağıda)
   { ad: "U15 (tam, ortak sinyaller)", adlar: U },
   { ad: "+ ACC birleşik (CLOSE+LATE→accBitis)", adlar: [...U.filter((n) => !ACC.includes(n)), "accBitis"] },
   { ad: "+ tempo aynası atıldı", adlar: U.filter((n) => !AYNA.includes(n)) },
   { ad: "S2 yapısı (ACC birleşik + ayna atıldı)", adlar: [...U.filter((n) => !ACC.includes(n) && !AYNA.includes(n)), "accBitis"] },
   { ad: "U15 − accHizFormu", adlar: U.filter((n) => n !== "accHizFormu") },
   { ad: "S2 yapısı − accHizFormu", adlar: [...U.filter((n) => !ACC.includes(n) && !AYNA.includes(n) && n !== "accHizFormu"), "accBitis"] },
+  { ad: "U15 − ayna − tempoErkenHiz (accHizFormu KALIR)", adlar: U.filter((n) => !AYNA.includes(n) && n !== "tempoErkenHiz") },
+  { ad: "ACC birleşik − ayna − tempoErkenHiz (accHizFormu KALIR)", adlar: [...U.filter((n) => !ACC.includes(n) && !AYNA.includes(n) && n !== "tempoErkenHiz"), "accBitis"] },
   { ad: "S2 yapısı − accHizFormu − tempoErkenHiz", adlar: [...U.filter((n) => !ACC.includes(n) && !AYNA.includes(n) && n !== "accHizFormu" && n !== "tempoErkenHiz"), "accBitis"] },
 ];
 type H = { raw: number; rel: number } | null;
@@ -35,8 +38,20 @@ function kur(tr: Race[], te: Race[], adlar: string[]) {
   return { train: tr.map(mk), test: te.map(mk) };
 }
 function egit(rows: Row[], d: number): Float64Array {
-  const w = new Float64Array(d), vel = new Float64Array(d);
-  for (let ep = 0; ep < 800; ep++) { const g = new Float64Array(d); for (const q of rows) { const p = softmax(q.x.map((v) => { let s = 0; for (let i = 0; i < d; i++) s += v[i]! * w[i]!; return s; })); for (let i = 0; i < q.x.length; i++) { const c = p[i]! - (i === q.w ? 1 : 0); for (let k = 0; k < d; k++) g[k]! += c * q.x[i]![k]!; } } for (let k = 0; k < d; k++) { const gk = g[k]! / rows.length + 0.02 * w[k]!; vel[k] = 0.9 * vel[k]! - 0.08 * gk; w[k]! += vel[k]!; } }
+  // Newton-Raphson (dışbükey): ortalama negatif log-olabilirlik + 0.01·||w||² (motorun ridge'i 0.02 ile aynı hedef), ≤25 adım.
+  const w = new Float64Array(d);
+  for (let it = 0; it < 25; it++) {
+    const g = new Float64Array(d), H = new Float64Array(d * d);
+    for (const q of rows) { const p = softmax(q.x.map((v) => { let t = 0; for (let i = 0; i < d; i++) t += v[i]! * w[i]!; return t; })); const m1 = new Float64Array(d);
+      for (let i = 0; i < q.x.length; i++) for (let k = 0; k < d; k++) m1[k]! += p[i]! * q.x[i]![k]!;
+      for (let k = 0; k < d; k++) g[k]! += m1[k]! - q.x[q.w]![k]!;
+      for (let i = 0; i < q.x.length; i++) { const v = q.x[i]!, pi = p[i]!; for (let a2 = 0; a2 < d; a2++) { const va = v[a2]! * pi; for (let b2 = 0; b2 <= a2; b2++) H[a2 * d + b2]! += va * v[b2]!; } }
+      for (let a2 = 0; a2 < d; a2++) for (let b2 = 0; b2 <= a2; b2++) H[a2 * d + b2]! -= m1[a2]! * m1[b2]!; }
+    const N = rows.length; for (let a2 = 0; a2 < d; a2++) { g[a2] = g[a2]! / N + 0.02 * w[a2]!; for (let b2 = 0; b2 <= a2; b2++) { const v = H[a2 * d + b2]! / N + (a2 === b2 ? 0.02 : 0); H[a2 * d + b2] = v; H[b2 * d + a2] = v; } }
+    const A = Array.from({ length: d }, (_, i) => [...Array.from({ length: d }, (_, j) => H[i * d + j]!), g[i]!]);
+    for (let i = 0; i < d; i++) { let pv = i; for (let k = i + 1; k < d; k++) if (Math.abs(A[k]![i]!) > Math.abs(A[pv]![i]!)) pv = k; [A[i], A[pv]] = [A[pv]!, A[i]!]; const dv = A[i]![i]! || 1e-12; for (let j = i; j <= d; j++) A[i]![j]! /= dv; for (let k = 0; k < d; k++) if (k !== i) { const mm = A[k]![i]!; for (let j = i; j <= d; j++) A[k]![j]! -= mm * A[i]![j]!; } }
+    let adim = 0; for (let i = 0; i < d; i++) { const st = A[i]![d]!; w[i]! -= st; adim = Math.max(adim, Math.abs(st)); } if (adim < 1e-7) break;
+  }
   return w;
 }
 type RS = { ll: number; t1: number; t3: number; fold: number };
