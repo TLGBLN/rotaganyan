@@ -7,7 +7,7 @@
  */
 import fs from "node:fs";
 import { db } from "./src/lib/db";
-import { GUNCEL_MOTOR_BASLANGIC } from "./src/server/services/admin.service";
+import { GUNCEL_MOTOR_BASLANGIC, normalizeClassType } from "./src/server/services/admin.service";
 import { GUN_MS, GALOP_SABITLERI, GalopDeposu, galopBilesenleri, galopNormalize, galopTekille, type GalopBilesenleri, type GalopHam, type GalopKaydi } from "./src/lib/methodology/yeni-motor/adaylar/galop-aday";
 
 const L: string[] = []; const p = (s = "") => L.push(s);
@@ -48,6 +48,25 @@ for (let i = 0; i < atlar.length; i += 500) for (const c of await db.horseRaceHi
 const kosuGunleri = new Map<number, number[]>([...kosuGun].map(([k, v]) => [k, [...v].sort((a, b) => a - b)]));
 const deposu = new GalopDeposu(tek, kosuGunleri);
 
+// ── TEK YARIŞ GÖRÜNÜMÜ: --kosu "Hipodrom|YYYY-MM-DD|no" → sahadaki HER atın yalnız SON KOŞUSUNDAN SONRAKİ galoplarla bileşenleri + yarış-içi KAPASİTE/HAZIRLIK
+const kosuArg = process.argv.indexOf("--kosu");
+if (kosuArg > 0) {
+  const [hip, gunS, noS] = process.argv[kosuArg + 1]!.split("|");
+  const t = Date.parse(gunS + "T00:00:00.000Z");
+  const k = await db.race.findFirst({ where: { raceNo: parseInt(noS!, 10), raceDay: { date: new Date(t), hippodrome: { name: hip } } }, select: { distance: true, runners: { where: { scratched: false }, orderBy: { no: "asc" }, select: { no: true, name: true, tjkAtId: true } } } });
+  if (!k) { console.log("yarış bulunamadı"); process.exit(0); }
+  const gv = deposu.gorunum(t);
+  const B = k.runners.map((r) => (r.tjkAtId == null ? null : galopBilesenleri(gv, r.tjkAtId)));
+  const yz = (v: (number | null)[]) => { const av = v.filter((x): x is number => x != null); return av.length < 2 ? v.map(() => null) : v.map((x) => (x == null ? null : (av.filter((y) => y < x).length + 0.5 * av.filter((y) => y === x).length) / av.length)); };
+  const pH = yz(B.map((b) => b?.hiz ?? null)), pK = yz(B.map((b) => b?.kapanis ?? null)), pE = yz(B.map((b) => b?.efor ?? null)), pT = yz(B.map((b) => b?.trend ?? null)), pS = yz(B.map((b) => b?.sureklilik ?? null));
+  const om = (v: (number | null)[]) => { const a = v.filter((x): x is number => x != null); return a.length ? a.reduce((s, x) => s + x, 0) / a.length : null; };
+  console.log(`${hip} ${gunS} K${noS} (${k.distance} m) — yalnız atın SON KOŞUSUNDAN SONRAKİ galoplar kullanıldı`);
+  console.log("no | at | son koşu | galop sayısı | hız z | kapanış z | efor z | trend | süreklilik | son galop (gün önce) | KAPASİTE (0-100) | HAZIRLIK (0-100)");
+  k.runners.forEach((r, i) => { const b = B[i]; const onceki = r.tjkAtId != null ? gv.oncekiKosu(r.tjkAtId) : null; const kap = om([pH[i]!, pK[i]!, pE[i]!]), haz = om([pT[i]!, pS[i]!]);
+    console.log(`${r.no} | ${r.name} | ${onceki ? new Date(onceki).toISOString().slice(5, 10) : "—"} | ${b?.guven.pencereGalop ?? 0} | ${f(b?.hiz, 2)} | ${f(b?.kapanis, 2)} | ${f(b?.efor, 2)} | ${f(b?.trend, 2)} | ${b?.sureklilik ?? "—"} | ${b?.sonGalopGun ?? "—"} | ${kap == null ? "—" : Math.round(kap * 100)} | ${haz == null ? "—" : Math.round(haz * 100)}`); });
+  await db.$disconnect(); process.exit(0);
+}
+
 // ── YÜZ GEÇERLİLİĞİ: --atlar "AD1,AD2" → o atların SIRADAKİ (sonuçlanmamış) koşusu için ham galop + bileşen dökümü, sonra çık
 const atlarArg = process.argv.indexOf("--atlar");
 if (atlarArg > 0) {
@@ -64,16 +83,17 @@ if (atlarArg > 0) {
 
 const kosular = await db.race.findMany({
   where: { prediction: { published: true, createdAt: { gte: GUNCEL_MOTOR_BASLANGIC } }, conditions: null, result: { isNot: null } },
-  select: { id: true, raceNo: true, raceDay: { select: { date: true, hippodrome: { select: { name: true } } } }, result: { select: { winnerNos: true } }, runners: { where: { scratched: false }, select: { no: true, name: true, tjkAtId: true } } },
+  select: { id: true, raceNo: true, classType: true, raceDay: { select: { date: true, hippodrome: { select: { name: true } } } }, result: { select: { winnerNos: true } }, runners: { where: { scratched: false }, select: { no: true, name: true, tjkAtId: true } } },
   orderBy: [{ raceDay: { date: "asc" } }, { raceNo: "asc" }],
 });
 type At = { no: number; ad: string; atId: number | null; b: GalopBilesenleri | null; kazandi: boolean };
-type Kosu = { id: string; t: number; hip: string; no: number; atlar: At[]; N: number; kazananSayi: number };
+type Kosu = { kaba: string; id: string; t: number; hip: string; no: number; atlar: At[]; N: number; kazananSayi: number };
+const kabaGrup = (t: string) => { const u = t.toUpperCase(); return u.includes("MAIDEN") ? "Maiden" : u.includes("ŞARTLI") ? "Şartlı" : u.includes("HANDIKAP") ? "Handikap" : u.startsWith("KV") ? "KV" : /^G d/.test(u) ? "Grup" : u.includes("SATIŞ") ? "Satış" : "Diğer"; };
 const pop: Kosu[] = [];
 for (const k of kosular) {
   const t = gunMs(k.raceDay.date); const win = new Set(k.result?.winnerNos ?? []); if (win.size === 0) continue;
   const g = deposu.gorunum(t);
-  pop.push({ id: k.id, t, hip: k.raceDay.hippodrome.name, no: k.raceNo, N: k.runners.length, kazananSayi: win.size, atlar: k.runners.map((r) => ({ no: r.no, ad: r.name, atId: r.tjkAtId, b: r.tjkAtId == null ? null : galopBilesenleri(g, r.tjkAtId), kazandi: win.has(r.no) })) });
+  pop.push({ kaba: kabaGrup(normalizeClassType(k.classType)), id: k.id, t, hip: k.raceDay.hippodrome.name, no: k.raceNo, N: k.runners.length, kazananSayi: win.size, atlar: k.runners.map((r) => ({ no: r.no, ad: r.name, atId: r.tjkAtId, b: r.tjkAtId == null ? null : galopBilesenleri(g, r.tjkAtId), kazandi: win.has(r.no) })) });
 }
 p(`## 2. Test popülasyonu\n/admin/kosu-tipleri yarışları: **${pop.length}** yarış, ${pop.reduce((a, k) => a + k.N, 0)} at (${new Date(pop[0]!.t).toISOString().slice(0, 10)} → ${new Date(pop[pop.length - 1]!.t).toISOString().slice(0, 10)}). Galop referansı ve her at için galop görünümü yalnız o yarış gününden ÖNCEKİ kayıtlardan kurulur.\n`);
 
@@ -152,6 +172,24 @@ p("");
 p("**Yalnız sahanın ≥%50'sinde galop verisi olan yarışlarda** (çok idman kaydı olan atlar avantajlı görünmesin diye ayrıca):");
 p("| Ölçüm | Yarış | Δ |\n|---|---|---|"); for (const s of sat2) p(s);
 p("");
+
+// ───────────────────────── 5b) TOP1 / TOP3 — düz sıralama (parametresiz: β YOK, öğrenme YOK; tüm popülasyon)
+{
+  const adT = ["GALOP_KAPASITE (yarış-içi yüzdelik ort.)", "GALOP_HAZIRLIK (yarış-içi yüzdelik ort.)", "BİRLEŞİK α=0.5 (α·KAPASİTE+(1−α)·HAZIRLIK)"];
+  const gruplar = ["Maiden", "Şartlı", "Handikap", "KV", "Grup", "Satış"];
+  const kredi = (k: Kosu, x: number[]) => { const w = k.atlar.map((a, j) => (a.kazandi ? j : -1)).filter((j) => j >= 0); let t1 = 0, t3 = 0; for (const j of w) { const better = x.filter((q) => q > x[j]! + 1e-12).length, eq = x.filter((q) => Math.abs(q - x[j]!) <= 1e-12).length; t1 += Math.max(0, Math.min(1, (1 - better) / eq)) / w.length; t3 += Math.max(0, Math.min(1, (3 - better) / eq)) / w.length; } return { t1, t3, rt1: 1 / k.N, rt3: Math.min(1, 3 / k.N) }; };
+  p("## 5b. TOP1 / TOP3 — düz sıralama (parametresiz)\nHer yarışta atlar adayın puanına göre sıralanır (en yüksek = 1.). **Top1** = puanı en yüksek olan atın kazandığı yarış oranı; **Top3** = kazananın puana göre ilk 3 içinde olduğu yarış oranı. Hiçbir katsayı öğrenilmedi (β yok), tüm " + pop.length + " yarış. Galop verisi olmayan atlar nötr (veri olanların ortalaması) alınır; eşit puanlı atlar arasında beraberlik payı eşit bölünür. **Rastgele** = sinyalsiz tahmin (1/N ve 3/N ortalaması).\n");
+  for (const ad of adT) {
+    const satirlar: string[] = [];
+    for (const g of ["TÜMÜ", ...gruplar, "Veri ≥%50 olan yarışlar"]) {
+      let n = 0, a1 = 0, a3 = 0, r1 = 0, r3 = 0;
+      pop.forEach((k, i) => { if (g === "Veri ≥%50 olan yarışlar" ? ozellikler[i]![ad]!.filter(notNull).length < Math.ceil(k.N / 2) : g !== "TÜMÜ" && k.kaba !== g) return; const x = xFill(ozellikler[i]![ad]!); const c = kredi(k, x); n++; a1 += c.t1; a3 += c.t3; r1 += c.rt1; r3 += c.rt3; });
+      if (n) satirlar.push(`| ${g} | ${n} | ${f(a1, 0)} (${f(a1 / n * 100, 1)}%) | ${f(r1 / n * 100, 1)}% | ${f(a3, 0)} (${f(a3 / n * 100, 1)}%) | ${f(r3 / n * 100, 1)}% |`);
+    }
+    p(`**${ad}**\n| Koşu tipi | Yarış | Top1 isabet | Top1 rastgele | Top3 isabet | Top3 rastgele |\n|---|---|---|---|---|---|`); for (const s2 of satirlar) p(s2); p("");
+    console.log("TOP1/TOP3 — " + ad + "\n" + satirlar.join("\n"));
+  }
+}
 
 // ───────────────────────── 6) BETİMLEYİCİLER (yön varsayılmadı; bileşik puana girmedi)
 p("## 5. Yön varsayılmayan betimleyiciler (bileşik puana GİRMEDİ)\nKazanma oranı ÷ beklenen (Σ1/N). 1,00 = beklenenle aynı. Yalnız betimleme; sıralama/hüküm değildir.\n");

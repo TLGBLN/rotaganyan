@@ -59,6 +59,42 @@ Yöntem: yarışlar tarihe göre 6 bloğa bölünür; blok k için β YALNIZ blo
 | BİRLEŞİK α=0.75 (α·KAPASİTE+(1−α)·HAZIRLIK) | 1211 | ΔLL 0.0211 [0.0084; 0.0330] | ΔTop1 3.77 [1.87; 5.93] |
 | BİRLEŞİK α=1 (α·KAPASİTE+(1−α)·HAZIRLIK) | 1211 | ΔLL 0.0205 [0.0084; 0.0335] | ΔTop1 4.85 [2.79; 6.77] |
 
+## 5b. TOP1 / TOP3 — düz sıralama (parametresiz)
+Her yarışta atlar adayın puanına göre sıralanır (en yüksek = 1.). **Top1** = puanı en yüksek olan atın kazandığı yarış oranı; **Top3** = kazananın puana göre ilk 3 içinde olduğu yarış oranı. Hiçbir katsayı öğrenilmedi (β yok), tüm 1510 yarış. Galop verisi olmayan atlar nötr (veri olanların ortalaması) alınır; eşit puanlı atlar arasında beraberlik payı eşit bölünür. **Rastgele** = sinyalsiz tahmin (1/N ve 3/N ortalaması).
+
+**GALOP_KAPASITE (yarış-içi yüzdelik ort.)**
+| Koşu tipi | Yarış | Top1 isabet | Top1 rastgele | Top3 isabet | Top3 rastgele |
+|---|---|---|---|---|---|
+| TÜMÜ | 1510 | 235 (15.6%) | 10.8% | 587 (38.9%) | 32.3% |
+| Maiden | 301 | 44 (14.7%) | 9.4% | 118 (39.1%) | 28.2% |
+| Şartlı | 499 | 92 (18.4%) | 11.2% | 200 (40.0%) | 33.6% |
+| Handikap | 418 | 49 (11.8%) | 9.8% | 141 (33.8%) | 29.5% |
+| KV | 194 | 41 (20.9%) | 13.6% | 91 (47.1%) | 40.9% |
+| Satış | 42 | 2 (4.8%) | 11.1% | 13 (29.8%) | 33.2% |
+| Veri ≥%50 olan yarışlar | 1460 | 226 (15.5%) | 10.8% | 569 (39.0%) | 32.3% |
+
+**GALOP_HAZIRLIK (yarış-içi yüzdelik ort.)**
+| Koşu tipi | Yarış | Top1 isabet | Top1 rastgele | Top3 isabet | Top3 rastgele |
+|---|---|---|---|---|---|
+| TÜMÜ | 1510 | 177 (11.7%) | 10.8% | 506 (33.5%) | 32.3% |
+| Maiden | 301 | 33 (11.0%) | 9.4% | 96 (32.0%) | 28.2% |
+| Şartlı | 499 | 56 (11.2%) | 11.2% | 173 (34.6%) | 33.6% |
+| Handikap | 418 | 38 (9.1%) | 9.8% | 115 (27.6%) | 29.5% |
+| KV | 194 | 33 (16.9%) | 13.6% | 86 (44.5%) | 40.9% |
+| Satış | 42 | 8 (19.0%) | 11.1% | 15 (34.9%) | 33.2% |
+| Veri ≥%50 olan yarışlar | 1460 | 171 (11.7%) | 10.8% | 490 (33.6%) | 32.3% |
+
+**BİRLEŞİK α=0.5 (α·KAPASİTE+(1−α)·HAZIRLIK)**
+| Koşu tipi | Yarış | Top1 isabet | Top1 rastgele | Top3 isabet | Top3 rastgele |
+|---|---|---|---|---|---|
+| TÜMÜ | 1510 | 191 (12.7%) | 10.8% | 573 (37.9%) | 32.3% |
+| Maiden | 301 | 32 (10.7%) | 9.4% | 111 (37.0%) | 28.2% |
+| Şartlı | 499 | 67 (13.5%) | 11.2% | 201 (40.4%) | 33.6% |
+| Handikap | 418 | 40 (9.6%) | 9.8% | 125 (30.0%) | 29.5% |
+| KV | 194 | 35 (18.2%) | 13.6% | 96 (49.6%) | 40.9% |
+| Satış | 42 | 6 (14.3%) | 11.1% | 14 (34.2%) | 33.2% |
+| Veri ≥%50 olan yarışlar | 1460 | 184 (12.6%) | 10.8% | 554 (37.9%) | 32.3% |
+
 ## 5. Yön varsayılmayan betimleyiciler (bileşik puana GİRMEDİ)
 Kazanma oranı ÷ beklenen (Σ1/N). 1,00 = beklenenle aynı. Yalnız betimleme; sıralama/hüküm değildir.
 
