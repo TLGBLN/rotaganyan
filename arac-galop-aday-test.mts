@@ -48,6 +48,35 @@ for (let i = 0; i < atlar.length; i += 500) for (const c of await db.horseRaceHi
 const kosuGunleri = new Map<number, number[]>([...kosuGun].map(([k, v]) => [k, [...v].sort((a, b) => a - b)]));
 const deposu = new GalopDeposu(tek, kosuGunleri);
 
+// ── GÜN GÖRÜNÜMÜ: --gun "YYYY-MM-DD|Hip1,Hip2" → o günün o hipodromlarındaki HER yarış: atların SON KOŞUSUNDAN SONRAKİ galoplarıyla aday sıralaması + gerçek sonuç
+const gunArg = process.argv.indexOf("--gun");
+if (gunArg > 0) {
+  const [gunS, hipS] = process.argv[gunArg + 1]!.split("|"); const t = Date.parse(gunS + "T00:00:00.000Z"); const gv = deposu.gorunum(t);
+  const ks = await db.race.findMany({ where: { conditions: null, raceDay: { date: new Date(t), hippodrome: { name: { in: hipS!.split(",") } } } }, orderBy: [{ raceDay: { hippodrome: { name: "asc" } } }, { raceNo: "asc" }], select: { raceNo: true, distance: true, raceDay: { select: { hippodrome: { select: { name: true } } } }, result: { select: { winnerNos: true } }, runners: { where: { scratched: false }, orderBy: { no: "asc" }, select: { no: true, name: true, tjkAtId: true } } } });
+  const yz = (v: (number | null)[]) => { const av = v.filter((x): x is number => x != null); return av.length < 2 ? v.map(() => null) : v.map((x) => (x == null ? null : (av.filter((y) => y < x).length + 0.5 * av.filter((y) => y === x).length) / av.length)); };
+  const om = (v: (number | null)[]) => { const a = v.filter((x): x is number => x != null); return a.length ? a.reduce((s, x) => s + x, 0) / a.length : null; };
+  const sira = (x: (number | null)[], j: number) => { if (x[j] == null) return "galop yok"; const v = x.filter((q): q is number => q != null); const better = v.filter((q) => q > x[j]! + 1e-12).length, eq = v.filter((q) => Math.abs(q - x[j]!) <= 1e-12).length; return eq > 1 ? `${better + 1}-${better + eq}/${v.length}` : `${better + 1}/${v.length}`; };
+  const ozet: Record<string, { y: number; k1: number; k3: number; h1: number; h3: number; yok: number }> = {};
+  for (const k of ks) {
+    const B = k.runners.map((r) => (r.tjkAtId == null ? null : galopBilesenleri(gv, r.tjkAtId)));
+    const pH = yz(B.map((b) => b?.hiz ?? null)), pK = yz(B.map((b) => b?.kapanis ?? null)), pE = yz(B.map((b) => b?.efor ?? null)), pT = yz(B.map((b) => b?.trend ?? null)), pS = yz(B.map((b) => b?.sureklilik ?? null));
+    const kap = B.map((_, i) => om([pH[i]!, pK[i]!, pE[i]!])), haz = B.map((_, i) => om([pT[i]!, pS[i]!]));
+    const win = new Set(k.result?.winnerNos ?? []); const hip = k.raceDay.hippodrome.name; const o = (ozet[hip] ??= { y: 0, k1: 0, k3: 0, h1: 0, h3: 0, yok: 0 });
+    const wj = k.runners.findIndex((r) => win.has(r.no));
+    console.log(`\n=== ${hip} K${k.raceNo} (${k.distance} m) — ${k.runners.length} at | kazanan: ${wj >= 0 ? `#${k.runners[wj]!.no} ${k.runners[wj]!.name}` : "sonuç yok"}`);
+    const goster = [...k.runners.keys()].sort((a, b) => (kap[b] ?? -1) - (kap[a] ?? -1));
+    for (const i of goster) console.log(`  #${k.runners[i]!.no} ${k.runners[i]!.name}${win.has(k.runners[i]!.no) ? "  ← KAZANDI" : ""} | galop ${B[i]?.guven.pencereGalop ?? 0} | hız ${f(B[i]?.hiz, 2)} kap ${f(B[i]?.kapanis, 2)} efor ${f(B[i]?.efor, 2)} trend ${f(B[i]?.trend, 2)} | KAPASİTE ${kap[i] == null ? "—" : Math.round(kap[i]! * 100)} HAZIRLIK ${haz[i] == null ? "—" : Math.round(haz[i]! * 100)}`);
+    if (wj >= 0) {
+      console.log(`  Kazananın sırası → KAPASİTE ${sira(kap, wj)} | HAZIRLIK ${sira(haz, wj)}`); o.y++; if (kap[wj] == null) o.yok++;
+      const cr = (x: (number | null)[], m: number) => { if (x[wj] == null) return 0; const v = x.filter((q): q is number => q != null); const better = v.filter((q) => q > x[wj]! + 1e-12).length, eq = v.filter((q) => Math.abs(q - x[wj]!) <= 1e-12).length; return Math.max(0, Math.min(1, (m - better) / eq)); };
+      o.k1 += cr(kap, 1); o.k3 += cr(kap, 3); o.h1 += cr(haz, 1); o.h3 += cr(haz, 3);
+    }
+  }
+  console.log(`\n##### ${gunS} ÖZET (beraberlikte pay bölünür; kazananı galopsuz olan yarış Top1/Top3 SAYILMAZ)`);
+  for (const [h, o] of Object.entries(ozet)) console.log(`${h}: ${o.y} yarış | KAPASİTE Top1 ${f(o.k1, 1)}/${o.y} Top3 ${f(o.k3, 1)}/${o.y} | HAZIRLIK Top1 ${f(o.h1, 1)}/${o.y} Top3 ${f(o.h3, 1)}/${o.y} | kazananı galopsuz ${o.yok}`);
+  await db.$disconnect(); process.exit(0);
+}
+
 // ── TEK YARIŞ GÖRÜNÜMÜ: --kosu "Hipodrom|YYYY-MM-DD|no" → sahadaki HER atın yalnız SON KOŞUSUNDAN SONRAKİ galoplarla bileşenleri + yarış-içi KAPASİTE/HAZIRLIK
 const kosuArg = process.argv.indexOf("--kosu");
 if (kosuArg > 0) {
