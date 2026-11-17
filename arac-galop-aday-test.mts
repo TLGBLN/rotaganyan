@@ -189,6 +189,22 @@ p("");
     p(`**${ad}**\n| Koşu tipi | Yarış | Top1 isabet | Top1 rastgele | Top3 isabet | Top3 rastgele |\n|---|---|---|---|---|---|`); for (const s2 of satirlar) p(s2); p("");
     console.log("TOP1/TOP3 — " + ad + "\n" + satirlar.join("\n"));
   }
+  // TEMİZ SIRALAMA TESTİ: yalnız galop verisi olan atlar arasında; kazananı da verisi olan yarışlarda (yokluk etkisi dışarıda).
+  // Sıralama bilgisizse kazanan, verisi olan atlar arasında düzgün dağılır → Top1=1/n, Top3=3/n. Fark = YALNIZ galop puanının sıralama bilgisi.
+  p("**Temiz sıralama testi (yokluk etkisi ayrıldı):** Galop verisi olmayan atlar sahadan çıkarılır; sıralama yalnız verisi olan atlar arasında yapılır ve yalnız kazananın da verisi olduğu yarışlarda sayılır. Bu koşulda sıralama bilgisizse Top1 = 1/n, Top3 = 3/n olur; aradaki fark yalnız galop puanının bilgisidir. (Kazananı galopsuz olan yarışlar: veri-yokluğunun kendi etkisi — bu ayrı raporlanır.)\n");
+  for (const ad of adT.slice(0, 2)) {
+    const satirlar: string[] = [];
+    for (const g of ["TÜMÜ", ...gruplar]) {
+      let n = 0, a1 = 0, a3 = 0, r1 = 0, r3 = 0, kazVerisiz = 0, toplam = 0;
+      pop.forEach((k, i) => { if (g !== "TÜMÜ" && k.kaba !== g) return; toplam++; const v = ozellikler[i]![ad]!; const wj = k.atlar.findIndex((a) => a.kazandi); const idx = v.map((x, j) => (x != null ? j : -1)).filter((j) => j >= 0);
+        if (wj < 0 || v[wj] == null) { kazVerisiz++; return; } if (idx.length < 4) return;
+        const x = idx.map((j) => v[j]!); const xw = v[wj]!; const better = x.filter((q) => q > xw + 1e-12).length, eq = x.filter((q) => Math.abs(q - xw) <= 1e-12).length;
+        n++; a1 += Math.max(0, Math.min(1, (1 - better) / eq)); a3 += Math.max(0, Math.min(1, (3 - better) / eq)); r1 += 1 / x.length; r3 += Math.min(1, 3 / x.length); });
+      if (n) satirlar.push(`| ${g} | ${n}/${toplam} | ${kazVerisiz} | ${f(a1 / n * 100, 1)}% | ${f(r1 / n * 100, 1)}% | ${f(a3 / n * 100, 1)}% | ${f(r3 / n * 100, 1)}% |`);
+    }
+    p(`**${ad}** — temiz test\n| Koşu tipi | Yarış (sayılan/toplam) | Kazananı galopsuz | Top1 | Rastgele | Top3 | Rastgele |\n|---|---|---|---|---|---|---|`); for (const s2 of satirlar) p(s2); p("");
+    console.log("TEMİZ — " + ad + "\n" + satirlar.join("\n"));
+  }
 }
 
 // ───────────────────────── 6) BETİMLEYİCİLER (yön varsayılmadı; bileşik puana girmedi)

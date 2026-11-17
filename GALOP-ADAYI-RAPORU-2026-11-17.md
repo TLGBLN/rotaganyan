@@ -95,6 +95,28 @@ Her yarışta atlar adayın puanına göre sıralanır (en yüksek = 1.). **Top1
 | Satış | 42 | 6 (14.3%) | 11.1% | 14 (34.2%) | 33.2% |
 | Veri ≥%50 olan yarışlar | 1460 | 184 (12.6%) | 10.8% | 554 (37.9%) | 32.3% |
 
+**Temiz sıralama testi (yokluk etkisi ayrıldı):** Galop verisi olmayan atlar sahadan çıkarılır; sıralama yalnız verisi olan atlar arasında yapılır ve yalnız kazananın da verisi olduğu yarışlarda sayılır. Bu koşulda sıralama bilgisizse Top1 = 1/n, Top3 = 3/n olur; aradaki fark yalnız galop puanının bilgisidir. (Kazananı galopsuz olan yarışlar: veri-yokluğunun kendi etkisi — bu ayrı raporlanır.)
+
+**GALOP_KAPASITE (yarış-içi yüzdelik ort.)** — temiz test
+| Koşu tipi | Yarış (sayılan/toplam) | Kazananı galopsuz | Top1 | Rastgele | Top3 | Rastgele |
+|---|---|---|---|---|---|---|
+| TÜMÜ | 1294/1510 | 205 | 17.8% | 12.7% | 45.0% | 38.0% |
+| Maiden | 260/301 | 40 | 16.8% | 11.0% | 44.4% | 32.9% |
+| Şartlı | 431/499 | 63 | 20.6% | 13.4% | 46.6% | 40.3% |
+| Handikap | 348/418 | 68 | 13.7% | 11.8% | 39.6% | 35.4% |
+| KV | 172/194 | 20 | 23.4% | 15.3% | 52.9% | 46.0% |
+| Satış | 30/42 | 11 | 6.7% | 13.6% | 44.4% | 40.8% |
+
+**GALOP_HAZIRLIK (yarış-içi yüzdelik ort.)** — temiz test
+| Koşu tipi | Yarış (sayılan/toplam) | Kazananı galopsuz | Top1 | Rastgele | Top3 | Rastgele |
+|---|---|---|---|---|---|---|
+| TÜMÜ | 1294/1510 | 205 | 13.3% | 12.7% | 39.0% | 38.0% |
+| Maiden | 260/301 | 40 | 12.7% | 11.0% | 36.4% | 32.9% |
+| Şartlı | 431/499 | 63 | 12.4% | 13.4% | 41.5% | 40.3% |
+| Handikap | 348/418 | 68 | 10.4% | 11.8% | 32.3% | 35.4% |
+| KV | 172/194 | 20 | 18.7% | 15.3% | 49.8% | 46.0% |
+| Satış | 30/42 | 11 | 26.5% | 13.6% | 41.9% | 40.8% |
+
 ## 5. Yön varsayılmayan betimleyiciler (bileşik puana GİRMEDİ)
 Kazanma oranı ÷ beklenen (Σ1/N). 1,00 = beklenenle aynı. Yalnız betimleme; sıralama/hüküm değildir.
 
