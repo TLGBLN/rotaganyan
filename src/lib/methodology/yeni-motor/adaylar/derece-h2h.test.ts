@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { DERECE_GUN_MS, DereceDeposu, dereceBilesenleri, type DereceKaydi } from "./derece-aday";
-import { H2H_GUN_MS, H2H_SABITLERI, H2HDeposu, h2hCift, h2hNet, type H2HKayit } from "./h2h-aday";
+import { H2H_GUN_MS, H2HDeposu, h2hCift, h2hNet, h2hNetCoklu, type H2HKayit } from "./h2h-aday";
 import { SINYAL_KAYDI } from "../sinyal-kaydi";
 
 const T = Date.UTC(2026, 10, 16);
@@ -48,27 +48,43 @@ describe("SON6 / HIZ_DERECESI (TJK resmî süre; aktif sinyal DEĞİL)", () => {
 
 const hk = (yarisKey: string, atId: number, gun: number, sira: number, yuzey = "K", mesafe = 1400): H2HKayit => ({ yarisKey, atId, tarih: T - gun * H2H_GUN_MS, sira, yuzey, mesafe });
 describe("H2H_NET_SKOR (aktif sinyal DEĞİL)", () => {
-  const hedef = { yuzey: "K", mesafe: 1400 };
-  it("H2H_{h,j} = Σw·X/(Σw+λ): bugün ortak koşulda; w = 0,5^(gün/90) (benzerlik 1)", () => {
-    const l = [hk("r1", 1, 0.0001, 2), hk("r1", 2, 0.0001, 5), hk("r2", 1, 90, 3), hk("r2", 2, 90, 1)]; const c = h2hCift(new H2HDeposu(l).gorunum(T), 1, 2, hedef);
-    const w1 = Math.pow(0.5, 0.0001 / 90), w2 = 0.5; expect(c.n).toBe(2); expect(c.deger).toBeCloseTo((w1 * 1 + w2 * -1) / (w1 + w2 + H2H_SABITLERI.lambda)); expect(c.galibiyet).toBe(1); expect(c.maglubiyet).toBe(1);
+  const hedef = { yuzey: "K", mesafe: 1400 }; const par = { yarimOmurGun: 90, lambda: 1, yuzey: "AYNI" as const };
+  it("H2H_{h,j} = Σw·X/(Σw+λ); w = 0,5^(gün/yarıÖmür) × min/max mesafe oranı", () => {
+    const l = [hk("r1", 1, 0.0001, 2, "K", 1400), hk("r1", 2, 0.0001, 5, "K", 1400), hk("r2", 1, 90, 3, "K", 1200), hk("r2", 2, 90, 1, "K", 1200)]; const c = h2hCift(new H2HDeposu(l).gorunum(T), 1, 2, hedef, par);
+    const w1 = Math.pow(0.5, 0.0001 / 90), w2 = 0.5 * (1200 / 1400); expect(c.n).toBe(2); expect(c.deger).toBeCloseTo((w1 * 1 + w2 * -1) / (w1 + w2 + 1)); expect(c.galibiyet).toBe(1); expect(c.maglubiyet).toBe(1);
   });
-  it("eşit sıra → 0; ortak yarış yoksa NULL (sıfır değil); farklı yüzey/mesafe ağırlığı düşürür", () => {
-    expect(h2hCift(new H2HDeposu([hk("r1", 1, 10, 3), hk("r1", 2, 10, 3)]).gorunum(T), 1, 2, hedef).deger).toBeCloseTo(0);
-    expect(h2hCift(new H2HDeposu([hk("r1", 1, 10, 3), hk("r2", 2, 10, 3)]).gorunum(T), 1, 2, hedef).deger).toBeNull();
-    const ayni = h2hCift(new H2HDeposu([hk("r1", 1, 10, 1), hk("r1", 2, 10, 4)]).gorunum(T), 1, 2, hedef), farkli = h2hCift(new H2HDeposu([hk("r1", 1, 10, 1, "Ç", 1400), hk("r1", 2, 10, 4, "Ç", 1400)]).gorunum(T), 1, 2, hedef);
-    expect(farkli.deger!).toBeLessThan(ayni.deger!); expect(farkli.agirlikToplam).toBeCloseTo(ayni.agirlikToplam * H2H_SABITLERI.farkliYuzeyAgirlik);
+  it("yarı ömür ve λ parametre: uzun yarı ömür eski yarışa daha çok ağırlık; büyük λ değeri sıfıra çeker", () => {
+    const g = new H2HDeposu([hk("r1", 1, 180, 1), hk("r1", 2, 180, 4)]).gorunum(T); const a = h2hCift(g, 1, 2, hedef, { ...par, yarimOmurGun: 90 }), b = h2hCift(g, 1, 2, hedef, { ...par, yarimOmurGun: 365 }); expect(b.agirlikToplam).toBeGreaterThan(a.agirlikToplam); expect(b.deger!).toBeGreaterThan(a.deger!);
+    expect(h2hCift(g, 1, 2, hedef, { ...par, lambda: 5 }).deger!).toBeLessThan(h2hCift(g, 1, 2, hedef, { ...par, lambda: 1 }).deger!);
   });
-  it("az karşılaşmada λ aşırı puanı engeller: tek galibiyet 1'e değil < 1'e", () => { const c = h2hCift(new H2HDeposu([hk("r1", 1, 1, 1), hk("r1", 2, 1, 2)]).gorunum(T), 1, 2, hedef); expect(c.deger!).toBeLessThan(0.6); expect(c.deger!).toBeGreaterThan(0.4); });
+  it("eşit sıra → 0; ortak yarış yoksa NULL (sıfır değil)", () => {
+    expect(h2hCift(new H2HDeposu([hk("r1", 1, 10, 3), hk("r1", 2, 10, 3)]).gorunum(T), 1, 2, hedef, par).deger).toBeCloseTo(0);
+    expect(h2hCift(new H2HDeposu([hk("r1", 1, 10, 3), hk("r2", 2, 10, 3)]).gorunum(T), 1, 2, hedef, par).deger).toBeNull();
+  });
+  it("ANA hesap yalnız AYNI yüzey; farklı yüzey ayrı hesapta; yüzey bilinmiyorsa ('?') ikisinde de dışarıda", () => {
+    const l = [hk("r1", 1, 10, 1, "Ç", 1400), hk("r1", 2, 10, 4, "Ç", 1400), hk("r2", 1, 10, 4, "K", 1400), hk("r2", 2, 10, 1, "K", 1400), hk("r3", 1, 10, 1, "?", 1400), hk("r3", 2, 10, 4, "?", 1400)]; const g = new H2HDeposu(l).gorunum(T);
+    const ayni = h2hCift(g, 1, 2, hedef, par), farkli = h2hCift(g, 1, 2, hedef, { ...par, yuzey: "FARKLI" }); expect(ayni.n).toBe(1); expect(ayni.deger!).toBeLessThan(0); expect(farkli.n).toBe(1); expect(farkli.deger!).toBeGreaterThan(0);
+    expect(h2hCift(new H2HDeposu([hk("r3", 1, 10, 1, "?"), hk("r3", 2, 10, 4, "?")]).gorunum(T), 1, 2, hedef, par).deger).toBeNull(); expect(h2hCift(new H2HDeposu([hk("r3", 1, 10, 1, "?"), hk("r3", 2, 10, 4, "?")]).gorunum(T), 1, 2, hedef, { ...par, yuzey: "FARKLI" }).deger).toBeNull();
+  });
+  it("mesafe benzerliği sürekli (keskin eşik yok): yakın mesafe ağırlığı > uzak mesafe ağırlığı, ikisi de > 0", () => {
+    const yakin = h2hCift(new H2HDeposu([hk("r1", 1, 10, 1, "K", 1300), hk("r1", 2, 10, 4, "K", 1300)]).gorunum(T), 1, 2, hedef, par), uzak = h2hCift(new H2HDeposu([hk("r1", 1, 10, 1, "K", 1000), hk("r1", 2, 10, 4, "K", 1000)]).gorunum(T), 1, 2, hedef, par);
+    expect(yakin.agirlikToplam).toBeGreaterThan(uzak.agirlikToplam); expect(uzak.agirlikToplam).toBeGreaterThan(0);
+  });
+  it("az karşılaşmada λ aşırı puanı engeller: tek galibiyet 1'e değil < 1'e", () => { const c = h2hCift(new H2HDeposu([hk("r1", 1, 1, 1), hk("r1", 2, 1, 2)]).gorunum(T), 1, 2, hedef, par); expect(c.deger!).toBeLessThan(0.6); expect(c.deger!).toBeGreaterThan(0.4); });
   it("H2H_NET: yalnız ortak yarışı olan rakiplerin ortalaması; hiç yoksa null; veri olan rakip sayısı ayrı", () => {
-    const l = [hk("a", 1, 5, 1), hk("a", 2, 5, 3), hk("b", 1, 5, 4), hk("b", 3, 5, 2)]; const g = new H2HDeposu(l).gorunum(T); const n = h2hNet(g, 1, [1, 2, 3, 4], hedef);
-    expect(n.nRakip).toBe(2); expect(n.toplamRakip).toBe(3); const c12 = h2hCift(g, 1, 2, hedef).deger!, c13 = h2hCift(g, 1, 3, hedef).deger!; expect(n.deger).toBeCloseTo((c12 + c13) / 2);
-    expect(h2hNet(g, 4, [1, 2, 3], hedef).deger).toBeNull();
+    const l = [hk("a", 1, 5, 1), hk("a", 2, 5, 3), hk("b", 1, 5, 4), hk("b", 3, 5, 2)]; const g = new H2HDeposu(l).gorunum(T); const n = h2hNet(g, 1, [1, 2, 3, 4], hedef, par);
+    expect(n.nRakip).toBe(2); expect(n.toplamRakip).toBe(3); const c12 = h2hCift(g, 1, 2, hedef, par).deger!, c13 = h2hCift(g, 1, 3, hedef, par).deger!; expect(n.deger).toBeCloseTo((c12 + c13) / 2);
+    expect(h2hNet(g, 4, [1, 2, 3], hedef, par).deger).toBeNull();
   });
-  it("as-of: yarış günü ve sonrası ortak yarışlar kullanılmaz", () => { const g = new H2HDeposu([hk("r1", 1, 0, 1), hk("r1", 2, 0, 5), hk("r2", 1, -3, 1), hk("r2", 2, -3, 5)]).gorunum(T); expect(h2hCift(g, 1, 2, hedef).deger).toBeNull(); });
-  it("SIZINTI: t ve sonrası bozulunca (aynı gün sahte ortak yarışlar dahil) değerler BİREBİR aynı", () => {
-    const l: H2HKayit[] = []; for (let r = 0; r < 30; r++) for (let a = 1; a <= 6; a++) l.push(hk("y" + r, a, 3 + r * 4 - (r > 24 ? 110 : 0), 1 + ((a * 5 + r * 3) % 6))); const d = new H2HDeposu(l); const x = d.gorunum(T), y = d.gelecegiBoz(T, 5).gorunum(T);
-    for (let a = 1; a <= 6; a++) expect(h2hNet(y, a, [1, 2, 3, 4, 5, 6], hedef)).toEqual(h2hNet(x, a, [1, 2, 3, 4, 5, 6], hedef));
+  it("as-of: yarış günü ve sonrası ortak yarışlar kullanılmaz", () => { const g = new H2HDeposu([hk("r1", 1, 0, 1), hk("r1", 2, 0, 5), hk("r2", 1, -3, 1), hk("r2", 2, -3, 5)]).gorunum(T); expect(h2hCift(g, 1, 2, hedef, par).deger).toBeNull(); });
+  it("SIZINTI: t ve sonrası bozulunca (aynı gün sahte ortak yarışlar dahil) değerler BİREBİR aynı — tüm parametre kombinasyonlarında", () => {
+    const l: H2HKayit[] = []; for (let r = 0; r < 30; r++) for (let a = 1; a <= 6; a++) l.push(hk("y" + r, a, 3 + r * 4 - (r > 24 ? 110 : 0), 1 + ((a * 5 + r * 3) % 6), r % 3 === 0 ? "Ç" : "K", 1200 + (r % 4) * 100)); const d = new H2HDeposu(l); const x = d.gorunum(T), y = d.gelecegiBoz(T, 5).gorunum(T);
+    for (const hl of [90, 180, 365]) for (const lam of [1, 3, 5]) for (const yz of ["AYNI", "FARKLI"] as const) for (let a = 1; a <= 6; a++) expect(h2hNet(y, a, [1, 2, 3, 4, 5, 6], hedef, { yarimOmurGun: hl, lambda: lam, yuzey: yz })).toEqual(h2hNet(x, a, [1, 2, 3, 4, 5, 6], hedef, { yarimOmurGun: hl, lambda: lam, yuzey: yz }));
+  });
+  it("h2hNetCoklu: her parametre kümesi için h2hNet ile BİREBİR aynı", () => {
+    const l: H2HKayit[] = []; for (let r = 0; r < 40; r++) for (let a = 1; a <= 7; a++) l.push(hk("y" + r, a, 2 + r * 5, 1 + ((a * 3 + r * 5) % 7), r % 3 === 0 ? "Ç" : r % 7 === 0 ? "?" : "K", 1000 + (r % 6) * 100)); const g = new H2HDeposu(l).gorunum(T); const pars = [] as { yarimOmurGun: number; lambda: number; yuzey: "AYNI" | "FARKLI" }[];
+    for (const hl of [90, 180, 365]) for (const lam of [1, 3, 5]) for (const yz of ["AYNI", "FARKLI"] as const) pars.push({ yarimOmurGun: hl, lambda: lam, yuzey: yz });
+    for (const hy of [{ yuzey: "K", mesafe: 1400 }, { yuzey: "?", mesafe: 1400 }]) for (let a = 1; a <= 7; a++) { const c = h2hNetCoklu(g, a, [1, 2, 3, 4, 5, 6, 7], hy, pars); pars.forEach((p, i) => expect(c[i]).toEqual(h2hNet(g, a, [1, 2, 3, 4, 5, 6, 7], hy, p))); }
   });
   it("yapısal: saf dosya (db/ağ/saat/rastgele/sonuç import ETMEZ)", () => {
     const kod = fs.readFileSync(path.join(__dirname, "h2h-aday.ts"), "utf8").split("\n").filter((l) => !l.trim().startsWith("//")).join("\n"); expect(/from\s+["']/.test(kod)).toBe(false); expect(/\bDate\b|Math\.random|fetch\(|prisma|\bdb\b|process\.|winner|result|ganyan/.test(kod)).toBe(false);
