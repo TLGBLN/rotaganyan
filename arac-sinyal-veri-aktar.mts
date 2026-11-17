@@ -9,7 +9,7 @@
 // Çalıştırma:
 //   node --env-file=.env node_modules/tsx/dist/cli.mjs arac-sinyal-veri-aktar.mts [--from 2026-11-13] [--to 2026-11-14]
 // Çıktı: .sinyal-veri/anlik.ndjson (git'e GİRMEZ). Her satır = 1 koşu: tip/mesafe/zemin/irk, kazanan(lar), bitiş sırası, atlar[{no, rank, p,
-// sig:[[kod, hamDeger, observed]], yaş/kilo/hp/kgs/jokey/antrenör/pedigri, ped(externalPedigree)}], motor etiketi ve sinyal sayısı.
+// sig:[[kod, hamDeger, observed, reliability]], yaş/kilo/hp/kgs/jokey/antrenör/pedigri, ped(externalPedigree)}], motor etiketi ve sinyal sayısı.
 import fs from "node:fs";
 import path from "node:path";
 import { db } from "./src/lib/db";
@@ -25,7 +25,7 @@ const done = new Set<string>();
 if (fs.existsSync(OUT)) for (const l of fs.readFileSync(OUT, "utf8").split("\n")) if (l) { try { done.add(JSON.parse(l).raceId); } catch { /* bozuk satır */ } }
 console.log(`Mevcut: ${done.size} koşu aktarılmış. Aralık: ${from.toISOString().slice(0, 10)} → ${to.toISOString().slice(0, 10)}`);
 
-type Snap = { tumSinyaller?: { kod: string; hamDeger: number; observed: boolean }[]; externalPedigree?: unknown; motorEtiketi?: string } | null;
+type Snap = { tumSinyaller?: { kod: string; hamDeger: number; observed: boolean; reliability?: number }[]; externalPedigree?: unknown; motorEtiketi?: string } | null;
 let yeni = 0;
 for (let d = new Date(from); d <= to; d = new Date(d.getTime() + 86400000)) {
   const races = await db.race.findMany({
@@ -54,7 +54,7 @@ for (let d = new Date(from); d <= to; d = new Date(d.getTime() + 86400000)) {
         jokey: rn?.jockey ?? null, antrenor: rn?.trainer ?? null, sahip: rn?.owner ?? null, sire: rn?.sire ?? null, dam: rn?.dam ?? null, damSire: rn?.damSire ?? null,
         ayniJokey: rn?.sameJockey ?? null, jokeyDeg: rn?.jockeyChanged ?? null, apprentice: rn?.apprentice ?? null, startNo: rn?.startNo ?? null, disari: rn?.disaridanStart ?? null,
         form: rn?.recentForm ?? null, takiEk: rn?.equipmentAdded ?? null, takiCik: rn?.equipmentRemoved ?? null, kosmadi: rn?.scratched ?? false,
-        sig: (snap?.tumSinyaller ?? []).map((s) => [s.kod, s.hamDeger, s.observed]),
+        sig: (snap?.tumSinyaller ?? []).map((s) => [s.kod, s.hamDeger, s.observed, s.reliability ?? 1]),
         ped: snap?.externalPedigree ?? null,
       };
     });

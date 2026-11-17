@@ -1,0 +1,104 @@
+{
+  "status": "SHADOW",
+  "version": "RotaGanyan Analiz Motoru — S2 gölge",
+  "generatedAt": "2026-11-17T14:08:54.307+00:00",
+  "note": "2026-11-17 S2 SADE MODEL (GÖLGE — canlı motor yüklemez): 24 → 17 sinyal. accBitis = (rel_C·z_C + rel_L·z_L)/2 (z'ler canlı v546-1-saf-weights.json μ/σ ile). Atılan: tempoOnBaski, tempoGeriBaski (ρ=−1 ayna), zeminToleransi, zeminMesafeDeneyim, jokeyFormuGenel, hizDerecesi. CV (zaman, 827 test): tam→S2 -0.0068 [-0.0164,0.0023] (5 kat), SINAMA 0.0000 [-0.0106,0.0104]. S2'yi yapı bilgisiyle seçtim ama ek-katkı tabloları SINAMA katlarını da içerdiği için SINAMA tam bağımsız değil → gerçek doğrulama yeni yarışlarda gölge kıyas. Handikap ve ŞARTLI 1/27 segmentleri bu dosyada YOK/DEĞİŞMEDİ.",
+  "baseModel": "v546-1-saf-weights.json",
+  "featureNames": [
+    "h2hNetSkor",
+    "sireOrani",
+    "accHizFormu",
+    "jokeyPIT",
+    "antrenorPIT",
+    "galopKaliteV1",
+    "lastWon",
+    "hpRel",
+    "kiloRel",
+    "fMean",
+    "kgsLog",
+    "sexE",
+    "dususDelta",
+    "galopPedigri",
+    "tempoOnOran",
+    "tempoErkenHiz",
+    "accBitis"
+  ],
+  "weights": [
+    0.07096716135227676,
+    0.08624719961975463,
+    -0.129322918679706,
+    0.2947265169390956,
+    0.12134584821696835,
+    0.18743603377620469,
+    0.10939373590027406,
+    0.34141731339401543,
+    -0.20265738117573795,
+    -0.3415495511866431,
+    -0.19467078172998034,
+    0.21188730992071947,
+    0.2162780414783389,
+    0.09741531458470912,
+    0.24302911286634046,
+    -0.1310504926432828,
+    0.24992165853349446
+  ],
+  "means": [
+    0,
+    11.658734769214712,
+    -0.16222818057629146,
+    10.475840424765739,
+    9.969006184496754,
+    54.67691476222976,
+    0.10241588854305618,
+    5.150004070236434e-9,
+    -2.5130890135231305e-9,
+    5.403051627468302,
+    2.936157808459974,
+    0.3115532286212914,
+    -0.348168331819558,
+    50.289596128660996,
+    0.5019687953120328,
+    2.0155270240071275e-9,
+    0.030912804145921093
+  ],
+  "stds": [
+    3.2374737378225182,
+    3.7914508295797145,
+    2.33753326571794,
+    5.374616973312761,
+    3.814131777589759,
+    21.002066375358538,
+    0.3031944496804061,
+    10.459660798147603,
+    2.326969702949603,
+    1.986830751051588,
+    0.7163535597532171,
+    0.4631282914667509,
+    1.9980518126518028,
+    17.432578557714272,
+    0.1524905509800676,
+    1.0454363362367247,
+    0.4022827915948452
+  ],
+  "bilesik": {
+    "accBitis": {
+      "kaynak": [
+        "ACC_CLOSE_RES",
+        "ACC_LATE"
+      ],
+      "mu": [
+        0.05347708919490392,
+        -0.2504294611843949
+      ],
+      "sd": [
+        0.4544710617185719,
+        0.8235583000529306
+      ],
+      "formul": "(rel_C*z_C + rel_L*z_L)/2; yalnız biri varsa o; güvenirlik=1"
+    }
+  },
+  "trainingWindow": {
+    "yarisSayisi": 1392
+  },
+  "holdoutDegerlendirme": "S2 − tam (5 kat): -0.0068 [-0.0164,0.0023]"
+}

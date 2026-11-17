@@ -1,0 +1,54 @@
+{
+  "status": "READY",
+  "version": "RotaGanyan Analiz Motoru — Segment: ŞARTLI 1/27",
+  "generatedAt": "2026-11-16T15:02:15.782Z",
+  "note": "2026-11-16 KULLANICI KARARI: galop girdisi galopKalite → galopKaliteV1 (GALOP ANALİZ MOTORU v1.0). Diğer 3 katsayı (sireOrani, jokeyFormuGenel, antrenorOraniGenel) DEĞİŞMEDİ; galopKaliteV1 β yalnız 63 Şartlı 1/27 yarışında dondurulmuş diğerleriyle uydurulup, ortalama/σ varsayılan modelden alındı. Önceki sürüm: v546-1-saf-segment-dusuk-deneyim-galopv1-oncesi-2026-11-16.json | ÖNCEKİ NOT: 2026-11-11 kullanıcı kararı — bağımsız AUC ölçümü (Şartlı1 n=183/Şartlı27 n=11, kazanan-rakip ikili karşılaştırma) idmJokey'in bu segmentte sinyal taşımadığını (0.494/0.381, rastgele=0.50) gösterince idmJokey çıkarıldı. 4 özellik: sireOrani (Sire-only, BİRLEŞİK DEĞİL) + jokeyFormuGenel + galopKalite + antrenorOraniGenel. SADECE ŞARTLI 1/27 koşularında kullanılır.",
+  "featureNames": [
+    "sireOrani",
+    "jokeyFormuGenel",
+    "galopKaliteV1",
+    "antrenorOraniGenel"
+  ],
+  "weights": [
+    0.10282454767413374,
+    0.054887748090740644,
+    1.0177585100428805,
+    0.2758539210097101
+  ],
+  "means": [
+    10.132953808587517,
+    -0.0035796517315265187,
+    53.605555377413594,
+    9.63374991208963
+  ],
+  "stds": [
+    5.537461529789796,
+    0.040983391520188484,
+    21.032085066359965,
+    3.7940678950144013
+  ],
+  "trainingWindow": {
+    "baslangic": "2026-08-16",
+    "bitis": "2026-10-24",
+    "yarisSayisi": 101
+  },
+  "holdoutWindow": {
+    "baslangic": "2026-10-25",
+    "bitis": "2026-11-09",
+    "yarisSayisi": 23
+  },
+  "holdoutDegerlendirme": {
+    "oncekiSegmentA5ozellikIdmJokeyDahil": {
+      "n": 23,
+      "top1": 0.17391304347826086,
+      "top3": 0.6521739130434783,
+      "logLoss": 2.24873365945434
+    },
+    "buDosyaninKendi4ozellikSonucu": {
+      "n": 23,
+      "top1": 0.21739130434782608,
+      "top3": 0.6086956521739131,
+      "logLoss": 2.2633126586662486
+    }
+  }
+}

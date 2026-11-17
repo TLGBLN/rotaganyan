@@ -1,0 +1,102 @@
+{
+  "uretim": "2026-11-17T14:08:54.468Z",
+  "not": "Yön = sinyalin TEK BAŞINA (diğer sinyaller olmadan) eğitim işareti; sıralama katsayısından alınmaz (gölgelenmeden etkilenir). Pozitiflik: yon·z > 0.",
+  "yonler": {
+    "h2hNetSkor": {
+      "yon": 1,
+      "soloBeta": 0.3433
+    },
+    "hizDerecesi": {
+      "yon": 1,
+      "soloBeta": 0.6306
+    },
+    "zeminToleransi": {
+      "yon": -1,
+      "soloBeta": -0.0105
+    },
+    "zeminMesafeDeneyim": {
+      "yon": 1,
+      "soloBeta": 0.0407
+    },
+    "sireOrani": {
+      "yon": 1,
+      "soloBeta": 0.1468
+    },
+    "ACC_CLOSE_RES": {
+      "yon": 1,
+      "soloBeta": 1.0305
+    },
+    "ACC_LATE": {
+      "yon": 1,
+      "soloBeta": 1.0558
+    },
+    "accHizFormu": {
+      "yon": 1,
+      "soloBeta": 0.3029
+    },
+    "jokeyFormuGenel": {
+      "yon": -1,
+      "soloBeta": -0.0109
+    },
+    "jokeyPIT": {
+      "yon": 1,
+      "soloBeta": 0.4873
+    },
+    "antrenorPIT": {
+      "yon": 1,
+      "soloBeta": 0.2734
+    },
+    "galopKaliteV1": {
+      "yon": 1,
+      "soloBeta": 0.2494
+    },
+    "lastWon": {
+      "yon": 1,
+      "soloBeta": 0.2116
+    },
+    "hpRel": {
+      "yon": 1,
+      "soloBeta": 0.5303
+    },
+    "kiloRel": {
+      "yon": 1,
+      "soloBeta": 0.221
+    },
+    "fMean": {
+      "yon": -1,
+      "soloBeta": -0.7773
+    },
+    "kgsLog": {
+      "yon": -1,
+      "soloBeta": -0.1142
+    },
+    "sexE": {
+      "yon": 1,
+      "soloBeta": 0.2446
+    },
+    "dususDelta": {
+      "yon": 1,
+      "soloBeta": 0.2619
+    },
+    "galopPedigri": {
+      "yon": 1,
+      "soloBeta": 0.2124
+    },
+    "tempoOnOran": {
+      "yon": 1,
+      "soloBeta": 0.2257
+    },
+    "tempoErkenHiz": {
+      "yon": -1,
+      "soloBeta": -0.2673
+    },
+    "tempoOnBaski": {
+      "yon": 1,
+      "soloBeta": 0.0153
+    },
+    "tempoGeriBaski": {
+      "yon": -1,
+      "soloBeta": -0.0072
+    }
+  }
+}
