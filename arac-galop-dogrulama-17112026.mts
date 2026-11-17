@@ -7,6 +7,7 @@
  */
 import fs from "node:fs";
 import { db } from "./src/lib/db";
+import { normalizeClassType } from "./src/server/services/admin.service";
 import { GUN_MS, GalopDeposu, galopBilesenleri, galopNormalize, galopTekille, type GalopHam } from "./src/lib/methodology/yeni-motor/adaylar/galop-aday";
 
 const GUN = "2026-11-17"; const T = Date.parse(GUN + "T00:00:00.000Z"); const HIPS = ["Adana", "Antalya"];
@@ -39,7 +40,7 @@ const temsil = new Map<string, (typeof norm)[number]>(); for (const g of norm) {
 const rep = [...temsil.values()]; const repIds = new Set(rep.map((g) => g.hamId));
 
 // ───────────── A1) KOŞU GÜNLERİ (önceki koşu tarihi)
-const ks = await db.race.findMany({ where: { conditions: null, raceDay: { date: new Date(T), hippodrome: { name: { in: HIPS } } } }, orderBy: [{ raceDay: { hippodrome: { name: "asc" } } }, { raceNo: "asc" }], select: { id: true, raceNo: true, distance: true, raceDay: { select: { hippodrome: { select: { name: true } } } }, runners: { where: { scratched: false }, orderBy: { no: "asc" }, select: { no: true, name: true, tjkAtId: true } } } });
+const ks = await db.race.findMany({ where: { conditions: null, raceDay: { date: new Date(T), hippodrome: { name: { in: HIPS } } } }, orderBy: [{ raceDay: { hippodrome: { name: "asc" } } }, { raceNo: "asc" }], select: { id: true, raceNo: true, distance: true, breed: true, surface: true, classType: true, raceDay: { select: { hippodrome: { select: { name: true } } } }, runners: { where: { scratched: false }, orderBy: { no: "asc" }, select: { no: true, name: true, tjkAtId: true } } } });
 const atIds = [...new Set(ks.flatMap((k) => k.runners.map((r) => r.tjkAtId).filter((x): x is number => x != null)))];
 const gunSet = new Map<number, Map<number, string>>(); const gEkle = (id: number, t: number, kaynak: string) => { const m = gunSet.get(id) ?? new Map(); if (!m.has(t)) m.set(t, kaynak); gunSet.set(id, m); };
 for (const r of await db.runner.findMany({ where: { scratched: false, tjkAtId: { in: atIds } }, select: { tjkAtId: true, race: { select: { raceDay: { select: { date: true } } } } } })) gEkle(r.tjkAtId!, gunMs(r.race.raceDay.date), "kendi kaydımız");
@@ -196,6 +197,56 @@ p(`- **Bağımsız hesap ↔ modül:** ${karsilastirilan} at karşılaştırıld
 p(`- **Geçersiz (yarış-sonrası veri kullanan) at: ${gecersizToplam}.** Kullanılan galop ${kullanilanGalop}; yarış günü/sonrası tarihli olduğu için DIŞLANAN kayıt ${dislanan}; mükerrer kaldırılan ${mukerrerSayi}. Kullanılan referans havuzlarındaki en yeni galop tarihi: **${dm(refMaxGenel)}** (< ${dm(T)}).`);
 for (const s of ozetTop) p(`- ${s}`);
 p("- **Sınırlar:** (1) 14–16 yarış çok küçük bir örnektir; bu bir gün, bir kanıt değil. (2) Galop kayıtlarının veritabanına **ne zaman** girdiği saklanmıyor: tarihler gerçek idman tarihidir (yarıştan önce olmuştur) ama \"o gün o kayıt sistemde görünüyor muydu\" kanıtlanamaz. (3) Hipodrom ve pist durumu kaydımızda yok. (4) Önceki koşu tarihi, kendi kayıtlarımız + TJK geçmiş önbelleğinden alınır (önbellek sonradan güncellenmiş olabilir; yalnız t'den önceki satırlar kullanıldı).");
+// ───────────── KOŞUL ANALİZİ — 17.11.2026, HER KOŞU AYRI AYRI (arşiv DEĞİL; yeni formül YOK; yalnız mevcut KAPASİTE)
+{
+  const Z: string[] = []; const z = (s = "") => Z.push(s); const nn = (v: (number | null)[]) => v.filter((q): q is number => q != null); const TOL = 1e-9;
+  const kabaG = (t: string) => { const u = t.toUpperCase(); return u.includes("MAIDEN") ? "Maiden" : u.includes("ŞARTLI") ? "Şartlı" : u.includes("HANDIKAP") ? "Handikap" : u.startsWith("KV") ? "KV" : /^G \d/.test(u) ? "Grup" : u.includes("SATIŞ") ? "Satış" : "Diğer"; };
+  type AtT = (typeof yarislar)[number]["atlar"][number];
+  const nG = (a: AtT) => a.satirlar.filter((s) => s.kullanildi).length; const arGun = (a: AtT) => (a.onceki ? Math.round((T - a.onceki.t) / GUN_MS) : null);
+  const gGrup = (n: number) => (n === 0 ? "galop yok" : n === 1 ? "tek galop" : n <= 3 ? "2–3 galop" : "4+ galop");
+  const aGrup = (g: number | null) => (g == null ? "önceki koşu yok" : g <= 35 ? "yakın (≤35 gün)" : g <= 60 ? "orta (36–60 gün)" : "uzun aradan (>60 gün)");
+  const GG = ["tek galop", "2–3 galop", "4+ galop", "galop yok"], AG = ["yakın (≤35 gün)", "orta (36–60 gün)", "uzun aradan (>60 gün)", "önceki koşu yok"];
+  const say = (arr: string[], anahtarlar: string[]) => anahtarlar.map((k) => arr.filter((x) => x === k).length).join(" / ");
+  type Acc = { yarislar: string[]; sayilan: number; t1: number; t3: number; r1: number; r3: number; tie: number; atTop: number; atVeri: number };
+  const grup: Record<string, Acc> = {}; const ac = (k: string) => (grup[k] ??= { yarislar: [], sayilan: 0, t1: 0, t3: 0, r1: 0, r3: 0, tie: 0, atTop: 0, atVeri: 0 });
+  const tab1: string[] = [], tab2: string[] = [], tab3: string[] = [];
+  const atAcc: Record<string, { nAt: number; nVeri: number; p1: number; w1: number; e1: number; p3: number; w3: number; e3: number; tieAg: number }> = {}; const aa = (k: string) => (atAcc[k] ??= { nAt: 0, nVeri: 0, p1: 0, w1: 0, e1: 0, p3: 0, w3: 0, e3: 0, tieAg: 0 });
+  yarislar.forEach((y, ri) => {
+    const m = ks[ri]!; const irk = m.breed === "INGILIZ" ? "İngiliz" : "Arap"; const tip = kabaG(normalizeClassType(m.classType)); const yuz = ({ KUM: "Kum", CIM: "Çim", SENTETIK: "Sentetik" } as Record<string, string>)[String(m.surface)] ?? String(m.surface);
+    const x = y.atlar.map((a) => a.kap); const nos = y.atlar.map((a) => a.no); const win = new Set(sonuclar.get(y.hip + "|" + y.no) ?? []); const wj = nos.findIndex((n) => win.has(n)); const v = nn(x); const etiket = `${y.hip} K${y.no}`;
+    const gs = y.atlar.map((a) => gGrup(nG(a))), as = y.atlar.map((a) => aGrup(arGun(a)));
+    const c1 = kredi(x, win, nos, 1, "degerlendirilebilir"), c3 = kredi(x, win, nos, 3, "degerlendirilebilir"), f1 = kredi(x, win, nos, 1, "tam"), f3 = kredi(x, win, nos, 3, "tam");
+    const mx = v.length ? Math.max(...v) : null; const ust = mx == null ? [] : y.atlar.filter((a) => a.kap != null && Math.abs(a.kap - mx) <= TOL);
+    tab1.push(`| ${etiket} | ${y.dist} m | ${irk} | ${tip} | ${yuz} | ${y.atlar.length} | ${v.length} (${f(v.length / y.atlar.length * 100, 0)}%) | ${say(gs, GG)} | ${say(as, AG)} |`);
+    const w = y.atlar[wj]!;
+    tab2.push(`| ${etiket} | #${w.no} ${w.ad} | ${nG(w)} galop (${gGrup(nG(w))}) · ${aGrup(arGun(w))}${arGun(w) != null ? " (" + arGun(w) + " gün)" : ""} | ${sirAraligi(x, wj)} | ${c1.sayildi ? f(c1.kredi, 2) : "sayılmadı"} / ${c1.sayildi ? f(c3.kredi, 2) : "sayılmadı"} | ${c1.sayildi ? f(c1.rastgele, 3) : "—"} / ${c1.sayildi ? f(c3.rastgele, 3) : "—"} | ${f(f1.kredi, 2)} / ${f(f3.kredi, 2)} | ${ust.length > 1 ? "VAR: " + ust.map((a) => "#" + a.no).join("=") : "yok"} | ${ust.map((a) => `#${a.no} ${a.ad} (${gGrup(nG(a))}, ${aGrup(arGun(a))})${win.has(a.no) ? " ✔KAZANDI" : ""}`).join(" ; ") || "—"} |`);
+    for (const k of [`Irk: ${irk}`, `Koşu tipi: ${tip}`, `Yüzey: ${yuz}`, "TÜM 16 YARIŞ"]) { const g = ac(k); g.yarislar.push(etiket); g.atTop += y.atlar.length; g.atVeri += v.length; if (c1.sayildi) { g.sayilan++; g.t1 += c1.kredi; g.t3 += c3.kredi; g.r1 += c1.rastgele; g.r3 += c3.rastgele; if (ust.length > 1) g.tie++; } }
+    y.atlar.forEach((a, j) => { const gk = [gs[j]!, as[j]!]; for (const k of gk) { const g = aa(k); g.nAt++; if (x[j] == null) continue; g.nVeri++; if (v.length < 2) continue;
+      const b = v.filter((q) => q > x[j]! + TOL).length, e = v.filter((q) => Math.abs(q - x[j]!) <= TOL).length; const P1 = Math.max(0, Math.min(1, (1 - b) / e)), P3 = Math.max(0, Math.min(1, (3 - b) / e)); const base = x[wj] != null ? 1 / v.length : 0; const wn = win.has(a.no) ? 1 : 0;
+      g.p1 += P1; g.w1 += P1 * wn; g.e1 += P1 * base; g.p3 += P3; g.w3 += P3 * wn; g.e3 += P3 * base; if (e > 1) g.tieAg += P1; } });
+  });
+  z("# GALOP_KAPASITE — 17.11.2026 Adana + Antalya, HER KOŞU AYRI AYRI koşul analizi");
+  z(`**Yeni formül, katsayı, sinyal veya başka gün YOK.** Yalnız mevcut \`GALOP_KAPASITE\` (galop-aday.ts değişmedi). Arşiv kullanılmadı: yalnız ${GUN} tarihli ${yarislar.length} koşu. Her atın galopları son koşusundan sonrası ve **yarış gününden önce**; referanslar t'den önceki kayıtlarla kuruldu (bağımsız doğrulama: modülle 160/160 eşleşti, en yeni referans galobu ${dm(refMaxGenel)}).`);
+  z(""); z("**Okuma:** Top1/Top3 = KAPASİTE puanı en yüksek atın kazanması / kazananın puana göre ilk 3'te olması. *Değerlendirilebilir* = yalnız galoplu atlar sıralanır, kazananın galopu da olmalı (aksi halde \"sayılmadı\"); rastgele = 1/n, 3/n. *Tam saha* = galopsuz atlar nötr, hepsi sayılır. Eşit puanda isabet payı bölünür (ör. 0,50). Her koşu yalnız 5–12 at olduğundan tek bir koşu tek başına bir sonuç göstermez.");
+  z(""); z("## 1. Her koşunun koşulları ve galop kapsamı");
+  z("Galop sayısı dağılımı = tek / 2–3 / 4+ / galop yok (at sayısı). Aradan dönüş = yakın (≤35 gün) / orta (36–60) / uzun (>60) / önceki koşu yok (at sayısı). Galop sayısı ve aradan dönüş atın kendi kaydıdır; koşunun ırkı/tipi/yüzeyi koşunun kaydıdır (galoplar çoğunlukla kum pistinde yapılır).");
+  z("| Koşu | Mesafe | Irk | Tip | Yüzey | At | KAPASİTE hesaplanan at (kapsam) | Galop sayısı: tek / 2–3 / 4+ / yok | Aradan: yakın / orta / uzun / bilinmiyor |"); z("|---|---|---|---|---|---|---|---|---|"); for (const s of tab1) z(s);
+  z(""); z("## 2. Her koşunun sonucu: kazanan, KAPASİTE sırası, Top1 / Top3, eşitlik");
+  z("| Koşu | Kazanan | Kazananın galop / aradan durumu | Kazananın KAPASİTE sırası | Top1 / Top3 kredi (değerlendirilebilir) | Rastgele Top1 / Top3 | Tam saha Top1 / Top3 | Üst puan eşitliği | KAPASİTE 1. sıradaki at(lar) (galop, aradan) |"); z("|---|---|---|---|---|---|---|---|---|"); for (const s of tab2) z(s);
+  z(""); z("## 3. Koşu koşuluna göre toplam (yalnız bu 16 yarış; çok küçük örnek)");
+  z("| Grup | Koşular | Değerlendirilebilir koşu | At kapsamı | Top1 (rastgele) | Top3 (rastgele) | Üst puan eşitliği (koşu) |"); z("|---|---|---|---|---|---|---|");
+  for (const [k, g] of Object.entries(grup).sort((a, b) => (a[0] === "TÜM 16 YARIŞ" ? 1 : b[0] === "TÜM 16 YARIŞ" ? -1 : a[0].localeCompare(b[0], "tr")))) z(`| ${k} | ${g.yarislar.length} (${g.yarislar.join(", ")}) | ${g.sayilan} | ${f(g.atVeri / g.atTop * 100, 0)}% | ${f(g.t1, 2)}/${g.sayilan} = ${f(g.t1 / Math.max(1, g.sayilan) * 100, 0)}% (${f(g.r1 / Math.max(1, g.sayilan) * 100, 0)}%) | ${f(g.t3, 2)}/${g.sayilan} = ${f(g.t3 / Math.max(1, g.sayilan) * 100, 0)}% (${f(g.r3 / Math.max(1, g.sayilan) * 100, 0)}%) | ${g.tie}/${g.sayilan} |`);
+  z(""); z("## 4. At düzeyi koşullar: KAPASİTE'nin 1. sıraya / ilk 3'e koyduğu atın kazanma oranı (bu 16 koşu toplamı)");
+  z("Her koşuda KAPASİTE'ye göre 1. sıradaki (Top1 seçimi) ve ilk 3'teki (Top3 seçimi) atlar, kendi galop sayısı ve aradan dönüşüne göre gruplanır. Seçim sayısı eşit puanda kesirlidir. *Beklenen* = o koşuda galoplu atlar arasından rastgele seçilen atın kazanma olasılığı. Bu n çok küçük; yalnız ham sayılar gösterilir, güven aralığı verilmez.");
+  z("| Grup | At | KAPASİTE hesaplanan | Top1 seçimi (kazanan / beklenen) | Top3 seçimi (kazanan / beklenen) | Top1 seçimlerinin eşit puan payı |"); z("|---|---|---|---|---|---|");
+  for (const k of [...GG, ...AG]) { const g = atAcc[k]; if (!g) continue; z(`| ${k} | ${g.nAt} | ${g.nVeri} | ${f(g.p1, 1)} seçim: ${f(g.w1, 1)} kazandı / ${f(g.e1, 2)} | ${f(g.p3, 1)} seçim: ${f(g.w3, 1)} kazandı / ${f(g.e3, 2)} | ${f(g.tieAg / Math.max(1e-9, g.p1) * 100, 0)}% |`); }
+  z(""); z("## Sınırlar");
+  z("- 16 koşu ve koşu başına 5–12 at: koşul bazlı her grup çok az örnek içerir (en küçük grupta 1–2 koşu). Bu tablolar koşulları gösterir, bir koşulun \"işe yaradığı\" hükmünü vermez.");
+  z("- Galop kaydının veritabanına ne zaman girdiği saklanmıyor; tarihler gerçek idman tarihidir (yarış öncesi). Hipodrom ve pist durumu yok.");
+  z("- Hiçbir gruba göre formül, ağırlık veya sinyal değiştirilmedi.");
+  fs.writeFileSync("GALOP_17112026_KOSUL_ANALIZI.md", Z.join("\n")); console.log("YAZILDI GALOP_17112026_KOSUL_ANALIZI.md | " + Z.length + " satır");
+}
+
 fs.writeFileSync("GALOP_17112026_DOGRULAMA.md", L.join("\n"));
 console.log(`YAZILDI GALOP_17112026_DOGRULAMA.md | ${L.length} satır | karşılaştırılan ${karsilastirilan} | uyuşmayan ${uyumsuz} | geçersiz at ${gecersizToplam}`);
 for (const s of ozetTop) console.log(s);
