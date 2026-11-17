@@ -61,12 +61,7 @@ console.log("ΔLL (S2 − tam): DEV " + dif(cvS, cvT, (x) => x.fold <= 2) + " | 
 const F = kur(races, [], S2_ADLAR); const w = egit(F.train, S2_ADLAR.length);
 console.log("\nS2 nihai katsayılar (tüm " + races.length + " yarış):"); S2_ADLAR.forEach((n, i) => console.log("  " + n.padEnd(18) + " β=" + w[i]!.toFixed(4) + "  mu=" + F.mu[i]!.toFixed(4) + " sd=" + F.sd[i]!.toFixed(4) + (CANLI.featureNames.includes(n) ? "  (canlı β " + CANLI.weights[CANLI.featureNames.indexOf(n)]!.toFixed(4) + ")" : "")));
 
-// ── BANKO sinyal yönleri: HER sinyalin TEK BAŞINA eğitim işareti (gölgelenmeden etkilenmez; sıralama katsayısından ALINMAZ) ──
-const yon: Record<string, { yon: 1 | -1; soloBeta: number }> = {};
-const tek = (n: string) => { const ad = [n]; const Fk = kur(races, [], ad); const wk = egit(Fk.train, 1); return wk[0]!; };
-for (const n of NAMES) { const b = tek(n); yon[n] = { yon: b >= 0 ? 1 : -1, soloBeta: +b.toFixed(4) }; }
-console.log("\nBANKO yönleri (tek başına β işareti; +1 = yüksek değer avantaj): " + NAMES.map((n) => n + ":" + (yon[n]!.yon > 0 ? "+" : "−") + Math.abs(yon[n]!.soloBeta).toFixed(2)).join(" | "));
-
+// Banko sinyal yönleri artık arac-banko-yon-uret.mts (kararlılık testli) tarafından üretilir.
 if (process.argv.includes("--yaz")) {
   const dir = "src/lib/methodology/weights/";
   const o = { status: "SHADOW", version: "RotaGanyan Analiz Motoru — S2 gölge", generatedAt: new Date().toISOString().replace("Z", "+00:00"),
@@ -75,6 +70,5 @@ if (process.argv.includes("--yaz")) {
     bilesik: { accBitis: { kaynak: ["ACC_CLOSE_RES", "ACC_LATE"], mu: [mC.mu, mL.mu], sd: [mC.sd, mL.sd], formul: "(rel_C*z_C + rel_L*z_L)/2; yalnız biri varsa o; güvenirlik=1" } },
     trainingWindow: { yarisSayisi: races.length }, holdoutDegerlendirme: "S2 − tam (5 kat): " + dif(cvS, cvT, () => true) };
   fs.writeFileSync(dir + "v546-1-saf-weights-s2-golge.json", JSON.stringify(o, null, 2));
-  fs.writeFileSync(dir + "banko-sinyal-yonleri.json", JSON.stringify({ uretim: new Date().toISOString(), not: "Yön = sinyalin TEK BAŞINA (diğer sinyaller olmadan) eğitim işareti; sıralama katsayısından alınmaz (gölgelenmeden etkilenir). Pozitiflik: yon·z > 0.", yonler: yon }, null, 2));
-  console.log("YAZILDI: " + dir + "v546-1-saf-weights-s2-golge.json , banko-sinyal-yonleri.json");
+  console.log("YAZILDI: " + dir + "v546-1-saf-weights-s2-golge.json");
 }
