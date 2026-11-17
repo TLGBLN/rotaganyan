@@ -35,13 +35,13 @@ Yöntem: yarışlar tarihe göre 6 bloğa bölünür; blok k için β YALNIZ blo
 | EFOR (z) | 82.3% | 96.2% | 11.4% (taban 10.7%) Δ0.71 [-0.13; 1.68] | 34.7% (taban 32.0%) Δ2.70 [1.33; 4.22] | 2.2788 (taban 2.2895) | 0.0107 [0.0032; 0.0184] | 0.31 / 0.26 / 0.21 / 0.22 / 0.23 |
 | TREND (gelişim, z farkı) | 26.1% | 14.5% | 11.0% (taban 10.7%) Δ0.38 [-0.95; 1.82] | 32.3% (taban 32.0%) Δ0.31 [-1.32; 1.91] | 2.2901 (taban 2.2895) | -0.0006 [-0.0027; 0.0012] | -0.18 / -0.09 / -0.08 / -0.02 / -0.06 |
 | SÜREKLİLİK (28g idman günü) | 82.5% | 96.2% | 12.3% (taban 10.7%) Δ1.62 [0.07; 3.28] | 34.2% (taban 32.0%) Δ2.20 [0.06; 4.25] | 2.2888 (taban 2.2895) | 0.0007 [-0.0006; 0.0019] | 0.01 / 0.01 / 0.01 / 0.02 / 0.03 |
-| GALOP_KAPASITE (yarış-içi yüzdelik ort.) | 82.5% | 96.2% | 15.7% (taban 10.7%) Δ5.01 [3.11; 7.05] | 38.8% (taban 32.0%) Δ6.84 [4.52; 9.58] | 2.2688 (taban 2.2895) | 0.0207 [0.0085; 0.0327] | 1.50 / 1.88 / 1.66 / 1.66 / 1.58 |
+| GALOP_KAPASITE (yarış-içi yüzdelik ort.) | 82.5% | 96.2% | 15.3% (taban 10.7%) Δ4.67 [2.88; 6.69] | 38.9% (taban 32.0%) Δ6.97 [4.59; 9.70] | 2.2685 (taban 2.2895) | 0.0210 [0.0087; 0.0328] | 1.50 / 1.89 / 1.68 / 1.68 / 1.59 |
 | GALOP_HAZIRLIK (yarış-içi yüzdelik ort.) | 82.5% | 96.2% | 11.9% (taban 10.7%) Δ1.24 [-0.44; 2.99] | 33.2% (taban 32.0%) Δ1.27 [-0.90; 3.58] | 2.2888 (taban 2.2895) | 0.0007 [-0.0016; 0.0033] | 0.26 / 0.21 / 0.12 / 0.22 / 0.25 |
 | BİRLEŞİK α=0 (α·KAPASİTE+(1−α)·HAZIRLIK) | 82.5% | 96.2% | 11.9% (taban 10.7%) Δ1.24 [-0.30; 3.04] | 33.2% (taban 32.0%) Δ1.27 [-1.13; 3.48] | 2.2888 (taban 2.2895) | 0.0007 [-0.0018; 0.0032] | 0.26 / 0.21 / 0.12 / 0.22 / 0.25 |
-| BİRLEŞİK α=0.25 (α·KAPASİTE+(1−α)·HAZIRLIK) | 82.5% | 96.2% | 11.7% (taban 10.7%) Δ1.09 [-0.57; 2.89] | 35.5% (taban 32.0%) Δ3.58 [1.16; 5.93] | 2.2859 (taban 2.2895) | 0.0036 [-0.0014; 0.0086] | 0.59 / 0.60 / 0.46 / 0.58 / 0.61 |
-| BİRLEŞİK α=0.5 (α·KAPASİTE+(1−α)·HAZIRLIK) | 82.5% | 96.2% | 12.7% (taban 10.7%) Δ2.07 [0.29; 3.84] | 37.8% (taban 32.0%) Δ5.85 [3.24; 8.53] | 2.2780 (taban 2.2895) | 0.0115 [0.0032; 0.0197] | 1.30 / 1.45 / 1.19 / 1.33 / 1.35 |
-| BİRLEŞİK α=0.75 (α·KAPASİTE+(1−α)·HAZIRLIK) | 82.5% | 96.2% | 14.6% (taban 10.7%) Δ3.96 [2.15; 5.88] | 39.1% (taban 32.0%) Δ7.13 [4.56; 9.72] | 2.2682 (taban 2.2895) | 0.0213 [0.0090; 0.0331] | 1.94 / 2.28 / 1.95 / 2.02 / 1.98 |
-| BİRLEŞİK α=1 (α·KAPASİTE+(1−α)·HAZIRLIK) | 82.5% | 96.2% | 15.7% (taban 10.7%) Δ5.01 [3.31; 6.95] | 38.8% (taban 32.0%) Δ6.84 [4.25; 9.46] | 2.2688 (taban 2.2895) | 0.0207 [0.0091; 0.0324] | 1.50 / 1.88 / 1.66 / 1.66 / 1.58 |
+| BİRLEŞİK α=0.25 (α·KAPASİTE+(1−α)·HAZIRLIK) | 82.5% | 96.2% | 11.7% (taban 10.7%) Δ1.09 [-0.57; 2.89] | 35.6% (taban 32.0%) Δ3.60 [1.21; 5.96] | 2.2859 (taban 2.2895) | 0.0036 [-0.0014; 0.0085] | 0.59 / 0.60 / 0.46 / 0.58 / 0.61 |
+| BİRLEŞİK α=0.5 (α·KAPASİTE+(1−α)·HAZIRLIK) | 82.5% | 96.2% | 12.6% (taban 10.7%) Δ1.99 [0.26; 3.73] | 37.9% (taban 32.0%) Δ5.97 [3.31; 8.68] | 2.2781 (taban 2.2895) | 0.0115 [0.0032; 0.0195] | 1.30 / 1.45 / 1.20 / 1.33 / 1.34 |
+| BİRLEŞİK α=0.75 (α·KAPASİTE+(1−α)·HAZIRLIK) | 82.5% | 96.2% | 14.2% (taban 10.7%) Δ3.52 [1.81; 5.44] | 39.3% (taban 32.0%) Δ7.37 [4.78; 9.99] | 2.2681 (taban 2.2895) | 0.0214 [0.0095; 0.0329] | 1.93 / 2.29 / 1.96 / 2.03 / 1.98 |
+| BİRLEŞİK α=1 (α·KAPASİTE+(1−α)·HAZIRLIK) | 82.5% | 96.2% | 15.3% (taban 10.7%) Δ4.67 [2.94; 6.67] | 38.9% (taban 32.0%) Δ6.97 [4.45; 9.61] | 2.2685 (taban 2.2895) | 0.0210 [0.0090; 0.0323] | 1.50 / 1.89 / 1.68 / 1.68 / 1.59 |
 
 **Yalnız sahanın ≥%50'sinde galop verisi olan yarışlarda** (çok idman kaydı olan atlar avantajlı görünmesin diye ayrıca):
 | Ölçüm | Yarış | Δ |
@@ -51,13 +51,13 @@ Yöntem: yarışlar tarihe göre 6 bloğa bölünür; blok k için β YALNIZ blo
 | EFOR (z) | 1211 | ΔLL 0.0115 [0.0033; 0.0202] | ΔTop1 0.69 [-0.15; 1.60] |
 | TREND (gelişim, z farkı) | 182 | ΔLL 0.0048 [-0.0050; 0.0130] | ΔTop1 2.55 [-2.30; 8.14] |
 | SÜREKLİLİK (28g idman günü) | 1211 | ΔLL 0.0008 [-0.0006; 0.0021] | ΔTop1 1.61 [-0.06; 3.28] |
-| GALOP_KAPASITE (yarış-içi yüzdelik ort.) | 1211 | ΔLL 0.0205 [0.0089; 0.0322] | ΔTop1 4.85 [2.98; 6.96] |
+| GALOP_KAPASITE (yarış-içi yüzdelik ort.) | 1211 | ΔLL 0.0208 [0.0091; 0.0326] | ΔTop1 4.50 [2.59; 6.56] |
 | GALOP_HAZIRLIK (yarış-içi yüzdelik ort.) | 1211 | ΔLL 0.0007 [-0.0021; 0.0034] | ΔTop1 1.21 [-0.51; 3.04] |
 | BİRLEŞİK α=0 (α·KAPASİTE+(1−α)·HAZIRLIK) | 1211 | ΔLL 0.0007 [-0.0018; 0.0031] | ΔTop1 1.21 [-0.46; 2.99] |
 | BİRLEŞİK α=0.25 (α·KAPASİTE+(1−α)·HAZIRLIK) | 1211 | ΔLL 0.0036 [-0.0013; 0.0083] | ΔTop1 0.95 [-0.78; 2.68] |
-| BİRLEŞİK α=0.5 (α·KAPASİTE+(1−α)·HAZIRLIK) | 1211 | ΔLL 0.0114 [0.0030; 0.0205] | ΔTop1 2.01 [0.11; 4.06] |
-| BİRLEŞİK α=0.75 (α·KAPASİTE+(1−α)·HAZIRLIK) | 1211 | ΔLL 0.0211 [0.0084; 0.0330] | ΔTop1 3.77 [1.87; 5.93] |
-| BİRLEŞİK α=1 (α·KAPASİTE+(1−α)·HAZIRLIK) | 1211 | ΔLL 0.0205 [0.0084; 0.0335] | ΔTop1 4.85 [2.79; 6.77] |
+| BİRLEŞİK α=0.5 (α·KAPASİTE+(1−α)·HAZIRLIK) | 1211 | ΔLL 0.0113 [0.0027; 0.0204] | ΔTop1 1.93 [-0.05; 3.97] |
+| BİRLEŞİK α=0.75 (α·KAPASİTE+(1−α)·HAZIRLIK) | 1211 | ΔLL 0.0212 [0.0084; 0.0336] | ΔTop1 3.32 [1.47; 5.38] |
+| BİRLEŞİK α=1 (α·KAPASİTE+(1−α)·HAZIRLIK) | 1211 | ΔLL 0.0208 [0.0088; 0.0338] | ΔTop1 4.50 [2.59; 6.36] |
 
 ## 5b. TOP1 / TOP3 — düz sıralama (parametresiz)
 Her yarışta atlar adayın puanına göre sıralanır (en yüksek = 1.). **Top1** = puanı en yüksek olan atın kazandığı yarış oranı; **Top3** = kazananın puana göre ilk 3 içinde olduğu yarış oranı. Hiçbir katsayı öğrenilmedi (β yok), tüm 1510 yarış. Galop verisi olmayan atlar nötr (veri olanların ortalaması) alınır; eşit puanlı atlar arasında beraberlik payı eşit bölünür. **Rastgele** = sinyalsiz tahmin (1/N ve 3/N ortalaması).
@@ -65,13 +65,13 @@ Her yarışta atlar adayın puanına göre sıralanır (en yüksek = 1.). **Top1
 **GALOP_KAPASITE (yarış-içi yüzdelik ort.)**
 | Koşu tipi | Yarış | Top1 isabet | Top1 rastgele | Top3 isabet | Top3 rastgele |
 |---|---|---|---|---|---|
-| TÜMÜ | 1510 | 235 (15.6%) | 10.8% | 587 (38.9%) | 32.3% |
-| Maiden | 301 | 44 (14.7%) | 9.4% | 118 (39.1%) | 28.2% |
-| Şartlı | 499 | 92 (18.4%) | 11.2% | 200 (40.0%) | 33.6% |
-| Handikap | 418 | 49 (11.8%) | 9.8% | 141 (33.8%) | 29.5% |
-| KV | 194 | 41 (20.9%) | 13.6% | 91 (47.1%) | 40.9% |
+| TÜMÜ | 1510 | 231 (15.3%) | 10.8% | 588 (39.0%) | 32.3% |
+| Maiden | 301 | 41 (13.8%) | 9.4% | 118 (39.2%) | 28.2% |
+| Şartlı | 499 | 91 (18.1%) | 11.2% | 201 (40.2%) | 33.6% |
+| Handikap | 418 | 49 (11.8%) | 9.8% | 140 (33.5%) | 29.5% |
+| KV | 194 | 41 (20.9%) | 13.6% | 92 (47.6%) | 40.9% |
 | Satış | 42 | 2 (4.8%) | 11.1% | 13 (29.8%) | 33.2% |
-| Veri ≥%50 olan yarışlar | 1460 | 226 (15.5%) | 10.8% | 569 (39.0%) | 32.3% |
+| Veri ≥%50 olan yarışlar | 1460 | 222 (15.2%) | 10.8% | 571 (39.1%) | 32.3% |
 
 **GALOP_HAZIRLIK (yarış-içi yüzdelik ort.)**
 | Koşu tipi | Yarış | Top1 isabet | Top1 rastgele | Top3 isabet | Top3 rastgele |
@@ -87,24 +87,24 @@ Her yarışta atlar adayın puanına göre sıralanır (en yüksek = 1.). **Top1
 **BİRLEŞİK α=0.5 (α·KAPASİTE+(1−α)·HAZIRLIK)**
 | Koşu tipi | Yarış | Top1 isabet | Top1 rastgele | Top3 isabet | Top3 rastgele |
 |---|---|---|---|---|---|
-| TÜMÜ | 1510 | 191 (12.7%) | 10.8% | 573 (37.9%) | 32.3% |
-| Maiden | 301 | 32 (10.7%) | 9.4% | 111 (37.0%) | 28.2% |
-| Şartlı | 499 | 67 (13.5%) | 11.2% | 201 (40.4%) | 33.6% |
-| Handikap | 418 | 40 (9.6%) | 9.8% | 125 (30.0%) | 29.5% |
-| KV | 194 | 35 (18.2%) | 13.6% | 96 (49.6%) | 40.9% |
+| TÜMÜ | 1510 | 190 (12.6%) | 10.8% | 574 (38.0%) | 32.3% |
+| Maiden | 301 | 33 (11.1%) | 9.4% | 112 (37.2%) | 28.2% |
+| Şartlı | 499 | 66 (13.3%) | 11.2% | 201 (40.4%) | 33.6% |
+| Handikap | 418 | 39 (9.3%) | 9.8% | 125 (30.0%) | 29.5% |
+| KV | 194 | 35 (18.2%) | 13.6% | 97 (49.8%) | 40.9% |
 | Satış | 42 | 6 (14.3%) | 11.1% | 14 (34.2%) | 33.2% |
-| Veri ≥%50 olan yarışlar | 1460 | 184 (12.6%) | 10.8% | 554 (37.9%) | 32.3% |
+| Veri ≥%50 olan yarışlar | 1460 | 183 (12.6%) | 10.8% | 555 (38.0%) | 32.3% |
 
 **Temiz sıralama testi (yokluk etkisi ayrıldı):** Galop verisi olmayan atlar sahadan çıkarılır; sıralama yalnız verisi olan atlar arasında yapılır ve yalnız kazananın da verisi olduğu yarışlarda sayılır. Bu koşulda sıralama bilgisizse Top1 = 1/n, Top3 = 3/n olur; aradaki fark yalnız galop puanının bilgisidir. (Kazananı galopsuz olan yarışlar: veri-yokluğunun kendi etkisi — bu ayrı raporlanır.)
 
 **GALOP_KAPASITE (yarış-içi yüzdelik ort.)** — temiz test
 | Koşu tipi | Yarış (sayılan/toplam) | Kazananı galopsuz | Top1 | Rastgele | Top3 | Rastgele |
 |---|---|---|---|---|---|---|
-| TÜMÜ | 1294/1510 | 205 | 17.8% | 12.7% | 45.0% | 38.0% |
-| Maiden | 260/301 | 40 | 16.8% | 11.0% | 44.4% | 32.9% |
-| Şartlı | 431/499 | 63 | 20.6% | 13.4% | 46.6% | 40.3% |
-| Handikap | 348/418 | 68 | 13.7% | 11.8% | 39.6% | 35.4% |
-| KV | 172/194 | 20 | 23.4% | 15.3% | 52.9% | 46.0% |
+| TÜMÜ | 1294/1510 | 205 | 17.4% | 12.7% | 45.3% | 38.0% |
+| Maiden | 260/301 | 40 | 15.8% | 11.0% | 44.6% | 32.9% |
+| Şartlı | 431/499 | 63 | 20.2% | 13.4% | 47.0% | 40.3% |
+| Handikap | 348/418 | 68 | 13.7% | 11.8% | 39.3% | 35.4% |
+| KV | 172/194 | 20 | 23.4% | 15.3% | 53.7% | 46.0% |
 | Satış | 30/42 | 11 | 6.7% | 13.6% | 44.4% | 40.8% |
 
 **GALOP_HAZIRLIK (yarış-içi yüzdelik ort.)** — temiz test

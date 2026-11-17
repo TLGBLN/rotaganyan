@@ -53,7 +53,7 @@ const gunArg = process.argv.indexOf("--gun");
 if (gunArg > 0) {
   const [gunS, hipS] = process.argv[gunArg + 1]!.split("|"); const t = Date.parse(gunS + "T00:00:00.000Z"); const gv = deposu.gorunum(t);
   const ks = await db.race.findMany({ where: { conditions: null, raceDay: { date: new Date(t), hippodrome: { name: { in: hipS!.split(",") } } } }, orderBy: [{ raceDay: { hippodrome: { name: "asc" } } }, { raceNo: "asc" }], select: { raceNo: true, distance: true, raceDay: { select: { hippodrome: { select: { name: true } } } }, result: { select: { winnerNos: true } }, runners: { where: { scratched: false }, orderBy: { no: "asc" }, select: { no: true, name: true, tjkAtId: true } } } });
-  const yz = (v: (number | null)[]) => { const av = v.filter((x): x is number => x != null); return av.length < 2 ? v.map(() => null) : v.map((x) => (x == null ? null : (av.filter((y) => y < x).length + 0.5 * av.filter((y) => y === x).length) / av.length)); };
+  const yz = (v: (number | null)[]) => { const av = v.filter((x): x is number => x != null); return av.length < 2 ? v.map(() => null) : v.map((x) => (x == null ? null : (av.filter((y) => y < x - 1e-9).length + 0.5 * av.filter((y) => Math.abs(y - x) <= 1e-9).length) / av.length)); };
   const om = (v: (number | null)[]) => { const a = v.filter((x): x is number => x != null); return a.length ? a.reduce((s, x) => s + x, 0) / a.length : null; };
   const sira = (x: (number | null)[], j: number) => { if (x[j] == null) return "galop yok"; const v = x.filter((q): q is number => q != null); const better = v.filter((q) => q > x[j]! + 1e-12).length, eq = v.filter((q) => Math.abs(q - x[j]!) <= 1e-12).length; return eq > 1 ? `${better + 1}-${better + eq}/${v.length}` : `${better + 1}/${v.length}`; };
   const ozet: Record<string, { y: number; k1: number; k3: number; h1: number; h3: number; yok: number }> = {};
@@ -86,7 +86,7 @@ if (kosuArg > 0) {
   if (!k) { console.log("yarış bulunamadı"); process.exit(0); }
   const gv = deposu.gorunum(t);
   const B = k.runners.map((r) => (r.tjkAtId == null ? null : galopBilesenleri(gv, r.tjkAtId)));
-  const yz = (v: (number | null)[]) => { const av = v.filter((x): x is number => x != null); return av.length < 2 ? v.map(() => null) : v.map((x) => (x == null ? null : (av.filter((y) => y < x).length + 0.5 * av.filter((y) => y === x).length) / av.length)); };
+  const yz = (v: (number | null)[]) => { const av = v.filter((x): x is number => x != null); return av.length < 2 ? v.map(() => null) : v.map((x) => (x == null ? null : (av.filter((y) => y < x - 1e-9).length + 0.5 * av.filter((y) => Math.abs(y - x) <= 1e-9).length) / av.length)); };
   const pH = yz(B.map((b) => b?.hiz ?? null)), pK = yz(B.map((b) => b?.kapanis ?? null)), pE = yz(B.map((b) => b?.efor ?? null)), pT = yz(B.map((b) => b?.trend ?? null)), pS = yz(B.map((b) => b?.sureklilik ?? null));
   const om = (v: (number | null)[]) => { const a = v.filter((x): x is number => x != null); return a.length ? a.reduce((s, x) => s + x, 0) / a.length : null; };
   console.log(`${hip} ${gunS} K${noS} (${k.distance} m) — yalnız atın SON KOŞUSUNDAN SONRAKİ galoplar kullanıldı`);
@@ -138,7 +138,7 @@ p(`## 3. Sızıntı denetimi (gelecek-bozma metamorfik testi)\nYarış günü t 
 
 // ───────────────────────── 4) KOŞU-İÇİ BİLEŞİK ADAYLAR
 const notNull = (x: number | null): x is number => x != null;
-const yuzdelik = (v: (number | null)[]): (number | null)[] => { const av = v.filter(notNull); if (av.length < 2) return v.map(() => null); return v.map((x) => (x == null ? null : (av.filter((y) => y < x).length + 0.5 * av.filter((y) => y === x).length) / av.length)); };
+const yuzdelik = (v: (number | null)[]): (number | null)[] => { const av = v.filter(notNull); if (av.length < 2) return v.map(() => null); return v.map((x) => (x == null ? null : (av.filter((y) => y < x - 1e-9).length + 0.5 * av.filter((y) => Math.abs(y - x) <= 1e-9).length) / av.length)); };
 const ort = (v: (number | null)[]) => { const a = v.filter(notNull); return a.length ? a.reduce((s, x) => s + x, 0) / a.length : null; };
 const KIRP = 3; const kirp = (x: number | null) => (x == null ? null : Math.max(-KIRP, Math.min(KIRP, x)));
 const ALFALAR = [0, 0.25, 0.5, 0.75, 1];
