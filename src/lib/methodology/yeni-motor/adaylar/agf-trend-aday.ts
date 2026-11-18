@@ -34,3 +34,14 @@ export function agfGelecegiBoz(noktalar: AgfNokta[], baslangic: number, tohum = 
   const yeni = noktalar.map((x) => (x.t < baslangic ? x : { t: x.t, agf: r() * 60 }));
   yeni.push({ t: baslangic, agf: 55 }, { t: baslangic + AGF_SAAT_MS, agf: 0.5 }, { t: baslangic + 5 * AGF_SAAT_MS, agf: 70 }); return yeni;
 }
+
+export type AgfPencere = { d: number | null; spanDk: number | null };
+/**
+ * EŞİT UZUNLUKTA pencere (kullanıcı isteği 2026-11-18): son kesite sabitlenir. d = son − (son kesitten EN AZ `dakika` önceki EN SON kesit); böyle bir kesit yoksa NULL.
+ * spanDk = o iki kesit arasındaki GERÇEK süre (≥ dakika; kesit aralığı düzensiz olduğu için pencere tam eşit olmayabilir — raporlanır). Yalnız başlangıçtan KESİN önceki kesitler.
+ */
+export function agfSonPencere(noktalar: AgfNokta[], baslangic: number, dakika: number): AgfPencere {
+  const p = noktalar.filter((x) => x.t < baslangic && Number.isFinite(x.agf)).sort((a, b) => a.t - b.t); if (p.length < 2) return { d: null, spanDk: null };
+  const son = p[p.length - 1]!; const hedef = son.t - dakika * 60000; let ref: AgfNokta | null = null; for (const x of p) if (x.t <= hedef) ref = x; if (ref == null) return { d: null, spanDk: null };
+  return { d: Math.round((son.agf - ref.agf) * 1e6) / 1e6, spanDk: (son.t - ref.t) / 60000 };
+}
