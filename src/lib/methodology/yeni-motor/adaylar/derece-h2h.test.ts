@@ -12,7 +12,7 @@ const referans = () => { const l: DereceKaydi[] = []; for (let i = 0; i < 40; i+
 const istat = () => { const t = referans().map((x) => x.sure); const mu = t.reduce((a, b) => a + b, 0) / t.length; const sd = Math.sqrt(t.reduce((s, x) => s + (x - mu) ** 2, 0) / (t.length - 1)); return { mu, sd }; };
 
 describe("SON6 / HIZ_DERECESI (TJK resmî süre; aktif sinyal DEĞİL)", () => {
-  it("SINYAL_KAYDI hâlâ BOŞ", () => { expect(SINYAL_KAYDI.length).toBe(0); });
+  it("SINYAL_KAYDI: kullanıcı onaylı beş aile (bu aday modül ayrıca yalnız araştırma amaçlıdır)", () => { expect(SINYAL_KAYDI.length).toBe(5); });
   // Bağımsız hesap: grup = t'den önceki TÜM satırlar (atın kendi geçmişi dahil, aynı grup); Z = (μ−T)/σ
   const zler = (l: DereceKaydi[], at: number) => { const o = l.filter((x) => x.tarih < T); const t = o.map((x) => x.sure); const mu = t.reduce((p, q) => p + q, 0) / t.length; const sd = Math.sqrt(t.reduce((p, q) => p + (q - mu) ** 2, 0) / (t.length - 1)); return o.filter((x) => x.atId === at).sort((p, q) => q.tarih - p.tarih).map((x) => (mu - x.sure) / sd); };
   it("Z = (μ−T)/σ ve SON6 = (6Z1+5Z2+4Z3+3Z4+2Z5+Z6)/21 (Z1 = en son yarış)", () => {

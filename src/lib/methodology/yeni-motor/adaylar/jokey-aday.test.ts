@@ -9,7 +9,7 @@ const b = (gun: number, kazandi: 0 | 1, pBaz: number | null = null, jokey = "J")
 const seri = (n: number, w: number, gunBas: number, gunSon: number, pBaz: number | null = null, jokey = "J") => Array.from({ length: n }, (_, i) => b(gunBas - Math.floor(((gunBas - gunSon) * i) / Math.max(1, n - 1)), i < w ? 1 : 0, pBaz, jokey));
 
 describe("JOKEY adayı (J_SEVIYE, J_FORM30, J_BEKLENTI; aktif sinyal DEĞİL)", () => {
-  it("SINYAL_KAYDI hâlâ BOŞ", () => { expect(SINYAL_KAYDI.length).toBe(0); });
+  it("SINYAL_KAYDI: kullanıcı onaylı beş aile (bu aday modül ayrıca yalnız araştırma amaçlıdır)", () => { expect(SINYAL_KAYDI.length).toBe(5); });
   it("J_SEVIYE = W_ref/N_ref; J_FORM30 = N30/(N30+8)·(W30/N30 − P_ref) (sayısal örnek)", () => {
     const l = [...seri(100, 12, 200, 40), ...seri(100, 18, 29, 1)]; const r = jokeyBilesenleri(new JokeyDeposu(l).gorunum(T), "J");
     expect(r.seviye).toMatchObject({ nRef: 100, wRef: 12 }); expect(r.seviye.pRef).toBeCloseTo(0.12); expect(r.form30.n30).toBe(100); expect(r.form30.oran30).toBeCloseTo(0.18);

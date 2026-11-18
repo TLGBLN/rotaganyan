@@ -13,7 +13,7 @@ const sentetik = () => {
 };
 
 describe("GALOP adayı (aktif sinyal DEĞİL)", () => {
-  it("SINYAL_KAYDI hâlâ BOŞ — aday hesap aktif sinyal listesine eklenmedi", () => { expect(SINYAL_KAYDI.length).toBe(0); });
+  it("SINYAL_KAYDI: kullanıcı onaylı beş aile (bu aday modül ayrıca yalnız araştırma amaçlıdır)", () => { expect(SINYAL_KAYDI.length).toBe(5); });
   it("süre ayrıştırma ve normalleştirme", () => {
     expect(sureSn("0.52.70")).toBeCloseTo(52.7); expect(sureSn("1.04.20")).toBeCloseTo(64.2); expect(sureSn("")).toBeNull();
     const n = galopNormalize({ atId: 1, tarih: T0, track: "Galop", form: "R", jokey: null, splits: { "400": "0.25.20", "800": "0.52.70", pist: "Kum", ic_dis: "İç" }, irk: "INGILIZ", yasGrubu: "2" });

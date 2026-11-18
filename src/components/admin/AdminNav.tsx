@@ -39,6 +39,7 @@ const NAV: NavOge[] = [
   // artık /admin/kosu-tipleri'ne yönlendiren bir redirect, iki ayrı nav girdisine gerek yok.
   { href: "/admin/kosu-tipleri", label: "Sonuçlar / Koşu Tipleri", icon: Trophy },
   { href: "/admin/sinyal-kutugu", label: "Sinyal Kütüğü", icon: BookOpen },
+  { href: "/admin/ran-f6", label: "RAN F6", icon: Gauge },
   { href: "/admin/jokey", label: "Jokey İstatistikleri", icon: TrendingUp },
   { href: "/admin/antrenor", label: "Antrenör İstatistikleri", icon: TrendingUp },
   { href: "/admin/kullanicilar", label: "Kullanıcılar", icon: Users },

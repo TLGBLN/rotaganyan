@@ -6,7 +6,7 @@ import { SINYAL_KAYDI } from "../sinyal-kaydi";
 
 const S = AGF_SAAT_MS; const B = 100 * S; const nk = (saatOnce: number, agf: number): AgfNokta => ({ t: B - saatOnce * S, agf });
 describe("AGF_TREND araştırma hesabı", () => {
-  it("SINYAL_KAYDI hâlâ BOŞ", () => { expect(SINYAL_KAYDI.length).toBe(0); });
+  it("SINYAL_KAYDI: kullanıcı onaylı beş aile (bu aday modül ayrıca yalnız araştırma amaçlıdır)", () => { expect(SINYAL_KAYDI.length).toBe(5); });
   it("trend = son − ilk (puan), seviye = ln(son), göreli = ln(son/ilk)", () => {
     const o = agfOzellik([nk(30, 16), nk(20, 15), nk(5, 14)], B); expect(o.n).toBe(3); expect(o.ilk).toBe(16); expect(o.son).toBe(14); expect(o.trend).toBeCloseTo(-2, 9); expect(o.seviye).toBeCloseTo(Math.log(14), 9); expect(o.trendG).toBeCloseTo(Math.log(14 / 16), 9); expect(o.sonGecikmeSaat).toBeCloseTo(5, 9);
   });

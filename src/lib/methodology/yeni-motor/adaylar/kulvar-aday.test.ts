@@ -6,7 +6,7 @@ import { SINYAL_KAYDI } from "../sinyal-kaydi";
 
 const T = 100 * KULVAR_GUN_MS; const kk = (gun: number, grup: string, y: 0 | 1, p: number): KulvarKayit => ({ tarih: gun * KULVAR_GUN_MS, grup, y, p });
 describe("KULVAR_ETKI aday hesabı", () => {
-  it("SINYAL_KAYDI hâlâ BOŞ", () => { expect(SINYAL_KAYDI.length).toBe(0); });
+  it("SINYAL_KAYDI: kullanıcı onaylı beş aile (bu aday modül ayrıca yalnız araştırma amaçlıdır)", () => { expect(SINYAL_KAYDI.length).toBe(5); });
   it("formül: B = Σ(Y−P) / (ΣP(1−P) + λ), elle hesapla", () => {
     const l = [kk(10, "g", 1, 0.2), kk(20, "g", 0, 0.2), kk(30, "g", 0, 0.5), kk(40, "g", 1, 0.1)]; const e = kulvarEtki(new KulvarDeposu(l).gorunum(T), "g", 5);
     const sy = 2, sp = 1.0, sv = 0.16 + 0.16 + 0.25 + 0.09; expect(e.n).toBe(4); expect(e.deger!).toBeCloseTo((sy - sp) / (sv + 5), 12);

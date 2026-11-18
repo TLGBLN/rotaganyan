@@ -9,7 +9,7 @@ const pk = (atId: number, gun: number, kazandi: 0 | 1, sire: string | null, dam:
 /** Taban: 100 farklı at, 1 start her biri, P_g = 0.2 (20 galibiyet) — baba 'S1' 10 yavru, 4 galibiyet. */
 function taban(): PedKayit[] { const l: PedKayit[] = []; for (let i = 0; i < 100; i++) l.push(pk(i, 10 + (i % 80), i < 20 ? 1 : 0, i < 10 ? "S1" : "S" + (i % 7 + 2), "D" + i, "M" + (i % 5))); return l; }
 describe("PEDİGRİ aday hesabı", () => {
-  it("SINYAL_KAYDI hâlâ BOŞ", () => { expect(SINYAL_KAYDI.length).toBe(0); });
+  it("SINYAL_KAYDI: kullanıcı onaylı beş aile (bu aday modül ayrıca yalnız araştırma amaçlıdır)", () => { expect(SINYAL_KAYDI.length).toBe(5); });
   it("anahtar normalizasyonu ve koşul grupları", () => { expect(pedAnahtar("  papa  clem (USA) ")).toBe("PAPA CLEM (USA)"); expect(pedAnahtar("")).toBeNull(); expect(pedAnahtar(null)).toBeNull(); expect(mesafeBandi(1300)).toBe("K"); expect(mesafeBandi(1400)).toBe("O"); expect(mesafeBandi(1900)).toBe("O"); expect(mesafeBandi(2000)).toBe("U"); expect(pedGrup("K", 1600)).toBe("K|O"); });
   it("formül: P̂ = (W + k·P_g)/(N + k), artık = P̂ − P_g (hedef atın kendisi YOK)", () => {
     const l = taban(); const d = new PedigriDeposu(l).gorunum(T); const s = pedSatir(d, "SIRE", "S1", GR, 9999, 10); const W = l.filter((r) => r.sire === "S1" && r.kazandi === 1).length, N = l.filter((r) => r.sire === "S1").length; const pg = l.filter((r) => r.kazandi === 1).length / l.length;

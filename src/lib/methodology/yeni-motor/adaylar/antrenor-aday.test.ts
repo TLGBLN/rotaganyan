@@ -9,7 +9,7 @@ let sayac = 0;
 const s = (gun: number, kazandi: 0 | 1, alanN = 10, pBaz: number | null = null, antrenor = "A"): StartKaydi => ({ raceId: "r" + sayac++, tarih: T - gun * ANT_GUN_MS, antrenor, kazandi, alanN, pBaz });
 
 describe("ANTRENÖR adayı (ANT_SEVIYE, ANT_BEKLENTI; aktif sinyal DEĞİL)", () => {
-  it("SINYAL_KAYDI hâlâ BOŞ", () => { expect(SINYAL_KAYDI.length).toBe(0); });
+  it("SINYAL_KAYDI: kullanıcı onaylı beş aile (bu aday modül ayrıca yalnız araştırma amaçlıdır)", () => { expect(SINYAL_KAYDI.length).toBe(5); });
   it("ANT_SEVIYE = (W + k·P0)/(N + k); P0 = ortalama 1/alan (sayısal örnek)", () => {
     const l = Array.from({ length: 20 }, (_, i) => s(5 + i, i < 4 ? 1 : 0, 10)); const r = antrenorBilesenleri(new AntrenorDeposu(l).gorunum(T), "A");
     expect(r.seviye).toMatchObject({ n: 20, w: 4, k: 8 }); expect(r.seviye.p0).toBeCloseTo(0.1); expect(r.seviye.deger).toBeCloseTo((4 + 8 * 0.1) / 28); expect(r.seviye.agirlik).toBeCloseTo(20 / 28);

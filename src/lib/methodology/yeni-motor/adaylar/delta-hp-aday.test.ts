@@ -6,7 +6,7 @@ import { SINYAL_KAYDI } from "../sinyal-kaydi";
 
 const G = DELTA_HP_GUN_MS; const T = 100 * G; const g = (gun: number, hp: number | null): HpGecmis => ({ tarih: gun * G, hp });
 describe("DELTA_HP aday hesabı", () => {
-  it("SINYAL_KAYDI hâlâ BOŞ", () => { expect(SINYAL_KAYDI.length).toBe(0); });
+  it("SINYAL_KAYDI: kullanıcı onaylı beş aile (bu aday modül ayrıca yalnız araştırma amaçlıdır)", () => { expect(SINYAL_KAYDI.length).toBe(5); });
   it("ΔHP = HP_bugün − hemen önceki yarışın HP'si; yükseliş +, düşüş −", () => {
     const l = [g(10, 50), g(40, 54), g(70, 56)]; const o = deltaHp(58, l, T); expect(o.delta).toBe(2); expect(o.hpOnceki).toBe(56); expect(o.hpBugun).toBe(58); expect(o.gunAra).toBe(30); expect(o.nGecmis).toBe(3);
     expect(deltaHp(54, l, T).delta).toBe(-2); expect(deltaHp(56, l, T).delta).toBe(0);

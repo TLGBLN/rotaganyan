@@ -13,7 +13,7 @@ const sentetik = () => {
 };
 
 describe("ACCURACE adayı (aktif sinyal DEĞİL)", () => {
-  it("SINYAL_KAYDI hâlâ BOŞ", () => { expect(SINYAL_KAYDI.length).toBe(0); });
+  it("SINYAL_KAYDI: kullanıcı onaylı beş aile (bu aday modül ayrıca yalnız araştırma amaçlıdır)", () => { expect(SINYAL_KAYDI.length).toBe(5); });
   it("normalleştirme: 800 m ayrımı, tahmin işareti, monotonluk", () => {
     const ham = (kontrol: { m: number; ms: number }[]): AccHam => ({ yarisId: "x", atId: 1, tarih: T0, hip: "BURSA", irk: "INGILIZ", yuzey: "KUM", mesafe: 1300, sureMs: 84000, kontrol });
     const tam = accNormalize(ham([{ m: 400, ms: 25000 }, { m: 500, ms: 31000 }, { m: 600, ms: 37000 }, { m: 1300, ms: 84000 }])).kayit!; expect(tam.erken).toBeCloseTo(31); expect(tam.son800).toBeCloseTo(53); expect(tam.erkenTahmin).toBe(false);

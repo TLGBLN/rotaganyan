@@ -9,7 +9,7 @@ const kayit = (id: string, atId: number, gun: number, v: number | null, s: numbe
 const sentetik = () => { const l: TempoKaydi[] = []; let q = 13; const r = () => (q = (q * 1664525 + 1013904223) % 4294967296) / 4294967296; for (let a = 1; a <= 50; a++) for (let k = 0; k < 4; k++) l.push(kayit(`y${Math.floor((a - 1) / 5)}-${k}`, a, k * 6 + Math.floor(r() * 3), 14 + r() * 2, r(), r() < 0.5)); return l; };
 
 describe("TEMPO adayı (ERKEN_HIZ + KOSU_STILI + LIDERLIK_BASKISI; aktif sinyal DEĞİL)", () => {
-  it("SINYAL_KAYDI hâlâ BOŞ", () => { expect(SINYAL_KAYDI.length).toBe(0); });
+  it("SINYAL_KAYDI: kullanıcı onaylı beş aile (bu aday modül ayrıca yalnız araştırma amaçlıdır)", () => { expect(SINYAL_KAYDI.length).toBe(5); });
   it("formüller: V = 400/(T600−T200); S (N = gerçek saha); ön grup = sıra ≤ max(2, ⌈0.2N⌉)", () => {
     const ham: TempoHam = { yarisId: "x", atId: 1, tarih: T0, hip: "BURSA", irk: "INGILIZ", yuzey: "KUM", mesafe: 1300, sahaN: 10, siraGecerli: true, kontrol: [{ m: 100, ms: 8000, place: 5 }, { m: 200, ms: 14000, place: 1 }, { m: 400, ms: 28000, place: 4 }, { m: 600, ms: 42000, place: 10 }, { m: 1300, ms: 90000, place: 5 }] };
     const k = tempoNormalize(ham).kayit!; expect(k.v).toBeCloseTo(400 / 28); expect(k.s).toBeCloseTo(1 - (0 / 9 + 3 / 9 + 9 / 9) / 3); expect(k.onGrupKalici).toBe(false); // R200=1 öndeydi AMA 400 m'de 4. / 600 m'de 10. → KALICI ön grup DEĞİL (eski "herhangi biri" kuralı true verirdi)
