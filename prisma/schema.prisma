@@ -1027,3 +1027,20 @@ model PageView {
   @@index([path])
   @@index([createdAt(sort: Desc)])
 }
+
+// 2026-11-18 kullanıcı kararı — RAN F6 sinyal kırılımı kaydı (analiz ekranında gösterilir). SALT YAN KAYIT: banko/kupon/V5.46.1/Saf Model
+// akışları bu tabloyu OKUMAZ. Tablo canlı veritabanında MEVCUT (migration 20261118120000_ran_f6_analiz, 2026-11-18 uygulandı; tekrar UYGULANMAZ). Tablo yoksa
+// servis (ran-f6.service.ts) kaydı sessizce atlar. Yarışla ilişki (FK) bilerek tanımlanmadı (mevcut Race modeline dokunulmaz).
+model RanF6Analiz {
+  id        String   @id @default(cuid())
+  raceId    String
+  surum     String // katsayı sürümü (örn. "F6-2026-11-18")
+  tur       String // yarış tipi grubu
+  model     String // "ANA" | "ILK_START"
+  payload   Json // yarış kaydı: olasılık, sıra, ham değerler, sinyal katkıları, kullanılan/kapalı sinyaller
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([raceId, surum])
+  @@index([raceId])
+}

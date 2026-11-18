@@ -42,6 +42,7 @@ const NAV = [
   { href: "/admin/veri-tamligi", label: "Veri Tamlığı", icon: ClipboardCheck },
   { href: "/admin/sonuclar", label: "Sonuçlar", icon: Trophy },
   { href: "/admin/kupon", label: "Kupon Hazırla", icon: Ticket },
+  { href: "/admin/ran-f6", label: "RAN F6", icon: Gauge },
   { href: "/admin/jokey", label: "Jokey İstatistikleri", icon: TrendingUp },
   { href: "/admin/antrenor", label: "Antrenör İstatistikleri", icon: TrendingUp },
   { href: "/admin/kullanicilar", label: "Kullanıcılar", icon: Users },
