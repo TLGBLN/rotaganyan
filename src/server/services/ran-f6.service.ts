@@ -46,8 +46,11 @@ export type RanF6YarisKaydi = { raceId: string; raceNo: number; hipodrom: string
 export type RanF6Sonuc = { yarislar: RanF6YarisKaydi[]; atlananlar: { raceId: string; neden: string }[]; populasyonSn: number };
 
 /** Yarış öncesi özellikler + F6. raceIds aynı çağrıda birden çok yarış (tipik: bir günün tüm yarışları) olabilir. */
+/** TJK "Karma" programı, gerçek hipodrom yarışlarının KOPYASIDIR (aynı atlar); F6 yalnız gerçek yarışı analiz eder/kaydeder (çift sayım yok). Kayıtlar silinmez. */
+export const KARMA_HIPODROM = "Karma";
 export async function ranF6Hesapla(raceIds: string[]): Promise<RanF6Sonuc> {
   const bas = Date.now(); const pop = await populasyon(); const popSn = (Date.now() - bas) / 1000;
+  const tumu = await db.race.findMany({ where: { id: { in: raceIds } }, select: { id: true, raceDay: { select: { hippodrome: { select: { name: true } } } } } }); const mukerrer = new Set(tumu.filter((r) => r.raceDay.hippodrome.name === KARMA_HIPODROM).map((r) => r.id)); raceIds = raceIds.filter((id) => !mukerrer.has(id));
   const races = await db.race.findMany({ where: { id: { in: raceIds } }, orderBy: [{ raceDay: { date: "asc" } }, { raceNo: "asc" }], select: { id: true, raceNo: true, surface: true, distance: true, classType: true, raceDay: { select: { date: true, hippodrome: { select: { name: true } } } }, runners: { where: { scratched: false }, orderBy: { no: "asc" }, select: { no: true, name: true, tjkAtId: true, jockey: true } } } });
   const atIds = [...new Set(races.flatMap((r) => r.runners.map((x) => x.tjkAtId)).filter((x): x is number => x != null))];
   // atların geçmişi (TJK önbelleği): Y_son/T_son, galop 'son koşu günü', H2H ortak yarışlar
@@ -58,7 +61,7 @@ export async function ranF6Hesapla(raceIds: string[]): Promise<RanF6Sonuc> {
       const city = String(x.city ?? "").trim().toLocaleUpperCase("tr"); const mesafe = parseInt(String(x.distance ?? ""), 10); const yuzey = YUZ_H[String(x.surface ?? "").trim().charAt(0).toLocaleUpperCase("tr")] ?? null; const raceNo = String(x.raceNo ?? "").trim();
       if (sira != null && city && raceNo) hRows.push({ yarisKey: city + "|" + t + "|" + raceNo, atId: c.tjkAtId, tarih: t, sira, yuzey: yuzey ?? "?", mesafe: Number.isFinite(mesafe) ? mesafe : 0 }); }
     gecmis.set(c.tjkAtId, liste.sort((a, b) => a.t - b.t)); gunSet.set(c.tjkAtId, [...gunler].sort((a, b) => a - b)); }
-  const galopDep = new GalopDeposu(pop.galopTek, gunSet); const hDep = new H2HDeposu(hRows); const yarislar: RanF6YarisKaydi[] = []; const atlananlar: { raceId: string; neden: string }[] = [];
+  const galopDep = new GalopDeposu(pop.galopTek, gunSet); const hDep = new H2HDeposu(hRows); const yarislar: RanF6YarisKaydi[] = []; const atlananlar: { raceId: string; neden: string }[] = [...mukerrer].map((raceId) => ({ raceId, neden: "Karma program kopyası (gerçek hipodrom yarışı ayrıca analiz edilir)" }));
   for (const k of races) {
     const yzm = YUZ[String(k.surface)]; if (!yzm) { atlananlar.push({ raceId: k.id, neden: "zemin bilinmiyor" }); continue; } if (k.runners.length < 2) { atlananlar.push({ raceId: k.id, neden: "koşan at < 2" }); continue; }
     const t = dayMs(k.raceDay.date); const gg = galopDep.gorunum(t), ga = pop.accDep.gorunum(t), gj = pop.jDep.gorunum(t), gh = hDep.gorunum(t); const hedef = { yuzey: YUZ_R[String(k.surface)] ?? "?", mesafe: k.distance }; const rakipIds = k.runners.map((r) => r.tjkAtId).filter((x): x is number => x != null);
@@ -70,7 +73,7 @@ export async function ranF6Hesapla(raceIds: string[]): Promise<RanF6Sonuc> {
       atlar: f.atlar.map((a, i) => ({ no: k.runners[i]!.no, ad: k.runners[i]!.name, olasilik: a.olasilik, sira: a.sira, skor: a.skor, katki: a.katki, ham: a.ham, eksik: a.eksik })) }); }
   return { yarislar, atlananlar, populasyonSn: popSn };
 }
-export async function ranF6Gun(tarih: string): Promise<RanF6Sonuc> { const d = new Date(tarih + "T00:00:00.000Z"); const races = await db.race.findMany({ where: { raceDay: { date: d } }, select: { id: true } }); return ranF6Hesapla(races.map((r) => r.id)); }
+export async function ranF6Gun(tarih: string): Promise<RanF6Sonuc> { const d = new Date(tarih + "T00:00:00.000Z"); const races = await db.race.findMany({ where: { raceDay: { date: d, hippodrome: { name: { not: KARMA_HIPODROM } } } }, select: { id: true } }); return ranF6Hesapla(races.map((r) => r.id)); }
 
 // ───── geri alma bayrağı ve kayıt (en iyi çaba; tablo yoksa sessizce atlanır)
 export async function ranF6Aktif(): Promise<boolean> { try { const s = await db.siteSetting.findUnique({ where: { key: RAN_F6_BAYRAK_ANAHTARI } }); return s?.value !== "0"; } catch { return true; } }

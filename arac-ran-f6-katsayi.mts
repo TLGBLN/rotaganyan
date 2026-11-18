@@ -49,7 +49,7 @@ const dDep = new DereceDeposu(dRows), hDep = new H2HDeposu(hRows);
 
 // ───── yarış listeleri, Accurace (ACC_HIZ tabanı için), galop
 const sec = { id: true, raceNo: true, surface: true, distance: true, classType: true, time: true, raceDay: { select: { date: true, surfaceConditions: true, hippodrome: { select: { name: true } } } }, result: { select: { winnerNos: true, ganyan: true } }, runners: { where: { scratched: false }, orderBy: { no: "asc" as const }, select: { id: true, no: true, name: true, tjkAtId: true, jockey: true, trainer: true, hp: true, weight: true } } };
-const ksA = await db.race.findMany({ where: { prediction: { published: true, createdAt: { gte: GUNCEL_MOTOR_BASLANGIC } }, conditions: null, result: { isNot: null } }, orderBy: [{ raceDay: { date: "asc" } }, { raceNo: "asc" }], select: sec });
+const ksA = await db.race.findMany({ where: { prediction: { published: true, createdAt: { gte: GUNCEL_MOTOR_BASLANGIC } }, conditions: null, result: { isNot: null }, raceDay: { hippodrome: { name: { not: "Karma" } } } }, orderBy: [{ raceDay: { date: "asc" } }, { raceNo: "asc" }], select: sec });
 const ksB = await db.race.findMany({ where: { conditions: null, result: { isNot: null }, raceDay: { date: { gte: new Date("2026-07-01T00:00:00.000Z"), lt: new Date("2026-08-16T00:00:00.000Z") }, hippodrome: { name: { not: "Karma" } } } }, orderBy: [{ raceDay: { date: "asc" } }, { raceNo: "asc" }], select: sec });
 console.log(`A ${ksA.length}, B ${ksB.length} yarış`);
 console.log("Accurace okunuyor…"); const YZ: Record<string, AccYuzey> = { K: "KUM", "Ç": "CIM", S: "SENTETIK" }; const accHam: AccHam[] = [];
@@ -175,9 +175,10 @@ const b75M = fitM(f75.filter((i) => !SEG(ykM[i]!.k)), F6), b75S = fitM(f75.filte
 const bFinM = fitM(allI.filter((i) => !SEG(ykM[i]!.k)), F6), bFinS = fitM(allI.filter((i) => SEG(ykM[i]!.k)), SEGC);
 const son = ALL[ALL.length - 1]!; const egitimSon = new Date(son.t).toISOString().slice(0, 10);
 P(""); P("## Dondurulmuş katsayılar (ölçekli birimler; maskeli veriyle eğitildi)"); P(`Eğitim: ${ykM.length} yarış (2026-01-01 → ${egitimSon}); τ=${tauF.toFixed(2)}.`); P("| Bileşen | β (ana model) |\n|---|---|"); F6.forEach((c, j) => P(`| ${c} | ${bFinM[j]!.toFixed(4)} |`)); P(`| Şartlı 1/27 modeli (J_SEVIYE, GALOP) | ${bFinS[0]!.toFixed(4)}, ${bFinS[1]!.toFixed(4)} |`);
-fs.writeFileSync("RAN_F6_KATSAYI_RAPORU.md", L2r.join("\n"));
+const CIKTI = process.env.F6_DRY ? "C:/tmp/f6_dry/" : ""; if (process.env.F6_DRY) fs.mkdirSync("C:/tmp/f6_dry/src", { recursive: true });
+fs.writeFileSync(CIKTI + "RAN_F6_KATSAYI_RAPORU.md", L2r.join("\n"));
 const SKo: Record<string, number> = {}; for (const c of F6) SKo[c] = SK(c);
 const ts = `// RAN F6 — DONDURULMUŞ KATSAYILAR (otomatik üretildi: arac-ran-f6-katsayi.mts; ELLE DEĞİŞTİRİLMEZ).\n// Eğitim: ${ykM.length} yarış (2026-01-01 → ${egitimSon}); kronolojik ilk %75 / son %25 kalibrasyon; MASKELİ veri. Bağımsız doğrulama DEĞİL (keşif dönemi).\nexport const RAN_F6_KATSAYI_SURUMU = "F6-2026-11-18";\nexport const RAN_F6_EGITIM = { yarisSayisi: ${ykM.length}, bitis: "${egitimSon}" } as const;\nexport const RAN_F6_KOLONLAR = ${JSON.stringify(F6.map((c) => (c === DEF ? "h2h" : c)))} as const;\nexport const RAN_F6_OLCEK: Record<string, number> = ${JSON.stringify(Object.fromEntries(F6.map((c) => [c === DEF ? "h2h" : c, SKo[c]])))};\nexport const RAN_F6_BETA_ANA: Record<string, number> = ${JSON.stringify(Object.fromEntries(F6.map((c, j) => [c === DEF ? "h2h" : c, Number(bFinM[j]!.toFixed(6))])))};\nexport const RAN_F6_BETA_ILK_START: Record<string, number> = ${JSON.stringify({ S: Number(bFinS[0]!.toFixed(6)), kap: Number(bFinS[1]!.toFixed(6)) })};\nexport const RAN_F6_TAU = ${tauF.toFixed(2)};\n`;
-fs.mkdirSync("src/lib/methodology/ran-f6", { recursive: true }); fs.writeFileSync("src/lib/methodology/ran-f6/ran-f6-katsayilar.ts", ts);
+if (process.env.F6_DRY) fs.writeFileSync("C:/tmp/f6_dry/ran-f6-katsayilar.ts", ts); else { fs.mkdirSync("src/lib/methodology/ran-f6", { recursive: true }); fs.writeFileSync("src/lib/methodology/ran-f6/ran-f6-katsayilar.ts", ts); }
 console.log(`YAZILDI RAN_F6_MASKE_DOGRULAMA.md + ran-f6-katsayilar.ts | τ=${tauF.toFixed(2)}`);
 await db.$disconnect(); process.exit(0);

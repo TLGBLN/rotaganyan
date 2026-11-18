@@ -5,7 +5,7 @@ import { F6_SINYALLER, turGrubu, type TurGrubu } from "./src/lib/methodology/ran
 const gunler = ["2026-11-10", "2026-11-14", "2026-11-17"]; const secilen: Record<string, string[]> = {}; const tipSay: Record<string, number> = {};
 const t0 = Date.now(); let ilk = true; const sat: string[] = []; let hata = 0;
 for (const g of gunler) {
-  const r = await db.race.findMany({ where: { raceDay: { date: new Date(g + "T00:00:00.000Z") } }, select: { id: true, classType: true } });
+  const r = await db.race.findMany({ where: { raceDay: { date: new Date(g + "T00:00:00.000Z"), hippodrome: { name: { not: "Karma" } } } }, select: { id: true, classType: true } });
   for (const x of r) { const t = turGrubu(x.classType ?? ""); tipSay[t] = (tipSay[t] ?? 0) + 1; if ((secilen[t] ??= []).length < 3) secilen[t]!.push(x.id); }
 }
 const tum = Object.values(secilen).flat(); console.log("tip dağılımı", JSON.stringify(tipSay), "seçilen", tum.length);

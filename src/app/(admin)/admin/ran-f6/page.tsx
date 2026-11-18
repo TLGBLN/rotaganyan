@@ -15,7 +15,7 @@ export const metadata = { title: "RAN F6 — Admin" };
 export default async function RanF6Sayfasi({ searchParams }: { searchParams: Promise<{ tarih?: string; yaris?: string }> }) {
   const sp = await searchParams; const aktif = await ranF6Aktif();
   const sonGun = await db.raceDay.findFirst({ orderBy: { date: "desc" }, select: { date: true } }); const tarih = /^\d{4}-\d{2}-\d{2}$/.test(sp.tarih ?? "") ? sp.tarih! : (sonGun?.date.toISOString().slice(0, 10) ?? new Date().toISOString().slice(0, 10));
-  const yarislar = await db.race.findMany({ where: { raceDay: { date: new Date(tarih + "T00:00:00.000Z") } }, orderBy: [{ raceDay: { hippodrome: { name: "asc" } } }, { raceNo: "asc" }], select: { id: true, raceNo: true, classType: true, raceDay: { select: { hippodrome: { select: { name: true } } } } } });
+  const yarislar = await db.race.findMany({ where: { raceDay: { date: new Date(tarih + "T00:00:00.000Z"), hippodrome: { name: { not: "Karma" } } } }, orderBy: [{ raceDay: { hippodrome: { name: "asc" } } }, { raceNo: "asc" }], select: { id: true, raceNo: true, classType: true, raceDay: { select: { hippodrome: { select: { name: true } } } } } });
   const sec = sp.yaris && yarislar.some((r) => r.id === sp.yaris) ? sp.yaris : null;
   let hesap = null as Awaited<ReturnType<typeof ranF6Hesapla>> | null; let kayitli = null as Awaited<ReturnType<typeof ranF6KayitliOku>>; let hata: string | null = null;
   if (aktif && sec) { kayitli = await ranF6KayitliOku(sec); if (!kayitli) { try { hesap = await ranF6Hesapla([sec]); } catch (e) { hata = String((e as Error).message ?? e); } } }
