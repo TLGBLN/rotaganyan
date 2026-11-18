@@ -4,7 +4,7 @@
 // SAF: veritabanı / ağ / saat / rastgelelik YOK; yalnız girdi değerlerinden hesap.
 //   Değer ölçeği (araştırma düzeneğiyle BİREBİR): x = değer / ölçek; yarışta ≥2 at değeri varsa eksikler yarış ortalamasıyla doldurulur, <2 ise bu sinyalin tüm x'i 0 (bilgi yok → nötr).
 //   Skor = Σ β·x (koşullu logit); olasılık = softmax; kalibrasyon: p^τ normalize (τ dondurulmuş).
-//   Yarış tipine göre kullanım maskesi (TUR_AYAR): kapalı sinyaller NULL sayılır (nötr; araştırmadaki maskeli eğitimle aynı). İlk start sınıfı (Şartlı 1/27): yalnız J_SEVIYE + GALOP_KAPASITE, ayrı katsayılarla.
+//   Tip bazlı ek kapatma YOK (kullanıcı kararı): sinyal veri varsa hesaplanır; veri yoksa NULL (nötr). İlk start sınıfı (Şartlı 1/27): atların %100'ü ilk kez koşan; yalnız J_SEVIYE + GALOP_KAPASITE, ayrı katsayılarla.
 import { RAN_F6_BETA_ANA, RAN_F6_BETA_ILK_START, RAN_F6_KATSAYI_SURUMU, RAN_F6_OLCEK, RAN_F6_TAU } from "./ran-f6-katsayilar";
 
 export type F6Sinyal = "acc" | "kap" | "S" | "h2h" | "sY" | "sT";
@@ -16,19 +16,34 @@ export type EtkiSeviyesi = "yüksek" | "orta" | "düşük" | "yetersiz kanıt";
 export type TurAyari = { ad: string; kapali: readonly F6Sinyal[]; ilkStart: boolean; etki: EtkiSeviyesi; not: string };
 
 /**
- * YARIŞ TİPİ KULLANIM AYARI (önceden bildirilen kural, SINYAL_SETI_RAPORU özgün katkısından; test sonucuna göre değiştirilmedi): sinyal bir tipte AKTİF = özgün katkı ΔLL% noktası > 0
- * (GALOP için galop kapsamlı örneklem); ✓ → etkili, ○ pozitif → izlenir; ≤ 0 → KAPALI; n<200 test yarışlı tipte (Şartlı 2/19) maske uygulanmaz; Şartlı 1/27 kullanıcı kararıyla J_SEVIYE+GALOP.
+ * YARIŞ TİPİ AYARI (kullanıcı kararı 2026-11-18, düzeltme): TİP BAZLI EK KAPATMA YOK. Beş sinyal ailesi (altı bileşen) VERİ VARSA her yarış tipinde hesaplanır.
+ * Bir sinyalin bir tipte istatistiksel katkısının KANITLANMAMIŞ olması onun zararlı olduğu anlamına GELMEZ; bu yüzden kapatılmaz (kanıt durumu yalnız bilgidir, KANIT tablosu).
+ * Sinyali olmayan (ör. ilk kez koşan atın geçmiş yarışı yok) hesaplanamaz: değer NULL → o at için nötr (veri yoksa 0 puan sayılmaz, yarış ortalamasıyla doldurulur).
+ * Tek özel durum: İLK START sınıfı (Şartlı 1/27): atların %100'ü ilk kez koşan; ACC_HIZ, H2H_NET, Y_SON, T_SON'un verisi YOKTUR → yalnız J_SEVIYE + GALOP_KAPASITE, segment-özel katsayıyla (kullanıcı kararı).
  * 'etki' = keşif dönemindeki F6 model kazancı (1/N log-loss'un kapatılan yüzdesi): ≥10 yüksek, 7–10 orta, <7 düşük. Bağımsız doğrulama DEĞİL; ileri-yönlü izleme gerekir.
  */
 export const TUR_AYAR: Record<TurGrubu, TurAyari> = {
-  MAIDEN: { ad: "Maiden", kapali: ["h2h"], ilkStart: false, etki: "yüksek", not: "H2H_NET özgün katkısı ≤ 0 (−0,38%): kapalı. Keşifte F6 kazancı %11–13." },
-  SARTLI_345: { ad: "Şartlı 3/4/5", kapali: [], ilkStart: false, etki: "yüksek", not: "Altı bileşenin hepsi aktif (GALOP, H2H_NET, T_SON 'izlenir': özgün katkı pozitif ama ○). Keşifte kazanç %9–11." },
-  SARTLI_219: { ad: "Şartlı 2/19", kapali: [], ilkStart: false, etki: "yetersiz kanıt", not: "Test yarışı <200: maske uygulanmadı, genel altı bileşen. Kanıt yetersiz." },
-  SARTLI_127: { ad: "Şartlı 1/27 (ilk start)", kapali: ["acc", "h2h", "sY", "sT"], ilkStart: true, etki: "orta", not: "Atların %100'ü ilk kez koşan: ACC_HIZ, H2H_NET, Y_SON, T_SON veri YOK (kullanılamaz). Yalnız J_SEVIYE + GALOP_KAPASITE; segment-özel katsayı. Kazanç ortak β'da %3,2, segment-özel β'da %7,2." },
-  HANDIKAP: { ad: "Handikap", kapali: ["kap"], ilkStart: false, etki: "orta", not: "GALOP_KAPASITE özgün katkısı ≤ 0 (−0,10% galop kapsamlı dönem): kapalı (hafif kilo × iyi galop hipotezi doğrulanmadı). Keşifte kazanç %7,6–8,8." },
-  KV: { ad: "KV", kapali: ["sT"], ilkStart: false, etki: "orta", not: "T_SON özgün katkısı ≤ 0: kapalı. ACC_HIZ ve GALOP 'izlenir' (○, pozitif). Keşifte kazanç %7,8–8,5." },
-  GRUP_SATIS: { ad: "Grup + Satış", kapali: ["sT"], ilkStart: false, etki: "yüksek", not: "T_SON kapalı (≤ 0); Y_SON ve GALOP 'izlenir'. Örneklem küçük (~250 yarış). Keşifte kazanç %9,7–11,8." },
-  DIGER: { ad: "Diğer", kapali: [], ilkStart: false, etki: "yetersiz kanıt", not: "Tanınmayan/seyrek tip: maske yok, genel altı bileşen. Kanıt yok." },
+  MAIDEN: { ad: "Maiden", kapali: [], ilkStart: false, etki: "yüksek", not: "Altı bileşenin hepsi veri varsa hesaplanır. H2H_NET'in özgün katkısı keşifte pozitif gösterilemedi (kanıtlanmadı; zararlı demek değil). Keşifte F6 kazancı %11–13." },
+  SARTLI_345: { ad: "Şartlı 3/4/5", kapali: [], ilkStart: false, etki: "yüksek", not: "Altı bileşenin hepsi hesaplanır (GALOP, H2H_NET, T_SON 'izlenir'). Keşifte kazanç %9–11." },
+  SARTLI_219: { ad: "Şartlı 2/19", kapali: [], ilkStart: false, etki: "yetersiz kanıt", not: "Test yarışı <200: kanıt yetersiz; altı bileşen hesaplanır." },
+  SARTLI_127: { ad: "Şartlı 1/27 (ilk start)", kapali: ["acc", "h2h", "sY", "sT"], ilkStart: true, etki: "orta", not: "Atların %100'ü ilk kez koşan: ACC_HIZ, H2H_NET, Y_SON, T_SON için geçmiş yarış verisi YOK (kullanılamaz — veri yok). Yalnız J_SEVIYE + GALOP_KAPASITE; segment-özel katsayı. Kazanç ortak β'da %3,2, segment-özel β'da %7,2." },
+  HANDIKAP: { ad: "Handikap", kapali: [], ilkStart: false, etki: "orta", not: "Altı bileşenin hepsi hesaplanır. GALOP_KAPASITE'nin özgün katkısı galop kapsamlı dönemde pozitif gösterilemedi (kanıtlanmadı; zararlı olduğu anlamına GELMEZ); hafif kilo × iyi galop hipotezi doğrulanmadı ama çürütülmedi. Keşifte kazanç %7,6–8,8." },
+  KV: { ad: "KV", kapali: [], ilkStart: false, etki: "orta", not: "Altı bileşenin hepsi hesaplanır. T_SON özgün katkısı keşifte pozitif gösterilemedi (kanıtlanmadı). Keşifte kazanç %7,8–8,5." },
+  GRUP_SATIS: { ad: "Grup + Satış", kapali: [], ilkStart: false, etki: "yüksek", not: "Altı bileşenin hepsi hesaplanır. T_SON özgün katkısı keşifte pozitif gösterilemedi (kanıtlanmadı). Örneklem küçük (~250 yarış). Keşifte kazanç %9,7–11,8." },
+  DIGER: { ad: "Diğer", kapali: [], ilkStart: false, etki: "yetersiz kanıt", not: "Tanınmayan/seyrek tip: altı bileşen hesaplanır. Kanıt yok." },
+};
+
+export type KanitDurumu = "etkili" | "izlenir" | "kanıtlanmadı" | "yetersiz örnek" | "veri yok";
+/** Keşif dönemindeki özgün katkı kanıtı (SINYAL_SETI_RAPORU; GALOP için galop kapsamlı dönem). YALNIZ BİLGİ: hiçbir sinyali KAPATMAZ. 'kanıtlanmadı' ≠ zararlı. */
+export const KANIT: Record<TurGrubu, Record<F6Sinyal, KanitDurumu>> = {
+  MAIDEN: { acc: "etkili", kap: "etkili", S: "etkili", h2h: "kanıtlanmadı", sY: "etkili", sT: "etkili" },
+  SARTLI_345: { acc: "etkili", kap: "izlenir", S: "etkili", h2h: "izlenir", sY: "etkili", sT: "izlenir" },
+  SARTLI_219: { acc: "yetersiz örnek", kap: "yetersiz örnek", S: "etkili", h2h: "yetersiz örnek", sY: "yetersiz örnek", sT: "yetersiz örnek" },
+  SARTLI_127: { acc: "veri yok", kap: "etkili", S: "etkili", h2h: "veri yok", sY: "veri yok", sT: "veri yok" },
+  HANDIKAP: { acc: "etkili", kap: "kanıtlanmadı", S: "etkili", h2h: "etkili", sY: "etkili", sT: "etkili" },
+  KV: { acc: "izlenir", kap: "izlenir", S: "etkili", h2h: "etkili", sY: "etkili", sT: "kanıtlanmadı" },
+  GRUP_SATIS: { acc: "etkili", kap: "izlenir", S: "etkili", h2h: "etkili", sY: "izlenir", sT: "kanıtlanmadı" },
+  DIGER: { acc: "yetersiz örnek", kap: "yetersiz örnek", S: "yetersiz örnek", h2h: "yetersiz örnek", sY: "yetersiz örnek", sT: "yetersiz örnek" },
 };
 
 /** TJK sınıf adından tip grubu (araştırma düzeneğiyle BİREBİR: ilk '/' öncesi, büyük harf, sıralı kontrol; Şartlı numarası tam ad üzerinden). */

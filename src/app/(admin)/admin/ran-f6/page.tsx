@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import RanF6YarisPaneli from "@/components/admin/RanF6YarisPaneli";
-import { F6_SINYAL_ADLARI, F6_SINYALLER, TUR_AYAR, type TurGrubu } from "@/lib/methodology/ran-f6/ran-f6-model";
+import { F6_SINYAL_ADLARI, F6_SINYALLER, KANIT, TUR_AYAR, type TurGrubu } from "@/lib/methodology/ran-f6/ran-f6-model";
 import { RAN_F6_EGITIM, RAN_F6_KATSAYI_SURUMU } from "@/lib/methodology/ran-f6/ran-f6-katsayilar";
 import { ranF6Aktif, ranF6Hesapla, ranF6KayitliOku } from "@/server/services/ran-f6.service";
 import { ranF6BayrakDegistirAction } from "@/server/actions/ran-f6.actions";
@@ -39,19 +39,19 @@ export default async function RanF6Sayfasi({ searchParams }: { searchParams: Pro
       </form>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-bold">Yarış tiplerine göre sinyal kullanımı</h2>
+        <h2 className="text-sm font-bold">Yarış tiplerine göre sinyal durumu (kanıt bilgisi — hiçbir sinyal kapatılmaz)</h2>
         <div className="overflow-x-auto rounded-lg border">
           <table className="w-full text-xs">
             <thead><tr className="border-b bg-muted/30 text-muted-foreground"><th className="px-2 py-1.5 text-left">Yarış tipi</th><th className="px-2 py-1.5 text-left">Etki düzeyi</th>{F6_SINYALLER.map((c) => <th key={c} className="px-2 py-1.5 text-center">{F6_SINYAL_ADLARI[c]}</th>)}<th className="px-2 py-1.5 text-left">Not</th></tr></thead>
             <tbody>
               {(Object.keys(TUR_AYAR) as TurGrubu[]).map((t) => { const a = TUR_AYAR[t]; const kul = a.ilkStart ? (["S", "kap"] as const).slice() as string[] : F6_SINYALLER.filter((c) => !a.kapali.includes(c)) as string[];
                 return (<tr key={t} className="border-b last:border-0 align-top"><td className="px-2 py-1.5 font-medium">{a.ad}</td><td className="px-2 py-1.5">{a.etki}</td>
-                  {F6_SINYALLER.map((c) => <td key={c} className="px-2 py-1.5 text-center">{kul.includes(c) ? <span className="text-hit">kullanılır</span> : <span className="text-muted-foreground/60">{a.ilkStart ? "kullanılamaz" : "kapalı"}</span>}</td>)}
+                  {F6_SINYALLER.map((c) => <td key={c} className="px-2 py-1.5 text-center">{kul.includes(c) ? <span className={KANIT[t][c] === "etkili" ? "text-hit" : "text-muted-foreground"}>hesaplanır · {KANIT[t][c]}</span> : <span className="text-muted-foreground/60">kullanılamaz (veri yok)</span>}</td>)}
                   <td className="px-2 py-1.5 text-[11px] text-muted-foreground">{a.not}</td></tr>); })}
             </tbody>
           </table>
         </div>
-        <p className="text-[10px] text-muted-foreground">Kural (önceden bildirildi): sinyal bir tipte AKTİF = özgün katkı ΔLL% noktası &gt; 0 (GALOP için galop kapsamlı dönem); ≤ 0 → kapalı; örneklemi yetersiz tipte (Şartlı 2/19) maske yok; Şartlı 1/27 yalnız J_SEVIYE + GALOP. Keşif dönemi verisiyle türetildi; ileri-yönlü izleme gerekir.</p>
+        <p className="text-[10px] text-muted-foreground">Kullanıcı kararı (2026-11-18): tip bazlı ek kapatma YOK; beş sinyal ailesi veri varsa her tipte hesaplanır. &quot;Kanıtlanmadı&quot; = keşifte özgün katkısı pozitif gösterilemedi; zararlı demek DEĞİL. Yalnız ilk kez koşan atlarda (Şartlı 1/27) geçmiş yarış gerektiren sinyaller doğal olarak yoktur. Keşif verisidir; ileri-yönlü izleme gerekir.</p>
       </section>
 
       <section className="space-y-2">

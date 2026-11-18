@@ -11,7 +11,7 @@ function hamBicim(c: F6Sinyal, v: number | null | undefined): string {
 function katkiRenk(x: number): string { return x > 0.05 ? "text-hit" : x < -0.05 ? "text-miss" : "text-muted-foreground"; }
 
 function Hucre({ y, a, c }: { y: RanF6YarisKaydi; a: RanF6AtKaydi; c: F6Sinyal }) {
-  if (!y.kullanilan.includes(c)) return <td className="px-2 py-1.5 text-center text-[10px] text-muted-foreground/60">{y.model === "ILK_START" ? "kullanılamaz" : "kapalı"}</td>;
+  if (!y.kullanilan.includes(c)) return <td className="px-2 py-1.5 text-center text-[10px] text-muted-foreground/60">kullanılamaz (veri yok)</td>;
   if (a.eksik.includes(c)) return <td className="px-2 py-1.5 text-center text-[10px] text-muted-foreground">veri yok</td>;
   const k = a.katki[c] ?? 0;
   return (<td className="px-2 py-1.5 text-center tabular-nums"><div>{hamBicim(c, a.ham[c])}</div><div className={cn("text-[10px]", katkiRenk(k))}>{k >= 0 ? "+" : ""}{k.toFixed(2)}</div></td>);
@@ -30,7 +30,7 @@ export default function RanF6YarisPaneli({ y }: { y: RanF6YarisKaydi }) {
           <span className="rounded bg-muted px-1.5 py-0.5">Sürüm {y.surum}</span>
         </div>
       </div>
-      <p className="text-[11px] text-muted-foreground">{y.turNotu}{kapaliAd ? ` · Bu tipte KAPALI/kullanılamaz: ${kapaliAd}.` : ""}</p>
+      <p className="text-[11px] text-muted-foreground">{y.turNotu}{kapaliAd ? ` · Bu yarışta kullanılamaz (veri yok): ${kapaliAd}.` : ""}</p>
       {y.uyari && <p className="text-[11px] text-amber-500">{y.uyari}</p>}
       <div className="overflow-x-auto">
         <table className="w-full text-xs">

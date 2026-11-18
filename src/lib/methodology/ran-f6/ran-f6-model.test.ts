@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { F6_SINYALLER, TUR_AYAR, hesaplaF6, turGrubu, type F6AtGirdisi, type F6Sinyal, type TurGrubu } from "./ran-f6-model";
+import { F6_SINYALLER, KANIT, TUR_AYAR, hesaplaF6, turGrubu, type F6AtGirdisi, type F6Sinyal, type TurGrubu } from "./ran-f6-model";
 import { RAN_F6_BETA_ANA, RAN_F6_BETA_ILK_START, RAN_F6_KOLONLAR, RAN_F6_OLCEK, RAN_F6_TAU } from "./ran-f6-katsayilar";
 
 const at = (d: Partial<Record<F6Sinyal, number | null>>): F6AtGirdisi => ({ deger: d });
@@ -25,9 +25,13 @@ describe("RAN F6 — saf model", () => {
     const tek = [at({ acc: 18, kap: 0.5, S: 0.1 }), at({ acc: null, kap: 0.5, S: 0.1 }), at({ acc: null, kap: 0.5, S: 0.1 })]; const r = hesaplaF6(tek, "SARTLI_345"); for (const a of r.atlar) expect(a.katki.acc).toBeCloseTo(0, 12); expect(r.atlar[1]!.eksik).toContain("acc"); expect(r.atlar[0]!.eksik).not.toContain("acc");
     const ikili = [at({ acc: 18 }), at({ acc: 16 }), at({ acc: null })]; const r2 = hesaplaF6(ikili, "SARTLI_345"); expect(r2.atlar[2]!.katki.acc).toBeCloseTo(0, 12); expect(r2.atlar[0]!.katki.acc!).toBeGreaterThan(0);
   });
-  it("tip maskesi: Handikap'ta GALOP verilse bile KULLANILMAZ; Maiden'de H2H kullanılmaz; KV'de T_SON kullanılmaz", () => {
-    const s = SAHA(); const a = hesaplaF6(s, "HANDIKAP"); expect(a.kullanilan).not.toContain("kap"); expect(a.kapali).toContain("kap"); const s2 = SAHA().map((x) => at({ ...x.deger, kap: 0.99 })); const b = hesaplaF6(s2, "HANDIKAP"); a.atlar.forEach((x, i) => expect(b.atlar[i]!.olasilik).toBeCloseTo(x.olasilik, 12));
-    expect(hesaplaF6(SAHA(), "MAIDEN").kullanilan).not.toContain("h2h"); expect(hesaplaF6(SAHA(), "KV").kullanilan).not.toContain("sT"); expect(hesaplaF6(SAHA(), "SARTLI_345").kullanilan.length).toBe(6);
+  it("TİP BAZLI KAPATMA YOK: ilk start dışında HER tipte altı bileşen hesaplanır; Handikap'ta GALOP, Maiden'de H2H, KV'de T_SON olasılığı DEĞİŞTİRİR", () => {
+    for (const tur of ["MAIDEN", "SARTLI_345", "SARTLI_219", "HANDIKAP", "KV", "GRUP_SATIS", "DIGER"] as const) { expect(hesaplaF6(SAHA(), tur).kullanilan.length).toBe(6); expect(hesaplaF6(SAHA(), tur).kapali).toEqual([]); expect(TUR_AYAR[tur].kapali).toEqual([]); }
+    const taban = hesaplaF6(SAHA(), "HANDIKAP"); const galopDegisti = hesaplaF6(SAHA().map((x) => at({ ...x.deger, kap: x.deger.kap == null ? null : 1 - (x.deger.kap as number) })), "HANDIKAP"); expect(taban.atlar.some((a, i) => Math.abs(a.olasilik - galopDegisti.atlar[i]!.olasilik) > 1e-6)).toBe(true);
+    const h2hDegisti = hesaplaF6(SAHA().map((x) => at({ ...x.deger, h2h: x.deger.h2h == null ? null : -(x.deger.h2h as number) })), "MAIDEN"); expect(hesaplaF6(SAHA(), "MAIDEN").atlar.some((a, i) => Math.abs(a.olasilik - h2hDegisti.atlar[i]!.olasilik) > 1e-6)).toBe(true);
+  });
+  it("kanıt tablosu YALNIZ BİLGİ: her tip × sinyal tanımlı; kanıtlanmamış sinyal bile hesaplanır", () => {
+    for (const tur of Object.keys(TUR_AYAR) as TurGrubu[]) for (const c of F6_SINYALLER) expect(KANIT[tur][c]).toBeTruthy(); expect(KANIT.HANDIKAP.kap).toBe("kanıtlanmadı"); expect(hesaplaF6(SAHA(), "HANDIKAP").kullanilan).toContain("kap");
   });
   it("İLK START (Şartlı 1/27): yalnız J_SEVIYE + GALOP; diğer sinyaller verilse bile sonucu DEĞİŞTİRMEZ", () => {
     const s = SAHA(); const r = hesaplaF6(s, "SARTLI_127"); expect(r.model).toBe("ILK_START"); expect([...r.kullanilan].sort()).toEqual(["S", "kap"]); const s2 = SAHA().map((x) => at({ S: x.deger.S, kap: x.deger.kap, acc: 99, h2h: 5, sY: 1, sT: 1 })); const r2 = hesaplaF6(s2, "SARTLI_127"); r.atlar.forEach((x, i) => expect(r2.atlar[i]!.olasilik).toBeCloseTo(x.olasilik, 12)); for (const a of r.atlar) expect(Object.keys(a.katki).sort()).toEqual(["S", "kap"]);
@@ -44,8 +48,8 @@ describe("RAN F6 — saf model", () => {
     const o: [string, TurGrubu][] = [["Maiden/DHÖW", "MAIDEN"], ["ŞARTLI 1/DHÖW/Dişi", "SARTLI_127"], ["ŞARTLI 27/Dişi", "SARTLI_127"], ["ŞARTLI 4/DHÖW/Y2", "SARTLI_345"], ["ŞARTLI 5", "SARTLI_345"], ["ŞARTLI 3", "SARTLI_345"], ["ŞARTLI 19", "SARTLI_219"], ["ŞARTLI 2", "SARTLI_219"], ["ŞARTLI 11", "DIGER"], ["Handikap 15 /H2", "HANDIKAP"], ["Handikap 16/DHÖW /H1", "HANDIKAP"], ["KV-6", "KV"], ["KV-9/DHÖW", "KV"], ["G 2", "GRUP_SATIS"], ["SATIŞ 1/DHÖW", "GRUP_SATIS"], ["—", "DIGER"], ["", "DIGER"]];
     for (const [ad, beklenen] of o) expect(turGrubu(ad), ad).toBe(beklenen);
   });
-  it("her tipin ayarı tanımlı; kapalı sinyaller geçerli; ilk-start yalnız Şartlı 1/27", () => {
-    for (const [tur, a] of Object.entries(TUR_AYAR)) { expect(a.ad.length).toBeGreaterThan(0); for (const c of a.kapali) expect(F6_SINYALLER).toContain(c); expect(a.ilkStart).toBe(tur === "SARTLI_127"); } expect(TUR_AYAR.SARTLI_127.kapali).toEqual(expect.arrayContaining(["acc", "h2h", "sY", "sT"]));
+  it("her tipin ayarı tanımlı; ilk-start yalnız Şartlı 1/27; yalnız ilk-start'ta 'kapalı' (veri yok) listesi var", () => {
+    for (const [tur, a] of Object.entries(TUR_AYAR)) { expect(a.ad.length).toBeGreaterThan(0); for (const c of a.kapali) expect(F6_SINYALLER).toContain(c); expect(a.ilkStart).toBe(tur === "SARTLI_127"); if (tur !== "SARTLI_127") expect(a.kapali).toEqual([]); } expect(TUR_AYAR.SARTLI_127.kapali).toEqual(expect.arrayContaining(["acc", "h2h", "sY", "sT"]));
   });
   it("yapısal: saf dosya (db/ağ/saat/rastgele import ETMEZ); SON6/AGF/eski motor referansı YOK", () => {
     const kod = fs.readFileSync(path.join(__dirname, "ran-f6-model.ts"), "utf8").split("\n").filter((l) => !l.trim().startsWith("//")).join("\n"); for (const m of kod.matchAll(/from\s+["']([^"']+)["']/g)) expect(m[1]).toBe("./ran-f6-katsayilar");
