@@ -139,6 +139,50 @@ Her satır, yalnızca o popülasyondaki atlara uygulanan pedigri özelliği (di�
 | LOO PED_SIRE | ✓ 0.04% (++) | ○ 0.03% (++) | ○ 0.04% (++) | ○ 0.04% (++) | ○ 0.06% (−+) | ○ -0.11% (−−) | ○ 0.21% (++) |
 | LOO PED_DAMSIRE | ○ -0.00% (−+) | ○ -0.01% (+−) | ○ 0.00% (−+) | ○ 0.00% (++) | ○ -0.03% (−+) | ○ -0.04% (−−) | ○ 0.01% (−+) |
 
+## 7. SADECE Şartlı 1 ve Şartlı 27 (kullanıcı isteği)
+Bu iki sınıfın test yarışı sayısı: **Şartlı 1: 164; Şartlı 27: 11; birlikte: 175** (tüm yarışlarda eğitilmiş ortak β ile bu yarışlara dilimlenerek değerlendirildi; yalnız bu yarışlarda ayrı model eğitilmedi). Veritabanında toplam Şartlı 1 = 183 ve Şartlı 27 = 11 yarış var; **Şartlı 27 çıkarım için fazla küçüktür (yetersiz n).** Aşağıdaki aralıklar çok geniştir; ✓/✗ yokluğu 'etki yok' değil 'ölçülemedi' demektir.
+| Karşılaştırma | Şartlı 1 (n=164) | Şartlı 27 (n=11) | Şartlı 1 + 27 (n=175) |
+|---|---|---|---|
+| PED_SIRE → B6 (k=30) | ○ 0.18% (−+) | — (n<30) | ○ 0.16% (−+) |
+| PED_DAM → B6 (k=30) | ○ 0.08% (+−) | — (n<30) | ○ 0.06% (+−) |
+| PED_DAMSIRE → B6 (k=30) | ○ -0.00% (+−) | — (n<30) | ○ -0.01% (+−) |
+| Üçü birlikte → B6 (k=30) | ○ 0.18% (++) | — (n<30) | ○ 0.15% (++) |
+| PED_SIRE → B6 (k=10) | ○ 0.20% (−+) | — (n<30) | ○ 0.19% (−+) |
+| Üçü birlikte → B6 (k=10) | ○ 0.28% (++) | — (n<30) | ○ 0.24% (++) |
+| Üçü birlikte → cB6 (k=30) | ○ 0.17% (++) | — (n<30) | ○ 0.14% (++) |
+
+**Aynı yarışlarda mevcut havuzun özgün katkısı (B6 − sinyalsiz model; ΔLL%):**
+| Sinyal | Şartlı 1 (n=164) | Şartlı 27 (n=11) | Şartlı 1 + 27 (n=175) |
+|---|---|---|---|
+| ACC_HIZ | ✗ -0.05% (−−) | — (n<30) | ✗ -0.05% (−−) |
+| GALOP_KAPASITE | ○ -0.19% (−−) | — (n<30) | ○ -0.48% (−−) |
+| J_SEVIYE | ✓ 3.09% (++) | — (n<30) | ✓ 3.22% (++) |
+| SON6 | ✗ -0.49% (−−) | — (n<30) | ✗ -0.51% (−−) |
+| H2H_NET | ✗ -0.38% (−−) | — (n<30) | ✗ -0.45% (−−) |
+| Y_son | ✓ 0.03% (−+) | — (n<30) | ✓ 0.04% (−+) |
+| T_son | ✗ -0.03% (−−) | — (n<30) | ✗ -0.03% (−−) |
+
+**Top1/Top3 (Şartlı 1 + 27, birlikte):**
+| Karşılaştırma | ΔLL% [%95] | ΔTop1 p [%95] | ΔTop3 p [%95] |
+|---|---|---|---|
+| PED_SIRE → B6 (k=30) | ○ 0.16 [-0.07; 0.39] | -0.6 [-4.6; 2.9] | -2.9 [-7.4; 1.1] |
+| Üçü birlikte → B6 (k=30) | ○ 0.15 [-0.24; 0.57] | 2.3 [-2.9; 7.4] | -0.6 [-5.7; 4.6] |
+| SON6 özgün katkı | ✗ -0.51 [-0.67; -0.36] | -0.6 [-1.7; 0.0] | 0.0 [-1.7; 1.7] |
+| Y_son özgün katkı | ✓ 0.04 [0.02; 0.06] | 0.0 [0.0; 0.0] | 0.6 [0.0; 1.7] |
+| T_son özgün katkı | ✗ -0.03 [-0.05; -0.01] | 0.0 [0.0; 0.0] | 0.6 [0.0; 1.7] |
+
+**B6 modeli bu yarışlarda:** kazanç 2.63%, Top1 22.3%, Top3 55.4%; rastgele (1/N) Top1 11.2%.
+
+**Betimleyici: Şartlı 1 + 27 test yarışlarında pedigri üçte biri → B6 beklentisine göre kazanma** (üçte birler bu yarışlardaki bileşen değerine göre; z = (kazanan − ΣP)/√ΣP(1−P)):
+| Bileşen | Üçte bir | n at | Kazanan | Beklenen (B6) | z |
+|---|---|---|---|---|---|
+| PED_SIRE | alt | 554 | 53 | 56.8 | -0.54 |
+| PED_SIRE | orta | 557 | 56 | 57.5 | -0.21 |
+| PED_SIRE | üst | 556 | 66 | 60.7 | 0.73 |
+| PED_DAMSIRE | alt | 555 | 42 | 56.0 | -1.98 |
+| PED_DAMSIRE | orta | 555 | 68 | 59.5 | 1.17 |
+| PED_DAMSIRE | üst | 557 | 65 | 59.5 | 0.76 |
+
 ## Sınırlar ve dürüst notlar
 - **Keşif sonucudur;** A/B/C dönemi tekrar kullanıldı. Tanım/parametre dondurulduktan sonra `--after` ile ileri-yönlü doğrulama yapılacaktır.
 - Yavru performansı yalnızca veritabanımızdaki atların soy bilgisi ve bu atların önbellekteki startlarından gelir (7 bin at; soy hatları kısmi, anne hattı çok seyrek). Soy hattı verisi, atın kendi startlarından çıkarılmış olsa da kardeşler/ortak sahip/antrenör/yarış tarihi örtüşmesi gibi dolaylı çift sayımlar ayrıca ölçülmedi. Hat başına ağır sahip/antrenör etkisi (aynı ahırın yavruları) kontrol edilmedi.
