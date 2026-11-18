@@ -24,8 +24,11 @@
 ## 4. İleri-yönlü doğrulama
 - **Komut:** `node --env-file=.env node_modules/tsx/dist/cli.mjs arac-son-yaris.mts --after 2026-11-18` → `SON_YARIS_DOGRULAMA_2026-11-18.md` (β yalnız ≤ 2026-11-18 yarışlarından, test yalnız sonrasında, tüm koşu tipleri).
 - **Yeterlilik (kullanıcı kararı):** 150 test yarışında ara rapor (bilgi amaçlı), **300 yarışta ana değerlendirme.** (Tüm tiplerde günde ~25–30 yarış → 300 yarış birkaç gün; tip/H15–16 dilimleri daha uzun sürer.)
-- **Birincil kriter (öneri, ⚠ onaya tabi):** Y+T'nin **SON6+H2H üzerine** ve **kc (cB5 + önceki yarış kontrolleri) üzerine** ΔLL% %95 alt sınırlarının ikisinin de > 0 olması; ikincil: T|Y ve Y|T ayrı ayrı (P1). Aralık sıfırı içeriyorsa "doğrulanamadı".
+- **Birincil kriter (KULLANICI ONAYI 2026-11-18):** Y+T'nin **SON6+H2H üzerine** ve **kc (cB5 + önceki yarış kontrolleri) üzerine** ΔLL% %95 alt sınırlarının ikisinin de > 0 olması; ikincil: T|Y ve Y|T ayrı ayrı (P1). Aralık sıfırı içeriyorsa "doğrulanamadı".
 - Eski A/B/C testleri bu karar için kullanılmaz. Doğrulama verisiyle tanım, eşik veya model seçimi YAPILMAZ.
 
 ## 5. Bilinen sınırlar
 Önceki yarıştaki sahanın büyüklüğü ve temposu yalnız veritabanındaki 2026 yarışlarında kısmen kontrol edildi; talih/pace/yarış gidişatı ayrıca modellenmedi. Keşif dönemi (A/B/C) tekrar kullanılmıştır; çoklu karşılaştırma düzeltilmedi; doğrusal-logit ve ortak β varsayımı geçerli. Önbellek `hp` hizalama tuzağı (yarış-sonrası puan) bu adayı etkilemez (yalnız bitiş sırası kullanılır).
+
+## 6. Kullanıcı kararı (2026-11-18)
+Birincil doğrulama kriteri onaylandı. Y_son (B5 üzerine T'ye eklediği +0,49% ΔLL) ve T_son (Y'ye eklediği +0,35% ΔLL) araştırma aşamasında **birlikte korunur**; ikisi de SON6 ve H2H'den farklı bilgi taşıyor. Galop kapsamlı dönemde T'nin katkısı zayıf göründüğü için doğrulamada ayrıca izlenir. Aktif sinyal sayısı 0.
