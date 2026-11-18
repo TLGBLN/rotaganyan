@@ -42,3 +42,10 @@
 
 ## 6. Yasaklar
 Formül/eşik/parametre seçimi için doğrulama verisini kullanmak; sonuca göre sınıf sınırlarını, pencereleri veya λ'yı değiştirmek; ΔHP'yi diğer koşu tiplerine otomatik uygulamak; AGF'yi sinyal havuzuna katmak (2026-11-14 / 2026-11-18 kararları).
+
+## 7. Kullanıcı kararları (2026-11-18, ⚠ maddeler onaylandı) ve güncel durum
+- **ΔHP bağımsız sinyal olarak korunmuyor** (önceki yarış sonucu modeldeyken ek katkısı 0,00%); "SON6/önceki yarış sonucunun vekili" olarak bekletiliyor. Ana sınama **cR üzerine**; yeterlilik: **150 test yarışı ara rapor, 300 yarış ana değerlendirme**.
+- **cR → SON_YARIS_SONUCU yeni aday** (Y_son: son yarışta 1.; T_son: 2.–3.). SON6 ve H2H_NET üzerine ek katkı vermezse ayrı sinyal kabul edilmez. Araç: `arac-son-yaris.mts` (`--after` modu var). Yarıştan geçen gün ve önceki rakip kalitesi kontrol edilir.
+- **GALOP × hafif kilo — onaylı birleşik karar kuralı (eşikler değişmez):** (1) ana hücre ≥150 at ve ≥100 yarış; (2) z ≥ +2; (3) yarış-kümesi bootstrap %95 alt sınırı > 0 (hücre ve ana − hafif∧zayıf farkı); (4) mevcut sinyaller (B5 ve kontrollü) üzerine ek ΔLL% alt sınırı > 0. Araç: `arac-galop-hafif-kilo.mts` (`--after` modu var).
+- **Keşif başlangıç değerleri (doğrulama DEĞİL):** koşul 1–3 sağlandı (1.408 at / 463 yarış, z=+3,91, küme alt sınırı +1,52 ve fark alt sınırı +0,88); **koşul 4 sağlanmadı** (HAIG, B5 üzerine ΔLL% 0,38 [−0,13; 0,90]; kontrollü 0,66 [−0,05; 1,31]; B5 + göreli kilo üzerine 0,03 [−0,22; 0,29]). Yani hücrenin beklenti üstü kazanması, galopsuz modelin kiloyu bilmemesinden de kaynaklanıyor olabilir.
+- **Veri doğrulaması (HP hizalaması):** TJK geçmiş program sayfası erişilemedi (504). Bağımsız iç doğrulama: tahmin anında saklanan hpRel ile Runner.hp 51 yarışta (391 at çifti) %100 uyuşuyor, ancak yalnız 1'i handikap; önceki yarışa taşınan puan için Runner.hp(k) = önceki satır hp'si %99. **ΔHP raporu kesin kabul edilmemiştir; geniş doğrulama (TJK sayfası veya program-anı hp'sinin ayrıca saklanması) bekleniyor.**
