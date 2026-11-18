@@ -18,3 +18,6 @@ CREATE INDEX "RanF6Analiz_raceId_idx" ON "RanF6Analiz"("raceId");
 -- CreateIndex
 CREATE UNIQUE INDEX "RanF6Analiz_raceId_surum_key" ON "RanF6Analiz"("raceId", "surum");
 
+
+-- Row Level Security: yalniz sunucu (postgres, BYPASSRLS) kullanir; anon/authenticated erisemez. Politika YOK.
+ALTER TABLE "RanF6Analiz" ENABLE ROW LEVEL SECURITY;
